@@ -323,6 +323,37 @@
   .copy-wait{font-size:13px;color:var(--c-foto);font-weight:700;margin-top:12px}
   .tpill.cev{background:rgba(255,176,46,.16);color:var(--c-foto)}
   .tpill.cok{background:rgba(54,211,153,.16);color:var(--c-trafego)}
+  .posts-link{width:100%;margin:14px 0 2px;background:var(--surface);border:1px solid var(--line);
+    color:var(--ink);font-size:13.5px;font-weight:800;padding:14px;border-radius:14px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:9px}
+  .posts-link svg{width:18px;height:18px;color:var(--accent)}
+  .posts-link:active{transform:scale(.99)}
+  .post-view{margin-top:20px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:16px;padding:16px}
+  .post-view .tt{font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
+  .post-meta{font-size:13px;color:var(--ink-soft);font-weight:600;line-height:1.55;margin-bottom:12px}
+  .post-badge.ok{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:800;
+    background:rgba(54,211,153,.14);color:var(--c-trafego);padding:8px 14px;border-radius:999px}
+  .post-pls{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .post-tg{display:flex;gap:10px}
+  .ptog{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);
+    border:1px solid var(--line);color:var(--ink-soft);font-size:13px;font-weight:800;
+    padding:13px;border-radius:13px;cursor:pointer;transition:.15s}
+  .ptog svg{width:18px;height:18px}
+  .ptog:active{transform:scale(.96)}
+  .ptog.ig.on{background:rgba(214,73,156,.16);border-color:rgba(214,73,156,.5);color:#e879c7}
+  .ptog.fb.on{background:rgba(77,159,255,.16);border-color:rgba(77,159,255,.5);color:#6db3ff}
+  .pch{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;
+    padding:6px 11px;border-radius:999px}
+  .pch svg{width:14px;height:14px}
+  .pch.ig{background:rgba(214,73,156,.16);color:#e879c7}
+  .pch.fb{background:rgba(77,159,255,.16);color:#6db3ff}
+  .pch.none{background:var(--surface);color:var(--ink-faint)}
+  .plog{padding:12px 0;border-top:1px solid var(--line-soft);cursor:pointer}
+  .plog:first-of-type{border-top:none;padding-top:2px}
+  .plog:active{opacity:.7}
+  .plog-t{font-size:14px;font-weight:800;letter-spacing:-.01em;margin-bottom:7px}
+  .plog-m{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .plog-dt{font-size:11.5px;color:var(--ink-faint);font-weight:700;margin-left:auto}
   .dash-btn{width:100%;margin-top:18px;background:var(--grad-accent);color:var(--accent-ink);
     border:none;font-size:14.5px;font-weight:800;padding:16px;border-radius:15px;cursor:pointer;
     box-shadow:var(--sh-glow)}
@@ -669,7 +700,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 34 · build copywriter</div>
+    <div class="ver">versão 35 · build posts</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1228,7 +1259,7 @@ function switchTab(t){
   const a=t==="agenda";
   $("calControls").classList.toggle("hidden",!a);
   $("pageTitle").classList.toggle("hidden",a);
-  if(!a)$("ptText").textContent = t==="team"?"Equipe" : t==="board"?"Quadro de projetos" : t==="painel"?"Painel do gestor" : "Perfil";
+  if(!a)$("ptText").textContent = t==="team"?"Equipe" : t==="board"?"Quadro de projetos" : t==="painel"?"Painel do gestor" : t==="posts"?"Registro de Posts" : "Perfil";
   render();
 }
 function dbar(label,val,max,color,extra){
@@ -1316,6 +1347,9 @@ function render(){
   else if(tab==="team"){c.innerHTML=renderTeam();bindTeam();}
   else if(tab==="painel"){c.innerHTML=renderDashboard();
     var bp=$("backToProfile"); if(bp)bp.onclick=()=>switchTab("profile");}
+  else if(tab==="posts"){c.innerHTML=renderPostsLog();
+    var pb=$("postsBack"); if(pb)pb.onclick=()=>switchTab("board");
+    document.querySelectorAll(".plog[data-tid]").forEach(el=>el.onclick=()=>openTaskDetail(el.dataset.tid));}
   else{c.innerHTML=renderProfile();$("logoutBtn").onclick=logout;
     document.querySelectorAll(".cp-dot").forEach(b=>b.onclick=()=>setMyColor(b.dataset.color));
     var bb=$("backupBtn"); if(bb){ bb.onclick=exportBackup;
@@ -1533,6 +1567,7 @@ function renderBoard(){
   h+='<button class="chip '+(boardFilter==="late"?"on":"")+'" data-bf="late" style="border-color:rgba(255,90,77,.5);color:#ff8c83">⚠ Atrasadas'+(lateAll.length?" ("+lateAll.length+")":"")+'</button>';
   for(const k in SECTORS) h+='<button class="chip '+(boardFilter===k?"on":"")+'" data-bf="'+k+'"><span class="dot" style="background:'+SECTORS[k].color+'"></span>'+SECTORS[k].label+'</button>';
   h+='</div>';
+  h+='<button class="posts-link" id="goPostsLog"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg>Registro de Posts publicados</button>';
   const od=myOverdue();
   if(od.length){
     h+='<div class="od-banner"><div class="ttl"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Pendência urgente — '+od.length+' tarefa(s) atrasada(s)</div>'+
@@ -1587,6 +1622,7 @@ function tcard(t){
       '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
       (t.priority?'<span class="tpill prio2"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>PRIORITÁRIA</span>':'')+
       (t.sector==="copy"&&(t.copyState==="em_avaliacao"||t.copyState==="aprovado")?'<span class="tpill '+(t.copyState==="aprovado"?"cok":"cev")+'">'+(t.copyState==="aprovado"?"APROVADO":"EM AVALIAÇÃO")+'</span>':'')+
+      (t.sector==="postagem"&&t.posted?'<span class="tpill cok">POSTADO</span>':'')+
       (late?'<span class="tpill"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>ATRASADA</span>':'')+
       '<span class="tc-avw"><span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span><span class="tc-cdot" style="background:'+uc+'"></span></span>'+
     '</div>'+
@@ -1598,6 +1634,7 @@ function tcard(t){
 }
 function bindBoard(){
   document.querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{boardFilter=b.dataset.bf;render();});
+  var gpl=$("goPostsLog"); if(gpl)gpl.onclick=()=>switchTab("posts");
   document.querySelectorAll("[data-od]").forEach(b=>b.onclick=()=>openTaskDetail(b.dataset.od));
   document.querySelectorAll(".tcard[data-tid]").forEach(c=>c.onclick=()=>openTaskDetail(c.dataset.tid));
 }
@@ -1804,6 +1841,23 @@ function openTaskDetail(id){
     }
     copyHtml+='</div>';
   }
+  let postHtml="";
+  if(t.sector==="postagem"){
+    pIG=!!t.postIG; pFB=!!t.postFB;
+    postHtml='<div class="post-view"><div class="tt">Registro de publicação</div>';
+    if(t.posted){
+      postHtml+='<div class="post-badge ok"><svg viewBox="0 0 24 24" fill="none" style="width:15px;height:15px"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg> Postado'+(t.postedAt?(' · '+esc(fmtDT(t.postedAt))):'')+'</div>'+
+        '<div class="post-pls">'+platformChips(t.postIG,t.postFB)+'</div>'+
+        '<button class="done-toggle" data-pundo="1" style="background:var(--surface);border-color:var(--line);color:var(--ink-soft);margin-top:12px">Desfazer registro</button>';
+    } else {
+      postHtml+='<div class="post-meta">Selecione onde foi postado e informe o horário, depois marque como postado.</div>'+
+        '<div class="post-tg"><button type="button" class="ptog ig'+(pIG?" on":"")+'" data-ptog="ig">'+IG_SVG+'Instagram</button>'+
+        '<button type="button" class="ptog fb'+(pFB?" on":"")+'" data-ptog="fb">'+FB_SVG+'Facebook</button></div>'+
+        '<div class="r2" style="margin-top:12px"><input id="pDate" type="date"><input id="pTime" type="time"></div>'+
+        '<button class="done-toggle" data-ppost="1" style="background:rgba(54,211,153,.12);border-color:rgba(54,211,153,.32);color:var(--c-trafego);margin-top:12px"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Marcar como postado</button>';
+    }
+    postHtml+='</div>';
+  }
   $("taskDetailBody").innerHTML=
     (t.priority?'<div class="od-flag" style="background:rgba(255,176,46,.14);border-color:rgba(255,176,46,.45);color:var(--c-foto)"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>TAREFA PRIORITÁRIA — definida pela coordenação. Tratar com urgência.</span></div>':'')+
     (late?'<div class="od-flag"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>PENDÊNCIA URGENTE — esta tarefa está atrasada. Conclua para liberar as demais.</span></div>':'')+
@@ -1819,9 +1873,18 @@ function openTaskDetail(id){
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Responsável",esc(t.assignee))+
     di('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Link / Anexo",linkHtml)+
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Criado por",u?esc(u.name):"—")+
-    '</div>'+cronHtml+copyHtml+chkHtml+trackHtml;
+    '</div>'+cronHtml+copyHtml+postHtml+chkHtml+trackHtml;
   $("taskDetailBody").querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveTask(id,b.dataset.mv));
   $("taskDetailBody").querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>setCopyState(id,b.dataset.cs));
+  $("taskDetailBody").querySelectorAll("[data-ptog]").forEach(b=>b.onclick=()=>{
+    if(b.dataset.ptog==="ig")pIG=!pIG; else pFB=!pFB; b.classList.toggle("on");
+  });
+  (function(){ var pd=$("pDate"),pt=$("pTime");
+    if(pd&&!pd.value){ var n=new Date(),p=x=>(x<10?"0":"")+x;
+      pd.value=n.getFullYear()+"-"+p(n.getMonth()+1)+"-"+p(n.getDate());
+      if(pt)pt.value=p(n.getHours())+":"+p(n.getMinutes()); } })();
+  var pPost=$("taskDetailBody").querySelector("[data-ppost]"); if(pPost)pPost.onclick=()=>markPosted(id);
+  var pUndo=$("taskDetailBody").querySelector("[data-pundo]"); if(pUndo)pUndo.onclick=()=>unmarkPosted(id);
   $("taskDetailBody").querySelectorAll("[data-tk]").forEach(b=>b.onclick=()=>toggleTaskChk(id,+b.dataset.tk));
   openSheet(taskDetailSheet);
 }
@@ -1925,6 +1988,73 @@ function openNotifs(){
 }
 $("hBell").onclick=openNotifs;
 $("notifClose").onclick=closeSheets;
+
+/* ===== Registro de Posts (setor Programação de posts) ===== */
+let pIG=false,pFB=false;
+var IG_SVG='<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg>';
+var FB_SVG='<svg viewBox="0 0 24 24" fill="none"><path d="M14 7h2V4h-2.5C11 4 10 5.6 10 7.5V10H8v3h2v8h3v-8h2.4l.6-3H13V8c0-.7.3-1 1-1Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+function platformChips(ig,fb){
+  var s="";
+  if(ig)s+='<span class="pch ig">'+IG_SVG+'Instagram</span>';
+  if(fb)s+='<span class="pch fb">'+FB_SVG+'Facebook</span>';
+  if(!s)s='<span class="pch none">— sem plataforma —</span>';
+  return s;
+}
+async function markPosted(id){
+  if(busy)return; var t=tasks.find(x=>x.id===id); if(!t||!db)return;
+  if(!pIG&&!pFB){ toast("Selecione Instagram e/ou Facebook"); return; }
+  var d=$("pDate"), tm=$("pTime");
+  if(!d||!d.value||!tm||!tm.value){ toast("Informe a data e a hora da postagem"); return; }
+  var ms=dtMs(d.value,tm.value);
+  busy=true;
+  try{
+    var prev=tasks.find(x=>x.id===id);
+    var upd={posted:true,postIG:!!pIG,postFB:!!pFB,postedAt:ms,postedDate:d.value,postedTime:tm.value,status:"concluido"};
+    Object.assign(upd,trackFields(prev,"concluido"));
+    await db.collection("tasks").doc(id).update(upd);
+    var lt=tasks.find(x=>x.id===id); if(lt)Object.assign(lt,upd);
+    if(detailTaskId===id && taskDetailSheet.classList.contains("open")) openTaskDetail(id);
+    if(!$("mainApp").classList.contains("hidden")&&(tab==="board"||tab==="posts"))render();
+    toast("Postagem registrada ✓");
+  }catch(e){ toast("Não foi possível registrar agora"); }
+  finally{ busy=false; }
+}
+async function unmarkPosted(id){
+  if(busy)return; if(!db)return; busy=true;
+  try{
+    await db.collection("tasks").doc(id).update({posted:false});
+    var lt=tasks.find(x=>x.id===id); if(lt)lt.posted=false;
+    if(detailTaskId===id && taskDetailSheet.classList.contains("open")) openTaskDetail(id);
+    if(!$("mainApp").classList.contains("hidden")&&(tab==="board"||tab==="posts"))render();
+    toast("Registro desfeito");
+  }catch(e){ toast("Não foi possível desfazer"); }
+  finally{ busy=false; }
+}
+function renderPostsLog(){
+  var all=tasks.filter(t=>t.sector==="postagem"&&t.posted);
+  var d0=new Date(), mS=new Date(d0.getFullYear(),d0.getMonth(),1).getTime(), mN=new Date(d0.getFullYear(),d0.getMonth()+1,1).getTime();
+  var mês=all.filter(t=>(t.postedAt||0)>=mS&&(t.postedAt||0)<mN).length;
+  var h='<div class="dash"><div class="dash-sub">Posts publicados · '+MO[d0.getMonth()].replace(/^./,x=>x.toUpperCase())+" "+d0.getFullYear()+'</div>';
+  h+='<div class="kpi-grid"><div class="kpi acc"><div class="n">'+all.length+'</div><div class="l">Posts registrados</div></div>'+
+     '<div class="kpi"><div class="n">'+mês+'</div><div class="l">Postados no mês</div></div></div>';
+  if(!all.length){
+    h+='<div class="empty" style="padding:46px 10px"><div class="ic"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/></svg></div><p>Nenhum post registrado ainda</p><span>No Quadro, abra uma tarefa de "Programação de posts" e marque como postado.</span></div>';
+  } else {
+    var byCli={};
+    all.forEach(function(t){ var c=(t.client||"Sem cliente").trim()||"Sem cliente"; (byCli[c]=byCli[c]||[]).push(t); });
+    Object.keys(byCli).sort(function(a,b){return a.localeCompare(b);}).forEach(function(c){
+      var arr=byCli[c].sort(function(a,b){return (b.postedAt||0)-(a.postedAt||0);});
+      h+='<div class="dash-sec"><div class="dash-h">'+esc(c)+' · '+arr.length+' post(s)</div>';
+      arr.forEach(function(t){
+        h+='<div class="plog" data-tid="'+t.id+'"><div class="plog-t">'+esc(t.title||"Post")+'</div>'+
+          '<div class="plog-m">'+platformChips(t.postIG,t.postFB)+'<span class="plog-dt">'+esc(t.postedAt?fmtDT(t.postedAt):"—")+'</span></div></div>';
+      });
+      h+='</div>';
+    });
+  }
+  h+='<button class="logout" id="postsBack" style="background:var(--surface);border-color:var(--line);color:var(--ink-soft)">← Voltar ao Quadro</button></div>';
+  return h;
+}
 scrim.onclick=closeSheets;$("formClose").onclick=closeSheets;$("detailClose").onclick=closeSheets;
 $("taskClose").onclick=closeSheets;$("taskDetailClose").onclick=closeSheets;
 let selType="gravacao";
