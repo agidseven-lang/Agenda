@@ -286,12 +286,15 @@
     color:#ff8c83;font-size:14px;font-weight:800;padding:15px;border-radius:14px;cursor:pointer}
   .bk-tip{font-size:11.5px;color:var(--ink-faint);font-weight:600;text-align:center;margin-top:9px;line-height:1.5;padding:0 6px}
   .cron-weeks{margin-top:14px;display:flex;flex-direction:column;gap:12px}
-  .cron-wk{background:var(--bg-2);border:1px solid var(--line-soft);border-radius:14px;padding:12px 13px}
-  .cron-wk-l{font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
-  .cron-wk textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;
-    padding:12px 13px;color:var(--ink);font-size:14px;outline:none;resize:none;min-height:70px;
-    line-height:1.5;font-family:inherit;transition:.16s}
-  .cron-wk textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(216,255,62,.13)}
+  .cron-wk{background:var(--bg-2);border:1px solid var(--line-soft);border-radius:14px;padding:13px 13px}
+  .cron-wk-l{font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+  .cron-fl{font-size:10px;font-weight:800;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px}
+  .cron-fl:first-of-type{margin-top:0}
+  .cron-wk input,.cron-wk textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:12px 13px;color:var(--ink);font-size:14px;outline:none;font-family:inherit;transition:.16s}
+  .cron-wk textarea{resize:none;min-height:64px;line-height:1.5}
+  .cron-wk input:focus,.cron-wk textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(216,255,62,.13)}
+  .cron-wk-v .cw-ti{font-size:14.5px;font-weight:800;letter-spacing:-.01em;margin-bottom:4px}
   .cron-view{margin-top:20px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:16px;padding:16px}
   .cron-view .tt{font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
   .cron-wk-v{border-top:1px solid var(--line-soft);padding:11px 0}
@@ -700,7 +703,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 35 · build posts</div>
+    <div class="ver">versão 36 · build cronograma-estruturado</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1664,6 +1667,7 @@ function cronWeekLabel(i,freq,ym){
   return "Semana "+(i+1)+" · dias "+a+"–"+b+"/"+mm;
 }
 function cronWeekCount(){ return selFreq==="semanal"?1 : selFreq==="quinzenal"?2 : weeksInMonth(cronMonthVal); }
+function cronNorm(x){ if(x&&typeof x==="object")return {t:(x.t||"")+"",d:(x.d||"")+""}; return {t:"",d:(x==null?"":(""+x))}; }
 function buildCronUI(){
   var fld=$("tCronFld"); if(!fld)return;
   var isCron=(selSector==="design");
@@ -1679,18 +1683,26 @@ function buildCronUI(){
   var mi=$("tCronMonth"); if(mi){ mi.value=cronMonthVal||"";
     mi.onchange=function(){ cronMonthVal=mi.value; buildCronUI(); }; }
   var n=cronWeekCount();
-  while(cronWeeks.length<n)cronWeeks.push("");
+  cronWeeks=cronWeeks.map(cronNorm);
+  while(cronWeeks.length<n)cronWeeks.push({t:"",d:""});
   if(cronWeeks.length>n)cronWeeks=cronWeeks.slice(0,n);
   var w=$("tCronWeeks"); w.innerHTML="";
   for(var i=0;i<n;i++){ (function(idx){
     var box=document.createElement("div"); box.className="cron-wk";
     var lab=document.createElement("div"); lab.className="cron-wk-l";
     lab.textContent=cronWeekLabel(idx,selFreq,cronMonthVal);
+    var l1=document.createElement("div"); l1.className="cron-fl"; l1.textContent="Tarefa / Título";
+    var ti=document.createElement("input");
+    ti.placeholder="Ex.: Post carrossel — lançamento";
+    ti.value=cronWeeks[idx].t||"";
+    ti.oninput=function(){ cronWeeks[idx].t=ti.value; };
+    var l2=document.createElement("div"); l2.className="cron-fl"; l2.textContent="Descrição / briefing";
     var ta=document.createElement("textarea");
-    ta.placeholder="Conteúdos da semana "+(idx+1)+" (temas, posts, formatos…)";
-    ta.value=cronWeeks[idx]||"";
-    ta.oninput=function(){ cronWeeks[idx]=ta.value; };
-    box.appendChild(lab); box.appendChild(ta); w.appendChild(box);
+    ta.placeholder="Temas, formatos, referências, instruções…";
+    ta.value=cronWeeks[idx].d||"";
+    ta.oninput=function(){ cronWeeks[idx].d=ta.value; };
+    box.appendChild(lab); box.appendChild(l1); box.appendChild(ti);
+    box.appendChild(l2); box.appendChild(ta); w.appendChild(box);
   })(i); }
 }
 function buildStageRow(){const g=$("tStageRow");g.innerHTML="";
@@ -1723,7 +1735,7 @@ function openTaskForm(t){
   selPrio=t?!!t.priority:false;
   selFreq=(t&&t.freq)?t.freq:"semanal";
   cronMonthVal=(t&&t.cronMonth)?t.cronMonth:"";
-  cronWeeks=(t&&Array.isArray(t.cronWeeks))?t.cronWeeks.slice():[];
+  cronWeeks=(t&&Array.isArray(t.cronWeeks))?t.cronWeeks.map(cronNorm):[];
   $("tPrioFld").style.display=(me&&me.admin)?"":"none";
   buildSecGrid();buildStageRow();renderChkEditor();buildRespChips();buildPrioToggle();buildCronUI();
   openSheet(taskSheet);
@@ -1756,7 +1768,7 @@ $("taskSave").onclick=async()=>{
   if(selSector==="design"){
     data.freq=selFreq;
     data.cronMonth=(selFreq==="mensal")?(cronMonthVal||""):"";
-    data.cronWeeks=cronWeeks.slice(0,cronWeekCount()).map(s=>(s||"").trim());
+    data.cronWeeks=cronWeeks.slice(0,cronWeekCount()).map(function(x){var o=cronNorm(x);return {t:(o.t||"").trim(),d:(o.d||"").trim()};});
   } else { data.freq=""; data.cronMonth=""; data.cronWeeks=[]; }
   try{
     if(editTaskId){
@@ -1813,9 +1825,12 @@ function openTaskDetail(id){
   if(t.sector==="design"){
     var fqL=t.freq==="quinzenal"?"Quinzenal":t.freq==="mensal"?"Mensal":"Semanal";
     cronHtml='<div class="cron-view"><div class="tt">Cronograma · '+fqL+((t.freq==="mensal"&&t.cronMonth)?(' · '+esc(t.cronMonth)):'')+'</div>';
-    var ws=Array.isArray(t.cronWeeks)?t.cronWeeks:[];
-    if(!ws.length||ws.every(x=>!(x&&(""+x).trim()))) cronHtml+='<div class="cron-empty">Nenhum conteúdo especificado ainda. Edite a tarefa para preencher as semanas.</div>';
-    else ws.forEach((c,i)=>{ cronHtml+='<div class="cron-wk-v"><div class="cw-l">'+esc(cronWeekLabel(i,t.freq,t.cronMonth))+'</div><div class="cw-c">'+((c&&(""+c).trim())?esc(c):'<span style="color:var(--ink-faint)">—</span>')+'</div></div>'; });
+    var ws=Array.isArray(t.cronWeeks)?t.cronWeeks.map(cronNorm):[];
+    var anyc=ws.some(o=>(o.t&&o.t.trim())||(o.d&&o.d.trim()));
+    if(!anyc) cronHtml+='<div class="cron-empty">Nenhum conteúdo especificado ainda. Edite a tarefa para preencher as semanas.</div>';
+    else ws.forEach((o,i)=>{ cronHtml+='<div class="cron-wk-v"><div class="cw-l">'+esc(cronWeekLabel(i,t.freq,t.cronMonth))+'</div>'+
+      '<div class="cw-ti">'+((o.t&&o.t.trim())?esc(o.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
+      '<div class="cw-c">'+((o.d&&o.d.trim())?esc(o.d):'<span style="color:var(--ink-faint)">— sem descrição —</span>')+'</div></div>'; });
     cronHtml+='</div>';
   }
   let copyHtml="";
