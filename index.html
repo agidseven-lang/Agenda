@@ -716,7 +716,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 41 · build cards-por-conteudo</div>
+    <div class="ver">versão 45 · build acesso-designers</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -827,6 +827,45 @@
       <div class="sec-hint" id="tPostHint" style="margin-top:10px">Marque as plataformas e o horário. Ao salvar como postado, entra no "Registro de Posts publicados" (topo do Quadro).</div>
     </div>
     <div class="fld"><label>Cliente / empresa</label><input id="tClient" placeholder="Ex.: Loja Aurora"></div>
+    <div class="fld" id="tRotFld" style="display:none">
+      <label>Roteiro · fluxo de 4 etapas</label>
+      <div class="cron-wk">
+        <div class="cron-wk-l">1 · Briefing e Planejamento</div>
+        <div class="cron-ct">
+          <div class="cron-fl">Objetivo</div>
+          <input id="tRotObj" placeholder="Leads · Branding · Venda direta · Educacional">
+          <div class="cron-fl">Público-alvo</div>
+          <input id="tRotPub" placeholder="Com quem estamos falando?">
+          <div class="cron-fl">Canal de veiculação e duração</div>
+          <input id="tRotCanal" placeholder="Ex.: Reels Instagram · até 60s">
+        </div>
+      </div>
+      <div class="cron-wk">
+        <div class="cron-wk-l">2 · Pré-Roteiro e Estrutura</div>
+        <div class="cron-ct">
+          <div class="cron-fl">Gancho (Hook) — primeiros 5 a 10s</div>
+          <textarea id="tRotHook" placeholder="O que prende a atenção logo no início"></textarea>
+          <div class="cron-fl">Desenvolvimento</div>
+          <textarea id="tRotDev" placeholder="A entrega de valor / resolução do problema"></textarea>
+          <div class="cron-fl">Chamada para ação (CTA)</div>
+          <textarea id="tRotCta" placeholder="Ex.: clique no link, compre agora"></textarea>
+        </div>
+      </div>
+      <div class="cron-wk">
+        <div class="cron-wk-l">3 · Roteirização Detalhada</div>
+        <div class="cron-ct">
+          <div class="cron-fl">Áudio (falas, locução, trilha)</div>
+          <textarea id="tRotAudio" placeholder="Texto da locução / falas / trilha sonora"></textarea>
+          <div class="cron-fl">Vídeo (enquadramento, takes, GC, expressões)</div>
+          <textarea id="tRotVideo" placeholder="Descrição visual de cada cena"></textarea>
+        </div>
+      </div>
+      <div class="cron-wk">
+        <div class="cron-wk-l">4 · Revisão e Aprovação</div>
+        <div class="stage-row" id="tRotState"></div>
+        <div class="sec-hint" id="tRotHint" style="margin-top:10px"></div>
+      </div>
+    </div>
     <div class="fld" id="tCronWeeksFld" style="display:none">
       <label>Conteúdos</label>
       <div id="tCronWeeks" class="cron-weeks"></div>
@@ -910,7 +949,7 @@ const FIREBASE_CONFIG = {
 const SESSION_KEY="idseven_session";
 const TYPES={
   gravacao:{label:"Gravação",color:"var(--c-grav)"},foto:{label:"Fotografia",color:"var(--c-foto)"},
-  reuniao:{label:"Reunião",color:"var(--c-reuni)"},trafego:{label:"Tráfego pago",color:"var(--c-trafego)"},
+  reuniao:{label:"Reunião",color:"var(--c-reuni)"},
   edicao:{label:"Edição",color:"var(--c-edicao)"},outro:{label:"Outro",color:"var(--c-outro)"}
 };
 /* Frase de situação conforme o tipo do compromisso (ex.: "Em gravação" / "Gravação finalizada") */
@@ -918,7 +957,6 @@ const EV_PHRASE={
   gravacao:{run:"Em gravação",done:"Gravação finalizada"},
   foto:{run:"Em fotografia",done:"Fotografia finalizada"},
   reuniao:{run:"Em reunião",done:"Reunião finalizada"},
-  trafego:{run:"Tráfego em andamento",done:"Tráfego finalizado"},
   edicao:{run:"Em edição",done:"Edição finalizada"},
   outro:{run:"Em andamento",done:"Concluída"}
 };
@@ -935,7 +973,6 @@ const SECTORS={
   design:{label:"Cronograma",color:"var(--c-edicao)"},
   copy:{label:"Copywriter",color:"var(--c-reuni)"},
   roteiro:{label:"Roteiro",color:"var(--c-outro)"},
-  trafego:{label:"Tráfego pago",color:"var(--c-trafego)"},
   postagem:{label:"Programação de posts",color:"var(--accent)"}
 };
 /* Etapas / colunas do quadro */
@@ -953,7 +990,7 @@ let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
 let usersLoaded=false, photoReady=false, sessionId=null, busy=false;
 const ALARM_KEY="idseven_alarmed", PRE_MIN=120; /* 2h antes */
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
-let boardFilter="all", editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_video", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false;
+let boardFilter="all", editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_video", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
 
 function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -1293,10 +1330,14 @@ function val(id){return $(id).value.trim();}
 
 /* ---------- Tabs / render ---------- */
 document.querySelectorAll(".navtab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
-$("navAdd").onclick=()=>{ if(tab==="board") openTaskForm(null); else openForm(null); };
+$("navAdd").onclick=()=>{
+  if(!canManage(me)){ toast("Apenas administradores criam tarefas e compromissos. Você recebe e executa as demandas."); return; }
+  if(tab==="board") openTaskForm(null); else openForm(null);
+};
 function switchTab(t){
   tab=t;
   document.querySelectorAll(".navtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
+  var _na=$("navAdd"); if(_na) _na.style.display=canManage(me)?"":"none";
   const a=t==="agenda";
   $("calControls").classList.toggle("hidden",!a);
   $("pageTitle").classList.toggle("hidden",a);
@@ -1705,6 +1746,7 @@ function tcard(t){
       '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
       (t.priority?'<span class="tpill prio2"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>PRIORITÁRIA</span>':'')+
       (t.sector==="copy"&&(t.copyState==="em_avaliacao"||t.copyState==="aprovado")?'<span class="tpill '+(t.copyState==="aprovado"?"cok":"cev")+'">'+(t.copyState==="aprovado"?"APROVADO":"EM AVALIAÇÃO")+'</span>':'')+
+      (t.sector==="roteiro"&&t.rotState?'<span class="tpill '+rotStateInfo(t.rotState).cls+'">'+esc(rotStateInfo(t.rotState).label.toUpperCase())+'</span>':'')+
       (t.sector==="postagem"&&t.posted?'<span class="tpill cok">POSTADO</span>':'')+
       (late?'<span class="tpill"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>ATRASADA</span>':'')+
       '<span class="tc-avw"><span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span><span class="tc-cdot" style="background:'+uc+'"></span></span>'+
@@ -1783,11 +1825,39 @@ function buildSecGrid(){const g=$("secGrid");g.innerHTML="";
 function buildSecHint(){
   var sh=$("tSecHint"); if(sh){ sh.style.display="none"; }
   // Esconde Título/Descrição/Link nos setores que usam blocos próprios
-  var hideTD = (selSector==="design"||selSector==="copy"||selSector==="postagem");
+  var hideTD = (selSector==="design"||selSector==="copy"||selSector==="postagem"||selSector==="roteiro");
   var tf=$("tTitleFld"), df=$("tDescFld"), lf=$("tLinkFld");
   if(tf) tf.style.display=hideTD?"none":"";
   if(df) df.style.display=hideTD?"none":"";
   if(lf) lf.style.display=hideTD?"none":"";
+  // ---- Roteiro (fluxo de 4 etapas) ----
+  var rf=$("tRotFld");
+  if(rf){
+    var isRot=(selSector==="roteiro"); rf.style.display=isRot?"":"none";
+    if(isRot){
+      var rappr=isRoteiroPerson(me);
+      var rr=$("tRotState"); rr.innerHTML="";
+      [["rascunho","Em roteirização"],["em_revisao","Em revisão"],["aprovado","Aprovado p/ gravação"]].forEach(function(o){
+        var b=document.createElement("button"); b.type="button";
+        var locked=((o[0]==="em_revisao"||o[0]==="aprovado")&&!rappr);
+        b.className="stage-chip"+(selRotState===o[0]?" on":"")+(locked?" lock":"");
+        b.textContent=o[1];
+        b.onclick=function(){
+          if(locked){ toast("Apenas Miercohévisk e Arydyjany trabalham no roteiro"); return; }
+          selRotState=o[0]; buildSecHint();
+        };
+        rr.appendChild(b);
+      });
+      var rh=$("tRotHint");
+      rh.textContent = !rappr
+        ? "Somente Miercohévisk e Arydyjany preenchem, enviam para revisão e aprovam o roteiro."
+        : selRotState==="aprovado"
+          ? "Roteiro aprovado — pronto para encaminhar à produção (gravação)."
+          : selRotState==="em_revisao"
+            ? "Em revisão. Você pode aprovar para gravação ou devolver para ajustes."
+            : "Em roteirização: preencha as etapas 1 a 3 e mude para “Em revisão” quando terminar.";
+    }
+  }
   var cf=$("tCopyFld"), pf=$("tPostFld2");
   // ---- Copywriter ----
   if(cf){
@@ -1903,6 +1973,7 @@ $("tAssignee").oninput=()=>{try{buildRespChips();}catch(e){}};
 $("fOwner").oninput=()=>{try{buildOwnerChips();}catch(e){}};
 
 function openTaskForm(t){
+  if(!canManage(me)){ toast("Apenas administradores podem criar ou editar tarefas."); return; }
   if(!t){ const bm=blockMsg(); if(bm){ alert(bm); return; } }
   editTaskId=t?t.id:null;
   $("taskFormTitle").textContent=t?"Editar tarefa":"Nova tarefa";
@@ -1922,6 +1993,11 @@ function openTaskForm(t){
   selCopyState=(t&&(t.copyState==="em_avaliacao"||t.copyState==="aprovado"))?t.copyState:"rascunho";
   pIG=!!(t&&t.postIG); pFB=!!(t&&t.postFB); postMark=!!(t&&t.posted);
   setV("tPDate",(t&&t.postedDate)||"");setV("tPTime",(t&&t.postedTime)||"");
+  var R=(t&&t.roteiro)||{};
+  setV("tRotObj",R.obj||"");setV("tRotPub",R.pub||"");setV("tRotCanal",R.canal||"");
+  setV("tRotHook",R.hook||"");setV("tRotDev",R.dev||"");setV("tRotCta",R.cta||"");
+  setV("tRotAudio",R.audio||"");setV("tRotVideo",R.video||"");
+  selRotState=(t&&(t.rotState==="em_revisao"||t.rotState==="aprovado"))?t.rotState:"rascunho";
   $("tPrioFld").style.display=(me&&me.admin)?"":"none";
   buildSecGrid();buildStageRow();renderChkEditor();buildRespChips();buildPrioToggle();buildCronUI();buildSecHint();
   openSheet(taskSheet);
@@ -1935,11 +2011,12 @@ $("taskSave").onclick=async()=>{
   let title=val("tTitle");
   const sD=$("tSDate").value,sT=$("tSTime").value,dD=$("tDDate").value,dT=$("tDTime").value;
   if(!client)return toast("Informe o cliente / empresa");
-  const hideT=(selSector==="design"||selSector==="copy"||selSector==="postagem");
+  const hideT=(selSector==="design"||selSector==="copy"||selSector==="postagem"||selSector==="roteiro");
   if(hideT){
     var freqLbl=selFreq==="quinzenal"?"Quinzenal":selFreq==="mensal"?"Mensal":"Semanal";
     title = selSector==="design" ? ("Cronograma "+freqLbl+" — "+client)
           : selSector==="copy"   ? ("Copywriter "+freqLbl+" — "+client)
+          : selSector==="roteiro"? ("Roteiro — "+client)
           : ("Posts — "+client);
   }
   if(!hideT && !title)return toast("Informe a tarefa (título)");
@@ -1980,6 +2057,18 @@ $("taskSave").onclick=async()=>{
       data.status="concluido"; taskStatus="concluido";
     } else { data.posted=false; }
   }
+  if(selSector==="roteiro"){
+    data.roteiro={
+      obj:val("tRotObj"), pub:val("tRotPub"), canal:val("tRotCanal"),
+      hook:val("tRotHook"), dev:val("tRotDev"), cta:val("tRotCta"),
+      audio:val("tRotAudio"), video:val("tRotVideo")
+    };
+    var rs=selRotState; if((rs==="em_revisao"||rs==="aprovado") && !isRoteiroPerson(me)) rs="rascunho";
+    data.rotState=rs;
+    var prevRs=(prevTask&&prevTask.rotState)?prevTask.rotState:"rascunho";
+    data.rotAt=(prevTask && rs===prevRs && prevTask.rotAt)?prevTask.rotAt:Date.now();
+    if(rs==="aprovado" && isRoteiroPerson(me)) data.rotBy=me.id;
+  }
   try{
     if(editTaskId){
       const prev=tasks.find(x=>x.id===editTaskId);
@@ -2004,6 +2093,9 @@ $("taskDel").onclick=async()=>{
 
 function openTaskDetail(id){
   const t=tasks.find(x=>x.id===id);if(!t)return;detailTaskId=id;
+  var _cm=canManage(me);
+  $("taskDetailEdit").style.display=_cm?"":"none";
+  $("taskDetailDel").style.display=_cm?"":"none";
   const sec=SECTORS[t.sector]||{label:"—",color:"var(--c-outro)"};
   const u=users.find(x=>x.id===t.by);
   const late=taskLate(t);
@@ -2080,6 +2172,39 @@ function openTaskDetail(id){
     }
     copyHtml+='</div>';
   }
+  let rotHtml="";
+  if(t.sector==="roteiro"){
+    var R=t.roteiro||{};
+    var rsi=rotStateInfo(t.rotState||"rascunho"), rappr2=isRoteiroPerson(me);
+    var rby=users.find(x=>x.id===t.rotBy);
+    function rrow(lb,vl){ return '<div class="cw-ct"><div class="cw-cn">'+esc(lb)+'</div><div class="cw-c">'+((vl&&(""+vl).trim())?esc(vl):'<span style="color:var(--ink-faint)">—</span>')+'</div></div>'; }
+    rotHtml='<div class="cron-view"><div class="tt">Roteiro · fluxo de 4 etapas</div>'+
+      '<div class="cron-wk-v"><div class="cw-l">1 · Briefing e Planejamento</div>'+
+        rrow("Objetivo",R.obj)+rrow("Público-alvo",R.pub)+rrow("Canal e duração",R.canal)+'</div>'+
+      '<div class="cron-wk-v"><div class="cw-l">2 · Pré-Roteiro e Estrutura</div>'+
+        rrow("Gancho (Hook)",R.hook)+rrow("Desenvolvimento",R.dev)+rrow("CTA",R.cta)+'</div>'+
+      '<div class="cron-wk-v"><div class="cw-l">3 · Roteirização Detalhada</div>'+
+        rrow("Áudio",R.audio)+rrow("Vídeo",R.video)+'</div>'+
+      '<div class="cron-wk-v"><div class="cw-l">4 · Revisão e Aprovação</div>'+
+        '<div class="copy-badge" style="display:inline-flex;background:'+secBg(rsi.color)+';color:'+rsi.color+'">'+esc(rsi.label)+'</div>';
+    var rst=t.rotState||"rascunho";
+    if(rst==="aprovado"){
+      rotHtml+='<div class="copy-meta">Aprovado por '+esc((rby&&rby.name)||"Miercohévisk/Arydyjany")+(t.rotAt?(' · '+esc(fmtDT(t.rotAt))):'')+'. Encaminhar para a produção (gravação).</div>';
+      if(rappr2) rotHtml+='<button class="done-toggle" data-rs="em_revisao" style="background:var(--surface);border-color:var(--line);color:var(--ink-soft);margin-top:12px">Reabrir para ajustes</button>';
+    } else if(rst==="em_revisao"){
+      rotHtml+='<div class="copy-meta">Em revisão'+(t.rotAt?(' · '+esc(fmtDT(t.rotAt))):'')+'.</div>';
+      if(rappr2){
+        rotHtml+='<button class="done-toggle" data-rs="aprovado" style="background:rgba(54,211,153,.12);border-color:rgba(54,211,153,.32);color:var(--c-trafego);margin-top:12px"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Aprovar para gravação</button>'+
+          '<button class="done-toggle" data-rs="rascunho" style="background:var(--surface);border-color:var(--line);color:var(--ink-soft);margin-top:10px">Devolver para ajustes</button>';
+      } else { rotHtml+='<div class="copy-wait">Aguardando Miercohévisk ou Arydyjany.</div>'; }
+    } else {
+      if(rappr2){
+        rotHtml+='<div class="copy-meta">Quando o roteiro estiver pronto, envie para revisão.</div>'+
+          '<button class="done-toggle" data-rs="em_revisao" style="background:rgba(255,176,46,.12);border-color:rgba(255,176,46,.32);color:var(--c-foto);margin-top:12px"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Enviar para revisão</button>';
+      } else { rotHtml+='<div class="copy-wait">Somente Miercohévisk e Arydyjany preenchem e enviam o roteiro.</div>'; }
+    }
+    rotHtml+='</div></div>';
+  }
   let postHtml="";
   if(t.sector==="postagem"){
     pIG=!!t.postIG; pFB=!!t.postFB;
@@ -2112,9 +2237,10 @@ function openTaskDetail(id){
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Responsável",esc(t.assignee))+
     di('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Link / Anexo",linkHtml)+
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Criado por",u?esc(u.name):"—")+
-    '</div>'+cronHtml+copyHtml+postHtml+chkHtml+trackHtml;
+    '</div>'+cronHtml+copyHtml+rotHtml+postHtml+chkHtml+trackHtml;
   $("taskDetailBody").querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveTask(id,b.dataset.mv));
   $("taskDetailBody").querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>setCopyState(id,b.dataset.cs));
+  $("taskDetailBody").querySelectorAll("[data-rs]").forEach(b=>b.onclick=()=>setRoteiroState(id,b.dataset.rs));
   $("taskDetailBody").querySelectorAll("[data-ptog]").forEach(b=>b.onclick=()=>{
     if(b.dataset.ptog==="ig")pIG=!pIG; else pFB=!pFB; b.classList.toggle("on");
   });
@@ -2147,8 +2273,9 @@ async function toggleTaskChk(id,idx){
     busy=false; t.checklist=nc; openTaskDetail(id);
   }catch(e){busy=false;toast("Erro ao atualizar checklist");}
 }
-$("taskDetailEdit").onclick=()=>{const t=tasks.find(x=>x.id===detailTaskId);if(!t){toast("Tarefa não encontrada");closeSheets();return;}closeSheets();setTimeout(()=>openTaskForm(t),260);};
+$("taskDetailEdit").onclick=()=>{if(!canManage(me)){toast("Apenas administradores editam tarefas.");return;}const t=tasks.find(x=>x.id===detailTaskId);if(!t){toast("Tarefa não encontrada");closeSheets();return;}closeSheets();setTimeout(()=>openTaskForm(t),260);};
 $("taskDetailDel").onclick=async()=>{
+  if(!canManage(me)){toast("Apenas administradores excluem tarefas.");return;}
   if(!detailTaskId||!confirm("Excluir esta tarefa para toda a equipe?"))return;
   if(busy)return; busy=true;
   try{await db.collection("tasks").doc(detailTaskId).delete();toast("Tarefa excluída");closeSheets();}
@@ -2168,6 +2295,14 @@ function closeSheets(){scrim.classList.remove("open");formSheet.classList.remove
 /* ===== Copywriter: avaliação da Arydyjany + sininho ===== */
 function normTxt(s){ return (s||"").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
 function isCopyApprover(u){ return !!u && normTxt(u.name).indexOf("arydyjany")>=0; }
+function isRoteiroPerson(u){ return !!u && (normTxt(u.name).indexOf("miercohevisk")>=0 || normTxt(u.name).indexOf("arydyjany")>=0); }
+function canManage(u){ if(!u)return false; var n=normTxt(u.name); return n.indexOf("miercohevisk")>=0 || n.indexOf("arydyjany")>=0 || n.indexOf("tatiana")>=0; }
+function isRoteiroApprover(u){ return isRoteiroPerson(u); }
+function rotStateInfo(s){
+  if(s==="aprovado")return {label:"Aprovado p/ gravação",cls:"cok",color:"var(--c-trafego)"};
+  if(s==="em_revisao")return {label:"Em revisão",cls:"cev",color:"var(--c-foto)"};
+  return {label:"Em roteirização",cls:"cev",color:"var(--c-foto)"};
+}
 function copyStateOf(t){ var s=t&&t.copyState; return (s==="em_avaliacao"||s==="aprovado")?s:"rascunho"; }
 function copyStateInfo(s){
   if(s==="aprovado")return {label:"Aprovado",color:"var(--c-trafego)"};
@@ -2188,6 +2323,22 @@ async function setCopyState(id,state){
     if(detailTaskId===id && taskDetailSheet.classList.contains("open")) openTaskDetail(id);
     if(!$("mainApp").classList.contains("hidden")&&tab==="board")render();
     toast(state==="aprovado"?"Conteúdo aprovado ✓":state==="em_avaliacao"?"Enviado para avaliação da Arydyjany":"Conteúdo devolvido para ajustes");
+  }catch(e){ toast("Não foi possível atualizar agora"); }
+  finally{ busy=false; }
+}
+async function setRoteiroState(id,state){
+  if(busy)return; var t=tasks.find(x=>x.id===id); if(!t||!db)return;
+  if((state==="aprovado"||state==="em_revisao") && !isRoteiroPerson(me)){ toast("Apenas Miercohévisk e Arydyjany podem enviar ou aprovar o roteiro"); return; }
+  busy=true;
+  try{
+    var upd={rotState:state,rotAt:Date.now()};
+    if(state==="aprovado"){ upd.rotBy=me.id; }
+    await db.collection("tasks").doc(id).update(upd);
+    var lt=tasks.find(x=>x.id===id);
+    if(lt){ lt.rotState=state; lt.rotAt=upd.rotAt; if(upd.rotBy)lt.rotBy=upd.rotBy; }
+    if(detailTaskId===id && taskDetailSheet.classList.contains("open")) openTaskDetail(id);
+    if(!$("mainApp").classList.contains("hidden")&&tab==="board")render();
+    toast(state==="aprovado"?"Roteiro aprovado para gravação ✓":state==="em_revisao"?"Roteiro enviado para revisão":"Roteiro devolvido para ajustes");
   }catch(e){ toast("Não foi possível atualizar agora"); }
   finally{ busy=false; }
 }
@@ -2306,7 +2457,7 @@ function buildTypeGrid(){const g=$("typeGrid");g.innerHTML="";
     o.innerHTML='<div class="td" style="background:'+TYPES[k].color+'"></div><span>'+TYPES[k].label+'</span>';
     o.onclick=()=>{selType=k;buildTypeGrid();};g.appendChild(o);}}
 function openForm(ev){
-  if(!me||!me.admin){ toast("Só administradores criam e atribuem no Cronograma"); return; }
+  if(!canManage(me)){ toast("Apenas administradores criam compromissos. Você recebe e executa as demandas."); return; }
   editingId=ev?ev.id:null;
   $("formTitle").textContent=ev?"Reagendar / Editar":"Novo compromisso";
   $("delBtn").style.display=ev?"block":"none";
@@ -2388,12 +2539,12 @@ function openDetail(id){
       if(!e.done){ await db.collection("events").doc(id).update({done:true,doneAt:Date.now(),doneBy:me.id}); clearEventAlarms(id); toast("Finalizado"); closeSheets(); }
       else{ await db.collection("events").doc(id).update({done:false,doneAt:null,doneBy:null}); toast("Reaberto"); closeSheets(); }
     }catch(_){toast("Erro");}finally{busy=false;}};
-  $("detailEdit").style.display=(me&&me.admin)?"":"none";
-  $("detailDel").style.display=(me&&me.admin)?"":"none";
+  $("detailEdit").style.display=canManage(me)?"":"none";
+  $("detailDel").style.display=canManage(me)?"":"none";
   openSheet(detailSheet);
 }
-$("detailEdit").onclick=()=>{const e=events.find(x=>x.id===detailId);if(!e){toast("Compromisso não encontrado");closeSheets();return;}closeSheets();setTimeout(()=>openForm(e),260);};
-$("detailDel").onclick=async()=>{if(!detailId||!confirm("Excluir para toda a equipe?"))return;
+$("detailEdit").onclick=()=>{if(!canManage(me)){toast("Apenas administradores editam compromissos.");return;}const e=events.find(x=>x.id===detailId);if(!e){toast("Compromisso não encontrado");closeSheets();return;}closeSheets();setTimeout(()=>openForm(e),260);};
+$("detailDel").onclick=async()=>{if(!canManage(me)){toast("Apenas administradores excluem compromissos.");return;}if(!detailId||!confirm("Excluir para toda a equipe?"))return;
   if(busy)return; busy=true;
   try{await db.collection("events").doc(detailId).delete();clearEventAlarms(detailId);toast("Excluído");closeSheets();}catch(_){toast("Erro ao excluir");}
   finally{busy=false;}};
