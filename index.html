@@ -715,7 +715,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 38 · build copy-posts-form</div>
+    <div class="ver">versão 39 · build setores-enxutos</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -805,15 +805,15 @@
     <div class="fld"><label>Setor responsável</label><div class="type-grid" id="secGrid"></div>
       <div id="tSecHint" class="sec-hint" style="display:none"></div>
     </div>
-    <div class="fld" id="tCronFld" style="display:none">
-      <label>Tipo de cronograma</label>
-      <div class="stage-row" id="tCronFreq"></div>
-      <div id="tCronWeeks" class="cron-weeks" style="margin-top:14px"></div>
-    </div>
     <div class="fld" id="tCopyFld" style="display:none">
       <label>Aprovação do conteúdo (Copywriter)</label>
       <div class="stage-row" id="tCopyState"></div>
       <div class="sec-hint" id="tCopyHint" style="margin-top:10px"></div>
+    </div>
+    <div class="fld" id="tCronFld" style="display:none">
+      <label>Tipo de cronograma</label>
+      <div class="stage-row" id="tCronFreq"></div>
+      <div id="tCronWeeks" class="cron-weeks" style="margin-top:14px"></div>
     </div>
     <div class="fld" id="tPostFld2" style="display:none">
       <label>Registro de publicação</label>
@@ -827,8 +827,8 @@
       <div class="sec-hint" id="tPostHint" style="margin-top:10px">Marque as plataformas e o horário. Ao salvar como postado, entra no "Registro de Posts publicados" (topo do Quadro).</div>
     </div>
     <div class="fld"><label>Cliente / empresa</label><input id="tClient" placeholder="Ex.: Loja Aurora"></div>
-    <div class="fld"><label>Tarefa (título)</label><input id="tTitle" placeholder="Ex.: Editar reels da campanha de junho"></div>
-    <div class="fld"><label>Descrição / briefing</label><textarea id="tDesc" placeholder="Detalhes, referências, instruções…"></textarea></div>
+    <div class="fld" id="tTitleFld"><label>Tarefa (título)</label><input id="tTitle" placeholder="Ex.: Editar reels da campanha de junho"></div>
+    <div class="fld" id="tDescFld"><label>Descrição / briefing</label><textarea id="tDesc" placeholder="Detalhes, referências, instruções…"></textarea></div>
     <div class="fld"><label>Início — data e hora</label>
       <div class="r2"><input id="tSDate" type="date"><input id="tSTime" type="time"></div></div>
     <div class="fld"><label>Término / Prazo — data e hora</label>
@@ -837,7 +837,7 @@
       <div class="resp-chips" id="tRespChips"></div>
       <input id="tAssignee" placeholder="Nome do responsável" style="margin-top:9px">
     </div>
-    <div class="fld"><label>Link / Anexo (Drive, Canva, etc.)</label><input id="tLink" placeholder="Cole o link aqui (opcional)" inputmode="url"></div>
+    <div class="fld" id="tLinkFld"><label>Link / Anexo (Drive, Canva, etc.)</label><input id="tLink" placeholder="Cole o link aqui (opcional)" inputmode="url"></div>
     <div class="fld" id="tPrioFld" style="display:none"><label>Prioridade</label>
       <button type="button" id="tPrio" class="prio-toggle"><span class="bx"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span>Marcar como tarefa prioritária (urgente)</span></button></div>
     <div class="fld"><label>Etapa</label><div class="stage-row" id="tStageRow"></div></div>
@@ -1683,6 +1683,12 @@ function buildSecGrid(){const g=$("secGrid");g.innerHTML="";
     o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();};g.appendChild(o);}}
 function buildSecHint(){
   var sh=$("tSecHint"); if(sh){ sh.style.display="none"; }
+  // Esconde Título/Descrição/Link nos setores que usam blocos próprios
+  var hideTD = (selSector==="design"||selSector==="copy"||selSector==="postagem");
+  var tf=$("tTitleFld"), df=$("tDescFld"), lf=$("tLinkFld");
+  if(tf) tf.style.display=hideTD?"none":"";
+  if(df) df.style.display=hideTD?"none":"";
+  if(lf) lf.style.display=hideTD?"none":"";
   var cf=$("tCopyFld"), pf=$("tPostFld2");
   // ---- Copywriter ----
   if(cf){
@@ -1738,7 +1744,7 @@ function cronWeekCount(){ return selFreq==="semanal"?1 : selFreq==="quinzenal"?2
 function cronNorm(x){ if(x&&typeof x==="object")return {t:(x.t||"")+"",d:(x.d||"")+"",l:(x.l||"")+""}; return {t:"",d:(x==null?"":(""+x)),l:""}; }
 function buildCronUI(){
   var fld=$("tCronFld"); if(!fld)return;
-  var isCron=(selSector==="design");
+  var isCron=(selSector==="design"||selSector==="copy");
   fld.style.display=isCron?"":"none";
   if(!isCron)return;
   var fr=$("tCronFreq"); fr.innerHTML="";
@@ -1818,10 +1824,18 @@ function buildPrioToggle(){const b=$("tPrio");if(!b)return;
   b.querySelector("span:last-child").textContent=selPrio?"Tarefa PRIORITÁRIA (urgente) ✓":"Marcar como tarefa prioritária (urgente)";
   b.onclick=()=>{selPrio=!selPrio;buildPrioToggle();};}
 $("taskSave").onclick=async()=>{
-  const client=val("tClient"),title=val("tTitle");
+  const client=val("tClient");
+  let title=val("tTitle");
   const sD=$("tSDate").value,sT=$("tSTime").value,dD=$("tDDate").value,dT=$("tDTime").value;
   if(!client)return toast("Informe o cliente / empresa");
-  if(!title)return toast("Informe a tarefa (título)");
+  const hideT=(selSector==="design"||selSector==="copy"||selSector==="postagem");
+  if(hideT){
+    var freqLbl=selFreq==="quinzenal"?"Quinzenal":selFreq==="mensal"?"Mensal":"Semanal";
+    title = selSector==="design" ? ("Cronograma "+freqLbl+" — "+client)
+          : selSector==="copy"   ? ("Copywriter "+freqLbl+" — "+client)
+          : ("Posts — "+client);
+  }
+  if(!hideT && !title)return toast("Informe a tarefa (título)");
   if(!sD||!sT)return toast("Informe a data e hora de início");
   if(!dD||!dT)return toast("Informe a data e hora de término (prazo)");
   const sMs=dtMs(sD,sT),dMs=dtMs(dD,dT);
@@ -1838,7 +1852,7 @@ $("taskSave").onclick=async()=>{
     assignee:val("tAssignee"),link:val("tLink"),status:taskStatus,
     priority:(me&&me.admin)?!!selPrio:(prevTask?!!prevTask.priority:false),
     checklist:taskChecklist.map(x=>({t:x.t,d:!!x.d}))};
-  if(selSector==="design"){
+  if(selSector==="design"||selSector==="copy"){
     data.freq=selFreq;
     data.cronMonth=(selFreq==="mensal")?(cronMonthVal||""):"";
     data.cronWeeks=cronWeeks.slice(0,cronWeekCount()*3).map(function(x){var o=cronNorm(x);return {t:(o.t||"").trim(),d:(o.d||"").trim(),l:(o.l||"").trim()};});
@@ -1911,9 +1925,9 @@ function openTaskDetail(id){
   }
   trackHtml+='</div>';
   let cronHtml="";
-  if(t.sector==="design"){
+  if(t.sector==="design"||t.sector==="copy"){
     var fqL=t.freq==="quinzenal"?"Quinzenal · 6 conteúdos":t.freq==="mensal"?"Mensal · 12 conteúdos":"Semanal · 3 conteúdos";
-    cronHtml='<div class="cron-view"><div class="tt">Cronograma · '+fqL+'</div>';
+    cronHtml='<div class="cron-view"><div class="tt">'+(t.sector==="copy"?"Conteúdos (Copywriter) · ":"Cronograma · ")+fqL+'</div>';
     var ws=Array.isArray(t.cronWeeks)?t.cronWeeks.map(cronNorm):[];
     var anyc=ws.some(o=>(o.t&&o.t.trim())||(o.d&&o.d.trim())||(o.l&&o.l.trim()));
     if(!anyc) cronHtml+='<div class="cron-empty">Nenhum conteúdo especificado ainda. Edite a tarefa para preencher.</div>';
