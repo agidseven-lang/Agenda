@@ -715,7 +715,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 39 · build setores-enxutos</div>
+    <div class="ver">versão 40 · build cliente-antes-conteudo</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -813,7 +813,6 @@
     <div class="fld" id="tCronFld" style="display:none">
       <label>Tipo de cronograma</label>
       <div class="stage-row" id="tCronFreq"></div>
-      <div id="tCronWeeks" class="cron-weeks" style="margin-top:14px"></div>
     </div>
     <div class="fld" id="tPostFld2" style="display:none">
       <label>Registro de publicação</label>
@@ -827,6 +826,10 @@
       <div class="sec-hint" id="tPostHint" style="margin-top:10px">Marque as plataformas e o horário. Ao salvar como postado, entra no "Registro de Posts publicados" (topo do Quadro).</div>
     </div>
     <div class="fld"><label>Cliente / empresa</label><input id="tClient" placeholder="Ex.: Loja Aurora"></div>
+    <div class="fld" id="tCronWeeksFld" style="display:none">
+      <label>Conteúdos</label>
+      <div id="tCronWeeks" class="cron-weeks"></div>
+    </div>
     <div class="fld" id="tTitleFld"><label>Tarefa (título)</label><input id="tTitle" placeholder="Ex.: Editar reels da campanha de junho"></div>
     <div class="fld" id="tDescFld"><label>Descrição / briefing</label><textarea id="tDesc" placeholder="Detalhes, referências, instruções…"></textarea></div>
     <div class="fld"><label>Início — data e hora</label>
@@ -1746,6 +1749,7 @@ function buildCronUI(){
   var fld=$("tCronFld"); if(!fld)return;
   var isCron=(selSector==="design"||selSector==="copy");
   fld.style.display=isCron?"":"none";
+  var wf=$("tCronWeeksFld"); if(wf) wf.style.display=isCron?"":"none";
   if(!isCron)return;
   var fr=$("tCronFreq"); fr.innerHTML="";
   [["semanal","Semanal · 3"],["quinzenal","Quinzenal · 6"],["mensal","Mensal · 12"]].forEach(function(o){
