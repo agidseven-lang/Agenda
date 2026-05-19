@@ -227,6 +227,16 @@
     margin-top:24px;text-align:left;overflow:hidden}
   .prof-card .pl{display:flex;align-items:center;gap:13px;padding:15px;border-bottom:1px solid var(--line-soft)}
   .prof-card .pl:last-child{border-bottom:none}
+  .color-pick{padding:15px;border-bottom:1px solid var(--line-soft)}
+  .color-pick .cp-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
+  .color-pick .cp-h .l{font-size:10.5px;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .color-pick .cp-now{width:20px;height:20px;border-radius:50%;flex-shrink:0;border:2px solid var(--bg-2)}
+  .color-pick .cp-grid{display:flex;flex-wrap:wrap;gap:11px}
+  .color-pick .cp-dot{width:38px;height:38px;border-radius:50%;border:3px solid transparent;
+    cursor:pointer;padding:0;transition:.15s;outline:none}
+  .color-pick .cp-dot:active{transform:scale(.9)}
+  .color-pick .cp-dot.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 4px currentColor}
+  .color-pick .cp-hint{font-size:11.5px;color:var(--ink-faint);font-weight:600;margin-top:12px;line-height:1.5}
   .prof-card .pl .pic{width:34px;height:34px;border-radius:10px;background:var(--bg-2);
     border:1px solid var(--line);display:grid;place-items:center;flex-shrink:0}
   .prof-card .pl .pic svg{width:16px;height:16px;color:var(--ink-soft)}
@@ -479,7 +489,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 23 · build visual</div>
+    <div class="ver">versão 24 · build cor</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -691,7 +701,7 @@ function fbAvatar(n){const i=(n||"?").trim().charAt(0).toUpperCase()||"?";
 function safePhoto(p){return(typeof p==="string"&&/^data:image\/(png|jpe?g|webp|gif);base64,/.test(p)&&p.length<500000)?p:null;}
 function avatarHTML(u){const p=u&&safePhoto(u.photo);return p?'<img src="'+p.replace(/"/g,"")+'" alt="">':fbAvatar(u?u.name:"?");}
 const USER_COLORS=["#ff5a4d","#4d9fff","#36d399","#b072ff","#ffb02e","#ff7ab8","#22d3ee","#d8ff3e","#f4845f","#9d8cff","#5eead4","#fca5f1"];
-function userColor(u){ if(!u||!u.id)return"#8a8a96"; let h=0; const s=String(u.id); for(let i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0; return USER_COLORS[Math.abs(h)%USER_COLORS.length]; }
+function userColor(u){ if(!u||!u.id)return"#8a8a96"; if(u.color&&USER_COLORS.includes(u.color))return u.color; let h=0; const s=String(u.id); for(let i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0; return USER_COLORS[Math.abs(h)%USER_COLORS.length]; }
 function userByName(n){ n=(n||"").trim().toLowerCase(); return n?users.find(u=>(u.name||"").trim().toLowerCase()===n):null; }
 
 /* image downscale for small avatars — robusto p/ HEIC/fotos grandes */
@@ -985,7 +995,8 @@ function render(){
     c.innerHTML=renderFilters()+(view==="month"?renderMonth():renderAgenda());bindAgenda();
   }else if(tab==="board"){c.innerHTML=renderBoard();bindBoard();}
   else if(tab==="team"){c.innerHTML=renderTeam();bindTeam();}
-  else{c.innerHTML=renderProfile();$("logoutBtn").onclick=logout;}
+  else{c.innerHTML=renderProfile();$("logoutBtn").onclick=logout;
+    document.querySelectorAll(".cp-dot").forEach(b=>b.onclick=()=>setMyColor(b.dataset.color));}
 }
 function renderFilters(){
   let h='<div class="filters"><button class="chip '+(filter==="all"?"on":"")+'" data-f="all">Todos</button>';
@@ -1058,9 +1069,21 @@ function renderProfile(){
   return '<div class="prof"><div class="pa" style="box-shadow:0 0 0 3px '+userColor(me)+'">'+avatarHTML(me)+'</div><h2>'+esc(me.name)+'</h2><div class="role">'+esc(me.role)+(me.admin?' · admin':'')+'</div><div class="prof-card">'+
     row('<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2"/>',"WhatsApp",me.phone)+
     row('<rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="2"/>',"E-mail",me.email)+
-    '<div class="pl"><div class="pic"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div><div class="px"><div class="l">Sua cor no Quadro</div><div class="v" style="display:flex;align-items:center;gap:8px"><span style="width:16px;height:16px;border-radius:50%;background:'+userColor(me)+';display:inline-block"></span>Identifica suas tarefas</div></div></div>'+
+    '<div class="color-pick"><div class="cp-h"><div class="l">Sua cor no Quadro</div><span class="cp-now" style="background:'+userColor(me)+'"></span></div><div class="cp-grid">'+
+      USER_COLORS.map(c=>'<button type="button" class="cp-dot'+(userColor(me)===c?' on':'')+'" data-color="'+c+'" style="background:'+c+'"></button>').join('')+
+    '</div><div class="cp-hint">Toque numa cor para escolher. Vale para você em todos os cartões, em tempo real.</div></div>'+
     row('<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2"/>',"Status","Ativo")+
     '</div><button class="logout" id="logoutBtn">Sair da conta</button><div class="info-bar" style="margin-top:20px"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><div>A agenda é compartilhada: tudo que você cria aparece para toda a equipe em tempo real.</div></div></div>';
+}
+
+async function setMyColor(hex){
+  if(!USER_COLORS.includes(hex)||!me||!db)return;
+  if(userColor(me)===hex && me.color===hex)return;
+  if(busy)return; busy=true;
+  try{ await db.collection("users").doc(me.id).update({color:hex});
+    me.color=hex; toast("Cor atualizada"); if(tab==="profile")render();
+  }catch(e){ toast("Erro ao salvar a cor"); }
+  finally{ busy=false; }
 }
 
 /* ================= QUADRO DE PROJETOS ================= */
