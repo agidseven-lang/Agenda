@@ -535,7 +535,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 27 · build design</div>
+    <div class="ver">versão 28 · build autoupdate</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1606,10 +1606,29 @@ try{const i192=makeIcon(192),i512=makeIcon(512);
   document.head.appendChild(ml);
 }catch(e){}
 
-/* service worker (necessário p/ instalar como app + funcionar offline) */
+/* service worker — atualização automática (mesmo link, sem reinstalar) */
 if("serviceWorker" in navigator){
+  var hadController=!!navigator.serviceWorker.controller, swRefreshing=false;
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(swRefreshing)return; swRefreshing=true;
+    if(hadController) window.location.reload(); /* só recarrega quando é ATUALIZAÇÃO */
+  });
   window.addEventListener("load",function(){
-    navigator.serviceWorker.register("sw.js").catch(function(){});
+    navigator.serviceWorker.register("sw.js").then(function(reg){
+      function check(){ try{ reg.update(); }catch(_){} }
+      check();
+      setInterval(check,60000); /* checa a cada 1 min enquanto aberto */
+      document.addEventListener("visibilitychange",function(){
+        if(document.visibilityState==="visible") check(); /* checa ao reabrir o app */
+      });
+      reg.addEventListener("updatefound",function(){
+        var nw=reg.installing; if(!nw)return;
+        nw.addEventListener("statechange",function(){
+          /* nova versão instalada: o SW já faz skipWaiting e assume,
+             disparando controllerchange -> recarrega sozinho */
+        });
+      });
+    }).catch(function(){});
   });
 }
 
