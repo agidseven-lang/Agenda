@@ -558,6 +558,8 @@
     border:1px solid var(--line);border-radius:999px;padding:2px 9px;min-width:24px;text-align:center}
   .col.afazer .nm i{background:var(--c-outro)} .col.andamento .nm i{background:var(--c-foto)}
   .col.revisao .nm i{background:var(--c-reuni)} .col.concluido .nm i{background:var(--c-trafego)}
+  .col.analise .nm i{background:var(--c-edicao)} .col.aprovacao .nm i{background:var(--c-copy)}
+  .col.pronto .nm i{background:var(--accent)}
   .tcard{position:relative;background:var(--bg-2);border:1px solid var(--line);
     border-left:4px solid var(--uc,var(--line));border-radius:14px;padding:13px 14px;
     margin-bottom:10px;cursor:pointer;transition:.15s}
@@ -746,8 +748,8 @@
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
     .ev .tt{font-size:16px}
-    /* Quadro aproveita a largura: 4 colunas lado a lado, sem rolar */
-    .board-wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;
+    /* Quadro aproveita a largura: número de colunas adapta ao setor (4 padrão, 6 para Edição de Vídeo e Imagem) */
+    .board-wrap{display:grid;grid-template-columns:repeat(var(--cols, 4),minmax(0,1fr));gap:16px;
       overflow:visible;padding:18px 0 10px;scroll-snap-type:none}
     .col{flex:none;max-width:none;scroll-snap-align:none}
     .tcard{margin-bottom:12px}
@@ -811,7 +813,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 48 · build workload-mencoes</div>
+    <div class="ver">versão 49 · build edicao-unificada-6etapas</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1063,13 +1065,15 @@ const RGBA={"var(--c-grav)":"rgba(255,90,77,.16)","var(--c-foto)":"rgba(255,176,
 
 /* Setores da agência (Quadro de projetos) */
 const SECTORS={
-  edicao_video:{label:"Edição de vídeo",color:"var(--c-grav)"},
-  edicao_foto:{label:"Edição de fotos",color:"var(--c-foto)"},
+  edicao_midia:{label:"Edição de Vídeo e Imagem",color:"var(--c-grav)"},
   design:{label:"Cronograma",color:"var(--c-edicao)"},
   copy:{label:"Copywriter",color:"var(--c-reuni)"},
   roteiro:{label:"Roteiro",color:"var(--c-outro)"},
   postagem:{label:"Programação de posts",color:"var(--accent)"}
 };
+/* Setores antigos mapeados para o novo (migração suave) */
+const SECTOR_ALIAS={ edicao_video:"edicao_midia", edicao_foto:"edicao_midia" };
+function normSector(s){ return SECTOR_ALIAS[s] || s; }
 /* Etapas / colunas do quadro */
 const STAGES=[
   {k:"afazer",label:"A Fazer"},
@@ -1077,7 +1081,24 @@ const STAGES=[
   {k:"revisao",label:"Revisão"},
   {k:"concluido",label:"Concluído"}
 ];
-function stageLabel(k){const s=STAGES.find(x=>x.k===k);return s?s.label:"A Fazer";}
+/* Etapas específicas do setor "Edição de Vídeo e Imagem" — 6 fases */
+const STAGES_EDICAO=[
+  {k:"afazer",label:"Briefing aberto"},
+  {k:"analise",label:"Em Análise"},
+  {k:"andamento",label:"Em Edição"},
+  {k:"aprovacao",label:"Aguardando Aprovação"},
+  {k:"pronto",label:"Pronto para Entrega"},
+  {k:"concluido",label:"Concluído"}
+];
+function stagesFor(sector){ return sector==="edicao_midia" ? STAGES_EDICAO : STAGES; }
+function stageLabel(k,sector){ var arr=stagesFor(sector); var s=arr.find(x=>x.k===k); if(s)return s.label; var g=STAGES.find(x=>x.k===k); return g?g.label:"A Fazer"; }
+/* Mapeia status especiais (analise/aprovacao/pronto) para a coluna padrão mais próxima quando o quadro mostra 4 colunas */
+function displayStatusKey(t){
+  var k=(t&&t.status)||"afazer";
+  if(k==="analise") return "afazer";
+  if(k==="aprovacao"||k==="pronto") return "revisao";
+  return k;
+}
 
 let db=null, me=null, users=[], events=[], tasks=[];
 let alarmTimer=null, alarmSeeded=false, alarmActive=false, audioCtx=null, beepTimer=null, notifAsked=false;
@@ -1085,7 +1106,7 @@ let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
 let usersLoaded=false, photoReady=false, sessionId=null, busy=false;
 const ALARM_KEY="idseven_alarmed", PRE_MIN=120; /* 2h antes */
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
-let boardFilter="all", boardFilterUserSet=false, calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_video", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
+let boardFilter="all", boardFilterUserSet=false, calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
 
 function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -1199,7 +1220,7 @@ function offlineMsg(){
     else checkAlarms(false);
   },err=>{});
   db.collection("tasks").onSnapshot(snap=>{
-    tasks=snap.docs.map(d=>({id:d.id,...d.data()}));
+    tasks=snap.docs.map(d=>{ var o={id:d.id,...d.data()}; o.sector=normSector(o.sector); return o; });
     if(!lateSeeded){ tasks.forEach(t=>{ if(isMyTask(t)&&taskLate(t))notifiedLate.add(t.id); }); lateSeeded=true; }
     if(!bellSeeded){ try{ var s=bellSeenSet(); notifList().forEach(x=>s.add(x.id)); bellSave(s); }catch(e){} bellSeeded=true; }
     try{ refreshBell(); }catch(e){}
@@ -1819,13 +1840,24 @@ function renderBoard(){
   }
   const list=boardVisible();
   const bi=boardItems(list);
+  /* Etapas adaptam: 6 colunas exclusivas quando filtra "Edição de Vídeo e Imagem"; 4 nos demais casos */
+  const COLS = (boardFilter==="edicao_midia") ? STAGES_EDICAO : STAGES;
+  /* Quando vendo as 4 colunas, mapeia status especiais (analise/aprovacao/pronto) pra coluna mais próxima */
+  function colKeyOf(x){
+    var raw = x.st || "afazer";
+    if(COLS===STAGES){
+      if(raw==="analise") return "afazer";
+      if(raw==="aprovacao"||raw==="pronto") return "revisao";
+    }
+    return raw;
+  }
   h+='<div class="stat-strip">';
-  STAGES.forEach(s=>{const n=bi.filter(x=>x.st===s.k).length;
+  COLS.forEach(s=>{const n=bi.filter(x=>colKeyOf(x)===s.k).length;
     h+='<div class="stat'+(s.k==="concluido"?" acc":"")+'"><div class="n">'+n+'</div><div class="l">'+esc(s.label)+'</div></div>';});
   h+='</div>';
-  h+='<div class="board-wrap">';
-  STAGES.forEach(s=>{
-    const items=bi.filter(x=>x.st===s.k)
+  h+='<div class="board-wrap" style="--cols:'+COLS.length+'">';
+  COLS.forEach(s=>{
+    const items=bi.filter(x=>colKeyOf(x)===s.k)
       .sort((a,b)=>((b.t.priority?1:0)-(a.t.priority?1:0))||((taskDueMs(a.t)||9e15)-(taskDueMs(b.t)||9e15))||((b.t.createdAt||0)-(a.t.createdAt||0))||(a.idx-b.idx));
     h+='<div class="col '+s.k+'"><div class="col-h"><div class="nm"><i></i>'+esc(s.label)+'</div><div class="qt">'+items.length+'</div></div>';
     h+= items.length? items.map(x=> x.idx<0 ? tcard(x.t) : ccard(x)).join("") : '<div class="col-empty">Sem tarefas aqui</div>';
@@ -1851,7 +1883,7 @@ function ccard(x){
   const person=userByName(t.assignee);
   const uc=person?userColor(person):sec.color;
   const st=STAGES.find(s=>s.k===x.st)||STAGES[0];
-  const STC={afazer:"var(--c-outro)",andamento:"var(--c-foto)",revisao:"var(--c-reuni)",concluido:"var(--c-trafego)"};
+  const STC={afazer:"var(--c-outro)",analise:"var(--c-edicao)",andamento:"var(--c-foto)",revisao:"var(--c-reuni)",aprovacao:"var(--c-copy)",pronto:"var(--accent)",concluido:"var(--c-trafego)"};
   const stc=STC[st.k]||"var(--c-outro)";
   const wk=Math.floor(idx/3)+1, cn=(idx%3)+1;
   const ttl=(o.t&&o.t.trim())?o.t:("Semana "+wk+" · Conteúdo "+cn);
@@ -1882,8 +1914,9 @@ function tcard(t){
   const done=ck.filter(x=>x&&x.d).length;
   const person=userByName(t.assignee);
   const uc=person?userColor(person):sec.color;
-  const st=STAGES.find(s=>s.k===(t.status||"afazer"))||STAGES[0];
-  const STC={afazer:"var(--c-outro)",andamento:"var(--c-foto)",revisao:"var(--c-reuni)",concluido:"var(--c-trafego)"};
+  const sectorArr=stagesFor(t.sector);
+  const st=sectorArr.find(s=>s.k===(t.status||"afazer"))||sectorArr[0];
+  const STC={afazer:"var(--c-outro)",analise:"var(--c-edicao)",andamento:"var(--c-foto)",revisao:"var(--c-reuni)",aprovacao:"var(--c-copy)",pronto:"var(--accent)",concluido:"var(--c-trafego)"};
   const stc=STC[st.k]||"var(--c-outro)";
   let meta='';
   const dMs=taskDueMs(t), ri=remainInfo(t);
@@ -1983,9 +2016,14 @@ function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
 function buildSecGrid(){const g=$("secGrid");g.innerHTML="";
   for(const k in SECTORS){const o=document.createElement("div");o.className="topt"+(k===selSector?" on":"");
     o.innerHTML='<div class="td" style="background:'+SECTORS[k].color+'"></div><span>'+SECTORS[k].label+'</span>';
-    o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();};g.appendChild(o);}}
+    o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();try{buildStageRow();}catch(_){}};g.appendChild(o);}}
 function buildSecHint(){
   var sh=$("tSecHint"); if(sh){ sh.style.display="none"; }
+  // Dica do fluxo de 6 etapas quando o setor é Edição de Vídeo e Imagem
+  if(sh && selSector==="edicao_midia"){
+    sh.innerHTML='<b>Fluxo deste setor:</b> Briefing aberto → Em Análise → Em Edição → Aguardando Aprovação → Pronto para Entrega → Concluído.<br><span style="color:var(--ink-faint);font-weight:600">Use a <b>Descrição</b> para o briefing (diretrizes, formato, roteiro) e o <b>Link/Anexo</b> para os ativos.</span>';
+    sh.style.display="";
+  }
   // Esconde Título/Descrição/Link nos setores que usam blocos próprios
   var hideTD = (selSector==="design"||selSector==="copy"||selSector==="postagem"||selSector==="roteiro");
   var tf=$("tTitleFld"), df=$("tDescFld"), lf=$("tLinkFld");
@@ -2121,7 +2159,10 @@ function buildCronUI(){
   }
 }
 function buildStageRow(){const g=$("tStageRow");g.innerHTML="";
-  STAGES.forEach(s=>{const b=document.createElement("button");b.type="button";
+  var arr=stagesFor(selSector);
+  /* se taskStatus não pertence ao setor atual, volta pra "afazer" */
+  if(!arr.find(s=>s.k===taskStatus)) taskStatus="afazer";
+  arr.forEach(s=>{const b=document.createElement("button");b.type="button";
     b.className="stage-chip"+(s.k===taskStatus?" on":"");b.textContent=s.label;
     b.onclick=()=>{taskStatus=s.k;buildStageRow();};g.appendChild(b);});}
 function renderChkEditor(){const w=$("tChkList");
@@ -2140,8 +2181,8 @@ function openTaskForm(t){
   editTaskId=t?t.id:null;
   $("taskFormTitle").textContent=t?"Editar tarefa":"Nova tarefa";
   $("taskDel").style.display=t?"block":"none";
-  selSector=(t&&SECTORS[t.sector])?t.sector:"edicao_video";
-  taskStatus=(t&&STAGES.some(s=>s.k===t.status))?t.status:"afazer";
+  selSector=(t&&SECTORS[normSector(t.sector)])?normSector(t.sector):"edicao_midia";
+  taskStatus=(t&&stagesFor(selSector).some(s=>s.k===t.status))?t.status:"afazer";
   setV("tClient",t&&t.client);setV("tTitle",t&&t.title);setV("tDesc",t&&t.desc);
   setV("tSDate",t&&t.startDate);setV("tSTime",(t&&t.startTime)||"");
   setV("tDDate",(t&&t.dueDate)||(t&&t.due)||"");setV("tDTime",(t&&t.dueTime)||"");
@@ -2269,7 +2310,7 @@ function openTaskDetail(id){
   if(t.link){ const safe=/^https?:\/\//i.test(t.link);
     linkHtml = safe ? '<a href="'+esc(t.link)+'" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all">'+esc(t.link)+'</a>' : esc(t.link); }
   let stageChips='<div class="l" style="font-size:10.5px;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:4px 0 9px">Mover para etapa</div><div class="stage-row" style="margin-bottom:6px">';
-  STAGES.forEach(s=>{stageChips+='<button type="button" class="stage-chip'+((t.status||"afazer")===s.k?" on":"")+'" data-mv="'+s.k+'">'+esc(s.label)+'</button>';});
+  stagesFor(t.sector).forEach(s=>{stageChips+='<button type="button" class="stage-chip'+((t.status||"afazer")===s.k?" on":"")+'" data-mv="'+s.k+'">'+esc(s.label)+'</button>';});
   stageChips+='</div>';
   let chkHtml="";
   if(ck.length){
@@ -2308,8 +2349,7 @@ function openTaskDetail(id){
     if(e.kind==="created") return W+'criou esta tarefa';
     if(e.kind==="started") return 'Iniciada (primeiro movimento para fora de A Fazer)';
     if(e.kind==="moved"){
-      var stMap={afazer:"A Fazer",andamento:"Em Andamento",revisao:"Revisão",concluido:"Concluído"};
-      return W+'moveu para <b>'+esc(stMap[e.to]||e.to||"—")+'</b>';
+      return W+'moveu para <b>'+esc(stageLabel(e.to, t.sector))+'</b>';
     }
     if(e.kind==="copy_em_avaliacao") return 'Copywriter enviou para <b>avaliação</b>';
     if(e.kind==="copy_aprovado") return W+'aprovou o <b>copy</b>';
@@ -2556,7 +2596,7 @@ async function moveTask(id,stage){
     payload.history=hist;
   }
   try{await db.collection("tasks").doc(id).update(payload);
-    toast("Movido para “"+stageLabel(stage)+"”");
+    toast("Movido para “"+stageLabel(stage, prev&&prev.sector)+"”");
     busy=false; if(prev)Object.assign(prev,payload); openTaskDetail(id);
   }catch(e){busy=false;toast("Erro ao mover");}
 }
