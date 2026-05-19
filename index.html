@@ -336,6 +336,7 @@
   .copy-wait{font-size:13px;color:var(--c-foto);font-weight:700;margin-top:12px}
   .tpill.cev{background:rgba(255,176,46,.16);color:var(--c-foto)}
   .tpill.cok{background:rgba(54,211,153,.16);color:var(--c-trafego)}
+  .tpill.cron2{background:rgba(168,130,255,.18);color:#b79bff}
   .posts-link{width:100%;margin:14px 0 2px;background:var(--surface);border:1px solid var(--line);
     color:var(--ink);font-size:13.5px;font-weight:800;padding:14px;border-radius:14px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;gap:9px}
@@ -715,7 +716,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 40 · build cliente-antes-conteudo</div>
+    <div class="ver">versão 41 · build cards-por-conteudo</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -867,6 +868,14 @@
   <div class="grab"></div>
   <div class="sh"><h2>Notificações</h2><button class="icon-btn" id="notifClose"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
   <div class="sbody" id="notifBody"></div>
+</div>
+<div class="sheet" id="contentSheet">
+  <div class="grab"></div>
+  <div class="sh"><h2 id="ctH">Conteúdo</h2><button class="icon-btn" id="ctClose"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
+  <div class="sbody detail" id="ctBody"></div>
+  <div class="sfoot">
+    <button class="btn btn-primary" id="ctEdit">Abrir cronograma completo</button>
+  </div>
 </div>
 <div class="alarm" id="alarmOverlay">
   <div class="ring" id="alarmRing">
@@ -1608,20 +1617,62 @@ function renderBoard(){
     h+='</div>';
   }
   const list=boardVisible();
+  const bi=boardItems(list);
   h+='<div class="stat-strip">';
-  STAGES.forEach(s=>{const n=list.filter(t=>(t.status||"afazer")===s.k).length;
+  STAGES.forEach(s=>{const n=bi.filter(x=>x.st===s.k).length;
     h+='<div class="stat'+(s.k==="concluido"?" acc":"")+'"><div class="n">'+n+'</div><div class="l">'+esc(s.label)+'</div></div>';});
   h+='</div>';
   h+='<div class="board-wrap">';
   STAGES.forEach(s=>{
-    const items=list.filter(t=>(t.status||"afazer")===s.k)
-      .sort((a,b)=>(b.priority?1:0)-(a.priority?1:0)||(taskDueMs(a)||9e15)-(taskDueMs(b)||9e15)||(b.createdAt||0)-(a.createdAt||0));
+    const items=bi.filter(x=>x.st===s.k)
+      .sort((a,b)=>((b.t.priority?1:0)-(a.t.priority?1:0))||((taskDueMs(a.t)||9e15)-(taskDueMs(b.t)||9e15))||((b.t.createdAt||0)-(a.t.createdAt||0))||(a.idx-b.idx));
     h+='<div class="col '+s.k+'"><div class="col-h"><div class="nm"><i></i>'+esc(s.label)+'</div><div class="qt">'+items.length+'</div></div>';
-    h+= items.length? items.map(tcard).join("") : '<div class="col-empty">Sem tarefas aqui</div>';
+    h+= items.length? items.map(x=> x.idx<0 ? tcard(x.t) : ccard(x)).join("") : '<div class="col-empty">Sem tarefas aqui</div>';
     h+='</div>';
   });
   h+='</div><div class="board-hint">Toque em um cartão para ver detalhes, mover de etapa e marcar o checklist.</div>';
   return h;
+}
+function isExpandable(t){ return (t.sector==="design"||t.sector==="copy") && Array.isArray(t.cronWeeks) && t.cronWeeks.length>0; }
+function boardItems(list){
+  var out=[];
+  list.forEach(function(t){
+    if(isExpandable(t)){
+      t.cronWeeks.map(cronNorm).forEach(function(o,i){ out.push({t:t,idx:i,c:o,st:(o.st||"afazer")}); });
+    } else { out.push({t:t,idx:-1,c:null,st:(t.status||"afazer")}); }
+  });
+  return out;
+}
+function ccard(x){
+  const t=x.t, o=x.c, idx=x.idx;
+  const sec=SECTORS[t.sector]||{label:"—",color:"var(--c-outro)"};
+  const late=taskLate(t);
+  const person=userByName(t.assignee);
+  const uc=person?userColor(person):sec.color;
+  const st=STAGES.find(s=>s.k===x.st)||STAGES[0];
+  const STC={afazer:"var(--c-outro)",andamento:"var(--c-foto)",revisao:"var(--c-reuni)",concluido:"var(--c-trafego)"};
+  const stc=STC[st.k]||"var(--c-outro)";
+  const wk=Math.floor(idx/3)+1, cn=(idx%3)+1;
+  const ttl=(o.t&&o.t.trim())?o.t:("Semana "+wk+" · Conteúdo "+cn);
+  let meta='';
+  const dMs=taskDueMs(t), ri=remainInfo(t);
+  if(dMs) meta+='<span class="mi due'+(late?" late":"")+'"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+esc(fmtShort(dMs))+'</span>';
+  if(ri&&!ri.done&&st.k!=="concluido") meta+='<span class="mi cd '+(ri.late?"late":"ok")+'"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+esc(ri.txt)+'</span>';
+  if(o.l&&o.l.trim()) meta+='<span class="mi"><svg viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>link</span>';
+  const nameLine='<div class="tc-who">'+esc(t.assignee||"Sem responsável")+'</div>';
+  return '<div class="tcard'+(late?" late urgent":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'" data-ci="'+idx+'">'+
+    '<div class="tc-top">'+
+      '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
+      '<span class="tpill cron2">SEM '+wk+' · #'+cn+'</span>'+
+      (t.priority?'<span class="tpill prio2"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>PRIORITÁRIA</span>':'')+
+      (late?'<span class="tpill"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>ATRASADA</span>':'')+
+      '<span class="tc-avw"><span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span><span class="tc-cdot" style="background:'+uc+'"></span></span>'+
+    '</div>'+
+    '<div class="tcli">'+esc(t.client||"Sem cliente")+'</div>'+
+    '<div class="ttt">'+esc(ttl)+'</div>'+
+    '<span class="tsec" style="background:'+secBg(sec.color)+';color:'+sec.color+'">'+esc(sec.label)+'</span>'+
+    nameLine+
+    (meta?'<div class="tmeta">'+meta+'</div>':'')+'</div>';
 }
 function tcard(t){
   const sec=SECTORS[t.sector]||{label:"—",color:"var(--c-outro)"};
@@ -1668,7 +1719,52 @@ function bindBoard(){
   document.querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{boardFilter=b.dataset.bf;render();});
   var gpl=$("goPostsLog"); if(gpl)gpl.onclick=()=>switchTab("posts");
   document.querySelectorAll("[data-od]").forEach(b=>b.onclick=()=>openTaskDetail(b.dataset.od));
-  document.querySelectorAll(".tcard[data-tid]").forEach(c=>c.onclick=()=>openTaskDetail(c.dataset.tid));
+  document.querySelectorAll(".tcard[data-tid]").forEach(c=>c.onclick=()=>{
+    if(c.dataset.ci!=null && c.dataset.ci!=="") openContentDetail(c.dataset.tid, +c.dataset.ci);
+    else openTaskDetail(c.dataset.tid);
+  });
+}
+function openContentDetail(tid, idx){
+  var t=tasks.find(x=>x.id===tid); if(!t)return;
+  var ws=Array.isArray(t.cronWeeks)?t.cronWeeks.map(cronNorm):[];
+  var o=ws[idx]; if(!o)return;
+  var wk=Math.floor(idx/3)+1, cn=(idx%3)+1;
+  var sec=SECTORS[t.sector]||{label:"—",color:"var(--c-outro)"};
+  ctCur={tid:tid,idx:idx};
+  $("ctH").textContent="Semana "+wk+" · Conteúdo "+cn;
+  var lk="";
+  if(o.l&&o.l.trim()){ var sf=/^https?:\/\//i.test(o.l);
+    lk=sf?'<a href="'+esc(o.l)+'" target="_blank" rel="noopener" class="cw-link">'+esc(o.l)+'</a>':'<span class="cw-link">'+esc(o.l)+'</span>'; }
+  var chips="";
+  STAGES.forEach(function(s){ chips+='<button type="button" class="stage-chip'+(o.st===s.k?" on":"")+'" data-cmv="'+s.k+'">'+esc(s.label)+'</button>'; });
+  $("ctBody").innerHTML=
+    '<div class="cron-view" style="margin-top:0">'+
+      '<div class="tt">'+esc(sec.label)+' · '+esc(t.client||"Sem cliente")+'</div>'+
+      '<div class="cw-ct">'+
+        '<div class="cw-cn">Tarefa / Título</div>'+
+        '<div class="cw-ti">'+((o.t&&o.t.trim())?esc(o.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
+        ((o.d&&o.d.trim())?'<div class="cw-cn" style="margin-top:10px">Descrição / briefing</div><div class="cw-c">'+esc(o.d)+'</div>':'')+
+        (lk?'<div class="cw-cn" style="margin-top:10px">Link / anexo</div><div class="cw-lk">'+lk+'</div>':'')+
+      '</div>'+
+    '</div>'+
+    '<div class="fld" style="margin-top:18px"><label>Etapa deste conteúdo</label><div class="stage-row" id="ctStage">'+chips+'</div></div>';
+  $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
+  openSheet(contentSheet);
+}
+async function setContentStage(tid, idx, st){
+  if(busy)return; var t=tasks.find(x=>x.id===tid); if(!t||!db)return;
+  busy=true;
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ busy=false; return; }
+    arr[idx].st=st;
+    await db.collection("tasks").doc(tid).update({cronWeeks:arr});
+    var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
+    if(!$("mainApp").classList.contains("hidden")&&tab==="board")render();
+    openContentDetail(tid,idx);
+    toast("Conteúdo movido para “"+stageLabel(st)+"”");
+  }catch(e){ toast("Não foi possível mover agora"); }
+  finally{ busy=false; }
 }
 function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
   const team=users.filter(u=>u.status==="ativo");
@@ -1744,7 +1840,14 @@ function buildSecHint(){
   }
 }
 function cronWeekCount(){ return selFreq==="semanal"?1 : selFreq==="quinzenal"?2 : 4; }
-function cronNorm(x){ if(x&&typeof x==="object")return {t:(x.t||"")+"",d:(x.d||"")+"",l:(x.l||"")+""}; return {t:"",d:(x==null?"":(""+x)),l:""}; }
+function cronNorm(x){
+  var st="afazer";
+  if(x&&typeof x==="object"){
+    if(x.st==="andamento"||x.st==="revisao"||x.st==="concluido"||x.st==="afazer") st=x.st;
+    return {t:(x.t||"")+"",d:(x.d||"")+"",l:(x.l||"")+"",st:st};
+  }
+  return {t:"",d:(x==null?"":(""+x)),l:"",st:"afazer"};
+}
 function buildCronUI(){
   var fld=$("tCronFld"); if(!fld)return;
   var isCron=(selSector==="design"||selSector==="copy");
@@ -1859,7 +1962,7 @@ $("taskSave").onclick=async()=>{
   if(selSector==="design"||selSector==="copy"){
     data.freq=selFreq;
     data.cronMonth=(selFreq==="mensal")?(cronMonthVal||""):"";
-    data.cronWeeks=cronWeeks.slice(0,cronWeekCount()*3).map(function(x){var o=cronNorm(x);return {t:(o.t||"").trim(),d:(o.d||"").trim(),l:(o.l||"").trim()};});
+    data.cronWeeks=cronWeeks.slice(0,cronWeekCount()*3).map(function(x){var o=cronNorm(x);return {t:(o.t||"").trim(),d:(o.d||"").trim(),l:(o.l||"").trim(),st:o.st};});
   } else { data.freq=""; data.cronMonth=""; data.cronWeeks=[]; }
   if(selSector==="copy"){
     var cs=selCopyState; if(cs==="aprovado" && !isCopyApprover(me)) cs="em_avaliacao";
@@ -2058,8 +2161,9 @@ $("taskDetailDel").onclick=async()=>{
 const scrim=$("scrim"),formSheet=$("formSheet"),detailSheet=$("detailSheet");
 const taskSheet=$("taskSheet"),taskDetailSheet=$("taskDetailSheet");
 const notifSheet=$("notifSheet");
+const contentSheet=$("contentSheet");
 function openSheet(s){scrim.classList.add("open");s.classList.add("open");}
-function closeSheets(){scrim.classList.remove("open");formSheet.classList.remove("open");detailSheet.classList.remove("open");taskSheet.classList.remove("open");taskDetailSheet.classList.remove("open");notifSheet.classList.remove("open");}
+function closeSheets(){scrim.classList.remove("open");formSheet.classList.remove("open");detailSheet.classList.remove("open");taskSheet.classList.remove("open");taskDetailSheet.classList.remove("open");notifSheet.classList.remove("open");contentSheet.classList.remove("open");}
 
 /* ===== Copywriter: avaliação da Arydyjany + sininho ===== */
 function normTxt(s){ return (s||"").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,""); }
@@ -2124,6 +2228,9 @@ function openNotifs(){
 }
 $("hBell").onclick=openNotifs;
 $("notifClose").onclick=closeSheets;
+let ctCur=null;
+$("ctClose").onclick=closeSheets;
+$("ctEdit").onclick=function(){ if(ctCur){ var id=ctCur.tid; closeSheets(); setTimeout(function(){ openTaskDetail(id); },240); } };
 
 /* ===== Registro de Posts (setor Programação de posts) ===== */
 let pIG=false,pFB=false;
