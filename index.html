@@ -466,6 +466,7 @@ const RGBA={"var(--c-grav)":"rgba(255,90,77,.16)","var(--c-foto)":"rgba(255,176,
 
 let db=null, me=null, users=[], events=[];
 let alarmTimer=null, alarmSeeded=false, alarmActive=false, audioCtx=null, beepTimer=null, notifAsked=false;
+let usersLoaded=false, photoReady=false;
 const ALARM_KEY="idseven_alarmed", PRE_MIN=120; /* 2h antes */
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
 
@@ -483,20 +484,38 @@ function dayLabel(s){const t=todayISO();if(s===t)return"Hoje";const a=new Date()
 function dayShort(s){const d=parseISO(s);return d.getDate()+" de "+MO[d.getMonth()];}
 function esc(s){return(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove("show"),2600);}
-function showErr(m){const e=$("errBox");e.textContent=m;e.classList.remove("hidden");setTimeout(()=>e.classList.add("hidden"),4500);}
+function showErr(m){const e=$("errBox");e.textContent=m;e.classList.remove("hidden");
+  try{e.scrollIntoView({behavior:"smooth",block:"center"});}catch(_){}
+  clearTimeout(e._x);e._x=setTimeout(()=>e.classList.add("hidden"),9000);}
 function hashPass(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return"h"+(h>>>0);}
 function fbAvatar(n){const i=(n||"?").trim().charAt(0).toUpperCase()||"?";
   return `<div style="width:100%;height:100%;background:var(--surface-2);display:grid;place-items:center;font-weight:800;color:var(--ink-soft);font-size:15px">${i}</div>`;}
 function avatarHTML(u){return u&&u.photo?`<img src="${u.photo}" alt="">`:fbAvatar(u?u.name:"?");}
 
-/* image downscale for small avatars */
-function compress(file,cb){
+/* image downscale for small avatars — robusto p/ HEIC/fotos grandes */
+function compress(file,ok,fail){
   const r=new FileReader();
-  r.onload=e=>{const img=new Image();img.onload=()=>{
-    const max=256,sc=Math.min(max/img.width,max/img.height,1);
-    const c=document.createElement("canvas");c.width=img.width*sc;c.height=img.height*sc;
-    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-    cb(c.toDataURL("image/jpeg",0.7));};img.src=e.target.result;};
+  r.onerror=()=>fail&&fail("não foi possível ler o arquivo");
+  r.onload=e=>{
+    const img=new Image();
+    img.onerror=()=>fail&&fail("formato de imagem não suportado");
+    img.onload=()=>{
+      try{
+        if(!img.width||!img.height) return fail&&fail("imagem inválida");
+        const max=240, sc=Math.min(max/img.width,max/img.height,1);
+        const c=document.createElement("canvas");
+        c.width=Math.max(1,Math.round(img.width*sc));
+        c.height=Math.max(1,Math.round(img.height*sc));
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+        let q=0.7, out=c.toDataURL("image/jpeg",q);
+        // garante foto bem pequena (<~110KB) p/ caber folgado no banco
+        while(out.length>150000 && q>0.3){ q-=0.15; out=c.toDataURL("image/jpeg",q); }
+        if(out.length>200000) return fail&&fail("foto muito pesada, tente outra");
+        ok(out);
+      }catch(_){ fail&&fail("erro ao processar a foto"); }
+    };
+    img.src=e.target.result;
+  };
   r.readAsDataURL(file);
 }
 
@@ -510,6 +529,7 @@ function configured(){return FIREBASE_CONFIG&&FIREBASE_CONFIG.projectId&&FIREBAS
   }catch(e){show("setupScreen");return;}
   db.collection("users").onSnapshot(snap=>{
     users=snap.docs.map(d=>({id:d.id,...d.data()}));
+    usersLoaded=true;
     if(me){const fresh=users.find(u=>u.id===me.id);if(fresh)me=fresh;}
     route();
     if(!$("mainApp").classList.contains("hidden"))render();
@@ -652,26 +672,59 @@ function switchAuth(m){
   $("regForm").classList.toggle("hidden",m!=="reg");
 }
 $("photoRing").onclick=()=>$("photoInput").click();
-$("photoInput").onchange=e=>{const f=e.target.files[0];if(!f)return;
-  compress(f,d=>{pendingPhoto=d;$("photoRing").innerHTML=`<img src="${d}" alt="">`;});};
+$("photoInput").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  photoReady=false; pendingPhoto=null;
+  $("photoRing").innerHTML='<div class="ph"><span>processando…</span></div>';
+  compress(f, d=>{
+    pendingPhoto=d; photoReady=true;
+    $("photoRing").innerHTML='<img src="'+d+'" alt="">';
+  }, msg=>{
+    $("photoRing").innerHTML='<div class="ph"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="9" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>TENTAR DE NOVO</span></div>';
+    showErr("Problema com a foto ("+msg+"). Dica: tire uma foto nova pela câmera ou escolha outra imagem (evite HEIC).");
+  });
+};
+
+function withTimeout(promise,ms){
+  return Promise.race([ promise,
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error("tempo esgotado")),ms)) ]);
+}
+
 $("doReg").onclick=async()=>{
+  const btn=$("doReg");
   const name=val("rName"),role=val("rRole"),phone=val("rPhone"),email=val("rEmail").toLowerCase(),pass=val("rPass");
-  if(!pendingPhoto)return showErr("Envie sua foto para continuar.");
-  if(!name||!role||!phone||!email||!pass)return showErr("Preencha todos os campos.");
-  if(users.some(u=>(u.email||"").toLowerCase()===email))return showErr("Já existe cadastro com este e-mail.");
-  const btn=$("doReg");btn.disabled=true;btn.textContent="Enviando…";
+  if(!photoReady||!pendingPhoto) return showErr("Envie sua foto para continuar (toque no círculo e escolha/tire a foto). Se a foto não aparecer no círculo, ela não foi aceita — tente outra.");
+  if(!name||!role||!phone||!email||!pass) return showErr("Preencha todos os campos do cadastro.");
+  if(!db) return showErr("Sem conexão com o servidor. Verifique a internet e tente de novo.");
+  btn.disabled=true; btn.textContent="Enviando…";
   try{
-    const first=users.length===0;
-    const ref=await db.collection("users").add({
+    // garante lista de usuários atualizada (evita criar admin duplicado / cadastro repetido)
+    let list=users;
+    if(!usersLoaded){
+      try{ const s=await withTimeout(db.collection("users").get(),12000);
+            list=s.docs.map(d=>({id:d.id,...d.data()})); }catch(_){}
+    }
+    if(list.some(u=>(u.email||"").toLowerCase()===email)){
+      showErr("Já existe um cadastro com este e-mail. Use a opção \"Entrar\".");
+      btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
+    }
+    const first=list.length===0;
+    const ref=await withTimeout(db.collection("users").add({
       name,role,phone,email,pass:hashPass(pass),photo:pendingPhoto,
       status:first?"ativo":"pendente",admin:first,createdAt:Date.now()
-    });
+    }),15000);
     localStorage.setItem(SESSION_KEY,ref.id);
     me={id:ref.id,name,role,phone,email,status:first?"ativo":"pendente",admin:first,photo:pendingPhoto};
-    toast(first?"Cadastro criado — você é o administrador":"Cadastro enviado!");
+    toast(first?"Cadastro criado — você é o administrador":"Cadastro enviado com sucesso!");
     route();
-  }catch(e){showErr("Erro ao salvar. Verifique a conexão.");}
-  btn.disabled=false;btn.textContent="Enviar cadastro para aprovação";
+  }catch(e){
+    const msg=(e&&e.message)?e.message:"falha desconhecida";
+    if(/tempo esgotado/.test(msg))
+      showErr("O servidor demorou a responder. Verifique a internet e toque em enviar de novo.");
+    else
+      showErr("Não foi possível concluir o cadastro: "+msg+". Tente novamente; se persistir, me avise com essa mensagem.");
+  }
+  btn.disabled=false; btn.textContent="Enviar cadastro para aprovação";
 };
 $("doLogin").onclick=()=>{
   const id=val("lUser").toLowerCase(),pass=hashPass(val("lPass"));
