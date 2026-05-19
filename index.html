@@ -45,9 +45,17 @@
     padding:11px;border-radius:10px;cursor:pointer;transition:.2s}
   .seg button.on{background:var(--ink);color:var(--bg)}
   .photo-pick{display:flex;flex-direction:column;align-items:center;margin-bottom:22px}
-  .photo-wrap{position:relative;width:104px;height:104px}
-  .photo-wrap input[type=file]{position:absolute;inset:0;width:100%;height:100%;
-    opacity:0;cursor:pointer;z-index:3;font-size:0}
+  .vh-file{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0;opacity:0}
+  .photo-wrap{display:block;width:104px;height:104px;cursor:pointer}
+  .photo-btn{display:inline-flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer;
+    background:var(--accent);color:var(--accent-ink);font-size:13.5px;font-weight:800;
+    padding:12px 20px;border-radius:12px;border:none;transition:.16s}
+  .photo-btn:active{transform:scale(.97)}
+  .photo-btn svg{width:17px;height:17px}
+  .photo-hint{font-size:11px;color:var(--ink-faint);margin-top:9px;font-weight:600}
+  .ver{text-align:center;font-size:10px;color:var(--ink-faint);opacity:.55;
+    font-weight:600;margin-top:26px;letter-spacing:.04em}
   .photo-ring{width:104px;height:104px;border-radius:50%;border:2px dashed var(--line);
     background:var(--surface);display:grid;place-items:center;cursor:pointer;overflow:hidden;transition:.2s}
   .photo-ring:active{transform:scale(.96)}
@@ -339,12 +347,13 @@
       <button class="big-btn" id="doLogin">Entrar</button>
     </div>
     <div id="regForm" class="hidden">
+      <input id="photoInput" type="file" accept="image/*" class="vh-file">
       <div class="photo-pick">
-        <div class="photo-wrap">
+        <label class="photo-wrap" for="photoInput">
           <div class="photo-ring" id="photoRing"><div class="ph"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="9" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>SUA FOTO</span></div></div>
-          <input id="photoInput" type="file" accept="image/*">
-        </div>
-        <label>Toque para enviar sua foto (obrigatória)</label>
+        </label>
+        <label class="photo-btn" for="photoInput"><svg viewBox="0 0 24 24" fill="none"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2" stroke="currentColor" stroke-width="2"/></svg>Escolher ou tirar foto</label>
+        <span class="photo-hint">Foto obrigatória para o cadastro</span>
       </div>
       <div class="fld"><label>Nome completo</label><input id="rName" placeholder="Seu nome"></div>
       <div class="fld"><label>Função na agência</label><input id="rRole" placeholder="Ex.: Filmmaker, Social media"></div>
@@ -353,6 +362,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
+    <div class="ver">versão 17 · build aud3</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
