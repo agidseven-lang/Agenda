@@ -285,22 +285,32 @@
   .logout{width:100%;margin-top:18px;background:rgba(255,90,77,.1);border:1px solid rgba(255,90,77,.25);
     color:#ff8c83;font-size:14px;font-weight:800;padding:15px;border-radius:14px;cursor:pointer}
   .bk-tip{font-size:11.5px;color:var(--ink-faint);font-weight:600;text-align:center;margin-top:9px;line-height:1.5;padding:0 6px}
-  .cron-weeks{margin-top:14px;display:flex;flex-direction:column;gap:12px}
+  .cron-weeks{margin-top:14px;display:flex;flex-direction:column;gap:14px}
   .cron-wk{background:var(--bg-2);border:1px solid var(--line-soft);border-radius:14px;padding:13px 13px}
-  .cron-wk-l{font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
-  .cron-fl{font-size:10px;font-weight:800;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:10px 0 6px}
+  .cron-wk-l{font-size:12px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+  .cron-ct{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:12px;margin-bottom:10px}
+  .cron-ct:last-child{margin-bottom:0}
+  .cron-cl{font-size:10.5px;font-weight:900;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px}
+  .cron-fl{font-size:10px;font-weight:800;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;margin:9px 0 6px}
   .cron-fl:first-of-type{margin-top:0}
-  .cron-wk input,.cron-wk textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;
-    padding:12px 13px;color:var(--ink);font-size:14px;outline:none;font-family:inherit;transition:.16s}
-  .cron-wk textarea{resize:none;min-height:64px;line-height:1.5}
-  .cron-wk input:focus,.cron-wk textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(216,255,62,.13)}
-  .cron-wk-v .cw-ti{font-size:14.5px;font-weight:800;letter-spacing:-.01em;margin-bottom:4px}
+  .cron-ct input,.cron-ct textarea{width:100%;background:var(--bg-2);border:1px solid var(--line);border-radius:11px;
+    padding:11px 12px;color:var(--ink);font-size:14px;outline:none;font-family:inherit;transition:.16s}
+  .cron-ct textarea{resize:none;min-height:58px;line-height:1.5}
+  .cron-ct input:focus,.cron-ct textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(216,255,62,.13)}
+  .sec-hint{margin-top:10px;background:rgba(77,159,255,.09);border:1px solid rgba(77,159,255,.22);
+    color:#9cc5ff;font-size:12px;font-weight:600;line-height:1.5;padding:11px 13px;border-radius:12px}
   .cron-view{margin-top:20px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:16px;padding:16px}
   .cron-view .tt{font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
-  .cron-wk-v{border-top:1px solid var(--line-soft);padding:11px 0}
+  .cron-wk-v{border-top:1px solid var(--line-soft);padding:12px 0 4px}
   .cron-wk-v:first-of-type{border-top:none;padding-top:2px}
-  .cron-wk-v .cw-l{font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
-  .cron-wk-v .cw-c{font-size:14px;font-weight:500;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+  .cron-wk-v .cw-l{font-size:12px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:9px}
+  .cw-ct{background:var(--surface);border:1px solid var(--line-soft);border-radius:11px;padding:11px 12px;margin-bottom:9px}
+  .cw-ct:last-child{margin-bottom:0}
+  .cw-cn{font-size:10px;font-weight:900;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+  .cw-ti{font-size:14.5px;font-weight:800;letter-spacing:-.01em;margin-bottom:4px}
+  .cw-c{font-size:13.5px;font-weight:500;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:var(--ink-soft)}
+  .cw-lk{margin-top:6px}
+  .cw-link{font-size:12.5px;font-weight:700;color:var(--accent);word-break:break-all}
   .cron-empty{font-size:13px;color:var(--ink-faint);font-weight:600;line-height:1.5}
   .hright{display:flex;align-items:center;gap:12px}
   .hbell{position:relative;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);
@@ -548,6 +558,8 @@
     font-size:12px;font-weight:700;padding:9px 13px;border-radius:10px;cursor:pointer;transition:.15s}
   .stage-chip:active{transform:scale(.96)}
   .stage-chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .stage-chip.lock{opacity:.45}
+  .stage-chip.lock.on{opacity:1}
   .chk-add{display:flex;gap:8px}
   .chk-add input{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:11px;
     padding:11px 13px;color:var(--ink);font-size:14px;outline:none}
@@ -703,7 +715,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 36 · build cronograma-estruturado</div>
+    <div class="ver">versão 38 · build copy-posts-form</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -790,19 +802,33 @@
   <div class="grab"></div>
   <div class="sh"><h2 id="taskFormTitle">Nova tarefa</h2><button class="icon-btn" id="taskClose"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
   <div class="sbody">
-    <div class="fld"><label>Setor responsável</label><div class="type-grid" id="secGrid"></div></div>
-    <div class="fld"><label>Cliente / empresa</label><input id="tClient" placeholder="Ex.: Loja Aurora"></div>
-    <div class="fld"><label>Tarefa (título)</label><input id="tTitle" placeholder="Ex.: Editar reels da campanha de junho"></div>
-    <div class="fld"><label>Descrição / briefing</label><textarea id="tDesc" placeholder="Detalhes, referências, instruções…"></textarea></div>
+    <div class="fld"><label>Setor responsável</label><div class="type-grid" id="secGrid"></div>
+      <div id="tSecHint" class="sec-hint" style="display:none"></div>
+    </div>
     <div class="fld" id="tCronFld" style="display:none">
       <label>Tipo de cronograma</label>
       <div class="stage-row" id="tCronFreq"></div>
-      <div id="tCronMonthWrap" style="display:none;margin-top:12px">
-        <label style="display:block;font-size:10.5px;font-weight:800;color:var(--ink-faint);margin-bottom:8px;letter-spacing:.07em;text-transform:uppercase">Mês de referência</label>
-        <input id="tCronMonth" type="month">
-      </div>
-      <div id="tCronWeeks" class="cron-weeks"></div>
+      <div id="tCronWeeks" class="cron-weeks" style="margin-top:14px"></div>
     </div>
+    <div class="fld" id="tCopyFld" style="display:none">
+      <label>Aprovação do conteúdo (Copywriter)</label>
+      <div class="stage-row" id="tCopyState"></div>
+      <div class="sec-hint" id="tCopyHint" style="margin-top:10px"></div>
+    </div>
+    <div class="fld" id="tPostFld2" style="display:none">
+      <label>Registro de publicação</label>
+      <div class="post-tg">
+        <button type="button" class="ptog ig" id="tPIG"></button>
+        <button type="button" class="ptog fb" id="tPFB"></button>
+      </div>
+      <div class="cron-fl" style="margin-top:14px">Data e hora da postagem</div>
+      <div class="r2"><input id="tPDate" type="date"><input id="tPTime" type="time"></div>
+      <button type="button" class="prio-toggle" id="tPMark" style="margin-top:12px"><span class="bx"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Marcar como já postado</span></button>
+      <div class="sec-hint" id="tPostHint" style="margin-top:10px">Marque as plataformas e o horário. Ao salvar como postado, entra no "Registro de Posts publicados" (topo do Quadro).</div>
+    </div>
+    <div class="fld"><label>Cliente / empresa</label><input id="tClient" placeholder="Ex.: Loja Aurora"></div>
+    <div class="fld"><label>Tarefa (título)</label><input id="tTitle" placeholder="Ex.: Editar reels da campanha de junho"></div>
+    <div class="fld"><label>Descrição / briefing</label><textarea id="tDesc" placeholder="Detalhes, referências, instruções…"></textarea></div>
     <div class="fld"><label>Início — data e hora</label>
       <div class="r2"><input id="tSDate" type="date"><input id="tSTime" type="time"></div></div>
     <div class="fld"><label>Término / Prazo — data e hora</label>
@@ -915,7 +941,7 @@ let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
 let usersLoaded=false, photoReady=false, sessionId=null, busy=false;
 const ALARM_KEY="idseven_alarmed", PRE_MIN=120; /* 2h antes */
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
-let boardFilter="all", editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_video", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="";
+let boardFilter="all", editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_video", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false;
 
 function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -1654,56 +1680,100 @@ function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
 function buildSecGrid(){const g=$("secGrid");g.innerHTML="";
   for(const k in SECTORS){const o=document.createElement("div");o.className="topt"+(k===selSector?" on":"");
     o.innerHTML='<div class="td" style="background:'+SECTORS[k].color+'"></div><span>'+SECTORS[k].label+'</span>';
-    o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();};g.appendChild(o);}}
-function weeksInMonth(ym){
-  if(!/^\d{4}-\d{2}$/.test(ym||""))return 4;
-  var y=+ym.slice(0,4),m=+ym.slice(5,7),days=new Date(y,m,0).getDate();
-  return Math.max(1,Math.ceil(days/7));
+    o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();};g.appendChild(o);}}
+function buildSecHint(){
+  var sh=$("tSecHint"); if(sh){ sh.style.display="none"; }
+  var cf=$("tCopyFld"), pf=$("tPostFld2");
+  // ---- Copywriter ----
+  if(cf){
+    var isCopy=(selSector==="copy"); cf.style.display=isCopy?"":"none";
+    if(isCopy){
+      var appr=isCopyApprover(me);
+      var row=$("tCopyState"); row.innerHTML="";
+      [["rascunho","Rascunho"],["em_avaliacao","Em avaliação"],["aprovado","Aprovado"]].forEach(function(o){
+        var b=document.createElement("button"); b.type="button";
+        b.className="stage-chip"+(selCopyState===o[0]?" on":"")+((o[0]==="aprovado"&&!appr)?" lock":"");
+        b.textContent=o[1];
+        b.onclick=function(){
+          if(o[0]==="aprovado" && !appr){ toast("Apenas a Arydyjany pode marcar como Aprovado"); return; }
+          selCopyState=o[0]; buildSecHint();
+        };
+        row.appendChild(b);
+      });
+      var h=$("tCopyHint");
+      h.textContent = selCopyState==="aprovado"
+        ? "Conteúdo aprovado. Ao salvar, o sininho avisa a equipe."
+        : selCopyState==="em_avaliacao"
+          ? (appr? "Em avaliação. Você (Arydyjany) pode marcar como Aprovado." : "Será enviado para a Arydyjany avaliar. O sininho avisa quando aprovar.")
+          : "Rascunho: ainda não enviado. Mude para \"Em avaliação\" para enviar à Arydyjany.";
+    }
+  }
+  // ---- Programação de posts ----
+  if(pf){
+    var isPost=(selSector==="postagem"); pf.style.display=isPost?"":"none";
+    if(isPost){
+      var ig=$("tPIG"), fb=$("tPFB");
+      ig.innerHTML=IG_SVG+"<span>Instagram</span>"; ig.className="ptog ig"+(pIG?" on":"");
+      fb.innerHTML=FB_SVG+"<span>Facebook</span>"; fb.className="ptog fb"+(pFB?" on":"");
+      ig.onclick=function(){ pIG=!pIG; buildSecHint(); };
+      fb.onclick=function(){ pFB=!pFB; buildSecHint(); };
+      var mk=$("tPMark");
+      mk.classList.toggle("on",!!postMark);
+      mk.querySelector("span:last-child").textContent = postMark? "Postado ✓ (marcado)" : "Marcar como já postado";
+      mk.onclick=function(){ postMark=!postMark;
+        if(postMark){ var d=$("tPDate"),tm=$("tPTime");
+          if(!d.value){ var n=new Date(); d.value=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0")+"-"+String(n.getDate()).padStart(2,"0"); }
+          if(!tm.value){ var n2=new Date(); tm.value=String(n2.getHours()).padStart(2,"0")+":"+String(n2.getMinutes()).padStart(2,"0"); }
+        }
+        buildSecHint();
+      };
+      var ph=$("tPostHint");
+      ph.textContent = postMark
+        ? "Será registrado como POSTADO e entra em \"Registro de Posts publicados\" (topo do Quadro)."
+        : "Marque a(s) plataforma(s) e o horário. Toque em \"Marcar como já postado\" quando publicar.";
+    }
+  }
 }
-function cronWeekLabel(i,freq,ym){
-  if(freq!=="mensal"||!/^\d{4}-\d{2}$/.test(ym||""))return "Semana "+(i+1);
-  var y=+ym.slice(0,4),m=+ym.slice(5,7),days=new Date(y,m,0).getDate();
-  var a=i*7+1,b=Math.min((i+1)*7,days),mm=(m<10?"0":"")+m;
-  return "Semana "+(i+1)+" · dias "+a+"–"+b+"/"+mm;
-}
-function cronWeekCount(){ return selFreq==="semanal"?1 : selFreq==="quinzenal"?2 : weeksInMonth(cronMonthVal); }
-function cronNorm(x){ if(x&&typeof x==="object")return {t:(x.t||"")+"",d:(x.d||"")+""}; return {t:"",d:(x==null?"":(""+x))}; }
+function cronWeekCount(){ return selFreq==="semanal"?1 : selFreq==="quinzenal"?2 : 4; }
+function cronNorm(x){ if(x&&typeof x==="object")return {t:(x.t||"")+"",d:(x.d||"")+"",l:(x.l||"")+""}; return {t:"",d:(x==null?"":(""+x)),l:""}; }
 function buildCronUI(){
   var fld=$("tCronFld"); if(!fld)return;
   var isCron=(selSector==="design");
   fld.style.display=isCron?"":"none";
   if(!isCron)return;
   var fr=$("tCronFreq"); fr.innerHTML="";
-  [["semanal","Semanal"],["quinzenal","Quinzenal"],["mensal","Mensal"]].forEach(function(o){
+  [["semanal","Semanal · 3"],["quinzenal","Quinzenal · 6"],["mensal","Mensal · 12"]].forEach(function(o){
     var b=document.createElement("button"); b.type="button";
     b.className="stage-chip"+(selFreq===o[0]?" on":""); b.textContent=o[1];
     b.onclick=function(){ selFreq=o[0]; buildCronUI(); }; fr.appendChild(b);
   });
-  var mw=$("tCronMonthWrap"); mw.style.display=(selFreq==="mensal")?"":"none";
-  var mi=$("tCronMonth"); if(mi){ mi.value=cronMonthVal||"";
-    mi.onchange=function(){ cronMonthVal=mi.value; buildCronUI(); }; }
-  var n=cronWeekCount();
+  var W=cronWeekCount(), total=W*3;
   cronWeeks=cronWeeks.map(cronNorm);
-  while(cronWeeks.length<n)cronWeeks.push({t:"",d:""});
-  if(cronWeeks.length>n)cronWeeks=cronWeeks.slice(0,n);
+  while(cronWeeks.length<total)cronWeeks.push({t:"",d:"",l:""});
+  if(cronWeeks.length>total)cronWeeks=cronWeeks.slice(0,total);
   var w=$("tCronWeeks"); w.innerHTML="";
-  for(var i=0;i<n;i++){ (function(idx){
-    var box=document.createElement("div"); box.className="cron-wk";
-    var lab=document.createElement("div"); lab.className="cron-wk-l";
-    lab.textContent=cronWeekLabel(idx,selFreq,cronMonthVal);
-    var l1=document.createElement("div"); l1.className="cron-fl"; l1.textContent="Tarefa / Título";
-    var ti=document.createElement("input");
-    ti.placeholder="Ex.: Post carrossel — lançamento";
-    ti.value=cronWeeks[idx].t||"";
-    ti.oninput=function(){ cronWeeks[idx].t=ti.value; };
-    var l2=document.createElement("div"); l2.className="cron-fl"; l2.textContent="Descrição / briefing";
-    var ta=document.createElement("textarea");
-    ta.placeholder="Temas, formatos, referências, instruções…";
-    ta.value=cronWeeks[idx].d||"";
-    ta.oninput=function(){ cronWeeks[idx].d=ta.value; };
-    box.appendChild(lab); box.appendChild(l1); box.appendChild(ti);
-    box.appendChild(l2); box.appendChild(ta); w.appendChild(box);
-  })(i); }
+  for(var wk=0; wk<W; wk++){
+    var grp=document.createElement("div"); grp.className="cron-wk";
+    var lab=document.createElement("div"); lab.className="cron-wk-l"; lab.textContent="Semana "+(wk+1);
+    grp.appendChild(lab);
+    for(var c=0;c<3;c++){ (function(idx,cn){
+      var blk=document.createElement("div"); blk.className="cron-ct";
+      var cl=document.createElement("div"); cl.className="cron-cl"; cl.textContent="Conteúdo "+cn;
+      var l1=document.createElement("div"); l1.className="cron-fl"; l1.textContent="Tarefa / Título";
+      var ti=document.createElement("input"); ti.placeholder="Ex.: Post carrossel — lançamento";
+      ti.value=cronWeeks[idx].t||""; ti.oninput=function(){ cronWeeks[idx].t=ti.value; };
+      var l2=document.createElement("div"); l2.className="cron-fl"; l2.textContent="Descrição / briefing";
+      var ta=document.createElement("textarea"); ta.placeholder="Temas, formatos, referências…";
+      ta.value=cronWeeks[idx].d||""; ta.oninput=function(){ cronWeeks[idx].d=ta.value; };
+      var l3=document.createElement("div"); l3.className="cron-fl"; l3.textContent="Link / anexo";
+      var li=document.createElement("input"); li.placeholder="Cole o link (Drive, Canva…)"; li.setAttribute("inputmode","url");
+      li.value=cronWeeks[idx].l||""; li.oninput=function(){ cronWeeks[idx].l=li.value; };
+      blk.appendChild(cl); blk.appendChild(l1); blk.appendChild(ti);
+      blk.appendChild(l2); blk.appendChild(ta); blk.appendChild(l3); blk.appendChild(li);
+      grp.appendChild(blk);
+    })(wk*3+c, c+1); }
+    w.appendChild(grp);
+  }
 }
 function buildStageRow(){const g=$("tStageRow");g.innerHTML="";
   STAGES.forEach(s=>{const b=document.createElement("button");b.type="button";
@@ -1736,8 +1806,11 @@ function openTaskForm(t){
   selFreq=(t&&t.freq)?t.freq:"semanal";
   cronMonthVal=(t&&t.cronMonth)?t.cronMonth:"";
   cronWeeks=(t&&Array.isArray(t.cronWeeks))?t.cronWeeks.map(cronNorm):[];
+  selCopyState=(t&&(t.copyState==="em_avaliacao"||t.copyState==="aprovado"))?t.copyState:"rascunho";
+  pIG=!!(t&&t.postIG); pFB=!!(t&&t.postFB); postMark=!!(t&&t.posted);
+  setV("tPDate",(t&&t.postedDate)||"");setV("tPTime",(t&&t.postedTime)||"");
   $("tPrioFld").style.display=(me&&me.admin)?"":"none";
-  buildSecGrid();buildStageRow();renderChkEditor();buildRespChips();buildPrioToggle();buildCronUI();
+  buildSecGrid();buildStageRow();renderChkEditor();buildRespChips();buildPrioToggle();buildCronUI();buildSecHint();
   openSheet(taskSheet);
 }
 function buildPrioToggle(){const b=$("tPrio");if(!b)return;
@@ -1768,8 +1841,24 @@ $("taskSave").onclick=async()=>{
   if(selSector==="design"){
     data.freq=selFreq;
     data.cronMonth=(selFreq==="mensal")?(cronMonthVal||""):"";
-    data.cronWeeks=cronWeeks.slice(0,cronWeekCount()).map(function(x){var o=cronNorm(x);return {t:(o.t||"").trim(),d:(o.d||"").trim()};});
+    data.cronWeeks=cronWeeks.slice(0,cronWeekCount()*3).map(function(x){var o=cronNorm(x);return {t:(o.t||"").trim(),d:(o.d||"").trim(),l:(o.l||"").trim()};});
   } else { data.freq=""; data.cronMonth=""; data.cronWeeks=[]; }
+  if(selSector==="copy"){
+    var cs=selCopyState; if(cs==="aprovado" && !isCopyApprover(me)) cs="em_avaliacao";
+    data.copyState=cs;
+    var prevCs=(prevTask&&prevTask.copyState)?prevTask.copyState:"rascunho";
+    data.copyAt=(prevTask && cs===prevCs && prevTask.copyAt)?prevTask.copyAt:Date.now();
+    if(cs==="aprovado" && isCopyApprover(me)) data.copyBy=me.id;
+  }
+  if(selSector==="postagem"){
+    data.postIG=!!pIG; data.postFB=!!pFB;
+    var pd=$("tPDate").value, pt=$("tPTime").value;
+    data.postedDate=pd||""; data.postedTime=pt||"";
+    if(postMark){
+      data.posted=true; data.postedAt=dtMs(pd,pt)||Date.now();
+      data.status="concluido"; taskStatus="concluido";
+    } else { data.posted=false; }
+  }
   try{
     if(editTaskId){
       const prev=tasks.find(x=>x.id===editTaskId);
@@ -1823,14 +1912,28 @@ function openTaskDetail(id){
   trackHtml+='</div>';
   let cronHtml="";
   if(t.sector==="design"){
-    var fqL=t.freq==="quinzenal"?"Quinzenal":t.freq==="mensal"?"Mensal":"Semanal";
-    cronHtml='<div class="cron-view"><div class="tt">Cronograma · '+fqL+((t.freq==="mensal"&&t.cronMonth)?(' · '+esc(t.cronMonth)):'')+'</div>';
+    var fqL=t.freq==="quinzenal"?"Quinzenal · 6 conteúdos":t.freq==="mensal"?"Mensal · 12 conteúdos":"Semanal · 3 conteúdos";
+    cronHtml='<div class="cron-view"><div class="tt">Cronograma · '+fqL+'</div>';
     var ws=Array.isArray(t.cronWeeks)?t.cronWeeks.map(cronNorm):[];
-    var anyc=ws.some(o=>(o.t&&o.t.trim())||(o.d&&o.d.trim()));
-    if(!anyc) cronHtml+='<div class="cron-empty">Nenhum conteúdo especificado ainda. Edite a tarefa para preencher as semanas.</div>';
-    else ws.forEach((o,i)=>{ cronHtml+='<div class="cron-wk-v"><div class="cw-l">'+esc(cronWeekLabel(i,t.freq,t.cronMonth))+'</div>'+
-      '<div class="cw-ti">'+((o.t&&o.t.trim())?esc(o.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
-      '<div class="cw-c">'+((o.d&&o.d.trim())?esc(o.d):'<span style="color:var(--ink-faint)">— sem descrição —</span>')+'</div></div>'; });
+    var anyc=ws.some(o=>(o.t&&o.t.trim())||(o.d&&o.d.trim())||(o.l&&o.l.trim()));
+    if(!anyc) cronHtml+='<div class="cron-empty">Nenhum conteúdo especificado ainda. Edite a tarefa para preencher.</div>';
+    else {
+      var W=Math.ceil(ws.length/3);
+      for(var wi=0; wi<W; wi++){
+        cronHtml+='<div class="cron-wk-v"><div class="cw-l">Semana '+(wi+1)+'</div>';
+        for(var ci=0; ci<3; ci++){
+          var o=ws[wi*3+ci]; if(!o) continue;
+          var lk="";
+          if(o.l&&o.l.trim()){ var sf=/^https?:\/\//i.test(o.l);
+            lk=sf?'<a href="'+esc(o.l)+'" target="_blank" rel="noopener" class="cw-link">'+esc(o.l)+'</a>':'<span class="cw-link">'+esc(o.l)+'</span>'; }
+          cronHtml+='<div class="cw-ct"><div class="cw-cn">Conteúdo '+(ci+1)+'</div>'+
+            '<div class="cw-ti">'+((o.t&&o.t.trim())?esc(o.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
+            ((o.d&&o.d.trim())?'<div class="cw-c">'+esc(o.d)+'</div>':'')+
+            (lk?'<div class="cw-lk">'+lk+'</div>':'')+'</div>';
+        }
+        cronHtml+='</div>';
+      }
+    }
     cronHtml+='</div>';
   }
   let copyHtml="";
