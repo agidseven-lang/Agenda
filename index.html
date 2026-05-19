@@ -188,7 +188,12 @@
   .ev .inf{font-size:11px;color:var(--ink-soft);font-weight:600;display:flex;align-items:center;gap:4px}
   .ev .inf svg{width:11px;height:11px;opacity:.7}
   .ev .who{font-size:10px;color:var(--ink-faint);font-weight:600;margin-top:6px;display:flex;align-items:center;gap:5px}
-  .ev .who .av{width:15px;height:15px;border-radius:50%;overflow:hidden;flex-shrink:0}
+  .ev .who .av{width:18px;height:18px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--surface-2)}
+  .ev .who .cdot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .ev.late{border-color:rgba(255,90,77,.45)}
+  .ev .cdv{font-size:11px;font-weight:800;display:flex;align-items:center;gap:4px;color:var(--ink-soft)}
+  .ev .cdv svg{width:11px;height:11px;opacity:.85}
+  .ev .cdv.ok{color:var(--c-trafego)} .ev .cdv.run{color:var(--c-foto)} .ev .cdv.late{color:#ff8c83}
   .ev .who .av img{width:100%;height:100%;object-fit:cover}
   .ev .dchk{position:absolute;top:13px;right:13px;width:18px;height:18px;border-radius:50%;
     border:1.5px solid var(--line);display:grid;place-items:center}
@@ -218,6 +223,21 @@
   .pst.ok{background:rgba(54,211,153,.15);color:var(--c-trafego)}
   .person .approve{background:var(--accent);color:var(--accent-ink);border:none;font-size:11.5px;
     font-weight:800;padding:8px 13px;border-radius:9px;cursor:pointer}
+  .adm-tag{font-size:8.5px;font-weight:900;letter-spacing:.05em;color:var(--accent-ink);
+    background:var(--accent);padding:2px 6px;border-radius:5px;margin-left:7px;vertical-align:middle}
+  .adm-btn{background:var(--bg-2);border:1px solid var(--line);color:var(--ink-soft);
+    font-size:11px;font-weight:800;padding:8px 12px;border-radius:9px;cursor:pointer;flex-shrink:0}
+  .adm-btn.on{background:rgba(255,90,77,.12);border-color:rgba(255,90,77,.3);color:#ff8c83}
+  .prio-toggle{display:flex;align-items:center;gap:11px;width:100%;background:var(--surface);
+    border:1px solid var(--line);border-radius:13px;padding:13px 14px;cursor:pointer;
+    color:var(--ink-soft);font-size:13.5px;font-weight:700;text-align:left}
+  .prio-toggle .bx{width:24px;height:24px;border-radius:7px;border:1.5px solid var(--line);
+    display:grid;place-items:center;flex-shrink:0;color:var(--ink-faint)}
+  .prio-toggle .bx svg{width:14px;height:14px}
+  .prio-toggle.on{background:rgba(255,90,77,.1);border-color:rgba(255,90,77,.4);color:#ff8c83}
+  .prio-toggle.on .bx{background:#ff5a4d;border-color:#ff5a4d;color:#fff}
+  .tpill.prio{background:#ff5a4d}
+  .tpill.prio2{background:var(--c-foto);color:#1a1205}
   .prof{text-align:center;padding-top:20px}
   .prof .pa{width:96px;height:96px;border-radius:50%;overflow:hidden;border:2px solid var(--accent);margin:0 auto 16px}
   .prof .pa img{width:100%;height:100%;object-fit:cover}
@@ -236,6 +256,9 @@
     cursor:pointer;padding:0;transition:.15s;outline:none}
   .color-pick .cp-dot:active{transform:scale(.9)}
   .color-pick .cp-dot.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface),0 0 0 4px currentColor}
+  .color-pick .cp-dot.taken{opacity:.55}
+  .color-pick .cp-dot{display:grid;place-items:center}
+  .color-pick .cp-tk{font-size:13px;font-weight:900;color:rgba(0,0,0,.65)}
   .color-pick .cp-hint{font-size:11.5px;color:var(--ink-faint);font-weight:600;margin-top:12px;line-height:1.5}
   .prof-card .pl .pic{width:34px;height:34px;border-radius:10px;background:var(--bg-2);
     border:1px solid var(--line);display:grid;place-items:center;flex-shrink:0}
@@ -328,9 +351,12 @@
   .tc-st{font-size:9.5px;font-weight:900;letter-spacing:.04em;text-transform:uppercase;
     padding:5px 10px;border-radius:8px;white-space:nowrap}
   .tc-top .tpill{margin:0}
-  .tc-av{margin-left:auto;width:36px;height:36px;border-radius:50%;overflow:hidden;
-    flex-shrink:0;border:2px solid var(--uc,var(--line));background:var(--surface-2)}
+  .tc-avw{margin-left:auto;position:relative;flex-shrink:0;width:36px;height:36px}
+  .tc-av{width:36px;height:36px;border-radius:50%;overflow:hidden;
+    border:2px solid var(--uc,var(--line));background:var(--surface-2);display:block}
   .tc-av img{width:100%;height:100%;object-fit:cover}
+  .tc-cdot{position:absolute;right:-2px;bottom:-2px;width:15px;height:15px;border-radius:50%;
+    border:2.5px solid var(--bg-2);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
   .tcard .tcli{font-size:10px;font-weight:800;color:var(--ink-faint);text-transform:uppercase;
     letter-spacing:.04em;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tcard .ttt{font-size:15.5px;font-weight:800;line-height:1.3;margin-bottom:10px}
@@ -489,7 +515,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 24 · build cor</div>
+    <div class="ver">versão 26 · build admin</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -550,7 +576,9 @@
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--ink-faint);margin-bottom:8px;letter-spacing:.04em;text-transform:uppercase">Início</label><input id="fStart" type="time"></div>
       <div><label style="display:block;font-size:11px;font-weight:700;color:var(--ink-faint);margin-bottom:8px;letter-spacing:.04em;text-transform:uppercase">Término</label><input id="fEnd" type="time"></div>
     </div></div>
-    <div class="fld"><label>Responsável / Equipe</label><input id="fOwner" placeholder="Quem executa"></div>
+    <div class="fld"><label>Responsável pela agenda</label>
+      <div class="resp-chips" id="fOwnerChips"></div>
+      <input id="fOwner" placeholder="Nome do responsável" style="margin-top:9px"></div>
     <div class="fld"><label>Observações</label><textarea id="fNotes" placeholder="Roteiro, equipamentos, briefing…"></textarea></div>
   </div>
   <div class="sfoot">
@@ -584,6 +612,8 @@
       <input id="tAssignee" placeholder="Nome do responsável" style="margin-top:9px">
     </div>
     <div class="fld"><label>Link / Anexo (Drive, Canva, etc.)</label><input id="tLink" placeholder="Cole o link aqui (opcional)" inputmode="url"></div>
+    <div class="fld" id="tPrioFld" style="display:none"><label>Prioridade</label>
+      <button type="button" id="tPrio" class="prio-toggle"><span class="bx"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span>Marcar como tarefa prioritária (urgente)</span></button></div>
     <div class="fld"><label>Etapa</label><div class="stage-row" id="tStageRow"></div></div>
     <div class="fld"><label>Checklist</label>
       <div class="chk-add"><input id="tChkInput" placeholder="Adicionar item e tocar em +"><button type="button" id="tChkAdd">+</button></div>
@@ -670,7 +700,7 @@ let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
 let usersLoaded=false, photoReady=false, sessionId=null, busy=false;
 const ALARM_KEY="idseven_alarmed", PRE_MIN=120; /* 2h antes */
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
-let boardFilter="all", editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_video", taskStatus="afazer";
+let boardFilter="all", editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_video", taskStatus="afazer", selPrio=false;
 
 function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -1036,8 +1066,15 @@ function renderAgenda(){
   return h;
 }
 function evCard(e){
-  const t=TYPES[e.type]||TYPES.outro,u=users.find(x=>x.id===e.by);
-  return '<div class="ev '+(e.done?"done":"")+'" data-id="'+e.id+'"><div class="bar" style="background:'+t.color+'"></div><div class="tm"><span class="t1">'+(e.start||"--:--")+'</span>'+(e.end?'<span class="t2">'+e.end+'</span>':"")+'</div><div class="bd"><div class="tt">'+(esc(e.title)||esc(e.client)||"Sem título")+'</div><div class="mt2"><span class="tag" style="background:'+RGBA[t.color]+';color:'+t.color+'">'+t.label+'</span>'+(e.client?'<span class="inf"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+esc(e.client)+'</span>':"")+(e.location?'<span class="inf"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2"/></svg>'+esc(e.location)+'</span>':"")+'</div>'+(u?'<div class="who"><span class="av">'+avatarHTML(u)+'</span>por '+esc((u.name||"—").split(" ")[0])+'</div>':"")+'</div><div class="dchk"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>';
+  const t=TYPES[e.type]||TYPES.outro;
+  const own=evOwner(e); const oc=own?userColor(own):t.color;
+  const si=evStatus(e);
+  let cd='';
+  if(si&&si.kind!=="done") cd='<span class="cdv '+(si.late?"late":(si.kind==="run"?"run":"ok"))+'"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+esc(si.txt)+'</span>';
+  const who = own
+    ? '<div class="who"><span class="av" style="border:2px solid '+oc+'">'+avatarHTML(own)+'</span><span class="cdot" style="background:'+oc+'"></span>'+esc((own.name||"—").split(" ")[0])+'</div>'
+    : (e.owner?'<div class="who"><span class="cdot" style="background:'+oc+'"></span>'+esc(e.owner)+'</div>':"");
+  return '<div class="ev '+(e.done?"done":"")+(evLate(e)?" late":"")+'" data-id="'+e.id+'"><div class="bar" style="background:'+oc+'"></div><div class="tm"><span class="t1">'+(e.start||"--:--")+'</span>'+(e.end?'<span class="t2">'+e.end+'</span>':"")+'</div><div class="bd"><div class="tt">'+(esc(e.title)||esc(e.client)||"Sem título")+'</div><div class="mt2"><span class="tag" style="background:'+RGBA[t.color]+';color:'+t.color+'">'+t.label+'</span>'+(e.client?'<span class="inf"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+esc(e.client)+'</span>':"")+(e.location?'<span class="inf"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2"/></svg>'+esc(e.location)+'</span>':"")+cd+'</div>'+who+'</div><div class="dchk"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>';
 }
 function bindAgenda(){
   document.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{filter=b.dataset.f;render();});
@@ -1054,13 +1091,27 @@ function renderTeam(){
   return h;
 }
 function personRow(u,p){
-  return '<div class="person"><div class="pa">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+' · '+esc(u.phone)+'</div></div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':'<span class="pst ok">Ativo</span>')+'</div>';
+  const isAdm=!!u.admin;
+  const admBtn=(!p && me && me.admin && u.id!==me.id)
+    ? '<button class="adm-btn'+(isAdm?' on':'')+'" data-adm="'+u.id+'" data-mk="'+(isAdm?0:1)+'">'+(isAdm?'Remover admin':'Tornar admin')+'</button>'
+    : '';
+  const tag = isAdm?'<span class="adm-tag">ADMIN</span>':'';
+  return '<div class="person"><div class="pa">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+tag+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+' · '+esc(u.phone)+'</div></div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':admBtn||'<span class="pst ok">Ativo</span>')+'</div>';
 }
 function bindTeam(){
   document.querySelectorAll("[data-ap]").forEach(b=>b.onclick=async()=>{
     if(busy)return; busy=true; b.disabled=true;
     try{await db.collection("users").doc(b.dataset.ap).update({status:"ativo"});toast("Acesso liberado");}
     catch(e){toast("Erro ao liberar");b.disabled=false;}
+    finally{busy=false;}
+  });
+  document.querySelectorAll("[data-adm]").forEach(b=>b.onclick=async()=>{
+    const mk=b.dataset.mk==="1";
+    if(!mk){ const admins=users.filter(u=>u.status==="ativo"&&u.admin); if(admins.length<=1){ toast("Precisa existir pelo menos 1 admin"); return; } }
+    if(!confirm(mk?"Tornar esta pessoa administradora?":"Remover o acesso de administrador desta pessoa?"))return;
+    if(busy)return; busy=true; b.disabled=true;
+    try{await db.collection("users").doc(b.dataset.adm).update({admin:mk});toast(mk?"Agora é admin":"Admin removido");}
+    catch(e){toast("Erro ao atualizar");b.disabled=false;}
     finally{busy=false;}
   });
 }
@@ -1070,8 +1121,13 @@ function renderProfile(){
     row('<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2"/>',"WhatsApp",me.phone)+
     row('<rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="2"/>',"E-mail",me.email)+
     '<div class="color-pick"><div class="cp-h"><div class="l">Sua cor no Quadro</div><span class="cp-now" style="background:'+userColor(me)+'"></span></div><div class="cp-grid">'+
-      USER_COLORS.map(c=>'<button type="button" class="cp-dot'+(userColor(me)===c?' on':'')+'" data-color="'+c+'" style="background:'+c+'"></button>').join('')+
-    '</div><div class="cp-hint">Toque numa cor para escolher. Vale para você em todos os cartões, em tempo real.</div></div>'+
+      USER_COLORS.map(c=>{
+        const taker=users.find(x=>x.status==="ativo"&&x.id!==me.id&&userColor(x)===c);
+        const mine=userColor(me)===c;
+        return '<button type="button" class="cp-dot'+(mine?' on':'')+(taker?' taken':'')+'" data-color="'+c+'" style="background:'+c+'" title="'+(taker?("Já usada por "+esc(taker.name)):"")+'">'+
+          (taker?'<span class="cp-tk">'+esc((taker.name||"?").trim().charAt(0).toUpperCase())+'</span>':'')+'</button>';
+      }).join('')+
+    '</div><div class="cp-hint">Toque numa cor para escolher. Bolinhas com uma inicial já estão sendo usadas por outra pessoa — escolha uma diferente para não confundir a equipe.</div></div>'+
     row('<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2"/>',"Status","Ativo")+
     '</div><button class="logout" id="logoutBtn">Sair da conta</button><div class="info-bar" style="margin-top:20px"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><div>A agenda é compartilhada: tudo que você cria aparece para toda a equipe em tempo real.</div></div></div>';
 }
@@ -1105,6 +1161,17 @@ function remainInfo(t){ const dm=taskDueMs(t); if(!dm)return null;
   return diff>0 ? {late:false,txt:"Faltam "+humanDur(diff),diff} : {late:true,txt:"Atrasada há "+humanDur(-diff),diff};
 }
 function taskLate(t){ const dm=taskDueMs(t); return !!(dm && Date.now()>dm && t.status!=="concluido"); }
+function evOwner(e){ if(e.ownerId){const u=users.find(x=>x.id===e.ownerId);if(u)return u;} return userByName(e.owner)||null; }
+function evStartMs(e){ return e.date?dtMs(e.date,e.start||"00:00"):null; }
+function evDueMs(e){ return e.date?dtMs(e.date,e.end||e.start||"23:59"):null; }
+function evLate(e){ const d=evDueMs(e); return !!(d && !e.done && Date.now()>d); }
+function evStatus(e){
+  if(e.done)return{kind:"done",txt:"Concluída",late:false};
+  const now=Date.now(), d=evDueMs(e);
+  if(e.startedAt){ return {kind:"run",txt:"Em andamento há "+humanDur(now-e.startedAt),late:!!(d&&now>d)}; }
+  if(d){ const diff=d-now; return diff>0?{kind:"wait",txt:"Faltam "+humanDur(diff),late:false}:{kind:"late",txt:"Atrasada há "+humanDur(-diff),late:true}; }
+  return null;
+}
 function boardTick(){
   if($("mainApp").classList.contains("hidden"))return;
   tasks.forEach(t=>{
@@ -1116,7 +1183,7 @@ function boardTick(){
     }
   });
   notifiedLate.forEach(id=>{ const t=tasks.find(x=>x.id===id); if(!t||!taskLate(t))notifiedLate.delete(id); });
-  if(tab==="board" && !(typeof scrim!=="undefined"&&scrim.classList.contains("open"))) render();
+  if((tab==="board"||tab==="agenda") && !(typeof scrim!=="undefined"&&scrim.classList.contains("open"))) render();
 }
 function isMyTask(t){const n=((me&&me.name)||"").trim().toLowerCase();return n!==""&&(t.assignee||"").trim().toLowerCase()===n;}
 function myOverdue(){return tasks.filter(t=>isMyTask(t)&&taskLate(t));}
@@ -1163,7 +1230,7 @@ function renderBoard(){
   h+='<div class="board-wrap">';
   STAGES.forEach(s=>{
     const items=list.filter(t=>(t.status||"afazer")===s.k)
-      .sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999")||(b.createdAt||0)-(a.createdAt||0));
+      .sort((a,b)=>(b.priority?1:0)-(a.priority?1:0)||(taskDueMs(a)||9e15)-(taskDueMs(b)||9e15)||(b.createdAt||0)-(a.createdAt||0));
     h+='<div class="col '+s.k+'"><div class="col-h"><div class="nm"><i></i>'+esc(s.label)+'</div><div class="qt">'+items.length+'</div></div>';
     h+= items.length? items.map(tcard).join("") : '<div class="col-empty">Sem tarefas aqui</div>';
     h+='</div>';
@@ -1200,8 +1267,9 @@ function tcard(t){
   return '<div class="tcard'+(late?" late urgent":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'">'+
     '<div class="tc-top">'+
       '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
+      (t.priority?'<span class="tpill prio2"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>PRIORITÁRIA</span>':'')+
       (late?'<span class="tpill"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>ATRASADA</span>':'')+
-      '<span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span>'+
+      '<span class="tc-avw"><span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span><span class="tc-cdot" style="background:'+uc+'"></span></span>'+
     '</div>'+
     '<div class="tcli">'+esc(t.client||"Sem cliente")+'</div>'+
     '<div class="ttt">'+(esc(t.title)||"Sem título")+'</div>'+
@@ -1240,6 +1308,7 @@ function addChkItem(){const i=$("tChkInput");const v=i.value.trim();if(!v)return
 $("tChkAdd").onclick=addChkItem;
 $("tChkInput").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addChkItem();}};
 $("tAssignee").oninput=()=>{try{buildRespChips();}catch(e){}};
+$("fOwner").oninput=()=>{try{buildOwnerChips();}catch(e){}};
 
 function openTaskForm(t){
   if(!t){ const bm=blockMsg(); if(bm){ alert(bm); return; } }
@@ -1254,9 +1323,15 @@ function openTaskForm(t){
   setV("tAssignee",(t&&t.assignee)||(!t&&me?me.name:""));setV("tLink",t&&t.link);
   taskChecklist=(t&&Array.isArray(t.checklist))?t.checklist.map(x=>({t:x.t,d:!!x.d})):[];
   $("tChkInput").value="";
-  buildSecGrid();buildStageRow();renderChkEditor();buildRespChips();
+  selPrio=t?!!t.priority:false;
+  $("tPrioFld").style.display=(me&&me.admin)?"":"none";
+  buildSecGrid();buildStageRow();renderChkEditor();buildRespChips();buildPrioToggle();
   openSheet(taskSheet);
 }
+function buildPrioToggle(){const b=$("tPrio");if(!b)return;
+  b.classList.toggle("on",!!selPrio);
+  b.querySelector("span:last-child").textContent=selPrio?"Tarefa PRIORITÁRIA (urgente) ✓":"Marcar como tarefa prioritária (urgente)";
+  b.onclick=()=>{selPrio=!selPrio;buildPrioToggle();};}
 $("taskSave").onclick=async()=>{
   const client=val("tClient"),title=val("tTitle");
   const sD=$("tSDate").value,sT=$("tSTime").value,dD=$("tDDate").value,dT=$("tDTime").value;
@@ -1272,9 +1347,11 @@ $("taskSave").onclick=async()=>{
     const advancing = prevT && taskStatus!=="afazer" && taskStatus!==(prevT.status||"afazer");
     if(advancing && !(isMyTask(prevT)&&taskLate(prevT))){ const bm=blockMsg(editTaskId); if(bm){ alert(bm); return; } } }
   if(busy)return; busy=true; const sb=$("taskSave");sb.disabled=true;
+  const prevTask = editTaskId?tasks.find(x=>x.id===editTaskId):null;
   const data={client,title,sector:selSector,desc:val("tDesc"),
     startDate:sD,startTime:sT,dueDate:dD,dueTime:dT,due:dD,
     assignee:val("tAssignee"),link:val("tLink"),status:taskStatus,
+    priority:(me&&me.admin)?!!selPrio:(prevTask?!!prevTask.priority:false),
     checklist:taskChecklist.map(x=>({t:x.t,d:!!x.d}))};
   try{
     if(editTaskId){
@@ -1328,6 +1405,7 @@ function openTaskDetail(id){
   }
   trackHtml+='</div>';
   $("taskDetailBody").innerHTML=
+    (t.priority?'<div class="od-flag" style="background:rgba(255,176,46,.14);border-color:rgba(255,176,46,.45);color:var(--c-foto)"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>TAREFA PRIORITÁRIA — definida pela coordenação. Tratar com urgência.</span></div>':'')+
     (late?'<div class="od-flag"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>PENDÊNCIA URGENTE — esta tarefa está atrasada. Conclua para liberar as demais.</span></div>':'')+
     '<span class="dt-type" style="background:'+secBg(sec.color)+';color:'+sec.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+sec.color+';display:inline-block"></span>'+esc(sec.label)+'</span>'+
     '<h2 class="dtt">'+(esc(t.title)||"Sem título")+'</h2>'+
@@ -1389,6 +1467,7 @@ function buildTypeGrid(){const g=$("typeGrid");g.innerHTML="";
     o.innerHTML='<div class="td" style="background:'+TYPES[k].color+'"></div><span>'+TYPES[k].label+'</span>';
     o.onclick=()=>{selType=k;buildTypeGrid();};g.appendChild(o);}}
 function openForm(ev){
+  if(!me||!me.admin){ toast("Só administradores criam e atribuem no Cronograma"); return; }
   editingId=ev?ev.id:null;
   $("formTitle").textContent=ev?"Reagendar / Editar":"Novo compromisso";
   $("delBtn").style.display=ev?"block":"none";
@@ -1396,7 +1475,17 @@ function openForm(ev){
   setV("fClient",ev&&ev.client);setV("fTitle",ev&&ev.title);setV("fLoc",ev&&ev.location);
   setV("fDate",(ev&&ev.date)||selDay||todayISO());setV("fStart",(ev&&ev.start)||"09:00");
   setV("fEnd",(ev&&ev.end)||"");setV("fOwner",(ev&&ev.owner)||(ev?"":me.name));setV("fNotes",ev&&ev.notes);
+  buildOwnerChips();
   openSheet(formSheet);
+}
+function buildOwnerChips(){const g=$("fOwnerChips");if(!g)return;g.innerHTML="";
+  const team=users.filter(u=>u.status==="ativo");
+  const mk=(nm,meFlag)=>{const b=document.createElement("button");b.type="button";
+    const cur=(val("fOwner")||"").trim().toLowerCase()===nm.trim().toLowerCase();
+    b.className="resp-chip"+(cur?" on":"");b.textContent=meFlag?("Eu ("+nm+")"):nm;
+    b.onclick=()=>{$("fOwner").value=nm;buildOwnerChips();};g.appendChild(b);};
+  if(me&&me.name)mk(me.name,true);
+  team.forEach(u=>{if(!me||u.id!==me.id)mk(u.name,false);});
 }
 function setV(id,v){$(id).value=v||"";}
 $("saveBtn").onclick=async()=>{
@@ -1405,8 +1494,10 @@ $("saveBtn").onclick=async()=>{
   if(!date)return toast("Escolha a data");
   if(busy)return; busy=true;
   const sb=$("saveBtn");sb.disabled=true;
+  const ownEl=userByName(val("fOwner"));
   const data={type:selType,client,title:val("fTitle"),location:val("fLoc"),date,
-    start:$("fStart").value,end:$("fEnd").value,owner:val("fOwner"),notes:val("fNotes")};
+    start:$("fStart").value,end:$("fEnd").value,owner:val("fOwner"),
+    ownerId:ownEl?ownEl.id:null,notes:val("fNotes")};
   try{
     if(editingId){await db.collection("events").doc(editingId).update(data);clearEventAlarms(editingId);toast("Atualizado para a equipe");}
     else{data.by=me.id;data.done=false;data.createdAt=Date.now();await db.collection("events").add(data);toast("Criado e compartilhado");}
@@ -1424,21 +1515,42 @@ $("delBtn").onclick=async()=>{
 function openDetail(id){
   const e=events.find(x=>x.id===id);if(!e)return;detailId=id;
   const t=TYPES[e.type]||TYPES.outro,u=users.find(x=>x.id===e.by);
+  const own=evOwner(e), oc=own?userColor(own):t.color, si=evStatus(e);
   const di=(svg,l,v)=>v?'<div class="dti"><div class="ic2"><svg viewBox="0 0 24 24" fill="none">'+svg+'</svg></div><div class="tx"><div class="l">'+l+'</div><div class="v">'+esc(v)+'</div></div></div>':"";
+  const diH=(svg,l,v)=>v?'<div class="dti"><div class="ic2"><svg viewBox="0 0 24 24" fill="none">'+svg+'</svg></div><div class="tx"><div class="l">'+l+'</div><div class="v">'+v+'</div></div></div>':"";
   const tt=e.start?(e.end?e.start+" — "+e.end:e.start):"—";
   const dd=dayLabel(e.date)+" · "+dayShort(e.date)+", "+parseISO(e.date).getFullYear();
+  const sMs=evStartMs(e), dMs=evDueMs(e);
+  const ownHtml = own
+    ? '<span style="display:flex;align-items:center;gap:9px"><span style="width:30px;height:30px;border-radius:50%;overflow:hidden;border:2px solid '+oc+';flex-shrink:0;display:inline-block">'+avatarHTML(own)+'</span><b>'+esc(own.name)+'</b><span style="width:11px;height:11px;border-radius:50%;background:'+oc+';display:inline-block"></span></span>'
+    : (e.owner?esc(e.owner):"");
+  const siColor = si?(si.late?"#ff8c83":(si.kind==="run"?"var(--c-foto)":"var(--c-trafego)")):"";
+  const dByU = e.doneBy?users.find(x=>x.id===e.doneBy):null;
   $("detailBody").innerHTML='<span class="dt-type" style="background:'+RGBA[t.color]+';color:'+t.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+t.color+';display:inline-block"></span>'+t.label+'</span><h2 class="dtt">'+(esc(e.title)||esc(e.client)||"Sem título")+'</h2><div class="dt-list">'+
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Cliente / Empresa",e.client)+
+    diH('<rect x="8" y="2" width="8" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke="currentColor" stroke-width="2"/>',"Responsável",ownHtml)+
     di('<rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Data",dd)+
     di('<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Horário",tt)+
+    diH('<path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>',"Início previsto",sMs?esc(fmtMs(sMs)):"")+
+    diH('<rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Término previsto",dMs?esc(fmtMs(dMs)):"")+
+    diH('<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',"Situação",si?('<b style="color:'+siColor+'">'+esc(si.txt)+'</b>'):"")+
+    diH('<path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Iniciada em",e.startedAt?('<b>'+esc(fmtMs(e.startedAt))+'</b>'):"")+
+    diH('<path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',"Finalizada em",(e.done&&e.doneAt)?('<b>'+esc(fmtMs(e.doneAt))+'</b>'+(dByU?' · '+esc(dByU.name):'')):"")+
     di('<path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2"/>',"Local",e.location)+
-    di('<rect x="8" y="2" width="8" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke="currentColor" stroke-width="2"/>',"Responsável / Equipe",e.owner)+
     di('<path d="M5 4h14M5 9h14M5 14h9M5 19h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Observações",e.notes)+
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Criado por",u?u.name:"—")+
-    '</div><button class="done-toggle '+(e.done?"is-done":"")+'" id="doneToggle"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'+(e.done?"Serviço finalizado ✓":"Marcar serviço como finalizado")+'</button>';
-  $("doneToggle").onclick=async()=>{if(busy)return;busy=true;try{await db.collection("events").doc(id).update({done:!e.done});
-    if(e.done) clearEventAlarms(id);
-    toast(!e.done?"Finalizado":"Reaberto");closeSheets();}catch(_){toast("Erro");}finally{busy=false;}};
+    '</div>'+
+    ((!e.done&&!e.startedAt)?'<button class="done-toggle" id="startBtn" style="background:rgba(255,176,46,.12);border-color:rgba(255,176,46,.3);color:var(--c-foto)"><svg viewBox="0 0 24 24" fill="none"><path d="M8 5v14l11-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Iniciar agora</button>':"")+
+    '<button class="done-toggle '+(e.done?"is-done":"")+'" id="doneToggle"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'+(e.done?"Serviço finalizado ✓ (tocar para reabrir)":"Finalizar agora")+'</button>';
+  const sBtn=$("startBtn");
+  if(sBtn) sBtn.onclick=async()=>{if(busy)return;busy=true;try{await db.collection("events").doc(id).update({startedAt:Date.now()});e.startedAt=Date.now();toast("Agenda iniciada — contando o tempo");busy=false;openDetail(id);}catch(_){busy=false;toast("Erro ao iniciar");}};
+  $("doneToggle").onclick=async()=>{if(busy)return;busy=true;
+    try{
+      if(!e.done){ await db.collection("events").doc(id).update({done:true,doneAt:Date.now(),doneBy:me.id}); clearEventAlarms(id); toast("Finalizado"); closeSheets(); }
+      else{ await db.collection("events").doc(id).update({done:false,doneAt:null,doneBy:null}); toast("Reaberto"); closeSheets(); }
+    }catch(_){toast("Erro");}finally{busy=false;}};
+  $("detailEdit").style.display=(me&&me.admin)?"":"none";
+  $("detailDel").style.display=(me&&me.admin)?"":"none";
   openSheet(detailSheet);
 }
 $("detailEdit").onclick=()=>{const e=events.find(x=>x.id===detailId);if(!e){toast("Compromisso não encontrado");closeSheets();return;}closeSheets();setTimeout(()=>openForm(e),260);};
