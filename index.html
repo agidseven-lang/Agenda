@@ -596,8 +596,8 @@
   .cv-link-plain{color:var(--ink-soft)}
   .cv-feedback{background:rgba(255,90,77,.08);border-left:3px solid var(--c-rev);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45;margin-bottom:12px}
   .cv-feedback b{color:var(--c-rev)}
-  .cv-actions{display:flex;gap:9px;margin-top:8px}
-  .cv-btn{flex:1;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:-.01em;transition:.15s;font-family:inherit}
+  .cv-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .cv-btn{flex:1 1 calc(50% - 4px);min-width:110px;border:none;border-radius:12px;padding:13px 10px;font-size:13.5px;font-weight:800;cursor:pointer;letter-spacing:-.01em;transition:.15s;font-family:inherit}
   .cv-btn:active{transform:scale(.97)}
   .cv-btn.ok{background:var(--c-trafego);color:#062514}
   .cv-btn.rev{background:var(--surface);color:var(--c-rev);border:1.5px solid rgba(255,90,77,.4)}
@@ -1089,10 +1089,13 @@
     .col::-webkit-scrollbar{width:6px}
     .col::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
     .col::-webkit-scrollbar-thumb:hover{background:var(--line-soft)}
-    /* Header da coluna sticky no topo — não some quando rola */
-    .col-h{position:sticky;top:0;z-index:1;background:var(--surface);
+    /* Header da coluna sticky no topo — não some quando rola.
+       [V62.18] z-index alto e background SÓLIDO + gradient só como camada visual (não translúcida)
+       pra impedir que o card abaixo apareça através do header quando o usuário rola a coluna. */
+    .col-h{position:sticky;top:0;z-index:5;background-color:var(--surface);
       margin:0 -10px 8px;padding:10px 12px 9px;border-bottom:1px solid var(--line-soft)}
-    .col.cliente .col-h{background:linear-gradient(180deg,rgba(176,114,255,.07),var(--surface))}
+    .col.cliente .col-h{background-color:var(--surface);
+      background-image:linear-gradient(180deg,rgba(176,114,255,.12),rgba(176,114,255,0))}
     .tcard{margin-bottom:8px}
     /* [V62.5] No desktop, a barra "NAVEGAR PARA →" SOME — tudo já está visível na tela */
     .board-nav{display:none}
@@ -1162,7 +1165,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.16 · build token-defensivo</div>
+    <div class="ver">versão 62.18 · build header-opaco</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2636,6 +2639,11 @@ function tlIcon(k){
   if(k==="legenda_sent") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="2"/></svg>';
   if(k==="legenda_approved") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   if(k==="legenda_revision") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  /* [V62.17] Edição direta pelo cliente / reenvio da equipe */
+  if(k==="client_edited_approved") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="20" cy="20" r="3" stroke="currentColor" stroke-width="2"/><path d="M18.5 20l1.2 1.2 2.3-2.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="legenda_edited_approved") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="20" cy="20" r="3" stroke="currentColor" stroke-width="2"/><path d="M18.5 20l1.2 1.2 2.3-2.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="team_resent") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 3v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 16M4 21v-5h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="team_legenda_resent") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 3v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 16M4 21v-5h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
 }
 function tlText(e, sector, scope){
@@ -2664,13 +2672,18 @@ function tlText(e, sector, scope){
   if(e.kind==="legenda_sent") return W+'enviou a <b>legenda</b> pro cliente';
   if(e.kind==="legenda_approved") return '<b>Cliente APROVOU a legenda</b> 🚀 — pronto pra publicar';
   if(e.kind==="legenda_revision"){ var tx3=(e.text||"").slice(0,180); return '<b>Cliente pediu revisão da legenda</b>: <span class="tl-q">"'+esc(tx3)+((e.text||"").length>180?"…":"")+'"</span>'; }
+  /* [V62.17] Cliente editou direto / equipe corrigiu e reenviou */
+  if(e.kind==="client_edited_approved") return '<b>Cliente EDITOU e APROVOU o tema</b> ✏✓';
+  if(e.kind==="legenda_edited_approved") return '<b>Cliente EDITOU e APROVOU a legenda</b> ✏✓ — pronto pra publicar';
+  if(e.kind==="team_resent") return W+'corrigiu e <b>reenviou o tema</b> pro cliente';
+  if(e.kind==="team_legenda_resent") return W+'corrigiu e <b>reenviou a legenda</b> pro cliente';
   return '';
 }
 function tlCls(k){
   if(k==="created") return "ev-cre";
   if(k==="started"||k==="moved") return "ev-mv";
-  if(k==="copy_aprovado"||k==="rot_aprovado"||k==="client_approved"||k==="team_delivered"||k==="legenda_approved") return "ev-ok";
-  if(k==="copy_em_avaliacao"||k==="rot_em_revisao"||k==="client_sent"||k==="client_opened"||k==="legenda_sent"||k==="legenda_written") return "ev-wt";
+  if(k==="copy_aprovado"||k==="rot_aprovado"||k==="client_approved"||k==="team_delivered"||k==="legenda_approved"||k==="client_edited_approved"||k==="legenda_edited_approved") return "ev-ok";
+  if(k==="copy_em_avaliacao"||k==="rot_em_revisao"||k==="client_sent"||k==="client_opened"||k==="legenda_sent"||k==="legenda_written"||k==="team_resent"||k==="team_legenda_resent") return "ev-wt";
   if(k==="client_revision"||k==="legenda_revision") return "ev-rev";
   if(k==="posted"||k==="done") return "ev-dn";
   if(k==="comment") return "ev-cm";
@@ -2786,10 +2799,28 @@ function openContentDetail(tid, idx){
     clientBox = '<div class="cs-box" style="border-color:'+csInfoDet.color+';background:'+csInfoDet.bg+'">'+
       '<div class="tt" style="color:'+csInfoDet.color+'">FASE 1 · Tema</div>'+
       '<div class="lab" style="color:'+csInfoDet.color+'">'+esc(csInfoDet.label)+'</div>'+
-      (o.csAt?'<div class="when">'+esc(fmtDT(o.csAt))+'</div>':'')+
-      ((o.cs==="em_revisao" && o.csFeedback)?'<div class="fb"><b>Pedido do cliente:</b> '+esc(o.csFeedback)+'</div>':'')+
-      ((o.cs==="aprovado" && canManage(me))?'<button class="cs-deliver" id="ctMarkDeliver">✓ Marcar como entregue</button>':'')+
-    '</div>';
+      (o.csAt?'<div class="when">'+esc(fmtDT(o.csAt))+'</div>':'');
+    /* [V62.17] Se cliente pediu revisão E é admin → mostra feedback + formulário editável + reenvio */
+    if(o.cs==="em_revisao" && canManage(me)){
+      clientBox +=
+        (o.csFeedback?'<div class="fb"><b>Pedido do cliente:</b> '+esc(o.csFeedback)+'</div>':'')+
+        '<div style="margin-top:14px;padding-top:14px;border-top:1px solid '+csInfoDet.color+'">'+
+          '<div class="cw-cn" style="margin-bottom:8px">✏ Corrija o tema e reenvie pro cliente</div>'+
+          '<div style="font-size:10.5px;color:var(--ink-faint);font-weight:700;margin:8px 0 4px;letter-spacing:.04em;text-transform:uppercase">Título</div>'+
+          '<input type="text" id="ctEditT" maxlength="300" value="'+esc(o.t||"")+'" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:11px 12px;color:var(--ink);font-size:14.5px;outline:none;font-family:inherit">'+
+          '<div style="font-size:10.5px;color:var(--ink-faint);font-weight:700;margin:11px 0 4px;letter-spacing:.04em;text-transform:uppercase">Descrição / briefing</div>'+
+          '<textarea id="ctEditD" maxlength="1500" rows="4" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:11px 12px;color:var(--ink);font-size:14px;outline:none;font-family:inherit;resize:vertical;line-height:1.45">'+esc(o.d||"")+'</textarea>'+
+          '<div style="font-size:10.5px;color:var(--ink-faint);font-weight:700;margin:11px 0 4px;letter-spacing:.04em;text-transform:uppercase">Link / anexo (opcional)</div>'+
+          '<input type="text" id="ctEditL" maxlength="500" value="'+esc(o.l||"")+'" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:11px 12px;color:var(--ink);font-size:14px;outline:none;font-family:inherit">'+
+          '<button class="cs-deliver" id="ctResendTema" style="margin-top:12px;background:'+csInfoDet.color+';color:#fff">📤 Salvar e reenviar pro cliente</button>'+
+        '</div>';
+    } else if(o.cs==="em_revisao" && o.csFeedback){
+      /* Quem não é admin: só vê o feedback, sem formulário */
+      clientBox += '<div class="fb"><b>Pedido do cliente:</b> '+esc(o.csFeedback)+'</div>';
+    } else if(o.cs==="aprovado" && canManage(me)){
+      clientBox += '<button class="cs-deliver" id="ctMarkDeliver">✓ Marcar como entregue</button>';
+    }
+    clientBox += '</div>';
   }
 
   /* [V62] FASE 2 · LEGENDA — aparece SÓ se tema foi aprovado pelo cliente */
@@ -2817,8 +2848,16 @@ function openContentDetail(tid, idx){
         '<textarea id="ctLgInput" class="lg-input" maxlength="3000" placeholder="Cole ou escreva aqui a legenda exatamente como vai ser publicada (com emojis, hashtags, quebras de linha)…">'+esc(o.lg||"")+'</textarea>'+
         '<div class="lg-actions">'+
           '<button class="primary" id="ctLgSave">💾 Salvar legenda</button>'+
+          /* [V62.17] Se está em revisão, dá opção de salvar E reenviar direto */
+          (lgSt==="em_revisao"
+            ? '<button class="primary" id="ctLgResend" style="background:var(--c-rev-strong);border-color:var(--c-rev-strong)">📤 Salvar e reenviar pro cliente</button>'
+            : '')+
         '</div>'+
-        '<div style="font-size:11.5px;color:var(--ink-faint);line-height:1.45;margin-top:8px">Depois de salvar todas as legendas do cronograma, vá até a tarefa principal pra <b>Enviar tudo pro cliente</b> de uma vez.</div>';
+        '<div style="font-size:11.5px;color:var(--ink-faint);line-height:1.45;margin-top:8px">'+
+          (lgSt==="em_revisao"
+            ? 'O cliente pediu revisão. Corrija a legenda e clique em "Salvar e reenviar" pra o cliente aprovar novamente.'
+            : 'Depois de salvar todas as legendas do cronograma, vá até a tarefa principal pra <b>Enviar tudo pro cliente</b> de uma vez.')+
+        '</div>';
     } else if(lgSent){
       /* Modo leitura: mostra a legenda que foi enviada */
       legendaBox += '<div class="cw-cn" style="margin-top:10px">Legenda enviada ao cliente</div>'+
@@ -2865,10 +2904,21 @@ function openContentDetail(tid, idx){
     cmtHtml;
   $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
   var _md=$("ctMarkDeliver"); if(_md) _md.onclick=()=>markCardDelivered(tid, idx);
+  /* [V62.17] hook do botão "Salvar e reenviar pro cliente" (tema em revisão) */
+  var _rt=$("ctResendTema"); if(_rt) _rt.onclick=function(){
+    var ti=$("ctEditT"), td=$("ctEditD"), tl=$("ctEditL");
+    if(!ti) return;
+    editAndResendTema(tid, idx, ti.value, (td&&td.value)||"", (tl&&tl.value)||"");
+  };
   /* [V62] hook do botão "Salvar legenda" */
   var _lgs=$("ctLgSave"); if(_lgs) _lgs.onclick=function(){
     var ta=$("ctLgInput"); if(!ta) return;
     saveLegenda(tid, idx, ta.value);
+  };
+  /* [V62.17] hook do botão "Salvar e reenviar pro cliente" (legenda em revisão) */
+  var _lgr=$("ctLgResend"); if(_lgr) _lgr.onclick=function(){
+    var ta=$("ctLgInput"); if(!ta) return;
+    editAndResendLegenda(tid, idx, ta.value);
   };
   /* binds do compartilhar duplicado no card */
   var _cs1=$("ctShareSend"); if(_cs1) _cs1.onclick=()=>sendCronToClient(tid);
@@ -3102,6 +3152,68 @@ async function markCardDelivered(tid, idx){
   finally{ busy=false; }
 }
 
+/* [V62.17] Time edita o tema (após cliente pedir revisão) e RE-ENVIA pro cliente.
+   Atualiza c.t/c.d/c.l, limpa csFeedback, volta cs pra "enviado". */
+async function editAndResendTema(tid, idx, novoT, novaD, novoL){
+  if(!canManage(me)){ toast("Apenas administradores."); return; }
+  var t=tasks.find(x=>x.id===tid); if(!t||!db) return;
+  var titulo=(novoT||"").trim();
+  if(!titulo){ toast("O título não pode ficar vazio."); return; }
+  if(busy) return; busy=true;
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    var c=arr[idx]; if(!c){ toast("Conteúdo não encontrado."); return; }
+    if(c.cs !== "em_revisao"){ toast("Esse card não está em revisão."); return; }
+    var now=Date.now();
+    var prevT=c.t||"", prevD=c.d||"", prevL=c.l||"";
+    c.t=titulo.slice(0,300);
+    c.d=(novaD||"").slice(0,1500);
+    c.l=(novoL||"").slice(0,500);
+    c.cs="enviado";
+    c.csAt=now;
+    c.csFeedback="";
+    var hist=Array.isArray(c.history)?c.history.slice():[];
+    hist.push({kind:"team_resent", at:now, byId:(me?me.id:null), prevT:prevT, prevD:prevD, prevL:prevL});
+    if(hist.length>100) hist=hist.slice(-100);
+    c.history=hist;
+    await db.collection("tasks").doc(tid).update({cronWeeks:arr});
+    var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
+    openContentDetail(tid, idx);
+    toast("Tema corrigido e reenviado pro cliente ✓");
+  }catch(e){ console.error("[editAndResendTema] erro:", e); toast("Não foi possível salvar agora"); }
+  finally{ busy=false; }
+}
+
+/* [V62.17] Time edita a LEGENDA (após cliente pedir revisão) e RE-ENVIA pro cliente.
+   Atualiza c.lg, limpa lgFeedback, marca lgState="enviada" (não fica em rascunho). */
+async function editAndResendLegenda(tid, idx, novaLg){
+  if(!canManage(me)){ toast("Apenas administradores."); return; }
+  var t=tasks.find(x=>x.id===tid); if(!t||!db) return;
+  var legenda=(novaLg||"").trim();
+  if(!legenda){ toast("Escreva a legenda corrigida antes de reenviar."); return; }
+  if(busy) return; busy=true;
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    var c=arr[idx]; if(!c){ toast("Conteúdo não encontrado."); return; }
+    if(c.lgState !== "em_revisao"){ toast("Essa legenda não está em revisão."); return; }
+    var now=Date.now();
+    var prevLg=c.lg||"";
+    c.lg=legenda.slice(0,3000);
+    c.lgState="enviada";
+    c.lgAt=now;
+    c.lgFeedback="";
+    var hist=Array.isArray(c.history)?c.history.slice():[];
+    hist.push({kind:"team_legenda_resent", at:now, byId:(me?me.id:null), prevLg:prevLg});
+    if(hist.length>100) hist=hist.slice(-100);
+    c.history=hist;
+    await db.collection("tasks").doc(tid).update({cronWeeks:arr});
+    var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
+    openContentDetail(tid, idx);
+    toast("Legenda corrigida e reenviada pro cliente ✓");
+  }catch(e){ console.error("[editAndResendLegenda] erro:", e); toast("Não foi possível salvar agora"); }
+  finally{ busy=false; }
+}
+
 /* ========== MODO CLIENTE (visão pública, sem login) ========== */
 /* Variáveis __client* foram movidas pra ANTES do boot (era bug — o `=null` aqui zerava o token) */
 
@@ -3266,12 +3378,24 @@ function renderCvCardTema(c, i){
     (canAct
       ? '<div class="cv-actions" id="cvAct'+i+'">'+
           '<button class="cv-btn ok"  data-ai="'+i+'">✓ Aprovar</button>'+
-          '<button class="cv-btn rev" data-ri="'+i+'">✏ Pedir revisão</button>'+
+          '<button class="cv-btn edit" data-ei="'+i+'" style="background:rgba(176,114,255,.12);color:var(--c-edicao);border:1.5px solid rgba(176,114,255,.4)">✏ Editar e aprovar</button>'+
+          '<button class="cv-btn rev" data-ri="'+i+'">↶ Pedir revisão</button>'+
         '</div>'+
         '<div class="cv-confirm" id="cvCf'+i+'" style="display:none">'+
           '<div class="cv-cf-msg">Você confirma que <b>APROVA</b> este tema? Esta ação avisa a agência na hora.</div>'+
           '<div class="cv-cf-acts">'+
             '<button class="cv-btn ok" data-doapp="'+i+'">✓ Sim, aprovar</button>'+
+            '<button class="cv-btn cancel" data-cnc="'+i+'">Cancelar</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="cv-editform" id="cvEd'+i+'" style="display:none;margin-top:10px;background:rgba(176,114,255,.05);border:1.5px solid rgba(176,114,255,.3);border-radius:12px;padding:14px">'+
+          '<div style="font-size:12.5px;color:var(--c-edicao);font-weight:800;margin-bottom:10px;letter-spacing:.02em">✏ EDITE O TEMA COMO VOCÊ PREFERE</div>'+
+          '<label style="display:block;font-size:11.5px;color:var(--ink-soft);font-weight:700;margin-bottom:6px">Título do tema</label>'+
+          '<input type="text" id="cvEdT'+i+'" maxlength="300" value="'+esc(c.t||"")+'" style="width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:14.5px;padding:11px 12px;margin-bottom:12px">'+
+          '<label style="display:block;font-size:11.5px;color:var(--ink-soft);font-weight:700;margin-bottom:6px">Descrição (opcional)</label>'+
+          '<textarea id="cvEdD'+i+'" maxlength="1500" rows="3" style="width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:14px;padding:11px 12px;resize:vertical;line-height:1.45;margin-bottom:12px">'+esc(c.d||"")+'</textarea>'+
+          '<div class="cv-cf-acts">'+
+            '<button class="cv-btn ok" data-doedit="'+i+'" style="background:var(--c-edicao);color:#fff">💾 Salvar e aprovar</button>'+
             '<button class="cv-btn cancel" data-cnc="'+i+'">Cancelar</button>'+
           '</div>'+
         '</div>'+
@@ -3308,12 +3432,21 @@ function renderCvCardLegenda(c, i){
     (canAct
       ? '<div class="cv-actions" id="cvLgAct'+i+'">'+
           '<button class="cv-btn ok"  data-lai="'+i+'">✓ Aprovar legenda</button>'+
-          '<button class="cv-btn rev" data-lri="'+i+'">✏ Pedir revisão</button>'+
+          '<button class="cv-btn edit" data-lei="'+i+'" style="background:rgba(176,114,255,.12);color:var(--c-edicao);border:1.5px solid rgba(176,114,255,.4)">✏ Editar e aprovar</button>'+
+          '<button class="cv-btn rev" data-lri="'+i+'">↶ Pedir revisão</button>'+
         '</div>'+
         '<div class="cv-confirm" id="cvLgCf'+i+'" style="display:none">'+
           '<div class="cv-cf-msg">Você confirma que <b>APROVA</b> esta legenda? Depois disso o post fica pronto pra publicar.</div>'+
           '<div class="cv-cf-acts">'+
             '<button class="cv-btn ok" data-doappl="'+i+'">✓ Sim, aprovar</button>'+
+            '<button class="cv-btn cancel" data-lcnc="'+i+'">Cancelar</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="cv-editform" id="cvLgEd'+i+'" style="display:none;margin-top:10px;background:rgba(176,114,255,.05);border:1.5px solid rgba(176,114,255,.3);border-radius:12px;padding:14px">'+
+          '<div style="font-size:12.5px;color:var(--c-edicao);font-weight:800;margin-bottom:10px;letter-spacing:.02em">✏ EDITE A LEGENDA COMO VOCÊ PREFERE</div>'+
+          '<textarea id="cvLgEdT'+i+'" maxlength="3000" rows="6" style="width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:14.5px;padding:11px 12px;resize:vertical;line-height:1.55;margin-bottom:12px">'+esc(c.lg||"")+'</textarea>'+
+          '<div class="cv-cf-acts">'+
+            '<button class="cv-btn ok" data-doeditl="'+i+'" style="background:var(--c-edicao);color:#fff">💾 Salvar e aprovar</button>'+
             '<button class="cv-btn cancel" data-lcnc="'+i+'">Cancelar</button>'+
           '</div>'+
         '</div>'+
@@ -3333,25 +3466,45 @@ function renderCvCardLegenda(c, i){
 /* [V62] Bindings de todos os botões da client view (Fase 1 + Fase 2). */
 function bindClientViewActions(){
   /* ===== FASE 1: TEMAS ===== */
+  /* "Aprovar" → abre painel de confirmação */
   document.querySelectorAll("[data-ai]").forEach(function(b){ b.onclick=function(){
     var i=+b.dataset.ai;
-    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i), r=document.getElementById("cvRv"+i);
+    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i),
+        e=document.getElementById("cvEd"+i),  r=document.getElementById("cvRv"+i);
     if(a) a.style.display="none";
+    if(e) e.style.display="none";
     if(r) r.style.display="none";
     if(c) c.style.display="block";
   };});
-  document.querySelectorAll("[data-ri]").forEach(function(b){ b.onclick=function(){
-    var i=+b.dataset.ri;
-    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i), r=document.getElementById("cvRv"+i);
+  /* [V62.17] "Editar e aprovar" → abre formulário com título/desc editáveis */
+  document.querySelectorAll("[data-ei]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.ei;
+    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i),
+        e=document.getElementById("cvEd"+i),  r=document.getElementById("cvRv"+i);
     if(a) a.style.display="none";
     if(c) c.style.display="none";
+    if(r) r.style.display="none";
+    if(e) e.style.display="block";
+    var ti=document.getElementById("cvEdT"+i); if(ti) try{ ti.focus(); ti.select(); }catch(_){}
+  };});
+  /* "Pedir revisão" → abre textarea */
+  document.querySelectorAll("[data-ri]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.ri;
+    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i),
+        e=document.getElementById("cvEd"+i),  r=document.getElementById("cvRv"+i);
+    if(a) a.style.display="none";
+    if(c) c.style.display="none";
+    if(e) e.style.display="none";
     if(r) r.style.display="block";
     var ta=document.getElementById("cvRvT"+i); if(ta) try{ ta.focus(); }catch(_){}
   };});
+  /* Cancelar — fecha todos os painéis e volta pros 3 botões */
   document.querySelectorAll("[data-cnc]").forEach(function(b){ b.onclick=function(){
     var i=+b.dataset.cnc;
-    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i), r=document.getElementById("cvRv"+i);
+    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i),
+        e=document.getElementById("cvEd"+i),  r=document.getElementById("cvRv"+i);
     if(c) c.style.display="none";
+    if(e) e.style.display="none";
     if(r) r.style.display="none";
     if(a) a.style.display="flex";
   };});
@@ -3360,6 +3513,22 @@ function bindClientViewActions(){
     var origTxt = b.textContent;
     b.disabled=true; b.textContent="Enviando…";
     try{ await clientApprove(+b.dataset.doapp); }
+    finally{ b.disabled=false; b.textContent=origTxt; }
+  };});
+  /* [V62.17] Submit do "Editar e aprovar" do tema */
+  document.querySelectorAll("[data-doedit]").forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var i=+b.dataset.doedit;
+    var ti=document.getElementById("cvEdT"+i);
+    var td=document.getElementById("cvEdD"+i);
+    var titulo=(ti&&ti.value||"").trim();
+    if(!titulo){
+      if(ti){ ti.style.borderColor="var(--c-rev)"; try{ ti.focus(); }catch(_){} }
+      return;
+    }
+    var origTxt = b.textContent;
+    b.disabled=true; b.textContent="Salvando…";
+    try{ await clientEditAndApproveTema(i, titulo, (td&&td.value||"")); }
     finally{ b.disabled=false; b.textContent=origTxt; }
   };});
   document.querySelectorAll("[data-dorev]").forEach(function(b){ b.onclick=async function(){
@@ -3381,23 +3550,40 @@ function bindClientViewActions(){
   /* ===== FASE 2: LEGENDAS ===== */
   document.querySelectorAll("[data-lai]").forEach(function(b){ b.onclick=function(){
     var i=+b.dataset.lai;
-    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i), r=document.getElementById("cvLgRv"+i);
+    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i),
+        e=document.getElementById("cvLgEd"+i),  r=document.getElementById("cvLgRv"+i);
     if(a) a.style.display="none";
+    if(e) e.style.display="none";
     if(r) r.style.display="none";
     if(c) c.style.display="block";
   };});
-  document.querySelectorAll("[data-lri]").forEach(function(b){ b.onclick=function(){
-    var i=+b.dataset.lri;
-    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i), r=document.getElementById("cvLgRv"+i);
+  /* [V62.17] "Editar e aprovar" da legenda */
+  document.querySelectorAll("[data-lei]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.lei;
+    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i),
+        e=document.getElementById("cvLgEd"+i),  r=document.getElementById("cvLgRv"+i);
     if(a) a.style.display="none";
     if(c) c.style.display="none";
+    if(r) r.style.display="none";
+    if(e) e.style.display="block";
+    var ta=document.getElementById("cvLgEdT"+i); if(ta) try{ ta.focus(); }catch(_){}
+  };});
+  document.querySelectorAll("[data-lri]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.lri;
+    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i),
+        e=document.getElementById("cvLgEd"+i),  r=document.getElementById("cvLgRv"+i);
+    if(a) a.style.display="none";
+    if(c) c.style.display="none";
+    if(e) e.style.display="none";
     if(r) r.style.display="block";
     var ta=document.getElementById("cvLgRvT"+i); if(ta) try{ ta.focus(); }catch(_){}
   };});
   document.querySelectorAll("[data-lcnc]").forEach(function(b){ b.onclick=function(){
     var i=+b.dataset.lcnc;
-    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i), r=document.getElementById("cvLgRv"+i);
+    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i),
+        e=document.getElementById("cvLgEd"+i),  r=document.getElementById("cvLgRv"+i);
     if(c) c.style.display="none";
+    if(e) e.style.display="none";
     if(r) r.style.display="none";
     if(a) a.style.display="flex";
   };});
@@ -3406,6 +3592,21 @@ function bindClientViewActions(){
     var origTxt = b.textContent;
     b.disabled=true; b.textContent="Enviando…";
     try{ await clientApproveLegenda(+b.dataset.doappl); }
+    finally{ b.disabled=false; b.textContent=origTxt; }
+  };});
+  /* [V62.17] Submit do "Editar e aprovar" da legenda */
+  document.querySelectorAll("[data-doeditl]").forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var i=+b.dataset.doeditl;
+    var ta=document.getElementById("cvLgEdT"+i);
+    var txt=(ta&&ta.value||"").trim();
+    if(!txt){
+      if(ta){ ta.style.borderColor="var(--c-rev)"; try{ ta.focus(); }catch(_){} }
+      return;
+    }
+    var origTxt = b.textContent;
+    b.disabled=true; b.textContent="Salvando…";
+    try{ await clientEditAndApproveLegenda(i, txt); }
     finally{ b.disabled=false; b.textContent=origTxt; }
   };});
   document.querySelectorAll("[data-dorevl]").forEach(function(b){ b.onclick=async function(){
@@ -3577,6 +3778,84 @@ async function clientRequestRevisionLegenda(idx, fbTxt){
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
   }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e tente de novo."); }
+}
+
+/* [V62.17] Cliente edita o tema (título/descrição) e APROVA direto.
+   Substitui os campos da equipe pelos novos valores e marca cs="aprovado". */
+async function clientEditAndApproveTema(idx, novoT, novaD){
+  var t = await ensureClientTask();
+  var tok = getClientToken();
+  if(!t||!db||!tok){
+    var code = (t?"":"T")+(db?"":"D")+(tok?"":"K");
+    console.error("[clientEditAndApproveTema] estado inválido:",{t:!!t,db:!!db,token:!!tok});
+    clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
+    return;
+  }
+  var titulo=(novoT||"").trim();
+  if(!titulo){ clientShowError("O título não pode ficar vazio."); return; }
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
+    var now=Date.now();
+    var antigoT=arr[idx].t||"", antigaD=arr[idx].d||"";
+    arr[idx].t=titulo.slice(0,300);
+    arr[idx].d=(novaD||"").slice(0,1500);
+    arr[idx].cs="aprovado";
+    arr[idx].csAt=now;
+    arr[idx].csFeedback="";
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"client_edited_approved", at:now, prevT:antigoT, prevD:antigaD});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+  }catch(e){
+    console.error("[clientEditAndApproveTema] erro firebase:", e);
+    var c = e && e.code ? e.code : "";
+    var msg = c==="permission-denied" ? "Permissão negada. Avise a agência."
+            : c==="unavailable" ? "Servidor indisponível. Tente em 10 segundos."
+            : "Não conseguimos registrar ("+(c||"erro")+"). Tente de novo.";
+    clientShowError(msg);
+  }
+}
+
+/* [V62.17] Cliente edita a LEGENDA e APROVA direto. */
+async function clientEditAndApproveLegenda(idx, novaLg){
+  var t = await ensureClientTask();
+  var tok = getClientToken();
+  if(!t||!db||!tok){
+    var code = (t?"":"T")+(db?"":"D")+(tok?"":"K");
+    console.error("[clientEditAndApproveLegenda] estado inválido:",{t:!!t,db:!!db,token:!!tok});
+    clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
+    return;
+  }
+  var legenda=(novaLg||"").trim();
+  if(!legenda){ clientShowError("A legenda não pode ficar vazia."); return; }
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
+    if(arr[idx].cs !== "aprovado"){ clientShowError("Aprove o tema antes."); return; }
+    if(arr[idx].lgState !== "enviada" && arr[idx].lgState !== "em_analise"){
+      clientShowError("Legenda ainda não foi enviada."); return;
+    }
+    var now=Date.now();
+    var antigaLg=arr[idx].lg||"";
+    arr[idx].lg=legenda.slice(0,3000);
+    arr[idx].lgState="aprovada";
+    arr[idx].lgAt=now;
+    arr[idx].lgFeedback="";
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"legenda_edited_approved", at:now, prevLg:antigaLg});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+  }catch(e){
+    console.error("[clientEditAndApproveLegenda] erro firebase:", e);
+    var c = e && e.code ? e.code : "";
+    var msg = c==="permission-denied" ? "Permissão negada. Avise a agência."
+            : c==="unavailable" ? "Servidor indisponível. Tente em 10 segundos."
+            : "Não conseguimos registrar ("+(c||"erro")+"). Tente de novo.";
+    clientShowError(msg);
+  }
 }
 
 /* Mensagem de erro visível no modo cliente (sem alert() — também é bloqueado em WhatsApp) */
