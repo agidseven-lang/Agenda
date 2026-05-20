@@ -891,7 +891,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 53 · build cliente-aprovacao</div>
+    <div class="ver">versão 54 · build cliente-aprovacao-v2</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2226,6 +2226,23 @@ function openContentDetail(tid, idx){
     '</div>';
   }
 
+  /* CAIXA DE COMPARTILHAR (mesmo card no detalhe do card — escopo é o cronograma inteiro) */
+  var shareBoxCard="";
+  if(canManage(me)){
+    var hasShr = !!(t.shareToken && t.shareToken.length>4);
+    var shrLk = hasShr ? clientShareURL(t.shareToken) : "";
+    shareBoxCard = '<div class="share-box" style="margin-top:14px"><div class="tt">📤 Compartilhar este cronograma com o cliente</div>';
+    if(!hasShr){
+      shareBoxCard += '<div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:12px">Gera um <b>link único</b> com TODOS os cards deste cronograma. O cliente abre no celular dele (sem login), aprova ou pede revisão em cada um. Você vê tudo aqui na hora.</div>';
+      shareBoxCard += '<div class="share-actions"><button class="primary" id="ctShareSend">📤 Enviar pro cliente</button></div>';
+    } else {
+      shareBoxCard += '<div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:8px">Link já gerado e ativo:</div>';
+      shareBoxCard += '<div class="share-url"><code>'+esc(shrLk)+'</code><button id="ctShareCopy">Copiar</button></div>';
+      shareBoxCard += '<div class="share-actions"><button id="ctShareWA">📱 Abrir WhatsApp</button><button class="danger" id="ctShareKill">Invalidar link</button></div>';
+    }
+    shareBoxCard += '</div>';
+  }
+
   $("ctBody").innerHTML=
     '<div class="cron-view" style="margin-top:0">'+
       '<div class="tt">'+esc(sec.label)+' · '+esc(t.client||"Sem cliente")+'</div>'+
@@ -2238,10 +2255,25 @@ function openContentDetail(tid, idx){
     '</div>'+
     '<div class="fld" style="margin-top:18px"><label>Etapa deste conteúdo</label><div class="stage-row" id="ctStage">'+chips+'</div></div>'+
     clientBox+
+    shareBoxCard+
     tlHtml+
     cmtHtml;
   $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
   var _md=$("ctMarkDeliver"); if(_md) _md.onclick=()=>markCardDelivered(tid, idx);
+  /* binds do compartilhar duplicado no card */
+  var _cs1=$("ctShareSend"); if(_cs1) _cs1.onclick=()=>sendCronToClient(tid);
+  var _cs2=$("ctShareKill"); if(_cs2) _cs2.onclick=()=>invalidateShareLink(tid);
+  var _cs3=$("ctShareCopy"); if(_cs3) _cs3.onclick=function(){
+    var tk=tasks.find(x=>x.id===tid); if(!tk||!tk.shareToken)return;
+    var u=clientShareURL(tk.shareToken);
+    try{ navigator.clipboard.writeText(u); toast("Link copiado ✓"); }catch(e){ alert(u); }
+  };
+  var _cs4=$("ctShareWA"); if(_cs4) _cs4.onclick=function(){
+    var tk=tasks.find(x=>x.id===tid); if(!tk||!tk.shareToken)return;
+    var u=clientShareURL(tk.shareToken);
+    var msg="Olá! Aqui está o cronograma de "+(tk.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+u;
+    window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+  };
   bindCommentInput({
     inputId:"ctCmtInput", sendId:"ctCmtSend", acId:"ctCmtAc",
     onSend:function(text, ms){ addContentComment(tid, idx, text, ms); }
