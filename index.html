@@ -1162,7 +1162,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.15 · build fix-hoisting-token</div>
+    <div class="ver">versão 62.16 · build token-defensivo</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -3135,12 +3135,24 @@ function renderClientNotFound(){
 /* [V62.13] Fallback robusto: se __clientTask estiver null por race condition (clique
    rapidinho antes do snapshot popular) ou listener stale, tenta um get() direto.
    Evita o falso "Conexão perdida" quando na verdade a conexão está OK. */
+/* [V62.16] Recupera o token do cliente de forma robusta — usa variável global se OK,
+   senão extrai diretamente da URL. Imune a bugs de hoisting/ordem de execução. */
+function getClientToken(){
+  if(__clientToken) return __clientToken;
+  try{
+    var tok = new URLSearchParams(location.search).get("cliente");
+    if(tok){ __clientToken = tok; return tok; }
+  }catch(_){}
+  return null;
+}
+
 async function ensureClientTask(){
   if(__clientTask) return __clientTask;
-  if(!db || !__clientToken) return null;
+  var tok = getClientToken();
+  if(!db || !tok) return null;
   try{
-    var snap = await db.collection("tasks").where("shareToken","==",__clientToken).limit(1).get();
-    if(snap.empty){ console.warn("[ensureClientTask] snap vazio pro token", __clientToken); return null; }
+    var snap = await db.collection("tasks").where("shareToken","==",tok).limit(1).get();
+    if(snap.empty){ console.warn("[ensureClientTask] snap vazio pro token", tok); return null; }
     __clientTask = Object.assign({id:snap.docs[0].id}, snap.docs[0].data());
     __clientTask.sector = normSector(__clientTask.sector);
     return __clientTask;
@@ -3416,7 +3428,7 @@ function bindClientViewActions(){
 
 function autoMarkOpened(){
   __clientOpenedMark = true;
-  var t=__clientTask; if(!t||!db||!__clientToken) return;
+  var t=__clientTask; var tok=getClientToken(); if(!t||!db||!tok) return;
   var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
   var changed=false, now=Date.now();
   arr.forEach(function(c){
@@ -3439,9 +3451,10 @@ function autoMarkOpened(){
 async function clientApprove(idx){
   /* Popup nativo removido — usuário confirma no painel inline (data-doapp) */
   var t = await ensureClientTask();
-  if(!t||!db||!__clientToken){
-    var code = (t?"":"T")+(db?"":"D")+(__clientToken?"":"K");
-    console.error("[clientApprove] estado inválido:",{t:!!t,db:!!db,token:!!__clientToken});
+  var tok = getClientToken();
+  if(!t||!db||!tok){
+    var code = (t?"":"T")+(db?"":"D")+(tok?"":"K");
+    console.error("[clientApprove] estado inválido:",{t:!!t,db:!!db,token:!!tok});
     clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
     return;
   }
@@ -3470,9 +3483,10 @@ async function clientApprove(idx){
 async function clientRequestRevision(idx, fbTxt){
   /* Popup nativo removido — texto vem do textarea inline (data-dorev) */
   var t = await ensureClientTask();
-  if(!t||!db||!__clientToken){
-    var code = (t?"":"T")+(db?"":"D")+(__clientToken?"":"K");
-    console.error("[clientRequestRevision] estado inválido:",{t:!!t,db:!!db,token:!!__clientToken});
+  var tok = getClientToken();
+  if(!t||!db||!tok){
+    var code = (t?"":"T")+(db?"":"D")+(tok?"":"K");
+    console.error("[clientRequestRevision] estado inválido:",{t:!!t,db:!!db,token:!!tok});
     clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
     return;
   }
@@ -3502,9 +3516,10 @@ async function clientRequestRevision(idx, fbTxt){
 /* [V62] FASE 2 — cliente aprova LEGENDA */
 async function clientApproveLegenda(idx){
   var t = await ensureClientTask();
-  if(!t||!db||!__clientToken){
-    var code = (t?"":"T")+(db?"":"D")+(__clientToken?"":"K");
-    console.error("[clientApproveLegenda] estado inválido:",{t:!!t,db:!!db,token:!!__clientToken});
+  var tok = getClientToken();
+  if(!t||!db||!tok){
+    var code = (t?"":"T")+(db?"":"D")+(tok?"":"K");
+    console.error("[clientApproveLegenda] estado inválido:",{t:!!t,db:!!db,token:!!tok});
     clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
     return;
   }
@@ -3537,9 +3552,10 @@ async function clientApproveLegenda(idx){
 /* [V62] FASE 2 — cliente pede revisão da LEGENDA */
 async function clientRequestRevisionLegenda(idx, fbTxt){
   var t = await ensureClientTask();
-  if(!t||!db||!__clientToken){
-    var code = (t?"":"T")+(db?"":"D")+(__clientToken?"":"K");
-    console.error("[clientRequestRevisionLegenda] estado inválido:",{t:!!t,db:!!db,token:!!__clientToken});
+  var tok = getClientToken();
+  if(!t||!db||!tok){
+    var code = (t?"":"T")+(db?"":"D")+(tok?"":"K");
+    console.error("[clientRequestRevisionLegenda] estado inválido:",{t:!!t,db:!!db,token:!!tok});
     clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
     return;
   }
