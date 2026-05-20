@@ -93,11 +93,11 @@
   .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--accent);background:var(--surface-2);
     box-shadow:0 0 0 3px rgba(62, 184, 216,.13)}
   .fld input::placeholder,.fld textarea::placeholder{color:var(--ink-faint)}
-  /* [V59→V62.6] Fix dos ícones nativos de date/time invisíveis no tema escuro.
-     Defesa em CAMADAS: color-scheme + accent-color + filter invert + background visível. */
+  /* [V59→V62.7] Fix dos ícones nativos de date/time — VERSÃO AGRESSIVA com !important.
+     Agora vira um BOTÃO AZUL VISÍVEL ao lado do campo. */
   input[type="date"],input[type="time"],input[type="datetime-local"],
   input[type="month"],input[type="week"]{
-    color-scheme:dark;
+    color-scheme:dark !important;
     accent-color:var(--accent)
   }
   input[type="date"]::-webkit-calendar-picker-indicator,
@@ -105,22 +105,24 @@
   input[type="datetime-local"]::-webkit-calendar-picker-indicator,
   input[type="month"]::-webkit-calendar-picker-indicator,
   input[type="week"]::-webkit-calendar-picker-indicator{
-    filter:invert(1);
-    opacity:.95;
-    cursor:pointer;
-    padding:5px;
-    margin-right:-2px;
-    border-radius:5px;
-    background:rgba(255,255,255,.06);
-    transition:.15s
+    filter:invert(1) brightness(2) !important;
+    opacity:1 !important;
+    cursor:pointer !important;
+    padding:6px !important;
+    margin-right:-4px !important;
+    border-radius:7px !important;
+    background:rgba(62,184,216,.22) !important;
+    width:18px !important;
+    height:18px !important;
+    transition:.15s !important
   }
   input[type="date"]::-webkit-calendar-picker-indicator:hover,
   input[type="time"]::-webkit-calendar-picker-indicator:hover,
   input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover{
-    background:rgba(62,184,216,.25);
-    opacity:1
+    background:rgba(62,184,216,.45) !important;
+    transform:scale(1.05)
   }
-  /* Firefox/outros: garante visibilidade dos botões internos */
+  /* Spin buttons internos do time */
   input[type="date"]::-webkit-inner-spin-button,
   input[type="time"]::-webkit-inner-spin-button{filter:invert(1);opacity:.7}
   .fld textarea{resize:none;min-height:74px;line-height:1.5}
@@ -1119,7 +1121,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.6 · build pickers-visiveis</div>
+    <div class="ver">versão 62.7 · build pickers-azuis</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
