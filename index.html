@@ -127,23 +127,21 @@
   input[type="time"]{
     background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233eb8d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 3'/%3E%3C/svg%3E") !important
   }
-  /* O ícone nativo fica TRANSPARENTE mas EXPANDIDO pra cobrir o campo inteiro.
-     Assim, clicar em qualquer lugar do campo abre o picker — sem precisar acertar o ícone. */
+  /* O ícone nativo fica INVISÍVEL no canto direito do PRÓPRIO input (sem position:absolute).
+     Assim NÃO vaza pro input vizinho no mesmo .fld. Largura generosa de 34px pra ser fácil clicar. */
   input[type="date"]::-webkit-calendar-picker-indicator,
   input[type="time"]::-webkit-calendar-picker-indicator,
   input[type="datetime-local"]::-webkit-calendar-picker-indicator,
   input[type="month"]::-webkit-calendar-picker-indicator,
   input[type="week"]::-webkit-calendar-picker-indicator{
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
     opacity:0;
     cursor:pointer;
+    width:34px;
+    height:34px;
+    margin-right:-4px;
+    padding:0;
     background:transparent
   }
-  /* Container dos inputs precisa de position relative pro inset funcionar */
-  .fld{position:relative}
   /* Spin buttons internos do time (números pra cima/baixo) */
   input[type="date"]::-webkit-inner-spin-button,
   input[type="time"]::-webkit-inner-spin-button{display:none}
@@ -1164,7 +1162,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.11 · build limpeza-central-tokens</div>
+    <div class="ver">versão 62.12 · build picker-fix-overlap</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1677,6 +1675,15 @@ function unlockAudio(){
   }catch(e){}
 }
 document.addEventListener("click",unlockAudio,{once:false});
+/* [V62.12] Clique em qualquer ponto de input date/time abre o picker nativo.
+   Como o ::-webkit-calendar-picker-indicator ficou pequeno (34px no canto direito) pra não vazar
+   pro vizinho, este handler garante que cliques no resto do input também abram o picker. */
+document.addEventListener("click",function(e){
+  var el=e.target;
+  if(el && el.tagName==="INPUT" && (el.type==="date"||el.type==="time"||el.type==="datetime-local"||el.type==="month"||el.type==="week")){
+    if(typeof el.showPicker==="function"){ try{ el.showPicker(); }catch(_){ } }
+  }
+},true);
 document.addEventListener("touchstart",unlockAudio,{once:false});
 
 function beep(){
