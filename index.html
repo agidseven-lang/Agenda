@@ -633,6 +633,41 @@
     display:flex;align-items:center;justify-content:center;gap:9px}
   .posts-link svg{width:18px;height:18px;color:var(--accent)}
   .posts-link:active{transform:scale(.99)}
+
+  /* [V62.2] Toolbar compacta do Quadro — 3 botões em uma linha (Calendário/Por cliente/Posts) */
+  .board-tools{display:flex;gap:8px;margin:14px 0 4px}
+  .bt-link{flex:1;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);
+    font-size:12.5px;font-weight:800;padding:11px 8px;border-radius:11px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;transition:.15s}
+  .bt-link svg{width:16px;height:16px;color:var(--accent);flex-shrink:0}
+  .bt-link span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bt-link:hover{background:var(--bg-2);color:var(--ink);border-color:var(--accent)}
+  .bt-link:active{transform:scale(.98)}
+
+  /* [V62.2] Barra de navegação de colunas — estilo Linear/Notion: chips clicáveis, com bullet de cor e contador */
+  .board-nav{display:flex;gap:6px;margin:18px 0 6px;padding:4px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;overflow-x:auto;
+    scrollbar-width:none;-ms-overflow-style:none}
+  .board-nav::-webkit-scrollbar{display:none}
+  .bn-tab{display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:10px;
+    background:transparent;border:none;color:var(--ink-soft);font-size:12.5px;font-weight:800;
+    cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.15s;min-width:0}
+  .bn-tab:hover{background:var(--bg-2);color:var(--ink)}
+  .bn-tab.active{background:var(--bg-2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-soft)}
+  .bn-tab .bn-dot{width:7px;height:7px;border-radius:50%;background:var(--c-outro);flex-shrink:0;
+    box-shadow:0 0 0 0 currentColor}
+  .bn-tab.afazer .bn-dot{background:var(--c-outro)}
+  .bn-tab.andamento .bn-dot{background:var(--c-foto)}
+  .bn-tab.revisao .bn-dot{background:var(--c-reuni)}
+  .bn-tab.concluido .bn-dot{background:var(--c-trafego)}
+  .bn-tab.cliente .bn-dot{background:var(--c-edicao)}
+  .bn-tab .bn-lab{font-weight:800;letter-spacing:.01em}
+  .bn-tab .bn-qt{background:var(--bg-2);color:var(--ink-faint);font-size:11px;font-weight:900;
+    padding:2px 8px;border-radius:7px;min-width:22px;text-align:center}
+  .bn-tab.active .bn-qt{background:var(--accent);color:#001423}
+  .bn-tab.cliente.urgent{animation:bn-pulse 1.8s infinite}
+  .bn-tab.cliente.urgent .bn-dot{background:#ff8c83;box-shadow:0 0 8px #ff8c83}
+  @keyframes bn-pulse{0%,100%{background:transparent}50%{background:rgba(255,140,131,.1)}}
   .post-view{margin-top:20px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:16px;padding:16px}
   .post-view .tt{font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
   .post-meta{font-size:13px;color:var(--ink-soft);font-weight:600;line-height:1.55;margin-bottom:12px}
@@ -874,7 +909,8 @@
     padding:12px 14px;font-size:12.5px;font-weight:800;color:#ff8c83;display:flex;align-items:center;
     gap:9px;margin-bottom:14px;line-height:1.4}
   .od-flag svg{width:18px;height:18px;flex-shrink:0}
-  .col-empty{font-size:12px;color:var(--ink-faint);text-align:center;padding:20px 6px;font-weight:600}
+  .col-empty{font-size:12.5px;color:var(--ink-faint);text-align:center;padding:32px 12px;font-weight:600;
+    flex:1;display:flex;align-items:center;justify-content:center;line-height:1.5}
   .board-hint{font-size:11.5px;color:var(--ink-faint);font-weight:600;text-align:center;
     padding:6px 16px 2px;line-height:1.5}
   .stage-row{display:flex;gap:7px;flex-wrap:wrap}
@@ -974,16 +1010,18 @@
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
     .ev .tt{font-size:16px}
-    /* [V62.1] Quadro com largura FIXA mínima por coluna (320px) + scroll horizontal suave.
+    /* [V62.1/V62.2] Quadro com largura FIXA mínima por coluna + scroll horizontal suave.
        Igual Trello/Linear — cards nunca ficam esmagados, mesmo com 5+ colunas. */
     .board-wrap{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;
-      padding:18px 4px 14px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
-      scrollbar-width:thin;scrollbar-color:var(--line) transparent}
-    .board-wrap::-webkit-scrollbar{height:10px}
-    .board-wrap::-webkit-scrollbar-track{background:transparent}
-    .board-wrap::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px}
-    .board-wrap::-webkit-scrollbar-thumb:hover{background:var(--line-soft)}
-    .col{flex:1 1 320px;min-width:320px;max-width:380px;scroll-snap-align:start}
+      padding:14px 6px 18px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+      scrollbar-width:thin;scrollbar-color:var(--line) transparent;
+      min-height:520px;align-items:stretch}
+    .board-wrap::-webkit-scrollbar{height:12px;display:block}
+    .board-wrap::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-radius:6px;margin:0 4px}
+    .board-wrap::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;border:2px solid var(--bg)}
+    .board-wrap::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+    .col{flex:1 1 320px;min-width:320px;max-width:380px;scroll-snap-align:start;
+      min-height:480px;display:flex;flex-direction:column}
     .tcard{margin-bottom:12px}
     .toast{bottom:30px;left:calc(50% + 54px)}
     .sheet{width:min(620px,80vw);max-width:620px}
@@ -1045,7 +1083,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.1 · build legendas+layout</div>
+    <div class="ver">versão 62.2 · build quadro-profissional</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2086,10 +2124,12 @@ function renderBoard(){
     h+='<div class="mine-bar">Mostrando apenas: <b>'+esc(boardFilter.slice(4))+'</b> · <button class="cli-clear" data-bf="all">limpar filtro</button></div>';
   }
   /* [V61] Botão "Central de Aprovações" REMOVIDO daqui — a 5ª coluna do Quadro substitui essa função.
-     A função renderCentralAprovacoes() continua no código caso queira voltar, mas o acesso saiu daqui. */
-  h+='<button class="posts-link" id="goContentCal"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Calendário de conteúdo</button>';
-  h+='<button class="posts-link" id="goClientes"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Visão por cliente</button>';
-  h+='<button class="posts-link" id="goPostsLog"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg>Registro de Posts publicados</button>';
+     [V62.2] Os 3 botões viram uma row compacta horizontal (rápido acesso sem ocupar 3 linhas). */
+  h+='<div class="board-tools">';
+  h+='<button class="bt-link" id="goContentCal" title="Calendário de conteúdo"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Calendário</span></button>';
+  h+='<button class="bt-link" id="goClientes" title="Visão por cliente"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Por cliente</span></button>';
+  h+='<button class="bt-link" id="goPostsLog" title="Registro de posts publicados"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg><span>Posts</span></button>';
+  h+='</div>';
   const od=myOverdue();
   if(od.length){
     h+='<div class="od-banner"><div class="ttl"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Pendência urgente — '+od.length+' tarefa(s) atrasada(s)</div>'+
@@ -2115,12 +2155,21 @@ function renderBoard(){
   }
   /* Ordem de urgência dentro da coluna do cliente: usa cardActiveStatus.urg (considera Fase 2). */
   function clientUrg(c){ var s=cardActiveStatus(c); return s && s.info ? s.info.urg : 99; }
-  h+='<div class="stat-strip">';
-  COLS.forEach(s=>{const n=bi.filter(x=>colKeyOf(x)===s.k).length;
-    var clsExtra = s.k==="concluido"?" acc" : s.k==="cliente"?" cli" : "";
-    h+='<div class="stat'+clsExtra+'"><div class="n">'+n+'</div><div class="l">'+esc(s.label)+'</div></div>';});
+  /* [V62.2] Barra de NAVEGAÇÃO de colunas — clicável, faz scroll até a coluna. Substitui a stat-strip antiga. */
+  h+='<div class="board-nav" id="boardNav">';
+  COLS.forEach(s=>{
+    var n = (s.k==="cliente")
+      ? bi.filter(x=>colKeyOf(x)==="cliente").length
+      : bi.filter(x=>colKeyOf(x)===s.k).length;
+    var urgent = (s.k==="cliente" && bi.filter(x=>x.c && (x.c.cs==="em_revisao" || x.c.lgState==="em_revisao")).length>0);
+    h+='<button class="bn-tab '+s.k+(urgent?' urgent':'')+'" data-goto="'+s.k+'">'+
+       '<span class="bn-dot"></span>'+
+       '<span class="bn-lab">'+esc(s.label)+'</span>'+
+       '<span class="bn-qt">'+n+'</span>'+
+       '</button>';
+  });
   h+='</div>';
-  h+='<div class="board-wrap" style="--cols:'+COLS.length+'">';
+  h+='<div class="board-wrap" id="boardWrap" style="--cols:'+COLS.length+'">';
   COLS.forEach(s=>{
     var items;
     if(s.k==="cliente"){
@@ -2142,7 +2191,7 @@ function renderBoard(){
       items = bi.filter(x=>colKeyOf(x)===s.k)
         .sort((a,b)=>((b.t.priority?1:0)-(a.t.priority?1:0))||((taskDueMs(a.t)||9e15)-(taskDueMs(b.t)||9e15))||((b.t.createdAt||0)-(a.t.createdAt||0))||(a.idx-b.idx));
     }
-    h+='<div class="col '+s.k+'"><div class="col-h"><div class="nm"><i></i>'+esc(s.label)+'</div><div class="qt">'+items.length+'</div></div>';
+    h+='<div class="col '+s.k+'" data-col="'+s.k+'"><div class="col-h"><div class="nm"><i></i>'+esc(s.label)+'</div><div class="qt">'+items.length+'</div></div>';
     var emptyMsg = s.k==="cliente"
       ? '<div class="col-empty">Nenhum cronograma com cliente.<br><br>Quando você enviar um cronograma pelo botão "Compartilhar com o cliente" na tela de detalhes, o card aparece aqui pra acompanhamento.</div>'
       : '<div class="col-empty">Sem tarefas aqui</div>';
@@ -2287,6 +2336,37 @@ function bindBoard(){
     if(c.dataset.ci!=null && c.dataset.ci!=="") openContentDetail(c.dataset.tid, +c.dataset.ci);
     else openTaskDetail(c.dataset.tid);
   });
+  /* [V62.2] Barra de navegação do board: clique faz scroll suave até a coluna correspondente. */
+  var bw = document.getElementById("boardWrap");
+  var bn = document.getElementById("boardNav");
+  if(bw && bn){
+    bn.querySelectorAll("[data-goto]").forEach(function(b){
+      b.onclick=function(){
+        var key=b.dataset.goto;
+        var col=bw.querySelector('[data-col="'+key+'"]');
+        if(!col) return;
+        var off = col.offsetLeft - 6;
+        bw.scrollTo({left: off, behavior: "smooth"});
+      };
+    });
+    /* Atualiza qual tab está "ativo" baseado em qual coluna ocupa mais espaço da viewport */
+    function updateActiveTab(){
+      var cols = bw.querySelectorAll(".col");
+      var wpL = bw.scrollLeft, wpR = wpL + bw.clientWidth, bestK=null, bestArea=0;
+      cols.forEach(function(c){
+        var cL = c.offsetLeft, cR = cL + c.offsetWidth;
+        var visL = Math.max(cL, wpL), visR = Math.min(cR, wpR);
+        var area = Math.max(0, visR - visL);
+        if(area > bestArea){ bestArea = area; bestK = c.dataset.col; }
+      });
+      bn.querySelectorAll(".bn-tab").forEach(function(t){
+        t.classList.toggle("active", t.dataset.goto === bestK);
+      });
+    }
+    bw.addEventListener("scroll", updateActiveTab, {passive:true});
+    /* roda 1x pra setar o estado inicial */
+    setTimeout(updateActiveTab, 50);
+  }
 }
 /* ============================================================
    [V60/V62] DETECÇÃO EM TEMPO REAL DE AÇÕES DO CLIENTE
