@@ -1165,7 +1165,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.18 · build header-opaco</div>
+    <div class="ver">versão 62.19 · build legenda-finalizada-concluido</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2307,6 +2307,9 @@ function renderBoard(){
      [V61] Cards com client status (cs) ou estado de legenda (lgState) SEMPRE vão pra coluna "cliente" (5ª).
      [V62] Inclui Fase 2 (legendas). */
   function colKeyOf(x){
+    /* [V62.19] Se time já finalizou o conteúdo (st=concluido), vai pra coluna Concluído
+       — mesmo que ainda tenha cs/lgState definidos. Fim do ciclo. */
+    if(x.c && x.c.st === "concluido") return "concluido";
     /* Se card tem status do cliente (Fase 1) ou estado de legenda (Fase 2), vai pra coluna do cliente */
     if(x.c && (x.c.cs || (x.c.lgState && x.c.lgState!=="pendente"))) return "cliente";
     var raw = x.st || "afazer";
@@ -2633,7 +2636,7 @@ function tlIcon(k){
   if(k==="client_opened") return '<svg viewBox="0 0 24 24" fill="none"><path d="M2 12c2.5-5 6-7.5 10-7.5s7.5 2.5 10 7.5c-2.5 5-6 7.5-10 7.5S4.5 17 2 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>';
   if(k==="client_approved") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   if(k==="client_revision") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
-  if(k==="team_delivered") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 8l8-4 8 4-8 4-8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  if(k==="team_delivered"||k==="team_completed") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   /* [V62] Eventos da Fase 2 (Legendas) */
   if(k==="legenda_written") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21h18M6 18l11-11 3 3-11 11H6v-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
   if(k==="legenda_sent") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="2"/></svg>';
@@ -2667,6 +2670,7 @@ function tlText(e, sector, scope){
   if(e.kind==="client_approved") return '<b>Cliente APROVOU o tema</b> ✓';
   if(e.kind==="client_revision"){ var tx2=(e.text||"").slice(0,180); return '<b>Cliente pediu revisão do tema</b>: <span class="tl-q">"'+esc(tx2)+((e.text||"").length>180?"…":"")+'"</span>'; }
   if(e.kind==="team_delivered") return W+'marcou como <b>entregue</b>';
+  if(e.kind==="team_completed") return W+'marcou o conteúdo como <b>concluído</b> ✓';
   /* [V62] Fase 2 - Legendas */
   if(e.kind==="legenda_written") return W+'escreveu a <b>legenda</b>';
   if(e.kind==="legenda_sent") return W+'enviou a <b>legenda</b> pro cliente';
@@ -2682,7 +2686,7 @@ function tlText(e, sector, scope){
 function tlCls(k){
   if(k==="created") return "ev-cre";
   if(k==="started"||k==="moved") return "ev-mv";
-  if(k==="copy_aprovado"||k==="rot_aprovado"||k==="client_approved"||k==="team_delivered"||k==="legenda_approved"||k==="client_edited_approved"||k==="legenda_edited_approved") return "ev-ok";
+  if(k==="copy_aprovado"||k==="rot_aprovado"||k==="client_approved"||k==="team_delivered"||k==="team_completed"||k==="legenda_approved"||k==="client_edited_approved"||k==="legenda_edited_approved") return "ev-ok";
   if(k==="copy_em_avaliacao"||k==="rot_em_revisao"||k==="client_sent"||k==="client_opened"||k==="legenda_sent"||k==="legenda_written"||k==="team_resent"||k==="team_legenda_resent") return "ev-wt";
   if(k==="client_revision"||k==="legenda_revision") return "ev-rev";
   if(k==="posted"||k==="done") return "ev-dn";
@@ -2863,7 +2867,14 @@ function openContentDetail(tid, idx){
       legendaBox += '<div class="cw-cn" style="margin-top:10px">Legenda enviada ao cliente</div>'+
         '<div class="lg-read">'+esc(o.lg||"")+'</div>';
       if(lgSt==="aprovada"){
-        legendaBox += '<div style="font-size:13px;color:var(--c-trafego);font-weight:800;margin-top:10px;text-align:center;padding:8px;background:rgba(54,211,153,.1);border-radius:8px">🚀 Pronto pra publicar</div>';
+        legendaBox += '<div style="font-size:13.5px;color:var(--c-trafego);font-weight:800;margin-top:10px;text-align:center;padding:10px;background:rgba(54,211,153,.12);border-radius:8px">🚀 Legenda finalizada — pronto pra publicar</div>';
+        /* [V62.19] Passo final: time marca todo o conteúdo como CONCLUÍDO. Card sai da coluna Cliente e vai pra Concluído */
+        if(canManage(me) && o.st !== "concluido"){
+          legendaBox += '<button class="cs-deliver" id="ctMarkCompleted" style="margin-top:12px;background:var(--c-trafego);color:#062514">✓ Marcar conteúdo como concluído</button>';
+        }
+        if(o.st === "concluido"){
+          legendaBox += '<div style="font-size:12.5px;color:var(--c-trafego);font-weight:700;text-align:center;padding:8px;margin-top:10px;border:1px solid rgba(54,211,153,.3);border-radius:8px">✓ Conteúdo concluído</div>';
+        }
       }
     }
     legendaBox += '</div>';
@@ -2904,6 +2915,8 @@ function openContentDetail(tid, idx){
     cmtHtml;
   $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
   var _md=$("ctMarkDeliver"); if(_md) _md.onclick=()=>markCardDelivered(tid, idx);
+  /* [V62.19] Hook do botão "Marcar conteúdo como concluído" (após cliente aprovar legenda) */
+  var _mc=$("ctMarkCompleted"); if(_mc) _mc.onclick=()=>markCardDelivered(tid, idx);
   /* [V62.17] hook do botão "Salvar e reenviar pro cliente" (tema em revisão) */
   var _rt=$("ctResendTema"); if(_rt) _rt.onclick=function(){
     var ti=$("ctEditT"), td=$("ctEditD"), tl=$("ctEditL");
@@ -3138,16 +3151,21 @@ async function markCardDelivered(tid, idx){
     var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
     if(!arr[idx]){ busy=false; return; }
     var now=Date.now();
+    /* [V62.19] Finalização total: marca etapa interna (st) E status do cliente (cs)
+       como concluído. Isso tira o card da coluna "Aprovação do Cliente" e leva pra "Concluído". */
+    arr[idx].st="concluido";
     arr[idx].cs="concluido";
     arr[idx].csAt=now;
+    arr[idx].doneAt=now;
+    if(me) arr[idx].doneBy=me.id;
     var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
-    hist.push({kind:"team_delivered", at:now, byId:(me?me.id:null)});
+    hist.push({kind:"team_completed", at:now, byId:(me?me.id:null)});
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(tid).update({cronWeeks:arr});
     var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
     openContentDetail(tid, idx);
-    toast("Conteúdo marcado como entregue ✓");
+    toast("Conteúdo concluído ✓");
   }catch(e){ toast("Não foi possível marcar agora"); }
   finally{ busy=false; }
 }
@@ -4016,7 +4034,7 @@ function clientLgStatusInfo(lg){
   if(lg==="enviada")    return {label:"Legenda enviada ao cliente",     short:"📤 Legenda enviada",                 icon:"📤", color:"var(--c-foto)",    bg:"rgba(255,176,46,.12)",   urg:4.4};
   if(lg==="em_analise") return {label:"Cliente analisando a legenda",   short:"👁 Cliente analisando a legenda",    icon:"👁", color:"var(--c-reuni)",   bg:"rgba(77,159,255,.12)",   urg:4.5};
   if(lg==="em_revisao") return {label:"Cliente pediu revisão da legenda", short:"✏ Cliente pediu revisão da legenda", icon:"✏", color:"var(--c-rev)",          bg:"rgba(255,90,77,.16)",   urg:1.5};
-  if(lg==="aprovada")   return {label:"Pronto pra publicar",             short:"🚀 Pronto pra publicar",            icon:"🚀", color:"var(--c-trafego)", bg:"rgba(54,211,153,.16)",   urg:99};
+  if(lg==="aprovada")   return {label:"Legenda finalizada · pronto pra publicar", short:"🚀 Legenda finalizada", icon:"🚀", color:"var(--c-trafego)", bg:"rgba(54,211,153,.16)",   urg:99};
   return null;
 }
 /* [V62] Calcula o estado mais relevante de um card pra exibição: prioriza Fase 2 (legenda) se tema já aprovado */
