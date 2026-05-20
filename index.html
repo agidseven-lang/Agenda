@@ -464,6 +464,22 @@
   .cv-btn:active{transform:scale(.97)}
   .cv-btn.ok{background:var(--c-trafego);color:#062514}
   .cv-btn.rev{background:var(--surface);color:#ff8c83;border:1.5px solid rgba(255,90,77,.4)}
+  .cv-btn.cancel{background:var(--surface);color:var(--ink-soft);border:1.5px solid var(--line)}
+  .cv-btn:disabled{opacity:.6;cursor:not-allowed}
+  /* Painel inline de confirmação de aprovação */
+  .cv-confirm{margin-top:10px;background:rgba(54,211,153,.08);border:1.5px solid rgba(54,211,153,.4);border-radius:12px;padding:14px}
+  .cv-cf-msg{font-size:13.5px;color:var(--ink);line-height:1.5;margin-bottom:12px;font-weight:500}
+  .cv-cf-msg b{color:var(--c-trafego)}
+  .cv-cf-acts{display:flex;gap:9px}
+  .cv-cf-acts .cv-btn{padding:12px;font-size:13.5px}
+  /* Painel inline de pedir revisão (textarea) */
+  .cv-revform{margin-top:10px;background:rgba(255,90,77,.05);border:1.5px solid rgba(255,90,77,.3);border-radius:12px;padding:14px}
+  .cv-rv-lab{display:block;font-size:12.5px;font-weight:700;color:#ff8c83;margin-bottom:9px;letter-spacing:.01em}
+  .cv-rv-ta{width:100%;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;color:var(--ink);font-family:inherit;font-size:14px;padding:11px 12px;resize:vertical;min-height:74px;margin-bottom:12px;line-height:1.45;transition:.16s}
+  .cv-rv-ta:focus{outline:none;border-color:#ff8c83}
+  .cv-rv-ta::placeholder{color:var(--ink-faint);font-weight:500}
+  /* Mensagem de erro flutuante no modo cliente (substitui alert()) */
+  .cv-err{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#3a1a1a;color:#fff;border:1.5px solid #ff5a4d;border-radius:12px;padding:13px 18px;font-size:13.5px;font-weight:600;display:none;align-items:center;gap:10px;z-index:9999;max-width:90%;box-shadow:0 12px 30px -8px rgba(255,90,77,.5);color:#ff8c83}
   .cv-foot{margin-top:30px;padding-top:20px;border-top:1px solid var(--line-soft);text-align:center;font-size:11px;color:var(--ink-faint);font-weight:600;letter-spacing:.02em}
   .hright{display:flex;align-items:center;gap:12px}
   .hbell{position:relative;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);
@@ -891,7 +907,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 54 · build cliente-aprovacao-v2</div>
+    <div class="ver">versão 56 · build etapas-unificadas</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1163,18 +1179,24 @@ const STAGES=[
   {k:"revisao",label:"Revisão"},
   {k:"concluido",label:"Concluído"}
 ];
-/* Etapas específicas do setor "Edição de Vídeo e Imagem" — 6 fases */
-const STAGES_EDICAO=[
-  {k:"afazer",label:"Briefing aberto"},
+/* Etapas legadas do antigo fluxo de 6 fases — mantidas só pra exibir labels corretos no histórico de tarefas antigas */
+const STAGES_EDICAO_LEGACY=[
+  {k:"afazer",label:"A Fazer"},
   {k:"analise",label:"Em Análise"},
-  {k:"andamento",label:"Em Edição"},
+  {k:"andamento",label:"Em Andamento"},
   {k:"aprovacao",label:"Aguardando Aprovação"},
   {k:"pronto",label:"Pronto para Entrega"},
   {k:"concluido",label:"Concluído"}
 ];
-function stagesFor(sector){ return sector==="edicao_midia" ? STAGES_EDICAO : STAGES; }
-function stageLabel(k,sector){ var arr=stagesFor(sector); var s=arr.find(x=>x.k===k); if(s)return s.label; var g=STAGES.find(x=>x.k===k); return g?g.label:"A Fazer"; }
-/* Mapeia status especiais (analise/aprovacao/pronto) para a coluna padrão mais próxima quando o quadro mostra 4 colunas */
+/* Todas as áreas usam o mesmo fluxo padrão de 4 etapas (incluindo Edição de Vídeo e Imagem) */
+function stagesFor(sector){ return STAGES; }
+function stageLabel(k,sector){
+  var s=STAGES.find(x=>x.k===k); if(s) return s.label;
+  /* fallback pra tarefas antigas com status do fluxo de 6 etapas */
+  var g=STAGES_EDICAO_LEGACY.find(x=>x.k===k); if(g) return g.label;
+  return "A Fazer";
+}
+/* Mapeia status legados (analise/aprovacao/pronto) para a coluna padrão mais próxima */
 function displayStatusKey(t){
   var k=(t&&t.status)||"afazer";
   if(k==="analise") return "afazer";
@@ -1932,15 +1954,13 @@ function renderBoard(){
   }
   const list=boardVisible();
   const bi=boardItems(list);
-  /* Etapas adaptam: 6 colunas exclusivas quando filtra "Edição de Vídeo e Imagem"; 4 nos demais casos */
-  const COLS = (boardFilter==="edicao_midia") ? STAGES_EDICAO : STAGES;
-  /* Quando vendo as 4 colunas, mapeia status especiais (analise/aprovacao/pronto) pra coluna mais próxima */
+  /* Todas as áreas usam 4 colunas (A Fazer / Em Andamento / Em Revisão / Concluído) */
+  const COLS = STAGES;
+  /* Mapeia status legados (analise/aprovacao/pronto) pra coluna padrão mais próxima */
   function colKeyOf(x){
     var raw = x.st || "afazer";
-    if(COLS===STAGES){
-      if(raw==="analise") return "afazer";
-      if(raw==="aprovacao"||raw==="pronto") return "revisao";
-    }
+    if(raw==="analise") return "afazer";
+    if(raw==="aprovacao"||raw==="pronto") return "revisao";
     return raw;
   }
   h+='<div class="stat-strip">';
@@ -2507,7 +2527,27 @@ function renderClientView(){
         (lk||'')+
         (isRev && c.csFeedback ? '<div class="cv-feedback"><b>Sua observação:</b> '+esc(c.csFeedback)+'</div>' : '')+
         (canAct
-          ? '<div class="cv-actions"><button class="cv-btn ok" data-ai="'+i+'">✓ Aprovar</button><button class="cv-btn rev" data-ri="'+i+'">✏ Pedir revisão</button></div>'
+          ? '<div class="cv-actions" id="cvAct'+i+'">'+
+              '<button class="cv-btn ok"  data-ai="'+i+'">✓ Aprovar</button>'+
+              '<button class="cv-btn rev" data-ri="'+i+'">✏ Pedir revisão</button>'+
+            '</div>'+
+            /* Painel inline de confirmação de aprovação (escondido até clicar) */
+            '<div class="cv-confirm" id="cvCf'+i+'" style="display:none">'+
+              '<div class="cv-cf-msg">Você confirma que <b>APROVA</b> este conteúdo? Esta ação avisa a agência na hora.</div>'+
+              '<div class="cv-cf-acts">'+
+                '<button class="cv-btn ok" data-doapp="'+i+'">✓ Sim, aprovar</button>'+
+                '<button class="cv-btn cancel" data-cnc="'+i+'">Cancelar</button>'+
+              '</div>'+
+            '</div>'+
+            /* Painel inline de pedir revisão (textarea) */
+            '<div class="cv-revform" id="cvRv'+i+'" style="display:none">'+
+              '<label class="cv-rv-lab">O que precisa mudar? Escreva em poucas palavras:</label>'+
+              '<textarea class="cv-rv-ta" id="cvRvT'+i+'" maxlength="500" rows="3" placeholder="Ex: refazer o gancho da abertura, trocar a imagem, etc."></textarea>'+
+              '<div class="cv-cf-acts">'+
+                '<button class="cv-btn rev" data-dorev="'+i+'">📨 Enviar pedido</button>'+
+                '<button class="cv-btn cancel" data-cnc="'+i+'">Cancelar</button>'+
+              '</div>'+
+            '</div>'
           : '')+
       '</div>';
     });
@@ -2516,8 +2556,48 @@ function renderClientView(){
 
   h+='<div class="cv-foot">ID Seven · Atualizado em tempo real</div>';
   $("clientBody").innerHTML=h;
-  document.querySelectorAll("[data-ai]").forEach(function(b){ b.onclick=function(){ clientApprove(+b.dataset.ai); }; });
-  document.querySelectorAll("[data-ri]").forEach(function(b){ b.onclick=function(){ clientRequestRevision(+b.dataset.ri); }; });
+  /* Bindings: abrir painel inline (sem popup, funciona no WhatsApp/Instagram/etc) */
+  document.querySelectorAll("[data-ai]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.ai;
+    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i), r=document.getElementById("cvRv"+i);
+    if(a) a.style.display="none";
+    if(r) r.style.display="none";
+    if(c) c.style.display="block";
+  };});
+  document.querySelectorAll("[data-ri]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.ri;
+    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i), r=document.getElementById("cvRv"+i);
+    if(a) a.style.display="none";
+    if(c) c.style.display="none";
+    if(r) r.style.display="block";
+    var ta=document.getElementById("cvRvT"+i); if(ta) try{ ta.focus(); }catch(_){}
+  };});
+  document.querySelectorAll("[data-cnc]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.cnc;
+    var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i), r=document.getElementById("cvRv"+i);
+    if(c) c.style.display="none";
+    if(r) r.style.display="none";
+    if(a) a.style.display="flex";
+  };});
+  document.querySelectorAll("[data-doapp]").forEach(function(b){ b.onclick=function(){
+    if(b.disabled) return;
+    b.disabled=true; b.textContent="Enviando…";
+    clientApprove(+b.dataset.doapp);
+  };});
+  document.querySelectorAll("[data-dorev]").forEach(function(b){ b.onclick=function(){
+    if(b.disabled) return;
+    var i=+b.dataset.dorev;
+    var ta=document.getElementById("cvRvT"+i);
+    var txt=(ta&&ta.value||"").trim();
+    if(!txt){
+      ta.style.borderColor="#ff8c83";
+      ta.placeholder="⚠ Escreva o que precisa mudar antes de enviar";
+      try{ ta.focus(); }catch(_){}
+      return;
+    }
+    b.disabled=true; b.textContent="Enviando…";
+    clientRequestRevision(i, txt);
+  };});
 }
 
 function autoMarkOpened(){
@@ -2543,11 +2623,11 @@ function autoMarkOpened(){
 }
 
 async function clientApprove(idx){
-  var t=__clientTask; if(!t||!db||!__clientToken) return;
-  if(!confirm("Confirma que você APROVA este conteúdo?\n\nA agência será avisada na hora.")) return;
+  /* Popup nativo removido — usuário confirma no painel inline (data-doapp) */
+  var t=__clientTask; if(!t||!db||!__clientToken){ clientShowError("Conexão perdida. Recarregue a página."); return; }
   try{
     var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
-    if(!arr[idx]) return;
+    if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
     var now=Date.now();
     arr[idx].cs="aprovado"; arr[idx].csAt=now;
     arr[idx].csFeedback="";
@@ -2556,18 +2636,18 @@ async function clientApprove(idx){
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
-  }catch(e){ alert("Não foi possível registrar agora. Verifique a internet e tente novamente."); }
+    /* re-render acontece automaticamente via onSnapshot — não precisa fazer nada */
+  }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e toque em Aprovar de novo."); }
 }
 
-async function clientRequestRevision(idx){
-  var t=__clientTask; if(!t||!db||!__clientToken) return;
-  var fb = prompt("O que precisa mudar neste conteúdo?\n\n(Escreva o pedido em poucas palavras — chega na hora pra equipe.)", "");
-  if(fb===null) return;
-  fb = (fb||"").trim();
-  if(!fb){ alert("Por favor, escreva o que precisa mudar."); return; }
+async function clientRequestRevision(idx, fbTxt){
+  /* Popup nativo removido — texto vem do textarea inline (data-dorev) */
+  var t=__clientTask; if(!t||!db||!__clientToken){ clientShowError("Conexão perdida. Recarregue a página."); return; }
+  var fb=(fbTxt||"").trim();
+  if(!fb){ clientShowError("Escreva o que precisa mudar."); return; }
   try{
     var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
-    if(!arr[idx]) return;
+    if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
     var now=Date.now();
     arr[idx].cs="em_revisao"; arr[idx].csAt=now;
     arr[idx].csFeedback=fb.slice(0,500);
@@ -2576,7 +2656,21 @@ async function clientRequestRevision(idx){
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
-  }catch(e){ alert("Não foi possível registrar agora. Verifique a internet e tente novamente."); }
+  }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e tente de novo."); }
+}
+
+/* Mensagem de erro visível no modo cliente (sem alert() — também é bloqueado em WhatsApp) */
+function clientShowError(msg){
+  var box=document.getElementById("cvErr");
+  if(!box){
+    box=document.createElement("div");
+    box.id="cvErr";
+    box.className="cv-err";
+    document.body.appendChild(box);
+  }
+  box.innerHTML='<svg viewBox="0 0 24 24" fill="none" style="width:18px;height:18px;flex-shrink:0"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>'+esc(msg)+'</span>';
+  box.style.display="flex";
+  setTimeout(function(){ if(box) box.style.display="none"; }, 4500);
 }
 
 function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
@@ -2594,12 +2688,7 @@ function buildSecGrid(){const g=$("secGrid");g.innerHTML="";
     o.innerHTML='<div class="td" style="background:'+SECTORS[k].color+'"></div><span>'+SECTORS[k].label+'</span>';
     o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();try{buildStageRow();}catch(_){}};g.appendChild(o);}}
 function buildSecHint(){
-  var sh=$("tSecHint"); if(sh){ sh.style.display="none"; }
-  // Dica do fluxo de 6 etapas quando o setor é Edição de Vídeo e Imagem
-  if(sh && selSector==="edicao_midia"){
-    sh.innerHTML='<b>Fluxo deste setor:</b> Briefing aberto → Em Análise → Em Edição → Aguardando Aprovação → Pronto para Entrega → Concluído.<br><span style="color:var(--ink-faint);font-weight:600">Use a <b>Descrição</b> para o briefing (diretrizes, formato, roteiro) e o <b>Link/Anexo</b> para os ativos.</span>';
-    sh.style.display="";
-  }
+  var sh=$("tSecHint"); if(sh){ sh.style.display="none"; sh.innerHTML=""; }
   // Esconde Título/Descrição/Link nos setores que usam blocos próprios
   var hideTD = (selSector==="design"||selSector==="copy"||selSector==="postagem"||selSector==="roteiro");
   var tf=$("tTitleFld"), df=$("tDescFld"), lf=$("tLinkFld");
