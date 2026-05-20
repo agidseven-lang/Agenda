@@ -642,30 +642,35 @@
   .bt-link:hover{background:var(--bg-2);border-color:var(--accent)}
   .bt-link:active{transform:scale(.98)}
 
-  /* [V62.2] Barra de navegação de colunas — estilo Linear/Notion: chips clicáveis, com bullet de cor e contador */
-  .board-nav{display:flex;gap:6px;margin:18px 0 6px;padding:4px;background:var(--surface);
-    border:1px solid var(--line);border-radius:14px;overflow-x:auto;
-    scrollbar-width:none;-ms-overflow-style:none}
+  /* [V62.2/V62.4] Barra de navegação de colunas — Trello/Linear style.
+     Cada chip é um BOTÃO clicável que faz scroll suave até a coluna. */
+  .board-nav{display:flex;gap:5px;margin:18px 0 8px;padding:5px;background:var(--surface);
+    border:1px solid var(--line);border-radius:13px;overflow-x:auto;
+    scrollbar-width:none;-ms-overflow-style:none;align-items:center}
   .board-nav::-webkit-scrollbar{display:none}
-  .bn-tab{display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:10px;
-    background:transparent;border:none;color:var(--ink-soft);font-size:12.5px;font-weight:800;
-    cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.15s;min-width:0}
-  .bn-tab:hover{background:var(--bg-2);color:var(--ink)}
-  .bn-tab.active{background:var(--bg-2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line-soft)}
-  .bn-tab .bn-dot{width:7px;height:7px;border-radius:50%;background:var(--c-outro);flex-shrink:0;
-    box-shadow:0 0 0 0 currentColor}
+  .board-nav::before{content:"NAVEGAR PARA →";font-size:9.5px;font-weight:900;color:var(--ink-faint);
+    letter-spacing:.08em;padding:0 10px 0 8px;flex-shrink:0;opacity:.6}
+  .bn-tab{display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:9px;
+    background:var(--bg-2);border:1px solid transparent;color:var(--ink-soft);font-size:12.5px;
+    font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.18s;min-width:0}
+  .bn-tab:hover{background:var(--bg);color:var(--ink);border-color:var(--line-soft);
+    transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.2)}
+  .bn-tab.active{background:var(--bg);color:var(--ink);border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent),0 2px 8px rgba(62,184,216,.18)}
+  .bn-tab .bn-dot{width:8px;height:8px;border-radius:50%;background:var(--c-outro);flex-shrink:0;
+    box-shadow:0 0 5px currentColor}
   .bn-tab.afazer .bn-dot{background:var(--c-outro)}
   .bn-tab.andamento .bn-dot{background:var(--c-foto)}
   .bn-tab.revisao .bn-dot{background:var(--c-reuni)}
   .bn-tab.concluido .bn-dot{background:var(--c-trafego)}
   .bn-tab.cliente .bn-dot{background:var(--c-edicao)}
   .bn-tab .bn-lab{font-weight:800;letter-spacing:.01em}
-  .bn-tab .bn-qt{background:var(--bg-2);color:var(--ink-faint);font-size:11px;font-weight:900;
-    padding:2px 8px;border-radius:7px;min-width:22px;text-align:center}
+  .bn-tab .bn-qt{background:var(--surface);color:var(--ink-faint);font-size:10.5px;font-weight:900;
+    padding:2px 7px;border-radius:6px;min-width:20px;text-align:center}
   .bn-tab.active .bn-qt{background:var(--accent);color:#001423}
-  .bn-tab.cliente.urgent{animation:bn-pulse 1.8s infinite}
-  .bn-tab.cliente.urgent .bn-dot{background:#ff8c83;box-shadow:0 0 8px #ff8c83}
-  @keyframes bn-pulse{0%,100%{background:transparent}50%{background:rgba(255,140,131,.1)}}
+  .bn-tab.cliente.urgent{animation:bn-pulse 1.6s infinite}
+  .bn-tab.cliente.urgent .bn-dot{background:#ff8c83;box-shadow:0 0 10px #ff8c83}
+  @keyframes bn-pulse{0%,100%{background:var(--bg-2)}50%{background:rgba(255,140,131,.14)}}
   .post-view{margin-top:20px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:16px;padding:16px}
   .post-view .tt{font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
   .post-meta{font-size:13px;color:var(--ink-soft);font-weight:600;line-height:1.55;margin-bottom:12px}
@@ -1021,17 +1026,30 @@
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
     .ev .tt{font-size:16px}
-    /* [V62.1/V62.2/V62.3] Quadro com largura fixa mínima por coluna + scroll horizontal */
-    .board-wrap{display:flex;gap:14px;overflow-x:auto;overflow-y:visible;
-      padding:8px 6px 14px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+    /* [V62.1→V62.4] QUADRO PROFISSIONAL — Trello-style:
+       O board ocupa altura fixa da viewport. Colunas têm scroll vertical INTERNO.
+       Scrollbar horizontal fica sempre visível na altura dos olhos (sem precisar rolar a página). */
+    .board-nav{position:sticky;top:0;z-index:5;background:var(--bg);
+      box-shadow:0 4px 12px -8px rgba(0,0,0,.4)}
+    .board-wrap{display:flex;gap:14px;overflow-x:auto;overflow-y:hidden;
+      padding:10px 4px 14px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
       scrollbar-width:thin;scrollbar-color:var(--line) transparent;
-      align-items:flex-start}
-    .board-wrap::-webkit-scrollbar{height:10px;display:block}
-    .board-wrap::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-radius:5px;margin:0 4px}
-    .board-wrap::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
+      align-items:flex-start;
+      height:calc(100vh - 290px);min-height:520px}
+    .board-wrap::-webkit-scrollbar{height:12px;display:block}
+    .board-wrap::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-radius:6px;margin:0 4px}
+    .board-wrap::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;border:2px solid var(--bg)}
     .board-wrap::-webkit-scrollbar-thumb:hover{background:var(--accent)}
     .col{flex:1 1 300px;min-width:300px;max-width:340px;scroll-snap-align:start;
-      min-height:200px;padding:10px}
+      padding:0 10px 10px;height:100%;overflow-y:auto;overflow-x:hidden;
+      scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+    .col::-webkit-scrollbar{width:6px}
+    .col::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+    .col::-webkit-scrollbar-thumb:hover{background:var(--line-soft)}
+    /* Header da coluna sticky — quando você rola dentro da coluna, o título dela continua visível */
+    .col-h{position:sticky;top:0;z-index:1;background:var(--surface);
+      margin:0 -10px 8px;padding:10px 12px 9px;border-bottom:1px solid var(--line-soft)}
+    .col.cliente .col-h{background:linear-gradient(180deg,rgba(176,114,255,.07),var(--surface))}
     .tcard{margin-bottom:8px}
     .toast{bottom:30px;left:calc(50% + 54px)}
     .sheet{width:min(620px,80vw);max-width:620px}
@@ -1040,7 +1058,7 @@
   /* ---- Monitores grandes (>=1500px) ---- */
   @media (min-width:1500px){
     header,main{max-width:1560px}
-    .board-wrap{gap:20px}
+    .board-wrap{gap:20px;height:calc(100vh - 280px)}
   }
 </style>
 </head>
@@ -1093,7 +1111,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.3 · build cards-densos</div>
+    <div class="ver">versão 62.4 · build board-viewport</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
