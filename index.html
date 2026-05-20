@@ -231,7 +231,7 @@
   .stat.acc .n,.stat.acc .l{color:var(--accent-ink)}
   .person{display:flex;align-items:center;gap:13px;background:var(--surface);border:1px solid var(--line);
     border-radius:var(--radius);padding:13px 15px;margin-bottom:9px}
-  .person .pa{width:46px;height:46px;border-radius:50%;overflow:hidden;flex-shrink:0;border:1px solid var(--line)}
+  .person .pa{width:46px;height:46px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2.5px solid var(--user-color,var(--line));box-sizing:border-box}
   .person .pa img{width:100%;height:100%;object-fit:cover}
   .person .pi{flex:1;min-width:0}
   .person .pn{font-size:14.5px;font-weight:700}
@@ -668,6 +668,16 @@
   .tc-av img{width:100%;height:100%;object-fit:cover}
   .tc-cdot{position:absolute;right:-2px;bottom:-2px;width:15px;height:15px;border-radius:50%;
     border:2.5px solid var(--bg-2);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+  .tc-from{display:flex;align-items:center;gap:7px;padding:7px 9px;margin-bottom:10px;
+    background:rgba(255,255,255,.025);border:1px solid var(--line-soft);border-radius:9px}
+  .tc-from .lab{font-size:8.5px;font-weight:900;color:var(--ink-faint);letter-spacing:.07em;
+    text-transform:uppercase;flex-shrink:0;line-height:1}
+  .tc-from .av{width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;
+    border:2px solid var(--user-color,var(--line));box-sizing:border-box;background:var(--surface)}
+  .tc-from .av img{width:100%;height:100%;object-fit:cover;display:block}
+  .tc-from .nm{font-size:11.5px;font-weight:700;color:var(--ink);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+  .tc-from .cdot{width:7px;height:7px;border-radius:50%;background:var(--user-color,var(--line));flex-shrink:0}
   .tcard .tcli{font-size:10px;font-weight:800;color:var(--ink-faint);text-transform:uppercase;
     letter-spacing:.04em;margin-bottom:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tcard .ttt{font-size:15.5px;font-weight:800;line-height:1.3;margin-bottom:10px}
@@ -907,7 +917,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 56 · build etapas-unificadas</div>
+    <div class="ver">versão 58 · build demandada-por</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1805,7 +1815,7 @@ function personRow(u,p){
     ? '<button class="adm-btn'+(isAdm?' on':'')+'" data-adm="'+u.id+'" data-mk="'+(isAdm?0:1)+'">'+(isAdm?'Remover admin':'Tornar admin')+'</button>'
     : '';
   const tag = isAdm?'<span class="adm-tag">ADMIN</span>':'';
-  return '<div class="person"><div class="pa">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+tag+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+' · '+esc(u.phone)+'</div></div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':admBtn||'<span class="pst ok">Ativo</span>')+'</div>';
+  return '<div class="person"><div class="pa" style="--user-color:'+userColor(u)+'">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+tag+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+' · '+esc(u.phone)+'</div></div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':admBtn||'<span class="pst ok">Ativo</span>')+'</div>';
 }
 function bindTeam(){
   document.querySelectorAll("[data-ap]").forEach(b=>b.onclick=async()=>{
@@ -2011,6 +2021,11 @@ function ccard(x){
   var csFb = (o.cs==="em_revisao" && o.csFeedback)
     ? '<div class="cli-fb-snip">✏ "'+esc(o.csFeedback.length>80?o.csFeedback.slice(0,80)+"…":o.csFeedback)+'"</div>'
     : '';
+  /* [V58] Quem demandou esta tarefa (criador). Não mostra se for tarefa antiga sem t.by */
+  var creator = t.by ? users.find(function(u){return u.id===t.by;}) : null;
+  var fromHtml = creator
+    ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">✉ DEMANDADA POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="cdot"></span><span class="nm">'+esc(creator.name)+'</span></div>'
+    : '';
   return '<div class="tcard'+(late?" late urgent":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'" data-ci="'+idx+'">'+
     '<div class="tc-top">'+
       '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
@@ -2019,6 +2034,7 @@ function ccard(x){
       (late?'<span class="tpill"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>ATRASADA</span>':'')+
       '<span class="tc-avw"><span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span><span class="tc-cdot" style="background:'+uc+'"></span></span>'+
     '</div>'+
+    fromHtml+
     '<div class="tcli">'+esc(t.client||"Sem cliente")+'</div>'+
     '<div class="ttt">'+esc(ttl)+'</div>'+
     csPill+csFb+
@@ -2053,6 +2069,11 @@ function tcard(t){
     doneLine='<div class="tdone"><span class="av">'+avatarHTML(du)+'</span>concluiu: '+nm+
       (t.doneAt?' · '+esc(fmtDT(t.doneAt)):'')+'</div>';
   }
+  /* [V58] Quem demandou esta tarefa (criador). Não mostra se for tarefa antiga sem t.by */
+  var creator = t.by ? users.find(function(u){return u.id===t.by;}) : null;
+  var fromHtml = creator
+    ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">✉ DEMANDADA POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="cdot"></span><span class="nm">'+esc(creator.name)+'</span></div>'
+    : '';
   return '<div class="tcard'+(late?" late urgent":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'">'+
     '<div class="tc-top">'+
       '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
@@ -2063,6 +2084,7 @@ function tcard(t){
       (late?'<span class="tpill"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>ATRASADA</span>':'')+
       '<span class="tc-avw"><span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span><span class="tc-cdot" style="background:'+uc+'"></span></span>'+
     '</div>'+
+    fromHtml+
     '<div class="tcli">'+esc(t.client||"Sem cliente")+'</div>'+
     '<div class="ttt">'+(esc(t.title)||"Sem título")+'</div>'+
     '<span class="tsec" style="background:'+secBg(sec.color)+';color:'+sec.color+'">'+esc(sec.label)+'</span>'+
