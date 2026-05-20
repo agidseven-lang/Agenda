@@ -1162,7 +1162,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.13 · build client-fallback</div>
+    <div class="ver">versão 62.14 · build diagnostico-cliente</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -3136,11 +3136,11 @@ async function ensureClientTask(){
   if(!db || !__clientToken) return null;
   try{
     var snap = await db.collection("tasks").where("shareToken","==",__clientToken).limit(1).get();
-    if(snap.empty) return null;
+    if(snap.empty){ console.warn("[ensureClientTask] snap vazio pro token", __clientToken); return null; }
     __clientTask = Object.assign({id:snap.docs[0].id}, snap.docs[0].data());
     __clientTask.sector = normSector(__clientTask.sector);
     return __clientTask;
-  }catch(e){ return null; }
+  }catch(e){ console.error("[ensureClientTask] erro firebase:", e); return null; }
 }
 
 function freqLongLabel(f){
@@ -3435,7 +3435,12 @@ function autoMarkOpened(){
 async function clientApprove(idx){
   /* Popup nativo removido — usuário confirma no painel inline (data-doapp) */
   var t = await ensureClientTask();
-  if(!t||!db||!__clientToken){ clientShowError("Conexão perdida. Recarregue a página."); return; }
+  if(!t||!db||!__clientToken){
+    var code = (t?"":"T")+(db?"":"D")+(__clientToken?"":"K");
+    console.error("[clientApprove] estado inválido:",{t:!!t,db:!!db,token:!!__clientToken});
+    clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
+    return;
+  }
   try{
     var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
     if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
@@ -3448,13 +3453,25 @@ async function clientApprove(idx){
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
     /* re-render acontece automaticamente via onSnapshot — não precisa fazer nada */
-  }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e toque em Aprovar de novo."); }
+  }catch(e){
+    console.error("[clientApprove] erro firebase:", e);
+    var c = e && e.code ? e.code : "";
+    var msg = c==="permission-denied" ? "Permissão negada. Avise a agência."
+            : c==="unavailable" ? "Servidor indisponível. Tente em 10 segundos."
+            : "Não conseguimos registrar ("+(c||"erro")+"). Toque em Aprovar de novo.";
+    clientShowError(msg);
+  }
 }
 
 async function clientRequestRevision(idx, fbTxt){
   /* Popup nativo removido — texto vem do textarea inline (data-dorev) */
   var t = await ensureClientTask();
-  if(!t||!db||!__clientToken){ clientShowError("Conexão perdida. Recarregue a página."); return; }
+  if(!t||!db||!__clientToken){
+    var code = (t?"":"T")+(db?"":"D")+(__clientToken?"":"K");
+    console.error("[clientRequestRevision] estado inválido:",{t:!!t,db:!!db,token:!!__clientToken});
+    clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
+    return;
+  }
   var fb=(fbTxt||"").trim();
   if(!fb){ clientShowError("Escreva o que precisa mudar."); return; }
   try{
@@ -3468,13 +3485,25 @@ async function clientRequestRevision(idx, fbTxt){
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
-  }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e tente de novo."); }
+  }catch(e){
+    console.error("[clientRequestRevision] erro firebase:", e);
+    var c = e && e.code ? e.code : "";
+    var msg = c==="permission-denied" ? "Permissão negada. Avise a agência."
+            : c==="unavailable" ? "Servidor indisponível. Tente em 10 segundos."
+            : "Não conseguimos registrar ("+(c||"erro")+"). Tente de novo.";
+    clientShowError(msg);
+  }
 }
 
 /* [V62] FASE 2 — cliente aprova LEGENDA */
 async function clientApproveLegenda(idx){
   var t = await ensureClientTask();
-  if(!t||!db||!__clientToken){ clientShowError("Conexão perdida. Recarregue a página."); return; }
+  if(!t||!db||!__clientToken){
+    var code = (t?"":"T")+(db?"":"D")+(__clientToken?"":"K");
+    console.error("[clientApproveLegenda] estado inválido:",{t:!!t,db:!!db,token:!!__clientToken});
+    clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
+    return;
+  }
   try{
     var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
     if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
@@ -3491,13 +3520,25 @@ async function clientApproveLegenda(idx){
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
-  }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e toque em Aprovar de novo."); }
+  }catch(e){
+    console.error("[clientApproveLegenda] erro firebase:", e);
+    var c = e && e.code ? e.code : "";
+    var msg = c==="permission-denied" ? "Permissão negada. Avise a agência."
+            : c==="unavailable" ? "Servidor indisponível. Tente em 10 segundos."
+            : "Não conseguimos registrar ("+(c||"erro")+"). Toque em Aprovar de novo.";
+    clientShowError(msg);
+  }
 }
 
 /* [V62] FASE 2 — cliente pede revisão da LEGENDA */
 async function clientRequestRevisionLegenda(idx, fbTxt){
   var t = await ensureClientTask();
-  if(!t||!db||!__clientToken){ clientShowError("Conexão perdida. Recarregue a página."); return; }
+  if(!t||!db||!__clientToken){
+    var code = (t?"":"T")+(db?"":"D")+(__clientToken?"":"K");
+    console.error("[clientRequestRevisionLegenda] estado inválido:",{t:!!t,db:!!db,token:!!__clientToken});
+    clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
+    return;
+  }
   var fb=(fbTxt||"").trim();
   if(!fb){ clientShowError("Escreva o que precisa mudar."); return; }
   try{
