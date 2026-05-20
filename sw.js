@@ -1,7 +1,7 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline. */
-var CACHE = "idseven-v62-21";
+var CACHE = "idseven-v62-23";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

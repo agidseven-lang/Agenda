@@ -673,10 +673,7 @@
   .vt-opt.on svg{opacity:1;color:var(--accent)}
   .vt-opt[data-bv="client"].on{color:var(--c-edicao);box-shadow:0 0 0 1px rgba(176,114,255,.4) inset}
   .vt-opt[data-bv="client"].on svg{color:var(--c-edicao)}
-  /* [V62.20] Cores das colunas da Vista Cliente — diferentes das colunas da Vista Equipe */
-  .col.enviado .col-h .nm{color:var(--c-foto)}
-  .col.enviado .col-h .nm i{background:var(--c-foto)}
-  .col.enviado{box-shadow:inset 4px 0 0 0 rgba(255,176,46,.55)}
+  /* [V62.20/V62.23] Cores das 4 colunas da Vista Cliente — diferentes das colunas da Vista Equipe */
   .col.em_analise .col-h .nm{color:var(--c-reuni)}
   .col.em_analise .col-h .nm i{background:var(--c-reuni)}
   .col.em_analise{box-shadow:inset 4px 0 0 0 rgba(77,159,255,.5)}
@@ -685,9 +682,7 @@
   .col.aprovado{box-shadow:inset 4px 0 0 0 rgba(54,211,153,.5)}
   /* Coluna "revisao" e "concluido" já têm cores aplicadas no CSS global das colunas */
   .board-wrap.client-view .col.revisao{box-shadow:inset 4px 0 0 0 rgba(255,90,77,.5)}
-  /* Tab da nav-bar pras colunas novas da Vista Cliente */
-  .bn-tab.enviado .bn-dot{background:var(--c-foto)}
-  .bn-tab.enviado.urgent,.bn-tab.enviado:hover{color:var(--c-foto)}
+  /* Tab da nav-bar pras colunas da Vista Cliente */
   .bn-tab.em_analise .bn-dot{background:var(--c-reuni)}
   .bn-tab.em_analise.urgent,.bn-tab.em_analise:hover{color:var(--c-reuni)}
   .bn-tab.aprovado .bn-dot{background:var(--c-trafego)}
@@ -1199,7 +1194,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.21 · build vistas-separadas</div>
+    <div class="ver">versão 62.23 · build cliente-4col-limpa</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2356,34 +2351,34 @@ function renderBoard(){
   var COLS, colKeyOf, isClientView = (boardView==="client");
 
   if(isClientView){
-    /* 5 colunas dedicadas ao fluxo de aprovação do cliente, em ordem cronológica */
+    /* [V62.23] 4 colunas dedicadas ao fluxo de aprovação do cliente — sem "Aprovação do Cliente" separada.
+       Cards enviados aguardando cliente abrir ficam em "Em Análise" junto com os que ele já abriu. */
     COLS = [
-      {k:"enviado",    label:"Aprovação do Cliente"},
       {k:"em_analise", label:"Em Análise"},
       {k:"revisao",    label:"Revisão"},
       {k:"aprovado",   label:"Aprovado"},
       {k:"concluido",  label:"Concluído"}
     ];
-    /* Classifica cards no fluxo do cliente. Só conteúdo com cs ou lgState ativos aparece. */
+    /* Classifica cards no fluxo do cliente. Só conteúdo com cs ou lgState ativos aparece.
+       [V62.22] FASE 2 (legenda) tem PRIORIDADE sobre FASE 1 (tema). Quando o card entra no fluxo
+       da legenda, o status dela é o que importa — o tema já está aprovado. Isso resolve o bug
+       de cards com legenda enviada aparecerem em "Aprovado" porque cs continua "aprovado". */
     colKeyOf = function(x){
       if(!x.c) return null;
       var c = x.c;
       /* Concluído: time já marcou como finalizado */
       if(c.st === "concluido") return "concluido";
-      /* Revisão (urgente): cliente pediu mudança em qualquer fase */
+      /* Revisão (urgente): cliente pediu mudança em QUALQUER fase */
       if(c.cs === "em_revisao" || c.lgState === "em_revisao") return "revisao";
-      /* Aprovado: tema OU legenda já aprovados (fim do ciclo, exceto concluído) */
-      if(c.lgState === "aprovada") return "aprovado";
-      if(c.cs === "aprovado") return "aprovado";
-      /* Em Análise: cliente ABRIU o link, está decidindo */
-      if(c.lgState === "em_analise") return "em_analise";
-      if(c.cs === "em_analise" && (!c.lgState || c.lgState==="pendente")) return "em_analise";
-      /* Aprovação do Cliente: link enviado, ainda não foi aberto pelo cliente */
-      if(c.lgState === "enviada") return "enviado";
-      if(c.cs === "enviado" && (!c.lgState || c.lgState==="pendente")) return "enviado";
-      /* Card sem cs/lgState ativo — não entra no fluxo cliente */
+      /* === FASE 2 (legenda) tem prioridade — se está ativa, classifica por ela === */
+      if(c.lgState === "aprovada")   return "aprovado";    /* Cliente aprovou a legenda — fim do ciclo */
+      if(c.lgState === "em_analise" || c.lgState === "enviada") return "em_analise"; /* Cliente recebeu/analisando legenda */
+      /* === FASE 1 (tema) — só chega aqui se a legenda ainda não foi enviada === */
+      if(c.cs === "aprovado") return "aprovado";  /* Tema aprovado (legenda pendente/escrita ou n/a) */
+      if(c.cs === "em_analise" || c.cs === "enviado") return "em_analise"; /* Cliente recebeu/analisando tema */
       return null;
     };
+  } else {
   } else {
     /* [V62.21] Vista Equipe agora tem só as 4 colunas internas — sem a 5ª "Aprovação do Cliente"
        (essa migrou pra Vista Cliente). Cards no fluxo do cliente continuam aparecendo aqui,
@@ -2435,8 +2430,7 @@ function renderBoard(){
     var emptyMsg;
     if(isClientView){
       emptyMsg = '<div class="col-empty">'+
-        (s.k==="enviado"    ? "Nenhum link aguardando o cliente abrir." :
-         s.k==="em_analise" ? "Nenhum conteúdo sendo analisado." :
+        (s.k==="em_analise" ? "Nenhum conteúdo aguardando o cliente." :
          s.k==="revisao"    ? "Nenhum pedido de revisão pendente." :
          s.k==="aprovado"   ? "Nenhum conteúdo aprovado." :
          "Nenhum conteúdo concluído.")+'</div>';
