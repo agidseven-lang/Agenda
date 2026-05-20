@@ -388,6 +388,83 @@
   .wl-meta{display:flex;flex-wrap:wrap;gap:6px}
   .wl-tag{font-size:10.5px;font-weight:700;color:var(--ink-soft);background:var(--bg-2);border:1px solid var(--line-soft);padding:3px 8px;border-radius:6px}
   .wl-tag.bad{color:#ff8c83;border-color:rgba(255,90,77,.4);background:rgba(255,90,77,.08)}
+  /* ===== Status do cliente em cada card do quadro ===== */
+  .cli-st-pill{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:800;letter-spacing:.05em;
+    text-transform:uppercase;padding:3px 8px;border-radius:6px;border:1px solid currentColor;margin-bottom:6px}
+  .cli-st-pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+  .cli-fb-snip{font-size:11.5px;color:#ff8c83;font-weight:600;margin-top:5px;line-height:1.35;font-style:italic}
+  /* Caixa do link compartilhado no detalhe da tarefa-pai */
+  .share-box{margin-top:14px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:14px;padding:14px}
+  .share-box .tt{font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+  .share-url{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:10px;overflow:hidden}
+  .share-url code{font-size:11.5px;color:var(--ink-soft);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .share-url button{flex-shrink:0;background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:800;cursor:pointer}
+  .share-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .share-actions button{flex:1;min-width:140px;border-radius:11px;padding:11px 13px;font-size:12.5px;font-weight:800;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);transition:.16s}
+  .share-actions button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  .share-actions button.danger{color:#ff8c83;border-color:rgba(255,90,77,.4);background:rgba(255,90,77,.07)}
+  .share-actions button:active{transform:scale(.97)}
+  /* Bloco de status do cliente no detalhe do card */
+  .cs-box{margin-top:14px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:14px;padding:14px}
+  .cs-box .tt{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
+  .cs-box .lab{font-size:13.5px;font-weight:700;margin-bottom:4px}
+  .cs-box .when{font-size:11.5px;color:var(--ink-faint);font-weight:600}
+  .cs-box .fb{margin-top:10px;padding:10px 12px;background:rgba(255,90,77,.08);border-left:3px solid #ff8c83;border-radius:8px;font-size:13px;line-height:1.45;color:var(--ink)}
+  .cs-box .fb b{color:#ff8c83}
+  .cs-deliver{margin-top:11px;width:100%;background:var(--c-trafego);color:#062514;border:none;border-radius:11px;padding:12px;font-size:13.5px;font-weight:800;cursor:pointer}
+  .cs-deliver:active{transform:scale(.98)}
+
+  /* ====== TELA DO CLIENTE (público, sem login) ====== */
+  .cv-wrap{background:var(--bg);min-height:100vh;padding:24px 18px 60px;overflow-y:auto;display:block}
+  .cv-wrap.hidden{display:none !important}
+  #clientBody{max-width:640px;margin:0 auto}
+  .cv-loading{display:flex;flex-direction:column;align-items:center;padding:60px 0;color:var(--ink-soft)}
+  .cv-spin{width:36px;height:36px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:cvspin 1s linear infinite;margin-bottom:14px}
+  @keyframes cvspin{to{transform:rotate(360deg)}}
+  .cv-loading p{font-size:13.5px;font-weight:600}
+  .cv-notfound{text-align:center;padding:80px 20px}
+  .cv-notfound .cv-ic{width:64px;height:64px;border-radius:50%;background:rgba(255,176,46,.12);color:var(--c-foto);display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px}
+  .cv-notfound .cv-ic svg{width:30px;height:30px}
+  .cv-notfound h2{font-size:20px;font-weight:900;margin-bottom:8px}
+  .cv-notfound p{font-size:14px;line-height:1.55;color:var(--ink-soft);font-weight:500}
+  .cv-head{margin-bottom:22px}
+  .cv-brand{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  .cv-mk{width:46px;height:46px;border-radius:50%;background-image:var(--logo-img);background-size:contain;background-repeat:no-repeat;background-position:center;flex-shrink:0;filter:drop-shadow(0 4px 14px rgba(133,80,255,.4))}
+  .cv-brand h1{font-size:18px;font-weight:900;letter-spacing:-.03em;line-height:1}
+  .cv-brand h1{color:var(--accent)}
+  .cv-sub{font-size:11px;color:var(--ink-faint);font-weight:600;margin-top:3px}
+  .cv-title{font-size:24px;font-weight:900;letter-spacing:-.03em;margin-bottom:6px}
+  .cv-title b{color:var(--accent)}
+  .cv-client{font-size:14px;color:var(--ink-soft);font-weight:600;margin-bottom:14px}
+  .cv-client b{color:var(--ink);font-weight:800}
+  .cv-intro{font-size:13.5px;color:var(--ink-soft);line-height:1.55;font-weight:500;margin-bottom:16px}
+  .cv-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px}
+  .cv-s{background:var(--surface);border:1px solid var(--line-soft);border-radius:11px;padding:11px 8px;text-align:center}
+  .cv-s b{display:block;font-size:20px;font-weight:900;line-height:1}
+  .cv-s span{font-size:10.5px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.03em}
+  .cv-s.ok b{color:var(--c-trafego)}
+  .cv-s.rev b{color:#ff8c83}
+  .cv-s.pen b{color:var(--c-foto)}
+  .cv-empty{padding:50px 16px;text-align:center;background:var(--surface);border:1px dashed var(--line);border-radius:14px;font-size:13.5px;color:var(--ink-soft);line-height:1.5}
+  .cv-list{display:flex;flex-direction:column;gap:14px}
+  .cv-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .cv-card.ok{border-color:rgba(54,211,153,.4);background:linear-gradient(180deg,rgba(54,211,153,.05) 0%,transparent 100%)}
+  .cv-card.rev{border-color:rgba(255,90,77,.4);background:linear-gradient(180deg,rgba(255,90,77,.05) 0%,transparent 100%)}
+  .cv-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .cv-pill{display:inline-block;font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;letter-spacing:.04em;text-transform:uppercase;background:rgba(176,114,255,.14);color:var(--c-edicao)}
+  .cv-status{display:inline-block;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:6px;letter-spacing:.03em;text-transform:uppercase}
+  .cv-ti{font-size:17px;font-weight:900;letter-spacing:-.01em;line-height:1.3;margin-bottom:8px}
+  .cv-desc{font-size:14px;color:var(--ink-soft);line-height:1.55;font-weight:500;margin-bottom:10px;white-space:pre-wrap}
+  .cv-link{display:inline-block;color:var(--accent);font-size:13px;font-weight:700;text-decoration:none;word-break:break-all;background:rgba(62,184,216,.08);border:1px solid rgba(62,184,216,.25);border-radius:9px;padding:8px 12px;margin-bottom:10px}
+  .cv-link-plain{color:var(--ink-soft)}
+  .cv-feedback{background:rgba(255,90,77,.08);border-left:3px solid #ff8c83;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45;margin-bottom:12px}
+  .cv-feedback b{color:#ff8c83}
+  .cv-actions{display:flex;gap:9px;margin-top:8px}
+  .cv-btn{flex:1;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;letter-spacing:-.01em;transition:.15s;font-family:inherit}
+  .cv-btn:active{transform:scale(.97)}
+  .cv-btn.ok{background:var(--c-trafego);color:#062514}
+  .cv-btn.rev{background:var(--surface);color:#ff8c83;border:1.5px solid rgba(255,90,77,.4)}
+  .cv-foot{margin-top:30px;padding-top:20px;border-top:1px solid var(--line-soft);text-align:center;font-size:11px;color:var(--ink-faint);font-weight:600;letter-spacing:.02em}
   .hright{display:flex;align-items:center;gap:12px}
   .hbell{position:relative;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);
     background:var(--surface);color:var(--ink-soft);display:grid;place-items:center;cursor:pointer;flex-shrink:0}
@@ -624,6 +701,7 @@
   .tl-row.ev-wt .tl-ic{color:var(--c-foto);border-color:rgba(255,176,46,.4);background:rgba(255,176,46,.08)}
   .tl-row.ev-dn .tl-ic{color:var(--c-trafego);border-color:rgba(86,255,176,.5);background:rgba(86,255,176,.1)}
   .tl-row.ev-cm .tl-ic{color:var(--c-copy);border-color:rgba(167,170,255,.4);background:rgba(167,170,255,.08)}
+  .tl-row.ev-rev .tl-ic{color:#ff8c83;border-color:rgba(255,90,77,.4);background:rgba(255,90,77,.1)}
   .tl-b{flex:1;min-width:0}
   .tl-x{font-size:13.5px;line-height:1.45;color:var(--ink);word-break:break-word}
   .tl-x b{font-weight:800;color:var(--ink)}
@@ -813,7 +891,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 52 · build accent-azul-petroleo</div>
+    <div class="ver">versão 53 · build cliente-aprovacao</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -823,6 +901,10 @@
     <p>Seu acesso precisa ser liberado por um administrador da equipe. Assim que aprovarem, é só entrar.</p>
     <button class="ghost-btn" id="pendReload">Já fui aprovado, verificar</button>
     <button class="ghost-btn" id="pendLogout">Sair</button>
+  </section>
+
+  <section id="clientView" class="hidden cv-wrap">
+    <div id="clientBody"></div>
   </section>
 
   <section id="mainApp" class="hidden" style="display:flex;flex-direction:column;height:100%">
@@ -1197,6 +1279,16 @@ function offlineMsg(){
   show("loadingScreen");
 }
 (function boot(){
+  /* ====== CLIENT MODE: detecta ?cliente=token e entra na visão pública ====== */
+  try{
+    var __ct = new URLSearchParams(location.search).get("cliente");
+    if(__ct){
+      if(!configured() || typeof firebase==="undefined"){ offlineMsg(); return; }
+      try{ firebase.initializeApp(FIREBASE_CONFIG); db=firebase.firestore(); }catch(e){ offlineMsg(); return; }
+      enterClientMode(__ct);
+      return;
+    }
+  }catch(_){}
   if(!configured()){show("setupScreen");return;}
   if(typeof firebase==="undefined"){offlineMsg();return;}
   try{
@@ -1893,6 +1985,12 @@ function ccard(x){
   if(ri&&!ri.done&&st.k!=="concluido") meta+='<span class="mi cd '+(ri.late?"late":"ok")+'"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+esc(ri.txt)+'</span>';
   if(o.l&&o.l.trim()) meta+='<span class="mi"><svg viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>link</span>';
   const nameLine='<div class="tc-who">'+esc(t.assignee||"Sem responsável")+'</div>';
+  /* Status do cliente (pill) e snippet do feedback se em revisão */
+  var csInfo=clientStatusInfo(o.cs);
+  var csPill = csInfo ? '<div class="cli-st-pill" style="color:'+csInfo.color+';background:'+csInfo.bg+'">'+esc(csInfo.short)+'</div>' : '';
+  var csFb = (o.cs==="em_revisao" && o.csFeedback)
+    ? '<div class="cli-fb-snip">✏ "'+esc(o.csFeedback.length>80?o.csFeedback.slice(0,80)+"…":o.csFeedback)+'"</div>'
+    : '';
   return '<div class="tcard'+(late?" late urgent":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'" data-ci="'+idx+'">'+
     '<div class="tc-top">'+
       '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
@@ -1903,6 +2001,7 @@ function ccard(x){
     '</div>'+
     '<div class="tcli">'+esc(t.client||"Sem cliente")+'</div>'+
     '<div class="ttt">'+esc(ttl)+'</div>'+
+    csPill+csFb+
     '<span class="tsec" style="background:'+secBg(sec.color)+';color:'+sec.color+'">'+esc(sec.label)+'</span>'+
     nameLine+
     (meta?'<div class="tmeta">'+meta+'</div>':'')+'</div>';
@@ -1971,10 +2070,14 @@ function tlIcon(k){
   if(k==="posted") return '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/></svg>';
   if(k==="done") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.4 2.4L15.5 9.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   if(k==="comment") return '<svg viewBox="0 0 24 24" fill="none"><path d="M5 5h14v11H9l-4 4V5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  if(k==="client_sent") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="client_opened") return '<svg viewBox="0 0 24 24" fill="none"><path d="M2 12c2.5-5 6-7.5 10-7.5s7.5 2.5 10 7.5c-2.5 5-6 7.5-10 7.5S4.5 17 2 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>';
+  if(k==="client_approved") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="client_revision") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  if(k==="team_delivered") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 8l8-4 8 4-8 4-8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
   return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
 }
 function tlText(e, sector, scope){
-  /* scope: "task" (default) ou "content" — muda algumas frases */
   var who="";
   if(e.byId){ var pu=users.find(function(x){return x.id===e.byId;}); who=(pu&&pu.name)||e.name||"alguém"; }
   else if(e.name){ who=e.name; }
@@ -1990,13 +2093,19 @@ function tlText(e, sector, scope){
   if(e.kind==="posted") return W+'registrou a <b>postagem</b>';
   if(e.kind==="done") return W+(scope==="content"?'concluiu este conteúdo':'concluiu a tarefa');
   if(e.kind==="comment"){ var tx=(e.text||"").slice(0,180); return W+'comentou: <span class="tl-q">"'+esc(tx)+((e.text||"").length>180?"…":"")+'"</span>'; }
+  if(e.kind==="client_sent") return W+'enviou este card pro <b>cliente</b>';
+  if(e.kind==="client_opened") return '<b>Cliente</b> abriu o cronograma';
+  if(e.kind==="client_approved") return '<b>Cliente aprovou</b> este card ✓';
+  if(e.kind==="client_revision"){ var tx2=(e.text||"").slice(0,180); return '<b>Cliente pediu revisão</b>: <span class="tl-q">"'+esc(tx2)+((e.text||"").length>180?"…":"")+'"</span>'; }
+  if(e.kind==="team_delivered") return W+'marcou como <b>entregue</b>';
   return '';
 }
 function tlCls(k){
   if(k==="created") return "ev-cre";
   if(k==="started"||k==="moved") return "ev-mv";
-  if(k==="copy_aprovado"||k==="rot_aprovado") return "ev-ok";
-  if(k==="copy_em_avaliacao"||k==="rot_em_revisao") return "ev-wt";
+  if(k==="copy_aprovado"||k==="rot_aprovado"||k==="client_approved"||k==="team_delivered") return "ev-ok";
+  if(k==="copy_em_avaliacao"||k==="rot_em_revisao"||k==="client_sent"||k==="client_opened") return "ev-wt";
+  if(k==="client_revision") return "ev-rev";
   if(k==="posted"||k==="done") return "ev-dn";
   if(k==="comment") return "ev-cm";
   return "";
@@ -2104,6 +2213,19 @@ function openContentDetail(tid, idx){
   }
   cmtHtml+='<div class="cmt-add"><div class="cmt-ac" id="ctCmtAc"></div><input id="ctCmtInput" placeholder="Comentar neste card… use @ pra mencionar" maxlength="1200" autocomplete="off"><button type="button" id="ctCmtSend"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div>';
 
+  /* Bloco do CLIENTE — só aparece se a equipe já enviou (cs definido) */
+  var csInfoDet = clientStatusInfo(o.cs);
+  var clientBox="";
+  if(csInfoDet){
+    clientBox = '<div class="cs-box" style="border-color:'+csInfoDet.color+';background:'+csInfoDet.bg+'">'+
+      '<div class="tt" style="color:'+csInfoDet.color+'">Cliente</div>'+
+      '<div class="lab" style="color:'+csInfoDet.color+'">'+esc(csInfoDet.label)+'</div>'+
+      (o.csAt?'<div class="when">'+esc(fmtDT(o.csAt))+'</div>':'')+
+      ((o.cs==="em_revisao" && o.csFeedback)?'<div class="fb"><b>Pedido do cliente:</b> '+esc(o.csFeedback)+'</div>':'')+
+      ((o.cs==="aprovado" && canManage(me))?'<button class="cs-deliver" id="ctMarkDeliver">✓ Marcar como entregue</button>':'')+
+    '</div>';
+  }
+
   $("ctBody").innerHTML=
     '<div class="cron-view" style="margin-top:0">'+
       '<div class="tt">'+esc(sec.label)+' · '+esc(t.client||"Sem cliente")+'</div>'+
@@ -2115,9 +2237,11 @@ function openContentDetail(tid, idx){
       '</div>'+
     '</div>'+
     '<div class="fld" style="margin-top:18px"><label>Etapa deste conteúdo</label><div class="stage-row" id="ctStage">'+chips+'</div></div>'+
+    clientBox+
     tlHtml+
     cmtHtml;
   $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
+  var _md=$("ctMarkDeliver"); if(_md) _md.onclick=()=>markCardDelivered(tid, idx);
   bindCommentInput({
     inputId:"ctCmtInput", sendId:"ctCmtSend", acId:"ctCmtAc",
     onSend:function(text, ms){ addContentComment(tid, idx, text, ms); }
@@ -2177,6 +2301,252 @@ async function addContentComment(tid, idx, txt, mentionsArr){
   }catch(e){ toast("Não foi possível comentar agora"); }
   finally{ busy=false; }
 }
+/* ========== CLIENTE: enviar/invalidar/entregar ========== */
+function clientShareURL(token){ return location.origin + location.pathname + "?cliente=" + encodeURIComponent(token); }
+
+async function sendCronToClient(taskId){
+  if(!canManage(me)){ toast("Apenas administradores."); return; }
+  var t=tasks.find(x=>x.id===taskId); if(!t||!db) return;
+  if(busy) return;
+  if(!confirm("Gerar link público pro cliente e marcar todos os conteúdos como ENVIADOS?\n\nO cliente recebe um link único, abre no celular dele (sem app, sem login) e pode aprovar ou pedir revisão em cada card.")) return;
+  busy=true;
+  try{
+    var token = t.shareToken || genShareToken();
+    var arr = (Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    var now=Date.now();
+    arr.forEach(function(c){
+      var hasTxt=(c.t&&c.t.trim())||(c.d&&c.d.trim())||(c.l&&c.l.trim());
+      if(!hasTxt) return;
+      /* só marca como enviado quem está sem status ou em rascunho/em_analise */
+      if(!c.cs || c.cs==="em_analise"){
+        c.cs = "enviado";
+        c.csAt = now;
+        var hist=Array.isArray(c.history)?c.history.slice():[];
+        hist.push({kind:"client_sent", at:now, byId:(me?me.id:null)});
+        if(hist.length>100) hist=hist.slice(-100);
+        c.history=hist;
+      }
+    });
+    await db.collection("tasks").doc(taskId).update({ shareToken:token, shareCreatedAt:now, cronWeeks:arr });
+    var lt=tasks.find(x=>x.id===taskId); if(lt){ lt.shareToken=token; lt.shareCreatedAt=now; lt.cronWeeks=arr; }
+    var url = clientShareURL(token);
+    var msg="Olá! Aqui está o cronograma de "+(t.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+url;
+    try{
+      await navigator.clipboard.writeText(url);
+      if(confirm("✓ Link gerado e copiado pra área de transferência.\n\nLink:\n"+url+"\n\nQuer abrir o WhatsApp agora pra colar no grupo do cliente?")){
+        window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+      }
+    }catch(e){
+      if(confirm("Link gerado:\n\n"+url+"\n\nQuer abrir o WhatsApp pra mandar pro cliente?")){
+        window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+      }
+    }
+    openTaskDetail(taskId);
+  }catch(e){ toast("Não foi possível gerar o link agora"); }
+  finally{ busy=false; }
+}
+
+async function invalidateShareLink(taskId){
+  if(!canManage(me)){ toast("Apenas administradores."); return; }
+  var t=tasks.find(x=>x.id===taskId); if(!t||!db) return;
+  if(!confirm("Invalidar o link enviado ao cliente?\n\nO link parará de funcionar imediatamente. Os status já marcados pelo cliente continuam registrados. Você pode gerar um novo link depois.")) return;
+  if(busy) return; busy=true;
+  try{
+    await db.collection("tasks").doc(taskId).update({ shareToken:"" });
+    var lt=tasks.find(x=>x.id===taskId); if(lt) lt.shareToken="";
+    toast("Link invalidado ✓");
+    openTaskDetail(taskId);
+  }catch(e){ toast("Não foi possível invalidar agora"); }
+  finally{ busy=false; }
+}
+
+async function markCardDelivered(tid, idx){
+  if(!canManage(me)){ toast("Apenas administradores."); return; }
+  var t=tasks.find(x=>x.id===tid); if(!t||!db) return;
+  if(busy) return; busy=true;
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ busy=false; return; }
+    var now=Date.now();
+    arr[idx].cs="concluido";
+    arr[idx].csAt=now;
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"team_delivered", at:now, byId:(me?me.id:null)});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(tid).update({cronWeeks:arr});
+    var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
+    openContentDetail(tid, idx);
+    toast("Conteúdo marcado como entregue ✓");
+  }catch(e){ toast("Não foi possível marcar agora"); }
+  finally{ busy=false; }
+}
+
+/* ========== MODO CLIENTE (visão pública, sem login) ========== */
+var __clientTask = null;
+var __clientToken = null;
+var __clientUnsub = null;
+var __clientOpenedMark = false;
+
+function enterClientMode(token){
+  __clientToken = token;
+  document.querySelectorAll("section").forEach(function(s){ s.classList.add("hidden"); s.style.display="none"; });
+  var cv = $("clientView");
+  if(cv){ cv.classList.remove("hidden"); cv.style.display=""; }
+  if($("clientBody")) $("clientBody").innerHTML='<div class="cv-loading"><div class="cv-spin"></div><p>Carregando seu cronograma…</p></div>';
+  try{
+    __clientUnsub = db.collection("tasks").where("shareToken","==",token).limit(1)
+      .onSnapshot(function(snap){
+        if(snap.empty){ renderClientNotFound(); return; }
+        __clientTask = Object.assign({id:snap.docs[0].id}, snap.docs[0].data());
+        __clientTask.sector = normSector(__clientTask.sector);
+        renderClientView();
+        if(!__clientOpenedMark) autoMarkOpened();
+      }, function(err){ renderClientNotFound(); });
+  }catch(e){ renderClientNotFound(); }
+}
+
+function renderClientNotFound(){
+  if(!$("clientBody"))return;
+  $("clientBody").innerHTML=
+    '<div class="cv-notfound"><div class="cv-ic"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>'+
+    '<h2>Link expirado ou inválido</h2>'+
+    '<p>Este link de cronograma não existe mais ou foi desativado pela agência. Entre em contato pelo WhatsApp pra receber um novo.</p>'+
+    '</div>';
+}
+
+function freqLongLabel(f){
+  if(f==="quinzenal") return "Quinzenal";
+  if(f==="mensal")    return "Mensal";
+  return "Semanal";
+}
+
+function renderClientView(){
+  var t=__clientTask; if(!t) return;
+  var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+  var rows=[];
+  arr.forEach(function(c, i){
+    var hasTxt=(c.t&&c.t.trim())||(c.d&&c.d.trim())||(c.l&&c.l.trim());
+    if(hasTxt) rows.push({c:c, i:i});
+  });
+  var freq=freqLongLabel(t.freq||"semanal");
+  var total=rows.length;
+  var nAprov=rows.filter(function(r){return r.c.cs==="aprovado"||r.c.cs==="concluido";}).length;
+  var nRev=rows.filter(function(r){return r.c.cs==="em_revisao";}).length;
+  var nPend=total-nAprov-nRev;
+
+  var h='<div class="cv-head">'+
+    '<div class="cv-brand"><div class="cv-mk"></div><div><h1>ID Seven</h1><div class="cv-sub">Agenda e Gestor de Tarefas</div></div></div>'+
+    '<div class="cv-title">Cronograma <b>'+esc(freq)+'</b></div>'+
+    '<div class="cv-client">Cliente: <b>'+esc(t.client||"—")+'</b></div>'+
+    '<div class="cv-intro">Olá! Confira os <b>'+total+'</b> conteúdo'+(total===1?'':'s')+' abaixo. Em cada card, escolha <b>Aprovar</b> ou <b>Pedir revisão</b>. Sua resposta chega na hora pra equipe.</div>'+
+    '<div class="cv-stats">'+
+      '<div class="cv-s ok"><b>'+nAprov+'</b><span>Aprovado'+(nAprov===1?'':'s')+'</span></div>'+
+      '<div class="cv-s rev"><b>'+nRev+'</b><span>Em revisão</span></div>'+
+      '<div class="cv-s pen"><b>'+nPend+'</b><span>Pendente'+(nPend===1?'':'s')+'</span></div>'+
+    '</div>'+
+    '</div>';
+
+  if(!total){
+    h+='<div class="cv-empty">A agência ainda não montou os conteúdos deste cronograma. Aguarde — eles aparecerão aqui automaticamente.</div>';
+  } else {
+    h+='<div class="cv-list">';
+    rows.forEach(function(r){
+      var c=r.c, i=r.i;
+      var wk=Math.floor(i/3)+1, cn=(i%3)+1;
+      var info=clientStatusInfo(c.cs);
+      var lk="";
+      if(c.l&&c.l.trim()){
+        var sf=/^https?:\/\//i.test(c.l);
+        lk = sf
+          ? '<a href="'+esc(c.l)+'" target="_blank" rel="noopener" class="cv-link">🔗 '+esc(c.l)+'</a>'
+          : '<div class="cv-link cv-link-plain">📎 '+esc(c.l)+'</div>';
+      }
+      var canAct = (c.cs==="enviado"||c.cs==="em_analise"||!c.cs);
+      var isAprov= (c.cs==="aprovado"||c.cs==="concluido");
+      var isRev  = (c.cs==="em_revisao");
+      h+='<div class="cv-card '+(isAprov?'ok':isRev?'rev':'')+'">'+
+        '<div class="cv-card-h">'+
+          '<div class="cv-pill">SEM '+wk+' · #'+cn+'</div>'+
+          (info?'<div class="cv-status" style="color:'+info.color+';background:'+info.bg+';border:1px solid '+info.color+'">'+esc(info.short)+'</div>':'')+
+        '</div>'+
+        '<div class="cv-ti">'+((c.t&&c.t.trim())?esc(c.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
+        ((c.d&&c.d.trim())?'<div class="cv-desc">'+esc(c.d)+'</div>':'')+
+        (lk||'')+
+        (isRev && c.csFeedback ? '<div class="cv-feedback"><b>Sua observação:</b> '+esc(c.csFeedback)+'</div>' : '')+
+        (canAct
+          ? '<div class="cv-actions"><button class="cv-btn ok" data-ai="'+i+'">✓ Aprovar</button><button class="cv-btn rev" data-ri="'+i+'">✏ Pedir revisão</button></div>'
+          : '')+
+      '</div>';
+    });
+    h+='</div>';
+  }
+
+  h+='<div class="cv-foot">ID Seven · Atualizado em tempo real</div>';
+  $("clientBody").innerHTML=h;
+  document.querySelectorAll("[data-ai]").forEach(function(b){ b.onclick=function(){ clientApprove(+b.dataset.ai); }; });
+  document.querySelectorAll("[data-ri]").forEach(function(b){ b.onclick=function(){ clientRequestRevision(+b.dataset.ri); }; });
+}
+
+function autoMarkOpened(){
+  __clientOpenedMark = true;
+  var t=__clientTask; if(!t||!db||!__clientToken) return;
+  var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+  var changed=false, now=Date.now();
+  arr.forEach(function(c){
+    if(c.cs==="enviado"){
+      var hasTxt=(c.t&&c.t.trim())||(c.d&&c.d.trim())||(c.l&&c.l.trim());
+      if(!hasTxt) return;
+      c.cs="em_analise"; c.csAt=now;
+      var hist=Array.isArray(c.history)?c.history.slice():[];
+      hist.push({kind:"client_opened", at:now});
+      if(hist.length>100) hist=hist.slice(-100);
+      c.history=hist;
+      changed=true;
+    }
+  });
+  if(changed){
+    db.collection("tasks").doc(t.id).update({cronWeeks:arr}).catch(function(){});
+  }
+}
+
+async function clientApprove(idx){
+  var t=__clientTask; if(!t||!db||!__clientToken) return;
+  if(!confirm("Confirma que você APROVA este conteúdo?\n\nA agência será avisada na hora.")) return;
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]) return;
+    var now=Date.now();
+    arr[idx].cs="aprovado"; arr[idx].csAt=now;
+    arr[idx].csFeedback="";
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"client_approved", at:now});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+  }catch(e){ alert("Não foi possível registrar agora. Verifique a internet e tente novamente."); }
+}
+
+async function clientRequestRevision(idx){
+  var t=__clientTask; if(!t||!db||!__clientToken) return;
+  var fb = prompt("O que precisa mudar neste conteúdo?\n\n(Escreva o pedido em poucas palavras — chega na hora pra equipe.)", "");
+  if(fb===null) return;
+  fb = (fb||"").trim();
+  if(!fb){ alert("Por favor, escreva o que precisa mudar."); return; }
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]) return;
+    var now=Date.now();
+    arr[idx].cs="em_revisao"; arr[idx].csAt=now;
+    arr[idx].csFeedback=fb.slice(0,500);
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"client_revision", at:now, text:fb.slice(0,500)});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+  }catch(e){ alert("Não foi possível registrar agora. Verifique a internet e tente novamente."); }
+}
+
 function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
   const team=users.filter(u=>u.status==="ativo");
   const mk=(nm,meFlag)=>{const b=document.createElement("button");b.type="button";
@@ -2294,9 +2664,28 @@ function cronNorm(x){
     if(x.startedAt) o.startedAt=x.startedAt;
     if(x.doneAt)    o.doneAt   =x.doneAt;
     if(x.doneBy)    o.doneBy   =x.doneBy;
+    /* Status do CLIENTE: enviado | em_analise | em_revisao | aprovado | concluido */
+    if(typeof x.cs==="string" && ["enviado","em_analise","em_revisao","aprovado","concluido"].indexOf(x.cs)>=0) o.cs=x.cs;
+    if(x.csAt) o.csAt=x.csAt;
+    if(typeof x.csFeedback==="string") o.csFeedback=x.csFeedback.slice(0,500);
     return o;
   }
   return {t:"",d:(x==null?"":(""+x)),l:"",st:"afazer"};
+}
+/* Mapeia o status de cliente pro label e cor visual */
+function clientStatusInfo(cs){
+  if(cs==="enviado")    return {label:"Enviado ao cliente",   short:"Enviado",   color:"var(--c-foto)",    bg:"rgba(255,176,46,.12)"};
+  if(cs==="em_analise") return {label:"Cliente analisando",    short:"Em Análise",color:"var(--c-reuni)",   bg:"rgba(77,159,255,.12)"};
+  if(cs==="em_revisao") return {label:"Cliente pediu revisão", short:"Revisão",   color:"#ff8c83",          bg:"rgba(255,90,77,.12)"};
+  if(cs==="aprovado")   return {label:"Aprovado pelo cliente", short:"Aprovado",  color:"var(--c-trafego)", bg:"rgba(54,211,153,.12)"};
+  if(cs==="concluido")  return {label:"Entregue ao cliente",   short:"Entregue",  color:"var(--accent)",    bg:"rgba(62,184,216,.12)"};
+  return null;
+}
+function genShareToken(){
+  /* token curto aleatório (22 chars base36) — impossível de adivinhar */
+  var a=Math.random().toString(36).slice(2,12);
+  var b=Math.random().toString(36).slice(2,12);
+  return (Date.now().toString(36)+a+b).slice(0,22);
 }
 function buildCronUI(){
   var fld=$("tCronFld"); if(!fld)return;
@@ -2587,6 +2976,19 @@ function openTaskDetail(id){
     }
     cronHtml+='</div>';
     if(canManage(me)) cronHtml+='<button class="cron-rep" id="cronRepeat"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 3v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 16M4 21v-5h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Repetir pro próximo ciclo</button>';
+    if(canManage(me)){
+      var hasShare = !!(t.shareToken && t.shareToken.length>4);
+      var shareLink = hasShare ? clientShareURL(t.shareToken) : "";
+      cronHtml+='<div class="share-box"><div class="tt">Compartilhar com o cliente</div>';
+      if(!hasShare){
+        cronHtml+='<div style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:12px">Gere um link único e mande pro grupo do cliente no WhatsApp. Ele aprova ou pede revisão em cada card direto pelo celular — sem login, sem instalar app. Você vê tudo aqui em tempo real.</div>';
+        cronHtml+='<div class="share-actions"><button class="primary" id="cronShare">📤 Enviar pro cliente</button></div>';
+      } else {
+        cronHtml+='<div class="share-url"><code>'+esc(shareLink)+'</code><button id="cronShareCopy">Copiar</button></div>';
+        cronHtml+='<div class="share-actions"><button id="cronShareWA">📱 Abrir WhatsApp</button><button class="danger" id="cronShareKill">Invalidar link</button></div>';
+      }
+      cronHtml+='</div>';
+    }
   }
   let copyHtml="";
   if(t.sector==="copy"){
@@ -2750,6 +3152,19 @@ function openTaskDetail(id){
     if(cs) cs.onclick=sendIt;
   })();
   var _rep=$("cronRepeat"); if(_rep) _rep.onclick=()=>repeatCron(id);
+  var _shr=$("cronShare"); if(_shr) _shr.onclick=()=>sendCronToClient(id);
+  var _shk=$("cronShareKill"); if(_shk) _shk.onclick=()=>invalidateShareLink(id);
+  var _shc=$("cronShareCopy"); if(_shc) _shc.onclick=function(){
+    var tk=tasks.find(x=>x.id===id); if(!tk||!tk.shareToken)return;
+    var u=clientShareURL(tk.shareToken);
+    try{ navigator.clipboard.writeText(u); toast("Link copiado ✓"); }catch(e){ alert(u); }
+  };
+  var _shw=$("cronShareWA"); if(_shw) _shw.onclick=function(){
+    var tk=tasks.find(x=>x.id===id); if(!tk||!tk.shareToken)return;
+    var u=clientShareURL(tk.shareToken);
+    var msg="Olá! Aqui está o cronograma de "+(tk.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+u;
+    window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+  };
   $("taskDetailBody").querySelectorAll("[data-ptog]").forEach(b=>b.onclick=()=>{
     if(b.dataset.ptog==="ig")pIG=!pIG; else pFB=!pFB; b.classList.toggle("on");
   });
@@ -2970,11 +3385,20 @@ function notifList(){
     if(Array.isArray(t.cronWeeks) && (t.sector==="design"||t.sector==="copy")){
       var iAmCreatorTk = meId && t.by===meId;
       t.cronWeeks.forEach(function(c, cidx){
+        var wkN=Math.floor(cidx/3)+1, ctN=(cidx%3)+1;
+        var cardTitle="SEM "+wkN+" · #"+ctN+((c.t&&c.t.trim())?(" — "+c.t.trim()):"");
+        /* 7c. Cliente APROVOU ou PEDIU REVISÃO num card → toda a equipe que gerencia recebe */
+        if(c && c.cs && c.csAt){
+          if(c.cs==="aprovado" && canManage(me)){
+            out.push({ id:t.id+"|capr|c"+cidx+"|"+c.csAt, kind:"client_approved", at:c.csAt, task:t, cidx:cidx, client:t.client||"", title:cardTitle });
+          }
+          if(c.cs==="em_revisao" && canManage(me)){
+            out.push({ id:t.id+"|crev|c"+cidx+"|"+c.csAt, kind:"client_revision", at:c.csAt, task:t, cidx:cidx, client:t.client||"", title:cardTitle, fb:c.csFeedback||"" });
+          }
+        }
         if(!c || !Array.isArray(c.comments) || !c.comments.length) return;
         var iCmtedInCard = meId && c.comments.some(function(x){return x&&x.by===meId;});
         var involvedInCard = isMine || iAmCreatorTk || iCmtedInCard;
-        var wkN=Math.floor(cidx/3)+1, ctN=(cidx%3)+1;
-        var cardTitle="SEM "+wkN+" · #"+ctN+((c.t&&c.t.trim())?(" — "+c.t.trim()):"");
         c.comments.forEach(function(cm){
           if(!(cm && cm.at && cm.by!==meId)) return;
           var mentioned = meId && Array.isArray(cm.mentions) && cm.mentions.indexOf(meId)>=0;
@@ -3030,6 +3454,15 @@ function openNotifs(){
         var txM=(x.cmt&&x.cmt.text)||""; var trimM=txM.slice(0,90)+(txM.length>90?"…":"");
         ic='<circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M16 8v6a3 3 0 0 0 6 0v-2a10 10 0 1 0-4 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
         col="var(--accent)"; h=esc(whoM)+" mencionou você"; body=ct+' · "'+esc(trimM)+'"';
+      }
+      else if(x.kind==="client_approved"){
+        ic='<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+        col="var(--c-trafego)"; h="Cliente aprovou um card ✓"; body=ct;
+      }
+      else if(x.kind==="client_revision"){
+        var fbT=(x.fb||"").slice(0,90); fbT+=((x.fb||"").length>90?"…":"");
+        ic='<path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>';
+        col="#ff8c83"; h="Cliente pediu revisão"; body=ct+(fbT?' · "'+esc(fbT)+'"':'');
       }
       return '<div class="ntf" data-tid="'+x.task.id+'"'+(x.cidx!=null?' data-cidx="'+x.cidx+'"':'')+'><span class="ntf-ic" style="color:'+col+'"><svg viewBox="0 0 24 24" fill="none">'+ic+'</svg></span>'+
         '<div class="ntf-tx"><div class="ntf-h">'+h+'</div>'+
