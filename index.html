@@ -417,7 +417,86 @@
     box-shadow:0 0 0 0 currentColor}
   .cli-st-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;
     box-shadow:0 0 6px currentColor}
+  /* [V61] Pílula HERO do status do cliente — quando o card está no fluxo do cliente, isso é o protagonista visual */
+  .cli-st-hero{display:flex;align-items:flex-start;gap:9px;padding:10px 13px;border-radius:11px;
+    border:1.5px solid currentColor;margin:10px 0;font-weight:900}
+  .cli-st-hero .cdot2{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:5px;box-shadow:0 0 8px currentColor}
+  .cli-st-hero .lab{font-size:11.5px;letter-spacing:.06em;line-height:1.2;color:currentColor}
+  /* [V62] Bloco interno da pílula hero — alinha label de fase + label do status */
+  .cli-st-hero-b{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+  .cli-st-hero .phlab{font-size:9px;font-weight:900;letter-spacing:.1em;opacity:.75;line-height:1}
+  /* [V62] Mini-tag "Tema aprovado" quando card está em Fase 2 — contextualiza Fase 1 */
+  .cli-st-mini{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;
+    color:var(--c-trafego);background:rgba(54,211,153,.1);border:1px solid rgba(54,211,153,.35);
+    padding:3px 8px;border-radius:6px;margin-bottom:8px}
+  /* Etapa interna fica MENOR quando card está no fluxo do cliente */
+  .tc-st-sm{font-size:8.5px !important;padding:3px 7px !important;opacity:.65}
+  /* Caixa do feedback do cliente quando pediu revisão — DESTAQUE total */
+  .cli-fb-box{background:rgba(255,90,77,.12);border:1.5px solid rgba(255,90,77,.4);border-radius:10px;
+    padding:9px 11px;margin-bottom:10px}
+  .cli-fb-box .cli-fb-lab{font-size:9.5px;font-weight:900;color:#ff8c83;letter-spacing:.07em;margin-bottom:5px}
+  .cli-fb-box .cli-fb-txt{font-size:13px;color:var(--ink);line-height:1.4;font-style:italic;font-weight:500}
+  /* Card no fluxo do cliente recebe halo lateral mais grosso */
+  .tcard.in-client{border-left-width:5px}
+  /* [V62] Card em Fase 2 (legenda) tem cor de borda diferenciada (roxo da edição) */
+  .tcard.in-fase2{border-left-color:var(--c-edicao)}
+  /* Stat-strip: card "cliente" tem destaque visual */
+  .stat.cli{background:linear-gradient(135deg,rgba(255,176,46,.15),rgba(176,114,255,.15));
+    border-color:rgba(176,114,255,.4)}
+  /* Coluna "cliente" tem header diferenciado */
+  .col.cliente{background:linear-gradient(180deg,rgba(176,114,255,.05) 0%,var(--surface) 60%);
+    border-color:rgba(176,114,255,.25)}
+  .col.cliente .nm i{background:var(--c-edicao)}
+  .col.cliente .col-h .nm{color:var(--c-edicao)}
   .cli-fb-snip{font-size:11.5px;color:#ff8c83;font-weight:600;margin-top:5px;line-height:1.35;font-style:italic}
+
+  /* [V62] FASE 2 · Caixa da Legenda no openContentDetail (time escreve aqui) */
+  .lg-sec{margin-top:18px;border:1.5px solid;border-radius:14px;padding:14px}
+  .lg-sec .lg-h{display:flex;flex-direction:column;gap:2px;margin-bottom:6px}
+  .lg-sec .tt{font-size:11px;font-weight:900;letter-spacing:.08em}
+  .lg-sec .lab{font-size:15px;font-weight:800}
+  .lg-sec .when{font-size:11.5px;color:var(--ink-faint);margin-bottom:8px}
+  .lg-input{width:100%;min-height:140px;background:var(--bg);border:1px solid var(--border);
+    border-radius:10px;padding:12px;font:inherit;color:var(--ink);resize:vertical;line-height:1.5;
+    margin-top:6px;font-family:inherit}
+  .lg-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(62,184,216,.18)}
+  .lg-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .lg-actions button{flex:1;min-width:140px;padding:10px 16px;border-radius:10px;
+    border:1px solid var(--border);background:var(--bg);color:var(--ink);font-weight:800;cursor:pointer}
+  .lg-actions button.primary{background:var(--accent);color:#001423;border-color:var(--accent)}
+  .lg-read{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px;
+    white-space:pre-wrap;line-height:1.55;font-size:14.5px;color:var(--ink);margin-top:6px}
+
+  /* [V62] Resumo Fase 2 no openTaskDetail — grid de estatísticas das legendas */
+  .lg-summary{margin-top:14px}
+  .lg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px;margin:10px 0}
+  .lg-stat{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:10px;
+    text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .lg-stat b{font-size:22px;font-weight:900;color:var(--ink);line-height:1}
+  .lg-stat span{font-size:10.5px;color:var(--ink-soft);font-weight:600;line-height:1.25;text-transform:uppercase;letter-spacing:.04em}
+  .lg-stat.bad{background:rgba(255,90,77,.12);border-color:rgba(255,90,77,.4)}
+  .lg-stat.bad b{color:#ff8c83}
+  .lg-stat.acc{background:rgba(176,114,255,.12);border-color:rgba(176,114,255,.4)}
+  .lg-stat.acc b{color:var(--c-edicao)}
+  .lg-stat.ok{background:rgba(54,211,153,.12);border-color:rgba(54,211,153,.4)}
+  .lg-stat.ok b{color:var(--c-trafego)}
+
+  /* [V62] Cliente view — seções numeradas (FASE 1 e FASE 2) */
+  .cv-phase{margin:20px 0}
+  .cv-phase-h{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;padding:0 4px}
+  .cv-phase-num{flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--accent);color:#001423;
+    font-size:18px;font-weight:900;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 12px rgba(62,184,216,.4)}
+  .cv-phase-num.phase2{background:var(--c-edicao);color:#fff;box-shadow:0 0 12px rgba(176,114,255,.5)}
+  .cv-phase-t{font-size:17px;font-weight:900;color:var(--ink);line-height:1.2;margin-bottom:3px}
+  .cv-phase-d{font-size:12.5px;color:var(--ink-soft);line-height:1.45}
+  .cv-phase.phase2{border-top:1px dashed var(--border);padding-top:20px}
+  .cv-pill.phase2{background:rgba(176,114,255,.15);color:var(--c-edicao);border:1px solid rgba(176,114,255,.4)}
+  /* [V62] Card de legenda na visão do cliente */
+  .cv-card-lg .cv-legenda-box{background:linear-gradient(180deg,rgba(176,114,255,.06),rgba(176,114,255,.02));
+    border:1px solid rgba(176,114,255,.3);border-radius:12px;padding:14px;margin:12px 0}
+  .cv-legenda-lab{font-size:10.5px;font-weight:900;color:var(--c-edicao);letter-spacing:.07em;margin-bottom:8px}
+  .cv-legenda-txt{font-size:15px;color:var(--ink);line-height:1.6;white-space:pre-wrap;font-weight:500}
   /* [V60] Badge no botão do Quadro quando há ações pendentes do cliente */
   .navtab .nav-cdot{position:absolute;top:4px;right:calc(50% - 18px);width:9px;height:9px;border-radius:50%;
     background:var(--c-grav);box-shadow:0 0 6px var(--c-grav);animation:pulse 1.6s infinite}
@@ -959,7 +1038,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 60 · build central-aprovacoes</div>
+    <div class="ver">versão 62 · build legendas-fase2</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1999,27 +2078,8 @@ function renderBoard(){
   if(boardFilter.indexOf("cli:")===0){
     h+='<div class="mine-bar">Mostrando apenas: <b>'+esc(boardFilter.slice(4))+'</b> · <button class="cli-clear" data-bf="all">limpar filtro</button></div>';
   }
-  /* [V60] Contagem dinâmica de itens em fluxo com cliente, pra destacar o botão da Central */
-  var apprStats = (function(){
-    var rev=0, wait=0, today=0, now=Date.now(), DAY=24*3600*1000;
-    tasks.forEach(function(t){
-      if(t.sector!=="design" && t.sector!=="copy") return;
-      if(!Array.isArray(t.cronWeeks)) return;
-      t.cronWeeks.forEach(function(c){
-        if(!c||!c.cs) return;
-        if(c.cs==="em_revisao") rev++;
-        else if(c.cs==="enviado"||c.cs==="em_analise") wait++;
-        else if(c.cs==="aprovado" && c.csAt && (now-c.csAt)<DAY) today++;
-      });
-    });
-    return {rev:rev, wait:wait, today:today};
-  })();
-  var apprUrg = apprStats.rev>0;
-  var apprBadge = '';
-  if(apprStats.rev) apprBadge += '<span style="background:#ff5a4d;color:#fff;font-size:10px;font-weight:900;padding:2px 7px;border-radius:6px;margin-left:6px">'+apprStats.rev+' REVISÃO</span>';
-  else if(apprStats.today) apprBadge += '<span style="background:rgba(54,211,153,.18);color:var(--c-trafego);font-size:10px;font-weight:900;padding:2px 7px;border-radius:6px;margin-left:6px">'+apprStats.today+' HOJE</span>';
-  else if(apprStats.wait) apprBadge += '<span style="background:rgba(255,176,46,.18);color:var(--c-foto);font-size:10px;font-weight:900;padding:2px 7px;border-radius:6px;margin-left:6px">'+apprStats.wait+' AGUARDANDO</span>';
-  h+='<button class="posts-link" id="goApprovals" style="'+(apprUrg?'background:rgba(255,90,77,.12);border-color:rgba(255,90,77,.45);color:#ff8c83':'')+'"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4M12 3l8 4v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Central de Aprovações do Cliente'+apprBadge+'</button>';
+  /* [V61] Botão "Central de Aprovações" REMOVIDO daqui — a 5ª coluna do Quadro substitui essa função.
+     A função renderCentralAprovacoes() continua no código caso queira voltar, mas o acesso saiu daqui. */
   h+='<button class="posts-link" id="goContentCal"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Calendário de conteúdo</button>';
   h+='<button class="posts-link" id="goClientes"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Visão por cliente</button>';
   h+='<button class="posts-link" id="goPostsLog"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg>Registro de Posts publicados</button>';
@@ -2032,25 +2092,54 @@ function renderBoard(){
   }
   const list=boardVisible();
   const bi=boardItems(list);
-  /* Todas as áreas usam 4 colunas (A Fazer / Em Andamento / Em Revisão / Concluído) */
-  const COLS = STAGES;
-  /* Mapeia status legados (analise/aprovacao/pronto) pra coluna padrão mais próxima */
+  /* [V61] 5 colunas: 4 internas (time) + 5ª de aprovação do cliente */
+  const STAGE_CLIENTE = {k:"cliente", label:"Aprovação do Cliente"};
+  const COLS = STAGES.concat([STAGE_CLIENTE]);
+  /* Mapeia status legados (analise/aprovacao/pronto) pra coluna padrão mais próxima.
+     [V61] Cards com client status (cs) ou estado de legenda (lgState) SEMPRE vão pra coluna "cliente" (5ª).
+     [V62] Inclui Fase 2 (legendas). */
   function colKeyOf(x){
+    /* Se card tem status do cliente (Fase 1) ou estado de legenda (Fase 2), vai pra coluna do cliente */
+    if(x.c && (x.c.cs || (x.c.lgState && x.c.lgState!=="pendente"))) return "cliente";
     var raw = x.st || "afazer";
     if(raw==="analise") return "afazer";
     if(raw==="aprovacao"||raw==="pronto") return "revisao";
     return raw;
   }
+  /* Ordem de urgência dentro da coluna do cliente: usa cardActiveStatus.urg (considera Fase 2). */
+  function clientUrg(c){ var s=cardActiveStatus(c); return s && s.info ? s.info.urg : 99; }
   h+='<div class="stat-strip">';
   COLS.forEach(s=>{const n=bi.filter(x=>colKeyOf(x)===s.k).length;
-    h+='<div class="stat'+(s.k==="concluido"?" acc":"")+'"><div class="n">'+n+'</div><div class="l">'+esc(s.label)+'</div></div>';});
+    var clsExtra = s.k==="concluido"?" acc" : s.k==="cliente"?" cli" : "";
+    h+='<div class="stat'+clsExtra+'"><div class="n">'+n+'</div><div class="l">'+esc(s.label)+'</div></div>';});
   h+='</div>';
   h+='<div class="board-wrap" style="--cols:'+COLS.length+'">';
   COLS.forEach(s=>{
-    const items=bi.filter(x=>colKeyOf(x)===s.k)
-      .sort((a,b)=>((b.t.priority?1:0)-(a.t.priority?1:0))||((taskDueMs(a.t)||9e15)-(taskDueMs(b.t)||9e15))||((b.t.createdAt||0)-(a.t.createdAt||0))||(a.idx-b.idx));
+    var items;
+    if(s.k==="cliente"){
+      /* Ordem de urgência (Fase 1 + Fase 2 misturadas):
+         1.0 revisão de tema       1.5 revisão de legenda
+         2.0 tema enviado          2.5 falta escrever legenda
+         3.0 cliente analisando tema
+         4.0 tema aprovado (pronto pra escrever)
+         4.2 legenda escrita (falta enviar)
+         4.4 legenda enviada
+         4.5 cliente analisando legenda
+         99  legenda aprovada (FIM — pronto pra publicar) */
+      items = bi.filter(x=>colKeyOf(x)==="cliente")
+        .sort((a,b)=> clientUrg(a.c) - clientUrg(b.c)
+                  || ((b.t.priority?1:0)-(a.t.priority?1:0))
+                  || ((b.t.createdAt||0)-(a.t.createdAt||0))
+                  || (a.idx-b.idx));
+    } else {
+      items = bi.filter(x=>colKeyOf(x)===s.k)
+        .sort((a,b)=>((b.t.priority?1:0)-(a.t.priority?1:0))||((taskDueMs(a.t)||9e15)-(taskDueMs(b.t)||9e15))||((b.t.createdAt||0)-(a.t.createdAt||0))||(a.idx-b.idx));
+    }
     h+='<div class="col '+s.k+'"><div class="col-h"><div class="nm"><i></i>'+esc(s.label)+'</div><div class="qt">'+items.length+'</div></div>';
-    h+= items.length? items.map(x=> x.idx<0 ? tcard(x.t) : ccard(x)).join("") : '<div class="col-empty">Sem tarefas aqui</div>';
+    var emptyMsg = s.k==="cliente"
+      ? '<div class="col-empty">Nenhum cronograma com cliente.<br><br>Quando você enviar um cronograma pelo botão "Compartilhar com o cliente" na tela de detalhes, o card aparece aqui pra acompanhamento.</div>'
+      : '<div class="col-empty">Sem tarefas aqui</div>';
+    h+= items.length? items.map(x=> x.idx<0 ? tcard(x.t) : ccard(x)).join("") : emptyMsg;
     h+='</div>';
   });
   h+='</div><div class="board-hint">Toque em um cartão para ver detalhes, mover de etapa e marcar o checklist.</div>';
@@ -2083,29 +2172,51 @@ function ccard(x){
   if(ri&&!ri.done&&st.k!=="concluido") meta+='<span class="mi cd '+(ri.late?"late":"ok")+'"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7.5v5l3.2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+esc(ri.txt)+'</span>';
   if(o.l&&o.l.trim()) meta+='<span class="mi"><svg viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>link</span>';
   const nameLine='<div class="tc-who">'+esc(t.assignee||"Sem responsável")+'</div>';
-  /* Status do cliente (pill) e snippet do feedback se em revisão */
-  var csInfo=clientStatusInfo(o.cs);
-  var csPill = csInfo ? '<div class="cli-st-pill" style="color:'+csInfo.color+';background:'+csInfo.bg+'">'+esc(csInfo.short)+'</div>' : '';
-  var csFb = (o.cs==="em_revisao" && o.csFeedback)
-    ? '<div class="cli-fb-snip">✏ "'+esc(o.csFeedback.length>80?o.csFeedback.slice(0,80)+"…":o.csFeedback)+'"</div>'
+  /* [V62] Status visualmente dominante (Fase 1 ou Fase 2). Usa cardActiveStatus. */
+  var actStat = cardActiveStatus(o);
+  var actInfo = actStat ? actStat.info : null;
+  var actPhase = actStat ? actStat.phase : 0;
+  /* [V61/V62] Pílula HERO — protagonista visual quando card está no fluxo do cliente. */
+  var csHero = actInfo
+    ? '<div class="cli-st-hero" style="color:'+actInfo.color+';background:'+actInfo.bg+';border-color:'+actInfo.color+'">'+
+        '<span class="cdot2" style="background:'+actInfo.color+'"></span>'+
+        '<div class="cli-st-hero-b">'+
+          (actPhase===2 ? '<span class="phlab">FASE 2 · LEGENDA</span>' : '<span class="phlab">FASE 1 · TEMA</span>')+
+          '<span class="lab">'+esc(actInfo.label.toUpperCase())+'</span>'+
+        '</div>'+
+      '</div>'
     : '';
+  /* Mini-tag mostrando o status da OUTRA fase (contextualização rápida) */
+  var minorTag = '';
+  if(actPhase===2 && o.cs==="aprovado"){
+    minorTag = '<div class="cli-st-mini">✓ Tema aprovado pelo cliente</div>';
+  }
+  /* Feedback de revisão (do tema OU da legenda — o que estiver ativo) */
+  var csFb = '';
+  if(actPhase===1 && o.cs==="em_revisao" && o.csFeedback){
+    csFb = '<div class="cli-fb-box"><div class="cli-fb-lab">✏ PEDIDO DO CLIENTE · TEMA</div><div class="cli-fb-txt">"'+esc(o.csFeedback)+'"</div></div>';
+  } else if(actPhase===2 && o.lgState==="em_revisao" && o.lgFeedback){
+    csFb = '<div class="cli-fb-box"><div class="cli-fb-lab">✏ PEDIDO DO CLIENTE · LEGENDA</div><div class="cli-fb-txt">"'+esc(o.lgFeedback)+'"</div></div>';
+  }
   /* [V58] Quem demandou esta tarefa (criador). Não mostra se for tarefa antiga sem t.by */
   var creator = t.by ? users.find(function(u){return u.id===t.by;}) : null;
   var fromHtml = creator
     ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">✉ DEMANDADA POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="cdot"></span><span class="nm">'+esc(creator.name)+'</span></div>'
     : '';
-  return '<div class="tcard'+(late?" late urgent":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'" data-ci="'+idx+'">'+
+  /* [V61] Se está no fluxo do cliente, pílula da etapa interna fica menor/secundária. */
+  var stPillCls = actInfo ? "tc-st tc-st-sm" : "tc-st";
+  return '<div class="tcard'+(late?" late urgent":"")+(actInfo?" in-client":"")+(actPhase===2?" in-fase2":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'" data-ci="'+idx+'">'+
     '<div class="tc-top">'+
-      '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
+      '<span class="'+stPillCls+'" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
       '<span class="tpill cron2">SEM '+wk+' · #'+cn+'</span>'+
       (t.priority?'<span class="tpill prio2"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>PRIORITÁRIA</span>':'')+
       (late?'<span class="tpill"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>ATRASADA</span>':'')+
       '<span class="tc-avw"><span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span><span class="tc-cdot" style="background:'+uc+'"></span></span>'+
     '</div>'+
+    csHero+minorTag+csFb+
     fromHtml+
     '<div class="tcli">'+esc(t.client||"Sem cliente")+'</div>'+
     '<div class="ttt">'+esc(ttl)+'</div>'+
-    csPill+csFb+
     '<span class="tsec" style="background:'+secBg(sec.color)+';color:'+sec.color+'">'+esc(sec.label)+'</span>'+
     nameLine+
     (meta?'<div class="tmeta">'+meta+'</div>':'')+'</div>';
@@ -2162,7 +2273,6 @@ function tcard(t){
 function bindBoard(){
   document.querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{boardFilter=b.dataset.bf;boardFilterUserSet=true;render();});
   var gpl=$("goPostsLog"); if(gpl)gpl.onclick=()=>switchTab("posts");
-  var gap=$("goApprovals"); if(gap)gap.onclick=()=>switchTab("approvals");
   var gcl=$("goClientes"); if(gcl)gcl.onclick=()=>switchTab("clientes");
   var gca=$("goContentCal"); if(gca)gca.onclick=()=>{ calCursor=new Date(); calSel=todayISO(); switchTab("calendar"); };
   document.querySelectorAll("[data-od]").forEach(b=>b.onclick=()=>openTaskDetail(b.dataset.od));
@@ -2172,14 +2282,15 @@ function bindBoard(){
   });
 }
 /* ============================================================
-   [V60] CENTRAL DE APROVAÇÕES DO CLIENTE — tempo real
+   [V60/V62] DETECÇÃO EM TEMPO REAL DE AÇÕES DO CLIENTE
+   Fase 1 (cs) e Fase 2 (lgState) — toast + beep
    ============================================================ */
-/* Memória do último estado conhecido de cs por card (taskId|idx) */
-var lastClientCsMap = {}, clientWatchInit = false;
+/* Memória do último estado conhecido de cs e lgState por card (taskId|idx) */
+var lastClientCsMap = {}, lastClientLgMap = {}, clientWatchInit = false;
 /* Set de eventos do cliente já vistos por mim (persistido) */
 function apprSeenSet(){ try{return new Set(JSON.parse(localStorage.getItem("idseven_apprseen")||"[]"));}catch(e){return new Set();} }
 function apprSeenSave(s){ try{localStorage.setItem("idseven_apprseen", JSON.stringify(Array.from(s).slice(-400)));}catch(e){} }
-/* Detecta transições de cs e dispara toast em tempo real */
+/* Detecta transições de cs e lgState e dispara toast em tempo real */
 function checkClientTransitions(newTasks){
   if(!clientWatchInit){
     /* Primeira carga: só registra estado atual, sem toast */
@@ -2187,6 +2298,7 @@ function checkClientTransitions(newTasks){
       if(!Array.isArray(t.cronWeeks)) return;
       t.cronWeeks.forEach(function(c,i){
         if(c && c.cs) lastClientCsMap[t.id+"|"+i] = c.cs;
+        if(c && c.lgState) lastClientLgMap[t.id+"|"+i] = c.lgState;
       });
     });
     clientWatchInit = true;
@@ -2197,24 +2309,35 @@ function checkClientTransitions(newTasks){
     if(!Array.isArray(t.cronWeeks)) return;
     t.cronWeeks.forEach(function(c,i){
       if(!c) return;
-      var key = t.id+"|"+i, prev = lastClientCsMap[key], curr = c.cs;
-      if(prev !== curr && curr){
-        transitions.push({task:t, idx:i, c:c, prev:prev, curr:curr});
+      var key = t.id+"|"+i;
+      /* Fase 1 — tema */
+      var prevCs = lastClientCsMap[key], currCs = c.cs;
+      if(prevCs !== currCs && currCs){
+        transitions.push({task:t, idx:i, c:c, kind:"cs", prev:prevCs, curr:currCs});
       }
-      lastClientCsMap[key] = curr || null;
+      lastClientCsMap[key] = currCs || null;
+      /* [V62] Fase 2 — legenda */
+      var prevLg = lastClientLgMap[key], currLg = c.lgState;
+      if(prevLg !== currLg && currLg){
+        transitions.push({task:t, idx:i, c:c, kind:"lg", prev:prevLg, curr:currLg});
+      }
+      lastClientLgMap[key] = currLg || null;
     });
   });
-  /* Mostra um toast por transição importante (aprovado / em_revisao apenas) */
+  /* Mostra um toast por transição importante */
   transitions.forEach(function(tr){
-    if(tr.curr !== "aprovado" && tr.curr !== "em_revisao") return;
     var wk = Math.floor(tr.idx/3)+1, cn = (tr.idx%3)+1;
     var lab = (tr.c.t && tr.c.t.trim()) ? tr.c.t.trim() : ("SEM "+wk+" · #"+cn);
     var cli = tr.task.client || "Cliente";
-    var msg = tr.curr === "aprovado"
-      ? ("✓ "+cli+" APROVOU: "+lab)
-      : ("✏ "+cli+" pediu REVISÃO: "+lab);
-    toast(msg);
-    try{ beep(); }catch(_){}
+    var msg = null;
+    if(tr.kind==="cs"){
+      if(tr.curr === "aprovado")   msg = "✓ "+cli+" APROVOU tema: "+lab;
+      if(tr.curr === "em_revisao") msg = "✏ "+cli+" pediu REVISÃO do tema: "+lab;
+    } else if(tr.kind==="lg"){
+      if(tr.curr === "aprovada")   msg = "🚀 "+cli+" APROVOU legenda: "+lab+" — pronto pra publicar!";
+      if(tr.curr === "em_revisao") msg = "✏ "+cli+" pediu REVISÃO da legenda: "+lab;
+    }
+    if(msg){ toast(msg); try{ beep(); }catch(_){} }
   });
 }
 /* Lista de eventos pendentes do cliente (não vistos) — pra badge na nav */
@@ -2226,7 +2349,8 @@ function pendingClientCount(){
       if(!c || !Array.isArray(c.history)) return;
       c.history.forEach(function(e){
         if(!e || !e.at) return;
-        if(e.kind!=="client_approved" && e.kind!=="client_revision") return;
+        /* [V62] Eventos do cliente das duas fases */
+        if(["client_approved","client_revision","legenda_approved","legenda_revision"].indexOf(e.kind)<0) return;
         var k = t.id+"|"+i+"|"+e.kind+"|"+e.at;
         if(!seen.has(k)) count++;
       });
@@ -2394,6 +2518,11 @@ function tlIcon(k){
   if(k==="client_approved") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   if(k==="client_revision") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
   if(k==="team_delivered") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 8l8-4 8 4-8 4-8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  /* [V62] Eventos da Fase 2 (Legendas) */
+  if(k==="legenda_written") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21h18M6 18l11-11 3 3-11 11H6v-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  if(k==="legenda_sent") return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="2"/></svg>';
+  if(k==="legenda_approved") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="legenda_revision") return '<svg viewBox="0 0 24 24" fill="none"><path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
   return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
 }
 function tlText(e, sector, scope){
@@ -2412,19 +2541,24 @@ function tlText(e, sector, scope){
   if(e.kind==="posted") return W+'registrou a <b>postagem</b>';
   if(e.kind==="done") return W+(scope==="content"?'concluiu este conteúdo':'concluiu a tarefa');
   if(e.kind==="comment"){ var tx=(e.text||"").slice(0,180); return W+'comentou: <span class="tl-q">"'+esc(tx)+((e.text||"").length>180?"…":"")+'"</span>'; }
-  if(e.kind==="client_sent") return W+'enviou este card pro <b>cliente</b>';
+  if(e.kind==="client_sent") return W+'enviou o <b>tema</b> deste card pro cliente';
   if(e.kind==="client_opened") return '<b>Cliente</b> abriu o cronograma';
-  if(e.kind==="client_approved") return '<b>Cliente aprovou</b> este card ✓';
-  if(e.kind==="client_revision"){ var tx2=(e.text||"").slice(0,180); return '<b>Cliente pediu revisão</b>: <span class="tl-q">"'+esc(tx2)+((e.text||"").length>180?"…":"")+'"</span>'; }
+  if(e.kind==="client_approved") return '<b>Cliente APROVOU o tema</b> ✓';
+  if(e.kind==="client_revision"){ var tx2=(e.text||"").slice(0,180); return '<b>Cliente pediu revisão do tema</b>: <span class="tl-q">"'+esc(tx2)+((e.text||"").length>180?"…":"")+'"</span>'; }
   if(e.kind==="team_delivered") return W+'marcou como <b>entregue</b>';
+  /* [V62] Fase 2 - Legendas */
+  if(e.kind==="legenda_written") return W+'escreveu a <b>legenda</b>';
+  if(e.kind==="legenda_sent") return W+'enviou a <b>legenda</b> pro cliente';
+  if(e.kind==="legenda_approved") return '<b>Cliente APROVOU a legenda</b> 🚀 — pronto pra publicar';
+  if(e.kind==="legenda_revision"){ var tx3=(e.text||"").slice(0,180); return '<b>Cliente pediu revisão da legenda</b>: <span class="tl-q">"'+esc(tx3)+((e.text||"").length>180?"…":"")+'"</span>'; }
   return '';
 }
 function tlCls(k){
   if(k==="created") return "ev-cre";
   if(k==="started"||k==="moved") return "ev-mv";
-  if(k==="copy_aprovado"||k==="rot_aprovado"||k==="client_approved"||k==="team_delivered") return "ev-ok";
-  if(k==="copy_em_avaliacao"||k==="rot_em_revisao"||k==="client_sent"||k==="client_opened") return "ev-wt";
-  if(k==="client_revision") return "ev-rev";
+  if(k==="copy_aprovado"||k==="rot_aprovado"||k==="client_approved"||k==="team_delivered"||k==="legenda_approved") return "ev-ok";
+  if(k==="copy_em_avaliacao"||k==="rot_em_revisao"||k==="client_sent"||k==="client_opened"||k==="legenda_sent"||k==="legenda_written") return "ev-wt";
+  if(k==="client_revision"||k==="legenda_revision") return "ev-rev";
   if(k==="posted"||k==="done") return "ev-dn";
   if(k==="comment") return "ev-cm";
   return "";
@@ -2537,12 +2671,50 @@ function openContentDetail(tid, idx){
   var clientBox="";
   if(csInfoDet){
     clientBox = '<div class="cs-box" style="border-color:'+csInfoDet.color+';background:'+csInfoDet.bg+'">'+
-      '<div class="tt" style="color:'+csInfoDet.color+'">Cliente</div>'+
+      '<div class="tt" style="color:'+csInfoDet.color+'">FASE 1 · Tema</div>'+
       '<div class="lab" style="color:'+csInfoDet.color+'">'+esc(csInfoDet.label)+'</div>'+
       (o.csAt?'<div class="when">'+esc(fmtDT(o.csAt))+'</div>':'')+
       ((o.cs==="em_revisao" && o.csFeedback)?'<div class="fb"><b>Pedido do cliente:</b> '+esc(o.csFeedback)+'</div>':'')+
       ((o.cs==="aprovado" && canManage(me))?'<button class="cs-deliver" id="ctMarkDeliver">✓ Marcar como entregue</button>':'')+
     '</div>';
+  }
+
+  /* [V62] FASE 2 · LEGENDA — aparece SÓ se tema foi aprovado pelo cliente */
+  var legendaBox = "";
+  if(o.cs === "aprovado" && (t.sector==="design" || t.sector==="copy")){
+    var lgSt = o.lgState || "pendente";
+    var lgInfo = clientLgStatusInfo(lgSt);
+    /* Pode editar quando: nunca escreveu, está em rascunho, ou cliente pediu revisão */
+    var lgEditable = canManage(me) && (lgSt==="pendente" || lgSt==="escrita" || lgSt==="em_revisao");
+    /* Está enviada/sendo analisada — só leitura */
+    var lgSent = (lgSt==="enviada" || lgSt==="em_analise" || lgSt==="aprovada");
+
+    legendaBox = '<div class="lg-sec" style="border-color:'+lgInfo.color+';background:'+lgInfo.bg+'">'+
+      '<div class="lg-h"><div class="tt" style="color:'+lgInfo.color+'">FASE 2 · Legenda</div>'+
+        '<div class="lab" style="color:'+lgInfo.color+'">'+esc(lgInfo.label)+'</div></div>';
+    if(o.lgAt){
+      legendaBox += '<div class="when">Última atualização: '+esc(fmtDT(o.lgAt))+'</div>';
+    }
+    /* Feedback do cliente se pediu revisão da legenda */
+    if(lgSt==="em_revisao" && o.lgFeedback){
+      legendaBox += '<div class="fb" style="background:rgba(255,90,77,.14);border-left:3px solid #ff8c83;border-radius:8px;padding:10px;margin:10px 0"><b style="color:#ff8c83">Pedido do cliente:</b> '+esc(o.lgFeedback)+'</div>';
+    }
+    if(lgEditable){
+      legendaBox += '<div class="cw-cn" style="margin-top:10px">Escreva a legenda do post</div>'+
+        '<textarea id="ctLgInput" class="lg-input" maxlength="3000" placeholder="Cole ou escreva aqui a legenda exatamente como vai ser publicada (com emojis, hashtags, quebras de linha)…">'+esc(o.lg||"")+'</textarea>'+
+        '<div class="lg-actions">'+
+          '<button class="primary" id="ctLgSave">💾 Salvar legenda</button>'+
+        '</div>'+
+        '<div style="font-size:11.5px;color:var(--ink-faint);line-height:1.45;margin-top:8px">Depois de salvar todas as legendas do cronograma, vá até a tarefa principal pra <b>Enviar tudo pro cliente</b> de uma vez.</div>';
+    } else if(lgSent){
+      /* Modo leitura: mostra a legenda que foi enviada */
+      legendaBox += '<div class="cw-cn" style="margin-top:10px">Legenda enviada ao cliente</div>'+
+        '<div class="lg-read">'+esc(o.lg||"")+'</div>';
+      if(lgSt==="aprovada"){
+        legendaBox += '<div style="font-size:13px;color:var(--c-trafego);font-weight:800;margin-top:10px;text-align:center;padding:8px;background:rgba(54,211,153,.1);border-radius:8px">🚀 Pronto pra publicar</div>';
+      }
+    }
+    legendaBox += '</div>';
   }
 
   /* CAIXA DE COMPARTILHAR (mesmo card no detalhe do card — escopo é o cronograma inteiro) */
@@ -2574,11 +2746,17 @@ function openContentDetail(tid, idx){
     '</div>'+
     '<div class="fld" style="margin-top:18px"><label>Etapa deste conteúdo</label><div class="stage-row" id="ctStage">'+chips+'</div></div>'+
     clientBox+
+    legendaBox+
     shareBoxCard+
     tlHtml+
     cmtHtml;
   $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
   var _md=$("ctMarkDeliver"); if(_md) _md.onclick=()=>markCardDelivered(tid, idx);
+  /* [V62] hook do botão "Salvar legenda" */
+  var _lgs=$("ctLgSave"); if(_lgs) _lgs.onclick=function(){
+    var ta=$("ctLgInput"); if(!ta) return;
+    saveLegenda(tid, idx, ta.value);
+  };
   /* binds do compartilhar duplicado no card */
   var _cs1=$("ctShareSend"); if(_cs1) _cs1.onclick=()=>sendCronToClient(tid);
   var _cs2=$("ctShareKill"); if(_cs2) _cs2.onclick=()=>invalidateShareLink(tid);
@@ -2697,6 +2875,84 @@ async function sendCronToClient(taskId){
   finally{ busy=false; }
 }
 
+/* ============================================================
+   [V62] FASE 2 — LEGENDAS
+   ============================================================ */
+/* Salva a legenda de UM card em rascunho. Marca lgState="escrita". Time pode editar várias vezes antes de enviar. */
+async function saveLegenda(taskId, idx, lgText){
+  if(!canManage(me)){ toast("Apenas administradores escrevem legendas."); return; }
+  var t=tasks.find(x=>x.id===taskId); if(!t||!db) return;
+  var txt=(lgText||"").trim();
+  if(!txt){ toast("Escreva a legenda antes de salvar."); return; }
+  if(busy) return; busy=true;
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    var c=arr[idx]; if(!c){ toast("Conteúdo não encontrado."); return; }
+    if(c.cs !== "aprovado"){ toast("Tema ainda não foi aprovado pelo cliente."); return; }
+    /* Não pode editar se já está enviada/analisando/aprovada */
+    if(c.lgState==="enviada" || c.lgState==="em_analise" || c.lgState==="aprovada"){
+      toast("Legenda já enviada — invalide e reenvie pra editar."); return;
+    }
+    var prev = c.lgState || "pendente";
+    var now=Date.now();
+    c.lg = txt.slice(0,3000);
+    c.lgAt = now;
+    /* Se vinha de em_revisao, ao salvar volta pra "escrita" (pronta pra reenviar) */
+    c.lgState = "escrita";
+    var hist=Array.isArray(c.history)?c.history.slice():[];
+    hist.push({kind:"legenda_written", at:now, byId:(me?me.id:null), prev:prev});
+    if(hist.length>100) hist=hist.slice(-100);
+    c.history=hist;
+    await db.collection("tasks").doc(taskId).update({cronWeeks:arr});
+    var lt=tasks.find(x=>x.id===taskId); if(lt) lt.cronWeeks=arr;
+    toast("Legenda salva ✓");
+    openContentDetail(taskId, idx);
+  }catch(e){ toast("Não foi possível salvar a legenda agora"); }
+  finally{ busy=false; }
+}
+
+/* Envia em lote: pega todas as legendas com lgState="escrita" e marca como "enviada".
+   Cliente vai ver no mesmo link (o shareToken não muda). */
+async function sendLegendasToClient(taskId){
+  if(!canManage(me)){ toast("Apenas administradores."); return; }
+  var t=tasks.find(x=>x.id===taskId); if(!t||!db) return;
+  if(busy) return;
+  var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+  var ready = arr.filter(function(c){ return c.cs==="aprovado" && c.lgState==="escrita" && c.lg && c.lg.trim(); });
+  if(!ready.length){ toast("Nenhuma legenda pronta pra enviar. Escreva e salve primeiro."); return; }
+  if(!confirm("Enviar "+ready.length+" legenda(s) pro cliente?\n\nO cliente vai abrir o MESMO link e ver as legendas pra aprovar.")) return;
+  busy=true;
+  try{
+    var now=Date.now();
+    arr.forEach(function(c){
+      if(c.cs==="aprovado" && c.lgState==="escrita" && c.lg && c.lg.trim()){
+        c.lgState = "enviada";
+        c.lgAt = now;
+        var hist=Array.isArray(c.history)?c.history.slice():[];
+        hist.push({kind:"legenda_sent", at:now, byId:(me?me.id:null)});
+        if(hist.length>100) hist=hist.slice(-100);
+        c.history=hist;
+      }
+    });
+    await db.collection("tasks").doc(taskId).update({cronWeeks:arr});
+    var lt=tasks.find(x=>x.id===taskId); if(lt) lt.cronWeeks=arr;
+    var url = t.shareToken ? clientShareURL(t.shareToken) : "";
+    var msg="Olá! As legendas do cronograma de "+(t.client||"")+" estão prontas pra sua aprovação.\n\nAbra o MESMO link de antes e role pra baixo pra ver as legendas:\n"+url;
+    try{
+      if(url) await navigator.clipboard.writeText(url);
+      if(confirm("✓ "+ready.length+" legenda(s) enviada(s).\n\nQuer abrir o WhatsApp pra avisar o cliente?")){
+        window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+      }
+    }catch(e){
+      if(confirm("✓ "+ready.length+" legenda(s) enviada(s).\n\nLink do cliente:\n"+url+"\n\nQuer abrir o WhatsApp?")){
+        window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+      }
+    }
+    openTaskDetail(taskId);
+  }catch(e){ toast("Não foi possível enviar agora"); }
+  finally{ busy=false; }
+}
+
 async function invalidateShareLink(taskId){
   if(!canManage(me)){ toast("Apenas administradores."); return; }
   var t=tasks.find(x=>x.id===taskId); if(!t||!db) return;
@@ -2782,15 +3038,34 @@ function renderClientView(){
   });
   var freq=freqLongLabel(t.freq||"semanal");
   var total=rows.length;
+  /* Stats Fase 1 (Temas) */
   var nAprov=rows.filter(function(r){return r.c.cs==="aprovado"||r.c.cs==="concluido";}).length;
   var nRev=rows.filter(function(r){return r.c.cs==="em_revisao";}).length;
   var nPend=total-nAprov-nRev;
+  /* [V62] Stats Fase 2 (Legendas) — só conta legendas que o cliente já recebeu */
+  var lgRows = rows.filter(function(r){
+    return r.c.lgState==="enviada" || r.c.lgState==="em_analise" || r.c.lgState==="em_revisao" || r.c.lgState==="aprovada";
+  });
+  var hasFase2 = lgRows.length > 0;
+  var lgAprov = lgRows.filter(function(r){return r.c.lgState==="aprovada";}).length;
+  var lgRevis = lgRows.filter(function(r){return r.c.lgState==="em_revisao";}).length;
+  var lgPend  = lgRows.length - lgAprov - lgRevis;
+
+  /* Cabeçalho com texto dinâmico baseado em qual fase está ativa */
+  var introTxt;
+  if(hasFase2 && lgPend>0){
+    introTxt = 'Olá! Você tem <b>'+lgPend+' legenda'+(lgPend===1?'':'s')+' nova'+(lgPend===1?'':'s')+'</b> pra aprovar na <b>Fase 2</b> abaixo. Sua resposta chega na hora pra equipe.';
+  } else if(hasFase2){
+    introTxt = 'Olá! Acompanhe abaixo o status dos <b>temas</b> e <b>legendas</b> do seu cronograma.';
+  } else {
+    introTxt = 'Olá! Confira os <b>'+total+'</b> conteúdo'+(total===1?'':'s')+' abaixo. Em cada card, escolha <b>Aprovar</b> ou <b>Pedir revisão</b>. Sua resposta chega na hora pra equipe.';
+  }
 
   var h='<div class="cv-head">'+
     '<div class="cv-brand"><div class="cv-mk"></div><div><h1>ID Seven</h1><div class="cv-sub">Agenda e Gestor de Tarefas</div></div></div>'+
     '<div class="cv-title">Cronograma <b>'+esc(freq)+'</b></div>'+
     '<div class="cv-client">Cliente: <b>'+esc(t.client||"—")+'</b></div>'+
-    '<div class="cv-intro">Olá! Confira os <b>'+total+'</b> conteúdo'+(total===1?'':'s')+' abaixo. Em cada card, escolha <b>Aprovar</b> ou <b>Pedir revisão</b>. Sua resposta chega na hora pra equipe.</div>'+
+    '<div class="cv-intro">'+introTxt+'</div>'+
     '<div class="cv-stats">'+
       '<div class="cv-s ok"><b>'+nAprov+'</b><span>Aprovado'+(nAprov===1?'':'s')+'</span></div>'+
       '<div class="cv-s rev"><b>'+nRev+'</b><span>Em revisão</span></div>'+
@@ -2801,61 +3076,126 @@ function renderClientView(){
   if(!total){
     h+='<div class="cv-empty">A agência ainda não montou os conteúdos deste cronograma. Aguarde — eles aparecerão aqui automaticamente.</div>';
   } else {
-    h+='<div class="cv-list">';
-    rows.forEach(function(r){
-      var c=r.c, i=r.i;
-      var wk=Math.floor(i/3)+1, cn=(i%3)+1;
-      var info=clientStatusInfo(c.cs);
-      var lk="";
-      if(c.l&&c.l.trim()){
-        var sf=/^https?:\/\//i.test(c.l);
-        lk = sf
-          ? '<a href="'+esc(c.l)+'" target="_blank" rel="noopener" class="cv-link">🔗 '+esc(c.l)+'</a>'
-          : '<div class="cv-link cv-link-plain">📎 '+esc(c.l)+'</div>';
-      }
-      var canAct = (c.cs==="enviado"||c.cs==="em_analise"||!c.cs);
-      var isAprov= (c.cs==="aprovado"||c.cs==="concluido");
-      var isRev  = (c.cs==="em_revisao");
-      h+='<div class="cv-card '+(isAprov?'ok':isRev?'rev':'')+'">'+
-        '<div class="cv-card-h">'+
-          '<div class="cv-pill">SEM '+wk+' · #'+cn+'</div>'+
-          (info?'<div class="cv-status" style="color:'+info.color+';background:'+info.bg+';border:1px solid '+info.color+'">'+esc(info.short)+'</div>':'')+
-        '</div>'+
-        '<div class="cv-ti">'+((c.t&&c.t.trim())?esc(c.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
-        ((c.d&&c.d.trim())?'<div class="cv-desc">'+esc(c.d)+'</div>':'')+
-        (lk||'')+
-        (isRev && c.csFeedback ? '<div class="cv-feedback"><b>Sua observação:</b> '+esc(c.csFeedback)+'</div>' : '')+
-        (canAct
-          ? '<div class="cv-actions" id="cvAct'+i+'">'+
-              '<button class="cv-btn ok"  data-ai="'+i+'">✓ Aprovar</button>'+
-              '<button class="cv-btn rev" data-ri="'+i+'">✏ Pedir revisão</button>'+
-            '</div>'+
-            /* Painel inline de confirmação de aprovação (escondido até clicar) */
-            '<div class="cv-confirm" id="cvCf'+i+'" style="display:none">'+
-              '<div class="cv-cf-msg">Você confirma que <b>APROVA</b> este conteúdo? Esta ação avisa a agência na hora.</div>'+
-              '<div class="cv-cf-acts">'+
-                '<button class="cv-btn ok" data-doapp="'+i+'">✓ Sim, aprovar</button>'+
-                '<button class="cv-btn cancel" data-cnc="'+i+'">Cancelar</button>'+
-              '</div>'+
-            '</div>'+
-            /* Painel inline de pedir revisão (textarea) */
-            '<div class="cv-revform" id="cvRv'+i+'" style="display:none">'+
-              '<label class="cv-rv-lab">O que precisa mudar? Escreva em poucas palavras:</label>'+
-              '<textarea class="cv-rv-ta" id="cvRvT'+i+'" maxlength="500" rows="3" placeholder="Ex: refazer o gancho da abertura, trocar a imagem, etc."></textarea>'+
-              '<div class="cv-cf-acts">'+
-                '<button class="cv-btn rev" data-dorev="'+i+'">📨 Enviar pedido</button>'+
-                '<button class="cv-btn cancel" data-cnc="'+i+'">Cancelar</button>'+
-              '</div>'+
-            '</div>'
-          : '')+
-      '</div>';
-    });
-    h+='</div>';
+    /* ============ FASE 1 · TEMAS ============ */
+    h+='<div class="cv-phase">'+
+        '<div class="cv-phase-h"><span class="cv-phase-num">1</span><div><div class="cv-phase-t">Temas dos conteúdos</div><div class="cv-phase-d">Aprove o tema de cada post abaixo. Depois disso, a equipe escreve as legendas.</div></div></div>'+
+       '<div class="cv-list">';
+    rows.forEach(function(r){ h += renderCvCardTema(r.c, r.i); });
+    h += '</div></div>';
+
+    /* ============ FASE 2 · LEGENDAS (só se já houver legenda enviada) ============ */
+    if(hasFase2){
+      h+='<div class="cv-phase phase2">'+
+          '<div class="cv-phase-h"><span class="cv-phase-num phase2">2</span><div><div class="cv-phase-t">Legendas dos posts aprovados</div><div class="cv-phase-d">A equipe escreveu as legendas dos temas que você aprovou. Confira e aprove cada uma — depois disso o post está pronto pra publicar.</div></div></div>'+
+          '<div class="cv-stats" style="margin-bottom:14px">'+
+            '<div class="cv-s ok"><b>'+lgAprov+'</b><span>Aprovada'+(lgAprov===1?'':'s')+'</span></div>'+
+            '<div class="cv-s rev"><b>'+lgRevis+'</b><span>Em revisão</span></div>'+
+            '<div class="cv-s pen"><b>'+lgPend+'</b><span>Pendente'+(lgPend===1?'':'s')+'</span></div>'+
+          '</div>'+
+         '<div class="cv-list">';
+      lgRows.forEach(function(r){ h += renderCvCardLegenda(r.c, r.i); });
+      h += '</div></div>';
+    }
   }
 
   h+='<div class="cv-foot">ID Seven · Atualizado em tempo real</div>';
   $("clientBody").innerHTML=h;
-  /* Bindings: abrir painel inline (sem popup, funciona no WhatsApp/Instagram/etc) */
+  bindClientViewActions();
+}
+
+/* [V62] Renderiza UM card no modo TEMA (Fase 1). */
+function renderCvCardTema(c, i){
+  var wk=Math.floor(i/3)+1, cn=(i%3)+1;
+  var info=clientStatusInfo(c.cs);
+  var lk="";
+  if(c.l&&c.l.trim()){
+    var sf=/^https?:\/\//i.test(c.l);
+    lk = sf
+      ? '<a href="'+esc(c.l)+'" target="_blank" rel="noopener" class="cv-link">🔗 '+esc(c.l)+'</a>'
+      : '<div class="cv-link cv-link-plain">📎 '+esc(c.l)+'</div>';
+  }
+  var canAct = (c.cs==="enviado"||c.cs==="em_analise"||!c.cs);
+  var isAprov= (c.cs==="aprovado"||c.cs==="concluido");
+  var isRev  = (c.cs==="em_revisao");
+  return '<div class="cv-card '+(isAprov?'ok':isRev?'rev':'')+'">'+
+    '<div class="cv-card-h">'+
+      '<div class="cv-pill">SEM '+wk+' · #'+cn+'</div>'+
+      (info?'<div class="cv-status" style="color:'+info.color+';background:'+info.bg+';border:1px solid '+info.color+'">'+esc(info.short)+'</div>':'')+
+    '</div>'+
+    '<div class="cv-ti">'+((c.t&&c.t.trim())?esc(c.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
+    ((c.d&&c.d.trim())?'<div class="cv-desc">'+esc(c.d)+'</div>':'')+
+    (lk||'')+
+    (isRev && c.csFeedback ? '<div class="cv-feedback"><b>Sua observação:</b> '+esc(c.csFeedback)+'</div>' : '')+
+    (canAct
+      ? '<div class="cv-actions" id="cvAct'+i+'">'+
+          '<button class="cv-btn ok"  data-ai="'+i+'">✓ Aprovar</button>'+
+          '<button class="cv-btn rev" data-ri="'+i+'">✏ Pedir revisão</button>'+
+        '</div>'+
+        '<div class="cv-confirm" id="cvCf'+i+'" style="display:none">'+
+          '<div class="cv-cf-msg">Você confirma que <b>APROVA</b> este tema? Esta ação avisa a agência na hora.</div>'+
+          '<div class="cv-cf-acts">'+
+            '<button class="cv-btn ok" data-doapp="'+i+'">✓ Sim, aprovar</button>'+
+            '<button class="cv-btn cancel" data-cnc="'+i+'">Cancelar</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="cv-revform" id="cvRv'+i+'" style="display:none">'+
+          '<label class="cv-rv-lab">O que precisa mudar no tema? Escreva em poucas palavras:</label>'+
+          '<textarea class="cv-rv-ta" id="cvRvT'+i+'" maxlength="500" rows="3" placeholder="Ex: trocar o ângulo, mudar o foco, etc."></textarea>'+
+          '<div class="cv-cf-acts">'+
+            '<button class="cv-btn rev" data-dorev="'+i+'">📨 Enviar pedido</button>'+
+            '<button class="cv-btn cancel" data-cnc="'+i+'">Cancelar</button>'+
+          '</div>'+
+        '</div>'
+      : '')+
+  '</div>';
+}
+
+/* [V62] Renderiza UM card no modo LEGENDA (Fase 2). */
+function renderCvCardLegenda(c, i){
+  var wk=Math.floor(i/3)+1, cn=(i%3)+1;
+  var info=clientLgStatusInfo(c.lgState);
+  var canAct = (c.lgState==="enviada"||c.lgState==="em_analise");
+  var isAprov= (c.lgState==="aprovada");
+  var isRev  = (c.lgState==="em_revisao");
+  return '<div class="cv-card cv-card-lg '+(isAprov?'ok':isRev?'rev':'')+'">'+
+    '<div class="cv-card-h">'+
+      '<div class="cv-pill phase2">SEM '+wk+' · #'+cn+' · LEGENDA</div>'+
+      (info?'<div class="cv-status" style="color:'+info.color+';background:'+info.bg+';border:1px solid '+info.color+'">'+esc(info.short)+'</div>':'')+
+    '</div>'+
+    '<div class="cv-ti" style="font-size:14px;color:var(--ink-soft);font-weight:700">Tema: '+((c.t&&c.t.trim())?esc(c.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
+    '<div class="cv-legenda-box">'+
+      '<div class="cv-legenda-lab">📝 LEGENDA PRO POST</div>'+
+      '<div class="cv-legenda-txt">'+esc(c.lg||"")+'</div>'+
+    '</div>'+
+    (isRev && c.lgFeedback ? '<div class="cv-feedback"><b>Sua observação:</b> '+esc(c.lgFeedback)+'</div>' : '')+
+    (canAct
+      ? '<div class="cv-actions" id="cvLgAct'+i+'">'+
+          '<button class="cv-btn ok"  data-lai="'+i+'">✓ Aprovar legenda</button>'+
+          '<button class="cv-btn rev" data-lri="'+i+'">✏ Pedir revisão</button>'+
+        '</div>'+
+        '<div class="cv-confirm" id="cvLgCf'+i+'" style="display:none">'+
+          '<div class="cv-cf-msg">Você confirma que <b>APROVA</b> esta legenda? Depois disso o post fica pronto pra publicar.</div>'+
+          '<div class="cv-cf-acts">'+
+            '<button class="cv-btn ok" data-doappl="'+i+'">✓ Sim, aprovar</button>'+
+            '<button class="cv-btn cancel" data-lcnc="'+i+'">Cancelar</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="cv-revform" id="cvLgRv'+i+'" style="display:none">'+
+          '<label class="cv-rv-lab">O que precisa ajustar na legenda? Escreva em poucas palavras:</label>'+
+          '<textarea class="cv-rv-ta" id="cvLgRvT'+i+'" maxlength="500" rows="3" placeholder="Ex: trocar a chamada, deixar mais curta, adicionar emoji, etc."></textarea>'+
+          '<div class="cv-cf-acts">'+
+            '<button class="cv-btn rev" data-dorevl="'+i+'">📨 Enviar pedido</button>'+
+            '<button class="cv-btn cancel" data-lcnc="'+i+'">Cancelar</button>'+
+          '</div>'+
+        '</div>'
+      : '')+
+    (isAprov ? '<div style="font-size:13.5px;color:var(--c-trafego);font-weight:800;text-align:center;padding:10px;background:rgba(54,211,153,.12);border-radius:8px;margin-top:8px">🚀 Pronto pra publicar</div>' : '')+
+  '</div>';
+}
+
+/* [V62] Bindings de todos os botões da client view (Fase 1 + Fase 2). */
+function bindClientViewActions(){
+  /* ===== FASE 1: TEMAS ===== */
   document.querySelectorAll("[data-ai]").forEach(function(b){ b.onclick=function(){
     var i=+b.dataset.ai;
     var a=document.getElementById("cvAct"+i), c=document.getElementById("cvCf"+i), r=document.getElementById("cvRv"+i);
@@ -2878,12 +3218,14 @@ function renderClientView(){
     if(r) r.style.display="none";
     if(a) a.style.display="flex";
   };});
-  document.querySelectorAll("[data-doapp]").forEach(function(b){ b.onclick=function(){
+  document.querySelectorAll("[data-doapp]").forEach(function(b){ b.onclick=async function(){
     if(b.disabled) return;
+    var origTxt = b.textContent;
     b.disabled=true; b.textContent="Enviando…";
-    clientApprove(+b.dataset.doapp);
+    try{ await clientApprove(+b.dataset.doapp); }
+    finally{ b.disabled=false; b.textContent=origTxt; }
   };});
-  document.querySelectorAll("[data-dorev]").forEach(function(b){ b.onclick=function(){
+  document.querySelectorAll("[data-dorev]").forEach(function(b){ b.onclick=async function(){
     if(b.disabled) return;
     var i=+b.dataset.dorev;
     var ta=document.getElementById("cvRvT"+i);
@@ -2894,8 +3236,56 @@ function renderClientView(){
       try{ ta.focus(); }catch(_){}
       return;
     }
+    var origTxt = b.textContent;
     b.disabled=true; b.textContent="Enviando…";
-    clientRequestRevision(i, txt);
+    try{ await clientRequestRevision(i, txt); }
+    finally{ b.disabled=false; b.textContent=origTxt; }
+  };});
+  /* ===== FASE 2: LEGENDAS ===== */
+  document.querySelectorAll("[data-lai]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.lai;
+    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i), r=document.getElementById("cvLgRv"+i);
+    if(a) a.style.display="none";
+    if(r) r.style.display="none";
+    if(c) c.style.display="block";
+  };});
+  document.querySelectorAll("[data-lri]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.lri;
+    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i), r=document.getElementById("cvLgRv"+i);
+    if(a) a.style.display="none";
+    if(c) c.style.display="none";
+    if(r) r.style.display="block";
+    var ta=document.getElementById("cvLgRvT"+i); if(ta) try{ ta.focus(); }catch(_){}
+  };});
+  document.querySelectorAll("[data-lcnc]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.lcnc;
+    var a=document.getElementById("cvLgAct"+i), c=document.getElementById("cvLgCf"+i), r=document.getElementById("cvLgRv"+i);
+    if(c) c.style.display="none";
+    if(r) r.style.display="none";
+    if(a) a.style.display="flex";
+  };});
+  document.querySelectorAll("[data-doappl]").forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var origTxt = b.textContent;
+    b.disabled=true; b.textContent="Enviando…";
+    try{ await clientApproveLegenda(+b.dataset.doappl); }
+    finally{ b.disabled=false; b.textContent=origTxt; }
+  };});
+  document.querySelectorAll("[data-dorevl]").forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var i=+b.dataset.dorevl;
+    var ta=document.getElementById("cvLgRvT"+i);
+    var txt=(ta&&ta.value||"").trim();
+    if(!txt){
+      ta.style.borderColor="#ff8c83";
+      ta.placeholder="⚠ Escreva o que precisa mudar antes de enviar";
+      try{ ta.focus(); }catch(_){}
+      return;
+    }
+    var origTxt = b.textContent;
+    b.disabled=true; b.textContent="Enviando…";
+    try{ await clientRequestRevisionLegenda(i, txt); }
+    finally{ b.disabled=false; b.textContent=origTxt; }
   };});
 }
 
@@ -2952,6 +3342,51 @@ async function clientRequestRevision(idx, fbTxt){
     arr[idx].csFeedback=fb.slice(0,500);
     var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
     hist.push({kind:"client_revision", at:now, text:fb.slice(0,500)});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+  }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e tente de novo."); }
+}
+
+/* [V62] FASE 2 — cliente aprova LEGENDA */
+async function clientApproveLegenda(idx){
+  var t=__clientTask; if(!t||!db||!__clientToken){ clientShowError("Conexão perdida. Recarregue a página."); return; }
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
+    if(arr[idx].cs !== "aprovado"){ clientShowError("Aprove o tema antes."); return; }
+    /* Só aceita aprovação se a legenda foi enviada / está em análise */
+    if(arr[idx].lgState !== "enviada" && arr[idx].lgState !== "em_analise"){
+      clientShowError("Legenda ainda não foi enviada."); return;
+    }
+    var now=Date.now();
+    arr[idx].lgState="aprovada"; arr[idx].lgAt=now;
+    arr[idx].lgFeedback="";
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"legenda_approved", at:now});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+  }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e toque em Aprovar de novo."); }
+}
+
+/* [V62] FASE 2 — cliente pede revisão da LEGENDA */
+async function clientRequestRevisionLegenda(idx, fbTxt){
+  var t=__clientTask; if(!t||!db||!__clientToken){ clientShowError("Conexão perdida. Recarregue a página."); return; }
+  var fb=(fbTxt||"").trim();
+  if(!fb){ clientShowError("Escreva o que precisa mudar."); return; }
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
+    if(arr[idx].lgState !== "enviada" && arr[idx].lgState !== "em_analise"){
+      clientShowError("Legenda ainda não foi enviada."); return;
+    }
+    var now=Date.now();
+    arr[idx].lgState="em_revisao"; arr[idx].lgAt=now;
+    arr[idx].lgFeedback=fb.slice(0,500);
+    arr[idx].lgFeedbackAt=now;
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"legenda_revision", at:now, text:fb.slice(0,500)});
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
@@ -3084,21 +3519,51 @@ function cronNorm(x){
     if(x.startedAt) o.startedAt=x.startedAt;
     if(x.doneAt)    o.doneAt   =x.doneAt;
     if(x.doneBy)    o.doneBy   =x.doneBy;
-    /* Status do CLIENTE: enviado | em_analise | em_revisao | aprovado | concluido */
+    /* Status do CLIENTE para o TEMA (Fase 1): enviado | em_analise | em_revisao | aprovado | concluido */
     if(typeof x.cs==="string" && ["enviado","em_analise","em_revisao","aprovado","concluido"].indexOf(x.cs)>=0) o.cs=x.cs;
     if(x.csAt) o.csAt=x.csAt;
     if(typeof x.csFeedback==="string") o.csFeedback=x.csFeedback.slice(0,500);
+    /* [V62] FASE 2 — LEGENDA. Só fica utilizável depois que cs==="aprovado". */
+    if(typeof x.lg==="string") o.lg=x.lg.slice(0,3000);
+    if(x.lgAt) o.lgAt=x.lgAt;
+    /* lgState: pendente (default quando tema aprovado) | escrita | enviada | em_analise | em_revisao | aprovada */
+    if(typeof x.lgState==="string" && ["pendente","escrita","enviada","em_analise","em_revisao","aprovada"].indexOf(x.lgState)>=0) o.lgState=x.lgState;
+    if(typeof x.lgFeedback==="string") o.lgFeedback=x.lgFeedback.slice(0,500);
+    if(x.lgFeedbackAt) o.lgFeedbackAt=x.lgFeedbackAt;
     return o;
   }
   return {t:"",d:(x==null?"":(""+x)),l:"",st:"afazer"};
 }
 /* Mapeia o status de cliente pro label e cor visual */
 function clientStatusInfo(cs){
-  if(cs==="enviado")    return {label:"Enviado ao cliente",   short:"Enviado",   color:"var(--c-foto)",    bg:"rgba(255,176,46,.12)"};
-  if(cs==="em_analise") return {label:"Cliente analisando",    short:"Em Análise",color:"var(--c-reuni)",   bg:"rgba(77,159,255,.12)"};
-  if(cs==="em_revisao") return {label:"Cliente pediu revisão", short:"Revisão",   color:"#ff8c83",          bg:"rgba(255,90,77,.12)"};
-  if(cs==="aprovado")   return {label:"Aprovado pelo cliente", short:"Aprovado",  color:"var(--c-trafego)", bg:"rgba(54,211,153,.12)"};
-  if(cs==="concluido")  return {label:"Entregue ao cliente",   short:"Entregue",  color:"var(--accent)",    bg:"rgba(62,184,216,.12)"};
+  if(cs==="enviado")    return {label:"Enviado ao cliente",     short:"📤 Enviado ao cliente",     icon:"📤", color:"var(--c-foto)",    bg:"rgba(255,176,46,.12)", urg:2};
+  if(cs==="em_analise") return {label:"Cliente analisando",     short:"👁 Cliente analisando",     icon:"👁", color:"var(--c-reuni)",   bg:"rgba(77,159,255,.12)", urg:3};
+  if(cs==="em_revisao") return {label:"Cliente pediu revisão",  short:"✏ Cliente pediu revisão",   icon:"✏",  color:"#ff8c83",          bg:"rgba(255,90,77,.14)",  urg:1};
+  if(cs==="aprovado")   return {label:"Aprovado pelo cliente",  short:"✓ Aprovado pelo cliente",   icon:"✓",  color:"var(--c-trafego)", bg:"rgba(54,211,153,.12)", urg:4};
+  if(cs==="concluido")  return {label:"Entregue ao cliente",    short:"📦 Entregue ao cliente",    icon:"📦", color:"var(--accent)",    bg:"rgba(62,184,216,.12)", urg:5};
+  return null;
+}
+/* [V62] Info visual do estado da LEGENDA (Fase 2). Espelha clientStatusInfo mas pra legenda. */
+function clientLgStatusInfo(lg){
+  if(lg==="pendente")   return {label:"Falta escrever legenda",         short:"📝 Falta escrever legenda",          icon:"📝", color:"var(--c-edicao)",  bg:"rgba(176,114,255,.14)",  urg:2.5};
+  if(lg==="escrita")    return {label:"Legenda escrita · falta enviar", short:"📋 Legenda escrita · falta enviar",  icon:"📋", color:"var(--c-foto)",    bg:"rgba(255,176,46,.10)",   urg:4.2};
+  if(lg==="enviada")    return {label:"Legenda enviada ao cliente",     short:"📤 Legenda enviada",                 icon:"📤", color:"var(--c-foto)",    bg:"rgba(255,176,46,.12)",   urg:4.4};
+  if(lg==="em_analise") return {label:"Cliente analisando a legenda",   short:"👁 Cliente analisando a legenda",    icon:"👁", color:"var(--c-reuni)",   bg:"rgba(77,159,255,.12)",   urg:4.5};
+  if(lg==="em_revisao") return {label:"Cliente pediu revisão da legenda", short:"✏ Cliente pediu revisão da legenda", icon:"✏", color:"#ff8c83",          bg:"rgba(255,90,77,.16)",   urg:1.5};
+  if(lg==="aprovada")   return {label:"Pronto pra publicar",             short:"🚀 Pronto pra publicar",            icon:"🚀", color:"var(--c-trafego)", bg:"rgba(54,211,153,.16)",   urg:99};
+  return null;
+}
+/* [V62] Calcula o estado mais relevante de um card pra exibição: prioriza Fase 2 (legenda) se tema já aprovado */
+function cardActiveStatus(c){
+  if(!c) return null;
+  /* Se já tem fase 2 ativa (qualquer lgState), Fase 2 é a info dominante */
+  if(c.lgState && c.lgState!=="pendente") return {phase:2, info:clientLgStatusInfo(c.lgState)};
+  /* Se tema aprovado mas legenda ainda pendente, mostra "falta escrever legenda" */
+  if(c.cs==="aprovado" && (!c.lgState || c.lgState==="pendente") && c.cs){
+    return {phase:2, info:clientLgStatusInfo("pendente")};
+  }
+  /* Senão é Fase 1 (tema): mostra o cs do tema */
+  if(c.cs) return {phase:1, info:clientStatusInfo(c.cs)};
   return null;
 }
 function genShareToken(){
@@ -3408,6 +3873,44 @@ function openTaskDetail(id){
         cronHtml+='<div class="share-actions"><button id="cronShareWA">📱 Abrir WhatsApp</button><button class="danger" id="cronShareKill">Invalidar link</button></div>';
       }
       cronHtml+='</div>';
+
+      /* [V62] BOX FASE 2 · LEGENDAS — mostra resumo + botão de envio em lote */
+      var ws2 = ws;
+      var lgStats = { aprovTema:0, lgPend:0, lgEscr:0, lgEnv:0, lgAna:0, lgRev:0, lgApr:0 };
+      ws2.forEach(function(c){
+        if(c.cs==="aprovado"){
+          lgStats.aprovTema++;
+          var s=c.lgState||"pendente";
+          if(s==="pendente") lgStats.lgPend++;
+          else if(s==="escrita") lgStats.lgEscr++;
+          else if(s==="enviada") lgStats.lgEnv++;
+          else if(s==="em_analise") lgStats.lgAna++;
+          else if(s==="em_revisao") lgStats.lgRev++;
+          else if(s==="aprovada") lgStats.lgApr++;
+        }
+      });
+      if(lgStats.aprovTema > 0){
+        cronHtml+='<div class="share-box lg-summary" style="border-color:var(--c-edicao);background:linear-gradient(135deg,rgba(176,114,255,.06),rgba(176,114,255,.02))">';
+        cronHtml+='<div class="tt" style="color:var(--c-edicao)">🎬 FASE 2 · Legendas</div>';
+        cronHtml+='<div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:10px">Depois do cliente aprovar os temas, o time escreve as legendas e envia tudo de uma vez pelo mesmo link.</div>';
+        /* Grid de estatísticas das legendas */
+        cronHtml+='<div class="lg-stats">';
+        if(lgStats.lgRev) cronHtml+='<div class="lg-stat bad"><b>'+lgStats.lgRev+'</b><span>Cliente pediu revisão</span></div>';
+        if(lgStats.lgPend) cronHtml+='<div class="lg-stat"><b>'+lgStats.lgPend+'</b><span>Falta escrever</span></div>';
+        if(lgStats.lgEscr) cronHtml+='<div class="lg-stat acc"><b>'+lgStats.lgEscr+'</b><span>Pronta pra enviar</span></div>';
+        if(lgStats.lgEnv) cronHtml+='<div class="lg-stat"><b>'+lgStats.lgEnv+'</b><span>Enviada</span></div>';
+        if(lgStats.lgAna) cronHtml+='<div class="lg-stat"><b>'+lgStats.lgAna+'</b><span>Cliente analisando</span></div>';
+        if(lgStats.lgApr) cronHtml+='<div class="lg-stat ok"><b>'+lgStats.lgApr+'</b><span>Aprovada</span></div>';
+        cronHtml+='</div>';
+        if(lgStats.lgEscr > 0){
+          cronHtml+='<div class="share-actions" style="margin-top:10px"><button class="primary" id="lgSend">📤 Enviar '+lgStats.lgEscr+' legenda(s) pro cliente</button></div>';
+        } else if(lgStats.lgPend > 0){
+          cronHtml+='<div style="font-size:12px;color:var(--ink-faint);margin-top:8px;font-style:italic">Escreva as legendas em cada card (toque pra abrir) e elas aparecem aqui pra enviar.</div>';
+        } else if(lgStats.lgApr === lgStats.aprovTema && lgStats.aprovTema>0){
+          cronHtml+='<div style="font-size:13px;color:var(--c-trafego);font-weight:800;text-align:center;padding:10px;background:rgba(54,211,153,.1);border-radius:8px;margin-top:8px">🚀 Todas as legendas aprovadas — pronto pra publicar!</div>';
+        }
+        cronHtml+='</div>';
+      }
     }
   }
   let copyHtml="";
@@ -3573,6 +4076,8 @@ function openTaskDetail(id){
   })();
   var _rep=$("cronRepeat"); if(_rep) _rep.onclick=()=>repeatCron(id);
   var _shr=$("cronShare"); if(_shr) _shr.onclick=()=>sendCronToClient(id);
+  /* [V62] hook do botão "Enviar legendas" */
+  var _lgs2=$("lgSend"); if(_lgs2) _lgs2.onclick=()=>sendLegendasToClient(id);
   var _shk=$("cronShareKill"); if(_shk) _shk.onclick=()=>invalidateShareLink(id);
   var _shc=$("cronShareCopy"); if(_shc) _shc.onclick=function(){
     var tk=tasks.find(x=>x.id===id); if(!tk||!tk.shareToken)return;
@@ -3816,6 +4321,15 @@ function notifList(){
             out.push({ id:t.id+"|crev|c"+cidx+"|"+c.csAt, kind:"client_revision", at:c.csAt, task:t, cidx:cidx, client:t.client||"", title:cardTitle, fb:c.csFeedback||"" });
           }
         }
+        /* [V62] 7d. Fase 2 — cliente APROVOU LEGENDA ou pediu revisão da legenda */
+        if(c && c.lgState && c.lgAt){
+          if(c.lgState==="aprovada" && canManage(me)){
+            out.push({ id:t.id+"|lapr|c"+cidx+"|"+c.lgAt, kind:"legenda_approved", at:c.lgAt, task:t, cidx:cidx, client:t.client||"", title:cardTitle });
+          }
+          if(c.lgState==="em_revisao" && canManage(me)){
+            out.push({ id:t.id+"|lrev|c"+cidx+"|"+(c.lgFeedbackAt||c.lgAt), kind:"legenda_revision", at:(c.lgFeedbackAt||c.lgAt), task:t, cidx:cidx, client:t.client||"", title:cardTitle, fb:c.lgFeedback||"" });
+          }
+        }
         if(!c || !Array.isArray(c.comments) || !c.comments.length) return;
         var iCmtedInCard = meId && c.comments.some(function(x){return x&&x.by===meId;});
         var involvedInCard = isMine || iAmCreatorTk || iCmtedInCard;
@@ -3877,12 +4391,21 @@ function openNotifs(){
       }
       else if(x.kind==="client_approved"){
         ic='<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
-        col="var(--c-trafego)"; h="Cliente aprovou um card ✓"; body=ct;
+        col="var(--c-trafego)"; h="Cliente aprovou TEMA ✓"; body=ct;
       }
       else if(x.kind==="client_revision"){
         var fbT=(x.fb||"").slice(0,90); fbT+=((x.fb||"").length>90?"…":"");
         ic='<path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>';
-        col="#ff8c83"; h="Cliente pediu revisão"; body=ct+(fbT?' · "'+esc(fbT)+'"':'');
+        col="#ff8c83"; h="Cliente pediu revisão do TEMA"; body=ct+(fbT?' · "'+esc(fbT)+'"':'');
+      }
+      else if(x.kind==="legenda_approved"){
+        ic='<path d="M5 12l4 4 10-10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>';
+        col="var(--c-trafego)"; h="🚀 Cliente aprovou LEGENDA"; body=ct+" · pronto pra publicar";
+      }
+      else if(x.kind==="legenda_revision"){
+        var fbL=(x.fb||"").slice(0,90); fbL+=((x.fb||"").length>90?"…":"");
+        ic='<path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>';
+        col="#ff8c83"; h="Cliente pediu revisão da LEGENDA"; body=ct+(fbL?' · "'+esc(fbL)+'"':'');
       }
       return '<div class="ntf" data-tid="'+x.task.id+'"'+(x.cidx!=null?' data-cidx="'+x.cidx+'"':'')+'><span class="ntf-ic" style="color:'+col+'"><svg viewBox="0 0 24 24" fill="none">'+ic+'</svg></span>'+
         '<div class="ntf-tx"><div class="ntf-h">'+h+'</div>'+
