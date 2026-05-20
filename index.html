@@ -659,6 +659,35 @@
   .bt-link:hover{background:var(--bg-2);border-color:var(--accent)}
   .bt-link:active{transform:scale(.98)}
 
+  /* [V62.20] Toggle Vista Equipe / Fluxo do Cliente — duas pílulas grandes, visual destacado */
+  .view-toggle{display:flex;gap:6px;margin:12px 0 2px;padding:4px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px}
+  .vt-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+    background:transparent;border:none;color:var(--ink-faint);font-family:inherit;
+    font-size:13px;font-weight:800;padding:10px 14px;border-radius:11px;cursor:pointer;
+    transition:.2s;letter-spacing:-.005em;white-space:nowrap;min-width:0}
+  .vt-opt svg{width:17px;height:17px;flex-shrink:0;opacity:.7}
+  .vt-opt span{overflow:hidden;text-overflow:ellipsis}
+  .vt-opt:hover:not(.on){color:var(--ink-soft);background:rgba(255,255,255,.025)}
+  .vt-opt.on{background:var(--bg-2);color:var(--accent);box-shadow:0 0 0 1px rgba(62,184,216,.35) inset}
+  .vt-opt.on svg{opacity:1;color:var(--accent)}
+  .vt-opt[data-bv="client"].on{color:var(--c-edicao);box-shadow:0 0 0 1px rgba(176,114,255,.4) inset}
+  .vt-opt[data-bv="client"].on svg{color:var(--c-edicao)}
+  /* [V62.20] Cores das 4 colunas da Vista Cliente — diferentes das colunas da Vista Equipe */
+  .col.em_analise .col-h .nm{color:var(--c-reuni)}
+  .col.em_analise .col-h .nm i{background:var(--c-reuni)}
+  .col.em_analise{box-shadow:inset 4px 0 0 0 rgba(77,159,255,.5)}
+  .col.aprovado .col-h .nm{color:var(--c-trafego)}
+  .col.aprovado .col-h .nm i{background:var(--c-trafego)}
+  .col.aprovado{box-shadow:inset 4px 0 0 0 rgba(54,211,153,.5)}
+  /* Coluna "revisao" e "concluido" já têm cores aplicadas no CSS global das colunas */
+  .board-wrap.client-view .col.revisao{box-shadow:inset 4px 0 0 0 rgba(255,90,77,.5)}
+  /* Tab da nav-bar pras 4 colunas novas */
+  .bn-tab.em_analise .bn-dot{background:var(--c-reuni)}
+  .bn-tab.em_analise.urgent,.bn-tab.em_analise:hover{color:var(--c-reuni)}
+  .bn-tab.aprovado .bn-dot{background:var(--c-trafego)}
+  .bn-tab.aprovado.urgent,.bn-tab.aprovado:hover{color:var(--c-trafego)}
+
   /* [V62.2/V62.4] Barra de navegação de colunas — Trello/Linear style.
      Cada chip é um BOTÃO clicável que faz scroll suave até a coluna. */
   .board-nav{display:flex;gap:5px;margin:18px 0 8px;padding:5px;background:var(--surface);
@@ -1165,7 +1194,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.19 · build legenda-finalizada-concluido</div>
+    <div class="ver">versão 62.20 · build vista-cliente-envia-legenda</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1471,7 +1500,7 @@ let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
 let usersLoaded=false, photoReady=false, sessionId=null, busy=false;
 const ALARM_KEY="idseven_alarmed", PRE_MIN=120; /* 2h antes */
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
-let boardFilter="all", boardFilterUserSet=false, calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
+let boardFilter="all", boardFilterUserSet=false, boardView="team", calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
 
 function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -2291,6 +2320,17 @@ function renderBoard(){
   h+='<button class="bt-link" id="goClientes" title="Visão por cliente"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Por cliente</span></button>';
   h+='<button class="bt-link" id="goPostsLog" title="Registro de posts publicados"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg><span>Posts</span></button>';
   h+='</div>';
+  /* [V62.20] Toggle Vista Equipe / Fluxo do Cliente — dois modos distintos do quadro */
+  h+='<div class="view-toggle">'+
+       '<button class="vt-opt '+(boardView==="team"?"on":"")+'" data-bv="team">'+
+         '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="6" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="11" y="4" width="6" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="19" y="4" width="2" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>'+
+         '<span>Vista Equipe</span>'+
+       '</button>'+
+       '<button class="vt-opt '+(boardView==="client"?"on":"")+'" data-bv="client">'+
+         '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+         '<span>Fluxo do Cliente</span>'+
+       '</button>'+
+     '</div>';
   const od=myOverdue();
   if(od.length){
     h+='<div class="od-banner"><div class="ttl"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Pendência urgente — '+od.length+' tarefa(s) atrasada(s)</div>'+
@@ -2300,32 +2340,74 @@ function renderBoard(){
   }
   const list=boardVisible();
   const bi=boardItems(list);
-  /* [V61] 5 colunas: 4 internas (time) + 5ª de aprovação do cliente */
-  const STAGE_CLIENTE = {k:"cliente", label:"Aprovação do Cliente"};
-  const COLS = STAGES.concat([STAGE_CLIENTE]);
-  /* Mapeia status legados (analise/aprovacao/pronto) pra coluna padrão mais próxima.
-     [V61] Cards com client status (cs) ou estado de legenda (lgState) SEMPRE vão pra coluna "cliente" (5ª).
-     [V62] Inclui Fase 2 (legendas). */
-  function colKeyOf(x){
-    /* [V62.19] Se time já finalizou o conteúdo (st=concluido), vai pra coluna Concluído
-       — mesmo que ainda tenha cs/lgState definidos. Fim do ciclo. */
-    if(x.c && x.c.st === "concluido") return "concluido";
-    /* Se card tem status do cliente (Fase 1) ou estado de legenda (Fase 2), vai pra coluna do cliente */
-    if(x.c && (x.c.cs || (x.c.lgState && x.c.lgState!=="pendente"))) return "cliente";
-    var raw = x.st || "afazer";
-    if(raw==="analise") return "afazer";
-    if(raw==="aprovacao"||raw==="pronto") return "revisao";
-    return raw;
+  /* [V62.20] DUAS VISTAS distintas do quadro:
+     - VISTA EQUIPE (default): 5 colunas (A Fazer, Em Andamento, Revisão, Concluído, Aprovação do Cliente)
+     - VISTA CLIENTE: 4 colunas focadas só no fluxo do cliente (Em Análise, Revisão, Aprovado, Concluído) */
+  var COLS, colKeyOf, isClientView = (boardView==="client");
+
+  if(isClientView){
+    /* 4 colunas dedicadas ao fluxo de aprovação do cliente */
+    COLS = [
+      {k:"em_analise", label:"Em Análise"},
+      {k:"revisao",    label:"Revisão"},
+      {k:"aprovado",   label:"Aprovado"},
+      {k:"concluido",  label:"Concluído"}
+    ];
+    /* Classifica cards no fluxo do cliente — só conteúdo com cs ou lgState definido */
+    colKeyOf = function(x){
+      if(!x.c) return null;
+      var c = x.c;
+      /* Concluído: time já marcou como finalizado */
+      if(c.st === "concluido") return "concluido";
+      /* Revisão (urgente, vem primeiro): cliente pediu mudança em qualquer fase */
+      if(c.cs === "em_revisao" || c.lgState === "em_revisao") return "revisao";
+      /* Aprovado: tema OU legenda já aprovados (fim do ciclo, exceto concluído) */
+      if(c.lgState === "aprovada") return "aprovado";
+      if(c.cs === "aprovado") return "aprovado";
+      /* Em Análise: enviado, esperando o cliente decidir */
+      if(c.lgState === "enviada" || c.lgState === "em_analise") return "em_analise";
+      if(c.cs === "enviado" || c.cs === "em_analise") return "em_analise";
+      /* Card sem cs/lgState ainda — não entra no fluxo cliente */
+      return null;
+    };
+  } else {
+    /* [V61] 5 colunas: 4 internas (time) + 5ª de aprovação do cliente */
+    var STAGE_CLIENTE = {k:"cliente", label:"Aprovação do Cliente"};
+    COLS = STAGES.concat([STAGE_CLIENTE]);
+    /* Mapeia status legados (analise/aprovacao/pronto) pra coluna padrão mais próxima.
+       [V61] Cards com client status (cs) ou estado de legenda (lgState) SEMPRE vão pra coluna "cliente" (5ª).
+       [V62] Inclui Fase 2 (legendas). */
+    colKeyOf = function(x){
+      /* [V62.19] Se time já finalizou o conteúdo (st=concluido), vai pra coluna Concluído
+         — mesmo que ainda tenha cs/lgState definidos. Fim do ciclo. */
+      if(x.c && x.c.st === "concluido") return "concluido";
+      /* Se card tem status do cliente (Fase 1) ou estado de legenda (Fase 2), vai pra coluna do cliente */
+      if(x.c && (x.c.cs || (x.c.lgState && x.c.lgState!=="pendente"))) return "cliente";
+      var raw = x.st || "afazer";
+      if(raw==="analise") return "afazer";
+      if(raw==="aprovacao"||raw==="pronto") return "revisao";
+      return raw;
+    };
   }
   /* Ordem de urgência dentro da coluna do cliente: usa cardActiveStatus.urg (considera Fase 2). */
   function clientUrg(c){ var s=cardActiveStatus(c); return s && s.info ? s.info.urg : 99; }
-  /* [V62.2] Barra de NAVEGAÇÃO de colunas — clicável, faz scroll até a coluna. Substitui a stat-strip antiga. */
+  /* [V62.2] Barra de NAVEGAÇÃO de colunas — clicável, faz scroll até a coluna. */
   h+='<div class="board-nav" id="boardNav">';
   COLS.forEach(s=>{
-    var n = (s.k==="cliente")
-      ? bi.filter(x=>colKeyOf(x)==="cliente").length
-      : bi.filter(x=>colKeyOf(x)===s.k).length;
-    var urgent = (s.k==="cliente" && bi.filter(x=>x.c && (x.c.cs==="em_revisao" || x.c.lgState==="em_revisao")).length>0);
+    var n;
+    if(isClientView){
+      n = bi.filter(x=>colKeyOf(x)===s.k).length;
+    } else {
+      n = (s.k==="cliente")
+        ? bi.filter(x=>colKeyOf(x)==="cliente").length
+        : bi.filter(x=>colKeyOf(x)===s.k).length;
+    }
+    var urgent;
+    if(isClientView){
+      urgent = (s.k==="revisao" && n>0);
+    } else {
+      urgent = (s.k==="cliente" && bi.filter(x=>x.c && (x.c.cs==="em_revisao" || x.c.lgState==="em_revisao")).length>0);
+    }
     h+='<button class="bn-tab '+s.k+(urgent?' urgent':'')+'" data-goto="'+s.k+'">'+
        '<span class="bn-dot"></span>'+
        '<span class="bn-lab">'+esc(s.label)+'</span>'+
@@ -2333,10 +2415,17 @@ function renderBoard(){
        '</button>';
   });
   h+='</div>';
-  h+='<div class="board-wrap" id="boardWrap" style="--cols:'+COLS.length+'">';
+  h+='<div class="board-wrap '+(isClientView?'client-view':'')+'" id="boardWrap" style="--cols:'+COLS.length+'">';
   COLS.forEach(s=>{
     var items;
-    if(s.k==="cliente"){
+    if(isClientView){
+      /* Vista Cliente: ordena por urgência do estado, exibe só cards do fluxo */
+      items = bi.filter(x=>colKeyOf(x)===s.k)
+        .sort((a,b)=> clientUrg(a.c) - clientUrg(b.c)
+                  || ((b.t.priority?1:0)-(a.t.priority?1:0))
+                  || ((b.t.createdAt||0)-(a.t.createdAt||0))
+                  || (a.idx-b.idx));
+    } else if(s.k==="cliente"){
       /* Ordem de urgência (Fase 1 + Fase 2 misturadas):
          1.0 revisão de tema       1.5 revisão de legenda
          2.0 tema enviado          2.5 falta escrever legenda
@@ -2356,9 +2445,18 @@ function renderBoard(){
         .sort((a,b)=>((b.t.priority?1:0)-(a.t.priority?1:0))||((taskDueMs(a.t)||9e15)-(taskDueMs(b.t)||9e15))||((b.t.createdAt||0)-(a.t.createdAt||0))||(a.idx-b.idx));
     }
     h+='<div class="col '+s.k+'" data-col="'+s.k+'"><div class="col-h"><div class="nm"><i></i>'+esc(s.label)+'</div><div class="qt">'+items.length+'</div></div>';
-    var emptyMsg = s.k==="cliente"
-      ? '<div class="col-empty">Nenhum cronograma com cliente ainda.<br>Envie pelo botão "Compartilhar" no detalhe.</div>'
-      : '<div class="col-empty">Sem tarefas</div>';
+    var emptyMsg;
+    if(isClientView){
+      emptyMsg = '<div class="col-empty">'+
+        (s.k==="em_analise" ? "Nenhum conteúdo aguardando o cliente." :
+         s.k==="revisao"    ? "Nenhum pedido de revisão pendente." :
+         s.k==="aprovado"   ? "Nenhum conteúdo aprovado." :
+         "Nenhum conteúdo concluído.")+'</div>';
+    } else {
+      emptyMsg = s.k==="cliente"
+        ? '<div class="col-empty">Nenhum cronograma com cliente ainda.<br>Envie pelo botão "Compartilhar" no detalhe.</div>'
+        : '<div class="col-empty">Sem tarefas</div>';
+    }
     h+= items.length? items.map(x=> x.idx<0 ? tcard(x.t) : ccard(x)).join("") : emptyMsg;
     h+='</div>';
   });
@@ -2492,6 +2590,8 @@ function tcard(t){
 }
 function bindBoard(){
   document.querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{boardFilter=b.dataset.bf;boardFilterUserSet=true;render();});
+  /* [V62.20] Toggle Vista Equipe / Fluxo do Cliente */
+  document.querySelectorAll("[data-bv]").forEach(b=>b.onclick=()=>{ boardView=b.dataset.bv; render(); });
   var gpl=$("goPostsLog"); if(gpl)gpl.onclick=()=>switchTab("posts");
   var gcl=$("goClientes"); if(gcl)gcl.onclick=()=>switchTab("clientes");
   var gca=$("goContentCal"); if(gca)gca.onclick=()=>{ calCursor=new Date(); calSel=todayISO(); switchTab("calendar"); };
@@ -2848,20 +2948,30 @@ function openContentDetail(tid, idx){
       legendaBox += '<div class="fb" style="background:rgba(255,90,77,.14);border-left:3px solid var(--c-rev);border-radius:8px;padding:10px;margin:10px 0"><b style="color:var(--c-rev)">Pedido do cliente:</b> '+esc(o.lgFeedback)+'</div>';
     }
     if(lgEditable){
+      /* Label/instrução adaptada ao estado da legenda */
+      var lgInstr, sendBtnLabel, sendBtnColor;
+      if(lgSt==="em_revisao"){
+        lgInstr = 'O cliente pediu revisão. Corrija a legenda abaixo e clique em "Salvar e reenviar" pro cliente aprovar de novo.';
+        sendBtnLabel = '📤 Salvar e reenviar pro cliente';
+        sendBtnColor = 'var(--c-rev-strong)';
+      } else if(lgSt==="escrita"){
+        lgInstr = 'Legenda salva como rascunho. Quando estiver pronta, clique em "Salvar e enviar pro cliente" pra começar a aprovação.';
+        sendBtnLabel = '📤 Salvar e enviar pro cliente';
+        sendBtnColor = 'var(--accent)';
+      } else {
+        /* pendente */
+        lgInstr = 'Cliente aprovou o tema. Escreva a legenda do post e envie pra ele aprovar.';
+        sendBtnLabel = '📤 Salvar e enviar pro cliente';
+        sendBtnColor = 'var(--accent)';
+      }
       legendaBox += '<div class="cw-cn" style="margin-top:10px">Escreva a legenda do post</div>'+
         '<textarea id="ctLgInput" class="lg-input" maxlength="3000" placeholder="Cole ou escreva aqui a legenda exatamente como vai ser publicada (com emojis, hashtags, quebras de linha)…">'+esc(o.lg||"")+'</textarea>'+
         '<div class="lg-actions">'+
-          '<button class="primary" id="ctLgSave">💾 Salvar legenda</button>'+
-          /* [V62.17] Se está em revisão, dá opção de salvar E reenviar direto */
-          (lgSt==="em_revisao"
-            ? '<button class="primary" id="ctLgResend" style="background:var(--c-rev-strong);border-color:var(--c-rev-strong)">📤 Salvar e reenviar pro cliente</button>'
-            : '')+
+          '<button class="primary" id="ctLgSave" style="background:transparent;color:var(--ink-soft);border:1.5px solid var(--line)">💾 Salvar rascunho</button>'+
+          /* [V62.20] Botão de envio individual em QUALQUER estado editável (pendente/escrita/em_revisao) */
+          '<button class="primary" id="ctLgResend" style="background:'+sendBtnColor+';border-color:'+sendBtnColor+'">'+sendBtnLabel+'</button>'+
         '</div>'+
-        '<div style="font-size:11.5px;color:var(--ink-faint);line-height:1.45;margin-top:8px">'+
-          (lgSt==="em_revisao"
-            ? 'O cliente pediu revisão. Corrija a legenda e clique em "Salvar e reenviar" pra o cliente aprovar novamente.'
-            : 'Depois de salvar todas as legendas do cronograma, vá até a tarefa principal pra <b>Enviar tudo pro cliente</b> de uma vez.')+
-        '</div>';
+        '<div style="font-size:11.5px;color:var(--ink-faint);line-height:1.45;margin-top:8px">'+lgInstr+'</div>';
     } else if(lgSent){
       /* Modo leitura: mostra a legenda que foi enviada */
       legendaBox += '<div class="cw-cn" style="margin-top:10px">Legenda enviada ao cliente</div>'+
@@ -2928,10 +3038,10 @@ function openContentDetail(tid, idx){
     var ta=$("ctLgInput"); if(!ta) return;
     saveLegenda(tid, idx, ta.value);
   };
-  /* [V62.17] hook do botão "Salvar e reenviar pro cliente" (legenda em revisão) */
+  /* [V62.20] hook do botão "Salvar e enviar pro cliente" — funciona em qualquer estado editável */
   var _lgr=$("ctLgResend"); if(_lgr) _lgr.onclick=function(){
     var ta=$("ctLgInput"); if(!ta) return;
-    editAndResendLegenda(tid, idx, ta.value);
+    saveAndSendLegenda(tid, idx, ta.value);
   };
   /* binds do compartilhar duplicado no card */
   var _cs1=$("ctShareSend"); if(_cs1) _cs1.onclick=()=>sendCronToClient(tid);
@@ -3204,16 +3314,24 @@ async function editAndResendTema(tid, idx, novoT, novaD, novoL){
 
 /* [V62.17] Time edita a LEGENDA (após cliente pedir revisão) e RE-ENVIA pro cliente.
    Atualiza c.lg, limpa lgFeedback, marca lgState="enviada" (não fica em rascunho). */
-async function editAndResendLegenda(tid, idx, novaLg){
+/* [V62.20] Salva a legenda e ENVIA pro cliente em um clique só.
+   Funciona em qualquer estado editável (pendente, escrita, em_revisao). Substitui editAndResendLegenda. */
+async function saveAndSendLegenda(tid, idx, novaLg){
   if(!canManage(me)){ toast("Apenas administradores."); return; }
   var t=tasks.find(x=>x.id===tid); if(!t||!db) return;
   var legenda=(novaLg||"").trim();
-  if(!legenda){ toast("Escreva a legenda corrigida antes de reenviar."); return; }
+  if(!legenda){ toast("Escreva a legenda antes de enviar."); return; }
   if(busy) return; busy=true;
   try{
     var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
     var c=arr[idx]; if(!c){ toast("Conteúdo não encontrado."); return; }
-    if(c.lgState !== "em_revisao"){ toast("Essa legenda não está em revisão."); return; }
+    if(c.cs !== "aprovado"){ toast("Tema ainda não foi aprovado pelo cliente."); return; }
+    var prevState = c.lgState || "pendente";
+    /* Só permite envio individual nos estados editáveis */
+    if(prevState !== "pendente" && prevState !== "escrita" && prevState !== "em_revisao"){
+      toast("Legenda já enviada — invalide o link pra reenviar.");
+      busy=false; return;
+    }
     var now=Date.now();
     var prevLg=c.lg||"";
     c.lg=legenda.slice(0,3000);
@@ -3221,15 +3339,22 @@ async function editAndResendLegenda(tid, idx, novaLg){
     c.lgAt=now;
     c.lgFeedback="";
     var hist=Array.isArray(c.history)?c.history.slice():[];
-    hist.push({kind:"team_legenda_resent", at:now, byId:(me?me.id:null), prevLg:prevLg});
+    /* Marca corretamente se foi reenvio (após revisão) ou primeiro envio */
+    var kind = (prevState==="em_revisao") ? "team_legenda_resent" : "legenda_sent";
+    hist.push({kind:kind, at:now, byId:(me?me.id:null), prevLg:prevLg});
     if(hist.length>100) hist=hist.slice(-100);
     c.history=hist;
     await db.collection("tasks").doc(tid).update({cronWeeks:arr});
     var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
     openContentDetail(tid, idx);
-    toast("Legenda corrigida e reenviada pro cliente ✓");
-  }catch(e){ console.error("[editAndResendLegenda] erro:", e); toast("Não foi possível salvar agora"); }
+    toast(prevState==="em_revisao" ? "Legenda corrigida e reenviada ✓" : "Legenda enviada ao cliente ✓");
+  }catch(e){ console.error("[saveAndSendLegenda] erro:", e); toast("Não foi possível enviar agora"); }
   finally{ busy=false; }
+}
+
+/* [V62.20] Alias mantido pra compatibilidade — comportamento idêntico a saveAndSendLegenda */
+async function editAndResendLegenda(tid, idx, novaLg){
+  return saveAndSendLegenda(tid, idx, novaLg);
 }
 
 /* ========== MODO CLIENTE (visão pública, sem login) ========== */
