@@ -1162,7 +1162,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.14 · build diagnostico-cliente</div>
+    <div class="ver">versão 62.15 · build fix-hoisting-token</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1611,6 +1611,13 @@ function offlineMsg(){
   $("loadingScreen").innerHTML='<div style="text-align:center;padding:0 20px"><svg viewBox="0 0 24 24" fill="none" style="width:42px;height:42px;color:var(--ink-faint);margin-bottom:16px"><path d="M3 3l18 18M8.5 8.5A8 8 0 0 0 5 11M12 5c2.6 0 5 1 6.8 2.6M2 9a14 14 0 0 1 4-2.8M9.5 13.5a4 4 0 0 1 5 .5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><p style="color:var(--ink-soft);font-weight:700;font-size:14px;line-height:1.6">Sem conexão com a internet.<br>Verifique sua rede e tente de novo.</p><button class="ghost-btn" style="margin-top:16px" onclick="location.reload()">Recarregar</button></div>';
   show("loadingScreen");
 }
+/* [V62.15] CRÍTICO: estas declarações DEVEM ficar ANTES do boot. Senão, quando o JS
+   alcançar a linha original lá embaixo, o `= null` ZERA o token que o boot tinha setado,
+   provocando "Conexão perdida [K]" em todas as ações do cliente. */
+var __clientTask = null;
+var __clientToken = null;
+var __clientUnsub = null;
+var __clientOpenedMark = false;
 (function boot(){
   /* ====== CLIENT MODE: detecta ?cliente=token e entra na visão pública ====== */
   try{
@@ -3096,10 +3103,7 @@ async function markCardDelivered(tid, idx){
 }
 
 /* ========== MODO CLIENTE (visão pública, sem login) ========== */
-var __clientTask = null;
-var __clientToken = null;
-var __clientUnsub = null;
-var __clientOpenedMark = false;
+/* Variáveis __client* foram movidas pra ANTES do boot (era bug — o `=null` aqui zerava o token) */
 
 function enterClientMode(token){
   __clientToken = token;
