@@ -1021,44 +1021,44 @@
     .nav button svg{width:26px;height:26px}
     .nav .navfab{order:-1;top:0;margin-bottom:16px}
     .nav .navfab .pl{width:50px;height:50px}
-    header{padding-left:148px;padding-right:48px;max-width:1380px;margin:0 auto}
-    main{padding-left:148px;padding-right:48px;padding-bottom:52px;max-width:1380px;margin:0 auto}
+    /* [V62.5] Header e main aproveitam a tela toda — não há mais espaço preto à direita */
+    header{padding-left:148px;padding-right:40px;max-width:none;margin:0}
+    main{padding-left:148px;padding-right:40px;padding-bottom:32px;max-width:none;margin:0}
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
     .ev .tt{font-size:16px}
-    /* [V62.1→V62.4] QUADRO PROFISSIONAL — Trello-style:
-       O board ocupa altura fixa da viewport. Colunas têm scroll vertical INTERNO.
-       Scrollbar horizontal fica sempre visível na altura dos olhos (sem precisar rolar a página). */
-    .board-nav{position:sticky;top:0;z-index:5;background:var(--bg);
-      box-shadow:0 4px 12px -8px rgba(0,0,0,.4)}
-    .board-wrap{display:flex;gap:14px;overflow-x:auto;overflow-y:hidden;
-      padding:10px 4px 14px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
-      scrollbar-width:thin;scrollbar-color:var(--line) transparent;
-      align-items:flex-start;
-      height:calc(100vh - 290px);min-height:520px}
-    .board-wrap::-webkit-scrollbar{height:12px;display:block}
-    .board-wrap::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-radius:6px;margin:0 4px}
-    .board-wrap::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;border:2px solid var(--bg)}
-    .board-wrap::-webkit-scrollbar-thumb:hover{background:var(--accent)}
-    .col{flex:1 1 300px;min-width:300px;max-width:340px;scroll-snap-align:start;
-      padding:0 10px 10px;height:100%;overflow-y:auto;overflow-x:hidden;
+    /* [V62.5] BOARD em GRID — 5 colunas iguais ocupam toda a largura disponível.
+       SEM scroll horizontal porque cabe tudo. Cada coluna tem scroll vertical próprio. */
+    .board-wrap{display:grid;grid-template-columns:repeat(var(--cols, 5),minmax(0,1fr));
+      gap:14px;overflow:visible;padding:10px 0 14px;
+      height:calc(100vh - 280px);min-height:520px;max-height:calc(100vh - 160px)}
+    .col{flex:none;min-width:0;max-width:none;scroll-snap-align:none;
+      height:100%;overflow-y:auto;overflow-x:hidden;padding:0 10px 10px;
       scrollbar-width:thin;scrollbar-color:var(--line) transparent}
     .col::-webkit-scrollbar{width:6px}
     .col::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
     .col::-webkit-scrollbar-thumb:hover{background:var(--line-soft)}
-    /* Header da coluna sticky — quando você rola dentro da coluna, o título dela continua visível */
+    /* Header da coluna sticky no topo — não some quando rola */
     .col-h{position:sticky;top:0;z-index:1;background:var(--surface);
       margin:0 -10px 8px;padding:10px 12px 9px;border-bottom:1px solid var(--line-soft)}
     .col.cliente .col-h{background:linear-gradient(180deg,rgba(176,114,255,.07),var(--surface))}
     .tcard{margin-bottom:8px}
+    /* [V62.5] No desktop, a barra "NAVEGAR PARA →" SOME — tudo já está visível na tela */
+    .board-nav{display:none}
     .toast{bottom:30px;left:calc(50% + 54px)}
     .sheet{width:min(620px,80vw);max-width:620px}
   }
 
-  /* ---- Monitores grandes (>=1500px) ---- */
+  /* ---- Monitores grandes (>=1500px) — colunas crescem ainda mais ---- */
   @media (min-width:1500px){
-    header,main{max-width:1560px}
-    .board-wrap{gap:20px;height:calc(100vh - 280px)}
+    .board-wrap{gap:18px;height:calc(100vh - 280px)}
+    .tcard .ttt{font-size:14px}
+  }
+
+  /* ---- Monitores ultrawide (>=1800px) ---- */
+  @media (min-width:1800px){
+    header{padding-right:80px}
+    main{padding-right:80px}
   }
 </style>
 </head>
@@ -1111,7 +1111,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.4 · build board-viewport</div>
+    <div class="ver">versão 62.5 · build grid-full-width</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
