@@ -23,8 +23,22 @@
     --sh-card:0 6px 22px -12px rgba(0,0,0,.65);
     --sh-pop:0 24px 60px -18px rgba(0,0,0,.78);
     --sh-glow:0 12px 30px -10px rgba(62,184,216,.45);
-    --c-grav:var(--c-rev-strong);--c-foto:#ffb02e;--c-reuni:#4d9fff;--c-trafego:#36d399;--c-edicao:#b072ff;--c-outro:#8a8a96;
-    --c-rev:var(--c-rev);--c-rev-strong:var(--c-rev-strong);
+    /* Cores semânticas dos setores e estados (valores literais — NÃO auto-referenciar) */
+    --c-rev:#ff8c83;
+    --c-rev-strong:#ff5a4d;
+    --c-grav:#ff5a4d;
+    --c-foto:#ffb02e;
+    --c-reuni:#4d9fff;
+    --c-trafego:#36d399;
+    --c-edicao:#b072ff;
+    --c-outro:#8a8a96;
+    /* [V62.11 — Design Tokens] Escalas semânticas pra consistência visual */
+    --rd-xs:6px; --rd-sm:9px; --rd-md:12px; --rd-lg:15px; --rd-xl:18px; --rd-full:999px;
+    --fs-xs:10.5px; --fs-sm:11.5px; --fs-md:13px; --fs-lg:14.5px; --fs-xl:17px; --fs-2xl:20px;
+    --sh-xs:0 2px 6px rgba(0,0,0,.18);
+    --sh-sm:0 4px 14px -6px rgba(0,0,0,.32);
+    --sh-md:0 6px 22px -10px rgba(0,0,0,.55);
+    --sh-lg:0 18px 44px -16px rgba(0,0,0,.72);
     --radius:20px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
     --font:'Montserrat',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   }
@@ -518,19 +532,6 @@
   .navtab .nav-cdot{position:absolute;top:4px;right:calc(50% - 18px);width:9px;height:9px;border-radius:50%;
     background:var(--c-grav);box-shadow:0 0 6px var(--c-grav);animation:pulse 1.6s infinite}
   .navtab{position:relative}
-  /* [V60] Estilos da Central de Aprovações */
-  .appr-row{padding:12px 14px;border-radius:11px;margin-bottom:9px;cursor:pointer;transition:.16s;
-    border:1px solid var(--line-soft)}
-  .appr-row:active{transform:scale(.99)}
-  .appr-row:hover{border-color:var(--line)}
-  .appr-row .appr-head{font-size:10.5px;font-weight:800;color:var(--ink-faint);letter-spacing:.04em;
-    text-transform:uppercase;margin-bottom:5px}
-  .appr-row .appr-head b{color:var(--ink);font-weight:900}
-  .appr-row .appr-ti{font-size:14px;font-weight:800;line-height:1.3;letter-spacing:-.01em;margin-bottom:6px}
-  .appr-row .appr-fb{background:rgba(255,90,77,.1);border-left:3px solid var(--c-rev);border-radius:7px;
-    padding:8px 11px;font-size:13px;line-height:1.45;margin:7px 0;color:var(--ink)}
-  .appr-row .appr-fb b{color:var(--c-rev);font-weight:800}
-  .appr-row .appr-meta{font-size:11px;color:var(--ink-faint);font-weight:600;margin-top:3px}
   /* Caixa do link compartilhado no detalhe da tarefa-pai */
   .share-box{margin-top:14px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:14px;padding:14px}
   .share-box .tt{font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px}
@@ -786,10 +787,14 @@
   .sbody{overflow-y:auto;padding:0 20px 20px;-webkit-overflow-scrolling:touch}
   .sbody::-webkit-scrollbar{width:0}
   .type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-  .topt{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:11px 6px;
-    cursor:pointer;text-align:center;transition:.15s}
+  .topt{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px 6px 11px;
+    cursor:pointer;text-align:center;transition:.15s;position:relative;overflow:hidden}
   .topt:active{transform:scale(.94)}
-  .topt .td{width:9px;height:9px;border-radius:50%;margin:0 auto 6px}
+  .topt::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--topt-c,transparent);
+    opacity:.7;transition:.15s}
+  .topt.on::before{opacity:1;height:4px}
+  .topt .td{width:12px;height:12px;border-radius:50%;margin:0 auto 8px;
+    box-shadow:0 0 0 3px rgba(255,255,255,.04),0 0 10px 0 var(--topt-c,transparent)}
   .topt span{font-size:10.5px;font-weight:700;color:var(--ink-soft)}
   .topt.on{border-color:var(--ink);background:var(--surface-2)}.topt.on span{color:var(--ink)}
   .sfoot{display:flex;gap:10px;padding:16px 20px calc(20px + var(--sb));border-top:1px solid var(--line-soft);
@@ -1159,7 +1164,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.9 · build auditoria-fase1</div>
+    <div class="ver">versão 62.11 · build limpeza-central-tokens</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1429,7 +1434,7 @@ const SECTORS={
   design:{label:"Cronograma",color:"var(--c-edicao)"},
   copy:{label:"Copywriter",color:"var(--c-reuni)"},
   roteiro:{label:"Roteiro",color:"var(--c-outro)"},
-  postagem:{label:"Programação de posts",color:"var(--accent)"}
+  postagem:{label:"Programação de posts",color:"var(--c-trafego)"}
 };
 /* Setores antigos mapeados para o novo (migração suave) */
 const SECTOR_ALIAS={ edicao_video:"edicao_midia", edicao_foto:"edicao_midia" };
@@ -1651,7 +1656,7 @@ function offlineMsg(){
     try{ refreshBell(); }catch(e){}
     try{ refreshClientBadge(); }catch(e){}
     if(!boardTimer) boardTimer=setInterval(boardTick,60000);
-    if(!$("mainApp").classList.contains("hidden")&&(tab==="board"||tab==="approvals"))render();
+    if(!$("mainApp").classList.contains("hidden")&&tab==="board")render();
   },err=>{});
   /* fallback: se nada carregar (offline), sai da tela de carregando após 6s */
   setTimeout(()=>{ if(!usersLoaded && !me) route(); },6000);
@@ -1892,7 +1897,7 @@ function switchTab(t){
   const a=t==="agenda";
   $("calControls").classList.toggle("hidden",!a);
   $("pageTitle").classList.toggle("hidden",a);
-  if(!a)$("ptText").textContent = t==="team"?"Equipe" : t==="board"?"Quadro de projetos" : t==="painel"?"Painel do gestor" : t==="posts"?"Registro de Posts" : t==="clientes"?"Visão por cliente" : t==="calendar"?"Calendário de conteúdo" : t==="approvals"?"Central de Aprovações" : "Perfil";
+  if(!a)$("ptText").textContent = t==="team"?"Equipe" : t==="board"?"Quadro de projetos" : t==="painel"?"Painel do gestor" : t==="posts"?"Registro de Posts" : t==="clientes"?"Visão por cliente" : t==="calendar"?"Calendário de conteúdo" : "Perfil";
   render();
 }
 function dbar(label,val,max,color,extra){
@@ -2031,7 +2036,6 @@ function render(){
     var cb=$("cliBack"); if(cb)cb.onclick=()=>switchTab("board");
     document.querySelectorAll("[data-cli]").forEach(el=>el.onclick=()=>{boardFilter="cli:"+el.dataset.cli;boardFilterUserSet=true;switchTab("board");});}
   else if(tab==="calendar"){c.innerHTML=renderContentCalendar();bindContentCalendar();}
-  else if(tab==="approvals"){c.innerHTML=renderCentralAprovacoes();bindCentralAprovacoes();}
   else{c.innerHTML=renderProfile();$("logoutBtn").onclick=logout;
     document.querySelectorAll(".cp-dot").forEach(b=>b.onclick=()=>setMyColor(b.dataset.color));
     var bb=$("backupBtn"); if(bb){ bb.onclick=exportBackup;
@@ -2597,138 +2601,6 @@ function refreshClientBadge(){
       btn.appendChild(dot);
     }
   } else if(dot){ dot.remove(); }
-}
-/* Renderiza a tela "Central de Aprovações" */
-function renderCentralAprovacoes(){
-  var now = Date.now(), DAY = 24*3600*1000;
-  /* Coleta cards organizados por bucket de status */
-  var buckets = { revision:[], waiting:[], analyzing:[], approvedToday:[], approvedOlder:[], delivered:[] };
-  var events = [];
-  tasks.forEach(function(t){
-    if(t.sector!=="design" && t.sector!=="copy") return;
-    if(!Array.isArray(t.cronWeeks)) return;
-    t.cronWeeks.forEach(function(c,i){
-      if(!c) return;
-      var wk = Math.floor(i/3)+1, cn = (i%3)+1;
-      var card = { task:t, idx:i, wk:wk, n:cn, c:c, label:(c.t&&c.t.trim())?c.t.trim():("Conteúdo "+cn) };
-      if(c.cs==="enviado") buckets.waiting.push(card);
-      else if(c.cs==="em_analise") buckets.analyzing.push(card);
-      else if(c.cs==="em_revisao") buckets.revision.push(card);
-      else if(c.cs==="aprovado"){
-        if(c.csAt && (now - c.csAt) < DAY) buckets.approvedToday.push(card);
-        else buckets.approvedOlder.push(card);
-      }
-      else if(c.cs==="concluido") buckets.delivered.push(card);
-      /* Coleta eventos pra o feed */
-      if(Array.isArray(c.history)){
-        c.history.forEach(function(e){
-          if(!e || !e.at) return;
-          if(["client_sent","client_opened","client_approved","client_revision","team_delivered"].indexOf(e.kind)<0) return;
-          events.push({ev:e, card:card});
-        });
-      }
-    });
-  });
-  events.sort(function(a,b){ return (b.ev.at||0) - (a.ev.at||0); });
-  /* Marca todos os eventos atualmente exibidos como vistos (limpa badge) */
-  var seen = apprSeenSet();
-  events.forEach(function(x){
-    if(x.ev.kind==="client_approved" || x.ev.kind==="client_revision"){
-      var k = x.card.task.id+"|"+x.card.idx+"|"+x.ev.kind+"|"+x.ev.at;
-      seen.add(k);
-    }
-  });
-  apprSeenSave(seen);
-  setTimeout(refreshClientBadge, 50);
-  /* HTML */
-  var h = '<div class="dash">';
-  h += '<div class="dash-sub">Central de Aprovações do Cliente · atualiza em tempo real</div>';
-  /* KPIs */
-  h += '<div class="kpi-grid">'+
-    '<div class="kpi'+(buckets.revision.length?" bad":"")+'"><div class="n">'+buckets.revision.length+'</div><div class="l">Em revisão</div></div>'+
-    '<div class="kpi"><div class="n">'+(buckets.waiting.length+buckets.analyzing.length)+'</div><div class="l">Aguardando cliente</div></div>'+
-    '<div class="kpi acc"><div class="n">'+buckets.approvedToday.length+'</div><div class="l">Aprovados hoje</div></div>'+
-    '<div class="kpi"><div class="n">'+(buckets.approvedOlder.length+buckets.delivered.length)+'</div><div class="l">Total aprovados</div></div>'+
-    '</div>';
-  /* Em revisão — mais urgente */
-  if(buckets.revision.length){
-    h += '<div class="dash-sec" style="border-left:3px solid var(--c-rev)"><div class="dash-h" style="color:var(--c-rev)">✏ Em revisão — cliente pediu ajuste</div>';
-    buckets.revision.forEach(function(x){ h += apprCard(x,"revision"); });
-    h += '</div>';
-  }
-  /* Aguardando resposta */
-  if(buckets.waiting.length){
-    h += '<div class="dash-sec"><div class="dash-h" style="color:var(--c-foto)">📤 Aguardando resposta do cliente</div>';
-    buckets.waiting.forEach(function(x){ h += apprCard(x,"waiting"); });
-    h += '</div>';
-  }
-  /* Cliente analisando (abriu mas não decidiu) */
-  if(buckets.analyzing.length){
-    h += '<div class="dash-sec"><div class="dash-h" style="color:var(--c-reuni)">👁 Cliente está analisando agora</div>';
-    buckets.analyzing.forEach(function(x){ h += apprCard(x,"analyzing"); });
-    h += '</div>';
-  }
-  /* Aprovados hoje */
-  if(buckets.approvedToday.length){
-    h += '<div class="dash-sec" style="border-left:3px solid var(--c-trafego)"><div class="dash-h" style="color:var(--c-trafego)">✓ Aprovados pelo cliente nas últimas 24h</div>';
-    buckets.approvedToday.forEach(function(x){ h += apprCard(x,"approved"); });
-    h += '</div>';
-  }
-  /* Sem nada no fluxo? */
-  if(!buckets.revision.length && !buckets.waiting.length && !buckets.analyzing.length && !buckets.approvedToday.length){
-    h += '<div class="dash-sec"><div class="dash-h">Tudo em ordem ✓</div><div class="dash-empty">Nenhum cronograma com cliente no momento. Quando você enviar um cronograma pelo botão "Compartilhar com o cliente" na tela de detalhes, ele aparece aqui pra acompanhamento em tempo real.</div></div>';
-  }
-  /* Feed completo de eventos */
-  h += '<div class="dash-sec"><div class="dash-h">📜 Histórico de ações do cliente</div>';
-  if(!events.length){
-    h += '<div class="dash-empty">Nenhuma ação do cliente registrada ainda.</div>';
-  } else {
-    h += '<div class="tl-list">';
-    events.slice(0,40).forEach(function(x){
-      var e = x.ev, c = x.card;
-      var ic="", cls="ev-cm", text="";
-      var lbl = esc(c.task.client||"Cliente")+' — <b>SEM '+c.wk+' · #'+c.n+'</b>';
-      if(e.kind==="client_sent"){ ic='<svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'; cls="ev-mv"; text='Time enviou pro cliente: '+lbl; }
-      else if(e.kind==="client_opened"){ ic='<svg viewBox="0 0 24 24" fill="none"><path d="M2 12c2.5-5 6-7.5 10-7.5s7.5 2.5 10 7.5c-2.5 5-6 7.5-10 7.5S4.5 17 2 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>'; cls="ev-wt"; text='Cliente abriu o cronograma: '+lbl; }
-      else if(e.kind==="client_approved"){ ic='<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'; cls="ev-ok"; text='✓ Cliente APROVOU: '+lbl; }
-      else if(e.kind==="client_revision"){
-        ic='<svg viewBox="0 0 24 24" fill="none"><path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
-        cls="ev-rev"; text='✏ Cliente pediu REVISÃO: '+lbl;
-        if(e.text) text += '<div class="tl-q">"'+esc(e.text.slice(0,160))+(e.text.length>160?"…":"")+'"</div>';
-      }
-      else if(e.kind==="team_delivered"){ ic='<svg viewBox="0 0 24 24" fill="none"><path d="M4 8l8-4 8 4-8 4-8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>'; cls="ev-dn"; text='Time entregou ao cliente: '+lbl; }
-      h += '<div class="tl-row '+cls+'" data-app-tid="'+c.task.id+'" data-app-idx="'+c.idx+'" style="cursor:pointer">'+
-        '<div class="tl-ic">'+ic+'</div>'+
-        '<div class="tl-b"><div class="tl-x">'+text+'</div><div class="tl-t">'+esc(fmtDT(e.at))+'</div></div>'+
-        '</div>';
-    });
-    h += '</div>';
-  }
-  h += '</div>';
-  h += '<button class="logout" id="apprBack" style="background:var(--surface);border-color:var(--line);color:var(--ink-soft)">← Voltar ao Quadro</button>';
-  h += '</div>';
-  return h;
-}
-function apprCard(x, kind){
-  var c = x.c, t = x.task;
-  var ago = c.csAt ? humanDur(Date.now()-c.csAt)+" atrás" : "—";
-  var col = kind==="revision"?"var(--c-rev)" : kind==="waiting"?"var(--c-foto)" : kind==="analyzing"?"var(--c-reuni)" : "var(--c-trafego)";
-  var bgc = kind==="revision"?"rgba(255,90,77,.08)" : kind==="waiting"?"rgba(255,176,46,.07)" : kind==="analyzing"?"rgba(77,159,255,.07)" : "rgba(54,211,153,.07)";
-  var h = '<div class="appr-row" data-app-tid="'+t.id+'" data-app-idx="'+x.idx+'" style="background:'+bgc+';border-left:3px solid '+col+'">';
-  h += '<div class="appr-head"><b>'+esc(t.client||"Sem cliente")+'</b> · SEM '+x.wk+' · #'+x.n+'</div>';
-  h += '<div class="appr-ti">'+esc(x.label)+'</div>';
-  if(kind==="revision" && c.csFeedback){
-    h += '<div class="appr-fb"><b>Pedido:</b> "'+esc(c.csFeedback)+'"</div>';
-  }
-  h += '<div class="appr-meta">'+ago+' · toque pra abrir</div>';
-  h += '</div>';
-  return h;
-}
-function bindCentralAprovacoes(){
-  var b = $("apprBack"); if(b) b.onclick = function(){ switchTab("board"); };
-  document.querySelectorAll("[data-app-tid]").forEach(function(el){
-    el.onclick = function(){ openContentDetail(el.dataset.appTid, +el.dataset.appIdx); };
-  });
 }
 /* ===== Helpers globais de Timeline e Comentário (compartilhados por tarefa-pai e cards) ===== */
 function tlIcon(k){
@@ -3646,6 +3518,7 @@ function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
 
 function buildSecGrid(){const g=$("secGrid");g.innerHTML="";
   for(const k in SECTORS){const o=document.createElement("div");o.className="topt"+(k===selSector?" on":"");
+    o.style.setProperty("--topt-c", SECTORS[k].color);
     o.innerHTML='<div class="td" style="background:'+SECTORS[k].color+'"></div><span>'+SECTORS[k].label+'</span>';
     o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();try{buildStageRow();}catch(_){}};g.appendChild(o);}}
 function buildSecHint(){
