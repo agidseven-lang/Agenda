@@ -813,7 +813,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 49 · build edicao-unificada-6etapas</div>
+    <div class="ver">versão 50 · build cards-interativos</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1961,6 +1961,102 @@ function bindBoard(){
     else openTaskDetail(c.dataset.tid);
   });
 }
+/* ===== Helpers globais de Timeline e Comentário (compartilhados por tarefa-pai e cards) ===== */
+function tlIcon(k){
+  if(k==="created") return '<svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+  if(k==="started") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="currentColor"/></svg>';
+  if(k==="moved") return '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="copy_em_avaliacao"||k==="rot_em_revisao") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  if(k==="copy_aprovado"||k==="rot_aprovado") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8 12l2.6 2.6L16 9.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="posted") return '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/></svg>';
+  if(k==="done") return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.4 2.4L15.5 9.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  if(k==="comment") return '<svg viewBox="0 0 24 24" fill="none"><path d="M5 5h14v11H9l-4 4V5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  return '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>';
+}
+function tlText(e, sector, scope){
+  /* scope: "task" (default) ou "content" — muda algumas frases */
+  var who="";
+  if(e.byId){ var pu=users.find(function(x){return x.id===e.byId;}); who=(pu&&pu.name)||e.name||"alguém"; }
+  else if(e.name){ who=e.name; }
+  var W=who?'<b>'+esc(who)+'</b> ':'';
+  var noun = (scope==="content")?"este conteúdo":"esta tarefa";
+  if(e.kind==="created") return W+'criou '+noun;
+  if(e.kind==="started") return 'Iniciada (primeiro movimento para fora de A Fazer)';
+  if(e.kind==="moved"){ return W+'moveu para <b>'+esc(stageLabel(e.to, sector))+'</b>'; }
+  if(e.kind==="copy_em_avaliacao") return 'Copywriter enviou para <b>avaliação</b>';
+  if(e.kind==="copy_aprovado") return W+'aprovou o <b>copy</b>';
+  if(e.kind==="rot_em_revisao") return 'Roteiro enviado para <b>revisão</b>';
+  if(e.kind==="rot_aprovado") return W+'aprovou o <b>roteiro</b>';
+  if(e.kind==="posted") return W+'registrou a <b>postagem</b>';
+  if(e.kind==="done") return W+(scope==="content"?'concluiu este conteúdo':'concluiu a tarefa');
+  if(e.kind==="comment"){ var tx=(e.text||"").slice(0,180); return W+'comentou: <span class="tl-q">"'+esc(tx)+((e.text||"").length>180?"…":"")+'"</span>'; }
+  return '';
+}
+function tlCls(k){
+  if(k==="created") return "ev-cre";
+  if(k==="started"||k==="moved") return "ev-mv";
+  if(k==="copy_aprovado"||k==="rot_aprovado") return "ev-ok";
+  if(k==="copy_em_avaliacao"||k==="rot_em_revisao") return "ev-wt";
+  if(k==="posted"||k==="done") return "ev-dn";
+  if(k==="comment") return "ev-cm";
+  return "";
+}
+function firstNameOf(u){ return ((u&&u.name)||"").trim().split(/\s+/)[0]||""; }
+function renderCmtText(c){
+  var raw=esc(c.text||"");
+  if(Array.isArray(c.mentions)){
+    c.mentions.forEach(function(uid){
+      var u=users.find(function(x){return x.id===uid;});
+      if(!u) return;
+      var fn=firstNameOf(u); if(!fn) return;
+      var safe=fn.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+      var re=new RegExp("@"+safe+"(?![A-Za-zÀ-ÿ0-9_])","gi");
+      raw=raw.replace(re, '<span class="cmt-mention">@'+esc(fn)+'</span>');
+    });
+  }
+  return raw;
+}
+/* Conecta o input de comentário (parent OU card) com autocomplete @, escape, envio */
+function bindCommentInput(opts){
+  /* opts: { inputId, sendId, acId, onSend(text, mentionsArr) } */
+  var ci=$(opts.inputId), cs=$(opts.sendId), ac=$(opts.acId);
+  if(!ci) return;
+  var mentions={};
+  function hideAc(){ if(ac){ ac.innerHTML=""; ac.classList.remove("on"); } }
+  function showAc(prefix){
+    if(!ac) return;
+    var pl=(prefix||"").toLowerCase();
+    var matches=users.filter(function(u){ return firstNameOf(u).toLowerCase().indexOf(pl)===0; }).slice(0,6);
+    if(!matches.length){ hideAc(); return; }
+    ac.innerHTML=matches.map(function(u){ var fn=firstNameOf(u); return '<div class="cmt-ac-it" data-uid="'+u.id+'" data-fn="'+esc(fn)+'"><span class="cmt-ac-av">'+avatarHTML(u)+'</span><span class="cmt-ac-nm">'+esc(u.name)+'</span><span class="cmt-ac-tag">@'+esc(fn)+'</span></div>'; }).join("");
+    ac.classList.add("on");
+    ac.querySelectorAll(".cmt-ac-it").forEach(function(el){ el.onmousedown=function(ev){ ev.preventDefault(); insertMention(el.dataset.uid, el.dataset.fn); }; });
+  }
+  function insertMention(uid, fn){
+    var v=ci.value||"", pos=ci.selectionStart||0;
+    var before=v.slice(0,pos), after=v.slice(pos);
+    var m=before.match(/@[A-Za-zÀ-ÿ0-9_]*$/);
+    if(!m) return;
+    var newBefore=before.slice(0, before.length-m[0].length)+"@"+fn+" ";
+    ci.value=newBefore+after;
+    mentions[uid]=true;
+    hideAc();
+    ci.focus();
+    try{ ci.setSelectionRange(newBefore.length, newBefore.length); }catch(_){}
+  }
+  function checkAt(){
+    var v=ci.value||"", pos=ci.selectionStart||0;
+    var seg=v.slice(0,pos);
+    var m=seg.match(/@([A-Za-zÀ-ÿ0-9_]*)$/);
+    if(m) showAc(m[1]); else hideAc();
+  }
+  function send(){ if(opts.onSend) opts.onSend(ci.value||"", Object.keys(mentions)); }
+  ci.oninput=checkAt; ci.onclick=checkAt;
+  ci.onkeyup=function(e){ if(e.key!=="Enter") checkAt(); };
+  ci.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); send(); } else if(e.key==="Escape"){ hideAc(); } };
+  ci.onblur=function(){ setTimeout(hideAc, 180); };
+  if(cs) cs.onclick=send;
+}
 function openContentDetail(tid, idx){
   var t=tasks.find(x=>x.id===tid); if(!t)return;
   var ws=Array.isArray(t.cronWeeks)?t.cronWeeks.map(cronNorm):[];
@@ -1974,6 +2070,40 @@ function openContentDetail(tid, idx){
     lk=sf?'<a href="'+esc(o.l)+'" target="_blank" rel="noopener" class="cw-link">'+esc(o.l)+'</a>':'<span class="cw-link">'+esc(o.l)+'</span>'; }
   var chips="";
   STAGES.forEach(function(s){ chips+='<button type="button" class="stage-chip'+(o.st===s.k?" on":"")+'" data-cmv="'+s.k+'">'+esc(s.label)+'</button>'; });
+
+  /* Timeline DESTE conteúdo */
+  var events=[];
+  if(o.startedAt) events.push({kind:"started", at:o.startedAt});
+  if(Array.isArray(o.history)) o.history.forEach(function(e){ if(e&&e.at) events.push(Object.assign({},e)); });
+  if(o.doneAt) events.push({kind:"done", at:o.doneAt, byId:o.doneBy});
+  if(Array.isArray(o.comments)) o.comments.forEach(function(c){ if(c&&c.at) events.push({kind:"comment", at:c.at, byId:c.by, name:c.name, text:c.text}); });
+  events.sort(function(a,b){ return (a.at||0)-(b.at||0); });
+  var tlHtml='<div class="tl-sec" style="margin-top:18px"><div class="tt">Histórico deste card · '+events.length+' evento(s)</div>';
+  if(!events.length){
+    tlHtml+='<div class="tl-empty">Nenhum evento registrado ainda. Cada movimento de etapa e cada comentário aparecem aqui em tempo real.</div>';
+  } else {
+    tlHtml+='<div class="tl-list">';
+    events.forEach(function(e){
+      tlHtml+='<div class="tl-row '+tlCls(e.kind)+'"><div class="tl-ic">'+tlIcon(e.kind)+'</div>'+
+        '<div class="tl-b"><div class="tl-x">'+tlText(e, t.sector, "content")+'</div><div class="tl-t">'+esc(fmtDT(e.at))+'</div></div></div>';
+    });
+    tlHtml+='</div>';
+  }
+  tlHtml+='</div>';
+
+  /* Comentários DESTE conteúdo */
+  var cms=Array.isArray(o.comments)?o.comments:[];
+  var cmtHtml='<div class="cmt-sec" style="margin-top:14px"><div class="tt">Comentários do card · '+cms.length+'</div>';
+  if(!cms.length){
+    cmtHtml+='<div class="cmt-empty">Sem comentários neste card. Use para correções específicas DESTE conteúdo — use <b>@nome</b> pra chamar alguém da equipe (notificação direcionada).</div>';
+  } else {
+    cmtHtml+='<div class="cmt-list">'+cms.slice(-60).map(function(c){
+      var cu=users.find(function(x){return x.id===c.by;});
+      return '<div class="cmt"><span class="av">'+avatarHTML(cu)+'</span><div class="cmt-b"><div class="cmt-h">'+esc((cu&&cu.name)||c.name||"Alguém")+' · <span>'+esc(fmtDT(c.at))+'</span></div><div class="cmt-x">'+renderCmtText(c)+'</div></div></div>';
+    }).join("")+'</div>';
+  }
+  cmtHtml+='<div class="cmt-add"><div class="cmt-ac" id="ctCmtAc"></div><input id="ctCmtInput" placeholder="Comentar neste card… use @ pra mencionar" maxlength="1200" autocomplete="off"><button type="button" id="ctCmtSend"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div>';
+
   $("ctBody").innerHTML=
     '<div class="cron-view" style="margin-top:0">'+
       '<div class="tt">'+esc(sec.label)+' · '+esc(t.client||"Sem cliente")+'</div>'+
@@ -1984,8 +2114,14 @@ function openContentDetail(tid, idx){
         (lk?'<div class="cw-cn" style="margin-top:10px">Link / anexo</div><div class="cw-lk">'+lk+'</div>':'')+
       '</div>'+
     '</div>'+
-    '<div class="fld" style="margin-top:18px"><label>Etapa deste conteúdo</label><div class="stage-row" id="ctStage">'+chips+'</div></div>';
+    '<div class="fld" style="margin-top:18px"><label>Etapa deste conteúdo</label><div class="stage-row" id="ctStage">'+chips+'</div></div>'+
+    tlHtml+
+    cmtHtml;
   $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
+  bindCommentInput({
+    inputId:"ctCmtInput", sendId:"ctCmtSend", acId:"ctCmtAc",
+    onSend:function(text, ms){ addContentComment(tid, idx, text, ms); }
+  });
   openSheet(contentSheet);
 }
 async function setContentStage(tid, idx, st){
@@ -1994,13 +2130,51 @@ async function setContentStage(tid, idx, st){
   try{
     var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
     if(!arr[idx]){ busy=false; return; }
-    arr[idx].st=st;
+    var from=arr[idx].st||"afazer";
+    if(from!==st){
+      arr[idx].st=st;
+      /* Track startedAt na primeira saída de "afazer" */
+      if(from==="afazer" && st!=="afazer" && !arr[idx].startedAt) arr[idx].startedAt=Date.now();
+      /* Track doneAt + doneBy ao concluir */
+      if(st==="concluido"){ arr[idx].doneAt=Date.now(); if(me) arr[idx].doneBy=me.id; }
+      /* Histórico de movimentos */
+      var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+      hist.push({kind:"moved", at:Date.now(), byId:(me?me.id:null), from:from, to:st});
+      if(hist.length>100) hist=hist.slice(-100);
+      arr[idx].history=hist;
+    }
     await db.collection("tasks").doc(tid).update({cronWeeks:arr});
     var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
     if(!$("mainApp").classList.contains("hidden")&&tab==="board")render();
     openContentDetail(tid,idx);
     toast("Conteúdo movido para “"+stageLabel(st)+"”");
   }catch(e){ toast("Não foi possível mover agora"); }
+  finally{ busy=false; }
+}
+async function addContentComment(tid, idx, txt, mentionsArr){
+  var raw=(txt||"").trim(); if(!raw) return;
+  if(busy) return;
+  var t=tasks.find(x=>x.id===tid); if(!t||!db||!me) return;
+  busy=true;
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ busy=false; return; }
+    var ms=Array.isArray(mentionsArr)?mentionsArr.slice(0,10):[];
+    ms=ms.filter(function(uid){
+      var u=users.find(function(x){return x.id===uid;}); if(!u) return false;
+      var fn=((u.name||"").trim().split(/\s+/)[0]||"").toLowerCase();
+      return fn && raw.toLowerCase().indexOf("@"+fn)>=0;
+    });
+    var cms=Array.isArray(arr[idx].comments)?arr[idx].comments.slice():[];
+    var entry={ by:me.id, name:(me.name||"Alguém"), text:raw.slice(0,1200), at:Date.now() };
+    if(ms.length) entry.mentions=ms;
+    cms.push(entry);
+    if(cms.length>120) cms=cms.slice(-120);
+    arr[idx].comments=cms;
+    await db.collection("tasks").doc(tid).update({cronWeeks:arr});
+    var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
+    openContentDetail(tid, idx);
+  }catch(e){ toast("Não foi possível comentar agora"); }
   finally{ busy=false; }
 }
 function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
@@ -2114,7 +2288,13 @@ function cronNorm(x){
   var st="afazer";
   if(x&&typeof x==="object"){
     if(x.st==="andamento"||x.st==="revisao"||x.st==="concluido"||x.st==="afazer") st=x.st;
-    return {t:(x.t||"")+"",d:(x.d||"")+"",l:(x.l||"")+"",st:st};
+    var o={t:(x.t||"")+"",d:(x.d||"")+"",l:(x.l||"")+"",st:st};
+    if(Array.isArray(x.comments)) o.comments=x.comments.slice(-120);
+    if(Array.isArray(x.history))  o.history =x.history.slice(-100);
+    if(x.startedAt) o.startedAt=x.startedAt;
+    if(x.doneAt)    o.doneAt   =x.doneAt;
+    if(x.doneBy)    o.doneBy   =x.doneBy;
+    return o;
   }
   return {t:"",d:(x==null?"":(""+x)),l:"",st:"afazer"};
 }
@@ -2770,7 +2950,7 @@ function notifList(){
     if(isMine && t.by!==meId && (t.createdAt||0) > (now-MONTH)){
       out.push({ id:t.id+"|asg", kind:"assigned", at:t.createdAt||0, task:t, client:t.client||"", title:t.title||"Tarefa" });
     }
-    /* 7. Comentários e menções */
+    /* 7. Comentários e menções na tarefa-pai */
     if(Array.isArray(t.comments) && t.comments.length){
       var iAmCreator = meId && t.by===meId;
       var iCommentedBefore = meId && t.comments.some(function(c){return c&&c.by===meId;});
@@ -2784,6 +2964,26 @@ function notifList(){
         } else if(involved){
           out.push({ id:t.id+"|cmt|"+c.at, kind:"comment", at:c.at, task:t, client:t.client||"", title:t.title||"Tarefa", cmt:c });
         }
+      });
+    }
+    /* 7b. Comentários e menções DOS CARDS de cronograma/copy */
+    if(Array.isArray(t.cronWeeks) && (t.sector==="design"||t.sector==="copy")){
+      var iAmCreatorTk = meId && t.by===meId;
+      t.cronWeeks.forEach(function(c, cidx){
+        if(!c || !Array.isArray(c.comments) || !c.comments.length) return;
+        var iCmtedInCard = meId && c.comments.some(function(x){return x&&x.by===meId;});
+        var involvedInCard = isMine || iAmCreatorTk || iCmtedInCard;
+        var wkN=Math.floor(cidx/3)+1, ctN=(cidx%3)+1;
+        var cardTitle="SEM "+wkN+" · #"+ctN+((c.t&&c.t.trim())?(" — "+c.t.trim()):"");
+        c.comments.forEach(function(cm){
+          if(!(cm && cm.at && cm.by!==meId)) return;
+          var mentioned = meId && Array.isArray(cm.mentions) && cm.mentions.indexOf(meId)>=0;
+          if(mentioned){
+            out.push({ id:t.id+"|men|c"+cidx+"|"+cm.at, kind:"mention", at:cm.at, task:t, cidx:cidx, client:t.client||"", title:cardTitle, cmt:cm });
+          } else if(involvedInCard){
+            out.push({ id:t.id+"|cmt|c"+cidx+"|"+cm.at, kind:"comment", at:cm.at, task:t, cidx:cidx, client:t.client||"", title:cardTitle, cmt:cm });
+          }
+        });
       });
     }
   });
@@ -2831,13 +3031,20 @@ function openNotifs(){
         ic='<circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M16 8v6a3 3 0 0 0 6 0v-2a10 10 0 1 0-4 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
         col="var(--accent)"; h=esc(whoM)+" mencionou você"; body=ct+' · "'+esc(trimM)+'"';
       }
-      return '<div class="ntf" data-tid="'+x.task.id+'"><span class="ntf-ic" style="color:'+col+'"><svg viewBox="0 0 24 24" fill="none">'+ic+'</svg></span>'+
+      return '<div class="ntf" data-tid="'+x.task.id+'"'+(x.cidx!=null?' data-cidx="'+x.cidx+'"':'')+'><span class="ntf-ic" style="color:'+col+'"><svg viewBox="0 0 24 24" fill="none">'+ic+'</svg></span>'+
         '<div class="ntf-tx"><div class="ntf-h">'+h+'</div>'+
         '<div class="ntf-b">'+body+'</div>'+
         '<div class="ntf-t">'+esc(fmtDT(x.at))+'</div></div></div>';
     }).join("");
     b.querySelectorAll(".ntf[data-tid]").forEach(function(el){
-      el.onclick=function(){ var id=el.dataset.tid; closeSheets(); setTimeout(function(){ openTaskDetail(id); },240); };
+      el.onclick=function(){
+        var id=el.dataset.tid, ci=el.dataset.cidx;
+        closeSheets();
+        setTimeout(function(){
+          if(ci!=null && ci!=="") openContentDetail(id, +ci);
+          else openTaskDetail(id);
+        }, 240);
+      };
     });
   }
   var seen=bellSeenSet(); list.forEach(function(x){seen.add(x.id);}); bellSave(seen);
