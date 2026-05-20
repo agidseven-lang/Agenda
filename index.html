@@ -673,7 +673,10 @@
   .vt-opt.on svg{opacity:1;color:var(--accent)}
   .vt-opt[data-bv="client"].on{color:var(--c-edicao);box-shadow:0 0 0 1px rgba(176,114,255,.4) inset}
   .vt-opt[data-bv="client"].on svg{color:var(--c-edicao)}
-  /* [V62.20] Cores das 4 colunas da Vista Cliente — diferentes das colunas da Vista Equipe */
+  /* [V62.20] Cores das colunas da Vista Cliente — diferentes das colunas da Vista Equipe */
+  .col.enviado .col-h .nm{color:var(--c-foto)}
+  .col.enviado .col-h .nm i{background:var(--c-foto)}
+  .col.enviado{box-shadow:inset 4px 0 0 0 rgba(255,176,46,.55)}
   .col.em_analise .col-h .nm{color:var(--c-reuni)}
   .col.em_analise .col-h .nm i{background:var(--c-reuni)}
   .col.em_analise{box-shadow:inset 4px 0 0 0 rgba(77,159,255,.5)}
@@ -682,7 +685,9 @@
   .col.aprovado{box-shadow:inset 4px 0 0 0 rgba(54,211,153,.5)}
   /* Coluna "revisao" e "concluido" já têm cores aplicadas no CSS global das colunas */
   .board-wrap.client-view .col.revisao{box-shadow:inset 4px 0 0 0 rgba(255,90,77,.5)}
-  /* Tab da nav-bar pras 4 colunas novas */
+  /* Tab da nav-bar pras colunas novas da Vista Cliente */
+  .bn-tab.enviado .bn-dot{background:var(--c-foto)}
+  .bn-tab.enviado.urgent,.bn-tab.enviado:hover{color:var(--c-foto)}
   .bn-tab.em_analise .bn-dot{background:var(--c-reuni)}
   .bn-tab.em_analise.urgent,.bn-tab.em_analise:hover{color:var(--c-reuni)}
   .bn-tab.aprovado .bn-dot{background:var(--c-trafego)}
@@ -1194,7 +1199,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.20 · build vista-cliente-envia-legenda</div>
+    <div class="ver">versão 62.21 · build vistas-separadas</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2340,50 +2345,54 @@ function renderBoard(){
   }
   const list=boardVisible();
   const bi=boardItems(list);
-  /* [V62.20] DUAS VISTAS distintas do quadro:
-     - VISTA EQUIPE (default): 5 colunas (A Fazer, Em Andamento, Revisão, Concluído, Aprovação do Cliente)
-     - VISTA CLIENTE: 4 colunas focadas só no fluxo do cliente (Em Análise, Revisão, Aprovado, Concluído) */
+  /* [V62.21] DUAS VISTAS distintas do quadro:
+     - VISTA EQUIPE: 4 colunas com o workflow interno (A Fazer, Em Andamento, Revisão, Concluído).
+     - VISTA CLIENTE: 5 colunas com o fluxo de aprovação:
+         1. Aprovação do Cliente (link enviado, aguardando cliente abrir)
+         2. Em Análise (cliente já abriu o link, decidindo)
+         3. Revisão (cliente pediu mudança)
+         4. Aprovado (cliente aprovou)
+         5. Concluído (time marcou como finalizado) */
   var COLS, colKeyOf, isClientView = (boardView==="client");
 
   if(isClientView){
-    /* 4 colunas dedicadas ao fluxo de aprovação do cliente */
+    /* 5 colunas dedicadas ao fluxo de aprovação do cliente, em ordem cronológica */
     COLS = [
+      {k:"enviado",    label:"Aprovação do Cliente"},
       {k:"em_analise", label:"Em Análise"},
       {k:"revisao",    label:"Revisão"},
       {k:"aprovado",   label:"Aprovado"},
       {k:"concluido",  label:"Concluído"}
     ];
-    /* Classifica cards no fluxo do cliente — só conteúdo com cs ou lgState definido */
+    /* Classifica cards no fluxo do cliente. Só conteúdo com cs ou lgState ativos aparece. */
     colKeyOf = function(x){
       if(!x.c) return null;
       var c = x.c;
       /* Concluído: time já marcou como finalizado */
       if(c.st === "concluido") return "concluido";
-      /* Revisão (urgente, vem primeiro): cliente pediu mudança em qualquer fase */
+      /* Revisão (urgente): cliente pediu mudança em qualquer fase */
       if(c.cs === "em_revisao" || c.lgState === "em_revisao") return "revisao";
       /* Aprovado: tema OU legenda já aprovados (fim do ciclo, exceto concluído) */
       if(c.lgState === "aprovada") return "aprovado";
       if(c.cs === "aprovado") return "aprovado";
-      /* Em Análise: enviado, esperando o cliente decidir */
-      if(c.lgState === "enviada" || c.lgState === "em_analise") return "em_analise";
-      if(c.cs === "enviado" || c.cs === "em_analise") return "em_analise";
-      /* Card sem cs/lgState ainda — não entra no fluxo cliente */
+      /* Em Análise: cliente ABRIU o link, está decidindo */
+      if(c.lgState === "em_analise") return "em_analise";
+      if(c.cs === "em_analise" && (!c.lgState || c.lgState==="pendente")) return "em_analise";
+      /* Aprovação do Cliente: link enviado, ainda não foi aberto pelo cliente */
+      if(c.lgState === "enviada") return "enviado";
+      if(c.cs === "enviado" && (!c.lgState || c.lgState==="pendente")) return "enviado";
+      /* Card sem cs/lgState ativo — não entra no fluxo cliente */
       return null;
     };
   } else {
-    /* [V61] 5 colunas: 4 internas (time) + 5ª de aprovação do cliente */
-    var STAGE_CLIENTE = {k:"cliente", label:"Aprovação do Cliente"};
-    COLS = STAGES.concat([STAGE_CLIENTE]);
-    /* Mapeia status legados (analise/aprovacao/pronto) pra coluna padrão mais próxima.
-       [V61] Cards com client status (cs) ou estado de legenda (lgState) SEMPRE vão pra coluna "cliente" (5ª).
-       [V62] Inclui Fase 2 (legendas). */
+    /* [V62.21] Vista Equipe agora tem só as 4 colunas internas — sem a 5ª "Aprovação do Cliente"
+       (essa migrou pra Vista Cliente). Cards no fluxo do cliente continuam aparecendo aqui,
+       mas classificados pela etapa interna (st) do conteúdo. */
+    COLS = STAGES.slice();
     colKeyOf = function(x){
-      /* [V62.19] Se time já finalizou o conteúdo (st=concluido), vai pra coluna Concluído
-         — mesmo que ainda tenha cs/lgState definidos. Fim do ciclo. */
+      /* Card finalizado (time marcou como concluído) → coluna Concluído */
       if(x.c && x.c.st === "concluido") return "concluido";
-      /* Se card tem status do cliente (Fase 1) ou estado de legenda (Fase 2), vai pra coluna do cliente */
-      if(x.c && (x.c.cs || (x.c.lgState && x.c.lgState!=="pendente"))) return "cliente";
-      var raw = x.st || "afazer";
+      var raw = (x.c ? (x.c.st || "afazer") : (x.st || "afazer"));
       if(raw==="analise") return "afazer";
       if(raw==="aprovacao"||raw==="pronto") return "revisao";
       return raw;
@@ -2394,19 +2403,12 @@ function renderBoard(){
   /* [V62.2] Barra de NAVEGAÇÃO de colunas — clicável, faz scroll até a coluna. */
   h+='<div class="board-nav" id="boardNav">';
   COLS.forEach(s=>{
-    var n;
-    if(isClientView){
-      n = bi.filter(x=>colKeyOf(x)===s.k).length;
-    } else {
-      n = (s.k==="cliente")
-        ? bi.filter(x=>colKeyOf(x)==="cliente").length
-        : bi.filter(x=>colKeyOf(x)===s.k).length;
-    }
+    var n = bi.filter(x=>colKeyOf(x)===s.k).length;
     var urgent;
     if(isClientView){
       urgent = (s.k==="revisao" && n>0);
     } else {
-      urgent = (s.k==="cliente" && bi.filter(x=>x.c && (x.c.cs==="em_revisao" || x.c.lgState==="em_revisao")).length>0);
+      urgent = false;
     }
     h+='<button class="bn-tab '+s.k+(urgent?' urgent':'')+'" data-goto="'+s.k+'">'+
        '<span class="bn-dot"></span>'+
@@ -2419,23 +2421,8 @@ function renderBoard(){
   COLS.forEach(s=>{
     var items;
     if(isClientView){
-      /* Vista Cliente: ordena por urgência do estado, exibe só cards do fluxo */
+      /* Vista Cliente: ordena por urgência do estado */
       items = bi.filter(x=>colKeyOf(x)===s.k)
-        .sort((a,b)=> clientUrg(a.c) - clientUrg(b.c)
-                  || ((b.t.priority?1:0)-(a.t.priority?1:0))
-                  || ((b.t.createdAt||0)-(a.t.createdAt||0))
-                  || (a.idx-b.idx));
-    } else if(s.k==="cliente"){
-      /* Ordem de urgência (Fase 1 + Fase 2 misturadas):
-         1.0 revisão de tema       1.5 revisão de legenda
-         2.0 tema enviado          2.5 falta escrever legenda
-         3.0 cliente analisando tema
-         4.0 tema aprovado (pronto pra escrever)
-         4.2 legenda escrita (falta enviar)
-         4.4 legenda enviada
-         4.5 cliente analisando legenda
-         99  legenda aprovada (FIM — pronto pra publicar) */
-      items = bi.filter(x=>colKeyOf(x)==="cliente")
         .sort((a,b)=> clientUrg(a.c) - clientUrg(b.c)
                   || ((b.t.priority?1:0)-(a.t.priority?1:0))
                   || ((b.t.createdAt||0)-(a.t.createdAt||0))
@@ -2448,14 +2435,13 @@ function renderBoard(){
     var emptyMsg;
     if(isClientView){
       emptyMsg = '<div class="col-empty">'+
-        (s.k==="em_analise" ? "Nenhum conteúdo aguardando o cliente." :
+        (s.k==="enviado"    ? "Nenhum link aguardando o cliente abrir." :
+         s.k==="em_analise" ? "Nenhum conteúdo sendo analisado." :
          s.k==="revisao"    ? "Nenhum pedido de revisão pendente." :
          s.k==="aprovado"   ? "Nenhum conteúdo aprovado." :
          "Nenhum conteúdo concluído.")+'</div>';
     } else {
-      emptyMsg = s.k==="cliente"
-        ? '<div class="col-empty">Nenhum cronograma com cliente ainda.<br>Envie pelo botão "Compartilhar" no detalhe.</div>'
-        : '<div class="col-empty">Sem tarefas</div>';
+      emptyMsg = '<div class="col-empty">Sem tarefas</div>';
     }
     h+= items.length? items.map(x=> x.idx<0 ? tcard(x.t) : ccard(x)).join("") : emptyMsg;
     h+='</div>';
