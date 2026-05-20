@@ -15,15 +15,28 @@
 <style>
   :root{
     color-scheme:dark;
-    --bg:#090a0e;--bg-2:#0f1015;--surface:#15171f;--surface-2:#1d2029;
-    --line:#2b3040;--line-soft:#202431;--ink:#f6f7f3;--ink-soft:#a4a8b5;--ink-faint:#686b78;
-    --accent:#3eb8d8;--accent-ink:#051721;--accent-2:#b072ff;
+    /* === [V63] PALETA REFINADA: dark profundo, contraste calibrado === */
+    --bg:#08090d;             /* Background profundo, quase preto */
+    --bg-2:#0e0f15;           /* Sutilmente acima */
+    --surface:#13151d;        /* Surface principal (cards, header) */
+    --surface-2:#1a1d27;      /* Surface elevado (cards aninhados, dropdowns) */
+    --surface-3:#23262f;      /* Hover state, inputs */
+    --line:rgba(255,255,255,.08);       /* Borda padrão */
+    --line-soft:rgba(255,255,255,.05);  /* Divider sutil */
+    --line-strong:rgba(255,255,255,.14);/* Borda destacada */
+    --ink:#f5f6f8;            /* Texto primário */
+    --ink-soft:#a8acb8;       /* Texto secundário */
+    --ink-faint:#6b7080;      /* Texto desbotado */
+    /* === Brand & accent === */
+    --accent:#3eb8d8;
+    --accent-soft:#5ed0ee;
+    --accent-deep:#2ea3c4;
+    --accent-ink:#051721;
+    --accent-2:#b072ff;
     --grad-accent:linear-gradient(135deg,#5ed0ee 0%,#2ea3c4 100%);
     --grad-mark:linear-gradient(135deg,#5ed0ee 0%,#3eb8d8 55%,#b072ff 100%);
-    --sh-card:0 6px 22px -12px rgba(0,0,0,.65);
-    --sh-pop:0 24px 60px -18px rgba(0,0,0,.78);
-    --sh-glow:0 12px 30px -10px rgba(62,184,216,.45);
-    /* Cores semânticas dos setores e estados (valores literais — NÃO auto-referenciar) */
+    --grad-surface:linear-gradient(180deg,rgba(255,255,255,.02) 0%,rgba(255,255,255,0) 100%);
+    /* === Cores semânticas (setores e estados) === */
     --c-rev:#ff8c83;
     --c-rev-strong:#ff5a4d;
     --c-grav:#ff5a4d;
@@ -32,26 +45,66 @@
     --c-trafego:#36d399;
     --c-edicao:#b072ff;
     --c-outro:#8a8a96;
-    /* [V62.11 — Design Tokens] Escalas semânticas pra consistência visual */
-    --rd-xs:6px; --rd-sm:9px; --rd-md:12px; --rd-lg:15px; --rd-xl:18px; --rd-full:999px;
-    --fs-xs:10.5px; --fs-sm:11.5px; --fs-md:13px; --fs-lg:14.5px; --fs-xl:17px; --fs-2xl:20px;
-    --sh-xs:0 2px 6px rgba(0,0,0,.18);
-    --sh-sm:0 4px 14px -6px rgba(0,0,0,.32);
-    --sh-md:0 6px 22px -10px rgba(0,0,0,.55);
-    --sh-lg:0 18px 44px -16px rgba(0,0,0,.72);
-    --radius:20px;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
-    --font:'Montserrat',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    /* === [V63] Sistema de raios — escala 4px === */
+    --rd-xs:6px; --rd-sm:8px; --rd-md:12px; --rd-lg:16px; --rd-xl:20px; --rd-2xl:24px; --rd-full:999px;
+    /* === [V63] Sistema de espaçamento — base 4px === */
+    --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-10:40px; --sp-12:48px;
+    /* === [V63] Tipografia escalada === */
+    --fs-2xs:10px; --fs-xs:11px; --fs-sm:12px; --fs-md:13.5px; --fs-lg:15px; --fs-xl:17px; --fs-2xl:20px; --fs-3xl:26px; --fs-4xl:34px;
+    /* === [V63] Sombras refinadas — sutis, intencionais === */
+    --sh-xs:0 1px 2px rgba(0,0,0,.3);
+    --sh-sm:0 2px 8px -2px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.2);
+    --sh-md:0 8px 24px -10px rgba(0,0,0,.5),0 2px 6px -2px rgba(0,0,0,.3);
+    --sh-lg:0 20px 50px -18px rgba(0,0,0,.7),0 6px 16px -8px rgba(0,0,0,.4);
+    --sh-xl:0 32px 80px -24px rgba(0,0,0,.78),0 0 0 1px rgba(255,255,255,.05) inset;
+    --sh-glow:0 0 0 1px rgba(62,184,216,.4),0 8px 32px -8px rgba(62,184,216,.45);
+    --sh-card:0 1px 3px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.04) inset;
+    --sh-pop:0 32px 80px -24px rgba(0,0,0,.78),0 0 0 1px rgba(255,255,255,.05) inset;
+    /* === Compat (variáveis antigas mantidas pra não quebrar) === */
+    --radius:20px;
+    --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
+    --font:'Inter','Montserrat',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    /* === [V63] Transições padrão === */
+    --tr-fast:.12s cubic-bezier(.4,0,.2,1);
+    --tr-base:.2s cubic-bezier(.4,0,.2,1);
+    --tr-slow:.32s cubic-bezier(.22,1,.36,1);
   }
+  /* [V63] TEMA CLARO — ativado por body.theme-light. Inverte os tokens neutros. */
+  body.theme-light{
+    --bg:#f7f8fa;
+    --bg-2:#eef0f4;
+    --surface:#ffffff;
+    --surface-2:#f7f8fa;
+    --surface-3:#eef0f4;
+    --line:rgba(0,0,0,.08);
+    --line-soft:rgba(0,0,0,.05);
+    --line-strong:rgba(0,0,0,.14);
+    --ink:#0d1117;
+    --ink-soft:#444a55;
+    --ink-faint:#8a909c;
+    --grad-surface:linear-gradient(180deg,rgba(0,0,0,.015) 0%,rgba(0,0,0,0) 100%);
+    --sh-card:0 1px 3px rgba(0,0,0,.05),0 0 0 1px rgba(0,0,0,.04) inset;
+    --sh-pop:0 32px 80px -24px rgba(0,0,0,.22),0 0 0 1px rgba(0,0,0,.05) inset;
+  }
+  /* [V63] TAMANHO DE FONTE — ativado por body.fs-{sm|md|lg} */
+  body.fs-sm{ font-size:14px }
+  body.fs-md{ font-size:15.5px }
+  body.fs-lg{ font-size:17px }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{font-family:var(--font);background:var(--bg);color:var(--ink);overflow:hidden;
-    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-.01em}
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+    letter-spacing:-.011em;transition:background var(--tr-base),color var(--tr-base)}
   body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
     background:
-      radial-gradient(820px 480px at 86% -14%,rgba(62, 184, 216,.10),transparent 58%),
-      radial-gradient(680px 560px at -14% 8%,rgba(122,108,255,.09),transparent 55%),
-      radial-gradient(760px 640px at 50% 118%,rgba(77,159,255,.08),transparent 56%)}
-  h1,h2,h3{letter-spacing:-.025em}
+      radial-gradient(900px 520px at 88% -10%,rgba(62,184,216,.07),transparent 60%),
+      radial-gradient(720px 600px at -10% 6%,rgba(176,114,255,.06),transparent 55%),
+      radial-gradient(800px 680px at 50% 120%,rgba(77,159,255,.04),transparent 58%)}
+  body.theme-light::before{
+    background:
+      radial-gradient(900px 520px at 88% -10%,rgba(62,184,216,.10),transparent 60%),
+      radial-gradient(720px 600px at -10% 6%,rgba(176,114,255,.08),transparent 55%)}
+  h1,h2,h3{letter-spacing:-.028em;font-weight:800}
   #app{position:relative;z-index:1;height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column}
   .hidden{display:none!important}
   button,input,textarea,select{font-family:inherit}
@@ -173,48 +226,61 @@
   .ghost-btn{margin-top:14px;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);
     font-size:12.5px;font-weight:700;padding:11px 18px;border-radius:12px;cursor:pointer}
 
-  header{padding:calc(var(--st) + 18px) 20px 12px;flex-shrink:0}
-  .hrow{display:flex;align-items:center;justify-content:space-between}
-  .hbrand{display:flex;align-items:center;gap:11px}
+  header{padding:calc(var(--st) + 20px) 20px 14px;flex-shrink:0}
+  .hrow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .hbrand{display:flex;align-items:center;gap:12px;min-width:0}
   .hbrand .mk{width:42px;height:42px;border-radius:50%;background:transparent;
     background-image:var(--logo-img);background-size:contain;background-repeat:no-repeat;background-position:center;
-    flex-shrink:0;filter:drop-shadow(0 4px 12px rgba(133,80,255,.35))}
-  .hbrand h1{font-size:17px;font-weight:900;letter-spacing:-.03em;line-height:1}
-  .hbrand h1 b{color:var(--accent)}
-  .hbrand .hsub{font-size:10.5px;color:var(--ink-soft);font-weight:600;margin-top:3px;letter-spacing:.01em}
-  .hbrand .sub{font-size:10.5px;color:var(--ink-faint);font-weight:600;margin-top:1px}
-  .hav{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid var(--line);cursor:pointer}
+    flex-shrink:0;filter:drop-shadow(0 4px 14px rgba(176,114,255,.32))}
+  .hbrand h1{font-size:17px;font-weight:800;letter-spacing:-.028em;line-height:1.05}
+  .hbrand h1 b{color:var(--accent);font-weight:800}
+  .hbrand .hsub{font-size:11px;color:var(--ink-soft);font-weight:600;margin-top:3px;letter-spacing:.005em}
+  .hbrand .sub{font-size:10.5px;color:var(--ink-faint);font-weight:500;margin-top:1px}
+  .hav{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid var(--line);cursor:pointer;
+    flex-shrink:0;transition:border-color var(--tr-fast),transform var(--tr-fast)}
+  .hav:hover{border-color:var(--accent)}
+  .hav:active{transform:scale(.95)}
   .hav img{width:100%;height:100%;object-fit:cover}
-  .sync{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--ink-faint);font-weight:600;margin-top:4px}
-  .sync i{width:6px;height:6px;border-radius:50%;background:var(--c-trafego);box-shadow:0 0 7px var(--c-trafego)}
+  .sync{display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--ink-faint);font-weight:600;margin-top:4px;letter-spacing:.02em}
+  .sync i{width:6px;height:6px;border-radius:50%;background:var(--c-trafego);box-shadow:0 0 8px var(--c-trafego)}
   .sync.off i{background:var(--c-grav);box-shadow:none}
-  .month-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:18px}
-  .mt{font-size:28px;font-weight:900;letter-spacing:-.04em;line-height:1;text-transform:capitalize}
-  .mt span{color:var(--ink-faint);font-weight:700}
+  .month-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:20px}
+  .mt{font-size:28px;font-weight:800;letter-spacing:-.035em;line-height:1.05;text-transform:capitalize}
+  .mt span{color:var(--ink-faint);font-weight:600}
   .navg{display:flex;gap:8px;align-items:center}
   .pill{border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);font-size:12px;
-    font-weight:700;padding:9px 14px;border-radius:999px;cursor:pointer}
-  .pill:active{transform:scale(.95)}
-  .arrows{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;overflow:hidden}
-  .arrows button{width:36px;height:34px;background:none;border:none;color:var(--ink-soft);display:grid;place-items:center;cursor:pointer}
+    font-weight:600;padding:9px 14px;border-radius:var(--rd-full);cursor:pointer;
+    transition:border-color var(--tr-fast),color var(--tr-fast),transform var(--tr-fast)}
+  .pill:hover{border-color:var(--line-strong);color:var(--ink)}
+  .pill:active{transform:scale(.97)}
+  .arrows{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:var(--rd-full);overflow:hidden}
+  .arrows button{width:36px;height:34px;background:none;border:none;color:var(--ink-soft);
+    display:grid;place-items:center;cursor:pointer;transition:background var(--tr-fast),color var(--tr-fast)}
+  .arrows button:hover{background:var(--surface-2);color:var(--ink)}
   .arrows button:first-child{border-right:1px solid var(--line)}
   .arrows svg{width:15px;height:15px}
-  .switch{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);padding:4px;border-radius:13px;margin-top:15px}
-  .switch button{flex:1;background:none;border:none;color:var(--ink-soft);font-size:12.5px;font-weight:700;
-    padding:9px;border-radius:9px;cursor:pointer}
-  .switch button.on{background:var(--ink);color:var(--bg)}
-  .pageT{margin-top:16px}.pageT .mt{text-transform:none}
+  .switch{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);
+    padding:5px;border-radius:13px;margin-top:16px}
+  .switch button{flex:1;background:none;border:none;color:var(--ink-soft);font-size:12.5px;font-weight:600;
+    padding:9px;border-radius:9px;cursor:pointer;transition:background var(--tr-fast),color var(--tr-fast)}
+  .switch button:hover:not(.on){background:rgba(255,255,255,.025);color:var(--ink)}
+  .switch button.on{background:var(--surface-2);color:var(--ink);
+    box-shadow:0 0 0 1px var(--line-strong) inset}
+  .pageT{margin-top:18px}.pageT .mt{text-transform:none;font-size:32px}
 
   main{flex:1;overflow-y:auto;overflow-x:hidden;padding:4px 20px 124px;-webkit-overflow-scrolling:touch}
   main::-webkit-scrollbar{width:0}
-  .filters{display:flex;gap:7px;overflow-x:auto;padding:14px 0 6px;scrollbar-width:none}
+  .filters{display:flex;gap:6px;overflow-x:auto;padding:14px 0 6px;scrollbar-width:none}
   .filters::-webkit-scrollbar{display:none}
-  .chip{flex-shrink:0;display:flex;align-items:center;gap:7px;border:1px solid var(--line);
-    background:var(--surface);color:var(--ink-soft);font-size:12px;font-weight:700;
-    padding:9px 15px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s}
-  .chip:active{transform:scale(.95)}
-  .chip .dot{width:8px;height:8px;border-radius:50%}
-  .chip.on{background:var(--grad-accent);color:var(--accent-ink);border-color:transparent;font-weight:800}
+  .chip{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-soft);font-size:12px;font-weight:600;
+    padding:8px 14px;border-radius:var(--rd-full);cursor:pointer;white-space:nowrap;
+    transition:border-color var(--tr-fast),background var(--tr-fast),color var(--tr-fast),transform var(--tr-fast)}
+  .chip:hover{border-color:var(--line-strong);color:var(--ink)}
+  .chip:active{transform:scale(.97)}
+  .chip .dot{width:7px;height:7px;border-radius:50%}
+  .chip.on{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:700;
+    box-shadow:0 0 0 1px rgba(62,184,216,.3),0 4px 12px -4px rgba(62,184,216,.4)}
   .cal-head{display:grid;grid-template-columns:repeat(7,1fr);margin:8px 0 6px}
   .cal-head div{text-align:center;font-size:10px;font-weight:800;color:var(--ink-faint);letter-spacing:.06em}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
@@ -650,28 +716,32 @@
   .posts-link:active{transform:scale(.99)}
 
   /* [V62.2] Toolbar compacta do Quadro — 3 botões em uma linha (Calendário/Por cliente/Posts) */
-  .board-tools{display:flex;gap:8px;margin:14px 0 2px}
-  .bt-link{flex:1;background:var(--surface);border:1px solid var(--line);color:var(--ink);
-    font-size:12.5px;font-weight:700;padding:11px 10px;border-radius:10px;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;transition:.15s}
-  .bt-link svg{width:15px;height:15px;color:var(--accent);flex-shrink:0;opacity:.85}
+  .board-tools{display:flex;gap:8px;margin:16px 0 2px}
+  .bt-link{flex:1;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);
+    font-family:inherit;font-size:12.5px;font-weight:600;padding:11px 14px;border-radius:12px;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:0;
+    transition:border-color var(--tr-fast),background var(--tr-fast),color var(--tr-fast),transform var(--tr-fast)}
+  .bt-link svg{width:15px;height:15px;color:var(--accent);flex-shrink:0;opacity:.9}
   .bt-link span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .bt-link:hover{background:var(--bg-2);border-color:var(--accent)}
+  .bt-link:hover{background:var(--surface-2);border-color:var(--line-strong);color:var(--ink)}
   .bt-link:active{transform:scale(.98)}
 
-  /* [V62.20] Toggle Vista Equipe / Fluxo do Cliente — duas pílulas grandes, visual destacado */
-  .view-toggle{display:flex;gap:6px;margin:12px 0 2px;padding:4px;background:var(--surface);
-    border:1px solid var(--line);border-radius:14px}
+  /* [V63] Toggle Vista Equipe / Fluxo do Cliente — visual premium */
+  .view-toggle{display:flex;gap:4px;margin:14px 0 2px;padding:5px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh-xs)}
   .vt-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
     background:transparent;border:none;color:var(--ink-faint);font-family:inherit;
-    font-size:13px;font-weight:800;padding:10px 14px;border-radius:11px;cursor:pointer;
-    transition:.2s;letter-spacing:-.005em;white-space:nowrap;min-width:0}
-  .vt-opt svg{width:17px;height:17px;flex-shrink:0;opacity:.7}
+    font-size:13px;font-weight:700;padding:11px 14px;border-radius:10px;cursor:pointer;
+    transition:color var(--tr-base),background var(--tr-base);
+    letter-spacing:-.005em;white-space:nowrap;min-width:0}
+  .vt-opt svg{width:17px;height:17px;flex-shrink:0;opacity:.6;transition:opacity var(--tr-base)}
   .vt-opt span{overflow:hidden;text-overflow:ellipsis}
   .vt-opt:hover:not(.on){color:var(--ink-soft);background:rgba(255,255,255,.025)}
-  .vt-opt.on{background:var(--bg-2);color:var(--accent);box-shadow:0 0 0 1px rgba(62,184,216,.35) inset}
+  .vt-opt.on{background:var(--surface-2);color:var(--accent);
+    box-shadow:0 0 0 1px rgba(62,184,216,.25) inset,0 1px 3px rgba(0,0,0,.2)}
   .vt-opt.on svg{opacity:1;color:var(--accent)}
-  .vt-opt[data-bv="client"].on{color:var(--c-edicao);box-shadow:0 0 0 1px rgba(176,114,255,.4) inset}
+  .vt-opt[data-bv="client"].on{color:var(--c-edicao);
+    box-shadow:0 0 0 1px rgba(176,114,255,.3) inset,0 1px 3px rgba(0,0,0,.2)}
   .vt-opt[data-bv="client"].on svg{color:var(--c-edicao)}
   /* [V62.20/V62.23] Cores das 4 colunas da Vista Cliente — diferentes das colunas da Vista Equipe */
   .col.em_analise .col-h .nm{color:var(--c-reuni)}
@@ -688,35 +758,32 @@
   .bn-tab.aprovado .bn-dot{background:var(--c-trafego)}
   .bn-tab.aprovado.urgent,.bn-tab.aprovado:hover{color:var(--c-trafego)}
 
-  /* [V62.2/V62.4] Barra de navegação de colunas — Trello/Linear style.
-     Cada chip é um BOTÃO clicável que faz scroll suave até a coluna. */
-  .board-nav{display:flex;gap:5px;margin:18px 0 8px;padding:5px;background:var(--surface);
-    border:1px solid var(--line);border-radius:13px;overflow-x:auto;
-    scrollbar-width:none;-ms-overflow-style:none;align-items:center}
+  /* [V63] Barra de navegação de colunas — visual Linear/Notion premium */
+  .board-nav{display:flex;gap:4px;margin:16px 0 10px;padding:5px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;overflow-x:auto;
+    scrollbar-width:none;-ms-overflow-style:none;align-items:center;
+    box-shadow:var(--sh-xs)}
   .board-nav::-webkit-scrollbar{display:none}
-  .board-nav::before{content:"NAVEGAR PARA →";font-size:9.5px;font-weight:900;color:var(--ink-faint);
-    letter-spacing:.08em;padding:0 10px 0 8px;flex-shrink:0;opacity:.6}
-  .bn-tab{display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:9px;
-    background:var(--bg-2);border:1px solid transparent;color:var(--ink-soft);font-size:12.5px;
-    font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:.18s;min-width:0}
-  .bn-tab:hover{background:var(--bg);color:var(--ink);border-color:var(--line-soft);
-    transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.2)}
-  .bn-tab.active{background:var(--bg);color:var(--ink);border-color:var(--accent);
-    box-shadow:0 0 0 1px var(--accent),0 2px 8px rgba(62,184,216,.18)}
-  .bn-tab .bn-dot{width:8px;height:8px;border-radius:50%;background:var(--c-outro);flex-shrink:0;
-    box-shadow:0 0 5px currentColor}
+  .bn-tab{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border-radius:10px;
+    background:transparent;border:1px solid transparent;color:var(--ink-soft);font-size:12.5px;
+    font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;min-width:0;
+    transition:background var(--tr-fast),color var(--tr-fast),border-color var(--tr-fast)}
+  .bn-tab:hover{background:var(--surface-2);color:var(--ink)}
+  .bn-tab.active{background:var(--surface-2);color:var(--ink);
+    box-shadow:0 0 0 1px var(--line-strong) inset}
+  .bn-tab .bn-dot{width:7px;height:7px;border-radius:50%;background:var(--c-outro);flex-shrink:0}
   .bn-tab.afazer .bn-dot{background:var(--c-outro)}
   .bn-tab.andamento .bn-dot{background:var(--c-foto)}
   .bn-tab.revisao .bn-dot{background:var(--c-reuni)}
   .bn-tab.concluido .bn-dot{background:var(--c-trafego)}
   .bn-tab.cliente .bn-dot{background:var(--c-edicao)}
-  .bn-tab .bn-lab{font-weight:800;letter-spacing:.01em}
-  .bn-tab .bn-qt{background:var(--surface);color:var(--ink-faint);font-size:10.5px;font-weight:900;
-    padding:2px 7px;border-radius:6px;min-width:20px;text-align:center}
-  .bn-tab.active .bn-qt{background:var(--accent);color:#001423}
-  .bn-tab.cliente.urgent{animation:bn-pulse 1.6s infinite}
-  .bn-tab.cliente.urgent .bn-dot{background:var(--c-rev);box-shadow:0 0 10px var(--c-rev)}
-  @keyframes bn-pulse{0%,100%{background:var(--bg-2)}50%{background:rgba(255,140,131,.14)}}
+  .bn-tab .bn-lab{letter-spacing:.005em}
+  .bn-tab .bn-qt{background:var(--surface-3);color:var(--ink-soft);font-size:10.5px;font-weight:700;
+    padding:2px 7px;border-radius:6px;min-width:20px;text-align:center;line-height:1.4}
+  .bn-tab.active .bn-qt{background:var(--accent);color:var(--accent-ink)}
+  .bn-tab.cliente.urgent,.bn-tab.revisao.urgent{color:var(--c-rev)}
+  .bn-tab.cliente.urgent .bn-dot,.bn-tab.revisao.urgent .bn-dot{background:var(--c-rev);
+    box-shadow:0 0 8px rgba(255,90,77,.5);animation:pulse 1.6s infinite}
   .post-view{margin-top:20px;background:var(--bg-2);border:1px solid var(--line-soft);border-radius:16px;padding:16px}
   .post-view .tt{font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px}
   .post-meta{font-size:13px;color:var(--ink-soft);font-weight:600;line-height:1.55;margin-bottom:12px}
@@ -782,21 +849,221 @@
     font-size:11.5px;font-weight:600;line-height:1.5;padding:11px 14px;border-radius:12px;margin:14px 0 2px;
     display:flex;gap:9px;align-items:flex-start}
   .info-bar svg{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+
+  /* ============================================================
+     [V63] CONFIGURAÇÕES — Design system de settings premium
+     ============================================================ */
+  .settings-btn{width:100%;margin-top:14px;background:var(--surface);border:1px solid var(--line);
+    color:var(--ink);font-family:inherit;font-size:14.5px;font-weight:700;padding:14px;
+    border-radius:14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    transition:border-color var(--tr-fast),background var(--tr-fast),transform var(--tr-fast)}
+  .settings-btn:hover{background:var(--surface-2);border-color:var(--line-strong)}
+  .settings-btn:active{transform:scale(.98)}
+  .settings-btn svg{color:var(--accent);opacity:.9}
+
+  .settings{padding:8px 0 30px}
+
+  /* --- Header de sub-página (com botão voltar) --- */
+  .set-head{display:flex;align-items:center;gap:14px;margin:8px 0 24px;padding:8px 0}
+  .set-back{width:38px;height:38px;border-radius:11px;background:var(--surface);
+    border:1px solid var(--line);color:var(--ink);display:grid;place-items:center;cursor:pointer;
+    transition:background var(--tr-fast),border-color var(--tr-fast),transform var(--tr-fast);flex-shrink:0}
+  .set-back:hover{background:var(--surface-2);border-color:var(--line-strong)}
+  .set-back:active{transform:scale(.95)}
+  .set-back svg{width:18px;height:18px}
+  .set-head-t{flex:1;min-width:0}
+  .set-head-t h2{font-size:22px;font-weight:800;letter-spacing:-.025em;line-height:1.1;color:var(--ink)}
+  .set-head-t p{font-size:12.5px;font-weight:500;color:var(--ink-faint);margin-top:3px;letter-spacing:-.005em}
+
+  /* --- Hero da tela principal (avatar grande) --- */
+  .set-hero{display:flex;align-items:center;gap:14px;padding:18px;
+    background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    margin-bottom:24px;box-shadow:var(--sh-card)}
+  .set-hero-ic{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;
+    flex-shrink:0;overflow:hidden;border:2px solid currentColor}
+  .set-hero-ic img{width:100%;height:100%;object-fit:cover}
+  .set-hero-t{flex:1;min-width:0}
+  .set-hero-t h2{font-size:18px;font-weight:800;letter-spacing:-.022em;line-height:1.2;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .set-hero-t p{font-size:12.5px;color:var(--ink-soft);font-weight:600;margin-top:3px;letter-spacing:.005em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* --- Sections --- */
+  .set-section{margin-bottom:24px}
+  .set-section-h{font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;
+    letter-spacing:.08em;padding:0 4px 10px;display:block}
+
+  /* --- Linhas clicáveis das categorias --- */
+  .set-row{display:flex;align-items:center;gap:14px;width:100%;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:14px 16px;margin-bottom:8px;cursor:pointer;font-family:inherit;
+    transition:background var(--tr-fast),border-color var(--tr-fast),transform var(--tr-fast);
+    text-align:left;color:var(--ink)}
+  .set-row:hover{background:var(--surface-2);border-color:var(--line-strong)}
+  .set-row:active{transform:scale(.99)}
+  .set-row-ic{width:38px;height:38px;border-radius:11px;background:var(--surface-2);
+    color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+  .set-row-ic svg{width:20px;height:20px}
+  .set-row[data-setgo="security"] .set-row-ic{color:var(--c-trafego)}
+  .set-row[data-setgo="notifications"] .set-row-ic{color:var(--c-foto)}
+  .set-row[data-setgo="appearance"] .set-row-ic{color:var(--c-edicao)}
+  .set-row-t{flex:1;min-width:0}
+  .set-row-l{font-size:14.5px;font-weight:700;letter-spacing:-.01em;line-height:1.25;color:var(--ink)}
+  .set-row-bg{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.04em;
+    background:var(--accent);color:var(--accent-ink);padding:2px 7px;border-radius:5px;
+    vertical-align:1px;margin-left:6px;text-transform:uppercase}
+  .set-row-d{font-size:12px;color:var(--ink-faint);font-weight:500;margin-top:3px;line-height:1.4;
+    overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .set-row-go{width:18px;height:18px;color:var(--ink-faint);flex-shrink:0;opacity:.6}
+  .set-row:hover .set-row-go{opacity:1;color:var(--ink)}
+
+  /* --- Caixa "Sobre" --- */
+  .set-about{display:flex;align-items:center;gap:14px;padding:18px;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .set-about-mk{width:44px;height:44px;border-radius:50%;flex-shrink:0;
+    background-image:var(--logo-img);background-size:contain;background-repeat:no-repeat;background-position:center;
+    filter:drop-shadow(0 4px 14px rgba(176,114,255,.32))}
+  .set-about-t{display:flex;flex-direction:column;line-height:1.3}
+  .set-about-t b{font-size:14.5px;font-weight:800;color:var(--ink);letter-spacing:-.015em}
+  .set-about-t span{font-size:11.5px;color:var(--ink-soft);font-weight:500;margin-top:2px}
+  .set-about-t small{font-size:10.5px;color:var(--ink-faint);font-weight:600;margin-top:4px;letter-spacing:.02em}
+
+  /* --- Inputs / Fields --- */
+  .set-field{margin-bottom:12px}
+  .set-field label{display:block;font-size:11px;font-weight:700;color:var(--ink-faint);
+    text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;padding:0 2px}
+  .set-field input{width:100%;background:var(--surface);border:1px solid var(--line);
+    color:var(--ink);font-family:inherit;font-size:14.5px;font-weight:500;padding:13px 14px;
+    border-radius:12px;outline:none;letter-spacing:-.005em;
+    transition:border-color var(--tr-fast),background var(--tr-fast),box-shadow var(--tr-fast)}
+  .set-field input::placeholder{color:var(--ink-faint);font-weight:400}
+  .set-field input:focus{border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(62,184,216,.15)}
+  .set-field input:hover:not(:focus){border-color:var(--line-strong);background:var(--surface-2)}
+
+  /* --- Botões de settings --- */
+  .set-btn-primary{width:100%;background:var(--accent);color:var(--accent-ink);
+    font-family:inherit;font-size:14px;font-weight:800;letter-spacing:-.005em;
+    padding:14px 18px;border-radius:13px;cursor:pointer;border:none;margin-top:6px;
+    box-shadow:0 4px 14px -4px rgba(62,184,216,.4);
+    transition:background var(--tr-fast),transform var(--tr-fast),box-shadow var(--tr-fast)}
+  .set-btn-primary:hover{background:var(--accent-deep);
+    box-shadow:0 6px 20px -4px rgba(62,184,216,.5)}
+  .set-btn-primary:active{transform:scale(.98)}
+  .set-btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .set-btn-ghost{width:100%;background:var(--surface);color:var(--ink);
+    font-family:inherit;font-size:13.5px;font-weight:700;padding:13px 16px;border-radius:12px;cursor:pointer;
+    border:1px solid var(--line);margin-top:6px;display:inline-flex;align-items:center;justify-content:center;
+    transition:background var(--tr-fast),border-color var(--tr-fast),transform var(--tr-fast)}
+  .set-btn-ghost:hover{background:var(--surface-2);border-color:var(--line-strong)}
+  .set-btn-ghost:active{transform:scale(.98)}
+  .set-btn-danger{background:rgba(255,90,77,.08);color:var(--c-rev-strong);
+    border-color:rgba(255,90,77,.25)}
+  .set-btn-danger:hover{background:rgba(255,90,77,.14);border-color:rgba(255,90,77,.4)}
+
+  /* --- Foto de perfil em settings --- */
+  .set-photo{display:flex;align-items:center;gap:18px;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+  .set-photo-av{width:78px;height:78px;border-radius:50%;overflow:hidden;flex-shrink:0;
+    background:var(--surface-2);display:grid;place-items:center}
+  .set-photo-av img{width:100%;height:100%;object-fit:cover}
+  .set-photo-acts{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .set-photo-acts .set-btn-ghost{margin-top:0}
+
+  /* --- Toggle row (label + descrição + switch) --- */
+  .set-toggle-row{display:flex;align-items:center;gap:14px;padding:14px 16px;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;
+    transition:background var(--tr-fast),border-color var(--tr-fast)}
+  .set-toggle-row:hover:not(.disabled){border-color:var(--line-strong)}
+  .set-toggle-row.disabled{opacity:.5}
+  .set-toggle-t{flex:1;min-width:0}
+  .set-toggle-t b{display:block;font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.01em;line-height:1.25}
+  .set-toggle-t span{display:block;font-size:11.5px;color:var(--ink-faint);font-weight:500;margin-top:3px;line-height:1.4}
+
+  /* --- Switch (iOS-style) --- */
+  .set-switch{position:relative;width:46px;height:28px;border-radius:99px;border:none;
+    background:var(--surface-3);cursor:pointer;flex-shrink:0;
+    transition:background var(--tr-base);padding:0}
+  .set-switch:disabled{opacity:.5;cursor:not-allowed}
+  .set-switch-thumb{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+    background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.06);
+    transition:left var(--tr-base),transform var(--tr-base)}
+  .set-switch.on{background:var(--accent)}
+  .set-switch.on .set-switch-thumb{left:21px}
+  .set-switch:active:not(:disabled) .set-switch-thumb{transform:scale(1.05)}
+
+  /* --- Radio (estilo card) --- */
+  .set-radio-group{display:flex;flex-direction:column;gap:7px}
+  .set-radio{display:flex;align-items:center;gap:12px;width:100%;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 14px;
+    cursor:pointer;font-family:inherit;text-align:left;
+    transition:background var(--tr-fast),border-color var(--tr-fast),transform var(--tr-fast)}
+  .set-radio:hover{background:var(--surface-2);border-color:var(--line-strong)}
+  .set-radio:active{transform:scale(.99)}
+  .set-radio-i{width:20px;height:20px;border-radius:50%;border:2px solid var(--line-strong);
+    flex-shrink:0;position:relative;transition:border-color var(--tr-base),background var(--tr-base)}
+  .set-radio.on{border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent) inset,0 4px 14px -4px rgba(62,184,216,.25)}
+  .set-radio.on .set-radio-i{border-color:var(--accent);background:var(--accent)}
+  .set-radio.on .set-radio-i::after{content:"";position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:var(--accent-ink)}
+  .set-radio-t{flex:1;min-width:0;line-height:1.3}
+  .set-radio-t b{display:block;font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+  .set-radio-t span{display:block;font-size:11.5px;color:var(--ink-faint);font-weight:500;margin-top:3px}
+
+  /* --- Info card (Sessão atual) --- */
+  .set-info-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;display:flex;flex-direction:column;gap:11px;margin-bottom:10px}
+  .set-info-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
+    font-size:13px}
+  .set-info-row span{color:var(--ink-faint);font-weight:500}
+  .set-info-row b{font-weight:700;color:var(--ink);letter-spacing:-.005em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;text-align:right}
+
+  /* --- Zona de perigo --- */
+  .set-danger-card{background:rgba(255,90,77,.06);border:1px solid rgba(255,90,77,.2);
+    border-radius:14px;padding:18px}
+  .set-danger-t{margin-bottom:14px}
+  .set-danger-t b{display:block;font-size:14.5px;font-weight:800;color:var(--c-rev-strong);
+    letter-spacing:-.015em;margin-bottom:6px}
+  .set-danger-t span{display:block;font-size:12.5px;color:var(--ink-soft);font-weight:500;line-height:1.5}
+  .set-danger-card .set-btn-danger{margin-top:0;width:100%}
+
+  /* --- Densidade compacta --- */
+  body.density-compact .set-section{margin-bottom:18px}
+  body.density-compact .set-row{padding:11px 14px}
+  body.density-compact .set-toggle-row{padding:11px 14px}
+  body.density-compact .set-radio{padding:10px 12px}
+  body.density-compact .set-hero{padding:14px}
+
+  /* ============================================================
+     [V63] FIM CSS de Configurações
+     ============================================================ */
   .nav{position:fixed;left:12px;right:12px;bottom:calc(10px + var(--sb));z-index:30;max-width:496px;margin:0 auto;
-    background:rgba(16,17,22,.86);-webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);
-    border:1px solid rgba(255,255,255,.07);border-radius:24px;box-shadow:var(--sh-pop);
-    display:flex;padding:9px 8px}
+    background:rgba(13,15,21,.84);-webkit-backdrop-filter:blur(24px) saturate(1.5);backdrop-filter:blur(24px) saturate(1.5);
+    border:1px solid rgba(255,255,255,.06);border-radius:22px;
+    box-shadow:0 24px 60px -20px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.03) inset;
+    display:flex;padding:8px 6px}
+  body.theme-light .nav{background:rgba(255,255,255,.86);border-color:rgba(0,0,0,.06);
+    box-shadow:0 24px 60px -20px rgba(0,0,0,.25),0 0 0 1px rgba(0,0,0,.03) inset}
   .nav button{flex:1;background:none;border:none;color:var(--ink-faint);display:flex;flex-direction:column;
-    align-items:center;gap:5px;padding:8px 0;cursor:pointer;transition:.18s}
-  .nav button svg{width:25px;height:25px;stroke-width:2}
-  .nav button span{font-size:9.5px;font-weight:800;letter-spacing:.01em}
+    align-items:center;gap:4px;padding:9px 0 7px;cursor:pointer;
+    transition:color var(--tr-fast),transform var(--tr-fast);
+    border-radius:14px}
+  .nav button svg{width:23px;height:23px;stroke-width:2}
+  .nav button span{font-size:9.5px;font-weight:700;letter-spacing:.02em}
   .nav button.on{color:var(--accent)}
-  .nav button.on svg{filter:drop-shadow(0 3px 8px rgba(62, 184, 216,.5))}
+  .nav button.on svg{filter:drop-shadow(0 2px 8px rgba(62,184,216,.5))}
+  .nav button:not(.on):hover{color:var(--ink-soft)}
   .nav .navfab{position:relative;top:-4px}
-  .nav .navfab .pl{width:52px;height:52px;border-radius:18px;background:var(--grad-accent);display:grid;place-items:center;
-    box-shadow:var(--sh-glow),0 0 0 5px rgba(62, 184, 216,.08)}
+  .nav .navfab .pl{width:52px;height:52px;border-radius:17px;
+    background:var(--grad-accent);display:grid;place-items:center;
+    box-shadow:0 8px 24px -6px rgba(62,184,216,.55),0 0 0 4px rgba(62,184,216,.07),
+      0 0 0 1px rgba(255,255,255,.1) inset;
+    transition:transform var(--tr-fast),box-shadow var(--tr-fast)}
+  .nav .navfab:hover .pl{transform:translateY(-1px);box-shadow:0 10px 28px -6px rgba(62,184,216,.65),0 0 0 4px rgba(62,184,216,.1)}
   .nav .navfab .pl svg{width:24px;height:24px;color:var(--accent-ink);stroke-width:2.6}
-  .nav .navfab span{margin-top:5px;color:var(--ink-soft)}
+  .nav .navfab span{margin-top:6px;color:var(--ink-soft)}
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:50;opacity:0;pointer-events:none;
     transition:.25s;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
   .scrim.open{opacity:1;pointer-events:auto}
@@ -895,14 +1162,19 @@
   .col.analise .nm i{background:var(--c-edicao)} .col.aprovacao .nm i{background:var(--c-copy)}
   .col.pronto .nm i{background:var(--accent)}
   /* ============================================================
-     [V62.3] CARDS DO BOARD — DENSIDADE PROFISSIONAL (estilo Linear/Asana)
+     [V63] CARDS DO BOARD — visual Linear/Notion premium
      ============================================================ */
-  .tcard{position:relative;background:var(--bg-2);border:1px solid var(--line);
-    border-left:3px solid var(--uc,var(--line));border-radius:10px;padding:11px 12px;
-    margin-bottom:8px;cursor:pointer;transition:.15s}
-  .tcard:hover{border-color:var(--accent);background:rgba(62,184,216,.03)}
-  .tcard:active{transform:scale(.985)}
-  .tcard.late{border-color:rgba(255,90,77,.5);border-left-color:var(--uc,var(--line))}
+  .tcard{position:relative;background:var(--surface);
+    border:1px solid var(--line);
+    border-left:3px solid var(--uc,var(--accent));
+    border-radius:var(--rd-md);padding:13px 14px;
+    margin-bottom:9px;cursor:pointer;
+    box-shadow:var(--sh-card);
+    transition:border-color var(--tr-fast),background var(--tr-fast),transform var(--tr-fast),box-shadow var(--tr-fast)}
+  .tcard:hover{border-color:var(--line-strong);background:var(--surface-2);
+    box-shadow:var(--sh-sm),0 0 0 1px rgba(255,255,255,.04) inset}
+  .tcard:active{transform:scale(.99)}
+  .tcard.late{box-shadow:var(--sh-card),0 0 0 1px rgba(255,90,77,.35) inset}
   /* Linha 1: pílula da etapa + identificador + ações + avatar */
   .tc-top{display:flex;align-items:center;gap:5px;margin-bottom:8px;flex-wrap:wrap}
   .tc-st{font-size:8.5px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;
@@ -1194,7 +1466,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.24 · build fix-else-orfao</div>
+    <div class="ver">versão 63.0 · build design-system-premium</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -1439,6 +1711,73 @@ const FIREBASE_CONFIG = {
 /* =================================================================== */
 
 const SESSION_KEY="idseven_session";
+const PREFS_KEY="idseven_prefs";
+
+/* [V63] Sistema de PREFERÊNCIAS do usuário — persistência em localStorage.
+   Cada preferência tem um valor padrão e é aplicada imediatamente ao mudar. */
+const DEFAULT_PREFS = {
+  theme: "dark",          /* "dark" | "light" | "auto" */
+  fontSize: "md",         /* "sm" | "md" | "lg" */
+  soundOn: true,          /* sons de notificação */
+  vibrationOn: true,      /* vibração */
+  notifyNewTasks: true,   /* notificar quando criarem tarefa pra mim */
+  notifyComments: true,   /* notificar quando me mencionarem em comentários */
+  notifyApproval: true,   /* notificar respostas do cliente */
+  notifyLate: true,       /* notificar atrasos */
+  biometricLock: false,   /* trava biométrica ao abrir */
+  density: "comfortable"  /* "compact" | "comfortable" */
+};
+function loadPrefs(){
+  try{
+    var raw = localStorage.getItem(PREFS_KEY);
+    if(!raw) return Object.assign({}, DEFAULT_PREFS);
+    var saved = JSON.parse(raw);
+    return Object.assign({}, DEFAULT_PREFS, saved);
+  }catch(_){ return Object.assign({}, DEFAULT_PREFS); }
+}
+function savePrefs(p){
+  try{ localStorage.setItem(PREFS_KEY, JSON.stringify(p)); }catch(_){}
+}
+function getPref(k, def){
+  var v = (window.__prefs && window.__prefs[k]);
+  return (v===undefined) ? (def!==undefined?def:DEFAULT_PREFS[k]) : v;
+}
+function setPref(k, v){
+  if(!window.__prefs) window.__prefs = loadPrefs();
+  window.__prefs[k] = v;
+  savePrefs(window.__prefs);
+  applyPrefs();
+}
+/* [V63] Aplica preferências de UI ao DOM (tema, fonte, etc.) */
+function applyPrefs(){
+  if(!window.__prefs) window.__prefs = loadPrefs();
+  var p = window.__prefs;
+  var b = document.body;
+  /* Tema: detecta auto se necessário */
+  var actualTheme = p.theme;
+  if(actualTheme === "auto"){
+    actualTheme = (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+  }
+  b.classList.toggle("theme-light", actualTheme === "light");
+  /* Tamanho da fonte */
+  b.classList.remove("fs-sm","fs-md","fs-lg");
+  b.classList.add("fs-"+p.fontSize);
+  /* Densidade */
+  b.classList.toggle("density-compact", p.density === "compact");
+}
+/* Inicializa preferências assim que o DOM estiver pronto */
+window.__prefs = loadPrefs();
+if(document.readyState !== "loading") applyPrefs();
+else document.addEventListener("DOMContentLoaded", applyPrefs);
+/* Reage a mudança de tema do sistema se modo "auto" */
+if(window.matchMedia){
+  try{
+    window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", function(){
+      if(window.__prefs && window.__prefs.theme === "auto") applyPrefs();
+    });
+  }catch(_){}
+}
+
 const TYPES={
   gravacao:{label:"Gravação",color:"var(--c-grav)"},foto:{label:"Fotografia",color:"var(--c-foto)"},
   reuniao:{label:"Reunião",color:"var(--c-reuni)"},
@@ -1500,7 +1839,7 @@ let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
 let usersLoaded=false, photoReady=false, sessionId=null, busy=false;
 const ALARM_KEY="idseven_alarmed", PRE_MIN=120; /* 2h antes */
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
-let boardFilter="all", boardFilterUserSet=false, boardView="team", calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
+let boardFilter="all", boardFilterUserSet=false, boardView="team", settingsView="main", calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
 
 function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -1726,6 +2065,8 @@ document.addEventListener("click",function(e){
 document.addEventListener("touchstart",unlockAudio,{once:false});
 
 function beep(){
+  /* [V63] Respeita preferências de som — se desabilitado, não toca */
+  if(!getPref("soundOn", true)) return;
   try{
     if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
     if(audioCtx.state==="suspended") audioCtx.resume();
@@ -1739,7 +2080,7 @@ function beep(){
       o.connect(g); g.connect(audioCtx.destination);
       o.start(t+off); o.stop(t+off+0.24);
     });
-    if(navigator.vibrate) navigator.vibrate([220,120,220]);
+    if(navigator.vibrate && getPref("vibrationOn", true)) navigator.vibrate([220,120,220]);
   }catch(e){}
 }
 function startBeeping(){ stopBeeping(); beep(); beepTimer=setInterval(beep,1400); }
@@ -1943,7 +2284,7 @@ function switchTab(t){
   const a=t==="agenda";
   $("calControls").classList.toggle("hidden",!a);
   $("pageTitle").classList.toggle("hidden",a);
-  if(!a)$("ptText").textContent = t==="team"?"Equipe" : t==="board"?"Quadro de projetos" : t==="painel"?"Painel do gestor" : t==="posts"?"Registro de Posts" : t==="clientes"?"Visão por cliente" : t==="calendar"?"Calendário de conteúdo" : "Perfil";
+  if(!a)$("ptText").textContent = t==="team"?"Equipe" : t==="board"?"Quadro de projetos" : t==="painel"?"Painel do gestor" : t==="posts"?"Registro de Posts" : t==="clientes"?"Visão por cliente" : t==="calendar"?"Calendário de conteúdo" : t==="settings"?"Configurações" : "Perfil";
   render();
 }
 function dbar(label,val,max,color,extra){
@@ -2082,11 +2423,14 @@ function render(){
     var cb=$("cliBack"); if(cb)cb.onclick=()=>switchTab("board");
     document.querySelectorAll("[data-cli]").forEach(el=>el.onclick=()=>{boardFilter="cli:"+el.dataset.cli;boardFilterUserSet=true;switchTab("board");});}
   else if(tab==="calendar"){c.innerHTML=renderContentCalendar();bindContentCalendar();}
+  else if(tab==="settings"){c.innerHTML=renderSettings();bindSettings();}
   else{c.innerHTML=renderProfile();$("logoutBtn").onclick=logout;
     document.querySelectorAll(".cp-dot").forEach(b=>b.onclick=()=>setMyColor(b.dataset.color));
     var bb=$("backupBtn"); if(bb){ bb.onclick=exportBackup;
       var last=lsGet("idseven_lastbackup"); if(last&&$("bkTip")) $("bkTip").textContent="Último backup: "+last+" · faça um por semana e guarde em local seguro."; }
     var gp=$("goPainel"); if(gp)gp.onclick=()=>switchTab("painel");
+    /* [V63] Botão Configurações */
+    var gs=$("goSettings"); if(gs)gs.onclick=()=>{ settingsView="main"; switchTab("settings"); };
   }
 }
 function exportBackup(){
@@ -2211,6 +2555,8 @@ function renderProfile(){
     row('<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2"/>',"Status","Ativo")+
     '</div>'+
     ((me&&me.admin)?'<button class="dash-btn" id="goPainel"><svg viewBox="0 0 24 24" fill="none" style="width:19px;height:19px;vertical-align:-4px;margin-right:8px"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>Painel do gestor</button>':'')+
+    /* [V63] Botão Configurações — leva pra área completa de preferências */
+    '<button class="settings-btn" id="goSettings"><svg viewBox="0 0 24 24" fill="none" style="width:18px;height:18px"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Configurações</button>'+
     ((me&&me.admin)?'<button class="logout" id="backupBtn" style="background:rgba(54,211,153,.1);border-color:rgba(54,211,153,.28);color:var(--c-trafego);margin-top:12px"><svg viewBox="0 0 24 24" fill="none" style="width:18px;height:18px;vertical-align:-3px;margin-right:7px"><path d="M12 3v12M8 11l4 4 4-4M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Backup / exportar todos os dados</button><div class="bk-tip" id="bkTip">Recomendado: faça um backup por semana e guarde o arquivo em local seguro.</div>':'')+
     '<button class="logout" id="logoutBtn">Sair da conta</button><div class="info-bar" style="margin-top:20px"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><div>A agenda é compartilhada: tudo que você cria aparece para toda a equipe em tempo real.</div></div></div>';
 }
@@ -2224,6 +2570,433 @@ async function setMyColor(hex){
   }catch(e){ toast("Erro ao salvar a cor"); }
   finally{ busy=false; }
 }
+
+/* ============================================================
+   [V63] CONFIGURAÇÕES — área completa de preferências e conta
+   ============================================================ */
+
+/* SVGs reutilizáveis pras categorias */
+const SET_ICONS = {
+  account: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>',
+  security: '<path d="M12 2 4 6v6c0 5 3.5 9.4 8 10 4.5-.6 8-5 8-10V6l-8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  notifications: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9zM9.5 19a2.5 2.5 0 0 0 5 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  appearance: '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 0 0 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="currentColor"/>'
+};
+
+function renderSettings(){
+  if(!me) return '<div class="empty"><p>Carregando…</p></div>';
+  if(settingsView === "account")        return renderSettingsAccount();
+  if(settingsView === "security")       return renderSettingsSecurity();
+  if(settingsView === "notifications")  return renderSettingsNotifications();
+  if(settingsView === "appearance")     return renderSettingsAppearance();
+  /* Tela principal — lista de categorias */
+  return renderSettingsMain();
+}
+
+function bindSettings(){
+  if(settingsView === "main")          return bindSettingsMain();
+  if(settingsView === "account")       return bindSettingsAccount();
+  if(settingsView === "security")      return bindSettingsSecurity();
+  if(settingsView === "notifications") return bindSettingsNotifications();
+  if(settingsView === "appearance")    return bindSettingsAppearance();
+}
+
+/* Helper: monta header de sub-página com botão voltar */
+function setHeader(title, subtitle){
+  return '<div class="set-head">'+
+    '<button class="set-back" id="setBack">'+
+      '<svg viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+    '</button>'+
+    '<div class="set-head-t">'+
+      '<h2>'+esc(title)+'</h2>'+
+      (subtitle?'<p>'+esc(subtitle)+'</p>':'')+
+    '</div>'+
+  '</div>';
+}
+
+/* === TELA PRINCIPAL — lista das 4 categorias === */
+function renderSettingsMain(){
+  function row(key, icon, label, desc, badge){
+    return '<button class="set-row" data-setgo="'+key+'">'+
+      '<div class="set-row-ic"><svg viewBox="0 0 24 24" fill="none">'+icon+'</svg></div>'+
+      '<div class="set-row-t">'+
+        '<div class="set-row-l">'+esc(label)+(badge?' <span class="set-row-bg">'+esc(badge)+'</span>':'')+'</div>'+
+        '<div class="set-row-d">'+esc(desc)+'</div>'+
+      '</div>'+
+      '<svg class="set-row-go" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+    '</button>';
+  }
+  return '<div class="settings">'+
+    '<div class="set-hero">'+
+      '<div class="set-hero-ic" style="background:'+userColor(me)+'22;color:'+userColor(me)+'">'+
+        avatarHTML(me)+
+      '</div>'+
+      '<div class="set-hero-t">'+
+        '<h2>'+esc(me.name)+'</h2>'+
+        '<p>'+esc(me.role)+(me.admin?' · Administrador':'')+'</p>'+
+      '</div>'+
+    '</div>'+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Preferências</div>'+
+      row("account", SET_ICONS.account, "Conta e Perfil", "Nome, e-mail, telefone, foto e senha")+
+      row("security", SET_ICONS.security, "Segurança e Privacidade", "Biometria, sessões e exclusão de conta")+
+      row("notifications", SET_ICONS.notifications, "Notificações", "Sons, vibração e tipos de alertas")+
+      row("appearance", SET_ICONS.appearance, "Aparência", "Tema, tamanho da fonte e densidade")+
+    '</div>'+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Sobre</div>'+
+      '<div class="set-about">'+
+        '<div class="set-about-mk"></div>'+
+        '<div class="set-about-t"><b>ID Seven</b><span>Agenda e Gestor de Tarefas</span><small id="setVer">v—</small></div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function bindSettingsMain(){
+  document.querySelectorAll("[data-setgo]").forEach(b=>b.onclick=()=>{
+    settingsView = b.dataset.setgo;
+    render();
+  });
+  var sv = document.getElementById("setVer");
+  if(sv){
+    var verEl = document.querySelector(".ver");
+    if(verEl) sv.textContent = verEl.textContent.replace("versão", "v");
+  }
+}
+
+/* === SUB-PÁGINA: CONTA E PERFIL === */
+function renderSettingsAccount(){
+  function field(id, label, value, type, placeholder){
+    type = type || "text";
+    return '<div class="set-field"><label>'+esc(label)+'</label>'+
+      '<input id="'+id+'" type="'+type+'" value="'+esc(value||"")+'" placeholder="'+esc(placeholder||"")+'" maxlength="120">'+
+    '</div>';
+  }
+  return '<div class="settings">'+
+    setHeader("Conta e Perfil", "Atualize seus dados pessoais")+
+    /* Foto */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Foto de perfil</div>'+
+      '<div class="set-photo">'+
+        '<div class="set-photo-av" style="box-shadow:0 0 0 3px '+userColor(me)+'">'+avatarHTML(me)+'</div>'+
+        '<div class="set-photo-acts">'+
+          '<input id="setPhoto" type="file" accept="image/*" class="vh-file">'+
+          '<label for="setPhoto" class="set-btn-ghost">Trocar foto</label>'+
+          (me.photo ? '<button class="set-btn-ghost set-btn-danger" id="setPhotoRm">Remover</button>' : '')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    /* Dados básicos */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Dados pessoais</div>'+
+      field("setName", "Nome completo", me.name, "text", "Seu nome")+
+      field("setRole", "Função na agência", me.role, "text", "Ex: Social Media, Videomaker")+
+      field("setPhone", "WhatsApp", me.phone, "tel", "Ex: 88 9 9999-9999")+
+      field("setEmail", "E-mail", me.email, "email", "voce@agencia.com")+
+      '<button class="set-btn-primary" id="setSaveAcc">Salvar alterações</button>'+
+    '</div>'+
+    /* Senha */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Alterar senha</div>'+
+      '<div class="set-field"><label>Senha atual</label><input id="setPassOld" type="password" placeholder="Digite a senha atual"></div>'+
+      '<div class="set-field"><label>Nova senha</label><input id="setPassNew" type="password" placeholder="Mínimo 6 caracteres" minlength="6"></div>'+
+      '<div class="set-field"><label>Confirmar nova senha</label><input id="setPassConf" type="password" placeholder="Repita a nova senha"></div>'+
+      '<button class="set-btn-primary" id="setSavePass">Alterar senha</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function bindSettingsAccount(){
+  var bk = document.getElementById("setBack");
+  if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
+  /* Foto */
+  var photoIn = document.getElementById("setPhoto");
+  if(photoIn) photoIn.onchange = async function(e){
+    var f = e.target.files && e.target.files[0]; if(!f) return;
+    try{
+      var dataUrl = await readImageAsDataURL(f, 600);
+      await db.collection("users").doc(me.id).update({photo:dataUrl});
+      me.photo = dataUrl; toast("Foto atualizada ✓"); render();
+    }catch(err){ toast("Erro ao salvar foto"); }
+  };
+  var rmBtn = document.getElementById("setPhotoRm");
+  if(rmBtn) rmBtn.onclick = async function(){
+    var ok = await customConfirm("Remover sua foto de perfil?", "Remover foto", "warn");
+    if(!ok) return;
+    try{
+      await db.collection("users").doc(me.id).update({photo:""});
+      me.photo = ""; toast("Foto removida"); render();
+    }catch(err){ toast("Erro ao remover foto"); }
+  };
+  /* Salvar dados básicos */
+  var saveBtn = document.getElementById("setSaveAcc");
+  if(saveBtn) saveBtn.onclick = async function(){
+    var name  = (document.getElementById("setName").value||"").trim();
+    var role  = (document.getElementById("setRole").value||"").trim();
+    var phone = (document.getElementById("setPhone").value||"").trim();
+    var email = (document.getElementById("setEmail").value||"").trim().toLowerCase();
+    if(!name){ toast("Nome não pode ficar vazio"); return; }
+    if(!role){ toast("Função não pode ficar vazia"); return; }
+    if(email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast("E-mail inválido"); return; }
+    if(busy) return; busy=true;
+    saveBtn.disabled=true; saveBtn.textContent="Salvando…";
+    try{
+      var updates = {name:name, role:role, phone:phone, email:email};
+      await db.collection("users").doc(me.id).update(updates);
+      Object.assign(me, updates);
+      toast("Dados atualizados ✓");
+    }catch(e){ toast("Erro ao salvar"); console.error(e); }
+    finally{ busy=false; saveBtn.disabled=false; saveBtn.textContent="Salvar alterações"; }
+  };
+  /* Alterar senha */
+  var passBtn = document.getElementById("setSavePass");
+  if(passBtn) passBtn.onclick = async function(){
+    var oldP  = document.getElementById("setPassOld").value;
+    var newP  = document.getElementById("setPassNew").value;
+    var confP = document.getElementById("setPassConf").value;
+    if(!oldP || !newP || !confP){ toast("Preencha todos os campos"); return; }
+    if(newP.length < 6){ toast("Senha nova precisa ter pelo menos 6 caracteres"); return; }
+    if(newP !== confP){ toast("As senhas não conferem"); return; }
+    /* Valida senha atual usando o mesmo método de hash do login (compatível s2:) */
+    try{
+      var valid = await verifyPw(me, oldP);
+      if(!valid){ toast("Senha atual incorreta"); return; }
+      var newSalt = randSalt();
+      var newHash = await hashPw(newP, newSalt);
+      await db.collection("users").doc(me.id).update({pass:newHash, salt:newSalt});
+      me.pass = newHash; me.salt = newSalt;
+      document.getElementById("setPassOld").value = "";
+      document.getElementById("setPassNew").value = "";
+      document.getElementById("setPassConf").value = "";
+      toast("Senha alterada com sucesso ✓");
+    }catch(e){ toast("Erro ao alterar senha"); console.error(e); }
+  };
+}
+
+/* === SUB-PÁGINA: SEGURANÇA E PRIVACIDADE === */
+function renderSettingsSecurity(){
+  var supportsBio = !!(window.PublicKeyCredential);
+  return '<div class="settings">'+
+    setHeader("Segurança e Privacidade", "Proteja sua conta e seus dados")+
+    /* Biometria */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Acesso ao app</div>'+
+      renderToggleRow("bioLock", "Trava biométrica",
+        supportsBio
+          ? "Pede biometria (digital ou face) ao abrir o app"
+          : "Não disponível neste dispositivo",
+        getPref("biometricLock"), !supportsBio)+
+    '</div>'+
+    /* Sessões */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Sessão atual</div>'+
+      '<div class="set-info-card">'+
+        '<div class="set-info-row"><span>Conectado como</span><b>'+esc(me.email||me.name)+'</b></div>'+
+        '<div class="set-info-row"><span>Status</span><b style="color:var(--c-trafego)">Ativo</b></div>'+
+        '<div class="set-info-row"><span>Sincronização</span><b style="color:var(--c-trafego)">Tempo real</b></div>'+
+      '</div>'+
+      '<button class="set-btn-ghost" id="setLogout">Sair desta sessão</button>'+
+    '</div>'+
+    /* Excluir conta */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Zona de perigo</div>'+
+      '<div class="set-danger-card">'+
+        '<div class="set-danger-t"><b>Excluir conta permanentemente</b><span>Esta ação não pode ser desfeita. Todos os seus dados pessoais (nome, foto, e-mail) serão removidos. Tarefas e cronogramas criados por você continuarão acessíveis à equipe.</span></div>'+
+        '<button class="set-btn-danger" id="setDelete">Excluir minha conta</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function bindSettingsSecurity(){
+  var bk = document.getElementById("setBack");
+  if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
+  /* Biometria toggle */
+  bindToggleRow("bioLock", function(on){
+    if(on && !window.PublicKeyCredential){
+      toast("Biometria não disponível neste dispositivo");
+      return false;
+    }
+    if(on){
+      toast("Biometria ativada");
+    } else {
+      toast("Biometria desativada");
+    }
+    setPref("biometricLock", on);
+    return true;
+  });
+  /* Logout */
+  var lo = document.getElementById("setLogout");
+  if(lo) lo.onclick = async function(){
+    var ok = await customConfirm("Deseja sair desta sessão?", "Sair", "warn");
+    if(ok) logout();
+  };
+  /* Excluir conta */
+  var del = document.getElementById("setDelete");
+  if(del) del.onclick = async function(){
+    var ok1 = await customConfirm(
+      "Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita.",
+      "Excluir conta — passo 1 de 2", "warn");
+    if(!ok1) return;
+    var ok2 = await customConfirm(
+      "Última confirmação. Sua conta será permanentemente desativada agora.",
+      "Excluir conta — passo 2 de 2", "warn");
+    if(!ok2) return;
+    try{
+      /* Marca conta como excluída em vez de deletar (preserva integridade dos dados da equipe) */
+      await db.collection("users").doc(me.id).update({
+        status:"excluido", deletedAt:Date.now(),
+        email:"", phone:"", photo:""
+      });
+      toast("Conta excluída");
+      setTimeout(logout, 1200);
+    }catch(e){ toast("Erro ao excluir conta"); console.error(e); }
+  };
+}
+
+/* === SUB-PÁGINA: NOTIFICAÇÕES === */
+function renderSettingsNotifications(){
+  return '<div class="settings">'+
+    setHeader("Notificações", "Escolha o que você quer ser avisado")+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Som e vibração</div>'+
+      renderToggleRow("soundOn", "Som de notificações", "Beep quando há nova tarefa, comentário ou alerta", getPref("soundOn"))+
+      renderToggleRow("vibrationOn", "Vibração", "Vibra ao receber alertas em dispositivos móveis", getPref("vibrationOn"))+
+    '</div>'+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Tipos de notificação</div>'+
+      renderToggleRow("notifyNewTasks", "Novas tarefas", "Avisa quando criam uma tarefa pra você", getPref("notifyNewTasks"))+
+      renderToggleRow("notifyComments", "Comentários e menções", "Avisa quando te mencionam (@) em um card", getPref("notifyComments"))+
+      renderToggleRow("notifyApproval", "Aprovações do cliente", "Avisa quando o cliente aprova ou pede revisão", getPref("notifyApproval"))+
+      renderToggleRow("notifyLate", "Tarefas atrasadas", "Avisa quando uma tarefa sua passa do prazo", getPref("notifyLate"))+
+    '</div>'+
+    '<div class="set-section">'+
+      '<button class="set-btn-ghost" id="setTestSound">'+
+        '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><path d="M11 5 6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+        'Testar som de notificação'+
+      '</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function bindSettingsNotifications(){
+  var bk = document.getElementById("setBack");
+  if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
+  ["soundOn","vibrationOn","notifyNewTasks","notifyComments","notifyApproval","notifyLate"].forEach(function(key){
+    bindToggleRow(key, function(on){ setPref(key, on); return true; });
+  });
+  var ts = document.getElementById("setTestSound");
+  if(ts) ts.onclick = function(){
+    /* Força beep ignorando preferência só pra TESTAR — usuário só clica isso pra testar */
+    var prev = getPref("soundOn", true);
+    if(!prev){ toast("Ative o som primeiro"); return; }
+    try{ beep(); }catch(_){}
+    toast("Som tocado ✓");
+  };
+}
+
+/* === SUB-PÁGINA: APARÊNCIA === */
+function renderSettingsAppearance(){
+  function radioRow(name, value, label, desc, current){
+    var on = current === value;
+    return '<button class="set-radio'+(on?' on':'')+'" data-pref="'+name+'" data-val="'+value+'">'+
+      '<div class="set-radio-i"></div>'+
+      '<div class="set-radio-t"><b>'+esc(label)+'</b>'+(desc?'<span>'+esc(desc)+'</span>':'')+'</div>'+
+    '</button>';
+  }
+  var th = getPref("theme"), fs = getPref("fontSize"), dn = getPref("density");
+  return '<div class="settings">'+
+    setHeader("Aparência", "Personalize a forma como o app aparece pra você")+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Tema</div>'+
+      '<div class="set-radio-group">'+
+        radioRow("theme","dark","Escuro","Padrão — fundo profundo, ideal pra trabalhar à noite", th)+
+        radioRow("theme","light","Claro","Fundo branco, ideal pra ambientes muito iluminados", th)+
+        radioRow("theme","auto","Automático","Acompanha a configuração do seu sistema", th)+
+      '</div>'+
+    '</div>'+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Tamanho da fonte</div>'+
+      '<div class="set-radio-group">'+
+        radioRow("fontSize","sm","Pequena","Mostra mais conteúdo na tela", fs)+
+        radioRow("fontSize","md","Média","Tamanho padrão equilibrado", fs)+
+        radioRow("fontSize","lg","Grande","Texto mais legível em telas grandes", fs)+
+      '</div>'+
+    '</div>'+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Densidade</div>'+
+      '<div class="set-radio-group">'+
+        radioRow("density","comfortable","Confortável","Mais espaço entre elementos (padrão)", dn)+
+        radioRow("density","compact","Compacta","Mais informação por tela, menos espaço", dn)+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function bindSettingsAppearance(){
+  var bk = document.getElementById("setBack");
+  if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
+  document.querySelectorAll("[data-pref]").forEach(function(b){
+    b.onclick = function(){
+      var key = b.dataset.pref, val = b.dataset.val;
+      setPref(key, val);
+      render();
+    };
+  });
+}
+
+/* === COMPONENTES REUTILIZÁVEIS DE SETTINGS === */
+function renderToggleRow(id, label, desc, on, disabled){
+  return '<div class="set-toggle-row'+(disabled?' disabled':'')+'" data-toggle-id="'+id+'">'+
+    '<div class="set-toggle-t">'+
+      '<b>'+esc(label)+'</b>'+
+      (desc?'<span>'+esc(desc)+'</span>':'')+
+    '</div>'+
+    '<button class="set-switch'+(on?' on':'')+'" '+(disabled?'disabled':'')+' aria-label="'+esc(label)+'">'+
+      '<span class="set-switch-thumb"></span>'+
+    '</button>'+
+  '</div>';
+}
+
+function bindToggleRow(id, onChange){
+  var row = document.querySelector('[data-toggle-id="'+id+'"]');
+  if(!row || row.classList.contains("disabled")) return;
+  var btn = row.querySelector(".set-switch");
+  if(!btn) return;
+  btn.onclick = function(){
+    var willBeOn = !btn.classList.contains("on");
+    var accepted = onChange(willBeOn);
+    if(accepted !== false){
+      btn.classList.toggle("on", willBeOn);
+    }
+  };
+}
+
+/* Helper de leitura de imagem comprimida (reusada do registro) */
+async function readImageAsDataURL(file, maxSize){
+  return new Promise(function(resolve, reject){
+    var fr = new FileReader();
+    fr.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var w = img.width, h = img.height, sz = maxSize || 800;
+        if(w > h && w > sz){ h = h*(sz/w); w = sz; }
+        else if(h > sz){ w = w*(sz/h); h = sz; }
+        var cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(cv.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = reject;
+      img.src = fr.result;
+    };
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+}
+
+/* SHA-256 helper REMOVIDO — usa sha256Hex existente acima */
 
 /* ================= QUADRO DE PROJETOS ================= */
 function secBg(c){return RGBA[c]||"rgba(138,138,150,.16)";}
