@@ -1194,7 +1194,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 62.23 · build cliente-4col-limpa</div>
+    <div class="ver">versão 62.24 · build fix-else-orfao</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2378,7 +2378,6 @@ function renderBoard(){
       if(c.cs === "em_analise" || c.cs === "enviado") return "em_analise"; /* Cliente recebeu/analisando tema */
       return null;
     };
-  } else {
   } else {
     /* [V62.21] Vista Equipe agora tem só as 4 colunas internas — sem a 5ª "Aprovação do Cliente"
        (essa migrou pra Vista Cliente). Cards no fluxo do cliente continuam aparecendo aqui,
