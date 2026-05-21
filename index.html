@@ -516,7 +516,20 @@
   .person:hover{border-color:var(--line-strong);transform:translateY(-1px);background:var(--surface-2)}
   .person .pa{width:50px;height:50px;border-radius:50%;overflow:hidden;flex-shrink:0;
     border:2.5px solid var(--user-color,var(--line));box-sizing:border-box;
-    box-shadow:0 0 0 1px var(--surface),0 0 12px color-mix(in srgb,var(--user-color,transparent) 30%,transparent)}
+    box-shadow:0 0 0 1px var(--surface),0 0 12px color-mix(in srgb,var(--user-color,transparent) 30%,transparent);
+    position:relative}
+  /* [V63.15] PRESENCE — bolinha verde no canto inferior direito do avatar */
+  .person .pa::after{content:"";position:absolute;right:-2px;bottom:-2px;
+    width:14px;height:14px;border-radius:50%;background:var(--ink-faint);
+    border:2.5px solid var(--surface);box-sizing:border-box;
+    transition:background var(--tr-fast),box-shadow var(--tr-fast);opacity:.55}
+  .person.online .pa::after{background:#36d399;opacity:1;
+    box-shadow:0 0 0 1px rgba(54,211,153,.4),0 0 8px rgba(54,211,153,.5)}
+  .person .pi{position:relative}
+  .person .last-seen{font-size:10.5px;font-weight:600;color:var(--ink-faint);
+    margin-top:2px;letter-spacing:-.005em;display:flex;align-items:center;gap:5px}
+  .person.online .last-seen{color:var(--c-trafego);font-weight:700}
+  .person .last-seen .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
   .person .pa img{width:100%;height:100%;object-fit:cover}
   .person .pi{flex:1;min-width:0}
   .person .pn{font-size:15px;font-weight:700;letter-spacing:-.015em;color:var(--ink);
@@ -2084,7 +2097,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.14 · build audit-full</div>
+    <div class="ver">versão 63.15 · build presence</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2474,6 +2487,8 @@ function stageLabel(k,sector){
 let db=null, me=null, users=[], events=[], tasks=[];
 let alarmTimer=null, alarmSeeded=false, alarmActive=false, audioCtx=null, beepTimer=null, notifAsked=false;
 let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
+/* [V63.15] PRESENCE — quem está online agora */
+let presenceTimer=null;
 let usersLoaded=false, photoReady=false, sessionId=null, busy=false;
 const ALARM_KEY="idseven_alarmed";
 /* [V63.13] Antecedência do alarme agora respeita a preferência do usuário
@@ -2651,11 +2666,31 @@ var __clientOpenedMark = false;
     db=firebase.firestore();
   }catch(e){offlineMsg();return;}
   sessionId=lsGet(SESSION_KEY);
+  /* [V63.15] Hash dos users EXCLUINDO lastSeen — pra detectar quando só presença mudou
+     e evitar re-render completo da tela atual (que causaria flicker da animação fade). */
+  var _prevUsersHash = "";
   db.collection("users").onSnapshot(snap=>{
-    users=snap.docs.map(d=>({id:d.id,...d.data()}));
+    var newUsers = snap.docs.map(d=>({id:d.id,...d.data()}));
+    /* Calcula hash ignorando o campo lastSeen */
+    var newHash;
+    try{
+      newHash = JSON.stringify(newUsers.map(function(u){
+        var o = Object.assign({}, u); delete o.lastSeen; return o;
+      }));
+    }catch(_){ newHash = ""; }
+    var onlyPresenceChanged = (_prevUsersHash && newHash === _prevUsersHash);
+    _prevUsersHash = newHash;
+    users = newUsers;
     usersLoaded=true;
     if(!me && sessionId){ const u=users.find(x=>x.id===sessionId); if(u) me=u; }
     if(me){const fresh=users.find(u=>u.id===me.id);if(fresh)me=fresh;}
+    if(onlyPresenceChanged){
+      /* Só presença mudou — atualiza dots da equipe sem flicker geral */
+      if(tab === "team" && !$("mainApp").classList.contains("hidden")){
+        try{ refreshPresenceInDOM(); }catch(_){}
+      }
+      return;
+    }
     route();
     if(!$("mainApp").classList.contains("hidden"))render();
   },err=>{$("syncBadge").classList.add("off");$("syncBadge").querySelector("span").textContent="sem conexão";});
@@ -2811,6 +2846,84 @@ function checkAlarms(seedOnly){
 }
 /* ====================================================== */
 
+/* ============================================================
+   [V63.15] PRESENCE — sistema de "quem está online agora"
+   - Atualiza campo lastSeen no Firestore a cada 60s enquanto:
+     · o usuário está logado e ativo
+     · a aba do navegador está visível (não em background)
+   - "Online" = lastSeen < 2 min atrás (margem de 1 ciclo + delay de rede)
+   - Quota Firebase: 1 write/min × 5 users = ~7.500/dia (limite gratuito é 20K)
+   ============================================================ */
+const PRESENCE_INTERVAL_MS = 60 * 1000;   // 60s entre atualizações
+const PRESENCE_ONLINE_WINDOW_MS = 2 * 60 * 1000; // considerado online se lastSeen < 2 min
+
+function markPresence(){
+  if(!db || !me || !me.id || me.status !== "ativo") return;
+  /* Usamos Date.now() do cliente (mais simples, evita 1 round-trip pro servidor).
+     Pequeno desvio entre relógios de dispositivos é aceitável pra esse caso. */
+  try{
+    db.collection("users").doc(me.id).update({ lastSeen: Date.now() }).catch(function(){});
+  }catch(_){}
+}
+
+function startPresence(){
+  stopPresence();
+  /* Primeira batida imediata */
+  markPresence();
+  /* Depois a cada 60s, mas SÓ se aba estiver visível */
+  presenceTimer = setInterval(function(){
+    if(document.visibilityState === "visible") markPresence();
+  }, PRESENCE_INTERVAL_MS);
+}
+
+function stopPresence(){
+  if(presenceTimer){ clearInterval(presenceTimer); presenceTimer = null; }
+}
+
+/* Quando a aba volta a ficar visível, pinga na hora (não espera o próximo ciclo) */
+document.addEventListener("visibilitychange", function(){
+  if(document.visibilityState === "visible" && me && me.status === "ativo"){
+    markPresence();
+  }
+});
+
+/* Helper: usuário está online agora? */
+function isUserOnline(u){
+  if(!u || !u.lastSeen) return false;
+  return (Date.now() - u.lastSeen) < PRESENCE_ONLINE_WINDOW_MS;
+}
+
+/* Helper: rótulo amigável de quando foi visto */
+function presenceLabel(u){
+  if(!u || !u.lastSeen) return "nunca entrou";
+  if(isUserOnline(u)) return "Online agora";
+  var diff = Date.now() - u.lastSeen;
+  var min = Math.floor(diff / 60000);
+  if(min < 60) return "há " + min + " min";
+  var h = Math.floor(min / 60);
+  if(h < 24) return "há " + h + "h";
+  var d = Math.floor(h / 24);
+  if(d === 1) return "ontem";
+  if(d < 7) return "há " + d + " dias";
+  /* mais de 7 dias: data formatada */
+  try{
+    var dt = new Date(u.lastSeen);
+    var dd = (dt.getDate()<10?"0":"")+dt.getDate();
+    var mm = (dt.getMonth()+1<10?"0":"")+(dt.getMonth()+1);
+    return dd+"/"+mm;
+  }catch(_){ return "há " + d + " dias"; }
+}
+
+/* [V63.15] Atualiza só os indicadores de presença na tela Equipe sem disparar
+   re-render completo (evita o flicker da animação .fade a cada ping). */
+function refreshPresenceInDOM(){
+  /* Re-renderiza só o conteúdo da equipe — sem aplicar classe .fade */
+  var c = $("content");
+  if(!c) return;
+  c.innerHTML = renderTeam();
+  bindTeam();
+}
+
 function route(){
   if(!configured()){show("setupScreen");return;}
   if(!me){show("authScreen");switchAuth("login");return;}
@@ -2821,6 +2934,8 @@ function route(){
   askNotif();
   /* [V63.12] Se já tinha permissão concedida antes, registra pra push real */
   try{ setupPushNotifications(); }catch(_){}
+  /* [V63.15] Inicia ping de presença */
+  try{ startPresence(); }catch(_){}
 }
 
 /* ---------- Auth ---------- */
@@ -2923,6 +3038,8 @@ function logout(){
   if(beepTimer){clearInterval(beepTimer);beepTimer=null;}
   if(typeof __clientUnsub==="function"){try{__clientUnsub();}catch(_){}__clientUnsub=null;}
   notifiedLate.clear();
+  /* [V63.15] Para o ping de presença */
+  try{ stopPresence(); }catch(_){}
   /* [V63.12] Remove o token FCM deste dispositivo do perfil (async, não trava) */
   try{ teardownPushNotifications(); }catch(_){}
   me=null;lsDel(SESSION_KEY);$("content").innerHTML="";route();
@@ -3180,7 +3297,11 @@ function personRow(u,p){
     ? '<button class="adm-btn'+(isAdm?' on':'')+'" data-adm="'+u.id+'" data-mk="'+(isAdm?0:1)+'">'+(isAdm?'Remover admin':'Tornar admin')+'</button>'
     : '';
   const tag = isAdm?'<span class="adm-tag">ADMIN</span>':'';
-  return '<div class="person"><div class="pa" style="--user-color:'+userColor(u)+'">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+tag+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+' · '+esc(u.phone)+'</div></div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':admBtn||'<span class="pst ok">Ativo</span>')+'</div>';
+  /* [V63.15] Estado de presença — bolinha verde + label sob o nome */
+  const online = !p && isUserOnline(u);
+  const presenceTxt = p ? '' : '<div class="last-seen"><span class="dot"></span>'+esc(presenceLabel(u))+'</div>';
+  const rowClass = online ? 'person online' : 'person';
+  return '<div class="'+rowClass+'"><div class="pa" style="--user-color:'+userColor(u)+'">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+tag+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+' · '+esc(u.phone)+'</div>'+presenceTxt+'</div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':admBtn||'<span class="pst ok">Ativo</span>')+'</div>';
 }
 function bindTeam(){
   document.querySelectorAll("[data-ap]").forEach(b=>b.onclick=async()=>{
@@ -3198,6 +3319,15 @@ function bindTeam(){
     catch(e){toast("Erro ao atualizar");b.disabled=false;}
     finally{busy=false;}
   });
+  /* [V63.15] Auto-refresh dos labels "há X min" enquanto na tela Equipe.
+     Sem isso, "Online agora" continuaria mostrando após o usuário sair sem refresh manual. */
+  if(window.__teamRefreshTimer){ clearInterval(window.__teamRefreshTimer); }
+  window.__teamRefreshTimer = setInterval(function(){
+    if(tab !== "team" || $("mainApp").classList.contains("hidden")){
+      clearInterval(window.__teamRefreshTimer); window.__teamRefreshTimer = null; return;
+    }
+    try{ refreshPresenceInDOM(); }catch(_){}
+  }, 30000); /* a cada 30s recalcula os labels */
 }
 function renderProfile(){
   const row=(svg,l,v)=>'<div class="pl"><div class="pic"><svg viewBox="0 0 24 24" fill="none">'+svg+'</svg></div><div class="px"><div class="l">'+l+'</div><div class="v">'+esc(v||"—")+'</div></div></div>';
