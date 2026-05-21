@@ -2464,6 +2464,24 @@ const PUSH_VAPID_KEY = "BF2H7PPXaTS1wUVpc53Cly3Gvug5JS4-v7DUyreAhI37nG1h8JS27wcn
 const PUSH_WORKER_URL = "https://idseven-push.agidseven.workers.dev";
 /* =================================================================== */
 
+/* ===================================================================
+   [V63.16] CONFIGURAÇÃO DO IMAGEKIT (upload de fotos via CDN)
+   Substitui o armazenamento de fotos em base64 no Firestore por
+   uploads pro ImageKit (URLs HTTPS). A Private Key fica no Worker.
+   Se ficar vazio, o upload fica DESLIGADO sem quebrar nada — as fotos
+   antigas (base64) continuam funcionando normalmente.
+
+   - IMAGEKIT_PUBLIC_KEY:    pegue em ImageKit Dashboard → Developer
+                             options → API Keys → Public Key (public_...)
+   - IMAGEKIT_URL_ENDPOINT:  pegue em ImageKit Dashboard → URL endpoints
+                             (ex: https://ik.imagekit.io/SEU-ID)
+   - IMAGEKIT_AUTH_URL:      URL do Worker + "/imagekit-auth"
+=================================================================== */
+const IMAGEKIT_PUBLIC_KEY    = "public_wD+TthW+vGHy/VK37SgcGhDP5Pg=";
+const IMAGEKIT_URL_ENDPOINT  = "https://ik.imagekit.io/agidseven";
+const IMAGEKIT_AUTH_URL      = PUSH_WORKER_URL + "/imagekit-auth";
+/* =================================================================== */
+
 const SESSION_KEY="idseven_session";
 const PREFS_KEY="idseven_prefs";
 
@@ -2708,7 +2726,14 @@ async function verifyPw(u,pw){
 }
 function fbAvatar(n){const i=(n||"?").trim().charAt(0).toUpperCase()||"?";
   return `<div style="width:100%;height:100%;background:var(--surface-2);display:grid;place-items:center;font-weight:800;color:var(--ink-soft);font-size:15px">${i}</div>`;}
-function safePhoto(p){return(typeof p==="string"&&/^data:image\/(png|jpe?g|webp|gif);base64,/.test(p)&&p.length<500000)?p:null;}
+function safePhoto(p){
+  if(typeof p!=="string") return null;
+  /* Base64 legado (fotos antigas) */
+  if(/^data:image\/(png|jpe?g|webp|gif);base64,/.test(p) && p.length<500000) return p;
+  /* URL HTTPS do ImageKit (fotos novas) */
+  if(/^https:\/\/ik\.imagekit\.io\/[a-zA-Z0-9_-]+\//.test(p) && p.length<2000) return p;
+  return null;
+}
 function avatarHTML(u){const p=u&&safePhoto(u.photo);return p?'<img src="'+p.replace(/"/g,"")+'" alt="" style="width:100%;height:100%;object-fit:cover;display:block">':fbAvatar(u?u.name:"?");}
 const USER_COLORS=["var(--c-rev-strong)","#4d9fff","#36d399","#b072ff","#ffb02e","#ff7ab8","#22d3ee","#3eb8d8","#f4845f","#9d8cff","#5eead4","#fca5f1"];
 function userColor(u){ if(!u||!u.id)return"#8a8a96"; if(u.color&&USER_COLORS.includes(u.color))return u.color; let h=0; const s=String(u.id); for(let i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0; return USER_COLORS[Math.abs(h)%USER_COLORS.length]; }
@@ -2740,6 +2765,123 @@ function compress(file,ok,fail){
   };
   r.readAsDataURL(file);
 }
+
+/* ===================================================================
+   [V63.16] UPLOAD para ImageKit (CDN) — substitui fotos em base64
+   por URLs HTTPS. Mantém compat total: se IMAGEKIT_PUBLIC_KEY/AUTH_URL
+   estiverem vazios, o fluxo cai no compress() base64 antigo.
+=================================================================== */
+function imageKitConfigured(){
+  return !!(IMAGEKIT_PUBLIC_KEY && IMAGEKIT_URL_ENDPOINT && IMAGEKIT_AUTH_URL);
+}
+
+/* Redimensiona arquivo localmente antes de subir — economiza banda
+   e força um teto de tamanho. Retorna Promise<{blob,filename}>. */
+function downscaleToBlob(file, maxSize, quality){
+  return new Promise(function(resolve,reject){
+    var fr = new FileReader();
+    fr.onerror = function(){ reject(new Error("não foi possível ler o arquivo")); };
+    fr.onload = function(e){
+      var img = new Image();
+      img.onerror = function(){ reject(new Error("formato de imagem não suportado")); };
+      img.onload = function(){
+        try{
+          if(!img.width||!img.height) return reject(new Error("imagem inválida"));
+          var sz = maxSize || 1080;
+          var sc = Math.min(sz/img.width, sz/img.height, 1);
+          var cv = document.createElement("canvas");
+          cv.width  = Math.max(1, Math.round(img.width *sc));
+          cv.height = Math.max(1, Math.round(img.height*sc));
+          cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+          cv.toBlob(function(blob){
+            if(!blob) return reject(new Error("falha ao processar"));
+            var base = (file.name||"photo").replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]/g,"_").slice(0,40)||"photo";
+            resolve({ blob: blob, filename: base + ".jpg" });
+          }, "image/jpeg", quality||0.85);
+        }catch(err){ reject(err); }
+      };
+      img.src = e.target.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+/* Faz upload pro ImageKit: pede assinatura no Worker e envia o arquivo.
+   Retorna Promise<string url>. Opções:
+   - folder:    pasta destino (default "/avatars")
+   - maxSize:   maior lado em px depois do redimensionamento (default 1080)
+   - quality:   qualidade JPEG 0..1 (default 0.85)
+   - tags:      array de tags ImageKit (opcional) */
+async function uploadToImageKit(file, opts){
+  opts = opts || {};
+  if(!imageKitConfigured()) throw new Error("ImageKit não configurado");
+  if(!file) throw new Error("nenhum arquivo");
+  if(file.type && !/^image\//.test(file.type)) throw new Error("o arquivo não é uma imagem");
+  if(file.size && file.size > 25*1024*1024) throw new Error("imagem muito grande (>25MB)");
+
+  /* 1) Redimensiona localmente */
+  var processed = await downscaleToBlob(file, opts.maxSize||1080, opts.quality||0.85);
+
+  /* 2) Pede assinatura ao Worker */
+  var authResp;
+  try{
+    authResp = await fetch(IMAGEKIT_AUTH_URL, { method:"POST", headers:{ "Content-Type":"application/json" } });
+  }catch(e){
+    throw new Error("sem conexão com o servidor de assinatura");
+  }
+  if(!authResp.ok){
+    var errTxt = "";
+    try{ errTxt = (await authResp.text()).slice(0,200); }catch(_){}
+    throw new Error("servidor de assinatura retornou "+authResp.status+(errTxt?(": "+errTxt):""));
+  }
+  var auth;
+  try{ auth = await authResp.json(); }catch(_){ throw new Error("resposta de assinatura inválida"); }
+  if(!auth || !auth.token || !auth.signature || !auth.expire) throw new Error("assinatura incompleta");
+
+  /* 3) Sobe pro ImageKit */
+  var fd = new FormData();
+  fd.append("file", processed.blob, processed.filename);
+  fd.append("fileName", processed.filename);
+  fd.append("publicKey", IMAGEKIT_PUBLIC_KEY);
+  fd.append("signature", auth.signature);
+  fd.append("expire", String(auth.expire));
+  fd.append("token", auth.token);
+  fd.append("folder", opts.folder || "/avatars");
+  fd.append("useUniqueFileName", "true");
+  if(Array.isArray(opts.tags) && opts.tags.length) fd.append("tags", opts.tags.join(","));
+
+  var upResp;
+  try{
+    upResp = await fetch("https://upload.imagekit.io/api/v1/files/upload", { method:"POST", body: fd });
+  }catch(e){
+    throw new Error("sem conexão com o ImageKit");
+  }
+  if(!upResp.ok){
+    var ikErr = "";
+    try{ ikErr = (await upResp.text()).slice(0,200); }catch(_){}
+    throw new Error("ImageKit retornou "+upResp.status+(ikErr?(": "+ikErr):""));
+  }
+  var result;
+  try{ result = await upResp.json(); }catch(_){ throw new Error("resposta do ImageKit inválida"); }
+  if(!result || !result.url) throw new Error("ImageKit não retornou URL");
+  return result.url;
+}
+
+/* Wrapper que tenta ImageKit primeiro e cai no base64 (compress) se ImageKit
+   falhar ou não estiver configurado. Mantém o app funcional em qualquer cenário.
+   Mesmo contrato de callback do compress() pra ser drop-in. */
+function uploadPhotoOrFallback(file, ok, fail, opts){
+  opts = opts || {};
+  if(imageKitConfigured()){
+    uploadToImageKit(file, opts).then(function(url){ ok(url); }).catch(function(err){
+      console.warn("[ImageKit] falhou, caindo no fallback base64:", err && err.message);
+      compress(file, ok, fail);
+    });
+  }else{
+    compress(file, ok, fail);
+  }
+}
+/* =================================================================== */
 
 /* ---------- Firebase boot ---------- */
 function configured(){return FIREBASE_CONFIG&&FIREBASE_CONFIG.projectId&&FIREBASE_CONFIG.apiKey;}
@@ -3083,11 +3225,11 @@ $("photoInput").onchange=e=>{
   };
   if(f.type && !/^image\//.test(f.type)) return showFail("o arquivo não é uma imagem");
   if(f.size && f.size>25*1024*1024) return showFail("imagem muito grande, escolha outra");
-  $("photoRing").innerHTML='<div class="ph"><span>processando…</span></div>';
-  compress(f, d=>{
+  $("photoRing").innerHTML='<div class="ph"><span>enviando…</span></div>';
+  uploadPhotoOrFallback(f, d=>{
     pendingPhoto=d; photoReady=true;
     $("photoRing").innerHTML='<img src="'+d+'" alt="">';
-  }, showFail);
+  }, showFail, { folder:"/avatars", maxSize:1080, tags:["avatar","signup"] });
 };
 
 function withTimeout(promise,ms){
@@ -4329,10 +4471,24 @@ function bindSettingsAccount(){
   if(photoIn) photoIn.onchange = async function(e){
     var f = e.target.files && e.target.files[0]; if(!f) return;
     try{
-      var dataUrl = await readImageAsDataURL(f, 600);
-      await db.collection("users").doc(me.id).update({photo:dataUrl});
-      me.photo = dataUrl; toast("Foto atualizada ✓"); render();
-    }catch(err){ toast("Erro ao salvar foto"); }
+      toast("Enviando foto…");
+      var photoUrl;
+      if(imageKitConfigured()){
+        try{
+          photoUrl = await uploadToImageKit(f, { folder:"/avatars", maxSize:1080, tags:["avatar","settings"] });
+        }catch(ikErr){
+          console.warn("[ImageKit] falhou, usando base64:", ikErr && ikErr.message);
+          photoUrl = await readImageAsDataURL(f, 600);
+        }
+      }else{
+        photoUrl = await readImageAsDataURL(f, 600);
+      }
+      await db.collection("users").doc(me.id).update({photo:photoUrl});
+      me.photo = photoUrl; toast("Foto atualizada ✓"); render();
+    }catch(err){
+      console.error("[setPhoto] erro:", err);
+      toast("Erro ao salvar foto" + (err && err.message ? ": "+err.message : ""));
+    }
   };
   var rmBtn = document.getElementById("setPhotoRm");
   if(rmBtn) rmBtn.onclick = async function(){
