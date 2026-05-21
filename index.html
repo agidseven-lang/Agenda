@@ -175,6 +175,79 @@
     transition:transform var(--tr-fast),box-shadow var(--tr-fast)}
   .install-bar #installBtn:hover{transform:translateY(-1px);box-shadow:0 6px 16px -3px rgba(62,184,216,.5)}
   .install-bar #installBtn:active{transform:scale(.96)}
+
+  /* [V63.8] DESKTOP: tela de login vira card central elegante na viewport inteira */
+  @media (min-width:720px){
+    /* Libera o #app do max-width quando estiver na tela de auth */
+    body:has(#authScreen:not(.hidden)) #app{max-width:none;width:100%}
+
+    /* Auth ocupa viewport inteira, centraliza vertical+horizontal */
+    #authScreen:not(.hidden).auth{
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      padding:60px 24px;
+      max-width:none}
+
+    /* Todo o conteúdo respeita largura máxima de 440px */
+    #authScreen .brandbig,
+    #authScreen .install-bar,
+    #authScreen .seg,
+    #authScreen #errBox,
+    #authScreen #loginForm,
+    #authScreen #regForm,
+    #authScreen .ver{
+      width:100%;max-width:440px}
+
+    /* Logo um pouco menor pra equilibrar com o card */
+    #authScreen .brandbig{margin-bottom:34px}
+    #authScreen .brandbig .mk{width:78px;height:78px;margin-bottom:16px}
+    #authScreen .brandbig h1{font-size:30px}
+    #authScreen .brandbig p{font-size:13.5px;margin-top:8px}
+
+    /* Card que envolve as tabs + form — visual de painel flutuante elegante */
+    #authScreen .seg{
+      background:var(--surface);
+      border:1px solid var(--line);
+      box-shadow:0 32px 80px -20px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04) inset;
+      margin-bottom:0;
+      border-radius:20px 20px 0 0;
+      border-bottom:none;
+      padding:14px 14px 12px}
+
+    #authScreen #loginForm,
+    #authScreen #regForm{
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-top:none;
+      border-radius:0 0 20px 20px;
+      padding:8px 28px 28px;
+      box-shadow:0 32px 80px -20px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.04) inset}
+
+    /* Quando form de erro aparece, fica entre tabs e form */
+    #authScreen #errBox:not(.hidden){
+      background:rgba(255,90,77,.1);
+      border:1px solid rgba(255,90,77,.32);
+      border-top:none;border-bottom:none;
+      border-radius:0;
+      margin:0;
+      padding:13px 28px}
+
+    /* Install bar fica acima das tabs */
+    #authScreen .install-bar{margin-bottom:24px}
+
+    /* Footer da versão */
+    #authScreen .ver{margin-top:24px;text-align:center}
+
+    /* Background mais elaborado quando estiver na auth no desktop */
+    body:has(#authScreen:not(.hidden))::before{
+      background:
+        radial-gradient(900px 600px at 50% 0%,rgba(62,184,216,.10),transparent 65%),
+        radial-gradient(800px 700px at 0% 100%,rgba(176,114,255,.08),transparent 60%),
+        radial-gradient(700px 600px at 100% 100%,rgba(77,159,255,.06),transparent 60%)}
+  }
   /* ============================================================
      [V63.1] INPUTS — visual Notion/Linear profissional
      ============================================================ */
@@ -1787,7 +1860,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.7 · build fix-avatar-foto</div>
+    <div class="ver">versão 63.8 · build desktop-login</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
