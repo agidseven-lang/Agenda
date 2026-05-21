@@ -1992,14 +1992,12 @@
   }
 
   /* =============================================================
-     [V63.20] SISTEMA RESPONSIVO REDESENHADO — alinhamento com kanban
-     + ESCALA proporcional (fonte/ícones/padding crescem com a tela).
-     Filosofia: tudo (header brand+icons, chips, page title, board) alinha
-     com a MESMA largura — definida pelo cap responsivo. Brand fica na
-     ESQUERDA, ícones na DIREITA dessa largura (alinhados com última coluna).
+     [V63.21] LAYOUT GRID — chips, botões e toggles em colunas IGUAIS
+     distribuídas pela largura total (alinhada com o Kanban abaixo).
+     Padrão: Grid com 1fr × N colunas. Como mostrado pelo usuário no rascunho.
      ============================================================= */
 
-  /* ---- Notebook base (>=1024px): sidebar + cap 1300px ---- */
+  /* ---- Notebook base (>=1024px) ---- */
   @media (min-width:1024px){
     #app{max-width:none;margin:0}
     .nav{left:0;right:auto;top:0;bottom:0;width:108px;height:100%;max-width:none;margin:0;
@@ -2015,25 +2013,31 @@
     /* Padding pra clear do sidebar */
     header{padding-left:148px;padding-right:40px;max-width:none;margin:0}
     main{padding-left:148px;padding-right:40px;padding-bottom:32px;max-width:none;margin:0}
-    /* Cap unificado em 1300px LEFT-ALIGNED — tudo nessa largura */
+    /* Cap unificado em 1300px LEFT-ALIGNED */
     .hrow,#pageTitle,#calControls{max-width:1300px;margin-left:0;margin-right:auto}
     main > *{max-width:1300px;margin-left:0;margin-right:auto}
-    /* Header: brand ESQUERDA, ícones DIREITA (alinhados com última coluna) */
+    /* Header: brand ESQUERDA, ícones DIREITA */
     .hrow{justify-content:space-between;gap:12px}
-    /* Chips: distribuídos no width do cap (último alinha com fim das colunas) */
-    .filters{justify-content:space-between;flex-wrap:wrap}
-    /* Botões action: auto-sized, left aligned */
-    .board-tools{justify-content:flex-start;gap:10px}
-    .board-tools .bt-link{flex:0 0 auto;padding:12px 22px;font-size:13px}
-    .board-tools .bt-link svg{width:18px;height:18px}
-    .view-toggle{display:inline-flex;max-width:max-content}
-    .view-toggle .vt-opt{flex:0 0 auto;padding:12px 26px;font-size:13.5px}
-    .view-toggle .vt-opt svg{width:18px;height:18px}
+    /* GRID: Chips em 4 colunas × 2 linhas (até 1600px), todos largura IGUAL */
+    .filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:10px;overflow:visible;padding:16px 0 8px}
+    .chip{flex:unset;width:100%;justify-content:center;
+      border-radius:14px;padding:14px 10px;font-size:13px;font-weight:700;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+    /* GRID: 3 botões (Calendário/Por cliente/Posts) largura igual */
+    .board-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:12px;margin:14px 0 4px}
+    .bt-link{flex:unset;width:100%;padding:18px 14px;
+      border-radius:14px;font-size:14px;font-weight:700}
+    .bt-link svg{width:18px;height:18px}
+    /* GRID: 2 botões (Vista Equipe/Fluxo do Cliente) largura igual */
+    .view-toggle{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:6px;max-width:1300px;margin-left:0;margin-right:auto;padding:6px}
+    .vt-opt{flex:unset;width:100%;padding:16px 18px;font-size:14px;font-weight:700}
+    .vt-opt svg{width:18px;height:18px}
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
     .ev .tt{font-size:16px}
-    /* Chip ligeiramente maior no desktop */
-    .chip{font-size:13px;padding:10px 18px}
     /* BOARD em GRID — colunas ocupam o cap */
     .board-wrap{display:grid;grid-template-columns:repeat(var(--cols, 5),minmax(0,1fr));
       gap:14px;overflow:visible;padding:10px 0 14px;
@@ -2054,99 +2058,98 @@
     .sheet{width:min(620px,80vw);max-width:620px}
   }
 
-  /* ---- PC standard (>=1600px) — cap 1500px + chips/brand maiores ---- */
+  /* ---- PC standard (>=1600px) — chips em 1 linha de 8 colunas iguais ---- */
   @media (min-width:1600px){
     .hrow,#pageTitle,#calControls,main > *{max-width:1500px}
-    .chip{font-size:13.5px;padding:11px 20px}
-    .board-tools .bt-link{padding:13px 24px;font-size:13.5px}
-    .view-toggle .vt-opt{padding:13px 28px;font-size:14px}
+    .view-toggle{max-width:1500px}
+    .filters{grid-template-columns:repeat(8,minmax(0,1fr));gap:12px}
+    .chip{font-size:13.5px;padding:15px 10px}
+    .bt-link{padding:20px 14px;font-size:14px}
+    .bt-link svg{width:19px;height:19px}
+    .vt-opt{padding:18px 20px;font-size:14.5px}
+    .vt-opt svg{width:19px;height:19px}
     .board-wrap{gap:18px}
     .tcard .ttt{font-size:14px}
   }
 
-  /* ---- Monitor 1080p 24-27" (>=1920px) — cap 1700px ---- */
+  /* ---- Monitor 1080p 24-27" (>=1920px) — escala maior ---- */
   @media (min-width:1920px){
     .hrow,#pageTitle,#calControls,main > *{max-width:1700px}
+    .view-toggle{max-width:1700px}
     body{font-size:15.5px}
     header{padding-right:60px}
     main{padding-right:60px}
-    /* Brand maior */
-    .hbrand .mk{width:52px;height:52px}
-    .hbrand h1{font-size:19px}
-    .hbrand .hsub{font-size:12.5px}
-    /* Icons maiores */
-    .hbell{width:50px;height:50px}
-    .hbell svg{width:25px;height:25px}
-    .hav{width:50px;height:50px}
-    /* Chips maiores */
-    .chip{font-size:14px;padding:12px 22px}
-    /* Botões maiores */
-    .board-tools .bt-link{padding:14px 26px;font-size:14px}
-    .board-tools .bt-link svg{width:19px;height:19px}
-    .view-toggle .vt-opt{padding:14px 30px;font-size:14.5px}
-    .view-toggle .vt-opt svg{width:19px;height:19px}
-    /* Page title maior */
-    .pageT .mt{font-size:40px}
+    .hbrand .mk{width:54px;height:54px}
+    .hbrand h1{font-size:20px}
+    .hbrand .hsub{font-size:13px}
+    .hbell{width:52px;height:52px}
+    .hbell svg{width:26px;height:26px}
+    .hav{width:52px;height:52px}
+    .chip{font-size:14.5px;padding:17px 12px}
+    .bt-link{padding:22px 16px;font-size:15px}
+    .bt-link svg{width:20px;height:20px}
+    .vt-opt{padding:20px 22px;font-size:15.5px}
+    .vt-opt svg{width:20px;height:20px}
+    .pageT .mt{font-size:42px}
   }
 
-  /* ---- Ultrawide / 32" QHD (>=2560px) — cap 2000px + escala maior ---- */
+  /* ---- Ultrawide / 32" QHD (>=2560px) ---- */
   @media (min-width:2560px){
     .hrow,#pageTitle,#calControls,main > *{max-width:2000px}
-    body{font-size:16px}
+    .view-toggle{max-width:2000px}
+    body{font-size:16.5px}
     header{padding-right:80px}
     main{padding-right:80px}
-    /* Brand bem maior */
-    .hbrand .mk{width:60px;height:60px}
-    .hbrand h1{font-size:22px}
-    .hbrand .hsub{font-size:13.5px}
-    .hbrand .sub{font-size:11.5px}
-    /* Icons maiores */
-    .hbell{width:56px;height:56px}
-    .hbell svg{width:28px;height:28px}
-    .hav{width:56px;height:56px}
-    /* Chips */
-    .chip{font-size:15px;padding:13px 24px;gap:8px}
-    .chip .dot{width:8px;height:8px}
-    /* Botões */
-    .board-tools .bt-link{padding:15px 28px;font-size:15px}
-    .board-tools .bt-link svg{width:20px;height:20px}
-    .view-toggle .vt-opt{padding:15px 32px;font-size:15.5px}
-    .view-toggle .vt-opt svg{width:20px;height:20px}
-    /* Page title */
-    .pageT .mt{font-size:44px}
-    /* Cards */
+    .hbrand .mk{width:64px;height:64px}
+    .hbrand h1{font-size:23px}
+    .hbrand .hsub{font-size:14.5px}
+    .hbrand .sub{font-size:12px}
+    .hbell{width:60px;height:60px}
+    .hbell svg{width:30px;height:30px}
+    .hav{width:60px;height:60px}
+    .chip{font-size:16px;padding:19px 14px;gap:9px}
+    .chip .dot{width:9px;height:9px}
+    .bt-link{padding:24px 18px;font-size:16px}
+    .bt-link svg{width:22px;height:22px}
+    .vt-opt{padding:22px 24px;font-size:16.5px}
+    .vt-opt svg{width:22px;height:22px}
+    .pageT .mt{font-size:48px}
     .tcard .ttt{font-size:15px}
   }
 
-  /* ---- TV 55-60" 4K / monitor ultrawide grande (>=3200px) — cap 2400px ---- */
+  /* ---- TV 55-60" 4K (>=3200px) ---- */
   @media (min-width:3200px){
     .hrow,#pageTitle,#calControls,main > *{max-width:2400px}
-    body{font-size:17px}
-    .hbrand .mk{width:68px;height:68px}
-    .hbrand h1{font-size:25px}
-    .hbrand .hsub{font-size:15px}
-    .hbell{width:62px;height:62px}
-    .hbell svg{width:32px;height:32px}
-    .hav{width:62px;height:62px}
-    .chip{font-size:16px;padding:14px 26px}
-    .board-tools .bt-link{padding:16px 30px;font-size:16px}
-    .view-toggle .vt-opt{padding:16px 34px;font-size:16.5px}
-    .pageT .mt{font-size:48px}
-    .tcard .ttt{font-size:16px}
-  }
-
-  /* ---- TV 4K nativo (>=3840px) — cap 2800px ---- */
-  @media (min-width:3840px){
-    .hrow,#pageTitle,#calControls,main > *{max-width:2800px}
+    .view-toggle{max-width:2400px}
     body{font-size:18px}
-    .hbrand .mk{width:76px;height:76px}
-    .hbrand h1{font-size:28px}
-    .hbrand .hsub{font-size:16px}
+    .hbrand .mk{width:74px;height:74px}
+    .hbrand h1{font-size:27px}
+    .hbrand .hsub{font-size:16.5px}
     .hbell{width:68px;height:68px}
     .hbell svg{width:34px;height:34px}
     .hav{width:68px;height:68px}
-    .chip{font-size:17px;padding:15px 28px}
+    .chip{font-size:18px;padding:22px 16px;gap:10px}
+    .bt-link{padding:28px 20px;font-size:18px}
+    .bt-link svg{width:24px;height:24px}
+    .vt-opt{padding:26px 28px;font-size:18.5px}
+    .vt-opt svg{width:24px;height:24px}
     .pageT .mt{font-size:54px}
+    .tcard .ttt{font-size:16px}
+  }
+
+  /* ---- TV 4K nativo (>=3840px) ---- */
+  @media (min-width:3840px){
+    .hrow,#pageTitle,#calControls,main > *{max-width:2800px}
+    .view-toggle{max-width:2800px}
+    body{font-size:19px}
+    .hbrand .mk{width:82px;height:82px}
+    .hbrand h1{font-size:30px}
+    .hbrand .hsub{font-size:18px}
+    .hbell{width:74px;height:74px}
+    .hbell svg{width:38px;height:38px}
+    .hav{width:74px;height:74px}
+    .chip{font-size:19px;padding:24px 18px}
+    .pageT .mt{font-size:60px}
   }
 
 </style>
@@ -2200,7 +2203,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.20 · build aligned-with-board</div>
+    <div class="ver">versão 63.21 · build grid-layout</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
