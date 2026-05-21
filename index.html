@@ -1435,6 +1435,67 @@
     border-color:rgba(255,90,77,.25)}
   .set-btn-danger:hover{background:rgba(255,90,77,.14);border-color:rgba(255,90,77,.4)}
 
+  /* [V63.11] Select nas Configurações (lembrete: X min antes) */
+  .set-select{background:var(--surface-2);border:1.5px solid var(--line);color:var(--ink);
+    font-family:inherit;font-size:13.5px;font-weight:600;padding:10px 36px 10px 14px;border-radius:10px;
+    cursor:pointer;letter-spacing:-.005em;appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237b8794' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;background-size:16px 16px;
+    transition:border-color var(--tr-fast),background-color var(--tr-fast)}
+  .set-select:hover{border-color:var(--line-strong);background-color:var(--surface-3)}
+  .set-select:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(62,184,216,.15)}
+
+  /* [V63.11] Badges de permissão de notificação */
+  .set-perm-ok,.set-perm-warn,.set-perm-no{
+    display:inline-block;font-size:10px;font-weight:800;padding:3px 9px;border-radius:6px;
+    letter-spacing:.05em;text-transform:uppercase;margin-left:10px;vertical-align:1px;text-transform:none}
+  .set-perm-ok{background:rgba(54,211,153,.14);color:var(--c-trafego);
+    box-shadow:0 0 0 1px rgba(54,211,153,.25) inset}
+  .set-perm-warn{background:rgba(255,176,46,.14);color:var(--c-foto);
+    box-shadow:0 0 0 1px rgba(255,176,46,.25) inset}
+  .set-perm-no{background:rgba(255,90,77,.14);color:var(--c-rev);
+    box-shadow:0 0 0 1px rgba(255,90,77,.25) inset}
+
+  /* [V63.11] Linha com tx + select (lembrete antecedência) */
+  .set-row{display:flex;align-items:center;gap:14px;padding:13px 0;border-top:1px solid var(--line-soft)}
+  .set-row:first-child{border-top:none}
+  .set-row-tx{flex:1;min-width:0}
+  .set-row-lab{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-.012em;line-height:1.3}
+  .set-row-sub{font-size:11.5px;color:var(--ink-faint);font-weight:500;margin-top:3px;letter-spacing:-.005em}
+
+  /* [V63.11] Botões WhatsApp espalhados pelo app */
+  .wa-row{display:flex;gap:10px;flex-wrap:wrap}
+  .wa-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    background:linear-gradient(135deg,#25D366 0%,#1da851 100%);color:#fff;
+    font-family:inherit;font-size:13.5px;font-weight:700;letter-spacing:-.015em;
+    padding:11px 16px;border-radius:11px;cursor:pointer;text-decoration:none;
+    flex:1 1 auto;min-width:140px;border:none;
+    box-shadow:0 4px 14px -4px rgba(37,211,102,.45),0 0 0 1px rgba(255,255,255,.08) inset;
+    transition:transform var(--tr-fast),box-shadow var(--tr-fast),filter var(--tr-fast)}
+  .wa-btn:hover{transform:translateY(-1px);filter:brightness(1.08);
+    box-shadow:0 6px 18px -4px rgba(37,211,102,.55),0 0 0 1px rgba(255,255,255,.12) inset}
+  .wa-btn:active{transform:scale(.97)}
+  .wa-btn svg{width:16px;height:16px;flex-shrink:0}
+  /* Variante ghost (Compartilhar genérico) */
+  .wa-btn-ghost{background:var(--surface);color:#25D366;
+    border:1.5px solid rgba(37,211,102,.4);
+    box-shadow:0 0 0 1px rgba(37,211,102,.08) inset}
+  .wa-btn-ghost:hover{background:rgba(37,211,102,.06);border-color:rgba(37,211,102,.6);
+    box-shadow:0 4px 14px -4px rgba(37,211,102,.25),0 0 0 1px rgba(37,211,102,.15) inset;
+    filter:none}
+  /* Variante grande na visão do cliente */
+  .wa-btn-cli{padding:14px 22px;font-size:14.5px;border-radius:13px;flex:0 1 auto;min-width:240px}
+  .wa-btn-cli svg{width:18px;height:18px}
+
+  /* [V63.11] Bloco de compartilhar no rodapé da visão pública */
+  .cv-share{margin-top:32px;background:var(--surface);border:1.5px solid var(--line);
+    border-radius:16px;padding:22px 20px;text-align:center;
+    box-shadow:var(--sh-card)}
+  .cv-share-lab{font-size:11.5px;font-weight:800;color:var(--ink-faint);
+    letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
+  .cv-share-row{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+
   /* --- Foto de perfil em settings --- */
   .set-photo{display:flex;align-items:center;gap:18px;
     background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
@@ -2016,7 +2077,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.10 · build foco-do-dia</div>
+    <div class="ver">versão 63.12 · build push-real-fcm</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2246,6 +2307,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <script>
 /* ===================================================================
    CONFIGURAÇÃO DO FIREBASE
@@ -2262,6 +2324,20 @@ const FIREBASE_CONFIG = {
 };
 /* =================================================================== */
 
+/* ===================================================================
+   [V63.12] CONFIGURAÇÃO DE PUSH NOTIFICATIONS (FCM + Cloudflare Worker)
+   Preencha após o setup. Se ficar vazio, o push fica DESLIGADO sem
+   quebrar nada — o app continua funcionando normalmente.
+
+   - PUSH_VAPID_KEY: pegue em Firebase Console → Project Settings →
+     Cloud Messaging → Web Push certificates → "Generate key pair".
+   - PUSH_WORKER_URL: URL do seu Cloudflare Worker depois do deploy
+     (ex: https://idseven-push.SEU-USUARIO.workers.dev/send)
+=================================================================== */
+const PUSH_VAPID_KEY = "BF2H7PPXaTS1wUVpc53Cly3Gvug5JS4-v7DUyreAhI37nG1h8JS27wcn8AZ5zhYdD0xy3d2DCjBl16mCgrn_sV8";
+const PUSH_WORKER_URL = "https://idseven-push.agidseven.workers.dev";
+/* =================================================================== */
+
 const SESSION_KEY="idseven_session";
 const PREFS_KEY="idseven_prefs";
 
@@ -2276,6 +2352,9 @@ const DEFAULT_PREFS = {
   notifyComments: true,   /* notificar quando me mencionarem em comentários */
   notifyApproval: true,   /* notificar respostas do cliente */
   notifyLate: true,       /* notificar atrasos */
+  notifyNative: true,     /* [V63.11] notificação NATIVA do sistema (popup do SO) — máster pra push */
+  notifyReminder: true,   /* [V63.11] lembrete antes dos compromissos */
+  reminderMinutes: 10,    /* [V63.11] minutos antes do compromisso (5,10,15,30,60) */
   biometricLock: false,   /* trava biométrica ao abrir */
   density: "comfortable"  /* "compact" | "comfortable" */
 };
@@ -2573,6 +2652,8 @@ var __clientOpenedMark = false;
     if(!$("mainApp").classList.contains("hidden"))render();
     if(!alarmSeeded){ checkAlarms(true); alarmSeeded=true; if(!alarmTimer)alarmTimer=setInterval(()=>checkAlarms(false),30000); }
     else checkAlarms(false);
+    /* [V63.11] Re-agenda os lembretes do sistema sempre que os compromissos mudam */
+    try{ scheduleEventReminders(); }catch(_){}
   },err=>{});
   db.collection("tasks").onSnapshot(snap=>{
     var newTasks = snap.docs.map(d=>{ var o={id:d.id,...d.data()}; o.sector=normSector(o.sector); return o; });
@@ -2716,6 +2797,8 @@ function route(){
   $("hAvatar").innerHTML=avatarHTML(me);
   if($("content").innerHTML==="")switchTab("hoje");
   askNotif();
+  /* [V63.12] Se já tinha permissão concedida antes, registra pra push real */
+  try{ setupPushNotifications(); }catch(_){}
 }
 
 /* ---------- Auth ---------- */
@@ -2818,6 +2901,8 @@ function logout(){
   if(beepTimer){clearInterval(beepTimer);beepTimer=null;}
   if(typeof __clientUnsub==="function"){try{__clientUnsub();}catch(_){}__clientUnsub=null;}
   notifiedLate.clear();
+  /* [V63.12] Remove o token FCM deste dispositivo do perfil (async, não trava) */
+  try{ teardownPushNotifications(); }catch(_){}
   me=null;lsDel(SESSION_KEY);$("content").innerHTML="";route();
 }
 function val(id){return $(id).value.trim();}
@@ -3123,6 +3208,277 @@ async function setMyColor(hex){
   }catch(e){ toast("Erro ao salvar a cor"); }
   finally{ busy=false; }
 }
+
+/* ============================================================
+   [V63.11] NOTIFICAÇÕES NATIVAS DO SISTEMA + LEMBRETES PROGRAMADOS
+   ============================================================ */
+
+/* Dispara notificação NATIVA do SO (popup do Windows / banner do Android).
+   Respeita o toggle máster "notifyNative". Não bloqueia se permissão negada. */
+function nativeNotify(title, body, tag, onClickHandler){
+  try{
+    if(!getPref("notifyNative", true)) return;
+    if(typeof Notification === "undefined") return;
+    if(Notification.permission !== "granted") return;
+    var opts = { body: body || "", tag: tag || ("idseven-"+Date.now()), renotify: false };
+    /* Se tem ícone PWA, usa */
+    try{ opts.icon = (document.querySelector('link[rel="apple-touch-icon"]')||{}).href || undefined; }catch(_){}
+    if(getPref("soundOn", true) === false) opts.silent = true;
+    var n = new Notification(title, opts);
+    if(onClickHandler && typeof onClickHandler === "function"){
+      n.onclick = function(){
+        try{ window.focus(); }catch(_){}
+        try{ onClickHandler(); }catch(_){}
+        try{ n.close(); }catch(_){}
+      };
+    }
+    /* Auto-close após 8s pra não acumular */
+    setTimeout(function(){ try{ n.close(); }catch(_){} }, 8000);
+  }catch(_){ /* falha silenciosa, é feature secundária */ }
+}
+
+/* Pede permissão de notificação ao usuário (com mensagem amigável) */
+async function requestNotifyPermission(){
+  if(typeof Notification === "undefined"){
+    toast("Seu navegador não suporta notificações do sistema");
+    return false;
+  }
+  if(Notification.permission === "granted") return true;
+  if(Notification.permission === "denied"){
+    customAlert("As notificações foram bloqueadas para este site. Você precisa habilitar manualmente nas configurações do navegador (ícone do cadeado na barra de endereço).", "Notificações bloqueadas", "warn");
+    return false;
+  }
+  try{
+    var p = await Notification.requestPermission();
+    if(p === "granted"){
+      /* Notificação de boas-vindas pra confirmar */
+      nativeNotify("ID Seven · Notificações ativadas", "Você receberá alertas do sistema quando algo importante acontecer.", "welcome");
+      /* [V63.12] Tenta registrar pra push real (FCM). Tolerante a falha. */
+      try{ await setupPushNotifications(); }catch(_){}
+      return true;
+    }
+    return false;
+  }catch(_){ return false; }
+}
+
+/* === LEMBRETES PROGRAMADOS DE COMPROMISSOS ===
+   Agenda setTimeout pra cada compromisso meu que vai começar dentro de 24h.
+   É re-chamado toda vez que `events` muda. */
+var reminderTimers = {};
+
+function scheduleEventReminders(){
+  /* Limpa timers antigos */
+  Object.keys(reminderTimers).forEach(function(id){ try{ clearTimeout(reminderTimers[id]); }catch(_){} });
+  reminderTimers = {};
+
+  if(!me) return;
+  if(!getPref("notifyReminder", true)) return;
+
+  var minBefore = parseInt(getPref("reminderMinutes", 10), 10) || 10;
+  var now = Date.now();
+  var horizon = now + 86400000; /* só agenda timers pras próximas 24h */
+
+  (events||[]).forEach(function(e){
+    if(!e || !e.date || e.done) return;
+    var own = evOwner(e);
+    /* Só compromissos meus (ou sem dono especificado, mas eu criei) */
+    var mine = (own && own.id === me.id) || (!own && !e.owner);
+    if(!mine) return;
+    var startMs = evStartMs(e);
+    if(!startMs) return;
+    var trigger = startMs - minBefore * 60000;
+    if(trigger <= now) return;          /* já passou do horário do lembrete */
+    if(trigger > horizon) return;       /* mais de 24h, não agenda agora */
+
+    reminderTimers[e.id] = setTimeout(function(){
+      var typ = TYPES[e.type] || TYPES.outro;
+      var titleLine = "⏰ " + (typ?typ.label+" em ":"Compromisso em ") + minBefore + " min";
+      var bodyLine = (e.title || e.client || "Compromisso");
+      if(e.client && e.title) bodyLine = (e.title) + " · " + e.client;
+      if(e.start) bodyLine += " (" + e.start + ")";
+
+      /* Toast interno sempre */
+      try{ toast(titleLine + ": " + bodyLine); }catch(_){}
+      try{ if(getPref("soundOn", true)) beep(); }catch(_){}
+      try{ if(getPref("vibrationOn", true) && navigator.vibrate) navigator.vibrate([180,80,180]); }catch(_){}
+
+      /* Notificação nativa do sistema (pode chegar com app em outra aba) */
+      nativeNotify(titleLine, bodyLine, "reminder-"+e.id, function(){
+        switchTab("agenda");
+        setTimeout(function(){ openDetail(e.id); }, 200);
+      });
+    }, trigger - now);
+  });
+}
+
+/* === HELPERS DE WHATSAPP ===
+   Monta URL wa.me com número normalizado pra BR. Se phone vazio/inválido,
+   retorna link SEM destino (pra "Compartilhar pra qualquer contato"). */
+function parsePhoneBR(raw){
+  if(!raw) return null;
+  var d = String(raw).replace(/\D/g, "");
+  if(!d) return null;
+  /* já tem código país 55 */
+  if((d.length === 12 || d.length === 13) && d.indexOf("55") === 0) return d;
+  /* tem DDD (10 ou 11 dígitos) — adiciona código país */
+  if(d.length === 10 || d.length === 11) return "55" + d;
+  /* fora de padrão */
+  return null;
+}
+
+function waLink(phone, text){
+  var t = encodeURIComponent(text || "");
+  var p = parsePhoneBR(phone);
+  return p ? ("https://wa.me/"+p+"?text="+t) : ("https://wa.me/?text="+t);
+}
+
+/* Ícone SVG do WhatsApp (oficial-style, monocromático) */
+var WA_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9c-.3-.1-.5-.1-.7.1c-.2.3-.8.9-.9 1.1c-.2.2-.3.2-.6.1c-.3-.1-1.2-.4-2.3-1.4c-.8-.7-1.4-1.6-1.6-1.9c-.2-.3 0-.4.1-.6c.1-.1.3-.3.4-.5c.1-.2.2-.3.3-.5c.1-.2 0-.4 0-.5c-.1-.1-.7-1.7-1-2.3c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4c-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5 4.5c.7.3 1.3.5 1.7.6c.7.2 1.4.2 1.9.1c.6-.1 1.7-.7 2-1.4c.2-.7.2-1.2.2-1.4c-.1-.1-.3-.2-.6-.3M12 21.5h0c-1.7 0-3.4-.5-4.9-1.3l-.4-.2l-3.7.9l1-3.6l-.2-.4c-.9-1.5-1.4-3.2-1.4-4.9c0-5.3 4.3-9.6 9.6-9.6c2.6 0 5 1 6.8 2.8c1.8 1.8 2.8 4.2 2.8 6.8c0 5.3-4.3 9.6-9.6 9.6m8.1-17.7C18 1.7 15 .5 12 .5C5.5.5.2 5.7.2 12.2c0 2.1.5 4.1 1.6 5.9L0 24l6.1-1.6c1.7.9 3.7 1.4 5.8 1.4h0c6.4 0 11.7-5.2 11.7-11.7c0-3.1-1.2-6-3.4-8.2"/></svg>';
+
+/* Helper que monta botão "Avisar no WhatsApp" inline.
+   Se phone NÃO for válido, ainda gera o botão (vai abrir picker de contato). */
+function waBtnHTML(label, phone, text, classExtra){
+  return '<a class="wa-btn'+(classExtra?' '+classExtra:'')+'" href="'+waLink(phone, text)+'" target="_blank" rel="noopener noreferrer">'+WA_SVG+'<span>'+esc(label)+'</span></a>';
+}
+
+/* ============================================================
+   [V63.12] PUSH NOTIFICATIONS REAIS — FCM + Cloudflare Worker
+   Funciona MESMO COM APP FECHADO.
+   ============================================================ */
+
+/* Estado do messaging — null até inicializar com sucesso */
+var fcmMessaging = null;
+var fcmTokenSaved = null;  /* token desta sessão, pra não salvar duplicado */
+var fcmInitTried = false;
+
+/* Inicializa o Firebase Messaging (1ª vez por sessão).
+   É chamada após login + permissão. Tolerante a falha total. */
+async function setupPushNotifications(){
+  if(fcmInitTried) return false;
+  fcmInitTried = true;
+  /* Sem config ainda? sai silencioso */
+  if(!PUSH_VAPID_KEY || !PUSH_WORKER_URL) return false;
+  /* Sem usuário logado? não tem onde salvar token */
+  if(!me || !db) return false;
+  /* SDK Messaging não carregado? */
+  if(typeof firebase === "undefined" || !firebase.messaging) return false;
+  /* Browser não suporta? (Safari iOS sem PWA instalado, alguns ambientes) */
+  try{ if(!firebase.messaging.isSupported || !firebase.messaging.isSupported()) return false; }catch(_){ return false; }
+  /* Permissão não concedida ainda? não força aqui */
+  if(typeof Notification === "undefined" || Notification.permission !== "granted") return false;
+
+  try{
+    fcmMessaging = firebase.messaging();
+    /* Pega ou registra o service worker dedicado pro FCM */
+    var reg = await navigator.serviceWorker.register("firebase-messaging-sw.js", {scope:"./"});
+    var token = await fcmMessaging.getToken({
+      vapidKey: PUSH_VAPID_KEY,
+      serviceWorkerRegistration: reg
+    });
+    if(!token) return false;
+
+    /* Salva o token no perfil do usuário (campo fcmTokens é array de strings).
+       Mantém últimos 5 dispositivos. */
+    var userRef = db.collection("users").doc(me.id);
+    var snap = await userRef.get();
+    var existing = (snap.data() && snap.data().fcmTokens) || [];
+    if(!Array.isArray(existing)) existing = [];
+    if(existing.indexOf(token) < 0){
+      var arr = existing.concat([token]).slice(-5);
+      await userRef.update({fcmTokens: arr});
+    }
+    fcmTokenSaved = token;
+
+    /* Listener pra quando recebe push com APP ABERTO (foreground) —
+       nesse caso o SO não mostra nada automaticamente; usamos nativeNotify. */
+    fcmMessaging.onMessage(function(payload){
+      try{
+        var n = payload && payload.notification || {};
+        var d = payload && payload.data || {};
+        nativeNotify(n.title || "ID Seven", n.body || "", d.tag || ("fg-"+Date.now()), function(){
+          if(d.url){ try{ window.location.href = d.url; }catch(_){} return; }
+          if(d.taskId){ openTaskDetail(d.taskId); return; }
+          if(d.eventId){ switchTab("agenda"); setTimeout(function(){ openDetail(d.eventId); }, 200); return; }
+        });
+      }catch(_){}
+    });
+    return true;
+  }catch(e){
+    /* Não loga erro pra não assustar — push é opcional */
+    return false;
+  }
+}
+
+/* Remove o token deste dispositivo do perfil (chamar no logout) */
+async function teardownPushNotifications(){
+  if(!fcmTokenSaved || !me || !db) return;
+  try{
+    var userRef = db.collection("users").doc(me.id);
+    var snap = await userRef.get();
+    var existing = (snap.data() && snap.data().fcmTokens) || [];
+    if(Array.isArray(existing) && existing.indexOf(fcmTokenSaved) >= 0){
+      var arr = existing.filter(function(t){ return t !== fcmTokenSaved; });
+      await userRef.update({fcmTokens: arr});
+    }
+  }catch(_){}
+  fcmTokenSaved = null;
+  fcmMessaging = null;
+}
+
+/* === ENVIA PUSH pra um ou mais usuários via Cloudflare Worker ===
+   userIds: string | array de string (IDs de users)
+   payload: { title, body, data?:{taskId, eventId, url, tag} }
+
+   Lê os fcmTokens dos destinatários no Firestore e POSTa pro Worker.
+   Tolerante a falha — se Worker offline, não quebra nada. */
+async function sendPushToUsers(userIds, payload){
+  if(!PUSH_WORKER_URL) return;            /* config vazia, push desligado */
+  if(!payload || !payload.title) return;
+  var ids = Array.isArray(userIds) ? userIds : [userIds];
+  if(!ids.length) return;
+
+  /* Coleta tokens — fonte de verdade é o array `users` em memória, fresco do snapshot */
+  var tokens = [];
+  ids.forEach(function(uid){
+    if(!uid) return;
+    var u = users.find(function(x){ return x.id === uid; });
+    if(u && Array.isArray(u.fcmTokens)){
+      u.fcmTokens.forEach(function(t){ if(t && tokens.indexOf(t) < 0) tokens.push(t); });
+    }
+  });
+  if(!tokens.length) return;
+
+  try{
+    await fetch(PUSH_WORKER_URL, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        tokens: tokens,
+        title: payload.title,
+        body: payload.body || "",
+        data: payload.data || {}
+      })
+    });
+  }catch(_){ /* falha silenciosa — push é best-effort */ }
+}
+
+/* === Helper: descobre IDs dos administradores/gestores (recipient quando cliente aprova) === */
+function pushAdminIds(){
+  return users.filter(function(u){ return canManage(u); }).map(function(u){ return u.id; }).filter(function(id, idx, arr){ return arr.indexOf(id) === idx; });
+}
+
+/* === Listener: quando o SW de push manda mensagem pro app aberto (clique em notificação fechada) === */
+try{
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.addEventListener("message", function(e){
+      var msg = e.data || {};
+      if(msg.type !== "fcm-notif-click") return;
+      var d = msg.data || {};
+      if(d.taskId){ openTaskDetail(d.taskId); return; }
+      if(d.eventId){ switchTab("agenda"); setTimeout(function(){ openDetail(d.eventId); }, 200); return; }
+    });
+  }
+}catch(_){}
 
 /* ============================================================
    [V63.10] FOCO DO DIA ("Hoje") — tela inicial com priorização automática
@@ -3693,6 +4049,24 @@ function bindSettingsSecurity(){
 
 /* === SUB-PÁGINA: NOTIFICAÇÕES === */
 function renderSettingsNotifications(){
+  /* [V63.11] Estado atual da permissão de notificação nativa pro selo "Ativado/Bloqueado" */
+  var permState = "default";
+  try{ permState = (typeof Notification !== "undefined") ? Notification.permission : "unsupported"; }catch(_){ permState = "unsupported"; }
+  var permBadge =
+    permState === "granted" ? '<span class="set-perm-ok">✓ Permissão concedida</span>' :
+    permState === "denied"  ? '<span class="set-perm-no">✕ Bloqueada no navegador</span>' :
+    permState === "default" ? '<span class="set-perm-warn">⚠ Aguardando permissão</span>' :
+                              '<span class="set-perm-warn">— Não suportado neste navegador</span>';
+
+  /* [V63.12] Status do push real (FCM) */
+  var pushConfigured = !!(PUSH_VAPID_KEY && PUSH_WORKER_URL);
+  var pushRegistered = !!fcmTokenSaved;
+  var pushBadge =
+    !pushConfigured                   ? '<span class="set-perm-warn">— Não configurado</span>' :
+    permState !== "granted"           ? '<span class="set-perm-warn">⚠ Precisa permitir notificações</span>' :
+    pushRegistered                    ? '<span class="set-perm-ok">✓ Dispositivo registrado</span>' :
+                                        '<span class="set-perm-warn">⚠ Registrando…</span>';
+
   return '<div class="settings">'+
     setHeader("Notificações", "Escolha o que você quer ser avisado")+
     '<div class="set-section">'+
@@ -3700,6 +4074,36 @@ function renderSettingsNotifications(){
       renderToggleRow("soundOn", "Som de notificações", "Beep quando há nova tarefa, comentário ou alerta", getPref("soundOn"))+
       renderToggleRow("vibrationOn", "Vibração", "Vibra ao receber alertas em dispositivos móveis", getPref("vibrationOn"))+
     '</div>'+
+
+    /* [V63.11] Notificações do sistema (popup do SO) */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Notificações do sistema '+permBadge+'</div>'+
+      renderToggleRow("notifyNative", "Mostrar popup do sistema operacional", "Notificação nativa aparece mesmo em outra aba (Windows / Android)", getPref("notifyNative"))+
+      (permState !== "granted" && permState !== "unsupported" ?
+        '<button class="set-btn-ghost" id="setReqNotifPerm" style="margin-top:10px">'+
+          '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><path d="M12 4a5 5 0 0 0-5 5v4l-2 3h14l-2-3V9a5 5 0 0 0-5-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 18.5a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+          'Permitir notificações do sistema'+
+        '</button>'
+      : '')+
+    '</div>'+
+
+    /* [V63.12] Push real com app fechado (FCM) */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Push com app fechado '+pushBadge+'</div>'+
+      '<div class="set-row" style="border-top:none;padding:0">'+
+        '<div class="set-row-tx">'+
+          '<div class="set-row-lab" style="font-size:13px;color:var(--ink-soft);font-weight:500;line-height:1.55">'+
+            (pushConfigured && pushRegistered ?
+              'Você vai receber alertas no celular/PC mesmo com o navegador fechado.' :
+            pushConfigured ?
+              'Configure permitir notificações acima pra ativar.' :
+              'Recurso desativado. Pra ativar push com app fechado, configure FCM e Cloudflare Worker (peça pro administrador do app).'
+            )+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
     '<div class="set-section">'+
       '<div class="set-section-h">Tipos de notificação</div>'+
       renderToggleRow("notifyNewTasks", "Novas tarefas", "Avisa quando criam uma tarefa pra você", getPref("notifyNewTasks"))+
@@ -3707,6 +4111,25 @@ function renderSettingsNotifications(){
       renderToggleRow("notifyApproval", "Aprovações do cliente", "Avisa quando o cliente aprova ou pede revisão", getPref("notifyApproval"))+
       renderToggleRow("notifyLate", "Tarefas atrasadas", "Avisa quando uma tarefa sua passa do prazo", getPref("notifyLate"))+
     '</div>'+
+
+    /* [V63.11] Lembretes programados de compromisso */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Lembretes de compromisso</div>'+
+      renderToggleRow("notifyReminder", "Lembrar antes do compromisso começar", "Alerta dispara X minutos antes do horário marcado", getPref("notifyReminder"))+
+      '<div class="set-row">'+
+        '<div class="set-row-tx">'+
+          '<div class="set-row-lab">Antecedência do lembrete</div>'+
+          '<div class="set-row-sub">Quantos minutos antes do compromisso</div>'+
+        '</div>'+
+        '<select id="setReminderMin" class="set-select">'+
+          ['5','10','15','30','60','120'].map(function(v){
+            var label = v==="60" ? "1 hora antes" : v==="120" ? "2 horas antes" : v+" min antes";
+            return '<option value="'+v+'"'+(String(getPref("reminderMinutes",10))===v?' selected':'')+'>'+label+'</option>';
+          }).join("")+
+        '</select>'+
+      '</div>'+
+    '</div>'+
+
     '<div class="set-section">'+
       '<button class="set-btn-ghost" id="setTestSound">'+
         '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><path d="M11 5 6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
@@ -3719,9 +4142,32 @@ function renderSettingsNotifications(){
 function bindSettingsNotifications(){
   var bk = document.getElementById("setBack");
   if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
-  ["soundOn","vibrationOn","notifyNewTasks","notifyComments","notifyApproval","notifyLate"].forEach(function(key){
-    bindToggleRow(key, function(on){ setPref(key, on); return true; });
+  ["soundOn","vibrationOn","notifyNewTasks","notifyComments","notifyApproval","notifyLate","notifyNative","notifyReminder"].forEach(function(key){
+    bindToggleRow(key, function(on){
+      setPref(key, on);
+      /* Se desligou notifyReminder, limpa timers ativos */
+      if(key === "notifyReminder" && !on){ try{ scheduleEventReminders(); }catch(_){} }
+      /* Se ligou notifyReminder, re-agenda */
+      if(key === "notifyReminder" && on){ try{ scheduleEventReminders(); }catch(_){} }
+      return true;
+    });
   });
+  /* [V63.11] Select de minutos do lembrete */
+  var sel = document.getElementById("setReminderMin");
+  if(sel){
+    sel.onchange = function(){
+      setPref("reminderMinutes", parseInt(sel.value,10) || 10);
+      try{ scheduleEventReminders(); }catch(_){}
+      toast("Lembrete agora dispara "+sel.options[sel.selectedIndex].text);
+    };
+  }
+  /* [V63.11] Botão pedir permissão de notificação */
+  var rq = document.getElementById("setReqNotifPerm");
+  if(rq) rq.onclick = async function(){
+    var ok = await requestNotifyPermission();
+    if(ok) toast("Notificações ativadas ✓");
+    render();
+  };
   var ts = document.getElementById("setTestSound");
   if(ts) ts.onclick = function(){
     /* Força beep ignorando preferência só pra TESTAR — usuário só clica isso pra testar */
@@ -3874,6 +4320,8 @@ function boardTick(){
         if(getPref("notifyLate", true)){
           toast("⏰ Prazo estourado: "+(t.title||"tarefa"));
           customAlert("A tarefa \""+(t.title||"")+"\""+(t.client?" — "+t.client:"")+" passou do prazo de término.\n\nConclua o quanto antes. Você não pode iniciar nem avançar outras tarefas até finalizar esta.","⏰ Prazo estourado","warn");
+          /* [V63.11] Notificação nativa do sistema */
+          nativeNotify("⏰ Prazo estourado", (t.title||"tarefa")+(t.client?" · "+t.client:""), "late-"+t.id, function(){ switchTab("board"); setTimeout(function(){ openTaskDetail(t.id); }, 200); });
         }
       }
     }
@@ -4283,6 +4731,13 @@ function checkClientTransitions(newTasks){
       /* [V63.2] Respeita preferência notifyApproval — só notifica se ativado */
       if(getPref("notifyApproval", true)){
         toast(msg); try{ beep(); }catch(_){}
+        /* [V63.11] Notificação nativa do sistema */
+        var natTitle = (tr.curr === "aprovado" || tr.curr === "aprovada") ? "✅ Cliente aprovou" : "✏ Cliente pediu revisão";
+        var natBody = cli + " · " + lab;
+        var ttid = tr.task.id;
+        nativeNotify(natTitle, natBody, "appr-"+ttid+"-"+tr.idx, function(){ switchTab("board"); setTimeout(function(){ openTaskDetail(ttid); }, 200); });
+        /* [V63.12] Push real (FCM) é disparado DIRETAMENTE nas funções de ação (clientApprove etc),
+           não aqui, pra não duplicar quando vários admins estão observando o snapshot. */
       }
     }
   });
@@ -5086,6 +5541,15 @@ function renderClientView(){
     }
   }
 
+  /* [V63.11] Botão Compartilhar Link com a Equipe via WhatsApp */
+  var __shareUrl = (function(){ try{ return window.location.href; }catch(_){ return ""; } })();
+  var __shareMsg = "Olá! Os conteúdos da semana"+(t.client?" da "+t.client:"")+" estão prontos pra sua avaliação:\n\n"+__shareUrl+"\n\n— via ID Seven";
+  if(__shareUrl){
+    h+='<div class="cv-share">'+
+       '<div class="cv-share-lab">Compartilhe com sua equipe</div>'+
+       '<div class="cv-share-row">'+waBtnHTML("Enviar pelo WhatsApp", null, __shareMsg, "wa-btn-cli")+'</div>'+
+     '</div>';
+  }
   h+='<div class="cv-foot">ID Seven · Atualizado em tempo real</div>';
   $("clientBody").innerHTML=h;
   bindClientViewActions();
@@ -5410,6 +5874,16 @@ async function clientApprove(idx){
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
     /* re-render acontece automaticamente via onSnapshot — não precisa fazer nada */
+    /* [V63.12] Push REAL pra admins (mesmo com app fechado) */
+    try{
+      var __wk = Math.floor(idx/3)+1, __cn = (idx%3)+1;
+      var __lab = (arr[idx].t && arr[idx].t.trim()) ? arr[idx].t.trim() : ("SEM "+__wk+" · #"+__cn);
+      sendPushToUsers(pushAdminIds(), {
+        title: "✅ Cliente aprovou tema",
+        body: (t.client||"Cliente") + " · " + __lab,
+        data: { taskId: t.id, tag: "appr-"+t.id+"-"+idx }
+      });
+    }catch(_){}
   }catch(e){
     console.error("[clientApprove] erro firebase:", e);
     var c = e && e.code ? e.code : "";
@@ -5443,6 +5917,16 @@ async function clientRequestRevision(idx, fbTxt){
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+    /* [V63.12] Push REAL pra admins */
+    try{
+      var __wk = Math.floor(idx/3)+1, __cn = (idx%3)+1;
+      var __lab = (arr[idx].t && arr[idx].t.trim()) ? arr[idx].t.trim() : ("SEM "+__wk+" · #"+__cn);
+      sendPushToUsers(pushAdminIds(), {
+        title: "✏ Cliente pediu revisão",
+        body: (t.client||"Cliente") + " · " + __lab,
+        data: { taskId: t.id, tag: "rev-"+t.id+"-"+idx }
+      });
+    }catch(_){}
   }catch(e){
     console.error("[clientRequestRevision] erro firebase:", e);
     var c = e && e.code ? e.code : "";
@@ -5479,6 +5963,16 @@ async function clientApproveLegenda(idx){
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+    /* [V63.12] Push REAL pra admins */
+    try{
+      var __wk = Math.floor(idx/3)+1, __cn = (idx%3)+1;
+      var __lab = (arr[idx].t && arr[idx].t.trim()) ? arr[idx].t.trim() : ("SEM "+__wk+" · #"+__cn);
+      sendPushToUsers(pushAdminIds(), {
+        title: "🚀 Cliente aprovou legenda",
+        body: (t.client||"Cliente") + " · " + __lab + " — pronto pra publicar",
+        data: { taskId: t.id, tag: "lapp-"+t.id+"-"+idx }
+      });
+    }catch(_){}
   }catch(e){
     console.error("[clientApproveLegenda] erro firebase:", e);
     var c = e && e.code ? e.code : "";
@@ -5516,6 +6010,16 @@ async function clientRequestRevisionLegenda(idx, fbTxt){
     if(hist.length>100) hist=hist.slice(-100);
     arr[idx].history=hist;
     await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+    /* [V63.12] Push REAL pra admins */
+    try{
+      var __wk = Math.floor(idx/3)+1, __cn = (idx%3)+1;
+      var __lab = (arr[idx].t && arr[idx].t.trim()) ? arr[idx].t.trim() : ("SEM "+__wk+" · #"+__cn);
+      sendPushToUsers(pushAdminIds(), {
+        title: "✏ Cliente pediu revisão da legenda",
+        body: (t.client||"Cliente") + " · " + __lab,
+        data: { taskId: t.id, tag: "lrev-"+t.id+"-"+idx }
+      });
+    }catch(_){}
   }catch(e){ clientShowError("Não conseguimos registrar. Verifique a internet e tente de novo."); }
 }
 
@@ -5937,10 +6441,42 @@ $("taskSave").onclick=async()=>{
       const prev=tasks.find(x=>x.id===editTaskId);
       Object.assign(data,trackFields(prev,taskStatus));
       await db.collection("tasks").doc(editTaskId).update(data);toast("Tarefa atualizada");
+      /* [V63.12] Push REAL — se o assignee MUDOU, avisa o novo responsável */
+      try{
+        var prevAss = ((prev && prev.assignee) || "").trim().toLowerCase();
+        var newAss = ((data.assignee) || "").trim().toLowerCase();
+        if(newAss && newAss !== prevAss && newAss !== ((me.name||"").trim().toLowerCase())){
+          var assUser = users.find(function(x){ return ((x.name||"").trim().toLowerCase()) === newAss; });
+          if(assUser){
+            sendPushToUsers(assUser.id, {
+              title: "🎯 Nova tarefa pra você",
+              body: (data.client?data.client+" · ":"") + (data.title||"Sem título"),
+              data: { taskId: editTaskId, tag: "asg-"+editTaskId }
+            });
+          }
+        }
+      }catch(_){}
     }
     else{
       Object.assign(data,trackFields(null,taskStatus));
-      data.by=me.id;data.createdAt=Date.now();await db.collection("tasks").add(data);toast("Tarefa criada e compartilhada");
+      data.by=me.id;data.createdAt=Date.now();
+      var docRef = await db.collection("tasks").add(data);
+      toast("Tarefa criada e compartilhada");
+      /* [V63.12] Push REAL — tarefa nova: avisa responsável se for diferente de mim */
+      try{
+        var newAss2 = ((data.assignee) || "").trim().toLowerCase();
+        var meNm = ((me.name||"").trim().toLowerCase());
+        if(newAss2 && newAss2 !== meNm){
+          var assUser2 = users.find(function(x){ return ((x.name||"").trim().toLowerCase()) === newAss2; });
+          if(assUser2){
+            sendPushToUsers(assUser2.id, {
+              title: "🎯 Nova tarefa pra você",
+              body: (data.client?data.client+" · ":"") + (data.title||"Sem título"),
+              data: { taskId: docRef.id, tag: "asg-"+docRef.id }
+            });
+          }
+        }
+      }catch(_){}
     }
     closeSheets();
   }catch(e){toast("Erro ao salvar. Verifique a conexão.");}
@@ -6208,7 +6744,29 @@ function openTaskDetail(id){
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Responsável",esc(t.assignee))+
     di('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Link / Anexo",linkHtml)+
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Criado por",u?esc(u.name):"—")+
-    '</div>'+cronHtml+copyHtml+rotHtml+postHtml+chkHtml+trackHtml;
+    '</div>'+
+    /* [V63.11] Bloco WhatsApp — ações pra compartilhar/avisar via WhatsApp */
+    (function(){
+      var assigneeUser = t.assignee ? users.find(function(x){ return ((x.name||"").trim().toLowerCase() === (t.assignee||"").trim().toLowerCase()); }) : null;
+      var assigneePhone = assigneeUser && assigneeUser.phone ? assigneeUser.phone : null;
+      var prazo = dMsD ? (" Prazo: "+fmtMs(dMsD)+".") : "";
+      var statusLab = stageLabel(t.status||"afazer", t.sector);
+      /* Texto pro responsável */
+      var firstName = (t.assignee||"").trim().split(/\s+/)[0] || "";
+      var msgAssign = "Olá"+(firstName?" "+firstName:"")+"! Te atribuíram a tarefa \""+(t.title||"")+"\""+(t.client?" do cliente "+t.client:"")+". Status atual: "+statusLab+"."+prazo+" — via ID Seven";
+      /* Texto pra compartilhar com a equipe (escolhe contato) */
+      var msgShare = "📌 "+(t.title||"Tarefa")+(t.client?" — "+t.client:"")+"\nSetor: "+sec.label+"\nResponsável: "+(t.assignee||"—")+"\nStatus: "+statusLab+prazo+"\n— via ID Seven";
+
+      var buttons = [];
+      if(assigneeUser && me && assigneeUser.id !== me.id){
+        /* Botão "Avisar responsável" — só aparece se o responsável NÃO é eu mesmo */
+        buttons.push(waBtnHTML(assigneePhone ? "Avisar responsável" : "Avisar responsável (escolher contato)", assigneePhone, msgAssign));
+      }
+      /* Botão genérico de compartilhar — sempre aparece */
+      buttons.push(waBtnHTML("Compartilhar no WhatsApp", null, msgShare, "wa-btn-ghost"));
+      return '<div class="wa-row" style="margin:18px 0 4px">'+buttons.join("")+'</div>';
+    })()+
+    cronHtml+copyHtml+rotHtml+postHtml+chkHtml+trackHtml;
   $("taskDetailBody").querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveTask(id,b.dataset.mv));
   $("taskDetailBody").querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>setCopyState(id,b.dataset.cs));
   $("taskDetailBody").querySelectorAll("[data-rs]").forEach(b=>b.onclick=()=>setRoteiroState(id,b.dataset.rs));
@@ -6426,6 +6984,31 @@ async function addComment(id, mentionsArr){
     await db.collection("tasks").doc(id).update({comments:arr});
     var lt=tasks.find(x=>x.id===id); if(lt) lt.comments=arr;
     if(detailTaskId===id && taskDetailSheet.classList.contains("open")) openTaskDetail(id);
+    /* [V63.12] Push REAL — pros mencionados (ou se não houver menção, pro responsável da tarefa) */
+    try{
+      var pushTargets = [];
+      if(ms.length){
+        /* Tem @: manda só pros mencionados (exceto eu) */
+        pushTargets = ms.filter(function(uid){ return uid !== me.id; });
+      } else {
+        /* Sem @: manda pro responsável SE for diferente de mim */
+        var assName = ((t.assignee||"").trim().toLowerCase());
+        var meNm3 = ((me.name||"").trim().toLowerCase());
+        if(assName && assName !== meNm3){
+          var assU = users.find(function(x){ return ((x.name||"").trim().toLowerCase()) === assName; });
+          if(assU) pushTargets.push(assU.id);
+        }
+      }
+      if(pushTargets.length){
+        var snippet = txt.slice(0,80) + (txt.length>80?"…":"");
+        var pushTitle = ms.length ? ("💬 "+(me.name||"Alguém")+" te mencionou") : ("💬 "+(me.name||"Alguém")+" comentou");
+        sendPushToUsers(pushTargets, {
+          title: pushTitle,
+          body: snippet + " — " + (t.title||"Tarefa"),
+          data: { taskId: id, tag: "cmt-"+id+"-"+entry.at }
+        });
+      }
+    }catch(_){}
   }catch(e){ toast("Não foi possível comentar agora"); }
   finally{ busy=false; }
 }
@@ -6569,10 +7152,47 @@ function notifList(){
 function bellSeenSet(){ try{ return new Set(JSON.parse(localStorage.getItem("idseven_bellseen")||"[]")); }catch(e){ return new Set(); } }
 function bellSave(set){ try{ localStorage.setItem("idseven_bellseen",JSON.stringify(Array.from(set).slice(-200))); }catch(e){} }
 let bellSeeded=false;
+/* [V63.11] Set de IDs que JÁ disparamos como notificação nativa pra não repetir */
+var nativeNotified = new Set();
 function refreshBell(){
   var dot=$("hBellDot"); if(!dot)return;
-  var seen=bellSeenSet(), n=notifList().filter(x=>!seen.has(x.id)).length;
-  dot.style.display=n>0?"block":"none";
+  var seen=bellSeenSet(), list=notifList(), unseen=list.filter(x=>!seen.has(x.id));
+  dot.style.display=unseen.length>0?"block":"none";
+
+  /* [V63.11] Dispara notificações nativas pros itens novos relevantes pra mim.
+     bellSeeded é true depois da primeira carga, então itens "antigos" não disparam. */
+  if(bellSeeded){
+    unseen.forEach(function(x){
+      if(nativeNotified.has(x.id)) return;
+      var title = null, body = (x.client?x.client+" · ":"") + (x.title||"");
+      var onClick = null, tid = x.task && x.task.id;
+      if(x.kind === "assigned"){
+        title = "🎯 Nova tarefa pra você";
+        onClick = function(){ switchTab("board"); if(tid) setTimeout(function(){ openTaskDetail(tid); }, 200); };
+      } else if(x.kind === "mention"){
+        var who1 = (x.cmt && x.cmt.name) || "Alguém";
+        title = "💬 "+who1+" te mencionou";
+        var snippet1 = (x.cmt && x.cmt.text || "").slice(0,80);
+        body = snippet1 + (snippet1.length<(x.cmt&&x.cmt.text||"").length?"…":"") + " — "+(x.title||"");
+        onClick = function(){ if(tid) { switchTab("board"); setTimeout(function(){ openTaskDetail(tid); }, 200); } };
+      } else if(x.kind === "comment"){
+        var who2 = (x.cmt && x.cmt.name) || "Alguém";
+        title = "💬 "+who2+" comentou";
+        var snippet2 = (x.cmt && x.cmt.text || "").slice(0,80);
+        body = snippet2 + (snippet2.length<(x.cmt&&x.cmt.text||"").length?"…":"") + " — "+(x.title||"");
+        onClick = function(){ if(tid) { switchTab("board"); setTimeout(function(){ openTaskDetail(tid); }, 200); } };
+      }
+      if(title){
+        nativeNotify(title, body, "bell-"+x.id, onClick);
+        nativeNotified.add(x.id);
+      }
+    });
+    /* Limita o Set a 500 IDs pra não crescer infinito */
+    if(nativeNotified.size > 500){
+      var arr = Array.from(nativeNotified).slice(-300);
+      nativeNotified = new Set(arr);
+    }
+  }
 }
 function openNotifs(){
   var list=notifList(), b=$("notifBody");
