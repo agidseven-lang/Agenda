@@ -2333,7 +2333,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.25 · build whatsapp-business</div>
+    <div class="ver">versão 63.26 · build wa-deeplink</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -5884,7 +5884,8 @@ async function addContentComment(tid, idx, txt, mentionsArr){
 /* ========== CLIENTE: enviar/invalidar/entregar ========== */
 function clientShareURL(token){ return location.origin + location.pathname + "?cliente=" + encodeURIComponent(token); }
 
-/* [V63.25] Modal de compartilhamento — copia texto e dá opção de WhatsApp Business OU normal.
+/* [V63.26] Modal de compartilhamento — usa deep link whatsapp:// pra abrir o app DESKTOP
+   (Business se for o instalado). Fallback pra WhatsApp Web.
    Importante: o WhatsApp NÃO permite enviar via link direto pra um grupo específico.
    O usuário precisa colar manualmente no grupo certo. */
 function openShareWAModal(message, title){
@@ -5899,23 +5900,23 @@ function openShareWAModal(message, title){
         '<div class="share-wa-title">📤 '+esc(title||"Enviar pro cliente")+'</div>'+
         '<button class="share-wa-x" id="__shareWAClose" title="Fechar">×</button>'+
       '</div>'+
-      '<div class="share-wa-warn">⚠ <b>Importante:</b> O WhatsApp não permite enviar direto pra um grupo via link. Copie a mensagem abaixo e cole no grupo/contato certo no seu WhatsApp Business.</div>'+
-      '<div class="share-wa-lab">📝 Mensagem pronta</div>'+
+      '<div class="share-wa-warn">⚠ <b>Importante:</b> O WhatsApp não permite enviar direto pra um grupo via link. A mensagem JÁ FOI COPIADA pra área de transferência — abra o WhatsApp Business e cole (Ctrl+V) no grupo/contato certo.</div>'+
+      '<div class="share-wa-lab">📝 Mensagem (já copiada automaticamente)</div>'+
       '<textarea class="share-wa-txt" id="__shareWATxt" readonly rows="6">'+esc(message||"")+'</textarea>'+
-      '<button class="share-wa-copy" id="__shareWACopy">📋 Copiar mensagem</button>'+
+      '<button class="share-wa-copy" id="__shareWACopy">📋 Copiar mensagem de novo</button>'+
       '<div class="share-wa-lab" style="margin-top:14px">🟢 Abrir WhatsApp</div>'+
       '<button class="share-wa-btn business" id="__shareWABiz">'+
-        '<span class="share-wa-btn-i">🟢</span>'+
+        '<span class="share-wa-btn-i">💻</span>'+
         '<div class="share-wa-btn-c">'+
-          '<div class="share-wa-btn-t">WhatsApp Business Web</div>'+
-          '<div class="share-wa-btn-s">Abre o Business no navegador · cole no grupo certo</div>'+
+          '<div class="share-wa-btn-t">Abrir WhatsApp Business no PC</div>'+
+          '<div class="share-wa-btn-s">Abre o app desktop instalado · escolha o grupo · cole com Ctrl+V</div>'+
         '</div>'+
       '</button>'+
-      '<button class="share-wa-btn normal" id="__shareWANormal">'+
-        '<span class="share-wa-btn-i">📱</span>'+
+      '<button class="share-wa-btn normal" id="__shareWAWeb">'+
+        '<span class="share-wa-btn-i">🌐</span>'+
         '<div class="share-wa-btn-c">'+
-          '<div class="share-wa-btn-t">WhatsApp com texto preenchido</div>'+
-          '<div class="share-wa-btn-s">Abre uma janela só pra escolher contato (não funciona pra grupo)</div>'+
+          '<div class="share-wa-btn-t">WhatsApp Web (navegador)</div>'+
+          '<div class="share-wa-btn-s">Use se NÃO tem o app instalado no PC</div>'+
         '</div>'+
       '</button>'+
     '</div>';
@@ -5933,18 +5934,26 @@ function openShareWAModal(message, title){
       navigator.clipboard.writeText(message||"");
       btn.textContent = "✓ Copiado!";
       btn.classList.add("copied");
-      setTimeout(function(){ btn.textContent = "📋 Copiar mensagem"; btn.classList.remove("copied"); }, 1800);
+      setTimeout(function(){ btn.textContent = "📋 Copiar mensagem de novo"; btn.classList.remove("copied"); }, 1800);
     }catch(e){
-      /* fallback: seleciona textarea */
       var ta = document.getElementById("__shareWATxt");
       if(ta){ ta.focus(); ta.select(); try{ document.execCommand("copy"); btn.textContent = "✓ Copiado!"; }catch(_){ toast("Não foi possível copiar — selecione e copie manual"); } }
     }
   };
+  /* Deep link nativo — abre o app desktop instalado (Business no caso do usuário) */
   document.getElementById("__shareWABiz").onclick = function(){
-    window.open("https://web.whatsapp.com/", "_blank");
+    var msg = message||"";
+    /* Garante que copiou antes de abrir o app */
+    try{ navigator.clipboard.writeText(msg); }catch(_){}
+    /* whatsapp://send?text=... → Windows registra esse esquema com o WhatsApp Business
+       se ele for o app instalado. Se o navegador perguntar "Abrir WhatsApp.exe?", aceitar. */
+    window.location.href = "whatsapp://send?text=" + encodeURIComponent(msg);
+    /* Fecha o modal depois de 1.5s pra dar tempo do app abrir */
+    setTimeout(closeMe, 1500);
   };
-  document.getElementById("__shareWANormal").onclick = function(){
-    window.open("https://wa.me/?text="+encodeURIComponent(message||""), "_blank");
+  /* WhatsApp Web (navegador) — quem não tem app instalado */
+  document.getElementById("__shareWAWeb").onclick = function(){
+    window.open("https://web.whatsapp.com/", "_blank");
   };
 }
 
