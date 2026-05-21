@@ -2004,12 +2004,18 @@
     .nav button svg{width:26px;height:26px}
     .nav .navfab{order:-1;top:0;margin-bottom:16px}
     .nav .navfab .pl{width:50px;height:50px}
-    /* [V63.16] Header e main aproveitam a tela toda — não há mais espaço preto à direita */
+    /* [V63.16] Header e main: padding pra clear do sidebar, depois cap do conteúdo
+       em 1400px centralizado. Resolve o problema de stretch em monitores ultrawide. */
     header{padding-left:148px;padding-right:40px;max-width:none;margin:0}
-    /* [V63.16] Cap da largura do conteúdo do header pra evitar que brand e ícones
-       fiquem distantes demais em monitores widescreen. Centralizado pra ficar proporcional. */
-    .hrow{max-width:800px;margin:0 auto}
     main{padding-left:148px;padding-right:40px;padding-bottom:32px;max-width:none;margin:0}
+    /* Conteúdo do header capado em 1400px e centralizado */
+    .hrow{max-width:1400px;margin:0 auto}
+    /* TODOS os filhos diretos de main capados em 1400px centralizado.
+       Isso resolve stretch das chips, headings, botões etc. em ultrawide. */
+    main > *{max-width:1400px;margin-left:auto;margin-right:auto}
+    /* Chips de filtro: agora flex-start ao invés de space-between
+       (com cap de 1400px, space-between ainda criaria gaps grandes) */
+    .filters{justify-content:flex-start}
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
     .ev .tt{font-size:16px}
@@ -2100,7 +2106,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.16 · build header-desktop</div>
+    <div class="ver">versão 63.16.1 · build layout-cap</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
