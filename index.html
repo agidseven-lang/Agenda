@@ -2077,7 +2077,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.12 · build push-real-fcm-debug</div>
+    <div class="ver">versão 63.12 · build push-real-fcm-debug2</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -3495,24 +3495,48 @@ async function teardownPushNotifications(){
    Lê os fcmTokens dos destinatários no Firestore e POSTa pro Worker.
    Tolerante a falha — se Worker offline, não quebra nada. */
 async function sendPushToUsers(userIds, payload){
-  if(!PUSH_WORKER_URL) return;            /* config vazia, push desligado */
-  if(!payload || !payload.title) return;
+  /* [V63.12-DEBUG] Diagnóstico visível pra entender por que push não dispara */
+  function _sendDbg(msg){
+    try{ console.log("[PUSH-SEND] " + msg); }catch(_){}
+  }
+  function _sendFail(reason, info){
+    var detail = info ? ("\n\nDetalhes: " + info) : "";
+    try{ console.error("[PUSH-SEND FALHA] " + reason, info); }catch(_){}
+    try{ alert("⚠ Push NÃO disparou.\n\nMotivo: " + reason + detail + "\n\nManda print pro Claude diagnosticar."); }catch(_){}
+  }
+
+  if(!PUSH_WORKER_URL){ _sendFail("Worker URL não configurado", "PUSH_WORKER_URL está vazio no código"); return; }
+  if(!payload || !payload.title){ _sendFail("Payload sem título", JSON.stringify(payload).substring(0,200)); return; }
   var ids = Array.isArray(userIds) ? userIds : [userIds];
-  if(!ids.length) return;
+  if(!ids.length){ _sendFail("Nenhum ID de usuário recebido", "ids vazio"); return; }
+
+  _sendDbg("Iniciando para " + ids.length + " usuário(s)");
 
   /* Coleta tokens — fonte de verdade é o array `users` em memória, fresco do snapshot */
   var tokens = [];
+  var diag = {idsRecebidos: ids.length, encontradosEmUsers: 0, semFcmTokensField: 0, fcmTokensVazio: 0, totalTokens: 0};
   ids.forEach(function(uid){
     if(!uid) return;
     var u = users.find(function(x){ return x.id === uid; });
-    if(u && Array.isArray(u.fcmTokens)){
-      u.fcmTokens.forEach(function(t){ if(t && tokens.indexOf(t) < 0) tokens.push(t); });
-    }
+    if(!u){ _sendDbg("Usuário ID='"+uid+"' não está em users[] (cache local pode estar desatualizado)"); return; }
+    diag.encontradosEmUsers++;
+    if(!Array.isArray(u.fcmTokens)){ diag.semFcmTokensField++; _sendDbg("Usuário '"+u.name+"' (id="+u.id+") não tem campo fcmTokens no documento"); return; }
+    if(u.fcmTokens.length === 0){ diag.fcmTokensVazio++; _sendDbg("Usuário '"+u.name+"' tem fcmTokens=[] (não registrou push em nenhum dispositivo ainda)"); return; }
+    u.fcmTokens.forEach(function(t){ if(t && tokens.indexOf(t) < 0){ tokens.push(t); diag.totalTokens++; } });
   });
-  if(!tokens.length) return;
 
+  if(!tokens.length){
+    _sendFail("Nenhum token coletado — destinatário(s) não tem(têm) push registrado",
+      "IDs recebidos: " + diag.idsRecebidos +
+      "\nEncontrados em users[]: " + diag.encontradosEmUsers +
+      "\nSem campo fcmTokens: " + diag.semFcmTokensField +
+      "\nCom fcmTokens vazio: " + diag.fcmTokensVazio);
+    return;
+  }
+
+  _sendDbg("Chamando Worker com " + tokens.length + " token(s)");
   try{
-    await fetch(PUSH_WORKER_URL, {
+    var res = await fetch(PUSH_WORKER_URL, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
@@ -3522,7 +3546,15 @@ async function sendPushToUsers(userIds, payload){
         data: payload.data || {}
       })
     });
-  }catch(_){ /* falha silenciosa — push é best-effort */ }
+    var txt = "";
+    try{ txt = await res.text(); }catch(_){}
+    _sendDbg("Worker respondeu status=" + res.status + " body=" + txt.substring(0,300));
+    if(res.status >= 400){
+      _sendFail("Worker retornou erro HTTP " + res.status, "Resposta: " + txt.substring(0,300));
+    }
+  }catch(e){
+    _sendFail("Erro de rede ao chamar Worker", e.message);
+  }
 }
 
 /* === Helper: descobre IDs dos administradores/gestores (recipient quando cliente aprova) === */
