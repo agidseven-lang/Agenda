@@ -1464,44 +1464,38 @@
   .col.analise .nm i{background:var(--c-edicao)} .col.aprovacao .nm i{background:var(--c-copy)}
   .col.pronto .nm i{background:var(--accent)}
   /* ============================================================
-     [V63.1] CARDS DO BOARD — REDESIGN VISUAL profundo
+     [V63.6] CARDS DO BOARD — visual sóbrio, border-left colorida
      ============================================================ */
   .tcard{position:relative;background:var(--surface);
     border:1px solid var(--line);
-    border-radius:14px;padding:14px;
+    border-left:3px solid var(--uc,var(--accent));
+    border-radius:12px;padding:14px 14px 14px 14px;
     margin-bottom:10px;cursor:pointer;
     box-shadow:0 1px 2px rgba(0,0,0,.25),0 0 0 1px rgba(255,255,255,.025) inset;
-    overflow:hidden;
     transition:transform var(--tr-fast),border-color var(--tr-fast),background var(--tr-fast),box-shadow var(--tr-base)}
-  /* Barra colorida superior — identidade visual forte do setor */
-  .tcard::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;
-    background:var(--uc,var(--accent));opacity:.85}
-  .tcard::after{content:"";position:absolute;top:0;left:0;right:0;height:50px;
-    background:linear-gradient(180deg,color-mix(in srgb,var(--uc,var(--accent)) 8%,transparent),transparent);
-    pointer-events:none;opacity:.5}
-  .tcard:hover{border-color:color-mix(in srgb,var(--uc,var(--accent)) 35%,var(--line-strong));
-    transform:translateY(-1px);
+  .tcard:hover{border-color:var(--line-strong);border-left-color:var(--uc,var(--accent));
+    background:var(--surface-2);transform:translateY(-1px);
     box-shadow:0 6px 18px -8px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.04) inset}
-  .tcard:hover::after{opacity:.8}
   .tcard:active{transform:scale(.99)}
   .tcard.late{border-color:rgba(255,90,77,.4)}
-  .tcard.late::before{background:var(--c-rev-strong);opacity:1}
+  .tcard.in-client{border-left-width:4px}
+  .tcard.in-fase2{border-left-color:var(--c-edicao)}
 
   /* === Topo: tags da etapa + identificador + avatar === */
-  .tc-top{position:relative;z-index:1;display:flex;align-items:center;gap:6px;margin-bottom:11px;flex-wrap:wrap}
+  .tc-top{display:flex;align-items:center;gap:6px;margin-bottom:11px;flex-wrap:wrap}
   .tc-st{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
     padding:4px 9px;border-radius:6px;white-space:nowrap}
   .tc-top .tpill{margin:0;font-size:9.5px;font-weight:800;padding:4px 8px;border-radius:6px;letter-spacing:.04em}
-  .tc-avw{margin-left:auto;position:relative;flex-shrink:0;width:30px;height:30px}
-  .tc-av{width:30px;height:30px;border-radius:50%;overflow:hidden;
-    border:2px solid var(--uc,var(--line));background:var(--surface-2);display:block;
-    box-shadow:0 2px 6px rgba(0,0,0,.35)}
+  .tc-avw{margin-left:auto;position:relative;flex-shrink:0;width:28px;height:28px}
+  .tc-av{width:28px;height:28px;border-radius:50%;overflow:hidden;
+    border:1.5px solid var(--uc,var(--line));background:var(--surface-2);display:block;
+    box-shadow:0 1px 4px rgba(0,0,0,.3)}
   .tc-av img{width:100%;height:100%;object-fit:cover}
-  .tc-cdot{position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;
+  .tc-cdot{position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;
     border:2px solid var(--surface)}
 
   /* === "Demandada por" — linha microtexto === */
-  .tc-from{position:relative;z-index:1;display:flex;align-items:center;gap:7px;margin-bottom:10px;font-size:11px;
+  .tc-from{display:flex;align-items:center;gap:7px;margin-bottom:9px;font-size:11px;
     color:var(--ink-faint);font-weight:500}
   .tc-from .lab{font-size:9px;font-weight:800;color:var(--ink-faint);letter-spacing:.06em;
     text-transform:uppercase;flex-shrink:0;opacity:.7}
@@ -1513,43 +1507,45 @@
   .tc-from .cdot{display:none}
 
   /* === Cliente — destaque visual === */
-  .tcard .tcli{position:relative;z-index:1;font-size:10px;font-weight:800;color:var(--accent);
-    text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;
+  .tcard .tcli{font-size:10px;font-weight:800;color:var(--accent);
+    text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-  /* === TÍTULO — protagonista, tipografia maior === */
-  .tcard .ttt{position:relative;z-index:1;font-size:15px;font-weight:700;line-height:1.35;
-    margin-bottom:11px;color:var(--ink);letter-spacing:-.015em;
+  /* === TÍTULO — protagonista, tipografia clara === */
+  .tcard .ttt{font-size:14px;font-weight:700;line-height:1.35;
+    margin-bottom:10px;color:var(--ink);letter-spacing:-.012em;
     overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
 
-  /* === Setor — pílula compacta === */
-  .tcard .tsec{position:relative;z-index:1;display:inline-flex;align-items:center;gap:5px;
-    font-size:10px;font-weight:800;padding:4px 9px;border-radius:6px;margin-bottom:8px;
-    letter-spacing:.03em;text-transform:uppercase}
+  /* === Setor — pílula compacta (COPYWRITER, etc) ===
+     IMPORTANTE: último elemento na maioria dos cards. Margem 0 ao fim
+     pra não ultrapassar o limite inferior do card. */
+  .tcard .tsec{display:inline-flex;align-items:center;gap:5px;
+    font-size:10px;font-weight:800;padding:4px 9px;border-radius:6px;
+    margin:0;letter-spacing:.05em;text-transform:uppercase;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-  /* === Responsável (legacy, ainda usado em alguns lugares) === */
-  .tcard .tc-who{position:relative;z-index:1;font-size:11.5px;font-weight:600;color:var(--ink-soft);
+  /* === Responsável (legacy) === */
+  .tcard .tc-who{font-size:11.5px;font-weight:600;color:var(--ink-soft);
     margin-bottom:7px;display:flex;align-items:center;gap:7px}
   .tcard .tc-who::before{content:"";width:6px;height:6px;border-radius:50%;
     background:var(--uc,var(--ink-faint));flex-shrink:0}
 
   /* === Meta (data, prazo, link) — rodapé com divisor === */
-  .tcard .tmeta{position:relative;z-index:1;display:flex;align-items:center;gap:11px;flex-wrap:wrap;
+  .tcard .tmeta{display:flex;align-items:center;gap:11px;flex-wrap:wrap;
     font-size:11px;color:var(--ink-faint);font-weight:600;padding-top:10px;
-    border-top:1px solid var(--line-soft);margin-top:2px}
+    border-top:1px solid var(--line-soft);margin-top:10px}
   .tcard .tmeta .mi{display:inline-flex;align-items:center;gap:5px}
   .tcard .tmeta svg{width:12px;height:12px;opacity:.75}
   .tcard .tmeta .due.late{color:var(--c-rev);font-weight:700}
   .tcard .tmeta .cd{font-weight:700}
   .tcard .tmeta .cd.ok{color:var(--c-trafego)}
   .tcard .tmeta .cd.late{color:var(--c-rev)}
-  .tc-pl{position:relative;z-index:1;display:flex;align-items:center;gap:10px;margin-top:11px}
+  .tc-pl{display:flex;align-items:center;gap:10px;margin-top:10px}
   .tc-pl .tprog{flex:1;height:6px;border-radius:99px;background:var(--surface-3);overflow:hidden}
-  .tc-pl .tprog>i{display:block;height:100%;border-radius:99px;
-    box-shadow:0 0 8px color-mix(in srgb,currentColor 40%,transparent)}
+  .tc-pl .tprog>i{display:block;height:100%;border-radius:99px}
   .tc-pct{font-size:11.5px;font-weight:800;flex-shrink:0}
-  .tcard .tdone{position:relative;z-index:1;display:flex;align-items:center;gap:8px;margin-top:11px;
-    padding-top:10px;border-top:1px solid var(--line);font-size:11.5px;font-weight:600;color:var(--ink-soft)}
+  .tcard .tdone{display:flex;align-items:center;gap:8px;margin-top:10px;
+    padding-top:10px;border-top:1px solid var(--line-soft);font-size:11.5px;font-weight:600;color:var(--ink-soft)}
   .tcard .tdone .av{width:20px;height:20px;border-radius:50%;overflow:hidden;flex-shrink:0}
   .tcard .tdone .av img{width:100%;height:100%;object-fit:cover}
   .tk-track{margin-top:14px;border:1px solid var(--line);background:var(--surface);border-radius:13px;padding:13px}
@@ -1791,7 +1787,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.5 · build fase-b3-completa</div>
+    <div class="ver">versão 63.7 · build fix-avatar-foto</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2270,7 +2266,7 @@ async function verifyPw(u,pw){
 function fbAvatar(n){const i=(n||"?").trim().charAt(0).toUpperCase()||"?";
   return `<div style="width:100%;height:100%;background:var(--surface-2);display:grid;place-items:center;font-weight:800;color:var(--ink-soft);font-size:15px">${i}</div>`;}
 function safePhoto(p){return(typeof p==="string"&&/^data:image\/(png|jpe?g|webp|gif);base64,/.test(p)&&p.length<500000)?p:null;}
-function avatarHTML(u){const p=u&&safePhoto(u.photo);return p?'<img src="'+p.replace(/"/g,"")+'" alt="">':fbAvatar(u?u.name:"?");}
+function avatarHTML(u){const p=u&&safePhoto(u.photo);return p?'<img src="'+p.replace(/"/g,"")+'" alt="" style="width:100%;height:100%;object-fit:cover;display:block">':fbAvatar(u?u.name:"?");}
 const USER_COLORS=["var(--c-rev-strong)","#4d9fff","#36d399","#b072ff","#ffb02e","#ff7ab8","#22d3ee","#3eb8d8","#f4845f","#9d8cff","#5eead4","#fca5f1"];
 function userColor(u){ if(!u||!u.id)return"#8a8a96"; if(u.color&&USER_COLORS.includes(u.color))return u.color; let h=0; const s=String(u.id); for(let i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0; return USER_COLORS[Math.abs(h)%USER_COLORS.length]; }
 function userByName(n){ n=(n||"").trim().toLowerCase(); return n?users.find(u=>(u.name||"").trim().toLowerCase()===n):null; }
