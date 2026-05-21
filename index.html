@@ -2084,7 +2084,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.13 · build push-real-fcm</div>
+    <div class="ver">versão 63.14 · build audit-full</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2745,6 +2745,9 @@ function askNotif(){
 }
 
 function showAlarm(kind, e, minBefore){
+  /* [V63.14 — AUDIT] Não dispara alarme se usuário não estiver logado/ativo
+     (evita overlay aparecer sobre a tela de login após logout). */
+  if(!me || me.status !== "ativo") return false;
   if(alarmActive) return false;
   alarmActive=true;
   const ov=$("alarmOverlay"), fin=(kind==="end");
@@ -3475,9 +3478,13 @@ async function setupPushNotifications(){
        nesse caso o SO não mostra nada automaticamente; usamos nativeNotify. */
     fcmMessaging.onMessage(function(payload){
       try{
+        /* [V63.14 — AUDIT] Não mostra notificação foreground se usuário deslogou
+           durante o ciclo de vida do messaging (caso raro mas existente). */
+        if(!me || me.status !== "ativo") return;
         var n = payload && payload.notification || {};
         var d = payload && payload.data || {};
         nativeNotify(n.title || "ID Seven", n.body || "", d.tag || ("fg-"+Date.now()), function(){
+          if(!me || me.status !== "ativo") return;
           if(d.url){ try{ window.location.href = d.url; }catch(_){} return; }
           if(d.taskId){ openTaskDetail(d.taskId); return; }
           if(d.eventId){ switchTab("agenda"); setTimeout(function(){ openDetail(d.eventId); }, 200); return; }
@@ -3487,7 +3494,8 @@ async function setupPushNotifications(){
 
     /* Re-render das configurações pra atualizar o badge "Dispositivo registrado" */
     try{ if(typeof renderSettingsNotifications === "function"){ renderSettingsNotifications(); } }catch(_){}
-    try{ if(typeof switchTab === "function" && getCurrentTab && getCurrentTab() === "settings"){ /* força refresh */ } }catch(_){}
+    /* [V63.14 — AUDIT] Removida referência a getCurrentTab() que não existia
+       (era no-op silenciado por try/catch — código morto). */
 
     return true;
   }catch(e){
@@ -3630,6 +3638,9 @@ try{
       var msg = e.data || {};
       if(msg.type !== "fcm-notif-click") return;
       var d = msg.data || {};
+      /* [V63.14 — AUDIT] Não abre detalhe se o usuário não estiver logado
+         (ex: notificação clicada após logout — evita estado UI inconsistente). */
+      if(!me || me.status !== "ativo") return;
       if(d.taskId){ openTaskDetail(d.taskId); return; }
       if(d.eventId){ switchTab("agenda"); setTimeout(function(){ openDetail(d.eventId); }, 200); return; }
     });
