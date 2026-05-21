@@ -7438,6 +7438,29 @@ function cronNorm(x){
     if(typeof x.lgState==="string" && ["pendente","escrita","enviada","em_analise","em_revisao","aprovada"].indexOf(x.lgState)>=0) o.lgState=x.lgState;
     if(typeof x.lgFeedback==="string") o.lgFeedback=x.lgFeedback.slice(0,500);
     if(x.lgFeedbackAt) o.lgFeedbackAt=x.lgFeedbackAt;
+    /* [V63.23] PRESERVA campos de Posts anexados — sem isso, são apagados a cada salvamento */
+    if(Array.isArray(x.feed)){
+      o.feed = x.feed.filter(function(img){
+        return img && typeof img.url === "string";
+      }).slice(0, 10);
+    } else if(x.feed && typeof x.feed === "object" && typeof x.feed.url === "string"){
+      /* legado V63.17: c.feed = {url,at,by} singular — preserva intacto pro getFeedImages migrar */
+      o.feed = { url: x.feed.url, at: x.feed.at||0, by: x.feed.by||null };
+    }
+    if(Array.isArray(x.stories)){
+      o.stories = x.stories.filter(function(s){
+        return s && typeof s.url === "string";
+      }).slice(0, 100);
+    }
+    if(x.story && typeof x.story === "object" && typeof x.story.url === "string"){
+      /* legado V63.17: c.story = {url,at,by} singular */
+      o.story = { url: x.story.url, at: x.story.at||0, by: x.story.by||null };
+    }
+    if(Array.isArray(x.imageComments)){
+      o.imageComments = x.imageComments.filter(function(ic){
+        return ic && typeof ic.imageId === "string" && typeof ic.text === "string";
+      }).slice(-500);
+    }
     return o;
   }
   return {t:"",d:(x==null?"":(""+x)),l:"",st:"afazer"};
@@ -7604,7 +7627,11 @@ $("taskSave").onclick=async()=>{
   if(selSector==="design"||selSector==="copy"){
     data.freq=selFreq;
     data.cronMonth=(selFreq==="mensal")?(cronMonthVal||""):"";
-    data.cronWeeks=cronWeeks.slice(0,cronWeekCount()*3).map(function(x){var o=cronNorm(x);return {t:(o.t||"").trim(),d:(o.d||"").trim(),l:(o.l||"").trim(),st:o.st};});
+    data.cronWeeks=cronWeeks.slice(0,cronWeekCount()*3).map(function(x){
+      var o=cronNorm(x);
+      o.t=(o.t||"").trim(); o.d=(o.d||"").trim(); o.l=(o.l||"").trim();
+      return o;
+    });
   } else { data.freq=""; data.cronMonth=""; data.cronWeeks=[]; }
   if(selSector==="copy"){
     var cs=selCopyState; if(cs==="aprovado" && !isCopyApprover(me)) cs="em_avaliacao";
