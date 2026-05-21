@@ -2077,7 +2077,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.12 · build push-real-fcm-debug3</div>
+    <div class="ver">versão 63.13 · build push-real-fcm</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2468,7 +2468,13 @@ let db=null, me=null, users=[], events=[], tasks=[];
 let alarmTimer=null, alarmSeeded=false, alarmActive=false, audioCtx=null, beepTimer=null, notifAsked=false;
 let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
 let usersLoaded=false, photoReady=false, sessionId=null, busy=false;
-const ALARM_KEY="idseven_alarmed", PRE_MIN=120; /* 2h antes */
+const ALARM_KEY="idseven_alarmed";
+/* [V63.13] Antecedência do alarme agora respeita a preferência do usuário
+   (5/10/15/30/60 min) em vez do antigo hardcode de 2h. */
+function preMinForAlarms(){
+  try{ var v = parseInt(getPref("reminderMinutes", 10), 10); return (v>0 ? v : 10); }
+  catch(_){ return 10; }
+}
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
 let boardFilter="all", boardFilterUserSet=false, boardView="team", settingsView="main", calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
 
@@ -2731,12 +2737,15 @@ function askNotif(){
   try{ if("Notification" in window && Notification.permission==="default") Notification.requestPermission(); }catch(e){}
 }
 
-function showAlarm(kind,e){
+function showAlarm(kind, e, minBefore){
   if(alarmActive) return false;
   alarmActive=true;
   const ov=$("alarmOverlay"), fin=(kind==="end");
+  /* [V63.13] Lead time agora vem da preferência do usuário, não hardcoded */
+  const mb = (typeof minBefore === "number" && minBefore > 0) ? minBefore : (function(){ try{ return preMinForAlarms(); }catch(_){ return 10; } })();
+  const leadLabel = (function(){ try{ return humanDur(mb*60000); }catch(_){ return mb+" min"; } })();
   ov.classList.toggle("finish",fin);
-  $("alarmHead").textContent = fin ? "Compromisso encerrado" : "Lembrete · faltam 2 horas";
+  $("alarmHead").textContent = fin ? "Compromisso encerrado" : ("Lembrete · faltam "+leadLabel);
   $("alarmTitle").textContent = (e.title||e.client||"Compromisso");
   const t=(TYPES[e.type]||TYPES.outro).label;
   const tt = e.start ? (e.end? e.start+" — "+e.end : e.start) : "—";
@@ -2748,7 +2757,7 @@ function showAlarm(kind,e){
   $("alarmStop").textContent = fin ? "Ok, encerrado" : "Parar alarme";
   ov.classList.add("on");
   startBeeping();
-  notify(fin?"Compromisso encerrado — ID Seven":"Lembrete (2h) — ID Seven",
+  notify(fin?"Compromisso encerrado — ID Seven":("Lembrete em "+leadLabel+" — ID Seven"),
          (e.client||e.title||"Compromisso")+" · "+tt);
   return true;
 }
@@ -2763,16 +2772,19 @@ $("alarmStop").onclick=stopAlarm;
 function checkAlarms(seedOnly){
   if(!events||!events.length) return;
   const now=Date.now(), fired=loadFired(); let changed=false;
+  /* [V63.13] Lead time agora vem da preferência do usuário (5/10/15/30/60),
+     não mais o antigo hardcode de 120 min. */
+  const minBefore = preMinForAlarms();
   events.forEach(e=>{
     if(e.done) return;
     const id=e.id, sDT=evStartDT(e), eDT=evEndDT(e);
-    // lembrete 2h antes
+    // lembrete X min antes (X = preferência do usuário)
     const kPre=id+"_pre";
     if(!fired[kPre]){
       if(now>=sDT){ fired[kPre]=true; changed=true; }              // já passou: não toca
-      else if(now>=sDT-PRE_MIN*60000){
+      else if(now>=sDT-minBefore*60000){
         if(seedOnly){ fired[kPre]=true; changed=true; }
-        else if(showAlarm("pre",e)){ fired[kPre]=true; changed=true; } // senão, tenta de novo no próximo ciclo
+        else if(showAlarm("pre",e,minBefore)){ fired[kPre]=true; changed=true; } // senão, tenta de novo no próximo ciclo
       }
     }
     // encerramento
@@ -2781,7 +2793,7 @@ function checkAlarms(seedOnly){
       if(now>eDT+30*60000){ fired[kEnd]=true; changed=true; }       // encerrou há muito: não toca
       else if(now>=eDT){
         if(seedOnly){ fired[kEnd]=true; changed=true; }
-        else if(showAlarm("end",e)){ fired[kEnd]=true; changed=true; }
+        else if(showAlarm("end",e,minBefore)){ fired[kEnd]=true; changed=true; }
       }
     }
   });
@@ -3367,15 +3379,14 @@ async function setupPushNotifications(){
   /* Permissão não concedida ainda? não força aqui */
   if(typeof Notification === "undefined" || Notification.permission !== "granted") return false;
 
-  /* [V63.12-DEBUG] Logger visível pra diagnosticar onde trava */
+  /* [V63.13] Logger silencioso pra console (sem alert popup em produção).
+     O alert antigo aparecia até em casos benignos (sessão expirou durante async, etc.)
+     e poluía a experiência. Erros importantes ainda aparecem no DevTools console. */
   function _pushDbg(step, info){
     try{ console.log("[PUSH] " + step, info || ""); }catch(_){}
   }
   function _pushErr(step, err){
-    var msg = (err && err.message) ? err.message : String(err);
-    var code = (err && err.code) ? (" [code: "+err.code+"]") : "";
-    try{ console.error("[PUSH ERRO em " + step + "]" + code, err); }catch(_){}
-    try{ alert("⚠ Push falhou em: " + step + "\n\nErro: " + msg + code + "\n\nManda esse texto pro Claude diagnosticar."); }catch(_){}
+    try{ console.error("[PUSH erro em " + step + "]", err); }catch(_){}
   }
 
   try{
@@ -3433,7 +3444,7 @@ async function setupPushNotifications(){
 
     if(!token){ _pushErr("getToken-vazio", new Error("getToken retornou vazio. Verifica VAPID key + permissão.")); return false; }
 
-    /* [V63.12-DEBUG2] Re-check defensivo: usuário pode ter deslogado durante o await */
+    /* [V63.13] Re-check defensivo: usuário pode ter deslogado durante o await */
     if(!me || !me.id || !db){
       _pushDbg("12a-sessao-expirou", "me ou db virou null durante async — abortando salvamento (não é erro real)");
       return false;
@@ -3501,42 +3512,31 @@ async function teardownPushNotifications(){
    Lê os fcmTokens dos destinatários no Firestore e POSTa pro Worker.
    Tolerante a falha — se Worker offline, não quebra nada. */
 async function sendPushToUsers(userIds, payload){
-  /* [V63.12-DEBUG] Diagnóstico visível pra entender por que push não dispara */
-  function _sendDbg(msg){
-    try{ console.log("[PUSH-SEND] " + msg); }catch(_){}
-  }
+  /* [V63.13] Logging silencioso pra console (sem alert popup em produção).
+     Push é best-effort — se falhar, não devemos disturbar o usuário com modal. */
+  function _sendDbg(msg){ try{ console.log("[PUSH-SEND] " + msg); }catch(_){} }
   function _sendFail(reason, info){
-    var detail = info ? ("\n\nDetalhes: " + info) : "";
-    try{ console.error("[PUSH-SEND FALHA] " + reason, info); }catch(_){}
-    try{ alert("⚠ Push NÃO disparou.\n\nMotivo: " + reason + detail + "\n\nManda print pro Claude diagnosticar."); }catch(_){}
+    try{ console.error("[PUSH-SEND falha] " + reason, info || ""); }catch(_){}
   }
 
-  if(!PUSH_WORKER_URL){ _sendFail("Worker URL não configurado", "PUSH_WORKER_URL está vazio no código"); return; }
-  if(!payload || !payload.title){ _sendFail("Payload sem título", JSON.stringify(payload).substring(0,200)); return; }
+  if(!PUSH_WORKER_URL){ _sendFail("Worker URL não configurado"); return; }
+  if(!payload || !payload.title){ _sendFail("Payload sem título"); return; }
   var ids = Array.isArray(userIds) ? userIds : [userIds];
-  if(!ids.length){ _sendFail("Nenhum ID de usuário recebido", "ids vazio"); return; }
+  if(!ids.length){ _sendFail("Nenhum ID de usuário recebido"); return; }
 
   _sendDbg("Iniciando para " + ids.length + " usuário(s)");
 
   /* Coleta tokens — fonte de verdade é o array `users` em memória, fresco do snapshot */
   var tokens = [];
-  var diag = {idsRecebidos: ids.length, encontradosEmUsers: 0, semFcmTokensField: 0, fcmTokensVazio: 0, totalTokens: 0};
   ids.forEach(function(uid){
     if(!uid) return;
     var u = users.find(function(x){ return x.id === uid; });
-    if(!u){ _sendDbg("Usuário ID='"+uid+"' não está em users[] (cache local pode estar desatualizado)"); return; }
-    diag.encontradosEmUsers++;
-    if(!Array.isArray(u.fcmTokens)){ diag.semFcmTokensField++; _sendDbg("Usuário '"+u.name+"' (id="+u.id+") não tem campo fcmTokens no documento"); return; }
-    if(u.fcmTokens.length === 0){ diag.fcmTokensVazio++; _sendDbg("Usuário '"+u.name+"' tem fcmTokens=[] (não registrou push em nenhum dispositivo ainda)"); return; }
-    u.fcmTokens.forEach(function(t){ if(t && tokens.indexOf(t) < 0){ tokens.push(t); diag.totalTokens++; } });
+    if(!u || !Array.isArray(u.fcmTokens) || u.fcmTokens.length === 0) return;
+    u.fcmTokens.forEach(function(t){ if(t && tokens.indexOf(t) < 0) tokens.push(t); });
   });
 
   if(!tokens.length){
-    _sendFail("Nenhum token coletado — destinatário(s) não tem(têm) push registrado",
-      "IDs recebidos: " + diag.idsRecebidos +
-      "\nEncontrados em users[]: " + diag.encontradosEmUsers +
-      "\nSem campo fcmTokens: " + diag.semFcmTokensField +
-      "\nCom fcmTokens vazio: " + diag.fcmTokensVazio);
+    _sendDbg("Nenhum token registrado nos destinatários — push pulado");
     return;
   }
 
@@ -3554,12 +3554,60 @@ async function sendPushToUsers(userIds, payload){
     });
     var txt = "";
     try{ txt = await res.text(); }catch(_){}
-    _sendDbg("Worker respondeu status=" + res.status + " body=" + txt.substring(0,300));
+    _sendDbg("Worker respondeu status=" + res.status);
     if(res.status >= 400){
-      _sendFail("Worker retornou erro HTTP " + res.status, "Resposta: " + txt.substring(0,300));
+      _sendFail("Worker HTTP " + res.status, txt.substring(0,300));
+      return;
     }
+
+    /* [V63.13] AUTO-LIMPEZA: o Worker retorna detalhes por token; se algum
+       falhou com NotRegistered/InvalidArgument, removemos do Firestore
+       automaticamente (best-effort — pode falhar por permissões). */
+    try{
+      var parsed = JSON.parse(txt);
+      if(parsed && Array.isArray(parsed.results)){
+        var deadTokens = [];
+        parsed.results.forEach(function(r, idx){
+          if(!r || r.ok) return;
+          var resp = String(r.response || "");
+          var isDead = resp.indexOf("NotRegistered") >= 0
+                    || resp.indexOf("UNREGISTERED") >= 0
+                    || resp.indexOf("InvalidArgument") >= 0
+                    || resp.indexOf("INVALID_ARGUMENT") >= 0
+                    || (r.status === 404);
+          if(isDead && tokens[idx]) deadTokens.push(tokens[idx]);
+        });
+        if(deadTokens.length > 0){
+          _sendDbg("Removendo " + deadTokens.length + " token(s) morto(s) do Firestore");
+          cleanupDeadTokens(ids, deadTokens);
+        }
+      }
+    }catch(_){ /* parse falhou — sem cleanup, sem problema */ }
   }catch(e){
-    _sendFail("Erro de rede ao chamar Worker", e.message);
+    _sendFail("Erro de rede ao chamar Worker", e && e.message);
+  }
+}
+
+/* [V63.13] Remove tokens mortos do Firestore dos usuários afetados.
+   Best-effort — falha silenciosa se permissões não permitirem (ex: usuário
+   tentando alterar doc de outro usuário sem ser admin). */
+async function cleanupDeadTokens(userIds, deadTokens){
+  if(!db || !Array.isArray(userIds) || !Array.isArray(deadTokens) || !deadTokens.length) return;
+  for(var i = 0; i < userIds.length; i++){
+    var uid = userIds[i];
+    if(!uid) continue;
+    try{
+      var ref = db.collection("users").doc(uid);
+      var snap = await ref.get();
+      if(!snap.exists) continue;
+      var existing = (snap.data() && snap.data().fcmTokens) || [];
+      if(!Array.isArray(existing) || !existing.length) continue;
+      var cleaned = existing.filter(function(t){ return deadTokens.indexOf(t) < 0; });
+      if(cleaned.length !== existing.length){
+        await ref.update({fcmTokens: cleaned});
+        try{ console.log("[PUSH-SEND] Limpou " + (existing.length - cleaned.length) + " token(s) de " + uid); }catch(_){}
+      }
+    }catch(_){ /* permissão negada ou outro erro — ignora */ }
   }
 }
 
