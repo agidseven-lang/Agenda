@@ -2077,7 +2077,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.12 · build push-real-fcm</div>
+    <div class="ver">versão 63.12 · build push-real-fcm-debug</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -3367,18 +3367,75 @@ async function setupPushNotifications(){
   /* Permissão não concedida ainda? não força aqui */
   if(typeof Notification === "undefined" || Notification.permission !== "granted") return false;
 
+  /* [V63.12-DEBUG] Logger visível pra diagnosticar onde trava */
+  function _pushDbg(step, info){
+    try{ console.log("[PUSH] " + step, info || ""); }catch(_){}
+  }
+  function _pushErr(step, err){
+    var msg = (err && err.message) ? err.message : String(err);
+    var code = (err && err.code) ? (" [code: "+err.code+"]") : "";
+    try{ console.error("[PUSH ERRO em " + step + "]" + code, err); }catch(_){}
+    try{ alert("⚠ Push falhou em: " + step + "\n\nErro: " + msg + code + "\n\nManda esse texto pro Claude diagnosticar."); }catch(_){}
+  }
+
   try{
+    _pushDbg("1-vapid-len", PUSH_VAPID_KEY.length);
+    _pushDbg("2-worker-url", PUSH_WORKER_URL);
+    _pushDbg("3-user-id", me && me.id);
+
+    /* Desregistra service workers antigos do FCM pra forçar fresh start
+       (causa comum de travar em "Registrando...") */
+    try{
+      var oldRegs = await navigator.serviceWorker.getRegistrations();
+      _pushDbg("4-sw-antigos", oldRegs.map(function(r){ return r.scope; }));
+      for(var i = 0; i < oldRegs.length; i++){
+        var r = oldRegs[i];
+        if(r.active && r.active.scriptURL && r.active.scriptURL.indexOf("firebase-messaging-sw.js") >= 0){
+          _pushDbg("4b-desregistrando-fcm-sw", r.active.scriptURL);
+          await r.unregister();
+        }
+      }
+    }catch(eCleanup){
+      _pushDbg("4-erro-listar-sw", eCleanup.message);
+    }
+
+    _pushDbg("5-antes-messaging", "chamando firebase.messaging()");
     fcmMessaging = firebase.messaging();
+    _pushDbg("6-messaging-ok", "instância criada");
+
     /* Pega ou registra o service worker dedicado pro FCM */
-    var reg = await navigator.serviceWorker.register("firebase-messaging-sw.js", {scope:"./"});
+    _pushDbg("7-antes-register", "registrando firebase-messaging-sw.js");
+    var reg = await navigator.serviceWorker.register("firebase-messaging-sw.js", {scope:"./firebase-cloud-messaging-push-scope"});
+    _pushDbg("8-register-ok", {scope: reg.scope, hasActive: !!reg.active, hasInstalling: !!reg.installing});
+
+    /* Espera o SW ficar ativo (até 10s) */
+    if(!reg.active && reg.installing){
+      _pushDbg("9-aguardando-sw-ativar", "");
+      await new Promise(function(resolve){
+        var done = false;
+        var sw = reg.installing;
+        function check(){
+          if(done) return;
+          if(sw.state === "activated"){ done = true; resolve(); }
+        }
+        sw.addEventListener("statechange", check);
+        setTimeout(function(){ if(!done){ done = true; resolve(); } }, 10000);
+      });
+      _pushDbg("9b-sw-pronto", reg.active ? "ativo" : "timeout");
+    }
+
+    _pushDbg("10-antes-getToken", "chamando getToken com vapidKey");
     var token = await fcmMessaging.getToken({
       vapidKey: PUSH_VAPID_KEY,
       serviceWorkerRegistration: reg
     });
-    if(!token) return false;
+    _pushDbg("11-getToken-retornou", token ? ("token len="+token.length) : "vazio/null");
+
+    if(!token){ _pushErr("getToken-vazio", new Error("getToken retornou vazio. Verifica VAPID key + permissão.")); return false; }
 
     /* Salva o token no perfil do usuário (campo fcmTokens é array de strings).
        Mantém últimos 5 dispositivos. */
+    _pushDbg("12-salvando-token-firestore", "");
     var userRef = db.collection("users").doc(me.id);
     var snap = await userRef.get();
     var existing = (snap.data() && snap.data().fcmTokens) || [];
@@ -3388,6 +3445,7 @@ async function setupPushNotifications(){
       await userRef.update({fcmTokens: arr});
     }
     fcmTokenSaved = token;
+    _pushDbg("13-SUCESSO", "token salvo no Firestore");
 
     /* Listener pra quando recebe push com APP ABERTO (foreground) —
        nesse caso o SO não mostra nada automaticamente; usamos nativeNotify. */
@@ -3402,9 +3460,14 @@ async function setupPushNotifications(){
         });
       }catch(_){}
     });
+
+    /* Re-render das configurações pra atualizar o badge "Dispositivo registrado" */
+    try{ if(typeof renderSettingsNotifications === "function"){ renderSettingsNotifications(); } }catch(_){}
+    try{ if(typeof switchTab === "function" && getCurrentTab && getCurrentTab() === "settings"){ /* força refresh */ } }catch(_){}
+
     return true;
   }catch(e){
-    /* Não loga erro pra não assustar — push é opcional */
+    _pushErr("catch-principal", e);
     return false;
   }
 }
