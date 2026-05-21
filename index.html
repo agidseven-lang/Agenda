@@ -1991,7 +1991,13 @@
     .grab{display:none}
   }
 
-  /* ---- Notebook / PC / Monitor (>=1024px): menu lateral ---- */
+  /* =============================================================
+     [V63.19] SISTEMA RESPONSIVO MULTI-BREAKPOINT — auditado pra
+     funcionar em: celular, tablet, notebook, PC, monitor 27/32",
+     ultrawide e TV 55-60" (1080p ou 4K).
+     ============================================================= */
+
+  /* ---- Notebook / PC base (>=1024px): menu lateral aparece ---- */
   @media (min-width:1024px){
     #app{max-width:none;margin:0}
     .nav{left:0;right:auto;top:0;bottom:0;width:108px;height:100%;max-width:none;margin:0;
@@ -2004,29 +2010,25 @@
     .nav button svg{width:26px;height:26px}
     .nav .navfab{order:-1;top:0;margin-bottom:16px}
     .nav .navfab .pl{width:50px;height:50px}
-    /* [V63.17] Header e main: padding pra clear do sidebar, depois cap do conteúdo
-       em 1400px LEFT-ALIGNED (não centralizado). Padrão Linear/Notion/Asana. */
+    /* Header e main: padding pra clear do sidebar */
     header{padding-left:148px;padding-right:40px;max-width:none;margin:0}
     main{padding-left:148px;padding-right:40px;padding-bottom:32px;max-width:none;margin:0}
-    /* Conteúdo do header E pageTitle capados em 1400px left-aligned */
-    .hrow,#pageTitle,#calControls{max-width:1400px;margin-left:0;margin-right:auto}
-    /* Direto filhos do main (renderTeam, renderBoard, etc) também capados left-aligned */
-    main > *{max-width:1400px;margin-left:0;margin-right:auto}
-    /* Chips: flex-start (em vez de space-between que criava gaps grandes) */
+    /* Content cap base: 1300px left-aligned (notebook) */
+    .hrow,#pageTitle,#calControls{max-width:1300px;margin-left:0;margin-right:auto}
+    main > *{max-width:1300px;margin-left:0;margin-right:auto}
+    /* Brand + ícones CLUSTERED na esquerda (sem gap gigante) */
+    .hrow{justify-content:flex-start;gap:32px}
+    /* Chips e botões: left-aligned, auto-size */
     .filters{justify-content:flex-start}
-    /* [V63.17] Botões "Calendário/Por cliente/Posts" não devem mais ser flex:1 no desktop —
-       ficavam blocos gigantes com ícone pequeno (visual amador). Auto-sized fica bem. */
     .board-tools{justify-content:flex-start}
     .board-tools .bt-link{flex:0 0 auto;padding:11px 22px}
     .board-tools .bt-link svg{width:17px;height:17px}
-    /* Toggle "Vista Equipe/Fluxo do Cliente": container só do tamanho do conteúdo */
     .view-toggle{display:inline-flex;max-width:max-content}
     .view-toggle .vt-opt{flex:0 0 auto;padding:11px 26px}
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
     .ev .tt{font-size:16px}
-    /* [V62.5] BOARD em GRID — 5 colunas iguais ocupam toda a largura disponível.
-       SEM scroll horizontal porque cabe tudo. Cada coluna tem scroll vertical próprio. */
+    /* BOARD em GRID — 5 colunas iguais ocupam toda a largura do cap */
     .board-wrap{display:grid;grid-template-columns:repeat(var(--cols, 5),minmax(0,1fr));
       gap:14px;overflow:visible;padding:10px 0 14px;
       height:calc(100vh - 280px);min-height:520px;max-height:calc(100vh - 160px)}
@@ -2036,31 +2038,56 @@
     .col::-webkit-scrollbar{width:6px}
     .col::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
     .col::-webkit-scrollbar-thumb:hover{background:var(--line-soft)}
-    /* Header da coluna sticky no topo — não some quando rola.
-       [V62.18] z-index alto e background SÓLIDO + gradient só como camada visual (não translúcida)
-       pra impedir que o card abaixo apareça através do header quando o usuário rola a coluna. */
     .col-h{position:sticky;top:0;z-index:5;background-color:var(--surface);
       margin:0 -10px 8px;padding:10px 12px 9px;border-bottom:1px solid var(--line-soft)}
     .col.cliente .col-h{background-color:var(--surface);
       background-image:linear-gradient(180deg,rgba(176,114,255,.12),rgba(176,114,255,0))}
     .tcard{margin-bottom:8px}
-    /* [V62.5] No desktop, a barra "NAVEGAR PARA →" SOME — tudo já está visível na tela */
     .board-nav{display:none}
     .toast{bottom:30px;left:calc(50% + 54px)}
     .sheet{width:min(620px,80vw);max-width:620px}
   }
 
-  /* ---- Monitores grandes (>=1500px) — colunas crescem ainda mais ---- */
-  @media (min-width:1500px){
-    .board-wrap{gap:18px;height:calc(100vh - 280px)}
+  /* ---- PC standard (>=1600px) — content cap aumenta pra 1500px ---- */
+  @media (min-width:1600px){
+    .hrow,#pageTitle,#calControls,main > *{max-width:1500px}
+    .board-wrap{gap:18px}
     .tcard .ttt{font-size:14px}
   }
 
-  /* ---- Monitores ultrawide (>=1800px) ---- */
-  @media (min-width:1800px){
+  /* ---- Monitor grande / Full HD 24-27" (>=1920px) — cap 1700px ---- */
+  @media (min-width:1920px){
+    .hrow,#pageTitle,#calControls,main > *{max-width:1700px}
+    body{font-size:15.5px}
+    header{padding-right:60px}
+    main{padding-right:60px}
+  }
+
+  /* ---- Ultrawide / 32" QHD (>=2560px) — cap 2000px ---- */
+  @media (min-width:2560px){
+    .hrow,#pageTitle,#calControls,main > *{max-width:2000px}
+    body{font-size:16px}
     header{padding-right:80px}
     main{padding-right:80px}
+    .tcard .ttt{font-size:15px}
   }
+
+  /* ---- TV 55-60" / 4K (>=3200px) — cap 2400px + fontes maiores
+     (usuário tipicamente está mais longe da tela) ---- */
+  @media (min-width:3200px){
+    .hrow,#pageTitle,#calControls,main > *{max-width:2400px}
+    body{font-size:17px}
+    .tcard .ttt{font-size:16px}
+    .pageT .mt{font-size:42px}
+  }
+
+  /* ---- TV 4K nativo (>=3840px) — cap final 2800px ---- */
+  @media (min-width:3840px){
+    .hrow,#pageTitle,#calControls,main > *{max-width:2800px}
+    body{font-size:18px}
+    .pageT .mt{font-size:46px}
+  }
+
 </style>
 </head>
 <body>
@@ -2112,7 +2139,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.17 · build desktop-aligned</div>
+    <div class="ver">versão 63.19 · build responsive-system</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
