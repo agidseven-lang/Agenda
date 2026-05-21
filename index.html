@@ -817,6 +817,103 @@
   .lg-read{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:13px;
     white-space:pre-wrap;line-height:1.55;font-size:14.5px;color:var(--ink);margin-top:6px}
 
+  /* [V63.23] Posts anexados: thumbnails (admin) + carrossel (cliente) + comentários por imagem */
+  .posts-section{margin:14px 0 4px}
+  .posts-block{margin:12px 0;background:var(--bg);border:1px solid var(--line-soft);border-radius:12px;padding:12px}
+  .posts-block-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .posts-block-t{font-size:11.5px;font-weight:900;letter-spacing:.08em;color:var(--ink);text-transform:uppercase}
+  .posts-block-c{font-size:11px;color:var(--ink-faint);font-weight:600}
+  .posts-hint{font-size:11px;color:var(--ink-faint);line-height:1.45;margin-top:8px}
+  /* Grid de miniaturas do Feed (até 10) */
+  .post-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+  .post-thumb-wrap{position:relative;border-radius:10px;overflow:hidden;background:#000;border:1px solid var(--line);aspect-ratio:3/4}
+  .post-thumb{width:100%;height:100%;display:block;object-fit:cover}
+  .post-thumb-fd{aspect-ratio:3/4}
+  .post-thumb-st{aspect-ratio:9/16}
+  .post-thumb-tag{position:absolute;top:5px;left:5px;font-size:9.5px;font-weight:900;letter-spacing:.06em;
+    background:rgba(0,0,0,.7);color:#fff;padding:2px 6px;border-radius:5px;backdrop-filter:blur(4px);z-index:2}
+  .post-thumb-x{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:6px;border:none;
+    background:rgba(0,0,0,.7);color:#fff;font-size:16px;line-height:1;cursor:pointer;z-index:2;
+    display:grid;place-items:center;backdrop-filter:blur(4px);font-weight:700}
+  .post-thumb-x:hover{background:rgba(220,38,38,.85)}
+  .post-thumb-cmt-badge{position:absolute;bottom:5px;right:5px;font-size:10px;font-weight:800;
+    background:rgba(176,114,255,.85);color:#fff;padding:3px 6px;border-radius:5px;backdrop-filter:blur(4px);z-index:2}
+  /* Botão "+ Adicionar" Feed/Story (no admin) */
+  .post-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    background:var(--surface);border:1.5px dashed var(--line-strong);border-radius:10px;
+    cursor:pointer;transition:border-color .15s ease,background .15s ease;aspect-ratio:3/4;
+    color:var(--ink-soft);text-align:center;padding:8px}
+  .post-add:hover{border-color:var(--accent);background:rgba(62,184,216,.06)}
+  .post-add-l{font-size:11.5px;font-weight:800;color:var(--ink)}
+  .post-add-s{font-size:9.5px;color:var(--ink-faint);font-weight:600;letter-spacing:.04em}
+  .post-add-story{aspect-ratio:auto;flex-direction:row;padding:12px;justify-content:flex-start;gap:10px;margin-top:8px}
+  .post-add-story .post-add-l{font-size:13px}
+  .post-add-story .post-add-s{font-size:10.5px;margin-left:auto}
+  .post-zone-busy{display:flex;flex-direction:column;align-items:center;gap:5px;padding:14px 6px;color:var(--accent)}
+  .post-zone-busy span{font-size:11px;font-weight:800;letter-spacing:.04em}
+  /* Linha de Story (thumb + caption opcional) */
+  .story-list{display:flex;flex-direction:column;gap:10px}
+  .story-row{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:flex-start}
+  .story-row .post-thumb-wrap{aspect-ratio:9/16;width:90px}
+  .story-row-r{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .story-cap-lab{font-size:10.5px;color:var(--ink-soft);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .story-cap-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;
+    padding:9px 11px;font:inherit;color:var(--ink);resize:vertical;line-height:1.45;font-family:inherit;font-size:13.5px;min-height:60px}
+  .story-cap-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(62,184,216,.18)}
+  .story-cap-read{font-size:13.5px;color:var(--ink);line-height:1.5;background:var(--surface);border:1px solid var(--line-soft);border-radius:9px;padding:10px 12px;min-height:32px}
+
+  /* Visão do CLIENTE — carrossel swipeable Feed + stories list */
+  .cv-feed-carousel{position:relative;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin:12px 0}
+  .cv-feed-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;
+    -ms-overflow-style:none;scrollbar-width:none}
+  .cv-feed-track::-webkit-scrollbar{display:none}
+  .cv-feed-slide{flex:0 0 100%;scroll-snap-align:start;position:relative;aspect-ratio:3/4;background:#000}
+  .cv-feed-slide img{width:100%;height:100%;object-fit:contain;display:block}
+  .cv-feed-counter{position:absolute;top:8px;left:8px;font-size:11px;font-weight:900;
+    background:rgba(0,0,0,.7);color:#fff;padding:4px 8px;border-radius:6px;backdrop-filter:blur(4px);z-index:3;letter-spacing:.04em}
+  .cv-feed-actions{position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:3}
+  .cv-feed-actions button{width:32px;height:32px;border-radius:8px;border:none;cursor:pointer;
+    background:rgba(0,0,0,.7);color:#fff;display:grid;place-items:center;backdrop-filter:blur(4px)}
+  .cv-feed-actions button:hover{background:rgba(0,0,0,.9)}
+  .cv-feed-actions button svg{width:15px;height:15px}
+  .cv-feed-dots{display:flex;justify-content:center;gap:6px;padding:8px 4px;background:rgba(0,0,0,.5)}
+  .cv-feed-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4);transition:background .2s}
+  .cv-feed-dot.on{background:#fff}
+  .cv-feed-nav{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;
+    border:none;cursor:pointer;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;z-index:3;backdrop-filter:blur(4px)}
+  .cv-feed-nav:hover{background:rgba(0,0,0,.8)}
+  .cv-feed-nav.prev{left:8px}
+  .cv-feed-nav.next{right:8px}
+  .cv-feed-nav svg{width:18px;height:18px}
+  .cv-stories-list{display:flex;flex-direction:column;gap:14px;margin:10px 0 14px}
+  .cv-story-item{background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line);position:relative}
+  .cv-story-item img{width:100%;display:block;aspect-ratio:9/16;object-fit:contain;background:#000}
+  .cv-story-lab{position:absolute;top:8px;left:8px;font-size:10.5px;font-weight:900;
+    background:rgba(0,0,0,.7);color:#fff;padding:4px 8px;border-radius:6px;backdrop-filter:blur(4px);z-index:2}
+  .cv-story-cmt-btn{position:absolute;bottom:8px;right:8px;font-size:11px;font-weight:800;
+    background:rgba(0,0,0,.7);color:#fff;padding:6px 11px;border-radius:8px;backdrop-filter:blur(4px);
+    border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;z-index:2}
+  .cv-story-cap{padding:10px 14px;background:rgba(255,255,255,.04);font-size:13.5px;line-height:1.5;color:var(--ink-soft)}
+
+  /* Popup de comentário em imagem (cliente) */
+  .cv-img-cmt-pop{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;
+    display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(8px)}
+  .cv-img-cmt-pop-box{background:var(--bg);border-radius:14px;padding:18px;width:100%;max-width:420px;
+    border:1px solid var(--line);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  .cv-img-cmt-pop h3{margin:0 0 6px;font-size:16px;font-weight:800}
+  .cv-img-cmt-pop p{margin:0 0 12px;font-size:12.5px;color:var(--ink-soft);line-height:1.5}
+  .cv-img-cmt-pop textarea{width:100%;min-height:90px;background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;padding:11px 12px;font:inherit;color:var(--ink);resize:vertical;line-height:1.5}
+  .cv-img-cmt-pop textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(62,184,216,.2)}
+  .cv-img-cmt-pop .acts{display:flex;gap:8px;margin-top:12px}
+  .cv-img-cmt-pop .acts button{flex:1;padding:11px;border-radius:10px;font-weight:800;cursor:pointer;border:none}
+  .cv-img-cmt-pop .acts .cancel{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+  .cv-img-cmt-pop .acts .send{background:var(--accent);color:#001423}
+  .cv-img-cmt-list{margin-top:10px;display:flex;flex-direction:column;gap:7px;max-height:160px;overflow-y:auto}
+  .cv-img-cmt-it{background:rgba(176,114,255,.07);border-left:3px solid var(--c-edicao);padding:8px 11px;border-radius:7px}
+  .cv-img-cmt-it-h{font-size:11px;color:var(--c-edicao);font-weight:800;margin-bottom:3px}
+  .cv-img-cmt-it-t{font-size:13px;color:var(--ink);line-height:1.45}
+
   /* [V62] Resumo Fase 2 no openTaskDetail — grid de estatísticas das legendas */
   .lg-summary{margin-top:14px}
   .lg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px;margin:10px 0}
@@ -2203,7 +2300,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.22 · build edicao-midia</div>
+    <div class="ver">versão 63.23 · build posts-completo</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2981,6 +3078,8 @@ var __clientOpenedMark = false;
     try{ refreshClientBadge(); }catch(e){}
     if(!boardTimer) boardTimer=setInterval(boardTick,60000);
     if(!$("mainApp").classList.contains("hidden")&&tab==="board")render();
+    /* [V63.23] Auto-arquiva posts > 10 dias após conclusão (roda 1x por sessão) */
+    try{ if(typeof autoArchiveOldPosts === "function") autoArchiveOldPosts(); }catch(_){}
   },err=>{});
   /* fallback: se nada carregar (offline), sai da tela de carregando após 6s */
   setTimeout(()=>{ if(!usersLoaded && !me) route(); },6000);
@@ -5593,7 +5692,8 @@ function openContentDetail(tid, idx){
         sendBtnLabel = '📤 Salvar e enviar pro cliente';
         sendBtnColor = 'var(--accent)';
       }
-      legendaBox += '<div class="cw-cn" style="margin-top:10px">Escreva a legenda do post</div>'+
+      legendaBox += renderPostsBlock(o, idx, true)+
+        '<div class="cw-cn" style="margin-top:10px">Escreva a legenda do post</div>'+
         '<textarea id="ctLgInput" class="lg-input" maxlength="3000" placeholder="Cole ou escreva aqui a legenda exatamente como vai ser publicada (com emojis, hashtags, quebras de linha)…">'+esc(o.lg||"")+'</textarea>'+
         '<div class="lg-actions">'+
           '<button class="primary" id="ctLgSave" style="background:transparent;color:var(--ink-soft);border:1.5px solid var(--line)">💾 Salvar rascunho</button>'+
@@ -5603,7 +5703,8 @@ function openContentDetail(tid, idx){
         '<div style="font-size:11.5px;color:var(--ink-faint);line-height:1.45;margin-top:8px">'+lgInstr+'</div>';
     } else if(lgSent){
       /* Modo leitura: mostra a legenda que foi enviada */
-      legendaBox += '<div class="cw-cn" style="margin-top:10px">Legenda enviada ao cliente</div>'+
+      legendaBox += renderPostsBlock(o, idx, false)+
+        '<div class="cw-cn" style="margin-top:10px">Legenda enviada ao cliente</div>'+
         '<div class="lg-read">'+esc(o.lg||"")+'</div>';
       if(lgSt==="aprovada"){
         legendaBox += '<div style="font-size:13.5px;color:var(--c-trafego);font-weight:800;margin-top:10px;text-align:center;padding:10px;background:rgba(54,211,153,.12);border-radius:8px">🚀 Legenda finalizada — pronto pra publicar</div>';
@@ -5672,6 +5773,8 @@ function openContentDetail(tid, idx){
     var ta=$("ctLgInput"); if(!ta) return;
     saveAndSendLegenda(tid, idx, ta.value);
   };
+  /* [V63.17] hooks dos botões de upload de Posts (Feed/Story) */
+  bindPostUploadZones(tid);
   /* binds do compartilhar duplicado no card */
   var _cs1=$("ctShareSend"); if(_cs1) _cs1.onclick=()=>sendCronToClient(tid);
   var _cs2=$("ctShareKill"); if(_cs2) _cs2.onclick=()=>invalidateShareLink(tid);
@@ -5825,6 +5928,355 @@ async function saveLegenda(taskId, idx, lgText){
   }catch(e){ toast("Não foi possível salvar a legenda agora"); }
   finally{ busy=false; }
 }
+
+/* ============================================================
+   [V63.23] POSTS ANEXADOS COMPLETO — carrossel + múltiplos stories
+   ============================================================
+   Cada card do cronograma pode ter:
+   - c.feed = [{id,url,at,by}, ...]              (até 10 — carrossel)
+   - c.stories = [{id,url,at,by,caption}, ...]   (múltiplos · legenda opc.)
+   - c.imageComments = [{id,imageId,by,byName,text,at}, ...]
+   Backward compat (V63.17): leitor aceita c.feed={url} e c.story={url}.
+   Auto-arquivamento: cards concluídos há > 10 dias têm imagens limpas.
+   ============================================================ */
+
+var POST_FEED_MAX = 10;
+var POST_STORIES_MAX = 100;
+var POST_AUTODELETE_DAYS = 10;
+
+function newImageId(){
+  return "img-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,8);
+}
+
+function getFeedImages(c){
+  if(!c) return [];
+  if(Array.isArray(c.feed)) return c.feed.filter(function(x){ return x && x.url; });
+  if(c.feed && c.feed.url) return [{ id:"legacy-feed-"+(c.feed.at||0), url:c.feed.url, at:c.feed.at||0, by:c.feed.by||null }];
+  return [];
+}
+
+function getStories(c){
+  if(!c) return [];
+  if(Array.isArray(c.stories)) return c.stories.filter(function(x){ return x && x.url; });
+  if(c.story && c.story.url) return [{ id:"legacy-story-"+(c.story.at||0), url:c.story.url, at:c.story.at||0, by:c.story.by||null, caption:"" }];
+  return [];
+}
+
+function getImageComments(c, imageId){
+  if(!c || !Array.isArray(c.imageComments)) return [];
+  if(!imageId) return c.imageComments.slice();
+  return c.imageComments.filter(function(ic){ return ic && ic.imageId === imageId; });
+}
+
+/* Sobe imagem pro ImageKit e APPENDA no array c.feed/c.stories */
+async function uploadPostImage(taskId, idx, type, file){
+  if(!canManage(me)){ toast("Apenas administradores podem anexar posts."); return; }
+  if(type!=="feed" && type!=="story"){ return; }
+  var t = tasks.find(function(x){ return x.id===taskId; });
+  if(!t||!db){ toast("Tarefa não encontrada"); return; }
+  if(!imageKitConfigured()){ toast("Upload de imagem não está configurado."); return; }
+  if(!file){ return; }
+  if(file.type && !/^image\//.test(file.type)){ toast("O arquivo não é uma imagem"); return; }
+  if(file.size && file.size > 25*1024*1024){ toast("Imagem muito grande (>25MB)"); return; }
+  var arr0 = (Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+  var c0 = arr0[idx]; if(!c0){ toast("Conteúdo não encontrado"); return; }
+  if(type === "feed"){
+    if(getFeedImages(c0).length >= POST_FEED_MAX){ toast("Limite de "+POST_FEED_MAX+" imagens no Feed"); return; }
+  } else {
+    if(getStories(c0).length >= POST_STORIES_MAX){ toast("Limite de "+POST_STORIES_MAX+" stories"); return; }
+  }
+  if(busy) return; busy = true;
+  /* Estado "enviando" no botão de adicionar */
+  var addBtn = document.querySelector('[data-pz-add="'+type+'"][data-pz-idx="'+idx+'"]');
+  var origAdd = "";
+  if(addBtn){
+    origAdd = addBtn.innerHTML;
+    addBtn.innerHTML = '<div class="post-zone-busy"><svg viewBox="0 0 24 24" fill="none" style="width:22px;height:22px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" stroke-dasharray="44" stroke-dashoffset="22" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg><span>ENVIANDO…</span></div>';
+  }
+  try{
+    var maxSize = (type==="feed") ? 1440 : 1920;
+    var url = await uploadToImageKit(file, {
+      folder: type==="feed" ? "/posts/feed" : "/posts/story",
+      maxSize: maxSize,
+      tags: ["post", type, "task:"+taskId]
+    });
+    var arr = (Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    var c = arr[idx]; if(!c){ throw new Error("Card removido"); }
+    var now = Date.now();
+    var imgId = newImageId();
+    if(type === "feed"){
+      var feedArr = Array.isArray(c.feed) ? c.feed.slice() : getFeedImages(c);
+      feedArr.push({ id:imgId, url:url, at:now, by:(me?me.id:null) });
+      c.feed = feedArr;
+    } else {
+      var storyArr = Array.isArray(c.stories) ? c.stories.slice() : getStories(c);
+      storyArr.push({ id:imgId, url:url, at:now, by:(me?me.id:null), caption:"" });
+      c.stories = storyArr;
+      if(c.story) delete c.story;
+    }
+    var hist = Array.isArray(c.history) ? c.history.slice() : [];
+    hist.push({ kind:"post_"+type+"_added", at:now, byId:(me?me.id:null), imageId:imgId });
+    if(hist.length>200) hist = hist.slice(-200);
+    c.history = hist;
+    await db.collection("tasks").doc(taskId).update({cronWeeks:arr});
+    var lt = tasks.find(function(x){ return x.id===taskId; });
+    if(lt) lt.cronWeeks = arr;
+    toast((type==="feed"?"Imagem":"Story") + " adicionado ✓");
+    openContentDetail(taskId, idx);
+  }catch(err){
+    console.error("[uploadPostImage]", err);
+    toast("Erro ao subir: " + (err && err.message ? err.message : "tente novamente"));
+    if(addBtn && origAdd) addBtn.innerHTML = origAdd;
+  }finally{ busy = false; }
+}
+
+/* Remove imagem por ID */
+async function removePostImageById(taskId, idx, type, imageId){
+  if(!canManage(me)){ toast("Apenas administradores."); return; }
+  if(type!=="feed" && type!=="story"){ return; }
+  var t = tasks.find(function(x){ return x.id===taskId; }); if(!t||!db){ return; }
+  if(!(await customConfirm("Remover esta imagem?", "Remover", "warn"))) return;
+  if(busy) return; busy = true;
+  try{
+    var arr = (Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    var c = arr[idx]; if(!c){ busy=false; return; }
+    if(type === "feed"){
+      var feedArr = Array.isArray(c.feed) ? c.feed.slice() : getFeedImages(c);
+      c.feed = feedArr.filter(function(img){ return img && img.id !== imageId; });
+    } else {
+      var storyArr = Array.isArray(c.stories) ? c.stories.slice() : getStories(c);
+      c.stories = storyArr.filter(function(img){ return img && img.id !== imageId; });
+      if(c.story) delete c.story;
+    }
+    if(Array.isArray(c.imageComments)){
+      c.imageComments = c.imageComments.filter(function(ic){ return ic && ic.imageId !== imageId; });
+    }
+    var hist = Array.isArray(c.history) ? c.history.slice() : [];
+    hist.push({ kind:"post_"+type+"_removed", at:Date.now(), byId:(me?me.id:null), imageId:imageId });
+    if(hist.length>200) hist = hist.slice(-200);
+    c.history = hist;
+    await db.collection("tasks").doc(taskId).update({cronWeeks:arr});
+    var lt = tasks.find(function(x){ return x.id===taskId; }); if(lt) lt.cronWeeks=arr;
+    toast("Imagem removida ✓");
+    openContentDetail(taskId, idx);
+  }catch(e){ toast("Erro ao remover"); }
+  finally{ busy = false; }
+}
+
+/* Atualiza legenda do story — debounced */
+var _storyCaptionTimers = {};
+function updateStoryCaptionDebounced(taskId, idx, storyId, text){
+  var key = taskId + "|" + idx + "|" + storyId;
+  if(_storyCaptionTimers[key]) clearTimeout(_storyCaptionTimers[key]);
+  _storyCaptionTimers[key] = setTimeout(function(){
+    delete _storyCaptionTimers[key];
+    saveStoryCaption(taskId, idx, storyId, text);
+  }, 800);
+}
+
+async function saveStoryCaption(taskId, idx, storyId, text){
+  if(!canManage(me)) return;
+  var t = tasks.find(function(x){ return x.id===taskId; }); if(!t||!db) return;
+  try{
+    var arr = (Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    var c = arr[idx]; if(!c) return;
+    var storyArr = Array.isArray(c.stories) ? c.stories.slice() : getStories(c);
+    var found = false;
+    storyArr.forEach(function(s){
+      if(s && s.id === storyId){ s.caption = (text||"").slice(0,500); found = true; }
+    });
+    if(!found) return;
+    c.stories = storyArr;
+    if(c.story) delete c.story;
+    await db.collection("tasks").doc(taskId).update({cronWeeks:arr});
+    var lt = tasks.find(function(x){ return x.id===taskId; }); if(lt) lt.cronWeeks=arr;
+  }catch(e){ console.warn("[saveStoryCaption]", e); }
+}
+
+/* Comentário em UMA imagem específica (cliente ou equipe) */
+async function addImageComment(taskId, idx, imageId, text, asClient){
+  text = (text||"").trim(); if(!text) return;
+  var t = tasks.find(function(x){ return x.id===taskId; }); if(!t||!db) return;
+  if(busy) return; busy = true;
+  try{
+    var arr = (Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    var c = arr[idx]; if(!c){ busy=false; return; }
+    var ic = Array.isArray(c.imageComments) ? c.imageComments.slice() : [];
+    ic.push({
+      id: "ic-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,6),
+      imageId: imageId,
+      by: asClient ? "client" : (me?me.id:null),
+      byName: asClient ? "Cliente" : (me?(me.name||"Equipe"):"Equipe"),
+      text: text.slice(0,500),
+      at: Date.now()
+    });
+    if(ic.length > 500) ic = ic.slice(-500);
+    c.imageComments = ic;
+    var hist = Array.isArray(c.history) ? c.history.slice() : [];
+    hist.push({ kind: asClient?"image_comment_client":"image_comment_team", at:Date.now(), byId:(asClient?null:(me?me.id:null)), imageId:imageId });
+    if(hist.length>200) hist = hist.slice(-200);
+    c.history = hist;
+    await db.collection("tasks").doc(taskId).update({cronWeeks:arr});
+    var lt = tasks.find(function(x){ return x.id===taskId; }); if(lt) lt.cronWeeks=arr;
+    toast("Comentário enviado ✓");
+  }catch(e){ console.error("[addImageComment]", e); toast("Erro ao comentar"); }
+  finally{ busy = false; }
+}
+
+/* Renderiza o miniaturão da imagem (admin) — com botão remover + badge de comentários */
+function renderImageThumb_v23(img, idx, type, cardIdx, editable, commentsCount){
+  var lab = (type==="feed") ? "FD" : "ST";
+  var cls = (type==="feed") ? "post-thumb-fd" : "post-thumb-st";
+  var html = '<div class="post-thumb-wrap" data-pz-img-id="'+esc(img.id||"")+'" data-pz-img-type="'+type+'" data-pz-card-idx="'+cardIdx+'">';
+  html += '<span class="post-thumb-tag">'+lab+(idx>=0?" "+(idx+1):"")+'</span>';
+  if(editable){
+    html += '<button type="button" class="post-thumb-x" title="Remover" data-pz-img-remove="1">×</button>';
+  }
+  html += '<img class="post-thumb '+cls+'" src="'+esc(img.url)+'" alt="'+lab+'">';
+  if(commentsCount > 0){
+    html += '<span class="post-thumb-cmt-badge" title="'+commentsCount+' comentário(s) do cliente">💬 '+commentsCount+'</span>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/* Bloco completo de Posts no modal (lado equipe) */
+function renderPostsBlock(c, idx, editable){
+  var feed = getFeedImages(c);
+  var stories = getStories(c);
+  if(!editable && !feed.length && !stories.length) return "";
+
+  var html = '<div class="posts-section"><div class="cw-cn" style="margin-top:4px">📸 Posts pro cliente aprovar</div>';
+
+  /* FEED — carrossel de até 10 */
+  html += '<div class="posts-block feed-block">';
+  html += '<div class="posts-block-h"><span class="posts-block-t">FEED</span>'+
+          '<span class="posts-block-c">'+feed.length+'/'+POST_FEED_MAX+(feed.length>1?' · carrossel':'')+' · 1 legenda compartilhada</span></div>';
+  html += '<div class="post-thumbs feed-thumbs">';
+  feed.forEach(function(img, i){
+    var icc = getImageComments(c, img.id||"").length;
+    html += renderImageThumb_v23(img, i, "feed", idx, editable, icc);
+  });
+  if(editable && feed.length < POST_FEED_MAX){
+    html += '<label class="post-add" data-pz-add="feed" data-pz-idx="'+idx+'">'+
+      '<input type="file" accept="image/*" data-pz-input="feed" data-pz-idx="'+idx+'" style="display:none">'+
+      '<svg viewBox="0 0 24 24" fill="none" style="width:30px;height:30px;color:var(--ink-faint)"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+      '<span class="post-add-l">+ Feed</span><span class="post-add-s">1080×1440</span>'+
+    '</label>';
+  }
+  html += '</div></div>';
+
+  /* STORIES — lista vertical com legenda própria opcional */
+  html += '<div class="posts-block story-block">';
+  html += '<div class="posts-block-h"><span class="posts-block-t">STORIES</span>'+
+          '<span class="posts-block-c">'+stories.length+'/'+POST_STORIES_MAX+' · legenda opcional</span></div>';
+  if(stories.length > 0){
+    html += '<div class="story-list">';
+    stories.forEach(function(s, i){
+      var icc = getImageComments(c, s.id||"").length;
+      html += '<div class="story-row">';
+      html += renderImageThumb_v23(s, i, "story", idx, editable, icc);
+      html += '<div class="story-row-r">';
+      html += '<label class="story-cap-lab">Story #'+(i+1)+' — legenda (opcional)</label>';
+      if(editable){
+        html += '<textarea class="story-cap-input" data-pz-story-id="'+esc(s.id||"")+'" data-pz-idx="'+idx+'" maxlength="500" rows="2" placeholder="Texto opcional pra acompanhar o story…">'+esc(s.caption||"")+'</textarea>';
+      } else {
+        html += '<div class="story-cap-read">'+(s.caption?esc(s.caption):'<i style="color:var(--ink-faint)">sem legenda</i>')+'</div>';
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+  }
+  if(editable && stories.length < POST_STORIES_MAX){
+    html += '<label class="post-add post-add-story" data-pz-add="story" data-pz-idx="'+idx+'">'+
+      '<input type="file" accept="image/*" data-pz-input="story" data-pz-idx="'+idx+'" style="display:none">'+
+      '<svg viewBox="0 0 24 24" fill="none" style="width:20px;height:20px;color:var(--ink-faint)"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+      '<span class="post-add-l">+ Adicionar story</span><span class="post-add-s">1080×1920</span>'+
+    '</label>';
+  }
+  html += '</div>';
+
+  if(editable){
+    html += '<div class="posts-hint">Feed: até 10 imagens (carrossel · 1 legenda) · Story: até 100 (cada um com legenda própria). Imagens são otimizadas automaticamente. Posts concluídos há mais de '+POST_AUTODELETE_DAYS+' dias são auto-arquivados.</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+/* Bindings: file inputs (Feed/Story), botões X, textarea de legenda do story */
+function bindPostUploadZones(tid){
+  document.querySelectorAll('[data-pz-input]').forEach(function(input){
+    input.onchange = function(e){
+      var f = e.target.files && e.target.files[0]; if(!f) return;
+      var type = input.dataset.pzInput;
+      var idx = +input.dataset.pzIdx;
+      e.target.value = "";
+      uploadPostImage(tid, idx, type, f);
+    };
+  });
+  document.querySelectorAll('[data-pz-img-remove]').forEach(function(btn){
+    btn.onclick = function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      var wrap = btn.closest('[data-pz-img-id]'); if(!wrap) return;
+      var imageId = wrap.dataset.pzImgId;
+      var type = wrap.dataset.pzImgType;
+      var idx = +wrap.dataset.pzCardIdx;
+      if(!isNaN(idx)) removePostImageById(tid, idx, type, imageId);
+    };
+  });
+  document.querySelectorAll('[data-pz-story-id]').forEach(function(ta){
+    ta.oninput = function(){
+      var storyId = ta.dataset.pzStoryId;
+      var idx = +ta.dataset.pzIdx;
+      updateStoryCaptionDebounced(tid, idx, storyId, ta.value);
+    };
+  });
+}
+
+/* ─── AUTO-ARQUIVAR posts > N dias após o card ficar "concluido" ─── */
+var _autoDeleteRan = false;
+async function autoArchiveOldPosts(){
+  if(_autoDeleteRan) return;
+  _autoDeleteRan = true;
+  if(!db || !tasks || !Array.isArray(tasks) || !tasks.length) return;
+  var now = Date.now();
+  var threshold = POST_AUTODELETE_DAYS * 24 * 60 * 60 * 1000;
+  var cleanCount = 0, taskCount = 0;
+  for(var ti=0; ti<tasks.length; ti++){
+    var t = tasks[ti];
+    if(!t || !Array.isArray(t.cronWeeks)) continue;
+    var arr = t.cronWeeks.map(cronNorm);
+    var modified = false;
+    arr.forEach(function(c){
+      if(!c) return;
+      if(c.st !== "concluido") return;
+      if(!c.doneAt || (now - c.doneAt) < threshold) return;
+      var feedHad = getFeedImages(c).length;
+      var storiesHad = getStories(c).length;
+      if(feedHad === 0 && storiesHad === 0) return;
+      c.feed = [];
+      c.stories = [];
+      if(c.story) delete c.story;
+      var hist = Array.isArray(c.history) ? c.history.slice() : [];
+      hist.push({ kind:"posts_auto_archived", at:now, feedCount:feedHad, storiesCount:storiesHad });
+      if(hist.length>200) hist = hist.slice(-200);
+      c.history = hist;
+      modified = true;
+      cleanCount += feedHad + storiesHad;
+    });
+    if(modified){
+      try{
+        await db.collection("tasks").doc(t.id).update({cronWeeks: arr});
+        t.cronWeeks = arr;
+        taskCount++;
+      }catch(e){ console.warn("[autoArchive] erro task", t.id, e); }
+    }
+  }
+  if(cleanCount > 0){
+    console.log("[V63.23] Auto-arquivado:", cleanCount, "imagens em", taskCount, "tarefa(s) (>" + POST_AUTODELETE_DAYS + " dias após conclusão)");
+  }
+}
+
 
 /* Envia em lote: pega todas as legendas com lgState="escrita" e marca como "enviada".
    Cliente vai ver no mesmo link (o shareToken não muda). */
@@ -6192,6 +6644,98 @@ function renderCvCardTema(c, i){
   '</div>';
 }
 
+/* [V63.23] Renderiza o bloco de Posts (Feed carrossel + Stories) na visão do cliente */
+function renderCvPostsBlock(c, cardIdx){
+  var feed = getFeedImages(c);
+  var stories = getStories(c);
+  if(!feed.length && !stories.length) return "";
+  var html = "";
+
+  /* FEED - carrossel swipeable */
+  if(feed.length > 0){
+    html += '<div class="cv-feed-carousel" data-cv-carousel="'+cardIdx+'">';
+    html += '<div class="cv-feed-counter"><span data-cv-cur="'+cardIdx+'">1</span>/'+feed.length+'</div>';
+    if(feed.length > 1){
+      html += '<button class="cv-feed-nav prev" data-cv-prev="'+cardIdx+'" title="Anterior"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      html += '<button class="cv-feed-nav next" data-cv-next="'+cardIdx+'" title="Próxima"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+    }
+    html += '<div class="cv-feed-actions">';
+    html += '<button title="Comentar nesta imagem" data-cv-img-cmt="'+cardIdx+'" data-cv-img-type="feed"><svg viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-12 7l-5 1.5L5 16A8 8 0 1 1 21 12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+    html += '<button title="Abrir em tela cheia" data-cv-img-zoom="'+cardIdx+'" data-cv-img-type="feed"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3h-6M21 3v6M21 3l-7 7M3 21h6M3 21v-6M3 21l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>';
+    html += '</div>';
+    html += '<div class="cv-feed-track" data-cv-track="'+cardIdx+'">';
+    feed.forEach(function(img, i){
+      html += '<div class="cv-feed-slide" data-cv-slide="'+i+'" data-cv-img-id="'+esc(img.id||"")+'" data-cv-img-url="'+esc(img.url)+'"><img src="'+esc(img.url)+'" alt="Feed '+(i+1)+'"></div>';
+    });
+    html += '</div>';
+    if(feed.length > 1){
+      html += '<div class="cv-feed-dots">';
+      feed.forEach(function(_, i){ html += '<span class="cv-feed-dot'+(i===0?' on':'')+'" data-cv-dot="'+cardIdx+'-'+i+'"></span>'; });
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  /* STORIES - lista vertical com legenda própria */
+  if(stories.length > 0){
+    html += '<div class="cv-stories-list">';
+    stories.forEach(function(s, i){
+      var icc = getImageComments(c, s.id||"").length;
+      html += '<div class="cv-story-item" data-cv-story-idx="'+cardIdx+'-'+i+'">';
+      html += '<span class="cv-story-lab">STORY '+(i+1)+'/'+stories.length+(icc>0?' · 💬 '+icc:'')+'</span>';
+      html += '<button class="cv-story-cmt-btn" data-cv-img-cmt-story="'+cardIdx+'-'+i+'" data-cv-img-id="'+esc(s.id||"")+'"><svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px"><path d="M21 12a8 8 0 0 1-12 7l-5 1.5L5 16A8 8 0 1 1 21 12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Comentar</button>';
+      html += '<img src="'+esc(s.url)+'" alt="Story '+(i+1)+'" onclick="window.open(\''+esc(s.url)+'\',\'_blank\')">';
+      if(s.caption && s.caption.trim()){
+        html += '<div class="cv-story-cap">'+esc(s.caption)+'</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  return html;
+}
+
+/* Popup de comentário do cliente em uma imagem */
+function openClientImageCommentPopup(imageId, imageType, cardIdx, imageLabel){
+  var t = __clientTask; if(!t) return;
+  var arr = (Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+  var c = arr[cardIdx]; if(!c) return;
+  var existing = getImageComments(c, imageId);
+  var existingHtml = "";
+  if(existing.length){
+    existingHtml = '<div class="cv-img-cmt-list">';
+    existing.slice(-10).forEach(function(ic){
+      existingHtml += '<div class="cv-img-cmt-it"><div class="cv-img-cmt-it-h">'+esc(ic.byName||"?")+' · '+esc(fmtDT(ic.at))+'</div><div class="cv-img-cmt-it-t">'+esc(ic.text||"")+'</div></div>';
+    });
+    existingHtml += '</div>';
+  }
+  var pop = document.createElement("div");
+  pop.className = "cv-img-cmt-pop";
+  pop.innerHTML = '<div class="cv-img-cmt-pop-box">'+
+    '<h3>💬 Comentar nesta '+imageLabel+'</h3>'+
+    '<p>Deixe uma observação ESPECÍFICA sobre esta imagem (cor, layout, texto, posição, etc.). Diferente do "Pedir revisão geral", isso fica anexado à imagem.</p>'+
+    '<textarea id="__cvImgCmtTxt" maxlength="500" placeholder="Ex: a cor do título poderia ser mais escura · trocar o emoji · ajustar margem inferior"></textarea>'+
+    existingHtml+
+    '<div class="acts">'+
+      '<button class="cancel" id="__cvImgCmtCancel">Cancelar</button>'+
+      '<button class="send" id="__cvImgCmtSend">📨 Enviar comentário</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(pop);
+  setTimeout(function(){ try{ document.getElementById("__cvImgCmtTxt").focus(); }catch(_){} }, 50);
+  document.getElementById("__cvImgCmtCancel").onclick = function(){ pop.remove(); };
+  pop.onclick = function(e){ if(e.target === pop) pop.remove(); };
+  document.getElementById("__cvImgCmtSend").onclick = async function(){
+    var btn = this;
+    var txt = document.getElementById("__cvImgCmtTxt").value.trim();
+    if(!txt){ try{ document.getElementById("__cvImgCmtTxt").focus(); }catch(_){} return; }
+    btn.disabled = true; btn.textContent = "Enviando…";
+    try{ await addImageComment(t.id, cardIdx, imageId, txt, true); pop.remove(); }
+    catch(e){ btn.disabled = false; btn.textContent = "📨 Enviar comentário"; }
+  };
+}
+
 /* [V62] Renderiza UM card no modo LEGENDA (Fase 2). */
 function renderCvCardLegenda(c, i){
   var wk=Math.floor(i/3)+1, cn=(i%3)+1;
@@ -6205,6 +6749,8 @@ function renderCvCardLegenda(c, i){
       (info?'<div class="cv-status" style="color:'+info.color+';background:'+info.bg+';border:1px solid '+info.color+'">'+esc(info.short)+'</div>':'')+
     '</div>'+
     '<div class="cv-ti" style="font-size:14px;color:var(--ink-soft);font-weight:700">Tema: '+((c.t&&c.t.trim())?esc(c.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
+    /* [V63.23] Carrossel Feed + lista de Stories + comentário por imagem */
+    renderCvPostsBlock(c, i)+
     '<div class="cv-legenda-box">'+
       '<div class="cv-legenda-lab">📝 LEGENDA PRO POST</div>'+
       '<div class="cv-legenda-txt">'+esc(c.lg||"")+'</div>'+
@@ -6246,6 +6792,80 @@ function renderCvCardLegenda(c, i){
 
 /* [V62] Bindings de todos os botões da client view (Fase 1 + Fase 2). */
 function bindClientViewActions(){
+  /* [V63.23] ===== Carrossel Feed + Comentários por imagem ===== */
+  function getCardByIdx(idx){
+    if(!__clientTask || !Array.isArray(__clientTask.cronWeeks)) return null;
+    var arr = __clientTask.cronWeeks.map(cronNorm);
+    return arr[idx] || null;
+  }
+  function scrollFeedTo(cardIdx, slideIdx){
+    var track = document.querySelector('[data-cv-track="'+cardIdx+'"]'); if(!track) return;
+    var slides = track.querySelectorAll('[data-cv-slide]'); if(!slides[slideIdx]) return;
+    track.scrollTo({left: slides[slideIdx].offsetLeft - track.offsetLeft, behavior:"smooth"});
+  }
+  function getCurrentSlide(cardIdx){
+    var track = document.querySelector('[data-cv-track="'+cardIdx+'"]'); if(!track) return 0;
+    var slides = track.querySelectorAll('[data-cv-slide]');
+    var w = track.clientWidth; if(!w) return 0;
+    return Math.round(track.scrollLeft / w);
+  }
+  function updateCarouselState(cardIdx){
+    var cur = getCurrentSlide(cardIdx);
+    var counter = document.querySelector('[data-cv-cur="'+cardIdx+'"]');
+    if(counter) counter.textContent = (cur+1);
+    document.querySelectorAll('[data-cv-dot^="'+cardIdx+'-"]').forEach(function(d){
+      var di = +d.dataset.cvDot.split("-")[1];
+      d.classList.toggle("on", di === cur);
+    });
+  }
+  document.querySelectorAll('[data-cv-prev]').forEach(function(btn){
+    btn.onclick = function(){
+      var idx = +btn.dataset.cvPrev; var cur = getCurrentSlide(idx);
+      scrollFeedTo(idx, Math.max(0, cur-1));
+    };
+  });
+  document.querySelectorAll('[data-cv-next]').forEach(function(btn){
+    btn.onclick = function(){
+      var idx = +btn.dataset.cvNext; var cur = getCurrentSlide(idx);
+      var track = document.querySelector('[data-cv-track="'+idx+'"]');
+      var slides = track ? track.querySelectorAll('[data-cv-slide]') : [];
+      scrollFeedTo(idx, Math.min(slides.length-1, cur+1));
+    };
+  });
+  document.querySelectorAll('[data-cv-track]').forEach(function(track){
+    var idx = +track.dataset.cvTrack;
+    var to = null;
+    track.addEventListener("scroll", function(){
+      if(to) clearTimeout(to);
+      to = setTimeout(function(){ updateCarouselState(idx); }, 80);
+    });
+  });
+  document.querySelectorAll('[data-cv-img-cmt]').forEach(function(btn){
+    btn.onclick = function(){
+      var cardIdx = +btn.dataset.cvImgCmt;
+      var cur = getCurrentSlide(cardIdx);
+      var slide = document.querySelector('[data-cv-track="'+cardIdx+'"] [data-cv-slide="'+cur+'"]');
+      if(!slide) return;
+      var imgId = slide.dataset.cvImgId;
+      openClientImageCommentPopup(imgId, "feed", cardIdx, "imagem do Feed #"+(cur+1));
+    };
+  });
+  document.querySelectorAll('[data-cv-img-zoom]').forEach(function(btn){
+    btn.onclick = function(){
+      var cardIdx = +btn.dataset.cvImgZoom;
+      var cur = getCurrentSlide(cardIdx);
+      var slide = document.querySelector('[data-cv-track="'+cardIdx+'"] [data-cv-slide="'+cur+'"]');
+      if(slide && slide.dataset.cvImgUrl) window.open(slide.dataset.cvImgUrl, "_blank");
+    };
+  });
+  document.querySelectorAll('[data-cv-img-cmt-story]').forEach(function(btn){
+    btn.onclick = function(){
+      var parts = btn.dataset.cvImgCmtStory.split("-");
+      var cardIdx = +parts[0]; var storyIdx = +parts[1];
+      var imgId = btn.dataset.cvImgId;
+      openClientImageCommentPopup(imgId, "story", cardIdx, "Story #"+(storyIdx+1));
+    };
+  });
   /* ===== FASE 1: TEMAS ===== */
   /* "Aprovar" → abre painel de confirmação */
   document.querySelectorAll("[data-ai]").forEach(function(b){ b.onclick=function(){
