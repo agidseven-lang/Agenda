@@ -914,6 +914,39 @@
   .cv-img-cmt-it-h{font-size:11px;color:var(--c-edicao);font-weight:800;margin-bottom:3px}
   .cv-img-cmt-it-t{font-size:13px;color:var(--ink);line-height:1.45}
 
+  /* [V63.25] Modal de compartilhamento WhatsApp */
+  .share-wa-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;
+    display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px)}
+  .share-wa-box{background:var(--bg);border-radius:14px;padding:18px 18px 16px;width:100%;max-width:480px;
+    border:1px solid var(--line);box-shadow:0 12px 40px rgba(0,0,0,.5);max-height:92vh;overflow-y:auto}
+  .share-wa-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+  .share-wa-title{font-size:17px;font-weight:800;color:var(--ink)}
+  .share-wa-x{width:32px;height:32px;border-radius:8px;border:none;background:var(--surface);
+    color:var(--ink);font-size:20px;line-height:1;cursor:pointer;font-weight:700}
+  .share-wa-x:hover{background:var(--line)}
+  .share-wa-warn{background:rgba(255,176,46,.10);border:1px solid rgba(255,176,46,.35);border-radius:9px;
+    padding:10px 12px;font-size:12.5px;color:var(--ink);line-height:1.5;margin-bottom:14px}
+  .share-wa-warn b{color:var(--c-foto)}
+  .share-wa-lab{font-size:11px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+  .share-wa-txt{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;
+    padding:11px 12px;font:inherit;font-size:13px;color:var(--ink);resize:vertical;line-height:1.5;
+    font-family:inherit;min-height:90px;margin-bottom:8px}
+  .share-wa-txt:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(62,184,216,.18)}
+  .share-wa-copy{width:100%;padding:11px;border-radius:10px;font-weight:800;cursor:pointer;border:1px solid var(--accent);
+    background:rgba(62,184,216,.10);color:var(--accent);font-size:14px;transition:background .15s ease}
+  .share-wa-copy:hover{background:rgba(62,184,216,.18)}
+  .share-wa-copy.copied{background:var(--c-trafego);color:#001423;border-color:var(--c-trafego)}
+  .share-wa-btn{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:11px;
+    border:1px solid var(--line);background:var(--surface);cursor:pointer;text-align:left;margin-bottom:8px;
+    transition:border-color .15s ease, background .15s ease}
+  .share-wa-btn:hover{border-color:var(--accent);background:rgba(62,184,216,.05)}
+  .share-wa-btn.business{border-color:rgba(37,211,102,.45);background:rgba(37,211,102,.08)}
+  .share-wa-btn.business:hover{border-color:rgba(37,211,102,.8);background:rgba(37,211,102,.14)}
+  .share-wa-btn-i{font-size:22px;line-height:1;flex-shrink:0}
+  .share-wa-btn-c{flex:1;min-width:0}
+  .share-wa-btn-t{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:2px}
+  .share-wa-btn-s{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
+
   /* [V62] Resumo Fase 2 no openTaskDetail — grid de estatísticas das legendas */
   .lg-summary{margin-top:14px}
   .lg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px;margin:10px 0}
@@ -2300,7 +2333,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.24 · build tamanho-medio</div>
+    <div class="ver">versão 63.25 · build whatsapp-business</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -5787,7 +5820,7 @@ function openContentDetail(tid, idx){
     var tk=tasks.find(x=>x.id===tid); if(!tk||!tk.shareToken)return;
     var u=clientShareURL(tk.shareToken);
     var msg="Olá! Aqui está o cronograma de "+(tk.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+u;
-    window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+    openShareWAModal(msg, "Compartilhar com cliente");
   };
   bindCommentInput({
     inputId:"ctCmtInput", sendId:"ctCmtSend", acId:"ctCmtAc",
@@ -5851,6 +5884,70 @@ async function addContentComment(tid, idx, txt, mentionsArr){
 /* ========== CLIENTE: enviar/invalidar/entregar ========== */
 function clientShareURL(token){ return location.origin + location.pathname + "?cliente=" + encodeURIComponent(token); }
 
+/* [V63.25] Modal de compartilhamento — copia texto e dá opção de WhatsApp Business OU normal.
+   Importante: o WhatsApp NÃO permite enviar via link direto pra um grupo específico.
+   O usuário precisa colar manualmente no grupo certo. */
+function openShareWAModal(message, title){
+  /* Remove modal anterior se houver */
+  var prev = document.getElementById("__shareWAModal"); if(prev) prev.remove();
+  var pop = document.createElement("div");
+  pop.id = "__shareWAModal";
+  pop.className = "share-wa-modal";
+  pop.innerHTML =
+    '<div class="share-wa-box">'+
+      '<div class="share-wa-head">'+
+        '<div class="share-wa-title">📤 '+esc(title||"Enviar pro cliente")+'</div>'+
+        '<button class="share-wa-x" id="__shareWAClose" title="Fechar">×</button>'+
+      '</div>'+
+      '<div class="share-wa-warn">⚠ <b>Importante:</b> O WhatsApp não permite enviar direto pra um grupo via link. Copie a mensagem abaixo e cole no grupo/contato certo no seu WhatsApp Business.</div>'+
+      '<div class="share-wa-lab">📝 Mensagem pronta</div>'+
+      '<textarea class="share-wa-txt" id="__shareWATxt" readonly rows="6">'+esc(message||"")+'</textarea>'+
+      '<button class="share-wa-copy" id="__shareWACopy">📋 Copiar mensagem</button>'+
+      '<div class="share-wa-lab" style="margin-top:14px">🟢 Abrir WhatsApp</div>'+
+      '<button class="share-wa-btn business" id="__shareWABiz">'+
+        '<span class="share-wa-btn-i">🟢</span>'+
+        '<div class="share-wa-btn-c">'+
+          '<div class="share-wa-btn-t">WhatsApp Business Web</div>'+
+          '<div class="share-wa-btn-s">Abre o Business no navegador · cole no grupo certo</div>'+
+        '</div>'+
+      '</button>'+
+      '<button class="share-wa-btn normal" id="__shareWANormal">'+
+        '<span class="share-wa-btn-i">📱</span>'+
+        '<div class="share-wa-btn-c">'+
+          '<div class="share-wa-btn-t">WhatsApp com texto preenchido</div>'+
+          '<div class="share-wa-btn-s">Abre uma janela só pra escolher contato (não funciona pra grupo)</div>'+
+        '</div>'+
+      '</button>'+
+    '</div>';
+  document.body.appendChild(pop);
+  /* tenta copiar automaticamente ao abrir */
+  setTimeout(function(){
+    try{ navigator.clipboard.writeText(message||""); }catch(_){}
+  }, 50);
+  function closeMe(){ pop.remove(); }
+  document.getElementById("__shareWAClose").onclick = closeMe;
+  pop.onclick = function(e){ if(e.target === pop) closeMe(); };
+  document.getElementById("__shareWACopy").onclick = function(){
+    var btn = this;
+    try{
+      navigator.clipboard.writeText(message||"");
+      btn.textContent = "✓ Copiado!";
+      btn.classList.add("copied");
+      setTimeout(function(){ btn.textContent = "📋 Copiar mensagem"; btn.classList.remove("copied"); }, 1800);
+    }catch(e){
+      /* fallback: seleciona textarea */
+      var ta = document.getElementById("__shareWATxt");
+      if(ta){ ta.focus(); ta.select(); try{ document.execCommand("copy"); btn.textContent = "✓ Copiado!"; }catch(_){ toast("Não foi possível copiar — selecione e copie manual"); } }
+    }
+  };
+  document.getElementById("__shareWABiz").onclick = function(){
+    window.open("https://web.whatsapp.com/", "_blank");
+  };
+  document.getElementById("__shareWANormal").onclick = function(){
+    window.open("https://wa.me/?text="+encodeURIComponent(message||""), "_blank");
+  };
+}
+
 async function sendCronToClient(taskId){
   if(!canManage(me)){ toast("Apenas administradores."); return; }
   var t=tasks.find(x=>x.id===taskId); if(!t||!db) return;
@@ -5878,16 +5975,7 @@ async function sendCronToClient(taskId){
     var lt=tasks.find(x=>x.id===taskId); if(lt){ lt.shareToken=token; lt.shareCreatedAt=now; lt.cronWeeks=arr; }
     var url = clientShareURL(token);
     var msg="Olá! Aqui está o cronograma de "+(t.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+url;
-    try{
-      await navigator.clipboard.writeText(url);
-      if(await customConfirm("✓ Link gerado e copiado pra área de transferência.\n\nLink:\n"+url+"\n\nQuer abrir o WhatsApp agora pra colar no grupo do cliente?","Link enviado","success")){
-        window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
-      }
-    }catch(e){
-      if(await customConfirm("Link gerado:\n\n"+url+"\n\nQuer abrir o WhatsApp pra mandar pro cliente?","Link gerado","success")){
-        window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
-      }
-    }
+    openShareWAModal(msg, "Enviar cronograma pro cliente");
     openTaskDetail(taskId);
   }catch(e){ toast("Não foi possível gerar o link agora"); }
   finally{ busy=false; }
@@ -6305,16 +6393,7 @@ async function sendLegendasToClient(taskId){
     var lt=tasks.find(x=>x.id===taskId); if(lt) lt.cronWeeks=arr;
     var url = t.shareToken ? clientShareURL(t.shareToken) : "";
     var msg="Olá! As legendas do cronograma de "+(t.client||"")+" estão prontas pra sua aprovação.\n\nAbra o MESMO link de antes e role pra baixo pra ver as legendas:\n"+url;
-    try{
-      if(url) await navigator.clipboard.writeText(url);
-      if(await customConfirm("✓ "+ready.length+" legenda(s) enviada(s).\n\nQuer abrir o WhatsApp pra avisar o cliente?","Legendas enviadas","success")){
-        window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
-      }
-    }catch(e){
-      if(await customConfirm("✓ "+ready.length+" legenda(s) enviada(s).\n\nLink do cliente:\n"+url+"\n\nQuer abrir o WhatsApp?","Legendas enviadas","success")){
-        window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
-      }
-    }
+    openShareWAModal(msg, ready.length+" legenda(s) enviada(s)");
     openTaskDetail(taskId);
   }catch(e){ toast("Não foi possível enviar agora"); }
   finally{ busy=false; }
@@ -8078,7 +8157,7 @@ function openTaskDetail(id){
     var tk=tasks.find(x=>x.id===id); if(!tk||!tk.shareToken)return;
     var u=clientShareURL(tk.shareToken);
     var msg="Olá! Aqui está o cronograma de "+(tk.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+u;
-    window.open("https://wa.me/?text="+encodeURIComponent(msg),"_blank");
+    openShareWAModal(msg, "Compartilhar com cliente");
   };
   $("taskDetailBody").querySelectorAll("[data-ptog]").forEach(b=>b.onclick=()=>{
     if(b.dataset.ptog==="ig")pIG=!pIG; else pFB=!pFB; b.classList.toggle("on");
