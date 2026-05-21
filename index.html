@@ -1992,12 +1992,14 @@
   }
 
   /* =============================================================
-     [V63.19] SISTEMA RESPONSIVO MULTI-BREAKPOINT — auditado pra
-     funcionar em: celular, tablet, notebook, PC, monitor 27/32",
-     ultrawide e TV 55-60" (1080p ou 4K).
+     [V63.20] SISTEMA RESPONSIVO REDESENHADO — alinhamento com kanban
+     + ESCALA proporcional (fonte/ícones/padding crescem com a tela).
+     Filosofia: tudo (header brand+icons, chips, page title, board) alinha
+     com a MESMA largura — definida pelo cap responsivo. Brand fica na
+     ESQUERDA, ícones na DIREITA dessa largura (alinhados com última coluna).
      ============================================================= */
 
-  /* ---- Notebook / PC base (>=1024px): menu lateral aparece ---- */
+  /* ---- Notebook base (>=1024px): sidebar + cap 1300px ---- */
   @media (min-width:1024px){
     #app{max-width:none;margin:0}
     .nav{left:0;right:auto;top:0;bottom:0;width:108px;height:100%;max-width:none;margin:0;
@@ -2010,25 +2012,29 @@
     .nav button svg{width:26px;height:26px}
     .nav .navfab{order:-1;top:0;margin-bottom:16px}
     .nav .navfab .pl{width:50px;height:50px}
-    /* Header e main: padding pra clear do sidebar */
+    /* Padding pra clear do sidebar */
     header{padding-left:148px;padding-right:40px;max-width:none;margin:0}
     main{padding-left:148px;padding-right:40px;padding-bottom:32px;max-width:none;margin:0}
-    /* Content cap base: 1300px left-aligned (notebook) */
+    /* Cap unificado em 1300px LEFT-ALIGNED — tudo nessa largura */
     .hrow,#pageTitle,#calControls{max-width:1300px;margin-left:0;margin-right:auto}
     main > *{max-width:1300px;margin-left:0;margin-right:auto}
-    /* Brand + ícones CLUSTERED na esquerda (sem gap gigante) */
-    .hrow{justify-content:flex-start;gap:32px}
-    /* Chips e botões: left-aligned, auto-size */
-    .filters{justify-content:flex-start}
-    .board-tools{justify-content:flex-start}
-    .board-tools .bt-link{flex:0 0 auto;padding:11px 22px}
-    .board-tools .bt-link svg{width:17px;height:17px}
+    /* Header: brand ESQUERDA, ícones DIREITA (alinhados com última coluna) */
+    .hrow{justify-content:space-between;gap:12px}
+    /* Chips: distribuídos no width do cap (último alinha com fim das colunas) */
+    .filters{justify-content:space-between;flex-wrap:wrap}
+    /* Botões action: auto-sized, left aligned */
+    .board-tools{justify-content:flex-start;gap:10px}
+    .board-tools .bt-link{flex:0 0 auto;padding:12px 22px;font-size:13px}
+    .board-tools .bt-link svg{width:18px;height:18px}
     .view-toggle{display:inline-flex;max-width:max-content}
-    .view-toggle .vt-opt{flex:0 0 auto;padding:11px 26px}
+    .view-toggle .vt-opt{flex:0 0 auto;padding:12px 26px;font-size:13.5px}
+    .view-toggle .vt-opt svg{width:18px;height:18px}
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
     .ev .tt{font-size:16px}
-    /* BOARD em GRID — 5 colunas iguais ocupam toda a largura do cap */
+    /* Chip ligeiramente maior no desktop */
+    .chip{font-size:13px;padding:10px 18px}
+    /* BOARD em GRID — colunas ocupam o cap */
     .board-wrap{display:grid;grid-template-columns:repeat(var(--cols, 5),minmax(0,1fr));
       gap:14px;overflow:visible;padding:10px 0 14px;
       height:calc(100vh - 280px);min-height:520px;max-height:calc(100vh - 160px)}
@@ -2048,44 +2054,99 @@
     .sheet{width:min(620px,80vw);max-width:620px}
   }
 
-  /* ---- PC standard (>=1600px) — content cap aumenta pra 1500px ---- */
+  /* ---- PC standard (>=1600px) — cap 1500px + chips/brand maiores ---- */
   @media (min-width:1600px){
     .hrow,#pageTitle,#calControls,main > *{max-width:1500px}
+    .chip{font-size:13.5px;padding:11px 20px}
+    .board-tools .bt-link{padding:13px 24px;font-size:13.5px}
+    .view-toggle .vt-opt{padding:13px 28px;font-size:14px}
     .board-wrap{gap:18px}
     .tcard .ttt{font-size:14px}
   }
 
-  /* ---- Monitor grande / Full HD 24-27" (>=1920px) — cap 1700px ---- */
+  /* ---- Monitor 1080p 24-27" (>=1920px) — cap 1700px ---- */
   @media (min-width:1920px){
     .hrow,#pageTitle,#calControls,main > *{max-width:1700px}
     body{font-size:15.5px}
     header{padding-right:60px}
     main{padding-right:60px}
+    /* Brand maior */
+    .hbrand .mk{width:52px;height:52px}
+    .hbrand h1{font-size:19px}
+    .hbrand .hsub{font-size:12.5px}
+    /* Icons maiores */
+    .hbell{width:50px;height:50px}
+    .hbell svg{width:25px;height:25px}
+    .hav{width:50px;height:50px}
+    /* Chips maiores */
+    .chip{font-size:14px;padding:12px 22px}
+    /* Botões maiores */
+    .board-tools .bt-link{padding:14px 26px;font-size:14px}
+    .board-tools .bt-link svg{width:19px;height:19px}
+    .view-toggle .vt-opt{padding:14px 30px;font-size:14.5px}
+    .view-toggle .vt-opt svg{width:19px;height:19px}
+    /* Page title maior */
+    .pageT .mt{font-size:40px}
   }
 
-  /* ---- Ultrawide / 32" QHD (>=2560px) — cap 2000px ---- */
+  /* ---- Ultrawide / 32" QHD (>=2560px) — cap 2000px + escala maior ---- */
   @media (min-width:2560px){
     .hrow,#pageTitle,#calControls,main > *{max-width:2000px}
     body{font-size:16px}
     header{padding-right:80px}
     main{padding-right:80px}
+    /* Brand bem maior */
+    .hbrand .mk{width:60px;height:60px}
+    .hbrand h1{font-size:22px}
+    .hbrand .hsub{font-size:13.5px}
+    .hbrand .sub{font-size:11.5px}
+    /* Icons maiores */
+    .hbell{width:56px;height:56px}
+    .hbell svg{width:28px;height:28px}
+    .hav{width:56px;height:56px}
+    /* Chips */
+    .chip{font-size:15px;padding:13px 24px;gap:8px}
+    .chip .dot{width:8px;height:8px}
+    /* Botões */
+    .board-tools .bt-link{padding:15px 28px;font-size:15px}
+    .board-tools .bt-link svg{width:20px;height:20px}
+    .view-toggle .vt-opt{padding:15px 32px;font-size:15.5px}
+    .view-toggle .vt-opt svg{width:20px;height:20px}
+    /* Page title */
+    .pageT .mt{font-size:44px}
+    /* Cards */
     .tcard .ttt{font-size:15px}
   }
 
-  /* ---- TV 55-60" / 4K (>=3200px) — cap 2400px + fontes maiores
-     (usuário tipicamente está mais longe da tela) ---- */
+  /* ---- TV 55-60" 4K / monitor ultrawide grande (>=3200px) — cap 2400px ---- */
   @media (min-width:3200px){
     .hrow,#pageTitle,#calControls,main > *{max-width:2400px}
     body{font-size:17px}
+    .hbrand .mk{width:68px;height:68px}
+    .hbrand h1{font-size:25px}
+    .hbrand .hsub{font-size:15px}
+    .hbell{width:62px;height:62px}
+    .hbell svg{width:32px;height:32px}
+    .hav{width:62px;height:62px}
+    .chip{font-size:16px;padding:14px 26px}
+    .board-tools .bt-link{padding:16px 30px;font-size:16px}
+    .view-toggle .vt-opt{padding:16px 34px;font-size:16.5px}
+    .pageT .mt{font-size:48px}
     .tcard .ttt{font-size:16px}
-    .pageT .mt{font-size:42px}
   }
 
-  /* ---- TV 4K nativo (>=3840px) — cap final 2800px ---- */
+  /* ---- TV 4K nativo (>=3840px) — cap 2800px ---- */
   @media (min-width:3840px){
     .hrow,#pageTitle,#calControls,main > *{max-width:2800px}
     body{font-size:18px}
-    .pageT .mt{font-size:46px}
+    .hbrand .mk{width:76px;height:76px}
+    .hbrand h1{font-size:28px}
+    .hbrand .hsub{font-size:16px}
+    .hbell{width:68px;height:68px}
+    .hbell svg{width:34px;height:34px}
+    .hav{width:68px;height:68px}
+    .chip{font-size:17px;padding:15px 28px}
+    .pageT .mt{font-size:54px}
   }
 
 </style>
@@ -2139,7 +2200,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.19 · build responsive-system</div>
+    <div class="ver">versão 63.20 · build aligned-with-board</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
