@@ -2004,8 +2004,11 @@
     .nav button svg{width:26px;height:26px}
     .nav .navfab{order:-1;top:0;margin-bottom:16px}
     .nav .navfab .pl{width:50px;height:50px}
-    /* [V62.5] Header e main aproveitam a tela toda — não há mais espaço preto à direita */
+    /* [V63.16] Header e main aproveitam a tela toda — não há mais espaço preto à direita */
     header{padding-left:148px;padding-right:40px;max-width:none;margin:0}
+    /* [V63.16] Cap da largura do conteúdo do header pra evitar que brand e ícones
+       fiquem distantes demais em monitores widescreen. Centralizado pra ficar proporcional. */
+    .hrow{max-width:800px;margin:0 auto}
     main{padding-left:148px;padding-right:40px;padding-bottom:32px;max-width:none;margin:0}
     .auth,.center-screen{max-width:520px;margin:0 auto}
     body{font-size:15px}
@@ -2097,7 +2100,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.15 · build presence</div>
+    <div class="ver">versão 63.16 · build header-desktop</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2666,26 +2669,45 @@ var __clientOpenedMark = false;
     db=firebase.firestore();
   }catch(e){offlineMsg();return;}
   sessionId=lsGet(SESSION_KEY);
-  /* [V63.15] Hash dos users EXCLUINDO lastSeen — pra detectar quando só presença mudou
-     e evitar re-render completo da tela atual (que causaria flicker da animação fade). */
-  var _prevUsersHash = "";
+  /* [V63.15.1] Snapshot anterior de users (sem lastSeen) — pra detectar quando só
+     presença mudou e evitar re-render completo (que causaria flicker da animação fade). */
+  var _prevUsersForCompare = null;
+  /* Lista fixa de campos que importam pra re-render. Se algum mudar, faz render.
+     Se SÓ lastSeen mudar (ou nada), pula o render pra evitar flicker. */
+  var USER_RENDER_FIELDS = ["name","role","email","phone","status","admin","color","photo","fcmTokens","createdAt","pass","salt"];
+  function _usersDifferIgnoringPresence(oldArr, newArr){
+    if(!oldArr || oldArr.length !== newArr.length) return true;
+    var oldMap = {};
+    for(var i=0; i<oldArr.length; i++){ oldMap[oldArr[i].id] = oldArr[i]; }
+    for(var j=0; j<newArr.length; j++){
+      var n = newArr[j], o = oldMap[n.id];
+      if(!o) return true;
+      for(var k=0; k<USER_RENDER_FIELDS.length; k++){
+        var f = USER_RENDER_FIELDS[k];
+        var ov = o[f], nv = n[f];
+        if(ov === nv) continue;
+        /* Comparação profunda só pra fcmTokens (array) */
+        if(f === "fcmTokens"){
+          try{ if(JSON.stringify(ov||[]) !== JSON.stringify(nv||[])) return true; }
+          catch(_){ return true; }
+        } else {
+          /* Primitivos: !== já basta */
+          return true;
+        }
+      }
+    }
+    return false;
+  }
   db.collection("users").onSnapshot(snap=>{
     var newUsers = snap.docs.map(d=>({id:d.id,...d.data()}));
-    /* Calcula hash ignorando o campo lastSeen */
-    var newHash;
-    try{
-      newHash = JSON.stringify(newUsers.map(function(u){
-        var o = Object.assign({}, u); delete o.lastSeen; return o;
-      }));
-    }catch(_){ newHash = ""; }
-    var onlyPresenceChanged = (_prevUsersHash && newHash === _prevUsersHash);
-    _prevUsersHash = newHash;
+    var changedBeyondPresence = _usersDifferIgnoringPresence(_prevUsersForCompare, newUsers);
+    _prevUsersForCompare = newUsers;
     users = newUsers;
     usersLoaded=true;
     if(!me && sessionId){ const u=users.find(x=>x.id===sessionId); if(u) me=u; }
     if(me){const fresh=users.find(u=>u.id===me.id);if(fresh)me=fresh;}
-    if(onlyPresenceChanged){
-      /* Só presença mudou — atualiza dots da equipe sem flicker geral */
+    if(!changedBeyondPresence){
+      /* Só presença mudou — atualiza dots da equipe sem disparar fade animation */
       if(tab === "team" && !$("mainApp").classList.contains("hidden")){
         try{ refreshPresenceInDOM(); }catch(_){}
       }
