@@ -2077,7 +2077,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.12 · build push-real-fcm-debug2</div>
+    <div class="ver">versão 63.12 · build push-real-fcm-debug3</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -3432,6 +3432,12 @@ async function setupPushNotifications(){
     _pushDbg("11-getToken-retornou", token ? ("token len="+token.length) : "vazio/null");
 
     if(!token){ _pushErr("getToken-vazio", new Error("getToken retornou vazio. Verifica VAPID key + permissão.")); return false; }
+
+    /* [V63.12-DEBUG2] Re-check defensivo: usuário pode ter deslogado durante o await */
+    if(!me || !me.id || !db){
+      _pushDbg("12a-sessao-expirou", "me ou db virou null durante async — abortando salvamento (não é erro real)");
+      return false;
+    }
 
     /* Salva o token no perfil do usuário (campo fcmTokens é array de strings).
        Mantém últimos 5 dispositivos. */
