@@ -395,6 +395,15 @@
   .chip .dot{width:7px;height:7px;border-radius:50%}
   .chip.on{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:700;
     box-shadow:0 0 0 1px rgba(62,184,216,.3),0 4px 12px -4px rgba(62,184,216,.4)}
+  /* [V63.9] Desktop: distribui chips pela largura total (alinha com Calendário/Posts/Vista Equipe) */
+  @media (min-width:720px){
+    .filters{
+      flex-wrap:wrap;
+      overflow-x:visible;
+      justify-content:space-between;
+      gap:8px;
+      row-gap:8px}
+  }
   .cal-head{display:grid;grid-template-columns:repeat(7,1fr);margin:8px 0 8px;gap:5px}
   .cal-head div{text-align:center;font-size:10px;font-weight:700;color:var(--ink-faint);
     letter-spacing:.08em;padding:6px 0}
@@ -1860,7 +1869,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.8 · build desktop-login</div>
+    <div class="ver">versão 63.9 · build filtros-desktop</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
