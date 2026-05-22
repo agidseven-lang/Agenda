@@ -158,6 +158,9 @@
   /* Version footer */
   .ver{text-align:center;font-size:10px;color:var(--ink-faint);opacity:.5;
     font-weight:500;margin-top:30px;letter-spacing:.04em}
+  .ver-credits{text-align:center;font-size:10px;color:var(--ink-faint);opacity:.42;
+    font-weight:500;margin-top:5px;letter-spacing:.04em;line-height:1.4}
+  .ver-credits b{color:var(--accent);opacity:.85;font-weight:700}
   /* Install bar (PWA prompt) — visual elegante */
   .install-bar{display:flex;align-items:center;gap:13px;
     background:linear-gradient(135deg,rgba(62,184,216,.12) 0%,rgba(176,114,255,.08) 100%);
@@ -2300,9 +2303,117 @@
     .pageT .mt{font-size:60px}
   }
 
+  /* ============================================================
+     [V63.29] CHAT INTERNO ESTILO WHATSAPP
+     ============================================================ */
+  /* Badge no botão de menu */
+  .navtab-badge{position:absolute;top:3px;right:50%;transform:translateX(14px);
+    min-width:17px;height:17px;border-radius:9px;background:var(--c-rev);color:#fff;
+    font-size:9.5px;font-weight:900;display:grid;place-items:center;padding:0 5px;letter-spacing:0;line-height:1}
+
+  /* Layout principal do chat */
+  .chat-wrap{display:flex;height:calc(100vh - 130px);min-height:480px;gap:0;
+    background:var(--bg);border-radius:14px;overflow:hidden;border:1px solid var(--line);position:relative}
+  @media (max-width:760px){
+    .chat-wrap{height:calc(100vh - 110px);border-radius:10px}
+  }
+
+  /* === COLUNA ESQUERDA: lista de conversas === */
+  .chat-side{width:340px;flex-shrink:0;display:flex;flex-direction:column;
+    border-right:1px solid var(--line);background:var(--surface)}
+  @media (max-width:760px){
+    .chat-side{width:100%;border-right:none}
+    .chat-side.hide-mobile{display:none}
+  }
+  .chat-side-h{padding:14px 16px 12px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0}
+  .chat-side-h h3{margin:0;font-size:16px;font-weight:800;color:var(--ink)}
+  .chat-new-btn{width:36px;height:36px;border-radius:10px;background:var(--accent);
+    color:#001423;border:none;cursor:pointer;display:grid;place-items:center;flex-shrink:0}
+  .chat-new-btn svg{width:18px;height:18px}
+  .chat-new-btn:hover{filter:brightness(1.1)}
+  .chat-search{padding:10px 14px;border-bottom:1px solid var(--line-soft);flex-shrink:0}
+  .chat-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;
+    padding:9px 12px;color:var(--ink);font:inherit;font-size:13px}
+  .chat-search input:focus{outline:none;border-color:var(--accent)}
+  .chat-list{flex:1;overflow-y:auto;padding:6px 0}
+  .chat-list-empty{padding:30px 20px;text-align:center;color:var(--ink-faint);font-size:13px;line-height:1.5}
+  .chat-li{display:flex;align-items:center;gap:11px;padding:11px 14px;cursor:pointer;
+    border-bottom:1px solid var(--line-soft);transition:background .12s ease;position:relative}
+  .chat-li:hover{background:rgba(255,255,255,.025)}
+  .chat-li.active{background:rgba(62,184,216,.08)}
+  .chat-li-av{width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;border:1.5px solid var(--line);background:var(--bg);position:relative}
+  .chat-li-av img{width:100%;height:100%;object-fit:cover;display:block}
+  .chat-li-av-fb{width:100%;height:100%;display:grid;place-items:center;font-weight:800;color:var(--ink);font-size:15px;background:var(--surface)}
+  .chat-li-online{position:absolute;bottom:1px;right:1px;width:11px;height:11px;border-radius:50%;background:var(--c-trafego);border:2px solid var(--surface)}
+  .chat-li-c{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .chat-li-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .chat-li-nm{font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+  .chat-li-at{font-size:10.5px;color:var(--ink-faint);font-weight:600;flex-shrink:0;letter-spacing:.02em}
+  .chat-li.unread .chat-li-at{color:var(--accent);font-weight:800}
+  .chat-li-bot{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .chat-li-lm{font-size:12.5px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;line-height:1.35}
+  .chat-li.unread .chat-li-lm{color:var(--ink);font-weight:600}
+  .chat-li-badge{min-width:20px;height:20px;border-radius:10px;background:var(--c-rev);color:#fff;
+    font-size:10.5px;font-weight:900;display:grid;place-items:center;padding:0 6px;flex-shrink:0;letter-spacing:0}
+
+  /* === COLUNA DIREITA: sala da conversa === */
+  .chat-room{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  @media (max-width:760px){
+    .chat-room.hide-mobile{display:none}
+  }
+  .chat-room-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px 20px;text-align:center}
+  .chat-room-empty svg{width:60px;height:60px;color:var(--ink-faint);opacity:.5}
+  .chat-room-empty h4{margin:0;font-size:17px;font-weight:800;color:var(--ink)}
+  .chat-room-empty p{margin:0;font-size:13.5px;color:var(--ink-soft);max-width:340px;line-height:1.5}
+  .chat-room-h{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);background:var(--surface);flex-shrink:0}
+  .chat-room-back{width:32px;height:32px;border-radius:8px;border:none;background:var(--bg);color:var(--ink);cursor:pointer;display:grid;place-items:center;flex-shrink:0}
+  .chat-room-back svg{width:18px;height:18px}
+  @media (min-width:761px){ .chat-room-back{display:none} }
+  .chat-room-h .chat-li-av{width:38px;height:38px}
+  .chat-room-h .nm{font-size:15px;font-weight:800;color:var(--ink);line-height:1.2}
+  .chat-room-h .st{font-size:11.5px;color:var(--ink-soft);font-weight:600;line-height:1.2;margin-top:2px}
+  .chat-room-h .st.online{color:var(--c-trafego)}
+  .chat-feed{flex:1;overflow-y:auto;padding:18px 16px;display:flex;flex-direction:column;gap:6px;
+    background:repeating-linear-gradient(45deg,var(--bg),var(--bg) 50px,rgba(255,255,255,.012) 50px,rgba(255,255,255,.012) 100px)}
+  .chat-day-sep{align-self:center;padding:5px 12px;background:var(--surface);border-radius:10px;
+    font-size:11px;color:var(--ink-soft);font-weight:700;margin:10px 0 4px;border:1px solid var(--line-soft)}
+  .chat-msg{max-width:78%;padding:8px 12px 6px;border-radius:13px;position:relative;font-size:14px;line-height:1.4;
+    word-wrap:break-word;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+  .chat-msg.in{align-self:flex-start;background:var(--surface);border-bottom-left-radius:4px}
+  .chat-msg.out{align-self:flex-end;background:linear-gradient(135deg,rgba(62,184,216,.18) 0%,rgba(62,184,216,.10) 100%);border:1px solid rgba(62,184,216,.30);border-bottom-right-radius:4px}
+  .chat-msg-text{white-space:pre-wrap}
+  .chat-msg-foot{display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:10px;color:var(--ink-faint);margin-top:3px;letter-spacing:.02em}
+  .chat-msg.in .chat-msg-foot{justify-content:flex-start}
+  .chat-msg-check{display:inline-flex;align-items:center}
+  .chat-msg-check svg{width:14px;height:14px}
+  .chat-msg-check.read{color:var(--accent)}
+  .chat-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface);flex-shrink:0}
+  .chat-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:18px;
+    padding:9px 14px;color:var(--ink);font:inherit;font-size:14px;resize:none;min-height:38px;max-height:120px;line-height:1.4;font-family:inherit}
+  .chat-input:focus{outline:none;border-color:var(--accent)}
+  .chat-send{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#001423;
+    border:none;cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:transform .1s ease}
+  .chat-send:hover{transform:scale(1.05)}
+  .chat-send:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .chat-send svg{width:18px;height:18px}
+
+  /* User picker (modal "Nova conversa") */
+  .chat-picker-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:9999;
+    display:flex;align-items:center;justify-content:center;padding:16px}
+  .chat-picker-box{background:var(--bg);border-radius:14px;width:100%;max-width:420px;max-height:80vh;
+    display:flex;flex-direction:column;border:1px solid var(--line);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+  .chat-picker-h{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line-soft)}
+  .chat-picker-h h3{margin:0;font-size:16px;font-weight:800}
+  .chat-picker-x{width:30px;height:30px;border-radius:8px;border:none;background:var(--surface);color:var(--ink);cursor:pointer;font-size:18px;font-weight:700}
+  .chat-picker-list{overflow-y:auto;padding:6px 0;flex:1}
+  .chat-picker-it{display:flex;align-items:center;gap:11px;padding:11px 16px;cursor:pointer;border-bottom:1px solid var(--line-soft);transition:background .12s ease}
+  .chat-picker-it:hover{background:rgba(62,184,216,.06)}
+  .chat-picker-it .chat-li-av{width:38px;height:38px}
+  .chat-picker-it .nm{font-size:14px;font-weight:700;color:var(--ink)}
+  .chat-picker-it .rl{font-size:11.5px;color:var(--ink-soft);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+
 </style>
-</head>
-<body>
 <div id="app">
   <section id="loadingScreen" class="center-screen">
     <div class="spin"></div>
@@ -2351,7 +2462,8 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.28 · build posts-lado-a-lado</div>
+    <div class="ver">versão 63.29 · build chat-interno</div>
+    <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -2402,6 +2514,7 @@
       <button class="navtab" data-tab="board"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="5" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="10" y="4" width="5" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="17" y="4" width="4" height="7" rx="1.5" stroke="currentColor" stroke-width="2"/></svg><span>Quadro</span></button>
       <button class="navfab" id="navAdd"><div class="pl"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></div><span>Novo</span></button>
       <button class="navtab" data-tab="team"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Equipe</span></button>
+      <button class="navtab" data-tab="chat" style="position:relative"><svg viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-12 7l-5 1.5L5 16A8 8 0 1 1 21 12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Chat</span><span class="navtab-badge" id="chatNavBadge" style="display:none">0</span></button>
       <button class="navtab" data-tab="profile"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Perfil</span></button>
     </nav>
   </section>
@@ -3131,6 +3244,8 @@ var __clientOpenedMark = false;
     if(!$("mainApp").classList.contains("hidden")&&tab==="board")render();
     /* [V63.23] Auto-arquiva posts > 10 dias após conclusão (roda 1x por sessão) */
     try{ if(typeof autoArchiveOldPosts === "function") autoArchiveOldPosts(); }catch(_){}
+    /* [V63.29] Inicia subscription dos chats (lista de conversas em tempo real) */
+    try{ if(typeof subscribeChats === "function") subscribeChats(); }catch(_){}
   },err=>{});
   /* fallback: se nada carregar (offline), sai da tela de carregando após 6s */
   setTimeout(()=>{ if(!usersLoaded && !me) route(); },6000);
@@ -3459,6 +3574,10 @@ function logout(){
   try{ stopPresence(); }catch(_){}
   /* [V63.12] Remove o token FCM deste dispositivo do perfil (async, não trava) */
   try{ teardownPushNotifications(); }catch(_){}
+  /* [V63.29] Limpa listeners do chat */
+  try{ if(chatsUnsub){ chatsUnsub(); chatsUnsub=null; } }catch(_){}
+  try{ if(msgsUnsub){ msgsUnsub(); msgsUnsub=null; } }catch(_){}
+  chats=[]; currentChatId=null; currentChatMessages=[]; chatView="list";
   me=null;lsDel(SESSION_KEY);$("content").innerHTML="";route();
 }
 function val(id){return $(id).value.trim();}
@@ -3598,6 +3717,513 @@ function renderDashboard(){
   h+='</div>';
   return h;
 }
+/* ============================================================
+   [V63.29] CHAT INTERNO ESTILO WHATSAPP — em tempo real via Firestore
+   ============================================================
+   Modelo de dados:
+   - chats/{chatId}              { participants:[uid1,uid2], lastMessage:{text,at,by},
+                                    unreadCount:{uid:n}, isGroup:false, createdAt }
+   - chats/{chatId}/messages/{mid}  { text, by, at, readBy:{uid:at} }
+
+   ChatId determinístico pra DMs: "dm_<uidA>_<uidB>" (ordenado alfabeticamente).
+   Real-time via onSnapshot. Push notification via FCM existente.
+   ============================================================ */
+var chats = [];                /* lista de chats do usuário atual */
+var currentChatId = null;
+var currentChatMessages = [];
+var chatsUnsub = null;
+var msgsUnsub = null;
+var chatView = "list";         /* "list" | "room" | "picker" */
+var chatSearchQuery = "";
+
+/* ─── ID determinístico pra DM entre 2 usuários ─── */
+function dmChatId(uidA, uidB){
+  var s = [uidA, uidB].sort();
+  return "dm_" + s[0] + "_" + s[1];
+}
+
+/* ─── Inicia o snapshot da lista de chats do usuário atual ─── */
+function subscribeChats(){
+  if(chatsUnsub){ try{ chatsUnsub(); }catch(_){} chatsUnsub = null; }
+  if(!me || !db) return;
+  chatsUnsub = db.collection("chats")
+    .where("participants", "array-contains", me.id)
+    .onSnapshot(function(snap){
+      chats = snap.docs.map(function(d){ var o = d.data() || {}; o.id = d.id; return o; });
+      chats.sort(function(a,b){
+        var ta = (a.lastMessage && a.lastMessage.at) || a.createdAt || 0;
+        var tb = (b.lastMessage && b.lastMessage.at) || b.createdAt || 0;
+        return tb - ta;
+      });
+      updateChatBadge();
+      if(tab === "chat") renderChatRefresh();
+    }, function(err){
+      console.warn("[chat] erro no snapshot de chats:", err.message);
+    });
+}
+
+/* ─── Snapshot das mensagens do chat aberto ─── */
+function subscribeMessages(chatId){
+  if(msgsUnsub){ try{ msgsUnsub(); }catch(_){} msgsUnsub = null; }
+  if(!chatId || !db) return;
+  msgsUnsub = db.collection("chats").doc(chatId)
+    .collection("messages").orderBy("at", "asc").limit(300)
+    .onSnapshot(function(snap){
+      currentChatMessages = snap.docs.map(function(d){ var o = d.data() || {}; o.id = d.id; return o; });
+      if(tab === "chat" && currentChatId === chatId){
+        renderChatRoomOnly();
+        markChatRead(chatId);
+        setTimeout(scrollChatToBottom, 30);
+      }
+    }, function(err){
+      console.warn("[chat] erro no snapshot de mensagens:", err.message);
+    });
+}
+
+/* ─── Abre conversa com outro usuário (cria o doc se não existir) ─── */
+async function openChatWith(otherUserId){
+  if(!me || !db) return;
+  if(otherUserId === me.id){ toast("Você não pode conversar consigo mesmo"); return; }
+  var chatId = dmChatId(me.id, otherUserId);
+  try{
+    var ref = db.collection("chats").doc(chatId);
+    var snap = await ref.get();
+    if(!snap.exists){
+      var unread = {}; unread[me.id] = 0; unread[otherUserId] = 0;
+      await ref.set({
+        participants: [me.id, otherUserId],
+        createdAt: Date.now(),
+        lastMessage: null,
+        unreadCount: unread,
+        isGroup: false
+      });
+    }
+    currentChatId = chatId;
+    chatView = "room";
+    subscribeMessages(chatId);
+    renderChatRefresh();
+  }catch(e){
+    console.error("[chat] erro ao abrir conversa:", e);
+    toast("Não foi possível abrir a conversa");
+  }
+}
+
+/* ─── Envia mensagem no chat atual ─── */
+async function sendChatMessage(){
+  if(!me || !db || !currentChatId) return;
+  var inp = document.getElementById("chatInput");
+  if(!inp) return;
+  var text = (inp.value || "").trim();
+  if(!text) return;
+  if(text.length > 2000) text = text.slice(0, 2000);
+  var chat = chats.find(function(c){ return c.id === currentChatId; });
+  if(!chat) return;
+  var other = (chat.participants || []).find(function(p){ return p !== me.id; });
+  var now = Date.now();
+  var msg = {
+    text: text,
+    by: me.id,
+    at: now,
+    readBy: {}
+  };
+  msg.readBy[me.id] = now;
+  /* Otimismo: limpa input antes do save */
+  inp.value = "";
+  inp.style.height = "";
+  var sendBtn = document.getElementById("chatSendBtn");
+  if(sendBtn) sendBtn.disabled = true;
+  try{
+    await db.collection("chats").doc(currentChatId)
+      .collection("messages").add(msg);
+    /* Atualiza lastMessage + incrementa unreadCount do outro */
+    var unread = Object.assign({}, chat.unreadCount || {});
+    if(other) unread[other] = (unread[other] || 0) + 1;
+    unread[me.id] = 0;
+    await db.collection("chats").doc(currentChatId).update({
+      lastMessage: { text: text.slice(0,200), at: now, by: me.id },
+      unreadCount: unread
+    });
+    /* Push notif pro outro (best-effort, não bloqueia) */
+    if(other && typeof sendPushToUsers === "function"){
+      try{
+        sendPushToUsers([other], {
+          title: "💬 " + (me.name || "Mensagem"),
+          body: text.slice(0, 140),
+          tag: "chat-" + currentChatId,
+          url: "/?go=chat&with=" + me.id
+        });
+      }catch(_){}
+    }
+  }catch(e){
+    console.error("[chat] erro ao enviar:", e);
+    toast("Erro ao enviar — tente de novo");
+    inp.value = text;
+  }finally{
+    if(sendBtn) sendBtn.disabled = false;
+    setTimeout(function(){ if(inp) inp.focus(); }, 50);
+  }
+}
+
+/* ─── Marca chat atual como lido (zera unreadCount do me) ─── */
+async function markChatRead(chatId){
+  if(!me || !db || !chatId) return;
+  var chat = chats.find(function(c){ return c.id === chatId; });
+  if(!chat) return;
+  var cur = (chat.unreadCount && chat.unreadCount[me.id]) || 0;
+  if(cur === 0) return;
+  try{
+    var newUnread = Object.assign({}, chat.unreadCount || {});
+    newUnread[me.id] = 0;
+    await db.collection("chats").doc(chatId).update({ unreadCount: newUnread });
+  }catch(e){ /* silencioso */ }
+  /* Marca as mensagens recentes como readBy[me.id] (best-effort) */
+  try{
+    var unreadMsgs = currentChatMessages.filter(function(m){
+      return m && m.by !== me.id && !(m.readBy && m.readBy[me.id]);
+    }).slice(-20);  /* só as últimas 20 pra não consumir cota */
+    var batch = db.batch();
+    var now = Date.now();
+    unreadMsgs.forEach(function(m){
+      var ref = db.collection("chats").doc(chatId).collection("messages").doc(m.id);
+      var update = {}; update["readBy." + me.id] = now;
+      batch.update(ref, update);
+    });
+    if(unreadMsgs.length) await batch.commit();
+  }catch(_){}
+}
+
+/* ─── Total de mensagens não lidas (todos os chats) ─── */
+function totalUnread(){
+  if(!me) return 0;
+  return chats.reduce(function(acc, c){
+    return acc + ((c.unreadCount && c.unreadCount[me.id]) || 0);
+  }, 0);
+}
+
+/* ─── Atualiza o badge no botão Chat do menu ─── */
+function updateChatBadge(){
+  var el = document.getElementById("chatNavBadge");
+  if(!el) return;
+  var n = totalUnread();
+  if(n > 0){
+    el.textContent = n > 99 ? "99+" : String(n);
+    el.style.display = "";
+  }else{
+    el.style.display = "none";
+  }
+}
+
+/* ─── Helpers de formatação ─── */
+function chatLiTime(at){
+  if(!at) return "";
+  var d = new Date(at), now = new Date();
+  var pad = function(n){ return n<10?"0"+n:n; };
+  if(d.toDateString() === now.toDateString()){
+    return pad(d.getHours())+":"+pad(d.getMinutes());
+  }
+  var yest = new Date(now); yest.setDate(yest.getDate()-1);
+  if(d.toDateString() === yest.toDateString()) return "ontem";
+  var diffDays = Math.floor((now - d) / 86400000);
+  if(diffDays < 7){
+    var dias = ["dom","seg","ter","qua","qui","sex","sáb"];
+    return dias[d.getDay()];
+  }
+  return pad(d.getDate())+"/"+pad(d.getMonth()+1);
+}
+function chatDaySep(at){
+  var d = new Date(at), now = new Date();
+  var pad = function(n){ return n<10?"0"+n:n; };
+  if(d.toDateString() === now.toDateString()) return "Hoje";
+  var yest = new Date(now); yest.setDate(yest.getDate()-1);
+  if(d.toDateString() === yest.toDateString()) return "Ontem";
+  return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();
+}
+function chatAvatarHTML(u){
+  if(!u) return '<div class="chat-li-av-fb">?</div>';
+  if(u.photo && typeof u.photo === "string" && u.photo.length > 0){
+    return '<img src="'+esc(safePhoto(u.photo))+'" alt="'+esc(u.name||"?")+'">';
+  }
+  var ini = ((u.name||"?").trim()[0]||"?").toUpperCase();
+  return '<div class="chat-li-av-fb">'+esc(ini)+'</div>';
+}
+function chatOtherUser(chat){
+  if(!chat || !Array.isArray(chat.participants)) return null;
+  var otherId = chat.participants.find(function(p){ return p !== me.id; });
+  return users.find(function(u){ return u.id === otherId; }) || {id: otherId, name: "Usuário"};
+}
+
+/* ─── RENDER: entry point pro tab "chat" ─── */
+function renderChat(){
+  /* Garante subscription ativa */
+  if(!chatsUnsub) subscribeChats();
+  /* Marca chat atual como lido (caso volte pra cá) */
+  if(currentChatId) markChatRead(currentChatId);
+  var hideSide = (chatView === "room" && currentChatId) ? "hide-mobile" : "";
+  var hideRoom = (chatView === "list") ? "hide-mobile" : "";
+  return ''+
+    '<div class="chat-wrap">'+
+      '<div class="chat-side '+hideSide+'" id="chatSide">'+
+        '<div class="chat-side-h">'+
+          '<h3>💬 Conversas</h3>'+
+          '<button class="chat-new-btn" id="chatNewBtn" title="Nova conversa">'+
+            '<svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>'+
+          '</button>'+
+        '</div>'+
+        '<div class="chat-search">'+
+          '<input type="text" id="chatSearchInput" placeholder="Buscar conversa..." value="'+esc(chatSearchQuery)+'">'+
+        '</div>'+
+        '<div class="chat-list" id="chatList">'+renderChatListItems()+'</div>'+
+      '</div>'+
+      '<div class="chat-room '+hideRoom+'" id="chatRoom">'+renderChatRoomInner()+'</div>'+
+    '</div>';
+}
+
+/* ─── Render só a lista de conversas (atualização em tempo real) ─── */
+function renderChatListItems(){
+  var list = chats.slice();
+  if(chatSearchQuery){
+    var q = chatSearchQuery.toLowerCase();
+    list = list.filter(function(c){
+      var ou = chatOtherUser(c);
+      return ou && (ou.name||"").toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  if(!list.length){
+    return '<div class="chat-list-empty">Nenhuma conversa ainda.<br>Clique em <b>+</b> pra começar uma.</div>';
+  }
+  return list.map(function(chat){
+    var ou = chatOtherUser(chat);
+    var nm = (ou && ou.name) || "Usuário";
+    var lm = chat.lastMessage;
+    var lmTxt = lm ? (lm.by === me.id ? "Você: " : "") + (lm.text||"") : '<i style="opacity:.6">conversa nova</i>';
+    var lmAt = lm ? chatLiTime(lm.at) : chatLiTime(chat.createdAt);
+    var unread = (chat.unreadCount && chat.unreadCount[me.id]) || 0;
+    var isActive = (chat.id === currentChatId);
+    /* "Online" = lastActive < 5min — não temos isso, então pulamos */
+    return '<div class="chat-li'+(isActive?" active":"")+(unread>0?" unread":"")+'" data-chat-id="'+esc(chat.id)+'">'+
+      '<div class="chat-li-av">'+chatAvatarHTML(ou)+'</div>'+
+      '<div class="chat-li-c">'+
+        '<div class="chat-li-top"><div class="chat-li-nm">'+esc(nm)+'</div><div class="chat-li-at">'+esc(lmAt)+'</div></div>'+
+        '<div class="chat-li-bot">'+
+          '<div class="chat-li-lm">'+(lm?esc(lmTxt):lmTxt)+'</div>'+
+          (unread>0 ? '<div class="chat-li-badge">'+(unread>99?"99+":unread)+'</div>' : '')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+}
+
+/* ─── Render interno da sala (header + mensagens + input) ─── */
+function renderChatRoomInner(){
+  if(!currentChatId){
+    return '<div class="chat-room-empty">'+
+      '<svg viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-12 7l-5 1.5L5 16A8 8 0 1 1 21 12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+      '<h4>Suas conversas com a equipe</h4>'+
+      '<p>Escolha uma conversa à esquerda ou clique em <b>+</b> pra iniciar uma nova. Mensagens em tempo real, sincronizadas entre todos os dispositivos.</p>'+
+    '</div>';
+  }
+  var chat = chats.find(function(c){ return c.id === currentChatId; });
+  if(!chat){
+    return '<div class="chat-room-empty"><p>Conversa não encontrada</p></div>';
+  }
+  var ou = chatOtherUser(chat);
+  var nm = (ou && ou.name) || "Usuário";
+  var role = (ou && ou.role) || "";
+  /* Cabeçalho */
+  var html = '<div class="chat-room-h">'+
+    '<button class="chat-room-back" id="chatRoomBack" title="Voltar"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'+
+    '<div class="chat-li-av">'+chatAvatarHTML(ou)+'</div>'+
+    '<div style="flex:1;min-width:0">'+
+      '<div class="nm">'+esc(nm)+'</div>'+
+      '<div class="st">'+esc(role||"membro da equipe")+'</div>'+
+    '</div>'+
+  '</div>';
+  /* Feed de mensagens */
+  html += '<div class="chat-feed" id="chatFeed">';
+  if(!currentChatMessages.length){
+    html += '<div style="margin:auto;color:var(--ink-faint);font-size:13px;text-align:center;padding:30px">Nenhuma mensagem ainda. Diga oi! 👋</div>';
+  }else{
+    var lastDay = "";
+    currentChatMessages.forEach(function(m){
+      if(!m) return;
+      var dayLabel = chatDaySep(m.at||0);
+      if(dayLabel !== lastDay){
+        html += '<div class="chat-day-sep">'+esc(dayLabel)+'</div>';
+        lastDay = dayLabel;
+      }
+      var isOut = (m.by === me.id);
+      var pad = function(n){ return n<10?"0"+n:n; };
+      var t = new Date(m.at||0);
+      var timeStr = pad(t.getHours())+":"+pad(t.getMinutes());
+      var checkSvg = "";
+      if(isOut){
+        /* Lida se o outro tem timestamp em readBy */
+        var other = (chat.participants||[]).find(function(p){ return p !== me.id; });
+        var wasRead = !!(m.readBy && other && m.readBy[other]);
+        checkSvg = '<span class="chat-msg-check'+(wasRead?" read":"")+'">'+
+          (wasRead
+            ? '<svg viewBox="0 0 16 12" fill="none"><path d="M1 6l3 3 6-7M5 9l3 3 7-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            : '<svg viewBox="0 0 16 12" fill="none"><path d="M1 6l4 4 9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+          )+'</span>';
+      }
+      html += '<div class="chat-msg '+(isOut?"out":"in")+'">'+
+        '<div class="chat-msg-text">'+chatLinkify(m.text||"")+'</div>'+
+        '<div class="chat-msg-foot">'+timeStr+' '+checkSvg+'</div>'+
+      '</div>';
+    });
+  }
+  html += '</div>';
+  /* Input */
+  html += '<div class="chat-input-bar">'+
+    '<textarea class="chat-input" id="chatInput" placeholder="Mensagem" rows="1"></textarea>'+
+    '<button class="chat-send" id="chatSendBtn" title="Enviar">'+
+      '<svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-7-7 18-2-9-9-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>'+
+    '</button>'+
+  '</div>';
+  return html;
+}
+
+/* ─── Sanitiza + linka URLs ─── */
+function chatLinkify(text){
+  var safe = esc(text);
+  return safe.replace(/(https?:\/\/[^\s<>"']+)/g, function(u){
+    return '<a href="'+u+'" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">'+u+'</a>';
+  });
+}
+
+/* ─── Re-renderiza só a lista + sala SEM piscar a tela toda ─── */
+function renderChatRefresh(){
+  if(tab !== "chat") return;
+  var list = document.getElementById("chatList");
+  if(list) list.innerHTML = renderChatListItems();
+  renderChatRoomOnly();
+  /* re-bind dos itens */
+  bindChatListItems();
+  updateChatBadge();
+}
+
+/* ─── Re-renderiza só a sala ─── */
+function renderChatRoomOnly(){
+  if(tab !== "chat") return;
+  var room = document.getElementById("chatRoom");
+  if(!room) return;
+  var hideRoom = (chatView === "list") ? "hide-mobile" : "";
+  room.className = "chat-room " + hideRoom;
+  room.innerHTML = renderChatRoomInner();
+  bindChatRoom();
+  /* Atualiza visibilidade da lista também (mobile) */
+  var side = document.getElementById("chatSide");
+  if(side){
+    var hideSide = (chatView === "room" && currentChatId) ? "hide-mobile" : "";
+    side.className = "chat-side " + hideSide;
+  }
+}
+
+/* ─── Auto-scroll pro fim do feed ─── */
+function scrollChatToBottom(){
+  var f = document.getElementById("chatFeed");
+  if(f) f.scrollTop = f.scrollHeight;
+}
+
+/* ─── Binds da lista de conversas ─── */
+function bindChatListItems(){
+  document.querySelectorAll(".chat-li[data-chat-id]").forEach(function(li){
+    li.onclick = function(){
+      var chatId = li.dataset.chatId;
+      if(currentChatId !== chatId){
+        currentChatId = chatId;
+        subscribeMessages(chatId);
+      }
+      chatView = "room";
+      renderChatRefresh();
+    };
+  });
+}
+
+/* ─── Binds da sala (input, enter, voltar) ─── */
+function bindChatRoom(){
+  var inp = document.getElementById("chatInput");
+  var sendBtn = document.getElementById("chatSendBtn");
+  var back = document.getElementById("chatRoomBack");
+  if(inp){
+    /* Auto-grow */
+    inp.addEventListener("input", function(){
+      inp.style.height = "auto";
+      inp.style.height = Math.min(120, inp.scrollHeight) + "px";
+    });
+    /* Enter envia, Shift+Enter quebra linha */
+    inp.addEventListener("keydown", function(e){
+      if(e.key === "Enter" && !e.shiftKey){
+        e.preventDefault();
+        sendChatMessage();
+      }
+    });
+    setTimeout(function(){ try{ inp.focus(); }catch(_){} }, 40);
+  }
+  if(sendBtn) sendBtn.onclick = sendChatMessage;
+  if(back) back.onclick = function(){
+    chatView = "list";
+    currentChatId = null;
+    if(msgsUnsub){ try{ msgsUnsub(); }catch(_){} msgsUnsub = null; }
+    renderChatRefresh();
+  };
+  setTimeout(scrollChatToBottom, 40);
+}
+
+/* ─── Bind principal do tab Chat ─── */
+function bindChat(){
+  bindChatListItems();
+  bindChatRoom();
+  var srch = document.getElementById("chatSearchInput");
+  if(srch){
+    srch.oninput = function(){
+      chatSearchQuery = srch.value || "";
+      var list = document.getElementById("chatList");
+      if(list){ list.innerHTML = renderChatListItems(); bindChatListItems(); }
+    };
+  }
+  var nbtn = document.getElementById("chatNewBtn");
+  if(nbtn) nbtn.onclick = openChatPicker;
+}
+
+/* ─── Modal "Nova conversa" — lista de usuários ─── */
+function openChatPicker(){
+  var prev = document.getElementById("__chatPickerBg"); if(prev) prev.remove();
+  /* Lista de usuários ativos, excluindo o próprio me */
+  var list = users.filter(function(u){
+    return u && u.id && u.id !== me.id && u.status !== "pendente";
+  }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
+  var bg = document.createElement("div");
+  bg.id = "__chatPickerBg";
+  bg.className = "chat-picker-bg";
+  var html = '<div class="chat-picker-box">'+
+    '<div class="chat-picker-h"><h3>Iniciar conversa</h3><button class="chat-picker-x" id="__chatPickerX">×</button></div>'+
+    '<div class="chat-picker-list">';
+  if(!list.length){
+    html += '<div style="padding:30px 20px;text-align:center;color:var(--ink-faint);font-size:13px">Nenhum outro usuário cadastrado ainda.</div>';
+  }else{
+    list.forEach(function(u){
+      html += '<div class="chat-picker-it" data-uid="'+esc(u.id)+'">'+
+        '<div class="chat-li-av">'+chatAvatarHTML(u)+'</div>'+
+        '<div style="flex:1;min-width:0"><div class="nm">'+esc(u.name||"?")+'</div><div class="rl">'+esc(u.role||"membro")+'</div></div>'+
+      '</div>';
+    });
+  }
+  html += '</div></div>';
+  bg.innerHTML = html;
+  document.body.appendChild(bg);
+  function closeMe(){ bg.remove(); }
+  document.getElementById("__chatPickerX").onclick = closeMe;
+  bg.onclick = function(e){ if(e.target === bg) closeMe(); };
+  document.querySelectorAll(".chat-picker-it[data-uid]").forEach(function(it){
+    it.onclick = function(){
+      var uid = it.dataset.uid;
+      closeMe();
+      openChatWith(uid);
+    };
+  });
+}
+
 function render(){
   if($("mainApp").classList.contains("hidden"))return;
   const c=$("content");c.className="";void c.offsetWidth;c.className="fade";
@@ -3608,6 +4234,7 @@ function render(){
     c.innerHTML=renderFilters()+(view==="month"?renderMonth():renderAgenda());bindAgenda();
   }else if(tab==="board"){c.innerHTML=renderBoard();bindBoard();}
   else if(tab==="team"){c.innerHTML=renderTeam();bindTeam();}
+  else if(tab==="chat"){c.innerHTML=renderChat();bindChat();}
   else if(tab==="painel"){c.innerHTML=renderDashboard();
     var bp=$("backToProfile"); if(bp)bp.onclick=()=>switchTab("profile");}
   else if(tab==="posts"){c.innerHTML=renderPostsLog();
