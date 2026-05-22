@@ -89,23 +89,641 @@
     --tr-base:.2s cubic-bezier(.4,0,.2,1);
     --tr-slow:.32s cubic-bezier(.22,1,.36,1);
   }
-  /* [V63] TEMA CLARO — ativado por body.theme-light. Inverte os tokens neutros. */
+  /* ════════════════════════════════════════════════════════════════
+     [V63.33] TEMA CLARO — PREMIUM REDESIGN
+     Paleta slate + cyan profissional (estilo Linear / Stripe / Notion)
+     Sombras neutras escalonadas. Tokens refinados. Hierarquia visual clara.
+     ════════════════════════════════════════════════════════════════ */
   body.theme-light{
-    --bg:#f7f8fa;
-    --bg-2:#eef0f4;
-    --surface:#ffffff;
-    --surface-2:#f7f8fa;
-    --surface-3:#eef0f4;
-    --line:rgba(0,0,0,.08);
-    --line-soft:rgba(0,0,0,.05);
-    --line-strong:rgba(0,0,0,.14);
-    --ink:#0d1117;
-    --ink-soft:#444a55;
-    --ink-faint:#8a909c;
-    --grad-surface:linear-gradient(180deg,rgba(0,0,0,.015) 0%,rgba(0,0,0,0) 100%);
-    --sh-card:0 1px 3px rgba(0,0,0,.05),0 0 0 1px rgba(0,0,0,.04) inset;
-    --sh-pop:0 32px 80px -24px rgba(0,0,0,.22),0 0 0 1px rgba(0,0,0,.05) inset;
+    /* === Superfícies (camadas de profundidade) === */
+    --bg:#f6f8fb;              /* off-white com toque azulado — NÃO branco puro */
+    --bg-2:#eef2f7;            /* camada secundária (recessed) */
+    --surface:#ffffff;         /* cards principais */
+    --surface-2:#f8fafc;       /* hover sutil / inputs */
+    --surface-3:#eef2f7;       /* active / mais recessed */
+
+    /* === Bordas refinadas === */
+    --line:rgba(15,23,42,.07);          /* padrão (mais visível mas refinada) */
+    --line-soft:rgba(15,23,42,.04);     /* divisores internos */
+    --line-strong:rgba(15,23,42,.12);   /* hover / focus */
+
+    /* === Tipografia (slate ao invés de preto puro) === */
+    --ink:#0f172a;             /* slate-900 — mais quente que preto puro */
+    --ink-soft:#475569;        /* slate-600 — texto secundário */
+    --ink-faint:#94a3b8;       /* slate-400 — texto desbotado / hints */
+
+    /* === Accent (cyan profissional, não neon) === */
+    --accent:#0891b2;          /* cyan-600 — sóbrio mas vibrante */
+    --accent-soft:#0ea5e9;     /* sky-500 — variação */
+    --accent-deep:#0e7490;     /* cyan-700 — pra hover/active de buttons accent */
+    --accent-ink:#ffffff;      /* texto sobre accent */
+    --accent-2:#7c3aed;        /* violet-600 — secundário (mais maduro que neon roxo) */
+
+    /* === Gradientes refinados (sem neon) === */
+    --grad-surface:linear-gradient(180deg,rgba(15,23,42,.015) 0%,rgba(15,23,42,0) 100%);
+    --grad-accent:linear-gradient(135deg,#0ea5e9 0%,#0891b2 100%);
+
+    /* === Sombras neutras escalonadas (não coloridas) === */
+    --sh-xs:0 1px 2px rgba(15,23,42,.04);
+    --sh-card:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.04);
+    --sh-card-hover:0 4px 12px rgba(15,23,42,.08),0 1px 3px rgba(15,23,42,.05);
+    --sh-pop:0 16px 48px -12px rgba(15,23,42,.18),0 0 0 1px rgba(15,23,42,.05);
+    --sh-modal:0 24px 60px -16px rgba(15,23,42,.22),0 0 0 1px rgba(15,23,42,.06);
   }
+
+  /* === Background gradient muito sutil (sem cores fortes) === */
+  body.theme-light::before{
+    background:
+      radial-gradient(900px 520px at 88% -10%,rgba(14,165,233,.045),transparent 60%),
+      radial-gradient(720px 600px at -10% 6%,rgba(124,58,237,.035),transparent 55%)}
+
+  /* === Logo: remover drop-shadow neon roxo que vaza no light === */
+  body.theme-light .hbrand .mk,
+  body.theme-light .brandbig .mk{filter:none}
+
+  /* === Header: sino, engrenagem e avatar mais elegantes === */
+  body.theme-light header{
+    border-bottom:1px solid var(--line-soft);
+    padding-bottom:18px;
+    background:rgba(255,255,255,.55);
+    backdrop-filter:saturate(180%) blur(8px);
+    -webkit-backdrop-filter:saturate(180%) blur(8px);
+  }
+  body.theme-light .hbell{
+    background:#ffffff;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    box-shadow:var(--sh-xs);
+  }
+  body.theme-light .hbell:hover{
+    background:var(--surface-2);
+    border-color:var(--line-strong);
+    color:var(--ink);
+    box-shadow:0 2px 8px rgba(15,23,42,.07);
+  }
+  body.theme-light .hbell svg{stroke-width:1.85}
+  body.theme-light .hbell-dot{
+    background:#ef4444;
+    border-color:#fff;
+    box-shadow:0 0 0 2px #fff,0 1px 4px rgba(239,68,68,.45);
+  }
+  body.theme-light .hav{
+    border:none;
+    box-shadow:0 0 0 1px var(--line),0 1px 3px rgba(15,23,42,.06);
+  }
+  body.theme-light .hav:hover{
+    box-shadow:0 0 0 2px var(--accent),0 4px 12px rgba(8,145,178,.18);
+  }
+  body.theme-light .sync i{
+    background:#10b981;
+    box-shadow:0 0 0 3px rgba(16,185,129,.12);
+  }
+
+  /* === Big button (login/CTA) — accent profissional === */
+  body.theme-light .big-btn{
+    background:linear-gradient(135deg,#0ea5e9 0%,#0891b2 100%);
+    color:#ffffff;
+    box-shadow:0 4px 14px -4px rgba(8,145,178,.45),0 1px 2px rgba(15,23,42,.04),0 0 0 1px rgba(255,255,255,.08) inset;
+  }
+  body.theme-light .big-btn:hover{
+    box-shadow:0 8px 22px -6px rgba(8,145,178,.55),0 1px 2px rgba(15,23,42,.05),0 0 0 1px rgba(255,255,255,.12) inset;
+    transform:translateY(-1px);
+  }
+
+  /* === Setup cards & forms === */
+  body.theme-light .setup-card{
+    background:#fff;
+    border:1px solid var(--line);
+    box-shadow:var(--sh-card);
+  }
+  body.theme-light .setup-card code{
+    background:#f1f5f9;
+    border-color:rgba(15,23,42,.06);
+    color:var(--accent-deep);
+  }
+  body.theme-light input,
+  body.theme-light textarea,
+  body.theme-light select{
+    background:#fff;
+    border-color:var(--line);
+    color:var(--ink);
+  }
+  body.theme-light input:focus,
+  body.theme-light textarea:focus,
+  body.theme-light select:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(8,145,178,.12);
+  }
+
+  /* === Pills, segs, switches, arrows — clean light look === */
+  body.theme-light .pill,
+  body.theme-light .seg,
+  body.theme-light .switch,
+  body.theme-light .arrows,
+  body.theme-light .view-toggle,
+  body.theme-light .board-nav,
+  body.theme-light .bt-link,
+  body.theme-light .ghost-btn,
+  body.theme-light .resp-chip,
+  body.theme-light .stage-chip{
+    background:#ffffff;
+    border-color:var(--line);
+    box-shadow:var(--sh-xs);
+  }
+  body.theme-light .pill:hover,
+  body.theme-light .bt-link:hover,
+  body.theme-light .ghost-btn:hover{
+    background:var(--surface-2);
+    border-color:var(--line-strong);
+    box-shadow:0 2px 6px rgba(15,23,42,.06);
+  }
+
+  /* Estado ativo em pills/chips */
+  body.theme-light .bn-tab.active,
+  body.theme-light .switch button.on,
+  body.theme-light .vt-opt.on{
+    background:#f0f9ff;          /* sky-50 */
+    color:var(--accent-deep);
+    box-shadow:0 0 0 1px rgba(8,145,178,.28) inset,0 1px 2px rgba(8,145,178,.08);
+  }
+  body.theme-light .resp-chip.on,
+  body.theme-light .stage-chip.on{
+    background:#0f172a;
+    color:#fff;
+    border-color:#0f172a;
+  }
+
+  /* === Colunas Kanban (background recessed, refinado) === */
+  body.theme-light .col{
+    background:#f8fafc;
+    border:1px solid var(--line);
+    box-shadow:none;
+  }
+  body.theme-light .col-h{border-bottom-color:var(--line-soft)}
+  body.theme-light .col-h .qt{
+    background:#e2e8f0;
+    color:#475569;
+  }
+
+  /* === CARDS DO BOARD (.tcard) — sombra neutra escalonada === */
+  body.theme-light .tcard{
+    background:#ffffff;
+    border:1px solid var(--line);
+    border-left:3px solid var(--uc,var(--accent));
+    box-shadow:var(--sh-card);
+  }
+  body.theme-light .tcard:hover{
+    background:#ffffff;
+    border-color:var(--line-strong);
+    border-left-color:var(--uc,var(--accent));
+    transform:translateY(-1px);
+    box-shadow:var(--sh-card-hover);
+  }
+  body.theme-light .tcard.late{
+    border-color:rgba(239,68,68,.40);
+    box-shadow:0 1px 2px rgba(239,68,68,.08),0 1px 3px rgba(15,23,42,.04);
+  }
+  body.theme-light .tcard.urgent{
+    border-color:#ef4444;
+    box-shadow:0 0 0 1px rgba(239,68,68,.20),var(--sh-card);
+  }
+  body.theme-light .tcard .tmeta{border-top-color:var(--line-soft)}
+  body.theme-light .tcard .tdone{border-top-color:var(--line-soft)}
+
+  /* Avatares dentro de cards: border refinada */
+  body.theme-light .tc-av{
+    background:#f1f5f9;
+    border-color:var(--uc,#cbd5e1);
+    box-shadow:0 0 0 2px #fff,0 1px 3px rgba(15,23,42,.08);
+  }
+  body.theme-light .tc-from .av{border-color:var(--user-color,#cbd5e1)}
+
+  /* === Banners de alerta (atrasos) — vermelho mais maduro === */
+  body.theme-light .od-banner,
+  body.theme-light .od-flag,
+  body.theme-light .err{
+    background:#fef2f2;
+    border-color:rgba(239,68,68,.30);
+  }
+  body.theme-light .od-banner .ttl,
+  body.theme-light .od-flag,
+  body.theme-light .err{color:#dc2626}
+  body.theme-light .od-item{
+    background:#fff;
+    border-color:var(--line);
+  }
+
+  /* === Notificações === */
+  body.theme-light .ntf-ic{
+    background:#f1f5f9;
+    border-color:var(--line-soft);
+  }
+
+  /* === Cores de status (mais profissionais no light) === */
+  body.theme-light{
+    --c-foto:#f59e0b;          /* amber-500 (em vez de neon) */
+    --c-trafego:#10b981;       /* emerald-500 */
+    --c-reuni:#3b82f6;         /* blue-500 */
+    --c-rev:#ef4444;           /* red-500 */
+    --c-grav:#a855f7;          /* purple-500 */
+    --c-edicao:#8b5cf6;        /* violet-500 */
+    --c-copy:#6366f1;          /* indigo-500 */
+    --c-design:#06b6d4;        /* cyan-500 */
+    --c-outro:#64748b;         /* slate-500 (em vez de cinza qualquer) */
+  }
+
+  /* === Brand title color === */
+  body.theme-light .brandbig h1 b,
+  body.theme-light .hbrand h1 b{color:var(--accent-deep)}
+
+  /* === Chat input + buttons no light === */
+  body.theme-light .chat-input-wrap{
+    background:#fff;
+    border-color:var(--line);
+  }
+  body.theme-light .chat-input-wrap:focus-within{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(8,145,178,.10);
+  }
+  body.theme-light .chat-send{
+    background:linear-gradient(135deg,#0ea5e9 0%,#0891b2 100%);
+    color:#fff;
+    box-shadow:0 2px 8px -2px rgba(8,145,178,.4),0 0 0 1px rgba(255,255,255,.1) inset;
+  }
+  body.theme-light .chat-msg.in{
+    background:#f1f5f9;
+    color:var(--ink);
+  }
+  body.theme-light .chat-msg.out{
+    background:linear-gradient(135deg,#e0f2fe 0%,#cffafe 100%);
+    border:1px solid rgba(8,145,178,.20);
+    color:var(--ink);
+  }
+  body.theme-light .chat-mention{
+    background:rgba(8,145,178,.10);
+    color:var(--accent-deep);
+  }
+  body.theme-light .chat-msg.out .chat-mention{
+    background:rgba(8,145,178,.18);
+  }
+
+  /* === Tipografia: títulos premium (peso 700, letter-spacing refinado) === */
+  body.theme-light h1,
+  body.theme-light h2,
+  body.theme-light h3{letter-spacing:-.025em;font-weight:700}
+  body.theme-light .brandbig h1{font-weight:700;letter-spacing:-.035em}
+  body.theme-light .mt{font-weight:700;letter-spacing:-.030em;color:#0f172a}
+  body.theme-light .mt span{color:#94a3b8}
+
+  /* === Scrollbars (delicadas) === */
+  body.theme-light ::-webkit-scrollbar{width:8px;height:8px}
+  body.theme-light ::-webkit-scrollbar-track{background:transparent}
+  body.theme-light ::-webkit-scrollbar-thumb{
+    background:rgba(15,23,42,.12);
+    border-radius:8px;
+    border:2px solid #f6f8fb;
+  }
+  body.theme-light ::-webkit-scrollbar-thumb:hover{background:rgba(15,23,42,.20)}
+
+  /* === Foco visível (acessibilidade) === */
+  body.theme-light button:focus-visible,
+  body.theme-light a:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:2px;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     [V63.34] TEMA CLARO — UPGRADE PREMIUM PROFUNDO (camada 2)
+     Refina: sidebar/nav, page title, filter chips, cards Kanban,
+     bt-link, view-toggle, microinterações.
+     Visual final: Linear / Notion / Stripe-tier.
+     ════════════════════════════════════════════════════════════════ */
+
+  /* ── SIDEBAR/NAV (desktop): branca limpa, NÃO mais escura ── */
+  body.theme-light .nav{
+    background:rgba(255,255,255,.94);
+    border-color:var(--line-soft);
+    box-shadow:0 24px 60px -24px rgba(15,23,42,.18),0 0 0 1px rgba(15,23,42,.04) inset;
+  }
+  @media (min-width:1024px){
+    body.theme-light .nav{
+      background:#ffffff;
+      border-right:1px solid var(--line);
+      box-shadow:1px 0 0 rgba(15,23,42,.02);
+    }
+    body.theme-light .nav button{color:#94a3b8}
+    body.theme-light .nav button:hover{
+      background:#f1f5f9;
+      color:#475569;
+    }
+    body.theme-light .nav button.on{
+      background:#f0f9ff;        /* sky-50 */
+      color:var(--accent-deep);
+    }
+    body.theme-light .nav button.on svg{
+      filter:none;
+      color:var(--accent-deep);
+    }
+    /* Sticky header sem fundo escuro */
+    body.theme-light .col-h{
+      background-color:#f8fafc;
+      background-image:none;
+    }
+    body.theme-light .col.cliente .col-h{
+      background-color:#f8fafc;
+      background-image:linear-gradient(180deg,rgba(139,92,246,.06),transparent);
+    }
+  }
+  /* FAB "Novo" — accent mais sóbrio no light */
+  body.theme-light .nav .navfab .pl{
+    background:linear-gradient(135deg,#0ea5e9 0%,#0891b2 100%);
+    box-shadow:0 4px 14px -4px rgba(8,145,178,.45),0 0 0 4px rgba(8,145,178,.06),0 1px 2px rgba(255,255,255,.4) inset;
+  }
+  body.theme-light .nav .navfab:hover .pl{
+    box-shadow:0 6px 18px -4px rgba(8,145,178,.55),0 0 0 4px rgba(8,145,178,.08),0 1px 2px rgba(255,255,255,.5) inset;
+  }
+  body.theme-light .nav .navfab span{color:#475569}
+
+  /* ── PAGE TITLE: peso 700, tamanho mais comedido (não imponente) ── */
+  body.theme-light .pageT .mt{
+    font-weight:700;
+    font-size:30px;
+    letter-spacing:-.032em;
+    color:#0f172a;
+  }
+  @media (min-width:1024px){
+    body.theme-light .pageT .mt{font-size:32px}
+  }
+  @media (min-width:1600px){
+    body.theme-light .pageT .mt{font-size:36px}
+  }
+  @media (min-width:1920px){
+    body.theme-light .pageT .mt{font-size:38px}
+  }
+
+  /* ── FILTER CHIPS (Todos os setores/Minhas/Atrasadas/etc.) ──
+     Estilo Linear: chip discreto, ativo com background sky-50 ao invés
+     de ciano vibrante. */
+  body.theme-light .chip{
+    background:#ffffff;
+    border:1px solid var(--line);
+    color:#475569;
+    font-weight:600;
+    box-shadow:var(--sh-xs);
+  }
+  body.theme-light .chip:hover{
+    background:#f8fafc;
+    border-color:var(--line-strong);
+    color:#0f172a;
+  }
+  body.theme-light .chip.on{
+    background:#0f172a;
+    color:#ffffff;
+    border-color:#0f172a;
+    box-shadow:0 1px 2px rgba(15,23,42,.10),0 4px 12px -4px rgba(15,23,42,.25);
+  }
+  body.theme-light .chip.on .dot{
+    background:#22d3ee;       /* dot continua visível mesmo no fundo escuro */
+    box-shadow:0 0 0 2px rgba(34,211,238,.25);
+  }
+  /* Chip "Atrasadas" — atenção sem gritar */
+  body.theme-light .chip.urgent,
+  body.theme-light .chip[data-f="late"]{
+    color:#dc2626;
+    border-color:rgba(220,38,38,.25);
+    background:#fef2f2;
+  }
+  body.theme-light .chip.urgent.on,
+  body.theme-light .chip[data-f="late"].on{
+    background:#dc2626;
+    color:#fff;
+    border-color:#dc2626;
+    box-shadow:0 1px 2px rgba(220,38,38,.18),0 4px 12px -4px rgba(220,38,38,.35);
+  }
+
+  /* ── BT-LINK (Calendário/Por cliente/Posts) — premium clean ── */
+  body.theme-light .bt-link{
+    background:#ffffff;
+    border:1px solid var(--line);
+    color:#475569;
+    box-shadow:var(--sh-xs);
+    font-weight:600;
+  }
+  body.theme-light .bt-link svg{
+    color:var(--accent-deep);
+    opacity:1;
+  }
+  body.theme-light .bt-link:hover{
+    background:#f8fafc;
+    border-color:var(--line-strong);
+    color:#0f172a;
+    box-shadow:0 2px 8px rgba(15,23,42,.06),0 1px 2px rgba(15,23,42,.04);
+    transform:translateY(-1px);
+  }
+
+  /* ── VIEW-TOGGLE (Vista Equipe / Fluxo do Cliente) — tab style ── */
+  body.theme-light .view-toggle{
+    background:#f1f5f9;
+    border:1px solid var(--line-soft);
+    box-shadow:inset 0 1px 2px rgba(15,23,42,.04);
+    padding:4px;
+  }
+  body.theme-light .vt-opt{
+    color:#94a3b8;
+    background:transparent;
+    font-weight:600;
+  }
+  body.theme-light .vt-opt:hover:not(.on){
+    color:#475569;
+    background:rgba(255,255,255,.5);
+  }
+  body.theme-light .vt-opt.on{
+    background:#ffffff;
+    color:var(--accent-deep);
+    box-shadow:0 1px 3px rgba(15,23,42,.08),0 0 0 1px rgba(15,23,42,.04);
+  }
+  body.theme-light .vt-opt.on svg{color:var(--accent-deep);opacity:1}
+  body.theme-light .vt-opt[data-bv="client"].on{
+    color:#7c3aed;
+    box-shadow:0 1px 3px rgba(124,58,237,.12),0 0 0 1px rgba(124,58,237,.10);
+  }
+  body.theme-light .vt-opt[data-bv="client"].on svg{color:#7c3aed}
+
+  /* ── BOARD-NAV (tabs de colunas) ── */
+  body.theme-light .board-nav{
+    background:#f1f5f9;
+    border:1px solid var(--line-soft);
+    box-shadow:inset 0 1px 2px rgba(15,23,42,.04);
+  }
+  body.theme-light .bn-tab{color:#64748b}
+  body.theme-light .bn-tab:hover{
+    background:rgba(255,255,255,.6);
+    color:#0f172a;
+  }
+  body.theme-light .bn-tab.active{
+    background:#ffffff;
+    color:#0f172a;
+    box-shadow:0 1px 3px rgba(15,23,42,.08),0 0 0 1px rgba(15,23,42,.04);
+  }
+  body.theme-light .bn-tab .bn-qt{
+    background:#e2e8f0;
+    color:#475569;
+  }
+  body.theme-light .bn-tab.active .bn-qt{
+    background:var(--accent-deep);
+    color:#fff;
+  }
+
+  /* ── CARDS DO KANBAN — refinamento final premium ──
+     Border-left mais discreta (2px), tag de setor com mais peso visual */
+  body.theme-light .tcard{
+    border-left-width:2px;
+    padding:14px 14px 14px 13px;
+  }
+  body.theme-light .tcard.in-client{border-left-width:3px}
+  body.theme-light .tcard .ttt{
+    font-weight:600;
+    color:#0f172a;
+    letter-spacing:-.012em;
+  }
+  body.theme-light .tcard .tcli{
+    color:var(--accent-deep);
+    font-weight:700;
+    letter-spacing:.06em;
+  }
+  body.theme-light .tcard .tsec{
+    background:rgba(15,23,42,.05);
+    color:#475569;
+    font-weight:700;
+  }
+  body.theme-light .tcard .tc-st{
+    background:rgba(15,23,42,.05);
+    color:#475569;
+    font-weight:700;
+  }
+  /* Status badges com tom mais maduro */
+  body.theme-light .tcard .tc-st.s-afazer{background:#f1f5f9;color:#475569}
+  body.theme-light .tcard .tc-st.s-andamento{background:#fef3c7;color:#92400e}
+  body.theme-light .tcard .tc-st.s-revisao{background:#dbeafe;color:#1e40af}
+  body.theme-light .tcard .tc-st.s-concluido{background:#d1fae5;color:#065f46}
+
+  /* ── MICRO-INTERAÇÕES PREMIUM ── */
+  body.theme-light .tcard,
+  body.theme-light .bt-link,
+  body.theme-light .chip,
+  body.theme-light .pill,
+  body.theme-light .vt-opt,
+  body.theme-light .bn-tab,
+  body.theme-light .hbell,
+  body.theme-light .hav{
+    transition:transform .18s cubic-bezier(.22,1,.36,1),
+               box-shadow .18s cubic-bezier(.22,1,.36,1),
+               background-color .15s ease,
+               border-color .15s ease,
+               color .15s ease;
+  }
+
+  /* ── SEARCH input (campo de busca) ── */
+  body.theme-light input[type="search"],
+  body.theme-light input[type="text"],
+  body.theme-light input[type="email"],
+  body.theme-light input[type="password"],
+  body.theme-light .search-input{
+    background:#ffffff;
+    border:1px solid var(--line);
+    box-shadow:inset 0 1px 2px rgba(15,23,42,.02);
+  }
+
+  /* ── Modais e popups (sheet) === */
+  body.theme-light .sheet{
+    background:#ffffff;
+    border-top:1px solid var(--line);
+    box-shadow:0 -24px 60px -16px rgba(15,23,42,.22),0 0 0 1px rgba(15,23,42,.04) inset;
+  }
+  body.theme-light .grab{
+    background:#cbd5e1;
+    opacity:.7;
+  }
+  body.theme-light .scrim{
+    background:rgba(15,23,42,.45);
+    -webkit-backdrop-filter:blur(4px);
+    backdrop-filter:blur(4px);
+  }
+  body.theme-light .icon-btn{
+    background:#f1f5f9;
+    border:1px solid var(--line);
+    color:#475569;
+  }
+  body.theme-light .icon-btn:hover{
+    background:#e2e8f0;
+    border-color:var(--line-strong);
+    color:#0f172a;
+  }
+
+  /* ── Toggles (switches do form) ── */
+  body.theme-light .switch button.on,
+  body.theme-light .seg button.on{
+    background:#ffffff;
+    color:#0f172a;
+    box-shadow:0 1px 3px rgba(15,23,42,.08),0 0 0 1px rgba(15,23,42,.04);
+  }
+
+  /* ── Setup options (type-grid) ── */
+  body.theme-light .topt{
+    background:#ffffff;
+    border:1px solid var(--line);
+    box-shadow:var(--sh-xs);
+  }
+  body.theme-light .topt:hover{
+    background:#f8fafc;
+    border-color:var(--line-strong);
+    box-shadow:0 4px 12px rgba(15,23,42,.06);
+  }
+
+  /* ── HEADER: refinamento final ── */
+  body.theme-light .hbrand h1{
+    font-weight:700;
+    letter-spacing:-.025em;
+    color:#0f172a;
+  }
+  body.theme-light .hbrand h1 b{
+    color:var(--accent-deep);
+    font-weight:700;
+  }
+  body.theme-light .hbrand .hsub{
+    color:#64748b;
+    font-weight:500;
+    letter-spacing:.005em;
+  }
+  body.theme-light .sync{color:#94a3b8;font-weight:500}
+
+  /* ── Toast & badges ── */
+  body.theme-light .toast{
+    background:#0f172a;
+    color:#fff;
+    border:none;
+    box-shadow:0 8px 24px -4px rgba(15,23,42,.30),0 1px 3px rgba(15,23,42,.10);
+  }
+
+  /* ── Cell do calendário ── */
+  body.theme-light .cell{
+    background:#ffffff;
+    border:1px solid var(--line);
+  }
+  body.theme-light .cell:hover{
+    background:#f8fafc;
+    border-color:var(--line-strong);
+  }
+  body.theme-light .cell.today{
+    background:linear-gradient(135deg,#0ea5e9 0%,#0891b2 100%);
+    box-shadow:0 4px 14px -4px rgba(8,145,178,.40),0 0 0 1px rgba(8,145,178,.20);
+  }
+  body.theme-light .cell.sel{
+    border-color:#0f172a;
+    box-shadow:0 0 0 1px #0f172a inset;
+  }
+
+
   /* [V63] TAMANHO DE FONTE — ativado por body.fs-{sm|md|lg} */
   body.fs-sm{ font-size:14px }
   body.fs-md{ font-size:15.5px }
@@ -2408,15 +3026,59 @@
   .chat-msg-check{display:inline-flex;align-items:center}
   .chat-msg-check svg{width:14px;height:14px}
   .chat-msg-check.read{color:var(--accent)}
-  .chat-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface);flex-shrink:0}
-  .chat-input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:18px;
-    padding:9px 14px;color:var(--ink);font:inherit;font-size:14px;resize:none;min-height:38px;max-height:120px;line-height:1.4;font-family:inherit}
-  .chat-input:focus{outline:none;border-color:var(--accent)}
+  .chat-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface);flex-shrink:0;position:relative}
+  .chat-input-wrap{flex:1;position:relative;display:flex;align-items:flex-end;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:18px;padding:2px 6px 2px 4px;transition:border-color .15s ease}
+  .chat-input-wrap:focus-within{border-color:var(--accent)}
+  .chat-input{flex:1;background:transparent;border:none;
+    padding:9px 6px;color:var(--ink);font:inherit;font-size:14px;resize:none;min-height:34px;max-height:120px;line-height:1.4;font-family:inherit}
+  .chat-input:focus{outline:none}
+  .chat-emoji-btn{width:34px;height:34px;border-radius:50%;background:transparent;border:none;cursor:pointer;
+    display:grid;place-items:center;flex-shrink:0;color:var(--ink-soft);transition:background .12s ease,color .12s ease;font-size:18px;padding:0}
+  .chat-emoji-btn:hover{background:rgba(62,184,216,.10);color:var(--accent)}
+  .chat-emoji-btn.active{color:var(--accent);background:rgba(62,184,216,.14)}
   .chat-send{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#001423;
     border:none;cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:transform .1s ease}
   .chat-send:hover{transform:scale(1.05)}
   .chat-send:disabled{opacity:.4;cursor:not-allowed;transform:none}
   .chat-send svg{width:18px;height:18px}
+
+  /* @menção destacada nas mensagens */
+  .chat-mention{color:var(--accent);font-weight:700;background:rgba(62,184,216,.13);padding:1px 5px;border-radius:5px;cursor:default}
+  .chat-msg.out .chat-mention{background:rgba(62,184,216,.20)}
+
+  /* Popup de @menções (lista de usuários enquanto digita @) */
+  .chat-mention-pop{position:absolute;left:12px;right:62px;bottom:calc(100% + 6px);background:var(--bg);
+    border:1px solid var(--border);border-radius:12px;box-shadow:0 -4px 24px rgba(0,0,0,.4);
+    max-height:240px;overflow-y:auto;z-index:200;padding:6px 0}
+  .chat-mention-pop.hidden{display:none}
+  .chat-mention-it{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .1s ease}
+  .chat-mention-it:hover,.chat-mention-it.active{background:rgba(62,184,216,.10)}
+  .chat-mention-it .av{width:30px;height:30px;border-radius:50%;background:var(--surface);overflow:hidden;flex-shrink:0;display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--accent)}
+  .chat-mention-it .av img{width:100%;height:100%;object-fit:cover}
+  .chat-mention-it .info{flex:1;min-width:0}
+  .chat-mention-it .info .n{font-size:13.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-mention-it .info .r{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+  .chat-mention-empty{padding:14px;text-align:center;color:var(--ink-faint);font-size:13px}
+
+  /* Emoji Picker (popup acima do input) */
+  .chat-emoji-picker{position:absolute;left:12px;right:62px;bottom:calc(100% + 6px);background:var(--bg);
+    border:1px solid var(--border);border-radius:14px;box-shadow:0 -4px 24px rgba(0,0,0,.4);
+    z-index:200;display:flex;flex-direction:column;max-height:320px;overflow:hidden}
+  .chat-emoji-picker.hidden{display:none}
+  .chat-emoji-tabs{display:flex;border-bottom:1px solid var(--line-soft);padding:4px 6px;gap:2px;flex-shrink:0}
+  .chat-emoji-tab{flex:1;padding:8px 4px;border:none;background:transparent;cursor:pointer;font-size:20px;
+    border-radius:8px;transition:background .1s ease;opacity:.55}
+  .chat-emoji-tab:hover{background:rgba(62,184,216,.08);opacity:1}
+  .chat-emoji-tab.active{background:rgba(62,184,216,.14);opacity:1}
+  .chat-emoji-grid{overflow-y:auto;padding:8px;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;flex:1}
+  .chat-emoji-cell{background:transparent;border:none;cursor:pointer;font-size:22px;padding:4px;
+    border-radius:6px;transition:background .1s ease;line-height:1}
+  .chat-emoji-cell:hover{background:rgba(62,184,216,.12)}
+  @media (max-width:520px){
+    .chat-emoji-picker,.chat-mention-pop{left:8px;right:54px}
+    .chat-emoji-grid{grid-template-columns:repeat(7,1fr)}
+  }
+
 
   /* User picker (modal "Nova conversa") */
   .chat-picker-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:9999;
@@ -2482,7 +3144,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.31 · build instalador-nativo</div>
+    <div class="ver">versão 63.34 · build tema-claro-premium-v2</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -2508,7 +3170,7 @@
         </div>
         <div class="hright">
           <button class="hbell" id="hBell" aria-label="Notificações"><svg viewBox="0 0 24 24" fill="none"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><i class="hbell-dot" id="hBellDot"></i></button>
-          <button class="hbell" id="hSettings" aria-label="Configurações"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+          <button class="hbell" id="hSettings" aria-label="Configurações"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
           <div class="hav" id="hAvatar"></div>
         </div>
       </div>
@@ -3839,6 +4501,8 @@ async function sendChatMessage(){
   var chat = chats.find(function(c){ return c.id === currentChatId; });
   if(!chat) return;
   var other = (chat.participants || []).find(function(p){ return p !== me.id; });
+  /* Detecta @menções no texto e mapeia pros UIDs */
+  var mentionedIds = extractMentionedUserIds(text);
   var now = Date.now();
   var msg = {
     text: text,
@@ -3847,9 +4511,13 @@ async function sendChatMessage(){
     readBy: {}
   };
   msg.readBy[me.id] = now;
+  if(mentionedIds.length) msg.mentions = mentionedIds;
   /* Otimismo: limpa input antes do save */
   inp.value = "";
+  inp.dataset.mentions = "{}";
   inp.style.height = "";
+  closeEmojiPicker();
+  closeMentionPop();
   var sendBtn = document.getElementById("chatSendBtn");
   if(sendBtn) sendBtn.disabled = true;
   try{
@@ -3866,9 +4534,11 @@ async function sendChatMessage(){
     /* Push notif pro outro (best-effort, não bloqueia) */
     if(other && typeof sendPushToUsers === "function"){
       try{
+        /* Se o outro foi mencionado: notif "premium" com tag/preview de menção */
+        var wasMentioned = mentionedIds.indexOf(other) >= 0;
         sendPushToUsers([other], {
-          title: "💬 " + (me.name || "Mensagem"),
-          body: text.slice(0, 140),
+          title: (wasMentioned ? "@ " : "💬 ") + (me.name || "Mensagem"),
+          body: (wasMentioned ? "te mencionou: " : "") + text.slice(0, 140),
           tag: "chat-" + currentChatId,
           url: "/?go=chat&with=" + me.id
         });
@@ -4093,23 +4763,277 @@ function renderChatRoomInner(){
     });
   }
   html += '</div>';
-  /* Input */
+  /* Input + emoji picker + mention popup */
   html += '<div class="chat-input-bar">'+
-    '<textarea class="chat-input" id="chatInput" placeholder="Mensagem" rows="1"></textarea>'+
+    '<div class="chat-input-wrap">'+
+      '<button class="chat-emoji-btn" id="chatEmojiBtn" title="Emoji" type="button">😊</button>'+
+      '<textarea class="chat-input" id="chatInput" placeholder="Mensagem" rows="1"></textarea>'+
+    '</div>'+
     '<button class="chat-send" id="chatSendBtn" title="Enviar">'+
       '<svg viewBox="0 0 24 24" fill="none"><path d="M3 11l18-7-7 18-2-9-9-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>'+
     '</button>'+
+    '<div class="chat-mention-pop hidden" id="chatMentionPop"></div>'+
+    '<div class="chat-emoji-picker hidden" id="chatEmojiPicker"></div>'+
   '</div>';
   return html;
 }
 
-/* ─── Sanitiza + linka URLs ─── */
+/* ─── Sanitiza + linka URLs + destaca @menções ─── */
 function chatLinkify(text){
   var safe = esc(text);
-  return safe.replace(/(https?:\/\/[^\s<>"']+)/g, function(u){
+  /* Linka URLs */
+  safe = safe.replace(/(https?:\/\/[^\s<>"']+)/g, function(u){
     return '<a href="'+u+'" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">'+u+'</a>';
   });
+  /* Destaca @menções: @palavra (suporta acentos pt-BR e nomes compostos com _) */
+  safe = safe.replace(/(^|\s|[(\[{])@([\wÀ-ÖØ-öø-ÿ][\wÀ-ÖØ-öø-ÿ ]{0,40}?)(?=$|[\s.,!?;:)\]}])/g, function(m, pre, nm){
+    return pre + '<span class="chat-mention">@'+nm+'</span>';
+  });
+  return safe;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   [V63.32] @MENÇÕES + EMOJI PICKER no chat (estilo WhatsApp Business)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Estado do popup de menção */
+var chatMentionActive = false;
+var chatMentionIndex = 0;
+var chatMentionList = [];   /* usuários filtrados atualmente exibidos */
+var chatMentionStart = -1;  /* posição do @ no input */
+
+/* Estado do emoji picker */
+var chatEmojiOpen = false;
+var chatEmojiCategory = "smileys";
+
+/* Lista compacta de emojis em 6 categorias (estilo WhatsApp Business) */
+var CHAT_EMOJIS = {
+  smileys: {
+    label: "😀",
+    items: ["😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","😉","😊","😇","🥰","😍","🤩","😘","😗","😚","😙","🥲","😋","😛","😜","🤪","😝","🤑","🤗","🤭","🤫","🤔","🤐","🤨","😐","😑","😶","😏","😒","🙄","😬","🤥","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤧","🥵","🥶","😵","🤯","🤠","🥳","😎","🤓","🧐","😕","😟","🙁","😮","😯","😲","😳","🥺","😦","😧","😨","😰","😥","😢","😭","😱","😖","😣","😞","😓","😩","😫","🥱","😤","😡","😠","🤬","😈","👿","💀","☠️","💩","🤡","👹","👺","👻","👽","👾","🤖"]
+  },
+  gestures: {
+    label: "👍",
+    items: ["👍","👎","👌","🤌","🤏","✌️","🤞","🫰","🤟","🤘","🤙","👈","👉","👆","👇","☝️","✋","🤚","🖐️","🖖","👋","🤝","🙏","✍️","💪","🦾","🙌","👏","🫶","❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","☮️","✝️","💯","💢","💥","💫","💦","💨","🕳️","💣","💬","👁️‍🗨️","🗨️","🗯️","💭","💤"]
+  },
+  celebration: {
+    label: "🎉",
+    items: ["🎉","🎊","🎈","🎁","🎂","🎄","🎃","🎗️","🎟️","🎫","🎖️","🏆","🥇","🥈","🥉","🏅","⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🪀","🏓","🏸","🥊","🥋","⛳","🎣","🤿","🎽","🛹","🛼","🛷","⛸️","🥌","🎿","⛷️","🏂","🏋️","🤼","🤸","⛹️","🤺","🤾","🏌️","🏇","🧘","🏃","🚴","🚵","🎮","🕹️","🧩","🎯","🎳","🎰","🎲","🪅","🎨","🖌️","🖍️","🎤","🎧","🎼","🎵","🎶","🎙️","🎚️","🎛️","🎻","🎷","🪗","🎸","🪕","🎺","🎬","🎭","🎟️","🎪"]
+  },
+  work: {
+    label: "💼",
+    items: ["💼","📁","📂","🗂️","📅","📆","🗓️","📇","📈","📉","📊","📋","📌","📍","📎","🖇️","📏","📐","✂️","🖊️","🖋️","✒️","🖌️","🖍️","📝","✏️","💻","⌨️","🖥️","🖨️","🖱️","🖲️","💽","💾","💿","📀","📱","📲","☎️","📞","📟","📠","🔋","🔌","💡","🔦","🕯️","🪔","🧯","🛢️","💸","💵","💴","💶","💷","💰","💳","💎","⚖️","🪜","🧰","🔧","🔨","⚒️","🛠️","⛏️","🪚","🔩","⚙️","🪤","🧱","🔗","⛓️","📜","📃","📄","📑","🔖","🏷️","🗞️","📰","📚","📖","🔍","🔎","🔬","🔭"]
+  },
+  food: {
+    label: "🍕",
+    items: ["🍏","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🫐","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🥦","🥬","🥒","🌶️","🫑","🌽","🥕","🫒","🧄","🧅","🥔","🍠","🥐","🥯","🍞","🥖","🥨","🧀","🥚","🍳","🧈","🥞","🧇","🥓","🥩","🍗","🍖","🦴","🌭","🍔","🍟","🍕","🥪","🥙","🧆","🌮","🌯","🫔","🥗","🥘","🫕","🥫","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🦪","🍤","🍙","🍚","🍘","🍥","🥠","🥮","🍢","🍡","🍧","🍨","🍦","🥧","🧁","🍰","🎂","🍮","🍭","🍬","🍫","🍿","🍩","🍪","🌰","🥜","🍯","🥛","🍼","🫖","☕","🍵","🧃","🥤","🧋","🍶","🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧉","🍾"]
+  },
+  symbols: {
+    label: "✨",
+    items: ["✨","⭐","🌟","💫","⚡","🔥","🌈","☀️","🌤️","⛅","🌥️","☁️","🌦️","🌧️","⛈️","🌩️","🌨️","❄️","☃️","⛄","🌬️","💨","🌪️","🌫️","🌊","💧","💦","☔","☂️","🌂","🎯","✅","☑️","✔️","❌","❎","➕","➖","➗","✖️","🟰","‼️","⁉️","❓","❔","❕","❗","〰️","💱","💲","⚜️","🔱","📛","🔰","♻️","✅","🆎","🆑","🆒","🆓","ℹ️","🆔","Ⓜ️","🆕","🆖","🅾️","🆗","🅿️","🆘","🆙","🆚","🈁","🈂️","🛐","⚛️","🕉️","✡️","☸️","☯️","✝️","☦️","☪️","☮️","🕎","🔯","♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓","🔴","🟠","🟡","🟢","🔵","🟣","⚫","⚪","🟤","🟥","🟧","🟨","🟩","🟦","🟪","⬛","⬜","🟫"]
+  }
+};
+
+/* Abre/fecha emoji picker */
+function toggleEmojiPicker(){
+  chatEmojiOpen ? closeEmojiPicker() : openEmojiPicker();
+}
+function openEmojiPicker(){
+  /* Fecha mention popup se aberto */
+  closeMentionPop();
+  chatEmojiOpen = true;
+  var pk = document.getElementById("chatEmojiPicker");
+  var btn = document.getElementById("chatEmojiBtn");
+  if(!pk) return;
+  pk.classList.remove("hidden");
+  if(btn) btn.classList.add("active");
+  renderEmojiPicker();
+}
+function closeEmojiPicker(){
+  chatEmojiOpen = false;
+  var pk = document.getElementById("chatEmojiPicker");
+  var btn = document.getElementById("chatEmojiBtn");
+  if(pk) pk.classList.add("hidden");
+  if(btn) btn.classList.remove("active");
+}
+function renderEmojiPicker(){
+  var pk = document.getElementById("chatEmojiPicker");
+  if(!pk) return;
+  var tabs = '';
+  var cats = ["smileys","gestures","celebration","work","food","symbols"];
+  cats.forEach(function(k){
+    var cat = CHAT_EMOJIS[k]; if(!cat) return;
+    tabs += '<button type="button" class="chat-emoji-tab '+(k===chatEmojiCategory?"active":"")+'" data-cat="'+k+'">'+cat.label+'</button>';
+  });
+  var grid = '';
+  var items = (CHAT_EMOJIS[chatEmojiCategory]||{}).items || [];
+  items.forEach(function(e){
+    grid += '<button type="button" class="chat-emoji-cell" data-emoji="'+esc(e)+'">'+e+'</button>';
+  });
+  pk.innerHTML =
+    '<div class="chat-emoji-tabs">'+tabs+'</div>'+
+    '<div class="chat-emoji-grid">'+grid+'</div>';
+  /* Bind tabs */
+  pk.querySelectorAll(".chat-emoji-tab").forEach(function(b){
+    b.onclick = function(){
+      chatEmojiCategory = b.dataset.cat;
+      renderEmojiPicker();
+    };
+  });
+  /* Bind células */
+  pk.querySelectorAll(".chat-emoji-cell").forEach(function(b){
+    b.onclick = function(){
+      insertEmojiAtCursor(b.dataset.emoji);
+    };
+  });
+}
+function insertEmojiAtCursor(emoji){
+  var inp = document.getElementById("chatInput");
+  if(!inp) return;
+  var start = inp.selectionStart || 0;
+  var end = inp.selectionEnd || 0;
+  var v = inp.value || "";
+  inp.value = v.slice(0, start) + emoji + v.slice(end);
+  var newPos = start + emoji.length;
+  inp.setSelectionRange(newPos, newPos);
+  inp.focus();
+  /* Trigger autogrow */
+  inp.style.height = "auto";
+  inp.style.height = Math.min(120, inp.scrollHeight) + "px";
+}
+
+/* ─── @MENÇÕES ─── */
+
+/* Detecta se o cursor está num "@palavra" e abre popup com sugestões */
+function checkMentionTrigger(){
+  var inp = document.getElementById("chatInput");
+  if(!inp){ closeMentionPop(); return; }
+  var pos = inp.selectionStart || 0;
+  var v = inp.value || "";
+  var before = v.slice(0, pos);
+  /* Procura o último @ antes do cursor sem quebra de linha/espaço */
+  var m = before.match(/(?:^|[\s])@([\wÀ-ÖØ-öø-ÿ ]{0,40})$/);
+  if(!m){ closeMentionPop(); return; }
+  var startIdx = before.length - m[0].length + m[0].indexOf("@");
+  chatMentionStart = startIdx;
+  var query = (m[1] || "").trim().toLowerCase();
+  /* Filtra usuários da equipe (excluindo me e pendentes) */
+  var candidates = users.filter(function(u){
+    if(!u || !u.id || u.id === me.id) return false;
+    if(u.status === "pendente") return false;
+    if(!query) return true;
+    var nm = (u.name || "").toLowerCase();
+    return nm.indexOf(query) >= 0 || (nm.split(" ")[0] || "").indexOf(query) >= 0;
+  }).slice(0, 8);
+  if(!candidates.length){
+    /* Mostra "Nenhum membro" mas mantém popup aberto enquanto digita */
+    chatMentionList = [];
+    chatMentionIndex = 0;
+    openMentionPop(true);
+    return;
+  }
+  chatMentionList = candidates;
+  chatMentionIndex = Math.min(chatMentionIndex, candidates.length - 1);
+  if(chatMentionIndex < 0) chatMentionIndex = 0;
+  openMentionPop(false);
+}
+function openMentionPop(empty){
+  closeEmojiPicker();
+  chatMentionActive = true;
+  var pop = document.getElementById("chatMentionPop");
+  if(!pop) return;
+  pop.classList.remove("hidden");
+  if(empty){
+    pop.innerHTML = '<div class="chat-mention-empty">Nenhum membro encontrado</div>';
+    return;
+  }
+  var html = '';
+  chatMentionList.forEach(function(u, i){
+    var av = "";
+    if(u.photoURL || u.photo){
+      av = '<img src="'+esc(u.photoURL || u.photo)+'" alt="">';
+    }else{
+      av = (u.name || "?").trim().charAt(0).toUpperCase();
+    }
+    html += '<div class="chat-mention-it '+(i===chatMentionIndex?"active":"")+'" data-uid="'+esc(u.id)+'" data-idx="'+i+'">'+
+      '<div class="av">'+av+'</div>'+
+      '<div class="info">'+
+        '<div class="n">'+esc(u.name||"Sem nome")+'</div>'+
+        (u.role ? '<div class="r">'+esc(u.role)+'</div>' : '')+
+      '</div>'+
+    '</div>';
+  });
+  pop.innerHTML = html;
+  pop.querySelectorAll(".chat-mention-it").forEach(function(it){
+    it.onmouseenter = function(){ chatMentionIndex = parseInt(it.dataset.idx,10)||0; updateMentionActive(); };
+    it.onclick = function(){
+      var uid = it.dataset.uid;
+      var u = users.find(function(x){ return x && x.id === uid; });
+      if(u) selectMention(u);
+    };
+  });
+}
+function updateMentionActive(){
+  var pop = document.getElementById("chatMentionPop");
+  if(!pop) return;
+  pop.querySelectorAll(".chat-mention-it").forEach(function(it,i){
+    it.classList.toggle("active", i===chatMentionIndex);
+  });
+}
+function closeMentionPop(){
+  chatMentionActive = false;
+  chatMentionStart = -1;
+  chatMentionList = [];
+  chatMentionIndex = 0;
+  var pop = document.getElementById("chatMentionPop");
+  if(pop) pop.classList.add("hidden");
+}
+/* Insere @nome no input (no formato @PrimeiroNome ou nome curto sem espaços) */
+function selectMention(u){
+  if(!u) return;
+  var inp = document.getElementById("chatInput");
+  if(!inp || chatMentionStart < 0){ closeMentionPop(); return; }
+  /* Pega primeiro nome (sem espaços, mantém acentos) */
+  var first = ((u.name || "").trim().split(/\s+/)[0]) || "Usuario";
+  var token = "@" + first + " ";
+  var v = inp.value || "";
+  var pos = inp.selectionStart || 0;
+  inp.value = v.slice(0, chatMentionStart) + token + v.slice(pos);
+  var newPos = chatMentionStart + token.length;
+  inp.setSelectionRange(newPos, newPos);
+  inp.focus();
+  /* Mapa de menções desta mensagem (uid → primeiro nome) p/ resolver no envio */
+  if(!inp.dataset.mentions) inp.dataset.mentions = "{}";
+  try{
+    var map = JSON.parse(inp.dataset.mentions || "{}");
+    map[u.id] = first;
+    inp.dataset.mentions = JSON.stringify(map);
+  }catch(_){}
+  closeMentionPop();
+  /* Re-trigger autogrow */
+  inp.style.height = "auto";
+  inp.style.height = Math.min(120, inp.scrollHeight) + "px";
+}
+
+/* Lê o input, encontra @nomes e mapeia pros uids da equipe */
+function extractMentionedUserIds(text){
+  if(!text) return [];
+  var found = [];
+  var re = /(?:^|\s)@([\wÀ-ÖØ-öø-ÿ]+)/g;
+  var m;
+  while((m = re.exec(text)) !== null){
+    var first = m[1].toLowerCase();
+    /* Acha usuário cujo primeiro nome bate */
+    var u = users.find(function(x){
+      if(!x || !x.id || x.id === me.id) return false;
+      var fn = ((x.name||"").trim().split(/\s+/)[0]||"").toLowerCase();
+      return fn === first;
+    });
+    if(u && found.indexOf(u.id) < 0) found.push(u.id);
+  }
+  return found;
+}
+
 
 /* ─── Re-renderiza só a lista + sala SEM piscar a tela toda ─── */
 function renderChatRefresh(){
@@ -4160,30 +5084,96 @@ function bindChatListItems(){
   });
 }
 
-/* ─── Binds da sala (input, enter, voltar) ─── */
+/* ─── Binds da sala (input, enter, voltar, emoji, menções) ─── */
 function bindChatRoom(){
   var inp = document.getElementById("chatInput");
   var sendBtn = document.getElementById("chatSendBtn");
   var back = document.getElementById("chatRoomBack");
+  var emBtn = document.getElementById("chatEmojiBtn");
   if(inp){
-    /* Auto-grow */
+    /* Auto-grow + detecta @ pra abrir mention popup */
     inp.addEventListener("input", function(){
       inp.style.height = "auto";
       inp.style.height = Math.min(120, inp.scrollHeight) + "px";
+      checkMentionTrigger();
     });
-    /* Enter envia, Shift+Enter quebra linha */
+    /* Detecta movimento de cursor (clique/setas) pra re-checar mention */
+    inp.addEventListener("click", function(){ checkMentionTrigger(); });
+    inp.addEventListener("keyup", function(e){
+      if(e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home" || e.key === "End"){
+        checkMentionTrigger();
+      }
+    });
+    /* Enter envia / Shift+Enter quebra / Setas navegam menção / Esc fecha popups */
     inp.addEventListener("keydown", function(e){
+      /* Se popup de menção aberto: setas navegam, Enter/Tab seleciona, Esc fecha */
+      if(chatMentionActive && chatMentionList.length){
+        if(e.key === "ArrowDown"){
+          e.preventDefault();
+          chatMentionIndex = (chatMentionIndex + 1) % chatMentionList.length;
+          updateMentionActive();
+          return;
+        }
+        if(e.key === "ArrowUp"){
+          e.preventDefault();
+          chatMentionIndex = (chatMentionIndex - 1 + chatMentionList.length) % chatMentionList.length;
+          updateMentionActive();
+          return;
+        }
+        if(e.key === "Enter" || e.key === "Tab"){
+          e.preventDefault();
+          selectMention(chatMentionList[chatMentionIndex]);
+          return;
+        }
+        if(e.key === "Escape"){
+          e.preventDefault();
+          closeMentionPop();
+          return;
+        }
+      }
+      /* Se emoji picker aberto: Esc fecha */
+      if(chatEmojiOpen && e.key === "Escape"){
+        e.preventDefault();
+        closeEmojiPicker();
+        return;
+      }
+      /* Enter envia (sem Shift) */
       if(e.key === "Enter" && !e.shiftKey){
         e.preventDefault();
         sendChatMessage();
       }
     });
+    /* Reseta menções salvas quando input fica vazio */
+    inp.addEventListener("blur", function(){
+      setTimeout(function(){
+        if(!inp.value || !inp.value.trim()) inp.dataset.mentions = "{}";
+      }, 100);
+    });
     setTimeout(function(){ try{ inp.focus(); }catch(_){} }, 40);
   }
   if(sendBtn) sendBtn.onclick = sendChatMessage;
+  if(emBtn) emBtn.onclick = function(e){ e.stopPropagation(); toggleEmojiPicker(); };
+  /* Clique fora fecha emoji picker / mention popup */
+  if(!window.__chatOutsideClickBound){
+    window.__chatOutsideClickBound = true;
+    document.addEventListener("click", function(e){
+      var pk = document.getElementById("chatEmojiPicker");
+      var pop = document.getElementById("chatMentionPop");
+      var em = document.getElementById("chatEmojiBtn");
+      var inp = document.getElementById("chatInput");
+      if(pk && !pk.classList.contains("hidden") && !pk.contains(e.target) && e.target !== em && !em.contains(e.target)){
+        closeEmojiPicker();
+      }
+      if(pop && !pop.classList.contains("hidden") && !pop.contains(e.target) && e.target !== inp){
+        closeMentionPop();
+      }
+    });
+  }
   if(back) back.onclick = function(){
     chatView = "list";
     currentChatId = null;
+    closeEmojiPicker();
+    closeMentionPop();
     if(msgsUnsub){ try{ msgsUnsub(); }catch(_){} msgsUnsub = null; }
     renderChatRefresh();
   };
