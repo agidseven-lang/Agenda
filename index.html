@@ -923,6 +923,332 @@
     body.theme-light .board-wrap{padding-top:6px !important;gap:10px !important}
   }
 
+  /* ═══════════════════════════════════════════════════════════════════
+     [V63.36] BOARD TOOLBAR — REDESIGN ESTRUTURAL PREMIUM
+     Substitui filtros gigantes + 3 botões grandes + view-toggle inflado
+     por UMA toolbar densa profissional (estilo Linear/Notion/Jira).
+     Funciona em DARK e LIGHT theme.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  .board-toolbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:14px 0 12px;
+    flex-wrap:wrap;
+    position:relative;
+  }
+  .bt-left,.bt-right{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    min-width:0;
+    flex-wrap:wrap;
+  }
+  .bt-right{justify-content:flex-end}
+
+  /* Pills (Todos / Minhas / Atrasadas) */
+  .bt-filter-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:0 12px;
+    height:34px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--ink-soft);
+    font-size:13px;
+    font-weight:600;
+    font-family:inherit;
+    cursor:pointer;
+    white-space:nowrap;
+    letter-spacing:-.005em;
+    transition:background .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease;
+  }
+  .bt-filter-pill:hover{
+    background:var(--surface-2);
+    border-color:var(--line-strong);
+    color:var(--ink);
+  }
+  .bt-filter-pill.on{
+    background:var(--ink);
+    border-color:var(--ink);
+    color:var(--bg);
+  }
+  .bt-filter-pill.mine.on{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--accent-ink);
+  }
+  .bt-filter-pill.late{color:var(--c-rev);border-color:rgba(255,90,77,.32)}
+  .bt-filter-pill.late:hover{border-color:rgba(255,90,77,.55);background:rgba(255,90,77,.06)}
+  .bt-filter-pill.late.on{background:var(--c-rev);border-color:var(--c-rev);color:#fff}
+  .bt-filter-pill svg{width:13px;height:13px;flex-shrink:0}
+  .bt-filter-pill .ct{
+    background:var(--surface-3);
+    color:var(--ink-soft);
+    padding:1px 7px;
+    border-radius:99px;
+    font-size:11px;
+    font-weight:700;
+    margin-left:2px;
+    min-width:18px;
+    text-align:center;
+    line-height:1.5;
+  }
+  .bt-filter-pill.on .ct{
+    background:rgba(255,255,255,.22);
+    color:#fff;
+  }
+  .bt-filter-pill.mine.on .ct{background:rgba(0,0,0,.20);color:var(--accent-ink)}
+  .bt-filter-pill.late.on .ct{background:rgba(255,255,255,.25);color:#fff}
+
+  /* Dropdown de Setor */
+  .bt-dropdown{position:relative}
+  .bt-dropdown-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    padding:0 10px 0 12px;
+    height:34px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--ink-soft);
+    font-size:13px;
+    font-weight:600;
+    font-family:inherit;
+    cursor:pointer;
+    white-space:nowrap;
+    letter-spacing:-.005em;
+    transition:all .15s ease;
+  }
+  .bt-dropdown-btn:hover{
+    background:var(--surface-2);
+    border-color:var(--line-strong);
+    color:var(--ink);
+  }
+  .bt-dropdown-btn.has-value{color:var(--ink)}
+  .bt-dropdown-btn .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .bt-dropdown-btn .chev{width:13px;height:13px;opacity:.55;transition:transform .15s ease;margin-left:2px}
+  .bt-dropdown.open .chev{transform:rotate(180deg);opacity:.85}
+  .bt-dropdown.open .bt-dropdown-btn{
+    background:var(--surface-2);
+    border-color:var(--line-strong);
+    color:var(--ink);
+  }
+
+  .bt-dropdown-menu{
+    position:absolute;
+    top:calc(100% + 5px);
+    left:0;
+    min-width:220px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:var(--sh-pop);
+    padding:5px;
+    z-index:100;
+    display:flex;
+    flex-direction:column;
+    gap:1px;
+    max-height:360px;
+    overflow-y:auto;
+    animation:btDropFade .14s ease;
+  }
+  @keyframes btDropFade{
+    from{opacity:0;transform:translateY(-4px)}
+    to{opacity:1;transform:translateY(0)}
+  }
+  .bt-dropdown-menu.hidden{display:none}
+  .bt-menu-it{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:8px 10px;
+    background:none;
+    border:none;
+    color:var(--ink-soft);
+    font-size:13px;
+    font-weight:600;
+    font-family:inherit;
+    text-align:left;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .12s ease,color .12s ease;
+    white-space:nowrap;
+    letter-spacing:-.005em;
+  }
+  .bt-menu-it:hover{background:var(--surface-2);color:var(--ink)}
+  .bt-menu-it.on{color:var(--ink);background:var(--surface-3)}
+  .bt-menu-it .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .bt-menu-it span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .bt-menu-it .check{width:14px;height:14px;color:var(--accent);opacity:0;flex-shrink:0;transition:opacity .12s ease}
+  .bt-menu-it.on .check{opacity:1}
+
+  /* Segmented control Vista|Fluxo */
+  .bt-seg{
+    display:inline-flex;
+    padding:3px;
+    background:var(--surface-3);
+    border:1px solid var(--line-soft);
+    border-radius:9px;
+    height:34px;
+    align-items:center;
+    flex-shrink:0;
+  }
+  .bt-seg-opt{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:0 11px;
+    height:26px;
+    background:transparent;
+    border:none;
+    color:var(--ink-faint);
+    font-size:12.5px;
+    font-weight:600;
+    font-family:inherit;
+    cursor:pointer;
+    border-radius:6px;
+    white-space:nowrap;
+    letter-spacing:-.005em;
+    transition:all .15s ease;
+  }
+  .bt-seg-opt svg{width:13px;height:13px;flex-shrink:0;opacity:.7;transition:opacity .15s ease}
+  .bt-seg-opt:hover:not(.on){color:var(--ink-soft)}
+  .bt-seg-opt.on{
+    background:var(--surface);
+    color:var(--ink);
+    box-shadow:0 1px 2px rgba(0,0,0,.10),0 0 0 1px rgba(0,0,0,.04);
+  }
+  .bt-seg-opt.on svg{opacity:1;color:var(--accent)}
+  .bt-seg-opt[data-bv="client"].on svg{color:var(--c-edicao)}
+
+  /* Icon buttons (Calendário/Cliente/Posts) */
+  .bt-icons{
+    display:inline-flex;
+    gap:4px;
+    align-items:center;
+    padding-left:8px;
+    margin-left:4px;
+    border-left:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .bt-icon{
+    width:34px;
+    height:34px;
+    border-radius:8px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    display:grid;
+    place-items:center;
+    cursor:pointer;
+    transition:all .15s ease;
+    flex-shrink:0;
+  }
+  .bt-icon:hover{
+    background:var(--surface-2);
+    border-color:var(--line-strong);
+    color:var(--accent);
+  }
+  .bt-icon:active{transform:scale(.94)}
+  .bt-icon svg{width:15px;height:15px}
+
+  /* ── LIGHT THEME ajustes específicos da nova toolbar ── */
+  body.theme-light .bt-filter-pill,
+  body.theme-light .bt-dropdown-btn,
+  body.theme-light .bt-icon{
+    background:#ffffff;
+    border-color:rgba(15,23,42,.08);
+    box-shadow:0 1px 2px rgba(15,23,42,.03);
+  }
+  body.theme-light .bt-filter-pill:hover,
+  body.theme-light .bt-dropdown-btn:hover,
+  body.theme-light .bt-icon:hover{
+    background:#f8fafc;
+    border-color:rgba(15,23,42,.14);
+    box-shadow:0 2px 4px rgba(15,23,42,.06);
+  }
+  body.theme-light .bt-filter-pill.on{
+    background:#0f172a;
+    border-color:#0f172a;
+    color:#fff;
+    box-shadow:0 2px 8px -2px rgba(15,23,42,.25);
+  }
+  body.theme-light .bt-filter-pill.mine.on{
+    background:#0891b2;
+    border-color:#0891b2;
+    color:#fff;
+  }
+  body.theme-light .bt-filter-pill.late{
+    color:#dc2626;
+    border-color:rgba(220,38,38,.24);
+    background:#fef2f2;
+  }
+  body.theme-light .bt-filter-pill.late.on{
+    background:#dc2626;
+    border-color:#dc2626;
+    color:#fff;
+  }
+  body.theme-light .bt-filter-pill .ct{
+    background:#e2e8f0;
+    color:#475569;
+  }
+  body.theme-light .bt-seg{
+    background:#f1f5f9;
+    border-color:rgba(15,23,42,.06);
+  }
+  body.theme-light .bt-seg-opt.on{
+    background:#ffffff;
+    color:#0f172a;
+    box-shadow:0 1px 3px rgba(15,23,42,.08),0 0 0 1px rgba(15,23,42,.04);
+  }
+  body.theme-light .bt-seg-opt.on svg{color:#0891b2}
+  body.theme-light .bt-seg-opt[data-bv="client"].on svg{color:#7c3aed}
+  body.theme-light .bt-dropdown-menu{
+    background:#ffffff;
+    border-color:rgba(15,23,42,.08);
+    box-shadow:0 16px 48px -12px rgba(15,23,42,.18),0 0 0 1px rgba(15,23,42,.04);
+  }
+  body.theme-light .bt-icons{border-left-color:rgba(15,23,42,.08)}
+
+  /* ── Mobile: empilha em 2 linhas ── */
+  @media (max-width:720px){
+    .board-toolbar{
+      flex-direction:column;
+      align-items:stretch;
+      gap:8px;
+      padding:10px 0;
+    }
+    .bt-left,.bt-right{
+      width:100%;
+      overflow-x:auto;
+      scrollbar-width:none;
+      flex-wrap:nowrap;
+      padding-bottom:2px;
+    }
+    .bt-left::-webkit-scrollbar,.bt-right::-webkit-scrollbar{display:none}
+    .bt-right{justify-content:flex-start;gap:8px}
+    .bt-icons{border-left:none;padding-left:0;margin-left:auto}
+    .bt-seg-opt span{display:none}
+    .bt-seg-opt{padding:0 10px}
+    .bt-dropdown-menu{
+      left:auto;
+      right:0;
+      min-width:240px;
+    }
+  }
+
+  /* ── Esconde elementos antigos (.filters/.board-tools/.view-toggle) se ainda existirem em algum lugar ── */
+  .board-toolbar ~ .filters,
+  .board-toolbar ~ .board-tools,
+  .board-toolbar ~ .view-toggle{display:none}
+
+
 
 
   /* [V63] TAMANHO DE FONTE — ativado por body.fs-{sm|md|lg} */
@@ -3345,7 +3671,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.35 · build densidade-premium</div>
+    <div class="ver">versão 63.36 · build toolbar-estrutural</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -6924,10 +7250,66 @@ function trackFields(prev,newStatus){
 function renderBoard(){
   const lateAll=tasks.filter(taskLate);
   const mineAll=tasks.filter(isMyTask);
-  let h='<div class="filters"><button class="chip '+(boardFilter==="all"?"on":"")+'" data-bf="all">Todos os setores</button>';
-  h+='<button class="chip '+(boardFilter==="mine"?"on":"")+'" data-bf="mine" style="border-color:rgba(62, 184, 216,.5);color:var(--accent)">👤 Minhas'+(mineAll.length?" ("+mineAll.length+")":"")+'</button>';
-  h+='<button class="chip '+(boardFilter==="late"?"on":"")+'" data-bf="late" style="border-color:rgba(255,90,77,.5);color:var(--c-rev)">⚠ Atrasadas'+(lateAll.length?" ("+lateAll.length+")":"")+'</button>';
-  for(const k in SECTORS) h+='<button class="chip '+(boardFilter===k?"on":"")+'" data-bf="'+k+'"><span class="dot" style="background:'+SECTORS[k].color+'"></span>'+SECTORS[k].label+'</button>';
+  /* [V63.36] BOARD TOOLBAR — redesign estrutural premium.
+     Substitui: filtros gigantes + 3 botões grandes + 2 botões toggle
+     por uma única toolbar densa com pills, dropdown, segmented e icon-buttons. */
+  var isSectorSelected = (boardFilter && SECTORS[boardFilter]);
+  var sectorLabel = isSectorSelected ? SECTORS[boardFilter].label : "Setor";
+  var sectorColor = isSectorSelected ? SECTORS[boardFilter].color : "transparent";
+  let h='<div class="board-toolbar">';
+  /* Esquerda: pills + dropdown setor */
+  h+='<div class="bt-left">';
+  h+='<button class="bt-filter-pill '+(boardFilter==="all"?"on":"")+'" data-bf="all">Todos</button>';
+  h+='<button class="bt-filter-pill mine '+(boardFilter==="mine"?"on":"")+'" data-bf="mine">'+
+       '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="2"/><path d="M4.5 20c0-3.6 3.4-6 7.5-6s7.5 2.4 7.5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+       '<span>Minhas</span>'+(mineAll.length?'<span class="ct">'+mineAll.length+'</span>':'')+
+     '</button>';
+  if(lateAll.length){
+    h+='<button class="bt-filter-pill late '+(boardFilter==="late"?"on":"")+'" data-bf="late">'+
+       '<svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+       '<span>Atrasadas</span><span class="ct">'+lateAll.length+'</span>'+
+     '</button>';
+  }
+  /* Dropdown de setor */
+  h+='<div class="bt-dropdown" id="btSectorWrap">';
+  h+='<button class="bt-dropdown-btn '+(isSectorSelected?"has-value":"")+'" id="btSectorBtn" type="button">';
+  if(isSectorSelected) h+='<span class="dot" style="background:'+sectorColor+'"></span>';
+  h+='<span>'+esc(sectorLabel)+'</span>';
+  h+='<svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  h+='</button>';
+  h+='<div class="bt-dropdown-menu hidden" id="btSectorMenu">';
+  h+='<button class="bt-menu-it '+(!isSectorSelected?"on":"")+'" data-bf="all" type="button">'+
+     '<span class="dot" style="background:#94a3b8"></span>'+
+     '<span>Todos os setores</span>'+
+     '<svg class="check" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+     '</button>';
+  for(const k in SECTORS){
+    h+='<button class="bt-menu-it '+(boardFilter===k?"on":"")+'" data-bf="'+k+'" type="button">'+
+       '<span class="dot" style="background:'+SECTORS[k].color+'"></span>'+
+       '<span>'+esc(SECTORS[k].label)+'</span>'+
+       '<svg class="check" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+       '</button>';
+  }
+  h+='</div></div>';
+  h+='</div>';
+  /* Direita: segmented + icon-buttons */
+  h+='<div class="bt-right">';
+  h+='<div class="bt-seg">'+
+       '<button class="bt-seg-opt '+(boardView==="team"?"on":"")+'" data-bv="team" type="button">'+
+         '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="6" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="11" y="4" width="6" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="19" y="4" width="2" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>'+
+         '<span>Vista Equipe</span>'+
+       '</button>'+
+       '<button class="bt-seg-opt '+(boardView==="client"?"on":"")+'" data-bv="client" type="button">'+
+         '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+         '<span>Fluxo Cliente</span>'+
+       '</button>'+
+     '</div>';
+  h+='<div class="bt-icons">'+
+       '<button class="bt-icon" id="goContentCal" title="Calendário de conteúdo" type="button"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>'+
+       '<button class="bt-icon" id="goClientes" title="Visão por cliente" type="button"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>'+
+       '<button class="bt-icon" id="goPostsLog" title="Registro de posts" type="button"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg></button>'+
+     '</div>';
+  h+='</div>';
   h+='</div>';
   if(boardFilter==="mine"){
     var now=Date.now(), wk=now+7*864e5;
@@ -6939,24 +7321,6 @@ function renderBoard(){
   if(boardFilter.indexOf("cli:")===0){
     h+='<div class="mine-bar">Mostrando apenas: <b>'+esc(boardFilter.slice(4))+'</b> · <button class="cli-clear" data-bf="all">limpar filtro</button></div>';
   }
-  /* [V61] Botão "Central de Aprovações" REMOVIDO daqui — a 5ª coluna do Quadro substitui essa função.
-     [V62.2] Os 3 botões viram uma row compacta horizontal (rápido acesso sem ocupar 3 linhas). */
-  h+='<div class="board-tools">';
-  h+='<button class="bt-link" id="goContentCal" title="Calendário de conteúdo"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Calendário</span></button>';
-  h+='<button class="bt-link" id="goClientes" title="Visão por cliente"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Por cliente</span></button>';
-  h+='<button class="bt-link" id="goPostsLog" title="Registro de posts publicados"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg><span>Posts</span></button>';
-  h+='</div>';
-  /* [V62.20] Toggle Vista Equipe / Fluxo do Cliente — dois modos distintos do quadro */
-  h+='<div class="view-toggle">'+
-       '<button class="vt-opt '+(boardView==="team"?"on":"")+'" data-bv="team">'+
-         '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="6" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="11" y="4" width="6" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="19" y="4" width="2" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>'+
-         '<span>Vista Equipe</span>'+
-       '</button>'+
-       '<button class="vt-opt '+(boardView==="client"?"on":"")+'" data-bv="client">'+
-         '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
-         '<span>Fluxo do Cliente</span>'+
-       '</button>'+
-     '</div>';
   const od=myOverdue();
   if(od.length){
     h+='<div class="od-banner"><div class="ttl"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Pendência urgente — '+od.length+' tarefa(s) atrasada(s)</div>'+
@@ -7199,6 +7563,40 @@ function bindBoard(){
   document.querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{boardFilter=b.dataset.bf;boardFilterUserSet=true;render();});
   /* [V62.20] Toggle Vista Equipe / Fluxo do Cliente */
   document.querySelectorAll("[data-bv]").forEach(b=>b.onclick=()=>{ boardView=b.dataset.bv; render(); });
+  /* [V63.36] Dropdown de Setor — toggle aberto/fechado, click fora fecha */
+  var ddBtn = document.getElementById("btSectorBtn");
+  var ddMenu = document.getElementById("btSectorMenu");
+  var ddWrap = document.getElementById("btSectorWrap");
+  if(ddBtn && ddMenu && ddWrap){
+    ddBtn.onclick = function(e){
+      e.stopPropagation();
+      var willOpen = ddMenu.classList.contains("hidden");
+      ddMenu.classList.toggle("hidden");
+      ddWrap.classList.toggle("open", willOpen);
+    };
+    /* Click fora ou ESC fecha (binding global único) */
+    if(!window.__btSectorOutBound){
+      window.__btSectorOutBound = true;
+      document.addEventListener("click", function(e){
+        var open = document.querySelector(".bt-dropdown.open");
+        if(open && !open.contains(e.target)){
+          open.classList.remove("open");
+          var m = open.querySelector(".bt-dropdown-menu");
+          if(m) m.classList.add("hidden");
+        }
+      });
+      document.addEventListener("keydown", function(e){
+        if(e.key === "Escape"){
+          var open = document.querySelector(".bt-dropdown.open");
+          if(open){
+            open.classList.remove("open");
+            var m = open.querySelector(".bt-dropdown-menu");
+            if(m) m.classList.add("hidden");
+          }
+        }
+      });
+    }
+  }
   var gpl=$("goPostsLog"); if(gpl)gpl.onclick=()=>switchTab("posts");
   var gcl=$("goClientes"); if(gcl)gcl.onclick=()=>switchTab("clientes");
   var gca=$("goContentCal"); if(gca)gca.onclick=()=>{ calCursor=new Date(); calSel=todayISO(); switchTab("calendar"); };
