@@ -863,37 +863,42 @@
   .story-cap-read{font-size:13.5px;color:var(--ink);line-height:1.5;background:var(--surface);border:1px solid var(--line-soft);border-radius:9px;padding:10px 12px;min-height:32px}
 
   /* Visão do CLIENTE — carrossel swipeable Feed + stories list */
-  .cv-feed-carousel{position:relative;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin:12px auto;max-width:380px;width:100%}
+  /* [V63.28] Visão do CLIENTE — Feed (esq) e Stories (dir) lado-a-lado, tamanho compacto */
+  .cv-posts-row{display:flex;flex-direction:row;gap:10px;align-items:flex-start;justify-content:center;margin:14px 0;flex-wrap:nowrap}
+  .cv-posts-col{flex:1 1 0;min-width:0;max-width:200px;display:flex;flex-direction:column;gap:6px}
+  .cv-posts-col-lab{font-size:10px;font-weight:800;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;text-align:center;opacity:.85}
+  .cv-feed-carousel{position:relative;background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--line);width:100%}
   .cv-feed-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;
     -ms-overflow-style:none;scrollbar-width:none}
   .cv-feed-track::-webkit-scrollbar{display:none}
   .cv-feed-slide{flex:0 0 100%;scroll-snap-align:start;position:relative;aspect-ratio:3/4;background:#000}
   .cv-feed-slide img{width:100%;height:100%;object-fit:contain;display:block}
-  .cv-feed-counter{position:absolute;top:8px;left:8px;font-size:11px;font-weight:900;
-    background:rgba(0,0,0,.7);color:#fff;padding:4px 8px;border-radius:6px;backdrop-filter:blur(4px);z-index:3;letter-spacing:.04em}
-  .cv-feed-actions{position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:3}
-  .cv-feed-actions button{width:32px;height:32px;border-radius:8px;border:none;cursor:pointer;
+  .cv-feed-counter{position:absolute;top:6px;left:6px;font-size:10px;font-weight:900;
+    background:rgba(0,0,0,.7);color:#fff;padding:3px 6px;border-radius:5px;backdrop-filter:blur(4px);z-index:3;letter-spacing:.04em}
+  .cv-feed-actions{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:3}
+  .cv-feed-actions button{width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;
     background:rgba(0,0,0,.7);color:#fff;display:grid;place-items:center;backdrop-filter:blur(4px)}
   .cv-feed-actions button:hover{background:rgba(0,0,0,.9)}
-  .cv-feed-actions button svg{width:15px;height:15px}
-  .cv-feed-dots{display:flex;justify-content:center;gap:6px;padding:8px 4px;background:rgba(0,0,0,.5)}
-  .cv-feed-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4);transition:background .2s}
+  .cv-feed-actions button svg{width:13px;height:13px}
+  .cv-feed-dots{display:flex;justify-content:center;gap:5px;padding:5px 4px;background:rgba(0,0,0,.5)}
+  .cv-feed-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.4);transition:background .2s}
   .cv-feed-dot.on{background:#fff}
-  .cv-feed-nav{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;
+  .cv-feed-nav{position:absolute;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;
     border:none;cursor:pointer;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;z-index:3;backdrop-filter:blur(4px)}
   .cv-feed-nav:hover{background:rgba(0,0,0,.8)}
-  .cv-feed-nav.prev{left:8px}
-  .cv-feed-nav.next{right:8px}
-  .cv-feed-nav svg{width:18px;height:18px}
-  .cv-stories-list{display:flex;flex-direction:column;align-items:center;gap:14px;margin:10px 0 14px}
-  .cv-story-item{background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line);position:relative;max-width:260px;width:100%}
-  .cv-story-item img{width:100%;display:block;aspect-ratio:9/16;object-fit:contain;background:#000}
-  .cv-story-lab{position:absolute;top:8px;left:8px;font-size:10.5px;font-weight:900;
-    background:rgba(0,0,0,.7);color:#fff;padding:4px 8px;border-radius:6px;backdrop-filter:blur(4px);z-index:2}
-  .cv-story-cmt-btn{position:absolute;bottom:8px;right:8px;font-size:11px;font-weight:800;
-    background:rgba(0,0,0,.7);color:#fff;padding:6px 11px;border-radius:8px;backdrop-filter:blur(4px);
-    border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;z-index:2}
-  .cv-story-cap{padding:10px 14px;background:rgba(255,255,255,.04);font-size:13.5px;line-height:1.5;color:var(--ink-soft)}
+  .cv-feed-nav.prev{left:5px}
+  .cv-feed-nav.next{right:5px}
+  .cv-feed-nav svg{width:14px;height:14px}
+  .cv-stories-list{display:flex;flex-direction:column;gap:10px;width:100%}
+  .cv-story-item{background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--line);position:relative;width:100%}
+  .cv-story-item img{width:100%;display:block;aspect-ratio:9/16;object-fit:contain;background:#000;cursor:pointer}
+  .cv-story-lab{position:absolute;top:6px;left:6px;font-size:9.5px;font-weight:900;
+    background:rgba(0,0,0,.7);color:#fff;padding:3px 6px;border-radius:5px;backdrop-filter:blur(4px);z-index:2;letter-spacing:.04em}
+  .cv-story-cmt-btn{position:absolute;bottom:6px;right:6px;width:28px;height:28px;
+    background:rgba(0,0,0,.7);color:#fff;padding:0;border-radius:7px;backdrop-filter:blur(4px);
+    border:none;cursor:pointer;display:grid;place-items:center;z-index:2}
+  .cv-story-cmt-btn:hover{background:rgba(0,0,0,.9)}
+  .cv-story-cap{padding:7px 9px;background:rgba(255,255,255,.04);font-size:11.5px;line-height:1.4;color:var(--ink-soft);word-wrap:break-word}
 
   /* Popup de comentário em imagem (cliente) */
   .cv-img-cmt-pop{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;
@@ -1944,7 +1949,20 @@
   .tc-from .av img{width:100%;height:100%;object-fit:cover;display:block}
   .tc-from .nm{font-size:11.5px;font-weight:600;color:var(--ink-soft);
     flex:1;min-width:0;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tc-from .at{font-size:10px;color:var(--ink-faint);font-weight:600;
+    flex-shrink:0;letter-spacing:.02em;opacity:.85}
   .tc-from .cdot{display:none}
+
+  /* [V63.27] Timeline do fluxo do cliente — eventos cronológicos por card */
+  .cv-tl{margin-top:14px;background:rgba(255,255,255,.025);border:1px solid var(--line-soft);
+    border-radius:10px;padding:10px 12px}
+  .cv-tl-h{font-size:10.5px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;
+    text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+  .cv-tl-list{display:flex;flex-direction:column;gap:5px}
+  .cv-tl-it{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);line-height:1.4}
+  .cv-tl-ic{font-size:13px;width:18px;text-align:center;flex-shrink:0}
+  .cv-tl-t{flex:1;min-width:0;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cv-tl-at{font-size:11px;color:var(--ink-faint);font-weight:600;flex-shrink:0;letter-spacing:.02em}
 
   /* === Cliente — destaque visual === */
   .tcard .tcli{font-size:10px;font-weight:800;color:var(--accent);
@@ -2333,7 +2351,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.26 · build wa-deeplink</div>
+    <div class="ver">versão 63.28 · build posts-lado-a-lado</div>
   </section>
 
   <section id="pendingScreen" class="center-screen pending hidden">
@@ -5267,9 +5285,10 @@ function ccard(x){
   }
   /* [V58] Quem demandou esta tarefa (criador). Não mostra se for tarefa antiga sem t.by */
   var creator = t.by ? users.find(function(u){return u.id===t.by;}) : null;
+  var launchedTxt2 = t.createdAt ? ('lançada '+fmtShort(t.createdAt)) : '';
   var fromHtml = creator
-    ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="nm">'+esc(creator.name)+'</span></div>'
-    : '';
+    ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="nm">'+esc(creator.name)+'</span>'+(launchedTxt2?'<span class="at">· '+esc(launchedTxt2)+'</span>':'')+'</div>'
+    : (launchedTxt2 ? '<div class="tc-from"><span class="lab">'+esc(launchedTxt2.toUpperCase())+'</span></div>' : '');
   /* [V61] Se está no fluxo do cliente, pílula da etapa interna fica menor/secundária. */
   var stPillCls = actInfo ? "tc-st tc-st-sm" : "tc-st";
   return '<div class="tcard'+(late?" late urgent":"")+(actInfo?" in-client":"")+(actPhase===2?" in-fase2":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'" data-ci="'+idx+'">'+
@@ -5317,9 +5336,10 @@ function tcard(t){
   }
   /* [V58] Quem demandou esta tarefa (criador). Não mostra se for tarefa antiga sem t.by */
   var creator = t.by ? users.find(function(u){return u.id===t.by;}) : null;
+  var launchedTxt = t.createdAt ? ('lançada '+fmtShort(t.createdAt)) : '';
   var fromHtml = creator
-    ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="nm">'+esc(creator.name)+'</span></div>'
-    : '';
+    ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="nm">'+esc(creator.name)+'</span>'+(launchedTxt?'<span class="at">· '+esc(launchedTxt)+'</span>':'')+'</div>'
+    : (launchedTxt ? '<div class="tc-from"><span class="lab">'+esc(launchedTxt.toUpperCase())+'</span></div>' : '');
   return '<div class="tcard'+(late?" late urgent":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'">'+
     '<div class="tc-top">'+
       '<span class="tc-st" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
@@ -6729,7 +6749,42 @@ function renderCvCardTema(c, i){
           '</div>'+
         '</div>'
       : '')+
+    renderCvTimeline(c, "tema")+
   '</div>';
+}
+
+/* [V63.27] Mini-timeline pro fluxo do cliente — mostra eventos cronológicos do card */
+function renderCvTimeline(c, phase){
+  if(!c || !Array.isArray(c.history)) return "";
+  var byPhase = {
+    tema: {
+      client_sent:           {ic:"📨", txt:"Conteúdo recebido pra análise"},
+      client_opened:         {ic:"👁",  txt:"Você abriu o link"},
+      client_approved:       {ic:"✅", txt:"Você aprovou o tema"},
+      client_edited_approved:{ic:"✏",  txt:"Você editou e aprovou o tema"},
+      client_revision:       {ic:"↶",  txt:"Você pediu revisão do tema"}
+    },
+    legenda: {
+      legenda_sent:           {ic:"✍",  txt:"Legenda enviada pra você"},
+      legenda_approved:       {ic:"✅", txt:"Você aprovou a legenda"},
+      legenda_edited_approved:{ic:"✏",  txt:"Você editou e aprovou a legenda"},
+      legenda_revision:       {ic:"↶",  txt:"Você pediu revisão da legenda"}
+    }
+  };
+  var map = byPhase[phase]; if(!map) return "";
+  var events = [];
+  c.history.forEach(function(h){
+    if(!h || !h.kind || !h.at) return;
+    if(map[h.kind]){ events.push({at: h.at, ic: map[h.kind].ic, txt: map[h.kind].txt}); }
+  });
+  if(!events.length) return "";
+  events.sort(function(a,b){ return (a.at||0) - (b.at||0); });
+  var html = '<div class="cv-tl"><div class="cv-tl-h">⏱ Rastreio em tempo real</div><div class="cv-tl-list">';
+  events.forEach(function(e){
+    html += '<div class="cv-tl-it"><span class="cv-tl-ic">'+e.ic+'</span><span class="cv-tl-t">'+esc(e.txt)+'</span><span class="cv-tl-at">'+esc(fmtDT(e.at))+'</span></div>';
+  });
+  html += '</div></div>';
+  return html;
 }
 
 /* [V63.23] Renderiza o bloco de Posts (Feed carrossel + Stories) na visão do cliente */
@@ -6737,51 +6792,55 @@ function renderCvPostsBlock(c, cardIdx){
   var feed = getFeedImages(c);
   var stories = getStories(c);
   if(!feed.length && !stories.length) return "";
-  var html = "";
+  var feedHtml = "", storiesHtml = "";
 
-  /* FEED - carrossel swipeable */
+  /* FEED - carrossel swipeable (coluna esquerda) */
   if(feed.length > 0){
-    html += '<div class="cv-feed-carousel" data-cv-carousel="'+cardIdx+'">';
-    html += '<div class="cv-feed-counter"><span data-cv-cur="'+cardIdx+'">1</span>/'+feed.length+'</div>';
+    feedHtml += '<div class="cv-feed-carousel" data-cv-carousel="'+cardIdx+'">';
+    feedHtml += '<div class="cv-feed-counter"><span data-cv-cur="'+cardIdx+'">1</span>/'+feed.length+'</div>';
     if(feed.length > 1){
-      html += '<button class="cv-feed-nav prev" data-cv-prev="'+cardIdx+'" title="Anterior"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
-      html += '<button class="cv-feed-nav next" data-cv-next="'+cardIdx+'" title="Próxima"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      feedHtml += '<button class="cv-feed-nav prev" data-cv-prev="'+cardIdx+'" title="Anterior"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      feedHtml += '<button class="cv-feed-nav next" data-cv-next="'+cardIdx+'" title="Próxima"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
     }
-    html += '<div class="cv-feed-actions">';
-    html += '<button title="Comentar nesta imagem" data-cv-img-cmt="'+cardIdx+'" data-cv-img-type="feed"><svg viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-12 7l-5 1.5L5 16A8 8 0 1 1 21 12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
-    html += '<button title="Abrir em tela cheia" data-cv-img-zoom="'+cardIdx+'" data-cv-img-type="feed"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3h-6M21 3v6M21 3l-7 7M3 21h6M3 21v-6M3 21l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>';
-    html += '</div>';
-    html += '<div class="cv-feed-track" data-cv-track="'+cardIdx+'">';
+    feedHtml += '<div class="cv-feed-actions">';
+    feedHtml += '<button title="Comentar nesta imagem" data-cv-img-cmt="'+cardIdx+'" data-cv-img-type="feed"><svg viewBox="0 0 24 24" fill="none"><path d="M21 12a8 8 0 0 1-12 7l-5 1.5L5 16A8 8 0 1 1 21 12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+    feedHtml += '<button title="Abrir em tela cheia" data-cv-img-zoom="'+cardIdx+'" data-cv-img-type="feed"><svg viewBox="0 0 24 24" fill="none"><path d="M21 3h-6M21 3v6M21 3l-7 7M3 21h6M3 21v-6M3 21l7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>';
+    feedHtml += '</div>';
+    feedHtml += '<div class="cv-feed-track" data-cv-track="'+cardIdx+'">';
     feed.forEach(function(img, i){
-      html += '<div class="cv-feed-slide" data-cv-slide="'+i+'" data-cv-img-id="'+esc(img.id||"")+'" data-cv-img-url="'+esc(img.url)+'"><img src="'+esc(img.url)+'" alt="Feed '+(i+1)+'"></div>';
+      feedHtml += '<div class="cv-feed-slide" data-cv-slide="'+i+'" data-cv-img-id="'+esc(img.id||"")+'" data-cv-img-url="'+esc(img.url)+'"><img src="'+esc(img.url)+'" alt="Feed '+(i+1)+'"></div>';
     });
-    html += '</div>';
+    feedHtml += '</div>';
     if(feed.length > 1){
-      html += '<div class="cv-feed-dots">';
-      feed.forEach(function(_, i){ html += '<span class="cv-feed-dot'+(i===0?' on':'')+'" data-cv-dot="'+cardIdx+'-'+i+'"></span>'; });
-      html += '</div>';
+      feedHtml += '<div class="cv-feed-dots">';
+      feed.forEach(function(_, i){ feedHtml += '<span class="cv-feed-dot'+(i===0?' on':'')+'" data-cv-dot="'+cardIdx+'-'+i+'"></span>'; });
+      feedHtml += '</div>';
     }
-    html += '</div>';
+    feedHtml += '</div>';
   }
 
-  /* STORIES - lista vertical com legenda própria */
+  /* STORIES - lista vertical com legenda própria (coluna direita) */
   if(stories.length > 0){
-    html += '<div class="cv-stories-list">';
+    storiesHtml += '<div class="cv-stories-list">';
     stories.forEach(function(s, i){
       var icc = getImageComments(c, s.id||"").length;
-      html += '<div class="cv-story-item" data-cv-story-idx="'+cardIdx+'-'+i+'">';
-      html += '<span class="cv-story-lab">STORY '+(i+1)+'/'+stories.length+(icc>0?' · 💬 '+icc:'')+'</span>';
-      html += '<button class="cv-story-cmt-btn" data-cv-img-cmt-story="'+cardIdx+'-'+i+'" data-cv-img-id="'+esc(s.id||"")+'"><svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px"><path d="M21 12a8 8 0 0 1-12 7l-5 1.5L5 16A8 8 0 1 1 21 12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Comentar</button>';
-      html += '<img src="'+esc(s.url)+'" alt="Story '+(i+1)+'" onclick="window.open(\''+esc(s.url)+'\',\'_blank\')">';
+      storiesHtml += '<div class="cv-story-item" data-cv-story-idx="'+cardIdx+'-'+i+'">';
+      storiesHtml += '<span class="cv-story-lab">ST '+(i+1)+'/'+stories.length+(icc>0?' · 💬 '+icc:'')+'</span>';
+      storiesHtml += '<button class="cv-story-cmt-btn" data-cv-img-cmt-story="'+cardIdx+'-'+i+'" data-cv-img-id="'+esc(s.id||"")+'" title="Comentar"><svg viewBox="0 0 24 24" fill="none" style="width:13px;height:13px"><path d="M21 12a8 8 0 0 1-12 7l-5 1.5L5 16A8 8 0 1 1 21 12z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>';
+      storiesHtml += '<img src="'+esc(s.url)+'" alt="Story '+(i+1)+'" onclick="window.open(\''+esc(s.url)+'\',\'_blank\')">';
       if(s.caption && s.caption.trim()){
-        html += '<div class="cv-story-cap">'+esc(s.caption)+'</div>';
+        storiesHtml += '<div class="cv-story-cap">'+esc(s.caption)+'</div>';
       }
-      html += '</div>';
+      storiesHtml += '</div>';
     });
-    html += '</div>';
+    storiesHtml += '</div>';
   }
 
-  return html;
+  /* Container lado-a-lado: Feed (esq) · Stories (dir) */
+  return '<div class="cv-posts-row">'+
+    (feedHtml    ? '<div class="cv-posts-col cv-posts-col-feed"><div class="cv-posts-col-lab">📷 FEED</div>'+feedHtml+'</div>' : '')+
+    (storiesHtml ? '<div class="cv-posts-col cv-posts-col-story"><div class="cv-posts-col-lab">🎯 STORIES</div>'+storiesHtml+'</div>' : '')+
+  '</div>';
 }
 
 /* Popup de comentário do cliente em uma imagem */
@@ -6875,6 +6934,7 @@ function renderCvCardLegenda(c, i){
         '</div>'
       : '')+
     (isAprov ? '<div style="font-size:13.5px;color:var(--c-trafego);font-weight:800;text-align:center;padding:10px;background:rgba(54,211,153,.12);border-radius:8px;margin-top:8px">🚀 Pronto pra publicar</div>' : '')+
+    renderCvTimeline(c, "legenda")+
   '</div>';
 }
 
