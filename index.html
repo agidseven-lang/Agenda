@@ -3550,9 +3550,9 @@
   .chat-msg-text{white-space:pre-wrap}
   .chat-msg-foot{display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:10px;color:var(--ink-faint);margin-top:3px;letter-spacing:.02em}
   .chat-msg.in .chat-msg-foot{justify-content:flex-start}
-  .chat-msg-check{display:inline-flex;align-items:center}
-  .chat-msg-check svg{width:14px;height:14px}
-  .chat-msg-check.read{color:var(--accent)}
+  .chat-msg-check{display:inline-flex;align-items:center;color:var(--ink-faint);transition:color .25s ease;margin-left:1px}
+  .chat-msg-check svg{width:16px;height:11px;display:block}
+  .chat-msg-check.read{color:#53bdeb} /* Azul exato do WhatsApp Business para mensagens lidas */
   .chat-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface);flex-shrink:0;position:relative}
   .chat-input-wrap{flex:1;position:relative;display:flex;align-items:flex-end;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:18px;padding:2px 6px 2px 4px;transition:border-color .15s ease}
   .chat-input-wrap:focus-within{border-color:var(--accent)}
@@ -4026,6 +4026,183 @@
     body.theme-light .hav{width:36px !important;height:36px !important}
   }
 
+  /* ════════════════════════════════════════════════════════════════════
+     [V63.40] PRESENCE NO CHAT — dot online + status real estilo WhatsApp
+     Integra com sistema isUserOnline()/presenceLabel() existente.
+     ════════════════════════════════════════════════════════════════════ */
+
+  /* Dot online no avatar (wrapper relativo) */
+  .chat-li-av,
+  .chat-picker-it .chat-li-av{position:relative}
+  .chat-li-av.is-online::after{
+    content:"";
+    position:absolute;
+    bottom:0;
+    right:0;
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    background:#22c55e;
+    border:2.5px solid var(--surface);
+    box-shadow:0 0 0 .5px rgba(0,0,0,.06);
+    z-index:2;
+    animation:onlineDotPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes onlineDotPulse{
+    0%,100%{box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 0 0 0 rgba(34,197,94,.5)}
+    50%{box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 0 0 4px rgba(34,197,94,0)}
+  }
+  /* No header do chat aberto, fundo é outro */
+  .chat-room-h .chat-li-av.is-online::after{
+    border-color:var(--surface);
+  }
+  body.theme-light .chat-li-av.is-online::after{
+    border-color:#ffffff;
+  }
+  /* Status text no header do chat aberto */
+  .chat-room-h .st.is-online{color:#22c55e !important;font-weight:600}
+  .chat-room-h .st.is-offline{color:var(--ink-faint) !important;font-weight:500}
+
+  /* Status no item do picker (modal Iniciar conversa) */
+  .chat-picker-it .st-line{
+    font-size:11.5px;
+    margin-top:2px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-weight:500;
+    color:var(--ink-faint);
+  }
+  .chat-picker-it .st-line.is-online{color:#22c55e;font-weight:600}
+  .chat-picker-it .st-mini-dot{
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:currentColor;
+    flex-shrink:0;
+  }
+
+  /* ── Modal "Iniciar conversa" — visual estilo WhatsApp Business ── */
+  .chat-picker-box{
+    max-width:480px !important;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  .chat-picker-h{
+    padding:18px 20px !important;
+    background:linear-gradient(135deg,rgba(62,184,216,.08) 0%,transparent 100%);
+  }
+  .chat-picker-h h3{
+    font-size:17px !important;
+    font-weight:700 !important;
+    letter-spacing:-.020em;
+    color:var(--ink);
+  }
+  .chat-picker-search{
+    padding:12px 16px;
+    background:var(--bg);
+    border-bottom:1px solid var(--line-soft);
+    flex-shrink:0;
+  }
+  .chat-picker-search-wrap{
+    position:relative;
+  }
+  .chat-picker-search-wrap svg{
+    position:absolute;
+    left:13px;
+    top:50%;
+    transform:translateY(-50%);
+    width:15px;
+    height:15px;
+    color:var(--ink-faint);
+    pointer-events:none;
+  }
+  .chat-picker-search input{
+    width:100%;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px 14px 10px 36px;
+    color:var(--ink);
+    font-size:14px;
+    font-family:inherit;
+    outline:none;
+    transition:border-color .15s ease,box-shadow .15s ease;
+  }
+  .chat-picker-search input:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(62,184,216,.10);
+  }
+  .chat-picker-search input::placeholder{color:var(--ink-faint)}
+  .chat-picker-section{
+    padding:12px 20px 6px;
+    font-size:10.5px;
+    font-weight:700;
+    color:var(--ink-faint);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    background:var(--bg);
+    flex-shrink:0;
+  }
+  .chat-picker-it{
+    padding:12px 18px !important;
+    gap:13px !important;
+    border-bottom:1px solid var(--line-soft);
+  }
+  .chat-picker-it:last-child{border-bottom:none}
+  .chat-picker-it .chat-li-av{
+    width:46px !important;
+    height:46px !important;
+  }
+  .chat-picker-it .chat-li-av img,
+  .chat-picker-it .chat-li-av-fb{
+    width:100%;
+    height:100%;
+    border-radius:50%;
+  }
+  .chat-picker-it .nm{
+    font-size:14.5px !important;
+    font-weight:700 !important;
+    color:var(--ink);
+    letter-spacing:-.010em;
+  }
+  .chat-picker-it .rl{
+    font-size:11px !important;
+    margin-top:2px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    color:var(--ink-faint) !important;
+    font-weight:600;
+  }
+  .chat-picker-empty{
+    padding:40px 20px;
+    text-align:center;
+    color:var(--ink-faint);
+  }
+  .chat-picker-empty .ic{
+    font-size:38px;
+    margin-bottom:10px;
+    opacity:.4;
+  }
+  .chat-picker-empty .t{
+    font-size:14px;
+    font-weight:600;
+    margin-bottom:4px;
+    color:var(--ink-soft);
+  }
+  .chat-picker-empty .s{font-size:12.5px;font-weight:500}
+
+  /* Light mode */
+  body.theme-light .chat-picker-h{
+    background:linear-gradient(135deg,rgba(8,145,178,.06) 0%,transparent 100%);
+  }
+  body.theme-light .chat-picker-search input{background:#ffffff}
+  body.theme-light .chat-picker-search input:focus{
+    border-color:#0891b2;
+    box-shadow:0 0 0 3px rgba(8,145,178,.10);
+  }
+
 </style>
 <div id="app">
   <section id="loadingScreen" class="center-screen">
@@ -4075,7 +4252,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.38 · build header-inline</div>
+    <div class="ver">versão 63.40 · build presence-whatsapp</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -4826,9 +5003,23 @@ var __clientOpenedMark = false;
     if(!me && sessionId){ const u=users.find(x=>x.id===sessionId); if(u) me=u; }
     if(me){const fresh=users.find(u=>u.id===me.id);if(fresh)me=fresh;}
     if(!changedBeyondPresence){
-      /* Só presença mudou — atualiza dots da equipe sem disparar fade animation */
-      if(tab === "team" && !$("mainApp").classList.contains("hidden")){
+      /* Só presença mudou — atualiza dots da equipe/chat sem disparar fade animation */
+      if((tab === "team" || tab === "chat") && !$("mainApp").classList.contains("hidden")){
         try{ refreshPresenceInDOM(); }catch(_){}
+      }
+      /* Mesmo fora do chat, se há modal "Iniciar conversa" aberto, atualiza ele */
+      if(document.getElementById("__chatPickerBg") && typeof openChatPicker === "function"){
+        try{
+          /* Re-renderiza a lista mantendo a query atual */
+          var srch = document.getElementById("__chatPickerSearch");
+          var q = srch ? srch.value : "";
+          /* Reabre passando focus implícito */
+          var pkBg = document.getElementById("__chatPickerBg");
+          pkBg.remove();
+          openChatPicker();
+          var newSrch = document.getElementById("__chatPickerSearch");
+          if(newSrch && q){ newSrch.value = q; newSrch.dispatchEvent(new Event("input")); }
+        }catch(_){}
       }
       return;
     }
@@ -5060,13 +5251,39 @@ function presenceLabel(u){
 }
 
 /* [V63.15] Atualiza só os indicadores de presença na tela Equipe sem disparar
-   re-render completo (evita o flicker da animação .fade a cada ping). */
+   re-render completo (evita o flicker da animação .fade a cada ping).
+   [V63.40] Estendido pra também atualizar Chat (lista + header). */
 function refreshPresenceInDOM(){
-  /* Re-renderiza só o conteúdo da equipe — sem aplicar classe .fade */
-  var c = $("content");
-  if(!c) return;
-  c.innerHTML = renderTeam();
-  bindTeam();
+  /* Equipe: re-renderiza tudo */
+  if(tab === "team"){
+    var c = $("content");
+    if(c){ c.innerHTML = renderTeam(); bindTeam(); }
+  }
+  /* Chat: atualiza dots na lista + status no header SEM piscar mensagens */
+  if(tab === "chat"){
+    try{
+      var listEl = document.getElementById("chatList");
+      if(listEl){ listEl.innerHTML = renderChatListItems(); bindChatListItems(); }
+      /* Atualiza apenas o cabeçalho da sala (não re-renderiza o feed inteiro) */
+      var roomH = document.querySelector(".chat-room-h");
+      if(roomH && currentChatId){
+        var chat = chats.find(function(c){ return c.id === currentChatId; });
+        if(chat){
+          var ou = chatOtherUser(chat);
+          var online = isUserOnline(ou);
+          var statusTxt = presenceLabel(ou) || (ou && ou.role) || "membro da equipe";
+          var av = roomH.querySelector(".chat-li-av");
+          if(av) av.classList.toggle("is-online", !!online);
+          var stEl = roomH.querySelector(".st");
+          if(stEl){
+            stEl.textContent = statusTxt;
+            stEl.classList.toggle("is-online", !!online);
+            stEl.classList.toggle("is-offline", !online);
+          }
+        }
+      }
+    }catch(_){}
+  }
 }
 
 function route(){
@@ -5620,9 +5837,10 @@ function renderChatListItems(){
     var lmAt = lm ? chatLiTime(lm.at) : chatLiTime(chat.createdAt);
     var unread = (chat.unreadCount && chat.unreadCount[me.id]) || 0;
     var isActive = (chat.id === currentChatId);
-    /* "Online" = lastActive < 5min — não temos isso, então pulamos */
+    /* [V63.40] Indicador online (dot verde no avatar) se outro user fez heartbeat < 2min */
+    var online = (typeof isUserOnline === "function") ? isUserOnline(ou) : false;
     return '<div class="chat-li'+(isActive?" active":"")+(unread>0?" unread":"")+'" data-chat-id="'+esc(chat.id)+'">'+
-      '<div class="chat-li-av">'+chatAvatarHTML(ou)+'</div>'+
+      '<div class="chat-li-av'+(online?" is-online":"")+'">'+chatAvatarHTML(ou)+'</div>'+
       '<div class="chat-li-c">'+
         '<div class="chat-li-top"><div class="chat-li-nm">'+esc(nm)+'</div><div class="chat-li-at">'+esc(lmAt)+'</div></div>'+
         '<div class="chat-li-bot">'+
@@ -5649,14 +5867,18 @@ function renderChatRoomInner(){
   }
   var ou = chatOtherUser(chat);
   var nm = (ou && ou.name) || "Usuário";
-  var role = (ou && ou.role) || "";
+  /* [V63.40] Status real do outro usuário */
+  var online = (typeof isUserOnline === "function") ? isUserOnline(ou) : false;
+  var statusTxt = (typeof presenceLabel === "function") ? presenceLabel(ou) : "";
+  if(!statusTxt) statusTxt = (ou && ou.role) || "membro da equipe";
+  var statusClass = online ? "is-online" : "is-offline";
   /* Cabeçalho */
   var html = '<div class="chat-room-h">'+
     '<button class="chat-room-back" id="chatRoomBack" title="Voltar"><svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'+
-    '<div class="chat-li-av">'+chatAvatarHTML(ou)+'</div>'+
+    '<div class="chat-li-av'+(online?" is-online":"")+'">'+chatAvatarHTML(ou)+'</div>'+
     '<div style="flex:1;min-width:0">'+
       '<div class="nm">'+esc(nm)+'</div>'+
-      '<div class="st">'+esc(role||"membro da equipe")+'</div>'+
+      '<div class="st '+statusClass+'">'+esc(statusTxt)+'</div>'+
     '</div>'+
   '</div>';
   /* Feed de mensagens */
@@ -5678,13 +5900,17 @@ function renderChatRoomInner(){
       var timeStr = pad(t.getHours())+":"+pad(t.getMinutes());
       var checkSvg = "";
       if(isOut){
-        /* Lida se o outro tem timestamp em readBy */
+        /* [V63.39] Tiques de leitura no padrão WhatsApp Business:
+           - 1 tique cinza ✓ = enviado, ainda não lido
+           - 2 tiques azuis ✓✓ = lido pelo destinatário */
         var other = (chat.participants||[]).find(function(p){ return p !== me.id; });
         var wasRead = !!(m.readBy && other && m.readBy[other]);
         checkSvg = '<span class="chat-msg-check'+(wasRead?" read":"")+'">'+
           (wasRead
-            ? '<svg viewBox="0 0 16 12" fill="none"><path d="M1 6l3 3 6-7M5 9l3 3 7-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-            : '<svg viewBox="0 0 16 12" fill="none"><path d="M1 6l4 4 9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            ? /* Double-check (lido): 2 tiques sobrepostos azuis estilo WhatsApp Business */
+              '<svg viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6.5 4.5 10 11 2"/><path d="M6.5 6.5 10 10 16.5 2"/></svg>'
+            : /* Single check (enviado): 1 tique cinza */
+              '<svg viewBox="0 0 14 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5 5.5 10 12 2"/></svg>'
           )+'</span>';
       }
       html += '<div class="chat-msg '+(isOut?"out":"in")+'">'+
@@ -6130,39 +6356,112 @@ function bindChat(){
 /* ─── Modal "Nova conversa" — lista de usuários ─── */
 function openChatPicker(){
   var prev = document.getElementById("__chatPickerBg"); if(prev) prev.remove();
-  /* Lista de usuários ativos, excluindo o próprio me */
-  var list = users.filter(function(u){
+  /* [V63.40] Modal "Nova conversa" estilo WhatsApp Business:
+     - Header refinado
+     - Campo de busca
+     - Lista com dot online + status real
+     - Online primeiro, depois alfabético */
+  var allList = users.filter(function(u){
     return u && u.id && u.id !== me.id && u.status !== "pendente";
-  }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
+  });
+  /* Sort: online primeiro, depois alfabético */
+  allList.sort(function(a,b){
+    var aOn = isUserOnline(a) ? 0 : 1;
+    var bOn = isUserOnline(b) ? 0 : 1;
+    if(aOn !== bOn) return aOn - bOn;
+    return (a.name||"").localeCompare(b.name||"");
+  });
+
   var bg = document.createElement("div");
   bg.id = "__chatPickerBg";
   bg.className = "chat-picker-bg";
-  var html = '<div class="chat-picker-box">'+
-    '<div class="chat-picker-h"><h3>Iniciar conversa</h3><button class="chat-picker-x" id="__chatPickerX">×</button></div>'+
-    '<div class="chat-picker-list">';
-  if(!list.length){
-    html += '<div style="padding:30px 20px;text-align:center;color:var(--ink-faint);font-size:13px">Nenhum outro usuário cadastrado ainda.</div>';
-  }else{
-    list.forEach(function(u){
-      html += '<div class="chat-picker-it" data-uid="'+esc(u.id)+'">'+
-        '<div class="chat-li-av">'+chatAvatarHTML(u)+'</div>'+
-        '<div style="flex:1;min-width:0"><div class="nm">'+esc(u.name||"?")+'</div><div class="rl">'+esc(u.role||"membro")+'</div></div>'+
+
+  function renderPickerList(query){
+    var q = (query||"").trim().toLowerCase();
+    var list = q ? allList.filter(function(u){
+      return (u.name||"").toLowerCase().indexOf(q) >= 0 ||
+             (u.role||"").toLowerCase().indexOf(q) >= 0;
+    }) : allList;
+    if(!list.length){
+      return '<div class="chat-picker-empty">'+
+        '<div class="ic">🔍</div>'+
+        '<div class="t">Nenhum contato encontrado</div>'+
+        '<div class="s">'+(q?"Tente outro termo de busca":"Nenhum outro usuário cadastrado ainda")+'</div>'+
       '</div>';
-    });
+    }
+    /* Separa online e offline pra mostrar seções */
+    var onlineList = list.filter(function(u){return isUserOnline(u);});
+    var offlineList = list.filter(function(u){return !isUserOnline(u);});
+    var inner = '';
+    function renderItem(u){
+      var online = isUserOnline(u);
+      var statusText = presenceLabel(u);
+      var role = u.role || "";
+      var subLine = online
+        ? '<div class="st-line is-online"><span class="st-mini-dot"></span><span>online</span>'+(role?' <span class="rl-divider">·</span> <span style="color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;font-size:10.5px;font-weight:600">'+esc(role)+'</span>':'')+'</div>'
+        : '<div class="st-line is-offline">'+esc(statusText)+(role?' <span class="rl-divider">·</span> <span style="text-transform:uppercase;letter-spacing:.04em;font-size:10.5px;font-weight:600">'+esc(role)+'</span>':'')+'</div>';
+      return '<div class="chat-picker-it" data-uid="'+esc(u.id)+'">'+
+        '<div class="chat-li-av'+(online?" is-online":"")+'">'+chatAvatarHTML(u)+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="nm">'+esc(u.name||"?")+'</div>'+
+          subLine+
+        '</div>'+
+      '</div>';
+    }
+    if(onlineList.length){
+      inner += '<div class="chat-picker-section">Online — '+onlineList.length+'</div>';
+      onlineList.forEach(function(u){ inner += renderItem(u); });
+    }
+    if(offlineList.length){
+      if(onlineList.length) inner += '<div class="chat-picker-section">Demais contatos</div>';
+      offlineList.forEach(function(u){ inner += renderItem(u); });
+    }
+    return inner;
   }
-  html += '</div></div>';
+
+  var html = '<div class="chat-picker-box">'+
+    '<div class="chat-picker-h">'+
+      '<h3>Nova conversa</h3>'+
+      '<button class="chat-picker-x" id="__chatPickerX" title="Fechar">×</button>'+
+    '</div>'+
+    '<div class="chat-picker-search">'+
+      '<div class="chat-picker-search-wrap">'+
+        '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+        '<input type="text" id="__chatPickerSearch" placeholder="Buscar contato..." autocomplete="off">'+
+      '</div>'+
+    '</div>'+
+    '<div class="chat-picker-list" id="__chatPickerList">'+renderPickerList("")+'</div>'+
+  '</div>';
   bg.innerHTML = html;
   document.body.appendChild(bg);
+
+  function bindItems(){
+    document.querySelectorAll(".chat-picker-it[data-uid]").forEach(function(it){
+      it.onclick = function(){
+        var uid = it.dataset.uid;
+        closeMe();
+        openChatWith(uid);
+      };
+    });
+  }
   function closeMe(){ bg.remove(); }
   document.getElementById("__chatPickerX").onclick = closeMe;
   bg.onclick = function(e){ if(e.target === bg) closeMe(); };
-  document.querySelectorAll(".chat-picker-it[data-uid]").forEach(function(it){
-    it.onclick = function(){
-      var uid = it.dataset.uid;
-      closeMe();
-      openChatWith(uid);
-    };
-  });
+  /* Busca em tempo real */
+  var srch = document.getElementById("__chatPickerSearch");
+  if(srch){
+    srch.addEventListener("input", function(){
+      var listEl = document.getElementById("__chatPickerList");
+      if(listEl){ listEl.innerHTML = renderPickerList(srch.value); bindItems(); }
+    });
+    setTimeout(function(){ try{ srch.focus(); }catch(_){} }, 80);
+  }
+  bindItems();
+  /* ESC fecha */
+  function onKey(e){
+    if(e.key === "Escape"){ closeMe(); document.removeEventListener("keydown", onKey); }
+  }
+  document.addEventListener("keydown", onKey);
 }
 
 function render(){
