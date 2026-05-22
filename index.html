@@ -4341,7 +4341,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.56 · build kanban-with-frame</div>
+    <div class="ver">versão 63.57 · build settings-fixes</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -7796,13 +7796,23 @@ function renderSettingsNotifications(){
           '<div class="set-row-lab" style="font-size:13px;color:var(--ink-soft);font-weight:500;line-height:1.55">'+
             (pushConfigured && pushRegistered ?
               'Você vai receber alertas no celular/PC mesmo com o navegador fechado.' :
+            pushConfigured && permState === "granted" ?
+              /* [V63.57] Permissão concedida mas token ainda não salvo — pode estar travado, oferece retry */
+              'Aguardando registro do dispositivo. Se demorar mais de alguns segundos, toque em <b>Tentar registrar novamente</b> abaixo.' :
             pushConfigured ?
-              'Configure permitir notificações acima pra ativar.' :
+              'Permita notificações acima pra ativar o push.' :
               'Recurso desativado. Pra ativar push com app fechado, configure FCM e Cloudflare Worker (peça pro administrador do app).'
             )+
           '</div>'+
         '</div>'+
       '</div>'+
+      /* [V63.57] Botão pra forçar nova tentativa de registro FCM quando travou em "Registrando..." */
+      ((pushConfigured && permState === "granted" && !pushRegistered) ?
+        '<button class="set-btn-ghost" id="setRetryPush" style="margin-top:10px">'+
+          '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+          'Tentar registrar novamente'+
+        '</button>'
+      : '')+
     '</div>'+
 
     '<div class="set-section">'+
@@ -7818,9 +7828,9 @@ function renderSettingsNotifications(){
       '<div class="set-section-h">Lembretes de compromisso</div>'+
       renderToggleRow("notifyReminder", "Lembrar antes do compromisso começar", "Alerta dispara X minutos antes do horário marcado", getPref("notifyReminder"))+
       '<div class="set-row">'+
-        '<div class="set-row-tx">'+
-          '<div class="set-row-lab">Antecedência do lembrete</div>'+
-          '<div class="set-row-sub">Quantos minutos antes do compromisso</div>'+
+        '<div class="set-row-t">'+
+          '<div class="set-row-l">Antecedência do lembrete</div>'+
+          '<div class="set-row-d">Quantos minutos antes do compromisso</div>'+
         '</div>'+
         '<select id="setReminderMin" class="set-select">'+
           ['5','10','15','30','60','120'].map(function(v){
@@ -7867,6 +7877,22 @@ function bindSettingsNotifications(){
   if(rq) rq.onclick = async function(){
     var ok = await requestNotifyPermission();
     if(ok) toast("Notificações ativadas ✓");
+    render();
+  };
+  /* [V63.57] Botão pra forçar nova tentativa de registro FCM (quando travou em "Registrando…") */
+  var rt = document.getElementById("setRetryPush");
+  if(rt) rt.onclick = async function(){
+    rt.disabled = true;
+    rt.innerHTML = '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" stroke-dasharray="42 6" opacity=".6"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg>Registrando…';
+    /* Reset do flag pra permitir nova tentativa */
+    try{ fcmInitTried = false; }catch(_){}
+    try{
+      var ok = await setupPushNotifications();
+      if(ok){ toast("Dispositivo registrado ✓"); }
+      else { toast("Não consegui registrar. Abra o Console (F12) e me manda os logs [PUSH]."); }
+    }catch(e){
+      toast("Erro ao registrar: "+(e&&e.message||e));
+    }
     render();
   };
   var ts = document.getElementById("setTestSound");
