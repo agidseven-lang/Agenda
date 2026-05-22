@@ -1986,9 +1986,7 @@
   /* Card no fluxo do cliente — halo lateral mais grosso */
   .tcard.in-client{border-left-width:4px}
   .tcard.in-fase2{border-left-color:var(--c-edicao)}
-  /* Coluna "cliente" tem header diferenciado */
-  .col.cliente{background:linear-gradient(180deg,rgba(176,114,255,.04) 0%,var(--surface) 60%);
-    border-color:rgba(176,114,255,.22)}
+  /* [V63.54] Colunas todas SEM caixa — só header + cards soltos */
   .col.cliente .nm i{background:var(--c-edicao)}
   .col.cliente .col-h .nm{color:var(--c-edicao)}
   .cli-fb-snip{font-size:11.5px;color:var(--c-rev);font-weight:600;margin-top:5px;line-height:1.35;font-style:italic}
@@ -2284,23 +2282,23 @@
   .cv-feedback{background:rgba(255,90,77,.08);border-left:3px solid var(--c-rev);border-radius:10px;
     padding:12px 14px;font-size:13.5px;line-height:1.5;margin-bottom:13px;letter-spacing:-.005em}
   .cv-feedback b{color:var(--c-rev)}
-  /* [V63.51] Botões da visão pública do cliente — HIERARQUIA CLARA:
-     - .ok = primário grande (Aprovar)
-     - .edit = secundário ghost com border (Editar antes de aprovar)
-     - .rev = link/texto discreto (Pedir revisão) */
+  /* [V63.51/V63.53] Botões da visão pública do cliente — TRÊS caixinhas empilhadas:
+     - .ok = primário grande accent (Aprovar)
+     - .edit = secundário ghost com border neutro (Editar antes de aprovar)
+     - .rev = secundário ghost com border vermelho (Pedir revisão) */
   .cv-actions{display:flex;flex-direction:column;gap:8px;margin-top:12px}
   .cv-btn{border:none;border-radius:10px;padding:0 16px;height:42px;
     font-size:14px;font-weight:600;cursor:pointer;letter-spacing:0;font-family:inherit;
-    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;width:100%;
     transition:transform var(--tr-fast),background var(--tr-fast),border-color var(--tr-fast)}
   .cv-btn:active{transform:scale(.98)}
-  .cv-btn.ok{background:var(--accent);color:var(--accent-ink);width:100%}
+  .cv-btn.ok{background:var(--accent);color:var(--accent-ink)}
   .cv-btn.ok:hover{background:var(--accent-deep)}
-  .cv-btn.edit{background:var(--surface);color:var(--ink);border:1px solid var(--line);width:100%}
+  .cv-btn.edit{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
   .cv-btn.edit:hover{background:var(--surface-2);border-color:var(--line-strong)}
-  .cv-btn.rev{background:transparent;color:var(--c-rev);height:34px;font-weight:500;font-size:13px;
-    border:none;align-self:center;padding:0 12px}
-  .cv-btn.rev:hover{color:var(--c-rev-strong)}
+  /* [V63.53] Pedir revisão agora é caixinha igual o Editar, mas com border + texto vermelho discreto */
+  .cv-btn.rev{background:var(--surface);color:var(--c-rev);border:1px solid rgba(248,113,113,.35)}
+  .cv-btn.rev:hover{background:rgba(248,113,113,.06);border-color:rgba(248,113,113,.55);color:var(--c-rev-strong)}
   .cv-btn.cancel{background:var(--surface);color:var(--ink-soft);border:1px solid var(--line)}
   .cv-btn.cancel:hover{background:var(--surface-2);border-color:var(--line-strong);color:var(--ink)}
   .cv-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
@@ -2396,12 +2394,11 @@
   /* [V62.20/V62.23] Cores das 4 colunas da Vista Cliente — diferentes das colunas da Vista Equipe */
   .col.em_analise .col-h .nm{color:var(--c-reuni)}
   .col.em_analise .col-h .nm i{background:var(--c-reuni)}
-  .col.em_analise{box-shadow:inset 4px 0 0 0 rgba(77,159,255,.5)}
+  /* [V63.54] Box-shadow inset removido — colunas não têm caixa */
+  /* (.col.em_analise, .col.aprovado, .col.revisao client-view não recebem mais shadow) */
   .col.aprovado .col-h .nm{color:var(--c-trafego)}
   .col.aprovado .col-h .nm i{background:var(--c-trafego)}
-  .col.aprovado{box-shadow:inset 4px 0 0 0 rgba(54,211,153,.5)}
-  /* Coluna "revisao" e "concluido" já têm cores aplicadas no CSS global das colunas */
-  .board-wrap.client-view .col.revisao{box-shadow:inset 4px 0 0 0 rgba(255,90,77,.5)}
+  /* [V63.54] Box-shadow inset removidos das colunas restantes — sem caixa */
   /* Tab da nav-bar pras colunas da Vista Cliente */
   .bn-tab.em_analise .bn-dot{background:var(--c-reuni)}
   .bn-tab.em_analise.urgent,.bn-tab.em_analise:hover{color:var(--c-reuni)}
@@ -3090,11 +3087,19 @@
   .board-wrap{display:flex;gap:12px;overflow-x:auto;padding:14px 0 8px;scrollbar-width:none;
     scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
   .board-wrap::-webkit-scrollbar{display:none}
-  .col{flex:0 0 86%;max-width:320px;scroll-snap-align:start;background:var(--surface);
-    border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;
-    box-shadow:var(--sh-card)}
-  .col-h{display:flex;align-items:center;justify-content:space-between;margin:0 -2px 12px;
-    padding:4px 6px 12px;border-bottom:1px solid var(--line-soft)}
+  /* [V63.54] Coluna SEM caixa ao redor — só agrupa os cards verticalmente
+     (estilo do desenho do user: cards soltos flutuando) */
+  .col{flex:0 0 86%;max-width:320px;scroll-snap-align:start;background:transparent;
+    border:none;border-radius:0;padding:0;display:flex;flex-direction:column;
+    box-shadow:none}
+  /* [V63.55] Desktop: colunas se expandem pra preencher a tela toda igualmente
+     (estilo dashboard PC, igual o desenho do user). Mobile mantém swipe horizontal. */
+  @media (min-width:768px){
+    .board-wrap{overflow-x:visible;scroll-snap-type:none;padding:14px 0 24px}
+    .col{flex:1 1 0;max-width:none;min-width:0}
+  }
+  .col-h{display:flex;align-items:center;justify-content:space-between;margin:0 0 10px;
+    padding:4px 4px 10px;border-bottom:1px solid var(--line-soft)}
   .col-h .nm{font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;
     letter-spacing:-.008em;color:var(--ink)}
   .col-h .nm i{width:8px;height:8px;border-radius:50%;
@@ -3108,22 +3113,34 @@
   .col.analise .nm i{background:var(--c-edicao)} .col.aprovacao .nm i{background:var(--c-copy)}
   .col.pronto .nm i{background:var(--accent)}
   /* ============================================================
-     [V63.6] CARDS DO BOARD — visual sóbrio, border-left colorida
+     [V63.6/V63.53] CARDS DO BOARD — visual sóbrio
+     Barra colorida na ESQUERDA = cor da COLUNA (status).
+     Estilo aprovado pelo user em V63.53 (visual referência: desenho dele).
      ============================================================ */
   .tcard{position:relative;background:var(--surface);
     border:1px solid var(--line);
-    border-left:3px solid var(--uc,var(--accent));
+    border-left:5px solid var(--col-c,var(--ink-faint));
     border-radius:12px;padding:14px 14px 14px 14px;
     margin-bottom:10px;cursor:pointer;
     box-shadow:0 1px 2px rgba(0,0,0,.25),0 0 0 1px rgba(255,255,255,.025) inset;
     transition:transform var(--tr-fast),border-color var(--tr-fast),background var(--tr-fast),box-shadow var(--tr-base)}
-  .tcard:hover{border-color:var(--line-strong);border-left-color:var(--uc,var(--accent));
+  .tcard:hover{border-color:var(--line-strong);
     background:var(--surface-2);transform:translateY(-1px);
     box-shadow:0 6px 18px -8px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.04) inset}
   .tcard:active{transform:scale(.99)}
+  /* [V63.53] Cor da barra esquerda inerda da .col pai via --col-c */
+  .col.afazer{--col-c:var(--c-outro)}
+  .col.andamento{--col-c:var(--c-foto)}
+  .col.revisao{--col-c:var(--c-reuni)}
+  .col.concluido{--col-c:var(--c-trafego)}
+  .col.cliente{--col-c:var(--c-edicao)}
+  .col.em_analise{--col-c:var(--c-reuni)}
+  .col.aprovado{--col-c:var(--c-trafego)}
+  .col.pronto{--col-c:var(--accent)}
+  .col.analise{--col-c:var(--c-edicao)}
+  .col.aprovacao{--col-c:var(--accent-2)}
   .tcard.late{border-color:rgba(255,90,77,.4)}
-  .tcard.in-client{border-left-width:4px}
-  .tcard.in-fase2{border-left-color:var(--c-edicao)}
+  .tcard.in-client{border-left-width:6px}
 
   /* === Topo: tags da etapa + identificador + avatar === */
   .tc-top{display:flex;align-items:center;gap:6px;margin-bottom:11px;flex-wrap:wrap}
@@ -3152,16 +3169,19 @@
     flex-shrink:0;letter-spacing:.02em;opacity:.85}
   .tc-from .cdot{display:none}
 
-  /* [V63.27/V63.51] Timeline do fluxo do cliente — eventos cronológicos por card */
-  .cv-tl{margin-top:14px;background:transparent;border:1px solid var(--line-soft);
+  /* [V63.27] Timeline do fluxo do cliente — eventos cronológicos por card
+     [V63.53] Texto do evento permite quebra em 2 linhas (não corta mais com ...) */
+  .cv-tl{margin-top:14px;background:rgba(255,255,255,.025);border:1px solid var(--line-soft);
     border-radius:10px;padding:10px 12px}
-  .cv-tl-h{font-size:11px;font-weight:600;color:var(--ink-faint);letter-spacing:.06em;
+  .cv-tl-h{font-size:10.5px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;
     text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:5px}
   .cv-tl-list{display:flex;flex-direction:column;gap:5px}
-  .cv-tl-it{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);line-height:1.4}
-  .cv-tl-ic{font-size:13px;width:18px;text-align:center;flex-shrink:0}
-  .cv-tl-t{flex:1;min-width:0;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .cv-tl-at{font-size:11px;color:var(--ink-faint);font-weight:600;flex-shrink:0;letter-spacing:.02em}
+  .cv-tl-it{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--ink-soft);line-height:1.4}
+  .cv-tl-ic{font-size:13px;width:18px;text-align:center;flex-shrink:0;line-height:1.4}
+  .cv-tl-t{flex:1;min-width:0;font-weight:600;color:var(--ink);
+    /* [V63.53] permite quebra de linha — texto longo aparece inteiro em 2 linhas */
+    overflow-wrap:anywhere;word-wrap:break-word;line-height:1.4}
+  .cv-tl-at{font-size:11px;color:var(--ink-faint);font-weight:600;flex-shrink:0;letter-spacing:.02em;line-height:1.4;padding-top:1px}
 
   /* === Cliente — destaque visual === */
   .tcard .tcli{font-size:10px;font-weight:800;color:var(--accent);
@@ -4323,7 +4343,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.52 · build resp-chip-avatar</div>
+    <div class="ver">versão 63.55 · build kanban-responsive-fit</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
