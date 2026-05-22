@@ -3087,19 +3087,17 @@
   .board-wrap{display:flex;gap:12px;overflow-x:auto;padding:14px 0 8px;scrollbar-width:none;
     scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
   .board-wrap::-webkit-scrollbar{display:none}
-  /* [V63.54] Coluna SEM caixa ao redor — só agrupa os cards verticalmente
-     (estilo do desenho do user: cards soltos flutuando) */
-  .col{flex:0 0 86%;max-width:320px;scroll-snap-align:start;background:transparent;
-    border:none;border-radius:0;padding:0;display:flex;flex-direction:column;
-    box-shadow:none}
-  /* [V63.55] Desktop: colunas se expandem pra preencher a tela toda igualmente
-     (estilo dashboard PC, igual o desenho do user). Mobile mantém swipe horizontal. */
+  /* [V63.56] Quadro de volta ao redor de cada coluna (user pediu o container) */
+  .col{flex:0 0 86%;max-width:320px;scroll-snap-align:start;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;
+    box-shadow:var(--sh-card)}
+  /* [V63.55] Desktop: colunas se expandem pra preencher a tela toda igualmente */
   @media (min-width:768px){
     .board-wrap{overflow-x:visible;scroll-snap-type:none;padding:14px 0 24px}
     .col{flex:1 1 0;max-width:none;min-width:0}
   }
-  .col-h{display:flex;align-items:center;justify-content:space-between;margin:0 0 10px;
-    padding:4px 4px 10px;border-bottom:1px solid var(--line-soft)}
+  .col-h{display:flex;align-items:center;justify-content:space-between;margin:0 -2px 12px;
+    padding:4px 6px 12px;border-bottom:1px solid var(--line-soft)}
   .col-h .nm{font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;
     letter-spacing:-.008em;color:var(--ink)}
   .col-h .nm i{width:8px;height:8px;border-radius:50%;
@@ -4343,7 +4341,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.55 · build kanban-responsive-fit</div>
+    <div class="ver">versão 63.56 · build kanban-with-frame</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 

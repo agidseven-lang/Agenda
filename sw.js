@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.55] Cache bump — kanban responsivo (full-width no PC, swipe no mobile). */
-var CACHE = "idseven-v63-55";
+   [V63.56] Cache bump — kanban com quadro ao redor das colunas (de volta). */
+var CACHE = "idseven-v63-56";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
