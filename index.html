@@ -4341,7 +4341,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.57 · build settings-fixes</div>
+    <div class="ver">versão 63.61 · build close-5-lacunas</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -4640,7 +4640,12 @@ const DEFAULT_PREFS = {
   notifyReminder: true,   /* [V63.11] lembrete antes dos compromissos */
   reminderMinutes: 10,    /* [V63.11] minutos antes do compromisso (5,10,15,30,60) */
   biometricLock: false,   /* trava biométrica ao abrir */
-  density: "comfortable"  /* "compact" | "comfortable" */
+  density: "comfortable", /* "compact" | "comfortable" */
+  /* [V63.60] Prefs das 5 features novas — todas ON por default */
+  notifyClientViewing: true,  /* F3: push em tempo real quando cliente abre o link */
+  wfAutoCascade: true,        /* F1: sucessão automática (Edição+Postagem) quando conteúdo é concluído */
+  showInsights: true,         /* F4: mostrar widget de insights na tela Hoje */
+  showCommDates: true         /* F5: sugestões de datas comemorativas */
 };
 function loadPrefs(){
   try{
@@ -4748,7 +4753,7 @@ function stageLabel(k,sector){
   return "A Fazer";
 }
 /* Mapeia status legados (analise/aprovacao/pronto) para a coluna padrão mais próxima */
-let db=null, me=null, users=[], events=[], tasks=[];
+let db=null, me=null, users=[], events=[], tasks=[], briefs={};
 let alarmTimer=null, alarmSeeded=false, alarmActive=false, audioCtx=null, beepTimer=null, notifAsked=false;
 let boardTimer=null, lateSeeded=false; const notifiedLate=new Set();
 /* [V63.15] PRESENCE — quem está online agora */
@@ -5140,6 +5145,19 @@ var __clientOpenedMark = false;
     /* [V63.29] Inicia subscription dos chats (lista de conversas em tempo real) */
     try{ if(typeof subscribeChats === "function") subscribeChats(); }catch(_){}
   },err=>{});
+  /* [V63.60-F2] BRIEF DO CLIENTE — carrega ficha viva de cada cliente.
+     Schema: { client, niche, tone, keywords[], banned[], cta, hashtags[], colors, notes }
+     doc.id = slug do nome do cliente */
+  try{
+    db.collection("briefs").onSnapshot(function(snap){
+      briefs = {};
+      snap.docs.forEach(function(d){
+        var data = d.data() || {};
+        briefs[d.id] = Object.assign({slug:d.id}, data);
+      });
+      try{ if(!$("mainApp").classList.contains("hidden")) render(); }catch(_){}
+    }, function(){});
+  }catch(e){ console.warn("briefs onSnapshot:",e); }
   /* fallback: se nada carregar (offline), sai da tela de carregando após 6s */
   setTimeout(()=>{ if(!usersLoaded && !me) route(); },6000);
 })();
@@ -7330,11 +7348,19 @@ function renderHoje(){
   var spot = list[0];
   var rest = list.slice(1);
 
+  /* [V63.60-F4/F5] Widgets das features novas — calculados em real-time */
+  var insightsHTML = "";
+  var commDatesHTML = "";
+  try{ insightsHTML = renderInsightsWidget(); }catch(e){ console.warn("insights widget:",e); }
+  try{ commDatesHTML = renderCommDatesWidget(); }catch(e){ console.warn("comm dates widget:",e); }
+
   return '<div class="hj-wrap">'+hero+
     '<div class="hj-spot-label">Próxima ação</div>'+
     renderFocusCard(spot, true)+
     (rest.length ? '<div class="hj-list-label">Depois disso</div>' +
       rest.map(function(x){ return renderFocusCard(x, false); }).join("") : '')+
+    insightsHTML+
+    commDatesHTML+
   '</div>';
 }
 
@@ -7459,7 +7485,13 @@ const SET_ICONS = {
   account: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>',
   security: '<path d="M12 2 4 6v6c0 5 3.5 9.4 8 10 4.5-.6 8-5 8-10V6l-8-4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   notifications: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9zM9.5 19a2.5 2.5 0 0 0 5 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
-  appearance: '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 0 0 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="currentColor"/>'
+  appearance: '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 0 0 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="currentColor"/>',
+  /* [V63.61-L1] Ícone pra nova seção Automação & Inteligência */
+  automation: '<path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>',
+  /* [V63.61-L3] Ícone pra nova seção Clientes (gestão de brief) */
+  clients: '<rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="14" r="1.5" fill="currentColor"/><path d="M12 14h6M12 17h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  /* [V63.61-L4] Ícone pra tela Insights detalhada */
+  insights: '<path d="M3 20h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="5" y="12" width="3.5" height="8" rx="1" stroke="currentColor" stroke-width="2"/><rect x="10.25" y="7" width="3.5" height="13" rx="1" stroke="currentColor" stroke-width="2"/><rect x="15.5" y="9" width="3.5" height="11" rx="1" stroke="currentColor" stroke-width="2"/>'
 };
 
 function renderSettings(){
@@ -7468,6 +7500,12 @@ function renderSettings(){
   if(settingsView === "security")       return renderSettingsSecurity();
   if(settingsView === "notifications")  return renderSettingsNotifications();
   if(settingsView === "appearance")     return renderSettingsAppearance();
+  /* [V63.61-L1] Sub-tela Automação & Inteligência (toggles do workflow/insights/datas) */
+  if(settingsView === "automation")     return renderSettingsAutomation();
+  /* [V63.61-L3] Sub-tela Clientes (gestão centralizada de briefs) */
+  if(settingsView === "clients")        return renderSettingsClients();
+  /* [V63.61-L4] Sub-tela Insights detalhados (analytics completo) */
+  if(settingsView === "insights")       return renderSettingsInsights();
   /* Tela principal — lista de categorias */
   return renderSettingsMain();
 }
@@ -7477,6 +7515,12 @@ function bindSettings(){
   if(settingsView === "account")       return bindSettingsAccount();
   if(settingsView === "security")      return bindSettingsSecurity();
   if(settingsView === "notifications") return bindSettingsNotifications();
+  /* [V63.61-L1] Bind da sub-tela Automação & Inteligência */
+  if(settingsView === "automation")    return bindSettingsAutomation();
+  /* [V63.61-L3] Bind da sub-tela Clientes */
+  if(settingsView === "clients")       return bindSettingsClients();
+  /* [V63.61-L4] Bind da sub-tela Insights */
+  if(settingsView === "insights")      return bindSettingsInsights();
   if(settingsView === "appearance")    return bindSettingsAppearance();
 }
 
@@ -7521,6 +7565,12 @@ function renderSettingsMain(){
       row("security", SET_ICONS.security, "Segurança e Privacidade", "Biometria, sessões e exclusão de conta")+
       row("notifications", SET_ICONS.notifications, "Notificações", "Sons, vibração e tipos de alertas")+
       row("appearance", SET_ICONS.appearance, "Aparência", "Tema, tamanho da fonte e densidade")+
+      /* [V63.61-L1] Nova seção pras 5 features V63.60 */
+      row("automation", SET_ICONS.automation, "Automação & Inteligência", "Sucessão automática de tarefas, insights e datas comemorativas")+
+      /* [V63.61-L3] Aba de gestão centralizada dos clientes e briefs */
+      row("clients", SET_ICONS.clients, "Clientes & Briefs", "Cadastre tom de voz, palavras-chave e referências de cada cliente")+
+      /* [V63.61-L4] Tela de insights detalhados (analytics) */
+      row("insights", SET_ICONS.insights, "Estatísticas & Insights", "Ranking de produtividade, taxa de aprovação por cliente, tempos médios")+
     '</div>'+
     '<div class="set-section">'+
       '<div class="set-section-h">Sobre</div>'+
@@ -7821,6 +7871,8 @@ function renderSettingsNotifications(){
       renderToggleRow("notifyComments", "Comentários e menções", "Avisa quando te mencionam (@) em um card", getPref("notifyComments"))+
       renderToggleRow("notifyApproval", "Aprovações do cliente", "Avisa quando o cliente aprova ou pede revisão", getPref("notifyApproval"))+
       renderToggleRow("notifyLate", "Tarefas atrasadas", "Avisa quando uma tarefa sua passa do prazo", getPref("notifyLate"))+
+      /* [V63.61-L1] Toggle do F3 — Cliente abriu agora (push em tempo real) */
+      renderToggleRow("notifyClientViewing", "Cliente abriu o link agora", "Push em tempo real quando o cliente abre o cronograma — sabe a hora certa de ligar/lembrar", getPref("notifyClientViewing"))+
     '</div>'+
 
     /* [V63.11] Lembretes programados de compromisso */
@@ -7853,7 +7905,7 @@ function renderSettingsNotifications(){
 function bindSettingsNotifications(){
   var bk = document.getElementById("setBack");
   if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
-  ["soundOn","vibrationOn","notifyNewTasks","notifyComments","notifyApproval","notifyLate","notifyNative","notifyReminder"].forEach(function(key){
+  ["soundOn","vibrationOn","notifyNewTasks","notifyComments","notifyApproval","notifyLate","notifyNative","notifyReminder","notifyClientViewing"].forEach(function(key){
     bindToggleRow(key, function(on){
       setPref(key, on);
       /* Se desligou notifyReminder, limpa timers ativos */
@@ -7903,6 +7955,330 @@ function bindSettingsNotifications(){
     try{ beep(); }catch(_){}
     toast("Som tocado ✓");
   };
+}
+
+/* === [V63.61-L1] SUB-PÁGINA: AUTOMAÇÃO & INTELIGÊNCIA ===
+   3 toggles das features V63.60:
+   - wfAutoCascade: Workflow Engine (sucessão automática)
+   - showInsights: Insights na tela Hoje
+   - showCommDates: Datas comemorativas
+   (Toggle de notifyClientViewing fica em Notificações) */
+function renderSettingsAutomation(){
+  return '<div class="settings">'+
+    setHeader("Automação & Inteligência", "Recursos que economizam cliques e antecipam o que vem")+
+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Sucessão automática</div>'+
+      renderToggleRow("wfAutoCascade", "Criar Edição e Postagem automaticamente",
+        "Quando um conteúdo do cronograma é marcado como concluído, o app cria automaticamente 2 cards no Quadro: 1 de Edição de Mídia e 1 de Programação de posts. Economiza dezenas de cliques por mês.",
+        getPref("wfAutoCascade"))+
+    '</div>'+
+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Tela inicial — Hoje</div>'+
+      renderToggleRow("showInsights", "Mostrar Insights",
+        "Cards inteligentes na tela Hoje: conteúdos entregues na semana, taxa de aprovação por cliente, tempo médio de aprovação, quem entrega mais rápido.",
+        getPref("showInsights"))+
+      renderToggleRow("showCommDates", "Mostrar datas comemorativas",
+        "Sugere datas relevantes pros próximos 30 dias com base no nicho do cliente cadastrado no Brief (ex: Dia do Médico pra Dra. Katyanne).",
+        getPref("showCommDates"))+
+    '</div>'+
+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Como funciona o Brief?</div>'+
+      '<div class="set-row" style="border-top:none;padding:14px 16px">'+
+        '<div class="set-row-t">'+
+          '<div class="set-row-l" style="font-size:13px;color:var(--ink-soft);font-weight:500;line-height:1.55">'+
+            'O Brief do Cliente é a <b>ficha viva</b> de cada cliente — tom de voz, palavras-chave, palavras banidas, CTA padrão, hashtags, cores. Abre qualquer card de Cronograma ou Copywriter, e a ficha aparece na lateral. Pra cadastrar pela primeira vez, abre o card e clica em <b>+ Adicionar brief</b>.'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Cliente abriu agora</div>'+
+      '<div class="set-row" style="border-top:none;padding:14px 16px">'+
+        '<div class="set-row-t">'+
+          '<div class="set-row-l" style="font-size:13px;color:var(--ink-soft);font-weight:500;line-height:1.55">'+
+            'Push em tempo real quando o cliente abre o link público do cronograma. O toggle dessa feature está em <b>Notificações → Tipos de notificação → Cliente abriu o link agora</b>.'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function bindSettingsAutomation(){
+  var bk = document.getElementById("setBack");
+  if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
+  /* Bind dos 3 toggles desta sub-tela */
+  ["wfAutoCascade","showInsights","showCommDates"].forEach(function(key){
+    bindToggleRow(key, function(on){
+      setPref(key, on);
+      return true;
+    });
+  });
+}
+
+/* === [V63.61-L3] SUB-PÁGINA: CLIENTES & BRIEFS ===
+   Gestão centralizada de todos os clientes (extraídos das tasks + briefs já cadastrados).
+   Permite ver, editar, criar e excluir briefs sem precisar abrir um card. */
+function renderSettingsClients(){
+  /* Coleta nomes de clientes únicos de TODAS as fontes: tasks + briefs já criados */
+  var clientSet = {};
+  (tasks||[]).forEach(function(t){
+    if(t.client && t.client.trim()) clientSet[t.client.trim()] = true;
+  });
+  /* Brief sem task associada também aparece (caso o user cadastre antes de criar tarefa) */
+  Object.keys(briefs||{}).forEach(function(slug){
+    var b = briefs[slug];
+    if(b && b.client && b.client.trim()) clientSet[b.client.trim()] = true;
+  });
+  var clientList = Object.keys(clientSet).sort();
+
+  /* Stats por cliente */
+  function clientStats(name){
+    var taskCount = (tasks||[]).filter(function(t){ return (t.client||"").trim() === name; }).length;
+    var activeCount = (tasks||[]).filter(function(t){
+      return (t.client||"").trim() === name && t.status !== "concluido";
+    }).length;
+    return {total: taskCount, active: activeCount};
+  }
+
+  function clientRow(name){
+    var b = getBriefByClient(name);
+    var st = clientStats(name);
+    var hasBriefIcon = b ? '<span class="cli-row-bg ok">✓ Brief</span>' : '<span class="cli-row-bg no">+ Sem brief</span>';
+    var nicheLbl = "";
+    if(b && b.niche){
+      var n = BRIEF_NICHES.find(function(x){return x.k === b.niche;});
+      if(n) nicheLbl = ' · ' + n.label;
+    }
+    var meta = st.active + ' tarefa' + (st.active!==1?'s':'') + ' ativa' + (st.active!==1?'s':'');
+    if(st.total > st.active) meta += ' · ' + (st.total - st.active) + ' concluída' + ((st.total-st.active)!==1?'s':'');
+    return '<button class="set-row" data-cli-edit="'+esc(name)+'">'+
+      '<div class="set-row-ic" style="background:rgba(91,108,255,.12);color:var(--accent)">'+
+        '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+      '</div>'+
+      '<div class="set-row-t">'+
+        '<div class="set-row-l">'+esc(name)+' '+hasBriefIcon+'</div>'+
+        '<div class="set-row-d">'+esc(meta + nicheLbl)+'</div>'+
+      '</div>'+
+      '<svg class="set-row-go" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+    '</button>';
+  }
+
+  var listHTML = "";
+  if(clientList.length){
+    listHTML = clientList.map(clientRow).join("");
+  } else {
+    listHTML = '<div class="set-empty" style="text-align:center;padding:24px 16px;color:var(--ink-faint);font-size:13px;line-height:1.5">'+
+      'Você ainda não tem clientes cadastrados.<br>Crie uma tarefa pra um cliente ou use o botão "+ Adicionar cliente novo" acima.'+
+    '</div>';
+  }
+
+  /* Conta quantos têm brief vs total */
+  var withBrief = clientList.filter(function(c){ return !!getBriefByClient(c); }).length;
+  var withoutBrief = clientList.length - withBrief;
+
+  return '<div class="settings">'+
+    setHeader("Clientes & Briefs", "Cadastre tom de voz e referências de cada cliente")+
+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Resumo</div>'+
+      '<div class="cli-stats">'+
+        '<div class="cli-stat"><div class="cli-stat-n">'+clientList.length+'</div><div class="cli-stat-l">cliente'+(clientList.length!==1?'s':'')+'</div></div>'+
+        '<div class="cli-stat ok"><div class="cli-stat-n">'+withBrief+'</div><div class="cli-stat-l">com brief</div></div>'+
+        '<div class="cli-stat warn"><div class="cli-stat-n">'+withoutBrief+'</div><div class="cli-stat-l">sem brief</div></div>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Adicionar cliente novo</div>'+
+      '<div class="set-row" style="border-top:none;padding:12px 14px;background:transparent;border:1px dashed var(--line);gap:10px">'+
+        '<input type="text" id="cliNewName" placeholder="Nome do cliente (ex: Dra. Katyanne)" style="flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:10px 12px;font-size:13.5px;font-family:inherit">'+
+        '<button class="btn btn-primary" id="cliNewAdd" style="white-space:nowrap;padding:10px 14px;font-size:13px">+ Brief</button>'+
+      '</div>'+
+      '<div class="set-row-help" style="font-size:11.5px;color:var(--ink-faint);margin-top:6px;padding-left:4px;line-height:1.4">'+
+        'Use isso pra criar a ficha de um cliente novo antes mesmo de criar a primeira tarefa dele.'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="set-section">'+
+      '<div class="set-section-h">Lista de clientes ('+clientList.length+')</div>'+
+      listHTML+
+    '</div>'+
+  '</div>';
+}
+
+function bindSettingsClients(){
+  var bk = document.getElementById("setBack");
+  if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
+  /* Click em cliente abre editor do brief */
+  document.querySelectorAll("[data-cli-edit]").forEach(function(b){
+    b.onclick = function(){
+      var name = b.getAttribute("data-cli-edit");
+      openBriefEditor(name);
+    };
+  });
+  /* Adicionar cliente novo + abrir editor direto */
+  var addBtn = document.getElementById("cliNewAdd");
+  var nameInp = document.getElementById("cliNewName");
+  if(addBtn && nameInp){
+    function trigger(){
+      var name = (nameInp.value||"").trim();
+      if(!name){ try{ toast("Digite o nome do cliente"); }catch(_){} return; }
+      if(name.length < 2){ try{ toast("Nome muito curto"); }catch(_){} return; }
+      openBriefEditor(name);
+      nameInp.value = "";
+    }
+    addBtn.onclick = trigger;
+    nameInp.onkeydown = function(e){ if(e.key === "Enter") trigger(); };
+  }
+}
+
+/* === [V63.61-L4] SUB-PÁGINA: ESTATÍSTICAS & INSIGHTS ===
+   Análises mais profundas que o widget da tela Hoje. Inclui:
+   - Stats globais (semana atual, mês, total)
+   - Ranking de clientes (volume, taxa de aprovação, revisões)
+   - Ranking de users (velocidade, volume)
+   - Histórico das últimas 4 semanas */
+function renderSettingsInsights(){
+  var s = calculateInsights();
+  /* Stats da semana e mês */
+  var WEEK = 7*24*3600*1000;
+  var MONTH = 30*24*3600*1000;
+  var now = Date.now();
+  var monthDelivered = 0;
+  /* Histórico das últimas 4 semanas */
+  var weeksHist = [0,0,0,0]; /* [-3sem, -2sem, -1sem, atual] */
+  (tasks||[]).forEach(function(t){
+    if(Array.isArray(t.cronWeeks)){
+      t.cronWeeks.forEach(function(c){
+        if(c.cs === "concluido" && c.doneAt){
+          var age = now - c.doneAt;
+          if(age <= MONTH) monthDelivered++;
+          var weekIdx = Math.floor(age / WEEK);
+          if(weekIdx >= 0 && weekIdx < 4){
+            /* weekIdx=0 → atual, 1 → -1sem, ... reverso pra ordem cronológica */
+            weeksHist[3 - weekIdx]++;
+          }
+        }
+      });
+    }
+  });
+  var maxWeek = Math.max.apply(null, weeksHist) || 1;
+
+  /* Top 5 clientes por volume */
+  var clientArr = Object.keys(s.clientStats).map(function(k){
+    return {name:k, stats:s.clientStats[k]};
+  });
+  clientArr.sort(function(a,b){ return b.stats.total - a.stats.total; });
+  var top5Clients = clientArr.slice(0, 5);
+
+  /* Ranking de users por velocidade (min 3 cards) */
+  var usersArr = Object.keys(s.userSpeed).map(function(id){
+    var u = s.userSpeed[id];
+    return {id:id, name:u.name, avg: u.count>0 ? u.totalMs/u.count : 0, count:u.count};
+  }).filter(function(x){ return x.count >= 3; });
+  usersArr.sort(function(a,b){ return a.avg - b.avg; });
+
+  /* Construção do HTML */
+  var html = '<div class="settings">'+
+    setHeader("Estatísticas & Insights", "Análise detalhada do trabalho da equipe");
+
+  /* Stats globais */
+  html += '<div class="set-section">'+
+    '<div class="set-section-h">Resumo geral</div>'+
+    '<div class="ins-grid" style="margin-top:0">'+
+      '<div class="ins-card"><div class="ins-num">'+s.weekDelivered+'</div><div class="ins-lbl">entregues esta semana'+
+        (s.prevWeekDelivered > 0 && s.weekTrendPct !== 0
+          ? ' <span class="ins-trend '+(s.weekTrendPct>0?'ok':'no')+'">'+(s.weekTrendPct>0?'↑':'↓')+' '+Math.abs(s.weekTrendPct)+'%</span>'
+          : ''
+        )+
+      '</div></div>'+
+      '<div class="ins-card"><div class="ins-num">'+monthDelivered+'</div><div class="ins-lbl">entregues no mês</div></div>'+
+      (s.avgApprovalSamples >= 3 ? '<div class="ins-card"><div class="ins-num">'+fmtDurMs(s.avgApprovalMs)+'</div><div class="ins-lbl">tempo médio Cronograma → Aprovação</div></div>' : '')+
+      (s.lateCount > 0 ? '<div class="ins-card warn"><div class="ins-num">'+s.lateCount+'</div><div class="ins-lbl">tarefa'+(s.lateCount>1?'s':'')+' atrasada'+(s.lateCount>1?'s':'')+'</div></div>' : '')+
+    '</div>'+
+  '</div>';
+
+  /* Histórico semanal */
+  if(weeksHist[3] > 0 || weeksHist[2] > 0){
+    var weekLabels = ['-3sem','-2sem','-1sem','Esta semana'];
+    html += '<div class="set-section">'+
+      '<div class="set-section-h">Histórico das últimas 4 semanas</div>'+
+      '<div class="ins-bars">';
+    weeksHist.forEach(function(v, i){
+      var pct = Math.round((v/maxWeek)*100);
+      html += '<div class="ins-bar-row">'+
+        '<div class="ins-bar-l">'+weekLabels[i]+'</div>'+
+        '<div class="ins-bar-track">'+
+          '<div class="ins-bar-fill'+(i===3?' current':'')+'" style="width:'+pct+'%"></div>'+
+        '</div>'+
+        '<div class="ins-bar-v">'+v+'</div>'+
+      '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  /* Top clientes */
+  if(top5Clients.length){
+    html += '<div class="set-section">'+
+      '<div class="set-section-h">Top clientes por volume</div>'+
+      '<div class="ins-rank">';
+    top5Clients.forEach(function(c, i){
+      var rateColor = c.stats.approvalRate >= 80 ? 'var(--c-trafego)' : (c.stats.approvalRate >= 50 ? 'var(--c-foto)' : 'var(--c-rev)');
+      var revisedLbl = c.stats.revised > 0 ? ' · '+c.stats.revised+' rev' : '';
+      html += '<div class="ins-rank-row">'+
+        '<div class="ins-rank-n">'+(i+1)+'</div>'+
+        '<div class="ins-rank-tx">'+
+          '<div class="ins-rank-name">'+esc(c.name)+'</div>'+
+          '<div class="ins-rank-meta">'+c.stats.total+' conteúdo'+(c.stats.total!==1?'s':'')+revisedLbl+'</div>'+
+        '</div>'+
+        '<div class="ins-rank-v" style="color:'+rateColor+'">'+c.stats.approvalRate+'%</div>'+
+      '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  /* Ranking de users */
+  if(usersArr.length){
+    html += '<div class="set-section">'+
+      '<div class="set-section-h">Ranking de velocidade da equipe</div>'+
+      '<div class="ins-rank">';
+    usersArr.slice(0, 8).forEach(function(u, i){
+      var medal = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : (i+1)));
+      html += '<div class="ins-rank-row">'+
+        '<div class="ins-rank-n">'+medal+'</div>'+
+        '<div class="ins-rank-tx">'+
+          '<div class="ins-rank-name">'+esc(u.name||"?")+'</div>'+
+          '<div class="ins-rank-meta">'+u.count+' card'+(u.count!==1?'s':'')+' concluído'+(u.count!==1?'s':'')+'</div>'+
+        '</div>'+
+        '<div class="ins-rank-v">'+fmtDurMs(u.avg)+'</div>'+
+      '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  /* Estado vazio se nada calculado */
+  if(s.weekDelivered === 0 && monthDelivered === 0 && !top5Clients.length){
+    html += '<div class="set-section">'+
+      '<div class="set-empty" style="text-align:center;padding:30px 16px;color:var(--ink-faint);font-size:13px;line-height:1.5">'+
+        '<div style="font-size:32px;margin-bottom:10px;opacity:.5">📊</div>'+
+        'Ainda não há dados suficientes pra calcular insights.<br>'+
+        'Crie tarefas, marque conteúdos como concluídos e volte aqui.'+
+      '</div>'+
+    '</div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function bindSettingsInsights(){
+  var bk = document.getElementById("setBack");
+  if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
 }
 
 /* === SUB-PÁGINA: APARÊNCIA === */
@@ -8861,6 +9237,10 @@ function openContentDetail(tid, idx){
     shareBoxCard += '</div>';
   }
 
+  /* [V63.60-F2] Brief do Cliente — sidebar com ficha viva do cliente do card */
+  var briefHTML = "";
+  try{ briefHTML = renderBriefSidebar(t.client||""); }catch(e){ console.warn("brief sidebar:",e); }
+
   $("ctBody").innerHTML=
     '<div class="cron-view" style="margin-top:0">'+
       '<div class="tt">'+esc(sec.label)+' · '+esc(t.client||"Sem cliente")+'</div>'+
@@ -8870,6 +9250,7 @@ function openContentDetail(tid, idx){
         ((o.d&&o.d.trim())?'<div class="cw-cn" style="margin-top:10px">Descrição / briefing</div><div class="cw-c">'+esc(o.d)+'</div>':'')+
         (lk?'<div class="cw-cn" style="margin-top:10px">Link / anexo</div><div class="cw-lk">'+lk+'</div>':'')+
       '</div>'+
+      briefHTML+
     '</div>'+
     '<div class="fld" style="margin-top:18px"><label>Etapa deste conteúdo</label><div class="stage-row" id="ctStage">'+chips+'</div></div>'+
     clientBox+
@@ -8878,6 +9259,8 @@ function openContentDetail(tid, idx){
     tlHtml+
     cmtHtml;
   $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
+  /* [V63.60-F2] Bind dos botões do brief (Adicionar / Editar) */
+  try{ bindBriefSidebar(); }catch(_){}
   var _md=$("ctMarkDeliver"); if(_md) _md.onclick=()=>markCardDelivered(tid, idx);
   /* [V62.19] Hook do botão "Marcar conteúdo como concluído" (após cliente aprovar legenda) */
   var _mc=$("ctMarkCompleted"); if(_mc) _mc.onclick=()=>markCardDelivered(tid, idx);
@@ -9556,10 +9939,115 @@ async function markCardDelivered(tid, idx){
     arr[idx].history=hist;
     await db.collection("tasks").doc(tid).update({cronWeeks:arr});
     var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
+    /* [V63.60-F1] WORKFLOW ENGINE: quando um conteúdo é concluído, dispara criação automática
+       dos próximos cards (Edição de Mídia + Programação de posts).
+       Defensivo: só se a pref estiver ON, e marca o item como cascadeado pra não duplicar. */
+    try{ cascadeFromCronItem(tid, idx); }catch(e){ console.warn("cascadeFromCronItem:",e); }
     openContentDetail(tid, idx);
     toast("Conteúdo concluído ✓");
   }catch(e){ toast("Não foi possível marcar agora"); }
   finally{ busy=false; }
+}
+
+/* [V63.60-F1] WORKFLOW ENGINE — sucessão automática de tarefas.
+   Quando um item de cronograma é concluído (após aprovar tema E legenda),
+   cria automaticamente 2 cards filhos:
+   - 1 Edição de Mídia (com o tema como título)
+   - 1 Programação de posts (com o tema como título)
+   
+   Defensivo:
+   - Toggle: wfAutoCascade (default ON)
+   - Não duplica: marca item.wfCascaded=true no Firestore
+   - Atribui pro responsável atual da task de cronograma (ou ninguém se não tiver)
+   - Falha silenciosamente sem quebrar o fluxo */
+async function cascadeFromCronItem(tid, idx){
+  try{ if(!getPref("wfAutoCascade", true)) return; }catch(_){ return; }
+  if(!db||!me) return;
+  var t = (tasks||[]).find(function(x){ return x.id === tid; });
+  if(!t) return;
+  var arr = (Array.isArray(t.cronWeeks) ? t.cronWeeks : []).map(cronNorm);
+  var item = arr[idx];
+  if(!item) return;
+  /* Já cascadeado? não duplica */
+  if(item.wfCascaded === true) return;
+  /* Pega o tema (título) — se vazio, usa fallback */
+  var tema = (item.t || "").trim();
+  if(!tema) tema = "Conteúdo " + (idx + 1);
+  /* Cliente herdado da task pai */
+  var client = (t.client || "").trim();
+  /* Responsável herdado (mesma pessoa do cronograma original) */
+  var assignee = (t.assignee || "").trim();
+  /* Prazo: 3 dias a partir de agora pra Edição, 5 dias pra Postagem */
+  function fmtDate(daysAhead){
+    var d = new Date(); d.setDate(d.getDate() + daysAhead);
+    var y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), dd = String(d.getDate()).padStart(2,"0");
+    return y + "-" + m + "-" + dd;
+  }
+  var now = Date.now();
+  /* Tarefa filha 1: Edição de Mídia */
+  var dataEdicao = {
+    client: client,
+    title: tema,
+    sector: "edicao_midia",
+    status: "afazer",
+    assignee: assignee,
+    by: me.id,
+    createdAt: now,
+    startDate: "", startTime: "",
+    dueDate: fmtDate(3), dueTime: "18:00", due: fmtDate(3),
+    link: "",
+    priority: false,
+    checklist: [],
+    /* Metadados de origem — pra futuro: rastreio do workflow */
+    wfParent: tid,
+    wfParentIdx: idx,
+    wfTipo: "cascaded"
+  };
+  /* Tarefa filha 2: Programação de posts */
+  var dataPost = {
+    client: client,
+    title: tema,
+    sector: "postagem",
+    status: "afazer",
+    assignee: assignee,
+    by: me.id,
+    createdAt: now,
+    startDate: "", startTime: "",
+    dueDate: fmtDate(5), dueTime: "10:00", due: fmtDate(5),
+    link: "",
+    priority: false,
+    checklist: [],
+    postIG: true, postFB: false,
+    postedDate: "", postedTime: "", posted: false,
+    wfParent: tid,
+    wfParentIdx: idx,
+    wfTipo: "cascaded"
+  };
+  try{
+    await db.collection("tasks").add(dataEdicao);
+    await db.collection("tasks").add(dataPost);
+    /* Marca o item original como cascadeado pra não duplicar */
+    arr[idx].wfCascaded = true;
+    arr[idx].wfCascadedAt = now;
+    await db.collection("tasks").doc(tid).update({cronWeeks: arr});
+    var lt = tasks.find(function(x){ return x.id === tid; });
+    if(lt) lt.cronWeeks = arr;
+    /* Notifica responsável (se for diferente de mim) que tem 2 cards novos */
+    try{
+      var assUser = (users||[]).find(function(x){ return (x.name||"").trim().toLowerCase() === assignee.toLowerCase(); });
+      if(assUser && assUser.id && assUser.id !== me.id){
+        sendPushToUsers(assUser.id, {
+          title: "⚡ 2 novas tarefas pra você",
+          body: (client ? client + " · " : "") + tema + " (Edição + Postagem)",
+          tag: "wf-cascade-" + tid + "-" + idx
+        });
+      }
+    }catch(_){}
+    toast("⚡ Edição + Postagem criadas automaticamente");
+  }catch(e){
+    console.warn("[cascadeFromCronItem] erro ao criar cards filhos:", e);
+    /* falha silenciosa — não quebra o fluxo principal de "Conteúdo concluído" */
+  }
 }
 
 /* [V62.17] Time edita o tema (após cliente pedir revisão) e RE-ENVIA pro cliente.
@@ -10274,7 +10762,8 @@ function autoMarkOpened(){
   var t=__clientTask; var tok=getClientToken(); if(!t||!db||!tok) return;
   var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
   var changed=false, now=Date.now();
-  arr.forEach(function(c){
+  var newlyOpened=[]; /* [V63.60-F3] itens que estão abrindo AGORA pela primeira vez */
+  arr.forEach(function(c,idx){
     if(c.cs==="enviado"){
       var hasTxt=(c.t&&c.t.trim())||(c.d&&c.d.trim())||(c.l&&c.l.trim());
       if(!hasTxt) return;
@@ -10284,11 +10773,61 @@ function autoMarkOpened(){
       if(hist.length>100) hist=hist.slice(-100);
       c.history=hist;
       changed=true;
+      newlyOpened.push({idx:idx, title:(c.t||"").trim()});
     }
   });
   if(changed){
     db.collection("tasks").doc(t.id).update({cronWeeks:arr}).catch(function(){});
+    /* [V63.60-F3] CLIENTE ABRIU AGORA — dispara push pros responsáveis
+       (toggle: notifyClientViewing — default ON, debounce: 1x por 10min por task) */
+    try{ notifyClientViewing(t, newlyOpened); }catch(e){ console.warn("notifyClientViewing:",e); }
   }
+}
+
+/* [V63.60-F3] Notifica responsáveis quando o cliente abre o link do cronograma.
+   Defensivo: 
+   - Só dispara se a preferência tá ativada (default ON)
+   - Debounce de 10 min por task (não dispara push de novo se cliente abriu de novo logo após)
+   - Falha silenciosamente se algo der errado */
+var _clientViewNotified = {}; /* { taskId: timestamp_ultimo_push } */
+function notifyClientViewing(task, newlyOpened){
+  if(!task||!task.id) return;
+  if(!newlyOpened||!newlyOpened.length) return;
+  /* Preferência global do app (admin pode desabilitar) — default ON */
+  try{ if(!getPref("notifyClientViewing", true)) return; }catch(_){}
+  /* Debounce: se mandou push pra essa task nos últimos 10min, ignora */
+  var last = _clientViewNotified[task.id] || 0;
+  var now = Date.now();
+  if(now - last < 10*60*1000) return;
+  _clientViewNotified[task.id] = now;
+  /* Lista de responsáveis a notificar: assignee da task + todos do array `secrespBy` */
+  var ids = [];
+  try{
+    var t = (tasks||[]).find(function(x){ return x.id === task.id; }) || task;
+    if(t.assignee){
+      var u = (users||[]).find(function(x){ return x.name === t.assignee; });
+      if(u && u.id) ids.push(u.id);
+    }
+    /* Demandador também é notificado (geralmente é quem mandou pro cliente) */
+    if(t.createdBy && ids.indexOf(t.createdBy) < 0) ids.push(t.createdBy);
+  }catch(_){}
+  if(!ids.length) return;
+  var client = (task.client||"").trim() || "Cliente";
+  var title = "👁 " + client + " está vendo agora";
+  var firstTitle = (newlyOpened[0] && newlyOpened[0].title) || "";
+  var body = newlyOpened.length === 1
+    ? (firstTitle ? "Abriu: " + firstTitle : "Abriu o cronograma — pode ser uma boa hora pra ligar/lembrar.")
+    : "Abriu " + newlyOpened.length + " conteúdos do cronograma.";
+  try{
+    sendPushToUsers(ids, {
+      title: title,
+      body: body,
+      tag: "client-viewing-" + task.id,
+      data: { taskId: task.id, kind: "client_viewing" }
+    });
+  }catch(e){ console.warn("sendPushToUsers:",e); }
+  /* Toast local se quem ABRIU o app for um dos responsáveis */
+  try{ if(me && ids.indexOf(me.id) >= 0){ toast("👁 " + client + " está vendo o cronograma agora"); } }catch(_){}
 }
 
 async function clientApprove(idx){
@@ -11200,11 +11739,40 @@ function openTaskDetail(id){
     }
     postHtml+='</div>';
   }
+  /* [V63.61-L5] Badge "Criado a partir de" — se task tem wfParent, mostra origem
+     pra dar contexto pro responsável (sabe de onde o card veio). */
+  var wfLineageHTML = "";
+  if(t.wfParent){
+    try{
+      var parentTask = (tasks||[]).find(function(x){ return x.id === t.wfParent; });
+      if(parentTask){
+        var parentTema = "";
+        if(Array.isArray(parentTask.cronWeeks) && parentTask.cronWeeks[t.wfParentIdx]){
+          parentTema = (parentTask.cronWeeks[t.wfParentIdx].t || "").trim();
+        }
+        var parentLbl = parentTask.title || (SECTORS[parentTask.sector]||{}).label || "Cronograma";
+        var weekLbl = "";
+        if(typeof t.wfParentIdx === "number"){
+          var wk = Math.floor(t.wfParentIdx/3)+1, cn=(t.wfParentIdx%3)+1;
+          weekLbl = " · Sem " + wk + " · #" + cn;
+        }
+        wfLineageHTML = '<div class="wf-lineage" data-wf-parent="'+esc(t.wfParent)+'" data-wf-idx="'+(t.wfParentIdx||0)+'">'+
+          '<div class="wf-lineage-ic">⚡</div>'+
+          '<div class="wf-lineage-tx">'+
+            '<div class="wf-lineage-l">CRIADO AUTOMATICAMENTE'+esc(weekLbl)+'</div>'+
+            '<div class="wf-lineage-v">A partir de "<b>'+esc(parentTema || parentLbl)+'</b>"<span class="wf-lineage-go">→ ver origem</span></div>'+
+          '</div>'+
+        '</div>';
+      }
+    }catch(e){ console.warn("wf lineage:",e); }
+  }
+
   $("taskDetailBody").innerHTML=
     (t.priority?'<div class="od-flag" style="background:rgba(255,176,46,.14);border-color:rgba(255,176,46,.45);color:var(--c-foto)"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>TAREFA PRIORITÁRIA — definida pela coordenação. Tratar com urgência.</span></div>':'')+
     (late?'<div class="od-flag"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>PENDÊNCIA URGENTE — esta tarefa está atrasada. Conclua para liberar as demais.</span></div>':'')+
     '<span class="dt-type" style="background:'+secBg(sec.color)+';color:'+sec.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+sec.color+';display:inline-block"></span>'+esc(sec.label)+'</span>'+
     '<h2 class="dtt">'+(esc(t.title)||"Sem título")+'</h2>'+
+    wfLineageHTML+
     stageChips+
     '<div class="dt-list">'+
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Cliente / Empresa",esc(t.client))+
@@ -11241,6 +11809,19 @@ function openTaskDetail(id){
   $("taskDetailBody").querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>moveTask(id,b.dataset.mv));
   $("taskDetailBody").querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>setCopyState(id,b.dataset.cs));
   $("taskDetailBody").querySelectorAll("[data-rs]").forEach(b=>b.onclick=()=>setRoteiroState(id,b.dataset.rs));
+  /* [V63.61-L5] Click no badge de lineage abre o cronograma pai */
+  var wfBadge = $("taskDetailBody").querySelector(".wf-lineage");
+  if(wfBadge){
+    wfBadge.style.cursor = "pointer";
+    wfBadge.onclick = function(){
+      var pid = this.getAttribute("data-wf-parent");
+      var pidx = parseInt(this.getAttribute("data-wf-idx"),10) || 0;
+      if(pid){
+        try{ closeSheets&&closeSheets(); }catch(_){}
+        try{ openContentDetail(pid, pidx); }catch(e){ console.warn(e); }
+      }
+    };
+  }
   (function(){
     var cms=Array.isArray(t.comments)?t.comments:[];
     function firstName(u){ return ((u&&u.name)||"").trim().split(/\s+/)[0]||""; }
@@ -12116,6 +12697,763 @@ window.addEventListener("appinstalled",function(){deferredPrompt=null;hideInstal
     deferredPrompt=null;hideInstallBar();
   };
   if(isiOS()&&!isStandalone())showInstallBar("ios");
+})();
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║  [V63.60] FEATURES NOVAS — bloco isolado, defensivo, zero impacto    ║
+   ║  no código antigo. Todas as funções aqui são "best-effort":          ║
+   ║  se algo der errado, falha silenciosa e o app continua funcionando.  ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+
+/* ═════════════════ F2: BRIEF DO CLIENTE ═════════════════ */
+
+/* Nichos disponíveis pra cada cliente — usados pra sugerir datas comemorativas (F5) */
+var BRIEF_NICHES = [
+  {k:"medico_geral",     label:"Médico (geral)"},
+  {k:"medico_pediatra",  label:"Médico — Pediatra"},
+  {k:"medico_derma",     label:"Médico — Dermatologista"},
+  {k:"medico_gineco",    label:"Médico — Ginecologista"},
+  {k:"medico_cardio",    label:"Médico — Cardiologista"},
+  {k:"medico_endocrino", label:"Médico — Endocrinologista"},
+  {k:"medico_oftalmo",   label:"Médico — Oftalmologista"},
+  {k:"medico_psiquiatra",label:"Médico — Psiquiatra"},
+  {k:"odonto",           label:"Odontologia"},
+  {k:"psicologo",        label:"Psicólogo(a)"},
+  {k:"nutri",            label:"Nutricionista"},
+  {k:"esteta",           label:"Estética"},
+  {k:"juridico",         label:"Advocacia"},
+  {k:"contabil",         label:"Contabilidade"},
+  {k:"educacao",         label:"Educação"},
+  {k:"varejo",           label:"Varejo / E-commerce"},
+  {k:"food",             label:"Restaurante / Food"},
+  {k:"fitness",          label:"Fitness / Academia"},
+  {k:"outro",            label:"Outro"}
+];
+
+var BRIEF_TONES = [
+  {k:"profissional", label:"Profissional / formal"},
+  {k:"acolhedor",    label:"Acolhedor / próximo"},
+  {k:"jovem",        label:"Jovem / descontraído"},
+  {k:"educativo",    label:"Educativo / didático"},
+  {k:"sofisticado", label:"Sofisticado / premium"},
+  {k:"divertido",   label:"Divertido / leve"}
+];
+
+function slugifyClient(name){
+  if(!name) return "";
+  return String(name).trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")  // tira acentos
+    .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,80);
+}
+
+function getBriefByClient(clientName){
+  if(!clientName) return null;
+  var slug = slugifyClient(clientName);
+  return (briefs && briefs[slug]) || null;
+}
+
+/* Lista de clientes únicos extraída das tasks atuais (pra dropdowns) */
+function listAllClients(){
+  var set = {};
+  (tasks||[]).forEach(function(t){ if(t.client && t.client.trim()) set[t.client.trim()] = true; });
+  return Object.keys(set).sort();
+}
+
+/* Sidebar HTML pra mostrar no detalhe do card (Cronograma/Copywriter).
+   Recebe nome do cliente. Se tem brief, mostra ficha; se não tem, mostra botão pra criar. */
+function renderBriefSidebar(clientName){
+  if(!clientName) return "";
+  var b = getBriefByClient(clientName);
+  var esc = function(s){ return (s==null?"":String(s)).replace(/[<>&"]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c];}); };
+  if(!b){
+    return '<div class="brief-side empty" data-brief-client="'+esc(clientName)+'">'+
+      '<div class="brief-side-h"><span>📋 BRIEF DO CLIENTE</span></div>'+
+      '<div class="brief-side-empty">'+
+        '<div>Sem ficha cadastrada pra <b>'+esc(clientName)+'</b> ainda.</div>'+
+        '<button class="brief-add-btn" data-brief-edit="'+esc(clientName)+'">+ Adicionar brief</button>'+
+      '</div>'+
+    '</div>';
+  }
+  var niche = (BRIEF_NICHES.find(function(n){return n.k===b.niche;})||{}).label || "";
+  var tone = (BRIEF_TONES.find(function(n){return n.k===b.tone;})||{}).label || "";
+  var keywords = Array.isArray(b.keywords) ? b.keywords : [];
+  var banned = Array.isArray(b.banned) ? b.banned : [];
+  var hashtags = Array.isArray(b.hashtags) ? b.hashtags : [];
+  function pill(text, kind){
+    return '<span class="brief-pill brief-pill-'+kind+'">'+esc(text)+'</span>';
+  }
+  var html = '<div class="brief-side" data-brief-client="'+esc(clientName)+'">';
+  html += '<div class="brief-side-h"><span>📋 BRIEF DE '+esc(clientName.toUpperCase())+'</span>'+
+          '<button class="brief-side-edit" data-brief-edit="'+esc(clientName)+'" title="Editar brief">✏</button></div>';
+  if(niche) html += '<div class="brief-row"><span class="brief-lbl">Nicho</span><span class="brief-val">'+esc(niche)+'</span></div>';
+  if(tone) html += '<div class="brief-row"><span class="brief-lbl">Tom de voz</span><span class="brief-val">'+esc(tone)+'</span></div>';
+  if(b.cta) html += '<div class="brief-row"><span class="brief-lbl">CTA padrão</span><span class="brief-val">"'+esc(b.cta)+'"</span></div>';
+  if(keywords.length) html += '<div class="brief-grp"><div class="brief-lbl">✓ Sempre usar</div><div class="brief-pills">'+keywords.map(function(k){return pill(k,"ok");}).join("")+'</div></div>';
+  if(banned.length)   html += '<div class="brief-grp"><div class="brief-lbl">✗ Nunca usar</div><div class="brief-pills">'+banned.map(function(k){return pill(k,"no");}).join("")+'</div></div>';
+  if(hashtags.length) html += '<div class="brief-grp"><div class="brief-lbl"># Hashtags padrão</div><div class="brief-pills">'+hashtags.map(function(k){return pill(k,"tag");}).join("")+'</div></div>';
+  if(b.colors) html += '<div class="brief-row"><span class="brief-lbl">Cores da marca</span><span class="brief-val">'+esc(b.colors)+'</span></div>';
+  if(b.notes) html += '<div class="brief-notes">'+esc(b.notes)+'</div>';
+  html += '</div>';
+  return html;
+}
+
+/* Bind dos botões dentro da sidebar do brief (chamar após inserir HTML) */
+function bindBriefSidebar(){
+  document.querySelectorAll("[data-brief-edit]").forEach(function(b){
+    b.onclick = function(){
+      var clientName = b.getAttribute("data-brief-edit");
+      openBriefEditor(clientName);
+    };
+  });
+}
+
+/* Modal de edição do Brief */
+function openBriefEditor(clientName){
+  if(!clientName){ try{ toast("Cliente sem nome — não dá pra cadastrar brief"); }catch(_){} return; }
+  var b = getBriefByClient(clientName) || {};
+  var esc = function(s){ return (s==null?"":String(s)).replace(/[<>&"]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c];}); };
+  /* Cria overlay + modal */
+  var old = document.getElementById("briefEdOverlay"); if(old) old.remove();
+  var overlay = document.createElement("div");
+  overlay.id = "briefEdOverlay";
+  overlay.className = "brief-overlay";
+  overlay.innerHTML =
+    '<div class="brief-modal" role="dialog">'+
+      '<div class="brief-modal-h">'+
+        '<div class="brief-modal-t">📋 Brief de '+esc(clientName)+'</div>'+
+        '<button class="brief-modal-x" id="briefEdClose" aria-label="Fechar">✕</button>'+
+      '</div>'+
+      '<div class="brief-modal-b">'+
+        '<div class="fld"><label>Nicho do cliente</label>'+
+          '<select id="briefNiche">'+
+            '<option value="">— Escolher —</option>'+
+            BRIEF_NICHES.map(function(n){
+              return '<option value="'+n.k+'"'+(b.niche===n.k?' selected':'')+'>'+esc(n.label)+'</option>';
+            }).join("")+
+          '</select>'+
+          '<div class="fld-help">Usado pelas sugestões de datas comemorativas</div>'+
+        '</div>'+
+        '<div class="fld"><label>Tom de voz</label>'+
+          '<select id="briefTone">'+
+            '<option value="">— Escolher —</option>'+
+            BRIEF_TONES.map(function(n){
+              return '<option value="'+n.k+'"'+(b.tone===n.k?' selected':'')+'>'+esc(n.label)+'</option>';
+            }).join("")+
+          '</select>'+
+        '</div>'+
+        '<div class="fld"><label>Palavras que SEMPRE usar (separadas por vírgula)</label>'+
+          '<input type="text" id="briefKeywords" value="'+esc((b.keywords||[]).join(", "))+'" placeholder="ex: cuidado, prevenção, saúde">'+
+          '<div class="fld-help">A equipe vê essas palavras como referência ao escrever copy</div>'+
+        '</div>'+
+        '<div class="fld"><label>Palavras BANIDAS (separadas por vírgula)</label>'+
+          '<input type="text" id="briefBanned" value="'+esc((b.banned||[]).join(", "))+'" placeholder="ex: barato, milagre, garantido 100%">'+
+          '<div class="fld-help">Termos que NUNCA devem aparecer no conteúdo desse cliente</div>'+
+        '</div>'+
+        '<div class="fld"><label>CTA padrão</label>'+
+          '<input type="text" id="briefCta" value="'+esc(b.cta||"")+'" placeholder="ex: Marque sua consulta pelo WhatsApp">'+
+        '</div>'+
+        '<div class="fld"><label>Hashtags padrão (separadas por espaço)</label>'+
+          '<input type="text" id="briefHashtags" value="'+esc((b.hashtags||[]).join(" "))+'" placeholder="ex: #saude #cuidados #DraKatyanne">'+
+        '</div>'+
+        '<div class="fld"><label>Cores da marca</label>'+
+          '<input type="text" id="briefColors" value="'+esc(b.colors||"")+'" placeholder="ex: #3a8fa8, #ffffff">'+
+        '</div>'+
+        '<div class="fld"><label>Observações</label>'+
+          '<textarea id="briefNotes" rows="3" placeholder="Detalhes importantes do tom de voz, público-alvo, restrições, etc">'+esc(b.notes||"")+'</textarea>'+
+        '</div>'+
+      '</div>'+
+      '<div class="brief-modal-f">'+
+        '<button class="btn btn-ghost" id="briefEdCancel">Cancelar</button>'+
+        (b && b.slug ? '<button class="btn btn-danger" id="briefEdDelete">Excluir brief</button>' : '')+
+        '<button class="btn btn-primary" id="briefEdSave">Salvar brief</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(overlay);
+  /* Binds */
+  function close(){ overlay.remove(); }
+  document.getElementById("briefEdClose").onclick = close;
+  document.getElementById("briefEdCancel").onclick = close;
+  overlay.addEventListener("click", function(e){ if(e.target === overlay) close(); });
+  document.getElementById("briefEdSave").onclick = async function(){
+    var btn = this; btn.disabled = true; btn.textContent = "Salvando…";
+    try{
+      function val(id){ var el=document.getElementById(id); return el?(el.value||"").trim():""; }
+      function arr(s, sep){ return s ? s.split(sep||",").map(function(x){return x.trim();}).filter(Boolean) : []; }
+      var data = {
+        client: clientName,
+        niche: val("briefNiche"),
+        tone: val("briefTone"),
+        keywords: arr(val("briefKeywords"), ","),
+        banned: arr(val("briefBanned"), ","),
+        cta: val("briefCta"),
+        hashtags: arr(val("briefHashtags"), /\s+/),
+        colors: val("briefColors"),
+        notes: val("briefNotes"),
+        updatedAt: Date.now(),
+        updatedBy: me ? me.id : null
+      };
+      var slug = slugifyClient(clientName);
+      if(!db || !slug) throw new Error("DB ou slug inválido");
+      await db.collection("briefs").doc(slug).set(data, {merge:true});
+      try{ toast("Brief salvo ✓"); }catch(_){}
+      close();
+    }catch(e){
+      console.error("[brief save]",e);
+      try{ toast("Erro ao salvar: "+(e.message||e)); }catch(_){}
+      btn.disabled = false; btn.textContent = "Salvar brief";
+    }
+  };
+  var del = document.getElementById("briefEdDelete");
+  if(del) del.onclick = async function(){
+    if(!confirm("Excluir o brief de "+clientName+"? Essa ação não pode ser desfeita.")) return;
+    try{
+      var slug = slugifyClient(clientName);
+      if(db && slug) await db.collection("briefs").doc(slug).delete();
+      try{ toast("Brief excluído"); }catch(_){}
+      close();
+    }catch(e){
+      console.error("[brief delete]",e);
+      try{ toast("Erro: "+(e.message||e)); }catch(_){}
+    }
+  };
+}
+
+/* ═════════════════ F4: INSIGHTS AUTOMÁTICOS ═════════════════ */
+
+/* Calcula insights a partir de tasks + users. Tudo em memória, zero custo de API. */
+function calculateInsights(){
+  var now = Date.now();
+  var WEEK = 7*24*3600*1000;
+  var stats = {
+    weekDelivered: 0,
+    prevWeekDelivered: 0,
+    weekTrendPct: 0,
+    clientStats: {},   // {clientName: {total, approved, revised, approvalRate}}
+    userSpeed: {},     // {userId: {count, avgMs}}
+    avgApprovalMs: 0,
+    avgApprovalSamples: 0,
+    topClient: null,
+    fastestUser: null,
+    lateCount: 0
+  };
+  /* Conta cards concluídos esta semana e semana passada (cronograma items) */
+  (tasks||[]).forEach(function(t){
+    if(Array.isArray(t.cronWeeks)){
+      t.cronWeeks.forEach(function(c){
+        if(c.cs === "concluido" && c.doneAt){
+          var age = now - c.doneAt;
+          if(age <= WEEK) stats.weekDelivered++;
+          else if(age <= 2*WEEK) stats.prevWeekDelivered++;
+        }
+        /* Stats por cliente */
+        var cli = (t.client||"").trim();
+        if(cli){
+          if(!stats.clientStats[cli]) stats.clientStats[cli] = {total:0, approved:0, revised:0, history:[]};
+          stats.clientStats[cli].total++;
+          if(c.cs === "aprovado" || c.cs === "concluido") stats.clientStats[cli].approved++;
+          /* Revisões: items com history contendo "client_revision_requested" */
+          if(Array.isArray(c.history)){
+            var hasRev = c.history.some(function(h){ return h.kind === "client_revision_requested" || h.kind === "client_revision"; });
+            if(hasRev) stats.clientStats[cli].revised++;
+          }
+          /* Tempo cronograma→aprovação */
+          if(c.csAt && t.createdAt && (c.cs === "aprovado" || c.cs === "concluido")){
+            var ms = c.csAt - t.createdAt;
+            if(ms > 0 && ms < 30*24*3600*1000){ /* ignora outliers > 30d */
+              stats.avgApprovalMs += ms;
+              stats.avgApprovalSamples++;
+            }
+          }
+        }
+      });
+    }
+    /* Tasks atrasadas (de mim) */
+    if(typeof isMyTask === "function" && typeof taskLate === "function"){
+      if(isMyTask(t) && taskLate(t)) stats.lateCount++;
+    }
+    /* Velocidade por user — cards não-cronograma concluídos */
+    if(t.status === "concluido" && t.assignee){
+      var u = (users||[]).find(function(x){ return (x.name||"").trim().toLowerCase() === (t.assignee||"").trim().toLowerCase(); });
+      if(u && u.id && t.createdAt && t.updatedAt){
+        var dur = t.updatedAt - t.createdAt;
+        if(dur > 0 && dur < 30*24*3600*1000){
+          if(!stats.userSpeed[u.id]) stats.userSpeed[u.id] = {count:0, totalMs:0, name:u.name};
+          stats.userSpeed[u.id].count++;
+          stats.userSpeed[u.id].totalMs += dur;
+        }
+      }
+    }
+  });
+  /* Pós-processamento */
+  if(stats.avgApprovalSamples > 0) stats.avgApprovalMs = stats.avgApprovalMs / stats.avgApprovalSamples;
+  if(stats.prevWeekDelivered > 0){
+    stats.weekTrendPct = Math.round(((stats.weekDelivered - stats.prevWeekDelivered) / stats.prevWeekDelivered) * 100);
+  }
+  Object.keys(stats.clientStats).forEach(function(cli){
+    var s = stats.clientStats[cli];
+    s.approvalRate = s.total > 0 ? Math.round((s.approved / s.total) * 100) : 0;
+  });
+  /* Top cliente (maior volume) */
+  var clis = Object.keys(stats.clientStats).map(function(k){ return {name:k, s:stats.clientStats[k]}; });
+  clis.sort(function(a,b){ return b.s.total - a.s.total; });
+  stats.topClient = clis[0] || null;
+  /* User mais rápido (média de tempo, mínimo 3 cards) */
+  var us = Object.keys(stats.userSpeed).map(function(id){
+    var u = stats.userSpeed[id];
+    return {id:id, name:u.name, avg: u.count>0 ? u.totalMs/u.count : 0, count:u.count};
+  }).filter(function(x){ return x.count >= 3; });
+  us.sort(function(a,b){ return a.avg - b.avg; });
+  stats.fastestUser = us[0] || null;
+  return stats;
+}
+
+function fmtDurMs(ms){
+  if(!ms || ms < 0) return "—";
+  var min = Math.round(ms / 60000);
+  if(min < 60) return min + "min";
+  var h = Math.round(min / 60 * 10) / 10;
+  if(h < 24) return h + "h";
+  var d = Math.round(h / 24 * 10) / 10;
+  return d + "d";
+}
+
+function renderInsightsWidget(){
+  try{ if(!getPref("showInsights", true)) return ""; }catch(_){ return ""; }
+  if(!tasks || tasks.length === 0) return "";
+  var s = calculateInsights();
+  var esc = function(t){ return (t==null?"":String(t)).replace(/[<>&"]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c];}); };
+  var cards = [];
+  /* Esta semana */
+  if(s.weekDelivered > 0){
+    var trend = "";
+    if(s.weekTrendPct !== 0 && s.prevWeekDelivered > 0){
+      var cls = s.weekTrendPct > 0 ? "ok" : "no";
+      var arrow = s.weekTrendPct > 0 ? "↑" : "↓";
+      trend = ' <span class="ins-trend '+cls+'">'+arrow+' '+Math.abs(s.weekTrendPct)+'%</span>';
+    }
+    cards.push('<div class="ins-card"><div class="ins-num">'+s.weekDelivered+'</div><div class="ins-lbl">conteúdos entregues esta semana'+trend+'</div></div>');
+  }
+  /* Top cliente */
+  if(s.topClient){
+    cards.push('<div class="ins-card"><div class="ins-mini">'+esc(s.topClient.name)+'</div><div class="ins-lbl"><b>'+s.topClient.s.approvalRate+'%</b> taxa de aprovação · '+s.topClient.s.total+' conteúdos</div></div>');
+  }
+  /* Tempo médio cronograma→aprovação */
+  if(s.avgApprovalSamples >= 3){
+    cards.push('<div class="ins-card"><div class="ins-num">'+fmtDurMs(s.avgApprovalMs)+'</div><div class="ins-lbl">tempo médio Cronograma → Aprovação</div></div>');
+  }
+  /* User mais rápido */
+  if(s.fastestUser){
+    cards.push('<div class="ins-card"><div class="ins-mini">'+esc(s.fastestUser.name||"?")+'</div><div class="ins-lbl">é o mais rápido (avg '+fmtDurMs(s.fastestUser.avg)+'/card)</div></div>');
+  }
+  /* Atrasadas (alerta) */
+  if(s.lateCount > 0){
+    cards.push('<div class="ins-card warn"><div class="ins-num">'+s.lateCount+'</div><div class="ins-lbl">tarefa'+(s.lateCount>1?"s":"")+' atrasada'+(s.lateCount>1?"s":"")+'</div></div>');
+  }
+  if(!cards.length) return "";
+  return '<div class="ins-section">'+
+    '<div class="ins-h">📊 Insights</div>'+
+    '<div class="ins-grid">'+cards.join("")+'</div>'+
+  '</div>';
+}
+
+/* ═════════════════ F5: DATAS COMEMORATIVAS ═════════════════ */
+
+/* Base de datas. Formato: MM-DD. niches=["geral"] aparece pra todos, niches=["medico_pediatra"] só pra pediatras.
+   Curado pra agência brasileira de marketing — datas mais usadas. */
+var COMM_DATES = [
+  /* ─────── JANEIRO ─────── */
+  {d:"01-01", name:"Ano Novo", niches:["geral"]},
+  {d:"01-04", name:"Dia Mundial do Braille", niches:["medico_oftalmo","medico_geral","educacao"]},
+  {d:"01-06", name:"Dia de Reis", niches:["geral"]},
+  {d:"01-08", name:"Dia do Fotógrafo", niches:["geral"]},
+  {d:"01-09", name:"Dia do Astronauta", niches:["educacao"]},
+  {d:"01-15", name:"Dia do Adulto", niches:["geral"]},
+  {d:"01-19", name:"Dia do Farmacêutico", niches:["medico_geral"]},
+  {d:"01-20", name:"Dia do Farmacêutico", niches:["medico_geral"]},
+  {d:"01-24", name:"Dia da Pizza", niches:["food"]},
+  {d:"01-25", name:"Aniversário de São Paulo", niches:["geral"]},
+  {d:"01-27", name:"Dia do Holocausto", niches:["geral","educacao"]},
+  {d:"01-30", name:"Dia da Saudade", niches:["geral"]},
+  {d:"01-31", name:"Dia do Mágico", niches:["geral"]},
+
+  /* ─────── FEVEREIRO ─────── */
+  {d:"02-04", name:"Dia Mundial do Câncer", niches:["medico_geral","medico_gineco","medico_derma"]},
+  {d:"02-09", name:"Dia do Odontólogo", niches:["odonto"]},
+  {d:"02-14", name:"Dia dos Namorados (Valentine's)", niches:["geral","esteta","food","varejo","odonto"]},
+  {d:"02-17", name:"Dia Mundial do Espontâneo", niches:["geral"]},
+  {d:"02-18", name:"Dia Nacional do Esporte", niches:["fitness"]},
+  {d:"02-21", name:"Dia da Língua Materna", niches:["educacao"]},
+  {d:"02-27", name:"Dia do Livro Didático", niches:["educacao"]},
+
+  /* ─────── MARÇO ─────── */
+  {d:"03-08", name:"Dia Internacional da Mulher", niches:["geral","medico_geral","medico_gineco","medico_derma","esteta","odonto","fitness","food","varejo"]},
+  {d:"03-12", name:"Dia do Bibliotecário", niches:["educacao"]},
+  {d:"03-15", name:"Dia Mundial do Consumidor", niches:["varejo","juridico"]},
+  {d:"03-19", name:"Dia do Marceneiro", niches:["geral"]},
+  {d:"03-21", name:"Dia Mundial da Síndrome de Down", niches:["medico_pediatra","educacao","psicologo"]},
+  {d:"03-22", name:"Dia Mundial da Água", niches:["geral","medico_geral","nutri"]},
+  {d:"03-24", name:"Dia Mundial da Tuberculose", niches:["medico_geral"]},
+  {d:"03-26", name:"Dia do Cacau", niches:["food"]},
+  {d:"03-27", name:"Dia do Circo · Dia da Páscoa", niches:["geral","educacao"]},
+
+  /* ─────── ABRIL ─────── */
+  {d:"04-01", name:"Dia da Mentira", niches:["geral"]},
+  {d:"04-02", name:"Dia Mundial Conscientização Autismo", niches:["medico_pediatra","psicologo","educacao","medico_psiquiatra"]},
+  {d:"04-04", name:"Dia Internacional do Rato", niches:["geral"]},
+  {d:"04-07", name:"Dia Mundial da Saúde", niches:["medico_geral","medico_pediatra","medico_derma","medico_gineco","medico_cardio","medico_endocrino","medico_oftalmo","medico_psiquiatra","odonto","nutri","psicologo","fitness"]},
+  {d:"04-08", name:"Dia Mundial Romani · Dia do Médico Legista", niches:["medico_geral"]},
+  {d:"04-11", name:"Dia Nacional do Parkinson", niches:["medico_geral","medico_psiquiatra"]},
+  {d:"04-13", name:"Dia do Beijo", niches:["geral","odonto","esteta"]},
+  {d:"04-15", name:"Dia da Conservação do Solo", niches:["geral"]},
+  {d:"04-19", name:"Dia do Índio", niches:["geral","educacao"]},
+  {d:"04-21", name:"Tiradentes", niches:["geral"]},
+  {d:"04-22", name:"Dia da Terra · Descobrimento do Brasil", niches:["geral","educacao"]},
+  {d:"04-25", name:"Dia Mundial da Malária", niches:["medico_geral"]},
+  {d:"04-26", name:"Dia Nacional da Prevenção e Combate à Hipertensão", niches:["medico_cardio","medico_geral","nutri"]},
+  {d:"04-28", name:"Dia da Educação", niches:["educacao"]},
+
+  /* ─────── MAIO ─────── */
+  {d:"05-01", name:"Dia do Trabalhador", niches:["geral"]},
+  {d:"05-03", name:"Dia Mundial da Liberdade de Imprensa", niches:["geral"]},
+  {d:"05-05", name:"Dia Mundial da Higiene das Mãos", niches:["medico_geral","odonto"]},
+  {d:"05-08", name:"Dia Mundial da Cruz Vermelha · Dia da Talassemia", niches:["medico_geral"]},
+  {d:"05-10", name:"Dia das Mães (2º dom)", niches:["geral","medico_gineco","medico_pediatra","esteta","odonto","food","varejo","fitness"], movable:true},
+  {d:"05-12", name:"Dia da Enfermagem · Dia da Fibromialgia", niches:["medico_geral","medico_psiquiatra"]},
+  {d:"05-13", name:"Dia da Abolição da Escravatura", niches:["geral","educacao"]},
+  {d:"05-15", name:"Dia Internacional da Família", niches:["geral","medico_pediatra","psicologo"]},
+  {d:"05-17", name:"Dia Mundial da Hipertensão", niches:["medico_geral","medico_cardio","nutri"]},
+  {d:"05-18", name:"Dia Mundial dos Museus", niches:["educacao"]},
+  {d:"05-25", name:"Dia Mundial da Tireoide", niches:["medico_endocrino","medico_geral","nutri"]},
+  {d:"05-28", name:"Dia Mundial da Nutrição · Saúde da Mulher", niches:["nutri","medico_gineco","medico_geral"]},
+  {d:"05-29", name:"Dia Mundial da Saúde Digestiva", niches:["medico_geral","nutri"]},
+  {d:"05-31", name:"Dia Mundial sem Tabaco", niches:["medico_geral","medico_cardio","psicologo"]},
+
+  /* ─────── JUNHO ─────── */
+  {d:"06-01", name:"Dia Internacional da Criança", niches:["medico_pediatra","odonto","educacao","varejo"]},
+  {d:"06-05", name:"Dia Mundial do Meio Ambiente", niches:["geral","educacao"]},
+  {d:"06-08", name:"Dia Mundial dos Oceanos", niches:["geral"]},
+  {d:"06-12", name:"Dia dos Namorados (Brasil)", niches:["geral","esteta","food","varejo","odonto","fitness"]},
+  {d:"06-14", name:"Dia Mundial do Doador de Sangue", niches:["medico_geral"]},
+  {d:"06-15", name:"Dia Mundial Conscientização Violência contra Idoso", niches:["medico_geral","psicologo"]},
+  {d:"06-18", name:"Dia do Orgulho Autista", niches:["medico_pediatra","psicologo","educacao"]},
+  {d:"06-21", name:"Dia Internacional do Yoga · Início Inverno", niches:["fitness","psicologo"]},
+  {d:"06-24", name:"São João", niches:["geral","food"]},
+  {d:"06-25", name:"Dia do Imigrante", niches:["geral"]},
+  {d:"06-26", name:"Dia Internacional Contra Drogas", niches:["psicologo","medico_psiquiatra","educacao"]},
+
+  /* ─────── JULHO ─────── */
+  {d:"07-01", name:"Dia do Bombeiro Brasileiro", niches:["geral"]},
+  {d:"07-02", name:"Dia do Hospital", niches:["medico_geral"]},
+  {d:"07-08", name:"Dia do Cirurgião · Dia do Panificador", niches:["medico_geral","food"]},
+  {d:"07-11", name:"Dia Mundial da População", niches:["geral"]},
+  {d:"07-13", name:"Dia Mundial do Rock", niches:["geral"]},
+  {d:"07-14", name:"Dia Mundial da Liberdade do Pensamento", niches:["psicologo","educacao"]},
+  {d:"07-20", name:"Dia do Amigo", niches:["geral","psicologo"]},
+  {d:"07-25", name:"Dia da Mulher Negra · Dia do Colono", niches:["geral","educacao"]},
+  {d:"07-26", name:"Dia dos Avós", niches:["geral","medico_geral","medico_cardio","food"]},
+  {d:"07-27", name:"Dia do Otorrinolaringologista", niches:["medico_geral"]},
+  {d:"07-28", name:"Dia Mundial da Hepatite", niches:["medico_geral"]},
+
+  /* ─────── AGOSTO ─────── */
+  {d:"08-01", name:"Início Agosto Dourado (amamentação)", niches:["medico_pediatra","medico_gineco","nutri"]},
+  {d:"08-07", name:"Dia Internacional da Amamentação", niches:["medico_pediatra","medico_gineco","nutri"]},
+  {d:"08-08", name:"Dia Internacional do Gato", niches:["geral"]},
+  {d:"08-09", name:"Dia dos Pais (2º dom)", niches:["geral","medico_pediatra","esteta","odonto","food","varejo","fitness"], movable:true},
+  {d:"08-11", name:"Dia do Advogado · Dia do Estudante", niches:["juridico","educacao"]},
+  {d:"08-13", name:"Dia Internacional da Esquerda e do Pediatra", niches:["medico_pediatra"]},
+  {d:"08-15", name:"Dia da Informática · Dia dos Solteiros", niches:["geral"]},
+  {d:"08-19", name:"Dia Mundial da Fotografia", niches:["geral"]},
+  {d:"08-22", name:"Dia do Folclore", niches:["educacao"]},
+  {d:"08-25", name:"Dia do Nutricionista · Dia do Soldado", niches:["nutri"]},
+  {d:"08-27", name:"Dia do Psicólogo", niches:["psicologo"]},
+  {d:"08-28", name:"Dia da Avicultura · Dia do Bancário", niches:["geral"]},
+  {d:"08-29", name:"Dia Nacional Combate ao Fumo", niches:["medico_geral","medico_cardio","psicologo"]},
+
+  /* ─────── SETEMBRO ─────── */
+  {d:"09-05", name:"Dia da Amazônia", niches:["geral","educacao"]},
+  {d:"09-07", name:"Independência do Brasil", niches:["geral"]},
+  {d:"09-08", name:"Dia da Fisioterapeuta · Dia Mundial da Alfabetização", niches:["fitness","educacao"]},
+  {d:"09-10", name:"Setembro Amarelo · Prevenção ao Suicídio", niches:["psicologo","medico_psiquiatra","medico_geral","educacao"]},
+  {d:"09-12", name:"Dia Nacional da Pessoa com Asma", niches:["medico_geral","medico_pediatra"]},
+  {d:"09-15", name:"Dia Internacional da Democracia", niches:["juridico","educacao"]},
+  {d:"09-16", name:"Dia da Camada de Ozônio", niches:["geral"]},
+  {d:"09-19", name:"Dia do Ortopedista", niches:["medico_geral","fitness"]},
+  {d:"09-21", name:"Dia da Árvore · Dia Mundial do Alzheimer", niches:["geral","medico_geral","medico_psiquiatra"]},
+  {d:"09-22", name:"Dia Mundial sem Carro", niches:["geral"]},
+  {d:"09-25", name:"Dia do Trânsito", niches:["geral"]},
+  {d:"09-27", name:"Dia Mundial do Turismo", niches:["varejo","food"]},
+  {d:"09-28", name:"Dia Nacional do Idoso · Dia Mundial Direito de Saber", niches:["medico_geral","medico_cardio","psicologo"]},
+  {d:"09-29", name:"Dia Mundial do Coração", niches:["medico_cardio","medico_geral","fitness","nutri"]},
+  {d:"09-30", name:"Dia da Secretária", niches:["geral"]},
+
+  /* ─────── OUTUBRO ─────── */
+  {d:"10-01", name:"Início Outubro Rosa · Dia Internacional do Idoso", niches:["medico_gineco","medico_geral","esteta","fitness"]},
+  {d:"10-03", name:"Dia do Dentista", niches:["odonto"]},
+  {d:"10-04", name:"Dia Mundial dos Animais", niches:["geral"]},
+  {d:"10-05", name:"Dia das Aves · Dia do Professor (oficial mundial)", niches:["educacao"]},
+  {d:"10-08", name:"Dia do Nordestino", niches:["geral"]},
+  {d:"10-10", name:"Dia Mundial da Saúde Mental", niches:["psicologo","medico_psiquiatra","educacao","medico_geral"]},
+  {d:"10-12", name:"Dia das Crianças · Padroeira do Brasil", niches:["geral","medico_pediatra","odonto","educacao","food","varejo","esteta"]},
+  {d:"10-13", name:"Dia do Fisioterapeuta", niches:["fitness","medico_geral"]},
+  {d:"10-15", name:"Dia do Professor", niches:["educacao"]},
+  {d:"10-16", name:"Dia Mundial da Alimentação · Dia do Anestesiologista", niches:["nutri","medico_geral","food"]},
+  {d:"10-18", name:"Dia do Médico", niches:["medico_geral","medico_pediatra","medico_derma","medico_gineco","medico_cardio","medico_endocrino","medico_oftalmo","medico_psiquiatra"]},
+  {d:"10-20", name:"Dia do Profissional de Marketing", niches:["geral"]},
+  {d:"10-23", name:"Dia do Aviador", niches:["geral"]},
+  {d:"10-25", name:"Dia do Dentista (BR)", niches:["odonto"]},
+  {d:"10-27", name:"Dia do Cirurgião Dentista", niches:["odonto"]},
+  {d:"10-28", name:"Dia do Servidor Público", niches:["geral","juridico"]},
+  {d:"10-29", name:"Dia Mundial do AVC · Dia Nacional da Visão", niches:["medico_geral","medico_cardio","medico_oftalmo"]},
+  {d:"10-31", name:"Halloween · Dia das Bruxas · Dia da Poupança", niches:["geral","food","varejo","esteta"]},
+
+  /* ─────── NOVEMBRO ─────── */
+  {d:"11-01", name:"Início Novembro Azul (saúde do homem)", niches:["medico_geral","medico_cardio","medico_endocrino"]},
+  {d:"11-02", name:"Dia de Finados", niches:["geral"]},
+  {d:"11-04", name:"Dia do Inventor", niches:["geral"]},
+  {d:"11-08", name:"Dia do Radialista · Dia Internacional do Urbanismo", niches:["geral"]},
+  {d:"11-10", name:"Dia Mundial da Ciência pela Paz", niches:["educacao"]},
+  {d:"11-12", name:"Dia do Diretor de Escola", niches:["educacao"]},
+  {d:"11-14", name:"Dia Mundial do Diabetes", niches:["medico_geral","medico_endocrino","nutri"]},
+  {d:"11-15", name:"Proclamação da República", niches:["geral"]},
+  {d:"11-17", name:"Dia da Criatividade", niches:["geral","educacao"]},
+  {d:"11-19", name:"Dia da Bandeira · Dia Internacional do Homem", niches:["geral","medico_geral"]},
+  {d:"11-20", name:"Dia da Consciência Negra", niches:["geral","educacao"]},
+  {d:"11-21", name:"Dia da Saudação", niches:["geral"]},
+  {d:"11-25", name:"Dia Internacional Não-Violência contra Mulher · Black Friday (4ª sex)", niches:["geral","varejo","esteta","odonto","fitness","food","juridico"], movable:true},
+  {d:"11-27", name:"Dia do Câncer de Mama (consciência)", niches:["medico_gineco","medico_geral"]},
+  {d:"11-30", name:"Dia Mundial da AIDS (próximo)", niches:["medico_geral"]},
+
+  /* ─────── DEZEMBRO ─────── */
+  {d:"12-01", name:"Dia Mundial Combate à AIDS", niches:["medico_geral","educacao"]},
+  {d:"12-04", name:"Dia do Dermatologista · Dia do Orientador Educacional", niches:["medico_derma","educacao"]},
+  {d:"12-05", name:"Dia do Voluntário", niches:["geral"]},
+  {d:"12-08", name:"Dia da Família · Dia da Justiça", niches:["geral","juridico"]},
+  {d:"12-10", name:"Dia dos Direitos Humanos · Dia do Palhaço", niches:["juridico","educacao"]},
+  {d:"12-13", name:"Santa Luzia · Dia do Cego", niches:["medico_oftalmo"]},
+  {d:"12-14", name:"Dia do Engenheiro · Dia do Cinegrafista", niches:["geral"]},
+  {d:"12-15", name:"Dia do Esperanto", niches:["educacao"]},
+  {d:"12-22", name:"Início do Verão · Dia do Fagote", niches:["geral","fitness","esteta"]},
+  {d:"12-23", name:"Dia do Vizinho", niches:["geral"]},
+  {d:"12-24", name:"Véspera de Natal", niches:["geral","food","varejo"]},
+  {d:"12-25", name:"Natal", niches:["geral","food","varejo","esteta"]},
+  {d:"12-31", name:"Réveillon / Virada do Ano", niches:["geral","food","varejo","esteta","fitness"]},
+
+  /* ─────── DATAS EXTRAS DE SAÚDE (cobertura mensal) ─────── */
+  {d:"01-12", name:"Dia Nacional do Esclarecimento sobre Hanseníase", niches:["medico_geral","medico_derma"]},
+  {d:"01-17", name:"Dia Mundial do Riso", niches:["psicologo","geral"]},
+  {d:"01-26", name:"Dia Mundial das Energias Limpas", niches:["geral"]},
+  {d:"01-31", name:"Dia Mundial do Mágico", niches:["geral","educacao"]},
+  {d:"02-04", name:"Dia Mundial Contra o Câncer", niches:["medico_geral","medico_gineco","medico_derma","nutri"]},
+  {d:"02-11", name:"Dia Mundial do Enfermo", niches:["medico_geral","psicologo"]},
+  {d:"02-13", name:"Dia Mundial do Rádio", niches:["geral"]},
+  {d:"02-22", name:"Dia da Reflexão", niches:["geral","psicologo"]},
+  {d:"02-28", name:"Dia Internacional das Doenças Raras", niches:["medico_geral","medico_pediatra"]},
+  {d:"03-01", name:"Dia Internacional do Combate à Discriminação", niches:["psicologo","educacao","juridico"]},
+  {d:"03-13", name:"Dia Mundial do Glaucoma", niches:["medico_oftalmo"]},
+  {d:"03-17", name:"Dia do Patrimônio Cultural", niches:["geral","educacao"]},
+  {d:"03-20", name:"Dia Internacional da Felicidade", niches:["psicologo","geral","esteta"]},
+  {d:"03-26", name:"Dia Mundial da Epilepsia", niches:["medico_geral","medico_psiquiatra"]},
+  {d:"04-10", name:"Dia da Saúde Mental do Trabalhador", niches:["psicologo","medico_psiquiatra"]},
+  {d:"04-13", name:"Dia do Hino Nacional · Dia do Beijo", niches:["geral","odonto"]},
+  {d:"04-17", name:"Dia Mundial da Hemofilia", niches:["medico_geral"]},
+  {d:"04-26", name:"Dia da Visibilidade Lésbica", niches:["psicologo","geral"]},
+  {d:"05-05", name:"Dia Mundial do Asma", niches:["medico_geral","medico_pediatra"]},
+  {d:"05-19", name:"Dia Mundial Combate à Hepatite", niches:["medico_geral"]},
+  {d:"05-21", name:"Dia da Diversidade Cultural", niches:["educacao","geral"]},
+  {d:"05-26", name:"Dia Nacional de Combate ao Glaucoma", niches:["medico_oftalmo"]},
+  {d:"06-04", name:"Dia Mundial Combate à Erosão", niches:["geral"]},
+  {d:"06-10", name:"Dia Mundial do Olho Seco · Dia da Língua Portuguesa", niches:["medico_oftalmo","educacao"]},
+  {d:"06-17", name:"Dia Mundial Combate à Desertificação", niches:["geral"]},
+  {d:"06-23", name:"Dia Olímpico", niches:["fitness","educacao"]},
+  {d:"06-27", name:"Dia Internacional do Diabetes", niches:["medico_endocrino","nutri","medico_geral"]},
+  {d:"07-02", name:"Dia Mundial do Esporte", niches:["fitness"]},
+  {d:"07-22", name:"Dia Mundial do Cérebro", niches:["medico_geral","medico_psiquiatra","psicologo"]},
+  {d:"07-26", name:"Dia da Vovó · Dia dos Avós", niches:["geral","food","medico_geral"]},
+  {d:"07-29", name:"Dia Nacional Combate ao Câncer", niches:["medico_geral","medico_gineco","medico_derma"]},
+  {d:"08-01", name:"Início Agosto Dourado", niches:["medico_pediatra","medico_gineco","nutri"]},
+  {d:"08-12", name:"Dia da Juventude · Dia Internacional", niches:["geral","educacao"]},
+  {d:"08-20", name:"Dia do Maçom · Dia Mundial do Mosquito", niches:["medico_geral"]},
+  {d:"08-26", name:"Dia Mundial da Cárie", niches:["odonto","medico_pediatra"]},
+  {d:"09-03", name:"Dia do Biólogo", niches:["educacao"]},
+  {d:"09-14", name:"Dia Internacional do Direito de Saber", niches:["juridico"]},
+  {d:"09-17", name:"Dia Mundial da Segurança do Paciente", niches:["medico_geral"]},
+  {d:"09-26", name:"Dia Mundial do Surdo · Dia Nacional do Surdo", niches:["medico_geral","educacao"]},
+  {d:"10-09", name:"Dia Nacional Combate ao Câncer Bucal", niches:["odonto","medico_geral"]},
+  {d:"10-11", name:"Dia da Menina (Internacional)", niches:["medico_pediatra","medico_gineco","educacao"]},
+  {d:"10-17", name:"Dia Internacional pela Erradicação da Pobreza", niches:["geral"]},
+  {d:"10-19", name:"Dia Nacional da Prevenção ao Câncer de Mama", niches:["medico_gineco","medico_geral","esteta"]},
+  {d:"11-06", name:"Dia da Radiologia", niches:["medico_geral"]},
+  {d:"11-13", name:"Dia Mundial da Gentileza", niches:["psicologo","geral","educacao"]},
+  {d:"11-23", name:"Dia do Livro", niches:["educacao"]},
+  {d:"12-03", name:"Dia Internacional Pessoa com Deficiência", niches:["medico_geral","educacao","psicologo"]},
+  {d:"12-09", name:"Dia Internacional Combate à Corrupção", niches:["juridico"]}
+];
+
+/* Retorna datas próximas (próximos N dias) pra clientes com brief.niche.
+   Resultado: [{date: Date, name, client, daysAhead}]  */
+function getUpcomingCommDates(daysAhead){
+  daysAhead = daysAhead || 30;
+  if(!briefs || !Object.keys(briefs).length) return [];
+  var now = new Date(); now.setHours(0,0,0,0);
+  var horizon = new Date(now.getTime() + daysAhead*24*3600*1000);
+  var year = now.getFullYear();
+  var results = [];
+  /* Pra cada cliente com brief */
+  Object.keys(briefs).forEach(function(slug){
+    var b = briefs[slug];
+    if(!b || !b.niche) return;
+    var clientNiche = b.niche;
+    /* Procura datas que combinam com o nicho do cliente */
+    COMM_DATES.forEach(function(cd){
+      var matches = (cd.niches||[]).some(function(n){
+        return n === "geral" || n === clientNiche || (
+          /* qualquer médico: se cliente é "medico_X", aceita datas com nicho "medico_geral" */
+          clientNiche.indexOf("medico_") === 0 && cd.niches.indexOf("medico_geral") >= 0
+        );
+      });
+      if(!matches) return;
+      /* Parseia MM-DD pro ano atual */
+      var parts = cd.d.split("-");
+      if(parts.length !== 2) return;
+      var dt = new Date(year, parseInt(parts[0],10)-1, parseInt(parts[1],10), 0,0,0,0);
+      /* Se já passou no ano atual, considera próximo ano */
+      if(dt < now) dt = new Date(year+1, parseInt(parts[0],10)-1, parseInt(parts[1],10));
+      if(dt > horizon) return;
+      var daysAheadCalc = Math.ceil((dt - now) / (24*3600*1000));
+      results.push({
+        date: dt,
+        name: cd.name,
+        client: b.client || slug,
+        clientSlug: slug,
+        daysAhead: daysAheadCalc
+      });
+    });
+  });
+  results.sort(function(a,b){ return a.date - b.date; });
+  return results;
+}
+
+function renderCommDatesWidget(){
+  try{ if(!getPref("showCommDates", true)) return ""; }catch(_){ return ""; }
+  var dates = getUpcomingCommDates(30);
+  if(!dates.length) return "";
+  var esc = function(t){ return (t==null?"":String(t)).replace(/[<>&"]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c];}); };
+  var items = dates.slice(0, 5).map(function(x){
+    var prefix = x.daysAhead === 0 ? "HOJE" : (x.daysAhead === 1 ? "Amanhã" : "Falta " + x.daysAhead + "d");
+    return '<div class="cd-item">'+
+      '<div class="cd-when">'+esc(prefix)+'</div>'+
+      '<div class="cd-info">'+
+        '<div class="cd-name">'+esc(x.name)+'</div>'+
+        '<div class="cd-client">→ '+esc(x.client)+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join("");
+  return '<div class="cd-section">'+
+    '<div class="cd-h">🎯 Datas próximas (30d)</div>'+
+    items+
+  '</div>';
+}
+
+/* ═════════════════ ESTILOS DAS NOVAS FEATURES ═════════════════ */
+(function injectV63_60Styles(){
+  var css = '\
+  /* Brief sidebar */\
+  .brief-side{background:rgba(91,108,255,.04);border:1px solid rgba(91,108,255,.18);border-radius:12px;padding:14px;margin-top:14px;font-size:13px}\
+  .brief-side.empty{background:transparent;border:1px dashed var(--line)}\
+  .brief-side-h{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;font-weight:800;color:var(--accent);letter-spacing:.06em;margin-bottom:10px}\
+  .brief-side-h span{flex:1}\
+  .brief-side-edit{background:transparent;border:none;color:var(--ink-faint);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px}\
+  .brief-side-edit:hover{background:var(--surface-2);color:var(--ink)}\
+  .brief-row{display:flex;gap:8px;align-items:baseline;margin-bottom:6px;line-height:1.4;flex-wrap:wrap}\
+  .brief-lbl{font-size:10.5px;font-weight:700;color:var(--ink-faint);letter-spacing:.04em;text-transform:uppercase;min-width:90px}\
+  .brief-val{color:var(--ink);font-weight:500}\
+  .brief-grp{margin-top:10px}\
+  .brief-grp .brief-lbl{display:block;margin-bottom:6px}\
+  .brief-pills{display:flex;flex-wrap:wrap;gap:5px}\
+  .brief-pill{display:inline-flex;font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:6px;letter-spacing:0}\
+  .brief-pill-ok{background:rgba(52,211,153,.12);color:var(--c-trafego);border:1px solid rgba(52,211,153,.3)}\
+  .brief-pill-no{background:rgba(248,113,113,.1);color:var(--c-rev);border:1px solid rgba(248,113,113,.3);text-decoration:line-through}\
+  .brief-pill-tag{background:rgba(91,108,255,.1);color:var(--accent);border:1px solid rgba(91,108,255,.3)}\
+  .brief-notes{margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft);font-size:12px;color:var(--ink-soft);line-height:1.5;font-style:italic}\
+  .brief-side-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0;color:var(--ink-soft);font-size:13px;text-align:center}\
+  .brief-add-btn{background:var(--accent);color:var(--accent-ink);border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}\
+  .brief-add-btn:hover{background:var(--accent-deep)}\
+  /* Modal de brief */\
+  .brief-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}\
+  .brief-modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5)}\
+  .brief-modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line-soft)}\
+  .brief-modal-t{font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.01em}\
+  .brief-modal-x{background:transparent;border:none;color:var(--ink-faint);font-size:16px;cursor:pointer;padding:6px 10px;border-radius:6px}\
+  .brief-modal-x:hover{background:var(--surface-2);color:var(--ink)}\
+  .brief-modal-b{padding:16px 18px;overflow-y:auto;flex:1}\
+  .brief-modal-b .fld{margin-bottom:14px}\
+  .brief-modal-b .fld-help{font-size:11px;color:var(--ink-faint);margin-top:4px;line-height:1.4}\
+  .brief-modal-f{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--line-soft);flex-wrap:wrap}\
+  /* Insights */\
+  .ins-section{margin:14px 0 4px}\
+  .ins-h{font-size:10.5px;font-weight:600;color:var(--ink-faint);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;padding-left:2px}\
+  .ins-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}\
+  .ins-card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}\
+  .ins-card.warn{border-color:rgba(248,113,113,.35);background:rgba(248,113,113,.04)}\
+  .ins-num{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1.1;margin-bottom:3px}\
+  .ins-mini{font-size:14px;font-weight:700;color:var(--ink);line-height:1.2;margin-bottom:3px}\
+  .ins-lbl{font-size:11px;color:var(--ink-faint);font-weight:500;line-height:1.4}\
+  .ins-lbl b{color:var(--ink);font-weight:700}\
+  .ins-trend{display:inline-block;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:3px}\
+  .ins-trend.ok{background:rgba(52,211,153,.14);color:var(--c-trafego)}\
+  .ins-trend.no{background:rgba(248,113,113,.12);color:var(--c-rev)}\
+  /* Datas comemorativas */\
+  .cd-section{margin:14px 0 4px}\
+  .cd-h{font-size:10.5px;font-weight:600;color:var(--ink-faint);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;padding-left:2px}\
+  .cd-item{display:flex;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:6px}\
+  .cd-item:hover{border-color:var(--line-strong)}\
+  .cd-when{font-size:10.5px;font-weight:800;color:var(--accent);letter-spacing:.04em;text-transform:uppercase;flex-shrink:0;min-width:60px;display:flex;align-items:center}\
+  .cd-info{flex:1;min-width:0}\
+  .cd-name{font-size:13px;font-weight:600;color:var(--ink);line-height:1.3}\
+  .cd-client{font-size:11.5px;color:var(--ink-faint);margin-top:2px}\
+  /* [V63.61-L5] Badge lineage — origem do card via Workflow Engine */\
+  .wf-lineage{display:flex;gap:10px;background:linear-gradient(180deg,rgba(91,108,255,.08) 0%,rgba(91,108,255,.03) 100%);border:1px solid rgba(91,108,255,.25);border-radius:10px;padding:11px 13px;margin:10px 0 14px;align-items:center;transition:all .15s}\
+  .wf-lineage:hover{background:rgba(91,108,255,.12);border-color:rgba(91,108,255,.4)}\
+  .wf-lineage-ic{font-size:18px;flex-shrink:0;line-height:1}\
+  .wf-lineage-tx{flex:1;min-width:0}\
+  .wf-lineage-l{font-size:9.5px;font-weight:800;color:var(--accent);letter-spacing:.06em;line-height:1.2;margin-bottom:3px}\
+  .wf-lineage-v{font-size:13px;color:var(--ink-soft);line-height:1.4}\
+  .wf-lineage-v b{color:var(--ink);font-weight:700}\
+  .wf-lineage-go{font-size:11px;color:var(--accent);font-weight:600;margin-left:8px;white-space:nowrap}\
+  /* [V63.61-L3] Sub-página Clientes */\
+  .cli-row-bg{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:5px;vertical-align:1px;margin-left:6px;text-transform:uppercase}\
+  .cli-row-bg.ok{background:rgba(52,211,153,.14);color:var(--c-trafego)}\
+  .cli-row-bg.no{background:rgba(255,176,46,.14);color:var(--c-foto)}\
+  .cli-stats{display:flex;gap:8px;margin-top:4px}\
+  .cli-stat{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center}\
+  .cli-stat.ok{border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.04)}\
+  .cli-stat.warn{border-color:rgba(255,176,46,.3);background:rgba(255,176,46,.04)}\
+  .cli-stat-n{font-size:22px;font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1.1}\
+  .cli-stat.ok .cli-stat-n{color:var(--c-trafego)}\
+  .cli-stat.warn .cli-stat-n{color:var(--c-foto)}\
+  .cli-stat-l{font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:3px}\
+  /* [V63.61-L4] Sub-página Insights detalhada — bars e rankings */\
+  .ins-bars{display:flex;flex-direction:column;gap:8px;padding:2px}\
+  .ins-bar-row{display:flex;align-items:center;gap:10px}\
+  .ins-bar-l{font-size:11px;font-weight:700;color:var(--ink-faint);min-width:70px;letter-spacing:.02em}\
+  .ins-bar-track{flex:1;height:22px;background:var(--surface-2);border-radius:6px;overflow:hidden;border:1px solid var(--line)}\
+  .ins-bar-fill{height:100%;background:linear-gradient(90deg,rgba(91,108,255,.3),rgba(91,108,255,.55));border-radius:5px;transition:width .3s}\
+  .ins-bar-fill.current{background:linear-gradient(90deg,var(--accent),var(--accent-soft))}\
+  .ins-bar-v{font-size:13px;font-weight:800;color:var(--ink);min-width:30px;text-align:right}\
+  .ins-rank{display:flex;flex-direction:column;gap:6px}\
+  .ins-rank-row{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 13px}\
+  .ins-rank-row:hover{border-color:var(--line-strong)}\
+  .ins-rank-n{font-size:14px;font-weight:800;color:var(--ink-faint);min-width:24px;text-align:center}\
+  .ins-rank-tx{flex:1;min-width:0}\
+  .ins-rank-name{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3}\
+  .ins-rank-meta{font-size:11px;color:var(--ink-faint);margin-top:2px}\
+  .ins-rank-v{font-size:14px;font-weight:800;letter-spacing:-.01em}';
+  try{
+    var st = document.createElement("style");
+    st.id = "v63-60-styles";
+    st.textContent = css;
+    document.head.appendChild(st);
+  }catch(e){ console.warn("inject styles V63.60:",e); }
 })();
 </script>
 </body>
