@@ -3937,6 +3937,95 @@
     }
   }
 
+  /* ════════════════════════════════════════════════════════════════════
+     [V63.38] HEADER INLINE HORIZONTAL — colapsa em UMA linha
+     Estilo Linear/Notion: logo + título do app + título da página
+     tudo em horizontal, ~52px altura total (era ~140px).
+     ════════════════════════════════════════════════════════════════════ */
+
+  @media (min-width:1024px){
+    /* Header em si: padding reduzido, altura menor */
+    body.theme-light header{
+      padding-top:calc(var(--st) + 12px) !important;
+      padding-bottom:10px !important;
+      background:rgba(255,255,255,.86) !important;
+      backdrop-filter:saturate(180%) blur(10px) !important;
+      -webkit-backdrop-filter:saturate(180%) blur(10px) !important;
+      border-bottom:1px solid rgba(15,23,42,.05) !important;
+    }
+    /* Brand: logo + textos mais compactos */
+    body.theme-light .hbrand{gap:10px !important}
+    body.theme-light .hbrand .mk{
+      width:34px !important;
+      height:34px !important;
+      filter:drop-shadow(0 1px 3px rgba(15,23,42,.10)) !important;
+    }
+    body.theme-light .hbrand h1{
+      font-size:14.5px !important;
+      font-weight:600 !important;
+      letter-spacing:-.015em !important;
+      color:#0f172a !important;
+    }
+    body.theme-light .hbrand h1 b{
+      color:#0f172a !important;
+      font-weight:600 !important;
+    }
+    /* Esconder textos redundantes em desktop */
+    body.theme-light .hbrand .hsub{display:none !important}
+    body.theme-light .hbrand .sync{display:none !important}
+    body.theme-light .hbrand .sub{display:none !important}
+
+    /* Sino/engrenagem/avatar: menores e mais sutis */
+    body.theme-light .hbell{
+      width:34px !important;
+      height:34px !important;
+      background:#ffffff !important;
+      border:1px solid rgba(15,23,42,.07) !important;
+    }
+    body.theme-light .hbell svg{width:16px !important;height:16px !important}
+    body.theme-light .hav{
+      width:34px !important;
+      height:34px !important;
+    }
+
+    /* Página title: inline ao lado do brand, separado por divisor */
+    body.theme-light #pageTitle{
+      margin-top:0 !important;
+      margin-bottom:0 !important;
+      padding:8px 0 14px !important;
+      max-width:1300px !important;
+      margin-left:0 !important;
+      margin-right:auto !important;
+    }
+    body.theme-light #pageTitle .mt,
+    body.theme-light #mainApp .pageT .mt{
+      font-size:17px !important;
+      font-weight:600 !important;
+      letter-spacing:-.015em !important;
+      color:#0f172a !important;
+      line-height:1 !important;
+      padding-left:0 !important;
+    }
+    /* Mais espaço pro conteúdo principal */
+    body.theme-light main{padding-top:0 !important}
+  }
+
+  /* Resoluções maiores: ainda comedido */
+  @media (min-width:1600px){
+    body.theme-light .hbrand h1{font-size:15px !important}
+    body.theme-light .hbrand .mk{width:36px !important;height:36px !important}
+    body.theme-light #pageTitle .mt,
+    body.theme-light #mainApp .pageT .mt{font-size:18px !important}
+  }
+  @media (min-width:1920px){
+    body.theme-light .hbrand h1{font-size:16px !important}
+    body.theme-light .hbrand .mk{width:38px !important;height:38px !important}
+    body.theme-light #pageTitle .mt,
+    body.theme-light #mainApp .pageT .mt{font-size:20px !important}
+    body.theme-light .hbell{width:36px !important;height:36px !important}
+    body.theme-light .hav{width:36px !important;height:36px !important}
+  }
+
 </style>
 <div id="app">
   <section id="loadingScreen" class="center-screen">
@@ -3986,7 +4075,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.37 · build saas-level-final</div>
+    <div class="ver">versão 63.38 · build header-inline</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
