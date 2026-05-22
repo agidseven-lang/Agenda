@@ -723,6 +723,207 @@
     box-shadow:0 0 0 1px #0f172a inset;
   }
 
+  /* ═══════════════════════════════════════════════════════════════════
+     [V63.35] CIRURGIA ESTRUTURAL — DENSIDADE PREMIUM
+     Premium real = menos navegação inflada, mais conteúdo visível.
+     Reduz paddings desktop (eram 18-24px = botões gigantes vazios),
+     reduz tipografia imponente, compacta hierarquia.
+     Inspiração: Linear, Notion, Stripe Dashboard.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── HEADER: brand mais compacto em todas resoluções ── */
+  @media (min-width:1024px){
+    .hbrand .mk{width:40px;height:40px}
+    .hbrand h1{font-size:15px;letter-spacing:-.020em}
+    .hbrand .hsub{font-size:11px;margin-top:2px}
+    .hbell{width:38px;height:38px}
+    .hbell svg{width:18px;height:18px}
+    .hav{width:38px;height:38px}
+    header{padding-top:calc(var(--st) + 14px);padding-bottom:10px}
+    .hright{gap:8px}
+  }
+
+  /* ── PAGE TITLE: tipografia comedida estilo Linear ── */
+  body.theme-light .pageT{margin-top:8px;margin-bottom:6px}
+  body.theme-light .pageT .mt{
+    font-size:22px !important;
+    font-weight:600 !important;
+    letter-spacing:-.022em !important;
+    line-height:1.2;
+  }
+  @media (min-width:1024px){
+    body.theme-light .pageT{margin-top:10px;margin-bottom:6px}
+    body.theme-light .pageT .mt{font-size:24px !important}
+  }
+  @media (min-width:1600px){
+    body.theme-light .pageT .mt{font-size:26px !important}
+  }
+  @media (min-width:1920px){
+    body.theme-light .pageT .mt{font-size:28px !important}
+  }
+  @media (min-width:2560px){
+    body.theme-light .pageT .mt{font-size:30px !important}
+  }
+
+  /* ── CHIPS DE FILTRO: compactos, densos, profissionais ── */
+  body.theme-light .chip{
+    padding:7px 12px !important;
+    font-size:12.5px !important;
+    font-weight:600 !important;
+    border-radius:8px !important;
+    gap:6px !important;
+  }
+  body.theme-light .chip .dot{width:6px;height:6px}
+  @media (min-width:1024px){
+    body.theme-light .filters{gap:6px !important;padding:10px 0 6px !important}
+    body.theme-light .chip{padding:8px 12px !important;font-size:12.5px !important}
+  }
+  @media (min-width:1600px){
+    body.theme-light .chip{padding:9px 14px !important;font-size:13px !important}
+  }
+  @media (min-width:1920px){
+    body.theme-light .chip{padding:10px 14px !important;font-size:13.5px !important;gap:7px !important}
+  }
+
+  /* ── BT-LINK (Calendário/Por cliente/Posts): drasticamente compacto ── */
+  body.theme-light .bt-link{
+    padding:9px 14px !important;
+    font-size:13px !important;
+    border-radius:10px !important;
+    gap:8px !important;
+    min-height:auto !important;
+  }
+  body.theme-light .bt-link svg{width:15px !important;height:15px !important}
+  @media (min-width:1024px){
+    body.theme-light .board-tools{margin:10px 0 4px !important;gap:8px !important}
+    body.theme-light .bt-link{padding:10px 14px !important;font-size:13px !important}
+    body.theme-light .bt-link svg{width:15px !important;height:15px !important}
+  }
+  @media (min-width:1600px){
+    body.theme-light .bt-link{padding:11px 16px !important;font-size:13.5px !important}
+    body.theme-light .bt-link svg{width:16px !important;height:16px !important}
+  }
+  @media (min-width:1920px){
+    body.theme-light .bt-link{padding:12px 18px !important;font-size:14px !important}
+    body.theme-light .bt-link svg{width:16px !important;height:16px !important}
+  }
+
+  /* ── VIEW-TOGGLE (Vista Equipe/Fluxo do Cliente): compacto ── */
+  body.theme-light .view-toggle{
+    padding:3px !important;
+    margin:8px 0 4px !important;
+    border-radius:10px !important;
+  }
+  body.theme-light .vt-opt{
+    padding:8px 14px !important;
+    font-size:12.5px !important;
+    font-weight:600 !important;
+    border-radius:8px !important;
+    gap:7px !important;
+  }
+  body.theme-light .vt-opt svg{width:14px !important;height:14px !important}
+  @media (min-width:1024px){
+    body.theme-light .vt-opt{padding:9px 14px !important;font-size:13px !important}
+    body.theme-light .vt-opt svg{width:15px !important;height:15px !important}
+  }
+  @media (min-width:1600px){
+    body.theme-light .vt-opt{padding:10px 16px !important;font-size:13px !important}
+    body.theme-light .vt-opt svg{width:15px !important;height:15px !important}
+  }
+  @media (min-width:1920px){
+    body.theme-light .vt-opt{padding:11px 18px !important;font-size:13.5px !important}
+    body.theme-light .vt-opt svg{width:16px !important;height:16px !important}
+  }
+
+  /* ── COL-H (cabeçalho das colunas) — discreto ── */
+  body.theme-light .col-h .nm{
+    font-size:12px !important;
+    font-weight:700 !important;
+    letter-spacing:.005em !important;
+    text-transform:uppercase !important;
+    opacity:.85;
+  }
+  body.theme-light .col-h .nm i{width:7px;height:7px}
+  body.theme-light .col-h .qt{
+    font-size:10.5px !important;
+    padding:2px 7px !important;
+    font-weight:600 !important;
+  }
+
+  /* ── CARDS KANBAN: mais densos, padding interno reduzido ── */
+  body.theme-light .tcard{
+    padding:11px 12px 11px 11px !important;
+    border-radius:10px !important;
+  }
+  body.theme-light .tcard .ttt{
+    font-size:13.5px !important;
+    line-height:1.32 !important;
+    margin-bottom:8px !important;
+    font-weight:600 !important;
+  }
+  body.theme-light .tcard .tc-top{margin-bottom:8px !important;gap:5px !important}
+  body.theme-light .tcard .tc-st,
+  body.theme-light .tcard .tc-top .tpill{
+    font-size:9px !important;
+    padding:3px 7px !important;
+    font-weight:700 !important;
+  }
+  body.theme-light .tcard .tcli{
+    font-size:9.5px !important;
+    margin-bottom:4px !important;
+  }
+  body.theme-light .tcard .tsec{
+    font-size:9px !important;
+    padding:3px 7px !important;
+  }
+  body.theme-light .tcard .tc-from{
+    font-size:10.5px !important;
+    margin-bottom:7px !important;
+  }
+  body.theme-light .tcard .tc-from .lab{font-size:8.5px !important}
+  body.theme-light .tcard .tc-from .at{font-size:9.5px !important}
+  body.theme-light .tcard .tmeta{
+    font-size:10.5px !important;
+    padding-top:8px !important;
+    margin-top:8px !important;
+    gap:9px !important;
+  }
+  body.theme-light .tcard .tmeta svg{width:11px;height:11px}
+  body.theme-light .tcard .tc-avw,
+  body.theme-light .tcard .tc-av{width:24px !important;height:24px !important}
+  @media (min-width:1024px){
+    body.theme-light .tcard{margin-bottom:6px !important}
+    body.theme-light .tcard .ttt{font-size:13px !important}
+  }
+
+  /* ── BOARD-NAV / outros containers compactos ── */
+  body.theme-light .board-nav{padding:3px !important;border-radius:10px !important}
+  body.theme-light .bn-tab{
+    padding:7px 11px !important;
+    font-size:12px !important;
+    font-weight:600 !important;
+    border-radius:7px !important;
+  }
+  body.theme-light .bn-tab .bn-qt{
+    font-size:10px !important;
+    padding:1px 6px !important;
+  }
+
+  /* ── COL (colunas do Kanban) — sticky header compacto ── */
+  @media (min-width:1024px){
+    body.theme-light .col-h{
+      padding:8px 10px 8px !important;
+      margin:0 -10px 6px !important;
+    }
+  }
+
+  /* ── SPACING: gaps menores entre seções ── */
+  @media (min-width:1024px){
+    body.theme-light main > *{margin-bottom:0}
+    body.theme-light .board-wrap{padding-top:6px !important;gap:10px !important}
+  }
+
+
 
   /* [V63] TAMANHO DE FONTE — ativado por body.fs-{sm|md|lg} */
   body.fs-sm{ font-size:14px }
@@ -3144,7 +3345,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.34 · build tema-claro-premium-v2</div>
+    <div class="ver">versão 63.35 · build densidade-premium</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
