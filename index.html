@@ -9,6 +9,21 @@
 <meta name="apple-mobile-web-app-title" content="ID Seven">
 <meta name="mobile-web-app-capable" content="yes">
 <title>ID Seven · Agenda e Gestor de Tarefas</title>
+<meta name="description" content="Sistema profissional de aprovação de cronograma de conteúdo. Aprove temas, legendas e posts com 1 clique.">
+<!-- [V63.30] Open Graph + Twitter Cards — preview premium no WhatsApp/Telegram/etc -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ID Seven">
+<meta property="og:title" content="ID Seven · Aprovação de Cronograma">
+<meta property="og:description" content="✨ Cronograma de conteúdo profissional · Aprove temas e legendas com 1 clique · Sem precisar baixar app, sem login.">
+<meta property="og:image" content="https://ik.imagekit.io/agidseven/og-preview.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ID Seven · Agenda e Gestor de Tarefas">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ID Seven · Aprovação de Cronograma">
+<meta name="twitter:description" content="✨ Cronograma de conteúdo profissional · Aprove com 1 clique.">
+<meta name="twitter:image" content="https://ik.imagekit.io/agidseven/og-preview.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -2462,7 +2477,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.29 · build chat-interno</div>
+    <div class="ver">versão 63.30 · build mensagem-premium</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -6466,7 +6481,7 @@ function openContentDetail(tid, idx){
   var _cs4=$("ctShareWA"); if(_cs4) _cs4.onclick=function(){
     var tk=tasks.find(x=>x.id===tid); if(!tk||!tk.shareToken)return;
     var u=clientShareURL(tk.shareToken);
-    var msg="Olá! Aqui está o cronograma de "+(tk.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+u;
+    var msg=buildShareMessage("cronograma", tk.client, u);
     openShareWAModal(msg, "Compartilhar com cliente");
   };
   bindCommentInput({
@@ -6530,6 +6545,28 @@ async function addContentComment(tid, idx, txt, mentionsArr){
 }
 /* ========== CLIENTE: enviar/invalidar/entregar ========== */
 function clientShareURL(token){ return location.origin + location.pathname + "?cliente=" + encodeURIComponent(token); }
+
+/* [V63.30] Mensagem premium pro cliente — formatação com CTA estilo botão */
+function buildShareMessage(kind, clientName, url){
+  var nm = (clientName||"").trim() || "vocês";
+  if(kind === "legendas"){
+    return "Olá! 👋\n\n" +
+           "As *legendas* do cronograma de *" + nm + "* estão prontas pra aprovação.\n\n" +
+           "✅ Aprovar cada legenda\n" +
+           "✏️ Editar e aprovar\n" +
+           "↶ Pedir revisão com 1 clique\n\n" +
+           "👇 *VER LEGENDAS*\n\n" +
+           url;
+  }
+  /* default: cronograma */
+  return "Olá! 👋\n\n" +
+         "O cronograma de *" + nm + "* está pronto pra sua análise.\n\n" +
+         "✅ Aprovar cada conteúdo individualmente\n" +
+         "✏️ Pedir ajustes com 1 clique\n" +
+         "💬 Comentar direto nas imagens\n\n" +
+         "👇 *ANALISAR AGORA*\n\n" +
+         url;
+}
 
 /* [V63.26] Modal de compartilhamento — usa deep link whatsapp:// pra abrir o app DESKTOP
    (Business se for o instalado). Fallback pra WhatsApp Web.
@@ -6630,7 +6667,7 @@ async function sendCronToClient(taskId){
     await db.collection("tasks").doc(taskId).update({ shareToken:token, shareCreatedAt:now, cronWeeks:arr });
     var lt=tasks.find(x=>x.id===taskId); if(lt){ lt.shareToken=token; lt.shareCreatedAt=now; lt.cronWeeks=arr; }
     var url = clientShareURL(token);
-    var msg="Olá! Aqui está o cronograma de "+(t.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+url;
+    var msg=buildShareMessage("cronograma", t.client, url);
     openShareWAModal(msg, "Enviar cronograma pro cliente");
     openTaskDetail(taskId);
   }catch(e){ toast("Não foi possível gerar o link agora"); }
@@ -7048,7 +7085,7 @@ async function sendLegendasToClient(taskId){
     await db.collection("tasks").doc(taskId).update({cronWeeks:arr});
     var lt=tasks.find(x=>x.id===taskId); if(lt) lt.cronWeeks=arr;
     var url = t.shareToken ? clientShareURL(t.shareToken) : "";
-    var msg="Olá! As legendas do cronograma de "+(t.client||"")+" estão prontas pra sua aprovação.\n\nAbra o MESMO link de antes e role pra baixo pra ver as legendas:\n"+url;
+    var msg=buildShareMessage("legendas", t.client, url);
     openShareWAModal(msg, ready.length+" legenda(s) enviada(s)");
     openTaskDetail(taskId);
   }catch(e){ toast("Não foi possível enviar agora"); }
@@ -8852,7 +8889,7 @@ function openTaskDetail(id){
   var _shw=$("cronShareWA"); if(_shw) _shw.onclick=function(){
     var tk=tasks.find(x=>x.id===id); if(!tk||!tk.shareToken)return;
     var u=clientShareURL(tk.shareToken);
-    var msg="Olá! Aqui está o cronograma de "+(tk.client||"")+" pra sua análise.\n\nVocê pode aprovar cada conteúdo ou pedir ajustes individualmente:\n"+u;
+    var msg=buildShareMessage("cronograma", tk.client, u);
     openShareWAModal(msg, "Compartilhar com cliente");
   };
   $("taskDetailBody").querySelectorAll("[data-ptog]").forEach(b=>b.onclick=()=>{
