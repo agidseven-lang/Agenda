@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.80 · build fase3-aprovacao-arte</div>
+    <div class="ver">versão 63.81 · build roteiro-responsavel-fixo-arydyjany</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -10030,7 +10030,9 @@ function openContentDetail(tid, idx){
      - Ainda não foi direcionado (!o.wfCascaded)
      Se já foi direcionado, mostra status com nome do designer + data. */
   var directBox = "";
-  if(canManage(me) && (t.sector === "design" || t.sector === "copy" || t.sector === "roteiro")){
+  /* [V63.81] Roteiro NÃO usa Direcionar/Arte — é vídeo, não tem peça gráfica.
+     Só Cronograma (design+copy) tem fluxo de direcionamento pra Designer + arte final. */
+  if(canManage(me) && (t.sector === "design" || t.sector === "copy")){
     var legendaOk = (o.lgState === "aprovada");
     var temaOk = (o.cs === "aprovado");
     var prontoPraDirecionar = legendaOk || (temaOk && o.lgState !== "enviada" && o.lgState !== "em_analise" && o.lgState !== "em_revisao");
@@ -11383,7 +11385,8 @@ function renderClientView(){
     }
 
     /* [V63.80-F3] ============ FASE 3 · ARTES FINAIS (só se já houver arte enviada) ============ */
-    var arRows = rows.filter(function(r){
+    /* [V63.81] Roteiro não tem fase de arte (é vídeo, sem peça gráfica estática) */
+    var arRows = (t.sector === "roteiro") ? [] : rows.filter(function(r){
       return r.c.artState==="enviada" || r.c.artState==="em_analise" || r.c.artState==="em_revisao" || r.c.artState==="aprovada" || r.c.artState==="concluida";
     });
     if(arRows.length > 0){
@@ -11420,6 +11423,9 @@ function renderClientView(){
 /* [V62] Renderiza UM card no modo TEMA (Fase 1). */
 function renderCvCardTema(c, i){
   var wk=Math.floor(i/3)+1, cn=(i%3)+1;
+  /* [V63.81] Roteiro usa rótulo "Vídeo N" em vez de "SEM W · #N" do cronograma */
+  var isRoteiro = (__clientTask && __clientTask.sector === "roteiro");
+  var pillLabel = isRoteiro ? ("Vídeo " + (i+1)) : ("SEM " + wk + " · #" + cn);
   var info=clientStatusInfo(c.cs);
   var lk="";
   if(c.l&&c.l.trim()){
@@ -11433,7 +11439,7 @@ function renderCvCardTema(c, i){
   var isRev  = (c.cs==="em_revisao");
   return '<div class="cv-card '+(isAprov?'ok':isRev?'rev':'')+'">'+
     '<div class="cv-card-h">'+
-      '<div class="cv-pill">SEM '+wk+' · #'+cn+'</div>'+
+      '<div class="cv-pill">'+esc(pillLabel)+'</div>'+
       (info?'<div class="cv-status" style="--dot-c:'+info.color+'">'+esc((info.label||'').toLowerCase())+'</div>':'')+
     '</div>'+
     '<div class="cv-ti">'+((c.t&&c.t.trim())?esc(c.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
@@ -11617,13 +11623,16 @@ function openClientImageCommentPopup(imageId, imageType, cardIdx, imageLabel){
 /* [V62] Renderiza UM card no modo LEGENDA (Fase 2). */
 function renderCvCardLegenda(c, i){
   var wk=Math.floor(i/3)+1, cn=(i%3)+1;
+  /* [V63.81] Roteiro usa rótulo "Vídeo N · LEGENDA"; cronograma usa "SEM W · #N · LEGENDA" */
+  var isRoteiro = (__clientTask && __clientTask.sector === "roteiro");
+  var pillLabel = isRoteiro ? ("Vídeo " + (i+1) + " · LEGENDA") : ("SEM " + wk + " · #" + cn + " · LEGENDA");
   var info=clientLgStatusInfo(c.lgState);
   var canAct = (c.lgState==="enviada"||c.lgState==="em_analise");
   var isAprov= (c.lgState==="aprovada");
   var isRev  = (c.lgState==="em_revisao");
   return '<div class="cv-card cv-card-lg '+(isAprov?'ok':isRev?'rev':'')+'">'+
     '<div class="cv-card-h">'+
-      '<div class="cv-pill phase2">SEM '+wk+' · #'+cn+' · LEGENDA</div>'+
+      '<div class="cv-pill phase2">'+esc(pillLabel)+'</div>'+
       (info?'<div class="cv-status" style="--dot-c:'+info.color+'">'+esc((info.label||'').toLowerCase())+'</div>':'')+
     '</div>'+
     '<div class="cv-ti" style="font-size:14px;color:var(--ink-soft);font-weight:700">Tema: '+((c.t&&c.t.trim())?esc(c.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
@@ -12391,6 +12400,39 @@ function clientShowError(msg){
 }
 
 function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
+  /* [V63.81] Setor Roteiro: responsável é FIXO = Arydyjany (só ela cria roteiros).
+     Mostra só o chip dela, ativo, e força o campo tAssignee pro nome dela. */
+  if(selSector === "roteiro"){
+    var arydy = (users||[]).find(function(u){
+      return u && u.status==="ativo" && /arydyjany/i.test(u.name||"");
+    });
+    if(arydy){
+      $("tAssignee").value = arydy.name;
+      var b=document.createElement("button"); b.type="button";
+      b.className="resp-chip on";
+      b.innerHTML='<span class="av">'+avatarHTML(arydy)+'</span><span>'+esc(arydy.name)+' (fixo)</span>';
+      b.style.cssText="opacity:1;pointer-events:none";
+      g.appendChild(b);
+      /* Mensagem explicativa */
+      var hint = document.createElement("div");
+      hint.style.cssText = "font-size:11.5px;color:var(--ink-faint);margin-top:8px;padding:8px 10px;background:rgba(0,0,0,.18);border-radius:8px;line-height:1.45";
+      hint.textContent = "Roteiros são criados e executados apenas pela Arydyjany.";
+      g.appendChild(hint);
+      /* Desabilita o input de texto livre */
+      try{
+        var ta = $("tAssignee");
+        if(ta){ ta.disabled = true; ta.style.opacity = ".55"; ta.style.pointerEvents = "none"; }
+      }catch(_){}
+      return;
+    }
+    /* Se Arydyjany não foi encontrada (caso edge), cai pro comportamento normal */
+  } else {
+    /* Reabilita o input se voltou pra outro setor */
+    try{
+      var ta2 = $("tAssignee");
+      if(ta2){ ta2.disabled = false; ta2.style.opacity = ""; ta2.style.pointerEvents = ""; }
+    }catch(_){}
+  }
   const team=users.filter(u=>u.status==="ativo");
   /* [V63.50/V63.52] Encurtador de nome — chips menores; agora também renderiza avatar */
   const shortName=(n)=>{const p=(n||"").trim().split(/\s+/);return p.length>1?(p[0]+' '+p[p.length-1]):p[0];};
@@ -12410,7 +12452,7 @@ function buildSecGrid(){const g=$("secGrid");g.innerHTML="";
     o.style.setProperty("--topt-c", SECTORS[k].color);
     var ic = SECTORS[k].icon || '<circle cx="12" cy="12" r="3" fill="currentColor"/>';
     o.innerHTML='<div class="topt-ic" style="color:'+SECTORS[k].color+'"><svg viewBox="0 0 24 24" fill="none">'+ic+'</svg></div><span>'+SECTORS[k].label+'</span>';
-    o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();try{buildStageRow();}catch(_){}};g.appendChild(o);}}
+    o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();try{buildStageRow();}catch(_){}try{buildRespChips();}catch(_){}};g.appendChild(o);}}
 function buildSecHint(){
   var sh=$("tSecHint"); if(sh){ sh.style.display="none"; sh.innerHTML=""; }
   // Esconde Título/Descrição/Link nos setores que usam blocos próprios

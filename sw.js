@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.80] Cache bump — FASE 3: aprovação da arte final pelo cliente. */
-var CACHE = "idseven-v63-80";
+   [V63.81] Cache bump — Roteiro: responsável fixo Arydyjany + label Vídeo N pro cliente. */
+var CACHE = "idseven-v63-81";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
