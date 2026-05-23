@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.76] Cache bump — 4 fluxos no quadro: Equipe/Cliente/Roteiro/Temas e Legendas. */
-var CACHE = "idseven-v63-76";
+   [V63.77] Cache bump — FASE 1 do redesign: novas abas + sub-toggle Equipe/Cliente. */
+var CACHE = "idseven-v63-77";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

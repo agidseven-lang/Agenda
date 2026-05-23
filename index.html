@@ -1139,6 +1139,21 @@
     background:rgba(0,0,0,.18);flex-shrink:0}
   .bt-mode-badge .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
   .bt-mode-badge b{font-weight:800}
+  /* [V63.77] Sub-toggle Equipe/Cliente — dentro de Cronograma e Roteiro.
+     Centralizado, mais discreto que o toggle principal pra deixar claro a hierarquia. */
+  .bt-subseg-wrap{display:flex;justify-content:center;padding:8px 0 12px;margin-top:-4px}
+  .bt-subseg{display:inline-flex;padding:3px;background:var(--surface-2);border:1px solid var(--line-soft);
+    border-radius:9px;gap:0}
+  .bt-subseg-opt{display:inline-flex;align-items:center;gap:6px;padding:0 16px;height:30px;background:transparent;
+    border:none;color:var(--ink-faint);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;
+    border-radius:6px;white-space:nowrap;letter-spacing:-.005em;transition:all .15s ease}
+  .bt-subseg-opt svg{width:13px;height:13px;flex-shrink:0;opacity:.7}
+  .bt-subseg-opt:hover{color:var(--ink-soft)}
+  .bt-subseg-opt.on{background:var(--accent);color:var(--accent-ink);box-shadow:0 2px 6px rgba(91,108,255,.25)}
+  .bt-subseg-opt.on svg{opacity:1}
+  @media (max-width:480px){
+    .bt-subseg-opt{padding:0 12px;font-size:12px}
+  }
   .bt-seg-opt{
     display:inline-flex;
     align-items:center;
@@ -4371,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.76 · build 4-fluxos-organizados</div>
+    <div class="ver">versão 63.77 · build fase1-novas-abas-subtoggle</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -4799,7 +4814,7 @@ function preMinForAlarms(){
   catch(_){ return 10; }
 }
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
-let boardFilter="all", boardFilterUserSet=false, boardView="team", settingsView="main", calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
+let boardFilter="all", boardFilterUserSet=false, boardView="team", boardSubView="team", settingsView="main", calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
 
 function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -8957,17 +8972,21 @@ function blockMsg(except){
   return m;
 }
 function boardVisible(){
-  /* [V63.76] Quando boardView é "roteiro" ou "temas", força filtro de setor automaticamente
-     pra organizar o fluxo. Outros filtros (Minhas/Atrasadas) AINDA se aplicam dentro
-     do setor — assim ele pode ver "minhas tarefas de roteiro" combinado. */
+  /* [V63.77] Filtragem por categoria de aba. Cada boardView mostra um subconjunto
+     fixo de setores — Postagem some das abas (vai pro Registro de Posts). */
   function applyViewSectorFilter(arr){
+    if(boardView === "designer"){
+      /* Designer = só Edição de Mídia (postagem manual, não fica em aba) */
+      return arr.filter(function(t){ return t.sector === "edicao_midia"; });
+    }
+    if(boardView === "cronograma"){
+      /* Cronograma = design (tema) + copy (legenda) — onde Ary/Tatiana criam o conteúdo */
+      return arr.filter(function(t){ return t.sector === "design" || t.sector === "copy"; });
+    }
     if(boardView === "roteiro"){
       return arr.filter(function(t){ return t.sector === "roteiro"; });
     }
-    if(boardView === "temas"){
-      /* Cronograma + Copywriter — onde se constrói tema e legenda */
-      return arr.filter(function(t){ return t.sector === "cronograma" || t.sector === "copy"; });
-    }
+    /* Equipe = todos (sem filtro) */
     return arr;
   }
   if(boardFilter==="late") return applyViewSectorFilter(tasks.filter(taskLate));
@@ -8976,8 +8995,8 @@ function boardVisible(){
     var cn=boardFilter.slice(4).trim().toLowerCase();
     return applyViewSectorFilter(tasks.filter(t=>((t.client||"").trim().toLowerCase())===cn));
   }
-  /* [V63.76] Se boardView é roteiro/temas, ignora boardFilter de setor (não pode mais filtrar manual) */
-  if(boardView === "roteiro" || boardView === "temas"){
+  /* [V63.77] Se boardView é categoria (designer/cronograma/roteiro), ignora filtro de setor manual */
+  if(boardView !== "team"){
     return applyViewSectorFilter(tasks);
   }
   return tasks.filter(t=>boardFilter==="all"||t.sector===boardFilter);
@@ -8992,6 +9011,13 @@ function trackFields(prev,newStatus){
 }
 
 function renderBoard(){
+  /* [V63.77] Sanity check: valores antigos do toggle (client, temas) viram "team".
+     Se não-admin tentar ver Cronograma (acesso direto via state), também volta pra team. */
+  var validViews = ["team", "designer", "cronograma", "roteiro"];
+  if(validViews.indexOf(boardView) < 0) boardView = "team";
+  if(boardView === "cronograma" && !canManage(me)) boardView = "team";
+  if(["team","client"].indexOf(boardSubView) < 0) boardSubView = "team";
+
   const lateAll=tasks.filter(taskLate);
   const mineAll=tasks.filter(isMyTask);
   /* [V63.36] BOARD TOOLBAR — redesign estrutural premium.
@@ -9014,9 +9040,9 @@ function renderBoard(){
        '<span>Atrasadas</span><span class="ct">'+lateAll.length+'</span>'+
      '</button>';
   }
-  /* [V63.76] Dropdown de setor — escondido nos modos "roteiro" e "temas" porque o setor
-     já é fixado pelo próprio modo (não faz sentido permitir filtrar manualmente). */
-  var hideSetorDropdown = (boardView === "roteiro" || boardView === "temas");
+  /* [V63.77] Dropdown de setor — escondido em todas as abas-categoria (Designer/Cronograma/Roteiro)
+     porque o setor já é fixado pela aba. Só Equipe permite escolha manual de setor. */
+  var hideSetorDropdown = (boardView !== "team");
   if(!hideSetorDropdown){
     h+='<div class="bt-dropdown" id="btSectorWrap">';
     h+='<button class="bt-dropdown-btn '+(isSectorSelected?"has-value":"")+'" id="btSectorBtn" type="button">';
@@ -9038,39 +9064,52 @@ function renderBoard(){
        '</button>';
   }
   h+='</div></div>';
-  } /* [V63.76] fim do if(!hideSetorDropdown) */
-  /* [V63.76] Banner indicando modo ativo quando é Roteiro ou Temas (substitui o dropdown) */
-  if(hideSetorDropdown){
-    var modeLabel = boardView === "roteiro" ? "Roteiro" : "Temas e Legendas";
-    var modeColor = boardView === "roteiro" ? SECTORS.roteiro.color : SECTORS.cronograma.color;
-    h+='<div class="bt-mode-badge" style="background:'+secBg(modeColor)+';border-color:'+modeColor+'33;color:'+modeColor+'">'+
-         '<span class="dot" style="background:'+modeColor+'"></span>'+
-         '<span>Modo: <b>'+esc(modeLabel)+'</b></span>'+
+  } /* [V63.77] fim do if(!hideSetorDropdown) */
+  h+='</div>';
+  /* [V63.77] Sub-toggle Equipe/Cliente — só dentro de Cronograma e Roteiro.
+     Aparece logo após a toolbar pra organizar fluxos dentro da mesma categoria. */
+  if(boardView === "cronograma" || boardView === "roteiro"){
+    h+='<div class="bt-subseg-wrap">'+
+         '<div class="bt-subseg" role="tablist">'+
+           '<button class="bt-subseg-opt '+(boardSubView==="team"?"on":"")+'" data-bsv="team" type="button" role="tab" aria-selected="'+(boardSubView==="team")+'">'+
+             '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="6" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="11" y="4" width="6" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="19" y="4" width="2" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>'+
+             '<span>Equipe</span>'+
+           '</button>'+
+           '<button class="bt-subseg-opt '+(boardSubView==="client"?"on":"")+'" data-bsv="client" type="button" role="tab" aria-selected="'+(boardSubView==="client")+'">'+
+             '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+             '<span>Cliente</span>'+
+           '</button>'+
+         '</div>'+
        '</div>';
   }
-  h+='</div>';
   /* Direita: segmented + icon-buttons */
   h+='<div class="bt-right">';
-  /* [V63.76] Toggle de visualização — 4 modos agora pra organizar fluxos por categoria.
-     "Roteiro" mostra só tarefas de roteiro. "Temas & Legendas" mostra só Cronograma+Copywriter. */
+  /* [V63.77] Toggle 4 abas: estrutura nova por categoria de trabalho.
+     - Equipe: visão geral (todos os setores)
+     - Designer: só Edição de Mídia (postagem some)
+     - Cronograma: design + copywriter (ADMIN ONLY)
+     - Roteiro: só roteiros
+     Cronograma e Roteiro ganham sub-toggle Equipe/Cliente */
+  var isAdmin = canManage(me);
   h+='<div class="bt-seg bt-seg-4">'+
-       '<button class="bt-seg-opt '+(boardView==="team"?"on":"")+'" data-bv="team" type="button" title="Vista Equipe — todas as tarefas">'+
+       '<button class="bt-seg-opt '+(boardView==="team"?"on":"")+'" data-bv="team" type="button" title="Equipe — visão geral de todas as tarefas">'+
          '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="6" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="11" y="4" width="6" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="19" y="4" width="2" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>'+
          '<span>Equipe</span>'+
        '</button>'+
-       '<button class="bt-seg-opt '+(boardView==="client"?"on":"")+'" data-bv="client" type="button" title="Fluxo do Cliente — vê pelo olhar do cliente">'+
-         '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
-         '<span>Cliente</span>'+
+       '<button class="bt-seg-opt '+(boardView==="designer"?"on":"")+'" data-bv="designer" type="button" title="Designer — só Edição de Mídia">'+
+         '<svg viewBox="0 0 24 24" fill="none"><path d="M12 19l7-7 3 3-7 7-3-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M2 2l7.586 7.586" stroke="currentColor" stroke-width="2"/><circle cx="11" cy="11" r="2" stroke="currentColor" stroke-width="2"/></svg>'+
+         '<span>Designer</span>'+
        '</button>'+
-       /* [V63.76] Fluxo Roteiro — só tarefas de roteiro */
-       '<button class="bt-seg-opt '+(boardView==="roteiro"?"on":"")+'" data-bv="roteiro" type="button" title="Fluxo Roteiro — só tarefas de roteiro">'+
-         '<svg viewBox="0 0 24 24" fill="none"><path d="M4 4h12l4 4v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 4v4h4M7 12h10M7 16h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+       /* [V63.77] Aba Cronograma — admin only */
+       (isAdmin ?
+         '<button class="bt-seg-opt '+(boardView==="cronograma"?"on":"")+'" data-bv="cronograma" type="button" title="Cronograma — admin only · Tema e legenda">'+
+           '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18" stroke="currentColor" stroke-width="2"/><path d="M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+           '<span>Cronograma</span>'+
+         '</button>'
+       : '')+
+       '<button class="bt-seg-opt '+(boardView==="roteiro"?"on":"")+'" data-bv="roteiro" type="button" title="Roteiro — só tarefas de roteiro">'+
+         '<svg viewBox="0 0 24 24" fill="none"><rect x="5" y="3" width="14" height="18" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
          '<span>Roteiro</span>'+
-       '</button>'+
-       /* [V63.76] Fluxo Temas & Legendas — só Cronograma + Copywriter (onde se faz tema e legenda) */
-       '<button class="bt-seg-opt '+(boardView==="temas"?"on":"")+'" data-bv="temas" type="button" title="Fluxo Temas e Legendas — Cronograma + Copywriter">'+
-         '<svg viewBox="0 0 24 24" fill="none"><path d="M3 7h18M3 12h18M3 17h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="17" r="2.5" stroke="currentColor" stroke-width="2"/></svg>'+
-         '<span>Temas & Legendas</span>'+
        '</button>'+
      '</div>';
   h+='<div class="bt-icons">'+
@@ -9107,7 +9146,11 @@ function renderBoard(){
          3. Revisão (cliente pediu mudança)
          4. Aprovado (cliente aprovou)
          5. Concluído (time marcou como finalizado) */
-  var COLS, colKeyOf, isClientView = (boardView==="client");
+  var COLS, colKeyOf;
+  /* [V63.77] isClientView agora depende do sub-toggle dentro de Cronograma/Roteiro.
+     Só essas 2 abas têm a opção de ver "Cliente" (fluxo de aprovação). */
+  var hasSubView = (boardView === "cronograma" || boardView === "roteiro");
+  var isClientView = hasSubView && (boardSubView === "client");
 
   if(isClientView){
     /* [V62.23] 4 colunas dedicadas ao fluxo de aprovação do cliente — sem "Aprovação do Cliente" separada.
@@ -9331,7 +9374,24 @@ function tcard(t){
 function bindBoard(){
   document.querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{boardFilter=b.dataset.bf;boardFilterUserSet=true;render();});
   /* [V62.20] Toggle Vista Equipe / Fluxo do Cliente */
-  document.querySelectorAll("[data-bv]").forEach(b=>b.onclick=()=>{ boardView=b.dataset.bv; render(); });
+  /* [V63.77] Toggle principal — ao mudar de aba, reseta sub-view pra "team" (default).
+     Garante: sair de Cronograma/Cliente e voltar mantém estado limpo. */
+  document.querySelectorAll("[data-bv]").forEach(b=>b.onclick=()=>{
+    var newView = b.dataset.bv;
+    /* Proteção admin pra Cronograma — não-admin não pode entrar */
+    if(newView === "cronograma" && !canManage(me)){
+      try{ toast("Acesso restrito — só admins veem o Cronograma"); }catch(_){}
+      return;
+    }
+    boardView = newView;
+    boardSubView = "team"; /* sempre volta pra Equipe ao mudar de aba */
+    render();
+  });
+  /* [V63.77] Bind do sub-toggle Equipe/Cliente dentro de Cronograma e Roteiro */
+  document.querySelectorAll("[data-bsv]").forEach(b=>b.onclick=()=>{
+    boardSubView = b.dataset.bsv;
+    render();
+  });
   /* [V63.36] Dropdown de Setor — toggle aberto/fechado, click fora fecha */
   var ddBtn = document.getElementById("btSectorBtn");
   var ddMenu = document.getElementById("btSectorMenu");
