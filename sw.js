@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.83] Cache bump — Direcionar pra Designer inclui Miercohévisk (admin que também faz design). */
-var CACHE = "idseven-v63-83";
+   [V63.84] Cache bump — Designers (Felipe, Boaz) podem criar tarefas de Edição atribuídas a si. */
+var CACHE = "idseven-v63-84";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

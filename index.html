@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.83 · build direcionar-incluir-miercohevisk</div>
+    <div class="ver">versão 63.84 · build designers-criam-edicao</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -5578,7 +5578,10 @@ function switchTab(t){
   tab=t;
   if(t==="board" && !boardFilterUserSet && !canManage(me) && boardFilter==="all"){ boardFilter="mine"; }
   document.querySelectorAll(".navtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
-  var _na=$("navAdd"); if(_na) _na.style.display=canManage(me)?"":"none";
+  /* [V63.84] Botão "Novo" agora aparece pra TODOS — não-admin pode criar tarefas de
+     Edição de Mídia atribuídas a eles mesmos (Felipe, Boaz). Os outros setores ficam
+     restritos a admin (Cronograma, Roteiro, Copy, Postagem). */
+  var _na=$("navAdd"); if(_na) _na.style.display="";
   const a=t==="agenda";
   /* [V63.72] No tab "chat", também esconde pageTitle pra dar espaço pro layout próprio do chat
      (igual agenda). Antes, o ternary do título caía no fallback "Perfil" e exibia errado. */
@@ -12409,6 +12412,26 @@ function clientShowError(msg){
 }
 
 function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
+  /* [V63.84] Não-admin (designer) criando: responsável é FIXO ele mesmo (não pode atribuir pra outro). */
+  var isAdmResp = canManage(me);
+  if(!isAdmResp && me && me.name){
+    $("tAssignee").value = me.name;
+    var bMe = document.createElement("button"); bMe.type="button";
+    bMe.className="resp-chip on";
+    bMe.innerHTML='<span class="av">'+avatarHTML(me)+'</span><span>Eu (fixo)</span>';
+    bMe.style.cssText="opacity:1;pointer-events:none";
+    g.appendChild(bMe);
+    var hintM = document.createElement("div");
+    hintM.style.cssText = "font-size:11.5px;color:var(--ink-faint);margin-top:8px;padding:8px 10px;background:rgba(0,0,0,.18);border-radius:8px;line-height:1.45";
+    hintM.textContent = "Tarefas que você cria são atribuídas a você. Pra atribuir a outra pessoa, peça pra um admin.";
+    g.appendChild(hintM);
+    /* Desabilita o input livre */
+    try{
+      var taM = $("tAssignee");
+      if(taM){ taM.disabled = true; taM.style.opacity = ".55"; taM.style.pointerEvents = "none"; }
+    }catch(_){}
+    return;
+  }
   /* [V63.81] Setor Roteiro: responsável é FIXO = Arydyjany (só ela cria roteiros).
      Mostra só o chip dela, ativo, e força o campo tAssignee pro nome dela. */
   if(selSector === "roteiro"){
@@ -12457,11 +12480,17 @@ function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
 }
 
 function buildSecGrid(){const g=$("secGrid");g.innerHTML="";
-  for(const k in SECTORS){const o=document.createElement("div");o.className="topt"+(k===selSector?" on":"");
+  /* [V63.84] Não-admin (designers): só mostra "Edição de Mídia" — único setor que podem criar. */
+  var isAdmGrid = canManage(me);
+  for(const k in SECTORS){
+    if(!isAdmGrid && k !== "edicao_midia") continue;  /* esconde outros setores pra não-admin */
+    const o=document.createElement("div");o.className="topt"+(k===selSector?" on":"");
     o.style.setProperty("--topt-c", SECTORS[k].color);
     var ic = SECTORS[k].icon || '<circle cx="12" cy="12" r="3" fill="currentColor"/>';
     o.innerHTML='<div class="topt-ic" style="color:'+SECTORS[k].color+'"><svg viewBox="0 0 24 24" fill="none">'+ic+'</svg></div><span>'+SECTORS[k].label+'</span>';
-    o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();try{buildStageRow();}catch(_){}try{buildRespChips();}catch(_){}};g.appendChild(o);}}
+    o.onclick=()=>{selSector=k;buildSecGrid();buildCronUI();buildSecHint();try{buildStageRow();}catch(_){}try{buildRespChips();}catch(_){}};g.appendChild(o);
+  }
+}
 function buildSecHint(){
   var sh=$("tSecHint"); if(sh){ sh.style.display="none"; sh.innerHTML=""; }
   // Esconde Título/Descrição/Link nos setores que usam blocos próprios
@@ -12741,12 +12770,30 @@ $("tAssignee").oninput=()=>{try{buildRespChips();}catch(e){}};
 $("fOwner").oninput=()=>{try{buildOwnerChips();}catch(e){}};
 
 function openTaskForm(t){
-  if(!canManage(me)){ toast("Apenas administradores podem criar ou editar tarefas."); return; }
+  /* [V63.84] Não-admin pode criar SÓ tarefas de Edição de Mídia atribuídas a si.
+     Não pode editar tarefas de outros setores nem reatribuir pra ninguém. */
+  var isAdmin = canManage(me);
+  if(!isAdmin){
+    /* Editando tarefa existente: só permite se for de Edição de Mídia E atribuída a ele */
+    if(t){
+      var myName = ((me&&me.name)||"").trim().toLowerCase();
+      var taskAss = ((t.assignee)||"").trim().toLowerCase();
+      if(normSector(t.sector) !== "edicao_midia" || taskAss !== myName){
+        toast("Só admins podem editar essa tarefa.");
+        return;
+      }
+    }
+  }
   if(!t){ const bm=blockMsg(); if(bm){ customAlert(bm,"Pendência urgente","warn"); return; } }
   editTaskId=t?t.id:null;
   $("taskFormTitle").textContent=t?"Editar tarefa":"Nova tarefa";
   $("taskDel").style.display=t?"block":"none";
-  selSector=(t&&SECTORS[normSector(t.sector)])?normSector(t.sector):"edicao_midia";
+  /* [V63.84] Não-admin: força setor edicao_midia (só pode criar Edição) */
+  if(!isAdmin && !t){
+    selSector = "edicao_midia";
+  } else {
+    selSector=(t&&SECTORS[normSector(t.sector)])?normSector(t.sector):"edicao_midia";
+  }
   taskStatus=(t&&stagesFor(selSector).some(s=>s.k===t.status))?t.status:"afazer";
   setV("tClient",t&&t.client);setV("tTitle",t&&t.title);setV("tDesc",t&&t.desc);
   setV("tSDate",t&&t.startDate);setV("tSTime",(t&&t.startTime)||"");
@@ -12784,6 +12831,23 @@ function buildPrioToggle(){const b=$("tPrio");if(!b)return;
   b.querySelector("span:last-child").textContent=selPrio?"Tarefa PRIORITÁRIA (urgente) ✓":"Marcar como tarefa prioritária (urgente)";
   b.onclick=()=>{selPrio=!selPrio;buildPrioToggle();};}
 $("taskSave").onclick=async()=>{
+  /* [V63.84] Defesa server-side: não-admin só salva tarefas de Edição atribuídas a si.
+     Se tentou burlar pela UI alterando setor/responsável, o save BLOQUEIA. */
+  if(!canManage(me)){
+    if(selSector !== "edicao_midia"){
+      toast("Você só pode criar tarefas de Edição de Mídia.");
+      return;
+    }
+    var myNameSave = ((me&&me.name)||"").trim().toLowerCase();
+    var assSave = (val("tAssignee")||"").trim().toLowerCase();
+    if(assSave && assSave !== myNameSave){
+      toast("Você só pode atribuir tarefas a você mesmo.");
+      return;
+    }
+    /* Força os 2 valores como cinto-e-suspensório */
+    selSector = "edicao_midia";
+    if(me && me.name) $("tAssignee").value = me.name;
+  }
   const client=val("tClient");
   let title=val("tTitle");
   const sD=$("tSDate").value,sT=$("tSTime").value,dD=$("tDDate").value,dT=$("tDTime").value;
