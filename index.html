@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.77 · build fase1-novas-abas-subtoggle</div>
+    <div class="ver">versão 63.80 · build fase3-aprovacao-arte</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -4814,7 +4814,7 @@ function preMinForAlarms(){
   catch(_){ return 10; }
 }
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
-let boardFilter="all", boardFilterUserSet=false, boardView="team", boardSubView="team", settingsView="main", calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho";
+let boardFilter="all", boardFilterUserSet=false, boardView="team", boardSubView="team", settingsView="main", calCursor=new Date(), calSel=null, editTaskId=null, detailTaskId=null, taskChecklist=[], selSector="edicao_midia", taskStatus="afazer", selPrio=false, selFreq="semanal", cronWeeks=[], cronMonthVal="", selCopyState="rascunho", postMark=false, selRotState="rascunho", selRoteiroPack="p4";
 
 function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -9787,6 +9787,98 @@ function bindCommentInput(opts){
   ci.onblur=function(){ setTimeout(hideAc, 180); };
   if(cs) cs.onclick=send;
 }
+
+/* [V63.79-F2] Modal pra escolher designer ao "Direcionar pra Designer".
+   Lista todos os users não-admin (designers conhecidos: Felipe, Boaz).
+   Cria o card filho via cascadeFromCronItem com designerId. */
+function openDirectDesignerModal(tid, idx){
+  if(!canManage(me)){ toast("Apenas administradores podem direcionar."); return; }
+  var t = (tasks||[]).find(function(x){ return x.id === tid; });
+  if(!t){ toast("Tarefa não encontrada."); return; }
+  var ws = Array.isArray(t.cronWeeks) ? t.cronWeeks.map(cronNorm) : [];
+  var o = ws[idx];
+  if(!o){ toast("Conteúdo não encontrado."); return; }
+  /* Lista de designers: pega todos os users que não são admins */
+  var designers = (users||[]).filter(function(u){
+    return u && u.id && !canManage(u);
+  });
+  if(!designers.length){
+    toast("Nenhum designer cadastrado.");
+    return;
+  }
+  /* Cria modal overlay full-screen */
+  var ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)";
+  var card = document.createElement("div");
+  card.style.cssText = "background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:22px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)";
+  var tema = (o.t || "Conteúdo " + (idx+1));
+  var client = (t.client || "");
+  var html = '<div style="font-size:11px;color:var(--ink-faint);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Direcionar pra Designer</div>'+
+    '<div style="font-size:19px;font-weight:800;color:var(--ink);margin-bottom:4px;line-height:1.25">'+esc(tema)+'</div>'+
+    (client?'<div style="font-size:13px;color:var(--ink-soft);margin-bottom:18px">'+esc(client)+'</div>':'<div style="margin-bottom:18px"></div>')+
+    '<div style="font-size:12px;color:var(--ink-faint);font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px">Escolha o designer responsável</div>'+
+    '<div id="ddDesignerList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px"></div>'+
+    '<div style="display:flex;gap:10px;justify-content:flex-end">'+
+      '<button id="ddCancel" type="button" style="padding:11px 18px;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);font-weight:700;cursor:pointer;font-family:inherit;font-size:14px">Cancelar</button>'+
+      '<button id="ddConfirm" type="button" style="padding:11px 22px;border-radius:11px;border:none;background:var(--accent);color:var(--accent-ink);font-weight:800;cursor:pointer;font-family:inherit;font-size:14px;opacity:.4;pointer-events:none">Confirmar</button>'+
+    '</div>';
+  card.innerHTML = html;
+  ov.appendChild(card);
+  document.body.appendChild(ov);
+
+  var selectedId = null;
+  var listEl = card.querySelector("#ddDesignerList");
+  designers.forEach(function(u){
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.style.cssText = "display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;font-family:inherit;text-align:left;transition:all .15s ease";
+    btn.innerHTML = '<span style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0">'+avatarHTML(u)+'</span>'+
+                    '<span style="flex:1;font-weight:700;font-size:14px">'+esc(u.name||"Sem nome")+'</span>'+
+                    '<span class="dd-check" style="width:20px;height:20px;border-radius:50%;border:2px solid var(--line);flex-shrink:0;display:flex;align-items:center;justify-content:center"></span>';
+    btn.onclick = function(){
+      selectedId = u.id;
+      listEl.querySelectorAll("button").forEach(function(b){
+        b.style.borderColor = "var(--line)";
+        var chk = b.querySelector(".dd-check");
+        if(chk){ chk.style.borderColor = "var(--line)"; chk.style.background = ""; chk.innerHTML = ""; }
+      });
+      btn.style.borderColor = "var(--accent)";
+      var myChk = btn.querySelector(".dd-check");
+      if(myChk){
+        myChk.style.borderColor = "var(--accent)";
+        myChk.style.background = "var(--accent)";
+        myChk.innerHTML = '<svg viewBox="0 0 24 24" fill="none" style="width:12px;height:12px"><path d="M5 12l4 4L19 7" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+      var btC = card.querySelector("#ddConfirm");
+      btC.style.opacity = "1";
+      btC.style.pointerEvents = "auto";
+    };
+    listEl.appendChild(btn);
+  });
+
+  card.querySelector("#ddCancel").onclick = function(){
+    try{ document.body.removeChild(ov); }catch(_){}
+  };
+  card.querySelector("#ddConfirm").onclick = async function(){
+    if(!selectedId){ toast("Escolha um designer."); return; }
+    var btC = card.querySelector("#ddConfirm");
+    btC.disabled = true;
+    btC.style.opacity = ".5";
+    btC.textContent = "Direcionando…";
+    try{
+      await cascadeFromCronItem(tid, idx, selectedId);
+      try{ document.body.removeChild(ov); }catch(_){}
+      try{ openContentDetail(tid, idx); }catch(_){}
+    }catch(e){
+      toast("Erro ao direcionar. Tente novamente.");
+      btC.disabled = false;
+      btC.style.opacity = "1";
+      btC.textContent = "Confirmar";
+    }
+  };
+  ov.onclick = function(e){ if(e.target === ov){ try{ document.body.removeChild(ov); }catch(_){} } };
+}
+
 function openContentDetail(tid, idx){
   var t=tasks.find(x=>x.id===tid); if(!t)return;
   var ws=Array.isArray(t.cronWeeks)?t.cronWeeks.map(cronNorm):[];
@@ -9930,6 +10022,111 @@ function openContentDetail(tid, idx){
     legendaBox += '</div>';
   }
 
+  /* [V63.79-F2] BOX "DIRECIONAR PRA DESIGNER" — workflow manual.
+     Aparece quando:
+     - É admin (Ary/Tatiana/Mier)
+     - Tema E legenda foram aprovados pelo cliente (lgState === "aprovada")
+       (se não houver fase legenda, basta cs === "aprovado")
+     - Ainda não foi direcionado (!o.wfCascaded)
+     Se já foi direcionado, mostra status com nome do designer + data. */
+  var directBox = "";
+  if(canManage(me) && (t.sector === "design" || t.sector === "copy" || t.sector === "roteiro")){
+    var legendaOk = (o.lgState === "aprovada");
+    var temaOk = (o.cs === "aprovado");
+    var prontoPraDirecionar = legendaOk || (temaOk && o.lgState !== "enviada" && o.lgState !== "em_analise" && o.lgState !== "em_revisao");
+    if(o.wfCascaded === true){
+      /* Já direcionado — mostra status */
+      var designerNm = "designer";
+      var dUser = (users||[]).find(function(x){ return x.id === o.wfDesignerId; });
+      if(dUser) designerNm = dUser.name || "designer";
+      var dirAt = o.wfCascadedAt ? fmtDT(o.wfCascadedAt) : "";
+      directBox = '<div class="cs-box" style="border-left-color:var(--c-grav);margin-top:14px">'+
+        '<div class="tt">FASE 3 · Direcionamento</div>'+
+        '<div class="lab">✓ Direcionado pra <b>'+esc(designerNm)+'</b></div>'+
+        (dirAt?'<div class="when">'+esc(dirAt)+'</div>':'')+
+        '<div style="font-size:12.5px;color:var(--ink-soft);margin-top:8px">Card de Edição criado. Designer foi avisado por push.</div>'+
+        '</div>';
+    } else if(prontoPraDirecionar){
+      /* Pronto pra direcionar — mostra botão */
+      directBox = '<div class="cs-box" style="border-left-color:var(--c-grav);margin-top:14px">'+
+        '<div class="tt">FASE 3 · Direcionar pra Designer</div>'+
+        '<div style="font-size:13px;color:var(--ink-soft);line-height:1.55;margin:8px 0 12px">'+
+          'Cliente aprovou. Direcione este conteúdo pra um designer começar a Edição da arte.'+
+        '</div>'+
+        '<button class="cs-deliver" id="ctDirectDesigner" style="background:var(--c-grav);color:#fff">'+
+          '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px"><path d="M12 19l7-7 3 3-7 7-3-3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>'+
+          'Direcionar pra Designer'+
+        '</button>'+
+        '</div>';
+    }
+  }
+
+  /* [V63.80-F3] BOX "FASE 4 · ARTE FINAL" — aparece após direcionamento.
+     Estados:
+     - sem artState: designer ainda não terminou (mostra status "Aguardando designer")
+     - artState === "pronta": designer marcou como concluído. Admin vê botão "Enviar pro cliente"
+     - artState === "enviada"/"em_analise": cliente recebeu, aguardando
+     - artState === "em_revisao": cliente pediu revisão (mostra feedback + reenviar)
+     - artState === "aprovada": cliente aprovou — pronto pra postar */
+  var arteBox = "";
+  if(canManage(me) && o.wfCascaded === true){
+    var artState = o.artState || null;
+    var artColor = artState === "aprovada" ? "var(--c-trafego)"
+                 : artState === "em_revisao" ? "var(--c-rev)"
+                 : artState === "enviada" || artState === "em_analise" ? "var(--c-edicao)"
+                 : artState === "pronta" ? "var(--c-grav)"
+                 : "var(--line)";
+    var artLabel = artState === "aprovada" ? "✓ Cliente aprovou a arte"
+                 : artState === "em_revisao" ? "✏ Cliente pediu revisão"
+                 : artState === "em_analise" ? "👁 Cliente abriu pra analisar"
+                 : artState === "enviada" ? "📤 Enviada — aguardando cliente"
+                 : artState === "pronta" ? "🎨 Arte pronta pra enviar"
+                 : "⏳ Aguardando designer terminar";
+
+    arteBox = '<div class="cs-box" style="border-left-color:'+artColor+';margin-top:14px">'+
+      '<div class="tt">FASE 4 · Arte Final</div>'+
+      '<div class="lab">'+esc(artLabel)+'</div>';
+
+    if(o.artReadyAt){
+      arteBox += '<div class="when">Pronta em '+esc(fmtDT(o.artReadyAt))+'</div>';
+    }
+    if(o.artSentAt && (artState === "enviada" || artState === "em_analise" || artState === "em_revisao")){
+      arteBox += '<div class="when">Enviada em '+esc(fmtDT(o.artSentAt))+'</div>';
+    }
+    if(o.artApprovedAt && artState === "aprovada"){
+      arteBox += '<div class="when">Aprovada em '+esc(fmtDT(o.artApprovedAt))+'</div>';
+    }
+    /* Link da arte (se designer colocou no card filho) */
+    if(o.artLink && o.artLink.trim()){
+      var artSafe = /^https?:\/\//i.test(o.artLink);
+      arteBox += '<div style="margin-top:10px"><a href="'+(artSafe?esc(o.artLink):"#")+'" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:13px;word-break:break-all">'+
+                 '<svg viewBox="0 0 24 24" fill="none" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M10 14l11-11M14 3h7v7M11 4H4a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h15a1 1 0 0 0 1-1v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+                 esc(o.artLink)+'</a></div>';
+    }
+    /* Feedback do cliente em revisão */
+    if(artState === "em_revisao" && o.artFeedback){
+      arteBox += '<div class="fb" style="margin-top:10px"><b>Pedido do cliente:</b> '+esc(o.artFeedback)+'</div>';
+    }
+    /* Ações */
+    if(artState === "pronta"){
+      arteBox += '<button class="cs-deliver" id="ctSendArte" style="margin-top:12px;background:'+artColor+';color:#fff">'+
+                 '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+                 'Enviar arte pro cliente'+
+                 '</button>';
+    } else if(artState === "em_revisao"){
+      arteBox += '<div style="font-size:12.5px;color:var(--ink-soft);margin:10px 0 8px;line-height:1.5">'+
+                 'Designer precisa ajustar e voltar a marcar como concluído. Depois você reenvia.'+
+                 '</div>'+
+                 '<button class="cs-deliver" id="ctSendArte" style="margin-top:4px;background:'+artColor+';color:#fff">'+
+                 '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;vertical-align:-3px;margin-right:6px"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+                 'Reenviar arte pro cliente'+
+                 '</button>';
+    } else if(artState === "aprovada"){
+      arteBox += '<div style="font-size:13.5px;color:var(--c-trafego);font-weight:800;margin-top:10px;text-align:center;padding:10px;background:rgba(54,211,153,.12);border-radius:8px">🚀 Pronto pra postar manualmente</div>';
+    }
+    arteBox += '</div>';
+  }
+
   /* CAIXA DE COMPARTILHAR (mesmo card no detalhe do card — escopo é o cronograma inteiro) */
   var shareBoxCard="";
   if(canManage(me)){
@@ -9965,12 +10162,20 @@ function openContentDetail(tid, idx){
     '<div class="fld" style="margin-top:18px"><label>Etapa deste conteúdo</label><div class="stage-row" id="ctStage">'+chips+'</div></div>'+
     clientBox+
     legendaBox+
+    directBox+
+    arteBox+
     shareBoxCard+
     tlHtml+
     cmtHtml;
   $("ctBody").querySelectorAll("[data-cmv]").forEach(b=>b.onclick=()=>setContentStage(tid,idx,b.dataset.cmv));
   /* [V63.60-F2] Bind dos botões do brief (Adicionar / Editar) */
   try{ bindBriefSidebar(); }catch(_){}
+  /* [V63.79-F2] Botão "Direcionar pra Designer" — abre modal pra escolher designer */
+  var _dd=$("ctDirectDesigner");
+  if(_dd) _dd.onclick=function(){ openDirectDesignerModal(tid, idx); };
+  /* [V63.80-F3] Botão "Enviar arte pro cliente" — muda artState pra "enviada" */
+  var _sa=$("ctSendArte");
+  if(_sa) _sa.onclick=function(){ sendArteToClient(tid, idx); };
   var _md=$("ctMarkDeliver"); if(_md) _md.onclick=()=>markCardDelivered(tid, idx);
   /* [V62.19] Hook do botão "Marcar conteúdo como concluído" (após cliente aprovar legenda) */
   var _mc=$("ctMarkCompleted"); if(_mc) _mc.onclick=()=>markCardDelivered(tid, idx);
@@ -10649,114 +10854,322 @@ async function markCardDelivered(tid, idx){
     arr[idx].history=hist;
     await db.collection("tasks").doc(tid).update({cronWeeks:arr});
     var lt=tasks.find(x=>x.id===tid); if(lt) lt.cronWeeks=arr;
-    /* [V63.60-F1] WORKFLOW ENGINE: quando um conteúdo é concluído, dispara criação automática
-       dos próximos cards (Edição de Mídia + Programação de posts).
-       Defensivo: só se a pref estiver ON, e marca o item como cascadeado pra não duplicar. */
-    try{ cascadeFromCronItem(tid, idx); }catch(e){ console.warn("cascadeFromCronItem:",e); }
+    /* [V63.79-F2] WORKFLOW ENGINE manual — disparo automático DESLIGADO.
+       Ary/Tatiana agora direciona pra Designer manualmente via botão "Direcionar pra Designer"
+       no detalhe do conteúdo. Só ainda dispara automático se a pref wfAutoCascade for explicitamente ON. */
+    try{
+      if(getPref("wfAutoCascade", false)){
+        cascadeFromCronItem(tid, idx);
+      }
+    }catch(e){ console.warn("cascadeFromCronItem:",e); }
     openContentDetail(tid, idx);
     toast("Conteúdo concluído ✓");
   }catch(e){ toast("Não foi possível marcar agora"); }
   finally{ busy=false; }
 }
 
-/* [V63.60-F1] WORKFLOW ENGINE — sucessão automática de tarefas.
-   Quando um item de cronograma é concluído (após aprovar tema E legenda),
-   cria automaticamente 2 cards filhos:
-   - 1 Edição de Mídia (com o tema como título)
-   - 1 Programação de posts (com o tema como título)
+/* [V63.79-F2] WORKFLOW ENGINE manual.
+   Cria 1 card de Edição de Mídia direcionado pro designer escolhido.
+   NÃO cria mais card de Postagem (postagem é manual agora — Ary/Tatiana postam direto).
+   
+   Pode ser chamado de 2 formas:
+   1. AUTOMÁTICO (legado): cascadeFromCronItem(tid, idx)
+      - Só roda se pref wfAutoCascade for explicitamente ON (default OFF agora)
+      - Atribui pro responsável do cronograma original
+   2. MANUAL (Fase 2): cascadeFromCronItem(tid, idx, designerId)
+      - Sempre roda, ignora pref
+      - Atribui pro designer escolhido no modal
    
    Defensivo:
-   - Toggle: wfAutoCascade (default ON)
    - Não duplica: marca item.wfCascaded=true no Firestore
-   - Atribui pro responsável atual da task de cronograma (ou ninguém se não tiver)
    - Falha silenciosamente sem quebrar o fluxo */
-async function cascadeFromCronItem(tid, idx){
-  try{ if(!getPref("wfAutoCascade", true)) return; }catch(_){ return; }
+async function cascadeFromCronItem(tid, idx, designerId){
+  var isManual = !!designerId;
+  if(!isManual){
+    /* Disparo automático — só roda se a pref explicitamente ativada */
+    try{ if(!getPref("wfAutoCascade", false)) return; }catch(_){ return; }
+  }
   if(!db||!me) return;
   var t = (tasks||[]).find(function(x){ return x.id === tid; });
   if(!t) return;
   var arr = (Array.isArray(t.cronWeeks) ? t.cronWeeks : []).map(cronNorm);
   var item = arr[idx];
   if(!item) return;
-  /* Já cascadeado? não duplica */
-  if(item.wfCascaded === true) return;
+  /* Já direcionado? não duplica */
+  if(item.wfCascaded === true){
+    if(isManual) toast("Este conteúdo já foi direcionado anteriormente.");
+    return;
+  }
   /* Pega o tema (título) — se vazio, usa fallback */
   var tema = (item.t || "").trim();
   if(!tema) tema = "Conteúdo " + (idx + 1);
   /* Cliente herdado da task pai */
   var client = (t.client || "").trim();
-  /* Responsável herdado (mesma pessoa do cronograma original) */
-  var assignee = (t.assignee || "").trim();
-  /* Prazo: 3 dias a partir de agora pra Edição, 5 dias pra Postagem */
+  /* [V63.79-F2] Designer responsável.
+     Manual: usa o designer escolhido no modal.
+     Automático (legado): herda o responsável do cronograma. */
+  var assigneeName = "";
+  var designerUser = null;
+  if(isManual){
+    designerUser = (users||[]).find(function(x){ return x.id === designerId; });
+    assigneeName = designerUser ? (designerUser.name || "").trim() : "";
+  } else {
+    assigneeName = (t.assignee || "").trim();
+  }
+  /* Prazo: 3 dias a partir de agora pra Edição */
   function fmtDate(daysAhead){
     var d = new Date(); d.setDate(d.getDate() + daysAhead);
     var y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), dd = String(d.getDate()).padStart(2,"0");
     return y + "-" + m + "-" + dd;
   }
   var now = Date.now();
-  /* Tarefa filha 1: Edição de Mídia */
+  /* Card filho: Edição de Mídia (único agora) */
   var dataEdicao = {
     client: client,
     title: tema,
     sector: "edicao_midia",
     status: "afazer",
-    assignee: assignee,
+    assignee: assigneeName,
     by: me.id,
     createdAt: now,
     startDate: "", startTime: "",
     dueDate: fmtDate(3), dueTime: "18:00", due: fmtDate(3),
     link: "",
+    desc: (item.d || "").trim(),  /* Legenda aprovada vai como briefing pro designer */
     priority: false,
     checklist: [],
-    /* Metadados de origem — pra futuro: rastreio do workflow */
+    /* Metadados de origem — pra rastreio do workflow */
     wfParent: tid,
     wfParentIdx: idx,
-    wfTipo: "cascaded"
-  };
-  /* Tarefa filha 2: Programação de posts */
-  var dataPost = {
-    client: client,
-    title: tema,
-    sector: "postagem",
-    status: "afazer",
-    assignee: assignee,
-    by: me.id,
-    createdAt: now,
-    startDate: "", startTime: "",
-    dueDate: fmtDate(5), dueTime: "10:00", due: fmtDate(5),
-    link: "",
-    priority: false,
-    checklist: [],
-    postIG: true, postFB: false,
-    postedDate: "", postedTime: "", posted: false,
-    wfParent: tid,
-    wfParentIdx: idx,
-    wfTipo: "cascaded"
+    wfTipo: isManual ? "manual" : "cascaded",
+    wfDirecionadoBy: me.id,
+    wfDirecionadoAt: now
   };
   try{
-    await db.collection("tasks").add(dataEdicao);
-    await db.collection("tasks").add(dataPost);
-    /* Marca o item original como cascadeado pra não duplicar */
+    var newDoc = await db.collection("tasks").add(dataEdicao);
+    /* Marca o item original como direcionado pra não duplicar */
     arr[idx].wfCascaded = true;
     arr[idx].wfCascadedAt = now;
+    arr[idx].wfDesignerId = designerId || null;
+    arr[idx].wfChildId = newDoc.id;  /* referência ao card filho criado */
     await db.collection("tasks").doc(tid).update({cronWeeks: arr});
     var lt = tasks.find(function(x){ return x.id === tid; });
     if(lt) lt.cronWeeks = arr;
-    /* Notifica responsável (se for diferente de mim) que tem 2 cards novos */
+    /* Push pro designer escolhido (se for diferente de mim) */
     try{
-      var assUser = (users||[]).find(function(x){ return (x.name||"").trim().toLowerCase() === assignee.toLowerCase(); });
-      if(assUser && assUser.id && assUser.id !== me.id){
-        sendPushToUsers(assUser.id, {
-          title: "⚡ 2 novas tarefas pra você",
-          body: (client ? client + " · " : "") + tema + " (Edição + Postagem)",
-          tag: "wf-cascade-" + tid + "-" + idx
+      if(designerUser && designerUser.id && designerUser.id !== me.id){
+        sendPushToUsers(designerUser.id, {
+          title: "🎨 Nova tarefa de Edição",
+          body: (client ? client + " · " : "") + tema,
+          tag: "wf-direct-" + tid + "-" + idx,
+          url: "?openTask=" + newDoc.id
         });
       }
     }catch(_){}
-    toast("⚡ Edição + Postagem criadas automaticamente");
+    if(isManual){
+      var nm = designerUser ? (designerUser.name || "designer") : "designer";
+      toast("✓ Direcionado pra " + nm);
+    } else {
+      toast("⚡ Edição criada automaticamente");
+    }
   }catch(e){
-    console.warn("[cascadeFromCronItem] erro ao criar cards filhos:", e);
-    /* falha silenciosa — não quebra o fluxo principal de "Conteúdo concluído" */
+    console.warn("[cascadeFromCronItem] erro ao criar card filho:", e);
+    if(isManual) toast("Erro ao direcionar. Tente novamente.");
+    /* falha silenciosa no automático — não quebra o fluxo principal */
+  }
+}
+
+/* [V63.80-F3] Propaga conclusão do card filho de Edição pro item pai do cronograma.
+   Quando designer marca o card de Edição como concluído, o item do cronograma pai
+   ganha artState="pronta" e o link da arte é copiado pra ser enviado ao cliente.
+   
+   Disparado a partir do taskSave (update e add). Idempotente — se artState já existe
+   e está em estado posterior a "pronta", não regride; apenas atualiza o link se mudou.
+   
+   Defensivo: erros não quebram o save da task. */
+async function propagateArtReadyIfNeeded(taskId, data){
+  if(!data || data.sector !== "edicao_midia") return;
+  if(data.status !== "concluido") return;
+  var parentId = data.wfParent;
+  var parentIdx = data.wfParentIdx;
+  if(!parentId || parentIdx == null) return;
+  if(!db) return;
+  var parent = (tasks||[]).find(function(x){ return x.id === parentId; });
+  if(!parent || !Array.isArray(parent.cronWeeks)) return;
+  var arr = parent.cronWeeks.map(cronNorm);
+  if(!arr[parentIdx]) return;
+  /* Estados já mais avançados não regridem */
+  var st = arr[parentIdx].artState;
+  if(st === "aprovada" || st === "concluida"){
+    return;
+  }
+  var alreadyReady = (st === "pronta" || st === "enviada" || st === "em_analise" || st === "em_revisao");
+  var now = Date.now();
+  if(alreadyReady){
+    /* Só atualiza o link se mudou */
+    var newLink = (data.link || "").trim();
+    if(newLink && arr[parentIdx].artLink !== newLink){
+      arr[parentIdx].artLink = newLink;
+      try{
+        await db.collection("tasks").doc(parentId).update({cronWeeks: arr});
+        var lt = tasks.find(function(x){ return x.id === parentId; });
+        if(lt) lt.cronWeeks = arr;
+      }catch(_){}
+    }
+    return;
+  }
+  /* Primeira vez — marca como pronta */
+  arr[parentIdx].artState = "pronta";
+  arr[parentIdx].artReadyAt = now;
+  arr[parentIdx].artLink = (data.link || "").trim();
+  arr[parentIdx].artChildId = taskId;
+  arr[parentIdx].artChildBy = data.by || (me ? me.id : null);
+  var hist = Array.isArray(arr[parentIdx].history) ? arr[parentIdx].history.slice() : [];
+  hist.push({kind:"art_ready", at:now, byId:(me?me.id:null), taskId:taskId});
+  if(hist.length>100) hist=hist.slice(-100);
+  arr[parentIdx].history = hist;
+  try{
+    await db.collection("tasks").doc(parentId).update({cronWeeks: arr});
+    var lt2 = tasks.find(function(x){ return x.id === parentId; });
+    if(lt2) lt2.cronWeeks = arr;
+    /* Push pros admins: designer entregou */
+    try{
+      var __tema = (arr[parentIdx].t && arr[parentIdx].t.trim()) ? arr[parentIdx].t.trim() : ("Conteúdo "+(parentIdx+1));
+      sendPushToUsers(pushAdminIds(), {
+        title: "🎨 Designer entregou a arte",
+        body: (parent.client?parent.client+" · ":"") + __tema,
+        data: { taskId: parentId, tag: "art-ready-"+parentId+"-"+parentIdx }
+      });
+    }catch(_){}
+  }catch(e){ console.warn("[propagateArtReady] erro:", e); }
+}
+
+/* [V63.80-F3] Admin envia a arte pronta pro cliente (após designer marcar como concluído).
+   Muda artState de "pronta" pra "enviada" — cliente verá no link público.
+   Push pro cliente NÃO existe (cliente não tem app), só pros admins veem o registro. */
+async function sendArteToClient(tid, idx){
+  if(!canManage(me)){ toast("Apenas administradores."); return; }
+  if(!db){ toast("Sem conexão."); return; }
+  var t = tasks.find(function(x){ return x.id === tid; });
+  if(!t || !Array.isArray(t.cronWeeks)){ toast("Tarefa não encontrada."); return; }
+  var arr = t.cronWeeks.map(cronNorm);
+  var item = arr[idx];
+  if(!item){ toast("Conteúdo não encontrado."); return; }
+  if(item.artState !== "pronta" && item.artState !== "em_revisao"){
+    toast("Arte ainda não está pronta pra enviar.");
+    return;
+  }
+  if(busy) return; busy = true;
+  try{
+    var now = Date.now();
+    arr[idx].artState = "enviada";
+    arr[idx].artSentAt = now;
+    arr[idx].artFeedback = "";  /* limpa feedback de revisão anterior se houver */
+    var hist = Array.isArray(arr[idx].history) ? arr[idx].history.slice() : [];
+    hist.push({kind:"art_sent_client", at:now, byId:(me?me.id:null)});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history = hist;
+    await db.collection("tasks").doc(tid).update({cronWeeks: arr});
+    var lt = tasks.find(function(x){ return x.id === tid; });
+    if(lt) lt.cronWeeks = arr;
+    toast("✓ Arte enviada pro cliente");
+    /* Recarrega o detalhe pra mostrar status novo */
+    try{ openContentDetail(tid, idx); }catch(_){}
+  }catch(e){
+    console.warn("[sendArteToClient] erro:", e);
+    toast("Erro ao enviar. Tente novamente.");
+  }finally{ busy = false; }
+}
+
+/* [V63.80-F3] Cliente APROVA a arte final via link público.
+   artState "enviada"/"em_analise" → "aprovada". Notifica admins. */
+async function clientApproveArte(idx){
+  var t = await ensureClientTask();
+  var tok = getClientToken();
+  if(!t||!db||!tok){
+    var code = (t?"":"T")+(db?"":"D")+(tok?"":"K");
+    console.error("[clientApproveArte] estado inválido:",{t:!!t,db:!!db,token:!!tok});
+    clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
+    return;
+  }
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
+    if(arr[idx].lgState !== "aprovada"){ clientShowError("Aprove a legenda antes."); return; }
+    if(arr[idx].artState !== "enviada" && arr[idx].artState !== "em_analise"){
+      clientShowError("Arte ainda não foi enviada."); return;
+    }
+    var now=Date.now();
+    arr[idx].artState="aprovada"; arr[idx].artApprovedAt=now;
+    arr[idx].artFeedback="";
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"art_approved", at:now});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+    /* Push pros admins */
+    try{
+      var __wk = Math.floor(idx/3)+1, __cn = (idx%3)+1;
+      var __lab = (arr[idx].t && arr[idx].t.trim()) ? arr[idx].t.trim() : ("SEM "+__wk+" · #"+__cn);
+      sendPushToUsers(pushAdminIds(), {
+        title: "✅ Cliente aprovou a arte",
+        body: (t.client||"Cliente") + " · " + __lab + " — pronto pra postar",
+        data: { taskId: t.id, tag: "art-app-"+t.id+"-"+idx }
+      });
+    }catch(_){}
+  }catch(e){
+    console.error("[clientApproveArte] erro firebase:", e);
+    var c = e && e.code ? e.code : "";
+    var msg = c==="permission-denied" ? "Permissão negada. Avise a agência."
+            : c==="unavailable" ? "Servidor indisponível. Tente em 10 segundos."
+            : "Não conseguimos registrar ("+(c||"erro")+"). Toque em Aprovar de novo.";
+    clientShowError(msg);
+  }
+}
+
+/* [V63.80-F3] Cliente PEDE REVISÃO da arte final via link público. */
+async function clientRequestRevisionArte(idx, fbTxt){
+  var t = await ensureClientTask();
+  var tok = getClientToken();
+  if(!t||!db||!tok){
+    var code = (t?"":"T")+(db?"":"D")+(tok?"":"K");
+    console.error("[clientRequestRevisionArte] estado inválido:",{t:!!t,db:!!db,token:!!tok});
+    clientShowError("Conexão perdida ["+code+"]. Recarregue a página.");
+    return;
+  }
+  try{
+    var arr=(Array.isArray(t.cronWeeks)?t.cronWeeks:[]).map(cronNorm);
+    if(!arr[idx]){ clientShowError("Conteúdo não encontrado."); return; }
+    if(arr[idx].artState !== "enviada" && arr[idx].artState !== "em_analise"){
+      clientShowError("Arte não está em análise."); return;
+    }
+    var fb=(fbTxt||"").trim().slice(0,1500);
+    if(!fb){ clientShowError("Escreva o pedido de revisão."); return; }
+    var now=Date.now();
+    arr[idx].artState="em_revisao"; arr[idx].artAt=now;
+    arr[idx].artFeedback=fb;
+    var hist=Array.isArray(arr[idx].history)?arr[idx].history.slice():[];
+    hist.push({kind:"art_revision_requested", at:now, fb:fb});
+    if(hist.length>100) hist=hist.slice(-100);
+    arr[idx].history=hist;
+    await db.collection("tasks").doc(t.id).update({cronWeeks:arr});
+    /* Push pros admins */
+    try{
+      var __wk = Math.floor(idx/3)+1, __cn = (idx%3)+1;
+      var __lab = (arr[idx].t && arr[idx].t.trim()) ? arr[idx].t.trim() : ("SEM "+__wk+" · #"+__cn);
+      sendPushToUsers(pushAdminIds(), {
+        title: "✏ Cliente pediu revisão da arte",
+        body: (t.client||"Cliente") + " · " + __lab,
+        data: { taskId: t.id, tag: "art-rev-"+t.id+"-"+idx }
+      });
+    }catch(_){}
+  }catch(e){
+    console.error("[clientRequestRevisionArte] erro firebase:", e);
+    var c = e && e.code ? e.code : "";
+    var msg = c==="permission-denied" ? "Permissão negada. Avise a agência."
+            : c==="unavailable" ? "Servidor indisponível. Tente em 10 segundos."
+            : "Não conseguimos registrar ("+(c||"erro")+"). Toque em Pedir revisão de novo.";
+    clientShowError(msg);
   }
 }
 
@@ -10968,6 +11381,26 @@ function renderClientView(){
       lgRows.forEach(function(r){ h += renderCvCardLegenda(r.c, r.i); });
       h += '</div></div>';
     }
+
+    /* [V63.80-F3] ============ FASE 3 · ARTES FINAIS (só se já houver arte enviada) ============ */
+    var arRows = rows.filter(function(r){
+      return r.c.artState==="enviada" || r.c.artState==="em_analise" || r.c.artState==="em_revisao" || r.c.artState==="aprovada" || r.c.artState==="concluida";
+    });
+    if(arRows.length > 0){
+      var arAprov = arRows.filter(function(r){return r.c.artState==="aprovada"||r.c.artState==="concluida";}).length;
+      var arRevis = arRows.filter(function(r){return r.c.artState==="em_revisao";}).length;
+      var arPend  = arRows.length - arAprov - arRevis;
+      h+='<div class="cv-phase phase2">'+
+          '<div class="cv-phase-h"><span class="cv-phase-num phase2">3</span><div><div class="cv-phase-t">Artes finais</div><div class="cv-phase-d">A equipe criou as artes dos posts com base nos temas e legendas aprovados. Confira cada arte e aprove — depois disso o post está pronto pra ser publicado.</div></div></div>'+
+          '<div class="cv-stats" style="margin-bottom:14px">'+
+            '<div class="cv-s ok"><b>'+arAprov+'</b><span>Aprovada'+(arAprov===1?'':'s')+'</span></div>'+
+            '<div class="cv-s rev"><b>'+arRevis+'</b><span>Em revisão</span></div>'+
+            '<div class="cv-s pen"><b>'+arPend+'</b><span>Pendente'+(arPend===1?'':'s')+'</span></div>'+
+          '</div>'+
+         '<div class="cv-list">';
+      arRows.forEach(function(r){ h += renderCvCardArte(r.c, r.i); });
+      h += '</div></div>';
+    }
   }
 
   /* [V63.11] Botão Compartilhar Link com a Equipe via WhatsApp */
@@ -11060,6 +11493,13 @@ function renderCvTimeline(c, phase){
       legenda_approved:       {ic:"✅", txt:"Você aprovou a legenda"},
       legenda_edited_approved:{ic:"✏",  txt:"Você editou e aprovou a legenda"},
       legenda_revision:       {ic:"↶",  txt:"Você pediu revisão da legenda"}
+    },
+    /* [V63.80-F3] FASE 3 — Arte Final */
+    arte: {
+      art_sent_client:         {ic:"🎨", txt:"Arte enviada pra você"},
+      client_opened_arte:      {ic:"👁",  txt:"Você abriu a arte"},
+      art_approved:            {ic:"✅", txt:"Você aprovou a arte"},
+      art_revision_requested:  {ic:"↶",  txt:"Você pediu revisão da arte"}
     }
   };
   var map = byPhase[phase]; if(!map) return "";
@@ -11226,6 +11666,86 @@ function renderCvCardLegenda(c, i){
       : '')+
     (isAprov ? '<div style="font-size:13.5px;color:var(--c-trafego);font-weight:800;text-align:center;padding:10px;background:rgba(54,211,153,.12);border-radius:8px;margin-top:8px">🚀 Pronto pra publicar</div>' : '')+
     renderCvTimeline(c, "legenda")+
+  '</div>';
+}
+
+/* [V63.80-F3] Mapeia artState pra cor/label visíveis pro cliente */
+function clientArtStatusInfo(state){
+  if(!state) return null;
+  switch(state){
+    case "enviada":    return {label:"Enviada — analise", color:"#a78bfa"};
+    case "em_analise": return {label:"Em análise",        color:"#a78bfa"};
+    case "aprovada":   return {label:"Aprovada",          color:"var(--c-trafego)"};
+    case "em_revisao": return {label:"Em revisão",        color:"var(--c-rev)"};
+    case "concluida":  return {label:"Concluída",         color:"var(--c-trafego)"};
+    default: return null;
+  }
+}
+
+/* [V63.80-F3] Renderiza UM card da FASE 3 (Arte Final) pro cliente.
+   Clonado de renderCvCardLegenda. Mostra a arte (link), tema, legenda aprovada,
+   e botões de Aprovar / Pedir revisão. */
+function renderCvCardArte(c, i){
+  var wk=Math.floor(i/3)+1, cn=(i%3)+1;
+  var info=clientArtStatusInfo(c.artState);
+  var canAct = (c.artState==="enviada"||c.artState==="em_analise");
+  var isAprov= (c.artState==="aprovada"||c.artState==="concluida");
+  var isRev  = (c.artState==="em_revisao");
+  /* Renderiza preview do link da arte */
+  var artPreview = "";
+  if(c.artLink && c.artLink.trim()){
+    var aSafe = /^https?:\/\//i.test(c.artLink);
+    if(aSafe){
+      /* Se for imagem, mostra inline. Se não, link clicável. */
+      var isImg = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(c.artLink);
+      if(isImg){
+        artPreview = '<div style="margin:10px 0;border-radius:12px;overflow:hidden;border:1px solid var(--line)">'+
+          '<img src="'+esc(c.artLink)+'" alt="Arte final" style="display:block;width:100%;max-height:480px;object-fit:contain;background:var(--bg)">'+
+          '</div>';
+      } else {
+        artPreview = '<a href="'+esc(c.artLink)+'" target="_blank" rel="noopener" class="cv-link" style="margin:10px 0;display:block">🎨 '+esc(c.artLink)+'</a>';
+      }
+    } else {
+      artPreview = '<div class="cv-link cv-link-plain" style="margin:10px 0">📎 '+esc(c.artLink)+'</div>';
+    }
+  } else {
+    artPreview = '<div style="padding:14px;background:var(--bg);border:1px dashed var(--line);border-radius:10px;margin:10px 0;text-align:center;color:var(--ink-faint);font-size:13px">A arte vai aparecer aqui</div>';
+  }
+  return '<div class="cv-card cv-card-lg '+(isAprov?'ok':isRev?'rev':'')+'">'+
+    '<div class="cv-card-h">'+
+      '<div class="cv-pill phase2" style="background:rgba(125,108,255,.18);color:#b8a8ff">SEM '+wk+' · #'+cn+' · ARTE</div>'+
+      (info?'<div class="cv-status" style="--dot-c:'+info.color+'">'+esc((info.label||'').toLowerCase())+'</div>':'')+
+    '</div>'+
+    '<div class="cv-ti" style="font-size:14px;color:var(--ink-soft);font-weight:700">Tema: '+((c.t&&c.t.trim())?esc(c.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
+    artPreview+
+    '<div class="cv-legenda-box">'+
+      '<div class="cv-legenda-lab">📝 LEGENDA APROVADA</div>'+
+      '<div class="cv-legenda-txt">'+esc(c.lg||c.d||"")+'</div>'+
+    '</div>'+
+    (isRev && c.artFeedback ? '<div class="cv-feedback"><b>Sua observação:</b> '+esc(c.artFeedback)+'</div>' : '')+
+    (canAct
+      ? '<div class="cv-actions" id="cvArAct'+i+'">'+
+          '<button class="cv-btn ok"  data-aai="'+i+'">Aprovar arte</button>'+
+          '<button class="cv-btn rev" data-ari="'+i+'">Pedir revisão</button>'+
+        '</div>'+
+        '<div class="cv-confirm" id="cvArCf'+i+'" style="display:none">'+
+          '<div class="cv-cf-msg">Você confirma que <b>APROVA</b> esta arte? Depois disso o post fica pronto pra publicar.</div>'+
+          '<div class="cv-cf-acts">'+
+            '<button class="cv-btn ok" data-doappa="'+i+'">✓ Sim, aprovar</button>'+
+            '<button class="cv-btn cancel" data-acnc="'+i+'">Cancelar</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="cv-revform" id="cvArRv'+i+'" style="display:none">'+
+          '<label class="cv-rv-lab">O que precisa ajustar na arte? Escreva em poucas palavras:</label>'+
+          '<textarea class="cv-rv-ta" id="cvArRvT'+i+'" maxlength="500" rows="3" placeholder="Ex: trocar a cor, ajustar a foto, mudar a posição do texto, etc."></textarea>'+
+          '<div class="cv-cf-acts">'+
+            '<button class="cv-btn rev" data-doreva="'+i+'">📨 Enviar pedido</button>'+
+            '<button class="cv-btn cancel" data-acnc="'+i+'">Cancelar</button>'+
+          '</div>'+
+        '</div>'
+      : '')+
+    (isAprov ? '<div style="font-size:13.5px;color:var(--c-trafego);font-weight:800;text-align:center;padding:10px;background:rgba(54,211,153,.12);border-radius:8px;margin-top:8px">✅ Arte aprovada — pronto pra postar</div>' : '')+
+    renderCvTimeline(c, "arte")+
   '</div>';
 }
 
@@ -11465,6 +11985,55 @@ function bindClientViewActions(){
     try{ await clientRequestRevisionLegenda(i, txt); }
     finally{ b.disabled=false; b.textContent=origTxt; }
   };});
+  /* [V63.80-F3] ===== FASE 3: ARTES ===== */
+  document.querySelectorAll("[data-aai]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.aai;
+    var a=document.getElementById("cvArAct"+i), c=document.getElementById("cvArCf"+i),
+        r=document.getElementById("cvArRv"+i);
+    if(a) a.style.display="none";
+    if(r) r.style.display="none";
+    if(c) c.style.display="block";
+  };});
+  document.querySelectorAll("[data-ari]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.ari;
+    var a=document.getElementById("cvArAct"+i), c=document.getElementById("cvArCf"+i),
+        r=document.getElementById("cvArRv"+i);
+    if(a) a.style.display="none";
+    if(c) c.style.display="none";
+    if(r) r.style.display="block";
+    var ta=document.getElementById("cvArRvT"+i); if(ta) try{ ta.focus(); }catch(_){}
+  };});
+  document.querySelectorAll("[data-acnc]").forEach(function(b){ b.onclick=function(){
+    var i=+b.dataset.acnc;
+    var a=document.getElementById("cvArAct"+i), c=document.getElementById("cvArCf"+i),
+        r=document.getElementById("cvArRv"+i);
+    if(c) c.style.display="none";
+    if(r) r.style.display="none";
+    if(a) a.style.display="flex";
+  };});
+  document.querySelectorAll("[data-doappa]").forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var origTxt = b.textContent;
+    b.disabled=true; b.textContent="Enviando…";
+    try{ await clientApproveArte(+b.dataset.doappa); }
+    finally{ b.disabled=false; b.textContent=origTxt; }
+  };});
+  document.querySelectorAll("[data-doreva]").forEach(function(b){ b.onclick=async function(){
+    if(b.disabled) return;
+    var i=+b.dataset.doreva;
+    var ta=document.getElementById("cvArRvT"+i);
+    var txt=(ta&&ta.value||"").trim();
+    if(!txt){
+      ta.style.borderColor="var(--c-rev)";
+      ta.placeholder="⚠ Escreva o que precisa mudar antes de enviar";
+      try{ ta.focus(); }catch(_){}
+      return;
+    }
+    var origTxt = b.textContent;
+    b.disabled=true; b.textContent="Enviando…";
+    try{ await clientRequestRevisionArte(i, txt); }
+    finally{ b.disabled=false; b.textContent=origTxt; }
+  };});
 }
 
 function autoMarkOpened(){
@@ -11484,6 +12053,24 @@ function autoMarkOpened(){
       c.history=hist;
       changed=true;
       newlyOpened.push({idx:idx, title:(c.t||"").trim()});
+    }
+    /* [V63.80-F3] Legenda enviada → em_analise (cliente abriu) */
+    if(c.lgState==="enviada"){
+      c.lgState="em_analise";
+      var hist2=Array.isArray(c.history)?c.history.slice():[];
+      hist2.push({kind:"client_opened_legenda", at:now});
+      if(hist2.length>100) hist2=hist2.slice(-100);
+      c.history=hist2;
+      changed=true;
+    }
+    /* [V63.80-F3] Arte enviada → em_analise (cliente abriu) */
+    if(c.artState==="enviada"){
+      c.artState="em_analise";
+      var hist3=Array.isArray(c.history)?c.history.slice():[];
+      hist3.push({kind:"client_opened_arte", at:now});
+      if(hist3.length>100) hist3=hist3.slice(-100);
+      c.history=hist3;
+      changed=true;
     }
   });
   if(changed){
@@ -11833,32 +12420,12 @@ function buildSecHint(){
   if(df) df.style.display=hideTD?"none":"";
   if(lf) lf.style.display=hideTD?"none":"";
   // ---- Roteiro (fluxo de 4 etapas) ----
+  /* [V63.78] DESLIGADO — Roteiro agora usa formato cronograma (pacotes 4/6/12 com tema+legenda).
+     O bloco antigo de 4 etapas (Briefing/Pré-roteiro/Roteirização/Revisão) fica oculto.
+     A interface nova aparece em tCronFld + tCronWeeksFld (mesmo do cronograma). */
   var rf=$("tRotFld");
   if(rf){
-    var isRot=(selSector==="roteiro"); rf.style.display=isRot?"":"none";
-    if(isRot){
-      var rappr=isRoteiroPerson(me);
-      var rr=$("tRotState"); rr.innerHTML="";
-      [["rascunho","Em roteirização"],["em_revisao","Em revisão"],["aprovado","Aprovado p/ gravação"]].forEach(function(o){
-        var b=document.createElement("button"); b.type="button";
-        var locked=((o[0]==="em_revisao"||o[0]==="aprovado")&&!rappr);
-        b.className="stage-chip"+(selRotState===o[0]?" on":"")+(locked?" lock":"");
-        b.textContent=o[1];
-        b.onclick=function(){
-          if(locked){ toast("Apenas Miercohévisk e Arydyjany trabalham no roteiro"); return; }
-          selRotState=o[0]; buildSecHint();
-        };
-        rr.appendChild(b);
-      });
-      var rh=$("tRotHint");
-      rh.textContent = !rappr
-        ? "Somente Miercohévisk e Arydyjany preenchem, enviam para revisão e aprovam o roteiro."
-        : selRotState==="aprovado"
-          ? "Roteiro aprovado — pronto para encaminhar à produção (gravação)."
-          : selRotState==="em_revisao"
-            ? "Em revisão. Você pode aprovar para gravação ou devolver para ajustes."
-            : "Em roteirização: preencha as etapas 1 a 3 e mude para “Em revisão” quando terminar.";
-    }
+    rf.style.display = "none";  /* Bloco velho sempre escondido agora */
   }
   var cf=$("tCopyFld"), pf=$("tPostFld2");
   // ---- Copywriter ----
@@ -11912,6 +12479,8 @@ function buildSecHint(){
   }
 }
 function cronWeekCount(){ return selFreq==="semanal"?1 : selFreq==="quinzenal"?2 : 4; }
+/* [V63.78] Pacotes do Roteiro — 4, 6 ou 12 vídeos */
+function roteiroVideoCount(){ return selRoteiroPack==="p4"?4 : selRoteiroPack==="p6"?6 : 12; }
 function cronNorm(x){
   var st="afazer";
   if(x&&typeof x==="object"){
@@ -12000,41 +12569,106 @@ function genShareToken(){
 }
 function buildCronUI(){
   var fld=$("tCronFld"); if(!fld)return;
+  /* [V63.78] Agora aceita ROTEIRO também (com pacotes 4/6/12 vídeos). */
   var isCron=(selSector==="design"||selSector==="copy");
-  fld.style.display=isCron?"":"none";
-  var wf=$("tCronWeeksFld"); if(wf) wf.style.display=isCron?"":"none";
-  if(!isCron)return;
+  var isRoteiro=(selSector==="roteiro");
+  var isAnyCron = isCron || isRoteiro;
+  fld.style.display=isAnyCron?"":"none";
+  var wf=$("tCronWeeksFld"); if(wf) wf.style.display=isAnyCron?"":"none";
+  if(!isAnyCron)return;
+
+  /* Atualiza label do campo "Frequência" / "Pacote" */
+  var fld_lab = fld.querySelector("label");
+  if(fld_lab) fld_lab.textContent = isRoteiro ? "Pacote (quantidade de vídeos)" : "Frequência";
+
   var fr=$("tCronFreq"); fr.innerHTML="";
-  [["semanal","Semanal · 3"],["quinzenal","Quinzenal · 6"],["mensal","Mensal · 12"]].forEach(function(o){
-    var b=document.createElement("button"); b.type="button";
-    b.className="stage-chip"+(selFreq===o[0]?" on":""); b.textContent=o[1];
-    b.onclick=function(){ selFreq=o[0]; buildCronUI(); }; fr.appendChild(b);
-  });
-  var W=cronWeekCount(), total=W*3;
+  var opts;
+  if(isRoteiro){
+    /* [V63.78] Pacotes do Roteiro */
+    opts = [["p4","4 vídeos"],["p6","6 vídeos"],["p12","12 vídeos"]];
+    opts.forEach(function(o){
+      var b=document.createElement("button"); b.type="button";
+      b.className="stage-chip"+(selRoteiroPack===o[0]?" on":"");
+      b.textContent=o[1];
+      b.onclick=function(){ selRoteiroPack=o[0]; buildCronUI(); };
+      fr.appendChild(b);
+    });
+  } else {
+    /* Cronograma original — frequência semanal/quinzenal/mensal */
+    opts = [["semanal","Semanal · 3"],["quinzenal","Quinzenal · 6"],["mensal","Mensal · 12"]];
+    opts.forEach(function(o){
+      var b=document.createElement("button"); b.type="button";
+      b.className="stage-chip"+(selFreq===o[0]?" on":"");
+      b.textContent=o[1];
+      b.onclick=function(){ selFreq=o[0]; buildCronUI(); };
+      fr.appendChild(b);
+    });
+  }
+
+  /* Calcula total de itens conforme tipo (cronograma: W*3, roteiro: pacote escolhido) */
+  var total, useWeeks;
+  if(isRoteiro){
+    total = roteiroVideoCount();
+    useWeeks = false; /* roteiro não tem agrupamento por semana */
+  } else {
+    var W=cronWeekCount();
+    total = W*3;
+    useWeeks = true;
+  }
   cronWeeks=cronWeeks.map(cronNorm);
   while(cronWeeks.length<total)cronWeeks.push({t:"",d:"",l:""});
   if(cronWeeks.length>total)cronWeeks=cronWeeks.slice(0,total);
+
   var w=$("tCronWeeks"); w.innerHTML="";
-  for(var wk=0; wk<W; wk++){
+
+  if(useWeeks){
+    /* Cronograma — agrupado por semanas (3 conteúdos por semana) */
+    var W=cronWeekCount();
+    for(var wk=0; wk<W; wk++){
+      var grp=document.createElement("div"); grp.className="cron-wk";
+      var lab=document.createElement("div"); lab.className="cron-wk-l"; lab.textContent="Semana "+(wk+1);
+      grp.appendChild(lab);
+      for(var c=0;c<3;c++){ (function(idx,cn){
+        var blk=document.createElement("div"); blk.className="cron-ct";
+        var cl=document.createElement("div"); cl.className="cron-cl"; cl.textContent="Conteúdo "+cn;
+        var l1=document.createElement("div"); l1.className="cron-fl"; l1.textContent="Tarefa / Título";
+        var ti=document.createElement("input"); ti.placeholder="Ex.: Post carrossel — lançamento";
+        ti.value=cronWeeks[idx].t||""; ti.oninput=function(){ cronWeeks[idx].t=ti.value; };
+        var l2=document.createElement("div"); l2.className="cron-fl"; l2.textContent="Descrição / briefing";
+        var ta=document.createElement("textarea"); ta.placeholder="Temas, formatos, referências…";
+        ta.value=cronWeeks[idx].d||""; ta.oninput=function(){ cronWeeks[idx].d=ta.value; };
+        var l3=document.createElement("div"); l3.className="cron-fl"; l3.textContent="Link / anexo";
+        var li=document.createElement("input"); li.placeholder="Cole o link (Drive, Canva…)"; li.setAttribute("inputmode","url");
+        li.value=cronWeeks[idx].l||""; li.oninput=function(){ cronWeeks[idx].l=li.value; };
+        blk.appendChild(cl); blk.appendChild(l1); blk.appendChild(ti);
+        blk.appendChild(l2); blk.appendChild(ta); blk.appendChild(l3); blk.appendChild(li);
+        grp.appendChild(blk);
+      })(wk*3+c, c+1); }
+      w.appendChild(grp);
+    }
+  } else {
+    /* [V63.78] Roteiro — lista de vídeos sem agrupamento por semana.
+       Labels: "Tema do vídeo" e "Legenda do vídeo". */
     var grp=document.createElement("div"); grp.className="cron-wk";
-    var lab=document.createElement("div"); lab.className="cron-wk-l"; lab.textContent="Semana "+(wk+1);
+    var lab=document.createElement("div"); lab.className="cron-wk-l";
+    lab.textContent = total + " vídeos no pacote";
     grp.appendChild(lab);
-    for(var c=0;c<3;c++){ (function(idx,cn){
+    for(var v=0; v<total; v++){ (function(idx, num){
       var blk=document.createElement("div"); blk.className="cron-ct";
-      var cl=document.createElement("div"); cl.className="cron-cl"; cl.textContent="Conteúdo "+cn;
-      var l1=document.createElement("div"); l1.className="cron-fl"; l1.textContent="Tarefa / Título";
-      var ti=document.createElement("input"); ti.placeholder="Ex.: Post carrossel — lançamento";
+      var cl=document.createElement("div"); cl.className="cron-cl"; cl.textContent="Vídeo "+num;
+      var l1=document.createElement("div"); l1.className="cron-fl"; l1.textContent="Tema do vídeo";
+      var ti=document.createElement("input"); ti.placeholder="Ex.: 5 sinais de gastrite — alerta";
       ti.value=cronWeeks[idx].t||""; ti.oninput=function(){ cronWeeks[idx].t=ti.value; };
-      var l2=document.createElement("div"); l2.className="cron-fl"; l2.textContent="Descrição / briefing";
-      var ta=document.createElement("textarea"); ta.placeholder="Temas, formatos, referências…";
+      var l2=document.createElement("div"); l2.className="cron-fl"; l2.textContent="Legenda do vídeo";
+      var ta=document.createElement("textarea"); ta.placeholder="Texto da legenda — clique pode pegar pelo briefing depois";
       ta.value=cronWeeks[idx].d||""; ta.oninput=function(){ cronWeeks[idx].d=ta.value; };
-      var l3=document.createElement("div"); l3.className="cron-fl"; l3.textContent="Link / anexo";
-      var li=document.createElement("input"); li.placeholder="Cole o link (Drive, Canva…)"; li.setAttribute("inputmode","url");
+      var l3=document.createElement("div"); l3.className="cron-fl"; l3.textContent="Link de referência (opcional)";
+      var li=document.createElement("input"); li.placeholder="Drive, Canva, referências visuais…"; li.setAttribute("inputmode","url");
       li.value=cronWeeks[idx].l||""; li.oninput=function(){ cronWeeks[idx].l=li.value; };
       blk.appendChild(cl); blk.appendChild(l1); blk.appendChild(ti);
       blk.appendChild(l2); blk.appendChild(ta); blk.appendChild(l3); blk.appendChild(li);
       grp.appendChild(blk);
-    })(wk*3+c, c+1); }
+    })(v, v+1); }
     w.appendChild(grp);
   }
 }
@@ -12081,6 +12715,15 @@ function openTaskForm(t){
   setV("tRotHook",R.hook||"");setV("tRotDev",R.dev||"");setV("tRotCta",R.cta||"");
   setV("tRotAudio",R.audio||"");setV("tRotVideo",R.video||"");
   selRotState=(t&&(t.rotState==="em_revisao"||t.rotState==="aprovado"))?t.rotState:"rascunho";
+  /* [V63.78] Pacote do Roteiro — detecta pela quantidade de itens em cronWeeks (se existir) */
+  if(t && t.sector === "roteiro" && Array.isArray(t.cronWeeks)){
+    var n = t.cronWeeks.length;
+    selRoteiroPack = n <= 4 ? "p4" : (n <= 6 ? "p6" : "p12");
+  } else if(t && t.sector === "roteiro" && t.roteiroPack){
+    selRoteiroPack = t.roteiroPack;
+  } else {
+    selRoteiroPack = "p4";
+  }
   $("tPrioFld").style.display=(me&&me.admin)?"":"none";
   buildSecGrid();buildStageRow();renderChkEditor();buildRespChips();buildPrioToggle();buildCronUI();buildSecHint();
   openSheet(taskSheet);
@@ -12097,9 +12740,11 @@ $("taskSave").onclick=async()=>{
   const hideT=(selSector==="design"||selSector==="copy"||selSector==="postagem"||selSector==="roteiro");
   if(hideT){
     var freqLbl=selFreq==="quinzenal"?"Quinzenal":selFreq==="mensal"?"Mensal":"Semanal";
+    /* [V63.78] Roteiro agora usa pacote (4/6/12 vídeos) — título inclui a quantidade */
+    var rotLbl = selRoteiroPack==="p12"?"12 vídeos":selRoteiroPack==="p6"?"6 vídeos":"4 vídeos";
     title = selSector==="design" ? ("Cronograma "+freqLbl+" — "+client)
           : selSector==="copy"   ? ("Copywriter "+freqLbl+" — "+client)
-          : selSector==="roteiro"? ("Roteiro — "+client)
+          : selSector==="roteiro"? ("Roteiro "+rotLbl+" — "+client)
           : ("Posts — "+client);
   }
   if(!hideT && !title)return toast("Informe a tarefa (título)");
@@ -12127,6 +12772,15 @@ $("taskSave").onclick=async()=>{
       o.t=(o.t||"").trim(); o.d=(o.d||"").trim(); o.l=(o.l||"").trim();
       return o;
     });
+  } else if(selSector==="roteiro"){
+    /* [V63.78] Roteiro agora salva cronWeeks (com tema+legenda pra cada vídeo) */
+    data.roteiroPack=selRoteiroPack;
+    data.cronWeeks=cronWeeks.slice(0,roteiroVideoCount()).map(function(x){
+      var o=cronNorm(x);
+      o.t=(o.t||"").trim(); o.d=(o.d||"").trim(); o.l=(o.l||"").trim();
+      return o;
+    });
+    data.freq=""; data.cronMonth="";
   } else { data.freq=""; data.cronMonth=""; data.cronWeeks=[]; }
   if(selSector==="copy"){
     var cs=selCopyState; if(cs==="aprovado" && !isCopyApprover(me)) cs="em_avaliacao";
@@ -12161,6 +12815,8 @@ $("taskSave").onclick=async()=>{
       const prev=tasks.find(x=>x.id===editTaskId);
       Object.assign(data,trackFields(prev,taskStatus));
       await db.collection("tasks").doc(editTaskId).update(data);toast("Tarefa atualizada");
+      /* [V63.80-F3] Propaga conclusão do card filho de Edição pro item pai do cronograma */
+      try{ await propagateArtReadyIfNeeded(editTaskId, data); }catch(_){}
       /* [V63.12] Push REAL — se o assignee MUDOU, avisa o novo responsável */
       try{
         var prevAss = ((prev && prev.assignee) || "").trim().toLowerCase();
@@ -12182,6 +12838,8 @@ $("taskSave").onclick=async()=>{
       data.by=me.id;data.createdAt=Date.now();
       var docRef = await db.collection("tasks").add(data);
       toast("Tarefa criada e compartilhada");
+      /* [V63.80-F3] Propaga conclusão se já criou direto como concluído (caso raro) */
+      try{ await propagateArtReadyIfNeeded(docRef.id, data); }catch(_){}
       /* [V63.12] Push REAL — tarefa nova: avisa responsável se for diferente de mim */
       try{
         var newAss2 = ((data.assignee) || "").trim().toLowerCase();
