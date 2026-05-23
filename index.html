@@ -4352,7 +4352,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.64 · build antecedencia-fix</div>
+    <div class="ver">versão 63.71 · build dropdown-portal-fix</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -4656,7 +4656,9 @@ const DEFAULT_PREFS = {
   notifyClientViewing: true,  /* F3: push em tempo real quando cliente abre o link */
   wfAutoCascade: true,        /* F1: sucessão automática (Edição+Postagem) quando conteúdo é concluído */
   showInsights: true,         /* F4: mostrar widget de insights na tela Hoje */
-  showCommDates: true         /* F5: sugestões de datas comemorativas */
+  showCommDates: true,        /* F5: sugestões de datas comemorativas */
+  /* [V63.70] Feature 6: Agendamento de postagens (Caminho B — assistido) */
+  notifyPostScheduled: true   /* push 10min antes + na hora do post agendado */
 };
 function loadPrefs(){
   try{
@@ -5155,6 +5157,8 @@ var __clientOpenedMark = false;
     try{ if(typeof autoArchiveOldPosts === "function") autoArchiveOldPosts(); }catch(_){}
     /* [V63.29] Inicia subscription dos chats (lista de conversas em tempo real) */
     try{ if(typeof subscribeChats === "function") subscribeChats(); }catch(_){}
+    /* [V63.70-F6] Re-agenda post reminders sempre que tasks mudam */
+    try{ schedulePostReminders(); }catch(_){}
   },err=>{});
   /* [V63.60-F2] BRIEF DO CLIENTE — carrega ficha viva de cada cliente.
      Schema: { client, niche, tone, keywords[], banned[], cta, hashtags[], colors, notes }
@@ -6836,6 +6840,10 @@ async function requestNotifyPermission(){
    Agenda setTimeout pra cada compromisso meu que vai começar dentro de 24h.
    É re-chamado toda vez que `events` muda. */
 var reminderTimers = {};
+/* [V63.70-F6] Agendamento de postagens — timers por taskId (2 timers cada: warn+fire) */
+var postReminderTimers = {};
+/* Pra detectar push click → abre modal de "Hora de Postar" automaticamente */
+var _pendingPostExecutor = null;
 
 function scheduleEventReminders(){
   /* Limpa timers antigos */
@@ -6881,6 +6889,302 @@ function scheduleEventReminders(){
     }, trigger - now);
   });
 }
+
+/* ═════════════════ [V63.70] F6: AGENDAMENTO DE POSTAGENS ═════════════════
+   Sistema "assistido" — push notification no horário → user toca → app abre tela
+   "Hora de Postar" → copia caption pra clipboard → abre Instagram/Facebook via
+   URL scheme → user cola e posta → marca como postado no app.
+   
+   Dispara 2 push por post: 10min antes (aviso) + na hora exata (ação principal).
+   
+   Aproveita TUDO que já existe: push FCM, notification nativa, ImageKit, history. */
+
+function schedulePostReminders(){
+  /* Limpa timers antigos */
+  Object.keys(postReminderTimers).forEach(function(id){
+    try{ clearTimeout(postReminderTimers[id]); }catch(_){}
+  });
+  postReminderTimers = {};
+  if(!me) return;
+  if(!getPref("notifyPostScheduled", true)) return;
+
+  var now = Date.now();
+  var horizon = now + 86400000; /* só agenda timers pras próximas 24h */
+
+  (tasks||[]).forEach(function(t){
+    if(!t || t.sector !== "postagem") return;
+    /* Já postado? não agenda */
+    if(t.posted === true || t.status === "concluido") return;
+    /* Verifica se tem horário definido (postedDate é quando POSTOU; pra agendar usamos dueDate+dueTime) */
+    var dt = t.dueDate, hr = t.dueTime;
+    if(!dt) return;
+    /* Parse "YYYY-MM-DD" + "HH:MM" pra timestamp */
+    var parts = dt.split("-"); if(parts.length !== 3) return;
+    var hp = (hr||"10:00").split(":");
+    var scheduled = new Date(
+      parseInt(parts[0],10), parseInt(parts[1],10)-1, parseInt(parts[2],10),
+      parseInt(hp[0],10)||10, parseInt(hp[1],10)||0, 0, 0
+    ).getTime();
+    if(isNaN(scheduled)) return;
+
+    /* Filtra: só posts atribuídos a mim (responsável) */
+    var mine = false;
+    if(t.assignee){
+      var u = (users||[]).find(function(x){ return (x.name||"").trim().toLowerCase() === (t.assignee||"").trim().toLowerCase(); });
+      mine = !!(u && u.id === me.id);
+    } else if(t.by === me.id){
+      mine = true;
+    }
+    if(!mine) return;
+
+    /* Timer 1: 10 min antes (aviso) */
+    var triggerWarn = scheduled - 10*60000;
+    if(triggerWarn > now && triggerWarn <= horizon){
+      postReminderTimers[t.id+"_w"] = setTimeout(function(){
+        firePostReminder(t.id, "warn");
+      }, triggerWarn - now);
+    }
+    /* Timer 2: Na hora exata (ação) */
+    if(scheduled > now && scheduled <= horizon){
+      postReminderTimers[t.id+"_f"] = setTimeout(function(){
+        firePostReminder(t.id, "fire");
+      }, scheduled - now);
+    }
+  });
+}
+
+function firePostReminder(taskId, kind){
+  var t = (tasks||[]).find(function(x){ return x.id === taskId; });
+  if(!t) return;
+  /* Re-checa: pode ter sido postado entre o agendamento e o disparo */
+  if(t.posted === true || t.status === "concluido") return;
+  var client = (t.client||"").trim();
+  var tema = (t.title||"").trim() || "Conteúdo";
+  var plats = [];
+  if(t.postIG !== false) plats.push("Instagram");
+  if(t.postFB === true) plats.push("Facebook");
+  var platStr = plats.length ? plats.join(" + ") : "Instagram";
+
+  var titleLine, bodyLine;
+  if(kind === "warn"){
+    titleLine = "⏰ Em 10 min: " + platStr;
+    bodyLine = tema + (client ? " · " + client : "");
+  } else {
+    titleLine = "📷 HORA DE POSTAR — " + platStr;
+    bodyLine = tema + (client ? " · " + client : "") + " · Toque pra abrir";
+  }
+
+  /* Toast local */
+  try{ toast(titleLine + ": " + bodyLine); }catch(_){}
+  try{ if(getPref("soundOn", true)) beep(); }catch(_){}
+  try{ if(getPref("vibrationOn", true) && navigator.vibrate){
+    navigator.vibrate(kind === "fire" ? [220,80,220,80,220] : [180,80,180]);
+  } }catch(_){}
+
+  /* Notificação nativa do sistema (chega mesmo com app em outra aba) */
+  try{
+    nativeNotify(titleLine, bodyLine, "post-"+kind+"-"+t.id, function(){
+      openPostExecutor(t.id);
+    });
+  }catch(_){}
+
+  /* Toast também na ação principal (kind=fire) abre modal direto se app tá aberto */
+  if(kind === "fire"){
+    setTimeout(function(){
+      try{ openPostExecutor(t.id); }catch(e){ console.warn("openPostExecutor:",e); }
+    }, 600);
+  }
+}
+
+/* Modal "Hora de Postar" — tela limpa com botões grandes pra Instagram/Facebook */
+function openPostExecutor(taskId){
+  var t = (tasks||[]).find(function(x){ return x.id === taskId; });
+  if(!t){ try{ toast("Post não encontrado"); }catch(_){} return; }
+  var esc = function(s){ return (s==null?"":String(s)).replace(/[<>&"]/g,function(c){return {"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c];}); };
+  /* Remove modal antigo se houver */
+  var old = document.getElementById("postExecOverlay"); if(old) old.remove();
+
+  var client = (t.client||"").trim() || "Sem cliente";
+  var tema = (t.title||"").trim() || "Conteúdo";
+  var caption = "";
+  /* A caption vem de t.copyText (Copywriter) se aprovada; senão do t.desc */
+  if(t.copyText && (t.copyState === "aprovado" || t.copyState === "publicado")){
+    caption = t.copyText;
+  } else if(t.desc){
+    caption = t.desc;
+  }
+  var mediaUrl = (t.link||"").trim();
+  var hasIG = t.postIG !== false;
+  var hasFB = t.postFB === true;
+
+  var overlay = document.createElement("div");
+  overlay.id = "postExecOverlay";
+  overlay.className = "post-exec-overlay";
+  overlay.innerHTML =
+    '<div class="post-exec-modal" role="dialog">'+
+      '<div class="post-exec-h">'+
+        '<div class="post-exec-h-ic">📷</div>'+
+        '<div class="post-exec-h-t">'+
+          '<div class="post-exec-h-l">HORA DE POSTAR</div>'+
+          '<div class="post-exec-h-v">'+esc(tema)+'</div>'+
+          '<div class="post-exec-h-c">'+esc(client)+'</div>'+
+        '</div>'+
+        '<button class="post-exec-x" id="postExecClose" aria-label="Fechar">✕</button>'+
+      '</div>'+
+      (mediaUrl ?
+        '<div class="post-exec-media">'+
+          (mediaUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ?
+            '<img src="'+esc(mediaUrl)+'" alt="mídia">' :
+          mediaUrl.match(/\.(mp4|mov|webm)$/i) ?
+            '<video src="'+esc(mediaUrl)+'" controls></video>' :
+            '<a href="'+esc(mediaUrl)+'" target="_blank" rel="noopener" class="post-exec-link">📎 '+esc(mediaUrl)+'</a>'
+          )+
+          (mediaUrl.match(/\.(jpg|jpeg|png|gif|webp|mp4|mov|webm)$/i) ?
+            '<a class="post-exec-dl" href="'+esc(mediaUrl)+'" download target="_blank">⬇ Baixar pra galeria</a>'
+          : '')+
+        '</div>'
+      : '<div class="post-exec-media empty">Sem mídia anexada — adicione manualmente no Instagram/Facebook</div>')+
+      '<div class="post-exec-caption-wrap">'+
+        '<div class="post-exec-caption-h">'+
+          '<span>Legenda</span>'+
+          '<span class="post-exec-copy-status" id="postExecCopyStatus">Copiada ✓</span>'+
+        '</div>'+
+        '<div class="post-exec-caption" id="postExecCaption">'+(caption ? esc(caption) : '<i style="color:var(--ink-faint)">Sem legenda</i>')+'</div>'+
+      '</div>'+
+      '<div class="post-exec-actions">'+
+        (hasIG ?
+          '<button class="post-exec-btn ig" data-pe="ig">'+
+            '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg>'+
+            '<span>Abrir Instagram</span>'+
+          '</button>'
+        : '')+
+        (hasFB ?
+          '<button class="post-exec-btn fb" data-pe="fb">'+
+            '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12z"/></svg>'+
+            '<span>Abrir Facebook</span>'+
+          '</button>'
+        : '')+
+        '<button class="post-exec-btn done" data-pe="done">'+
+          '<svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+          '<span>Já postei</span>'+
+        '</button>'+
+      '</div>'+
+      '<div class="post-exec-hint">'+
+        'A legenda já foi <b>copiada</b>. No app que abrir: cole no campo de legenda e poste.'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(overlay);
+
+  /* Copia caption pra clipboard automaticamente quando o modal abre */
+  try{
+    if(caption && navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(caption).then(function(){
+        var st = document.getElementById("postExecCopyStatus");
+        if(st){ st.textContent = "Copiada ✓"; st.classList.add("ok"); }
+      }).catch(function(e){
+        var st = document.getElementById("postExecCopyStatus");
+        if(st){ st.textContent = "Toque na legenda pra copiar"; st.classList.add("warn"); }
+        console.warn("clipboard:",e);
+      });
+    } else {
+      var st = document.getElementById("postExecCopyStatus");
+      if(st){ st.textContent = "Toque na legenda pra copiar"; st.classList.add("warn"); }
+    }
+  }catch(e){ console.warn("clipboard exception:",e); }
+
+  /* Bind: clica na caption pra copiar manualmente (fallback) */
+  var capEl = document.getElementById("postExecCaption");
+  if(capEl){
+    capEl.style.cursor = "pointer";
+    capEl.title = "Toque pra copiar";
+    capEl.onclick = function(){
+      if(!caption) return;
+      try{
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(caption);
+        } else {
+          /* Fallback: cria textarea temporário e seleciona */
+          var ta = document.createElement("textarea");
+          ta.value = caption; ta.style.position="fixed"; ta.style.left="-9999px";
+          document.body.appendChild(ta); ta.select();
+          document.execCommand("copy"); ta.remove();
+        }
+        try{ toast("Legenda copiada ✓"); }catch(_){}
+        var st = document.getElementById("postExecCopyStatus");
+        if(st){ st.textContent = "Copiada ✓"; st.className = "post-exec-copy-status ok"; }
+      }catch(e){ console.warn(e); try{ toast("Não consegui copiar"); }catch(_){} }
+    };
+  }
+
+  /* Fechar modal */
+  function close(){ overlay.remove(); }
+  document.getElementById("postExecClose").onclick = close;
+  overlay.addEventListener("click", function(e){ if(e.target === overlay) close(); });
+
+  /* Bind dos botões IG / FB / Já postei */
+  overlay.querySelectorAll("[data-pe]").forEach(function(btn){
+    btn.onclick = function(){
+      var act = btn.getAttribute("data-pe");
+      if(act === "ig"){
+        /* Tenta URL scheme do Instagram → fallback web */
+        try{
+          if(navigator.clipboard && caption){ navigator.clipboard.writeText(caption).catch(function(){}); }
+        }catch(_){}
+        var iaUrl = "instagram://library";
+        var webUrl = "https://www.instagram.com/";
+        /* Em iOS/Android, tenta abrir o app via URL scheme.
+           Se falhar (app não instalado), o navegador volta pra ID Seven; aí abre web. */
+        var t0 = Date.now();
+        window.location.href = iaUrl;
+        setTimeout(function(){
+          /* Se passou mais de 1.5s, provavelmente o app abriu (browser foi pra background).
+             Se voltou rápido, app não instalado — abre fallback. */
+          if(Date.now() - t0 < 2000 && document.visibilityState === "visible"){
+            window.open(webUrl, "_blank");
+          }
+        }, 1500);
+      } else if(act === "fb"){
+        try{
+          if(navigator.clipboard && caption){ navigator.clipboard.writeText(caption).catch(function(){}); }
+        }catch(_){}
+        var fbUrl = "fb://";
+        var fbWeb = "https://www.facebook.com/";
+        var t0 = Date.now();
+        window.location.href = fbUrl;
+        setTimeout(function(){
+          if(Date.now() - t0 < 2000 && document.visibilityState === "visible"){
+            window.open(fbWeb, "_blank");
+          }
+        }, 1500);
+      } else if(act === "done"){
+        /* Marca como postado: usa a função existente markPosted se disponível */
+        try{
+          if(typeof markPosted === "function"){
+            markPosted(taskId);
+          } else {
+            /* Fallback: atualiza direto no Firestore */
+            var nowT = Date.now();
+            var iso = new Date().toISOString();
+            db.collection("tasks").doc(taskId).update({
+              posted: true,
+              postedDate: iso.slice(0,10),
+              postedTime: iso.slice(11,16),
+              postedAt: nowT,
+              postedBy: me ? me.id : null,
+              status: "concluido",
+              doneAt: nowT,
+              doneBy: me ? me.id : null
+            }).then(function(){
+              try{ toast("Post marcado como postado ✓"); }catch(_){}
+            }).catch(function(e){ console.warn(e); });
+          }
+        }catch(e){ console.warn(e); }
+        close();
+      }
+    };
+  });
+}
+/* ═════════════════ /F6: AGENDAMENTO DE POSTAGENS ═════════════════ */
 
 /* === HELPERS DE WHATSAPP ===
    Monta URL wa.me com número normalizado pra BR. Se phone vazio/inválido,
@@ -7993,6 +8297,21 @@ function renderSettingsAutomation(){
         getPref("wfAutoCascade"))+
     '</div>'+
 
+    /* [V63.70-F6] Toggle do agendamento de postagens */
+    '<div class="set-section">'+
+      '<div class="set-section-h">Agendamento de postagens</div>'+
+      renderToggleRow("notifyPostScheduled", "Avisar na hora de postar",
+        "Quando um card de Postagem chega no horário agendado (data + hora), o app dispara push notification 10 minutos antes e na hora exata. Toque no aviso pra abrir a tela 'Hora de Postar' que copia a legenda e abre o Instagram/Facebook.",
+        getPref("notifyPostScheduled"))+
+      '<div class="set-row" style="border-top:none;padding:14px 16px">'+
+        '<div class="set-row-t">'+
+          '<div class="set-row-l" style="font-size:13px;color:var(--ink-soft);font-weight:500;line-height:1.55">'+
+            '<b>Como usar:</b> crie um card de Postagem com data + hora preenchidas. No horário marcado, você recebe um push. Toque pra abrir a tela com a legenda já copiada e os botões pra abrir Instagram/Facebook. Cola e posta em 5 segundos.'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
     '<div class="set-section">'+
       '<div class="set-section-h">Tela inicial — Hoje</div>'+
       renderToggleRow("showInsights", "Mostrar Insights",
@@ -8031,9 +8350,14 @@ function bindSettingsAutomation(){
   var bk = document.getElementById("setBack");
   if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
   /* Bind dos 3 toggles desta sub-tela */
-  ["wfAutoCascade","showInsights","showCommDates"].forEach(function(key){
+  /* Bind dos toggles desta sub-tela */
+  ["wfAutoCascade","showInsights","showCommDates","notifyPostScheduled"].forEach(function(key){
     bindToggleRow(key, function(on){
       setPref(key, on);
+      /* [V63.70-F6] Re-agenda post reminders quando ON, limpa quando OFF */
+      if(key === "notifyPostScheduled"){
+        try{ schedulePostReminders(); }catch(_){}
+      }
       return true;
     });
   });
@@ -8798,53 +9122,76 @@ function bindBoard(){
   var ddMenu = document.getElementById("btSectorMenu");
   var ddWrap = document.getElementById("btSectorWrap");
   if(ddBtn && ddMenu && ddWrap){
-    /* [V63.62] BUG FIX MOBILE: posiciona menu com position:fixed quando abre
-       — o .bt-left tem overflow-x:auto em mobile e estava cortando o dropdown.
-       Calcula coordenadas via getBoundingClientRect e move pro <body> */
+    /* [V63.71] PORTAL APPROACH: move o menu pra um container fixo no <body> quando abre.
+       Elimina qualquer interferência de overflow/transform do parent (.bt-left em mobile).
+       Antes: usava position:fixed inline mas ainda dava bug em alguns Android.
+       Agora: o menu vira filho direto do body — sem ancestor causando deslocamento. */
+
+    /* Container portal fixo no body (criado uma vez) */
+    var portal = document.getElementById("btSectorPortal");
+    if(!portal){
+      portal = document.createElement("div");
+      portal.id = "btSectorPortal";
+      portal.style.cssText = "position:fixed;top:0;left:0;width:0;height:0;z-index:9999;pointer-events:none";
+      document.body.appendChild(portal);
+    }
+    /* Salva referência original (pra restaurar quando fechar) */
+    var ddMenuOrigParent = ddMenu.parentNode;
+
     function positionDropdown(){
       var btnRect = ddBtn.getBoundingClientRect();
       var vw = window.innerWidth;
+      var menuW = vw < 720 ? Math.min(240, vw - 24) : 240;
       ddMenu.style.position = "fixed";
-      ddMenu.style.top = (btnRect.bottom + 5) + "px";
-      /* Em mobile (vw < 720), alinha à direita pra não estourar a tela */
-      if(vw < 720){
-        ddMenu.style.left = "auto";
-        ddMenu.style.right = Math.max(8, vw - btnRect.right) + "px";
-        ddMenu.style.minWidth = "240px";
-        ddMenu.style.maxWidth = (vw - 16) + "px";
-      } else {
-        ddMenu.style.left = btnRect.left + "px";
-        ddMenu.style.right = "auto";
-        ddMenu.style.minWidth = "220px";
-        ddMenu.style.maxWidth = "";
-      }
-      /* Garante que o menu fica sobre TUDO */
-      ddMenu.style.zIndex = "9999";
+      ddMenu.style.top = Math.round(btnRect.bottom + 5) + "px";
+      /* Alinha à direita do botão; se passar da tela à esquerda, vai pra direita */
+      var rightOffset = vw - btnRect.right;
+      if(rightOffset < 8) rightOffset = 8;
+      ddMenu.style.right = Math.round(rightOffset) + "px";
+      ddMenu.style.left = "auto";
+      ddMenu.style.width = menuW + "px";
+      ddMenu.style.minWidth = menuW + "px";
+      ddMenu.style.maxWidth = menuW + "px";
+      ddMenu.style.zIndex = "10000";
+      ddMenu.style.pointerEvents = "auto";
     }
     function resetDropdownPos(){
       ddMenu.style.position = "";
       ddMenu.style.top = "";
       ddMenu.style.left = "";
       ddMenu.style.right = "";
+      ddMenu.style.width = "";
       ddMenu.style.minWidth = "";
       ddMenu.style.maxWidth = "";
       ddMenu.style.zIndex = "";
+      ddMenu.style.pointerEvents = "";
     }
+
+    function openDropdown(){
+      /* Move pro portal (no body) */
+      try{ portal.appendChild(ddMenu); }catch(_){}
+      ddMenu.classList.remove("hidden");
+      ddWrap.classList.add("open");
+      /* Duplo requestAnimationFrame: garante que o reflow aconteceu antes de medir */
+      requestAnimationFrame(function(){
+        requestAnimationFrame(positionDropdown);
+      });
+    }
+    function closeDropdown(){
+      ddMenu.classList.add("hidden");
+      ddWrap.classList.remove("open");
+      resetDropdownPos();
+      /* Devolve pro parent original (pra HTML ficar coerente em próximo render) */
+      try{ if(ddMenuOrigParent) ddMenuOrigParent.appendChild(ddMenu); }catch(_){}
+    }
+
     ddBtn.onclick = function(e){
       e.stopPropagation();
-      var willOpen = ddMenu.classList.contains("hidden");
-      if(willOpen){
-        ddMenu.classList.remove("hidden");
-        ddWrap.classList.add("open");
-        /* Posiciona no próximo frame pra garantir que o display:flex já aplicou */
-        requestAnimationFrame(positionDropdown);
-      } else {
-        ddMenu.classList.add("hidden");
-        ddWrap.classList.remove("open");
-        resetDropdownPos();
-      }
+      var isOpen = ddWrap.classList.contains("open");
+      if(isOpen){ closeDropdown(); } else { openDropdown(); }
     };
-    /* Reposiciona se a janela mudar de tamanho enquanto aberto */
+
+    /* Reposiciona se a janela mudar de tamanho ou rolar enquanto aberto */
     if(!window.__btSectorResizeBound){
       window.__btSectorResizeBound = true;
       window.addEventListener("resize", function(){
@@ -8858,30 +9205,38 @@ function bindBoard(){
     if(!window.__btSectorOutBound){
       window.__btSectorOutBound = true;
       document.addEventListener("click", function(e){
-        var open = document.querySelector(".bt-dropdown.open");
-        if(open && !open.contains(e.target)){
-          open.classList.remove("open");
-          var m = open.querySelector(".bt-dropdown-menu");
-          if(m){
-            m.classList.add("hidden");
-            /* [V63.62] limpa inline styles do fixed-positioning */
-            m.style.position = ""; m.style.top = ""; m.style.left = "";
-            m.style.right = ""; m.style.minWidth = ""; m.style.maxWidth = "";
-            m.style.zIndex = "";
+        var openWrap = document.querySelector(".bt-dropdown.open");
+        if(!openWrap) return;
+        var m = document.getElementById("btSectorMenu");
+        var btn = document.getElementById("btSectorBtn");
+        /* Click no botão ou dentro do menu? não fecha. Click fora dos dois? fecha. */
+        if((m && m.contains(e.target)) || (btn && btn.contains(e.target))) return;
+        openWrap.classList.remove("open");
+        if(m){
+          m.classList.add("hidden");
+          m.style.position=""; m.style.top=""; m.style.left=""; m.style.right="";
+          m.style.width=""; m.style.minWidth=""; m.style.maxWidth=""; m.style.zIndex="";
+          m.style.pointerEvents = "";
+          /* Devolve pro wrap original se ainda tá no portal */
+          var p = document.getElementById("btSectorPortal");
+          if(p && p.contains(m) && openWrap.contains && !openWrap.contains(m)){
+            try{ openWrap.appendChild(m); }catch(_){}
           }
         }
       });
       document.addEventListener("keydown", function(e){
         if(e.key === "Escape"){
-          var open = document.querySelector(".bt-dropdown.open");
-          if(open){
-            open.classList.remove("open");
-            var m = open.querySelector(".bt-dropdown-menu");
+          var openWrap = document.querySelector(".bt-dropdown.open");
+          if(openWrap){
+            openWrap.classList.remove("open");
+            var m = document.getElementById("btSectorMenu");
             if(m){
               m.classList.add("hidden");
-              m.style.position = ""; m.style.top = ""; m.style.left = "";
-              m.style.right = ""; m.style.minWidth = ""; m.style.maxWidth = "";
-              m.style.zIndex = "";
+              m.style.position=""; m.style.top=""; m.style.left=""; m.style.right="";
+              m.style.width=""; m.style.minWidth=""; m.style.maxWidth=""; m.style.zIndex="";
+              m.style.pointerEvents = "";
+              var p = document.getElementById("btSectorPortal");
+              if(p && p.contains(m)){ try{ openWrap.appendChild(m); }catch(_){} }
             }
           }
         }
@@ -11815,7 +12170,9 @@ function openTaskDetail(id){
         '<div class="post-tg"><button type="button" class="ptog ig'+(pIG?" on":"")+'" data-ptog="ig">'+IG_SVG+'Instagram</button>'+
         '<button type="button" class="ptog fb'+(pFB?" on":"")+'" data-ptog="fb">'+FB_SVG+'Facebook</button></div>'+
         '<div class="r2" style="margin-top:12px"><input id="pDate" type="date"><input id="pTime" type="time"></div>'+
-        '<button class="done-toggle" data-ppost="1" style="background:rgba(54,211,153,.12);border-color:rgba(54,211,153,.32);color:var(--c-trafego);margin-top:12px"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Marcar como postado</button>';
+        /* [V63.70-F6] Botão "Postar agora" — abre o modal Hora de Postar imediatamente */
+        '<button class="done-toggle" data-ppostnow="1" style="background:linear-gradient(135deg,#feda75 0%,#fa7e1e 25%,#d62976 50%,#962fbf 75%,#4f5bd5 100%);border:none;color:#fff;margin-top:12px;font-weight:700"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor"/></svg>Postar agora (abre IG/FB)</button>'+
+        '<button class="done-toggle" data-ppost="1" style="background:rgba(54,211,153,.12);border-color:rgba(54,211,153,.32);color:var(--c-trafego);margin-top:8px"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Já postei (marcar como postado)</button>';
     }
     postHtml+='</div>';
   }
@@ -11995,6 +12352,12 @@ function openTaskDetail(id){
       pd.value=n.getFullYear()+"-"+p(n.getMonth()+1)+"-"+p(n.getDate());
       if(pt)pt.value=p(n.getHours())+":"+p(n.getMinutes()); } })();
   var pPost=$("taskDetailBody").querySelector("[data-ppost]"); if(pPost)pPost.onclick=()=>markPosted(id);
+  /* [V63.70-F6] Botão "Postar agora" — abre modal Hora de Postar com legenda copiada */
+  var pPostNow=$("taskDetailBody").querySelector("[data-ppostnow]");
+  if(pPostNow) pPostNow.onclick=function(){
+    try{ closeSheets&&closeSheets(); }catch(_){}
+    setTimeout(function(){ try{ openPostExecutor(id); }catch(e){ console.warn(e); } }, 200);
+  };
   var pUndo=$("taskDetailBody").querySelector("[data-pundo]"); if(pUndo)pUndo.onclick=()=>unmarkPosted(id);
   $("taskDetailBody").querySelectorAll("[data-tk]").forEach(b=>b.onclick=()=>toggleTaskChk(id,+b.dataset.tk));
   openSheet(taskDetailSheet);
@@ -13527,7 +13890,42 @@ function renderCommDatesWidget(){
   .ins-rank-tx{flex:1;min-width:0}\
   .ins-rank-name{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3}\
   .ins-rank-meta{font-size:11px;color:var(--ink-faint);margin-top:2px}\
-  .ins-rank-v{font-size:14px;font-weight:800;letter-spacing:-.01em}';
+  .ins-rank-v{font-size:14px;font-weight:800;letter-spacing:-.01em}\
+  /* ═══ [V63.70] F6: Modal Hora de Postar ═══ */\
+  .post-exec-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;animation:peFade .2s ease}\
+  @keyframes peFade{from{opacity:0}to{opacity:1}}\
+  .post-exec-modal{background:var(--surface);border:1px solid var(--line);border-radius:18px;width:100%;max-width:480px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.55);animation:peSlide .25s cubic-bezier(.18,.95,.4,1)}\
+  @keyframes peSlide{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}\
+  .post-exec-h{display:flex;align-items:center;gap:12px;padding:18px 18px 14px;border-bottom:1px solid var(--line-soft);background:linear-gradient(180deg,rgba(91,108,255,.06) 0%,transparent 100%)}\
+  .post-exec-h-ic{font-size:24px;flex-shrink:0;width:44px;height:44px;border-radius:12px;background:rgba(91,108,255,.14);display:grid;place-items:center}\
+  .post-exec-h-t{flex:1;min-width:0}\
+  .post-exec-h-l{font-size:10.5px;font-weight:800;color:var(--accent);letter-spacing:.08em}\
+  .post-exec-h-v{font-size:15.5px;font-weight:700;color:var(--ink);line-height:1.25;margin-top:2px}\
+  .post-exec-h-c{font-size:12px;color:var(--ink-faint);margin-top:2px}\
+  .post-exec-x{background:transparent;border:none;color:var(--ink-faint);font-size:18px;cursor:pointer;padding:6px 10px;border-radius:6px;flex-shrink:0}\
+  .post-exec-x:hover{background:var(--surface-2);color:var(--ink)}\
+  .post-exec-media{padding:12px 18px;display:flex;flex-direction:column;align-items:center;gap:8px}\
+  .post-exec-media img,.post-exec-media video{max-width:100%;max-height:240px;border-radius:10px;background:var(--surface-2)}\
+  .post-exec-media.empty{color:var(--ink-faint);font-size:12.5px;padding:18px;text-align:center;font-style:italic}\
+  .post-exec-link{color:var(--accent);font-size:13px;word-break:break-all;text-decoration:none}\
+  .post-exec-dl{font-size:11.5px;color:var(--ink-soft);font-weight:600;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;text-decoration:none}\
+  .post-exec-dl:hover{background:var(--surface-3);color:var(--ink)}\
+  .post-exec-caption-wrap{padding:0 18px 12px}\
+  .post-exec-caption-h{display:flex;align-items:center;justify-content:space-between;font-size:10.5px;font-weight:700;color:var(--ink-faint);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}\
+  .post-exec-copy-status{font-size:10.5px;font-weight:800;letter-spacing:.04em;color:var(--c-trafego);background:rgba(52,211,153,.12);padding:2px 7px;border-radius:5px;text-transform:uppercase}\
+  .post-exec-copy-status.warn{color:var(--c-foto);background:rgba(255,176,46,.14)}\
+  .post-exec-caption{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--ink);line-height:1.45;max-height:120px;overflow-y:auto;white-space:pre-wrap;word-break:break-word}\
+  .post-exec-caption:hover{border-color:var(--line-strong)}\
+  .post-exec-actions{display:flex;flex-direction:column;gap:8px;padding:14px 18px 8px}\
+  .post-exec-btn{display:flex;align-items:center;justify-content:center;gap:10px;border:none;border-radius:12px;padding:0 18px;height:52px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-.01em;transition:transform var(--tr-fast),background var(--tr-fast)}\
+  .post-exec-btn svg{width:22px;height:22px;flex-shrink:0}\
+  .post-exec-btn:active{transform:scale(.98)}\
+  .post-exec-btn.ig{background:linear-gradient(135deg,#feda75 0%,#fa7e1e 25%,#d62976 50%,#962fbf 75%,#4f5bd5 100%);color:#fff}\
+  .post-exec-btn.fb{background:#1877f2;color:#fff}\
+  .post-exec-btn.done{background:var(--accent);color:var(--accent-ink)}\
+  .post-exec-btn.done:hover{background:var(--accent-deep)}\
+  .post-exec-hint{padding:0 18px 18px;font-size:11.5px;color:var(--ink-faint);text-align:center;line-height:1.5}\
+  .post-exec-hint b{color:var(--ink-soft)}';
   try{
     var st = document.createElement("style");
     st.id = "v63-60-styles";
