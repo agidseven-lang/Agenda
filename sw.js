@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.93] Cache bump — FIX MOBILE: token gerado mas não salvo pq me/db virava null durante async no celular. */
-var CACHE = "idseven-v63-93";
+   [V63.94] Cache bump — REFATOR ESTRUTURAL: sistema de retry resiliente + auto-healing + visibilitychange listener. */
+var CACHE = "idseven-v63-94";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

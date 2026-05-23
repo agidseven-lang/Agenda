@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.93 · build fix-mobile-sessao-expirou</div>
+    <div class="ver">versão 63.94 · build resiliencia-retry-self-healing</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -5452,9 +5452,44 @@ function route(){
   askNotif();
   /* [V63.12] Se já tinha permissão concedida antes, registra pra push real */
   try{ setupPushNotifications(); }catch(_){}
+  /* [V63.94] AUTO-HEALING: tenta novamente após 5s se ainda não tem token salvo.
+     Isso resolve race condition no mobile onde o app inicializa antes do db estar pronto. */
+  setTimeout(function(){
+    try{
+      if(!fcmInitSucceeded && me && Notification && Notification.permission === "granted"){
+        var hasToken = Array.isArray(me.fcmTokens) && me.fcmTokens.length > 0
+                       && me.fcmTokens.some(function(t){ return t === fcmTokenSaved; });
+        if(!hasToken){
+          _pushDbgCapture("auto-retry-5s", "sem token salvo, tentando novamente");
+          setupPushNotifications();
+        }
+      }
+    }catch(_){}
+  }, 5000);
   /* [V63.15] Inicia ping de presença */
   try{ startPresence(); }catch(_){}
 }
+
+/* [V63.94] visibilitychange — quando user volta pro app (foreground), verifica se tem
+   token salvo. Se não tem, tenta registrar de novo. Isso resolve o caso onde o user
+   alternou entre apps no celular e o registro não completou na primeira tentativa.
+   Adicionar 1x só, fora do route() pra não duplicar listeners. */
+(function setupPushAutoHeal(){
+  if(window.__pushHealInstalled) return;
+  window.__pushHealInstalled = true;
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState !== "visible") return;
+    if(!me || !db) return;
+    if(typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    /* Se sucesso na sessão, nada a fazer */
+    if(fcmInitSucceeded) return;
+    /* Se já tem token salvo no Firestore (que reflete em me.fcmTokens), nada a fazer */
+    var hasAny = Array.isArray(me.fcmTokens) && me.fcmTokens.length > 0;
+    if(hasAny && fcmTokenSaved) return;
+    _pushDbgCapture("visibilitychange", "voltou pro app sem token salvo, tentando registrar");
+    try{ setupPushNotifications(); }catch(_){}
+  });
+})();
 
 /* ---------- Auth ---------- */
 let pendingPhoto=null;
@@ -7294,6 +7329,14 @@ function waBtnHTML(label, phone, text, classExtra){
 /* Estado do messaging — null até inicializar com sucesso */
 var fcmMessaging = null;
 var fcmTokenSaved = null;  /* token desta sessão, pra não salvar duplicado */
+/* [V63.94] Sistema de retry resiliente.
+   - fcmInitInProgress: previne concorrência (2 chamadas simultâneas)
+   - fcmInitSucceeded: marcador definitivo de sucesso desta sessão
+   - fcmInitTryCount: limita tentativas pra não ficar batendo no FCM infinitamente */
+var fcmInitInProgress = false;
+var fcmInitSucceeded = false;
+var fcmInitTryCount = 0;
+var FCM_INIT_MAX_TRIES = 8;
 /* [V63.91] Captura logs do setupPushNotifications pra exibir na tela do app.
    Sem isso, user comum não consegue ver logs do console (precisaria abrir DevTools).
    Mantém apenas os últimos 40 logs em memória pra não vazar. */
@@ -7315,23 +7358,29 @@ function _pushErrCapture(step, err){
     try{ console.error(msg); }catch(_){}
   }catch(_){}
 }
-var fcmInitTried = false;
-
 /* Inicializa o Firebase Messaging (1ª vez por sessão).
    É chamada após login + permissão. Tolerante a falha total. */
 async function setupPushNotifications(){
-  if(fcmInitTried) return false;
-  fcmInitTried = true;
+  /* [V63.94] Lógica de retry resiliente.
+     - Se já SUCCESS nesta sessão, não tenta de novo (sucesso é sucesso)
+     - Se já tem outra tentativa rodando, espera (previne concorrência)
+     - Se já tentou MAX_TRIES vezes, desiste (proteção contra loop infinito)
+     - Em qualquer outro caso, TENTA de novo (resiliente a falhas temporárias) */
+  if(fcmInitSucceeded){ _pushDbgCapture("init", "já registrado nesta sessão, pulando"); return true; }
+  if(fcmInitInProgress){ _pushDbgCapture("init", "tentativa em andamento, pulando"); return false; }
+  if(fcmInitTryCount >= FCM_INIT_MAX_TRIES){ _pushDbgCapture("init", "max tries atingido — clique manualmente em re-registrar"); return false; }
+  fcmInitInProgress = true;
+  fcmInitTryCount++;
   /* Sem config ainda? sai silencioso */
-  if(!PUSH_VAPID_KEY || !PUSH_WORKER_URL) return false;
+  if(!PUSH_VAPID_KEY || !PUSH_WORKER_URL){ fcmInitInProgress = false; return false; }
   /* Sem usuário logado? não tem onde salvar token */
-  if(!me || !db) return false;
+  if(!me || !db){ fcmInitInProgress = false; return false; }
   /* SDK Messaging não carregado? */
-  if(typeof firebase === "undefined" || !firebase.messaging) return false;
+  if(typeof firebase === "undefined" || !firebase.messaging){ fcmInitInProgress = false; return false; }
   /* Browser não suporta? (Safari iOS sem PWA instalado, alguns ambientes) */
-  try{ if(!firebase.messaging.isSupported || !firebase.messaging.isSupported()) return false; }catch(_){ return false; }
+  try{ if(!firebase.messaging.isSupported || !firebase.messaging.isSupported()){ fcmInitInProgress = false; return false; } }catch(_){ fcmInitInProgress = false; return false; }
   /* Permissão não concedida ainda? não força aqui */
-  if(typeof Notification === "undefined" || Notification.permission !== "granted") return false;
+  if(typeof Notification === "undefined" || Notification.permission !== "granted"){ fcmInitInProgress = false; return false; }
 
   /* [V63.93] FIX CRÍTICO PARA MOBILE: captura `me.id` e `db` em variáveis locais ANTES de
      qualquer await. Em mobile (Chrome Android, Samsung Internet), durante o getToken que
@@ -7423,6 +7472,8 @@ async function setupPushNotifications(){
       await userRef.update({fcmTokens: arr});
     }
     fcmTokenSaved = token;
+    fcmInitSucceeded = true;        /* [V63.94] marcador de sucesso definitivo */
+    fcmInitInProgress = false;       /* [V63.94] libera */
     _pushDbg("13-SUCESSO", "token salvo no Firestore");
 
     /* Listener pra quando recebe push com APP ABERTO (foreground) —
@@ -7456,6 +7507,7 @@ async function setupPushNotifications(){
     return true;
   }catch(e){
     _pushErr("catch-principal", e);
+    fcmInitInProgress = false;   /* [V63.94] libera pra próxima tentativa */
     return false;
   }
 }
@@ -8403,8 +8455,8 @@ function bindSettingsNotifications(){
   if(rt) rt.onclick = async function(){
     rt.disabled = true;
     rt.innerHTML = '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" stroke-dasharray="42 6" opacity=".6"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg>Registrando…';
-    /* Reset do flag pra permitir nova tentativa */
-    try{ fcmInitTried = false; }catch(_){}
+    /* [V63.94] Reset dos flags pra forçar nova tentativa, mesmo se já tentou max vezes */
+    try{ fcmInitSucceeded = false; fcmInitInProgress = false; fcmInitTryCount = 0; }catch(_){}
     try{
       var ok = await setupPushNotifications();
       if(ok){ toast("Dispositivo registrado ✓"); }
@@ -8556,8 +8608,8 @@ function bindSettingsNotifications(){
         if(me && db){
           await db.collection("users").doc(me.id).update({ fcmTokens: [] });
         }
-        /* Reseta flag pra permitir nova tentativa */
-        try{ fcmInitTried = false; }catch(_){}
+        /* [V63.94] Reseta os 3 flags do novo sistema pra forçar nova tentativa */
+        try{ fcmInitSucceeded = false; fcmInitInProgress = false; fcmInitTryCount = 0; }catch(_){}
         /* Re-registra */
         await setupPushNotifications();
         try{ toast("Token re-registrado — teste de novo"); }catch(_){}
