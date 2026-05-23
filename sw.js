@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.87] Cache bump — FIX: push de agenda não disparava por filtro positivo de status. Agora sai pra todos. */
-var CACHE = "idseven-v63-87";
+   [V63.88] Cache bump — DEBUG VISUAL: toast no save de evento mostra exatamente o que acontece com o push. */
+var CACHE = "idseven-v63-88";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

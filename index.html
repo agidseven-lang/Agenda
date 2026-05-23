@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.87 · build fix-push-agenda-filtro-status</div>
+    <div class="ver">versão 63.88 · build debug-push-agenda-visual</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -14154,7 +14154,8 @@ $("saveBtn").onclick=async()=>{
       data.by=me.id;data.done=false;data.createdAt=Date.now();
       var newEv = await db.collection("events").add(data);
       toast("Criado e compartilhado");
-      /* [V63.85] Push imediato pros outros usuários ativos avisando do novo compromisso */
+      /* [V63.88] DEBUG VISUAL — toast mostra exatamente o que aconteceu com o push.
+         Quando user reportar "não chegou", o toast vai dizer onde parou. */
       try{
         var typIm = TYPES[data.type] || TYPES.outro;
         var titleIm = "📅 Novo compromisso: " + (typIm?typIm.label:"agendamento");
@@ -14164,15 +14165,56 @@ $("saveBtn").onclick=async()=>{
         var timeLbl = data.start || "";
         if(dateLbl || timeLbl) bodyIm += " — " + dateLbl + (timeLbl?(" "+timeLbl):"");
         var recipImm = pushAllExcept(me.id);
-        if(recipImm.length > 0){
-          sendPushToUsers(recipImm, {
-            title: titleIm,
-            body: bodyIm,
-            tag: "newev-" + newEv.id,
-            url: "?openEvent=" + newEv.id
+
+        /* [V63.88] Logging detalhado em console + toast visual */
+        console.log("[EVENT-PUSH] recipImm IDs:", recipImm);
+        console.log("[EVENT-PUSH] total users no app:", (users||[]).length);
+
+        if(recipImm.length === 0){
+          toast("⚠ Debug push: 0 destinatários (sem outros usuários ativos)");
+          console.warn("[EVENT-PUSH] FALHA: pushAllExcept retornou vazio");
+        } else {
+          /* Conta tokens disponíveis */
+          var totalTokens = 0;
+          var usersWithTokens = 0;
+          var usersWithoutTokens = [];
+          recipImm.forEach(function(uid){
+            var u = (users||[]).find(function(x){ return x.id === uid; });
+            if(u && Array.isArray(u.fcmTokens) && u.fcmTokens.length > 0){
+              totalTokens += u.fcmTokens.length;
+              usersWithTokens++;
+            } else {
+              usersWithoutTokens.push(u ? u.name : uid);
+            }
           });
+
+          console.log("[EVENT-PUSH] destinatários:", recipImm.length,
+                      "com token:", usersWithTokens,
+                      "sem token:", usersWithoutTokens);
+
+          if(totalTokens === 0){
+            toast("⚠ Push: " + recipImm.length + " usuários, MAS NENHUM tem token FCM ativo");
+          } else {
+            toast("📤 Push enviando pra " + usersWithTokens + " usuários (" + totalTokens + " tokens)" +
+                  (usersWithoutTokens.length > 0 ? " — sem token: " + usersWithoutTokens.join(",") : ""));
+
+            sendPushToUsers(recipImm, {
+              title: titleIm,
+              body: bodyIm,
+              tag: "newev-" + newEv.id,
+              url: "?openEvent=" + newEv.id
+            }).then(function(){
+              console.log("[EVENT-PUSH] sendPushToUsers terminou (sucesso/falha — ver acima)");
+            }).catch(function(err){
+              console.error("[EVENT-PUSH] sendPushToUsers ERRO:", err);
+              toast("❌ Push falhou: " + (err && err.message || "erro desconhecido"));
+            });
+          }
         }
-      }catch(_){}
+      }catch(eP){
+        console.error("[EVENT-PUSH] EXCEPTION:", eP);
+        toast("❌ Push erro: " + (eP && eP.message || "exceção"));
+      }
     }
     selDay=date;closeSheets();
   }catch(e){toast("Erro ao salvar. Verifique a conexão.");}
