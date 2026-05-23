@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.84 · build designers-criam-edicao</div>
+    <div class="ver">versão 63.86 · build lembretes-agenda-4-momentos</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -4683,7 +4683,7 @@ const DEFAULT_PREFS = {
   notifyLate: true,       /* notificar atrasos */
   notifyNative: true,     /* [V63.11] notificação NATIVA do sistema (popup do SO) — máster pra push */
   notifyReminder: true,   /* [V63.11] lembrete antes dos compromissos */
-  reminderMinutes: 10,    /* [V63.11] minutos antes do compromisso (5,10,15,30,60) */
+  reminderMinutes: 60,    /* [V63.85] minutos antes do compromisso — default 1h (era 10min) */
   biometricLock: false,   /* trava biométrica ao abrir */
   density: "comfortable", /* "compact" | "comfortable" */
   /* [V63.60] Prefs das 5 features novas — todas ON por default */
@@ -4810,7 +4810,7 @@ const ALARM_KEY="idseven_alarmed";
 /* [V63.13] Antecedência do alarme agora respeita a preferência do usuário
    (5/10/15/30/60 min) em vez do antigo hardcode de 2h. */
 function preMinForAlarms(){
-  try{ var v = parseInt(getPref("reminderMinutes", 10), 10); return (v>0 ? v : 10); }
+  try{ var v = parseInt(getPref("reminderMinutes", 60), 10); return (v>0 ? v : 10); }
   catch(_){ return 10; }
 }
 let view="month",cursor=new Date(),selDay=todayISO(),filter="all",editingId=null,detailId=null,tab="agenda";
@@ -6886,23 +6886,31 @@ var postReminderTimers = {};
 var _pendingPostExecutor = null;
 
 function scheduleEventReminders(){
-  /* Limpa timers antigos */
+  /* [V63.85] LEMBRETES DE AGENDA — versão robusta.
+     ANTES (V63.11):
+     - Só notificava o DONO (filtro `mine`)
+     - Só notification local (sem push FCM)
+     - Default 10min
+     AGORA:
+     - Notifica TODOS os usuários ativos (compromissos da agência são compartilhados)
+     - Envia push FCM via Worker (chega com app fechado em qualquer device)
+     - Default 1h (60 min)
+     - Tag único por evento → FCM deduplica se múltiplos users dispararem o mesmo trigger
+     LIMITAÇÃO: setTimeout é local — só dispara se algum dispositivo tem app vivo.
+     Pra garantir mesmo com TODOS fechados, precisa Cloudflare Worker CRON (próximo passo). */
   Object.keys(reminderTimers).forEach(function(id){ try{ clearTimeout(reminderTimers[id]); }catch(_){} });
   reminderTimers = {};
 
   if(!me) return;
   if(!getPref("notifyReminder", true)) return;
 
-  var minBefore = parseInt(getPref("reminderMinutes", 10), 10) || 10;
+  var minBefore = parseInt(getPref("reminderMinutes", 60), 10) || 60;
   var now = Date.now();
   var horizon = now + 86400000; /* só agenda timers pras próximas 24h */
 
   (events||[]).forEach(function(e){
     if(!e || !e.date || e.done) return;
-    var own = evOwner(e);
-    /* Só compromissos meus (ou sem dono especificado, mas eu criei) */
-    var mine = (own && own.id === me.id) || (!own && !e.owner);
-    if(!mine) return;
+    /* [V63.85] Removido filtro `mine` — todos os compromissos da agência geram lembretes pra todos */
     var startMs = evStartMs(e);
     if(!startMs) return;
     var trigger = startMs - minBefore * 60000;
@@ -6910,22 +6918,49 @@ function scheduleEventReminders(){
     if(trigger > horizon) return;       /* mais de 24h, não agenda agora */
 
     reminderTimers[e.id] = setTimeout(function(){
+      /* [V63.86] Local toast/notification SÓ pro user atual SE ele for o responsável.
+         Os outros usuários (não responsáveis) também rodam esse timer mas pulam o disparo local;
+         eles vão acionar o push FCM pro responsável. */
+      var ownerIdLocal = eventOwnerId(e);
+      var isMineToShow = (ownerIdLocal === me.id);
       var typ = TYPES[e.type] || TYPES.outro;
       var titleLine = "⏰ " + (typ?typ.label+" em ":"Compromisso em ") + minBefore + " min";
       var bodyLine = (e.title || e.client || "Compromisso");
       if(e.client && e.title) bodyLine = (e.title) + " · " + e.client;
       if(e.start) bodyLine += " (" + e.start + ")";
 
-      /* Toast interno sempre */
-      try{ toast(titleLine + ": " + bodyLine); }catch(_){}
-      try{ if(getPref("soundOn", true)) beep(); }catch(_){}
-      try{ if(getPref("vibrationOn", true) && navigator.vibrate) navigator.vibrate([180,80,180]); }catch(_){}
+      if(isMineToShow){
+        /* Toast + som + vibração local pro responsável (caso esteja com app aberto) */
+        try{ toast(titleLine + ": " + bodyLine); }catch(_){}
+        try{ if(getPref("soundOn", true)) beep(); }catch(_){}
+        try{ if(getPref("vibrationOn", true) && navigator.vibrate) navigator.vibrate([180,80,180]); }catch(_){}
 
-      /* Notificação nativa do sistema (pode chegar com app em outra aba) */
-      nativeNotify(titleLine, bodyLine, "reminder-"+e.id, function(){
-        switchTab("agenda");
-        setTimeout(function(){ openDetail(e.id); }, 200);
-      });
+        /* Notificação nativa LOCAL (app em outra aba/foreground) */
+        nativeNotify(titleLine, bodyLine, "reminder-"+e.id, function(){
+          switchTab("agenda");
+          setTimeout(function(){ openDetail(e.id); }, 200);
+        });
+      }
+
+      /* [V63.86] PUSH FCM via Worker — chega com app fechado.
+         CORREÇÃO: lembrete 1h antes vai SÓ pro responsável (owner), não pra todos.
+         Os outros só são notificados na CRIAÇÃO, INÍCIO e FIM (não no lembrete).
+         FCM deduplica notifs pelo `tag` se múltiplos dispositivos dispararem. */
+      try{
+        var ownerIdRem = eventOwnerId(e);
+        if(ownerIdRem && ownerIdRem !== me.id){
+          /* Confirma que o responsável tem tokens registrados */
+          var ownerUser = (users||[]).find(function(u){ return u.id === ownerIdRem; });
+          if(ownerUser && Array.isArray(ownerUser.fcmTokens) && ownerUser.fcmTokens.length > 0){
+            sendPushToUsers([ownerIdRem], {
+              title: titleLine,
+              body: bodyLine,
+              tag: "reminder-" + e.id,
+              url: "?openEvent=" + e.id
+            });
+          }
+        }
+      }catch(err){ console.warn("[scheduleEventReminders] push fail:", err); }
     }, trigger - now);
   });
 }
@@ -7530,6 +7565,28 @@ async function cleanupDeadTokens(userIds, deadTokens){
 /* === Helper: descobre IDs dos administradores/gestores (recipient quando cliente aprova) === */
 function pushAdminIds(){
   return users.filter(function(u){ return canManage(u); }).map(function(u){ return u.id; }).filter(function(id, idx, arr){ return arr.indexOf(id) === idx; });
+}
+
+/* [V63.86] Helper: IDs de TODOS usuários ativos com tokens FCM, exceto o ID excluído. */
+function pushAllExcept(excludeId){
+  return (users||[])
+    .filter(function(u){
+      return u && u.id && u.status === "ativo"
+             && u.id !== excludeId
+             && Array.isArray(u.fcmTokens) && u.fcmTokens.length > 0;
+    })
+    .map(function(u){ return u.id; });
+}
+
+/* [V63.86] Helper: ID do responsável de um evento (owner). Retorna null se não encontrado. */
+function eventOwnerId(e){
+  if(!e) return null;
+  if(e.ownerId) return e.ownerId;
+  if(e.owner){
+    var u = userByName(e.owner);
+    return u ? u.id : null;
+  }
+  return null;
 }
 
 /* === Listener: quando o SW de push manda mensagem pro app aberto (clique em notificação fechada) === */
@@ -8258,7 +8315,7 @@ function renderSettingsNotifications(){
         '<select id="setReminderMin" class="set-select">'+
           ['5','10','15','30','60','120'].map(function(v){
             var label = v==="60" ? "1 hora antes" : v==="120" ? "2 horas antes" : v+" min antes";
-            return '<option value="'+v+'"'+(String(getPref("reminderMinutes",10))===v?' selected':'')+'>'+label+'</option>';
+            return '<option value="'+v+'"'+(String(getPref("reminderMinutes",60))===v?' selected':'')+'>'+label+'</option>';
           }).join("")+
         '</select>'+
       '</div>'+
@@ -14095,7 +14152,35 @@ $("saveBtn").onclick=async()=>{
     ownerId:ownEl?ownEl.id:null,notes:val("fNotes")};
   try{
     if(editingId){await db.collection("events").doc(editingId).update(data);clearEventAlarms(editingId);toast("Atualizado para a equipe");}
-    else{data.by=me.id;data.done=false;data.createdAt=Date.now();await db.collection("events").add(data);toast("Criado e compartilhado");}
+    else{
+      data.by=me.id;data.done=false;data.createdAt=Date.now();
+      var newEv = await db.collection("events").add(data);
+      toast("Criado e compartilhado");
+      /* [V63.85] Push imediato pros outros usuários ativos avisando do novo compromisso */
+      try{
+        var typIm = TYPES[data.type] || TYPES.outro;
+        var titleIm = "📅 Novo compromisso: " + (typIm?typIm.label:"agendamento");
+        var bodyIm = (data.title || data.client || "Sem título");
+        if(data.client && data.title) bodyIm = data.title + " · " + data.client;
+        var dateLbl = data.date || "";
+        var timeLbl = data.start || "";
+        if(dateLbl || timeLbl) bodyIm += " — " + dateLbl + (timeLbl?(" "+timeLbl):"");
+        var recipImm = (users||[])
+          .filter(function(u){
+            return u && u.id && u.status==="ativo" && u.id !== me.id
+                   && Array.isArray(u.fcmTokens) && u.fcmTokens.length > 0;
+          })
+          .map(function(u){ return u.id; });
+        if(recipImm.length > 0){
+          sendPushToUsers(recipImm, {
+            title: titleIm,
+            body: bodyIm,
+            tag: "newev-" + newEv.id,
+            url: "?openEvent=" + newEv.id
+          });
+        }
+      }catch(_){}
+    }
     selDay=date;closeSheets();
   }catch(e){toast("Erro ao salvar. Verifique a conexão.");}
   finally{busy=false;sb.disabled=false;}
@@ -14139,10 +14224,56 @@ function openDetail(id){
     ((!e.done&&!e.startedAt)?'<button class="done-toggle" id="startBtn" style="background:rgba(255,176,46,.12);border-color:rgba(255,176,46,.3);color:var(--c-foto)"><svg viewBox="0 0 24 24" fill="none"><path d="M8 5v14l11-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Iniciar agora</button>':"")+
     '<button class="done-toggle '+(e.done?"is-done":"")+'" id="doneToggle"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'+(e.done?"Serviço finalizado ✓ (tocar para reabrir)":"Finalizar agora")+'</button>';
   const sBtn=$("startBtn");
-  if(sBtn) sBtn.onclick=async()=>{if(busy)return;busy=true;try{await db.collection("events").doc(id).update({startedAt:Date.now()});e.startedAt=Date.now();toast("Agenda iniciada — contando o tempo");busy=false;openDetail(id);}catch(_){busy=false;toast("Erro ao iniciar");}};
+  if(sBtn) sBtn.onclick=async()=>{
+    if(busy)return;busy=true;
+    try{
+      await db.collection("events").doc(id).update({startedAt:Date.now(),startedBy:me.id});
+      e.startedAt=Date.now();
+      toast("Agenda iniciada — contando o tempo");
+      /* [V63.86] Push pra TODOS exceto quem iniciou */
+      try{
+        var typIn = TYPES[e.type] || TYPES.outro;
+        var titleIn = "▶ " + (me.name||"Alguém") + " iniciou: " + (typIn?typIn.label:"compromisso");
+        var bodyIn = (e.title || e.client || "Compromisso");
+        if(e.client && e.title) bodyIn = e.title + " · " + e.client;
+        var rcIn = pushAllExcept(me.id);
+        if(rcIn.length > 0){
+          sendPushToUsers(rcIn, {
+            title: titleIn,
+            body: bodyIn,
+            tag: "evstart-" + id,
+            url: "?openEvent=" + id
+          });
+        }
+      }catch(_){}
+      busy=false;
+      openDetail(id);
+    }catch(_){busy=false;toast("Erro ao iniciar");}
+  };
   $("doneToggle").onclick=async()=>{if(busy)return;busy=true;
     try{
-      if(!e.done){ await db.collection("events").doc(id).update({done:true,doneAt:Date.now(),doneBy:me.id}); clearEventAlarms(id); toast("Finalizado"); closeSheets(); }
+      if(!e.done){
+        await db.collection("events").doc(id).update({done:true,doneAt:Date.now(),doneBy:me.id});
+        clearEventAlarms(id);
+        toast("Finalizado");
+        /* [V63.86] Push pra TODOS exceto quem finalizou */
+        try{
+          var typFn = TYPES[e.type] || TYPES.outro;
+          var titleFn = "✅ " + (me.name||"Alguém") + " finalizou: " + (typFn?typFn.label:"compromisso");
+          var bodyFn = (e.title || e.client || "Compromisso");
+          if(e.client && e.title) bodyFn = e.title + " · " + e.client;
+          var rcFn = pushAllExcept(me.id);
+          if(rcFn.length > 0){
+            sendPushToUsers(rcFn, {
+              title: titleFn,
+              body: bodyFn,
+              tag: "evdone-" + id,
+              url: "?openEvent=" + id
+            });
+          }
+        }catch(_){}
+        closeSheets();
+      }
       else{ await db.collection("events").doc(id).update({done:false,doneAt:null,doneBy:null}); toast("Reaberto"); closeSheets(); }
     }catch(_){toast("Erro");}finally{busy=false;}};
   $("detailEdit").style.display=canManage(me)?"":"none";

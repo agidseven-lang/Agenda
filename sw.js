@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.84] Cache bump — Designers (Felipe, Boaz) podem criar tarefas de Edição atribuídas a si. */
-var CACHE = "idseven-v63-84";
+   [V63.86] Cache bump — Lembretes de agenda 4 momentos: Criar(todos) Lembrete(só dono) Iniciar/Finalizar(todos). */
+var CACHE = "idseven-v63-86";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
