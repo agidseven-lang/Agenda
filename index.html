@@ -2821,6 +2821,17 @@
   .set-row-lab{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:-.012em;line-height:1.3}
   .set-row-sub{font-size:11.5px;color:var(--ink-faint);font-weight:500;margin-top:3px;letter-spacing:-.005em}
 
+  /* [V63.64] Row com select (Antecedência do lembrete) — fix de alinhamento mobile.
+     Em mobile estreito (≤480px), empilha verticalmente: texto em cima, select embaixo (largura total).
+     Em telas maiores, mantém lado a lado mas alinha o select pelo TOPO (não pelo centro) — assim
+     o select fica visualmente alinhado com o título e a descrição flui logo abaixo sem sobreposição. */
+  .set-row.set-row-select{align-items:flex-start;padding:14px 16px}
+  .set-row.set-row-select .set-select{flex-shrink:0;margin-top:-2px}
+  @media (max-width:480px){
+    .set-row.set-row-select{flex-direction:column;align-items:stretch;gap:10px}
+    .set-row.set-row-select .set-select{width:100%;margin-top:0}
+  }
+
   /* [V63.11] Botões WhatsApp espalhados pelo app */
   .wa-row{display:flex;gap:10px;flex-wrap:wrap}
   .wa-btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;
@@ -4341,7 +4352,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.61 · build close-5-lacunas</div>
+    <div class="ver">versão 63.64 · build antecedencia-fix</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -7550,6 +7561,11 @@ function renderSettingsMain(){
     '</button>';
   }
   return '<div class="settings">'+
+    /* [V63.63] Botão de voltar pra tela Perfil — antes só dava pra voltar via sidebar */
+    '<button class="set-back" id="setMainBack" style="margin-bottom:8px;width:auto;padding:0 14px;gap:8px;font-weight:600;color:var(--ink-soft);font-size:13px" title="Voltar ao Perfil">'+
+      '<svg viewBox="0 0 24 24" fill="none" style="flex-shrink:0"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+      '<span>Voltar ao Perfil</span>'+
+    '</button>'+
     '<div class="set-hero">'+
       '<div class="set-hero-ic" style="background:'+userColor(me)+'22;color:'+userColor(me)+'">'+
         avatarHTML(me)+
@@ -7583,6 +7599,9 @@ function renderSettingsMain(){
 }
 
 function bindSettingsMain(){
+  /* [V63.63] Bind do botão "Voltar ao Perfil" na tela principal de Settings */
+  var bk = document.getElementById("setMainBack");
+  if(bk) bk.onclick = function(){ switchTab("profile"); };
   document.querySelectorAll("[data-setgo]").forEach(b=>b.onclick=()=>{
     settingsView = b.dataset.setgo;
     render();
@@ -7879,7 +7898,7 @@ function renderSettingsNotifications(){
     '<div class="set-section">'+
       '<div class="set-section-h">Lembretes de compromisso</div>'+
       renderToggleRow("notifyReminder", "Lembrar antes do compromisso começar", "Alerta dispara X minutos antes do horário marcado", getPref("notifyReminder"))+
-      '<div class="set-row">'+
+      '<div class="set-row set-row-select">'+
         '<div class="set-row-t">'+
           '<div class="set-row-l">Antecedência do lembrete</div>'+
           '<div class="set-row-d">Quantos minutos antes do compromisso</div>'+
@@ -8779,12 +8798,62 @@ function bindBoard(){
   var ddMenu = document.getElementById("btSectorMenu");
   var ddWrap = document.getElementById("btSectorWrap");
   if(ddBtn && ddMenu && ddWrap){
+    /* [V63.62] BUG FIX MOBILE: posiciona menu com position:fixed quando abre
+       — o .bt-left tem overflow-x:auto em mobile e estava cortando o dropdown.
+       Calcula coordenadas via getBoundingClientRect e move pro <body> */
+    function positionDropdown(){
+      var btnRect = ddBtn.getBoundingClientRect();
+      var vw = window.innerWidth;
+      ddMenu.style.position = "fixed";
+      ddMenu.style.top = (btnRect.bottom + 5) + "px";
+      /* Em mobile (vw < 720), alinha à direita pra não estourar a tela */
+      if(vw < 720){
+        ddMenu.style.left = "auto";
+        ddMenu.style.right = Math.max(8, vw - btnRect.right) + "px";
+        ddMenu.style.minWidth = "240px";
+        ddMenu.style.maxWidth = (vw - 16) + "px";
+      } else {
+        ddMenu.style.left = btnRect.left + "px";
+        ddMenu.style.right = "auto";
+        ddMenu.style.minWidth = "220px";
+        ddMenu.style.maxWidth = "";
+      }
+      /* Garante que o menu fica sobre TUDO */
+      ddMenu.style.zIndex = "9999";
+    }
+    function resetDropdownPos(){
+      ddMenu.style.position = "";
+      ddMenu.style.top = "";
+      ddMenu.style.left = "";
+      ddMenu.style.right = "";
+      ddMenu.style.minWidth = "";
+      ddMenu.style.maxWidth = "";
+      ddMenu.style.zIndex = "";
+    }
     ddBtn.onclick = function(e){
       e.stopPropagation();
       var willOpen = ddMenu.classList.contains("hidden");
-      ddMenu.classList.toggle("hidden");
-      ddWrap.classList.toggle("open", willOpen);
+      if(willOpen){
+        ddMenu.classList.remove("hidden");
+        ddWrap.classList.add("open");
+        /* Posiciona no próximo frame pra garantir que o display:flex já aplicou */
+        requestAnimationFrame(positionDropdown);
+      } else {
+        ddMenu.classList.add("hidden");
+        ddWrap.classList.remove("open");
+        resetDropdownPos();
+      }
     };
+    /* Reposiciona se a janela mudar de tamanho enquanto aberto */
+    if(!window.__btSectorResizeBound){
+      window.__btSectorResizeBound = true;
+      window.addEventListener("resize", function(){
+        if(ddWrap.classList.contains("open")) positionDropdown();
+      });
+      window.addEventListener("scroll", function(){
+        if(ddWrap.classList.contains("open")) positionDropdown();
+      }, true);
+    }
     /* Click fora ou ESC fecha (binding global único) */
     if(!window.__btSectorOutBound){
       window.__btSectorOutBound = true;
@@ -8793,7 +8862,13 @@ function bindBoard(){
         if(open && !open.contains(e.target)){
           open.classList.remove("open");
           var m = open.querySelector(".bt-dropdown-menu");
-          if(m) m.classList.add("hidden");
+          if(m){
+            m.classList.add("hidden");
+            /* [V63.62] limpa inline styles do fixed-positioning */
+            m.style.position = ""; m.style.top = ""; m.style.left = "";
+            m.style.right = ""; m.style.minWidth = ""; m.style.maxWidth = "";
+            m.style.zIndex = "";
+          }
         }
       });
       document.addEventListener("keydown", function(e){
@@ -8802,7 +8877,12 @@ function bindBoard(){
           if(open){
             open.classList.remove("open");
             var m = open.querySelector(".bt-dropdown-menu");
-            if(m) m.classList.add("hidden");
+            if(m){
+              m.classList.add("hidden");
+              m.style.position = ""; m.style.top = ""; m.style.left = "";
+              m.style.right = ""; m.style.minWidth = ""; m.style.maxWidth = "";
+              m.style.zIndex = "";
+            }
           }
         }
       });
