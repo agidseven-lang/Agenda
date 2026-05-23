@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 64.2 · build remove-pre-validacao-cache-local</div>
+    <div class="ver">versão 64.3 · build regra-lembrete-1h-sem-push-imediato</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -4828,6 +4828,35 @@ function $(id){return document.getElementById(id);}
 function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
 function lsDel(k){try{localStorage.removeItem(k);}catch(e){}}
+/* [V64.3] DEVICE ID PERSISTENTE — identifica o "mesmo aparelho" entre registros de push.
+   Fica no localStorage, que é compartilhado entre o navegador e a TWA/PWA do MESMO origin.
+   Isso permite remover o token antigo do Chrome quando o app reabre como PWA/TWA no mesmo
+   celular, evitando que o aparelho receba notificações duplicadas. */
+const DEVICE_ID_KEY = "idseven_device_id";
+function getDeviceId(){
+  var id = lsGet(DEVICE_ID_KEY);
+  if(id) return id;
+  try{
+    if(window.crypto && crypto.randomUUID) id = crypto.randomUUID();
+  }catch(_){}
+  if(!id) id = "dev-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2,10);
+  lsSet(DEVICE_ID_KEY, id);
+  return id;
+}
+/* [V64.3] Plataforma aproximada do dispositivo (pra metadados/diagnóstico do token). */
+function detectPlatform(){
+  try{
+    var ua = (navigator.userAgent || "").toLowerCase();
+    var standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+                     || window.navigator.standalone === true;
+    var base = /android/.test(ua) ? "android"
+             : /iphone|ipad|ipod/.test(ua) ? "ios"
+             : /windows/.test(ua) ? "windows"
+             : /mac/.test(ua) ? "mac"
+             : /linux/.test(ua) ? "linux" : "web";
+    return base + (standalone ? "/pwa" : "/browser");
+  }catch(_){ return "web"; }
+}
 function show(id){["loadingScreen","setupScreen","authScreen","pendingScreen","mainApp"].forEach(s=>$(s).classList.add("hidden"));$(id).classList.remove("hidden");}
 function todayISO(){return iso(new Date());}
 function iso(d){const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);return z.toISOString().slice(0,10);}
@@ -5151,6 +5180,8 @@ var __clientOpenedMark = false;
     usersLoaded=true;
     if(!me && sessionId){ const u=users.find(x=>x.id===sessionId); if(u) me=u; }
     if(me){const fresh=users.find(u=>u.id===me.id);if(fresh)me=fresh;}
+    /* [V64.3] Sincroniza reminderMinutes Firestore↔local uma vez por sessão (pro Worker ler) */
+    if(me && !window.__reminderSynced){ window.__reminderSynced = true; try{ syncReminderMinutesOnLogin(); }catch(_){} }
     if(!changedBeyondPresence){
       /* Só presença mudou — atualiza dots da equipe/chat sem disparar fade animation */
       if((tab === "team" || tab === "chat") && !$("mainApp").classList.contains("hidden")){
@@ -6989,6 +7020,41 @@ var postReminderTimers = {};
 /* Pra detectar push click → abre modal de "Hora de Postar" automaticamente */
 var _pendingPostExecutor = null;
 
+/* [V64.3] Salva a antecedência do lembrete (reminderMinutes) no doc do usuário
+   no Firestore. O Cloudflare Worker (cron) lê users/{ownerId}.reminderMinutes
+   pra saber quantos minutos antes disparar o lembrete de cada compromisso.
+   Se nunca foi salvo, o Worker usa o default 60 (1h). */
+async function persistReminderMinutes(mins){
+  try{
+    if(!db || !me || !me.id) return;
+    var v = parseInt(mins, 10);
+    if(!(v > 0)) v = 60;
+    await db.collection("users").doc(me.id).update({ reminderMinutes: v });
+    console.log("[REMINDER] reminderMinutes=" + v + " salvo em users/" + me.id + " (Worker lê daqui)");
+  }catch(e){
+    try{ console.warn("[REMINDER] falha ao salvar reminderMinutes no Firestore:", e && e.message); }catch(_){}
+  }
+}
+
+/* [V64.3] Sincroniza a antecedência entre Firestore ↔ localStorage no login.
+   - Se o doc do user já tem reminderMinutes, ele é a fonte da verdade → reflete no pref local.
+   - Se NÃO tem (user antigo), grava o pref local (default 60) no Firestore pro Worker ler. */
+function syncReminderMinutesOnLogin(){
+  try{
+    if(!me) return;
+    var fromCloud = parseInt(me.reminderMinutes, 10);
+    if(fromCloud > 0){
+      if(parseInt(getPref("reminderMinutes",60),10) !== fromCloud){
+        setPref("reminderMinutes", fromCloud);
+        try{ scheduleEventReminders(); }catch(_){}
+      }
+    } else {
+      /* Não existe no Firestore — grava o atual (ou 60) pra o Worker enxergar */
+      persistReminderMinutes(parseInt(getPref("reminderMinutes",60),10) || 60);
+    }
+  }catch(_){}
+}
+
 function scheduleEventReminders(){
   /* [V63.85] LEMBRETES DE AGENDA — versão robusta.
      ANTES (V63.11):
@@ -7017,9 +7083,22 @@ function scheduleEventReminders(){
     /* [V63.85] Removido filtro `mine` — todos os compromissos da agência geram lembretes pra todos */
     var startMs = evStartMs(e);
     if(!startMs) return;
-    var trigger = startMs - minBefore * 60000;
-    if(trigger <= now) return;          /* já passou do horário do lembrete */
-    if(trigger > horizon) return;       /* mais de 24h, não agenda agora */
+    var trigger = startMs - minBefore * 60000;   /* reminderAt = eventStart - reminderMinutes */
+    /* [V64.3] Logs claros do cálculo do lembrete (item #7 do briefing) */
+    console.log("[REMINDER] eventStart=" + new Date(startMs).toISOString() + " (" + (e.id||"?") + ")");
+    console.log("[REMINDER] reminderAt=" + new Date(trigger).toISOString() + " (" + minBefore + " min antes)");
+    console.log("[REMINDER] now=" + new Date(now).toISOString());
+    /* [V64.3] REGRA: não disparar lembrete retroativo. Se reminderAt já passou
+       (ex: compromisso criado faltando menos de reminderMinutes), NÃO mandamos
+       lembrete atrasado imediato — apenas registramos o log. */
+    if(trigger <= now){
+      console.log("[REMINDER] skipped: reminderAt já passou — lembrete não enviado (" + (e.id||"?") + ")");
+      return;
+    }
+    if(trigger > horizon){
+      console.log("[REMINDER] skipped: reminderAt no futuro além de 24h — agenda mais tarde (" + (e.id||"?") + ")");
+      return;       /* mais de 24h, não agenda agora */
+    }
 
     reminderTimers[e.id] = setTimeout(function(){
       /* [V63.86] Local toast/notification SÓ pro user atual SE ele for o responsável.
@@ -7052,6 +7131,7 @@ function scheduleEventReminders(){
       try{
         var ownerIdRem = eventOwnerId(e);
         if(ownerIdRem && ownerIdRem !== me.id){
+          console.log("[REMINDER] sent: ownerId=" + ownerIdRem + " event=" + e.id);
           sendPushToUsers([ownerIdRem], {
             title: titleLine,
             body: bodyLine,
@@ -7629,34 +7709,63 @@ async function _setupPushNotificationsInternal(){
       return false;
     }
 
-    /* Salva o token no perfil do usuário (campo fcmTokens é array de strings).
-       [V63.96] FIX RACE CONDITION CRÍTICA: usa arrayUnion atômico em vez de read-modify-write.
-       Antes: get() + push() + update() — se 2 devices fizessem isso simultaneamente, um
-       sobrescrevia o outro e tokens eram perdidos. arrayUnion é executado server-side e
-       garante que ambos os tokens entrem sem conflito.
-       Mantém também limite de 5 dispositivos: lê primeiro pra ver se já tem o token e
-       se a lista já está cheia (mais devices = mais antigos saem por trim local). */
+    /* [V64.3] Salva o token + METADADOS por dispositivo, com DEDUP POR DEVICE.
+       Campos: fcmTokens (array de strings, lido pelo Worker) +
+               fcmTokenMeta (map token → {token, deviceId, platform, createdAt, lastSeenAt}).
+       REGRA: ao registrar um novo token DESTE device, removemos qualquer token ANTIGO
+       que pertença ao MESMO deviceId. Isso elimina o caso clássico de duplicidade:
+       "token velho do Chrome + token novo do PWA/TWA no mesmo celular" → 2 notificações.
+       Usamos uma TRANSAÇÃO pra evitar race condition (2 devices salvando ao mesmo tempo). */
     _pushDbg("12-salvando-token-firestore", "");
     var userRef = savedDb.collection("users").doc(savedMeId);
-    var snap = await userRef.get();
-    var existing = (snap.data() && snap.data().fcmTokens) || [];
-    if(!Array.isArray(existing)) existing = [];
-    if(existing.indexOf(token) < 0){
-      if(existing.length >= 5){
-        /* Lista já tem 5+ tokens. Faz trim manual (read+write) só nesse caso raro. */
-        var arr = existing.concat([token]).slice(-5);
-        await userRef.update({fcmTokens: arr});
-      } else {
-        /* Caso comum: usa arrayUnion atômico — não sobrescreve concorrência */
-        await userRef.update({
-          fcmTokens: firebase.firestore.FieldValue.arrayUnion(token)
-        });
-      }
-    }
+    var devId = getDeviceId();
+    var platform = detectPlatform();
+    var nowTs = Date.now();
+    var _dedupCount = 0, _finalCount = 0;
+    await savedDb.runTransaction(async function(tx){
+      var doc = await tx.get(userRef);
+      var d = (doc.exists ? doc.data() : {}) || {};
+      var existing = Array.isArray(d.fcmTokens) ? d.fcmTokens.filter(Boolean) : [];
+      var meta = (d.fcmTokenMeta && typeof d.fcmTokenMeta === "object") ? Object.assign({}, d.fcmTokenMeta) : {};
+
+      /* Tokens ANTIGOS deste mesmo device (exceto o atual) → serão removidos */
+      var sameDeviceOld = [];
+      Object.keys(meta).forEach(function(t){
+        if(meta[t] && meta[t].deviceId === devId && t !== token) sameDeviceOld.push(t);
+      });
+      _dedupCount = sameDeviceOld.length;
+
+      /* Nova lista de tokens: remove os do mesmo device + dedup com Set + garante o atual */
+      var nextTokens = existing.filter(function(t){ return sameDeviceOld.indexOf(t) < 0; });
+      if(nextTokens.indexOf(token) < 0) nextTokens.push(token);
+      nextTokens = Array.from(new Set(nextTokens.filter(Boolean)));
+      if(nextTokens.length > 5) nextTokens = nextTokens.slice(-5); /* limite de 5 devices */
+
+      /* Sincroniza meta: descarta entradas de tokens que saíram, atualiza/cria o atual */
+      sameDeviceOld.forEach(function(t){ delete meta[t]; });
+      Object.keys(meta).forEach(function(t){ if(nextTokens.indexOf(t) < 0) delete meta[t]; });
+      var prevCreated = (meta[token] && meta[token].createdAt) || nowTs;
+      meta[token] = { token: token, deviceId: devId, platform: platform, createdAt: prevCreated, lastSeenAt: nowTs };
+
+      _finalCount = nextTokens.length;
+      tx.set(userRef, { fcmTokens: nextTokens, fcmTokenMeta: meta }, { merge: true });
+    });
+    _pushDbg("12b-dedup-device", "device=" + devId + " (" + platform + "); removeu " + _dedupCount + " token(s) antigo(s) do mesmo aparelho; total agora=" + _finalCount);
     fcmTokenSaved = token;
     fcmInitSucceeded = true;        /* [V63.94] marcador de sucesso definitivo */
     fcmInitInProgress = false;       /* [V63.94] libera */
     _pushDbg("13-SUCESSO", "token salvo no Firestore");
+
+    /* [V64.3] ATUALIZAÇÃO VISUAL IMEDIATA (item #6 do briefing): reflete o token
+       deste device no cache em memória ANTES do próximo snapshot, pra que o banner
+       "Dispositivo não registrado" suma na hora e o diagnóstico já conte certo.
+       O snapshot do Firestore confirma logo em seguida. */
+    try{
+      if(me && me.id === savedMeId){
+        if(!Array.isArray(me.fcmTokens)) me.fcmTokens = [];
+        if(me.fcmTokens.indexOf(token) < 0) me.fcmTokens.push(token);
+      }
+    }catch(_){}
 
     /* [V63.97] Atualiza banner de status — deve desaparecer agora que tem token */
     try{ if(typeof updatePushStatusBanner === "function") updatePushStatusBanner(); }catch(_){}
@@ -8909,8 +9018,35 @@ function renderSettingsNotifications(){
     pushRegistered                    ? '<span class="set-perm-ok">✓ Dispositivo registrado</span>' :
                                         '<span class="set-perm-warn">⚠ Registrando…</span>';
 
+  /* [V64.3] DIAGNÓSTICO DE TOKENS — mostra quantos tokens/dispositivos ativos o user
+     tem e avisa se há risco de notificação duplicada (mais tokens do que aparelhos
+     distintos, ou tokens sem metadados de device). */
+  var _myTokens = (me && Array.isArray(me.fcmTokens)) ? me.fcmTokens.filter(Boolean) : [];
+  var _myMeta = (me && me.fcmTokenMeta && typeof me.fcmTokenMeta === "object") ? me.fcmTokenMeta : {};
+  var _devSet = {}; var _tokensNoMeta = 0;
+  _myTokens.forEach(function(t){
+    var m = _myMeta[t];
+    if(m && m.deviceId){ _devSet[m.deviceId] = (_devSet[m.deviceId]||0) + 1; }
+    else { _tokensNoMeta++; }
+  });
+  var _devCount = Object.keys(_devSet).length;
+  var _dupRisk = (_myTokens.length > _devCount) || (_tokensNoMeta > 0 && _myTokens.length > 1);
+  var tokenDiag =
+    '<div class="set-section">'+
+      '<div class="set-section-h">Diagnóstico de notificações</div>'+
+      '<div style="font-size:12px;line-height:1.55;padding:2px 4px;color:var(--ink-faint)">'+
+        'Este usuário tem <b style="color:var(--ink)">' + _myTokens.length + '</b> token(s) ativo(s)'+
+        (_devCount ? ' em <b style="color:var(--ink)">' + _devCount + '</b> aparelho(s) identificado(s)' : '')+
+        (_tokensNoMeta ? ' · ' + _tokensNoMeta + ' sem identificação de aparelho' : '')+'.'+
+        (_dupRisk
+          ? '<br><span style="color:var(--c-rev)">⚠ Pode receber notificação duplicada se o mesmo celular estiver registrado mais de uma vez. Toque em "Testar push" e depois em "Limpar tokens antigos e re-registrar" para corrigir.</span>'
+          : '<br><span style="color:var(--c-trafego)">✓ Sem indício de duplicidade.</span>')+
+      '</div>'+
+    '</div>';
+
   return '<div class="settings">'+
     setHeader("Notificações", "Escolha o que você quer ser avisado")+
+    tokenDiag+
     '<div class="set-section">'+
       '<div class="set-section-h">Som e vibração</div>'+
       renderToggleRow("soundOn", "Som de notificações", "Beep quando há nova tarefa, comentário ou alerta", getPref("soundOn"))+
@@ -9018,8 +9154,14 @@ function bindSettingsNotifications(){
   var sel = document.getElementById("setReminderMin");
   if(sel){
     sel.onchange = function(){
-      setPref("reminderMinutes", parseInt(sel.value,10) || 10);
+      var mins = parseInt(sel.value,10) || 60;
+      setPref("reminderMinutes", mins);
       try{ scheduleEventReminders(); }catch(_){}
+      /* [V64.3] PRODUÇÃO REAL: a antecedência NÃO pode ficar só no localStorage —
+         o Cloudflare Worker (cron) não lê localStorage. Salvamos também em
+         users/{uid}.reminderMinutes pra que o Worker leia a preferência real do
+         dono do compromisso e dispare o lembrete na janela certa. */
+      try{ persistReminderMinutes(mins); }catch(_){}
       toast("Lembrete agora dispara "+sel.options[sel.selectedIndex].text);
     };
   }
@@ -9197,9 +9339,9 @@ function bindSettingsNotifications(){
     if(rr) rr.onclick = async function(){
       rr.disabled = true; rr.textContent = "Limpando...";
       try{
-        /* Apaga tokens do Firestore */
+        /* Apaga tokens do Firestore (e os metadados por device da V64.3) */
         if(me && db){
-          await db.collection("users").doc(me.id).update({ fcmTokens: [] });
+          await db.collection("users").doc(me.id).update({ fcmTokens: [], fcmTokenMeta: {} });
         }
         /* [V63.97] Desregistra o SW do FCM pra forçar um fresh start.
            Antes, o setupPushNotifications fazia isso automaticamente. Agora setupPush
@@ -15053,80 +15195,22 @@ $("saveBtn").onclick=async()=>{
     else{
       data.by=me.id;data.done=false;data.createdAt=Date.now();
       var newEv = await db.collection("events").add(data);
-      toast("Criado e compartilhado");
-      /* [V63.88] DEBUG VISUAL — toast mostra exatamente o que aconteceu com o push.
-         Quando user reportar "não chegou", o toast vai dizer onde parou. */
-      try{
-        var typIm = TYPES[data.type] || TYPES.outro;
-        var titleIm = "📅 Novo compromisso: " + (typIm?typIm.label:"agendamento");
-        var bodyIm = (data.title || data.client || "Sem título");
-        if(data.client && data.title) bodyIm = data.title + " · " + data.client;
-        var dateLbl = data.date || "";
-        var timeLbl = data.start || "";
-        if(dateLbl || timeLbl) bodyIm += " — " + dateLbl + (timeLbl?(" "+timeLbl):"");
-        var recipImm = pushAllExcept(me.id);
-
-        /* [V63.88] Logging detalhado em console + toast visual */
-        console.log("[EVENT-PUSH] recipImm IDs:", recipImm);
-        console.log("[EVENT-PUSH] total users no app:", (users||[]).length);
-
-        if(recipImm.length === 0){
-          toast("⚠ Debug push: 0 destinatários (sem outros usuários ativos)");
-          console.warn("[EVENT-PUSH] FALHA: pushAllExcept retornou vazio");
-        } else {
-          /* Conta tokens disponíveis */
-          var totalTokens = 0;
-          var usersWithTokens = 0;
-          var usersWithoutTokens = [];
-          recipImm.forEach(function(uid){
-            var u = (users||[]).find(function(x){ return x.id === uid; });
-            if(u && Array.isArray(u.fcmTokens) && u.fcmTokens.length > 0){
-              totalTokens += u.fcmTokens.length;
-              usersWithTokens++;
-            } else {
-              usersWithoutTokens.push(u ? u.name : uid);
-            }
-          });
-
-          console.log("[EVENT-PUSH] destinatários:", recipImm.length,
-                      "com token (cache):", usersWithTokens,
-                      "sem token (cache):", usersWithoutTokens);
-
-          /* [V64.2] FIX CRÍTICO: SEMPRE chama sendPushToUsers se há destinatários.
-             Antes (V63.88 → V64.1): se totalTokens === 0 no cache local, o código
-             pulava o sendPushToUsers — bloqueando a verificação de tokens FRESCOS
-             do Firestore que a V64.1 tinha adicionado. Resultado: V64.1 ficava
-             inutilizada nesse fluxo, e push não disparava mesmo com tokens válidos
-             no Firestore (cache atrasado).
-             AGORA: o toast informativo é apenas isso — informativo. A decisão de
-             enviar ou não fica 100% dentro do sendPushToUsers, que tem a fonte
-             da verdade (Firestore fresh). */
-          if(totalTokens === 0){
-            toast("ℹ Cache local sem tokens — verificando Firestore fresh…");
-          } else {
-            toast("📤 Push enviando pra " + usersWithTokens + " usuários (" + totalTokens + " tokens" + (usersWithoutTokens.length > 0 ? " — sem token no cache: " + usersWithoutTokens.join(",") : "") + ")");
-          }
-
-          /* [V64.2] sendPushToUsers é a fonte da verdade — chama SEMPRE.
-             Dentro dele a V64.1 busca tokens frescos do Firestore por user e
-             decide o que enviar. Se realmente não houver token nenhum no
-             Firestore, ele loga sem barulho. */
-          sendPushToUsers(recipImm, {
-            title: titleIm,
-            body: bodyIm,
-            tag: "newev-" + newEv.id,
-            url: "?openEvent=" + newEv.id
-          }).then(function(){
-            console.log("[EVENT-PUSH] sendPushToUsers terminou (sucesso/falha — ver acima)");
-          }).catch(function(err){
-            console.error("[EVENT-PUSH] sendPushToUsers ERRO:", err);
-            toast("❌ Push falhou: " + (err && err.message || "erro desconhecido"));
-          });
-        }
-      }catch(eP){
-        console.error("[EVENT-PUSH] EXCEPTION:", eP);
-        toast("❌ Push erro: " + (eP && eP.message || "exceção"));
-      }
+      toast("Compromisso criado com sucesso");
+      /* [V64.3] REGRA DE NEGÓCIO: COMPROMISSO/AGENDA NÃO dispara push imediato na criação.
+         ANTES (V63.88 → V64.2): ao salvar um novo compromisso o app disparava
+         sendPushToUsers({title:"📅 Novo compromisso..."}) pra TODOS imediatamente.
+         Isso estava errado — o usuário recebia "Novo compromisso..." no exato
+         momento da criação, quando a regra do app é notificar SOMENTE antes do
+         horário (lembrete por antecedência, ex: 1h antes).
+         AGORA: nenhum push imediato pra compromisso. O único lembrete vem via
+         scheduleEventReminders() (timer local) + o cron do Cloudflare Worker,
+         ambos disparando exatamente em (eventStart - reminderMinutes).
+         OBSERVAÇÃO: tarefas atribuídas, chat e comentários/menções CONTINUAM
+         com push imediato — só COMPROMISSO deixou de disparar. */
+      console.log("[EVENT-CREATE] compromisso criado — sem push imediato por regra de negócio (id=" + newEv.id + ")");
+      /* Re-agenda os lembretes locais já incluindo o novo evento (não espera o
+         próximo snapshot). O lembrete dispara em eventStart - reminderMinutes. */
+      try{ scheduleEventReminders(); }catch(_){}
     }
     selDay=date;closeSheets();
   }catch(e){toast("Erro ao salvar. Verifique a conexão.");}
