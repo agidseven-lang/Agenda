@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.91 · build logs-push-visiveis-na-ui</div>
+    <div class="ver">versão 63.92 · build fix-onmessage-bug-critico</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -7418,13 +7418,18 @@ async function setupPushNotifications(){
        nesse caso o SO não mostra nada automaticamente; usamos nativeNotify. */
     fcmMessaging.onMessage(function(payload){
       try{
-        /* [V63.14 — AUDIT] Não mostra notificação foreground se usuário deslogou
-           durante o ciclo de vida do messaging (caso raro mas existente). */
-        if(!me || me.status !== "ativo") return;
+        /* [V63.92] FIX CRÍTICO: filtra NEGATIVAMENTE — bloqueia só status "pendente"/"removido",
+           porque users criados antes da feature de status NÃO TÊM esse campo no Firestore.
+           Antes (V63.14) checava `status !== "ativo"` → bloqueava users com status undefined
+           → notification não aparecia mesmo o FCM aceitando o push.
+           Mesmo bug do pushAllExcept corrigido em V63.87. */
+        if(!me) return;
+        if(me.status === "pendente" || me.status === "removido") return;
         var n = payload && payload.notification || {};
         var d = payload && payload.data || {};
         nativeNotify(n.title || "ID Seven", n.body || "", d.tag || ("fg-"+Date.now()), function(){
-          if(!me || me.status !== "ativo") return;
+          if(!me) return;
+          if(me.status === "pendente" || me.status === "removido") return;
           if(d.url){ try{ window.location.href = d.url; }catch(_){} return; }
           if(d.taskId){ openTaskDetail(d.taskId); return; }
           if(d.eventId){ switchTab("agenda"); setTimeout(function(){ openDetail(d.eventId); }, 200); return; }
