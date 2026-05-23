@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.90] Cache bump — Diagnóstico da equipe: botão testa push pra cada user individualmente. */
-var CACHE = "idseven-v63-90";
+   [V63.91] Cache bump — Logs detalhados [PUSH] aparecem na tela ao testar push, sem precisar de DevTools. */
+var CACHE = "idseven-v63-91";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
