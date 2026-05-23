@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.88 · build debug-push-agenda-visual</div>
+    <div class="ver">versão 63.89 · build sino-app-eventos-agenda</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -13780,6 +13780,53 @@ function notifList(){
       });
     }
   });
+  /* [V63.89] EVENTOS DA AGENDA — adiciona compromissos no centro de notificações.
+     Tipos:
+     - event_upcoming: meu compromisso em ≤24h (urgente)
+     - event_assigned: alguém me atribuiu como responsável (últimas 48h)
+     - event_new: alguém criou compromisso novo (últimas 12h, não fui eu)
+     - event_started: alguém iniciou um compromisso (últimas 12h, não fui eu)
+     - event_done: alguém finalizou um compromisso (últimas 12h, não fui eu) */
+  var HALF_DAY = 12*HOUR;
+  var TWO_DAYS = 2*DAY;
+  (events||[]).forEach(function(e){
+    if(!e || !e.id || !e.date) return;
+    var startMs = evStartMs(e);
+    if(!startMs) return;
+
+    /* Detecta responsável (owner) — pode vir por ID ou por nome */
+    var ownId = e.ownerId || (e.owner ? ((userByName(e.owner)||{}).id || null) : null);
+    var isMineEv = (ownId === meId);
+
+    /* a. UPCOMING: meu compromisso nas próximas 24h, não iniciado e não concluído */
+    if(isMineEv && !e.done && !e.startedAt && startMs > now && (startMs - now) <= DAY){
+      out.push({ id:"ev:"+e.id+"|upcoming", kind:"event_upcoming", at:startMs,
+                 item:e, client:e.client||"", title:e.title||"" });
+    }
+    /* b. ASSIGNED: me atribuíram como responsável (últimas 48h, não fui eu que criei) */
+    else if(isMineEv && !e.done && e.by !== meId && (e.createdAt || 0) > (now - TWO_DAYS)){
+      out.push({ id:"ev:"+e.id+"|assigned", kind:"event_assigned", at:(e.createdAt||startMs),
+                 item:e, client:e.client||"", title:e.title||"" });
+    }
+    /* c. NEW: alguém criou um compromisso (últimas 12h, não fui eu, e eu não sou responsável) */
+    else if(!isMineEv && e.by !== meId && (e.createdAt || 0) > (now - HALF_DAY)){
+      out.push({ id:"ev:"+e.id+"|new", kind:"event_new", at:(e.createdAt||startMs),
+                 item:e, client:e.client||"", title:e.title||"" });
+    }
+
+    /* d. STARTED: alguém iniciou (últimas 12h, não fui eu) */
+    if(e.startedAt && (now - e.startedAt) < HALF_DAY && e.startedBy && e.startedBy !== meId){
+      out.push({ id:"ev:"+e.id+"|started|"+e.startedAt, kind:"event_started", at:e.startedAt,
+                 item:e, client:e.client||"", title:e.title||"" });
+    }
+
+    /* e. DONE: alguém finalizou (últimas 12h, não fui eu) */
+    if(e.done && e.doneAt && (now - e.doneAt) < HALF_DAY && e.doneBy && e.doneBy !== meId){
+      out.push({ id:"ev:"+e.id+"|done|"+e.doneAt, kind:"event_done", at:e.doneAt,
+                 item:e, client:e.client||"", title:e.title||"" });
+    }
+  });
+
   var seen={}, uniq=[];
   out.forEach(function(o){ if(!seen[o.id]){ seen[o.id]=1; uniq.push(o); } });
   /* [V63.2] Filtra notificações pelas preferências do usuário */
@@ -13790,6 +13837,8 @@ function notifList(){
     if(x.kind === "due24"               && !getPref("notifyLate", true))      return false;
     if(["approve_copy","approve_rot","copy_aprovado","rot_aprovado","client_approved","client_revision","legenda_approved","legenda_revision"].indexOf(x.kind) >= 0
        && !getPref("notifyApproval", true)) return false;
+    /* [V63.89] Notificações de eventos da agenda usam a pref notifyReminder */
+    if(x.kind && x.kind.indexOf("event_") === 0 && !getPref("notifyReminder", true)) return false;
     return true;
   });
   return uniq.sort(function(a,b){return b.at-a.at;}).slice(0,80);
@@ -13889,6 +13938,59 @@ function openNotifs(){
         ic='<path d="M3 21l3.2-1 11-11-2.2-2.2-11 11L3 21z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M14 6l3-3 4 4-3 3" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>';
         col="var(--c-rev)"; h="Cliente pediu revisão da LEGENDA"; body=ct+(fbL?' · "'+esc(fbL)+'"':'');
       }
+      /* [V63.89] Notificações da AGENDA — kinds event_* renderizam abrindo o detail do compromisso */
+      else if(x.kind && x.kind.indexOf("event_") === 0){
+        var ev = x.item || {};
+        var evTyp = TYPES[ev.type] || TYPES.outro;
+        var dateLine = (ev.date || "") + (ev.start ? (" " + ev.start) : "");
+        var bodyEv = (evTyp ? evTyp.label : "Compromisso") + (ct ? " · " + ct : "") + (dateLine ? " · " + dateLine : "");
+
+        if(x.kind === "event_upcoming"){
+          ic='<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+          col="var(--c-grav)";
+          var diffUp = x.at - Date.now();
+          var labUp = diffUp < 3600000 ? "em menos de 1h" : ("em " + Math.round(diffUp/3600000) + "h");
+          h = "⏰ Você é responsável · " + labUp;
+          body = bodyEv;
+        }
+        else if(x.kind === "event_assigned"){
+          ic='<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+          col="var(--c-foto)";
+          var byUser = (users||[]).find(function(u){ return u.id === ev.by; });
+          var byName = (byUser && byUser.name) || "Alguém";
+          h = "📅 " + esc(byName) + " te colocou como responsável";
+          body = bodyEv;
+        }
+        else if(x.kind === "event_new"){
+          ic='<rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+          col="var(--c-design)";
+          var byUser2 = (users||[]).find(function(u){ return u.id === ev.by; });
+          var byName2 = (byUser2 && byUser2.name) || "Alguém";
+          var ownNm = ev.owner || "—";
+          h = "📅 " + esc(byName2) + " criou novo compromisso";
+          body = bodyEv + " · resp: " + esc(ownNm);
+        }
+        else if(x.kind === "event_started"){
+          ic='<path d="M8 5v14l11-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>';
+          col="var(--c-edicao)";
+          var stUser = (users||[]).find(function(u){ return u.id === ev.startedBy; });
+          var stName = (stUser && stUser.name) || "Alguém";
+          h = "▶ " + esc(stName) + " iniciou";
+          body = bodyEv;
+        }
+        else if(x.kind === "event_done"){
+          ic='<path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>';
+          col="var(--c-trafego)";
+          var dnUser = (users||[]).find(function(u){ return u.id === ev.doneBy; });
+          var dnName = (dnUser && dnUser.name) || "Alguém";
+          h = "✅ " + esc(dnName) + " finalizou";
+          body = bodyEv;
+        }
+        return '<div class="ntf" data-evid="'+esc(ev.id)+'"><span class="ntf-ic" style="color:'+col+'"><svg viewBox="0 0 24 24" fill="none">'+ic+'</svg></span>'+
+          '<div class="ntf-tx"><div class="ntf-h">'+h+'</div>'+
+          '<div class="ntf-b">'+body+'</div>'+
+          '<div class="ntf-t">'+esc(fmtDT(x.at))+'</div></div></div>';
+      }
       return '<div class="ntf" data-tid="'+x.task.id+'"'+(x.cidx!=null?' data-cidx="'+x.cidx+'"':'')+'><span class="ntf-ic" style="color:'+col+'"><svg viewBox="0 0 24 24" fill="none">'+ic+'</svg></span>'+
         '<div class="ntf-tx"><div class="ntf-h">'+h+'</div>'+
         '<div class="ntf-b">'+body+'</div>'+
@@ -13901,6 +14003,17 @@ function openNotifs(){
         setTimeout(function(){
           if(ci!=null && ci!=="") openContentDetail(id, +ci);
           else openTaskDetail(id);
+        }, 240);
+      };
+    });
+    /* [V63.89] Handler de clique pros itens de AGENDA (data-evid) — abre o detail do compromisso */
+    b.querySelectorAll(".ntf[data-evid]").forEach(function(el){
+      el.onclick=function(){
+        var id=el.dataset.evid;
+        closeSheets();
+        setTimeout(function(){
+          switchTab("agenda");
+          setTimeout(function(){ openDetail(id); }, 200);
         }, 240);
       };
     });

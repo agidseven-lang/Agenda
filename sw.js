@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.88] Cache bump — DEBUG VISUAL: toast no save de evento mostra exatamente o que acontece com o push. */
-var CACHE = "idseven-v63-88";
+   [V63.89] Cache bump — Sino do app agora mostra compromissos da agenda: upcoming, assigned, new, started, done. */
+var CACHE = "idseven-v63-89";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
