@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.81] Cache bump — Roteiro: responsável fixo Arydyjany + label Vídeo N pro cliente. */
-var CACHE = "idseven-v63-81";
+   [V63.82] Cache bump — Roteiro: detalhe da task mostra vídeos + caixa Compartilhar WhatsApp + Legendas. */
+var CACHE = "idseven-v63-82";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

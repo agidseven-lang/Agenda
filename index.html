@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.81 · build roteiro-responsavel-fixo-arydyjany</div>
+    <div class="ver">versão 63.82 · build roteiro-share-cliente-whatsapp</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -9244,7 +9244,7 @@ function renderBoard(){
   h+='</div><div class="board-hint">Toque em um cartão para ver detalhes, mover de etapa e marcar o checklist.</div>';
   return h;
 }
-function isExpandable(t){ return (t.sector==="design"||t.sector==="copy") && Array.isArray(t.cronWeeks) && t.cronWeeks.length>0; }
+function isExpandable(t){ return (t.sector==="design"||t.sector==="copy"||t.sector==="roteiro") && Array.isArray(t.cronWeeks) && t.cronWeeks.length>0; }
 function boardItems(list){
   var out=[];
   list.forEach(function(t){
@@ -9264,7 +9264,9 @@ function ccard(x){
   const STC={afazer:"var(--c-outro)",analise:"var(--c-edicao)",andamento:"var(--c-foto)",revisao:"var(--c-reuni)",aprovacao:"var(--c-copy)",pronto:"var(--accent)",concluido:"var(--c-trafego)"};
   const stc=STC[st.k]||"var(--c-outro)";
   const wk=Math.floor(idx/3)+1, cn=(idx%3)+1;
-  const ttl=(o.t&&o.t.trim())?o.t:("Semana "+wk+" · Conteúdo "+cn);
+  /* [V63.82] Roteiro usa "Vídeo N" como label do card no quadro */
+  var isRoteiroCard = (t.sector === "roteiro");
+  const ttl=(o.t&&o.t.trim())?o.t:(isRoteiroCard?("Vídeo "+(idx+1)):("Semana "+wk+" · Conteúdo "+cn));
   let meta='';
   const dMs=taskDueMs(t), ri=remainInfo(t);
   if(dMs) meta+='<span class="mi due'+(late?" late":"")+'"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+esc(fmtShort(dMs))+'</span>';
@@ -9308,7 +9310,7 @@ function ccard(x){
   return '<div class="tcard'+(late?" late urgent":"")+(actInfo?" in-client":"")+(actPhase===2?" in-fase2":"")+'" style="--uc:'+uc+'" data-tid="'+t.id+'" data-ci="'+idx+'">'+
     '<div class="tc-top">'+
       '<span class="'+stPillCls+'" style="background:'+secBg(stc)+';color:'+stc+'">'+esc(st.label)+'</span>'+
-      '<span class="tpill cron2">SEM '+wk+' · #'+cn+'</span>'+
+      '<span class="tpill cron2">'+(isRoteiroCard?("VÍDEO "+(idx+1)):("SEM "+wk+" · #"+cn))+'</span>'+
       (t.priority?'<span class="tpill prio2"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M5 3v18l7-5 7 5V3z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>PRIORITÁRIA</span>':'')+
       (late?'<span class="tpill"><svg viewBox="0 0 24 24" fill="none" style="width:11px;height:11px"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v4M12 16h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>ATRASADA</span>':'')+
       '<span class="tc-avw"><span class="tc-av" style="border-color:'+uc+'">'+avatarHTML(person)+'</span><span class="tc-cdot" style="background:'+uc+'"></span></span>'+
@@ -9886,7 +9888,7 @@ function openContentDetail(tid, idx){
   var wk=Math.floor(idx/3)+1, cn=(idx%3)+1;
   var sec=SECTORS[t.sector]||{label:"—",color:"var(--c-outro)"};
   ctCur={tid:tid,idx:idx};
-  $("ctH").textContent="Semana "+wk+" · Conteúdo "+cn;
+  $("ctH").textContent = (t.sector === "roteiro") ? ("Vídeo "+(idx+1)) : ("Semana "+wk+" · Conteúdo "+cn);
   var lk="";
   if(o.l&&o.l.trim()){ var sf=/^https?:\/\//i.test(o.l);
     lk=sf?'<a href="'+esc(o.l)+'" target="_blank" rel="noopener" class="cw-link">'+esc(o.l)+'</a>':'<span class="cw-link">'+esc(o.l)+'</span>'; }
@@ -10154,7 +10156,7 @@ function openContentDetail(tid, idx){
     '<div class="cron-view" style="margin-top:0">'+
       '<div class="tt">'+esc(sec.label)+' · '+esc(t.client||"Sem cliente")+'</div>'+
       '<div class="cw-ct">'+
-        '<div class="cw-cn">Tarefa / Título</div>'+
+        '<div class="cw-cn">'+(t.sector==="roteiro"?"Tema do vídeo":"Tarefa / Título")+'</div>'+
         '<div class="cw-ti">'+((o.t&&o.t.trim())?esc(o.t):'<span style="color:var(--ink-faint)">Sem título</span>')+'</div>'+
         ((o.d&&o.d.trim())?'<div class="cw-cn" style="margin-top:10px">Descrição / briefing</div><div class="cw-c">'+esc(o.d)+'</div>':'')+
         (lk?'<div class="cw-cn" style="margin-top:10px">Link / anexo</div><div class="cw-lk">'+lk+'</div>':'')+
@@ -13101,36 +13103,83 @@ function openTaskDetail(id){
   }
   let rotHtml="";
   if(t.sector==="roteiro"){
-    var R=t.roteiro||{};
-    var rsi=rotStateInfo(t.rotState||"rascunho"), rappr2=isRoteiroPerson(me);
-    var rby=users.find(x=>x.id===t.rotBy);
-    function rrow(lb,vl){ return '<div class="cw-ct"><div class="cw-cn">'+esc(lb)+'</div><div class="cw-c">'+((vl&&(""+vl).trim())?esc(vl):'<span style="color:var(--ink-faint)">—</span>')+'</div></div>'; }
-    rotHtml='<div class="cron-view"><div class="tt">Roteiro · fluxo de 4 etapas</div>'+
-      '<div class="cron-wk-v"><div class="cw-l">1 · Briefing e Planejamento</div>'+
-        rrow("Objetivo",R.obj)+rrow("Público-alvo",R.pub)+rrow("Canal e duração",R.canal)+'</div>'+
-      '<div class="cron-wk-v"><div class="cw-l">2 · Pré-Roteiro e Estrutura</div>'+
-        rrow("Gancho (Hook)",R.hook)+rrow("Desenvolvimento",R.dev)+rrow("CTA",R.cta)+'</div>'+
-      '<div class="cron-wk-v"><div class="cw-l">3 · Roteirização Detalhada</div>'+
-        rrow("Áudio",R.audio)+rrow("Vídeo",R.video)+'</div>'+
-      '<div class="cron-wk-v"><div class="cw-l">4 · Revisão e Aprovação</div>'+
-        '<div class="copy-badge" style="display:inline-flex;background:'+secBg(rsi.color)+';color:'+rsi.color+'">'+esc(rsi.label)+'</div>';
-    var rst=t.rotState||"rascunho";
-    if(rst==="aprovado"){
-      rotHtml+='<div class="copy-meta">Aprovado por '+esc((rby&&rby.name)||"Miercohévisk/Arydyjany")+(t.rotAt?(' · '+esc(fmtDT(t.rotAt))):'')+'. Encaminhar para a produção (gravação).</div>';
-      if(rappr2) rotHtml+='<button class="done-toggle" data-rs="em_revisao" style="background:var(--surface);border-color:var(--line);color:var(--ink-soft);margin-top:12px">Reabrir para ajustes</button>';
-    } else if(rst==="em_revisao"){
-      rotHtml+='<div class="copy-meta">Em revisão'+(t.rotAt?(' · '+esc(fmtDT(t.rotAt))):'')+'.</div>';
-      if(rappr2){
-        rotHtml+='<button class="done-toggle" data-rs="aprovado" style="background:rgba(54,211,153,.12);border-color:rgba(54,211,153,.32);color:var(--c-trafego);margin-top:12px"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Aprovar para gravação</button>'+
-          '<button class="done-toggle" data-rs="rascunho" style="background:var(--surface);border-color:var(--line);color:var(--ink-soft);margin-top:10px">Devolver para ajustes</button>';
-      } else { rotHtml+='<div class="copy-wait">Aguardando Miercohévisk ou Arydyjany.</div>'; }
+    /* [V63.82] Roteiro agora usa MESMA estrutura do cronograma:
+       - Lista de vídeos (em vez de Semanas × 3 conteúdos)
+       - Caixa "Compartilhar com o cliente" (link público + WhatsApp)
+       - Caixa "FASE 2 · Legendas" pra envio em lote
+       Substitui o bloco antigo de 4 etapas. */
+    var pack = t.roteiroPack || "p4";
+    var packLbl = pack==="p12"?"12 vídeos":pack==="p6"?"6 vídeos":"4 vídeos";
+    rotHtml='<div class="cron-view"><div class="tt">Roteiro · '+packLbl+'</div>';
+    var wsR=Array.isArray(t.cronWeeks)?t.cronWeeks.map(cronNorm):[];
+    var anyR=wsR.some(o=>(o.t&&o.t.trim())||(o.d&&o.d.trim())||(o.l&&o.l.trim()));
+    if(!anyR){
+      rotHtml+='<div class="cron-empty">Nenhum vídeo especificado ainda. Edite a tarefa para preencher.</div>';
     } else {
-      if(rappr2){
-        rotHtml+='<div class="copy-meta">Quando o roteiro estiver pronto, envie para revisão.</div>'+
-          '<button class="done-toggle" data-rs="em_revisao" style="background:rgba(255,176,46,.12);border-color:rgba(255,176,46,.32);color:var(--c-foto);margin-top:12px"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Enviar para revisão</button>';
-      } else { rotHtml+='<div class="copy-wait">Somente Miercohévisk e Arydyjany preenchem e enviam o roteiro.</div>'; }
+      /* Lista de vídeos (sem agrupamento por semana — é um pacote único) */
+      rotHtml+='<div class="cron-wk-v"><div class="cw-l">'+wsR.length+' vídeos no pacote</div>';
+      wsR.forEach(function(o, vi){
+        var lkR="";
+        if(o.l&&o.l.trim()){ var sfR=/^https?:\/\//i.test(o.l);
+          lkR=sfR?'<a href="'+esc(o.l)+'" target="_blank" rel="noopener" class="cw-link">'+esc(o.l)+'</a>':'<span class="cw-link">'+esc(o.l)+'</span>'; }
+        rotHtml+='<div class="cw-ct"><div class="cw-cn">Vídeo '+(vi+1)+'</div>'+
+          '<div class="cw-ti">'+((o.t&&o.t.trim())?esc(o.t):'<span style="color:var(--ink-faint)">Sem tema</span>')+'</div>'+
+          ((o.d&&o.d.trim())?'<div class="cw-c">'+esc(o.d)+'</div>':'')+
+          (lkR?'<div class="cw-lk">'+lkR+'</div>':'')+'</div>';
+      });
+      rotHtml+='</div>';
     }
-    rotHtml+='</div></div>';
+    rotHtml+='</div>';
+    /* Caixa Compartilhar (mesmo padrão do cronograma) — usa MESMOS IDs (cronShare/cronShareWA/etc) pra reusar os handlers */
+    if(canManage(me)){
+      var hasShareR = !!(t.shareToken && t.shareToken.length>4);
+      var shareLinkR = hasShareR ? clientShareURL(t.shareToken) : "";
+      rotHtml+='<div class="share-box"><div class="tt">Compartilhar com o cliente</div>';
+      if(!hasShareR){
+        rotHtml+='<div style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin-bottom:12px">Gere um link único e mande pro grupo do cliente no WhatsApp. Ele aprova ou pede revisão em cada vídeo direto pelo celular — sem login, sem instalar app. Você vê tudo aqui em tempo real.</div>';
+        rotHtml+='<div class="share-actions"><button class="primary" id="cronShare">📤 Enviar pro cliente</button></div>';
+      } else {
+        rotHtml+='<div class="share-url"><code>'+esc(shareLinkR)+'</code><button id="cronShareCopy">Copiar</button></div>';
+        rotHtml+='<div class="share-actions"><button class="primary" id="cronShareWA">Abrir WhatsApp</button><button class="danger" id="cronShareKill">Invalidar link</button></div>';
+      }
+      rotHtml+='</div>';
+
+      /* [V63.82] Box "FASE 2 · Legendas" — mesma do cronograma, pra envio em lote */
+      var lgStatsR = { aprovTema:0, lgPend:0, lgEscr:0, lgEnv:0, lgAna:0, lgRev:0, lgApr:0 };
+      wsR.forEach(function(c){
+        if(c.cs==="aprovado"){
+          lgStatsR.aprovTema++;
+          var s=c.lgState||"pendente";
+          if(s==="pendente") lgStatsR.lgPend++;
+          else if(s==="escrita") lgStatsR.lgEscr++;
+          else if(s==="enviada") lgStatsR.lgEnv++;
+          else if(s==="em_analise") lgStatsR.lgAna++;
+          else if(s==="em_revisao") lgStatsR.lgRev++;
+          else if(s==="aprovada") lgStatsR.lgApr++;
+        }
+      });
+      if(lgStatsR.aprovTema > 0){
+        rotHtml+='<div class="share-box lg-summary" style="border-color:var(--c-edicao);background:linear-gradient(135deg,rgba(176,114,255,.06),rgba(176,114,255,.02))">';
+        rotHtml+='<div class="tt" style="color:var(--c-edicao)">🎬 FASE 2 · Legendas dos vídeos</div>';
+        rotHtml+='<div style="font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin-bottom:10px">Depois do cliente aprovar os temas, o time escreve as legendas e envia tudo de uma vez pelo mesmo link.</div>';
+        rotHtml+='<div class="lg-stats">';
+        if(lgStatsR.lgRev) rotHtml+='<div class="lg-stat bad"><b>'+lgStatsR.lgRev+'</b><span>Cliente pediu revisão</span></div>';
+        if(lgStatsR.lgPend) rotHtml+='<div class="lg-stat"><b>'+lgStatsR.lgPend+'</b><span>Falta escrever</span></div>';
+        if(lgStatsR.lgEscr) rotHtml+='<div class="lg-stat acc"><b>'+lgStatsR.lgEscr+'</b><span>Pronta pra enviar</span></div>';
+        if(lgStatsR.lgEnv) rotHtml+='<div class="lg-stat"><b>'+lgStatsR.lgEnv+'</b><span>Enviada</span></div>';
+        if(lgStatsR.lgAna) rotHtml+='<div class="lg-stat"><b>'+lgStatsR.lgAna+'</b><span>Cliente analisando</span></div>';
+        if(lgStatsR.lgApr) rotHtml+='<div class="lg-stat ok"><b>'+lgStatsR.lgApr+'</b><span>Aprovada</span></div>';
+        rotHtml+='</div>';
+        if(lgStatsR.lgEscr > 0){
+          rotHtml+='<div class="share-actions" style="margin-top:10px"><button class="primary" id="lgSend">📤 Enviar '+lgStatsR.lgEscr+' legenda(s) pro cliente</button></div>';
+        } else if(lgStatsR.lgPend > 0){
+          rotHtml+='<div style="font-size:12px;color:var(--ink-faint);margin-top:8px;font-style:italic">Escreva as legendas em cada vídeo (toque pra abrir) e elas aparecem aqui pra enviar.</div>';
+        } else if(lgStatsR.lgApr === lgStatsR.aprovTema && lgStatsR.aprovTema>0){
+          rotHtml+='<div style="font-size:13px;color:var(--c-trafego);font-weight:800;text-align:center;padding:10px;background:rgba(54,211,153,.1);border-radius:8px;margin-top:8px">🚀 Todas as legendas aprovadas — pronto pra publicar!</div>';
+        }
+        rotHtml+='</div>';
+      }
+    }
   }
   let postHtml="";
   if(t.sector==="postagem"){
