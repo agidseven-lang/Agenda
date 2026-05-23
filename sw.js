@@ -1,4 +1,29 @@
 /* Agenda ID Seven - service worker (cache offline)
+   [V64.2] FIX FOLLOW-UP DA V64.1 — pré-validação por cache local removida no
+   fluxo de criação de novo compromisso. Bug detectado em auditoria pós-V64.1:
+   o handler de "criar evento" contava me.fcmTokens em CACHE LOCAL antes de
+   chamar sendPushToUsers. Se o cache estivesse desatualizado e mostrasse 0
+   tokens, o sendPushToUsers (que tem a busca FRESH do Firestore da V64.1)
+   nem era chamado. Resultado: a melhoria da V64.1 ficava inutilizada nesse
+   fluxo. Agora: o sendPushToUsers é chamado SEMPRE que há destinatários,
+   e ele mesmo decide enviar ou não com base nos tokens frescos do Firestore.
+   Os toasts continuam informativos, mas não bloqueiam mais o envio.
+   sw.js: só cache bump.
+   [V64.1] AUDITORIA DEFINITIVA PUSH REAL-TIME — 5 mudanças estruturais:
+   1. index.html: getPushHealthState agora valida TOKEN ATUAL DO DISPOSITIVO,
+      não só "tem algum token". Antes, novo device achava que estava OK
+      porque o user tinha token antigo de outro device — e nunca registrava
+      o próprio.
+   2. index.html: sendPushToUsers busca tokens FRESCOS do Firestore antes
+      de enviar (não confia em cache de memória que pode estar atrasado).
+   3. index.html: triggerPush(eventType, recipients, payload) — camada
+      centralizada com log padronizado.
+   4. index.html: logs visíveis em TODOS os early returns do setup
+      (antes saía silencioso, agora aparece exatamente onde parou).
+   5. cloudflare-worker.js: REMINDER_BEFORE_MINUTES configurável via env
+      (default 480 = 8 h, antes hardcoded 60 min). Texto do push dinâmico.
+      Urgency=high + TTL no cron também (antes só no handlePush).
+   firestore.rules unificado (chats + users + events + tasks + messages).
    [V64.0] FIX CAUSA RAIZ — race condition do registro de push. ANTES: chamadas
    paralelas de setupPushNotifications abandonavam (return false) se vissem outra
    em andamento. Se a primeira chamada falhasse silenciosamente (rede ruim, app
@@ -28,7 +53,7 @@
    AGORA: SÓ intercepta same-origin (a própria app). Tudo que não é da app
    passa direto pra rede sem cachear.
 */
-var CACHE = "idseven-v64-0";
+var CACHE = "idseven-v64-2";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

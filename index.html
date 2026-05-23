@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 64.0 · build fix-causa-raiz-race-condition</div>
+    <div class="ver">versão 64.2 · build remove-pre-validacao-cache-local</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -7492,20 +7492,43 @@ async function setupPushNotifications(){
   try{ return await fcmSetupPromise; }catch(_){ return false; }
 }
 
-/* [V64.0] Função interna que faz o trabalho real. Encapsulada pra ficar limpa
-   a lógica de promise compartilhada no wrapper acima. */
+/* [V64.1] Função interna que faz o trabalho real. Encapsulada pra ficar limpa
+   a lógica de promise compartilhada no wrapper acima.
+   AGORA com logs visíveis em CADA early return — antes saía silenciosamente
+   e a gente não sabia onde estava parando. */
 async function _setupPushNotificationsInternal(){
   fcmInitInProgress = true;
+  _pushDbgCapture("0-entrada-internal", "iniciando setup");
   /* Sem config ainda? sai silencioso */
-  if(!PUSH_VAPID_KEY || !PUSH_WORKER_URL){ fcmInitInProgress = false; return false; }
+  if(!PUSH_VAPID_KEY || !PUSH_WORKER_URL){
+    _pushDbgCapture("0-abort", "sem PUSH_VAPID_KEY ou PUSH_WORKER_URL configurados");
+    fcmInitInProgress = false; return false;
+  }
   /* Sem usuário logado? não tem onde salvar token */
-  if(!me || !db){ fcmInitInProgress = false; return false; }
+  if(!me || !db){
+    _pushDbgCapture("0-abort", "sem me ou db (me=" + (me?"ok":"null") + ", db=" + (db?"ok":"null") + ")");
+    fcmInitInProgress = false; return false;
+  }
   /* SDK Messaging não carregado? */
-  if(typeof firebase === "undefined" || !firebase.messaging){ fcmInitInProgress = false; return false; }
+  if(typeof firebase === "undefined" || !firebase.messaging){
+    _pushDbgCapture("0-abort", "firebase SDK ou firebase.messaging não carregado");
+    fcmInitInProgress = false; return false;
+  }
   /* Browser não suporta? (Safari iOS sem PWA instalado, alguns ambientes) */
-  try{ if(!firebase.messaging.isSupported || !firebase.messaging.isSupported()){ fcmInitInProgress = false; return false; } }catch(_){ fcmInitInProgress = false; return false; }
+  try{
+    if(!firebase.messaging.isSupported || !firebase.messaging.isSupported()){
+      _pushDbgCapture("0-abort", "firebase.messaging.isSupported retornou false (browser sem suporte)");
+      fcmInitInProgress = false; return false;
+    }
+  }catch(eIsSupp){
+    _pushDbgCapture("0-abort", "isSupported() lançou erro: " + (eIsSupp.message || eIsSupp));
+    fcmInitInProgress = false; return false;
+  }
   /* Permissão não concedida ainda? não força aqui */
-  if(typeof Notification === "undefined" || Notification.permission !== "granted"){ fcmInitInProgress = false; return false; }
+  if(typeof Notification === "undefined" || Notification.permission !== "granted"){
+    _pushDbgCapture("0-abort", "permission != granted (atual: " + (typeof Notification !== "undefined" ? Notification.permission : "undefined") + ")");
+    fcmInitInProgress = false; return false;
+  }
 
   /* [V63.97] AQUI sim incrementa — passou todas as validações e vai realmente tentar. */
   fcmInitTryCount++;
@@ -7727,7 +7750,12 @@ async function teardownPushNotifications(){
    userIds: string | array de string (IDs de users)
    payload: { title, body, data?:{taskId, eventId, url, tag} }
 
-   Lê os fcmTokens dos destinatários no Firestore e POSTa pro Worker.
+   [V64.1] AGORA busca tokens FRESCOS do Firestore antes de enviar — não confia
+   no array `users` em memória, que pode estar desatualizado (snapshot delay,
+   tokens recém salvos por outro dispositivo, etc). Isso elimina o cenário onde
+   um user registrou push num dispositivo novo MAS a notificação ainda usava
+   tokens antigos do cache em memória.
+
    Tolerante a falha — se Worker offline, não quebra nada. */
 async function sendPushToUsers(userIds, payload){
   /* [V63.13] Logging silencioso pra console (sem alert popup em produção).
@@ -7740,25 +7768,64 @@ async function sendPushToUsers(userIds, payload){
   if(!PUSH_WORKER_URL){ _sendFail("Worker URL não configurado"); return; }
   if(!payload || !payload.title){ _sendFail("Payload sem título"); return; }
   var ids = Array.isArray(userIds) ? userIds : [userIds];
+  /* Dedup IDs */
+  ids = ids.filter(function(v, i, a){ return v && a.indexOf(v) === i; });
   if(!ids.length){ _sendFail("Nenhum ID de usuário recebido"); return; }
 
   _sendDbg("Iniciando para " + ids.length + " usuário(s)");
 
-  /* Coleta tokens — fonte de verdade é o array `users` em memória, fresco do snapshot */
+  /* [V64.1] FRESH TOKEN FETCH: busca o doc de cada user DIRETAMENTE do Firestore.
+     Antes (V63.x): pegava de `users` em memória, que pode estar atrasado.
+     Agora: fetch direto da fonte da verdade. Custa N reads (1 por destinatário),
+     mas garante que estamos enviando pros tokens REAIS, não pros cacheados.
+     Se a leitura do Firestore falhar pra um user específico, cai no fallback
+     do cache em memória pra esse user específico. */
   var tokens = [];
-  ids.forEach(function(uid){
-    if(!uid) return;
-    var u = users.find(function(x){ return x.id === uid; });
-    if(!u || !Array.isArray(u.fcmTokens) || u.fcmTokens.length === 0) return;
-    u.fcmTokens.forEach(function(t){ if(t && tokens.indexOf(t) < 0) tokens.push(t); });
-  });
+  var tokenToUserId = {};  /* mapeia token → uid pra cleanup direcionado depois */
+  var usersWithoutToken = [];  /* pra log explícito */
+
+  for(var i = 0; i < ids.length; i++){
+    var uid = ids[i];
+    var freshTokens = null;
+    try{
+      if(db){
+        var snap = await db.collection("users").doc(uid).get();
+        if(snap.exists){
+          var data = snap.data() || {};
+          if(Array.isArray(data.fcmTokens)) freshTokens = data.fcmTokens.filter(Boolean);
+        }
+      }
+    }catch(eFetch){
+      _sendDbg("Falha ao ler doc fresco de " + uid + " (fallback pro cache): " + (eFetch && eFetch.message || eFetch));
+    }
+    /* Fallback: se não conseguiu ler do Firestore, usa cache em memória */
+    if(!freshTokens){
+      var u = users.find(function(x){ return x.id === uid; });
+      freshTokens = (u && Array.isArray(u.fcmTokens)) ? u.fcmTokens.filter(Boolean) : [];
+    }
+    if(!freshTokens.length){
+      var uName = (users.find(function(x){ return x.id === uid; }) || {}).name || uid;
+      usersWithoutToken.push(uName + " (" + uid + ")");
+      continue;
+    }
+    freshTokens.forEach(function(t){
+      if(!t || tokens.indexOf(t) >= 0) return;
+      tokens.push(t);
+      tokenToUserId[t] = uid;
+    });
+  }
+
+  /* [V64.1] Log explícito: quem está sem token (item #3 do briefing) */
+  if(usersWithoutToken.length > 0){
+    _sendDbg("⚠ Sem token registrado: " + usersWithoutToken.join(", "));
+  }
 
   if(!tokens.length){
-    _sendDbg("Nenhum token registrado nos destinatários — push pulado");
+    _sendDbg("Nenhum token nos destinatários — push pulado");
     return;
   }
 
-  _sendDbg("Chamando Worker com " + tokens.length + " token(s)");
+  _sendDbg("Chamando Worker com " + tokens.length + " token(s) (fresh do Firestore)");
   /* [V63.73] Normaliza payload: aceita tag/url tanto no nível de cima quanto dentro de data.
      Antes, chamadas como sendPushToUsers([id], {tag:"...", url:"..."}) tinham tag/url
      ignorados — só era lido payload.data. Resultado: push chegava mas sem deep link. */
@@ -7791,12 +7858,13 @@ async function sendPushToUsers(userIds, payload){
     /* [V63.13] AUTO-LIMPEZA: o Worker retorna detalhes por token; se algum
        falhou com NotRegistered/InvalidArgument, removemos do Firestore
        automaticamente (best-effort — pode falhar por permissões).
-       [V63.75 nota] Esse cleanup já estava aqui desde V63.13 — funciona bem.
-       O usuário só precisa rodar push (qualquer um) que tokens mortos saem. */
+       [V64.1] AGORA usa tokenToUserId pra fazer cleanup DIRECIONADO — remove o token
+       morto SÓ do user que tinha esse token, não de todos os destinatários.
+       Antes: arrayRemove em TODOS os ids — desnecessário e poluído. */
     try{
       var parsed = JSON.parse(txt);
       if(parsed && Array.isArray(parsed.results)){
-        var deadTokens = [];
+        var deadByUser = {};  /* uid → [tokens mortos desse user] */
         parsed.results.forEach(function(r, idx){
           if(!r || r.ok) return;
           var resp = String(r.response || "");
@@ -7805,16 +7873,75 @@ async function sendPushToUsers(userIds, payload){
                     || resp.indexOf("InvalidArgument") >= 0
                     || resp.indexOf("INVALID_ARGUMENT") >= 0
                     || (r.status === 404);
-          if(isDead && tokens[idx]) deadTokens.push(tokens[idx]);
+          if(isDead && tokens[idx]){
+            var deadToken = tokens[idx];
+            var deadUid = tokenToUserId[deadToken];
+            if(deadUid){
+              if(!deadByUser[deadUid]) deadByUser[deadUid] = [];
+              deadByUser[deadUid].push(deadToken);
+            }
+          }
         });
-        if(deadTokens.length > 0){
-          _sendDbg("Removendo " + deadTokens.length + " token(s) morto(s) do Firestore");
-          cleanupDeadTokens(ids, deadTokens);
+        var totalDead = 0;
+        Object.keys(deadByUser).forEach(function(uid){
+          totalDead += deadByUser[uid].length;
+          cleanupDeadTokens([uid], deadByUser[uid]);
+        });
+        if(totalDead > 0){
+          _sendDbg("Removendo " + totalDead + " token(s) morto(s) (direcionado por user)");
         }
       }
     }catch(_){ /* parse falhou — sem cleanup, sem problema */ }
   }catch(e){
     _sendFail("Erro de rede ao chamar Worker", e && e.message);
+  }
+}
+
+/* === [V64.1] triggerPush — CAMADA CENTRALIZADA pra disparar push ===
+   Recebe um EVENT TYPE + recipients + payload. Padroniza os logs e a estrutura
+   de data, e chama sendPushToUsers por baixo.
+
+   eventType: "new-event" | "edit-event" | "event-start" | "event-end"
+              | "new-task" | "task-comment" | "new-chat-message"
+              | "client-opened-link" | "client-approved" | etc.
+   recipients: array de userIds (ou string única — vira array)
+   payload: { title, body, data?:{eventId, taskId, chatId, url, tag} }
+
+   Vantagens vs chamar sendPushToUsers direto:
+   - Log padronizado por tipo de evento (fica fácil rastrear no console)
+   - Garante que `data.tag` segue convenção (eventType-id), evitando notifs duplicadas
+   - Adiciona timestamp e source pra debug futuro
+   - Ponto único pra futuramente adicionar prefs por tipo (já tem getPref por tipo)
+*/
+async function triggerPush(eventType, recipients, payload){
+  try{
+    if(!eventType || !payload || !payload.title){
+      console.warn("[triggerPush] argumentos inválidos:", eventType, payload);
+      return;
+    }
+    var ids = Array.isArray(recipients) ? recipients : [recipients];
+    ids = ids.filter(function(v, i, a){ return v && a.indexOf(v) === i; });
+    if(!ids.length){
+      console.log("[triggerPush:" + eventType + "] sem destinatários, pulando");
+      return;
+    }
+    /* Garante tag padronizada se não veio uma */
+    var data = Object.assign({}, payload.data || {});
+    if(!data.tag){
+      var seed = data.eventId || data.taskId || data.chatId || Date.now();
+      data.tag = eventType + "-" + seed;
+    }
+    /* Acrescenta source pra debug */
+    if(!data.source) data.source = "triggerPush:" + eventType;
+
+    console.log("[triggerPush:" + eventType + "] enviando pra " + ids.length + " user(s):", payload.title);
+    await sendPushToUsers(ids, {
+      title: payload.title,
+      body: payload.body || "",
+      data: data
+    });
+  }catch(e){
+    try{ console.error("[triggerPush:" + eventType + "] erro:", e && e.message); }catch(_){}
   }
 }
 
@@ -7999,9 +8126,18 @@ function getPushHealthState(){
   try{ if(!firebase.messaging.isSupported || !firebase.messaging.isSupported()) return "no-support"; }catch(_){ return "no-support"; }
   if(Notification.permission === "denied") return "denied";
   if(Notification.permission !== "granted") return "no-perm";
-  /* Tem permissão. Verifica se tem token no Firestore. */
-  var hasToken = me && Array.isArray(me.fcmTokens) && me.fcmTokens.length > 0;
-  if(!hasToken) return "no-token";
+  /* [V64.1] Tem permissão. Verifica se tem o TOKEN ATUAL DESTE DISPOSITIVO salvo.
+     ANTES (V63.x até V64.0): só verificava se me.fcmTokens.length > 0 — qualquer token,
+     incluindo tokens VELHOS de outras sessões/dispositivos. Se um device do user já tinha
+     registrado push antes, novos devices VIAM "ok" e nunca registravam o próprio token.
+     Resultado: push nunca chegava nesses novos devices.
+     AGORA: pra ser "ok" o token DESTA sessão (fcmTokenSaved) precisa estar em me.fcmTokens.
+     Se fcmTokenSaved é null (nunca registrou nesta sessão), tem que registrar antes
+     mesmo se já tem outros tokens. */
+  if(!fcmTokenSaved) return "no-token";
+  var hasMyToken = me && Array.isArray(me.fcmTokens)
+                   && me.fcmTokens.some(function(t){ return t === fcmTokenSaved; });
+  if(!hasMyToken) return "no-token";
   return "ok";
 }
 
@@ -14953,27 +15089,39 @@ $("saveBtn").onclick=async()=>{
           });
 
           console.log("[EVENT-PUSH] destinatários:", recipImm.length,
-                      "com token:", usersWithTokens,
-                      "sem token:", usersWithoutTokens);
+                      "com token (cache):", usersWithTokens,
+                      "sem token (cache):", usersWithoutTokens);
 
+          /* [V64.2] FIX CRÍTICO: SEMPRE chama sendPushToUsers se há destinatários.
+             Antes (V63.88 → V64.1): se totalTokens === 0 no cache local, o código
+             pulava o sendPushToUsers — bloqueando a verificação de tokens FRESCOS
+             do Firestore que a V64.1 tinha adicionado. Resultado: V64.1 ficava
+             inutilizada nesse fluxo, e push não disparava mesmo com tokens válidos
+             no Firestore (cache atrasado).
+             AGORA: o toast informativo é apenas isso — informativo. A decisão de
+             enviar ou não fica 100% dentro do sendPushToUsers, que tem a fonte
+             da verdade (Firestore fresh). */
           if(totalTokens === 0){
-            toast("⚠ Push: " + recipImm.length + " usuários, MAS NENHUM tem token FCM ativo");
+            toast("ℹ Cache local sem tokens — verificando Firestore fresh…");
           } else {
-            toast("📤 Push enviando pra " + usersWithTokens + " usuários (" + totalTokens + " tokens)" +
-                  (usersWithoutTokens.length > 0 ? " — sem token: " + usersWithoutTokens.join(",") : ""));
-
-            sendPushToUsers(recipImm, {
-              title: titleIm,
-              body: bodyIm,
-              tag: "newev-" + newEv.id,
-              url: "?openEvent=" + newEv.id
-            }).then(function(){
-              console.log("[EVENT-PUSH] sendPushToUsers terminou (sucesso/falha — ver acima)");
-            }).catch(function(err){
-              console.error("[EVENT-PUSH] sendPushToUsers ERRO:", err);
-              toast("❌ Push falhou: " + (err && err.message || "erro desconhecido"));
-            });
+            toast("📤 Push enviando pra " + usersWithTokens + " usuários (" + totalTokens + " tokens" + (usersWithoutTokens.length > 0 ? " — sem token no cache: " + usersWithoutTokens.join(",") : "") + ")");
           }
+
+          /* [V64.2] sendPushToUsers é a fonte da verdade — chama SEMPRE.
+             Dentro dele a V64.1 busca tokens frescos do Firestore por user e
+             decide o que enviar. Se realmente não houver token nenhum no
+             Firestore, ele loga sem barulho. */
+          sendPushToUsers(recipImm, {
+            title: titleIm,
+            body: bodyIm,
+            tag: "newev-" + newEv.id,
+            url: "?openEvent=" + newEv.id
+          }).then(function(){
+            console.log("[EVENT-PUSH] sendPushToUsers terminou (sucesso/falha — ver acima)");
+          }).catch(function(err){
+            console.error("[EVENT-PUSH] sendPushToUsers ERRO:", err);
+            toast("❌ Push falhou: " + (err && err.message || "erro desconhecido"));
+          });
         }
       }catch(eP){
         console.error("[EVENT-PUSH] EXCEPTION:", eP);
