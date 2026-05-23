@@ -4356,7 +4356,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.74 · build push-diagnostic-deep</div>
+    <div class="ver">versão 63.75 · build cleanup-dedup</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -7443,7 +7443,9 @@ async function sendPushToUsers(userIds, payload){
 
     /* [V63.13] AUTO-LIMPEZA: o Worker retorna detalhes por token; se algum
        falhou com NotRegistered/InvalidArgument, removemos do Firestore
-       automaticamente (best-effort — pode falhar por permissões). */
+       automaticamente (best-effort — pode falhar por permissões).
+       [V63.75 nota] Esse cleanup já estava aqui desde V63.13 — funciona bem.
+       O usuário só precisa rodar push (qualquer um) que tokens mortos saem. */
     try{
       var parsed = JSON.parse(txt);
       if(parsed && Array.isArray(parsed.results)){
