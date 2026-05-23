@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.92 · build fix-onmessage-bug-critico</div>
+    <div class="ver">versão 63.93 · build fix-mobile-sessao-expirou</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -7333,6 +7333,15 @@ async function setupPushNotifications(){
   /* Permissão não concedida ainda? não força aqui */
   if(typeof Notification === "undefined" || Notification.permission !== "granted") return false;
 
+  /* [V63.93] FIX CRÍTICO PARA MOBILE: captura `me.id` e `db` em variáveis locais ANTES de
+     qualquer await. Em mobile (Chrome Android, Samsung Internet), durante o getToken que
+     demora 3+ segundos, o app pode ir pra background e o auth state do Firebase dispara
+     onAuthStateChanged(null) temporariamente, fazendo `me` virar null. Sem essa captura,
+     o salvamento era abortado em 12a-sessao-expirou e o token nunca chegava no Firestore.
+     Mesmo bug afetava `db` em alguns casos extremos. */
+  var savedMeId = me.id;
+  var savedDb = db;
+
   /* [V63.91] Usa _pushDbgCapture / _pushErrCapture (globais) que SALVAM os logs em
      pushDbgLogs[] pra exibir na tela do app, além de fazer console.log.
      Antes (V63.13), os logs ficavam só no console — user comum não conseguia ver. */
@@ -7394,16 +7403,18 @@ async function setupPushNotifications(){
 
     if(!token){ _pushErr("getToken-vazio", new Error("getToken retornou vazio. Verifica VAPID key + permissão.")); return false; }
 
-    /* [V63.13] Re-check defensivo: usuário pode ter deslogado durante o await */
-    if(!me || !me.id || !db){
-      _pushDbg("12a-sessao-expirou", "me ou db virou null durante async — abortando salvamento (não é erro real)");
+    /* [V63.93] Usa savedMeId/savedDb capturados ANTES do await — não depende mais
+       do estado live de `me`/`db` que pode ter virado null em mobile durante background.
+       Se savedMeId e savedDb estavam OK no início (validados), eles continuam OK aqui. */
+    if(!savedMeId || !savedDb){
+      _pushDbg("12a-sem-id-inicial", "savedMeId ou savedDb nunca esteve disponível — não dá pra salvar");
       return false;
     }
 
     /* Salva o token no perfil do usuário (campo fcmTokens é array de strings).
        Mantém últimos 5 dispositivos. */
     _pushDbg("12-salvando-token-firestore", "");
-    var userRef = db.collection("users").doc(me.id);
+    var userRef = savedDb.collection("users").doc(savedMeId);
     var snap = await userRef.get();
     var existing = (snap.data() && snap.data().fcmTokens) || [];
     if(!Array.isArray(existing)) existing = [];
