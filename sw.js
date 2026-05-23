@@ -1,4 +1,17 @@
 /* Agenda ID Seven - service worker (cache offline)
+   [V64.0] FIX CAUSA RAIZ — race condition do registro de push. ANTES: chamadas
+   paralelas de setupPushNotifications abandonavam (return false) se vissem outra
+   em andamento. Se a primeira chamada falhasse silenciosamente (rede ruim, app
+   em background no mobile), TODAS as outras já tinham desistido. User ficava
+   sem token até clicar manualmente em "Testar push". AGORA: promise compartilhada
+   (chamadas paralelas esperam a mesma promise) + watchdog de 30s (reseta se
+   travar) + trigger automático no snapshot dos users (se detecta sem token,
+   agenda retry). sw.js: só cache bump.
+   [V63.99] FIX CRÍTICO — Bug do loop ao sair da conta. Causa raiz: sessionId em memória
+   não era zerado no logout (só o localStorage), e o teardownPushNotifications da V63.98
+   dispara update no Firestore que ativa o onSnapshot de users → snapshot tinha auto-relogin
+   por sessionId → re-login infinito → tela piscando. Fix em index.html: sessionId=null
+   no logout + sincronização nos handlers de login/cadastro. sw.js: só cache bump.
    [V63.98] AUDITORIA ENGENHARIA SENIOR — 7 bugs reais novos: deep link URL params, isUserActive excluido, fcm-notif-click data.url, onMessage listeners duplicados, teardown race+state, retryPush sem desregistro SW.
    [V63.97] AUDITORIA ESTRUTURAL — bug crítico corrigido:
 
@@ -15,7 +28,7 @@
    AGORA: SÓ intercepta same-origin (a própria app). Tudo que não é da app
    passa direto pra rede sem cachear.
 */
-var CACHE = "idseven-v63-98";
+var CACHE = "idseven-v64-0";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();

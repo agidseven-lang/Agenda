@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.98 · build engenheiro-senior-7-bugs-novos</div>
+    <div class="ver">versão 64.0 · build fix-causa-raiz-race-condition</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -5176,6 +5176,28 @@ var __clientOpenedMark = false;
     if(!$("mainApp").classList.contains("hidden"))render();
     /* [V63.97] Atualiza banner sempre que users muda (fcmTokens pode ter sido adicionado/removido) */
     try{ if(typeof updatePushStatusBanner === "function") updatePushStatusBanner(); }catch(_){}
+    /* [V64.0] AUTO-HEALING REATIVO: se snapshot atualizou e me ainda não tem token,
+       mas permissão tá concedida e setup ainda não rodou com sucesso → agenda retry
+       curto. Isso cobre o cenário onde o setup inicial do route() falhou silenciosamente
+       e o user ficaria preso com banner vermelho até clicar manualmente. */
+    try{
+      if(me && db && typeof Notification !== "undefined" && Notification.permission === "granted"
+         && !fcmInitSucceeded){
+        var _hasMyToken = Array.isArray(me.fcmTokens) && me.fcmTokens.length > 0
+                          && me.fcmTokens.some(function(t){ return t === fcmTokenSaved; });
+        if(!_hasMyToken){
+          setTimeout(function(){
+            try{
+              /* re-checa antes de chamar — pode ter resolvido entre o agendamento e agora */
+              if(!fcmInitSucceeded && me && Notification.permission === "granted"){
+                _pushDbgCapture("snapshot-retry", "users atualizado mas sem token salvo, retry");
+                setupPushNotifications();
+              }
+            }catch(_){}
+          }, 1500);
+        }
+      }
+    }catch(_){}
   },err=>{$("syncBadge").classList.add("off");$("syncBadge").querySelector("span").textContent="sem conexão";});
   db.collection("events").onSnapshot(snap=>{
     events=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -5593,6 +5615,8 @@ $("doReg").onclick=async()=>{
       name,role,phone,email,pass:_ph,salt:_salt,photo:pendingPhoto,
       status:first?"ativo":"pendente",admin:first,createdAt:Date.now()
     }),15000);
+    /* [V63.99] sincroniza sessionId em memória junto com localStorage (consistência) */
+    sessionId=ref.id;
     lsSet(SESSION_KEY,ref.id);
     me={id:ref.id,name,role,phone,email,status:first?"ativo":"pendente",admin:first,photo:pendingPhoto};
     toast(first?"Cadastro criado — você é o administrador":"Cadastro enviado com sucesso!");
@@ -5616,7 +5640,7 @@ $("doLogin").onclick=async()=>{
   try{
     const ok=await verifyPw(u,pw);
     if(!ok){ showErr("E-mail/WhatsApp ou senha incorretos."); return; }
-    me=u; lsSet(SESSION_KEY,u.id); route();
+    me=u; sessionId=u.id; lsSet(SESSION_KEY,u.id); route();
   }catch(e){ showErr("Não foi possível entrar agora. Verifique a internet e tente de novo."); }
   finally{ busy=false; b.disabled=false; b.textContent=ot; }
 };
@@ -5637,7 +5661,14 @@ function logout(){
   try{ if(chatsUnsub){ chatsUnsub(); chatsUnsub=null; } }catch(_){}
   try{ if(msgsUnsub){ msgsUnsub(); msgsUnsub=null; } }catch(_){}
   chats=[]; currentChatId=null; currentChatMessages=[]; chatView="list";
-  me=null;lsDel(SESSION_KEY);$("content").innerHTML="";route();
+  /* [V63.99] FIX CRÍTICO LOOP LOGOUT: zerar sessionId em memória, não só localStorage.
+     Causa do loop antigo: teardownPushNotifications() faz update no Firestore (arrayRemove
+     do token) → dispara onSnapshot de users → snapshot tinha lógica:
+       if(!me && sessionId){ const u=users.find(x=>x.id===sessionId); if(u) me=u; }
+     Como sessionId em memória ainda estava setado, o user era re-logado automaticamente
+     → route() mostrava o app de novo → ciclo se repetia → tela piscando infinito.
+     Fix: zerar sessionId TAMBÉM em memória aqui. */
+  me=null;sessionId=null;lsDel(SESSION_KEY);$("content").innerHTML="";route();
 }
 function val(id){return $(id).value.trim();}
 
@@ -7375,6 +7406,23 @@ var fcmInitInProgress = false;
 var fcmInitSucceeded = false;
 var fcmInitTryCount = 0;
 var FCM_INIT_MAX_TRIES = 8;
+/* [V64.0] FIX CAUSA RAIZ — race condition + chamadas abandonadas.
+   ANTES: chamadas paralelas chegavam, viam fcmInitInProgress=true, e DESISTIAM
+   retornando false. Se a primeira chamada falhasse silenciosamente (rede ruim,
+   background no mobile), TODAS as outras chamadas já tinham desistido e o
+   user ficava sem token até clicar manualmente em "Testar push".
+
+   AGORA: usamos UMA promise compartilhada. Chamadas paralelas recebem a MESMA
+   promise da primeira chamada e ESPERAM o resultado. Se a primeira completa
+   com sucesso, todas as paralelas recebem true imediatamente. Se a primeira
+   falha, todas recebem false e podem ser reagendadas pelo retry de fora.
+
+   Também temos um WATCHDOG: se uma promise ficar travada (Firebase getToken
+   pendurado em rede ruim, app foi pra background), depois de 30s o sistema
+   considera "stuck", reseta o flag, e libera nova tentativa. */
+var fcmSetupPromise = null;
+var fcmSetupStartedAt = 0;
+var FCM_SETUP_WATCHDOG_MS = 30000; /* 30s — máximo razoável pra getToken */
 /* [V63.91] Captura logs do setupPushNotifications pra exibir na tela do app.
    Sem isso, user comum não consegue ver logs do console (precisaria abrir DevTools).
    Mantém apenas os últimos 40 logs em memória pra não vazar. */
@@ -7399,22 +7447,54 @@ function _pushErrCapture(step, err){
 /* Inicializa o Firebase Messaging (1ª vez por sessão).
    É chamada após login + permissão. Tolerante a falha total. */
 async function setupPushNotifications(){
-  /* [V63.94] Lógica de retry resiliente.
-     - Se já SUCCESS nesta sessão, não tenta de novo (sucesso é sucesso)
-     - Se já tem outra tentativa rodando, espera (previne concorrência)
+  /* [V64.0] FIX CAUSA RAIZ — chamadas paralelas agora ESPERAM a primeira
+     (promise compartilhada) em vez de abandonar. Isso elimina a race condition
+     onde, se a primeira chamada falhava silenciosamente, todas as outras já
+     tinham desistido e o user ficava sem token até clicar manualmente.
+
+     - Se já SUCCESS nesta sessão, retorna true imediatamente (sucesso é sucesso)
+     - Se já tem promise em andamento NÃO TRAVADA, retorna ela (aguarda mesmo resultado)
+     - Se promise em andamento está TRAVADA há > 30s (rede ruim, background), reseta
      - Se já tentou MAX_TRIES vezes, desiste (proteção contra loop infinito)
-     - Em qualquer outro caso, TENTA de novo (resiliente a falhas temporárias)
-     
-     [V63.97] FIX ESTRUTURAL: tryCount NÃO é mais incrementado em early returns
-     (sem permissão, sem firebase, sem me). Antes era incrementado a cada call
-     mesmo sem fazer nada — em 8 calls rápidas (snapshot do users dispara várias)
-     o sistema desistia ANTES de a permissão ser concedida pelo user.
-     
-     Agora: tryCount só incrementa quando entra no try{} real (depois de TODAS
-     as validações). Cada incremento representa uma tentativa GENUÍNA de getToken. */
+     - Caso contrário, INICIA uma nova promise e armazena em fcmSetupPromise */
+
   if(fcmInitSucceeded){ _pushDbgCapture("init", "já registrado nesta sessão, pulando"); return true; }
-  if(fcmInitInProgress){ _pushDbgCapture("init", "tentativa em andamento, pulando"); return false; }
+
+  /* [V64.0] WATCHDOG: se a promise existente ficou travada > 30s, reseta. */
+  if(fcmSetupPromise && fcmSetupStartedAt > 0){
+    var elapsed = Date.now() - fcmSetupStartedAt;
+    if(elapsed > FCM_SETUP_WATCHDOG_MS){
+      _pushDbgCapture("watchdog", "setup travado há " + elapsed + "ms, resetando");
+      fcmSetupPromise = null;
+      fcmSetupStartedAt = 0;
+      fcmInitInProgress = false;
+      /* tryCount NÃO reseta — manteremos limite global de 8 */
+    }
+  }
+
+  /* [V64.0] Se já tem promise rodando (não travada), ESPERA ela em vez de abandonar. */
+  if(fcmSetupPromise){
+    _pushDbgCapture("init", "aguardando promise compartilhada em andamento");
+    try{ return await fcmSetupPromise; }catch(_){ return false; }
+  }
+
   if(fcmInitTryCount >= FCM_INIT_MAX_TRIES){ _pushDbgCapture("init", "max tries atingido — clique manualmente em re-registrar"); return false; }
+
+  /* [V64.0] Cria a promise compartilhada AGORA — todas as chamadas paralelas
+     que chegarem a partir daqui vão receber essa mesma promise. */
+  fcmSetupStartedAt = Date.now();
+  fcmSetupPromise = _setupPushNotificationsInternal();
+  /* Quando a promise resolver/rejeitar, libera o slot pra próxima */
+  fcmSetupPromise.finally(function(){
+    fcmSetupPromise = null;
+    fcmSetupStartedAt = 0;
+  });
+  try{ return await fcmSetupPromise; }catch(_){ return false; }
+}
+
+/* [V64.0] Função interna que faz o trabalho real. Encapsulada pra ficar limpa
+   a lógica de promise compartilhada no wrapper acima. */
+async function _setupPushNotificationsInternal(){
   fcmInitInProgress = true;
   /* Sem config ainda? sai silencioso */
   if(!PUSH_VAPID_KEY || !PUSH_WORKER_URL){ fcmInitInProgress = false; return false; }
