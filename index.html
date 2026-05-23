@@ -3548,6 +3548,10 @@
   @media (max-width:760px){
     .chat-wrap{height:calc(100vh - 110px);border-radius:10px}
   }
+  /* [V63.72] Desktop ultra-wide (>1400px): limita largura e centraliza pra não ficar esticado demais */
+  @media (min-width:1400px){
+    .chat-wrap{max-width:1280px;margin:0 auto}
+  }
 
   /* === COLUNA ESQUERDA: lista de conversas === */
   .chat-side{width:340px;flex-shrink:0;display:flex;flex-direction:column;
@@ -3653,8 +3657,8 @@
     transition:color .25s ease;margin-left:1px}
   .chat-msg-check svg{width:14px;height:10px;display:block}
   .chat-msg-check.read{color:#53bdeb} /* Azul WhatsApp Business para mensagens lidas */
-  .chat-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface);flex-shrink:0;position:relative}
-  .chat-input-wrap{flex:1;position:relative;display:flex;align-items:flex-end;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:18px;padding:2px 6px 2px 4px;transition:border-color .15s ease}
+  .chat-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface);flex-shrink:0;position:relative;width:100%;box-sizing:border-box}
+  .chat-input-wrap{flex:1 1 auto;min-width:0;position:relative;display:flex;align-items:flex-end;gap:6px;background:var(--bg);border:1px solid var(--border);border-radius:18px;padding:2px 6px 2px 4px;transition:border-color .15s ease}
   .chat-input-wrap:focus-within{border-color:var(--accent)}
   .chat-input{flex:1;background:transparent;border:none;
     padding:9px 6px;color:var(--ink);font:inherit;font-size:14px;resize:none;min-height:34px;max-height:120px;line-height:1.4;font-family:inherit}
@@ -4352,7 +4356,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.71 · build dropdown-portal-fix</div>
+    <div class="ver">versão 63.73 · build push-test-and-fix</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -5546,9 +5550,12 @@ function switchTab(t){
   document.querySelectorAll(".navtab").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
   var _na=$("navAdd"); if(_na) _na.style.display=canManage(me)?"":"none";
   const a=t==="agenda";
+  /* [V63.72] No tab "chat", também esconde pageTitle pra dar espaço pro layout próprio do chat
+     (igual agenda). Antes, o ternary do título caía no fallback "Perfil" e exibia errado. */
+  const hidePageTitle = a || (t==="chat");
   $("calControls").classList.toggle("hidden",!a);
-  $("pageTitle").classList.toggle("hidden",a);
-  if(!a)$("ptText").textContent = t==="hoje"?"Hoje" : t==="team"?"Equipe" : t==="board"?"Quadro de projetos" : t==="painel"?"Painel do gestor" : t==="posts"?"Registro de Posts" : t==="clientes"?"Visão por cliente" : t==="calendar"?"Calendário de conteúdo" : t==="settings"?"Configurações" : "Perfil";
+  $("pageTitle").classList.toggle("hidden",hidePageTitle);
+  if(!hidePageTitle)$("ptText").textContent = t==="hoje"?"Hoje" : t==="team"?"Equipe" : t==="board"?"Quadro de projetos" : t==="painel"?"Painel do gestor" : t==="posts"?"Registro de Posts" : t==="clientes"?"Visão por cliente" : t==="calendar"?"Calendário de conteúdo" : t==="settings"?"Configurações" : "Perfil";
   render();
 }
 function dbar(label,val,max,color,extra){
@@ -7409,6 +7416,12 @@ async function sendPushToUsers(userIds, payload){
   }
 
   _sendDbg("Chamando Worker com " + tokens.length + " token(s)");
+  /* [V63.73] Normaliza payload: aceita tag/url tanto no nível de cima quanto dentro de data.
+     Antes, chamadas como sendPushToUsers([id], {tag:"...", url:"..."}) tinham tag/url
+     ignorados — só era lido payload.data. Resultado: push chegava mas sem deep link. */
+  var normalizedData = Object.assign({}, payload.data || {});
+  if(payload.tag && !normalizedData.tag) normalizedData.tag = payload.tag;
+  if(payload.url && !normalizedData.url) normalizedData.url = payload.url;
   try{
     var res = await fetch(PUSH_WORKER_URL, {
       method: "POST",
@@ -7417,7 +7430,7 @@ async function sendPushToUsers(userIds, payload){
         tokens: tokens,
         title: payload.title,
         body: payload.body || "",
-        data: payload.data || {}
+        data: normalizedData
       })
     });
     var txt = "";
@@ -8221,6 +8234,14 @@ function renderSettingsNotifications(){
         '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><path d="M11 5 6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
         'Testar som de notificação'+
       '</button>'+
+      /* [V63.73] Botão de teste do PUSH REAL — dispara um push pra mim mesmo, simulando
+         o fluxo completo. Se chegar, o sistema tá funcionando. Se não chegar, mostra
+         exatamente onde tá o problema (token, permissão, worker, etc). */
+      '<button class="set-btn-ghost" id="setTestPush" style="margin-top:8px">'+
+        '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9zM9.5 19a2.5 2.5 0 0 0 5 0" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+
+        'Testar push (envia notificação real pra mim)'+
+      '</button>'+
+      '<div id="setTestPushResult" style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;line-height:1.5;padding:0 4px"></div>'+
     '</div>'+
   '</div>';
 }
@@ -8277,6 +8298,74 @@ function bindSettingsNotifications(){
     if(!prev){ toast("Ative o som primeiro"); return; }
     try{ beep(); }catch(_){}
     toast("Som tocado ✓");
+  };
+  /* [V63.73] Bind do botão Testar push real — dispara push pra mim mesmo via Worker.
+     Diagnóstico completo se algo falhar: permissão, token, service worker, worker URL. */
+  var tp = document.getElementById("setTestPush");
+  var tpResult = document.getElementById("setTestPushResult");
+  if(tp) tp.onclick = async function(){
+    if(!tpResult) return;
+    tp.disabled = true;
+    tp.style.opacity = "0.6";
+    tpResult.innerHTML = '<div style="color:var(--ink-soft)">⏳ Diagnosticando...</div>';
+
+    var report = [];
+    /* Diagnóstico 1: Permissão de notificação */
+    var perm = (typeof Notification !== "undefined") ? Notification.permission : "?";
+    if(perm === "granted") report.push('<span style="color:var(--c-trafego)">✓</span> Permissão de notificação: concedida');
+    else { report.push('<span style="color:var(--c-rev)">✗</span> Permissão: <b>' + perm + '</b> — toque em "Permitir notificações" acima'); }
+
+    /* Diagnóstico 2: Service Worker do FCM */
+    var swOk = false;
+    try{
+      var regs = await navigator.serviceWorker.getRegistrations();
+      var fcmSW = regs.find(function(r){ return r.active && r.active.scriptURL.indexOf("firebase-messaging-sw") >= 0; });
+      if(fcmSW){ swOk = true; report.push('<span style="color:var(--c-trafego)">✓</span> Service Worker do FCM: registrado'); }
+      else report.push('<span style="color:var(--c-rev)">✗</span> Service Worker do FCM: <b>não encontrado</b> — verifique se o firebase-messaging-sw.js está na raiz');
+    }catch(e){
+      report.push('<span style="color:var(--c-rev)">✗</span> Erro ao listar service workers: ' + e.message);
+    }
+
+    /* Diagnóstico 3: Meu token FCM salvo no Firestore */
+    var myTokens = (me && Array.isArray(me.fcmTokens)) ? me.fcmTokens : [];
+    if(myTokens.length > 0){
+      report.push('<span style="color:var(--c-trafego)">✓</span> Token FCM salvo: ' + myTokens.length + ' dispositivo' + (myTokens.length>1?'s':''));
+    } else {
+      report.push('<span style="color:var(--c-rev)">✗</span> <b>Nenhum token FCM salvo</b> — toque em "Tentar registrar novamente" na seção "Push com app fechado" acima');
+    }
+
+    /* Diagnóstico 4: Worker URL configurada? */
+    if(typeof PUSH_WORKER_URL !== "undefined" && PUSH_WORKER_URL){
+      report.push('<span style="color:var(--c-trafego)">✓</span> Worker URL: configurado');
+    } else {
+      report.push('<span style="color:var(--c-rev)">✗</span> Worker URL: <b>não configurado</b>');
+    }
+
+    /* Se tudo OK, manda push de teste */
+    if(perm === "granted" && swOk && myTokens.length > 0){
+      report.push('<div style="margin-top:8px;color:var(--accent)">🚀 Enviando push de teste...</div>');
+      tpResult.innerHTML = report.join('<br>');
+      try{
+        await sendPushToUsers([me.id], {
+          title: "🔔 Teste do ID Seven",
+          body: "Se você está lendo isso, o push está funcionando 100%.",
+          data: { tag: "test-push-" + Date.now(), url: "/" }
+        });
+        setTimeout(function(){
+          report.push('<div style="margin-top:8px;color:var(--c-trafego)"><b>✓ Push enviado.</b> Aguarde alguns segundos — a notificação deve aparecer no sistema (mesmo com o app fechado).</div>');
+          report.push('<div style="color:var(--ink-faint);margin-top:4px">Se não chegou: feche este aplicativo completamente e tente de novo. Algumas vezes o sistema precisa do app fechado pra mostrar a notificação nativa.</div>');
+          tpResult.innerHTML = report.join('<br>');
+        }, 1500);
+      }catch(e){
+        report.push('<div style="margin-top:8px;color:var(--c-rev)"><b>✗ Erro ao chamar Worker:</b> ' + (e.message||e) + '</div>');
+        tpResult.innerHTML = report.join('<br>');
+      }
+    } else {
+      report.push('<div style="margin-top:8px;color:var(--c-foto)"><b>⚠ Corrija os problemas acima antes de testar.</b></div>');
+      tpResult.innerHTML = report.join('<br>');
+    }
+    tp.disabled = false;
+    tp.style.opacity = "";
   };
 }
 
