@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.89 · build sino-app-eventos-agenda</div>
+    <div class="ver">versão 63.90 · build diagnostico-equipe-push</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -8498,7 +8498,10 @@ function bindSettingsNotifications(){
     }
     /* Botão de "reregistrar token" embaixo do diagnóstico */
     report.push('<button id="setForceReregister" style="margin-top:14px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-soft);border-radius:8px;padding:9px 14px;font-size:12px;cursor:pointer;font-family:inherit;width:100%">🔄 Limpar tokens antigos e re-registrar</button>');
+    report.push('<button id="setTeamDiag" style="margin-top:8px;background:rgba(125,108,255,.12);border:1px solid rgba(125,108,255,.3);color:#b8a8ff;border-radius:8px;padding:9px 14px;font-size:12px;cursor:pointer;font-family:inherit;width:100%;font-weight:600">🔬 Diagnosticar TODA a equipe (testa push pra cada user)</button>');
     tpResult.innerHTML = report.join('<br>');
+    tp.disabled = false;
+    tp.style.opacity = "";
     /* Bind do re-registrar */
     var rr = document.getElementById("setForceReregister");
     if(rr) rr.onclick = async function(){
@@ -8518,8 +8521,86 @@ function bindSettingsNotifications(){
         rr.textContent = "Erro: " + (e.message||e);
       }
     };
-    tp.disabled = false;
-    tp.style.opacity = "";
+    /* [V63.90] BOTÃO MEGA-DIAGNÓSTICO — testa push pra CADA user da equipe individualmente.
+       Mostra resultado por user (sent/dead/sem-token) pra a gente ver em 1 print exatamente
+       o que tá acontecendo. */
+    var ts2 = document.getElementById("setTeamDiag");
+    if(ts2) ts2.onclick = async function(){
+      ts2.disabled = true;
+      ts2.textContent = "Testando equipe...";
+      var diagEl = document.getElementById("setTeamDiagResult");
+      if(!diagEl){
+        diagEl = document.createElement("div");
+        diagEl.id = "setTeamDiagResult";
+        diagEl.style.cssText = "margin-top:14px;padding:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;font-size:12px;line-height:1.6;font-family:ui-monospace,Consolas,monospace";
+        ts2.parentNode.insertBefore(diagEl, ts2.nextSibling);
+      }
+      diagEl.innerHTML = '<div style="color:var(--ink-soft)">⏳ Testando push pra cada user...</div>';
+
+      var report = ["<b style=\"font-family:inherit\">🔬 DIAGNÓSTICO DA EQUIPE</b>", ""];
+      var teamUsers = (users||[]).filter(function(u){
+        return u && u.id && u.status !== "pendente" && u.status !== "removido";
+      });
+      report.push("<b style=\"font-family:inherit\">Total de users:</b> " + teamUsers.length);
+
+      var totTok = 0;
+      teamUsers.forEach(function(u){
+        if(Array.isArray(u.fcmTokens)) totTok += u.fcmTokens.length;
+      });
+      report.push("<b style=\"font-family:inherit\">Total de tokens registrados:</b> " + totTok);
+      report.push("");
+      report.push("<b style=\"font-family:inherit\">Por user:</b>");
+
+      /* Dispara push individual pra cada user (incluindo eu) e mostra resultado */
+      for(var i = 0; i < teamUsers.length; i++){
+        var u = teamUsers[i];
+        var nm = u.name || u.id;
+        var toks = Array.isArray(u.fcmTokens) ? u.fcmTokens : [];
+        if(toks.length === 0){
+          report.push('<span style="color:#ff6e6e">✗</span> ' + esc(nm) + ' — <b>0 tokens</b> (não vai receber nada)');
+          diagEl.innerHTML = report.join("<br>");
+          continue;
+        }
+        try{
+          var resp = await fetch(PUSH_WORKER_URL, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+              tokens: toks,
+              title: "🔬 Teste " + (new Date()).toLocaleTimeString(),
+              body: "Diagnóstico da equipe",
+              data: { tag: "diag-" + u.id }
+            })
+          });
+          var txt = await resp.text();
+          var sent = 0, dead = 0;
+          try{
+            var parsed = JSON.parse(txt);
+            if(parsed && Array.isArray(parsed.results)){
+              parsed.results.forEach(function(r){
+                if(r && r.ok) sent++;
+                else dead++;
+              });
+            }
+          }catch(_){}
+          var status = "";
+          if(sent > 0 && dead === 0) status = '<span style="color:#36d399">✓</span> ' + esc(nm) + ' — <b>' + sent + ' OK</b>';
+          else if(sent > 0 && dead > 0) status = '<span style="color:#ffb02e">⚠</span> ' + esc(nm) + ' — ' + sent + ' OK, ' + dead + ' mortos';
+          else status = '<span style="color:#ff6e6e">✗</span> ' + esc(nm) + ' — TODOS ' + dead + ' tokens mortos';
+          report.push(status);
+          diagEl.innerHTML = report.join("<br>");
+        }catch(eR){
+          report.push('<span style="color:#ff6e6e">✗</span> ' + esc(nm) + ' — ERRO REDE: ' + (eR.message || eR));
+          diagEl.innerHTML = report.join("<br>");
+        }
+      }
+
+      report.push("");
+      report.push('<span style="color:var(--ink-faint)">Tire print desta tela e mande pro suporte.</span>');
+      diagEl.innerHTML = report.join("<br>");
+      ts2.disabled = false;
+      ts2.textContent = "🔬 Diagnosticar TODA a equipe de novo";
+    };
   };
 }
 
