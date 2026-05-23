@@ -4356,7 +4356,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.73 · build push-test-and-fix</div>
+    <div class="ver">versão 63.74 · build push-diagnostic-deep</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -8299,8 +8299,8 @@ function bindSettingsNotifications(){
     try{ beep(); }catch(_){}
     toast("Som tocado ✓");
   };
-  /* [V63.73] Bind do botão Testar push real — dispara push pra mim mesmo via Worker.
-     Diagnóstico completo se algo falhar: permissão, token, service worker, worker URL. */
+  /* [V63.73→V63.74] Bind do botão Testar push real — DIAGNÓSTICO EXPANDIDO.
+     Faz chamada direta ao Worker e mostra status HTTP + erros do FCM. */
   var tp = document.getElementById("setTestPush");
   var tpResult = document.getElementById("setTestPushResult");
   if(tp) tp.onclick = async function(){
@@ -8317,11 +8317,17 @@ function bindSettingsNotifications(){
 
     /* Diagnóstico 2: Service Worker do FCM */
     var swOk = false;
+    var swUrl = "";
     try{
       var regs = await navigator.serviceWorker.getRegistrations();
       var fcmSW = regs.find(function(r){ return r.active && r.active.scriptURL.indexOf("firebase-messaging-sw") >= 0; });
-      if(fcmSW){ swOk = true; report.push('<span style="color:var(--c-trafego)">✓</span> Service Worker do FCM: registrado'); }
-      else report.push('<span style="color:var(--c-rev)">✗</span> Service Worker do FCM: <b>não encontrado</b> — verifique se o firebase-messaging-sw.js está na raiz');
+      if(fcmSW){
+        swOk = true;
+        swUrl = fcmSW.active.scriptURL;
+        report.push('<span style="color:var(--c-trafego)">✓</span> Service Worker do FCM: registrado<br><span style="color:var(--ink-faint);font-size:10.5px;word-break:break-all">→ ' + swUrl + '</span>');
+      } else {
+        report.push('<span style="color:var(--c-rev)">✗</span> Service Worker do FCM: <b>não encontrado</b><br><span style="color:var(--ink-faint);font-size:10.5px">SWs ativos: ' + regs.map(function(r){return (r.active && r.active.scriptURL.split("/").pop()) || "?"; }).join(", ") + '</span>');
+      }
     }catch(e){
       report.push('<span style="color:var(--c-rev)">✗</span> Erro ao listar service workers: ' + e.message);
     }
@@ -8329,41 +8335,99 @@ function bindSettingsNotifications(){
     /* Diagnóstico 3: Meu token FCM salvo no Firestore */
     var myTokens = (me && Array.isArray(me.fcmTokens)) ? me.fcmTokens : [];
     if(myTokens.length > 0){
-      report.push('<span style="color:var(--c-trafego)">✓</span> Token FCM salvo: ' + myTokens.length + ' dispositivo' + (myTokens.length>1?'s':''));
+      var preview = myTokens.map(function(t){ return t.slice(0, 16) + "…" + t.slice(-8); }).join(", ");
+      report.push('<span style="color:var(--c-trafego)">✓</span> Tokens FCM salvos: ' + myTokens.length + '<br><span style="color:var(--ink-faint);font-size:10.5px;word-break:break-all">' + preview + '</span>');
     } else {
-      report.push('<span style="color:var(--c-rev)">✗</span> <b>Nenhum token FCM salvo</b> — toque em "Tentar registrar novamente" na seção "Push com app fechado" acima');
+      report.push('<span style="color:var(--c-rev)">✗</span> <b>Nenhum token FCM salvo</b> — toque em "Tentar registrar novamente" na seção "Push com app fechado"');
     }
 
-    /* Diagnóstico 4: Worker URL configurada? */
-    if(typeof PUSH_WORKER_URL !== "undefined" && PUSH_WORKER_URL){
-      report.push('<span style="color:var(--c-trafego)">✓</span> Worker URL: configurado');
+    /* Diagnóstico 4: Worker URL */
+    var workerUrl = (typeof PUSH_WORKER_URL !== "undefined") ? PUSH_WORKER_URL : "";
+    if(workerUrl){
+      report.push('<span style="color:var(--c-trafego)">✓</span> Worker URL: configurado<br><span style="color:var(--ink-faint);font-size:10.5px;word-break:break-all">→ ' + workerUrl + '</span>');
     } else {
       report.push('<span style="color:var(--c-rev)">✗</span> Worker URL: <b>não configurado</b>');
     }
 
-    /* Se tudo OK, manda push de teste */
-    if(perm === "granted" && swOk && myTokens.length > 0){
-      report.push('<div style="margin-top:8px;color:var(--accent)">🚀 Enviando push de teste...</div>');
+    /* Se tudo OK, manda push de teste DIRETO via fetch pro Worker — captura tudo */
+    if(perm === "granted" && swOk && myTokens.length > 0 && workerUrl){
+      report.push('<div style="margin-top:10px;color:var(--accent)">🚀 Chamando Worker...</div>');
       tpResult.innerHTML = report.join('<br>');
       try{
-        await sendPushToUsers([me.id], {
-          title: "🔔 Teste do ID Seven",
-          body: "Se você está lendo isso, o push está funcionando 100%.",
-          data: { tag: "test-push-" + Date.now(), url: "/" }
+        var t0 = Date.now();
+        var res = await fetch(workerUrl, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            tokens: myTokens,
+            title: "🔔 Teste do ID Seven",
+            body: "Push funcionando! " + new Date().toLocaleTimeString("pt-BR"),
+            data: { tag: "test-push-" + Date.now(), url: "/" }
+          })
         });
-        setTimeout(function(){
-          report.push('<div style="margin-top:8px;color:var(--c-trafego)"><b>✓ Push enviado.</b> Aguarde alguns segundos — a notificação deve aparecer no sistema (mesmo com o app fechado).</div>');
-          report.push('<div style="color:var(--ink-faint);margin-top:4px">Se não chegou: feche este aplicativo completamente e tente de novo. Algumas vezes o sistema precisa do app fechado pra mostrar a notificação nativa.</div>');
-          tpResult.innerHTML = report.join('<br>');
-        }, 1500);
+        var elapsed = Date.now() - t0;
+        var bodyText = "";
+        try{ bodyText = await res.text(); }catch(_){}
+        /* Status do Worker */
+        if(res.ok){
+          report.push('<div style="margin-top:8px;color:var(--c-trafego)"><b>✓ Worker respondeu:</b> HTTP ' + res.status + ' (' + elapsed + 'ms)</div>');
+        } else {
+          report.push('<div style="margin-top:8px;color:var(--c-rev)"><b>✗ Worker retornou erro:</b> HTTP ' + res.status + '</div>');
+        }
+        /* Parse JSON pra ver detalhes do FCM */
+        try{
+          var jr = JSON.parse(bodyText);
+          if(jr.results && Array.isArray(jr.results)){
+            jr.results.forEach(function(r, i){
+              var ico = r.ok ? '✓' : '✗';
+              var color = r.ok ? 'var(--c-trafego)' : 'var(--c-rev)';
+              report.push('<div style="margin-top:4px;color:'+color+';font-size:11.5px"><b>'+ico+' Token #'+(i+1)+':</b> FCM status '+r.status+'</div>');
+              if(!r.ok && r.response){
+                report.push('<div style="color:var(--ink-faint);font-size:10.5px;word-break:break-all;padding-left:14px">'+esc(r.response.slice(0,300))+'</div>');
+              }
+            });
+            var okCount = jr.results.filter(function(r){return r.ok;}).length;
+            if(okCount > 0){
+              report.push('<div style="margin-top:10px;color:var(--c-trafego);font-size:12.5px"><b>'+okCount+' push enviado(s) com sucesso.</b></div>');
+              report.push('<div style="color:var(--ink-faint);font-size:11px;margin-top:3px">A notificação deve aparecer no sistema. <b>Tente fechar o app agora</b> — algumas vezes o Android só mostra notificação quando o app não está em primeiro plano.</div>');
+            } else {
+              report.push('<div style="margin-top:10px;color:var(--c-rev);font-size:12.5px"><b>Nenhum push entregue.</b> Veja os erros acima.</div>');
+              report.push('<div style="color:var(--ink-faint);font-size:11px;margin-top:3px">Se aparece <b>UNREGISTERED</b> ou <b>404</b>: o token expirou. Toque em "Re-registrar token" abaixo.</div>');
+            }
+          } else {
+            report.push('<div style="margin-top:8px;color:var(--ink-faint);font-size:10.5px;word-break:break-all"><b>Body:</b> '+esc(bodyText.slice(0,500))+'</div>');
+          }
+        }catch(_){
+          report.push('<div style="margin-top:8px;color:var(--ink-faint);font-size:10.5px;word-break:break-all"><b>Body (raw):</b> '+esc(bodyText.slice(0,400))+'</div>');
+        }
       }catch(e){
-        report.push('<div style="margin-top:8px;color:var(--c-rev)"><b>✗ Erro ao chamar Worker:</b> ' + (e.message||e) + '</div>');
-        tpResult.innerHTML = report.join('<br>');
+        report.push('<div style="margin-top:8px;color:var(--c-rev)"><b>✗ Erro de rede chamando Worker:</b> ' + (e.message||e) + '</div>');
       }
     } else {
-      report.push('<div style="margin-top:8px;color:var(--c-foto)"><b>⚠ Corrija os problemas acima antes de testar.</b></div>');
-      tpResult.innerHTML = report.join('<br>');
+      report.push('<div style="margin-top:8px;color:var(--c-foto)"><b>⚠ Corrija os ✗ acima antes de testar.</b></div>');
     }
+    /* Botão de "reregistrar token" embaixo do diagnóstico */
+    report.push('<button id="setForceReregister" style="margin-top:14px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-soft);border-radius:8px;padding:9px 14px;font-size:12px;cursor:pointer;font-family:inherit;width:100%">🔄 Limpar tokens antigos e re-registrar</button>');
+    tpResult.innerHTML = report.join('<br>');
+    /* Bind do re-registrar */
+    var rr = document.getElementById("setForceReregister");
+    if(rr) rr.onclick = async function(){
+      rr.disabled = true; rr.textContent = "Limpando...";
+      try{
+        /* Apaga tokens do Firestore */
+        if(me && db){
+          await db.collection("users").doc(me.id).update({ fcmTokens: [] });
+        }
+        /* Reseta flag pra permitir nova tentativa */
+        try{ fcmInitTried = false; }catch(_){}
+        /* Re-registra */
+        await setupPushNotifications();
+        try{ toast("Token re-registrado — teste de novo"); }catch(_){}
+        rr.textContent = "✓ Pronto — clique em Testar push de novo";
+      }catch(e){
+        rr.textContent = "Erro: " + (e.message||e);
+      }
+    };
     tp.disabled = false;
     tp.style.opacity = "";
   };

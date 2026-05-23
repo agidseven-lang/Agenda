@@ -1,8 +1,8 @@
 /* Agenda ID Seven - service worker
    Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
    com cache de reserva para funcionar offline.
-   [V63.73] Cache bump — fix push do chat + botão diagnóstico de push real. */
-var CACHE = "idseven-v63-73";
+   [V63.74] Cache bump — diagnóstico de push profundo (HTTP, FCM errors, re-registrar). */
+var CACHE = "idseven-v63-74";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
