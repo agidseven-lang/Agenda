@@ -1124,6 +1124,21 @@
     align-items:center;
     flex-shrink:0;
   }
+  /* [V63.76] Toggle de 4 botões (Equipe/Cliente/Roteiro/Temas) — esconde texto em mobile,
+     só ícones; mostra texto em telas maiores. */
+  .bt-seg-4 .bt-seg-opt{padding:0 9px}
+  .bt-seg-4 .bt-seg-opt span{font-size:11.5px}
+  @media (max-width:880px){
+    .bt-seg-4 .bt-seg-opt span{display:none}
+    .bt-seg-4 .bt-seg-opt{padding:0 10px;min-width:34px;justify-content:center}
+    .bt-seg-4 .bt-seg-opt svg{opacity:1;width:15px;height:15px}
+  }
+  /* [V63.76] Badge "Modo: Roteiro" / "Modo: Temas e Legendas" — substitui o dropdown Setor */
+  .bt-mode-badge{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;
+    border-radius:8px;border:1px solid;font-size:12.5px;font-weight:600;letter-spacing:-.005em;
+    background:rgba(0,0,0,.18);flex-shrink:0}
+  .bt-mode-badge .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .bt-mode-badge b{font-weight:800}
   .bt-seg-opt{
     display:inline-flex;
     align-items:center;
@@ -4356,7 +4371,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.75 · build cleanup-dedup</div>
+    <div class="ver">versão 63.76 · build 4-fluxos-organizados</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -8942,9 +8957,29 @@ function blockMsg(except){
   return m;
 }
 function boardVisible(){
-  if(boardFilter==="late")return tasks.filter(taskLate);
-  if(boardFilter==="mine")return tasks.filter(isMyTask);
-  if(boardFilter.indexOf("cli:")===0){ var cn=boardFilter.slice(4).trim().toLowerCase(); return tasks.filter(t=>((t.client||"").trim().toLowerCase())===cn); }
+  /* [V63.76] Quando boardView é "roteiro" ou "temas", força filtro de setor automaticamente
+     pra organizar o fluxo. Outros filtros (Minhas/Atrasadas) AINDA se aplicam dentro
+     do setor — assim ele pode ver "minhas tarefas de roteiro" combinado. */
+  function applyViewSectorFilter(arr){
+    if(boardView === "roteiro"){
+      return arr.filter(function(t){ return t.sector === "roteiro"; });
+    }
+    if(boardView === "temas"){
+      /* Cronograma + Copywriter — onde se constrói tema e legenda */
+      return arr.filter(function(t){ return t.sector === "cronograma" || t.sector === "copy"; });
+    }
+    return arr;
+  }
+  if(boardFilter==="late") return applyViewSectorFilter(tasks.filter(taskLate));
+  if(boardFilter==="mine") return applyViewSectorFilter(tasks.filter(isMyTask));
+  if(boardFilter.indexOf("cli:")===0){
+    var cn=boardFilter.slice(4).trim().toLowerCase();
+    return applyViewSectorFilter(tasks.filter(t=>((t.client||"").trim().toLowerCase())===cn));
+  }
+  /* [V63.76] Se boardView é roteiro/temas, ignora boardFilter de setor (não pode mais filtrar manual) */
+  if(boardView === "roteiro" || boardView === "temas"){
+    return applyViewSectorFilter(tasks);
+  }
   return tasks.filter(t=>boardFilter==="all"||t.sector===boardFilter);
 }
 /* registra início/conclusão automaticamente nas transições de etapa */
@@ -8979,13 +9014,16 @@ function renderBoard(){
        '<span>Atrasadas</span><span class="ct">'+lateAll.length+'</span>'+
      '</button>';
   }
-  /* Dropdown de setor */
-  h+='<div class="bt-dropdown" id="btSectorWrap">';
-  h+='<button class="bt-dropdown-btn '+(isSectorSelected?"has-value":"")+'" id="btSectorBtn" type="button">';
-  if(isSectorSelected) h+='<span class="dot" style="background:'+sectorColor+'"></span>';
-  h+='<span>'+esc(sectorLabel)+'</span>';
-  h+='<svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  h+='</button>';
+  /* [V63.76] Dropdown de setor — escondido nos modos "roteiro" e "temas" porque o setor
+     já é fixado pelo próprio modo (não faz sentido permitir filtrar manualmente). */
+  var hideSetorDropdown = (boardView === "roteiro" || boardView === "temas");
+  if(!hideSetorDropdown){
+    h+='<div class="bt-dropdown" id="btSectorWrap">';
+    h+='<button class="bt-dropdown-btn '+(isSectorSelected?"has-value":"")+'" id="btSectorBtn" type="button">';
+    if(isSectorSelected) h+='<span class="dot" style="background:'+sectorColor+'"></span>';
+    h+='<span>'+esc(sectorLabel)+'</span>';
+    h+='<svg class="chev" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    h+='</button>';
   h+='<div class="bt-dropdown-menu hidden" id="btSectorMenu">';
   h+='<button class="bt-menu-it '+(!isSectorSelected?"on":"")+'" data-bf="all" type="button">'+
      '<span class="dot" style="background:#94a3b8"></span>'+
@@ -9000,17 +9038,39 @@ function renderBoard(){
        '</button>';
   }
   h+='</div></div>';
+  } /* [V63.76] fim do if(!hideSetorDropdown) */
+  /* [V63.76] Banner indicando modo ativo quando é Roteiro ou Temas (substitui o dropdown) */
+  if(hideSetorDropdown){
+    var modeLabel = boardView === "roteiro" ? "Roteiro" : "Temas e Legendas";
+    var modeColor = boardView === "roteiro" ? SECTORS.roteiro.color : SECTORS.cronograma.color;
+    h+='<div class="bt-mode-badge" style="background:'+secBg(modeColor)+';border-color:'+modeColor+'33;color:'+modeColor+'">'+
+         '<span class="dot" style="background:'+modeColor+'"></span>'+
+         '<span>Modo: <b>'+esc(modeLabel)+'</b></span>'+
+       '</div>';
+  }
   h+='</div>';
   /* Direita: segmented + icon-buttons */
   h+='<div class="bt-right">';
-  h+='<div class="bt-seg">'+
-       '<button class="bt-seg-opt '+(boardView==="team"?"on":"")+'" data-bv="team" type="button">'+
+  /* [V63.76] Toggle de visualização — 4 modos agora pra organizar fluxos por categoria.
+     "Roteiro" mostra só tarefas de roteiro. "Temas & Legendas" mostra só Cronograma+Copywriter. */
+  h+='<div class="bt-seg bt-seg-4">'+
+       '<button class="bt-seg-opt '+(boardView==="team"?"on":"")+'" data-bv="team" type="button" title="Vista Equipe — todas as tarefas">'+
          '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="6" height="16" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="11" y="4" width="6" height="11" rx="1.5" stroke="currentColor" stroke-width="2"/><rect x="19" y="4" width="2" height="7" rx="1" stroke="currentColor" stroke-width="2"/></svg>'+
-         '<span>Vista Equipe</span>'+
+         '<span>Equipe</span>'+
        '</button>'+
-       '<button class="bt-seg-opt '+(boardView==="client"?"on":"")+'" data-bv="client" type="button">'+
+       '<button class="bt-seg-opt '+(boardView==="client"?"on":"")+'" data-bv="client" type="button" title="Fluxo do Cliente — vê pelo olhar do cliente">'+
          '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 19c0-2.6-1.6-4.6-4-5.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
-         '<span>Fluxo Cliente</span>'+
+         '<span>Cliente</span>'+
+       '</button>'+
+       /* [V63.76] Fluxo Roteiro — só tarefas de roteiro */
+       '<button class="bt-seg-opt '+(boardView==="roteiro"?"on":"")+'" data-bv="roteiro" type="button" title="Fluxo Roteiro — só tarefas de roteiro">'+
+         '<svg viewBox="0 0 24 24" fill="none"><path d="M4 4h12l4 4v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 4v4h4M7 12h10M7 16h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'+
+         '<span>Roteiro</span>'+
+       '</button>'+
+       /* [V63.76] Fluxo Temas & Legendas — só Cronograma + Copywriter (onde se faz tema e legenda) */
+       '<button class="bt-seg-opt '+(boardView==="temas"?"on":"")+'" data-bv="temas" type="button" title="Fluxo Temas e Legendas — Cronograma + Copywriter">'+
+         '<svg viewBox="0 0 24 24" fill="none"><path d="M3 7h18M3 12h18M3 17h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="17" r="2.5" stroke="currentColor" stroke-width="2"/></svg>'+
+         '<span>Temas & Legendas</span>'+
        '</button>'+
      '</div>';
   h+='<div class="bt-icons">'+
