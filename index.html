@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.94 · build resiliencia-retry-self-healing</div>
+    <div class="ver">versão 63.98 · build engenheiro-senior-7-bugs-novos</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -4405,6 +4405,14 @@
 
   <section id="mainApp" class="hidden" style="display:flex;flex-direction:column;height:100%">
     <header>
+      <!-- [V63.97] Banner de alerta — aparece SOMENTE quando o user atual não tem token
+           de push registrado. Controlado por updatePushStatusBanner() — display=flex quando
+           ativado, display=none por default. Toca → força registro de token. -->
+      <div id="pushHealthBanner" style="display:none;background:rgba(239,68,68,0.18);border-bottom:1px solid rgba(239,68,68,0.4);color:#fca5a5;padding:10px 14px;font-size:13px;line-height:1.4;align-items:center;gap:10px;cursor:pointer">
+        <svg viewBox="0 0 24 24" fill="none" style="width:20px;height:20px;flex-shrink:0;color:#f87171"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <div style="flex:1"><b id="pushHealthText">Notificações desativadas</b><div style="opacity:0.85;font-size:11px;margin-top:2px" id="pushHealthSub">Toque pra ativar e receber compromissos da equipe</div></div>
+        <span id="pushHealthAction" style="background:#ef4444;color:#fff;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap">ATIVAR</span>
+      </div>
       <div class="hrow">
         <div class="hbrand">
           <div class="mk" id="brandMkHeader"></div>
@@ -5166,6 +5174,8 @@ var __clientOpenedMark = false;
     }
     route();
     if(!$("mainApp").classList.contains("hidden"))render();
+    /* [V63.97] Atualiza banner sempre que users muda (fcmTokens pode ter sido adicionado/removido) */
+    try{ if(typeof updatePushStatusBanner === "function") updatePushStatusBanner(); }catch(_){}
   },err=>{$("syncBadge").classList.add("off");$("syncBadge").querySelector("span").textContent="sem conexão";});
   db.collection("events").onSnapshot(snap=>{
     events=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -5268,13 +5278,30 @@ function notify(title,body){
 }
 function askNotif(){
   if(notifAsked) return; notifAsked=true;
-  try{ if("Notification" in window && Notification.permission==="default") Notification.requestPermission(); }catch(e){}
+  /* [V63.96] FIX CRÍTICO: antes só disparava requestPermission() sem aguardar resultado.
+     Quando user clicava "Permitir", o app NUNCA registrava push automaticamente —
+     setupPushNotifications era chamado logo após askNotif() mas via permission="default"
+     porque a promise ainda não tinha resolvido. Agora aguarda e dispara o setup. */
+  try{
+    if("Notification" in window && Notification.permission === "default"){
+      Notification.requestPermission().then(function(perm){
+        if(perm === "granted"){
+          /* permissão concedida → tenta registrar push real */
+          try{ setupPushNotifications(); }catch(_){}
+        }
+      }).catch(function(){});
+    } else if("Notification" in window && Notification.permission === "granted"){
+      /* Já tinha permissão antes — garante que push está registrado */
+      try{ setupPushNotifications(); }catch(_){}
+    }
+  }catch(e){}
 }
 
 function showAlarm(kind, e, minBefore){
   /* [V63.14 — AUDIT] Não dispara alarme se usuário não estiver logado/ativo
-     (evita overlay aparecer sobre a tela de login após logout). */
-  if(!me || me.status !== "ativo") return false;
+     (evita overlay aparecer sobre a tela de login após logout).
+     [V63.95] usa meIsActive() pra cobrir users com status undefined */
+  if(!meIsActive()) return false;
   if(alarmActive) return false;
   alarmActive=true;
   const ov=$("alarmOverlay"), fin=(kind==="end");
@@ -5350,7 +5377,8 @@ const PRESENCE_INTERVAL_MS = 60 * 1000;   // 60s entre atualizações
 const PRESENCE_ONLINE_WINDOW_MS = 2 * 60 * 1000; // considerado online se lastSeen < 2 min
 
 function markPresence(){
-  if(!db || !me || !me.id || me.status !== "ativo") return;
+  /* [V63.95] usa meIsActive() — antes não atualizava lastSeen pra users com status undefined */
+  if(!db || !me || !me.id || !meIsActive()) return;
   /* Usamos Date.now() do cliente (mais simples, evita 1 round-trip pro servidor).
      Pequeno desvio entre relógios de dispositivos é aceitável pra esse caso. */
   try{
@@ -5374,7 +5402,8 @@ function stopPresence(){
 
 /* Quando a aba volta a ficar visível, pinga na hora (não espera o próximo ciclo) */
 document.addEventListener("visibilitychange", function(){
-  if(document.visibilityState === "visible" && me && me.status === "ativo"){
+  /* [V63.95] usa meIsActive() */
+  if(document.visibilityState === "visible" && meIsActive()){
     markPresence();
   }
 });
@@ -5445,13 +5474,22 @@ function refreshPresenceInDOM(){
 function route(){
   if(!configured()){show("setupScreen");return;}
   if(!me){show("authScreen");switchAuth("login");return;}
-  if(me.status!=="ativo"){$("pendAv").innerHTML=avatarHTML(me);show("pendingScreen");return;}
+  /* [V63.95] FIX: usa meIsActive() — antes prendia user em pendingScreen se status undefined */
+  if(!meIsActive()){$("pendAv").innerHTML=avatarHTML(me);show("pendingScreen");return;}
   show("mainApp");
   $("hAvatar").innerHTML=avatarHTML(me);
   if($("content").innerHTML==="")switchTab("hoje");
   askNotif();
   /* [V63.12] Se já tinha permissão concedida antes, registra pra push real */
   try{ setupPushNotifications(); }catch(_){}
+  /* [V63.97] Atualiza banner de status — mostra "ATIVAR" se user sem token */
+  try{ updatePushStatusBanner(); }catch(_){}
+  /* [V63.98] FIX CRÍTICO: processar URL params de deep link.
+     Quando user clica numa push notif e o app abre do zero, a URL fica tipo
+     "https://agendaidseven.com.br/?openEvent=ABC123". ANTES o app ignorava esses
+     params e caía na tela inicial — push chegava mas user não via o que era pra ver.
+     Agora processa ?openEvent, ?openTask, ?go=chat&with= */
+  try{ processDeepLinkParams(); }catch(_){}
   /* [V63.94] AUTO-HEALING: tenta novamente após 5s se ainda não tem token salvo.
      Isso resolve race condition no mobile onde o app inicializa antes do db estar pronto. */
   setTimeout(function(){
@@ -6782,7 +6820,7 @@ function bindAgenda(){
 }
 function renderTeam(){
   let h='<div class="info-bar"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><div>Cadastros pendentes precisam ser liberados para acessar a agenda.</div></div>';
-  const pend=users.filter(u=>u.status!=="ativo"),act=users.filter(u=>u.status==="ativo");
+  const pend=users.filter(u=>!isUserActive(u)),act=users.filter(isUserActive);
   if(pend.length){h+='<div class="glabel" style="margin:18px 0 12px"><span class="d">Aguardando liberação</span><span class="ln"></span></div>';
     pend.forEach(u=>h+=personRow(u,true));}
   h+='<div class="glabel" style="margin:18px 0 12px"><span class="d">Equipe ativa</span><span class="dd">'+act.length+'</span><span class="ln"></span></div>';
@@ -6810,7 +6848,7 @@ function bindTeam(){
   });
   document.querySelectorAll("[data-adm]").forEach(b=>b.onclick=async()=>{
     const mk=b.dataset.mk==="1";
-    if(!mk){ const admins=users.filter(u=>u.status==="ativo"&&u.admin); if(admins.length<=1){ toast("Precisa existir pelo menos 1 admin"); return; } }
+    if(!mk){ const admins=users.filter(u=>isUserActive(u)&&u.admin); if(admins.length<=1){ toast("Precisa existir pelo menos 1 admin"); return; } }
     if(!(await customConfirm(mk?"Tornar esta pessoa administradora?":"Remover o acesso de administrador desta pessoa?","Permissões",mk?"warn":"danger")))return;
     if(busy)return; busy=true; b.disabled=true;
     try{await db.collection("users").doc(b.dataset.adm).update({admin:mk});toast(mk?"Agora é admin":"Admin removido");}
@@ -6834,7 +6872,7 @@ function renderProfile(){
     row('<rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="2"/>',"E-mail",me.email)+
     '<div class="color-pick"><div class="cp-h"><div class="l">Sua cor no Quadro</div><span class="cp-now" style="background:'+userColor(me)+'"></span></div><div class="cp-grid">'+
       USER_COLORS.map(c=>{
-        const taker=users.find(x=>x.status==="ativo"&&x.id!==me.id&&userColor(x)===c);
+        const taker=users.find(x=>isUserActive(x)&&x.id!==me.id&&userColor(x)===c);
         const mine=userColor(me)===c;
         return '<button type="button" class="cp-dot'+(mine?' on':'')+(taker?' taken':'')+'" data-color="'+c+'" style="background:'+c+'" title="'+(taker?("Já usada por "+esc(taker.name)):"")+'">'+
           (taker?'<span class="cp-tk">'+esc((taker.name||"?").trim().charAt(0).toUpperCase())+'</span>':'')+'</button>';
@@ -7365,12 +7403,19 @@ async function setupPushNotifications(){
      - Se já SUCCESS nesta sessão, não tenta de novo (sucesso é sucesso)
      - Se já tem outra tentativa rodando, espera (previne concorrência)
      - Se já tentou MAX_TRIES vezes, desiste (proteção contra loop infinito)
-     - Em qualquer outro caso, TENTA de novo (resiliente a falhas temporárias) */
+     - Em qualquer outro caso, TENTA de novo (resiliente a falhas temporárias)
+     
+     [V63.97] FIX ESTRUTURAL: tryCount NÃO é mais incrementado em early returns
+     (sem permissão, sem firebase, sem me). Antes era incrementado a cada call
+     mesmo sem fazer nada — em 8 calls rápidas (snapshot do users dispara várias)
+     o sistema desistia ANTES de a permissão ser concedida pelo user.
+     
+     Agora: tryCount só incrementa quando entra no try{} real (depois de TODAS
+     as validações). Cada incremento representa uma tentativa GENUÍNA de getToken. */
   if(fcmInitSucceeded){ _pushDbgCapture("init", "já registrado nesta sessão, pulando"); return true; }
   if(fcmInitInProgress){ _pushDbgCapture("init", "tentativa em andamento, pulando"); return false; }
   if(fcmInitTryCount >= FCM_INIT_MAX_TRIES){ _pushDbgCapture("init", "max tries atingido — clique manualmente em re-registrar"); return false; }
   fcmInitInProgress = true;
-  fcmInitTryCount++;
   /* Sem config ainda? sai silencioso */
   if(!PUSH_VAPID_KEY || !PUSH_WORKER_URL){ fcmInitInProgress = false; return false; }
   /* Sem usuário logado? não tem onde salvar token */
@@ -7381,6 +7426,9 @@ async function setupPushNotifications(){
   try{ if(!firebase.messaging.isSupported || !firebase.messaging.isSupported()){ fcmInitInProgress = false; return false; } }catch(_){ fcmInitInProgress = false; return false; }
   /* Permissão não concedida ainda? não força aqui */
   if(typeof Notification === "undefined" || Notification.permission !== "granted"){ fcmInitInProgress = false; return false; }
+
+  /* [V63.97] AQUI sim incrementa — passou todas as validações e vai realmente tentar. */
+  fcmInitTryCount++;
 
   /* [V63.93] FIX CRÍTICO PARA MOBILE: captura `me.id` e `db` em variáveis locais ANTES de
      qualquer await. Em mobile (Chrome Android, Samsung Internet), durante o getToken que
@@ -7402,16 +7450,29 @@ async function setupPushNotifications(){
     _pushDbg("2-worker-url", PUSH_WORKER_URL);
     _pushDbg("3-user-id", me && me.id);
 
-    /* Desregistra service workers antigos do FCM pra forçar fresh start
-       (causa comum de travar em "Registrando...") */
+    /* [V63.97] FIX ESTRUTURAL CRÍTICO: NÃO desregistra+registra SW a cada call.
+       Antes: cada chamada de setupPushNotifications desregistrava o SW do FCM e registrava de
+       novo. Isso fazia o FCM gerar token NOVO toda hora e invalidar o antigo no servidor —
+       resultando em acúmulo de tokens UNREGISTERED no Firestore, push pulado quando o app
+       desregistra entre sessões, e instabilidade geral.
+       
+       Agora: REUTILIZA o SW existente do FCM se já estiver ativo (caso comum). Só registra
+       se realmente não existir. Token fica estável entre sessões — FCM dá o mesmo token
+       pro mesmo SW. */
+    var reg = null;
     try{
       var oldRegs = await navigator.serviceWorker.getRegistrations();
-      _pushDbg("4-sw-antigos", oldRegs.map(function(r){ return r.scope; }));
+      _pushDbg("4-sw-existentes", oldRegs.map(function(r){
+        return (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || "?";
+      }));
+      /* Procura o SW do FCM já ativo */
       for(var i = 0; i < oldRegs.length; i++){
         var r = oldRegs[i];
-        if(r.active && r.active.scriptURL && r.active.scriptURL.indexOf("firebase-messaging-sw.js") >= 0){
-          _pushDbg("4b-desregistrando-fcm-sw", r.active.scriptURL);
-          await r.unregister();
+        var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || "";
+        if(url.indexOf("firebase-messaging-sw.js") >= 0){
+          reg = r;
+          _pushDbg("4b-sw-FCM-reutilizando", url);
+          break;
         }
       }
     }catch(eCleanup){
@@ -7422,10 +7483,14 @@ async function setupPushNotifications(){
     fcmMessaging = firebase.messaging();
     _pushDbg("6-messaging-ok", "instância criada");
 
-    /* Pega ou registra o service worker dedicado pro FCM */
-    _pushDbg("7-antes-register", "registrando firebase-messaging-sw.js");
-    var reg = await navigator.serviceWorker.register("firebase-messaging-sw.js", {scope:"./firebase-cloud-messaging-push-scope"});
-    _pushDbg("8-register-ok", {scope: reg.scope, hasActive: !!reg.active, hasInstalling: !!reg.installing});
+    /* Pega ou registra o service worker dedicado pro FCM — só registra se não tinha */
+    if(!reg){
+      _pushDbg("7-antes-register", "SW FCM não existia — registrando firebase-messaging-sw.js");
+      reg = await navigator.serviceWorker.register("firebase-messaging-sw.js", {scope:"./firebase-cloud-messaging-push-scope"});
+      _pushDbg("8-register-ok", {scope: reg.scope, hasActive: !!reg.active, hasInstalling: !!reg.installing});
+    } else {
+      _pushDbg("7-pular-register", "SW FCM já existia, reutilizando");
+    }
 
     /* Espera o SW ficar ativo (até 10s) */
     if(!reg.active && reg.installing){
@@ -7450,50 +7515,85 @@ async function setupPushNotifications(){
     });
     _pushDbg("11-getToken-retornou", token ? ("token len="+token.length) : "vazio/null");
 
-    if(!token){ _pushErr("getToken-vazio", new Error("getToken retornou vazio. Verifica VAPID key + permissão.")); return false; }
+    if(!token){ _pushErr("getToken-vazio", new Error("getToken retornou vazio. Verifica VAPID key + permissão.")); fcmInitInProgress = false; return false; }
 
     /* [V63.93] Usa savedMeId/savedDb capturados ANTES do await — não depende mais
        do estado live de `me`/`db` que pode ter virado null em mobile durante background.
        Se savedMeId e savedDb estavam OK no início (validados), eles continuam OK aqui. */
     if(!savedMeId || !savedDb){
       _pushDbg("12a-sem-id-inicial", "savedMeId ou savedDb nunca esteve disponível — não dá pra salvar");
+      fcmInitInProgress = false;
       return false;
     }
 
     /* Salva o token no perfil do usuário (campo fcmTokens é array de strings).
-       Mantém últimos 5 dispositivos. */
+       [V63.96] FIX RACE CONDITION CRÍTICA: usa arrayUnion atômico em vez de read-modify-write.
+       Antes: get() + push() + update() — se 2 devices fizessem isso simultaneamente, um
+       sobrescrevia o outro e tokens eram perdidos. arrayUnion é executado server-side e
+       garante que ambos os tokens entrem sem conflito.
+       Mantém também limite de 5 dispositivos: lê primeiro pra ver se já tem o token e
+       se a lista já está cheia (mais devices = mais antigos saem por trim local). */
     _pushDbg("12-salvando-token-firestore", "");
     var userRef = savedDb.collection("users").doc(savedMeId);
     var snap = await userRef.get();
     var existing = (snap.data() && snap.data().fcmTokens) || [];
     if(!Array.isArray(existing)) existing = [];
     if(existing.indexOf(token) < 0){
-      var arr = existing.concat([token]).slice(-5);
-      await userRef.update({fcmTokens: arr});
+      if(existing.length >= 5){
+        /* Lista já tem 5+ tokens. Faz trim manual (read+write) só nesse caso raro. */
+        var arr = existing.concat([token]).slice(-5);
+        await userRef.update({fcmTokens: arr});
+      } else {
+        /* Caso comum: usa arrayUnion atômico — não sobrescreve concorrência */
+        await userRef.update({
+          fcmTokens: firebase.firestore.FieldValue.arrayUnion(token)
+        });
+      }
     }
     fcmTokenSaved = token;
     fcmInitSucceeded = true;        /* [V63.94] marcador de sucesso definitivo */
     fcmInitInProgress = false;       /* [V63.94] libera */
     _pushDbg("13-SUCESSO", "token salvo no Firestore");
 
+    /* [V63.97] Atualiza banner de status — deve desaparecer agora que tem token */
+    try{ if(typeof updatePushStatusBanner === "function") updatePushStatusBanner(); }catch(_){}
+
     /* Listener pra quando recebe push com APP ABERTO (foreground) —
-       nesse caso o SO não mostra nada automaticamente; usamos nativeNotify. */
-    fcmMessaging.onMessage(function(payload){
+       nesse caso o SO não mostra nada automaticamente; usamos nativeNotify.
+       [V63.98] FIX: salva unsubscribe da chamada anterior pra evitar acúmulo de listeners
+       em re-registro (ex: clicou "Limpar tokens" → setupPush rodou de novo → duplicava listener).
+       Antes, cada re-registro adicionava +1 listener, resultando em notificações duplicadas. */
+    try{ if(window.__fcmOnMessageUnsub){ window.__fcmOnMessageUnsub(); window.__fcmOnMessageUnsub = null; } }catch(_){}
+    window.__fcmOnMessageUnsub = fcmMessaging.onMessage(function(payload){
       try{
-        /* [V63.92] FIX CRÍTICO: filtra NEGATIVAMENTE — bloqueia só status "pendente"/"removido",
+        /* [V63.92] FIX CRÍTICO: filtra NEGATIVAMENTE — bloqueia só status terminais,
            porque users criados antes da feature de status NÃO TÊM esse campo no Firestore.
-           Antes (V63.14) checava `status !== "ativo"` → bloqueava users com status undefined
-           → notification não aparecia mesmo o FCM aceitando o push.
-           Mesmo bug do pushAllExcept corrigido em V63.87. */
+           [V63.98] cobre "excluido" também. */
         if(!me) return;
-        if(me.status === "pendente" || me.status === "removido") return;
+        if(me.status === "pendente" || me.status === "removido" || me.status === "excluido") return;
         var n = payload && payload.notification || {};
         var d = payload && payload.data || {};
         nativeNotify(n.title || "ID Seven", n.body || "", d.tag || ("fg-"+Date.now()), function(){
           if(!me) return;
-          if(me.status === "pendente" || me.status === "removido") return;
-          if(d.url){ try{ window.location.href = d.url; }catch(_){} return; }
-          if(d.taskId){ openTaskDetail(d.taskId); return; }
+          if(me.status === "pendente" || me.status === "removido" || me.status === "excluido") return;
+          /* [V63.98] Trata deep link via data.url também */
+          if(d.url){
+            try{
+              var u = String(d.url);
+              var meOpen = u.match(/[?&]openEvent=([^&]+)/);
+              if(meOpen && meOpen[1]){
+                switchTab("agenda");
+                setTimeout(function(){ openDetail(decodeURIComponent(meOpen[1])); }, 200);
+                return;
+              }
+              var mtOpen = u.match(/[?&]openTask=([^&]+)/);
+              if(mtOpen && mtOpen[1]){
+                try{ openTaskDetail(decodeURIComponent(mtOpen[1])); }catch(_){}
+                return;
+              }
+            }catch(_){}
+          }
+          if(d.taskId){ try{ openTaskDetail(d.taskId); }catch(_){} return; }
           if(d.eventId){ switchTab("agenda"); setTimeout(function(){ openDetail(d.eventId); }, 200); return; }
         });
       }catch(_){}
@@ -7513,19 +7613,34 @@ async function setupPushNotifications(){
 }
 
 /* Remove o token deste dispositivo do perfil (chamar no logout) */
+/* Remove o token deste dispositivo do perfil (chamar no logout).
+   [V63.98] FIX CRÍTICO: 2 problemas corrigidos —
+   1. Race condition: usava read-modify-write (get + filter + update). Se outro device do
+      mesmo user salvasse token em paralelo, o update sobrescrevia e perdia o token novo.
+      Agora usa arrayRemove atômico (server-side).
+   2. Estado órfão: NÃO resetava fcmInitSucceeded, fcmInitTryCount, fcmInitInProgress.
+      Resultado: se 2 users compartilham o mesmo device (ex: tablet de equipe), depois do
+      logout do user A, ao logar como user B, setupPushNotifications saía direto via
+      fcmInitSucceeded=true e B HERDAVA o token de A. Push pra A chegava no device de B
+      (que tava logado). Agora reseta tudo. */
 async function teardownPushNotifications(){
-  if(!fcmTokenSaved || !me || !db) return;
-  try{
-    var userRef = db.collection("users").doc(me.id);
-    var snap = await userRef.get();
-    var existing = (snap.data() && snap.data().fcmTokens) || [];
-    if(Array.isArray(existing) && existing.indexOf(fcmTokenSaved) >= 0){
-      var arr = existing.filter(function(t){ return t !== fcmTokenSaved; });
-      await userRef.update({fcmTokens: arr});
-    }
-  }catch(_){}
+  if(me && db && fcmTokenSaved){
+    try{
+      var userRef = db.collection("users").doc(me.id);
+      /* arrayRemove atômico — não sobrescreve concorrência */
+      await userRef.update({
+        fcmTokens: firebase.firestore.FieldValue.arrayRemove(fcmTokenSaved)
+      });
+    }catch(_){ /* permissão negada ou outro erro — ignora */ }
+  }
+  /* Reseta TODO o estado do FCM no app — próximo login vai re-registrar */
   fcmTokenSaved = null;
   fcmMessaging = null;
+  fcmInitSucceeded = false;
+  fcmInitInProgress = false;
+  fcmInitTryCount = 0;
+  /* Desfaz o onMessage handler antigo pra não disparar pra outro user */
+  try{ if(window.__fcmOnMessageUnsub){ window.__fcmOnMessageUnsub(); window.__fcmOnMessageUnsub = null; } }catch(_){}
 }
 
 /* === ENVIA PUSH pra um ou mais usuários via Cloudflare Worker ===
@@ -7584,9 +7699,13 @@ async function sendPushToUsers(userIds, payload){
     var txt = "";
     try{ txt = await res.text(); }catch(_){}
     _sendDbg("Worker respondeu status=" + res.status);
+    /* [V63.96] FIX CRÍTICO: NÃO retornar prematuro se status ≥ 400.
+       Antes: erro de Worker → return → tokens mortos nunca eram limpos do Firestore.
+       Agora: registra o fail mas SEGUE pro bloco de cleanup. Worker V63.96 retorna 200 sempre,
+       mas mantemos esse fallback caso Worker antigo retorne 502 (todos tokens UNREGISTERED). */
     if(res.status >= 400){
       _sendFail("Worker HTTP " + res.status, txt.substring(0,300));
-      return;
+      /* NÃO returns aqui — segue pro auto-cleanup abaixo */
     }
 
     /* [V63.13] AUTO-LIMPEZA: o Worker retorna detalhes por token; se algum
@@ -7621,7 +7740,10 @@ async function sendPushToUsers(userIds, payload){
 
 /* [V63.13] Remove tokens mortos do Firestore dos usuários afetados.
    Best-effort — falha silenciosa se permissões não permitirem (ex: usuário
-   tentando alterar doc de outro usuário sem ser admin). */
+   tentando alterar doc de outro usuário sem ser admin).
+   [V63.96] FIX RACE CONDITION: usa arrayRemove atômico em vez de read-modify-write.
+   Antes: se outro device salvasse token novo ENQUANTO esse cleanup rodava, podia
+   sobrescrever a lista e perder o token novo. arrayRemove é atômico server-side. */
 async function cleanupDeadTokens(userIds, deadTokens){
   if(!db || !Array.isArray(userIds) || !Array.isArray(deadTokens) || !deadTokens.length) return;
   for(var i = 0; i < userIds.length; i++){
@@ -7629,34 +7751,63 @@ async function cleanupDeadTokens(userIds, deadTokens){
     if(!uid) continue;
     try{
       var ref = db.collection("users").doc(uid);
-      var snap = await ref.get();
-      if(!snap.exists) continue;
-      var existing = (snap.data() && snap.data().fcmTokens) || [];
-      if(!Array.isArray(existing) || !existing.length) continue;
-      var cleaned = existing.filter(function(t){ return deadTokens.indexOf(t) < 0; });
-      if(cleaned.length !== existing.length){
-        await ref.update({fcmTokens: cleaned});
-        try{ console.log("[PUSH-SEND] Limpou " + (existing.length - cleaned.length) + " token(s) de " + uid); }catch(_){}
-      }
+      /* arrayRemove aceita N argumentos — remove todos os tokens mortos atomicamente */
+      await ref.update({
+        fcmTokens: firebase.firestore.FieldValue.arrayRemove.apply(null, deadTokens)
+      });
+      try{ console.log("[PUSH-SEND] Removeu " + deadTokens.length + " token(s) morto(s) de " + uid + " (arrayRemove atômico)"); }catch(_){}
     }catch(_){ /* permissão negada ou outro erro — ignora */ }
   }
 }
 
-/* === Helper: descobre IDs dos administradores/gestores (recipient quando cliente aprova) === */
+/* === Helper: descobre IDs dos administradores/gestores (recipient quando cliente aprova) ===
+   [V63.96] FIX: agora filtra por isUserActive — antes incluía admins com status pendente/removido */
 function pushAdminIds(){
-  return users.filter(function(u){ return canManage(u); }).map(function(u){ return u.id; }).filter(function(id, idx, arr){ return arr.indexOf(id) === idx; });
+  return users.filter(function(u){ return isUserActive(u) && canManage(u); }).map(function(u){ return u.id; }).filter(function(id, idx, arr){ return arr.indexOf(id) === idx; });
+}
+
+/* [V63.95] HELPERS UNIVERSAIS DE STATUS DO USUÁRIO
+   ====================================================================
+   Histórico do bug: na auditoria sistemática V63.95 foi identificado que
+   o app tinha 9 lugares usando filtro POSITIVO `status === "ativo"` ou
+   `status !== "ativo"`. Esses filtros falham silenciosamente quando o
+   campo `status` é `undefined` no Firestore (users antigos criados antes
+   da feature de status, ou docs sem migração).
+   
+   Os V63.87, V63.92 e V63.93 corrigiram ESSES bugs UM A UM, mas restavam
+   outros 9 espalhados pelo app (route(), markPresence, find Arydyjany,
+   chips de owner em eventos, etc).
+   
+   Estes helpers padronizam o teste: bloqueia APENAS users que estão
+   explicitamente em status terminal (pendente, removido ou excluido).
+   Qualquer outro valor (undefined, null, "ativo", "" ou qualquer string)
+   é considerado ATIVO. Isso evita o bug DEFINITIVAMENTE pra novos lugares
+   que venham a precisar do check.
+   
+   [V63.98] FIX: cobre também "excluido" (user que deletou conta — status
+   setado em renderSettingsAccount, linha ~8530). Antes esses users
+   continuavam recebendo push e aparecendo nas listas. */
+function isUserActive(u){
+  if(!u) return false;
+  return u.status !== "pendente" && u.status !== "removido" && u.status !== "excluido";
+}
+function meIsActive(){
+  if(!me) return false;
+  return me.status !== "pendente" && me.status !== "removido" && me.status !== "excluido";
 }
 
 /* [V63.87] Helper: IDs de TODOS usuários ativos, exceto o ID excluído.
    FIX V63.86: filtro positivo por status === "ativo" excluía users com status undefined.
-   Agora segue o padrão do pushAdminIds — só exclui pendentes/removidos (negative filter).
-   O filtro de tokens FCM é feito DENTRO de sendPushToUsers, não aqui. */
+   Agora segue o padrão do pushAdminIds — só exclui pendentes/removidos/excluidos (negative filter).
+   O filtro de tokens FCM é feito DENTRO de sendPushToUsers, não aqui.
+   [V63.98] FIX: cobre também "excluido" (user que deletou conta). */
 function pushAllExcept(excludeId){
   return (users||[])
     .filter(function(u){
       return u && u.id && u.id !== excludeId
              && u.status !== "pendente"
-             && u.status !== "removido";
+             && u.status !== "removido"
+             && u.status !== "excluido";
     })
     .map(function(u){ return u.id; });
 }
@@ -7672,6 +7823,198 @@ function eventOwnerId(e){
   return null;
 }
 
+/* ============================================================
+   [V63.98] DEEP LINK — processa URL params depois do app abrir
+   ============================================================
+   Quando user clica numa push notification e o app abre do zero, a URL pode ser:
+   - "https://agendaidseven.com.br/?openEvent=ABC123" → abre o evento
+   - "https://agendaidseven.com.br/?openTask=XYZ789"   → abre a task
+   - "https://agendaidseven.com.br/?go=chat&with=UID"  → abre o chat com user UID
+   
+   ANTES da V63.98 o app ignorava esses params completamente — push chegava no
+   celular do user, ele clicava, app abria na tela inicial e ele não via NADA do
+   conteúdo que motivou o push.
+   
+   IMPORTANTE: só processa UMA vez por carga. Limpa os params da URL depois pra
+   não disparar de novo se user navegar. Aguarda 300ms pra dar tempo do app
+   renderizar antes de abrir overlay.
+   ============================================================ */
+var __deepLinkProcessed = false;
+function processDeepLinkParams(){
+  if(__deepLinkProcessed) return;
+  __deepLinkProcessed = true;
+  try{
+    var params = new URLSearchParams(location.search);
+    var openEvent = params.get("openEvent");
+    var openTask = params.get("openTask");
+    var go = params.get("go");
+    var withId = params.get("with");
+
+    /* Sem nada pra processar */
+    if(!openEvent && !openTask && !go) return;
+
+    /* Limpa os params da URL (mantém pathname e hash) */
+    try{
+      var cleanUrl = location.pathname + (location.hash || "");
+      window.history.replaceState({}, "", cleanUrl);
+    }catch(_){}
+
+    /* Dispara o handler depois de pequeno delay pra UI render */
+    setTimeout(function(){
+      try{
+        if(openEvent){
+          /* Garante que a aba agenda tá ativa */
+          try{ switchTab("agenda"); }catch(_){}
+          /* Aguarda mais 200ms pra render da agenda */
+          setTimeout(function(){
+            try{ openDetail(openEvent); }catch(_){}
+          }, 200);
+          return;
+        }
+        if(openTask){
+          try{ openTaskDetail(openTask); }catch(_){}
+          return;
+        }
+        if(go === "chat" && withId){
+          try{
+            /* Vai pra aba chat */
+            switchTab("chat");
+            /* Aguarda chat list carregar e abre conversa */
+            setTimeout(function(){
+              try{
+                if(typeof openChatWith === "function"){ openChatWith(withId); }
+                else if(typeof openChatPicker === "function"){ openChatPicker(); }
+              }catch(_){}
+            }, 300);
+          }catch(_){}
+          return;
+        }
+      }catch(_){}
+    }, 300);
+  }catch(_){}
+}
+
+/* ============================================================
+   [V63.97] BANNER DE STATUS DE PUSH (visibilidade total ao usuário)
+   ============================================================
+   Mostra um banner persistente no topo do app SE o user atual não está
+   recebendo push (sem token salvo, sem permissão, ou sem suporte).
+   
+   Onclick → tenta resolver automaticamente:
+   - Sem permissão: pede permissão
+   - Sem token mas com permissão: força registro (reset + setupPush)
+   - Permissão negada: instrui user a habilitar manualmente nas configs do browser
+   
+   updatePushStatusBanner() é chamada em vários pontos:
+   - route() (cada navegação)
+   - users snapshot (quando token é salvo, banner atualiza)
+   - visibilitychange (volta pro app)
+   - após setupPushNotifications resolver (sucesso/falha)
+   ============================================================ */
+function getPushHealthState(){
+  /* Retorna estado atual do push: "ok", "no-perm", "denied", "no-support", "no-token" */
+  if(!me) return "no-me";
+  if(typeof Notification === "undefined") return "no-support";
+  if(typeof firebase === "undefined" || !firebase.messaging) return "no-support";
+  try{ if(!firebase.messaging.isSupported || !firebase.messaging.isSupported()) return "no-support"; }catch(_){ return "no-support"; }
+  if(Notification.permission === "denied") return "denied";
+  if(Notification.permission !== "granted") return "no-perm";
+  /* Tem permissão. Verifica se tem token no Firestore. */
+  var hasToken = me && Array.isArray(me.fcmTokens) && me.fcmTokens.length > 0;
+  if(!hasToken) return "no-token";
+  return "ok";
+}
+
+function updatePushStatusBanner(){
+  var banner = document.getElementById("pushHealthBanner");
+  if(!banner) return;
+  var state = getPushHealthState();
+  var txt = document.getElementById("pushHealthText");
+  var sub = document.getElementById("pushHealthSub");
+  var act = document.getElementById("pushHealthAction");
+  if(state === "ok" || state === "no-me" || state === "no-support"){
+    /* Sem banner: tudo OK, ou user não logado, ou navegador sem suporte */
+    banner.style.display = "none";
+    return;
+  }
+  /* Mostra banner com mensagem específica */
+  banner.style.display = "flex";
+  if(state === "denied"){
+    if(txt) txt.textContent = "Notificações BLOQUEADAS no navegador";
+    if(sub) sub.textContent = "Habilite nas configurações do navegador (cadeado na barra de endereço) e toque aqui";
+    if(act) act.textContent = "INSTRUÇÕES";
+  } else if(state === "no-perm"){
+    if(txt) txt.textContent = "Notificações desativadas";
+    if(sub) sub.textContent = "Toque pra ativar — você receberá compromissos e tarefas";
+    if(act) act.textContent = "ATIVAR";
+  } else if(state === "no-token"){
+    if(txt) txt.textContent = "Dispositivo não registrado pra notificações";
+    if(sub) sub.textContent = "Toque pra registrar — push não chega sem isso";
+    if(act) act.textContent = "REGISTRAR";
+  }
+}
+
+/* Bind do click do banner (uma vez só, na primeira chamada) */
+(function bindPushHealthBannerClick(){
+  if(window.__pushBannerBound) return;
+  window.__pushBannerBound = true;
+  document.addEventListener("DOMContentLoaded", function(){
+    var banner = document.getElementById("pushHealthBanner");
+    if(!banner) return;
+    banner.onclick = async function(){
+      var state = getPushHealthState();
+      if(state === "denied"){
+        try{ customAlert("As notificações foram bloqueadas no seu navegador. Pra ativar, toque no cadeado na barra de endereço (ou ícone i no Android), abra Configurações do Site, e marque Notificações como Permitir. Depois recarregue a página.", "Notificações bloqueadas", "warn"); }catch(_){}
+        return;
+      }
+      if(state === "no-perm"){
+        /* Pede permissão */
+        try{
+          var p = await Notification.requestPermission();
+          if(p === "granted"){
+            /* Força setup */
+            try{ fcmInitSucceeded = false; fcmInitInProgress = false; fcmInitTryCount = 0; }catch(_){}
+            try{ await setupPushNotifications(); }catch(_){}
+            try{ updatePushStatusBanner(); }catch(_){}
+          } else {
+            try{ updatePushStatusBanner(); }catch(_){}
+          }
+        }catch(_){}
+        return;
+      }
+      if(state === "no-token"){
+        /* Permissão OK mas sem token. Força registro completo: limpa, desregistra SW, re-registra */
+        try{
+          if(act) act.textContent = "...";
+          /* Desregistra SW velho do FCM */
+          try{
+            var oldRegs = await navigator.serviceWorker.getRegistrations();
+            for(var i = 0; i < oldRegs.length; i++){
+              var r = oldRegs[i];
+              var url = (r.active && r.active.scriptURL) || "";
+              if(url.indexOf("firebase-messaging-sw.js") >= 0){
+                await r.unregister();
+              }
+            }
+          }catch(_){}
+          /* Reset flags */
+          try{ fcmInitSucceeded = false; fcmInitInProgress = false; fcmInitTryCount = 0; fcmTokenSaved = null; }catch(_){}
+          /* Re-registra */
+          var ok = await setupPushNotifications();
+          try{ updatePushStatusBanner(); }catch(_){}
+          if(ok){
+            try{ toast("✓ Dispositivo registrado — você receberá notificações"); }catch(_){}
+          } else {
+            try{ toast("⚠ Falha ao registrar — tente fechar e abrir o app"); }catch(_){}
+          }
+        }catch(e){
+          try{ toast("Erro: " + (e && e.message || "desconhecido")); }catch(_){}
+        }
+      }
+    };
+  });
+})();
+
 /* === Listener: quando o SW de push manda mensagem pro app aberto (clique em notificação fechada) === */
 try{
   if("serviceWorker" in navigator){
@@ -7680,9 +8023,30 @@ try{
       if(msg.type !== "fcm-notif-click") return;
       var d = msg.data || {};
       /* [V63.14 — AUDIT] Não abre detalhe se o usuário não estiver logado
-         (ex: notificação clicada após logout — evita estado UI inconsistente). */
-      if(!me || me.status !== "ativo") return;
-      if(d.taskId){ openTaskDetail(d.taskId); return; }
+         (ex: notificação clicada após logout — evita estado UI inconsistente).
+         [V63.95] usa meIsActive() — antes não abria detail se status undefined
+         [V63.98] FIX: trata data.url também (deep link). Antes só taskId/eventId. */
+      if(!meIsActive()) return;
+      /* Deep link genérico via url (?openEvent=ID, ?openTask=ID, etc) */
+      if(d.url){
+        try{
+          var u = String(d.url);
+          /* Se tem openEvent=, abre detail do evento */
+          var meOpen = u.match(/[?&]openEvent=([^&]+)/);
+          if(meOpen && meOpen[1]){
+            switchTab("agenda");
+            setTimeout(function(){ openDetail(decodeURIComponent(meOpen[1])); }, 200);
+            return;
+          }
+          /* Se tem openTask=, abre detail da task */
+          var mtOpen = u.match(/[?&]openTask=([^&]+)/);
+          if(mtOpen && mtOpen[1]){
+            try{ openTaskDetail(decodeURIComponent(mtOpen[1])); }catch(_){}
+            return;
+          }
+        }catch(_){}
+      }
+      if(d.taskId){ try{ openTaskDetail(d.taskId); }catch(_){} return; }
       if(d.eventId){ switchTab("agenda"); setTimeout(function(){ openDetail(d.eventId); }, 200); return; }
     });
   }
@@ -8450,13 +8814,26 @@ function bindSettingsNotifications(){
     if(ok) toast("Notificações ativadas ✓");
     render();
   };
-  /* [V63.57] Botão pra forçar nova tentativa de registro FCM (quando travou em "Registrando…") */
+  /* [V63.57] Botão pra forçar nova tentativa de registro FCM (quando travou em "Registrando…")
+     [V63.98] FIX: agora desregistra SW velho e limpa tokens órfãos ANTES de retentar.
+     Antes só resetava flags — se o SW estava corrompido, retentar não ajudava. */
   var rt = document.getElementById("setRetryPush");
   if(rt) rt.onclick = async function(){
     rt.disabled = true;
     rt.innerHTML = '<svg viewBox="0 0 24 24" fill="none" style="width:16px;height:16px;margin-right:7px;vertical-align:-3px"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" stroke-dasharray="42 6" opacity=".6"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle></svg>Registrando…';
+    /* [V63.98] Desregistra SW do FCM pra fresh start */
+    try{
+      var oldRegs = await navigator.serviceWorker.getRegistrations();
+      for(var i = 0; i < oldRegs.length; i++){
+        var r = oldRegs[i];
+        var url = (r.active && r.active.scriptURL) || "";
+        if(url.indexOf("firebase-messaging-sw.js") >= 0){
+          await r.unregister();
+        }
+      }
+    }catch(_){}
     /* [V63.94] Reset dos flags pra forçar nova tentativa, mesmo se já tentou max vezes */
-    try{ fcmInitSucceeded = false; fcmInitInProgress = false; fcmInitTryCount = 0; }catch(_){}
+    try{ fcmInitSucceeded = false; fcmInitInProgress = false; fcmInitTryCount = 0; fcmTokenSaved = null; }catch(_){}
     try{
       var ok = await setupPushNotifications();
       if(ok){ toast("Dispositivo registrado ✓"); }
@@ -8608,8 +8985,21 @@ function bindSettingsNotifications(){
         if(me && db){
           await db.collection("users").doc(me.id).update({ fcmTokens: [] });
         }
+        /* [V63.97] Desregistra o SW do FCM pra forçar um fresh start.
+           Antes, o setupPushNotifications fazia isso automaticamente. Agora setupPush
+           só reutiliza (V63.97), então pra forçar token novo precisamos limpar SW aqui. */
+        try{
+          var oldRegs = await navigator.serviceWorker.getRegistrations();
+          for(var i = 0; i < oldRegs.length; i++){
+            var r = oldRegs[i];
+            var url = (r.active && r.active.scriptURL) || "";
+            if(url.indexOf("firebase-messaging-sw.js") >= 0){
+              await r.unregister();
+            }
+          }
+        }catch(_){}
         /* [V63.94] Reseta os 3 flags do novo sistema pra forçar nova tentativa */
-        try{ fcmInitSucceeded = false; fcmInitInProgress = false; fcmInitTryCount = 0; }catch(_){}
+        try{ fcmInitSucceeded = false; fcmInitInProgress = false; fcmInitTryCount = 0; fcmTokenSaved = null; }catch(_){}
         /* Re-registra */
         await setupPushNotifications();
         try{ toast("Token re-registrado — teste de novo"); }catch(_){}
@@ -12669,7 +13059,7 @@ function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
      Mostra só o chip dela, ativo, e força o campo tAssignee pro nome dela. */
   if(selSector === "roteiro"){
     var arydy = (users||[]).find(function(u){
-      return u && u.status==="ativo" && /arydyjany/i.test(u.name||"");
+      return isUserActive(u) && /arydyjany/i.test(u.name||"");
     });
     if(arydy){
       $("tAssignee").value = arydy.name;
@@ -12698,7 +13088,7 @@ function buildRespChips(){const g=$("tRespChips");if(!g)return;g.innerHTML="";
       if(ta2){ ta2.disabled = false; ta2.style.opacity = ""; ta2.style.pointerEvents = ""; }
     }catch(_){}
   }
-  const team=users.filter(u=>u.status==="ativo");
+  const team=users.filter(isUserActive); /* [V63.95] FIX: era u.status==="ativo" — não pegava users com status undefined */
   /* [V63.50/V63.52] Encurtador de nome — chips menores; agora também renderiza avatar */
   const shortName=(n)=>{const p=(n||"").trim().split(/\s+/);return p.length>1?(p[0]+' '+p[p.length-1]):p[0];};
   const mk=(u,meFlag)=>{const b=document.createElement("button");b.type="button";
@@ -14015,8 +14405,11 @@ function notifList(){
     if(x.kind === "due24"               && !getPref("notifyLate", true))      return false;
     if(["approve_copy","approve_rot","copy_aprovado","rot_aprovado","client_approved","client_revision","legenda_approved","legenda_revision"].indexOf(x.kind) >= 0
        && !getPref("notifyApproval", true)) return false;
-    /* [V63.89] Notificações de eventos da agenda usam a pref notifyReminder */
-    if(x.kind && x.kind.indexOf("event_") === 0 && !getPref("notifyReminder", true)) return false;
+    /* [V63.89/V63.95] Filtro de eventos no sino:
+       - notifyReminder controla SOMENTE event_upcoming (lembrete X min antes)
+       - event_assigned, event_new, event_started, event_done aparecem SEMPRE
+         (não tem pref específica de "esconder eventos da equipe") */
+    if(x.kind === "event_upcoming" && !getPref("notifyReminder", true)) return false;
     return true;
   });
   return uniq.sort(function(a,b){return b.at-a.at;}).slice(0,80);
@@ -14415,7 +14808,7 @@ function openForm(ev){
   openSheet(formSheet);
 }
 function buildOwnerChips(){const g=$("fOwnerChips");if(!g)return;g.innerHTML="";
-  const team=users.filter(u=>u.status==="ativo");
+  const team=users.filter(isUserActive); /* [V63.95] FIX: era u.status==="ativo" — não pegava users com status undefined */
   /* [V63.50/V63.52] Encurtador de nome + avatar dentro do chip */
   const shortName=(n)=>{const p=(n||"").trim().split(/\s+/);return p.length>1?(p[0]+' '+p[p.length-1]):p[0];};
   const mk=(u,meFlag)=>{const b=document.createElement("button");b.type="button";

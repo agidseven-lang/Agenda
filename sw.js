@@ -1,8 +1,21 @@
-/* Agenda ID Seven - service worker
-   Estratégia: rede primeiro (sempre busca a versão mais nova quando online),
-   com cache de reserva para funcionar offline.
-   [V63.94] Cache bump — REFATOR ESTRUTURAL: sistema de retry resiliente + auto-healing + visibilitychange listener. */
-var CACHE = "idseven-v63-94";
+/* Agenda ID Seven - service worker (cache offline)
+   [V63.98] AUDITORIA ENGENHARIA SENIOR — 7 bugs reais novos: deep link URL params, isUserActive excluido, fcm-notif-click data.url, onMessage listeners duplicados, teardown race+state, retryPush sem desregistro SW.
+   [V63.97] AUDITORIA ESTRUTURAL — bug crítico corrigido:
+
+   BUG: o handler 'fetch' interceptava TODAS as requests GET, incluindo:
+     - https://firestore.googleapis.com/... (Firestore listen/watch — usa SSE)
+     - https://fcm.googleapis.com/... (FCM client → servidor)
+     - https://www.gstatic.com/firebasejs/... (SDK CDN)
+     - https://ik.imagekit.io/... (uploads/leituras de fotos)
+   
+   Cachear essas responses (especialmente listen do Firestore que é SSE
+   streaming) podia corromper conexões long-lived. Em mobile com rede
+   instável, isso causava reconexões frequentes e estados inconsistentes.
+   
+   AGORA: SÓ intercepta same-origin (a própria app). Tudo que não é da app
+   passa direto pra rede sem cachear.
+*/
+var CACHE = "idseven-v63-98";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
@@ -24,14 +37,34 @@ self.addEventListener("activate", function (e) {
 
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
+
+  /* [V63.97] FIX CRÍTICO: só intercepta requests pra mesma origin (app).
+     Requests pra Firestore, FCM, gstatic, ImageKit etc passam direto. */
+  var sameOrigin;
+  try{
+    sameOrigin = new URL(e.request.url).origin === self.location.origin;
+  }catch(_){
+    sameOrigin = false;
+  }
+  if(!sameOrigin) return; /* deixa o browser tratar normalmente, sem cache */
+
+  /* [V63.97] Não cacheia os próprios service workers — browser trata o
+     lifecycle deles separadamente; cache aqui só atrapalha update. */
+  var p = "";
+  try{ p = new URL(e.request.url).pathname; }catch(_){}
+  if(p === "/sw.js" || p === "/firebase-messaging-sw.js") return;
+
   e.respondWith(
     fetch(e.request)
       .then(function (resp) {
         try {
-          var copy = resp.clone();
-          caches.open(CACHE).then(function (c) {
-            c.put(e.request, copy);
-          });
+          /* Só cacheia responses básicas (200, mesmo origin) */
+          if(resp && resp.ok && resp.type === "basic"){
+            var copy = resp.clone();
+            caches.open(CACHE).then(function (c) {
+              c.put(e.request, copy);
+            }).catch(function(){});
+          }
         } catch (_) {}
         return resp;
       })
