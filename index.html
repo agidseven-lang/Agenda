@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.82 · build roteiro-share-cliente-whatsapp</div>
+    <div class="ver">versão 63.83 · build direcionar-incluir-miercohevisk</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -9800,9 +9800,16 @@ function openDirectDesignerModal(tid, idx){
   var ws = Array.isArray(t.cronWeeks) ? t.cronWeeks.map(cronNorm) : [];
   var o = ws[idx];
   if(!o){ toast("Conteúdo não encontrado."); return; }
-  /* Lista de designers: pega todos os users que não são admins */
+  /* [V63.83] Lista de designers: não-admins (Felipe, Boaz) + Miercohévisk (admin que também faz design).
+     Arydyjany e Tatiana ficam de fora — elas fazem cronograma/copy, não design. */
   var designers = (users||[]).filter(function(u){
-    return u && u.id && !canManage(u);
+    if(!u || !u.id) return false;
+    /* Inclui todos os não-admins (Felipe, Boaz) */
+    if(!canManage(u)) return true;
+    /* Inclui Miercohévisk especificamente (admin mas trabalha como designer também) */
+    var nm = normTxt(u.name || "");
+    if(nm.indexOf("miercohevisk") >= 0) return true;
+    return false;
   });
   if(!designers.length){
     toast("Nenhum designer cadastrado.");
