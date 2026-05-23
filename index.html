@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 63.86 · build lembretes-agenda-4-momentos</div>
+    <div class="ver">versão 63.87 · build fix-push-agenda-filtro-status</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -6942,23 +6942,18 @@ function scheduleEventReminders(){
         });
       }
 
-      /* [V63.86] PUSH FCM via Worker — chega com app fechado.
-         CORREÇÃO: lembrete 1h antes vai SÓ pro responsável (owner), não pra todos.
-         Os outros só são notificados na CRIAÇÃO, INÍCIO e FIM (não no lembrete).
-         FCM deduplica notifs pelo `tag` se múltiplos dispositivos dispararem. */
+      /* [V63.87] PUSH FCM via Worker — chega com app fechado.
+         Lembrete 1h antes vai SÓ pro responsável (owner). FCM deduplica notifs pelo `tag`.
+         FIX V63.86: removida pré-validação de tokens — sendPushToUsers já faz isso internamente. */
       try{
         var ownerIdRem = eventOwnerId(e);
         if(ownerIdRem && ownerIdRem !== me.id){
-          /* Confirma que o responsável tem tokens registrados */
-          var ownerUser = (users||[]).find(function(u){ return u.id === ownerIdRem; });
-          if(ownerUser && Array.isArray(ownerUser.fcmTokens) && ownerUser.fcmTokens.length > 0){
-            sendPushToUsers([ownerIdRem], {
-              title: titleLine,
-              body: bodyLine,
-              tag: "reminder-" + e.id,
-              url: "?openEvent=" + e.id
-            });
-          }
+          sendPushToUsers([ownerIdRem], {
+            title: titleLine,
+            body: bodyLine,
+            tag: "reminder-" + e.id,
+            url: "?openEvent=" + e.id
+          });
         }
       }catch(err){ console.warn("[scheduleEventReminders] push fail:", err); }
     }, trigger - now);
@@ -7567,13 +7562,16 @@ function pushAdminIds(){
   return users.filter(function(u){ return canManage(u); }).map(function(u){ return u.id; }).filter(function(id, idx, arr){ return arr.indexOf(id) === idx; });
 }
 
-/* [V63.86] Helper: IDs de TODOS usuários ativos com tokens FCM, exceto o ID excluído. */
+/* [V63.87] Helper: IDs de TODOS usuários ativos, exceto o ID excluído.
+   FIX V63.86: filtro positivo por status === "ativo" excluía users com status undefined.
+   Agora segue o padrão do pushAdminIds — só exclui pendentes/removidos (negative filter).
+   O filtro de tokens FCM é feito DENTRO de sendPushToUsers, não aqui. */
 function pushAllExcept(excludeId){
   return (users||[])
     .filter(function(u){
-      return u && u.id && u.status === "ativo"
-             && u.id !== excludeId
-             && Array.isArray(u.fcmTokens) && u.fcmTokens.length > 0;
+      return u && u.id && u.id !== excludeId
+             && u.status !== "pendente"
+             && u.status !== "removido";
     })
     .map(function(u){ return u.id; });
 }
@@ -14165,12 +14163,7 @@ $("saveBtn").onclick=async()=>{
         var dateLbl = data.date || "";
         var timeLbl = data.start || "";
         if(dateLbl || timeLbl) bodyIm += " — " + dateLbl + (timeLbl?(" "+timeLbl):"");
-        var recipImm = (users||[])
-          .filter(function(u){
-            return u && u.id && u.status==="ativo" && u.id !== me.id
-                   && Array.isArray(u.fcmTokens) && u.fcmTokens.length > 0;
-          })
-          .map(function(u){ return u.id; });
+        var recipImm = pushAllExcept(me.id);
         if(recipImm.length > 0){
           sendPushToUsers(recipImm, {
             title: titleIm,
