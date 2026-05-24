@@ -1,22 +1,20 @@
-# Build do APK debug do app nativo (/native) no CI — sem depender da máquina local.
-# Roda manualmente (workflow_dispatch) e em push na branch da PR #7.
-# O google-services.json NÃO fica no repo: é restaurado de um secret base64 no build.
-name: Build APK Nativo (debug)
+# Build de DIAGNÓSTICO por isolamento. Gera APKs mínimos para achar o módulo que crasha.
+# Variante atual: minimal (RN puro, sem Firebase/Notifee/navegação/services).
+name: Build APK Diagnostico
 
 on:
   workflow_dispatch:
   push:
     branches: [feat/native-android]
     paths:
-      - 'native/**'
-      - '!native/diag/**'
-      - '.github/workflows/build-native-apk.yml'
+      - 'native/diag/**'
+      - '.github/workflows/build-native-diag.yml'
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  minimal:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,17 +34,6 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Restaurar google-services.json (do secret)
-        env:
-          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
-        run: |
-          if [ -z "$GS_B64" ]; then
-            echo "::error::Secret GOOGLE_SERVICES_JSON_BASE64 ausente. Crie-o (base64 do google-services.json) em Settings → Secrets and variables → Actions."
-            exit 1
-          fi
-          echo "$GS_B64" | base64 -d > native/android/app/google-services.json
-          echo "google-services.json gerado ($(wc -c < native/android/app/google-services.json) bytes)."
-
       - name: Gerar debug keystore (assinatura de teste)
         run: |
           mkdir -p ~/.android
@@ -57,19 +44,37 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
+      - name: Restaurar google-services.json (exigido pelo plugin no build.gradle)
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -z "$GS_B64" ]; then
+            echo "::error::Secret GOOGLE_SERVICES_JSON_BASE64 ausente."
+            exit 1
+          fi
+          echo "$GS_B64" | base64 -d > native/android/app/google-services.json
+
+      - name: Aplicar variante MINIMAL (package.json/index.js/App.tsx reduzidos)
+        run: |
+          cp native/diag/minimal/package.json native/package.json
+          cp native/diag/minimal/index.js native/index.js
+          cp native/diag/minimal/App.tsx native/App.tsx
+          rm -f native/package-lock.json
+          echo "package.json minimal aplicado:"; cat native/package.json
+
       - name: npm install
         working-directory: native
         run: npm install --legacy-peer-deps
 
-      - name: gradlew assembleRelease (APK standalone)
+      - name: gradlew assembleRelease (minimal)
         working-directory: native/android
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK release (artifact)
+      - name: Upload app-minimal.apk
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
+          name: app-minimal-apk
           path: native/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
