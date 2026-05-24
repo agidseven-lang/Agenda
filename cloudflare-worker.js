@@ -1,63 +1,49 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.3]
+   ID Seven — Cloudflare Worker  [V64.4 / V64.3-worker-compat]
    ============================================================================
-   Responsabilidades:
-     1. RELAY DE PUSH  (POST /)            → recebe {tokens,title,body,data} do app
-                                              e envia via FCM HTTP v1. Retorna
-                                              {results:[{ok,status,response}]} na MESMA
-                                              ordem dos tokens (o index.html usa isso
-                                              pra limpar tokens mortos).
-     2. CRON DE LEMBRETE (scheduled)       → a cada minuto lê os compromissos no
-                                              Firestore, calcula reminderAt e dispara
-                                              o lembrete SÓ na janela exata:
-                                                now >= reminderAt
-                                                AND now < reminderAt + REMINDER_WINDOW_SECONDS
-                                              Lê a antecedência do DONO em
-                                              users/{ownerId}.reminderMinutes (default 60).
-     3. AUTH IMAGEKIT  (GET/POST /imagekit-auth) → assina upload do ImageKit.
+   COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
+   Worker real `idseven-push` no Cloudflare (confirmado no painel):
 
-   ----------------------------------------------------------------------------
-   REGRA DE NEGÓCIO V64.3:
-     - Compromisso/agenda NÃO recebe push imediato na criação (isso é tratado no
-       index.html — aqui o Worker NUNCA dispara nada na criação).
-     - O único push de compromisso é o LEMBRETE, em (eventStart - reminderMinutes).
-     - Nunca dispara lembrete retroativo: se reminderAt já passou da janela, ignora.
-   ----------------------------------------------------------------------------
-   VARIÁVEIS / SECRETS necessários no Cloudflare (Settings → Variables):
-     FIREBASE_PROJECT_ID        (var)     ex: "agenda-id-seven"
-     FIREBASE_SERVICE_ACCOUNT   (secret)  JSON da service account (client_email +
-                                          private_key) com permissão de FCM e Firestore.
-     REMINDER_BEFORE_MINUTES    (var)     default 60  — usado se o dono não tiver
-                                          users/{ownerId}.reminderMinutes salvo.
-     REMINDER_WINDOW_SECONDS    (var)     default 60  — largura da janela do disparo.
-     APP_TZ_OFFSET_MINUTES      (var)     default -180 (UTC-3, horário de Brasília).
-                                          O app guarda date "YYYY-MM-DD" + start "HH:MM"
-                                          em horário local; o Worker roda em UTC.
-     IMAGEKIT_PRIVATE_KEY       (secret)  chave privada do ImageKit (pra /imagekit-auth).
-     ALLOW_ORIGIN               (var)     default "*" — origem permitida no CORS.
+     ALLOWED_ORIGIN        (var)     = https://agendaidseven.com.br
+     FCM_PROJECT_ID        (var)     = agenda-id-seven
+     FCM_CLIENT_EMAIL      (secret)  e-mail da service account (FCM HTTP v1 + Firestore)
+     FCM_PRIVATE_KEY       (secret)  chave privada PEM da service account
+     IMAGEKIT_PRIVATE_KEY  (secret)  chave privada do ImageKit (/imagekit-auth)
 
-   BINDINGS opcionais:
-     SENT_REMINDERS (KV Namespace)  — usado pra garantir EXACTLY-ONCE no lembrete
-                                      (evita reenvio se o cron pegar a janela 2x).
-                                      Se não existir, o Worker ainda funciona, mas a
-                                      janela curta passa a ser a única proteção.
+   Vars opcionais do lembrete (com default — não são secrets):
+     REMINDER_BEFORE_MINUTES   default 60   (usado se o dono não tiver reminderMinutes)
+     REMINDER_WINDOW_SECONDS   default 60   (janela exata do disparo)
+     APP_TZ_OFFSET_MINUTES     default -180 (UTC-3, horário de Brasília)
 
-   CRON sugerido (wrangler.toml):
-     [triggers]
-     crons = ["* * * * *"]   # a cada 1 minuto
+   ENDPOINTS:
+     POST /              → push imediato (relay): {tokens,title,body,data} → FCM HTTP v1
+     POST /imagekit-auth → assinatura de upload do ImageKit
+     POST /cron-test     → executa a lógica do lembrete sob demanda (DRY-RUN por padrão;
+                           só envia de verdade com body {"send":true})
+     GET  /              → status do serviço
 
+   CRON: scheduled(event, env, ctx) → handleCronTrigger(env,{dryRun:false}) a cada minuto.
+
+   REGRA DE NEGÓCIO:
+     - Criar compromisso NÃO dispara push (isso é tratado no index.html).
+     - O lembrete dispara somente em (eventStart - reminderMinutes), na janela exata:
+         now >= reminderAt  AND  now < reminderAt + REMINDER_WINDOW_SECONDS
+     - Nunca dispara retroativo.
+
+   DEDUPLICAÇÃO: por campo `reminderSentAt` no doc do compromisso no Firestore
+     (events/{id}.reminderSentAt). NÃO usa KV. Antes de enviar, se reminderSentAt já
+     estiver setado, pula; após enviar, grava reminderSentAt = now.
    ============================================================================ */
 
 const FIRESTORE_BASE = "https://firestore.googleapis.com/v1";
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
-const FIRESTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
+const DATASTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
 
 /* ───────────────────────── ENTRYPOINTS ───────────────────────── */
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    /* CORS preflight */
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }
@@ -66,23 +52,28 @@ export default {
       return handleImageKitAuth(request, env);
     }
 
-    if (request.method === "POST") {
-      return handlePushRelay(request, env, ctx);
+    if (url.pathname === "/cron-test" && request.method === "POST") {
+      return handleCronTest(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.3" }, 200, env);
+    if (request.method === "POST") {
+      return handlePushRelay(request, env);
+    }
+
+    return json({ ok: true, service: "idseven-push", version: "V64.4" }, 200, env);
   },
 
-  /* Cron: a cada minuto. */
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runReminderCron(env).catch((e) => {
-      console.error("[CRON] erro fatal:", e && e.message);
-    }));
+    ctx.waitUntil(
+      handleCronTrigger(env, { dryRun: false }).catch((e) => {
+        console.error("[CRON] erro fatal:", e && e.message);
+      })
+    );
   },
 };
 
-/* ───────────────────────── 1. PUSH RELAY ───────────────────────── */
-async function handlePushRelay(request, env, ctx) {
+/* ───────────────────────── 1. PUSH IMEDIATO (POST /) ───────────────────────── */
+async function handlePushRelay(request, env) {
   let payload;
   try {
     payload = await request.json();
@@ -91,7 +82,7 @@ async function handlePushRelay(request, env, ctx) {
   }
 
   let tokens = Array.isArray(payload.tokens) ? payload.tokens : [];
-  /* [V64.3] dedup com Set() — nunca enviar pro mesmo token 2x na mesma chamada */
+  /* dedup com Set() — nunca enviar pro mesmo token 2x na mesma chamada */
   tokens = Array.from(new Set(tokens.filter(Boolean)));
   if (!tokens.length) {
     return json({ ok: false, error: "sem tokens", results: [] }, 200, env);
@@ -115,9 +106,9 @@ async function handlePushRelay(request, env, ctx) {
   return json({ ok: true, results }, 200, env);
 }
 
-/* Envia para uma lista de tokens (FCM HTTP v1 é 1 request por token). */
+/* Envio FCM HTTP v1 — 1 request por token. */
 async function sendToTokens(env, accessToken, tokens, msg) {
-  const projectId = env.FIREBASE_PROJECT_ID;
+  const projectId = env.FCM_PROJECT_ID;
   const endpoint = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
   const results = [];
@@ -127,7 +118,7 @@ async function sendToTokens(env, accessToken, tokens, msg) {
         token,
         data: msg.data,
         webpush: {
-          headers: { Urgency: "high", TTL: "86400" }, /* [V64.1+] alta prioridade + TTL */
+          headers: { Urgency: "high", TTL: "86400" },
           notification: {
             title: msg.title,
             body: msg.body,
@@ -135,19 +126,13 @@ async function sendToTokens(env, accessToken, tokens, msg) {
             badge: "/icon-192.png",
             tag: (msg.data && msg.data.tag) || undefined,
           },
-          /* Sem fcm_options.link de propósito: o clique é tratado pelo
-             notificationclick do firebase-messaging-sw.js, que usa data.url
-             pra focar a aba existente / abrir o deep link sem duplicar. */
         },
       },
     };
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Authorization": "Bearer " + accessToken,
-          "Content-Type": "application/json",
-        },
+        headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
         body: JSON.stringify(fcmMessage),
       });
       const text = await res.text();
@@ -160,35 +145,49 @@ async function sendToTokens(env, accessToken, tokens, msg) {
 }
 
 /* ───────────────────────── 2. CRON DE LEMBRETE ───────────────────────── */
-async function runReminderCron(env) {
-  const projectId = env.FIREBASE_PROJECT_ID;
-  if (!projectId) { console.error("[CRON] FIREBASE_PROJECT_ID ausente"); return; }
+/* POST /cron-test — executa a lógica do cron sob demanda. DRY-RUN por padrão:
+   calcula reminderAt/now/janela e diz o que FARIA, sem enviar. Envia de verdade
+   só com body {"send":true}. */
+async function handleCronTest(request, env) {
+  let opts = { dryRun: true };
+  try {
+    const b = await request.json();
+    if (b && b.send === true) opts.dryRun = false;
+  } catch (_) { /* sem body = dry-run */ }
+  try {
+    const report = await handleCronTrigger(env, opts);
+    return json({ ok: true, mode: opts.dryRun ? "dry-run" : "send", report }, 200, env);
+  } catch (e) {
+    return json({ ok: false, error: e && e.message }, 200, env);
+  }
+}
 
-  const windowSec = parseInt(env.REMINDER_WINDOW_SECONDS, 10) > 0
-    ? parseInt(env.REMINDER_WINDOW_SECONDS, 10) : 60;
-  const defaultBefore = parseInt(env.REMINDER_BEFORE_MINUTES, 10) > 0
-    ? parseInt(env.REMINDER_BEFORE_MINUTES, 10) : 60;
-  const tzOffset = Number.isFinite(parseInt(env.APP_TZ_OFFSET_MINUTES, 10))
-    ? parseInt(env.APP_TZ_OFFSET_MINUTES, 10) : -180; /* UTC-3 (Brasília) */
+async function handleCronTrigger(env, opts) {
+  opts = opts || {};
+  const dryRun = !!opts.dryRun;
+  const projectId = env.FCM_PROJECT_ID;
+  if (!projectId) { console.error("[CRON] FCM_PROJECT_ID ausente"); return { error: "FCM_PROJECT_ID ausente" }; }
 
+  const windowSec = parseInt(env.REMINDER_WINDOW_SECONDS, 10) > 0 ? parseInt(env.REMINDER_WINDOW_SECONDS, 10) : 60;
+  const defaultBefore = parseInt(env.REMINDER_BEFORE_MINUTES, 10) > 0 ? parseInt(env.REMINDER_BEFORE_MINUTES, 10) : 60;
+  const tzOffset = Number.isFinite(parseInt(env.APP_TZ_OFFSET_MINUTES, 10)) ? parseInt(env.APP_TZ_OFFSET_MINUTES, 10) : -180;
   const now = Date.now();
 
   let accessToken;
   try {
-    accessToken = await getAccessToken(env, FCM_SCOPE + " " + FIRESTORE_SCOPE);
+    accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
   } catch (e) {
     console.error("[CRON] auth falhou:", e && e.message);
-    return;
+    return { error: "auth falhou: " + (e && e.message) };
   }
 
-  /* Busca compromissos não concluídos com data >= ontem (margem de TZ). */
   const yesterdayStr = isoDate(now - 86400000);
   const events = await queryEvents(env, accessToken, yesterdayStr);
-  console.log(`[CRON] ${events.length} compromisso(s) candidatos; now=${new Date(now).toISOString()}`);
+  console.log(`[CRON] ${events.length} compromisso(s) candidatos; now=${new Date(now).toISOString()}; dryRun=${dryRun}`);
 
-  /* Cache de reminderMinutes por owner pra não reler o mesmo user várias vezes. */
   const ownerMinsCache = {};
   const userDocCache = {};
+  const report = { now: new Date(now).toISOString(), dryRun, scanned: events.length, candidates: [], sent: [] };
 
   for (const e of events) {
     if (!e || e.done) continue;
@@ -196,12 +195,8 @@ async function runReminderCron(env) {
     if (!startMs) continue;
 
     const ownerId = e.ownerId || null;
-    if (!ownerId) {
-      console.log(`[REMINDER] skipped: compromisso ${e.id} sem ownerId — sem destinatário`);
-      continue;
-    }
+    if (!ownerId) { console.log(`[REMINDER] skipped: ${e.id} sem ownerId`); continue; }
 
-    /* reminderMinutes do DONO (Firestore) — default se não existir. */
     let minutes = ownerMinsCache[ownerId];
     if (minutes === undefined) {
       const u = userDocCache[ownerId] || await getUser(env, accessToken, ownerId);
@@ -212,54 +207,52 @@ async function runReminderCron(env) {
     }
 
     const reminderAt = startMs - minutes * 60000;
-    console.log(`[REMINDER] eventStart=${new Date(startMs).toISOString()} (${e.id})`);
-    console.log(`[REMINDER] reminderAt=${new Date(reminderAt).toISOString()} (${minutes} min antes)`);
-    console.log(`[REMINDER] now=${new Date(now).toISOString()}`);
+    console.log(`[REMINDER] eventStart=${new Date(startMs).toISOString()} reminderAt=${new Date(reminderAt).toISOString()} now=${new Date(now).toISOString()} (${e.id})`);
 
-    /* JANELA EXATA: now >= reminderAt AND now < reminderAt + windowSec. */
-    if (now < reminderAt) {
-      console.log(`[REMINDER] skipped: reminderAt no futuro (${e.id})`);
-      continue;
-    }
-    if (now >= reminderAt + windowSec * 1000) {
-      console.log(`[REMINDER] skipped: reminderAt já passou (${e.id})`);
-      continue;
-    }
+    let decision;
+    if (now < reminderAt) decision = "skip: reminderAt no futuro";
+    else if (now >= reminderAt + windowSec * 1000) decision = "skip: reminderAt já passou";
+    else if (e.reminderSentAt) decision = "skip: já enviado (reminderSentAt)";
+    else decision = "in-window";
 
-    /* EXACTLY-ONCE: se já mandamos esse lembrete, pula (proteção contra cron 2x). */
-    const dedupeKey = `sent:${e.id}:${Math.floor(reminderAt / 60000)}`;
-    if (await alreadySent(env, dedupeKey)) {
-      console.log(`[REMINDER] skipped: já enviado (${e.id})`);
-      continue;
-    }
+    report.candidates.push({ id: e.id, eventStart: new Date(startMs).toISOString(), reminderAt: new Date(reminderAt).toISOString(), minutes, decision });
 
-    /* Tokens do dono, deduplicados por dispositivo. */
+    if (decision !== "in-window") { console.log(`[REMINDER] ${decision} (${e.id})`); continue; }
+
+    /* tokens do dono, deduplicados por dispositivo */
     const owner = userDocCache[ownerId] || await getUser(env, accessToken, ownerId);
     userDocCache[ownerId] = owner;
     const tokensBefore = (owner && Array.isArray(owner.fcmTokens)) ? owner.fcmTokens.filter(Boolean) : [];
     const tokens = dedupeTokensByDevice(tokensBefore, owner && owner.fcmTokenMeta);
     console.log(`[PUSH] tokens antes=${tokensBefore.length} depois=${tokens.length} (owner=${ownerId})`);
-    if (!tokens.length) {
-      console.log(`[REMINDER] skipped: dono ${ownerId} sem token (${e.id})`);
-      continue;
-    }
+    if (!tokens.length) { console.log(`[REMINDER] skipped: dono ${ownerId} sem token (${e.id})`); continue; }
 
     const typeLabel = labelForType(e.type);
     const title = `⏰ ${typeLabel} em ${minutes} min`;
     let body = e.title || e.client || "Compromisso";
     if (e.client && e.title) body = `${e.title} · ${e.client}`;
     if (e.start) body += ` (${e.start})`;
-
     const data = stringifyData({ tag: "reminder-" + e.id, url: "?openEvent=" + e.id, eventId: e.id });
+
+    if (dryRun) {
+      report.sent.push({ id: e.id, wouldSendTo: tokens.length, title });
+      console.log(`[REMINDER] dry-run: enviaria ownerId=${ownerId} event=${e.id} para ${tokens.length} token(s)`);
+      continue;
+    }
+
     const results = await sendToTokens(env, accessToken, tokens, { title, body, data });
     const okCount = results.filter((r) => r.ok).length;
     console.log(`[REMINDER] sent: ownerId=${ownerId} event=${e.id} ok=${okCount}/${tokens.length}`);
+    report.sent.push({ id: e.id, sentTo: tokens.length, ok: okCount });
 
-    await markSent(env, dedupeKey);
+    /* DEDUP: grava reminderSentAt no doc do compromisso (exactly-once via Firestore) */
+    await markReminderSent(env, accessToken, e.id, now);
   }
+
+  return report;
 }
 
-/* Calcula o timestamp UTC do início do compromisso a partir de date+start locais. */
+/* eventStart (UTC) a partir de date "YYYY-MM-DD" + start "HH:MM" em horário local. */
 function eventStartMs(e, tzOffsetMinutes) {
   if (!e || !e.date) return 0;
   const dm = String(e.date).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -270,25 +263,21 @@ function eventStartMs(e, tzOffsetMinutes) {
     const tm = String(e.start).match(/^(\d{1,2}):(\d{2})$/);
     if (tm) { hh = +tm[1]; mm = +tm[2]; }
   }
-  /* Wall clock (local) → UTC: UTC = local - offset. offset(-180) → +180min. */
   return Date.UTC(y, mo - 1, d, hh, mm) - tzOffsetMinutes * 60000;
 }
 
-/* [V64.3] Mantém só 1 token por deviceId (o mais recente por lastSeenAt/createdAt),
-   e dedup final com Set(). Tokens sem metadados são mantidos como estão. */
+/* mantém 1 token por deviceId (mais recente) + dedup com Set() */
 function dedupeTokensByDevice(tokens, meta) {
   if (!Array.isArray(tokens)) return [];
   meta = (meta && typeof meta === "object") ? meta : {};
-  const byDevice = {};   /* deviceId → {token, ts} */
+  const byDevice = {};
   const noMeta = [];
   for (const t of tokens) {
     if (!t) continue;
     const m = meta[t];
     if (m && m.deviceId) {
       const ts = (m.lastSeenAt || m.createdAt || 0);
-      if (!byDevice[m.deviceId] || ts >= byDevice[m.deviceId].ts) {
-        byDevice[m.deviceId] = { token: t, ts };
-      }
+      if (!byDevice[m.deviceId] || ts >= byDevice[m.deviceId].ts) byDevice[m.deviceId] = { token: t, ts };
     } else {
       noMeta.push(t);
     }
@@ -298,39 +287,22 @@ function dedupeTokensByDevice(tokens, meta) {
 }
 
 function labelForType(type) {
-  const map = {
-    gravacao: "Gravação", reuniao: "Reunião", trafego: "Tráfego",
-    revisao: "Revisão", entrega: "Entrega", foto: "Foto", outro: "Compromisso",
-  };
+  const map = { gravacao: "Gravação", reuniao: "Reunião", trafego: "Tráfego", revisao: "Revisão", entrega: "Entrega", foto: "Foto", outro: "Compromisso" };
   return (type && map[type]) || "Compromisso";
 }
 
 /* ───────────────────────── FIRESTORE REST ───────────────────────── */
 async function queryEvents(env, accessToken, fromDateStr) {
-  const projectId = env.FIREBASE_PROJECT_ID;
-  const url = `${FIRESTORE_BASE}/projects/${projectId}/databases/(default)/documents:runQuery`;
-  const structuredQuery = {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = {
     structuredQuery: {
       from: [{ collectionId: "events" }],
-      where: {
-        fieldFilter: {
-          field: { fieldPath: "date" },
-          op: "GREATER_THAN_OR_EQUAL",
-          value: { stringValue: fromDateStr },
-        },
-      },
+      where: { fieldFilter: { field: { fieldPath: "date" }, op: "GREATER_THAN_OR_EQUAL", value: { stringValue: fromDateStr } } },
       limit: 500,
     },
   };
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
-    body: JSON.stringify(structuredQuery),
-  });
-  if (!res.ok) {
-    console.error("[CRON] runQuery falhou:", res.status, (await res.text()).slice(0, 300));
-    return [];
-  }
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  if (!res.ok) { console.error("[CRON] runQuery falhou:", res.status, (await res.text()).slice(0, 300)); return []; }
   const rows = await res.json();
   const out = [];
   for (const row of rows) {
@@ -342,15 +314,27 @@ async function queryEvents(env, accessToken, fromDateStr) {
 }
 
 async function getUser(env, accessToken, uid) {
-  const projectId = env.FIREBASE_PROJECT_ID;
-  const url = `${FIRESTORE_BASE}/projects/${projectId}/databases/(default)/documents/users/${uid}`;
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/users/${uid}`;
   const res = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
   if (!res.ok) return null;
   const doc = await res.json();
   return decodeFields(doc.fields);
 }
 
-/* Converte os "fields" do formato REST do Firestore pra objeto JS simples. */
+/* grava events/{id}.reminderSentAt = nowMs (dedup exactly-once via Firestore) */
+async function markReminderSent(env, accessToken, eventId, nowMs) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/events/${eventId}?updateMask.fieldPaths=reminderSentAt`;
+  try {
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { reminderSentAt: { integerValue: String(nowMs) } } }),
+    });
+  } catch (e) {
+    console.warn("[REMINDER] falha ao gravar reminderSentAt:", e && e.message);
+  }
+}
+
 function decodeFields(fields) {
   const out = {};
   if (!fields) return out;
@@ -370,34 +354,22 @@ function decodeValue(v) {
   return null;
 }
 
-/* ───────────────────────── EXACTLY-ONCE (KV opcional) ───────────────────────── */
-async function alreadySent(env, key) {
-  try { if (env.SENT_REMINDERS) return (await env.SENT_REMINDERS.get(key)) !== null; } catch (_) {}
-  return false;
-}
-async function markSent(env, key) {
-  try { if (env.SENT_REMINDERS) await env.SENT_REMINDERS.put(key, "1", { expirationTtl: 7200 }); } catch (_) {}
-}
-
 /* ───────────────────────── OAUTH (service account → access token) ───────────────────────── */
 let _tokenCache = { value: null, exp: 0, scope: "" };
 async function getAccessToken(env, scope) {
   const nowSec = Math.floor(Date.now() / 1000);
-  if (_tokenCache.value && _tokenCache.exp - 60 > nowSec && _tokenCache.scope === scope) {
-    return _tokenCache.value;
-  }
-  const sa = parseServiceAccount(env);
+  if (_tokenCache.value && _tokenCache.exp - 60 > nowSec && _tokenCache.scope === scope) return _tokenCache.value;
+
+  const clientEmail = env.FCM_CLIENT_EMAIL;
+  const privateKey = env.FCM_PRIVATE_KEY;
+  if (!clientEmail) throw new Error("FCM_CLIENT_EMAIL ausente");
+  if (!privateKey) throw new Error("FCM_PRIVATE_KEY ausente");
+
   const header = { alg: "RS256", typ: "JWT" };
-  const claim = {
-    iss: sa.client_email,
-    scope,
-    aud: "https://oauth2.googleapis.com/token",
-    iat: nowSec,
-    exp: nowSec + 3600,
-  };
+  const claim = { iss: clientEmail, scope, aud: "https://oauth2.googleapis.com/token", iat: nowSec, exp: nowSec + 3600 };
   const enc = (o) => b64url(new TextEncoder().encode(JSON.stringify(o)));
   const unsigned = `${enc(header)}.${enc(claim)}`;
-  const signature = await rs256Sign(unsigned, sa.private_key);
+  const signature = await rs256Sign(unsigned, privateKey);
   const jwt = `${unsigned}.${signature}`;
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
@@ -411,37 +383,18 @@ async function getAccessToken(env, scope) {
   return data.access_token;
 }
 
-function parseServiceAccount(env) {
-  const raw = env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) throw new Error("FIREBASE_SERVICE_ACCOUNT ausente");
-  let sa;
-  try { sa = typeof raw === "string" ? JSON.parse(raw) : raw; }
-  catch (e) { throw new Error("FIREBASE_SERVICE_ACCOUNT não é JSON válido"); }
-  if (!sa.client_email || !sa.private_key) throw new Error("service account sem client_email/private_key");
-  return sa;
-}
-
 async function rs256Sign(data, pem) {
   const key = await importPrivateKey(pem);
-  const sig = await crypto.subtle.sign(
-    { name: "RSASSA-PKCS1-v1_5" },
-    key,
-    new TextEncoder().encode(data),
-  );
+  const sig = await crypto.subtle.sign({ name: "RSASSA-PKCS1-v1_5" }, key, new TextEncoder().encode(data));
   return b64url(new Uint8Array(sig));
 }
-
 async function importPrivateKey(pem) {
-  const clean = pem.replace(/\\n/g, "\n")
+  const clean = String(pem).replace(/\\n/g, "\n")
     .replace("-----BEGIN PRIVATE KEY-----", "")
     .replace("-----END PRIVATE KEY-----", "")
     .replace(/\s+/g, "");
   const der = Uint8Array.from(atob(clean), (c) => c.charCodeAt(0));
-  return crypto.subtle.importKey(
-    "pkcs8", der.buffer,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false, ["sign"],
-  );
+  return crypto.subtle.importKey("pkcs8", der.buffer, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
 }
 
 /* ───────────────────────── 3. IMAGEKIT AUTH ───────────────────────── */
@@ -449,16 +402,12 @@ async function handleImageKitAuth(request, env) {
   const privateKey = env.IMAGEKIT_PRIVATE_KEY;
   if (!privateKey) return json({ error: "IMAGEKIT_PRIVATE_KEY ausente" }, 500, env);
   const token = crypto.randomUUID();
-  const expire = Math.floor(Date.now() / 1000) + 2400; /* +40 min */
+  const expire = Math.floor(Date.now() / 1000) + 2400;
   const signature = await hmacSha1Hex(privateKey, token + expire);
   return json({ token, expire, signature }, 200, env);
 }
-
 async function hmacSha1Hex(key, msg) {
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(key),
-    { name: "HMAC", hash: "SHA-1" }, false, ["sign"],
-  );
+  const cryptoKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(msg));
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -466,19 +415,15 @@ async function hmacSha1Hex(key, msg) {
 /* ───────────────────────── HELPERS ───────────────────────── */
 function corsHeaders(env) {
   return {
-    "Access-Control-Allow-Origin": (env && env.ALLOW_ORIGIN) || "*",
+    "Access-Control-Allow-Origin": (env && env.ALLOWED_ORIGIN) || "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
   };
 }
 function json(obj, status, env) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: Object.assign({ "Content-Type": "application/json" }, corsHeaders(env)),
-  });
+  return new Response(JSON.stringify(obj), { status: status || 200, headers: Object.assign({ "Content-Type": "application/json" }, corsHeaders(env)) });
 }
-/* FCM data só aceita strings — normaliza tudo pra string. */
 function stringifyData(data) {
   const out = {};
   for (const k of Object.keys(data || {})) {
@@ -488,10 +433,7 @@ function stringifyData(data) {
   }
   return out;
 }
-function isoDate(ms) {
-  const d = new Date(ms);
-  return d.toISOString().slice(0, 10);
-}
+function isoDate(ms) { return new Date(ms).toISOString().slice(0, 10); }
 function b64url(bytes) {
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
