@@ -1,5 +1,6 @@
-# Build de DIAGNÓSTICO por isolamento. Gera APKs mínimos para achar o módulo que crasha.
-# Variante atual: minimal (RN puro, sem Firebase/Notifee/navegação/services).
+# Build de DIAGNÓSTICO por isolamento de baixo nível.
+#  - native_smoke: Android 100% nativo (sem React Native) → app-native-smoke.apk
+#  - rn_smoke: React Native mínimo, appId diferente, sem Firebase/Notifee → app-rn-smoke.apk
 name: Build APK Diagnostico
 
 on:
@@ -14,26 +15,42 @@ permissions:
   contents: read
 
 jobs:
-  minimal:
+  # (A) Android puro, sem React Native. Se isto crashar → base Android/Gradle/assinatura/device.
+  native_smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: gradlew assembleDebug (Android puro)
+        working-directory: native/diag/native-smoke
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Upload app-native-smoke.apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-native-smoke-apk
+          path: native/diag/native-smoke/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
+  # (B) RN mínimo, appId .rnsmoke, sem Firebase/Notifee/google-services. Se isto crashar
+  #     (e o native_smoke abrir) → o problema é startup do React Native/Hermes/MainApplication.
+  rn_smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
       - name: Gerar debug keystore (assinatura de teste)
         run: |
           mkdir -p ~/.android
@@ -43,38 +60,27 @@ jobs:
               -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
-
-      - name: Restaurar google-services.json (exigido pelo plugin no build.gradle)
-        env:
-          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+      - name: Aplicar variante RN-SMOKE (appId .rnsmoke, sem google-services)
         run: |
-          if [ -z "$GS_B64" ]; then
-            echo "::error::Secret GOOGLE_SERVICES_JSON_BASE64 ausente."
-            exit 1
-          fi
-          echo "$GS_B64" | base64 -d > native/android/app/google-services.json
-
-      - name: Aplicar variante MINIMAL (package.json/index.js/App.tsx reduzidos)
-        run: |
-          cp native/diag/minimal/package.json native/package.json
-          cp native/diag/minimal/index.js native/index.js
-          cp native/diag/minimal/App.tsx native/App.tsx
-          rm -f native/package-lock.json
-          echo "package.json minimal aplicado:"; cat native/package.json
-
+          cp native/diag/rn-smoke/package.json native/package.json
+          cp native/diag/rn-smoke/index.js native/index.js
+          cp native/diag/rn-smoke/App.tsx native/App.tsx
+          rm -f native/package-lock.json native/android/app/google-services.json
+          # appId diferente p/ coexistir; remove o plugin google-services (sem Firebase aqui)
+          sed -i 's/applicationId "br.com.idseven.agenda"/applicationId "br.com.idseven.agenda.rnsmoke"/' native/android/app/build.gradle
+          sed -i "/apply plugin: 'com.google.gms.google-services'/d" native/android/app/build.gradle
+          echo "applicationId e plugin ajustados:"; grep -nE 'applicationId|google-services' native/android/app/build.gradle || true
       - name: npm install
         working-directory: native
         run: npm install --legacy-peer-deps
-
-      - name: gradlew assembleRelease (minimal)
+      - name: gradlew assembleRelease (RN mínimo, bundle embutido)
         working-directory: native/android
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
-
-      - name: Upload app-minimal.apk
+      - name: Upload app-rn-smoke.apk
         uses: actions/upload-artifact@v4
         with:
-          name: app-minimal-apk
+          name: app-rn-smoke-apk
           path: native/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
