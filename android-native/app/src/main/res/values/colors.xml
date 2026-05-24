@@ -1,12 +1,14 @@
 <resources>
-    <color name="bg">#0b0c0f</color>
-    <color name="surface">#16181d</color>
-    <color name="line">#23262d</color>
-    <color name="ink">#FFFFFF</color>
-    <color name="inkSoft">#9aa0ac</color>
-    <color name="inkFaint">#6b7280</color>
+    <!-- Paleta REAL do PWA (tema escuro :root) -->
+    <color name="bg">#0a0b10</color>
+    <color name="surface">#15171f</color>
+    <color name="surface2">#1c1f29</color>
+    <color name="line">#262a36</color>
+    <color name="ink">#f1f2f4</color>
+    <color name="inkSoft">#9ba0ab</color>
+    <color name="inkFaint">#6e7480</color>
     <color name="accent">#5b6cff</color>
-    <color name="ic_launcher_background">#0b0c0f</color>
+    <color name="ic_launcher_background">#0a0b10</color>
 
     <!-- Cores por tipo de compromisso (iguais ao PWA) -->
     <color name="t_grav">#ef4444</color>

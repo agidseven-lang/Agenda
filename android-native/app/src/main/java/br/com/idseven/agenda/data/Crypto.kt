@@ -20,6 +20,15 @@ object Crypto {
 
     fun hashPw(pw: String, salt: String): String = "s2:" + sha256Hex("$salt|$pw")
 
+    // sal aleatório de 16 bytes em hex (igual ao randSalt do web).
+    fun randSalt(): String {
+        val a = ByteArray(16)
+        java.security.SecureRandom().nextBytes(a)
+        val sb = StringBuilder(32)
+        for (b in a) { val v = b.toInt() and 0xFF; sb.append("0123456789abcdef"[v ushr 4]); sb.append("0123456789abcdef"[v and 0x0F]) }
+        return sb.toString()
+    }
+
     // djb2 idêntico ao web: h=5381; h=((h<<5)+h+code)|0 ; return "h"+(h>>>0)
     fun legacyHashPass(s: String): String {
         var h = 5381 // Int overflow no Kotlin == |0 do JS
