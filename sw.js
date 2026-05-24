@@ -72,7 +72,7 @@
    AGORA: SÓ intercepta same-origin (a própria app). Tudo que não é da app
    passa direto pra rede sem cachear.
 */
-var CACHE = "idseven-v64-5";
+var CACHE = "idseven-v64-6";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
