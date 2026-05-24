@@ -19,6 +19,15 @@ android {
             // debug = standalone e auto-assinado (debug keystore). Sem JS, sem Metro.
         }
     }
+
+    // Alinha Java e Kotlin no MESMO target (17) — corrige o erro de JVM-target inconsistente.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
