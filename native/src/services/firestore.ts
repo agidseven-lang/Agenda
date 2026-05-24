@@ -38,10 +38,12 @@ export type AppEvent = {
   reminderSentAt?: number;
 };
 
-const db = firestore();
+// LAZY: não chamar firestore() no topo do módulo (evita crash nativo no boot,
+// antes do React montar). Só inicializa quando uma função realmente é usada.
+const db = () => firestore();
 
 export async function findUserByEmail(email: string): Promise<AppUser | null> {
-  const snap = await db
+  const snap = await db()
     .collection('users')
     .where('email', '==', email.trim().toLowerCase())
     .limit(1)
@@ -52,7 +54,7 @@ export async function findUserByEmail(email: string): Promise<AppUser | null> {
 }
 
 export async function getUser(uid: string): Promise<AppUser | null> {
-  const d = await db.collection('users').doc(uid).get();
+  const d = await db().collection('users').doc(uid).get();
   if (!d.exists) return null;
   return {id: d.id, ...(d.data() as object)} as AppUser;
 }
@@ -60,7 +62,7 @@ export async function getUser(uid: string): Promise<AppUser | null> {
 export function listenEvents(
   onChange: (events: AppEvent[]) => void,
 ): () => void {
-  return db.collection('events').onSnapshot(
+  return db().collection('events').onSnapshot(
     (snap: FirebaseFirestoreTypes.QuerySnapshot) => {
       const out: AppEvent[] = [];
       snap.forEach(doc => out.push({id: doc.id, ...(doc.data() as object)} as AppEvent));
@@ -77,7 +79,7 @@ export function listenEvents(
 export async function createEvent(
   data: Omit<AppEvent, 'id'>,
 ): Promise<string> {
-  const ref = await db.collection('events').add({
+  const ref = await db().collection('events').add({
     ...data,
     done: false,
     createdAt: Date.now(),
@@ -90,12 +92,12 @@ export async function updateEvent(
   data: Partial<AppEvent>,
 ): Promise<void> {
   // Reagendou? limpa o estado de lembrete (mesma regra do web V64.5) p/ o Worker reenviar.
-  await db.collection('events').doc(id).update({
+  await db().collection('events').doc(id).update({
     ...data,
     reminderSentAt: firestore.FieldValue.delete(),
   } as any);
 }
 
 export async function deleteEvent(id: string): Promise<void> {
-  await db.collection('events').doc(id).delete();
+  await db().collection('events').doc(id).delete();
 }
