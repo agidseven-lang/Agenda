@@ -83,6 +83,13 @@ class HojeFragment : Fragment() {
 
     private fun render() {
         root.removeAllViews()
+        // MARCADOR TEMPORÁRIO de verificação de versão (remover após aprovação).
+        val mark = TextView(requireContext())
+        mark.text = "Hoje Kotlin v2"
+        mark.setTextColor(Color.parseColor("#5b6cff")); mark.textSize = 11f
+        mark.setTypeface(mark.typeface, android.graphics.Typeface.BOLD)
+        mark.setPadding(0, 0, 0, dp(8))
+        root.addView(mark)
         // Hero
         val firstName = (Session.name(requireContext()) ?: "").trim().split(Regex("\\s+")).firstOrNull() ?: ""
         val greet = TextView(requireContext()); greet.text = saudacao() + (if (firstName.isNotEmpty()) ", $firstName 👋" else " 👋")
