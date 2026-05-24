@@ -40,16 +40,16 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Restaurar google-services.json (do secret; usado a partir da Fase 2)
+      - name: Restaurar google-services.json (do secret) — obrigatório a partir da Fase 2
         env:
           GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
-          if [ -n "$GS_B64" ]; then
-            echo "$GS_B64" | base64 -d > android-native/app/google-services.json
-            echo "google-services.json restaurado ($(wc -c < android-native/app/google-services.json) bytes)."
-          else
-            echo "Secret ausente — ok na Fase 1 (Firebase ainda não usado)."
+          if [ -z "$GS_B64" ]; then
+            echo "::error::Secret GOOGLE_SERVICES_JSON_BASE64 ausente — necessário pelo plugin google-services (Firebase)."
+            exit 1
           fi
+          echo "$GS_B64" | base64 -d > android-native/app/google-services.json
+          echo "google-services.json restaurado ($(wc -c < android-native/app/google-services.json) bytes)."
 
       - name: gradlew assembleRelease
         working-directory: android-native
@@ -57,9 +57,9 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK (smoke da Fase 1)
+      - name: Upload APK release
         uses: actions/upload-artifact@v4
         with:
-          name: app-android-native-smoke-apk
+          name: app-android-native-release-apk
           path: android-native/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

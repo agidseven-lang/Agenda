@@ -45,9 +45,19 @@
         android:backgroundTint="@color/accent" />
 
     <TextView
+        android:id="@+id/txtErro"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text=""
+        android:textColor="#ff6b6b"
+        android:textSize="13sp"
+        android:gravity="center" />
+
+    <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="12dp"
         android:text="Use a mesma conta do app web."
         android:textColor="@color/inkFaint"
         android:textSize="12sp" />

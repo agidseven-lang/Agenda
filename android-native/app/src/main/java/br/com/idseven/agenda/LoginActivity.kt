@@ -1,12 +1,15 @@
 package br.com.idseven.agenda
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
-import android.widget.Toast
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import br.com.idseven.agenda.data.AuthRepo
+import br.com.idseven.agenda.data.Session
 
-// Tela de login (Fase 1: só a UI). O login real (Firestore + hash custom) entra na Fase 2.
+// Login REAL (Fase 2): valida em users{} no Firestore com o mesmo hash do web. Sem Firebase Auth.
 class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -14,17 +17,29 @@ class LoginActivity : AppCompatActivity() {
 
         val email = findViewById<EditText>(R.id.inEmail)
         val pass = findViewById<EditText>(R.id.inSenha)
-        findViewById<Button>(R.id.btnEntrar).setOnClickListener {
-            if (email.text.isNullOrBlank() || pass.text.isNullOrBlank()) {
-                Toast.makeText(this, "Informe email e senha.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+        val btn = findViewById<Button>(R.id.btnEntrar)
+        val err = findViewById<TextView>(R.id.txtErro)
+
+        btn.setOnClickListener {
+            err.text = ""
+            btn.isEnabled = false
+            btn.text = "Entrando..."
+            AuthRepo.login(email.text.toString(), pass.text.toString()) { result ->
+                runOnUiThread {
+                    when (result) {
+                        is AuthRepo.Result.Ok -> {
+                            Session.save(this, result.uid, result.name)
+                            startActivity(Intent(this, AgendaActivity::class.java))
+                            finish()
+                        }
+                        is AuthRepo.Result.Err -> {
+                            err.text = result.message
+                            btn.isEnabled = true
+                            btn.text = "Entrar"
+                        }
+                    }
+                }
             }
-            // Fase 2: validar em users{} no Firestore com "s2:" + sha256(salt + "|" + senha).
-            Toast.makeText(
-                this,
-                "Login real entra na Fase 2 (Firebase/Firestore).",
-                Toast.LENGTH_LONG
-            ).show()
         }
     }
 }
