@@ -1,0 +1,18 @@
+package br.com.idseven.agenda
+
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+
+// Tela inicial (smoke da Fase 1): prova que o app Android nativo abre.
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        findViewById<Button>(R.id.btnContinuar).setOnClickListener {
+            startActivity(Intent(this, LoginActivity::class.java))
+        }
+    }
+}

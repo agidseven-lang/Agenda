@@ -1,0 +1,56 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+
+android {
+    namespace "br.com.idseven.agenda"
+    compileSdk 34
+
+    defaultConfig {
+        // DEVE casar com o google-services.json (app Android br.com.idseven.agenda) na Fase 2.
+        applicationId "br.com.idseven.agenda"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    signingConfigs {
+        // Assinatura de TESTE (debug keystore) p/ gerar release instalável. NÃO usar na Play.
+        debugtest {
+            storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
+    buildTypes {
+        debug { }
+        release {
+            signingConfig signingConfigs.debugtest
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    // Java e Kotlin no MESMO target 17.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    implementation "androidx.core:core-ktx:1.13.1"
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "com.google.android.material:material:1.12.0"
+}
+
+// FASE 2 (Firebase/Firestore) vai adicionar:
+//   build.gradle (raiz) já tem o classpath com.google.gms:google-services
+//   aqui: implementation platform('com.google.firebase:firebase-bom:33.7.0')
+//         implementation 'com.google.firebase:firebase-firestore'
+//         apply plugin: 'com.google.gms.google-services'   (no final)

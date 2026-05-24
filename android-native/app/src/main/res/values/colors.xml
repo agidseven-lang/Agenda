@@ -1,0 +1,8 @@
+<resources>
+    <color name="bg">#0b0c0f</color>
+    <color name="ink">#FFFFFF</color>
+    <color name="inkSoft">#9aa0ac</color>
+    <color name="inkFaint">#6b7280</color>
+    <color name="accent">#5b6cff</color>
+    <color name="ic_launcher_background">#0b0c0f</color>
+</resources>
