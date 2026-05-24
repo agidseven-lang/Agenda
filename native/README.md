@@ -23,65 +23,43 @@ React Native 0.76 · React Native Firebase (app/firestore/messaging) · Notifee
 
 ## Passo a passo
 
-### 1. Gerar o esqueleto nativo do Android
-Este repositório traz a camada JS/TS pronta. Gere a pasta nativa `android/` (uma vez):
+A pasta **`android/` já está no repositório** (Gradle, Manifest, MainActivity/MainApplication,
+plugin google-services, permissões, ícone adaptativo). Faltam só **2 coisas que não vão pro Git**:
+o `gradle-wrapper.jar` (binário) e o `google-services.json`.
 
+### 1. Instalar dependências
 ```bash
 cd native
-# instala dependências
 npm install
-# gera a pasta android/ nativa com o package correto
-npx @react-native-community/cli init IdSevenTmp --version 0.76.5 --skip-install --directory ./_tmp
-# copie a pasta _tmp/android para ./android e ajuste (veja item 3) — ou use Android Studio.
 ```
-> Alternativa recomendada: abrir o projeto no Android Studio e deixar o Gradle sincronizar.
 
-### 2. Colocar o `google-services.json` (NÃO vai pro Git)
-Baixe no Firebase Console (app Android `br.com.idseven.agenda`) e salve em:
+### 2. Gerar o gradle-wrapper.jar (binário — uma vez)
+O repo traz `gradle/wrapper/gradle-wrapper.properties`, mas **não** o `.jar` (binário).
+Gere o wrapper (escolha UMA opção):
+```bash
+# A) se tiver Gradle instalado:
+cd android && gradle wrapper --gradle-version 8.10.2
+# B) ou simplesmente abra a pasta `native/android` no Android Studio:
+#    ele baixa o wrapper e sincroniza sozinho.
+```
 
+### 3. Colocar o `google-services.json` (NÃO vai pro Git)
+Baixe no Firebase Console (app Android **`br.com.idseven.agenda`** no projeto
+**`agenda-id-seven`**) e salve EXATAMENTE em:
 ```
 native/android/app/google-services.json
 ```
-Esse caminho está no `.gitignore` — **não será commitado**.
+Já está no `.gitignore` — **não será commitado**.
 
-### 3. Ajustes Android obrigatórios
-
-**`android/app/build.gradle`**
-```gradle
-android {
-  defaultConfig {
-    applicationId "br.com.idseven.agenda"
-    minSdkVersion 24
-    targetSdkVersion 34
-  }
-}
-apply plugin: 'com.google.gms.google-services'   // no final do arquivo
-```
-
-**`android/build.gradle`** (classpath do plugin)
-```gradle
-buildscript {
-  dependencies {
-    classpath 'com.google.gms:google-services:4.4.2'
-  }
-}
-```
-
-**`android/app/src/main/AndroidManifest.xml`** (permissões)
-```xml
-<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-<uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
-<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-```
-> `USE_EXACT_ALARM` é a via aceita pela Play Store para apps de agenda/alarme.
-> O Notifee já registra o receiver de boot para reagendar os triggers.
-
-### 4. Rodar
+### 4. Rodar / Buildar
 ```bash
-npm run android      # debug
-npm run build:apk    # release (assembleRelease)
+npm run android       # instala em device/emulador (debug)
+# ou, dentro de native/android:
+./gradlew assembleDebug      # APK debug  → app/build/outputs/apk/debug/
+./gradlew assembleRelease    # APK release (configure sua assinatura antes de publicar)
 ```
+> Debug usa o keystore padrão do SDK (`~/.android/debug.keystore`, gerado automaticamente).
+> `minSdk = 26` (ícone adaptativo em XML; sem PNGs binários no repo).
 
 ## O que a Fase 1 entrega
 - Login compatível com o web.

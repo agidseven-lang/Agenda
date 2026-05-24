@@ -1,0 +1,51 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+react {
+    // Autolinking das libs nativas (RN Firebase, Notifee, screens, etc.)
+    autolinkLibrariesWithApp()
+}
+
+def enableProguardInReleaseBuilds = false
+def jscFlavor = 'org.webkit:android-jsc:+'
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "br.com.idseven.agenda"
+    defaultConfig {
+        applicationId "br.com.idseven.agenda"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    buildTypes {
+        debug {
+            // Usa o debug keystore padrão do Android SDK (~/.android/debug.keystore),
+            // gerado automaticamente — sem precisar de binário no repo.
+        }
+        release {
+            // Configure sua chave de release antes de publicar na Play Store.
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+}
+
+// DEVE ficar no FINAL: processa native/android/app/google-services.json (FCM/Firebase).
+apply plugin: 'com.google.gms.google-services'
