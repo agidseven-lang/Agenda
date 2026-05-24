@@ -12,7 +12,7 @@
 
    Vars opcionais do lembrete (com default — não são secrets):
      REMINDER_BEFORE_MINUTES   default 60   (usado se o dono não tiver reminderMinutes)
-     REMINDER_WINDOW_SECONDS   default 60   (janela exata do disparo)
+     REMINDER_WINDOW_SECONDS   default 300  (janela do disparo — tolera atraso/jitter do cron)
      APP_TZ_OFFSET_MINUTES     default -180 (UTC-3, horário de Brasília)
 
    ENDPOINTS:
@@ -170,7 +170,7 @@ async function handleCronTrigger(env, opts) {
   const projectId = env.FCM_PROJECT_ID;
   if (!projectId) { console.error("[CRON] FCM_PROJECT_ID ausente"); return { error: "FCM_PROJECT_ID ausente" }; }
 
-  const windowSec = parseInt(env.REMINDER_WINDOW_SECONDS, 10) > 0 ? parseInt(env.REMINDER_WINDOW_SECONDS, 10) : 60;
+  const windowSec = parseInt(env.REMINDER_WINDOW_SECONDS, 10) > 0 ? parseInt(env.REMINDER_WINDOW_SECONDS, 10) : 300;
   const defaultBefore = parseInt(env.REMINDER_BEFORE_MINUTES, 10) > 0 ? parseInt(env.REMINDER_BEFORE_MINUTES, 10) : 60;
   const tzOffset = Number.isFinite(parseInt(env.APP_TZ_OFFSET_MINUTES, 10)) ? parseInt(env.APP_TZ_OFFSET_MINUTES, 10) : -180;
   const now = Date.now();
@@ -197,37 +197,61 @@ async function handleCronTrigger(env, opts) {
     if (!startMs) continue;
 
     const ownerId = e.ownerId || null;
-    if (!ownerId) { console.log(`[REMINDER] skipped: ${e.id} sem ownerId`); continue; }
 
+    /* Lê o dono UMA vez (reminderMinutes + tokens p/ diagnóstico) */
+    let owner = null;
+    if (ownerId) {
+      owner = (userDocCache[ownerId] !== undefined) ? userDocCache[ownerId] : await getUser(env, accessToken, ownerId);
+      userDocCache[ownerId] = owner;
+    }
     let minutes = ownerMinsCache[ownerId];
     if (minutes === undefined) {
-      const u = userDocCache[ownerId] || await getUser(env, accessToken, ownerId);
-      userDocCache[ownerId] = u;
-      const m = u && parseInt(u.reminderMinutes, 10);
+      const m = owner && parseInt(owner.reminderMinutes, 10);
       minutes = (m > 0) ? m : defaultBefore;
       ownerMinsCache[ownerId] = minutes;
     }
 
     const reminderAt = startMs - minutes * 60000;
-    console.log(`[REMINDER] eventStart=${new Date(startMs).toISOString()} reminderAt=${new Date(reminderAt).toISOString()} now=${new Date(now).toISOString()} (${e.id})`);
-
-    let decision;
-    if (now < reminderAt) decision = "skip: reminderAt no futuro";
-    else if (now >= reminderAt + windowSec * 1000) decision = "skip: reminderAt já passou";
-    else if (e.reminderSentAt) decision = "skip: já enviado (reminderSentAt)";
-    else decision = "in-window";
-
-    report.candidates.push({ id: e.id, eventStart: new Date(startMs).toISOString(), reminderAt: new Date(reminderAt).toISOString(), minutes, decision });
-
-    if (decision !== "in-window") { console.log(`[REMINDER] ${decision} (${e.id})`); continue; }
-
-    /* tokens do dono, deduplicados por dispositivo */
-    const owner = userDocCache[ownerId] || await getUser(env, accessToken, ownerId);
-    userDocCache[ownerId] = owner;
     const tokensBefore = (owner && Array.isArray(owner.fcmTokens)) ? owner.fcmTokens.filter(Boolean) : [];
     const tokens = dedupeTokensByDevice(tokensBefore, owner && owner.fcmTokenMeta);
-    console.log(`[PUSH] tokens antes=${tokensBefore.length} depois=${tokens.length} (owner=${ownerId})`);
-    if (!tokens.length) { console.log(`[REMINDER] skipped: dono ${ownerId} sem token (${e.id})`); continue; }
+    const hasTokens = tokens.length > 0;
+    const createdAtMs = (typeof e.createdAt === "number") ? e.createdAt : (parseInt(e.createdAt, 10) || null);
+
+    /* ELEGIBILIDADE:
+       enviar SE  now >= reminderAt
+              AND now < reminderAt + windowSec  (tolerância operacional do cron)
+              AND NÃO foi criado depois do reminderAt (sem retroativo)
+              AND reminderSentAt não existe
+              AND o dono tem token. */
+    let eligible = false, skippedReason = null;
+    if (!ownerId) skippedReason = "sem ownerId";
+    else if (now < reminderAt) skippedReason = "reminderAt no futuro";
+    else if (now >= reminderAt + windowSec * 1000) skippedReason = "janela expirada (reminderAt + " + windowSec + "s)";
+    else if (createdAtMs && createdAtMs > reminderAt) skippedReason = "criado apos reminderAt (sem retroativo)";
+    else if (e.reminderSentAt) skippedReason = "ja enviado (reminderSentAt)";
+    else if (!hasTokens) skippedReason = "owner sem token";
+    else eligible = true;
+
+    /* Diagnóstico rico (item do briefing) — usado especialmente no /cron-test dry-run */
+    report.candidates.push({
+      eventId: e.id,
+      date: e.date || null,
+      start: e.start || null,
+      eventStart: new Date(startMs).toISOString(),
+      reminderAt: new Date(reminderAt).toISOString(),
+      now: new Date(now).toISOString(),
+      windowSeconds: windowSec,
+      minutes: minutes,
+      eligible: eligible,
+      skippedReason: skippedReason,
+      createdAt: createdAtMs ? new Date(createdAtMs).toISOString() : null,
+      reminderSentAt: e.reminderSentAt ? new Date(parseInt(e.reminderSentAt, 10)).toISOString() : null,
+      ownerId: ownerId,
+      hasTokens: hasTokens
+    });
+    console.log(`[REMINDER] ${e.id} eventStart=${new Date(startMs).toISOString()} reminderAt=${new Date(reminderAt).toISOString()} now=${new Date(now).toISOString()} window=${windowSec}s eligible=${eligible}${eligible ? "" : " reason=" + skippedReason}`);
+
+    if (!eligible) continue;
 
     const typeLabel = labelForType(e.type);
     const title = `⏰ ${typeLabel} em ${minutes} min`;
@@ -237,7 +261,7 @@ async function handleCronTrigger(env, opts) {
     const data = stringifyData({ tag: "reminder-" + e.id, url: "?openEvent=" + e.id, eventId: e.id });
 
     if (dryRun) {
-      report.sent.push({ id: e.id, wouldSendTo: tokens.length, title });
+      report.sent.push({ eventId: e.id, wouldSendTo: tokens.length, title });
       console.log(`[REMINDER] dry-run: enviaria ownerId=${ownerId} event=${e.id} para ${tokens.length} token(s)`);
       continue;
     }
@@ -245,7 +269,7 @@ async function handleCronTrigger(env, opts) {
     const results = await sendToTokens(env, accessToken, tokens, { title, body, data });
     const okCount = results.filter((r) => r.ok).length;
     console.log(`[REMINDER] sent: ownerId=${ownerId} event=${e.id} ok=${okCount}/${tokens.length}`);
-    report.sent.push({ id: e.id, sentTo: tokens.length, ok: okCount });
+    report.sent.push({ eventId: e.id, sentTo: tokens.length, ok: okCount });
 
     /* DEDUP: grava reminderSentAt no doc do compromisso (exactly-once via Firestore) */
     await markReminderSent(env, accessToken, e.id, now);
