@@ -1,4 +1,23 @@
 /* Agenda ID Seven - service worker (cache offline)
+   [V64.3] REGRA FINAL DAS NOTIFICAÇÕES DE COMPROMISSO. Mudanças:
+   1. index.html: COMPROMISSO/AGENDA NÃO dispara mais push imediato na criação.
+      Antes o app mandava "📅 Novo compromisso..." na hora de salvar — errado.
+      Agora compromisso só notifica via lembrete (eventStart - reminderMinutes).
+      Tarefas, chat e comentários/menções CONTINUAM com push imediato.
+   2. index.html: lembrete nunca dispara retroativo. Se reminderAt já passou
+      (compromisso criado faltando menos que a antecedência), só loga e não envia.
+      Logs [REMINDER] eventStart/reminderAt/now/skipped/sent adicionados.
+   3. index.html: reminderMinutes agora é salvo em users/{uid}.reminderMinutes
+      no Firestore (não só localStorage), pro Cloudflare Worker conseguir ler.
+   4. index.html: DEDUP DE TOKEN POR DISPOSITIVO. Cada token ganha metadados
+      (deviceId, platform, createdAt, lastSeenAt). Ao registrar novo token do
+      mesmo deviceId, o token antigo daquele aparelho é removido — acaba com a
+      duplicidade "Chrome antigo + PWA/TWA novo no mesmo celular". Diagnóstico
+      de tokens ativos na tela de Notificações.
+   5. cloudflare-worker.js: janela do cron reduzida — envia o lembrete só quando
+      now >= reminderAt AND now < reminderAt + 60s. Lê reminderMinutes do dono
+      (default 60). Dedup de tokens por deviceId via fcmTokenMeta.
+   sw.js: cache bump (idseven-v64-2 → idseven-v64-3).
    [V64.2] FIX FOLLOW-UP DA V64.1 — pré-validação por cache local removida no
    fluxo de criação de novo compromisso. Bug detectado em auditoria pós-V64.1:
    o handler de "criar evento" contava me.fcmTokens em CACHE LOCAL antes de
@@ -53,7 +72,7 @@
    AGORA: SÓ intercepta same-origin (a própria app). Tudo que não é da app
    passa direto pra rede sem cachear.
 */
-var CACHE = "idseven-v64-2";
+var CACHE = "idseven-v64-3";
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
