@@ -24,13 +24,26 @@ android {
         versionName "0.1.0"
     }
 
+    signingConfigs {
+        // Assinatura de TESTE: usa o debug keystore (~/.android/debug.keystore).
+        // Permite gerar um APK release instalável p/ teste. NÃO usar para publicar na Play.
+        debugtest {
+            storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
     buildTypes {
         debug {
             // Usa o debug keystore padrão do Android SDK (~/.android/debug.keystore),
             // gerado automaticamente — sem precisar de binário no repo.
         }
         release {
-            // Configure sua chave de release antes de publicar na Play Store.
+            // APK release STANDALONE (bundle JS/Hermes embutido). Assinado com a chave de
+            // teste acima só para instalar/testar no celular sem Metro/PC.
+            signingConfig signingConfigs.debugtest
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
