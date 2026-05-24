@@ -1,8 +1,20 @@
 <resources>
     <color name="bg">#0b0c0f</color>
+    <color name="surface">#16181d</color>
+    <color name="line">#23262d</color>
     <color name="ink">#FFFFFF</color>
     <color name="inkSoft">#9aa0ac</color>
     <color name="inkFaint">#6b7280</color>
     <color name="accent">#5b6cff</color>
     <color name="ic_launcher_background">#0b0c0f</color>
+
+    <!-- Cores por tipo de compromisso (iguais ao PWA) -->
+    <color name="t_grav">#ef4444</color>
+    <color name="t_foto">#f59e0b</color>
+    <color name="t_reuni">#60a5fa</color>
+    <color name="t_edicao">#a78bfa</color>
+    <color name="t_outro">#9ca3af</color>
+
+    <color name="late">#f87171</color>
+    <color name="ok">#34d399</color>
 </resources>

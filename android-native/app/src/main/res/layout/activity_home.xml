@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <FrameLayout
+        android:id="@+id/content"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@color/surface"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <TextView android:id="@+id/tabHoje" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Hoje" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
+        <TextView android:id="@+id/tabAgenda" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Agenda" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
+        <TextView android:id="@+id/tabQuadro" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Quadro" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
+        <TextView android:id="@+id/tabNovo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="＋ Novo" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/accent" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
+        <TextView android:id="@+id/tabEquipe" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Equipe" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
+        <TextView android:id="@+id/tabChat" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Chat" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
+        <TextView android:id="@+id/tabPerfil" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Perfil" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
+    </LinearLayout>
+</LinearLayout>

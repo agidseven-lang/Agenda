@@ -29,7 +29,11 @@
             android:exported="false" />
 
         <activity
-            android:name=".AgendaActivity"
+            android:name=".HomeActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".EventDetailActivity"
             android:exported="false" />
 
         <activity

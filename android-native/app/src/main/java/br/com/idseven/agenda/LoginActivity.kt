@@ -29,7 +29,7 @@ class LoginActivity : AppCompatActivity() {
                     when (result) {
                         is AuthRepo.Result.Ok -> {
                             Session.save(this, result.uid, result.name)
-                            startActivity(Intent(this, AgendaActivity::class.java))
+                            startActivity(Intent(this, HomeActivity::class.java))
                             finish()
                         }
                         is AuthRepo.Result.Err -> {
