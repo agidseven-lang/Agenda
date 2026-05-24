@@ -4386,7 +4386,7 @@
       <div class="fld"><label>Senha</label><input id="rPass" type="password" placeholder="crie uma senha"></div>
       <button class="big-btn" id="doReg">Enviar cadastro para aprovação</button>
     </div>
-    <div class="ver">versão 64.3 · build regra-lembrete-1h-sem-push-imediato</div>
+    <div class="ver">versão 64.6 · build notificacoes-ricas-whatsapp-style</div>
     <div class="ver-credits">Desenvolvido por <b>ID Seven</b> · Miercohévisk Niheb F N Carlôto</div>
   </section>
 
@@ -5981,12 +5981,7 @@ async function sendChatMessage(){
       try{
         /* Se o outro foi mencionado: notif "premium" com tag/preview de menção */
         var wasMentioned = mentionedIds.indexOf(other) >= 0;
-        sendPushToUsers([other], {
-          title: (wasMentioned ? "@ " : "💬 ") + (me.name || "Mensagem"),
-          body: (wasMentioned ? "te mencionou: " : "") + text.slice(0, 140),
-          tag: "chat-" + currentChatId,
-          url: "/?go=chat&with=" + me.id
-        });
+        sendPushToUsers([other], buildNotificationPayload("chat", { sender: me, senderId: me.id, mentioned: wasMentioned, text: text, chatId: currentChatId }));
       }catch(_){}
     }
   }catch(e){
@@ -7132,12 +7127,8 @@ function scheduleEventReminders(){
         var ownerIdRem = eventOwnerId(e);
         if(ownerIdRem && ownerIdRem !== me.id){
           console.log("[REMINDER] sent: ownerId=" + ownerIdRem + " event=" + e.id);
-          sendPushToUsers([ownerIdRem], {
-            title: titleLine,
-            body: bodyLine,
-            tag: "reminder-" + e.id,
-            url: "?openEvent=" + e.id
-          });
+          var ownerUserRem = (users||[]).find(function(x){ return x.id === ownerIdRem; }) || null;
+          sendPushToUsers([ownerIdRem], buildNotificationPayload("reminder", { event: e, owner: ownerUserRem, minutes: minBefore }));
         }
       }catch(err){ console.warn("[scheduleEventReminders] push fail:", err); }
     }, trigger - now);
@@ -7866,6 +7857,104 @@ async function teardownPushNotifications(){
    tokens antigos do cache em memória.
 
    Tolerante a falha — se Worker offline, não quebra nada. */
+/* [V64.6] HELPER CENTRAL DE PAYLOAD DE NOTIFICAÇÃO RICA (Web Push / FCM).
+   Retorna { title, body, data:{ tag, url, icon, badge, image?, renotify } }.
+   - icon = foto (avatar ImageKit https) do usuário relevante; senão ícone do app.
+   - URLs de imagem sempre HTTPS públicas (ImageKit ou ícone do app no domínio).
+   - tag única por tipo+ID evita empilhar; renotify re-alerta com info nova.
+   NÃO muda regra de lembrete nem de push imediato — só padroniza o conteúdo. */
+var APP_ICON_URL = "https://agendaidseven.com.br/icon-192.png";
+var APP_BADGE_URL = "https://agendaidseven.com.br/icon-192.png";
+function _notifPhoto(u){
+  try{ var p = u && safePhoto(u.photo); return p ? p : APP_ICON_URL; }catch(_){ return APP_ICON_URL; }
+}
+function _notifShortName(n){
+  var p = (n||"").trim().split(/\s+/);
+  return p.length > 1 ? (p[0] + " " + p[p.length-1]) : (p[0] || "");
+}
+function buildNotificationPayload(type, d){
+  d = d || {};
+  var out = { title: "ID Seven", body: "", data: { icon: APP_ICON_URL, badge: APP_BADGE_URL, renotify: true } };
+  switch(type){
+    case "reminder": {
+      var e = d.event || {}, owner = d.owner || null, typ = (TYPES[e.type] || TYPES.outro);
+      var mins = d.minutes || 60;
+      out.title = "⏰ " + (typ ? typ.label : "Compromisso") + " em " + mins + " min";
+      var pr = [];
+      if(e.client) pr.push("Cliente: " + e.client);
+      var hor = e.start ? (e.end ? (e.start + "–" + e.end) : e.start) : "";
+      if(hor) pr.push(hor);
+      if(owner && owner.name) pr.push("Responsável: " + _notifShortName(owner.name));
+      if(e.location) pr.push(e.location);
+      out.body = pr.join(" • ") || (e.title || "Compromisso");
+      out.data.icon = _notifPhoto(owner);
+      out.data.tag = "reminder-" + e.id;
+      out.data.eventId = e.id;
+      out.data.url = "?openEvent=" + e.id;
+      break;
+    }
+    case "event-start": {
+      var es = d.event || {}, ac = d.actor || null, ts = (TYPES[es.type] || TYPES.outro);
+      out.title = "▶️ Compromisso iniciado";
+      var ps = [];
+      if(es.client) ps.push(es.client);
+      if(ts) ps.push(ts.label);
+      if(ac && ac.name) ps.push("iniciado por " + _notifShortName(ac.name));
+      out.body = ps.join(" • ") || (es.title || "Compromisso");
+      out.data.icon = _notifPhoto(ac || d.owner);
+      out.data.tag = "evstart-" + es.id;
+      out.data.eventId = es.id;
+      out.data.url = "?openEvent=" + es.id;
+      break;
+    }
+    case "event-done": {
+      var ed = d.event || {}, ad = d.actor || null, td = (TYPES[ed.type] || TYPES.outro);
+      out.title = "✅ Compromisso finalizado";
+      var pd = [];
+      if(ed.client) pd.push(ed.client);
+      if(td) pd.push(td.label);
+      if(ad && ad.name) pd.push("finalizado por " + _notifShortName(ad.name));
+      out.body = pd.join(" • ") || (ed.title || "Compromisso");
+      out.data.icon = _notifPhoto(ad || d.owner);
+      out.data.tag = "evdone-" + ed.id;
+      out.data.eventId = ed.id;
+      out.data.url = "?openEvent=" + ed.id;
+      break;
+    }
+    case "task": {
+      var t = d.task || {}, asg = d.assignee || null;
+      out.title = "📌 Nova tarefa atribuída";
+      var pt = [];
+      if(t.title) pt.push(t.title);
+      if(t.assignee) pt.push(_notifShortName(t.assignee));
+      if(t.due) pt.push("prazo " + t.due);
+      out.body = pt.join(" • ") || (t.client || "Tarefa");
+      out.data.icon = _notifPhoto(asg);
+      out.data.tag = "asg-" + t.id;
+      out.data.taskId = t.id;
+      out.data.url = "?openTask=" + t.id;
+      break;
+    }
+    case "chat": {
+      var sd = d.sender || null, mn = !!d.mentioned;
+      out.title = (mn ? "@ " : "💬 ") + "Nova mensagem de " + _notifShortName((sd && sd.name) || "alguém");
+      out.body = (mn ? "te mencionou: " : "") + String(d.text || "").slice(0, 140);
+      out.data.icon = _notifPhoto(sd);
+      out.data.tag = "chat-" + (d.chatId || "");
+      out.data.url = "/?go=chat&with=" + (d.senderId || "");
+      break;
+    }
+    default: {
+      out.title = d.title || "ID Seven";
+      out.body = d.body || "";
+      if(d.tag) out.data.tag = d.tag;
+      if(d.url) out.data.url = d.url;
+      if(d.icon) out.data.icon = d.icon;
+    }
+  }
+  return out;
+}
+
 async function sendPushToUsers(userIds, payload){
   /* [V63.13] Logging silencioso pra console (sem alert popup em produção).
      Push é best-effort — se falhar, não devemos disturbar o usuário com modal. */
@@ -13920,11 +14009,7 @@ $("taskSave").onclick=async()=>{
         if(newAss && newAss !== prevAss && newAss !== ((me.name||"").trim().toLowerCase())){
           var assUser = users.find(function(x){ return ((x.name||"").trim().toLowerCase()) === newAss; });
           if(assUser){
-            sendPushToUsers(assUser.id, {
-              title: "🎯 Nova tarefa pra você",
-              body: (data.client?data.client+" · ":"") + (data.title||"Sem título"),
-              data: { taskId: editTaskId, tag: "asg-"+editTaskId }
-            });
+            sendPushToUsers(assUser.id, buildNotificationPayload("task", { task: Object.assign({ id: editTaskId }, data), assignee: assUser }));
           }
         }
       }catch(_){}
@@ -13943,11 +14028,7 @@ $("taskSave").onclick=async()=>{
         if(newAss2 && newAss2 !== meNm){
           var assUser2 = users.find(function(x){ return ((x.name||"").trim().toLowerCase()) === newAss2; });
           if(assUser2){
-            sendPushToUsers(assUser2.id, {
-              title: "🎯 Nova tarefa pra você",
-              body: (data.client?data.client+" · ":"") + (data.title||"Sem título"),
-              data: { taskId: docRef.id, tag: "asg-"+docRef.id }
-            });
+            sendPushToUsers(assUser2.id, buildNotificationPayload("task", { task: Object.assign({ id: docRef.id }, data), assignee: assUser2 }));
           }
         }
       }catch(_){}
@@ -15191,7 +15272,32 @@ $("saveBtn").onclick=async()=>{
     start:$("fStart").value,end:$("fEnd").value,owner:val("fOwner"),
     ownerId:ownEl?ownEl.id:null,notes:val("fNotes")};
   try{
-    if(editingId){await db.collection("events").doc(editingId).update(data);clearEventAlarms(editingId);toast("Atualizado para a equipe");}
+    if(editingId){
+      /* [V64.5] REAGENDAMENTO: se a data/horário/responsável/antecedência mudou,
+         limpamos o estado de lembrete no Firestore (reminderSentAt e afins). Sem isso,
+         o Cloudflare Worker veria reminderSentAt preenchido e NÃO reenviaria o lembrete
+         no novo horário. Editar só título/cliente/local/notas NÃO limpa (preserva). */
+      try{
+        var oldEv = (events||[]).find(function(x){ return x.id === editingId; }) || {};
+        var reminderRelevantChanged =
+             (oldEv.date||"")      !== (data.date||"")
+          || (oldEv.start||"")     !== (data.start||"")
+          || (oldEv.end||"")       !== (data.end||"")
+          || (oldEv.ownerId||null) !== (data.ownerId||null)
+          || (data.reminderMinutes !== undefined && (oldEv.reminderMinutes||null) !== (data.reminderMinutes||null));
+        if(reminderRelevantChanged){
+          var _delFV = firebase.firestore.FieldValue.delete();
+          data.reminderSentAt = _delFV;
+          data.reminderSentStatus = _delFV;
+          data.reminderError = _delFV;
+          data.reminderLastAttemptAt = _delFV;
+          console.log("[EVENT-EDIT] reagendamento detectado — reminderSentAt/Status/Error/LastAttempt removidos (id=" + editingId + ")");
+        } else {
+          console.log("[EVENT-EDIT] edição sem mudança de agenda — reminderSentAt preservado (id=" + editingId + ")");
+        }
+      }catch(eClr){ try{ console.warn("[EVENT-EDIT] falha ao avaliar limpeza de reminderSentAt:", eClr && eClr.message); }catch(_){} }
+      await db.collection("events").doc(editingId).update(data);clearEventAlarms(editingId);toast("Atualizado para a equipe");
+    }
     else{
       data.by=me.id;data.done=false;data.createdAt=Date.now();
       var newEv = await db.collection("events").add(data);
@@ -15263,18 +15369,9 @@ function openDetail(id){
       toast("Agenda iniciada — contando o tempo");
       /* [V63.86] Push pra TODOS exceto quem iniciou */
       try{
-        var typIn = TYPES[e.type] || TYPES.outro;
-        var titleIn = "▶ " + (me.name||"Alguém") + " iniciou: " + (typIn?typIn.label:"compromisso");
-        var bodyIn = (e.title || e.client || "Compromisso");
-        if(e.client && e.title) bodyIn = e.title + " · " + e.client;
         var rcIn = pushAllExcept(me.id);
         if(rcIn.length > 0){
-          sendPushToUsers(rcIn, {
-            title: titleIn,
-            body: bodyIn,
-            tag: "evstart-" + id,
-            url: "?openEvent=" + id
-          });
+          sendPushToUsers(rcIn, buildNotificationPayload("event-start", { event: e, actor: me }));
         }
       }catch(_){}
       busy=false;
@@ -15289,18 +15386,9 @@ function openDetail(id){
         toast("Finalizado");
         /* [V63.86] Push pra TODOS exceto quem finalizou */
         try{
-          var typFn = TYPES[e.type] || TYPES.outro;
-          var titleFn = "✅ " + (me.name||"Alguém") + " finalizou: " + (typFn?typFn.label:"compromisso");
-          var bodyFn = (e.title || e.client || "Compromisso");
-          if(e.client && e.title) bodyFn = e.title + " · " + e.client;
           var rcFn = pushAllExcept(me.id);
           if(rcFn.length > 0){
-            sendPushToUsers(rcFn, {
-              title: titleFn,
-              body: bodyFn,
-              tag: "evdone-" + id,
-              url: "?openEvent=" + id
-            });
+            sendPushToUsers(rcFn, buildNotificationPayload("event-done", { event: e, actor: me }));
           }
         }catch(_){}
         closeSheets();

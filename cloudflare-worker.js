@@ -122,9 +122,11 @@ async function sendToTokens(env, accessToken, tokens, msg) {
           notification: {
             title: msg.title,
             body: msg.body,
-            icon: "/icon-192.png",
-            badge: "/icon-192.png",
+            icon: (msg.data && msg.data.icon) || "https://agendaidseven.com.br/icon-192.png",
+            badge: (msg.data && msg.data.badge) || "https://agendaidseven.com.br/icon-192.png",
+            image: (msg.data && msg.data.image) || undefined,
             tag: (msg.data && msg.data.tag) || undefined,
+            renotify: (msg.data && String(msg.data.renotify) === "true") ? true : undefined,
           },
         },
       },

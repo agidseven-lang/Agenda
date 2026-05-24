@@ -44,11 +44,14 @@ messaging.onBackgroundMessage(function(payload){
     var n = payload.notification || {};
     var d = payload.data || {};
     var title = n.title || "ID Seven";
+    /* [V64.6] notificação rica: usa icon (avatar), image e badge vindos do data */
     var options = {
       body: n.body || "",
-      icon: n.icon || "icon-192.png",
-      badge: "icon-192.png",
+      icon: d.icon || n.icon || "icon-192.png",
+      badge: d.badge || "icon-192.png",
+      image: d.image || undefined,
       tag: d.tag || ("push-" + Date.now()),
+      renotify: String(d.renotify) === "true",
       data: d,
       requireInteraction: false,
       vibrate: [200, 100, 200]
