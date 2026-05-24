@@ -51,15 +51,15 @@ jobs:
           echo "$GS_B64" | base64 -d > android-native/app/google-services.json
           echo "google-services.json restaurado ($(wc -c < android-native/app/google-services.json) bytes)."
 
-      - name: gradlew assembleRelease
+      - name: gradlew clean assembleRelease
         working-directory: android-native
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK release
+      - name: Upload APK release (nome único por commit)
         uses: actions/upload-artifact@v4
         with:
-          name: app-android-native-release-apk
+          name: app-android-native-release-${{ github.sha }}
           path: android-native/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

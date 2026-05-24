@@ -85,7 +85,7 @@ class HojeFragment : Fragment() {
         root.removeAllViews()
         // MARCADOR TEMPORÁRIO de verificação de versão (remover após aprovação).
         val mark = TextView(requireContext())
-        mark.text = "Hoje Kotlin v2"
+        mark.text = "Hoje Kotlin v3"
         mark.setTextColor(Color.parseColor("#5b6cff")); mark.textSize = 11f
         mark.setTypeface(mark.typeface, android.graphics.Typeface.BOLD)
         mark.setPadding(0, 0, 0, dp(8))

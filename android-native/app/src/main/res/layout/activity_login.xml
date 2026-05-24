@@ -118,5 +118,14 @@
             android:textSize="10sp"
             android:alpha="0.6"
             android:gravity="center" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="build: 0.2.1-hoje-v3"
+            android:textColor="@color/accent"
+            android:textSize="10sp"
+            android:gravity="center" />
     </LinearLayout>
 </ScrollView>
