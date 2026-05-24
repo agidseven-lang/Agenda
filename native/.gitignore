@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# React Native / Metro
+.bundle/
+*.jsbundle
+metro-cache/
+
+# Android build
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+*.keystore
+!debug.keystore
+
+# iOS (futuro)
+ios/Pods/
+ios/build/
+
+# === Firebase: NUNCA commitar (config do projeto) ===
+android/app/google-services.json
+ios/GoogleService-Info.plist
+
+# Logs / OS
+*.log
+.DS_Store
