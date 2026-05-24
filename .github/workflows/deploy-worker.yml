@@ -1,0 +1,33 @@
+# Deploy manual do Worker `idseven-push` no Cloudflare.
+# - Roda SOMENTE quando acionado manualmente (workflow_dispatch). Nunca em push.
+# - Usa o wrangler.toml do repositorio (name, vars plaintext, cron * * * * *).
+# - Credenciais vem dos SECRETS do GitHub (nunca escritas neste arquivo).
+# - `wrangler deploy` publica o script + vars + cron. NAO altera os secrets do
+#   Worker (FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY, IMAGEKIT_PRIVATE_KEY permanecem).
+name: Deploy Worker (idseven-push)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: wrangler deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
