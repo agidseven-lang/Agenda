@@ -3,6 +3,8 @@ package br.com.idseven.agenda
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -12,59 +14,57 @@ import br.com.idseven.agenda.data.Session
 
 class HomeActivity : AppCompatActivity() {
 
-    private var current = "agenda"
-    private val tabs by lazy {
-        mapOf(
-            "hoje" to findViewById<TextView>(R.id.tabHoje),
-            "agenda" to findViewById<TextView>(R.id.tabAgenda),
-            "board" to findViewById<TextView>(R.id.tabQuadro),
-            "team" to findViewById<TextView>(R.id.tabEquipe),
-            "chat" to findViewById<TextView>(R.id.tabChat),
-            "profile" to findViewById<TextView>(R.id.tabPerfil)
+    private var current = "hoje"
+    private val WHITE = Color.parseColor("#f1f2f4")
+    private val SOFT = Color.parseColor("#9ba0ab")
+
+    private data class Tab(val container: Int, val ico: Int, val lbl: Int)
+    private val tabDefs by lazy {
+        linkedMapOf(
+            "hoje" to Tab(R.id.navHoje, R.id.icoHoje, R.id.lblHoje),
+            "agenda" to Tab(R.id.navAgenda, R.id.icoAgenda, R.id.lblAgenda),
+            "board" to Tab(R.id.navQuadro, R.id.icoQuadro, R.id.lblQuadro),
+            "team" to Tab(R.id.navEquipe, R.id.icoEquipe, R.id.lblEquipe),
+            "chat" to Tab(R.id.navChat, R.id.icoChat, R.id.lblChat),
+            "profile" to Tab(R.id.navPerfil, R.id.icoPerfil, R.id.lblPerfil)
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!Session.isLoggedIn(this)) {
-            startActivity(Intent(this, MainActivity::class.java)); finish(); return
-        }
+        if (!Session.isLoggedIn(this)) { startActivity(Intent(this, MainActivity::class.java)); finish(); return }
         setContentView(R.layout.activity_home)
 
-        tabs.forEach { (key, view) -> view.setOnClickListener { select(key) } }
-        findViewById<TextView>(R.id.tabNovo).setOnClickListener { onNovo() }
+        tabDefs.forEach { (key, t) -> findViewById<LinearLayout>(t.container).setOnClickListener { select(key) } }
+        findViewById<LinearLayout>(R.id.navNovo).setOnClickListener { onNovo() }
 
-        select("agenda")
+        select("hoje")
     }
 
     private fun onNovo() {
         if (!Perm.canManage(Session.name(this))) {
-            Toast.makeText(
-                this,
-                "Apenas administradores criam compromissos. Você recebe e executa as demandas.",
-                Toast.LENGTH_LONG
-            ).show()
+            Toast.makeText(this, "Apenas administradores criam compromissos. Você recebe e executa as demandas.", Toast.LENGTH_LONG).show()
             return
         }
-        if (current == "board") {
-            Toast.makeText(this, "Novo no Quadro entra numa fase seguinte.", Toast.LENGTH_SHORT).show()
-        } else {
-            startActivity(Intent(this, EventFormActivity::class.java))
-        }
+        if (current == "board") Toast.makeText(this, "Novo no Quadro entra numa fase seguinte.", Toast.LENGTH_SHORT).show()
+        else startActivity(Intent(this, EventFormActivity::class.java))
     }
 
     private fun select(key: String) {
         current = key
-        tabs.forEach { (k, v) ->
-            v.setTextColor(if (k == key) Color.WHITE else Color.parseColor("#9aa0ac"))
+        tabDefs.forEach { (k, t) ->
+            val color = if (k == key) WHITE else SOFT
+            findViewById<ImageView>(t.ico).setColorFilter(color)
+            findViewById<TextView>(t.lbl).setTextColor(color)
         }
         val frag: Fragment = when (key) {
+            "hoje" -> HojeFragment()
             "agenda" -> AgendaFragment()
             "profile" -> PerfilFragment()
             "team" -> PlaceholderFragment.of("Equipe", "A tela de Equipe entra numa fase seguinte.")
             "board" -> PlaceholderFragment.of("Quadro", "O Quadro (tarefas) entra numa fase seguinte.")
             "chat" -> PlaceholderFragment.of("Chat", "O Chat entra numa fase seguinte.")
-            else -> PlaceholderFragment.of("Hoje", "A tela Hoje entra numa fase seguinte.")
+            else -> HojeFragment()
         }
         supportFragmentManager.beginTransaction().replace(R.id.content, frag).commit()
     }

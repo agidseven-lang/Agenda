@@ -16,15 +16,43 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="@color/surface"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingTop="7dp"
+        android:paddingBottom="7dp"
+        android:gravity="center_vertical">
 
-        <TextView android:id="@+id/tabHoje" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Hoje" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
-        <TextView android:id="@+id/tabAgenda" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Agenda" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
-        <TextView android:id="@+id/tabQuadro" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Quadro" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
-        <TextView android:id="@+id/tabNovo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="＋ Novo" android:textSize="12sp" android:textStyle="bold" android:textColor="@color/accent" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
-        <TextView android:id="@+id/tabEquipe" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Equipe" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
-        <TextView android:id="@+id/tabChat" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Chat" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
-        <TextView android:id="@+id/tabPerfil" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Perfil" android:textSize="11sp" android:textColor="@color/inkSoft" android:clickable="true" android:focusable="true" android:paddingTop="6dp" android:paddingBottom="6dp" />
+        <LinearLayout android:id="@+id/navHoje" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/icoHoje" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_hoje" />
+            <TextView android:id="@+id/lblHoje" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Hoje" android:textSize="10sp" android:layout_marginTop="3dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navAgenda" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/icoAgenda" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_agenda" />
+            <TextView android:id="@+id/lblAgenda" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Agenda" android:textSize="10sp" android:layout_marginTop="3dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navQuadro" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/icoQuadro" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_quadro" />
+            <TextView android:id="@+id/lblQuadro" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Quadro" android:textSize="10sp" android:layout_marginTop="3dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navNovo" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:layout_width="44dp" android:layout_height="44dp" android:src="@drawable/ic_novo" android:background="@drawable/fab_bg" android:padding="10dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Novo" android:textSize="10sp" android:textColor="@color/accent" android:layout_marginTop="3dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navEquipe" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/icoEquipe" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_equipe" />
+            <TextView android:id="@+id/lblEquipe" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Equipe" android:textSize="10sp" android:layout_marginTop="3dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navChat" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/icoChat" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_chat" />
+            <TextView android:id="@+id/lblChat" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Chat" android:textSize="10sp" android:layout_marginTop="3dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navPerfil" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/icoPerfil" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_perfil" />
+            <TextView android:id="@+id/lblPerfil" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Perfil" android:textSize="10sp" android:layout_marginTop="3dp" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
