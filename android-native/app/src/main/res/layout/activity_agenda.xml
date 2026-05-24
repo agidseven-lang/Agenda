@@ -3,34 +3,61 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center"
     android:background="@color/bg"
-    android:padding="28dp">
+    android:padding="20dp">
 
     <TextView
         android:id="@+id/txtOla"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Olá"
         android:textColor="@color/ink"
-        android:textSize="24sp"
+        android:textSize="22sp"
         android:textStyle="bold" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="Login conectado ao Firestore. A agenda (lista e criação) entra na Fase 3."
-        android:textColor="@color/inkSoft"
-        android:textSize="14sp"
-        android:gravity="center" />
-
-    <Button
-        android:id="@+id/btnSair"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="36dp"
-        android:text="Sair"
-        android:textColor="@color/ink"
-        android:backgroundTint="@color/accent" />
+        android:orientation="horizontal"
+        android:layout_marginTop="14dp">
+
+        <Button
+            android:id="@+id/btnNovo"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Novo compromisso"
+            android:textColor="@color/ink"
+            android:backgroundTint="@color/accent" />
+
+        <Button
+            android:id="@+id/btnSair"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:text="Sair"
+            android:textColor="@color/inkSoft"
+            android:backgroundTint="#16181d" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/txtErro"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text=""
+        android:textColor="#ff6b6b"
+        android:textSize="13sp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="12dp">
+
+        <LinearLayout
+            android:id="@+id/listaEventos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
 </LinearLayout>

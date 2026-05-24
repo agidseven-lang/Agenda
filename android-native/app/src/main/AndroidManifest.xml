@@ -31,5 +31,9 @@
         <activity
             android:name=".AgendaActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".EventFormActivity"
+            android:exported="false" />
     </application>
 </manifest>
