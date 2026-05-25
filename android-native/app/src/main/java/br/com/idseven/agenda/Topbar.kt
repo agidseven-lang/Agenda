@@ -34,8 +34,9 @@ object Topbar {
     private val GREEN = Color.parseColor("#34d399")
     private val avatarCache = HashMap<String, Bitmap>()
 
-    fun build(f: Fragment, photoUrl: String?, colorKey: String?): View {
-        val ctx = f.requireContext()
+    fun build(f: Fragment, photoUrl: String?, colorKey: String?): View = build(f.requireContext(), photoUrl, colorKey)
+
+    fun build(ctx: Context, photoUrl: String?, colorKey: String?): View {
         val row = LinearLayout(ctx); row.orientation = LinearLayout.HORIZONTAL; row.gravity = Gravity.CENTER_VERTICAL
         val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.topMargin = dp(ctx, 4); lp.bottomMargin = dp(ctx, 18); row.layoutParams = lp
 
@@ -57,15 +58,17 @@ object Topbar {
         row.addView(iconCircle(ctx, R.drawable.ic_gear))
 
         val ring = UserColor.of(Session.uid(ctx), colorKey)
-        val av = avatar(f, photoUrl, ring, Session.name(ctx), dp(ctx, 44), dp(ctx, 2))
+        val av = avatar(ctx, photoUrl, ring, Session.name(ctx), dp(ctx, 44), dp(ctx, 2))
         (av.layoutParams as LinearLayout.LayoutParams).leftMargin = dp(ctx, 8)
         row.addView(av)
         return row
     }
 
+    fun avatar(f: Fragment, url: String?, ringColor: Int, name: String?, sizePx: Int, ringPx: Int): View =
+        avatar(f.requireContext(), url, ringColor, name, sizePx, ringPx)
+
     // Avatar circular com anel colorido. Carrega foto (http ou data: base64) com fallback de iniciais.
-    fun avatar(f: Fragment, url: String?, ringColor: Int, name: String?, sizePx: Int, ringPx: Int): View {
-        val ctx = f.requireContext()
+    fun avatar(ctx: Context, url: String?, ringColor: Int, name: String?, sizePx: Int, ringPx: Int): View {
         val box = FrameLayout(ctx)
         val ring = GradientDrawable(); ring.shape = GradientDrawable.OVAL; ring.setColor(ringColor); box.background = ring
         box.setPadding(ringPx, ringPx, ringPx, ringPx)
@@ -73,7 +76,7 @@ object Topbar {
         val img = ImageView(ctx); img.scaleType = ImageView.ScaleType.CENTER_CROP
         img.layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         box.addView(img)
-        loadAvatar(f, img, url, sizePx - ringPx * 2, ringColor, UserColor.initials(name))
+        loadAvatar(img, url, sizePx - ringPx * 2, ringColor, UserColor.initials(name))
         return box
     }
 
@@ -102,7 +105,7 @@ object Topbar {
         return box
     }
 
-    private fun loadAvatar(f: Fragment, img: ImageView, url: String?, sizePx: Int, ringColor: Int, initials: String) {
+    private fun loadAvatar(img: ImageView, url: String?, sizePx: Int, ringColor: Int, initials: String) {
         img.setImageBitmap(initialsBmp(sizePx, ringColor, initials))
         if (url.isNullOrBlank()) return
         avatarCache[url]?.let { img.setImageBitmap(it); return }
@@ -119,7 +122,7 @@ object Topbar {
                 }
                 if (bmp != null) {
                     val circ = circleBmp(bmp, sizePx); avatarCache[url] = circ
-                    if (f.isAdded) f.requireActivity().runOnUiThread { img.setImageBitmap(circ) }
+                    img.post { img.setImageBitmap(circ) }
                 }
             } catch (_: Exception) { }
         }.start()
