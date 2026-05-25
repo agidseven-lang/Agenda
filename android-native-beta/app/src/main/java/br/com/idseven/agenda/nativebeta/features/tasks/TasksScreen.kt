@@ -1,28 +1,31 @@
 package br.com.idseven.agenda.nativebeta.features.tasks
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,44 +44,44 @@ import br.com.idseven.agenda.nativebeta.domain.TaskStatus
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 
 @Composable
-fun TasksScreen(tasksState: UiList<TaskItem>, users: List<UserLite>) {
+fun TasksScreen(tasksState: UiList<TaskItem>, users: List<UserLite>, onTaskClick: (String) -> Unit) {
     if (tasksState.isLoading) { LoadingState(); return }
     val tasks = tasksState.itemsOrEmpty()
     if (tasks.isEmpty()) {
-        EmptyState("Sem tarefas", "O gerenciador de tarefas aparece aqui em tempo real", Icons.Outlined.Checklist)
+        EmptyState("Sem tarefas", "O Kanban da equipe aparece aqui em tempo real", Icons.Outlined.Checklist)
         return
     }
-    val byStatus = TaskStatus.COLUMNS.associateWith { st -> tasks.filter { (it.status ?: "afazer") == st } }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+    Row(
+        modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(16.dp),
     ) {
         TaskStatus.COLUMNS.forEach { st ->
-            val list = byStatus[st] ?: emptyList()
-            item(key = "h_$st") { StatusHeader(TaskStatus.label(st), TaskStatus.color(st), list.size) }
-            items(list, key = { it.id }) { TaskCard(it) }
+            val list = tasks.filter { (it.status ?: "afazer") == st }
+            Column(Modifier.width(300.dp).fillMaxHeight().padding(end = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 10.dp)) {
+                    Box(Modifier.size(9.dp).clip(CircleShape).background(TaskStatus.color(st)))
+                    Spacer(Modifier.width(8.dp))
+                    Text(TaskStatus.label(st), color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(6.dp))
+                    Text("(${list.size})", color = Tokens.Faint, fontSize = 12.sp)
+                }
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    list.forEach { task -> TaskCard(task) { onTaskClick(task.id) } }
+                    Spacer(Modifier.height(24.dp))
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun StatusHeader(label: String, color: Color, count: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 16.dp, bottom = 10.dp)) {
-        Box(Modifier.size(9.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(8.dp))
-        Text(label, color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.width(6.dp))
-        Text("($count)", color = Tokens.Faint, fontSize = 12.sp)
-    }
-}
-
-@Composable
-private fun TaskCard(task: TaskItem) {
+fun TaskCard(task: TaskItem, onClick: () -> Unit) {
     val sector = Sectors.of(task.sector)
     val checkDone = task.checklist.count { it.d }
     Column(
         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
-            .clip(RoundedCornerShape(14.dp)).background(Tokens.Surface).padding(14.dp),
+            .clip(RoundedCornerShape(14.dp)).background(Tokens.Surface)
+            .border(1.dp, Tokens.Line, RoundedCornerShape(14.dp))
+            .clickable { onClick() }.padding(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (task.priority) {

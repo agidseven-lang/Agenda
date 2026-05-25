@@ -37,6 +37,8 @@ import br.com.idseven.agenda.nativebeta.features.dashboard.DashboardScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventDetailScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventFormScreen
 import br.com.idseven.agenda.nativebeta.features.profile.ProfileScreen
+import br.com.idseven.agenda.nativebeta.features.tasks.TaskDetailScreen
+import br.com.idseven.agenda.nativebeta.features.tasks.TaskFormScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TasksScreen
 import br.com.idseven.agenda.nativebeta.features.team.TeamScreen
 
@@ -94,9 +96,14 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             }
         },
         floatingActionButton = {
-            if (route == "hoje" || route == "agenda") {
-                FloatingActionButton(onClick = { nav.navigate("eventForm") }, containerColor = Tokens.Accent, contentColor = Color.White) {
-                    Icon(Icons.Filled.Add, contentDescription = "Novo compromisso")
+            val target = when (route) {
+                "hoje", "agenda" -> "eventForm"
+                "tarefas" -> "taskForm"
+                else -> null
+            }
+            if (target != null) {
+                FloatingActionButton(onClick = { nav.navigate(target) }, containerColor = Tokens.Accent, contentColor = Color.White) {
+                    Icon(Icons.Filled.Add, contentDescription = "Novo")
                 }
             }
         },
@@ -104,7 +111,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         NavHost(nav, startDestination = "hoje", modifier = Modifier.padding(padding)) {
             composable("hoje") { DashboardScreen(eventsState, tasksState, users, session, onEventClick = { nav.navigate("event/$it") }) }
             composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
-            composable("tarefas") { TasksScreen(tasksState, users) }
+            composable("tarefas") { TasksScreen(tasksState, users, onTaskClick = { nav.navigate("task/$it") }) }
             composable("equipe") { TeamScreen(usersState) }
             composable("perfil") { ProfileScreen(currentUser, session, onLogout) }
             composable("event/{id}") { entry ->
@@ -122,6 +129,28 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                 arguments = listOf(navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null }),
             ) { entry ->
                 EventFormScreen(
+                    editId = entry.arguments?.getString("id"),
+                    users = users,
+                    currentUid = session.uid,
+                    onDone = { nav.popBackStack() },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable("task/{id}") { entry ->
+                TaskDetailScreen(
+                    id = entry.arguments?.getString("id") ?: "",
+                    users = users,
+                    canManage = canManage,
+                    currentUid = session.uid,
+                    onBack = { nav.popBackStack() },
+                    onEdit = { nav.navigate("taskForm?id=$it") },
+                )
+            }
+            composable(
+                route = "taskForm?id={id}",
+                arguments = listOf(navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null }),
+            ) { entry ->
+                TaskFormScreen(
                     editId = entry.arguments?.getString("id"),
                     users = users,
                     currentUid = session.uid,

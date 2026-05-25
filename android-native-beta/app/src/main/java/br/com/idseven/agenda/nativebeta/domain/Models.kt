@@ -42,11 +42,17 @@ data class TaskItem(
     val desc: String?,
     val status: String?,        // afazer | andamento | concluido
     val assignee: String?,
+    val link: String?,
     val priority: Boolean,
+    val startDate: String?,
+    val startTime: String?,
     val dueDate: String?,       // "YYYY-MM-DD"
     val dueTime: String?,       // "HH:MM"
     val by: String?,
     val createdAt: Long?,
+    val startedAt: Long?,
+    val doneAt: Long?,
+    val doneBy: String?,
     val checklist: List<ChecklistItem>,
 )
 
