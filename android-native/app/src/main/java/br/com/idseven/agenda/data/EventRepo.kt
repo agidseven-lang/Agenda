@@ -19,7 +19,8 @@ data class EventItem(
     val by: String?,
     val done: Boolean,
     val startedAt: Long?,
-    val doneAt: Long?
+    val doneAt: Long?,
+    val doneBy: String?
 )
 
 object EventRepo {
@@ -40,7 +41,8 @@ object EventRepo {
         by = d.getString("by"),
         done = d.getBoolean("done") ?: false,
         startedAt = d.getLong("startedAt"),
-        doneAt = d.getLong("doneAt")
+        doneAt = d.getLong("doneAt"),
+        doneBy = d.getString("doneBy")
     )
 
     fun listen(onData: (List<EventItem>) -> Unit, onError: (String) -> Unit): ListenerRegistration {
