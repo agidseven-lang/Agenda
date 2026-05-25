@@ -118,7 +118,7 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
         if (!listMode) {
             val dayEvents = (eventsByDay[selected] ?: emptyList()).sortedBy { it.start ?: "" }
             val iso = selected.toString()
-            LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
                 item("cal") {
                     HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().height(366.dp)) { page ->
                         val m = base.plusMonths((page - ANCHOR).toLong())
@@ -150,7 +150,7 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
                 }
             } else {
                 val groups = ordered.groupBy { it.date ?: "" }
-                LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)) {
+                LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
                     groups.forEach { (date, list) ->
                         item(key = "h_$date") {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 14.dp, bottom = 10.dp)) {

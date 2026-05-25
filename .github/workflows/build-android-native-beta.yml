@@ -60,6 +60,6 @@ jobs:
       - name: Upload APK release (nome único por versão + commit)
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.6-beta-calendar-pro-${{ github.sha }}
+          name: idseven-nativebeta-1.0.7-beta-calendar-fab-fix-${{ github.sha }}
           path: android-native-beta/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

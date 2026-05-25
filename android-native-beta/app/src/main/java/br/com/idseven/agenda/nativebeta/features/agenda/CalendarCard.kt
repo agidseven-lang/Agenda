@@ -81,37 +81,37 @@ fun CalendarCard(
 
 @Composable
 private fun DayCell(date: LocalDate, inMonth: Boolean, isToday: Boolean, isSelected: Boolean, events: List<EventItem>, modifier: Modifier, onClick: () -> Unit) {
+    val bg = when {
+        isSelected -> Tokens.Accent
+        isToday -> Tokens.Accent.copy(alpha = 0.14f)
+        inMonth -> Tokens.Surface2
+        else -> Color.Transparent
+    }
     val numColor = when {
-        isToday -> Color.White
+        isSelected -> Color.White
+        isToday -> Tokens.Accent
         !inMonth -> Tokens.Faint.copy(alpha = 0.4f)
         else -> Tokens.Ink
     }
     Column(
-        modifier = modifier.height(50.dp).clip(RoundedCornerShape(12.dp)).clickable { onClick() },
+        modifier = modifier.height(54.dp).padding(2.5.dp).clip(RoundedCornerShape(13.dp)).background(bg)
+            .then(if (isToday && !isSelected) Modifier.border(1.5.dp, Tokens.Accent, RoundedCornerShape(13.dp)) else Modifier)
+            .clickable { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Box(
-            modifier = Modifier.size(34.dp).clip(CircleShape)
-                .background(if (isToday) Tokens.Accent else Color.Transparent)
-                .then(if (isSelected && !isToday) Modifier.border(1.6.dp, Tokens.Accent, CircleShape) else Modifier),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("${date.dayOfMonth}", color = numColor, fontSize = 14.sp, fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Medium)
-        }
+        Text("${date.dayOfMonth}", color = numColor, fontSize = 14.sp, fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Medium)
         if (events.isNotEmpty() && inMonth) {
-            Spacer(Modifier.height(3.dp))
+            Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 events.take(3).forEach { e ->
-                    Box(Modifier.padding(horizontal = 1.dp).size(5.dp).clip(CircleShape).background(Types.of(e.type).color))
+                    Box(Modifier.padding(horizontal = 1.dp).size(5.dp).clip(CircleShape).background(if (isSelected) Color.White else Types.of(e.type).color))
                 }
                 if (events.size > 3) {
                     Spacer(Modifier.size(2.dp))
-                    Text("+${events.size - 3}", color = Tokens.Faint, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    Text("+${events.size - 3}", color = if (isSelected) Color.White else Tokens.Faint, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
             }
-        } else {
-            Spacer(Modifier.height(8.dp))
         }
     }
 }
