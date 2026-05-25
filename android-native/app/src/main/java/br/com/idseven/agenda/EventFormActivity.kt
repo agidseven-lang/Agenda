@@ -64,11 +64,30 @@ class EventFormActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         if (!Perm.canManage(Session.name(this))) { finish(); return }
         editId = intent.getStringExtra("id")
-        setContentView(buildUi())
-        if (Session.name(this) != null) ownerIn.setText(Session.name(this))
-        renderTypeGrid()
-        loadTeam()
-        editId?.let { prefill(it) }
+        try {
+            setContentView(buildUi())
+            if (Session.name(this) != null) ownerIn.setText(Session.name(this))
+            renderTypeGrid()
+            loadTeam()
+            editId?.let { prefill(it) }
+        } catch (e: Throwable) {
+            setContentView(errorScreen(e))
+        }
+    }
+
+    private fun errorScreen(e: Throwable): View {
+        val col = LinearLayout(this); col.orientation = LinearLayout.VERTICAL; col.gravity = Gravity.CENTER
+        col.setBackgroundColor(Color.parseColor("#0a0b10")); col.setPadding(dp(28), dp(28), dp(28), dp(28))
+        col.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT)
+        val t = TextView(this); t.text = "Não foi possível abrir o formulário"; t.setTextColor(INK); t.textSize = 17f
+        t.setTypeface(t.typeface, Typeface.BOLD); t.gravity = Gravity.CENTER; col.addView(t)
+        val m = TextView(this); m.text = (e.message ?: e.javaClass.simpleName); m.setTextColor(SOFT); m.textSize = 12.5f
+        m.gravity = Gravity.CENTER; m.setPadding(0, dp(12), 0, dp(22)); col.addView(m)
+        val b = TextView(this); b.text = "Fechar"; b.setTextColor(Color.WHITE); b.textSize = 14f; b.gravity = Gravity.CENTER
+        b.setTypeface(b.typeface, Typeface.BOLD); b.setPadding(dp(28), dp(13), dp(28), dp(13))
+        val bg = GradientDrawable(); bg.cornerRadius = dp(10).toFloat(); bg.setColor(ACCENT); b.background = bg
+        b.isClickable = true; b.setOnClickListener { finish() }; col.addView(b)
+        return col
     }
 
     private fun buildUi(): View {
@@ -180,13 +199,18 @@ class EventFormActivity : AppCompatActivity() {
 
     // ---- Responsável ----
     private fun loadTeam() {
-        FirebaseFirestore.getInstance().collection("users").get().addOnSuccessListener { snap ->
-            team = snap.documents.map { UserLite(it.id, it.getString("name"), it.getString("color"), it.getString("photo"), it.getString("status")) }
-                .filter { it.isActive() }
-            renderOwnerChips()
-        }
+        FirebaseFirestore.getInstance().collection("users").get()
+            .addOnSuccessListener { snap ->
+                try {
+                    team = snap.documents.map { UserLite(it.id, it.getString("name"), it.getString("color"), it.getString("photo"), it.getString("status")) }
+                        .filter { it.isActive() }
+                    renderOwnerChips()
+                } catch (_: Throwable) { }
+            }
+            .addOnFailureListener { renderOwnerChips() }
     }
     private fun renderOwnerChips() {
+        if (!::ownerWrap.isInitialized || !::ownerIn.isInitialized) return
         ownerWrap.removeAllViews()
         val cur = ownerIn.text.toString().trim().lowercase()
         val chips = ArrayList<View>()
@@ -209,6 +233,7 @@ class EventFormActivity : AppCompatActivity() {
 
     private fun prefill(id: String) {
         FirebaseFirestore.getInstance().collection("events").document(id).get().addOnSuccessListener { d ->
+          try {
             if (!d.exists()) return@addOnSuccessListener
             selType = d.getString("type") ?: "gravacao"
             clientIn.setText(d.getString("client") ?: "")
@@ -221,6 +246,7 @@ class EventFormActivity : AppCompatActivity() {
             ownerIn.setText(d.getString("owner") ?: "")
             oldDate = selDate; oldStart = selStart; oldEnd = selEnd; oldOwnerId = d.getString("ownerId")
             renderTypeGrid(); renderOwnerChips()
+          } catch (_: Throwable) { }
         }
     }
 
@@ -311,7 +337,8 @@ class EventFormActivity : AppCompatActivity() {
             val sp = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
             c.measure(sp, sp)
             val w = c.measuredWidth + dp(7)
-            (c.layoutParams as LinearLayout.LayoutParams).rightMargin = dp(7)
+            val mlp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            mlp.rightMargin = dp(7); c.layoutParams = mlp
             if (used + w > avail && rowv.childCount > 0) { container.addView(rowv); rowv = newFlowRow(); used = 0 }
             rowv.addView(c); used += w
         }

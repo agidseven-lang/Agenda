@@ -47,7 +47,11 @@ class HomeActivity : AppCompatActivity() {
             return
         }
         if (current == "board") Toast.makeText(this, "Novo no Quadro entra numa fase seguinte.", Toast.LENGTH_SHORT).show()
-        else startActivity(Intent(this, EventFormActivity::class.java))
+        else try {
+            startActivity(Intent(this, EventFormActivity::class.java))
+        } catch (e: Throwable) {
+            Toast.makeText(this, "Não foi possível abrir o formulário: ${e.message ?: e.javaClass.simpleName}", Toast.LENGTH_LONG).show()
+        }
     }
 
     fun selectTab(key: String) = select(key)
