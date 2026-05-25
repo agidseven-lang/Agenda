@@ -1,0 +1,9 @@
+<resources>
+    <!-- Tema base do app (NoActionBar). A UI é desenhada em Compose; este tema só evita
+         flash branco no launch e define as cores das barras de sistema. -->
+    <style name="Theme.IDSevenBeta" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/beta_bg</item>
+        <item name="android:statusBarColor">@color/beta_bg</item>
+        <item name="android:navigationBarColor">@color/beta_bg</item>
+    </style>
+</resources>
