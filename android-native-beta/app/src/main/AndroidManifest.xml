@@ -30,5 +30,21 @@
             android:name=".core.CrashActivity"
             android:exported="false"
             android:theme="@style/Theme.IDSevenBeta" />
+
+        <receiver
+            android:name=".core.ReminderReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".core.AppFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
     </application>
 </manifest>

@@ -75,7 +75,7 @@ fun DashboardScreen(
                 Text("Nada agendado para hoje.", color = Tokens.Faint, fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp))
             }
         } else {
-            items(todayEvents, key = { it.id }) { ev ->
+            items(todayEvents, key = { it.id }) { ev ->  // beta 1.0.0
                 EventCard(ev, owner = users.firstOrNull { it.id == ev.ownerId }, onClick = { onEventClick(ev.id) })
             }
         }

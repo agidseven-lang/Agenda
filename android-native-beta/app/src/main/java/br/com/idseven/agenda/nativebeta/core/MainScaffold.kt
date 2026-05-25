@@ -1,6 +1,12 @@
 package br.com.idseven.agenda.nativebeta.core
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -58,6 +64,21 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
     val users = usersState.itemsOrEmpty()
     val currentUser = users.firstOrNull { it.id == session.uid }
     val canManage = currentUser?.admin == true
+
+    // Notificações: canais, permissão (Android 13+) e registro do token FCM.
+    val context = LocalContext.current
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        Notifications.ensure(context)
+        if (Build.VERSION.SDK_INT >= 33 && !Notifications.hasPostPermission(context)) {
+            notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        Fcm.register(session.uid)
+    }
+    // Lembretes locais: reagenda sempre que a agenda muda (com dedupe).
+    LaunchedEffect(eventsState) {
+        ReminderScheduler.sync(context, eventsState.itemsOrEmpty())
+    }
 
     val tabs = listOf(
         Tab("hoje", "Hoje", Icons.Outlined.Today),
