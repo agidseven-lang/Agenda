@@ -313,75 +313,92 @@ class AgendaFragment : Fragment() {
         val ty = Types.of(e.type)
         val owner = e.ownerId?.let { users[it] }
         val ownerColor = UserColor.of(e.ownerId, owner?.color)
+        val ownerName = owner?.name ?: e.owner
+        val late = EventStatus.isLate(e)
+
         val card = LinearLayout(requireContext()); card.orientation = LinearLayout.HORIZONTAL
-        val bg = GradientDrawable(); bg.cornerRadius = dp(14).toFloat(); bg.setColor(SURFACE)
-        bg.setStroke(dp(1), if (EventStatus.isLate(e)) withAlpha(REV, 0.4f) else LINE)
+        val bg = GradientDrawable(); bg.cornerRadius = dp(16).toFloat(); bg.setColor(SURFACE)
+        bg.setStroke(dp(if (late) 2 else 1), if (late) withAlpha(REV, 0.55f) else withAlpha(ownerColor, 0.5f))
         card.background = bg
-        val clp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); clp.bottomMargin = dp(10); card.layoutParams = clp
-        card.setPadding(dp(16), dp(14), dp(16), dp(14))
+        val clp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); clp.bottomMargin = dp(12); card.layoutParams = clp
+        card.setPadding(dp(14), dp(14), dp(16), dp(16))
         if (e.done) card.alpha = 0.55f
 
+        // barra lateral na cor do usuário
         val bar = View(requireContext()); val barLp = LinearLayout.LayoutParams(dp(4), LinearLayout.LayoutParams.MATCH_PARENT); barLp.rightMargin = dp(14)
         bar.layoutParams = barLp; val barBg = GradientDrawable(); barBg.cornerRadius = dp(3).toFloat(); barBg.setColor(ownerColor); bar.background = barBg
         card.addView(bar)
 
-        val tm = LinearLayout(requireContext()); tm.orientation = LinearLayout.VERTICAL
-        val tmLp = LinearLayout.LayoutParams(dp(52), LinearLayout.LayoutParams.WRAP_CONTENT); tmLp.rightMargin = dp(2); tm.layoutParams = tmLp
-        val t1 = TextView(requireContext()); t1.text = e.start ?: "--:--"; t1.setTextColor(INK); t1.textSize = 16f; t1.setTypeface(t1.typeface, Typeface.BOLD); t1.letterSpacing = -0.025f; tm.addView(t1)
-        if (!e.end.isNullOrBlank()) { val t2 = TextView(requireContext()); t2.text = e.end; t2.setTextColor(FAINT); t2.textSize = 11f; t2.setPadding(0, dp(4), 0, 0); tm.addView(t2) }
-        card.addView(tm)
-
         val body = LinearLayout(requireContext()); body.orientation = LinearLayout.VERTICAL
         body.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+
+        // cabeçalho: avatar (topo-esquerda) + título/responsável + horário
+        val head = LinearLayout(requireContext()); head.orientation = LinearLayout.HORIZONTAL; head.gravity = Gravity.CENTER_VERTICAL
+        head.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        if (!ownerName.isNullOrBlank()) {
+            val av = Topbar.avatar(this, owner?.photo, ownerColor, ownerName, dp(40), dp(2))
+            (av.layoutParams as LinearLayout.LayoutParams).rightMargin = dp(12); head.addView(av)
+        }
+        val titleCol = LinearLayout(requireContext()); titleCol.orientation = LinearLayout.VERTICAL
+        titleCol.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         val tt = TextView(requireContext()); tt.text = e.title?.ifBlank { null } ?: e.client ?: "Sem título"
-        tt.setTextColor(INK); tt.textSize = 15f; tt.setTypeface(tt.typeface, Typeface.BOLD)
+        tt.setTextColor(INK); tt.textSize = 17f; tt.setTypeface(tt.typeface, Typeface.BOLD); tt.letterSpacing = -0.02f; tt.maxLines = 2; tt.ellipsize = android.text.TextUtils.TruncateAt.END
         if (e.done) tt.paintFlags = tt.paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
-        body.addView(tt)
+        titleCol.addView(tt)
+        if (!ownerName.isNullOrBlank()) {
+            val nm = TextView(requireContext()); nm.text = UserColor.firstName(ownerName); nm.setTextColor(ownerColor); nm.textSize = 12.5f; nm.setTypeface(nm.typeface, Typeface.BOLD)
+            nm.setPadding(0, dp(3), 0, 0); titleCol.addView(nm)
+        }
+        head.addView(titleCol)
+        val timeCol = LinearLayout(requireContext()); timeCol.orientation = LinearLayout.VERTICAL; timeCol.gravity = Gravity.END
+        val tlp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT); tlp.leftMargin = dp(10); timeCol.layoutParams = tlp
+        val t1 = TextView(requireContext()); t1.text = e.start ?: "--:--"; t1.setTextColor(INK); t1.textSize = 16.5f; t1.setTypeface(t1.typeface, Typeface.BOLD); t1.letterSpacing = -0.025f; timeCol.addView(t1)
+        if (!e.end.isNullOrBlank()) { val t2 = TextView(requireContext()); t2.text = e.end; t2.setTextColor(FAINT); t2.textSize = 12f; t2.gravity = Gravity.END; t2.setPadding(0, dp(2), 0, 0); timeCol.addView(t2) }
+        head.addView(timeCol)
+        body.addView(head)
 
-        val mt2 = LinearLayout(requireContext()); mt2.orientation = LinearLayout.HORIZONTAL; mt2.gravity = Gravity.CENTER_VERTICAL
-        (mt2.layoutParams ?: LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)).also { mt2.layoutParams = it }
-        mt2.setPadding(0, dp(8), 0, 0)
         // tag do tipo
-        val tag = TextView(requireContext()); tag.text = ty.label.uppercase(); tag.setTextColor(ty.color); tag.textSize = 10f
-        tag.setTypeface(tag.typeface, Typeface.BOLD); tag.letterSpacing = 0.02f; tag.setPadding(dp(9), dp(3), dp(9), dp(3))
-        val tagBg = GradientDrawable(); tagBg.cornerRadius = dp(6).toFloat(); tagBg.setColor(withAlpha(ty.color, 0.16f)); tag.background = tagBg
-        val tlp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT); tlp.rightMargin = dp(9); tag.layoutParams = tlp; mt2.addView(tag)
-        e.client?.ifBlank { null }?.let { mt2.addView(inf("👤  $it")) }
-        e.location?.ifBlank { null }?.let { mt2.addView(inf("📍  $it")) }
-        body.addView(mt2)
+        val tag = TextView(requireContext()); tag.text = ty.label.uppercase(); tag.setTextColor(ty.color); tag.textSize = 10.5f
+        tag.setTypeface(tag.typeface, Typeface.BOLD); tag.letterSpacing = 0.03f; tag.setPadding(dp(10), dp(4), dp(10), dp(4))
+        val tagBg = GradientDrawable(); tagBg.cornerRadius = dp(7).toFloat(); tagBg.setColor(withAlpha(ty.color, 0.16f)); tag.background = tagBg
+        val taglp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT); taglp.topMargin = dp(13); tag.layoutParams = taglp; body.addView(tag)
 
+        // cliente e local empilhados à esquerda
+        e.client?.ifBlank { null }?.let { body.addView(infoLine(R.drawable.ic_person, it, SOFT, 11)) }
+        e.location?.ifBlank { null }?.let { body.addView(infoLine(R.drawable.ic_pin, it, SOFT, 7)) }
+
+        // situação
         val si = EventStatus.status(e)
         if (si != null) {
             val col = when (si.kind) { "done", "wait" -> GREEN; "run" -> AMBER; "late" -> REV; else -> SOFT }
-            val pre = when { si.kind == "done" -> "✓  "; si.late -> "⚠  "; else -> "🕒  " }
-            val chip = TextView(requireContext()); chip.text = pre + si.text; chip.setTextColor(col); chip.textSize = 11f; chip.setTypeface(chip.typeface, Typeface.BOLD)
-            chip.setPadding(dp(8), dp(4), dp(8), dp(4))
-            val cbg = GradientDrawable(); cbg.cornerRadius = dp(7).toFloat(); cbg.setColor(withAlpha(col, 0.10f)); chip.background = cbg
-            val slp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT); slp.topMargin = dp(8); chip.layoutParams = slp
-            body.addView(chip)
+            val icon = if (si.kind == "done") R.drawable.ic_check else R.drawable.ic_clock
+            body.addView(statusChip(icon, si.text, col))
         }
 
-        val ownerName = owner?.name ?: e.owner
-        if (!ownerName.isNullOrBlank()) {
-            val who = LinearLayout(requireContext()); who.orientation = LinearLayout.HORIZONTAL; who.gravity = Gravity.CENTER_VERTICAL
-            (who.layoutParams ?: LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)).also { who.layoutParams = it }
-            who.setPadding(0, dp(8), 0, 0)
-            val av = Topbar.avatar(this, owner?.photo, ownerColor, ownerName, dp(20), dp(2))
-            (av.layoutParams as LinearLayout.LayoutParams).rightMargin = dp(7); who.addView(av)
-            val nm = TextView(requireContext()); nm.text = UserColor.firstName(ownerName); nm.setTextColor(FAINT); nm.textSize = 10.5f; who.addView(nm)
-            body.addView(who)
-        }
         card.addView(body)
-
         card.isClickable = true
         card.setOnClickListener { startActivity(Intent(requireContext(), EventDetailActivity::class.java).putExtra("id", e.id)) }
         return card
     }
 
-    private fun inf(text: String): TextView {
-        val t = TextView(requireContext()); t.text = text; t.setTextColor(SOFT); t.textSize = 11.5f
-        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.rightMargin = dp(9); t.layoutParams = lp
-        return t
+    private fun infoLine(iconRes: Int, text: String, tint: Int, topMargin: Int): View {
+        val row = LinearLayout(requireContext()); row.orientation = LinearLayout.HORIZONTAL; row.gravity = Gravity.CENTER_VERTICAL
+        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.topMargin = dp(topMargin); row.layoutParams = lp
+        val iv = android.widget.ImageView(requireContext()); iv.setImageResource(iconRes); iv.setColorFilter(tint)
+        val ilp = LinearLayout.LayoutParams(dp(16), dp(16)); ilp.rightMargin = dp(9); iv.layoutParams = ilp; row.addView(iv)
+        val t = TextView(requireContext()); t.text = text; t.setTextColor(INK); t.textSize = 13.5f; t.maxLines = 1; t.ellipsize = android.text.TextUtils.TruncateAt.END; row.addView(t)
+        return row
+    }
+
+    private fun statusChip(iconRes: Int, text: String, col: Int): View {
+        val chip = LinearLayout(requireContext()); chip.orientation = LinearLayout.HORIZONTAL; chip.gravity = Gravity.CENTER_VERTICAL
+        chip.setPadding(dp(9), dp(5), dp(11), dp(5))
+        val cbg = GradientDrawable(); cbg.cornerRadius = dp(8).toFloat(); cbg.setColor(withAlpha(col, 0.12f)); chip.background = cbg
+        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.topMargin = dp(11); chip.layoutParams = lp
+        val iv = android.widget.ImageView(requireContext()); iv.setImageResource(iconRes); iv.setColorFilter(col)
+        val ilp = LinearLayout.LayoutParams(dp(15), dp(15)); ilp.rightMargin = dp(7); iv.layoutParams = ilp; chip.addView(iv)
+        val t = TextView(requireContext()); t.text = text; t.setTextColor(col); t.textSize = 12.5f; t.setTypeface(t.typeface, Typeface.BOLD); chip.addView(t)
+        return chip
     }
 
     private fun emptyState(title: String, sub: String): View {
