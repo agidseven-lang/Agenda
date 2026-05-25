@@ -27,6 +27,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,19 +39,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.nativebeta.data.TaskRepo
+import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.components.LoadingState
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskStatus
+import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import kotlinx.coroutines.launch
 
@@ -69,10 +72,7 @@ fun TaskDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 14.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Tarefa", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (canManage) {
                 IconBtn(Icons.Outlined.Edit, Tokens.Soft) { task?.let { onEdit(it.id) } }
@@ -89,14 +89,24 @@ fun TaskDetailScreen(
         } else {
             val sector = Sectors.of(t.sector)
             val creator = t.by?.let { b -> users.firstOrNull { it.id == b } }
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                Box(Modifier.padding(bottom = 12.dp)) { Pill(sector.label, sector.color) }
-                Text(t.title?.ifBlank { null } ?: t.client ?: "Sem título", color = Tokens.Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(18.dp))
+            val assignee = users.firstOrNull { (it.name ?: "").equals(t.assignee ?: "", ignoreCase = true) }
+            val total = t.checklist.size
+            val done = t.checklist.count { it.d }
 
-                // Status (mudança com rastreio)
-                Text("STATUS", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp)
-                Spacer(Modifier.height(8.dp))
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+                // Resumo
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)) {
+                    Pill(sector.label, sector.color)
+                    if (t.priority) { Spacer(Modifier.width(8.dp)); Pill("Prioridade alta", Tokens.Red) }
+                }
+                Text(t.title?.ifBlank { null } ?: t.client ?: "Sem título", color = Tokens.Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                if (!t.client.isNullOrBlank() && !t.title.isNullOrBlank()) {
+                    Spacer(Modifier.height(4.dp)); Text(t.client, color = Tokens.Soft, fontSize = 14.sp)
+                }
+                Spacer(Modifier.height(20.dp))
+
+                // Status
+                SectionLabel("Status")
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
                     TaskStatus.COLUMNS.forEach { st ->
                         FilterChip(
@@ -104,60 +114,59 @@ fun TaskDetailScreen(
                             onClick = { scope.launch { TaskRepo.move(t, st, currentUid) } },
                             label = { Text(TaskStatus.label(st)) },
                             modifier = Modifier.padding(end = 8.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = TaskStatus.color(st).copy(alpha = 0.18f),
-                                selectedLabelColor = TaskStatus.color(st),
-                            ),
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = TaskStatus.color(st).copy(alpha = 0.18f), selectedLabelColor = TaskStatus.color(st)),
                         )
                     }
                 }
                 Spacer(Modifier.height(18.dp))
 
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)).padding(16.dp)) {
-                    if (!t.client.isNullOrBlank()) InfoRow("Cliente", t.client)
-                    if (!t.assignee.isNullOrBlank()) InfoRow("Responsável", t.assignee)
-                    if (!t.dueDate.isNullOrBlank()) InfoRow("Prazo", t.dueDate + (t.dueTime?.let { if (it.isNotBlank()) " às $it" else "" } ?: ""))
-                    if (t.priority) InfoRow("Prioridade", "Alta")
-                    if (!t.link.isNullOrBlank()) InfoRow("Link", t.link)
-                    InfoRow("Criado por", creator?.name ?: "—", last = true)
+                // Responsável e prazo
+                SectionLabel("Responsável e prazo")
+                Card {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = if (!t.dueDate.isNullOrBlank() || creator != null) 12.dp else 0.dp)) {
+                        Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), t.assignee ?: "—", 36.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Responsável", color = Tokens.Faint, fontSize = 11.sp)
+                            Text(t.assignee?.ifBlank { null } ?: "Não atribuído", color = Tokens.Ink, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    if (!t.dueDate.isNullOrBlank()) {
+                        Divider(); InfoLine("Prazo", t.dueDate + (t.dueTime?.let { if (it.isNotBlank()) " às $it" else "" } ?: ""))
+                    }
+                    if (creator != null) { Divider(); InfoLine("Criado por", creator.name ?: "—") }
+                    if (!t.link.isNullOrBlank()) { Divider(); InfoLine("Link", t.link) }
+                }
+
+                if (total > 0) {
+                    Spacer(Modifier.height(18.dp))
+                    SectionLabel("Checklist · $done/$total")
+                    Card {
+                        LinearProgressIndicator(progress = { done.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)), color = Tokens.Green, trackColor = Tokens.Surface2)
+                        Spacer(Modifier.height(10.dp))
+                        t.checklist.forEachIndexed { idx, item ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable {
+                                    scope.launch {
+                                        val nl = t.checklist.toMutableList()
+                                        nl[idx] = item.copy(d = !item.d)
+                                        TaskRepo.setChecklist(t.id, nl)
+                                    }
+                                }.padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(if (item.d) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked, contentDescription = null, tint = if (item.d) Tokens.Green else Tokens.Faint, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(item.t, color = if (item.d) Tokens.Faint else Tokens.Ink, fontSize = 14.sp, textDecoration = if (item.d) TextDecoration.LineThrough else TextDecoration.None)
+                            }
+                        }
+                    }
                 }
 
                 if (!t.desc.isNullOrBlank()) {
-                    Spacer(Modifier.height(16.dp))
-                    Text("DESCRIÇÃO", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp)
-                    Spacer(Modifier.height(6.dp))
-                    Text(t.desc, color = Tokens.Ink, fontSize = 14.sp)
-                }
-
-                if (t.checklist.isNotEmpty()) {
                     Spacer(Modifier.height(18.dp))
-                    val done = t.checklist.count { it.d }
-                    Text("CHECKLIST ($done/${t.checklist.size})", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp)
-                    Spacer(Modifier.height(8.dp))
-                    t.checklist.forEachIndexed { idx, item ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                scope.launch {
-                                    val nl = t.checklist.toMutableList()
-                                    nl[idx] = item.copy(d = !item.d)
-                                    TaskRepo.setChecklist(t.id, nl)
-                                }
-                            }.padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                if (item.d) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
-                                contentDescription = null,
-                                tint = if (item.d) Tokens.Green else Tokens.Faint,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                item.t, color = if (item.d) Tokens.Faint else Tokens.Ink, fontSize = 14.sp,
-                                textDecoration = if (item.d) TextDecoration.LineThrough else TextDecoration.None,
-                            )
-                        }
-                    }
+                    SectionLabel("Descrição")
+                    Card { Text(t.desc, color = Tokens.Ink, fontSize = 14.sp) }
                 }
                 Spacer(Modifier.height(28.dp))
             }
@@ -169,30 +178,38 @@ fun TaskDetailScreen(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Excluir tarefa") },
             text = { Text("Excluir esta tarefa para toda a equipe?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDelete = false
-                    scope.launch { TaskRepo.delete(id).onSuccess { onBack() } }
-                }) { Text("Excluir", color = Tokens.Red) }
-            },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; scope.launch { TaskRepo.delete(id).onSuccess { onBack() } } }) { Text("Excluir", color = Tokens.Red) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
         )
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String, last: Boolean = false) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-        Text(label, color = Tokens.Faint, fontSize = 13.sp, modifier = Modifier.width(110.dp))
+private fun SectionLabel(text: String) {
+    Text(text.uppercase(), color = Tokens.Faint, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp, modifier = Modifier.padding(bottom = 8.dp))
+}
+
+@Composable
+private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)).padding(16.dp), content = content)
+}
+
+@Composable
+private fun Divider() {
+    Box(Modifier.fillMaxWidth().padding(vertical = 10.dp).height(1.dp).background(Color(0xFF222633)))
+}
+
+@Composable
+private fun InfoLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, color = Tokens.Faint, fontSize = 13.sp, modifier = Modifier.width(96.dp))
         Text(value, color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
     }
-    if (!last) Box(Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF222633)))
 }
 
 @Composable
 private fun IconBtn(icon: ImageVector, tint: Color, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() },
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp)) }
+    Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() }, contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+    }
 }
