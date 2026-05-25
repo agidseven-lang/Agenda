@@ -92,9 +92,6 @@ class HojeFragment : Fragment() {
 
     private fun render() {
         root.removeAllViews()
-        val mark = TextView(requireContext()); mark.text = "Hoje Kotlin v4"; mark.setTextColor(ACCENT); mark.textSize = 10f
-        mark.setTypeface(mark.typeface, android.graphics.Typeface.BOLD); mark.setPadding(dp(2), 0, 0, dp(8)); root.addView(mark)
-
         root.addView(hero())
 
         val focus = pickFocus()
@@ -109,12 +106,12 @@ class HojeFragment : Fragment() {
 
     private fun hero(): View {
         val card = LinearLayout(requireContext()); card.orientation = LinearLayout.VERTICAL
-        card.background = rounded(SURFACE, dp(18), LINE); card.setPadding(dp(22), dp(24), dp(22), dp(22))
+        card.background = heroBg(); card.setPadding(dp(22), dp(24), dp(22), dp(22))
         val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.bottomMargin = dp(24); card.layoutParams = lp
 
         val first = (Session.name(requireContext()) ?: "").trim().split(Regex("\\s+")).firstOrNull() ?: ""
         val greet = TextView(requireContext()); greet.text = saudacao() + (if (first.isNotEmpty()) ", $first 👋" else " 👋")
-        greet.setTextColor(INK); greet.textSize = 22f; greet.setTypeface(greet.typeface, android.graphics.Typeface.BOLD); card.addView(greet)
+        greet.setTextColor(INK); greet.textSize = 22f; greet.letterSpacing = -0.025f; greet.setTypeface(greet.typeface, android.graphics.Typeface.BOLD); card.addView(greet)
 
         val cal = Calendar.getInstance()
         val date = TextView(requireContext())
@@ -169,7 +166,7 @@ class HojeFragment : Fragment() {
         // título
         val title = TextView(requireContext())
         title.text = if (f.kind == "event") (f.event!!.title?.ifBlank { null } ?: f.event.client ?: "Compromisso") else (f.task!!.title?.ifBlank { null } ?: "Sem título")
-        title.setTextColor(INK); title.textSize = if (spot) 18f else 14.5f; title.setTypeface(title.typeface, android.graphics.Typeface.BOLD); body.addView(title)
+        title.setTextColor(INK); title.textSize = if (spot) 18f else 14.5f; title.letterSpacing = -0.02f; title.setTypeface(title.typeface, android.graphics.Typeface.BOLD); body.addView(title)
 
         val w = whenText(f)
         if (w.isNotEmpty()) { val wt = TextView(requireContext()); wt.text = "🕒  $w"; wt.setTextColor(SOFT); wt.textSize = 11.5f; wt.setPadding(0, dp(8), 0, dp(13)); body.addView(wt) }
@@ -235,6 +232,16 @@ class HojeFragment : Fragment() {
         tv.isClickable = true; tv.setOnClickListener { onClick() }; return tv
     }
     private fun rounded(fill: Int, radius: Int, stroke: Int): GradientDrawable { val g = GradientDrawable(); g.cornerRadius = radius.toFloat(); g.setColor(fill); g.setStroke(dp(1), stroke); return g }
+    // Hero com leve gradiente accent→roxo (aprox. os radial-gradients do .hj-hero do PWA).
+    private fun heroBg(): GradientDrawable {
+        val g = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            intArrayOf(blend(SURFACE, ACCENT, 0.13f), SURFACE, blend(SURFACE, Color.parseColor("#a855f7"), 0.08f)))
+        g.cornerRadius = dp(18).toFloat(); g.setStroke(dp(1), LINE); return g
+    }
+    private fun blend(a: Int, b: Int, t: Float): Int = Color.rgb(
+        (Color.red(a) * (1 - t) + Color.red(b) * t).toInt(),
+        (Color.green(a) * (1 - t) + Color.green(b) * t).toInt(),
+        (Color.blue(a) * (1 - t) + Color.blue(b) * t).toInt())
     private fun withAlpha(color: Int, a: Float): Int = Color.argb((a * 255).toInt(), Color.red(color), Color.green(color), Color.blue(color))
     private fun dp(v: Int): Int = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
 }
