@@ -40,6 +40,7 @@ fun DashboardScreen(
     tasksState: UiList<TaskItem>,
     users: List<UserLite>,
     session: UserSession,
+    onEventClick: (String) -> Unit,
 ) {
     if (eventsState.isLoading) { LoadingState(); return }
 
@@ -75,7 +76,7 @@ fun DashboardScreen(
             }
         } else {
             items(todayEvents, key = { it.id }) { ev ->
-                EventCard(ev, owner = users.firstOrNull { it.id == ev.ownerId })
+                EventCard(ev, owner = users.firstOrNull { it.id == ev.ownerId }, onClick = { onEventClick(ev.id) })
             }
         }
     }

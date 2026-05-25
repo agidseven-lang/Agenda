@@ -30,7 +30,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
 @Composable
-fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>) {
+fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventClick: (String) -> Unit) {
     if (eventsState.isLoading) { LoadingState(); return }
     val events = eventsState.itemsOrEmpty().sortedWith(compareBy({ it.date ?: "" }, { it.start ?: "" }))
     if (events.isEmpty()) {
@@ -45,7 +45,7 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>) {
         groups.forEach { (date, list) ->
             item(key = "h_$date") { DateHeader(date) }
             items(list, key = { it.id }) { ev ->
-                EventCard(ev, owner = users.firstOrNull { it.id == ev.ownerId })
+                EventCard(ev, owner = users.firstOrNull { it.id == ev.ownerId }, onClick = { onEventClick(ev.id) })
             }
         }
     }

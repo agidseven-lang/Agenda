@@ -2,11 +2,13 @@ package br.com.idseven.agenda.nativebeta.core
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -17,18 +19,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import br.com.idseven.agenda.nativebeta.data.UserSession
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTopbar
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.features.agenda.AgendaScreen
 import br.com.idseven.agenda.nativebeta.features.dashboard.DashboardScreen
+import br.com.idseven.agenda.nativebeta.features.events.EventDetailScreen
+import br.com.idseven.agenda.nativebeta.features.events.EventFormScreen
 import br.com.idseven.agenda.nativebeta.features.profile.ProfileScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TasksScreen
 import br.com.idseven.agenda.nativebeta.features.team.TeamScreen
@@ -45,6 +52,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
 
     val users = usersState.itemsOrEmpty()
     val currentUser = users.firstOrNull { it.id == session.uid }
+    val canManage = currentUser?.admin == true
 
     val tabs = listOf(
         Tab("hoje", "Hoje", Icons.Outlined.Today),
@@ -55,12 +63,13 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
     )
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route ?: "hoje"
+    val isTab = tabs.any { it.route == route }
 
     Scaffold(
         containerColor = Tokens.Bg,
-        topBar = { AppTopbar(title = "ID Seven", subtitle = "sincronizado", currentUser = currentUser) },
+        topBar = { if (isTab) AppTopbar(title = "ID Seven", subtitle = "sincronizado", currentUser = currentUser) },
         bottomBar = {
-            NavigationBar(containerColor = Tokens.Surface) {
+            if (isTab) NavigationBar(containerColor = Tokens.Surface) {
                 tabs.forEach { tab ->
                     NavigationBarItem(
                         selected = route == tab.route,
@@ -84,13 +93,42 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                 }
             }
         },
+        floatingActionButton = {
+            if (route == "hoje" || route == "agenda") {
+                FloatingActionButton(onClick = { nav.navigate("eventForm") }, containerColor = Tokens.Accent, contentColor = Color.White) {
+                    Icon(Icons.Filled.Add, contentDescription = "Novo compromisso")
+                }
+            }
+        },
     ) { padding ->
         NavHost(nav, startDestination = "hoje", modifier = Modifier.padding(padding)) {
-            composable("hoje") { DashboardScreen(eventsState, tasksState, users, session) }
-            composable("agenda") { AgendaScreen(eventsState, users) }
+            composable("hoje") { DashboardScreen(eventsState, tasksState, users, session, onEventClick = { nav.navigate("event/$it") }) }
+            composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
             composable("tarefas") { TasksScreen(tasksState, users) }
             composable("equipe") { TeamScreen(usersState) }
             composable("perfil") { ProfileScreen(currentUser, session, onLogout) }
+            composable("event/{id}") { entry ->
+                EventDetailScreen(
+                    id = entry.arguments?.getString("id") ?: "",
+                    users = users,
+                    canManage = canManage,
+                    currentUid = session.uid,
+                    onBack = { nav.popBackStack() },
+                    onEdit = { nav.navigate("eventForm?id=$it") },
+                )
+            }
+            composable(
+                route = "eventForm?id={id}",
+                arguments = listOf(navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null }),
+            ) { entry ->
+                EventFormScreen(
+                    editId = entry.arguments?.getString("id"),
+                    users = users,
+                    currentUid = session.uid,
+                    onDone = { nav.popBackStack() },
+                    onBack = { nav.popBackStack() },
+                )
+            }
         }
     }
 }
