@@ -21,12 +21,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,6 +42,7 @@ import br.com.idseven.agenda.nativebeta.core.itemsOrEmpty
 import br.com.idseven.agenda.nativebeta.designsystem.components.EmptyState
 import br.com.idseven.agenda.nativebeta.designsystem.components.LoadingState
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
+import br.com.idseven.agenda.nativebeta.designsystem.components.SearchField
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
@@ -46,27 +52,52 @@ import br.com.idseven.agenda.nativebeta.domain.UserLite
 @Composable
 fun TasksScreen(tasksState: UiList<TaskItem>, users: List<UserLite>, onTaskClick: (String) -> Unit) {
     if (tasksState.isLoading) { LoadingState(); return }
-    val tasks = tasksState.itemsOrEmpty()
-    if (tasks.isEmpty()) {
-        EmptyState("Sem tarefas", "O Kanban da equipe aparece aqui em tempo real", Icons.Outlined.Checklist)
-        return
+    val all = tasksState.itemsOrEmpty()
+
+    var query by remember { mutableStateOf("") }
+    var sectorFilter by remember { mutableStateOf<String?>(null) }
+
+    val q = query.trim().lowercase()
+    val tasks = all.filter { t ->
+        val okQ = q.isEmpty() || listOf(t.title, t.client, t.assignee).any { (it ?: "").lowercase().contains(q) }
+        val okS = sectorFilter == null || t.sector == sectorFilter
+        okQ && okS
     }
-    Row(
-        modifier = Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(16.dp),
-    ) {
-        TaskStatus.COLUMNS.forEach { st ->
-            val list = tasks.filter { (it.status ?: "afazer") == st }
-            Column(Modifier.width(300.dp).fillMaxHeight().padding(end = 12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 10.dp)) {
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(TaskStatus.color(st)))
-                    Spacer(Modifier.width(8.dp))
-                    Text(TaskStatus.label(st), color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.width(6.dp))
-                    Text("(${list.size})", color = Tokens.Faint, fontSize = 12.sp)
-                }
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    list.forEach { task -> TaskCard(task) { onTaskClick(task.id) } }
-                    Spacer(Modifier.height(24.dp))
+
+    Column(Modifier.fillMaxSize()) {
+        SearchField(query, { query = it }, "Buscar por título, cliente, responsável…")
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 4.dp)) {
+            FilterChip(selected = sectorFilter == null, onClick = { sectorFilter = null }, label = { Text("Todos") }, modifier = Modifier.padding(end = 8.dp))
+            Sectors.ALL.forEach { s ->
+                FilterChip(
+                    selected = sectorFilter == s.key, onClick = { sectorFilter = s.key }, label = { Text(s.label) },
+                    modifier = Modifier.padding(end = 8.dp),
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = s.color.copy(alpha = 0.18f), selectedLabelColor = s.color),
+                )
+            }
+        }
+
+        if (all.isEmpty()) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                EmptyState("Sem tarefas", "O Kanban da equipe aparece aqui em tempo real", Icons.Outlined.Checklist)
+            }
+        } else {
+            Row(modifier = Modifier.weight(1f).fillMaxWidth().horizontalScroll(rememberScrollState()).padding(16.dp)) {
+                TaskStatus.COLUMNS.forEach { st ->
+                    val list = tasks.filter { (it.status ?: "afazer") == st }
+                    Column(Modifier.width(300.dp).fillMaxHeight().padding(end = 12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 10.dp)) {
+                            Box(Modifier.size(9.dp).clip(CircleShape).background(TaskStatus.color(st)))
+                            Spacer(Modifier.width(8.dp))
+                            Text(TaskStatus.label(st), color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(6.dp))
+                            Text("(${list.size})", color = Tokens.Faint, fontSize = 12.sp)
+                        }
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            list.forEach { task -> TaskCard(task) { onTaskClick(task.id) } }
+                            Spacer(Modifier.height(24.dp))
+                        }
+                    }
                 }
             }
         }

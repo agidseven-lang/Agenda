@@ -39,4 +39,11 @@ object DateUtil {
         fun p(n: Int) = if (n < 10) "0$n" else "$n"
         return "${p(c.get(Calendar.DAY_OF_MONTH))}/${p(c.get(Calendar.MONTH) + 1)}/${c.get(Calendar.YEAR)} às ${p(c.get(Calendar.HOUR_OF_DAY))}:${p(c.get(Calendar.MINUTE))}"
     }
+
+    fun hm(ms: Long?): String {
+        if (ms == null || ms <= 0) return ""
+        val c = Calendar.getInstance().apply { timeInMillis = ms }
+        fun p(n: Int) = if (n < 10) "0$n" else "$n"
+        return "${p(c.get(Calendar.HOUR_OF_DAY))}:${p(c.get(Calendar.MINUTE))}"
+    }
 }

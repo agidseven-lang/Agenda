@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Person
@@ -33,6 +34,8 @@ import br.com.idseven.agenda.nativebeta.data.UserSession
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTopbar
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.features.agenda.AgendaScreen
+import br.com.idseven.agenda.nativebeta.features.chat.ChatListScreen
+import br.com.idseven.agenda.nativebeta.features.chat.ChatThreadScreen
 import br.com.idseven.agenda.nativebeta.features.dashboard.DashboardScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventDetailScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventFormScreen
@@ -61,6 +64,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         Tab("agenda", "Agenda", Icons.Outlined.CalendarMonth),
         Tab("tarefas", "Tarefas", Icons.Outlined.Checklist),
         Tab("equipe", "Equipe", Icons.Outlined.Group),
+        Tab("chat", "Chat", Icons.Outlined.ChatBubbleOutline),
         Tab("perfil", "Perfil", Icons.Outlined.Person),
     )
     val backStack by nav.currentBackStackEntryAsState()
@@ -113,6 +117,15 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
             composable("tarefas") { TasksScreen(tasksState, users, onTaskClick = { nav.navigate("task/$it") }) }
             composable("equipe") { TeamScreen(usersState) }
+            composable("chat") { ChatListScreen(session, users, onOpenChat = { nav.navigate("chatThread/$it") }) }
+            composable("chatThread/{otherId}") { entry ->
+                ChatThreadScreen(
+                    session = session,
+                    otherId = entry.arguments?.getString("otherId") ?: "",
+                    users = users,
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable("perfil") { ProfileScreen(currentUser, session, onLogout) }
             composable("event/{id}") { entry ->
                 EventDetailScreen(
