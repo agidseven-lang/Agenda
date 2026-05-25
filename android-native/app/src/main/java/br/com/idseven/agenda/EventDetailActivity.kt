@@ -71,7 +71,7 @@ class EventDetailActivity : AppCompatActivity() {
             val foot = LinearLayout(this); foot.orientation = LinearLayout.HORIZONTAL; foot.gravity = Gravity.CENTER_VERTICAL; foot.setPadding(dp(22), dp(14), dp(22), dp(18))
             val del = iconBtn(R.drawable.ic_trash, REV) { confirmDelete() }
             val dbg = GradientDrawable(); dbg.cornerRadius = dp(10).toFloat(); dbg.setColor(SURFACE); dbg.setStroke(dp(1), LINE); del.background = dbg
-            (del.layoutParams as LinearLayout.LayoutParams).rightMargin = dp(10); foot.addView(del)
+            del.layoutParams = LinearLayout.LayoutParams(dp(54), dp(48)).also { it.rightMargin = dp(10) }; foot.addView(del)
             val edit = TextView(this); edit.text = "Reagendar / Editar"; edit.gravity = Gravity.CENTER; edit.textSize = 14f
             edit.setTextColor(Color.WHITE); edit.setTypeface(edit.typeface, Typeface.BOLD)
             val ebg = GradientDrawable(); ebg.cornerRadius = dp(10).toFloat(); ebg.setColor(ACCENT); edit.background = ebg
@@ -97,8 +97,9 @@ class EventDetailActivity : AppCompatActivity() {
         val typePill = LinearLayout(this); typePill.orientation = LinearLayout.HORIZONTAL; typePill.gravity = Gravity.CENTER_VERTICAL
         typePill.setPadding(dp(14), dp(7), dp(14), dp(7))
         val tbg = GradientDrawable(); tbg.cornerRadius = dp(9).toFloat(); tbg.setColor(withAlpha(ty.color, 0.16f)); tbg.setStroke(dp(1), withAlpha(ty.color, 0.25f)); typePill.background = tbg
-        typePill.addView(dot(ty.color, 7)); typePill.addView(dot(ty.color, 7))
-        val tl = TextView(this); tl.text = ty.label.uppercase(); tl.setTextColor(ty.color); tl.textSize = 11.5f; tl.setTypeface(tl.typeface, Typeface.BOLD); tl.letterSpacing = 0.03f; tl.setPadding(dp(4), 0, 0, 0); typePill.addView(tl)
+        val d1 = dot(ty.color, 6); (d1.layoutParams as LinearLayout.LayoutParams).rightMargin = dp(6); typePill.addView(d1)
+        val d2 = dot(ty.color, 6); (d2.layoutParams as LinearLayout.LayoutParams).rightMargin = dp(8); typePill.addView(d2)
+        val tl = TextView(this); tl.text = ty.label.uppercase(); tl.setTextColor(ty.color); tl.textSize = 11f; tl.setTypeface(tl.typeface, Typeface.BOLD); tl.letterSpacing = 0.05f; typePill.addView(tl)
         typePill.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).also { it.bottomMargin = dp(16) }
         bodyCol.addView(typePill)
 
@@ -138,7 +139,7 @@ class EventDetailActivity : AppCompatActivity() {
 
         for ((i, r) in rows.withIndex()) {
             list.addView(r)
-            if (i < rows.size - 1) { val d = View(this); d.setBackgroundColor(Color.parseColor("#1a1d27")); list.addView(d, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1))) }
+            if (i < rows.size - 1) { val d = View(this); d.setBackgroundColor(Color.parseColor("#222633")); val dlp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)); dlp.leftMargin = dp(68); list.addView(d, dlp) }
         }
         bodyCol.addView(list)
 
@@ -161,10 +162,10 @@ class EventDetailActivity : AppCompatActivity() {
 
     private fun ownerValue(owner: UserLite, oc: Int): View {
         val row = LinearLayout(this); row.orientation = LinearLayout.HORIZONTAL; row.gravity = Gravity.CENTER_VERTICAL
-        val av = Topbar.avatar(this, owner.photo, oc, owner.name, dp(30), dp(2))
-        (av.layoutParams as LinearLayout.LayoutParams).rightMargin = dp(9); row.addView(av)
+        val av = Topbar.avatar(this, owner.photo, oc, owner.name, dp(28), dp(2))
+        (av.layoutParams as LinearLayout.LayoutParams).rightMargin = dp(10); row.addView(av)
         val nm = TextView(this); nm.text = owner.name ?: "—"; nm.setTextColor(INK); nm.textSize = 14.5f; nm.setTypeface(nm.typeface, Typeface.BOLD); row.addView(nm)
-        val d = dot(oc, 11); (d.layoutParams as LinearLayout.LayoutParams).leftMargin = dp(9); row.addView(d)
+        val d = dot(oc, 10); (d.layoutParams as LinearLayout.LayoutParams).leftMargin = dp(9); row.addView(d)
         return row
     }
     private fun boldColored(text: String, color: Int): View {
@@ -172,19 +173,21 @@ class EventDetailActivity : AppCompatActivity() {
     }
 
     private fun rowText(iconRes: Int, label: String, value: String): View {
-        val v = TextView(this); v.text = value; v.setTextColor(INK); v.textSize = 14.5f; v.setTypeface(v.typeface, Typeface.BOLD)
+        val v = TextView(this); v.text = value; v.setTextColor(INK); v.textSize = 14.5f; v.setTypeface(v.typeface, Typeface.BOLD); v.setLineSpacing(dp(3).toFloat(), 1f)
         return rowView(iconRes, label, v)
     }
     private fun rowView(iconRes: Int, label: String, valueView: View): View {
-        val row = LinearLayout(this); row.orientation = LinearLayout.HORIZONTAL; row.gravity = Gravity.CENTER_VERTICAL; row.setPadding(dp(16), dp(16), dp(16), dp(16))
+        val row = LinearLayout(this); row.orientation = LinearLayout.HORIZONTAL; row.gravity = Gravity.CENTER_VERTICAL
+        row.setPadding(dp(15), dp(12), dp(15), dp(12)); row.minimumHeight = dp(66)
         val ic = FrameLayout(this)
-        val ibg = GradientDrawable(); ibg.cornerRadius = dp(12).toFloat(); ibg.setColor(SURFACE2); ibg.setStroke(dp(1), LINE); ic.background = ibg
-        ic.layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).also { it.rightMargin = dp(14) }
+        val ibg = GradientDrawable(); ibg.cornerRadius = dp(11).toFloat(); ibg.setColor(SURFACE2); ibg.setStroke(dp(1), LINE); ic.background = ibg
+        ic.layoutParams = LinearLayout.LayoutParams(dp(40), dp(40)).also { it.rightMargin = dp(13) }
         val img = ImageView(this); img.setImageResource(iconRes); img.setColorFilter(ACCENT)
         img.layoutParams = FrameLayout.LayoutParams(dp(20), dp(20)).also { it.gravity = Gravity.CENTER }
         ic.addView(img); row.addView(ic)
-        val tx = LinearLayout(this); tx.orientation = LinearLayout.VERTICAL; tx.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        val l = TextView(this); l.text = label.uppercase(); l.setTextColor(FAINT); l.textSize = 10.5f; l.setTypeface(l.typeface, Typeface.BOLD); l.letterSpacing = 0.07f; l.setPadding(0, 0, 0, dp(5)); tx.addView(l)
+        val tx = LinearLayout(this); tx.orientation = LinearLayout.VERTICAL; tx.gravity = Gravity.CENTER_VERTICAL
+        tx.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        val l = TextView(this); l.text = label.uppercase(); l.setTextColor(FAINT); l.textSize = 10f; l.setTypeface(l.typeface, Typeface.BOLD); l.letterSpacing = 0.06f; l.maxLines = 1; l.setPadding(0, 0, 0, dp(4)); tx.addView(l)
         tx.addView(valueView); row.addView(tx)
         return row
     }
