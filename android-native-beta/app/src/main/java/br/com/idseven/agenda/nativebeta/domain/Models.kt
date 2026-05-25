@@ -54,6 +54,9 @@ data class TaskItem(
     val doneAt: Long?,
     val doneBy: String?,
     val checklist: List<ChecklistItem>,
+    val history: List<TaskHistory>,
 )
 
 data class ChecklistItem(val t: String, val d: Boolean)
+
+data class TaskHistory(val kind: String, val at: Long?, val byId: String?, val from: String?, val to: String?)

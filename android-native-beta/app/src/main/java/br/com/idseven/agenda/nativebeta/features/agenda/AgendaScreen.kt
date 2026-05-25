@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,7 +71,6 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
     val eventsByDay: Map<LocalDate, List<EventItem>> = filtered
         .mapNotNull { e -> parseDay(e.date)?.let { it to e } }
         .groupBy({ it.first }, { it.second })
-
     fun ownerOf(e: EventItem) = users.firstOrNull { it.id == e.ownerId }
 
     Column(Modifier.fillMaxSize()) {
@@ -85,26 +84,23 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
         TypeFilters(typeFilter) { typeFilter = it }
 
         if (!listMode) {
-            Column(Modifier.padding(horizontal = 18.dp)) {
-                CalendarCard(
-                    month = month, selected = selected, eventsByDay = eventsByDay,
-                    onPrev = { month = month.minusMonths(1) },
-                    onNext = { month = month.plusMonths(1) },
-                    onSelect = { selected = it },
-                )
-            }
             val dayEvents = (eventsByDay[selected] ?: emptyList()).sortedBy { it.start ?: "" }
             val iso = selected.toString()
-            Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 16.dp, end = 18.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(DateUtil.dayLabel(iso), color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(8.dp))
-                Text(DateUtil.dayShort(iso), color = Tokens.Faint, fontSize = 12.5.sp, modifier = Modifier.weight(1f))
-                Text("${dayEvents.size} ${if (dayEvents.size == 1) "item" else "itens"}", color = Tokens.Faint, fontSize = 12.sp)
-            }
-            if (dayEvents.isEmpty()) {
-                Box(Modifier.weight(1f).fillMaxWidth()) { EmptyState("Dia livre", "Nenhum compromisso neste dia", Icons.Outlined.CalendarMonth) }
-            } else {
-                LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
+                item("cal") {
+                    CalendarCard(month, selected, eventsByDay, { month = month.minusMonths(1) }, { month = month.plusMonths(1) }, { selected = it })
+                }
+                item("dh") {
+                    Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(DateUtil.dayLabel(iso), color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(8.dp))
+                        Text(DateUtil.dayShort(iso), color = Tokens.Faint, fontSize = 12.5.sp, modifier = Modifier.weight(1f))
+                        Text("${dayEvents.size} ${if (dayEvents.size == 1) "item" else "itens"}", color = Tokens.Faint, fontSize = 12.sp)
+                    }
+                }
+                if (dayEvents.isEmpty()) {
+                    item("empty") { Text("Dia livre — nenhum compromisso", color = Tokens.Faint, fontSize = 13.sp, modifier = Modifier.padding(vertical = 24.dp)) }
+                } else {
                     items(dayEvents, key = { it.id }) { ev -> EventCard(ev, ownerOf(ev)) { onEventClick(ev.id) } }
                 }
             }
@@ -138,10 +134,8 @@ private fun parseDay(date: String?): LocalDate? = runCatching { LocalDate.parse(
 @Composable
 private fun Toggle(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
-        modifier = Modifier.clip(RoundedCornerShape(999.dp))
-            .background(if (selected) Tokens.Accent else Tokens.Surface2)
-            .clickable { onClick() }.padding(horizontal = 14.dp, vertical = 7.dp),
-    ) { Text(label, color = if (selected) androidx.compose.ui.graphics.Color.White else Tokens.Soft, fontSize = 12.5.sp, fontWeight = FontWeight.Bold) }
+        modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(if (selected) Tokens.Accent else Tokens.Surface2).clickable { onClick() }.padding(horizontal = 14.dp, vertical = 7.dp),
+    ) { Text(label, color = if (selected) Color.White else Tokens.Soft, fontSize = 12.5.sp, fontWeight = FontWeight.Bold) }
 }
 
 @Composable

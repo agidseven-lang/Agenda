@@ -30,17 +30,42 @@ object Sectors {
     fun of(key: String?): Sec = ALL.firstOrNull { it.key == key } ?: ALL.first()
 }
 
-// Status de tarefa (Kanban).
+// Status de tarefa (Kanban) — 4 colunas compatíveis com o PWA (afazer/andamento/revisao/concluido).
 object TaskStatus {
-    val COLUMNS = listOf("afazer", "andamento", "concluido")
+    val COLUMNS = listOf("afazer", "andamento", "revisao", "concluido")
     fun label(s: String?): String = when (s) {
         "andamento" -> "Em andamento"
+        "revisao" -> "Revisão"
         "concluido" -> "Concluído"
-        else -> "A fazer"
+        else -> "A Fazer"
     }
     fun color(s: String?): Color = when (s) {
         "andamento" -> Color(0xFFF59E0B)
+        "revisao" -> Color(0xFF60A5FA)
         "concluido" -> Color(0xFF34D399)
         else -> Color(0xFF9BA0AB)
+    }
+    fun desc(s: String?): String = when (s) {
+        "andamento" -> "Em execução agora"
+        "revisao" -> "Aguardando revisão"
+        "concluido" -> "Tarefas finalizadas"
+        else -> "Aguardando início"
+    }
+}
+
+// Indicador de prazo em tempo real da tarefa.
+object TaskDeadline {
+    data class D(val text: String, val color: Color, val late: Boolean)
+    fun of(t: TaskItem): D? {
+        if (t.status == "concluido") return D("Concluída", Color(0xFF34D399), false)
+        if (t.dueDate.isNullOrBlank()) return null
+        val due = EventStatus.dtMs(t.dueDate, t.dueTime?.ifBlank { null } ?: "23:59") ?: return null
+        val now = System.currentTimeMillis()
+        val today = java.time.LocalDate.now().toString()
+        return when {
+            now > due -> D("Atrasada", Color(0xFFF87171), true)
+            t.dueDate == today -> D("Hoje", Color(0xFFF59E0B), false)
+            else -> D("Faltam " + EventStatus.humanDur(due - now), Color(0xFF34D399), false)
+        }
     }
 }

@@ -1,8 +1,10 @@
 package br.com.idseven.agenda.nativebeta.data
 
 import br.com.idseven.agenda.nativebeta.domain.ChecklistItem
+import br.com.idseven.agenda.nativebeta.domain.TaskHistory
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlin.coroutines.resume
 import kotlinx.coroutines.channels.awaitClose
@@ -14,10 +16,30 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 object TaskRepo {
     private val db get() = FirebaseFirestore.getInstance()
 
-    @Suppress("UNCHECKED_CAST")
+    private fun bool(v: Any?): Boolean = when (v) {
+        is Boolean -> v
+        is Number -> v.toInt() != 0
+        is String -> v.equals("true", true) || v == "1"
+        else -> false
+    }
+
     private fun map(d: DocumentSnapshot): TaskItem {
-        val rawList = d.get("checklist") as? List<Map<String, Any?>> ?: emptyList()
-        val checklist = rawList.map { ChecklistItem(t = (it["t"] as? String) ?: "", d = (it["d"] as? Boolean) ?: false) }
+        val rawCl = d.get("checklist") as? List<*> ?: emptyList<Any?>()
+        val checklist = rawCl.mapNotNull { item ->
+            val m = item as? Map<*, *> ?: return@mapNotNull null
+            ChecklistItem(t = (m["t"] as? String) ?: "", d = bool(m["d"]))
+        }
+        val rawHist = d.get("history") as? List<*> ?: emptyList<Any?>()
+        val history = rawHist.mapNotNull { h ->
+            val m = h as? Map<*, *> ?: return@mapNotNull null
+            TaskHistory(
+                kind = (m["kind"] as? String) ?: "",
+                at = (m["at"] as? Number)?.toLong(),
+                byId = m["byId"] as? String,
+                from = m["from"] as? String,
+                to = m["to"] as? String,
+            )
+        }
         return TaskItem(
             id = d.id,
             title = d.getString("title"),
@@ -27,7 +49,7 @@ object TaskRepo {
             status = d.getString("status"),
             assignee = d.getString("assignee"),
             link = d.getString("link"),
-            priority = d.getBoolean("priority") ?: false,
+            priority = bool(d.get("priority")),
             startDate = d.getString("startDate"),
             startTime = d.getString("startTime"),
             dueDate = d.getString("dueDate"),
@@ -38,6 +60,7 @@ object TaskRepo {
             doneAt = d.getLong("doneAt"),
             doneBy = d.getString("doneBy"),
             checklist = checklist,
+            history = history,
         )
     }
 
@@ -79,8 +102,14 @@ object TaskRepo {
             .addOnFailureListener { cont.resume(Result.failure(it)) }
     }
 
-    suspend fun move(task: TaskItem, newStatus: String, uid: String?) =
-        update(task.id, TaskContract.statusPatch(newStatus, uid, task, System.currentTimeMillis()))
+    suspend fun move(task: TaskItem, newStatus: String, uid: String?): Result<Unit> {
+        val now = System.currentTimeMillis()
+        val patch = TaskContract.statusPatch(newStatus, uid, task, now).toMutableMap()
+        patch["history"] = FieldValue.arrayUnion(
+            mapOf("kind" to "moved", "at" to now, "byId" to uid, "from" to (task.status ?: "afazer"), "to" to newStatus)
+        )
+        return update(task.id, patch)
+    }
 
     suspend fun setChecklist(id: String, items: List<ChecklistItem>) =
         update(id, TaskContract.checklistPatch(items))

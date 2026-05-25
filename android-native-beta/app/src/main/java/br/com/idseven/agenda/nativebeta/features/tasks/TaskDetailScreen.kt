@@ -52,9 +52,11 @@ import br.com.idseven.agenda.nativebeta.designsystem.components.LoadingState
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
+import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
 import br.com.idseven.agenda.nativebeta.domain.TaskStatus
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
+import br.com.idseven.agenda.nativebeta.shared.DateUtil
 import kotlinx.coroutines.launch
 
 @Composable
@@ -72,6 +74,7 @@ fun TaskDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
+        // Cabeçalho
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 14.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Tarefa", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             if (canManage) {
@@ -88,24 +91,58 @@ fun TaskDetailScreen(
             LoadingState()
         } else {
             val sector = Sectors.of(t.sector)
-            val creator = t.by?.let { b -> users.firstOrNull { it.id == b } }
+            val requester = t.by?.let { b -> users.firstOrNull { it.id == b } }
             val assignee = users.firstOrNull { (it.name ?: "").equals(t.assignee ?: "", ignoreCase = true) }
+            val deadline = TaskDeadline.of(t)
             val total = t.checklist.size
             val done = t.checklist.count { it.d }
 
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                // Resumo
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)) {
+                // Solicitação
+                SectionLabel("Solicitação")
+                Card {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 36.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Solicitado por", color = Tokens.Faint, fontSize = 11.sp)
+                            Text(requester?.name ?: "—", color = Tokens.Ink, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                            t.createdAt?.let { Text("Lançada em ${DateUtil.fmtMs(it)}", color = Tokens.Soft, fontSize = 11.5.sp) }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+
+                // Cliente e demanda
+                SectionLabel("Cliente e demanda")
+                if (!t.client.isNullOrBlank()) Text(t.client.uppercase(), color = Tokens.Soft, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp)
+                Spacer(Modifier.height(3.dp))
+                Text(t.title?.ifBlank { null } ?: t.client ?: "Sem título", color = Tokens.Ink, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Pill(sector.label, sector.color)
                     if (t.priority) { Spacer(Modifier.width(8.dp)); Pill("Prioridade alta", Tokens.Red) }
+                    if (deadline != null) { Spacer(Modifier.width(8.dp)); Pill(deadline.text, deadline.color) }
                 }
-                Text(t.title?.ifBlank { null } ?: t.client ?: "Sem título", color = Tokens.Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                if (!t.client.isNullOrBlank() && !t.title.isNullOrBlank()) {
-                    Spacer(Modifier.height(4.dp)); Text(t.client, color = Tokens.Soft, fontSize = 14.sp)
-                }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // Status
+                // Responsável e prazo
+                SectionLabel("Responsável e prazo")
+                Card {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), t.assignee ?: "—", 36.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Responsável", color = Tokens.Faint, fontSize = 11.sp)
+                            Text(t.assignee?.ifBlank { null } ?: "Não atribuído", color = Tokens.Ink, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    if (!t.dueDate.isNullOrBlank()) { Divider(); InfoLine("Prazo", t.dueDate + (t.dueTime?.let { if (it.isNotBlank()) " às $it" else "" } ?: "")) }
+                    if (!t.link.isNullOrBlank()) { Divider(); InfoLine("Link", t.link) }
+                }
+                Spacer(Modifier.height(16.dp))
+
+                // Status e prioridade
                 SectionLabel("Status")
                 Row(Modifier.horizontalScroll(rememberScrollState())) {
                     TaskStatus.COLUMNS.forEach { st ->
@@ -117,25 +154,6 @@ fun TaskDetailScreen(
                             colors = FilterChipDefaults.filterChipColors(selectedContainerColor = TaskStatus.color(st).copy(alpha = 0.18f), selectedLabelColor = TaskStatus.color(st)),
                         )
                     }
-                }
-                Spacer(Modifier.height(18.dp))
-
-                // Responsável e prazo
-                SectionLabel("Responsável e prazo")
-                Card {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = if (!t.dueDate.isNullOrBlank() || creator != null) 12.dp else 0.dp)) {
-                        Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), t.assignee ?: "—", 36.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text("Responsável", color = Tokens.Faint, fontSize = 11.sp)
-                            Text(t.assignee?.ifBlank { null } ?: "Não atribuído", color = Tokens.Ink, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    if (!t.dueDate.isNullOrBlank()) {
-                        Divider(); InfoLine("Prazo", t.dueDate + (t.dueTime?.let { if (it.isNotBlank()) " às $it" else "" } ?: ""))
-                    }
-                    if (creator != null) { Divider(); InfoLine("Criado por", creator.name ?: "—") }
-                    if (!t.link.isNullOrBlank()) { Divider(); InfoLine("Link", t.link) }
                 }
 
                 if (total > 0) {
@@ -164,9 +182,28 @@ fun TaskDetailScreen(
                 }
 
                 if (!t.desc.isNullOrBlank()) {
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(16.dp))
                     SectionLabel("Descrição")
                     Card { Text(t.desc, color = Tokens.Ink, fontSize = 14.sp) }
+                }
+
+                if (t.history.isNotEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    SectionLabel("Histórico")
+                    Card {
+                        t.history.takeLast(12).reversed().forEachIndexed { i, h ->
+                            if (i > 0) Spacer(Modifier.height(10.dp))
+                            val who = h.byId?.let { b -> users.firstOrNull { it.id == b }?.name } ?: "Alguém"
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(7.dp).clip(RoundedCornerShape(999.dp)).background(TaskStatus.color(h.to)))
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text("$who moveu para ${TaskStatus.label(h.to)}", color = Tokens.Ink, fontSize = 13.sp)
+                                    Text(DateUtil.fmtMs(h.at), color = Tokens.Faint, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
                 }
                 Spacer(Modifier.height(28.dp))
             }
