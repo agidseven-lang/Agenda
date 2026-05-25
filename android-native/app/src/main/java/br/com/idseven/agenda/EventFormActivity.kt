@@ -10,7 +10,9 @@ import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
+import android.view.WindowManager
 import android.widget.EditText
+import android.widget.Toast
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -63,6 +65,7 @@ class EventFormActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!Perm.canManage(Session.name(this))) { finish(); return }
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         editId = intent.getStringExtra("id")
         try {
             setContentView(buildUi())
@@ -292,16 +295,20 @@ class EventFormActivity : AppCompatActivity() {
 
     // ---- Date / time pickers ----
     private fun pickDate() {
-        val c = Calendar.getInstance()
-        Regex("^(\\d{4})-(\\d{2})-(\\d{2})$").find(selDate)?.let { c.set(it.groupValues[1].toInt(), it.groupValues[2].toInt() - 1, it.groupValues[3].toInt()) }
-        DatePickerDialog(this, { _, y, mo, d -> selDate = "%04d-%02d-%02d".format(y, mo + 1, d); dateView.text = fmtDate(selDate); dateView.setTextColor(INK) },
-            c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+        try {
+            val c = Calendar.getInstance()
+            Regex("^(\\d{4})-(\\d{2})-(\\d{2})$").find(selDate)?.let { c.set(it.groupValues[1].toInt(), it.groupValues[2].toInt() - 1, it.groupValues[3].toInt()) }
+            DatePickerDialog(this, { _, y, mo, d -> selDate = "%04d-%02d-%02d".format(y, mo + 1, d); dateView.text = fmtDate(selDate); dateView.setTextColor(INK) },
+                c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+        } catch (e: Throwable) { Toast.makeText(this, "Não foi possível abrir o calendário: ${e.message ?: ""}", Toast.LENGTH_SHORT).show() }
     }
     private fun pickTime(start: Boolean) {
-        val cur = if (start) selStart else selEnd
-        var hh = 9; var mm = 0
-        Regex("^(\\d{1,2}):(\\d{2})$").find(cur)?.let { hh = it.groupValues[1].toInt(); mm = it.groupValues[2].toInt() }
-        TimePickerDialog(this, { _, h, m -> val v = "%02d:%02d".format(h, m); if (start) { selStart = v; startView.text = v; startView.setTextColor(INK) } else { selEnd = v; endView.text = v; endView.setTextColor(INK) } }, hh, mm, true).show()
+        try {
+            val cur = if (start) selStart else selEnd
+            var hh = 9; var mm = 0
+            Regex("^(\\d{1,2}):(\\d{2})$").find(cur)?.let { hh = it.groupValues[1].toInt(); mm = it.groupValues[2].toInt() }
+            TimePickerDialog(this, { _, h, m -> val v = "%02d:%02d".format(h, m); if (start) { selStart = v; startView.text = v; startView.setTextColor(INK) } else { selEnd = v; endView.text = v; endView.setTextColor(INK) } }, hh, mm, true).show()
+        } catch (e: Throwable) { Toast.makeText(this, "Não foi possível abrir o relógio: ${e.message ?: ""}", Toast.LENGTH_SHORT).show() }
     }
 
     // ---- UI helpers ----
@@ -310,8 +317,10 @@ class EventFormActivity : AppCompatActivity() {
         t.setTypeface(t.typeface, Typeface.BOLD); t.letterSpacing = 0.04f; t.setPadding(0, 0, 0, dp(8)); return t
     }
     private fun input(hint: String, type: Int): EditText {
-        val e = EditText(this); e.hint = hint; e.setHintTextColor(FAINT); e.setTextColor(INK); e.textSize = 15f
+        val e = androidx.appcompat.widget.AppCompatEditText(this)
+        e.hint = hint; e.setHintTextColor(FAINT); e.setTextColor(INK); e.textSize = 15f
         e.setPadding(dp(16), dp(14), dp(16), dp(14)); e.inputType = type
+        e.isEnabled = true; e.isFocusable = true; e.isFocusableInTouchMode = true; e.isClickable = true; e.isCursorVisible = true
         val bg = GradientDrawable(); bg.cornerRadius = dp(13).toFloat(); bg.setColor(SURFACE); bg.setStroke(dp(1), LINE); e.background = bg
         e.layoutParams = fld(); return e
     }
