@@ -267,7 +267,7 @@ class EventFormActivity : AppCompatActivity() {
         m["type"] = selType; m["client"] = client; m["title"] = titleIn.text.toString().trim()
         m["location"] = locIn.text.toString().trim(); m["date"] = selDate
         m["start"] = selStart; m["end"] = selEnd; m["owner"] = ownerName; m["ownerId"] = ownerId
-        m["notes"] = notesIn.text.toString().trim(); m["updatedAt"] = System.currentTimeMillis()
+        m["notes"] = notesIn.text.toString().trim()
 
         saveBtn.isEnabled = false; saveBtn.text = "Salvando…"
         if (editId != null) {

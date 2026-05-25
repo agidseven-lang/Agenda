@@ -123,7 +123,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="build: 0.2.9-novo-fields-fix"
+            android:text="build: 0.2.10-novo-model-fix"
             android:textColor="@color/accent"
             android:textSize="10sp"
             android:gravity="center" />
