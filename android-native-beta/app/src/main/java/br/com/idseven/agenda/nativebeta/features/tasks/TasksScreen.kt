@@ -25,7 +25,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,11 +66,27 @@ import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
+import br.com.idseven.agenda.nativebeta.domain.TaskSort
 import br.com.idseven.agenda.nativebeta.domain.TaskStatus
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 import kotlinx.coroutines.launch
+
+private data class MoveOpt(val label: String, val target: String, val desc: String, val icon: ImageVector)
+
+private fun moveOptions(status: String): List<MoveOpt> = when (status) {
+    "afazer" -> listOf(MoveOpt("Mover para Em andamento", "andamento", "Começar a executar", Icons.Filled.KeyboardArrowRight))
+    "andamento" -> listOf(
+        MoveOpt("Mover para Revisão", "revisao", "Enviar para revisão", Icons.Filled.KeyboardArrowRight),
+        MoveOpt("Voltar para A Fazer", "afazer", "Pausar e retornar", Icons.Filled.KeyboardArrowLeft),
+    )
+    "revisao" -> listOf(
+        MoveOpt("Mover para Concluído", "concluido", "Finalizar a tarefa", Icons.Filled.KeyboardArrowRight),
+        MoveOpt("Voltar para Em andamento", "andamento", "Precisa de ajustes", Icons.Filled.KeyboardArrowLeft),
+    )
+    else -> listOf(MoveOpt("Reabrir tarefa", "andamento", "Voltar para Em andamento", Icons.Outlined.Refresh))
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,7 +149,7 @@ fun TasksScreen(
 
         HorizontalPager(state = pager, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp), pageSpacing = 10.dp) { page ->
             val st = TaskStatus.COLUMNS[page]
-            val list = tasks.filter { (it.status ?: "afazer") == st }
+            val list = TaskSort.order(tasks.filter { (it.status ?: "afazer") == st })
             Column(Modifier.fillMaxHeight()) {
                 ColumnHeader(st, list.size)
                 if (list.isEmpty()) {
@@ -156,18 +176,21 @@ fun TasksScreen(
                 Spacer(Modifier.height(2.dp))
                 Text(target.title?.ifBlank { null } ?: target.client ?: "Tarefa", color = Tokens.Soft, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(14.dp))
-                TaskStatus.COLUMNS.filter { it != (target.status ?: "afazer") }.forEach { st ->
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(12.dp))
-                            .background(TaskStatus.color(st).copy(alpha = 0.14f))
-                            .clickable { scope.launch { TaskRepo.move(target, st, currentUid) }; moveTarget = null }
-                            .padding(vertical = 15.dp, horizontal = 16.dp),
-                        contentAlignment = Alignment.CenterStart,
+                moveOptions(target.status ?: "afazer").forEach { opt ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(14.dp))
+                            .background(TaskStatus.color(opt.target).copy(alpha = 0.12f))
+                            .clickable { scope.launch { TaskRepo.move(target, opt.target, currentUid) }; moveTarget = null }
+                            .padding(vertical = 13.dp, horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(9.dp).clip(CircleShape).background(TaskStatus.color(st)))
-                            Spacer(Modifier.width(10.dp))
-                            Text("Mover para ${TaskStatus.label(st)}", color = TaskStatus.color(st), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(TaskStatus.color(opt.target).copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                            Icon(opt.icon, contentDescription = null, tint = TaskStatus.color(opt.target), modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(opt.label, color = TaskStatus.color(opt.target), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(opt.desc, color = Tokens.Faint, fontSize = 11.5.sp)
                         }
                     }
                 }
@@ -230,7 +253,7 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
         if (requester != null || task.createdAt != null) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 22.dp)
+                Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 26.dp)
                 Spacer(Modifier.width(8.dp))
                 Column {
                     Text("Solicitado por ${UserColor.firstName(requester?.name) .ifBlank { "—" }}", color = Tokens.Soft, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
@@ -256,7 +279,7 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (!task.assignee.isNullOrBlank()) {
-                Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee, 22.dp)
+                Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee, 26.dp)
                 Spacer(Modifier.width(8.dp))
                 Text(UserColor.firstName(task.assignee), color = Tokens.Soft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             } else {

@@ -1,6 +1,7 @@
 package br.com.idseven.agenda.nativebeta.features.agenda
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -11,15 +12,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,11 +80,28 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
     fun ownerOf(e: EventItem) = users.firstOrNull { it.id == e.ownerId }
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 12.dp, end = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Agenda", color = Tokens.Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Toggle("Dia", !listMode) { listMode = false }
-            Spacer(Modifier.width(8.dp))
-            Toggle("Lista", listMode) { listMode = true }
+        // Topo premium: mês/ano (ou "Agenda") + Hoje + navegação
+        Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 10.dp, end = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (!listMode) {
+                Text(monthLabel(month), color = Tokens.Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(6.dp))
+                Text("${month.year}", color = Tokens.Soft, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Box(Modifier.clip(RoundedCornerShape(999.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(999.dp)).clickable { month = YearMonth.now(); selected = LocalDate.now() }.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                    Text("Hoje", color = Tokens.Soft, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(8.dp))
+                NavBtn(Icons.Filled.KeyboardArrowLeft) { month = month.minusMonths(1) }
+                Spacer(Modifier.width(6.dp))
+                NavBtn(Icons.Filled.KeyboardArrowRight) { month = month.plusMonths(1) }
+            } else {
+                Text("Agenda", color = Tokens.Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        // Toggle Mês / Agenda
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp).clip(RoundedCornerShape(14.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(14.dp)).padding(4.dp)) {
+            Seg("Mês", !listMode, Modifier.weight(1f)) { listMode = false }
+            Seg("Agenda", listMode, Modifier.weight(1f)) { listMode = true }
         }
         SearchField(query, { query = it }, "Buscar compromisso…")
         TypeFilters(typeFilter) { typeFilter = it }
@@ -87,9 +110,7 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
             val dayEvents = (eventsByDay[selected] ?: emptyList()).sortedBy { it.start ?: "" }
             val iso = selected.toString()
             LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
-                item("cal") {
-                    CalendarCard(month, selected, eventsByDay, { month = month.minusMonths(1) }, { month = month.plusMonths(1) }, { selected = it })
-                }
+                item("cal") { CalendarCard(month, selected, eventsByDay) { selected = it; month = YearMonth.from(it) } }
                 item("dh") {
                     Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(DateUtil.dayLabel(iso), color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -132,10 +153,18 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
 private fun parseDay(date: String?): LocalDate? = runCatching { LocalDate.parse(date) }.getOrNull()
 
 @Composable
-private fun Toggle(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun Seg(label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(
-        modifier = Modifier.clip(RoundedCornerShape(999.dp)).background(if (selected) Tokens.Accent else Tokens.Surface2).clickable { onClick() }.padding(horizontal = 14.dp, vertical = 7.dp),
-    ) { Text(label, color = if (selected) Color.White else Tokens.Soft, fontSize = 12.5.sp, fontWeight = FontWeight.Bold) }
+        modifier = modifier.clip(RoundedCornerShape(11.dp)).background(if (selected) Tokens.Accent else Color.Transparent).clickable { onClick() }.padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, color = if (selected) Color.White else Tokens.Soft, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+}
+
+@Composable
+private fun NavBtn(icon: ImageVector, onClick: () -> Unit) {
+    Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(11.dp)).clickable { onClick() }, contentAlignment = Alignment.Center) {
+        Icon(icon, contentDescription = null, tint = Tokens.Soft, modifier = Modifier.size(22.dp))
+    }
 }
 
 @Composable

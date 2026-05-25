@@ -102,7 +102,7 @@ fun TaskDetailScreen(
                 SectionLabel("Solicitação")
                 Card {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 36.dp)
+                        Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 44.dp)
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text("Solicitado por", color = Tokens.Faint, fontSize = 11.sp)
@@ -130,7 +130,7 @@ fun TaskDetailScreen(
                 SectionLabel("Responsável e prazo")
                 Card {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), t.assignee ?: "—", 36.dp)
+                        Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), t.assignee ?: "—", 44.dp)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Responsável", color = Tokens.Faint, fontSize = 11.sp)
@@ -156,10 +156,12 @@ fun TaskDetailScreen(
                     }
                 }
 
-                if (total > 0) {
-                    Spacer(Modifier.height(18.dp))
-                    SectionLabel("Checklist · $done/$total")
-                    Card {
+                Spacer(Modifier.height(18.dp))
+                SectionLabel(if (total > 0) "Checklist · $done/$total concluídos" else "Checklist")
+                Card {
+                    if (total == 0) {
+                        Text("Nenhum checklist cadastrado", color = Tokens.Faint, fontSize = 13.sp)
+                    } else {
                         LinearProgressIndicator(progress = { done.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)), color = Tokens.Green, trackColor = Tokens.Surface2)
                         Spacer(Modifier.height(10.dp))
                         t.checklist.forEachIndexed { idx, item ->
