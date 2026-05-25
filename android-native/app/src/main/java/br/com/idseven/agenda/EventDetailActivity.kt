@@ -144,17 +144,18 @@ class EventDetailActivity : AppCompatActivity() {
         bodyCol.addView(list)
 
         // Ações
-        if (!e.done && (e.startedAt == null || e.startedAt <= 0)) {
-            bodyCol.addView(actionToggle("Iniciar agora", R.drawable.ic_play, AMBER, withAlpha(AMBER, 0.12f), withAlpha(AMBER, 0.30f)) {
+        val notStarted = e.startedAt == null || e.startedAt <= 0
+        if (!e.done && notStarted) {
+            bodyCol.addView(actionToggle("Iniciar agora", R.drawable.ic_play, AMBER, withAlpha(AMBER, 0.12f), withAlpha(AMBER, 0.30f), topMarginDp = 16) {
                 EventRepo.start(id, Session.uid(this), {}, { m -> toast(m) })
             })
         }
         if (!e.done) {
-            bodyCol.addView(actionToggle("Finalizar agora", R.drawable.ic_check, INK, SURFACE, LINE) {
+            bodyCol.addView(actionToggle("Finalizar agora", R.drawable.ic_check, INK, SURFACE, LINE, topMarginDp = if (notStarted) 11 else 16) {
                 EventRepo.finish(id, Session.uid(this), {}, { m -> toast(m) })
             })
         } else {
-            bodyCol.addView(actionToggle("Serviço finalizado ✓ (tocar para reabrir)", R.drawable.ic_check, GREEN, withAlpha(GREEN, 0.10f), withAlpha(GREEN, 0.35f)) {
+            bodyCol.addView(actionToggle("Serviço finalizado ✓ (tocar para reabrir)", R.drawable.ic_check, GREEN, withAlpha(GREEN, 0.10f), withAlpha(GREEN, 0.35f), topMarginDp = 16) {
                 EventRepo.reopen(id, {}, { m -> toast(m) })
             })
         }
@@ -192,11 +193,11 @@ class EventDetailActivity : AppCompatActivity() {
         return row
     }
 
-    private fun actionToggle(text: String, iconRes: Int, fg: Int, bgColor: Int, strokeColor: Int, onClick: () -> Unit): View {
+    private fun actionToggle(text: String, iconRes: Int, fg: Int, bgColor: Int, strokeColor: Int, topMarginDp: Int = 11, onClick: () -> Unit): View {
         val b = LinearLayout(this); b.orientation = LinearLayout.HORIZONTAL; b.gravity = Gravity.CENTER
         b.setPadding(dp(16), dp(16), dp(16), dp(16))
         val bg = GradientDrawable(); bg.cornerRadius = dp(14).toFloat(); bg.setColor(bgColor); bg.setStroke(dp(if (bgColor == SURFACE) 1 else 2), strokeColor); b.background = bg
-        b.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).also { it.topMargin = dp(12) }
+        b.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).also { it.topMargin = dp(topMarginDp) }
         val img = ImageView(this); img.setImageResource(iconRes); img.setColorFilter(fg)
         img.layoutParams = LinearLayout.LayoutParams(dp(18), dp(18)).also { it.rightMargin = dp(10) }; b.addView(img)
         val t = TextView(this); t.text = text; t.setTextColor(fg); t.textSize = 14.5f; t.setTypeface(t.typeface, Typeface.BOLD); b.addView(t)

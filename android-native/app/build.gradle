@@ -10,8 +10,8 @@ android {
         applicationId "br.com.idseven.agenda"
         minSdk 26
         targetSdk 34
-        versionCode 16
-        versionName "0.2.14-card-redesign"
+        versionCode 17
+        versionName "0.2.15-detalhe-align"
     }
 
     signingConfigs {
