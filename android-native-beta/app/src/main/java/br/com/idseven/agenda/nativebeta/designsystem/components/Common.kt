@@ -17,6 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -164,16 +168,16 @@ fun EventCard(event: EventItem, owner: UserLite?, onClick: () -> Unit = {}) {
             Pill(type.label, type.color)
             if (!event.client.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
-                InfoLine(androidx.compose.material.icons.Icons.Outlined.Person, event.client)
+                InfoLine(Icons.Outlined.Person, event.client)
             }
             if (!event.location.isNullOrBlank()) {
                 Spacer(Modifier.height(6.dp))
-                InfoLine(androidx.compose.material.icons.Icons.Outlined.Place, event.location)
+                InfoLine(Icons.Outlined.Place, event.location)
             }
             EventStatus.status(event)?.let { si ->
                 val col = if (si.late) Tokens.Red else if (si.kind == "run") Tokens.Amber else Tokens.Green
                 Spacer(Modifier.height(11.dp))
-                StatusChip(si.text, col, androidx.compose.material.icons.Icons.Outlined.Schedule)
+                StatusChip(si.text, col, Icons.Outlined.Schedule)
             }
         }
     }

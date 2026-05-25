@@ -42,5 +42,8 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 // Helpers para extrair a lista (ou vazio enquanto carrega).
-fun <T> UiList<T>.itemsOrEmpty(): List<T> = (this as? UiList.Data)?.items ?: emptyList()
+fun <T> UiList<T>.itemsOrEmpty(): List<T> = when (this) {
+    is UiList.Data -> items
+    else -> emptyList()
+}
 val UiList<*>.isLoading: Boolean get() = this is UiList.Loading
