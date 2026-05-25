@@ -2,6 +2,7 @@ package br.com.idseven.agenda.nativebeta.features.tasks
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -104,10 +105,10 @@ fun TaskDetailScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 44.dp)
                         Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text("Solicitado por", color = Tokens.Faint, fontSize = 11.sp)
-                            Text(requester?.name ?: "—", color = Tokens.Ink, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
-                            t.createdAt?.let { Text("Lançada em ${DateUtil.fmtMs(it)}", color = Tokens.Soft, fontSize = 11.5.sp) }
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text("Solicitado por", color = Tokens.Faint, fontSize = 11.sp, lineHeight = 13.sp)
+                            Text(requester?.name ?: "—", color = Tokens.Ink, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, lineHeight = 17.sp)
+                            t.createdAt?.let { Text("Lançada em ${DateUtil.fmtMs(it)}", color = Tokens.Soft, fontSize = 11.5.sp, lineHeight = 14.sp) }
                         }
                     }
                 }

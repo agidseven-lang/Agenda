@@ -147,10 +147,10 @@ fun TasksScreen(
             return
         }
 
-        HorizontalPager(state = pager, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp), pageSpacing = 10.dp) { page ->
+        HorizontalPager(state = pager, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
             val st = TaskStatus.COLUMNS[page]
             val list = TaskSort.order(tasks.filter { (it.status ?: "afazer") == st })
-            Column(Modifier.fillMaxHeight()) {
+            Column(Modifier.fillMaxHeight().padding(horizontal = 18.dp)) {
                 ColumnHeader(st, list.size)
                 if (list.isEmpty()) {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { Text("Nenhuma tarefa aqui", color = Tokens.Faint, fontSize = 13.sp) }
@@ -213,16 +213,20 @@ private fun SectorChip(label: String, color: Color?, selected: Boolean, onClick:
 @Composable
 private fun ColumnHeader(st: String, count: Int) {
     val color = TaskStatus.color(st)
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(11.dp).clip(CircleShape).background(color))
-            Spacer(Modifier.width(10.dp))
-            Text(TaskStatus.label(st), color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Box(Modifier.clip(RoundedCornerShape(999.dp)).background(color.copy(alpha = 0.16f)).padding(horizontal = 12.dp, vertical = 4.dp)) {
-                Text("$count", color = color, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
-            }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 14.dp).clip(RoundedCornerShape(16.dp))
+            .background(Tokens.Surface).border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(16.dp)).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(12.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(TaskStatus.label(st), color = color, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(TaskStatus.desc(st), color = Tokens.Faint, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
         }
-        Text(TaskStatus.desc(st), color = Tokens.Faint, fontSize = 12.sp, modifier = Modifier.padding(start = 21.dp, top = 3.dp))
+        Box(Modifier.clip(RoundedCornerShape(999.dp)).background(color.copy(alpha = 0.16f)).padding(horizontal = 12.dp, vertical = 5.dp)) {
+            Text("$count", color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -250,10 +254,10 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 36.dp)
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text("Solicitado por ${UserColor.firstName(requester?.name) .ifBlank { "—" }}", color = Tokens.Soft, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
-                    task.createdAt?.let { Text("lançada em ${DateUtil.fmtMs(it)}", color = Tokens.Faint, fontSize = 10.5.sp) }
+                Spacer(Modifier.width(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    Text("Solicitado por ${UserColor.firstName(requester?.name).ifBlank { "—" }}", color = Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 14.sp)
+                    task.createdAt?.let { Text("lançada em ${DateUtil.fmtMs(it)}", color = Tokens.Faint, fontSize = 11.sp, lineHeight = 13.sp) }
                 }
             }
         }

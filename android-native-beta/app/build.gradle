@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 9
-        versionName "1.0.5-beta-layout-pro"
+        versionCode 10
+        versionName "1.0.6-beta-calendar-pro"
         vectorDrawables { useSupportLibrary true }
     }
 

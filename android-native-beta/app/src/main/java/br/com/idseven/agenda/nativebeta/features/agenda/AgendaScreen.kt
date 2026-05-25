@@ -120,7 +120,7 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
             val iso = selected.toString()
             LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)) {
                 item("cal") {
-                    HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().height(384.dp)) { page ->
+                    HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().height(366.dp)) { page ->
                         val m = base.plusMonths((page - ANCHOR).toLong())
                         CalendarCard(m, selected, eventsByDay) { d ->
                             selected = d
