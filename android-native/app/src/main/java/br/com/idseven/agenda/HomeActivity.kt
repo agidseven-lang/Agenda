@@ -50,8 +50,9 @@ class HomeActivity : AppCompatActivity() {
         else startActivity(Intent(this, EventFormActivity::class.java))
     }
 
-    private fun select(key: String) {
-        current = key
+    fun selectTab(key: String) = select(key)
+
+    private fun select(key: String) {        current = key
         tabDefs.forEach { (k, t) ->
             val color = if (k == key) WHITE else SOFT
             findViewById<ImageView>(t.ico).setColorFilter(color)
