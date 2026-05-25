@@ -40,16 +40,16 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: (Opcional) Restaurar google-services.json — usado a partir da Fase 1 (Firebase)
+      - name: Restaurar google-services.json (secret GOOGLE_SERVICES_JSON_BETA — texto puro)
         env:
-          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+          GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
         run: |
-          if [ -n "$GS_B64" ]; then
-            echo "$GS_B64" | base64 -d > android-native-beta/app/google-services.json
-            echo "google-services.json restaurado ($(wc -c < android-native-beta/app/google-services.json) bytes)."
-          else
-            echo "Secret GOOGLE_SERVICES_JSON_BASE64 ausente — OK na Fase 0 (app ainda não usa Firebase)."
+          if [ -z "$GS_JSON" ]; then
+            echo "::error::Secret GOOGLE_SERVICES_JSON_BETA ausente — necessário pelo plugin google-services (Firebase) a partir da Fase 1."
+            exit 1
           fi
+          printf '%s' "$GS_JSON" > android-native-beta/app/google-services.json
+          echo "google-services.json gravado ($(wc -c < android-native-beta/app/google-services.json) bytes)."
 
       - name: gradlew clean assembleRelease
         working-directory: android-native-beta
@@ -60,6 +60,6 @@ jobs:
       - name: Upload APK release (nome único por versão + commit)
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-0.1.0-fase0-${{ github.sha }}
+          name: idseven-nativebeta-0.2.0-fase1-${{ github.sha }}
           path: android-native-beta/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error

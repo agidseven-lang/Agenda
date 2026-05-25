@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "0.1.0-beta-fase0"
+        versionCode 2
+        versionName "0.2.0-beta-fase1-login"
         vectorDrawables { useSupportLibrary true }
     }
 
@@ -52,6 +52,14 @@ dependencies {
     implementation "androidx.activity:activity-compose:1.9.3"
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.8.7"
     implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7"
+
+    // Sessão local (DataStore Preferences)
+    implementation "androidx.datastore:datastore-preferences:1.1.1"
+
+    // Firebase Android NATIVO (Firestore). BoM controla as versões. NÃO usa Firebase Auth.
+    implementation platform("com.google.firebase:firebase-bom:33.7.0")
+    implementation "com.google.firebase:firebase-firestore"
 
     implementation platform("androidx.compose:compose-bom:2024.10.01")
     implementation "androidx.compose.ui:ui"
@@ -62,5 +70,5 @@ dependencies {
     debugImplementation "androidx.compose.ui:ui-tooling"
 }
 
-// Firebase (Firestore/FCM) entra na Fase 1 — plugin google-services será aplicado então,
-// após o package br.com.idseven.agenda.nativebeta ser registrado no projeto Firebase.
+// Processa app/google-services.json (DEVE ficar no final). NÃO usa Firebase Auth.
+apply plugin: "com.google.gms.google-services"
