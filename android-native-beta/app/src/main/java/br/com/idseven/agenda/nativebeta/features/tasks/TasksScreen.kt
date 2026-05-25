@@ -133,10 +133,10 @@ fun TasksScreen(
                         .padding(vertical = 7.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(7.dp).clip(CircleShape).background(TaskStatus.color(st)))
-                        Spacer(Modifier.width(5.dp))
-                        Text("$count", color = if (sel) TaskStatus.color(st) else Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    val sl = when (st) { "andamento" -> "Andam."; "revisao" -> "Revisão"; "concluido" -> "Concl."; else -> "A Fazer" }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(sl, color = if (sel) TaskStatus.color(st) else Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text("$count", color = if (sel) TaskStatus.color(st) else Tokens.Soft, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -155,13 +155,12 @@ fun TasksScreen(
                 if (list.isEmpty()) {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { Text("Nenhuma tarefa aqui", color = Tokens.Faint, fontSize = 13.sp) }
                 } else {
-                    LazyColumn(Modifier.fillMaxWidth()) {
+                    LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 96.dp)) {
                         items(list, key = { it.id }) { task ->
                             val requester = users.firstOrNull { it.id == task.by }
                             val assignee = users.firstOrNull { (it.name ?: "").equals(task.assignee ?: "", ignoreCase = true) }
                             TaskCardPro(task, requester, assignee, onClick = { onTaskClick(task.id) }, onMove = { moveTarget = task })
                         }
-                        item { Spacer(Modifier.height(24.dp)) }
                     }
                 }
             }
@@ -214,19 +213,16 @@ private fun SectorChip(label: String, color: Color?, selected: Boolean, onClick:
 @Composable
 private fun ColumnHeader(st: String, count: Int) {
     val color = TaskStatus.color(st)
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(14.dp))
-            .background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(14.dp)).padding(14.dp),
-    ) {
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-            Spacer(Modifier.width(9.dp))
-            Text(TaskStatus.label(st), color = color, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Box(Modifier.clip(RoundedCornerShape(999.dp)).background(Tokens.Surface2).padding(horizontal = 11.dp, vertical = 3.dp)) {
-                Text("$count", color = Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Box(Modifier.size(11.dp).clip(CircleShape).background(color))
+            Spacer(Modifier.width(10.dp))
+            Text(TaskStatus.label(st), color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Box(Modifier.clip(RoundedCornerShape(999.dp)).background(color.copy(alpha = 0.16f)).padding(horizontal = 12.dp, vertical = 4.dp)) {
+                Text("$count", color = color, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
             }
         }
-        Text(TaskStatus.desc(st), color = Tokens.Faint, fontSize = 12.sp, modifier = Modifier.padding(start = 19.dp, top = 2.dp))
+        Text(TaskStatus.desc(st), color = Tokens.Faint, fontSize = 12.sp, modifier = Modifier.padding(start = 21.dp, top = 3.dp))
     }
 }
 
@@ -253,7 +249,7 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
         if (requester != null || task.createdAt != null) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 26.dp)
+                Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 36.dp)
                 Spacer(Modifier.width(8.dp))
                 Column {
                     Text("Solicitado por ${UserColor.firstName(requester?.name) .ifBlank { "—" }}", color = Tokens.Soft, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
@@ -279,7 +275,7 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (!task.assignee.isNullOrBlank()) {
-                Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee, 26.dp)
+                Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee, 36.dp)
                 Spacer(Modifier.width(8.dp))
                 Text(UserColor.firstName(task.assignee), color = Tokens.Soft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             } else {
@@ -289,7 +285,7 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
             if (!task.dueDate.isNullOrBlank()) {
                 Icon(Icons.Outlined.Schedule, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
-                Text(task.dueDate + (task.dueTime?.let { if (it.isNotBlank()) " $it" else "" } ?: ""), color = Tokens.Faint, fontSize = 12.sp)
+                Text(DateUtil.prazo(task.dueDate, task.dueTime), color = Tokens.Faint, fontSize = 12.sp)
             }
         }
         // 12. checklist progress

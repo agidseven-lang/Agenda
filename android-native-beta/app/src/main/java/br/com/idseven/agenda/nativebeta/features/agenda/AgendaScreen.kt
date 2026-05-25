@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,16 +57,23 @@ import br.com.idseven.agenda.nativebeta.domain.EventItem
 import br.com.idseven.agenda.nativebeta.domain.Types
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
+
+private const val ANCHOR = 1200
+private fun monthsBetween(a: YearMonth, b: YearMonth) = (b.year - a.year) * 12 + (b.monthValue - a.monthValue)
 
 @Composable
 fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventClick: (String) -> Unit) {
     eventsState.errorMessage()?.let { ErrorState("Agenda — $it"); return }
     if (eventsState.isLoading) { SkeletonList(); return }
     val all = eventsState.itemsOrEmpty()
+    val scope = rememberCoroutineScope()
 
-    var month by remember { mutableStateOf(YearMonth.now()) }
+    val base = remember { YearMonth.now() }
+    val pager = rememberPagerState(initialPage = ANCHOR, pageCount = { ANCHOR * 2 })
+    val month = base.plusMonths((pager.currentPage - ANCHOR).toLong())
     var selected by remember { mutableStateOf(LocalDate.now()) }
     var query by remember { mutableStateOf("") }
     var typeFilter by remember { mutableStateOf<String?>(null) }
@@ -80,25 +91,23 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
     fun ownerOf(e: EventItem) = users.firstOrNull { it.id == e.ownerId }
 
     Column(Modifier.fillMaxSize()) {
-        // Topo premium: mês/ano (ou "Agenda") + Hoje + navegação
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 10.dp, end = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (!listMode) {
                 Text(monthLabel(month), color = Tokens.Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(6.dp))
                 Text("${month.year}", color = Tokens.Soft, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
-                Box(Modifier.clip(RoundedCornerShape(999.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(999.dp)).clickable { month = YearMonth.now(); selected = LocalDate.now() }.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                Box(Modifier.clip(RoundedCornerShape(999.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(999.dp)).clickable { scope.launch { pager.animateScrollToPage(ANCHOR) }; selected = LocalDate.now() }.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text("Hoje", color = Tokens.Soft, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.width(8.dp))
-                NavBtn(Icons.Filled.KeyboardArrowLeft) { month = month.minusMonths(1) }
+                NavBtn(Icons.Filled.KeyboardArrowLeft) { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } }
                 Spacer(Modifier.width(6.dp))
-                NavBtn(Icons.Filled.KeyboardArrowRight) { month = month.plusMonths(1) }
+                NavBtn(Icons.Filled.KeyboardArrowRight) { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } }
             } else {
                 Text("Agenda", color = Tokens.Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             }
         }
-        // Toggle Mês / Agenda
         Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp).clip(RoundedCornerShape(14.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(14.dp)).padding(4.dp)) {
             Seg("Mês", !listMode, Modifier.weight(1f)) { listMode = false }
             Seg("Agenda", listMode, Modifier.weight(1f)) { listMode = true }
@@ -109,10 +118,18 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
         if (!listMode) {
             val dayEvents = (eventsByDay[selected] ?: emptyList()).sortedBy { it.start ?: "" }
             val iso = selected.toString()
-            LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
-                item("cal") { CalendarCard(month, selected, eventsByDay) { selected = it; month = YearMonth.from(it) } }
+            LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)) {
+                item("cal") {
+                    HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().height(384.dp)) { page ->
+                        val m = base.plusMonths((page - ANCHOR).toLong())
+                        CalendarCard(m, selected, eventsByDay) { d ->
+                            selected = d
+                            if (YearMonth.from(d) != m) scope.launch { pager.animateScrollToPage(ANCHOR + monthsBetween(base, YearMonth.from(d))) }
+                        }
+                    }
+                }
                 item("dh") {
-                    Row(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(DateUtil.dayLabel(iso), color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.width(8.dp))
                         Text(DateUtil.dayShort(iso), color = Tokens.Faint, fontSize = 12.5.sp, modifier = Modifier.weight(1f))
@@ -133,7 +150,7 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
                 }
             } else {
                 val groups = ordered.groupBy { it.date ?: "" }
-                LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
+                LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)) {
                     groups.forEach { (date, list) ->
                         item(key = "h_$date") {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 14.dp, bottom = 10.dp)) {

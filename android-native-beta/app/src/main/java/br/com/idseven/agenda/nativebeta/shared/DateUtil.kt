@@ -46,4 +46,13 @@ object DateUtil {
         fun p(n: Int) = if (n < 10) "0$n" else "$n"
         return "${p(c.get(Calendar.HOUR_OF_DAY))}:${p(c.get(Calendar.MINUTE))}"
     }
+
+    // Prazo legível a partir de "YYYY-MM-DD" + "HH:MM": "29/05/2026 às 18:00".
+    fun prazo(dateIso: String?, time: String?): String {
+        if (dateIso.isNullOrBlank()) return "Sem prazo"
+        val c = parse(dateIso) ?: return dateIso
+        fun p(n: Int) = if (n < 10) "0$n" else "$n"
+        val d = "${p(c.get(Calendar.DAY_OF_MONTH))}/${p(c.get(Calendar.MONTH) + 1)}/${c.get(Calendar.YEAR)}"
+        return if (!time.isNullOrBlank()) "$d às $time" else d
+    }
 }

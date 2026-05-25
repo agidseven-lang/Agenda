@@ -52,6 +52,6 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
         ) { Text("Sair", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
 
         Spacer(Modifier.height(1.dp).weight(1f))
-        Text("build: 1.0.4-beta-flow-pro", color = Tokens.Faint, fontSize = 11.sp)
+        Text("build: 1.0.5-beta-layout-pro", color = Tokens.Faint, fontSize = 11.sp)
     }
 }
