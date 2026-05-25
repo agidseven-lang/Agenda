@@ -12,6 +12,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -386,10 +387,12 @@ class AgendaFragment : Fragment() {
     private fun emptyState(title: String, sub: String): View {
         val box = LinearLayout(requireContext()); box.orientation = LinearLayout.VERTICAL; box.gravity = Gravity.CENTER
         box.setPadding(dp(20), dp(50), dp(20), dp(50))
-        val ic = TextView(requireContext()); ic.text = "🗓"; ic.textSize = 26f; ic.gravity = Gravity.CENTER
-        ic.layoutParams = LinearLayout.LayoutParams(dp(64), dp(64))
-        val ig = GradientDrawable(); ig.cornerRadius = dp(18).toFloat(); ig.setColor(SURFACE); ig.setStroke(dp(1), LINE); ic.background = ig
-        box.addView(ic)
+        val icBox = FrameLayout(requireContext()); icBox.layoutParams = LinearLayout.LayoutParams(dp(64), dp(64))
+        val ig = GradientDrawable(); ig.cornerRadius = dp(18).toFloat(); ig.setColor(SURFACE); ig.setStroke(dp(1), LINE); icBox.background = ig
+        val iv = android.widget.ImageView(requireContext()); iv.setImageResource(R.drawable.ic_cal_empty); iv.setColorFilter(FAINT); iv.alpha = 0.7f
+        val ilp = FrameLayout.LayoutParams(dp(26), dp(26)); ilp.gravity = Gravity.CENTER; iv.layoutParams = ilp
+        icBox.addView(iv)
+        box.addView(icBox)
         val p = TextView(requireContext()); p.text = title; p.setTextColor(SOFT); p.textSize = 15f; p.setTypeface(p.typeface, Typeface.BOLD); p.gravity = Gravity.CENTER; p.setPadding(0, dp(16), 0, 0); box.addView(p)
         val s = TextView(requireContext()); s.text = sub; s.setTextColor(FAINT); s.textSize = 12.5f; s.gravity = Gravity.CENTER; s.setPadding(0, dp(6), 0, 0); box.addView(s)
         return box
