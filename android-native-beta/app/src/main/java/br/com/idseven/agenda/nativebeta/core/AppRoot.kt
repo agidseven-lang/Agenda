@@ -16,7 +16,6 @@ import androidx.compose.ui.platform.LocalContext
 import br.com.idseven.agenda.nativebeta.data.SessionStore
 import br.com.idseven.agenda.nativebeta.data.UserSession
 import br.com.idseven.agenda.nativebeta.features.auth.LoginScreen
-import br.com.idseven.agenda.nativebeta.features.dashboard.DashboardScreen
 import kotlinx.coroutines.launch
 
 private sealed class SessionState {
@@ -42,8 +41,8 @@ fun AppRoot() {
     when (val s = state) {
         is SessionState.Loading -> Splash()
         is SessionState.LoggedOut -> LoginScreen()
-        is SessionState.LoggedIn -> DashboardScreen(
-            name = s.session.name,
+        is SessionState.LoggedIn -> MainScaffold(
+            session = s.session,
             onLogout = { scope.launch { sessionStore.clear() } },
         )
     }
