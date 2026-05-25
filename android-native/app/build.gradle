@@ -10,8 +10,8 @@ android {
         applicationId "br.com.idseven.agenda"
         minSdk 26
         targetSdk 34
-        versionCode 12
-        versionName "0.2.10-novo-model-fix"
+        versionCode 13
+        versionName "0.2.11-detalhe-fiel"
     }
 
     signingConfigs {
