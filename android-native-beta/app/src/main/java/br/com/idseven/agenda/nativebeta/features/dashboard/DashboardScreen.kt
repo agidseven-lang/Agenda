@@ -21,12 +21,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.nativebeta.core.UiList
+import br.com.idseven.agenda.nativebeta.core.errorMessage
 import br.com.idseven.agenda.nativebeta.core.isLoading
 import br.com.idseven.agenda.nativebeta.core.itemsOrEmpty
 import br.com.idseven.agenda.nativebeta.data.UserSession
+import br.com.idseven.agenda.nativebeta.designsystem.components.ErrorState
 import br.com.idseven.agenda.nativebeta.designsystem.components.EventCard
-import br.com.idseven.agenda.nativebeta.designsystem.components.LoadingState
 import br.com.idseven.agenda.nativebeta.designsystem.components.SectionTitle
+import br.com.idseven.agenda.nativebeta.designsystem.components.SkeletonList
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.EventItem
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
@@ -42,7 +44,8 @@ fun DashboardScreen(
     session: UserSession,
     onEventClick: (String) -> Unit,
 ) {
-    if (eventsState.isLoading) { LoadingState(); return }
+    eventsState.errorMessage()?.let { ErrorState("Hoje — $it"); return }
+    if (eventsState.isLoading) { SkeletonList(); return }
 
     val today = DateUtil.todayIso()
     val events = eventsState.itemsOrEmpty()

@@ -29,7 +29,10 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         _ui.value = AuthUi.Loading
         viewModelScope.launch {
             when (val r = AuthRepo.login(idOrPhone, password)) {
-                is AuthRepo.Result.Ok -> sessionStore.save(r.uid, r.name) // dispara navegação reativa
+                is AuthRepo.Result.Ok -> {
+                    sessionStore.save(r.uid, r.name) // dispara navegação reativa
+                    _ui.value = AuthUi.Idle // evita spinner travado ao voltar do logout (VM é da Activity)
+                }
                 is AuthRepo.Result.Err -> _ui.value = AuthUi.Error(r.message)
             }
         }

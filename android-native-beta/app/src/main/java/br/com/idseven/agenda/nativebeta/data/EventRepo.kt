@@ -35,8 +35,13 @@ object EventRepo {
 
     fun events(): Flow<List<EventItem>> = callbackFlow {
         val reg = db.collection("events").addSnapshotListener { snap, e ->
-            if (e != null) { trySend(emptyList()); return@addSnapshotListener }
-            trySend(snap?.documents?.map { map(it) } ?: emptyList())
+            if (e != null) {
+                android.util.Log.w("EventRepo", "events listener erro: ${e.message}", e)
+                close(e); return@addSnapshotListener
+            }
+            val docs = snap?.documents ?: emptyList()
+            android.util.Log.d("EventRepo", "events lidos do Firestore: ${docs.size}")
+            trySend(docs.map { map(it) })
         }
         awaitClose { reg.remove() }
     }

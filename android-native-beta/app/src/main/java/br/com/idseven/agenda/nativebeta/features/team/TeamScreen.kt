@@ -24,19 +24,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.nativebeta.core.UiList
+import br.com.idseven.agenda.nativebeta.core.errorMessage
 import br.com.idseven.agenda.nativebeta.core.isLoading
 import br.com.idseven.agenda.nativebeta.core.itemsOrEmpty
 import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.components.EmptyState
-import br.com.idseven.agenda.nativebeta.designsystem.components.LoadingState
+import br.com.idseven.agenda.nativebeta.designsystem.components.ErrorState
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
+import br.com.idseven.agenda.nativebeta.designsystem.components.SkeletonList
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 
 @Composable
 fun TeamScreen(usersState: UiList<UserLite>) {
-    if (usersState.isLoading) { LoadingState(); return }
+    usersState.errorMessage()?.let { ErrorState("Equipe — $it"); return }
+    if (usersState.isLoading) { SkeletonList(); return }
     val users = usersState.itemsOrEmpty().filter { it.isActive() }.sortedBy { (it.name ?: "").lowercase() }
     if (users.isEmpty()) {
         EmptyState("Sem membros ativos", "A equipe aparece aqui em tempo real", Icons.Outlined.Group)

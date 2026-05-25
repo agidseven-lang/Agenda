@@ -136,7 +136,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         NavHost(nav, startDestination = "hoje", modifier = Modifier.padding(padding)) {
             composable("hoje") { DashboardScreen(eventsState, tasksState, users, session, onEventClick = { nav.navigate("event/$it") }) }
             composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
-            composable("tarefas") { TasksScreen(tasksState, users, onTaskClick = { nav.navigate("task/$it") }) }
+            composable("tarefas") { TasksScreen(tasksState, users, currentUid = session.uid, onTaskClick = { nav.navigate("task/$it") }) }
             composable("equipe") { TeamScreen(usersState) }
             composable("chat") { ChatListScreen(session, users, onOpenChat = { nav.navigate("chatThread/$it") }) }
             composable("chatThread/{otherId}") { entry ->

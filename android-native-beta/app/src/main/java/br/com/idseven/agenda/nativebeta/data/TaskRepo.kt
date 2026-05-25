@@ -43,8 +43,13 @@ object TaskRepo {
 
     fun tasks(): Flow<List<TaskItem>> = callbackFlow {
         val reg = db.collection("tasks").addSnapshotListener { snap, e ->
-            if (e != null) { trySend(emptyList()); return@addSnapshotListener }
-            trySend(snap?.documents?.map { map(it) } ?: emptyList())
+            if (e != null) {
+                android.util.Log.w("TaskRepo", "tasks listener erro: ${e.message}", e)
+                close(e); return@addSnapshotListener
+            }
+            val docs = snap?.documents ?: emptyList()
+            android.util.Log.d("TaskRepo", "tasks lidas do Firestore: ${docs.size}")
+            trySend(docs.map { map(it) })
         }
         awaitClose { reg.remove() }
     }

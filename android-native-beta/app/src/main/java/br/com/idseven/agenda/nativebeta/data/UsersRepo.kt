@@ -12,7 +12,10 @@ object UsersRepo {
 
     fun users(): Flow<List<UserLite>> = callbackFlow {
         val reg = db.collection("users").addSnapshotListener { snap, e ->
-            if (e != null) { trySend(emptyList()); return@addSnapshotListener }
+            if (e != null) {
+                android.util.Log.w("UsersRepo", "users listener erro: ${e.message}", e)
+                close(e); return@addSnapshotListener
+            }
             val list = snap?.documents?.map { d ->
                 UserLite(
                     id = d.id,
@@ -24,6 +27,7 @@ object UsersRepo {
                     admin = d.getBoolean("admin") ?: false,
                 )
             } ?: emptyList()
+            android.util.Log.d("UsersRepo", "users lidos do Firestore: ${list.size}")
             trySend(list)
         }
         awaitClose { reg.remove() }

@@ -32,12 +32,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.nativebeta.core.UiList
+import br.com.idseven.agenda.nativebeta.core.errorMessage
 import br.com.idseven.agenda.nativebeta.core.isLoading
 import br.com.idseven.agenda.nativebeta.core.itemsOrEmpty
 import br.com.idseven.agenda.nativebeta.designsystem.components.EmptyState
+import br.com.idseven.agenda.nativebeta.designsystem.components.ErrorState
 import br.com.idseven.agenda.nativebeta.designsystem.components.EventCard
-import br.com.idseven.agenda.nativebeta.designsystem.components.LoadingState
 import br.com.idseven.agenda.nativebeta.designsystem.components.SearchField
+import br.com.idseven.agenda.nativebeta.designsystem.components.SkeletonList
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.EventItem
 import br.com.idseven.agenda.nativebeta.domain.Types
@@ -46,7 +48,8 @@ import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
 @Composable
 fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventClick: (String) -> Unit) {
-    if (eventsState.isLoading) { LoadingState(); return }
+    eventsState.errorMessage()?.let { ErrorState("Agenda — $it"); return }
+    if (eventsState.isLoading) { SkeletonList(); return }
     val all = eventsState.itemsOrEmpty()
 
     var query by remember { mutableStateOf("") }
@@ -64,8 +67,10 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
         TypeFilters(typeFilter) { typeFilter = it }
 
         if (filtered.isEmpty()) {
+            val title = if (all.isEmpty()) "Nenhum compromisso" else "Nada encontrado"
+            val sub = if (all.isEmpty()) "Lidos do Firestore: 0 (confira permissões/coleção)" else "Ajuste a busca ou os filtros"
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                EmptyState("Nada encontrado", "Ajuste a busca ou os filtros", Icons.Outlined.CalendarMonth)
+                EmptyState(title, sub, Icons.Outlined.CalendarMonth)
             }
         } else {
             val groups = filtered.groupBy { it.date ?: "" }
