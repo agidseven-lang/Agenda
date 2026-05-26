@@ -18,8 +18,14 @@ object ReminderScheduler {
         try {
             val now = System.currentTimeMillis()
             val targets = events.filter { !it.done }.mapNotNull { e ->
-                val start = EventStatus.startMs(e) ?: return@mapNotNull null
-                val trigger = start - leadMinutes * 60_000L
+                // Com horário: lembra `leadMinutes` antes. Sem horário (evento de dia inteiro):
+                // lembra às 09:00 do próprio dia, em vez de 30 min antes da meia-noite.
+                val trigger = if (!e.start.isNullOrBlank()) {
+                    val start = EventStatus.dtMs(e.date, e.start) ?: return@mapNotNull null
+                    start - leadMinutes * 60_000L
+                } else {
+                    EventStatus.dtMs(e.date, "09:00") ?: return@mapNotNull null
+                }
                 if (trigger > now) Triple(e.id, trigger, e) else null
             }
             val prefs = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)

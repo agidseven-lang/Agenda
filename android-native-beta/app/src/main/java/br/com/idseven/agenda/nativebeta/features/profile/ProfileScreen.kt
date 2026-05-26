@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import br.com.idseven.agenda.nativebeta.core.Notifications
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -56,7 +60,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.12-beta-startup-crash-fix"
+private const val BUILD = "1.0.13-beta-notify-local-real"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +70,15 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
     val context = LocalContext.current
     var sheet by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Reavalia status de permissões ao voltar das telas de Configurações do sistema.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var permRefresh by remember { mutableStateOf(0) }
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) permRefresh++ }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(18.dp))
@@ -128,20 +141,38 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                     }
                     "notif" -> {
                         SheetTitle("Notificações")
-                        val notifOk = Notifications.hasPostPermission(context)
-                        val hasToken = context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null) != null
-                        InfoLine("Permissão", if (notifOk) "Permitidas" else "Pendentes")
-                        InfoLine("Token FCM", if (hasToken) "Registrado" else "Não registrado")
-                        InfoLine("Lembretes locais", "Ativos (AlarmManager)")
-                        Spacer(Modifier.height(10.dp))
-                        SheetText("Notificações reais ainda precisam de validação em aparelho. O push remoto depende do envio pelo backend.")
-                        Spacer(Modifier.height(14.dp))
-                        SheetButton("Testar notificação local", hint = if (notifOk) null else "permissão pendente", enabled = notifOk) {
-                            Notifications.notify(context, 9001, Notifications.CH_GENERAL, "Teste de notificação", "Se você está vendo isto, as notificações locais funcionam.")
-                            Toast.makeText(context, "Notificação enviada", Toast.LENGTH_SHORT).show()
+                        val notifOk = remember(permRefresh) { Notifications.hasPostPermission(context) }
+                        val exactOk = remember(permRefresh) { Notifications.canExactAlarm(context) }
+                        val hasToken = remember(permRefresh) {
+                            context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null) != null
                         }
-                        Spacer(Modifier.height(8.dp))
-                        SheetButton("Configurar notificações", hint = "em breve", enabled = false) {}
+                        val exactLabel = if (android.os.Build.VERSION.SDK_INT < 31) "Não exigido"
+                            else if (exactOk) "Permitidos" else "Pendentes (lembrete aproximado)"
+                        InfoLine("Permissão", if (notifOk) "Concedida" else "Pendente")
+                        InfoLine("Alarmes exatos", exactLabel)
+                        InfoLine("Lembretes locais", if (notifOk) "Ativos" else "Inativos (permissão pendente)")
+                        InfoLine("Antecedência", "30 minutos")
+                        InfoLine("Token FCM", if (hasToken) "Registrado" else "Não registrado")
+                        Spacer(Modifier.height(10.dp))
+                        SheetText("Push remoto ainda não está ativo — por enquanto funcionam apenas os lembretes locais (no próprio aparelho). As notificações reais devem ser validadas tocando em \"Testar notificação local\".")
+                        Spacer(Modifier.height(14.dp))
+                        if (!notifOk) {
+                            SheetButton("Permitir notificações") { Notifications.openNotificationSettings(context) }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        if (android.os.Build.VERSION.SDK_INT >= 31 && !exactOk) {
+                            SheetButton("Permitir alarmes exatos") { Notifications.openExactAlarmSettings(context) }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        SheetButton("Testar notificação local") {
+                            if (Notifications.hasPostPermission(context)) {
+                                Notifications.notify(context, 9001, Notifications.CH_GENERAL, "Teste de notificação", "Se você está vendo isto, as notificações locais funcionam.")
+                                Toast.makeText(context, "Notificação enviada", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Permita as notificações para testar", Toast.LENGTH_LONG).show()
+                                Notifications.openNotificationSettings(context)
+                            }
+                        }
                     }
                     "aparencia" -> {
                         SheetTitle("Aparência")

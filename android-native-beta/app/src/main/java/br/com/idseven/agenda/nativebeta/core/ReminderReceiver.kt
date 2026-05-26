@@ -12,7 +12,7 @@ class ReminderReceiver : BroadcastReceiver() {
             val title = intent.getStringExtra("title") ?: "Lembrete"
             val text = intent.getStringExtra("text") ?: ""
             Notifications.ensure(context)
-            Notifications.notify(context, id.hashCode(), Notifications.CH_REMINDERS, title, text)
+            Notifications.notify(context, id.hashCode(), Notifications.CH_REMINDERS, title, text, eventId = id)
         } catch (_: Throwable) { }
     }
 }

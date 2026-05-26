@@ -127,6 +127,13 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
     LaunchedEffect(eventsState) {
         ReminderScheduler.sync(context, eventsState.itemsOrEmpty())
     }
+    // Deep-link da notificação de lembrete: abre o detalhe do compromisso ao tocar.
+    val pendingEventId by DeepLink.pendingEventId.collectAsState()
+    LaunchedEffect(pendingEventId) {
+        val id = pendingEventId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        DeepLink.pendingEventId.value = null
+        runCatching { nav.navigate("event/$id") }
+    }
 
     val tabs = listOf(
         Tab("hoje", "Hoje", Icons.Outlined.Today),
