@@ -39,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import br.com.idseven.agenda.nativebeta.core.Notifications
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,13 +52,14 @@ import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 
-private const val BUILD = "1.0.9-beta-dashboard-chat-profile-pro"
+private const val BUILD = "1.0.10-beta-chat-settings-pro"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> Unit) {
     val name = (currentUser?.name ?: session.name).ifBlank { "Usuário" }
     val color = UserColor.of(currentUser?.id ?: session.uid, currentUser?.color)
+    val context = LocalContext.current
     var sheet by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -113,24 +116,41 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         currentUser?.phone?.takeIf { it.isNotBlank() }?.let { InfoLine("WhatsApp", it) }
                         InfoLine("Status", "Ativa")
                         InfoLine("Permissão", if (currentUser?.admin == true) "Administrador" else "Membro")
+                        InfoLine("ID", session.uid)
                     }
                     "notif" -> {
                         SheetTitle("Notificações")
-                        SheetText("Lembretes locais de compromissos e avisos da equipe. Gerencie as permissões de notificação nas configurações do Android. (Configuração de antecedência chega em breve.)")
+                        val notifOk = Notifications.hasPostPermission(context)
+                        val hasToken = context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null) != null
+                        InfoLine("Permissão", if (notifOk) "Permitidas" else "Pendentes")
+                        InfoLine("Token FCM", if (hasToken) "Registrado" else "Não registrado")
+                        InfoLine("Lembretes", "Locais (AlarmManager)")
+                        Spacer(Modifier.height(8.dp))
+                        SheetText("Push remoto depende do envio pelo backend. As notificações ainda estão em fase de teste real.")
                     }
                     "aparencia" -> {
                         SheetTitle("Aparência")
-                        SheetText("Tema escuro (padrão). Mais opções de tema chegam em breve.")
+                        InfoLine("Tema", "Escuro")
+                        Spacer(Modifier.height(8.dp))
+                        SheetText("Tema escuro padrão. Troca de tema (claro/automático) chega em uma próxima versão, sem afetar os dados.")
                     }
                     "seguranca" -> {
                         SheetTitle("Segurança")
-                        SheetText("Sessão ativa neste dispositivo. Acesso protegido por senha com hash (s2 / SHA-256). Para encerrar, use \"Sair da conta\".")
+                        InfoLine("Sessão", "Ativa neste aparelho")
+                        InfoLine("Login", "Custom (hash s2 / SHA-256)")
+                        InfoLine("ID da sessão", session.uid)
+                        Spacer(Modifier.height(8.dp))
+                        SheetText("Sem Firebase Auth — mesmo modelo do PWA. Para encerrar a sessão use \"Sair da conta\".")
                     }
                     "sobre" -> {
                         SheetTitle("Sobre o aplicativo")
                         InfoLine("App", "ID Seven Nativo Beta")
                         InfoLine("Build", BUILD)
-                        InfoLine("Tecnologia", "Kotlin + Jetpack Compose")
+                        InfoLine("Ambiente", "Beta interno")
+                        InfoLine("Package", context.packageName)
+                        InfoLine("Tecnologia", "Kotlin + Compose")
+                        Spacer(Modifier.height(8.dp))
+                        SheetText("O PWA atual segue intacto e funcionando normalmente.")
                     }
                 }
                 Spacer(Modifier.height(18.dp))

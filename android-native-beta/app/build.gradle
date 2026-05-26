@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 13
-        versionName "1.0.9-beta-dashboard-chat-profile-pro"
+        versionCode 14
+        versionName "1.0.10-beta-chat-settings-pro"
         vectorDrawables { useSupportLibrary true }
     }
 

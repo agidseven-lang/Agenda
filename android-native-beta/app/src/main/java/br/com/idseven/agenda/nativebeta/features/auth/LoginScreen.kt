@@ -103,7 +103,7 @@ fun LoginScreen(vm: LoginViewModel = viewModel()) {
 
             Spacer(Modifier.height(28.dp))
             Text(
-                "build: 1.0.9-beta-dashboard-chat-profile-pro",
+                "build: 1.0.10-beta-chat-settings-pro",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
         }

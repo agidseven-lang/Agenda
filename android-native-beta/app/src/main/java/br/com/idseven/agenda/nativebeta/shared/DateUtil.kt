@@ -47,6 +47,22 @@ object DateUtil {
         return "${p(c.get(Calendar.HOUR_OF_DAY))}:${p(c.get(Calendar.MINUTE))}"
     }
 
+    // Carimbo estilo WhatsApp p/ lista de conversas: hora se hoje, "Ontem", senão dd/MM/yy.
+    fun chatStamp(ms: Long?): String {
+        if (ms == null || ms <= 0) return ""
+        val c = Calendar.getInstance().apply { timeInMillis = ms }
+        val today = Calendar.getInstance()
+        val ytd = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, -1) }
+        fun sameDay(a: Calendar, b: Calendar) =
+            a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR)
+        fun p(n: Int) = if (n < 10) "0$n" else "$n"
+        return when {
+            sameDay(c, today) -> "${p(c.get(Calendar.HOUR_OF_DAY))}:${p(c.get(Calendar.MINUTE))}"
+            sameDay(c, ytd) -> "Ontem"
+            else -> "${p(c.get(Calendar.DAY_OF_MONTH))}/${p(c.get(Calendar.MONTH) + 1)}/${c.get(Calendar.YEAR) % 100}"
+        }
+    }
+
     // Prazo legível a partir de "YYYY-MM-DD" + "HH:MM": "29/05/2026 às 18:00".
     fun prazo(dateIso: String?, time: String?): String {
         if (dateIso.isNullOrBlank()) return "Sem prazo"

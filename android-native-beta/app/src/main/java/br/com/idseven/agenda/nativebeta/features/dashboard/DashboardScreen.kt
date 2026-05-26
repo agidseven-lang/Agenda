@@ -53,6 +53,9 @@ import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
+import java.time.LocalDate
+
+private fun parseDay(d: String?): LocalDate? = runCatching { LocalDate.parse(d) }.getOrNull()
 
 @Composable
 fun DashboardScreen(
@@ -71,8 +74,10 @@ fun DashboardScreen(
     val events = eventsState.itemsOrEmpty()
     val tasks = tasksState.itemsOrEmpty()
     val todayEvents = events.filter { it.date == today }.sortedBy { it.start ?: "" }
-    val upcoming = events.filter { (it.date ?: "") > today && !it.done }
-        .sortedWith(compareBy({ it.date ?: "" }, { it.start ?: "" })).take(4)
+    val todayDate = LocalDate.now()
+    val upcoming = events
+        .filter { e -> !e.done && (parseDay(e.date)?.isAfter(todayDate) == true) }
+        .sortedWith(compareBy({ it.date ?: "" }, { it.start ?: "" })).take(5)
     val urgent = tasks.filter { it.status != "concluido" }
         .sortedWith(compareBy(nullsLast()) { EventStatus.dtMs(it.dueDate, it.dueTime ?: "23:59") })
         .take(4)

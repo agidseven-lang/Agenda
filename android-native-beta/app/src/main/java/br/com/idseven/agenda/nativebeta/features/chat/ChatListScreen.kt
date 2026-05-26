@@ -1,7 +1,6 @@
 package br.com.idseven.agenda.nativebeta.features.chat
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,12 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -62,11 +61,15 @@ fun ChatListScreen(session: UserSession, users: List<UserLite>, onOpenChat: (Str
     val filtered = others
         .filter { u -> q.isEmpty() || (u.name ?: "").lowercase().contains(q) || (chatByOther[u.id]?.lastText ?: "").lowercase().contains(q) }
         .sortedByDescending { chatByOther[it.id]?.lastAt ?: 0L }
-    Column(Modifier.fillMaxSize()) {
-        Text("Mensagens", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 18.dp, top = 12.dp, bottom = 2.dp))
+    Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
+        Text("Mensagens", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 18.dp, top = 12.dp, bottom = 4.dp))
         SearchField(query, { query = it }, "Buscar conversa…")
-        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp)) {
-            items(filtered, key = { it.id }) { u -> ChatRow(u, chatByOther[u.id], me) { onOpenChat(u.id) } }
+        Spacer(Modifier.height(4.dp))
+        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
+            itemsIndexed(filtered, key = { _, u -> u.id }) { index, u ->
+                ChatRow(u, chatByOther[u.id], me) { onOpenChat(u.id) }
+                if (index < filtered.lastIndex) RowDivider()
+            }
         }
     }
 }
@@ -74,31 +77,50 @@ fun ChatListScreen(session: UserSession, users: List<UserLite>, onOpenChat: (Str
 @Composable
 private fun ChatRow(user: UserLite, chat: Chat?, meId: String, onClick: () -> Unit) {
     val unread = chat?.unreadFor(meId) ?: 0L
+    val mineLast = chat?.lastBy != null && chat.lastBy == meId
     Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(16.dp))
-            .background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)).clickable { onClick() }.padding(13.dp),
+        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(user.photo, UserColor.of(user.id, user.color), user.name, 48.dp)
+        Avatar(user.photo, UserColor.of(user.id, user.color), user.name, 54.dp)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(user.name ?: "—", color = Tokens.Ink, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(3.dp))
-            Text(
-                chat?.lastText ?: "Toque para conversar",
-                color = if (unread > 0) Tokens.Ink else Tokens.Faint,
-                fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            chat?.lastAt?.let { Text(DateUtil.hm(it), color = Tokens.Faint, fontSize = 10.5.sp) }
-            if (unread > 0) {
-                Spacer(Modifier.height(5.dp))
-                Box(Modifier.size(22.dp).clip(CircleShape).background(Tokens.Accent), contentAlignment = Alignment.Center) {
-                    Text(if (unread > 9) "9+" else "$unread", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(user.name ?: "—", color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                chat?.lastAt?.let {
+                    Text(
+                        DateUtil.chatStamp(it),
+                        color = if (unread > 0) Tokens.Accent else Tokens.Faint,
+                        fontSize = 11.5.sp,
+                        fontWeight = if (unread > 0) FontWeight.Bold else FontWeight.Normal,
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (chat?.lastText != null && mineLast) {
+                    Icon(Icons.Outlined.DoneAll, contentDescription = null, tint = Tokens.Soft, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    chat?.lastText ?: "Toque para conversar",
+                    color = if (unread > 0) Tokens.Soft else Tokens.Faint,
+                    fontSize = 13.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (unread > 0) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.size(20.dp).clip(CircleShape).background(Tokens.Accent), contentAlignment = Alignment.Center) {
+                        Text(if (unread > 9) "9+" else "$unread", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun RowDivider() {
+    Box(Modifier.fillMaxWidth().padding(start = 84.dp).height(1.dp).background(Tokens.Line))
 }

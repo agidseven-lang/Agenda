@@ -1,7 +1,7 @@
 package br.com.idseven.agenda.nativebeta.features.chat
 
+import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,18 +12,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.EmojiEmotions
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -39,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,11 +65,20 @@ import br.com.idseven.agenda.nativebeta.shared.DateUtil
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
+private val EMOJIS = listOf(
+    "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😎", "🤔", "🙏",
+    "👍", "👏", "🙌", "💪", "🔥", "✅", "❌", "⚠️", "🎉", "❤️",
+    "💜", "💙", "💚", "🧡", "⭐", "✨", "📅", "📌", "📎", "📷",
+    "🎥", "🎙️", "💬", "👀", "😴", "😅", "😉", "🤝", "👋", "🚀",
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite>, onBack: () -> Unit) {
     val me = session.uid
     val other = users.firstOrNull { it.id == otherId }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var chatId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(otherId) { ChatRepo.openOrCreate(me, otherId).onSuccess { chatId = it } }
@@ -72,49 +93,77 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
     LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1) }
 
     var input by remember { mutableStateOf("") }
+    var showEmoji by remember { mutableStateOf(false) }
+
+    fun send() {
+        val cid = chatId ?: return
+        val text = input
+        if (text.isBlank()) return
+        input = ""
+        scope.launch { ChatRepo.send(cid, me, otherId, text) }
+    }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        // Header
+        // Cabeçalho
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 14.dp, bottom = 10.dp),
+            modifier = Modifier.fillMaxWidth().background(Tokens.Surface).padding(start = 12.dp, top = 12.dp, end = 14.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.Close, contentDescription = "Voltar", tint = Tokens.Soft, modifier = Modifier.size(20.dp))
+            Box(Modifier.size(38.dp).clip(CircleShape).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.Close, contentDescription = "Voltar", tint = Tokens.Soft, modifier = Modifier.size(22.dp))
             }
+            Spacer(Modifier.width(8.dp))
+            Avatar(other?.photo, UserColor.of(otherId, other?.color), other?.name, 42.dp)
             Spacer(Modifier.width(12.dp))
-            Avatar(other?.photo, UserColor.of(otherId, other?.color), other?.name, 38.dp)
-            Spacer(Modifier.width(10.dp))
-            Text(other?.name ?: "Conversa", color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Column(Modifier.weight(1f)) {
+                Text(other?.name ?: "Conversa", color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(other?.role?.ifBlank { null } ?: "Equipe ID Seven", color = Tokens.Soft, fontSize = 12.sp, maxLines = 1)
+            }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(Tokens.Line))
 
+        // Mensagens
         if (messages.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text("Nenhuma mensagem ainda — diga olá 👋", color = Tokens.Faint, fontSize = 13.sp)
             }
         } else {
             LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp),
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp),
                 state = listState,
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
-                items(messages, key = { it.id }) { msg -> MessageBubble(msg, mine = msg.by == me) }
+                itemsIndexed(messages, key = { _, m -> m.id }) { index, msg ->
+                    val mine = msg.by == me
+                    val grouped = index > 0 && messages[index - 1].by == msg.by
+                    MessageBubble(msg, mine, grouped)
+                }
             }
         }
 
-        // Input
+        // Barra de envio
         Row(
-            modifier = Modifier.fillMaxWidth().background(Tokens.Surface).padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().background(Tokens.Surface).padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
-                placeholder = { Text("Mensagem…") },
+                placeholder = { Text("Mensagem") },
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(22.dp),
-                maxLines = 4,
+                shape = RoundedCornerShape(24.dp),
+                maxLines = 5,
+                leadingIcon = {
+                    Icon(Icons.Outlined.EmojiEmotions, contentDescription = "Emoji", tint = Tokens.Soft, modifier = Modifier.size(24.dp).clip(CircleShape).clickable { showEmoji = true })
+                },
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Outlined.AttachFile, contentDescription = "Anexar", tint = Tokens.Soft, modifier = Modifier.size(22.dp).clickable { Toast.makeText(context, "Anexos em breve", Toast.LENGTH_SHORT).show() })
+                        Spacer(Modifier.width(12.dp))
+                        Icon(Icons.Outlined.PhotoCamera, contentDescription = "Câmera", tint = Tokens.Soft, modifier = Modifier.size(22.dp).clickable { Toast.makeText(context, "Câmera em breve", Toast.LENGTH_SHORT).show() })
+                        Spacer(Modifier.width(6.dp))
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Tokens.Accent, unfocusedBorderColor = Tokens.Line,
                     focusedTextColor = Tokens.Ink, unfocusedTextColor = Tokens.Ink, cursorColor = Tokens.Accent,
@@ -123,34 +172,60 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
             Spacer(Modifier.width(8.dp))
             val canSend = input.isNotBlank() && chatId != null
             Box(
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(24.dp))
-                    .background(if (canSend) Tokens.Accent else Tokens.Surface2)
-                    .clickable(enabled = canSend) {
-                        val cid = chatId ?: return@clickable
-                        val text = input
-                        input = ""
-                        scope.launch { ChatRepo.send(cid, me, otherId, text) }
+                modifier = Modifier.size(50.dp).clip(CircleShape).background(Tokens.Accent)
+                    .clickable {
+                        if (canSend) send() else Toast.makeText(context, "Gravação de áudio em breve", Toast.LENGTH_SHORT).show()
                     },
                 contentAlignment = Alignment.Center,
-            ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar", tint = if (canSend) Color.White else Tokens.Faint, modifier = Modifier.size(20.dp)) }
+            ) {
+                Icon(
+                    if (canSend) Icons.AutoMirrored.Filled.Send else Icons.Outlined.Mic,
+                    contentDescription = if (canSend) "Enviar" else "Áudio",
+                    tint = Color.White, modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+    }
+
+    if (showEmoji) {
+        ModalBottomSheet(onDismissRequest = { showEmoji = false }, containerColor = Tokens.Surface) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Text("Emojis", color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
+                    EMOJIS.chunked(8).forEach { rowEmojis ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            rowEmojis.forEach { e ->
+                                Text(e, fontSize = 26.sp, modifier = Modifier.padding(8.dp).clickable { input += e })
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
         }
     }
 }
 
 @Composable
-private fun MessageBubble(msg: Message, mine: Boolean) {
+private fun MessageBubble(msg: Message, mine: Boolean, grouped: Boolean) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = if (grouped) 2.dp else 8.dp),
         horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
     ) {
         Column(
-            modifier = Modifier.widthIn(max = 280.dp).clip(
-                RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (mine) 16.dp else 4.dp, bottomEnd = if (mine) 4.dp else 16.dp)
+            modifier = Modifier.widthIn(max = 290.dp).clip(
+                RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = if (mine) 18.dp else 5.dp, bottomEnd = if (mine) 5.dp else 18.dp)
             ).background(if (mine) Tokens.Accent else Tokens.Surface).padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Text(msg.text, color = if (mine) Color.White else Tokens.Ink, fontSize = 14.sp)
-            Spacer(Modifier.height(2.dp))
-            Text(DateUtil.hm(msg.at), color = if (mine) Color.White.copy(alpha = 0.7f) else Tokens.Faint, fontSize = 10.sp)
+            Text(msg.text, color = if (mine) Color.White else Tokens.Ink, fontSize = 14.5.sp)
+            Spacer(Modifier.height(3.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                Text(DateUtil.hm(msg.at), color = if (mine) Color.White.copy(alpha = 0.7f) else Tokens.Faint, fontSize = 10.sp)
+                if (mine) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Outlined.DoneAll, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
+                }
+            }
         }
     }
 }
