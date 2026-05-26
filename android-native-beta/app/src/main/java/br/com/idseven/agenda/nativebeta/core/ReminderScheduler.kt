@@ -63,4 +63,30 @@ object ReminderScheduler {
         val pi = PendingIntent.getBroadcast(ctx, eventId.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE)
         if (pi != null) am.cancel(pi)
     }
+
+    // Teste de diagnóstico: agenda um alarme (sem eventId) para daqui a `seconds`.
+    // Valida AlarmManager + BroadcastReceiver de ponta a ponta.
+    fun scheduleTestIn(ctx: Context, seconds: Int): Boolean {
+        return try {
+            val am = ctx.getSystemService(AlarmManager::class.java) ?: return false
+            val intent = Intent(ctx, ReminderReceiver::class.java)
+                .putExtra("title", "Teste agendado")
+                .putExtra("text", "Disparado pelo AlarmManager após ${seconds}s.")
+            val pi = PendingIntent.getBroadcast(ctx, 99020, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val at = System.currentTimeMillis() + seconds * 1000L
+            try {
+                if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) {
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+                } else {
+                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+                }
+            } catch (_: SecurityException) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+            }
+            true
+        } catch (t: Throwable) {
+            NotifyDiag.lastError.value = t.message ?: t.javaClass.simpleName
+            false
+        }
+    }
 }

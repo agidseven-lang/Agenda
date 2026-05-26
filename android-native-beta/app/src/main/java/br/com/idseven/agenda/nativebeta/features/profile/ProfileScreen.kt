@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import br.com.idseven.agenda.nativebeta.core.Notifications
+import br.com.idseven.agenda.nativebeta.core.NotifyDiag
+import br.com.idseven.agenda.nativebeta.core.ReminderScheduler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -60,7 +63,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.13-beta-notify-local-real"
+private const val BUILD = "1.0.14-beta-notify-debug-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,6 +82,10 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
         lifecycleOwner.lifecycle.addObserver(obs)
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
+    val lastImmediate by NotifyDiag.lastImmediate.collectAsState()
+    val lastScheduled by NotifyDiag.lastScheduled.collectAsState()
+    val lastFired by NotifyDiag.lastFired.collectAsState()
+    val lastError by NotifyDiag.lastError.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(18.dp))
@@ -142,21 +149,29 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                     "notif" -> {
                         SheetTitle("Notificações")
                         val notifOk = remember(permRefresh) { Notifications.hasPostPermission(context) }
+                        val enabled = remember(permRefresh) { Notifications.areEnabled(context) }
                         val exactOk = remember(permRefresh) { Notifications.canExactAlarm(context) }
+                        val chStatus = remember(permRefresh) { Notifications.channelStatus(context, Notifications.CH_REMINDERS) }
                         val hasToken = remember(permRefresh) {
                             context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null) != null
                         }
                         val exactLabel = if (android.os.Build.VERSION.SDK_INT < 31) "Não exigido"
                             else if (exactOk) "Permitidos" else "Pendentes (lembrete aproximado)"
                         InfoLine("Permissão", if (notifOk) "Concedida" else "Pendente")
+                        InfoLine("Notificações do app", if (enabled) "Habilitadas" else "Desabilitadas")
+                        InfoLine("Canal Lembretes", chStatus)
                         InfoLine("Alarmes exatos", exactLabel)
-                        InfoLine("Lembretes locais", if (notifOk) "Ativos" else "Inativos (permissão pendente)")
+                        InfoLine("Lembretes locais", if (notifOk && enabled) "Ativos" else "Inativos")
                         InfoLine("Antecedência", "30 minutos")
                         InfoLine("Token FCM", if (hasToken) "Registrado" else "Não registrado")
+                        InfoLine("Último teste imediato", lastImmediate ?: "—")
+                        InfoLine("Último teste agendado", lastScheduled ?: "—")
+                        InfoLine("Último disparo", lastFired ?: "—")
+                        if (lastError != null) InfoLine("Último erro", lastError!!)
                         Spacer(Modifier.height(10.dp))
-                        SheetText("Push remoto ainda não está ativo — por enquanto funcionam apenas os lembretes locais (no próprio aparelho). As notificações reais devem ser validadas tocando em \"Testar notificação local\".")
+                        SheetText("Push remoto ainda não está ativo — por enquanto funcionam apenas os lembretes locais (no próprio aparelho).")
                         Spacer(Modifier.height(14.dp))
-                        if (!notifOk) {
+                        if (!notifOk || !enabled) {
                             SheetButton("Permitir notificações") { Notifications.openNotificationSettings(context) }
                             Spacer(Modifier.height(8.dp))
                         }
@@ -164,14 +179,20 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                             SheetButton("Permitir alarmes exatos") { Notifications.openExactAlarmSettings(context) }
                             Spacer(Modifier.height(8.dp))
                         }
-                        SheetButton("Testar notificação local") {
-                            if (Notifications.hasPostPermission(context)) {
-                                Notifications.notify(context, 9001, Notifications.CH_GENERAL, "Teste de notificação", "Se você está vendo isto, as notificações locais funcionam.")
-                                Toast.makeText(context, "Notificação enviada", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "Permita as notificações para testar", Toast.LENGTH_LONG).show()
-                                Notifications.openNotificationSettings(context)
-                            }
+                        SheetButton("Mostrar notificação agora") {
+                            NotifyDiag.lastError.value = null
+                            val ok = Notifications.notify(context, 9001, Notifications.CH_REMINDERS, "Teste imediato", "Notificação direta via NotificationManager.")
+                            NotifyDiag.lastImmediate.value = (if (ok) "OK · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis())
+                            if (ok) Toast.makeText(context, "Solicitação de notificação enviada", Toast.LENGTH_SHORT).show()
+                            else Toast.makeText(context, "Erro ao exibir notificação: ${NotifyDiag.lastError.value ?: "desconhecido"}", Toast.LENGTH_LONG).show()
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        SheetButton("Agendar teste em 10 segundos") {
+                            NotifyDiag.lastError.value = null
+                            val ok = ReminderScheduler.scheduleTestIn(context, 10)
+                            NotifyDiag.lastScheduled.value = (if (ok) "Agendado · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis())
+                            if (ok) Toast.makeText(context, "Teste agendado para daqui a 10 segundos", Toast.LENGTH_SHORT).show()
+                            else Toast.makeText(context, "Erro ao agendar: ${NotifyDiag.lastError.value ?: "desconhecido"}", Toast.LENGTH_LONG).show()
                         }
                     }
                     "aparencia" -> {
