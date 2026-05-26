@@ -17,14 +17,18 @@ object UsersRepo {
                 close(e); return@addSnapshotListener
             }
             val list = snap?.documents?.map { d ->
+                val photo = listOf("photo", "photoUrl", "avatar", "avatarUrl", "image", "imageUrl", "picture", "foto")
+                    .firstNotNullOfOrNull { k -> d.getString(k)?.takeIf { it.isNotBlank() } }
                 UserLite(
                     id = d.id,
                     name = d.getString("name"),
                     role = d.getString("role"),
                     color = d.getString("color"),
-                    photo = d.getString("photo"),
+                    photo = photo,
                     status = d.getString("status"),
                     admin = d.getBoolean("admin") ?: false,
+                    email = d.getString("email"),
+                    phone = d.getString("phone"),
                 )
             } ?: emptyList()
             android.util.Log.d("UsersRepo", "users lidos do Firestore: ${list.size}")

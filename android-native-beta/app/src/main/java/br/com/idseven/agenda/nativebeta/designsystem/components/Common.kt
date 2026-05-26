@@ -25,11 +25,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +54,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserLite
 
 @Composable
 fun Avatar(photo: String?, ringColor: Color, name: String?, size: Dp, ring: Dp = 2.dp) {
+    val bmp = remember(photo) { decodeAvatarBitmap(photo) }
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(ringColor).padding(ring),
         contentAlignment = Alignment.Center,
@@ -59,16 +63,30 @@ fun Avatar(photo: String?, ringColor: Color, name: String?, size: Dp, ring: Dp =
             modifier = Modifier.fillMaxSize().clip(CircleShape).background(lerp(ringColor, Color.Black, 0.22f)),
             contentAlignment = Alignment.Center,
         ) {
-            if (!photo.isNullOrBlank() && photo.startsWith("http")) {
-                AsyncImage(
+            when {
+                !photo.isNullOrBlank() && photo.startsWith("http") -> AsyncImage(
                     model = photo, contentDescription = null,
                     modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop,
                 )
-            } else {
-                Text(UserColor.initials(name), color = Color.White, fontSize = (size.value * 0.36f).sp, fontWeight = FontWeight.Bold)
+                bmp != null -> Image(
+                    bitmap = bmp.asImageBitmap(), contentDescription = null,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape), contentScale = ContentScale.Crop,
+                )
+                else -> Text(UserColor.initials(name), color = Color.White, fontSize = (size.value * 0.36f).sp, fontWeight = FontWeight.Bold)
             }
         }
     }
+}
+
+// Decodifica foto em base64 (data:image/...;base64,... ou base64 puro). Retorna null se não aplicável.
+private fun decodeAvatarBitmap(photo: String?): android.graphics.Bitmap? {
+    if (photo.isNullOrBlank() || photo.startsWith("http")) return null
+    return try {
+        val b64 = if (photo.startsWith("data:")) photo.substringAfter(",", "") else photo
+        if (b64.length < 64) return null
+        val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    } catch (_: Throwable) { null }
 }
 
 @Composable

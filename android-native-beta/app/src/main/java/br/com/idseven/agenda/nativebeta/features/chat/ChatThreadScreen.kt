@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -131,7 +132,7 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
                         scope.launch { ChatRepo.send(cid, me, otherId, text) }
                     },
                 contentAlignment = Alignment.Center,
-            ) { Text("➤", color = if (canSend) Color.White else Tokens.Faint, fontSize = 18.sp) }
+            ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar", tint = if (canSend) Color.White else Tokens.Faint, modifier = Modifier.size(20.dp)) }
         }
     }
 }

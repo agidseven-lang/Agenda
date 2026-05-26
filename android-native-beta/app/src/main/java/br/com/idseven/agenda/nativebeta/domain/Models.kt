@@ -30,6 +30,8 @@ data class UserLite(
     val photo: String?,
     val status: String?,
     val admin: Boolean,
+    val email: String? = null,
+    val phone: String? = null,
 ) {
     fun isActive(): Boolean = status != "pendente" && status != "removido" && status != "excluido"
 }

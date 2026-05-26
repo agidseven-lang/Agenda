@@ -38,6 +38,7 @@ import br.com.idseven.agenda.nativebeta.core.errorMessage
 import br.com.idseven.agenda.nativebeta.core.isLoading
 import br.com.idseven.agenda.nativebeta.core.itemsOrEmpty
 import br.com.idseven.agenda.nativebeta.data.UserSession
+import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.components.ErrorState
 import br.com.idseven.agenda.nativebeta.designsystem.components.EventCard
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
@@ -61,6 +62,7 @@ fun DashboardScreen(
     session: UserSession,
     onEventClick: (String) -> Unit,
     onTaskClick: (String) -> Unit,
+    onNavTab: (String) -> Unit,
 ) {
     eventsState.errorMessage()?.let { ErrorState("Hoje — $it"); return }
     if (eventsState.isLoading) { SkeletonList(); return }
@@ -69,7 +71,8 @@ fun DashboardScreen(
     val events = eventsState.itemsOrEmpty()
     val tasks = tasksState.itemsOrEmpty()
     val todayEvents = events.filter { it.date == today }.sortedBy { it.start ?: "" }
-    val upcoming = events.filter { (it.date ?: "") > today && !it.done }.sortedWith(compareBy({ it.date ?: "" }, { it.start ?: "" })).take(3)
+    val upcoming = events.filter { (it.date ?: "") > today && !it.done }
+        .sortedWith(compareBy({ it.date ?: "" }, { it.start ?: "" })).take(4)
     val urgent = tasks.filter { it.status != "concluido" }
         .sortedWith(compareBy(nullsLast()) { EventStatus.dtMs(it.dueDate, it.dueTime ?: "23:59") })
         .take(4)
@@ -84,11 +87,11 @@ fun DashboardScreen(
             Text("Resumo de hoje · ${DateUtil.dayShort(today)}", color = Tokens.Soft, fontSize = 13.sp)
             Spacer(Modifier.height(18.dp))
             Row {
-                StatCard("Hoje", todayEvents.size.toString(), Icons.Outlined.Today, Modifier.weight(1f), accent = true)
+                StatCard("Hoje", todayEvents.size.toString(), Icons.Outlined.Today, Modifier.weight(1f), accent = true) { onNavTab("agenda") }
                 Spacer(Modifier.width(10.dp))
-                StatCard("Tarefas", tasks.count { it.status != "concluido" }.toString(), Icons.Outlined.Checklist, Modifier.weight(1f))
+                StatCard("Tarefas", tasks.count { it.status != "concluido" }.toString(), Icons.Outlined.Checklist, Modifier.weight(1f)) { onNavTab("tarefas") }
                 Spacer(Modifier.width(10.dp))
-                StatCard("Equipe", users.count { it.isActive() }.toString(), Icons.Outlined.Group, Modifier.weight(1f))
+                StatCard("Equipe", users.count { it.isActive() }.toString(), Icons.Outlined.Group, Modifier.weight(1f)) { onNavTab("equipe") }
             }
             Spacer(Modifier.height(24.dp))
             SectionTitle("Compromissos de hoje")
@@ -110,15 +113,17 @@ fun DashboardScreen(
         if (urgent.isEmpty()) {
             item { EmptyLine("Nenhuma tarefa pendente. 🎉") }
         } else {
-            items(urgent, key = { "tk_${it.id}" }) { t -> UrgentTaskRow(t) { onTaskClick(t.id) } }
+            items(urgent, key = { "tk_${it.id}" }) { t -> UrgentTaskRow(t, users) { onTaskClick(t.id) } }
         }
 
-        if (upcoming.isNotEmpty()) {
-            item {
-                Spacer(Modifier.height(14.dp))
-                SectionTitle("Próximos compromissos")
-                Spacer(Modifier.height(12.dp))
-            }
+        item {
+            Spacer(Modifier.height(14.dp))
+            SectionTitle("Próximos compromissos")
+            Spacer(Modifier.height(12.dp))
+        }
+        if (upcoming.isEmpty()) {
+            item { EmptyLine("Nenhum compromisso futuro agendado.") }
+        } else {
             items(upcoming, key = { "up_${it.id}" }) { ev ->
                 EventCard(ev, owner = users.firstOrNull { it.id == ev.ownerId }, onClick = { onEventClick(ev.id) })
             }
@@ -132,11 +137,12 @@ private fun EmptyLine(text: String) {
 }
 
 @Composable
-private fun StatCard(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier, accent: Boolean = false) {
+private fun StatCard(label: String, value: String, icon: ImageVector, modifier: Modifier = Modifier, accent: Boolean = false, onClick: () -> Unit) {
     Column(
         modifier = modifier.clip(RoundedCornerShape(16.dp))
             .background(if (accent) Tokens.Accent else Tokens.Surface)
             .then(if (accent) Modifier else Modifier.border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)))
+            .clickable { onClick() }
             .padding(14.dp),
     ) {
         Icon(icon, contentDescription = null, tint = if (accent) Color.White else Tokens.Accent, modifier = Modifier.size(20.dp))
@@ -147,20 +153,26 @@ private fun StatCard(label: String, value: String, icon: ImageVector, modifier: 
 }
 
 @Composable
-private fun UrgentTaskRow(task: TaskItem, onClick: () -> Unit) {
+private fun UrgentTaskRow(task: TaskItem, users: List<UserLite>, onClick: () -> Unit) {
     val sector = Sectors.of(task.sector)
     val deadline = TaskDeadline.of(task)
+    val person = users.firstOrNull { (it.name ?: "").equals(task.assignee ?: "", ignoreCase = true) }
+        ?: users.firstOrNull { it.id == task.by }
     Row(
         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(14.dp))
-            .background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(14.dp)).clickable { onClick() }.padding(14.dp),
+            .background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(14.dp)).clickable { onClick() }.padding(13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(8.dp).clip(RoundedCornerShape(999.dp)).background(sector.color))
+        Avatar(person?.photo, UserColor.of(person?.id, person?.color), person?.name ?: (task.assignee ?: "?"), 38.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(task.title?.ifBlank { null } ?: task.client ?: "Sem título", color = Tokens.Ink, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(3.dp))
-            Text(sector.label + (task.client?.let { " · $it" } ?: ""), color = Tokens.Faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(7.dp).clip(RoundedCornerShape(999.dp)).background(sector.color))
+                Spacer(Modifier.width(6.dp))
+                Text(sector.label + (task.client?.let { " · $it" } ?: ""), color = Tokens.Faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
         if (deadline != null) { Spacer(Modifier.width(8.dp)); Pill(deadline.text, deadline.color) }
     }

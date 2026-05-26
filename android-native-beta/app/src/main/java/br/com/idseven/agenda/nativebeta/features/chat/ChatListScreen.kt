@@ -25,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +40,7 @@ import br.com.idseven.agenda.nativebeta.data.ChatRepo
 import br.com.idseven.agenda.nativebeta.data.UserSession
 import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.components.EmptyState
+import br.com.idseven.agenda.nativebeta.designsystem.components.SearchField
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Chat
 import br.com.idseven.agenda.nativebeta.domain.UserColor
@@ -54,10 +57,17 @@ fun ChatListScreen(session: UserSession, users: List<UserLite>, onOpenChat: (Str
         return
     }
     val chatByOther = chats.associateBy { it.otherId(me) }
-    val sorted = others.sortedByDescending { chatByOther[it.id]?.lastAt ?: 0L }
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp)) {
-        item("h") { Text("Mensagens", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp, bottom = 12.dp)) }
-        items(sorted, key = { it.id }) { u -> ChatRow(u, chatByOther[u.id], me) { onOpenChat(u.id) } }
+    var query by remember { mutableStateOf("") }
+    val q = query.trim().lowercase()
+    val filtered = others
+        .filter { u -> q.isEmpty() || (u.name ?: "").lowercase().contains(q) || (chatByOther[u.id]?.lastText ?: "").lowercase().contains(q) }
+        .sortedByDescending { chatByOther[it.id]?.lastAt ?: 0L }
+    Column(Modifier.fillMaxSize()) {
+        Text("Mensagens", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 18.dp, top = 12.dp, bottom = 2.dp))
+        SearchField(query, { query = it }, "Buscar conversa…")
+        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp)) {
+            items(filtered, key = { it.id }) { u -> ChatRow(u, chatByOther[u.id], me) { onOpenChat(u.id) } }
+        }
     }
 }
 
