@@ -1,7 +1,7 @@
 # Workflow TEMPORÁRIO de CI manual na branch DEFAULT (main).
 # Objetivo: gerar o APK 1.0.14-beta-notify-debug-fix a partir de feat/android-native-saas.
-# Usa o JDK 17 JÁ PRÉ-INSTALADO no runner (sem actions/setup-java) para evitar a falha
-# transitória de download da action (codeload Internal server error). REMOVER após validar.
+# Sem actions/setup-java e sem android-actions/setup-android (downloads do codeload falhando).
+# Usa JDK 17 e Android SDK JÁ PRÉ-INSTALADOS no runner. REMOVER após validar.
 # Não toca PWA, Worker, Firebase web, secrets nem código do app — só CI.
 name: Build Android Nativo Beta Manual
 
@@ -22,8 +22,21 @@ jobs:
         with:
           ref: feat/android-native-saas
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Diagnostics (ambiente pre-instalado do runner)
+        run: |
+          echo "JAVA_HOME_17_X64=$JAVA_HOME_17_X64"
+          "$JAVA_HOME_17_X64/bin/java" -version || true
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -la "$ANDROID_HOME" || true
+          ls -la "$ANDROID_HOME/cmdline-tools/latest/bin" 2>/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list_installed 2>/dev/null | head -60 || true
+
+      - name: Garantir SDK (licencas + platform 34 + build-tools 34)
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses >/dev/null 2>&1 || true
+          "$SDKM" "platform-tools" "platforms;android-34" "build-tools;34.0.0" >/dev/null 2>&1 || true
 
       - name: Gerar debug keystore (assinatura de teste)
         run: |
@@ -46,7 +59,7 @@ jobs:
           printf '%s' "$GS_JSON" > android-native-beta/app/google-services.json
           echo "google-services.json gravado ($(wc -c < android-native-beta/app/google-services.json) bytes)."
 
-      - name: gradlew clean assembleRelease (JDK 17 pre-instalado do runner)
+      - name: gradlew clean assembleRelease (JDK 17 + SDK pre-instalados)
         working-directory: android-native-beta
         run: |
           export JAVA_HOME="$JAVA_HOME_17_X64"
