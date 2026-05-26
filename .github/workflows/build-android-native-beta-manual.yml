@@ -1,7 +1,7 @@
 # Workflow TEMPORÁRIO de CI manual na branch DEFAULT (main).
-# Objetivo: gerar o APK 1.0.14-beta-notify-debug-fix a partir de feat/android-native-saas,
-# contornando o push na branch feat (que parou de acionar) e o "Failed to queue" do dispatch.
-# Dispara no PUSH para main (sem path filter) e por workflow_dispatch. REMOVER após validar.
+# Objetivo: gerar o APK 1.0.14-beta-notify-debug-fix a partir de feat/android-native-saas.
+# Usa o JDK 17 JÁ PRÉ-INSTALADO no runner (sem actions/setup-java) para evitar a falha
+# transitória de download da action (codeload Internal server error). REMOVER após validar.
 # Não toca PWA, Worker, Firebase web, secrets nem código do app — só CI.
 name: Build Android Nativo Beta Manual
 
@@ -21,12 +21,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: feat/android-native-saas
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -52,9 +46,12 @@ jobs:
           printf '%s' "$GS_JSON" > android-native-beta/app/google-services.json
           echo "google-services.json gravado ($(wc -c < android-native-beta/app/google-services.json) bytes)."
 
-      - name: gradlew clean assembleRelease
+      - name: gradlew clean assembleRelease (JDK 17 pre-instalado do runner)
         working-directory: android-native-beta
         run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          echo "JAVA_HOME=$JAVA_HOME"
+          "$JAVA_HOME/bin/java" -version
           chmod +x ./gradlew
           ./gradlew clean assembleRelease --no-daemon --stacktrace
 
