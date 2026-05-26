@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 15
-        versionName "1.0.11-beta-settings-emoji-fix"
+        versionCode 16
+        versionName "1.0.12-beta-startup-crash-fix"
         vectorDrawables { useSupportLibrary true }
     }
 

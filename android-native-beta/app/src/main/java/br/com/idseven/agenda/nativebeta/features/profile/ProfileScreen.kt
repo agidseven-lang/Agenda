@@ -56,7 +56,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.11-beta-settings-emoji-fix"
+private const val BUILD = "1.0.12-beta-startup-crash-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,9 +116,9 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                     "conta" -> {
                         SheetTitle("Conta")
                         InfoLine("Nome", name)
-                        InfoLine("Função", currentUser?.role?.takeIf { it.isNotBlank() } ?: "—")
-                        InfoLine("E-mail", currentUser?.email?.takeIf { it.isNotBlank() } ?: "—")
-                        InfoLine("WhatsApp", currentUser?.phone?.takeIf { it.isNotBlank() } ?: "—")
+                        InfoLine("Função", currentUser?.role?.takeIf { it.isNotBlank() } ?: "Não informado")
+                        InfoLine("E-mail", currentUser?.email?.takeIf { it.isNotBlank() } ?: "Não informado")
+                        InfoLine("WhatsApp", currentUser?.phone?.takeIf { it.isNotBlank() } ?: "Não informado")
                         InfoLine("Status", "Ativa")
                         InfoLine("Permissão", if (currentUser?.admin == true) "Administrador" else "Membro da equipe")
                         InfoLine("ID do usuário", session.uid)
