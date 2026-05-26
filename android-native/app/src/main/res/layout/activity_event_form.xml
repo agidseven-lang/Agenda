@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="22dp">
+
+        <TextView android:id="@+id/formTitle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Novo compromisso" android:textColor="@color/ink" android:textSize="22sp" android:textStyle="bold" android:layout_marginBottom="16dp" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tipo" android:textColor="@color/inkFaint" android:textSize="12sp" />
+        <LinearLayout android:id="@+id/typeGrid" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp" android:layout_marginBottom="12dp" />
+
+        <EditText android:id="@+id/inCliente" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Cliente / empresa" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:layout_marginBottom="10dp" />
+        <EditText android:id="@+id/inTitulo" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Título" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:layout_marginBottom="10dp" />
+        <EditText android:id="@+id/inLocal" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Local (opcional)" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:layout_marginBottom="10dp" />
+        <EditText android:id="@+id/inData" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Data (AAAA-MM-DD)" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:inputType="date" android:layout_marginBottom="10dp" />
+        <EditText android:id="@+id/inInicio" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Início (HH:MM)" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:layout_marginBottom="10dp" />
+        <EditText android:id="@+id/inFim" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Fim (HH:MM) — opcional" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:layout_marginBottom="10dp" />
+        <EditText android:id="@+id/inNotas" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Observações (opcional)" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:layout_marginBottom="12dp" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Responsável" android:textColor="@color/inkFaint" android:textSize="12sp" />
+        <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content" android:scrollbars="none" android:layout_marginTop="6dp" android:layout_marginBottom="16dp">
+            <LinearLayout android:id="@+id/ownerChips" android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <Button android:id="@+id/btnSalvar" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Salvar" android:textColor="@color/ink" android:backgroundTint="@color/accent" />
+
+        <TextView android:id="@+id/txtErro" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="" android:textColor="@color/late" android:textSize="13sp" android:gravity="center" />
+    </LinearLayout>
+</ScrollView>
