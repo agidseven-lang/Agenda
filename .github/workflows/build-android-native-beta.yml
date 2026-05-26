@@ -1,6 +1,7 @@
 # Build do APK do app SaaS NATIVO BETA (Kotlin + Jetpack Compose) em /android-native-beta.
 # App em PARALELO ao PWA e ao app aprovado — package br.com.idseven.agenda.nativebeta.
 # Fase 0: app limpo (abre + tela smoke + proteção contra crash). Firebase entra na Fase 1.
+# Redisparo manual de CI: 1.0.14 (commit 23a0bb6 não acionou o workflow automaticamente).
 name: Build Android Nativo Beta (SaaS)
 
 on:
