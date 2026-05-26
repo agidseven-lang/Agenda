@@ -1,6 +1,7 @@
 package br.com.idseven.agenda.nativebeta.features.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Chat
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
+import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
 @Composable
 fun ChatListScreen(session: UserSession, users: List<UserLite>, onOpenChat: (String) -> Unit) {
@@ -53,7 +55,8 @@ fun ChatListScreen(session: UserSession, users: List<UserLite>, onOpenChat: (Str
     }
     val chatByOther = chats.associateBy { it.otherId(me) }
     val sorted = others.sortedByDescending { chatByOther[it.id]?.lastAt ?: 0L }
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), contentPadding = PaddingValues(vertical = 10.dp)) {
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp)) {
+        item("h") { Text("Mensagens", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp, bottom = 12.dp)) }
         items(sorted, key = { it.id }) { u -> ChatRow(u, chatByOther[u.id], me) { onOpenChat(u.id) } }
     }
 }
@@ -62,24 +65,29 @@ fun ChatListScreen(session: UserSession, users: List<UserLite>, onOpenChat: (Str
 private fun ChatRow(user: UserLite, chat: Chat?, meId: String, onClick: () -> Unit) {
     val unread = chat?.unreadFor(meId) ?: 0L
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(14.dp)).clickable { onClick() }.padding(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(16.dp))
+            .background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)).clickable { onClick() }.padding(13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Avatar(user.photo, UserColor.of(user.id, user.color), user.name, 48.dp)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(user.name ?: "—", color = Tokens.Ink, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(2.dp))
+            Text(user.name ?: "—", color = Tokens.Ink, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(3.dp))
             Text(
                 chat?.lastText ?: "Toque para conversar",
                 color = if (unread > 0) Tokens.Ink else Tokens.Faint,
                 fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
-        if (unread > 0) {
-            Spacer(Modifier.width(8.dp))
-            Box(Modifier.size(22.dp).clip(CircleShape).background(Tokens.Accent), contentAlignment = Alignment.Center) {
-                Text(if (unread > 9) "9+" else "$unread", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            chat?.lastAt?.let { Text(DateUtil.hm(it), color = Tokens.Faint, fontSize = 10.5.sp) }
+            if (unread > 0) {
+                Spacer(Modifier.height(5.dp))
+                Box(Modifier.size(22.dp).clip(CircleShape).background(Tokens.Accent), contentAlignment = Alignment.Center) {
+                    Text(if (unread > 9) "9+" else "$unread", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

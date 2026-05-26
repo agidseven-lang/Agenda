@@ -88,12 +88,18 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(Tokens.Line))
 
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp),
-            state = listState,
-            contentPadding = PaddingValues(vertical = 12.dp),
-        ) {
-            items(messages, key = { it.id }) { msg -> MessageBubble(msg, mine = msg.by == me) }
+        if (messages.isEmpty()) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Text("Nenhuma mensagem ainda — diga olá 👋", color = Tokens.Faint, fontSize = 13.sp)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp),
+                state = listState,
+                contentPadding = PaddingValues(vertical = 12.dp),
+            ) {
+                items(messages, key = { it.id }) { msg -> MessageBubble(msg, mine = msg.by == me) }
+            }
         }
 
         // Input
