@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 14
-        versionName "1.0.10-beta-chat-settings-pro"
+        versionCode 15
+        versionName "1.0.11-beta-settings-emoji-fix"
         vectorDrawables { useSupportLibrary true }
     }
 

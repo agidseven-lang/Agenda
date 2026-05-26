@@ -38,6 +38,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -52,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.nativebeta.data.ChatRepo
@@ -94,6 +97,7 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
 
     var input by remember { mutableStateOf("") }
     var showEmoji by remember { mutableStateOf(false) }
+    val emojiSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     fun send() {
         val cid = chatId ?: return
@@ -154,7 +158,9 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
                 shape = RoundedCornerShape(24.dp),
                 maxLines = 5,
                 leadingIcon = {
-                    Icon(Icons.Outlined.EmojiEmotions, contentDescription = "Emoji", tint = Tokens.Soft, modifier = Modifier.size(24.dp).clip(CircleShape).clickable { showEmoji = true })
+                    Box(Modifier.size(36.dp).clip(CircleShape).clickable { showEmoji = true }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.EmojiEmotions, contentDescription = "Inserir emoji", tint = Tokens.Accent, modifier = Modifier.size(24.dp))
+                    }
                 },
                 trailingIcon = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -188,19 +194,46 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
     }
 
     if (showEmoji) {
-        ModalBottomSheet(onDismissRequest = { showEmoji = false }, containerColor = Tokens.Surface) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-                Text("Emojis", color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
+        ModalBottomSheet(onDismissRequest = { showEmoji = false }, sheetState = emojiSheetState, containerColor = Tokens.Surface) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 20.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Emojis", color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("Toque para inserir na mensagem", color = Tokens.Faint, fontSize = 12.sp)
+                    }
+                    TextButton(onClick = { showEmoji = false }) {
+                        Text("Pronto", color = Tokens.Accent, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Surface2).padding(horizontal = 12.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        input.ifBlank { "Sua mensagem aparece aqui…" },
+                        color = if (input.isBlank()) Tokens.Faint else Tokens.Ink,
+                        fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                    )
+                    if (input.isNotEmpty()) {
+                        Spacer(Modifier.width(8.dp))
+                        Box(Modifier.size(26.dp).clip(CircleShape).clickable { input = input.dropLast(1) }, contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.Close, contentDescription = "Apagar", tint = Tokens.Soft, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Column(Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())) {
                     EMOJIS.chunked(8).forEach { rowEmojis ->
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             rowEmojis.forEach { e ->
-                                Text(e, fontSize = 26.sp, modifier = Modifier.padding(8.dp).clickable { input += e })
+                                Box(Modifier.size(40.dp).clip(CircleShape).clickable { input += e }, contentAlignment = Alignment.Center) {
+                                    Text(e, fontSize = 24.sp)
+                                }
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
             }
         }
     }

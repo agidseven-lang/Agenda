@@ -19,6 +19,8 @@ object UsersRepo {
             val list = snap?.documents?.map { d ->
                 val photo = listOf("photo", "photoUrl", "avatar", "avatarUrl", "image", "imageUrl", "picture", "foto")
                     .firstNotNullOfOrNull { k -> d.getString(k)?.takeIf { it.isNotBlank() } }
+                val createdAt = d.getTimestamp("createdAt")?.toDate()?.time
+                    ?: (d.get("createdAt") as? Number)?.toLong()
                 UserLite(
                     id = d.id,
                     name = d.getString("name"),
@@ -29,6 +31,7 @@ object UsersRepo {
                     admin = d.getBoolean("admin") ?: false,
                     email = d.getString("email"),
                     phone = d.getString("phone"),
+                    createdAt = createdAt,
                 )
             } ?: emptyList()
             android.util.Log.d("UsersRepo", "users lidos do Firestore: ${list.size}")

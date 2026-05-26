@@ -32,6 +32,7 @@ data class UserLite(
     val admin: Boolean,
     val email: String? = null,
     val phone: String? = null,
+    val createdAt: Long? = null,
 ) {
     fun isActive(): Boolean = status != "pendente" && status != "removido" && status != "excluido"
 }
