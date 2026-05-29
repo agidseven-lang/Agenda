@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "br.com.agendaidseven.app",
+        "sha256_cert_fingerprints": ["89:EF:50:B5:DF:02:17:B5:59:7C:42:39:24:1E:02:DC:8D:31:E3:9D:5D:C8:12:A1:90:40:94:0A:65:4E:DF:AD"]
+      }
+    }]

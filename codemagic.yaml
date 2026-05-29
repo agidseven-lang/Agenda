@@ -1,0 +1,65 @@
+# codemagic.yaml — Build Android Nativo Beta (1.0.14)
+# Sem trigger automático: só roda manualmente pelo painel do Codemagic.
+# NÃO toca PWA, Worker, Firebase web nem schema. Lê secret encrypted no painel.
+
+workflows:
+  build-android-native-beta:
+    name: Build Android Nativo Beta (1.0.14-beta-notify-debug-fix)
+    instance_type: linux_x2
+    max_build_duration: 30
+    environment:
+      java: 17
+      groups:
+        # Crie em Codemagic > Settings > Environment variables > Groups:
+        #   nome do grupo: idseven_beta_secrets
+        #   variavel:      GOOGLE_SERVICES_JSON_BETA (Secure)
+        - idseven_beta_secrets
+      vars:
+        APK_OUT: idseven-nativebeta-1.0.14-beta-notify-debug-fix.apk
+        APP_DIR: android-native-beta
+    scripts:
+      - name: Restaurar google-services.json (secret -> arquivo)
+        script: |
+          set -e
+          if [ -z "$GOOGLE_SERVICES_JSON_BETA" ]; then
+            echo "ERRO: variavel GOOGLE_SERVICES_JSON_BETA ausente no grupo idseven_beta_secrets."
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_BETA" > "$APP_DIR/app/google-services.json"
+          echo "google-services.json gravado ($(wc -c < "$APP_DIR/app/google-services.json") bytes)."
+
+      - name: Garantir debug keystore (assinatura de teste)
+        script: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -v -keystore ~/.android/debug.keystore \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Build APK release (assembleRelease)
+        working_directory: $APP_DIR
+        script: |
+          chmod +x ./gradlew
+          ./gradlew clean assembleRelease --no-daemon --stacktrace
+
+      - name: Renomear APK para o nome canonico
+        script: |
+          set -e
+          SRC="$APP_DIR/app/build/outputs/apk/release/app-release.apk"
+          DST="$APP_DIR/app/build/outputs/apk/release/$APK_OUT"
+          [ -f "$SRC" ] || { echo "APK nao encontrado em $SRC"; exit 1; }
+          cp "$SRC" "$DST"
+          echo "APK final: $DST ($(stat -c '%s' "$DST") bytes)"
+    artifacts:
+      - android-native-beta/app/build/outputs/apk/release/idseven-nativebeta-1.0.14-beta-notify-debug-fix.apk
+      - android-native-beta/app/build/outputs/logs/*.log
+    publishing:
+      email:
+        # Substitua pelo e-mail que receberá o link do APK
+        recipients:
+          - <seu-email>
+        notify:
+          success: true
+          failure: true

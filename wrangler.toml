@@ -1,0 +1,29 @@
+# ============================================================================
+# ID Seven — Cloudflare Worker `idseven-push`  (deploy reproduzível)
+# ============================================================================
+# Deploy:  wrangler deploy
+#
+# SECRETS (NUNCA neste arquivo — somente no painel Cloudflare ou via
+# `wrangler secret put <NOME>`). Os valores não aparecem aqui:
+#   - FCM_CLIENT_EMAIL       (service account — e-mail)
+#   - FCM_PRIVATE_KEY        (service account — chave privada PEM)
+#   - IMAGEKIT_PRIVATE_KEY   (ImageKit)
+# Confirme que esses 3 secrets já existem no Worker antes de publicar.
+# ============================================================================
+
+name = "idseven-push"
+main = "cloudflare-worker.js"
+compatibility_date = "2026-05-24"
+workers_dev = true
+
+# Cron a cada 1 minuto — dispara scheduled(event, env, ctx) → lembrete na janela exata.
+[triggers]
+crons = ["* * * * *"]
+
+# Apenas variáveis de texto (NÃO-secretas). Todas são lidas pelo cloudflare-worker.js.
+[vars]
+FCM_PROJECT_ID = "agenda-id-seven"
+ALLOWED_ORIGIN = "https://agendaidseven.com.br"
+REMINDER_BEFORE_MINUTES = "60"
+REMINDER_WINDOW_SECONDS = "300"
+APP_TZ_OFFSET_MINUTES = "-180"

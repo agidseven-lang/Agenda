@@ -1,0 +1,23 @@
+// ID Seven Nativo Beta — app Android NATIVO PURO (Kotlin + Jetpack Compose).
+// Sem React Native / Hermes / Metro / npm / WebView / TWA / wrapper.
+// Mesma toolchain comprovada do app aprovado (Gradle 8.10.2 / AGP 8.6.0 / Kotlin 2.0.21).
+buildscript {
+    ext.kotlin_version = "2.0.21"
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.6.0"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlin_version"
+        classpath "com.google.gms:google-services:4.4.2"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
