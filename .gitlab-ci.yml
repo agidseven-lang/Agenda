@@ -58,10 +58,27 @@ build_android_beta:
       fi
     - cp "$GOOGLE_SERVICES_JSON_BETA" "$APP_DIR/app/google-services.json"
     - echo "google-services.json gravado ($(wc -c < "$APP_DIR/app/google-services.json") bytes)."
+    # CI-only: ajuste de estabilidade para runner pequeno. Apenda override em gradle.properties
+    # (Gradle lê top-down, linhas posteriores ganham). Arquivo do repositorio NAO e modificado
+    # no commit — so existe dentro do container do job. Nenhum codigo Kotlin/app e alterado.
+    - |
+      {
+        echo ""
+        echo "# ---- CI override: estabilidade em runner pequeno (injetado por .gitlab-ci.yml) ----"
+        echo "org.gradle.daemon=false"
+        echo "org.gradle.parallel=false"
+        echo "org.gradle.workers.max=1"
+        echo "org.gradle.jvmargs=-Xmx1024m -XX:MaxMetaspaceSize=384m -Dfile.encoding=UTF-8"
+        echo "kotlin.daemon.jvmargs=-Xmx768m"
+      } >> "$APP_DIR/gradle.properties"
+    - echo "gradle.properties efetivo no CI (tail):" && tail -10 "$APP_DIR/gradle.properties"
+    # Limpeza defensiva de daemons remanescentes (no-op em runner novo, util em re-run)
+    - pkill -f GradleDaemon 2>/dev/null || true
+    - pkill -f aapt2 2>/dev/null || true
   script:
     - cd "$APP_DIR"
     - chmod +x ./gradlew
-    - ./gradlew clean assembleRelease --no-daemon --stacktrace
+    - ./gradlew clean assembleRelease --no-daemon --max-workers=1 --no-parallel --stacktrace --info
     - cd "$CI_PROJECT_DIR"
     - cp "$APP_DIR/app/build/outputs/apk/release/app-release.apk" "$APK_OUT"
     - ls -lh "$APK_OUT"
