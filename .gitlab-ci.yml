@@ -151,15 +151,24 @@ deploy_firebase_functions:
           sed 's/^/      /' /tmp/api.err || true
         fi
       }
-      bind_iam() {   # $1=member  $2=role
-        echo ">> IAM binding: $2  ->  $1"
-        if gcloud projects add-iam-policy-binding "$GCP_PROJECT" \
-             --member="$1" --role="$2" --condition=None --quiet >/dev/null 2>/tmp/iam.err; then
-          echo "   ok (idempotente)"
-        else
-          echo "   AVISO: nao aplicou binding (pode ja existir, ou faltar resourcemanager.projects.setIamPolicy na SA):"
-          sed 's/^/      /' /tmp/iam.err || true
-        fi
+      bind_iam() {   # $1=member  $2=role  (retry: service agent pode demorar a provisionar)
+        member="$1"; role="$2"; tries=0; max=5
+        echo ">> IAM binding: $role  ->  $member"
+        while : ; do
+          if gcloud projects add-iam-policy-binding "$GCP_PROJECT" \
+               --member="$member" --role="$role" --condition=None --quiet >/dev/null 2>/tmp/iam.err; then
+            echo "   ok (idempotente)"
+            return 0
+          fi
+          tries=$((tries+1))
+          if [ "$tries" -ge "$max" ]; then
+            echo "   AVISO: binding nao aplicado apos $max tentativas (pode faltar setIamPolicy na SA, ou service agent ainda nao provisionado):"
+            sed 's/^/      /' /tmp/iam.err || true
+            return 0
+          fi
+          echo "   tentativa $tries falhou; aguardando 15s (provisionamento/propagacao do service agent)…"
+          sleep 15
+        done
       }
 
       # ---------- 1) Habilitar APIs necessarias (idempotente) ----------
@@ -185,14 +194,25 @@ deploy_firebase_functions:
       # ---------- 3) Bindings IAM exigidos pelos gatilhos Firestore v2 (idempotente) ----------
       echo "===== Preflight 2/3: IAM bindings ====="
       PUBSUB_SA="serviceAccount:service-${GCP_PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com"
+      EVENTARC_SA="serviceAccount:service-${GCP_PROJECT_NUMBER}@gcp-sa-eventarc.iam.gserviceaccount.com"
       COMPUTE_SA="serviceAccount:${GCP_PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-      bind_iam "$PUBSUB_SA"  "roles/iam.serviceAccountTokenCreator"
-      bind_iam "$COMPUTE_SA" "roles/run.invoker"
-      bind_iam "$COMPUTE_SA" "roles/eventarc.eventReceiver"
+
+      # Forca a criacao do P4SA (service agent) do Eventarc/Pub/Sub caso ainda nao exista
+      # (best-effort; sem 'beta' nao falha o job). Garante que o binding abaixo tenha alvo.
+      gcloud beta services identity create --service=eventarc.googleapis.com --project="$GCP_PROJECT" >/dev/null 2>&1 || true
+      gcloud beta services identity create --service=pubsub.googleapis.com   --project="$GCP_PROJECT" >/dev/null 2>&1 || true
+
+      # Papel exigido pelo erro "Permission denied while using the Eventarc Service Agent":
+      bind_iam "$EVENTARC_SA" "roles/eventarc.serviceAgent"
+      bind_iam "$PUBSUB_SA"   "roles/iam.serviceAccountTokenCreator"
+      bind_iam "$COMPUTE_SA"  "roles/run.invoker"
+      bind_iam "$COMPUTE_SA"  "roles/eventarc.eventReceiver"
 
       # ---------- 4) Propagacao IAM antes do deploy ----------
-      echo ">> Aguardando propagacao IAM (15s)…"
-      sleep 15
+      # 1o deploy de Functions 2nd Gen: a config do Eventarc pode levar alguns minutos
+      # para propagar. Esperamos 90s para reduzir falha por propagacao incompleta.
+      echo ">> Aguardando propagacao IAM / config 2nd Gen (90s)…"
+      sleep 90
 
       # ---------- 5) firebase-tools + deps das functions ----------
       echo "===== Preflight 3/3: ferramentas ====="
