@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.23-beta-universal-immediate-push-fallback"
+private const val BUILD = "1.0.24-beta-firestore-trigger-immediate-push"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

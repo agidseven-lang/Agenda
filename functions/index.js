@@ -1,0 +1,141 @@
+/* ============================================================================
+   ID Seven — Cloud Functions (Firestore Trigger) — push IMEDIATO ao responsável
+   ============================================================================
+   Por que existe: o push imediato NÃO pode depender do app cliente chamar
+   /notify-assignee (frágil: rede/Doze no aparelho de quem cria) nem só do CRON
+   do Worker (latência de até ~60s). Este gatilho dispara no servidor em ~1-2s
+   ao CRIAR um evento/tarefa e envia FCM de alta prioridade ao responsável.
+
+   Escopo: somente itens criados pelo app nativo (src == "nativebeta"), para não
+   duplicar com o fluxo do PWA. Dedupe via campo immediateNotifiedAt (mesmo campo
+   usado pelo Worker /notify-assignee e pelo IMMEDIATE-FALLBACK), então as três
+   camadas coordenam e não duplicam.
+
+   Credenciais: usa as credenciais padrão do runtime de Functions (admin SDK).
+   NENHUM segredo no código. Requer plano Blaze para deploy.
+   ============================================================================ */
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { setGlobalOptions } = require("firebase-functions/v2");
+const logger = require("firebase-functions/logger");
+const admin = require("firebase-admin");
+
+admin.initializeApp();
+setGlobalOptions({ region: "us-central1", maxInstances: 10 });
+
+const TTL_MS = 600000; // 10 min — alinhado ao ttl "600s" do Worker
+
+/* mantém 1 token por deviceId (mais recente) + dedup — igual ao Worker. */
+function dedupeTokensByDevice(tokens, meta) {
+  if (!Array.isArray(tokens)) return [];
+  meta = (meta && typeof meta === "object") ? meta : {};
+  const byDevice = {};
+  const noMeta = [];
+  for (const t of tokens) {
+    if (!t) continue;
+    const m = meta[t];
+    if (m && m.deviceId) {
+      const ts = (m.lastSeenAt || m.createdAt || 0);
+      if (!byDevice[m.deviceId] || ts >= byDevice[m.deviceId].ts) byDevice[m.deviceId] = { token: t, ts };
+    } else {
+      noMeta.push(t);
+    }
+  }
+  const out = Object.keys(byDevice).map((k) => byDevice[k].token).concat(noMeta);
+  return Array.from(new Set(out.filter(Boolean)));
+}
+
+/* Monta título/corpo + data payload (strings) — compatível com o app nativo
+   (AppFirebaseMessagingService lê data.deepLink / eventId / taskId). */
+function buildMessageData(type, id, doc) {
+  const titleBase = (type === "task") ? "Nova tarefa atribuída" : "Novo compromisso atribuído";
+  const title = doc.title || doc.client || titleBase;
+  const when = [doc.date || doc.dueDate, (doc.start || doc.dueTime)].filter(Boolean).join(" ");
+  const body = (type === "task")
+    ? ("Tarefa para você" + (when ? " · vence " + when : ""))
+    : ("Compromisso para você" + (when ? " · " + when : ""));
+  const responsibleId = (type === "task") ? (doc.assigneeId || "") : (doc.ownerId || "");
+  const data = {
+    type: type,
+    eventId: (type === "event") ? id : "",
+    taskId: (type === "task") ? id : "",
+    title: title,
+    body: body,
+    responsibleId: String(responsibleId),
+    createdBy: String(doc.by || ""),
+    scheduledAt: String(doc.date || doc.dueDate || ""),
+    deepLink: type + ":" + id,
+  };
+  for (const k of Object.keys(data)) data[k] = String(data[k] == null ? "" : data[k]);
+  return { title, body, data };
+}
+
+/* Núcleo: notifica o responsável de um item recém-criado (idempotente). */
+async function notifyResponsible(type, coll, id, doc) {
+  if (!doc) return;
+  if (doc.src !== "nativebeta") return;                 // só itens do app nativo (evita double com PWA)
+  if (doc.immediateNotifiedAt) return;                  // dedupe (já notificado por outra camada)
+  if (type === "event" && doc.done) return;
+  if (type === "task" && doc.status === "concluido") return;
+
+  const responsibleId = (type === "task") ? (doc.assigneeId || null) : (doc.ownerId || null);
+  if (!responsibleId) return;
+
+  const db = admin.firestore();
+  const ref = db.collection(coll).doc(id);
+
+  // Não notificar o próprio criador; marca p/ não reprocessar.
+  if (responsibleId === (doc.by || null)) {
+    await ref.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: "auto-atribuicao (skip)" }, { merge: true });
+    return;
+  }
+
+  const userSnap = await db.collection("users").doc(responsibleId).get();
+  const user = userSnap.exists ? userSnap.data() : null;
+  const tokens = dedupeTokensByDevice(
+    (user && Array.isArray(user.fcmTokens)) ? user.fcmTokens.filter(Boolean) : [],
+    user && user.fcmTokenMeta
+  );
+
+  if (!tokens.length) {
+    logger.warn(`[TRIGGER] ${type}/${id} -> ${responsibleId}: responsavel sem token`);
+    await ref.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: "responsavel sem token" }, { merge: true });
+    return;
+  }
+
+  const { data } = buildMessageData(type, id, doc);
+  let sent = 0, reason = "";
+  try {
+    const resp = await admin.messaging().sendEachForMulticast({
+      tokens: tokens,
+      data: data,
+      android: { priority: "high", ttl: TTL_MS },
+    });
+    sent = resp.successCount;
+    reason = `sent ${sent}/${tokens.length}`;
+  } catch (e) {
+    reason = "erro FCM: " + (e && e.message ? e.message : String(e));
+    logger.error(`[TRIGGER] ${type}/${id} -> ${responsibleId}: ${reason}`);
+  }
+  logger.info(`[TRIGGER] ${type}/${id} -> ${responsibleId}: ${reason}`);
+  await ref.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: reason }, { merge: true });
+}
+
+exports.onEventCreated = onDocumentCreated("events/{eventId}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  try {
+    await notifyResponsible("event", "events", event.params.eventId, snap.data());
+  } catch (e) {
+    logger.error("[TRIGGER] onEventCreated falhou:", e && e.message);
+  }
+});
+
+exports.onTaskCreated = onDocumentCreated("tasks/{taskId}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  try {
+    await notifyResponsible("task", "tasks", event.params.taskId, snap.data());
+  } catch (e) {
+    logger.error("[TRIGGER] onTaskCreated falhou:", e && e.message);
+  }
+});
