@@ -19,6 +19,7 @@ variables:
 
 stages:
   - build
+  - deploy
 
 cache:
   key: android-beta-v1
@@ -88,3 +89,32 @@ build_android_beta:
       - "$APK_OUT"
     expire_in: 30 days
     when: on_success
+
+# Deploy MANUAL das Firebase Functions (push imediato: onEventCreated/onTaskCreated).
+# Roda no runner do GitLab. A credencial NUNCA fica no codigo: vem de uma variavel
+# CI/CD do GitLab. Suporta dois modos (defina UM em Settings > CI/CD > Variables):
+#   - GOOGLE_APPLICATION_CREDENTIALS : variavel do tipo FILE com o JSON da service
+#     account (recomendado; 100% pelo Console, sem comando local). O GitLab grava o
+#     conteudo num arquivo e expoe o caminho nesta env var, que o firebase-tools lê.
+#   - FIREBASE_TOKEN : token de CI (firebase login:ci) — alternativa.
+deploy_firebase_functions:
+  stage: deploy
+  image: node:20
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "feat/android-native-saas"'
+      when: manual
+      allow_failure: true
+  script:
+    - npm install -g firebase-tools
+    - (cd functions && (npm ci || npm install))
+    - |
+      if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ] && [ -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+        echo "Autenticando via service account (GOOGLE_APPLICATION_CREDENTIALS)."
+        firebase deploy --only functions --project agenda-id-seven --non-interactive
+      elif [ -n "$FIREBASE_TOKEN" ]; then
+        echo "Autenticando via FIREBASE_TOKEN."
+        firebase deploy --only functions --project agenda-id-seven --token "$FIREBASE_TOKEN" --non-interactive
+      else
+        echo "::error:: defina GOOGLE_APPLICATION_CREDENTIALS (File) OU FIREBASE_TOKEN em Settings > CI/CD > Variables."
+        exit 1
+      fi
