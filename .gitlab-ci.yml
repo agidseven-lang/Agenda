@@ -32,9 +32,13 @@ cache:
 build_android_beta:
   stage: build
   image: eclipse-temurin:17-jdk-jammy
-  # Build pesado do APK NAO roda em push automatico: so via "Run pipeline" (web).
+  # Build pesado do APK NAO roda em todo push. Roda em:
+  #  - "Run pipeline" (web); OU
+  #  - push cujo commit tenha o marcador [build-apk] (gera APK sob demanda,
+  #    sem clique e sem buildar em pushes normais; auto-restaura por commit).
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas" && $CI_COMMIT_MESSAGE =~ /\[build-apk\]/'
   before_script:
     - apt-get update -qq && apt-get install -y -qq --no-install-recommends unzip curl ca-certificates git
     - mkdir -p "$ANDROID_HOME/cmdline-tools"
