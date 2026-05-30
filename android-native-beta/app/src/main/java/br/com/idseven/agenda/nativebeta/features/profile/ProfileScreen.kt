@@ -63,7 +63,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.17-beta-specific-time-notify-fix"
+private const val BUILD = "1.0.18-beta-assignee-notify-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -188,7 +188,7 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         InfoLine("Último disparo", lastFired ?: firedPersist ?: "—")
                         if (lastError != null) InfoLine("Último erro", lastError!!)
                         Spacer(Modifier.height(10.dp))
-                        SheetText("Para lembretes funcionarem com o app fechado, desative a otimização de bateria. Push remoto ainda não está ativo — por enquanto funcionam apenas os lembretes locais.")
+                        SheetText("Lembretes locais valem para este aparelho (desative a otimização de bateria para o app fechado). Compromissos em que você é o responsável também chegam por push do servidor, no horário do lembrete. Notificação de tarefa para o responsável ainda depende de configuração no servidor.")
                         Spacer(Modifier.height(14.dp))
                         if (!notifOk || !enabled) {
                             SheetButton("Permitir notificações") { Notifications.openNotificationSettings(context) }

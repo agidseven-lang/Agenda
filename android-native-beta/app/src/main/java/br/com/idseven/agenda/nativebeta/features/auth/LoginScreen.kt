@@ -103,7 +103,7 @@ fun LoginScreen(vm: LoginViewModel = viewModel()) {
 
             Spacer(Modifier.height(28.dp))
             Text(
-                "build: 1.0.17-beta-specific-time-notify-fix",
+                "build: 1.0.18-beta-assignee-notify-fix",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
         }

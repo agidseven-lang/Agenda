@@ -121,7 +121,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         if (Build.VERSION.SDK_INT >= 33 && !Notifications.hasPostPermission(context)) {
             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        Fcm.register(session.uid)
+        Fcm.register(context, session.uid)
     }
     // Lembretes locais: reagenda sempre que a agenda OU as tarefas mudam (com dedupe).
     LaunchedEffect(eventsState, tasksState) {
