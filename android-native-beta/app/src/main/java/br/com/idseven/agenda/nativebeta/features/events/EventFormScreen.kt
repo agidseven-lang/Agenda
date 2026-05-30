@@ -123,7 +123,7 @@ fun EventFormScreen(
             if (res.isSuccess) {
                 val savedId = (res.getOrNull() as? String) ?: editId
                 // Push imediato ao responsável (se houver) via Worker. Evita notificar a si mesmo.
-                if (!ownerId.isNullOrBlank() && ownerId != currentUid) PushNotify.notifyAssignee("event", savedId)
+                if (!ownerId.isNullOrBlank() && ownerId != currentUid) PushNotify.notifyAssignee(context, "event", savedId)
                 onDone()
             } else {
                 error = res.exceptionOrNull()?.message ?: "Erro ao salvar"; busy = false

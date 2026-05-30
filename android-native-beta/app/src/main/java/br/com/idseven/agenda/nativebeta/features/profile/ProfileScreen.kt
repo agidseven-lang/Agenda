@@ -63,7 +63,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.19-beta-realtime-assignee-push"
+private const val BUILD = "1.0.20-beta-immediate-push-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -171,6 +171,9 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         val schedNext = remember(permRefresh) {
                             context.getSharedPreferences("notifydiag", android.content.Context.MODE_PRIVATE).getString("sched_next", null)
                         }
+                        val lastPush = remember(permRefresh) {
+                            context.getSharedPreferences("notifydiag", android.content.Context.MODE_PRIVATE).getString("last_push", null)
+                        }
                         val exactLabel = if (android.os.Build.VERSION.SDK_INT < 31) "Não exigido"
                             else if (exactOk) "Permitidos" else "Pendentes (lembrete aproximado)"
                         InfoLine("Permissão", if (notifOk) "Concedida" else "Pendente")
@@ -183,6 +186,7 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         InfoLine("Token FCM", if (hasToken) "Registrado" else "Não registrado")
                         InfoLine("Lembretes agendados", schedCount ?: "—")
                         InfoLine("Próximo lembrete", schedNext ?: "—")
+                        InfoLine("Último push imediato", lastPush ?: "—")
                         InfoLine("Último teste imediato", lastImmediate ?: "—")
                         InfoLine("Último teste agendado", lastScheduled ?: "—")
                         InfoLine("Último disparo", lastFired ?: firedPersist ?: "—")

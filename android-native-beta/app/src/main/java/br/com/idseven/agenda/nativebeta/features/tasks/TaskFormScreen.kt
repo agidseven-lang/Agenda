@@ -122,7 +122,7 @@ fun TaskFormScreen(
             else TaskRepo.create(TaskContract.create(input, currentUid, System.currentTimeMillis()))
             if (res.isSuccess) {
                 val savedId = (res.getOrNull() as? String) ?: editId
-                if (!assigneeId.isNullOrBlank()) PushNotify.notifyAssignee("task", savedId)
+                if (!assigneeId.isNullOrBlank()) PushNotify.notifyAssignee(context, "task", savedId)
                 onDone()
             } else {
                 error = res.exceptionOrNull()?.message ?: "Erro ao salvar"; busy = false

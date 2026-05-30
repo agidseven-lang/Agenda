@@ -161,25 +161,29 @@ async function handleNotifyAssignee(request, env) {
 
   const type = (payload.type === "task") ? "task" : (payload.type === "event") ? "event" : null;
   const id = (typeof payload.id === "string") ? payload.id.trim() : "";
-  if (!type || !id) return json({ ok: false, error: "type/id obrigatórios" }, 400, env);
+  console.log(`[ASSIGN] recebido type=${type} id=${id}`);
+  if (!type || !id) return json({ ok: false, reason: "type/id obrigatórios", type, id }, 400, env);
 
   let accessToken;
   try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
-  catch (e) { return json({ ok: false, error: "auth falhou: " + (e && e.message) }, 200, env); }
+  catch (e) { return json({ ok: false, reason: "auth falhou: " + (e && e.message), type, id }, 200, env); }
 
   const collection = (type === "task") ? "tasks" : "events";
   const doc = await getDoc(env, accessToken, collection, id);
-  if (!doc) return json({ ok: false, error: "item não encontrado" }, 200, env);
+  console.log(`[ASSIGN] doc encontrado=${!!doc} colecao=${collection}`);
+  if (!doc) return json({ ok: false, reason: "item nao encontrado", type, id }, 200, env);
 
   const responsibleId = (type === "task")
     ? (doc.assigneeId || null)
     : (doc.ownerId || null);
-  if (!responsibleId) return json({ ok: false, error: "sem responsável (id)" }, 200, env);
+  console.log(`[ASSIGN] responsibleId=${responsibleId} (assigneeId=${doc.assigneeId || ""} ownerId=${doc.ownerId || ""})`);
+  if (!responsibleId) return json({ ok: false, reason: "sem responsavel (id)", type, id, assigneeId: doc.assigneeId || null, ownerId: doc.ownerId || null }, 200, env);
 
   const user = await getUser(env, accessToken, responsibleId);
   const tokensBefore = (user && Array.isArray(user.fcmTokens)) ? user.fcmTokens.filter(Boolean) : [];
   const tokens = dedupeTokensByDevice(tokensBefore, user && user.fcmTokenMeta);
-  if (!tokens.length) return json({ ok: false, error: "responsável sem token" }, 200, env);
+  console.log(`[ASSIGN] responsavel=${responsibleId} tokens=${tokens.length}`);
+  if (!tokens.length) return json({ ok: false, reason: "responsavel sem token", type, id, responsibleId }, 200, env);
 
   const titleBase = (type === "task") ? "Nova tarefa atribuída" : "Novo compromisso atribuído";
   const title = doc.title || doc.client || titleBase;
@@ -202,7 +206,7 @@ async function handleNotifyAssignee(request, env) {
   const results = await sendToTokens(env, accessToken, tokens, { title, body, data });
   const okCount = results.filter((r) => r.ok).length;
   console.log(`[ASSIGN] ${type}/${id} -> ${responsibleId}: ${okCount}/${tokens.length}`);
-  return json({ ok: okCount > 0, sent: okCount, total: tokens.length }, 200, env);
+  return json({ ok: okCount > 0, reason: okCount > 0 ? "enviado" : "FCM nao aceitou", type, id, responsibleId, tokens: tokens.length, sent: okCount }, 200, env);
 }
 
 /* Lê um doc genérico (events/tasks) e decodifica os campos. */
