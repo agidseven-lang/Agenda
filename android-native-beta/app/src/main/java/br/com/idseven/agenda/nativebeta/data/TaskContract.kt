@@ -47,6 +47,7 @@ object TaskContract {
         base(i).apply {
             put("by", byUid)
             put("createdAt", nowMs)
+            put("src", "nativebeta")
         }
 
     // Rastreio igual ao trackFields do PWA: startedAt ao sair de "afazer";

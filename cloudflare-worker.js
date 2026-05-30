@@ -176,6 +176,7 @@ async function handleNotifyAssignee(request, env) {
   const doc = await getDoc(env, accessToken, collection, id);
   console.log(`[ASSIGN] doc encontrado=${!!doc} colecao=${collection}`);
   if (!doc) return json({ ok: false, reason: "item nao encontrado", type, id }, 200, env);
+  if (doc.immediateNotifiedAt) return json({ ok: true, reason: "ja notificado (immediateNotifiedAt)", type, id }, 200, env);
 
   const responsibleId = (type === "task")
     ? (doc.assigneeId || null)
@@ -189,12 +190,23 @@ async function handleNotifyAssignee(request, env) {
   console.log(`[ASSIGN] responsavel=${responsibleId} tokens=${tokens.length}`);
   if (!tokens.length) return json({ ok: false, reason: "responsavel sem token", type, id, responsibleId }, 200, env);
 
+  const m = immediatePayload(type, id, doc);
+  const results = await sendToTokens(env, accessToken, tokens, m);
+  const okCount = results.filter((r) => r.ok).length;
+  if (okCount > 0) await markField(env, accessToken, collection, id, "immediateNotifiedAt", Date.now());
+  console.log(`[ASSIGN] ${type}/${id} -> ${responsibleId}: ${okCount}/${tokens.length}`);
+  return json({ ok: okCount > 0, reason: okCount > 0 ? "enviado" : "FCM nao aceitou", type, id, responsibleId, tokens: tokens.length, sent: okCount }, 200, env);
+}
+
+/* Monta título/corpo/data do push IMEDIATO (usado por /notify-assignee e pelo fallback do CRON). */
+function immediatePayload(type, id, doc) {
   const titleBase = (type === "task") ? "Nova tarefa atribuída" : "Novo compromisso atribuído";
   const title = doc.title || doc.client || titleBase;
   const when = [doc.date || doc.dueDate, (doc.start || doc.dueTime)].filter(Boolean).join(" ");
   const body = (type === "task")
     ? ("Tarefa para você" + (when ? " · vence " + when : ""))
     : ("Compromisso para você" + (when ? " · " + when : ""));
+  const responsibleId = (type === "task") ? (doc.assigneeId || "") : (doc.ownerId || "");
   const data = stringifyData({
     type,
     eventId: (type === "event") ? id : "",
@@ -206,11 +218,7 @@ async function handleNotifyAssignee(request, env) {
     scheduledAt: String(doc.date || doc.dueDate || ""),
     deepLink: type + ":" + id,
   });
-
-  const results = await sendToTokens(env, accessToken, tokens, { title, body, data });
-  const okCount = results.filter((r) => r.ok).length;
-  console.log(`[ASSIGN] ${type}/${id} -> ${responsibleId}: ${okCount}/${tokens.length}`);
-  return json({ ok: okCount > 0, reason: okCount > 0 ? "enviado" : "FCM nao aceitou", type, id, responsibleId, tokens: tokens.length, sent: okCount }, 200, env);
+  return { title, body, data };
 }
 
 /* Lê um doc genérico (events/tasks) e decodifica os campos. */
@@ -426,6 +434,46 @@ async function handleCronTrigger(env, opts) {
     await markReminderSent(env, accessToken, "tasks", t.id, now);
   }
 
+  /* ───── FALLBACK SERVER-SIDE: push IMEDIATO ao responsável, p/ itens recém-criados
+     pelo app nativo (src=nativebeta) que ainda não tiveram immediateNotifiedAt. Garante
+     "quase tempo real" (<= 1 min) mesmo se a chamada /notify-assignee do app falhar.
+     Escopo: só src=nativebeta (não duplica notificações de itens criados no PWA). ───── */
+  const immediateWindowMin = parseInt(env.IMMEDIATE_WINDOW_MINUTES, 10) > 0 ? parseInt(env.IMMEDIATE_WINDOW_MINUTES, 10) : 15;
+  const sinceMs = now - immediateWindowMin * 60000;
+  report.immediate = [];
+  const recents = [];
+  for (const d of await queryRecentByCreatedAt(env, accessToken, "events", sinceMs)) recents.push({ type: "event", doc: d });
+  for (const d of await queryRecentByCreatedAt(env, accessToken, "tasks", sinceMs)) recents.push({ type: "task", doc: d });
+  console.log(`[IMMEDIATE-FALLBACK] ${recents.length} item(ns) recente(s) (janela ${immediateWindowMin}min)`);
+
+  for (const { type, doc } of recents) {
+    if (!doc) continue;
+    if (doc.src !== "nativebeta") continue;                 // só itens do app nativo
+    if (doc.immediateNotifiedAt) continue;                  // dedupe
+    if (type === "event" && doc.done) continue;
+    if (type === "task" && doc.status === "concluido") continue;
+    const coll = (type === "task") ? "tasks" : "events";
+    const responsibleId = (type === "task") ? (doc.assigneeId || null) : (doc.ownerId || null);
+    if (!responsibleId) continue;
+    // Não notificar o próprio criador; marca p/ não reprocessar todo minuto.
+    if (responsibleId === (doc.by || null)) {
+      if (!dryRun) await markField(env, accessToken, coll, doc.id, "immediateNotifiedAt", now);
+      continue;
+    }
+    const user = (userDocCache[responsibleId] !== undefined) ? userDocCache[responsibleId] : await getUser(env, accessToken, responsibleId);
+    userDocCache[responsibleId] = user;
+    const tokens = dedupeTokensByDevice((user && Array.isArray(user.fcmTokens)) ? user.fcmTokens.filter(Boolean) : [], user && user.fcmTokenMeta);
+    report.immediate.push({ type, id: doc.id, responsibleId, hasTokens: tokens.length > 0 });
+    console.log(`[IMMEDIATE-FALLBACK] ${type}/${doc.id} -> ${responsibleId} tokens=${tokens.length}`);
+    if (!tokens.length) continue;
+    if (dryRun) continue;
+    const m = immediatePayload(type, doc.id, doc);
+    const results = await sendToTokens(env, accessToken, tokens, m);
+    const okCount = results.filter((r) => r.ok).length;
+    console.log(`[IMMEDIATE-FALLBACK] sent ${type}/${doc.id} -> ${responsibleId}: ${okCount}/${tokens.length}`);
+    await markField(env, accessToken, coll, doc.id, "immediateNotifiedAt", now);
+  }
+
   return report;
 }
 
@@ -512,6 +560,28 @@ async function queryTasks(env, accessToken, fromDateStr) {
   return out;
 }
 
+/* itens recém-criados (createdAt epoch ms >= sinceMs) — usado pelo fallback de push imediato. */
+async function queryRecentByCreatedAt(env, accessToken, collection, sinceMs) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = {
+    structuredQuery: {
+      from: [{ collectionId: collection }],
+      where: { fieldFilter: { field: { fieldPath: "createdAt" }, op: "GREATER_THAN_OR_EQUAL", value: { integerValue: String(sinceMs) } } },
+      limit: 200,
+    },
+  };
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  if (!res.ok) { console.error("[IMMEDIATE-FALLBACK] runQuery " + collection + " falhou:", res.status, (await res.text()).slice(0, 300)); return []; }
+  const rows = await res.json();
+  const out = [];
+  for (const row of rows) {
+    if (!row.document) continue;
+    const id = row.document.name.split("/").pop();
+    out.push(Object.assign({ id }, decodeFields(row.document.fields)));
+  }
+  return out;
+}
+
 /* due (UTC) a partir de dueDate "YYYY-MM-DD" + dueTime "HH:MM" em horário local. */
 function taskDueMs(t, tzOffsetMinutes) {
   if (!t || !t.dueDate) return 0;
@@ -545,6 +615,20 @@ async function markReminderSent(env, accessToken, collection, id, nowMs) {
     });
   } catch (e) {
     console.warn("[REMINDER] falha ao gravar reminderSentAt:", e && e.message);
+  }
+}
+
+/* grava {collection}/{id}.{field} = nowMs (dedupe genérico: immediateNotifiedAt etc.) */
+async function markField(env, accessToken, collection, id, field, nowMs) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/${collection}/${id}?updateMask.fieldPaths=${field}`;
+  try {
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { [field]: { integerValue: String(nowMs) } } }),
+    });
+  } catch (e) {
+    console.warn("[MARK] falha ao gravar " + field + ":", e && e.message);
   }
 }
 

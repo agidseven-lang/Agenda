@@ -36,6 +36,7 @@ object EventContract {
             put("by", byUid)
             put("done", false)
             put("createdAt", nowMs)
+            put("src", "nativebeta")
         }
 
     fun startPatch(uid: String?, nowMs: Long): Map<String, Any?> =

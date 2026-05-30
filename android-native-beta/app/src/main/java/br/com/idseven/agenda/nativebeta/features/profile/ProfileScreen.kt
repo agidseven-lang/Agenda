@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.22-beta-all-users-fcm-notify-fix"
+private const val BUILD = "1.0.23-beta-universal-immediate-push-fallback"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
