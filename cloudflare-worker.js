@@ -121,6 +121,10 @@ async function sendToTokens(env, accessToken, tokens, msg) {
       message: {
         token,
         data: msg.data,
+        android: {
+          priority: "HIGH",
+          ttl: "600s",
+        },
         webpush: {
           headers: { Urgency: "high", TTL: "86400" },
           notification: {

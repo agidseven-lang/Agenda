@@ -63,7 +63,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.20-beta-immediate-push-fix"
+private const val BUILD = "1.0.21-beta-high-priority-reminder-push"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
