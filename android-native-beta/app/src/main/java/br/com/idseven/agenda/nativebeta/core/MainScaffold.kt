@@ -56,7 +56,6 @@ import br.com.idseven.agenda.nativebeta.features.chat.ChatThreadScreen
 import br.com.idseven.agenda.nativebeta.features.dashboard.DashboardScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventDetailScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventFormScreen
-import br.com.idseven.agenda.nativebeta.features.notif.NotificationDetailModal
 import br.com.idseven.agenda.nativebeta.features.profile.ProfileScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskDetailScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskFormScreen
@@ -138,10 +137,19 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
     LaunchedEffect(eventsState, tasksState) {
         ReminderScheduler.sync(context, eventsState.itemsOrEmpty(), tasksState.itemsOrEmpty())
     }
-    // Notificação tocada: abre o MODAL premium de detalhe (compromisso/tarefa/chat).
-    val pendingNotif by DeepLink.notif.collectAsState()
-    LaunchedEffect(pendingNotif) {
-        if (pendingNotif != null) runCatching { nav.navigate("notifDetail") { launchSingleTop = true } }
+    // Notificação IMEDIATA tocada: navega DIRETO ao destino (sem modal).
+    // O modal premium é exclusivo do lembrete de 1h (ReminderAlarmActivity full-screen).
+    val pendingDeepLink by DeepLink.pending.collectAsState()
+    LaunchedEffect(pendingDeepLink) {
+        val dl = pendingDeepLink?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        DeepLink.pending.value = null
+        val route = when {
+            dl.startsWith("task:") -> "task/${dl.removePrefix("task:")}"
+            dl.startsWith("event:") -> "event/${dl.removePrefix("event:")}"
+            dl.startsWith("chat:") -> "chatThread/${dl.removePrefix("chat:")}"
+            else -> "event/$dl"
+        }
+        runCatching { nav.navigate(route) }
     }
 
     val tabs = listOf(
@@ -202,36 +210,6 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                 )
             }
             composable("perfil") { ProfileScreen(currentUser, session, onLogout) }
-            composable("notifDetail") {
-                val p = pendingNotif
-                if (p == null) {
-                    LaunchedEffect(Unit) { runCatching { nav.popBackStack() } }
-                } else {
-                    val ev = if (p.type == "event") eventsState.itemsOrEmpty().firstOrNull { it.id == p.id } else null
-                    val tk = if (p.type == "task") tasksState.itemsOrEmpty().firstOrNull { it.id == p.id } else null
-                    val loading = when (p.type) {
-                        "event" -> eventsState.isLoading
-                        "task" -> tasksState.isLoading
-                        else -> false
-                    }
-                    NotificationDetailModal(
-                        payload = p, event = ev, task = tk, users = users, loading = loading,
-                        onAction = {
-                            val route = when (p.type) {
-                                "task" -> "task/${p.id}"
-                                "chat" -> "chatThread/${p.id}"
-                                else -> "event/${p.id}"
-                            }
-                            DeepLink.notif.value = null
-                            runCatching { nav.navigate(route) { popUpTo("notifDetail") { inclusive = true } } }
-                        },
-                        onClose = {
-                            DeepLink.notif.value = null
-                            runCatching { nav.popBackStack() }
-                        },
-                    )
-                }
-            }
             composable("event/{id}") { entry ->
                 EventDetailScreen(
                     id = entry.arguments?.getString("id") ?: "",

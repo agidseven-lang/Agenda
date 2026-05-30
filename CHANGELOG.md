@@ -5,7 +5,33 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
-## 1.0.26-beta-notification-detail-modal — modal premium pós-clique (em desenvolvimento)
+## 1.0.27-beta-reminder-fullscreen-notification — lembrete 1h em tela cheia (em desenvolvimento)
+
+**Correção conceitual:** a experiência premium é do **lembrete de 1h antes**, não do
+push imediato. Imediatos voltam a ser notificação normal (heads-up), mais rica.
+
+- **Imediato (agenda/tarefa/chat):** notificação normal de alta prioridade no novo
+  canal `immediate`, com subText por tipo (Compromisso/Tarefa/Mensagem); toque
+  **navega direto** ao destino — sem modal. (Reverte o modal-no-toque da 1.0.26.)
+- **Lembrete 1h antes:** agora dispara experiência **premium full-screen**
+  (`ReminderAlarmActivity`) via `setFullScreenIntent`, canal próprio `reminder_call`
+  (IMPORTANCE_HIGH, categoria REMINDER, bypass DnD). Aparece sobre o lockscreen e
+  liga a tela (showWhenLocked/turnScreenOn), sem depender de toque. **Fallback**
+  automático para heads-up quando full-screen não é permitido (Android 14+
+  `canUseFullScreenIntent`). Permissão `USE_FULL_SCREEN_INTENT` no Manifest.
+- **Tela premium do lembrete:** fundo escuro, ícone circular, título forte, card
+  (compromisso/tarefa, responsável, data, horário, status), botão "Abrir detalhe"
+  (deep link) e "Dispensar".
+- **Plumbing:** `ReminderScheduler` carrega campos estruturados (type/date/time/
+  responsável/status/deeplink) no alarme e na persistência de reboot (tolerante a
+  payloads antigos); `ReminderReceiver` chama o caminho full-screen.
+- Não altera PWA/Worker/Cloudflare/Rules/schema nem as Functions aprovadas.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
+## 1.0.26-beta-notification-detail-modal — modal premium pós-clique (substituída pela 1.0.27)
 
 **Objetivo:** ao tocar na notificação, abrir uma tela/modal nativa premium com
 o detalhe (compromisso/tarefa/chat), sem alterar o push em tempo real aprovado.

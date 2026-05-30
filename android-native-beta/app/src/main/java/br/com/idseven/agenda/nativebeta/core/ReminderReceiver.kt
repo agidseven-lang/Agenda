@@ -15,9 +15,22 @@ class ReminderReceiver : BroadcastReceiver() {
             val id = intent.getStringExtra("eventId")?.takeIf { it.isNotBlank() }
             val title = intent.getStringExtra("title") ?: "Lembrete"
             val text = intent.getStringExtra("text") ?: ""
+            val type = intent.getStringExtra("type")?.takeIf { it.isNotBlank() } ?: "event"
+            val date = intent.getStringExtra("date")
+            val time = intent.getStringExtra("time")
+            val resp = intent.getStringExtra("resp")
+            val status = intent.getStringExtra("status")
+            val deeplink = intent.getStringExtra("deeplink")?.takeIf { it.isNotBlank() }
+                ?: id?.let { "event:$it" } ?: ""
             Notifications.ensure(context)
             val notifId = id?.hashCode() ?: 99021
-            val ok = Notifications.notify(context, notifId, Notifications.CH_REMINDERS, title, text, eventId = id)
+            // Lembrete 1h antes = experiência PREMIUM full-screen (heads-up se não permitido).
+            val rawId = id?.removePrefix("task_") ?: ""
+            val ok = Notifications.notifyReminderFullScreen(
+                context, notifId, title, text,
+                type = type, rawId = rawId, deepLink = deeplink,
+                date = date, time = time, responsible = resp, status = status,
+            )
             val stamp = (if (ok) "Disparado · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis()) +
                 " · " + (id ?: "teste")
             // Em memória (útil quando o app está aberto)

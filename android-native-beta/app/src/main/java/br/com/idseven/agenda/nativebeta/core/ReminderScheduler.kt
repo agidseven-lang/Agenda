@@ -8,6 +8,7 @@ import android.os.Build
 import br.com.idseven.agenda.nativebeta.domain.EventItem
 import br.com.idseven.agenda.nativebeta.domain.EventStatus
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
+import br.com.idseven.agenda.nativebeta.domain.TaskStatus
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
 // Lembretes locais exatos via AlarmManager. Agenda/cancela/reagenda com dedupe.
@@ -20,7 +21,18 @@ object ReminderScheduler {
     private const val KEY_PAYLOADS = "payloads" // Set<String> codificado com SEP
     private const val SEP = "\u0001"            // delimitador improvavel em texto de evento
 
-    private data class Sched(val key: String, val at: Long, val title: String, val text: String)
+    // Campos estruturados p/ a tela premium do lembrete (full-screen).
+    private data class Sched(
+        val key: String, val at: Long, val title: String, val text: String,
+        val type: String = "event", val date: String = "", val time: String = "",
+        val resp: String = "", val status: String = "", val deepLink: String = "",
+    )
+
+    // Extras estruturados levados no alarme/persistência (toleram ausência).
+    data class Extra(
+        val type: String = "event", val date: String = "", val time: String = "",
+        val resp: String = "", val status: String = "", val deepLink: String = "",
+    )
 
     // Agenda lembretes de EVENTOS e TAREFAS (marcar alguém por horário).
     // Evento com horário: lembra `leadMinutes` antes; se essa janela já passou mas o evento
@@ -42,9 +54,15 @@ object ReminderScheduler {
                     baseMs > now -> baseMs        // janela de antecedência já passou -> dispara no horário
                     else -> return@forEach        // evento já passou
                 }
-                val title = "Lembrete: " + (e.title?.ifBlank { null } ?: e.client ?: "Compromisso")
+                val nome = e.title?.ifBlank { null } ?: e.client ?: "Compromisso"
+                val title = "Lembrete: $nome"
                 val text = listOfNotNull(e.client, e.start?.let { "às $it" }, e.location).joinToString(" · ")
-                targets.add(Sched(e.id, trigger, title, text))
+                val status = EventStatus.status(e)?.text ?: ""
+                targets.add(Sched(
+                    e.id, trigger, title, text,
+                    type = "event", date = e.date ?: "", time = e.start ?: "",
+                    resp = e.owner ?: "", status = status, deepLink = "event:${e.id}",
+                ))
             }
 
             tasks.forEach { t ->
@@ -52,9 +70,14 @@ object ReminderScheduler {
                 if (t.dueDate.isNullOrBlank() || t.dueTime.isNullOrBlank()) return@forEach
                 val at = EventStatus.dtMs(t.dueDate, t.dueTime) ?: return@forEach
                 if (at <= now) return@forEach
-                val title = "Tarefa: " + (t.title?.ifBlank { null } ?: t.client ?: "Tarefa")
+                val nome = t.title?.ifBlank { null } ?: t.client ?: "Tarefa"
+                val title = "Tarefa: $nome"
                 val text = listOfNotNull(t.assignee?.takeIf { it.isNotBlank() }?.let { "para $it" }, "vence às ${t.dueTime}").joinToString(" · ")
-                targets.add(Sched("task_" + t.id, at, title, text))
+                targets.add(Sched(
+                    "task_" + t.id, at, title, text,
+                    type = "task", date = t.dueDate ?: "", time = t.dueTime ?: "",
+                    resp = t.assignee ?: "", status = TaskStatus.label(t.status), deepLink = "task:${t.id}",
+                ))
             }
 
             val prefs = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
@@ -63,8 +86,9 @@ object ReminderScheduler {
             (old - newIds).forEach { cancel(ctx, it) }
             val payloads = LinkedHashSet<String>()
             targets.forEach { s ->
-                schedule(ctx, s.key, s.at, s.title, s.text)
-                payloads.add(encode(s.key, s.at, s.title, s.text))
+                val ex = Extra(s.type, s.date, s.time, s.resp, s.status, s.deepLink)
+                schedule(ctx, s.key, s.at, s.title, s.text, ex)
+                payloads.add(encode(s.key, s.at, s.title, s.text, ex))
             }
             prefs.edit().putStringSet(KEY, newIds).putStringSet(KEY_PAYLOADS, payloads).apply()
 
@@ -96,7 +120,9 @@ object ReminderScheduler {
                     val id = p[0]
                     val at = p[1].toLongOrNull()
                     if (at != null && at > now) {
-                        schedule(ctx, id, at, p[2], p[3])
+                        // Extras só existem em payloads novos (size >= 10); toleramos os antigos.
+                        val ex = if (p.size >= 10) Extra(p[4], p[5], p[6], p[7], p[8], p[9]) else Extra()
+                        schedule(ctx, id, at, p[2], p[3], ex)
                         kept.add(row); keptIds.add(id)
                     }
                 }
@@ -118,13 +144,20 @@ object ReminderScheduler {
         } catch (_: Throwable) { }
     }
 
-    private fun encode(id: String, at: Long, title: String, text: String): String =
-        listOf(id, at.toString(), title.replace(SEP, " "), text.replace(SEP, " ")).joinToString(SEP)
+    private fun s(v: String) = v.replace(SEP, " ")
 
-    fun schedule(ctx: Context, eventId: String, triggerAt: Long, title: String, text: String) {
+    private fun encode(id: String, at: Long, title: String, text: String, ex: Extra): String =
+        listOf(
+            id, at.toString(), s(title), s(text),
+            s(ex.type), s(ex.date), s(ex.time), s(ex.resp), s(ex.status), s(ex.deepLink),
+        ).joinToString(SEP)
+
+    fun schedule(ctx: Context, eventId: String, triggerAt: Long, title: String, text: String, ex: Extra = Extra()) {
         val am = ctx.getSystemService(AlarmManager::class.java) ?: return
         val intent = Intent(ctx, ReminderReceiver::class.java)
             .putExtra("eventId", eventId).putExtra("title", title).putExtra("text", text)
+            .putExtra("type", ex.type).putExtra("date", ex.date).putExtra("time", ex.time)
+            .putExtra("resp", ex.resp).putExtra("status", ex.status).putExtra("deeplink", ex.deepLink)
         val pi = PendingIntent.getBroadcast(ctx, eventId.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         try {
             if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) {
