@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.27-beta-reminder-fullscreen-notification"
+private const val BUILD = "1.0.28-beta-reminder-fullscreen-diagnostics"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,7 +159,9 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         val enabled = remember(permRefresh) { Notifications.areEnabled(context) }
                         val exactOk = remember(permRefresh) { Notifications.canExactAlarm(context) }
                         val battOk = remember(permRefresh) { Notifications.isIgnoringBatteryOptimizations(context) }
-                        val chStatus = remember(permRefresh) { Notifications.channelStatus(context, Notifications.CH_REMINDERS) }
+                        val fullScreenOk = remember(permRefresh) { Notifications.canUseFullScreen(context) }
+                        val fullScreenLabel = remember(permRefresh) { Notifications.fullScreenLabel(context) }
+                        val chStatus = remember(permRefresh) { Notifications.channelStatus(context, Notifications.CH_ALARM) }
                         val localToken = remember(permRefresh) {
                             context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null)
                         }
@@ -182,13 +184,13 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         }
                         val exactLabel = if (android.os.Build.VERSION.SDK_INT < 31) "Não exigido"
                             else if (exactOk) "Permitidos" else "Pendentes (lembrete aproximado)"
-                        InfoLine("Permissão", if (notifOk) "Concedida" else "Pendente")
-                        InfoLine("Notificações do app", if (enabled) "Habilitadas" else "Desabilitadas")
-                        InfoLine("Canal Lembretes", chStatus)
+                        InfoLine("Notificações", if (notifOk && enabled) "Permitido" else "Bloqueado")
                         InfoLine("Alarmes exatos", exactLabel)
-                        InfoLine("Otimização de bateria", if (battOk) "Ignorada (ideal)" else "Ativa (pode bloquear)")
+                        InfoLine("Tela cheia (chamada)", fullScreenLabel)
+                        InfoLine("Otimização de bateria", if (battOk) "Desativada (ideal)" else "Ativa (pode bloquear)")
+                        InfoLine("Canal do lembrete", chStatus)
                         InfoLine("Lembretes locais", if (notifOk && enabled) "Ativos" else "Inativos")
-                        InfoLine("Antecedência", "30 minutos")
+                        InfoLine("Antecedência", "1 hora")
                         InfoLine("Token FCM", if (hasToken) "Gerado" else "Não gerado")
                         InfoLine("Este aparelho na conta", if (deviceRegistered) "Registrado ✓" else "Ausente — toque em Reenviar")
                         InfoLine("Lembretes agendados", schedCount ?: "—")
@@ -218,6 +220,23 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                             SheetButton("Desativar otimização de bateria") { Notifications.openBatteryOptimizationSettings(context) }
                             Spacer(Modifier.height(8.dp))
                         }
+                        if (!fullScreenOk) {
+                            SheetButton("Permitir alerta em tela cheia") { Notifications.openFullScreenIntentSettings(context) }
+                            SheetText("Sem essa permissão (Android 14+), o lembrete de 1h aparece apenas como aviso comum (heads-up). Conceda para que a tela premium apareça sozinha sobre a tela bloqueada.")
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        SheetButton("Testar alerta premium agora") {
+                            NotifyDiag.lastError.value = null
+                            val ok = ReminderScheduler.scheduleFullScreenTestIn(context, 12)
+                            NotifyDiag.lastScheduled.value = (if (ok) "Premium agendado · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis())
+                            val msg = when {
+                                !ok -> "Erro ao agendar: ${NotifyDiag.lastError.value ?: "desconhecido"}"
+                                !Notifications.canUseFullScreen(context) -> "Agendado p/ 12s. Tela cheia BLOQUEADA → virá como aviso (heads-up). Toque em \"Permitir alerta em tela cheia\" e BLOQUEIE a tela para ver a experiência premium."
+                                else -> "Agendado p/ 12s. BLOQUEIE a tela agora — a chamada premium deve aparecer sozinha."
+                            }
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        }
+                        Spacer(Modifier.height(8.dp))
                         SheetButton("Mostrar notificação agora") {
                             NotifyDiag.lastError.value = null
                             val ok = Notifications.notify(context, 9001, Notifications.CH_REMINDERS, "Teste imediato", "Notificação direta via NotificationManager.")

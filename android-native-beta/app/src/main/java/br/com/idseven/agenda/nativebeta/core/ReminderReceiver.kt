@@ -22,6 +22,7 @@ class ReminderReceiver : BroadcastReceiver() {
             val status = intent.getStringExtra("status")
             val deeplink = intent.getStringExtra("deeplink")?.takeIf { it.isNotBlank() }
                 ?: id?.let { "event:$it" } ?: ""
+            android.util.Log.i("ReminderDiag", "[REMINDER_RECEIVED] id=${id ?: "teste"} type=$type")
             Notifications.ensure(context)
             val notifId = id?.hashCode() ?: 99021
             // Lembrete 1h antes = experiência PREMIUM full-screen (heads-up se não permitido).

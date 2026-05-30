@@ -20,6 +20,7 @@ import br.com.idseven.agenda.nativebeta.R
 
 // Canais e disparo de notificações (locais e remotas).
 object Notifications {
+    private const val TAG = "ReminderDiag"
     // Canal dos lembretes locais 1h antes (full-screen / heads-up). Mantido para compat
     // com a tela de diagnóstico; passa a representar o lembrete "call/alarme".
     const val CH_REMINDERS = "reminders"
@@ -67,6 +68,25 @@ object Notifications {
         if (Build.VERSION.SDK_INT < 34) return true
         val nm = ctx.getSystemService(NotificationManager::class.java) ?: return false
         return try { nm.canUseFullScreenIntent() } catch (_: Throwable) { false }
+    }
+
+    // Rótulo para o diagnóstico na tela de Notificações.
+    fun fullScreenLabel(ctx: Context): String = when {
+        Build.VERSION.SDK_INT < 34 -> "Permitido (Android < 14)"
+        canUseFullScreen(ctx) -> "Permitido"
+        else -> "Bloqueado (toque para permitir)"
+    }
+
+    // Abre a tela do Android 14+ para o usuário permitir alerta em tela cheia deste app.
+    fun openFullScreenIntentSettings(ctx: Context) {
+        if (Build.VERSION.SDK_INT < 34) { openNotificationSettings(ctx); return }
+        try {
+            ctx.startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
+                    .setData(Uri.parse("package:${ctx.packageName}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: Throwable) { openNotificationSettings(ctx) }
     }
 
     fun hasPostPermission(ctx: Context): Boolean =
@@ -207,6 +227,10 @@ object Notifications {
                 .putExtra(ReminderAlarmActivity.EX_STATUS, status ?: "")
             val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             val pi = PendingIntent.getActivity(ctx, id, full, flags)
+            val allowed = canUseFullScreen(ctx)
+            if (allowed) android.util.Log.i(TAG, "[REMINDER_FULLSCREEN_ALLOWED] id=$id type=$type")
+            else android.util.Log.w(TAG, "[REMINDER_FULLSCREEN_BLOCKED] id=$id type=$type (fallback heads-up)")
+
             val b = NotificationCompat.Builder(ctx, CH_ALARM)
                 .setSmallIcon(R.drawable.ic_notify)
                 .setContentTitle(title)
@@ -216,9 +240,24 @@ object Notifications {
                 .setContentIntent(pi)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setOngoing(false)
                 .setFullScreenIntent(pi, true)   // tela cheia quando permitido; senão heads-up
             NotificationManagerCompat.from(ctx).notify(id, b.build())
+
+            // Quando permitido, tentamos abrir a Activity full-screen diretamente também
+            // (cobre OEMs que não disparam o fullScreenIntent de imediato). A Activity é
+            // showWhenLocked/turnScreenOn, então acende a tela sobre o lockscreen.
+            if (allowed) {
+                try {
+                    ctx.startActivity(full)
+                    android.util.Log.i(TAG, "[REMINDER_ACTIVITY_OPENED] id=$id")
+                } catch (e: Throwable) {
+                    android.util.Log.w(TAG, "[REMINDER_FALLBACK_HEADSUP] startActivity falhou: ${e.message}")
+                }
+            } else {
+                android.util.Log.i(TAG, "[REMINDER_FALLBACK_HEADSUP] id=$id (toque abre a tela premium)")
+            }
             true
         } catch (t: Throwable) {
             NotifyDiag.lastError.value = t.message ?: t.javaClass.simpleName

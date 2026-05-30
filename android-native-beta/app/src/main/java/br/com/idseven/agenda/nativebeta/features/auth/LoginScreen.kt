@@ -103,7 +103,7 @@ fun LoginScreen(vm: LoginViewModel = viewModel()) {
 
             Spacer(Modifier.height(28.dp))
             Text(
-                "build: 1.0.27-beta-reminder-fullscreen-notification",
+                "build: 1.0.28-beta-reminder-fullscreen-diagnostics",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
         }

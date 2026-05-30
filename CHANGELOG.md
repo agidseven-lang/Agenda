@@ -5,7 +5,34 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
-## 1.0.27-beta-reminder-fullscreen-notification — lembrete 1h em tela cheia (em desenvolvimento)
+## 1.0.28-beta-reminder-fullscreen-diagnostics — diagnóstico + correção do lembrete (em desenvolvimento)
+
+**Causa raiz (1.0.27 não abriu a tela premium):** (1) Android 14+ bloqueia
+`USE_FULL_SCREEN_INTENT` por padrão → `canUseFullScreenIntent()` = false → o
+sistema rebaixava para heads-up, e não havia botão para o usuário conceder;
+(2) a antecedência efetiva estava em 30 min (não 1h); (3) full-screen só dispara
+com a tela bloqueada.
+
+- **Antecedência corrigida para 60 min** (`sync(leadMinutes = 60)`; default 60).
+- **Diagnóstico na tela Notificações:** Notificações (permitido/bloqueado),
+  Alarmes exatos, **Tela cheia (chamada)** (permitido/bloqueado), Otimização de
+  bateria, canal do lembrete.
+- **Botão "Permitir alerta em tela cheia":** abre `ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT`
+  (Android 14+), com explicação. `canUseFullScreen()`/`fullScreenLabel()`.
+- **Botão "Testar alerta premium agora":** agenda em 12s usando EXATAMENTE o fluxo
+  real (AlarmManager → ReminderReceiver → ReminderAlarmActivity full-screen).
+- **Logs:** `[REMINDER_SCHEDULED]`, `[REMINDER_RECEIVED]`,
+  `[REMINDER_FULLSCREEN_ALLOWED]`, `[REMINDER_FULLSCREEN_BLOCKED]`,
+  `[REMINDER_ACTIVITY_OPENED]`, `[REMINDER_FALLBACK_HEADSUP]` (tag `ReminderDiag`).
+- **Comportamento:** full-screen permitido → abre `ReminderAlarmActivity` (também
+  via `startActivity`, cobrindo OEMs); bloqueado → heads-up premium e o toque abre
+  a tela. Notificações imediatas aprovadas **intactas**.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
+## 1.0.27-beta-reminder-fullscreen-notification — lembrete 1h em tela cheia (substituída pela 1.0.28)
 
 **Correção conceitual:** a experiência premium é do **lembrete de 1h antes**, não do
 push imediato. Imediatos voltam a ser notificação normal (heads-up), mais rica.

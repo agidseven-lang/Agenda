@@ -38,7 +38,7 @@ object ReminderScheduler {
     // Evento com horário: lembra `leadMinutes` antes; se essa janela já passou mas o evento
     // ainda é futuro, dispara NO horário do evento (não fica sem alarme). Sem horário: 09:00.
     // Tarefa com data+hora de vencimento: dispara no horário de vencimento.
-    fun sync(ctx: Context, events: List<EventItem>, tasks: List<TaskItem> = emptyList(), leadMinutes: Int = 30) {
+    fun sync(ctx: Context, events: List<EventItem>, tasks: List<TaskItem> = emptyList(), leadMinutes: Int = 60) {
         try {
             val now = System.currentTimeMillis()
             val targets = ArrayList<Sched>()
@@ -165,8 +165,33 @@ object ReminderScheduler {
             } else {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
             }
+            android.util.Log.i("ReminderDiag", "[REMINDER_SCHEDULED] id=$eventId at=$triggerAt type=${ex.type}")
         } catch (_: SecurityException) {
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+            android.util.Log.w("ReminderDiag", "[REMINDER_SCHEDULED] (inexato) id=$eventId at=$triggerAt")
+        }
+    }
+
+    // TESTE do alerta premium: usa EXATAMENTE o mesmo fluxo real (AlarmManager ->
+    // ReminderReceiver -> ReminderAlarmActivity full-screen), com dados de exemplo,
+    // para validar em ~segundos sem esperar 1h.
+    fun scheduleFullScreenTestIn(ctx: Context, seconds: Int): Boolean {
+        return try {
+            val at = System.currentTimeMillis() + seconds * 1000L
+            val ex = Extra(
+                type = "event", date = DateUtil.todayIso(), time = DateUtil.hm(at),
+                resp = "Você (teste)", status = "Agendado", deepLink = "",
+            )
+            schedule(
+                ctx, "fs_test", at,
+                "Lembrete (teste): Reunião de equipe",
+                "Compromisso em 1 hora · teste do alerta premium",
+                ex,
+            )
+            true
+        } catch (t: Throwable) {
+            NotifyDiag.lastError.value = t.message ?: t.javaClass.simpleName
+            false
         }
     }
 
