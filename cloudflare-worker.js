@@ -56,6 +56,10 @@ export default {
       return handleCronTest(request, env);
     }
 
+    if (url.pathname === "/notify-assignee" && request.method === "POST") {
+      return handleNotifyAssignee(request, env);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
@@ -144,6 +148,70 @@ async function sendToTokens(env, accessToken, tokens, msg) {
     }
   }
   return results;
+}
+
+/* ─────────────── 1b. PUSH IMEDIATO AO RESPONSÁVEL (POST /notify-assignee) ───────────────
+   Segurança: o cliente envia APENAS { type, id }. O Worker RE-LÊ o doc no Firestore,
+   extrai o responsável (events.ownerId | tasks.assigneeId), busca os tokens
+   server-side (users/{uid}.fcmTokens) e envia. O app NUNCA manda tokens nem segredo,
+   e não há envio arbitrário: só dispara para o responsável real de um item existente. */
+async function handleNotifyAssignee(request, env) {
+  let payload;
+  try { payload = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
+
+  const type = (payload.type === "task") ? "task" : (payload.type === "event") ? "event" : null;
+  const id = (typeof payload.id === "string") ? payload.id.trim() : "";
+  if (!type || !id) return json({ ok: false, error: "type/id obrigatórios" }, 400, env);
+
+  let accessToken;
+  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, error: "auth falhou: " + (e && e.message) }, 200, env); }
+
+  const collection = (type === "task") ? "tasks" : "events";
+  const doc = await getDoc(env, accessToken, collection, id);
+  if (!doc) return json({ ok: false, error: "item não encontrado" }, 200, env);
+
+  const responsibleId = (type === "task")
+    ? (doc.assigneeId || null)
+    : (doc.ownerId || null);
+  if (!responsibleId) return json({ ok: false, error: "sem responsável (id)" }, 200, env);
+
+  const user = await getUser(env, accessToken, responsibleId);
+  const tokensBefore = (user && Array.isArray(user.fcmTokens)) ? user.fcmTokens.filter(Boolean) : [];
+  const tokens = dedupeTokensByDevice(tokensBefore, user && user.fcmTokenMeta);
+  if (!tokens.length) return json({ ok: false, error: "responsável sem token" }, 200, env);
+
+  const titleBase = (type === "task") ? "Nova tarefa atribuída" : "Novo compromisso atribuído";
+  const title = doc.title || doc.client || titleBase;
+  const when = [doc.date || doc.dueDate, (doc.start || doc.dueTime)].filter(Boolean).join(" ");
+  const body = (type === "task")
+    ? ("Tarefa para você" + (when ? " · vence " + when : ""))
+    : ("Compromisso para você" + (when ? " · " + when : ""));
+  const data = stringifyData({
+    type,
+    eventId: (type === "event") ? id : "",
+    taskId: (type === "task") ? id : "",
+    title,
+    body,
+    responsibleId,
+    createdBy: doc.by || "",
+    scheduledAt: String(doc.date || doc.dueDate || ""),
+    deepLink: type + ":" + id,
+  });
+
+  const results = await sendToTokens(env, accessToken, tokens, { title, body, data });
+  const okCount = results.filter((r) => r.ok).length;
+  console.log(`[ASSIGN] ${type}/${id} -> ${responsibleId}: ${okCount}/${tokens.length}`);
+  return json({ ok: okCount > 0, sent: okCount, total: tokens.length }, 200, env);
+}
+
+/* Lê um doc genérico (events/tasks) e decodifica os campos. */
+async function getDoc(env, accessToken, collection, id) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/${collection}/${id}`;
+  const res = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
+  if (!res.ok) return null;
+  const doc = await res.json();
+  return decodeFields(doc.fields);
 }
 
 /* ───────────────────────── 2. CRON DE LEMBRETE ───────────────────────── */
@@ -272,7 +340,82 @@ async function handleCronTrigger(env, opts) {
     report.sent.push({ eventId: e.id, sentTo: tokens.length, ok: okCount });
 
     /* DEDUP: grava reminderSentAt no doc do compromisso (exactly-once via Firestore) */
-    await markReminderSent(env, accessToken, e.id, now);
+    await markReminderSent(env, accessToken, "events", e.id, now);
+  }
+
+  /* ───── TAREFAS: lembrete `minutes` antes do vencimento, ao RESPONSÁVEL (assigneeId) ───── */
+  const tasks = await queryTasks(env, accessToken, yesterdayStr);
+  report.scannedTasks = tasks.length;
+  console.log(`[CRON] ${tasks.length} tarefa(s) candidatas`);
+
+  for (const t of tasks) {
+    if (!t || t.status === "concluido") continue;
+    if (!t.dueDate || !t.dueTime) continue;
+    const dueMs = taskDueMs(t, tzOffset);
+    if (!dueMs) continue;
+
+    const assigneeId = t.assigneeId || null;
+    let user = null;
+    if (assigneeId) {
+      user = (userDocCache[assigneeId] !== undefined) ? userDocCache[assigneeId] : await getUser(env, accessToken, assigneeId);
+      userDocCache[assigneeId] = user;
+    }
+    let minutes = ownerMinsCache[assigneeId];
+    if (minutes === undefined) {
+      const m = user && parseInt(user.reminderMinutes, 10);
+      minutes = (m > 0) ? m : defaultBefore;
+      ownerMinsCache[assigneeId] = minutes;
+    }
+
+    const reminderAt = dueMs - minutes * 60000;
+    const tokensBefore = (user && Array.isArray(user.fcmTokens)) ? user.fcmTokens.filter(Boolean) : [];
+    const tokens = dedupeTokensByDevice(tokensBefore, user && user.fcmTokenMeta);
+    const hasTokens = tokens.length > 0;
+    const createdAtMs = (typeof t.createdAt === "number") ? t.createdAt : (parseInt(t.createdAt, 10) || null);
+
+    let eligible = false, skippedReason = null;
+    if (!assigneeId) skippedReason = "sem assigneeId";
+    else if (now < reminderAt) skippedReason = "reminderAt no futuro";
+    else if (now >= reminderAt + windowSec * 1000) skippedReason = "janela expirada (reminderAt + " + windowSec + "s)";
+    else if (createdAtMs && createdAtMs > reminderAt) skippedReason = "criado apos reminderAt (sem retroativo)";
+    else if (t.reminderSentAt) skippedReason = "ja enviado (reminderSentAt)";
+    else if (!hasTokens) skippedReason = "assignee sem token";
+    else eligible = true;
+
+    report.candidates.push({
+      taskId: t.id,
+      due: (t.dueDate || null) + (t.dueTime ? " " + t.dueTime : ""),
+      reminderAt: new Date(reminderAt).toISOString(),
+      now: new Date(now).toISOString(),
+      windowSeconds: windowSec,
+      minutes: minutes,
+      eligible: eligible,
+      skippedReason: skippedReason,
+      assigneeId: assigneeId,
+      hasTokens: hasTokens,
+    });
+    console.log(`[TASK-REMINDER] ${t.id} due=${new Date(dueMs).toISOString()} reminderAt=${new Date(reminderAt).toISOString()} eligible=${eligible}${eligible ? "" : " reason=" + skippedReason}`);
+
+    if (!eligible) continue;
+
+    const title = `⏰ Tarefa em ${minutes} min`;
+    let body = t.title || t.client || "Tarefa";
+    if (t.client && t.title) body = `${t.title} · ${t.client}`;
+    if (t.dueTime) body += ` (vence ${t.dueTime})`;
+    const data = stringifyData({ type: "task", tag: "task-reminder-" + t.id, taskId: t.id, deepLink: "task:" + t.id });
+
+    if (dryRun) {
+      report.sent.push({ taskId: t.id, wouldSendTo: tokens.length, title });
+      console.log(`[TASK-REMINDER] dry-run: enviaria assigneeId=${assigneeId} task=${t.id} para ${tokens.length} token(s)`);
+      continue;
+    }
+
+    const results = await sendToTokens(env, accessToken, tokens, { title, body, data });
+    const okCount = results.filter((r) => r.ok).length;
+    console.log(`[TASK-REMINDER] sent: assigneeId=${assigneeId} task=${t.id} ok=${okCount}/${tokens.length}`);
+    report.sent.push({ taskId: t.id, sentTo: tokens.length, ok: okCount });
+
+    await markReminderSent(env, accessToken, "tasks", t.id, now);
   }
 
   return report;
@@ -339,6 +482,42 @@ async function queryEvents(env, accessToken, fromDateStr) {
   return out;
 }
 
+/* tarefas com dueDate >= ontem (sem dueDate são naturalmente excluídas: "" < data). */
+async function queryTasks(env, accessToken, fromDateStr) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = {
+    structuredQuery: {
+      from: [{ collectionId: "tasks" }],
+      where: { fieldFilter: { field: { fieldPath: "dueDate" }, op: "GREATER_THAN_OR_EQUAL", value: { stringValue: fromDateStr } } },
+      limit: 500,
+    },
+  };
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  if (!res.ok) { console.error("[CRON] runQuery tasks falhou:", res.status, (await res.text()).slice(0, 300)); return []; }
+  const rows = await res.json();
+  const out = [];
+  for (const row of rows) {
+    if (!row.document) continue;
+    const id = row.document.name.split("/").pop();
+    out.push(Object.assign({ id }, decodeFields(row.document.fields)));
+  }
+  return out;
+}
+
+/* due (UTC) a partir de dueDate "YYYY-MM-DD" + dueTime "HH:MM" em horário local. */
+function taskDueMs(t, tzOffsetMinutes) {
+  if (!t || !t.dueDate) return 0;
+  const dm = String(t.dueDate).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dm) return 0;
+  const y = +dm[1], mo = +dm[2], d = +dm[3];
+  let hh = 0, mm = 0;
+  if (t.dueTime) {
+    const tm = String(t.dueTime).match(/^(\d{1,2}):(\d{2})$/);
+    if (tm) { hh = +tm[1]; mm = +tm[2]; }
+  }
+  return Date.UTC(y, mo - 1, d, hh, mm) - tzOffsetMinutes * 60000;
+}
+
 async function getUser(env, accessToken, uid) {
   const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/users/${uid}`;
   const res = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
@@ -347,9 +526,9 @@ async function getUser(env, accessToken, uid) {
   return decodeFields(doc.fields);
 }
 
-/* grava events/{id}.reminderSentAt = nowMs (dedup exactly-once via Firestore) */
-async function markReminderSent(env, accessToken, eventId, nowMs) {
-  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/events/${eventId}?updateMask.fieldPaths=reminderSentAt`;
+/* grava {collection}/{id}.reminderSentAt = nowMs (dedup exactly-once via Firestore) */
+async function markReminderSent(env, accessToken, collection, id, nowMs) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/${collection}/${id}?updateMask.fieldPaths=reminderSentAt`;
   try {
     await fetch(url, {
       method: "PATCH",

@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import br.com.idseven.agenda.nativebeta.core.PushNotify
 import br.com.idseven.agenda.nativebeta.data.EventContract
 import br.com.idseven.agenda.nativebeta.data.EventRepo
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTextField
@@ -119,7 +120,14 @@ fun EventFormScreen(
         scope.launch {
             val res: Result<Any?> = if (editId != null) EventRepo.update(editId, EventContract.base(input))
             else EventRepo.create(EventContract.create(input, currentUid, System.currentTimeMillis()))
-            res.onSuccess { onDone() }.onFailure { error = it.message ?: "Erro ao salvar"; busy = false }
+            if (res.isSuccess) {
+                val savedId = (res.getOrNull() as? String) ?: editId
+                // Push imediato ao responsável (se houver) via Worker. Evita notificar a si mesmo.
+                if (!ownerId.isNullOrBlank() && ownerId != currentUid) PushNotify.notifyAssignee("event", savedId)
+                onDone()
+            } else {
+                error = res.exceptionOrNull()?.message ?: "Erro ao salvar"; busy = false
+            }
         }
     }
 

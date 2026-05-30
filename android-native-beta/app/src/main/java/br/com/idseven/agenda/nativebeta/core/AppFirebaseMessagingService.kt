@@ -28,10 +28,15 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
         try {
             Notifications.ensure(this)
             val n = message.notification
-            val title = n?.title ?: message.data["title"] ?: "ID Seven"
-            val body = n?.body ?: message.data["body"] ?: ""
-            val eventId = message.data["eventId"]?.takeIf { it.isNotBlank() }
-            Notifications.notify(this, System.currentTimeMillis().toInt(), Notifications.CH_GENERAL, title, body, eventId = eventId)
+            val data = message.data
+            val title = n?.title ?: data["title"] ?: "ID Seven"
+            val body = n?.body ?: data["body"] ?: ""
+            // Deep-link: usa o campo data.deepLink ("event:id"/"task:id") ou monta a partir de eventId/taskId.
+            val deepLink = data["deepLink"]?.takeIf { it.isNotBlank() }
+                ?: data["taskId"]?.takeIf { it.isNotBlank() }?.let { "task:$it" }
+                ?: data["eventId"]?.takeIf { it.isNotBlank() }?.let { "event:$it" }
+            // Canal de ALTA importância (heads-up) para atribuições em tempo real.
+            Notifications.notify(this, System.currentTimeMillis().toInt(), Notifications.CH_REMINDERS, title, body, deepLink = deepLink)
         } catch (_: Throwable) { }
     }
 }

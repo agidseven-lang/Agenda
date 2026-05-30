@@ -13,6 +13,7 @@ object TaskContract {
         val sector: String,
         val desc: String,
         val assignee: String,
+        val assigneeId: String?,
         val link: String,
         val dueDate: String,   // "YYYY-MM-DD" ou ""
         val dueTime: String,   // "HH:MM" ou ""
@@ -35,6 +36,7 @@ object TaskContract {
         "dueTime" to i.dueTime,
         "due" to i.dueDate,
         "assignee" to i.assignee,
+        "assigneeId" to i.assigneeId,
         "link" to i.link,
         "status" to i.status,
         "priority" to i.priority,

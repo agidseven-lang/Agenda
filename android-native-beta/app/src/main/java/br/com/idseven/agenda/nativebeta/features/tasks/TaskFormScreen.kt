@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import br.com.idseven.agenda.nativebeta.core.PushNotify
 import br.com.idseven.agenda.nativebeta.data.TaskContract
 import br.com.idseven.agenda.nativebeta.data.TaskRepo
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTextField
@@ -70,6 +71,7 @@ fun TaskFormScreen(
     var client by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var assignee by remember { mutableStateOf("") }
+    var assigneeId by remember { mutableStateOf<String?>(null) }
     var assigneeMenu by remember { mutableStateOf(false) }
     var link by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
@@ -86,7 +88,7 @@ fun TaskFormScreen(
             val t = TaskRepo.task(editId).first()
             if (t != null) {
                 sector = t.sector ?: "design"; client = t.client ?: ""; title = t.title ?: ""
-                assignee = t.assignee ?: ""; link = t.link ?: ""; desc = t.desc ?: ""
+                assignee = t.assignee ?: ""; assigneeId = t.assigneeId; link = t.link ?: ""; desc = t.desc ?: ""
                 dueDate = t.dueDate ?: ""; dueTime = t.dueTime ?: ""; priority = t.priority
                 status = t.status ?: "afazer"
                 checklist.clear(); checklist.addAll(t.checklist)
@@ -110,7 +112,7 @@ fun TaskFormScreen(
         if (client.trim().isEmpty() && title.trim().isEmpty()) { error = "Informe ao menos cliente ou título"; return }
         val input = TaskContract.Input(
             client = client.trim(), title = title.trim(), sector = sector, desc = desc.trim(),
-            assignee = assignee.trim(), link = link.trim(), dueDate = dueDate, dueTime = dueTime,
+            assignee = assignee.trim(), assigneeId = assigneeId, link = link.trim(), dueDate = dueDate, dueTime = dueTime,
             priority = priority, status = status,
             checklist = checklist.map { ChecklistItem(it.t.trim(), it.d) }.filter { it.t.isNotEmpty() },
         )
@@ -118,7 +120,13 @@ fun TaskFormScreen(
         scope.launch {
             val res: Result<Any?> = if (editId != null) TaskRepo.update(editId, TaskContract.base(input))
             else TaskRepo.create(TaskContract.create(input, currentUid, System.currentTimeMillis()))
-            res.onSuccess { onDone() }.onFailure { error = it.message ?: "Erro ao salvar"; busy = false }
+            if (res.isSuccess) {
+                val savedId = (res.getOrNull() as? String) ?: editId
+                if (!assigneeId.isNullOrBlank()) PushNotify.notifyAssignee("task", savedId)
+                onDone()
+            } else {
+                error = res.exceptionOrNull()?.message ?: "Erro ao salvar"; busy = false
+            }
         }
     }
 
@@ -154,8 +162,8 @@ fun TaskFormScreen(
             Box {
                 PickerField(assignee.ifBlank { "Selecionar da equipe" }) { assigneeMenu = true }
                 DropdownMenu(expanded = assigneeMenu, onDismissRequest = { assigneeMenu = false }) {
-                    DropdownMenuItem(text = { Text("— Ninguém —") }, onClick = { assignee = ""; assigneeMenu = false })
-                    activeUsers.forEach { u -> DropdownMenuItem(text = { Text(u.name ?: "—") }, onClick = { assignee = u.name ?: ""; assigneeMenu = false }) }
+                    DropdownMenuItem(text = { Text("— Ninguém —") }, onClick = { assignee = ""; assigneeId = null; assigneeMenu = false })
+                    activeUsers.forEach { u -> DropdownMenuItem(text = { Text(u.name ?: "—") }, onClick = { assignee = u.name ?: ""; assigneeId = u.id; assigneeMenu = false }) }
                 }
             }
             Spacer(Modifier.height(14.dp))

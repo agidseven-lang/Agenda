@@ -127,12 +127,17 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
     LaunchedEffect(eventsState, tasksState) {
         ReminderScheduler.sync(context, eventsState.itemsOrEmpty(), tasksState.itemsOrEmpty())
     }
-    // Deep-link da notificação de lembrete: abre o detalhe do compromisso ao tocar.
-    val pendingEventId by DeepLink.pendingEventId.collectAsState()
-    LaunchedEffect(pendingEventId) {
-        val id = pendingEventId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
-        DeepLink.pendingEventId.value = null
-        runCatching { nav.navigate("event/$id") }
+    // Deep-link da notificação: abre o detalhe correto (evento ou tarefa) ao tocar.
+    val pendingDeepLink by DeepLink.pending.collectAsState()
+    LaunchedEffect(pendingDeepLink) {
+        val dl = pendingDeepLink?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        DeepLink.pending.value = null
+        val route = when {
+            dl.startsWith("task:") -> "task/${dl.removePrefix("task:")}"
+            dl.startsWith("event:") -> "event/${dl.removePrefix("event:")}"
+            else -> "event/$dl"
+        }
+        runCatching { nav.navigate(route) }
     }
 
     val tabs = listOf(

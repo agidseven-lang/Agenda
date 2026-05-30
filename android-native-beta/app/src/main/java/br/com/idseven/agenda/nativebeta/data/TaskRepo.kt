@@ -48,6 +48,7 @@ object TaskRepo {
             desc = d.getString("desc"),
             status = d.getString("status"),
             assignee = d.getString("assignee"),
+            assigneeId = d.getString("assigneeId"),
             link = d.getString("link"),
             priority = bool(d.get("priority")),
             startDate = d.getString("startDate"),

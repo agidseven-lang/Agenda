@@ -45,6 +45,7 @@ data class TaskItem(
     val desc: String?,
     val status: String?,        // afazer | andamento | concluido
     val assignee: String?,
+    val assigneeId: String? = null,  // uid do responsável (aditivo; compatível com dados antigos)
     val link: String?,
     val priority: Boolean,
     val startDate: String?,

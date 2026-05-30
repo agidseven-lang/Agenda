@@ -63,7 +63,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.18-beta-assignee-notify-fix"
+private const val BUILD = "1.0.19-beta-realtime-assignee-push"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
