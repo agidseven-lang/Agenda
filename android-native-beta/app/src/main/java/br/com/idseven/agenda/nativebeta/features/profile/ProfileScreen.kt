@@ -63,7 +63,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.15-beta-notify-bg-fix"
+private const val BUILD = "1.0.16-beta-notify-ui-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,7 +131,12 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
 
     if (sheet != null) {
         ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = sheetState, containerColor = Tokens.Surface) {
-            Column(Modifier.fillMaxWidth().heightIn(min = 160.dp).padding(horizontal = 22.dp).padding(bottom = 28.dp)) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .heightIn(min = 160.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 22.dp).padding(bottom = 28.dp)
+            ) {
                 when (sheet) {
                     "conta" -> {
                         SheetTitle("Conta")
@@ -148,6 +153,7 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                     }
                     "notif" -> {
                         SheetTitle("Notificações")
+                        InfoLine("Versão do app", BUILD)
                         val notifOk = remember(permRefresh) { Notifications.hasPostPermission(context) }
                         val enabled = remember(permRefresh) { Notifications.areEnabled(context) }
                         val exactOk = remember(permRefresh) { Notifications.canExactAlarm(context) }
@@ -200,8 +206,12 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                             NotifyDiag.lastError.value = null
                             val ok = ReminderScheduler.scheduleTestIn(context, 10)
                             NotifyDiag.lastScheduled.value = (if (ok) "Agendado · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis())
-                            if (ok) Toast.makeText(context, "Teste agendado para daqui a 10 segundos", Toast.LENGTH_SHORT).show()
-                            else Toast.makeText(context, "Erro ao agendar: ${NotifyDiag.lastError.value ?: "desconhecido"}", Toast.LENGTH_LONG).show()
+                            when {
+                                ok && !Notifications.hasPostPermission(context) ->
+                                    Toast.makeText(context, "Agendado, mas a notificação não vai aparecer sem permissão. Toque em \"Permitir notificações\".", Toast.LENGTH_LONG).show()
+                                ok -> Toast.makeText(context, "Teste agendado para daqui a 10 segundos", Toast.LENGTH_SHORT).show()
+                                else -> Toast.makeText(context, "Erro ao agendar: ${NotifyDiag.lastError.value ?: "desconhecido"}", Toast.LENGTH_LONG).show()
+                            }
                         }
                     }
                     "aparencia" -> {
