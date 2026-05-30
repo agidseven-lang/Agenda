@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -79,6 +80,31 @@ object Notifications {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         } catch (_: Throwable) { openAppDetails(ctx) }
+    }
+
+    // App isento da otimização de bateria? (Doze/App Standby cancelam alarmes de apps "dormindo".)
+    fun isIgnoringBatteryOptimizations(ctx: Context): Boolean {
+        val pm = ctx.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return false
+        return pm.isIgnoringBatteryOptimizations(ctx.packageName)
+    }
+
+    // Abre o diálogo do sistema para isentar o app da otimização de bateria.
+    // Decisivo para lembretes dispararem com o app fechado em OEMs agressivos (ex.: Samsung).
+    fun openBatteryOptimizationSettings(ctx: Context) {
+        try {
+            ctx.startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:${ctx.packageName}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: Throwable) {
+            try {
+                ctx.startActivity(
+                    Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (_: Throwable) { openAppDetails(ctx) }
+        }
     }
 
     private fun openAppDetails(ctx: Context) {

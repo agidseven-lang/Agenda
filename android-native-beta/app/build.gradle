@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 18
-        versionName "1.0.14-beta-notify-debug-fix"
+        versionCode 19
+        versionName "1.0.15-beta-notify-bg-fix"
         vectorDrawables { useSupportLibrary true }
     }
 

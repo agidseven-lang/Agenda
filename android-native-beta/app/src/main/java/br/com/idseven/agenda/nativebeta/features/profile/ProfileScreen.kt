@@ -63,7 +63,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.14-beta-notify-debug-fix"
+private const val BUILD = "1.0.15-beta-notify-bg-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,9 +151,13 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         val notifOk = remember(permRefresh) { Notifications.hasPostPermission(context) }
                         val enabled = remember(permRefresh) { Notifications.areEnabled(context) }
                         val exactOk = remember(permRefresh) { Notifications.canExactAlarm(context) }
+                        val battOk = remember(permRefresh) { Notifications.isIgnoringBatteryOptimizations(context) }
                         val chStatus = remember(permRefresh) { Notifications.channelStatus(context, Notifications.CH_REMINDERS) }
                         val hasToken = remember(permRefresh) {
                             context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null) != null
+                        }
+                        val firedPersist = remember(permRefresh) {
+                            context.getSharedPreferences("notifydiag", android.content.Context.MODE_PRIVATE).getString("last_fired", null)
                         }
                         val exactLabel = if (android.os.Build.VERSION.SDK_INT < 31) "Não exigido"
                             else if (exactOk) "Permitidos" else "Pendentes (lembrete aproximado)"
@@ -161,15 +165,16 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         InfoLine("Notificações do app", if (enabled) "Habilitadas" else "Desabilitadas")
                         InfoLine("Canal Lembretes", chStatus)
                         InfoLine("Alarmes exatos", exactLabel)
+                        InfoLine("Otimização de bateria", if (battOk) "Ignorada (ideal)" else "Ativa (pode bloquear)")
                         InfoLine("Lembretes locais", if (notifOk && enabled) "Ativos" else "Inativos")
                         InfoLine("Antecedência", "30 minutos")
                         InfoLine("Token FCM", if (hasToken) "Registrado" else "Não registrado")
                         InfoLine("Último teste imediato", lastImmediate ?: "—")
                         InfoLine("Último teste agendado", lastScheduled ?: "—")
-                        InfoLine("Último disparo", lastFired ?: "—")
+                        InfoLine("Último disparo", lastFired ?: firedPersist ?: "—")
                         if (lastError != null) InfoLine("Último erro", lastError!!)
                         Spacer(Modifier.height(10.dp))
-                        SheetText("Push remoto ainda não está ativo — por enquanto funcionam apenas os lembretes locais (no próprio aparelho).")
+                        SheetText("Para lembretes funcionarem com o app fechado, desative a otimização de bateria. Push remoto ainda não está ativo — por enquanto funcionam apenas os lembretes locais.")
                         Spacer(Modifier.height(14.dp))
                         if (!notifOk || !enabled) {
                             SheetButton("Permitir notificações") { Notifications.openNotificationSettings(context) }
@@ -177,6 +182,10 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         }
                         if (android.os.Build.VERSION.SDK_INT >= 31 && !exactOk) {
                             SheetButton("Permitir alarmes exatos") { Notifications.openExactAlarmSettings(context) }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        if (!battOk) {
+                            SheetButton("Desativar otimização de bateria") { Notifications.openBatteryOptimizationSettings(context) }
                             Spacer(Modifier.height(8.dp))
                         }
                         SheetButton("Mostrar notificação agora") {

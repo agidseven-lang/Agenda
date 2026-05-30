@@ -8,11 +8,15 @@ import android.os.Build
 import br.com.idseven.agenda.nativebeta.domain.EventItem
 import br.com.idseven.agenda.nativebeta.domain.EventStatus
 
-// Lembretes locais exatos via AlarmManager. Agenda/cancela/reagenda com dedupe
-// (requestCode estável por evento + conjunto persistido). leadMinutes = antecedência.
+// Lembretes locais exatos via AlarmManager. Agenda/cancela/reagenda com dedupe.
+// Persiste o PAYLOAD completo de cada lembrete (id, horário, título, texto) para
+// permitir RE-ARMAR todos os alarmes após reboot/atualização (BootReceiver), já que
+// o AlarmManager perde os alarmes nesses casos. leadMinutes = antecedência.
 object ReminderScheduler {
     private const val PREF = "reminders"
-    private const val KEY = "scheduled"
+    private const val KEY = "scheduled"        // Set<String> de ids (compat)
+    private const val KEY_PAYLOADS = "payloads" // Set<String> codificado com SEP
+    private const val SEP = "\u0001"            // delimitador improvavel em texto de evento
 
     fun sync(ctx: Context, events: List<EventItem>, leadMinutes: Int = 30) {
         try {
@@ -32,14 +36,56 @@ object ReminderScheduler {
             val old = prefs.getStringSet(KEY, emptySet()) ?: emptySet()
             val newIds = targets.map { it.first }.toSet()
             (old - newIds).forEach { cancel(ctx, it) }
+            val payloads = LinkedHashSet<String>()
             targets.forEach { (id, trigger, e) ->
                 val title = "Lembrete: " + (e.title?.ifBlank { null } ?: e.client ?: "Compromisso")
                 val text = listOfNotNull(e.client, e.start?.let { "às $it" }, e.location).joinToString(" · ")
                 schedule(ctx, id, trigger, title, text)
+                payloads.add(encode(id, trigger, title, text))
             }
-            prefs.edit().putStringSet(KEY, newIds).apply()
+            prefs.edit().putStringSet(KEY, newIds).putStringSet(KEY_PAYLOADS, payloads).apply()
         } catch (_: Throwable) { }
     }
+
+    // Re-arma todos os lembretes futuros a partir do payload persistido.
+    // Usado pelo BootReceiver (reboot / app atualizado), quando o AlarmManager é zerado.
+    fun rearmAll(ctx: Context) {
+        try {
+            val prefs = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            val payloads = prefs.getStringSet(KEY_PAYLOADS, emptySet()) ?: return
+            val now = System.currentTimeMillis()
+            val kept = LinkedHashSet<String>()
+            val keptIds = LinkedHashSet<String>()
+            payloads.forEach { row ->
+                val p = row.split(SEP)
+                if (p.size >= 4) {
+                    val id = p[0]
+                    val at = p[1].toLongOrNull()
+                    if (at != null && at > now) {
+                        schedule(ctx, id, at, p[2], p[3])
+                        kept.add(row); keptIds.add(id)
+                    }
+                }
+            }
+            prefs.edit().putStringSet(KEY_PAYLOADS, kept).putStringSet(KEY, keptIds).apply()
+        } catch (_: Throwable) { }
+    }
+
+    // Remove um lembrete já disparado do armazenamento persistido (evita re-armar no boot).
+    fun removeFired(ctx: Context, eventId: String?) {
+        if (eventId.isNullOrBlank()) return
+        try {
+            val prefs = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            val payloads = prefs.getStringSet(KEY_PAYLOADS, emptySet())?.toMutableSet() ?: return
+            val ids = prefs.getStringSet(KEY, emptySet())?.toMutableSet() ?: mutableSetOf()
+            payloads.removeAll { it.substringBefore(SEP) == eventId }
+            ids.remove(eventId)
+            prefs.edit().putStringSet(KEY_PAYLOADS, payloads).putStringSet(KEY, ids).apply()
+        } catch (_: Throwable) { }
+    }
+
+    private fun encode(id: String, at: Long, title: String, text: String): String =
+        listOf(id, at.toString(), title.replace(SEP, " "), text.replace(SEP, " ")).joinToString(SEP)
 
     fun schedule(ctx: Context, eventId: String, triggerAt: Long, title: String, text: String) {
         val am = ctx.getSystemService(AlarmManager::class.java) ?: return
