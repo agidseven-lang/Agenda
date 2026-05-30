@@ -171,7 +171,7 @@ fun NotificationDetailModal(
                     .padding(16.dp)
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(Tokens.SurfaceElev)
+                    .background(Tokens.Surface2)
                     .clickable { onClose() },
                 contentAlignment = Alignment.Center,
             ) {
@@ -194,7 +194,7 @@ fun NotificationDetailModal(
                     Icon(c.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(38.dp))
                 }
                 Spacer(Modifier.height(20.dp))
-                Text(c.title, color = Tokens.Text, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text(c.title, color = Tokens.Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(8.dp))
                 Text(
                     c.subtitle, color = Tokens.Faint, fontSize = 14.sp, textAlign = TextAlign.Center,
@@ -204,9 +204,9 @@ fun NotificationDetailModal(
                 c.notice?.let {
                     Spacer(Modifier.height(14.dp))
                     Box(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.SurfaceElev).padding(12.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Surface2).padding(12.dp),
                     ) {
-                        Text(it, color = Tokens.Warn, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        Text(it, color = Tokens.Amber, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
 
@@ -217,14 +217,14 @@ fun NotificationDetailModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
-                        .background(Tokens.SurfaceElev)
+                        .background(Tokens.Surface2)
                         .padding(20.dp),
                 ) {
                     c.rows.forEachIndexed { i, row ->
                         if (i > 0) Spacer(Modifier.height(16.dp))
                         Text(row.label, color = Tokens.Faint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(3.dp))
-                        Text(row.value, color = Tokens.Text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                        Text(row.value, color = Tokens.Ink, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                     }
                 }
 
