@@ -295,7 +295,7 @@ async function handleCronTrigger(env, opts) {
     if (!ownerId) skippedReason = "sem ownerId";
     else if (now < reminderAt) skippedReason = "reminderAt no futuro";
     else if (now >= reminderAt + windowSec * 1000) skippedReason = "janela expirada (reminderAt + " + windowSec + "s)";
-    else if (createdAtMs && createdAtMs > reminderAt) skippedReason = "criado apos reminderAt (sem retroativo)";
+    else if (createdAtMs && createdAtMs >= reminderAt + windowSec * 1000) skippedReason = "criado apos a janela do lembrete (sem retroativo)";
     else if (e.reminderSentAt) skippedReason = "ja enviado (reminderSentAt)";
     else if (!hasTokens) skippedReason = "owner sem token";
     else eligible = true;
@@ -377,7 +377,7 @@ async function handleCronTrigger(env, opts) {
     if (!assigneeId) skippedReason = "sem assigneeId";
     else if (now < reminderAt) skippedReason = "reminderAt no futuro";
     else if (now >= reminderAt + windowSec * 1000) skippedReason = "janela expirada (reminderAt + " + windowSec + "s)";
-    else if (createdAtMs && createdAtMs > reminderAt) skippedReason = "criado apos reminderAt (sem retroativo)";
+    else if (createdAtMs && createdAtMs >= reminderAt + windowSec * 1000) skippedReason = "criado apos a janela do lembrete (sem retroativo)";
     else if (t.reminderSentAt) skippedReason = "ja enviado (reminderSentAt)";
     else if (!hasTokens) skippedReason = "assignee sem token";
     else eligible = true;
