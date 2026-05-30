@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import br.com.idseven.agenda.nativebeta.core.Fcm
 import br.com.idseven.agenda.nativebeta.core.Notifications
 import br.com.idseven.agenda.nativebeta.core.NotifyDiag
 import br.com.idseven.agenda.nativebeta.core.ReminderScheduler
@@ -63,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.21-beta-high-priority-reminder-push"
+private const val BUILD = "1.0.22-beta-all-users-fcm-notify-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,8 +160,13 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         val exactOk = remember(permRefresh) { Notifications.canExactAlarm(context) }
                         val battOk = remember(permRefresh) { Notifications.isIgnoringBatteryOptimizations(context) }
                         val chStatus = remember(permRefresh) { Notifications.channelStatus(context, Notifications.CH_REMINDERS) }
-                        val hasToken = remember(permRefresh) {
-                            context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null) != null
+                        val localToken = remember(permRefresh) {
+                            context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null)
+                        }
+                        val hasToken = localToken != null
+                        // Este aparelho está registrado na conta do usuário logado? (token local ∈ users/{uid}.fcmTokens)
+                        val deviceRegistered = remember(permRefresh, currentUser) {
+                            !localToken.isNullOrBlank() && (currentUser?.fcmTokens?.contains(localToken) == true)
                         }
                         val firedPersist = remember(permRefresh) {
                             context.getSharedPreferences("notifydiag", android.content.Context.MODE_PRIVATE).getString("last_fired", null)
@@ -183,7 +189,8 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         InfoLine("Otimização de bateria", if (battOk) "Ignorada (ideal)" else "Ativa (pode bloquear)")
                         InfoLine("Lembretes locais", if (notifOk && enabled) "Ativos" else "Inativos")
                         InfoLine("Antecedência", "30 minutos")
-                        InfoLine("Token FCM", if (hasToken) "Registrado" else "Não registrado")
+                        InfoLine("Token FCM", if (hasToken) "Gerado" else "Não gerado")
+                        InfoLine("Este aparelho na conta", if (deviceRegistered) "Registrado ✓" else "Ausente — toque em Reenviar")
                         InfoLine("Lembretes agendados", schedCount ?: "—")
                         InfoLine("Próximo lembrete", schedNext ?: "—")
                         InfoLine("Último push imediato", lastPush ?: "—")
@@ -192,8 +199,13 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         InfoLine("Último disparo", lastFired ?: firedPersist ?: "—")
                         if (lastError != null) InfoLine("Último erro", lastError!!)
                         Spacer(Modifier.height(10.dp))
-                        SheetText("Lembretes locais valem para este aparelho (desative a otimização de bateria para o app fechado). Compromissos em que você é o responsável também chegam por push do servidor, no horário do lembrete. Notificação de tarefa para o responsável ainda depende de configuração no servidor.")
+                        SheetText("Para receber notificações da equipe (quando alguém te marca como responsável), seu aparelho precisa estar Registrado na conta. Se estiver Ausente, toque em \"Reenviar meu token\".")
                         Spacer(Modifier.height(14.dp))
+                        SheetButton("Reenviar meu token") {
+                            Fcm.register(context, session.uid)
+                            Toast.makeText(context, "Token reenviado. Aguarde alguns segundos e reabra esta tela.", Toast.LENGTH_LONG).show()
+                        }
+                        Spacer(Modifier.height(8.dp))
                         if (!notifOk || !enabled) {
                             SheetButton("Permitir notificações") { Notifications.openNotificationSettings(context) }
                             Spacer(Modifier.height(8.dp))

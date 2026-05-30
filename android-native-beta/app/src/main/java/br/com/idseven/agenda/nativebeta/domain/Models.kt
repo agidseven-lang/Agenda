@@ -33,6 +33,7 @@ data class UserLite(
     val email: String? = null,
     val phone: String? = null,
     val createdAt: Long? = null,
+    val fcmTokens: List<String> = emptyList(),
 ) {
     fun isActive(): Boolean = status != "pendente" && status != "removido" && status != "excluido"
 }

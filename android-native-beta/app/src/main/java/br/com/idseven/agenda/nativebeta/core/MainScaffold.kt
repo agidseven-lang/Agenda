@@ -123,6 +123,16 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         }
         Fcm.register(context, session.uid)
     }
+    // Re-registra o token FCM a cada retomada do app (auto-recuperação): cobre falhas de
+    // rede no 1º registro e garante que TODOS os usuários tenham token atual em users/{uid}.
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner, session.uid) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) Fcm.register(context, session.uid)
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
     // Lembretes locais: reagenda sempre que a agenda OU as tarefas mudam (com dedupe).
     LaunchedEffect(eventsState, tasksState) {
         ReminderScheduler.sync(context, eventsState.itemsOrEmpty(), tasksState.itemsOrEmpty())

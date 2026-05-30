@@ -29,6 +29,8 @@ object UsersRepo {
                         is String -> v.toLongOrNull()
                         else -> null
                     }
+                    val fcmTokens: List<String> = (d.get("fcmTokens") as? List<*>)
+                        ?.mapNotNull { it as? String }?.filter { it.isNotBlank() } ?: emptyList()
                     UserLite(
                         id = d.id,
                         name = d.getString("name"),
@@ -40,6 +42,7 @@ object UsersRepo {
                         email = d.getString("email"),
                         phone = d.getString("phone"),
                         createdAt = createdAt,
+                        fcmTokens = fcmTokens,
                     )
                 }.getOrElse { ex ->
                     android.util.Log.w("UsersRepo", "falha ao ler user ${d.id}: ${ex.message}", ex)
