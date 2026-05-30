@@ -145,6 +145,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         val route = when {
             dl.startsWith("task:") -> "task/${dl.removePrefix("task:")}"
             dl.startsWith("event:") -> "event/${dl.removePrefix("event:")}"
+            dl.startsWith("chat:") -> "chatThread/${dl.removePrefix("chat:")}"
             else -> "event/$dl"
         }
         runCatching { nav.navigate(route) }

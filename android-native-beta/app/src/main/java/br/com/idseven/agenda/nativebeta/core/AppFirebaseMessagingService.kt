@@ -31,10 +31,12 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
             val data = message.data
             val title = n?.title ?: data["title"] ?: "ID Seven"
             val body = n?.body ?: data["body"] ?: ""
-            // Deep-link: usa o campo data.deepLink ("event:id"/"task:id") ou monta a partir de eventId/taskId.
+            // Deep-link: usa o campo data.deepLink ("event:id"/"task:id"/"chat:senderId")
+            // ou monta a partir de eventId/taskId/senderId.
             val deepLink = data["deepLink"]?.takeIf { it.isNotBlank() }
                 ?: data["taskId"]?.takeIf { it.isNotBlank() }?.let { "task:$it" }
                 ?: data["eventId"]?.takeIf { it.isNotBlank() }?.let { "event:$it" }
+                ?: data["senderId"]?.takeIf { it.isNotBlank() && data["type"] == "chat" }?.let { "chat:$it" }
             // Canal de ALTA importância (heads-up) para atribuições em tempo real.
             Notifications.notify(this, System.currentTimeMillis().toInt(), Notifications.CH_REMINDERS, title, body, deepLink = deepLink)
         } catch (_: Throwable) { }

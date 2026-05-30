@@ -111,7 +111,9 @@ object ChatRepo {
         val text = raw.trim().let { if (it.length > 2000) it.substring(0, 2000) else it }
         if (text.isEmpty()) return Result.success(Unit)
         val now = System.currentTimeMillis()
-        val msg = hashMapOf<String, Any?>("text" to text, "by" to meId, "at" to now, "readBy" to mapOf(meId to now))
+        // src="nativebeta": marca a origem para a Cloud Function onChatMessageCreated
+        // notificar o destinatario (o PWA faz o proprio push; isto evita duplicidade).
+        val msg = hashMapOf<String, Any?>("text" to text, "by" to meId, "at" to now, "readBy" to mapOf(meId to now), "src" to "nativebeta")
         val add = addMessage(chatId, msg)
         if (add.isFailure) return add
         val unread = (getChat(chatId)?.unreadCount ?: emptyMap()).toMutableMap()

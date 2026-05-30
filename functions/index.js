@@ -139,3 +139,111 @@ exports.onTaskCreated = onDocumentCreated("tasks/{taskId}", async (event) => {
     logger.error("[TRIGGER] onTaskCreated falhou:", e && e.message);
   }
 });
+
+/* ============================================================================
+   CHAT — push IMEDIATO ao destinatario de uma mensagem nova
+   ----------------------------------------------------------------------------
+   Schema (igual ao PWA): chats/{chatId} { participants[], isGroup, ... } e
+   subcolecao chats/{chatId}/messages/{messageId} { text, by, at, readBy }.
+   Destinatario = participants - remetente (by). Escopo src=="nativebeta": o PWA
+   ja faz o proprio push ao enviar, entao so notificamos as mensagens do app
+   nativo, evitando duplicidade. Dedupe via immediateNotifiedAt na mensagem.
+   ========================================================================== */
+
+/* Previa curta e segura do corpo da notificacao (audio/midia detectados de
+   forma defensiva; schema atual e texto). Preserva emoji; limita tamanho. */
+function chatPreview(msg) {
+  const t = String(msg.type || msg.kind || msg.mediaType || "").toLowerCase();
+  if (msg.audioUrl || t.indexOf("audio") >= 0 || t === "voice") return "🎤 Enviou um áudio";
+  const raw = String(msg.text || "").replace(/\s+/g, " ").trim();
+  if (!raw) {
+    if (msg.imageUrl || msg.mediaUrl || t.indexOf("image") >= 0) return "📷 Enviou uma imagem";
+    if (msg.fileUrl || msg.attachment) return "📎 Enviou um anexo";
+    return "Nova mensagem";
+  }
+  return raw.length > 120 ? (raw.slice(0, 120) + "…") : raw;
+}
+
+/* data payload (strings) para o app nativo. deepLink "chat:<senderId>" abre a
+   conversa correta (rota chatThread/{otherId}, onde otherId = remetente). */
+function buildChatData(senderName, msg, chatId, messageId, senderId) {
+  const title = (senderName && senderName.trim()) ? senderName.trim() : "Nova mensagem";
+  const data = {
+    type: "chat",
+    chatId: chatId,
+    conversationId: chatId,
+    messageId: messageId,
+    senderId: String(senderId || ""),
+    title: title,
+    body: chatPreview(msg),
+    deepLink: "chat:" + String(senderId || ""),
+  };
+  for (const k of Object.keys(data)) data[k] = String(data[k] == null ? "" : data[k]);
+  return data;
+}
+
+async function notifyChatMessage(chatId, messageId, msg) {
+  if (!msg) return;
+  if (msg.src !== "nativebeta") return;      // PWA ja faz seu push; evita duplicidade
+  if (msg.immediateNotifiedAt) return;       // dedupe (retry/reprocesso)
+  const senderId = msg.by || null;
+  if (!senderId) return;
+
+  const db = admin.firestore();
+  const msgRef = db.collection("chats").doc(chatId).collection("messages").doc(messageId);
+
+  const chatSnap = await db.collection("chats").doc(chatId).get();
+  const chat = chatSnap.exists ? chatSnap.data() : null;
+  const participants = (chat && Array.isArray(chat.participants)) ? chat.participants : [];
+  const recipients = participants.filter((u) => u && u !== senderId);   // ignora auto-notificacao
+  if (!recipients.length) {
+    await msgRef.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: "sem destinatario" }, { merge: true });
+    return;
+  }
+
+  let senderName = "";
+  try {
+    const su = await db.collection("users").doc(senderId).get();
+    if (su.exists) { const d = su.data(); senderName = String(d.name || d.nome || ""); }
+  } catch (_) { /* nome e opcional */ }
+
+  const results = [];
+  for (const rid of recipients) {
+    try {
+      const us = await db.collection("users").doc(rid).get();
+      const u = us.exists ? us.data() : null;
+      const tokens = dedupeTokensByDevice(
+        (u && Array.isArray(u.fcmTokens)) ? u.fcmTokens.filter(Boolean) : [],
+        u && u.fcmTokenMeta
+      );
+      if (!tokens.length) {
+        logger.warn(`[TRIGGER] chat/${messageId} -> ${rid}: sem token`);
+        results.push(`${rid}: sem token`);
+        continue;
+      }
+      const data = buildChatData(senderName, msg, chatId, messageId, senderId);
+      const resp = await admin.messaging().sendEachForMulticast({
+        tokens: tokens,
+        data: data,
+        android: { priority: "high", ttl: TTL_MS },
+      });
+      logger.info(`[TRIGGER] chat/${messageId} -> ${rid}: sent ${resp.successCount}/${tokens.length}`);
+      results.push(`${rid}: sent ${resp.successCount}/${tokens.length}`);
+    } catch (e) {
+      const m = "erro FCM: " + (e && e.message ? e.message : String(e));
+      logger.error(`[TRIGGER] chat/${messageId} -> ${rid}: ${m}`);
+      results.push(`${rid}: ${m}`);
+    }
+  }
+  await msgRef.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: results.join("; ") }, { merge: true });
+}
+
+exports.onChatMessageCreated = onDocumentCreated("chats/{chatId}/messages/{messageId}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+  try {
+    await notifyChatMessage(event.params.chatId, event.params.messageId, snap.data());
+  } catch (e) {
+    logger.error("[TRIGGER] onChatMessageCreated falhou:", e && e.message);
+  }
+});

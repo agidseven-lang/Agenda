@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 28
-        versionName "1.0.24-beta-firestore-trigger-immediate-push"
+        versionCode 29
+        versionName "1.0.25-beta-chat-immediate-push"
         vectorDrawables { useSupportLibrary true }
     }
 
