@@ -176,6 +176,7 @@ function buildChatData(senderName, msg, chatId, messageId, senderId) {
     senderId: String(senderId || ""),
     title: title,
     body: chatPreview(msg),
+    sentAt: String(msg.at || ""),    // carimbo p/ o modal premium pos-clique (aditivo)
     deepLink: "chat:" + String(senderId || ""),
   };
   for (const k of Object.keys(data)) data[k] = String(data[k] == null ? "" : data[k]);

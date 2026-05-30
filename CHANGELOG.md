@@ -5,6 +5,31 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.26-beta-notification-detail-modal — modal premium pós-clique (em desenvolvimento)
+
+**Objetivo:** ao tocar na notificação, abrir uma tela/modal nativa premium com
+o detalhe (compromisso/tarefa/chat), sem alterar o push em tempo real aprovado.
+
+- **Novo `NotificationDetailModal`** (Compose, `features/notif`): fundo escuro,
+  ícone circular no topo, título, card de informações rotuladas, botão de ação
+  (pílula) e botão fechar; layout responsivo (scroll).
+  - Compromisso: título, responsável, data, horário, status → "Abrir compromisso".
+  - Tarefa: título, responsável, prazo, status → "Abrir tarefa".
+  - Chat: remetente, prévia, horário → "Abrir conversa".
+- **Dados:** instantâneos do payload do push + autoritativos do estado em memória
+  (eventos/tarefas já carregados); **fallback amigável** quando ainda carregando
+  ou quando o item foi removido/indisponível.
+- **Plumbing:** `DeepLink` carrega `NotifPayload` (type/id/title/body/scheduledAt/sentAt);
+  `Notifications.notify` leva esses extras na intent; `MainScaffold` roteia o toque
+  para o modal e, no botão de ação, abre o detalhe real (`event/{id}`,`task/{id}`,
+  `chatThread/{otherId}`). Compatível com `onEventCreated`/`onTaskCreated`/`onChatMessageCreated`.
+- **Function (mínimo):** payload do chat ganhou `sentAt` (aditivo) p/ exibir o horário
+  no modal — sem mudar dedup/comportamento aprovado.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
 ## 1.0.25-beta-chat-immediate-push — push imediato do CHAT (em desenvolvimento)
 
 **Objetivo:** quando um usuário envia mensagem no chat do app nativo, o

@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 29
-        versionName "1.0.25-beta-chat-immediate-push"
+        versionCode 30
+        versionName "1.0.26-beta-notification-detail-modal"
         vectorDrawables { useSupportLibrary true }
     }
 

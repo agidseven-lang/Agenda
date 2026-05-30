@@ -118,7 +118,7 @@ object Notifications {
     }
 
     // Retorna true se a notificação foi postada sem erro. Registra falhas em NotifyDiag.lastError.
-    fun notify(ctx: Context, id: Int, channel: String, title: String, text: String, eventId: String? = null, deepLink: String? = null): Boolean {
+    fun notify(ctx: Context, id: Int, channel: String, title: String, text: String, eventId: String? = null, deepLink: String? = null, extras: Map<String, String>? = null): Boolean {
         return try {
             if (!hasPostPermission(ctx)) {
                 NotifyDiag.lastError.value = "Permissão de notificações não concedida"
@@ -126,9 +126,13 @@ object Notifications {
             }
             ensure(ctx) // garante o canal antes de postar
             val open = Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            // Alvo do deep-link: explícito ("event:id"/"task:id") ou derivado do eventId (lembrete local).
+            // Alvo do deep-link: explícito ("event:id"/"task:id"/"chat:senderId") ou derivado do eventId (lembrete local).
             val target = deepLink?.takeIf { it.isNotBlank() } ?: eventId?.takeIf { it.isNotBlank() }?.let { "event:$it" }
             if (target != null) open.putExtra(DeepLink.EXTRA_DEEPLINK, target)
+            // Dados para o modal premium pós-clique (título/corpo + extras: tipo, scheduledAt, sentAt).
+            open.putExtra(DeepLink.EXTRA_TITLE, title)
+            open.putExtra(DeepLink.EXTRA_BODY, text)
+            extras?.forEach { (k, v) -> if (v.isNotBlank()) open.putExtra(k, v) }
             val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             val pi = PendingIntent.getActivity(ctx, id, open, flags)
             val n = NotificationCompat.Builder(ctx, channel)
