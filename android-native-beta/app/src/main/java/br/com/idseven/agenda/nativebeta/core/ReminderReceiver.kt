@@ -18,7 +18,8 @@ class ReminderReceiver : BroadcastReceiver() {
             Notifications.ensure(context)
             val notifId = id?.hashCode() ?: 99021
             val ok = Notifications.notify(context, notifId, Notifications.CH_REMINDERS, title, text, eventId = id)
-            val stamp = (if (ok) "Disparado · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis())
+            val stamp = (if (ok) "Disparado · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis()) +
+                " · " + (id ?: "teste")
             // Em memória (útil quando o app está aberto)
             NotifyDiag.lastFired.value = stamp
             // Persistido (sobrevive ao app fechado; lido na tela de Notificações ao reabrir)

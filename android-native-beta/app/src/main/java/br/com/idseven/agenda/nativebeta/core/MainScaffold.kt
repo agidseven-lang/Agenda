@@ -123,9 +123,9 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         }
         Fcm.register(session.uid)
     }
-    // Lembretes locais: reagenda sempre que a agenda muda (com dedupe).
-    LaunchedEffect(eventsState) {
-        ReminderScheduler.sync(context, eventsState.itemsOrEmpty())
+    // Lembretes locais: reagenda sempre que a agenda OU as tarefas mudam (com dedupe).
+    LaunchedEffect(eventsState, tasksState) {
+        ReminderScheduler.sync(context, eventsState.itemsOrEmpty(), tasksState.itemsOrEmpty())
     }
     // Deep-link da notificação de lembrete: abre o detalhe do compromisso ao tocar.
     val pendingEventId by DeepLink.pendingEventId.collectAsState()
