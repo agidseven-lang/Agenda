@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.28-beta-reminder-fullscreen-diagnostics"
+private const val BUILD = "1.0.29-beta-reminder-fullscreen-v2-channel"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,7 +161,10 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         val battOk = remember(permRefresh) { Notifications.isIgnoringBatteryOptimizations(context) }
                         val fullScreenOk = remember(permRefresh) { Notifications.canUseFullScreen(context) }
                         val fullScreenLabel = remember(permRefresh) { Notifications.fullScreenLabel(context) }
-                        val chStatus = remember(permRefresh) { Notifications.channelStatus(context, Notifications.CH_ALARM) }
+                        val chId = remember(permRefresh) { Notifications.reminderChannelId() }
+                        val chImp = remember(permRefresh) { Notifications.reminderChannelImportance(context) }
+                        val chBlocked = remember(permRefresh) { Notifications.reminderChannelBlocked(context) }
+                        val chStatus = remember(permRefresh) { Notifications.channelStatus(context, Notifications.CH_ALARM_V2) }
                         val localToken = remember(permRefresh) {
                             context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null)
                         }
@@ -186,9 +189,12 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                             else if (exactOk) "Permitidos" else "Pendentes (lembrete aproximado)"
                         InfoLine("Notificações", if (notifOk && enabled) "Permitido" else "Bloqueado")
                         InfoLine("Alarmes exatos", exactLabel)
-                        InfoLine("Tela cheia (chamada)", fullScreenLabel)
+                        InfoLine("Tela cheia (FSI)", "$fullScreenLabel" + if (fullScreenOk) " · true" else " · false")
                         InfoLine("Otimização de bateria", if (battOk) "Desativada (ideal)" else "Ativa (pode bloquear)")
-                        InfoLine("Canal do lembrete", chStatus)
+                        InfoLine("Canal do lembrete", chId)
+                        InfoLine("Importância do canal", if (chImp >= 0) "$chImp" + (if (chImp >= 4) " (HIGH/MAX)" else "") else "—")
+                        InfoLine("Canal bloqueado?", if (chBlocked) "SIM (reative nas configs)" else "Não")
+                        InfoLine("Estado do canal", chStatus)
                         InfoLine("Lembretes locais", if (notifOk && enabled) "Ativos" else "Inativos")
                         InfoLine("Antecedência", "1 hora")
                         InfoLine("Token FCM", if (hasToken) "Gerado" else "Não gerado")

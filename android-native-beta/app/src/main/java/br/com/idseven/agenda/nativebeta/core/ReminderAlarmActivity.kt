@@ -32,6 +32,7 @@ class ReminderAlarmActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        android.util.Log.i("ReminderDiag", "[REMINDER_ACTIVITY_OPENED] onCreate")
         // Mostrar sobre o lockscreen e acordar a tela.
         if (Build.VERSION.SDK_INT >= 27) {
             setShowWhenLocked(true)

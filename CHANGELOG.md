@@ -5,7 +5,37 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
-## 1.0.28-beta-reminder-fullscreen-diagnostics — diagnóstico + correção do lembrete (em desenvolvimento)
+## 1.0.29-beta-reminder-fullscreen-v2-channel — canal v2 + builder reforçado (em desenvolvimento)
+
+**Causa raiz refinada (1.0.28):** o alarme dispara e a notificação aparece, mas a
+Activity full-screen não abre. Isso aponta para o par canal/full-screen: (a) canais
+Android **não atualizam** importância/comportamento após criados — o `reminder_call`
+antigo podia não honrar o full-screen; (b) em Android 14, `canUseFullScreenIntent()`
+provavelmente = false → rebaixa para heads-up.
+
+- **Novo canal `reminder_fullscreen_v2`** (não reutiliza `reminder_call`):
+  IMPORTANCE_HIGH, `lockscreenVisibility = PUBLIC`, vibração, **som de ALARME**
+  (USAGE_ALARM), bypass DnD, descrição "Alertas em tela cheia para lembretes importantes".
+- **Lembrete usa exclusivamente o v2.** Builder reforçado: `PRIORITY_MAX`,
+  `CATEGORY_ALARM`, `VISIBILITY_PUBLIC`, `setFullScreenIntent(pi, true)`,
+  `setContentIntent(pi)`, `setOngoing(true)` quando vai abrir tela cheia.
+- **PendingIntent** para **Activity** (`ReminderAlarmActivity`), `FLAG_IMMUTABLE |
+  FLAG_UPDATE_CURRENT`, **requestCode único por lembrete**.
+- **Activity:** theme próprio, `excludeFromRecents`, `showWhenLocked`, `turnScreenOn`,
+  `setShowWhenLocked/ setTurnScreenOn`, `requestDismissKeyguard`, log `[REMINDER_ACTIVITY_OPENED]` no onCreate.
+- **FSI true** → também `startActivity(ReminderAlarmActivity, NEW_TASK)` (caminho ativo);
+  se falhar, `[REMINDER_ACTIVITY_START_FAILED]`, mantendo o fullScreenIntent. **FSI false**
+  → não promete tela cheia; diagnóstico "Bloqueado pelo Android"; botão de permissão.
+- **Diagnóstico:** ID do canal, importância real, canal bloqueado?, `canUseFullScreenIntent` true/false.
+- **Logs:** `[REMINDER_CHANNEL_ID]`, `[REMINDER_CHANNEL_IMPORTANCE]`, `[REMINDER_CAN_USE_FSI_TRUE/FALSE]`,
+  `[REMINDER_ACTIVITY_START_ATTEMPT]`, `[REMINDER_ACTIVITY_START_FAILED]`, `[REMINDER_NOTIFY_POSTED]`.
+- Não mexe em push imediato/Functions/PWA/Worker/Cloudflare/Rules/schema.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
+## 1.0.28-beta-reminder-fullscreen-diagnostics — diagnóstico + correção do lembrete (substituída pela 1.0.29)
 
 **Causa raiz (1.0.27 não abriu a tela premium):** (1) Android 14+ bloqueia
 `USE_FULL_SCREEN_INTENT` por padrão → `canUseFullScreenIntent()` = false → o

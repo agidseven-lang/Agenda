@@ -1,12 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Declaradas já p/ as próximas fases (notificações nativas) -->
+    <!-- Notificações nativas -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Lembrete 1h antes como chamada em tela cheia (com fallback heads-up). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:name=".core.AgendaApp"
@@ -30,6 +32,18 @@
         <activity
             android:name=".core.CrashActivity"
             android:exported="false"
+            android:theme="@style/Theme.IDSevenBeta" />
+
+        <!-- Tela premium do lembrete 1h antes (full-screen intent). Aparece sobre o
+             lockscreen e liga a tela. Fora dos recentes; instância única. -->
+        <activity
+            android:name=".core.ReminderAlarmActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=".reminder"
             android:theme="@style/Theme.IDSevenBeta" />
 
         <receiver
