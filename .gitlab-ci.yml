@@ -5,8 +5,10 @@
 
 workflow:
   rules:
-    # Cria pipeline apenas via "Run pipeline" na UI. Push e MR NAO criam pipeline.
+    # "Run pipeline" na UI (web) continua valido.
     - if: '$CI_PIPELINE_SOURCE == "web"'
+    # Push na branch de trabalho cria pipeline automaticamente (para o deploy das Functions).
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas"'
 
 variables:
   ANDROID_COMPILE_SDK: "34"
@@ -30,6 +32,9 @@ cache:
 build_android_beta:
   stage: build
   image: eclipse-temurin:17-jdk-jammy
+  # Build pesado do APK NAO roda em push automatico: so via "Run pipeline" (web).
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
   before_script:
     - apt-get update -qq && apt-get install -y -qq --no-install-recommends unzip curl ca-certificates git
     - mkdir -p "$ANDROID_HOME/cmdline-tools"
@@ -105,6 +110,10 @@ deploy_firebase_functions:
     GCP_PROJECT: "agenda-id-seven"
     GCP_PROJECT_NUMBER: "391529908613"
   rules:
+    # Push na branch de trabalho: roda AUTOMATICAMENTE (sem botao manual).
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas"'
+      when: on_success
+    # "Run pipeline" pela UI: continua manual (fallback).
     - if: '$CI_COMMIT_BRANCH == "feat/android-native-saas"'
       when: manual
       allow_failure: true
