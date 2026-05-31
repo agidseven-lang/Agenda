@@ -5,7 +5,27 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
-## 1.0.31-beta-reminder-responsible-fix — fix da elegibilidade (em desenvolvimento)
+## 1.0.31-beta-reminder-responsible-fix — ✅ APROVADA EM APARELHO REAL
+
+**Baseline estável de notificações.** Tag interna: `v1.0.31-beta-notifications-approved`.
+
+Registro técnico:
+- **Branch:** `feat/android-native-saas` · **commit:** `80d62a8` (GitLab) / árvore `42ada4f`.
+- **APK aprovado:** `idseven-nativebeta-1.0.31-beta-reminder-responsible-fix.apk` (versionCode 35).
+- **Functions ativas:** `onEventCreated`, `onTaskCreated`, `onChatMessageCreated`.
+- **Canais:** `immediate` (push imediato) e `reminder_fullscreen_v2` (lembrete em chamada) — distintos.
+
+Comportamento aprovado (teste real):
+- Notificação imediata normal/sininho ✓
+- Push imediato de agenda/tarefa ✓ · Push imediato do chat ✓
+- Tela premium estilo chamada/alarme ✓ · Lembrete premium de 1h antes ✓
+- Lembrete aparece no aparelho do **responsável** correto ✓
+- A cria item p/ B → A **não** recebe; B recebe ✓ · A cria p/ si → A recebe ✓
+
+**Congelado:** não alterar onEventCreated/onTaskCreated/onChatMessageCreated,
+ReminderAlarmActivity, ReminderScheduler, canais, FullScreenIntent — salvo bug comprovado.
+
+### 1.0.31-beta-reminder-responsible-fix — fix da elegibilidade
 
 **Causa raiz da regressão da 1.0.30:** o filtro exigia `ownerId`/`assigneeId`
 preenchido. Mas no `EventFormScreen`/`TaskFormScreen` esses campos começam `null`
