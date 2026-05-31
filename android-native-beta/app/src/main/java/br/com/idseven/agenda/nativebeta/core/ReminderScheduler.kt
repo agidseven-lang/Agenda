@@ -35,6 +35,27 @@ object ReminderScheduler {
         val resp: String = "", val status: String = "", val deepLink: String = "",
     )
 
+    // Resolve o UID do RESPONSÁVEL por um item, com fallbacks seguros e log claro.
+    //  - Compromisso: ownerId; se vazio, o item "sem responsável explícito" pertence a
+    //    quem criou (by) -> o criador recebe o lembrete do próprio item.
+    //  - Tarefa: assigneeId; se vazio, idem (by).
+    // Regra resultante: A cria p/ B (ownerId=B) -> só B; A cria p/ si (ownerId vazio,
+    // by=A) -> A; item de B -> B. NÃO assume nada sem o campo real existir.
+    fun resolveReminderResponsibleUid(type: String, ownerOrAssigneeId: String?, createdBy: String?): String? {
+        val explicit = ownerOrAssigneeId?.takeIf { it.isNotBlank() }
+        if (explicit != null) {
+            android.util.Log.i(TAG, "[REMINDER_RESPONSIBLE_FIELD_RESOLVED] type=$type field=${if (type == "task") "assigneeId" else "ownerId"} uid=$explicit")
+            return explicit
+        }
+        val creator = createdBy?.takeIf { it.isNotBlank() }
+        if (creator != null) {
+            android.util.Log.i(TAG, "[REMINDER_RESPONSIBLE_FIELD_RESOLVED] type=$type field=by(creator-fallback) uid=$creator")
+            return creator
+        }
+        android.util.Log.w(TAG, "[REMINDER_NO_RESPONSIBLE_UID_FOUND] type=$type (sem ownerId/assigneeId/by)")
+        return null
+    }
+
     // Agenda lembretes de EVENTOS e TAREFAS APENAS quando o usuário logado é o
     // RESPONSÁVEL (evento: ownerId; tarefa: assigneeId). Assim o lembrete premium de
     // 1h aparece só no aparelho do responsável — nunca no de quem criou para outra pessoa.
@@ -49,9 +70,10 @@ object ReminderScheduler {
 
             events.forEach { e ->
                 if (e.done) return@forEach
-                // Elegibilidade: só o responsável (ownerId) agenda o lembrete local.
-                val responsibleId = e.ownerId
-                if (uid == null || responsibleId.isNullOrBlank() || responsibleId != uid) {
+                // Elegibilidade por UID do responsável (ownerId; fallback criador `by`).
+                val responsibleId = resolveReminderResponsibleUid("event", e.ownerId, e.by)
+                android.util.Log.i(TAG, "[REMINDER_ELIGIBILITY_DEBUG] item=${e.id} type=event currentUid=$uid ownerId=${e.ownerId} by=${e.by} responsible=$responsibleId eligible=${uid != null && responsibleId == uid}")
+                if (uid == null || responsibleId == null || responsibleId != uid) {
                     android.util.Log.i(TAG, "[REMINDER_SKIPPED_NOT_RESPONSIBLE] item=${e.id} type=event user=$uid responsible=$responsibleId")
                     return@forEach
                 }
@@ -79,9 +101,10 @@ object ReminderScheduler {
             tasks.forEach { t ->
                 if (t.status == "concluido") return@forEach
                 if (t.dueDate.isNullOrBlank() || t.dueTime.isNullOrBlank()) return@forEach
-                // Elegibilidade: só o responsável (assigneeId) agenda o lembrete local.
-                val responsibleId = t.assigneeId
-                if (uid == null || responsibleId.isNullOrBlank() || responsibleId != uid) {
+                // Elegibilidade por UID do responsável (assigneeId; fallback criador `by`).
+                val responsibleId = resolveReminderResponsibleUid("task", t.assigneeId, t.by)
+                android.util.Log.i(TAG, "[REMINDER_ELIGIBILITY_DEBUG] item=${t.id} type=task currentUid=$uid assigneeId=${t.assigneeId} by=${t.by} responsible=$responsibleId eligible=${uid != null && responsibleId == uid}")
+                if (uid == null || responsibleId == null || responsibleId != uid) {
                     android.util.Log.i(TAG, "[REMINDER_SKIPPED_NOT_RESPONSIBLE] item=${t.id} type=task user=$uid responsible=$responsibleId")
                     return@forEach
                 }
@@ -238,6 +261,34 @@ object ReminderScheduler {
                 payloads.add(encode(key, trigger, notifTitle, text, ex))
                 prefs.edit().putStringSet(KEY, ids).putStringSet(KEY_PAYLOADS, payloads).apply()
             } catch (_: Throwable) { }
+            true
+        } catch (t: Throwable) {
+            NotifyDiag.lastError.value = t.message ?: t.javaClass.simpleName
+            false
+        }
+    }
+
+    // TESTE como RESPONSÁVEL: passa pelo resolver de elegibilidade (responsável == uid
+    // atual) e agenda pelo mesmo fluxo real. Isola o filtro: se isto abre a tela cheia,
+    // o problema (quando houver) está nos dados do item, não no full-screen.
+    fun scheduleResponsibleTestIn(ctx: Context, currentUid: String?, seconds: Int): Boolean {
+        return try {
+            val uid = currentUid?.takeIf { it.isNotBlank() }
+            // Simula um item cujo responsável é o próprio usuário (ownerId = uid).
+            val resp = resolveReminderResponsibleUid("event", uid, uid)
+            android.util.Log.i(TAG, "[REMINDER_ELIGIBILITY_DEBUG] item=resp_test type=event currentUid=$uid ownerId=$uid by=$uid responsible=$resp eligible=${uid != null && resp == uid}")
+            if (uid == null || resp != uid) {
+                android.util.Log.w(TAG, "[REMINDER_SKIPPED_NOT_RESPONSIBLE] item=resp_test user=$uid responsible=$resp")
+                NotifyDiag.lastError.value = "Sessão sem uid para o teste de responsável"
+                return false
+            }
+            val at = System.currentTimeMillis() + seconds * 1000L
+            val ex = Extra(
+                type = "event", date = DateUtil.todayIso(), time = DateUtil.hm(at),
+                resp = "Você (responsável)", status = "Agendado", deepLink = "",
+            )
+            schedule(ctx, "resp_test", at, "Lembrete (teste responsável): Reunião", "Compromisso em 1 hora · você é o responsável", ex)
+            android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FOR_RESPONSIBLE] item=resp_test responsible=$uid")
             true
         } catch (t: Throwable) {
             NotifyDiag.lastError.value = t.message ?: t.javaClass.simpleName

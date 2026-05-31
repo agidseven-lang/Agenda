@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.30-beta-reminder-responsible-only"
+private const val BUILD = "1.0.31-beta-reminder-responsible-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -241,6 +241,19 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                                 else -> "Agendado p/ 12s. BLOQUEIE a tela agora — a chamada premium deve aparecer sozinha."
                             }
                             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        // Testa o fluxo LOCAL como responsável (sem Firestore/FCM): prova que a
+                        // tela cheia continua funcionando, isolando o filtro de elegibilidade.
+                        SheetButton("Testar alerta premium como responsável") {
+                            NotifyDiag.lastError.value = null
+                            val ok = ReminderScheduler.scheduleResponsibleTestIn(context, session.uid, 12)
+                            NotifyDiag.lastScheduled.value = (if (ok) "Premium (resp.) agendado · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis())
+                            Toast.makeText(
+                                context,
+                                if (ok) "Agendado p/ 12s como responsável (você). BLOQUEIE a tela." else "Erro: ${NotifyDiag.lastError.value ?: "desconhecido"}",
+                                Toast.LENGTH_LONG,
+                            ).show()
                         }
                         Spacer(Modifier.height(8.dp))
                         SheetButton("Mostrar notificação agora") {

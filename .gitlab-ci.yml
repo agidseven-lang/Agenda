@@ -16,7 +16,7 @@ variables:
   ANDROID_CMDLINE_TOOLS_VERSION: "11076708"   # confira em https://developer.android.com/studio
   ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-  APK_OUT: "idseven-nativebeta-1.0.30-beta-reminder-responsible-only.apk"
+  APK_OUT: "idseven-nativebeta-1.0.31-beta-reminder-responsible-fix.apk"
   APP_DIR: "android-native-beta"
 
 stages:
@@ -93,7 +93,7 @@ build_android_beta:
     - cp "$APP_DIR/app/build/outputs/apk/release/app-release.apk" "$APK_OUT"
     - ls -lh "$APK_OUT"
   artifacts:
-    name: "idseven-nativebeta-1.0.30-beta-reminder-responsible-only-$CI_COMMIT_SHORT_SHA"
+    name: "idseven-nativebeta-1.0.31-beta-reminder-responsible-fix-$CI_COMMIT_SHORT_SHA"
     paths:
       - "$APK_OUT"
     expire_in: 30 days

@@ -5,7 +5,36 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
-## 1.0.30-beta-reminder-responsible-only — lembrete só no responsável (em desenvolvimento)
+## 1.0.31-beta-reminder-responsible-fix — fix da elegibilidade (em desenvolvimento)
+
+**Causa raiz da regressão da 1.0.30:** o filtro exigia `ownerId`/`assigneeId`
+preenchido. Mas no `EventFormScreen`/`TaskFormScreen` esses campos começam `null`
+e, quando o usuário cria um item **para si** sem escolher responsável no dropdown,
+o doc é salvo **sem** `ownerId`/`assigneeId`. O filtro 1.0.30 então pulava o item
+(`isNullOrBlank` → skip) e o lembrete premium **não disparava nem para o criador**.
+
+- **`resolveReminderResponsibleUid(type, ownerOrAssigneeId, createdBy)`:** usa o
+  campo real (`ownerId` p/ evento, `assigneeId` p/ tarefa) e, se vazio, faz
+  **fallback para o criador `by`** (item sem responsável explícito = de quem criou).
+  Regra: A cria p/ B → só B; A cria p/ si (sem responsável) → A; item de B → B.
+- **Logs de auditoria:** `[REMINDER_ELIGIBILITY_DEBUG]` (currentUid, ownerId/
+  assigneeId, by, responsible, eligible), `[REMINDER_RESPONSIBLE_FIELD_RESOLVED]`,
+  `[REMINDER_NO_RESPONSIBLE_UID_FOUND]`, `[REMINDER_SKIPPED_NOT_RESPONSIBLE]`,
+  `[REMINDER_SCHEDULED_FOR_RESPONSIBLE]`.
+- **Botão "Testar alerta premium como responsável"** (Perfil > Notificações):
+  fluxo LOCAL (sem Firestore/FCM) passando pelo resolver — isola o filtro e prova
+  que a tela cheia 1.0.29 continua funcionando.
+- Preserva ReminderAlarmActivity + canal `reminder_fullscreen_v2` +
+  USE_FULL_SCREEN_INTENT + fullScreenIntent + teste premium local.
+- Campos reais confirmados: evento `ownerId` (UID) + `owner` (nome) + `by` (criador);
+  tarefa `assigneeId` (UID) + `assignee` (nome) + `by`. session.uid = users/{doc.id}.
+- Não mexe em push imediato/chat/PWA/Worker/Cloudflare/Rules/schema.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
+## 1.0.30-beta-reminder-responsible-only — lembrete só no responsável (substituída pela 1.0.31)
 
 **Causa raiz:** `ReminderScheduler.sync` agendava o lembrete local para **todo**
 item visível, **sem filtrar pelo usuário logado** (e o campo `resp` usava o nome,
