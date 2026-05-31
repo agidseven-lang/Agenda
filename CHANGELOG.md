@@ -5,6 +5,25 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.32-beta-chat-read-receipts — status visual de leitura no chat (em desenvolvimento)
+
+**Fase 3A do chat (baixo risco, só UI + readBy existente).** Não toca notificações 1.0.31.
+
+- **Ticks de leitura** (estilo WhatsApp) **só nas minhas mensagens**:
+  - enviada (destinatário ainda não leu): **✓** simples, neutro (`Done`);
+  - lida (`readBy` contém o uid do destinatário): **✓✓** em destaque sutil (`DoneAll`, ciano).
+  - mensagens recebidas não exibem ticks. Horário preservado.
+- **`markRead` agora grava `readBy.<meuUid>`** nas mensagens RECEBIDAS ao abrir a
+  conversa (mesmo padrão do PWA; campo `readBy` já existia). Filtro client-side +
+  idempotente (só escreve nas que faltam) → sem writes duplicados; não toca minhas
+  mensagens. Continua zerando `unreadCount.<meuUid>` (contador não regride).
+- Sem alterar PWA/Worker/Cloudflare/Rules/Functions/schema (campo `readBy` aditivo
+  já existente). Sem áudio/anexos nesta fase.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
 ## 1.0.31-beta-reminder-responsible-fix — ✅ APROVADA EM APARELHO REAL
 
 **Baseline estável de notificações.** Tag interna: `v1.0.31-beta-notifications-approved`.

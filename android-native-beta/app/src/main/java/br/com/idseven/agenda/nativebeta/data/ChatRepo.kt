@@ -86,7 +86,25 @@ object ChatRepo {
     }
 
     fun markRead(chatId: String, meId: String) {
+        // Zera o contador de não lidas do usuário atual.
         db.collection("chats").document(chatId).update("unreadCount.$meId", 0L)
+        // Marca readBy.<meId> nas mensagens RECEBIDAS ainda não lidas por mim (mesmo
+        // padrão do PWA — campo readBy já existe no schema). Filtro client-side +
+        // idempotente: só escreve nas que faltam, evitando writes duplicados. Não toca
+        // mensagens que eu enviei.
+        db.collection("chats").document(chatId).collection("messages")
+            .get()
+            .addOnSuccessListener { snap ->
+                val now = System.currentTimeMillis()
+                snap?.documents?.forEach { d ->
+                    val by = d.getString("by")
+                    @Suppress("UNCHECKED_CAST")
+                    val readBy = d.get("readBy") as? Map<String, Any?> ?: emptyMap()
+                    if (by != meId && !readBy.containsKey(meId)) {
+                        d.reference.update("readBy.$meId", now)
+                    }
+                }
+            }
     }
 
     private suspend fun addMessage(chatId: String, msg: Map<String, Any?>): Result<Unit> = suspendCancellableCoroutine { cont ->

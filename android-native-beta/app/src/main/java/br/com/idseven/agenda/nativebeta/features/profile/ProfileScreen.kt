@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.31-beta-reminder-responsible-fix"
+private const val BUILD = "1.0.32-beta-chat-read-receipts"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

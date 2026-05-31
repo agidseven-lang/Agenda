@@ -103,7 +103,7 @@ fun LoginScreen(vm: LoginViewModel = viewModel()) {
 
             Spacer(Modifier.height(28.dp))
             Text(
-                "build: 1.0.31-beta-reminder-responsible-fix",
+                "build: 1.0.32-beta-chat-read-receipts",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
         }

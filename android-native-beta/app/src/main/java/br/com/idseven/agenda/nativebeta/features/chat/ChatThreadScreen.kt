@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.outlined.Mic
@@ -140,7 +141,7 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
                 itemsIndexed(messages, key = { _, m -> m.id }) { index, msg ->
                     val mine = msg.by == me
                     val grouped = index > 0 && messages[index - 1].by == msg.by
-                    MessageBubble(msg, mine, grouped)
+                    MessageBubble(msg, mine, grouped, readByOther = msg.readBy.containsKey(otherId))
                 }
             }
         }
@@ -240,7 +241,7 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
 }
 
 @Composable
-private fun MessageBubble(msg: Message, mine: Boolean, grouped: Boolean) {
+private fun MessageBubble(msg: Message, mine: Boolean, grouped: Boolean, readByOther: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = if (grouped) 2.dp else 8.dp),
         horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
@@ -254,9 +255,17 @@ private fun MessageBubble(msg: Message, mine: Boolean, grouped: Boolean) {
             Spacer(Modifier.height(3.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                 Text(DateUtil.hm(msg.at), color = if (mine) Color.White.copy(alpha = 0.7f) else Tokens.Faint, fontSize = 10.sp)
+                // Ticks de leitura SÓ nas minhas mensagens (estilo WhatsApp):
+                //  - enviada (destinatário ainda não leu): ✓ simples, neutro;
+                //  - lida (readBy contém o uid do destinatário): ✓✓ em destaque sutil.
                 if (mine) {
                     Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Outlined.DoneAll, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
+                    Icon(
+                        imageVector = if (readByOther) Icons.Outlined.DoneAll else Icons.Outlined.Done,
+                        contentDescription = if (readByOther) "Lida" else "Enviada",
+                        tint = if (readByOther) Color(0xFF7FE7FF) else Color.White.copy(alpha = 0.65f),
+                        modifier = Modifier.size(15.dp),
+                    )
                 }
             }
         }

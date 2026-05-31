@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 35
-        versionName "1.0.31-beta-reminder-responsible-fix"
+        versionCode 36
+        versionName "1.0.32-beta-chat-read-receipts"
         vectorDrawables { useSupportLibrary true }
     }
 
