@@ -63,6 +63,9 @@ function buildMessageData(type, id, doc) {
     responsibleId: String(responsibleId),
     createdBy: String(doc.by || ""),
     scheduledAt: String(doc.date || doc.dueDate || ""),
+    // Aditivos p/ o app do responsavel agendar o lembrete premium de 1h (T-60min):
+    scheduledDate: String(doc.date || doc.dueDate || ""),
+    scheduledTime: String((type === "task") ? (doc.dueTime || "") : (doc.start || "")),
     deepLink: type + ":" + id,
   };
   for (const k of Object.keys(data)) data[k] = String(data[k] == null ? "" : data[k]);

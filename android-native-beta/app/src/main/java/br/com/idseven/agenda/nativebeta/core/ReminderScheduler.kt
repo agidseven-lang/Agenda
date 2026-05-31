@@ -16,6 +16,7 @@ import br.com.idseven.agenda.nativebeta.shared.DateUtil
 // permitir RE-ARMAR todos os alarmes após reboot/atualização (BootReceiver), já que
 // o AlarmManager perde os alarmes nesses casos. leadMinutes = antecedência.
 object ReminderScheduler {
+    private const val TAG = "ReminderDiag"
     private const val PREF = "reminders"
     private const val KEY = "scheduled"        // Set<String> de ids (compat)
     private const val KEY_PAYLOADS = "payloads" // Set<String> codificado com SEP
@@ -34,23 +35,32 @@ object ReminderScheduler {
         val resp: String = "", val status: String = "", val deepLink: String = "",
     )
 
-    // Agenda lembretes de EVENTOS e TAREFAS (marcar alguém por horário).
-    // Evento com horário: lembra `leadMinutes` antes; se essa janela já passou mas o evento
-    // ainda é futuro, dispara NO horário do evento (não fica sem alarme). Sem horário: 09:00.
-    // Tarefa com data+hora de vencimento: dispara no horário de vencimento.
-    fun sync(ctx: Context, events: List<EventItem>, tasks: List<TaskItem> = emptyList(), leadMinutes: Int = 60) {
+    // Agenda lembretes de EVENTOS e TAREFAS APENAS quando o usuário logado é o
+    // RESPONSÁVEL (evento: ownerId; tarefa: assigneeId). Assim o lembrete premium de
+    // 1h aparece só no aparelho do responsável — nunca no de quem criou para outra pessoa.
+    // Itens não-elegíveis têm o alarme local cancelado no próximo sync.
+    // Evento com horário: lembra `leadMinutes` antes; se a janela já passou mas o evento
+    // ainda é futuro, dispara NO horário. Sem horário: 09:00. Tarefa: no vencimento.
+    fun sync(ctx: Context, events: List<EventItem>, tasks: List<TaskItem> = emptyList(), currentUid: String? = null, leadMinutes: Int = 60) {
         try {
             val now = System.currentTimeMillis()
+            val uid = currentUid?.takeIf { it.isNotBlank() }
             val targets = ArrayList<Sched>()
 
             events.forEach { e ->
                 if (e.done) return@forEach
+                // Elegibilidade: só o responsável (ownerId) agenda o lembrete local.
+                val responsibleId = e.ownerId
+                if (uid == null || responsibleId.isNullOrBlank() || responsibleId != uid) {
+                    android.util.Log.i(TAG, "[REMINDER_SKIPPED_NOT_RESPONSIBLE] item=${e.id} type=event user=$uid responsible=$responsibleId")
+                    return@forEach
+                }
                 val hasTime = !e.start.isNullOrBlank()
                 val baseMs = if (hasTime) EventStatus.dtMs(e.date, e.start) else EventStatus.dtMs(e.date, "09:00")
                 if (baseMs == null) return@forEach
                 val desired = if (hasTime) baseMs - leadMinutes * 60_000L else baseMs
                 val trigger = when {
-                    desired > now -> desired      // 30 min antes (ou 09:00 p/ dia inteiro)
+                    desired > now -> desired      // 1h antes (ou 09:00 p/ dia inteiro)
                     baseMs > now -> baseMs        // janela de antecedência já passou -> dispara no horário
                     else -> return@forEach        // evento já passou
                 }
@@ -58,6 +68,7 @@ object ReminderScheduler {
                 val title = "Lembrete: $nome"
                 val text = listOfNotNull(e.client, e.start?.let { "às $it" }, e.location).joinToString(" · ")
                 val status = EventStatus.status(e)?.text ?: ""
+                android.util.Log.i(TAG, "[REMINDER_ELIGIBLE] item=${e.id} type=event user=$uid responsible=$responsibleId")
                 targets.add(Sched(
                     e.id, trigger, title, text,
                     type = "event", date = e.date ?: "", time = e.start ?: "",
@@ -68,11 +79,18 @@ object ReminderScheduler {
             tasks.forEach { t ->
                 if (t.status == "concluido") return@forEach
                 if (t.dueDate.isNullOrBlank() || t.dueTime.isNullOrBlank()) return@forEach
+                // Elegibilidade: só o responsável (assigneeId) agenda o lembrete local.
+                val responsibleId = t.assigneeId
+                if (uid == null || responsibleId.isNullOrBlank() || responsibleId != uid) {
+                    android.util.Log.i(TAG, "[REMINDER_SKIPPED_NOT_RESPONSIBLE] item=${t.id} type=task user=$uid responsible=$responsibleId")
+                    return@forEach
+                }
                 val at = EventStatus.dtMs(t.dueDate, t.dueTime) ?: return@forEach
                 if (at <= now) return@forEach
                 val nome = t.title?.ifBlank { null } ?: t.client ?: "Tarefa"
                 val title = "Tarefa: $nome"
                 val text = listOfNotNull(t.assignee?.takeIf { it.isNotBlank() }?.let { "para $it" }, "vence às ${t.dueTime}").joinToString(" · ")
+                android.util.Log.i(TAG, "[REMINDER_ELIGIBLE] item=${t.id} type=task user=$uid responsible=$responsibleId")
                 targets.add(Sched(
                     "task_" + t.id, at, title, text,
                     type = "task", date = t.dueDate ?: "", time = t.dueTime ?: "",
@@ -83,11 +101,17 @@ object ReminderScheduler {
             val prefs = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
             val old = prefs.getStringSet(KEY, emptySet()) ?: emptySet()
             val newIds = targets.map { it.key }.toSet()
-            (old - newIds).forEach { cancel(ctx, it) }
+            // Cancela alarmes que deixaram de ser elegíveis (ex.: A criou p/ B, ou mudou o responsável).
+            (old - newIds).forEach {
+                android.util.Log.i(TAG, "[REMINDER_CANCELLED_NOT_RESPONSIBLE] item=$it")
+                cancel(ctx, it)
+            }
             val payloads = LinkedHashSet<String>()
             targets.forEach { s ->
                 val ex = Extra(s.type, s.date, s.time, s.resp, s.status, s.deepLink)
                 schedule(ctx, s.key, s.at, s.title, s.text, ex)
+                android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FOR_RESPONSIBLE] item=${s.key} responsible=${s.resp}")
+                android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FROM_SYNC] item=${s.key} responsible=${s.resp}")
                 payloads.add(encode(s.key, s.at, s.title, s.text, ex))
             }
             prefs.edit().putStringSet(KEY, newIds).putStringSet(KEY_PAYLOADS, payloads).apply()
@@ -169,6 +193,55 @@ object ReminderScheduler {
         } catch (_: SecurityException) {
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
             android.util.Log.w("ReminderDiag", "[REMINDER_SCHEDULED] (inexato) id=$eventId at=$triggerAt")
+        }
+    }
+
+    // Agenda o lembrete premium de 1h a partir do PUSH IMEDIATO (no aparelho do
+    // responsável B), cobrindo o caso de B não abrir o app antes do lembrete.
+    // Persiste o payload p/ sobreviver a reboot. Idempotente: o próximo sync regenera
+    // o mesmo id (event:<id> / task_<id>), sem duplicar. leadMinutes default 60.
+    fun scheduleFromFcm(
+        ctx: Context, type: String, rawId: String, title: String,
+        scheduledDate: String?, scheduledTime: String?, leadMinutes: Int = 60,
+    ): Boolean {
+        return try {
+            val id = rawId.takeIf { it.isNotBlank() } ?: return false
+            if (scheduledDate.isNullOrBlank()) return false   // sem data não há quando lembrar
+            val key = if (type == "task") "task_$id" else id
+            val baseMs = EventStatus.dtMs(scheduledDate, scheduledTime?.ifBlank { null } ?: "09:00") ?: return false
+            val now = System.currentTimeMillis()
+            val hasTime = !scheduledTime.isNullOrBlank()
+            val desired = if (hasTime) baseMs - leadMinutes * 60_000L else baseMs
+            val trigger = when {
+                desired > now -> desired
+                baseMs > now -> baseMs        // <1h: dispara no horário do item (sem duplicar)
+                else -> return false          // já passou
+            }
+            val nome = title.ifBlank { if (type == "task") "Tarefa" else "Compromisso" }
+            val notifTitle = if (type == "task") "Tarefa: $nome" else "Lembrete: $nome"
+            val text = (if (type == "task") "Vence" else "Começa") +
+                listOfNotNull(scheduledDate, scheduledTime?.takeIf { it.isNotBlank() }?.let { "às $it" }).joinToString(" · ", prefix = " ")
+            val ex = Extra(
+                type = if (type == "task") "task" else "event",
+                date = scheduledDate, time = scheduledTime ?: "",
+                resp = "Você", status = if (type == "task") "Pendente" else "Agendado",
+                deepLink = (if (type == "task") "task:" else "event:") + id,
+            )
+            schedule(ctx, key, trigger, notifTitle, text, ex)
+            android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FROM_FCM] item=$id type=$type at=$trigger")
+            // Persiste p/ rearmar no boot (mesmo formato do sync).
+            try {
+                val prefs = ctx.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+                val ids = (prefs.getStringSet(KEY, emptySet()) ?: emptySet()).toMutableSet().apply { add(key) }
+                val payloads = (prefs.getStringSet(KEY_PAYLOADS, emptySet()) ?: emptySet()).toMutableSet()
+                payloads.removeAll { it.substringBefore(SEP) == key }
+                payloads.add(encode(key, trigger, notifTitle, text, ex))
+                prefs.edit().putStringSet(KEY, ids).putStringSet(KEY_PAYLOADS, payloads).apply()
+            } catch (_: Throwable) { }
+            true
+        } catch (t: Throwable) {
+            NotifyDiag.lastError.value = t.message ?: t.javaClass.simpleName
+            false
         }
     }
 

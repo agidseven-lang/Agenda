@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 33
-        versionName "1.0.29-beta-reminder-fullscreen-v2-channel"
+        versionCode 34
+        versionName "1.0.30-beta-reminder-responsible-only"
         vectorDrawables { useSupportLibrary true }
     }
 

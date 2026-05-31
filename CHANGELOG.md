@@ -5,7 +5,35 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
-## 1.0.29-beta-reminder-fullscreen-v2-channel — canal v2 + builder reforçado (em desenvolvimento)
+## 1.0.30-beta-reminder-responsible-only — lembrete só no responsável (em desenvolvimento)
+
+**Causa raiz:** `ReminderScheduler.sync` agendava o lembrete local para **todo**
+item visível, **sem filtrar pelo usuário logado** (e o campo `resp` usava o nome,
+não o UID). Como o criador A vê o item que criou, o aparelho de A agendava e
+disparava a tela premium — em vez do responsável B.
+
+- **Elegibilidade por UID:** o lembrete local só é agendado quando
+  `currentUid == ownerId` (compromisso) ou `currentUid == assigneeId` (tarefa).
+  `sync(... currentUid ...)`; `MainScaffold` passa `session.uid`.
+- **Cancelamento:** itens que deixaram de ser elegíveis (A criou p/ B, ou o
+  responsável mudou) têm o alarme local cancelado no próximo sync.
+- **B agenda mesmo sem abrir o app:** ao chegar o push imediato (a Function só
+  envia ao responsável), `AppFirebaseMessagingService` chama
+  `ReminderScheduler.scheduleFromFcm(...)` → agenda o premium em T‑60min;
+  idempotente com o sync (mesmo id), persiste p/ reboot.
+- **Function (ajuste mínimo aditivo):** payload de evento/tarefa ganhou
+  `scheduledDate` e `scheduledTime` (sem alterar entrega/dedup do push aprovado).
+- **Logs:** `[REMINDER_ELIGIBLE]`, `[REMINDER_SKIPPED_NOT_RESPONSIBLE]`,
+  `[REMINDER_CANCELLED_NOT_RESPONSIBLE]`, `[REMINDER_SCHEDULED_FOR_RESPONSIBLE]`,
+  `[REMINDER_SCHEDULED_FROM_FCM]`, `[REMINDER_SCHEDULED_FROM_SYNC]`.
+- Mantém ReminderAlarmActivity + canal `reminder_fullscreen_v2` + full-screen +
+  diagnóstico aprovados. Não mexe em push imediato/chat/PWA/Worker/Cloudflare/Rules/schema.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
+## 1.0.29-beta-reminder-fullscreen-v2-channel — canal v2 + builder reforçado (substituída pela 1.0.30)
 
 **Causa raiz refinada (1.0.28):** o alarme dispara e a notificação aparece, mas a
 Activity full-screen não abre. Isso aponta para o par canal/full-screen: (a) canais

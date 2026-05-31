@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.29-beta-reminder-fullscreen-v2-channel"
+private const val BUILD = "1.0.30-beta-reminder-responsible-only"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -49,6 +49,20 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
                 this, System.currentTimeMillis().toInt(), Notifications.CH_IMMEDIATE,
                 title, body, deepLink = deepLink, subText = subText,
             )
+
+            // Este aparelho É o do responsável (a Function só envia ao responsável).
+            // Agenda o lembrete premium de 1h aqui, cobrindo o caso de B não abrir o app
+            // antes do lembrete. Idempotente com o sync (mesmo id). Não afeta o push imediato.
+            val type = data["type"]
+            if (type == "event" || type == "task") {
+                val rawId = (if (type == "task") data["taskId"] else data["eventId"])?.takeIf { it.isNotBlank() }
+                    ?: data["deepLink"]?.substringAfter(":", "")?.takeIf { it.isNotBlank() }
+                val date = data["scheduledDate"]?.takeIf { it.isNotBlank() } ?: data["scheduledAt"]
+                val timeStr = data["scheduledTime"]
+                if (rawId != null) {
+                    ReminderScheduler.scheduleFromFcm(this, type, rawId, title, date, timeStr)
+                }
+            }
         } catch (_: Throwable) { }
     }
 }
