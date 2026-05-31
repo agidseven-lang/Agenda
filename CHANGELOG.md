@@ -5,6 +5,31 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.35-beta-chat-list-polish — refinamento da lista de conversas (em desenvolvimento)
+
+**Fase 3D do chat (UI-only).** Lista do Marketing mais próxima do WhatsApp Business.
+
+- **Cards arredondados** (16 dp) com superfície/borda distintas; itens com **não
+  lidas** ganham destaque sutil (fundo `Surface2` + borda accent translúcida,
+  nome em bold, prévia em `Ink`/SemiBold, horário accent).
+- **Header premium:** título + subtítulo dinâmico ("N não lidas · equipe ID Seven"
+  ou "Conversas da equipe ID Seven").
+- **Ticks na prévia (consistente com 1.0.32):** só nas minhas últimas mensagens —
+  **✓** quando o destinatário ainda não leu, **✓✓** accent quando leu (derivado de
+  `unreadFor(otherId) == 0`). Recebidas sem ticks.
+- **Estados vazios profissionais:**
+  - busca sem resultado: "Nada encontrado para "<termo>"";
+  - sem nenhuma conversa iniciada: "Nenhuma conversa ainda — toque em alguém da
+    equipe para iniciar o atendimento por aqui." (sem inventar botão "nova
+    conversa" — já basta tocar num contato).
+- **Badge** de não lidas até 99+; ordenação `lastAt desc` preservada; busca por
+  nome + última mensagem preservada.
+- Não toca ChatRepo/schema/Functions/notificações; nada de áudio.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
 ## 1.0.34-beta-chat-quick-replies — respostas rápidas no chat (em desenvolvimento)
 
 **Fase 3C do chat (leve, sem schema/backend).** Textos prontos estilo WhatsApp Business.

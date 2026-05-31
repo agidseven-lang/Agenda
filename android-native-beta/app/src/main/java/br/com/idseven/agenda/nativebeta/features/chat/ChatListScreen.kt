@@ -1,7 +1,9 @@
 package br.com.idseven.agenda.nativebeta.features.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,15 +12,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,58 +67,113 @@ fun ChatListScreen(session: UserSession, users: List<UserLite>, onOpenChat: (Str
     val filtered = others
         .filter { u -> q.isEmpty() || (u.name ?: "").lowercase().contains(q) || (chatByOther[u.id]?.lastText ?: "").lowercase().contains(q) }
         .sortedByDescending { chatByOther[it.id]?.lastAt ?: 0L }
+    val unreadTotal = chats.sumOf { it.unreadFor(me) }
+    // "Nenhuma conversa ainda" só quando existem contatos mas nenhum chat com mensagem.
+    val anyConversation = chats.any { (it.lastAt ?: 0L) > 0L }
+
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        Text("Mensagens", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 18.dp, top = 12.dp, bottom = 4.dp))
+        // Header premium (titulo + subtitulo com contador de nao lidas).
+        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 6.dp)) {
+            Text("Mensagens", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(
+                when {
+                    unreadTotal > 0L -> "$unreadTotal não lida${if (unreadTotal > 1L) "s" else ""} · equipe ID Seven"
+                    else -> "Conversas da equipe ID Seven"
+                },
+                color = Tokens.Faint, fontSize = 12.5.sp, modifier = Modifier.padding(top = 2.dp),
+            )
+        }
         SearchField(query, { query = it }, "Buscar conversa…")
-        Spacer(Modifier.height(4.dp))
-        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
-            itemsIndexed(filtered, key = { _, u -> u.id }) { index, u ->
-                ChatRow(u, chatByOther[u.id], me) { onOpenChat(u.id) }
-                if (index < filtered.lastIndex) RowDivider()
+        Spacer(Modifier.height(2.dp))
+        when {
+            // Busca sem resultado.
+            filtered.isEmpty() && q.isNotEmpty() -> EmptyStateInline(
+                Icons.Outlined.SearchOff, "Nada encontrado",
+                "Nenhuma conversa para “$query”. Tente outro nome ou trecho da mensagem.",
+            )
+            // Existem contatos mas ainda nenhuma conversa iniciada.
+            !anyConversation -> EmptyStateInline(
+                Icons.Outlined.ChatBubbleOutline, "Nenhuma conversa ainda",
+                "Toque em alguém da equipe para iniciar o atendimento por aqui.",
+            )
+            else -> LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                items(filtered, key = { it.id }) { u ->
+                    ChatCard(u, chatByOther[u.id], me) { onOpenChat(u.id) }
+                }
             }
         }
     }
 }
 
+/* Card de conversa (estilo premium, WhatsApp Business): avatar, nome, ultima
+   mensagem com tick correto (✓ enviada vs ✓✓ lida, conforme readBy do destinatário),
+   horario/data e badge de nao lidas. Conversas com nao lidas ganham destaque sutil. */
 @Composable
-private fun ChatRow(user: UserLite, chat: Chat?, meId: String, onClick: () -> Unit) {
+private fun ChatCard(user: UserLite, chat: Chat?, meId: String, onClick: () -> Unit) {
     val unread = chat?.unreadFor(meId) ?: 0L
+    val hasUnread = unread > 0L
     val mineLast = chat?.lastBy != null && chat.lastBy == meId
     Row(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(horizontal = 16.dp, vertical = 11.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (hasUnread) Tokens.Surface2 else Tokens.Surface)
+            .border(1.dp, if (hasUnread) Tokens.Accent.copy(alpha = 0.35f) else Tokens.Line, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(user.photo, UserColor.of(user.id, user.color), user.name, 54.dp)
-        Spacer(Modifier.width(14.dp))
+        Avatar(user.photo, UserColor.of(user.id, user.color), user.name, 52.dp)
+        Spacer(Modifier.width(13.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(user.name ?: "—", color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text(
+                    user.name ?: "—",
+                    color = Tokens.Ink, fontSize = 15.5.sp,
+                    fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
                 Spacer(Modifier.width(8.dp))
                 chat?.lastAt?.let {
                     Text(
                         DateUtil.chatStamp(it),
-                        color = if (unread > 0) Tokens.Accent else Tokens.Faint,
+                        color = if (hasUnread) Tokens.Accent else Tokens.Faint,
                         fontSize = 11.5.sp,
-                        fontWeight = if (unread > 0) FontWeight.Bold else FontWeight.Normal,
+                        fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.Normal,
                     )
                 }
             }
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (chat?.lastText != null && mineLast) {
-                    Icon(Icons.Outlined.DoneAll, contentDescription = null, tint = Tokens.Soft, modifier = Modifier.size(15.dp))
+                // Tick na lista (estilo WhatsApp): só p/ MINHAS últimas mensagens.
+                // Lida quando o destinatário marcou readBy (lastReadAt[other] > 0).
+                if (mineLast && chat?.lastText != null) {
+                    val readByOther = chat.unreadFor(user.id) == 0L && (chat.lastAt ?: 0L) > 0L
+                    Icon(
+                        imageVector = if (readByOther) Icons.Outlined.DoneAll else Icons.Outlined.Done,
+                        contentDescription = if (readByOther) "Lida" else "Enviada",
+                        tint = if (readByOther) Tokens.Accent else Tokens.Soft,
+                        modifier = Modifier.size(15.dp),
+                    )
                     Spacer(Modifier.width(4.dp))
                 }
                 Text(
                     chat?.lastText ?: "Toque para conversar",
-                    color = if (unread > 0) Tokens.Soft else Tokens.Faint,
-                    fontSize = 13.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = if (hasUnread) Tokens.Ink else Tokens.Faint,
+                    fontSize = 13.5.sp,
+                    fontWeight = if (hasUnread) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (unread > 0) {
+                if (hasUnread) {
                     Spacer(Modifier.width(8.dp))
-                    Box(Modifier.size(20.dp).clip(CircleShape).background(Tokens.Accent), contentAlignment = Alignment.Center) {
-                        Text(if (unread > 9) "9+" else "$unread", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    Box(Modifier.size(22.dp).clip(CircleShape).background(Tokens.Accent), contentAlignment = Alignment.Center) {
+                        Text(if (unread > 99) "99+" else "$unread", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -120,7 +181,21 @@ private fun ChatRow(user: UserLite, chat: Chat?, meId: String, onClick: () -> Un
     }
 }
 
+/* Estado vazio "inline" (para busca sem resultado e "nenhuma conversa ainda"),
+   alinhado ao visual do app sem ocupar a tela inteira como o EmptyState global. */
 @Composable
-private fun RowDivider() {
-    Box(Modifier.fillMaxWidth().padding(start = 84.dp).height(1.dp).background(Tokens.Line))
+private fun EmptyStateInline(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp).padding(horizontal = 28.dp, vertical = 36.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(Modifier.size(64.dp).clip(CircleShape).background(Tokens.Surface2), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Tokens.Accent, modifier = Modifier.size(28.dp))
+        }
+        Spacer(Modifier.height(14.dp))
+        Text(title, color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Text(subtitle, color = Tokens.Faint, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 6.dp))
+    }
 }

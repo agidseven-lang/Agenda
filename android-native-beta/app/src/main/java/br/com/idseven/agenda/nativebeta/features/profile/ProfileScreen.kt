@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.34-beta-chat-quick-replies"
+private const val BUILD = "1.0.35-beta-chat-list-polish"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
