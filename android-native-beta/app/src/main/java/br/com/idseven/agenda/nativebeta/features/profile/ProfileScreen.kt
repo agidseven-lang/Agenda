@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.32-beta-chat-read-receipts"
+private const val BUILD = "1.0.33-beta-chat-audio-removed"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

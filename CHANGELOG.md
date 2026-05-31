@@ -5,6 +5,27 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.33-beta-chat-audio-removed — áudio do chat cancelado (em desenvolvimento)
+
+**Decisão de produto:** a Fase 3B (envio de áudio no chat) foi **CANCELADA**.
+Não haverá gravação/upload/player de áudio. A próxima evolução do chat **não**
+será áudio (candidatas: lista de conversas, UX das mensagens, respostas rápidas,
+filtros do Marketing, busca).
+
+- **Removido da UI do chat:** ícone de microfone e o toast "Gravação de áudio em
+  breve" no botão de envio (`ChatThreadScreen`). O botão agora é só **Enviar**
+  (texto), desabilitado quando não há texto. Sem `RECORD_AUDIO`, sem player.
+- **Mantido (justificado):** o ramo defensivo `🎤 Enviou um áudio` em
+  `functions/index.js` (`chatPreview`) é **código morto** — o app só grava texto,
+  então nunca é alcançado e não gera UX errada. Removê-lo exigiria **re-deploy das
+  Functions aprovadas** sem ganho funcional; por isso fica intacto.
+- Não adiciona Firebase Storage; não usa ImageKit; não toca Worker/PWA/Rules/
+  schema/Functions/notificações. Texto, push do chat, ✓/✓✓ e contador intactos.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
 ## 1.0.32-beta-chat-read-receipts — status visual de leitura no chat (em desenvolvimento)
 
 **Fase 3A do chat (baixo risco, só UI + readBy existente).** Não toca notificações 1.0.31.

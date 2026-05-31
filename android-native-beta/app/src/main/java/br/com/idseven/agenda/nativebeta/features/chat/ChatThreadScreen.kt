@@ -31,7 +31,6 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.EmojiEmotions
-import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -178,17 +177,19 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
             )
             Spacer(Modifier.width(8.dp))
             val canSend = input.isNotBlank() && chatId != null
+            // Botão de ENVIAR (texto). Áudio foi descartado por decisão de produto:
+            // sem microfone, sem gravação. Quando não há texto, o botão fica desabilitado.
             Box(
-                modifier = Modifier.size(50.dp).clip(CircleShape).background(Tokens.Accent)
-                    .clickable {
-                        if (canSend) send() else Toast.makeText(context, "Gravação de áudio em breve", Toast.LENGTH_SHORT).show()
-                    },
+                modifier = Modifier.size(50.dp).clip(CircleShape)
+                    .background(if (canSend) Tokens.Accent else Tokens.Surface2)
+                    .then(if (canSend) Modifier.clickable { send() } else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    if (canSend) Icons.AutoMirrored.Filled.Send else Icons.Outlined.Mic,
-                    contentDescription = if (canSend) "Enviar" else "Áudio",
-                    tint = Color.White, modifier = Modifier.size(22.dp),
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = "Enviar",
+                    tint = if (canSend) Color.White else Tokens.Faint,
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }
