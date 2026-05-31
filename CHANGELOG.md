@@ -5,6 +5,26 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.34-beta-chat-quick-replies — respostas rápidas no chat (em desenvolvimento)
+
+**Fase 3C do chat (leve, sem schema/backend).** Textos prontos estilo WhatsApp Business.
+
+- **Botão "Respostas"** (ícone `ListAlt`, discreto, acima da barra de envio) abre um
+  bottom sheet "Respostas rápidas" com os textos organizados por categoria
+  (Saudação, Confirmação, Solicitação, Encaminhamento, Retorno).
+- **Inserção no campo, NÃO envia:** ao tocar numa resposta, o texto entra no input
+  (se já houver texto, acrescenta ao final com espaço); o usuário edita e envia com
+  o botão Enviar normal. Sem auto-envio.
+- **Local/estático:** `QUICK_REPLIES` no app (sem coleção nova, sem sync remoto, sem
+  painel admin). Arquitetura preparada p/ futuramente virar editável por setor
+  (basta trocar a fonte mantendo categoria → textos).
+- Não reintroduz áudio. Não toca Storage/ImageKit/Worker/PWA/Rules/schema/Functions/
+  notificações. Texto, push do chat, ✓/✓✓ e contador intactos.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
 ## 1.0.33-beta-chat-audio-removed — áudio do chat cancelado (em desenvolvimento)
 
 **Decisão de produto:** a Fase 3B (envio de áudio no chat) foi **CANCELADA**.

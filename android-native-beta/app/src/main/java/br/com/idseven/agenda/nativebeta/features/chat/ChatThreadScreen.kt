@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Done
@@ -68,6 +69,30 @@ import br.com.idseven.agenda.nativebeta.shared.DateUtil
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
+// Respostas rápidas LOCAIS/estáticas (sem Firestore, sem painel admin). Arquitetura
+// preparada p/ no futuro virar editável por setor: basta trocar esta fonte por dados
+// remotos mantendo a mesma estrutura (categoria -> textos).
+private val QUICK_REPLIES: List<Pair<String, List<String>>> = listOf(
+    "Saudação" to listOf(
+        "Olá! Tudo bem? Como posso ajudar?",
+    ),
+    "Confirmação" to listOf(
+        "Recebido. Vou verificar e retorno em instantes.",
+        "Perfeito, combinado.",
+    ),
+    "Solicitação" to listOf(
+        "Pode me enviar mais detalhes, por favor?",
+    ),
+    "Encaminhamento" to listOf(
+        "Encaminhei sua solicitação para o responsável.",
+        "Sua demanda foi registrada. Assim que houver atualização, aviso por aqui.",
+    ),
+    "Retorno" to listOf(
+        "Obrigado pelo retorno.",
+        "Vou acompanhar e te aviso assim que for concluído.",
+    ),
+)
+
 private val EMOJIS = listOf(
     "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😎", "🤔", "🙏",
     "👍", "👏", "🙌", "💪", "🔥", "✅", "❌", "⚠️", "🎉", "❤️",
@@ -98,6 +123,8 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
     var input by remember { mutableStateOf("") }
     var showEmoji by remember { mutableStateOf(false) }
     val emojiSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showQuickReplies by remember { mutableStateOf(false) }
+    val quickSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     fun send() {
         val cid = chatId ?: return
@@ -146,10 +173,26 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
         }
 
         // Barra de envio
-        Row(
-            modifier = Modifier.fillMaxWidth().background(Tokens.Surface).padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
+        Column(Modifier.fillMaxWidth().background(Tokens.Surface)) {
+            // Atalho de respostas rápidas (textos prontos) — insere no campo, não envia.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.clip(RoundedCornerShape(16.dp)).background(Tokens.Surface2)
+                        .clickable { showQuickReplies = true }.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.AutoMirrored.Outlined.ListAlt, contentDescription = null, tint = Tokens.Accent, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Respostas", color = Tokens.Accent, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
@@ -191,6 +234,7 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
                     tint = if (canSend) Color.White else Tokens.Faint,
                     modifier = Modifier.size(22.dp),
                 )
+            }
             }
         }
     }
@@ -235,6 +279,49 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    if (showQuickReplies) {
+        ModalBottomSheet(onDismissRequest = { showQuickReplies = false }, sheetState = quickSheetState, containerColor = Tokens.Surface) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 20.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Respostas rápidas", color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("Toque para inserir no campo — você pode editar antes de enviar", color = Tokens.Faint, fontSize = 12.sp)
+                    }
+                    TextButton(onClick = { showQuickReplies = false }) {
+                        Text("Fechar", color = Tokens.Accent, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                    QUICK_REPLIES.forEach { (categoria, textos) ->
+                        Text(
+                            categoria.uppercase(),
+                            color = Tokens.Faint, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+                        )
+                        textos.forEach { texto ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(12.dp)).background(Tokens.Surface2)
+                                    .clickable {
+                                        // Insere no campo (NÃO envia). Se já houver texto,
+                                        // acrescenta ao final com separação segura.
+                                        input = if (input.isBlank()) texto else (input.trimEnd() + " " + texto)
+                                        showQuickReplies = false
+                                    }
+                                    .padding(horizontal = 13.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(texto, color = Tokens.Ink, fontSize = 13.5.sp, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
             }
         }

@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 37
-        versionName "1.0.33-beta-chat-audio-removed"
+        versionCode 38
+        versionName "1.0.34-beta-chat-quick-replies"
         vectorDrawables { useSupportLibrary true }
     }
 
