@@ -1,6 +1,5 @@
 package br.com.idseven.agenda.nativebeta.features.chat
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,13 +26,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
-import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Done
 import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.EmojiEmotions
-import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -54,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -108,7 +104,6 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
     val me = session.uid
     val other = users.firstOrNull { it.id == otherId }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
 
     var chatId by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(otherId) { ChatRepo.openOrCreate(me, otherId).onSuccess { chatId = it } }
@@ -120,7 +115,16 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
     LaunchedEffect(chatId, messages.size) { chatId?.let { ChatRepo.markRead(it, me) } }
 
     val listState = rememberLazyListState()
-    LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1) }
+    // Scroll para o fim: INSTANTANEO na 1a carga da conversa (evita "pulo"
+    // animado desde o topo); ANIMADO nas mensagens seguintes (envio/recebimento).
+    var firstScroll by remember(chatId) { mutableStateOf(true) }
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            val target = messages.size - 1
+            if (firstScroll) { listState.scrollToItem(target); firstScroll = false }
+            else listState.animateScrollToItem(target)
+        }
+    }
 
     var input by remember { mutableStateOf("") }
     var showEmoji by remember { mutableStateOf(false) }
@@ -156,7 +160,17 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
         Box(Modifier.fillMaxWidth().height(1.dp).background(Tokens.Line))
 
         // Mensagens
-        if (messages.isEmpty()) {
+        if (chatId == null) {
+            // Loading discreto enquanto a conversa abre (evita mostrar "Nenhuma
+            // mensagem ainda" antes de saber se ha historico).
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text("Carregando conversa…", color = Tokens.Faint, fontSize = 13.sp)
+            }
+        } else if (messages.isEmpty()) {
             // Estado vazio premium da conversa (campo de envio segue disponivel abaixo).
             Column(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp),
@@ -232,14 +246,8 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
                         Icon(Icons.Outlined.EmojiEmotions, contentDescription = "Inserir emoji", tint = Tokens.Accent, modifier = Modifier.size(24.dp))
                     }
                 },
-                trailingIcon = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.AttachFile, contentDescription = "Anexar", tint = Tokens.Soft, modifier = Modifier.size(22.dp).clickable { Toast.makeText(context, "Anexos em breve", Toast.LENGTH_SHORT).show() })
-                        Spacer(Modifier.width(12.dp))
-                        Icon(Icons.Outlined.PhotoCamera, contentDescription = "Câmera", tint = Tokens.Soft, modifier = Modifier.size(22.dp).clickable { Toast.makeText(context, "Câmera em breve", Toast.LENGTH_SHORT).show() })
-                        Spacer(Modifier.width(6.dp))
-                    }
-                },
+                // Sem anexo/camera nesta fase (placeholders nao-funcionais removidos
+                // para deixar a barra mais limpa e profissional). Sem microfone/audio.
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Tokens.Accent, unfocusedBorderColor = Tokens.Line,
                     focusedTextColor = Tokens.Ink, unfocusedTextColor = Tokens.Ink, cursorColor = Tokens.Accent,

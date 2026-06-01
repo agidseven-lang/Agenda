@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.45-beta-password-reset-email-live"
+private const val BUILD = "1.0.46-beta-chat-thread-final-polish"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

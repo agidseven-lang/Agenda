@@ -3,6 +3,35 @@
 Histórico das entregas do app nativo (`br.com.idseven.agenda.nativebeta`) e das
 Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
+## 1.0.46-beta-chat-thread-final-polish — refinamento final da conversa (FASE 3F)
+
+Polimento UI-only da tela interna da conversa do Chat do Marketing. **Sem tocar
+backend/ChatRepo/Functions/Rules/reset de senha.** Apenas `ChatThreadScreen`.
+
+- **Scroll sem pulo**: ao abrir a conversa, posicionamento INSTANTANEO no fim
+  (`scrollToItem`); nas mensagens seguintes (envio/recebimento), ANIMADO
+  (`animateScrollToItem`). Elimina o "pulo" animado desde o topo na 1a carga.
+- **Loading discreto**: enquanto a conversa abre (`chatId == null`) mostra
+  "Carregando conversa…" em vez de exibir "Nenhuma mensagem ainda" antes de
+  saber se ha historico.
+- **Barra de envio mais limpa**: removidos os placeholders nao-funcionais de
+  anexo e camera (so mostravam Toast "em breve"). Preservados: emoji (leading),
+  "Respostas" e "Enviar". Sem microfone/audio. Sem anexos nesta fase.
+- **Preservado e auditado (sem regressao)**: balao enviado a direita / recebido
+  a esquerda, cantos arredondados + tail por grupo, largura max confortavel
+  (290dp), separador de data (Hoje/Ontem/data via DateUtil, sem duplicar),
+  agrupamento de mensagens consecutivas, horario discreto, ticks ✓/✓✓ SO nas
+  enviadas (readBy), respostas rapidas, estado vazio ("Nenhuma mensagem ainda" /
+  "Envie uma mensagem para iniciar a conversa."), envio de texto, push imediato
+  (onChatMessageCreated intacto), deep link, contador de nao lidas, lista de
+  conversas 1.0.35.
+
+Versao: 1.0.46-beta-chat-thread-final-polish / versionCode 51.
+Sem mudanca em reset de senha 1.0.45, Resend, Secret Manager, Firestore Rules,
+PWA, Worker, Cloudflare, agenda, tarefas, notificacoes, lembrete premium.
+
+---
+
 ## Higiene de passwordResetCodes — cleanup agendado (backend-only, sem APK)
 
 Fase isolada pos-1.0.45. **Sem APK, sem mudanca no app, sem tocar no fluxo
