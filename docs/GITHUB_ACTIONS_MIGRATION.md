@@ -7,6 +7,35 @@
 
 ---
 
+## 🌿 Modelo de branches no GitHub (decisão A → C, 2026-06-01)
+
+Para não misturar dois produtos no mesmo branch default, o repositório
+`agidseven-lang/Agenda` adota:
+
+| Branch | Papel | Aponta para |
+|---|---|---|
+| `main` | **PWA / GitHub Pages** (site servido) + os 5 workflows `[manual]` | (raiz do PWA) |
+| **`app/main`** | **App Agenda ID Seven (nativo)** — branch dedicada e validada do app | `4e317f5` (1.0.46-beta-chat-thread-final-polish, vc 51) |
+| `mirror/gitlab-1.0.46` | Espelho imutável do estado aprovado do GitLab | `4e317f5` |
+| `pr/align-main-gitlab-1.0.46` | Head do **PR #10** (draft, não mesclar) — alinhamento opcional do app no `main` | descende de `main` |
+
+- **`main` = PWA/Pages** — inalterado; continua servindo o site.
+- **`app/main` = app Agenda ID Seven** — branch oficial do app no GitHub, contendo
+  Android 1.0.46 + `functions/` (push + reset HTTP + `cleanupPasswordResetCodes`)
+  + `scripts/` + `docs/`. Validada (GitHub Actions já rodou contra esta árvore).
+- **GitLab segue PRINCIPAL** até decisão final; `app/main` é o lar dedicado do app
+  no GitHub durante a observação.
+- **PR #10 permanece DRAFT** (não mesclar) — só seria usado se a decisão futura for
+  unificar app + PWA no `main` como monorepo.
+- Branches preservadas: `main`, `mirror/gitlab-1.0.46`, `feat/android-native-saas`.
+
+> Os workflows `[manual]` fazem checkout do código do app por `ref`. Para usar
+> `app/main` como fonte, basta informar `app/main` no input `ref` do
+> `android-beta-build.yml` (hoje o default é `mirror/gitlab-1.0.46`; ambos
+> apontam para `4e317f5`).
+
+---
+
 ## ✅ STATUS: GitHub Actions validado operacionalmente (2026-06-01)
 
 > **GitHub está PRONTO tecnicamente, mas NÃO é o principal ainda** — em
