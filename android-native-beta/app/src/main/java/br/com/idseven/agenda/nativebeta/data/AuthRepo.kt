@@ -1,6 +1,8 @@
 package br.com.idseven.agenda.nativebeta.data
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.functions.FirebaseFunctionsException
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 
@@ -21,6 +23,7 @@ object AuthRepo {
     }
 
     private val db get() = FirebaseFirestore.getInstance()
+    private val fn get() = FirebaseFunctions.getInstance("us-central1")
     private fun digits(s: String) = s.replace(Regex("\\D"), "")
 
     suspend fun login(idOrPhone: String, password: String): Result = suspendCancellableCoroutine { cont ->
@@ -75,35 +78,63 @@ object AuthRepo {
                 .addOnFailureListener { ex -> cont.resume(Result.Err("Erro ao enviar cadastro: ${ex.message ?: "tente novamente"}")) }
         }
 
-    // Cria solicitação de redefinição (admin trata fora do app). NÃO revela existência:
-    // sempre retorna sucesso para o caller (caller exibe mensagem genérica).
-    // Aditivo: coleção passwordResetRequests; não toca users/* nem auth.
-    suspend fun requestPasswordReset(idOrPhone: String): Result = suspendCancellableCoroutine { cont ->
-        val raw = idOrPhone.trim()
-        if (raw.isEmpty()) {
-            cont.resume(Result.Err("Informe seu e-mail ou WhatsApp.")); return@suspendCancellableCoroutine
+    // Redefinicao AUTONOMA por codigo de e-mail (1.0.39+). Chama Cloud Function
+    // `requestPasswordReset`: backend envia codigo de 6 digitos via Resend, salva
+    // hash em passwordResetCodes (TTL 15min, 5 tentativas). Cliente NUNCA escreve
+    // direto; sempre resposta generica (anti-enumeracao).
+    suspend fun requestPasswordReset(email: String): Result = suspendCancellableCoroutine { cont ->
+        val em = email.trim().lowercase()
+        if (em.isEmpty() || !em.contains("@") || !em.contains(".")) {
+            cont.resume(Result.Err("Informe um e-mail válido.")); return@suspendCancellableCoroutine
         }
-        val id = raw.lowercase()
-        val isEmail = id.contains("@")
-        val data = hashMapOf<String, Any?>(
-            // Guarda o identificador informado SEM checar existência (anti-enumeração).
-            "identifier" to id,
-            "kind" to (if (isEmail) "email" else "phone"),
-            "phoneDigits" to (if (isEmail) "" else digits(id)),
-            "createdAt" to System.currentTimeMillis(),
-            "status" to "pending",
-            "source" to "nativebeta",
-            "handledBy" to null,
-            "handledAt" to null,
-        )
-        db.collection("passwordResetRequests").add(data)
+        fn.getHttpsCallable("requestPasswordReset")
+            .call(hashMapOf("email" to em))
             .addOnSuccessListener { cont.resume(Result.Ok("", null)) }
             .addOnFailureListener {
-                // NUNCA expor PERMISSION_DENIED / detalhes tecnicos ao usuario.
-                // Mensagem amigavel unica para qualquer falha (rede, regras, etc).
+                // Sempre amigavel; nao expor detalhes tecnicos.
                 cont.resume(Result.Err("Não foi possível enviar sua solicitação agora. Tente novamente em instantes."))
             }
     }
+
+    // Conclui a redefinicao: envia codigo + nova senha; backend valida e atualiza
+    // pass/salt (mesmo padrao do app). Em sucesso, o usuario pode logar com a
+    // senha nova. Mensagens vem do servidor (codigo errado / expirado / etc.).
+    suspend fun confirmPasswordReset(email: String, code: String, newPassword: String, confirmPassword: String): Result =
+        suspendCancellableCoroutine { cont ->
+            val em = email.trim().lowercase()
+            val cd = code.trim()
+            if (em.isEmpty() || !em.contains("@")) {
+                cont.resume(Result.Err("Informe um e-mail válido.")); return@suspendCancellableCoroutine
+            }
+            if (!cd.matches(Regex("^\\d{6}$"))) {
+                cont.resume(Result.Err("O código deve ter 6 dígitos.")); return@suspendCancellableCoroutine
+            }
+            if (newPassword.length < 6) {
+                cont.resume(Result.Err("A nova senha precisa ter pelo menos 6 caracteres.")); return@suspendCancellableCoroutine
+            }
+            if (newPassword != confirmPassword) {
+                cont.resume(Result.Err("As senhas não coincidem.")); return@suspendCancellableCoroutine
+            }
+            fn.getHttpsCallable("confirmPasswordReset")
+                .call(hashMapOf("email" to em, "code" to cd, "newPassword" to newPassword))
+                .addOnSuccessListener { cont.resume(Result.Ok("", null)) }
+                .addOnFailureListener { ex ->
+                    val msg = if (ex is FirebaseFunctionsException) {
+                        // Servidor manda mensagem amigavel via HttpsError; usar.
+                        when (ex.code) {
+                            FirebaseFunctionsException.Code.INVALID_ARGUMENT,
+                            FirebaseFunctionsException.Code.NOT_FOUND,
+                            FirebaseFunctionsException.Code.FAILED_PRECONDITION,
+                            FirebaseFunctionsException.Code.DEADLINE_EXCEEDED,
+                            FirebaseFunctionsException.Code.RESOURCE_EXHAUSTED,
+                            FirebaseFunctionsException.Code.PERMISSION_DENIED ->
+                                ex.message ?: "Não foi possível redefinir a senha."
+                            else -> "Não foi possível redefinir a senha agora. Tente novamente em instantes."
+                        }
+                    } else "Não foi possível redefinir a senha agora. Tente novamente em instantes."
+                    cont.resume(Result.Err(msg))
+                }
+        }
 
     // Troca de senha após login com senha temporária. Re-autentica com a senha antiga
     // (defesa em profundidade), atualiza hash e zera mustChangePassword. Não cria sessão.

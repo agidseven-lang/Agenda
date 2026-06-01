@@ -5,7 +5,56 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
-## 1.0.39-beta-password-reset-final — build consolidada do reset (em desenvolvimento)
+## 1.0.39-beta-password-reset-self-service — redefinicao AUTONOMA por codigo de e-mail
+
+**Correcao de escopo.** O fluxo anterior ("reset por admin") nao atendia ao
+requisito: o usuario deve resetar a propria senha sozinho. Esta versao
+implementa redefinicao autonoma por codigo via Cloud Functions, sem migrar
+para Firebase Auth e sem alterar o hash existente.
+
+**Backend (Cloud Functions v2, Node 20 — admin SDK ignora rules):**
+- `requestPasswordReset(email)`: valida, busca usuario por e-mail, gera codigo
+  numerico de 6 digitos cripto-seguro, salva APENAS hash sha256 em
+  `passwordResetCodes` (TTL 15min, status=pending, attempts=0), envia e-mail
+  via **Resend**. Resposta SEMPRE generica (anti-enumeracao). Rate-limit 60s
+  por e-mail. Logs sem codigo/senha.
+- `confirmPasswordReset(email, code, newPassword)`: valida formato, busca
+  codigo mais recente, verifica usedAt/expiresAt/attempts/hash. Se invalido,
+  incrementa attempts e retorna HttpsError amigavel. Se valido: gera novo salt
+  e `pass="s2:"+sha256(salt|pw)` (mesmo padrao do app), atualiza users/{uid},
+  zera mustChangePassword, marca codigo como `used` com usedAt.
+
+**Variaveis necessarias no projeto Functions** (sem segredo no repo):
+- `RESEND_API_KEY` — SECRET (Firebase Secret Manager).
+- `RESET_EMAIL_FROM` — env (ex.: `no-reply@dominio.com.br`).
+- `RESET_EMAIL_FROM_NAME` — env (default: `ID Seven Agenda`).
+- `RESET_EMAIL_PROVIDER` — env (default: `resend`).
+Sem essas, a Function falha controlada: log `password-reset:config-missing`
++ resposta generica ao cliente — NUNCA inventa envio falso.
+
+**App Android:**
+- Nova dep: `com.google.firebase:firebase-functions` (via BOM, sem versao).
+- `AuthRepo.requestPasswordReset(email)` agora chama Cloud Function
+  (nao escreve mais direto em Firestore); `confirmPasswordReset(email, code,
+  newPw, confirmPw)` novo.
+- `LoginViewModel` adiciona estado `forgot` (Step1Email -> Step2Code -> Done).
+- `LoginScreen`: "Esqueci minha senha" abre Step1 (e-mail -> Enviar codigo);
+  Step2 (codigo de 6 digitos + nova senha + confirmar -> Criar nova senha);
+  Done -> banner "Senha redefinida com sucesso. Entre com a nova senha." +
+  volta para Login. Botao "Reenviar codigo" no Step2.
+- Fluxo legado de admin (`pendingChange` apos login com `mustChangePassword`)
+  preservado para nao quebrar contas que admin redefiniu antes da 1.0.39.
+
+**Firestore Rules (auto-deploy via patch-firestore-password-reset-rules.mjs):**
+- Bloco `passwordResetRequests` permanece (legado, instalacoes < 1.0.39).
+- Novo bloco `passwordResetCodes`: `read, list, write: if false` —
+  defesa em profundidade (so Admin SDK escreve; nada de cliente).
+
+Versao: 1.0.39-beta-password-reset-self-service / versionCode 44.
+
+---
+
+## 1.0.39-beta-password-reset-final — build consolidada do reset (substituida pela versao acima)
 
 **Apenas bump de versao.** As Firestore Rules do reset foram publicadas
 pelo pipeline autonomo (commit `ffd61ee`); o backend agora aceita create

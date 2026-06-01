@@ -15,9 +15,12 @@
    NENHUM segredo no código. Requer plano Blaze para deploy.
    ============================================================================ */
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const { defineSecret, defineString } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const crypto = require("node:crypto");
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1", maxInstances: 10 });
@@ -251,3 +254,197 @@ exports.onChatMessageCreated = onDocumentCreated("chats/{chatId}/messages/{messa
     logger.error("[TRIGGER] onChatMessageCreated falhou:", e && e.message);
   }
 });
+
+/* ============================================================================
+   Redefinicao AUTONOMA de senha por codigo de e-mail (1.0.39+)
+   ----------------------------------------------------------------------------
+   Por que existe: o app usa auth propria via Firestore (sem Firebase Auth),
+   entao nao podemos usar sendPasswordResetEmail. Aqui o backend gera codigo,
+   envia por e-mail (Resend), valida e troca a senha (mesmo padrao
+   "s2:"+sha256Hex(salt|pw)) — tudo sem depender de admin.
+
+   Variaveis necessarias no projeto Functions:
+     - RESEND_API_KEY      (SECRET — Firebase Secret Manager)
+     - RESET_EMAIL_FROM    (env, ex.: "no-reply@dominio.com.br")
+     - RESET_EMAIL_FROM_NAME (env, opcional, default: "ID Seven Agenda")
+     - RESET_EMAIL_PROVIDER (env, opcional, default: "resend")
+   Sem RESEND_API_KEY ou RESET_EMAIL_FROM, a funcao registra erro no log
+   ("config-missing") e devolve resposta GENERICA ao cliente — sem inventar
+   envio falso.
+
+   Seguranca:
+     - Codigo numerico de 6 digitos, salvo APENAS como hash sha256.
+     - TTL 15 minutos. Limite 5 tentativas por codigo. Rate-limit 60s/e-mail.
+     - Resposta sempre generica para nao revelar existencia do e-mail.
+     - Logs nao contem o codigo nem a senha em texto puro.
+     - Codigos vivem em passwordResetCodes (apenas Admin SDK escreve).
+   ============================================================================ */
+const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
+const RESET_EMAIL_FROM = defineString("RESET_EMAIL_FROM", { default: "" });
+const RESET_EMAIL_FROM_NAME = defineString("RESET_EMAIL_FROM_NAME", { default: "ID Seven Agenda" });
+const RESET_EMAIL_PROVIDER = defineString("RESET_EMAIL_PROVIDER", { default: "resend" });
+
+const CODE_TTL_MS = 15 * 60 * 1000;
+const CODE_MAX_ATTEMPTS = 5;
+const REQUEST_RATE_LIMIT_MS = 60 * 1000;
+
+function sha256Hex(s) { return crypto.createHash("sha256").update(s, "utf8").digest("hex"); }
+function hashPw(pw, salt) { return "s2:" + sha256Hex(`${salt}|${pw}`); }
+function randSalt() { return crypto.randomBytes(16).toString("hex"); }
+function genCode() {
+  // 6 digitos com fonte cripto-segura uniformemente distribuida.
+  // 4 bytes => 32 bits; range 0..0xFFFFFFFF. Rejeicao para evitar bias modular.
+  const MAX = 0x100000000;
+  const LIM = MAX - (MAX % 1000000);
+  let n;
+  do { n = crypto.randomBytes(4).readUInt32BE(); } while (n >= LIM);
+  return String(n % 1000000).padStart(6, "0");
+}
+function normEmail(e) { return String(e || "").trim().toLowerCase(); }
+function isValidEmail(e) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+async function sendResetCodeEmail({ to, code, fromAddress, fromName, apiKey }) {
+  if (RESET_EMAIL_PROVIDER.value() !== "resend") {
+    throw new Error(`provider "${RESET_EMAIL_PROVIDER.value()}" nao suportado`);
+  }
+  const subject = "Seu codigo de redefinicao de senha";
+  const text =
+    "Use o codigo abaixo no app ID Seven Agenda para redefinir sua senha.\n\n" +
+    `Codigo: ${code}\n\n` +
+    "Validade: 15 minutos.\n" +
+    "Se voce nao solicitou, ignore este e-mail — sua senha permanece a mesma.";
+  const html =
+    '<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#222">' +
+    '<h2 style="margin:0 0 12px">ID Seven Agenda</h2>' +
+    "<p>Use o codigo abaixo no app para redefinir sua senha.</p>" +
+    '<div style="font-size:32px;font-weight:700;letter-spacing:6px;padding:14px 18px;background:#f3f4f6;border-radius:8px;text-align:center">' +
+    code + "</div>" +
+    '<p style="color:#555;font-size:13px;margin-top:14px">Validade: <b>15 minutos</b>. ' +
+    "Se voce nao solicitou, <b>ignore este e-mail</b> — sua senha permanece a mesma.</p></div>";
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: fromName ? `${fromName} <${fromAddress}>` : fromAddress,
+      to: [to], subject, text, html,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`resend ${res.status}: ${detail.slice(0, 200)}`);
+  }
+}
+
+const GENERIC_REQUEST_OK = { ok: true, message: "Se o e-mail estiver cadastrado, enviaremos um codigo de redefinicao." };
+
+exports.requestPasswordReset = onCall(
+  { secrets: [RESEND_API_KEY], region: "us-central1", maxInstances: 5 },
+  async (req) => {
+    const email = normEmail(req && req.data && req.data.email);
+    if (!isValidEmail(email)) throw new HttpsError("invalid-argument", "E-mail invalido.");
+
+    const apiKey = RESEND_API_KEY.value();
+    const fromAddress = RESET_EMAIL_FROM.value();
+    if (!apiKey || !fromAddress) {
+      logger.error("password-reset:config-missing", {
+        hasApiKey: !!apiKey, hasFrom: !!fromAddress,
+      });
+      return GENERIC_REQUEST_OK; // nao revela ao usuario que esta sem config
+    }
+
+    const db = admin.firestore();
+    const usersSnap = await db.collection("users").where("email", "==", email).limit(1).get();
+    if (usersSnap.empty) {
+      logger.info("password-reset:not-found", { email });
+      return GENERIC_REQUEST_OK;
+    }
+    const userDoc = usersSnap.docs[0];
+    const status = userDoc.get("status");
+    if (status === "removido" || status === "excluido" || status === "pendente") {
+      logger.info("password-reset:user-not-eligible", { email, status });
+      return GENERIC_REQUEST_OK;
+    }
+
+    // Rate-limit por e-mail: 60s desde o ultimo codigo gerado.
+    const recent = await db.collection("passwordResetCodes")
+      .where("email", "==", email).orderBy("createdAt", "desc").limit(1).get();
+    if (!recent.empty) {
+      const last = recent.docs[0].get("createdAt") || 0;
+      if (Date.now() - last < REQUEST_RATE_LIMIT_MS) {
+        logger.warn("password-reset:rate-limited", { email });
+        return GENERIC_REQUEST_OK;
+      }
+    }
+
+    const code = genCode();
+    const now = Date.now();
+    await db.collection("passwordResetCodes").add({
+      email, userId: userDoc.id, codeHash: sha256Hex(code),
+      createdAt: now, expiresAt: now + CODE_TTL_MS,
+      usedAt: null, attempts: 0, status: "pending", source: "nativebeta",
+    });
+
+    try {
+      await sendResetCodeEmail({
+        to: email, code, fromAddress,
+        fromName: RESET_EMAIL_FROM_NAME.value(), apiKey,
+      });
+      logger.info("password-reset:email-sent", { email });
+    } catch (e) {
+      logger.error("password-reset:email-failed", { error: String(e && e.message).slice(0, 200) });
+      // resposta ao usuario continua generica
+    }
+    return GENERIC_REQUEST_OK;
+  }
+);
+
+exports.confirmPasswordReset = onCall(
+  { region: "us-central1", maxInstances: 5 },
+  async (req) => {
+    const d = (req && req.data) || {};
+    const email = normEmail(d.email);
+    const code = String(d.code || "").trim();
+    const newPassword = String(d.newPassword || "");
+    if (!isValidEmail(email)) throw new HttpsError("invalid-argument", "E-mail invalido.");
+    if (!/^\d{6}$/.test(code)) throw new HttpsError("invalid-argument", "Codigo invalido. Verifique o e-mail.");
+    if (newPassword.length < 6) throw new HttpsError("invalid-argument", "A nova senha precisa ter pelo menos 6 caracteres.");
+
+    const db = admin.firestore();
+    const codes = await db.collection("passwordResetCodes")
+      .where("email", "==", email).orderBy("createdAt", "desc").limit(1).get();
+    if (codes.empty) throw new HttpsError("not-found", "Codigo nao encontrado. Solicite um novo.");
+    const codeDoc = codes.docs[0];
+    const data = codeDoc.data() || {};
+
+    if (data.usedAt) throw new HttpsError("failed-precondition", "Codigo ja utilizado. Solicite um novo.");
+    if ((data.attempts || 0) >= CODE_MAX_ATTEMPTS) {
+      throw new HttpsError("resource-exhausted", "Limite de tentativas atingido. Solicite um novo codigo.");
+    }
+    if (Date.now() > (data.expiresAt || 0)) {
+      throw new HttpsError("deadline-exceeded", "Codigo expirado. Solicite um novo.");
+    }
+    if (data.codeHash !== sha256Hex(code)) {
+      await codeDoc.ref.update({ attempts: admin.firestore.FieldValue.increment(1) });
+      throw new HttpsError("permission-denied", "Codigo incorreto.");
+    }
+
+    const userRef = db.collection("users").doc(data.userId);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) throw new HttpsError("not-found", "Conta nao encontrada.");
+    const status = userSnap.get("status");
+    if (status === "removido" || status === "excluido") {
+      throw new HttpsError("failed-precondition", "Conta inativa.");
+    }
+
+    const salt = randSalt();
+    const pass = hashPw(newPassword, salt);
+    await userRef.update({
+      pass, salt,
+      mustChangePassword: false,
+      passwordChangedAt: Date.now(),
+    });
+    await codeDoc.ref.update({ usedAt: Date.now(), status: "used" });
+    logger.info("password-reset:confirmed", { email });
+    return { ok: true };
+  }
+);

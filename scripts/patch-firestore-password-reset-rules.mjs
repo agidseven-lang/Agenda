@@ -36,19 +36,23 @@ if (/^[ \t]*```/m.test(input)) abort('input contem cerca markdown (```), provave
 const inputBackticks = (input.match(/`/g) || []).length;
 
 // ---------- Idempotencia ----------
-if (/match\s+\/passwordResetRequests\b/.test(input)) {
-  console.log('Bloco passwordResetRequests JA presente no input — patch idempotente (no-op).');
+// Idempotente para AMBOS os blocos (passwordResetRequests + passwordResetCodes).
+// So sai antecipadamente se TUDO ja estiver presente.
+const hasReq = /match\s+\/passwordResetRequests\b/.test(input);
+const hasCodes = /match\s+\/passwordResetCodes\b/.test(input);
+if (hasReq && hasCodes) {
+  console.log('Ambos os blocos (passwordResetRequests + passwordResetCodes) JA presentes — patch idempotente (no-op).');
   fs.writeFileSync(outPath, input, 'utf8');
   process.exit(0);
 }
 
-// ---------- Bloco a inserir (sem markdown, sem crases) ----------
-const BLOCK_LINES = [
+// ---------- Blocos a inserir (sem markdown, sem crases) ----------
+// Apenas blocos que ainda nao existem no input sao incluidos.
+const REQ_BLOCK = [
   '',
-  '    // -------- INICIO injetado por scripts/patch-firestore-password-reset-rules.mjs --------',
-  '    // passwordResetRequests — reset por administrador (app nativo 1.0.37+).',
-  '    // App nao usa Firebase Auth (sem request.auth confiavel), entao a',
-  '    // regra valida o SCHEMA do documento criado.',
+  '    // -------- INICIO injetado: passwordResetRequests (legado 1.0.37-1.0.38) --------',
+  '    // Reset por admin (legado). Mantido para nao quebrar instalacoes antigas.',
+  '    // App 1.0.39+ usa Cloud Functions e nao escreve mais aqui.',
   '    match /passwordResetRequests/{reqId} {',
   '      allow get, list: if false;',
   '      allow update, delete: if false;',
@@ -83,8 +87,22 @@ const BLOCK_LINES = [
   '        request.resource.data.handledBy == null &&',
   '        request.resource.data.handledAt == null;',
   '    }',
-  '    // -------- FIM injetado --------',
+  '    // -------- FIM injetado: passwordResetRequests --------',
 ];
+const CODES_BLOCK = [
+  '',
+  '    // -------- INICIO injetado: passwordResetCodes (self-service 1.0.39+) --------',
+  '    // Codigos de redefinicao gerenciados APENAS pelas Cloud Functions',
+  '    // (requestPasswordReset / confirmPasswordReset) via Admin SDK, que',
+  '    // bypassa estas rules. Cliente NAO tem acesso direto.',
+  '    match /passwordResetCodes/{codeId} {',
+  '      allow read, list, write: if false;',
+  '    }',
+  '    // -------- FIM injetado: passwordResetCodes --------',
+];
+const BLOCK_LINES = [];
+if (!hasReq) BLOCK_LINES.push(...REQ_BLOCK);
+if (!hasCodes) BLOCK_LINES.push(...CODES_BLOCK);
 
 // ---------- Localizar ponto de insercao por LINHAS ----------
 const lines = input.split('\n');
@@ -126,8 +144,10 @@ console.log(`Insercao: ${mode} (linha ${insertIdx + 1}).`);
 if (!/rules_version\s*=\s*'2'/.test(patched)) abort('output perdeu rules_version');
 if (!patched.includes('service cloud.firestore')) abort('output perdeu service cloud.firestore');
 if (!patched.includes('match /databases/{database}/documents')) abort('output perdeu match /databases');
-const occ = (patched.match(/match\s+\/passwordResetRequests\b/g) || []).length;
-if (occ !== 1) abort(`passwordResetRequests aparece ${occ}x (esperado 1)`);
+const occReq = (patched.match(/match\s+\/passwordResetRequests\b/g) || []).length;
+if (occReq !== 1) abort(`passwordResetRequests aparece ${occReq}x (esperado 1)`);
+const occCodes = (patched.match(/match\s+\/passwordResetCodes\b/g) || []).length;
+if (occCodes !== 1) abort(`passwordResetCodes aparece ${occCodes}x (esperado 1)`);
 // Cerca markdown ``` permanece BLOQUEADA em qualquer hipotese.
 if (/^[ \t]*```/m.test(patched)) abort('output contem cerca markdown (```)');
 // Crase SOLTA: o input pode ter crases legitimas em comentarios de producao
