@@ -1,0 +1,96 @@
+# Deploy das Cloud Functions (port do GitLab deploy_firebase_functions).
+# PREPARADO — execucao SOMENTE manual. Exige confirm_deploy=DEPLOY; qualquer
+# outro valor ABORTA antes de qualquer deploy. NAO roda em push/PR/schedule.
+name: "[manual] Firebase Functions Deploy"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Digite DEPLOY para confirmar (qualquer outro valor aborta)"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: "agenda-id-seven"
+      GCP_PROJECT_NUMBER: "391529908613"
+    steps:
+      - name: Guard confirm_deploy
+        run: |
+          if [ "${{ github.event.inputs.confirm_deploy }}" != "DEPLOY" ]; then
+            echo "::error:: confirm_deploy != DEPLOY — abortando antes de qualquer deploy."
+            exit 1
+          fi
+          echo "Confirmacao OK — prosseguindo."
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: mirror/gitlab-1.0.46
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Auth gcloud (SA via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: GOOGLE_APPLICATION_CREDENTIALS_JSON ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+
+      - name: Preflight Secret Manager (IAM + secret placeholder)
+        run: |
+          set -e
+          gcloud services enable secretmanager.googleapis.com cloudresourcemanager.googleapis.com cloudscheduler.googleapis.com --project "$GCP_PROJECT" >/dev/null 2>&1 || true
+          SA_EMAIL=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" | head -1)
+          echo "SA ativa: $SA_EMAIL"
+          if gcloud secrets list --project="$GCP_PROJECT" --limit=1 >/dev/null 2>&1; then
+            echo "Secret Manager acessivel."
+          else
+            echo "Tentando auto-conceder roles/secretmanager.admin..."
+            gcloud projects add-iam-policy-binding "$GCP_PROJECT" --member="serviceAccount:$SA_EMAIL" --role="roles/secretmanager.admin" --condition=None --quiet >/dev/null 2>/tmp/iam.err || {
+              echo "::error:: SA sem permissao p/ Secret Manager. Conceda manualmente roles/secretmanager.admin a $SA_EMAIL."; sed 's/^/    /' /tmp/iam.err || true; exit 1; }
+            sleep 30
+          fi
+          if ! gcloud secrets describe RESEND_API_KEY --project="$GCP_PROJECT" >/dev/null 2>&1; then
+            gcloud secrets create RESEND_API_KEY --replication-policy=automatic --project="$GCP_PROJECT" >/dev/null || true
+            printf 'PLACEHOLDER_NOT_CONFIGURED_RUN_setup_password_reset_provider' | gcloud secrets versions add RESEND_API_KEY --data-file=- --project="$GCP_PROJECT" >/dev/null 2>&1 || true
+          fi
+          for RSA in "${GCP_PROJECT_NUMBER}-compute@developer.gserviceaccount.com" "${GCP_PROJECT}@appspot.gserviceaccount.com"; do
+            gcloud secrets add-iam-policy-binding RESEND_API_KEY --member="serviceAccount:$RSA" --role="roles/secretmanager.secretAccessor" --project="$GCP_PROJECT" --quiet >/dev/null 2>&1 || true
+          done
+
+      - name: Preparar functions/.env (sem imprimir segredo)
+        env:
+          RESET_EMAIL_FROM: ${{ secrets.RESET_EMAIL_FROM }}
+          RESET_EMAIL_FROM_NAME: ${{ secrets.RESET_EMAIL_FROM_NAME }}
+          RESET_EMAIL_PROVIDER: ${{ secrets.RESET_EMAIL_PROVIDER }}
+        run: |
+          FROM="${RESET_EMAIL_FROM:-no-reply@agendaidseven.com.br}"
+          {
+            printf 'RESET_EMAIL_FROM=%s\n' "$FROM"
+            printf 'RESET_EMAIL_FROM_NAME=%s\n' "${RESET_EMAIL_FROM_NAME:-ID Seven Agenda}"
+            printf 'RESET_EMAIL_PROVIDER=%s\n' "${RESET_EMAIL_PROVIDER:-resend}"
+          } > "functions/.env.${GCP_PROJECT}"
+          echo "functions/.env.${GCP_PROJECT} gravado (FROM mascarado): $(sed -E 's/(RESET_EMAIL_FROM=.{2})[^@]*/\1***/' functions/.env.${GCP_PROJECT} | tr '\n' ' ')"
+
+      - name: Deploy functions (firebase-tools, ADC)
+        run: |
+          npm install -g firebase-tools >/dev/null 2>&1
+          ( cd functions && if [ -f package-lock.json ]; then npm ci; else npm install; fi )
+          firebase deploy --only functions --project "$GCP_PROJECT" --non-interactive --force
+
+      - name: Limpeza (.env e SA)
+        if: always()
+        run: rm -f functions/.env.* "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
