@@ -32,12 +32,15 @@ import br.com.idseven.agenda.nativebeta.designsystem.components.MessageBanner
 import br.com.idseven.agenda.nativebeta.designsystem.components.PasswordField
 import br.com.idseven.agenda.nativebeta.designsystem.components.PrimaryButton
 
+private enum class AuthMode { Login, Register, Forgot }
+
 @Composable
 fun LoginScreen(vm: LoginViewModel = viewModel()) {
     val ui by vm.ui.collectAsState()
+    val pendingChange by vm.pendingChange.collectAsState()
     val loading = ui is AuthUi.Loading
 
-    var register by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf(AuthMode.Login) }
     var idOrPhone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showPw by remember { mutableStateOf(false) }
@@ -47,6 +50,23 @@ fun LoginScreen(vm: LoginViewModel = viewModel()) {
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var regPw by remember { mutableStateOf("") }
+    // esqueci minha senha
+    var forgotIdOrPhone by remember { mutableStateOf("") }
+    // criar nova senha (apos login com senha temporaria)
+    var newPw by remember { mutableStateOf("") }
+    var newPw2 by remember { mutableStateOf("") }
+    var showNewPw by remember { mutableStateOf(false) }
+
+    val titleText: String
+    val subtitleText: String
+    if (pendingChange != null) {
+        titleText = "Criar nova senha"
+        subtitleText = "Defina uma nova senha para continuar — você entrou com uma senha temporária."
+    } else when (mode) {
+        AuthMode.Login -> { titleText = "Entrar"; subtitleText = "Acesse sua agenda e tarefas da equipe" }
+        AuthMode.Register -> { titleText = "Criar conta"; subtitleText = "Cadastre-se para a equipe da ID Seven" }
+        AuthMode.Forgot -> { titleText = "Redefinir senha"; subtitleText = "Informe seu e-mail ou WhatsApp cadastrado para solicitar a redefinição." }
+    }
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -56,14 +76,11 @@ fun LoginScreen(vm: LoginViewModel = viewModel()) {
         ) {
             BrandHeader()
             Spacer(Modifier.height(28.dp))
-            Text(
-                if (register) "Criar conta" else "Entrar",
-                color = MaterialTheme.colorScheme.onBackground, fontSize = 22.sp, fontWeight = FontWeight.Bold,
-            )
+            Text(titleText, color = MaterialTheme.colorScheme.onBackground, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
-                if (register) "Cadastre-se para a equipe da ID Seven" else "Acesse sua agenda e tarefas da equipe",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp,
+                subtitleText,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(20.dp))
 
@@ -73,37 +90,73 @@ fun LoginScreen(vm: LoginViewModel = viewModel()) {
                 else -> {}
             }
 
-            if (!register) {
-                AppTextField(idOrPhone, { idOrPhone = it }, "E-mail ou WhatsApp", keyboardType = KeyboardType.Email)
+            // 1) Criar nova senha (sobrepõe os outros fluxos quando pendingChange != null).
+            if (pendingChange != null) {
+                PasswordField(newPw, { newPw = it }, showNewPw, { showNewPw = !showNewPw }, label = "Nova senha")
                 Spacer(Modifier.height(12.dp))
-                PasswordField(password, { password = it }, showPw, { showPw = !showPw })
+                PasswordField(newPw2, { newPw2 = it }, showNewPw, { showNewPw = !showNewPw }, label = "Confirmar nova senha")
                 Spacer(Modifier.height(22.dp))
-                PrimaryButton("Entrar", loading = loading) { vm.login(idOrPhone, password) }
-                Spacer(Modifier.height(6.dp))
-                TextButton(onClick = { register = true; vm.resetMessage() }) {
-                    Text("Não tem conta? Criar conta", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                PrimaryButton("Salvar nova senha", loading = loading) {
+                    vm.changePassword(newPw, newPw2)
                 }
-            } else {
-                AppTextField(name, { name = it }, "Nome completo")
-                Spacer(Modifier.height(12.dp))
-                AppTextField(role, { role = it }, "Função (ex.: Social Media)")
-                Spacer(Modifier.height(12.dp))
-                AppTextField(phone, { phone = it }, "WhatsApp", keyboardType = KeyboardType.Phone)
-                Spacer(Modifier.height(12.dp))
-                AppTextField(email, { email = it }, "E-mail", keyboardType = KeyboardType.Email)
-                Spacer(Modifier.height(12.dp))
-                PasswordField(regPw, { regPw = it }, showPw, { showPw = !showPw })
-                Spacer(Modifier.height(22.dp))
-                PrimaryButton("Criar conta", loading = loading) { vm.register(name, role, phone, email, regPw) }
                 Spacer(Modifier.height(6.dp))
-                TextButton(onClick = { register = false; vm.resetMessage() }) {
-                    Text("Já tenho conta? Entrar", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                TextButton(onClick = {
+                    vm.cancelChange()
+                    newPw = ""; newPw2 = ""; password = ""
+                }) {
+                    Text("Cancelar e voltar ao login", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                }
+            } else when (mode) {
+                AuthMode.Login -> {
+                    AppTextField(idOrPhone, { idOrPhone = it }, "E-mail ou WhatsApp", keyboardType = KeyboardType.Email)
+                    Spacer(Modifier.height(12.dp))
+                    PasswordField(password, { password = it }, showPw, { showPw = !showPw })
+                    Spacer(Modifier.height(22.dp))
+                    PrimaryButton("Entrar", loading = loading) { vm.login(idOrPhone, password) }
+                    Spacer(Modifier.height(2.dp))
+                    TextButton(onClick = {
+                        // Pré-preenche o campo de redefinição com o que o usuário digitou.
+                        forgotIdOrPhone = idOrPhone
+                        mode = AuthMode.Forgot
+                        vm.resetMessage()
+                    }) {
+                        Text("Esqueci minha senha", color = MaterialTheme.colorScheme.primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    TextButton(onClick = { mode = AuthMode.Register; vm.resetMessage() }) {
+                        Text("Não tem conta? Criar conta", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    }
+                }
+                AuthMode.Register -> {
+                    AppTextField(name, { name = it }, "Nome completo")
+                    Spacer(Modifier.height(12.dp))
+                    AppTextField(role, { role = it }, "Função (ex.: Social Media)")
+                    Spacer(Modifier.height(12.dp))
+                    AppTextField(phone, { phone = it }, "WhatsApp", keyboardType = KeyboardType.Phone)
+                    Spacer(Modifier.height(12.dp))
+                    AppTextField(email, { email = it }, "E-mail", keyboardType = KeyboardType.Email)
+                    Spacer(Modifier.height(12.dp))
+                    PasswordField(regPw, { regPw = it }, showPw, { showPw = !showPw })
+                    Spacer(Modifier.height(22.dp))
+                    PrimaryButton("Criar conta", loading = loading) { vm.register(name, role, phone, email, regPw) }
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = { mode = AuthMode.Login; vm.resetMessage() }) {
+                        Text("Já tenho conta? Entrar", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    }
+                }
+                AuthMode.Forgot -> {
+                    AppTextField(forgotIdOrPhone, { forgotIdOrPhone = it }, "E-mail ou WhatsApp", keyboardType = KeyboardType.Email)
+                    Spacer(Modifier.height(22.dp))
+                    PrimaryButton("Enviar instruções", loading = loading) { vm.requestReset(forgotIdOrPhone) }
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = { mode = AuthMode.Login; vm.resetMessage() }) {
+                        Text("Voltar ao login", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    }
                 }
             }
 
             Spacer(Modifier.height(28.dp))
             Text(
-                "build: 1.0.36-beta-chat-thread-polish",
+                "build: 1.0.37-beta-password-reset-admin",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
         }

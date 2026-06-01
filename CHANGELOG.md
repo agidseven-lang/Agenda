@@ -5,6 +5,38 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.37-beta-password-reset-admin — redefinição de senha por administrador (em desenvolvimento)
+
+**Esqueci minha senha sem e-mail (decisão de produto).** Reset solicitado no app,
+tratado por admin (que define senha temporária); o usuário entra e o app obriga
+trocar antes de criar sessão. **Auditoria:** o app usa auth própria via Firestore
+(sem Firebase Auth) e o projeto NÃO tem provedor de e-mail — então nada de
+`sendPasswordResetEmail`, nada de token+e-mail, nada de migrar para Firebase Auth.
+
+- **Tela de login:** link "Esqueci minha senha" abre o formulário de redefinição
+  (e-mail ou WhatsApp). Mensagem genérica de retorno; sem revelar existência.
+- **Solicitação:** `AuthRepo.requestPasswordReset` cria doc em **`passwordResetRequests`**
+  (aditivo) com `identifier`, `kind`, `phoneDigits`, `createdAt`, `status="pending"`,
+  `source="nativebeta"`, `handledBy=null`, `handledAt=null` — sem consultar `users/*`
+  (anti-enumeração) e sem expor schema no erro.
+- **Fluxo do admin (fora do app):** ver pendências em `passwordResetRequests`;
+  marcar usuário com `mustChangePassword=true` e nova senha temporária (`pass`/`salt`
+  no padrão do app: `s2:sha256(salt+"|"+temp)`); atualizar request para
+  `status="done"` com `handledBy`/`handledAt`.
+- **Próximo login do usuário:** ao logar com a temporária, o app detecta
+  `mustChangePassword=true` e **NÃO cria sessão**; mostra "Criar nova senha"
+  (mín. 6 chars, ≠ atual, confirmação igual). `AuthRepo.changePassword`
+  re-autentica com a temporária, grava novo `pass`/`salt`, zera `mustChangePassword`
+  e marca `passwordChangedAt`. Só então a sessão é criada.
+- **Segurança:** sem senha em texto puro; sem token de reset (fluxo não usa); sem
+  segredo no código; logs sem expor senha; nenhuma enumeração de usuário; nenhuma
+  alteração em Functions/PWA/Worker/Cloudflare/Rules.
+- Esta versão **não** envia e-mails.
+
+Status: aguardando build do APK + teste em aparelho real + um admin para a 1ª aprovação.
+
+---
+
 ## 1.0.36-beta-chat-thread-polish — refinamento visual da conversa (em desenvolvimento)
 
 **Fase 3E do chat (UI-only no `ChatThreadScreen`).** Sem mexer em lógica/Functions/notificações.

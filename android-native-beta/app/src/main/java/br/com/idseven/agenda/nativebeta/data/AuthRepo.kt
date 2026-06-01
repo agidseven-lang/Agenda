@@ -8,10 +8,15 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 //  - aceita E-MAIL OU WHATSAPP;
 //  - valida senha "s2:"+sha256(salt+"|"+senha) (com fallback legado);
 //  - cadastro cria users{} com status "pendente".
+// Reset de senha por ADMIN (sem e-mail): app cria solicitação em
+// passwordResetRequests; admin define senha temporária e marca mustChangePassword=true;
+// no próximo login o app obriga troca (changePassword) e zera a flag.
 object AuthRepo {
 
     sealed class Result {
-        data class Ok(val uid: String, val name: String?) : Result()
+        // mustChangePassword: usuário entrou com senha temporária; precisa trocar antes
+        // de receber sessão. O caller (VM) NÃO grava sessão até a troca concluir.
+        data class Ok(val uid: String, val name: String?, val mustChangePassword: Boolean = false) : Result()
         data class Err(val message: String) : Result()
     }
 
@@ -39,7 +44,8 @@ object AuthRepo {
                 if (!Crypto.verify(doc.getString("pass"), doc.getString("salt"), password)) {
                     cont.resume(Result.Err("E-mail/WhatsApp ou senha incorretos.")); return@addOnSuccessListener
                 }
-                cont.resume(Result.Ok(doc.id, doc.getString("name")))
+                val mustChange = doc.getBoolean("mustChangePassword") == true
+                cont.resume(Result.Ok(doc.id, doc.getString("name"), mustChange))
             }
             .addOnFailureListener { ex ->
                 cont.resume(Result.Err("Não foi possível entrar agora. Verifique a internet. (${ex.message})"))
@@ -67,5 +73,65 @@ object AuthRepo {
             db.collection("users").add(data)
                 .addOnSuccessListener { ref -> cont.resume(Result.Ok(ref.id, n)) }
                 .addOnFailureListener { ex -> cont.resume(Result.Err("Erro ao enviar cadastro: ${ex.message ?: "tente novamente"}")) }
+        }
+
+    // Cria solicitação de redefinição (admin trata fora do app). NÃO revela existência:
+    // sempre retorna sucesso para o caller (caller exibe mensagem genérica).
+    // Aditivo: coleção passwordResetRequests; não toca users/* nem auth.
+    suspend fun requestPasswordReset(idOrPhone: String): Result = suspendCancellableCoroutine { cont ->
+        val raw = idOrPhone.trim()
+        if (raw.isEmpty()) {
+            cont.resume(Result.Err("Informe seu e-mail ou WhatsApp.")); return@suspendCancellableCoroutine
+        }
+        val id = raw.lowercase()
+        val isEmail = id.contains("@")
+        val data = hashMapOf<String, Any?>(
+            // Guarda o identificador informado SEM checar existência (anti-enumeração).
+            "identifier" to id,
+            "kind" to (if (isEmail) "email" else "phone"),
+            "phoneDigits" to (if (isEmail) "" else digits(id)),
+            "createdAt" to System.currentTimeMillis(),
+            "status" to "pending",
+            "source" to "nativebeta",
+            "handledBy" to null,
+            "handledAt" to null,
+        )
+        db.collection("passwordResetRequests").add(data)
+            .addOnSuccessListener { cont.resume(Result.Ok("", null)) }
+            .addOnFailureListener { ex ->
+                // Falha de rede é o único caso em que damos erro técnico; sem expor schema.
+                cont.resume(Result.Err("Não foi possível enviar agora. Verifique a internet. (${ex.message})"))
+            }
+    }
+
+    // Troca de senha após login com senha temporária. Re-autentica com a senha antiga
+    // (defesa em profundidade), atualiza hash e zera mustChangePassword. Não cria sessão.
+    suspend fun changePassword(uid: String, currentPassword: String, newPassword: String): Result =
+        suspendCancellableCoroutine { cont ->
+            if (newPassword.length < 6) {
+                cont.resume(Result.Err("A nova senha precisa ter pelo menos 6 caracteres.")); return@suspendCancellableCoroutine
+            }
+            if (newPassword == currentPassword) {
+                cont.resume(Result.Err("A nova senha deve ser diferente da atual.")); return@suspendCancellableCoroutine
+            }
+            val ref = db.collection("users").document(uid)
+            ref.get().addOnSuccessListener { d ->
+                if (d == null || !d.exists()) { cont.resume(Result.Err("Conta não encontrada.")); return@addOnSuccessListener }
+                if (!Crypto.verify(d.getString("pass"), d.getString("salt"), currentPassword)) {
+                    cont.resume(Result.Err("Senha atual incorreta.")); return@addOnSuccessListener
+                }
+                val salt = Crypto.randSalt()
+                ref.update(
+                    mapOf(
+                        "pass" to Crypto.hashPw(newPassword, salt),
+                        "salt" to salt,
+                        "mustChangePassword" to false,
+                        "passwordChangedAt" to System.currentTimeMillis(),
+                    )
+                ).addOnSuccessListener { cont.resume(Result.Ok(uid, d.getString("name"))) }
+                    .addOnFailureListener { ex -> cont.resume(Result.Err("Não foi possível atualizar a senha. (${ex.message})")) }
+            }.addOnFailureListener { ex ->
+                cont.resume(Result.Err("Não foi possível verificar a conta. (${ex.message})"))
+            }
         }
 }
