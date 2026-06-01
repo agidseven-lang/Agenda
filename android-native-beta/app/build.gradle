@@ -11,9 +11,19 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 47
-        versionName "1.0.42-beta-password-reset-http-final"
+        versionCode 48
+        versionName "1.0.43-beta-password-reset-url-real-fix"
         vectorDrawables { useSupportLibrary true }
+
+        // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
+        // `gcloud functions describe ... --format=value(serviceConfig.uri)` e
+        // injetadas no build por -PPASSWORD_RESET_REQUEST_URL / -P...CONFIRM_URL.
+        // Em build local sem essas properties, ficam vazias e o AuthRepo retorna
+        // mensagem amigavel + log tecnico em vez de chamar URL presumida.
+        def _resetReq = project.findProperty('PASSWORD_RESET_REQUEST_URL') ?: ''
+        def _resetCnf = project.findProperty('PASSWORD_RESET_CONFIRM_URL') ?: ''
+        buildConfigField "String", "PASSWORD_RESET_REQUEST_URL", "\"${_resetReq}\""
+        buildConfigField "String", "PASSWORD_RESET_CONFIRM_URL", "\"${_resetCnf}\""
     }
 
     signingConfigs {
@@ -44,6 +54,7 @@ android {
     }
     buildFeatures {
         compose true
+        buildConfig true
     }
 }
 

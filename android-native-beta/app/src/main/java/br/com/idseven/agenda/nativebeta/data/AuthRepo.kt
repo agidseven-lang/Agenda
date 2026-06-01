@@ -1,8 +1,14 @@
 package br.com.idseven.agenda.nativebeta.data
 
+import android.util.Log
+import br.com.idseven.agenda.nativebeta.BuildConfig
 import com.google.firebase.firestore.FirebaseFirestore
+import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
+import javax.net.ssl.SSLException
 import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -28,30 +34,46 @@ object AuthRepo {
     private val db get() = FirebaseFirestore.getInstance()
     private fun digits(s: String) = s.replace(Regex("\\D"), "")
 
-    // Endpoints HTTPS onRequest (1.0.42+). NAO usa Callable (causava queda no
-    // addOnFailureListener por transporte/invoker Gen2 sem Firebase Auth).
-    private const val FN_BASE = "https://us-central1-agenda-id-seven.cloudfunctions.net"
+    // Endpoints HTTPS onRequest (1.0.43+). URLs sao as URIs REAIS resolvidas
+    // no CI via `gcloud functions describe ... --format=value(serviceConfig.uri)`
+    // e injetadas via buildConfigField. Nao ha URL presumida no codigo.
+    private val FN_REQUEST_URL: String = BuildConfig.PASSWORD_RESET_REQUEST_URL
+    private val FN_CONFIRM_URL: String = BuildConfig.PASSWORD_RESET_CONFIRM_URL
+    private const val TAG = "AuthRepo"
 
-    // POST JSON simples via HttpURLConnection. Retorna Pair(httpCode, bodyString)
-    // ou lanca em erro de rede/timeout. Roda em Dispatchers.IO.
-    private suspend fun postJson(path: String, payload: JSONObject): Pair<Int, String> =
+    private fun classifyError(e: Throwable): String = when (e) {
+        is SocketTimeoutException -> "TIMEOUT"
+        is UnknownHostException -> "UNKNOWN_HOST"
+        is SSLException -> "SSL"
+        is IOException -> "NETWORK"
+        else -> "OTHER"
+    }
+
+    // POST JSON via HttpURLConnection (sem lib externa). Retorna Triple(httpCode,
+    // bodyString, exceptionOrNull). Em erro de rede/SSL/timeout, exception
+    // preenchido; em resposta HTTP, code+body preenchidos. Roda em Dispatchers.IO.
+    private suspend fun postJson(url: String, payload: JSONObject): Triple<Int, String, Throwable?> =
         withContext(Dispatchers.IO) {
-            val conn = (URL("$FN_BASE/$path").openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 15000
-                readTimeout = 20000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("Accept", "application/json")
-            }
+            if (url.isBlank()) return@withContext Triple(0, "", IllegalStateException("URL vazia (build sem -PPASSWORD_RESET_*_URL)"))
+            var conn: HttpURLConnection? = null
             try {
+                conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 15000
+                    readTimeout = 20000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    setRequestProperty("Accept", "application/json")
+                }
                 conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                 val code = conn.responseCode
                 val stream = if (code in 200..299) conn.inputStream else (conn.errorStream ?: conn.inputStream)
                 val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-                code to text
+                Triple(code, text, null)
+            } catch (e: Throwable) {
+                Triple(0, "", e)
             } finally {
-                conn.disconnect()
+                conn?.disconnect()
             }
         }
 
@@ -107,24 +129,24 @@ object AuthRepo {
                 .addOnFailureListener { ex -> cont.resume(Result.Err("Erro ao enviar cadastro: ${ex.message ?: "tente novamente"}")) }
         }
 
-    // Redefinicao AUTONOMA por codigo de e-mail (1.0.42+ via endpoint HTTPS
-    // onRequest — NAO usa Callable). O backend envia codigo de 6 digitos via
-    // Resend e salva hash em passwordResetCodes (TTL 15min, 5 tentativas).
-    // Resposta sempre generica (anti-enumeracao): qualquer 200 avanca a UI.
+    // Redefinicao AUTONOMA por codigo de e-mail (1.0.43+, endpoint HTTPS
+    // onRequest com URL real injetada por BuildConfig). Logs internos detalhados
+    // (URL chamada, HTTP, body, classe e mensagem da exception) — usuario final
+    // ve apenas mensagem amigavel.
     suspend fun requestPasswordReset(email: String): Result {
         val em = email.trim().lowercase()
         if (em.isEmpty() || !em.contains("@") || !em.contains(".")) {
             return Result.Err("Informe um e-mail válido.")
         }
-        return try {
-            val (code, body) = postJson("requestPasswordResetHttp", JSONObject().put("email", em))
-            // Backend responde 200 com {ok:true,...} em todos os casos controlaveis.
-            if (code == 200) Result.Ok("", null)
-            else Result.Err("Não foi possível enviar sua solicitação agora. Tente novamente em instantes.")
-                .also { android.util.Log.w("AuthRepo", "requestReset http=$code body=${body.take(120)}") }
-        } catch (e: Exception) {
-            Result.Err("Não foi possível enviar sua solicitação agora. Verifique a internet e tente de novo.")
+        val url = FN_REQUEST_URL
+        val (http, body, exc) = postJson(url, JSONObject().put("email", em))
+        if (exc != null) {
+            Log.w(TAG, "requestReset url=$url cls=${exc.javaClass.simpleName} kind=${classifyError(exc)} msg=${exc.message?.take(200)}")
+            return Result.Err("Não foi possível enviar sua solicitação agora. Verifique a internet e tente de novo.")
         }
+        Log.i(TAG, "requestReset url=$url http=$http body=${body.take(200)}")
+        return if (http == 200) Result.Ok("", null)
+        else Result.Err("Não foi possível enviar sua solicitação agora. Tente novamente em instantes.")
     }
 
     // Conclui a redefinicao: envia codigo + nova senha ao endpoint HTTPS; backend
@@ -137,18 +159,20 @@ object AuthRepo {
         if (!cd.matches(Regex("^\\d{6}$"))) return Result.Err("O código deve ter 6 dígitos.")
         if (newPassword.length < 6) return Result.Err("A nova senha precisa ter pelo menos 6 caracteres.")
         if (newPassword != confirmPassword) return Result.Err("As senhas não coincidem.")
-        return try {
-            val payload = JSONObject().put("email", em).put("code", cd).put("newPassword", newPassword)
-            val (http, body) = postJson("confirmPasswordResetHttp", payload)
-            val json = runCatching { JSONObject(body) }.getOrNull()
-            when {
-                http == 200 && json?.optBoolean("ok", false) == true -> Result.Ok("", null)
-                json != null && json.has("message") ->
-                    Result.Err(json.optString("message", "Não foi possível redefinir a senha."))
-                else -> Result.Err("Não foi possível redefinir a senha agora. Tente novamente em instantes.")
-            }
-        } catch (e: Exception) {
-            Result.Err("Não foi possível redefinir a senha agora. Verifique a internet e tente de novo.")
+        val url = FN_CONFIRM_URL
+        val payload = JSONObject().put("email", em).put("code", cd).put("newPassword", newPassword)
+        val (http, body, exc) = postJson(url, payload)
+        if (exc != null) {
+            Log.w(TAG, "confirmReset url=$url cls=${exc.javaClass.simpleName} kind=${classifyError(exc)} msg=${exc.message?.take(200)}")
+            return Result.Err("Não foi possível redefinir a senha agora. Verifique a internet e tente de novo.")
+        }
+        Log.i(TAG, "confirmReset url=$url http=$http body=${body.take(200)}")
+        val json = runCatching { JSONObject(body) }.getOrNull()
+        return when {
+            http == 200 && json?.optBoolean("ok", false) == true -> Result.Ok("", null)
+            json != null && json.has("message") ->
+                Result.Err(json.optString("message", "Não foi possível redefinir a senha."))
+            else -> Result.Err("Não foi possível redefinir a senha agora. Tente novamente em instantes.")
         }
     }
 

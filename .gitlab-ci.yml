@@ -16,13 +16,14 @@ variables:
   ANDROID_CMDLINE_TOOLS_VERSION: "11076708"   # confira em https://developer.android.com/studio
   ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-  APK_OUT: "idseven-nativebeta-1.0.42-beta-password-reset-http-final.apk"
+  APK_OUT: "idseven-nativebeta-1.0.43-beta-password-reset-url-real-fix.apk"
   APP_DIR: "android-native-beta"
 
 stages:
   - build
   - deploy
   - verify
+  - package
 
 cache:
   key: android-beta-v1
@@ -31,12 +32,23 @@ cache:
     - .gradle/
 
 build_android_beta:
-  stage: build
+  stage: package   # roda APOS deploy + verify (URLs reais + curl real validados)
   image: eclipse-temurin:17-jdk-jammy
   # Build pesado do APK NAO roda em todo push. Roda em:
   #  - "Run pipeline" (web); OU
   #  - push cujo commit tenha o marcador [build-apk] (gera APK sob demanda,
   #    sem clique e sem buildar em pushes normais; auto-restaura por commit).
+  # `needs` (artifacts dotenv) traz PASSWORD_RESET_REQUEST_URL e
+  # PASSWORD_RESET_CONFIRM_URL resolvidas a partir do gcloud — sem URL presumida.
+  # Bloqueia o APK se test_password_reset_backend falhar (quando [test-reset]
+  # estiver no commit). resolve_password_reset_urls e obrigatorio; o teste e
+  # opcional via `optional: true` para permitir build sem [test-reset].
+  needs:
+    - job: resolve_password_reset_urls
+      artifacts: true
+    - job: test_password_reset_backend
+      artifacts: false
+      optional: true
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas" && $CI_COMMIT_MESSAGE =~ /\[build-apk\]/'
@@ -89,12 +101,20 @@ build_android_beta:
   script:
     - cd "$APP_DIR"
     - chmod +x ./gradlew
-    - ./gradlew clean assembleRelease --no-daemon --max-workers=1 --no-parallel --stacktrace --info
+    - |
+      # URLs vem do dotenv produzido por resolve_password_reset_urls.
+      if [ -z "$PASSWORD_RESET_REQUEST_URL" ] || [ -z "$PASSWORD_RESET_CONFIRM_URL" ]; then
+        echo "::error:: PASSWORD_RESET_REQUEST_URL/CONFIRM_URL ausentes (resolve_password_reset_urls falhou ou Functions nao publicadas)."
+        exit 1
+      fi
+      echo "URL request : $PASSWORD_RESET_REQUEST_URL"
+      echo "URL confirm : $PASSWORD_RESET_CONFIRM_URL"
+    - ./gradlew clean assembleRelease --no-daemon --max-workers=1 --no-parallel --stacktrace --info -PPASSWORD_RESET_REQUEST_URL="$PASSWORD_RESET_REQUEST_URL" -PPASSWORD_RESET_CONFIRM_URL="$PASSWORD_RESET_CONFIRM_URL"
     - cd "$CI_PROJECT_DIR"
     - cp "$APP_DIR/app/build/outputs/apk/release/app-release.apk" "$APK_OUT"
     - ls -lh "$APK_OUT"
   artifacts:
-    name: "idseven-nativebeta-1.0.42-beta-password-reset-http-final-$CI_COMMIT_SHORT_SHA"
+    name: "idseven-nativebeta-1.0.43-beta-password-reset-url-real-fix-$CI_COMMIT_SHORT_SHA"
     paths:
       - "$APK_OUT"
     expire_in: 30 days
@@ -532,11 +552,61 @@ setup_password_reset_provider:
 # capturando o erro tecnico verdadeiro. Falha com mensagem objetiva e unica.
 # NUNCA imprime a RESEND_API_KEY nem o codigo gerado. Nao toca Android/PWA/etc.
 # ─────────────────────────────────────────────────────────────────────────────
-test_password_reset_backend:
-  stage: verify   # roda APOS o stage deploy (setup + deploy_firebase_functions)
+# ─────────────────────────────────────────────────────────────────────────────
+# Resolve as URIs REAIS das Cloud Functions Gen2 (sem URL presumida).
+# Sempre roda na branch (mesmo sem markers) porque o build_android_beta
+# depende deste dotenv para gerar APK com BuildConfig.PASSWORD_RESET_*_URL.
+# Exige que o deploy ja tenha publicado as Functions (stage anterior).
+# ─────────────────────────────────────────────────────────────────────────────
+resolve_password_reset_urls:
+  stage: verify
   image: google/cloud-sdk:slim
   variables:
     GCP_PROJECT: "agenda-id-seven"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas"'
+  script:
+    - |
+      set -e
+      if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] || [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+        echo "::error:: GOOGLE_APPLICATION_CREDENTIALS (File) ausente."; exit 1
+      fi
+      gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" >/dev/null
+      gcloud config set project "$GCP_PROJECT" >/dev/null
+
+      REQ=$(gcloud functions describe requestPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)
+      CNF=$(gcloud functions describe confirmPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)
+      echo "PASSWORD_RESET_REQUEST_URL=$REQ"
+      echo "PASSWORD_RESET_CONFIRM_URL=$CNF"
+
+      if [ -z "$REQ" ] || [ -z "$CNF" ]; then
+        echo "::error:: URI vazia. As Functions requestPasswordResetHttp / confirmPasswordResetHttp nao foram publicadas em us-central1."
+        echo "  Acao: certifique-se de que o stage 'deploy' (deploy_firebase_functions) rodou neste pipeline antes deste job."
+        exit 1
+      fi
+
+      # Sanidade: HTTPS, dominio cloudfunctions.net OU run.app (Gen2).
+      case "$REQ" in https://*cloudfunctions.net/*|https://*run.app/*) : ;; *) echo "::error:: URL request inesperada: $REQ"; exit 1 ;; esac
+      case "$CNF" in https://*cloudfunctions.net/*|https://*run.app/*) : ;; *) echo "::error:: URL confirm inesperada: $CNF"; exit 1 ;; esac
+
+      # dotenv artifact: GitLab carrega como ENV vars em jobs `needs:` artifacts:true.
+      printf 'PASSWORD_RESET_REQUEST_URL=%s\nPASSWORD_RESET_CONFIRM_URL=%s\n' "$REQ" "$CNF" > password-reset-urls.env
+      cat password-reset-urls.env
+  artifacts:
+    reports:
+      dotenv: password-reset-urls.env
+    expire_in: 7 days
+
+test_password_reset_backend:
+  stage: verify
+  image: google/cloud-sdk:slim
+  variables:
+    GCP_PROJECT: "agenda-id-seven"
+  # Importa PASSWORD_RESET_REQUEST_URL / CONFIRM_URL do dotenv resolvido.
+  needs:
+    - job: resolve_password_reset_urls
+      artifacts: true
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas" && $CI_COMMIT_MESSAGE =~ /\[test-reset\]/'
       when: on_success
@@ -617,28 +687,30 @@ test_password_reset_backend:
 
       echo "===== 5) Chamada REAL ao endpoint HTTP (curl, igual ao app) ====="
       TEST_EMAIL="${PASSWORD_RESET_TEST_EMAIL:-idseven@idseven.com.br}"
-      # Tenta a URL canonica do app; se diferente, usa a URI publicada.
-      URL_APP="https://us-central1-${GCP_PROJECT}.cloudfunctions.net/requestPasswordResetHttp"
-      URI=$(gcloud functions describe requestPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)
-      REQUEST_RESET_URL="${URI:-$URL_APP}"
-      echo "  REQUEST_RESET_URL=$REQUEST_RESET_URL"
-      # SEM Authorization: o app chama anonimo. Se vier 403 aqui, o invoker
-      # publico nao esta aplicado (causa real exposta).
-      HTTP=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST "$REQUEST_RESET_URL" \
-        -H "Content-Type: application/json" \
-        --data "{\"email\":\"$TEST_EMAIL\"}" || echo "000")
-      echo "  HTTP=$HTTP"
-      echo "  corpo:"; jq '.' /tmp/resp.json 2>/dev/null | sed 's/^/    /' || sed 's/^/    /' /tmp/resp.json
-      if [ "$HTTP" = "200" ] && jq -e '.ok == true' /tmp/resp.json >/dev/null 2>&1; then
-        DELIVERED=$(jq -r '.delivered // empty' /tmp/resp.json 2>/dev/null)
-        echo "  -> endpoint respondeu {ok:true, delivered:$DELIVERED}."
-        if [ "$DELIVERED" = "false" ]; then
-          echo "  AVISO: delivered=false — e-mail NAO enviado (config-missing / rate-limit /"
-          echo "         e-mail nao cadastrado / Resend rejeitou). Veja os logs na secao 6."
-        fi
+      # URL REAL vem do dotenv do resolve_password_reset_urls (sem URL presumida).
+      if [ -z "$PASSWORD_RESET_REQUEST_URL" ]; then
+        echo "  PASSWORD_RESET_REQUEST_URL nao disponivel (dotenv ausente)."
+        FAIL="$FAIL\n  - PASSWORD_RESET_REQUEST_URL nao chegou do resolve_password_reset_urls. Function pode nao estar publicada."
       else
-        echo "  -> endpoint NAO retornou 200/{ok:true}."
-        FAIL="$FAIL\n  - curl real retornou HTTP=$HTTP (corpo acima: 404 nao existe / 403 invoker / 500 crash)."
+        echo "  URL real: $PASSWORD_RESET_REQUEST_URL"
+        # SEM Authorization: o app chama anonimo. Se vier 403, o invoker publico
+        # nao esta aplicado (causa real exposta).
+        HTTP=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST "$PASSWORD_RESET_REQUEST_URL" \
+          -H "Content-Type: application/json" \
+          --data "{\"email\":\"$TEST_EMAIL\"}" || echo "000")
+        echo "  HTTP=$HTTP"
+        echo "  corpo:"; jq '.' /tmp/resp.json 2>/dev/null | sed 's/^/    /' || sed 's/^/    /' /tmp/resp.json
+        if [ "$HTTP" = "200" ] && jq -e '.ok == true' /tmp/resp.json >/dev/null 2>&1; then
+          DELIVERED=$(jq -r '.delivered // empty' /tmp/resp.json 2>/dev/null)
+          echo "  -> endpoint respondeu {ok:true, delivered:$DELIVERED}."
+          if [ "$DELIVERED" = "false" ]; then
+            echo "  AVISO: delivered=false — e-mail NAO enviado (config-missing / rate-limit /"
+            echo "         e-mail nao cadastrado / Resend rejeitou). Veja os logs na secao 6."
+          fi
+        else
+          echo "  -> endpoint NAO retornou 200/{ok:true}."
+          FAIL="$FAIL\n  - curl real retornou HTTP=$HTTP em $PASSWORD_RESET_REQUEST_URL (corpo acima: 404 nao existe / 403 invoker / 500 crash)."
+        fi
       fi
 
       echo "===== 6) Logs recentes (sem segredo) ====="

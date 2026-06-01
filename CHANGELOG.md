@@ -5,6 +5,50 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.43-beta-password-reset-url-real-fix — URL real via gcloud + ordem do pipeline
+
+**Causa raiz que faltou:** Cloud Functions Gen2 publicam em URIs com hash
+(`*.run.app` ou `*-<hash>-<region>.a.run.app`) — a URL canonica
+`https://us-central1-<projeto>.cloudfunctions.net/<fn>` muitas vezes nao
+resolve para Gen2 ate o `firebase-tools` aplicar redirect. O app 1.0.42 batia
+exatamente nessa URL canonica, recebia falha de rede/SSL/UnknownHost, caia no
+catch (Result.Err) e exibia o erro vermelho — sem nunca chegar nas Functions.
+
+**Correcao** (sem URL presumida):
+- `build.gradle`: aceita `-PPASSWORD_RESET_REQUEST_URL` e `-PPASSWORD_RESET_CONFIRM_URL`,
+  expoe via `buildConfigField` (`PASSWORD_RESET_REQUEST_URL`, `PASSWORD_RESET_CONFIRM_URL`).
+  `buildFeatures { buildConfig true }` (AGP 8). Build local sem essas props
+  gera URLs vazias -> app retorna msg amigavel + log tecnico (nao chama URL invalida).
+- `AuthRepo`: usa `BuildConfig.PASSWORD_RESET_REQUEST_URL`/`CONFIRM_URL`. Em qualquer
+  falha (HTTP != 200, timeout, SSL, UnknownHost, NETWORK, OTHER) loga
+  `cls=<Exception> kind=<TIMEOUT|UNKNOWN_HOST|SSL|NETWORK|OTHER> http=<code>
+  body=<200chars>` em `android.util.Log.w/i("AuthRepo", ...)`. Usuario final
+  ve apenas mensagem amigavel.
+
+**Pipeline (4 stages, ordem correta):**
+1. `deploy` — `setup_password_reset_provider` (re-deploya 4 functions + secret/env),
+   `deploy_firebase_functions`, `deploy_password_reset_firestore_rules_autonomous`.
+2. `verify` — NOVO `resolve_password_reset_urls` (sempre roda) resolve as
+   URIs reais com `gcloud functions describe ... --format=value(serviceConfig.uri)`,
+   valida HTTPS + dominio cloudfunctions.net|run.app, e salva
+   `password-reset-urls.env` como **dotenv artifact** (GitLab carrega como
+   env vars em jobs dependentes).
+3. `verify` — `test_password_reset_backend` ([test-reset]) `needs:
+   resolve_password_reset_urls` (artifacts), curl REAL com `$PASSWORD_RESET_REQUEST_URL`
+   sem Authorization (igual ao app); falha objetiva em != 200.
+4. `package` — `build_android_beta` move de stage `build` para `package`,
+   `needs:` `resolve_password_reset_urls` (artifacts) e `test_password_reset_backend`
+   (optional). Passa as URLs reais via `-PPASSWORD_RESET_*_URL` para o gradle.
+   APK nunca eh gerado sem URL real do gcloud; quando [test-reset] esta
+   presente, APK eh BLOQUEADO se o curl real falhar.
+
+**Versao:** 1.0.43-beta-password-reset-url-real-fix / versionCode 48.
+
+Sem mudanca em chat, agenda, tarefas, notificacoes, lembrete premium, PWA,
+Worker, Cloudflare, schema. Sem Firebase Auth. Sem envio falso.
+
+---
+
 ## 1.0.42-beta-password-reset-http-final — reset via endpoints HTTP testaveis
 
 **Causa raiz final.** O app continuava caindo no `addOnFailureListener` da
