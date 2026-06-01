@@ -5,6 +5,24 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.40-beta-password-reset-email-ready — reset por e-mail com provider real
+
+**Bump de consolidacao.** As variaveis do Resend foram configuradas no GitLab
+(RESEND_API_KEY, RESET_EMAIL_FROM, RESET_EMAIL_FROM_NAME, RESET_EMAIL_PROVIDER).
+Este commit carrega os marcadores [setup-reset] (injeta secret real + re-deploy
+das callables) e [build-apk] (gera o APK), consolidando o fluxo self-service.
+
+- **Sem mudanca de codigo funcional** vs 1.0.39-self-service — apenas versao
+  (versionName 1.0.40-beta-password-reset-email-ready / versionCode 45) e
+  labels de build (LoginScreen + ProfileScreen).
+- Backend: setup_password_reset_provider injeta o secret real e re-deploya
+  SOMENTE requestPasswordReset / confirmPasswordReset. Sem chave em log;
+  sem segredo no repo.
+- Sem alteracao em chat, agenda, notificacoes, lembrete premium, PWA, Worker,
+  Cloudflare, schema. Sem Firebase Auth. Sem envio falso. Sem reset por admin.
+
+---
+
 ## 1.0.39-beta-password-reset-self-service — redefinicao AUTONOMA por codigo de e-mail
 
 **Correcao de escopo.** O fluxo anterior ("reset por admin") nao atendia ao

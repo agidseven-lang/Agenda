@@ -16,7 +16,7 @@ variables:
   ANDROID_CMDLINE_TOOLS_VERSION: "11076708"   # confira em https://developer.android.com/studio
   ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-  APK_OUT: "idseven-nativebeta-1.0.39-beta-password-reset-self-service.apk"
+  APK_OUT: "idseven-nativebeta-1.0.40-beta-password-reset-email-ready.apk"
   APP_DIR: "android-native-beta"
 
 stages:
@@ -93,7 +93,7 @@ build_android_beta:
     - cp "$APP_DIR/app/build/outputs/apk/release/app-release.apk" "$APK_OUT"
     - ls -lh "$APK_OUT"
   artifacts:
-    name: "idseven-nativebeta-1.0.39-beta-password-reset-self-service-$CI_COMMIT_SHORT_SHA"
+    name: "idseven-nativebeta-1.0.40-beta-password-reset-email-ready-$CI_COMMIT_SHORT_SHA"
     paths:
       - "$APK_OUT"
     expire_in: 30 days
@@ -517,7 +517,7 @@ setup_password_reset_provider:
       echo "=================================================================="
       echo "OK — Provider de e-mail configurado e callables re-deployadas."
       echo "Teste real:"
-      echo "  1) abra o app 1.0.39-self-service e toque 'Esqueci minha senha';"
+      echo "  1) abra o app (1.0.39+ self-service) e toque 'Esqueci minha senha';"
       echo "  2) informe um e-mail cadastrado em users/* e toque 'Enviar codigo';"
       echo "  3) deve chegar um e-mail do Resend com codigo de 6 digitos;"
       echo "  4) informe codigo + nova senha; faca login com a nova senha."

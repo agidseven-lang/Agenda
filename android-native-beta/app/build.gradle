@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 44
-        versionName "1.0.39-beta-password-reset-self-service"
+        versionCode 45
+        versionName "1.0.40-beta-password-reset-email-ready"
         vectorDrawables { useSupportLibrary true }
     }
 
