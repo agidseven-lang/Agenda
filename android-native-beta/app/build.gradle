@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 48
-        versionName "1.0.43-beta-password-reset-url-real-fix"
+        versionCode 49
+        versionName "1.0.44-beta-password-reset-secretmanager-fix"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via

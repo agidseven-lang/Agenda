@@ -211,7 +211,7 @@ fun LoginScreen(vm: LoginViewModel = viewModel()) {
 
             Spacer(Modifier.height(28.dp))
             Text(
-                "build: 1.0.43-beta-password-reset-url-real-fix",
+                "build: 1.0.44-beta-password-reset-secretmanager-fix",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, textAlign = TextAlign.Center,
             )
         }

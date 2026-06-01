@@ -16,7 +16,7 @@ variables:
   ANDROID_CMDLINE_TOOLS_VERSION: "11076708"   # confira em https://developer.android.com/studio
   ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-  APK_OUT: "idseven-nativebeta-1.0.43-beta-password-reset-url-real-fix.apk"
+  APK_OUT: "idseven-nativebeta-1.0.44-beta-password-reset-secretmanager-fix.apk"
   APP_DIR: "android-native-beta"
 
 stages:
@@ -114,7 +114,7 @@ build_android_beta:
     - cp "$APP_DIR/app/build/outputs/apk/release/app-release.apk" "$APK_OUT"
     - ls -lh "$APK_OUT"
   artifacts:
-    name: "idseven-nativebeta-1.0.43-beta-password-reset-url-real-fix-$CI_COMMIT_SHORT_SHA"
+    name: "idseven-nativebeta-1.0.44-beta-password-reset-secretmanager-fix-$CI_COMMIT_SHORT_SHA"
     paths:
       - "$APK_OUT"
     expire_in: 30 days
@@ -254,6 +254,39 @@ deploy_firebase_functions:
       echo "firebase-tools $(firebase --version)"
       ( cd functions && if [ -f package-lock.json ]; then echo "deps: npm ci"; npm ci; else echo "deps: npm install"; npm install; fi )
 
+      # ---------- 5a) PREFLIGHT IAM Secret Manager (idempotente, bloqueador) ----------
+      # Causa raiz confirmada (pipeline d7daaa0): a SA do CI nao tinha
+      # secretmanager.secrets.create/get -> setup e deploy falhavam. Aqui:
+      #  1) habilita as APIs; 2) testa se a SA ja acessa Secret Manager;
+      #  3) se nao, tenta auto-conceder roles/secretmanager.admin; 4) se nao
+      #  conseguir alterar IAM, FALHA com instrucao manual exata (sem seguir no escuro).
+      gcloud services enable secretmanager.googleapis.com cloudresourcemanager.googleapis.com --project "$GCP_PROJECT" >/dev/null 2>&1 || true
+      SA_EMAIL=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1)
+      echo ">> SA ativa: $SA_EMAIL"
+      if gcloud secrets list --project="$GCP_PROJECT" --limit=1 >/dev/null 2>&1; then
+        echo ">> Secret Manager ja acessivel pela SA do CI."
+      else
+        echo ">> Sem acesso a Secret Manager; tentando auto-conceder roles/secretmanager.admin a $SA_EMAIL…"
+        if gcloud projects add-iam-policy-binding "$GCP_PROJECT" \
+             --member="serviceAccount:$SA_EMAIL" --role="roles/secretmanager.admin" \
+             --condition=None --quiet >/dev/null 2>/tmp/iamsm.err; then
+          echo ">> Concedido. Aguardando 30s de propagacao…"; sleep 30
+        else
+          echo "::error:: A service account do CI nao tem permissao para se conceder roles/secretmanager.admin. E necessario conceder manualmente no Google Cloud IAM."
+          echo "  Detalhe gcloud:"; sed 's/^/    /' /tmp/iamsm.err || true
+          echo "  ----------------------------------------------------------------"
+          echo "  Conceda no projeto $GCP_PROJECT (Console IAM ou comando abaixo):"
+          echo "    serviceAccount:$SA_EMAIL"
+          echo "    role: roles/secretmanager.admin"
+          echo "  Comando (rodar com uma conta que tenha resourcemanager.projects.setIamPolicy):"
+          echo "    gcloud projects add-iam-policy-binding $GCP_PROJECT \\"
+          echo "      --member=\"serviceAccount:$SA_EMAIL\" \\"
+          echo "      --role=\"roles/secretmanager.admin\""
+          echo "  ----------------------------------------------------------------"
+          exit 1
+        fi
+      fi
+
       # ---------- 5b) Garantir que o secret RESEND_API_KEY EXISTE no Secret Manager ----------
       # As callables requestPasswordReset/confirmPasswordReset declaram
       # `secrets: [RESEND_API_KEY]`. Se o secret nao existir no projeto,
@@ -275,6 +308,20 @@ deploy_firebase_functions:
             | gcloud secrets versions add RESEND_API_KEY --data-file=- --project="$GCP_PROJECT" >/dev/null 2>&1 \
             && echo ">> Placeholder adicionado. Funcao deploya, mas Resend rejeita ate o setup real."
         fi
+      fi
+
+      # ---------- 5c) Runtime SA com secretAccessor no RESEND_API_KEY (FASE 3) ----------
+      # As Functions Gen2 rodam como a compute SA (default) e/ou appspot.
+      # firebase-tools tenta conceder no deploy, mas garantimos idempotente aqui
+      # para o secret poder ser lido em runtime.
+      if gcloud secrets describe RESEND_API_KEY --project="$GCP_PROJECT" >/dev/null 2>&1; then
+        for RSA in "${GCP_PROJECT_NUMBER}-compute@developer.gserviceaccount.com" "${GCP_PROJECT}@appspot.gserviceaccount.com"; do
+          gcloud secrets add-iam-policy-binding RESEND_API_KEY \
+            --member="serviceAccount:$RSA" --role="roles/secretmanager.secretAccessor" \
+            --project="$GCP_PROJECT" --quiet >/dev/null 2>&1 \
+            && echo ">> secretAccessor concedido a $RSA" \
+            || echo "AVISO: nao concedi secretAccessor a $RSA (pode ja existir)."
+        done
       fi
 
       # ---------- 6) Deploy (firebase-tools usa GOOGLE_APPLICATION_CREDENTIALS via ADC) ----------
@@ -481,7 +528,34 @@ setup_password_reset_provider:
       # ---------- 2) Auth ----------
       gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" >/dev/null
       gcloud config set project "$GCP_PROJECT" >/dev/null
-      gcloud services enable secretmanager.googleapis.com --project "$GCP_PROJECT" >/dev/null 2>&1 || true
+      gcloud services enable secretmanager.googleapis.com cloudresourcemanager.googleapis.com --project "$GCP_PROJECT" >/dev/null 2>&1 || true
+
+      # ---------- 2b) PREFLIGHT IAM Secret Manager (idempotente, bloqueador) ----------
+      SA_EMAIL=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1)
+      echo ">> SA ativa: $SA_EMAIL"
+      if gcloud secrets list --project="$GCP_PROJECT" --limit=1 >/dev/null 2>&1; then
+        echo ">> Secret Manager ja acessivel pela SA do CI."
+      else
+        echo ">> Sem acesso a Secret Manager; tentando auto-conceder roles/secretmanager.admin a $SA_EMAIL…"
+        if gcloud projects add-iam-policy-binding "$GCP_PROJECT" \
+             --member="serviceAccount:$SA_EMAIL" --role="roles/secretmanager.admin" \
+             --condition=None --quiet >/dev/null 2>/tmp/iamsm.err; then
+          echo ">> Concedido. Aguardando 30s de propagacao…"; sleep 30
+        else
+          echo "::error:: A service account do CI nao tem permissao para se conceder roles/secretmanager.admin. E necessario conceder manualmente no Google Cloud IAM."
+          echo "  Detalhe gcloud:"; sed 's/^/    /' /tmp/iamsm.err || true
+          echo "  ----------------------------------------------------------------"
+          echo "  Conceda no projeto $GCP_PROJECT (Console IAM ou comando abaixo):"
+          echo "    serviceAccount:$SA_EMAIL"
+          echo "    role: roles/secretmanager.admin"
+          echo "  Comando (rodar com conta que tenha resourcemanager.projects.setIamPolicy):"
+          echo "    gcloud projects add-iam-policy-binding $GCP_PROJECT \\"
+          echo "      --member=\"serviceAccount:$SA_EMAIL\" \\"
+          echo "      --role=\"roles/secretmanager.admin\""
+          echo "  ----------------------------------------------------------------"
+          exit 1
+        fi
+      fi
 
       # ---------- 3) Atualizar SECRET RESEND_API_KEY (cria se nao existir) ----------
       if ! gcloud secrets describe RESEND_API_KEY --project="$GCP_PROJECT" >/dev/null 2>&1; then
@@ -493,13 +567,16 @@ setup_password_reset_provider:
         --data-file=- --project="$GCP_PROJECT" >/dev/null
       echo "   versao mais recente: $(gcloud secrets versions list RESEND_API_KEY --project=$GCP_PROJECT --limit=1 --format='value(name)')"
 
-      # ---------- 4) Conceder acesso a service account das Functions (idempotente) ----------
+      # ---------- 4) Conceder acesso as runtime SA das Functions (idempotente) ----------
       # firebase-functions com `secrets: [RESEND_API_KEY]` ja faz binding no deploy,
-      # mas garantimos aqui caso o secret tenha sido criado SO agora.
-      RUNTIME_SA="serviceAccount:${GCP_PROJECT}@appspot.gserviceaccount.com"
-      gcloud secrets add-iam-policy-binding RESEND_API_KEY \
-        --member="$RUNTIME_SA" --role="roles/secretmanager.secretAccessor" \
-        --project="$GCP_PROJECT" --quiet >/dev/null 2>&1 || true
+      # mas garantimos aqui. Gen2 roda como compute SA; Gen1/legado como appspot.
+      for RSA in "${GCP_PROJECT_NUMBER:-391529908613}-compute@developer.gserviceaccount.com" "${GCP_PROJECT}@appspot.gserviceaccount.com"; do
+        gcloud secrets add-iam-policy-binding RESEND_API_KEY \
+          --member="serviceAccount:$RSA" --role="roles/secretmanager.secretAccessor" \
+          --project="$GCP_PROJECT" --quiet >/dev/null 2>&1 \
+          && echo ">> secretAccessor concedido a $RSA" \
+          || echo "AVISO: nao concedi secretAccessor a $RSA (pode ja existir)."
+      done
 
       # ---------- 5) Escrever .env.agenda-id-seven em functions/ ----------
       # firebase-tools le esse arquivo no deploy e injeta como env vars do

@@ -5,6 +5,47 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.44-beta-password-reset-secretmanager-fix — corrige IAM/Secret Manager do CI
+
+**Causa raiz confirmada (logs do pipeline d7daaa0):**
+- `setup_password_reset_provider` falhou com `Permission 'secretmanager.secrets.create' denied`;
+- `deploy_firebase_functions` falhou com `Permission 'secretmanager.secrets.get' denied`.
+Nao era APK/Android/URL/Resend/Rules — a SA do CI
+(`firebase-adminsdk-fbsvc@agenda-id-seven.iam.gserviceaccount.com`) nao tinha
+permissao de Secret Manager para criar/ler o secret RESEND_API_KEY exigido
+pelas Functions (`secrets: [RESEND_API_KEY]`).
+
+**Correcao (apenas .gitlab-ci.yml + labels de versao; sem mexer no Android):**
+- **Preflight IAM Secret Manager** (idempotente, bloqueador) adicionado em
+  `setup_password_reset_provider` e `deploy_firebase_functions`, ANTES de
+  qualquer `gcloud secrets *` / `firebase deploy`:
+  1. habilita `secretmanager` + `cloudresourcemanager`;
+  2. testa se a SA ja acessa Secret Manager (`gcloud secrets list`);
+  3. se nao, tenta auto-conceder `roles/secretmanager.admin` a SA ativa;
+  4. se nao conseguir alterar IAM, FALHA com instrucao manual EXATA
+     (member + role + comando) — sem seguir no escuro;
+  5. se conceder, aguarda 30s de propagacao.
+- **Runtime SA com secretAccessor**: concede `roles/secretmanager.secretAccessor`
+  no RESEND_API_KEY a `<PROJECT_NUMBER>-compute@developer...` (Gen2) e
+  `<project>@appspot...` (legado), idempotente, nos dois jobs.
+- RESEND_API_KEY nunca aparece em log (printf via stdin pipe).
+
+**Importante:** se a SA do CI nao puder se auto-conceder o papel (faltar
+`resourcemanager.projects.setIamPolicy`), o pipeline para no preflight com a
+instrucao exata para conceder manualmente UMA vez. Apos isso, qualquer re-run
+passa sozinho.
+
+**Gating do APK:** `build_android_beta` (stage package) so roda apos
+`resolve_password_reset_urls` (precisa das Functions publicadas) e, com
+[test-reset], apos `test_password_reset_backend` retornar 200. Logo, o APK
+1.0.44 so e gerado quando o backend estiver comprovadamente operacional.
+
+Versao: 1.0.44-beta-password-reset-secretmanager-fix / versionCode 49.
+Sem mudanca em codigo Android, Functions, chat, agenda, tarefas, notificacoes,
+lembrete premium, PWA, Worker, Cloudflare, schema.
+
+---
+
 ## 1.0.43-beta-password-reset-url-real-fix — URL real via gcloud + ordem do pipeline
 
 **Causa raiz que faltou:** Cloud Functions Gen2 publicam em URIs com hash
