@@ -318,25 +318,25 @@ deploy_password_reset_firestore_rules_autonomous:
       echo "Backup salvo: firestore.rules.backup-pre-${CI_COMMIT_SHORT_SHA} ($(wc -l < firestore.rules.from-prod) linhas)"
 
       # ---------- 2) Patch idempotente (preserva tudo, injeta apenas o bloco) ----------
+      # O script Node eh a UNICA fonte de validacao: idempotencia, schema do
+      # output (rules_version / service / match /databases), exatamente 1x
+      # passwordResetRequests, ausencia de cerca markdown, chaves balanceadas,
+      # nao introducao de crases (delta) e zero linhas removidas do input.
+      # Falha do script aborta o job (set -e). Nada de validacao duplicada em
+      # bash aqui — a tentativa anterior quebrava com "[: 0\n0: integer
+      # expression expected" e rejeitava crases legitimas em comentarios.
       echo ">> Aplicando patch passwordResetRequests…"
       node scripts/patch-firestore-password-reset-rules.mjs firestore.rules.from-prod firestore.rules.generated
 
-      # ---------- 3) Diff resumido + garantia de NENHUMA REMOCAO ----------
+      # ---------- 3) Diff resumido (apenas para o log do CI) ----------
       echo "===== diff (-u from-prod -> generated) ====="
       diff -u firestore.rules.from-prod firestore.rules.generated || true
       echo "==========================================="
-      REMOVED=$(diff -u firestore.rules.from-prod firestore.rules.generated 2>/dev/null | grep -E '^-[^-]' | wc -l || echo 0)
-      if [ "$REMOVED" -gt 0 ]; then
-        echo "::error:: o patch removeu/alterou $REMOVED linha(s) do arquivo de prod. ABORTANDO sem deployar."
-        exit 1
-      fi
 
-      # ---------- 4) Validacoes anti-markdown (defesa em profundidade) ----------
-      if grep -nP '`' firestore.rules.generated >/dev/null; then
-        echo "::error:: generated contem crase — abortando."; exit 1
-      fi
-      if grep -nE '^[[:space:]]*```' firestore.rules.generated >/dev/null; then
-        echo "::error:: generated contem cerca markdown — abortando."; exit 1
+      # ---------- 4) Pre-checagens minimas do generated (existencia + nao-vazio) ----------
+      if [ ! -s firestore.rules.generated ]; then
+        echo "::error:: firestore.rules.generated ausente ou vazio apos o patch."
+        exit 1
       fi
 
       # ---------- 5) firebase.ci.json temporario apontando para o arquivo gerado ----------
