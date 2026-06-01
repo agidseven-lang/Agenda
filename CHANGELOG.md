@@ -5,6 +5,40 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.42-beta-password-reset-http-final — reset via endpoints HTTP testaveis
+
+**Causa raiz final.** O app continuava caindo no `addOnFailureListener` da
+**Callable Function** (transporte/protocolo callable Gen2 sem Firebase Auth —
+provavel invoker/identidade). Em vez de insistir na Callable, o fluxo de reset
+migrou para **endpoints HTTPS `onRequest`** chamados via `HttpURLConnection`.
+
+**Backend (functions/index.js):** 2 novas Functions v2 `onRequest`, mesma
+logica/seguranca das callables (TTL 15min, 5 tentativas, hash do codigo,
+rate-limit 60s, anti-enumeracao, Resend, sem indice composto):
+- `requestPasswordResetHttp` (POST {email}) -> 200 `{ok:true, delivered:true|false}`.
+- `confirmPasswordResetHttp` (POST {email,code,newPassword}) -> 200 `{ok:true}`
+  ou `{ok:false, code, message}` controlado. Apenas POST; CORS; sem stack trace;
+  nunca revela existencia de usuario; nunca expoe segredo.
+  URLs: https://us-central1-agenda-id-seven.cloudfunctions.net/{requestPasswordResetHttp,confirmPasswordResetHttp}
+  As callables antigas permanecem no codigo (nao usadas pelo app).
+
+**Android (AuthRepo):** abandona `FirebaseFunctions.getHttpsCallable` no reset;
+usa `HttpURLConnection` (POST JSON, timeouts 15/20s) para os endpoints. 200 com
+`{ok:true}` avanca a UI; `{ok:false,message}` mostra a mensagem do servidor;
+erro de rede -> mensagem amigavel. O app **nao cai mais no erro vermelho** por
+falha de transporte da Callable. Sem lib nova (HttpURLConnection nativo).
+
+**CI:** `test_password_reset_backend` ([test-reset]) agora bate nos endpoints
+HTTP via `curl` SEM Authorization (igual ao app) e reporta HTTP/corpo/logs —
+404 (nao existe), 403 (invoker), 500 (crash) ou delivered=false (config/Resend).
+Jobs de deploy/setup garantem `allUsers` invoker tambem nos 2 endpoints HTTP.
+
+Versao: 1.0.42-beta-password-reset-http-final / versionCode 47.
+Sem mudanca em chat, agenda, tarefas, notificacoes, lembrete premium, PWA,
+Worker, Cloudflare, schema. Sem Firebase Auth. Sem envio falso. Sem reset por admin.
+
+---
+
 ## 1.0.41-beta-password-reset-backend-fix — build consolidada apos correcao backend
 
 **Apenas bump de versao** para facilitar o teste final. A causa raiz do

@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.41-beta-password-reset-backend-fix"
+private const val BUILD = "1.0.42-beta-password-reset-http-final"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

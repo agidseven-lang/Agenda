@@ -15,7 +15,7 @@
    NENHUM segredo no código. Requer plano Blaze para deploy.
    ============================================================================ */
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret, defineString } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
@@ -478,5 +478,159 @@ exports.confirmPasswordReset = onCall(
     await codeDoc.ref.update({ usedAt: Date.now(), status: "used" });
     logger.info("password-reset:confirmed", { email });
     return { ok: true };
+  }
+);
+
+/* ============================================================================
+   Endpoints HTTPS onRequest (1.0.42+) — fluxo de reset usado pelo APP.
+   ----------------------------------------------------------------------------
+   Motivo: o app caia no addOnFailureListener da Callable (transporte/invoker
+   Gen2 sem Firebase Auth). Endpoints onRequest com HttpURLConnection no Android
+   eliminam o protocolo callable. Mesma logica/seguranca; respostas JSON
+   controladas com HTTP 200 para nao enumerar usuario.
+   URLs:
+     POST https://us-central1-agenda-id-seven.cloudfunctions.net/requestPasswordResetHttp
+     POST https://us-central1-agenda-id-seven.cloudfunctions.net/confirmPasswordResetHttp
+   ============================================================================ */
+function applyCommonHeaders(res) {
+  res.set("Content-Type", "application/json; charset=utf-8");
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type");
+}
+function readJsonBody(req) {
+  // onRequest ja faz body-parsing de application/json em req.body;
+  // fallback defensivo para string.
+  if (req.body && typeof req.body === "object") return req.body;
+  if (typeof req.body === "string" && req.body.trim()) {
+    try { return JSON.parse(req.body); } catch (_) { return {}; }
+  }
+  return {};
+}
+
+exports.requestPasswordResetHttp = onRequest(
+  { secrets: [RESEND_API_KEY], region: "us-central1", maxInstances: 5, cors: true },
+  async (req, res) => {
+    applyCommonHeaders(res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, code: "METHOD_NOT_ALLOWED" }); return; }
+
+    const body = readJsonBody(req);
+    const email = normEmail(body.email);
+    if (!isValidEmail(email)) {
+      // Amigavel e generico; nao revela nada. 200 para o app nunca "quebrar".
+      res.status(200).json({ ok: true, delivered: false });
+      return;
+    }
+
+    try {
+      const apiKey = RESEND_API_KEY.value();
+      const fromAddress = RESET_EMAIL_FROM.value();
+      const PLACEHOLDER = "PLACEHOLDER_NOT_CONFIGURED_RUN_setup_password_reset_provider";
+      if (!apiKey || !fromAddress || apiKey === PLACEHOLDER) {
+        logger.error("password-reset:config-missing", {
+          hasApiKey: !!apiKey, apiKeyIsPlaceholder: apiKey === PLACEHOLDER, hasFrom: !!fromAddress,
+          hint: "Rode setup_password_reset_provider (push [setup-reset]) com RESEND_API_KEY e RESET_EMAIL_FROM no GitLab.",
+        });
+        res.status(200).json({ ok: true, delivered: false });
+        return;
+      }
+
+      const db = admin.firestore();
+      const usersSnap = await db.collection("users").where("email", "==", email).limit(1).get();
+      if (usersSnap.empty) {
+        logger.info("password-reset:not-found", { email });
+        res.status(200).json({ ok: true, delivered: false });
+        return;
+      }
+      const userDoc = usersSnap.docs[0];
+      const status = userDoc.get("status");
+      if (status === "removido" || status === "excluido" || status === "pendente") {
+        logger.info("password-reset:user-not-eligible", { email, status });
+        res.status(200).json({ ok: true, delivered: false });
+        return;
+      }
+
+      const last = await latestResetCodeDoc(db, email);
+      if (last) {
+        const lastAt = last.get("createdAt") || 0;
+        if (Date.now() - lastAt < REQUEST_RATE_LIMIT_MS) {
+          logger.warn("password-reset:rate-limited", { email });
+          res.status(200).json({ ok: true, delivered: false });
+          return;
+        }
+      }
+
+      const code = genCode();
+      const now = Date.now();
+      await db.collection("passwordResetCodes").add({
+        email, userId: userDoc.id, codeHash: sha256Hex(code),
+        createdAt: now, expiresAt: now + CODE_TTL_MS,
+        usedAt: null, attempts: 0, status: "pending", source: "nativebeta",
+      });
+
+      try {
+        await sendResetCodeEmail({
+          to: email, code, fromAddress, fromName: RESET_EMAIL_FROM_NAME.value(), apiKey,
+        });
+        logger.info("password-reset:email-sent", { email });
+        res.status(200).json({ ok: true, delivered: true });
+      } catch (e) {
+        logger.error("password-reset:resend-rejected", { error: String(e && e.message).slice(0, 300) });
+        res.status(200).json({ ok: true, delivered: false });
+      }
+    } catch (e) {
+      logger.error("password-reset:function-error", { error: String(e && e.message).slice(0, 300) });
+      res.status(200).json({ ok: true, delivered: false });
+    }
+  }
+);
+
+exports.confirmPasswordResetHttp = onRequest(
+  { region: "us-central1", maxInstances: 5, cors: true },
+  async (req, res) => {
+    applyCommonHeaders(res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, code: "METHOD_NOT_ALLOWED" }); return; }
+
+    const body = readJsonBody(req);
+    const email = normEmail(body.email);
+    const code = String(body.code || "").trim();
+    const newPassword = String(body.newPassword || "");
+    if (!isValidEmail(email)) { res.status(200).json({ ok: false, code: "INVALID_EMAIL", message: "E-mail inválido." }); return; }
+    if (!/^\d{6}$/.test(code)) { res.status(200).json({ ok: false, code: "INVALID_CODE", message: "Código inválido. Verifique o e-mail." }); return; }
+    if (newPassword.length < 6) { res.status(200).json({ ok: false, code: "WEAK_PASSWORD", message: "A nova senha precisa ter pelo menos 6 caracteres." }); return; }
+
+    try {
+      const db = admin.firestore();
+      const codeDoc = await latestResetCodeDoc(db, email);
+      if (!codeDoc) { res.status(200).json({ ok: false, code: "NO_CODE", message: "Código não encontrado. Solicite um novo." }); return; }
+      const data = codeDoc.data() || {};
+
+      if (data.usedAt) { res.status(200).json({ ok: false, code: "USED", message: "Código já utilizado. Solicite um novo." }); return; }
+      if ((data.attempts || 0) >= CODE_MAX_ATTEMPTS) { res.status(200).json({ ok: false, code: "TOO_MANY", message: "Limite de tentativas atingido. Solicite um novo código." }); return; }
+      if (Date.now() > (data.expiresAt || 0)) { res.status(200).json({ ok: false, code: "EXPIRED", message: "Código expirado. Solicite um novo." }); return; }
+      if (data.codeHash !== sha256Hex(code)) {
+        await codeDoc.ref.update({ attempts: admin.firestore.FieldValue.increment(1) });
+        res.status(200).json({ ok: false, code: "INVALID_CODE", message: "Código incorreto." });
+        return;
+      }
+
+      const userRef = db.collection("users").doc(data.userId);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) { res.status(200).json({ ok: false, code: "NO_USER", message: "Conta não encontrada." }); return; }
+      const status = userSnap.get("status");
+      if (status === "removido" || status === "excluido") { res.status(200).json({ ok: false, code: "INACTIVE", message: "Conta inativa." }); return; }
+
+      const salt = randSalt();
+      const pass = hashPw(newPassword, salt);
+      await userRef.update({ pass, salt, mustChangePassword: false, passwordChangedAt: Date.now() });
+      await codeDoc.ref.update({ usedAt: Date.now(), status: "used" });
+      logger.info("password-reset:confirmed", { email });
+      res.status(200).json({ ok: true });
+    } catch (e) {
+      logger.error("password-reset:function-error", { phase: "confirm-http", error: String(e && e.message).slice(0, 300) });
+      res.status(200).json({ ok: false, code: "INTERNAL", message: "Não foi possível redefinir a senha agora. Tente novamente em instantes." });
+    }
   }
 );
