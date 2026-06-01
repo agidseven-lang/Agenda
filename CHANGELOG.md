@@ -5,6 +5,22 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.39-beta-password-reset-final — build consolidada do reset (em desenvolvimento)
+
+**Apenas bump de versao.** As Firestore Rules do reset foram publicadas
+pelo pipeline autonomo (commit `ffd61ee`); o backend agora aceita create
+em `passwordResetRequests`. Esta versao consolida o estado para teste
+final no aparelho — **sem alteracao funcional**.
+
+- versionName: `1.0.39-beta-password-reset-final` / versionCode: 43.
+- Sem mudanca em codigo Kotlin de auth, chat, notificacoes, lembrete
+  premium, agenda ou cadastro. Sem alteracao em Firestore Rules,
+  pipeline de rules, Functions, PWA, Worker, Cloudflare ou schema.
+  Sem reintroducao de audio. Sem Firebase Auth. Sem envio de e-mail.
+- Build label no rodape do login e em Profile atualizado.
+
+---
+
 ## Infra: deploy autonomo das Firestore Rules (sem Console manual)
 
 **Decisao operacional.** Acabou copiar/colar no Firebase Console e job manual.
