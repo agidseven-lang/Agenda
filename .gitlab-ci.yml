@@ -246,7 +246,8 @@ deploy_firebase_functions:
         eventarc.googleapis.com \
         pubsub.googleapis.com \
         storage.googleapis.com \
-        runtimeconfig.googleapis.com ; do
+        runtimeconfig.googleapis.com \
+        cloudscheduler.googleapis.com ; do
         enable_api "$API"
       done
 

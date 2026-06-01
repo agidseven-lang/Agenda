@@ -16,6 +16,7 @@
    ============================================================================ */
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret, defineString } = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
@@ -634,3 +635,72 @@ exports.confirmPasswordResetHttp = onRequest(
     }
   }
 );
+
+/* ============================================================================
+   Higiene de passwordResetCodes (1.0.45+, backend-only, NAO toca o app).
+   ----------------------------------------------------------------------------
+   Apaga apenas codigos JA consumidos/expirados ha mais que a janela de
+   retencao. Codigos pendentes ainda validos sao PRESERVADOS.
+     - usados:    apaga quando usedAt    < agora - RETENTION_MS
+     - expirados: apaga quando expiresAt < agora - RETENTION_MS
+   Idempotente (re-rodar nao causa efeito colateral). Lote limitado por
+   execucao (custo previsivel). Logs SO com contadores — sem e-mail/codigo/
+   hash/uid. Agenda diaria 03:30 America/Fortaleza.
+
+   Modo dry-run: defina a env CLEANUP_DRY_RUN=true (NAO apaga; so conta) — usado
+   pelo smoke test local scripts/cleanup-dry-run.mjs.
+   ============================================================================ */
+const CLEANUP_RETENTION_MS = 24 * 60 * 60 * 1000; // 24h
+const CLEANUP_MAX_DOCS = 500;                      // teto por execucao
+
+// Logica pura, testavel: decide se um doc deve ser apagado dada a hora atual.
+// Exportada para o dry-run. NAO recebe/loga dado sensivel (so timestamps/status).
+function shouldDeleteResetCode(data, now, retentionMs) {
+  if (!data) return false;
+  const cutoff = now - retentionMs;
+  const usedAt = typeof data.usedAt === "number" ? data.usedAt : null;
+  const expiresAt = typeof data.expiresAt === "number" ? data.expiresAt : null;
+  // usado ha mais que a retencao
+  if (usedAt !== null && usedAt < cutoff) return true;
+  // expirado ha mais que a retencao (e nao usado, ou usado sem timestamp)
+  if (expiresAt !== null && expiresAt < cutoff) return true;
+  return false;
+}
+
+async function runCleanup({ dryRun }) {
+  const db = admin.firestore();
+  const now = Date.now();
+  const snap = await db.collection("passwordResetCodes").limit(CLEANUP_MAX_DOCS).get();
+  let scanned = 0; let deleted = 0; let skipped = 0; let errors = 0;
+  let batch = db.batch(); let pending = 0;
+  for (const doc of snap.docs) {
+    scanned++;
+    let del = false;
+    try {
+      del = shouldDeleteResetCode(doc.data(), now, CLEANUP_RETENTION_MS);
+    } catch (_) { errors++; continue; }
+    if (!del) { skipped++; continue; }
+    if (dryRun) { deleted++; continue; }
+    batch.delete(doc.ref); pending++; deleted++;
+    if (pending >= 400) { await batch.commit(); batch = db.batch(); pending = 0; }
+  }
+  if (!dryRun && pending > 0) await batch.commit();
+  // Logs SO com contadores (sem dados sensiveis).
+  logger.info("cleanup-reset-codes", { dryRun: !!dryRun, scanned, deleted, skipped, errors, retentionHours: 24, max: CLEANUP_MAX_DOCS });
+  return { scanned, deleted, skipped, errors };
+}
+
+exports.cleanupPasswordResetCodes = onSchedule(
+  { schedule: "30 3 * * *", timeZone: "America/Fortaleza", region: "us-central1", maxInstances: 1 },
+  async () => {
+    const dryRun = String(process.env.CLEANUP_DRY_RUN || "").toLowerCase() === "true";
+    try {
+      await runCleanup({ dryRun });
+    } catch (e) {
+      logger.error("cleanup-reset-codes:error", { error: String(e && e.message).slice(0, 200) });
+    }
+  }
+);
+
+// Exporta logica pura para o smoke test local (nao afeta o runtime das Functions).
+exports._shouldDeleteResetCode = shouldDeleteResetCode;

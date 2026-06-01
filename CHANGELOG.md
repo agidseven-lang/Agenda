@@ -3,6 +3,31 @@
 Histórico das entregas do app nativo (`br.com.idseven.agenda.nativebeta`) e das
 Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
+## Higiene de passwordResetCodes — cleanup agendado (backend-only, sem APK)
+
+Fase isolada pos-1.0.45. **Sem APK, sem mudanca no app, sem tocar no fluxo
+aprovado de reset.**
+
+- **Nova Function `cleanupPasswordResetCodes`** (`onSchedule`, Gen2, us-central1):
+  roda diariamente as **03:30 America/Fortaleza**. Apaga SO codigos ja
+  consumidos/expirados ha mais de **24h** (`usedAt < agora-24h` OU
+  `expiresAt < agora-24h`); **preserva** pendentes validos. Lote limitado a
+  **500 docs/execucao** (commit em blocos de 400). Idempotente.
+- **Logs sem dado sensivel**: apenas contadores `scanned/deleted/skipped/errors`
+  (+ dryRun/retentionHours). Nunca loga e-mail, codigo, hash ou uid.
+- **Logica pura testavel** `shouldDeleteResetCode()` exportada como
+  `_shouldDeleteResetCode`; smoke test `scripts/cleanup-dry-run.mjs` (10/10
+  casos, sem Firestore, sem apagar nada). Modo dry-run via env `CLEANUP_DRY_RUN=true`.
+- **Pipeline**: `deploy_firebase_functions` (roda em todo push da branch) publica
+  a nova funcao; `cloudscheduler.googleapis.com` adicionada ao preflight de APIs.
+  Sem `[build-apk]`. Endpoints aprovados (`requestPasswordResetHttp`/
+  `confirmPasswordResetHttp`) e callables permanecem exportados e inalterados.
+- **Nao alterado**: remetente `no-reply@agendaidseven.com.br`, RESEND_API_KEY,
+  dominio Resend, Secret Manager, Android, chat, agenda, tarefas, notificacoes,
+  lembrete premium, PWA, Worker, Cloudflare.
+
+---
+
 ## Checkpoint de estabilização pós-1.0.45 (somente documentacao)
 
 Auditoria pos-aprovacao do reset de senha. **Nenhum bug encontrado → nenhuma
