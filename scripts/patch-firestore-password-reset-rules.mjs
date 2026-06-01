@@ -30,6 +30,10 @@ const input = fs.readFileSync(inPath, 'utf8');
 if (!/rules_version\s*=\s*'2'/.test(input)) abort("input nao contem rules_version = '2'");
 if (!input.includes('service cloud.firestore')) abort('input nao contem "service cloud.firestore"');
 if (!input.includes('match /databases/{database}/documents')) abort('input nao contem match /databases/{database}/documents');
+// Cercas markdown ``` no input indicam regras corrompidas (copia/cola de Markdown).
+if (/^[ \t]*```/m.test(input)) abort('input contem cerca markdown (```), provavel copia corrompida');
+// Contagem de crases no input — sera o BASELINE para detectar se o patch introduz crase.
+const inputBackticks = (input.match(/`/g) || []).length;
 
 // ---------- Idempotencia ----------
 if (/match\s+\/passwordResetRequests\b/.test(input)) {
@@ -124,8 +128,15 @@ if (!patched.includes('service cloud.firestore')) abort('output perdeu service c
 if (!patched.includes('match /databases/{database}/documents')) abort('output perdeu match /databases');
 const occ = (patched.match(/match\s+\/passwordResetRequests\b/g) || []).length;
 if (occ !== 1) abort(`passwordResetRequests aparece ${occ}x (esperado 1)`);
-if (patched.includes('`')) abort('output contem crase');
-if (/^[ \t]*```/m.test(patched)) abort('output contem cerca markdown');
+// Cerca markdown ``` permanece BLOQUEADA em qualquer hipotese.
+if (/^[ \t]*```/m.test(patched)) abort('output contem cerca markdown (```)');
+// Crase SOLTA: o input pode ter crases legitimas em comentarios de producao
+// (ex.: // veja `status` em users). O patch nao pode INTRODUZIR crases — comparamos
+// a contagem antes/depois. Permitimos igualdade; aborta se aumentou.
+const outputBackticks = (patched.match(/`/g) || []).length;
+if (outputBackticks > inputBackticks) {
+  abort(`patch introduziu ${outputBackticks - inputBackticks} crase(s) novas (input=${inputBackticks}, output=${outputBackticks})`);
+}
 const opens = (patched.match(/\{/g) || []).length;
 const closes = (patched.match(/\}/g) || []).length;
 if (opens !== closes) abort(`chaves desbalanceadas: ${opens} { vs ${closes} }`);
