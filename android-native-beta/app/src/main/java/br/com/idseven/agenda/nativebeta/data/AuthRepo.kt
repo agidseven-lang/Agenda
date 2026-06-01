@@ -98,9 +98,10 @@ object AuthRepo {
         )
         db.collection("passwordResetRequests").add(data)
             .addOnSuccessListener { cont.resume(Result.Ok("", null)) }
-            .addOnFailureListener { ex ->
-                // Falha de rede é o único caso em que damos erro técnico; sem expor schema.
-                cont.resume(Result.Err("Não foi possível enviar agora. Verifique a internet. (${ex.message})"))
+            .addOnFailureListener {
+                // NUNCA expor PERMISSION_DENIED / detalhes tecnicos ao usuario.
+                // Mensagem amigavel unica para qualquer falha (rede, regras, etc).
+                cont.resume(Result.Err("Não foi possível enviar sua solicitação agora. Tente novamente em instantes."))
             }
     }
 

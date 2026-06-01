@@ -5,6 +5,33 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.38-beta-password-reset-rules-fix — corrige PERMISSION_DENIED do reset (em desenvolvimento)
+
+**Causa raiz.** Na 1.0.37 a coleção aditiva `passwordResetRequests` foi criada
+sem regra no Firestore. Como o app **não** usa Firebase Auth (sem `request.auth`),
+a regra default nega `create` → Firestore retorna
+`PERMISSION_DENIED: Missing or insufficient permissions.`, e o app exibia o
+erro técnico bruto.
+
+- **Snippet de Rules (novo `firestore.rules` no repo, OUT-OF-BAND deploy).**
+  O snippet permite apenas `create` (cliente), nega `read/list/update/delete`,
+  exige schema EXATO (`hasOnly` + `hasAll`), `status=="pending"`,
+  `source=="nativebeta"`, `handledBy==null`, `handledAt==null`, `kind∈{email,phone}`,
+  `identifier` string 3-120, `phoneDigits` ≤20 e ≥8 quando `kind=="phone"`,
+  `createdAt` numérico > 0. **Atenção:** o arquivo do repo é SNIPPET — deve ser
+  MESCLADO nas regras existentes do Console (não substituir). Triagem das
+  solicitações fica no Console Firebase (não há admin auth real para o app
+  nesta fase).
+- **App:** `AuthRepo.requestPasswordReset` deixa de propagar `ex.message`;
+  qualquer falha (rede, regras) mostra agora *"Não foi possível enviar sua
+  solicitação agora. Tente novamente em instantes."* (mensagem amigável fixa).
+- **Mantido:** sucesso continua com mensagem genérica (anti-enumeração);
+  fluxo de "Criar nova senha" intacto; login normal intacto; chat, notificações,
+  Functions, PWA, Worker e Cloudflare **não tocados**.
+- Versão 1.0.38 (versionCode 42).
+
+---
+
 ## 1.0.37-beta-password-reset-admin — redefinição de senha por administrador (em desenvolvimento)
 
 **Esqueci minha senha sem e-mail (decisão de produto).** Reset solicitado no app,

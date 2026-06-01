@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.37-beta-password-reset-admin"
+private const val BUILD = "1.0.38-beta-password-reset-rules-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

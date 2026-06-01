@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ──────────────────────────────────────────────────────────────────────
+    // passwordResetRequests — SNIPPET para reset por administrador (1.0.37+)
+    //
+    // OBJETIVO: permitir que o app (cliente anonimo) CRIE uma solicitacao,
+    // sem revelar dados de outros usuarios, e SEM permitir leitura ou
+    // alteracao por cliente comum.
+    //
+    // ATENCAO — DEPLOY (LEIA ANTES):
+    //   Este arquivo contem APENAS o bloco de passwordResetRequests. O
+    //   projeto provavelmente ja tem outras regras no Console Firebase para
+    //   users / events / tasks / chats / agendas / lembretes etc. Antes de
+    //   publicar:
+    //     1) Abra Firebase Console -> Firestore Database -> Regras
+    //     2) MESCLE o bloco "match /passwordResetRequests/{reqId}" abaixo
+    //        DENTRO do "match /databases/{database}/documents { ... }" que
+    //        ja existe. NAO substitua o arquivo inteiro — voce vai derrubar
+    //        o PWA e o login.
+    //     3) Clique em Publicar. Se preferir CLI: copie esse bloco para o
+    //        seu firestore.rules em producao e rode
+    //        `firebase deploy --only firestore:rules`.
+    //
+    // ADMINISTRACAO (leitura/atualizacao):
+    //   Esta versao NAO cria regra de leitura/admin na coleção, porque o
+    //   app NAO usa Firebase Auth (sem `request.auth` confiavel para validar
+    //   admin sem mudar arquitetura). Triagem das solicitacoes deve ser
+    //   feita pelo Console Firebase (admin do projeto) nesta fase.
+    // ──────────────────────────────────────────────────────────────────────
+
+    match /passwordResetRequests/{reqId} {
+      // Anti-enumeracao: ninguem le do lado do cliente.
+      allow read, list: if false;
+      // Apenas Console trata; cliente nao altera nem apaga.
+      allow update, delete: if false;
+
+      // Criacao: schema EXATO, sem campos extras, status/source fixos,
+      // handledBy / handledAt obrigatoriamente null na criacao.
+      allow create: if
+        request.resource.data.keys().hasOnly([
+          'identifier','kind','phoneDigits','createdAt',
+          'status','source','handledBy','handledAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'identifier','kind','phoneDigits','createdAt',
+          'status','source','handledBy','handledAt'
+        ]) &&
+        request.resource.data.identifier is string &&
+        request.resource.data.identifier.size() >= 3 &&
+        request.resource.data.identifier.size() <= 120 &&
+        request.resource.data.kind is string &&
+        (request.resource.data.kind == 'email' ||
+         request.resource.data.kind == 'phone') &&
+        request.resource.data.phoneDigits is string &&
+        request.resource.data.phoneDigits.size() <= 20 &&
+        (request.resource.data.kind != 'phone' ||
+         request.resource.data.phoneDigits.size() >= 8) &&
+        request.resource.data.createdAt is number &&
+        request.resource.data.createdAt > 0 &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.source == 'nativebeta' &&
+        request.resource.data.handledBy == null &&
+        request.resource.data.handledAt == null;
+    }
+  }
+}
