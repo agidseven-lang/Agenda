@@ -345,11 +345,17 @@ exports.requestPasswordReset = onCall(
 
     const apiKey = RESEND_API_KEY.value();
     const fromAddress = RESET_EMAIL_FROM.value();
-    if (!apiKey || !fromAddress) {
+    const PLACEHOLDER = "PLACEHOLDER_NOT_CONFIGURED_RUN_setup_password_reset_provider";
+    if (!apiKey || !fromAddress || apiKey === PLACEHOLDER) {
+      // Log COMPLETO no Cloud Logging (admin ve) — cliente continua recebendo
+      // resposta generica (anti-enumeracao, sem detalhe tecnico).
       logger.error("password-reset:config-missing", {
-        hasApiKey: !!apiKey, hasFrom: !!fromAddress,
+        hasApiKey: !!apiKey,
+        apiKeyIsPlaceholder: apiKey === PLACEHOLDER,
+        hasFrom: !!fromAddress,
+        hint: "Rode o job CI setup_password_reset_provider (push com [setup-reset]) com as vars protegidas RESEND_API_KEY e RESET_EMAIL_FROM no GitLab.",
       });
-      return GENERIC_REQUEST_OK; // nao revela ao usuario que esta sem config
+      return GENERIC_REQUEST_OK;
     }
 
     const db = admin.firestore();
