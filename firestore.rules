@@ -1,43 +1,105 @@
 rules_version = '2';
+
+// =====================================================================
+// firestore.rules — Agenda ID Seven (deploy via GitLab CI/CD)
+//
+// Coleções em uso (auditadas no codigo do PWA, do app nativo e das Functions):
+//   - users
+//   - events
+//   - tasks
+//   - chats
+//   - chats/{chatId}/messages   (SUBCOLECAO)
+//   - briefs                    (PWA-only)
+//   - passwordResetRequests     (app nativo; reset por administrador, 1.0.37+)
+//
+// MODELO DE AUTH: o produto NAO usa Firebase Auth — autenticacao eh custom
+// via documento 'users/*' (campo 'pass'/'salt'). Portanto 'request.auth' eh
+// SEMPRE null nos clientes; as regras nao podem depender dele.
+//
+// PRINCIPIOS:
+//   - Reproduzir o comportamento existente em producao para nao quebrar PWA/app.
+//   - Endurecer apenas 'passwordResetRequests' (coleção nova, schema fechado).
+//   - Bloquear coleções nao listadas (default-deny no 'match /{document=**}').
+//   - Limites de tamanho defensivos para impedir abuso (1 MiB por doc).
+//
+// IMPORTANTE — PRIMEIRA PUBLICACAO:
+//   Estas regras foram montadas a partir do uso conhecido do codigo, NAO
+//   foram extraidas da producao. Antes de rodar 'deploy_firestore_rules'
+//   pela primeira vez, rode o job 'dump_firestore_rules' no GitLab — ele
+//   baixa as regras de prod via API (sem voce copiar/colar) e salva como
+//   artifact 'firestore.rules.from-prod'. Compare com este arquivo; se
+//   houver validacoes especificas em prod que nao estao aqui, traga-as
+//   para ca antes do deploy. So entao rode 'deploy_firestore_rules'.
+// =====================================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ──────────────────────────────────────────────────────────────────────
-    // passwordResetRequests — SNIPPET para reset por administrador (1.0.37+)
-    //
-    // OBJETIVO: permitir que o app (cliente anonimo) CRIE uma solicitacao,
-    // sem revelar dados de outros usuarios, e SEM permitir leitura ou
-    // alteracao por cliente comum.
-    //
-    // ATENCAO — DEPLOY (LEIA ANTES):
-    //   Este arquivo contem APENAS o bloco de passwordResetRequests. O
-    //   projeto provavelmente ja tem outras regras no Console Firebase para
-    //   users / events / tasks / chats / agendas / lembretes etc. Antes de
-    //   publicar:
-    //     1) Abra Firebase Console -> Firestore Database -> Regras
-    //     2) MESCLE o bloco "match /passwordResetRequests/{reqId}" abaixo
-    //        DENTRO do "match /databases/{database}/documents { ... }" que
-    //        ja existe. NAO substitua o arquivo inteiro — voce vai derrubar
-    //        o PWA e o login.
-    //     3) Clique em Publicar. Se preferir CLI: copie esse bloco para o
-    //        seu firestore.rules em producao e rode
-    //        `firebase deploy --only firestore:rules`.
-    //
-    // ADMINISTRACAO (leitura/atualizacao):
-    //   Esta versao NAO cria regra de leitura/admin na coleção, porque o
-    //   app NAO usa Firebase Auth (sem `request.auth` confiavel para validar
-    //   admin sem mudar arquitetura). Triagem das solicitacoes deve ser
-    //   feita pelo Console Firebase (admin do projeto) nesta fase.
-    // ──────────────────────────────────────────────────────────────────────
+    // ----------------------------------------------------------------
+    // users — cadastro do PWA cria; login le; profile atualiza
+    // PWA: db.collection("users").add({...}) ; .doc(id).update({pass,salt,...})
+    // App: AuthRepo lê/atualiza users; sem request.auth confiavel
+    // ----------------------------------------------------------------
+    match /users/{userId} {
+      allow read, list: if true;
+      allow create: if request.resource.size() < 1048576;
+      allow update: if request.resource.size() < 1048576;
+      allow delete: if false;
+    }
 
+    // ----------------------------------------------------------------
+    // events — agenda; criados/editados/excluidos por PWA e app
+    // ----------------------------------------------------------------
+    match /events/{eventId} {
+      allow read, list: if true;
+      allow create, update: if request.resource.size() < 1048576;
+      allow delete: if true;
+    }
+
+    // ----------------------------------------------------------------
+    // tasks — tarefas; idem events
+    // ----------------------------------------------------------------
+    match /tasks/{taskId} {
+      allow read, list: if true;
+      allow create, update: if request.resource.size() < 1048576;
+      allow delete: if true;
+    }
+
+    // ----------------------------------------------------------------
+    // chats — sala de conversa; PWA e app leem/criam/atualizam
+    // subcolecao messages logo abaixo
+    // ----------------------------------------------------------------
+    match /chats/{chatId} {
+      allow read, list: if true;
+      allow create, update: if request.resource.size() < 1048576;
+      allow delete: if true;
+
+      match /messages/{messageId} {
+        allow read, list: if true;
+        allow create, update: if request.resource.size() < 1048576;
+        allow delete: if true;
+      }
+    }
+
+    // ----------------------------------------------------------------
+    // briefs — PWA (gestao de briefs); chave = slug
+    // ----------------------------------------------------------------
+    match /briefs/{briefId} {
+      allow read, list: if true;
+      allow create, update: if request.resource.size() < 1048576;
+      allow delete: if true;
+    }
+
+    // ----------------------------------------------------------------
+    // passwordResetRequests — reset por administrador (1.0.37+)
+    //
+    // - Cliente cria UMA solicitacao com schema EXATO.
+    // - Cliente NAO le, NAO lista, NAO atualiza, NAO apaga.
+    // - Triagem fica no Console Firebase (admin do projeto).
+    // ----------------------------------------------------------------
     match /passwordResetRequests/{reqId} {
-      // Anti-enumeracao: ninguem le do lado do cliente.
       allow read, list: if false;
-      // Apenas Console trata; cliente nao altera nem apaga.
       allow update, delete: if false;
-
-      // Criacao: schema EXATO, sem campos extras, status/source fixos,
-      // handledBy / handledAt obrigatoriamente null na criacao.
       allow create: if
         request.resource.data.keys().hasOnly([
           'identifier','kind','phoneDigits','createdAt',
@@ -63,6 +125,13 @@ service cloud.firestore {
         request.resource.data.source == 'nativebeta' &&
         request.resource.data.handledBy == null &&
         request.resource.data.handledAt == null;
+    }
+
+    // ----------------------------------------------------------------
+    // Default-deny — qualquer coleção nao listada acima e bloqueada.
+    // ----------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

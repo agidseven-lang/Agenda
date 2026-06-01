@@ -238,3 +238,141 @@ deploy_firebase_functions:
       # (us-central1), evitando o aviso pos-deploy. Idempotente em re-execucoes.
       echo "===== Deploy ====="
       firebase deploy --only functions --project "$GCP_PROJECT" --non-interactive --force
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DUMP MANUAL das Firestore Rules de PRODUCAO (somente leitura — NAO publica).
+# Use para auditar / fazer backup antes do primeiro deploy via CI. Salva como
+# artifact `firestore.rules.from-prod`. Usa REST API Firebase Rules; nenhum
+# segredo no log; nenhuma alteracao em PWA/Worker/Cloudflare/Functions/App.
+# ─────────────────────────────────────────────────────────────────────────────
+dump_firestore_rules:
+  stage: deploy
+  image: google/cloud-sdk:slim
+  variables:
+    GCP_PROJECT: "agenda-id-seven"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "feat/android-native-saas"'
+      when: manual
+      allow_failure: true
+  script:
+    - |
+      set -e
+      if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] || [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+        echo "::error:: GOOGLE_APPLICATION_CREDENTIALS (File) ausente."
+        exit 1
+      fi
+      apt-get update -qq && apt-get install -y -qq jq curl ca-certificates >/dev/null
+      gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" >/dev/null
+      gcloud config set project "$GCP_PROJECT" >/dev/null
+      TOKEN="$(gcloud auth print-access-token)"
+      echo ">> Resolvendo release atual de cloud.firestore..."
+      REL=$(curl -fsSL -H "Authorization: Bearer $TOKEN" \
+        "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore")
+      RULESET=$(echo "$REL" | jq -r '.rulesetName')
+      if [ -z "$RULESET" ] || [ "$RULESET" = "null" ]; then
+        echo "::error:: nao encontrei rulesetName na release cloud.firestore."
+        echo "$REL"
+        exit 1
+      fi
+      echo ">> Ruleset: $RULESET"
+      RS=$(curl -fsSL -H "Authorization: Bearer $TOKEN" \
+        "https://firebaserules.googleapis.com/v1/${RULESET}")
+      echo "$RS" | jq -r '.source.files[0].content' > firestore.rules.from-prod
+      echo "---- firestore.rules.from-prod (primeiras 40 linhas) ----"
+      head -40 firestore.rules.from-prod || true
+      wc -l firestore.rules.from-prod
+      echo ">> Compare com o firestore.rules do repo antes de rodar deploy_firestore_rules."
+  artifacts:
+    name: "firestore-rules-from-prod-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - firestore.rules.from-prod
+    expire_in: 30 days
+    when: on_success
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPLOY MANUAL do firestore.rules versionado no repo.
+# Antes de publicar, faz BACKUP automatico das regras de producao via REST API
+# (artifact `firestore.rules.backup-pre-<sha>`). MANUAL por seguranca — nao
+# publica em todo push. Nao toca PWA/Worker/Cloudflare/Functions/App.
+# Pre-requisitos do projeto GCP:
+#   - APIs: firebaserules.googleapis.com (idempotente abaixo)
+#   - IAM da service account: roles/firebaserules.admin (ou equivalente)
+# ─────────────────────────────────────────────────────────────────────────────
+deploy_firestore_rules:
+  stage: deploy
+  image: google/cloud-sdk:slim
+  variables:
+    GCP_PROJECT: "agenda-id-seven"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "feat/android-native-saas"'
+      when: manual
+      allow_failure: false
+  script:
+    - |
+      set -e
+      if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] || [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+        echo "::error:: GOOGLE_APPLICATION_CREDENTIALS (File) ausente."
+        exit 1
+      fi
+      if [ ! -f firestore.rules ]; then
+        echo "::error:: firestore.rules nao encontrado na raiz do repo."
+        exit 1
+      fi
+      echo ">> Validando ausencia de crases (\`) no firestore.rules (proteção contra markdown)..."
+      if grep -nP '`' firestore.rules ; then
+        echo "::error:: firestore.rules contem crase (\`) — provavel markdown copiado. Remova antes do deploy."
+        exit 1
+      fi
+      echo ">> Validando ausencia de cercas de codigo (markdown leftovers)..."
+      if grep -nE '^[[:space:]]*```' firestore.rules ; then
+        echo "::error:: firestore.rules contem cerca de codigo markdown (\`\`\`)."
+        exit 1
+      fi
+      echo ">> Validando estrutura minima do arquivo..."
+      grep -q "^rules_version *= *'2';" firestore.rules || { echo "::error:: falta rules_version = '2';"; exit 1; }
+      grep -q "service cloud.firestore" firestore.rules || { echo "::error:: falta service cloud.firestore"; exit 1; }
+      grep -q "match /databases/{database}/documents" firestore.rules || { echo "::error:: falta match /databases/{database}/documents"; exit 1; }
+      grep -q "passwordResetRequests" firestore.rules || { echo "::error:: falta bloco passwordResetRequests"; exit 1; }
+      OPEN=$(tr -cd '{' < firestore.rules | wc -c); CLOSE=$(tr -cd '}' < firestore.rules | wc -c)
+      if [ "$OPEN" != "$CLOSE" ]; then
+        echo "::error:: chaves desbalanceadas: $OPEN abre vs $CLOSE fecha"
+        exit 1
+      fi
+      apt-get update -qq && apt-get install -y -qq jq curl ca-certificates >/dev/null
+      if ! command -v node >/dev/null 2>&1; then
+        apt-get install -y -qq gnupg >/dev/null
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+        apt-get install -y -qq nodejs >/dev/null
+      fi
+      gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" >/dev/null
+      gcloud config set project "$GCP_PROJECT" >/dev/null
+      gcloud services enable firebaserules.googleapis.com --project "$GCP_PROJECT" >/dev/null 2>&1 || true
+      echo ">> Backup das regras de PRODUCAO antes de publicar..."
+      TOKEN="$(gcloud auth print-access-token)"
+      REL=$(curl -fsSL -H "Authorization: Bearer $TOKEN" \
+        "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" || echo "{}")
+      RULESET=$(echo "$REL" | jq -r '.rulesetName // empty')
+      if [ -n "$RULESET" ]; then
+        curl -fsSL -H "Authorization: Bearer $TOKEN" \
+          "https://firebaserules.googleapis.com/v1/${RULESET}" \
+          | jq -r '.source.files[0].content' > "firestore.rules.backup-pre-${CI_COMMIT_SHORT_SHA}" || true
+        echo "Backup salvo: firestore.rules.backup-pre-${CI_COMMIT_SHORT_SHA} ($(wc -l < firestore.rules.backup-pre-${CI_COMMIT_SHORT_SHA}) linhas)"
+      else
+        echo "AVISO: nao consegui resolver ruleset atual para backup (pode ser primeira publicacao). Prosseguindo."
+      fi
+      echo ">> Instalando firebase-tools..."
+      npm install -g firebase-tools >/dev/null 2>&1
+      firebase --version
+      echo ">> Publicando firestore:rules..."
+      firebase deploy --only firestore:rules --project "$GCP_PROJECT" --non-interactive
+      echo ">> Confirmando nova release..."
+      curl -fsSL -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+        "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" \
+        | jq '{rulesetName, updateTime}'
+  artifacts:
+    name: "firestore-rules-deploy-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - "firestore.rules"
+      - "firestore.rules.backup-pre-*"
+    expire_in: 90 days
+    when: always

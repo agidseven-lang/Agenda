@@ -5,6 +5,44 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## Infra: deploy de Firestore Rules via GitLab CI (sem copia manual no Console)
+
+**Causa raiz da dor.** O editor do Firebase Console rejeita texto com markdown
+(crases / cercas `\`\`\``) com `token recognition error at: '\`'`. Pior: o
+`firestore.rules` do repo era um snippet (so `passwordResetRequests`) — publica-lo
+substituiria as regras de producao e derrubaria PWA + app.
+
+**Solucao definitiva (infra apenas; APK 1.0.38 nao muda).** Dois jobs novos no
+`.gitlab-ci.yml`, ambos **manuais** (sem efeito em push), usando a mesma
+service account ja configurada (`GOOGLE_APPLICATION_CREDENTIALS` File var):
+
+- **`dump_firestore_rules`** — baixa as regras de PRODUCAO via Firebase Rules
+  REST API e salva como artifact `firestore.rules.from-prod`. Nao publica nada.
+  Voce roda *antes* do primeiro deploy para conferir o que esta vivo.
+- **`deploy_firestore_rules`** — valida o `firestore.rules` do repo (sem crases,
+  sem cercas markdown, com `rules_version`, `service`, `match` e bloco
+  `passwordResetRequests`; chaves balanceadas), faz BACKUP automatico das regras
+  de prod (artifact `firestore.rules.backup-pre-<sha>`), e publica via
+  `firebase deploy --only firestore:rules`. Idempotente. Confirma a release
+  no final via REST API.
+
+**`firebase.json`:** acrescentado bloco `firestore.rules` mantendo `functions` intactas.
+
+**`firestore.rules`:** agora COMPLETO (preserva users/events/tasks/chats/messages/briefs
+no comportamento conhecido + bloco restrito `passwordResetRequests` + default-deny
+em `match /{document=**}`). Limite de 1 MiB por doc. Cabecalho documentado.
+
+**Pre-requisito IAM (uma vez, no Console GCP):** a service account do CI precisa
+ter `roles/firebaserules.admin` no projeto `agenda-id-seven` (provavelmente ja
+tem; se o deploy falhar com `PERMISSION_DENIED` no IAM, conceder e tentar de novo).
+
+**APK:** nao houve mudanca de codigo Android. O artifact 1.0.38 existente
+(`idseven-nativebeta-1.0.38-beta-password-reset-rules-fix.apk`) ja contem a
+mensagem amigavel e o fluxo correto. So o deploy das regras destrava o
+PERMISSION_DENIED no app real.
+
+---
+
 ## 1.0.38-beta-password-reset-rules-fix — corrige PERMISSION_DENIED do reset (em desenvolvimento)
 
 **Causa raiz.** Na 1.0.37 a coleção aditiva `passwordResetRequests` foi criada
