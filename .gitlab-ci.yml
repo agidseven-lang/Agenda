@@ -752,6 +752,7 @@ test_password_reset_backend:
       gcloud config set project "$GCP_PROJECT" >/dev/null
       PLACEHOLDER="PLACEHOLDER_NOT_CONFIGURED_RUN_setup_password_reset_provider"
       FAIL=""
+      EMAIL_OK=""
 
       echo "===== 1) Functions Gen2 existem em us-central1? ====="
       gcloud functions list --gen2 --regions=us-central1 --project="$GCP_PROJECT" \
@@ -843,7 +844,10 @@ test_password_reset_backend:
             echo "  NOTA: allUsers nao apareceu no get-iam-policy, mas o curl anonimo"
             echo "        retornou 200 — acesso publico esta funcional (falso negativo do IAM list)."
           fi
-          if [ "$DELIVERED" = "false" ]; then
+          if [ "$DELIVERED" = "true" ]; then
+            EMAIL_OK="yes"
+            echo "  ✅ password-reset:email-sent confirmado pelo response body (delivered=true)."
+          elif [ "$DELIVERED" = "false" ]; then
             echo "  AVISO (NAO bloqueia APK): Backend acessivel, mas e-mail nao foi entregue."
             echo "         Verificar dominio/remetente no Resend ou e-mail de teste cadastrado."
             echo "         O app NAO mostra erro vermelho; pendencia separada eh delivered=true."
@@ -857,36 +861,36 @@ test_password_reset_backend:
         fi
       fi
 
-      echo "===== 6) Logs recentes + VEREDITO do envio ====="
-      LOGS=$(gcloud functions logs read requestPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --limit=40 2>/dev/null || true)
-      echo "$LOGS" | grep -iE 'password-reset:|error|resend' | sed 's/^/    /' | head -30 || echo "    (sem logs ou sem permissao de leitura de logs)"
-      echo ""
-      echo "  --- VEREDITO (com base nos logs mais recentes) ---"
-      RECENT=$(echo "$LOGS" | grep -iE 'password-reset:(email-sent|resend-rejected|config-missing|not-found|rate-limited|user-not-eligible|function-error)' | tail -1)
-      case "$RECENT" in
-        *email-sent*)
-          echo "  ✅ password-reset:email-sent — ENVIO FUNCIONANDO (e-mail despachado pelo Resend)." ;;
-        *resend-rejected*)
-          echo "  ❌ password-reset:resend-rejected — Resend recusou o envio."
-          FAIL="$FAIL\n  - Resend rejeitou (provavel remetente fora do dominio verificado agendaidseven.com.br ou API key sem permissao de envio). Veja a linha resend-rejected acima." ;;
-        *config-missing*)
-          echo "  ❌ password-reset:config-missing — secret/env ausente."
-          FAIL="$FAIL\n  - config-missing: rode [setup-reset] (RESEND_API_KEY/RESET_EMAIL_FROM)." ;;
-        *not-found*)
-          echo "  ⚠️  password-reset:not-found — o e-mail de teste ($TEST_EMAIL) NAO esta cadastrado em users/*."
-          echo "      A INFRA de envio esta OK (sem resend-rejected). Para comprovar entrega real,"
-          echo "      defina a variavel PASSWORD_RESET_TEST_EMAIL com um e-mail cadastrado e re-rode [test-reset]."
-          echo "      Isso NAO bloqueia o APK." ;;
-        *rate-limited*)
-          echo "  ⚠️  password-reset:rate-limited — chamada recente (<60s). Infra OK. Nao bloqueia." ;;
-        *user-not-eligible*)
-          echo "  ⚠️  password-reset:user-not-eligible — usuario pendente/inativo. Infra OK. Nao bloqueia." ;;
-        *function-error*)
-          echo "  ❌ password-reset:function-error — erro inesperado no backend."
-          FAIL="$FAIL\n  - function-error: ver linha nos logs acima." ;;
-        *)
-          echo "  ⚠️  Sem linha de veredito recente nos logs (pode ser atraso de propagacao do Cloud Logging)." ;;
-      esac
+      echo "===== 6) Cloud Logging (diagnostico COMPLEMENTAR — nunca bloqueia) ====="
+      if [ "$EMAIL_OK" = "yes" ]; then
+        # delivered=true ja eh prova suficiente de envio; logs sao opcionais.
+        echo "  Envio confirmado pelo response body (delivered=true). Logs dispensados como criterio."
+        LOGS=$(gcloud functions logs read requestPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --limit=20 2>/dev/null || true)
+        if [ -n "$LOGS" ]; then
+          echo "$LOGS" | grep -iE 'password-reset:|resend' | sed 's/^/    /' | head -15 || true
+        else
+          echo "  (Cloud Logging indisponivel para a SA do CI, mas response body confirmou delivered=true.)"
+        fi
+      else
+        # Sem delivered=true: usa logs SO para investigar; ausencia de log = warning.
+        LOGS=$(gcloud functions logs read requestPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --limit=40 2>/dev/null || true)
+        if [ -n "$LOGS" ]; then
+          echo "$LOGS" | grep -iE 'password-reset:|error|resend' | sed 's/^/    /' | head -30 || true
+          RECENT=$(echo "$LOGS" | grep -iE 'password-reset:(email-sent|resend-rejected|config-missing|not-found|rate-limited|user-not-eligible|function-error)' | tail -1)
+          case "$RECENT" in
+            *email-sent*)        echo "  ✅ password-reset:email-sent — ENVIO FUNCIONANDO." ;;
+            *resend-rejected*)   echo "  ❌ resend-rejected"; FAIL="$FAIL\n  - Resend rejeitou (remetente fora do dominio verificado ou API key sem envio)." ;;
+            *config-missing*)    echo "  ❌ config-missing"; FAIL="$FAIL\n  - config-missing: rode [setup-reset]." ;;
+            *not-found*)         echo "  ⚠️  not-found — e-mail de teste ($TEST_EMAIL) nao cadastrado. Infra OK. Nao bloqueia." ;;
+            *rate-limited*)      echo "  ⚠️  rate-limited (<60s). Infra OK. Nao bloqueia." ;;
+            *user-not-eligible*) echo "  ⚠️  user-not-eligible. Infra OK. Nao bloqueia." ;;
+            *function-error*)    echo "  ❌ function-error"; FAIL="$FAIL\n  - function-error: ver logs acima." ;;
+            *)                   echo "  ⚠️  Sem linha de veredito nos logs (propagacao ou sem permissao). Nao bloqueia." ;;
+          esac
+        else
+          echo "  (Cloud Logging indisponivel para a SA do CI. Sem delivered=true; veja o corpo do curl acima.)"
+        fi
+      fi
 
       echo ""
       if [ -n "$FAIL" ]; then
