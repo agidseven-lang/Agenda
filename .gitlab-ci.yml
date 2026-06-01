@@ -16,7 +16,7 @@ variables:
   ANDROID_CMDLINE_TOOLS_VERSION: "11076708"   # confira em https://developer.android.com/studio
   ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-  APK_OUT: "idseven-nativebeta-1.0.44-beta-password-reset-secretmanager-fix.apk"
+  APK_OUT: "idseven-nativebeta-1.0.45-beta-password-reset-email-live.apk"
   APP_DIR: "android-native-beta"
 
 stages:
@@ -114,7 +114,7 @@ build_android_beta:
     - cp "$APP_DIR/app/build/outputs/apk/release/app-release.apk" "$APK_OUT"
     - ls -lh "$APK_OUT"
   artifacts:
-    name: "idseven-nativebeta-1.0.44-beta-password-reset-secretmanager-fix-$CI_COMMIT_SHORT_SHA"
+    name: "idseven-nativebeta-1.0.45-beta-password-reset-email-live-$CI_COMMIT_SHORT_SHA"
     paths:
       - "$APK_OUT"
     expire_in: 30 days
@@ -134,6 +134,11 @@ deploy_firebase_functions:
   variables:
     GCP_PROJECT: "agenda-id-seven"
     GCP_PROJECT_NUMBER: "391529908613"
+    # Defaults do remetente (dominio VERIFICADO no Resend: agendaidseven.com.br).
+    # Variavel de projeto CI/CD com mesmo nome, se existir, tem precedencia.
+    RESET_EMAIL_FROM: "no-reply@agendaidseven.com.br"
+    RESET_EMAIL_FROM_NAME: "ID Seven Agenda"
+    RESET_EMAIL_PROVIDER: "resend"
   rules:
     # Push na branch de trabalho: roda AUTOMATICAMENTE (sem botao manual).
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas"'
@@ -522,6 +527,10 @@ setup_password_reset_provider:
   image: google/cloud-sdk:slim
   variables:
     GCP_PROJECT: "agenda-id-seven"
+    # Default do remetente verificado; variavel de projeto CI/CD tem precedencia.
+    RESET_EMAIL_FROM: "no-reply@agendaidseven.com.br"
+    RESET_EMAIL_FROM_NAME: "ID Seven Agenda"
+    RESET_EMAIL_PROVIDER: "resend"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas" && $CI_COMMIT_MESSAGE =~ /\[setup-reset\]/'
       when: on_success
@@ -848,9 +857,36 @@ test_password_reset_backend:
         fi
       fi
 
-      echo "===== 6) Logs recentes (sem segredo) ====="
-      gcloud functions logs read requestPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --limit=25 2>/dev/null \
-        | grep -iE 'password-reset:|error|resend' | sed 's/^/    /' | head -25 || echo "    (sem logs ou sem permissao de leitura de logs)"
+      echo "===== 6) Logs recentes + VEREDITO do envio ====="
+      LOGS=$(gcloud functions logs read requestPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --limit=40 2>/dev/null || true)
+      echo "$LOGS" | grep -iE 'password-reset:|error|resend' | sed 's/^/    /' | head -30 || echo "    (sem logs ou sem permissao de leitura de logs)"
+      echo ""
+      echo "  --- VEREDITO (com base nos logs mais recentes) ---"
+      RECENT=$(echo "$LOGS" | grep -iE 'password-reset:(email-sent|resend-rejected|config-missing|not-found|rate-limited|user-not-eligible|function-error)' | tail -1)
+      case "$RECENT" in
+        *email-sent*)
+          echo "  ✅ password-reset:email-sent — ENVIO FUNCIONANDO (e-mail despachado pelo Resend)." ;;
+        *resend-rejected*)
+          echo "  ❌ password-reset:resend-rejected — Resend recusou o envio."
+          FAIL="$FAIL\n  - Resend rejeitou (provavel remetente fora do dominio verificado agendaidseven.com.br ou API key sem permissao de envio). Veja a linha resend-rejected acima." ;;
+        *config-missing*)
+          echo "  ❌ password-reset:config-missing — secret/env ausente."
+          FAIL="$FAIL\n  - config-missing: rode [setup-reset] (RESEND_API_KEY/RESET_EMAIL_FROM)." ;;
+        *not-found*)
+          echo "  ⚠️  password-reset:not-found — o e-mail de teste ($TEST_EMAIL) NAO esta cadastrado em users/*."
+          echo "      A INFRA de envio esta OK (sem resend-rejected). Para comprovar entrega real,"
+          echo "      defina a variavel PASSWORD_RESET_TEST_EMAIL com um e-mail cadastrado e re-rode [test-reset]."
+          echo "      Isso NAO bloqueia o APK." ;;
+        *rate-limited*)
+          echo "  ⚠️  password-reset:rate-limited — chamada recente (<60s). Infra OK. Nao bloqueia." ;;
+        *user-not-eligible*)
+          echo "  ⚠️  password-reset:user-not-eligible — usuario pendente/inativo. Infra OK. Nao bloqueia." ;;
+        *function-error*)
+          echo "  ❌ password-reset:function-error — erro inesperado no backend."
+          FAIL="$FAIL\n  - function-error: ver linha nos logs acima." ;;
+        *)
+          echo "  ⚠️  Sem linha de veredito recente nos logs (pode ser atraso de propagacao do Cloud Logging)." ;;
+      esac
 
       echo ""
       if [ -n "$FAIL" ]; then
@@ -859,9 +895,9 @@ test_password_reset_backend:
         echo ""
         echo "Acoes:"
         echo "  * placeholder/secret/env ausente -> push com [setup-reset] (vars protegidas no GitLab)."
-        echo "  * sem allUsers invoker -> checar org policy iam.allowedPolicyMemberDomains."
-        echo "  * dominio nao verificado no Resend -> verifique o dominio do RESET_EMAIL_FROM no painel Resend."
+        echo "  * 401/403 invoker -> checar org policy iam.allowedPolicyMemberDomains."
+        echo "  * resend-rejected -> remetente deve ser do dominio verificado (no-reply@agendaidseven.com.br)."
         exit 1
       fi
-      echo "OK — backend de reset operacional. Verifique a caixa de $TEST_EMAIL para o codigo real."
+      echo "OK — backend de reset ACESSIVEL (HTTP 200 ok:true). Veredito de envio acima."
   # Sem artifacts — evita expor qualquer resposta com dado sensivel.

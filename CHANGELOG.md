@@ -5,6 +5,31 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.45-beta-password-reset-email-live — remetente verificado (agendaidseven.com.br)
+
+Dominio **agendaidseven.com.br verificado no Resend** (DNS/SPF/DKIM Verified,
+Enable Sending ativo). Consolidacao do envio real do codigo de redefinicao.
+
+- **Remetente default no pipeline** (setup + deploy): `RESET_EMAIL_FROM=no-reply@agendaidseven.com.br`,
+  `RESET_EMAIL_FROM_NAME=ID Seven Agenda`, `RESET_EMAIL_PROVIDER=resend`.
+  Variavel de projeto CI/CD com o mesmo nome ainda tem precedencia; o default
+  garante remetente valido mesmo se a variavel estiver vazia. Redeploy das 4
+  Functions de reset com esse env.
+- **Veredito automatico de envio** no `test_password_reset_backend`: le os logs
+  da Function e classifica a ultima ocorrencia —
+  `email-sent` (✅ envio OK) / `resend-rejected` (❌ falha real, bloqueia) /
+  `config-missing` (❌) / `not-found` (⚠️ e-mail de teste nao cadastrado, infra
+  OK, nao bloqueia) / `rate-limited` / `user-not-eligible`. So bloqueia o APK
+  em falha real de infra; `delivered=false` por e-mail de teste nao cadastrado
+  nao bloqueia.
+- App: sem mudanca de codigo; apenas versao/labels (1.0.45 / vc 50). Continua
+  usando a URL real `*.a.run.app` via BuildConfig.
+
+Sem mudanca em Functions (logica), chat, agenda, tarefas, notificacoes,
+lembrete premium, PWA, Worker, Cloudflare, schema. Secret Manager ja OK.
+
+---
+
 ## 1.0.44-beta-password-reset-secretmanager-fix — corrige IAM/Secret Manager do CI
 
 **Causa raiz confirmada (logs do pipeline d7daaa0):**
