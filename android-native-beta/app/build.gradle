@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 39
-        versionName "1.0.35-beta-chat-list-polish"
+        versionCode 40
+        versionName "1.0.36-beta-chat-thread-polish"
         vectorDrawables { useSupportLibrary true }
     }
 

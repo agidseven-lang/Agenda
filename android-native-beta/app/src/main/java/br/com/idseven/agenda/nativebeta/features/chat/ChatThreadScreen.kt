@@ -55,6 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -155,8 +156,28 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
 
         // Mensagens
         if (messages.isEmpty()) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text("Nenhuma mensagem ainda — diga olá 👋", color = Tokens.Faint, fontSize = 13.sp)
+            // Estado vazio premium da conversa (campo de envio segue disponivel abaixo).
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Box(
+                    Modifier.size(72.dp).clip(CircleShape).background(Tokens.Surface2),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Outlined.ChatBubbleOutline, contentDescription = null,
+                        tint = Tokens.Accent, modifier = Modifier.size(32.dp),
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Text("Nenhuma mensagem ainda", color = Tokens.Ink, fontSize = 15.5.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Envie uma mensagem para iniciar a conversa.",
+                    color = Tokens.Faint, fontSize = 13.sp, textAlign = TextAlign.Center,
+                )
             }
         } else {
             LazyColumn(
@@ -166,7 +187,12 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
             ) {
                 itemsIndexed(messages, key = { _, m -> m.id }) { index, msg ->
                     val mine = msg.by == me
-                    val grouped = index > 0 && messages[index - 1].by == msg.by
+                    val prev = messages.getOrNull(index - 1)
+                    // Separador de data (sticky-like) quando muda o dia (ou no primeiro item).
+                    val showDay = prev == null || !DateUtil.sameDay(prev.at, msg.at)
+                    if (showDay) DateChip(DateUtil.dayHeader(msg.at))
+                    // Agrupa mensagens consecutivas do MESMO remetente NO MESMO DIA.
+                    val grouped = !showDay && prev != null && prev.by == msg.by
                     MessageBubble(msg, mine, grouped, readByOther = msg.readBy.containsKey(otherId))
                 }
             }
@@ -329,15 +355,38 @@ fun ChatThreadScreen(session: UserSession, otherId: String, users: List<UserLite
 }
 
 @Composable
+private fun DateChip(label: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Tokens.Surface2)
+                .padding(horizontal = 12.dp, vertical = 5.dp),
+        ) {
+            Text(label, color = Tokens.Faint, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
 private fun MessageBubble(msg: Message, mine: Boolean, grouped: Boolean, readByOther: Boolean) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = if (grouped) 2.dp else 8.dp),
         horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
     ) {
+        // Tail (canto curto) só na última mensagem do grupo do mesmo remetente —
+        // mensagens agrupadas mantêm cantos arredondados em ambos os lados (estilo
+        // premium, evita "rabinho" repetido).
+        val tail = !grouped
         Column(
             modifier = Modifier.widthIn(max = 290.dp).clip(
-                RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = if (mine) 18.dp else 5.dp, bottomEnd = if (mine) 5.dp else 18.dp)
-            ).background(if (mine) Tokens.Accent else Tokens.Surface).padding(horizontal = 12.dp, vertical = 8.dp),
+                RoundedCornerShape(
+                    topStart = 18.dp, topEnd = 18.dp,
+                    bottomStart = if (mine || !tail) 18.dp else 5.dp,
+                    bottomEnd = if (!mine || !tail) 18.dp else 5.dp,
+                )
+            ).background(if (mine) Tokens.Accent else Tokens.Surface).padding(horizontal = 13.dp, vertical = 9.dp),
         ) {
             Text(msg.text, color = if (mine) Color.White else Tokens.Ink, fontSize = 14.5.sp)
             Spacer(Modifier.height(3.dp))

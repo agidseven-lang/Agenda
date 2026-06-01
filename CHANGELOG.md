@@ -5,6 +5,27 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.36-beta-chat-thread-polish — refinamento visual da conversa (em desenvolvimento)
+
+**Fase 3E do chat (UI-only no `ChatThreadScreen`).** Sem mexer em lógica/Functions/notificações.
+
+- **Separador de data:** chip "Hoje" / "Ontem" / "dia de mês" / "dd/mm/aaaa"
+  (anos passados), inserido só quando muda o dia entre mensagens consecutivas.
+- **Agrupamento por dia + remetente:** mensagens consecutivas do mesmo remetente
+  no mesmo dia ficam coladas (sem "rabinho" repetido); só a última do grupo tem
+  o canto curto (estilo premium).
+- **Estado vazio premium:** ícone circular accent + "Nenhuma mensagem ainda" +
+  "Envie uma mensagem para iniciar a conversa." (campo de envio segue disponível).
+- **Bubble polish sutil:** padding 13×9 (era 12×8); horário/ticks intactos
+  (1.0.32 — ✓/✓✓ por `readBy`, recebidas sem ticks).
+- **`DateUtil`:** adicionado `sameDay(a,b)` e `dayHeader(ms)` (aditivo, públicos).
+- Lista de conversas, ChatRepo, schema, Functions, push, ✓/✓✓, contador,
+  respostas rápidas e notificações 1.0.31 **não tocados**. Sem áudio.
+
+Status: aguardando build do APK + teste em aparelho real.
+
+---
+
 ## 1.0.35-beta-chat-list-polish — refinamento da lista de conversas (em desenvolvimento)
 
 **Fase 3D do chat (UI-only).** Lista do Marketing mais próxima do WhatsApp Business.
