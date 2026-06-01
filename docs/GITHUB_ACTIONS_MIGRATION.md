@@ -29,10 +29,15 @@ Para não misturar dois produtos no mesmo branch default, o repositório
   unificar app + PWA no `main` como monorepo.
 - Branches preservadas: `main`, `mirror/gitlab-1.0.46`, `feat/android-native-saas`.
 
-> Os workflows `[manual]` fazem checkout do código do app por `ref`. Para usar
-> `app/main` como fonte, basta informar `app/main` no input `ref` do
-> `android-beta-build.yml` (hoje o default é `mirror/gitlab-1.0.46`; ambos
-> apontam para `4e317f5`).
+> **Ref padrão dos workflows = `app/main`.** Desde 2026-06-01, os 4 workflows do
+> app que fazem checkout usam `app/main` por padrão:
+> - `android-beta-build.yml` — input `ref` default `app/main` (override por execução);
+> - `firebase-functions-deploy.yml`, `password-reset-provider-setup.yml`,
+>   `firestore-rules-deploy.yml` — `ref: app/main` no checkout.
+> - `password-reset-backend-test.yml` — não faz checkout (usa gcloud/REST), sem ref.
+> Continuam **`workflow_dispatch`** apenas; os de deploy seguem exigindo
+> `confirm_deploy=DEPLOY`. Os arquivos dos workflows vivem no branch default
+> `main` (onde o GitHub registra o dispatch); o **código do app** vem de `app/main`.
 
 ---
 
