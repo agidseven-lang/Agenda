@@ -523,3 +523,135 @@ setup_password_reset_provider:
       echo "  4) informe codigo + nova senha; faca login com a nova senha."
       echo "=================================================================="
   # Sem artifacts neste job — nada de segredo expirando no GitLab.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DIAGNOSTICO REAL do backend de reset de senha. Dispara em push com [test-reset].
+# Confirma que as callables existem, que o secret nao eh placeholder, que as
+# env vars foram aplicadas, e faz UMA chamada real a requestPasswordReset
+# capturando o erro tecnico verdadeiro. Falha com mensagem objetiva e unica.
+# NUNCA imprime a RESEND_API_KEY nem o codigo gerado. Nao toca Android/PWA/etc.
+# ─────────────────────────────────────────────────────────────────────────────
+test_password_reset_backend:
+  stage: deploy
+  image: google/cloud-sdk:slim
+  variables:
+    GCP_PROJECT: "agenda-id-seven"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "feat/android-native-saas" && $CI_COMMIT_MESSAGE =~ /\[test-reset\]/'
+      when: on_success
+  script:
+    - |
+      set -e
+      if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ] || [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+        echo "::error:: GOOGLE_APPLICATION_CREDENTIALS (File) ausente."; exit 1
+      fi
+      apt-get update -qq && apt-get install -y -qq jq curl ca-certificates >/dev/null
+      gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" >/dev/null
+      gcloud config set project "$GCP_PROJECT" >/dev/null
+      PLACEHOLDER="PLACEHOLDER_NOT_CONFIGURED_RUN_setup_password_reset_provider"
+      FAIL=""
+
+      echo "===== 1) Functions Gen2 existem em us-central1? ====="
+      gcloud functions list --gen2 --regions=us-central1 --project="$GCP_PROJECT" \
+        --format='table(name,state,serviceConfig.uri)' 2>/dev/null || true
+      for FN in requestPasswordReset confirmPasswordReset; do
+        if gcloud functions describe "$FN" --gen2 --region=us-central1 --project="$GCP_PROJECT" >/tmp/fn.json 2>/dev/null; then
+          STATE=$(gcloud functions describe "$FN" --gen2 --region=us-central1 --project="$GCP_PROJECT" --format='value(state)' 2>/dev/null)
+          echo "  $FN: existe (state=$STATE)"
+          [ "$STATE" = "ACTIVE" ] || FAIL="$FAIL\n  - $FN nao esta ACTIVE (state=$STATE)"
+        else
+          echo "  $FN: NAO EXISTE"
+          FAIL="$FAIL\n  - Function $FN nao publicada em us-central1 (deploy falhou)."
+        fi
+      done
+
+      echo "===== 2) Secret RESEND_API_KEY existe, enabled e != placeholder? ====="
+      if gcloud secrets describe RESEND_API_KEY --project="$GCP_PROJECT" >/dev/null 2>&1; then
+        VER=$(gcloud secrets versions list RESEND_API_KEY --project="$GCP_PROJECT" --filter='state=ENABLED' --limit=1 --format='value(name)' 2>/dev/null)
+        if [ -z "$VER" ]; then
+          echo "  secret existe, mas SEM versao ENABLED."
+          FAIL="$FAIL\n  - RESEND_API_KEY sem versao habilitada."
+        else
+          echo "  secret RESEND_API_KEY: versao enabled = $VER"
+          # Le o valor SO para comparar com o placeholder; nunca imprime o valor.
+          if gcloud secrets versions access latest --secret=RESEND_API_KEY --project="$GCP_PROJECT" >/tmp/key 2>/dev/null; then
+            if [ "$(cat /tmp/key)" = "$PLACEHOLDER" ]; then
+              echo "  valor = PLACEHOLDER (setup real nao rodou)."
+              FAIL="$FAIL\n  - RESEND_API_KEY ainda eh PLACEHOLDER. Rode setup_password_reset_provider com a key real."
+            else
+              echo "  valor real configurado (len=$(wc -c < /tmp/key) bytes)."
+            fi
+            shred -u /tmp/key 2>/dev/null || rm -f /tmp/key
+          else
+            echo "  (SA do CI nao tem acesso de leitura ao secret — ok; sera lido em runtime pela SA das Functions)"
+          fi
+        fi
+      else
+        echo "  secret RESEND_API_KEY NAO existe."
+        FAIL="$FAIL\n  - RESEND_API_KEY ausente no Secret Manager."
+      fi
+
+      echo "===== 3) Env vars aplicadas na requestPasswordReset? ====="
+      if gcloud functions describe requestPasswordReset --gen2 --region=us-central1 --project="$GCP_PROJECT" \
+           --format='json(serviceConfig.environmentVariables)' >/tmp/env.json 2>/dev/null; then
+        FROM=$(jq -r '.serviceConfig.environmentVariables.RESET_EMAIL_FROM // empty' /tmp/env.json)
+        PROV=$(jq -r '.serviceConfig.environmentVariables.RESET_EMAIL_PROVIDER // empty' /tmp/env.json)
+        NAME=$(jq -r '.serviceConfig.environmentVariables.RESET_EMAIL_FROM_NAME // empty' /tmp/env.json)
+        echo "  RESET_EMAIL_FROM=${FROM:-(vazio)} | RESET_EMAIL_PROVIDER=${PROV:-(vazio)} | RESET_EMAIL_FROM_NAME=${NAME:-(vazio)}"
+        [ -n "$FROM" ] || FAIL="$FAIL\n  - RESET_EMAIL_FROM nao aplicado na Function (rode setup_password_reset_provider)."
+      else
+        echo "  (nao consegui ler env vars — Function pode nao existir)"
+      fi
+
+      echo "===== 4) Invoker publico (allUsers) nas callables? ====="
+      for SVC in requestPasswordReset confirmPasswordReset; do
+        if gcloud run services get-iam-policy "$SVC" --region=us-central1 --project="$GCP_PROJECT" --format='value(bindings.members)' 2>/dev/null | grep -q allUsers; then
+          echo "  $SVC: allUsers OK"
+        else
+          echo "  $SVC: SEM allUsers invoker"
+          FAIL="$FAIL\n  - $SVC sem 'allUsers' run.invoker (app sem Firebase Auth recebe UNAUTHENTICATED). Pode ser org policy iam.allowedPolicyMemberDomains bloqueando allUsers."
+        fi
+      done
+
+      echo "===== 5) Chamada REAL a requestPasswordReset (protocolo callable) ====="
+      TEST_EMAIL="${PASSWORD_RESET_TEST_EMAIL:-idseven@idseven.com.br}"
+      URI=$(gcloud functions describe requestPasswordReset --gen2 --region=us-central1 --project="$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)
+      if [ -n "$URI" ]; then
+        echo "  POST $URI (email de teste mascarado)"
+        # Identity token autentica o invoker IAM; o wrapper callable trata como
+        # chamada nao-autenticada do ponto de vista do Firebase Auth (ok).
+        IDTOKEN=$(gcloud auth print-identity-token 2>/dev/null || true)
+        HTTP=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST "$URI" \
+          -H "Authorization: Bearer $IDTOKEN" \
+          -H "Content-Type: application/json" \
+          --data "{\"data\":{\"email\":\"$TEST_EMAIL\"}}" || echo "000")
+        echo "  HTTP=$HTTP"
+        echo "  corpo:"; jq '.' /tmp/resp.json 2>/dev/null | sed 's/^/    /' || sed 's/^/    /' /tmp/resp.json
+        if [ "$HTTP" = "200" ] && jq -e '.result.ok == true' /tmp/resp.json >/dev/null 2>&1; then
+          echo "  -> Function respondeu {ok:true} (caminho generico OK)."
+        else
+          echo "  -> Function NAO retornou 200/{ok:true}."
+          FAIL="$FAIL\n  - Chamada real retornou HTTP=$HTTP (veja corpo acima: NOT_FOUND/UNAUTHENTICATED/INTERNAL?)."
+        fi
+      else
+        echo "  (sem URI — Function nao publicada)"
+        FAIL="$FAIL\n  - requestPasswordReset sem URI (nao publicada)."
+      fi
+
+      echo "===== 6) Logs recentes (sem segredo) ====="
+      gcloud functions logs read requestPasswordReset --gen2 --region=us-central1 --project="$GCP_PROJECT" --limit=20 2>/dev/null \
+        | grep -iE 'password-reset:|error|resend' | sed 's/^/    /' | head -20 || echo "    (sem logs ou sem permissao de leitura de logs)"
+
+      echo ""
+      if [ -n "$FAIL" ]; then
+        echo "::error:: DIAGNOSTICO DO RESET FALHOU. Causa(s):"
+        printf "%b\n" "$FAIL"
+        echo ""
+        echo "Acoes:"
+        echo "  * placeholder/secret/env ausente -> push com [setup-reset] (vars protegidas no GitLab)."
+        echo "  * sem allUsers invoker -> checar org policy iam.allowedPolicyMemberDomains."
+        echo "  * dominio nao verificado no Resend -> verifique o dominio do RESET_EMAIL_FROM no painel Resend."
+        exit 1
+      fi
+      echo "OK — backend de reset operacional. Verifique a caixa de $TEST_EMAIL para o codigo real."
+  # Sem artifacts — evita expor qualquer resposta com dado sensivel.

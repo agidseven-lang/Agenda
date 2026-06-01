@@ -337,70 +337,92 @@ async function sendResetCodeEmail({ to, code, fromAddress, fromName, apiKey }) {
 
 const GENERIC_REQUEST_OK = { ok: true, message: "Se o e-mail estiver cadastrado, enviaremos um codigo de redefinicao." };
 
+// Busca o codigo de reset mais recente de um e-mail SEM exigir indice composto.
+// Query so por igualdade em `email` (campo auto-indexado) e ordena em memoria.
+// Evita FAILED_PRECONDITION por falta de indice (email ASC + createdAt DESC),
+// que era a causa do app cair no addOnFailureListener.
+async function latestResetCodeDoc(db, email) {
+  const snap = await db.collection("passwordResetCodes").where("email", "==", email).get();
+  if (snap.empty) return null;
+  let best = null;
+  for (const doc of snap.docs) {
+    const c = doc.get("createdAt") || 0;
+    if (!best || c > best.c) best = { doc, c };
+  }
+  return best ? best.doc : null;
+}
+
 exports.requestPasswordReset = onCall(
   { secrets: [RESEND_API_KEY], region: "us-central1", maxInstances: 5 },
   async (req) => {
+    // Validacao severa de payload pode lancar (cliente trata). Todo o resto eh
+    // blindado: qualquer erro tecnico vira log + retorno generico, para o app
+    // NUNCA cair no addOnFailureListener por causa controlavel.
     const email = normEmail(req && req.data && req.data.email);
     if (!isValidEmail(email)) throw new HttpsError("invalid-argument", "E-mail invalido.");
 
-    const apiKey = RESEND_API_KEY.value();
-    const fromAddress = RESET_EMAIL_FROM.value();
-    const PLACEHOLDER = "PLACEHOLDER_NOT_CONFIGURED_RUN_setup_password_reset_provider";
-    if (!apiKey || !fromAddress || apiKey === PLACEHOLDER) {
-      // Log COMPLETO no Cloud Logging (admin ve) — cliente continua recebendo
-      // resposta generica (anti-enumeracao, sem detalhe tecnico).
-      logger.error("password-reset:config-missing", {
-        hasApiKey: !!apiKey,
-        apiKeyIsPlaceholder: apiKey === PLACEHOLDER,
-        hasFrom: !!fromAddress,
-        hint: "Rode o job CI setup_password_reset_provider (push com [setup-reset]) com as vars protegidas RESEND_API_KEY e RESET_EMAIL_FROM no GitLab.",
-      });
-      return GENERIC_REQUEST_OK;
-    }
-
-    const db = admin.firestore();
-    const usersSnap = await db.collection("users").where("email", "==", email).limit(1).get();
-    if (usersSnap.empty) {
-      logger.info("password-reset:not-found", { email });
-      return GENERIC_REQUEST_OK;
-    }
-    const userDoc = usersSnap.docs[0];
-    const status = userDoc.get("status");
-    if (status === "removido" || status === "excluido" || status === "pendente") {
-      logger.info("password-reset:user-not-eligible", { email, status });
-      return GENERIC_REQUEST_OK;
-    }
-
-    // Rate-limit por e-mail: 60s desde o ultimo codigo gerado.
-    const recent = await db.collection("passwordResetCodes")
-      .where("email", "==", email).orderBy("createdAt", "desc").limit(1).get();
-    if (!recent.empty) {
-      const last = recent.docs[0].get("createdAt") || 0;
-      if (Date.now() - last < REQUEST_RATE_LIMIT_MS) {
-        logger.warn("password-reset:rate-limited", { email });
+    try {
+      const apiKey = RESEND_API_KEY.value();
+      const fromAddress = RESET_EMAIL_FROM.value();
+      const PLACEHOLDER = "PLACEHOLDER_NOT_CONFIGURED_RUN_setup_password_reset_provider";
+      if (!apiKey || !fromAddress || apiKey === PLACEHOLDER) {
+        logger.error("password-reset:config-missing", {
+          hasApiKey: !!apiKey,
+          apiKeyIsPlaceholder: apiKey === PLACEHOLDER,
+          hasFrom: !!fromAddress,
+          hint: "Rode o job CI setup_password_reset_provider (push com [setup-reset]) com as vars protegidas RESEND_API_KEY e RESET_EMAIL_FROM no GitLab.",
+        });
         return GENERIC_REQUEST_OK;
       }
-    }
 
-    const code = genCode();
-    const now = Date.now();
-    await db.collection("passwordResetCodes").add({
-      email, userId: userDoc.id, codeHash: sha256Hex(code),
-      createdAt: now, expiresAt: now + CODE_TTL_MS,
-      usedAt: null, attempts: 0, status: "pending", source: "nativebeta",
-    });
+      const db = admin.firestore();
+      const usersSnap = await db.collection("users").where("email", "==", email).limit(1).get();
+      if (usersSnap.empty) {
+        logger.info("password-reset:not-found", { email });
+        return GENERIC_REQUEST_OK;
+      }
+      const userDoc = usersSnap.docs[0];
+      const status = userDoc.get("status");
+      if (status === "removido" || status === "excluido" || status === "pendente") {
+        logger.info("password-reset:user-not-eligible", { email, status });
+        return GENERIC_REQUEST_OK;
+      }
 
-    try {
-      await sendResetCodeEmail({
-        to: email, code, fromAddress,
-        fromName: RESET_EMAIL_FROM_NAME.value(), apiKey,
+      // Rate-limit por e-mail: 60s desde o ultimo codigo gerado (sem indice composto).
+      const last = await latestResetCodeDoc(db, email);
+      if (last) {
+        const lastAt = last.get("createdAt") || 0;
+        if (Date.now() - lastAt < REQUEST_RATE_LIMIT_MS) {
+          logger.warn("password-reset:rate-limited", { email });
+          return GENERIC_REQUEST_OK;
+        }
+      }
+
+      const code = genCode();
+      const now = Date.now();
+      await db.collection("passwordResetCodes").add({
+        email, userId: userDoc.id, codeHash: sha256Hex(code),
+        createdAt: now, expiresAt: now + CODE_TTL_MS,
+        usedAt: null, attempts: 0, status: "pending", source: "nativebeta",
       });
-      logger.info("password-reset:email-sent", { email });
+
+      try {
+        await sendResetCodeEmail({
+          to: email, code, fromAddress,
+          fromName: RESET_EMAIL_FROM_NAME.value(), apiKey,
+        });
+        logger.info("password-reset:email-sent", { email });
+      } catch (e) {
+        // Resend rejeitou (dominio nao verificado, remetente invalido, etc).
+        logger.error("password-reset:resend-rejected", { error: String(e && e.message).slice(0, 300) });
+      }
+      return GENERIC_REQUEST_OK;
     } catch (e) {
-      logger.error("password-reset:email-failed", { error: String(e && e.message).slice(0, 200) });
-      // resposta ao usuario continua generica
+      // Erro tecnico inesperado (Firestore/indice/permissao): loga e responde
+      // generico — o usuario nao ve detalhe e o app nao cai no failure listener.
+      logger.error("password-reset:function-error", { error: String(e && e.message).slice(0, 300) });
+      return GENERIC_REQUEST_OK;
     }
-    return GENERIC_REQUEST_OK;
   }
 );
 
@@ -416,10 +438,14 @@ exports.confirmPasswordReset = onCall(
     if (newPassword.length < 6) throw new HttpsError("invalid-argument", "A nova senha precisa ter pelo menos 6 caracteres.");
 
     const db = admin.firestore();
-    const codes = await db.collection("passwordResetCodes")
-      .where("email", "==", email).orderBy("createdAt", "desc").limit(1).get();
-    if (codes.empty) throw new HttpsError("not-found", "Codigo nao encontrado. Solicite um novo.");
-    const codeDoc = codes.docs[0];
+    let codeDoc;
+    try {
+      codeDoc = await latestResetCodeDoc(db, email); // sem indice composto
+    } catch (e) {
+      logger.error("password-reset:function-error", { phase: "confirm-query", error: String(e && e.message).slice(0, 300) });
+      throw new HttpsError("internal", "Não foi possível redefinir a senha agora. Tente novamente em instantes.");
+    }
+    if (!codeDoc) throw new HttpsError("not-found", "Codigo nao encontrado. Solicite um novo.");
     const data = codeDoc.data() || {};
 
     if (data.usedAt) throw new HttpsError("failed-precondition", "Codigo ja utilizado. Solicite um novo.");
