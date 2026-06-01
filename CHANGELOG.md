@@ -3,6 +3,29 @@
 Histórico das entregas do app nativo (`br.com.idseven.agenda.nativebeta`) e das
 Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
+## Checkpoint de estabilização pós-1.0.45 (somente documentacao)
+
+Auditoria pos-aprovacao do reset de senha. **Nenhum bug encontrado → nenhuma
+mudanca de codigo, nenhum APK novo.** Base estavel ancorada no commit `d348cb8`
+(APK 1.0.45-beta-password-reset-email-live, vc 50).
+
+- **Regressao auditada (intacto):** login, cadastro, reset por e-mail (HTTP
+  onRequest + BuildConfig, sem Callable/URL presumida), Crypto `s2:`+sha256,
+  chat, push imediato (onEventCreated/onTaskCreated/onChatMessageCreated),
+  lembrete premium, agenda, tarefas, perfil. 7 exports de Functions validos
+  (`node --check` OK). 0 refs a Callable/cloudfunctions.net no AuthRepo.
+- **Pipeline auditado:** ordem `build→deploy→verify→package`; `build_android_beta`
+  depende de `resolve_password_reset_urls` (obrig.) + `test_password_reset_backend`
+  (opcional). Veredito `delivered:true` aprova sem depender de Cloud Logging
+  (sem falso negativo). Bloqueios reais preservados: HTTP≠200, 401/403,
+  secret ausente/placeholder/sem-versao, RESET_EMAIL_FROM ausente, URL vazia,
+  Function nao publicada/nao-ACTIVE, resend-rejected, config-missing, function-error.
+- **Novo doc:** `docs/PASSWORD_RESET.md` (checkpoint, endpoints, env vars,
+  rollback, checklist de deploy).
+- Remetente/dominio/API key/Secret Manager: **nao alterados**.
+
+---
+
 ---
 
 ## 1.0.45-beta-password-reset-email-live — remetente verificado (agendaidseven.com.br)
