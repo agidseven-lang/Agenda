@@ -5,6 +5,44 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## Infra: deploy autonomo das Firestore Rules (sem Console manual)
+
+**Decisao operacional.** Acabou copiar/colar no Firebase Console e job manual.
+Agora o GitLab CI faz tudo sozinho — em PUSH com marker [deploy-rules] na
+mensagem do commit, o job:
+
+  1. Baixa as regras de PRODUCAO via Firebase Rules REST (fonte da verdade).
+  2. Salva backup como artifact firestore.rules.backup-pre-<sha>.
+  3. Roda scripts/patch-firestore-password-reset-rules.mjs — idempotente,
+     trabalha por LINHAS (preserva 100% do input), insere apenas o bloco
+     passwordResetRequests antes de match /{document=**} (ou, no fallback,
+     antes do fechamento de match /databases/{database}/documents).
+  4. Diff -u from-prod -> generated; aborta se o patch alterou/removeu
+     qualquer linha existente.
+  5. Valida ausencia de crases / cercas markdown.
+  6. Cria firebase.ci.json temporario apontando para firestore.rules.generated
+     e publica via firebase deploy --only firestore:rules --config ...
+  7. Confirma a nova release via REST.
+
+**O que mudou no repo (cleanup):**
+- Removido `firestore.rules` reconstruido (prod e a fonte da verdade).
+- `firebase.json` reverteu para functions-only (evita deploy acidental do
+  arquivo errado em ambiente local; o CI usa firebase.ci.json transitorio).
+- Removidos os dois jobs manuais (`dump_firestore_rules`,
+  `deploy_firestore_rules`) — substituidos pelo job autonomo.
+- Novo: `scripts/patch-firestore-password-reset-rules.mjs` (Node ESM,
+  testado em 5 cenarios: inserir, idempotente, fallback sem wildcard,
+  rejeicao de input invalido, indentacao alternativa).
+
+**IAM (one-time):** o job tenta `gcloud projects add-iam-policy-binding`
+de `roles/firebaserules.admin` na SA do CI. Se a SA ja tiver, no-op
+idempotente; se nao tiver setIamPolicy, prossegue e o deploy falha com
+causa exata no log (nao mascara).
+
+**APK 1.0.38:** sem mudancas (commit nao tem `[build-apk]`).
+
+---
+
 ## Infra: deploy de Firestore Rules via GitLab CI (sem copia manual no Console)
 
 **Causa raiz da dor.** O editor do Firebase Console rejeita texto com markdown
