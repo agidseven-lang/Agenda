@@ -1,0 +1,104 @@
+# Build Android Nativo Beta (port do GitLab build_android_beta).
+# PREPARADO — execucao SOMENTE manual (workflow_dispatch). NAO roda em push/PR.
+# Nao faz deploy. Gera APK como artifact. GitLab continua principal.
+name: "[manual] Android Beta Build"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit a buildar (ex.: mirror/gitlab-1.0.46)"
+        required: true
+        default: "mirror/gitlab-1.0.46"
+      resolve_urls:
+        description: "Resolver URLs reais das Functions Gen2 via gcloud (true/false)"
+        required: false
+        default: "true"
+
+# Sem permissoes de escrita: este workflow nao publica nada.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: "agenda-id-seven"
+      APP_DIR: "android-native-beta"
+    steps:
+      - name: Checkout (ref escolhido)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Debug keystore (assinatura de TESTE)
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -v -keystore ~/.android/debug.keystore \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Restaurar google-services.json (secret texto puro)
+        env:
+          GOOGLE_SERVICES_JSON_BETA: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON_BETA" ]; then
+            echo "::error:: secret GOOGLE_SERVICES_JSON_BETA ausente."; exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_BETA" > "$APP_DIR/app/google-services.json"
+          echo "google-services.json gravado ($(wc -c < "$APP_DIR/app/google-services.json") bytes)."
+
+      - name: Resolver URLs reais das Functions (opcional, sem deploy)
+        id: urls
+        if: ${{ github.event.inputs.resolve_urls == 'true' }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          if [ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]; then
+            echo "::error:: secret GOOGLE_APPLICATION_CREDENTIALS_JSON ausente (necessario p/ resolver URLs)."; exit 1
+          fi
+          KEY="$(mktemp)"; printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$KEY"
+          gcloud auth activate-service-account --key-file="$KEY" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          REQ=$(gcloud functions describe requestPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)
+          CNF=$(gcloud functions describe confirmPasswordResetHttp --gen2 --region=us-central1 --project="$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)
+          rm -f "$KEY"
+          if [ -z "$REQ" ] || [ -z "$CNF" ]; then
+            echo "::error:: URLs vazias — Functions de reset nao publicadas. Rode o deploy de Functions antes."; exit 1
+          fi
+          case "$REQ" in https://*.run.app|https://*.run.app/*|https://*.cloudfunctions.net|https://*.cloudfunctions.net/*) : ;; *) echo "::error:: URL request inesperada: $REQ"; exit 1 ;; esac
+          case "$CNF" in https://*.run.app|https://*.run.app/*|https://*.cloudfunctions.net|https://*.cloudfunctions.net/*) : ;; *) echo "::error:: URL confirm inesperada: $CNF"; exit 1 ;; esac
+          echo "req=$REQ" >> "$GITHUB_OUTPUT"
+          echo "cnf=$CNF" >> "$GITHUB_OUTPUT"
+          echo "URL request: $REQ"
+          echo "URL confirm: $CNF"
+
+      - name: gradlew clean assembleRelease (com URLs reais, se resolvidas)
+        run: |
+          cd "$APP_DIR"
+          chmod +x ./gradlew
+          EXTRA=""
+          if [ -n "${{ steps.urls.outputs.req }}" ] && [ -n "${{ steps.urls.outputs.cnf }}" ]; then
+            EXTRA="-PPASSWORD_RESET_REQUEST_URL=${{ steps.urls.outputs.req }} -PPASSWORD_RESET_CONFIRM_URL=${{ steps.urls.outputs.cnf }}"
+          fi
+          ./gradlew clean assembleRelease --no-daemon --stacktrace $EXTRA
+
+      - name: Upload APK (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: idseven-nativebeta-${{ github.sha }}
+          path: ${{ env.APP_DIR }}/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
