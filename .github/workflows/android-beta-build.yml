@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (ex.: mirror/gitlab-1.0.46)"
+        description: "Branch/commit a buildar (default: app/main — branch dedicada do app)"
         required: true
-        default: "mirror/gitlab-1.0.46"
+        default: "app/main"
       resolve_urls:
         description: "Resolver URLs reais das Functions Gen2 via gcloud (true/false)"
         required: false
