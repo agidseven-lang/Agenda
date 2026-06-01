@@ -5,6 +5,32 @@ Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
 ---
 
+## 1.0.41-beta-password-reset-backend-fix — build consolidada apos correcao backend
+
+**Apenas bump de versao** para facilitar o teste final. A causa raiz do
+"Nao foi possivel enviar sua solicitacao agora" foi corrigida no backend
+(commit 38b4c2c):
+
+- a Cloud Function `requestPasswordReset` usava `where('email')` + `orderBy('createdAt')`,
+  exigindo um indice composto inexistente -> Firestore lancava FAILED_PRECONDITION
+  -> a callable retornava INTERNAL -> o app caia no addOnFailureListener;
+- a correcao removeu a dependencia do indice composto (query so por `email`,
+  ordenacao em memoria via `latestResetCodeDoc`) e blindou a Function com
+  try/catch (erro tecnico -> log + retorno generico {ok:true}).
+
+Esta versao **nao altera codigo funcional** vs 1.0.40 — so versao e labels:
+- versionName 1.0.41-beta-password-reset-backend-fix / versionCode 46;
+- rodape do login + ProfileScreen atualizados.
+
+App pronto para teste final de redefinicao por e-mail: "Enviar codigo" nao
+deve mais cair no erro vermelho; com o remetente aceito pelo Resend, o
+e-mail com o codigo de 6 digitos chega e permite criar a nova senha.
+
+Sem mudanca em chat, agenda, tarefas, notificacoes, lembrete premium, PWA,
+Worker, Cloudflare, schema ou Functions (nao alteradas neste commit).
+
+---
+
 ## 1.0.40-beta-password-reset-email-ready — reset por e-mail com provider real
 
 **Bump de consolidacao.** As variaveis do Resend foram configuradas no GitLab
