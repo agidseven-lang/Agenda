@@ -15,12 +15,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -39,16 +43,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.nativebeta.core.PushNotify
 import br.com.idseven.agenda.nativebeta.data.EventContract
 import br.com.idseven.agenda.nativebeta.data.EventRepo
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTextField
+import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.components.MessageBanner
 import br.com.idseven.agenda.nativebeta.designsystem.components.PrimaryButton
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Types
+import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 import kotlinx.coroutines.flow.first
@@ -196,12 +204,24 @@ fun EventFormScreen(
             Spacer(Modifier.height(14.dp))
 
             FieldLabel("Responsável")
+            val selectedUser = activeUsers.firstOrNull { it.id == ownerId }
             Box {
-                PickerField(ownerName.ifBlank { "Selecionar da equipe" }) { ownerMenu = true }
+                AssigneePickerField(
+                    selected = ownerId != null,
+                    photo = selectedUser?.photo,
+                    ringColor = UserColor.of(ownerId, selectedUser?.color),
+                    name = ownerName,
+                ) { ownerMenu = true }
                 DropdownMenu(expanded = ownerMenu, onDismissRequest = { ownerMenu = false }) {
-                    DropdownMenuItem(text = { Text("— Ninguém —") }, onClick = { ownerId = null; ownerName = ""; ownerMenu = false })
+                    DropdownMenuItem(
+                        text = { AssigneeItemRow(photo = null, ringColor = Tokens.Line, name = "Ninguém", neutral = true, selected = ownerId == null) },
+                        onClick = { ownerId = null; ownerName = ""; ownerMenu = false },
+                    )
                     activeUsers.forEach { u ->
-                        DropdownMenuItem(text = { Text(u.name ?: "—") }, onClick = { ownerId = u.id; ownerName = u.name ?: ""; ownerMenu = false })
+                        DropdownMenuItem(
+                            text = { AssigneeItemRow(photo = u.photo, ringColor = UserColor.of(u.id, u.color), name = u.name ?: "—", neutral = false, selected = u.id == ownerId) },
+                            onClick = { ownerId = u.id; ownerName = u.name ?: ""; ownerMenu = false },
+                        )
                     }
                 }
             }
@@ -227,4 +247,62 @@ private fun PickerField(value: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() }.padding(horizontal = 14.dp, vertical = 15.dp),
     ) { Text(value, color = Tokens.Ink, fontSize = 14.5.sp) }
+}
+
+// Avatar neutro (sem usuário / "Ninguém"): círculo discreto com ícone de pessoa.
+@Composable
+private fun NeutralAvatar(size: Dp) {
+    Box(
+        modifier = Modifier.size(size).clip(CircleShape).background(Tokens.Surface2),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Outlined.Person, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(size * 0.55f))
+    }
+}
+
+// Campo FECHADO do responsável: avatar/foto (ou neutro) + nome completo, padrão premium.
+@Composable
+private fun AssigneePickerField(selected: Boolean, photo: String?, ringColor: Color, name: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Surface)
+            .border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (selected) Avatar(photo, ringColor, name, 36.dp) else NeutralAvatar(36.dp)
+            Spacer(Modifier.width(12.dp))
+            Text(
+                if (selected) name.ifBlank { "—" } else "Selecionar da equipe",
+                color = if (selected) Tokens.Ink else Tokens.Faint,
+                fontSize = 14.5.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+// Item da LISTA do responsável: avatar/foto (ou neutro) + nome completo + marca de selecionado.
+@Composable
+private fun AssigneeItemRow(photo: String?, ringColor: Color, name: String, neutral: Boolean, selected: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 4.dp),
+    ) {
+        if (neutral) NeutralAvatar(34.dp) else Avatar(photo, ringColor, name, 34.dp)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            name,
+            color = if (selected) Tokens.Accent else Tokens.Ink,
+            fontSize = 14.5.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp,
+            modifier = Modifier.widthIn(max = 200.dp),
+        )
+        if (selected) {
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Outlined.Check, contentDescription = null, tint = Tokens.Accent, modifier = Modifier.size(18.dp))
+        }
+    }
 }
