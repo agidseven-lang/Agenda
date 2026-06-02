@@ -89,10 +89,8 @@ jobs:
           ./gradlew clean assembleRelease --no-daemon --stacktrace $EXTRA
 
       # Empacotamento p/ distribuicao DIRETA (sem Play Store):
-      # - renomeia APK com nome claro;
-      # - relatorio de instalacao: apksigner verify, zipalign -c, debuggable, permissoes;
-      # - instrucoes de instalacao direta;
-      # - ZIP final (APK + relatorio + instrucoes).
+      # renomeia APK, gera relatorio (apksigner verify, zipalign -c, debuggable,
+      # permissoes) e instrucoes de instalacao.
       - name: Renomear + verificar + gerar relatorio/instrucoes
         if: always()
         run: |
@@ -107,62 +105,62 @@ jobs:
           if [ ! -f "$SRC" ]; then echo "::error:: APK nao gerado ($SRC ausente)."; exit 1; fi
           cp "$SRC" "$APK"
           {
-            echo "===== RELATORIO DE INSTALACAO — idseven nativebeta ====="
+            echo "===== RELATORIO DE INSTALACAO - idseven nativebeta ====="
             echo "Gerado (UTC)   : $(date -u)"
             echo "Ref / commit   : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
             echo "Arquivo APK    : $(basename "$APK")"
             echo "Tamanho        : $(wc -c < "$APK") bytes"
             echo "SHA-256 (apk)  : $(sha256sum "$APK" | cut -d' ' -f1)"
-            echo
+            echo ""
             echo "----- Identidade do pacote (aapt badging) -----"
             "$AAPT" dump badging "$APK" 2>/dev/null | grep -E "^package:|sdkVersion:|targetSdkVersion:|application-label:"
             if "$AAPT" dump badging "$APK" 2>/dev/null | grep -q "application-debuggable"; then
-              echo "debuggable     : TRUE (ATENCAO — nao deveria em release)"
+              echo "debuggable     : TRUE (ATENCAO - nao deveria em release)"
             else
-              echo "debuggable     : FALSE (ok — release nao-depuravel)"
+              echo "debuggable     : FALSE (ok - release nao-depuravel)"
             fi
-            echo
+            echo ""
             echo "----- Permissoes declaradas (uses-permission) -----"
             "$AAPT" dump permissions "$APK" 2>/dev/null | grep "uses-permission:" | sed "s/uses-permission: name=//"
-            echo
+            echo ""
             echo "----- zipalign -c -v 4 (alinhamento 4 bytes) -----"
             if "$ZIPALIGN" -c -v 4 "$APK" >/dev/null 2>&1; then echo "zipalign       : OK (4-byte aligned)"; else echo "zipalign       : FALHOU"; fi
-            echo
+            echo ""
             echo "----- apksigner verify --verbose --print-certs -----"
             "$APKSIGNER" verify --verbose --print-certs "$APK" 2>&1
-            echo
+            echo ""
             echo "----- keytool: fingerprints do keystore versionado -----"
             keytool -list -v -keystore "$APP_DIR/app/idseven-test.keystore" -storepass android 2>/dev/null | grep -E "Alias name:|Owner:|SHA1:|SHA256:|Valid"
           } | tee "$REPORT"
-          cat > "$INSTR" <<'EOF'
-==== COMO INSTALAR (APK DIRETO, SEM PLAY STORE) ====
-
-1) Baixe o arquivo .apk pelo NAVEGADOR (Chrome) do celular.
-2) O arquivo fica na pasta "Downloads".
-3) Abra o app "Meus Arquivos" (ou "Arquivos") > pasta Download.
-4) Toque em idseven-nativebeta-1.0.49-beta-direct-install-fix.apk.
-5) Se aparecer "Instalar apps desconhecidos": habilite a permissao
-   para "Meus Arquivos" (ou Chrome) e volte. Toque em INSTALAR.
-
-==== PRIMEIRA INSTALACAO DESTA LINHA (faca uma vez) ====
-Se ja teve uma versao ANTERIOR (1.0.46/1.0.47) instalada, DESINSTALE
-primeiro — inclusive em "Dual Apps" / "Espaco Seguro" / 2o usuario /
-Perfil de trabalho. A assinatura mudou UMA unica vez; depois desta,
-as proximas atualizam por cima normalmente, sem desinstalar.
-
-==== SE O PLAY PROTECT BLOQUEAR ====
-- Toque em "Mais detalhes" e depois "Instalar mesmo assim", se aparecer.
-- Se a opcao NAO aparecer: e bloqueio do Google por instalacao fora da
-  Play Store (sideload), NAO e erro do app. Para liberar temporariamente:
-  Play Store > foto do perfil > Play Protect > engrenagem (config) >
-  desligue "Verificar apps", instale, e religue depois.
-
-==== DISTRIBUICAO RECOMENDADA ====
-- Link de download direto aberto no NAVEGADOR do aparelho.
-- Salvar em Downloads e instalar pelo "Meus Arquivos".
-- Evite depender de envio por WhatsApp como meio principal
-  (recompacta/renomeia e pode atrapalhar a instalacao).
-EOF
+          printf '%s\n' \
+            "==== COMO INSTALAR (APK DIRETO, SEM PLAY STORE) ====" \
+            "" \
+            "1) Baixe o arquivo .apk pelo NAVEGADOR (Chrome) do celular." \
+            "2) O arquivo fica na pasta Downloads." \
+            "3) Abra o app Meus Arquivos (ou Arquivos) > pasta Download." \
+            "4) Toque em ${DIST_BASENAME}.apk." \
+            "5) Se aparecer 'Instalar apps desconhecidos': habilite a permissao" \
+            "   para Meus Arquivos (ou Chrome) e volte. Toque em INSTALAR." \
+            "" \
+            "==== PRIMEIRA INSTALACAO DESTA LINHA (faca uma vez) ====" \
+            "Se ja teve uma versao ANTERIOR (1.0.46/1.0.47) instalada, DESINSTALE" \
+            "primeiro - inclusive em Dual Apps / Espaco Seguro / 2o usuario /" \
+            "Perfil de trabalho. A assinatura mudou UMA unica vez; depois desta," \
+            "as proximas atualizam por cima normalmente, sem desinstalar." \
+            "" \
+            "==== SE O PLAY PROTECT BLOQUEAR ====" \
+            "- Toque em 'Mais detalhes' e depois 'Instalar mesmo assim', se aparecer." \
+            "- Se a opcao NAO aparecer: e bloqueio do Google por instalacao fora da" \
+            "  Play Store (sideload), NAO e erro do app. Para liberar temporariamente:" \
+            "  Play Store > foto do perfil > Play Protect > engrenagem (config) >" \
+            "  desligue 'Verificar apps', instale, e religue depois." \
+            "" \
+            "==== DISTRIBUICAO RECOMENDADA ====" \
+            "- Link de download direto aberto no NAVEGADOR do aparelho." \
+            "- Salvar em Downloads e instalar pelo Meus Arquivos." \
+            "- Evite depender de envio por WhatsApp como meio principal" \
+            "  (recompacta/renomeia e pode atrapalhar a instalacao)." \
+            > "$INSTR"
           echo "Conteudo de dist/:"; ls -lh "$OUTDIR"
 
       - name: Montar ZIP de distribuicao (APK + relatorio + instrucoes)
