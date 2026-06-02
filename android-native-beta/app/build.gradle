@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 54
-        versionName "1.0.49-beta-install-diagnostic"
+        versionCode 55
+        versionName "1.0.49-beta-direct-install-fix"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
@@ -42,6 +42,7 @@ android {
     buildTypes {
         debug { }
         release {
+            // debuggable nao definido -> default FALSE (release nao-depuravel).
             signingConfig signingConfigs.debugtest
             minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
