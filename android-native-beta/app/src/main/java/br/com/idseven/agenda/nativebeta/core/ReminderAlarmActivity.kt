@@ -29,6 +29,7 @@ class ReminderAlarmActivity : ComponentActivity() {
         const val EX_RESP = "rem_resp"
         const val EX_STATUS = "rem_status"
         const val EX_PHOTO = "rem_photo"   // foto/avatar do responsável (url http ou base64)
+        const val EX_RESP_ID = "rem_resp_id" // UID do responsável (resolve foto/nome em tempo real)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,25 +58,52 @@ class ReminderAlarmActivity : ComponentActivity() {
         val resp = intent.getStringExtra(EX_RESP)?.takeIf { it.isNotBlank() }
         val status = intent.getStringExtra(EX_STATUS)?.takeIf { it.isNotBlank() }
         val photo = intent.getStringExtra(EX_PHOTO)?.takeIf { it.isNotBlank() }
+        val respId = intent.getStringExtra(EX_RESP_ID)?.takeIf { it.isNotBlank() }
+
+        // Estado reativo: começa com o que veio no intent (foto/nome do payload) e é
+        // ATUALIZADO em tempo real ao resolver o responsável por respId no Firestore.
+        // Cobre payloads sem foto (ex.: agendados via FCM) e lembretes antigos/rearmados.
+        val photoState = androidx.compose.runtime.mutableStateOf(photo)
+        val nameState = androidx.compose.runtime.mutableStateOf(resp)
+        if (respId != null) {
+            android.util.Log.i("ReminderDiag", "[REMINDER_PHOTO_RESOLVE_START] respId=$respId intentPhoto=${!photo.isNullOrBlank()}")
+            runCatching {
+                com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").document(respId).get()
+                    .addOnSuccessListener { d ->
+                        // Mesma lista de campos do UsersRepo (foto pode estar em qualquer um).
+                        val p = listOf("photo", "photoUrl", "avatar", "avatarUrl", "image", "imageUrl", "picture", "foto")
+                            .firstNotNullOfOrNull { k -> d.getString(k)?.takeIf { it.isNotBlank() } }
+                        val nm = d.getString("name")?.takeIf { it.isNotBlank() }
+                        if (!p.isNullOrBlank()) photoState.value = p   // foto ATUAL do responsável
+                        if (!nm.isNullOrBlank()) nameState.value = nm
+                        android.util.Log.i("ReminderDiag", "[REMINDER_PHOTO_RESOLVED] respId=$respId hasPhoto=${!p.isNullOrBlank()} name=$nm")
+                    }
+                    .addOnFailureListener { e ->
+                        android.util.Log.w("ReminderDiag", "[REMINDER_PHOTO_RESOLVE_FAILED] respId=$respId err=${e.message}")
+                    }
+            }
+        }
 
         val headline = if (type == "task") "Tarefa em 1 hora" else "Compromisso em 1 hora"
         val dateLabel = date?.let { runCatching { "${DateUtil.dayLabel(it)}, ${DateUtil.dayShort(it)}" }.getOrDefault(it) } ?: "—"
-        val rows = buildList {
-            add(ReminderRow(if (type == "task") "Tarefa" else "Compromisso", title))
-            add(ReminderRow("Responsável", resp ?: "—"))
-            add(ReminderRow("Data", dateLabel))
-            add(ReminderRow("Horário", time ?: "—"))
-            add(ReminderRow("Status", status ?: (if (type == "task") "Pendente" else "Agendado")))
-        }
 
         setContent {
             IDSevenBetaTheme {
+                val curName = nameState.value
+                val rows = buildList {
+                    add(ReminderRow(if (type == "task") "Tarefa" else "Compromisso", title))
+                    add(ReminderRow("Responsável", curName ?: "—"))
+                    add(ReminderRow("Data", dateLabel))
+                    add(ReminderRow("Horário", time ?: "—"))
+                    add(ReminderRow("Status", status ?: (if (type == "task") "Pendente" else "Agendado")))
+                }
                 ReminderPremiumScreen(
                     type = type,
                     title = headline,
                     subtitle = if (text.isNotBlank()) text else title,
-                    responsiblePhoto = photo,
-                    responsibleName = resp,
+                    responsiblePhoto = photoState.value,
+                    responsibleName = curName,
                     rows = rows,
                     actionLabel = if (type == "task") "Abrir tarefa" else "Abrir compromisso",
                     onAction = {

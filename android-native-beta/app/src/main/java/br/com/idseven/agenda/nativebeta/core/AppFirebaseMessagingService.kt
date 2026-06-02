@@ -59,8 +59,9 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
                     ?: data["deepLink"]?.substringAfter(":", "")?.takeIf { it.isNotBlank() }
                 val date = data["scheduledDate"]?.takeIf { it.isNotBlank() } ?: data["scheduledAt"]
                 val timeStr = data["scheduledTime"]
+                val responsibleId = data["responsibleId"]?.takeIf { it.isNotBlank() }
                 if (rawId != null) {
-                    ReminderScheduler.scheduleFromFcm(this, type, rawId, title, date, timeStr)
+                    ReminderScheduler.scheduleFromFcm(this, type, rawId, title, date, timeStr, responsibleId = responsibleId)
                 }
             }
         } catch (_: Throwable) { }

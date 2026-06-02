@@ -28,16 +28,18 @@ object ReminderScheduler {
         val key: String, val at: Long, val title: String, val text: String,
         val type: String = "event", val date: String = "", val time: String = "",
         val resp: String = "", val status: String = "", val deepLink: String = "",
-        val photo: String = "",
+        val photo: String = "", val respId: String = "",
     )
 
     // Extras estruturados levados no alarme/persistência (toleram ausência).
     // `photo` (1.0.51): foto/avatar do RESPONSÁVEL para a tela premium. Pode ser URL http
     // ou base64; vazio cai no fallback (iniciais -> ícone). Aditivo, sem schema novo.
+    // `respId` (1.0.52): UID do responsável -> a tela premium resolve foto/nome ATUAIS em
+    // tempo real (Firestore), mesmo que o payload tenha vindo sem foto (ex.: via FCM).
     data class Extra(
         val type: String = "event", val date: String = "", val time: String = "",
         val resp: String = "", val status: String = "", val deepLink: String = "",
-        val photo: String = "",
+        val photo: String = "", val respId: String = "",
     )
 
     // Limita o tamanho do avatar carregado no Intent/persistência (evita TransactionTooLarge
@@ -115,7 +117,7 @@ object ReminderScheduler {
                     e.id, trigger, title, text,
                     type = "event", date = e.date ?: "", time = e.start ?: "",
                     resp = e.owner ?: "", status = status, deepLink = "event:${e.id}",
-                    photo = safePhoto(photoByUid[responsibleId]),
+                    photo = safePhoto(photoByUid[responsibleId]), respId = responsibleId ?: "",
                 ))
             }
 
@@ -139,7 +141,7 @@ object ReminderScheduler {
                     "task_" + t.id, at, title, text,
                     type = "task", date = t.dueDate ?: "", time = t.dueTime ?: "",
                     resp = t.assignee ?: "", status = TaskStatus.label(t.status), deepLink = "task:${t.id}",
-                    photo = safePhoto(photoByUid[responsibleId]),
+                    photo = safePhoto(photoByUid[responsibleId]), respId = responsibleId ?: "",
                 ))
             }
 
@@ -153,7 +155,7 @@ object ReminderScheduler {
             }
             val payloads = LinkedHashSet<String>()
             targets.forEach { s ->
-                val ex = Extra(s.type, s.date, s.time, s.resp, s.status, s.deepLink, s.photo)
+                val ex = Extra(s.type, s.date, s.time, s.resp, s.status, s.deepLink, s.photo, s.respId)
                 schedule(ctx, s.key, s.at, s.title, s.text, ex)
                 android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FOR_RESPONSIBLE] item=${s.key} responsible=${s.resp}")
                 android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FROM_SYNC] item=${s.key} responsible=${s.resp}")
@@ -190,8 +192,9 @@ object ReminderScheduler {
                     val at = p[1].toLongOrNull()
                     if (at != null && at > now) {
                         // Extras só existem em payloads novos (size >= 10); toleramos os antigos.
-                        // photo é o 11º campo (size >= 11), aditivo em 1.0.51.
+                        // photo é o 11º campo (1.0.51); respId é o 12º (1.0.52). Retrocompatível.
                         val ex = when {
+                            p.size >= 12 -> Extra(p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11])
                             p.size >= 11 -> Extra(p[4], p[5], p[6], p[7], p[8], p[9], p[10])
                             p.size >= 10 -> Extra(p[4], p[5], p[6], p[7], p[8], p[9])
                             else -> Extra()
@@ -224,7 +227,7 @@ object ReminderScheduler {
         listOf(
             id, at.toString(), s(title), s(text),
             s(ex.type), s(ex.date), s(ex.time), s(ex.resp), s(ex.status), s(ex.deepLink),
-            s(ex.photo),
+            s(ex.photo), s(ex.respId),
         ).joinToString(SEP)
 
     fun schedule(ctx: Context, eventId: String, triggerAt: Long, title: String, text: String, ex: Extra = Extra()) {
@@ -233,7 +236,7 @@ object ReminderScheduler {
             .putExtra("eventId", eventId).putExtra("title", title).putExtra("text", text)
             .putExtra("type", ex.type).putExtra("date", ex.date).putExtra("time", ex.time)
             .putExtra("resp", ex.resp).putExtra("status", ex.status).putExtra("deeplink", ex.deepLink)
-            .putExtra("photo", ex.photo)
+            .putExtra("photo", ex.photo).putExtra("respId", ex.respId)
         val pi = PendingIntent.getBroadcast(ctx, eventId.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         try {
             if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) {
@@ -255,6 +258,7 @@ object ReminderScheduler {
     fun scheduleFromFcm(
         ctx: Context, type: String, rawId: String, title: String,
         scheduledDate: String?, scheduledTime: String?, leadMinutes: Int = 60,
+        responsibleId: String? = null,
     ): Boolean {
         return try {
             val id = rawId.takeIf { it.isNotBlank() } ?: return false
@@ -273,11 +277,16 @@ object ReminderScheduler {
             val notifTitle = if (type == "task") "Tarefa: $nome" else "Lembrete: $nome"
             val text = (if (type == "task") "Vence" else "Começa") +
                 listOfNotNull(scheduledDate, scheduledTime?.takeIf { it.isNotBlank() }?.let { "às $it" }).joinToString(" · ", prefix = " ")
+            // respId: vem do FCM (responsibleId) ou, na falta, do uid salvo no login
+            // (este aparelho É o do responsável). A tela premium resolve a foto por ele.
+            val respId = responsibleId?.takeIf { it.isNotBlank() }
+                ?: ctx.getSharedPreferences("fcm", Context.MODE_PRIVATE).getString("uid", null) ?: ""
             val ex = Extra(
                 type = if (type == "task") "task" else "event",
                 date = scheduledDate, time = scheduledTime ?: "",
                 resp = "Você", status = if (type == "task") "Pendente" else "Agendado",
                 deepLink = (if (type == "task") "task:" else "event:") + id,
+                respId = respId,
             )
             schedule(ctx, key, trigger, notifTitle, text, ex)
             android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FROM_FCM] item=$id type=$type at=$trigger")

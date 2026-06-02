@@ -237,7 +237,7 @@ object Notifications {
     fun notifyReminderFullScreen(
         ctx: Context, id: Int, title: String, text: String,
         type: String, rawId: String, deepLink: String,
-        date: String?, time: String?, responsible: String?, status: String?, photo: String? = null,
+        date: String?, time: String?, responsible: String?, status: String?, photo: String? = null, respId: String? = null,
     ): Boolean {
         return try {
             if (!hasPostPermission(ctx)) {
@@ -256,6 +256,7 @@ object Notifications {
                 .putExtra(ReminderAlarmActivity.EX_RESP, responsible ?: "")
                 .putExtra(ReminderAlarmActivity.EX_STATUS, status ?: "")
                 .putExtra(ReminderAlarmActivity.EX_PHOTO, photo ?: "")
+                .putExtra(ReminderAlarmActivity.EX_RESP_ID, respId ?: "")
             val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             // requestCode único por lembrete (evita PendingIntent compartilhado entre alarmes).
             val reqCode = (rawId.takeIf { it.isNotBlank() }?.hashCode() ?: id)

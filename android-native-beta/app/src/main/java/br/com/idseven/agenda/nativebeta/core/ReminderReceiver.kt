@@ -21,6 +21,7 @@ class ReminderReceiver : BroadcastReceiver() {
             val resp = intent.getStringExtra("resp")
             val status = intent.getStringExtra("status")
             val photo = intent.getStringExtra("photo") ?: ""
+            val respId = intent.getStringExtra("respId") ?: ""
             val deeplink = intent.getStringExtra("deeplink")?.takeIf { it.isNotBlank() }
                 ?: id?.let { "event:$it" } ?: ""
             android.util.Log.i("ReminderDiag", "[REMINDER_RECEIVED] id=${id ?: "teste"} type=$type")
@@ -31,7 +32,7 @@ class ReminderReceiver : BroadcastReceiver() {
             val ok = Notifications.notifyReminderFullScreen(
                 context, notifId, title, text,
                 type = type, rawId = rawId, deepLink = deeplink,
-                date = date, time = time, responsible = resp, status = status, photo = photo,
+                date = date, time = time, responsible = resp, status = status, photo = photo, respId = respId,
             )
             val stamp = (if (ok) "Disparado · " else "Falhou · ") + DateUtil.hm(System.currentTimeMillis()) +
                 " · " + (id ?: "teste")
