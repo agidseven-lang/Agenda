@@ -122,8 +122,10 @@ fun EventFormScreen(
             else EventRepo.create(EventContract.create(input, currentUid, System.currentTimeMillis()))
             if (res.isSuccess) {
                 val savedId = (res.getOrNull() as? String) ?: editId
-                // Push imediato ao responsável (se houver) via Worker. Evita notificar a si mesmo.
-                if (!ownerId.isNullOrBlank() && ownerId != currentUid) PushNotify.notifyAssignee(context, "event", savedId)
+                // Push imediato ao RESPONSÁVEL (ownerId), inclusive quando é o próprio criador
+                // (ex.: "compromisso para mim"). O Worker envia só ao responsável -> criar para
+                // OUTRO não notifica o criador. Alinha com o comportamento das tarefas.
+                if (!ownerId.isNullOrBlank()) PushNotify.notifyAssignee(context, "event", savedId)
                 onDone()
             } else {
                 error = res.exceptionOrNull()?.message ?: "Erro ao salvar"; busy = false
