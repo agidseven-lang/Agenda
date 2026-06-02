@@ -25,7 +25,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.49-beta-direct-install-fix"
+      DIST_BASENAME: "idseven-nativebeta-1.0.50-beta-notifications-regression-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -142,6 +142,13 @@ jobs:
             "5) Se aparecer 'Instalar apps desconhecidos': habilite a permissao" \
             "   para Meus Arquivos (ou Chrome) e volte. Toque em INSTALAR." \
             "" \
+            "==== APOS INSTALAR: ATIVAR NOTIFICACOES (IMPORTANTE) ====" \
+            "No Android 13+ a reinstalacao reseta a permissao de notificacoes." \
+            "Ao abrir o app, ACEITE o pedido de notificacoes. Se nao aparecer ou" \
+            "se ja negou antes, o app mostra uma FAIXA VERMELHA no topo: toque nela" \
+            "e ative 'Notificacoes'. Sem isso o push imediato e o lembrete de 1h" \
+            "nao aparecem. O token FCM e re-sincronizado sozinho no login/abertura." \
+            "" \
             "==== PRIMEIRA INSTALACAO DESTA LINHA (faca uma vez) ====" \
             "Se ja teve uma versao ANTERIOR (1.0.46/1.0.47) instalada, DESINSTALE" \
             "primeiro - inclusive em Dual Apps / Espaco Seguro / 2o usuario /" \
@@ -175,8 +182,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.49-beta-direct-install-fix
-          path: dist/idseven-nativebeta-1.0.49-beta-direct-install-fix.apk
+          name: idseven-nativebeta-1.0.50-beta-notifications-regression-fix
+          path: dist/idseven-nativebeta-1.0.50-beta-notifications-regression-fix.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -184,7 +191,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.49-beta-direct-install-fix-bundle
-          path: dist/idseven-nativebeta-1.0.49-beta-direct-install-fix.zip
+          name: idseven-nativebeta-1.0.50-beta-notifications-regression-fix-bundle
+          path: dist/idseven-nativebeta-1.0.50-beta-notifications-regression-fix.zip
           if-no-files-found: error
           retention-days: 30
