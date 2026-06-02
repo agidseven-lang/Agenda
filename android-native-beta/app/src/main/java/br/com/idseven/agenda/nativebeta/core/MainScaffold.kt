@@ -139,10 +139,11 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
     // Lembretes locais: reagenda sempre que a agenda OU as tarefas mudam (com dedupe).
-    LaunchedEffect(eventsState, tasksState, session.uid) {
+    LaunchedEffect(eventsState, tasksState, usersState, session.uid) {
         // Lembrete 1h antes (premium full-screen) APENAS para o responsável (ownerId/assigneeId).
-        // Se faltar <1h, dispara no horário do item.
-        ReminderScheduler.sync(context, eventsState.itemsOrEmpty(), tasksState.itemsOrEmpty(), currentUid = session.uid, leadMinutes = 60)
+        // Se faltar <1h, dispara no horário do item. `users` resolve a foto do responsável
+        // p/ o avatar premium (reagenda quando a lista de usuários carrega).
+        ReminderScheduler.sync(context, eventsState.itemsOrEmpty(), tasksState.itemsOrEmpty(), currentUid = session.uid, leadMinutes = 60, users = users)
     }
     // Notificação IMEDIATA tocada: navega DIRETO ao destino (sem modal).
     // O modal premium é exclusivo do lembrete de 1h (ReminderAlarmActivity full-screen).

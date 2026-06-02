@@ -27,11 +27,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 
 /** Linha rotulada do card (label fraco em cima, valor destacado embaixo). */
@@ -52,6 +54,8 @@ fun ReminderPremiumScreen(
     actionLabel: String,
     onAction: () -> Unit,
     onDismiss: () -> Unit,
+    responsiblePhoto: String? = null,   // foto/avatar do responsável (url http ou base64)
+    responsibleName: String? = null,    // nome do responsável (p/ iniciais quando sem foto)
 ) {
     val icon = when (type) {
         "task" -> Icons.Outlined.Checklist
@@ -76,8 +80,22 @@ fun ReminderPremiumScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Box(Modifier.size(78.dp).clip(CircleShape).background(accent), contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(38.dp))
+                // Topo: foto/avatar do RESPONSÁVEL (premium, circular, sombra suave).
+                //  - com foto: mostra a foto (Coil p/ http, bitmap p/ base64), sem distorcer;
+                //  - sem foto mas com nome: iniciais (via Avatar);
+                //  - sem nome e sem foto: fallback final no ícone de agenda/tarefa.
+                val hasResponsible = !responsiblePhoto.isNullOrBlank() || !responsibleName.isNullOrBlank()
+                if (hasResponsible) {
+                    Box(
+                        Modifier.size(84.dp).shadow(elevation = 12.dp, shape = CircleShape, clip = false),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Avatar(photo = responsiblePhoto, ringColor = accent, name = responsibleName, size = 84.dp, ring = 3.dp)
+                    }
+                } else {
+                    Box(Modifier.size(78.dp).clip(CircleShape).background(accent), contentAlignment = Alignment.Center) {
+                        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(38.dp))
+                    }
                 }
                 Spacer(Modifier.height(20.dp))
                 Text(title, color = Tokens.Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)

@@ -28,6 +28,7 @@ class ReminderAlarmActivity : ComponentActivity() {
         const val EX_TIME = "rem_time"
         const val EX_RESP = "rem_resp"
         const val EX_STATUS = "rem_status"
+        const val EX_PHOTO = "rem_photo"   // foto/avatar do responsável (url http ou base64)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,6 +56,7 @@ class ReminderAlarmActivity : ComponentActivity() {
         val time = intent.getStringExtra(EX_TIME)?.takeIf { it.isNotBlank() }
         val resp = intent.getStringExtra(EX_RESP)?.takeIf { it.isNotBlank() }
         val status = intent.getStringExtra(EX_STATUS)?.takeIf { it.isNotBlank() }
+        val photo = intent.getStringExtra(EX_PHOTO)?.takeIf { it.isNotBlank() }
 
         val headline = if (type == "task") "Tarefa em 1 hora" else "Compromisso em 1 hora"
         val dateLabel = date?.let { runCatching { "${DateUtil.dayLabel(it)}, ${DateUtil.dayShort(it)}" }.getOrDefault(it) } ?: "—"
@@ -72,6 +74,8 @@ class ReminderAlarmActivity : ComponentActivity() {
                     type = type,
                     title = headline,
                     subtitle = if (text.isNotBlank()) text else title,
+                    responsiblePhoto = photo,
+                    responsibleName = resp,
                     rows = rows,
                     actionLabel = if (type == "task") "Abrir tarefa" else "Abrir compromisso",
                     onAction = {

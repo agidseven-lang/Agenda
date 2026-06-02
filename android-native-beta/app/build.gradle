@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 56
-        versionName "1.0.50-beta-notifications-regression-fix"
+        versionCode 57
+        versionName "1.0.51-beta-reminder-assignee-photo"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via

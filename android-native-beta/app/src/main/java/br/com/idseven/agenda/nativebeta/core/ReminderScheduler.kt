@@ -9,6 +9,7 @@ import br.com.idseven.agenda.nativebeta.domain.EventItem
 import br.com.idseven.agenda.nativebeta.domain.EventStatus
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.TaskStatus
+import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
 // Lembretes locais exatos via AlarmManager. Agenda/cancela/reagenda com dedupe.
@@ -27,13 +28,30 @@ object ReminderScheduler {
         val key: String, val at: Long, val title: String, val text: String,
         val type: String = "event", val date: String = "", val time: String = "",
         val resp: String = "", val status: String = "", val deepLink: String = "",
+        val photo: String = "",
     )
 
     // Extras estruturados levados no alarme/persistência (toleram ausência).
+    // `photo` (1.0.51): foto/avatar do RESPONSÁVEL para a tela premium. Pode ser URL http
+    // ou base64; vazio cai no fallback (iniciais -> ícone). Aditivo, sem schema novo.
     data class Extra(
         val type: String = "event", val date: String = "", val time: String = "",
         val resp: String = "", val status: String = "", val deepLink: String = "",
+        val photo: String = "",
     )
+
+    // Limita o tamanho do avatar carregado no Intent/persistência (evita TransactionTooLarge
+    // em broadcast de alarme): URLs http sempre passam; base64 só se for pequeno; senão vazio
+    // (fallback p/ iniciais). Mantém a tela premium robusta sem distorcer nada.
+    private fun safePhoto(p: String?): String {
+        val v = p?.trim().orEmpty()
+        return when {
+            v.isBlank() -> ""
+            v.startsWith("http") -> v
+            v.length <= 8192 -> v
+            else -> ""
+        }
+    }
 
     // Resolve o UID do RESPONSÁVEL por um item, com fallbacks seguros e log claro.
     //  - Compromisso: ownerId; se vazio, o item "sem responsável explícito" pertence a
@@ -62,11 +80,13 @@ object ReminderScheduler {
     // Itens não-elegíveis têm o alarme local cancelado no próximo sync.
     // Evento com horário: lembra `leadMinutes` antes; se a janela já passou mas o evento
     // ainda é futuro, dispara NO horário. Sem horário: 09:00. Tarefa: no vencimento.
-    fun sync(ctx: Context, events: List<EventItem>, tasks: List<TaskItem> = emptyList(), currentUid: String? = null, leadMinutes: Int = 60) {
+    fun sync(ctx: Context, events: List<EventItem>, tasks: List<TaskItem> = emptyList(), currentUid: String? = null, leadMinutes: Int = 60, users: List<UserLite> = emptyList()) {
         try {
             val now = System.currentTimeMillis()
             val uid = currentUid?.takeIf { it.isNotBlank() }
             val targets = ArrayList<Sched>()
+            // Mapa uid -> foto do responsável (p/ avatar no lembrete premium). Sem users, fica vazio.
+            val photoByUid = users.associate { it.id to (it.photo ?: "") }
 
             events.forEach { e ->
                 if (e.done) return@forEach
@@ -95,6 +115,7 @@ object ReminderScheduler {
                     e.id, trigger, title, text,
                     type = "event", date = e.date ?: "", time = e.start ?: "",
                     resp = e.owner ?: "", status = status, deepLink = "event:${e.id}",
+                    photo = safePhoto(photoByUid[responsibleId]),
                 ))
             }
 
@@ -118,6 +139,7 @@ object ReminderScheduler {
                     "task_" + t.id, at, title, text,
                     type = "task", date = t.dueDate ?: "", time = t.dueTime ?: "",
                     resp = t.assignee ?: "", status = TaskStatus.label(t.status), deepLink = "task:${t.id}",
+                    photo = safePhoto(photoByUid[responsibleId]),
                 ))
             }
 
@@ -131,7 +153,7 @@ object ReminderScheduler {
             }
             val payloads = LinkedHashSet<String>()
             targets.forEach { s ->
-                val ex = Extra(s.type, s.date, s.time, s.resp, s.status, s.deepLink)
+                val ex = Extra(s.type, s.date, s.time, s.resp, s.status, s.deepLink, s.photo)
                 schedule(ctx, s.key, s.at, s.title, s.text, ex)
                 android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FOR_RESPONSIBLE] item=${s.key} responsible=${s.resp}")
                 android.util.Log.i(TAG, "[REMINDER_SCHEDULED_FROM_SYNC] item=${s.key} responsible=${s.resp}")
@@ -168,7 +190,12 @@ object ReminderScheduler {
                     val at = p[1].toLongOrNull()
                     if (at != null && at > now) {
                         // Extras só existem em payloads novos (size >= 10); toleramos os antigos.
-                        val ex = if (p.size >= 10) Extra(p[4], p[5], p[6], p[7], p[8], p[9]) else Extra()
+                        // photo é o 11º campo (size >= 11), aditivo em 1.0.51.
+                        val ex = when {
+                            p.size >= 11 -> Extra(p[4], p[5], p[6], p[7], p[8], p[9], p[10])
+                            p.size >= 10 -> Extra(p[4], p[5], p[6], p[7], p[8], p[9])
+                            else -> Extra()
+                        }
                         schedule(ctx, id, at, p[2], p[3], ex)
                         kept.add(row); keptIds.add(id)
                     }
@@ -197,6 +224,7 @@ object ReminderScheduler {
         listOf(
             id, at.toString(), s(title), s(text),
             s(ex.type), s(ex.date), s(ex.time), s(ex.resp), s(ex.status), s(ex.deepLink),
+            s(ex.photo),
         ).joinToString(SEP)
 
     fun schedule(ctx: Context, eventId: String, triggerAt: Long, title: String, text: String, ex: Extra = Extra()) {
@@ -205,6 +233,7 @@ object ReminderScheduler {
             .putExtra("eventId", eventId).putExtra("title", title).putExtra("text", text)
             .putExtra("type", ex.type).putExtra("date", ex.date).putExtra("time", ex.time)
             .putExtra("resp", ex.resp).putExtra("status", ex.status).putExtra("deeplink", ex.deepLink)
+            .putExtra("photo", ex.photo)
         val pi = PendingIntent.getBroadcast(ctx, eventId.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         try {
             if (Build.VERSION.SDK_INT >= 31 && !am.canScheduleExactAlarms()) {
