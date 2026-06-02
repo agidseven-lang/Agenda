@@ -16,7 +16,7 @@ variables:
   ANDROID_CMDLINE_TOOLS_VERSION: "11076708"   # confira em https://developer.android.com/studio
   ANDROID_HOME: "$CI_PROJECT_DIR/.android-sdk"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-  APK_OUT: "idseven-nativebeta-1.0.47-beta-agenda-tasks-polish.apk"
+  APK_OUT: "idseven-nativebeta-1.0.48-beta-agenda-tasks-polish-install-fix.apk"
   APP_DIR: "android-native-beta"
 
 stages:
@@ -65,14 +65,8 @@ build_android_beta:
     - export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
     - yes | sdkmanager --licenses >/dev/null 2>&1 || true
     - sdkmanager "platform-tools" "platforms;android-${ANDROID_COMPILE_SDK}" "build-tools;${ANDROID_BUILD_TOOLS}" >/dev/null
-    - mkdir -p ~/.android
-    - |
-      if [ ! -f ~/.android/debug.keystore ]; then
-        keytool -genkeypair -v -keystore ~/.android/debug.keystore \
-          -storepass android -keypass android -alias androiddebugkey \
-          -keyalg RSA -keysize 2048 -validity 10000 \
-          -dname "CN=Android Debug,O=Android,C=US"
-      fi
+    # Assinatura: usa o keystore FIXO versionado (android-native-beta/app/idseven-test.keystore).
+    # NAO geramos mais keystore aleatorio -> certificado estavel -> APKs atualizaveis.
     # Secret: GOOGLE_SERVICES_JSON_BETA do tipo File -> $GOOGLE_SERVICES_JSON_BETA é o caminho do arquivo
     - |
       if [ -z "$GOOGLE_SERVICES_JSON_BETA" ] || [ ! -f "$GOOGLE_SERVICES_JSON_BETA" ]; then
@@ -114,7 +108,7 @@ build_android_beta:
     - cp "$APP_DIR/app/build/outputs/apk/release/app-release.apk" "$APK_OUT"
     - ls -lh "$APK_OUT"
   artifacts:
-    name: "idseven-nativebeta-1.0.47-beta-agenda-tasks-polish-$CI_COMMIT_SHORT_SHA"
+    name: "idseven-nativebeta-1.0.48-beta-agenda-tasks-polish-install-fix-$CI_COMMIT_SHORT_SHA"
     paths:
       - "$APK_OUT"
     expire_in: 30 days

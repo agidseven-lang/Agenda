@@ -64,7 +64,7 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.47-beta-agenda-tasks-polish"
+private const val BUILD = "1.0.48-beta-agenda-tasks-polish-install-fix"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

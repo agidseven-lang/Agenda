@@ -11,8 +11,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 52
-        versionName "1.0.47-beta-agenda-tasks-polish"
+        versionCode 53
+        versionName "1.0.48-beta-agenda-tasks-polish-install-fix"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
@@ -27,9 +27,12 @@ android {
     }
 
     signingConfigs {
-        // Assinatura de TESTE (debug keystore) p/ gerar release instalável. NÃO usar na Play.
+        // Assinatura de TESTE com keystore FIXO versionado no repo
+        // (idseven-test.keystore). Garante o MESMO certificado em todo build
+        // (GitLab, GitHub Actions e local) -> APKs sempre atualizaveis entre si.
+        // NAO e chave de producao/Play (senha padrao "android").
         debugtest {
-            storeFile file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storeFile file("idseven-test.keystore")
             storePassword "android"
             keyAlias "androiddebugkey"
             keyPassword "android"

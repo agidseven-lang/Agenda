@@ -3,6 +3,35 @@
 Histórico das entregas do app nativo (`br.com.idseven.agenda.nativebeta`) e das
 Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
+## 1.0.48-beta-agenda-tasks-polish-install-fix — assinatura estavel (corrige "App nao instalado")
+
+**Causa raiz do "App nao instalado" na 1.0.47:** os pipelines (GitLab e GitHub
+Actions) geravam um `debug.keystore` ALEATORIO a cada build (`keytool -genkeypair`
+em runner efemero). Cada APK saia assinado com um certificado diferente, entao o
+Android recusava atualizar o app instalado (INSTALL_FAILED_UPDATE_INCOMPATIBLE).
+versionCode (52>51) e applicationId estavam corretos — o problema era so a assinatura.
+
+**Correcao definitiva — keystore de TESTE fixo e versionado:**
+- Adicionado `android-native-beta/app/idseven-test.keystore` (RSA 2048, validade
+  longa, senha padrao "android" — NAO e chave de producao/Play).
+- `build.gradle` signingConfig `debugtest` aponta para esse keystore fixo
+  (storeFile "idseven-test.keystore") em vez de `~/.android/debug.keystore`.
+- Removida a geracao aleatoria de keystore no `.gitlab-ci.yml` e no
+  `.github/workflows/android-beta-build.yml`.
+- Resultado: TODO build (GitLab, GitHub, local) assina com o MESMO certificado
+  -> APKs sempre atualizaveis entre si daqui pra frente.
+
+**Conteudo identico a 1.0.47** (Agenda/Tarefas refinadas); muda so versao +
+assinatura. versionCode 53.
+
+> ATENCAO (transicao unica): o app HOJE instalado foi assinado com o certificado
+> aleatorio antigo (que era efemero e nao pode ser recuperado). Para instalar a
+> 1.0.48 sobre ele e necessario DESINSTALAR uma vez. Dados sao seguros: ficam no
+> Firestore e voltam ao logar; so a sessao local (DataStore) e refeita. Apos esta
+> unica desinstalacao, as proximas atualizacoes funcionam sem desinstalar.
+
+---
+
 ## 1.0.47-beta-agenda-tasks-polish — refinamento da Agenda e Tarefas (FASE 4A)
 
 Polimento UI-only de Agenda e Tarefas. **Sem tocar Functions, reset de senha,
