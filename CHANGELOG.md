@@ -3,6 +3,32 @@
 Histórico das entregas do app nativo (`br.com.idseven.agenda.nativebeta`) e das
 Cloud Functions de push imediato. Não cobre PWA, Worker nem schema do backend.
 
+## 1.0.47-beta-agenda-tasks-polish — refinamento da Agenda e Tarefas (FASE 4A)
+
+Polimento UI-only de Agenda e Tarefas. **Sem tocar Functions, reset de senha,
+chat, push imediato, lembrete premium, PWA/Worker/Cloudflare, GitHub/GitLab CI
+ou schema.** Apenas 2 arquivos: `AgendaScreen.kt` e `TasksScreen.kt`.
+
+- **Agenda (modo Mês)**: estado vazio do dia agora usa o `EmptyState` premium
+  (icone CalendarMonth + titulo "Dia livre" + subtitulo) em vez de texto solto.
+- **Agenda (modo Lista)**: novo agrupamento **Atrasados / Hoje / Proximos**
+  (derivado da data via `LocalDate.now()`, sem schema novo). Cada secao tem
+  cabecalho com bolinha colorida (Vermelho / Accent / Soft) + contador, e o
+  sub-cabecalho por dia continua dentro da secao.
+- **Tarefas**: novo chip **"Minhas tarefas"** (toggle) ao lado dos filtros de
+  setor. Ativo, mantem so itens em que o usuario atual eh **responsavel**
+  (`assigneeId == currentUid`) ou **solicitante** (`by == currentUid`). So
+  aparece quando ha `currentUid` (login OK).
+- Preservado sem regressao: criar/editar/excluir/concluir/mover, calendario
+  mensal, swipe entre meses, busca, filtros de setor, pager de status (Kanban),
+  cards ricos com responsavel/avatar/prazo/checklist/setor/prioridade, detalhes
+  (`EventDetailScreen`, `TaskDetailScreen`), repos (`EventRepo`/`TaskRepo`/
+  `UsersRepo`) e dominio (`TaskItem.assigneeId`/`by`).
+
+Versao: 1.0.47-beta-agenda-tasks-polish / versionCode 52.
+
+---
+
 ## 1.0.46-beta-chat-thread-final-polish — refinamento final da conversa (FASE 3F)
 
 Polimento UI-only da tela interna da conversa do Chat do Marketing. **Sem tocar

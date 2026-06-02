@@ -104,19 +104,27 @@ fun TasksScreen(
     var query by remember { mutableStateOf("") }
     var sectorFilter by remember { mutableStateOf<String?>(null) }
     var moveTarget by remember { mutableStateOf<TaskItem?>(null) }
+    // "Minhas tarefas" = sou o responsavel (assigneeId) OU o solicitante (by).
+    // So habilita o chip quando ha um currentUid; sem schema novo, sem repo novo.
+    var mineOnly by remember { mutableStateOf(false) }
 
     val q = query.trim().lowercase()
     val tasks = all.filter { t ->
         val okQ = q.isEmpty() || listOf(t.title, t.client, t.assignee).any { (it ?: "").lowercase().contains(q) }
         val okS = sectorFilter == null || t.sector == sectorFilter
-        okQ && okS
+        val okM = !mineOnly || currentUid == null ||
+            (t.assigneeId == currentUid) || (t.by == currentUid)
+        okQ && okS && okM
     }
     val pager = rememberPagerState(pageCount = { TaskStatus.COLUMNS.size })
 
     Column(Modifier.fillMaxSize()) {
         SearchField(query, { query = it }, "Buscar tarefa…")
-        // Filtro de setor
+        // Filtro "Minhas tarefas" (chip de escopo) + filtros de setor.
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 2.dp)) {
+            if (currentUid != null) {
+                SectorChip("Minhas tarefas", Tokens.Accent, mineOnly) { mineOnly = !mineOnly }
+            }
             SectorChip("Todos", null, sectorFilter == null) { sectorFilter = null }
             Sectors.ALL.forEach { s -> SectorChip(s.label, s.color, sectorFilter == s.key) { sectorFilter = s.key } }
         }

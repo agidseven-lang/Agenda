@@ -137,7 +137,15 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
                     }
                 }
                 if (dayEvents.isEmpty()) {
-                    item("empty") { Text("Dia livre — nenhum compromisso", color = Tokens.Faint, fontSize = 13.sp, modifier = Modifier.padding(vertical = 24.dp)) }
+                    // Estado vazio do modo Mês — premium (em vez de texto solto).
+                    item("empty") {
+                        EmptyState(
+                            "Dia livre",
+                            "Nenhum compromisso para esta data.",
+                            Icons.Outlined.CalendarMonth,
+                            modifier = Modifier.padding(vertical = 32.dp),
+                        )
+                    }
                 } else {
                     items(dayEvents, key = { it.id }) { ev -> EventCard(ev, ownerOf(ev)) { onEventClick(ev.id) } }
                 }
@@ -149,17 +157,48 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
                     EmptyState(if (all.isEmpty()) "Nenhum compromisso" else "Nada encontrado", if (all.isEmpty()) "Lidos do Firestore: 0" else "Ajuste a busca ou os filtros", Icons.Outlined.CalendarMonth)
                 }
             } else {
-                val groups = ordered.groupBy { it.date ?: "" }
+                // Modo Lista premium: agrupa Atrasados / Hoje / Proximos (derivado da data,
+                // sem mudar schema). Dentro de cada secao, mantem o sub-cabecalho por dia.
+                val today = LocalDate.now()
+                fun bucket(d: LocalDate?): Int = when {
+                    d == null -> 2                            // sem data -> Proximos
+                    d.isBefore(today) -> 0                    // Atrasados
+                    d == today -> 1                           // Hoje
+                    else -> 2                                  // Proximos
+                }
+                val grouped = ordered.groupBy { bucket(parseDay(it.date)) }
+                val sections = listOf(
+                    Triple(0, "Atrasados", Tokens.Red),
+                    Triple(1, "Hoje", Tokens.Accent),
+                    Triple(2, "Próximos", Tokens.Soft),
+                )
                 LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 18.dp), contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp)) {
-                    groups.forEach { (date, list) ->
-                        item(key = "h_$date") {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 14.dp, bottom = 10.dp)) {
-                                Text(DateUtil.dayLabel(date), color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.width(8.dp))
-                                Text(DateUtil.dayShort(date), color = Tokens.Faint, fontSize = 12.sp)
+                    sections.forEach { (idx, sectionLabel, sectionColor) ->
+                        val list = grouped[idx] ?: emptyList()
+                        if (list.isNotEmpty()) {
+                            item(key = "section_$idx") {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 18.dp, bottom = 6.dp)) {
+                                    Box(Modifier.size(8.dp).clip(RoundedCornerShape(999.dp)).background(sectionColor))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(sectionLabel, color = sectionColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.width(8.dp))
+                                    Box(Modifier.clip(RoundedCornerShape(999.dp)).background(sectionColor.copy(alpha = 0.14f)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                        Text("${list.size}", color = sectionColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                            // Sub-cabecalho por dia dentro da secao
+                            list.groupBy { it.date ?: "" }.forEach { (date, dayList) ->
+                                item(key = "h_${idx}_$date") {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 10.dp, bottom = 8.dp)) {
+                                        Text(DateUtil.dayLabel(date), color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(DateUtil.dayShort(date), color = Tokens.Faint, fontSize = 12.sp)
+                                    }
+                                }
+                                items(dayList, key = { it.id }) { ev -> EventCard(ev, ownerOf(ev)) { onEventClick(ev.id) } }
                             }
                         }
-                        items(list, key = { it.id }) { ev -> EventCard(ev, ownerOf(ev)) { onEventClick(ev.id) } }
                     }
                 }
             }
