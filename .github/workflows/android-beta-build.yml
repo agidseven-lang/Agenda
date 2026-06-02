@@ -90,7 +90,52 @@ jobs:
       - name: Upload APK (artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-${{ github.sha }}
+          name: idseven-nativebeta-1.0.49-diagnostic-${{ github.sha }}
           path: ${{ env.APP_DIR }}/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+          retention-days: 30
+
+      # Diagnostico de instalacao: prova binaria de assinatura e empacotamento.
+      # Roda apksigner verify --print-certs + aapt badging + keytool no keystore.
+      # if: always() -> gera o relatorio mesmo se algo falhar acima.
+      - name: Verificar assinatura + empacotamento (relatorio apksigner/aapt)
+        if: always()
+        run: |
+          set +e
+          APK="$APP_DIR/app/build/outputs/apk/release/app-release.apk"
+          REPORT="$GITHUB_WORKSPACE/apk-verification-report.txt"
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ 2>/dev/null | sort -V | tail -1)"
+          APKSIGNER="${BT}apksigner"
+          AAPT="${BT}aapt"
+          {
+            echo "===== APK VERIFICATION REPORT (1.0.49 install-diagnostic) ====="
+            echo "Data UTC      : $(date -u)"
+            echo "Ref buildado  : ${{ github.event.inputs.ref }}"
+            echo "Commit SHA    : $GITHUB_SHA"
+            echo "build-tools   : $BT"
+            echo "APK path      : $APK"
+            if [ -f "$APK" ]; then
+              echo "APK size      : $(wc -c < "$APK") bytes"
+              echo "APK sha256    : $(sha256sum "$APK" | cut -d' ' -f1)"
+            else
+              echo "APK AUSENTE — build falhou antes de gerar o APK."
+            fi
+            echo
+            echo "----- aapt dump badging (package / versionCode / sdk) -----"
+            "$AAPT" dump badging "$APK" 2>&1 | grep -E "^package:|sdkVersion:|targetSdkVersion:|application-label:"
+            echo
+            echo "----- apksigner verify --verbose --print-certs -----"
+            "$APKSIGNER" verify --verbose --print-certs "$APK" 2>&1
+            echo
+            echo "----- keytool: fingerprints do keystore versionado -----"
+            keytool -list -v -keystore "$APP_DIR/app/idseven-test.keystore" -storepass android 2>/dev/null | grep -E "Alias name:|Owner:|SHA1:|SHA256:|Valid"
+          } | tee "$REPORT"
+
+      - name: Upload relatorio de verificacao (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-verification-report-${{ github.sha }}
+          path: apk-verification-report.txt
+          if-no-files-found: warn
           retention-days: 30
