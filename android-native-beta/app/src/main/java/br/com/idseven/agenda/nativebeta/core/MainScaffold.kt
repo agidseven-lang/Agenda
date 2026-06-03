@@ -190,11 +190,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             )
         },
     ) { padding ->
-      Column(Modifier.padding(padding).fillMaxSize()) {
-        // Aviso não-silencioso quando as notificações estão desativadas (permissão resetada
-        // pós-reinstalação no Android 13+). Restaura push imediato + lembrete 1h ao reativar.
-        NotifGateBanner()
-        NavHost(nav, startDestination = "hoje", modifier = Modifier.weight(1f).fillMaxWidth()) {
+        NavHost(nav, startDestination = "hoje", modifier = Modifier.padding(padding)) {
             composable("hoje") {
                 DashboardScreen(
                     eventsState, tasksState, users, session,
@@ -267,39 +263,5 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                 )
             }
         }
-      }
     }
-}
-
-// Faixa NÃO-SILENCIOSA de notificações: aparece somente quando o app NÃO tem permissão de
-// notificar (Android 13+). Reinstalar o app reseta POST_NOTIFICATIONS; sem isso o push
-// imediato e o lembrete de 1h não são exibidos. Toque -> abre as configurações do app para
-// reativar. Reavalia a permissão a cada retomada (ON_RESUME), some sozinha após permitir.
-@Composable
-private fun NotifGateBanner() {
-    val context = LocalContext.current
-    var refresh by remember { mutableStateOf(0) }
-    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
-            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) refresh += 1
-        }
-        lifecycleOwner.lifecycle.addObserver(obs)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
-    }
-    val off = remember(refresh) {
-        Build.VERSION.SDK_INT >= 33 && !Notifications.hasPostPermission(context)
-    }
-    if (!off) return
-    Text(
-        text = "⚠  Notificações desativadas. Toque para ativar e receber compromissos, tarefas e o lembrete de 1h.",
-        color = Color.White,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFB3261E))
-            .clickable { Notifications.openNotificationSettings(context) }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-    )
 }
