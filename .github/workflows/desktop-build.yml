@@ -11,7 +11,7 @@
 # =====================================================================
 name: "[manual] Desktop Build (Windows)"
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       ref:
@@ -97,47 +97,47 @@ jobs:
             echo "----- Conferencia de versao -----"
             cat "$OUT/VERSAO-DESKTOP.txt"
           } > "$OUT/RELATORIO-DESKTOP.txt"
-          # INSTRUCOES-INSTALACAO-DESKTOP.txt
-          cat > "$OUT/INSTRUCOES-INSTALACAO-DESKTOP.txt" <<EOF
-==== COMO INSTALAR — Agenda ID Seven Desktop (Windows) ====
-
-1) Baixe o instalador (.exe ou .msi).
-2) De dois cliques. Se o Windows SmartScreen avisar:
-   - clique em "Mais informacoes" -> "Executar assim mesmo".
-   - O app NAO esta assinado com certificado de empresa nesta fase
-     (mesma situacao do APK x Play Protect — esperado em beta).
-3) Marque "Criar atalho na area de trabalho" se desejar.
-4) Apos instalar, abra o app pelo menu Iniciar ou icone.
-5) Faca login com a mesma conta do celular.
-
-==== TRAY (BANDEJA) e NOTIFICACOES ====
-- Fechar a janela (X) ENVIA o app para a bandeja (nao encerra).
-- Para reabrir: duplo clique no icone na bandeja.
-- Para encerrar de verdade: clique direito no icone -> Sair.
-- As notificacoes funcionam enquanto o app estiver aberto, minimizado
-  ou na bandeja. Se voce "Sair", as notificacoes param ate reabrir.
-
-==== INICIAR COM O WINDOWS ====
-- Marque na bandeja: "Iniciar com o Windows".
-- O app sobe oculto na bandeja a cada login do Windows.
-- Garante notificacoes confiaveis sem precisar abrir manualmente.
-
-==== O QUE NOTIFICA ====
-- Nova tarefa atribuida a voce.
-- Novo compromisso criado para voce.
-- Lembrete: 1 hora antes do compromisso.
-- Clique na notificacao abre a tela certa do app.
-
-==== SINCRONIZACAO COM O CELULAR ====
-- Mesma base Firebase do APK. Criar/mover no Desktop reflete no celular
-  em tempo real, e vice-versa.
-
-==== LIMITACOES CONHECIDAS NESTA FASE ====
-- Push com o app totalmente encerrado (igual FCM do Android) exige
-  backend dedicado para Desktop — sera tratado em fase futura.
-- Lembrete pode chegar tambem no celular (cada dispositivo lembra).
-- Sem certificado de codigo: SmartScreen avisa na primeira instalacao.
-EOF
+          # INSTRUCOES-INSTALACAO-DESKTOP.txt (printf para nao quebrar a YAML)
+          printf '%s\n' \
+            "==== COMO INSTALAR - Agenda ID Seven Desktop (Windows) ====" \
+            "" \
+            "1) Baixe o instalador (.exe ou .msi)." \
+            "2) De dois cliques. Se o Windows SmartScreen avisar:" \
+            "   - clique em 'Mais informacoes' -> 'Executar assim mesmo'." \
+            "   - O app NAO esta assinado com certificado de empresa nesta fase" \
+            "     (mesma situacao do APK x Play Protect - esperado em beta)." \
+            "3) Marque 'Criar atalho na area de trabalho' se desejar." \
+            "4) Apos instalar, abra o app pelo menu Iniciar ou icone." \
+            "5) Faca login com a mesma conta do celular." \
+            "" \
+            "==== TRAY (BANDEJA) e NOTIFICACOES ====" \
+            "- Fechar a janela (X) ENVIA o app para a bandeja (nao encerra)." \
+            "- Para reabrir: duplo clique no icone na bandeja." \
+            "- Para encerrar de verdade: clique direito no icone -> Sair." \
+            "- As notificacoes funcionam enquanto o app estiver aberto, minimizado" \
+            "  ou na bandeja. Se voce 'Sair', param ate reabrir." \
+            "" \
+            "==== INICIAR COM O WINDOWS ====" \
+            "- Marque na bandeja: 'Iniciar com o Windows'." \
+            "- O app sobe oculto na bandeja a cada login do Windows." \
+            "- Garante notificacoes confiaveis sem precisar abrir manualmente." \
+            "" \
+            "==== O QUE NOTIFICA ====" \
+            "- Nova tarefa atribuida a voce." \
+            "- Novo compromisso criado para voce." \
+            "- Lembrete: 1 hora antes do compromisso." \
+            "- Clique na notificacao abre a tela certa do app." \
+            "" \
+            "==== SINCRONIZACAO COM O CELULAR ====" \
+            "- Mesma base Firebase do APK. Criar/mover no Desktop reflete no celular" \
+            "  em tempo real, e vice-versa." \
+            "" \
+            "==== LIMITACOES CONHECIDAS NESTA FASE ====" \
+            "- Push com o app totalmente encerrado (igual FCM do Android) exige" \
+            "  backend dedicado para Desktop - sera tratado em fase futura." \
+            "- Lembrete pode chegar tambem no celular (cada dispositivo lembra)." \
+            "- Sem certificado de codigo: SmartScreen avisa na primeira instalacao." \
+            > "$OUT/INSTRUCOES-INSTALACAO-DESKTOP.txt"
           # ZIP de distribuicao
           (cd "$OUT" && powershell -Command "Compress-Archive -Path * -DestinationPath ../${DIST_BASENAME}.zip -Force")
           mv "$GITHUB_WORKSPACE/${DIST_BASENAME}.zip" "$OUT/${DIST_BASENAME}.zip" 2>/dev/null || true
