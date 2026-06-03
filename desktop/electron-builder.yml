@@ -1,0 +1,34 @@
+# Electron Builder — Agenda ID Seven Desktop (Windows)
+# Sem code-sign nesta fase (SmartScreen mostrara aviso — esperado).
+appId: br.com.idseven.agenda.desktop
+productName: Agenda ID Seven Desktop
+copyright: ID Seven
+directories:
+  output: dist-installer
+  buildResources: build
+files:
+  - dist/**/*
+  - src/renderer/**/*
+  - package.json
+  - "!**/*.map"
+  - "!node_modules/firebase/**/{*.md,*.ts,LICENSE,*.flow,docs/**}"
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: msi
+      arch:
+        - x64
+  icon: build/icon.png
+  artifactName: "Agenda-ID-Seven-Desktop-${version}-${arch}.${ext}"
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Agenda ID Seven Desktop
+msi:
+  oneClick: false
+  perMachine: false

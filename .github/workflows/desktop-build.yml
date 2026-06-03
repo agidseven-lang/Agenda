@@ -1,0 +1,163 @@
+# =====================================================================
+# [manual] Agenda ID Seven Desktop — Windows installer build
+# ---------------------------------------------------------------------
+# Gera o instalador Windows (NSIS .exe + MSI) do app Desktop e empacota
+# bundle ZIP com: instalador, VERSAO-DESKTOP.txt, RELATORIO-DESKTOP.txt,
+# INSTRUCOES-INSTALACAO-DESKTOP.txt.
+#
+# NAO toca: APK Android, site agendaidseven.com.br, Cloudflare Worker
+# de push, Firebase Functions, Resend, Secret Manager, Firestore Rules.
+# Execucao SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] Desktop Build (Windows)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit a buildar (default: desktop/local-1.0.66)"
+        required: true
+        default: "desktop/local-1.0.66"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: "desktop"
+      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.66-desktop-parity-foundation"
+    steps:
+      - name: Checkout (ref escolhido)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm install
+        working-directory: ${{ env.APP_DIR }}
+        run: npm install --no-audit --no-fund
+
+      - name: TypeScript build (main + preload)
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run build
+
+      - name: electron-builder (NSIS + MSI)
+        working-directory: ${{ env.APP_DIR }}
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Empacotar bundle (instalador + relatorios)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set +e
+          OUT="$GITHUB_WORKSPACE/dist-pkg"
+          mkdir -p "$OUT"
+          # Copia instaladores (nome vem do electron-builder.yml artifactName)
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*.exe 2>/dev/null | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*.msi 2>/dev/null | head -1)
+          if [ -z "$EXE" ]; then echo "::error::instalador .exe nao gerado"; exit 1; fi
+          cp "$EXE" "$OUT/"
+          [ -n "$MSI" ] && cp "$MSI" "$OUT/"
+          EXE_NAME=$(basename "$EXE")
+          MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo "")
+          EXE_SHA=$(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')
+          MSI_SHA=$([ -n "$MSI" ] && sha256sum "$OUT/$MSI_NAME" | awk '{print $1}' || echo "")
+          # VERSAO-DESKTOP.txt — prova do que esta dentro
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : 1.0.66-desktop-parity-foundation"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $EXE_SHA"
+            if [ -n "$MSI_NAME" ]; then
+              echo "instalador2 : $MSI_NAME"
+              echo "SHA-256 msi : $MSI_SHA"
+            fi
+            echo "commit      : $GITHUB_SHA"
+            echo "ref         : ${{ github.event.inputs.ref }}"
+            echo "espelha APK : 1.0.64-beta-build-artifact-version-fix"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          # RELATORIO-DESKTOP.txt — checagens
+          {
+            echo "===== RELATORIO DESKTOP - Agenda ID Seven Desktop ====="
+            echo "Gerado (UTC) : $(date -u)"
+            echo "Ref / commit : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
+            echo ""
+            echo "----- Arquivos no instalador package -----"
+            ls -lh "$OUT"
+            echo ""
+            echo "----- Conferencia de versao -----"
+            cat "$OUT/VERSAO-DESKTOP.txt"
+          } > "$OUT/RELATORIO-DESKTOP.txt"
+          # INSTRUCOES-INSTALACAO-DESKTOP.txt
+          cat > "$OUT/INSTRUCOES-INSTALACAO-DESKTOP.txt" <<EOF
+==== COMO INSTALAR — Agenda ID Seven Desktop (Windows) ====
+
+1) Baixe o instalador (.exe ou .msi).
+2) De dois cliques. Se o Windows SmartScreen avisar:
+   - clique em "Mais informacoes" -> "Executar assim mesmo".
+   - O app NAO esta assinado com certificado de empresa nesta fase
+     (mesma situacao do APK x Play Protect — esperado em beta).
+3) Marque "Criar atalho na area de trabalho" se desejar.
+4) Apos instalar, abra o app pelo menu Iniciar ou icone.
+5) Faca login com a mesma conta do celular.
+
+==== TRAY (BANDEJA) e NOTIFICACOES ====
+- Fechar a janela (X) ENVIA o app para a bandeja (nao encerra).
+- Para reabrir: duplo clique no icone na bandeja.
+- Para encerrar de verdade: clique direito no icone -> Sair.
+- As notificacoes funcionam enquanto o app estiver aberto, minimizado
+  ou na bandeja. Se voce "Sair", as notificacoes param ate reabrir.
+
+==== INICIAR COM O WINDOWS ====
+- Marque na bandeja: "Iniciar com o Windows".
+- O app sobe oculto na bandeja a cada login do Windows.
+- Garante notificacoes confiaveis sem precisar abrir manualmente.
+
+==== O QUE NOTIFICA ====
+- Nova tarefa atribuida a voce.
+- Novo compromisso criado para voce.
+- Lembrete: 1 hora antes do compromisso.
+- Clique na notificacao abre a tela certa do app.
+
+==== SINCRONIZACAO COM O CELULAR ====
+- Mesma base Firebase do APK. Criar/mover no Desktop reflete no celular
+  em tempo real, e vice-versa.
+
+==== LIMITACOES CONHECIDAS NESTA FASE ====
+- Push com o app totalmente encerrado (igual FCM do Android) exige
+  backend dedicado para Desktop — sera tratado em fase futura.
+- Lembrete pode chegar tambem no celular (cada dispositivo lembra).
+- Sem certificado de codigo: SmartScreen avisa na primeira instalacao.
+EOF
+          # ZIP de distribuicao
+          (cd "$OUT" && powershell -Command "Compress-Archive -Path * -DestinationPath ../${DIST_BASENAME}.zip -Force")
+          mv "$GITHUB_WORKSPACE/${DIST_BASENAME}.zip" "$OUT/${DIST_BASENAME}.zip" 2>/dev/null || true
+          ls -lh "$OUT"
+          echo "== VERSAO-DESKTOP =="; cat "$OUT/VERSAO-DESKTOP.txt"
+
+      - name: Upload installer (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.66-installer
+          path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload bundle (ZIP com instaladores + relatorios)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.66-bundle
+          path: dist-pkg/
+          if-no-files-found: error
+          retention-days: 30

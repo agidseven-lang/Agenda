@@ -1,0 +1,22 @@
+{
+  "name": "agenda-id-seven-desktop",
+  "version": "1.0.66",
+  "description": "Agenda ID Seven Desktop — paridade APK (Electron)",
+  "main": "dist/main/main.js",
+  "private": true,
+  "scripts": {
+    "build:ts": "tsc -p tsconfig.json",
+    "build:renderer": "node scripts/copy-renderer.js",
+    "build": "npm run build:ts && npm run build:renderer",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --win nsis msi --publish never"
+  },
+  "dependencies": {
+    "firebase": "10.12.2"
+  },
+  "devDependencies": {
+    "electron": "31.3.1",
+    "electron-builder": "24.13.3",
+    "typescript": "5.5.4"
+  }
+}
