@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.66 (Paridade APK)</title>
+<title>ID Seven · Desktop 1.0.67 (Responsive Polish)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -13,12 +13,20 @@
     --ink:#F1F2F4; --soft:#9BA0AB; --faint:#6E7480;
     --accent:#5B6CFF; --green:#34D399; --amber:#F59E0B; --red:#F87171; --violet:#A78BFA; --cyan:#22D3EE; --pink:#F472B6;
     --grad:linear-gradient(135deg,#22D3EE,#5B6CFF,#F472B6);
-    --maxw:920px;
+    --maxw:920px;        /* mobile shell */
+    --d-maxw:1400px;     /* desktop content cap */
+    --d-side:248px;      /* desktop sidebar width */
+    --d-topbar:64px;     /* desktop topbar height */
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;
-    -webkit-font-smoothing:antialiased}
+    font-family:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",Inter,-apple-system,BlinkMacSystemFont,Roboto,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    font-feature-settings:"ss01","cv11","kern";
+    font-synthesis:none;
+    -webkit-text-size-adjust:100%;
+  }
   body{min-height:100vh}
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
   input,textarea{font-family:inherit}
@@ -85,7 +93,7 @@
   .nav .fab{flex:none;width:46px;height:46px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;margin:0 4px;box-shadow:0 8px 20px -6px rgba(91,108,255,.6)}
   .nav .fab svg{width:26px;height:26px}
 
-  @media(min-width:980px){ #app{box-shadow:0 0 0 1px var(--line)} }
+  /* layer mobile remains; desktop overrides ficam no bloco .desktop abaixo */
 
   .scr{padding:14px 18px}
   .scr-head{padding:16px 18px 6px}
@@ -219,7 +227,175 @@
   .divline{height:1px;background:#222633;margin-left:65px}
 
   .wpbadge{position:fixed;z-index:90;right:14px;bottom:84px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:800;padding:6px 11px;border-radius:999px;box-shadow:0 6px 18px -6px rgba(0,0,0,.6);pointer-events:none;opacity:.92}
-  @media(min-width:980px){.wpbadge{bottom:16px}}
+
+  /* ============================================================
+     DESKTOP LAYER (>=1024px)  — ativada por body.desktop (JS toggle)
+     ============================================================ */
+  body.desktop{
+    /* shell */
+  }
+  body.desktop #login{max-width:520px}
+  body.desktop #app{
+    display:grid !important;
+    grid-template-columns:var(--d-side) 1fr;
+    grid-template-rows:100vh;
+    max-width:none !important;
+    margin:0 !important;
+    min-height:100vh;
+    box-shadow:none !important;
+  }
+  /* SIDEBAR (vira a nav) */
+  body.desktop .nav{
+    position:relative !important;
+    left:auto !important;right:auto !important;bottom:auto !important;
+    max-width:none !important;margin:0 !important;
+    grid-column:1;grid-row:1;
+    display:flex !important;flex-direction:column;justify-content:flex-start;align-items:stretch;
+    gap:4px;padding:18px 14px 18px 14px;
+    background:#0D0E14;border-top:none;border-right:1px solid var(--line-soft);
+    backdrop-filter:none;height:100vh;overflow-y:auto;
+  }
+  body.desktop .nav .sb-brand{
+    display:flex;align-items:center;gap:11px;padding:6px 6px 18px 6px;border-bottom:1px solid var(--line-soft);margin-bottom:14px
+  }
+  body.desktop .nav .sb-brand .logo.sm{width:38px;height:38px;border-radius:12px;font-size:18px}
+  body.desktop .nav .sb-brand .nm{font-size:15px;font-weight:800;letter-spacing:-.01em}
+  body.desktop .nav .sb-brand .sy{font-size:11px;color:var(--soft);display:flex;align-items:center;gap:5px;margin-top:2px}
+  body.desktop .nav .sb-brand .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+  body.desktop .nav .sb-sect{font-size:10px;font-weight:800;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;padding:14px 10px 6px}
+  body.desktop .nav button.sb-item{
+    flex:none !important;flex-direction:row !important;align-items:center !important;
+    gap:12px !important;padding:10px 12px !important;border-radius:11px;
+    color:var(--soft) !important;font-size:14px !important;font-weight:600 !important;
+    justify-content:flex-start !important;width:100%;text-align:left;transition:background .12s,color .12s;
+  }
+  body.desktop .nav button.sb-item svg{width:20px !important;height:20px !important;flex:none}
+  body.desktop .nav button.sb-item span{font-size:14px !important;font-weight:600 !important}
+  body.desktop .nav button.sb-item:hover{background:rgba(255,255,255,.04);color:var(--ink) !important}
+  body.desktop .nav button.sb-item.on{background:rgba(91,108,255,.14);color:var(--accent) !important;font-weight:800 !important}
+  body.desktop .nav button.sb-item.on span{font-weight:800 !important}
+  body.desktop .nav .fab{
+    margin:14px 0 0 0 !important;width:100% !important;height:44px !important;border-radius:12px !important;
+    display:flex !important;align-items:center;justify-content:center;gap:8px;
+    font-size:14px;font-weight:800;
+  }
+  body.desktop .nav .fab::after{content:"Nova tarefa";letter-spacing:.01em}
+  body.desktop .nav .fab svg{width:20px !important;height:20px !important}
+  body.desktop .nav .sb-footer{margin-top:auto;padding:14px 6px 4px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--faint);line-height:1.5}
+  body.desktop .nav .sb-footer .ver{display:inline-block;background:rgba(91,108,255,.14);color:var(--accent);font-weight:800;padding:3px 9px;border-radius:999px;margin-bottom:6px;font-size:10.5px}
+
+  /* TOPBAR + CONTENT */
+  body.desktop #app > .topbar{
+    grid-column:2;grid-row:1;
+    height:var(--d-topbar);position:sticky;top:0;
+    padding:0 32px;background:rgba(10,11,16,.85);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line-soft);
+    align-self:start;z-index:25;
+  }
+  body.desktop #app > .topbar .logo.sm{display:none}
+  body.desktop #app > .topbar .tt .nm{font-size:15px}
+  body.desktop #app > .topbar .tt .sy{font-size:11.5px}
+  body.desktop #app > .content{
+    grid-column:2;grid-row:1;
+    padding:calc(var(--d-topbar) + 8px) 32px 48px 32px !important;
+    overflow-y:auto;height:100vh;
+  }
+  body.desktop #app > .content > *{max-width:var(--d-maxw);margin-left:auto;margin-right:auto}
+  body.desktop .scr,body.desktop .scr-head{padding-left:0;padding-right:0}
+  body.desktop .h-title{font-size:30px}
+  body.desktop .sect{font-size:18px;margin:0 0 16px}
+
+  /* HOME GRID (desktop) */
+  body.desktop .d-home{display:grid;grid-template-columns:1.4fr 1fr;gap:24px;align-items:start}
+  body.desktop .d-home .col-tasks{grid-column:2;grid-row:1 / span 2}
+  body.desktop .d-home .col-future{grid-column:1 / -1}
+  @media(min-width:1500px){
+    body.desktop .d-home{grid-template-columns:1fr 1fr 1fr}
+    body.desktop .d-home .col-events{grid-column:1}
+    body.desktop .d-home .col-tasks{grid-column:2;grid-row:1}
+    body.desktop .d-home .col-future{grid-column:3;grid-row:1}
+  }
+  body.desktop .stats{gap:16px}
+  body.desktop .stat{padding:20px;border-radius:18px}
+  body.desktop .stat .v{font-size:32px}
+  body.desktop .stat .l{font-size:13px;margin-top:4px}
+  body.desktop .stat .ic{width:24px;height:24px}
+
+  /* HUB grid (Quadros) */
+  body.desktop .d-hub{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+  body.desktop .d-hub .bcard{margin-bottom:0;padding:18px;border-radius:18px;min-height:104px}
+  body.desktop .d-hub .bcard .icb{width:56px;height:56px;border-radius:16px}
+  body.desktop .d-hub .bcard .icb svg{width:28px;height:28px}
+  body.desktop .d-hub .bcard .bl{font-size:17px}
+  body.desktop .d-hub .bcard .bd{font-size:13px;margin-top:2px}
+
+  /* EQUIPE / CHAT grid */
+  body.desktop .d-team{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  body.desktop .d-team .card{margin-bottom:0}
+
+  /* AGENDA: cal + lista lado a lado */
+  body.desktop .d-agenda-month{display:grid;grid-template-columns:1.05fr .95fr;gap:24px;align-items:start}
+  body.desktop .d-agenda-month .d-cal-card{padding:18px}
+
+  /* KANBAN — 4 colunas lado a lado */
+  body.desktop .kanban{
+    display:grid;grid-template-columns:repeat(4,minmax(260px,1fr));gap:16px;
+    align-items:start;margin-top:12px;
+  }
+  body.desktop .kanban .kcol{
+    background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    display:flex;flex-direction:column;max-height:calc(100vh - 220px);overflow:hidden;
+  }
+  body.desktop .kanban .kcol .khead{
+    display:flex;align-items:center;gap:10px;padding:14px 14px 12px;border-bottom:1px solid var(--line-soft)
+  }
+  body.desktop .kanban .kcol .khead .cc{width:10px;height:10px;border-radius:50%;flex:none}
+  body.desktop .kanban .kcol .khead .kt{font-size:14px;font-weight:800;flex:1;letter-spacing:.01em}
+  body.desktop .kanban .kcol .khead .kn{background:var(--surface2);border-radius:999px;font-size:12px;font-weight:800;padding:3px 10px;color:var(--soft)}
+  body.desktop .kanban .kcol .kbody{padding:12px 12px 12px;overflow-y:auto;flex:1}
+  body.desktop .kanban .kcol .tc{margin-bottom:10px;padding:13px;border-radius:14px}
+  body.desktop .kanban .kcol .tc .tt{font-size:14.5px}
+  body.desktop .kanban .kcol .tc .ds{font-size:12px}
+  body.desktop .kanban .kcol .tc .move{height:36px;font-size:12px;margin-top:10px}
+  body.desktop .kanban .colsel,body.desktop .kanban .colhead{display:none}
+  body.desktop .d-board-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  body.desktop .d-board-head .d-bh-icon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none}
+  body.desktop .d-board-head .d-bh-icon svg{width:24px;height:24px}
+  body.desktop .d-board-head .d-bh-title{font-size:22px;font-weight:800;letter-spacing:-.01em}
+  body.desktop .d-board-head .d-bh-sub{font-size:12.5px;color:var(--faint);margin-top:2px}
+  body.desktop .d-board-tools{display:flex;align-items:center;gap:10px;margin:14px 0 4px}
+  body.desktop .d-board-tools .inp{flex:1;max-width:420px;margin:0}
+
+  /* AGENDA cal */
+  body.desktop .d-cal-grid{padding:18px}
+
+  /* PERFIL */
+  body.desktop .d-perfil{display:grid;grid-template-columns:380px 1fr;gap:24px;align-items:start}
+  body.desktop .d-perfil .pcard{margin-top:0;padding:32px;border-radius:22px}
+
+  /* FORM desktop */
+  body.desktop .scr,body.desktop .scr-head{max-width:820px;margin-left:auto;margin-right:auto}
+  body.desktop .footer-nav{position:fixed;bottom:0;left:var(--d-side);right:0;background:rgba(13,14,20,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line-soft);padding:14px 32px;display:flex;justify-content:flex-end;gap:12px;z-index:30}
+  body.desktop .footer-nav .btn{width:auto;min-width:160px;height:46px;border-radius:12px;padding:0 22px}
+  body.desktop .footer-nav .btn.ghost{min-width:120px}
+
+  /* MODAL polish */
+  body.desktop .modal-back{align-items:center}
+  body.desktop .sheet{max-width:560px;border-radius:18px}
+
+  /* Topbar avatar */
+  body.desktop #app > .topbar #topAvatar > .av{box-shadow:0 0 0 2px var(--line) !important;cursor:pointer}
+
+  /* Esconde wpbadge no desktop (versão já aparece no rodapé da sidebar) */
+  body.desktop .wpbadge{display:none}
+
+  /* Scrollbar desktop polish */
+  body.desktop ::-webkit-scrollbar{width:10px;height:10px}
+  body.desktop ::-webkit-scrollbar-thumb{background:#262A36;border-radius:8px;border:2px solid #0A0B10}
+  body.desktop ::-webkit-scrollbar-thumb:hover{background:#34384A}
+
+  /* Para evitar reflow horizontal quando aparece scrollbar Y */
+  body.desktop #app > .content{scrollbar-gutter:stable}
 </style>
 </head>
 <body>
@@ -235,7 +411,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.66 · Paridade APK</span><br>
+    <span class="pill-ver">Desktop 1.0.67 · Responsive Polish</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -250,7 +426,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.66 · Paridade APK</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.67 · Responsive Polish</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -357,6 +533,13 @@ const ICON={
 function svg(n,cls){return '<svg viewBox="0 0 24 24" fill="none" class="'+(cls||'')+'">'+(ICON[n]||'')+'</svg>';}
 
 const state={user:null,users:[],events:[],tasks:[],tab:'hoje',boardSector:null,form:null,pending:null};
+
+/* ---- DESKTOP MODE detection (>=1024px) ---- */
+const DESKTOP_MQ=window.matchMedia('(min-width:1024px)');
+function isDesktop(){return DESKTOP_MQ.matches;}
+function applyDesktopClass(){document.body.classList.toggle('desktop',isDesktop());}
+applyDesktopClass();
+DESKTOP_MQ.addEventListener('change',()=>{applyDesktopClass();if(state.user)render();});
 let unsub={users:null,events:null,tasks:null};
 
 /* ---- AUTH ---- */
@@ -458,7 +641,16 @@ function render(){
   if(!state.user)return;
   document.getElementById('topAvatar').innerHTML=avatar(state.user,40);
   const nav=document.getElementById('bottomNav');
-  nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
+  if(isDesktop()){
+    nav.innerHTML=
+      '<div class="sb-brand"><div class="logo sm">7</div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
+      '<div class="sb-sect">Workspace</div>'+
+      TABS.map(sbItem).join('')+
+      '<button class="fab" data-fab="1">'+svg('add')+'</button>'+
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.67 · Responsive Polish</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+  }else{
+    nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
+  }
   const c=document.getElementById('content');
   if(state.form){c.innerHTML=renderForm();afterForm();return;}
   if(state.tab==='hoje')c.innerHTML=renderHoje();
@@ -469,6 +661,7 @@ function render(){
   else if(state.tab==='perfil')c.innerHTML=renderPerfil();
 }
 function navBtn(t){const on=state.tab===t.k&&!state.form;return '<button class="'+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+'<span>'+t.l+'</span></button>';}
+function sbItem(t){const on=state.tab===t.k&&!state.form;return '<button class="sb-item '+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+'<span>'+t.l+'</span></button>';}
 
 /* ---- HOJE ---- */
 function renderHoje(){
@@ -484,12 +677,15 @@ function renderHoje(){
       '<button class="stat accent" data-tab="agenda"><div class="ic">'+svg('today')+'</div><div class="v">'+todays.length+'</div><div class="l">Hoje</div></button>'+
       '<button class="stat" data-tab="tarefas"><div class="ic">'+svg('checklist')+'</div><div class="v">'+openTasks.length+'</div><div class="l">Tarefas</div></button>'+
       '<button class="stat" data-tab="equipe"><div class="ic">'+svg('group')+'</div><div class="v">'+activeUsers.length+'</div><div class="l">Equipe</div></button>'+
-    '</div><div class="sect">Compromissos de hoje</div>';
-  h+=todays.length?todays.map(eventCard).join(''):'<div class="emptyline">Nada agendado para hoje.</div>';
-  h+='<div style="height:14px"></div><div class="sect">Tarefas urgentes</div>';
-  h+=urgent.length?urgent.map(o=>urgentRow(o.t,o.d)).join(''):'<div class="emptyline">Nenhuma tarefa pendente. 🎉</div>';
-  h+='<div style="height:14px"></div><div class="sect">Próximos compromissos</div>';
-  h+=future.length?future.map(eventCard).join(''):'<div class="emptyline">Nenhum compromisso futuro agendado.</div>';
+    '</div>';
+  const evHtml='<div class="sect">Compromissos de hoje</div>'+(todays.length?todays.map(eventCard).join(''):'<div class="emptyline">Nada agendado para hoje.</div>');
+  const tkHtml='<div class="sect">Tarefas urgentes</div>'+(urgent.length?urgent.map(o=>urgentRow(o.t,o.d)).join(''):'<div class="emptyline">Nenhuma tarefa pendente. 🎉</div>');
+  const fuHtml='<div class="sect">Próximos compromissos</div>'+(future.length?future.map(eventCard).join(''):'<div class="emptyline">Nenhum compromisso futuro agendado.</div>');
+  if(isDesktop()){
+    h+='<div class="d-home"><div class="col-events">'+evHtml+'</div><div class="col-tasks">'+tkHtml+'</div><div class="col-future">'+fuHtml+'</div></div>';
+  }else{
+    h+=evHtml+'<div style="height:14px"></div>'+tkHtml+'<div style="height:14px"></div>'+fuHtml;
+  }
   return h+'</div>';
 }
 function urgentRow(t,d){const s=secOf(t.sector);const asg=state.users.find(u=>u.id===t.assigneeId)||{name:t.assignee,id:t.assigneeId};
@@ -563,12 +759,13 @@ function afterAgenda(){const s=document.getElementById('agSearch');if(s)s.oninpu
 function renderHub(){
   const vis=visibleTasks(state.user,state.tasks);
   let h='<div class="scr-head"><div class="row"><div style="flex:1"><div class="h-title">Quadros</div><div class="h-sub">Gestão por setor da agência</div></div><span class="badge-round">'+vis.length+' tarefas</span></div></div><div class="scr" style="padding-top:8px">';
-  SECTORS.forEach(s=>{const list=vis.filter(t=>secOf(t.sector).key===s.key);const total=list.length;const late=list.filter(t=>{const d=taskDeadline(t);return d&&d.late;}).length;
-    h+='<button class="bcard" data-sector="'+s.key+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div>'+
+  const cards=SECTORS.map(s=>{const list=vis.filter(t=>secOf(t.sector).key===s.key);const total=list.length;const late=list.filter(t=>{const d=taskDeadline(t);return d&&d.late;}).length;
+    return '<button class="bcard" data-sector="'+s.key+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div>'+
       '<div class="bm"><div class="bl">'+esc(s.label)+'</div><div class="bd">'+esc(s.desc)+'</div>'+
         '<div class="bp"><span class="pill" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+total+' tarefas</span>'+
         (late>0?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">'+late+' em atraso</span>':'')+'</div></div>'+
-      '<div class="arr">'+svg('arr')+'</div></button>';});
+      '<div class="arr">'+svg('arr')+'</div></button>';}).join('');
+  h+=isDesktop()?('<div class="d-hub">'+cards+'</div>'):cards;
   return h+'</div>';
 }
 
@@ -580,8 +777,33 @@ function renderBoard(){
   if(boardMine&&u)list=list.filter(t=>t.assigneeId===u.id||t.by===u.id);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
   const counts=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).length);
+  const byStatus=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const cur=STATUS[boardCol];
-  const colTasks=list.filter(t=>(t.status||'afazer')===cur.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;});
+  if(isDesktop()){
+    // Desktop: 4 colunas lado a lado, cada uma com seu scroll
+    let h='<div class="scr-head"><div class="d-board-head">'+
+      '<button class="iconbtn" data-board="back">'+svg('back')+'</button>'+
+      '<div class="d-bh-icon" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div>'+
+      '<div style="flex:1;min-width:0"><div class="d-bh-title">Quadro de '+esc(s.label)+'</div><div class="d-bh-sub">'+esc(s.desc)+'</div></div>'+
+      '<button class="btn" data-board="new" style="width:auto;height:auto;padding:10px 18px;border-radius:12px;font-size:13.5px">+ Nova tarefa</button>'+
+    '</div></div>'+
+    '<div class="scr" style="padding-top:0"><div class="d-board-tools">'+
+      '<input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'">'+
+      (u?'<button class="chip" data-bmine="1" style="'+(boardMine?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Minhas tarefas</button>':'')+
+    '</div>';
+    h+='<div class="kanban">';
+    STATUS.forEach((st,i)=>{
+      const tasks=byStatus[i];
+      h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
+      if(tasks.length)h+=tasks.map(taskCard).join('');
+      else h+='<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
+      h+='</div></div>';
+    });
+    h+='</div>';
+    return h+'</div>';
+  }
+  // Mobile: mantém o seletor de coluna única (paridade APK)
+  const colTasks=byStatus[boardCol];
   let h='<div class="scr-head"><div class="row" style="gap:10px">'+
     '<button class="iconbtn" data-board="back">'+svg('back')+'</button>'+
     '<div style="width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:'+withAlpha(s.color,.18)+';color:'+s.color+';flex:none"><svg viewBox="0 0 24 24" fill="none" style="width:19px;height:19px">'+ICON[s.icon]+'</svg></div>'+
@@ -630,20 +852,22 @@ function closeModal(){document.getElementById('modalRoot').innerHTML='';}
 function renderEquipe(){
   const us=state.users.filter(u=>!['removido','excluido'].includes(u.status||'')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   let h='<div class="scr-head"><div class="h-title">Equipe</div><div class="h-sub">'+us.length+' integrantes</div></div><div class="scr" style="padding-top:8px">';
-  h+=us.map(u=>'<div class="card" style="display:flex;align-items:center;gap:12px;padding:13px;margin-bottom:10px">'+avatar(u,42)+
+  const items=us.map(u=>'<div class="card" style="display:flex;align-items:center;gap:12px;padding:13px;margin-bottom:10px">'+avatar(u,42)+
     '<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:15px">'+esc(u.name||'')+(u.id===state.user.id?' <span style="color:var(--faint);font-weight:600">(você)</span>':'')+'</div>'+
     '<div style="font-size:12.5px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div>'+
     (u.status==='pendente'?'<span class="pill" style="background:'+withAlpha('#F59E0B',.16)+';color:#F59E0B">Pendente</span>':'<span class="pill" style="background:'+withAlpha('#34D399',.16)+';color:#34D399">Ativo</span>')+'</div>').join('');
+  h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
 function renderChat(){
   const us=state.users.filter(u=>u.id!==state.user.id&&!['removido','excluido','pendente'].includes(u.status||'')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   let h='<div class="scr-head"><div class="h-title">Chat</div><div class="h-sub">Equipe ID Seven</div></div><div class="scr" style="padding-top:8px">'+
-    '<div class="card" style="padding:13px;margin-bottom:12px;color:var(--soft);font-size:12.5px;line-height:1.5">O chat em tempo real existe igual no APK e no PWA. Nesta prévia de homologação ele aparece como <b>lista da equipe</b> (as mensagens não foram replicadas aqui para não duplicar a lógica de tempo real — divergência documentada).</div>';
-  h+=us.map(u=>'<div class="card" style="display:flex;align-items:center;gap:12px;padding:13px;margin-bottom:10px">'+avatar(u,42)+'<div style="flex:1"><div style="font-weight:800;font-size:15px">'+esc(u.name||'')+'</div><div style="font-size:12.5px;color:var(--faint)">'+esc(u.role||'Equipe')+'</div></div>'+svg('chat')+'</div>').join('');
+    '<div class="card" style="padding:14px 16px;margin-bottom:14px;color:var(--soft);font-size:13px;line-height:1.55">O chat em tempo real existe igual no APK e no PWA. Nesta versão Desktop ele aparece como <b>lista da equipe</b> (mensagens em tempo real ficam para a próxima fase dedicada — divergência documentada).</div>';
+  const items=us.map(u=>'<div class="card" style="display:flex;align-items:center;gap:12px;padding:13px;margin-bottom:10px">'+avatar(u,42)+'<div style="flex:1"><div style="font-weight:800;font-size:15px">'+esc(u.name||'')+'</div><div style="font-size:12.5px;color:var(--faint)">'+esc(u.role||'Equipe')+'</div></div>'+svg('chat')+'</div>').join('');
+  h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.66-desktop-parity-foundation';
+const BUILD='1.0.67-desktop-responsive-polish';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -655,7 +879,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('grid','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.66 · Paridade APK</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.67 · Responsive Polish</div></div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
 function openSheet(which){

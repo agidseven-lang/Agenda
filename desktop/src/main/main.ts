@@ -37,10 +37,10 @@ if (!lock) {
 function createWindow() {
   const startHidden = process.argv.includes("--hidden");
   mainWin = new BrowserWindow({
-    width: 1180,
-    height: 820,
-    minWidth: 880,
-    minHeight: 620,
+    width: 1440,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 640,
     show: !startHidden,
     backgroundColor: "#0A0B10",
     title: "Agenda ID Seven Desktop",
@@ -50,10 +50,17 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      backgroundThrottling: false,
+      spellcheck: false,
     },
   });
   mainWin.removeMenu();
   mainWin.loadFile(path.join(app.getAppPath(), "src", "renderer", "index.html"));
+  // Garante nitidez 1:1 (sem zoom acidental). Windows respeita HiDPI nativamente.
+  mainWin.webContents.on("did-finish-load", () => {
+    mainWin?.webContents.setZoomFactor(1.0);
+    mainWin?.webContents.setVisualZoomLevelLimits(1, 1);
+  });
 
   // Fechar = esconde na tray (nao encerra). Quit real so pelo menu da tray.
   mainWin.on("close", (e) => {
