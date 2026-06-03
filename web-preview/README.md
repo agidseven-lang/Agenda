@@ -1,53 +1,28 @@
-# Agenda ID Seven — Web Preview (homologação LOCAL)
+# ID Seven — Web Preview 1.0.65 (Paridade APK)
 
-**Versão:** `1.0.64-web-preview` · commit `7ddbd44` · ref `app/main`
+App web de **homologação** que **espelha o app Android (APK 1.0.64)**: mesmo
+design (dark/Compose), mesmos fluxos (Login → Hoje → Agenda → Quadros por setor
+→ Kanban → Nova tarefa wizard → Cronograma) e a **mesma base Firestore**
+(`agenda-id-seven`). **Não é produção.** Não usa o PWA antigo como referência.
 
-Cópia **isolada** do PWA para testar no navegador do computador.
-**Não é produção.** Não substitui `agendaidseven.com.br`. Não faz deploy.
+## Stack
+- HTML/CSS/JS único (sem framework), Firebase Firestore (compat) via CDN.
+- Login custom `s2:` + SHA-256 (Web Crypto) — idêntico ao `Crypto.kt` do nativo.
+- Sem Firebase Auth, sem Service Worker, sem push (homologação).
 
-## O que muda em relação à produção
-- "Copywriter" → **"Copywriting"** (alinhado ao app nativo) — 12 ocorrências.
-- Rodapé do login mostra **"Web Preview 1.0.64 · commit 7ddbd44 · ref app/main"**.
-- Selo flutuante **"Web Preview 1.0.64"** visível durante o uso.
-- **Service Worker e Push FCM desativados** nesta cópia (evita cache preso e ruído de push no localhost).
-- Usa a **mesma base Firebase** (`agenda-id-seven`) — **sem mudança de schema**.
+## Rodar local
+Na raiz do repo: `python3 -m http.server 8000` → `http://localhost:8000/web-preview/`
 
-O layout **desktop responsivo já existia** no PWA (sidebar lateral a partir de 1024px,
-painéis viram modal a partir de 900px). Nada disso foi reescrito nesta etapa.
+## Publicado (homologação remota)
+Cloudflare Worker separado: **https://idseven-web-preview.agidseven.workers.dev**
+(deploy manual via `.github/workflows/web-preview-deploy.yml`, config
+`wrangler-preview.toml`). Não toca produção, APK, Functions, Resend, SM ou Rules.
 
-## Como rodar no computador
-
-A partir da **raiz do repositório** (a pasta que contém `web-preview/`):
-
-### Python (já vem no Mac/Linux; no Windows instale do python.org)
-```bash
-python3 -m http.server 8000
-```
-Depois abra no navegador:
-```
-http://localhost:8000/web-preview/
-```
-
-### Alternativa com Node (se preferir)
-```bash
-npx serve -l 8000 .
-# abra http://localhost:8000/web-preview/
-```
-
-> Importante: rode o servidor na **raiz do repo**, não dentro de `web-preview/`.
-> A pasta `web-preview/` é auto-contida (tem seu próprio index.html, ícones, manifest).
-
-## O que dá para testar agora
-1. **Login** (e-mail/WhatsApp + senha) — mesma conta da equipe.
-2. **Home / dashboard**.
-3. **Agenda** (preservada, igual à produção aprovada).
-4. **Quadros** e **Kanban** (modelo atual do PWA).
-5. **Copywriting** escrito corretamente.
-6. **Cronograma** (fluxo atual do PWA, por semanas).
-7. **Chat** interno.
-8. Layout **desktop** (sidebar lateral em telas largas).
-
-## Limpando o ambiente (se algum dia instalou o PWA de produção neste navegador)
-Se este navegador já tem o site de produção como PWA/SW, abra DevTools >
-Application > Service Workers > "Unregister", e teste em uma **aba anônima**
-para garantir que está vendo o preview, não o cache de produção.
+## Telas espelhadas do APK
+Login (entrar/criar conta/recuperar) · Hoje (saudação + 3 cards + compromissos +
+urgentes + próximos) · Agenda (mês/lista, filtros por tipo, calendário) ·
+Quadros (hub por setor) · Kanban por setor (A Fazer/Em andamento/Revisão/
+Concluído + mover status) · Nova tarefa (wizard Setor→Dados→Briefing→Revisão) ·
+Cronograma (cliente obrigatório; semanal=3/quinzenal=6/mensal=12; Tema+Legenda) ·
+Visibilidade por função (admin/social=tudo; designer/freelancer/desconhecido=só
+suas) · Equipe · Perfil. Chat aparece como lista da equipe (divergência documentada).
