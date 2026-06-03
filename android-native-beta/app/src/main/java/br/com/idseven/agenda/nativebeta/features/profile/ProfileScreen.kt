@@ -64,7 +64,8 @@ import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 
-private const val BUILD = "1.0.48-beta-agenda-tasks-polish-install-fix"
+// Versão real do APK (reflete app/build.gradle -> sempre a versão instalada). Sem hardcode.
+private val BUILD = br.com.idseven.agenda.nativebeta.BuildConfig.VERSION_NAME
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
