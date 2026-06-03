@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.nativebeta.core.PushNotify
@@ -62,6 +65,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
+private val STEPS = listOf("Setor", "Dados", "Briefing", "Revisão")
+
 @Composable
 fun TaskFormScreen(
     editId: String?,
@@ -73,6 +78,7 @@ fun TaskFormScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    var step by remember { mutableStateOf(0) }
     var sector by remember { mutableStateOf("edicao_midia") }
     var client by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
@@ -86,12 +92,10 @@ fun TaskFormScreen(
     var priority by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("afazer") }
     val checklist = remember { mutableStateListOf<ChecklistItem>() }
-    // Campos específicos do setor (serializados em `desc` no salvamento; sem schema novo).
     val extra = remember { mutableStateMapOf<String, String>() }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // Preenche o checklist padrão do setor (apenas na CRIAÇÃO ao trocar de setor).
     fun applySectorChecklist(key: String) {
         val tpl = TaskTemplates.forSector(key) ?: return
         checklist.clear()
@@ -109,7 +113,6 @@ fun TaskFormScreen(
                 checklist.clear(); checklist.addAll(t.checklist)
             }
         } else {
-            // Criação: já entra com o checklist do setor inicial.
             applySectorChecklist(sector)
         }
     }
@@ -125,7 +128,6 @@ fun TaskFormScreen(
         android.app.TimePickerDialog(context, { _, h, m -> dueTime = "%02d:%02d".format(h, m) }, hh, mm, true).show()
     }
 
-    // Serializa os campos específicos do setor + descrição livre num único bloco (campo desc).
     fun composedDesc(): String {
         val tpl = TaskTemplates.forSector(sector)
         val briefing = tpl?.fields.orEmpty().mapNotNull { f ->
@@ -136,7 +138,7 @@ fun TaskFormScreen(
 
     fun save() {
         error = null
-        if (client.trim().isEmpty() && title.trim().isEmpty()) { error = "Informe ao menos cliente ou título"; return }
+        if (client.trim().isEmpty() && title.trim().isEmpty()) { error = "Informe ao menos cliente ou título"; step = 1; return }
         val input = TaskContract.Input(
             client = client.trim(), title = title.trim(), sector = sector, desc = composedDesc(),
             assignee = assignee.trim(), assigneeId = assigneeId, link = link.trim(), dueDate = dueDate, dueTime = dueTime,
@@ -162,149 +164,208 @@ fun TaskFormScreen(
     val sec = Sectors.of(sector)
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        Row(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Cabeçalho
+        Row(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(if (editId != null) "Editar tarefa" else "Nova tarefa", color = Tokens.Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                Text(if (editId != null) "Editar tarefa" else "Nova tarefa", color = Tokens.Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text(
                     if (client.isNotBlank()) "${sec.label} · ${client.trim()}" else "Quadro de ${sec.label}",
-                    color = Tokens.Faint, fontSize = 12.5.sp, fontWeight = FontWeight.Medium,
+                    color = Tokens.Faint, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.Close, contentDescription = "Fechar", tint = Tokens.Soft, modifier = Modifier.size(20.dp))
+            Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(11.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.Close, contentDescription = "Fechar", tint = Tokens.Soft, modifier = Modifier.size(19.dp))
             }
         }
 
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Stepper(step)
+
+        // Conteúdo rolável (ocupa o espaço; o rodapé fica SEPARADO embaixo e nunca cobre).
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp)) {
             error?.let { MessageBanner(it, isError = true); Spacer(Modifier.height(14.dp)) }
 
-            // ---- Setor (cards profissionais com ícone + descrição) ----
-            Label("Setor")
-            Sectors.ALL.forEach { s ->
-                SectorCard(s.label, s.desc, s.icon, s.color, selected = sector == s.key) {
-                    if (sector != s.key) {
-                        sector = s.key
-                        extra.clear()
-                        if (editId == null) applySectorChecklist(s.key)
+            when (step) {
+                0 -> { // ----- Etapa 1: Setor -----
+                    Label("Escolha o setor")
+                    Sectors.ALL.forEach { s ->
+                        SectorCardCompact(s.label, s.desc, s.icon, s.color, selected = sector == s.key) {
+                            if (sector != s.key) {
+                                sector = s.key; extra.clear()
+                                if (editId == null) applySectorChecklist(s.key)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-            }
-            Spacer(Modifier.height(8.dp))
+                1 -> { // ----- Etapa 2: Dados principais (status no TOPO do fluxo) -----
+                    Label(tpl?.titleLabel ?: "Título")
+                    AppTextField(title, { title = it }, tpl?.titlePlaceholder ?: "Título da tarefa"); Spacer(Modifier.height(14.dp))
+                    Label("Cliente / Empresa"); AppTextField(client, { client = it }, "Ex.: Hospital Visão"); Spacer(Modifier.height(14.dp))
 
-            // ---- Título específico do setor + cliente ----
-            Label(tpl?.titleLabel ?: "Título")
-            AppTextField(title, { title = it }, tpl?.titlePlaceholder ?: "Título da tarefa"); Spacer(Modifier.height(14.dp))
-            Label("Cliente / Empresa"); AppTextField(client, { client = it }, "Ex.: Hospital Visão"); Spacer(Modifier.height(14.dp))
+                    Label("Responsável")
+                    val selectedUser = activeUsers.firstOrNull { it.id == assigneeId }
+                    Box {
+                        AssigneePickerField(
+                            selected = assigneeId != null, photo = selectedUser?.photo,
+                            ringColor = UserColor.of(assigneeId, selectedUser?.color), name = assignee,
+                        ) { assigneeMenu = true }
+                        DropdownMenu(expanded = assigneeMenu, onDismissRequest = { assigneeMenu = false }) {
+                            DropdownMenuItem(
+                                text = { AssigneeItemRow(photo = null, ringColor = Tokens.Line, name = "Ninguém", neutral = true, selected = assigneeId == null) },
+                                onClick = { assignee = ""; assigneeId = null; assigneeMenu = false },
+                            )
+                            activeUsers.forEach { u ->
+                                DropdownMenuItem(
+                                    text = { AssigneeItemRow(photo = u.photo, ringColor = UserColor.of(u.id, u.color), name = u.name ?: "—", neutral = false, selected = u.id == assigneeId) },
+                                    onClick = { assignee = u.name ?: ""; assigneeId = u.id; assigneeMenu = false },
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
 
-            // ---- Responsável (seletor aprovado, avatar + nome) ----
-            Label("Responsável")
-            val selectedUser = activeUsers.firstOrNull { it.id == assigneeId }
-            Box {
-                AssigneePickerField(
-                    selected = assigneeId != null,
-                    photo = selectedUser?.photo,
-                    ringColor = UserColor.of(assigneeId, selectedUser?.color),
-                    name = assignee,
-                ) { assigneeMenu = true }
-                DropdownMenu(expanded = assigneeMenu, onDismissRequest = { assigneeMenu = false }) {
-                    DropdownMenuItem(
-                        text = { AssigneeItemRow(photo = null, ringColor = Tokens.Line, name = "Ninguém", neutral = true, selected = assigneeId == null) },
-                        onClick = { assignee = ""; assigneeId = null; assigneeMenu = false },
-                    )
-                    activeUsers.forEach { u ->
-                        DropdownMenuItem(
-                            text = { AssigneeItemRow(photo = u.photo, ringColor = UserColor.of(u.id, u.color), name = u.name ?: "—", neutral = false, selected = u.id == assigneeId) },
-                            onClick = { assignee = u.name ?: ""; assigneeId = u.id; assigneeMenu = false },
-                        )
+                    Label("Etapa")
+                    StatusSelector(status) { status = it }
+                    Spacer(Modifier.height(14.dp))
+
+                    Row {
+                        Column(Modifier.weight(1f)) { Label("Prazo"); PickerField(dueDate.ifBlank { "Escolher" }) { showDate() } }
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) { Label("Horário"); PickerField(dueTime.ifBlank { "--:--" }) { showTime() } }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Prioridade alta", color = Tokens.Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                        Switch(checked = priority, onCheckedChange = { priority = it })
                     }
                 }
-            }
-            Spacer(Modifier.height(14.dp))
-
-            // ---- Etapa (status do fluxo) ----
-            Label("Etapa")
-            StatusSelector(status) { status = it }
-            Spacer(Modifier.height(14.dp))
-
-            // ---- Prazo / horário ----
-            Row {
-                Column(Modifier.weight(1f)) { Label("Prazo"); PickerField(dueDate.ifBlank { "Escolher" }) { showDate() } }
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) { Label("Horário"); PickerField(dueTime.ifBlank { "--:--" }) { showTime() } }
-            }
-            Spacer(Modifier.height(14.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Prioridade alta", color = Tokens.Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                Switch(checked = priority, onCheckedChange = { priority = it })
-            }
-            Spacer(Modifier.height(16.dp))
-
-            // ---- Campos ESPECÍFICOS do setor (dinâmicos) ----
-            tpl?.fields?.let { fields ->
-                if (fields.isNotEmpty()) {
-                    Label("Detalhes de ${sec.label}")
-                    fields.forEach { f ->
+                2 -> { // ----- Etapa 3: Briefing do setor (compacto) -----
+                    Label("Briefing · ${sec.label}")
+                    tpl?.fields?.forEach { f ->
                         TemplateField(f, extra[f.key] ?: "") { extra[f.key] = it }
                         Spacer(Modifier.height(12.dp))
                     }
-                    Spacer(Modifier.height(2.dp))
+                    Label("Link / anexo"); AppTextField(link, { link = it }, "URL (Drive, Figma, etc.)"); Spacer(Modifier.height(12.dp))
+                    Label("Observações livres"); AppTextField(desc, { desc = it }, "Notas adicionais…"); Spacer(Modifier.height(14.dp))
+
+                    Label("Checklist")
+                    checklist.forEachIndexed { idx, item ->
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                            Box(Modifier.weight(1f)) { AppTextField(item.t, { checklist[idx] = item.copy(t = it) }, "Item ${idx + 1}") }
+                            Spacer(Modifier.width(8.dp))
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(10.dp)).clickable { checklist.removeAt(idx) }, contentAlignment = Alignment.Center) {
+                                Icon(Icons.Outlined.Close, contentDescription = "Remover", tint = Tokens.Red, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { checklist.add(ChecklistItem("", false)) }.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                        Text("+ Adicionar item", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
-            }
-
-            Label("Link / anexo"); AppTextField(link, { link = it }, "URL (Drive, Figma, etc.)"); Spacer(Modifier.height(14.dp))
-            Label("Observações livres"); AppTextField(desc, { desc = it }, "Notas adicionais…"); Spacer(Modifier.height(16.dp))
-
-            // ---- Checklist (pré-preenchido pelo setor) ----
-            Label("Checklist")
-            checklist.forEachIndexed { idx, item ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-                    Box(Modifier.weight(1f)) { AppTextField(item.t, { checklist[idx] = item.copy(t = it) }, "Item ${idx + 1}") }
-                    Spacer(Modifier.width(8.dp))
-                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(10.dp)).clickable { checklist.removeAt(idx) }, contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.Close, contentDescription = "Remover", tint = Tokens.Red, modifier = Modifier.size(18.dp))
+                else -> { // ----- Etapa 4: Revisão -----
+                    Label("Revisão")
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)).padding(16.dp)) {
+                        ReviewRow("Setor", sec.label)
+                        ReviewRow("Cliente", client.ifBlank { "—" })
+                        ReviewRow("Título", title.ifBlank { "—" })
+                        ReviewRow("Responsável", assignee.ifBlank { "Ninguém" })
+                        ReviewRow("Etapa", TaskStatus.label(status))
+                        ReviewRow("Prazo", listOf(dueDate, dueTime).filter { it.isNotBlank() }.joinToString(" ").ifBlank { "—" })
+                        ReviewRow("Prioridade", if (priority) "Alta" else "Normal")
+                        val brief = composedDesc()
+                        if (brief.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("BRIEFING", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(brief, color = Tokens.Soft, fontSize = 13.sp, maxLines = 6, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
+                        }
+                        if (checklist.any { it.t.isNotBlank() }) {
+                            Spacer(Modifier.height(8.dp))
+                            Text("CHECKLIST (${checklist.count { it.t.isNotBlank() }})", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
-            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { checklist.add(ChecklistItem("", false)) }.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
-                Text("+ Adicionar item", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(8.dp))
+        }
 
-            PrimaryButton(if (editId != null) "Salvar alterações" else "Criar tarefa", loading = busy) { save() }
-            Spacer(Modifier.height(28.dp))
+        // ----- Rodapé fixo (fora do scroll, com safe area) — nunca cobre o conteúdo -----
+        Row(
+            modifier = Modifier.fillMaxWidth().background(Tokens.Surface).border(1.dp, Tokens.Line)
+                .navigationBarsPadding().imePadding().padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (step > 0) {
+                Box(
+                    Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(25.dp)).border(1.dp, Tokens.Line, RoundedCornerShape(25.dp)).clickable { step-- },
+                    contentAlignment = Alignment.Center,
+                ) { Text("Voltar", color = Tokens.Soft, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                Spacer(Modifier.width(12.dp))
+            }
+            if (step < STEPS.size - 1) {
+                Box(
+                    Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(25.dp)).background(Tokens.Accent).clickable { step++ },
+                    contentAlignment = Alignment.Center,
+                ) { Text("Próximo", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+            } else {
+                Box(Modifier.weight(1f)) {
+                    PrimaryButton(if (editId != null) "Salvar alterações" else "Salvar tarefa", loading = busy) { save() }
+                }
+            }
         }
     }
 }
 
-// Card de SETOR — ícone colorido + nome + descrição + estado selecionado (borda accent + check).
+// Indicador de etapas (Setor · Dados · Briefing · Revisão).
 @Composable
-private fun SectorCard(label: String, desc: String, icon: ImageVector, color: Color, selected: Boolean, onClick: () -> Unit) {
+private fun Stepper(current: Int) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        STEPS.forEachIndexed { i, label ->
+            val done = i < current
+            val active = i == current
+            val col = if (active || done) Tokens.Accent else Tokens.Line
+            Box(Modifier.size(22.dp).clip(CircleShape).background(if (active || done) Tokens.Accent.copy(alpha = if (active) 1f else 0.5f) else Tokens.Surface).border(1.dp, col, CircleShape), contentAlignment = Alignment.Center) {
+                if (done) Icon(Icons.Outlined.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                else Text("${i + 1}", color = if (active) Color.White else Tokens.Faint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(label, color = if (active) Tokens.Ink else Tokens.Faint, fontSize = 11.5.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+            if (i < STEPS.size - 1) {
+                Spacer(Modifier.width(6.dp))
+                Box(Modifier.weight(1f).height(1.5.dp).background(if (done) Tokens.Accent else Tokens.Line))
+                Spacer(Modifier.width(6.dp))
+            }
+        }
+    }
+}
+
+// Card de setor COMPACTO (ícone + nome + descrição curta + check), uma linha de altura confortável.
+@Composable
+private fun SectorCardCompact(label: String, desc: String, icon: ImageVector, color: Color, selected: Boolean, onClick: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
             .background(if (selected) color.copy(alpha = 0.12f) else Tokens.Surface)
-            .border(if (selected) 1.5.dp else 1.dp, if (selected) color else Tokens.Line, RoundedCornerShape(14.dp))
-            .clickable { onClick() }.padding(12.dp),
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) color else Tokens.Line, RoundedCornerShape(13.dp))
+            .clickable { onClick() }.padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(color.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(22.dp))
+        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(color.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(19.dp))
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
-            Text(label, color = Tokens.Ink, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-            Text(desc, color = Tokens.Faint, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(label, color = Tokens.Ink, fontSize = 14.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(desc, color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (selected) {
-            Box(Modifier.size(24.dp).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(8.dp))
+            Box(Modifier.size(22.dp).clip(CircleShape).background(color), contentAlignment = Alignment.Center) {
+                Icon(Icons.Outlined.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
             }
         }
     }
 }
 
-// Seletor de ETAPA (status do fluxo) — segmented chips: A fazer / Em andamento / Revisão / Concluído.
 @Composable
 private fun StatusSelector(current: String, onSelect: (String) -> Unit) {
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
@@ -315,7 +376,7 @@ private fun StatusSelector(current: String, onSelect: (String) -> Unit) {
                 modifier = Modifier.padding(end = 8.dp).clip(RoundedCornerShape(999.dp))
                     .background(if (sel) col.copy(alpha = 0.18f) else Tokens.Surface)
                     .border(1.dp, if (sel) col else Tokens.Line, RoundedCornerShape(999.dp))
-                    .clickable { onSelect(st) }.padding(horizontal = 14.dp, vertical = 9.dp),
+                    .clickable { onSelect(st) }.padding(horizontal = 13.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(col))
@@ -326,7 +387,6 @@ private fun StatusSelector(current: String, onSelect: (String) -> Unit) {
     }
 }
 
-// Campo dinâmico de template: TEXT (input), CHOICE (chips) ou BOOL (switch Sim/Não).
 @Composable
 private fun TemplateField(f: TplField, value: String, onChange: (String) -> Unit) {
     Label(f.label)
@@ -353,6 +413,14 @@ private fun TemplateField(f: TplField, value: String, onChange: (String) -> Unit
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ReviewRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+        Text(label, color = Tokens.Faint, fontSize = 13.sp, modifier = Modifier.width(110.dp))
+        Text(value, color = Tokens.Ink, fontSize = 13.5.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
