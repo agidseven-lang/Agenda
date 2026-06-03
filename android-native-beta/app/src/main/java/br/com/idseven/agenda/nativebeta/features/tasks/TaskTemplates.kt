@@ -27,6 +27,7 @@ object TaskTemplates {
             titleLabel = "Título da edição",
             titlePlaceholder = "Ex.: Reels institucional — corte 30s",
             fields = listOf(
+                TplField("pacote", "Pacote (quantidade)", FieldKind.CHOICE, listOf("4 vídeos/roteiros", "6 vídeos/roteiros", "12 vídeos/roteiros")),
                 TplField("tipo_peca", "Tipo de peça", FieldKind.CHOICE, listOf("Reels", "Stories", "Feed", "YouTube", "Institucional")),
                 TplField("material_recebido", "Material recebido?", FieldKind.BOOL),
                 TplField("orientacoes", "Orientações de edição", FieldKind.TEXT, placeholder = "Cortes, ritmo, trilha, legendas…"),
@@ -37,6 +38,7 @@ object TaskTemplates {
             titleLabel = "Nome do cronograma",
             titlePlaceholder = "Ex.: Cronograma de junho",
             fields = listOf(
+                TplField("tipo_cronograma", "Tipo de cronograma", FieldKind.CHOICE, listOf("Semanal", "Quinzenal", "Mensal")),
                 TplField("periodo", "Período", FieldKind.TEXT, placeholder = "Ex.: 01/06 a 30/06"),
                 TplField("canais", "Canais", FieldKind.CHOICE, listOf("Instagram", "Facebook", "YouTube", "WhatsApp")),
                 TplField("qtd_posts", "Quantidade de posts", FieldKind.TEXT, placeholder = "Ex.: 12"),
@@ -48,6 +50,7 @@ object TaskTemplates {
             titleLabel = "Título da copy",
             titlePlaceholder = "Ex.: Legenda lançamento",
             fields = listOf(
+                TplField("pacote_conteudo", "Pacote de conteúdo", FieldKind.CHOICE, listOf("Semanal", "Quinzenal", "Mensal")),
                 TplField("tipo_copy", "Tipo de copy", FieldKind.CHOICE, listOf("Legenda", "Anúncio", "Roteiro curto", "Chamada", "Carrossel")),
                 TplField("objetivo", "Objetivo", FieldKind.CHOICE, listOf("Engajamento", "Conversão", "Autoridade", "Captação")),
                 TplField("tom_voz", "Tom de voz", FieldKind.TEXT, placeholder = "Ex.: próximo, confiante"),
