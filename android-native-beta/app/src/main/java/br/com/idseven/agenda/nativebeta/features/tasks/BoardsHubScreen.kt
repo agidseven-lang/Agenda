@@ -37,17 +37,21 @@ import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
+import br.com.idseven.agenda.nativebeta.domain.UserLite
 
 // Hub de QUADROS por setor (Fase A). Lista os setores como cards SaaS; cada card mostra
 // total de tarefas e quantas estão em atraso. Toque abre o quadro Kanban daquele setor.
+// Fase B: contadores respeitam a VISIBILIDADE por função (admin/social veem tudo;
+// operacional vê só as próprias). Filtro client-side (sem schema/Rules).
 @Composable
 fun BoardsHubScreen(
     tasksState: UiList<TaskItem>,
+    currentUser: UserLite?,
     onOpenSector: (String) -> Unit,
 ) {
     tasksState.errorMessage()?.let { ErrorState("Quadros — $it"); return }
     if (tasksState.isLoading) { SkeletonList(); return }
-    val all = tasksState.itemsOrEmpty()
+    val all = TaskVisibility.visibleTasks(currentUser, tasksState.itemsOrEmpty())
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {

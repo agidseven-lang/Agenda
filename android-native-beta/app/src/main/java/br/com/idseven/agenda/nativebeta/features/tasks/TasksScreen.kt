@@ -95,6 +95,7 @@ fun TasksScreen(
     users: List<UserLite>,
     currentUid: String?,
     onTaskClick: (String) -> Unit,
+    currentUser: UserLite? = null,     // Fase B: visibilidade por função (client-side)
     lockedSector: String? = null,      // quando setado: quadro de UM setor (Fase A)
     onNew: () -> Unit = {},
     onBack: (() -> Unit)? = null,
@@ -119,7 +120,9 @@ fun TasksScreen(
         else (sectorFilter == null || t.sector == sectorFilter)
         val okM = !mineOnly || currentUid == null ||
             (t.assigneeId == currentUid) || (t.by == currentUid)
-        okQ && okS && okM
+        // Fase B: visibilidade por função (admin/social veem tudo; operacional só as próprias).
+        val okVis = TaskVisibility.canSeeTask(currentUser, t)
+        okQ && okS && okM && okVis
     }
     val pager = rememberPagerState(pageCount = { TaskStatus.COLUMNS.size })
 

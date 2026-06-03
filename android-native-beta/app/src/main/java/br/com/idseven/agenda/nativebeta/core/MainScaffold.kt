@@ -208,7 +208,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             }
             composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
             composable("tarefas") {
-                BoardsHubScreen(tasksState, onOpenSector = { nav.navigate("board/$it") })
+                BoardsHubScreen(tasksState, currentUser = currentUser, onOpenSector = { nav.navigate("board/$it") })
             }
             composable(
                 route = "board/{sector}",
@@ -218,6 +218,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                 TasksScreen(
                     tasksState, users, currentUid = session.uid,
                     onTaskClick = { nav.navigate("task/$it") },
+                    currentUser = currentUser,
                     lockedSector = sectorKey,
                     onNew = { nav.navigate("taskForm?sector=$sectorKey") },
                     onBack = { nav.popBackStack() },
