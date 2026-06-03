@@ -25,7 +25,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.60-beta-task-subtemplate-forms-fix"
+      DIST_BASENAME: "idseven-nativebeta-1.0.61-beta-cronograma-content-forms-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -182,8 +182,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.60-beta-task-subtemplate-forms-fix
-          path: dist/idseven-nativebeta-1.0.60-beta-task-subtemplate-forms-fix.apk
+          name: idseven-nativebeta-1.0.61-beta-cronograma-content-forms-fix
+          path: dist/idseven-nativebeta-1.0.61-beta-cronograma-content-forms-fix.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -191,7 +191,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.60-beta-task-subtemplate-forms-fix-bundle
-          path: dist/idseven-nativebeta-1.0.60-beta-task-subtemplate-forms-fix.zip
+          name: idseven-nativebeta-1.0.61-beta-cronograma-content-forms-fix-bundle
+          path: dist/idseven-nativebeta-1.0.61-beta-cronograma-content-forms-fix.zip
           if-no-files-found: error
           retention-days: 30
