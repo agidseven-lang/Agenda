@@ -1,6 +1,13 @@
 package br.com.idseven.agenda.nativebeta.domain
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 
 // Tipos de compromisso — iguais ao PWA (5 tipos), com cor, label e frases de situação.
 object Types {
@@ -17,17 +24,24 @@ object Types {
     fun of(type: String?): T = ALL.firstOrNull { it.key == type } ?: ALL.last()
 }
 
-// Setores de tarefas (gerenciador) — base inicial, alinhada ao PWA.
+// Setores de tarefas (Quadros) — cada setor tem ícone, cor e descrição (SaaS).
+// Mantém alias de chaves legadas (design/copy/postagem) para não quebrar dados antigos:
+// o campo `sector` continua sendo uma String no Firestore (sem mudança de schema).
 object Sectors {
-    data class Sec(val key: String, val label: String, val color: Color)
+    data class Sec(val key: String, val label: String, val color: Color, val icon: ImageVector, val desc: String)
     val ALL = listOf(
-        Sec("design", "Design", Color(0xFFA78BFA)),
-        Sec("copy", "Copy", Color(0xFF22D3EE)),
-        Sec("roteiro", "Roteiro", Color(0xFFF59E0B)),
-        Sec("postagem", "Postagem", Color(0xFF34D399)),
-        Sec("edicao_midia", "Edição de Mídia", Color(0xFF60A5FA)),
+        Sec("edicao_midia", "Edição de mídia", Color(0xFF60A5FA), Icons.Outlined.Movie, "Cortes, legendas e exportação"),
+        Sec("cronograma", "Cronograma", Color(0xFF34D399), Icons.Outlined.CalendarMonth, "Planejamento de publicações"),
+        Sec("copywriting", "Copywriting", Color(0xFF22D3EE), Icons.Outlined.EditNote, "Textos, legendas e anúncios"),
+        Sec("roteiro", "Roteiro", Color(0xFFF59E0B), Icons.Outlined.Description, "Gancho, desenvolvimento e CTA"),
+        Sec("programacao_posts", "Programação de posts", Color(0xFFA78BFA), Icons.Outlined.GridView, "Agendamento e publicação"),
     )
-    fun of(key: String?): Sec = ALL.firstOrNull { it.key == key } ?: ALL.first()
+    // Aliases de chaves antigas -> setor atual (compatibilidade com tarefas já salvas).
+    private val ALIAS = mapOf("design" to "edicao_midia", "copy" to "copywriting", "postagem" to "programacao_posts")
+    fun of(key: String?): Sec {
+        val k = ALIAS[key] ?: key
+        return ALL.firstOrNull { it.key == k } ?: ALL.first()
+    }
 }
 
 // Status de tarefa (Kanban) — 4 colunas compatíveis com o PWA (afazer/andamento/revisao/concluido).
