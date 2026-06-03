@@ -25,7 +25,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.53-beta-assignee-picker-polish"
+      DIST_BASENAME: "idseven-nativebeta-1.0.54-beta-task-assignee-picker-polish"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -182,8 +182,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.53-beta-assignee-picker-polish
-          path: dist/idseven-nativebeta-1.0.53-beta-assignee-picker-polish.apk
+          name: idseven-nativebeta-1.0.54-beta-task-assignee-picker-polish
+          path: dist/idseven-nativebeta-1.0.54-beta-task-assignee-picker-polish.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -191,7 +191,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.53-beta-assignee-picker-polish-bundle
-          path: dist/idseven-nativebeta-1.0.53-beta-assignee-picker-polish.zip
+          name: idseven-nativebeta-1.0.54-beta-task-assignee-picker-polish-bundle
+          path: dist/idseven-nativebeta-1.0.54-beta-task-assignee-picker-polish.zip
           if-no-files-found: error
           retention-days: 30
