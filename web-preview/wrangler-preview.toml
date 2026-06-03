@@ -1,0 +1,11 @@
+# Cloudflare Worker de HOMOLOGACAO (assets estaticos do web-preview/).
+# Nome SEPARADO do Worker de push (idseven-push) -> nao colide, nao sobrescreve.
+# NAO toca: site agendaidseven.com.br, producao, APK, Functions, Resend,
+# Secret Manager, Firestore Rules. Apenas serve os arquivos desta pasta.
+name = "idseven-web-preview"
+compatibility_date = "2026-05-24"
+workers_dev = true
+
+# Worker "assets-only" (sem codigo de servidor): serve index.html + assets.
+[assets]
+directory = "."
