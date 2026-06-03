@@ -1,6 +1,6 @@
 # Build Android Nativo Beta (port do GitLab build_android_beta).
 # PREPARADO — execucao SOMENTE manual (workflow_dispatch). NAO roda em push/PR.
-# Nao faz deploy. Gera APK como artifact. GitLab continua principal.
+# Nao faz deploy. Gera APK + ZIP de distribuicao como artifacts. GitLab continua principal.
 name: "[manual] Android Beta Build"
 
 on:
@@ -25,6 +25,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
+      DIST_BASENAME: "idseven-nativebeta-1.0.65-beta-mobile-validation"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -81,16 +82,122 @@ jobs:
         run: |
           cd "$APP_DIR"
           chmod +x ./gradlew
+          # Limpeza defensiva: remove APK de qualquer build anterior antes do clean build,
+          # garantindo que o artifact NUNCA reaproveite binario antigo.
+          rm -rf app/build/outputs/apk || true
           EXTRA=""
           if [ -n "${{ steps.urls.outputs.req }}" ] && [ -n "${{ steps.urls.outputs.cnf }}" ]; then
             EXTRA="-PPASSWORD_RESET_REQUEST_URL=${{ steps.urls.outputs.req }} -PPASSWORD_RESET_CONFIRM_URL=${{ steps.urls.outputs.cnf }}"
           fi
           ./gradlew clean assembleRelease --no-daemon --stacktrace $EXTRA
 
+      # Empacotamento p/ distribuicao DIRETA (sem Play Store):
+      # renomeia APK (nome unico), gera relatorio + VERSAO-DO-APK.txt + instrucoes.
+      - name: Renomear + verificar + gerar relatorio/instrucoes
+        if: always()
+        run: |
+          set +e
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ 2>/dev/null | sort -V | tail -1)"
+          APKSIGNER="${BT}apksigner"; AAPT="${BT}aapt"; ZIPALIGN="${BT}zipalign"
+          SRC="$APP_DIR/app/build/outputs/apk/release/app-release.apk"
+          OUTDIR="$GITHUB_WORKSPACE/dist"; rm -rf "$OUTDIR"; mkdir -p "$OUTDIR"
+          APK="$OUTDIR/${DIST_BASENAME}.apk"
+          REPORT="$OUTDIR/RELATORIO-INSTALACAO.txt"
+          INSTR="$OUTDIR/INSTRUCOES-INSTALACAO.txt"
+          VERFILE="$OUTDIR/VERSAO-DO-APK.txt"
+          if [ ! -f "$SRC" ]; then echo "::error:: APK nao gerado ($SRC ausente)."; exit 1; fi
+          cp "$SRC" "$APK"
+          VER="$("$AAPT" dump badging "$APK" 2>/dev/null | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")"
+          VC="$("$AAPT" dump badging "$APK" 2>/dev/null | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")"
+          PKG="$("$AAPT" dump badging "$APK" 2>/dev/null | sed -n "s/package: name='\([^']*\)'.*/\1/p")"
+          SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
+          {
+            echo "===== RELATORIO DE INSTALACAO - idseven nativebeta ====="
+            echo "Gerado (UTC)   : $(date -u)"
+            echo "Ref / commit   : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
+            echo "Arquivo APK    : $(basename "$APK")"
+            echo "Tamanho        : $(wc -c < "$APK") bytes"
+            echo "SHA-256 (apk)  : $SHA"
+            echo ""
+            echo "----- Identidade do pacote (aapt badging) -----"
+            "$AAPT" dump badging "$APK" 2>/dev/null | grep -E "^package:|sdkVersion:|targetSdkVersion:|application-label:"
+            if "$AAPT" dump badging "$APK" 2>/dev/null | grep -q "application-debuggable"; then
+              echo "debuggable     : TRUE (ATENCAO - nao deveria em release)"
+            else
+              echo "debuggable     : FALSE (ok - release nao-depuravel)"
+            fi
+            echo ""
+            echo "----- Permissoes declaradas (uses-permission) -----"
+            "$AAPT" dump permissions "$APK" 2>/dev/null | grep "uses-permission:" | sed "s/uses-permission: name=//"
+            echo ""
+            echo "----- zipalign -c -v 4 (alinhamento 4 bytes) -----"
+            if "$ZIPALIGN" -c -v 4 "$APK" >/dev/null 2>&1; then echo "zipalign       : OK (4-byte aligned)"; else echo "zipalign       : FALHOU"; fi
+            echo ""
+            echo "----- apksigner verify --verbose --print-certs -----"
+            "$APKSIGNER" verify --verbose --print-certs "$APK" 2>&1
+            echo ""
+            echo "----- keytool: fingerprints do keystore versionado -----"
+            keytool -list -v -keystore "$APP_DIR/app/idseven-test.keystore" -storepass android 2>/dev/null | grep -E "Alias name:|Owner:|SHA1:|SHA256:|Valid"
+          } | tee "$REPORT"
+          # VERSAO-DO-APK.txt: prova rapida do que esta dentro do APK (lido do binario).
+          printf '%s\n' \
+            "versionName : $VER" \
+            "versionCode : $VC" \
+            "packageName : $PKG" \
+            "SHA-256     : $SHA" \
+            "commit      : $GITHUB_SHA" \
+            "ref         : ${{ github.event.inputs.ref }}" \
+            "arquivo     : $(basename "$APK")" \
+            > "$VERFILE"
+          echo "== VERSAO-DO-APK =="; cat "$VERFILE"
+          printf '%s\n' \
+            "==== COMO INSTALAR (APK DIRETO, SEM PLAY STORE) ====" \
+            "" \
+            "IMPORTANTE: instale o arquivo com NOME COMPLETO abaixo (nao o app-release.apk):" \
+            "  ${DIST_BASENAME}.apk" \
+            "" \
+            "1) Baixe o .apk pelo NAVEGADOR (Chrome) do celular -> pasta Downloads." \
+            "2) Abra Meus Arquivos (ou Arquivos) > Download e toque no arquivo." \
+            "3) Se aparecer 'Instalar apps desconhecidos': habilite p/ Meus Arquivos (ou Chrome)." \
+            "4) Confirme a versao na tela de login (rodape) e em Perfil > Sobre o app." \
+            "" \
+            "==== APOS INSTALAR: ATIVAR NOTIFICACOES ====" \
+            "No Android 13+ a reinstalacao reseta a permissao de notificacoes. Aceite o pedido," \
+            "ou va em Perfil > Notificacoes > 'Permitir notificacoes'. Token FCM sincroniza sozinho." \
+            "" \
+            "==== PRIMEIRA INSTALACAO DESTA LINHA (faca uma vez) ====" \
+            "Se ja teve a 1.0.46/1.0.47 instalada, DESINSTALE primeiro (inclusive Dual Apps /" \
+            "Espaco Seguro / 2o usuario). Depois desta, as proximas atualizam por cima." \
+            "" \
+            "==== SE O PLAY PROTECT BLOQUEAR ====" \
+            "'Mais detalhes' > 'Instalar mesmo assim'. Se nao aparecer: e bloqueio de sideload" \
+            "do Google (nao e erro do app) — Play Store > perfil > Play Protect > desligar" \
+            "'Verificar apps' temporariamente, instalar, religar." \
+            > "$INSTR"
+          echo "Conteudo de dist/:"; ls -lh "$OUTDIR"
+
+      - name: Montar ZIP de distribuicao (APK + relatorio + versao + instrucoes)
+        if: always()
+        run: |
+          cd "$GITHUB_WORKSPACE/dist" || exit 1
+          zip -j "${DIST_BASENAME}.zip" \
+            "${DIST_BASENAME}.apk" "VERSAO-DO-APK.txt" "RELATORIO-INSTALACAO.txt" "INSTRUCOES-INSTALACAO.txt"
+          ls -lh
+
       - name: Upload APK (artifact)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-${{ github.sha }}
-          path: ${{ env.APP_DIR }}/app/build/outputs/apk/release/app-release.apk
+          name: idseven-nativebeta-1.0.65-beta-mobile-validation
+          path: dist/idseven-nativebeta-1.0.65-beta-mobile-validation.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload ZIP de distribuicao (APK + relatorio + versao + instrucoes)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: idseven-nativebeta-1.0.65-beta-mobile-validation-bundle
+          path: dist/idseven-nativebeta-1.0.65-beta-mobile-validation.zip
           if-no-files-found: error
           retention-days: 30
