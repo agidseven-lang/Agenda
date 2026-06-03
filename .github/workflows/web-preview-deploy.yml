@@ -46,5 +46,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: web-preview
-          command: deploy --config wrangler-preview.toml
+          # Roda na RAIZ (sem workingDirectory) p/ o node_modules do wrangler
+          # NAO cair dentro de web-preview/ e ser empacotado como asset.
+          command: deploy --config web-preview/wrangler-preview.toml

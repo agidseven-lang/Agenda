@@ -1,0 +1,4 @@
+node_modules
+wrangler-preview.toml
+.assetsignore
+README.md
