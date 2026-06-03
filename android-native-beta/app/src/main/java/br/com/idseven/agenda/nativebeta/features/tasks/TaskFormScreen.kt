@@ -76,6 +76,7 @@ fun TaskFormScreen(
     currentUid: String?,
     onDone: () -> Unit,
     onBack: () -> Unit,
+    initialSector: String? = null,   // setor do quadro de origem (Fase A: "+ Novo" dentro do setor)
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -129,7 +130,9 @@ fun TaskFormScreen(
                 checklist.clear(); checklist.addAll(t.checklist)
             }
         } else {
-            applySectorDefaults(sector)
+            val s = initialSector?.let { Sectors.of(it).key } ?: sector
+            sector = s
+            applySectorDefaults(s)
         }
     }
 

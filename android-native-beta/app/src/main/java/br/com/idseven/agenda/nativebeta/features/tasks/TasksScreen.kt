@@ -95,6 +95,9 @@ fun TasksScreen(
     users: List<UserLite>,
     currentUid: String?,
     onTaskClick: (String) -> Unit,
+    lockedSector: String? = null,      // quando setado: quadro de UM setor (Fase A)
+    onNew: () -> Unit = {},
+    onBack: (() -> Unit)? = null,
 ) {
     tasksState.errorMessage()?.let { ErrorState("Tarefas — $it"); return }
     if (tasksState.isLoading) { SkeletonList(); return }
@@ -111,7 +114,9 @@ fun TasksScreen(
     val q = query.trim().lowercase()
     val tasks = all.filter { t ->
         val okQ = q.isEmpty() || listOf(t.title, t.client, t.assignee).any { (it ?: "").lowercase().contains(q) }
-        val okS = sectorFilter == null || t.sector == sectorFilter
+        // Quadro de setor (lockedSector) usa resolução por alias; senão, filtro livre.
+        val okS = if (lockedSector != null) Sectors.of(t.sector).key == lockedSector
+        else (sectorFilter == null || t.sector == sectorFilter)
         val okM = !mineOnly || currentUid == null ||
             (t.assigneeId == currentUid) || (t.by == currentUid)
         okQ && okS && okM
@@ -119,14 +124,39 @@ fun TasksScreen(
     val pager = rememberPagerState(pageCount = { TaskStatus.COLUMNS.size })
 
     Column(Modifier.fillMaxSize()) {
+        // Cabeçalho do quadro do setor (Fase A): voltar + nome do setor + "+ Novo".
+        if (lockedSector != null) {
+            val sec = Sectors.of(lockedSector)
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, end = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) {
+                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(11.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Voltar", tint = Tokens.Soft, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(10.dp))
+                }
+                Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(sec.color.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                    Icon(sec.icon, contentDescription = null, tint = sec.color, modifier = Modifier.size(19.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Quadro de ${sec.label}", color = Tokens.Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(sec.desc, color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Box(Modifier.clip(RoundedCornerShape(999.dp)).background(Tokens.Accent).clickable { onNew() }.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                    Text("+ Novo", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
         SearchField(query, { query = it }, "Buscar tarefa…")
-        // Filtro "Minhas tarefas" (chip de escopo) + filtros de setor.
+        // Filtro "Minhas tarefas" (chip de escopo) + filtros de setor (ocultos no quadro de setor).
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 2.dp)) {
             if (currentUid != null) {
                 SectorChip("Minhas tarefas", Tokens.Accent, mineOnly) { mineOnly = !mineOnly }
             }
-            SectorChip("Todos", null, sectorFilter == null) { sectorFilter = null }
-            Sectors.ALL.forEach { s -> SectorChip(s.label, s.color, sectorFilter == s.key) { sectorFilter = s.key } }
+            if (lockedSector == null) {
+                SectorChip("Todos", null, sectorFilter == null) { sectorFilter = null }
+                Sectors.ALL.forEach { s -> SectorChip(s.label, s.color, sectorFilter == s.key) { sectorFilter = s.key } }
+            }
         }
         // Seletor/indicador de coluna
         Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 8.dp)) {

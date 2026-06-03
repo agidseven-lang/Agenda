@@ -62,6 +62,7 @@ import br.com.idseven.agenda.nativebeta.features.dashboard.DashboardScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventDetailScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventFormScreen
 import br.com.idseven.agenda.nativebeta.features.profile.ProfileScreen
+import br.com.idseven.agenda.nativebeta.features.tasks.BoardsHubScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskDetailScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskFormScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TasksScreen
@@ -206,7 +207,22 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                 )
             }
             composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
-            composable("tarefas") { TasksScreen(tasksState, users, currentUid = session.uid, onTaskClick = { nav.navigate("task/$it") }) }
+            composable("tarefas") {
+                BoardsHubScreen(tasksState, onOpenSector = { nav.navigate("board/$it") })
+            }
+            composable(
+                route = "board/{sector}",
+                arguments = listOf(navArgument("sector") { type = NavType.StringType }),
+            ) { entry ->
+                val sectorKey = entry.arguments?.getString("sector") ?: "edicao_midia"
+                TasksScreen(
+                    tasksState, users, currentUid = session.uid,
+                    onTaskClick = { nav.navigate("task/$it") },
+                    lockedSector = sectorKey,
+                    onNew = { nav.navigate("taskForm?sector=$sectorKey") },
+                    onBack = { nav.popBackStack() },
+                )
+            }
             composable("equipe") { TeamScreen(usersState) }
             composable("chat") { ChatListScreen(session, users, onOpenChat = { nav.navigate("chatThread/$it") }) }
             composable("chatThread/{otherId}") { entry ->
@@ -251,8 +267,11 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                 )
             }
             composable(
-                route = "taskForm?id={id}",
-                arguments = listOf(navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null }),
+                route = "taskForm?id={id}&sector={sector}",
+                arguments = listOf(
+                    navArgument("id") { type = NavType.StringType; nullable = true; defaultValue = null },
+                    navArgument("sector") { type = NavType.StringType; nullable = true; defaultValue = null },
+                ),
             ) { entry ->
                 TaskFormScreen(
                     editId = entry.arguments?.getString("id"),
@@ -260,6 +279,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     currentUid = session.uid,
                     onDone = { nav.popBackStack() },
                     onBack = { nav.popBackStack() },
+                    initialSector = entry.arguments?.getString("sector"),
                 )
             }
         }
