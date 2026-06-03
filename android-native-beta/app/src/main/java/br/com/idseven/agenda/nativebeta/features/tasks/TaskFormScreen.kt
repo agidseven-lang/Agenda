@@ -23,6 +23,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -94,6 +96,7 @@ fun TaskFormScreen(
     var status by remember { mutableStateOf("afazer") }
     val checklist = remember { mutableStateListOf<ChecklistItem>() }
     val extra = remember { mutableStateMapOf<String, String>() }
+    val contentOpen = remember { mutableStateMapOf<Int, Boolean>() } // accordion dos conteúdos do cronograma
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -105,12 +108,12 @@ fun TaskFormScreen(
     fun applySectorDefaults(key: String) {
         val tpl = TaskTemplates.forSector(key)
         subtype = tpl?.subtypes?.firstOrNull()?.key ?: ""
-        extra.clear()
+        extra.clear(); contentOpen.clear()
         if (editId == null) setChecklist(tpl?.subtypeOf(subtype)?.checklist ?: tpl?.checklist.orEmpty())
     }
     // Troca o SUBFORMULÁRIO conforme a escolha (Semanal/Quinzenal/Mensal ou 4/6/12).
     fun applySubtype(key: String) {
-        subtype = key; extra.clear()
+        subtype = key; extra.clear(); contentOpen.clear()
         if (editId == null) setChecklist(TaskTemplates.forSector(sector)?.subtypeOf(key)?.checklist.orEmpty())
     }
 
@@ -147,9 +150,20 @@ fun TaskFormScreen(
         val lines = mutableListOf<String>()
         val sub = tpl.subtypeOf(subtype)
         if (sub != null) {
-            lines.add("Tipo: ${sub.formTitle}")
+            val countNote = if (sub.contentCount > 0) " — ${sub.contentCount} conteúdos" else ""
+            lines.add("Tipo: ${sub.formTitle}$countNote")
             sub.fields.forEach { f -> extra[f.key]?.trim()?.takeIf { it.isNotEmpty() }?.let { lines.add("${f.label}: $it") } }
             sub.itemLabels.forEach { lbl -> extra[lbl]?.trim()?.takeIf { it.isNotEmpty() }?.let { lines.add("$lbl: $it") } }
+            // Conteúdos do cronograma (Tema + Legenda por conteúdo).
+            for (i in 1..sub.contentCount) {
+                val t = extra["c${i}_tema"]?.trim().orEmpty()
+                val l = extra["c${i}_legenda"]?.trim().orEmpty()
+                if (t.isNotEmpty() || l.isNotEmpty()) {
+                    lines.add("Conteúdo $i:")
+                    if (t.isNotEmpty()) lines.add("  Tema: $t")
+                    if (l.isNotEmpty()) lines.add("  Legenda: $l")
+                }
+            }
         } else {
             tpl.fields.forEach { f -> extra[f.key]?.trim()?.takeIf { it.isNotEmpty() }?.let { lines.add("${f.label}: $it") } }
         }
@@ -272,6 +286,23 @@ fun TaskFormScreen(
                                 }
                                 Spacer(Modifier.height(4.dp))
                             }
+                            // Conteúdos do cronograma: N blocos (accordion) com Tema + Legenda.
+                            if (s.contentCount > 0) {
+                                Label("Conteúdos do cronograma (${s.contentCount})")
+                                for (i in 1..s.contentCount) {
+                                    val tKey = "c${i}_tema"; val lKey = "c${i}_legenda"
+                                    ContentCard(
+                                        title = if (s.dayLabels) "Conteúdo $i / ${i}º dia" else "Conteúdo $i",
+                                        expanded = contentOpen[i] ?: (i == 1),
+                                        filled = !extra[tKey].isNullOrBlank() || !extra[lKey].isNullOrBlank(),
+                                        onToggle = { contentOpen[i] = !(contentOpen[i] ?: (i == 1)) },
+                                        tema = extra[tKey] ?: "", onTema = { extra[tKey] = it },
+                                        legenda = extra[lKey] ?: "", onLegenda = { extra[lKey] = it },
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                                Spacer(Modifier.height(4.dp))
+                            }
                         }
                     } else {
                         Label("Briefing · ${sec.label}")
@@ -297,7 +328,13 @@ fun TaskFormScreen(
                     Label("Revisão")
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)).padding(16.dp)) {
                         ReviewRow("Setor", sec.label)
-                        if (sub != null) ReviewRow("Subtipo", sub.formTitle)
+                        if (sub != null) {
+                            ReviewRow("Subtipo", sub.formTitle + (if (sub.contentCount > 0) " · ${sub.contentCount} conteúdos" else ""))
+                            if (sub.contentCount > 0) {
+                                val filled = (1..sub.contentCount).count { !extra["c${it}_tema"].isNullOrBlank() || !extra["c${it}_legenda"].isNullOrBlank() }
+                                ReviewRow("Conteúdos", "$filled de ${sub.contentCount} preenchidos")
+                            }
+                        }
                         ReviewRow("Cliente", client.ifBlank { "—" })
                         ReviewRow("Título", title.ifBlank { "—" })
                         ReviewRow("Responsável", assignee.ifBlank { "Ninguém" })
@@ -455,6 +492,40 @@ private fun CompactItem(label: String, value: String, onChange: (String) -> Unit
         Text(label, color = Tokens.Faint, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(118.dp))
         Spacer(Modifier.width(8.dp))
         Box(Modifier.weight(1f)) { AppTextField(value, onChange, "Tema / título") }
+    }
+}
+
+// Bloco de CONTEÚDO do cronograma (accordion compacto): cabeçalho clicável + Tema + Legenda.
+// Recolhido por padrão (exceto o 1º) -> 12 conteúdos NÃO viram blocos gigantes na tela.
+@Composable
+private fun ContentCard(
+    title: String, expanded: Boolean, filled: Boolean, onToggle: () -> Unit,
+    tema: String, onTema: (String) -> Unit, legenda: String, onLegenda: (String) -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Surface)
+            .border(1.dp, if (expanded) Tokens.Accent.copy(alpha = 0.6f) else Tokens.Line, RoundedCornerShape(12.dp)),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().clickable { onToggle() }.padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(if (filled) Tokens.Green else Tokens.Line))
+            Spacer(Modifier.width(10.dp))
+            Text(title, color = Tokens.Ink, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            if (filled && !expanded) {
+                Text(tema.ifBlank { "preenchido" }, color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.width(120.dp))
+                Spacer(Modifier.width(6.dp))
+            }
+            Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, contentDescription = null, tint = Tokens.Soft, modifier = Modifier.size(20.dp))
+        }
+        if (expanded) {
+            Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
+                Label("Tema"); AppTextField(tema, onTema, "Tema do conteúdo")
+                Spacer(Modifier.height(10.dp))
+                Label("Legenda"); AppTextField(legenda, onLegenda, "Legenda do conteúdo")
+            }
+        }
     }
 }
 

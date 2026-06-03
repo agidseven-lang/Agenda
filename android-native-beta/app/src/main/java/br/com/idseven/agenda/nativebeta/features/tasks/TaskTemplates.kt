@@ -15,12 +15,16 @@ data class TplField(
 )
 
 // Subtipo de um setor (ex.: Cronograma Semanal/Quinzenal/Mensal; Edição 4/6/12).
+// `contentCount` > 0: gera N blocos de CONTEÚDO, cada um com Tema + Legenda (Cronograma).
+// `itemLabels`: lista simples de 1 campo por item (Edição: Vídeo/Roteiro 1..N).
 data class SubType(
     val key: String,
     val label: String,        // rótulo curto do chip (ex.: "Semanal", "4 vídeos/roteiros")
     val formTitle: String,    // título do subformulário (ex.: "Cronograma semanal")
     val fields: List<TplField> = emptyList(),
-    val itemLabels: List<String> = emptyList(), // lista compacta editável (ex.: Vídeo/Roteiro 1..N)
+    val itemLabels: List<String> = emptyList(), // lista compacta de 1 campo (ex.: Vídeo/Roteiro 1..N)
+    val contentCount: Int = 0,                   // nº de conteúdos (Tema+Legenda) — Cronograma
+    val dayLabels: Boolean = false,              // rotula "Conteúdo i / iº dia" (semanal)
     val checklist: List<String> = emptyList(),
 )
 
@@ -77,33 +81,27 @@ object TaskTemplates {
                     "semanal", "Semanal", "Cronograma semanal",
                     fields = listOf(
                         TplField("semana_ref", "Semana de referência", FieldKind.TEXT, placeholder = "Ex.: 03/06 a 09/06"),
-                        TplField("qtd", "Quantidade de conteúdos na semana", FieldKind.TEXT, placeholder = "Ex.: 3"),
                         TplField("canais", "Canais", FieldKind.CHOICE, CANAIS),
-                        TplField("temas", "Temas principais", FieldKind.TEXT, placeholder = "Temas da semana"),
-                        TplField("obs", "Observações da semana", FieldKind.TEXT),
                     ),
+                    contentCount = 3, dayLabels = true,
                     checklist = listOf("Definir temas da semana", "Organizar datas", "Revisar cronograma", "Aprovar cronograma semanal", "Enviar para produção"),
                 ),
                 SubType(
                     "quinzenal", "Quinzenal", "Cronograma quinzenal",
                     fields = listOf(
                         TplField("periodo", "Período da quinzena", FieldKind.TEXT, placeholder = "Ex.: 03/06 a 16/06"),
-                        TplField("qtd", "Quantidade de conteúdos na quinzena", FieldKind.TEXT, placeholder = "Ex.: 6"),
                         TplField("canais", "Canais", FieldKind.CHOICE, CANAIS),
-                        TplField("obs", "Observações da quinzena", FieldKind.TEXT),
                     ),
-                    itemLabels = listOf("Temas da primeira semana", "Temas da segunda semana"),
+                    contentCount = 6,
                     checklist = listOf("Definir temas da quinzena", "Distribuir conteúdos por semana", "Revisar cronograma", "Aprovar cronograma quinzenal", "Enviar para produção"),
                 ),
                 SubType(
                     "mensal", "Mensal", "Cronograma mensal",
                     fields = listOf(
                         TplField("mes_ref", "Mês de referência", FieldKind.TEXT, placeholder = "Ex.: Junho/2026"),
-                        TplField("qtd", "Quantidade total de conteúdos no mês", FieldKind.TEXT, placeholder = "Ex.: 12"),
                         TplField("canais", "Canais", FieldKind.CHOICE, CANAIS),
-                        TplField("obs", "Observações do mês", FieldKind.TEXT),
                     ),
-                    itemLabels = listOf("Temas da semana 1", "Temas da semana 2", "Temas da semana 3", "Temas da semana 4"),
+                    contentCount = 12,
                     checklist = listOf("Definir temas do mês", "Organizar calendário mensal", "Revisar cronograma", "Aprovar cronograma mensal", "Enviar para produção"),
                 ),
             ),
