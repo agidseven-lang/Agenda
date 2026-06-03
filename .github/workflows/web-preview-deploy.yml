@@ -1,0 +1,50 @@
+# =====================================================================
+# [manual] Deploy Web Preview — Cloudflare Worker de HOMOLOGACAO
+# ---------------------------------------------------------------------
+# Publica APENAS o Worker separado 'idseven-web-preview' (assets estaticos
+# da pasta web-preview/), gerando o link https://idseven-web-preview.<sub>.workers.dev
+#
+# NAO toca, em hipotese alguma:
+#   - o site agendaidseven.com.br / producao
+#   - o Worker de push 'idseven-push' (config propria em wrangler.toml)
+#   - o APK Android
+#   - Firebase Functions / Resend / Secret Manager / Firestore Rules
+#
+# Execucao SOMENTE manual (workflow_dispatch). Inerte ate ser acionado.
+# Workflow seguro e removivel (basta apagar este arquivo).
+# =====================================================================
+name: "[manual] Deploy Web Preview (Cloudflare)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit com a pasta web-preview/ (default: web-preview/local-1.0.64)"
+        required: true
+        default: "web-preview/local-1.0.64"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: wrangler deploy idseven-web-preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (ref escolhido)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Deploy Worker de homologacao (assets estaticos)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web-preview
+          command: deploy --config wrangler-preview.toml
