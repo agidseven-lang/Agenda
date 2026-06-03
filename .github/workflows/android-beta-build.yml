@@ -25,7 +25,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.63-beta-task-role-visibility"
+      DIST_BASENAME: "idseven-nativebeta-1.0.64-beta-build-artifact-version-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -82,6 +82,9 @@ jobs:
         run: |
           cd "$APP_DIR"
           chmod +x ./gradlew
+          # Limpeza defensiva: remove APK de qualquer build anterior antes do clean build,
+          # garantindo que o artifact NUNCA reaproveite binario antigo.
+          rm -rf app/build/outputs/apk || true
           EXTRA=""
           if [ -n "${{ steps.urls.outputs.req }}" ] && [ -n "${{ steps.urls.outputs.cnf }}" ]; then
             EXTRA="-PPASSWORD_RESET_REQUEST_URL=${{ steps.urls.outputs.req }} -PPASSWORD_RESET_CONFIRM_URL=${{ steps.urls.outputs.cnf }}"
@@ -89,8 +92,7 @@ jobs:
           ./gradlew clean assembleRelease --no-daemon --stacktrace $EXTRA
 
       # Empacotamento p/ distribuicao DIRETA (sem Play Store):
-      # renomeia APK, gera relatorio (apksigner verify, zipalign -c, debuggable,
-      # permissoes) e instrucoes de instalacao.
+      # renomeia APK (nome unico), gera relatorio + VERSAO-DO-APK.txt + instrucoes.
       - name: Renomear + verificar + gerar relatorio/instrucoes
         if: always()
         run: |
@@ -98,19 +100,24 @@ jobs:
           BT="$(ls -d "$ANDROID_HOME"/build-tools/*/ 2>/dev/null | sort -V | tail -1)"
           APKSIGNER="${BT}apksigner"; AAPT="${BT}aapt"; ZIPALIGN="${BT}zipalign"
           SRC="$APP_DIR/app/build/outputs/apk/release/app-release.apk"
-          OUTDIR="$GITHUB_WORKSPACE/dist"; mkdir -p "$OUTDIR"
+          OUTDIR="$GITHUB_WORKSPACE/dist"; rm -rf "$OUTDIR"; mkdir -p "$OUTDIR"
           APK="$OUTDIR/${DIST_BASENAME}.apk"
           REPORT="$OUTDIR/RELATORIO-INSTALACAO.txt"
           INSTR="$OUTDIR/INSTRUCOES-INSTALACAO.txt"
+          VERFILE="$OUTDIR/VERSAO-DO-APK.txt"
           if [ ! -f "$SRC" ]; then echo "::error:: APK nao gerado ($SRC ausente)."; exit 1; fi
           cp "$SRC" "$APK"
+          VER="$("$AAPT" dump badging "$APK" 2>/dev/null | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")"
+          VC="$("$AAPT" dump badging "$APK" 2>/dev/null | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")"
+          PKG="$("$AAPT" dump badging "$APK" 2>/dev/null | sed -n "s/package: name='\([^']*\)'.*/\1/p")"
+          SHA="$(sha256sum "$APK" | cut -d' ' -f1)"
           {
             echo "===== RELATORIO DE INSTALACAO - idseven nativebeta ====="
             echo "Gerado (UTC)   : $(date -u)"
             echo "Ref / commit   : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
             echo "Arquivo APK    : $(basename "$APK")"
             echo "Tamanho        : $(wc -c < "$APK") bytes"
-            echo "SHA-256 (apk)  : $(sha256sum "$APK" | cut -d' ' -f1)"
+            echo "SHA-256 (apk)  : $SHA"
             echo ""
             echo "----- Identidade do pacote (aapt badging) -----"
             "$AAPT" dump badging "$APK" 2>/dev/null | grep -E "^package:|sdkVersion:|targetSdkVersion:|application-label:"
@@ -132,66 +139,65 @@ jobs:
             echo "----- keytool: fingerprints do keystore versionado -----"
             keytool -list -v -keystore "$APP_DIR/app/idseven-test.keystore" -storepass android 2>/dev/null | grep -E "Alias name:|Owner:|SHA1:|SHA256:|Valid"
           } | tee "$REPORT"
+          # VERSAO-DO-APK.txt: prova rapida do que esta dentro do APK (lido do binario).
+          printf '%s\n' \
+            "versionName : $VER" \
+            "versionCode : $VC" \
+            "packageName : $PKG" \
+            "SHA-256     : $SHA" \
+            "commit      : $GITHUB_SHA" \
+            "ref         : ${{ github.event.inputs.ref }}" \
+            "arquivo     : $(basename "$APK")" \
+            > "$VERFILE"
+          echo "== VERSAO-DO-APK =="; cat "$VERFILE"
           printf '%s\n' \
             "==== COMO INSTALAR (APK DIRETO, SEM PLAY STORE) ====" \
             "" \
-            "1) Baixe o arquivo .apk pelo NAVEGADOR (Chrome) do celular." \
-            "2) O arquivo fica na pasta Downloads." \
-            "3) Abra o app Meus Arquivos (ou Arquivos) > pasta Download." \
-            "4) Toque em ${DIST_BASENAME}.apk." \
-            "5) Se aparecer 'Instalar apps desconhecidos': habilite a permissao" \
-            "   para Meus Arquivos (ou Chrome) e volte. Toque em INSTALAR." \
+            "IMPORTANTE: instale o arquivo com NOME COMPLETO abaixo (nao o app-release.apk):" \
+            "  ${DIST_BASENAME}.apk" \
             "" \
-            "==== APOS INSTALAR: ATIVAR NOTIFICACOES (IMPORTANTE) ====" \
-            "No Android 13+ a reinstalacao reseta a permissao de notificacoes." \
-            "Ao abrir o app, ACEITE o pedido de notificacoes. Se precisar reativar" \
-            "depois, va em Perfil > Notificacoes e toque em 'Permitir notificacoes'." \
-            "Sem isso o push imediato e o lembrete de 1h nao aparecem. O token FCM" \
-            "e re-sincronizado sozinho no login/abertura." \
+            "1) Baixe o .apk pelo NAVEGADOR (Chrome) do celular -> pasta Downloads." \
+            "2) Abra Meus Arquivos (ou Arquivos) > Download e toque no arquivo." \
+            "3) Se aparecer 'Instalar apps desconhecidos': habilite p/ Meus Arquivos (ou Chrome)." \
+            "4) Confirme a versao na tela de login (rodape) e em Perfil > Sobre o app." \
+            "" \
+            "==== APOS INSTALAR: ATIVAR NOTIFICACOES ====" \
+            "No Android 13+ a reinstalacao reseta a permissao de notificacoes. Aceite o pedido," \
+            "ou va em Perfil > Notificacoes > 'Permitir notificacoes'. Token FCM sincroniza sozinho." \
             "" \
             "==== PRIMEIRA INSTALACAO DESTA LINHA (faca uma vez) ====" \
-            "Se ja teve uma versao ANTERIOR (1.0.46/1.0.47) instalada, DESINSTALE" \
-            "primeiro - inclusive em Dual Apps / Espaco Seguro / 2o usuario /" \
-            "Perfil de trabalho. A assinatura mudou UMA unica vez; depois desta," \
-            "as proximas atualizam por cima normalmente, sem desinstalar." \
+            "Se ja teve a 1.0.46/1.0.47 instalada, DESINSTALE primeiro (inclusive Dual Apps /" \
+            "Espaco Seguro / 2o usuario). Depois desta, as proximas atualizam por cima." \
             "" \
             "==== SE O PLAY PROTECT BLOQUEAR ====" \
-            "- Toque em 'Mais detalhes' e depois 'Instalar mesmo assim', se aparecer." \
-            "- Se a opcao NAO aparecer: e bloqueio do Google por instalacao fora da" \
-            "  Play Store (sideload), NAO e erro do app. Para liberar temporariamente:" \
-            "  Play Store > foto do perfil > Play Protect > engrenagem (config) >" \
-            "  desligue 'Verificar apps', instale, e religue depois." \
-            "" \
-            "==== DISTRIBUICAO RECOMENDADA ====" \
-            "- Link de download direto aberto no NAVEGADOR do aparelho." \
-            "- Salvar em Downloads e instalar pelo Meus Arquivos." \
-            "- Evite depender de envio por WhatsApp como meio principal" \
-            "  (recompacta/renomeia e pode atrapalhar a instalacao)." \
+            "'Mais detalhes' > 'Instalar mesmo assim'. Se nao aparecer: e bloqueio de sideload" \
+            "do Google (nao e erro do app) — Play Store > perfil > Play Protect > desligar" \
+            "'Verificar apps' temporariamente, instalar, religar." \
             > "$INSTR"
           echo "Conteudo de dist/:"; ls -lh "$OUTDIR"
 
-      - name: Montar ZIP de distribuicao (APK + relatorio + instrucoes)
+      - name: Montar ZIP de distribuicao (APK + relatorio + versao + instrucoes)
         if: always()
         run: |
           cd "$GITHUB_WORKSPACE/dist" || exit 1
           zip -j "${DIST_BASENAME}.zip" \
-            "${DIST_BASENAME}.apk" "RELATORIO-INSTALACAO.txt" "INSTRUCOES-INSTALACAO.txt"
+            "${DIST_BASENAME}.apk" "VERSAO-DO-APK.txt" "RELATORIO-INSTALACAO.txt" "INSTRUCOES-INSTALACAO.txt"
           ls -lh
 
       - name: Upload APK (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.63-beta-task-role-visibility
-          path: dist/idseven-nativebeta-1.0.63-beta-task-role-visibility.apk
+          name: idseven-nativebeta-1.0.64-beta-build-artifact-version-fix
+          path: dist/idseven-nativebeta-1.0.64-beta-build-artifact-version-fix.apk
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload ZIP de distribuicao (APK + relatorio + instrucoes)
+      - name: Upload ZIP de distribuicao (APK + relatorio + versao + instrucoes)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.63-beta-task-role-visibility-bundle
-          path: dist/idseven-nativebeta-1.0.63-beta-task-role-visibility.zip
+          name: idseven-nativebeta-1.0.64-beta-build-artifact-version-fix-bundle
+          path: dist/idseven-nativebeta-1.0.64-beta-build-artifact-version-fix.zip
           if-no-files-found: error
           retention-days: 30
