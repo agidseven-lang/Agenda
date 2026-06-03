@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -191,6 +192,10 @@ fun EventCard(event: EventItem, owner: UserLite?, onClick: () -> Unit = {}) {
             if (!event.location.isNullOrBlank()) {
                 Spacer(Modifier.height(6.dp))
                 InfoLine(Icons.Outlined.Place, event.location)
+            }
+            if (!event.notes.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                InfoLine(Icons.Outlined.Notes, event.notes)
             }
             EventStatus.status(event)?.let { si ->
                 val col = if (si.late) Tokens.Red else if (si.kind == "run") Tokens.Amber else Tokens.Green

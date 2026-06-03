@@ -277,6 +277,11 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
         // 6. título
         Spacer(Modifier.height(3.dp))
         Text(task.title?.ifBlank { null } ?: task.client ?: "Sem título", color = Tokens.Ink, fontSize = 16.5.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // 6b. descrição resumida (se houver) — preview discreto, 2 linhas/elipse
+        if (!task.desc.isNullOrBlank()) {
+            Spacer(Modifier.height(5.dp))
+            Text(task.desc, color = Tokens.Faint, fontSize = 12.5.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+        }
         // 7. setor + prioridade
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
