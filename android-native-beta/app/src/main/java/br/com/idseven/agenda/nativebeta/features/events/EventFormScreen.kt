@@ -51,6 +51,8 @@ import br.com.idseven.agenda.nativebeta.core.PushNotify
 import br.com.idseven.agenda.nativebeta.data.EventContract
 import br.com.idseven.agenda.nativebeta.data.EventRepo
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTextField
+import br.com.idseven.agenda.nativebeta.designsystem.components.AssigneeItemRow
+import br.com.idseven.agenda.nativebeta.designsystem.components.AssigneePickerField
 import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.components.MessageBanner
 import br.com.idseven.agenda.nativebeta.designsystem.components.PrimaryButton
@@ -247,62 +249,4 @@ private fun PickerField(value: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() }.padding(horizontal = 14.dp, vertical = 15.dp),
     ) { Text(value, color = Tokens.Ink, fontSize = 14.5.sp) }
-}
-
-// Avatar neutro (sem usuário / "Ninguém"): círculo discreto com ícone de pessoa.
-@Composable
-private fun NeutralAvatar(size: Dp) {
-    Box(
-        modifier = Modifier.size(size).clip(CircleShape).background(Tokens.Surface2),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(Icons.Outlined.Person, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(size * 0.55f))
-    }
-}
-
-// Campo FECHADO do responsável: avatar/foto (ou neutro) + nome completo, padrão premium.
-@Composable
-private fun AssigneePickerField(selected: Boolean, photo: String?, ringColor: Color, name: String, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Surface)
-            .border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (selected) Avatar(photo, ringColor, name, 36.dp) else NeutralAvatar(36.dp)
-            Spacer(Modifier.width(12.dp))
-            Text(
-                if (selected) name.ifBlank { "—" } else "Selecionar da equipe",
-                color = if (selected) Tokens.Ink else Tokens.Faint,
-                fontSize = 14.5.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-// Item da LISTA do responsável: avatar/foto (ou neutro) + nome completo + marca de selecionado.
-@Composable
-private fun AssigneeItemRow(photo: String?, ringColor: Color, name: String, neutral: Boolean, selected: Boolean) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(vertical = 4.dp),
-    ) {
-        if (neutral) NeutralAvatar(34.dp) else Avatar(photo, ringColor, name, 34.dp)
-        Spacer(Modifier.width(12.dp))
-        Text(
-            name,
-            color = if (selected) Tokens.Accent else Tokens.Ink,
-            fontSize = 14.5.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 17.sp,
-            modifier = Modifier.widthIn(max = 200.dp),
-        )
-        if (selected) {
-            Spacer(Modifier.width(8.dp))
-            Icon(Icons.Outlined.Check, contentDescription = null, tint = Tokens.Accent, modifier = Modifier.size(18.dp))
-        }
-    }
 }

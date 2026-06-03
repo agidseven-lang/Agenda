@@ -45,11 +45,14 @@ import br.com.idseven.agenda.nativebeta.core.PushNotify
 import br.com.idseven.agenda.nativebeta.data.TaskContract
 import br.com.idseven.agenda.nativebeta.data.TaskRepo
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTextField
+import br.com.idseven.agenda.nativebeta.designsystem.components.AssigneeItemRow
+import br.com.idseven.agenda.nativebeta.designsystem.components.AssigneePickerField
 import br.com.idseven.agenda.nativebeta.designsystem.components.MessageBanner
 import br.com.idseven.agenda.nativebeta.designsystem.components.PrimaryButton
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.ChecklistItem
 import br.com.idseven.agenda.nativebeta.domain.Sectors
+import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
 import kotlinx.coroutines.flow.first
@@ -159,11 +162,25 @@ fun TaskFormScreen(
             Label("Título"); AppTextField(title, { title = it }, "Ex.: Arte para feed"); Spacer(Modifier.height(14.dp))
 
             Label("Responsável")
+            val selectedUser = activeUsers.firstOrNull { it.id == assigneeId }
             Box {
-                PickerField(assignee.ifBlank { "Selecionar da equipe" }) { assigneeMenu = true }
+                AssigneePickerField(
+                    selected = assigneeId != null,
+                    photo = selectedUser?.photo,
+                    ringColor = UserColor.of(assigneeId, selectedUser?.color),
+                    name = assignee,
+                ) { assigneeMenu = true }
                 DropdownMenu(expanded = assigneeMenu, onDismissRequest = { assigneeMenu = false }) {
-                    DropdownMenuItem(text = { Text("— Ninguém —") }, onClick = { assignee = ""; assigneeId = null; assigneeMenu = false })
-                    activeUsers.forEach { u -> DropdownMenuItem(text = { Text(u.name ?: "—") }, onClick = { assignee = u.name ?: ""; assigneeId = u.id; assigneeMenu = false }) }
+                    DropdownMenuItem(
+                        text = { AssigneeItemRow(photo = null, ringColor = Tokens.Line, name = "Ninguém", neutral = true, selected = assigneeId == null) },
+                        onClick = { assignee = ""; assigneeId = null; assigneeMenu = false },
+                    )
+                    activeUsers.forEach { u ->
+                        DropdownMenuItem(
+                            text = { AssigneeItemRow(photo = u.photo, ringColor = UserColor.of(u.id, u.color), name = u.name ?: "—", neutral = false, selected = u.id == assigneeId) },
+                            onClick = { assignee = u.name ?: ""; assigneeId = u.id; assigneeMenu = false },
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(14.dp))
