@@ -80,6 +80,7 @@ fun TaskFormScreen(
 
     var step by remember { mutableStateOf(0) }
     var sector by remember { mutableStateOf("edicao_midia") }
+    var subtype by remember { mutableStateOf("") }
     var client by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var assignee by remember { mutableStateOf("") }
@@ -96,10 +97,21 @@ fun TaskFormScreen(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    fun applySectorChecklist(key: String) {
-        val tpl = TaskTemplates.forSector(key) ?: return
-        checklist.clear()
-        checklist.addAll(tpl.checklist.map { ChecklistItem(it, false) })
+    fun setChecklist(items: List<String>) {
+        checklist.clear(); checklist.addAll(items.map { ChecklistItem(it, false) })
+    }
+
+    // Aplica os defaults do setor: subtipo inicial + checklist correspondente (criação).
+    fun applySectorDefaults(key: String) {
+        val tpl = TaskTemplates.forSector(key)
+        subtype = tpl?.subtypes?.firstOrNull()?.key ?: ""
+        extra.clear()
+        if (editId == null) setChecklist(tpl?.subtypeOf(subtype)?.checklist ?: tpl?.checklist.orEmpty())
+    }
+    // Troca o SUBFORMULÁRIO conforme a escolha (Semanal/Quinzenal/Mensal ou 4/6/12).
+    fun applySubtype(key: String) {
+        subtype = key; extra.clear()
+        if (editId == null) setChecklist(TaskTemplates.forSector(sector)?.subtypeOf(key)?.checklist.orEmpty())
     }
 
     LaunchedEffect(editId) {
@@ -110,10 +122,11 @@ fun TaskFormScreen(
                 assignee = t.assignee ?: ""; assigneeId = t.assigneeId; link = t.link ?: ""; desc = t.desc ?: ""
                 dueDate = t.dueDate ?: ""; dueTime = t.dueTime ?: ""; priority = t.priority
                 status = t.status ?: "afazer"
+                subtype = TaskTemplates.forSector(sector)?.subtypes?.firstOrNull()?.key ?: ""
                 checklist.clear(); checklist.addAll(t.checklist)
             }
         } else {
-            applySectorChecklist(sector)
+            applySectorDefaults(sector)
         }
     }
 
@@ -128,12 +141,19 @@ fun TaskFormScreen(
         android.app.TimePickerDialog(context, { _, h, m -> dueTime = "%02d:%02d".format(h, m) }, hh, mm, true).show()
     }
 
+    // Serializa subtipo + campos + itens específicos no campo desc (sem schema novo).
     fun composedDesc(): String {
-        val tpl = TaskTemplates.forSector(sector)
-        val briefing = tpl?.fields.orEmpty().mapNotNull { f ->
-            extra[f.key]?.trim()?.takeIf { it.isNotEmpty() }?.let { "${f.label}: $it" }
-        }.joinToString("\n")
-        return listOf(briefing.trim(), desc.trim()).filter { it.isNotEmpty() }.joinToString("\n\n")
+        val tpl = TaskTemplates.forSector(sector) ?: return desc.trim()
+        val lines = mutableListOf<String>()
+        val sub = tpl.subtypeOf(subtype)
+        if (sub != null) {
+            lines.add("Tipo: ${sub.formTitle}")
+            sub.fields.forEach { f -> extra[f.key]?.trim()?.takeIf { it.isNotEmpty() }?.let { lines.add("${f.label}: $it") } }
+            sub.itemLabels.forEach { lbl -> extra[lbl]?.trim()?.takeIf { it.isNotEmpty() }?.let { lines.add("$lbl: $it") } }
+        } else {
+            tpl.fields.forEach { f -> extra[f.key]?.trim()?.takeIf { it.isNotEmpty() }?.let { lines.add("${f.label}: $it") } }
+        }
+        return listOf(lines.joinToString("\n").trim(), desc.trim()).filter { it.isNotEmpty() }.joinToString("\n\n")
     }
 
     fun save() {
@@ -161,10 +181,10 @@ fun TaskFormScreen(
 
     val activeUsers = users.filter { it.isActive() }.sortedBy { (it.name ?: "").lowercase() }
     val tpl = TaskTemplates.forSector(sector)
+    val sub = tpl?.subtypeOf(subtype)
     val sec = Sectors.of(sector)
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        // Cabeçalho
         Row(modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(if (editId != null) "Editar tarefa" else "Nova tarefa", color = Tokens.Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -180,24 +200,20 @@ fun TaskFormScreen(
 
         Stepper(step)
 
-        // Conteúdo rolável (ocupa o espaço; o rodapé fica SEPARADO embaixo e nunca cobre).
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp)) {
             error?.let { MessageBanner(it, isError = true); Spacer(Modifier.height(14.dp)) }
 
             when (step) {
-                0 -> { // ----- Etapa 1: Setor -----
+                0 -> {
                     Label("Escolha o setor")
                     Sectors.ALL.forEach { s ->
                         SectorCardCompact(s.label, s.desc, s.icon, s.color, selected = sector == s.key) {
-                            if (sector != s.key) {
-                                sector = s.key; extra.clear()
-                                if (editId == null) applySectorChecklist(s.key)
-                            }
+                            if (sector != s.key) { sector = s.key; applySectorDefaults(s.key) }
                         }
                         Spacer(Modifier.height(8.dp))
                     }
                 }
-                1 -> { // ----- Etapa 2: Dados principais (status no TOPO do fluxo) -----
+                1 -> {
                     Label(tpl?.titleLabel ?: "Título")
                     AppTextField(title, { title = it }, tpl?.titlePlaceholder ?: "Título da tarefa"); Spacer(Modifier.height(14.dp))
                     Label("Cliente / Empresa"); AppTextField(client, { client = it }, "Ex.: Hospital Visão"); Spacer(Modifier.height(14.dp))
@@ -223,11 +239,7 @@ fun TaskFormScreen(
                         }
                     }
                     Spacer(Modifier.height(14.dp))
-
-                    Label("Etapa")
-                    StatusSelector(status) { status = it }
-                    Spacer(Modifier.height(14.dp))
-
+                    Label("Etapa"); StatusSelector(status) { status = it }; Spacer(Modifier.height(14.dp))
                     Row {
                         Column(Modifier.weight(1f)) { Label("Prazo"); PickerField(dueDate.ifBlank { "Escolher" }) { showDate() } }
                         Spacer(Modifier.width(12.dp))
@@ -239,15 +251,34 @@ fun TaskFormScreen(
                         Switch(checked = priority, onCheckedChange = { priority = it })
                     }
                 }
-                2 -> { // ----- Etapa 3: Briefing do setor (compacto) -----
-                    Label("Briefing · ${sec.label}")
-                    tpl?.fields?.forEach { f ->
-                        TemplateField(f, extra[f.key] ?: "") { extra[f.key] = it }
-                        Spacer(Modifier.height(12.dp))
+                2 -> {
+                    if (tpl?.subtypes?.isNotEmpty() == true) {
+                        // Seletor de subtipo -> TROCA o subformulário exibido.
+                        Label(tpl.subtypeLabel ?: "Tipo")
+                        ChipRow(tpl.subtypes.map { it.key to it.label }, subtype) { applySubtype(it) }
+                        Spacer(Modifier.height(14.dp))
+                        sub?.let { s ->
+                            // Título claro do subformulário (ex.: "Cronograma semanal").
+                            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Tokens.Accent.copy(alpha = 0.12f)).padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                Text(s.formTitle, color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            s.fields.forEach { f -> TemplateField(f, extra[f.key] ?: "") { extra[f.key] = it }; Spacer(Modifier.height(12.dp)) }
+                            if (s.itemLabels.isNotEmpty()) {
+                                Label("Itens do pacote")
+                                s.itemLabels.forEach { lbl ->
+                                    CompactItem(lbl, extra[lbl] ?: "") { extra[lbl] = it }
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                                Spacer(Modifier.height(4.dp))
+                            }
+                        }
+                    } else {
+                        Label("Briefing · ${sec.label}")
+                        tpl?.fields?.forEach { f -> TemplateField(f, extra[f.key] ?: "") { extra[f.key] = it }; Spacer(Modifier.height(12.dp)) }
                     }
                     Label("Link / anexo"); AppTextField(link, { link = it }, "URL (Drive, Figma, etc.)"); Spacer(Modifier.height(12.dp))
                     Label("Observações livres"); AppTextField(desc, { desc = it }, "Notas adicionais…"); Spacer(Modifier.height(14.dp))
-
                     Label("Checklist")
                     checklist.forEachIndexed { idx, item ->
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
@@ -262,10 +293,11 @@ fun TaskFormScreen(
                         Text("+ Adicionar item", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-                else -> { // ----- Etapa 4: Revisão -----
+                else -> {
                     Label("Revisão")
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)).padding(16.dp)) {
                         ReviewRow("Setor", sec.label)
+                        if (sub != null) ReviewRow("Subtipo", sub.formTitle)
                         ReviewRow("Cliente", client.ifBlank { "—" })
                         ReviewRow("Título", title.ifBlank { "—" })
                         ReviewRow("Responsável", assignee.ifBlank { "Ninguém" })
@@ -277,11 +309,7 @@ fun TaskFormScreen(
                             Spacer(Modifier.height(8.dp))
                             Text("BRIEFING", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(4.dp))
-                            Text(brief, color = Tokens.Soft, fontSize = 13.sp, maxLines = 6, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
-                        }
-                        if (checklist.any { it.t.isNotBlank() }) {
-                            Spacer(Modifier.height(8.dp))
-                            Text("CHECKLIST (${checklist.count { it.t.isNotBlank() }})", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(brief, color = Tokens.Soft, fontSize = 13.sp, maxLines = 8, overflow = TextOverflow.Ellipsis, lineHeight = 18.sp)
                         }
                     }
                 }
@@ -289,34 +317,29 @@ fun TaskFormScreen(
             Spacer(Modifier.height(8.dp))
         }
 
-        // ----- Rodapé fixo (fora do scroll, com safe area) — nunca cobre o conteúdo -----
+        // Rodapé fixo (fora do scroll, safe area) — nunca cobre o conteúdo.
         Row(
             modifier = Modifier.fillMaxWidth().background(Tokens.Surface).border(1.dp, Tokens.Line)
                 .navigationBarsPadding().imePadding().padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (step > 0) {
-                Box(
-                    Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(25.dp)).border(1.dp, Tokens.Line, RoundedCornerShape(25.dp)).clickable { step-- },
-                    contentAlignment = Alignment.Center,
-                ) { Text("Voltar", color = Tokens.Soft, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                Box(Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(25.dp)).border(1.dp, Tokens.Line, RoundedCornerShape(25.dp)).clickable { step-- }, contentAlignment = Alignment.Center) {
+                    Text("Voltar", color = Tokens.Soft, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
                 Spacer(Modifier.width(12.dp))
             }
             if (step < STEPS.size - 1) {
-                Box(
-                    Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(25.dp)).background(Tokens.Accent).clickable { step++ },
-                    contentAlignment = Alignment.Center,
-                ) { Text("Próximo", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
-            } else {
-                Box(Modifier.weight(1f)) {
-                    PrimaryButton(if (editId != null) "Salvar alterações" else "Salvar tarefa", loading = busy) { save() }
+                Box(Modifier.weight(1f).height(50.dp).clip(RoundedCornerShape(25.dp)).background(Tokens.Accent).clickable { step++ }, contentAlignment = Alignment.Center) {
+                    Text("Próximo", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
+            } else {
+                Box(Modifier.weight(1f)) { PrimaryButton(if (editId != null) "Salvar alterações" else "Salvar tarefa", loading = busy) { save() } }
             }
         }
     }
 }
 
-// Indicador de etapas (Setor · Dados · Briefing · Revisão).
 @Composable
 private fun Stepper(current: Int) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -339,7 +362,6 @@ private fun Stepper(current: Int) {
     }
 }
 
-// Card de setor COMPACTO (ícone + nome + descrição curta + check), uma linha de altura confortável.
 @Composable
 private fun SectorCardCompact(label: String, desc: String, icon: ImageVector, color: Color, selected: Boolean, onClick: () -> Unit) {
     Row(
@@ -387,32 +409,52 @@ private fun StatusSelector(current: String, onSelect: (String) -> Unit) {
     }
 }
 
+// Chips genéricos (key -> label) com seleção; usado pelo seletor de SUBTIPO.
+@Composable
+private fun ChipRow(options: List<Pair<String, String>>, current: String, onSelect: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+        options.forEach { (key, label) ->
+            val sel = current == key
+            Box(
+                modifier = Modifier.padding(end = 8.dp).clip(RoundedCornerShape(999.dp))
+                    .background(if (sel) Tokens.Accent.copy(alpha = 0.18f) else Tokens.Surface)
+                    .border(1.dp, if (sel) Tokens.Accent else Tokens.Line, RoundedCornerShape(999.dp))
+                    .clickable { onSelect(key) }.padding(horizontal = 14.dp, vertical = 9.dp),
+            ) { Text(label, color = if (sel) Tokens.Accent else Tokens.Soft, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
 @Composable
 private fun TemplateField(f: TplField, value: String, onChange: (String) -> Unit) {
     Label(f.label)
     when (f.kind) {
         FieldKind.TEXT -> AppTextField(value, onChange, f.placeholder)
-        FieldKind.BOOL -> {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (value == "Sim") "Sim" else "Não", color = Tokens.Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                Switch(checked = value == "Sim", onCheckedChange = { onChange(if (it) "Sim" else "Não") })
+        FieldKind.BOOL -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (value == "Sim") "Sim" else "Não", color = Tokens.Ink, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Switch(checked = value == "Sim", onCheckedChange = { onChange(if (it) "Sim" else "Não") })
+        }
+        FieldKind.CHOICE -> Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+            f.options.forEach { opt ->
+                val sel = value == opt
+                Box(
+                    modifier = Modifier.padding(end = 8.dp).clip(RoundedCornerShape(999.dp))
+                        .background(if (sel) Tokens.Accent.copy(alpha = 0.18f) else Tokens.Surface)
+                        .border(1.dp, if (sel) Tokens.Accent else Tokens.Line, RoundedCornerShape(999.dp))
+                        .clickable { onChange(if (sel) "" else opt) }.padding(horizontal = 13.dp, vertical = 8.dp),
+                ) { Text(opt, color = if (sel) Tokens.Accent else Tokens.Soft, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             }
         }
-        FieldKind.CHOICE -> {
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                f.options.forEach { opt ->
-                    val sel = value == opt
-                    Box(
-                        modifier = Modifier.padding(end = 8.dp).clip(RoundedCornerShape(999.dp))
-                            .background(if (sel) Tokens.Accent.copy(alpha = 0.18f) else Tokens.Surface)
-                            .border(1.dp, if (sel) Tokens.Accent else Tokens.Line, RoundedCornerShape(999.dp))
-                            .clickable { onChange(if (sel) "" else opt) }.padding(horizontal = 13.dp, vertical = 8.dp),
-                    ) {
-                        Text(opt, color = if (sel) Tokens.Accent else Tokens.Soft, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
+    }
+}
+
+// Item compacto da lista do pacote (ex.: "Vídeo/Roteiro 1") — 1 linha, sem bloco gigante.
+@Composable
+private fun CompactItem(label: String, value: String, onChange: (String) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Tokens.Faint, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(118.dp))
+        Spacer(Modifier.width(8.dp))
+        Box(Modifier.weight(1f)) { AppTextField(value, onChange, "Tema / título") }
     }
 }
 
