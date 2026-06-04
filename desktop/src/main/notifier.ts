@@ -72,7 +72,8 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string) {
       const key = `designer:${t.id}:${at}`;                    // 1 notificacao por atribuicao
       if (state.seen.has(key)) return;
       state.seen.add(key);
-      const n = new Notification({ title: "Novo cronograma para voce", body: (t.title || "Cronograma") + (t.client ? ` - ${t.client}` : ""), silent: false });
+      const linha = `${t.client ? t.client + " — " : ""}${t.title || "Cronograma"}`;
+      const n = new Notification({ title: "Novo cronograma atribuido", body: `${linha}\nAcesse para iniciar a producao.`, silent: false });
       n.on("click", () => { const w = getWin(); if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); w.webContents.send("notif-open", `board/${t.sector || ""}`); } });
       n.show();
     });

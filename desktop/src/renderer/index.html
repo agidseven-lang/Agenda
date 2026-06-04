@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.83 (Client Designer Flow Phase 1)</title>
+<title>ID Seven · Desktop 1.0.84 (Responsive Client Designer Production Flow)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -881,6 +881,20 @@
   .cvw-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--soft);font-size:14px;text-align:center}
   .btn.cvw-open{color:#22D3EE;background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.34)}
   .btn.cvw-open:hover{background:rgba(34,211,238,.2)}
+  /* Editar conteudos (Social) */
+  .btn.ce-edit{color:#22D3EE;background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.34)}
+  .btn.ce-edit:hover{background:rgba(34,211,238,.18)}
+  .ce-sheet{position:relative;text-align:center}body.desktop .ce-sheet{max-width:580px}
+  .ce-ic{width:54px;height:54px;border-radius:15px;background:rgba(34,211,238,.16);color:#22D3EE;display:flex;align-items:center;justify-content:center;margin:4px auto 14px}
+  .ce-ic svg{width:26px;height:26px}
+  .ce-list{display:flex;flex-direction:column;gap:10px;max-height:42vh;overflow:auto;margin-bottom:12px;text-align:left}
+  .ce-card{display:flex;gap:12px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px}
+  .ce-n{width:26px;height:26px;border-radius:8px;background:rgba(91,108,255,.16);color:#8b96ff;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .ce-f{flex:1;min-width:0}.ce-f label{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:6px}
+  .ce-in{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;font:inherit;font-size:14px}.ce-in:focus{outline:none;border-color:var(--accent)}
+  .ce-ta{width:100%;min-height:64px;resize:vertical;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;font:inherit;font-size:13.5px;line-height:1.5}.ce-ta:focus{outline:none;border-color:var(--accent)}
+  .ce-obs{text-align:left;margin-bottom:14px}.ce-obs label{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:6px}
+  .ce-obs textarea{width:100%;min-height:64px;resize:vertical;background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;color:var(--ink);padding:11px;font:inherit;font-size:13.5px;line-height:1.5}.ce-obs textarea:focus{outline:none;border-color:var(--accent)}
   /* Enviar para designer */
   .btn.dz-go{color:#fff;border:none;background:linear-gradient(135deg,#7C5CFF 0%,#5B6CFF 100%);box-shadow:0 6px 16px -8px rgba(124,92,255,.6)}
   .btn.dz-go:hover{filter:brightness(1.07)}
@@ -925,7 +939,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.83 · Client Designer Flow Phase 1</span><br>
+    <span class="pill-ver">Desktop 1.0.84 · Responsive Client Designer Production Flow</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -940,7 +954,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.83 · Client Designer Flow Phase 1</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.84 · Responsive Client Designer Production Flow</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1176,7 +1190,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.83 · Client Designer Flow Phase 1</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.84 · Responsive Client Designer Production Flow</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1500,6 +1514,7 @@ function openDetails(taskId){
 function detFooter(t,cron){
   const clientBtns=
     (cron&&t.cronStatus?'<button class="btn cvw-open" data-clientview="'+t.id+'">'+svg('eye')+'Abrir Visão do cliente</button>':'')+
+    (cron?'<button class="btn ce-edit" data-ceopen="'+t.id+'">'+svg('editnote')+'Editar conteúdos</button>':'')+
     (canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':'')+
     // Apos APROVACAO do cliente -> habilita Enviar para designer (some apos enviado)
     (clientApproved(t)&&!isSentToDesigner(t)?'<button class="btn dz-go" data-senddesigner="'+t.id+'">'+svg('group')+'Enviar para designer</button>':'');
@@ -1548,16 +1563,59 @@ async function sendToDesigner(taskId,designerId){
     designerAssignment:assignment,
     assigneeId:designerId,                 // isola no quadro do designer (visibleTasks)
     assignee:d.name||'',
+    assigneeName:d.name||'',
     cronStatus:'sent_to_designer',
+    status:'afazer',                       // entra na coluna A Fazer do designer
+    startedAt:null,                        // reinicia o tracking p/ o designer
     history:firebase.firestore.FieldValue.arrayUnion({
       type:'enviado_designer',label:'Enviado ao designer '+(d.name||''),
       by:u.name||'',byId:u.id||null,at:now,designerId:designerId,channel:'designer_flow'
     })
   };
   // otimista
-  t.designerAssignment=assignment;t.assigneeId=designerId;t.assignee=d.name||'';t.cronStatus='sent_to_designer';
+  t.designerAssignment=assignment;t.assigneeId=designerId;t.assignee=d.name||'';t.assigneeName=d.name||'';t.cronStatus='sent_to_designer';t.status='afazer';
   closeModal();render();flashToast('Enviado para '+(d.name||'designer')+'. Notificação disparada.');
   try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('sendToDesigner',e);}
+}
+/* ===== Social edita conteúdos (tema/legenda/observação) — premium, por tema ===== */
+function openContentEditor(taskId){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const conts=(Array.isArray(t.cronContents)?t.cronContents:[]).map(c=>c||{});
+  const list=(conts.length?conts:[{}]).map((c,i)=>
+    '<div class="ce-card"><div class="ce-n">'+(i+1)+'</div><div class="ce-f">'+
+      '<label>Tema do conteúdo '+(i+1)+'</label>'+
+      '<input class="ce-in" data-cetema="'+i+'" type="text" value="'+esc(c.tema||'')+'" placeholder="Tema do conteúdo">'+
+      '<label style="margin-top:10px">Legenda</label>'+
+      '<textarea class="ce-ta" data-celeg="'+i+'" placeholder="Legenda para este conteúdo…">'+esc(c.legenda||'')+'</textarea>'+
+    '</div></div>').join('');
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet ce-sheet">'+
+    '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
+    '<div class="ce-ic">'+svg('editnote')+'</div>'+
+    '<div class="sp-title">Editar conteúdos</div>'+
+    '<div class="sp-sub">Ajuste tema e legenda de cada conteúdo. As mudanças refletem em tempo real e no link do cliente.</div>'+
+    '<div class="ce-list">'+list+'</div>'+
+    '<div class="ce-obs"><label>Observações da equipe</label><textarea id="ceObs" placeholder="Notas internas / orientações…">'+esc(t.desc||'')+'</textarea></div>'+
+    '<div class="sp-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button>'+
+      '<button class="btn sp-go" data-cesave="'+taskId+'">'+svg('check')+'Salvar alterações</button></div>'+
+  '</div></div>';
+}
+async function saveContentEdits(taskId){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const orig=(Array.isArray(t.cronContents)?t.cronContents:[]).map(c=>c||{});
+  const n=Math.max(orig.length,document.querySelectorAll('[data-cetema]').length);
+  const contents=[];
+  for(let i=0;i<n;i++){
+    const tm=document.querySelector('[data-cetema="'+i+'"]');const lg=document.querySelector('[data-celeg="'+i+'"]');
+    if(!tm&&!lg)continue;
+    contents.push({tema:tm?tm.value.trim():(orig[i]&&orig[i].tema||''),legenda:lg?lg.value.trim():(orig[i]&&orig[i].legenda||'')});
+  }
+  const obsEl=document.getElementById('ceObs');const desc=obsEl?obsEl.value:t.desc||'';
+  const now=Date.now();const u=state.user||{};
+  const patch={cronContents:contents,desc:desc,
+    history:firebase.firestore.FieldValue.arrayUnion({type:'social_editou_conteudo',label:'Social editou tema/legenda',by:u.name||'',byId:u.id||null,at:now,channel:'social_edit'})};
+  t.cronContents=contents;t.desc=desc;     // otimista
+  closeModal();render();flashToast('Conteúdos atualizados. Reflete no link do cliente.');
+  try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveContentEdits',e);}
 }
 /* ===== Cronograma — Fase 1: enviar para cliente =====
    Campos aditivos (Firestore schemaless; APK nativo ignora):
@@ -1592,9 +1650,18 @@ const CRON_STATES={
   designer_done:{label:'Designer concluiu',color:'#34D399'},
 };
 // Designer = usuario OPERACIONAL (nao-MANAGER). Social/Admin veem tudo.
+// Designer = quem PRODUZ. Inclui funcao de design/edicao E donos/admins (ex.: CEO
+// que tambem atua como designer/responsavel tecnico) — sem hardcode de nome.
+const DESIGNER_KW=['design','editor','edicao','edição','arte','video','vídeo','motion','ilustr','produç','produc'];
+function isDesignerCandidate(u){
+  if(!u)return false;const r=norm(u.role||'');
+  if(DESIGNER_KW.some(k=>r.includes(norm(k))))return true;  // funcao de design/edicao
+  // dono/CEO/responsavel tecnico (cargo permite produzir) — NAO inclui admin generico.
+  return ['ceo','dono','owner','founder','socio'].some(k=>r.includes(norm(k)));
+}
 function designerUsers(){
   return state.users.filter(u=>u&&!['pendente','removido','excluido'].includes(u.status||'')
-    && roleCat(u)==='OPERATIONAL' && (!state.user||u.id!==state.user.id));
+    && (!state.user||u.id!==state.user.id) && isDesignerCandidate(u));
 }
 // Cliente respondeu de forma que habilita envio ao designer (aprovou)?
 function clientApproved(t){return t&&(t.cronStatus==='aprovado_cliente'||t.cronStatus==='client_approved'||(t.clientReview&&t.clientReview.status==='aprovado'));}
@@ -1936,7 +2003,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.83-desktop-client-designer-flow-phase1';
+const BUILD='1.0.84-desktop-responsive-client-designer-production-flow';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -1948,7 +2015,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.83 · Client Designer Flow Phase 1</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.84 · Responsive Client Designer Production Flow</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -1961,7 +2028,7 @@ function renderConfig(){
     '<div style="height:16px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div></div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.83 · Client Designer Flow Phase 1 · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.84 · Responsive Client Designer Production Flow · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
   return h+'</div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
@@ -2182,6 +2249,8 @@ document.addEventListener('click',async e=>{
   }
   if(el=g('[data-senddesigner]')){openDesignerModal(el.dataset.senddesigner);return;}
   if(el=g('[data-pickdesigner]')){const p=el.dataset.pickdesigner.split('|');sendToDesigner(p[0],p[1]);return;}
+  if(el=g('[data-ceopen]')){openContentEditor(el.dataset.ceopen);return;}
+  if(el=g('[data-cesave]')){saveContentEdits(el.dataset.cesave);return;}
   if(el=g('[data-sendclient-task]')){const t=state.tasks.find(x=>x.id===el.dataset.sendclientTask);if(t)openSendClientModal(t);return;}
   if(el=g('[data-clientview]')){openClientView(el.dataset.clientview||(state._sendCtx&&state._sendCtx.id));return;}
   if(el=g('[data-clientviewback]')){closeClientView();return;}
