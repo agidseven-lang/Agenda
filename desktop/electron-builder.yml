@@ -25,10 +25,12 @@ win:
 nsis:
   oneClick: false
   perMachine: false
-  allowToChangeInstallationDirectory: true
+  allowToChangeInstallationDirectory: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Agenda ID Seven Desktop
+  include: build/installer.nsh
+  deleteAppDataOnUninstall: false
 msi:
   oneClick: false
   perMachine: false

@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.67",
-  "description": "Agenda ID Seven Desktop — responsivo desktop premium (Electron)",
+  "version": "1.0.68",
+  "description": "Agenda ID Seven Desktop — instalacao substitui versao anterior (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
