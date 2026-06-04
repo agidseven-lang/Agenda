@@ -58,6 +58,26 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string) {
     });
   });
 
+  // tasks (modificadas): cronograma ENVIADO AO DESIGNER (reatribuicao) — notifica o designer.
+  // Dedupe por designerAssignment.assignedAt para nao repetir em outras edicoes do doc.
+  const u1b = listen<Task>("tasks", (snap) => {
+    snap.docChanges().forEach((ch) => {
+      if (ch.type !== "modified") return;
+      const t = { id: ch.doc.id, ...(ch.doc.data() as any) } as any;
+      const da = t.designerAssignment;
+      if (!da || da.designerId !== state.uid) return;          // nao fui eu o designer escolhido
+      if (da.assignedBy && da.assignedBy === state.uid) return;
+      const at = Number(da.assignedAt) || 0;
+      if (at && at < state.sinceMs) return;                    // atribuicao anterior ao login
+      const key = `designer:${t.id}:${at}`;                    // 1 notificacao por atribuicao
+      if (state.seen.has(key)) return;
+      state.seen.add(key);
+      const n = new Notification({ title: "Novo cronograma para voce", body: (t.title || "Cronograma") + (t.client ? ` - ${t.client}` : ""), silent: false });
+      n.on("click", () => { const w = getWin(); if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); w.webContents.send("notif-open", `board/${t.sector || ""}`); } });
+      n.show();
+    });
+  });
+
   // events: novo compromisso para mim
   const u2 = listen<Event>("events", (snap) => {
     snap.docChanges().forEach((ch) => {
@@ -73,5 +93,5 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string) {
     });
   });
 
-  return () => { u1(); u2(); };
+  return () => { u1(); u1b(); u2(); };
 }
