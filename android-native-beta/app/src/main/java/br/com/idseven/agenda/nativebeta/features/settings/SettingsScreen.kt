@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CleaningServices
 import androidx.compose.material.icons.outlined.ColorLens
 import androidx.compose.material.icons.outlined.Language
@@ -76,7 +77,7 @@ fun SettingsScreen(currentUser: UserLite?, onLogout: () -> Unit, onBack: () -> U
                 Item("Perfil e dados pessoais", currentUser?.name ?: "—")
                 Soon("Atualizar dados pessoais")
                 Soon("Assinatura / plano")
-                ActionRow("Sair da conta", "Encerrar a sessão neste aparelho", Tokens.Red) { onLogout() }
+                ActionRow("Sair da conta", "Encerrar a sessão neste aparelho", Tokens.Red, Icons.Outlined.Logout) { onLogout() }
             }
 
             Section("Privacidade e Segurança", Icons.Outlined.Lock) {
@@ -103,7 +104,7 @@ fun SettingsScreen(currentUser: UserLite?, onLogout: () -> Unit, onBack: () -> U
             }
 
             Section("Desempenho e Dados", Icons.Outlined.Speed) {
-                ActionRow("Limpar cache", "Em uso: $cacheLabel") {
+                ActionRow("Limpar cache", "Em uso: $cacheLabel", trailing = Icons.Outlined.CleaningServices) {
                     runCatching { ctx.cacheDir.listFiles()?.forEach { it.deleteRecursively() } }
                     cacheLabel = dirSizeLabel(ctx.cacheDir)
                 }
@@ -157,14 +158,13 @@ private fun Item(title: String, value: String, icon: ImageVector? = null) {
 }
 
 @Composable
-private fun ActionRow(title: String, subtitle: String, color: Color = Tokens.Ink, onClick: () -> Unit) {
+private fun ActionRow(title: String, subtitle: String, color: Color = Tokens.Ink, trailing: ImageVector = Icons.Filled.KeyboardArrowRight, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable { onClick() }.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, color = color, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
             Text(subtitle, color = Tokens.Faint, fontSize = 12.sp)
         }
-        val trailing = if (color == Tokens.Red) Icons.Outlined.Logout else Icons.Outlined.CleaningServices
-        Icon(trailing, null, tint = if (color == Tokens.Red) Tokens.Red else Tokens.Accent, modifier = Modifier.size(18.dp))
+        Icon(trailing, null, tint = if (color == Tokens.Red) Tokens.Red else Tokens.Soft, modifier = Modifier.size(18.dp))
     }
     Divider()
 }
