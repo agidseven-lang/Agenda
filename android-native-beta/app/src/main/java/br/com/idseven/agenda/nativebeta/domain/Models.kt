@@ -60,8 +60,15 @@ data class TaskItem(
     val doneBy: String?,
     val checklist: List<ChecklistItem>,
     val history: List<TaskHistory>,
+    // Fluxo Cronograma -> Cliente (aditivos; escritos pelo Desktop. Compat: null em tarefas antigas).
+    val cronStatus: String? = null,
+    val clientReview: ClientReview? = null,
+    val clientSentBy: String? = null,
 )
 
 data class ChecklistItem(val t: String, val d: Boolean)
 
 data class TaskHistory(val kind: String, val at: Long?, val byId: String?, val from: String?, val to: String?)
+
+// Resposta do cliente na avaliação do cronograma (aditivo). status: aprovado | revisao | editado
+data class ClientReview(val status: String, val note: String?, val at: Long?, val byName: String?)

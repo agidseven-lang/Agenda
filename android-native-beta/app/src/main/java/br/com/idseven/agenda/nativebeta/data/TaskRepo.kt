@@ -1,6 +1,7 @@
 package br.com.idseven.agenda.nativebeta.data
 
 import br.com.idseven.agenda.nativebeta.domain.ChecklistItem
+import br.com.idseven.agenda.nativebeta.domain.ClientReview
 import br.com.idseven.agenda.nativebeta.domain.TaskHistory
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import com.google.firebase.firestore.DocumentSnapshot
@@ -62,6 +63,18 @@ object TaskRepo {
             doneBy = d.getString("doneBy"),
             checklist = checklist,
             history = history,
+            cronStatus = d.getString("cronStatus"),
+            clientReview = (d.get("clientReview") as? Map<*, *>)?.let { cr ->
+                val st = cr["status"] as? String
+                if (st.isNullOrBlank()) null
+                else ClientReview(
+                    status = st,
+                    note = cr["note"] as? String,
+                    at = (cr["at"] as? Number)?.toLong(),
+                    byName = cr["byName"] as? String,
+                )
+            },
+            clientSentBy = d.getString("clientSentBy"),
         )
     }
 

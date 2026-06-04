@@ -25,7 +25,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.65-beta-mobile-validation"
+      DIST_BASENAME: "idseven-nativebeta-1.0.67-beta-client-vision-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -188,8 +188,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.65-beta-mobile-validation
-          path: dist/idseven-nativebeta-1.0.65-beta-mobile-validation.apk
+          name: idseven-nativebeta-1.0.67-beta-client-vision-fix
+          path: dist/idseven-nativebeta-1.0.67-beta-client-vision-fix.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -197,7 +197,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.65-beta-mobile-validation-bundle
-          path: dist/idseven-nativebeta-1.0.65-beta-mobile-validation.zip
+          name: idseven-nativebeta-1.0.67-beta-client-vision-fix-bundle
+          path: dist/idseven-nativebeta-1.0.67-beta-client-vision-fix.zip
           if-no-files-found: error
           retention-days: 30
