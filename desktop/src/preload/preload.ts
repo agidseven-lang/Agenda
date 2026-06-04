@@ -17,5 +17,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.on("notif-open", (_e, t: string) => cb(t));
   },
   isDesktop: true,
-  version: "1.0.70-desktop-premium-ui-polish",
+  version: "1.0.71-desktop-button-datetime-fix",
 });

@@ -21,6 +21,9 @@ let quitting = false;
 // AUMID p/ toasts no Windows respeitarem o app
 if (process.platform === "win32") app.setAppUserModelId("br.com.idseven.agenda.desktop");
 
+// Locale pt-BR: faz os inputs nativos date/time exibirem dd/mm/aaaa e HH:mm.
+app.commandLine.appendSwitch("lang", "pt-BR");
+
 const lock = app.requestSingleInstanceLock();
 if (!lock) {
   app.quit();

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.70 (Premium UI Polish)</title>
+<title>ID Seven · Desktop 1.0.71 (Button DateTime Fix)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -55,12 +55,13 @@
     font-size:15px;padding:13px 14px;outline:none;transition:border-color .15s;color-scheme:dark}
   .inp::placeholder{color:var(--faint);opacity:1}
   .inp:focus{border-color:var(--accent)}
-  /* date/time: indicador nativo do calendario/relogio VISIVEL no dark (era preto) */
+  /* date/time: OCULTA totalmente o indicador nativo (era preto/invisivel no dark).
+     Usamos icone SVG claro proprio (.dt-field) + showPicker() no clique. */
   .inp[type=date]::-webkit-calendar-picker-indicator,
-  .inp[type=time]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(1.7);opacity:.55;cursor:pointer;transition:opacity .12s}
-  .inp[type=date]::-webkit-calendar-picker-indicator:hover,
-  .inp[type=time]::-webkit-calendar-picker-indicator:hover{opacity:.95}
-  .inp[type=date],.inp[type=time]{color:var(--ink)}
+  .inp[type=time]::-webkit-calendar-picker-indicator{-webkit-appearance:none;appearance:none;opacity:0;display:none;width:0;height:0;margin:0;padding:0;background:none}
+  .inp[type=date]::-webkit-inner-spin-button,.inp[type=time]::-webkit-inner-spin-button,
+  .inp[type=date]::-webkit-clear-button,.inp[type=time]::-webkit-clear-button{-webkit-appearance:none;display:none;margin:0}
+  .inp[type=date],.inp[type=time]{color:var(--ink);cursor:pointer}
   .inp::selection{background:rgba(91,108,255,.4)}
   textarea.inp{resize:vertical;min-height:64px;line-height:1.45}
   .pwwrap{position:relative}
@@ -288,23 +289,24 @@
   body.desktop .nav button.sb-item.on::before{content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:22px;border-radius:0 3px 3px 0;background:var(--accent)}
   body.desktop .nav button.sb-item.on span{font-weight:800 !important}
   body.desktop .nav button.sb-item.on svg{color:var(--accent)}
-  /* Botao primario "Nova tarefa" — premium (icone em chip translucido) */
-  body.desktop .nav .fab.fab-desktop{
-    position:relative !important;left:auto !important;bottom:auto !important;right:auto !important;
-    margin:2px 0 8px 0 !important;width:100% !important;height:44px !important;border-radius:11px !important;
-    display:flex !important;align-items:center;justify-content:center;gap:10px;
-    font-size:14px;font-weight:700;letter-spacing:.01em;color:#fff;
-    background:linear-gradient(135deg,#5B6CFF 0%,#6E5BFF 100%) !important;
-    border:1px solid rgba(255,255,255,.10) !important;
+  /* Botao primario "Nova tarefa" — HORIZONTAL premium: [ +  Nova tarefa ]
+     Override do .nav button base (que e flex-direction:column) -> aqui ROW. */
+  body.desktop .nav .new-task-btn{
+    flex:none !important;width:100% !important;
+    display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:center !important;
+    gap:9px !important;height:44px;margin:2px 0 8px 0;padding:0 14px;border-radius:11px;
+    color:#fff;font-size:14px;font-weight:700;letter-spacing:.01em;
+    background:linear-gradient(135deg,#5B6CFF 0%,#6E5BFF 100%);
+    border:1px solid rgba(255,255,255,.10);
     box-shadow:0 6px 16px -6px rgba(91,108,255,.55),inset 0 1px 0 rgba(255,255,255,.16);
     transition:transform .12s ease,box-shadow .12s ease,filter .12s ease;
   }
-  body.desktop .nav .fab.fab-desktop:hover{transform:translateY(-1px);filter:brightness(1.05);box-shadow:0 10px 22px -6px rgba(91,108,255,.7),inset 0 1px 0 rgba(255,255,255,.22)}
-  body.desktop .nav .fab.fab-desktop:active{transform:translateY(0);filter:brightness(.98)}
-  body.desktop .nav .fab.fab-desktop:focus-visible{outline:2px solid #fff;outline-offset:2px}
-  body.desktop .nav .fab.fab-desktop .fab-ic{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.17)}
-  body.desktop .nav .fab.fab-desktop .fab-ic svg{width:15px !important;height:15px !important}
-  body.desktop .nav .fab.fab-desktop .fab-tx{line-height:1}
+  body.desktop .nav .new-task-btn:hover{transform:translateY(-1px);filter:brightness(1.05);box-shadow:0 10px 22px -6px rgba(91,108,255,.7),inset 0 1px 0 rgba(255,255,255,.22)}
+  body.desktop .nav .new-task-btn:active{transform:translateY(0);filter:brightness(.98)}
+  body.desktop .nav .new-task-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  body.desktop .nav .new-task-btn .new-task-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex:none}
+  body.desktop .nav .new-task-btn .new-task-icon svg{width:18px !important;height:18px !important;display:block}
+  body.desktop .nav .new-task-btn .new-task-label{line-height:1;display:inline-flex;align-items:center;white-space:nowrap}
   body.desktop .nav .sb-footer{margin-top:auto;padding:14px 6px 4px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--faint);line-height:1.5}
   body.desktop .nav .sb-footer .ver{display:inline-block;background:rgba(91,108,255,.14);color:var(--accent);font-weight:800;padding:3px 9px;border-radius:999px;margin-bottom:6px;font-size:10.5px}
 
@@ -447,7 +449,7 @@
   body.desktop #app > .content{scrollbar-gutter:stable}
 
   /* =====================================================================
-     1.0.70 — PREMIUM UI POLISH (desktop)
+     PREMIUM UI POLISH (desktop)
      ===================================================================== */
   /* Sidebar refino: respiro, brand, sync com leve pulse */
   body.desktop .nav{padding:20px 16px 16px;gap:3px;background:linear-gradient(180deg,#0D0E14 0%,#0B0C11 100%)}
@@ -539,7 +541,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.70 · Premium UI Polish</span><br>
+    <span class="pill-ver">Desktop 1.0.71 · Button DateTime Fix</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -554,7 +556,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.70 · Premium UI Polish</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.71 · Button DateTime Fix</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -773,10 +775,10 @@ function render(){
   if(isDesktop()){
     nav.innerHTML=
       '<div class="sb-brand"><div class="logo sm">7</div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
-      '<button class="fab fab-desktop" data-fab="1"><span class="fab-ic">'+svg('plus')+'</span><span class="fab-tx">Nova tarefa</span></button>'+
+      '<button class="new-task-btn" data-fab="1"><span class="new-task-icon">'+svg('plus')+'</span><span class="new-task-label">Nova tarefa</span></button>'+
       '<div class="sb-sect">Workspace</div>'+
       TABS.map(sbItem).join('')+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.70 · Premium UI Polish</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.71 · Button DateTime Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -996,7 +998,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.70-desktop-premium-ui-polish';
+const BUILD='1.0.71-desktop-button-datetime-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -1008,7 +1010,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('grid','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.70 · Premium UI Polish</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.71 · Button DateTime Fix</div></div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
 function openSheet(which){
@@ -1108,6 +1110,9 @@ function afterForm(){
   bind('[data-cleg]',e=>{const i=+e.dataset.cleg;state.form.contents[i]=state.form.contents[i]||{};state.form.contents[i].legenda=e.value;});
   bind('[data-item]',e=>state.form.items[+e.dataset.item]=e.value);
   bind('[data-chk]',e=>state.form.checklist[+e.dataset.chk].t=e.value);
+  // date/time: indicador nativo oculto -> clicar no campo abre o seletor via showPicker()
+  c.querySelectorAll('.dt-field').forEach(w=>{const inp=w.querySelector('input');if(!inp)return;
+    w.addEventListener('click',()=>{try{inp.showPicker&&inp.showPicker();}catch(_){inp.focus();}});});
 }
 function composedDesc(){const f=state.form;const sub=curSub();const t=tpl();let lines=[];
   if(sub)lines.push(sub.formTitle);
