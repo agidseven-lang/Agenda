@@ -55,6 +55,16 @@ jobs:
       - name: Listar PNGs gerados
         if: always()
         run: ls -lh "$APP_DIR/app/build/outputs/roborazzi" || echo "nenhum PNG"
+      - name: Dump PNGs em base64 no log (inspecao sem download externo)
+        if: always()
+        run: |
+          cd "$APP_DIR/app/build/outputs/roborazzi" || exit 0
+          for f in *.png; do
+            [ -f "$f" ] || continue
+            echo "=====B64START:$f====="
+            base64 -w0 "$f"; echo
+            echo "=====B64END:$f====="
+          done
       - name: Upload relatorio de teste (diagnostico, se falhar)
         if: always()
         uses: actions/upload-artifact@v4
