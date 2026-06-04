@@ -28,14 +28,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,8 +52,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.nativebeta.core.UiList
@@ -62,7 +70,10 @@ import br.com.idseven.agenda.nativebeta.designsystem.components.ErrorState
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
 import br.com.idseven.agenda.nativebeta.designsystem.components.SearchField
 import br.com.idseven.agenda.nativebeta.designsystem.components.SkeletonList
+import br.com.idseven.agenda.nativebeta.designsystem.components.StatusChip
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
+import br.com.idseven.agenda.nativebeta.domain.Cron
+import br.com.idseven.agenda.nativebeta.domain.CronStatusUi
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
@@ -108,6 +119,7 @@ fun TasksScreen(
     var query by remember { mutableStateOf("") }
     var sectorFilter by remember { mutableStateOf<String?>(null) }
     var moveTarget by remember { mutableStateOf<TaskItem?>(null) }
+    var deleteTarget by remember { mutableStateOf<TaskItem?>(null) }
     // "Minhas tarefas" = sou o responsavel (assigneeId) OU o solicitante (by).
     // So habilita o chip quando ha um currentUid; sem schema novo, sem repo novo.
     var mineOnly by remember { mutableStateOf(false) }
@@ -199,8 +211,18 @@ fun TasksScreen(
                     LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
                         items(list, key = { it.id }) { task ->
                             val requester = users.firstOrNull { it.id == task.by }
-                            val assignee = users.firstOrNull { (it.name ?: "").equals(task.assignee ?: "", ignoreCase = true) }
-                            TaskCardPro(task, requester, assignee, onClick = { onTaskClick(task.id) }, onMove = { moveTarget = task })
+                            // Responsável: resolve por assigneeId (preciso) e cai para nome (dados antigos).
+                            val assignee = users.firstOrNull { it.id == task.assigneeId }
+                                ?: users.firstOrNull { (it.name ?: "").equals(task.assignee ?: "", ignoreCase = true) }
+                            // Mesma regra do Desktop canDelTask: admin/gestão, ou criador, ou responsável.
+                            val canDel = TaskVisibility.canSeeAllBoards(currentUser) ||
+                                (currentUid != null && (task.by == currentUid || task.assigneeId == currentUid))
+                            TaskCardPro(
+                                task, requester, assignee, canDel,
+                                onClick = { onTaskClick(task.id) },
+                                onMove = { moveTarget = task },
+                                onDelete = { deleteTarget = task },
+                            )
                         }
                     }
                 }
@@ -238,6 +260,27 @@ fun TasksScreen(
             }
         }
     }
+
+    // Confirmação de exclusão (mesma ação do Desktop: remove a tarefa da coleção).
+    val del = deleteTarget
+    if (del != null) {
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            containerColor = Tokens.Surface,
+            titleContentColor = Tokens.Ink,
+            textContentColor = Tokens.Soft,
+            title = { Text("Excluir tarefa?", fontWeight = FontWeight.Bold) },
+            text = { Text("Esta ação remove \"${del.title?.ifBlank { null } ?: del.client ?: "a tarefa"}\" para toda a equipe. Não dá para desfazer.") },
+            confirmButton = {
+                TextButton(onClick = { scope.launch { TaskRepo.delete(del.id) }; deleteTarget = null }) {
+                    Text("Excluir", color = Tokens.Red, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("Cancelar", color = Tokens.Soft) }
+            },
+        )
+    }
 }
 
 @Composable
@@ -271,89 +314,189 @@ private fun ColumnHeader(st: String, count: Int) {
     }
 }
 
+// Chip de tag (NÃO maiúsculo — espelha os chips do card Desktop "Cronograma"/"Semanal").
 @Composable
-private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite?, onClick: () -> Unit, onMove: () -> Unit) {
+private fun TagChip(text: String, color: Color, soft: Boolean = false) {
+    val bg = if (soft) Tokens.Surface2 else color.copy(alpha = 0.14f)
+    val base = Modifier.clip(RoundedCornerShape(8.dp)).background(bg)
+    val mod = if (soft) base.border(1.dp, Tokens.Line, RoundedCornerShape(8.dp)) else base
+    Box(mod.padding(horizontal = 11.dp, vertical = 5.dp)) {
+        Text(text, color = if (soft) Tokens.Soft else color, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+// CARD DE TAREFA — paridade 100% com o card premium do Desktop (renderer taskCard()),
+// apenas empilhado para o celular. internal: acessível ao teste de screenshot (Roborazzi).
+@Composable
+internal fun TaskCardPro(
+    task: TaskItem,
+    requester: UserLite?,
+    assignee: UserLite?,
+    canDelete: Boolean,
+    onClick: () -> Unit,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val sector = Sectors.of(task.sector)
     val total = task.checklist.size
     val done = task.checklist.count { it.d }
     val deadline = TaskDeadline.of(task)
+    val cron = Cron.of(task)
+    val asgName = (assignee?.name ?: task.assignee)?.trim().orEmpty()
+    val reqName = (requester?.name ?: task.by?.let { "—" } ?: "").trim()
     Column(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(18.dp))
             .background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(18.dp))
-            .clickable { onClick() }.padding(15.dp),
+            .clickable { onClick() }.padding(16.dp),
     ) {
-        // 1. metadata: status + indicador de prazo
+        // 1) META — chip de status (esq) + indicador de prazo (dir)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(TaskStatus.color(task.status)))
-            Spacer(Modifier.width(7.dp))
-            Text(TaskStatus.label(task.status), color = TaskStatus.color(task.status), fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+            StatusChip(TaskStatus.label(task.status), TaskStatus.color(task.status))
             Spacer(Modifier.weight(1f))
             if (deadline != null) Pill(deadline.text, deadline.color)
         }
-        // 2-4. solicitante + data de lançamento
-        if (requester != null || task.createdAt != null) {
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Avatar(requester?.photo, UserColor.of(requester?.id, requester?.color), requester?.name ?: "?", 36.dp)
-                Spacer(Modifier.width(10.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    Text("Solicitado por ${UserColor.firstName(requester?.name).ifBlank { "—" }}", color = Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 14.sp)
-                    task.createdAt?.let { Text("lançada em ${DateUtil.fmtMs(it)}", color = Tokens.Faint, fontSize = 11.sp, lineHeight = 13.sp) }
-                }
+        // 2) RESPONSÁVEL — avatar grande + nome (até 2 linhas) + cargo/função
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Avatar(assignee?.photo, UserColor.of(assignee?.id ?: task.assigneeId, assignee?.color), asgName.ifEmpty { "?" }, 52.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    asgName.ifEmpty { "Sem responsável" },
+                    color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                    lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    assignee?.role?.ifBlank { null } ?: "Responsável",
+                    color = Tokens.Soft, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
             }
         }
-        // 5. cliente (kicker)
+        // 3) ENVIADO POR — bloco com ícone + nome (negrito) + data/hora
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Bg)
+                .border(1.dp, Tokens.LineSoft, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Person, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = buildAnnotatedString {
+                    append("Enviado por ")
+                    withStyle(SpanStyle(color = Tokens.Ink, fontWeight = FontWeight.Bold)) { append(reqName.ifEmpty { "—" }) }
+                    task.createdAt?.takeIf { it > 0 }?.let { append(" · ${DateUtil.fmtMs(it)}") }
+                },
+                color = Tokens.Soft, fontSize = 12.sp, lineHeight = 16.sp,
+            )
+        }
+        // 4) CORPO — cliente (kicker) + título + chip de fluxo + tags
         if (!task.client.isNullOrBlank()) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(13.dp))
             Text(task.client.uppercase(), color = Tokens.Soft, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp)
         }
-        // 6. título
         Spacer(Modifier.height(3.dp))
-        Text(task.title?.ifBlank { null } ?: task.client ?: "Sem título", color = Tokens.Ink, fontSize = 16.5.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        // 6b. descrição resumida (se houver) — preview discreto, 2 linhas/elipse
-        if (!task.desc.isNullOrBlank()) {
-            Spacer(Modifier.height(5.dp))
-            Text(task.desc, color = Tokens.Faint, fontSize = 12.5.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
+        Text(
+            task.title?.ifBlank { null } ?: task.client ?: "Sem título",
+            color = Tokens.Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold,
+            lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
+        if (!task.cronStatus.isNullOrBlank()) {
+            Spacer(Modifier.height(9.dp))
+            val cc = CronStatusUi.color(task.cronStatus)
+            Row(
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(cc.copy(alpha = 0.14f))
+                    .border(1.dp, cc.copy(alpha = 0.32f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(cc))
+                Spacer(Modifier.width(7.dp))
+                Text(CronStatusUi.label(task.cronStatus), color = cc, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
-        // 7. setor + prioridade
         Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Pill(sector.label, sector.color)
-            if (task.priority) { Spacer(Modifier.width(8.dp)); Pill("Prioridade alta", Tokens.Red) }
+            TagChip(sector.label, sector.color)
+            if (cron != null) { Spacer(Modifier.width(8.dp)); TagChip(cron.label, Tokens.Soft, soft = true) }
+            if (task.priority) { Spacer(Modifier.width(8.dp)); TagChip("Prioridade", Tokens.Red) }
         }
-        // 8-10. responsável + prazo
-        Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (!task.assignee.isNullOrBlank()) {
-                Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee, 36.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(UserColor.firstName(task.assignee), color = Tokens.Soft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            } else {
-                Text("Sem responsável", color = Tokens.Faint, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false))
+        // 5) TEMAS numerados (conteúdos do cronograma) OU briefing curto
+        if (cron != null && cron.themes.isNotEmpty()) {
+            Spacer(Modifier.height(13.dp))
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Tokens.Bg)
+                    .border(1.dp, Tokens.LineSoft, RoundedCornerShape(14.dp)).padding(13.dp),
+            ) {
+                Text("TEMAS", color = Tokens.Faint, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.08.sp)
+                cron.themes.take(3).forEach { th ->
+                    Spacer(Modifier.height(9.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(26.dp).clip(RoundedCornerShape(8.dp)).background(Tokens.Accent.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                            Text("${th.n}", color = Tokens.Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.width(11.dp))
+                        Text(th.tema, color = Tokens.Ink, fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                val rest = cron.count - 3
+                if (rest > 0) {
+                    Spacer(Modifier.height(9.dp))
+                    Text("+ $rest conteúdo${if (rest > 1) "s" else ""}", color = Tokens.Faint, fontSize = 11.5.sp)
+                }
             }
-            Spacer(Modifier.weight(1f))
-            if (!task.dueDate.isNullOrBlank()) {
-                Icon(Icons.Outlined.Schedule, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(DateUtil.prazo(task.dueDate, task.dueTime), color = Tokens.Faint, fontSize = 12.sp)
-            }
+        } else if (!task.desc.isNullOrBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(task.desc, color = Tokens.Faint, fontSize = 12.5.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
         }
-        // 12. checklist progress
+        // 6) CHECKLIST — barra + contador
         if (total > 0) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(13.dp))
             LinearProgressIndicator(progress = { done.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)), color = Tokens.Green, trackColor = Tokens.Surface2)
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(5.dp))
             Text("$done de $total no checklist", color = Tokens.Faint, fontSize = 11.sp)
         }
-        // 13. mover
+        // 7) PRAZO ou "Sem prazo"
+        Spacer(Modifier.height(13.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Schedule, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (!task.dueDate.isNullOrBlank()) DateUtil.prazo(task.dueDate, task.dueTime) else "Sem prazo",
+                color = Tokens.Faint, fontSize = 12.sp,
+            )
+        }
+        // 8) AÇÕES — Detalhes / Mover / Excluir
         Spacer(Modifier.height(14.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Accent.copy(alpha = 0.12f)).clickable { onMove() }.padding(vertical = 11.dp),
-            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Outlined.SwapHoriz, contentDescription = null, tint = Tokens.Accent, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Mover status", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Tokens.Accent)
+                    .clickable { onClick() }.padding(vertical = 11.dp),
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.Visibility, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("Detalhes", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(10.dp))
+            Row(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Tokens.Surface2)
+                    .border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onMove() }.padding(vertical = 11.dp),
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.SwapHoriz, contentDescription = null, tint = Tokens.Soft, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(7.dp))
+                Text("Mover", color = Tokens.Soft, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            if (canDelete) {
+                Spacer(Modifier.width(10.dp))
+                Box(
+                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(Tokens.Red.copy(alpha = 0.12f))
+                        .border(1.dp, Tokens.Red.copy(alpha = 0.35f), RoundedCornerShape(12.dp)).clickable { onDelete() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.DeleteOutline, contentDescription = "Excluir", tint = Tokens.Red, modifier = Modifier.size(19.dp))
+                }
+            }
         }
     }
 }

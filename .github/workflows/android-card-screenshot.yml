@@ -1,0 +1,66 @@
+# Render do CARD de tarefa Android em PNG (JVM, Roborazzi + Robolectric NATIVE) — SEM emulador.
+# Prova visual EXIGIDA antes do build do APK: o card mobile precisa ser igual ao do PC.
+# Execucao SOMENTE manual (workflow_dispatch). Nao faz deploy. So gera artifacts (PNGs).
+name: "[manual] Android Card Screenshot (Roborazzi)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit a renderizar"
+        required: true
+        default: "app/local-1.0.75-task-card-mobile-parity-fix"
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: "android-native-beta"
+    steps:
+      - name: Checkout (ref escolhido)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Restaurar google-services.json (secret texto puro)
+        env:
+          GOOGLE_SERVICES_JSON_BETA: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON_BETA" ]; then
+            echo "::error:: secret GOOGLE_SERVICES_JSON_BETA ausente."; exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_BETA" > "$APP_DIR/app/google-services.json"
+          echo "google-services.json gravado ($(wc -c < "$APP_DIR/app/google-services.json") bytes)."
+
+      - name: Roborazzi — renderizar o card em PNG (record)
+        run: |
+          cd "$APP_DIR"
+          chmod +x ./gradlew
+          ./gradlew :app:recordRoborazziDebug --no-daemon --stacktrace
+
+      - name: Listar PNGs gerados
+        if: always()
+        run: |
+          echo "== PNGs do card (Roborazzi) =="
+          ls -lh "$APP_DIR/app/build/outputs/roborazzi" || echo "nenhum PNG encontrado"
+
+      - name: Upload screenshots do card (PNG)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-task-card-screenshots
+          path: android-native-beta/app/build/outputs/roborazzi/*.png
+          if-no-files-found: error
+          retention-days: 30

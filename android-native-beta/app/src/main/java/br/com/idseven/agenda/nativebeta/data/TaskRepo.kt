@@ -2,6 +2,7 @@ package br.com.idseven.agenda.nativebeta.data
 
 import br.com.idseven.agenda.nativebeta.domain.ChecklistItem
 import br.com.idseven.agenda.nativebeta.domain.ClientReview
+import br.com.idseven.agenda.nativebeta.domain.CronContent
 import br.com.idseven.agenda.nativebeta.domain.TaskHistory
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import com.google.firebase.firestore.DocumentSnapshot
@@ -29,6 +30,17 @@ object TaskRepo {
         val checklist = rawCl.mapNotNull { item ->
             val m = item as? Map<*, *> ?: return@mapNotNull null
             ChecklistItem(t = (m["t"] as? String) ?: "", d = bool(m["d"]))
+        }
+        // Conteúdos do cronograma: aceita `cronContents` (atual) e o alias legado `contents`.
+        val rawCron = (d.get("cronContents") as? List<*>) ?: (d.get("contents") as? List<*>) ?: emptyList<Any?>()
+        val cronContents = rawCron.mapNotNull { item ->
+            val m = item as? Map<*, *> ?: return@mapNotNull null
+            CronContent(
+                tema = m["tema"] as? String,
+                legenda = m["legenda"] as? String,
+                feedImageUrl = m["feedImageUrl"] as? String,
+                storyImageUrl = m["storyImageUrl"] as? String,
+            )
         }
         val rawHist = d.get("history") as? List<*> ?: emptyList<Any?>()
         val history = rawHist.mapNotNull { h ->
@@ -75,6 +87,7 @@ object TaskRepo {
                 )
             },
             clientSentBy = d.getString("clientSentBy"),
+            cronContents = cronContents,
         )
     }
 
