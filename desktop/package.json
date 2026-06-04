@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.73",
-  "description": "Agenda ID Seven Desktop — refina card e detalhes completos da tarefa (Electron) (Electron)",
+  "version": "1.0.74",
+  "description": "Agenda ID Seven Desktop — refina card e detalhes com padrao premium aprovado (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
