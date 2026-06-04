@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.81",
-  "description": "Agenda ID Seven Desktop — Fase 1 WhatsApp message sanitization fix (Electron) (Electron)",
+  "version": "1.0.82",
+  "description": "Agenda ID Seven Desktop — Fase 1 link publico HTTPS da Visao do Cliente (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
