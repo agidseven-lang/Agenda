@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.79",
-  "description": "Agenda ID Seven Desktop — Fase 1 share link + detail footer fix (Electron) (Electron)",
+  "version": "1.0.80",
+  "description": "Agenda ID Seven Desktop — Fase 1 WhatsApp share flow fix (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

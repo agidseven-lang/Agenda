@@ -12,10 +12,12 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   sessionLogout: () => ipcRenderer.send("session-logout"),
   // sair de verdade (fora da tray)
   appQuit: (): Promise<void> => ipcRenderer.invoke("app-quit"),
-  // receber deep-link de clique em toast
+  // receber deep-link de clique em toast / protocolo idseven://
   onNotifOpen: (cb: (target: string) => void) => {
     ipcRenderer.on("notif-open", (_e, t: string) => cb(t));
   },
+  // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
+  openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   isDesktop: true,
-  version: "1.0.79-desktop-share-link-detail-footer-fix",
+  version: "1.0.80-desktop-whatsapp-share-flow-fix",
 });
