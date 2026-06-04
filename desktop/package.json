@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.77",
-  "description": "Agenda ID Seven Desktop — Fase 1 fluxo cronograma cliente (Electron) (Electron)",
+  "version": "1.0.78",
+  "description": "Agenda ID Seven Desktop — Fase 1 Visao do cliente real (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

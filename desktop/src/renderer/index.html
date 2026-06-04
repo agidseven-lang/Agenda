@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.77 (Cronograma Client Flow Phase 1)</title>
+<title>ID Seven · Desktop 1.0.78 (Client Vision Fix)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -799,6 +799,88 @@
   /* Chip cronStatus no card */
   .tc-cron-st{display:inline-flex;align-items:center;gap:7px;margin-top:8px;padding:5px 11px;border-radius:8px;font-size:11px;font-weight:800;background:rgba(34,211,238,.12);color:#22D3EE;border:1px solid rgba(34,211,238,.22)}
   .tc-cron-st .dotc{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  /* ===== VISÃO DO CLIENTE — tela real (rota dedicada) ===== */
+  .cvw-wrap{height:100%;display:flex;flex-direction:column;background:radial-gradient(120% 80% at 50% -10%,rgba(34,211,238,.07),transparent 60%),var(--bg)}
+  .cvw-top{display:flex;align-items:center;gap:14px;padding:18px 22px 6px}
+  .cvw-back{display:inline-flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--line);color:var(--soft);font-size:13px;font-weight:700;padding:9px 14px;border-radius:11px;transition:border-color .12s,color .12s}
+  .cvw-back:hover{border-color:var(--accent);color:var(--ink)}
+  .cvw-back svg{width:16px;height:16px}
+  .cvw-badge{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:800;background:rgba(34,211,238,.14);color:#22D3EE;border:1px solid rgba(34,211,238,.3)}
+  .cvw-badge svg{width:15px;height:15px}
+  .cvw-scroll{flex:1;overflow:auto;padding:14px 22px 40px;max-width:780px;margin:0 auto;width:100%}
+  .cvw-hero{background:linear-gradient(165deg,var(--surface2),var(--surface));border:1px solid var(--line-soft);border-radius:20px;padding:22px;box-shadow:0 18px 50px -28px rgba(0,0,0,.8)}
+  .cvw-hero-head{display:flex;align-items:center;gap:13px;margin-bottom:16px}
+  .cvw-hero-av{width:50px;height:50px;border-radius:14px;background:rgba(34,211,238,.14);color:#22D3EE;display:flex;align-items:center;justify-content:center;flex:none}
+  .cvw-hero-av svg{width:26px;height:26px}
+  .cvw-hero-id{flex:1;min-width:0}
+  .cvw-hero-n{font-size:17px;font-weight:800;line-height:1.2}
+  .cvw-hero-r{font-size:12px;color:var(--faint);margin-top:2px}
+  .cvw-st{display:inline-flex;align-items:center;gap:7px;flex:none;padding:6px 12px;border-radius:999px;font-size:11.5px;font-weight:800;border:1px solid transparent}
+  .cvw-st .dotc{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .cvw-title{font-size:23px;font-weight:800;letter-spacing:-.01em;line-height:1.2;margin-bottom:18px}
+  .cvw-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .cvw-meta{display:flex;align-items:flex-start;gap:11px}
+  .cvw-meta-ic{width:34px;height:34px;border-radius:10px;background:var(--surface);border:1px solid var(--line-soft);color:var(--faint);display:flex;align-items:center;justify-content:center;flex:none}
+  .cvw-meta-ic svg{width:17px;height:17px}
+  .cvw-meta-l{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+  .cvw-meta-v{font-size:14px;font-weight:700;margin-top:2px}
+  .cvw-sec{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin:24px 0 11px}
+  .cvw-list{display:flex;flex-direction:column;gap:9px}
+  .cvw-item{display:flex;align-items:flex-start;gap:13px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:14px}
+  .cvw-item-n{width:26px;height:26px;border-radius:8px;background:rgba(91,108,255,.16);color:var(--accent);font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .cvw-item-m{flex:1;min-width:0}
+  .cvw-item-t{font-size:14.5px;font-weight:700}
+  .cvw-item-l{font-size:13px;color:var(--soft);margin-top:3px;line-height:1.5}
+  .cvw-card{background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:14px}
+  .cvw-chk{display:flex;align-items:center;gap:11px;font-size:14px;padding:5px 0}
+  .cvw-chk-box{width:20px;height:20px;border-radius:6px;border:1.6px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;color:#fff}
+  .cvw-chk-box.on{background:#34D399;border-color:#34D399}.cvw-chk-box svg{width:13px;height:13px}
+  .cvw-chk-done{color:var(--faint);text-decoration:line-through}
+  .cvw-obs{font-size:13.5px;color:var(--ink);line-height:1.55;white-space:pre-wrap}
+  .cvw-soft{font-size:13px;color:var(--faint);padding:6px 2px}
+  /* resposta do cliente (banner) */
+  .cvw-resp{display:flex;align-items:flex-start;gap:13px;border:1px solid;border-radius:14px;padding:15px;margin-top:18px}
+  .cvw-resp-ic{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;flex:none}
+  .cvw-resp-ic svg{width:20px;height:20px}
+  .cvw-resp-t{font-size:14.5px;font-weight:800}
+  .cvw-resp-n{font-size:13.5px;color:var(--ink);margin-top:4px;line-height:1.5;font-style:italic}
+  .cvw-resp-d{font-size:11.5px;color:var(--faint);margin-top:5px}
+  /* acoes do cliente */
+  .cvw-actions{display:flex;flex-direction:column;gap:11px;margin-top:26px}
+  .cvw-actions .btn,.cvw-note-actions .btn{height:52px;border-radius:14px;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px}
+  .cvw-actions .btn svg,.cvw-note-actions .btn svg{width:18px;height:18px}
+  .btn.cvw-approve{color:#fff;border:none;background:linear-gradient(135deg,#34D399 0%,#10B981 100%);box-shadow:0 12px 28px -12px rgba(16,185,129,.65)}
+  .btn.cvw-approve:hover{filter:brightness(1.07);transform:translateY(-1px)}
+  .btn.cvw-rev{color:var(--amber);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)}
+  .btn.cvw-rev:hover{background:rgba(245,158,11,.18)}
+  .btn.cvw-edit{color:#A78BFA;background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.4)}
+  .btn.cvw-edit:hover{background:rgba(167,139,250,.18)}
+  .btn.cvw-amber{color:#fff;border:none;background:linear-gradient(135deg,#F59E0B,#F97316);flex:1.4}
+  .btn.cvw-violet{color:#fff;border:none;background:linear-gradient(135deg,#A78BFA,#7C5CFF);flex:1.4}
+  .cvw-note-box{margin-top:26px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:16px;padding:18px}
+  .cvw-note-l{font-size:13.5px;font-weight:800;margin-bottom:10px}
+  .cvw-note{width:100%;min-height:96px;resize:vertical;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;color:var(--ink);font-family:inherit;font-size:14px;line-height:1.5}
+  .cvw-note:focus{outline:none;border-color:var(--accent)}
+  .cvw-note-actions{display:flex;gap:10px;margin-top:12px}
+  .cvw-note-actions .btn.ghost{flex:1}
+  .cvw-approved{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:26px;padding:16px;border-radius:14px;font-size:14.5px;font-weight:800;color:#34D399;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.34)}
+  .cvw-approved svg{width:20px;height:20px}
+  .cvw-foot{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--soft);margin-top:22px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:13px;line-height:1.5}
+  .cvw-foot svg{width:16px;height:16px;flex:none;margin-top:1px;color:var(--faint)}
+  .cvw-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--soft);font-size:14px;text-align:center}
+  .btn.cvw-open{color:#22D3EE;background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.34)}
+  .btn.cvw-open:hover{background:rgba(34,211,238,.2)}
+  /* resposta do cliente no Detalhes (Social) */
+  .det-cresp{display:flex;align-items:flex-start;gap:12px;border:1px solid;border-radius:13px;padding:14px}
+  .det-cresp-ic{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;flex:none}
+  .det-cresp-ic svg{width:19px;height:19px}
+  .det-cresp-t{font-size:14px;font-weight:800}
+  .det-cresp-n{font-size:13px;color:var(--ink);margin-top:4px;line-height:1.5;font-style:italic}
+  .det-cresp-d{font-size:11.5px;color:var(--faint);margin-top:5px}
+
+  /* mobile: tela do cliente ocupa largura total */
+  @media (max-width:720px){.cvw-grid{grid-template-columns:1fr}.cvw-scroll{padding:12px 16px 36px}}
 </style>
 </head>
 <body>
@@ -814,7 +896,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.77 · Cronograma Client Flow Phase 1</span><br>
+    <span class="pill-ver">Desktop 1.0.78 · Client Vision Fix</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -829,7 +911,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.77 · Cronograma Client Flow Phase 1</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.78 · Client Vision Fix</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -946,7 +1028,7 @@ const ICON={
   notes:'<path d="M5 5h14M5 10h14M5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'};
 function svg(n,cls){return '<svg viewBox="0 0 24 24" fill="none" class="'+(cls||'')+'">'+(ICON[n]||'')+'</svg>';}
 
-const state={user:null,users:[],events:[],tasks:[],tab:'hoje',boardSector:null,form:null,pending:null};
+const state={user:null,users:[],events:[],tasks:[],tab:'hoje',boardSector:null,form:null,pending:null,clientView:null,clientAction:null};
 
 /* ---- DESKTOP MODE detection (>=1024px) ---- */
 const DESKTOP_MQ=window.matchMedia('(min-width:1024px)');
@@ -1063,11 +1145,12 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.77 · Cronograma Client Flow Phase 1</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.78 · Client Vision Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
   const c=document.getElementById('content');
+  if(state.clientView){c.innerHTML=renderClientView();afterClientView();return;}
   if(state.form){c.innerHTML=renderForm();afterForm();return;}
   if(state.tab==='hoje')c.innerHTML=renderHoje();
   else if(state.tab==='agenda'){c.innerHTML=renderAgenda();afterAgenda();}
@@ -1331,7 +1414,8 @@ function openDetails(taskId){
     (t.client?'<div class="det-client">'+svg('place')+'<span>'+esc(t.client)+'</span></div>':'')+
     '<div class="det-chips"><span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>'+
       (t.priority?'<span class="rev-chip" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">⚑ Prioridade alta</span>':'<span class="rev-chip rev-chip-soft">Prioridade normal</span>')+
-      (cron?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+'</div>'+
+      (cron?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+
+      (t.cronStatus?'<span class="rev-chip" style="background:'+withAlpha(cronStatusColor(t.cronStatus),.16)+';color:'+cronStatusColor(t.cronStatus)+'"><span class="dotc" style="background:'+cronStatusColor(t.cronStatus)+'"></span>'+esc(cronStatusLabel(t.cronStatus))+'</span>':'')+'</div>'+
     '<div class="det-body">'+
     // pessoas
     '<div class="det-people">'+
@@ -1354,8 +1438,18 @@ function openDetails(taskId){
     h+='<div class="det-sec">Checklist <span class="det-sec-c">'+done+' / '+t.checklist.length+'</span></div><div class="det-check">'+
       t.checklist.map(c=>'<div class="det-check-i"><span class="det-check-b '+(c.d?'on':'')+'">'+(c.d?'✓':'')+'</span><span class="'+(c.d?'det-check-done':'')+'">'+esc(c.t||'')+'</span></div>').join('')+'</div>';}
   if(t.link)h+='<div class="det-sec">Link / anexo</div><div class="det-link">'+esc(t.link)+'</div>';
+  // Resposta do cliente (tempo real) — visivel para a Social
+  if(t.clientReview&&t.clientReview.status){const cr=t.clientReview;const cc=clientReviewColor(cr.status);
+    h+='<div class="det-sec">Resposta do cliente</div>'+
+       '<div class="det-cresp" style="border-color:'+withAlpha(cc,.4)+';background:'+withAlpha(cc,.10)+'">'+
+       '<div class="det-cresp-ic" style="color:'+cc+'">'+svg(cr.status==='aprovado'?'check':cr.status==='revisao'?'revise':'editnote')+'</div>'+
+       '<div class="det-cresp-m"><div class="det-cresp-t" style="color:'+cc+'">'+esc(clientReviewLabel(cr.status))+'</div>'+
+       (cr.note?'<div class="det-cresp-n">"'+esc(cr.note)+'"</div>':'')+
+       (cr.at?'<div class="det-cresp-d">'+fmtDateTimeBR(cr.at)+(cr.byName?' · '+esc(cr.byName):'')+'</div>':'')+'</div></div>';
+  }
   h+='</div>'+ // det-body
     '<div class="det-actions">'+
+      (cron&&t.cronStatus?'<button class="btn cvw-open" data-clientview="'+t.id+'">'+svg('eye')+'Abrir Visão do cliente</button>':'')+
       (canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':'')+
       '<button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>'+
       (canDelTask(t)?'<button class="btn btn-danger" data-del="'+t.id+'">'+svg('trash')+'Remover</button>':'')+
@@ -1373,6 +1467,9 @@ const CRON_STATES={
   pronto_cliente:{label:'Pronto para envio',color:'#60A5FA'},
   enviado_cliente:{label:'Enviado ao cliente',color:'#22D3EE'},
   cliente_visualizou:{label:'Cliente visualizou',color:'#A78BFA'},
+  em_revisao_cliente:{label:'Em revisão (cliente)',color:'#F59E0B'},
+  aprovado_cliente:{label:'Aprovado pelo cliente',color:'#34D399'},
+  editado_cliente:{label:'Editado pelo cliente',color:'#A78BFA'},
   cliente_pediu_revisao:{label:'Cliente pediu revisão',color:'#F59E0B'},
   cliente_editou:{label:'Cliente editou',color:'#F59E0B'},
   cliente_aprovou:{label:'Cliente aprovou',color:'#34D399'},
@@ -1412,10 +1509,10 @@ function clientPreviewLink(ctx){return 'idseven://client/'+(ctx.id||'<id>');}
 // Mensagem profissional para WhatsApp (texto puro — limitacao do canal)
 function clientMessage(ctx){
   const nome=ctx.client||'cliente';
-  return 'Olá, '+nome+'!\n'+
-    'Seu cronograma '+ctx.type.toLowerCase()+' está pronto para avaliação.\n'+
-    'Acesse o link abaixo para aprovar, pedir revisão ou editar:\n\n'+
-    'Visualizar cronograma: '+clientPreviewLink(ctx)+'\n\n'+
+  return 'Olá, '+nome+'!\n\n'+
+    'Seu cronograma '+ctx.type.toLowerCase()+' está pronto para avaliação.\n\n'+
+    'Você pode:\n• aprovar;\n• pedir revisão;\n• editar, se necessário.\n\n'+
+    'Visualizar cronograma:\n'+clientPreviewLink(ctx)+'\n\n'+
     'Contamos com seu retorno.';
 }
 function openSendClientModal(taskOrForm){
@@ -1437,13 +1534,13 @@ function openSendClientModal(taskOrForm){
         chip+
       '</div>'+
       '<div class="sp-prev-msg">Olá, <b>'+esc(ctx.client||'cliente')+'</b>! Seu cronograma está pronto para avaliação.<br>Acesse o link abaixo para aprovar, pedir revisão ou editar.</div>'+
-      '<div class="sp-cta" data-clientpreview="1">'+
+      '<div class="sp-cta" data-clientview="'+(ctx.isForm?'':esc(ctx.id))+'">'+
         '<div class="sp-cta-ic">'+svg('eye')+'</div>'+
         '<div class="sp-cta-m"><div class="sp-cta-t">Visualizar cronograma</div><div class="sp-cta-s">Aprovar • Pedir revisão • Editar</div></div>'+
         '<div class="sp-cta-ext">'+svg('ext')+'</div>'+
       '</div>'+
     '</div>'+
-    '<div class="sp-warn">'+svg('info')+'<span>Nesta fase, a visualização ocorre pelo app interno. Link público externo será tratado em fase futura.</span></div>'+
+    '<div class="sp-warn">'+svg('info')+'<span>Nesta fase, a visualização ocorre pela tela <b>Visão do cliente</b> dentro do app. Link público externo será tratado em fase futura.</span></div>'+
     '<div class="sp-actions">'+
       '<button class="btn ghost" data-modalclose="1">Cancelar</button>'+
       '<button class="btn ghost" data-copyclient="'+esc(msg).replace(/"/g,'&quot;')+'"><span class="sp-copied-w">'+svg('copy')+'<span class="sp-copy-lbl">Copiar mensagem</span></span></button>'+
@@ -1451,34 +1548,132 @@ function openSendClientModal(taskOrForm){
     '</div>'+
   '</div></div>';
 }
-// Preview interno controlado — a "visão do cliente" (Fase 1: visual; ações reais na Fase 2)
-function openClientPreview(ctx){
-  ctx=ctx||state._sendCtx;if(!ctx)return;
+/* ===== VISÃO DO CLIENTE — tela real (rota dedicada) =====
+   Aberta via state.clientView=<taskId>. Le a tarefa AO VIVO de state.tasks
+   (onSnapshot -> render), entao acoes do cliente refletem em tempo real
+   tanto aqui quanto na janela da Social. Regra de visibilidade: esta tela
+   mostra UM cronograma especifico (o do cliente), nunca a lista. */
+function openClientView(taskId){
+  if(!taskId){flashToast('Salve o cronograma antes de abrir a Visão do cliente.');return;}
+  closeModal();
+  state.clientView=taskId;
+  state.clientAction=null;            // 'revisao' | 'editar' quando um campo de nota esta aberto
+  // Fallback: se a tarefa ainda nao chegou via onSnapshot (recem-criada), usa o
+  // contexto capturado no envio para renderizar de imediato. A versao ao vivo
+  // (com clientReview/history) substitui assim que o snapshot chega.
+  state._clientFallback=(state._sendCtx&&state._sendCtx.id===taskId)?state._sendCtx:null;
+  render();
+}
+function fallbackTaskFromCtx(ctx){
+  return {id:ctx.id,title:ctx.title,client:ctx.client,sector:'cronograma',cronStatus:ctx.status,
+    cronContents:ctx.contents,assignee:ctx.assignee,assigneeId:null,clientSentBy:(state.user&&state.user.id)||null,
+    createdAt:ctx._createdAt||Date.now(),checklist:[],desc:'',clientReview:ctx._review||null};
+}
+function closeClientView(){state.clientView=null;state.clientAction=null;state._clientFallback=null;render();}
+function clientReviewLabel(s){return {aprovado:'Aprovado pelo cliente',revisao:'Revisão solicitada pelo cliente',editado:'Edição solicitada pelo cliente'}[s]||'';}
+function clientReviewColor(s){return {aprovado:'#34D399',revisao:'#F59E0B',editado:'#A78BFA'}[s]||'#9BA0AB';}
+function renderClientView(){
+  let t=state.tasks.find(x=>x.id===state.clientView);
+  if(!t&&state._clientFallback&&state._clientFallback.id===state.clientView)t=fallbackTaskFromCtx(state._clientFallback);
+  if(!t){return '<div class="cvw-wrap"><div class="cvw-empty">Cronograma não encontrado ou removido.<br><button class="btn" data-clientviewback="1" style="margin-top:14px;width:auto;padding:10px 18px">Voltar</button></div></div>';}
+  const ctx=cronCtx(t);
+  const u=t.assigneeId?state.users.find(x=>x.id===t.assigneeId):null;
+  const sentBy=t.clientSentBy?state.users.find(x=>x.id===t.clientSentBy):null;
   const stColor=cronStatusColor(ctx.status),stLabel=cronStatusLabel(ctx.status);
+  const cr=t.clientReview||null;
+  const meta=(ic,l,v)=>'<div class="cvw-meta"><div class="cvw-meta-ic">'+svg(ic)+'</div><div><div class="cvw-meta-l">'+l+'</div><div class="cvw-meta-v">'+esc(v||'—')+'</div></div></div>';
+  // Conteudos
   const conts=ctx.contents.length?ctx.contents.map((c,i)=>
-    '<div class="cv-item"><div class="cv-item-n">'+(i+1)+'</div>'+
-    '<div class="cv-item-m"><div class="cv-item-t">'+esc(c.tema||'(sem tema)')+'</div>'+
-    (c.legenda?'<div class="cv-item-l">'+esc(c.legenda)+'</div>':'')+'</div></div>'
-  ).join(''):'<div class="cv-empty">Nenhum conteúdo preenchido.</div>';
-  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet cv-sheet">'+
-    '<button class="iconbtn cv-x" data-clientback="1">'+svg('close')+'</button>'+
-    '<div class="cv-badge">'+svg('eye')+'Prévia da visão do cliente</div>'+
-    '<div class="cv-head">'+
-      '<div class="cv-head-av">'+svg('building')+'</div>'+
-      '<div class="cv-head-m"><div class="cv-head-n">'+esc(ctx.client||'Cliente')+'</div>'+
-        '<div class="cv-head-s">Cronograma '+esc(ctx.type.toLowerCase())+'</div></div>'+
-      '<span class="cv-st" style="color:'+stColor+';background:'+withAlpha(stColor,.14)+';border-color:'+withAlpha(stColor,.32)+'"><span class="dotc"></span>'+esc(stLabel)+'</span>'+
+    '<div class="cvw-item"><div class="cvw-item-n">'+(i+1)+'</div>'+
+    '<div class="cvw-item-m"><div class="cvw-item-t">'+esc(c.tema||'(sem tema)')+'</div>'+
+    (c.legenda?'<div class="cvw-item-l">'+esc(c.legenda)+'</div>':'')+'</div></div>'
+  ).join(''):'<div class="cvw-soft">Nenhum conteúdo preenchido.</div>';
+  // Checklist (se houver)
+  const chk=(t.checklist||[]).filter(c=>c&&c.t);
+  const chkHtml=chk.length?'<div class="cvw-sec">Checklist</div><div class="cvw-card">'+chk.map(c=>
+    '<div class="cvw-chk"><span class="cvw-chk-box'+(c.d?' on':'')+'">'+(c.d?svg('check'):'')+'</span><span class="'+(c.d?'cvw-chk-done':'')+'">'+esc(c.t)+'</span></div>').join('')+'</div>':'';
+  // Observacoes da social (desc)
+  const obsHtml=t.desc?'<div class="cvw-sec">Observações da equipe</div><div class="cvw-card"><div class="cvw-obs">'+esc(t.desc).replace(/\n/g,'<br>')+'</div></div>':'';
+  // Banner de resposta do cliente (se ja respondeu)
+  const crHtml=cr?'<div class="cvw-resp" style="border-color:'+withAlpha(clientReviewColor(cr.status),.4)+';background:'+withAlpha(clientReviewColor(cr.status),.10)+'">'+
+    '<div class="cvw-resp-ic" style="color:'+clientReviewColor(cr.status)+'">'+svg(cr.status==='aprovado'?'check':cr.status==='revisao'?'revise':'editnote')+'</div>'+
+    '<div class="cvw-resp-m"><div class="cvw-resp-t" style="color:'+clientReviewColor(cr.status)+'">'+esc(clientReviewLabel(cr.status))+'</div>'+
+    (cr.note?'<div class="cvw-resp-n">"'+esc(cr.note)+'"</div>':'')+
+    (cr.at?'<div class="cvw-resp-d">'+fmtDateBR(new Date(cr.at).toISOString().slice(0,10))+'</div>':'')+'</div></div>':'';
+  // Acoes — esconde se ja aprovado; mostra campo de nota quando revisao/editar selecionado
+  let actions='';
+  if(state.clientAction==='revisao'||state.clientAction==='editar'){
+    const isRev=state.clientAction==='revisao';
+    actions='<div class="cvw-note-box">'+
+      '<div class="cvw-note-l">'+(isRev?'O que precisa ser revisado?':'O que deseja ajustar?')+'</div>'+
+      '<textarea id="cvwNote" class="cvw-note" placeholder="'+(isRev?'Descreva os pontos para revisão…':'Descreva as alterações desejadas…')+'"></textarea>'+
+      '<div class="cvw-note-actions">'+
+        '<button class="btn ghost" data-clientcancel="1">Cancelar</button>'+
+        '<button class="btn '+(isRev?'cvw-amber':'cvw-violet')+'" data-clientsubmit="'+state.clientAction+'">'+svg(isRev?'revise':'editnote')+(isRev?'Enviar revisão':'Enviar edição')+'</button>'+
+      '</div></div>';
+  } else if(ctx.status==='aprovado_cliente'){
+    actions='<div class="cvw-approved">'+svg('check')+'<span>Você aprovou este cronograma. A equipe foi notificada.</span></div>';
+  } else {
+    actions='<div class="cvw-actions">'+
+      '<button class="btn cvw-approve" data-clientact="aprovar">'+svg('check')+'Aprovar cronograma</button>'+
+      '<button class="btn cvw-rev" data-clientact="revisao">'+svg('revise')+'Pedir revisão</button>'+
+      '<button class="btn cvw-edit" data-clientact="editar">'+svg('editnote')+'Editar cronograma</button>'+
+    '</div>';
+  }
+  return '<div class="cvw-wrap">'+
+    '<div class="cvw-top">'+
+      '<button class="cvw-back" data-clientviewback="1">'+svg('back')+'Voltar</button>'+
+      '<div class="cvw-badge">'+svg('eye')+'Avaliação do cronograma</div>'+
     '</div>'+
-    '<div class="cv-name">'+esc(ctx.title)+'</div>'+
-    '<div class="cv-sec">Conteúdos ('+ctx.contents.length+')</div>'+
-    '<div class="cv-list">'+conts+'</div>'+
-    '<div class="cv-actions">'+
-      '<button class="btn cv-approve" data-cpv="aprovar">'+svg('check')+'Aprovar</button>'+
-      '<button class="btn ghost cv-rev" data-cpv="revisao">'+svg('revise')+'Pedir revisão</button>'+
-      '<button class="btn ghost" data-cpv="editar">'+svg('editnote')+'Editar</button>'+
+    '<div class="cvw-scroll">'+
+    '<div class="cvw-hero">'+
+      '<div class="cvw-hero-head">'+
+        '<div class="cvw-hero-av">'+svg('building')+'</div>'+
+        '<div class="cvw-hero-id"><div class="cvw-hero-n">'+esc(ctx.client||'Cliente')+'</div><div class="cvw-hero-r">Cliente</div></div>'+
+        '<span class="cvw-st" style="color:'+stColor+';background:'+withAlpha(stColor,.14)+';border-color:'+withAlpha(stColor,.32)+'"><span class="dotc"></span>'+esc(stLabel)+'</span>'+
+      '</div>'+
+      '<div class="cvw-title">'+esc(ctx.title)+'</div>'+
+      '<div class="cvw-grid">'+
+        meta('calendar','Tipo','Cronograma '+ctx.type.toLowerCase())+
+        meta('person','Responsável',u?u.name:(t.assignee||'—'))+
+        meta('send','Enviado por',sentBy?sentBy.name:'—')+
+        meta('clock','Criado em',t.createdAt?fmtDateBR(new Date(t.createdAt).toISOString().slice(0,10)):'—')+
+        meta('today','Prazo',t.dueDate?fmtDateBR(t.dueDate)+(t.dueTime?' · '+t.dueTime:''):'Sem prazo')+
+      '</div>'+
     '</div>'+
-    '<div class="cv-foot">'+svg('info')+'<span>Prévia visual da Fase 1. As ações <b>Aprovar / Pedir revisão / Editar</b> pelo cliente entram na Fase 2.</span></div>'+
-  '</div></div>';
+    crHtml+
+    '<div class="cvw-sec">Conteúdos do cronograma ('+ctx.contents.length+')</div>'+
+    '<div class="cvw-list">'+conts+'</div>'+
+    chkHtml+obsHtml+
+    actions+
+    '<div class="cvw-foot">'+svg('info')+'<span>Você está vendo apenas o seu cronograma. Sua resposta é registrada e enviada à equipe em tempo real.</span></div>'+
+    '</div>'+
+  '</div>';
+}
+async function clientReviewAction(taskId,kind,note){
+  const map={aprovar:{cronStatus:'aprovado_cliente',rev:'aprovado',type:'cliente_aprovou',label:'Cliente aprovou o cronograma'},
+             revisao:{cronStatus:'em_revisao_cliente',rev:'revisao',type:'cliente_pediu_revisao',label:'Cliente pediu revisão'},
+             editar:{cronStatus:'editado_cliente',rev:'editado',type:'cliente_editou',label:'Cliente solicitou edição'}};
+  const m=map[kind];if(!m)return;
+  const now=Date.now();const u=state.user||{};
+  const t=state.tasks.find(x=>x.id===taskId)||null;
+  const review={status:m.rev,note:note||'',at:now,byId:u.id||null,byName:u.name||''};
+  const patch={
+    cronStatus:m.cronStatus,
+    clientReview:review,
+    clientReviewAt:now,
+    history:firebase.firestore.FieldValue.arrayUnion({
+      type:m.type,label:m.label,by:u.name||'',byId:u.id||null,
+      at:now,client:(t&&t.client)||(state._clientFallback&&state._clientFallback.client)||'',channel:'client_vision',note:note||''
+    })
+  };
+  // atualizacao otimista (refletir imediato mesmo antes do round-trip),
+  // tanto na tarefa ao vivo quanto no fallback (recem-criada ainda sem snapshot)
+  if(t){t.cronStatus=m.cronStatus;t.clientReview=review;}
+  if(state._clientFallback&&state._clientFallback.id===taskId){state._clientFallback.status=m.cronStatus;state._clientFallback._review=review;}
+  state.clientAction=null;render();
+  try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('clientReviewAction',e);}
+  flashToast(kind==='aprovar'?'Cronograma aprovado. Equipe notificada.':kind==='revisao'?'Revisão enviada à equipe.':'Edição enviada à equipe.');
 }
 function flashToast(msg){
   let t=document.getElementById('flashToast');
@@ -1542,7 +1737,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.77-desktop-cronograma-client-flow-phase1';
+const BUILD='1.0.78-desktop-client-vision-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -1554,7 +1749,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.77 · Cronograma Client Flow Phase 1</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.78 · Client Vision Fix</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -1567,7 +1762,7 @@ function renderConfig(){
     '<div style="height:16px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div></div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.77 · Cronograma Client Flow Phase 1 · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.78 · Client Vision Fix · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
   return h+'</div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
@@ -1787,9 +1982,11 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(el=g('[data-sendclient-task]')){const t=state.tasks.find(x=>x.id===el.dataset.sendclientTask);if(t)openSendClientModal(t);return;}
-  if(el=g('[data-clientpreview]')){openClientPreview(state._sendCtx);return;}
-  if(el=g('[data-clientback]')){if(state._sendCtx)openSendClientModal(state._sendCtx.id?(state.tasks.find(x=>x.id===state._sendCtx.id)||state._sendCtx):state._sendCtx);else closeModal();return;}
-  if(el=g('[data-cpv]')){const a=el.dataset.cpv;const m={aprovar:'Aprovação pelo cliente — disponível na Fase 2.',revisao:'Pedido de revisão pelo cliente — disponível na Fase 2.',editar:'Edição pelo cliente — disponível na Fase 2.'};flashToast(m[a]||'Disponível na Fase 2.');return;}
+  if(el=g('[data-clientview]')){openClientView(el.dataset.clientview||(state._sendCtx&&state._sendCtx.id));return;}
+  if(el=g('[data-clientviewback]')){closeClientView();return;}
+  if(el=g('[data-clientact]')){const a=el.dataset.clientact;if(a==='aprovar'){clientReviewAction(state.clientView,'aprovar','');}else{state.clientAction=a;render();}return;}
+  if(el=g('[data-clientcancel]')){state.clientAction=null;render();return;}
+  if(el=g('[data-clientsubmit]')){const kind=el.dataset.clientsubmit;const ta=document.getElementById('cvwNote');const note=ta?ta.value.trim():'';if((kind==='revisao'||kind==='editar')&&!note){flashToast('Descreva o que precisa antes de enviar.');if(ta)ta.focus();return;}clientReviewAction(state.clientView,kind,note);return;}
   if(el=g('[data-copyclient]')){copyToClipboard(el.dataset.copyclient);const lbl=el.querySelector('.sp-copy-lbl');if(lbl){lbl.textContent='Copiada!';setTimeout(()=>{lbl.textContent='Copiar mensagem';},1600);}flashToast('Mensagem copiada para a área de transferência.');return;}
   if(el=g('[data-dosendclient]')){
     const id=el.dataset.dosendclient;
@@ -1822,7 +2019,8 @@ function stepNext(){const f=state.form;
 }
 
 /* ---- BOOT ---- */
-try{window.desktopAPI&&window.desktopAPI.onNotifOpen(function(t){if(!state.user)return;if(t&&t.indexOf("board/")===0){state.tab="tarefas";state.boardSector=t.slice(6);}else if(t=="agenda"){state.tab="agenda";state.boardSector=null;}render();})}catch(_){}
+try{window.desktopAPI&&window.desktopAPI.onNotifOpen(function(t){if(!state.user)return;if(t&&t.indexOf("client/")===0){openClientView(t.slice(7));return;}else if(t&&t.indexOf("board/")===0){state.tab="tarefas";state.boardSector=t.slice(6);}else if(t=="agenda"){state.tab="agenda";state.boardSector=null;}render();})}catch(_){}
+function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta.focus();}}
 (async function boot(){
   renderLogin();
   const uid=localStorage.getItem('wp_uid');

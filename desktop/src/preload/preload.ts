@@ -17,5 +17,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.on("notif-open", (_e, t: string) => cb(t));
   },
   isDesktop: true,
-  version: "1.0.77-desktop-cronograma-client-flow-phase1",
+  version: "1.0.78-desktop-client-vision-fix",
 });
