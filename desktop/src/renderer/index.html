@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.72 (Review Delete Polish)</title>
+<title>ID Seven · Desktop 1.0.73 (Task Card Detail Polish)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -528,7 +528,7 @@
   body.desktop .content-card{border-radius:12px;border:1px solid var(--line-soft);overflow:hidden;margin-bottom:8px}
 
   /* =====================================================================
-     REVISAO premium + EXCLUSAO (1.0.72)  — base (mobile+desktop)
+     REVISAO premium + EXCLUSAO  — base (mobile+desktop)
      ===================================================================== */
   .rev-head{margin-bottom:16px}
   .rev-badge{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:.01em}
@@ -591,6 +591,100 @@
   body.desktop .rev-h-title{font-size:24px}
   body.desktop .del-sheet{max-width:440px}
   body.desktop .tc-actions .del-btn:hover{transform:translateY(-1px)}
+
+  /* =====================================================================
+     CARD DE TAREFA premium + DETALHES (1.0.73)
+     ===================================================================== */
+  .tc{padding:16px}
+  .tc-top{display:flex;align-items:center;gap:11px}
+  .tc-av-empty{display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--surface2);color:var(--faint)}
+  .tc-av-empty svg{width:20px;height:20px}
+  .tc-top-m{flex:1;min-width:0}
+  .tc-asg-n{font-size:14.5px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tc-asg-r{font-size:11.5px;color:var(--soft);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tc-badges{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none}
+  .tc-st{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:800}
+  .tc-st .dotc{width:6px;height:6px;border-radius:50%}
+  .tc-due{padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:800}
+  .tc-origin{display:flex;align-items:center;gap:7px;margin-top:12px;padding:8px 10px;background:var(--bg);border-radius:9px;font-size:11.5px;color:var(--soft)}
+  .tc-origin svg{width:14px;height:14px;color:var(--faint);flex:none}
+  .tc-origin b{color:var(--ink);font-weight:700}
+  .tc-body{margin-top:12px}
+  .tc-client{font-size:10.5px;font-weight:800;color:var(--soft);letter-spacing:.05em;text-transform:uppercase}
+  .tc-title{font-size:16px;font-weight:800;margin-top:3px;line-height:1.25}
+  .tc-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .tc-tag{padding:4px 10px;border-radius:8px;font-size:11px;font-weight:800}
+  .tc-tag-soft{background:var(--surface2);color:var(--soft)}
+  .tc-themes{margin-top:12px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:11px 12px}
+  .tc-themes-h{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:8px}
+  .tc-theme{display:flex;align-items:flex-start;gap:9px;margin-bottom:7px}
+  .tc-theme:last-child{margin-bottom:0}
+  .tc-theme-n{flex:none;width:19px;height:19px;border-radius:6px;background:rgba(91,108,255,.16);color:var(--accent);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .tc-theme-t{font-size:13px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .tc-more{font-size:11.5px;font-weight:700;color:var(--accent);margin-top:8px;padding-left:28px}
+  .tc-brief{font-size:12.5px;color:var(--faint);margin-top:10px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tc-chk{margin-top:12px}
+  .tc-chk-bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .tc-chk-bar>div{height:100%;background:var(--green)}
+  .tc-chk-l{font-size:11px;color:var(--faint);margin-top:5px}
+  .tc-foot{display:flex;align-items:center;margin-top:13px;padding-top:12px;border-top:1px solid var(--line-soft)}
+  .tc-prazo{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--soft)}
+  .tc-prazo svg{width:14px;height:14px;color:var(--faint)}
+  .tc-prazo-empty{color:var(--faint);font-weight:600}
+  .tc-actions{display:flex;align-items:center;gap:8px;margin-top:11px}
+  .tc-act{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:40px;border-radius:11px;font-size:12.5px;font-weight:800;transition:background .12s,border-color .12s,transform .1s,color .12s}
+  .tc-act svg{width:16px;height:16px}
+  .tc-detail{flex:1;background:rgba(91,108,255,.12);color:var(--accent)}
+  .tc-detail:hover{background:rgba(91,108,255,.2)}
+  .tc-act.move{flex:1;background:var(--surface2);color:var(--soft);border:1px solid var(--line)}
+  .tc-act.move:hover{border-color:var(--accent);color:var(--ink)}
+  .tc-act.del-btn{flex:none;width:40px;height:40px;border-radius:11px;background:rgba(248,113,113,.10);border:1px solid rgba(248,113,113,.28);color:#F87171;margin:0}
+  .tc-act.del-btn:hover{background:rgba(248,113,113,.18)}
+  body.desktop .tc-act:active{transform:translateY(1px)}
+  body.desktop .tc:hover .tc-detail{background:rgba(91,108,255,.16)}
+
+  /* DETALHES (modal) */
+  body.desktop .det-sheet{max-width:600px;width:100%;text-align:left;max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden}
+  .det-sheet .det-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 0}
+  .det-badge{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:800}
+  .det-badge svg{width:15px;height:15px}
+  .det-x{width:34px;height:34px;border-radius:10px;background:var(--surface2);color:var(--soft);display:flex;align-items:center;justify-content:center}
+  .det-x:hover{color:var(--ink)}
+  .det-x svg{width:18px;height:18px}
+  .det-title{font-size:20px;font-weight:800;letter-spacing:-.01em;padding:12px 22px 0;line-height:1.25}
+  .det-client{display:flex;align-items:center;gap:6px;color:var(--soft);font-size:13.5px;font-weight:600;padding:6px 22px 0}
+  .det-client svg{width:15px;height:15px;color:var(--faint)}
+  .det-chips{display:flex;flex-wrap:wrap;gap:8px;padding:14px 22px 0}
+  .det-body{padding:18px 22px 4px;overflow-y:auto;flex:1}
+  .det-people{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .det-person{display:flex;align-items:center;gap:11px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:13px}
+  .det-person-m{min-width:0}
+  .det-person-l{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+  .det-person-n{font-size:14.5px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .det-person-r{font-size:12px;color:var(--soft);margin-top:1px}
+  .det-sec{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--soft);margin:20px 0 11px;display:flex;align-items:center;gap:9px}
+  .det-sec-c{font-size:11px;font-weight:800;color:var(--accent);background:rgba(91,108,255,.14);padding:2px 9px;border-radius:999px;text-transform:none}
+  .det-dates{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .det-date{background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:12px}
+  .det-date-l{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
+  .det-date-v{font-size:13px;font-weight:700;margin-top:4px}
+  .det-contents{display:flex;flex-direction:column;gap:10px}
+  .det-content{display:flex;gap:12px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px}
+  .det-content-n{flex:none;width:26px;height:26px;border-radius:8px;background:rgba(91,108,255,.16);color:var(--accent);font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .det-content-t{font-size:14.5px;font-weight:800}
+  .det-content-l{font-size:13px;color:var(--soft);margin-top:4px;line-height:1.5;white-space:pre-wrap}
+  .det-desc{font-size:13.5px;color:var(--soft);line-height:1.6;white-space:pre-wrap;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:14px}
+  .det-check{display:flex;flex-direction:column;gap:8px}
+  .det-check-i{display:flex;align-items:center;gap:10px;font-size:13.5px}
+  .det-check-b{flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff}
+  .det-check-b.on{background:var(--green);border-color:transparent}
+  .det-check-done{color:var(--faint);text-decoration:line-through}
+  .det-link{font-size:13px;color:var(--accent);word-break:break-all;background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:12px}
+  .det-actions{display:flex;gap:10px;padding:16px 22px;border-top:1px solid var(--line-soft);background:var(--surface)}
+  .det-actions .btn{width:auto;flex:1;height:44px;border-radius:11px;font-size:13.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 14px}
+  .det-actions .btn svg{width:17px;height:17px}
+  .det-actions .btn-danger{flex:none;padding:0 18px}
+  @media(max-width:560px){.det-people,.det-dates{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -606,7 +700,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.72 · Review Delete Polish</span><br>
+    <span class="pill-ver">Desktop 1.0.73 · Task Card Detail Polish</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -621,7 +715,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.72 · Review Delete Polish</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.73 · Task Card Detail Polish</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -844,7 +938,7 @@ function render(){
       '<button class="new-task-btn" data-fab="1"><span class="new-task-icon">'+svg('plus')+'</span><span class="new-task-label">Nova tarefa</span></button>'+
       '<div class="sb-sect">Workspace</div>'+
       TABS.map(sbItem).join('')+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.72 · Review Delete Polish</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.73 · Task Card Detail Polish</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1013,21 +1107,70 @@ function renderBoard(){
   h+=colTasks.length?colTasks.map(taskCard).join(''):emptyState('checklist','Coluna vazia','Nenhuma tarefa em "'+cur.label+'".');
   return h+'</div>';
 }
+function fmtDateTimeBR(v){
+  if(v===undefined||v===null||v==='')return 'Não informado';
+  let ms=null;
+  if(typeof v==='number')ms=v;
+  else if(typeof v==='object'){if(typeof v.toDate==='function'){try{ms=v.toDate().getTime();}catch(_){}}else if(typeof v.seconds==='number')ms=v.seconds*1000;}
+  else if(typeof v==='string'){const n=Number(v);if(v.trim()!==''&&!isNaN(n))ms=n;else{const dt=new Date(v);if(!isNaN(dt.getTime()))ms=dt.getTime();}}
+  if(ms===null||isNaN(ms))return 'Não informado';
+  const dt=new Date(ms),p=n=>String(n).padStart(2,'0');
+  return p(dt.getDate())+'/'+p(dt.getMonth()+1)+'/'+dt.getFullYear()+' às '+p(dt.getHours())+':'+p(dt.getMinutes());
+}
+function cronOf(t){
+  const arr=Array.isArray(t.cronContents)?t.cronContents:(Array.isArray(t.contents)?t.contents:null);
+  if(!arr||!arr.length)return null;
+  const list=arr.map((c,i)=>({tema:c&&c.tema,legenda:c&&c.legenda,_i:i})).filter(c=>c.tema||c.legenda);
+  const count=arr.length;
+  const label=count>=12?'Mensal':count>=6?'Quinzenal':count>=3?'Semanal':'Cronograma';
+  return {list,count,label};
+}
+function lastUpdate(t){
+  if(t.updatedAt)return t.updatedAt;
+  if(Array.isArray(t.history)&&t.history.length){const ats=t.history.map(h=>h&&h.at).filter(Boolean);if(ats.length)return Math.max.apply(null,ats);}
+  return t.doneAt||t.startedAt||null;
+}
+function briefLine(t){if(!t.desc)return '';const ln=String(t.desc).split('\n').map(x=>x.trim()).filter(Boolean);return ln[0]||'';}
+
 function taskCard(t){
   const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
-  const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:t.assignee;
-  const req=t.by?state.users.find(u=>u.id===t.by):null;
+  const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
+  const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:(t.by?'—':'');
+  const cron=cronOf(t);
   let chk='';if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;const pct=Math.round(done/t.checklist.length*100);
-    chk='<div style="margin-top:12px"><div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--green)"></div></div><div style="font-size:11px;color:var(--faint);margin-top:5px">'+done+' de '+t.checklist.length+' no checklist</div></div>';}
-  return '<div class="tc"><div class="metar"><span class="sdot" style="background:'+st.color+'"></span><span class="slab" style="color:'+st.color+'">'+st.label+'</span><div style="flex:1"></div>'+(d?'<span class="pill" style="background:'+withAlpha(d.color,.16)+';color:'+d.color+'">'+esc(d.text)+'</span>':'')+'</div>'+
-    (req?'<div class="row" style="gap:10px;margin-top:12px">'+avatar(req,36)+'<div style="font-size:12px;font-weight:600;color:var(--soft)">Solicitado por '+esc(first(req.name))+'</div></div>':'')+
-    (t.client?'<div class="client">'+esc(t.client)+'</div>':'')+
-    '<div class="tt">'+esc(t.title||'Sem título')+'</div>'+
-    (t.desc?'<div class="ds">'+esc(t.desc)+'</div>':'')+
-    '<div class="pills"><span class="pill" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+esc(s.label)+'</span>'+(t.priority?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">Prioridade alta</span>':'')+'</div>'+
-    '<div class="asg">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},36)+'<span>'+esc(asgName)+'</span>':'<span style="color:var(--faint)">Sem responsável</span>')+'<div style="flex:1"></div>'+((t.dueDate||t.due)?'<span style="display:flex;align-items:center;gap:5px">'+svg('clock')+esc(t.dueDate||t.due)+' '+esc(t.dueTime||'')+'</span>':'')+'</div>'+
-    chk+'<div class="tc-actions"><button class="move" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>'+
-    (canDelTask(t)?'<button class="del-btn" data-del="'+t.id+'" title="Remover tarefa">'+svg('trash')+'</button>':'')+'</div></div>';
+    chk='<div class="tc-chk"><div class="tc-chk-bar"><div style="width:'+pct+'%"></div></div><div class="tc-chk-l">'+done+' de '+t.checklist.length+' no checklist</div></div>';}
+  let h='<div class="tc">';
+  // 1) TOPO — responsavel pela execucao + status + prazo
+  h+='<div class="tc-top">'+
+       (asgName?avatar(asg||{name:asgName,id:t.assigneeId},38):'<div class="av tc-av-empty" style="width:38px;height:38px">'+svg('person')+'</div>')+
+       '<div class="tc-top-m"><div class="tc-asg-n">'+esc(asgName||'Sem responsável')+'</div>'+
+         '<div class="tc-asg-r">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
+       '<div class="tc-badges"><span class="tc-st" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>'+
+         (d?'<span class="tc-due" style="background:'+withAlpha(d.color,.16)+';color:'+d.color+'">'+esc(d.text)+'</span>':'')+'</div>'+
+     '</div>';
+  // 2) Origem — enviado por + criado em
+  h+='<div class="tc-origin">'+svg('person')+'<span>Enviado por <b>'+esc(reqName||'—')+'</b>'+(t.createdAt?' · '+fmtDateTimeBR(t.createdAt):'')+'</span></div>';
+  // 3) Corpo
+  h+='<div class="tc-body">'+
+       (t.client?'<div class="tc-client">'+esc(t.client)+'</div>':'')+
+       '<div class="tc-title">'+esc(t.title||'Sem título')+'</div>'+
+       '<div class="tc-tags"><span class="tc-tag" style="color:'+s.color+';background:'+withAlpha(s.color,.14)+'">'+esc(s.label)+'</span>'+
+         (cron?'<span class="tc-tag tc-tag-soft">'+esc(cron.label)+'</span>':'')+
+         (t.priority?'<span class="tc-tag" style="color:#F87171;background:'+withAlpha('#F87171',.14)+'">⚑ Prioridade</span>':'')+'</div>';
+  // 4) Cronograma (temas reais) OU briefing curto
+  if(cron&&cron.list.length){
+    const show=cron.list.slice(0,3);const rest=cron.count-3;
+    h+='<div class="tc-themes"><div class="tc-themes-h">Temas</div>'+
+       show.map(c=>'<div class="tc-theme"><span class="tc-theme-n">'+(c._i+1)+'</span><span class="tc-theme-t">'+esc(c.tema||'(sem tema)')+'</span></div>').join('')+
+       (rest>0?'<div class="tc-more">+ '+rest+' conteúdo'+(rest>1?'s':'')+'</div>':'')+'</div>';
+  }else{const b=briefLine(t);if(b)h+='<div class="tc-brief">'+esc(b)+'</div>';}
+  h+='</div>'+chk;
+  // 5) Rodape — prazo + acoes
+  h+='<div class="tc-foot">'+((t.dueDate||t.due)?'<span class="tc-prazo">'+svg('clock')+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span>':'<span class="tc-prazo tc-prazo-empty">'+svg('clock')+'Sem prazo</span>')+'</div>'+
+     '<div class="tc-actions"><button class="tc-act tc-detail" data-detail="'+t.id+'">'+svg('grid')+'Detalhes</button>'+
+       '<button class="tc-act move" data-move="'+t.id+'">'+svg('swap')+'Mover</button>'+
+       (canDelTask(t)?'<button class="tc-act del-btn" data-del="'+t.id+'" title="Remover tarefa">'+svg('trash')+'</button>':'')+'</div>';
+  return h+'</div>';
 }
 function canDelTask(t){const u=state.user;return !!u&&(canSeeAll(u)||t.by===u.id||t.assigneeId===u.id);}
 function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};}
@@ -1044,6 +1187,51 @@ async function moveStatus(taskId,newStatus){
   if(newStatus!=='afazer'&&!t.startedAt)patch.startedAt=now;
   if(newStatus==='concluido'){patch.doneAt=now;patch.doneBy=state.user.id;}
   closeModal();await db.collection('tasks').doc(taskId).update(patch);
+}
+function detDate(l,v){return '<div class="det-date"><div class="det-date-l">'+esc(l)+'</div><div class="det-date-v">'+esc(v)+'</div></div>';}
+function openDetails(taskId){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const s=secOf(t.sector);const st=stOf(t.status);
+  const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
+  const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'—';
+  const cron=cronOf(t);const upd=lastUpdate(t);
+  const emptyAv='<div class="av" style="width:40px;height:40px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>';
+  let h='<div class="modal-back" data-modalbg="1"><div class="sheet det-sheet">'+
+    '<div class="det-head"><div class="det-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
+      '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
+    '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
+    (t.client?'<div class="det-client">'+svg('place')+'<span>'+esc(t.client)+'</span></div>':'')+
+    '<div class="det-chips"><span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>'+
+      (t.priority?'<span class="rev-chip" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">⚑ Prioridade alta</span>':'<span class="rev-chip rev-chip-soft">Prioridade normal</span>')+
+      (cron?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+'</div>'+
+    '<div class="det-body">'+
+    // pessoas
+    '<div class="det-people">'+
+      '<div class="det-person">'+(asg?avatar(asg,40):emptyAv)+'<div class="det-person-m"><div class="det-person-l">Responsável pela execução</div><div class="det-person-n">'+esc(asgName||'Ninguém atribuído')+'</div>'+(asg&&asg.role?'<div class="det-person-r">'+esc(asg.role)+'</div>':'')+'</div></div>'+
+      '<div class="det-person">'+(req?avatar(req,40):emptyAv)+'<div class="det-person-m"><div class="det-person-l">Enviado por</div><div class="det-person-n">'+esc(reqName)+'</div>'+(req&&req.role?'<div class="det-person-r">'+esc(req.role)+'</div>':'')+'</div></div>'+
+    '</div>'+
+    // datas
+    '<div class="det-sec">Datas</div><div class="det-dates">'+
+      detDate('Criado em',fmtDateTimeBR(t.createdAt))+
+      detDate('Atualizado em',upd?fmtDateTimeBR(upd):'—')+
+      detDate('Prazo',(t.dueDate||t.due)?(fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+t.dueTime:'')):'Não informado')+
+    '</div>';
+  // cronograma
+  if(cron){
+    h+='<div class="det-sec">Conteúdos do cronograma <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span></div>';
+    h+=cron.list.length?('<div class="det-contents">'+cron.list.map(c=>'<div class="det-content"><div class="det-content-n">'+(c._i+1)+'</div><div class="det-content-m"><div class="det-content-t">'+esc(c.tema||'(sem tema)')+'</div>'+(c.legenda?'<div class="det-content-l">'+esc(c.legenda)+'</div>':'')+'</div></div>').join('')+'</div>'):'<div class="emptyline">Nenhum conteúdo preenchido.</div>';
+  }else if(t.desc){h+='<div class="det-sec">Briefing</div><div class="det-desc">'+esc(t.desc)+'</div>';}
+  // checklist (leitura)
+  if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;
+    h+='<div class="det-sec">Checklist <span class="det-sec-c">'+done+' / '+t.checklist.length+'</span></div><div class="det-check">'+
+      t.checklist.map(c=>'<div class="det-check-i"><span class="det-check-b '+(c.d?'on':'')+'">'+(c.d?'✓':'')+'</span><span class="'+(c.d?'det-check-done':'')+'">'+esc(c.t||'')+'</span></div>').join('')+'</div>';}
+  if(t.link)h+='<div class="det-sec">Link / anexo</div><div class="det-link">'+esc(t.link)+'</div>';
+  h+='</div>'+ // det-body
+    '<div class="det-actions"><button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>'+
+      (canDelTask(t)?'<button class="btn btn-danger" data-del="'+t.id+'">'+svg('trash')+'Remover</button>':'')+
+      '<button class="btn" data-modalclose="1">Fechar</button></div>'+
+  '</div></div>';
+  document.getElementById('modalRoot').innerHTML=h;
 }
 function openDeleteConfirm(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
@@ -1081,7 +1269,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.72-desktop-review-delete-polish';
+const BUILD='1.0.73-desktop-task-card-detail-polish';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -1093,7 +1281,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('grid','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.72 · Review Delete Polish</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.73 · Task Card Detail Polish</div></div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
 function openSheet(which){
@@ -1274,6 +1462,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
   if(el=g('[data-agf]')){agFilter=el.dataset.agf;render();return;}
   if(el=g('[data-day]')){agSel=el.dataset.day;render();return;}
+  if(el=g('[data-detail]')){openDetails(el.dataset.detail);return;}
   if(el=g('[data-move]')){openMove(el.dataset.move);return;}
   if(el=g('[data-domove]')){const parts=el.dataset.domove.split('|');await moveStatus(parts[0],parts[1]);return;}
   if(el=g('[data-del]')){openDeleteConfirm(el.dataset.del);return;}
