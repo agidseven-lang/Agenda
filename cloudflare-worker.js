@@ -492,26 +492,45 @@ async function handleClientReview(request, env, url) {
   if (!task) return htmlResponse(renderClientNotFound("Cronograma não encontrado ou link expirado."), 404);
 
   if (isAction && request.method === "POST") {
-    let action = "", note = "";
+    let action = "", note = "", form = null, jbody = null;
     const ct = request.headers.get("content-type") || "";
     try {
-      if (ct.indexOf("application/json") >= 0) { const b = await request.json(); action = b.action || ""; note = b.note || ""; }
-      else { const f = await request.formData(); action = String(f.get("action") || ""); note = String(f.get("note") || ""); }
+      if (ct.indexOf("application/json") >= 0) { jbody = await request.json(); action = jbody.action || ""; note = jbody.note || ""; }
+      else { form = await request.formData(); action = String(form.get("action") || ""); note = String(form.get("note") || ""); }
     } catch (_) {}
+    const back = "/cliente/cronograma/" + encodeURIComponent(token);
+
+    // EDITAR — coleta os temas editados (1 card por tema) + comentario.
+    if (action === "editar") {
+      const items = [];
+      const orig = Array.isArray(task.cronContents) ? task.cronContents : [];
+      if (jbody && Array.isArray(jbody.items)) {
+        jbody.items.forEach(function (it, i) { items.push({ tema: String(it.tema || ""), legenda: (orig[i] && orig[i].legenda) || "" }); });
+        note = jbody.comment || note;
+      } else if (form) {
+        for (let i = 0; i < orig.length; i++) {
+          const v = form.get("theme_" + i);
+          if (v === null) continue;
+          items.push({ tema: String(v || ""), legenda: (orig[i] && orig[i].legenda) || "" });
+        }
+        note = String(form.get("comment") || "");
+      }
+      if (!items.length) return htmlResponse(renderClientPage(task, url, { editMode: true }), 200);
+      await applyClientEdit(env, accessToken, task, items, note.trim());
+      return new Response(null, { status: 303, headers: { Location: back + "?done=editar", ...corsHeaders(env) } });
+    }
+
     const map = {
       aprovar: { cronStatus: "aprovado_cliente", rev: "aprovado", type: "cliente_aprovou", label: "Cliente aprovou o cronograma" },
       revisao: { cronStatus: "em_revisao_cliente", rev: "revisao", type: "cliente_pediu_revisao", label: "Cliente pediu revisão" },
-      editar: { cronStatus: "editado_cliente", rev: "editado", type: "cliente_editou", label: "Cliente solicitou edição" },
     };
     const m = map[action];
     if (!m) return htmlResponse(renderClientNotFound("Ação inválida."), 400);
-    if ((action === "revisao" || action === "editar") && !note.trim()) {
-      // volta para a pagina pedindo a nota
+    if (action === "revisao" && !note.trim()) {
       return htmlResponse(renderClientPage(task, url, { needNote: action }), 200);
     }
     await applyClientReview(env, accessToken, task, m, note.trim());
-    // PRG: redireciona para a pagina (GET) com o status atualizado
-    return new Response(null, { status: 303, headers: { Location: "/cliente/cronograma/" + encodeURIComponent(token) + "?done=" + action, ...corsHeaders(env) } });
+    return new Response(null, { status: 303, headers: { Location: back + "?done=" + action, ...corsHeaders(env) } });
   }
 
   // GET -> renderiza a pagina
@@ -561,6 +580,40 @@ async function applyClientReview(env, accessToken, task, m, note) {
   }] };
   const res = await fetch(commit, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!res.ok) console.error("[CLIENT-REVIEW] commit falhou:", res.status, (await res.text()).slice(0, 300));
+}
+
+// Edicao do cliente: atualiza cronContents (temas) + cronStatus=editado_cliente + clientReview + history.
+async function applyClientEdit(env, accessToken, task, items, comment) {
+  const now = Date.now();
+  const contentsVal = { arrayValue: { values: items.map(function (it) {
+    const f = { tema: { stringValue: String(it.tema || "") } };
+    if (it.legenda) f.legenda = { stringValue: String(it.legenda) };
+    return { mapValue: { fields: f } };
+  }) } };
+  const editedItems = { arrayValue: { values: items.map(function (it, i) {
+    return { mapValue: { fields: { index: { integerValue: String(i) }, tema: { stringValue: String(it.tema || "") } } } };
+  }) } };
+  const review = { mapValue: { fields: {
+    status: { stringValue: "editado" }, note: { stringValue: comment || "" },
+    at: { integerValue: String(now) }, byName: { stringValue: "Cliente" }, editedItems: editedItems,
+  } } };
+  const ev = { mapValue: { fields: {
+    type: { stringValue: "cliente_editou" }, label: { stringValue: "Cliente editou os temas do cronograma" },
+    at: { integerValue: String(now) }, channel: { stringValue: "client_public_link" },
+    note: { stringValue: comment || "" }, client: { stringValue: task.client || "" },
+  } } };
+  const commit = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`;
+  const body = { writes: [{
+    update: { name: task._name, fields: {
+      cronStatus: { stringValue: "editado_cliente" }, clientReview: review,
+      clientReviewAt: { integerValue: String(now) }, cronContents: contentsVal,
+    } },
+    updateMask: { fieldPaths: ["cronStatus", "clientReview", "clientReviewAt", "cronContents"] },
+    updateTransforms: [{ fieldPath: "history", appendMissingElements: { values: [ev] } }],
+    currentDocument: { exists: true },
+  }] };
+  const res = await fetch(commit, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) console.error("[CLIENT-EDIT] commit falhou:", res.status, (await res.text()).slice(0, 300));
 }
 
 function clientPageHead(task, url) {
@@ -619,7 +672,21 @@ function clientPageCss() {
     + '.row{display:flex;gap:10px;margin-top:12px}.row .btn{height:46px;font-size:14px}.ghost{background:var(--surface);border:1px solid var(--line);color:var(--soft)}'
     + '.ok{color:#34D399;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.34);border-radius:14px;padding:15px;text-align:center;font-weight:800;margin-top:22px}'
     + '.foot{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--soft);margin-top:22px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:13px}'
-    + '.center{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--soft)}';
+    + '.center{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--soft)}'
+    // stepper de etapas
+    + '.stepper{display:flex;align-items:center;justify-content:space-between;gap:4px;margin:16px 2px 4px}'
+    + '.stp{display:flex;flex-direction:column;align-items:center;gap:5px;flex:none}'
+    + '.stp-d{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:var(--surface2);border:1px solid var(--line);color:var(--faint)}'
+    + '.stp.on .stp-d{background:linear-gradient(135deg,#5B6CFF,#22D3EE);border-color:transparent;color:#fff}'
+    + '.stp-l{font-size:10.5px;font-weight:700;color:var(--faint)}.stp.on .stp-l{color:var(--ink)}'
+    + '.stp-line{flex:1;height:2px;background:var(--line);border-radius:2px;margin-bottom:18px}.stp-line.on{background:linear-gradient(90deg,#5B6CFF,#22D3EE)}'
+    // editor de temas (cliente)
+    + '.ed-form{margin-top:8px}'
+    + '.ed-card{display:flex;gap:12px;background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:10px}'
+    + '.ed-n{width:26px;height:26px;border-radius:8px;background:rgba(91,108,255,.16);color:#8b96ff;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}'
+    + '.ed-f{flex:1;min-width:0}.ed-f label{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:6px}'
+    + '.ed-in{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:11px;font:inherit;font-size:14.5px}.ed-in:focus{outline:none;border-color:var(--accent)}'
+    + '.ed-leg{font-size:12.5px;color:var(--soft);margin-top:6px}';
 }
 
 function renderClientPage(task, url, opts) {
@@ -647,30 +714,47 @@ function renderClientPage(task, url, opts) {
   const obsHtml = task.desc ? '<div class="sec">Observações da equipe</div><div class="card">' + htmlEsc(task.desc) + '</div>' : '';
   const sentAt = task.clientSentAt ? new Date(task.clientSentAt).toLocaleDateString("pt-BR") : "—";
 
+  const base = htmlEsc(url.pathname.replace(/\/$/, ""));
+  // ui via querystring (sem JS): ?ui=revisao -> nota; ?ui=editar -> editor de temas.
+  const ui = url.searchParams.get("ui");
+  if (!opts.needNote && !opts.editMode && st !== "aprovado_cliente") {
+    if (ui === "revisao") return renderClientPage(task, url, { needNote: "revisao" });
+    if (ui === "editar") return renderClientPage(task, url, { editMode: true });
+  }
+
   let actions = "";
-  if (st === "aprovado_cliente") {
-    actions = '<div class="ok">✓ Cronograma aprovado. A equipe foi notificada.</div>';
-  } else if (opts.needNote === "revisao" || opts.needNote === "editar") {
-    const isRev = opts.needNote === "revisao";
-    actions = '<form method="POST" action="' + htmlEsc(url.pathname.replace(/\/$/, "")) + '/acao" class="note-box">'
-      + '<input type="hidden" name="action" value="' + (isRev ? "revisao" : "editar") + '"/>'
-      + '<label>' + (isRev ? "O que precisa ser revisado?" : "O que deseja ajustar?") + '</label>'
-      + '<textarea name="note" required placeholder="' + (isRev ? "Descreva os pontos para revisão…" : "Descreva as alterações desejadas…") + '"></textarea>'
+  if (opts.editMode) {
+    // Editor premium — 1 card por tema (Tema editavel) + comentario.
+    const cards = (conts.length ? conts : [{ tema: "" }]).map(function (c, i) {
+      return '<div class="ed-card"><div class="ed-n">' + (i + 1) + '</div><div class="ed-f">'
+        + '<label>Tema do conteúdo ' + (i + 1) + '</label>'
+        + '<input class="ed-in" type="text" name="theme_' + i + '" value="' + htmlEsc(c.tema || "") + '" placeholder="Tema do conteúdo"/>'
+        + (c.legenda ? '<div class="ed-leg">Legenda: ' + htmlEsc(c.legenda) + '</div>' : '')
+        + '</div></div>';
+    }).join("");
+    actions = '<form method="POST" action="' + base + '/acao" class="ed-form">'
+      + '<input type="hidden" name="action" value="editar"/>'
+      + '<div class="sec" style="margin-top:6px">Editar temas do cronograma</div>'
+      + cards
+      + '<div class="note-box" style="margin-top:14px"><label>Comentário para a equipe (opcional)</label>'
+      + '<textarea name="comment" placeholder="Explique o que mudou ou o que deseja…"></textarea></div>'
       + '<div class="row"><a class="btn ghost" href="' + htmlEsc(url.pathname) + '" style="text-decoration:none">Cancelar</a>'
-      + '<button class="btn ' + (isRev ? "rev" : "edit") + '" type="submit">Enviar ' + (isRev ? "revisão" : "edição") + '</button></div></form>';
+      + '<button class="btn edit" type="submit">Salvar alterações</button></div></form>';
+  } else if (st === "aprovado_cliente") {
+    actions = '<div class="ok">✓ Cronograma aprovado. A equipe foi notificada.</div>';
+  } else if (opts.needNote === "revisao") {
+    actions = '<form method="POST" action="' + base + '/acao" class="note-box">'
+      + '<input type="hidden" name="action" value="revisao"/>'
+      + '<label>O que precisa ser revisado?</label>'
+      + '<textarea name="note" required placeholder="Descreva os pontos para revisão…"></textarea>'
+      + '<div class="row"><a class="btn ghost" href="' + htmlEsc(url.pathname) + '" style="text-decoration:none">Cancelar</a>'
+      + '<button class="btn rev" type="submit">Enviar revisão</button></div></form>';
   } else {
-    const base = htmlEsc(url.pathname.replace(/\/$/, ""));
     actions = '<div class="actions">'
       + '<form method="POST" action="' + base + '/acao"><input type="hidden" name="action" value="aprovar"/><button class="btn approve" type="submit">✓ Aprovar cronograma</button></form>'
-      + '<form method="GET" action="' + base + '"><input type="hidden" name="acao_ui" value="revisao"/></form>'
       + '<a class="btn rev" href="' + base + '?ui=revisao" style="text-decoration:none">⇄ Pedir revisão</a>'
       + '<a class="btn edit" href="' + base + '?ui=editar" style="text-decoration:none">✎ Editar cronograma</a>'
       + '</div>';
-  }
-  // ui=revisao/editar via querystring -> abre o campo de nota (sem JS)
-  const ui = url.searchParams.get("ui");
-  if (!opts.needNote && (ui === "revisao" || ui === "editar") && st !== "aprovado_cliente") {
-    return renderClientPage(task, url, { needNote: ui });
   }
 
   const body = '<div class="wrap">'
@@ -686,6 +770,7 @@ function renderClientPage(task, url, opts) {
     + '<div class="m"><label>Enviado em</label><div>' + sentAt + '</div></div>'
     + '<div class="m"><label>Prazo</label><div>' + (task.dueDate ? htmlEsc(task.dueDate.split("-").reverse().join("/")) + (task.dueTime ? " · " + htmlEsc(task.dueTime) : "") : "Sem prazo") + '</div></div>'
     + '</div></div>'
+    + clientStepper(st)
     + respHtml
     + (opts.done ? '<div class="ok">Resposta registrada. Obrigado!</div>' : '')
     + '<div class="sec">Conteúdos do cronograma (' + conts.length + ')</div>' + contHtml
@@ -694,6 +779,22 @@ function renderClientPage(task, url, opts) {
     + '<div class="foot"><span>Você está vendo apenas o seu cronograma. Sua resposta é registrada e enviada à equipe.</span></div>'
     + '</div>';
   return '<!doctype html><html lang="pt-BR"><head>' + clientPageHead(task, url) + '<style>' + clientPageCss() + '</style></head><body>' + body + '</body></html>';
+}
+
+// Stepper premium das etapas do fluxo (destaca a etapa atual pelo cronStatus).
+function clientStepper(st) {
+  const steps = [
+    { k: "envio", label: "Enviado", on: ["enviado_cliente", "em_revisao_cliente", "editado_cliente", "aprovado_cliente"] },
+    { k: "aval", label: "Avaliação", on: ["em_revisao_cliente", "editado_cliente", "aprovado_cliente"] },
+    { k: "aprov", label: "Aprovado", on: ["aprovado_cliente"] },
+    { k: "design", label: "Produção", on: ["sent_to_designer", "designer_in_progress", "designer_done", "ready_for_final_client_review", "completed"] },
+  ];
+  const html = steps.map(function (s, i) {
+    const done = s.on.indexOf(st) >= 0;
+    return '<div class="stp ' + (done ? "on" : "") + '"><span class="stp-d">' + (done ? "✓" : (i + 1)) + '</span><span class="stp-l">' + s.label + '</span></div>'
+      + (i < steps.length - 1 ? '<span class="stp-line ' + (done ? "on" : "") + '"></span>' : "");
+  }).join("");
+  return '<div class="stepper">' + html + '</div>';
 }
 
 function renderClientNotFound(msg) {
