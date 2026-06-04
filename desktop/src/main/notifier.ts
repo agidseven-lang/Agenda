@@ -62,7 +62,10 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string) {
   // Dedupe por designerAssignment.assignedAt para nao repetir em outras edicoes do doc.
   const u1b = listen<Task>("tasks", (snap) => {
     snap.docChanges().forEach((ch) => {
-      if (ch.type !== "modified") return;
+      // Cobre a reatribuicao ao vivo (modified) E o designer que ABRE o Desktop logo
+      // apos ser escolhido (added na carga inicial). Dedupe por assignedAt garante 1
+      // toast por atribuicao, sem repetir entre added/modified.
+      if (ch.type !== "modified" && ch.type !== "added") return;
       const t = { id: ch.doc.id, ...(ch.doc.data() as any) } as any;
       const da = t.designerAssignment;
       if (!da || da.designerId !== state.uid) return;          // nao fui eu o designer escolhido

@@ -60,11 +60,17 @@ export default {
       return handleNotifyAssignee(request, env);
     }
 
+    // ADITIVO (1.0.88): push premium imediato ao DESIGNER escolhido na reatribuicao.
+    // Nao toca /notify-assignee, cron, nem schema existente — usa campo proprio designerNotifiedAt.
+    if (url.pathname === "/notify-designer" && request.method === "POST") {
+      return handleNotifyDesigner(request, env);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.4" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.5-designer-notify" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -196,6 +202,71 @@ async function handleNotifyAssignee(request, env) {
   if (okCount > 0) await markField(env, accessToken, collection, id, "immediateNotifiedAt", Date.now());
   console.log(`[ASSIGN] ${type}/${id} -> ${responsibleId}: ${okCount}/${tokens.length}`);
   return json({ ok: okCount > 0, reason: okCount > 0 ? "enviado" : "FCM nao aceitou", type, id, responsibleId, tokens: tokens.length, sent: okCount }, 200, env);
+}
+
+/* ─────────────── 1c. PUSH PREMIUM IMEDIATO AO DESIGNER (POST /notify-designer) ───────────────
+   ADITIVO (1.0.88). Cliente envia APENAS { id } (taskId) — opcional { dryRun:true }.
+   O Worker RE-LÊ a task, extrai o designer de designerAssignment.designerId (fallback assigneeId),
+   busca tokens server-side e envia mensagem premium. Dedupe por designerNotifiedAt vs
+   designerAssignment.assignedAt (uma nova atribuição re-notifica; a mesma não repete).
+   NÃO usa immediateNotifiedAt — não interfere no /notify-assignee nem no CRON. */
+async function handleNotifyDesigner(request, env) {
+  let payload;
+  try { payload = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
+  const id = (typeof payload.id === "string") ? payload.id.trim() : "";
+  const dryRun = payload.dryRun === true || payload.dryRun === "true";
+  console.log(`[DESIGNER] recebido id=${id} dryRun=${dryRun}`);
+  if (!id) return json({ ok: false, reason: "id obrigatório" }, 400, env);
+
+  let accessToken;
+  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, reason: "auth falhou: " + (e && e.message), id }, 200, env); }
+
+  const doc = await getDoc(env, accessToken, "tasks", id);
+  if (!doc) return json({ ok: false, reason: "tarefa nao encontrada", id }, 200, env);
+  const da = doc.designerAssignment || null;
+  const designerId = (da && da.designerId) ? da.designerId : (doc.assigneeId || null);
+  if (!designerId) return json({ ok: false, reason: "sem designer atribuido", id }, 200, env);
+
+  const assignedAt = Number(da && da.assignedAt) || 0;
+  const notifiedAt = Number(doc.designerNotifiedAt) || 0;
+  if (!dryRun && assignedAt && notifiedAt && notifiedAt >= assignedAt) {
+    return json({ ok: true, reason: "ja notificado (designerNotifiedAt)", id, designerId }, 200, env);
+  }
+
+  const user = await getUser(env, accessToken, designerId);
+  const tokensBefore = (user && Array.isArray(user.fcmTokens)) ? user.fcmTokens.filter(Boolean) : [];
+  const tokens = dedupeTokensByDevice(tokensBefore, user && user.fcmTokenMeta);
+  const m = designerPayload(id, doc);
+  console.log(`[DESIGNER] designer=${designerId} tokens=${tokens.length}`);
+
+  if (dryRun) return json({ ok: true, dryRun: true, id, designerId, tokens: tokens.length, message: m }, 200, env);
+  if (!tokens.length) return json({ ok: false, reason: "designer sem token", id, designerId }, 200, env);
+
+  const results = await sendToTokens(env, accessToken, tokens, m);
+  const okCount = results.filter((r) => r.ok).length;
+  if (okCount > 0) await markField(env, accessToken, "tasks", id, "designerNotifiedAt", Date.now());
+  console.log(`[DESIGNER] ${id} -> ${designerId}: ${okCount}/${tokens.length}`);
+  return json({ ok: okCount > 0, reason: okCount > 0 ? "enviado" : "FCM nao aceitou", id, designerId, tokens: tokens.length, sent: okCount }, 200, env);
+}
+
+/* Mensagem premium do push ao designer (cronograma + cliente). */
+function designerPayload(id, doc) {
+  const cliente = doc.client || "";
+  const titulo = doc.title || "Cronograma";
+  const title = "Novo cronograma atribuído";
+  const body = (cliente ? cliente + " — " : "") + titulo + " · inicie a produção.";
+  const data = stringifyData({
+    type: "task",
+    taskId: id,
+    title,
+    body,
+    responsibleId: (doc.designerAssignment && doc.designerAssignment.designerId) || doc.assigneeId || "",
+    createdBy: (doc.designerAssignment && doc.designerAssignment.assignedBy) || doc.by || "",
+    deepLink: "task:" + id,
+    channel: "designer_flow",
+  });
+  return { title, body, data };
 }
 
 /* Monta título/corpo/data do push IMEDIATO (usado por /notify-assignee e pelo fallback do CRON). */

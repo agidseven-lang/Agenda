@@ -19,5 +19,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   isDesktop: true,
-  version: "1.0.87-desktop-current-sync-build",
+  version: "1.0.88-desktop-team-notes-designer-notify",
 });

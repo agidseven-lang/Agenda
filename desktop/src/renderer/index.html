@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.87 (Current Sync Build)</title>
+<title>ID Seven · Desktop 1.0.88 (Notas Premium + Designer)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -953,6 +953,34 @@
   .cvw-art-lbl{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
   .cvw-feed,.cvw-story{width:100%;border-radius:10px;border:1px solid var(--line);object-fit:cover;display:block;background:var(--surface)}
   .cvw-feed{aspect-ratio:1080/1440}.cvw-story{aspect-ratio:1080/1920}
+  /* ===== Resumo editorial premium (cards por conteúdo) ===== */
+  .cvw-ed-list{display:flex;flex-direction:column;gap:12px}
+  .cvw-ed{background:var(--surface2);border:1px solid var(--line-soft);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px}
+  .cvw-ed-head{display:flex;align-items:flex-start;gap:12px}
+  .cvw-ed-n{width:30px;height:30px;border-radius:10px;background:rgba(91,108,255,.16);color:var(--accent);font-size:13.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .cvw-ed-h-m{flex:1;min-width:0}
+  .cvw-ed-kicker{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .cvw-ed-tema{font-size:15.5px;font-weight:800;line-height:1.3;margin-top:2px}
+  .cvw-ed-sit{flex:none;font-size:11px;font-weight:800;padding:5px 11px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .cvw-ed-sit .dotc{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .cvw-ed-flbl{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .cvw-ed-leg{font-size:13.5px;color:var(--ink);line-height:1.55;white-space:pre-wrap}
+  .cvw-ed-leg.pend{color:var(--faint);font-style:italic}
+  /* miniaturas pequenas, alinhadas (não ocupam a largura toda) */
+  .cvw-ed-media{display:flex;gap:12px;flex-wrap:wrap}
+  .cvw-ed-mthumb{position:relative;display:block;width:120px;flex:none;border-radius:11px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+  .cvw-ed-mthumb img{width:100%;display:block;object-fit:cover}
+  .cvw-ed-mthumb.feed img{aspect-ratio:1080/1440}.cvw-ed-mthumb.story img{aspect-ratio:1080/1920}
+  .cvw-ed-mtag{position:absolute;left:6px;bottom:6px;font-size:9px;font-weight:800;color:#fff;background:rgba(10,11,16,.74);padding:2px 6px;border-radius:6px;letter-spacing:.02em}
+  .cvw-ed-mpend{width:120px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;border:1.5px dashed var(--line);border-radius:11px;color:var(--faint);background:var(--surface);text-align:center;padding:12px 6px}
+  .cvw-ed-mpend.feed{aspect-ratio:1080/1440}.cvw-ed-mpend.story{aspect-ratio:1080/1920}
+  .cvw-ed-mpend svg{width:20px;height:20px;opacity:.75}
+  .cvw-ed-mpend-t{font-size:11px;font-weight:800;color:var(--soft);line-height:1.2}
+  .cvw-ed-mpend-d{font-size:9.5px;font-weight:700;letter-spacing:.03em}
+  .cvw-note-card{display:flex;align-items:flex-start;gap:12px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:15px}
+  .cvw-note-ic{width:36px;height:36px;border-radius:10px;background:rgba(124,92,255,.14);color:#A78BFA;display:flex;align-items:center;justify-content:center;flex:none}
+  .cvw-note-ic svg{width:18px;height:18px}
+  .cvw-note-tx{flex:1;min-width:0;font-size:13.5px;color:var(--ink);line-height:1.6}
   @media (max-width:720px){.cvw-grid{grid-template-columns:1fr}.cvw-scroll{padding:12px 16px 36px}.cvw-arts{grid-template-columns:1fr 1fr}}
   @media (max-width:440px){.cvw-arts{grid-template-columns:1fr}}
 </style>
@@ -970,7 +998,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.87 · Current Sync Build</span><br>
+    <span class="pill-ver">Desktop 1.0.88 · Notas Premium + Designer</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -985,7 +1013,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.87 · Current Sync Build</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.88 · Notas Premium + Designer</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1221,7 +1249,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.87 · Current Sync Build</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.88 · Notas Premium + Designer</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1609,7 +1637,12 @@ async function sendToDesigner(taskId,designerId){
   // otimista
   t.designerAssignment=assignment;t.assigneeId=designerId;t.assignee=d.name||'';t.assigneeName=d.name||'';t.cronStatus='sent_to_designer';t.status='afazer';
   closeModal();render();flashToast('Enviado para '+(d.name||'designer')+'. Notificação disparada.');
-  try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('sendToDesigner',e);}
+  try{
+    await db.collection('tasks').doc(taskId).update(patch);
+    // Push premium imediato ao designer (servidor RE-LÊ o doc; aditivo, fire-and-forget).
+    // Roda DEPOIS do update p/ o Worker enxergar designerAssignment já persistido.
+    fetch(CLIENT_REVIEW_BASE+'/notify-designer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:taskId})}).catch(()=>{});
+  }catch(e){console.warn('sendToDesigner',e);}
 }
 /* ===== Social edita conteúdos (tema/legenda/observação) — premium, por tema ===== */
 function openContentEditor(taskId){
@@ -1930,26 +1963,39 @@ function renderClientView(){
   const stColor=cronStatusColor(ctx.status),stLabel=cronStatusLabel(ctx.status);
   const cr=t.clientReview||null;
   const meta=(ic,l,v)=>'<div class="cvw-meta"><div class="cvw-meta-ic">'+svg(ic)+'</div><div><div class="cvw-meta-l">'+l+'</div><div class="cvw-meta-v">'+esc(v||'—')+'</div></div></div>';
-  // Conteudos — com Feed/Story quando existirem (lado a lado no desktop, empilha no mobile)
-  const arts=(c)=>{
-    if(!c.feedImageUrl&&!c.storyImageUrl)return '';
-    return '<div class="cvw-arts">'+
-      (c.feedImageUrl?'<div class="cvw-art"><div class="cvw-art-lbl">Feed · 1080×1440</div><a href="'+esc(c.feedImageUrl)+'" target="_blank" rel="noopener"><img class="cvw-feed" src="'+esc(c.feedImageUrl)+'" alt="Feed"></a></div>':'')+
-      (c.storyImageUrl?'<div class="cvw-art"><div class="cvw-art-lbl">Story · 1080×1920</div><a href="'+esc(c.storyImageUrl)+'" target="_blank" rel="noopener"><img class="cvw-story" src="'+esc(c.storyImageUrl)+'" alt="Story"></a></div>':'')+
-    '</div>';
+  // ===== Resumo editorial premium — um card por conteúdo (tema/legenda/feed/story/situação) =====
+  // Situação por item: deriva do preenchimento (briefing -> legenda -> produção -> completo).
+  const itemStatus=(c)=>{
+    const leg=!!(c.legenda&&String(c.legenda).trim());
+    const f=!!c.feedImageUrl,s=!!c.storyImageUrl;
+    if(leg&&f&&s)return {label:'Completo',color:'#34D399'};
+    if(leg&&(f||s))return {label:'Em produção',color:'#F59E0B'};
+    if(leg)return {label:'Legenda pronta',color:'#60A5FA'};
+    return {label:'Em briefing',color:'#9BA0AB'};
   };
-  const conts=ctx.contents.length?ctx.contents.map((c,i)=>
-    '<div class="cvw-item"><div class="cvw-item-head"><div class="cvw-item-n">'+(i+1)+'</div>'+
-    '<div class="cvw-item-m"><div class="cvw-item-t">'+esc(c.tema||'(sem tema)')+'</div>'+
-    (c.legenda?'<div class="cvw-item-l">'+esc(c.legenda)+'</div>':'')+'</div></div>'+
-    arts(c)+'</div>'
-  ).join(''):'<div class="cvw-soft">Nenhum conteúdo preenchido.</div>';
+  // Bloco de mídia: miniatura clicável quando anexada; placeholder elegante "pendente" quando não.
+  const media=(label,dim,url,cls)=>url
+    ? '<a class="cvw-ed-mthumb '+cls+'" href="'+esc(url)+'" target="_blank" rel="noopener"><img src="'+esc(url)+'" alt="'+label+'"><span class="cvw-ed-mtag">'+label+' · '+dim+'</span></a>'
+    : '<div class="cvw-ed-mpend '+cls+'">'+svg('image')+'<span class="cvw-ed-mpend-t">'+label+' pendente</span><span class="cvw-ed-mpend-d">'+dim+'</span></div>';
+  const conts=ctx.contents.length?ctx.contents.map((c,i)=>{
+    const st=itemStatus(c);const legOk=!!(c.legenda&&String(c.legenda).trim());
+    return '<div class="cvw-ed">'+
+      '<div class="cvw-ed-head"><div class="cvw-ed-n">'+(i+1)+'</div>'+
+        '<div class="cvw-ed-h-m"><div class="cvw-ed-kicker">Conteúdo '+(i+1)+'</div>'+
+        '<div class="cvw-ed-tema">'+esc(c.tema||'Tema pendente')+'</div></div>'+
+        '<span class="cvw-ed-sit" style="color:'+st.color+';background:'+withAlpha(st.color,.14)+'"><span class="dotc"></span>'+st.label+'</span>'+
+      '</div>'+
+      '<div class="cvw-ed-field"><div class="cvw-ed-flbl">Legenda</div>'+
+        '<div class="cvw-ed-leg'+(legOk?'':' pend')+'">'+(legOk?esc(c.legenda):'Legenda pendente').replace(/\n/g,'<br>')+'</div></div>'+
+      '<div class="cvw-ed-media">'+media('Feed','1080×1440',c.feedImageUrl,'feed')+media('Story','1080×1920',c.storyImageUrl,'story')+'</div>'+
+    '</div>';
+  }).join(''):'<div class="cvw-soft">Nenhum conteúdo no cronograma ainda.</div>';
   // Checklist (se houver)
   const chk=(t.checklist||[]).filter(c=>c&&c.t);
   const chkHtml=chk.length?'<div class="cvw-sec">Checklist</div><div class="cvw-card">'+chk.map(c=>
     '<div class="cvw-chk"><span class="cvw-chk-box'+(c.d?' on':'')+'">'+(c.d?svg('check'):'')+'</span><span class="'+(c.d?'cvw-chk-done':'')+'">'+esc(c.t)+'</span></div>').join('')+'</div>':'';
-  // Observacoes da social (desc)
-  const obsHtml=t.desc?'<div class="cvw-sec">Observações da equipe</div><div class="cvw-card"><div class="cvw-obs">'+esc(t.desc).replace(/\n/g,'<br>')+'</div></div>':'';
+  // Nota livre da equipe (desc) — card elegante, nunca mais dump de texto cru.
+  const obsHtml=(t.desc&&String(t.desc).trim())?'<div class="cvw-sec">Nota da equipe</div><div class="cvw-note-card"><div class="cvw-note-ic">'+svg('editnote')+'</div><div class="cvw-note-tx">'+esc(t.desc).replace(/\n/g,'<br>')+'</div></div>':'';
   // Banner de resposta do cliente (se ja respondeu)
   const crHtml=cr?'<div class="cvw-resp" style="border-color:'+withAlpha(clientReviewColor(cr.status),.4)+';background:'+withAlpha(clientReviewColor(cr.status),.10)+'">'+
     '<div class="cvw-resp-ic" style="color:'+clientReviewColor(cr.status)+'">'+svg(cr.status==='aprovado'?'check':cr.status==='revisao'?'revise':'editnote')+'</div>'+
@@ -1999,8 +2045,8 @@ function renderClientView(){
       '</div>'+
     '</div>'+
     crHtml+
-    '<div class="cvw-sec">Conteúdos do cronograma ('+ctx.contents.length+')</div>'+
-    '<div class="cvw-list">'+conts+'</div>'+
+    '<div class="cvw-sec">Resumo editorial ('+ctx.contents.length+')</div>'+
+    '<div class="cvw-ed-list">'+conts+'</div>'+
     chkHtml+obsHtml+
     actions+
     '<div class="cvw-foot">'+svg('info')+'<span>Você está vendo apenas o seu cronograma. Sua resposta é registrada e enviada à equipe em tempo real.</span></div>'+
@@ -2127,7 +2173,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.87-desktop-current-sync-build';
+const BUILD='1.0.88-desktop-team-notes-designer-notify';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2139,7 +2185,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.87 · Current Sync Build</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.88 · Notas Premium + Designer</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -2152,7 +2198,7 @@ function renderConfig(){
     '<div style="height:16px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div></div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.87 · Current Sync Build · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.88 · Notas Premium + Designer · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
   return h+'</div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
