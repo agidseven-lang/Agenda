@@ -56,11 +56,17 @@ export default {
       return handleCronTest(request, env);
     }
 
+    // ADITIVO (Visão do Cliente pública, link HTTPS seguro por token).
+    // Vem ANTES do POST generico de push para nao colidir com handlePushRelay.
+    if (url.pathname.startsWith("/cliente/cronograma/")) {
+      return handleClientReview(request, env, url);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.4" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.4 + client-review" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -436,6 +442,268 @@ async function hmacSha1Hex(key, msg) {
   const cryptoKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(msg));
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/* ============================================================================
+   VISÃO DO CLIENTE — página pública premium por token (ADITIVO)
+   ----------------------------------------------------------------------------
+   Rotas:
+     GET  /cliente/cronograma/<token>        -> renderiza a Visão do Cliente
+                                                (HTML server-side + Open Graph)
+     POST /cliente/cronograma/<token>/acao   -> Aprovar / Pedir revisão / Editar
+   Seguranca: o <token> e uma capability aleatoria (clientReviewToken) gravada
+   na tarefa pelo Desktop. O Worker usa a SERVICE ACCOUNT (mesma do push) para
+   ler/gravar SOMENTE a tarefa daquele token via Firestore REST. Nao expoe o
+   Firestore publicamente; nao mexe em Firestore Rules; nao mostra outra tarefa.
+   ============================================================================ */
+const CRON_LABELS = {
+  rascunho_social: "Em rascunho", pronto_cliente: "Pronto para envio",
+  enviado_cliente: "Enviado ao cliente", cliente_visualizou: "Cliente visualizou",
+  em_revisao_cliente: "Em revisão", aprovado_cliente: "Aprovado", editado_cliente: "Edição solicitada",
+};
+function cronColor(s) {
+  return ({ enviado_cliente: "#22D3EE", em_revisao_cliente: "#F59E0B", aprovado_cliente: "#34D399",
+    editado_cliente: "#A78BFA", pronto_cliente: "#60A5FA" })[s] || "#9BA0AB";
+}
+function htmlEsc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+function cronTypeLabel(t) {
+  const n = Array.isArray(t.cronContents) ? t.cronContents.length : 0;
+  if (n >= 12) return "Mensal"; if (n >= 6) return "Quinzenal"; if (n >= 1) return "Semanal";
+  return "Cronograma";
+}
+
+async function handleClientReview(request, env, url) {
+  // path: /cliente/cronograma/<token>[/acao]
+  const rest = url.pathname.replace(/^\/cliente\/cronograma\//, "").replace(/\/+$/, "");
+  const parts = rest.split("/");
+  const token = (parts[0] || "").trim();
+  const isAction = parts[1] === "acao";
+  if (!token || !/^[A-Za-z0-9_-]{16,128}$/.test(token)) {
+    return htmlResponse(renderClientNotFound("Link inválido."), 404);
+  }
+  let accessToken;
+  try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
+  catch (e) { return htmlResponse(renderClientError(), 500); }
+
+  const task = await findTaskByReviewToken(env, accessToken, token);
+  if (!task) return htmlResponse(renderClientNotFound("Cronograma não encontrado ou link expirado."), 404);
+
+  if (isAction && request.method === "POST") {
+    let action = "", note = "";
+    const ct = request.headers.get("content-type") || "";
+    try {
+      if (ct.indexOf("application/json") >= 0) { const b = await request.json(); action = b.action || ""; note = b.note || ""; }
+      else { const f = await request.formData(); action = String(f.get("action") || ""); note = String(f.get("note") || ""); }
+    } catch (_) {}
+    const map = {
+      aprovar: { cronStatus: "aprovado_cliente", rev: "aprovado", type: "cliente_aprovou", label: "Cliente aprovou o cronograma" },
+      revisao: { cronStatus: "em_revisao_cliente", rev: "revisao", type: "cliente_pediu_revisao", label: "Cliente pediu revisão" },
+      editar: { cronStatus: "editado_cliente", rev: "editado", type: "cliente_editou", label: "Cliente solicitou edição" },
+    };
+    const m = map[action];
+    if (!m) return htmlResponse(renderClientNotFound("Ação inválida."), 400);
+    if ((action === "revisao" || action === "editar") && !note.trim()) {
+      // volta para a pagina pedindo a nota
+      return htmlResponse(renderClientPage(task, url, { needNote: action }), 200);
+    }
+    await applyClientReview(env, accessToken, task, m, note.trim());
+    // PRG: redireciona para a pagina (GET) com o status atualizado
+    return new Response(null, { status: 303, headers: { Location: "/cliente/cronograma/" + encodeURIComponent(token) + "?done=" + action, ...corsHeaders(env) } });
+  }
+
+  // GET -> renderiza a pagina
+  const done = url.searchParams.get("done") || "";
+  return htmlResponse(renderClientPage(task, url, { done }), 200);
+}
+
+async function findTaskByReviewToken(env, accessToken, token) {
+  const endpoint = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = {
+    structuredQuery: {
+      from: [{ collectionId: "tasks" }],
+      where: { fieldFilter: { field: { fieldPath: "clientReviewToken" }, op: "EQUAL", value: { stringValue: token } } },
+      limit: 1,
+    },
+  };
+  const res = await fetch(endpoint, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  if (!res.ok) { console.error("[CLIENT-REVIEW] runQuery falhou:", res.status); return null; }
+  const rows = await res.json();
+  for (const row of rows) {
+    if (!row.document) continue;
+    const id = row.document.name.split("/").pop();
+    return Object.assign({ id, _name: row.document.name }, decodeFields(row.document.fields));
+  }
+  return null;
+}
+
+async function applyClientReview(env, accessToken, task, m, note) {
+  const now = Date.now();
+  const ev = { mapValue: { fields: {
+    type: { stringValue: m.type }, label: { stringValue: m.label },
+    at: { integerValue: String(now) }, channel: { stringValue: "client_public_link" },
+    note: { stringValue: note || "" }, client: { stringValue: task.client || "" },
+  } } };
+  const review = { mapValue: { fields: {
+    status: { stringValue: m.rev }, note: { stringValue: note || "" },
+    at: { integerValue: String(now) }, byName: { stringValue: "Cliente" },
+  } } };
+  const commit = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`;
+  const body = { writes: [{
+    update: { name: task._name, fields: {
+      cronStatus: { stringValue: m.cronStatus }, clientReview: review, clientReviewAt: { integerValue: String(now) },
+    } },
+    updateMask: { fieldPaths: ["cronStatus", "clientReview", "clientReviewAt"] },
+    updateTransforms: [{ fieldPath: "history", appendMissingElements: { values: [ev] } }],
+    currentDocument: { exists: true },
+  }] };
+  const res = await fetch(commit, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) console.error("[CLIENT-REVIEW] commit falhou:", res.status, (await res.text()).slice(0, 300));
+}
+
+function clientPageHead(task, url) {
+  const tipo = cronTypeLabel(task);
+  const title = "Cronograma " + tipo.toLowerCase() + " — " + (task.client || "Cliente");
+  const desc = "Acesse para visualizar, aprovar, pedir revisão ou editar o cronograma.";
+  const ogUrl = url.origin + url.pathname;
+  const ogImg = "https://agendaidseven.com.br/icon-512.png";
+  return '<meta charset="utf-8"/>'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>'
+    + '<title>' + htmlEsc(title) + '</title>'
+    + '<meta name="description" content="' + htmlEsc(desc) + '"/>'
+    + '<meta property="og:type" content="website"/>'
+    + '<meta property="og:site_name" content="Agenda ID Seven"/>'
+    + '<meta property="og:title" content="' + htmlEsc(title) + '"/>'
+    + '<meta property="og:description" content="' + htmlEsc(desc) + '"/>'
+    + '<meta property="og:url" content="' + htmlEsc(ogUrl) + '"/>'
+    + '<meta property="og:image" content="' + htmlEsc(ogImg) + '"/>'
+    + '<meta name="twitter:card" content="summary_large_image"/>'
+    + '<meta name="twitter:title" content="' + htmlEsc(title) + '"/>'
+    + '<meta name="twitter:description" content="' + htmlEsc(desc) + '"/>'
+    + '<meta name="twitter:image" content="' + htmlEsc(ogImg) + '"/>'
+    + '<meta name="robots" content="noindex, nofollow"/>'
+    + '<link rel="icon" href="https://agendaidseven.com.br/icon-192.png"/>';
+}
+
+function clientPageCss() {
+  return ':root{--bg:#0A0B10;--surface:#12141C;--surface2:#171A24;--line:#262A38;--ink:#E8EAF0;--soft:#9BA0AB;--faint:#6B7180;--accent:#5B6CFF}'
+    + '*{box-sizing:border-box}body{margin:0;background:radial-gradient(120% 80% at 50% -10%,rgba(34,211,238,.08),transparent 60%),var(--bg);color:var(--ink);font:15px/1.55 -apple-system,Segoe UI,Roboto,Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}'
+    + '.wrap{max-width:680px;margin:0 auto;padding:22px 16px 60px}'
+    + '.brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}'
+    + '.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#5B6CFF,#22D3EE);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}'
+    + '.brand b{font-size:15px}.brand span{color:var(--soft);font-size:12px;display:block}'
+    + '.hero{background:linear-gradient(165deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 18px 50px -28px rgba(0,0,0,.8)}'
+    + '.head{display:flex;align-items:center;gap:12px;margin-bottom:14px}'
+    + '.av{width:46px;height:46px;border-radius:13px;background:rgba(34,211,238,.14);color:#22D3EE;display:flex;align-items:center;justify-content:center;flex:none}'
+    + '.av svg{width:24px;height:24px}.hid{flex:1;min-width:0}.hn{font-size:16px;font-weight:800}.hr{font-size:12px;color:var(--faint)}'
+    + '.st{display:inline-flex;align-items:center;gap:7px;flex:none;padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:800;border:1px solid}'
+    + '.dot{width:6px;height:6px;border-radius:50%;background:currentColor}'
+    + '.ttl{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:6px 0 14px}'
+    + '.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:560px){.grid{grid-template-columns:1fr}}'
+    + '.m label{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}.m div{font-size:14px;font-weight:600;margin-top:2px}'
+    + '.sec{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin:22px 0 10px}'
+    + '.item{display:flex;gap:12px;background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:9px}'
+    + '.n{width:26px;height:26px;border-radius:8px;background:rgba(91,108,255,.16);color:#8b96ff;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}'
+    + '.it{font-size:14.5px;font-weight:700}.il{font-size:13px;color:var(--soft);margin-top:3px}'
+    + '.card{background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:14px;white-space:pre-wrap;font-size:13.5px;color:var(--ink)}'
+    + '.resp{display:flex;gap:12px;align-items:flex-start;border:1px solid;border-radius:14px;padding:14px;margin:16px 0}'
+    + '.actions{display:flex;flex-direction:column;gap:11px;margin-top:24px}'
+    + '.btn{height:52px;border-radius:14px;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid transparent;cursor:pointer;width:100%;font-family:inherit}'
+    + '.approve{color:#fff;background:linear-gradient(135deg,#34D399,#10B981);box-shadow:0 12px 28px -12px rgba(16,185,129,.6)}'
+    + '.rev{color:#F59E0B;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4)}'
+    + '.edit{color:#A78BFA;background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4)}'
+    + 'textarea{width:100%;min-height:90px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--ink);padding:12px;font:inherit;resize:vertical}textarea:focus{outline:none;border-color:var(--accent)}'
+    + '.note-box{margin-top:24px;background:var(--surface2);border:1px solid var(--line);border-radius:16px;padding:16px}.note-box label{font-size:13.5px;font-weight:800;display:block;margin-bottom:10px}'
+    + '.row{display:flex;gap:10px;margin-top:12px}.row .btn{height:46px;font-size:14px}.ghost{background:var(--surface);border:1px solid var(--line);color:var(--soft)}'
+    + '.ok{color:#34D399;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.34);border-radius:14px;padding:15px;text-align:center;font-weight:800;margin-top:22px}'
+    + '.foot{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--soft);margin-top:22px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:13px}'
+    + '.center{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--soft)}';
+}
+
+function renderClientPage(task, url, opts) {
+  opts = opts || {};
+  const tipo = cronTypeLabel(task);
+  const st = task.cronStatus || "enviado_cliente";
+  const stLabel = CRON_LABELS[st] || st;
+  const stColor = cronColor(st);
+  const conts = (Array.isArray(task.cronContents) ? task.cronContents : [])
+    .map(function (c) { return c || {}; })
+    .filter(function (c) { return c.tema || c.legenda; });
+  const contHtml = conts.length
+    ? conts.map(function (c, i) {
+        return '<div class="item"><div class="n">' + (i + 1) + '</div><div><div class="it">'
+          + htmlEsc(c.tema || "(sem tema)") + '</div>'
+          + (c.legenda ? '<div class="il">' + htmlEsc(c.legenda) + '</div>' : '') + '</div></div>';
+      }).join("")
+    : '<div class="il">Nenhum conteúdo cadastrado.</div>';
+  const cr = task.clientReview && task.clientReview.status ? task.clientReview : null;
+  const crColor = cr ? cronColor(cr.status === "aprovado" ? "aprovado_cliente" : cr.status === "revisao" ? "em_revisao_cliente" : "editado_cliente") : "#9BA0AB";
+  const crLabel = cr ? ({ aprovado: "Você aprovou este cronograma", revisao: "Você solicitou revisão", editado: "Você solicitou edição" }[cr.status] || "Resposta registrada") : "";
+  const respHtml = cr
+    ? '<div class="resp" style="border-color:' + crColor + '55;background:' + crColor + '1a"><div style="color:' + crColor + ';font-weight:800;font-size:14.5px">' + htmlEsc(crLabel) + (cr.note ? '<div style="color:var(--ink);font-weight:400;font-style:italic;margin-top:5px">"' + htmlEsc(cr.note) + '"</div>' : '') + '</div></div>'
+    : '';
+  const obsHtml = task.desc ? '<div class="sec">Observações da equipe</div><div class="card">' + htmlEsc(task.desc) + '</div>' : '';
+  const sentAt = task.clientSentAt ? new Date(task.clientSentAt).toLocaleDateString("pt-BR") : "—";
+
+  let actions = "";
+  if (st === "aprovado_cliente") {
+    actions = '<div class="ok">✓ Cronograma aprovado. A equipe foi notificada.</div>';
+  } else if (opts.needNote === "revisao" || opts.needNote === "editar") {
+    const isRev = opts.needNote === "revisao";
+    actions = '<form method="POST" action="' + htmlEsc(url.pathname.replace(/\/$/, "")) + '/acao" class="note-box">'
+      + '<input type="hidden" name="action" value="' + (isRev ? "revisao" : "editar") + '"/>'
+      + '<label>' + (isRev ? "O que precisa ser revisado?" : "O que deseja ajustar?") + '</label>'
+      + '<textarea name="note" required placeholder="' + (isRev ? "Descreva os pontos para revisão…" : "Descreva as alterações desejadas…") + '"></textarea>'
+      + '<div class="row"><a class="btn ghost" href="' + htmlEsc(url.pathname) + '" style="text-decoration:none">Cancelar</a>'
+      + '<button class="btn ' + (isRev ? "rev" : "edit") + '" type="submit">Enviar ' + (isRev ? "revisão" : "edição") + '</button></div></form>';
+  } else {
+    const base = htmlEsc(url.pathname.replace(/\/$/, ""));
+    actions = '<div class="actions">'
+      + '<form method="POST" action="' + base + '/acao"><input type="hidden" name="action" value="aprovar"/><button class="btn approve" type="submit">✓ Aprovar cronograma</button></form>'
+      + '<form method="GET" action="' + base + '"><input type="hidden" name="acao_ui" value="revisao"/></form>'
+      + '<a class="btn rev" href="' + base + '?ui=revisao" style="text-decoration:none">⇄ Pedir revisão</a>'
+      + '<a class="btn edit" href="' + base + '?ui=editar" style="text-decoration:none">✎ Editar cronograma</a>'
+      + '</div>';
+  }
+  // ui=revisao/editar via querystring -> abre o campo de nota (sem JS)
+  const ui = url.searchParams.get("ui");
+  if (!opts.needNote && (ui === "revisao" || ui === "editar") && st !== "aprovado_cliente") {
+    return renderClientPage(task, url, { needNote: ui });
+  }
+
+  const body = '<div class="wrap">'
+    + '<div class="brand"><div class="logo">7</div><div><b>Agenda ID Seven</b><span>Avaliação do cronograma</span></div></div>'
+    + '<div class="hero">'
+    + '<div class="head"><div class="av"><svg viewBox="0 0 24 24" fill="none"><path d="M5 21V5.5A1.5 1.5 0 0 1 6.5 4H13a1.5 1.5 0 0 1 1.5 1.5V21M14.5 9h3A1.5 1.5 0 0 1 19 10.5V21M3 21h18" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></div>'
+    + '<div class="hid"><div class="hn">' + htmlEsc(task.client || "Cliente") + '</div><div class="hr">Cliente</div></div>'
+    + '<span class="st" style="color:' + stColor + ';background:' + stColor + '22;border-color:' + stColor + '44"><span class="dot"></span>' + htmlEsc(stLabel) + '</span></div>'
+    + '<div class="ttl">' + htmlEsc(task.title || "Cronograma") + '</div>'
+    + '<div class="grid">'
+    + '<div class="m"><label>Tipo</label><div>Cronograma ' + tipo.toLowerCase() + '</div></div>'
+    + '<div class="m"><label>Responsável</label><div>' + htmlEsc(task.assignee || "—") + '</div></div>'
+    + '<div class="m"><label>Enviado em</label><div>' + sentAt + '</div></div>'
+    + '<div class="m"><label>Prazo</label><div>' + (task.dueDate ? htmlEsc(task.dueDate.split("-").reverse().join("/")) + (task.dueTime ? " · " + htmlEsc(task.dueTime) : "") : "Sem prazo") + '</div></div>'
+    + '</div></div>'
+    + respHtml
+    + (opts.done ? '<div class="ok">Resposta registrada. Obrigado!</div>' : '')
+    + '<div class="sec">Conteúdos do cronograma (' + conts.length + ')</div>' + contHtml
+    + obsHtml
+    + actions
+    + '<div class="foot"><span>Você está vendo apenas o seu cronograma. Sua resposta é registrada e enviada à equipe.</span></div>'
+    + '</div>';
+  return '<!doctype html><html lang="pt-BR"><head>' + clientPageHead(task, url) + '<style>' + clientPageCss() + '</style></head><body>' + body + '</body></html>';
+}
+
+function renderClientNotFound(msg) {
+  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Link indisponível — Agenda ID Seven</title><style>' + clientPageCss() + '</style></head><body><div class="center"><div class="logo" style="margin:0 auto 16px">7</div><h2 style="color:var(--ink)">Link indisponível</h2><p>' + htmlEsc(msg || "Não foi possível abrir este cronograma.") + '</p></div></body></html>';
+}
+function renderClientError() {
+  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><title>Erro — Agenda ID Seven</title><style>' + clientPageCss() + '</style></head><body><div class="center"><div class="logo" style="margin:0 auto 16px">7</div><h2 style="color:var(--ink)">Indisponível no momento</h2><p>Tente novamente em instantes.</p></div></body></html>';
+}
+function htmlResponse(html, status) {
+  return new Response(html, { status: status || 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }
 
 /* ───────────────────────── HELPERS ───────────────────────── */
