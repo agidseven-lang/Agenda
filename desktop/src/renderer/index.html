@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.69 (Functional Audit Fix)</title>
+<title>ID Seven · Desktop 1.0.70 (Premium UI Polish)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
   /* ====== Design system espelhado do APK nativo (Theme.kt) ====== */
   :root{
+    color-scheme: dark;   /* faz o Chromium/Electron pintar controles nativos (date/time, scrollbars) em tema escuro */
     --bg:#0A0B10; --surface:#15171F; --surface2:#1C1F29; --line:#262A36; --line-soft:#1F222C;
     --ink:#F1F2F4; --soft:#9BA0AB; --faint:#6E7480;
     --accent:#5B6CFF; --green:#34D399; --amber:#F59E0B; --red:#F87171; --violet:#A78BFA; --cyan:#22D3EE; --pink:#F472B6;
@@ -19,6 +20,7 @@
     --d-topbar:64px;     /* desktop topbar height */
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{color-scheme:dark}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
     font-family:"Segoe UI Variable Text","Segoe UI Variable","Segoe UI",Inter,-apple-system,BlinkMacSystemFont,Roboto,system-ui,sans-serif;
     -webkit-font-smoothing:antialiased;
@@ -50,8 +52,16 @@
   .fld{width:100%;margin-top:12px}
   .fld label{display:block;font-size:11px;font-weight:700;color:var(--faint);letter-spacing:.04em;text-transform:uppercase;margin-bottom:7px}
   .inp{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--ink);
-    font-size:15px;padding:13px 14px;outline:none;transition:border-color .15s}
+    font-size:15px;padding:13px 14px;outline:none;transition:border-color .15s;color-scheme:dark}
+  .inp::placeholder{color:var(--faint);opacity:1}
   .inp:focus{border-color:var(--accent)}
+  /* date/time: indicador nativo do calendario/relogio VISIVEL no dark (era preto) */
+  .inp[type=date]::-webkit-calendar-picker-indicator,
+  .inp[type=time]::-webkit-calendar-picker-indicator{filter:invert(1) brightness(1.7);opacity:.55;cursor:pointer;transition:opacity .12s}
+  .inp[type=date]::-webkit-calendar-picker-indicator:hover,
+  .inp[type=time]::-webkit-calendar-picker-indicator:hover{opacity:.95}
+  .inp[type=date],.inp[type=time]{color:var(--ink)}
+  .inp::selection{background:rgba(91,108,255,.4)}
   textarea.inp{resize:vertical;min-height:64px;line-height:1.45}
   .pwwrap{position:relative}
   .pwwrap .toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--accent);font-size:12px;font-weight:700}
@@ -278,21 +288,22 @@
   body.desktop .nav button.sb-item.on::before{content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:22px;border-radius:0 3px 3px 0;background:var(--accent)}
   body.desktop .nav button.sb-item.on span{font-weight:800 !important}
   body.desktop .nav button.sb-item.on svg{color:var(--accent)}
-  /* Botao primario "Nova tarefa" — premium, no topo da sidebar */
+  /* Botao primario "Nova tarefa" — premium (icone em chip translucido) */
   body.desktop .nav .fab.fab-desktop{
     position:relative !important;left:auto !important;bottom:auto !important;right:auto !important;
-    margin:2px 0 6px 0 !important;width:100% !important;height:46px !important;border-radius:13px !important;
-    display:flex !important;align-items:center;justify-content:center;gap:9px;
-    font-size:14.5px;font-weight:800;letter-spacing:.005em;color:#fff;
-    background:linear-gradient(135deg,#5B6CFF,#7C5CFF) !important;
-    box-shadow:0 8px 20px -8px rgba(91,108,255,.7),inset 0 1px 0 rgba(255,255,255,.18);
-    transition:transform .12s,box-shadow .12s,filter .12s;
+    margin:2px 0 8px 0 !important;width:100% !important;height:44px !important;border-radius:11px !important;
+    display:flex !important;align-items:center;justify-content:center;gap:10px;
+    font-size:14px;font-weight:700;letter-spacing:.01em;color:#fff;
+    background:linear-gradient(135deg,#5B6CFF 0%,#6E5BFF 100%) !important;
+    border:1px solid rgba(255,255,255,.10) !important;
+    box-shadow:0 6px 16px -6px rgba(91,108,255,.55),inset 0 1px 0 rgba(255,255,255,.16);
+    transition:transform .12s ease,box-shadow .12s ease,filter .12s ease;
   }
-  body.desktop .nav .fab.fab-desktop:hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 12px 26px -8px rgba(91,108,255,.8),inset 0 1px 0 rgba(255,255,255,.22)}
-  body.desktop .nav .fab.fab-desktop:active{transform:translateY(0)}
+  body.desktop .nav .fab.fab-desktop:hover{transform:translateY(-1px);filter:brightness(1.05);box-shadow:0 10px 22px -6px rgba(91,108,255,.7),inset 0 1px 0 rgba(255,255,255,.22)}
+  body.desktop .nav .fab.fab-desktop:active{transform:translateY(0);filter:brightness(.98)}
   body.desktop .nav .fab.fab-desktop:focus-visible{outline:2px solid #fff;outline-offset:2px}
-  body.desktop .nav .fab.fab-desktop .fab-ic{display:inline-flex;width:22px;height:22px}
-  body.desktop .nav .fab.fab-desktop .fab-ic svg{width:22px !important;height:22px !important}
+  body.desktop .nav .fab.fab-desktop .fab-ic{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.17)}
+  body.desktop .nav .fab.fab-desktop .fab-ic svg{width:15px !important;height:15px !important}
   body.desktop .nav .fab.fab-desktop .fab-tx{line-height:1}
   body.desktop .nav .sb-footer{margin-top:auto;padding:14px 6px 4px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--faint);line-height:1.5}
   body.desktop .nav .sb-footer .ver{display:inline-block;background:rgba(91,108,255,.14);color:var(--accent);font-weight:800;padding:3px 9px;border-radius:999px;margin-bottom:6px;font-size:10.5px}
@@ -434,6 +445,85 @@
 
   /* Para evitar reflow horizontal quando aparece scrollbar Y */
   body.desktop #app > .content{scrollbar-gutter:stable}
+
+  /* =====================================================================
+     1.0.70 — PREMIUM UI POLISH (desktop)
+     ===================================================================== */
+  /* Sidebar refino: respiro, brand, sync com leve pulse */
+  body.desktop .nav{padding:20px 16px 16px;gap:3px;background:linear-gradient(180deg,#0D0E14 0%,#0B0C11 100%)}
+  body.desktop .nav .sb-brand{padding:4px 6px 16px;margin-bottom:12px}
+  body.desktop .nav .sb-brand .logo.sm{width:40px;height:40px;border-radius:13px;font-size:19px;box-shadow:0 4px 14px -6px rgba(91,108,255,.6)}
+  body.desktop .nav .sb-brand .dot{box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:syncpulse 2.4s ease-out infinite}
+  @keyframes syncpulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 5px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+  body.desktop .nav .sb-sect{padding:16px 10px 6px;font-size:10px;letter-spacing:.1em}
+  body.desktop .nav button.sb-item{height:42px;padding:0 12px !important;gap:13px !important;border-radius:10px}
+  body.desktop .nav button.sb-item svg{width:19px !important;height:19px !important;opacity:.85}
+  body.desktop .nav button.sb-item.on svg{opacity:1}
+  body.desktop .nav .sb-footer{font-size:10.5px}
+  body.desktop .nav .sb-footer .ver{font-size:10px;padding:3px 10px}
+
+  /* Conteudo: cabecalho com mais ar */
+  body.desktop .h-title{font-size:28px;letter-spacing:-.02em}
+  body.desktop .scr-head{padding-bottom:4px}
+
+  /* INPUTS premium */
+  body.desktop .inp{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:12px 14px;font-size:14px;transition:border-color .12s,box-shadow .12s,background .12s}
+  body.desktop .inp:hover{border-color:#343a4d}
+  body.desktop .inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,108,255,.20);background:var(--surface)}
+  body.desktop textarea.inp{min-height:84px}
+
+  /* FORM: grupos visuais (estilo Linear/Notion) */
+  body.desktop .form-wrap{max-width:680px}
+  body.desktop .fgroup{background:var(--surface2);border:1px solid var(--line-soft);border-radius:16px;padding:18px 18px 20px;margin-bottom:16px;box-shadow:0 1px 0 rgba(255,255,255,.02) inset}
+  body.desktop .fgroup .fgroup-h{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--soft);margin-bottom:15px}
+  body.desktop .fgroup .fgroup-h::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--accent)}
+  body.desktop .fgroup .inp{background:var(--surface)}      /* input recuado dentro do painel claro */
+  body.desktop .fgroup .lbl{font-size:10.5px;letter-spacing:.06em;color:var(--soft);margin-bottom:7px}
+  body.desktop .fgroup .req{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:800;letter-spacing:.04em;color:var(--amber);background:rgba(245,158,11,.14);padding:2px 7px;border-radius:999px;vertical-align:middle;text-transform:none}
+  body.desktop .fgroup .sector-card{background:var(--surface);border-radius:12px;padding:11px}
+  body.desktop .fgroup .chips{gap:8px}
+  body.desktop .fgroup .chip{padding:8px 14px;font-size:13px;border-radius:10px;transition:background .12s,border-color .12s,color .12s}
+  body.desktop .fgroup .chip:hover{border-color:#3a4054;color:var(--ink)}
+
+  /* date/time premium: icone SVG claro a esquerda + indicador nativo visivel */
+  body.desktop .dt-field{position:relative;display:flex;align-items:center}
+  body.desktop .dt-field>svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--soft);pointer-events:none;z-index:1}
+  body.desktop .dt-field .inp.dt{padding-left:40px;width:100%}
+  body.desktop .dt-field:focus-within>svg{color:var(--accent)}
+
+  /* SWITCH premium */
+  body.desktop .switchrow{padding:6px 0 2px}
+  body.desktop .sw{width:48px;height:28px}
+  body.desktop .sw::after{box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  body.desktop .sw.on{box-shadow:0 0 0 3px rgba(91,108,255,.18)}
+
+  /* STEPPER premium */
+  body.desktop .stepper{max-width:680px;margin:0 auto;padding:20px 0 24px;gap:0}
+  body.desktop .stepper .sc{width:28px;height:28px;font-size:12.5px;font-weight:800;transition:box-shadow .15s,background .15s}
+  body.desktop .stepper .sc.on{box-shadow:0 0 0 4px rgba(91,108,255,.2)}
+  body.desktop .stepper .sc.done{background:var(--accent);border-color:transparent}
+  body.desktop .stepper .slab{font-size:12.5px;margin-left:2px}
+  body.desktop .stepper .ln{margin:0 10px;height:2px;border-radius:2px}
+
+  /* FOOTER nav premium */
+  body.desktop .footer-nav{padding:14px 32px;gap:12px;background:rgba(11,12,17,.92)}
+  body.desktop .footer-nav .btn{height:44px;border-radius:11px;font-size:14px;font-weight:700;min-width:150px}
+  body.desktop .footer-nav .btn:not(.ghost){background:linear-gradient(135deg,#5B6CFF 0%,#6E5BFF 100%);box-shadow:0 6px 16px -6px rgba(91,108,255,.5)}
+  body.desktop .footer-nav .btn.ghost{min-width:118px;background:transparent;border:1px solid var(--line);color:var(--soft)}
+  body.desktop .footer-nav .btn.ghost:hover{border-color:#3a4054;color:var(--ink);background:rgba(255,255,255,.03)}
+
+  /* SECTOR cards (etapa Setor) premium */
+  body.desktop .sector-card{border-radius:13px;padding:13px;transition:border-color .12s,background .12s,transform .1s}
+  body.desktop .sector-card:hover{transform:translateY(-1px)}
+  body.desktop .sector-card.sel{box-shadow:0 0 0 3px rgba(91,108,255,.14)}
+
+  /* REVIEW card premium */
+  body.desktop .review{background:var(--surface2);border:1px solid var(--line-soft);border-radius:16px}
+  body.desktop .review .rr{padding:11px 0;border-bottom:1px solid var(--line-soft)}
+  body.desktop .review .rr:last-child{border-bottom:none}
+
+  /* Conteudo do cronograma — cards premium */
+  body.desktop .content-card{border-radius:12px;border:1px solid var(--line-soft);overflow:hidden;margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -449,7 +539,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.69 · Functional Audit Fix</span><br>
+    <span class="pill-ver">Desktop 1.0.70 · Premium UI Polish</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -464,7 +554,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.69 · Functional Audit Fix</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.70 · Premium UI Polish</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -561,6 +651,7 @@ const ICON={
   chat:'<path d="M4 5h16v11H8l-4 3z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>',
   person:'<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M5 20a7 7 0 0 1 14 0" stroke="currentColor" stroke-width="2" fill="none"/>',
   add:'<path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>',
+  plus:'<path d="M12 5.5v13M5.5 12h13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   back:'<path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
   arr:'<path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   close:'<path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
@@ -682,10 +773,10 @@ function render(){
   if(isDesktop()){
     nav.innerHTML=
       '<div class="sb-brand"><div class="logo sm">7</div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
-      '<button class="fab fab-desktop" data-fab="1"><span class="fab-ic">'+svg('add')+'</span><span class="fab-tx">Nova tarefa</span></button>'+
+      '<button class="fab fab-desktop" data-fab="1"><span class="fab-ic">'+svg('plus')+'</span><span class="fab-tx">Nova tarefa</span></button>'+
       '<div class="sb-sect">Workspace</div>'+
       TABS.map(sbItem).join('')+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.69 · Functional Audit Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.70 · Premium UI Polish</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -905,7 +996,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.69-desktop-functional-audit-fix';
+const BUILD='1.0.70-desktop-premium-ui-polish';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -917,7 +1008,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('grid','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.69 · Functional Audit Fix</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.70 · Premium UI Polish</div></div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
 function openSheet(which){
@@ -950,12 +1041,20 @@ function stepSector(){const f=state.form;let h='<div class="lbl">Escolha o setor
   return h;
 }
 function stepDados(){const f=state.form;const t=tpl();
-  return '<div class="lbl">'+esc(t?t.titleLabel:'Título')+'</div><input class="inp" id="fTitle" placeholder="'+esc(t?t.titlePh:'')+'" value="'+esc(f.title)+'">'+
-    '<div style="height:14px"></div><div class="lbl">Cliente / Empresa'+((t&&t.clientRequired)?' *':'')+'</div><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
-    '<div style="height:14px"></div><div class="lbl">Responsável</div>'+assigneeField()+
-    '<div style="height:14px"></div><div class="lbl">Etapa</div><div class="chips" style="margin-bottom:4px">'+STATUS.map(st=>'<button class="chip" data-fstatus="'+st.key+'" style="'+(f.status===st.key?'background:'+withAlpha(st.color,.18)+';color:'+st.color+';border-color:'+st.color:'')+'">'+st.label+'</button>').join('')+'</div>'+
-    '<div style="height:14px"></div><div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Prazo</div><input class="inp" id="fDue" type="date" value="'+esc(f.dueDate)+'"></div><div style="flex:1"><div class="lbl">Horário</div><input class="inp" id="fDueT" type="time" value="'+esc(f.dueTime)+'"></div></div>'+
-    '<div style="height:14px"></div><div class="switchrow"><span style="font-size:14px">Prioridade alta</span><button class="sw '+(f.priority?'on':'')+'" data-ftoggle="priority"></button></div>';
+  const dt=(ic,id,type,val)=>'<div class="dt-field">'+svg(ic)+'<input class="inp dt" id="'+id+'" type="'+type+'" value="'+esc(val)+'"></div>';
+  return ''+
+  '<div class="fgroup"><div class="fgroup-h">Identificação</div>'+
+    '<div class="lbl">'+esc(t?t.titleLabel:'Título')+'</div><input class="inp" id="fTitle" placeholder="'+esc(t?t.titlePh:'Dê um nome claro à tarefa')+'" value="'+esc(f.title)+'">'+
+    '<div style="height:14px"></div><div class="lbl">Cliente / Empresa'+((t&&t.clientRequired)?' <span class="req">obrigatório</span>':'')+'</div><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
+  '</div>'+
+  '<div class="fgroup"><div class="fgroup-h">Atribuição</div>'+
+    '<div class="lbl">Responsável</div>'+assigneeField()+
+    '<div style="height:14px"></div><div class="lbl">Etapa</div><div class="chips" style="margin-bottom:0">'+STATUS.map(st=>'<button class="chip" data-fstatus="'+st.key+'" style="'+(f.status===st.key?'background:'+withAlpha(st.color,.18)+';color:'+st.color+';border-color:'+st.color:'')+'">'+st.label+'</button>').join('')+'</div>'+
+  '</div>'+
+  '<div class="fgroup"><div class="fgroup-h">Prazo &amp; prioridade</div>'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data</div>'+dt('calendar','fDue','date',f.dueDate)+'</div><div style="flex:1"><div class="lbl">Horário</div>'+dt('clock','fDueT','time',f.dueTime)+'</div></div>'+
+    '<div style="height:16px"></div><div class="switchrow"><div><div style="font-size:14px;font-weight:600">Prioridade alta</div><div style="font-size:12px;color:var(--faint);margin-top:1px">Destaca a tarefa nos quadros</div></div><button class="sw '+(f.priority?'on':'')+'" data-ftoggle="priority"></button></div>'+
+  '</div>';
 }
 function assigneeField(){const f=state.form;const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
   return '<button class="sector-card" data-assignee="open" style="margin-bottom:0">'+(u?avatar(u,36):'<div class="av" style="width:36px;height:36px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>')+'<div class="sm"><div class="sl" style="font-weight:600;color:'+(u?'var(--ink)':'var(--faint)')+'">'+(u?esc(u.name):'Selecionar da equipe')+'</div></div></button>';

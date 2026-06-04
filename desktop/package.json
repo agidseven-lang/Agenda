@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.69",
-  "description": "Agenda ID Seven Desktop — auditoria funcional e polish sistemico (Electron) (Electron)",
+  "version": "1.0.70",
+  "description": "Agenda ID Seven Desktop — polish visual premium e dark mode (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
