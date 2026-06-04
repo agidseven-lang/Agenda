@@ -17,5 +17,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.on("notif-open", (_e, t: string) => cb(t));
   },
   isDesktop: true,
-  version: "1.0.78-desktop-client-vision-fix",
+  version: "1.0.79-desktop-share-link-detail-footer-fix",
 });

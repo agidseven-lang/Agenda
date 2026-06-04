@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.78 (Client Vision Fix)</title>
+<title>ID Seven · Desktop 1.0.79 (Share Link Detail Footer Fix)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -698,12 +698,19 @@
   .det-check-b.on{background:var(--green);border-color:transparent}
   .det-check-done{color:var(--faint);text-decoration:line-through}
   .det-link{font-size:13px;color:var(--accent);word-break:break-all;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px}
-  .det-actions{display:flex;align-items:center;gap:11px;padding:16px 26px;border-top:1px solid var(--line-soft);background:var(--surface)}
-  .det-actions .btn{width:auto;flex:1;height:46px;border-radius:12px;font-size:13.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 14px;white-space:nowrap}
-  .det-actions .btn svg{width:17px;height:17px;flex:none}
-  .det-actions .btn-danger{flex:none;padding:0 20px}
-  .det-actions .btn:not(.ghost):not(.btn-danger){box-shadow:0 6px 16px -8px rgba(91,108,255,.6)}
-  @media(max-width:560px){.det-people,.det-dates{grid-template-columns:1fr}}
+  /* Footer premium agrupado — header fixo + body scroll + footer fixo (det-sheet e flex-column).
+     Cada grupo e flex-wrap com min-width: os botoes NUNCA cortam, quebram em 2 linhas. */
+  .det-actions{display:flex;flex-direction:column;gap:14px;padding:16px 26px calc(16px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line-soft);background:var(--surface);flex:none}
+  .det-act-group{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .det-act-lbl{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+  .det-act-row{display:flex;flex-wrap:wrap;gap:10px;min-width:0}
+  .det-act-row .btn{flex:1 1 auto;min-width:150px;width:auto;height:46px;border-radius:12px;font-size:13.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 16px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .det-act-row .btn svg{width:17px;height:17px;flex:none}
+  .det-act-row .btn-danger{flex:0 1 auto;min-width:130px}
+  .det-act-row .det-close{flex:0 1 auto;min-width:120px;background:var(--surface2);border:1px solid var(--line);color:var(--soft)}
+  .det-act-row .det-close:hover{border-color:var(--accent);color:var(--ink)}
+  .det-act-row .btn:not(.ghost):not(.btn-danger):not(.det-close){box-shadow:0 6px 16px -8px rgba(91,108,255,.6)}
+  @media(max-width:560px){.det-people,.det-dates{grid-template-columns:1fr}.det-act-row .btn{min-width:46%}}
 
   /* Configuracoes — icone do cabecalho */
   .cfg-ic{width:44px;height:44px;border-radius:13px;background:rgba(91,108,255,.14);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:none}
@@ -754,6 +761,8 @@
   .sp-actions .btn{flex:1;height:46px;border-radius:12px;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:8px}
   .sp-actions .btn svg{width:16px;height:16px}
   .sp-copied-w{display:inline-flex;align-items:center;gap:8px}
+  .btn.sp-share{flex:1.15;color:#22D3EE;background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.34);font-weight:800}
+  .btn.sp-share:hover{background:rgba(34,211,238,.18);border-color:rgba(34,211,238,.55)}
   .btn.sp-go{flex:1.3;color:#fff;border:none;background:linear-gradient(135deg,#5B6CFF 0%,#22D3EE 60%,#10B981 100%);box-shadow:0 8px 20px -10px rgba(34,211,238,.6)}
   .btn.sp-go:hover{filter:brightness(1.07)}
 
@@ -896,7 +905,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.78 · Client Vision Fix</span><br>
+    <span class="pill-ver">Desktop 1.0.79 · Share Link Detail Footer Fix</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -911,7 +920,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.78 · Client Vision Fix</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.79 · Share Link Detail Footer Fix</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1006,6 +1015,8 @@ const ICON={
   send:'<path d="M21 3 11 13M21 3l-7 18-3-8-8-3 18-7z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>',
   copy:'<rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M5 15V6.2A1.2 1.2 0 0 1 6.2 5H15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
   ext:'<path d="M14 4h6v6M20 4l-8.5 8.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 13.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  link:'<path d="M9.5 14.5l5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M11 7.5l1.4-1.4a3.5 3.5 0 0 1 5 5L16 12.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 16.5l-1.4 1.4a3.5 3.5 0 0 1-5-5L8 11.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  share:'<circle cx="6" cy="12" r="2.4" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="17" cy="6" r="2.4" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="17" cy="18" r="2.4" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8.1 10.9l6.8-3.8M8.1 13.1l6.8 3.8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
   building:'<path d="M5 21V5.5A1.5 1.5 0 0 1 6.5 4H13a1.5 1.5 0 0 1 1.5 1.5V21M14.5 9h3A1.5 1.5 0 0 1 19 10.5V21M3 21h18" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M8 8h2.5M8 12h2.5M8 16h2.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
   check:'<path d="M4 12.5l5 5 11-11" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   revise:'<path d="M3.5 7.5h12M3.5 7.5l3-3M3.5 7.5l3 3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.5 16.5h-12M20.5 16.5l-3-3M20.5 16.5l-3 3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -1145,7 +1156,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.78 · Client Vision Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.79 · Share Link Detail Footer Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1448,14 +1459,28 @@ function openDetails(taskId){
        (cr.at?'<div class="det-cresp-d">'+fmtDateTimeBR(cr.at)+(cr.byName?' · '+esc(cr.byName):'')+'</div>':'')+'</div></div>';
   }
   h+='</div>'+ // det-body
-    '<div class="det-actions">'+
-      (cron&&t.cronStatus?'<button class="btn cvw-open" data-clientview="'+t.id+'">'+svg('eye')+'Abrir Visão do cliente</button>':'')+
-      (canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':'')+
-      '<button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>'+
-      (canDelTask(t)?'<button class="btn btn-danger" data-del="'+t.id+'">'+svg('trash')+'Remover</button>':'')+
-      '<button class="btn" data-modalclose="1">Fechar</button></div>'+
+    detFooter(t,cron)+
   '</div></div>';
   document.getElementById('modalRoot').innerHTML=h;
+}
+// Footer premium do Detalhes — agrupado (cliente / tarefa), nunca corta: cada
+// grupo e flex-wrap com min-width, quebrando em 2 linhas quando necessario.
+function detFooter(t,cron){
+  const clientBtns=
+    (cron&&t.cronStatus?'<button class="btn cvw-open" data-clientview="'+t.id+'">'+svg('eye')+'Abrir Visão do cliente</button>':'')+
+    (canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':'');
+  const taskBtns=
+    '<button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>'+
+    (canDelTask(t)?'<button class="btn btn-danger" data-del="'+t.id+'">'+svg('trash')+'Remover</button>':'')+
+    '<button class="btn det-close" data-modalclose="1">'+svg('close')+'Fechar</button>';
+  let h='<div class="det-actions">';
+  if(clientBtns){
+    h+='<div class="det-act-group"><div class="det-act-lbl">Ações do cliente</div><div class="det-act-row">'+clientBtns+'</div></div>';
+    h+='<div class="det-act-group"><div class="det-act-lbl">Ações da tarefa</div><div class="det-act-row">'+taskBtns+'</div></div>';
+  }else{
+    h+='<div class="det-act-row det-act-row-solo">'+taskBtns+'</div>';
+  }
+  return h+'</div>';
 }
 /* ===== Cronograma — Fase 1: enviar para cliente =====
    Campos aditivos (Firestore schemaless; APK nativo ignora):
@@ -1511,8 +1536,11 @@ function clientMessage(ctx){
   const nome=ctx.client||'cliente';
   return 'Olá, '+nome+'!\n\n'+
     'Seu cronograma '+ctx.type.toLowerCase()+' está pronto para avaliação.\n\n'+
-    'Você pode:\n• aprovar;\n• pedir revisão;\n• editar, se necessário.\n\n'+
-    'Visualizar cronograma:\n'+clientPreviewLink(ctx)+'\n\n'+
+    'Acesse a visão do cliente para:\n'+
+    '• aprovar o cronograma;\n'+
+    '• pedir revisão;\n'+
+    '• editar, se necessário.\n\n'+
+    '🔗 Visualizar cronograma:\n'+clientPreviewLink(ctx)+'\n\n'+
     'Contamos com seu retorno.';
 }
 function openSendClientModal(taskOrForm){
@@ -1543,7 +1571,7 @@ function openSendClientModal(taskOrForm){
     '<div class="sp-warn">'+svg('info')+'<span>Nesta fase, a visualização ocorre pela tela <b>Visão do cliente</b> dentro do app. Link público externo será tratado em fase futura.</span></div>'+
     '<div class="sp-actions">'+
       '<button class="btn ghost" data-modalclose="1">Cancelar</button>'+
-      '<button class="btn ghost" data-copyclient="'+esc(msg).replace(/"/g,'&quot;')+'"><span class="sp-copied-w">'+svg('copy')+'<span class="sp-copy-lbl">Copiar mensagem</span></span></button>'+
+      '<button class="btn ghost sp-share" data-sharelink="'+esc(clientPreviewLink(ctx))+'" data-sharemsg="'+esc(msg).replace(/"/g,'&quot;')+'"><span class="sp-copied-w">'+svg('link')+'<span class="sp-share-lbl">Compartilhar link</span></span></button>'+
       '<button class="btn sp-go" data-dosendclient="'+(ctx.isForm?'__form__':ctx.id)+'" data-wa="'+esc(wa)+'">'+svg('send')+'Abrir WhatsApp</button>'+
     '</div>'+
   '</div></div>';
@@ -1700,6 +1728,18 @@ async function persistClientSend(taskId){
   }catch(e){console.warn('persistClientSend',e);}
 }
 function copyToClipboard(text){try{navigator.clipboard&&navigator.clipboard.writeText(text);}catch(_){}}
+// Compartilhar link do cronograma: Web Share API quando disponivel; senao copia o link.
+function shareClientLink(btn,link,msg){
+  const lbl=btn&&btn.querySelector('.sp-share-lbl');
+  const done=(txt)=>{if(lbl){const o=lbl.textContent;lbl.textContent=txt;setTimeout(()=>{lbl.textContent='Compartilhar link';},1700);}};
+  if(navigator.share){
+    navigator.share({title:'Cronograma — ID Seven',text:msg||'',url:link})
+      .then(()=>{flashToast('Compartilhamento aberto.');})
+      .catch(()=>{copyToClipboard(link);done('Link copiado');flashToast('Link copiado para compartilhar.');});
+  }else{
+    copyToClipboard(link);done('Link copiado');flashToast('Link copiado para compartilhar.');
+  }
+}
 
 function openDeleteConfirm(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
@@ -1737,7 +1777,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.78-desktop-client-vision-fix';
+const BUILD='1.0.79-desktop-share-link-detail-footer-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -1749,7 +1789,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.78 · Client Vision Fix</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.79 · Share Link Detail Footer Fix</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -1762,7 +1802,7 @@ function renderConfig(){
     '<div style="height:16px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div></div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.78 · Client Vision Fix · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.79 · Share Link Detail Footer Fix · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
   return h+'</div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
@@ -1987,7 +2027,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-clientact]')){const a=el.dataset.clientact;if(a==='aprovar'){clientReviewAction(state.clientView,'aprovar','');}else{state.clientAction=a;render();}return;}
   if(el=g('[data-clientcancel]')){state.clientAction=null;render();return;}
   if(el=g('[data-clientsubmit]')){const kind=el.dataset.clientsubmit;const ta=document.getElementById('cvwNote');const note=ta?ta.value.trim():'';if((kind==='revisao'||kind==='editar')&&!note){flashToast('Descreva o que precisa antes de enviar.');if(ta)ta.focus();return;}clientReviewAction(state.clientView,kind,note);return;}
-  if(el=g('[data-copyclient]')){copyToClipboard(el.dataset.copyclient);const lbl=el.querySelector('.sp-copy-lbl');if(lbl){lbl.textContent='Copiada!';setTimeout(()=>{lbl.textContent='Copiar mensagem';},1600);}flashToast('Mensagem copiada para a área de transferência.');return;}
+  if(el=g('[data-sharelink]')){shareClientLink(el,el.dataset.sharelink,el.dataset.sharemsg);return;}
   if(el=g('[data-dosendclient]')){
     const id=el.dataset.dosendclient;
     const wa=el.dataset.wa;
