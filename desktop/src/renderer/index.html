@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.80 (WhatsApp Share Flow Fix)</title>
+<title>ID Seven · Desktop 1.0.81 (WhatsApp Message Sanitization Fix)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -735,6 +735,7 @@
   .sp-title{font-size:20px;font-weight:800;letter-spacing:-.01em}
   .sp-sub{font-size:13px;color:var(--soft);margin:8px auto 18px;max-width:440px;line-height:1.5}
   .sp-lbl{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);text-align:left;margin-bottom:8px}
+  .sp-lbl-note{font-weight:600;letter-spacing:0;text-transform:none;color:var(--soft);opacity:.8}
   .sp-prev{background:var(--surface2);border:1px solid var(--line-soft);border-radius:16px;padding:15px;text-align:left;box-shadow:0 8px 30px -20px rgba(0,0,0,.8)}
   .sp-prev-head{display:flex;align-items:center;gap:11px;margin-bottom:12px}
   .sp-prev-av{width:40px;height:40px;border-radius:11px;background:rgba(34,211,238,.14);color:#22D3EE;display:flex;align-items:center;justify-content:center;flex:none}
@@ -744,7 +745,7 @@
   .sp-prev-r{font-size:11.5px;color:var(--faint);margin-top:1px}
   .sp-chip{display:inline-flex;align-items:center;gap:6px;flex:none;padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:800;background:rgba(16,185,129,.12);color:#10B981;border:1px solid rgba(16,185,129,.28)}
   .sp-chip svg{width:14px;height:14px}
-  .sp-prev-msg{font-size:13.5px;color:var(--ink);line-height:1.55;margin-bottom:13px}
+  .sp-prev-msg{font-size:13.5px;color:var(--ink);line-height:1.55;margin:0 0 13px;white-space:pre-wrap;word-break:break-word;font-family:inherit;background:var(--surface);border:1px solid var(--line-soft);border-radius:11px;padding:13px;max-height:220px;overflow:auto}
   .sp-cta{display:flex;align-items:center;gap:13px;padding:13px;border-radius:13px;cursor:pointer;
     background:linear-gradient(135deg,rgba(34,211,238,.10),rgba(16,185,129,.08));border:1px solid rgba(34,211,238,.30);transition:border-color .14s,transform .14s,box-shadow .14s}
   .sp-cta:hover{border-color:rgba(34,211,238,.6);transform:translateY(-1px);box-shadow:0 10px 24px -16px rgba(34,211,238,.8)}
@@ -905,7 +906,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.80 · WhatsApp Share Flow Fix</span><br>
+    <span class="pill-ver">Desktop 1.0.81 · WhatsApp Message Sanitization Fix</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -920,7 +921,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.80 · WhatsApp Share Flow Fix</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.81 · WhatsApp Message Sanitization Fix</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1156,7 +1157,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.80 · WhatsApp Share Flow Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.81 · WhatsApp Message Sanitization Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1529,53 +1530,68 @@ function cronCtx(o){
     assignee:o.assignee||'',
   };
 }
-// Link interno/controlado (Fase 1 — nao publico). Documentado no relatorio.
-function clientPreviewLink(ctx){return 'idseven://client/'+(ctx.id||'<id>');}
-// Mensagem profissional para WhatsApp (texto puro — limitacao do canal)
-function clientMessage(ctx){
-  const nome=ctx.client||'cliente';
+/* ===== TRÊS COISAS SEPARADAS — nunca misturar =====
+   1) buildClientMessage  -> texto humano que o cliente recebe (sem encode, sem URL do WhatsApp)
+   2) buildInternalClientLink -> apenas idseven://client/<id> (aparece DENTRO da mensagem, nunca sozinho)
+   3) buildWhatsAppAppUrl / buildWhatsAppWebUrl -> URL TÉCNICA, usada SÓ para abrir o WhatsApp
+      (shell.openExternal). NUNCA copiar/compartilhar/exibir essas URLs. */
+
+// (2) Link interno/controlado (Fase 1 — nao publico). Documentado no relatorio.
+function buildInternalClientLink(ctx){return 'idseven://client/'+((ctx&&ctx.id)||'<id>');}
+
+// (1) Mensagem profissional, texto humano. Nunca contem URL do WhatsApp nem texto codificado.
+function buildClientMessage(ctx){
+  const nome=(ctx&&ctx.client)||'cliente';
+  const tipo=((ctx&&ctx.type)||'').toLowerCase();
   return 'Olá, '+nome+'!\n\n'+
-    'Seu cronograma '+ctx.type.toLowerCase()+' está pronto para avaliação.\n\n'+
+    'Seu cronograma '+tipo+' está pronto para avaliação.\n\n'+
     'Acesse a visão do cliente para:\n'+
     '• aprovar o cronograma;\n'+
     '• pedir revisão;\n'+
     '• editar, se necessário.\n\n'+
-    '🔗 Visualizar cronograma:\n'+clientPreviewLink(ctx)+'\n\n'+
+    'Visualizar cronograma:\n'+buildInternalClientLink(ctx)+'\n\n'+
     'Contamos com seu retorno.';
 }
+
+// (3) URLs TÉCNICAS — codificam a mensagem APENAS no momento de abrir o WhatsApp.
+function buildWhatsAppAppUrl(message){return 'whatsapp://send?text='+encodeURIComponent(message||'');}
+function buildWhatsAppWebUrl(message){return 'https://web.whatsapp.com/send?text='+encodeURIComponent(message||'');}
+
+// Aliases legados (evita quebrar referencias antigas).
+function clientPreviewLink(ctx){return buildInternalClientLink(ctx);}
+function clientMessage(ctx){return buildClientMessage(ctx);}
 function openSendClientModal(taskOrForm){
   const ctx=cronCtx(taskOrForm);
-  state._sendCtx=ctx;                              // guarda p/ CTA "Visualizar cronograma"
-  const msg=clientMessage(ctx);
-  // Abrir WhatsApp com a MENSAGEM COMPLETA: tenta o app (whatsapp://) e cai
-  // para o WhatsApp Web. Nada de wa.me (que abre landing intermediaria).
-  const waApp='whatsapp://send?text='+encodeURIComponent(msg);
-  const waWeb='https://web.whatsapp.com/send?text='+encodeURIComponent(msg);
+  state._sendCtx=ctx;                              // guarda p/ CTA + acoes (msg/urls montadas no clique)
+  // Mensagem humana exibida no preview = EXATAMENTE a que sera copiada/enviada.
+  const msg=buildClientMessage(ctx);
+  // As URLs TÉCNICAS do WhatsApp NAO vao para o DOM: sao montadas so no clique
+  // de "Abrir WhatsApp" e usadas apenas em shell.openExternal.
   const chip='<span class="sp-chip">'+svg('calendar')+'Cronograma '+esc(ctx.type.toLowerCase())+'</span>';
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet sp-sheet">'+
     '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
     '<div class="sp-ic">'+svg('send')+'</div>'+
     '<div class="sp-title">Enviar cronograma para o cliente</div>'+
-    '<div class="sp-sub">Enviaremos o cronograma por WhatsApp com uma mensagem personalizada e um link para o cliente visualizar e interagir.</div>'+
-    '<div class="sp-lbl">PRÉVIA DA MENSAGEM</div>'+
+    '<div class="sp-sub">O cliente recebe uma mensagem profissional. A experiência completa (aprovar, pedir revisão, editar) ocorre na tela <b>Visão do cliente</b>.</div>'+
+    '<div class="sp-lbl">PRÉVIA DA MENSAGEM <span class="sp-lbl-note">(igual à mensagem enviada)</span></div>'+
     '<div class="sp-prev">'+
       '<div class="sp-prev-head">'+
         '<div class="sp-prev-av">'+svg('building')+'</div>'+
         '<div class="sp-prev-id"><div class="sp-prev-n">'+esc(ctx.client||'Cliente')+'</div><div class="sp-prev-r">Cliente</div></div>'+
         chip+
       '</div>'+
-      '<div class="sp-prev-msg">Olá, <b>'+esc(ctx.client||'cliente')+'</b>! Seu cronograma está pronto para avaliação.<br>Acesse o link abaixo para aprovar, pedir revisão ou editar.</div>'+
+      '<pre class="sp-prev-msg">'+esc(msg)+'</pre>'+
       '<div class="sp-cta" data-clientview="'+(ctx.isForm?'':esc(ctx.id))+'">'+
         '<div class="sp-cta-ic">'+svg('eye')+'</div>'+
         '<div class="sp-cta-m"><div class="sp-cta-t">Visualizar cronograma</div><div class="sp-cta-s">Aprovar • Pedir revisão • Editar</div></div>'+
         '<div class="sp-cta-ext">'+svg('ext')+'</div>'+
       '</div>'+
     '</div>'+
-    '<div class="sp-warn">'+svg('info')+'<span><b>Abrir WhatsApp</b> abre o app (ou o WhatsApp Web) com a mensagem completa pronta. O WhatsApp não exibe cartão visual para link <code>idseven://</code> — a experiência premium ocorre na tela <b>Visão do cliente</b> dentro do app. Link público externo fica para fase futura.</span></div>'+
+    '<div class="sp-warn">'+svg('info')+'<span><b>Abrir WhatsApp</b> abre o app (ou o WhatsApp Web) já com esta mensagem pronta. O WhatsApp não exibe cartão visual para o link <code>idseven://</code> — a experiência premium ocorre na <b>Visão do cliente</b> dentro do app. Link público externo fica para fase futura.</span></div>'+
     '<div class="sp-actions">'+
       '<button class="btn ghost" data-modalclose="1">Cancelar</button>'+
-      '<button class="btn ghost sp-share" data-sharemsg="'+esc(msg).replace(/"/g,'&quot;')+'"><span class="sp-copied-w">'+svg('share')+'<span class="sp-share-lbl">Compartilhar mensagem</span></span></button>'+
-      '<button class="btn sp-go" data-dosendclient="'+(ctx.isForm?'__form__':ctx.id)+'" data-wa-app="'+esc(waApp)+'" data-wa-web="'+esc(waWeb)+'">'+svg('send')+'Abrir WhatsApp</button>'+
+      '<button class="btn ghost sp-share" data-copymsg="1"><span class="sp-copied-w">'+svg('copy')+'<span class="sp-share-lbl">Copiar mensagem pronta</span></span></button>'+
+      '<button class="btn sp-go" data-openwa="'+(ctx.isForm?'__form__':esc(ctx.id))+'">'+svg('send')+'Abrir WhatsApp</button>'+
     '</div>'+
   '</div></div>';
 }
@@ -1731,17 +1747,26 @@ async function persistClientSend(taskId){
   }catch(e){console.warn('persistClientSend',e);}
 }
 function copyToClipboard(text){try{navigator.clipboard&&navigator.clipboard.writeText(text);}catch(_){}}
-// Compartilhar a MENSAGEM COMPLETA (nao o link cru): Web Share API quando
-// disponivel; senao copia a mensagem inteira (com o link interno embutido).
-function shareClientMessage(btn,msg){
+// Copia SOMENTE a mensagem humana completa (buildClientMessage), montada do
+// contexto atual. Nunca copia link cru sozinho nem URL tecnica do WhatsApp.
+function copyClientMessage(btn){
+  const ctx=state._sendCtx;if(!ctx)return;
+  const msg=buildClientMessage(ctx);
+  copyToClipboard(msg);
   const lbl=btn&&btn.querySelector('.sp-share-lbl');
-  const done=(txt)=>{if(lbl){lbl.textContent=txt;setTimeout(()=>{lbl.textContent='Compartilhar mensagem';},1800);}};
-  if(navigator.share){
-    navigator.share({title:'Cronograma — ID Seven',text:msg||''})
-      .then(()=>{flashToast('Compartilhamento aberto.');})
-      .catch(()=>{copyToClipboard(msg);done('Mensagem copiada');flashToast('Mensagem pronta copiada para compartilhar.');});
+  if(lbl){lbl.textContent='Mensagem copiada';setTimeout(()=>{lbl.textContent='Copiar mensagem pronta';},1800);}
+  flashToast('Mensagem pronta copiada para compartilhar.');
+}
+// Abrir WhatsApp: tenta o app instalado (whatsapp://) via shell.openExternal;
+// se o SO nao abrir, cai para o WhatsApp Web. Fora do Electron, abre o web.
+// As URLs aqui sao TECNICAS e usadas SO para abrir o app — nunca como conteudo.
+function openWhatsApp(appUrl,webUrl){
+  const ext=window.desktopAPI&&window.desktopAPI.openExternal;
+  if(ext){
+    Promise.resolve(ext(appUrl)).then(ok=>{ if(ok===false){ ext(webUrl); } })
+      .catch(()=>{ try{ext(webUrl);}catch(_){} });
   }else{
-    copyToClipboard(msg);done('Mensagem copiada');flashToast('Mensagem pronta copiada para compartilhar.');
+    try{window.open(webUrl,'_blank');}catch(_){}
   }
 }
 // Abrir WhatsApp: tenta o app instalado (whatsapp://) via shell.openExternal;
@@ -1792,7 +1817,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.80-desktop-whatsapp-share-flow-fix';
+const BUILD='1.0.81-desktop-whatsapp-message-sanitization-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -1804,7 +1829,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.80 · WhatsApp Share Flow Fix</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.81 · WhatsApp Message Sanitization Fix</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -1817,7 +1842,7 @@ function renderConfig(){
     '<div style="height:16px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div></div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.80 · WhatsApp Share Flow Fix · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.81 · WhatsApp Message Sanitization Fix · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
   return h+'</div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
@@ -2042,13 +2067,16 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-clientact]')){const a=el.dataset.clientact;if(a==='aprovar'){clientReviewAction(state.clientView,'aprovar','');}else{state.clientAction=a;render();}return;}
   if(el=g('[data-clientcancel]')){state.clientAction=null;render();return;}
   if(el=g('[data-clientsubmit]')){const kind=el.dataset.clientsubmit;const ta=document.getElementById('cvwNote');const note=ta?ta.value.trim():'';if((kind==='revisao'||kind==='editar')&&!note){flashToast('Descreva o que precisa antes de enviar.');if(ta)ta.focus();return;}clientReviewAction(state.clientView,kind,note);return;}
-  if(el=g('[data-sharemsg]')){shareClientMessage(el,el.dataset.sharemsg);return;}
-  if(el=g('[data-dosendclient]')){
-    const id=el.dataset.dosendclient;
-    const waApp=el.dataset.waApp, waWeb=el.dataset.waWeb;
+  if(el=g('[data-copymsg]')){copyClientMessage(el);return;}
+  if(el=g('[data-openwa]')){
+    const id=el.dataset.openwa;
+    const ctx=state._sendCtx;if(!ctx){closeModal();return;}
+    // Monta a MENSAGEM humana e, SO AQUI, as URLs tecnicas para abrir o app.
+    const msg=buildClientMessage(ctx);
+    const waApp=buildWhatsAppAppUrl(msg), waWeb=buildWhatsAppWebUrl(msg);
     if(id&&id!=='__form__')await persistClientSend(id);
     closeModal();
-    openWhatsApp(waApp,waWeb);
+    openWhatsApp(waApp,waWeb);   // URLs tecnicas usadas APENAS em shell.openExternal
     return;
   }
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
