@@ -16,6 +16,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -32,11 +35,13 @@ fun AppTopbar(title: String, subtitle: String, currentUser: UserLite?) {
         modifier = Modifier.fillMaxWidth().background(Tokens.Bg).padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF22D3EE), Tokens.Accent, Color(0xFFF472B6)))),
-            contentAlignment = Alignment.Center,
-        ) { Text("7", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+        // Logo oficial no header (sem o "7").
+        Image(
+            painter = painterResource(br.com.idseven.agenda.nativebeta.R.drawable.brand_logo),
+            contentDescription = "ID Seven",
+            modifier = Modifier.size(44.dp),
+            contentScale = ContentScale.Fit,
+        )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(title, color = Tokens.Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold)

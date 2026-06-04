@@ -22,6 +22,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -38,11 +41,13 @@ import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 @Composable
 fun BrandHeader(subtitle: String = "Nativo Beta · SaaS") {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier.size(72.dp).clip(RoundedCornerShape(20.dp))
-                .background(Brush.linearGradient(listOf(Color(0xFF22D3EE), Tokens.Accent, Color(0xFFF472B6)))),
-            contentAlignment = Alignment.Center,
-        ) { Text("7", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Bold) }
+        // Logo oficial (brand/logo-source.png -> res/drawable-nodpi/brand_logo.png). Sem o "7".
+        Image(
+            painter = painterResource(br.com.idseven.agenda.nativebeta.R.drawable.brand_logo),
+            contentDescription = "ID Seven",
+            modifier = Modifier.size(76.dp),
+            contentScale = ContentScale.Fit,
+        )
         androidx.compose.foundation.layout.Spacer(Modifier.height(14.dp))
         Text("ID Seven", color = Tokens.Accent, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Medium)
