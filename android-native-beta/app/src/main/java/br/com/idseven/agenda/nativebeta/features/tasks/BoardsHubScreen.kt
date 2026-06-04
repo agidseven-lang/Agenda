@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,10 +50,17 @@ fun BoardsHubScreen(
     tasksState: UiList<TaskItem>,
     currentUser: UserLite?,
     onOpenSector: (String) -> Unit,
+    onOpenRoleBoards: () -> Unit = {},   // ADITIVO: admin -> "Quadros por responsável"
+    onOpenMyBoard: () -> Unit = {},      // ADITIVO: "Meu quadro / Minhas demandas"
 ) {
     tasksState.errorMessage()?.let { ErrorState("Quadros — $it"); return }
     if (tasksState.isLoading) { SkeletonList(); return }
     val all = TaskVisibility.visibleTasks(currentUser, tasksState.itemsOrEmpty())
+    val isAdmin = TaskVisibility.roleCategory(currentUser) == TaskVisibility.Cat.ADMIN
+    val uid = currentUser?.id
+    val myOpen = if (uid != null) tasksState.itemsOrEmpty().count {
+        (it.assigneeId == uid || it.by == uid) && (it.status ?: "afazer") != "concluido"
+    } else 0
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -64,6 +73,27 @@ fun BoardsHubScreen(
             }
         }
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp)) {
+            // ADITIVO — "Meu quadro" (todos: minhas demandas/tarefas) — não remove a visão ampla.
+            if (uid != null) {
+                item {
+                    BoardCard(
+                        label = "Meu quadro", desc = "Minhas demandas e tarefas", color = Tokens.Accent,
+                        icon = Icons.Outlined.Dashboard, total = myOpen, late = 0, onClick = onOpenMyBoard,
+                    )
+                    Spacer(Modifier.size(12.dp))
+                }
+            }
+            // ADITIVO — Admin: índice de "Quadros por responsável" (cada pessoa isolada).
+            if (isAdmin) {
+                item {
+                    BoardCard(
+                        label = "Quadros por responsável", desc = "Cada designer/social em um quadro isolado",
+                        color = androidx.compose.ui.graphics.Color(0xFFA78BFA),
+                        icon = Icons.Outlined.Groups, total = 0, late = 0, onClick = onOpenRoleBoards,
+                    )
+                    Spacer(Modifier.size(12.dp))
+                }
+            }
             items(Sectors.ALL, key = { it.key }) { s ->
                 val list = all.filter { Sectors.of(it.sector).key == s.key }
                 val total = list.size

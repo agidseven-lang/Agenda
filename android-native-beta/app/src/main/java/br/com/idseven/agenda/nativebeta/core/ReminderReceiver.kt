@@ -25,6 +25,11 @@ class ReminderReceiver : BroadcastReceiver() {
             val deeplink = intent.getStringExtra("deeplink")?.takeIf { it.isNotBlank() }
                 ?: id?.let { "event:$it" } ?: ""
             android.util.Log.i("ReminderDiag", "[REMINDER_RECEIVED] id=${id ?: "teste"} type=$type")
+            // Preferência local (Configurações): se o usuário desativou lembretes locais, não posta.
+            // Default ON -> comportamento atual preservado. Remove o agendado p/ não re-armar no boot.
+            if (!br.com.idseven.agenda.nativebeta.data.SettingsStore.remindersEnabled(context)) {
+                ReminderScheduler.removeFired(context, id); return
+            }
             Notifications.ensure(context)
             val notifId = id?.hashCode() ?: 99021
             // Lembrete 1h antes = experiência PREMIUM full-screen (heads-up se não permitido).

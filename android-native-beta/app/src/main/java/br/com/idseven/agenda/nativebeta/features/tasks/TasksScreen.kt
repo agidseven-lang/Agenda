@@ -108,6 +108,8 @@ fun TasksScreen(
     onTaskClick: (String) -> Unit,
     currentUser: UserLite? = null,     // Fase B: visibilidade por função (client-side)
     lockedSector: String? = null,      // quando setado: quadro de UM setor (Fase A)
+    personId: String? = null,          // ADITIVO: quadro por RESPONSÁVEL (admin/role-boards) — todos os setores
+    personName: String? = null,
     onNew: () -> Unit = {},
     onBack: (() -> Unit)? = null,
 ) {
@@ -127,14 +129,19 @@ fun TasksScreen(
     val q = query.trim().lowercase()
     val tasks = all.filter { t ->
         val okQ = q.isEmpty() || listOf(t.title, t.client, t.assignee).any { (it ?: "").lowercase().contains(q) }
-        // Quadro de setor (lockedSector) usa resolução por alias; senão, filtro livre.
-        val okS = if (lockedSector != null) Sectors.of(t.sector).key == lockedSector
-        else (sectorFilter == null || t.sector == sectorFilter)
+        // Quadro por responsável (personId) ignora setor; quadro de setor (lockedSector) trava o setor.
+        val okS = when {
+            personId != null -> true
+            lockedSector != null -> Sectors.of(t.sector).key == lockedSector
+            else -> (sectorFilter == null || t.sector == sectorFilter)
+        }
+        // Fluxo da pessoa = o que ela executa (assigneeId) OU as demandas dela (by). Cobre designer e social.
+        val okPerson = personId == null || t.assigneeId == personId || t.by == personId
         val okM = !mineOnly || currentUid == null ||
             (t.assigneeId == currentUid) || (t.by == currentUid)
         // Fase B: visibilidade por função (admin/social veem tudo; operacional só as próprias).
         val okVis = TaskVisibility.canSeeTask(currentUser, t)
-        okQ && okS && okM && okVis
+        okQ && okS && okPerson && okM && okVis
     }
     val pager = rememberPagerState(pageCount = { TaskStatus.COLUMNS.size })
 
@@ -161,14 +168,32 @@ fun TasksScreen(
                     Text("+ Novo", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
+        } else if (personId != null) {
+            // Cabeçalho do QUADRO POR RESPONSÁVEL (admin / "Meu quadro"): avatar + nome, todos os setores.
+            val person = users.firstOrNull { it.id == personId }
+            val nm = personName ?: person?.name ?: "Responsável"
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, end = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) {
+                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(11.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Voltar", tint = Tokens.Soft, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(10.dp))
+                }
+                Avatar(person?.photo, UserColor.of(person?.id ?: personId, person?.color), nm, 38.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Quadro de ${UserColor.firstName(nm)}", color = Tokens.Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(person?.role?.ifBlank { null } ?: "Fluxo individual", color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
         SearchField(query, { query = it }, "Buscar tarefa…")
-        // Filtro "Minhas tarefas" (chip de escopo) + filtros de setor (ocultos no quadro de setor).
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 2.dp)) {
-            if (currentUid != null) {
-                SectorChip("Minhas tarefas", Tokens.Accent, mineOnly) { mineOnly = !mineOnly }
-            }
-            if (lockedSector == null) {
+        // Filtro "Minhas tarefas" + filtros de setor (ocultos no quadro de setor e no quadro por responsável).
+        if (lockedSector == null && personId == null) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 2.dp)) {
+                if (currentUid != null) {
+                    SectorChip("Minhas tarefas", Tokens.Accent, mineOnly) { mineOnly = !mineOnly }
+                }
                 SectorChip("Todos", null, sectorFilter == null) { sectorFilter = null }
                 Sectors.ALL.forEach { s -> SectorChip(s.label, s.color, sectorFilter == s.key) { sectorFilter = s.key } }
             }
