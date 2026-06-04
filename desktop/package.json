@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.75",
-  "description": "Agenda ID Seven Desktop — corrige icone Detalhes (olho) e polish do card (Electron) (Electron)",
+  "version": "1.0.76",
+  "description": "Agenda ID Seven Desktop — adiciona icone Configuracoes na sidebar (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

@@ -17,5 +17,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.on("notif-open", (_e, t: string) => cb(t));
   },
   isDesktop: true,
-  version: "1.0.75-desktop-details-icon-card-polish",
+  version: "1.0.76-desktop-settings-sidebar-icon",
 });
