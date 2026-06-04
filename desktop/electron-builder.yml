@@ -20,7 +20,7 @@ win:
     - target: msi
       arch:
         - x64
-  icon: build/icon.png
+  icon: build/icon.ico
   artifactName: "Agenda-ID-Seven-Desktop-${version}-${arch}.${ext}"
 nsis:
   oneClick: false

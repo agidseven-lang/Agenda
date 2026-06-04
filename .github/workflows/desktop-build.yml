@@ -30,7 +30,7 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.88-desktop-team-notes-designer-notify"
+      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.88-desktop-team-notes-designer-notify-logo-logo"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
           # VERSAO-DESKTOP.txt — prova do que esta dentro
           {
             echo "productName : Agenda ID Seven Desktop"
-            echo "versionName : 1.0.88-desktop-team-notes-designer-notify"
+            echo "versionName : 1.0.88-desktop-team-notes-designer-notify-logo"
             echo "appId       : br.com.idseven.agenda.desktop"
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
