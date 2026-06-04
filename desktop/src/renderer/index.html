@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.77 (Cronograma Client Flow Phase1)</title>
+<title>ID Seven · Desktop 1.0.77 (Cronograma Client Flow Phase 1)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -712,21 +712,90 @@
   /* Cronograma — botao Enviar para cliente (Fase 1) */
   .rev-send{margin-top:18px}
   .rev-send-btn{width:100%;height:52px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px;font-weight:800;color:#fff;
-    background:linear-gradient(135deg,#22D3EE 0%,#10B981 100%);box-shadow:0 8px 22px -10px rgba(16,185,129,.6),inset 0 1px 0 rgba(255,255,255,.18);border:none;letter-spacing:.005em}
-  .rev-send-btn:hover{filter:brightness(1.06);transform:translateY(-1px)}
+    background:linear-gradient(135deg,#5B6CFF 0%,#22D3EE 55%,#10B981 100%);box-shadow:0 10px 26px -10px rgba(34,211,238,.55),inset 0 1px 0 rgba(255,255,255,.2);border:none;letter-spacing:.005em}
+  .rev-send-btn:hover{filter:brightness(1.07);transform:translateY(-1px)}
   .rev-send-btn:active{filter:brightness(.98);transform:translateY(0)}
   .rev-send-btn svg{width:18px;height:18px}
   .rev-send-hint{font-size:12px;color:var(--soft);margin-top:8px;text-align:center}
-  /* Modal de envio */
-  .send-ic{width:54px;height:54px;border-radius:15px;background:rgba(16,185,129,.16);color:#10B981;display:flex;align-items:center;justify-content:center;margin:4px auto 14px}
-  .send-ic svg{width:26px;height:26px}
-  .send-msg-box{background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:12px;margin:14px 0 8px;text-align:left}
-  .send-msg-box pre{margin:0;font-family:inherit;font-size:13px;color:var(--ink);white-space:pre-wrap;word-break:break-word;line-height:1.5}
-  .send-warn{font-size:11.5px;color:var(--amber);background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.28);border-radius:10px;padding:10px;margin-bottom:12px;text-align:left;line-height:1.45}
-  .send-sheet{text-align:center}
-  body.desktop .send-sheet{max-width:520px}
-  .btn.send-go{background:linear-gradient(135deg,#22D3EE 0%,#10B981 100%);color:#fff;box-shadow:0 6px 16px -8px rgba(16,185,129,.6)}
-  .btn.send-go:hover{filter:brightness(1.06)}
+
+  /* ===== Modal premium "Enviar cronograma para o cliente" ===== */
+  .sp-sheet{position:relative;text-align:center}
+  body.desktop .sp-sheet{max-width:560px}
+  .sp-x{position:absolute;top:14px;right:14px;color:var(--faint)}
+  .sp-ic{width:58px;height:58px;border-radius:17px;display:flex;align-items:center;justify-content:center;margin:4px auto 16px;color:#10B981;
+    background:linear-gradient(160deg,rgba(34,211,238,.20),rgba(16,185,129,.16));border:1px solid rgba(16,185,129,.32);box-shadow:0 10px 26px -14px rgba(16,185,129,.7)}
+  .sp-ic svg{width:28px;height:28px}
+  .sp-title{font-size:20px;font-weight:800;letter-spacing:-.01em}
+  .sp-sub{font-size:13px;color:var(--soft);margin:8px auto 18px;max-width:440px;line-height:1.5}
+  .sp-lbl{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);text-align:left;margin-bottom:8px}
+  .sp-prev{background:var(--surface2);border:1px solid var(--line-soft);border-radius:16px;padding:15px;text-align:left;box-shadow:0 8px 30px -20px rgba(0,0,0,.8)}
+  .sp-prev-head{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+  .sp-prev-av{width:40px;height:40px;border-radius:11px;background:rgba(34,211,238,.14);color:#22D3EE;display:flex;align-items:center;justify-content:center;flex:none}
+  .sp-prev-av svg{width:21px;height:21px}
+  .sp-prev-id{flex:1;min-width:0}
+  .sp-prev-n{font-size:14.5px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sp-prev-r{font-size:11.5px;color:var(--faint);margin-top:1px}
+  .sp-chip{display:inline-flex;align-items:center;gap:6px;flex:none;padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:800;background:rgba(16,185,129,.12);color:#10B981;border:1px solid rgba(16,185,129,.28)}
+  .sp-chip svg{width:14px;height:14px}
+  .sp-prev-msg{font-size:13.5px;color:var(--ink);line-height:1.55;margin-bottom:13px}
+  .sp-cta{display:flex;align-items:center;gap:13px;padding:13px;border-radius:13px;cursor:pointer;
+    background:linear-gradient(135deg,rgba(34,211,238,.10),rgba(16,185,129,.08));border:1px solid rgba(34,211,238,.30);transition:border-color .14s,transform .14s,box-shadow .14s}
+  .sp-cta:hover{border-color:rgba(34,211,238,.6);transform:translateY(-1px);box-shadow:0 10px 24px -16px rgba(34,211,238,.8)}
+  .sp-cta-ic{width:42px;height:42px;border-radius:11px;background:rgba(16,185,129,.16);color:#10B981;display:flex;align-items:center;justify-content:center;flex:none}
+  .sp-cta-ic svg{width:21px;height:21px}
+  .sp-cta-m{flex:1;min-width:0}
+  .sp-cta-t{font-size:14.5px;font-weight:800}
+  .sp-cta-s{font-size:12px;color:var(--soft);margin-top:2px}
+  .sp-cta-ext{color:#22D3EE;flex:none}
+  .sp-cta-ext svg{width:18px;height:18px}
+  .sp-warn{display:flex;align-items:flex-start;gap:8px;font-size:11.5px;color:var(--amber);background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.28);border-radius:11px;padding:11px;margin:14px 0;text-align:left;line-height:1.45}
+  .sp-warn svg{width:15px;height:15px;flex:none;margin-top:1px}
+  .sp-actions{display:flex;gap:10px}
+  .sp-actions .btn{flex:1;height:46px;border-radius:12px;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:8px}
+  .sp-actions .btn svg{width:16px;height:16px}
+  .sp-copied-w{display:inline-flex;align-items:center;gap:8px}
+  .btn.sp-go{flex:1.3;color:#fff;border:none;background:linear-gradient(135deg,#5B6CFF 0%,#22D3EE 60%,#10B981 100%);box-shadow:0 8px 20px -10px rgba(34,211,238,.6)}
+  .btn.sp-go:hover{filter:brightness(1.07)}
+
+  /* ===== Preview interno — visão do cliente ===== */
+  .cv-sheet{position:relative;text-align:left}
+  body.desktop .cv-sheet{max-width:560px}
+  .cv-x{position:absolute;top:14px;right:14px;color:var(--faint)}
+  .cv-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;font-size:11.5px;font-weight:800;background:rgba(167,139,250,.14);color:#A78BFA;border:1px solid rgba(167,139,250,.3);margin-bottom:16px}
+  .cv-badge svg{width:15px;height:15px}
+  .cv-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .cv-head-av{width:46px;height:46px;border-radius:13px;background:rgba(34,211,238,.14);color:#22D3EE;display:flex;align-items:center;justify-content:center;flex:none}
+  .cv-head-av svg{width:24px;height:24px}
+  .cv-head-m{flex:1;min-width:0}
+  .cv-head-n{font-size:16px;font-weight:800;line-height:1.2}
+  .cv-head-s{font-size:12.5px;color:var(--soft);margin-top:2px}
+  .cv-st{display:inline-flex;align-items:center;gap:7px;flex:none;padding:6px 11px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid transparent}
+  .cv-st .dotc{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .cv-name{font-size:18px;font-weight:800;letter-spacing:-.01em;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line-soft)}
+  .cv-sec{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+  .cv-list{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto;margin-bottom:16px}
+  .cv-item{display:flex;align-items:flex-start;gap:12px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:12px}
+  .cv-item-n{width:24px;height:24px;border-radius:8px;background:rgba(91,108,255,.16);color:var(--accent);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .cv-item-m{flex:1;min-width:0}
+  .cv-item-t{font-size:14px;font-weight:700}
+  .cv-item-l{font-size:12.5px;color:var(--soft);margin-top:3px;line-height:1.45}
+  .cv-empty{font-size:13px;color:var(--faint);padding:16px;text-align:center}
+  .cv-actions{display:flex;gap:10px;margin-bottom:14px}
+  .cv-actions .btn{flex:1;height:46px;border-radius:12px;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:8px}
+  .cv-actions .btn svg{width:16px;height:16px}
+  .btn.cv-approve{color:#fff;border:none;background:linear-gradient(135deg,#34D399 0%,#10B981 100%);box-shadow:0 8px 20px -10px rgba(16,185,129,.6)}
+  .btn.cv-approve:hover{filter:brightness(1.07)}
+  .btn.cv-rev{color:var(--amber);border-color:rgba(245,158,11,.4)}
+  .cv-foot{display:flex;align-items:flex-start;gap:8px;font-size:11.5px;color:var(--soft);background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:11px;line-height:1.45}
+  .cv-foot svg{width:15px;height:15px;flex:none;margin-top:1px;color:var(--faint)}
+
+  /* Toast efêmero */
+  .flash-toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);z-index:9999;display:flex;align-items:center;gap:9px;
+    background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:13px;font-weight:600;color:var(--ink);
+    box-shadow:0 14px 40px -12px rgba(0,0,0,.7);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw}
+  .flash-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .flash-toast svg{width:16px;height:16px;color:var(--accent);flex:none}
+
   /* Chip cronStatus no card */
   .tc-cron-st{display:inline-flex;align-items:center;gap:7px;margin-top:8px;padding:5px 11px;border-radius:8px;font-size:11px;font-weight:800;background:rgba(34,211,238,.12);color:#22D3EE;border:1px solid rgba(34,211,238,.22)}
   .tc-cron-st .dotc{width:6px;height:6px;border-radius:50%;background:currentColor}
@@ -854,6 +923,10 @@ const ICON={
   eye:'<path d="M2.5 12C4 8.5 7.6 6 12 6s8 2.5 9.5 6c-1.5 3.5-5.1 6-9.5 6s-8-2.5-9.5-6Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/>',
   send:'<path d="M21 3 11 13M21 3l-7 18-3-8-8-3 18-7z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/>',
   copy:'<rect x="9" y="9" width="11" height="11" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M5 15V6.2A1.2 1.2 0 0 1 6.2 5H15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
+  ext:'<path d="M14 4h6v6M20 4l-8.5 8.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 13.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  building:'<path d="M5 21V5.5A1.5 1.5 0 0 1 6.5 4H13a1.5 1.5 0 0 1 1.5 1.5V21M14.5 9h3A1.5 1.5 0 0 1 19 10.5V21M3 21h18" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M8 8h2.5M8 12h2.5M8 16h2.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
+  check:'<path d="M4 12.5l5 5 11-11" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  revise:'<path d="M3.5 7.5h12M3.5 7.5l3-3M3.5 7.5l3 3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.5 16.5h-12M20.5 16.5l-3-3M20.5 16.5l-3 3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   gear:'<circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M19.4 13a1.65 1.65 0 0 0 .33 1.82l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V20a2 2 0 1 1-4 0v-.08a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H4a2 2 0 1 1 0-4h.08a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05a1.65 1.65 0 0 0 1.82.33H10a1.65 1.65 0 0 0 1-1.51V4a2 2 0 1 1 4 0v.08a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05a1.65 1.65 0 0 0-.33 1.82V13Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   info:'<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 11v5M12 7.6v.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   today:'<rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
@@ -1313,37 +1386,121 @@ const CRON_STATES={
 };
 function cronStatusLabel(k){return (CRON_STATES[k]||{label:k}).label;}
 function cronStatusColor(k){return (CRON_STATES[k]||{color:'#9BA0AB'}).color;}
-function clientMessage(t){
-  const link='idseven://client/'+t.id;
-  return 'Olá, '+(t.client||'cliente')+'. Seu cronograma "'+(t.title||'')+'" está pronto para avaliação. '+
-         'Acesse pelo link abaixo para aprovar, pedir revisão ou editar: '+link;
+// Deriva o tipo do cronograma (Semanal/Quinzenal/Mensal) de um form ou tarefa salva
+function cronTypeLabel(o){
+  const map={semanal:'Semanal',quinzenal:'Quinzenal',mensal:'Mensal'};
+  if(o.subtype&&map[o.subtype])return map[o.subtype];
+  if(o.cronSub&&map[o.cronSub])return map[o.cronSub];
+  const n=(o.contents||o.cronContents||[]).length;
+  if(n>=12)return 'Mensal';if(n>=6)return 'Quinzenal';if(n>=1)return 'Semanal';return 'Cronograma';
+}
+// Normaliza form ou tarefa salva num contexto unico para envio/preview
+function cronCtx(o){
+  const isForm=!o.id;
+  return {
+    id:o.id||null, isForm,
+    client:(o.client||'').trim(),
+    title:(o.title||'').trim()||'Cronograma',
+    type:cronTypeLabel(o),
+    status:o.cronStatus||(isForm?'pronto_cliente':'rascunho_social'),
+    contents:(o.contents||o.cronContents||[]).filter(c=>c&&(c.tema||c.legenda)),
+    assignee:o.assignee||'',
+  };
+}
+// Link interno/controlado (Fase 1 — nao publico). Documentado no relatorio.
+function clientPreviewLink(ctx){return 'idseven://client/'+(ctx.id||'<id>');}
+// Mensagem profissional para WhatsApp (texto puro — limitacao do canal)
+function clientMessage(ctx){
+  const nome=ctx.client||'cliente';
+  return 'Olá, '+nome+'!\n'+
+    'Seu cronograma '+ctx.type.toLowerCase()+' está pronto para avaliação.\n'+
+    'Acesse o link abaixo para aprovar, pedir revisão ou editar:\n\n'+
+    'Visualizar cronograma: '+clientPreviewLink(ctx)+'\n\n'+
+    'Contamos com seu retorno.';
 }
 function openSendClientModal(taskOrForm){
-  // Aceita tarefa salva (com .id) ou state.form ainda nao salvo
-  const isForm=!taskOrForm.id;
-  const t=isForm?taskOrForm:taskOrForm;
-  const msg=clientMessage({id:isForm?'<gerado-ao-salvar>':t.id,client:t.client,title:t.title});
+  const ctx=cronCtx(taskOrForm);
+  state._sendCtx=ctx;                              // guarda p/ CTA "Visualizar cronograma"
+  const msg=clientMessage(ctx);
   const wa='https://wa.me/?text='+encodeURIComponent(msg);
-  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet send-sheet">'+
-    '<div class="send-ic">'+svg('send')+'</div>'+
-    '<div class="del-title">Enviar para o cliente</div>'+
-    '<div class="del-msg">Vamos abrir o WhatsApp com a mensagem pronta. Escolha o contato do cliente <b>'+esc(t.client||'')+'</b> e envie. O cronograma fica marcado como <b>enviado ao cliente</b>.</div>'+
-    '<div class="send-msg-box"><pre>'+esc(msg)+'</pre></div>'+
-    '<div class="send-warn">Limitação atual: não há link público real (Fase 1). O cliente visualizará pelo app interno; link público externo vem em fase futura.</div>'+
-    '<div class="del-actions">'+
+  const chip='<span class="sp-chip">'+svg('calendar')+'Cronograma '+esc(ctx.type.toLowerCase())+'</span>';
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet sp-sheet">'+
+    '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
+    '<div class="sp-ic">'+svg('send')+'</div>'+
+    '<div class="sp-title">Enviar cronograma para o cliente</div>'+
+    '<div class="sp-sub">Enviaremos o cronograma por WhatsApp com uma mensagem personalizada e um link para o cliente visualizar e interagir.</div>'+
+    '<div class="sp-lbl">PRÉVIA DA MENSAGEM</div>'+
+    '<div class="sp-prev">'+
+      '<div class="sp-prev-head">'+
+        '<div class="sp-prev-av">'+svg('building')+'</div>'+
+        '<div class="sp-prev-id"><div class="sp-prev-n">'+esc(ctx.client||'Cliente')+'</div><div class="sp-prev-r">Cliente</div></div>'+
+        chip+
+      '</div>'+
+      '<div class="sp-prev-msg">Olá, <b>'+esc(ctx.client||'cliente')+'</b>! Seu cronograma está pronto para avaliação.<br>Acesse o link abaixo para aprovar, pedir revisão ou editar.</div>'+
+      '<div class="sp-cta" data-clientpreview="1">'+
+        '<div class="sp-cta-ic">'+svg('eye')+'</div>'+
+        '<div class="sp-cta-m"><div class="sp-cta-t">Visualizar cronograma</div><div class="sp-cta-s">Aprovar • Pedir revisão • Editar</div></div>'+
+        '<div class="sp-cta-ext">'+svg('ext')+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="sp-warn">'+svg('info')+'<span>Nesta fase, a visualização ocorre pelo app interno. Link público externo será tratado em fase futura.</span></div>'+
+    '<div class="sp-actions">'+
       '<button class="btn ghost" data-modalclose="1">Cancelar</button>'+
-      '<button class="btn ghost" data-copyclient="'+esc(msg).replace(/"/g,'&quot;')+'">'+svg('copy')+'Copiar</button>'+
-      '<button class="btn send-go" data-dosendclient="'+(isForm?'__form__':t.id)+'" data-wa="'+esc(wa)+'">'+svg('send')+'Abrir WhatsApp</button>'+
+      '<button class="btn ghost" data-copyclient="'+esc(msg).replace(/"/g,'&quot;')+'"><span class="sp-copied-w">'+svg('copy')+'<span class="sp-copy-lbl">Copiar mensagem</span></span></button>'+
+      '<button class="btn sp-go" data-dosendclient="'+(ctx.isForm?'__form__':ctx.id)+'" data-wa="'+esc(wa)+'">'+svg('send')+'Abrir WhatsApp</button>'+
     '</div>'+
   '</div></div>';
 }
+// Preview interno controlado — a "visão do cliente" (Fase 1: visual; ações reais na Fase 2)
+function openClientPreview(ctx){
+  ctx=ctx||state._sendCtx;if(!ctx)return;
+  const stColor=cronStatusColor(ctx.status),stLabel=cronStatusLabel(ctx.status);
+  const conts=ctx.contents.length?ctx.contents.map((c,i)=>
+    '<div class="cv-item"><div class="cv-item-n">'+(i+1)+'</div>'+
+    '<div class="cv-item-m"><div class="cv-item-t">'+esc(c.tema||'(sem tema)')+'</div>'+
+    (c.legenda?'<div class="cv-item-l">'+esc(c.legenda)+'</div>':'')+'</div></div>'
+  ).join(''):'<div class="cv-empty">Nenhum conteúdo preenchido.</div>';
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet cv-sheet">'+
+    '<button class="iconbtn cv-x" data-clientback="1">'+svg('close')+'</button>'+
+    '<div class="cv-badge">'+svg('eye')+'Prévia da visão do cliente</div>'+
+    '<div class="cv-head">'+
+      '<div class="cv-head-av">'+svg('building')+'</div>'+
+      '<div class="cv-head-m"><div class="cv-head-n">'+esc(ctx.client||'Cliente')+'</div>'+
+        '<div class="cv-head-s">Cronograma '+esc(ctx.type.toLowerCase())+'</div></div>'+
+      '<span class="cv-st" style="color:'+stColor+';background:'+withAlpha(stColor,.14)+';border-color:'+withAlpha(stColor,.32)+'"><span class="dotc"></span>'+esc(stLabel)+'</span>'+
+    '</div>'+
+    '<div class="cv-name">'+esc(ctx.title)+'</div>'+
+    '<div class="cv-sec">Conteúdos ('+ctx.contents.length+')</div>'+
+    '<div class="cv-list">'+conts+'</div>'+
+    '<div class="cv-actions">'+
+      '<button class="btn cv-approve" data-cpv="aprovar">'+svg('check')+'Aprovar</button>'+
+      '<button class="btn ghost cv-rev" data-cpv="revisao">'+svg('revise')+'Pedir revisão</button>'+
+      '<button class="btn ghost" data-cpv="editar">'+svg('editnote')+'Editar</button>'+
+    '</div>'+
+    '<div class="cv-foot">'+svg('info')+'<span>Prévia visual da Fase 1. As ações <b>Aprovar / Pedir revisão / Editar</b> pelo cliente entram na Fase 2.</span></div>'+
+  '</div></div>';
+}
+function flashToast(msg){
+  let t=document.getElementById('flashToast');
+  if(!t){t=document.createElement('div');t.id='flashToast';t.className='flash-toast';document.body.appendChild(t);}
+  t.innerHTML=svg('info')+'<span>'+esc(msg)+'</span>';t.classList.add('show');
+  clearTimeout(window.__ft);window.__ft=setTimeout(()=>t.classList.remove('show'),2600);
+}
 async function persistClientSend(taskId){
-  const now=Date.now();
+  const now=Date.now();const u=state.user||{};
+  const t=state.tasks.find(x=>x.id===taskId)||{};
   try{
     await db.collection('tasks').doc(taskId).update({
       cronStatus:'enviado_cliente',
       clientSentAt:now,
-      history:firebase.firestore.FieldValue.arrayUnion({kind:'sent_to_client',at:now,byId:state.user.id})
+      clientSentBy:u.id||null,
+      clientPreviewLink:'idseven://client/'+taskId,
+      history:firebase.firestore.FieldValue.arrayUnion({
+        type:'cronograma_enviado_cliente',
+        label:'Cronograma enviado ao cliente',
+        by:u.name||'', byId:u.id||null,
+        at:now, client:t.client||'', channel:'whatsapp_fallback'
+      })
     });
   }catch(e){console.warn('persistClientSend',e);}
 }
@@ -1538,7 +1695,7 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
      (sub||TEMPLATES[s.key]?'<button class="rev-edit2" data-formgoto="2">'+svg('description')+'Editar briefing</button>':'')+'</div>';
   // Fase 1: Enviar para cliente — apenas Cronograma + cliente + 1+ conteudos + papel Social/Admin/Manager
   if(canSendToClient(f)){
-    h+='<div class="rev-send"><button class="btn rev-send-btn" data-sendclient="1">'+svg('send')+'Enviar cronograma para o cliente</button>'+
+    h+='<div class="rev-send"><button class="btn rev-send-btn" data-sendclient="1">'+svg('send')+'Enviar para o cliente</button>'+
        '<div class="rev-send-hint">Gera mensagem para WhatsApp com link de preview interno do cronograma.</div></div>';
   }
   return h;
@@ -1585,14 +1742,14 @@ async function saveTask(){const f=state.form;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
   if(f.contents.length)data.cronContents=f.contents;
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
-  if(secOf(f.sector).key==='cronograma')data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';
+  if(secOf(f.sector).key==='cronograma'){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;}
   const sendAfter=!!f._sendAfterSave;
   const ref=await db.collection('tasks').add(data);
   const sector=f.sector;state.form=null;
   if(sendAfter&&ref&&ref.id){
     // mantemos o board aberto e abrimos o modal de envio com a tarefa recem-criada
     state.tab='tarefas';state.boardSector=sector;boardCol=0;render();
-    openSendClientModal({id:ref.id,client:data.client,title:data.title});
+    openSendClientModal({id:ref.id,client:data.client,title:data.title,cronContents:data.cronContents||[],cronSub:data.cronSub,cronStatus:data.cronStatus});
   }else{
     state.tab='tarefas';state.boardSector=sector;boardCol=0;render();
   }
@@ -1630,7 +1787,10 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(el=g('[data-sendclient-task]')){const t=state.tasks.find(x=>x.id===el.dataset.sendclientTask);if(t)openSendClientModal(t);return;}
-  if(el=g('[data-copyclient]')){copyToClipboard(el.dataset.copyclient);return;}
+  if(el=g('[data-clientpreview]')){openClientPreview(state._sendCtx);return;}
+  if(el=g('[data-clientback]')){if(state._sendCtx)openSendClientModal(state._sendCtx.id?(state.tasks.find(x=>x.id===state._sendCtx.id)||state._sendCtx):state._sendCtx);else closeModal();return;}
+  if(el=g('[data-cpv]')){const a=el.dataset.cpv;const m={aprovar:'Aprovação pelo cliente — disponível na Fase 2.',revisao:'Pedido de revisão pelo cliente — disponível na Fase 2.',editar:'Edição pelo cliente — disponível na Fase 2.'};flashToast(m[a]||'Disponível na Fase 2.');return;}
+  if(el=g('[data-copyclient]')){copyToClipboard(el.dataset.copyclient);const lbl=el.querySelector('.sp-copy-lbl');if(lbl){lbl.textContent='Copiada!';setTimeout(()=>{lbl.textContent='Copiar mensagem';},1600);}flashToast('Mensagem copiada para a área de transferência.');return;}
   if(el=g('[data-dosendclient]')){
     const id=el.dataset.dosendclient;
     const wa=el.dataset.wa;
