@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.86 (Login Render Hotfix)</title>
+<title>ID Seven · Desktop 1.0.87 (Current Sync Build)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -970,7 +970,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.86 · Login Render Hotfix</span><br>
+    <span class="pill-ver">Desktop 1.0.87 · Current Sync Build</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -985,7 +985,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.86 · Login Render Hotfix</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.87 · Current Sync Build</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1221,7 +1221,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.86 · Login Render Hotfix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.87 · Current Sync Build</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2127,7 +2127,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.86-desktop-login-render-hotfix';
+const BUILD='1.0.87-desktop-current-sync-build';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2139,7 +2139,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.86 · Login Render Hotfix</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.87 · Current Sync Build</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -2152,7 +2152,7 @@ function renderConfig(){
     '<div style="height:16px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div></div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.86 · Login Render Hotfix · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.87 · Current Sync Build · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
   return h+'</div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
