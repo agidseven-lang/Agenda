@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.74 (Card Detail Excellence)</title>
+<title>ID Seven · Desktop 1.0.75 (Details Icon Card Polish)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -719,7 +719,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.74 · Card Detail Excellence</span><br>
+    <span class="pill-ver">Desktop 1.0.75 · Details Icon Card Polish</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -734,7 +734,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.74 · Card Detail Excellence</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.75 · Details Icon Card Polish</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -825,6 +825,7 @@ const ICON={
   editnote:'<path d="M14.5 3 21 9.5l-12 12H3v-6L14.5 3z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><path d="m12 5.5 6.5 6.5" stroke="currentColor" stroke-width="2"/>',
   description:'<rect x="5" y="3" width="14" height="18" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M9 8h6M9 12h6M9 16h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   grid:'<rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2" fill="none"/>',
+  eye:'<path d="M2.5 12C4 8.5 7.6 6 12 6s8 2.5 9.5 6c-1.5 3.5-5.1 6-9.5 6s-8-2.5-9.5-6Z" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/>',
   today:'<rect x="3" y="4" width="18" height="17" rx="3" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   checklist:'<path d="M9 6h11M9 12h11M9 18h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
   group:'<circle cx="9" cy="8" r="3.2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0" stroke="currentColor" stroke-width="2" fill="none"/><path d="M16 6.2a3 3 0 0 1 0 5.6M17 13.5a5.5 5.5 0 0 1 3.5 5" stroke="currentColor" stroke-width="2" fill="none"/>',
@@ -957,7 +958,7 @@ function render(){
       '<button class="new-task-btn" data-fab="1"><span class="new-task-icon">'+svg('plus')+'</span><span class="new-task-label">Nova tarefa</span></button>'+
       '<div class="sb-sect">Workspace</div>'+
       TABS.map(sbItem).join('')+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.74 · Card Detail Excellence</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.75 · Details Icon Card Polish</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1187,7 +1188,7 @@ function taskCard(t){
   h+='</div>'+chk;
   // 5) Rodape — prazo + acoes
   h+='<div class="tc-foot">'+((t.dueDate||t.due)?'<span class="tc-prazo">'+svg('clock')+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span>':'<span class="tc-prazo tc-prazo-empty">'+svg('clock')+'Sem prazo</span>')+'</div>'+
-     '<div class="tc-actions"><button class="tc-act tc-detail" data-detail="'+t.id+'">'+svg('grid')+'Detalhes</button>'+
+     '<div class="tc-actions"><button class="tc-act tc-detail" data-detail="'+t.id+'">'+svg('eye')+'Detalhes</button>'+
        '<button class="tc-act move" data-move="'+t.id+'">'+svg('swap')+'Mover</button>'+
        (canDelTask(t)?'<button class="tc-act del-btn" data-del="'+t.id+'" title="Remover tarefa">'+svg('trash')+'</button>':'')+'</div>';
   return h+'</div>';
@@ -1289,7 +1290,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.74-desktop-card-detail-excellence-polish';
+const BUILD='1.0.75-desktop-details-icon-card-polish';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -1301,7 +1302,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('grid','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.74 · Card Detail Excellence</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.75 · Details Icon Card Polish</div></div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
 function openSheet(which){
