@@ -657,9 +657,15 @@ function clientPageCss() {
     + '.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:560px){.grid{grid-template-columns:1fr}}'
     + '.m label{font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}.m div{font-size:14px;font-weight:600;margin-top:2px}'
     + '.sec{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin:22px 0 10px}'
-    + '.item{display:flex;gap:12px;background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:9px}'
+    + '.item{display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:9px}'
+    + '.item-h{display:flex;gap:12px;align-items:flex-start}'
     + '.n{width:26px;height:26px;border-radius:8px;background:rgba(91,108,255,.16);color:#8b96ff;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}'
     + '.it{font-size:14.5px;font-weight:700}.il{font-size:13px;color:var(--soft);margin-top:3px}'
+    + '.arts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}'
+    + '.art-l{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}'
+    + '.feed,.story{width:100%;border-radius:10px;border:1px solid var(--line);object-fit:cover;display:block;background:var(--surface)}'
+    + '.feed{aspect-ratio:1080/1440}.story{aspect-ratio:1080/1920}'
+    + '@media(max-width:480px){.arts{grid-template-columns:1fr}}'
     + '.card{background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:14px;white-space:pre-wrap;font-size:13.5px;color:var(--ink)}'
     + '.resp{display:flex;gap:12px;align-items:flex-start;border:1px solid;border-radius:14px;padding:14px;margin:16px 0}'
     + '.actions{display:flex;flex-direction:column;gap:11px;margin-top:24px}'
@@ -708,12 +714,20 @@ function renderClientPage(task, url, opts) {
   const stColor = cronColor(st);
   const conts = (Array.isArray(task.cronContents) ? task.cronContents : [])
     .map(function (c) { return c || {}; })
-    .filter(function (c) { return c.tema || c.legenda; });
+    .filter(function (c) { return c.tema || c.legenda || c.feedImageUrl || c.storyImageUrl; });
+  function artsHtml(c) {
+    if (!c.feedImageUrl && !c.storyImageUrl) return "";
+    return '<div class="arts">'
+      + (c.feedImageUrl ? '<div class="art"><div class="art-l">Feed · 1080×1440</div><a href="' + htmlEsc(c.feedImageUrl) + '" target="_blank" rel="noopener"><img class="feed" src="' + htmlEsc(c.feedImageUrl) + '" alt="Feed" loading="lazy"></a></div>' : "")
+      + (c.storyImageUrl ? '<div class="art"><div class="art-l">Story · 1080×1920</div><a href="' + htmlEsc(c.storyImageUrl) + '" target="_blank" rel="noopener"><img class="story" src="' + htmlEsc(c.storyImageUrl) + '" alt="Story" loading="lazy"></a></div>' : "")
+      + '</div>';
+  }
   const contHtml = conts.length
     ? conts.map(function (c, i) {
-        return '<div class="item"><div class="n">' + (i + 1) + '</div><div><div class="it">'
+        return '<div class="item"><div class="item-h"><div class="n">' + (i + 1) + '</div><div><div class="it">'
           + htmlEsc(c.tema || "(sem tema)") + '</div>'
-          + (c.legenda ? '<div class="il">' + htmlEsc(c.legenda) + '</div>' : '') + '</div></div>';
+          + (c.legenda ? '<div class="il">' + htmlEsc(c.legenda) + '</div>' : '') + '</div></div>'
+          + artsHtml(c) + '</div>';
       }).join("")
     : '<div class="il">Nenhum conteúdo cadastrado.</div>';
   const cr = task.clientReview && task.clientReview.status ? task.clientReview : null;
@@ -778,8 +792,10 @@ function renderClientPage(task, url, opts) {
     + '<div class="grid">'
     + '<div class="m"><label>Tipo</label><div>Cronograma ' + tipo.toLowerCase() + '</div></div>'
     + '<div class="m"><label>Responsável</label><div>' + htmlEsc(task.assignee || "—") + '</div></div>'
+    + (task.startDate ? '<div class="m"><label>Início</label><div>' + htmlEsc(task.startDate.split("-").reverse().join("/")) + (task.startTime ? " · " + htmlEsc(task.startTime) : "") + '</div></div>' : "")
+    + (task.endDate ? '<div class="m"><label>Término</label><div>' + htmlEsc(task.endDate.split("-").reverse().join("/")) + (task.endTime ? " · " + htmlEsc(task.endTime) : "") + '</div></div>' : "")
     + '<div class="m"><label>Enviado em</label><div>' + sentAt + '</div></div>'
-    + '<div class="m"><label>Prazo</label><div>' + (task.dueDate ? htmlEsc(task.dueDate.split("-").reverse().join("/")) + (task.dueTime ? " · " + htmlEsc(task.dueTime) : "") : "Sem prazo") + '</div></div>'
+    + '<div class="m"><label>Prazo final</label><div>' + (task.dueDate ? htmlEsc(task.dueDate.split("-").reverse().join("/")) + (task.dueTime ? " · " + htmlEsc(task.dueTime) : "") : "Sem prazo") + '</div></div>'
     + '</div></div>'
     + clientStepper(st)
     + respHtml
