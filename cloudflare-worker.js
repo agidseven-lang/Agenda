@@ -686,7 +686,18 @@ function clientPageCss() {
     + '.ed-n{width:26px;height:26px;border-radius:8px;background:rgba(91,108,255,.16);color:#8b96ff;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}'
     + '.ed-f{flex:1;min-width:0}.ed-f label{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:6px}'
     + '.ed-in{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:11px;font:inherit;font-size:14.5px}.ed-in:focus{outline:none;border-color:var(--accent)}'
-    + '.ed-leg{font-size:12.5px;color:var(--soft);margin-top:6px}';
+    + '.ed-leg{font-size:12.5px;color:var(--soft);margin-top:6px}'
+    // Observacoes da equipe — premium
+    + '.ob-card{background:var(--surface2);border:1px solid var(--line);border-radius:14px;overflow:hidden}'
+    + '.ob-head{display:flex;align-items:center;gap:10px;padding:13px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(91,108,255,.08),transparent)}'
+    + '.ob-ic{width:30px;height:30px;border-radius:9px;background:rgba(91,108,255,.16);color:#8b96ff;display:flex;align-items:center;justify-content:center;flex:none}.ob-ic svg{width:17px;height:17px}'
+    + '.ob-title{font-size:13.5px;font-weight:800}'
+    + '.ob-body{padding:6px 14px 12px}'
+    + '.ob-h{display:flex;align-items:center;gap:9px;margin:13px 0 6px;font-size:12.5px;font-weight:800;color:var(--ink)}'
+    + '.ob-num{width:22px;height:22px;border-radius:7px;background:rgba(34,211,238,.16);color:#22D3EE;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}'
+    + '.ob-kv{display:flex;gap:8px;padding:4px 0 4px 31px;font-size:13px;line-height:1.5}'
+    + '.ob-k{color:var(--faint);font-weight:700;min-width:62px;flex:none}.ob-v{color:var(--ink)}'
+    + '.ob-p{font-size:13.5px;color:var(--ink);line-height:1.55;padding:4px 0}';
 }
 
 function renderClientPage(task, url, opts) {
@@ -711,7 +722,7 @@ function renderClientPage(task, url, opts) {
   const respHtml = cr
     ? '<div class="resp" style="border-color:' + crColor + '55;background:' + crColor + '1a"><div style="color:' + crColor + ';font-weight:800;font-size:14.5px">' + htmlEsc(crLabel) + (cr.note ? '<div style="color:var(--ink);font-weight:400;font-style:italic;margin-top:5px">"' + htmlEsc(cr.note) + '"</div>' : '') + '</div></div>'
     : '';
-  const obsHtml = task.desc ? '<div class="sec">Observações da equipe</div><div class="card">' + htmlEsc(task.desc) + '</div>' : '';
+  const obsHtml = renderObs(task.desc);
   const sentAt = task.clientSentAt ? new Date(task.clientSentAt).toLocaleDateString("pt-BR") : "—";
 
   const base = htmlEsc(url.pathname.replace(/\/$/, ""));
@@ -779,6 +790,26 @@ function renderClientPage(task, url, opts) {
     + '<div class="foot"><span>Você está vendo apenas o seu cronograma. Sua resposta é registrada e enviada à equipe.</span></div>'
     + '</div>';
   return '<!doctype html><html lang="pt-BR"><head>' + clientPageHead(task, url) + '<style>' + clientPageCss() + '</style></head><body>' + body + '</body></html>';
+}
+
+// Observações da equipe — card premium com hierarquia (quebra "Conteúdo N" / "Tema:" /
+// "Legenda:" em sub-itens). Nunca texto solto.
+function renderObs(desc) {
+  if (!desc) return "";
+  const raw = String(desc).replace(/\r/g, "");
+  const lines = raw.split("\n").map(function (l) { return l.replace(/\s+$/, ""); }).filter(function (l) { return l.trim() !== ""; });
+  const rows = lines.map(function (l) {
+    const t = l.trim();
+    const mc = t.match(/^(Conte[úu]do|Item)\s*(\d+)\s*:?\s*$/i);
+    if (mc) return '<div class="ob-h"><span class="ob-num">' + htmlEsc(mc[2]) + '</span><span>' + htmlEsc(mc[1].replace(/^./, function (c) { return c.toUpperCase(); })) + ' ' + htmlEsc(mc[2]) + '</span></div>';
+    const mk = t.match(/^(Tema|Legenda|Canais?|Per[íi]odo|Semana|M[êe]s|Objetivo|Tom|CTA|Quantidade)\s*:\s*(.*)$/i);
+    if (mk) return '<div class="ob-kv"><span class="ob-k">' + htmlEsc(mk[1]) + '</span><span class="ob-v">' + htmlEsc(mk[2]) + '</span></div>';
+    return '<div class="ob-p">' + htmlEsc(t) + '</div>';
+  }).join("");
+  return '<div class="sec">Observações da equipe</div>'
+    + '<div class="ob-card"><div class="ob-head"><span class="ob-ic">'
+    + '<svg viewBox="0 0 24 24" fill="none"><path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 11h8M8 15h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+    + '</span><span class="ob-title">Notas da equipe</span></div><div class="ob-body">' + rows + '</div></div>';
 }
 
 // Stepper premium das etapas do fluxo (destaca a etapa atual pelo cronStatus).
