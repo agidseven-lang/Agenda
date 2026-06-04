@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.68",
-  "description": "Agenda ID Seven Desktop — instalacao substitui versao anterior (Electron) (Electron)",
+  "version": "1.0.69",
+  "description": "Agenda ID Seven Desktop — auditoria funcional e polish sistemico (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

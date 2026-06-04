@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.68 (Install Replace Fix)</title>
+<title>ID Seven · Desktop 1.0.69 (Functional Audit Fix)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -271,16 +271,29 @@
   }
   body.desktop .nav button.sb-item svg{width:20px !important;height:20px !important;flex:none}
   body.desktop .nav button.sb-item span{font-size:14px !important;font-weight:600 !important}
-  body.desktop .nav button.sb-item:hover{background:rgba(255,255,255,.04);color:var(--ink) !important}
-  body.desktop .nav button.sb-item.on{background:rgba(91,108,255,.14);color:var(--accent) !important;font-weight:800 !important}
+  body.desktop .nav button.sb-item:hover{background:rgba(255,255,255,.05);color:var(--ink) !important}
+  body.desktop .nav button.sb-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  /* barra de acento a esquerda no item ativo (padrao SaaS) */
+  body.desktop .nav button.sb-item.on{background:rgba(91,108,255,.16);color:var(--accent) !important;font-weight:800 !important;position:relative}
+  body.desktop .nav button.sb-item.on::before{content:"";position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:3px;height:22px;border-radius:0 3px 3px 0;background:var(--accent)}
   body.desktop .nav button.sb-item.on span{font-weight:800 !important}
-  body.desktop .nav .fab{
-    margin:14px 0 0 0 !important;width:100% !important;height:44px !important;border-radius:12px !important;
-    display:flex !important;align-items:center;justify-content:center;gap:8px;
-    font-size:14px;font-weight:800;
+  body.desktop .nav button.sb-item.on svg{color:var(--accent)}
+  /* Botao primario "Nova tarefa" — premium, no topo da sidebar */
+  body.desktop .nav .fab.fab-desktop{
+    position:relative !important;left:auto !important;bottom:auto !important;right:auto !important;
+    margin:2px 0 6px 0 !important;width:100% !important;height:46px !important;border-radius:13px !important;
+    display:flex !important;align-items:center;justify-content:center;gap:9px;
+    font-size:14.5px;font-weight:800;letter-spacing:.005em;color:#fff;
+    background:linear-gradient(135deg,#5B6CFF,#7C5CFF) !important;
+    box-shadow:0 8px 20px -8px rgba(91,108,255,.7),inset 0 1px 0 rgba(255,255,255,.18);
+    transition:transform .12s,box-shadow .12s,filter .12s;
   }
-  body.desktop .nav .fab::after{content:"Nova tarefa";letter-spacing:.01em}
-  body.desktop .nav .fab svg{width:20px !important;height:20px !important}
+  body.desktop .nav .fab.fab-desktop:hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 12px 26px -8px rgba(91,108,255,.8),inset 0 1px 0 rgba(255,255,255,.22)}
+  body.desktop .nav .fab.fab-desktop:active{transform:translateY(0)}
+  body.desktop .nav .fab.fab-desktop:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  body.desktop .nav .fab.fab-desktop .fab-ic{display:inline-flex;width:22px;height:22px}
+  body.desktop .nav .fab.fab-desktop .fab-ic svg{width:22px !important;height:22px !important}
+  body.desktop .nav .fab.fab-desktop .fab-tx{line-height:1}
   body.desktop .nav .sb-footer{margin-top:auto;padding:14px 6px 4px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--faint);line-height:1.5}
   body.desktop .nav .sb-footer .ver{display:inline-block;background:rgba(91,108,255,.14);color:var(--accent);font-weight:800;padding:3px 9px;border-radius:999px;margin-bottom:6px;font-size:10.5px}
 
@@ -373,18 +386,43 @@
   body.desktop .d-perfil{display:grid;grid-template-columns:380px 1fr;gap:24px;align-items:start}
   body.desktop .d-perfil .pcard{margin-top:0;padding:32px;border-radius:22px}
 
-  /* FORM desktop */
-  body.desktop .scr,body.desktop .scr-head{max-width:820px;margin-left:auto;margin-right:auto}
+  /* FORM desktop — wizard isolado num wrapper estreito e centrado */
+  body.desktop #app > .content > .form-wrap{max-width:760px;margin:0 auto;padding-bottom:84px}
+  body.desktop .form-wrap .scr,body.desktop .form-wrap .scr-head{max-width:none}
   body.desktop .footer-nav{position:fixed;bottom:0;left:var(--d-side);right:0;background:rgba(13,14,20,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line-soft);padding:14px 32px;display:flex;justify-content:flex-end;gap:12px;z-index:30}
   body.desktop .footer-nav .btn{width:auto;min-width:160px;height:46px;border-radius:12px;padding:0 22px}
   body.desktop .footer-nav .btn.ghost{min-width:120px}
+  body.desktop .stepper{max-width:760px;margin:0 auto}
 
-  /* MODAL polish */
-  body.desktop .modal-back{align-items:center}
-  body.desktop .sheet{max-width:560px;border-radius:18px}
+  /* MODAL polish — centrado, premium */
+  body.desktop .modal-back{align-items:center;justify-content:center;background:rgba(6,7,11,.62);backdrop-filter:blur(3px)}
+  body.desktop .sheet{max-width:480px;width:100%;border-radius:18px;border:1px solid var(--line);box-shadow:0 24px 70px -20px rgba(0,0,0,.75);animation:dpop .14s ease-out}
+  body.desktop .sheet .grab{display:none}
+  @keyframes dpop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  body.desktop .sheet .settrow,body.desktop .sheet .moveopt{transition:background .12s,transform .08s}
+  body.desktop .sheet .settrow:hover,body.desktop .sheet .moveopt:hover{background:rgba(255,255,255,.05)}
+  body.desktop .sheet .settrow:active,body.desktop .sheet .moveopt:active{transform:scale(.995)}
 
-  /* Topbar avatar */
-  body.desktop #app > .topbar #topAvatar > .av{box-shadow:0 0 0 2px var(--line) !important;cursor:pointer}
+  /* Topbar avatar clicavel */
+  body.desktop #app > .topbar #topAvatar .topav-btn{padding:0;border-radius:50%;cursor:pointer;transition:transform .12s}
+  body.desktop #app > .topbar #topAvatar .topav-btn:hover{transform:scale(1.06)}
+  body.desktop #app > .topbar #topAvatar .av{box-shadow:0 0 0 2px var(--line) !important}
+
+  /* HOVER/FOCUS de cards e botoes (padrao SaaS) */
+  body.desktop .bcard,body.desktop .stat,body.desktop .sector-card,body.desktop .settrow{transition:transform .12s,border-color .12s,background .12s,box-shadow .12s}
+  body.desktop .bcard:hover,body.desktop .stat:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:0 10px 26px -16px rgba(91,108,255,.55)}
+  body.desktop .sector-card:hover{border-color:var(--accent)}
+  body.desktop .kanban .tc{transition:transform .1s,box-shadow .12s,border-color .12s}
+  body.desktop .kanban .tc:hover{transform:translateY(-1px);border-color:var(--line);box-shadow:0 8px 20px -14px rgba(0,0,0,.7)}
+  body.desktop button:focus-visible,body.desktop .inp:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  body.desktop .inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,108,255,.18)}
+  body.desktop .btn{transition:transform .1s,filter .12s,box-shadow .12s}
+  body.desktop .btn:not(.ghost):hover{filter:brightness(1.05)}
+  body.desktop .btn:active{transform:translateY(1px)}
+
+  /* Estados vazios mais respiraveis no desktop */
+  body.desktop .empty{padding:48px 20px}
+  body.desktop .emptyline{padding:18px;text-align:center;color:var(--faint);border:1px dashed var(--line);border-radius:14px;background:rgba(255,255,255,.012)}
 
   /* Esconde wpbadge no desktop (versão já aparece no rodapé da sidebar) */
   body.desktop .wpbadge{display:none}
@@ -411,7 +449,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.68 · Install Replace Fix</span><br>
+    <span class="pill-ver">Desktop 1.0.69 · Functional Audit Fix</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -426,7 +464,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.68 · Install Replace Fix</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.69 · Functional Audit Fix</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -639,15 +677,15 @@ async function pendingChange(p1,p2,btn){
 const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'}];
 function render(){
   if(!state.user)return;
-  document.getElementById('topAvatar').innerHTML=avatar(state.user,40);
+  document.getElementById('topAvatar').innerHTML='<button class="topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,38)+'</button>';
   const nav=document.getElementById('bottomNav');
   if(isDesktop()){
     nav.innerHTML=
       '<div class="sb-brand"><div class="logo sm">7</div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
+      '<button class="fab fab-desktop" data-fab="1"><span class="fab-ic">'+svg('add')+'</span><span class="fab-tx">Nova tarefa</span></button>'+
       '<div class="sb-sect">Workspace</div>'+
       TABS.map(sbItem).join('')+
-      '<button class="fab" data-fab="1">'+svg('add')+'</button>'+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.68 · Install Replace Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.69 · Functional Audit Fix</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -867,7 +905,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.68-desktop-install-replace-fix';
+const BUILD='1.0.69-desktop-functional-audit-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -879,7 +917,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('grid','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.68 · Install Replace Fix</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.69 · Functional Audit Fix</div></div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
 function openSheet(which){
@@ -905,7 +943,7 @@ function renderForm(){
     '<div class="stepper">'+STEPS.map((st,i)=>'<div class="st"><div class="sc '+(i<f.step?'done':'')+' '+(i===f.step?'on':'')+'">'+(i<f.step?'✓':(i+1))+'</div><div class="slab '+(i===f.step?'on':'')+'">'+st+'</div></div>'+(i<3?'<div class="ln '+(i<f.step?'done':'')+'"></div>':'')).join('')+'</div><div class="scr">';
   if(f.step===0)h+=stepSector();else if(f.step===1)h+=stepDados();else if(f.step===2)h+=stepBriefing();else h+=stepReview();
   h+='</div><div class="footer-nav">'+(f.step>0?'<button class="btn ghost" data-form="back">Voltar</button>':'')+(f.step<3?'<button class="btn" data-form="next">Próximo</button>':'<button class="btn" data-form="save">'+(f.id?'Salvar alterações':'Salvar tarefa')+'</button>')+'</div>';
-  return h;
+  return '<div class="form-wrap">'+h+'</div>';
 }
 function stepSector(){const f=state.form;let h='<div class="lbl">Escolha o setor</div>';
   SECTORS.forEach(s=>{const sel=f.sector===s.key;h+='<button class="sector-card '+(sel?'sel':'')+'" data-fsector="'+s.key+'" style="'+(sel?'background:'+withAlpha(s.color,.12)+';border-color:'+s.color:'')+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div><div class="sm"><div class="sl">'+esc(s.label)+'</div><div class="sd">'+esc(s.desc)+'</div></div>'+(sel?'<div style="color:'+s.color+'">✓</div>':'')+'</button>';});
@@ -993,11 +1031,17 @@ async function saveTask(){const f=state.form;
   const sector=f.sector;state.form=null;state.tab='tarefas';state.boardSector=sector;boardCol=0;render();
 }
 
-/* ---- EVENT DELEGATION ---- */
-document.getElementById('app').addEventListener('click',async e=>{
+/* ---- EVENT DELEGATION ----
+   ATENCAO: o handler fica em `document` (nao em #app) porque os modais sao
+   injetados em #modalRoot, que e IRMAO de #app. Preso em #app, nenhum clique
+   dentro de um modal era capturado -> seletor de responsavel/mover status/
+   sheets ficavam mortos. Em document, captura tudo (com guarda de sessao). */
+document.addEventListener('click',async e=>{
+  if(!state.user)return;                       // login tem seu proprio handler
+  if(!(e.target&&e.target.closest))return;
   const g=sel=>e.target.closest(sel);let el;
-  if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.tab=el.dataset.tab;render();return;}
-  if(el=g('[data-fab]')){if(state.tab==='tarefas')openTaskForm(state.boardSector);else{state.tab='tarefas';openTaskForm(null);}return;}
+  if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.tab=el.dataset.tab;closeModal();render();return;}
+  if(el=g('[data-fab]')){closeModal();if(state.tab==='tarefas')openTaskForm(state.boardSector);else{state.tab='tarefas';openTaskForm(null);}return;}
   if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;boardCol=0;boardMine=false;boardQuery='';render();return;}
   if(el=g('[data-board]')){const a=el.dataset.board;if(a==='back')state.boardSector=null;else if(a==='new'){openTaskForm(state.boardSector);return;}render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
@@ -1009,7 +1053,7 @@ document.getElementById('app').addEventListener('click',async e=>{
   if(el=g('[data-domove]')){const parts=el.dataset.domove.split('|');await moveStatus(parts[0],parts[1]);return;}
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
   if(el=g('[data-logout]')){closeModal();logout();return;}
-  if(el=g('[data-pickasg]')){state.form.assigneeId=el.dataset.pickasg||null;closeModal();render();return;}
+  if(el=g('[data-pickasg]')){if(state.form){const id=el.dataset.pickasg||null;state.form.assigneeId=id;const u=id?state.users.find(x=>x.id===id):null;state.form.assignee=u?(u.name||''):'';}closeModal();render();return;}
   if(el=g('[data-form]')){const a=el.dataset.form;if(a==='close'){state.form=null;render();}else if(a==='back'){state.form.step=Math.max(0,state.form.step-1);render();}else if(a==='next')stepNext();else if(a==='save')await saveTask();return;}
   if(el=g('[data-fsector]')){state.form.sector=el.dataset.fsector;state.form.subtype=null;state.form.contents=[];state.form.checklist=[];render();return;}
   if(el=g('[data-fstatus]')){state.form.status=el.dataset.fstatus;render();return;}
@@ -1022,7 +1066,7 @@ document.getElementById('app').addEventListener('click',async e=>{
   if(el=g('[data-chkdel]')){state.form.checklist.splice(+el.dataset.chkdel,1);render();return;}
   if(el=g('[data-assignee]')){openAssignee();return;}
 });
-document.getElementById('modalRoot').addEventListener('click',e=>{if(e.target.classList.contains('modal-back'))closeModal();});
+document.getElementById('modalRoot').addEventListener('click',e=>{if(e.target.classList&&e.target.classList.contains('modal-back'))closeModal();});
 function stepNext(){const f=state.form;
   if(f.step===0&&!f.sector){alert('Escolha o setor.');return;}
   if(f.step===1){const t=tpl();if(t&&t.clientRequired&&!f.client.trim()){alert('Para Cronograma o cliente é obrigatório.');return;}if(!f.title.trim()){alert('Informe o título.');return;}}

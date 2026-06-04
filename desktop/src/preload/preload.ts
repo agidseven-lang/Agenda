@@ -17,5 +17,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.on("notif-open", (_e, t: string) => cb(t));
   },
   isDesktop: true,
-  version: "1.0.68-desktop-install-replace-fix",
+  version: "1.0.69-desktop-functional-audit-fix",
 });
