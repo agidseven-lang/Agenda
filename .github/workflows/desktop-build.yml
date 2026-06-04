@@ -15,9 +15,9 @@ name: "[manual] Desktop Build (Windows)"
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: desktop/local-1.0.84-responsive-client-designer-production-flow)"
+        description: "Branch/commit a buildar (default: desktop/local-1.0.85-feed-story-final-client-review-flow)"
         required: true
-        default: "desktop/local-1.0.84-responsive-client-designer-production-flow"
+        default: "desktop/local-1.0.85-feed-story-final-client-review-flow"
 
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.84-desktop-responsive-client-designer-production-flow"
+      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.85-desktop-feed-story-final-client-review-flow"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
           # VERSAO-DESKTOP.txt — prova do que esta dentro
           {
             echo "productName : Agenda ID Seven Desktop"
-            echo "versionName : 1.0.84-desktop-responsive-client-designer-production-flow"
+            echo "versionName : 1.0.85-desktop-feed-story-final-client-review-flow"
             echo "appId       : br.com.idseven.agenda.desktop"
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
@@ -101,13 +101,13 @@ jobs:
           printf '%s\n' \
             "==== COMO INSTALAR - Agenda ID Seven Desktop (Windows) ====" \
             "" \
-            "*** IMPORTANTE - ANTES DE INSTALAR (correcao 1.0.84) ***" \
+            "*** IMPORTANTE - ANTES DE INSTALAR (correcao 1.0.85) ***" \
             "- Se ja existe uma versao instalada, FECHE-A PELA BANDEJA:" \
             "  clique direito no icone na bandeja (perto do relogio) -> 'Sair'." \
             "- O app mora na bandeja; clicar no X apenas esconde, NAO encerra," \
             "  e a versao antiga travava os arquivos, impedindo a atualizacao" \
             "  (era a causa de continuar aparecendo 1.0.66)." \
-            "- A partir do 1.0.84 o instalador ja ENCERRA a versao antiga" \
+            "- A partir do 1.0.85 o instalador ja ENCERRA a versao antiga" \
             "  automaticamente, mas fechar pela bandeja antes garante 100%." \
             "" \
             "1) Baixe o instalador (.exe ou .msi). PREFIRA o .exe." \
@@ -157,7 +157,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.84-installer
+          name: agenda-id-seven-desktop-1.0.85-installer
           path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
           if-no-files-found: error
           retention-days: 30
@@ -166,7 +166,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.84-bundle
+          name: agenda-id-seven-desktop-1.0.85-bundle
           path: dist-pkg/
           if-no-files-found: error
           retention-days: 30

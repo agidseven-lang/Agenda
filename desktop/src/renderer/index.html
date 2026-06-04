@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.84 (Responsive Client Designer Production Flow)</title>
+<title>ID Seven · Desktop 1.0.85 (Feed Story Final Client Review Flow)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -895,6 +895,29 @@
   .ce-ta{width:100%;min-height:64px;resize:vertical;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;font:inherit;font-size:13.5px;line-height:1.5}.ce-ta:focus{outline:none;border-color:var(--accent)}
   .ce-obs{text-align:left;margin-bottom:14px}.ce-obs label{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:6px}
   .ce-obs textarea{width:100%;min-height:64px;resize:vertical;background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;color:var(--ink);padding:11px;font:inherit;font-size:13.5px;line-height:1.5}.ce-obs textarea:focus{outline:none;border-color:var(--accent)}
+  /* Produção do conteúdo (legendas + Feed/Story) */
+  .btn.pr-go{color:#F59E0B;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)}
+  .btn.pr-go:hover{background:rgba(245,158,11,.2)}
+  .pr-sheet{position:relative;text-align:center}body.desktop .pr-sheet{max-width:680px}
+  .pr-ic{width:54px;height:54px;border-radius:15px;background:rgba(245,158,11,.16);color:#F59E0B;display:flex;align-items:center;justify-content:center;margin:4px auto 14px}
+  .pr-ic svg{width:26px;height:26px}
+  .pr-list{display:flex;flex-direction:column;gap:14px;max-height:56vh;overflow:auto;margin-bottom:14px;text-align:left}
+  .pr-card{background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:15px}
+  .pr-card-h{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+  .pr-n{width:26px;height:26px;border-radius:8px;background:rgba(91,108,255,.16);color:#8b96ff;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+  .pr-tema{font-size:15px;font-weight:800}
+  .pr-leg-l{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:6px}
+  .pr-leg{width:100%;min-height:64px;resize:vertical;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;font:inherit;font-size:13.5px;line-height:1.5}.pr-leg:focus{outline:none;border-color:var(--accent)}
+  .pr-arts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .pr-art-lbl{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .pr-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:1.5px dashed var(--line);border-radius:12px;color:var(--soft);cursor:pointer;background:var(--surface);transition:border-color .14s,color .14s}
+  .pr-drop:hover{border-color:var(--accent);color:var(--ink)}.pr-drop svg{width:22px;height:22px}.pr-drop span{font-size:12px;font-weight:700}
+  .pr-feed{aspect-ratio:1080/1440}.pr-story{aspect-ratio:1080/1920}
+  .pr-thumb{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+  .pr-thumb img{width:100%;height:100%;object-fit:cover;display:block}.pr-thumb.pr-feed img,.pr-thumb.pr-story img{aspect-ratio:auto}
+  .pr-thumb-x{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:8px;background:rgba(10,11,16,.7);color:#fff;display:flex;align-items:center;justify-content:center;border:none}.pr-thumb-x svg{width:14px;height:14px}
+  .pr-url{width:100%;margin-top:7px;background:var(--surface);border:1px solid var(--line);border-radius:9px;color:var(--soft);padding:8px;font:inherit;font-size:11.5px}.pr-url:focus{outline:none;border-color:var(--accent);color:var(--ink)}
+  @media(max-width:560px){.pr-arts{grid-template-columns:1fr 1fr}}
   /* Enviar para designer */
   .btn.dz-go{color:#fff;border:none;background:linear-gradient(135deg,#7C5CFF 0%,#5B6CFF 100%);box-shadow:0 6px 16px -8px rgba(124,92,255,.6)}
   .btn.dz-go:hover{filter:brightness(1.07)}
@@ -923,7 +946,15 @@
   .det-cresp-d{font-size:11.5px;color:var(--faint);margin-top:5px}
 
   /* mobile: tela do cliente ocupa largura total */
-  @media (max-width:720px){.cvw-grid{grid-template-columns:1fr}.cvw-scroll{padding:12px 16px 36px}}
+  /* conteudo com Feed/Story */
+  .cvw-item{flex-direction:column;align-items:stretch}
+  .cvw-item-head{display:flex;align-items:flex-start;gap:13px}
+  .cvw-arts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .cvw-art-lbl{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .cvw-feed,.cvw-story{width:100%;border-radius:10px;border:1px solid var(--line);object-fit:cover;display:block;background:var(--surface)}
+  .cvw-feed{aspect-ratio:1080/1440}.cvw-story{aspect-ratio:1080/1920}
+  @media (max-width:720px){.cvw-grid{grid-template-columns:1fr}.cvw-scroll{padding:12px 16px 36px}.cvw-arts{grid-template-columns:1fr 1fr}}
+  @media (max-width:440px){.cvw-arts{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -939,7 +970,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.84 · Responsive Client Designer Production Flow</span><br>
+    <span class="pill-ver">Desktop 1.0.85 · Feed Story Final Client Review Flow</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -954,7 +985,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.84 · Responsive Client Designer Production Flow</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.85 · Feed Story Final Client Review Flow</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1190,7 +1221,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.84 · Responsive Client Designer Production Flow</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.85 · Feed Story Final Client Review Flow</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1470,8 +1501,10 @@ function openDetails(taskId){
     // datas
     '<div class="det-sec">Datas</div><div class="det-dates">'+
       detDate('calendar','Criado em',fmtDateTimeBR(t.createdAt))+
+      (t.startDate?detDate('today','Início',fmtDateBR(t.startDate)+(t.startTime?' às '+t.startTime:'')):'')+
+      (t.endDate?detDate('today','Término',fmtDateBR(t.endDate)+(t.endTime?' às '+t.endTime:'')):'')+
       detDate('swap','Atualizado em',upd?fmtDateTimeBR(upd):'—')+
-      detDate('clock','Prazo',(t.dueDate||t.due)?(fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+t.dueTime:'')):'Não informado')+
+      detDate('clock','Prazo final',(t.dueDate||t.due)?(fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+t.dueTime:'')):'Não informado')+
     '</div>';
   // cronograma
   if(cron){
@@ -1515,6 +1548,7 @@ function detFooter(t,cron){
   const clientBtns=
     (cron&&t.cronStatus?'<button class="btn cvw-open" data-clientview="'+t.id+'">'+svg('eye')+'Abrir Visão do cliente</button>':'')+
     (cron?'<button class="btn ce-edit" data-ceopen="'+t.id+'">'+svg('editnote')+'Editar conteúdos</button>':'')+
+    (cron?'<button class="btn pr-go" data-prodopen="'+t.id+'">'+svg('movie')+'Legendas e artes</button>':'')+
     (canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':'')+
     // Apos APROVACAO do cliente -> habilita Enviar para designer (some apos enviado)
     (clientApproved(t)&&!isSentToDesigner(t)?'<button class="btn dz-go" data-senddesigner="'+t.id+'">'+svg('group')+'Enviar para designer</button>':'');
@@ -1607,7 +1641,8 @@ async function saveContentEdits(taskId){
   for(let i=0;i<n;i++){
     const tm=document.querySelector('[data-cetema="'+i+'"]');const lg=document.querySelector('[data-celeg="'+i+'"]');
     if(!tm&&!lg)continue;
-    contents.push({tema:tm?tm.value.trim():(orig[i]&&orig[i].tema||''),legenda:lg?lg.value.trim():(orig[i]&&orig[i].legenda||'')});
+    const o=orig[i]||{};
+    contents.push({tema:tm?tm.value.trim():(o.tema||''),legenda:lg?lg.value.trim():(o.legenda||''),feedImageUrl:o.feedImageUrl||'',storyImageUrl:o.storyImageUrl||''});
   }
   const obsEl=document.getElementById('ceObs');const desc=obsEl?obsEl.value:t.desc||'';
   const now=Date.now();const u=state.user||{};
@@ -1616,6 +1651,80 @@ async function saveContentEdits(taskId){
   t.cronContents=contents;t.desc=desc;     // otimista
   closeModal();render();flashToast('Conteúdos atualizados. Reflete no link do cliente.');
   try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveContentEdits',e);}
+}
+/* ===== PRODUÇÃO DO CONTEÚDO — legendas + Feed 1080x1440 / Story 1080x1920 ===== */
+const IK_PUBLIC_KEY='public_wD+TthW+vGHy/VK37SgcGhDP5Pg=';
+const IK_AUTH_URL=CLIENT_REVIEW_BASE+'/imagekit-auth';     // worker (já existente)
+// Upload real via ImageKit (mesmo padrão do PWA). Fora do ambiente sandbox a rede
+// e liberada; aqui a UI tambem aceita colar URL como alternativa.
+async function ikUpload(file,folder){
+  const a=await fetch(IK_AUTH_URL).then(r=>r.json());
+  if(!a||!a.token||!a.signature||!a.expire)throw new Error('assinatura ImageKit inválida');
+  const fd=new FormData();
+  fd.append('file',file);fd.append('fileName',file.name||('art_'+Date.now()+'.jpg'));
+  fd.append('publicKey',IK_PUBLIC_KEY);fd.append('signature',a.signature);
+  fd.append('expire',String(a.expire));fd.append('token',a.token);
+  fd.append('folder',folder||'/cronogramas');fd.append('useUniqueFileName','true');
+  const up=await fetch('https://upload.imagekit.io/api/v1/files/upload',{method:'POST',body:fd});
+  if(!up.ok)throw new Error('ImageKit '+up.status);
+  const j=await up.json();if(!j||!j.url)throw new Error('ImageKit sem URL');return j.url;
+}
+function openProductionModal(taskId){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  state._prod={taskId:taskId,items:(Array.isArray(t.cronContents)?t.cronContents:[]).map(c=>({tema:(c&&c.tema)||'',legenda:(c&&c.legenda)||'',feedImageUrl:(c&&c.feedImageUrl)||'',storyImageUrl:(c&&c.storyImageUrl)||''}))};
+  renderProductionModal();
+}
+function artBox(i,kind){
+  const it=state._prod.items[i];const url=kind==='feed'?it.feedImageUrl:it.storyImageUrl;
+  const spec=kind==='feed'?'1080 × 1440':'1080 × 1920';const cls=kind==='feed'?'pr-feed':'pr-story';
+  return '<div class="pr-art">'+
+    '<div class="pr-art-lbl">'+(kind==='feed'?'Feed':'Story')+' · '+spec+'</div>'+
+    (url
+      ? '<div class="pr-thumb '+cls+'"><img src="'+esc(url)+'" alt=""><button class="pr-thumb-x" data-prodclear="'+i+'|'+kind+'" title="Remover">'+svg('close')+'</button></div>'
+      : '<label class="pr-drop '+cls+'"><input type="file" accept="image/*" data-produp="'+i+'|'+kind+'" hidden>'+svg('plus')+'<span>Anexar '+(kind==='feed'?'Feed':'Story')+'</span></label>')+
+    '<input class="pr-url" type="url" data-produrl="'+i+'|'+kind+'" value="'+esc(url||'')+'" placeholder="ou cole a URL da arte…">'+
+  '</div>';
+}
+function renderProductionModal(){
+  const p=state._prod;const t=state.tasks.find(x=>x.id===p.taskId)||{};
+  const cards=p.items.length?p.items.map((it,i)=>
+    '<div class="pr-card"><div class="pr-card-h"><div class="pr-n">'+(i+1)+'</div><div class="pr-tema">'+esc(it.tema||'(sem tema)')+'</div></div>'+
+    '<label class="pr-leg-l">Legenda</label><textarea class="pr-leg" data-prodleg="'+i+'" placeholder="Escreva a legenda deste conteúdo…">'+esc(it.legenda||'')+'</textarea>'+
+    '<div class="pr-arts">'+artBox(i,'feed')+artBox(i,'story')+'</div>'+
+    '</div>').join(''):'<div class="cvw-soft">Nenhum conteúdo neste cronograma.</div>';
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet pr-sheet">'+
+    '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
+    '<div class="pr-ic">'+svg('movie')+'</div>'+
+    '<div class="sp-title">Legendas e artes</div>'+
+    '<div class="sp-sub">Preencha a legenda e anexe as artes de cada conteúdo. Feed <b>1080×1440</b> e Story <b>1080×1920</b>. Depois reenvie ao cliente pelo mesmo link.</div>'+
+    '<div class="pr-list">'+cards+'</div>'+
+    '<div class="sp-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button>'+
+      '<button class="btn ghost ce-edit" data-prodsave="'+p.taskId+'">'+svg('check')+'Salvar</button>'+
+      '<button class="btn sp-go" data-prodresend="'+p.taskId+'">'+svg('send')+'Salvar e reenviar ao cliente</button></div>'+
+  '</div></div>';
+  // listeners de input (texto/url/file) — fora da delegacao de click
+  document.querySelectorAll('[data-prodleg]').forEach(el=>el.addEventListener('input',e=>{state._prod.items[+el.dataset.prodleg].legenda=e.target.value;}));
+  document.querySelectorAll('[data-produrl]').forEach(el=>el.addEventListener('change',e=>{const[i,k]=el.dataset.produrl.split('|');const v=e.target.value.trim();if(k==='feed')state._prod.items[+i].feedImageUrl=v;else state._prod.items[+i].storyImageUrl=v;renderProductionModal();}));
+  document.querySelectorAll('[data-produp]').forEach(el=>el.addEventListener('change',async e=>{
+    const[i,k]=el.dataset.produp.split('|');const file=e.target.files&&e.target.files[0];if(!file)return;
+    flashToast('Enviando arte…');
+    try{const url=await ikUpload(file,'/cronogramas/'+p.taskId);if(k==='feed')state._prod.items[+i].feedImageUrl=url;else state._prod.items[+i].storyImageUrl=url;renderProductionModal();flashToast('Arte anexada.');}
+    catch(err){console.warn('ikUpload',err);flashToast('Falha no upload. Cole a URL da arte como alternativa.');}
+  }));
+}
+function prodCollect(){return (state._prod&&state._prod.items||[]).map(it=>({tema:it.tema||'',legenda:it.legenda||'',feedImageUrl:it.feedImageUrl||'',storyImageUrl:it.storyImageUrl||''}));}
+async function saveProduction(taskId,resend){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const contents=prodCollect();const now=Date.now();const u=state.user||{};
+  const patch={cronContents:contents,
+    history:firebase.firestore.FieldValue.arrayUnion({type:'social_producao',label:'Social atualizou legendas/artes',by:u.name||'',byId:u.id||null,at:now,channel:'production'})};
+  if(resend){patch.cronStatus='ready_for_final_client_review';
+    patch.history=firebase.firestore.FieldValue.arrayUnion({type:'reenviado_cliente',label:'Reenviado ao cliente (versão final)',by:u.name||'',byId:u.id||null,at:now,channel:'final_review'});}
+  t.cronContents=contents;if(resend)t.cronStatus='ready_for_final_client_review';   // otimista
+  closeModal();render();
+  try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveProduction',e);}
+  if(resend){await ensureReviewToken(taskId);const tk=state.tasks.find(x=>x.id===taskId);flashToast('Versão final pronta. Reenviando ao cliente…');openSendClientModal(tk||t);}
+  else flashToast('Produção salva. Reflete no link do cliente.');
 }
 /* ===== Cronograma — Fase 1: enviar para cliente =====
    Campos aditivos (Firestore schemaless; APK nativo ignora):
@@ -1685,9 +1794,11 @@ function cronCtx(o){
     title:(o.title||'').trim()||'Cronograma',
     type:cronTypeLabel(o),
     status:o.cronStatus||(isForm?'pronto_cliente':'rascunho_social'),
-    contents:(o.contents||o.cronContents||[]).filter(c=>c&&(c.tema||c.legenda)),
+    contents:(o.contents||o.cronContents||[]).filter(c=>c&&(c.tema||c.legenda||c.feedImageUrl||c.storyImageUrl)),
     assignee:o.assignee||'',
     token:o.clientReviewToken||null,
+    startDate:o.startDate||'',startTime:o.startTime||'',endDate:o.endDate||'',endTime:o.endTime||'',
+    dueDate:o.dueDate||o.due||'',dueTime:o.dueTime||'',
   };
 }
 /* ===== TRÊS COISAS SEPARADAS — nunca misturar =====
@@ -1815,11 +1926,19 @@ function renderClientView(){
   const stColor=cronStatusColor(ctx.status),stLabel=cronStatusLabel(ctx.status);
   const cr=t.clientReview||null;
   const meta=(ic,l,v)=>'<div class="cvw-meta"><div class="cvw-meta-ic">'+svg(ic)+'</div><div><div class="cvw-meta-l">'+l+'</div><div class="cvw-meta-v">'+esc(v||'—')+'</div></div></div>';
-  // Conteudos
+  // Conteudos — com Feed/Story quando existirem (lado a lado no desktop, empilha no mobile)
+  const arts=(c)=>{
+    if(!c.feedImageUrl&&!c.storyImageUrl)return '';
+    return '<div class="cvw-arts">'+
+      (c.feedImageUrl?'<div class="cvw-art"><div class="cvw-art-lbl">Feed · 1080×1440</div><a href="'+esc(c.feedImageUrl)+'" target="_blank" rel="noopener"><img class="cvw-feed" src="'+esc(c.feedImageUrl)+'" alt="Feed"></a></div>':'')+
+      (c.storyImageUrl?'<div class="cvw-art"><div class="cvw-art-lbl">Story · 1080×1920</div><a href="'+esc(c.storyImageUrl)+'" target="_blank" rel="noopener"><img class="cvw-story" src="'+esc(c.storyImageUrl)+'" alt="Story"></a></div>':'')+
+    '</div>';
+  };
   const conts=ctx.contents.length?ctx.contents.map((c,i)=>
-    '<div class="cvw-item"><div class="cvw-item-n">'+(i+1)+'</div>'+
+    '<div class="cvw-item"><div class="cvw-item-head"><div class="cvw-item-n">'+(i+1)+'</div>'+
     '<div class="cvw-item-m"><div class="cvw-item-t">'+esc(c.tema||'(sem tema)')+'</div>'+
-    (c.legenda?'<div class="cvw-item-l">'+esc(c.legenda)+'</div>':'')+'</div></div>'
+    (c.legenda?'<div class="cvw-item-l">'+esc(c.legenda)+'</div>':'')+'</div></div>'+
+    arts(c)+'</div>'
   ).join(''):'<div class="cvw-soft">Nenhum conteúdo preenchido.</div>';
   // Checklist (se houver)
   const chk=(t.checklist||[]).filter(c=>c&&c.t);
@@ -1870,8 +1989,9 @@ function renderClientView(){
         meta('calendar','Tipo','Cronograma '+ctx.type.toLowerCase())+
         meta('person','Responsável',u?u.name:(t.assignee||'—'))+
         meta('send','Enviado por',sentBy?sentBy.name:'—')+
-        meta('clock','Criado em',t.createdAt?fmtDateBR(new Date(t.createdAt).toISOString().slice(0,10)):'—')+
-        meta('today','Prazo',t.dueDate?fmtDateBR(t.dueDate)+(t.dueTime?' · '+t.dueTime:''):'Sem prazo')+
+        (t.startDate?meta('today','Início',fmtDateBR(t.startDate)+(t.startTime?' · '+t.startTime:'')):'')+
+        (t.endDate?meta('today','Término',fmtDateBR(t.endDate)+(t.endTime?' · '+t.endTime:'')):'')+
+        meta('clock','Prazo final',t.dueDate?fmtDateBR(t.dueDate)+(t.dueTime?' · '+t.dueTime:''):'Sem prazo')+
       '</div>'+
     '</div>'+
     crHtml+
@@ -2003,7 +2123,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.84-desktop-responsive-client-designer-production-flow';
+const BUILD='1.0.85-desktop-feed-story-final-client-review-flow';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2015,7 +2135,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.84 · Responsive Client Designer Production Flow</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.85 · Feed Story Final Client Review Flow</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -2028,7 +2148,7 @@ function renderConfig(){
     '<div style="height:16px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div></div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.84 · Responsive Client Designer Production Flow · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.85 · Feed Story Final Client Review Flow · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
   return h+'</div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
@@ -2043,7 +2163,7 @@ function openSheet(which){
 }
 
 /* ---- TASK FORM (wizard) ---- */
-function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],checklist:[],link:'',obs:'',_openContent:null};}
+function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],checklist:[],link:'',obs:'',_openContent:null};}
 function openTaskForm(sector){state.form=newForm(sector);if(sector)state.form.step=1;render();}
 function tpl(){return state.form.sector?TEMPLATES[secOf(state.form.sector).key]:null;}
 function curSub(){const t=tpl();return (t&&t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;}
@@ -2072,8 +2192,13 @@ function stepDados(){const f=state.form;const t=tpl();
     '<div class="lbl">Responsável</div>'+assigneeField()+
     '<div style="height:14px"></div><div class="lbl">Etapa</div><div class="chips" style="margin-bottom:0">'+STATUS.map(st=>'<button class="chip" data-fstatus="'+st.key+'" style="'+(f.status===st.key?'background:'+withAlpha(st.color,.18)+';color:'+st.color+';border-color:'+st.color:'')+'">'+st.label+'</button>').join('')+'</div>'+
   '</div>'+
-  '<div class="fgroup"><div class="fgroup-h">Prazo &amp; prioridade</div>'+
-    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data</div>'+dt('calendar','fDue','date',f.dueDate)+'</div><div style="flex:1"><div class="lbl">Horário</div>'+dt('clock','fDueT','time',f.dueTime)+'</div></div>'+
+  '<div class="fgroup"><div class="fgroup-h">Período do cronograma</div>'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de início</div>'+dt('calendar','fStart','date',f.startDate)+'</div><div style="flex:1"><div class="lbl">Hora de início</div>'+dt('clock','fStartT','time',f.startTime)+'</div></div>'+
+    '<div style="height:12px"></div>'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de término</div>'+dt('calendar','fEnd','date',f.endDate)+'</div><div style="flex:1"><div class="lbl">Hora de término</div>'+dt('clock','fEndT','time',f.endTime)+'</div></div>'+
+  '</div>'+
+  '<div class="fgroup"><div class="fgroup-h">Prazo final &amp; prioridade</div>'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data limite</div>'+dt('calendar','fDue','date',f.dueDate)+'</div><div style="flex:1"><div class="lbl">Hora limite</div>'+dt('clock','fDueT','time',f.dueTime)+'</div></div>'+
     '<div style="height:16px"></div><div class="switchrow"><div><div style="font-size:14px;font-weight:600">Prioridade alta</div><div style="font-size:12px;color:var(--faint);margin-top:1px">Destaca a tarefa nos quadros</div></div><button class="sw '+(f.priority?'on':'')+'" data-ftoggle="priority"></button></div>'+
   '</div>';
 }
@@ -2132,8 +2257,9 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
     '</div>'+
     '<div class="rev-divider"></div>'+
     '<div class="rev-grid">'+
-      revItem('calendar','Prazo',prazo)+
-      revItem('clock','Horário',f.dueTime||'—')+
+      revItem('today','Início',f.startDate?fmtDateBR(f.startDate)+(f.startTime?' '+f.startTime:''):'—')+
+      revItem('today','Término',f.endDate?fmtDateBR(f.endDate)+(f.endTime?' '+f.endTime:''):'—')+
+      revItem('calendar','Prazo final',prazo+(f.dueTime?' às '+f.dueTime:''))+
       revItem('grid','Setor',s.label)+
       (sub?revItem('description','Subtipo',sub.label||sub.formTitle):'')+
     '</div>'+
@@ -2175,6 +2301,8 @@ function afterForm(){
   const bind=(sel,fn)=>c.querySelectorAll(sel).forEach(el=>el.oninput=()=>fn(el));
   bind('#fTitle',e=>state.form.title=e.value);bind('#fClient',e=>state.form.client=e.value);
   bind('#fDue',e=>state.form.dueDate=e.value);bind('#fDueT',e=>state.form.dueTime=e.value);
+  bind('#fStart',e=>state.form.startDate=e.value);bind('#fStartT',e=>state.form.startTime=e.value);
+  bind('#fEnd',e=>state.form.endDate=e.value);bind('#fEndT',e=>state.form.endTime=e.value);
   bind('#fLink',e=>state.form.link=e.value);bind('#fObs',e=>state.form.obs=e.value);
   bind('[data-ffield]',e=>state.form.fields[e.dataset.ffield]=e.value);
   bind('[data-ctema]',e=>{const i=+e.dataset.ctema;state.form.contents[i]=state.form.contents[i]||{};state.form.contents[i].tema=e.value;});
@@ -2200,7 +2328,7 @@ async function saveTask(){const f=state.form;
   if(t&&t.clientRequired&&!f.client.trim()){alert('Para Cronograma o cliente é obrigatório.');f.step=1;render();return;}
   if(!f.title.trim()){alert('Informe o título.');f.step=1;render();return;}
   const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
-  const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
+  const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
   if(f.contents.length)data.cronContents=f.contents;
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
   if(secOf(f.sector).key==='cronograma'){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;}
@@ -2251,6 +2379,10 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-pickdesigner]')){const p=el.dataset.pickdesigner.split('|');sendToDesigner(p[0],p[1]);return;}
   if(el=g('[data-ceopen]')){openContentEditor(el.dataset.ceopen);return;}
   if(el=g('[data-cesave]')){saveContentEdits(el.dataset.cesave);return;}
+  if(el=g('[data-prodopen]')){openProductionModal(el.dataset.prodopen);return;}
+  if(el=g('[data-prodclear]')){const[i,k]=el.dataset.prodclear.split('|');if(k==='feed')state._prod.items[+i].feedImageUrl='';else state._prod.items[+i].storyImageUrl='';renderProductionModal();return;}
+  if(el=g('[data-prodsave]')){saveProduction(el.dataset.prodsave,false);return;}
+  if(el=g('[data-prodresend]')){saveProduction(el.dataset.prodresend,true);return;}
   if(el=g('[data-sendclient-task]')){const t=state.tasks.find(x=>x.id===el.dataset.sendclientTask);if(t)openSendClientModal(t);return;}
   if(el=g('[data-clientview]')){openClientView(el.dataset.clientview||(state._sendCtx&&state._sendCtx.id));return;}
   if(el=g('[data-clientviewback]')){closeClientView();return;}
