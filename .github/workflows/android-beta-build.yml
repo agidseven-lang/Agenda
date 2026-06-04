@@ -55,6 +55,16 @@ jobs:
       - name: Listar PNGs gerados
         if: always()
         run: ls -lh "$APP_DIR/app/build/outputs/roborazzi" || echo "nenhum PNG"
+      - name: Upload relatorio de teste (diagnostico, se falhar)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-card-test-report
+          path: |
+            android-native-beta/app/build/reports/tests/**
+            android-native-beta/app/build/test-results/**
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload screenshots do card (PNG)
         if: always()
         uses: actions/upload-artifact@v4
