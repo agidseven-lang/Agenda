@@ -15,9 +15,9 @@ name: "[manual] Desktop Build (Windows)"
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: desktop/local-1.0.89-settings-roleboards)"
+        description: "Branch/commit a buildar (default: desktop/hotfix-client-link-persist)"
         required: true
-        default: "desktop/local-1.0.89-settings-roleboards"
+        default: "desktop/hotfix-client-link-persist"
 
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.89-desktop-settings-roleboards-logo"
+      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.90-desktop-client-link-persist-hotfix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
           # VERSAO-DESKTOP.txt — prova do que esta dentro
           {
             echo "productName : Agenda ID Seven Desktop"
-            echo "versionName : 1.0.89-desktop-settings-roleboards"
+            echo "versionName : 1.0.90-desktop-client-link-persist-hotfix"
             echo "appId       : br.com.idseven.agenda.desktop"
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
@@ -157,7 +157,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.89-installer
+          name: agenda-id-seven-desktop-1.0.90-installer
           path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
           if-no-files-found: error
           retention-days: 30
@@ -166,7 +166,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.89-bundle
+          name: agenda-id-seven-desktop-1.0.90-bundle
           path: dist-pkg/
           if-no-files-found: error
           retention-days: 30
