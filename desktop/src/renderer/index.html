@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.88 (Notas + Designer + Logo)</title>
+<title>ID Seven · Desktop 1.0.89 (Settings + Quadros)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1000,7 +1000,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.88 · Notas + Designer + Logo</span><br>
+    <span class="pill-ver">Desktop 1.0.89 · Settings + Quadros</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1015,7 +1015,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.88 · Notas + Designer + Logo</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.89 · Settings + Quadros</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1134,7 +1134,7 @@ const ICON={
   notes:'<path d="M5 5h14M5 10h14M5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'};
 function svg(n,cls){return '<svg viewBox="0 0 24 24" fill="none" class="'+(cls||'')+'">'+(ICON[n]||'')+'</svg>';}
 
-const state={user:null,users:[],events:[],tasks:[],tab:'hoje',boardSector:null,form:null,pending:null,clientView:null,clientAction:null};
+const state={user:null,users:[],events:[],tasks:[],tab:'hoje',boardSector:null,personBoard:null,roleBoards:false,form:null,pending:null,clientView:null,clientAction:null};
 
 /* ---- DESKTOP MODE detection (>=1024px) ---- */
 const DESKTOP_MQ=window.matchMedia('(min-width:1024px)');
@@ -1251,7 +1251,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.88 · Notas + Designer + Logo</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.89 · Settings + Quadros</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1260,7 +1260,12 @@ function render(){
   if(state.form){c.innerHTML=renderForm();afterForm();return;}
   if(state.tab==='hoje')c.innerHTML=renderHoje();
   else if(state.tab==='agenda'){c.innerHTML=renderAgenda();afterAgenda();}
-  else if(state.tab==='tarefas'){if(state.boardSector){c.innerHTML=renderBoard();afterBoard();}else c.innerHTML=renderHub();}
+  else if(state.tab==='tarefas'){
+    if(state.personBoard){c.innerHTML=renderPersonBoard();afterBoard();}
+    else if(state.roleBoards){c.innerHTML=renderRoleBoards();}
+    else if(state.boardSector){c.innerHTML=renderBoard();afterBoard();}
+    else c.innerHTML=renderHub();
+  }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
   else if(state.tab==='chat')c.innerHTML=renderChat();
   else if(state.tab==='perfil')c.innerHTML=renderPerfil();
@@ -1363,16 +1368,60 @@ function afterAgenda(){const s=document.getElementById('agSearch');if(s)s.oninpu
 
 /* ---- HUB ---- */
 function renderHub(){
-  const vis=visibleTasks(state.user,state.tasks);
+  const u=state.user;const vis=visibleTasks(u,state.tasks);
   let h='<div class="scr-head"><div class="row"><div style="flex:1"><div class="h-title">Quadros</div><div class="h-sub">Gestão por setor da agência</div></div><span class="badge-round">'+vis.length+' tarefas</span></div></div><div class="scr" style="padding-top:8px">';
+  // ADITIVO — Meu quadro (todos) + Quadros por responsável (admin). Não remove a visão por setor.
+  const myOpen=u?state.tasks.filter(t=>(t.assigneeId===u.id||t.by===u.id)&&t.status!=='concluido').length:0;
+  let nav='';
+  if(u)nav+='<button class="bcard" data-myboard="1"><div class="icb" style="background:'+withAlpha('#5B6CFF',.18)+';color:#5B6CFF">'+svg('today')+'</div>'+
+    '<div class="bm"><div class="bl">Meu quadro</div><div class="bd">Minhas demandas e tarefas</div>'+
+      '<div class="bp"><span class="pill" style="background:'+withAlpha('#5B6CFF',.16)+';color:#5B6CFF">'+myOpen+' abertas</span></div></div>'+
+    '<div class="arr">'+svg('arr')+'</div></button>';
+  if(roleCat(u)==='ADMIN')nav+='<button class="bcard" data-roleboards="1"><div class="icb" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
+    '<div class="bm"><div class="bl">Quadros por responsável</div><div class="bd">Cada designer/social em um quadro isolado</div>'+
+      '<div class="bp"><span class="pill" style="background:'+withAlpha('#A78BFA',.16)+';color:#A78BFA">admin</span></div></div>'+
+    '<div class="arr">'+svg('arr')+'</div></button>';
   const cards=SECTORS.map(s=>{const list=vis.filter(t=>secOf(t.sector).key===s.key);const total=list.length;const late=list.filter(t=>{const d=taskDeadline(t);return d&&d.late;}).length;
     return '<button class="bcard" data-sector="'+s.key+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div>'+
       '<div class="bm"><div class="bl">'+esc(s.label)+'</div><div class="bd">'+esc(s.desc)+'</div>'+
         '<div class="bp"><span class="pill" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+total+' tarefas</span>'+
         (late>0?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">'+late+' em atraso</span>':'')+'</div></div>'+
       '<div class="arr">'+svg('arr')+'</div></button>';}).join('');
+  h+=isDesktop()?('<div class="d-hub">'+nav+cards+'</div>'):(nav+cards);
+  return h+'</div>';
+}
+// ADITIVO — Admin: índice de quadros por responsável (cada pessoa isolada).
+function renderRoleBoards(){
+  const people=state.users.filter(x=>x&&(x.status!=='pendente'&&x.status!=='removido'&&x.status!=='excluido')).slice().sort((a,b)=>(a.name||'').toLowerCase()<(b.name||'').toLowerCase()?-1:1);
+  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="hub">'+svg('back')+'</button>'+
+    '<div class="d-bh-icon" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">Quadros por responsável</div><div class="d-bh-sub">Cada pessoa em um quadro isolado — sem misturar</div></div></div></div>'+
+    '<div class="scr" style="padding-top:8px">';
+  const cards=people.map(p=>{const mine=state.tasks.filter(t=>t.assigneeId===p.id||t.by===p.id);const open=mine.filter(t=>t.status!=='concluido').length;
+    return '<button class="bcard" data-personboard="'+p.id+'">'+avatar(p,44)+
+      '<div class="bm"><div class="bl">'+esc(p.name||'—')+'</div><div class="bd">'+esc(p.role||'Equipe')+'</div>'+
+        '<div class="bp"><span class="pill" style="background:'+withAlpha('#5B6CFF',.16)+';color:#5B6CFF">'+open+' aberta'+(open===1?'':'s')+'</span></div></div>'+
+      '<div class="arr">'+svg('arr')+'</div></button>';}).join('');
   h+=isDesktop()?('<div class="d-hub">'+cards+'</div>'):cards;
   return h+'</div>';
+}
+// ADITIVO — Quadro por RESPONSÁVEL (admin) ou "Meu quadro" (social/qualquer): todos os setores, fluxo = assigneeId OU by.
+function renderPersonBoard(){
+  const pid=state.personBoard;const p=state.users.find(x=>x.id===pid)||{id:pid,name:(state.user&&state.user.id===pid?state.user.name:'Responsável')};
+  const isMe=state.user&&state.user.id===pid;
+  let list=state.tasks.filter(t=>t.assigneeId===pid||t.by===pid);
+  if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
+  const byStatus=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const backTo=isMe?'hub':(roleCat(state.user)==='ADMIN'?'roleboards':'hub');
+  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
+    avatar(p,44)+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
+    '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
+  STATUS.forEach((st,i)=>{const tasks=byStatus[i];
+    h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
+    h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
+    h+='</div></div>';});
+  return h+'</div></div>';
 }
 
 /* ---- KANBAN ---- */
@@ -2175,7 +2224,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.88-desktop-team-notes-designer-notify-logo';
+const BUILD='1.0.89-desktop-settings-roleboards';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2187,20 +2236,32 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.88 · Notas + Designer + Logo</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.89 · Settings + Quadros</div></div>';
 }
 function renderConfig(){
   const u=state.user;
-  let h='<div class="scr-head"><div class="row" style="align-items:center;gap:12px"><div class="cfg-ic">'+svg('gear')+'</div><div><div class="h-title">Configurações</div><div class="h-sub">Conta, segurança e informações do app</div></div></div></div>'+
+  const soon=l=>'<div class="settrow" style="cursor:default"><div class="sm"><div class="sl" style="color:var(--soft);font-weight:600">'+esc(l)+'</div></div><span class="pill" style="background:var(--surface2);color:var(--faint);border:1px solid var(--line)">Em breve</span></div>';
+  const info=(l,v)=>'<div class="settrow" style="cursor:default"><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(v)+'</div></div></div>';
+  const act=(ic,l,s,attr,color)=>'<button class="settrow" '+attr+'><div class="icb"'+(color?' style="color:'+color+'"':'')+'>'+svg(ic)+'</div><div class="sm"><div class="sl"'+(color?' style="color:'+color+'"':'')+'>'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';
+  let h='<div class="scr-head"><div class="row" style="align-items:center;gap:12px"><div class="cfg-ic">'+svg('gear')+'</div><div><div class="h-title">Configurações</div><div class="h-sub">Conta, privacidade, notificações, dados e idioma</div></div></div></div>'+
     '<div class="scr" style="padding-top:8px">';
-  h+='<div class="lbl">Conta &amp; segurança</div><div class="card">'+
-      settRow('person','Conta','Seus dados','conta')+'<div class="divline"></div>'+
-      settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
-      settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
-    '<div style="height:16px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
-      '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div></div>'+
+  h+='<div class="lbl">Gerenciamento de Conta</div><div class="card">'+
+      settRow('person','Conta','Seus dados','conta')+'<div class="divline"></div>'+soon('Atualizar dados pessoais')+'<div class="divline"></div>'+soon('Assinatura / plano')+'</div>';
+  h+='<div style="height:14px"></div><div class="lbl">Privacidade e Segurança</div><div class="card">'+
+      settRow('gear','Segurança da sessão','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+soon('Autenticação em duas etapas (2FA)')+'<div class="divline"></div>'+soon('Sessões e dispositivos')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
+  h+='<div style="height:14px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
+      act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+soon('Notificações de tarefas')+'<div class="divline"></div>'+soon('Notificações de chat')+'</div>';
+  h+='<div style="height:14px"></div><div class="lbl">Acessibilidade e Aparência</div><div class="card">'+
+      info('Tema','Escuro (premium)')+'<div class="divline"></div>'+soon('Tema claro')+'<div class="divline"></div>'+soon('Tamanho da fonte')+'<div class="divline"></div>'+soon('Alto contraste')+'</div>';
+  h+='<div style="height:14px"></div><div class="lbl">Desempenho e Dados</div><div class="card">'+
+      info('Sincronização','Tempo real (Firestore) · bandeja + autostart')+'<div class="divline"></div>'+soon('Limpar cache')+'<div class="divline"></div>'+soon('Otimizar uso de dados')+'</div>';
+  h+='<div style="height:14px"></div><div class="lbl">Idioma e Região</div><div class="card">'+
+      info('Idioma','Português (Brasil)')+'<div class="divline"></div>'+info('Formato de data','dd/MM/aaaa')+'<div class="divline"></div>'+info('Formato de hora','24h')+'<div class="divline"></div>'+soon('Outros idiomas e moeda')+'</div>';
+  h+='<div style="height:14px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
+      '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div>'+
+      '<div class="divline"></div>'+settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop 1.0.88 · Notas + Designer + Logo · espelha APK 1.0.64-beta-build-artifact-version-fix</div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:16px">ID Seven · Desktop '+BUILD+'</div>';
   return h+'</div>';
 }
 function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+sheet+'"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';}
@@ -2405,10 +2466,18 @@ document.addEventListener('click',async e=>{
   if(!state.user)return;                       // login tem seu proprio handler
   if(!(e.target&&e.target.closest))return;
   const g=sel=>e.target.closest(sel);let el;
-  if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.tab=el.dataset.tab;closeModal();render();return;}
+  if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.tab=el.dataset.tab;closeModal();render();return;}
   if(el=g('[data-fab]')){closeModal();if(state.tab==='tarefas')openTaskForm(state.boardSector);else{state.tab='tarefas';openTaskForm(null);}return;}
-  if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;boardCol=0;boardMine=false;boardQuery='';render();return;}
-  if(el=g('[data-board]')){const a=el.dataset.board;if(a==='back')state.boardSector=null;else if(a==='new'){openTaskForm(state.boardSector);return;}render();return;}
+  if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;boardCol=0;boardMine=false;boardQuery='';render();return;}
+  if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-board]')){const a=el.dataset.board;
+    if(a==='back')state.boardSector=null;
+    else if(a==='hub'){state.boardSector=null;state.personBoard=null;state.roleBoards=false;}
+    else if(a==='roleboards'){state.personBoard=null;state.roleBoards=true;}
+    else if(a==='new'){openTaskForm(state.boardSector);return;}
+    render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
   if(el=g('[data-bmine]')){boardMine=!boardMine;render();return;}
   if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
@@ -2454,6 +2523,7 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
+  if(el=g('[data-cfgnotiftest]')){try{window.desktopAPI&&window.desktopAPI.notifTest&&window.desktopAPI.notifTest();}catch(_){}flashToast('Notificação de teste disparada.');return;}
   if(el=g('[data-logout]')){closeModal();logout();return;}
   if(el=g('[data-pickasg]')){if(state.form){const id=el.dataset.pickasg||null;state.form.assigneeId=id;const u=id?state.users.find(x=>x.id===id):null;state.form.assignee=u?(u.name||''):'';}closeModal();render();return;}
   if(el=g('[data-form]')){const a=el.dataset.form;if(a==='close'){state.form=null;render();}else if(a==='back'){state.form.step=Math.max(0,state.form.step-1);render();}else if(a==='next')stepNext();else if(a==='save')await saveTask();return;}
