@@ -329,7 +329,7 @@ private fun OperationalPanel(t: TaskItem) {
     val steps = listOf(
         Step("Cliente aprovou os temas", themesOk),
         Step("Enviado ao designer", hasD),
-        Step("Designer em produção", hasD && (delivered || TaskVisibility.designerCol(t) == "andamento" || TaskVisibility.designerCol(t) == "revisao"), cur = hasD && !delivered),
+        Step("Designer em produção", delivered, cur = hasD && !delivered),
         Step("Designer entregou", delivered),
         Step("Legenda final pronta", !TaskVisibility.pendingLegend(t)),
         Step("Feed (1080×1440) anexado", !TaskVisibility.pendingFeed(t)),
