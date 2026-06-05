@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.93 (Fluxo + Prazos)</title>
+<title>ID Seven · Desktop 1.0.94 (Fluxo Cliente/Designers)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -954,6 +954,24 @@
   .det-cresp-t{font-size:14px;font-weight:800}
   .det-cresp-n{font-size:13px;color:var(--ink);margin-top:4px;line-height:1.5;font-style:italic}
   .det-cresp-d{font-size:11.5px;color:var(--faint);margin-top:5px}
+  /* P1: correções pedidas pelo cliente (por conteúdo) no Detalhes */
+  .det-fix{border:1px solid;border-radius:13px;padding:14px;margin-bottom:11px;background:var(--surface2)}
+  .det-fix-h{display:flex;align-items:center;gap:10px}
+  .det-fix-n{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none}
+  .det-fix-tt{font-size:13.5px;font-weight:800}
+  .det-fix-note{font-size:13px;color:var(--ink);margin-top:9px;line-height:1.5;font-style:italic;border-left:2px solid var(--line);padding-left:10px}
+  .det-fix-cur{margin-top:10px}
+  .det-fix-lbl{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);display:block;margin-bottom:3px}
+  .det-fix-val{font-size:13px;color:var(--ink);line-height:1.45}
+  .det-fix-acts{display:flex;gap:9px;margin-top:13px;flex-wrap:wrap}
+  .det-fix-acts .btn{height:40px;border-radius:11px;font-size:12.5px;padding:0 14px;display:inline-flex;align-items:center;gap:7px}
+  .det-fix-acts .btn svg{width:15px;height:15px}
+  /* P1: editor focado de um conteúdo (antes/depois) */
+  .if-ba{text-align:left;margin-bottom:16px}
+  .if-lbl{font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .if-before{font-size:13px;color:var(--soft);line-height:1.5;background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:11px 13px;white-space:pre-wrap}
+  .if-in{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--ink);font-size:14px;font-family:inherit;line-height:1.5;margin-bottom:16px;box-sizing:border-box;resize:vertical}
+  .if-in:focus{outline:none;border-color:var(--accent)}
 
   /* mobile: tela do cliente ocupa largura total */
   /* conteudo com Feed/Story */
@@ -1034,7 +1052,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.93 · Fluxo + Prazos</span><br>
+    <span class="pill-ver">Desktop 1.0.94 · Fluxo Cliente/Designers</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1049,7 +1067,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.93 · Fluxo + Prazos</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.94 · Fluxo Cliente/Designers</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1285,7 +1303,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.93 · Fluxo + Prazos</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.94 · Fluxo Cliente/Designers</span><br>espelha o APK <b>1.0.82-beta-client-designer-flow-final-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1295,7 +1313,9 @@ function render(){
   if(state.tab==='hoje')c.innerHTML=renderHoje();
   else if(state.tab==='agenda'){c.innerHTML=renderAgenda();afterAgenda();}
   else if(state.tab==='tarefas'){
-    if(state.personBoard){c.innerHTML=renderPersonBoard();afterBoard();}
+    if(state.flowView==='client'){c.innerHTML=renderClientFlowBoard();afterBoard();}
+    else if(state.flowView==='designers'){if(state.designerBoard){c.innerHTML=renderDesignerBoard();afterBoard();}else c.innerHTML=renderDesignersHub();}
+    else if(state.personBoard){c.innerHTML=renderPersonBoard();afterBoard();}
     else if(state.roleBoards){c.innerHTML=renderRoleBoards();}
     else if(state.boardSector){c.innerHTML=renderBoard();afterBoard();}
     else c.innerHTML=renderHub();
@@ -1415,6 +1435,20 @@ function renderHub(){
     '<div class="bm"><div class="bl">Quadros por responsável</div><div class="bd">Cada designer/social em um quadro isolado</div>'+
       '<div class="bp"><span class="pill" style="background:'+withAlpha('#A78BFA',.16)+';color:#A78BFA">admin</span></div></div>'+
     '<div class="arr">'+svg('arr')+'</div></button>';
+  // P3/P4 — Social/Admin: separar Fluxo do Cliente x Fluxo dos Designers (sem misturar tarefas).
+  if(canSeeAll(u)){
+    const cliFlow=state.tasks.filter(isClientFlow);const cliOpen=cliFlow.filter(t=>t.status!=='concluido').length;
+    const dz=designerBoardsList();const dzLate=state.tasks.filter(t=>isDesignerFlow(t)&&(()=>{const d=taskDeadline(t);return d&&d.late;})()).length;
+    nav+='<button class="bcard" data-flowclient="1"><div class="icb" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
+      '<div class="bm"><div class="bl">Fluxo do Cliente</div><div class="bd">Relacionamento: enviado, aprovado, revisão, reenvio, concluído</div>'+
+        '<div class="bp"><span class="pill" style="background:'+withAlpha('#22D3B8',.16)+';color:#22D3B8">'+cliOpen+' aberta'+(cliOpen===1?'':'s')+'</span></div></div>'+
+      '<div class="arr">'+svg('arr')+'</div></button>';
+    nav+='<button class="bcard" data-flowdesigners="1"><div class="icb" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
+      '<div class="bm"><div class="bl">Fluxo dos Designers</div><div class="bd">Um quadro Kanban por designer — monitore cada um</div>'+
+        '<div class="bp"><span class="pill" style="background:'+withAlpha('#A78BFA',.16)+';color:#A78BFA">'+dz.length+' designer'+(dz.length===1?'':'s')+'</span>'+
+        (dzLate>0?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">'+dzLate+' em atraso</span>':'')+'</div></div>'+
+      '<div class="arr">'+svg('arr')+'</div></button>';
+  }
   const cards=SECTORS.map(s=>{const list=vis.filter(t=>secOf(t.sector).key===s.key);const total=list.length;const late=list.filter(t=>{const d=taskDeadline(t);return d&&d.late;}).length;
     return '<button class="bcard" data-sector="'+s.key+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div>'+
       '<div class="bm"><div class="bl">'+esc(s.label)+'</div><div class="bd">'+esc(s.desc)+'</div>'+
@@ -1450,6 +1484,67 @@ function renderPersonBoard(){
   let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
+    '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
+  STATUS.forEach((st,i)=>{const tasks=byStatus[i];
+    h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
+    h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
+    h+='</div></div>';});
+  return h+'</div></div>';
+}
+
+/* ===== P3/P4 — Fluxo do Cliente x Fluxo dos Designers ===== */
+// Designer flow: tem designerAssignment OU cronStatus do fluxo de produção/designer.
+const DESIGNER_CRON=['sent_to_designer','in_design','designer_producao','pronto_design','ready_for_designer'];
+function isDesignerFlow(t){return !!(t&&(t.designerAssignment&&t.designerAssignment.designerId))||(t&&DESIGNER_CRON.indexOf(t.cronStatus)>=0);}
+// Client flow: cronograma em relacionamento com o cliente (ainda não no fluxo do designer).
+function isClientFlow(t){return !!t&&secOf(t.sector).key==='cronograma'&&!isDesignerFlow(t);}
+// Lista de designers que têm tarefas no fluxo de designer (por designerAssignment ou assigneeId).
+function designerBoardsList(){
+  const ids={};
+  state.tasks.forEach(t=>{if(!isDesignerFlow(t))return;const did=(t.designerAssignment&&t.designerAssignment.designerId)||t.assigneeId;if(did)ids[did]=(ids[did]||0)+1;});
+  return Object.keys(ids).map(id=>{const u=state.users.find(x=>x.id===id)||{id:id,name:'Designer'};return {u:u,count:ids[id]};})
+    .sort((a,b)=>(a.u.name||'').toLowerCase()<(b.u.name||'').toLowerCase()?-1:1);
+}
+function renderClientFlowBoard(){
+  let list=state.tasks.filter(isClientFlow);
+  if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
+  const byStatus=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="hub">'+svg('back')+'</button>'+
+    '<div class="d-bh-icon" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">Fluxo do Cliente</div><div class="d-bh-sub">Relacionamento com o cliente — '+list.length+' tarefa'+(list.length===1?'':'s')+'</div></div></div></div>'+
+    '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
+  STATUS.forEach((st,i)=>{const tasks=byStatus[i];
+    h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
+    h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
+    h+='</div></div>';});
+  return h+'</div></div>';
+}
+function renderDesignersHub(){
+  const dz=designerBoardsList();
+  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="hub">'+svg('back')+'</button>'+
+    '<div class="d-bh-icon" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">Fluxo dos Designers</div><div class="d-bh-sub">Cada designer em um quadro Kanban próprio</div></div></div></div>'+
+    '<div class="scr" style="padding-top:8px">';
+  const cards=dz.length?dz.map(d=>{const tasks=state.tasks.filter(t=>isDesignerFlow(t)&&((t.designerAssignment&&t.designerAssignment.designerId===d.u.id)||t.assigneeId===d.u.id));
+    const open=tasks.filter(t=>t.status!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
+    return '<button class="bcard" data-designerboard="'+d.u.id+'">'+avatar(d.u,44)+
+      '<div class="bm"><div class="bl">'+esc(d.u.name||'Designer')+'</div><div class="bd">'+esc(d.u.role||'Designer')+'</div>'+
+        '<div class="bp"><span class="pill" style="background:'+withAlpha('#5B6CFF',.16)+';color:#5B6CFF">'+open+' aberta'+(open===1?'':'s')+'</span>'+
+        (late>0?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">'+late+' em atraso</span>':'')+'</div></div>'+
+      '<div class="arr">'+svg('arr')+'</div></button>';}).join('')
+    :'<div class="emptyline" style="text-align:center;padding:26px 6px">Nenhuma tarefa enviada a designers ainda. Envie um cronograma aprovado para um designer.</div>';
+  h+=isDesktop()?('<div class="d-hub">'+cards+'</div>'):cards;
+  return h+'</div>';
+}
+function renderDesignerBoard(){
+  const id=state.designerBoard;const p=state.users.find(x=>x.id===id)||{id:id,name:'Designer'};
+  let list=state.tasks.filter(t=>isDesignerFlow(t)&&((t.designerAssignment&&t.designerAssignment.designerId===id)||t.assigneeId===id));
+  if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
+  const byStatus=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const late=list.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
+  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
+    avatar(p,44)+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">Designer · '+esc((p.name||'').split(' ')[0]||'Designer')+'</div><div class="d-bh-sub">'+esc(p.role||'Designer')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
   STATUS.forEach((st,i)=>{const tasks=byStatus[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
@@ -1638,6 +1733,8 @@ function openDetails(taskId){
        (cr.note?'<div class="det-cresp-n">"'+esc(cr.note)+'"</div>':'')+
        (cr.at?'<div class="det-cresp-d">'+fmtDateTimeBR(cr.at)+(cr.byName?' · '+esc(cr.byName):'')+'</div>':'')+'</div></div>';
   }
+  // P1 — Correções pedidas pelo cliente POR CONTEÚDO: editar tema/legenda daquele item.
+  h+=clientRevisionFixBlock(t);
   // Designer atribuido (tempo real) — quem recebeu + status
   if(t.designerAssignment&&t.designerAssignment.designerId){const da=t.designerAssignment;
     const du=state.users.find(u=>u.id===da.designerId);const dStatus={sent:'Recebido',in_progress:'Em produção',done:'Concluído'}[da.status]||'Enviado';
@@ -1654,6 +1751,69 @@ function openDetails(taskId){
     detFooter(t,cron)+
   '</div></div>';
   document.getElementById('modalRoot').innerHTML=h;
+}
+/* P1 — bloco de correções por conteúdo (quando o cliente pediu revisão/edição de itens). */
+function clientRevisionFixBlock(t){
+  const ci=(t.clientItems&&typeof t.clientItems==='object')?t.clientItems:null;
+  if(!ci)return '';
+  const arr=Array.isArray(t.cronContents)?t.cronContents:[];
+  const rows=[];
+  Object.keys(ci).forEach(k=>{const m=k.match(/^i(\d+)$/);if(!m)return;const idx=+m[1];const it=ci[k]||{};
+    if(it.cs!=='em_revisao'&&it.cs!=='editado')return;
+    const c=arr[idx]||{};const tema=(typeof it.theme==='string'&&it.theme)?it.theme:(c.tema||'(sem tema)');const leg=(typeof it.legenda==='string')?it.legenda:(c.legenda||'');
+    const isRev=it.cs==='em_revisao';const col=isRev?'#F59E0B':'#A78BFA';
+    rows.push({idx:idx,tema:tema,leg:leg,note:it.note||'',col:col,isRev:isRev});});
+  if(!rows.length)return '';
+  let h='<div class="det-sec">Correções pedidas pelo cliente</div>';
+  rows.forEach(r=>{
+    h+='<div class="det-fix" style="border-color:'+withAlpha(r.col,.4)+'">'+
+      '<div class="det-fix-h"><span class="det-fix-n" style="background:'+withAlpha(r.col,.16)+';color:'+r.col+'">'+(r.idx+1)+'</span>'+
+        '<div class="det-fix-tt">Conteúdo '+(r.idx+1)+' · '+(r.isRev?'Ajuste pedido':'Editado pelo cliente')+'</div></div>'+
+      (r.note?'<div class="det-fix-note">"'+esc(r.note)+'"</div>':'')+
+      '<div class="det-fix-cur"><span class="det-fix-lbl">Tema atual</span><div class="det-fix-val">'+esc(r.tema)+'</div></div>'+
+      (r.leg?'<div class="det-fix-cur"><span class="det-fix-lbl">Legenda atual</span><div class="det-fix-val">'+esc(r.leg)+'</div></div>':'')+
+      '<div class="det-fix-acts"><button class="btn ce-edit" data-itemfix="'+t.id+'|'+r.idx+'|tema">'+svg('editnote')+'Editar tema</button>'+
+        '<button class="btn ce-edit" data-itemfix="'+t.id+'|'+r.idx+'|legenda">'+svg('editnote')+'Editar legenda</button></div>'+
+    '</div>';
+  });
+  return h;
+}
+// Editor FOCADO de UM conteúdo (tema OU legenda) com antes/depois + salvar + reenviar.
+function openItemFix(taskId,idx,field){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const arr=Array.isArray(t.cronContents)?t.cronContents:[];const c=arr[idx]||{};
+  const ci=(t.clientItems&&t.clientItems['i'+idx])||{};
+  const cur=field==='tema'?(c.tema||''):(c.legenda||'');
+  const isLeg=field==='legenda';const lbl=isLeg?'Legenda':'Tema';
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet sp-sheet">'+
+    '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
+    '<div class="sp-ic">'+svg('editnote')+'</div>'+
+    '<div class="sp-title">Corrigir '+lbl.toLowerCase()+' — Conteúdo '+(idx+1)+'</div>'+
+    (ci.note?'<div class="sp-sub">Pedido do cliente: <b>"'+esc(ci.note)+'"</b></div>':'<div class="sp-sub">Ajuste apenas este conteúdo. Os demais não são alterados.</div>')+
+    '<div class="if-ba"><div class="if-lbl">Antes</div><div class="if-before">'+esc(cur||'(vazio)')+'</div></div>'+
+    '<div class="sp-lbl">'+lbl+' corrigido</div>'+
+    (isLeg?'<textarea id="ifIn" class="if-in" rows="5">'+esc(cur)+'</textarea>':'<input id="ifIn" class="if-in" value="'+esc(cur).replace(/"/g,'&quot;')+'">')+
+    '<div class="sp-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button>'+
+      '<button class="btn ce-edit" data-itemfixsave="'+taskId+'|'+idx+'|'+field+'|save">'+svg('check')+'Salvar correção</button>'+
+      '<button class="btn send-go" data-itemfixsave="'+taskId+'|'+idx+'|'+field+'|resend">'+svg('send')+'Salvar e reenviar ao cliente</button></div>'+
+  '</div></div>';
+}
+async function saveItemFix(taskId,idx,field,val,resend){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const arr=Array.isArray(t.cronContents)?t.cronContents.slice():[];
+  while(arr.length<=idx)arr.push({});
+  const c=Object.assign({},arr[idx]||{});const old=field==='tema'?(c.tema||''):(c.legenda||'');
+  if(field==='tema')c.tema=val;else c.legenda=val;arr[idx]=c;
+  const now=Date.now();const u=state.user||{};
+  const patch={cronContents:arr,
+    history:firebase.firestore.FieldValue.arrayUnion({type:'social_corrigiu',label:'Social corrigiu '+(field==='tema'?'o tema':'a legenda')+' do Conteúdo '+(idx+1),
+      by:u.name||'',byId:u.id||null,at:now,channel:'social_edit',contentIndex:idx,field:field,oldValue:String(old).slice(0,300),newValue:String(val).slice(0,300)})};
+  t.cronContents=arr;
+  closeModal();
+  try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveItemFix',e);}
+  flashToast('Correção salva no Conteúdo '+(idx+1)+'.');
+  if(resend){const lt=state.tasks.find(x=>x.id===taskId)||t;openSendClientModal(lt);}
+  else render();
 }
 // Footer premium do Detalhes — agrupado (cliente / tarefa), nunca corta: cada
 // grupo e flex-wrap com min-width, quebrando em 2 linhas quando necessario.
@@ -2353,7 +2513,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.93-desktop-workflow-stage-deadline-fix';
+const BUILD='1.0.94-desktop-client-designer-flow-final-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2365,7 +2525,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.93 · Fluxo + Prazos</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.94 · Fluxo Cliente/Designers</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -2595,16 +2755,20 @@ document.addEventListener('click',async e=>{
   if(!state.user)return;                       // login tem seu proprio handler
   if(!(e.target&&e.target.closest))return;
   const g=sel=>e.target.closest(sel);let el;
-  if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.tab=el.dataset.tab;closeModal();render();return;}
+  if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.tab=el.dataset.tab;closeModal();render();return;}
   if(el=g('[data-fab]')){closeModal();if(state.tab==='tarefas')openTaskForm(state.boardSector);else{state.tab='tarefas';openTaskForm(null);}return;}
-  if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;boardCol=0;boardMine=false;boardQuery='';render();return;}
-  if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}
+  if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-flowclient]')){state.flowView='client';state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-flowdesigners]')){state.flowView='designers';state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-designerboard]')){state.flowView='designers';state.designerBoard=el.dataset.designerboard;boardQuery='';render();return;}
   if(el=g('[data-board]')){const a=el.dataset.board;
     if(a==='back')state.boardSector=null;
-    else if(a==='hub'){state.boardSector=null;state.personBoard=null;state.roleBoards=false;}
+    else if(a==='hub'){state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;}
     else if(a==='roleboards'){state.personBoard=null;state.roleBoards=true;}
+    else if(a==='flowdesigners'){state.designerBoard=null;state.flowView='designers';}
     else if(a==='new'){openTaskForm(state.boardSector);return;}
     render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
@@ -2637,6 +2801,8 @@ document.addEventListener('click',async e=>{
     sendToDesigner(p[0],p[1],{startDate:sd,startTime:st,endDate:ed,endTime:et,obs:obs});
     return;
   }
+  if(el=g('[data-itemfix]')){const p=el.dataset.itemfix.split('|');openItemFix(p[0],+p[1],p[2]);return;}
+  if(el=g('[data-itemfixsave]')){const p=el.dataset.itemfixsave.split('|');const ta=document.getElementById('ifIn');const val=ta?ta.value:'';saveItemFix(p[0],+p[1],p[2],val,p[3]==='resend');return;}
   if(el=g('[data-ceopen]')){openContentEditor(el.dataset.ceopen);return;}
   if(el=g('[data-cesave]')){saveContentEdits(el.dataset.cesave);return;}
   if(el=g('[data-prodopen]')){openProductionModal(el.dataset.prodopen);return;}
