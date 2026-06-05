@@ -96,6 +96,8 @@ jobs:
             code2=$(curl -sS -o "$tmp2" -w '%{http_code}' "$B/cliente/cronograma/$CTOKEN")
             ct2=$(curl -sS -o /dev/null -w '%{content_type}' "$B/cliente/cronograma/$CTOKEN")
             echo "HTTP=$code2  Content-Type=$ct2  bytes=$(wc -c < $tmp2)"
+            echo "---- primeiros 500 bytes do corpo (diagnostico) ----"
+            head -c 500 "$tmp2" ; echo ; echo "----------------------------------------------------"
             [ "$code2" = "200" ] || { echo "FAIL: esperava 200 com token real" >&2 ; exit 1 ; }
             echo "$ct2" | grep -qi 'text/html' || { echo "FAIL: token real NAO retornou text/html" >&2 ; exit 1 ; }
             grep -q 'Visão do Cliente' "$tmp2" || { echo "FAIL: HTML nao contem titulo da Visao do Cliente" >&2 ; exit 1 ; }

@@ -809,21 +809,28 @@ async function hmacSha1Hex(key, msg) {
    appendar a clientActions[] via array-merge — não toca cronWeeks, cs, lg, lgState, etc. */
 
 async function handleClientCronogramaView(token, env) {
-  if (!token) return htmlResponse(renderClientErrorHtml("Link inválido", "O link não contém um token válido."), 400);
-  let accessToken;
-  try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
-  catch (e) {
-    console.error("[CLIENT-VIEW] auth falhou:", e && e.message);
-    return htmlResponse(renderClientErrorHtml("Indisponível", "Não foi possível carregar agora. Tente novamente em instantes."), 503);
+  try {
+    if (!token) return htmlResponse(renderClientErrorHtml("Link inválido", "O link não contém um token válido."), 400);
+    let accessToken;
+    try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
+    catch (e) {
+      console.error("[CLIENT-VIEW] auth falhou:", e && e.message);
+      return htmlResponse(renderClientErrorHtml("Indisponível", "Não foi possível carregar agora. Tente novamente em instantes."), 503);
+    }
+    const task = await queryTaskByToken(env, accessToken, token);
+    if (!task) {
+      console.log(`[CLIENT-VIEW] token nao encontrado: ${token.slice(0, 6)}…`);
+      return htmlResponse(renderClientErrorHtml("Cronograma não encontrado",
+        "Este link pode ter sido invalidado ou ainda não foi compartilhado. Fale com sua equipe ID Seven."), 404);
+    }
+    console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""}`);
+    return htmlResponse(renderClientHtml(task, token, env), 200);
+  } catch (e) {
+    // Blindagem: qualquer erro inesperado de render/query → HTML amigável (NUNCA tela branca/JSON/corpo vazio).
+    console.error("[CLIENT-VIEW] erro inesperado:", e && (e.stack || e.message));
+    return htmlResponse(renderClientErrorHtml("Algo deu errado",
+      "Tivemos um problema ao montar sua página. Tente novamente em instantes ou fale com a equipe ID Seven."), 500);
   }
-  const task = await queryTaskByShareToken(env, accessToken, token);
-  if (!task) {
-    console.log(`[CLIENT-VIEW] token nao encontrado: ${token.slice(0, 6)}…`);
-    return htmlResponse(renderClientErrorHtml("Cronograma não encontrado",
-      "Este link pode ter sido invalidado ou ainda não foi compartilhado. Fale com sua equipe ID Seven."), 404);
-  }
-  console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""}`);
-  return htmlResponse(renderClientHtml(task, token, env), 200);
 }
 
 async function handleClientCronogramaAction(token, request, env) {
@@ -840,7 +847,7 @@ async function handleClientCronogramaAction(token, request, env) {
   try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
   catch (e) { return json({ ok: false, error: "auth falhou: " + (e && e.message) }, 200, env); }
 
-  const task = await queryTaskByShareToken(env, accessToken, token);
+  const task = await queryTaskByToken(env, accessToken, token);
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
 
   const now = Date.now();
@@ -850,13 +857,26 @@ async function handleClientCronogramaAction(token, request, env) {
   return json({ ok: true, action }, 200, env);
 }
 
-/* Query Firestore por shareToken (campo do doc tasks/{id}). */
-async function queryTaskByShareToken(env, accessToken, token) {
+/* Query Firestore pela task que corresponde ao token público do cliente.
+   O token pode estar em DOIS campos, conforme a origem do link:
+     - clientReviewToken  → Desktop (genReviewToken → ensureReviewToken)
+     - shareToken         → Web/PWA (genShareToken)
+   Tenta clientReviewToken primeiro (origem dos links /cliente/cronograma/<token>),
+   depois shareToken como fallback. Equality simples — não exige índice composto. */
+async function queryTaskByToken(env, accessToken, token) {
+  for (const field of ["clientReviewToken", "shareToken"]) {
+    const task = await queryTaskByField(env, accessToken, field, token);
+    if (task) { console.log(`[CLIENT-VIEW] task achada por ${field}`); return task; }
+  }
+  return null;
+}
+
+async function queryTaskByField(env, accessToken, field, value) {
   const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
   const q = {
     structuredQuery: {
       from: [{ collectionId: "tasks" }],
-      where: { fieldFilter: { field: { fieldPath: "shareToken" }, op: "EQUAL", value: { stringValue: token } } },
+      where: { fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: { stringValue: value } } },
       limit: 1,
     },
   };
@@ -865,7 +885,7 @@ async function queryTaskByShareToken(env, accessToken, token) {
     headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
     body: JSON.stringify(q),
   });
-  if (!res.ok) { console.error("[CLIENT-VIEW] runQuery falhou:", res.status, (await res.text()).slice(0, 200)); return null; }
+  if (!res.ok) { console.error(`[CLIENT-VIEW] runQuery(${field}) falhou:`, res.status, (await res.text()).slice(0, 200)); return null; }
   const rows = await res.json();
   for (const row of rows) {
     if (!row.document) continue;
