@@ -50,6 +50,7 @@ fun DesignersHubScreen(
     users: List<UserLite>,
     onOpenDesigner: (String) -> Unit,
     onBack: () -> Unit,
+    tabsBar: @Composable () -> Unit = {},
 ) {
     val tasks = tasksState.itemsOrEmpty()
     val counts = TaskVisibility.designersWithFlow(tasks)
@@ -59,7 +60,8 @@ fun DesignersHubScreen(
         .sortedBy { (u, id) -> (u?.name ?: id).lowercase() }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 16.dp, end = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        tabsBar()
+        Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 8.dp, end = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(11.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Voltar", tint = Tokens.Soft, modifier = Modifier.size(22.dp))
             }
@@ -69,7 +71,7 @@ fun DesignersHubScreen(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("Fluxo dos Designers", color = Tokens.Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Designers", color = Tokens.Ink, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("Cada designer em um quadro Kanban próprio", color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -82,7 +84,7 @@ fun DesignersHubScreen(
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp)) {
             items(designers, key = { it.second }) { (u, id) ->
                 val mine = tasks.filter { TaskVisibility.isDesignerFlow(it) && TaskVisibility.designerOf(it) == id }
-                val open = mine.count { (it.status ?: "afazer") != "concluido" }
+                val open = mine.count { TaskVisibility.designerCol(it) != "concluido" }
                 val late = mine.count { TaskDeadline.of(it)?.late == true }
                 val nm = u?.name ?: "Designer"
                 Row(

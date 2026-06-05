@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -110,10 +111,11 @@ fun TasksScreen(
     lockedSector: String? = null,      // quando setado: quadro de UM setor (Fase A)
     personId: String? = null,          // ADITIVO: quadro por RESPONSÁVEL (admin/role-boards) — todos os setores
     personName: String? = null,
-    flow: String? = null,              // P3/P4: "client" = Fluxo do Cliente; "designer" = quadro de UM designer
+    flow: String? = null,              // P3/P4: "client" = fluxo do Cliente; "designer" = quadro de UM designer
     designerId: String? = null,        // P4: quando flow=="designer", o designer dono do quadro
     onNew: () -> Unit = {},
     onBack: (() -> Unit)? = null,
+    tabsBar: @Composable () -> Unit = {}, // abas superiores (Meu quadro/Cliente/Designers/Setores)
 ) {
     tasksState.errorMessage()?.let { ErrorState("Tarefas — $it"); return }
     if (tasksState.isLoading) { SkeletonList(); return }
@@ -152,20 +154,33 @@ fun TasksScreen(
         val okVis = TaskVisibility.canSeeTask(currentUser, t)
         okQ && okS && okFlow && okPerson && okM && okVis
     }
-    val pager = rememberPagerState(pageCount = { TaskStatus.COLUMNS.size })
+    // Eixo de colunas conforme o fluxo: CLIENTE (7 colunas próprias) x demais (4 status do kanban).
+    val isClientBoard = flow == "client"
+    val cols: List<BoardCol> = if (isClientBoard)
+        TaskVisibility.CLIENT_COLS.map { BoardCol(it.key, it.label, clientColShort(it.key), clientColColor(it.key)) }
+    else TaskStatus.COLUMNS.map { BoardCol(it, TaskStatus.label(it), statusColShort(it), TaskStatus.color(it)) }
+    val colKeyOf: (TaskItem) -> String = { t ->
+        when {
+            isClientBoard -> TaskVisibility.clientCol(t)
+            flow == "designer" -> TaskVisibility.designerCol(t)
+            else -> t.status ?: "afazer"
+        }
+    }
+    val pager = rememberPagerState(pageCount = { cols.size })
 
     Column(Modifier.fillMaxSize()) {
+        tabsBar()
         // P3/P4 — Cabeçalho dos fluxos separados (Cliente / um Designer).
         if (flow != null) {
             val designer = users.firstOrNull { it.id == designerId }
             val isClient = flow == "client"
             val accent = if (isClient) Color(0xFF22D3B8) else Color(0xFFA78BFA)
             val title = when {
-                isClient -> "Fluxo do Cliente"
+                isClient -> "Cliente"
                 designer != null -> "Designer · ${UserColor.firstName(designer.name ?: "Designer")}"
                 else -> "Quadro do Designer"
             }
-            val sub = if (isClient) "Relacionamento com o cliente — sem misturar"
+            val sub = if (isClient) "Fica visível até a aprovação final — mesmo enviado ao designer"
                 else (designer?.role?.ifBlank { null } ?: "Designer") + " · monitorado em tempo real"
             Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, end = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (onBack != null) {
@@ -240,23 +255,27 @@ fun TasksScreen(
                 Sectors.ALL.forEach { s -> SectorChip(s.label, s.color, sectorFilter == s.key) { sectorFilter = s.key } }
             }
         }
-        // Seletor/indicador de coluna
-        Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 8.dp)) {
-            TaskStatus.COLUMNS.forEachIndexed { i, st ->
-                val count = tasks.count { (it.status ?: "afazer") == st }
+        // Seletor/indicador de coluna. Cliente = 7 colunas (rolável, largura fixa);
+        // demais = 4 colunas (preenchem a largura com weight, sem scroll p/ não quebrar a medição).
+        val selRowMod = if (isClientBoard)
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp)
+        else Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+        Row(selRowMod) {
+            cols.forEachIndexed { i, c ->
+                val count = tasks.count { colKeyOf(it) == c.key }
                 val sel = pager.currentPage == i
                 Box(
-                    modifier = Modifier.weight(1f).padding(horizontal = 3.dp).clip(RoundedCornerShape(10.dp))
-                        .background(if (sel) TaskStatus.color(st).copy(alpha = 0.18f) else Tokens.Surface)
-                        .border(1.dp, if (sel) TaskStatus.color(st) else Tokens.Line, RoundedCornerShape(10.dp))
+                    modifier = (if (isClientBoard) Modifier.widthIn(min = 92.dp) else Modifier.weight(1f))
+                        .padding(horizontal = 3.dp).clip(RoundedCornerShape(10.dp))
+                        .background(if (sel) c.color.copy(alpha = 0.18f) else Tokens.Surface)
+                        .border(1.dp, if (sel) c.color else Tokens.Line, RoundedCornerShape(10.dp))
                         .clickable { scope.launch { pager.animateScrollToPage(i) } }
-                        .padding(vertical = 7.dp),
+                        .padding(vertical = 7.dp, horizontal = 10.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    val sl = when (st) { "andamento" -> "Andam."; "revisao" -> "Revisão"; "concluido" -> "Concl."; else -> "A Fazer" }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(sl, color = if (sel) TaskStatus.color(st) else Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text("$count", color = if (sel) TaskStatus.color(st) else Tokens.Soft, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                        Text(c.short, color = if (sel) c.color else Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text("$count", color = if (sel) c.color else Tokens.Soft, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -268,10 +287,10 @@ fun TasksScreen(
         }
 
         HorizontalPager(state = pager, modifier = Modifier.weight(1f).fillMaxWidth()) { page ->
-            val st = TaskStatus.COLUMNS[page]
-            val list = TaskSort.order(tasks.filter { (it.status ?: "afazer") == st })
+            val col = cols[page]
+            val list = TaskSort.order(tasks.filter { colKeyOf(it) == col.key })
             Column(Modifier.fillMaxHeight().padding(horizontal = 18.dp)) {
-                ColumnHeader(st, list.size)
+                BoardColumnHeader(col, list.size)
                 if (list.isEmpty()) {
                     Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { Text("Nenhuma tarefa aqui", color = Tokens.Faint, fontSize = 13.sp) }
                 } else {
@@ -361,9 +380,24 @@ private fun SectorChip(label: String, color: Color?, selected: Boolean, onClick:
     ) { Text(label, color = if (selected) c else Tokens.Soft, fontSize = 12.5.sp, fontWeight = FontWeight.Bold) }
 }
 
+// Coluna genérica (cliente OU designer/status) — espelha BoardCol.
+data class BoardCol(val key: String, val label: String, val short: String, val color: Color)
+
+// Rótulos curtos + cores das colunas do fluxo do CLIENTE (7 colunas).
+private fun clientColShort(k: String): String = when (k) {
+    "enviado" -> "Enviado"; "aprovado" -> "Aprovado"; "producao" -> "Produção"
+    "revisao" -> "Revisão"; "reenviado" -> "Reenviado"; "concluido" -> "Concl."; else -> "A Fazer"
+}
+private fun clientColColor(k: String): Color = when (k) {
+    "enviado" -> Color(0xFF5B6CFF); "aprovado" -> Color(0xFF22D3EE); "producao" -> Color(0xFFA78BFA)
+    "revisao" -> Color(0xFFF59E0B); "reenviado" -> Color(0xFF34D399); "concluido" -> Color(0xFF10B981)
+    else -> Color(0xFF6E7480)
+}
+private fun statusColShort(k: String): String = when (k) { "andamento" -> "Andam."; "revisao" -> "Revisão"; "concluido" -> "Concl."; else -> "A Fazer" }
+
 @Composable
-private fun ColumnHeader(st: String, count: Int) {
-    val color = TaskStatus.color(st)
+private fun BoardColumnHeader(col: BoardCol, count: Int) {
+    val color = col.color
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 14.dp).clip(RoundedCornerShape(16.dp))
             .background(Tokens.Surface).border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(16.dp)).padding(16.dp),
@@ -372,8 +406,7 @@ private fun ColumnHeader(st: String, count: Int) {
         Box(Modifier.size(12.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(TaskStatus.label(st), color = color, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text(TaskStatus.desc(st), color = Tokens.Faint, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            Text(col.label, color = color, fontSize = 17.sp, fontWeight = FontWeight.Bold)
         }
         Box(Modifier.clip(RoundedCornerShape(999.dp)).background(color.copy(alpha = 0.16f)).padding(horizontal = 12.dp, vertical = 5.dp)) {
             Text("$count", color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)

@@ -49,23 +49,53 @@ object TaskVisibility {
     fun visibleTasks(user: UserLite?, tasks: List<TaskItem>): List<TaskItem> =
         if (canSeeAllBoards(user)) tasks else tasks.filter { canSeeTask(user, it) }
 
-    // ===== P3/P4 — separação Fluxo do Cliente x Fluxo dos Designers (espelha o Desktop) =====
-    // cronStatus que indicam que a tarefa já está no fluxo do designer.
-    private val DESIGNER_CRON = listOf(
-        "sent_to_designer", "enviado_design", "in_design", "designer_producao",
-        "pronto_design", "ready_for_designer",
-    )
+    // ===== EIXOS SEPARADOS cliente x designer (visibility-fix; espelha o Desktop) =====
+    // Fluxo do DESIGNER: a tarefa foi ATRIBUÍDA a um designer.
+    fun hasDesigner(t: TaskItem): Boolean = !t.assignedDesignerId.isNullOrBlank()
+    fun isDesignerFlow(t: TaskItem): Boolean = hasDesigner(t)
 
-    // Fluxo do DESIGNER: tem designer atribuído OU cronStatus de produção do designer.
-    fun isDesignerFlow(t: TaskItem): Boolean =
-        !t.assignedDesignerId.isNullOrBlank() || (t.cronStatus != null && DESIGNER_CRON.contains(t.cronStatus))
+    // Fluxo do CLIENTE: TODO cronograma vive no fluxo do cliente — INDEPENDENTE do designer.
+    // Só "conclui" o fluxo do cliente na aprovação final (clientFlowStatus='concluido').
+    fun isClientFlow(t: TaskItem): Boolean = Sectors.of(t.sector).key == "cronograma"
 
-    // Fluxo do CLIENTE: cronograma em relacionamento com o cliente (ainda não no fluxo do designer).
-    fun isClientFlow(t: TaskItem): Boolean =
-        Sectors.of(t.sector).key == "cronograma" && !isDesignerFlow(t)
-
-    // O designer "dono" de uma tarefa do fluxo (atribuição explícita ou, na falta, o responsável).
+    // O designer "dono" da tarefa.
     fun designerOf(t: TaskItem): String? = t.assignedDesignerId?.ifBlank { null } ?: t.assigneeId
+
+    // Colunas do FLUXO DO CLIENTE (eixo próprio, separado do designer).
+    data class ClientCol(val key: String, val label: String)
+    val CLIENT_COLS = listOf(
+        ClientCol("afazer", "A Fazer"),
+        ClientCol("enviado", "Enviado ao cliente"),
+        ClientCol("aprovado", "Aprovado pelo cliente"),
+        ClientCol("producao", "Em produção"),
+        ClientCol("revisao", "Revisão"),
+        ClientCol("reenviado", "Reenviado ao cliente"),
+        ClientCol("concluido", "Concluído"),
+    )
+    private val CLIENT_KEYS = CLIENT_COLS.map { it.key }.toSet()
+
+    // Coluna do cliente: usa clientFlowStatus (gravado por Worker/Desktop); senão deriva (compat).
+    fun clientCol(t: TaskItem): String {
+        val v = t.clientFlowStatus ?: ""
+        if (CLIENT_KEYS.contains(v)) return v
+        val ws = t.cronStatus ?: ""  // workflowStage não está no modelo; usa cronStatus + review
+        val cr = t.clientReview?.status ?: ""
+        val st = t.status ?: ""
+        if (st == "concluido" || ws == "aprovado_final") return "concluido"
+        if (cr == "revisao" || ws == "em_revisao_cliente" || ws == "editado_cliente") return "revisao"
+        if (ws == "ready_for_final_client_review" || ws == "reenviado_cliente") return "reenviado"
+        if (hasDesigner(t) || ws == "sent_to_designer") return "producao"
+        if (cr == "aprovado" || ws == "aprovado_cliente") return "aprovado"
+        if (ws == "enviado_cliente" || !t.clientSentBy.isNullOrBlank()) return "enviado"
+        return "afazer"
+    }
+
+    // Coluna do DESIGNER (eixo de trabalho do designer): designerFlowStatus; senão status.
+    fun designerCol(t: TaskItem): String {
+        val v = t.designerFlowStatus ?: ""
+        if (v == "afazer" || v == "andamento" || v == "revisao" || v == "concluido") return v
+        return t.status ?: "afazer"
+    }
 
     // IDs de designers que possuem tarefas no fluxo de designer (para o hub de designers).
     fun designersWithFlow(tasks: List<TaskItem>): Map<String, Int> {

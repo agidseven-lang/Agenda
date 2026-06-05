@@ -53,8 +53,9 @@ fun BoardsHubScreen(
     onOpenSector: (String) -> Unit,
     onOpenRoleBoards: () -> Unit = {},   // ADITIVO: admin -> "Quadros por responsável"
     onOpenMyBoard: () -> Unit = {},      // ADITIVO: "Meu quadro / Minhas demandas"
-    onOpenClientFlow: () -> Unit = {},   // P3: Social/Admin -> "Fluxo do Cliente"
-    onOpenDesignersFlow: () -> Unit = {}, // P4: Social/Admin -> "Fluxo dos Designers"
+    onOpenClientFlow: () -> Unit = {},   // P3: Social/Admin -> "Cliente"
+    onOpenDesignersFlow: () -> Unit = {}, // P4: Social/Admin -> "Designers"
+    tabsBar: @Composable () -> Unit = {}, // abas superiores (Meu quadro/Cliente/Designers/Setores)
 ) {
     tasksState.errorMessage()?.let { ErrorState("Quadros — $it"); return }
     if (tasksState.isLoading) { SkeletonList(); return }
@@ -66,12 +67,13 @@ fun BoardsHubScreen(
         (it.assigneeId == uid || it.by == uid) && (it.status ?: "afazer") != "concluido"
     } else 0
     // P3/P4 — contadores dos fluxos (Social/Admin).
-    val clientOpen = all.count { TaskVisibility.isClientFlow(it) && (it.status ?: "afazer") != "concluido" }
+    val clientOpen = all.count { TaskVisibility.isClientFlow(it) && TaskVisibility.clientCol(it) != "concluido" }
     val designersCount = TaskVisibility.designersWithFlow(all).size
     val designersLate = all.count { TaskVisibility.isDesignerFlow(it) && TaskDeadline.of(it)?.late == true }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        tabsBar()
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 10.dp, end = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Quadros", color = Tokens.Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                 Text("Gestão por setor da agência", color = Tokens.Faint, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
@@ -95,7 +97,7 @@ fun BoardsHubScreen(
             if (seeAll) {
                 item {
                     BoardCard(
-                        label = "Fluxo do Cliente", desc = "Enviado, aprovado, revisão, reenvio, concluído",
+                        label = "Cliente", desc = "Fica no fluxo do cliente até a aprovação final (mesmo no designer)",
                         color = androidx.compose.ui.graphics.Color(0xFF22D3B8),
                         icon = Icons.Outlined.Visibility, total = clientOpen, late = 0,
                         totalSuffix = "aberta", onClick = onOpenClientFlow,
@@ -105,7 +107,7 @@ fun BoardsHubScreen(
                 // P4 — Social/Admin: "Fluxo dos Designers" (um quadro Kanban por designer).
                 item {
                     BoardCard(
-                        label = "Fluxo dos Designers", desc = "Um quadro Kanban por designer — monitore cada um",
+                        label = "Designers", desc = "Um quadro Kanban por designer — monitore cada um",
                         color = androidx.compose.ui.graphics.Color(0xFFA78BFA),
                         icon = Icons.Outlined.Groups, total = designersCount, late = designersLate,
                         totalSuffix = "designer", onClick = onOpenDesignersFlow,

@@ -90,6 +90,10 @@ object TaskRepo {
             cronContents = cronContents,
             assignedDesignerId = (d.get("designerAssignment") as? Map<*, *>)?.get("designerId") as? String,
             assignedDesignerName = (d.get("designerAssignment") as? Map<*, *>)?.get("designerName") as? String,
+            clientFlowStatus = d.getString("clientFlowStatus"),
+            designerFlowStatus = d.getString("designerFlowStatus"),
+            designerEndDate = (d.get("designerAssignment") as? Map<*, *>)?.get("endDate") as? String ?: d.getString("endDate"),
+            designerEndTime = (d.get("designerAssignment") as? Map<*, *>)?.get("endTime") as? String ?: d.getString("endTime"),
         )
     }
 

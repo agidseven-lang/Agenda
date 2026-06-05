@@ -66,6 +66,7 @@ import br.com.idseven.agenda.nativebeta.features.settings.SettingsScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.BoardsHubScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.DesignersHubScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.RoleBoardsScreen
+import br.com.idseven.agenda.nativebeta.features.tasks.TasksTopTabs
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskDetailScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskFormScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TasksScreen
@@ -194,6 +195,16 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             )
         },
     ) { padding ->
+        // Abas superiores das Tarefas: Meu quadro · Cliente · Designers · Setores.
+        val tasksTabs: @Composable (String) -> Unit = { active ->
+            TasksTopTabs(
+                active = active, currentUser = currentUser,
+                onMine = { session.uid?.let { nav.navigate("personBoard/$it") { launchSingleTop = true } } },
+                onClient = { nav.navigate("flowClient") { launchSingleTop = true } },
+                onDesigners = { nav.navigate("flowDesigners") { launchSingleTop = true } },
+                onSectors = { nav.navigate("tarefas") { launchSingleTop = true } },
+            )
+        }
         NavHost(nav, startDestination = "hoje", modifier = Modifier.padding(padding)) {
             composable("hoje") {
                 DashboardScreen(
@@ -218,6 +229,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     onOpenMyBoard = { session.uid?.let { nav.navigate("personBoard/$it") } },
                     onOpenClientFlow = { nav.navigate("flowClient") },
                     onOpenDesignersFlow = { nav.navigate("flowDesigners") },
+                    tabsBar = { tasksTabs("sectors") },
                 )
             }
             composable("roleBoards") {
@@ -235,6 +247,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     currentUser = currentUser,
                     flow = "client",
                     onBack = { nav.popBackStack() },
+                    tabsBar = { tasksTabs("client") },
                 )
             }
             // P4 — Fluxo dos Designers: hub com cada designer; toque abre o quadro do designer.
@@ -243,6 +256,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     tasksState, users,
                     onOpenDesigner = { nav.navigate("designerBoard/$it") },
                     onBack = { nav.popBackStack() },
+                    tabsBar = { tasksTabs("designers") },
                 )
             }
             composable(
@@ -257,6 +271,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     flow = "designer",
                     designerId = did,
                     onBack = { nav.popBackStack() },
+                    tabsBar = { tasksTabs("designers") },
                 )
             }
             composable(
@@ -270,6 +285,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     currentUser = currentUser,
                     personId = pid,
                     onBack = { nav.popBackStack() },
+                    tabsBar = { tasksTabs(if (pid == session.uid) "mine" else "sectors") },
                 )
             }
             composable("config") {

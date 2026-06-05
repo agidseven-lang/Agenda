@@ -68,6 +68,13 @@ data class TaskItem(
     // Compat: null em tarefas que nunca foram enviadas a um designer.
     val assignedDesignerId: String? = null,
     val assignedDesignerName: String? = null,
+    // EIXOS SEPARADOS (visibility-fix): status do fluxo do CLIENTE e do DESIGNER,
+    // independentes de `status`. A tarefa fica no fluxo do cliente até a aprovação final.
+    val clientFlowStatus: String? = null,
+    val designerFlowStatus: String? = null,
+    // prazos do designer (para exibir término no card/detalhe do fluxo).
+    val designerEndDate: String? = null,
+    val designerEndTime: String? = null,
     // Conteúdos do cronograma (temas/legendas/artes) — escritos pelo Desktop.
     // Aceita `cronContents` (atual) e o alias legado `contents`. Compat: lista vazia em tarefas antigas.
     val cronContents: List<CronContent> = emptyList(),
