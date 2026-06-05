@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.92 (Tempo Real)</title>
+<title>ID Seven · Desktop 1.0.93 (Fluxo + Prazos)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -928,6 +928,14 @@
   .dz-ic{width:54px;height:54px;border-radius:15px;background:rgba(124,92,255,.16);color:#A78BFA;display:flex;align-items:center;justify-content:center;margin:4px auto 14px}
   .dz-ic svg{width:26px;height:26px}
   .dz-card{background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px;text-align:left;margin-bottom:16px}
+  .dz-dl{text-align:left;margin-bottom:16px}
+  .dz-dl-row{display:flex;gap:10px}
+  @media(max-width:520px){.dz-dl-row{flex-direction:column}}
+  .dz-dl-f{flex:1;min-width:0;margin-bottom:11px;display:flex;flex-direction:column}
+  .dz-dl-f label{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .dz-dl-f input,.dz-dl-f textarea{background:var(--surface);border:1px solid var(--line-soft);border-radius:11px;color:var(--ink);font:inherit;padding:11px 12px;resize:vertical}
+  .dz-dl-f input:focus,.dz-dl-f textarea:focus{outline:none;border-color:var(--accent)}
+  .dz-dl-err{color:#F87171;font-size:12.5px;font-weight:600;min-height:16px;margin-top:2px}
   .dz-card-h{display:flex;align-items:center;gap:11px}
   .dz-card-av{width:38px;height:38px;border-radius:10px;background:rgba(34,211,238,.14);color:#22D3EE;display:flex;align-items:center;justify-content:center;flex:none}
   .dz-card-av svg{width:19px;height:19px}
@@ -1026,7 +1034,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.92 · Tempo Real</span><br>
+    <span class="pill-ver">Desktop 1.0.93 · Fluxo + Prazos</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1041,7 +1049,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.92 · Tempo Real</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.93 · Fluxo + Prazos</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1277,7 +1285,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.92 · Tempo Real</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.93 · Fluxo + Prazos</span><br>espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1692,12 +1700,14 @@ function openDesignerModal(taskId){
     '<div class="sp-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button></div>'+
   '</div></div>';
 }
-async function sendToDesigner(taskId,designerId){
+async function sendToDesigner(taskId,designerId,dl){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const d=state.users.find(u=>u.id===designerId);if(!d)return;
+  dl=dl||{};
   const now=Date.now();const u=state.user||{};
   const assignment={designerId:designerId,designerName:d.name||'',designerAvatar:d.photo||d.avatar||'',
-    assignedAt:now,assignedBy:u.id||null,status:'sent'};
+    assignedAt:now,assignedBy:u.id||null,status:'sent',
+    startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',obs:dl.obs||''};
   const patch={
     designerAssignment:assignment,
     assigneeId:designerId,                 // isola no quadro do designer (visibleTasks)
@@ -1706,21 +1716,53 @@ async function sendToDesigner(taskId,designerId){
     cronStatus:'sent_to_designer',
     status:'afazer',                       // entra na coluna A Fazer do designer
     startedAt:null,                        // reinicia o tracking p/ o designer
+    // PRAZO OBRIGATÓRIO (BUG3): início + término (data/hora). dueDate/dueTime = término,
+    // para o card calcular "Atrasada" e o cron do Worker notificar atraso ao designer.
+    startDate:dl.startDate||'',startTime:dl.startTime||'',
+    endDate:dl.endDate||'',endTime:dl.endTime||'',
+    dueDate:dl.endDate||'',dueTime:dl.endTime||'',
+    lateNotifiedAt:null,                   // zera flag de atraso p/ o novo prazo
     history:firebase.firestore.FieldValue.arrayUnion({
-      type:'enviado_designer',label:'Enviado ao designer '+(d.name||''),
-      by:u.name||'',byId:u.id||null,at:now,designerId:designerId,channel:'designer_flow'
+      type:'enviado_designer',label:'Enviado ao designer '+(d.name||'')+(dl.endDate?(' · prazo '+fmtDateBR(dl.endDate)+(dl.endTime?' '+dl.endTime:'')):''),
+      by:u.name||'',byId:u.id||null,at:now,designerId:designerId,channel:'designer_flow',
+      startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',note:dl.obs||''
     })
   };
+  if(dl.obs&&String(dl.obs).trim())patch.desc=String(dl.obs).trim();
   // otimista
-  t.designerAssignment=assignment;t.assigneeId=designerId;t.assignee=d.name||'';t.assigneeName=d.name||'';t.cronStatus='sent_to_designer';t.status='afazer';
+  Object.assign(t,{designerAssignment:assignment,assigneeId:designerId,assignee:d.name||'',assigneeName:d.name||'',cronStatus:'sent_to_designer',status:'afazer',
+    startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',dueDate:dl.endDate||'',dueTime:dl.endTime||''});
   closeModal();render();flashToast('Enviado para '+(d.name||'designer')+'. Notificação disparada.');
   try{
     await db.collection('tasks').doc(taskId).update(patch);
-    // Push premium imediato ao designer (servidor RE-LÊ o doc; aditivo, fire-and-forget).
-    // Roda DEPOIS do update p/ o Worker enxergar designerAssignment já persistido.
     fetch(CLIENT_REVIEW_BASE+'/notify-designer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:taskId})}).catch(()=>{});
   }catch(e){console.warn('sendToDesigner',e);}
 }
+/* 2º passo do envio ao designer: PRAZO obrigatório (início + término, data+hora) + observação. */
+function openDesignerDeadline(taskId,designerId){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const d=state.users.find(u=>u.id===designerId);if(!d)return;
+  const t0=todayStr();const t3=addDaysStr(t0,3);
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet dz-sheet">'+
+    '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
+    '<div class="dz-ic">'+svg('group')+'</div>'+
+    '<div class="sp-title">Prazo para o designer</div>'+
+    '<div class="sp-sub">Defina <b>início</b> e <b>término</b> (data e hora). O designer recebe a tarefa com o prazo e é avisado se atrasar.</div>'+
+    '<div class="dz-card"><div class="dz-card-h">'+avatar(d,40)+
+      '<div><div class="dz-card-t">'+esc(d.name||'Designer')+'</div><div class="dz-card-s">'+esc(d.role||'Designer')+' · '+esc(t.title||'Cronograma')+'</div></div></div></div>'+
+    '<div class="dz-dl">'+
+      '<div class="dz-dl-row"><div class="dz-dl-f"><label>Data de início</label><input type="date" id="dlSd" value="'+t0+'"></div>'+
+        '<div class="dz-dl-f"><label>Hora de início</label><input type="time" id="dlSt" value="09:00"></div></div>'+
+      '<div class="dz-dl-row"><div class="dz-dl-f"><label>Data de término</label><input type="date" id="dlEd" value="'+t3+'"></div>'+
+        '<div class="dz-dl-f"><label>Hora de término</label><input type="time" id="dlEt" value="18:00"></div></div>'+
+      '<div class="dz-dl-f"><label>Observação / instrução (opcional)</label><textarea id="dlObs" rows="3" placeholder="Ex.: usar identidade da campanha; priorizar o Feed."></textarea></div>'+
+      '<div class="dz-dl-err" id="dlErr"></div>'+
+    '</div>'+
+    '<div class="sp-actions"><button class="btn ghost" data-senddesigner="'+taskId+'">Voltar</button>'+
+      '<button class="btn sp-go" data-designersend="'+taskId+'|'+designerId+'">'+svg('send')+'Enviar para o designer</button></div>'+
+  '</div></div>';
+}
+function addDaysStr(s,n){const p=String(s).split('-');const dt=new Date(+p[0],+p[1]-1,+p[2]);dt.setDate(dt.getDate()+n);return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
 /* ===== Social edita conteúdos (tema/legenda/observação) — premium, por tema ===== */
 function openContentEditor(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
@@ -2311,7 +2353,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.92-desktop-client-realtime-status-fix';
+const BUILD='1.0.93-desktop-workflow-stage-deadline-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2323,7 +2365,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.92 · Tempo Real</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.93 · Fluxo + Prazos</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -2584,7 +2626,17 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(el=g('[data-senddesigner]')){openDesignerModal(el.dataset.senddesigner);return;}
-  if(el=g('[data-pickdesigner]')){const p=el.dataset.pickdesigner.split('|');sendToDesigner(p[0],p[1]);return;}
+  if(el=g('[data-pickdesigner]')){const p=el.dataset.pickdesigner.split('|');openDesignerDeadline(p[0],p[1]);return;}
+  if(el=g('[data-designersend]')){
+    const p=el.dataset.designersend.split('|');const gid=id=>document.getElementById(id);
+    const sd=(gid('dlSd')||{}).value||'',st=(gid('dlSt')||{}).value||'',ed=(gid('dlEd')||{}).value||'',et=(gid('dlEt')||{}).value||'',obs=(gid('dlObs')||{}).value||'';
+    const err=gid('dlErr');const fail=m=>{if(err)err.textContent=m;};
+    if(!sd||!st||!ed||!et){fail('Preencha início e término completos (data e hora).');return;}
+    const sMs=dtMs(sd,st),eMs=dtMs(ed,et);
+    if(eMs!=null&&sMs!=null&&eMs<sMs){fail('O término não pode ser antes do início.');return;}
+    sendToDesigner(p[0],p[1],{startDate:sd,startTime:st,endDate:ed,endTime:et,obs:obs});
+    return;
+  }
   if(el=g('[data-ceopen]')){openContentEditor(el.dataset.ceopen);return;}
   if(el=g('[data-cesave]')){saveContentEdits(el.dataset.cesave);return;}
   if(el=g('[data-prodopen]')){openProductionModal(el.dataset.prodopen);return;}
