@@ -965,6 +965,32 @@
   .cvw-ed-tema{font-size:15.5px;font-weight:800;line-height:1.3;margin-top:2px}
   .cvw-ed-sit{flex:none;font-size:11px;font-weight:800;padding:5px 11px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
   .cvw-ed-sit .dotc{width:6px;height:6px;border-radius:50%;background:currentColor}
+  /* ===== Retorno granular do cliente (V1.0.91) ===== */
+  .cvw-cfb{border:1px solid;border-radius:16px;padding:16px 16px 6px;margin-top:18px;background:linear-gradient(180deg,rgba(91,108,255,.06),transparent)}
+  .cvw-cfb-h{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .cvw-cfb-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+  .cvw-cfb-ic svg{width:17px;height:17px}
+  .cvw-cfb-t{font-size:14px;font-weight:800}
+  .cvw-cfb-s{font-size:12px;color:var(--faint);margin-top:1px}
+  .cvw-hl{display:flex;flex-direction:column;gap:9px;margin-top:13px}
+  .cvw-hl-i{display:flex;gap:11px;padding:11px 12px;border:1px solid var(--line-soft);border-radius:12px;background:var(--surface2)}
+  .cvw-hl-ic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none}
+  .cvw-hl-ic svg{width:14px;height:14px}
+  .cvw-hl-m{flex:1;min-width:0}
+  .cvw-hl-tt{font-size:13px;font-weight:700}
+  .cvw-hl-d{margin-top:6px;font-size:12px;background:var(--surface);border:1px solid var(--line-soft);border-radius:8px;padding:7px 9px;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+  .cvw-hl-time{font-size:11px;color:var(--faint);white-space:nowrap;flex:none}
+  /* overlay por conteúdo: o que o cliente fez naquele item */
+  .cvw-cli{margin-top:2px;border-top:1px dashed var(--line-soft);padding-top:12px;display:flex;flex-direction:column;gap:9px}
+  .cvw-cli-badge{align-self:flex-start;font-size:11px;font-weight:800;padding:5px 11px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
+  .cvw-cli-badge .dotc{width:6px;height:6px;border-radius:50%;background:currentColor}
+  .cvw-cli-row{display:flex;gap:9px;align-items:flex-start;font-size:12.5px}
+  .cvw-cli-row .ci{width:24px;height:24px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center}
+  .cvw-cli-row .ci svg{width:13px;height:13px}
+  .cvw-cli-row .cm{flex:1;min-width:0}
+  .cvw-cli-row .cl{font-weight:700;font-size:11px;letter-spacing:.03em;text-transform:uppercase;color:var(--faint)}
+  .cvw-cli-row .cv{margin-top:2px;color:var(--ink);line-height:1.5;white-space:pre-wrap;word-break:break-word}
+  .cvw-cli-time{font-size:11px;color:var(--faint);margin-top:1px}
   .cvw-ed-flbl{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
   .cvw-ed-leg{font-size:13.5px;color:var(--ink);line-height:1.55;white-space:pre-wrap}
   .cvw-ed-leg.pend{color:var(--faint);font-style:italic}
@@ -2029,6 +2055,40 @@ function fallbackTaskFromCtx(ctx){
 function closeClientView(){state.clientView=null;state.clientAction=null;state._clientFallback=null;render();}
 function clientReviewLabel(s){return {aprovado:'Aprovado pelo cliente',revisao:'Revisão solicitada pelo cliente',editado:'Edição solicitada pelo cliente'}[s]||'';}
 function clientReviewColor(s){return {aprovado:'#34D399',revisao:'#F59E0B',editado:'#A78BFA'}[s]||'#9BA0AB';}
+/* ===== Retorno GRANULAR do cliente (lê clientItems / clientActions / clientLastAction) =====
+   ADITIVO: só leitura/exibição. Não altera o fluxo de escrita do Desktop nem o schema. */
+function cvWhen(ms){if(!ms)return'';const d=new Date(Number(ms));if(isNaN(d))return'';const p=n=>('0'+n).slice(-2);return p(d.getDate())+'/'+p(d.getMonth()+1)+' · '+p(d.getHours())+':'+p(d.getMinutes());}
+function cvCs(cs){const m={aprovado:['Aprovado pelo cliente','#34D399'],em_revisao:['Ajuste pedido pelo cliente','#F59E0B'],editado:['Editado pelo cliente','#A78BFA'],em_analise:['Em análise pelo cliente','#60A5FA']};return m[cs]?{label:m[cs][0],color:m[cs][1]}:null;}
+function cvActionMeta(type){const M={approve:['check','#34D399'],approveAll:['check','#34D399'],approveItem:['check','#34D399'],reviseItem:['revise','#F59E0B'],revision:['revise','#F59E0B'],edit_request:['editnote','#A78BFA'],editTheme:['editnote','#A78BFA'],editLegenda:['editnote','#A78BFA'],noteItem:['editnote','#60A5FA'],comment:['editnote','#60A5FA']};return M[type]||['editnote','#60A5FA'];}
+function cvActionLabel(a){const ci=(a&&a.contentIndex!=null&&a.contentIndex!=='')?(' · Conteúdo '+(Number(a.contentIndex)+1)):'';const L={approve:'Aprovou o cronograma',approveAll:'Aprovou o cronograma',approveItem:'Aprovou conteúdo'+ci,reviseItem:'Pediu ajuste'+ci,revision:'Pediu revisão geral',edit_request:'Pediu edição do cronograma',editTheme:'Editou o tema'+ci,editLegenda:'Editou a legenda'+ci,noteItem:'Comentou'+ci,comment:'Comentou no cronograma'};return L[(a&&a.type)]||('Ação'+ci);}
+function cliRow(ic,color,label,val){return '<div class="cvw-cli-row"><div class="ci" style="color:'+color+';background:'+withAlpha(color,.14)+'">'+svg(ic)+'</div><div class="cm"><div class="cl">'+esc(label)+'</div><div class="cv">'+esc(String(val)).replace(/\n/g,'<br>')+'</div></div></div>';}
+function clientItemOverlay(c,t){
+  const arr=Array.isArray(t.cronContents)?t.cronContents:(Array.isArray(t.cronWeeks)?t.cronWeeks:[]);
+  const orig=arr.indexOf(c);
+  const ci=(t.clientItems&&orig>=0)?(t.clientItems['i'+orig]||null):null;
+  if(!ci)return '';
+  const badge=cvCs(ci.cs);let rows='';
+  if(typeof ci.theme==='string'&&ci.theme.trim())rows+=cliRow('editnote','#A78BFA','Tema alterado pelo cliente',ci.theme);
+  if(typeof ci.legenda==='string')rows+=cliRow('editnote','#A78BFA','Legenda editada pelo cliente',ci.legenda||'(vazia)');
+  if(ci.cs==='em_revisao'&&ci.note)rows+=cliRow('revise','#F59E0B','Ajuste pedido neste conteúdo',ci.note);
+  else if(ci.note)rows+=cliRow('editnote','#60A5FA','Observação do cliente',ci.note);
+  if(!badge&&!rows)return '';
+  return '<div class="cvw-cli">'+(badge?'<span class="cvw-cli-badge" style="color:'+badge.color+';background:'+withAlpha(badge.color,.14)+'"><span class="dotc"></span>'+badge.label+(ci.at?' · '+cvWhen(ci.at):'')+'</span>':'')+rows+'</div>';
+}
+function clientFeedbackBlock(t){
+  const actsMap=(t.clientActions&&typeof t.clientActions==='object')?t.clientActions:{};
+  const la=t.clientLastAction||null;
+  const acts=Object.keys(actsMap).map(k=>actsMap[k]||{}).filter(a=>a&&a.at).sort((a,b)=>(b.at||0)-(a.at||0));
+  if(!acts.length&&!la)return '';
+  const ref=la||acts[0];const sumTxt='Última ação: '+cvActionLabel(ref)+(ref&&ref.at?' · '+cvWhen(ref.at):'');
+  const accent='#5B6CFF';
+  const list=acts.slice(0,20).map(a=>{const m=cvActionMeta(a.type);let extra='';if(a.newValue)extra='<div class="cvw-hl-d">'+esc(String(a.newValue).slice(0,400))+'</div>';else if(a.note)extra='<div class="cvw-hl-d">"'+esc(String(a.note).slice(0,400))+'"</div>';return '<div class="cvw-hl-i"><div class="cvw-hl-ic" style="color:'+m[1]+';background:'+withAlpha(m[1],.14)+'">'+svg(m[0])+'</div><div class="cvw-hl-m"><div class="cvw-hl-tt">'+esc(cvActionLabel(a))+'</div>'+extra+'</div><div class="cvw-hl-time">'+cvWhen(a.at)+'</div></div>';}).join('');
+  return '<div class="cvw-cfb" style="border-color:'+withAlpha(accent,.35)+'">'+
+    '<div class="cvw-cfb-h"><div class="cvw-cfb-ic" style="color:'+accent+';background:'+withAlpha(accent,.16)+'">'+svg('eye')+'</div>'+
+    '<div><div class="cvw-cfb-t">Retorno do cliente</div><div class="cvw-cfb-s">'+esc(sumTxt)+'</div></div></div>'+
+    (list?'<div class="cvw-hl">'+list+'</div>':'<div class="cvw-cfb-s" style="padding:4px 0 12px">Sem ações detalhadas ainda.</div>')+
+  '</div>';
+}
 function renderClientView(){
   let t=state.tasks.find(x=>x.id===state.clientView);
   if(!t&&state._clientFallback&&state._clientFallback.id===state.clientView)t=fallbackTaskFromCtx(state._clientFallback);
@@ -2064,6 +2124,7 @@ function renderClientView(){
       '<div class="cvw-ed-field"><div class="cvw-ed-flbl">Legenda</div>'+
         '<div class="cvw-ed-leg'+(legOk?'':' pend')+'">'+(legOk?esc(c.legenda):'Legenda pendente').replace(/\n/g,'<br>')+'</div></div>'+
       '<div class="cvw-ed-media">'+media('Feed','1080×1440',c.feedImageUrl,'feed')+media('Story','1080×1920',c.storyImageUrl,'story')+'</div>'+
+      clientItemOverlay(c,t)+
     '</div>';
   }).join(''):'<div class="cvw-soft">Nenhum conteúdo no cronograma ainda.</div>';
   // Checklist (se houver)
@@ -2121,6 +2182,7 @@ function renderClientView(){
       '</div>'+
     '</div>'+
     crHtml+
+    clientFeedbackBlock(t)+
     '<div class="cvw-sec">Resumo editorial ('+ctx.contents.length+')</div>'+
     '<div class="cvw-ed-list">'+conts+'</div>'+
     chkHtml+obsHtml+
