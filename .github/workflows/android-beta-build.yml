@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: app/local-1.0.78-mobile-current-refresh)"
+        description: "Branch/commit a buildar (default: app/local-1.0.79-mobile-premium-client-view-sync)"
         required: true
-        default: "app/local-1.0.78-mobile-current-refresh"
+        default: "app/local-1.0.79-mobile-premium-client-view-sync"
       resolve_urls:
         description: "Resolver URLs reais das Functions Gen2 via gcloud (true/false)"
         required: false
@@ -90,7 +90,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.78-beta-mobile-current-refresh"
+      DIST_BASENAME: "idseven-nativebeta-1.0.79-beta-mobile-premium-client-view-sync"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -253,8 +253,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.78-beta-mobile-current-refresh
-          path: dist/idseven-nativebeta-1.0.78-beta-mobile-current-refresh.apk
+          name: idseven-nativebeta-1.0.79-beta-mobile-premium-client-view-sync
+          path: dist/idseven-nativebeta-1.0.79-beta-mobile-premium-client-view-sync.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -262,7 +262,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.78-beta-mobile-current-refresh-bundle
-          path: dist/idseven-nativebeta-1.0.78-beta-mobile-current-refresh.zip
+          name: idseven-nativebeta-1.0.79-beta-mobile-premium-client-view-sync-bundle
+          path: dist/idseven-nativebeta-1.0.79-beta-mobile-premium-client-view-sync.zip
           if-no-files-found: error
           retention-days: 30
