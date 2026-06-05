@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.95 (Cliente · Designers · eixos)</title>
+<title>ID Seven · Desktop 1.0.96 (Cliente · Designers · Social Medias)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1067,7 +1067,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.95 · Cliente · Designers</span><br>
+    <span class="pill-ver">Desktop 1.0.96 · Cliente · Designers · Social Medias</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1082,7 +1082,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.95 · Cliente · Designers</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.96 · Cliente · Designers · Social Medias</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1318,7 +1318,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.95 · Cliente · Designers</span><br>espelha o APK <b>1.0.83-beta-client-designer-flow-visibility-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.96 · Cliente · Designers · Social Medias</span><br>espelha o APK <b>1.0.84-beta-social-medias-flow</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1330,6 +1330,7 @@ function render(){
   else if(state.tab==='tarefas'){
     if(state.flowView==='client'){c.innerHTML=renderClientFlowBoard();afterBoard();}
     else if(state.flowView==='designers'){if(state.designerBoard){c.innerHTML=renderDesignerBoard();afterBoard();}else c.innerHTML=renderDesignersHub();}
+    else if(state.flowView==='socials'){if(state.socialBoard){c.innerHTML=renderSocialBoard();afterBoard();}else c.innerHTML=renderSocialsHub();}
     else if(state.personBoard){c.innerHTML=renderPersonBoard();afterBoard();}
     else if(state.roleBoards){c.innerHTML=renderRoleBoards();}
     else if(state.boardSector){c.innerHTML=renderBoard();afterBoard();}
@@ -1552,12 +1553,14 @@ function designerBoardsList(){
   return Object.keys(ids).map(id=>{const u=state.users.find(x=>x.id===id)||{id:id,name:'Designer'};return {u:u,count:ids[id]};})
     .sort((a,b)=>(a.u.name||'').toLowerCase()<(b.u.name||'').toLowerCase()?-1:1);
 }
-// Abas superiores da área de Tarefas: Meu quadro · Cliente · Designers.
-// Cliente/Designers só para Social/Admin (canSeeAll); designer comum vê só Meu quadro.
+// Abas superiores da área de Tarefas: Meu quadro · Cliente · Designers · Social Medias.
+// Cliente/Designers/Social Medias só para Social/Admin (canSeeAll); designer comum vê só Meu quadro.
 function renderTasksTabs(active){
   const u=state.user;const see=canSeeAll(u);
   const tabs=[{k:'mine',l:'Meu quadro',a:'data-myboard="1"'}];
-  if(see){tabs.push({k:'client',l:'Cliente',a:'data-flowclient="1"'});tabs.push({k:'designers',l:'Designers',a:'data-flowdesigners="1"'});}
+  if(see){tabs.push({k:'client',l:'Cliente',a:'data-flowclient="1"'});
+    tabs.push({k:'designers',l:'Designers',a:'data-flowdesigners="1"'});
+    tabs.push({k:'socials',l:'Social Medias',a:'data-flowsocials="1"'});}
   let h='<div class="tflow-tabs">';
   tabs.forEach(t=>{h+='<button class="tflow-tab'+(t.k===active?' on':'')+'" '+t.a+'>'+esc(t.l)+'</button>';});
   h+='<button class="tflow-tab tflow-quad'+(active==='hub'?' on':'')+'" data-board="hub">Setores</button>';
@@ -1607,6 +1610,71 @@ function renderDesignerBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designer · '+esc((p.name||'').split(' ')[0]||'Designer')+'</div><div class="d-bh-sub">'+esc(p.role||'Designer')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
+    '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
+  STATUS.forEach((st,i)=>{const tasks=byStatus[i];
+    h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
+    h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
+    h+='</div></div>';});
+  return h+'</div></div>';
+}
+
+/* ===== FLUXO DAS SOCIAL MEDIAS (eixo próprio, por Social Media) ===== */
+// É Social Media? cargo contém "social" (espelha MANAGER_KW). Admin é tratado à parte.
+function isSocialUser(u){return !!u&&norm(u.role||'').includes('social');}
+// Social media "dona" da tarefa: socialOwnerId explícito; senão criador (by) se social; senão responsável se social.
+function socialOf(t){
+  if(t&&t.socialOwnerId)return t.socialOwnerId;
+  const byU=t&&state.users.find(u=>u.id===t.by); if(byU&&isSocialUser(byU))return t.by;
+  const asU=t&&state.users.find(u=>u.id===t.assigneeId); if(asU&&isSocialUser(asU))return t.assigneeId;
+  return null;
+}
+function socialUsers(){return state.users.filter(u=>u&&!['pendente','removido','excluido'].includes(u.status||'')&&isSocialUser(u));}
+// Coluna do quadro da Social Media: cronograma deriva do eixo do cliente; demais usam status.
+function socialCol(t){
+  if(secOf(t.sector).key==='cronograma'){const c=clientCol(t);
+    if(c==='concluido')return 'concluido';if(c==='revisao')return 'revisao';if(c==='afazer')return 'afazer';
+    return 'andamento';}                 // enviado/aprovado/producao/reenviado = em andamento (produzindo/acompanhando)
+  return t.status||'afazer';
+}
+// Lista de Social Medias (todas as ativas + contagem de tarefas que cada uma é dona).
+function socialBoardsList(){
+  const ids={};
+  state.tasks.forEach(t=>{const sid=socialOf(t);if(sid)ids[sid]=(ids[sid]||0)+1;});
+  socialUsers().forEach(u=>{if(ids[u.id]==null)ids[u.id]=0;});
+  return Object.keys(ids).map(id=>{const u=state.users.find(x=>x.id===id)||{id:id,name:'Social Media'};return {u:u,count:ids[id]};})
+    .filter(o=>isSocialUser(o.u))
+    .sort((a,b)=>(a.u.name||'').toLowerCase()<(b.u.name||'').toLowerCase()?-1:1);
+}
+function renderSocialsHub(){
+  const sm=socialBoardsList();
+  let h=renderTasksTabs('socials')+
+    '<div class="scr-head"><div class="d-board-head">'+
+    '<div class="d-bh-icon" style="background:'+withAlpha('#22D3EE',.18)+';color:#22D3EE">'+svg('group')+'</div>'+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">Social Medias</div><div class="d-bh-sub">Cada Social Media em um quadro próprio — sem misturar</div></div></div></div>'+
+    '<div class="scr" style="padding-top:8px">';
+  const cards=sm.length?sm.map(d=>{const tasks=state.tasks.filter(t=>socialOf(t)===d.u.id);
+    const open=tasks.filter(t=>socialCol(t)!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
+    const waiting=tasks.filter(t=>hasDesigner(t)&&socialCol(t)!=='concluido').length;
+    return '<button class="bcard" data-socialboard="'+d.u.id+'">'+avatar(d.u,44)+
+      '<div class="bm"><div class="bl">'+esc(d.u.name||'Social Media')+'</div><div class="bd">'+esc(d.u.role||'Social Media')+'</div>'+
+        '<div class="bp"><span class="pill" style="background:'+withAlpha('#22D3EE',.16)+';color:#22D3EE">'+open+' aberta'+(open===1?'':'s')+'</span>'+
+        (waiting>0?'<span class="pill" style="background:'+withAlpha('#A78BFA',.16)+';color:#A78BFA">'+waiting+' c/ designer</span>':'')+
+        (late>0?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">'+late+' em atraso</span>':'')+'</div></div>'+
+      '<div class="arr">'+svg('arr')+'</div></button>';}).join('')
+    :'<div class="emptyline" style="text-align:center;padding:26px 6px">Nenhuma Social Media ativa encontrada na equipe.</div>';
+  h+=isDesktop()?('<div class="d-hub">'+cards+'</div>'):cards;
+  return h+'</div>';
+}
+function renderSocialBoard(){
+  const id=state.socialBoard;const p=state.users.find(x=>x.id===id)||{id:id,name:'Social Media'};
+  let list=state.tasks.filter(t=>socialOf(t)===id);
+  if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
+  const byStatus=STATUS.map(st=>list.filter(t=>socialCol(t)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const late=list.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
+  let h=renderTasksTabs('socials')+
+    '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowsocials">'+svg('back')+'</button>'+
+    avatar(p,44)+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">Social · '+esc((p.name||'').split(' ')[0]||'Social Media')+'</div><div class="d-bh-sub">'+esc(p.role||'Social Media')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
   STATUS.forEach((st,i)=>{const tasks=byStatus[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
@@ -1960,6 +2028,10 @@ async function sendToDesigner(taskId,designerId,dl){
     // "Em produção" e ENTRA no quadro do designer em "A Fazer". Não some do Cliente.
     clientFlowStatus:'producao', clientWorkflowStage:'producao',
     designerFlowStatus:'afazer', designerWorkflowStage:'afazer',
+    // Preserva o DONO SOCIAL: a tarefa continua no quadro da Social Media mesmo após
+    // assigneeId virar o designer (socialOf usa socialOwnerId, não o assigneeId).
+    socialOwnerId:(socialOf(t)||(isSocialUser(u)?u.id:null)),
+    socialOwnerName:((state.users.find(x=>x.id===socialOf(t))||{}).name)||(isSocialUser(u)?u.name:'')||'',
     startedAt:null,                        // reinicia o tracking p/ o designer
     // PRAZO OBRIGATÓRIO (BUG3): início + término (data/hora). dueDate/dueTime = término,
     // para o card calcular "Atrasada" e o cron do Worker notificar atraso ao designer.
@@ -2606,7 +2678,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.95-desktop-client-designer-flow-visibility-fix';
+const BUILD='1.0.96-desktop-social-medias-flow';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2618,7 +2690,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.95 · Cliente · Designers</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.96 · Cliente · Designers · Social Medias</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -2825,6 +2897,10 @@ async function saveTask(){const f=state.form;
   const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
   if(f.contents.length)data.cronContents=f.contents;
+  // EIXO SOCIAL (aditivo): dono social = responsável social, senão o criador se for social.
+  // Persistido p/ a tarefa NÃO sair do quadro da Social Media ao ser enviada a um designer.
+  const socialOwner=(u&&isSocialUser(u))?u:(isSocialUser(state.user)?state.user:null);
+  if(socialOwner){data.socialOwnerId=socialOwner.id;data.socialOwnerName=socialOwner.name||'';data.socialFlowStatus='afazer';data.socialWorkflowStage='afazer';}
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
   if(secOf(f.sector).key==='cronograma'){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
     data.clientFlowStatus=f._sendAfterSave?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
@@ -2849,20 +2925,23 @@ document.addEventListener('click',async e=>{
   if(!state.user)return;                       // login tem seu proprio handler
   if(!(e.target&&e.target.closest))return;
   const g=sel=>e.target.closest(sel);let el;
-  if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.tab=el.dataset.tab;closeModal();render();return;}
+  if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.tab=el.dataset.tab;closeModal();render();return;}
   if(el=g('[data-fab]')){closeModal();if(state.tab==='tarefas')openTaskForm(state.boardSector);else{state.tab='tarefas';openTaskForm(null);}return;}
-  if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}
-  if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-flowclient]')){state.flowView='client';state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-flowdesigners]')){state.flowView='designers';state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-designerboard]')){state.flowView='designers';state.designerBoard=el.dataset.designerboard;boardQuery='';render();return;}
+  if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}
+  if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-flowclient]')){state.flowView='client';state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-flowdesigners]')){state.flowView='designers';state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-designerboard]')){state.flowView='designers';state.designerBoard=el.dataset.designerboard;state.socialBoard=null;boardQuery='';render();return;}
+  if(el=g('[data-flowsocials]')){state.flowView='socials';state.socialBoard=null;state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-socialboard]')){state.flowView='socials';state.socialBoard=el.dataset.socialboard;state.designerBoard=null;boardQuery='';render();return;}
   if(el=g('[data-board]')){const a=el.dataset.board;
     if(a==='back')state.boardSector=null;
-    else if(a==='hub'){state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;}
+    else if(a==='hub'){state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;}
     else if(a==='roleboards'){state.personBoard=null;state.roleBoards=true;}
-    else if(a==='flowdesigners'){state.designerBoard=null;state.flowView='designers';}
+    else if(a==='flowdesigners'){state.designerBoard=null;state.socialBoard=null;state.flowView='designers';}
+    else if(a==='flowsocials'){state.socialBoard=null;state.designerBoard=null;state.flowView='socials';}
     else if(a==='new'){openTaskForm(state.boardSector);return;}
     render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
