@@ -1811,7 +1811,12 @@ async function saveProduction(taskId,resend){
   t.cronContents=contents;if(resend)t.cronStatus='ready_for_final_client_review';   // otimista
   closeModal();render();
   try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveProduction',e);}
-  if(resend){await ensureReviewToken(taskId);const tk=state.tasks.find(x=>x.id===taskId);flashToast('Versão final pronta. Reenviando ao cliente…');openSendClientModal(tk||t);}
+  if(resend){
+    // ensureReviewToken pode lançar (token não confirmado): nesse caso openSendClientModal
+    // re-tenta e aborta com aviso se ainda falhar — nunca reenvia link órfão.
+    try{await ensureReviewToken(taskId);}catch(e){console.warn('ensureReviewToken (resend)',e);}
+    const tk=state.tasks.find(x=>x.id===taskId);flashToast('Versão final pronta. Reenviando ao cliente…');openSendClientModal(tk||t);
+  }
   else flashToast('Produção salva. Reflete no link do cliente.');
 }
 /* ===== Cronograma — Fase 1: enviar para cliente =====
@@ -1926,13 +1931,28 @@ function buildWhatsAppWebUrl(message){return 'https://web.whatsapp.com/send?text
 
 // Garante que a tarefa tenha clientReviewToken + clientReviewUrl (gera e persiste se faltar).
 // Funciona mesmo se a tarefa ainda nao chegou em state.tasks (recem-criada).
+//
+// HOTFIX (link orfao): ANTES, um update() com erro engolido (console.warn) retornava
+// o token mesmo sem ter gravado -> o cliente recebia um link cujo token nunca foi salvo
+// no Firestore, e o Worker respondia "Cronograma nao encontrado". Agora:
+//   1) usa set(...,{merge:true}) em vez de update() -> robusto se o doc ainda nao existir
+//      (corrida apos o add() do saveTask); continua aditivo (so mescla 2 campos).
+//   2) NAO engole o erro: confirma a escrita com um get() de leitura (read-back).
+//   3) se a gravacao/confirmacao falhar, LANCA -> o chamador aborta o envio em vez de
+//      mandar um link orfao. So persiste a versao otimista em memoria APOS confirmar.
 async function ensureReviewToken(taskId){
   if(!taskId)return null;
   const t=state.tasks.find(x=>x.id===taskId);
   if(t&&t.clientReviewToken)return t.clientReviewToken;
   const token=genReviewToken();const url=buildPublicClientUrl(token);
-  if(t){t.clientReviewToken=token;t.clientReviewUrl=url;} // otimista
-  try{await db.collection('tasks').doc(taskId).update({clientReviewToken:token,clientReviewUrl:url});}catch(e){console.warn('ensureReviewToken',e);}
+  // set merge: cria/mescla mesmo se o doc acabou de ser criado (sem depender de update).
+  await db.collection('tasks').doc(taskId).set({clientReviewToken:token,clientReviewUrl:url},{merge:true});
+  // Read-back: confirma que o token REALMENTE esta no servidor antes de liberar o envio.
+  const snap=await db.collection('tasks').doc(taskId).get();
+  const saved=snap&&snap.exists?snap.get('clientReviewToken'):null;
+  if(saved!==token){throw new Error('clientReviewToken nao confirmado no Firestore');}
+  // So agora atualiza o cache em memoria (estado consistente com o servidor).
+  if(t){t.clientReviewToken=token;t.clientReviewUrl=url;}
   return token;
 }
 
@@ -1941,10 +1961,15 @@ function clientPreviewLink(ctx){return buildInternalClientLink(ctx);}
 function clientMessage(ctx){return buildClientMessage(ctx);}
 async function openSendClientModal(taskOrForm){
   // Garante o token publico ANTES de montar a mensagem (link HTTPS valido no preview).
+  // HOTFIX: se a confirmacao do token no Firestore falhar, ABORTA o modal — nunca
+  // exibe/permite enviar um link orfao. O usuario ve um aviso claro e tenta de novo.
   if(taskOrForm&&taskOrForm.id&&!taskOrForm.clientReviewToken){
-    const tok=await ensureReviewToken(taskOrForm.id);
+    let tok=null;
+    try{ tok=await ensureReviewToken(taskOrForm.id); }
+    catch(e){ console.warn('ensureReviewToken (modal)',e); flashToast('Não foi possível gerar o link do cliente. Verifique a conexão e tente novamente.'); return; }
+    if(!tok){ flashToast('Não foi possível gerar o link do cliente. Tente novamente.'); return; }
     taskOrForm=state.tasks.find(x=>x.id===taskOrForm.id)||taskOrForm;
-    if(tok&&!taskOrForm.clientReviewToken)taskOrForm.clientReviewToken=tok;
+    if(!taskOrForm.clientReviewToken)taskOrForm.clientReviewToken=tok;
   }
   const ctx=cronCtx(taskOrForm);
   state._sendCtx=ctx;                              // guarda p/ CTA + acoes (msg/urls montadas no clique)
@@ -2514,6 +2539,20 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-openwa]')){
     const id=el.dataset.openwa;
     const ctx=state._sendCtx;if(!ctx){closeModal();return;}
+    // HOTFIX (link orfao): ULTIMA confirmacao antes de abrir o WhatsApp. Para uma
+    // tarefa salva, re-garante que o token do ctx esta REALMENTE no Firestore. Se a
+    // confirmacao falhar, NAO abre o WhatsApp com link orfao — avisa e mantem o modal.
+    if(id&&id!=='__form__'){
+      try{
+        const tok=await ensureReviewToken(id);
+        if(tok)ctx.token=tok;                 // garante que a msg use o token confirmado
+      }catch(e){
+        console.warn('ensureReviewToken (openwa)',e);
+        flashToast('Não foi possível confirmar o link do cliente. Verifique a conexão e tente novamente.');
+        return;                               // aborta: nada de link orfao no WhatsApp
+      }
+      if(!ctx.token){ flashToast('Link do cliente indisponível. Tente novamente.'); return; }
+    }
     // Monta a MENSAGEM humana e, SO AQUI, as URLs tecnicas para abrir o app.
     const msg=buildClientMessage(ctx);
     const waApp=buildWhatsAppAppUrl(msg), waWeb=buildWhatsAppWebUrl(msg);
