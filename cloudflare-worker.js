@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.8-client-realtime-status-fix]
+   ID Seven — Cloudflare Worker  [V64.9-workflow-stage-deadline-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.8-client-realtime-status-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.9-workflow-stage-deadline-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -565,7 +565,70 @@ async function handleCronTrigger(env, opts) {
     await markField(env, accessToken, coll, doc.id, "immediateNotifiedAt", now);
   }
 
+  /* ───── ATRASO DO DESIGNER (V64.9): push URGENTE ao designer quando o prazo de término
+     vence e a tarefa ainda não foi concluída. Dedup por `lateNotifiedAt` (uma vez por prazo).
+     Escopo: tarefas no fluxo de designer (cronStatus IN [sent_to_designer, in_design]).
+     Aditivo: não altera o lembrete normal nem o status da tarefa. ───── */
+  report.late = [];
+  try {
+    const designerTasks = await queryTasksByCronStatusIn(env, accessToken, ["sent_to_designer", "in_design"]);
+    console.log(`[LATE-DESIGNER] ${designerTasks.length} tarefa(s) no fluxo de designer`);
+    for (const t of designerTasks) {
+      if (!t || t.status === "concluido" || t.done || t.delivered) continue;
+      const dueMs = taskDueMs(t, tzOffset);
+      if (!dueMs || now <= dueMs) continue;                          // ainda dentro do prazo
+      if (Number(t.lateNotifiedAt) >= dueMs) continue;               // já avisado deste prazo
+      const designerId = (t.designerAssignment && t.designerAssignment.designerId) || t.assigneeId || null;
+      if (!designerId) continue;
+      const user = (userDocCache[designerId] !== undefined) ? userDocCache[designerId] : await getUser(env, accessToken, designerId);
+      userDocCache[designerId] = user;
+      const tokens = dedupeTokensByDevice((user && Array.isArray(user.fcmTokens)) ? user.fcmTokens.filter(Boolean) : [], user && user.fcmTokenMeta);
+      const overdueMin = Math.round((now - dueMs) / 60000);
+      report.late.push({ taskId: t.id, designerId, overdueMin, hasTokens: tokens.length > 0 });
+      console.log(`[LATE-DESIGNER] task=${t.id} designer=${designerId} overdueMin=${overdueMin} tokens=${tokens.length}`);
+      if (dryRun) continue;
+      if (tokens.length) {
+        const results = await sendToTokens(env, accessToken, tokens, designerLatePayload(t.id, t));
+        console.log(`[LATE-DESIGNER] sent task=${t.id} ok=${results.filter((r) => r.ok).length}/${tokens.length}`);
+      }
+      await markField(env, accessToken, "tasks", t.id, "lateNotifiedAt", now);
+    }
+  } catch (e) { console.warn("[LATE-DESIGNER] erro:", e && e.message); }
+
   return report;
+}
+
+/* tarefas cujo cronStatus está em uma lista (IN) — usado p/ detecção de atraso do designer. */
+async function queryTasksByCronStatusIn(env, accessToken, values) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = {
+    structuredQuery: {
+      from: [{ collectionId: "tasks" }],
+      where: { fieldFilter: { field: { fieldPath: "cronStatus" }, op: "IN", value: { arrayValue: { values: values.map((v) => ({ stringValue: v })) } } } },
+      limit: 300,
+    },
+  };
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  if (!res.ok) { console.error("[LATE-DESIGNER] runQuery falhou:", res.status, (await res.text()).slice(0, 200)); return []; }
+  const rows = await res.json();
+  const out = [];
+  for (const row of rows) { if (!row.document) continue; const id = row.document.name.split("/").pop(); out.push(Object.assign({ id }, decodeFields(row.document.fields))); }
+  return out;
+}
+
+/* Mensagem premium URGENTE de prazo vencido ao designer. */
+function designerLatePayload(id, doc) {
+  const cliente = doc.client || "";
+  const titulo = doc.title || "Tarefa";
+  const title = "⏰ Prazo vencido: entrega urgente necessária";
+  const body = (cliente ? cliente + " — " : "") + titulo + " · entregue com urgência.";
+  const data = stringifyData({
+    type: "task", taskId: id, title, body,
+    responsibleId: (doc.designerAssignment && doc.designerAssignment.designerId) || doc.assigneeId || "",
+    deepLink: "task:" + id, channel: "designer_late", urgent: "true",
+    tag: "late-" + id, renotify: "true",
+  });
+  return { title, body, data };
 }
 
 /* eventStart (UTC) a partir de date "YYYY-MM-DD" + start "HH:MM" em horário local. */
@@ -911,25 +974,31 @@ async function writeClientGranular(env, accessToken, task, e) {
     mask.push("clientItems." + key);
   }
 
-  /* ───── CORREÇÃO V64.8 (tempo real): também grava os campos de STATUS que o
-     Desktop e o Android usam no card/detalhe (cronStatus + clientReview), com os
-     MESMOS valores que o Desktop escreve (aprovado_cliente | em_revisao_cliente |
-     editado_cliente). Sem isso o card ficava preso em "Pronto para envio".
-     Aditivo: NÃO toca cronWeeks, status (coluna do kanban), assignee, etc. ───── */
+  /* ───── V64.9 (fluxo lógico): além de cronStatus/clientReview, MOVE a coluna do
+     kanban (campo `status`) conforme a fase, e registra `workflowStage` (aditivo):
+       • aprovação INICIAL dos temas → status='andamento' (Em andamento), stage='producao'
+       • aprovação FINAL (reenvio) → status='concluido', stage='concluido'
+       • revisão / edição → status='revisao', stage='revisao'
+     Fase detectada pelo cronStatus atual: 'ready_for_final_client_review' (reenvio) = final. ───── */
+  const isFinalPhase = (task.cronStatus === "ready_for_final_client_review")
+    || (task.workflowStage === "entrega") || (task.workflowStage === "revisao_final");
+  const approveG = isFinalPhase
+    ? { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou_final", label: "Cliente aprovou a entrega final", col: "concluido", stage: "concluido" }
+    : { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou",       label: "Cliente aprovou os temas/cronograma", col: "andamento", stage: "producao" };
   const STAT = {
-    approve:      { cs: "aprovado_cliente",   rev: "aprovado", htype: "cliente_aprovou",       label: "Cliente aprovou o cronograma" },
-    approveAll:   { cs: "aprovado_cliente",   rev: "aprovado", htype: "cliente_aprovou",       label: "Cliente aprovou o cronograma" },
-    revision:     { cs: "em_revisao_cliente", rev: "revisao",  htype: "cliente_pediu_revisao", label: "Cliente pediu revisão geral" },
-    reviseItem:   { cs: "em_revisao_cliente", rev: "revisao",  htype: "cliente_pediu_revisao", label: "Cliente pediu ajuste em um conteúdo" },
-    edit_request: { cs: "editado_cliente",    rev: "editado",  htype: "cliente_editou",        label: "Cliente solicitou edição" },
-    editTheme:    { cs: "editado_cliente",    rev: "editado",  htype: "cliente_editou",        label: "Cliente editou o tema de um conteúdo" },
-    editLegenda:  { cs: "editado_cliente",    rev: "editado",  htype: "cliente_editou",        label: "Cliente editou a legenda de um conteúdo" },
-    noteItem:     { cs: null,                 rev: null,       htype: "cliente_comentou",      label: "Cliente deixou uma observação" },
-    comment:      { cs: null,                 rev: null,       htype: "cliente_comentou",      label: "Cliente comentou no cronograma" },
+    approve:      approveG,
+    approveAll:   approveG,
+    revision:     { cs: "em_revisao_cliente", rev: "revisao", htype: "cliente_pediu_revisao", label: "Cliente pediu revisão geral",         col: "revisao", stage: "revisao" },
+    reviseItem:   { cs: "em_revisao_cliente", rev: "revisao", htype: "cliente_pediu_revisao", label: "Cliente pediu ajuste em um conteúdo", col: "revisao", stage: "revisao" },
+    edit_request: { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente solicitou edição",            col: "revisao", stage: "revisao" },
+    editTheme:    { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente editou o tema de um conteúdo",    col: "revisao", stage: "revisao" },
+    editLegenda:  { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente editou a legenda de um conteúdo", col: "revisao", stage: "revisao" },
+    noteItem:     { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente deixou uma observação", col: null, stage: null },
+    comment:      { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente comentou no cronograma", col: null, stage: null },
   };
-  let g = STAT[e.type] || { cs: null, rev: null, htype: "cliente_acao", label: "Ação do cliente" };
+  let g = STAT[e.type] || { cs: null, rev: null, htype: "cliente_acao", label: "Ação do cliente", col: null, stage: null };
 
-  // approveItem: só vira "aprovado_cliente" no card quando TODOS os conteúdos estiverem aprovados.
+  // approveItem: só conclui/avança quando TODOS os conteúdos estiverem aprovados.
   if (e.type === "approveItem") {
     const arr = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
     const total = arr.length;
@@ -937,8 +1006,8 @@ async function writeClientGranular(env, accessToken, task, e) {
     const approved = new Set();
     for (const k of Object.keys(ci)) { if (ci[k] && ci[k].cs === "aprovado") approved.add(k); }
     approved.add("i" + e.contentIndex);
-    if (total > 0 && approved.size >= total) g = { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou", label: "Cliente aprovou todos os conteúdos" };
-    else g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo" };
+    if (total > 0 && approved.size >= total) g = Object.assign({}, approveG, { label: "Cliente aprovou todos os conteúdos" });
+    else g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo", col: null, stage: null };
   }
 
   if (g.cs) {
@@ -952,9 +1021,12 @@ async function writeClientGranular(env, accessToken, task, e) {
     fields.clientReviewAt = { integerValue: String(at) };
     mask.push("cronStatus", "clientReview", "clientReviewAt");
   }
+  const statusFrom = (task.status || "afazer");
+  if (g.col) { fields.status = { stringValue: g.col }; mask.push("status"); }
+  if (g.stage) { fields.workflowStage = { stringValue: g.stage }; mask.push("workflowStage"); }
 
   // entrada de histórico (arrayUnion via appendMissingElements — REST :commit)
-  const histValue = { mapValue: { fields: {
+  const histFields = {
     type: { stringValue: g.htype },
     label: { stringValue: g.label },
     at: { integerValue: String(at) },
@@ -962,7 +1034,10 @@ async function writeClientGranular(env, accessToken, task, e) {
     channel: { stringValue: "client_public" },
     client: { stringValue: (task.client || "") },
     note: { stringValue: e.note || "" },
-  } } };
+  };
+  if (e.contentIndex != null) histFields.contentIndex = { integerValue: String(e.contentIndex) };
+  if (g.col && g.col !== statusFrom) { histFields.statusFrom = { stringValue: statusFrom }; histFields.statusTo = { stringValue: g.col }; }
+  const histValue = { mapValue: { fields: histFields } };
 
   const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}`;
   const body = {
