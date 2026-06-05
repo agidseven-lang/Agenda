@@ -46,7 +46,7 @@ jobs:
       - name: Verificar deploy + dryRun /notify-designer (sem enviar push)
         run: |
           B="https://idseven-push.agidseven.workers.dev"
-          echo "== HEALTH (espera version V64.6-public-client-route) =="
+          echo "== HEALTH (espera version V64.7-premium-client-view) =="
           curl -sS "$B/" ; echo
           echo "== dryRun id de teste (NAO envia; espera 'tarefa nao encontrada') =="
           curl -sS -X POST "$B/notify-designer" -H "Content-Type: application/json" -d '{"id":"__dryrun_ci__","dryRun":true}' ; echo
@@ -100,11 +100,12 @@ jobs:
             head -c 500 "$tmp2" ; echo ; echo "----------------------------------------------------"
             [ "$code2" = "200" ] || { echo "FAIL: esperava 200 com token real" >&2 ; exit 1 ; }
             echo "$ct2" | grep -qi 'text/html' || { echo "FAIL: token real NAO retornou text/html" >&2 ; exit 1 ; }
-            grep -q 'Visão do Cliente' "$tmp2" || { echo "FAIL: HTML nao contem titulo da Visao do Cliente" >&2 ; exit 1 ; }
-            grep -q 'btnApprove'        "$tmp2" || { echo "FAIL: HTML nao contem botao Aprovar"               >&2 ; exit 1 ; }
-            grep -q 'btnRev'            "$tmp2" || { echo "FAIL: HTML nao contem botao Pedir revisao"         >&2 ; exit 1 ; }
-            grep -q 'btnEdit'           "$tmp2" || { echo "FAIL: HTML nao contem botao Editar cronograma"     >&2 ; exit 1 ; }
-            echo "OK: rota publica renderizou HTML completo da Visao do Cliente"
+            grep -q 'Visão do Cliente'       "$tmp2" || { echo "FAIL: HTML nao contem 'Visao do Cliente'" >&2 ; exit 1 ; }
+            grep -q 'Aprovar cronograma'     "$tmp2" || { echo "FAIL: HTML nao contem 'Aprovar cronograma'" >&2 ; exit 1 ; }
+            grep -q 'Pedir revisão'          "$tmp2" || { echo "FAIL: HTML nao contem 'Pedir revisao'" >&2 ; exit 1 ; }
+            grep -q "data-act=\"approveItem\"" "$tmp2" || { echo "FAIL: HTML nao contem acao por item (approveItem)" >&2 ; exit 1 ; }
+            grep -q "data-act=\"editLegenda\"" "$tmp2" || { echo "FAIL: HTML nao contem edicao individual (editLegenda)" >&2 ; exit 1 ; }
+            echo "OK: rota publica renderizou a nova Visao do Cliente premium (com acoes por item)"
           else
             echo "(sem client_share_token informado — pulei a prova com token real; informe no dispatch p/ validar dados de uma task real)"
           fi

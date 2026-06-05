@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.6-public-client-route]
+   ID Seven — Cloudflare Worker  [V64.7-premium-client-view]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.6-public-client-route" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.7-premium-client-view" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -838,11 +838,19 @@ async function handleClientCronogramaAction(token, request, env) {
   let payload = {};
   try { payload = await request.json(); } catch (_) { /* tolera body vazio */ }
   const type = (payload && typeof payload.action === "string") ? payload.action.trim() : "";
-  const ALLOWED = ["approve", "revision", "edit_request"];
+  // Globais + GRANULARES por conteúdo (V64.7). Back-compat: approve/revision/edit_request.
+  const ALLOWED = [
+    "approve", "approveAll", "revision", "edit_request",        // globais
+    "approveItem", "reviseItem", "editTheme", "editLegenda", "noteItem", "comment", // por item
+  ];
   if (ALLOWED.indexOf(type) < 0) {
-    return json({ ok: false, error: "ação inválida (use: approve | revision | edit_request)" }, 400, env);
+    return json({ ok: false, error: "ação inválida" }, 400, env);
   }
   const note = (payload && typeof payload.note === "string") ? payload.note.slice(0, 1000) : "";
+  const value = (payload && typeof payload.value === "string") ? payload.value.slice(0, 4000) : "";
+  let ci = null;
+  if (payload && typeof payload.contentIndex === "number" && payload.contentIndex >= 0) ci = Math.floor(payload.contentIndex);
+  else if (payload && typeof payload.contentIndex === "string" && /^\d+$/.test(payload.contentIndex)) ci = parseInt(payload.contentIndex, 10);
 
   let accessToken;
   try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
@@ -852,10 +860,65 @@ async function handleClientCronogramaAction(token, request, env) {
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
 
   const now = Date.now();
-  const action = { type, at: now, note };
-  await writeClientLastAction(env, accessToken, task.id, action);
-  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} hasNote=${!!note}`);
-  return json({ ok: true, action }, 200, env);
+  await writeClientGranular(env, accessToken, task.id, { type, contentIndex: ci, note, value, at: now });
+  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} hasNote=${!!note} hasValue=${!!value}`);
+  return json({ ok: true, type, contentIndex: ci, at: now }, 200, env);
+}
+
+/* Persistência ADITIVA e granular do feedback do cliente (V64.7).
+   NÃO reescreve cronWeeks (evita clobber de edição concorrente do Desktop) e NÃO
+   toca cronStatus/clientReview/history. Grava em 3 campos novos (merge por updateMask):
+     - clientLastAction : map  {type, at, note, contentIndex} (compat com leitura existente)
+     - clientActions.a<at> : map  log granular {type, at, contentIndex, field, newValue, note}
+     - clientItems.i<idx>  : map  estado do item p/ o cliente {cs, theme, legenda, note, at}
+   A Desktop lê clientItems/clientActions para mostrar exatamente o que o cliente mexeu. */
+async function writeClientGranular(env, accessToken, taskId, e) {
+  const at = e.at;
+  const aid = "a" + at;                  // chave de ação (começa com letra → field path válido)
+  const perItem = ["approveItem", "reviseItem", "editTheme", "editLegenda", "noteItem"].indexOf(e.type) >= 0 && e.contentIndex != null;
+
+  // log granular
+  const actFields = { type: { stringValue: e.type }, at: { integerValue: String(at) } };
+  if (e.contentIndex != null) actFields.contentIndex = { integerValue: String(e.contentIndex) };
+  if (e.note) actFields.note = { stringValue: e.note };
+  if (e.type === "editTheme") { actFields.field = { stringValue: "tema" }; actFields.newValue = { stringValue: e.value }; }
+  if (e.type === "editLegenda") { actFields.field = { stringValue: "legenda" }; actFields.newValue = { stringValue: e.value }; }
+
+  const lastActionFields = {
+    type: { stringValue: e.type }, at: { integerValue: String(at) }, note: { stringValue: e.note || "" },
+  };
+  if (e.contentIndex != null) lastActionFields.contentIndex = { integerValue: String(e.contentIndex) };
+
+  const fields = {
+    clientLastAction: { mapValue: { fields: lastActionFields } },
+    clientActions: { mapValue: { fields: { [aid]: { mapValue: { fields: actFields } } } } },
+  };
+  const mask = ["clientLastAction", "clientActions." + aid];
+
+  if (perItem) {
+    const key = "i" + e.contentIndex;
+    const itemFields = { at: { integerValue: String(at) } };
+    if (e.type === "approveItem") itemFields.cs = { stringValue: "aprovado" };
+    else if (e.type === "reviseItem") { itemFields.cs = { stringValue: "em_revisao" }; if (e.note) itemFields.note = { stringValue: e.note }; }
+    else if (e.type === "editTheme") { itemFields.cs = { stringValue: "editado" }; itemFields.theme = { stringValue: e.value }; }
+    else if (e.type === "editLegenda") { itemFields.cs = { stringValue: "editado" }; itemFields.legenda = { stringValue: e.value }; }
+    else if (e.type === "noteItem") { if (e.note) itemFields.note = { stringValue: e.note }; }
+    fields.clientItems = { mapValue: { fields: { [key]: { mapValue: { fields: itemFields } } } } };
+    mask.push("clientItems." + key);
+  }
+
+  const qs = mask.map((m) => "updateMask.fieldPaths=" + encodeURIComponent(m)).join("&");
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}?${qs}`;
+  try {
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields }),
+    });
+    if (!res.ok) console.warn("[CLIENT-ACTION] PATCH falhou:", res.status, (await res.text()).slice(0, 200));
+  } catch (err) {
+    console.warn("[CLIENT-ACTION] erro ao gravar feedback granular:", err && err.message);
+  }
 }
 
 /* Query Firestore pela task que corresponde ao token público do cliente.
@@ -1002,6 +1065,153 @@ function storyCount(c) {
   return 0;
 }
 
+/* ───── Visão do Cliente premium (V64.7) — assets server-rendered ───── */
+const ICN = {
+  shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  layers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  pen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  type:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg>',
+  text:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  img:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>',
+  zoom:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3M11 8v6M8 11h6"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  revise:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>',
+  note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>',
+  lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+  chev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+};
+const CV_LOGO = '<svg class="logo" viewBox="0 0 96 96" aria-label="ID Seven"><defs><linearGradient id="gcv" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#c64bd8"/></linearGradient></defs><circle cx="48" cy="48" r="43" fill="none" stroke="url(#gcv)" stroke-width="7"/><circle cx="48" cy="48" r="29" fill="#22d3b8"/><rect x="34" y="38" width="28" height="20" rx="3" fill="#fff"/><rect x="42" y="60" width="12" height="3" rx="1.5" fill="#fff"/><rect x="38" y="43" width="20" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="47.5" width="14" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="52" width="17" height="2.4" rx="1.2" fill="#0c2f2a"/></svg>';
+
+const CV_CSS = `
+:root{--bg:#070810;--bg2:#0c0e1a;--panel:#10131f;--panel2:#141826;--line:#1f2435;--line2:#2a3149;--txt:#EDEFF7;--mut:#9aa3bd;--faint:#6b7390;--brand1:#7c5cff;--brand2:#c64bd8;--teal:#22d3b8;--ok:#34d399;--okbg:rgba(52,211,153,.12);--warn:#f5a524;--rev:#fb7185;--revbg:rgba(251,113,133,.13);--info:#5b9bff;--infobg:rgba(91,155,255,.12);--radius:18px;--radius-sm:13px;--shadow:0 24px 70px -30px rgba(124,92,255,.55);--ff:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif}
+*,*::before,*::after{box-sizing:border-box}html,body{margin:0;padding:0}
+body{background:radial-gradient(1100px 520px at 12% -8%,rgba(124,92,255,.20),transparent 60%),radial-gradient(900px 480px at 105% 0%,rgba(198,75,216,.14),transparent 55%),radial-gradient(700px 600px at 50% 120%,rgba(34,211,184,.07),transparent 60%),var(--bg);color:var(--txt);font:15px/1.55 var(--ff);-webkit-font-smoothing:antialiased;min-height:100vh}
+a{color:#b9a4ff;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:30px 22px 160px}
+@media(max-width:560px){.wrap{padding:18px 14px 150px}}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px}
+.brand{display:flex;align-items:center;gap:12px}.brand .logo{width:44px;height:44px;flex:0 0 44px;filter:drop-shadow(0 6px 16px rgba(124,92,255,.45))}
+.brand .bn{font-weight:800;letter-spacing:.2px;font-size:15px}.brand .bn small{display:block;font-weight:600;font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);margin-top:1px}
+.secure{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--mut);background:rgba(255,255,255,.04);border:1px solid var(--line);padding:7px 12px;border-radius:999px}.secure svg{width:13px;height:13px}
+@media(max-width:560px){.secure .lbl{display:none}.secure{padding:7px}}
+.hero{position:relative;overflow:hidden;border-radius:24px;padding:30px 30px 26px;background:linear-gradient(135deg,rgba(124,92,255,.20),rgba(198,75,216,.08) 45%,rgba(34,211,184,.06)),var(--panel);border:1px solid var(--line2);box-shadow:var(--shadow)}
+.hero::after{content:"";position:absolute;inset:0;background:radial-gradient(600px 200px at 90% -20%,rgba(198,75,216,.22),transparent 60%);pointer-events:none}
+.hero-top{position:relative;z-index:1}.kicker{font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--brand2)}
+.hero h1{position:relative;z-index:1;margin:12px 0 4px;font-size:34px;line-height:1.1;letter-spacing:-.02em;font-weight:800}
+@media(max-width:560px){.hero{padding:24px 20px}.hero h1{font-size:26px}}
+.hero .cli{position:relative;z-index:1;color:var(--mut);font-size:15px}.hero .cli b{color:var(--txt);font-weight:700}
+.hero-meta{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}
+.mpill{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.05);border:1px solid var(--line2);padding:8px 13px;border-radius:12px;font-size:12.5px;color:var(--txt)}.mpill svg{width:14px;height:14px;color:var(--mut)}.mpill .mv{color:var(--mut)}
+.mpill.status{border-color:rgba(34,211,184,.35);background:rgba(34,211,184,.10)}.mpill.status .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 3px rgba(34,211,184,.18)}
+.prog{position:relative;z-index:1;margin-top:20px}.prog-h{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mut);margin-bottom:7px}
+.prog-bar{height:9px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;border:1px solid var(--line)}.prog-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--brand1),var(--brand2) 60%,var(--teal));box-shadow:0 0 18px rgba(124,92,255,.5);transition:width .4s ease}
+.sec{margin:30px 2px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px}.sec.hide{display:none}
+.sec h2{margin:0;font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--faint)}
+.sec .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--mut)}.sec .legend i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;transition:border-color .18s,box-shadow .18s}
+.card:hover{border-color:var(--line2)}.card.is-open{border-color:rgba(124,92,255,.45);box-shadow:0 18px 50px -32px rgba(124,92,255,.6)}
+.card.pad{padding:16px}
+.chead{display:flex;align-items:center;gap:14px;padding:16px;cursor:pointer;user-select:none}
+.cidx{flex:0 0 40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;box-shadow:0 8px 18px -8px rgba(124,92,255,.8)}
+.ctitle{flex:1;min-width:0}.ctitle .ck{font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint)}
+.ctitle h3{margin:2px 0 0;font-size:16px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cstate{flex:0 0 auto}.badge{font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+.badge .bd{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+.b-pend{background:rgba(255,255,255,.05);color:var(--mut);border-color:var(--line2)}.b-ok{background:var(--okbg);color:var(--ok);border-color:rgba(52,211,153,.3)}
+.b-rev{background:var(--revbg);color:var(--rev);border-color:rgba(251,113,133,.35)}.b-edit{background:rgba(124,92,255,.12);color:#b9a4ff;border-color:rgba(124,92,255,.35)}
+.b-info{background:var(--infobg);color:var(--info);border-color:rgba(91,155,255,.3)}
+.chev{flex:0 0 auto;color:var(--faint);transition:transform .22s}.card.is-open .chev{transform:rotate(180deg)}
+.cbody{display:none;padding:0 16px 16px;border-top:1px solid var(--line)}.card.is-open .cbody{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.field{margin-top:16px}.flabel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.flabel .fl{font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:7px}.flabel .fl svg{width:13px;height:13px;color:var(--brand2)}
+.flabel .cnt{font-size:11px;color:var(--mut)}
+.fval{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:13px 14px;font-size:14px;color:var(--txt);line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.fval.theme{font-weight:600;font-size:15px}.fval.note{border-color:rgba(251,113,133,.3)}
+.pend{display:flex;align-items:center;gap:11px;background:repeating-linear-gradient(45deg,rgba(255,255,255,.02),rgba(255,255,255,.02) 10px,transparent 10px,transparent 20px),var(--bg2);border:1px dashed var(--line2);border-radius:var(--radius-sm);padding:14px;color:var(--mut)}
+.pend .pi{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;color:var(--faint);flex:0 0 34px}.pend .pi svg{width:16px;height:16px}
+.pend .pt{font-weight:600;color:var(--txt)}.pend .ps{font-size:12px;color:var(--faint)}
+.media-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}@media(max-width:560px){.media-row{grid-template-columns:1fr}}
+.media{position:relative;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg2);display:block}
+.media .mh{display:flex;align-items:center;justify-content:space-between;padding:9px 11px;font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--mut);text-transform:uppercase;border-bottom:1px solid var(--line)}.media .mh .on{color:var(--ok)}
+.media .thumb{aspect-ratio:1/1;background:linear-gradient(135deg,#1a1f30,#0f1320);display:flex;align-items:center;justify-content:center;position:relative}
+.media.story .thumb{aspect-ratio:9/16}.media .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.media .zoom{position:absolute;right:9px;bottom:9px;background:rgba(7,8,16,.78);border:1px solid var(--line2);border-radius:9px;padding:6px 9px;font-size:11px;color:var(--txt);display:flex;align-items:center;gap:5px}.media .zoom svg{width:12px;height:12px}
+.media .ph{aspect-ratio:1/1;display:flex;flex-direction:column;gap:7px;align-items:center;justify-content:center;color:var(--faint);background:repeating-linear-gradient(45deg,rgba(255,255,255,.02),rgba(255,255,255,.02) 10px,transparent 10px,transparent 20px)}
+.media.story .ph{aspect-ratio:9/16}.media .ph svg{width:26px;height:26px;opacity:.6}.media .ph .pl{font-size:12px;font-weight:600;color:var(--mut)}
+.iacts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:14px;border-top:1px dashed var(--line2)}
+.ibtn{appearance:none;border:1px solid var(--line2);background:rgba(255,255,255,.03);color:var(--txt);border-radius:11px;padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.14s}.ibtn svg{width:14px;height:14px}
+.ibtn:hover{border-color:var(--brand1);background:rgba(124,92,255,.1)}.ibtn.ok{border-color:rgba(52,211,153,.4);color:#9beecb}.ibtn.ok:hover{background:var(--okbg)}
+.ibtn.rev{border-color:rgba(251,113,133,.4);color:#ffb1bd}.ibtn.rev:hover{background:var(--revbg)}.ibtn[disabled]{opacity:.5;cursor:wait}
+.card.pad textarea{width:100%;min-height:92px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius-sm);color:var(--txt);font:inherit;padding:13px;resize:vertical}.card.pad textarea:focus{outline:none;border-color:var(--brand1)}
+.hist{display:flex;flex-direction:column;gap:10px}
+.hitem{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px 13px}
+.hicon{flex:0 0 32px;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center}.hicon svg{width:15px;height:15px}
+.hb-ok{background:var(--okbg);color:var(--ok)}.hb-rev{background:var(--revbg);color:var(--rev)}.hb-edit{background:rgba(124,92,255,.12);color:#b9a4ff}.hb-note{background:var(--infobg);color:var(--info)}
+.hmain{flex:1;min-width:0}.hmain .ht{font-size:13.5px;font-weight:600}.hmain .hdiff{margin-top:7px;font-size:12px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 10px}.hdiff .new{color:var(--ok)}
+.htime{flex:0 0 auto;font-size:11px;color:var(--faint);white-space:nowrap}
+.gactions{position:fixed;left:0;right:0;bottom:0;z-index:50;background:linear-gradient(180deg,rgba(7,8,16,0),rgba(7,8,16,.88) 34%,var(--bg) 70%);padding:20px 0 max(18px,env(safe-area-inset-bottom))}
+.gactions .inner{max-width:1180px;margin:0 auto;padding:0 22px;display:flex;align-items:center;gap:12px}@media(max-width:560px){.gactions .inner{padding:0 14px;flex-wrap:wrap}}
+.gstat{flex:1;min-width:0;font-size:12.5px;color:var(--mut)}.gstat b{color:var(--txt)}@media(max-width:560px){.gstat{flex:1 0 100%;order:-1;margin-bottom:2px}}
+.btn{appearance:none;border:0;border-radius:14px;padding:14px 20px;font-size:14.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:.14s;white-space:nowrap}.btn svg{width:16px;height:16px}
+.btn:active{transform:translateY(1px)}.btn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--line2);color:var(--txt)}.btn.ghost:hover{border-color:var(--brand1)}
+.btn.warn{background:linear-gradient(135deg,#f5a524,#fb7185);color:#fff}.btn.primary{background:linear-gradient(135deg,var(--teal),#15b8a6);color:#04231d;box-shadow:0 14px 30px -14px rgba(34,211,184,.8)}.btn[disabled]{opacity:.6;cursor:wait}
+@media(max-width:560px){.btn{flex:1;padding:13px 12px;font-size:13.5px}}
+.scrim{position:fixed;inset:0;z-index:60;background:rgba(4,5,12,.72);backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center}.scrim.on{display:flex}
+@media(min-width:680px){.scrim.on{align-items:center}}
+.sheet{width:100%;max-width:560px;background:var(--panel2);border:1px solid var(--line2);border-radius:22px 22px 0 0;padding:20px;box-shadow:0 -30px 80px -20px rgba(0,0,0,.7);animation:up .26s cubic-bezier(.2,.8,.2,1)}
+@media(min-width:680px){.sheet{border-radius:22px}}@keyframes up{from{transform:translateY(28px);opacity:.6}to{transform:none;opacity:1}}
+.sheet h3{margin:2px 0 4px;font-size:18px;font-weight:800}.sheet .sd{color:var(--mut);font-size:13px;margin-bottom:14px}
+.sheet textarea,.sheet input{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;color:var(--txt);font:inherit;padding:12px;resize:vertical}.sheet textarea{min-height:120px}.sheet textarea:focus,.sheet input:focus{outline:none;border-color:var(--brand1)}
+.srow{display:flex;gap:10px;margin-top:14px}.srow .btn{flex:1;padding:13px}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(16px);z-index:80;opacity:0;pointer-events:none;background:var(--panel2);border:1px solid var(--line2);border-radius:13px;padding:12px 16px;font-size:13.5px;display:flex;align-items:center;gap:9px;box-shadow:0 18px 50px -18px rgba(0,0,0,.8);transition:.25s}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}.toast svg{width:16px;height:16px}.toast.ok{border-color:rgba(52,211,153,.45)}.toast.ok svg{color:var(--ok)}.toast.err{border-color:rgba(251,113,133,.45)}.toast.err svg{color:var(--rev)}
+.foot{margin-top:28px;text-align:center;color:var(--faint);font-size:11.5px}
+.errwrap{max-width:480px;margin:7vh auto 0;text-align:center;padding:0 8px}
+.errcard{background:var(--panel);border:1px solid var(--line2);border-radius:22px;padding:38px 28px;box-shadow:var(--shadow)}
+.erricon{width:64px;height:64px;border-radius:18px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(124,92,255,.2),rgba(198,75,216,.12));border:1px solid var(--line2)}.erricon svg{width:30px;height:30px;color:#b9a4ff}
+.errcard h1{margin:0 0 8px;font-size:22px;font-weight:800}.errcard p{margin:0 auto;max-width:340px;color:var(--mut)}.errcard .eb{margin-top:22px;color:var(--faint);font-size:11px;letter-spacing:1.4px;text-transform:uppercase}
+`;
+
+const CV_JS = `
+var CIC={check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',revise:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg>',edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>'};
+var URLX='/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/action';
+var scrim=document.getElementById('scrim'),sheet=document.getElementById('sheet'),toastEl=document.getElementById('toast'),pending=null,tt;
+function toast(m,k){toastEl.className='toast on '+(k||'');toastEl.innerHTML=(k==='ok'?CIC.check:k==='err'?CIC.revise:CIC.note)+'<span></span>';toastEl.querySelector('span').textContent=m;clearTimeout(tt);tt=setTimeout(function(){toastEl.className='toast';},2800);}
+function openSheet(h){sheet.innerHTML=h;scrim.classList.add('on');var f=sheet.querySelector('#sIn');if(f)setTimeout(function(){f.focus();},60);}
+function closeSheet(){scrim.classList.remove('on');pending=null;}
+function badgeInfo(cs){if(cs==='aprovado')return['b-ok','var(--ok)','Aprovado'];if(cs==='em_revisao')return['b-rev','var(--rev)','Ajuste pedido'];if(cs==='editado')return['b-edit','#b9a4ff','Editado'];return['b-pend','var(--faint)','Pendente'];}
+function card(i){return document.querySelector('[data-card="'+i+'"]');}
+function setBadge(i,cs){var c=card(i);if(!c)return;var b=c.querySelector('[data-badge]');var x=badgeInfo(cs);b.className='badge '+x[0];b.innerHTML='<span class="bd" style="background:'+x[1]+'"></span>'+x[2];}
+function setItemNote(i,note){var c=card(i);if(!c)return;var slot=c.querySelector('[data-noteslot]');if(slot)slot.style.display='';var box=c.querySelector('[data-itemnote]');if(box)box.textContent=note;}
+function setTheme(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-field="tema"]');if(el)el.textContent=v;var h=c.querySelector('.ctitle h3');if(h)h.textContent=v;}
+function setLegenda(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-field="legenda"]');if(!el)return;var d=document.createElement('div');d.className='fval';d.setAttribute('data-field','legenda');d.textContent=v;el.parentNode.replaceChild(d,el);}
+function bumpProgress(){var cards=document.querySelectorAll('#contents [data-card]');var done=0;cards.forEach(function(c){var b=c.querySelector('[data-badge]');if(b&&b.textContent.indexOf('Aprovado')>=0)done++;});var t=document.querySelector('[data-progtxt]');if(t)t.textContent=done+' de '+TOTAL+' aprovados';var f=document.querySelector('[data-progfill]');if(f)f.style.width=Math.max(TOTAL?Math.round(done/TOTAL*100):0,4)+'%';}
+function addHist(kind,label){var sec=document.querySelector('[data-histsec]');if(sec)sec.classList.remove('hide');var h=document.getElementById('hist');var d=document.createElement('div');d.className='hitem';var ic=kind==='ok'?'hb-ok':kind==='rev'?'hb-rev':kind==='edit'?'hb-edit':'hb-note';var sv=kind==='ok'?CIC.check:kind==='rev'?CIC.revise:kind==='edit'?CIC.edit:CIC.note;d.innerHTML='<div class="hicon '+ic+'">'+sv+'</div><div class="hmain"><div class="ht"></div></div><div class="htime">agora</div>';d.querySelector('.ht').textContent=label;h.insertBefore(d,h.firstChild);}
+function post(payload,btn,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){return{ok:r.ok&&j&&j.ok,j:j};});}).then(function(res){if(btn)btn.disabled=false;if(res.ok){if(cb)cb();}else{toast((res.j&&res.j.error)||'Falha ao enviar.','err');}}).catch(function(){if(btn)btn.disabled=false;toast('Sem conexão. Tente novamente.','err');});}
+function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';return el.textContent||'';}
+function sheetForm(title,desc,kind,val,multiline){var inp=multiline?'<textarea id="sIn" placeholder="Escreva aqui...">'+(val||'')+'</textarea>':'<input id="sIn" value="'+(val||'').replace(/"/g,'&quot;')+'"/>';return '<h3></h3><div class="sd"></div>'+inp+'<div class="srow"><button class="btn ghost" data-x="cancel">Cancelar</button><button class="btn '+(kind==='rev'?'warn':'primary')+'" data-x="send">'+(kind==='rev'?'Enviar':'Salvar')+'</button></div>';}
+function openInput(title,desc,kind,val,multiline,cb){openSheet(sheetForm(title,desc,kind,val,multiline));sheet.querySelector('h3').textContent=title;sheet.querySelector('.sd').textContent=desc;pending=cb;}
+document.addEventListener('click',function(e){
+  var tg=e.target.closest&&e.target.closest('[data-toggle]');if(tg){tg.closest('.card').classList.toggle('is-open');return;}
+  if(e.target===scrim){closeSheet();return;}
+  var sx=e.target.closest&&e.target.closest('[data-x]');if(sx){if(sx.dataset.x==='cancel'){closeSheet();}else{var v=(sheet.querySelector('#sIn')||{}).value||'';var cb=pending;closeSheet();if(cb)cb(v);}return;}
+  var a=e.target.closest&&e.target.closest('[data-act]');if(!a)return;
+  var act=a.dataset.act,i=a.dataset.i!=null?+a.dataset.i:null;
+  if(act==='approveItem'){post({action:'approveItem',contentIndex:i},a,function(){setBadge(i,'aprovado');bumpProgress();addHist('ok','Aprovou Conteúdo '+(i+1));toast('Conteúdo '+(i+1)+' aprovado','ok');});}
+  else if(act==='reviseItem'){openInput('Pedir ajuste — Conteúdo '+(i+1),'Descreva o que ajustar neste conteúdo. A equipe é notificada.','rev','',true,function(v){if(!v.trim())return;post({action:'reviseItem',contentIndex:i,note:v},null,function(){setBadge(i,'em_revisao');setItemNote(i,v);addHist('rev','Pediu ajuste em Conteúdo '+(i+1));toast('Ajuste solicitado','ok');});});}
+  else if(act==='editTheme'){openInput('Editar tema — Conteúdo '+(i+1),'Sugira um novo tema para este conteúdo.','ok',getText(i,'tema'),false,function(v){if(!v.trim())return;post({action:'editTheme',contentIndex:i,value:v},null,function(){setTheme(i,v);setBadge(i,'editado');addHist('edit','Editou o tema de Conteúdo '+(i+1));toast('Tema atualizado','ok');});});}
+  else if(act==='editLegenda'){openInput('Editar legenda — Conteúdo '+(i+1),'Ajuste a legenda deste conteúdo do jeito que preferir.','ok',getText(i,'legenda'),true,function(v){post({action:'editLegenda',contentIndex:i,value:v},null,function(){setLegenda(i,v);setBadge(i,'editado');addHist('edit','Editou a legenda de Conteúdo '+(i+1));toast('Legenda atualizada','ok');});});}
+  else if(act==='noteItem'){openInput('Observação — Conteúdo '+(i+1),'Deixe uma observação específica para este conteúdo.','ok','',true,function(v){if(!v.trim())return;post({action:'noteItem',contentIndex:i,note:v},null,function(){setItemNote(i,v);addHist('note','Comentou em Conteúdo '+(i+1));toast('Observação registrada','ok');});});}
+  else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar no cronograma como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
+  else if(act==='approveAll'){if(!confirm('Confirmar aprovação de todo o cronograma?'))return;post({action:'approveAll'},a,function(){var cs=document.querySelectorAll('#contents [data-card]');cs.forEach(function(c){setBadge(+c.dataset.card,'aprovado');});bumpProgress();addHist('ok','Aprovou o cronograma');toast('Cronograma aprovado! Obrigado','ok');});}
+  else if(act==='sendGenObs'){var ta=document.getElementById('genObs');var v=ta?ta.value.trim():'';if(!v){toast('Escreva uma observação primeiro.','err');return;}post({action:'comment',note:v},a,function(){if(ta)ta.value='';addHist('note','Comentou no cronograma');toast('Observação enviada','ok');});}
+});
+`;
+
 function renderClientHtml(task, token, env) {
   const cliente = escapeHtml(task.client || "Cliente");
   const titulo = escapeHtml(task.title || "Cronograma");
@@ -1010,289 +1220,166 @@ function renderClientHtml(task, token, env) {
   const items = Array.isArray(task.cronWeeks) ? task.cronWeeks
     : (Array.isArray(task.cronContents) ? task.cronContents : []);
   const total = items.length;
+  const cItems = (task.clientItems && typeof task.clientItems === "object") ? task.clientItems : {};
 
+  function firstUrl(v) {
+    if (!v) return "";
+    if (typeof v === "string") return v;
+    if (Array.isArray(v)) { for (const z of v) { if (z && typeof z === "string") return z; if (z && z.url) return z.url; } return ""; }
+    if (v.url) return v.url;
+    return "";
+  }
+  function badge(cs) {
+    if (cs === "aprovado") return { cls: "b-ok", dot: "var(--ok)", label: "Aprovado" };
+    if (cs === "em_revisao") return { cls: "b-rev", dot: "var(--rev)", label: "Ajuste pedido" };
+    if (cs === "editado") return { cls: "b-edit", dot: "#b9a4ff", label: "Editado" };
+    if (cs === "em_analise") return { cls: "b-info", dot: "var(--info)", label: "Em análise" };
+    if (cs === "enviado") return { cls: "b-pend", dot: "var(--faint)", label: "Enviado" };
+    return { cls: "b-pend", dot: "var(--faint)", label: "Pendente" };
+  }
+  function media(kind, url) {
+    const label = kind === "feed" ? "Feed" : "Story";
+    const cls = kind === "story" ? "media story" : "media";
+    if (url) {
+      return '<a class="' + cls + '" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' +
+        '<div class="mh"><span>' + label + '</span><span class="on">anexado</span></div>' +
+        '<div class="thumb"><img src="' + escapeHtml(url) + '" alt="' + label + '"/><span class="zoom">' + ICN.zoom + ' ampliar</span></div></a>';
+    }
+    return '<div class="' + cls + '"><div class="mh"><span>' + label + '</span><span>pendente</span></div>' +
+      '<div class="ph">' + ICN.img + '<span class="pl">' + label + ' pendente</span></div></div>';
+  }
+
+  let doneCount = 0;
   let contentsHtml = "";
   if (!total) {
-    contentsHtml = `<div class="empty">Os conteúdos ainda não foram publicados. Você será avisado quando estiverem prontos.</div>`;
+    contentsHtml = '<div class="empty">Os conteúdos ainda não foram publicados. Você será avisado assim que estiverem prontos para sua avaliação.</div>';
   } else {
-    contentsHtml = items.map((raw, i) => {
+    contentsHtml = items.map(function (raw, i) {
       const c = (raw && typeof raw === "object") ? raw : {};
-      const tema = escapeHtml(c.t || c.tema || `Conteúdo ${i + 1}`);
-      const data = escapeHtml(c.d || "");
-      const lg = (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : "")).trim();
-      const lgPreview = lg ? escapeHtml(lg.length > 240 ? lg.slice(0, 240) + "…" : lg) : "";
-      const lgSt = lgStateLabel(c.lgState);
-      const fdN = feedCount(c);
-      const stN = storyCount(c);
-      const csL = csLabel(c.cs);
-      const csClass = c.cs ? `cs-${escapeHtml(c.cs)}` : "";
-
-      const chips = [];
-      if (lg) chips.push(`<span class="chip chip-on">Legenda · ${escapeHtml(lgSt)}</span>`);
-      else    chips.push(`<span class="chip chip-pending">Legenda · Pendente</span>`);
-      if (fdN) chips.push(`<span class="chip chip-on">Feed · ${fdN}</span>`);
-      else     chips.push(`<span class="chip chip-pending">Feed · Pendente</span>`);
-      if (stN) chips.push(`<span class="chip chip-on">Story · ${stN}</span>`);
-      else     chips.push(`<span class="chip chip-pending">Story · Pendente</span>`);
-      if (csL) chips.push(`<span class="chip ${csClass}">${escapeHtml(csL)}</span>`);
-
-      return `
-        <article class="item">
-          <header class="item-head">
-            <div class="item-idx">${i + 1}</div>
-            <div class="item-title">
-              <h3>${tema}</h3>
-              ${data ? `<div class="item-date">${data}</div>` : ""}
-            </div>
-          </header>
-          ${lgPreview ? `<p class="item-legenda">${lgPreview}</p>` : ""}
-          <div class="item-chips">${chips.join("")}</div>
-        </article>`;
+      const ov = cItems["i" + i] || {};
+      const cs = ov.cs || c.cs || "";
+      if (cs === "aprovado") doneCount++;
+      const tema = escapeHtml((typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || ("Conteúdo " + (i + 1))));
+      const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""));
+      const leg = (legRaw || "").trim();
+      const itemNote = (ov.note || c.csFeedback || "").toString().trim();
+      const feedUrl = firstUrl(c.feed) || (c.feedImageUrl || "");
+      const storyUrl = firstUrl(c.story || c.stories) || (c.storyImageUrl || "");
+      const b = badge(cs);
+      const open = i === 0 ? " is-open" : "";
+      return '<div class="card' + open + '" data-card="' + i + '">' +
+        '<div class="chead" data-toggle="' + i + '">' +
+          '<div class="cidx">' + (i + 1) + '</div>' +
+          '<div class="ctitle"><div class="ck">Conteúdo ' + (i + 1) + '</div><h3>' + tema + '</h3></div>' +
+          '<div class="cstate"><span class="badge ' + b.cls + '" data-badge><span class="bd" style="background:' + b.dot + '"></span>' + b.label + '</span></div>' +
+          '<div class="chev">' + ICN.chev + '</div>' +
+        '</div>' +
+        '<div class="cbody">' +
+          '<div class="field"><div class="flabel"><span class="fl">' + ICN.type + 'Tema</span></div><div class="fval theme" data-field="tema">' + tema + '</div></div>' +
+          '<div class="field"><div class="flabel"><span class="fl">' + ICN.text + 'Legenda</span>' + (leg ? '<span class="cnt">' + leg.length + ' caracteres</span>' : '') + '</div>' +
+            (leg ? '<div class="fval" data-field="legenda">' + escapeHtml(leg) + '</div>'
+                 : '<div class="pend" data-field="legenda"><div class="pi">' + ICN.text + '</div><div><div class="pt">Legenda pendente</div><div class="ps">Nossa equipe ainda está finalizando a legenda deste conteúdo.</div></div></div>') +
+          '</div>' +
+          '<div class="field"><div class="flabel"><span class="fl">' + ICN.img + 'Peças</span></div><div class="media-row">' + media("feed", feedUrl) + media("story", storyUrl) + '</div></div>' +
+          (itemNote ? '<div class="field"><div class="flabel"><span class="fl">' + ICN.note + 'Sua observação</span></div><div class="fval note" data-itemnote>' + escapeHtml(itemNote) + '</div></div>'
+                    : '<div class="field" data-noteslot style="display:none"><div class="flabel"><span class="fl">' + ICN.note + 'Sua observação</span></div><div class="fval note" data-itemnote></div></div>') +
+          '<div class="iacts">' +
+            '<button class="ibtn ok" data-act="approveItem" data-i="' + i + '">' + ICN.check + 'Aprovar conteúdo</button>' +
+            '<button class="ibtn rev" data-act="reviseItem" data-i="' + i + '">' + ICN.revise + 'Pedir ajuste</button>' +
+            '<button class="ibtn" data-act="editTheme" data-i="' + i + '">' + ICN.type + 'Editar tema</button>' +
+            '<button class="ibtn" data-act="editLegenda" data-i="' + i + '">' + ICN.pen + 'Editar legenda</button>' +
+            '<button class="ibtn" data-act="noteItem" data-i="' + i + '">' + ICN.note + 'Observação</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
     }).join("");
   }
 
-  const publicUrl = `https://idseven-push.agidseven.workers.dev/cliente/cronograma/${escapeHtml(token)}`;
-  const ogTitle = `${cliente} · ${titulo}`;
-  const ogDesc = total
-    ? `Cronograma com ${total} ${total === 1 ? "conteúdo" : "conteúdos"} — ${status}.`
-    : `Cronograma — ${status}.`;
-
-  // Logo inline SVG (anel roxo→magenta + disco teal + monitor branco) — bate com a brand.
-  const logoSvg = `
-    <svg viewBox="0 0 96 96" aria-label="ID Seven" role="img">
-      <defs>
-        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#7c3aed"/>
-          <stop offset="100%" stop-color="#ec4899"/>
-        </linearGradient>
-      </defs>
-      <circle cx="48" cy="48" r="44" fill="none" stroke="url(#g1)" stroke-width="7"/>
-      <circle cx="48" cy="48" r="30" fill="#22d3b8"/>
-      <rect x="34" y="38" width="28" height="20" rx="3" fill="#ffffff"/>
-      <rect x="42" y="60" width="12" height="3" rx="1.5" fill="#ffffff"/>
-      <rect x="38" y="42" width="20" height="2" rx="1" fill="#22d3b8"/>
-      <rect x="38" y="46" width="14" height="2" rx="1" fill="#22d3b8"/>
-      <rect x="38" y="50" width="17" height="2" rx="1" fill="#22d3b8"/>
-    </svg>`;
-
-  return `<!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-<title>${ogTitle} · Visão do Cliente</title>
-<meta name="description" content="${escapeHtml(ogDesc)}"/>
-<meta name="theme-color" content="#0A0B10"/>
-<meta property="og:type" content="website"/>
-<meta property="og:title" content="${ogTitle}"/>
-<meta property="og:description" content="${escapeHtml(ogDesc)}"/>
-<meta property="og:url" content="${publicUrl}"/>
-<meta property="og:site_name" content="Agenda ID Seven"/>
-<meta name="robots" content="noindex,nofollow"/>
-<style>
-  *,*::before,*::after{box-sizing:border-box}
-  html,body{margin:0;padding:0;background:#0A0B10;color:#E6E8F0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-  body{min-height:100vh;display:flex;flex-direction:column}
-  a{color:#a78bfa;text-decoration:none}
-  .wrap{max-width:760px;width:100%;margin:0 auto;padding:24px 18px 120px}
-  header.brand{display:flex;align-items:center;gap:12px;padding:6px 2px 22px}
-  header.brand svg{width:42px;height:42px;display:block}
-  header.brand .name{font-weight:700;letter-spacing:.2px;color:#fff}
-  header.brand .name small{display:block;color:#9ca3af;font-weight:500;font-size:11px;letter-spacing:.6px;text-transform:uppercase;margin-top:2px}
-  .card{background:linear-gradient(180deg,rgba(124,58,237,.10),rgba(34,211,184,.04)),#11131c;border:1px solid #20232f;border-radius:18px;padding:20px 18px;box-shadow:0 12px 40px -20px rgba(124,58,237,.40)}
-  .card.title h1{margin:0 0 6px;font-size:22px;line-height:1.25;color:#fff;font-weight:700;letter-spacing:-.01em}
-  .card.title .cli{color:#a78bfa;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
-  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-  .meta .pill{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);padding:6px 10px;border-radius:999px;font-size:12px;color:#cbd5e1}
-  .meta .pill.status{background:rgba(34,211,184,.10);border-color:rgba(34,211,184,.28);color:#34d3b8}
-  .section-title{font-size:11px;font-weight:700;letter-spacing:1.4px;color:#9ca3af;text-transform:uppercase;margin:28px 4px 12px}
-  .list{display:flex;flex-direction:column;gap:12px}
-  .item{background:#11131c;border:1px solid #20232f;border-radius:14px;padding:14px 14px 12px}
-  .item-head{display:flex;align-items:flex-start;gap:12px}
-  .item-idx{flex:0 0 30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px}
-  .item-title h3{margin:2px 0 2px;font-size:15px;color:#fff;font-weight:600;line-height:1.3}
-  .item-title .item-date{font-size:12px;color:#9ca3af}
-  .item-legenda{margin:10px 0 0;font-size:13px;color:#cbd5e1;line-height:1.55;white-space:pre-wrap;word-break:break-word}
-  .item-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .chip{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#cbd5e1;letter-spacing:.2px}
-  .chip-on{background:rgba(34,211,184,.10);border-color:rgba(34,211,184,.28);color:#34d3b8}
-  .chip-pending{background:rgba(255,255,255,.03);color:#9ca3af}
-  .chip.cs-aprovado{background:rgba(34,211,153,.12);border-color:rgba(34,211,153,.30);color:#22d399}
-  .chip.cs-em_revisao{background:rgba(255,90,77,.12);border-color:rgba(255,90,77,.32);color:#ff7a6f}
-  .chip.cs-em_analise{background:rgba(77,159,255,.10);border-color:rgba(77,159,255,.30);color:#4d9fff}
-  .chip.cs-enviado{background:rgba(255,176,46,.10);border-color:rgba(255,176,46,.30);color:#ffb02e}
-  .empty{background:#11131c;border:1px dashed #2a2f3d;border-radius:14px;padding:22px;text-align:center;color:#9ca3af}
-  .actions{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(10,11,16,0),rgba(10,11,16,.92) 30%,#0A0B10 65%);padding:18px 0 max(18px,env(safe-area-inset-bottom));margin-top:18px;display:flex;flex-direction:column;gap:10px}
-  .btn{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-size:15px;font-weight:600;letter-spacing:.1px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;color:#fff;transition:transform .08s ease,filter .12s ease}
-  .btn:active{transform:translateY(1px)}
-  .btn.primary{background:linear-gradient(135deg,#22d399,#34d3b8);color:#06251c}
-  .btn.warn{background:linear-gradient(135deg,#f59e0b,#ec4899);color:#fff}
-  .btn.ghost{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);color:#E6E8F0}
-  .btn[disabled]{opacity:.55;cursor:wait}
-  dialog{border:0;border-radius:18px;background:#11131c;color:#E6E8F0;padding:0;max-width:520px;width:calc(100% - 32px);box-shadow:0 24px 60px -20px rgba(0,0,0,.7)}
-  dialog::backdrop{background:rgba(5,6,10,.72)}
-  .dlg{padding:20px 18px}
-  .dlg h2{margin:0 0 6px;font-size:17px;color:#fff;font-weight:700}
-  .dlg p{margin:0 0 14px;color:#9ca3af;font-size:13.5px}
-  .dlg textarea{width:100%;min-height:120px;background:#0A0B10;color:#E6E8F0;border:1px solid #2a2f3d;border-radius:12px;padding:12px;font:inherit;resize:vertical}
-  .dlg-row{display:flex;gap:8px;margin-top:12px}
-  .dlg-row .btn{flex:1;padding:12px 14px;font-size:14px}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#11131c;border:1px solid #2a2f3d;color:#E6E8F0;padding:12px 16px;border-radius:12px;box-shadow:0 12px 40px -16px rgba(0,0,0,.7);opacity:0;transition:transform .25s ease,opacity .25s ease;z-index:9999;font-size:14px}
-  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
-  .toast.ok{border-color:rgba(34,211,153,.40);color:#22d399}
-  .toast.err{border-color:rgba(255,90,77,.40);color:#ff7a6f}
-  .foot{margin-top:24px;color:#525a6e;font-size:11.5px;text-align:center;letter-spacing:.3px}
-  @media (min-width:520px){
-    .actions{flex-direction:row;justify-content:flex-end}
-    .actions .btn{min-width:180px;flex:0 0 auto}
-    .card.title h1{font-size:26px}
+  // histórico granular (clientActions map -> lista)
+  const actsMap = (task.clientActions && typeof task.clientActions === "object") ? task.clientActions : {};
+  const acts = Object.keys(actsMap).map(function (k) { return actsMap[k] || {}; })
+    .filter(function (a) { return a && a.at; }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); }).slice(0, 14);
+  function hhmm(ms) { try { const d = new Date(Number(ms)); return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); } catch (_) { return ""; } }
+  let histHtml = "";
+  if (acts.length) {
+    histHtml = acts.map(function (a) {
+      const map = {
+        approve: ["hb-ok", ICN.check, "Aprovou o cronograma"], approveAll: ["hb-ok", ICN.check, "Aprovou o cronograma"],
+        approveItem: ["hb-ok", ICN.check, "Aprovou"], reviseItem: ["hb-rev", ICN.revise, "Pediu ajuste em"],
+        revision: ["hb-rev", ICN.revise, "Pediu revisão geral"], edit_request: ["hb-edit", ICN.edit, "Pediu edição"],
+        editTheme: ["hb-edit", ICN.edit, "Editou o tema de"], editLegenda: ["hb-edit", ICN.edit, "Editou a legenda de"], noteItem: ["hb-note", ICN.note, "Comentou em"],
+        comment: ["hb-note", ICN.note, "Comentou no cronograma"],
+      };
+      const m = map[a.type] || ["hb-note", ICN.note, "Ação em"];
+      const tgt = (a.contentIndex != null && a.contentIndex !== "") ? (" Conteúdo " + (Number(a.contentIndex) + 1)) : "";
+      let extra = "";
+      if (a.newValue) extra = '<div class="hdiff"><span class="new">' + escapeHtml(String(a.newValue).slice(0, 160)) + '</span></div>';
+      else if (a.note) extra = '<div class="hdiff">' + escapeHtml(String(a.note).slice(0, 200)) + '</div>';
+      return '<div class="hitem"><div class="hicon ' + m[0] + '">' + m[1] + '</div><div class="hmain"><div class="ht">' + m[2] + escapeHtml(tgt) + '</div>' + extra + '</div><div class="htime">' + hhmm(a.at) + '</div></div>';
+    }).join("");
   }
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header class="brand">
-    ${logoSvg}
-    <div class="name">Agenda ID Seven<small>Visão do Cliente</small></div>
-  </header>
 
-  <section class="card title" aria-labelledby="t">
-    <div class="cli">${cliente}</div>
-    <h1 id="t">${titulo}</h1>
-    <div class="meta">
-      <span class="pill">${freq}</span>
-      <span class="pill status">${status}</span>
-      <span class="pill">${total} ${total === 1 ? "conteúdo" : "conteúdos"}</span>
-    </div>
-  </section>
+  const pct = total ? Math.round(doneCount / total * 100) : 0;
+  const publicUrl = "https://idseven-push.agidseven.workers.dev/cliente/cronograma/" + escapeHtml(token);
+  const ogTitle = cliente + " · " + titulo;
+  const ogDesc = total ? ("Cronograma com " + total + " " + (total === 1 ? "conteúdo" : "conteúdos") + " — " + status + ".") : ("Cronograma — " + status + ".");
 
-  <div class="section-title">Conteúdos</div>
-  <div class="list">${contentsHtml}</div>
-
-  <div class="actions" role="group" aria-label="Ações do cliente">
-    <button class="btn ghost" id="btnEdit" type="button">Editar cronograma</button>
-    <button class="btn warn"  id="btnRev"  type="button">Pedir revisão</button>
-    <button class="btn primary" id="btnApprove" type="button">Aprovar</button>
-  </div>
-
-  <div class="foot">Link seguro · ID Seven · ${new Date().getFullYear()}</div>
-</div>
-
-<dialog id="dlg">
-  <form method="dialog" class="dlg" id="dlgForm">
-    <h2 id="dlgTitle">Conte para a equipe</h2>
-    <p id="dlgHelp">Descreva o que precisa ser ajustado. A equipe ID Seven será notificada.</p>
-    <textarea id="dlgNote" maxlength="1000" placeholder="Escreva sua mensagem…"></textarea>
-    <div class="dlg-row">
-      <button class="btn ghost" value="cancel" type="submit">Cancelar</button>
-      <button class="btn warn"  id="dlgSend" value="send" type="submit">Enviar</button>
-    </div>
-  </form>
-</dialog>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-
-<script>
-(function(){
-  var TOKEN = ${JSON.stringify(token)};
-  var ACTION_URL = "/cliente/cronograma/" + encodeURIComponent(TOKEN) + "/action";
-  var dlg = document.getElementById("dlg");
-  var dlgTitle = document.getElementById("dlgTitle");
-  var dlgHelp  = document.getElementById("dlgHelp");
-  var dlgNote  = document.getElementById("dlgNote");
-  var dlgForm  = document.getElementById("dlgForm");
-  var dlgPendingType = null;
-  var toast = document.getElementById("toast");
-  var toastTimer = null;
-  function showToast(msg, kind){
-    toast.textContent = msg;
-    toast.className = "toast on " + (kind || "");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function(){ toast.className = "toast"; }, 3000);
-  }
-  function setBusy(btn, busy){
-    if(!btn) return;
-    btn.disabled = !!busy;
-    btn.dataset.label = btn.dataset.label || btn.textContent;
-    btn.textContent = busy ? "Enviando…" : btn.dataset.label;
-  }
-  function send(type, note, btn){
-    setBusy(btn, true);
-    fetch(ACTION_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: type, note: note || "" }),
-    }).then(function(r){ return r.json().then(function(j){ return { ok:r.ok, j:j }; }); })
-      .then(function(res){
-        if(res.ok && res.j && res.j.ok){
-          var msg = type === "approve" ? "Aprovado! Obrigado." :
-                    type === "revision" ? "Revisão solicitada." :
-                    "Mensagem enviada.";
-          showToast(msg, "ok");
-        } else {
-          showToast((res.j && res.j.error) || "Falha ao enviar. Tente novamente.", "err");
-        }
-      })
-      .catch(function(){ showToast("Sem conexão. Tente novamente.", "err"); })
-      .finally(function(){ setBusy(btn, false); });
-  }
-  function openDlg(type, title, help, btn){
-    dlgPendingType = { type: type, btn: btn };
-    dlgTitle.textContent = title;
-    dlgHelp.textContent = help;
-    dlgNote.value = "";
-    if(typeof dlg.showModal === "function") dlg.showModal();
-    else { var n = prompt(help, ""); if(n !== null) send(type, n, btn); }
-  }
-  dlgForm.addEventListener("submit", function(ev){
-    var which = (ev.submitter && ev.submitter.value) || "cancel";
-    if(which === "send" && dlgPendingType){
-      send(dlgPendingType.type, dlgNote.value.trim(), dlgPendingType.btn);
-    }
-    dlgPendingType = null;
-  });
-
-  document.getElementById("btnApprove").addEventListener("click", function(ev){
-    if(confirm("Confirmar aprovação deste cronograma?")) send("approve", "", ev.currentTarget);
-  });
-  document.getElementById("btnRev").addEventListener("click", function(ev){
-    openDlg("revision", "Pedir revisão", "Descreva o que deseja ajustar. A equipe será notificada.", ev.currentTarget);
-  });
-  document.getElementById("btnEdit").addEventListener("click", function(ev){
-    openDlg("edit_request", "Editar cronograma", "Conte quais alterações você gostaria de fazer. A equipe abrirá o cronograma para edição.", ev.currentTarget);
-  });
-})();
-</script>
-</body>
-</html>`;
+  return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
+'<meta charset="utf-8"/>\n' +
+'<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>\n' +
+'<title>' + ogTitle + ' · Visão do Cliente</title>\n' +
+'<meta name="description" content="' + escapeHtml(ogDesc) + '"/>\n' +
+'<meta name="theme-color" content="#070810"/>\n' +
+'<meta property="og:type" content="website"/>\n' +
+'<meta property="og:title" content="' + escapeHtml(ogTitle) + '"/>\n' +
+'<meta property="og:description" content="' + escapeHtml(ogDesc) + '"/>\n' +
+'<meta property="og:url" content="' + publicUrl + '"/>\n' +
+'<meta property="og:site_name" content="Agenda ID Seven"/>\n' +
+'<meta name="robots" content="noindex,nofollow"/>\n' +
+'<style>' + CV_CSS + '</style></head><body>\n' +
+'<div class="wrap">' +
+  '<div class="topbar"><div class="brand">' + CV_LOGO + '<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div>' +
+    '<div class="secure">' + ICN.shield + '<span class="lbl">Link seguro</span></div></div>' +
+  '<section class="hero"><div class="hero-top"><span class="kicker">Cronograma para sua aprovação</span></div>' +
+    '<h1>' + titulo + '</h1><div class="cli">Preparado para <b>' + cliente + '</b></div>' +
+    '<div class="hero-meta">' +
+      '<span class="mpill">' + ICN.cal + '<span class="mv">Frequência</span> ' + freq + '</span>' +
+      '<span class="mpill">' + ICN.layers + '<span class="mv">Conteúdos</span> ' + total + '</span>' +
+      '<span class="mpill status"><span class="dot"></span>' + status + '</span>' +
+    '</div>' +
+    '<div class="prog"><div class="prog-h"><span>Progresso de aprovação</span><span data-progtxt>' + doneCount + ' de ' + total + ' aprovados</span></div>' +
+      '<div class="prog-bar"><div class="prog-fill" data-progfill style="width:' + Math.max(pct, 4) + '%"></div></div></div>' +
+  '</section>' +
+  '<div class="sec"><h2>Conteúdos</h2><div class="legend"><span><i style="background:var(--ok)"></i>Aprovado</span><span><i style="background:var(--rev)"></i>Ajuste</span><span><i style="background:var(--faint)"></i>Pendente</span></div></div>' +
+  '<div id="contents">' + contentsHtml + '</div>' +
+  '<div class="sec"><h2>Observações gerais</h2></div>' +
+  '<div class="card pad"><textarea id="genObs" placeholder="Quer deixar um recado para a equipe sobre o cronograma como um todo? (opcional)"></textarea>' +
+    '<div style="text-align:right;margin-top:10px"><button class="ibtn" data-act="sendGenObs">' + ICN.note + 'Enviar observação geral</button></div></div>' +
+  '<div class="sec' + (acts.length ? '' : ' hide') + '" data-histsec><h2>Histórico de feedback</h2></div>' +
+  '<div class="hist" id="hist">' + histHtml + '</div>' +
+  '<div class="foot">Link público seguro · Agenda ID Seven · ' + new Date().getFullYear() + '</div>' +
+'</div>' +
+'<div class="gactions"><div class="inner"><div class="gstat">Você pode aprovar tudo, ajustar itens específicos ou pedir uma revisão geral — <b>sem obrigação de editar todos.</b></div>' +
+  '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
+  '<button class="btn primary" data-act="approveAll">' + ICN.check + 'Aprovar cronograma</button></div></div>' +
+'<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
+'<div class="toast" id="toast"></div>' +
+'<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';\n' + CV_JS + '\n</script>\n' +
+'</body></html>';
 }
 
 function renderClientErrorHtml(title, msg) {
-  const t = escapeHtml(title);
-  const m = escapeHtml(msg);
-  return `<!doctype html>
-<html lang="pt-BR"><head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>${t} · Agenda ID Seven</title>
-<meta name="theme-color" content="#0A0B10"/>
-<meta name="robots" content="noindex,nofollow"/>
-<meta property="og:type" content="website"/>
-<meta property="og:title" content="${t} · Agenda ID Seven"/>
-<meta property="og:description" content="${m}"/>
-<style>
-  html,body{margin:0;padding:0;background:#0A0B10;color:#E6E8F0;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;min-height:100vh}
-  .wrap{max-width:520px;margin:0 auto;padding:48px 22px;text-align:center}
-  .icon{font-size:44px;margin-bottom:14px}
-  h1{margin:0 0 10px;color:#fff;font-size:22px;font-weight:700}
-  p{margin:0 auto;max-width:380px;color:#9ca3af}
-  .brand{margin-top:36px;color:#525a6e;font-size:12px;letter-spacing:.4px;text-transform:uppercase}
-</style></head>
-<body><div class="wrap">
-  <div class="icon">🔒</div>
-  <h1>${t}</h1>
-  <p>${m}</p>
-  <div class="brand">Agenda ID Seven</div>
-</div></body></html>`;
+  const t = escapeHtml(title), m = escapeHtml(msg);
+  return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
+'<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1"/>\n' +
+'<title>' + t + ' · Agenda ID Seven</title>\n<meta name="theme-color" content="#070810"/>\n<meta name="robots" content="noindex,nofollow"/>\n' +
+'<meta property="og:type" content="website"/>\n<meta property="og:title" content="' + t + ' · Agenda ID Seven"/>\n<meta property="og:description" content="' + m + '"/>\n' +
+'<style>' + CV_CSS + '</style></head><body>\n' +
+'<div class="wrap"><div class="topbar"><div class="brand">' + CV_LOGO + '<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div>' +
+  '<div class="secure">' + ICN.shield + '<span class="lbl">Link seguro</span></div></div>' +
+  '<div class="errwrap"><div class="errcard"><div class="erricon">' + ICN.lock + '</div>' +
+    '<h1>' + t + '</h1><p>' + m + '</p><div class="eb">Agenda ID Seven</div></div></div>' +
+'</div></body></html>';
 }
 
 /* ───────────────────────── HELPERS ───────────────────────── */
