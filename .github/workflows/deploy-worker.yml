@@ -46,7 +46,7 @@ jobs:
       - name: Verificar deploy + dryRun /notify-designer (sem enviar push)
         run: |
           B="https://idseven-push.agidseven.workers.dev"
-          echo "== HEALTH (espera version V64.10-client-designer-flow-final-fix) =="
+          echo "== HEALTH (espera version V64.11-client-designer-flow-visibility-fix) =="
           curl -sS "$B/" ; echo
           echo "== dryRun id de teste (NAO envia; espera 'tarefa nao encontrada') =="
           curl -sS -X POST "$B/notify-designer" -H "Content-Type: application/json" -d '{"id":"__dryrun_ci__","dryRun":true}' ; echo

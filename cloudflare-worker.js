@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.10-client-designer-flow-final-fix]
+   ID Seven — Cloudflare Worker  [V64.11-client-designer-flow-visibility-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.10-client-designer-flow-final-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.11-client-designer-flow-visibility-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -889,7 +889,8 @@ async function handleClientCronogramaView(token, env) {
     }
     console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""}`);
     // P2: se a aprovação FINAL já aconteceu, o cliente vê a tela de SUCESSO (não mais ações).
-    if (task.status === "concluido" || task.workflowStage === "concluido") {
+    // V64.11: usa o eixo do CLIENTE (clientFlowStatus) — independente do status do designer.
+    if (task.clientFlowStatus === "concluido" || task.status === "concluido" || task.workflowStage === "concluido") {
       return htmlResponse(renderClientSuccessHtml(task, token), 200);
     }
     return htmlResponse(renderClientHtml(task, token, env), 200);
@@ -928,9 +929,9 @@ async function handleClientCronogramaAction(token, request, env) {
 
   const now = Date.now();
   const g = await writeClientGranular(env, accessToken, task, { type, contentIndex: ci, note, value, at: now });
-  const final = !!(g && g.col === "concluido");   // aprovação FINAL -> tela de sucesso no cliente
-  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} final=${final}`);
-  return json({ ok: true, type, contentIndex: ci, at: now, final, col: (g && g.col) || null }, 200, env);
+  const final = !!(g && (g.client === "concluido" || g.col === "concluido"));   // aprovação FINAL -> tela de sucesso no cliente
+  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} final=${final} clientFlow=${(g && g.client) || ""}`);
+  return json({ ok: true, type, contentIndex: ci, at: now, final, col: (g && g.col) || null, clientFlowStatus: (g && g.client) || null }, 200, env);
 }
 
 /* Persistência ADITIVA e granular do feedback do cliente (V64.7).
@@ -987,21 +988,25 @@ async function writeClientGranular(env, accessToken, task, e) {
      Fase detectada pelo cronStatus atual: 'ready_for_final_client_review' (reenvio) = final. ───── */
   const isFinalPhase = (task.cronStatus === "ready_for_final_client_review")
     || (task.workflowStage === "entrega") || (task.workflowStage === "revisao_final");
+  // V64.11 — EIXOS SEPARADOS: além de `status`/`workflowStage` (compat), grava o eixo
+  // DO CLIENTE (`clientFlowStatus`/`clientWorkflowStage`). A tarefa NÃO sai do fluxo do
+  // cliente quando vai ao designer; só sai de cena na aprovação FINAL (clientFlowStatus=concluido).
+  //   client: 'aprovado' (temas aprovados) | 'revisao' (pediu ajuste) | 'concluido' (aprovação final)
   const approveG = isFinalPhase
-    ? { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou_final", label: "Cliente aprovou a entrega final", col: "concluido", stage: "concluido" }
-    : { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou",       label: "Cliente aprovou os temas/cronograma", col: "andamento", stage: "producao" };
+    ? { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou_final", label: "Cliente aprovou a entrega final", col: "concluido", stage: "concluido", client: "concluido" }
+    : { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou",       label: "Cliente aprovou os temas/cronograma", col: "andamento", stage: "producao", client: "aprovado" };
   const STAT = {
     approve:      approveG,
     approveAll:   approveG,
-    revision:     { cs: "em_revisao_cliente", rev: "revisao", htype: "cliente_pediu_revisao", label: "Cliente pediu revisão geral",         col: "revisao", stage: "revisao" },
-    reviseItem:   { cs: "em_revisao_cliente", rev: "revisao", htype: "cliente_pediu_revisao", label: "Cliente pediu ajuste em um conteúdo", col: "revisao", stage: "revisao" },
-    edit_request: { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente solicitou edição",            col: "revisao", stage: "revisao" },
-    editTheme:    { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente editou o tema de um conteúdo",    col: "revisao", stage: "revisao" },
-    editLegenda:  { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente editou a legenda de um conteúdo", col: "revisao", stage: "revisao" },
-    noteItem:     { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente deixou uma observação", col: null, stage: null },
-    comment:      { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente comentou no cronograma", col: null, stage: null },
+    revision:     { cs: "em_revisao_cliente", rev: "revisao", htype: "cliente_pediu_revisao", label: "Cliente pediu revisão geral",         col: "revisao", stage: "revisao", client: "revisao" },
+    reviseItem:   { cs: "em_revisao_cliente", rev: "revisao", htype: "cliente_pediu_revisao", label: "Cliente pediu ajuste em um conteúdo", col: "revisao", stage: "revisao", client: "revisao" },
+    edit_request: { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente solicitou edição",            col: "revisao", stage: "revisao", client: "revisao" },
+    editTheme:    { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente editou o tema de um conteúdo",    col: "revisao", stage: "revisao", client: "revisao" },
+    editLegenda:  { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente editou a legenda de um conteúdo", col: "revisao", stage: "revisao", client: "revisao" },
+    noteItem:     { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente deixou uma observação", col: null, stage: null, client: null },
+    comment:      { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente comentou no cronograma", col: null, stage: null, client: null },
   };
-  let g = STAT[e.type] || { cs: null, rev: null, htype: "cliente_acao", label: "Ação do cliente", col: null, stage: null };
+  let g = STAT[e.type] || { cs: null, rev: null, htype: "cliente_acao", label: "Ação do cliente", col: null, stage: null, client: null };
 
   // approveItem: só conclui/avança quando TODOS os conteúdos estiverem aprovados.
   if (e.type === "approveItem") {
@@ -1012,7 +1017,7 @@ async function writeClientGranular(env, accessToken, task, e) {
     for (const k of Object.keys(ci)) { if (ci[k] && ci[k].cs === "aprovado") approved.add(k); }
     approved.add("i" + e.contentIndex);
     if (total > 0 && approved.size >= total) g = Object.assign({}, approveG, { label: "Cliente aprovou todos os conteúdos" });
-    else g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo", col: null, stage: null };
+    else g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo", col: null, stage: null, client: null };
   }
 
   if (g.cs) {
@@ -1029,6 +1034,13 @@ async function writeClientGranular(env, accessToken, task, e) {
   const statusFrom = (task.status || "afazer");
   if (g.col) { fields.status = { stringValue: g.col }; mask.push("status"); }
   if (g.stage) { fields.workflowStage = { stringValue: g.stage }; mask.push("workflowStage"); }
+  // V64.11 — eixo do CLIENTE (independente do designer; só conclui na aprovação final).
+  const clientFrom = (task.clientFlowStatus || "");
+  if (g.client) {
+    fields.clientFlowStatus = { stringValue: g.client };
+    fields.clientWorkflowStage = { stringValue: g.client };
+    mask.push("clientFlowStatus", "clientWorkflowStage");
+  }
 
   // entrada de histórico (arrayUnion via appendMissingElements — REST :commit)
   const histFields = {
@@ -1042,6 +1054,7 @@ async function writeClientGranular(env, accessToken, task, e) {
   };
   if (e.contentIndex != null) histFields.contentIndex = { integerValue: String(e.contentIndex) };
   if (g.col && g.col !== statusFrom) { histFields.statusFrom = { stringValue: statusFrom }; histFields.statusTo = { stringValue: g.col }; }
+  if (g.client && g.client !== clientFrom) { histFields.clientFrom = { stringValue: clientFrom }; histFields.clientTo = { stringValue: g.client }; }
   const histValue = { mapValue: { fields: histFields } };
 
   const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}`;
