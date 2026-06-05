@@ -812,7 +812,8 @@ async function handleClientCronogramaView(token, env) {
   try {
     if (!token) return htmlResponse(renderClientErrorHtml("Link inválido", "O link não contém um token válido."), 400);
     let accessToken;
-    try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
+    // Mesmo escopo usado pelo CRON p/ ler Firestore (comprovadamente funcional).
+    try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
     catch (e) {
       console.error("[CLIENT-VIEW] auth falhou:", e && e.message);
       return htmlResponse(renderClientErrorHtml("Indisponível", "Não foi possível carregar agora. Tente novamente em instantes."), 503);
@@ -844,7 +845,7 @@ async function handleClientCronogramaAction(token, request, env) {
   const note = (payload && typeof payload.note === "string") ? payload.note.slice(0, 1000) : "";
 
   let accessToken;
-  try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
+  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
   catch (e) { return json({ ok: false, error: "auth falhou: " + (e && e.message) }, 200, env); }
 
   const task = await queryTaskByToken(env, accessToken, token);
@@ -885,7 +886,14 @@ async function queryTaskByField(env, accessToken, field, value) {
     headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
     body: JSON.stringify(q),
   });
-  if (!res.ok) { console.error(`[CLIENT-VIEW] runQuery(${field}) falhou:`, res.status, (await res.text()).slice(0, 200)); return null; }
+  if (!res.ok) {
+    // Distingue FALHA de query (auth/permissão/Firestore) de "não encontrado".
+    // Lança para o handler cair no catch (página "Algo deu errado", 500) em vez de
+    // mascarar como 404 — assim um problema de infra não vira "link inválido".
+    const body = (await res.text()).slice(0, 200);
+    console.error(`[CLIENT-VIEW] runQuery(${field}) falhou:`, res.status, body);
+    throw new Error(`firestore runQuery ${field} ${res.status}: ${body}`);
+  }
   const rows = await res.json();
   for (const row of rows) {
     if (!row.document) continue;
