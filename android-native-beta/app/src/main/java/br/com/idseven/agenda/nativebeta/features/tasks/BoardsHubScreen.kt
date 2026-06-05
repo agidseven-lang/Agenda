@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,15 +53,22 @@ fun BoardsHubScreen(
     onOpenSector: (String) -> Unit,
     onOpenRoleBoards: () -> Unit = {},   // ADITIVO: admin -> "Quadros por responsável"
     onOpenMyBoard: () -> Unit = {},      // ADITIVO: "Meu quadro / Minhas demandas"
+    onOpenClientFlow: () -> Unit = {},   // P3: Social/Admin -> "Fluxo do Cliente"
+    onOpenDesignersFlow: () -> Unit = {}, // P4: Social/Admin -> "Fluxo dos Designers"
 ) {
     tasksState.errorMessage()?.let { ErrorState("Quadros — $it"); return }
     if (tasksState.isLoading) { SkeletonList(); return }
     val all = TaskVisibility.visibleTasks(currentUser, tasksState.itemsOrEmpty())
     val isAdmin = TaskVisibility.roleCategory(currentUser) == TaskVisibility.Cat.ADMIN
+    val seeAll = TaskVisibility.canSeeAllBoards(currentUser)  // admin + social/gestão
     val uid = currentUser?.id
     val myOpen = if (uid != null) tasksState.itemsOrEmpty().count {
         (it.assigneeId == uid || it.by == uid) && (it.status ?: "afazer") != "concluido"
     } else 0
+    // P3/P4 — contadores dos fluxos (Social/Admin).
+    val clientOpen = all.count { TaskVisibility.isClientFlow(it) && (it.status ?: "afazer") != "concluido" }
+    val designersCount = TaskVisibility.designersWithFlow(all).size
+    val designersLate = all.count { TaskVisibility.isDesignerFlow(it) && TaskDeadline.of(it)?.late == true }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -79,6 +87,28 @@ fun BoardsHubScreen(
                     BoardCard(
                         label = "Meu quadro", desc = "Minhas demandas e tarefas", color = Tokens.Accent,
                         icon = Icons.Outlined.Dashboard, total = myOpen, late = 0, onClick = onOpenMyBoard,
+                    )
+                    Spacer(Modifier.size(12.dp))
+                }
+            }
+            // P3 — Social/Admin: "Fluxo do Cliente" (relacionamento, sem misturar com designer).
+            if (seeAll) {
+                item {
+                    BoardCard(
+                        label = "Fluxo do Cliente", desc = "Enviado, aprovado, revisão, reenvio, concluído",
+                        color = androidx.compose.ui.graphics.Color(0xFF22D3B8),
+                        icon = Icons.Outlined.Visibility, total = clientOpen, late = 0,
+                        totalSuffix = "aberta", onClick = onOpenClientFlow,
+                    )
+                    Spacer(Modifier.size(12.dp))
+                }
+                // P4 — Social/Admin: "Fluxo dos Designers" (um quadro Kanban por designer).
+                item {
+                    BoardCard(
+                        label = "Fluxo dos Designers", desc = "Um quadro Kanban por designer — monitore cada um",
+                        color = androidx.compose.ui.graphics.Color(0xFFA78BFA),
+                        icon = Icons.Outlined.Groups, total = designersCount, late = designersLate,
+                        totalSuffix = "designer", onClick = onOpenDesignersFlow,
                     )
                     Spacer(Modifier.size(12.dp))
                 }
@@ -112,7 +142,12 @@ fun BoardsHubScreen(
 private fun BoardCard(
     label: String, desc: String, color: androidx.compose.ui.graphics.Color, icon: androidx.compose.ui.graphics.vector.ImageVector,
     total: Int, late: Int, onClick: () -> Unit,
+    totalSuffix: String = "tarefas",   // pluraliza automaticamente quando != "tarefas"
 ) {
+    val totalLabel = when (totalSuffix) {
+        "tarefas" -> "$total tarefas"
+        else -> "$total $totalSuffix${if (total == 1) "" else "s"}"
+    }
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Tokens.Surface)
             .border(1.dp, Tokens.Line, RoundedCornerShape(16.dp)).clickable { onClick() }.padding(14.dp),
@@ -128,7 +163,7 @@ private fun BoardCard(
             Spacer(Modifier.size(7.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.clip(RoundedCornerShape(999.dp)).background(color.copy(alpha = 0.16f)).padding(horizontal = 9.dp, vertical = 3.dp)) {
-                    Text("$total tarefas", color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(totalLabel, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 if (late > 0) {
                     Spacer(Modifier.size(8.dp))

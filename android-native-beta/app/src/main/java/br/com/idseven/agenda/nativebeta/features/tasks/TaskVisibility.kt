@@ -1,5 +1,6 @@
 package br.com.idseven.agenda.nativebeta.features.tasks
 
+import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 
@@ -47,4 +48,29 @@ object TaskVisibility {
     // Tarefas visíveis ao usuário (aplica a regra acima).
     fun visibleTasks(user: UserLite?, tasks: List<TaskItem>): List<TaskItem> =
         if (canSeeAllBoards(user)) tasks else tasks.filter { canSeeTask(user, it) }
+
+    // ===== P3/P4 — separação Fluxo do Cliente x Fluxo dos Designers (espelha o Desktop) =====
+    // cronStatus que indicam que a tarefa já está no fluxo do designer.
+    private val DESIGNER_CRON = listOf(
+        "sent_to_designer", "enviado_design", "in_design", "designer_producao",
+        "pronto_design", "ready_for_designer",
+    )
+
+    // Fluxo do DESIGNER: tem designer atribuído OU cronStatus de produção do designer.
+    fun isDesignerFlow(t: TaskItem): Boolean =
+        !t.assignedDesignerId.isNullOrBlank() || (t.cronStatus != null && DESIGNER_CRON.contains(t.cronStatus))
+
+    // Fluxo do CLIENTE: cronograma em relacionamento com o cliente (ainda não no fluxo do designer).
+    fun isClientFlow(t: TaskItem): Boolean =
+        Sectors.of(t.sector).key == "cronograma" && !isDesignerFlow(t)
+
+    // O designer "dono" de uma tarefa do fluxo (atribuição explícita ou, na falta, o responsável).
+    fun designerOf(t: TaskItem): String? = t.assignedDesignerId?.ifBlank { null } ?: t.assigneeId
+
+    // IDs de designers que possuem tarefas no fluxo de designer (para o hub de designers).
+    fun designersWithFlow(tasks: List<TaskItem>): Map<String, Int> {
+        val m = LinkedHashMap<String, Int>()
+        tasks.forEach { t -> if (isDesignerFlow(t)) designerOf(t)?.let { id -> m[id] = (m[id] ?: 0) + 1 } }
+        return m
+    }
 }

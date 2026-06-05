@@ -64,6 +64,10 @@ data class TaskItem(
     val cronStatus: String? = null,
     val clientReview: ClientReview? = null,
     val clientSentBy: String? = null,
+    // Atribuição ao DESIGNER (aditivo; escrito pelo Desktop em designerAssignment{...}).
+    // Compat: null em tarefas que nunca foram enviadas a um designer.
+    val assignedDesignerId: String? = null,
+    val assignedDesignerName: String? = null,
     // Conteúdos do cronograma (temas/legendas/artes) — escritos pelo Desktop.
     // Aceita `cronContents` (atual) e o alias legado `contents`. Compat: lista vazia em tarefas antigas.
     val cronContents: List<CronContent> = emptyList(),

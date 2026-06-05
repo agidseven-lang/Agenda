@@ -64,6 +64,7 @@ import br.com.idseven.agenda.nativebeta.features.events.EventFormScreen
 import br.com.idseven.agenda.nativebeta.features.profile.ProfileScreen
 import br.com.idseven.agenda.nativebeta.features.settings.SettingsScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.BoardsHubScreen
+import br.com.idseven.agenda.nativebeta.features.tasks.DesignersHubScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.RoleBoardsScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskDetailScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskFormScreen
@@ -215,12 +216,46 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     onOpenSector = { nav.navigate("board/$it") },
                     onOpenRoleBoards = { nav.navigate("roleBoards") },
                     onOpenMyBoard = { session.uid?.let { nav.navigate("personBoard/$it") } },
+                    onOpenClientFlow = { nav.navigate("flowClient") },
+                    onOpenDesignersFlow = { nav.navigate("flowDesigners") },
                 )
             }
             composable("roleBoards") {
                 RoleBoardsScreen(
                     tasksState, users,
                     onOpenPerson = { nav.navigate("personBoard/$it") },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            // P3 — Fluxo do Cliente: quadro só de cronograma em relacionamento com o cliente.
+            composable("flowClient") {
+                TasksScreen(
+                    tasksState, users, currentUid = session.uid,
+                    onTaskClick = { nav.navigate("task/$it") },
+                    currentUser = currentUser,
+                    flow = "client",
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            // P4 — Fluxo dos Designers: hub com cada designer; toque abre o quadro do designer.
+            composable("flowDesigners") {
+                DesignersHubScreen(
+                    tasksState, users,
+                    onOpenDesigner = { nav.navigate("designerBoard/$it") },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(
+                route = "designerBoard/{uid}",
+                arguments = listOf(navArgument("uid") { type = NavType.StringType }),
+            ) { entry ->
+                val did = entry.arguments?.getString("uid") ?: ""
+                TasksScreen(
+                    tasksState, users, currentUid = session.uid,
+                    onTaskClick = { nav.navigate("task/$it") },
+                    currentUser = currentUser,
+                    flow = "designer",
+                    designerId = did,
                     onBack = { nav.popBackStack() },
                 )
             }

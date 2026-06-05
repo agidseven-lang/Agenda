@@ -90,7 +90,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix"
+      DIST_BASENAME: "idseven-nativebeta-1.0.82-beta-client-designer-flow-final-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -253,8 +253,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix
-          path: dist/idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix.apk
+          name: idseven-nativebeta-1.0.82-beta-client-designer-flow-final-fix
+          path: dist/idseven-nativebeta-1.0.82-beta-client-designer-flow-final-fix.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -262,7 +262,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix-bundle
-          path: dist/idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix.zip
+          name: idseven-nativebeta-1.0.82-beta-client-designer-flow-final-fix-bundle
+          path: dist/idseven-nativebeta-1.0.82-beta-client-designer-flow-final-fix.zip
           if-no-files-found: error
           retention-days: 30

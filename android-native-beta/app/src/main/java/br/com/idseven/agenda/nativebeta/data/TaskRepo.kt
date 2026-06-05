@@ -88,6 +88,8 @@ object TaskRepo {
             },
             clientSentBy = d.getString("clientSentBy"),
             cronContents = cronContents,
+            assignedDesignerId = (d.get("designerAssignment") as? Map<*, *>)?.get("designerId") as? String,
+            assignedDesignerName = (d.get("designerAssignment") as? Map<*, *>)?.get("designerName") as? String,
         )
     }
 

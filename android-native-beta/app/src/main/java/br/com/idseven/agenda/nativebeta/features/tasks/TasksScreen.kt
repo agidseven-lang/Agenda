@@ -110,6 +110,8 @@ fun TasksScreen(
     lockedSector: String? = null,      // quando setado: quadro de UM setor (Fase A)
     personId: String? = null,          // ADITIVO: quadro por RESPONSÁVEL (admin/role-boards) — todos os setores
     personName: String? = null,
+    flow: String? = null,              // P3/P4: "client" = Fluxo do Cliente; "designer" = quadro de UM designer
+    designerId: String? = null,        // P4: quando flow=="designer", o designer dono do quadro
     onNew: () -> Unit = {},
     onBack: (() -> Unit)? = null,
 ) {
@@ -131,9 +133,16 @@ fun TasksScreen(
         val okQ = q.isEmpty() || listOf(t.title, t.client, t.assignee).any { (it ?: "").lowercase().contains(q) }
         // Quadro por responsável (personId) ignora setor; quadro de setor (lockedSector) trava o setor.
         val okS = when {
+            flow != null -> true
             personId != null -> true
             lockedSector != null -> Sectors.of(t.sector).key == lockedSector
             else -> (sectorFilter == null || t.sector == sectorFilter)
+        }
+        // P3/P4 — separação de fluxos: cliente (relacionamento) x designer (quadro de UM designer).
+        val okFlow = when (flow) {
+            "client" -> TaskVisibility.isClientFlow(t)
+            "designer" -> TaskVisibility.isDesignerFlow(t) && (designerId == null || TaskVisibility.designerOf(t) == designerId)
+            else -> true
         }
         // Fluxo da pessoa = o que ela executa (assigneeId) OU as demandas dela (by). Cobre designer e social.
         val okPerson = personId == null || t.assigneeId == personId || t.by == personId
@@ -141,11 +150,44 @@ fun TasksScreen(
             (t.assigneeId == currentUid) || (t.by == currentUid)
         // Fase B: visibilidade por função (admin/social veem tudo; operacional só as próprias).
         val okVis = TaskVisibility.canSeeTask(currentUser, t)
-        okQ && okS && okPerson && okM && okVis
+        okQ && okS && okFlow && okPerson && okM && okVis
     }
     val pager = rememberPagerState(pageCount = { TaskStatus.COLUMNS.size })
 
     Column(Modifier.fillMaxSize()) {
+        // P3/P4 — Cabeçalho dos fluxos separados (Cliente / um Designer).
+        if (flow != null) {
+            val designer = users.firstOrNull { it.id == designerId }
+            val isClient = flow == "client"
+            val accent = if (isClient) Color(0xFF22D3B8) else Color(0xFFA78BFA)
+            val title = when {
+                isClient -> "Fluxo do Cliente"
+                designer != null -> "Designer · ${UserColor.firstName(designer.name ?: "Designer")}"
+                else -> "Quadro do Designer"
+            }
+            val sub = if (isClient) "Relacionamento com o cliente — sem misturar"
+                else (designer?.role?.ifBlank { null } ?: "Designer") + " · monitorado em tempo real"
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, end = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) {
+                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(11.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
+                        Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Voltar", tint = Tokens.Soft, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(10.dp))
+                }
+                if (!isClient && designer != null) {
+                    Avatar(designer.photo, UserColor.of(designer.id, designer.color), designer.name, 38.dp)
+                } else {
+                    Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(accent.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                        Icon(if (isClient) Icons.Outlined.Visibility else Icons.Outlined.Person, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, color = Tokens.Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(sub, color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        } else
         // Cabeçalho do quadro do setor (Fase A): voltar + nome do setor + "+ Novo".
         if (lockedSector != null) {
             val sec = Sectors.of(lockedSector)
@@ -188,8 +230,8 @@ fun TasksScreen(
             }
         }
         SearchField(query, { query = it }, "Buscar tarefa…")
-        // Filtro "Minhas tarefas" + filtros de setor (ocultos no quadro de setor e no quadro por responsável).
-        if (lockedSector == null && personId == null) {
+        // Filtro "Minhas tarefas" + filtros de setor (ocultos no quadro de setor, por responsável e nos fluxos).
+        if (lockedSector == null && personId == null && flow == null) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 2.dp)) {
                 if (currentUid != null) {
                     SectorChip("Minhas tarefas", Tokens.Accent, mineOnly) { mineOnly = !mineOnly }
