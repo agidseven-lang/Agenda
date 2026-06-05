@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: app/local-1.0.80-client-realtime-status-fix)"
+        description: "Branch/commit a buildar (default: app/local-1.0.81-workflow-stage-deadline-fix)"
         required: true
-        default: "app/local-1.0.80-client-realtime-status-fix"
+        default: "app/local-1.0.81-workflow-stage-deadline-fix"
       resolve_urls:
         description: "Resolver URLs reais das Functions Gen2 via gcloud (true/false)"
         required: false
@@ -90,7 +90,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.80-beta-client-realtime-status-fix"
+      DIST_BASENAME: "idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -253,8 +253,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.80-beta-client-realtime-status-fix
-          path: dist/idseven-nativebeta-1.0.80-beta-client-realtime-status-fix.apk
+          name: idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix
+          path: dist/idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -262,7 +262,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.80-beta-client-realtime-status-fix-bundle
-          path: dist/idseven-nativebeta-1.0.80-beta-client-realtime-status-fix.zip
+          name: idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix-bundle
+          path: dist/idseven-nativebeta-1.0.81-beta-workflow-stage-deadline-fix.zip
           if-no-files-found: error
           retention-days: 30
