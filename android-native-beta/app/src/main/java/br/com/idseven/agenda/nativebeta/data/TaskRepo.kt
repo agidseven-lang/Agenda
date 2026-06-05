@@ -92,6 +92,9 @@ object TaskRepo {
             assignedDesignerName = (d.get("designerAssignment") as? Map<*, *>)?.get("designerName") as? String,
             clientFlowStatus = d.getString("clientFlowStatus"),
             designerFlowStatus = d.getString("designerFlowStatus"),
+            socialOwnerId = d.getString("socialOwnerId"),
+            socialOwnerName = d.getString("socialOwnerName"),
+            socialFlowStatus = d.getString("socialFlowStatus"),
             designerEndDate = (d.get("designerAssignment") as? Map<*, *>)?.get("endDate") as? String ?: d.getString("endDate"),
             designerEndTime = (d.get("designerAssignment") as? Map<*, *>)?.get("endTime") as? String ?: d.getString("endTime"),
         )

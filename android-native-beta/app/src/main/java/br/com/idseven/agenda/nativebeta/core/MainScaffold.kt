@@ -66,6 +66,7 @@ import br.com.idseven.agenda.nativebeta.features.settings.SettingsScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.BoardsHubScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.DesignersHubScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.RoleBoardsScreen
+import br.com.idseven.agenda.nativebeta.features.tasks.SocialsHubScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TasksTopTabs
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskDetailScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskFormScreen
@@ -195,13 +196,14 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             )
         },
     ) { padding ->
-        // Abas superiores das Tarefas: Meu quadro · Cliente · Designers · Setores.
+        // Abas superiores das Tarefas: Meu quadro · Cliente · Designers · Social Medias · Setores.
         val tasksTabs: @Composable (String) -> Unit = { active ->
             TasksTopTabs(
                 active = active, currentUser = currentUser,
                 onMine = { session.uid?.let { nav.navigate("personBoard/$it") { launchSingleTop = true } } },
                 onClient = { nav.navigate("flowClient") { launchSingleTop = true } },
                 onDesigners = { nav.navigate("flowDesigners") { launchSingleTop = true } },
+                onSocials = { nav.navigate("flowSocials") { launchSingleTop = true } },
                 onSectors = { nav.navigate("tarefas") { launchSingleTop = true } },
             )
         }
@@ -223,12 +225,13 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
             composable("tarefas") {
                 BoardsHubScreen(
-                    tasksState, currentUser = currentUser,
+                    tasksState, currentUser = currentUser, users = users,
                     onOpenSector = { nav.navigate("board/$it") },
                     onOpenRoleBoards = { nav.navigate("roleBoards") },
                     onOpenMyBoard = { session.uid?.let { nav.navigate("personBoard/$it") } },
                     onOpenClientFlow = { nav.navigate("flowClient") },
                     onOpenDesignersFlow = { nav.navigate("flowDesigners") },
+                    onOpenSocialsFlow = { nav.navigate("flowSocials") },
                     tabsBar = { tasksTabs("sectors") },
                 )
             }
@@ -272,6 +275,30 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     designerId = did,
                     onBack = { nav.popBackStack() },
                     tabsBar = { tasksTabs("designers") },
+                )
+            }
+            // Social Medias: hub com cada Social Media; toque abre o quadro daquela Social.
+            composable("flowSocials") {
+                SocialsHubScreen(
+                    tasksState, users,
+                    onOpenSocial = { nav.navigate("socialBoard/$it") },
+                    onBack = { nav.popBackStack() },
+                    tabsBar = { tasksTabs("socials") },
+                )
+            }
+            composable(
+                route = "socialBoard/{uid}",
+                arguments = listOf(navArgument("uid") { type = NavType.StringType }),
+            ) { entry ->
+                val sid = entry.arguments?.getString("uid") ?: ""
+                TasksScreen(
+                    tasksState, users, currentUid = session.uid,
+                    onTaskClick = { nav.navigate("task/$it") },
+                    currentUser = currentUser,
+                    flow = "social",
+                    socialId = sid,
+                    onBack = { nav.popBackStack() },
+                    tabsBar = { tasksTabs("socials") },
                 )
             }
             composable(

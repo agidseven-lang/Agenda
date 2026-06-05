@@ -26,11 +26,12 @@ import br.com.idseven.agenda.nativebeta.domain.UserLite
 // Cliente/Designers só para Social/Admin (canSeeAllBoards). Designer comum vê só Meu quadro.
 @Composable
 fun TasksTopTabs(
-    active: String,                     // "mine" | "client" | "designers" | "sectors"
+    active: String,                     // "mine" | "client" | "designers" | "socials" | "sectors"
     currentUser: UserLite?,
     onMine: () -> Unit,
     onClient: () -> Unit,
     onDesigners: () -> Unit,
+    onSocials: () -> Unit,
     onSectors: () -> Unit,
 ) {
     val see = TaskVisibility.canSeeAllBoards(currentUser)
@@ -39,6 +40,7 @@ fun TasksTopTabs(
         if (see) {
             add(Triple("client", "Cliente", onClient))
             add(Triple("designers", "Designers", onDesigners))
+            add(Triple("socials", "Social Medias", onSocials))
         }
         add(Triple("sectors", "Setores", onSectors))
     }

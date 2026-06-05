@@ -111,8 +111,9 @@ fun TasksScreen(
     lockedSector: String? = null,      // quando setado: quadro de UM setor (Fase A)
     personId: String? = null,          // ADITIVO: quadro por RESPONSÁVEL (admin/role-boards) — todos os setores
     personName: String? = null,
-    flow: String? = null,              // P3/P4: "client" = fluxo do Cliente; "designer" = quadro de UM designer
-    designerId: String? = null,        // P4: quando flow=="designer", o designer dono do quadro
+    flow: String? = null,              // "client" | "designer" | "social"
+    designerId: String? = null,        // quando flow=="designer", o designer dono do quadro
+    socialId: String? = null,          // quando flow=="social", a Social Media dona do quadro
     onNew: () -> Unit = {},
     onBack: (() -> Unit)? = null,
     tabsBar: @Composable () -> Unit = {}, // abas superiores (Meu quadro/Cliente/Designers/Setores)
@@ -144,6 +145,7 @@ fun TasksScreen(
         val okFlow = when (flow) {
             "client" -> TaskVisibility.isClientFlow(t)
             "designer" -> TaskVisibility.isDesignerFlow(t) && (designerId == null || TaskVisibility.designerOf(t) == designerId)
+            "social" -> socialId == null || TaskVisibility.socialOf(t, users) == socialId
             else -> true
         }
         // Fluxo da pessoa = o que ela executa (assigneeId) OU as demandas dela (by). Cobre designer e social.
@@ -163,6 +165,7 @@ fun TasksScreen(
         when {
             isClientBoard -> TaskVisibility.clientCol(t)
             flow == "designer" -> TaskVisibility.designerCol(t)
+            flow == "social" -> TaskVisibility.socialCol(t)
             else -> t.status ?: "afazer"
         }
     }
@@ -172,16 +175,21 @@ fun TasksScreen(
         tabsBar()
         // P3/P4 — Cabeçalho dos fluxos separados (Cliente / um Designer).
         if (flow != null) {
-            val designer = users.firstOrNull { it.id == designerId }
             val isClient = flow == "client"
-            val accent = if (isClient) Color(0xFF22D3B8) else Color(0xFFA78BFA)
+            val isSocial = flow == "social"
+            val person = users.firstOrNull { it.id == (if (isSocial) socialId else designerId) }
+            val accent = when { isClient -> Color(0xFF22D3B8); isSocial -> Color(0xFF22D3EE); else -> Color(0xFFA78BFA) }
             val title = when {
                 isClient -> "Cliente"
-                designer != null -> "Designer · ${UserColor.firstName(designer.name ?: "Designer")}"
+                isSocial -> "Social · ${UserColor.firstName(person?.name ?: "Social Media")}"
+                person != null -> "Designer · ${UserColor.firstName(person.name ?: "Designer")}"
                 else -> "Quadro do Designer"
             }
-            val sub = if (isClient) "Fica visível até a aprovação final — mesmo enviado ao designer"
-                else (designer?.role?.ifBlank { null } ?: "Designer") + " · monitorado em tempo real"
+            val sub = when {
+                isClient -> "Fica visível até a aprovação final — mesmo enviado ao designer"
+                isSocial -> (person?.role?.ifBlank { null } ?: "Social Media") + " · inclui tarefas no designer"
+                else -> (person?.role?.ifBlank { null } ?: "Designer") + " · monitorado em tempo real"
+            }
             Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 12.dp, end = 16.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (onBack != null) {
                     Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(11.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
@@ -189,8 +197,8 @@ fun TasksScreen(
                     }
                     Spacer(Modifier.width(10.dp))
                 }
-                if (!isClient && designer != null) {
-                    Avatar(designer.photo, UserColor.of(designer.id, designer.color), designer.name, 38.dp)
+                if (!isClient && person != null) {
+                    Avatar(person.photo, UserColor.of(person.id, person.color), person.name, 38.dp)
                 } else {
                     Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(accent.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
                         Icon(if (isClient) Icons.Outlined.Visibility else Icons.Outlined.Person, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))

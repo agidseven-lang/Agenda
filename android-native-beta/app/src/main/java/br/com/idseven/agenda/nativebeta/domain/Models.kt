@@ -72,6 +72,10 @@ data class TaskItem(
     // independentes de `status`. A tarefa fica no fluxo do cliente até a aprovação final.
     val clientFlowStatus: String? = null,
     val designerFlowStatus: String? = null,
+    // EIXO SOCIAL (aditivo): dona Social Media da tarefa — preservada ao enviar ao designer.
+    val socialOwnerId: String? = null,
+    val socialOwnerName: String? = null,
+    val socialFlowStatus: String? = null,
     // prazos do designer (para exibir término no card/detalhe do fluxo).
     val designerEndDate: String? = null,
     val designerEndTime: String? = null,

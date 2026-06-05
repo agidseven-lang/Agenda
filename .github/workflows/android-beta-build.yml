@@ -90,7 +90,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.83-beta-client-designer-flow-visibility-fix"
+      DIST_BASENAME: "idseven-nativebeta-1.0.84-beta-social-medias-flow"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -253,8 +253,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.83-beta-client-designer-flow-visibility-fix
-          path: dist/idseven-nativebeta-1.0.83-beta-client-designer-flow-visibility-fix.apk
+          name: idseven-nativebeta-1.0.84-beta-social-medias-flow
+          path: dist/idseven-nativebeta-1.0.84-beta-social-medias-flow.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -262,7 +262,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.83-beta-client-designer-flow-visibility-fix-bundle
-          path: dist/idseven-nativebeta-1.0.83-beta-client-designer-flow-visibility-fix.zip
+          name: idseven-nativebeta-1.0.84-beta-social-medias-flow-bundle
+          path: dist/idseven-nativebeta-1.0.84-beta-social-medias-flow.zip
           if-no-files-found: error
           retention-days: 30

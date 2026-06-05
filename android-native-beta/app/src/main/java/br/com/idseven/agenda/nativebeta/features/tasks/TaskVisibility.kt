@@ -103,4 +103,38 @@ object TaskVisibility {
         tasks.forEach { t -> if (isDesignerFlow(t)) designerOf(t)?.let { id -> m[id] = (m[id] ?: 0) + 1 } }
         return m
     }
+
+    // ===== EIXO SOCIAL (Social Medias) — espelha o Desktop 1.0.96 =====
+    fun isSocialUser(u: UserLite?): Boolean = u != null && norm(u.role).contains("social")
+
+    // Social Media "dona": socialOwnerId explícito; senão criador (by) se social; senão responsável se social.
+    fun socialOf(t: TaskItem, users: List<UserLite>): String? {
+        t.socialOwnerId?.ifBlank { null }?.let { return it }
+        users.firstOrNull { it.id == t.by }?.let { if (isSocialUser(it)) return t.by }
+        users.firstOrNull { it.id == t.assigneeId }?.let { if (isSocialUser(it)) return t.assigneeId }
+        return null
+    }
+
+    // Social Medias ativas (para listar todas no hub mesmo sem tarefa).
+    fun socialUsers(users: List<UserLite>): List<UserLite> =
+        users.filter { it.isActive() && isSocialUser(it) }
+
+    // Hub das Social Medias: todas as ativas + contagem de tarefas das quais cada uma é dona.
+    fun socialsWithFlow(tasks: List<TaskItem>, users: List<UserLite>): Map<String, Int> {
+        val m = LinkedHashMap<String, Int>()
+        socialUsers(users).forEach { m[it.id] = 0 }
+        tasks.forEach { t -> socialOf(t, users)?.let { id -> if (users.firstOrNull { u -> u.id == id }?.let { isSocialUser(it) } == true) m[id] = (m[id] ?: 0) + 1 } }
+        return m
+    }
+
+    // Coluna do quadro da Social Media: cronograma deriva do eixo do cliente; demais usam status.
+    fun socialCol(t: TaskItem): String {
+        if (Sectors.of(t.sector).key == "cronograma") {
+            return when (clientCol(t)) {
+                "concluido" -> "concluido"; "revisao" -> "revisao"; "afazer" -> "afazer"
+                else -> "andamento" // enviado/aprovado/producao/reenviado = em andamento
+            }
+        }
+        return t.status ?: "afazer"
+    }
 }

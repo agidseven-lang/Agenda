@@ -50,11 +50,13 @@ import br.com.idseven.agenda.nativebeta.domain.UserLite
 fun BoardsHubScreen(
     tasksState: UiList<TaskItem>,
     currentUser: UserLite?,
+    users: List<UserLite> = emptyList(),  // para contar Social Medias por cargo
     onOpenSector: (String) -> Unit,
     onOpenRoleBoards: () -> Unit = {},   // ADITIVO: admin -> "Quadros por responsável"
     onOpenMyBoard: () -> Unit = {},      // ADITIVO: "Meu quadro / Minhas demandas"
     onOpenClientFlow: () -> Unit = {},   // P3: Social/Admin -> "Cliente"
     onOpenDesignersFlow: () -> Unit = {}, // P4: Social/Admin -> "Designers"
+    onOpenSocialsFlow: () -> Unit = {},  // Social/Admin -> "Social Medias"
     tabsBar: @Composable () -> Unit = {}, // abas superiores (Meu quadro/Cliente/Designers/Setores)
 ) {
     tasksState.errorMessage()?.let { ErrorState("Quadros — $it"); return }
@@ -69,6 +71,7 @@ fun BoardsHubScreen(
     // P3/P4 — contadores dos fluxos (Social/Admin).
     val clientOpen = all.count { TaskVisibility.isClientFlow(it) && TaskVisibility.clientCol(it) != "concluido" }
     val designersCount = TaskVisibility.designersWithFlow(all).size
+    val socialsCount = TaskVisibility.socialUsers(users).size
     val designersLate = all.count { TaskVisibility.isDesignerFlow(it) && TaskDeadline.of(it)?.late == true }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
@@ -104,13 +107,23 @@ fun BoardsHubScreen(
                     )
                     Spacer(Modifier.size(12.dp))
                 }
-                // P4 — Social/Admin: "Fluxo dos Designers" (um quadro Kanban por designer).
+                // P4 — Social/Admin: "Designers" (um quadro Kanban por designer).
                 item {
                     BoardCard(
                         label = "Designers", desc = "Um quadro Kanban por designer — monitore cada um",
                         color = androidx.compose.ui.graphics.Color(0xFFA78BFA),
                         icon = Icons.Outlined.Groups, total = designersCount, late = designersLate,
                         totalSuffix = "designer", onClick = onOpenDesignersFlow,
+                    )
+                    Spacer(Modifier.size(12.dp))
+                }
+                // Social/Admin: "Social Medias" (um quadro Kanban por Social Media).
+                item {
+                    BoardCard(
+                        label = "Social Medias", desc = "Cada Social Media em um quadro próprio — sem misturar",
+                        color = androidx.compose.ui.graphics.Color(0xFF22D3EE),
+                        icon = Icons.Outlined.Groups, total = socialsCount, late = 0,
+                        totalSuffix = "social", onClick = onOpenSocialsFlow,
                     )
                     Spacer(Modifier.size(12.dp))
                 }
