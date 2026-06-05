@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.9-workflow-stage-deadline-fix]
+   ID Seven — Cloudflare Worker  [V64.10-client-designer-flow-final-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.9-workflow-stage-deadline-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.10-client-designer-flow-final-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -888,6 +888,10 @@ async function handleClientCronogramaView(token, env) {
         "Este link pode ter sido invalidado ou ainda não foi compartilhado. Fale com sua equipe ID Seven."), 404);
     }
     console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""}`);
+    // P2: se a aprovação FINAL já aconteceu, o cliente vê a tela de SUCESSO (não mais ações).
+    if (task.status === "concluido" || task.workflowStage === "concluido") {
+      return htmlResponse(renderClientSuccessHtml(task, token), 200);
+    }
     return htmlResponse(renderClientHtml(task, token, env), 200);
   } catch (e) {
     // Blindagem: qualquer erro inesperado de render/query → HTML amigável (NUNCA tela branca/JSON/corpo vazio).
@@ -923,9 +927,10 @@ async function handleClientCronogramaAction(token, request, env) {
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
 
   const now = Date.now();
-  await writeClientGranular(env, accessToken, task, { type, contentIndex: ci, note, value, at: now });
-  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} hasNote=${!!note} hasValue=${!!value}`);
-  return json({ ok: true, type, contentIndex: ci, at: now }, 200, env);
+  const g = await writeClientGranular(env, accessToken, task, { type, contentIndex: ci, note, value, at: now });
+  const final = !!(g && g.col === "concluido");   // aprovação FINAL -> tela de sucesso no cliente
+  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} final=${final}`);
+  return json({ ok: true, type, contentIndex: ci, at: now, final, col: (g && g.col) || null }, 200, env);
 }
 
 /* Persistência ADITIVA e granular do feedback do cliente (V64.7).
@@ -1059,6 +1064,7 @@ async function writeClientGranular(env, accessToken, task, e) {
   } catch (err) {
     console.warn("[CLIENT-ACTION] erro ao gravar feedback granular:", err && err.message);
   }
+  return g;   // {cs, rev, htype, label, col, stage} — handler usa p/ saber se concluiu (col==='concluido')
 }
 
 /* Query Firestore pela task que corresponde ao token público do cliente.
@@ -1314,6 +1320,18 @@ a{color:#b9a4ff;text-decoration:none}
 .errcard{background:var(--panel);border:1px solid var(--line2);border-radius:22px;padding:38px 28px;box-shadow:var(--shadow)}
 .erricon{width:64px;height:64px;border-radius:18px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(124,92,255,.2),rgba(198,75,216,.12));border:1px solid var(--line2)}.erricon svg{width:30px;height:30px;color:#b9a4ff}
 .errcard h1{margin:0 0 8px;font-size:22px;font-weight:800}.errcard p{margin:0 auto;max-width:340px;color:var(--mut)}.errcard .eb{margin-top:22px;color:var(--faint);font-size:11px;letter-spacing:1.4px;text-transform:uppercase}
+/* tela final de sucesso (P2) */
+.succwrap{max-width:560px;margin:6vh auto 0;text-align:center;padding:0 10px}
+.succcard{position:relative;overflow:hidden;background:linear-gradient(180deg,rgba(52,211,153,.10),rgba(34,211,184,.04)),var(--panel);border:1px solid rgba(52,211,153,.32);border-radius:24px;padding:44px 30px 34px;box-shadow:0 24px 70px -30px rgba(34,211,184,.5)}
+.succcard::after{content:"";position:absolute;inset:0;background:radial-gradient(440px 200px at 50% -10%,rgba(52,211,153,.22),transparent 60%);pointer-events:none}
+.succ-badge{position:relative;z-index:1;width:78px;height:78px;border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--ok),var(--teal));box-shadow:0 14px 36px -10px rgba(52,211,153,.7)}
+.succ-badge svg{width:38px;height:38px;color:#04231d}
+.succcard h1{position:relative;z-index:1;margin:0 0 10px;font-size:26px;font-weight:800;letter-spacing:-.01em}
+.succcard p{position:relative;z-index:1;margin:0 auto;max-width:400px;color:var(--mut);font-size:15px;line-height:1.6}
+.succ-meta{position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-top:22px}
+.succ-meta .pill{background:rgba(255,255,255,.05);border:1px solid var(--line2);padding:8px 13px;border-radius:12px;font-size:12.5px;color:var(--txt)}
+.succ-meta .pill.ok{border-color:rgba(52,211,153,.35);background:var(--okbg);color:var(--ok)}
+.succ-foot{position:relative;z-index:1;margin-top:24px;color:var(--faint);font-size:12px}
 `;
 
 const CV_JS = `
@@ -1331,7 +1349,8 @@ function setTheme(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-
 function setLegenda(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-field="legenda"]');if(!el)return;var d=document.createElement('div');d.className='fval';d.setAttribute('data-field','legenda');d.textContent=v;el.parentNode.replaceChild(d,el);}
 function bumpProgress(){var cards=document.querySelectorAll('#contents [data-card]');var done=0;cards.forEach(function(c){var b=c.querySelector('[data-badge]');if(b&&b.textContent.indexOf('Aprovado')>=0)done++;});var t=document.querySelector('[data-progtxt]');if(t)t.textContent=done+' de '+TOTAL+' aprovados';var f=document.querySelector('[data-progfill]');if(f)f.style.width=Math.max(TOTAL?Math.round(done/TOTAL*100):0,4)+'%';}
 function addHist(kind,label){var sec=document.querySelector('[data-histsec]');if(sec)sec.classList.remove('hide');var h=document.getElementById('hist');var d=document.createElement('div');d.className='hitem';var ic=kind==='ok'?'hb-ok':kind==='rev'?'hb-rev':kind==='edit'?'hb-edit':'hb-note';var sv=kind==='ok'?CIC.check:kind==='rev'?CIC.revise:kind==='edit'?CIC.edit:CIC.note;d.innerHTML='<div class="hicon '+ic+'">'+sv+'</div><div class="hmain"><div class="ht"></div></div><div class="htime">agora</div>';d.querySelector('.ht').textContent=label;h.insertBefore(d,h.firstChild);}
-function post(payload,btn,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){return{ok:r.ok&&j&&j.ok,j:j};});}).then(function(res){if(btn)btn.disabled=false;if(res.ok){if(cb)cb();}else{toast((res.j&&res.j.error)||'Falha ao enviar.','err');}}).catch(function(){if(btn)btn.disabled=false;toast('Sem conexão. Tente novamente.','err');});}
+function post(payload,btn,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){return{ok:r.ok&&j&&j.ok,j:j};});}).then(function(res){if(btn)btn.disabled=false;if(res.ok){if(cb)cb(res.j);}else{toast((res.j&&res.j.error)||'Falha ao enviar.','err');}}).catch(function(){if(btn)btn.disabled=false;toast('Sem conexão. Tente novamente.','err');});}
+function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);if(!w)return;w.innerHTML='<div class="topbar"><div class="brand">'+(document.querySelector('.brand .logo')?document.querySelector('.brand .logo').outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div></div>'+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Cronograma aprovado com sucesso!</h1><p>Obrigado. Sua aprovação foi registrada e a equipe já foi notificada.</p><div class="succ-foot">Você já pode fechar esta página. 💜</div></div></div>';window.scrollTo(0,0);}
 function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';return el.textContent||'';}
 function sheetForm(title,desc,kind,val,multiline){var inp=multiline?'<textarea id="sIn" placeholder="Escreva aqui...">'+(val||'')+'</textarea>':'<input id="sIn" value="'+(val||'').replace(/"/g,'&quot;')+'"/>';return '<h3></h3><div class="sd"></div>'+inp+'<div class="srow"><button class="btn ghost" data-x="cancel">Cancelar</button><button class="btn '+(kind==='rev'?'warn':'primary')+'" data-x="send">'+(kind==='rev'?'Enviar':'Salvar')+'</button></div>';}
 function openInput(title,desc,kind,val,multiline,cb){openSheet(sheetForm(title,desc,kind,val,multiline));sheet.querySelector('h3').textContent=title;sheet.querySelector('.sd').textContent=desc;pending=cb;}
@@ -1347,7 +1366,7 @@ document.addEventListener('click',function(e){
   else if(act==='editLegenda'){openInput('Editar legenda — Conteúdo '+(i+1),'Ajuste a legenda deste conteúdo do jeito que preferir.','ok',getText(i,'legenda'),true,function(v){post({action:'editLegenda',contentIndex:i,value:v},null,function(){setLegenda(i,v);setBadge(i,'editado');addHist('edit','Editou a legenda de Conteúdo '+(i+1));toast('Legenda atualizada','ok');});});}
   else if(act==='noteItem'){openInput('Observação — Conteúdo '+(i+1),'Deixe uma observação específica para este conteúdo.','ok','',true,function(v){if(!v.trim())return;post({action:'noteItem',contentIndex:i,note:v},null,function(){setItemNote(i,v);addHist('note','Comentou em Conteúdo '+(i+1));toast('Observação registrada','ok');});});}
   else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar no cronograma como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
-  else if(act==='approveAll'){if(!confirm('Confirmar aprovação de todo o cronograma?'))return;post({action:'approveAll'},a,function(){var cs=document.querySelectorAll('#contents [data-card]');cs.forEach(function(c){setBadge(+c.dataset.card,'aprovado');});bumpProgress();addHist('ok','Aprovou o cronograma');toast('Cronograma aprovado! Obrigado','ok');});}
+  else if(act==='approveAll'){if(!confirm('Confirmar aprovação de todo o cronograma?'))return;post({action:'approveAll'},a,function(j){if(j&&j.final){clientSuccess();return;}var cs=document.querySelectorAll('#contents [data-card]');cs.forEach(function(c){setBadge(+c.dataset.card,'aprovado');});bumpProgress();addHist('ok','Aprovou o cronograma');toast('Cronograma aprovado! Obrigado','ok');});}
   else if(act==='sendGenObs'){var ta=document.getElementById('genObs');var v=ta?ta.value.trim():'';if(!v){toast('Escreva uma observação primeiro.','err');return;}post({action:'comment',note:v},a,function(){if(ta)ta.value='';addHist('note','Comentou no cronograma');toast('Observação enviada','ok');});}
 });
 `;
@@ -1519,6 +1538,35 @@ function renderClientErrorHtml(title, msg) {
   '<div class="secure">' + ICN.shield + '<span class="lbl">Link seguro</span></div></div>' +
   '<div class="errwrap"><div class="errcard"><div class="erricon">' + ICN.lock + '</div>' +
     '<h1>' + t + '</h1><p>' + m + '</p><div class="eb">Agenda ID Seven</div></div></div>' +
+'</div></body></html>';
+}
+
+/* P2: tela final PREMIUM de sucesso — exibida quando o cronograma já foi aprovado em definitivo
+   (status/workflowStage = concluido). Sem botões de ação: o fluxo está encerrado. */
+function renderClientSuccessHtml(task, token) {
+  const cliente = escapeHtml(task.client || "Cliente");
+  const titulo = escapeHtml(task.title || "Cronograma");
+  const items = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
+  const total = items.length;
+  return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
+'<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>\n' +
+'<title>Cronograma aprovado · ' + cliente + '</title>\n<meta name="theme-color" content="#070810"/>\n<meta name="robots" content="noindex,nofollow"/>\n' +
+'<meta property="og:type" content="website"/>\n<meta property="og:title" content="Cronograma aprovado com sucesso"/>\n<meta property="og:description" content="A aprovação do cliente foi registrada."/>\n' +
+'<style>' + CV_CSS + '</style></head><body>\n' +
+'<div class="wrap"><div class="topbar"><div class="brand">' + CV_LOGO + '<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div>' +
+  '<div class="secure">' + ICN.shield + '<span class="lbl">Link seguro</span></div></div>' +
+  '<div class="succwrap"><div class="succcard">' +
+    '<div class="succ-badge">' + ICN.check + '</div>' +
+    '<h1>Cronograma aprovado com sucesso!</h1>' +
+    '<p>Obrigado. Sua aprovação foi registrada e a equipe já foi notificada.</p>' +
+    '<div class="succ-meta">' +
+      '<span class="pill">' + cliente + '</span>' +
+      '<span class="pill">' + titulo + '</span>' +
+      '<span class="pill ok"><span class="bd" style="background:var(--ok)"></span>' + (total ? (total + ' ' + (total === 1 ? "conteúdo aprovado" : "conteúdos aprovados")) : "Aprovado") + '</span>' +
+    '</div>' +
+    '<div class="succ-foot">Você já pode fechar esta página. 💜</div>' +
+  '</div></div>' +
+  '<div class="foot">Link público seguro · Agenda ID Seven · ' + new Date().getFullYear() + '</div>' +
 '</div></body></html>';
 }
 
