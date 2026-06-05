@@ -8,6 +8,15 @@ name: Deploy Worker (idseven-push)
 
 on:
   workflow_dispatch:
+    inputs:
+      task_id:
+        description: "Task ID p/ dryRun /notify-designer (opcional)"
+        required: false
+        type: string
+      client_share_token:
+        description: "shareToken real de uma task p/ validar a rota pública /cliente/cronograma/<token> (opcional)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -37,7 +46,7 @@ jobs:
       - name: Verificar deploy + dryRun /notify-designer (sem enviar push)
         run: |
           B="https://idseven-push.agidseven.workers.dev"
-          echo "== HEALTH (espera version V64.5-designer-notify) =="
+          echo "== HEALTH (espera version V64.6-public-client-route) =="
           curl -sS "$B/" ; echo
           echo "== dryRun id de teste (NAO envia; espera 'tarefa nao encontrada') =="
           curl -sS -X POST "$B/notify-designer" -H "Content-Type: application/json" -d '{"id":"__dryrun_ci__","dryRun":true}' ; echo
@@ -47,4 +56,53 @@ jobs:
             curl -sS -X POST "$B/notify-designer" -H "Content-Type: application/json" -d "{\"id\":\"$TID\",\"dryRun\":true}" ; echo
           else
             echo "(sem task_id informado — pulei a prova com doc real; informe task_id no dispatch p/ comprovar destinatario/tokens)"
+          fi
+
+      # V64.6: prova de que a rota publica do CLIENTE retorna HTML (NAO JSON / NAO tela branca).
+      # Falha o job se a rota voltar JSON ou se o status != 200.
+      - name: Validar rota publica /cliente/cronograma/:token (HTML, sem regredir healthcheck)
+        run: |
+          set -euo pipefail
+          B="https://idseven-push.agidseven.workers.dev"
+
+          echo "== A) Healthcheck DEVE continuar JSON =="
+          ct_root=$(curl -sS -o /dev/null -w '%{content_type}' "$B/")
+          echo "Content-Type root = $ct_root"
+          case "$ct_root" in
+            application/json*) echo "OK: healthcheck preservado" ;;
+            *) echo "FAIL: healthcheck deveria ser application/json" >&2 ; exit 1 ;;
+          esac
+
+          echo "== B) Token invalido DEVE retornar HTML amigavel (NAO JSON) =="
+          tmp=$(mktemp)
+          code=$(curl -sS -o "$tmp" -w '%{http_code}' "$B/cliente/cronograma/__invalido_ci__")
+          ct=$(curl -sS -o /dev/null -w '%{content_type}' "$B/cliente/cronograma/__invalido_ci__")
+          echo "HTTP=$code  Content-Type=$ct"
+          if ! echo "$ct" | grep -qi 'text/html'; then
+            echo "FAIL: token invalido NAO retornou text/html (atual: $ct)" >&2 ; head -c 400 "$tmp" >&2 ; echo >&2 ; exit 1
+          fi
+          if head -c 200 "$tmp" | grep -qi '"ok":true,"service":"idseven-push"'; then
+            echo "FAIL: token invalido retornou JSON do healthcheck (regressao do fallback)" >&2 ; exit 1
+          fi
+          if ! head -c 200 "$tmp" | grep -qi '<!doctype html'; then
+            echo "FAIL: corpo nao comeca com <!doctype html>" >&2 ; head -c 400 "$tmp" >&2 ; echo >&2 ; exit 1
+          fi
+          echo "OK: rota publica retorna HTML para token invalido (sem tela branca / sem JSON cru)"
+
+          CTOKEN="${{ github.event.inputs.client_share_token }}"
+          if [ -n "$CTOKEN" ]; then
+            echo "== C) Token real DEVE retornar HTML com dados do cronograma =="
+            tmp2=$(mktemp)
+            code2=$(curl -sS -o "$tmp2" -w '%{http_code}' "$B/cliente/cronograma/$CTOKEN")
+            ct2=$(curl -sS -o /dev/null -w '%{content_type}' "$B/cliente/cronograma/$CTOKEN")
+            echo "HTTP=$code2  Content-Type=$ct2  bytes=$(wc -c < $tmp2)"
+            [ "$code2" = "200" ] || { echo "FAIL: esperava 200 com token real" >&2 ; exit 1 ; }
+            echo "$ct2" | grep -qi 'text/html' || { echo "FAIL: token real NAO retornou text/html" >&2 ; exit 1 ; }
+            grep -q 'Visão do Cliente' "$tmp2" || { echo "FAIL: HTML nao contem titulo da Visao do Cliente" >&2 ; exit 1 ; }
+            grep -q 'btnApprove'        "$tmp2" || { echo "FAIL: HTML nao contem botao Aprovar"               >&2 ; exit 1 ; }
+            grep -q 'btnRev'            "$tmp2" || { echo "FAIL: HTML nao contem botao Pedir revisao"         >&2 ; exit 1 ; }
+            grep -q 'btnEdit'           "$tmp2" || { echo "FAIL: HTML nao contem botao Editar cronograma"     >&2 ; exit 1 ; }
+            echo "OK: rota publica renderizou HTML completo da Visao do Cliente"
+          else
+            echo "(sem client_share_token informado — pulei a prova com token real; informe no dispatch p/ validar dados de uma task real)"
           fi
