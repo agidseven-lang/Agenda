@@ -1990,7 +1990,7 @@ function opPanelBlock(t){
   const steps=[
     {l:'Cliente aprovou os temas', done:themesOk},
     {l:'Enviado ao designer',       done:hasD},
-    {l:'Designer em produção',      done:hasD&&(delivered||designerCol(t)==='andamento'||designerCol(t)==='revisao'), cur:hasD&&!delivered},
+    {l:'Designer em produção',      done:delivered, cur:hasD&&!delivered},
     {l:'Designer entregou',         done:delivered},
     {l:'Legenda final pronta',      done:!pendingLegend(t)},
     {l:'Feed (1080×1440) anexado',  done:!pendingFeed(t)},
