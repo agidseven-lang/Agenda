@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.11-client-designer-flow-visibility-fix]
+   ID Seven — Cloudflare Worker  [V64.12-agency-operational-flow-final-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.11-client-designer-flow-visibility-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.12-agency-operational-flow-final-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -890,7 +890,7 @@ async function handleClientCronogramaView(token, env) {
     console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""}`);
     // P2: se a aprovação FINAL já aconteceu, o cliente vê a tela de SUCESSO (não mais ações).
     // V64.11: usa o eixo do CLIENTE (clientFlowStatus) — independente do status do designer.
-    if (task.clientFlowStatus === "concluido" || task.status === "concluido" || task.workflowStage === "concluido") {
+    if (task.finalApprovalCompleted === true || task.clientFlowStatus === "concluido" || task.status === "concluido" || task.workflowStage === "concluido") {
       return htmlResponse(renderClientSuccessHtml(task, token), 200);
     }
     return htmlResponse(renderClientHtml(task, token, env), 200);
@@ -1040,6 +1040,16 @@ async function writeClientGranular(env, accessToken, task, e) {
     fields.clientFlowStatus = { stringValue: g.client };
     fields.clientWorkflowStage = { stringValue: g.client };
     mask.push("clientFlowStatus", "clientWorkflowStage");
+  }
+  // V64.12 — APROVAÇÃO FINAL: registra encerramento do eixo do cliente + operacional.
+  // NÃO apaga socialFlowStatus/designerFlowStatus (updateMask só toca os campos abaixo).
+  if (g.client === "concluido") {
+    fields.clientFinalApprovedAt = { integerValue: String(at) };
+    fields.clientFinalApprovedBy = { stringValue: "Cliente" };
+    fields.finalApprovalCompleted = { booleanValue: true };
+    fields.operationalStatus = { stringValue: "concluido" };
+    fields.clientClosedMessageShown = { booleanValue: true };
+    mask.push("clientFinalApprovedAt", "clientFinalApprovedBy", "finalApprovalCompleted", "operationalStatus", "clientClosedMessageShown");
   }
 
   // entrada de histórico (arrayUnion via appendMissingElements — REST :commit)
@@ -1363,7 +1373,7 @@ function setLegenda(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[dat
 function bumpProgress(){var cards=document.querySelectorAll('#contents [data-card]');var done=0;cards.forEach(function(c){var b=c.querySelector('[data-badge]');if(b&&b.textContent.indexOf('Aprovado')>=0)done++;});var t=document.querySelector('[data-progtxt]');if(t)t.textContent=done+' de '+TOTAL+' aprovados';var f=document.querySelector('[data-progfill]');if(f)f.style.width=Math.max(TOTAL?Math.round(done/TOTAL*100):0,4)+'%';}
 function addHist(kind,label){var sec=document.querySelector('[data-histsec]');if(sec)sec.classList.remove('hide');var h=document.getElementById('hist');var d=document.createElement('div');d.className='hitem';var ic=kind==='ok'?'hb-ok':kind==='rev'?'hb-rev':kind==='edit'?'hb-edit':'hb-note';var sv=kind==='ok'?CIC.check:kind==='rev'?CIC.revise:kind==='edit'?CIC.edit:CIC.note;d.innerHTML='<div class="hicon '+ic+'">'+sv+'</div><div class="hmain"><div class="ht"></div></div><div class="htime">agora</div>';d.querySelector('.ht').textContent=label;h.insertBefore(d,h.firstChild);}
 function post(payload,btn,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){return{ok:r.ok&&j&&j.ok,j:j};});}).then(function(res){if(btn)btn.disabled=false;if(res.ok){if(cb)cb(res.j);}else{toast((res.j&&res.j.error)||'Falha ao enviar.','err');}}).catch(function(){if(btn)btn.disabled=false;toast('Sem conexão. Tente novamente.','err');});}
-function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);if(!w)return;w.innerHTML='<div class="topbar"><div class="brand">'+(document.querySelector('.brand .logo')?document.querySelector('.brand .logo').outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div></div>'+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Cronograma aprovado com sucesso!</h1><p>Obrigado. Sua aprovação foi registrada e a equipe já foi notificada.</p><div class="succ-foot">Você já pode fechar esta página. 💜</div></div></div>';window.scrollTo(0,0);}
+function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);if(!w)return;w.innerHTML='<div class="topbar"><div class="brand">'+(document.querySelector('.brand .logo')?document.querySelector('.brand .logo').outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div></div>'+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Cronograma aprovado com sucesso!</h1><p>Sua aprovação foi registrada. A equipe já foi notificada e seguirá com a finalização.</p><div class="succ-foot">Você já pode fechar esta página. 💜</div></div></div>';window.scrollTo(0,0);}
 function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';return el.textContent||'';}
 function sheetForm(title,desc,kind,val,multiline){var inp=multiline?'<textarea id="sIn" placeholder="Escreva aqui...">'+(val||'')+'</textarea>':'<input id="sIn" value="'+(val||'').replace(/"/g,'&quot;')+'"/>';return '<h3></h3><div class="sd"></div>'+inp+'<div class="srow"><button class="btn ghost" data-x="cancel">Cancelar</button><button class="btn '+(kind==='rev'?'warn':'primary')+'" data-x="send">'+(kind==='rev'?'Enviar':'Salvar')+'</button></div>';}
 function openInput(title,desc,kind,val,multiline,cb){openSheet(sheetForm(title,desc,kind,val,multiline));sheet.querySelector('h3').textContent=title;sheet.querySelector('.sd').textContent=desc;pending=cb;}
@@ -1571,7 +1581,7 @@ function renderClientSuccessHtml(task, token) {
   '<div class="succwrap"><div class="succcard">' +
     '<div class="succ-badge">' + ICN.check + '</div>' +
     '<h1>Cronograma aprovado com sucesso!</h1>' +
-    '<p>Obrigado. Sua aprovação foi registrada e a equipe já foi notificada.</p>' +
+    '<p>Sua aprovação foi registrada. A equipe já foi notificada e seguirá com a finalização.</p>' +
     '<div class="succ-meta">' +
       '<span class="pill">' + cliente + '</span>' +
       '<span class="pill">' + titulo + '</span>' +
