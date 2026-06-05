@@ -83,8 +83,8 @@ fun SocialsHubScreen(
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp), contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp)) {
             items(socials, key = { it.second }) { (u, id) ->
                 val mine = tasks.filter { TaskVisibility.socialOf(it, users) == id }
-                val open = mine.count { TaskVisibility.socialCol(it) != "concluido" }
-                val withDesigner = mine.count { TaskVisibility.hasDesigner(it) && TaskVisibility.socialCol(it) != "concluido" }
+                val open = mine.count { TaskVisibility.operationalCol(it) != "concluido" }
+                val withDesigner = mine.count { TaskVisibility.operationalCol(it) == "aguardando_designer" }
                 val late = mine.count { TaskDeadline.of(it)?.late == true }
                 val nm = u?.name ?: "Social Media"
                 Row(

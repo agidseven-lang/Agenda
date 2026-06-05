@@ -156,16 +156,20 @@ fun TasksScreen(
         val okVis = TaskVisibility.canSeeTask(currentUser, t)
         okQ && okS && okFlow && okPerson && okM && okVis
     }
-    // Eixo de colunas conforme o fluxo: CLIENTE (7 colunas próprias) x demais (4 status do kanban).
+    // Eixo de colunas conforme o fluxo: CLIENTE (7) / SOCIAL-OPERACIONAL (7) / demais (4 status).
     val isClientBoard = flow == "client"
-    val cols: List<BoardCol> = if (isClientBoard)
-        TaskVisibility.CLIENT_COLS.map { BoardCol(it.key, it.label, clientColShort(it.key), clientColColor(it.key)) }
-    else TaskStatus.COLUMNS.map { BoardCol(it, TaskStatus.label(it), statusColShort(it), TaskStatus.color(it)) }
+    val isSocialBoard = flow == "social"
+    val wideBoard = isClientBoard || isSocialBoard   // 7 colunas roláveis
+    val cols: List<BoardCol> = when {
+        isClientBoard -> TaskVisibility.CLIENT_COLS.map { BoardCol(it.key, it.label, clientColShort(it.key), clientColColor(it.key)) }
+        isSocialBoard -> TaskVisibility.OPERATIONAL_COLS.map { BoardCol(it.key, it.label, opColShort(it.key), opColColor(it.key)) }
+        else -> TaskStatus.COLUMNS.map { BoardCol(it, TaskStatus.label(it), statusColShort(it), TaskStatus.color(it)) }
+    }
     val colKeyOf: (TaskItem) -> String = { t ->
         when {
             isClientBoard -> TaskVisibility.clientCol(t)
             flow == "designer" -> TaskVisibility.designerCol(t)
-            flow == "social" -> TaskVisibility.socialCol(t)
+            isSocialBoard -> TaskVisibility.operationalCol(t)
             else -> t.status ?: "afazer"
         }
     }
@@ -263,9 +267,9 @@ fun TasksScreen(
                 Sectors.ALL.forEach { s -> SectorChip(s.label, s.color, sectorFilter == s.key) { sectorFilter = s.key } }
             }
         }
-        // Seletor/indicador de coluna. Cliente = 7 colunas (rolável, largura fixa);
+        // Seletor/indicador de coluna. Cliente/Operacional = 7 colunas (rolável, largura fixa);
         // demais = 4 colunas (preenchem a largura com weight, sem scroll p/ não quebrar a medição).
-        val selRowMod = if (isClientBoard)
+        val selRowMod = if (wideBoard)
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp)
         else Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
         Row(selRowMod) {
@@ -273,7 +277,7 @@ fun TasksScreen(
                 val count = tasks.count { colKeyOf(it) == c.key }
                 val sel = pager.currentPage == i
                 Box(
-                    modifier = (if (isClientBoard) Modifier.widthIn(min = 92.dp) else Modifier.weight(1f))
+                    modifier = (if (wideBoard) Modifier.widthIn(min = 92.dp) else Modifier.weight(1f))
                         .padding(horizontal = 3.dp).clip(RoundedCornerShape(10.dp))
                         .background(if (sel) c.color.copy(alpha = 0.18f) else Tokens.Surface)
                         .border(1.dp, if (sel) c.color else Tokens.Line, RoundedCornerShape(10.dp))
@@ -402,6 +406,16 @@ private fun clientColColor(k: String): Color = when (k) {
     else -> Color(0xFF6E7480)
 }
 private fun statusColShort(k: String): String = when (k) { "andamento" -> "Andam."; "revisao" -> "Revisão"; "concluido" -> "Concl."; else -> "A Fazer" }
+// Rótulos curtos + cores das colunas do eixo OPERACIONAL (7).
+private fun opColShort(k: String): String = when (k) {
+    "producao" -> "Produção"; "aguardando_designer" -> "Designer"; "aguardando_legenda" -> "Legenda/post"
+    "aguardando_revisao" -> "Revisão"; "aguardando_final" -> "Aprov. final"; "concluido" -> "Concl."; else -> "A Fazer"
+}
+private fun opColColor(k: String): Color = when (k) {
+    "producao" -> Color(0xFF22D3EE); "aguardando_designer" -> Color(0xFFA78BFA); "aguardando_legenda" -> Color(0xFF5B6CFF)
+    "aguardando_revisao" -> Color(0xFFF59E0B); "aguardando_final" -> Color(0xFF34D399); "concluido" -> Color(0xFF10B981)
+    else -> Color(0xFF6E7480)
+}
 
 @Composable
 private fun BoardColumnHeader(col: BoardCol, count: Int) {

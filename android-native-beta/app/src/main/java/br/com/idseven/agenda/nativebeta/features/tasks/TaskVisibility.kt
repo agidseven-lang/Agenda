@@ -137,4 +137,53 @@ object TaskVisibility {
         }
         return t.status ?: "afazer"
     }
+
+    // ===== EIXO OPERACIONAL (status REAL da operação ≠ aprovação do cliente) — espelha o Desktop =====
+    data class OpCol(val key: String, val label: String)
+    val OPERATIONAL_COLS = listOf(
+        OpCol("afazer", "A Fazer"),
+        OpCol("producao", "Em produção"),
+        OpCol("aguardando_designer", "Aguardando designer"),
+        OpCol("aguardando_legenda", "Aguardando legenda/post"),
+        OpCol("aguardando_revisao", "Revisão do cliente"),
+        OpCol("aguardando_final", "Aguardando aprov. final"),
+        OpCol("concluido", "Concluído"),
+    )
+    fun pendingLegend(t: TaskItem): Boolean {
+        val a = t.cronContents
+        return a.isEmpty() || a.any { it.legenda.isNullOrBlank() }
+    }
+    fun pendingFeed(t: TaskItem): Boolean {
+        val a = t.cronContents
+        return a.isEmpty() || a.any { it.feedImageUrl.isNullOrBlank() }
+    }
+    private fun pendingProduction(t: TaskItem) = pendingLegend(t) || pendingFeed(t)
+
+    // Status operacional REAL — DERIVADO. Só 'concluido' é override fixo (encerramento/aprovação final).
+    fun operationalCol(t: TaskItem): String {
+        if (Sectors.of(t.sector).key != "cronograma") return t.status ?: "afazer"
+        val cf = clientCol(t)
+        if (t.operationalStatus == "concluido" || t.finalApprovalCompleted || cf == "concluido") return "concluido"
+        if (cf == "revisao") return "aguardando_revisao"
+        if (cf == "reenviado") return "aguardando_final"
+        if (hasDesigner(t)) {
+            if (designerCol(t) != "concluido") return "aguardando_designer"
+            return if (pendingProduction(t)) "aguardando_legenda" else "aguardando_final"
+        }
+        if (cf == "aprovado") return if (pendingProduction(t)) "aguardando_legenda" else "producao"
+        if (cf == "afazer") return "afazer"
+        return "producao"
+    }
+
+    // "Próxima ação" em destaque para a Social/Admin.
+    fun nextActionText(t: TaskItem): String = when (operationalCol(t)) {
+        "afazer" -> "Criar o cronograma e enviar ao cliente."
+        "producao" -> "Cliente aprovou os temas. Próxima etapa: enviar/acompanhar designer ou produzir legendas e posts."
+        "aguardando_designer" -> "Designer produzindo. Próxima etapa: aguardar a entrega do designer."
+        "aguardando_legenda" -> "Designer entregou. Próxima etapa: revisar, adicionar legenda e posts (Feed/Story)."
+        "aguardando_revisao" -> "Cliente pediu revisão. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link."
+        "aguardando_final" -> "Tudo pronto. Próxima etapa: reenviar ao cliente e aguardar a aprovação final."
+        "concluido" -> "Aprovação final concluída. Tarefa encerrada operacionalmente."
+        else -> "Acompanhar o andamento."
+    }
 }

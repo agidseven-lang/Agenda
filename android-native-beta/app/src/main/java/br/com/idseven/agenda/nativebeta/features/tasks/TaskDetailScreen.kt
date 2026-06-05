@@ -55,6 +55,7 @@ import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.CronStatusUi
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
+import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.TaskStatus
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
@@ -127,6 +128,12 @@ fun TaskDetailScreen(
                     if (deadline != null) { Spacer(Modifier.width(8.dp)); Pill(deadline.text, deadline.color) }
                 }
                 Spacer(Modifier.height(16.dp))
+
+                // Operação (eixo operacional: próxima ação + linha do tempo) — só cronograma.
+                if (Sectors.of(t.sector).key == "cronograma") {
+                    OperationalPanel(t)
+                    Spacer(Modifier.height(16.dp))
+                }
 
                 // Responsável e prazo
                 SectionLabel("Responsável e prazo")
@@ -298,5 +305,70 @@ private fun InfoLine(label: String, value: String) {
 private fun IconBtn(icon: ImageVector, tint: Color, onClick: () -> Unit) {
     Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() }, contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+private data class Step(val l: String, val done: Boolean, val cur: Boolean = false, val opt: Boolean = false)
+
+// Painel operacional: status REAL + "Próxima ação" + "Linha do tempo operacional" (10 etapas).
+@Composable
+private fun OperationalPanel(t: TaskItem) {
+    val opKey = TaskVisibility.operationalCol(t)
+    val opLabel = TaskVisibility.OPERATIONAL_COLS.firstOrNull { it.key == opKey }?.label ?: "Em produção"
+    val accent = when (opKey) {
+        "producao" -> Color(0xFF22D3EE); "aguardando_designer" -> Color(0xFFA78BFA); "aguardando_legenda" -> Color(0xFF5B6CFF)
+        "aguardando_revisao" -> Color(0xFFF59E0B); "aguardando_final" -> Color(0xFF34D399); "concluido" -> Color(0xFF10B981)
+        else -> Color(0xFF6E7480)
+    }
+    val cf = TaskVisibility.clientCol(t)
+    val hasD = TaskVisibility.hasDesigner(t)
+    val delivered = hasD && TaskVisibility.designerCol(t) == "concluido"
+    val themesOk = cf in listOf("aprovado", "producao", "revisao", "reenviado", "concluido") || t.clientReview?.status == "aprovado"
+    val finalOk = t.finalApprovalCompleted || cf == "concluido"
+    val resent = cf == "reenviado" || cf == "concluido"
+    val steps = listOf(
+        Step("Cliente aprovou os temas", themesOk),
+        Step("Enviado ao designer", hasD),
+        Step("Designer em produção", hasD && (delivered || TaskVisibility.designerCol(t) == "andamento" || TaskVisibility.designerCol(t) == "revisao"), cur = hasD && !delivered),
+        Step("Designer entregou", delivered),
+        Step("Legenda final pronta", !TaskVisibility.pendingLegend(t)),
+        Step("Feed (1080×1440) anexado", !TaskVisibility.pendingFeed(t)),
+        Step("Story (1080×1920) anexado", false, opt = true),
+        Step("Reenviado ao cliente", resent),
+        Step("Aprovação final do cliente", finalOk),
+        Step("Conclusão operacional", opKey == "concluido"),
+    )
+    SectionLabel("Operação")
+    // Próxima ação
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Tokens.Surface)
+            .border(1.dp, accent.copy(alpha = 0.4f), RoundedCornerShape(13.dp)).padding(13.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.16f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(11.dp))
+        Column(Modifier.weight(1f)) {
+            Text("PRÓXIMA AÇÃO · $opLabel", color = accent, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(3.dp))
+            Text(TaskVisibility.nextActionText(t), color = Tokens.Ink, fontSize = 13.5.sp, fontWeight = FontWeight.Medium, lineHeight = 18.sp)
+        }
+    }
+    Spacer(Modifier.height(10.dp))
+    // Linha do tempo
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(13.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
+        steps.forEachIndexed { i, s ->
+            val c = if (s.done) Tokens.Green else if (s.cur) Tokens.Accent else Tokens.Faint
+            Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(22.dp).clip(RoundedCornerShape(50)).background(if (s.done) Tokens.Green.copy(alpha = 0.18f) else if (s.cur) Tokens.Accent.copy(alpha = 0.18f) else Tokens.Surface2), contentAlignment = Alignment.Center) {
+                    if (s.done) Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = Tokens.Green, modifier = Modifier.size(14.dp))
+                    else Text("${i + 1}", color = c, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(s.l + (if (s.opt) " (quando aplicável)" else ""), color = if (s.done || s.cur) Tokens.Ink else Tokens.Soft, fontSize = 13.sp, fontWeight = if (s.cur) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
+                Text(if (s.done) "OK" else if (s.cur) "Em andamento" else "Pendente", color = c, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }

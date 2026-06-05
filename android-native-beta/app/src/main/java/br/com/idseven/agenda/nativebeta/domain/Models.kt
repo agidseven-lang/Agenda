@@ -76,6 +76,9 @@ data class TaskItem(
     val socialOwnerId: String? = null,
     val socialOwnerName: String? = null,
     val socialFlowStatus: String? = null,
+    // EIXO OPERACIONAL (aditivo): status REAL da operação (≠ aprovação do cliente).
+    val operationalStatus: String? = null,
+    val finalApprovalCompleted: Boolean = false,
     // prazos do designer (para exibir término no card/detalhe do fluxo).
     val designerEndDate: String? = null,
     val designerEndTime: String? = null,
