@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.7-premium-client-view]
+   ID Seven — Cloudflare Worker  [V64.8-client-realtime-status-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.7-premium-client-view" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.8-client-realtime-status-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -860,7 +860,7 @@ async function handleClientCronogramaAction(token, request, env) {
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
 
   const now = Date.now();
-  await writeClientGranular(env, accessToken, task.id, { type, contentIndex: ci, note, value, at: now });
+  await writeClientGranular(env, accessToken, task, { type, contentIndex: ci, note, value, at: now });
   console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} hasNote=${!!note} hasValue=${!!value}`);
   return json({ ok: true, type, contentIndex: ci, at: now }, 200, env);
 }
@@ -872,18 +872,20 @@ async function handleClientCronogramaAction(token, request, env) {
      - clientActions.a<at> : map  log granular {type, at, contentIndex, field, newValue, note}
      - clientItems.i<idx>  : map  estado do item p/ o cliente {cs, theme, legenda, note, at}
    A Desktop lê clientItems/clientActions para mostrar exatamente o que o cliente mexeu. */
-async function writeClientGranular(env, accessToken, taskId, e) {
+async function writeClientGranular(env, accessToken, task, e) {
+  const taskId = task.id;
   const at = e.at;
   const aid = "a" + at;                  // chave de ação (começa com letra → field path válido)
   const perItem = ["approveItem", "reviseItem", "editTheme", "editLegenda", "noteItem"].indexOf(e.type) >= 0 && e.contentIndex != null;
 
-  // log granular
+  // log granular (clientActions.<aid>)
   const actFields = { type: { stringValue: e.type }, at: { integerValue: String(at) } };
   if (e.contentIndex != null) actFields.contentIndex = { integerValue: String(e.contentIndex) };
   if (e.note) actFields.note = { stringValue: e.note };
   if (e.type === "editTheme") { actFields.field = { stringValue: "tema" }; actFields.newValue = { stringValue: e.value }; }
   if (e.type === "editLegenda") { actFields.field = { stringValue: "legenda" }; actFields.newValue = { stringValue: e.value }; }
 
+  // clientLastAction (compat de leitura)
   const lastActionFields = {
     type: { stringValue: e.type }, at: { integerValue: String(at) }, note: { stringValue: e.note || "" },
   };
@@ -892,9 +894,11 @@ async function writeClientGranular(env, accessToken, taskId, e) {
   const fields = {
     clientLastAction: { mapValue: { fields: lastActionFields } },
     clientActions: { mapValue: { fields: { [aid]: { mapValue: { fields: actFields } } } } },
+    updatedAt: { integerValue: String(at) },                 // sinaliza mudança p/ quem observa
   };
-  const mask = ["clientLastAction", "clientActions." + aid];
+  const mask = ["clientLastAction", "clientActions." + aid, "updatedAt"];
 
+  // estado POR item (clientItems.i<idx>)
   if (perItem) {
     const key = "i" + e.contentIndex;
     const itemFields = { at: { integerValue: String(at) } };
@@ -907,15 +911,76 @@ async function writeClientGranular(env, accessToken, taskId, e) {
     mask.push("clientItems." + key);
   }
 
-  const qs = mask.map((m) => "updateMask.fieldPaths=" + encodeURIComponent(m)).join("&");
-  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}?${qs}`;
+  /* ───── CORREÇÃO V64.8 (tempo real): também grava os campos de STATUS que o
+     Desktop e o Android usam no card/detalhe (cronStatus + clientReview), com os
+     MESMOS valores que o Desktop escreve (aprovado_cliente | em_revisao_cliente |
+     editado_cliente). Sem isso o card ficava preso em "Pronto para envio".
+     Aditivo: NÃO toca cronWeeks, status (coluna do kanban), assignee, etc. ───── */
+  const STAT = {
+    approve:      { cs: "aprovado_cliente",   rev: "aprovado", htype: "cliente_aprovou",       label: "Cliente aprovou o cronograma" },
+    approveAll:   { cs: "aprovado_cliente",   rev: "aprovado", htype: "cliente_aprovou",       label: "Cliente aprovou o cronograma" },
+    revision:     { cs: "em_revisao_cliente", rev: "revisao",  htype: "cliente_pediu_revisao", label: "Cliente pediu revisão geral" },
+    reviseItem:   { cs: "em_revisao_cliente", rev: "revisao",  htype: "cliente_pediu_revisao", label: "Cliente pediu ajuste em um conteúdo" },
+    edit_request: { cs: "editado_cliente",    rev: "editado",  htype: "cliente_editou",        label: "Cliente solicitou edição" },
+    editTheme:    { cs: "editado_cliente",    rev: "editado",  htype: "cliente_editou",        label: "Cliente editou o tema de um conteúdo" },
+    editLegenda:  { cs: "editado_cliente",    rev: "editado",  htype: "cliente_editou",        label: "Cliente editou a legenda de um conteúdo" },
+    noteItem:     { cs: null,                 rev: null,       htype: "cliente_comentou",      label: "Cliente deixou uma observação" },
+    comment:      { cs: null,                 rev: null,       htype: "cliente_comentou",      label: "Cliente comentou no cronograma" },
+  };
+  let g = STAT[e.type] || { cs: null, rev: null, htype: "cliente_acao", label: "Ação do cliente" };
+
+  // approveItem: só vira "aprovado_cliente" no card quando TODOS os conteúdos estiverem aprovados.
+  if (e.type === "approveItem") {
+    const arr = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
+    const total = arr.length;
+    const ci = (task.clientItems && typeof task.clientItems === "object") ? task.clientItems : {};
+    const approved = new Set();
+    for (const k of Object.keys(ci)) { if (ci[k] && ci[k].cs === "aprovado") approved.add(k); }
+    approved.add("i" + e.contentIndex);
+    if (total > 0 && approved.size >= total) g = { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou", label: "Cliente aprovou todos os conteúdos" };
+    else g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo" };
+  }
+
+  if (g.cs) {
+    fields.cronStatus = { stringValue: g.cs };
+    fields.clientReview = { mapValue: { fields: {
+      status: { stringValue: g.rev },
+      note: { stringValue: e.note || "" },
+      at: { integerValue: String(at) },
+      byName: { stringValue: "Cliente" },
+    } } };
+    fields.clientReviewAt = { integerValue: String(at) };
+    mask.push("cronStatus", "clientReview", "clientReviewAt");
+  }
+
+  // entrada de histórico (arrayUnion via appendMissingElements — REST :commit)
+  const histValue = { mapValue: { fields: {
+    type: { stringValue: g.htype },
+    label: { stringValue: g.label },
+    at: { integerValue: String(at) },
+    by: { stringValue: "Cliente" },
+    channel: { stringValue: "client_public" },
+    client: { stringValue: (task.client || "") },
+    note: { stringValue: e.note || "" },
+  } } };
+
+  const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}`;
+  const body = {
+    writes: [{
+      update: { name: docName, fields },
+      updateMask: { fieldPaths: mask },
+      updateTransforms: [{ fieldPath: "history", appendMissingElements: { values: [histValue] } }],
+    }],
+  };
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`;
   try {
     const res = await fetch(url, {
-      method: "PATCH",
+      method: "POST",
       headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
-      body: JSON.stringify({ fields }),
+      body: JSON.stringify(body),
     });
-    if (!res.ok) console.warn("[CLIENT-ACTION] PATCH falhou:", res.status, (await res.text()).slice(0, 200));
+    if (!res.ok) console.warn("[CLIENT-ACTION] commit falhou:", res.status, (await res.text()).slice(0, 240));
+    else console.log(`[CLIENT-ACTION] commit ok task=${taskId} type=${e.type} cronStatus=${g.cs || "(inalterado)"}`);
   } catch (err) {
     console.warn("[CLIENT-ACTION] erro ao gravar feedback granular:", err && err.message);
   }
