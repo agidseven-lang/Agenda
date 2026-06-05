@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -69,7 +70,7 @@ private val BUILD = br.com.idseven.agenda.nativebeta.BuildConfig.VERSION_NAME
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> Unit) {
+fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> Unit, onOpenSettings: () -> Unit = {}) {
     val name = (currentUser?.name ?: session.name).ifBlank { "Usuário" }
     val color = UserColor.of(currentUser?.id ?: session.uid, currentUser?.color)
     val context = LocalContext.current
@@ -111,6 +112,8 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
         // Configurações
         SectionLabel("Configurações")
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(16.dp))) {
+            SettingsRow(Icons.Outlined.Settings, "Configurações do app", "Conta, notificações, dados, idioma") { onOpenSettings() }
+            RowDivider()
             SettingsRow(Icons.Outlined.Person, "Conta", "Seus dados") { sheet = "conta" }
             RowDivider()
             SettingsRow(Icons.Outlined.Notifications, "Notificações", "Lembretes e avisos") { sheet = "notif" }

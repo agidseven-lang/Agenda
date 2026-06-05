@@ -12,6 +12,8 @@ buildscript {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlin_version"
         classpath "com.google.gms:google-services:4.4.2"
+        // Screenshot do card via JVM (Roborazzi + Robolectric NATIVE) — sem emulador.
+        classpath "io.github.takahirom.roborazzi:roborazzi-gradle-plugin:1.30.1"
     }
 }
 

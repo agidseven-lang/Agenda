@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "org.jetbrains.kotlin.plugin.compose"
+apply plugin: "io.github.takahirom.roborazzi"
 
 android {
     namespace "br.com.idseven.agenda.nativebeta"
@@ -11,8 +12,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 72
-        versionName "1.0.67-beta-client-vision-fix"
+        versionCode 75
+        versionName "1.0.77-beta-android-logo-settings-roleboards"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
@@ -60,6 +61,25 @@ android {
         compose true
         buildConfig true
     }
+    // Testes unitários JVM (Robolectric/Roborazzi) precisam dos recursos Android e do
+    // modo gráfico NATIVE para renderizar o Compose em PNG real, sem emulador.
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
+            all {
+                it.systemProperty "robolectric.graphicsMode", "NATIVE"
+                it.systemProperty "robolectric.pixelCopyRenderMode", "hardware"
+                it.testLogging {
+                    events "passed", "failed", "skipped"
+                    exceptionFormat "full"
+                    showStackTraces true
+                    showCauses true
+                    showStandardStreams true
+                }
+            }
+        }
+    }
 }
 
 dependencies {
@@ -88,6 +108,19 @@ dependencies {
     implementation "androidx.navigation:navigation-compose:2.8.3"
     implementation "io.coil-kt:coil-compose:2.7.0"
     debugImplementation "androidx.compose.ui:ui-tooling"
+
+    // ===== Teste de screenshot do card (JVM, sem emulador) =====
+    // Roborazzi renderiza o Compose com Robolectric (graphicsMode NATIVE) -> PNG real.
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.robolectric:robolectric:4.14.1"
+    testImplementation platform("androidx.compose:compose-bom:2024.10.01")
+    testImplementation "androidx.compose.ui:ui-test-junit4"
+    // ui-test-manifest precisa ser debugImplementation: registra a ComponentActivity
+    // no MANIFEST do variant debug, que o testDebugUnitTest (Robolectric) usa.
+    debugImplementation "androidx.compose.ui:ui-test-manifest"
+    testImplementation "io.github.takahirom.roborazzi:roborazzi:1.30.1"
+    testImplementation "io.github.takahirom.roborazzi:roborazzi-compose:1.30.1"
+    testImplementation "io.github.takahirom.roborazzi:roborazzi-junit-rule:1.30.1"
 }
 
 // Processa app/google-services.json (DEVE ficar no final). NÃO usa Firebase Auth.

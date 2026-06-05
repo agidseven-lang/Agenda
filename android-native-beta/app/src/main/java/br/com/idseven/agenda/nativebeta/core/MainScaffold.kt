@@ -62,7 +62,9 @@ import br.com.idseven.agenda.nativebeta.features.dashboard.DashboardScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventDetailScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventFormScreen
 import br.com.idseven.agenda.nativebeta.features.profile.ProfileScreen
+import br.com.idseven.agenda.nativebeta.features.settings.SettingsScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.BoardsHubScreen
+import br.com.idseven.agenda.nativebeta.features.tasks.RoleBoardsScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskDetailScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskFormScreen
 import br.com.idseven.agenda.nativebeta.features.tasks.TasksScreen
@@ -208,7 +210,35 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             }
             composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
             composable("tarefas") {
-                BoardsHubScreen(tasksState, currentUser = currentUser, onOpenSector = { nav.navigate("board/$it") })
+                BoardsHubScreen(
+                    tasksState, currentUser = currentUser,
+                    onOpenSector = { nav.navigate("board/$it") },
+                    onOpenRoleBoards = { nav.navigate("roleBoards") },
+                    onOpenMyBoard = { session.uid?.let { nav.navigate("personBoard/$it") } },
+                )
+            }
+            composable("roleBoards") {
+                RoleBoardsScreen(
+                    tasksState, users,
+                    onOpenPerson = { nav.navigate("personBoard/$it") },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(
+                route = "personBoard/{uid}",
+                arguments = listOf(navArgument("uid") { type = NavType.StringType }),
+            ) { entry ->
+                val pid = entry.arguments?.getString("uid") ?: ""
+                TasksScreen(
+                    tasksState, users, currentUid = session.uid,
+                    onTaskClick = { nav.navigate("task/$it") },
+                    currentUser = currentUser,
+                    personId = pid,
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable("config") {
+                SettingsScreen(currentUser = currentUser, onLogout = onLogout, onBack = { nav.popBackStack() })
             }
             composable(
                 route = "board/{sector}",
@@ -234,7 +264,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable("perfil") { ProfileScreen(currentUser, session, onLogout) }
+            composable("perfil") { ProfileScreen(currentUser, session, onLogout, onOpenSettings = { nav.navigate("config") }) }
             composable("event/{id}") { entry ->
                 EventDetailScreen(
                     id = entry.arguments?.getString("id") ?: "",

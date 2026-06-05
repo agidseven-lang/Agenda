@@ -52,6 +52,7 @@ import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.components.LoadingState
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
+import br.com.idseven.agenda.nativebeta.domain.CronStatusUi
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
 import br.com.idseven.agenda.nativebeta.domain.TaskStatus
@@ -272,39 +273,8 @@ private fun SectionLabel(text: String) {
     Text(text.uppercase(), color = Tokens.Faint, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp, modifier = Modifier.padding(bottom = 8.dp))
 }
 
-// Espelha o fluxo de status do Desktop (cronStatus + clientReview). Somente leitura nesta fase.
-private object CronStatusUi {
-    fun label(s: String?): String = when (s) {
-        "rascunho_social" -> "Em rascunho (Social)"
-        "pronto_cliente" -> "Pronto para envio"
-        "enviado_cliente" -> "Enviado ao cliente"
-        "cliente_visualizou" -> "Cliente visualizou"
-        "em_revisao_cliente" -> "Em revisão (cliente)"
-        "aprovado_cliente" -> "Aprovado pelo cliente"
-        "editado_cliente" -> "Editado pelo cliente"
-        else -> s ?: "—"
-    }
-    fun color(s: String?): Color = when (s) {
-        "enviado_cliente" -> Color(0xFF22D3EE)
-        "em_revisao_cliente" -> Color(0xFFF59E0B)
-        "aprovado_cliente" -> Color(0xFF34D399)
-        "editado_cliente" -> Color(0xFFA78BFA)
-        "pronto_cliente" -> Color(0xFF60A5FA)
-        else -> Color(0xFF9BA0AB)
-    }
-    fun reviewLabel(s: String?): String = when (s) {
-        "aprovado" -> "Aprovado pelo cliente"
-        "revisao" -> "Revisão solicitada pelo cliente"
-        "editado" -> "Edição solicitada pelo cliente"
-        else -> "Resposta do cliente"
-    }
-    fun reviewColor(s: String?): Color = when (s) {
-        "aprovado" -> Color(0xFF34D399)
-        "revisao" -> Color(0xFFF59E0B)
-        "editado" -> Color(0xFFA78BFA)
-        else -> Color(0xFF9BA0AB)
-    }
-}
+// O fluxo de status (cronStatus + clientReview) agora vive em domain/CronStatusUi.kt
+// (fonte única compartilhada com o card de tarefa). Mantido o mesmo comportamento.
 
 @Composable
 private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {

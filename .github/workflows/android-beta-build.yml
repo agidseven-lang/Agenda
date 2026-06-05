@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: app/main — branch dedicada do app)"
+        description: "Branch/commit a buildar (default: app/local-1.0.77-android-logo-settings-roleboards)"
         required: true
-        default: "app/main"
+        default: "app/local-1.0.77-android-logo-settings-roleboards"
       resolve_urls:
         description: "Resolver URLs reais das Functions Gen2 via gcloud (true/false)"
         required: false
@@ -20,12 +20,77 @@ permissions:
   contents: read
 
 jobs:
+  # GATE de evidencia visual ANTES do APK: renderiza o card de tarefa em PNG
+  # (Roborazzi + Robolectric NATIVE, JVM, sem emulador). Se nao compilar/renderizar,
+  # o job falha e o build do APK (needs: screenshot) NEM roda.
+  screenshot:
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: "android-native-beta"
+    steps:
+      - name: Checkout (ref escolhido)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Restaurar google-services.json (secret texto puro)
+        env:
+          GOOGLE_SERVICES_JSON_BETA: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON_BETA" ]; then
+            echo "::error:: secret GOOGLE_SERVICES_JSON_BETA ausente."; exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_BETA" > "$APP_DIR/app/google-services.json"
+      - name: Roborazzi — renderizar o card em PNG (record)
+        run: |
+          cd "$APP_DIR"
+          chmod +x ./gradlew
+          ./gradlew :app:recordRoborazziDebug --no-daemon --stacktrace
+      - name: Listar PNGs gerados
+        if: always()
+        run: ls -lh "$APP_DIR/app/build/outputs/roborazzi" || echo "nenhum PNG"
+      - name: Dump PNGs em base64 no log (inspecao sem download externo)
+        if: always()
+        run: |
+          cd "$APP_DIR/app/build/outputs/roborazzi" || exit 0
+          for f in *.png; do
+            [ -f "$f" ] || continue
+            echo "=====B64START:$f====="
+            base64 -w0 "$f"; echo
+            echo "=====B64END:$f====="
+          done
+      - name: Upload relatorio de teste (diagnostico, se falhar)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-card-test-report
+          path: |
+            android-native-beta/app/build/reports/tests/**
+            android-native-beta/app/build/test-results/**
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload screenshots do card (PNG)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-task-card-screenshots
+          path: android-native-beta/app/build/outputs/roborazzi/*.png
+          if-no-files-found: error
+          retention-days: 30
+
   build:
+    needs: screenshot
     runs-on: ubuntu-latest
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.67-beta-client-vision-fix"
+      DIST_BASENAME: "idseven-nativebeta-1.0.77-beta-android-logo-settings-roleboards"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -188,8 +253,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.67-beta-client-vision-fix
-          path: dist/idseven-nativebeta-1.0.67-beta-client-vision-fix.apk
+          name: idseven-nativebeta-1.0.77-beta-android-logo-settings-roleboards
+          path: dist/idseven-nativebeta-1.0.77-beta-android-logo-settings-roleboards.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -197,7 +262,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.67-beta-client-vision-fix-bundle
-          path: dist/idseven-nativebeta-1.0.67-beta-client-vision-fix.zip
+          name: idseven-nativebeta-1.0.77-beta-android-logo-settings-roleboards-bundle
+          path: dist/idseven-nativebeta-1.0.77-beta-android-logo-settings-roleboards.zip
           if-no-files-found: error
           retention-days: 30

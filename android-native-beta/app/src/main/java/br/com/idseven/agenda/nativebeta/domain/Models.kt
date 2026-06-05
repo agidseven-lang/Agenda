@@ -64,6 +64,17 @@ data class TaskItem(
     val cronStatus: String? = null,
     val clientReview: ClientReview? = null,
     val clientSentBy: String? = null,
+    // Conteúdos do cronograma (temas/legendas/artes) — escritos pelo Desktop.
+    // Aceita `cronContents` (atual) e o alias legado `contents`. Compat: lista vazia em tarefas antigas.
+    val cronContents: List<CronContent> = emptyList(),
+)
+
+// Um conteúdo do cronograma (um "tema" da semana/quinzena/mês). Aditivo, espelha o Desktop.
+data class CronContent(
+    val tema: String? = null,
+    val legenda: String? = null,
+    val feedImageUrl: String? = null,
+    val storyImageUrl: String? = null,
 )
 
 data class ChecklistItem(val t: String, val d: Boolean)
