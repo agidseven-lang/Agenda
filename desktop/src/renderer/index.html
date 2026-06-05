@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.94 (Fluxo Cliente/Designers)</title>
+<title>ID Seven · Desktop 1.0.95 (Cliente · Designers · eixos)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -972,6 +972,21 @@
   .if-before{font-size:13px;color:var(--soft);line-height:1.5;background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:11px 13px;white-space:pre-wrap}
   .if-in{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--ink);font-size:14px;font-family:inherit;line-height:1.5;margin-bottom:16px;box-sizing:border-box;resize:vertical}
   .if-in:focus{outline:none;border-color:var(--accent)}
+  /* Abas superiores da área de Tarefas (Meu quadro · Cliente · Designers · Setores) */
+  .tflow-tabs{display:flex;gap:8px;padding:14px 20px 4px;flex-wrap:wrap}
+  .tflow-tab{background:var(--surface2);border:1px solid var(--line);color:var(--soft);font-size:13.5px;font-weight:800;
+    padding:9px 16px;border-radius:11px;cursor:pointer;transition:all .12s}
+  .tflow-tab:hover{color:var(--ink);border-color:var(--accent)}
+  .tflow-tab.on{background:var(--accent);color:#fff;border-color:transparent}
+  .tflow-quad{margin-left:auto;background:transparent;font-weight:700;font-size:12.5px}
+  /* Resumo dos dois eixos no Detalhes */
+  .det-flow{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px 15px}
+  .det-flow-col{flex:1;min-width:160px}
+  .det-flow-lbl{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin-bottom:7px}
+  .det-flow-pill{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:800;padding:5px 12px;border-radius:999px}
+  .det-flow-pill.det-flow-soft{background:var(--surface);color:var(--faint);border:1px solid var(--line)}
+  .det-flow-dl{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--soft);margin-left:8px}
+  .det-flow-dl svg{width:13px;height:13px}
 
   /* mobile: tela do cliente ocupa largura total */
   /* conteudo com Feed/Story */
@@ -1052,7 +1067,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.94 · Fluxo Cliente/Designers</span><br>
+    <span class="pill-ver">Desktop 1.0.95 · Cliente · Designers</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1067,7 +1082,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.94 · Fluxo Cliente/Designers</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.95 · Cliente · Designers</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1303,7 +1318,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.94 · Fluxo Cliente/Designers</span><br>espelha o APK <b>1.0.82-beta-client-designer-flow-final-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.95 · Cliente · Designers</span><br>espelha o APK <b>1.0.83-beta-client-designer-flow-visibility-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1423,7 +1438,7 @@ function afterAgenda(){const s=document.getElementById('agSearch');if(s)s.oninpu
 /* ---- HUB ---- */
 function renderHub(){
   const u=state.user;const vis=visibleTasks(u,state.tasks);
-  let h='<div class="scr-head"><div class="row"><div style="flex:1"><div class="h-title">Quadros</div><div class="h-sub">Gestão por setor da agência</div></div><span class="badge-round">'+vis.length+' tarefas</span></div></div><div class="scr" style="padding-top:8px">';
+  let h=renderTasksTabs('hub')+'<div class="scr-head"><div class="row"><div style="flex:1"><div class="h-title">Quadros</div><div class="h-sub">Gestão por setor da agência</div></div><span class="badge-round">'+vis.length+' tarefas</span></div></div><div class="scr" style="padding-top:8px">';
   // ADITIVO — Meu quadro (todos) + Quadros por responsável (admin). Não remove a visão por setor.
   const myOpen=u?state.tasks.filter(t=>(t.assigneeId===u.id||t.by===u.id)&&t.status!=='concluido').length:0;
   let nav='';
@@ -1437,14 +1452,14 @@ function renderHub(){
     '<div class="arr">'+svg('arr')+'</div></button>';
   // P3/P4 — Social/Admin: separar Fluxo do Cliente x Fluxo dos Designers (sem misturar tarefas).
   if(canSeeAll(u)){
-    const cliFlow=state.tasks.filter(isClientFlow);const cliOpen=cliFlow.filter(t=>t.status!=='concluido').length;
+    const cliFlow=state.tasks.filter(isClientFlow);const cliOpen=cliFlow.filter(t=>clientCol(t)!=='concluido').length;
     const dz=designerBoardsList();const dzLate=state.tasks.filter(t=>isDesignerFlow(t)&&(()=>{const d=taskDeadline(t);return d&&d.late;})()).length;
     nav+='<button class="bcard" data-flowclient="1"><div class="icb" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
-      '<div class="bm"><div class="bl">Fluxo do Cliente</div><div class="bd">Relacionamento: enviado, aprovado, revisão, reenvio, concluído</div>'+
+      '<div class="bm"><div class="bl">Cliente</div><div class="bd">Fica no fluxo do cliente até a aprovação final (mesmo enviado ao designer)</div>'+
         '<div class="bp"><span class="pill" style="background:'+withAlpha('#22D3B8',.16)+';color:#22D3B8">'+cliOpen+' aberta'+(cliOpen===1?'':'s')+'</span></div></div>'+
       '<div class="arr">'+svg('arr')+'</div></button>';
     nav+='<button class="bcard" data-flowdesigners="1"><div class="icb" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
-      '<div class="bm"><div class="bl">Fluxo dos Designers</div><div class="bd">Um quadro Kanban por designer — monitore cada um</div>'+
+      '<div class="bm"><div class="bl">Designers</div><div class="bd">Um quadro Kanban por designer — monitore cada um</div>'+
         '<div class="bp"><span class="pill" style="background:'+withAlpha('#A78BFA',.16)+';color:#A78BFA">'+dz.length+' designer'+(dz.length===1?'':'s')+'</span>'+
         (dzLate>0?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">'+dzLate+' em atraso</span>':'')+'</div></div>'+
       '<div class="arr">'+svg('arr')+'</div></button>';
@@ -1481,7 +1496,8 @@ function renderPersonBoard(){
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
   const byStatus=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const backTo=isMe?'hub':(roleCat(state.user)==='ADMIN'?'roleboards':'hub');
-  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
+  let h=(isMe?renderTasksTabs('mine'):'')+
+    '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
@@ -1493,40 +1509,85 @@ function renderPersonBoard(){
 }
 
 /* ===== P3/P4 — Fluxo do Cliente x Fluxo dos Designers ===== */
-// Designer flow: tem designerAssignment OU cronStatus do fluxo de produção/designer.
-const DESIGNER_CRON=['sent_to_designer','in_design','designer_producao','pronto_design','ready_for_designer'];
-function isDesignerFlow(t){return !!(t&&(t.designerAssignment&&t.designerAssignment.designerId))||(t&&DESIGNER_CRON.indexOf(t.cronStatus)>=0);}
-// Client flow: cronograma em relacionamento com o cliente (ainda não no fluxo do designer).
-function isClientFlow(t){return !!t&&secOf(t.sector).key==='cronograma'&&!isDesignerFlow(t);}
-// Lista de designers que têm tarefas no fluxo de designer (por designerAssignment ou assigneeId).
+// ===== EIXOS SEPARADOS (visibility-fix) =====
+// Designer flow: a tarefa foi atribuída a um designer (designerAssignment.designerId).
+function hasDesigner(t){return !!(t&&t.designerAssignment&&t.designerAssignment.designerId);}
+function isDesignerFlow(t){return hasDesigner(t);}
+function designerOf(t){return (t&&t.designerAssignment&&t.designerAssignment.designerId)||(t&&t.assigneeId)||null;}
+// Client flow: TODO cronograma vive no fluxo do cliente — INDEPENDENTE do designer.
+// A tarefa só "conclui" o fluxo do cliente na aprovação final (clientFlowStatus='concluido').
+function isClientFlow(t){return !!t&&secOf(t.sector).key==='cronograma';}
+// Colunas do FLUXO DO CLIENTE (eixo próprio, separado do designer).
+const CLIENT_COLS=[
+  {key:'afazer',    label:'A Fazer',            color:'#6E7480'},
+  {key:'enviado',   label:'Enviado ao cliente', color:'#5B6CFF'},
+  {key:'aprovado',  label:'Aprovado pelo cliente',color:'#22D3EE'},
+  {key:'producao',  label:'Em produção',        color:'#A78BFA'},
+  {key:'revisao',   label:'Revisão',            color:'#F59E0B'},
+  {key:'reenviado', label:'Reenviado ao cliente',color:'#34D399'},
+  {key:'concluido', label:'Concluído',          color:'#10B981'},
+];
+// Coluna do cliente: usa clientFlowStatus (gravado por Worker/Desktop); senão deriva (compat).
+function clientCol(t){
+  const v=(t&&t.clientFlowStatus||'').toString();
+  if(CLIENT_COLS.some(c=>c.key===v))return v;
+  const ws=(t&&t.workflowStage||'').toString();
+  const cs=(t&&t.cronStatus||'').toString();
+  const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();
+  const st=(t&&t.status||'').toString();
+  if(st==='concluido'||ws==='concluido'||cs==='aprovado_final')return 'concluido';
+  if(cr==='revisao'||cs==='em_revisao_cliente'||cs==='editado_cliente')return 'revisao';
+  if(cs==='ready_for_final_client_review'||cs==='reenviado_cliente')return 'reenviado';
+  if(hasDesigner(t)||cs==='sent_to_designer'||ws==='producao'||ws==='entrega'||ws==='revisao_final')return 'producao';
+  if(cr==='aprovado'||cs==='aprovado_cliente')return 'aprovado';
+  if(cs==='enviado_cliente'||t.clientSentBy||t.clientReviewToken||t.shareToken)return 'enviado';
+  return 'afazer';
+}
+// Coluna do DESIGNER: eixo de trabalho do designer (designerFlowStatus; senão status).
+function designerCol(t){const v=(t&&t.designerFlowStatus||'').toString();if(['afazer','andamento','revisao','concluido'].indexOf(v)>=0)return v;return (t&&t.status)||'afazer';}
+// Lista de designers que têm tarefas atribuídas (fluxo de designer).
 function designerBoardsList(){
   const ids={};
-  state.tasks.forEach(t=>{if(!isDesignerFlow(t))return;const did=(t.designerAssignment&&t.designerAssignment.designerId)||t.assigneeId;if(did)ids[did]=(ids[did]||0)+1;});
+  state.tasks.forEach(t=>{if(!isDesignerFlow(t))return;const did=designerOf(t);if(did)ids[did]=(ids[did]||0)+1;});
   return Object.keys(ids).map(id=>{const u=state.users.find(x=>x.id===id)||{id:id,name:'Designer'};return {u:u,count:ids[id]};})
     .sort((a,b)=>(a.u.name||'').toLowerCase()<(b.u.name||'').toLowerCase()?-1:1);
+}
+// Abas superiores da área de Tarefas: Meu quadro · Cliente · Designers.
+// Cliente/Designers só para Social/Admin (canSeeAll); designer comum vê só Meu quadro.
+function renderTasksTabs(active){
+  const u=state.user;const see=canSeeAll(u);
+  const tabs=[{k:'mine',l:'Meu quadro',a:'data-myboard="1"'}];
+  if(see){tabs.push({k:'client',l:'Cliente',a:'data-flowclient="1"'});tabs.push({k:'designers',l:'Designers',a:'data-flowdesigners="1"'});}
+  let h='<div class="tflow-tabs">';
+  tabs.forEach(t=>{h+='<button class="tflow-tab'+(t.k===active?' on':'')+'" '+t.a+'>'+esc(t.l)+'</button>';});
+  h+='<button class="tflow-tab tflow-quad'+(active==='hub'?' on':'')+'" data-board="hub">Setores</button>';
+  h+='</div>';
+  return h;
 }
 function renderClientFlowBoard(){
   let list=state.tasks.filter(isClientFlow);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  const byStatus=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
-  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="hub">'+svg('back')+'</button>'+
+  const byCol=CLIENT_COLS.map(c=>list.filter(t=>clientCol(t)===c.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  let h=renderTasksTabs('client')+
+    '<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
-    '<div style="flex:1;min-width:0"><div class="d-bh-title">Fluxo do Cliente</div><div class="d-bh-sub">Relacionamento com o cliente — '+list.length+' tarefa'+(list.length===1?'':'s')+'</div></div></div></div>'+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">Cliente</div><div class="d-bh-sub">Fica visível até a aprovação final — mesmo enviado ao designer · '+list.length+' tarefa'+(list.length===1?'':'s')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
-  STATUS.forEach((st,i)=>{const tasks=byStatus[i];
-    h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
+  CLIENT_COLS.forEach((c,i)=>{const tasks=byCol[i];
+    h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+c.color+'"></div><div class="kt" style="color:'+c.color+'">'+esc(c.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
     h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
     h+='</div></div>';});
   return h+'</div></div>';
 }
 function renderDesignersHub(){
   const dz=designerBoardsList();
-  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="hub">'+svg('back')+'</button>'+
+  let h=renderTasksTabs('designers')+
+    '<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
-    '<div style="flex:1;min-width:0"><div class="d-bh-title">Fluxo dos Designers</div><div class="d-bh-sub">Cada designer em um quadro Kanban próprio</div></div></div></div>'+
+    '<div style="flex:1;min-width:0"><div class="d-bh-title">Designers</div><div class="d-bh-sub">Cada designer em um quadro Kanban próprio</div></div></div></div>'+
     '<div class="scr" style="padding-top:8px">';
-  const cards=dz.length?dz.map(d=>{const tasks=state.tasks.filter(t=>isDesignerFlow(t)&&((t.designerAssignment&&t.designerAssignment.designerId===d.u.id)||t.assigneeId===d.u.id));
-    const open=tasks.filter(t=>t.status!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
+  const cards=dz.length?dz.map(d=>{const tasks=state.tasks.filter(t=>isDesignerFlow(t)&&designerOf(t)===d.u.id);
+    const open=tasks.filter(t=>designerCol(t)!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
     return '<button class="bcard" data-designerboard="'+d.u.id+'">'+avatar(d.u,44)+
       '<div class="bm"><div class="bl">'+esc(d.u.name||'Designer')+'</div><div class="bd">'+esc(d.u.role||'Designer')+'</div>'+
         '<div class="bp"><span class="pill" style="background:'+withAlpha('#5B6CFF',.16)+';color:#5B6CFF">'+open+' aberta'+(open===1?'':'s')+'</span>'+
@@ -1538,11 +1599,12 @@ function renderDesignersHub(){
 }
 function renderDesignerBoard(){
   const id=state.designerBoard;const p=state.users.find(x=>x.id===id)||{id:id,name:'Designer'};
-  let list=state.tasks.filter(t=>isDesignerFlow(t)&&((t.designerAssignment&&t.designerAssignment.designerId===id)||t.assigneeId===id));
+  let list=state.tasks.filter(t=>isDesignerFlow(t)&&designerOf(t)===id);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  const byStatus=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const byStatus=STATUS.map(st=>list.filter(t=>designerCol(t)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const late=list.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
-  let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
+  let h=renderTasksTabs('designers')+
+    '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designer · '+esc((p.name||'').split(' ')[0]||'Designer')+'</div><div class="d-bh-sub">'+esc(p.role||'Designer')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
@@ -1706,6 +1768,7 @@ function openDetails(taskId){
       '<div class="det-person">'+(asg?avatar(asg,44):emptyAv)+'<div class="det-person-m"><div class="det-person-l">Responsável pela execução</div><div class="det-person-n">'+esc(asgName||'Ninguém atribuído')+'</div>'+(asg&&asg.role?'<div class="det-person-r">'+esc(asg.role)+'</div>':'')+'</div></div>'+
       '<div class="det-person">'+(req?avatar(req,44):emptyAv)+'<div class="det-person-m"><div class="det-person-l">Enviado por</div><div class="det-person-n">'+esc(reqName)+'</div>'+(req&&req.role?'<div class="det-person-r">'+esc(req.role)+'</div>':'')+'</div></div>'+
     '</div>'+
+    flowSummaryBlock(t)+
     // datas
     '<div class="det-sec">Datas</div><div class="det-dates">'+
       detDate('calendar','Criado em',fmtDateTimeBR(t.createdAt))+
@@ -1753,6 +1816,24 @@ function openDetails(taskId){
   document.getElementById('modalRoot').innerHTML=h;
 }
 /* P1 — bloco de correções por conteúdo (quando o cliente pediu revisão/edição de itens). */
+// Resumo dos DOIS eixos no Detalhes: status do cliente + status do designer + prazos.
+function flowSummaryBlock(t){
+  if(secOf(t.sector).key!=='cronograma')return '';
+  const cc=CLIENT_COLS.find(c=>c.key===clientCol(t))||CLIENT_COLS[0];
+  let h='<div class="det-flow"><div class="det-flow-col"><div class="det-flow-lbl">Fluxo do cliente</div>'+
+    '<span class="det-flow-pill" style="background:'+withAlpha(cc.color,.16)+';color:'+cc.color+'"><span class="dotc" style="background:'+cc.color+'"></span>'+esc(cc.label)+'</span></div>';
+  if(hasDesigner(t)){
+    const did=designerOf(t);const d=state.users.find(u=>u.id===did)||{name:(t.designerAssignment&&t.designerAssignment.designerName)||'Designer'};
+    const dc=stOf(designerCol(t));const dl=t.designerAssignment||{};
+    const prazo=(dl.endDate?('término '+fmtDateBR(dl.endDate)+(dl.endTime?' '+dl.endTime:'')):'');
+    h+='<div class="det-flow-col"><div class="det-flow-lbl">Fluxo do designer · '+esc((d.name||'Designer').split(' ')[0])+'</div>'+
+      '<span class="det-flow-pill" style="background:'+withAlpha(dc.color,.16)+';color:'+dc.color+'"><span class="dotc" style="background:'+dc.color+'"></span>'+esc(dc.label)+'</span>'+
+      (prazo?'<span class="det-flow-dl">'+svg('clock')+esc(prazo)+'</span>':'')+'</div>';
+  }else{
+    h+='<div class="det-flow-col"><div class="det-flow-lbl">Fluxo do designer</div><span class="det-flow-pill det-flow-soft">Ainda não enviado a designer</span></div>';
+  }
+  return h+'</div>';
+}
 function clientRevisionFixBlock(t){
   const ci=(t.clientItems&&typeof t.clientItems==='object')?t.clientItems:null;
   if(!ci)return '';
@@ -1875,6 +1956,10 @@ async function sendToDesigner(taskId,designerId,dl){
     assigneeName:d.name||'',
     cronStatus:'sent_to_designer',
     status:'afazer',                       // entra na coluna A Fazer do designer
+    // EIXOS SEPARADOS (visibility-fix): a tarefa CONTINUA no fluxo do cliente como
+    // "Em produção" e ENTRA no quadro do designer em "A Fazer". Não some do Cliente.
+    clientFlowStatus:'producao', clientWorkflowStage:'producao',
+    designerFlowStatus:'afazer', designerWorkflowStage:'afazer',
     startedAt:null,                        // reinicia o tracking p/ o designer
     // PRAZO OBRIGATÓRIO (BUG3): início + término (data/hora). dueDate/dueTime = término,
     // para o card calcular "Atrasada" e o cron do Worker notificar atraso ao designer.
@@ -1891,6 +1976,7 @@ async function sendToDesigner(taskId,designerId,dl){
   if(dl.obs&&String(dl.obs).trim())patch.desc=String(dl.obs).trim();
   // otimista
   Object.assign(t,{designerAssignment:assignment,assigneeId:designerId,assignee:d.name||'',assigneeName:d.name||'',cronStatus:'sent_to_designer',status:'afazer',
+    clientFlowStatus:'producao',clientWorkflowStage:'producao',designerFlowStatus:'afazer',designerWorkflowStage:'afazer',
     startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',dueDate:dl.endDate||'',dueTime:dl.endTime||''});
   closeModal();render();flashToast('Enviado para '+(d.name||'designer')+'. Notificação disparada.');
   try{
@@ -2033,10 +2119,12 @@ async function saveProduction(taskId,resend){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const contents=prodCollect();const now=Date.now();const u=state.user||{};
   const patch={cronContents:contents,
+    // Social produzindo legendas/posts: eixo do cliente = "Em produção" (não some, não conclui).
+    clientFlowStatus:'producao', clientWorkflowStage:'producao',
     history:firebase.firestore.FieldValue.arrayUnion({type:'social_producao',label:'Social atualizou legendas/artes',by:u.name||'',byId:u.id||null,at:now,channel:'production'})};
   if(resend){patch.cronStatus='ready_for_final_client_review';
     patch.history=firebase.firestore.FieldValue.arrayUnion({type:'reenviado_cliente',label:'Reenviado ao cliente (versão final)',by:u.name||'',byId:u.id||null,at:now,channel:'final_review'});}
-  t.cronContents=contents;if(resend)t.cronStatus='ready_for_final_client_review';   // otimista
+  t.cronContents=contents;t.clientFlowStatus='producao';if(resend)t.cronStatus='ready_for_final_client_review';   // otimista
   closeModal();render();
   try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveProduction',e);}
   if(resend){
@@ -2427,19 +2515,24 @@ function flashToast(msg){
 async function persistClientSend(taskId){
   const now=Date.now();const u=state.user||{};
   const t=state.tasks.find(x=>x.id===taskId)||{};
+  // EIXO DO CLIENTE: 1º envio = 'enviado'; reenvio após revisão/produção = 'reenviado'.
+  const prev=clientCol(t);
+  const cflow=(prev==='revisao'||prev==='producao'||prev==='reenviado'||prev==='aprovado')?'reenviado':'enviado';
   try{
     await db.collection('tasks').doc(taskId).update({
       cronStatus:'enviado_cliente',
+      clientFlowStatus:cflow, clientWorkflowStage:cflow,
       clientSentAt:now,
       clientSentBy:u.id||null,
       clientPreviewLink:'idseven://client/'+taskId,
       history:firebase.firestore.FieldValue.arrayUnion({
         type:'cronograma_enviado_cliente',
-        label:'Cronograma enviado ao cliente',
+        label:(cflow==='reenviado'?'Reenviado ao cliente (mesmo link)':'Cronograma enviado ao cliente'),
         by:u.name||'', byId:u.id||null,
-        at:now, client:t.client||'', channel:'whatsapp_fallback'
+        at:now, client:t.client||'', channel:'whatsapp_fallback', clientTo:cflow
       })
     });
+    if(t)t.clientFlowStatus=cflow;
   }catch(e){console.warn('persistClientSend',e);}
 }
 function copyToClipboard(text){try{navigator.clipboard&&navigator.clipboard.writeText(text);}catch(_){}}
@@ -2513,7 +2606,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.94-desktop-client-designer-flow-final-fix';
+const BUILD='1.0.95-desktop-client-designer-flow-visibility-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2525,7 +2618,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.94 · Fluxo Cliente/Designers</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.95 · Cliente · Designers</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -2733,7 +2826,8 @@ async function saveTask(){const f=state.form;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
   if(f.contents.length)data.cronContents=f.contents;
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
-  if(secOf(f.sector).key==='cronograma'){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;}
+  if(secOf(f.sector).key==='cronograma'){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
+    data.clientFlowStatus=f._sendAfterSave?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
   const sendAfter=!!f._sendAfterSave;
   const ref=await db.collection('tasks').add(data);
   const sector=f.sector;state.form=null;
