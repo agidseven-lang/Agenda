@@ -273,11 +273,19 @@ check('W_CAP1', 'Portal lê a legenda de c.legenda (HTML inicial + /state) — 2
 check('W_CAP2', 'Precedência de legenda inclui ov.legenda E c.legenda', /typeof ov\.legenda === "string"\) \? ov\.legenda : \(typeof c\.legenda === "string"/.test(W));
 check('W_CAP3', '/state devolve campo JSON "legenda" e o card tem data-field="legenda"', /legenda: \(legRaw/.test(W) && /data-field="legenda"/.test(W));
 // ===== PREVIEW PREMIUM do link (V64.20): card grande clicável no WhatsApp =====
-check('W_OG1', 'Portal define og:image (card grande no WhatsApp)', /property="og:image"/.test(W) && /og:image:width" content="1200"/.test(W));
-check('W_OG2', 'og:image usa a 1ª arte do cronograma (ImageKit) com fallback de marca', /tr=w-1200,h-630/.test(W) && /icon-512\.png/.test(W));
+check('W_OG1', 'og:image aponta para o banner /og/aprovar.png (1200×630)', /const ogImg = "https:\/\/idseven-push\.agidseven\.workers\.dev\/og\/aprovar\.png"/.test(W) && /og:image" content="' \+ ogImg \+ '"/.test(W) && /og:image:width" content="1200"/.test(W) && /og:image:height" content="630"/.test(W));
+check('W_OG2', 'Rota GET /og/aprovar.png serve o PNG embutido (ogBannerResponse + OG_BANNER_B64)', /url\.pathname === "\/og\/aprovar\.png"/.test(W) && /function ogBannerResponse\(\)/.test(W) && /const OG_BANNER_B64=/.test(W));
 check('W_OG3', 'og:title de AÇÃO "Aprovar cronograma — <cliente>"', /Aprovar cronograma — " \+ \(task\.client/.test(W));
-check('W_OG4', 'twitter:card summary_large_image (preview grande)', /name="twitter:card" content="summary_large_image"/.test(W));
-check('W_OG5', '<title> e og:title premium "Aprovar cronograma"', /<title>' \+ ogTitle \+ ' · Aprovação de cronograma/.test(W));
+check('W_OG4', 'twitter:card summary_large_image (cartão GRANDE)', /name="twitter:card" content="summary_large_image"/.test(W));
+check('W_OG5', '<title>/og:title premium "Aprovação de cronograma"', /· Aprovação de cronograma<\/title>/.test(W));
+// Prova FORTE: o base64 embutido decodifica para um PNG real 1200×630.
+check('W_OG6', 'Banner embutido é um PNG VÁLIDO 1200×630', (() => {
+  const m = W.match(/const OG_BANNER_B64="([A-Za-z0-9+/=]+)"/); if (!m) return false;
+  const b = Buffer.from(m[1], 'base64');
+  if (b.slice(0, 8).toString('hex') !== '89504e470d0a1a0a') return false;
+  const w = b.readUInt32BE(16), h = b.readUInt32BE(20);
+  return w === 1200 && h === 630;
+})());
 const feedFn = (W.match(/function clientFeedbackSent\(\)\{[\s\S]*?window\.scrollTo/) || [''])[0];
 check('W2', 'clientFeedbackSent SUBSTITUI a .wrap (sem formulário empilhado)', /w\.innerHTML\s*=\s*CV_TOP\(\)/.test(feedFn));
 check('W3', 'NÃO há insertAdjacentHTML("afterbegin")', !/insertAdjacentHTML\(\s*['"]afterbegin['"]/.test(W));
@@ -397,7 +405,7 @@ check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|Gri
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.110 / Android 1.0.98-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.20 / Desktop 1.0.111 / Android 1.0.99-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
