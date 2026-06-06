@@ -1748,26 +1748,14 @@ function renderClientHtml(task, token, env) {
 
   const pct = total ? Math.round(doneCount / total * 100) : 0;
   const publicUrl = "https://idseven-push.agidseven.workers.dev/cliente/cronograma/" + escapeHtml(token);
-  // V64.20 — PREVIEW PREMIUM do link (card grande e clicável no WhatsApp = o "botão" possível no
-  // compartilhamento por link). Título de ação + descrição + IMAGEM: usa a 1ª arte do cronograma
-  // (ImageKit 1200×630) quando já existir; senão, a marca. (Botão NATIVO no balão exige WhatsApp
-  // Business API/templates — não existe no compartilhamento comum.)
+  // V64.20 — PREVIEW PREMIUM do link (card clicável no WhatsApp = o "botão" possível no
+  // compartilhamento por link). Título de ação + descrição + IMAGEM = LOGO da ID Seven (a pedido).
+  // (Botão NATIVO no balão exige WhatsApp Business API/templates — não existe no link comum.)
   const ogTitleRaw = "Aprovar cronograma — " + (task.client || "Cliente");
   const ogDescRaw = "Sua área de aprovação está pronta. Toque para revisar os temas, aprovar o que estiver correto e solicitar ajustes. Link seguro · Agenda ID Seven.";
   const ogTitle = escapeHtml(ogTitleRaw);
   const ogDesc = escapeHtml(ogDescRaw);
-  const ogArt = (function () {
-    for (let k = 0; k < items.length; k++) {
-      const c = (items[k] && typeof items[k] === "object") ? items[k] : {};
-      let u = c.feedImageUrl || c.storyImageUrl || "";
-      if (!u) { const f = c.feed, s = c.story; u = (typeof f === "string" ? f : (f && f.url) || "") || (typeof s === "string" ? s : (s && s.url) || ""); }
-      if (u) return u;
-    }
-    return "";
-  })();
-  const ogImg = ogArt
-    ? (ogArt.indexOf("ik.imagekit.io") >= 0 ? (ogArt + (ogArt.indexOf("?") >= 0 ? "&" : "?") + "tr=w-1200,h-630,fo-auto,q-82") : ogArt)
-    : "https://agendaidseven.com.br/icon-512.png";
+  const ogImg = "https://agendaidseven.com.br/icon-192.png";  // LOGO da ID Seven no cartão
 
   return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
 '<meta charset="utf-8"/>\n' +
@@ -1780,13 +1768,13 @@ function renderClientHtml(task, token, env) {
 '<meta property="og:description" content="' + ogDesc + '"/>\n' +
 '<meta property="og:url" content="' + publicUrl + '"/>\n' +
 '<meta property="og:site_name" content="Agenda ID Seven"/>\n' +
-'<meta property="og:image" content="' + escapeHtml(ogImg) + '"/>\n' +
-'<meta property="og:image:width" content="1200"/>\n<meta property="og:image:height" content="630"/>\n' +
-'<meta property="og:image:alt" content="Aprovar cronograma — Agenda ID Seven"/>\n' +
-'<meta name="twitter:card" content="summary_large_image"/>\n' +
+'<meta property="og:image" content="' + ogImg + '"/>\n' +
+'<meta property="og:image:width" content="192"/>\n<meta property="og:image:height" content="192"/>\n' +
+'<meta property="og:image:alt" content="ID Seven — Aprovar cronograma"/>\n' +
+'<meta name="twitter:card" content="summary"/>\n' +
 '<meta name="twitter:title" content="' + ogTitle + '"/>\n' +
 '<meta name="twitter:description" content="' + ogDesc + '"/>\n' +
-'<meta name="twitter:image" content="' + escapeHtml(ogImg) + '"/>\n' +
+'<meta name="twitter:image" content="' + ogImg + '"/>\n' +
 '<meta name="robots" content="noindex,nofollow"/>\n' +
 '<style>' + CV_CSS + '</style></head><body>\n' +
 '<div class="wrap">' +
