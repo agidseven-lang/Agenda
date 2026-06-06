@@ -97,6 +97,7 @@ object TaskRepo {
             socialFlowStatus = d.getString("socialFlowStatus"),
             operationalStatus = d.getString("operationalStatus"),
             finalApprovalCompleted = bool(d.get("finalApprovalCompleted")),
+            clientApprovalPhase = d.getString("clientApprovalPhase"),
             designerEndDate = (d.get("designerAssignment") as? Map<*, *>)?.get("endDate") as? String ?: d.getString("endDate"),
             designerEndTime = (d.get("designerAssignment") as? Map<*, *>)?.get("endTime") as? String ?: d.getString("endTime"),
         )

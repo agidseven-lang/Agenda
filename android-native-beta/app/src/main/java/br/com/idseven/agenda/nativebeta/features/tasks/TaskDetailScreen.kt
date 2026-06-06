@@ -339,6 +339,21 @@ private fun OperationalPanel(t: TaskItem) {
         Step("Conclusão operacional", opKey == "concluido"),
     )
     SectionLabel("Operação")
+    // Fase do cliente (themes/production/final) — fica claro o que o cliente está aprovando agora.
+    val phase = TaskVisibility.clientApprovalPhase(t)
+    val phaseColor = when (phase) {
+        "final" -> Color(0xFF34D399); "production" -> Color(0xFFF59E0B); else -> Color(0xFF5B6CFF)
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(11.dp))
+            .background(phaseColor.copy(alpha = 0.10f)).border(1.dp, phaseColor.copy(alpha = 0.35f), RoundedCornerShape(11.dp))
+            .padding(horizontal = 13.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(9.dp).clip(androidx.compose.foundation.shape.CircleShape).background(phaseColor))
+        Spacer(Modifier.width(9.dp))
+        Text("Fase do cliente · ${TaskVisibility.clientApprovalPhaseLabel(phase)}", color = phaseColor, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+    }
     // Próxima ação
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Tokens.Surface)

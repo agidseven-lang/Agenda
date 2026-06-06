@@ -79,6 +79,8 @@ data class TaskItem(
     // EIXO OPERACIONAL (aditivo): status REAL da operação (≠ aprovação do cliente).
     val operationalStatus: String? = null,
     val finalApprovalCompleted: Boolean = false,
+    // FASE de aprovação do cliente: 'themes' | 'production' | 'final'.
+    val clientApprovalPhase: String? = null,
     // prazos do designer (para exibir término no card/detalhe do fluxo).
     val designerEndDate: String? = null,
     val designerEndTime: String? = null,

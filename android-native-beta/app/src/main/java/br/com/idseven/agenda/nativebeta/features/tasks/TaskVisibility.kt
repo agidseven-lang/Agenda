@@ -176,6 +176,27 @@ object TaskVisibility {
     }
 
     // "Próxima ação" em destaque para a Social/Admin.
+    // FASE de aprovação do cliente (themes/production/final) — espelha o Worker V64.13.
+    fun clientApprovalPhase(t: TaskItem): String {
+        val e = t.clientApprovalPhase ?: ""
+        if (e == "themes" || e == "production" || e == "final") return e
+        if (t.finalApprovalCompleted) return "final"
+        if (t.cronStatus == "ready_for_final_client_review") return "final"
+        val arr = t.cronContents
+        val total = arr.size
+        if (total > 0) {
+            val withLeg = arr.count { !it.legenda.isNullOrBlank() }
+            val withFeed = arr.count { !it.feedImageUrl.isNullOrBlank() }
+            if (withLeg == total && withFeed == total) return "production"
+        }
+        return "themes"
+    }
+    fun clientApprovalPhaseLabel(p: String): String = when (p) {
+        "final" -> "Aprovação final"
+        "production" -> "Aprovação de legendas/artes"
+        else -> "Aprovação de temas"
+    }
+
     fun nextActionText(t: TaskItem): String = when (operationalCol(t)) {
         "afazer" -> "Criar o cronograma e enviar ao cliente."
         "producao" -> "Cliente aprovou os temas. Próxima etapa: enviar/acompanhar designer ou produzir legendas e posts."
