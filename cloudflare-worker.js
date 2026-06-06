@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.17-client-flow-e2e-fix]
+   ID Seven — Cloudflare Worker  [V64.18-real-flow-sync-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -95,7 +95,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.17-client-flow-e2e-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.18-real-flow-sync-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1539,7 +1539,10 @@ function clientFeedbackSent(){var w=document.querySelector('.wrap');if(!w)return
   var rows='';document.querySelectorAll('#contents [data-card]').forEach(function(c){var i=+c.dataset.card;var b=c.querySelector('[data-badge]');var t=b?(b.textContent||''):'';
     var lbl=t.indexOf('Aprovado')>=0?'Aprovado':(t.indexOf('Ajuste')>=0?'Ajuste solicitado':(t.indexOf('Editado')>=0?'Editado':'Pendente'));
     rows+='<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px"><span style="color:var(--mut)">Conteúdo '+(i+1)+'</span><b>'+lbl+'</b></div>';});
-  w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.note+'</div><h2>Feedback enviado!</h2><p>Registramos suas aprovações e os ajustes solicitados. A equipe fará as correções e reenviará para sua avaliação neste mesmo link.</p>'+(rows?'<div style="margin:14px 0 4px;text-align:left">'+rows+'</div>':'')+'<div class="phase-banner phase-production" style="justify-content:center;margin-top:6px"><span class="phase-dot"></span><b>Aguardando ajuste da equipe</b></div><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);}
+  w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.note+'</div><h2>Feedback enviado!</h2><p>Registramos suas aprovações e os ajustes solicitados. A equipe fará as correções e elas aparecerão <b>aqui mesmo, automaticamente</b> — você não precisa reabrir o link.</p>'+(rows?'<div style="margin:14px 0 4px;text-align:left">'+rows+'</div>':'')+'<div class="phase-banner phase-production" style="justify-content:center;margin-top:6px"><span class="phase-dot"></span><b>Aguardando ajuste da equipe</b></div><div id="teamupd" style="display:none;margin-top:14px"></div><div class="mid-foot">Atualização automática ativa — pode deixar esta página aberta. 💜</div></div></div>';
+  // V64.18 — entra em modo "aguardando ajuste": o poller detecta quando a equipe corrige e
+  // recarrega o MESMO link automaticamente para o cliente revisar de novo (sem reabrir o WhatsApp).
+  FEEDBACK_MODE=true;FEEDBACK_BASE=null;window.scrollTo(0,0);}
 function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';return el.textContent||'';}
 function sheetForm(title,desc,kind,val,multiline){var inp=multiline?'<textarea id="sIn" placeholder="Escreva aqui...">'+(val||'')+'</textarea>':'<input id="sIn" value="'+(val||'').replace(/"/g,'&quot;')+'"/>';return '<h3></h3><div class="sd"></div>'+inp+'<div class="srow"><button class="btn ghost" data-x="cancel">Cancelar</button><button class="btn '+(kind==='rev'?'warn':'primary')+'" data-x="send">'+(kind==='rev'?'Enviar':'Salvar')+'</button></div>';}
 function openInput(title,desc,kind,val,multiline,cb){openSheet(sheetForm(title,desc,kind,val,multiline));sheet.querySelector('h3').textContent=title;sheet.querySelector('.sd').textContent=desc;pending=cb;}
@@ -1577,21 +1580,52 @@ document.addEventListener('click',function(e){
     });}
   else if(act==='sendGenObs'){var ta=document.getElementById('genObs');var v=ta?ta.value.trim():'';if(!v){toast('Escreva uma observação primeiro.','err');return;}post({action:'comment',note:v},a,function(){if(ta)ta.value='';addHist('note','Comentou no cronograma');toast('Observação enviada','ok');});}
 });
-/* V64.16 — TEMPO REAL: polling leve do mesmo link (sem reabrir, sem gerar link novo). */
-var LAST_SIG=null;
-function applyState(j){(j.items||[]).forEach(function(it){setTheme(it.i,it.tema);if(it.legenda)setLegenda(it.i,it.legenda);setBadge(it.i,it.cs==='aprovado'?'aprovado':it.cs==='em_revisao'?'em_revisao':it.cs==='editado'?'editado':'');});bumpProgress();}
+/* V64.16/18 — TEMPO REAL: polling leve do MESMO link (sem reabrir, sem gerar link novo). */
+var LAST_SIG=null, FEEDBACK_MODE=false, FEEDBACK_BASE=null, LIVE_EL=null;
+// Indicador discreto e PERSISTENTE de atualização automática (canto inferior).
+function liveTick(ok){
+  if(!LIVE_EL){LIVE_EL=document.createElement('div');LIVE_EL.id='livebar';
+    LIVE_EL.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:50;display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;background:rgba(20,22,30,.92);border:1px solid var(--line);color:var(--mut);font-size:12px;backdrop-filter:blur(6px);box-shadow:0 10px 30px -12px rgba(0,0,0,.6)';
+    document.body.appendChild(LIVE_EL);}
+  LIVE_EL.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+(ok?'#34D399':'#9aa0aa')+';box-shadow:0 0 0 3px '+(ok?'rgba(52,211,153,.18)':'rgba(154,160,170,.14)')+'"></span><span>Atualização automática ativa · verificado agora</span>';
+}
+// Mostra, na tela "Feedback enviado!", o aviso CLARO de que a equipe atualizou + recarrega o mesmo link.
+function teamUpdated(){
+  var box=document.getElementById('teamupd');
+  if(box){box.style.display='block';
+    box.innerHTML='<div style="border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.12);border-radius:14px;padding:14px;text-align:center"><div style="font-weight:800;color:#34D399;margin-bottom:4px">A equipe atualizou seu cronograma ✦</div><div style="color:var(--mut);font-size:13px;margin-bottom:10px">As correções estão prontas. Vamos abrir a versão atualizada para você revisar novamente.</div><button class="btn primary" onclick="location.reload()" style="width:auto;padding:10px 18px">Revisar agora</button></div>';}
+  toast('A equipe atualizou — abrindo a versão revisada…','ok');
+  setTimeout(function(){location.reload();},2200);   // mesmo link, sem reabrir o WhatsApp
+}
+function applyState(j,changed){
+  (j.items||[]).forEach(function(it){setTheme(it.i,it.tema);if(it.legenda)setLegenda(it.i,it.legenda);setBadge(it.i,it.cs==='aprovado'?'aprovado':it.cs==='em_revisao'?'em_revisao':it.cs==='editado'?'editado':'');});
+  bumpProgress();
+  // Destaca os conteúdos que a equipe mexeu (anel + scroll até o primeiro).
+  (changed||[]).forEach(function(i){var c=card(i);if(!c)return;c.style.transition='box-shadow .3s';c.style.boxShadow='0 0 0 2px #34D399, 0 0 0 6px rgba(52,211,153,.18)';setTimeout(function(){c.style.boxShadow='';},4000);});
+  if(changed&&changed.length){var f=card(changed[0]);if(f&&f.scrollIntoView)try{f.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}}
+}
 function pollState(){fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
-  if(!j||!j.ok)return;
-  if(j.finalDone){clientSuccess();return;}
+  if(!j||!j.ok){liveTick(false);return;}
+  liveTick(true);
   var sig=JSON.stringify((j.items||[]).map(function(x){return [x.cs,x.tema,x.legenda,x.feed,x.story];}));
+  // Em modo "Feedback enviado!": detecta a correção da equipe e recarrega o MESMO link.
+  if(FEEDBACK_MODE){
+    if(FEEDBACK_BASE===null){FEEDBACK_BASE=sig;return;}
+    if(sig!==FEEDBACK_BASE||!j.pendingRevision){teamUpdated();FEEDBACK_MODE=false;}
+    return;
+  }
+  if(j.finalDone){clientSuccess();return;}
   if(LAST_SIG===null){LAST_SIG=sig;return;}                 // baseline (página já renderizada)
   if(sig===LAST_SIG)return;
-  var prev=JSON.parse(LAST_SIG),mediaChanged=false;
-  (j.items||[]).forEach(function(x,idx){var p=prev[idx]||[];if((x.feed||'')!==(p[3]||'')||(x.story||'')!==(p[4]||''))mediaChanged=true;});
+  var prev=JSON.parse(LAST_SIG),mediaChanged=false,changed=[];
+  (j.items||[]).forEach(function(x,idx){var p=prev[idx]||[];
+    if((x.feed||'')!==(p[3]||'')||(x.story||'')!==(p[4]||''))mediaChanged=true;
+    if((x.tema||'')!==(p[1]||'')||(x.legenda||'')!==(p[2]||''))changed.push(idx);});
   LAST_SIG=sig;
   if(mediaChanged){location.reload();return;}               // Feed/Story novo: re-render completo 1x
-  applyState(j);toast('Atualizado pela equipe.','ok');
-}).catch(function(){});}
+  applyState(j,changed);
+  toast(changed.length?('Tema atualizado pela equipe — revise o Conteúdo '+(changed[0]+1)):'Atualizado pela equipe.','ok');
+}).catch(function(){liveTick(false);});}
 setInterval(pollState,6000);
 `;
 
