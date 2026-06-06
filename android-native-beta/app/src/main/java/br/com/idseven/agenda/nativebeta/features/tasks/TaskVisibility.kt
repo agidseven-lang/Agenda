@@ -148,6 +148,7 @@ object TaskVisibility {
     val OPERATIONAL_COLS = listOf(
         OpCol("afazer", "A Fazer"),
         OpCol("producao", "Em produção"),
+        OpCol("aguardando_envio", "Aguardando envio ao designer"),
         OpCol("aguardando_designer", "Aguardando designer"),
         OpCol("aguardando_legenda", "Aguardando legenda/post"),
         OpCol("aguardando_revisao", "Revisão do cliente"),
@@ -195,9 +196,10 @@ object TaskVisibility {
             if (designerCol(t) != "concluido") return "aguardando_designer"
             return if (pendingProduction(t)) "aguardando_legenda" else "aguardando_final"
         }
-        if (cf == "aprovado") return if (pendingProduction(t)) "aguardando_legenda" else "producao"
+        // SEM designer atribuído: NUNCA mostrar produção/legenda/entrega.
+        if (cf == "aprovado") return "aguardando_envio"   // temas aprovados → falta ENVIAR ao designer
         if (cf == "afazer") return "afazer"
-        return "producao"
+        return "producao"                                 // enviado ao cliente, aguardando feedback
     }
 
     // Bucket de 4 colunas (afazer/andamento/revisao/concluido) para o quadro por papel e
@@ -237,10 +239,11 @@ object TaskVisibility {
 
     fun nextActionText(t: TaskItem): String = when (operationalCol(t)) {
         "afazer" -> "Criar o cronograma e enviar ao cliente."
-        "producao" -> "Cliente aprovou os temas. Próxima etapa: enviar/acompanhar designer ou produzir legendas e posts."
+        "producao" -> "Enviado ao cliente. Próxima etapa: aguardar o feedback do cliente sobre os temas."
+        "aguardando_envio" -> "Temas aprovados. Próxima etapa: enviar o cronograma ao designer."
         "aguardando_designer" -> "Designer produzindo. Próxima etapa: aguardar a entrega do designer."
         "aguardando_legenda" -> "Designer entregou. Próxima etapa: revisar, adicionar legenda e posts (Feed/Story)."
-        "aguardando_revisao" -> "Cliente pediu revisão. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link."
+        "aguardando_revisao" -> "Cliente pediu ajuste. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link."
         "aguardando_final" -> "Tudo pronto. Próxima etapa: reenviar ao cliente e aguardar a aprovação final."
         "concluido" -> "Aprovação final concluída. Tarefa encerrada operacionalmente."
         else -> "Acompanhar o andamento."
