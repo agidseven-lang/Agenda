@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.19-client-caption-render-fix]
+   ID Seven — Cloudflare Worker  [V64.20-client-link-preview-premium]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -95,7 +95,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.19-client-caption-render-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.20-client-link-preview-premium" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1748,20 +1748,45 @@ function renderClientHtml(task, token, env) {
 
   const pct = total ? Math.round(doneCount / total * 100) : 0;
   const publicUrl = "https://idseven-push.agidseven.workers.dev/cliente/cronograma/" + escapeHtml(token);
-  const ogTitle = cliente + " · " + titulo;
-  const ogDesc = total ? ("Cronograma com " + total + " " + (total === 1 ? "conteúdo" : "conteúdos") + " — " + status + ".") : ("Cronograma — " + status + ".");
+  // V64.20 — PREVIEW PREMIUM do link (card grande e clicável no WhatsApp = o "botão" possível no
+  // compartilhamento por link). Título de ação + descrição + IMAGEM: usa a 1ª arte do cronograma
+  // (ImageKit 1200×630) quando já existir; senão, a marca. (Botão NATIVO no balão exige WhatsApp
+  // Business API/templates — não existe no compartilhamento comum.)
+  const ogTitleRaw = "Aprovar cronograma — " + (task.client || "Cliente");
+  const ogDescRaw = "Sua área de aprovação está pronta. Toque para revisar os temas, aprovar o que estiver correto e solicitar ajustes. Link seguro · Agenda ID Seven.";
+  const ogTitle = escapeHtml(ogTitleRaw);
+  const ogDesc = escapeHtml(ogDescRaw);
+  const ogArt = (function () {
+    for (let k = 0; k < items.length; k++) {
+      const c = (items[k] && typeof items[k] === "object") ? items[k] : {};
+      let u = c.feedImageUrl || c.storyImageUrl || "";
+      if (!u) { const f = c.feed, s = c.story; u = (typeof f === "string" ? f : (f && f.url) || "") || (typeof s === "string" ? s : (s && s.url) || ""); }
+      if (u) return u;
+    }
+    return "";
+  })();
+  const ogImg = ogArt
+    ? (ogArt.indexOf("ik.imagekit.io") >= 0 ? (ogArt + (ogArt.indexOf("?") >= 0 ? "&" : "?") + "tr=w-1200,h-630,fo-auto,q-82") : ogArt)
+    : "https://agendaidseven.com.br/icon-512.png";
 
   return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
 '<meta charset="utf-8"/>\n' +
 '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>\n' +
-'<title>' + ogTitle + ' · Visão do Cliente</title>\n' +
-'<meta name="description" content="' + escapeHtml(ogDesc) + '"/>\n' +
-'<meta name="theme-color" content="#070810"/>\n' +
+'<title>' + ogTitle + ' · Aprovação de cronograma</title>\n' +
+'<meta name="description" content="' + ogDesc + '"/>\n' +
+'<meta name="theme-color" content="#5B6CFF"/>\n' +
 '<meta property="og:type" content="website"/>\n' +
-'<meta property="og:title" content="' + escapeHtml(ogTitle) + '"/>\n' +
-'<meta property="og:description" content="' + escapeHtml(ogDesc) + '"/>\n' +
+'<meta property="og:title" content="' + ogTitle + '"/>\n' +
+'<meta property="og:description" content="' + ogDesc + '"/>\n' +
 '<meta property="og:url" content="' + publicUrl + '"/>\n' +
 '<meta property="og:site_name" content="Agenda ID Seven"/>\n' +
+'<meta property="og:image" content="' + escapeHtml(ogImg) + '"/>\n' +
+'<meta property="og:image:width" content="1200"/>\n<meta property="og:image:height" content="630"/>\n' +
+'<meta property="og:image:alt" content="Aprovar cronograma — Agenda ID Seven"/>\n' +
+'<meta name="twitter:card" content="summary_large_image"/>\n' +
+'<meta name="twitter:title" content="' + ogTitle + '"/>\n' +
+'<meta name="twitter:description" content="' + ogDesc + '"/>\n' +
+'<meta name="twitter:image" content="' + escapeHtml(ogImg) + '"/>\n' +
 '<meta name="robots" content="noindex,nofollow"/>\n' +
 '<style>' + CV_CSS + '</style></head><body>\n' +
 '<div class="wrap">' +
