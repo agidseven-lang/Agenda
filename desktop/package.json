@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.103",
-  "description": "Agenda ID Seven Desktop — board filters polish (Electron)",
+  "version": "1.0.104",
+  "description": "Agenda ID Seven Desktop — client-flow E2E fix (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

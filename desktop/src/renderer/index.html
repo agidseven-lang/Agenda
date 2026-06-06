@@ -1269,7 +1269,16 @@ function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch
 function subscribeData(){
   unsub.users=db.collection('users').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}render();});
   unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));render();});
-  unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=s.docs.map(d=>Object.assign({id:d.id},d.data()));render();});
+  unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=dedupById(s.docs.map(d=>Object.assign({id:d.id},d.data())));render();});
+}
+// 1.0.104 — dedup defensivo por id: garante uma ÚNICA fonte por tarefa antes do render.
+// Se o snapshot trouxer (ou um fallback acumular) o mesmo id, mantém a última ocorrência.
+// Corrige cards/telas empilhados (dois cards um embaixo do outro).
+function dedupById(arr){
+  if(!Array.isArray(arr))return [];
+  const m=new Map();
+  for(const it of arr){if(it&&it.id!=null)m.set(it.id,it);}
+  return Array.from(m.values());
 }
 
 /* ---- LOGIN UI ---- */
@@ -1357,7 +1366,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.103 · Filtros premium</span><br>espelha o APK <b>1.0.91-beta-board-filters-polish</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.104 · Fluxo cliente E2E</span><br>espelha o APK <b>1.0.92-beta-client-flow-e2e-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2146,6 +2155,9 @@ function openItemFix(taskId,idx,field){
       '<button class="btn ce-edit" data-itemfixsave="'+taskId+'|'+idx+'|'+field+'|save">'+svg('check')+'Salvar correção</button>'+
       '<button class="btn send-go" data-itemfixsave="'+taskId+'|'+idx+'|'+field+'|resend">'+svg('send')+'Salvar e reenviar ao cliente</button></div>'+
   '</div></div>';
+  // 1.0.104 — foco imediato no campo (responde no PRIMEIRO clique). Antes o input só
+  // "acordava" depois de um segundo clique/navegação (Problema 5).
+  setTimeout(function(){var i=document.getElementById('ifIn');if(i){try{i.focus();var n=i.value.length;if(i.setSelectionRange)i.setSelectionRange(n,n);}catch(e){}}},30);
 }
 async function saveItemFix(taskId,idx,field,val,resend){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
@@ -2876,13 +2888,25 @@ async function deleteTask(taskId){
   // Kanban e celular atualizam sozinhos via onSnapshot.
 }
 function closeModal(){document.getElementById('modalRoot').innerHTML='';if(_deferRender){_deferRender=false;render();}}
-// 1.0.102 — guarda de edição: há modal aberto com campo OU um input/textarea em foco?
+// 1.0.104 — guarda de edição ESCOPADA. Só adia o render (snapshot do Firestore) quando há
+// uma edição REAL aberta que seria destruída: (a) um modal aberto com campo de edição, ou
+// (b) o wizard de criação (state.form) com um campo em foco DENTRO do #content.
+// NÃO adia mais por causa da busca/chips da toolbar do quadro — era isso que travava a
+// toolbar "Meu quadro / Cliente / Designer / Social Media / Setores" de aparecer sem dar
+// um passo de navegação extra (Problema 2). A toolbar e os cards re-renderizam na hora.
 let _deferRender=false;
 function _editingNow(){
   const mr=document.getElementById('modalRoot');
   if(mr&&mr.firstChild&&mr.querySelector('input,textarea,select'))return true;
   const a=document.activeElement;
-  return !!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable));
+  if(!a)return false;
+  const isField=(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable);
+  if(!isField)return false;
+  // Foco na busca/filtros da toolbar do quadro NUNCA bloqueia o render.
+  if(a.closest&&a.closest('.d-board-tools,.tbar,.tflow-tabs,.tflow-chipbar,.bsearch'))return false;
+  // Só adia quando o foco está num campo do wizard de criação aberto.
+  if(state.form&&a.closest&&a.closest('#content'))return true;
+  return false;
 }
 
 /* ---- EQUIPE / CHAT / PERFIL ---- */
@@ -3116,10 +3140,14 @@ function composedDesc(){const f=state.form;const sub=curSub();const t=tpl();let 
   return lines.join('\n').trim();
 }
 async function saveTask(){const f=state.form;
-  if(!f.sector){alert('Selecione o setor.');f.step=0;render();return;}
+  if(!f)return;
+  // 1.0.104 — trava anti-duplo-envio: dois cliques rápidos em "Confirmar/Enviar" criavam
+  // DOIS docs de tarefa (duas telas/cards). Um único add por submissão.
+  if(f._saving)return; f._saving=true;
+  if(!f.sector){f._saving=false;alert('Selecione o setor.');f.step=0;render();return;}
   const t=tpl();
-  if(t&&t.clientRequired&&!f.client.trim()){alert('Para Cronograma o cliente é obrigatório.');f.step=1;render();return;}
-  if(!f.title.trim()){alert('Informe o título.');f.step=1;render();return;}
+  if(t&&t.clientRequired&&!f.client.trim()){f._saving=false;alert('Para Cronograma o cliente é obrigatório.');f.step=1;render();return;}
+  if(!f.title.trim()){f._saving=false;alert('Informe o título.');f.step=1;render();return;}
   const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
   if(f.contents.length)data.cronContents=f.contents;
@@ -3131,7 +3159,9 @@ async function saveTask(){const f=state.form;
   if(secOf(f.sector).key==='cronograma'){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
     data.clientFlowStatus=f._sendAfterSave?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
   const sendAfter=!!f._sendAfterSave;
-  const ref=await db.collection('tasks').add(data);
+  let ref;
+  try{ref=await db.collection('tasks').add(data);}
+  catch(e){f._saving=false;console.warn('saveTask add',e);alert('Não foi possível salvar a tarefa. Verifique a conexão e tente novamente.');render();return;}
   const sector=f.sector;state.form=null;
   if(sendAfter&&ref&&ref.id){
     // mantemos o board aberto e abrimos o modal de envio com a tarefa recem-criada
