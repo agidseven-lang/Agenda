@@ -1,73 +1,134 @@
 <!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Prévia · Mensagem + Cartão com a LOGO ID Seven (WhatsApp) — para aprovação</title>
+<title>Prévia · Banner PREMIUM 1200×630 do link (WhatsApp) — para aprovação</title>
 <style>
   *{box-sizing:border-box}
-  body{margin:0;background:#0b141a;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e9edef;padding:24px}
-  h1{font-size:18px;margin:0 0 4px}.sub{color:#8696a0;font-size:13px;margin:0 0 20px}
-  .phone{width:390px;max-width:100%;background:#0b141a;border:1px solid #223;border-radius:22px;overflow:hidden;box-shadow:0 24px 60px -20px #000}
+  body{margin:0;background:#0b0c12;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e9edef;padding:26px}
+  h1{font-size:19px;margin:0 0 4px}.sub{color:#8696a0;font-size:13px;margin:0 0 22px}
+  .row{display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start}
+  .cap{color:#8fa0ad;font-size:12px;margin:0 0 8px;font-weight:700;letter-spacing:.3px}
+
+  /* ===== BANNER OG 1200x630 (premium SaaS) — exibido a 600x315 ===== */
+  .ogwrap{width:600px;height:315px;overflow:hidden;border-radius:16px;box-shadow:0 30px 70px -25px #000}
+  .og{width:1200px;height:630px;transform:scale(.5);transform-origin:top left;position:relative;
+      background:radial-gradient(1200px 700px at 78% -12%,rgba(124,92,255,.55),transparent 60%),
+                 radial-gradient(900px 600px at 8% 120%,rgba(34,211,184,.40),transparent 55%),
+                 linear-gradient(135deg,#0b0e22 0%,#141a3a 48%,#0c1330 100%);
+      color:#fff;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:flex;flex-direction:column;justify-content:space-between;padding:64px 72px}
+  .og::after{content:"";position:absolute;right:-120px;top:-120px;width:520px;height:520px;border-radius:50%;
+      background:conic-gradient(from 120deg,rgba(124,92,255,.0),rgba(124,92,255,.25),rgba(34,211,184,.18),rgba(124,92,255,0));filter:blur(8px)}
+  .og-top{display:flex;align-items:center;gap:18px;position:relative;z-index:2}
+  .og-logo{width:74px;height:74px;flex:none}
+  .og-brand{font-weight:800;font-size:26px;letter-spacing:.5px}
+  .og-brand small{display:block;font-weight:600;font-size:15px;color:#aeb6e6;letter-spacing:.4px}
+  .og-mid{position:relative;z-index:2}
+  .og-kicker{display:inline-block;font-size:18px;font-weight:700;color:#22d3b8;background:rgba(34,211,184,.12);
+      border:1px solid rgba(34,211,184,.35);padding:8px 16px;border-radius:999px;margin-bottom:20px}
+  .og-h1{font-size:66px;line-height:1.02;font-weight:800;margin:0 0 14px;letter-spacing:-1px}
+  .og-h1 span{background:linear-gradient(90deg,#a78bff,#22d3b8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .og-p{font-size:25px;color:#c7cfe8;max-width:760px;line-height:1.3}
+  .og-bot{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2}
+  .og-cta{display:inline-flex;align-items:center;gap:12px;font-size:24px;font-weight:800;color:#0b0e22;
+      background:linear-gradient(135deg,#a78bff,#7c5cff);padding:18px 34px;border-radius:16px;box-shadow:0 18px 40px -14px rgba(124,92,255,.8)}
+  .og-secure{display:flex;align-items:center;gap:10px;font-size:19px;color:#aab4dd;font-weight:600}
+
+  /* ===== WhatsApp mockup com o banner grande ===== */
+  .phone{width:400px;background:#0b141a;border:1px solid #223;border-radius:22px;overflow:hidden;box-shadow:0 24px 60px -20px #000}
   .wa-top{background:#202c33;padding:12px 14px;display:flex;align-items:center;gap:10px}
   .wa-av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#5B6CFF,#22D3B8);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
   .wa-name{font-weight:700;font-size:14.5px}.wa-st{color:#8696a0;font-size:11.5px}
-  .wa-body{background:#0b141a;padding:16px 12px 22px;min-height:360px}
+  .wa-body{background:#0b141a;padding:16px 12px 22px}
   .label{color:#8696a0;font-size:11px;text-align:center;margin:4px 0 14px}
-  .bubble{background:#005c4b;border-radius:12px;border-top-right-radius:4px;margin-left:auto;max-width:320px;padding:6px 6px 8px;box-shadow:0 1px 1px rgba(0,0,0,.3)}
-  /* CARTÃO COMPACTO do link (como o WhatsApp mostra com a LOGO quadrada) */
-  .lp{background:#025144;border-radius:8px;overflow:hidden;margin-bottom:4px;display:flex;cursor:pointer}
-  .lp-thumb{width:74px;min-width:74px;height:74px;display:flex;align-items:center;justify-content:center;background:radial-gradient(120% 120% at 30% 10%,#20264a 0%,#0e1430 70%)}
-  .lp-thumb svg{width:50px;height:50px}
-  .lp-meta{padding:8px 11px;min-width:0}
-  .lp-title{font-weight:700;font-size:13.5px;line-height:1.25;margin-bottom:2px}
-  .lp-desc{color:#cfe9e0;font-size:11.5px;line-height:1.3;max-height:30px;overflow:hidden}
-  .lp-dom{color:#8fd0c2;font-size:10.5px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .msg{font-size:14.2px;line-height:1.45;white-space:pre-wrap;padding:4px 6px 0;color:#e9edef}
+  .bubble{background:#005c4b;border-radius:12px;border-top-right-radius:4px;margin-left:auto;max-width:330px;padding:6px 6px 8px}
+  .lp{background:#025144;border-radius:8px;overflow:hidden;margin-bottom:4px;cursor:pointer}
+  .lp-banner{width:100%;height:184px;overflow:hidden}
+  .lp-banner .ogwrap{width:100%;height:184px;border-radius:0;box-shadow:none}
+  .lp-banner .og{transform:scale(.3145);}
+  .lp-meta{padding:9px 11px}
+  .lp-title{font-weight:700;font-size:14px;margin-bottom:2px}
+  .lp-desc{color:#cfe9e0;font-size:12px;line-height:1.3}
+  .lp-dom{color:#8fd0c2;font-size:11px;margin-top:5px}
+  .msg{font-size:14.2px;line-height:1.45;white-space:pre-wrap;padding:4px 6px 0}
   .msg b{font-weight:800}.msg a{color:#7fd6ff;word-break:break-all}
   .time{color:#8696a0;font-size:10.5px;text-align:right;padding:2px 6px 0}
-  .note{max-width:780px;color:#b9c4cc;font-size:13px;line-height:1.55;margin-top:18px}
+  .note{max-width:820px;color:#b9c4cc;font-size:13px;line-height:1.6;margin-top:22px}
   .note b{color:#fff}
 </style></head>
 <body>
-  <h1>Prévia para aprovação — Mensagem + Cartão com a LOGO da ID Seven</h1>
-  <p class="sub">O cartão (logo + “Aprovar cronograma”) é clicável — é o “botão” possível no envio por link.</p>
+  <h1>Banner PREMIUM do link (padrão SaaS) — prévia para aprovação</h1>
+  <p class="sub">Imagem 1200×630 dinâmica (logo + nome do cliente + CTA). É o cartão GRANDE que o WhatsApp mostra ao enviar o link.</p>
 
-  <div class="phone">
-    <div class="wa-top"><div class="wa-av">HV</div><div><div class="wa-name">Hospital Visão</div><div class="wa-st">online</div></div></div>
-    <div class="wa-body">
-      <div class="label">HOJE</div>
-      <div class="bubble">
-        <div class="lp">
-          <div class="lp-thumb">
-            <!-- LOGO REAL da ID Seven (mesma marca do app/portal) -->
-            <svg viewBox="0 0 96 96" aria-label="ID Seven"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#c64bd8"/></linearGradient></defs><circle cx="48" cy="48" r="43" fill="none" stroke="url(#g)" stroke-width="7"/><circle cx="48" cy="48" r="29" fill="#22d3b8"/><rect x="34" y="38" width="28" height="20" rx="3" fill="#fff"/><rect x="42" y="60" width="12" height="3" rx="1.5" fill="#fff"/><rect x="38" y="43" width="20" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="47.5" width="14" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="52" width="17" height="2.4" rx="1.2" fill="#0c2f2a"/></svg>
+  <div class="row">
+    <div>
+      <p class="cap">1 · O BANNER (1200×630) — imagem do cartão</p>
+      <div class="ogwrap">
+        <div class="og">
+          <div class="og-top">
+            <svg class="og-logo" viewBox="0 0 96 96"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#c64bd8"/></linearGradient></defs><circle cx="48" cy="48" r="43" fill="none" stroke="url(#g)" stroke-width="7"/><circle cx="48" cy="48" r="29" fill="#22d3b8"/><rect x="34" y="38" width="28" height="20" rx="3" fill="#fff"/><rect x="42" y="60" width="12" height="3" rx="1.5" fill="#fff"/><rect x="38" y="43" width="20" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="47.5" width="14" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="52" width="17" height="2.4" rx="1.2" fill="#0c2f2a"/></svg>
+            <div class="og-brand">Agenda ID Seven<small>Visão do Cliente</small></div>
           </div>
-          <div class="lp-meta">
-            <div class="lp-title">Aprovar cronograma — Hospital Visão</div>
-            <div class="lp-desc">Sua área de aprovação está pronta. Toque para revisar e aprovar.</div>
-            <div class="lp-dom">idseven-push.agidseven.workers.dev</div>
+          <div class="og-mid">
+            <span class="og-kicker">APROVAÇÃO DE CRONOGRAMA</span>
+            <h1 class="og-h1">Aprovar cronograma<br><span>Hospital Visão</span></h1>
+            <p class="og-p">Sua área de aprovação está pronta. Revise os temas, aprove e solicite ajustes — tudo em um link seguro.</p>
+          </div>
+          <div class="og-bot">
+            <div class="og-cta">Revisar e aprovar →</div>
+            <div class="og-secure">🔒 Link seguro · Cronograma semanal</div>
           </div>
         </div>
-        <div class="msg">Olá, Hospital Visão. 👋
+      </div>
+    </div>
 
-A primeira etapa do <b>Cronograma semanal</b> (cronograma semanal) já está pronta para a sua avaliação.
+    <div>
+      <p class="cap">2 · COMO O CLIENTE VÊ NO WHATSAPP</p>
+      <div class="phone">
+        <div class="wa-top"><div class="wa-av">HV</div><div><div class="wa-name">Hospital Visão</div><div class="wa-st">online</div></div></div>
+        <div class="wa-body">
+          <div class="label">HOJE</div>
+          <div class="bubble">
+            <div class="lp">
+              <div class="lp-banner"><div class="ogwrap"><div class="og">
+                <div class="og-top">
+                  <svg class="og-logo" viewBox="0 0 96 96"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#c64bd8"/></linearGradient></defs><circle cx="48" cy="48" r="43" fill="none" stroke="url(#g2)" stroke-width="7"/><circle cx="48" cy="48" r="29" fill="#22d3b8"/><rect x="34" y="38" width="28" height="20" rx="3" fill="#fff"/><rect x="42" y="60" width="12" height="3" rx="1.5" fill="#fff"/><rect x="38" y="43" width="20" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="47.5" width="14" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="52" width="17" height="2.4" rx="1.2" fill="#0c2f2a"/></svg>
+                  <div class="og-brand">Agenda ID Seven<small>Visão do Cliente</small></div>
+                </div>
+                <div class="og-mid">
+                  <span class="og-kicker">APROVAÇÃO DE CRONOGRAMA</span>
+                  <h1 class="og-h1">Aprovar cronograma<br><span>Hospital Visão</span></h1>
+                  <p class="og-p">Sua área de aprovação está pronta. Revise, aprove e peça ajustes.</p>
+                </div>
+                <div class="og-bot">
+                  <div class="og-cta">Revisar e aprovar →</div>
+                  <div class="og-secure">🔒 Link seguro</div>
+                </div>
+              </div></div></div>
+              <div class="lp-meta">
+                <div class="lp-title">Aprovar cronograma — Hospital Visão</div>
+                <div class="lp-desc">Sua área de aprovação está pronta. Toque para revisar e aprovar.</div>
+                <div class="lp-dom">idseven-push.agidseven.workers.dev</div>
+              </div>
+            </div>
+            <div class="msg">Olá, Hospital Visão. 👋
 
-Você poderá revisar os temas, aprovar o que estiver correto e solicitar ajustes quando necessário.
+A primeira etapa do <b>Cronograma semanal</b> já está pronta para a sua avaliação.
 
 🔒 Acesse a sua área de aprovação pelo link seguro abaixo:
 
-<a href="#">https://idseven-push.agidseven.workers.dev/cliente/cronograma/d9ed6b9a8282…</a>
+<a href="#">https://idseven-push.agidseven.workers.dev/cliente/cronograma/d9ed…</a>
 
 Após a sua avaliação, seguimos para a próxima etapa de produção.
 
 <b>Equipe ID Seven</b></div>
-        <div class="time">18:44 ✓✓</div>
+            <div class="time">18:44 ✓✓</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <p class="note"><b>O que muda nesta prévia (a seu pedido):</b><br>
-  • A imagem do cartão agora é a <b>logo da ID Seven</b> (em todas as etapas).<br>
-  • Como a logo é <b>quadrada</b>, o WhatsApp exibe o cartão <b>compacto</b> (logo + título + descrição), como acima.<br>
-  • Se você quiser um cartão <b>grande</b> (faixa larga) com a logo, eu preciso de uma <b>arte 1200×630</b> (logo sobre fundo da marca) — você me envia essa arte, ou eu monto se liberar o ImageKit. Aí o cartão vira banner.<br>
-  • Domínio: posso trocar <b>idseven-push…workers.dev</b> por <b>agendaidseven.com.br/aprovar/…</b> (DNS + rota Cloudflare) se autorizar.<br>
-  • <b>Nada será publicado/gerado</b> até você aprovar.</p>
+  <p class="note"><b>Para aprovar:</b> este é o banner premium 1200×630 (logo + nome do cliente + CTA "Revisar e aprovar") que substitui o cartão amador.<br>
+  <b>Como eu torno isso real no WhatsApp:</b> o Worker vai <b>gerar essa imagem dinamicamente</b> (por cliente) em PNG 1200×630 e publicá-la como a imagem de preview do link (og:image). Isso usa geração de imagem no Cloudflare (Satori/Workers-OG) — eu implemento após a sua aprovação do design.<br>
+  <b>Ajustes possíveis:</b> cores, texto do CTA, kicker, mostrar/ocultar o tipo (semanal), e trocar o domínio para <b>agendaidseven.com.br/aprovar/…</b>.<br>
+  <b>Nada será gerado/publicado até você aprovar este design.</b></p>
 </body></html>
