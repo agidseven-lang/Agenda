@@ -267,6 +267,13 @@ check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(D
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
 check('D20', 'Rodapé mostra Desktop 1.0.105', /Desktop 1\.0\.105/.test(DH));
+// CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
+check('D21', 'Login/título/watermark mostram 1.0.105 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.105/.test(DH) && /<title>ID Seven · Desktop 1\.0\.105/.test(DH) && /id="wpbadge">Desktop 1\.0\.105/.test(DH));
+check('D22', 'Login espelha o APK 1.0.93-beta-real-flow-sync-fix', /espelha o APK <b>1\.0\.93-beta-real-flow-sync-fix/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.105'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
+  !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.93-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
 check('N1', 'versionName 1.0.93-beta-real-flow-sync-fix', /versionName\s+"1\.0\.93-beta-real-flow-sync-fix"/.test(GRADLE));
