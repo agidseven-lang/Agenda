@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.14-operational-status-consistency-fix]
+   ID Seven — Cloudflare Worker  [V64.15-flow-state-machine-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.14-operational-status-consistency-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.15-flow-state-machine-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1486,6 +1486,8 @@ function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.q
 // V64.13 — Confirmação INTERMEDIÁRIA: temas aprovados (NÃO encerra; mantém o cronograma ativo).
 function clientThemesApproved(){var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);var w=document.querySelector('.wrap');if(!w)return;var card='<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Temas aprovados!</h2><p>A equipe seguirá com a produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';w.insertAdjacentHTML('afterbegin',card);window.scrollTo(0,0);}
 function clientProductionApproved(){var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);var w=document.querySelector('.wrap');if(!w)return;var card='<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Legendas e artes aprovadas!</h2><p>A equipe enviará a versão final completa para sua aprovação. Em breve você receberá o aviso neste mesmo link.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';w.insertAdjacentHTML('afterbegin',card);window.scrollTo(0,0);}
+// V64.15 — feedback PARCIAL enviado (há ajustes pedidos): NÃO encerra, NÃO segue p/ produção.
+function clientFeedbackSent(){var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);var w=document.querySelector('.wrap');if(!w)return;var card='<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.note+'</div><h2>Feedback enviado!</h2><p>Registramos suas aprovações e os ajustes solicitados. A equipe fará as correções e reenviará para sua avaliação neste mesmo link.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';w.insertAdjacentHTML('afterbegin',card);window.scrollTo(0,0);}
 function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';return el.textContent||'';}
 function sheetForm(title,desc,kind,val,multiline){var inp=multiline?'<textarea id="sIn" placeholder="Escreva aqui...">'+(val||'')+'</textarea>':'<input id="sIn" value="'+(val||'').replace(/"/g,'&quot;')+'"/>';return '<h3></h3><div class="sd"></div>'+inp+'<div class="srow"><button class="btn ghost" data-x="cancel">Cancelar</button><button class="btn '+(kind==='rev'?'warn':'primary')+'" data-x="send">'+(kind==='rev'?'Enviar':'Salvar')+'</button></div>';}
 function openInput(title,desc,kind,val,multiline,cb){openSheet(sheetForm(title,desc,kind,val,multiline));sheet.querySelector('h3').textContent=title;sheet.querySelector('.sd').textContent=desc;pending=cb;}
@@ -1501,6 +1503,7 @@ document.addEventListener('click',function(e){
   else if(act==='editLegenda'){openInput('Editar legenda — Conteúdo '+(i+1),'Ajuste a legenda deste conteúdo do jeito que preferir.','ok',getText(i,'legenda'),true,function(v){post({action:'editLegenda',contentIndex:i,value:v},null,function(){setLegenda(i,v);setBadge(i,'editado');addHist('edit','Editou a legenda de Conteúdo '+(i+1));toast('Legenda atualizada','ok');});});}
   else if(act==='noteItem'){openInput('Observação — Conteúdo '+(i+1),'Deixe uma observação específica para este conteúdo.','ok','',true,function(v){if(!v.trim())return;post({action:'noteItem',contentIndex:i,note:v},null,function(){setItemNote(i,v);addHist('note','Comentou em Conteúdo '+(i+1));toast('Observação registrada','ok');});});}
   else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar no cronograma como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
+  else if(act==='ackFeedback'){clientFeedbackSent();return;}
   else if(act==='approveAll'){var ph=a.getAttribute('data-phase')||'themes';
     var msg=ph==='final'?'Confirmar APROVAÇÃO FINAL do cronograma? Esta é a etapa que encerra o processo.'
       :ph==='production'?'Confirmar aprovação das legendas e artes? A equipe ainda enviará a versão final para você.'
@@ -1533,6 +1536,11 @@ function renderClientHtml(task, token, env) {
   // Tela de sucesso só aparece quando a fase é 'final' (gating do clientSuccess).
   const phase = clientPhase(task);
   const phaseUi = phaseCopy(phase);
+  // V64.15 — aprovação PARCIAL: algum conteúdo com ajuste/edição pedido? Então NÃO mostrar
+  // o CTA global "Aprovar todos" como se tudo estivesse ok.
+  const pendingRevision = Object.keys(cItems).some(function (k) {
+    const cs = cItems[k] && cItems[k].cs; return cs === "em_revisao" || cs === "editado";
+  }) || (task.clientReview && task.clientReview.status === "revisao");
 
   function firstUrl(v) {
     if (!v) return "";
@@ -1578,7 +1586,7 @@ function renderClientHtml(task, token, env) {
       const feedUrl = firstUrl(c.feed) || (c.feedImageUrl || "");
       const storyUrl = firstUrl(c.story || c.stories) || (c.storyImageUrl || "");
       const b = badge(cs);
-      const open = i === 0 ? " is-open" : "";
+      const open = "";   // V64.15 — conteúdos iniciam COLAPSADOS; cliente abre cada um ao tocar
       return '<div class="card' + open + '" data-card="' + i + '">' +
         '<div class="chead" data-toggle="' + i + '">' +
           '<div class="cidx">' + (i + 1) + '</div>' +
@@ -1672,9 +1680,14 @@ function renderClientHtml(task, token, env) {
   '<div class="hist" id="hist">' + histHtml + '</div>' +
   '<div class="foot">Link público seguro · Agenda ID Seven · ' + new Date().getFullYear() + '</div>' +
 '</div>' +
-'<div class="gactions"><div class="inner"><div class="gstat">Você pode aprovar tudo, ajustar itens específicos ou pedir uma revisão geral — <b>sem obrigação de editar todos.</b></div>' +
-  '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
-  '<button class="btn primary" data-act="approveAll" data-phase="' + phase + '">' + ICN.check + escapeHtml(phaseUi.cta) + '</button></div></div>' +
+'<div class="gactions"><div class="inner">' + (pendingRevision
+  ? '<div class="gstat">Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</div>' +
+    '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir mais ajustes</button>' +
+    '<button class="btn primary" data-act="ackFeedback">' + ICN.check + 'Enviar feedback para a equipe</button>'
+  : '<div class="gstat">Você pode aprovar tudo, ajustar itens específicos ou pedir uma revisão geral — <b>sem obrigação de editar todos.</b></div>' +
+    '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
+    '<button class="btn primary" data-act="approveAll" data-phase="' + phase + '">' + ICN.check + escapeHtml(phaseUi.cta) + '</button>'
+) + '</div></div>' +
 '<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
 '<div class="toast" id="toast"></div>' +
 '<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';\n' + CV_JS + '\n</script>\n' +
