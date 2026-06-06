@@ -215,6 +215,45 @@ object TaskVisibility {
         }
     }
 
+    // 1.0.93 — COLUNAS POR CONTEXTO (espelha o Desktop 1.0.105). Reduz o excesso de colunas;
+    // o detalhe operacional segue visível no card. Social=4, Designer=3, Cliente=4.
+    val SOCIAL_COLS4 = listOf(
+        OpCol("afazer", "A Fazer"), OpCol("andamento", "Em andamento"),
+        OpCol("revisao", "Revisão"), OpCol("concluido", "Finalizado"),
+    )
+    val DESIGNER_COLS3 = listOf(
+        OpCol("afazer", "A Fazer"), OpCol("andamento", "Em andamento"), OpCol("entregue", "Entregue"),
+    )
+    val CLIENT_COLS4 = listOf(
+        ClientCol("enviado", "Enviado"), ClientCol("analise", "Em análise"),
+        ClientCol("revisao", "Revisão solicitada"), ClientCol("aprovado", "Aprovado"),
+    )
+    // Bucket de 3 colunas do DESIGNER (a partir do eixo de trabalho do designer).
+    fun designerCol3(t: TaskItem): String = when (designerCol(t)) {
+        "concluido" -> "entregue"; "afazer" -> "afazer"; else -> "andamento"
+    }
+    // Bucket de 4 colunas do CLIENTE (a partir do eixo do cliente).
+    fun clientCol4(t: TaskItem): String = when (clientCol(t)) {
+        "revisao" -> "revisao"
+        "aprovado", "concluido" -> "aprovado"
+        "producao", "reenviado" -> "analise"
+        else -> "enviado"
+    }
+    // 1.0.93 — bucket de 4 colunas DERIVADO DO PAPEL DE QUEM VÊ. Se quem abre o quadro é o
+    // DESIGNER atribuído à tarefa, usa o eixo de trabalho do designer — assim um cronograma
+    // recém-enviado cai em "A Fazer" do designer (corrige o bug do teste real: tarefa do
+    // designer não aparecia em "A Fazer" no celular). Senão, usa o eixo operacional.
+    fun boardCol4For(t: TaskItem, uid: String?): String {
+        if (Sectors.of(t.sector).key != "cronograma") return t.status ?: "afazer"
+        if (!uid.isNullOrBlank() && hasDesigner(t) && designerOf(t) == uid) {
+            return when (designerCol(t)) {
+                "concluido" -> "concluido"; "revisao" -> "revisao"
+                "andamento" -> "andamento"; else -> "afazer"
+            }
+        }
+        return boardCol4(t)
+    }
+
     // "Próxima ação" em destaque para a Social/Admin.
     // FASE de aprovação do cliente (themes/production/final) — espelha o Worker V64.13.
     fun clientApprovalPhase(t: TaskItem): String {

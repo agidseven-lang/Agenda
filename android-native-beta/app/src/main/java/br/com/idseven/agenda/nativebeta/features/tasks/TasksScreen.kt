@@ -156,23 +156,26 @@ fun TasksScreen(
         val okVis = TaskVisibility.canSeeTask(currentUser, t)
         okQ && okS && okFlow && okPerson && okM && okVis
     }
-    // Eixo de colunas conforme o fluxo: CLIENTE (7) / SOCIAL-OPERACIONAL (7) / demais (4 status).
+    // 1.0.93 — COLUNAS POR CONTEXTO (espelha o Desktop 1.0.105): Cliente 4 / Social 4 /
+    // Designer 3 / "Meu quadro"+Setor 4. Reduz o excesso de colunas do teste real.
     val isClientBoard = flow == "client"
     val isSocialBoard = flow == "social"
-    val wideBoard = isClientBoard || isSocialBoard   // 7 colunas roláveis
+    val isDesignerBoard = flow == "designer"
+    val wideBoard = false   // todos os quadros agora têm no máximo 4 colunas
     val cols: List<BoardCol> = when {
-        isClientBoard -> TaskVisibility.CLIENT_COLS.map { BoardCol(it.key, it.label, clientColShort(it.key), clientColColor(it.key)) }
-        isSocialBoard -> TaskVisibility.OPERATIONAL_COLS.map { BoardCol(it.key, it.label, opColShort(it.key), opColColor(it.key)) }
+        isClientBoard -> TaskVisibility.CLIENT_COLS4.map { BoardCol(it.key, it.label, it.label, clientCol4Color(it.key)) }
+        isSocialBoard -> TaskVisibility.SOCIAL_COLS4.map { BoardCol(it.key, it.label, statusColShort(it.key), TaskStatus.color(it.key)) }
+        isDesignerBoard -> TaskVisibility.DESIGNER_COLS3.map { BoardCol(it.key, it.label, it.label, designerCol3Color(it.key)) }
         else -> TaskStatus.COLUMNS.map { BoardCol(it, TaskStatus.label(it), statusColShort(it), TaskStatus.color(it)) }
     }
     val colKeyOf: (TaskItem) -> String = { t ->
         when {
-            isClientBoard -> TaskVisibility.clientCol(t)
-            flow == "designer" -> TaskVisibility.designerCol(t)
-            isSocialBoard -> TaskVisibility.operationalCol(t)
-            // Role board / "Meu quadro": cronograma deriva do eixo operacional (boardCol4);
-            // status BRUTO nunca coloca cronograma em "Concluído" antes da aprovação final.
-            else -> TaskVisibility.boardCol4(t)
+            isClientBoard -> TaskVisibility.clientCol4(t)
+            isDesignerBoard -> TaskVisibility.designerCol3(t)
+            isSocialBoard -> TaskVisibility.boardCol4(t)
+            // Role board / "Meu quadro": designer-aware — cronograma recém-enviado ao designer
+            // aparece em "A Fazer" para o próprio designer (corrige o desync PC×Android).
+            else -> TaskVisibility.boardCol4For(t, currentUid)
         }
     }
     val pager = rememberPagerState(pageCount = { cols.size })
@@ -408,6 +411,14 @@ private fun clientColColor(k: String): Color = when (k) {
     else -> Color(0xFF6E7480)
 }
 private fun statusColShort(k: String): String = when (k) { "andamento" -> "Andam."; "revisao" -> "Revisão"; "concluido" -> "Concl."; else -> "A Fazer" }
+// 1.0.93 — cores das colunas reduzidas por contexto (Cliente 4 / Designer 3).
+private fun clientCol4Color(k: String): Color = when (k) {
+    "enviado" -> Color(0xFF5B6CFF); "analise" -> Color(0xFF22D3EE)
+    "revisao" -> Color(0xFFF59E0B); "aprovado" -> Color(0xFF34D399); else -> Color(0xFF6E7480)
+}
+private fun designerCol3Color(k: String): Color = when (k) {
+    "andamento" -> Color(0xFFF59E0B); "entregue" -> Color(0xFF34D399); else -> Color(0xFF9BA0AB)
+}
 // Rótulos curtos + cores das colunas do eixo OPERACIONAL (7).
 private fun opColShort(k: String): String = when (k) {
     "producao" -> "Produção"; "aguardando_envio" -> "Enviar designer"; "aguardando_designer" -> "Designer"; "aguardando_legenda" -> "Legenda/post"
