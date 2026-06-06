@@ -74,7 +74,7 @@ fun SocialsHubScreen(
                 Text("Cada Social Media em um quadro próprio — sem misturar", color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        tabsBar()
+        // 1.0.96 — HUB (lista de social medias) NÃO mostra chips; eles pertencem ao Kanban.
         if (socials.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 EmptyState("Nenhuma Social Media ativa", "Cadastre Social Medias na equipe", Icons.Outlined.Group)

@@ -85,7 +85,7 @@ fun BoardsHubScreen(
                 Text("${all.size} tarefas", color = Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
-        tabsBar()
+        // 1.0.96 — HUB "Quadros" NÃO mostra chips; eles pertencem ao Kanban (TasksScreen).
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp)) {
             // ADITIVO — "Meu quadro" (todos: minhas demandas/tarefas) — não remove a visão ampla.
             if (uid != null) {

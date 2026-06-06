@@ -75,7 +75,7 @@ fun DesignersHubScreen(
                 Text("Cada designer em um quadro Kanban próprio", color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        tabsBar()
+        // 1.0.96 — HUB (lista de designers) NÃO mostra chips; eles pertencem ao Kanban.
         if (designers.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 EmptyState("Nenhuma tarefa com designer", "Envie um cronograma aprovado para um designer", Icons.Outlined.Group)
