@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.107 (Chips alinhados)</title>
+<title>ID Seven · Desktop 1.0.108 (Chips no Kanban)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1103,8 +1103,8 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.107 · Chips alinhados</span><br>
-    espelha o APK <b>1.0.95-beta-board-chip-shape-fix</b> · ref app/main
+    <span class="pill-ver">Desktop 1.0.108 · Chips no Kanban</span><br>
+    espelha o APK <b>1.0.96-beta-board-toolbar-inside-kanban-fix</b> · ref app/main
   </div>
 </section>
 
@@ -1118,7 +1118,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.107 · Chips alinhados</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.108 · Chips no Kanban</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1134,7 +1134,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.107', tag:'Chips alinhados', apk:'1.0.95-beta-board-chip-shape-fix' };
+const APP_VER={ desktop:'1.0.108', tag:'Chips no Kanban', apk:'1.0.96-beta-board-toolbar-inside-kanban-fix' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1383,7 +1383,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.107 · Chips alinhados</span><br>espelha o APK <b>1.0.95-beta-board-chip-shape-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.108 · Chips no Kanban</span><br>espelha o APK <b>1.0.96-beta-board-toolbar-inside-kanban-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1510,7 +1510,7 @@ function afterAgenda(){const s=document.getElementById('agSearch');if(s)s.oninpu
 /* ---- HUB ---- */
 function renderHub(){
   const u=state.user;const vis=visibleTasks(u,state.tasks);
-  let h='<div class="scr-head"><div class="row"><div style="flex:1"><div class="h-title">Quadros</div><div class="h-sub">Gestão por setor da agência</div></div><span class="badge-round">'+vis.length+' tarefas</span></div></div>'+boardToolbar()+'<div class="scr" style="padding-top:8px">';
+  let h='<div class="scr-head"><div class="row"><div style="flex:1"><div class="h-title">Quadros</div><div class="h-sub">Gestão por setor da agência</div></div><span class="badge-round">'+vis.length+' tarefas</span></div></div>'+'<div class="scr" style="padding-top:8px">';
   // ADITIVO — Meu quadro (todos) + Quadros por responsável (admin). Não remove a visão por setor.
   const myOpen=u?state.tasks.filter(t=>(t.assigneeId===u.id||t.by===u.id)&&t.status!=='concluido').length:0;
   let nav='';
@@ -1551,7 +1551,7 @@ function renderRoleBoards(){
   let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="hub">'+svg('back')+'</button>'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Quadros por responsável</div><div class="d-bh-sub">Cada pessoa em um quadro isolado — sem misturar</div></div></div></div>'+
-    boardToolbar()+'<div class="scr" style="padding-top:8px">';
+    '<div class="scr" style="padding-top:8px">';
   const cards=people.map(p=>{const mine=state.tasks.filter(t=>t.assigneeId===p.id||t.by===p.id);const open=mine.filter(t=>t.status!=='concluido').length;
     return '<button class="bcard" data-personboard="'+p.id+'">'+avatar(p,44)+
       '<div class="bm"><div class="bl">'+esc(p.name||'—')+'</div><div class="bd">'+esc(p.role||'Equipe')+'</div>'+
@@ -1678,7 +1678,7 @@ function renderDesignersHub(){
   let h='<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designers</div><div class="d-bh-sub">Cada designer em um quadro Kanban próprio</div></div></div></div>'+
-    boardToolbar()+'<div class="scr" style="padding-top:8px">';
+    '<div class="scr" style="padding-top:8px">';
   const cards=dz.length?dz.map(d=>{const tasks=state.tasks.filter(t=>isDesignerFlow(t)&&designerOf(t)===d.u.id);
     const open=tasks.filter(t=>designerCol(t)!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
     return '<button class="bcard" data-designerboard="'+d.u.id+'">'+avatar(d.u,44)+
@@ -1860,7 +1860,7 @@ function renderSocialsHub(){
   let h='<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3EE',.18)+';color:#22D3EE">'+svg('group')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Social Medias</div><div class="d-bh-sub">Cada Social Media em um quadro próprio — sem misturar</div></div></div></div>'+
-    boardToolbar()+'<div class="scr" style="padding-top:8px">';
+    '<div class="scr" style="padding-top:8px">';
   const cards=sm.length?sm.map(d=>{const tasks=state.tasks.filter(t=>socialOf(t)===d.u.id);
     const open=tasks.filter(t=>operationalCol(t)!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
     const waiting=tasks.filter(t=>operationalCol(t)==='aguardando_designer').length;
@@ -3006,7 +3006,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.107-board-chip-shape-fix';
+const BUILD='1.0.108-board-toolbar-inside-kanban-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -3018,7 +3018,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.107 · Chips alinhados</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.108 · Chips no Kanban</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -3051,7 +3051,7 @@ function openSheet(which){
   const u=state.user;let rows,title;
   if(which==='conta'){title='Conta';rows=[['Nome',u.name],['Função',u.role||'Não informado'],['E-mail',u.email||'Não informado'],['WhatsApp',u.phone||'Não informado'],['Status','Ativa'],['Permissão',u.admin?'Administrador':'Membro da equipe'],['ID do usuário',u.id]];}
   else if(which==='seguranca'){title='Segurança';rows=[['Sessão','Ativa neste navegador'],['Login','Custom (hash s2 / SHA-256)'],['UID',u.id],['Sessão salva','Local (localStorage)']];}
-  else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.95-beta-board-chip-shape-fix'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
+  else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.96-beta-board-toolbar-inside-kanban-fix'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800;margin-bottom:10px">'+title+'</div>'+
     rows.map(r=>'<div class="infoline"><div class="il">'+esc(r[0])+'</div><div class="iv">'+esc(r[1])+'</div></div>').join('')+
     (which==='seguranca'?'<div style="height:14px"></div><button class="btn" data-logout="1" style="background:'+withAlpha('#F87171',.14)+';color:var(--red)">Sair da conta</button>':'')+'</div></div>';
