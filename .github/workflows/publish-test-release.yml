@@ -14,11 +14,11 @@ name: "[infra] Publish Test Release"
       desktop_run:
         description: "Run id do build Desktop"
         required: true
-        default: "27073525338"
+        default: "27074483447"
       android_run:
         description: "Run id do build Android"
         required: true
-        default: "27073525730"
+        default: "27074483837"
 
 permissions:
   contents: write
@@ -28,12 +28,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      DESKTOP_RUN: "27073525338"
-      ANDROID_RUN: "27073525730"
-      TAG: "test/board-toolbar-inside-kanban-1.0.108-1.0.96"
-      EXE_SHA: "caec96ea93d23f555f67b3c3ab11f8b60a142228f487bb294a9c9bfe07dbe4a7"
-      MSI_SHA: "5662cc3e651e82f74b2c0c25f94af2349383d16351b11f87e8f1b221973c405d"
-      APK_SHA: "8196f3c2524b9af1975388e44e42c406861806f121b95991cb9bd732f9420d57"
+      DESKTOP_RUN: "27074483447"
+      ANDROID_RUN: "27074483837"
+      TAG: "test/designer-sync-1.0.109-1.0.97"
+      EXE_SHA: "11a11f7ca6b7a96335cc7e6a3bcc402f989188cd3565464f1a73f54e6be025de"
+      MSI_SHA: "9f7d05c5e03bdc614d90b8a4f3408ecf64cb65c046cc1e7afb863939a7086261"
+      APK_SHA: "8cc3282a2714bcd236316300e2d071e412e8ff392afc26e21e1e3cb79db09772"
     steps:
       - name: Resolver run ids (input tem prioridade)
         run: |
@@ -67,23 +67,23 @@ jobs:
             unzip -o -q "$z" -d "$(dirname "$z")/_unz" || true
           done < <(find dl -name '*.zip')
           echo "== Apos extrair zips =="; find dl -type f | sort
-          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.108*.exe' | head -1)
-          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.108*.msi' | head -1)
-          APK=$(find dl -name 'idseven-nativebeta-1.0.96*board-toolbar-inside-kanban-fix.apk' | head -1)
+          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.109*.exe' | head -1)
+          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.109*.msi' | head -1)
+          APK=$(find dl -name 'idseven-nativebeta-1.0.97*designer-sync-fix.apk' | head -1)
           VDESK=$(find dl -name 'VERSAO-DESKTOP.txt' | head -1 || true)
           VAPK=$(find dl -name 'VERSAO-DO-APK.txt' | head -1 || true)
           for f in "$EXE" "$MSI" "$APK"; do
             if [ -z "$f" ] || [ ! -f "$f" ]; then echo "::error::artefato faltando ($f)"; exit 1; fi
           done
-          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.108-x64.exe"
-          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.108-x64.msi"
-          cp "$APK" "out/idseven-nativebeta-1.0.96-beta-board-toolbar-inside-kanban-fix.apk"
+          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.109-x64.exe"
+          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.109-x64.msi"
+          cp "$APK" "out/idseven-nativebeta-1.0.97-beta-designer-sync-fix.apk"
           [ -n "$VDESK" ] && cp "$VDESK" out/VERSAO-DESKTOP.txt || true
           [ -n "$VAPK" ] && cp "$VAPK" out/VERSAO-DO-APK.txt || true
           cd out
-          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.108-x64.exe" | awk '{print $1}')
-          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.108-x64.msi" | awk '{print $1}')
-          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.96-beta-board-toolbar-inside-kanban-fix.apk" | awk '{print $1}')
+          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.109-x64.exe" | awk '{print $1}')
+          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.109-x64.msi" | awk '{print $1}')
+          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.97-beta-designer-sync-fix.apk" | awk '{print $1}')
           echo "exe esperado=$EXE_SHA obtido=$GOT_EXE"
           echo "msi esperado=$MSI_SHA obtido=$GOT_MSI"
           echo "apk esperado=$APK_SHA obtido=$GOT_APK"
@@ -97,55 +97,56 @@ jobs:
         run: |
           cat > out/README-TESTE-REAL.txt <<'EOF'
           ============================================================
-          Agenda ID Seven — TESTE REAL (Chips somente no Kanban)
+          Agenda ID Seven — TESTE REAL (Sincronização do Designer)
           Pre-release de teste — NAO e producao.
           ============================================================
 
           VERSOES
           - Worker  : V64.18-real-flow-sync-fix (INALTERADO; ja ativo)
-          - Desktop : 1.0.108-board-toolbar-inside-kanban-fix
-          - Android : 1.0.96-beta-board-toolbar-inside-kanban-fix (versionCode 94)
+          - Desktop : 1.0.109-designer-sync-fix
+          - Android : 1.0.97-beta-designer-sync-fix (versionCode 95)
 
-          O QUE MUDOU (somente posicao dos chips)
-          - A tela HUB "Quadros" (lista de quadros/setores) NAO mostra mais chips.
-          - Os chips (Meu quadro / Cliente / Designers / Social Medias / Setores)
-            aparecem SOMENTE dentro de um quadro Kanban, ao lado de "Buscar tarefa...",
-            acima das colunas (A Fazer / Em andamento / Revisao / Finalizado).
-          - Chip "Designers" com icone. Chips menos arredondados (estilo do input).
-          - Nenhuma logica de fluxo foi alterada.
+          O QUE MUDOU (sincronizacao do designer PC x Android)
+          - BUG: ao mover o card do designer para "Em andamento", gravava-se so `status`,
+            mas o quadro do Designer LE `designerFlowStatus` -> o card ficava preso em
+            "A Fazer" no celular e no PC do designer.
+          - FIX: mover no eixo do designer grava `designerFlowStatus` (fonte unica lida por
+            PC e Android). Agora "Em andamento" e "Entregue" sincronizam nos dois.
+          - Nenhuma mudanca de schema destrutiva; Worker nao tocado.
 
           SHA-256 (confira apos baixar)
-          - Agenda-ID-Seven-Desktop-1.0.108-x64.exe
-            caec96ea93d23f555f67b3c3ab11f8b60a142228f487bb294a9c9bfe07dbe4a7
-          - Agenda-ID-Seven-Desktop-1.0.108-x64.msi
-            5662cc3e651e82f74b2c0c25f94af2349383d16351b11f87e8f1b221973c405d
-          - idseven-nativebeta-1.0.96-beta-board-toolbar-inside-kanban-fix.apk
-            8196f3c2524b9af1975388e44e42c406861806f121b95991cb9bd732f9420d57
-          (o arquivo SHA256SUMS.txt traz todos os hashes)
+          - Agenda-ID-Seven-Desktop-1.0.109-x64.exe
+            11a11f7ca6b7a96335cc7e6a3bcc402f989188cd3565464f1a73f54e6be025de
+          - Agenda-ID-Seven-Desktop-1.0.109-x64.msi
+            9f7d05c5e03bdc614d90b8a4f3408ecf64cb65c046cc1e7afb863939a7086261
+          - idseven-nativebeta-1.0.97-beta-designer-sync-fix.apk
+            8cc3282a2714bcd236316300e2d071e412e8ff392afc26e21e1e3cb79db09772
 
           ------------------------------------------------------------
           INSTALAR — DESKTOP (Windows)
           ------------------------------------------------------------
-          IMPORTANTE: FECHE a versao antiga ANTES de instalar.
-          1) Na BANDEJA (ao lado do relogio), clique direito no icone -> "Sair".
-          2) Abra o Agenda-ID-Seven-Desktop-1.0.108-x64.exe (prefira o .exe).
+          1) FECHE a versao antiga pela BANDEJA (clique direito no icone -> "Sair").
+          2) Abra o Agenda-ID-Seven-Desktop-1.0.109-x64.exe (prefira o .exe).
           3) SmartScreen: "Mais informacoes" -> "Executar assim mesmo".
-          4) No login deve aparecer: "Desktop 1.0.108 - Chips no Kanban".
+          4) No login deve aparecer: "Desktop 1.0.109 - Sync do designer".
 
           ------------------------------------------------------------
           INSTALAR — ANDROID
           ------------------------------------------------------------
           1) Baixe o .apk no celular. Toque para instalar.
           2) Permita "Instalar apps desconhecidos"; Play Protect -> "Instalar assim mesmo".
-          3) No login/perfil deve mostrar 1.0.96-beta-board-toolbar-inside-kanban-fix.
+          3) No login/perfil deve mostrar 1.0.97-beta-designer-sync-fix.
 
           ------------------------------------------------------------
-          O QUE CONFERIR
+          ROTEIRO DE TESTE (o que reprovou)
           ------------------------------------------------------------
-          1) Tela "Quadros" (hub): SEM chips, apenas os cards dos quadros.
-          2) Entrar em "Meu quadro"/"Cliente"/um setor: busca + chips ACIMA das colunas.
-          3) Chip "Designers" com icone.
-          4) PC e Android iguais nesse comportamento.
+          PC=Social, celular=Designer.
+          1) Social cria cronograma, atribui ao designer, envia ao cliente, cliente aprova.
+          2) Social envia ao Designer. No celular do designer: tarefa em "A Fazer".
+          3) Designer move para "Em andamento" no celular.
+          4) CONFERIR: celular mostra "Em andamento"; PC (quadro Designer) mostra "Em andamento";
+             Social mostra "Designer em producao"; Cliente "Em producao". Nada preso em "A Fazer".
+          5) Designer "Entregue" -> Social passa para "Aguardando legendas e posts".
           EOF
           echo "== out =="; ls -lh out
 
@@ -154,15 +155,15 @@ jobs:
         with:
           tag_name: ${{ env.TAG }}
           target_commitish: ${{ github.sha }}
-          name: "Agenda ID Seven — Chips no Kanban (1.0.108 / 1.0.96)"
+          name: "Agenda ID Seven — Sync do Designer (1.0.109 / 1.0.97)"
           prerelease: true
           make_latest: false
           fail_on_unmatched_files: true
           body_path: out/README-TESTE-REAL.txt
           files: |
-            out/Agenda-ID-Seven-Desktop-1.0.108-x64.exe
-            out/Agenda-ID-Seven-Desktop-1.0.108-x64.msi
-            out/idseven-nativebeta-1.0.96-beta-board-toolbar-inside-kanban-fix.apk
+            out/Agenda-ID-Seven-Desktop-1.0.109-x64.exe
+            out/Agenda-ID-Seven-Desktop-1.0.109-x64.msi
+            out/idseven-nativebeta-1.0.97-beta-designer-sync-fix.apk
             out/VERSAO-DESKTOP.txt
             out/VERSAO-DO-APK.txt
             out/SHA256SUMS.txt
