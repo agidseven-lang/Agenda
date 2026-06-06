@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.110",
-  "description": "Agenda ID Seven Desktop — client caption render fix (Electron)",
+  "version": "1.0.111",
+  "description": "Agenda ID Seven Desktop — premium client link preview (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
