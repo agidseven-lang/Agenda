@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.18 / Desktop 1.0.110 / Android 1.0.98
+ * Agenda ID Seven · Worker V64.20 / Desktop 1.0.112 / Android 1.0.100
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.99-beta-client-link-preview-premium';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.100-beta-premium-client-domain';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.20 · Desktop 1.0.111 · Android 1.0.99-beta');
+console.log(' Worker V64.20 · Desktop 1.0.112 · Android 1.0.100-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -303,7 +303,7 @@ check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaS
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.111', /"version":\s*"1\.0\.111"/.test(DP));
+check('D1', 'package.json versão 1.0.112', /"version":\s*"1\.0\.112"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -353,14 +353,17 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.111', /Desktop 1\.0\.111/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.112', /Desktop 1\.0\.112/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.111 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.111/.test(DH) && /<title>ID Seven · Desktop 1\.0\.111/.test(DH) && /id="wpbadge">Desktop 1\.0\.111/.test(DH));
-check('D22', 'Login espelha o APK 1.0.99-beta-client-link-preview-premium', /espelha o APK <b>1\.0\.99-beta-client-link-preview-premium/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.111'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.112 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.112/.test(DH) && /<title>ID Seven · Desktop 1\.0\.112/.test(DH) && /id="wpbadge">Desktop 1\.0\.112/.test(DH));
+check('D22', 'Login espelha o APK 1.0.100-beta-premium-client-domain', /espelha o APK <b>1\.0\.100-beta-premium-client-domain/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.112'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
+// DOMÍNIO PREMIUM do link do cliente (aprovar.agendaidseven.com.br); API interna fica em workers.dev.
+check('D_DOMAIN1', 'Link público do cliente usa aprovar.agendaidseven.com.br', /const CLIENT_LINK_BASE='https:\/\/aprovar\.agendaidseven\.com\.br'/.test(DH) && /buildPublicClientUrl\(token\)\{return CLIENT_LINK_BASE\+/.test(DH));
+check('D_DOMAIN2', 'API interna (token/imagekit/notify) permanece em workers.dev (fallback vivo)', /const CLIENT_REVIEW_BASE='https:\/\/idseven-push\.agidseven\.workers\.dev'/.test(DH));
 // ===== SYNC DO DESIGNER (move grava designerFlowStatus) — Desktop =====
 const moveFn = (DH.match(/async function moveStatus\(taskId,newStatus\)\{[\s\S]*?\n\}/) || [''])[0];
 check('D_MOVE1', 'Desktop tem isDesignerAxisMove (detecta eixo do designer)', /function isDesignerAxisMove\(t\)\{return isDesignerFlow\(t\)/.test(DH));
@@ -370,8 +373,8 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.99-beta-client-link-preview-premium', /versionName\s+"1\.0\.99-beta-client-link-preview-premium"/.test(GRADLE));
-check('N2', 'versionCode >= 97', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 97; })());
+check('N1', 'versionName 1.0.100-beta-premium-client-domain', /versionName\s+"1\.0\.100-beta-premium-client-domain"/.test(GRADLE));
+check('N2', 'versionCode >= 98', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 98; })());
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
 check('N_ICON', 'TasksTopTabs: ícone do Designers = Icons.Outlined.Image', /"designers"\s*->\s*Icons\.Outlined\.Image/.test(KT_TABS));
@@ -405,7 +408,7 @@ check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|Gri
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.20 / Desktop 1.0.111 / Android 1.0.99-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.20 / Desktop 1.0.112 / Android 1.0.100-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
