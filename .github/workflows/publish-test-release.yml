@@ -14,11 +14,11 @@ name: "[infra] Publish Test Release"
       desktop_run:
         description: "Run id do build Desktop"
         required: true
-        default: "27071898848"
+        default: "27072605863"
       android_run:
         description: "Run id do build Android"
         required: true
-        default: "27070499926"
+        default: "27072606314"
 
 permissions:
   contents: write
@@ -28,12 +28,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      DESKTOP_RUN: "27071898848"
-      ANDROID_RUN: "27070499926"
-      TAG: "test/real-flow-sync-fix-1.0.105-1.0.93"
-      EXE_SHA: "096ec64fcf2f1dff24e84eabb28a0efe66537273dd4146d87de04914d89240f5"
-      MSI_SHA: "916290aeeecf051a19d9bf602adb06d4ab366bdb7d93677a68333cac2491a53f"
-      APK_SHA: "2b7947a3233473e5bb14b711d0b5d8fbd9493292a5b295d4a00f0bcc0c56ab77"
+      DESKTOP_RUN: "27072605863"
+      ANDROID_RUN: "27072606314"
+      TAG: "test/board-toolbar-placement-1.0.106-1.0.94"
+      EXE_SHA: "e0ceccf05d84cad47f1cc218d678b49018290317a9e43c55649d32f8344b410a"
+      MSI_SHA: "a9dadcac374f4b469eb499f2668c644ea8314ae8d4e8247dbb8de6c1be2f8cf8"
+      APK_SHA: "506dce784e69ceafa6e6bb81fac10f73c7e1c97550ba1b93ec5253bc201c8ccd"
     steps:
       - name: Resolver run ids (input tem prioridade)
         run: |
@@ -61,31 +61,29 @@ jobs:
           set -euo pipefail
           mkdir -p out
           echo "== Arquivos baixados =="; find dl -type f | sort
-          # Alguns bundles trazem os arquivos DENTRO de um .zip (ex.: o APK).
-          # Extrai todos os .zip aninhados antes de procurar os arquivos.
           while IFS= read -r z; do
             [ -n "$z" ] || continue
             echo "unzip: $z"
             unzip -o -q "$z" -d "$(dirname "$z")/_unz" || true
           done < <(find dl -name '*.zip')
           echo "== Apos extrair zips =="; find dl -type f | sort
-          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.105*.exe' | head -1)
-          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.105*.msi' | head -1)
-          APK=$(find dl -name 'idseven-nativebeta-1.0.93*real-flow-sync-fix.apk' | head -1)
+          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.106*.exe' | head -1)
+          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.106*.msi' | head -1)
+          APK=$(find dl -name 'idseven-nativebeta-1.0.94*board-toolbar-placement-fix.apk' | head -1)
           VDESK=$(find dl -name 'VERSAO-DESKTOP.txt' | head -1 || true)
           VAPK=$(find dl -name 'VERSAO-DO-APK.txt' | head -1 || true)
           for f in "$EXE" "$MSI" "$APK"; do
             if [ -z "$f" ] || [ ! -f "$f" ]; then echo "::error::artefato faltando ($f)"; exit 1; fi
           done
-          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.105-x64.exe"
-          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.105-x64.msi"
-          cp "$APK" "out/idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk"
+          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.106-x64.exe"
+          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.106-x64.msi"
+          cp "$APK" "out/idseven-nativebeta-1.0.94-beta-board-toolbar-placement-fix.apk"
           [ -n "$VDESK" ] && cp "$VDESK" out/VERSAO-DESKTOP.txt || true
           [ -n "$VAPK" ] && cp "$VAPK" out/VERSAO-DO-APK.txt || true
           cd out
-          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.105-x64.exe" | awk '{print $1}')
-          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.105-x64.msi" | awk '{print $1}')
-          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk" | awk '{print $1}')
+          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.106-x64.exe" | awk '{print $1}')
+          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.106-x64.msi" | awk '{print $1}')
+          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.94-beta-board-toolbar-placement-fix.apk" | awk '{print $1}')
           echo "exe esperado=$EXE_SHA obtido=$GOT_EXE"
           echo "msi esperado=$MSI_SHA obtido=$GOT_MSI"
           echo "apk esperado=$APK_SHA obtido=$GOT_APK"
@@ -99,22 +97,28 @@ jobs:
         run: |
           cat > out/README-TESTE-REAL.txt <<'EOF'
           ============================================================
-          Agenda ID Seven — TESTE REAL (Real Flow Sync Fix)
+          Agenda ID Seven — TESTE REAL (Board Toolbar Placement Fix)
           Pre-release de teste — NAO e producao.
           ============================================================
 
           VERSOES
-          - Worker  : V64.18-real-flow-sync-fix (ja ativo no link do cliente)
-          - Desktop : 1.0.105-real-flow-sync-fix
-          - Android : 1.0.93-beta-real-flow-sync-fix (versionCode 91)
+          - Worker  : V64.18-real-flow-sync-fix (INALTERADO; ja ativo)
+          - Desktop : 1.0.106-board-toolbar-placement-fix
+          - Android : 1.0.94-beta-board-toolbar-placement-fix (versionCode 92)
+
+          O QUE MUDOU (somente layout/posicao)
+          - Os chips (Meu quadro / Cliente / Designers / Social Medias / Setores)
+            SAIRAM do topo global. Agora ficam DENTRO da area do quadro, ao lado
+            do campo "Buscar tarefa..." (no mobile, logo abaixo da busca).
+          - Nenhuma logica de fluxo foi alterada.
 
           SHA-256 (confira apos baixar)
-          - Agenda-ID-Seven-Desktop-1.0.105-x64.exe
-            096ec64fcf2f1dff24e84eabb28a0efe66537273dd4146d87de04914d89240f5
-          - Agenda-ID-Seven-Desktop-1.0.105-x64.msi
-            916290aeeecf051a19d9bf602adb06d4ab366bdb7d93677a68333cac2491a53f
-          - idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk
-            2b7947a3233473e5bb14b711d0b5d8fbd9493292a5b295d4a00f0bcc0c56ab77
+          - Agenda-ID-Seven-Desktop-1.0.106-x64.exe
+            e0ceccf05d84cad47f1cc218d678b49018290317a9e43c55649d32f8344b410a
+          - Agenda-ID-Seven-Desktop-1.0.106-x64.msi
+            a9dadcac374f4b469eb499f2668c644ea8314ae8d4e8247dbb8de6c1be2f8cf8
+          - idseven-nativebeta-1.0.94-beta-board-toolbar-placement-fix.apk
+            506dce784e69ceafa6e6bb81fac10f73c7e1c97550ba1b93ec5253bc201c8ccd
           (o arquivo SHA256SUMS.txt traz todos os hashes)
 
           ------------------------------------------------------------
@@ -123,51 +127,27 @@ jobs:
           IMPORTANTE: FECHE a versao antiga ANTES de instalar.
           1) Na BANDEJA (ao lado do relogio), clique com o botao direito
              no icone do Agenda ID Seven -> "Sair". (o X so esconde)
-          2) Abra o Agenda-ID-Seven-Desktop-1.0.105-x64.exe (prefira o .exe).
+          2) Abra o Agenda-ID-Seven-Desktop-1.0.106-x64.exe (prefira o .exe).
           3) Se o SmartScreen avisar: "Mais informacoes" -> "Executar assim mesmo".
-          4) Abra o app e faca login. A tela de login deve mostrar:
-             "Desktop 1.0.105 - Sync real PC x Android".
+          4) No login deve aparecer: "Desktop 1.0.106 - Toolbar dos quadros".
 
           ------------------------------------------------------------
           INSTALAR — ANDROID
           ------------------------------------------------------------
           1) Baixe o .apk no celular (ou transfira para ele).
           2) Toque no arquivo; se pedir, permita "Instalar apps desconhecidos".
-          3) Play Protect pode avisar (beta sem assinatura de loja) ->
-             "Instalar assim mesmo".
-          4) Abre lado a lado do app aprovado (package nativebeta).
-             No login/perfil deve mostrar 1.0.93-beta-real-flow-sync-fix.
+          3) Play Protect pode avisar (beta) -> "Instalar assim mesmo".
+          4) No login/perfil deve mostrar 1.0.94-beta-board-toolbar-placement-fix.
 
           ------------------------------------------------------------
-          ROTEIRO DE TESTE (foco no que reprovou)
+          O QUE CONFERIR (posicao dos chips)
           ------------------------------------------------------------
-          PC logado como SOCIAL MEDIA, celular logado como DESIGNER.
-
-          1) PC: criar Cronograma semanal, atribuir ao designer, 3 temas,
-             "Confirmar/Enviar" (uma vez so). Conferir: NAO duplica card/tela.
-          2) PC: trocar de aba no quadro. Os chips "Meu quadro / Cliente /
-             Designer / Social Media / Setores" devem aparecer NA HORA, fixos
-             no topo, sem precisar voltar.
-          3) PC: "Copiar mensagem" -> a mensagem do WhatsApp deve estar premium
-             (saudacao + contexto + link + "Equipe ID Seven"), sem link cru.
-          4) Portal do cliente (mesmo link): aprovar Tema 1 e Tema 3, pedir
-             ajuste no Tema 2, enviar. Deve aparecer "Feedback enviado!" com
-             resumo (sem formulario duplicado) e "Aguardando ajuste da equipe".
-          5) PC (Social): abrir Detalhes -> editar o Tema 2. O campo deve
-             responder no PRIMEIRO clique. Salvar.
-          6) Portal do cliente (mesma aba aberta, mesmo link): deve atualizar
-             SOZINHO -> "A equipe atualizou seu cronograma" e recarregar para
-             revisar de novo (sem reabrir o WhatsApp).
-          7) Quadros com colunas por contexto: Social 4 (A Fazer / Em andamento
-             / Revisao / Finalizado), Designer 3 (A Fazer / Em andamento /
-             Entregue), Cliente 4 (Enviado / Em analise / Revisao solicitada /
-             Aprovado). Sem excesso de colunas.
-          8) CRITICO PC x ANDROID: PC (Social) envia ao designer. No CELULAR
-             logado como designer, em "Meu quadro", a tarefa deve aparecer em
-             "A FAZER". Desktop e Android devem bater.
-
-          Qualquer item que falhar: anote o passo (de preferencia com print/
-          video) para correcao na proxima passada.
+          1) Tela "Quadros": NAO deve haver chips ACIMA do titulo "Quadros".
+          2) Os chips aparecem JUNTO da busca, dentro da area do quadro.
+          3) Meu quadro / Cliente / Designers / Social / Setores: busca + chips
+             no mesmo bloco, alinhados; no celular, chips com scroll horizontal.
+          4) Trocar de aba e voltar: os chips NAO somem e NAO duplicam.
+          5) Criar tarefa / copiar mensagem: a toolbar continua no lugar.
           EOF
           echo "== README =="; sed -n '1,20p' out/README-TESTE-REAL.txt
           echo "== out =="; ls -lh out
@@ -177,15 +157,15 @@ jobs:
         with:
           tag_name: ${{ env.TAG }}
           target_commitish: ${{ github.sha }}
-          name: "Agenda ID Seven — Teste Real Flow Sync Fix"
+          name: "Agenda ID Seven — Board Toolbar Placement Fix (1.0.106 / 1.0.94)"
           prerelease: true
           make_latest: false
           fail_on_unmatched_files: true
           body_path: out/README-TESTE-REAL.txt
           files: |
-            out/Agenda-ID-Seven-Desktop-1.0.105-x64.exe
-            out/Agenda-ID-Seven-Desktop-1.0.105-x64.msi
-            out/idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk
+            out/Agenda-ID-Seven-Desktop-1.0.106-x64.exe
+            out/Agenda-ID-Seven-Desktop-1.0.106-x64.msi
+            out/idseven-nativebeta-1.0.94-beta-board-toolbar-placement-fix.apk
             out/VERSAO-DESKTOP.txt
             out/VERSAO-DO-APK.txt
             out/SHA256SUMS.txt
