@@ -65,12 +65,12 @@ object TaskVisibility {
     data class ClientCol(val key: String, val label: String)
     val CLIENT_COLS = listOf(
         ClientCol("afazer", "A Fazer"),
-        ClientCol("enviado", "Enviado ao cliente"),
-        ClientCol("aprovado", "Aprovado pelo cliente"),
+        ClientCol("enviado", "Temas enviados ao cliente"),
+        ClientCol("aprovado", "Temas aprovados pelo cliente"),
         ClientCol("producao", "Em produção"),
-        ClientCol("revisao", "Revisão"),
+        ClientCol("revisao", "Ajuste solicitado pelo cliente"),
         ClientCol("reenviado", "Reenviado ao cliente"),
-        ClientCol("concluido", "Concluído"),
+        ClientCol("concluido", "Concluído final"),
     )
     private val CLIENT_KEYS = CLIENT_COLS.map { it.key }.toSet()
 
@@ -147,13 +147,13 @@ object TaskVisibility {
     data class OpCol(val key: String, val label: String)
     val OPERATIONAL_COLS = listOf(
         OpCol("afazer", "A Fazer"),
-        OpCol("producao", "Em produção"),
+        OpCol("producao", "Aguardando aprovação dos temas"),
         OpCol("aguardando_envio", "Aguardando envio ao designer"),
-        OpCol("aguardando_designer", "Aguardando designer"),
-        OpCol("aguardando_legenda", "Aguardando legenda/post"),
-        OpCol("aguardando_revisao", "Revisão do cliente"),
-        OpCol("aguardando_final", "Aguardando aprov. final"),
-        OpCol("concluido", "Concluído"),
+        OpCol("aguardando_designer", "Designer em produção"),
+        OpCol("aguardando_legenda", "Aguardando legendas e posts"),
+        OpCol("aguardando_revisao", "Ajuste solicitado pelo cliente"),
+        OpCol("aguardando_final", "Aguardando aprovação final"),
+        OpCol("concluido", "Concluído final"),
     )
     fun pendingLegend(t: TaskItem): Boolean {
         val a = t.cronContents
