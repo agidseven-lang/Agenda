@@ -25,30 +25,42 @@ function header(title, sub) {
 }
 function fakeCards() {
   return '<div class="scr"><div class="d-hub">' +
+    '<div class="bcard"><div class="bm"><div class="bl">Meu quadro</div><div class="bd">Minhas demandas e tarefas</div></div></div>' +
     '<div class="bcard"><div class="bm"><div class="bl">Conteúdo / Cronograma</div><div class="bd">Gestão por setor</div></div></div>' +
     '<div class="bcard"><div class="bm"><div class="bl">Edição de Mídia</div><div class="bd">Cortes e finalização</div></div></div>' +
     '</div></div>';
 }
-// ANTES (errado): chips no topo global, ACIMA do título
-function wrong() {
-  return '<div class="tflow-tabs tflow-chipbar" style="border-bottom:1px solid var(--line);padding:14px 20px">' + chips() + '</div>' +
-    header('Quadros', 'Gestão por setor da agência') + fakeCards();
+function kanbanCols() {
+  const cols = ['A Fazer', 'Em andamento', 'Revisão', 'Finalizado'];
+  return '<div class="kanban" style="display:flex;gap:12px;padding:8px 16px 16px">' +
+    cols.map(c => '<div class="kcol" style="flex:1;border:1px solid var(--line);border-radius:12px;padding:10px;min-height:90px;background:var(--surface)"><div style="font:800 12px system-ui;color:var(--soft)">' + c + '</div></div>').join('') +
+    '</div>';
 }
-// DEPOIS (certo): título, depois toolbar (busca + chips), depois cards
-function right() {
+// ANTES (errado, 1.0.107): chips na tela hub "Quadros" (ao lado da busca, acima dos cards)
+function wrong() {
   return header('Quadros', 'Gestão por setor da agência') + boardToolbar() + fakeCards();
+}
+// DEPOIS (certo, 1.0.108): hub "Quadros" SEM chips (só cards)
+function rightHub() {
+  return header('Quadros', 'Gestão por setor da agência') + fakeCards();
+}
+// DEPOIS (certo, 1.0.108): Kanban "Meu quadro" COM busca + chips ACIMA das colunas
+function rightKanban() {
+  return '<div class="scr-head" style="padding:12px 16px 0"><div class="h-title">Meu quadro</div></div>' +
+    boardToolbar() + kanbanCols();
 }
 function panel(label, inner) {
   return '<div style="margin:18px 0"><div style="font:700 13px system-ui;color:#9aa0aa;margin:0 0 8px">' + label + '</div>' +
     '<div class="content" style="border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg)">' + inner + '</div></div>';
 }
 const out =
-  '<!doctype html><html><head><meta charset="utf-8"><title>Preview · toolbar dos quadros 1.0.106</title>' +
+  '<!doctype html><html><head><meta charset="utf-8"><title>Preview · chips no Kanban 1.0.108</title>' +
   '<style>' + style + '\nbody{padding:24px;max-width:1100px;margin:0 auto}</style></head>' +
   '<body class="desktop">' +
-  '<h1 style="font:800 20px system-ui;color:var(--ink)">Agenda ID Seven · prova de layout dos chips (Desktop 1.0.106)</h1>' +
-  panel('❌ ANTES (reprovado) — chips no topo global, ACIMA do título “Quadros”', wrong()) +
-  panel('✅ DEPOIS (1.0.106) — título primeiro; busca + chips juntos na toolbar do quadro', right()) +
+  '<h1 style="font:800 20px system-ui;color:var(--ink)">Agenda ID Seven · chips SOMENTE no Kanban (Desktop 1.0.108)</h1>' +
+  panel('❌ ANTES (1.0.107 reprovado) — chips na tela hub “Quadros”, ao lado da busca, acima dos cards', wrong()) +
+  panel('✅ DEPOIS (1.0.108) — hub “Quadros” SEM chips (apenas cards)', rightHub()) +
+  panel('✅ DEPOIS (1.0.108) — Kanban “Meu quadro”: busca + chips ACIMA das colunas (chip Designers com ícone)', rightKanban()) +
   '</body></html>';
 const DST = path.join(__dirname, 'board-toolbar-preview.html');
 fs.writeFileSync(DST, out);

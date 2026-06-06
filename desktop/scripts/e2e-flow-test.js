@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.18 / Desktop 1.0.107 / Android 1.0.95
+ * Agenda ID Seven · Worker V64.18 / Desktop 1.0.108 / Android 1.0.96
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = 'worker/real-flow-sync-fix';
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.95-beta-board-chip-shape-fix';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.96-beta-board-toolbar-inside-kanban-fix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.18 · Desktop 1.0.107 · Android 1.0.95-beta');
+console.log(' Worker V64.18 · Desktop 1.0.108 · Android 1.0.96-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -241,9 +241,9 @@ check('W12', 'Toast claro "Tema atualizado pela equipe"', /Tema atualizado pela 
 check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaState/.test(W) && /setInterval\(\s*pollState/.test(W));
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
-console.log(`${C.b}\n[PARTE B] Desktop 1.0.107 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.107', /"version":\s*"1\.0\.107"/.test(DP));
-// ===== ESTILO DOS CHIPS (1.0.107): menos arredondados + borda/raio do input + ícone Designers.
+console.log(`${C.b}\n[PARTE B] Desktop 1.0.108 — chips fixos + colunas por contexto + msg premium${C.x}`);
+check('D1', 'package.json versão 1.0.108', /"version":\s*"1\.0\.108"/.test(DP));
+// ===== ESTILO DOS CHIPS (1.0.108): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
 check('D_SHAPE2', 'Chips SEM cápsula: .tchip não usa border-radius:999px', !/border-radius:999px/.test(tchipCss));
@@ -255,19 +255,24 @@ const msgFn = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [
 check('D2', 'WhatsApp premium: assinatura "Equipe ID Seven"', /Equipe ID Seven/.test(msgFn));
 check('D3', 'WhatsApp premium: CTA de revisar/aprovar/ajustes', /aprovar ou solicitar ajustes|revisar os temas/.test(msgFn));
 check('D4', 'WhatsApp premium: saudação com nome do cliente', /Olá, '\+nome/.test(msgFn));
-// ===== CORREÇÃO PRINCIPAL (teste real): CHIPS na TOOLBAR do quadro (ao lado da busca),
-// NUNCA no topo global / NUNCA acima do título "Quadros". =====
+// ===== REGRA FINAL (teste real): CHIPS SOMENTE dentro do Kanban; NUNCA no hub "Quadros". =====
 check('D5', 'boardToolbar() contém BUSCA + CHIPS na mesma moldura', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><input[^>]*><div class="tchips">'\+taskChips\(\)/.test(DH));
-check('D6', 'NÃO existe barra de chips no topo global (tasksChipBar removida)', !/function tasksChipBar/.test(DH) && !/tflow-fixed/.test(DH));
+check('D6', 'SEM barra de chips no topo global (tasksChipBar/tflow-fixed removidos)', !/function tasksChipBar/.test(DH) && !/tflow-fixed/.test(DH));
 check('D7', 'Dispatch NÃO prepende chips ao topo (c.innerHTML=body)', /c\.innerHTML=body;/.test(DH) && !/c\.innerHTML=tasksChipBar/.test(DH));
-// DOM-ORDER (prova): na tela "Quadros", o TÍTULO vem ANTES da toolbar; e NÃO há chips antes do título.
+// HUB "Quadros" (renderHub) NÃO pode ter chips/toolbar — só título + cards.
 const hubFn = (DH.match(/function renderHub\(\)\{[\s\S]*?\n\}/) || [''])[0];
-const iTitulo = hubFn.indexOf('h-title">Quadros');
-const iTool = hubFn.indexOf('boardToolbar()');
-check('D8a', 'renderHub: título "Quadros" ANTES da toolbar (busca+chips)', iTitulo > -1 && iTool > iTitulo);
-check('D8b', 'renderHub: NENHUM chip/taskChips ANTES do título "Quadros"', iTitulo > -1 && hubFn.slice(0, iTitulo).indexOf('taskChips(') === -1 && hubFn.slice(0, iTitulo).indexOf('tchip') === -1);
-check('D8c', 'Hubs (RoleBoards/Designers/Socials) usam boardToolbar abaixo do título',
-  /function renderRoleBoards\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderDesignersHub\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderSocialsHub\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH));
+check('D8a', 'HUB "Quadros" SEM toolbar/chips (renderHub não chama boardToolbar)', hubFn.indexOf('boardToolbar()') === -1);
+check('D8b', 'HUB "Quadros" SEM taskChips/.tchip', hubFn.indexOf('taskChips(') === -1 && hubFn.indexOf('tchip') === -1);
+// Hubs de LISTA (RoleBoards/Designers/Socials) também SEM chips.
+const roleFn = (DH.match(/function renderRoleBoards\(\)\{[\s\S]*?\n\}/) || [''])[0];
+const dhubFn = (DH.match(/function renderDesignersHub\(\)\{[\s\S]*?\n\}/) || [''])[0];
+const shubFn = (DH.match(/function renderSocialsHub\(\)\{[\s\S]*?\n\}/) || [''])[0];
+check('D8c', 'Hubs de lista (RoleBoards/Designers/Socials) SEM boardToolbar/chips',
+  roleFn.indexOf('boardToolbar()') === -1 && dhubFn.indexOf('boardToolbar()') === -1 && shubFn.indexOf('boardToolbar()') === -1);
+// KANBAN tem a toolbar (busca + chips): Meu quadro / Cliente / Designer / Social / Setor.
+check('D8d', 'Kanban (PersonBoard/Client/Designer/Social) usa boardToolbar()',
+  /function renderPersonBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderClientFlowBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderDesignerBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderSocialBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH));
+check('D8e', 'Kanban de Setor (renderBoard) tem toolbar com taskChips()', /function renderBoard\(\)\{[\s\S]*?d-board-tools tbar[\s\S]*?taskChips\(\)/.test(DH));
 // CORREÇÃO 3: colunas por contexto (sem excesso).
 check('D9', 'Colunas Social = 4 (A Fazer/Em andamento/Revisão/Finalizado)', /const SOCIAL_COLS4=\[[\s\S]*?Finalizado/.test(DH) && (DH.match(/const SOCIAL_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4);
 check('D10', 'Colunas Designer = 3 (A Fazer/Em andamento/Entregue)', (DH.match(/const DESIGNER_COLS3=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 3);
@@ -282,29 +287,29 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.107', /Desktop 1\.0\.107/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.108', /Desktop 1\.0\.108/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.107 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.107/.test(DH) && /<title>ID Seven · Desktop 1\.0\.107/.test(DH) && /id="wpbadge">Desktop 1\.0\.107/.test(DH));
-check('D22', 'Login espelha o APK 1.0.95-beta-board-chip-shape-fix', /espelha o APK <b>1\.0\.95-beta-board-chip-shape-fix/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.107'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.108 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.108/.test(DH) && /<title>ID Seven · Desktop 1\.0\.108/.test(DH) && /id="wpbadge">Desktop 1\.0\.108/.test(DH));
+check('D22', 'Login espelha o APK 1.0.96-beta-board-toolbar-inside-kanban-fix', /espelha o APK <b>1\.0\.96-beta-board-toolbar-inside-kanban-fix/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.108'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
 
-console.log(`${C.b}\n[PARTE B] Android 1.0.95-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.95-beta-board-chip-shape-fix', /versionName\s+"1\.0\.95-beta-board-chip-shape-fix"/.test(GRADLE));
-check('N2', 'versionCode >= 93', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 93; })());
+console.log(`${C.b}\n[PARTE B] Android 1.0.96-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
+check('N1', 'versionName 1.0.96-beta-board-toolbar-inside-kanban-fix', /versionName\s+"1\.0\.96-beta-board-toolbar-inside-kanban-fix"/.test(GRADLE));
+check('N2', 'versionCode >= 94', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 94; })());
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
 check('N_ICON', 'TasksTopTabs: ícone do Designers = Icons.Outlined.Image', /"designers"\s*->\s*Icons\.Outlined\.Image/.test(KT_TABS));
-// ===== PLACEMENT (mesma regra do Desktop): chips JUNTO da busca / abaixo do título, nunca soltos no topo.
+// ===== REGRA FINAL (Android): chips SOMENTE no Kanban (TasksScreen, junto da busca); NUNCA no hub.
 const iSearch = KT_SCREEN.indexOf('SearchField(query');
 const iTabsAfter = KT_SCREEN.indexOf('tabsBar()', iSearch);
-const iTabsAny = KT_SCREEN.indexOf('tabsBar()');
-check('N_PL1', 'TasksScreen: chips (tabsBar) vêm JUNTO da busca (após SearchField)', iSearch > -1 && iTabsAfter > -1 && (iTabsAny >= iSearch));
-const iQuadros = KT_HUB.indexOf('"Quadros"');
-const iHubTabs = KT_HUB.indexOf('tabsBar()');
-check('N_PL2', 'BoardsHubScreen: título "Quadros" ANTES dos chips (chips abaixo do título)', iQuadros > -1 && iHubTabs > iQuadros);
+check('N_PL1', 'Kanban (TasksScreen): chips (tabsBar) JUNTO da busca (após SearchField)', iSearch > -1 && iTabsAfter > -1);
+check('N_PL2', 'HUB "Quadros" (BoardsHubScreen) SEM chips (sem tabsBar())', KT_HUB.indexOf('tabsBar()') === -1);
+const KT_DHUB = readAndroid(AND + 'features/tasks/DesignersHubScreen.kt');
+const KT_SHUB = readAndroid(AND + 'features/tasks/SocialsHubScreen.kt');
+check('N_PL3', 'Hubs de lista (Designers/Socials) SEM chips (sem tabsBar())', KT_DHUB.indexOf('tabsBar()') === -1 && KT_SHUB.indexOf('tabsBar()') === -1);
 // CORREÇÃO 6 (Android): designer vê tarefa em A Fazer.
 check('N3', 'TaskVisibility tem boardCol4For(t,uid) designer-aware', /fun\s+boardCol4For\(t:\s*TaskItem,\s*uid:\s*String\?\)/.test(KT_VIS));
 check('N4', 'TasksScreen usa boardCol4For(t, currentUid) no Meu quadro', /boardCol4For\(t,\s*currentUid\)/.test(KT_SCREEN));
@@ -321,7 +326,7 @@ check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|Gri
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.107 / Android 1.0.95-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.108 / Android 1.0.96-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
