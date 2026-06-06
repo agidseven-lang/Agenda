@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.100 (Status operacional real)</title>
+<title>ID Seven · Desktop 1.0.101 (Fluxo por papel)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1086,7 +1086,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.100 · Status operacional real</span><br>
+    <span class="pill-ver">Desktop 1.0.101 · Fluxo por papel</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1101,7 +1101,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.100 · Status operacional real</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.101 · Fluxo por papel</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1338,7 +1338,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.100 · Status operacional real</span><br>espelha o APK <b>1.0.88-beta-operational-status-real-ui-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.101 · Fluxo por papel</span><br>espelha o APK <b>1.0.89-beta-flow-state-machine-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1352,8 +1352,8 @@ function render(){
     else if(state.flowView==='designers'){if(state.designerBoard){c.innerHTML=renderDesignerBoard();afterBoard();}else c.innerHTML=renderDesignersHub();}
     else if(state.flowView==='socials'){if(state.socialBoard){c.innerHTML=renderSocialBoard();afterBoard();}else c.innerHTML=renderSocialsHub();}
     else if(state.personBoard){c.innerHTML=renderPersonBoard();afterBoard();}
-    else if(state.roleBoards){c.innerHTML=renderRoleBoards();}
-    else if(state.boardSector){c.innerHTML=renderBoard();afterBoard();}
+    else if(state.roleBoards){c.innerHTML=renderTasksTabs('hub')+renderRoleBoards();}
+    else if(state.boardSector){c.innerHTML=renderTasksTabs('hub')+renderBoard();afterBoard();}
     else c.innerHTML=renderHub();
   }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
@@ -1668,6 +1668,7 @@ function socialCol(t){
 const OPERATIONAL_COLS=[
   {key:'afazer',              label:'A Fazer',                 color:'#6E7480'},
   {key:'producao',            label:'Em produção',             color:'#22D3EE'},
+  {key:'aguardando_envio',    label:'Aguardando envio ao designer', color:'#22D3EE'},
   {key:'aguardando_designer', label:'Aguardando designer',     color:'#A78BFA'},
   {key:'aguardando_legenda',  label:'Aguardando legenda/post', color:'#5B6CFF'},
   {key:'aguardando_revisao',  label:'Revisão do cliente',      color:'#F59E0B'},
@@ -1681,6 +1682,8 @@ function pendingFeed(t){const a=Array.isArray(t.cronContents)?t.cronContents:[];
 function pendingStory(t){const a=Array.isArray(t.cronContents)?t.cronContents:[];return a.some(c=>c&&c.storyImageUrl)&&a.some(c=>!(c&&c.storyImageUrl));}
 function pendingProduction(t){return pendingLegend(t)||pendingFeed(t);}
 function designerDelivered(t){return hasDesigner(t)&&designerCol(t)==='concluido';}
+// Ajuste pedido pelo cliente em ALGUM conteúdo (aprovação parcial) — via clientItems granular.
+function hasPendingItemRevision(t){const ci=t&&t.clientItems;if(!ci||typeof ci!=='object')return false;return Object.keys(ci).some(k=>{const cs=ci[k]&&ci[k].cs;return cs==='em_revisao'||cs==='editado';});}
 /* ===== FONTE ÚNICA DA VERDADE — o fluxo está REALMENTE encerrado? =====
    "Concluído" exige aprovação FINAL do cliente E zero pendências operacionais.
    O status BRUTO do kanban (t.status) NUNCA, sozinho, conclui um cronograma. */
@@ -1700,24 +1703,26 @@ function operationalCol(t){
   if(secOf(t.sector).key!=='cronograma')return t.status||'afazer';
   if(isFullyComplete(t))return 'concluido';                              // ÚNICO caminho para concluído
   const cf=clientCol(t);
-  if(cf==='revisao')return 'aguardando_revisao';
+  if(cf==='revisao'||hasPendingItemRevision(t))return 'aguardando_revisao'; // cliente pediu ajuste
   if(cf==='reenviado')return 'aguardando_final';
   if(hasDesigner(t)){
     if(designerCol(t)!=='concluido')return 'aguardando_designer';   // designer ainda produzindo
     return pendingProduction(t)?'aguardando_legenda':'aguardando_final'; // entregou: falta legenda/post ou pronto p/ reenvio
   }
-  if(cf==='aprovado')return pendingProduction(t)?'aguardando_legenda':'producao';
+  // SEM designer atribuído: NUNCA mostrar produção/legenda/entrega.
+  if(cf==='aprovado')return 'aguardando_envio';                          // temas aprovados → falta ENVIAR ao designer
   if(cf==='afazer')return 'afazer';
-  return 'producao';                                                  // enviado, aguardando cliente
+  return 'producao';                                                  // enviado ao cliente, aguardando feedback
 }
 // "Próxima ação" em destaque para a Social/Admin.
 function nextActionText(t){
   switch(operationalCol(t)){
     case 'afazer':              return 'Criar o cronograma e enviar ao cliente.';
-    case 'producao':            return 'Cliente aprovou os temas. Próxima etapa: enviar/acompanhar designer ou produzir legendas e posts.';
+    case 'producao':            return 'Enviado ao cliente. Próxima etapa: aguardar o feedback do cliente sobre os temas.';
+    case 'aguardando_envio':    return 'Temas aprovados. Próxima etapa: enviar o cronograma ao designer.';
     case 'aguardando_designer': return 'Designer produzindo. Próxima etapa: aguardar a entrega do designer.';
     case 'aguardando_legenda':  return 'Designer entregou. Próxima etapa: revisar, adicionar legenda e posts (Feed/Story).';
-    case 'aguardando_revisao':  return 'Cliente pediu revisão. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link.';
+    case 'aguardando_revisao':  return 'Cliente pediu ajuste. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link.';
     case 'aguardando_final':    return 'Tudo pronto. Próxima etapa: reenviar ao cliente e aguardar a aprovação final.';
     case 'concluido':           return 'Aprovação final concluída. Tarefa encerrada operacionalmente.';
   }
@@ -2861,7 +2866,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.100-desktop-operational-status-real-ui-fix';
+const BUILD='1.0.101-desktop-flow-state-machine-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2873,7 +2878,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.100 · Status operacional real</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.101 · Fluxo por papel</div></div>';
 }
 function renderConfig(){
   const u=state.user;
