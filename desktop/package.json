@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.99",
-  "description": "Agenda ID Seven Desktop — operational status consistency fix (Electron)",
+  "version": "1.0.100",
+  "description": "Agenda ID Seven Desktop — operational status real UI fix (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

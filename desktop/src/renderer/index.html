@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.98 (Fases de aprovação)</title>
+<title>ID Seven · Desktop 1.0.100 (Status operacional real)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1086,7 +1086,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.98 · Fases de aprovação</span><br>
+    <span class="pill-ver">Desktop 1.0.100 · Status operacional real</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1101,7 +1101,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.98 · Fases de aprovação</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.100 · Status operacional real</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1338,7 +1338,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.98 · Fases de aprovação</span><br>espelha o APK <b>1.0.86-beta-agency-operational-phase-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.100 · Status operacional real</span><br>espelha o APK <b>1.0.88-beta-operational-status-real-ui-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1724,6 +1724,17 @@ function nextActionText(t){
   return 'Acompanhar o andamento.';
 }
 function opColOf(k){return OPERATIONAL_COLS.find(c=>c.key===k)||OPERATIONAL_COLS[0];}
+// Bucket de 4 colunas (afazer/andamento/revisao/concluido) para os quadros por SETOR e
+// "Meu quadro". Para CRONOGRAMA, deriva do eixo OPERACIONAL — assim o status BRUTO nunca
+// coloca um cronograma em "Concluído" antes da aprovação final real (paridade com o card).
+function boardCol4(t){
+  if(secOf(t.sector).key!=='cronograma')return t.status||'afazer';
+  const oc=operationalCol(t);
+  if(oc==='concluido')return 'concluido';            // só quando isFullyComplete
+  if(oc==='aguardando_revisao')return 'revisao';
+  if(oc==='afazer')return 'afazer';
+  return 'andamento';                                 // producao/aguardando_designer/legenda/final
+}
 
 // Lista de Social Medias (todas as ativas + contagem de tarefas que cada uma é dona).
 function socialBoardsList(){
@@ -1781,8 +1792,8 @@ function renderBoard(){
   let list=visibleTasks(u,state.tasks).filter(t=>secOf(t.sector).key===s.key);
   if(boardMine&&u)list=list.filter(t=>t.assigneeId===u.id||t.by===u.id);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  const counts=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).length);
-  const byStatus=STATUS.map(st=>list.filter(t=>(t.status||'afazer')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const counts=STATUS.map(st=>list.filter(t=>boardCol4(t)===st.key).length);
+  const byStatus=STATUS.map(st=>list.filter(t=>boardCol4(t)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const cur=STATUS[boardCol];
   if(isDesktop()){
     // Desktop: 4 colunas lado a lado, cada uma com seu scroll
@@ -2850,7 +2861,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.98-desktop-agency-operational-phase-fix';
+const BUILD='1.0.100-desktop-operational-status-real-ui-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2862,7 +2873,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.98 · Fases de aprovação</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.100 · Status operacional real</div></div>';
 }
 function renderConfig(){
   const u=state.user;
