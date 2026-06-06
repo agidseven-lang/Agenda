@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.18 / Desktop 1.0.109 / Android 1.0.97
+ * Agenda ID Seven · Worker V64.18 / Desktop 1.0.110 / Android 1.0.98
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -27,9 +27,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const WORKER_BRANCH = 'worker/real-flow-sync-fix';
+const WORKER_BRANCH = "worker/client-caption-render-fix";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.97-beta-designer-sync-fix';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.98-beta-client-caption-render-fix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.18 · Desktop 1.0.109 · Android 1.0.97-beta');
+console.log(' Worker V64.19 · Desktop 1.0.110 · Android 1.0.98-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -232,6 +232,25 @@ check('MOVE6', 'REGRESSÃO coberta: gravar só status deixaria preso em "A Fazer
 const dDone = moveDesigner(D0, 'concluido');
 check('MOVE7', 'Designer "Entregue" => Social "Aguardando legendas e posts"', operationalCol(dDone) === 'aguardando_legenda');
 
+/* ===================== PARTE A.5 — Legenda do conteúdo aparece para o cliente =====================
+   Bug real: a Social preenche cronContents[i].legenda mas o portal lia c.lg/c.l (nunca c.legenda)
+   -> legenda invisível. Simula a precedência do Worker (nova x antiga). */
+console.log(`${C.b}\n[PARTE A.5] Legenda do cliente: portal lê c.legenda (3 temas) + tema+legenda+post${C.x}`);
+const readLegNEW = c => { const ov = {}; return (typeof ov.legenda === 'string') ? ov.legenda : (typeof c.legenda === 'string' ? c.legenda : (typeof c.caption === 'string' ? c.caption : (typeof c.lg === 'string' ? c.lg : (typeof c.l === 'string' ? c.l : '')))); };
+const readLegOLD = c => { const ov = {}; return (typeof ov.legenda === 'string') ? ov.legenda : (typeof c.lg === 'string' ? c.lg : (typeof c.l === 'string' ? c.l : '')); };
+const readTema = c => { const ov = {}; return (typeof ov.theme === 'string' && ov.theme) ? ov.theme : (c.t || c.tema || ''); };
+// Conteúdo como o Desktop salva (saveProduction): tema/legenda/feedImageUrl/storyImageUrl.
+const PROD = [
+  { tema: 'T1', legenda: 'Legenda do Tema 1', feedImageUrl: 'f1', storyImageUrl: 's1' },
+  { tema: 'T2', legenda: 'Legenda do Tema 2', feedImageUrl: 'f2' },
+  { tema: 'T3', legenda: 'Legenda do Tema 3', feedImageUrl: 'f3' },
+];
+PROD.forEach((c, i) => {
+  check('CAP' + (i + 1), `Cliente vê a legenda do Tema ${i + 1} (lê c.legenda)`, readLegNEW(c) === c.legenda && readLegNEW(c).length > 0);
+});
+check('CAP_REGR', 'REGRESSÃO: precedência ANTIGA (sem c.legenda) deixava legenda VAZIA', PROD.every(c => readLegOLD(c) === ''));
+check('CAP_TRIO', 'Cliente vê TEMA + LEGENDA + POST de cada conteúdo', PROD.every(c => readTema(c) && readLegNEW(c) && (c.feedImageUrl || c.storyImageUrl)));
+
 /* ===================== PARTE B — Asserções estruturais (arquitetura de render) ===================== */
 const W = readWorker();
 const DH = readDesktop('desktop/src/renderer/index.html');
@@ -246,7 +265,13 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.18-real-flow-sync-fix', /V64\.18-real-flow-sync-fix/.test(W));
+check('W1', 'Worker é V64.19-client-caption-render-fix', /V64\.19-client-caption-render-fix/.test(W));
+// ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
+// Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
+const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
+check('W_CAP1', 'Portal lê a legenda de c.legenda (HTML inicial + /state) — 2 ocorrências', legReads >= 2);
+check('W_CAP2', 'Precedência de legenda inclui ov.legenda E c.legenda', /typeof ov\.legenda === "string"\) \? ov\.legenda : \(typeof c\.legenda === "string"/.test(W));
+check('W_CAP3', '/state devolve campo JSON "legenda" e o card tem data-field="legenda"', /legenda: \(legRaw/.test(W) && /data-field="legenda"/.test(W));
 const feedFn = (W.match(/function clientFeedbackSent\(\)\{[\s\S]*?window\.scrollTo/) || [''])[0];
 check('W2', 'clientFeedbackSent SUBSTITUI a .wrap (sem formulário empilhado)', /w\.innerHTML\s*=\s*CV_TOP\(\)/.test(feedFn));
 check('W3', 'NÃO há insertAdjacentHTML("afterbegin")', !/insertAdjacentHTML\(\s*['"]afterbegin['"]/.test(W));
@@ -263,8 +288,8 @@ check('W12', 'Toast claro "Tema atualizado pela equipe"', /Tema atualizado pela 
 check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaState/.test(W) && /setInterval\(\s*pollState/.test(W));
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
-console.log(`${C.b}\n[PARTE B] Desktop 1.0.109 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.109', /"version":\s*"1\.0\.109"/.test(DP));
+console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
+check('D1', 'package.json versão 1.0.110', /"version":\s*"1\.0\.110"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -277,6 +302,10 @@ const msgFn = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [
 check('D2', 'WhatsApp premium: assinatura "Equipe ID Seven"', /Equipe ID Seven/.test(msgFn));
 check('D3', 'WhatsApp premium: CTA de revisar/aprovar/ajustes', /aprovar ou solicitar ajustes|revisar os temas/.test(msgFn));
 check('D4', 'WhatsApp premium: saudação com nome do cliente', /Olá, '\+nome/.test(msgFn));
+check('D_MSG1', 'WhatsApp premium: "área de aprovação" + "link seguro"', /área de aprovação pelo link seguro/.test(msgFn));
+check('D_MSG2', 'WhatsApp premium: "primeira etapa" + "próxima etapa de produção"', /A primeira etapa/.test(msgFn) && /próxima etapa de produção/.test(msgFn));
+// CORREÇÃO 4: upload de Feed/Story não pula para o 1º post (preserva scroll da lista).
+check('D_UPLOAD', 'Produção preserva o scroll ao anexar arte (_prodKeepScroll + restore)', /function _prodKeepScroll\(\)/.test(DH) && /_prodKeepScroll\(\);renderProductionModal\(\)/.test(DH) && /\.pr-list'\);if\(_pl&&state\._prodScroll\)/.test(DH));
 // ===== REGRA FINAL (teste real): CHIPS SOMENTE dentro do Kanban; NUNCA no hub "Quadros". =====
 check('D5', 'boardToolbar() contém BUSCA + CHIPS na mesma moldura', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><input[^>]*><div class="tchips">'\+taskChips\(\)/.test(DH));
 check('D6', 'SEM barra de chips no topo global (tasksChipBar/tflow-fixed removidos)', !/function tasksChipBar/.test(DH) && !/tflow-fixed/.test(DH));
@@ -309,12 +338,12 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.109', /Desktop 1\.0\.109/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.110', /Desktop 1\.0\.110/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.109 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.109/.test(DH) && /<title>ID Seven · Desktop 1\.0\.109/.test(DH) && /id="wpbadge">Desktop 1\.0\.109/.test(DH));
-check('D22', 'Login espelha o APK 1.0.97-beta-designer-sync-fix', /espelha o APK <b>1\.0\.97-beta-designer-sync-fix/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.109'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.110 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.110/.test(DH) && /<title>ID Seven · Desktop 1\.0\.110/.test(DH) && /id="wpbadge">Desktop 1\.0\.110/.test(DH));
+check('D22', 'Login espelha o APK 1.0.98-beta-client-caption-render-fix', /espelha o APK <b>1\.0\.98-beta-client-caption-render-fix/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.110'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
 // ===== SYNC DO DESIGNER (move grava designerFlowStatus) — Desktop =====
@@ -325,9 +354,9 @@ check('D_MOVE2', 'moveStatus grava designerFlowStatus no eixo do designer', /des
 check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({status:newStatus})', dBranch.length > 0 && !/\{status:newStatus/.test(dBranch));
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
-console.log(`${C.b}\n[PARTE B] Android 1.0.97-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.97-beta-designer-sync-fix', /versionName\s+"1\.0\.97-beta-designer-sync-fix"/.test(GRADLE));
-check('N2', 'versionCode >= 95', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 95; })());
+console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
+check('N1', 'versionName 1.0.98-beta-client-caption-render-fix', /versionName\s+"1\.0\.98-beta-client-caption-render-fix"/.test(GRADLE));
+check('N2', 'versionCode >= 96', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 96; })());
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
 check('N_ICON', 'TasksTopTabs: ícone do Designers = Icons.Outlined.Image', /"designers"\s*->\s*Icons\.Outlined\.Image/.test(KT_TABS));
@@ -361,7 +390,7 @@ check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|Gri
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.109 / Android 1.0.97-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.110 / Android 1.0.98-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
