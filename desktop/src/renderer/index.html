@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.97 (Fluxo operacional)</title>
+<title>ID Seven · Desktop 1.0.98 (Fases de aprovação)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1086,7 +1086,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.97 · Fluxo operacional</span><br>
+    <span class="pill-ver">Desktop 1.0.98 · Fases de aprovação</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1101,7 +1101,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.97 · Fluxo operacional</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.98 · Fases de aprovação</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1338,7 +1338,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.97 · Fluxo operacional</span><br>espelha o APK <b>1.0.85-beta-agency-operational-flow-final-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.98 · Fases de aprovação</span><br>espelha o APK <b>1.0.86-beta-agency-operational-phase-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1851,7 +1851,12 @@ function taskCard(t){
   h+='<div class="tc-body">'+
        (t.client?'<div class="tc-client">'+esc(t.client)+'</div>':'')+
        '<div class="tc-title">'+esc(t.title||'Sem título')+'</div>'+
-       (t.cronStatus?'<div class="tc-cron-st" style="color:'+cronStatusColor(t.cronStatus)+';background:'+withAlpha(cronStatusColor(t.cronStatus),.14)+';border-color:'+withAlpha(cronStatusColor(t.cronStatus),.32)+'"><span class="dotc"></span>'+esc(cronStatusLabel(t.cronStatus))+'</div>':'')+
+       ((function(){
+         // V1.0.98 — Cronograma: mostra o STATUS OPERACIONAL (mais claro que cronStatus).
+         if(secOf(t.sector).key==='cronograma'){const oc=opColOf(operationalCol(t));
+           return '<div class="tc-cron-st" style="color:'+oc.color+';background:'+withAlpha(oc.color,.14)+';border-color:'+withAlpha(oc.color,.32)+'"><span class="dotc"></span>'+esc(oc.label)+'</div>';}
+         return t.cronStatus?('<div class="tc-cron-st" style="color:'+cronStatusColor(t.cronStatus)+';background:'+withAlpha(cronStatusColor(t.cronStatus),.14)+';border-color:'+withAlpha(cronStatusColor(t.cronStatus),.32)+'"><span class="dotc"></span>'+esc(cronStatusLabel(t.cronStatus))+'</div>'):'';
+       })())+
        '<div class="tc-tags"><span class="tc-tag" style="color:'+s.color+';background:'+withAlpha(s.color,.14)+'">'+esc(s.label)+'</span>'+
          (cron?'<span class="tc-tag tc-tag-soft">'+esc(cron.label)+'</span>':'')+
          (t.priority?'<span class="tc-tag" style="color:#F87171;background:'+withAlpha('#F87171',.14)+'">⚑ Prioridade</span>':'')+'</div>';
@@ -1977,7 +1982,22 @@ function flowSummaryBlock(t){
   const oc=opColOf(operationalCol(t));
   h+='<div class="det-flow-col"><div class="det-flow-lbl">Status operacional</div>'+
     '<span class="det-flow-pill" style="background:'+withAlpha(oc.color,.16)+';color:'+oc.color+'"><span class="dotc" style="background:'+oc.color+'"></span>'+esc(oc.label)+'</span></div>';
+  // V1.0.98 — Fase de aprovação do cliente (themes/production/final).
+  const ph=clientApprovalPhaseOf(t);const phUi={themes:{l:'Aprovação de temas',c:'#5B6CFF'},production:{l:'Aprovação de legendas/artes',c:'#F59E0B'},final:{l:'Aprovação final',c:'#34D399'}}[ph];
+  h+='<div class="det-flow-col"><div class="det-flow-lbl">Fase do cliente</div>'+
+    '<span class="det-flow-pill" style="background:'+withAlpha(phUi.c,.16)+';color:'+phUi.c+'"><span class="dotc" style="background:'+phUi.c+'"></span>'+esc(phUi.l)+'</span></div>';
   return h+'</div>';
+}
+// V1.0.98 — Fase de aprovação do cliente (espelha o Worker).
+function clientApprovalPhaseOf(t){
+  const e=(t&&t.clientApprovalPhase||'').toString();if(e==='themes'||e==='production'||e==='final')return e;
+  if(t&&t.finalApprovalCompleted===true)return 'final';
+  if(t&&(t.cronStatus==='ready_for_final_client_review'||t.workflowStage==='entrega'||t.workflowStage==='revisao_final'))return 'final';
+  const arr=Array.isArray(t&&t.cronContents)?t.cronContents:[];const total=arr.length||0;
+  if(total>0){const withLeg=arr.filter(c=>c&&c.legenda&&String(c.legenda).trim()).length;
+    const withFeed=arr.filter(c=>c&&c.feedImageUrl).length;
+    if(withLeg===total&&withFeed===total)return 'production';}
+  return 'themes';
 }
 /* Painel "Próxima ação" + "Linha do tempo operacional" (10 etapas) no Detalhes. */
 function opPanelBlock(t){
@@ -2315,8 +2335,10 @@ async function saveProduction(taskId,resend){
     pendingLegend:pLeg, pendingFeed:pFeed, pendingStory:pStory, pendingSocialReview:!resend,
     history:firebase.firestore.FieldValue.arrayUnion({type:'social_producao',label:'Social atualizou legendas/artes',by:u.name||'',byId:u.id||null,at:now,channel:'production'})};
   if(resend){patch.cronStatus='ready_for_final_client_review';patch.finalApprovalRequired=true;
-    patch.history=firebase.firestore.FieldValue.arrayUnion({type:'reenviado_cliente',label:'Reenviado ao cliente (versão final)',by:u.name||'',byId:u.id||null,at:now,channel:'final_review'});}
-  t.cronContents=contents;t.clientFlowStatus='producao';t.operationalStatus=opSnap;if(resend)t.cronStatus='ready_for_final_client_review';   // otimista
+    // V1.0.98 — reenvio com versão final = fase FINAL no cliente.
+    patch.clientApprovalPhase='final';
+    patch.history=firebase.firestore.FieldValue.arrayUnion({type:'reenviado_cliente',label:'Reenviado ao cliente (versão FINAL)',by:u.name||'',byId:u.id||null,at:now,channel:'final_review',phase:'final'});}
+  t.cronContents=contents;t.clientFlowStatus='producao';t.operationalStatus=opSnap;if(resend){t.cronStatus='ready_for_final_client_review';t.clientApprovalPhase='final';}   // otimista
   closeModal();render();
   try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('saveProduction',e);}
   if(resend){
@@ -2710,21 +2732,27 @@ async function persistClientSend(taskId){
   // EIXO DO CLIENTE: 1º envio = 'enviado'; reenvio após revisão/produção = 'reenviado'.
   const prev=clientCol(t);
   const cflow=(prev==='revisao'||prev==='producao'||prev==='reenviado'||prev==='aprovado')?'reenviado':'enviado';
+  // V1.0.98 — FASE de aprovação do cliente. 1º envio: 'themes'. Conteúdos com legenda+Feed: 'production'.
+  const arr=Array.isArray(t.cronContents)?t.cronContents:[];const total=arr.length||0;
+  const withLegend=arr.filter(c=>c&&c.legenda&&String(c.legenda).trim()).length;
+  const withFeed=arr.filter(c=>c&&c.feedImageUrl).length;
+  const phase=(prev==='afazer'||cflow==='enviado'||total===0||withLegend<total||withFeed<total)?'themes':'production';
   try{
     await db.collection('tasks').doc(taskId).update({
       cronStatus:'enviado_cliente',
       clientFlowStatus:cflow, clientWorkflowStage:cflow,
+      clientApprovalPhase:phase,
       clientSentAt:now,
       clientSentBy:u.id||null,
       clientPreviewLink:'idseven://client/'+taskId,
       history:firebase.firestore.FieldValue.arrayUnion({
         type:'cronograma_enviado_cliente',
-        label:(cflow==='reenviado'?'Reenviado ao cliente (mesmo link)':'Cronograma enviado ao cliente'),
+        label:(phase==='themes'?'Cronograma enviado ao cliente (aprovação de TEMAS)':'Reenviado ao cliente (aprovação de legendas/artes)'),
         by:u.name||'', byId:u.id||null,
-        at:now, client:t.client||'', channel:'whatsapp_fallback', clientTo:cflow
+        at:now, client:t.client||'', channel:'whatsapp_fallback', clientTo:cflow, phase:phase
       })
     });
-    if(t)t.clientFlowStatus=cflow;
+    if(t){t.clientFlowStatus=cflow;t.clientApprovalPhase=phase;}
   }catch(e){console.warn('persistClientSend',e);}
 }
 function copyToClipboard(text){try{navigator.clipboard&&navigator.clipboard.writeText(text);}catch(_){}}
@@ -2798,7 +2826,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.97-desktop-agency-operational-flow-final-fix';
+const BUILD='1.0.98-desktop-agency-operational-phase-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2810,7 +2838,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.97 · Fluxo operacional</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.98 · Fases de aprovação</div></div>';
 }
 function renderConfig(){
   const u=state.user;

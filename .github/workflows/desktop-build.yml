@@ -30,7 +30,7 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.97-desktop-agency-operational-flow-final-fix"
+      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.98-desktop-agency-operational-phase-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
           # VERSAO-DESKTOP.txt — prova do que esta dentro
           {
             echo "productName : Agenda ID Seven Desktop"
-            echo "versionName : 1.0.97-desktop-agency-operational-flow-final-fix"
+            echo "versionName : 1.0.98-desktop-agency-operational-phase-fix"
             echo "appId       : br.com.idseven.agenda.desktop"
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
@@ -157,7 +157,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.97-installer
+          name: agenda-id-seven-desktop-1.0.98-installer
           path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
           if-no-files-found: error
           retention-days: 30
@@ -166,7 +166,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.97-bundle
+          name: agenda-id-seven-desktop-1.0.98-bundle
           path: dist-pkg/
           if-no-files-found: error
           retention-days: 30

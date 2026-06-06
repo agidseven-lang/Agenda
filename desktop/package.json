@@ -1,6 +1,6 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.97",
+  "version": "1.0.98",
   "description": "Agenda ID Seven Desktop — responsive client-designer-production flow (Electron) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
