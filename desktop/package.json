@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.105",
-  "description": "Agenda ID Seven Desktop — real-flow sync fix PC×Android (Electron)",
+  "version": "1.0.106",
+  "description": "Agenda ID Seven Desktop — board toolbar placement fix (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
