@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.15-flow-state-machine-fix]
+   ID Seven — Cloudflare Worker  [V64.16-client-portal-partial-review-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -84,13 +84,18 @@ export default {
       if (actionMatch && request.method === "POST") {
         return handleClientCronogramaAction(actionMatch[1], request, env);
       }
+      // V64.16 — estado JSON p/ tempo real (polling do portal; mesmo token/link, no-store).
+      const stateMatch = url.pathname.match(/^\/cliente\/cronograma\/([A-Za-z0-9_-]{4,128})\/state\/?$/);
+      if (stateMatch && request.method === "GET") {
+        return handleClientCronogramaState(stateMatch[1], env);
+      }
     }
 
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.15-flow-state-machine-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.16-client-portal-partial-review-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -943,6 +948,35 @@ async function handleClientCronogramaAction(token, request, env) {
   return json({ ok: true, type, contentIndex: ci, at: now, final, phase: phaseIn, col: (g && g.col) || null, clientFlowStatus: (g && g.client) || null }, 200, env);
 }
 
+/* V64.16 — ESTADO JSON p/ TEMPO REAL. O portal faz polling leve e atualiza tema/legenda/Feed/
+   Story/badge sem recarregar, no MESMO link. Sem cache (no-store). */
+async function handleClientCronogramaState(token, env) {
+  try {
+    let accessToken;
+    try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+    catch (e) { return json({ ok: false, error: "auth" }, 200, env); }
+    const task = await queryTaskByToken(env, accessToken, token);
+    if (!task) return json({ ok: false, error: "not_found" }, 200, env);
+    const items = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
+    const ci = (task.clientItems && typeof task.clientItems === "object") ? task.clientItems : {};
+    const firstUrl = (v) => { if (!v) return ""; if (typeof v === "string") return v; if (Array.isArray(v)) { for (const z of v) { if (z && typeof z === "string") return z; if (z && z.url) return z.url; } return ""; } return v.url || ""; };
+    const out = items.map((raw, i) => {
+      const c = (raw && typeof raw === "object") ? raw : {};
+      const ov = ci["i" + i] || {};
+      const tema = (typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || ("Conteúdo " + (i + 1)));
+      const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""));
+      return { i, cs: ov.cs || c.cs || "", tema, legenda: (legRaw || "").toString(),
+        feed: firstUrl(c.feed) || (c.feedImageUrl || ""), story: firstUrl(c.story || c.stories) || (c.storyImageUrl || "") };
+    });
+    const pendingRevision = Object.keys(ci).some((k) => { const cs = ci[k] && ci[k].cs; return cs === "em_revisao" || cs === "editado"; })
+      || (task.clientReview && task.clientReview.status === "revisao");
+    const finalDone = task.finalApprovalCompleted === true || task.clientFlowStatus === "concluido";
+    return json({ ok: true, phase: clientPhase(task), pendingRevision, finalDone, updatedAt: task.updatedAt || 0, items: out }, 200, env);
+  } catch (e) {
+    return json({ ok: false, error: "err" }, 200, env);
+  }
+}
+
 /* Persistência ADITIVA e granular do feedback do cliente (V64.7).
    NÃO reescreve cronWeeks (evita clobber de edição concorrente do Desktop) e NÃO
    toca cronStatus/clientReview/history. Grava em 3 campos novos (merge por updateMask):
@@ -1018,6 +1052,17 @@ async function writeClientGranular(env, accessToken, task, e) {
     comment:      { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente comentou no cronograma", col: null, stage: null, client: null },
   };
   let g = STAT[e.type] || { cs: null, rev: null, htype: "cliente_acao", label: "Ação do cliente", col: null, stage: null, client: null };
+
+  // V64.16 — GATE de aprovação PARCIAL: se QUALQUER conteúdo tem ajuste/edição pendente,
+  // 'approve'/'approveAll' NÃO pode marcar tudo aprovado nem liberar produção. Vira feedback
+  // (revisão), preservando os aprovados individuais e o ajuste pedido. (bug do vídeo: T1 ok,
+  // T2 ajuste, T3 ok → continuava virando "Temas aprovados").
+  const _ci0 = (task.clientItems && typeof task.clientItems === "object") ? task.clientItems : {};
+  const _pendingRev = Object.keys(_ci0).some((k) => { const cs = _ci0[k] && _ci0[k].cs; return cs === "em_revisao" || cs === "editado"; });
+  if ((e.type === "approve" || e.type === "approveAll") && _pendingRev) {
+    g = { cs: "em_revisao_cliente", rev: "revisao", htype: "cliente_enviou_feedback",
+          label: "Cliente enviou feedback (há ajustes pendentes)", col: "revisao", stage: "revisao", client: "revisao" };
+  }
 
   // approveItem: só conclui/avança quando TODOS os conteúdos estiverem aprovados.
   if (e.type === "approveItem") {
@@ -1505,11 +1550,16 @@ document.addEventListener('click',function(e){
   else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar no cronograma como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
   else if(act==='ackFeedback'){clientFeedbackSent();return;}
   else if(act==='approveAll'){var ph=a.getAttribute('data-phase')||'themes';
+    // V64.16 — GATE client-side: se algum conteúdo está com ajuste/edição pedido, NÃO aprova tudo.
+    var anyRev=false;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){var t=(b.textContent||'');if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)anyRev=true;});
+    if(anyRev){toast('Há ajuste pendente — enviando como feedback.','ok');post({action:'approveAll'},a,function(){addHist('rev','Enviou feedback (ajustes pendentes)');clientFeedbackSent();});return;}
     var msg=ph==='final'?'Confirmar APROVAÇÃO FINAL do cronograma? Esta é a etapa que encerra o processo.'
       :ph==='production'?'Confirmar aprovação das legendas e artes? A equipe ainda enviará a versão final para você.'
       :'Confirmar aprovação dos TEMAS? A equipe seguirá com a produção e enviará a versão final depois.';
     if(!confirm(msg))return;
     post({action:'approveAll'},a,function(j){
+      // V64.16 — se o backend converteu em revisão (ajuste pendente), mostra FEEDBACK, não sucesso.
+      if(j&&(j.clientFlowStatus==='revisao'||j.col==='revisao')){addHist('rev','Enviou feedback (ajustes pendentes)');clientFeedbackSent();return;}
       // Sucesso premium SOMENTE quando o backend confirmar que a fase é FINAL.
       if(j&&j.final===true&&(j.phase==='final'||j.phase==null)){clientSuccess();return;}
       var cs=document.querySelectorAll('#contents [data-card]');cs.forEach(function(c){setBadge(+c.dataset.card,'aprovado');});bumpProgress();
@@ -1520,6 +1570,22 @@ document.addEventListener('click',function(e){
     });}
   else if(act==='sendGenObs'){var ta=document.getElementById('genObs');var v=ta?ta.value.trim():'';if(!v){toast('Escreva uma observação primeiro.','err');return;}post({action:'comment',note:v},a,function(){if(ta)ta.value='';addHist('note','Comentou no cronograma');toast('Observação enviada','ok');});}
 });
+/* V64.16 — TEMPO REAL: polling leve do mesmo link (sem reabrir, sem gerar link novo). */
+var LAST_SIG=null;
+function applyState(j){(j.items||[]).forEach(function(it){setTheme(it.i,it.tema);if(it.legenda)setLegenda(it.i,it.legenda);setBadge(it.i,it.cs==='aprovado'?'aprovado':it.cs==='em_revisao'?'em_revisao':it.cs==='editado'?'editado':'');});bumpProgress();}
+function pollState(){fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+  if(!j||!j.ok)return;
+  if(j.finalDone){clientSuccess();return;}
+  var sig=JSON.stringify((j.items||[]).map(function(x){return [x.cs,x.tema,x.legenda,x.feed,x.story];}));
+  if(LAST_SIG===null){LAST_SIG=sig;return;}                 // baseline (página já renderizada)
+  if(sig===LAST_SIG)return;
+  var prev=JSON.parse(LAST_SIG),mediaChanged=false;
+  (j.items||[]).forEach(function(x,idx){var p=prev[idx]||[];if((x.feed||'')!==(p[3]||'')||(x.story||'')!==(p[4]||''))mediaChanged=true;});
+  LAST_SIG=sig;
+  if(mediaChanged){location.reload();return;}               // Feed/Story novo: re-render completo 1x
+  applyState(j);toast('Atualizado pela equipe.','ok');
+}).catch(function(){});}
+setInterval(pollState,6000);
 `;
 
 function renderClientHtml(task, token, env) {
