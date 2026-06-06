@@ -61,6 +61,14 @@ jobs:
           set -euo pipefail
           mkdir -p out
           echo "== Arquivos baixados =="; find dl -type f | sort
+          # Alguns bundles trazem os arquivos DENTRO de um .zip (ex.: o APK).
+          # Extrai todos os .zip aninhados antes de procurar os arquivos.
+          while IFS= read -r z; do
+            [ -n "$z" ] || continue
+            echo "unzip: $z"
+            unzip -o -q "$z" -d "$(dirname "$z")/_unz" || true
+          done < <(find dl -name '*.zip')
+          echo "== Apos extrair zips =="; find dl -type f | sort
           EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.105*.exe' | head -1)
           MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.105*.msi' | head -1)
           APK=$(find dl -name 'idseven-nativebeta-1.0.93*real-flow-sync-fix.apk' | head -1)
@@ -69,7 +77,6 @@ jobs:
           for f in "$EXE" "$MSI" "$APK"; do
             if [ -z "$f" ] || [ ! -f "$f" ]; then echo "::error::artefato faltando ($f)"; exit 1; fi
           done
-          # renomeia o APK para o nome canonico esperado
           cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.105-x64.exe"
           cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.105-x64.msi"
           cp "$APK" "out/idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk"
