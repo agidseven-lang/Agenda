@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.101",
-  "description": "Agenda ID Seven Desktop — flow state machine fix (Electron)",
+  "version": "1.0.102",
+  "description": "Agenda ID Seven Desktop — client portal + partial review fix (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

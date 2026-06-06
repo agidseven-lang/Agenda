@@ -98,4 +98,23 @@ for(const [name,t,exp,dAppears] of CASES){
 }
 console.log('-'.repeat(140));
 if(fails){console.error(`\nMATRIZ REPROVADA: ${fails} caso(s) divergente(s).`);process.exit(1);}
-console.log('\nMATRIZ APROVADA: casos A-H corretos em cliente/social/designer/meu_quadro/setor; nenhum estado de producao antes do designer; Desktop==Android (mesma regra).');
+
+/* ===== GATE de aprovação PARCIAL (V64.16 / caso real do vídeo) =====
+   Simula o gate server+client: 'approveAll' com QUALQUER item em ajuste vira FEEDBACK, não total. */
+function approveAllResult(t){
+  const ci=t.clientItems||{};
+  const pend=Object.keys(ci).some(k=>['em_revisao','editado'].includes(ci[k]&&ci[k].cs))||(t.clientReview&&t.clientReview.status==='revisao');
+  return pend ? 'feedback' : 'aprovado';   // feedback = "Feedback enviado!"; aprovado = "Temas aprovados!"
+}
+console.log('\n=== GATE de aprovação parcial (caso do vídeo) ===');
+let gateFail=0;
+const GATE=[
+  ['T1 ok, T2 ajuste, T3 ok → approveAll', {clientItems:{i0:{cs:'aprovado'},i1:{cs:'em_revisao'},i2:{cs:'aprovado'}}}, 'feedback'],
+  ['T1/T2 editado → approveAll',           {clientItems:{i0:{cs:'aprovado'},i1:{cs:'editado'}}},                     'feedback'],
+  ['todos aprovados → approveAll',         {clientItems:{i0:{cs:'aprovado'},i1:{cs:'aprovado'},i2:{cs:'aprovado'}}}, 'aprovado'],
+  ['equipe corrigiu, sem pendência → approveAll', {clientItems:{i0:{cs:'aprovado'},i1:{cs:'aprovado'}}},             'aprovado'],
+];
+for(const [name,t,exp] of GATE){ const got=approveAllResult(t); const ok=got===exp; if(!ok)gateFail++;
+  console.log((ok?'OK   ':'FALHA')+' | '+pad(name,42)+' → '+got+' (esperado '+exp+')'); }
+if(gateFail){console.error(`\nGATE REPROVADO: ${gateFail} caso(s).`);process.exit(1);}
+console.log('\nMATRIZ APROVADA: A-H por papel + GATE de aprovacao parcial (aprovacao parcial NAO vira total; feedback quando ha ajuste).');

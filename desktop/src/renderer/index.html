@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.101 (Fluxo por papel)</title>
+<title>ID Seven · Desktop 1.0.102 (Revisão parcial e portal)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1086,7 +1086,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.101 · Fluxo por papel</span><br>
+    <span class="pill-ver">Desktop 1.0.102 · Revisão parcial e portal</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1101,7 +1101,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.101 · Fluxo por papel</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.102 · Revisão parcial e portal</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1328,6 +1328,11 @@ async function pendingChange(p1,p2,btn){
 const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'}];
 function render(){
   if(!state.user)return;
+  // 1.0.102 — NUNCA re-renderizar por baixo de uma edição aberta. Se há um modal aberto com
+  // campo de edição (ou qualquer input/textarea em foco), adia o render (snapshot do Firestore)
+  // até o usuário fechar/salvar. Corrige o modal de correção sumindo em tempo real.
+  if(_editingNow()){_deferRender=true;return;}
+  _deferRender=false;
   document.getElementById('topAvatar').innerHTML='<button class="topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,38)+'</button>';
   const nav=document.getElementById('bottomNav');
   if(isDesktop()){
@@ -1338,7 +1343,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.101 · Fluxo por papel</span><br>espelha o APK <b>1.0.89-beta-flow-state-machine-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.102 · Revisão parcial e portal</span><br>espelha o APK <b>1.0.90-beta-client-portal-partial-review-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1540,13 +1545,13 @@ function designerOf(t){return (t&&t.designerAssignment&&t.designerAssignment.des
 function isClientFlow(t){return !!t&&secOf(t.sector).key==='cronograma';}
 // Colunas do FLUXO DO CLIENTE (eixo próprio, separado do designer).
 const CLIENT_COLS=[
-  {key:'afazer',    label:'A Fazer',            color:'#6E7480'},
-  {key:'enviado',   label:'Enviado ao cliente', color:'#5B6CFF'},
-  {key:'aprovado',  label:'Aprovado pelo cliente',color:'#22D3EE'},
-  {key:'producao',  label:'Em produção',        color:'#A78BFA'},
-  {key:'revisao',   label:'Revisão',            color:'#F59E0B'},
-  {key:'reenviado', label:'Reenviado ao cliente',color:'#34D399'},
-  {key:'concluido', label:'Concluído',          color:'#10B981'},
+  {key:'afazer',    label:'A Fazer',                     color:'#6E7480'},
+  {key:'enviado',   label:'Temas enviados ao cliente',   color:'#5B6CFF'},
+  {key:'aprovado',  label:'Temas aprovados pelo cliente',color:'#22D3EE'},
+  {key:'producao',  label:'Em produção',                 color:'#A78BFA'},
+  {key:'revisao',   label:'Ajuste solicitado pelo cliente',color:'#F59E0B'},
+  {key:'reenviado', label:'Reenviado ao cliente',        color:'#34D399'},
+  {key:'concluido', label:'Concluído final',             color:'#10B981'},
 ];
 // Coluna do cliente: usa clientFlowStatus (gravado por Worker/Desktop); senão deriva (compat).
 function clientCol(t){
@@ -1666,14 +1671,14 @@ function socialCol(t){
    A aprovação parcial do cliente NÃO conclui a operação: enquanto faltar designer,
    legenda, post ou aprovação final, a tarefa fica num estágio operacional aberto. */
 const OPERATIONAL_COLS=[
-  {key:'afazer',              label:'A Fazer',                 color:'#6E7480'},
-  {key:'producao',            label:'Em produção',             color:'#22D3EE'},
-  {key:'aguardando_envio',    label:'Aguardando envio ao designer', color:'#22D3EE'},
-  {key:'aguardando_designer', label:'Aguardando designer',     color:'#A78BFA'},
-  {key:'aguardando_legenda',  label:'Aguardando legenda/post', color:'#5B6CFF'},
-  {key:'aguardando_revisao',  label:'Revisão do cliente',      color:'#F59E0B'},
-  {key:'aguardando_final',    label:'Aguardando aprov. final', color:'#34D399'},
-  {key:'concluido',           label:'Concluído',               color:'#10B981'},
+  {key:'afazer',              label:'A Fazer',                          color:'#6E7480'},
+  {key:'producao',            label:'Aguardando aprovação dos temas',   color:'#22D3EE'},
+  {key:'aguardando_envio',    label:'Aguardando envio ao designer',     color:'#22D3EE'},
+  {key:'aguardando_designer', label:'Designer em produção',             color:'#A78BFA'},
+  {key:'aguardando_legenda',  label:'Aguardando legendas e posts',      color:'#5B6CFF'},
+  {key:'aguardando_revisao',  label:'Ajuste solicitado pelo cliente',   color:'#F59E0B'},
+  {key:'aguardando_final',    label:'Aguardando aprovação final',       color:'#34D399'},
+  {key:'concluido',           label:'Concluído final',                  color:'#10B981'},
 ];
 const OP_KEYS=OPERATIONAL_COLS.map(c=>c.key);
 // Há produção pendente? (alguma legenda vazia OU algum Feed sem arte)
@@ -2845,7 +2850,15 @@ async function deleteTask(taskId){
   catch(e){ alert('Não foi possível remover agora. Tente novamente.'); }
   // Kanban e celular atualizam sozinhos via onSnapshot.
 }
-function closeModal(){document.getElementById('modalRoot').innerHTML='';}
+function closeModal(){document.getElementById('modalRoot').innerHTML='';if(_deferRender){_deferRender=false;render();}}
+// 1.0.102 — guarda de edição: há modal aberto com campo OU um input/textarea em foco?
+let _deferRender=false;
+function _editingNow(){
+  const mr=document.getElementById('modalRoot');
+  if(mr&&mr.firstChild&&mr.querySelector('input,textarea,select'))return true;
+  const a=document.activeElement;
+  return !!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable));
+}
 
 /* ---- EQUIPE / CHAT / PERFIL ---- */
 function renderEquipe(){
@@ -2866,7 +2879,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.101-desktop-flow-state-machine-fix';
+const BUILD='1.0.102-desktop-client-portal-partial-review-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2878,7 +2891,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.101 · Fluxo por papel</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.102 · Revisão parcial e portal</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -3219,6 +3232,8 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-assignee]')){openAssignee();return;}
 });
 document.getElementById('modalRoot').addEventListener('click',e=>{if(e.target.classList&&e.target.classList.contains('modal-back'))closeModal();});
+// 1.0.102 — ao sair de um campo, se houve render adiado durante a edição, aplica agora.
+document.addEventListener('focusout',function(){if(_deferRender)setTimeout(function(){if(!_editingNow()){_deferRender=false;render();}},80);});
 function stepNext(){const f=state.form;
   if(f.step===0&&!f.sector){alert('Escolha o setor.');return;}
   if(f.step===1){const t=tpl();if(t&&t.clientRequired&&!f.client.trim()){alert('Para Cronograma o cliente é obrigatório.');return;}if(!f.title.trim()){alert('Informe o título.');return;}}
