@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.108 (Chips no Kanban)</title>
+<title>ID Seven · Desktop 1.0.109 (Sync do designer)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1103,8 +1103,8 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.108 · Chips no Kanban</span><br>
-    espelha o APK <b>1.0.96-beta-board-toolbar-inside-kanban-fix</b> · ref app/main
+    <span class="pill-ver">Desktop 1.0.109 · Sync do designer</span><br>
+    espelha o APK <b>1.0.97-beta-designer-sync-fix</b> · ref app/main
   </div>
 </section>
 
@@ -1118,7 +1118,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.108 · Chips no Kanban</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.109 · Sync do designer</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1134,7 +1134,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.108', tag:'Chips no Kanban', apk:'1.0.96-beta-board-toolbar-inside-kanban-fix' };
+const APP_VER={ desktop:'1.0.109', tag:'Sync do designer', apk:'1.0.97-beta-designer-sync-fix' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1383,7 +1383,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.108 · Chips no Kanban</span><br>espelha o APK <b>1.0.96-beta-board-toolbar-inside-kanban-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.109 · Sync do designer</span><br>espelha o APK <b>1.0.97-beta-designer-sync-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2019,14 +2019,32 @@ function taskCard(t){
 function canDelTask(t){const u=state.user;return !!u&&(canSeeAll(u)||t.by===u.id||t.assigneeId===u.id);}
 function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};}
 
+// 1.0.109 — eixo do DESIGNER: card no quadro do designer (ou sou o designer atribuído).
+// Mover grava designerFlowStatus (fonte única lida pelo quadro do designer no PC e no Android).
+function isDesignerAxisMove(t){return isDesignerFlow(t)&&((state.user&&designerOf(t)===state.user.id)||!!state.designerBoard);}
+function designerMoveOpts(t){const cur=designerCol(t);
+  if(cur==='afazer')return [{key:'andamento',label:'Em andamento',desc:'Começar a produção'}];
+  if(cur==='concluido')return [{key:'andamento',label:'Reabrir (Em andamento)',desc:'Voltar a produzir'}];
+  return [{key:'concluido',label:'Entregue',desc:'Entrega para a Social finalizar'},{key:'afazer',label:'A Fazer',desc:'Pausar e retornar'}];
+}
 function openMove(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
-  const opts=STATUS.filter(st=>st.key!==(t.status||'afazer'));
+  const opts=isDesignerAxisMove(t)
+    ? designerMoveOpts(t).map(o=>({key:o.key,label:o.label,desc:o.desc,color:stOf(o.key).color}))
+    : STATUS.filter(st=>st.key!==(t.status||'afazer'));
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800">Mover tarefa</div><div style="font-size:13px;color:var(--soft);margin-bottom:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(t.title||t.client||'')+'</div>'+
     opts.map(st=>'<button class="moveopt" data-domove="'+t.id+'|'+st.key+'" style="background:'+withAlpha(st.color,.12)+'"><div class="icb" style="background:'+withAlpha(st.color,.18)+';color:'+st.color+'">'+svg('swap')+'</div><div><div style="font-size:14px;font-weight:800;color:'+st.color+'">'+st.label+'</div><div style="font-size:11.5px;color:var(--faint)">'+st.desc+'</div></div></button>').join('')+'</div></div>';
 }
 async function moveStatus(taskId,newStatus){
-  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;const old=t.status||'afazer';const now=Date.now();
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;const now=Date.now();
+  if(isDesignerAxisMove(t)){
+    // EIXO DO DESIGNER (fonte única): grava designerFlowStatus; NÃO toca em status genérico nem doneAt.
+    const old=designerCol(t);
+    const patch={designerFlowStatus:newStatus,designerWorkflowStage:newStatus,history:firebase.firestore.FieldValue.arrayUnion({kind:'designer_moved',at:now,byId:state.user.id,from:old,to:newStatus})};
+    if(newStatus!=='afazer'&&!t.startedAt)patch.startedAt=now;
+    closeModal();await db.collection('tasks').doc(taskId).update(patch);return;
+  }
+  const old=t.status||'afazer';
   const patch={status:newStatus,history:firebase.firestore.FieldValue.arrayUnion({kind:'moved',at:now,byId:state.user.id,from:old,to:newStatus})};
   if(newStatus!=='afazer'&&!t.startedAt)patch.startedAt=now;
   if(newStatus==='concluido'){patch.doneAt=now;patch.doneBy=state.user.id;}
@@ -3006,7 +3024,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.108-board-toolbar-inside-kanban-fix';
+const BUILD='1.0.109-designer-sync-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -3018,7 +3036,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.108 · Chips no Kanban</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.109 · Sync do designer</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -3051,7 +3069,7 @@ function openSheet(which){
   const u=state.user;let rows,title;
   if(which==='conta'){title='Conta';rows=[['Nome',u.name],['Função',u.role||'Não informado'],['E-mail',u.email||'Não informado'],['WhatsApp',u.phone||'Não informado'],['Status','Ativa'],['Permissão',u.admin?'Administrador':'Membro da equipe'],['ID do usuário',u.id]];}
   else if(which==='seguranca'){title='Segurança';rows=[['Sessão','Ativa neste navegador'],['Login','Custom (hash s2 / SHA-256)'],['UID',u.id],['Sessão salva','Local (localStorage)']];}
-  else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.96-beta-board-toolbar-inside-kanban-fix'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
+  else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.97-beta-designer-sync-fix'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800;margin-bottom:10px">'+title+'</div>'+
     rows.map(r=>'<div class="infoline"><div class="il">'+esc(r[0])+'</div><div class="iv">'+esc(r[1])+'</div></div>').join('')+
     (which==='seguranca'?'<div style="height:14px"></div><button class="btn" data-logout="1" style="background:'+withAlpha('#F87171',.14)+';color:var(--red)">Sair da conta</button>':'')+'</div></div>';

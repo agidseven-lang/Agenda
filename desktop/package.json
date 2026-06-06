@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.108",
-  "description": "Agenda ID Seven Desktop — chips inside kanban fix (Electron)",
+  "version": "1.0.109",
+  "description": "Agenda ID Seven Desktop — designer sync fix (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
