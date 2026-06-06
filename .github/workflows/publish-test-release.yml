@@ -1,0 +1,185 @@
+# =====================================================================
+# [infra] Publica uma PRE-RELEASE de teste reunindo os instaladores JÁ
+# gerados (NÃO rebuilda, NÃO faz merge, NÃO toca em app). Baixa os
+# artifacts das runs informadas, confere SHA-256 e publica a release.
+# Dispara no push desta branch (e tambem manualmente, se promovida).
+# =====================================================================
+name: "[infra] Publish Test Release"
+
+"on":
+  push:
+    branches: ["infra/test-release-publish"]
+  workflow_dispatch:
+    inputs:
+      desktop_run:
+        description: "Run id do build Desktop"
+        required: true
+        default: "27071898848"
+      android_run:
+        description: "Run id do build Android"
+        required: true
+        default: "27070499926"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      DESKTOP_RUN: "27071898848"
+      ANDROID_RUN: "27070499926"
+      TAG: "test/real-flow-sync-fix-1.0.105-1.0.93"
+      EXE_SHA: "096ec64fcf2f1dff24e84eabb28a0efe66537273dd4146d87de04914d89240f5"
+      MSI_SHA: "916290aeeecf051a19d9bf602adb06d4ab366bdb7d93677a68333cac2491a53f"
+      APK_SHA: "2b7947a3233473e5bb14b711d0b5d8fbd9493292a5b295d4a00f0bcc0c56ab77"
+    steps:
+      - name: Resolver run ids (input tem prioridade)
+        run: |
+          echo "DRUN=${{ github.event.inputs.desktop_run || env.DESKTOP_RUN }}" >> "$GITHUB_ENV"
+          echo "ARUN=${{ github.event.inputs.android_run || env.ANDROID_RUN }}" >> "$GITHUB_ENV"
+
+      - name: Baixar bundle do Desktop (run existente, sem rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ env.DRUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dl/desktop
+          pattern: "agenda-id-seven-desktop-*-bundle"
+
+      - name: Baixar bundle do Android (run existente, sem rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ env.ARUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dl/android
+          pattern: "idseven-nativebeta-*-bundle"
+
+      - name: Selecionar arquivos + CONFERIR SHA-256
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          echo "== Arquivos baixados =="; find dl -type f | sort
+          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.105*.exe' | head -1)
+          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.105*.msi' | head -1)
+          APK=$(find dl -name 'idseven-nativebeta-1.0.93*real-flow-sync-fix.apk' | head -1)
+          VDESK=$(find dl -name 'VERSAO-DESKTOP.txt' | head -1 || true)
+          VAPK=$(find dl -name 'VERSAO-DO-APK.txt' | head -1 || true)
+          for f in "$EXE" "$MSI" "$APK"; do
+            if [ -z "$f" ] || [ ! -f "$f" ]; then echo "::error::artefato faltando ($f)"; exit 1; fi
+          done
+          # renomeia o APK para o nome canonico esperado
+          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.105-x64.exe"
+          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.105-x64.msi"
+          cp "$APK" "out/idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk"
+          [ -n "$VDESK" ] && cp "$VDESK" out/VERSAO-DESKTOP.txt || true
+          [ -n "$VAPK" ] && cp "$VAPK" out/VERSAO-DO-APK.txt || true
+          cd out
+          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.105-x64.exe" | awk '{print $1}')
+          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.105-x64.msi" | awk '{print $1}')
+          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk" | awk '{print $1}')
+          echo "exe esperado=$EXE_SHA obtido=$GOT_EXE"
+          echo "msi esperado=$MSI_SHA obtido=$GOT_MSI"
+          echo "apk esperado=$APK_SHA obtido=$GOT_APK"
+          [ "$GOT_EXE" = "$EXE_SHA" ] || { echo "::error::SHA exe diverge"; exit 1; }
+          [ "$GOT_MSI" = "$MSI_SHA" ] || { echo "::error::SHA msi diverge"; exit 1; }
+          [ "$GOT_APK" = "$APK_SHA" ] || { echo "::error::SHA apk diverge"; exit 1; }
+          sha256sum * > SHA256SUMS.txt
+          echo "== SHA-256 conferido (todos batem) =="; cat SHA256SUMS.txt
+
+      - name: Gerar README-TESTE-REAL.txt
+        run: |
+          cat > out/README-TESTE-REAL.txt <<'EOF'
+          ============================================================
+          Agenda ID Seven — TESTE REAL (Real Flow Sync Fix)
+          Pre-release de teste — NAO e producao.
+          ============================================================
+
+          VERSOES
+          - Worker  : V64.18-real-flow-sync-fix (ja ativo no link do cliente)
+          - Desktop : 1.0.105-real-flow-sync-fix
+          - Android : 1.0.93-beta-real-flow-sync-fix (versionCode 91)
+
+          SHA-256 (confira apos baixar)
+          - Agenda-ID-Seven-Desktop-1.0.105-x64.exe
+            096ec64fcf2f1dff24e84eabb28a0efe66537273dd4146d87de04914d89240f5
+          - Agenda-ID-Seven-Desktop-1.0.105-x64.msi
+            916290aeeecf051a19d9bf602adb06d4ab366bdb7d93677a68333cac2491a53f
+          - idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk
+            2b7947a3233473e5bb14b711d0b5d8fbd9493292a5b295d4a00f0bcc0c56ab77
+          (o arquivo SHA256SUMS.txt traz todos os hashes)
+
+          ------------------------------------------------------------
+          INSTALAR — DESKTOP (Windows)
+          ------------------------------------------------------------
+          IMPORTANTE: FECHE a versao antiga ANTES de instalar.
+          1) Na BANDEJA (ao lado do relogio), clique com o botao direito
+             no icone do Agenda ID Seven -> "Sair". (o X so esconde)
+          2) Abra o Agenda-ID-Seven-Desktop-1.0.105-x64.exe (prefira o .exe).
+          3) Se o SmartScreen avisar: "Mais informacoes" -> "Executar assim mesmo".
+          4) Abra o app e faca login. A tela de login deve mostrar:
+             "Desktop 1.0.105 - Sync real PC x Android".
+
+          ------------------------------------------------------------
+          INSTALAR — ANDROID
+          ------------------------------------------------------------
+          1) Baixe o .apk no celular (ou transfira para ele).
+          2) Toque no arquivo; se pedir, permita "Instalar apps desconhecidos".
+          3) Play Protect pode avisar (beta sem assinatura de loja) ->
+             "Instalar assim mesmo".
+          4) Abre lado a lado do app aprovado (package nativebeta).
+             No login/perfil deve mostrar 1.0.93-beta-real-flow-sync-fix.
+
+          ------------------------------------------------------------
+          ROTEIRO DE TESTE (foco no que reprovou)
+          ------------------------------------------------------------
+          PC logado como SOCIAL MEDIA, celular logado como DESIGNER.
+
+          1) PC: criar Cronograma semanal, atribuir ao designer, 3 temas,
+             "Confirmar/Enviar" (uma vez so). Conferir: NAO duplica card/tela.
+          2) PC: trocar de aba no quadro. Os chips "Meu quadro / Cliente /
+             Designer / Social Media / Setores" devem aparecer NA HORA, fixos
+             no topo, sem precisar voltar.
+          3) PC: "Copiar mensagem" -> a mensagem do WhatsApp deve estar premium
+             (saudacao + contexto + link + "Equipe ID Seven"), sem link cru.
+          4) Portal do cliente (mesmo link): aprovar Tema 1 e Tema 3, pedir
+             ajuste no Tema 2, enviar. Deve aparecer "Feedback enviado!" com
+             resumo (sem formulario duplicado) e "Aguardando ajuste da equipe".
+          5) PC (Social): abrir Detalhes -> editar o Tema 2. O campo deve
+             responder no PRIMEIRO clique. Salvar.
+          6) Portal do cliente (mesma aba aberta, mesmo link): deve atualizar
+             SOZINHO -> "A equipe atualizou seu cronograma" e recarregar para
+             revisar de novo (sem reabrir o WhatsApp).
+          7) Quadros com colunas por contexto: Social 4 (A Fazer / Em andamento
+             / Revisao / Finalizado), Designer 3 (A Fazer / Em andamento /
+             Entregue), Cliente 4 (Enviado / Em analise / Revisao solicitada /
+             Aprovado). Sem excesso de colunas.
+          8) CRITICO PC x ANDROID: PC (Social) envia ao designer. No CELULAR
+             logado como designer, em "Meu quadro", a tarefa deve aparecer em
+             "A FAZER". Desktop e Android devem bater.
+
+          Qualquer item que falhar: anote o passo (de preferencia com print/
+          video) para correcao na proxima passada.
+          EOF
+          echo "== README =="; sed -n '1,20p' out/README-TESTE-REAL.txt
+          echo "== out =="; ls -lh out
+
+      - name: Publicar PRE-RELEASE com os arquivos
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: "Agenda ID Seven — Teste Real Flow Sync Fix"
+          prerelease: true
+          make_latest: false
+          fail_on_unmatched_files: true
+          body_path: out/README-TESTE-REAL.txt
+          files: |
+            out/Agenda-ID-Seven-Desktop-1.0.105-x64.exe
+            out/Agenda-ID-Seven-Desktop-1.0.105-x64.msi
+            out/idseven-nativebeta-1.0.93-beta-real-flow-sync-fix.apk
+            out/VERSAO-DESKTOP.txt
+            out/VERSAO-DO-APK.txt
+            out/SHA256SUMS.txt
+            out/README-TESTE-REAL.txt
