@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.17 / Desktop 1.0.104 / Android 1.0.92
+ * Agenda ID Seven · Worker V64.18 / Desktop 1.0.105 / Android 1.0.93
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -27,9 +27,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const WORKER_BRANCH = 'worker/client-flow-e2e-fix';
-const ANDROID_BRANCH = 'app/local-1.0.91-board-filters-polish'; // chips/state; versão será buildada na branch e2e
-const ANDROID_E2E_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix';
+const WORKER_BRANCH = 'worker/real-flow-sync-fix';
+const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
+const ANDROID_E2E_BRANCH = 'app/local-1.0.93-beta-real-flow-sync-fix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -40,7 +40,7 @@ function readWorkTree(relPath) {
 }
 /* Worker/Android: tenta a branch e2e, depois a branch base, depois working tree. */
 function readWorker() {
-  return readFromGit('worker/client-flow-e2e-fix', 'cloudflare-worker.js') || readWorkTree('cloudflare-worker.js') || '';
+  return readFromGit(WORKER_BRANCH, 'cloudflare-worker.js') || readWorkTree('cloudflare-worker.js') || '';
 }
 function readAndroid(relPath) {
   return readFromGit(ANDROID_E2E_BRANCH, relPath) || readFromGit(ANDROID_BRANCH, relPath) || readWorkTree(relPath) || '';
@@ -96,6 +96,16 @@ function boardCol4(t) {
   if (oc === 'afazer') return 'afazer';
   return 'andamento';
 }
+const designerOf = t => (t.assignedDesignerId || t.assigneeId || null);
+// Bucket DERIVADO DO PAPEL: se quem vê é o designer atribuído, usa o eixo do designer.
+function boardCol4For(t, uid) {
+  if (sec(t) !== 'cronograma') return t.status || 'afazer';
+  if (uid && hasDesigner(t) && designerOf(t) === uid) {
+    const dc = designerCol(t);
+    return dc === 'concluido' ? 'concluido' : dc === 'revisao' ? 'revisao' : dc === 'andamento' ? 'andamento' : 'afazer';
+  }
+  return boardCol4(t);
+}
 /* GATE: approveAll com qualquer item em ajuste/edição vira FEEDBACK, não aprovação total. */
 function approveAllResult(t) {
   const ci = t.clientItems || {};
@@ -116,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.17 · Desktop 1.0.104 · Android 1.0.92-beta');
+console.log(' Worker V64.18 · Desktop 1.0.105 · Android 1.0.93-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -183,64 +193,101 @@ for (const [name, t, exp] of GATE) {
   check('GATE', `approveAll {${name}} → ${got} (esperado ${exp})`, got === exp);
 }
 
+/* ===================== PARTE A.3 — PC×Android: designer vê a tarefa em "A Fazer" =====================
+   Cenário REAL do vídeo: PC=Social envia ao designer D; celular logado como D abre "Meu quadro".
+   A coluna do designer (no SEU quadro) DEVE ser "A Fazer" assim que recebe — em Desktop e Android. */
+console.log(`${C.b}\n[PARTE A.3] PC×Android — tarefa enviada ao designer cai em "A Fazer" do designer${C.x}`);
+const justSentToDesigner = {
+  sector: 'cronograma', status: 'afazer', clientFlowStatus: 'producao',
+  assignedDesignerId: 'D', assigneeId: 'D', designerFlowStatus: 'afazer',
+  operationalStatus: 'aguardando_designer', cronStatus: 'sent_to_designer', cronContents: TH,
+};
+// "Meu quadro" do designer D (quem vê = D): designer-aware → 'afazer'.
+check('SYNC1', 'Meu quadro do designer D → "A Fazer" (boardCol4For viewer=D)', boardCol4For(justSentToDesigner, 'D') === 'afazer');
+// Sem o eixo do designer, o boardCol4 cru cairia em "andamento" (era O BUG: A Fazer vazio no celular).
+check('SYNC2', 'Regressão coberta: boardCol4 cru daria "andamento" (bug antigo)', boardCol4(justSentToDesigner) === 'andamento');
+// Para a Social (quem NÃO é o designer), continua no eixo operacional (andamento) — correto.
+check('SYNC3', 'Mesma tarefa para a Social (viewer=social) → "andamento"', boardCol4For(justSentToDesigner, 'social') === 'andamento');
+// Identidade: o id gravado (assigneeId/designerId) é o MESMO espaço do uid logado no Android.
+check('SYNC4', 'designerOf == id gravado (assigneeId/designerAssignment.designerId)', designerOf(justSentToDesigner) === 'D');
+
 /* ===================== PARTE B — Asserções estruturais (arquitetura de render) ===================== */
 const W = readWorker();
 const DH = readDesktop('desktop/src/renderer/index.html');
 const DP = readDesktop('desktop/package.json');
-const KT_VIS = readAndroid('android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/features/tasks/TaskVisibility.kt');
-const KT_TABS = readAndroid('android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/features/tasks/TasksTopTabs.kt');
+const AND = 'android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/';
+const KT_VIS = readAndroid(AND + 'features/tasks/TaskVisibility.kt');
+const KT_TABS = readAndroid(AND + 'features/tasks/TasksTopTabs.kt');
+const KT_SCREEN = readAndroid(AND + 'features/tasks/TasksScreen.kt');
+const KT_REPO = readAndroid(AND + 'data/TaskRepo.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
-console.log(`${C.b}\n[PARTE B] Worker V64.17 — portal do cliente (P3/P4/P6/P7)${C.x}`);
-check('W1', 'Worker é V64.17-client-flow-e2e-fix', /V64\.17-client-flow-e2e-fix/.test(W));
-// P4/P7: telas de feedback/ack SUBSTITUEM a .wrap (innerHTML), não usam insertAdjacentHTML('afterbegin').
+console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
+check('W1', 'Worker é V64.18-real-flow-sync-fix', /V64\.18-real-flow-sync-fix/.test(W));
 const feedFn = (W.match(/function clientFeedbackSent\(\)\{[\s\S]*?window\.scrollTo/) || [''])[0];
-check('W2', 'clientFeedbackSent SUBSTITUI a .wrap (w.innerHTML=CV_TOP())', /w\.innerHTML\s*=\s*CV_TOP\(\)/.test(feedFn));
-check('W3', 'NÃO há insertAdjacentHTML("afterbegin") (sem formulário empilhado)', !/insertAdjacentHTML\(\s*['"]afterbegin['"]/.test(W));
+check('W2', 'clientFeedbackSent SUBSTITUI a .wrap (sem formulário empilhado)', /w\.innerHTML\s*=\s*CV_TOP\(\)/.test(feedFn));
+check('W3', 'NÃO há insertAdjacentHTML("afterbegin")', !/insertAdjacentHTML\(\s*['"]afterbegin['"]/.test(W));
 check('W4', 'Feedback parcial mostra "Aguardando ajuste da equipe"', /Aguardando ajuste da equipe/.test(feedFn));
 check('W5', 'Feedback parcial NÃO afirma "Temas aprovados"', !/Temas aprovados/.test(feedFn));
-check('W6', 'Resumo read-only por conteúdo (Aprovado/Ajuste/Editado/Pendente)', /Ajuste solicitado/.test(feedFn) && /Pendente/.test(feedFn));
-// P6: sincronização no MESMO link via polling de /state.
-check('W7', 'Endpoint GET /cliente/cronograma/:token/state existe', /handleClientCronogramaState/.test(W) && /\/state\\\/\?\$/.test(W));
-check('W8', 'Poller periódico (setInterval pollState)', /setInterval\(\s*pollState/.test(W));
-check('W9', 'applyState atualiza tema/legenda/badge NO LUGAR (sem empilhar)', /function applyState\(/.test(W) && /setTheme\(/.test(W) && /setLegenda\(/.test(W));
-check('W10', 'reload só quando muda mídia (feed/story), não a cada poll', /mediaChanged/.test(W) && /location\.reload\(\)/.test(W));
-check('W11', 'State endpoint devolve tema com override do cliente (ov.theme)', /ov\.theme/.test(W) && /tema,/.test(W));
-// GATE server-side dentro do writeClientGranular.
-check('W12', 'Gate server-side: approveAll com pendência vira revisão', /_pendingRev|pendingRev/.test(W) && /em_revisao_cliente/.test(W));
-// GATE client-side dentro do handler approveAll.
-check('W13', 'Gate client-side: anyRev → clientFeedbackSent (não sucesso)', /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
-// P3: visual premium mínimo (topbar + cards colapsáveis + selo seguro).
-check('W14', 'Portal premium: topbar de marca + selo "Link seguro"', /function CV_TOP\(\)/.test(W) && /Link seguro/.test(W));
+check('W6', 'Tela de feedback ENTRA em modo de espera (FEEDBACK_MODE=true)', /FEEDBACK_MODE\s*=\s*true/.test(feedFn));
+// CORREÇÃO 5 do teste real: cliente NÃO precisa reabrir o link — atualiza sozinho.
+check('W7', 'Função teamUpdated() existe (aviso "A equipe atualizou")', /function teamUpdated\(\)/.test(W) && /A equipe atualizou/.test(W));
+check('W8', 'teamUpdated recarrega o MESMO link (location.reload)', /function teamUpdated\(\)\{[\s\S]*?location\.reload\(\)/.test(W));
+check('W9', 'Poller dispara teamUpdated quando a equipe corrige (FEEDBACK_MODE)', /if\s*\(FEEDBACK_MODE\)\{[\s\S]*?teamUpdated\(\)/.test(W));
+check('W10', 'Indicador "Atualização automática ativa" (liveTick)', /function liveTick\(/.test(W) && /Atualização automática ativa/.test(W));
+check('W11', 'applyState DESTACA conteúdos alterados pela equipe (changed)', /function applyState\(j,changed\)/.test(W) && /boxShadow/.test(W));
+check('W12', 'Toast claro "Tema atualizado pela equipe"', /Tema atualizado pela equipe/.test(W));
+check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaState/.test(W) && /setInterval\(\s*pollState/.test(W));
+check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
-console.log(`${C.b}\n[PARTE B] Desktop 1.0.104 — render idempotente + toolbar + input (P1/P2/P5/P7)${C.x}`);
-check('D1', 'package.json versão 1.0.104', /"version":\s*"1\.0\.104"/.test(DP));
-check('D2', 'dedupById definido', /function dedupById\(/.test(DH));
-check('D3', 'Snapshot de tasks usa dedupById (sem cards empilhados)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-// P2: _editingNow escopado — não adia mais por foco na toolbar/busca.
-const editFn = (DH.match(/function _editingNow\(\)\{[\s\S]*?\n\}/) || [''])[0];
-check('D4', '_editingNow ignora foco na toolbar do quadro (.d-board-tools/.bsearch)', /d-board-tools|\.bsearch/.test(editFn));
-check('D5', '_editingNow NÃO adia por qualquer activeElement global', !/return\s*!!\(a&&\(a\.tagName==='INPUT'\|\|a\.tagName==='TEXTAREA'\|\|a\.isContentEditable\)\);/.test(editFn));
-check('D6', '_editingNow ainda protege modal de edição aberto', /modalRoot/.test(editFn) && /querySelector\('input,textarea,select'\)/.test(editFn));
-// P1: trava anti-duplo-envio no saveTask.
-check('D7', 'saveTask tem trava anti-duplo-envio (_saving)', /if\(f\._saving\)return;\s*f\._saving=true;/.test(DH));
-check('D8', 'saveTask reseta _saving em erro de add', /catch\([^)]*\)\{f\._saving=false;[\s\S]*?saveTask add/.test(DH));
-// P5: input de edição responde no primeiro clique (foco imediato).
-check('D9', 'openItemFix dá foco imediato em #ifIn', /getElementById\('ifIn'\)[\s\S]{0,80}\.focus\(\)/.test(DH));
-check('D10', 'Rodapé da sidebar mostra Desktop 1.0.104', /Desktop 1\.0\.104/.test(DH));
+console.log(`${C.b}\n[PARTE B] Desktop 1.0.105 — chips fixos + colunas por contexto + msg premium${C.x}`);
+check('D1', 'package.json versão 1.0.105', /"version":\s*"1\.0\.105"/.test(DP));
+// CORREÇÃO 1: mensagem WhatsApp PREMIUM (assinatura + CTA; não é link cru).
+const msgFn = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [''])[0];
+check('D2', 'WhatsApp premium: assinatura "Equipe ID Seven"', /Equipe ID Seven/.test(msgFn));
+check('D3', 'WhatsApp premium: CTA de revisar/aprovar/ajustes', /aprovar ou solicitar ajustes|revisar os temas/.test(msgFn));
+check('D4', 'WhatsApp premium: saudação com nome do cliente', /Olá, '\+nome/.test(msgFn));
+// CORREÇÃO 2: chips ÚNICOS e FIXOS no topo de Tarefas (fonte única).
+check('D5', 'tasksChipBar() é a fonte ÚNICA dos chips (barra fixa)', /function tasksChipBar\(\)\{return '<div class="tflow-fixed/.test(DH));
+check('D6', 'renderTasksTabs NÃO emite mais chips (return vazio)', /function renderTasksTabs\(active\)\{return '';\}/.test(DH));
+check('D7', 'boardToolbar NÃO contém chips (só busca)', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><input[^>]*><\/div>';\}/.test(DH));
+check('D8', 'Dispatch de Tarefas injeta a barra de chips UMA vez', /c\.innerHTML\s*=\s*tasksChipBar\(\)\s*\+\s*body;/.test(DH));
+// CORREÇÃO 3: colunas por contexto (sem excesso).
+check('D9', 'Colunas Social = 4 (A Fazer/Em andamento/Revisão/Finalizado)', /const SOCIAL_COLS4=\[[\s\S]*?Finalizado/.test(DH) && (DH.match(/const SOCIAL_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4);
+check('D10', 'Colunas Designer = 3 (A Fazer/Em andamento/Entregue)', (DH.match(/const DESIGNER_COLS3=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 3);
+check('D11', 'Colunas Cliente = 4 (Enviado/Em análise/Revisão solicitada/Aprovado)', (DH.match(/const CLIENT_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4);
+check('D12', 'Social board usa SOCIAL_COLS4 (não OPERATIONAL_COLS 8)', /const byCol=SOCIAL_COLS4\.map/.test(DH));
+check('D13', 'Designer board usa DESIGNER_COLS3', /const byStatus=DESIGNER_COLS3\.map/.test(DH));
+check('D14', 'Cliente board usa CLIENT_COLS4', /const byCol=CLIENT_COLS4\.map/.test(DH));
+// CORREÇÃO 6 (Desktop): boardCol4For designer-aware + usado no Meu quadro/Setor.
+check('D15', 'boardCol4For(t,uid) designer-aware definido', /function boardCol4For\(t,uid\)/.test(DH));
+check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4For\(t,pid\)/.test(DH));
+// CORREÇÃO 4: edição de tema responde no 1º clique.
+check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
+check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
+check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.105', /Desktop 1\.0\.105/.test(DH));
 
-console.log(`${C.b}\n[PARTE B] Android 1.0.92-beta — paridade de estado + chips${C.x}`);
-check('N1', 'build.gradle versionName 1.0.92-beta-client-flow-e2e-fix', /versionName\s+"1\.0\.92-beta-client-flow-e2e-fix"/.test(GRADLE));
-check('N2', 'build.gradle versionCode >= 90', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 90; })());
-check('N3', 'TaskVisibility mantém isFullyComplete (fonte única de conclusão)', /fun\s+isFullyComplete/.test(KT_VIS));
-check('N4', 'TaskVisibility mantém boardCol4 (quadro 4 colunas)', /boardCol4/.test(KT_VIS));
-check('N5', 'TasksTopTabs com chips (paridade com Desktop)', /Person|Visibility|GridView|horizontalScroll/.test(KT_TABS));
+console.log(`${C.b}\n[PARTE B] Android 1.0.93-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
+check('N1', 'versionName 1.0.93-beta-real-flow-sync-fix', /versionName\s+"1\.0\.93-beta-real-flow-sync-fix"/.test(GRADLE));
+check('N2', 'versionCode >= 91', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 91; })());
+// CORREÇÃO 6 (Android): designer vê tarefa em A Fazer.
+check('N3', 'TaskVisibility tem boardCol4For(t,uid) designer-aware', /fun\s+boardCol4For\(t:\s*TaskItem,\s*uid:\s*String\?\)/.test(KT_VIS));
+check('N4', 'TasksScreen usa boardCol4For(t, currentUid) no Meu quadro', /boardCol4For\(t,\s*currentUid\)/.test(KT_SCREEN));
+// Equivalência de identidade/campo: Android lê designerAssignment.designerId.
+check('N5', 'TaskRepo lê designerAssignment.designerId (= assigneeId do Desktop)', /designerAssignment[\s\S]{0,40}designerId/.test(KT_REPO));
+check('N6', 'TaskRepo lê assigneeId (uid do designer logado)', /assigneeId\s*=\s*d\.getString\("assigneeId"\)/.test(KT_REPO));
+// CORREÇÃO 3 (Android): colunas por contexto.
+check('N7', 'Colunas reduzidas: SOCIAL_COLS4 / DESIGNER_COLS3 / CLIENT_COLS4', /SOCIAL_COLS4/.test(KT_VIS) && /DESIGNER_COLS3/.test(KT_VIS) && /CLIENT_COLS4/.test(KT_VIS));
+check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerCol3)', /clientCol4\(t\)/.test(KT_SCREEN) && /designerCol3\(t\)/.test(KT_SCREEN));
+check('N9', 'TaskVisibility mantém isFullyComplete (fonte única de conclusão)', /fun\s+isFullyComplete/.test(KT_VIS));
+check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|GridView|horizontalScroll/.test(KT_TABS));
 
 /* ===================== VEREDITO ===================== */
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.17 / Desktop 1.0.104 / Android 1.0.92-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.105 / Android 1.0.93-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
