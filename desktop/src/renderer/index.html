@@ -1551,12 +1551,17 @@ const CLIENT_COLS=[
 // Coluna do cliente: usa clientFlowStatus (gravado por Worker/Desktop); senão deriva (compat).
 function clientCol(t){
   const v=(t&&t.clientFlowStatus||'').toString();
-  if(CLIENT_COLS.some(c=>c.key===v))return v;
+  if(CLIENT_COLS.some(c=>c.key===v)){
+    // 'concluido' explícito só vale se o fluxo realmente encerrou; senão ainda é reenvio/aprov. final.
+    if(v==='concluido'&&!isFullyComplete(t))return 'reenviado';
+    return v;
+  }
   const ws=(t&&t.workflowStage||'').toString();
   const cs=(t&&t.cronStatus||'').toString();
   const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();
-  const st=(t&&t.status||'').toString();
-  if(st==='concluido'||ws==='concluido'||cs==='aprovado_final')return 'concluido';
+  // CORREÇÃO (status-consistency): o status BRUTO do kanban (t.status==='concluido')
+  // NÃO força mais a coluna 'concluido'. Conclusão só via isFullyComplete (aprovação final real).
+  if(isFullyComplete(t))return 'concluido';
   if(cr==='revisao'||cs==='em_revisao_cliente'||cs==='editado_cliente')return 'revisao';
   if(cs==='ready_for_final_client_review'||cs==='reenviado_cliente')return 'reenviado';
   if(hasDesigner(t)||cs==='sent_to_designer'||ws==='producao'||ws==='entrega'||ws==='revisao_final')return 'producao';
@@ -1676,12 +1681,25 @@ function pendingFeed(t){const a=Array.isArray(t.cronContents)?t.cronContents:[];
 function pendingStory(t){const a=Array.isArray(t.cronContents)?t.cronContents:[];return a.some(c=>c&&c.storyImageUrl)&&a.some(c=>!(c&&c.storyImageUrl));}
 function pendingProduction(t){return pendingLegend(t)||pendingFeed(t);}
 function designerDelivered(t){return hasDesigner(t)&&designerCol(t)==='concluido';}
+/* ===== FONTE ÚNICA DA VERDADE — o fluxo está REALMENTE encerrado? =====
+   "Concluído" exige aprovação FINAL do cliente E zero pendências operacionais.
+   O status BRUTO do kanban (t.status) NUNCA, sozinho, conclui um cronograma. */
+function isFullyComplete(t){
+  if(secOf(t.sector).key!=='cronograma')return (t&&t.status)==='concluido';
+  // Guardas duras: qualquer pendência aberta => NUNCA concluído.
+  if(hasDesigner(t)&&!designerDelivered(t))return false;                 // designer ainda produzindo
+  if(pendingProduction(t))return false;                                  // legenda/Feed pendente
+  if(pendingStory(t))return false;                                       // Story pendente (quando aplicável)
+  if((t.clientReview&&t.clientReview.status)==='revisao')return false;   // revisão solicitada pelo cliente
+  // Sinais DELIBERADOS de encerramento (escritos só na aprovação final pelo Worker/Desktop).
+  return !!(t.finalApprovalCompleted===true||t.operationalStatus==='concluido'||t.clientFlowStatus==='concluido');
+}
 // Status operacional REAL — DERIVADO dos eixos + pendências (sempre dinâmico).
-// Só 'concluido' é override fixo (encerramento manual da Social OU aprovação final).
+// 'concluido' tem caminho ÚNICO: isFullyComplete (aprovação final real + sem pendências).
 function operationalCol(t){
   if(secOf(t.sector).key!=='cronograma')return t.status||'afazer';
+  if(isFullyComplete(t))return 'concluido';                              // ÚNICO caminho para concluído
   const cf=clientCol(t);
-  if(t.operationalStatus==='concluido'||t.finalApprovalCompleted||cf==='concluido')return 'concluido';
   if(cf==='revisao')return 'aguardando_revisao';
   if(cf==='reenviado')return 'aguardando_final';
   if(hasDesigner(t)){
@@ -1904,7 +1922,13 @@ function openDetails(taskId){
       '<button class="iconbtn det-x" data-modalclose="1">'+svg('close')+'</button></div>'+
     '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
     (t.client?'<div class="det-client">'+svg('place')+'<span>'+esc(t.client)+'</span></div>':'')+
-    '<div class="det-chips"><span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>'+
+    '<div class="det-chips">'+((function(){
+        // CORREÇÃO (status-consistency): para cronograma, o chip principal mostra o STATUS
+        // OPERACIONAL (não o status bruto) — evita "Concluído" contraditório com a linha do tempo.
+        if(secOf(t.sector).key==='cronograma'){const oc=opColOf(operationalCol(t));
+          return '<span class="rev-chip" style="background:'+withAlpha(oc.color,.16)+';color:'+oc.color+'"><span class="dotc" style="background:'+oc.color+'"></span>'+esc(oc.label)+'</span>';}
+        return '<span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>';
+      })())+
       (t.priority?'<span class="rev-chip" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">⚑ Prioridade alta</span>':'<span class="rev-chip rev-chip-soft">Prioridade normal</span>')+
       (cron?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+
       (t.cronStatus?'<span class="rev-chip" style="background:'+withAlpha(cronStatusColor(t.cronStatus),.16)+';color:'+cronStatusColor(t.cronStatus)+'"><span class="dotc" style="background:'+cronStatusColor(t.cronStatus)+'"></span>'+esc(cronStatusLabel(t.cronStatus))+'</span>':'')+'</div>'+
