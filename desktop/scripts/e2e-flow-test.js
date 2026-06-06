@@ -27,9 +27,9 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const WORKER_BRANCH = "worker/client-caption-render-fix";
+const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.98-beta-client-caption-render-fix';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.99-beta-client-link-preview-premium';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.19 · Desktop 1.0.110 · Android 1.0.98-beta');
+console.log(' Worker V64.20 · Desktop 1.0.111 · Android 1.0.99-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -265,13 +265,19 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.19-client-caption-render-fix', /V64\.19-client-caption-render-fix/.test(W));
+check('W1', 'Worker é V64.20-client-link-preview-premium', /V64\.20-client-link-preview-premium/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
 const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
 check('W_CAP1', 'Portal lê a legenda de c.legenda (HTML inicial + /state) — 2 ocorrências', legReads >= 2);
 check('W_CAP2', 'Precedência de legenda inclui ov.legenda E c.legenda', /typeof ov\.legenda === "string"\) \? ov\.legenda : \(typeof c\.legenda === "string"/.test(W));
 check('W_CAP3', '/state devolve campo JSON "legenda" e o card tem data-field="legenda"', /legenda: \(legRaw/.test(W) && /data-field="legenda"/.test(W));
+// ===== PREVIEW PREMIUM do link (V64.20): card grande clicável no WhatsApp =====
+check('W_OG1', 'Portal define og:image (card grande no WhatsApp)', /property="og:image"/.test(W) && /og:image:width" content="1200"/.test(W));
+check('W_OG2', 'og:image usa a 1ª arte do cronograma (ImageKit) com fallback de marca', /tr=w-1200,h-630/.test(W) && /icon-512\.png/.test(W));
+check('W_OG3', 'og:title de AÇÃO "Aprovar cronograma — <cliente>"', /Aprovar cronograma — " \+ \(task\.client/.test(W));
+check('W_OG4', 'twitter:card summary_large_image (preview grande)', /name="twitter:card" content="summary_large_image"/.test(W));
+check('W_OG5', '<title> e og:title premium "Aprovar cronograma"', /<title>' \+ ogTitle \+ ' · Aprovação de cronograma/.test(W));
 const feedFn = (W.match(/function clientFeedbackSent\(\)\{[\s\S]*?window\.scrollTo/) || [''])[0];
 check('W2', 'clientFeedbackSent SUBSTITUI a .wrap (sem formulário empilhado)', /w\.innerHTML\s*=\s*CV_TOP\(\)/.test(feedFn));
 check('W3', 'NÃO há insertAdjacentHTML("afterbegin")', !/insertAdjacentHTML\(\s*['"]afterbegin['"]/.test(W));
@@ -289,7 +295,7 @@ check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaS
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.110', /"version":\s*"1\.0\.110"/.test(DP));
+check('D1', 'package.json versão 1.0.111', /"version":\s*"1\.0\.111"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -304,6 +310,7 @@ check('D3', 'WhatsApp premium: CTA de revisar/aprovar/ajustes', /aprovar ou soli
 check('D4', 'WhatsApp premium: saudação com nome do cliente', /Olá, '\+nome/.test(msgFn));
 check('D_MSG1', 'WhatsApp premium: "área de aprovação" + "link seguro"', /área de aprovação pelo link seguro/.test(msgFn));
 check('D_MSG2', 'WhatsApp premium: "primeira etapa" + "próxima etapa de produção"', /A primeira etapa/.test(msgFn) && /próxima etapa de produção/.test(msgFn));
+check('D_MSG3', 'WhatsApp premium: link seguro 🔒 + assinatura em negrito *Equipe ID Seven*', /🔒 Acesse a sua área de aprovação/.test(msgFn) && /\*Equipe ID Seven\*/.test(msgFn));
 // CORREÇÃO 4: upload de Feed/Story não pula para o 1º post (preserva scroll da lista).
 check('D_UPLOAD', 'Produção preserva o scroll ao anexar arte (_prodKeepScroll + restore)', /function _prodKeepScroll\(\)/.test(DH) && /_prodKeepScroll\(\);renderProductionModal\(\)/.test(DH) && /\.pr-list'\);if\(_pl&&state\._prodScroll\)/.test(DH));
 // ===== REGRA FINAL (teste real): CHIPS SOMENTE dentro do Kanban; NUNCA no hub "Quadros". =====
@@ -338,12 +345,12 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.110', /Desktop 1\.0\.110/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.111', /Desktop 1\.0\.111/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.110 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.110/.test(DH) && /<title>ID Seven · Desktop 1\.0\.110/.test(DH) && /id="wpbadge">Desktop 1\.0\.110/.test(DH));
-check('D22', 'Login espelha o APK 1.0.98-beta-client-caption-render-fix', /espelha o APK <b>1\.0\.98-beta-client-caption-render-fix/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.110'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.111 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.111/.test(DH) && /<title>ID Seven · Desktop 1\.0\.111/.test(DH) && /id="wpbadge">Desktop 1\.0\.111/.test(DH));
+check('D22', 'Login espelha o APK 1.0.99-beta-client-link-preview-premium', /espelha o APK <b>1\.0\.99-beta-client-link-preview-premium/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.111'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
 // ===== SYNC DO DESIGNER (move grava designerFlowStatus) — Desktop =====
@@ -355,8 +362,8 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.98-beta-client-caption-render-fix', /versionName\s+"1\.0\.98-beta-client-caption-render-fix"/.test(GRADLE));
-check('N2', 'versionCode >= 96', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 96; })());
+check('N1', 'versionName 1.0.99-beta-client-link-preview-premium', /versionName\s+"1\.0\.99-beta-client-link-preview-premium"/.test(GRADLE));
+check('N2', 'versionCode >= 97', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 97; })());
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
 check('N_ICON', 'TasksTopTabs: ícone do Designers = Icons.Outlined.Image', /"designers"\s*->\s*Icons\.Outlined\.Image/.test(KT_TABS));
