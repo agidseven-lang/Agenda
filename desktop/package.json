@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.104",
-  "description": "Agenda ID Seven Desktop — client-flow E2E fix (Electron)",
+  "version": "1.0.105",
+  "description": "Agenda ID Seven Desktop — real-flow sync fix PC×Android (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
