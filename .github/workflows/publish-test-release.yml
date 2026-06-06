@@ -1,8 +1,7 @@
 # =====================================================================
 # [infra] Publica uma PRE-RELEASE de teste reunindo os instaladores JÁ
-# gerados (NÃO rebuilda, NÃO faz merge, NÃO toca em app). Baixa os
-# artifacts das runs informadas, confere SHA-256 e publica a release.
-# Dispara no push desta branch (e tambem manualmente, se promovida).
+# gerados (NÃO rebuilda, NÃO faz merge). Baixa os artifacts das runs,
+# confere SHA-256 e publica a release. Dispara no push desta branch.
 # =====================================================================
 name: "[infra] Publish Test Release"
 
@@ -14,11 +13,11 @@ name: "[infra] Publish Test Release"
       desktop_run:
         description: "Run id do build Desktop"
         required: true
-        default: "27074483447"
+        default: "27076573052"
       android_run:
         description: "Run id do build Android"
         required: true
-        default: "27074483837"
+        default: "27076573387"
 
 permissions:
   contents: write
@@ -28,19 +27,19 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      DESKTOP_RUN: "27074483447"
-      ANDROID_RUN: "27074483837"
-      TAG: "test/designer-sync-1.0.109-1.0.97"
-      EXE_SHA: "11a11f7ca6b7a96335cc7e6a3bcc402f989188cd3565464f1a73f54e6be025de"
-      MSI_SHA: "9f7d05c5e03bdc614d90b8a4f3408ecf64cb65c046cc1e7afb863939a7086261"
-      APK_SHA: "8cc3282a2714bcd236316300e2d071e412e8ff392afc26e21e1e3cb79db09772"
+      DESKTOP_RUN: "27076573052"
+      ANDROID_RUN: "27076573387"
+      TAG: "test/premium-client-domain-1.0.112-1.0.100"
+      EXE_SHA: "e948aa8a269686ec17a8d1992aacd18215ef1a31808aa1615fa2e5816e03dd00"
+      MSI_SHA: "0b83e3192797571503c782dc7c762c90c993f9ffaa2c554d75a19b18ee714dd7"
+      APK_SHA: "52d4494edad273e231d6568e1355fba5eb37eb6d92fd7be3ac3f1f6f55789235"
     steps:
-      - name: Resolver run ids (input tem prioridade)
+      - name: Resolver run ids
         run: |
           echo "DRUN=${{ github.event.inputs.desktop_run || env.DESKTOP_RUN }}" >> "$GITHUB_ENV"
           echo "ARUN=${{ github.event.inputs.android_run || env.ANDROID_RUN }}" >> "$GITHUB_ENV"
 
-      - name: Baixar bundle do Desktop (run existente, sem rebuild)
+      - name: Baixar bundle do Desktop (sem rebuild)
         uses: actions/download-artifact@v4
         with:
           run-id: ${{ env.DRUN }}
@@ -48,7 +47,7 @@ jobs:
           path: dl/desktop
           pattern: "agenda-id-seven-desktop-*-bundle"
 
-      - name: Baixar bundle do Android (run existente, sem rebuild)
+      - name: Baixar bundle do Android (sem rebuild)
         uses: actions/download-artifact@v4
         with:
           run-id: ${{ env.ARUN }}
@@ -60,110 +59,76 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
-          echo "== Arquivos baixados =="; find dl -type f | sort
-          while IFS= read -r z; do
-            [ -n "$z" ] || continue
-            echo "unzip: $z"
-            unzip -o -q "$z" -d "$(dirname "$z")/_unz" || true
-          done < <(find dl -name '*.zip')
-          echo "== Apos extrair zips =="; find dl -type f | sort
-          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.109*.exe' | head -1)
-          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.109*.msi' | head -1)
-          APK=$(find dl -name 'idseven-nativebeta-1.0.97*designer-sync-fix.apk' | head -1)
+          while IFS= read -r z; do [ -n "$z" ] || continue; unzip -o -q "$z" -d "$(dirname "$z")/_unz" || true; done < <(find dl -name '*.zip')
+          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.112*.exe' | head -1)
+          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.112*.msi' | head -1)
+          APK=$(find dl -name 'idseven-nativebeta-1.0.100*premium-client-domain.apk' | head -1)
           VDESK=$(find dl -name 'VERSAO-DESKTOP.txt' | head -1 || true)
           VAPK=$(find dl -name 'VERSAO-DO-APK.txt' | head -1 || true)
-          for f in "$EXE" "$MSI" "$APK"; do
-            if [ -z "$f" ] || [ ! -f "$f" ]; then echo "::error::artefato faltando ($f)"; exit 1; fi
-          done
-          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.109-x64.exe"
-          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.109-x64.msi"
-          cp "$APK" "out/idseven-nativebeta-1.0.97-beta-designer-sync-fix.apk"
+          for f in "$EXE" "$MSI" "$APK"; do if [ -z "$f" ] || [ ! -f "$f" ]; then echo "::error::artefato faltando ($f)"; exit 1; fi; done
+          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.112-x64.exe"
+          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.112-x64.msi"
+          cp "$APK" "out/idseven-nativebeta-1.0.100-beta-premium-client-domain.apk"
           [ -n "$VDESK" ] && cp "$VDESK" out/VERSAO-DESKTOP.txt || true
           [ -n "$VAPK" ] && cp "$VAPK" out/VERSAO-DO-APK.txt || true
           cd out
-          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.109-x64.exe" | awk '{print $1}')
-          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.109-x64.msi" | awk '{print $1}')
-          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.97-beta-designer-sync-fix.apk" | awk '{print $1}')
-          echo "exe esperado=$EXE_SHA obtido=$GOT_EXE"
-          echo "msi esperado=$MSI_SHA obtido=$GOT_MSI"
-          echo "apk esperado=$APK_SHA obtido=$GOT_APK"
+          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.112-x64.exe" | awk '{print $1}')
+          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.112-x64.msi" | awk '{print $1}')
+          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.100-beta-premium-client-domain.apk" | awk '{print $1}')
+          echo "exe $GOT_EXE"; echo "msi $GOT_MSI"; echo "apk $GOT_APK"
           [ "$GOT_EXE" = "$EXE_SHA" ] || { echo "::error::SHA exe diverge"; exit 1; }
           [ "$GOT_MSI" = "$MSI_SHA" ] || { echo "::error::SHA msi diverge"; exit 1; }
           [ "$GOT_APK" = "$APK_SHA" ] || { echo "::error::SHA apk diverge"; exit 1; }
           sha256sum * > SHA256SUMS.txt
-          echo "== SHA-256 conferido (todos batem) =="; cat SHA256SUMS.txt
+          echo "== SHA-256 conferido =="; cat SHA256SUMS.txt
 
       - name: Gerar README-TESTE-REAL.txt
         run: |
           cat > out/README-TESTE-REAL.txt <<'EOF'
           ============================================================
-          Agenda ID Seven — TESTE REAL (Sincronização do Designer)
+          Agenda ID Seven — TESTE REAL (Link premium + banner do cliente)
           Pre-release de teste — NAO e producao.
           ============================================================
-
           VERSOES
-          - Worker  : V64.18-real-flow-sync-fix (INALTERADO; ja ativo)
-          - Desktop : 1.0.109-designer-sync-fix
-          - Android : 1.0.97-beta-designer-sync-fix (versionCode 95)
+          - Worker  : V64.20-client-link-preview-premium (ja ativo)
+          - Desktop : 1.0.112-premium-client-domain
+          - Android : 1.0.100-beta-premium-client-domain (versionCode 98)
 
-          O QUE MUDOU (sincronizacao do designer PC x Android)
-          - BUG: ao mover o card do designer para "Em andamento", gravava-se so `status`,
-            mas o quadro do Designer LE `designerFlowStatus` -> o card ficava preso em
-            "A Fazer" no celular e no PC do designer.
-          - FIX: mover no eixo do designer grava `designerFlowStatus` (fonte unica lida por
-            PC e Android). Agora "Em andamento" e "Entregue" sincronizam nos dois.
-          - Nenhuma mudanca de schema destrutiva; Worker nao tocado.
+          O QUE MUDOU
+          - Link do cliente no WhatsApp agora abre um CARTAO PREMIUM 1200x630
+            (banner Modelo C): logo + "Aprovar cronograma — <cliente>" + CTA.
+          - Dominio premium do link: aprovar.agendaidseven.com.br (precisa do
+            DNS+Route aplicados no Cloudflare — ver instrucoes).
+          - workers.dev segue como fallback (API interna e links antigos).
 
-          SHA-256 (confira apos baixar)
-          - Agenda-ID-Seven-Desktop-1.0.109-x64.exe
-            11a11f7ca6b7a96335cc7e6a3bcc402f989188cd3565464f1a73f54e6be025de
-          - Agenda-ID-Seven-Desktop-1.0.109-x64.msi
-            9f7d05c5e03bdc614d90b8a4f3408ecf64cb65c046cc1e7afb863939a7086261
-          - idseven-nativebeta-1.0.97-beta-designer-sync-fix.apk
-            8cc3282a2714bcd236316300e2d071e412e8ff392afc26e21e1e3cb79db09772
+          SHA-256
+          - Agenda-ID-Seven-Desktop-1.0.112-x64.exe
+            e948aa8a269686ec17a8d1992aacd18215ef1a31808aa1615fa2e5816e03dd00
+          - Agenda-ID-Seven-Desktop-1.0.112-x64.msi
+            0b83e3192797571503c782dc7c762c90c993f9ffaa2c554d75a19b18ee714dd7
+          - idseven-nativebeta-1.0.100-beta-premium-client-domain.apk
+            52d4494edad273e231d6568e1355fba5eb37eb6d92fd7be3ac3f1f6f55789235
 
-          ------------------------------------------------------------
-          INSTALAR — DESKTOP (Windows)
-          ------------------------------------------------------------
-          1) FECHE a versao antiga pela BANDEJA (clique direito no icone -> "Sair").
-          2) Abra o Agenda-ID-Seven-Desktop-1.0.109-x64.exe (prefira o .exe).
-          3) SmartScreen: "Mais informacoes" -> "Executar assim mesmo".
-          4) No login deve aparecer: "Desktop 1.0.109 - Sync do designer".
-
-          ------------------------------------------------------------
-          INSTALAR — ANDROID
-          ------------------------------------------------------------
-          1) Baixe o .apk no celular. Toque para instalar.
-          2) Permita "Instalar apps desconhecidos"; Play Protect -> "Instalar assim mesmo".
-          3) No login/perfil deve mostrar 1.0.97-beta-designer-sync-fix.
-
-          ------------------------------------------------------------
-          ROTEIRO DE TESTE (o que reprovou)
-          ------------------------------------------------------------
-          PC=Social, celular=Designer.
-          1) Social cria cronograma, atribui ao designer, envia ao cliente, cliente aprova.
-          2) Social envia ao Designer. No celular do designer: tarefa em "A Fazer".
-          3) Designer move para "Em andamento" no celular.
-          4) CONFERIR: celular mostra "Em andamento"; PC (quadro Designer) mostra "Em andamento";
-             Social mostra "Designer em producao"; Cliente "Em producao". Nada preso em "A Fazer".
-          5) Designer "Entregue" -> Social passa para "Aguardando legendas e posts".
+          INSTALAR DESKTOP: feche a versao antiga pela bandeja (Sair) e instale o .exe.
+          INSTALAR ANDROID: instale o .apk (permitir apps desconhecidos / Play Protect).
+          IMPORTANTE: aplique o DNS+Route do subdominio antes de enviar links a clientes.
           EOF
-          echo "== out =="; ls -lh out
+          ls -lh out
 
-      - name: Publicar PRE-RELEASE com os arquivos
+      - name: Publicar PRE-RELEASE
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
           target_commitish: ${{ github.sha }}
-          name: "Agenda ID Seven — Sync do Designer (1.0.109 / 1.0.97)"
+          name: "Agenda ID Seven — Link premium do cliente (1.0.112 / 1.0.100)"
           prerelease: true
           make_latest: false
           fail_on_unmatched_files: true
           body_path: out/README-TESTE-REAL.txt
           files: |
-            out/Agenda-ID-Seven-Desktop-1.0.109-x64.exe
-            out/Agenda-ID-Seven-Desktop-1.0.109-x64.msi
-            out/idseven-nativebeta-1.0.97-beta-designer-sync-fix.apk
+            out/Agenda-ID-Seven-Desktop-1.0.112-x64.exe
+            out/Agenda-ID-Seven-Desktop-1.0.112-x64.msi
+            out/idseven-nativebeta-1.0.100-beta-premium-client-domain.apk
             out/VERSAO-DESKTOP.txt
             out/VERSAO-DO-APK.txt
             out/SHA256SUMS.txt
