@@ -14,11 +14,11 @@ name: "[infra] Publish Test Release"
       desktop_run:
         description: "Run id do build Desktop"
         required: true
-        default: "27072605863"
+        default: "27073024252"
       android_run:
         description: "Run id do build Android"
         required: true
-        default: "27072606314"
+        default: "27073024654"
 
 permissions:
   contents: write
@@ -28,12 +28,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      DESKTOP_RUN: "27072605863"
-      ANDROID_RUN: "27072606314"
-      TAG: "test/board-toolbar-placement-1.0.106-1.0.94"
-      EXE_SHA: "e0ceccf05d84cad47f1cc218d678b49018290317a9e43c55649d32f8344b410a"
-      MSI_SHA: "a9dadcac374f4b469eb499f2668c644ea8314ae8d4e8247dbb8de6c1be2f8cf8"
-      APK_SHA: "506dce784e69ceafa6e6bb81fac10f73c7e1c97550ba1b93ec5253bc201c8ccd"
+      DESKTOP_RUN: "27073024252"
+      ANDROID_RUN: "27073024654"
+      TAG: "test/board-chip-shape-1.0.107-1.0.95"
+      EXE_SHA: "c83d0de667d9e2dca5ee497c727198af8437da1d4130088b60bab7e5c4a34d2b"
+      MSI_SHA: "e5951377bed62f30f43e2b8b5f835c05984c398f4153976648c61d14973c1aa8"
+      APK_SHA: "95a8ce291e171cf438c01d30f4d3426925edd802fd225069c9bf005fc6edaf38"
     steps:
       - name: Resolver run ids (input tem prioridade)
         run: |
@@ -67,23 +67,23 @@ jobs:
             unzip -o -q "$z" -d "$(dirname "$z")/_unz" || true
           done < <(find dl -name '*.zip')
           echo "== Apos extrair zips =="; find dl -type f | sort
-          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.106*.exe' | head -1)
-          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.106*.msi' | head -1)
-          APK=$(find dl -name 'idseven-nativebeta-1.0.94*board-toolbar-placement-fix.apk' | head -1)
+          EXE=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.107*.exe' | head -1)
+          MSI=$(find dl -name 'Agenda-ID-Seven-Desktop-1.0.107*.msi' | head -1)
+          APK=$(find dl -name 'idseven-nativebeta-1.0.95*board-chip-shape-fix.apk' | head -1)
           VDESK=$(find dl -name 'VERSAO-DESKTOP.txt' | head -1 || true)
           VAPK=$(find dl -name 'VERSAO-DO-APK.txt' | head -1 || true)
           for f in "$EXE" "$MSI" "$APK"; do
             if [ -z "$f" ] || [ ! -f "$f" ]; then echo "::error::artefato faltando ($f)"; exit 1; fi
           done
-          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.106-x64.exe"
-          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.106-x64.msi"
-          cp "$APK" "out/idseven-nativebeta-1.0.94-beta-board-toolbar-placement-fix.apk"
+          cp "$EXE" "out/Agenda-ID-Seven-Desktop-1.0.107-x64.exe"
+          cp "$MSI" "out/Agenda-ID-Seven-Desktop-1.0.107-x64.msi"
+          cp "$APK" "out/idseven-nativebeta-1.0.95-beta-board-chip-shape-fix.apk"
           [ -n "$VDESK" ] && cp "$VDESK" out/VERSAO-DESKTOP.txt || true
           [ -n "$VAPK" ] && cp "$VAPK" out/VERSAO-DO-APK.txt || true
           cd out
-          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.106-x64.exe" | awk '{print $1}')
-          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.106-x64.msi" | awk '{print $1}')
-          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.94-beta-board-toolbar-placement-fix.apk" | awk '{print $1}')
+          GOT_EXE=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.107-x64.exe" | awk '{print $1}')
+          GOT_MSI=$(sha256sum "Agenda-ID-Seven-Desktop-1.0.107-x64.msi" | awk '{print $1}')
+          GOT_APK=$(sha256sum "idseven-nativebeta-1.0.95-beta-board-chip-shape-fix.apk" | awk '{print $1}')
           echo "exe esperado=$EXE_SHA obtido=$GOT_EXE"
           echo "msi esperado=$MSI_SHA obtido=$GOT_MSI"
           echo "apk esperado=$APK_SHA obtido=$GOT_APK"
@@ -97,28 +97,30 @@ jobs:
         run: |
           cat > out/README-TESTE-REAL.txt <<'EOF'
           ============================================================
-          Agenda ID Seven — TESTE REAL (Board Toolbar Placement Fix)
+          Agenda ID Seven — TESTE REAL (Board Chip Shape Fix)
           Pre-release de teste — NAO e producao.
           ============================================================
 
           VERSOES
           - Worker  : V64.18-real-flow-sync-fix (INALTERADO; ja ativo)
-          - Desktop : 1.0.106-board-toolbar-placement-fix
-          - Android : 1.0.94-beta-board-toolbar-placement-fix (versionCode 92)
+          - Desktop : 1.0.107-board-chip-shape-fix
+          - Android : 1.0.95-beta-board-chip-shape-fix (versionCode 93)
 
-          O QUE MUDOU (somente layout/posicao)
-          - Os chips (Meu quadro / Cliente / Designers / Social Medias / Setores)
-            SAIRAM do topo global. Agora ficam DENTRO da area do quadro, ao lado
-            do campo "Buscar tarefa..." (no mobile, logo abaixo da busca).
+          O QUE MUDOU (somente visual dos chips)
+          - Chips (Meu quadro / Cliente / Designers / Social Medias / Setores)
+            seguem na toolbar do quadro, ao lado do campo "Buscar tarefa...".
+          - Agora MENOS arredondados: mesmo raio/borda do campo de busca
+            (sem aparencia de capsula/pilula).
+          - Corrigido o ICONE do chip "Designers" (estava ausente no Desktop).
           - Nenhuma logica de fluxo foi alterada.
 
           SHA-256 (confira apos baixar)
-          - Agenda-ID-Seven-Desktop-1.0.106-x64.exe
-            e0ceccf05d84cad47f1cc218d678b49018290317a9e43c55649d32f8344b410a
-          - Agenda-ID-Seven-Desktop-1.0.106-x64.msi
-            a9dadcac374f4b469eb499f2668c644ea8314ae8d4e8247dbb8de6c1be2f8cf8
-          - idseven-nativebeta-1.0.94-beta-board-toolbar-placement-fix.apk
-            506dce784e69ceafa6e6bb81fac10f73c7e1c97550ba1b93ec5253bc201c8ccd
+          - Agenda-ID-Seven-Desktop-1.0.107-x64.exe
+            c83d0de667d9e2dca5ee497c727198af8437da1d4130088b60bab7e5c4a34d2b
+          - Agenda-ID-Seven-Desktop-1.0.107-x64.msi
+            e5951377bed62f30f43e2b8b5f835c05984c398f4153976648c61d14973c1aa8
+          - idseven-nativebeta-1.0.95-beta-board-chip-shape-fix.apk
+            95a8ce291e171cf438c01d30f4d3426925edd802fd225069c9bf005fc6edaf38
           (o arquivo SHA256SUMS.txt traz todos os hashes)
 
           ------------------------------------------------------------
@@ -127,9 +129,9 @@ jobs:
           IMPORTANTE: FECHE a versao antiga ANTES de instalar.
           1) Na BANDEJA (ao lado do relogio), clique com o botao direito
              no icone do Agenda ID Seven -> "Sair". (o X so esconde)
-          2) Abra o Agenda-ID-Seven-Desktop-1.0.106-x64.exe (prefira o .exe).
+          2) Abra o Agenda-ID-Seven-Desktop-1.0.107-x64.exe (prefira o .exe).
           3) Se o SmartScreen avisar: "Mais informacoes" -> "Executar assim mesmo".
-          4) No login deve aparecer: "Desktop 1.0.106 - Toolbar dos quadros".
+          4) No login deve aparecer: "Desktop 1.0.107 - Chips alinhados".
 
           ------------------------------------------------------------
           INSTALAR — ANDROID
@@ -137,19 +139,16 @@ jobs:
           1) Baixe o .apk no celular (ou transfira para ele).
           2) Toque no arquivo; se pedir, permita "Instalar apps desconhecidos".
           3) Play Protect pode avisar (beta) -> "Instalar assim mesmo".
-          4) No login/perfil deve mostrar 1.0.94-beta-board-toolbar-placement-fix.
+          4) No login/perfil deve mostrar 1.0.95-beta-board-chip-shape-fix.
 
           ------------------------------------------------------------
-          O QUE CONFERIR (posicao dos chips)
+          O QUE CONFERIR (visual dos chips)
           ------------------------------------------------------------
-          1) Tela "Quadros": NAO deve haver chips ACIMA do titulo "Quadros".
-          2) Os chips aparecem JUNTO da busca, dentro da area do quadro.
-          3) Meu quadro / Cliente / Designers / Social / Setores: busca + chips
-             no mesmo bloco, alinhados; no celular, chips com scroll horizontal.
-          4) Trocar de aba e voltar: os chips NAO somem e NAO duplicam.
-          5) Criar tarefa / copiar mensagem: a toolbar continua no lugar.
+          1) Chips ao lado da busca, na toolbar do quadro (nunca no topo global).
+          2) Chips MENOS arredondados, no mesmo estilo/borda do campo de busca.
+          3) O chip "Designers" deve exibir o icone.
+          4) Trocar de aba / voltar: chips nao somem e nao duplicam.
           EOF
-          echo "== README =="; sed -n '1,20p' out/README-TESTE-REAL.txt
           echo "== out =="; ls -lh out
 
       - name: Publicar PRE-RELEASE com os arquivos
@@ -157,15 +156,15 @@ jobs:
         with:
           tag_name: ${{ env.TAG }}
           target_commitish: ${{ github.sha }}
-          name: "Agenda ID Seven — Board Toolbar Placement Fix (1.0.106 / 1.0.94)"
+          name: "Agenda ID Seven — Board Chip Shape Fix (1.0.107 / 1.0.95)"
           prerelease: true
           make_latest: false
           fail_on_unmatched_files: true
           body_path: out/README-TESTE-REAL.txt
           files: |
-            out/Agenda-ID-Seven-Desktop-1.0.106-x64.exe
-            out/Agenda-ID-Seven-Desktop-1.0.106-x64.msi
-            out/idseven-nativebeta-1.0.94-beta-board-toolbar-placement-fix.apk
+            out/Agenda-ID-Seven-Desktop-1.0.107-x64.exe
+            out/Agenda-ID-Seven-Desktop-1.0.107-x64.msi
+            out/idseven-nativebeta-1.0.95-beta-board-chip-shape-fix.apk
             out/VERSAO-DESKTOP.txt
             out/VERSAO-DO-APK.txt
             out/SHA256SUMS.txt
