@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.12-agency-operational-flow-final-fix]
+   ID Seven — Cloudflare Worker  [V64.13-agency-operational-phase-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.12-agency-operational-flow-final-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.13-agency-operational-phase-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -928,10 +928,12 @@ async function handleClientCronogramaAction(token, request, env) {
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
 
   const now = Date.now();
+  const phaseIn = clientPhase(task);                                              // V64.13 — fase ANTES da escrita
   const g = await writeClientGranular(env, accessToken, task, { type, contentIndex: ci, note, value, at: now });
-  const final = !!(g && (g.client === "concluido" || g.col === "concluido"));   // aprovação FINAL -> tela de sucesso no cliente
-  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} final=${final} clientFlow=${(g && g.client) || ""}`);
-  return json({ ok: true, type, contentIndex: ci, at: now, final, col: (g && g.col) || null, clientFlowStatus: (g && g.client) || null }, 200, env);
+  // FINAL gating: só é "aprovação final" se a fase de entrada for 'final' E o eixo do cliente concluiu.
+  const final = phaseIn === "final" && !!(g && (g.client === "concluido" || g.col === "concluido"));
+  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} phase=${phaseIn} final=${final} clientFlow=${(g && g.client) || ""}`);
+  return json({ ok: true, type, contentIndex: ci, at: now, final, phase: phaseIn, col: (g && g.col) || null, clientFlowStatus: (g && g.client) || null }, 200, env);
 }
 
 /* Persistência ADITIVA e granular do feedback do cliente (V64.7).
@@ -986,8 +988,10 @@ async function writeClientGranular(env, accessToken, task, e) {
        • aprovação FINAL (reenvio) → status='concluido', stage='concluido'
        • revisão / edição → status='revisao', stage='revisao'
      Fase detectada pelo cronStatus atual: 'ready_for_final_client_review' (reenvio) = final. ───── */
-  const isFinalPhase = (task.cronStatus === "ready_for_final_client_review")
-    || (task.workflowStage === "entrega") || (task.workflowStage === "revisao_final");
+  // V64.13 — Fase de entrada (explícita via clientApprovalPhase OU derivada).
+  // SÓ 'final' encerra. 'themes'/'production' continuam o fluxo com clientFlowStatus='aprovado'.
+  const phaseIn = clientPhase(task);
+  const isFinalPhase = phaseIn === "final";
   // V64.11 — EIXOS SEPARADOS: além de `status`/`workflowStage` (compat), grava o eixo
   // DO CLIENTE (`clientFlowStatus`/`clientWorkflowStage`). A tarefa NÃO sai do fluxo do
   // cliente quando vai ao designer; só sai de cena na aprovação FINAL (clientFlowStatus=concluido).
@@ -1185,6 +1189,46 @@ function frequencyLabel(t) {
   return map[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : "Cronograma");
 }
 
+// V64.13 — Fase REAL da aprovação do cliente.
+// 'themes' = primeiro envio (só temas) · 'production' = legendas/posts em validação
+// 'final' = aprovação final (reenvio após produção). Explícito > derivado.
+function clientPhase(task) {
+  const explicit = (task.clientApprovalPhase || "").toString();
+  if (explicit === "themes" || explicit === "production" || explicit === "final") return explicit;
+  if (task.finalApprovalCompleted === true) return "final";
+  if (task.cronStatus === "ready_for_final_client_review"
+      || task.workflowStage === "entrega" || task.workflowStage === "revisao_final") return "final";
+  // Deriva pela completude do conteúdo: todas com legenda E todas com Feed -> produção/final-prox.
+  const arr = Array.isArray(task.cronWeeks) ? task.cronWeeks
+    : (Array.isArray(task.cronContents) ? task.cronContents : []);
+  const total = arr.length || 0;
+  if (total > 0) {
+    const withLegend = arr.filter((c) => c && c.legenda && String(c.legenda).trim()).length;
+    const withFeed = arr.filter((c) => c && c.feedImageUrl).length;
+    if (withLegend === total && withFeed === total) return "production";
+  }
+  return "themes";
+}
+function phaseCopy(phase) {
+  if (phase === "final") return {
+    kicker: "Aprovação final do cronograma",
+    title: "Aprovação final do cronograma",
+    sub: "Confira legendas, Feed e Story. Ao aprovar aqui, o processo é encerrado.",
+    cta: "Aprovar versão final",
+  };
+  if (phase === "production") return {
+    kicker: "Aprovação de legendas e artes",
+    title: "Aprovação de legendas e artes",
+    sub: "Confira as legendas e as artes. Ainda haverá uma etapa final.",
+    cta: "Aprovar legendas e artes",
+  };
+  return {
+    kicker: "Aprovação de temas",
+    title: "Aprovação de temas",
+    sub: "Você está aprovando apenas os temas. A equipe seguirá com a produção (designer + legendas + posts).",
+    cta: "Aprovar temas e liberar produção",
+  };
+}
 function statusLabel(t) {
   const cls = (t.cronStatus || "").toString();
   const map = {
@@ -1355,6 +1399,25 @@ a{color:#b9a4ff;text-decoration:none}
 .succ-meta .pill{background:rgba(255,255,255,.05);border:1px solid var(--line2);padding:8px 13px;border-radius:12px;font-size:12.5px;color:var(--txt)}
 .succ-meta .pill.ok{border-color:rgba(52,211,153,.35);background:var(--okbg);color:var(--ok)}
 .succ-foot{position:relative;z-index:1;margin-top:24px;color:var(--faint);font-size:12px}
+/* V64.13 — Banner de FASE da aprovação no topo da hero (themes/production/final) */
+.phase-banner{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:14px;border:1px solid;border-radius:13px;padding:10px 14px;font-size:13.5px;line-height:1.45}
+.phase-banner b{font-weight:800}
+.phase-banner .phase-sub{color:var(--mut);font-size:12.5px;width:100%;margin-top:2px}
+.phase-banner .phase-dot{width:10px;height:10px;border-radius:50%;flex:none}
+.phase-banner.phase-themes{background:rgba(91,108,255,.10);border-color:rgba(91,108,255,.35);color:#a6b4ff}
+.phase-banner.phase-themes .phase-dot{background:#5B6CFF}
+.phase-banner.phase-production{background:rgba(245,158,11,.10);border-color:rgba(245,158,11,.35);color:#fcd283}
+.phase-banner.phase-production .phase-dot{background:#F59E0B}
+.phase-banner.phase-final{background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.35);color:#86e7c4}
+.phase-banner.phase-final .phase-dot{background:#34D399}
+/* Tela INTERMEDIÁRIA (temas/produção aprovados — NÃO encerra) */
+.midwrap{max-width:560px;margin:18px auto 6px;padding:0 10px}
+.midcard{background:linear-gradient(180deg,rgba(91,108,255,.10),rgba(91,108,255,.02)),var(--panel);border:1px solid rgba(91,108,255,.35);border-radius:20px;padding:24px 22px;text-align:center;box-shadow:0 16px 50px -25px rgba(91,108,255,.4)}
+.mid-badge{width:54px;height:54px;border-radius:50%;background:rgba(91,108,255,.18);color:#a6b4ff;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
+.mid-badge svg{width:28px;height:28px}
+.midcard h2{margin:0 0 9px;font-size:22px;font-weight:800;color:var(--txt);letter-spacing:-.01em}
+.midcard p{margin:0 auto;max-width:420px;color:var(--mut);font-size:14px;line-height:1.6}
+.mid-foot{margin-top:16px;color:var(--faint);font-size:12px}
 `;
 
 const CV_JS = `
@@ -1374,6 +1437,9 @@ function bumpProgress(){var cards=document.querySelectorAll('#contents [data-car
 function addHist(kind,label){var sec=document.querySelector('[data-histsec]');if(sec)sec.classList.remove('hide');var h=document.getElementById('hist');var d=document.createElement('div');d.className='hitem';var ic=kind==='ok'?'hb-ok':kind==='rev'?'hb-rev':kind==='edit'?'hb-edit':'hb-note';var sv=kind==='ok'?CIC.check:kind==='rev'?CIC.revise:kind==='edit'?CIC.edit:CIC.note;d.innerHTML='<div class="hicon '+ic+'">'+sv+'</div><div class="hmain"><div class="ht"></div></div><div class="htime">agora</div>';d.querySelector('.ht').textContent=label;h.insertBefore(d,h.firstChild);}
 function post(payload,btn,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){return{ok:r.ok&&j&&j.ok,j:j};});}).then(function(res){if(btn)btn.disabled=false;if(res.ok){if(cb)cb(res.j);}else{toast((res.j&&res.j.error)||'Falha ao enviar.','err');}}).catch(function(){if(btn)btn.disabled=false;toast('Sem conexão. Tente novamente.','err');});}
 function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);if(!w)return;w.innerHTML='<div class="topbar"><div class="brand">'+(document.querySelector('.brand .logo')?document.querySelector('.brand .logo').outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div></div>'+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Cronograma aprovado com sucesso!</h1><p>Sua aprovação foi registrada. A equipe já foi notificada e seguirá com a finalização.</p><div class="succ-foot">Você já pode fechar esta página. 💜</div></div></div>';window.scrollTo(0,0);}
+// V64.13 — Confirmação INTERMEDIÁRIA: temas aprovados (NÃO encerra; mantém o cronograma ativo).
+function clientThemesApproved(){var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);var w=document.querySelector('.wrap');if(!w)return;var card='<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Temas aprovados!</h2><p>A equipe seguirá com a produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';w.insertAdjacentHTML('afterbegin',card);window.scrollTo(0,0);}
+function clientProductionApproved(){var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);var w=document.querySelector('.wrap');if(!w)return;var card='<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Legendas e artes aprovadas!</h2><p>A equipe enviará a versão final completa para sua aprovação. Em breve você receberá o aviso neste mesmo link.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';w.insertAdjacentHTML('afterbegin',card);window.scrollTo(0,0);}
 function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';return el.textContent||'';}
 function sheetForm(title,desc,kind,val,multiline){var inp=multiline?'<textarea id="sIn" placeholder="Escreva aqui...">'+(val||'')+'</textarea>':'<input id="sIn" value="'+(val||'').replace(/"/g,'&quot;')+'"/>';return '<h3></h3><div class="sd"></div>'+inp+'<div class="srow"><button class="btn ghost" data-x="cancel">Cancelar</button><button class="btn '+(kind==='rev'?'warn':'primary')+'" data-x="send">'+(kind==='rev'?'Enviar':'Salvar')+'</button></div>';}
 function openInput(title,desc,kind,val,multiline,cb){openSheet(sheetForm(title,desc,kind,val,multiline));sheet.querySelector('h3').textContent=title;sheet.querySelector('.sd').textContent=desc;pending=cb;}
@@ -1389,7 +1455,20 @@ document.addEventListener('click',function(e){
   else if(act==='editLegenda'){openInput('Editar legenda — Conteúdo '+(i+1),'Ajuste a legenda deste conteúdo do jeito que preferir.','ok',getText(i,'legenda'),true,function(v){post({action:'editLegenda',contentIndex:i,value:v},null,function(){setLegenda(i,v);setBadge(i,'editado');addHist('edit','Editou a legenda de Conteúdo '+(i+1));toast('Legenda atualizada','ok');});});}
   else if(act==='noteItem'){openInput('Observação — Conteúdo '+(i+1),'Deixe uma observação específica para este conteúdo.','ok','',true,function(v){if(!v.trim())return;post({action:'noteItem',contentIndex:i,note:v},null,function(){setItemNote(i,v);addHist('note','Comentou em Conteúdo '+(i+1));toast('Observação registrada','ok');});});}
   else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar no cronograma como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
-  else if(act==='approveAll'){if(!confirm('Confirmar aprovação de todo o cronograma?'))return;post({action:'approveAll'},a,function(j){if(j&&j.final){clientSuccess();return;}var cs=document.querySelectorAll('#contents [data-card]');cs.forEach(function(c){setBadge(+c.dataset.card,'aprovado');});bumpProgress();addHist('ok','Aprovou o cronograma');toast('Cronograma aprovado! Obrigado','ok');});}
+  else if(act==='approveAll'){var ph=a.getAttribute('data-phase')||'themes';
+    var msg=ph==='final'?'Confirmar APROVAÇÃO FINAL do cronograma? Esta é a etapa que encerra o processo.'
+      :ph==='production'?'Confirmar aprovação das legendas e artes? A equipe ainda enviará a versão final para você.'
+      :'Confirmar aprovação dos TEMAS? A equipe seguirá com a produção e enviará a versão final depois.';
+    if(!confirm(msg))return;
+    post({action:'approveAll'},a,function(j){
+      // Sucesso premium SOMENTE quando o backend confirmar que a fase é FINAL.
+      if(j&&j.final===true&&(j.phase==='final'||j.phase==null)){clientSuccess();return;}
+      var cs=document.querySelectorAll('#contents [data-card]');cs.forEach(function(c){setBadge(+c.dataset.card,'aprovado');});bumpProgress();
+      // Intermediário: temas aprovados (fase themes) ou produção aprovada (production).
+      if(j&&j.phase==='themes'){addHist('ok','Aprovou os temas');clientThemesApproved();return;}
+      if(j&&j.phase==='production'){addHist('ok','Aprovou legendas e artes');clientProductionApproved();return;}
+      addHist('ok','Aprovou o cronograma');toast('Aprovação registrada','ok');
+    });}
   else if(act==='sendGenObs'){var ta=document.getElementById('genObs');var v=ta?ta.value.trim():'';if(!v){toast('Escreva uma observação primeiro.','err');return;}post({action:'comment',note:v},a,function(){if(ta)ta.value='';addHist('note','Comentou no cronograma');toast('Observação enviada','ok');});}
 });
 `;
@@ -1403,6 +1482,11 @@ function renderClientHtml(task, token, env) {
     : (Array.isArray(task.cronContents) ? task.cronContents : []);
   const total = items.length;
   const cItems = (task.clientItems && typeof task.clientItems === "object") ? task.clientItems : {};
+  // V64.13 — Fase REAL da aprovação do cliente. Botão e título ficam coerentes com a fase
+  // ('themes' = só temas; 'production' = legendas/posts; 'final' = aprovação final).
+  // Tela de sucesso só aparece quando a fase é 'final' (gating do clientSuccess).
+  const phase = clientPhase(task);
+  const phaseUi = phaseCopy(phase);
 
   function firstUrl(v) {
     if (!v) return "";
@@ -1522,8 +1606,9 @@ function renderClientHtml(task, token, env) {
 '<div class="wrap">' +
   '<div class="topbar"><div class="brand">' + CV_LOGO + '<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div>' +
     '<div class="secure">' + ICN.shield + '<span class="lbl">Link seguro</span></div></div>' +
-  '<section class="hero"><div class="hero-top"><span class="kicker">Cronograma para sua aprovação</span></div>' +
+  '<section class="hero"><div class="hero-top"><span class="kicker">' + escapeHtml(phaseUi.kicker) + '</span></div>' +
     '<h1>' + titulo + '</h1><div class="cli">Preparado para <b>' + cliente + '</b></div>' +
+    '<div class="phase-banner phase-' + phase + '"><span class="phase-dot"></span><b>' + escapeHtml(phaseUi.title) + '</b><span class="phase-sub">' + escapeHtml(phaseUi.sub) + '</span></div>' +
     '<div class="hero-meta">' +
       '<span class="mpill">' + ICN.cal + '<span class="mv">Frequência</span> ' + freq + '</span>' +
       '<span class="mpill">' + ICN.layers + '<span class="mv">Conteúdos</span> ' + total + '</span>' +
@@ -1543,7 +1628,7 @@ function renderClientHtml(task, token, env) {
 '</div>' +
 '<div class="gactions"><div class="inner"><div class="gstat">Você pode aprovar tudo, ajustar itens específicos ou pedir uma revisão geral — <b>sem obrigação de editar todos.</b></div>' +
   '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
-  '<button class="btn primary" data-act="approveAll">' + ICN.check + 'Aprovar cronograma</button></div></div>' +
+  '<button class="btn primary" data-act="approveAll" data-phase="' + phase + '">' + ICN.check + escapeHtml(phaseUi.cta) + '</button></div></div>' +
 '<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
 '<div class="toast" id="toast"></div>' +
 '<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';\n' + CV_JS + '\n</script>\n' +
