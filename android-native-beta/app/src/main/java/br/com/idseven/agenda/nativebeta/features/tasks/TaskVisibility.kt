@@ -77,11 +77,16 @@ object TaskVisibility {
     // Coluna do cliente: usa clientFlowStatus (gravado por Worker/Desktop); senão deriva (compat).
     fun clientCol(t: TaskItem): String {
         val v = t.clientFlowStatus ?: ""
-        if (CLIENT_KEYS.contains(v)) return v
+        if (CLIENT_KEYS.contains(v)) {
+            // 'concluido' explícito só vale se o fluxo realmente encerrou; senão ainda é reenvio.
+            if (v == "concluido" && !isFullyComplete(t)) return "reenviado"
+            return v
+        }
         val ws = t.cronStatus ?: ""  // workflowStage não está no modelo; usa cronStatus + review
         val cr = t.clientReview?.status ?: ""
-        val st = t.status ?: ""
-        if (st == "concluido" || ws == "aprovado_final") return "concluido"
+        // CORREÇÃO (status-consistency): status BRUTO do kanban (t.status=='concluido') NÃO força
+        // mais 'concluido'. Conclusão só via isFullyComplete (aprovação final real + sem pendências).
+        if (isFullyComplete(t)) return "concluido"
         if (cr == "revisao" || ws == "em_revisao_cliente" || ws == "editado_cliente") return "revisao"
         if (ws == "ready_for_final_client_review" || ws == "reenviado_cliente") return "reenviado"
         if (hasDesigner(t) || ws == "sent_to_designer") return "producao"
@@ -157,13 +162,33 @@ object TaskVisibility {
         val a = t.cronContents
         return a.isEmpty() || a.any { it.feedImageUrl.isNullOrBlank() }
     }
+    // Story é OPCIONAL: só pendente se ALGUNS conteúdos têm story e outros não (incompleto).
+    fun pendingStory(t: TaskItem): Boolean {
+        val a = t.cronContents
+        return a.any { !it.storyImageUrl.isNullOrBlank() } && a.any { it.storyImageUrl.isNullOrBlank() }
+    }
     private fun pendingProduction(t: TaskItem) = pendingLegend(t) || pendingFeed(t)
+    private fun designerDelivered(t: TaskItem) = hasDesigner(t) && designerCol(t) == "concluido"
 
-    // Status operacional REAL — DERIVADO. Só 'concluido' é override fixo (encerramento/aprovação final).
+    // ===== FONTE ÚNICA DA VERDADE — o fluxo está REALMENTE encerrado? (espelha o Desktop 1.0.99)
+    // "Concluído" exige aprovação FINAL do cliente E zero pendências operacionais.
+    // O status BRUTO do kanban (t.status) NUNCA, sozinho, conclui um cronograma.
+    fun isFullyComplete(t: TaskItem): Boolean {
+        if (Sectors.of(t.sector).key != "cronograma") return t.status == "concluido"
+        if (hasDesigner(t) && !designerDelivered(t)) return false           // designer ainda produzindo
+        if (pendingProduction(t)) return false                              // legenda/Feed pendente
+        if (pendingStory(t)) return false                                   // Story pendente (quando aplicável)
+        if (t.clientReview?.status == "revisao") return false               // revisão solicitada
+        // Sinais DELIBERADOS de encerramento final (escritos só na aprovação final).
+        return t.finalApprovalCompleted || t.operationalStatus == "concluido" ||
+            t.clientFlowStatus == "concluido" || t.cronStatus == "aprovado_final"
+    }
+
+    // Status operacional REAL — DERIVADO. 'concluido' tem caminho ÚNICO: isFullyComplete.
     fun operationalCol(t: TaskItem): String {
         if (Sectors.of(t.sector).key != "cronograma") return t.status ?: "afazer"
+        if (isFullyComplete(t)) return "concluido"                          // ÚNICO caminho para concluído
         val cf = clientCol(t)
-        if (t.operationalStatus == "concluido" || t.finalApprovalCompleted || cf == "concluido") return "concluido"
         if (cf == "revisao") return "aguardando_revisao"
         if (cf == "reenviado") return "aguardando_final"
         if (hasDesigner(t)) {

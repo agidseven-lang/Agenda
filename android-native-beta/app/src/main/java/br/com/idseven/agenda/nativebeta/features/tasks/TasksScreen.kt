@@ -472,8 +472,16 @@ internal fun TaskCardPro(
             .clickable { onClick() }.padding(16.dp),
     ) {
         // 1) META — chip de status (esq) + indicador de prazo (dir)
+        // CORREÇÃO (status-consistency): para CRONOGRAMA o chip mostra o STATUS OPERACIONAL
+        // (não o status bruto) — evita "Concluído" contraditório com o fluxo real.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusChip(TaskStatus.label(task.status), TaskStatus.color(task.status))
+            if (sector.key == "cronograma") {
+                val op = TaskVisibility.operationalCol(task)
+                val opLbl = TaskVisibility.OPERATIONAL_COLS.firstOrNull { it.key == op }?.label ?: TaskStatus.label(task.status)
+                StatusChip(opLbl, opColColor(op))
+            } else {
+                StatusChip(TaskStatus.label(task.status), TaskStatus.color(task.status))
+            }
             Spacer(Modifier.weight(1f))
             if (deadline != null) Pill(deadline.text, deadline.color)
         }
