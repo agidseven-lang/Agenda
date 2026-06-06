@@ -90,7 +90,7 @@ jobs:
     env:
       GCP_PROJECT: "agenda-id-seven"
       APP_DIR: "android-native-beta"
-      DIST_BASENAME: "idseven-nativebeta-1.0.86-beta-agency-operational-phase-fix"
+      DIST_BASENAME: "idseven-nativebeta-1.0.87-beta-operational-status-consistency-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
@@ -105,6 +105,13 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      # CI-only: deriva DIST_BASENAME do versionName REAL do build.gradle (evita rotulo defasado).
+      - name: Definir DIST_BASENAME a partir do versionName (build.gradle)
+        run: |
+          VN="$(sed -nE 's/.*versionName[[:space:]]+"([^"]+)".*/\1/p' "$APP_DIR/app/build.gradle" | head -1)"
+          if [ -n "$VN" ]; then echo "DIST_BASENAME=idseven-nativebeta-${VN}" >> "$GITHUB_ENV"; fi
+          echo "DIST_BASENAME=idseven-nativebeta-${VN}"
 
       # Assinatura: keystore FIXO versionado (android-native-beta/app/idseven-test.keystore).
       # Sem geracao aleatoria -> certificado estavel entre builds (GitLab/GitHub/local).
@@ -253,8 +260,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.86-beta-agency-operational-phase-fix
-          path: dist/idseven-nativebeta-1.0.86-beta-agency-operational-phase-fix.apk
+          name: ${{ env.DIST_BASENAME }}
+          path: dist/${{ env.DIST_BASENAME }}.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -262,7 +269,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.86-beta-agency-operational-phase-fix-bundle
-          path: dist/idseven-nativebeta-1.0.86-beta-agency-operational-phase-fix.zip
+          name: ${{ env.DIST_BASENAME }}-bundle
+          path: dist/${{ env.DIST_BASENAME }}.zip
           if-no-files-found: error
           retention-days: 30
