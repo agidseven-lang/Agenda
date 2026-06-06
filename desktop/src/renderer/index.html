@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.102 (Revisão parcial e portal)</title>
+<title>ID Seven · Desktop 1.0.103 (Filtros premium)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -972,13 +972,27 @@
   .if-before{font-size:13px;color:var(--soft);line-height:1.5;background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:11px 13px;white-space:pre-wrap}
   .if-in{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--ink);font-size:14px;font-family:inherit;line-height:1.5;margin-bottom:16px;box-sizing:border-box;resize:vertical}
   .if-in:focus{outline:none;border-color:var(--accent)}
-  /* Abas superiores da área de Tarefas (Meu quadro · Cliente · Designers · Setores) */
+  /* 1.0.103 — Filtros/abas premium em CHIPS COM ÍCONES (Meu quadro · Cliente · Designers · Social Medias · Setores) */
   .tflow-tabs{display:flex;gap:8px;padding:14px 20px 4px;flex-wrap:wrap}
-  .tflow-tab{background:var(--surface2);border:1px solid var(--line);color:var(--soft);font-size:13.5px;font-weight:800;
-    padding:9px 16px;border-radius:11px;cursor:pointer;transition:all .12s}
-  .tflow-tab:hover{color:var(--ink);border-color:var(--accent)}
-  .tflow-tab.on{background:var(--accent);color:#fff;border-color:transparent}
-  .tflow-quad{margin-left:auto;background:transparent;font-weight:700;font-size:12.5px}
+  .tflow-chipbar{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+  .tflow-chipbar::-webkit-scrollbar{display:none}
+  /* chip individual */
+  .tchip{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;height:36px;padding:0 14px;border-radius:999px;
+    background:var(--surface2);border:1px solid var(--line);color:var(--soft);font-size:13px;font-weight:800;
+    cursor:pointer;transition:all .14s;white-space:nowrap}
+  .tchip svg{width:15px;height:15px;flex:none;opacity:.9}
+  .tchip:hover{color:var(--ink);border-color:var(--accent);transform:translateY(-1px)}
+  .tchip.on{background:linear-gradient(135deg,var(--accent),#7c5cff);color:#fff;border-color:transparent;box-shadow:0 8px 20px -10px var(--accent)}
+  .tchip.on svg{opacity:1}
+  /* Toolbar dos quadros: BUSCA + CHIPS na mesma moldura */
+  .d-board-tools.tbar{display:flex;align-items:center;gap:12px;margin:14px 0 4px;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;padding:9px 12px;flex-wrap:nowrap}
+  .d-board-tools.tbar .bsearch{flex:0 1 320px;min-width:150px;margin:0;height:36px}
+  .d-board-tools.tbar .tchips{display:flex;align-items:center;gap:8px;flex:1 1 auto;overflow-x:auto;scrollbar-width:none;justify-content:flex-end}
+  .d-board-tools.tbar .tchips::-webkit-scrollbar{display:none}
+  body:not(.desktop) .d-board-tools.tbar{flex-wrap:wrap}
+  body:not(.desktop) .d-board-tools.tbar .bsearch{flex:1 1 100%}
+  body:not(.desktop) .d-board-tools.tbar .tchips{justify-content:flex-start;flex:1 1 100%}
   /* Resumo dos dois eixos no Detalhes */
   .det-flow{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px 15px}
   .det-flow-col{flex:1;min-width:160px}
@@ -1086,7 +1100,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.102 · Revisão parcial e portal</span><br>
+    <span class="pill-ver">Desktop 1.0.103 · Filtros premium</span><br>
     espelha o APK <b>1.0.64-beta-build-artifact-version-fix</b> · ref app/main
   </div>
 </section>
@@ -1101,7 +1115,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.102 · Revisão parcial e portal</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.103 · Filtros premium</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1343,7 +1357,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.102 · Revisão parcial e portal</span><br>espelha o APK <b>1.0.90-beta-client-portal-partial-review-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.103 · Filtros premium</span><br>espelha o APK <b>1.0.91-beta-board-filters-polish</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1358,7 +1372,7 @@ function render(){
     else if(state.flowView==='socials'){if(state.socialBoard){c.innerHTML=renderSocialBoard();afterBoard();}else c.innerHTML=renderSocialsHub();}
     else if(state.personBoard){c.innerHTML=renderPersonBoard();afterBoard();}
     else if(state.roleBoards){c.innerHTML=renderTasksTabs('hub')+renderRoleBoards();}
-    else if(state.boardSector){c.innerHTML=renderTasksTabs('hub')+renderBoard();afterBoard();}
+    else if(state.boardSector){c.innerHTML=renderBoard();afterBoard();}
     else c.innerHTML=renderHub();
   }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
@@ -1526,7 +1540,7 @@ function renderPersonBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
+    '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
   STATUS.forEach((st,i)=>{const tasks=byStatus[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
     h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
@@ -1585,27 +1599,38 @@ function designerBoardsList(){
 }
 // Abas superiores da área de Tarefas: Meu quadro · Cliente · Designers · Social Medias.
 // Cliente/Designers/Social Medias só para Social/Admin (canSeeAll); designer comum vê só Meu quadro.
-function renderTasksTabs(active){
-  const u=state.user;const see=canSeeAll(u);
+// 1.0.103 — aba ATIVA derivada do estado (toolbar única e coerente).
+function activeTab(){
+  if(state.flowView==='client')return 'client';
+  if(state.flowView==='designers')return 'designers';
+  if(state.flowView==='socials')return 'socials';
+  if(state.personBoard&&!state.flowView&&!state.boardSector)return 'mine';
+  return 'hub';
+}
+function tabIcon(k){return {mine:'person',client:'eye',designers:'image',socials:'group',hub:'grid'}[k]||'grid';}
+// 1.0.103 — chips premium COM ÍCONES (Meu quadro/Cliente/Designers/Social Medias/Setores).
+function taskChips(){
+  const u=state.user;const see=canSeeAll(u);const act=activeTab();
   const tabs=[{k:'mine',l:'Meu quadro',a:'data-myboard="1"'}];
   if(see){tabs.push({k:'client',l:'Cliente',a:'data-flowclient="1"'});
     tabs.push({k:'designers',l:'Designers',a:'data-flowdesigners="1"'});
     tabs.push({k:'socials',l:'Social Medias',a:'data-flowsocials="1"'});}
-  let h='<div class="tflow-tabs">';
-  tabs.forEach(t=>{h+='<button class="tflow-tab'+(t.k===active?' on':'')+'" '+t.a+'>'+esc(t.l)+'</button>';});
-  h+='<button class="tflow-tab tflow-quad'+(active==='hub'?' on':'')+'" data-board="hub">Setores</button>';
-  h+='</div>';
-  return h;
+  tabs.push({k:'hub',l:'Setores',a:'data-board="hub"'});
+  return tabs.map(t=>'<button class="tchip'+(t.k===act?' on':'')+'" '+t.a+'>'+svg(tabIcon(t.k))+'<span>'+esc(t.l)+'</span></button>').join('');
 }
+// Barra de filtros do topo dos HUBs (sem busca).
+function renderTasksTabs(active){return '<div class="tflow-tabs tflow-chipbar">'+taskChips()+'</div>';}
+// Toolbar premium dos QUADROS: busca + chips na MESMA moldura.
+function boardToolbar(){return '<div class="d-board-tools tbar"><input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"><div class="tchips">'+taskChips()+'</div></div>';}
 function renderClientFlowBoard(){
   let list=state.tasks.filter(isClientFlow);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
   const byCol=CLIENT_COLS.map(c=>list.filter(t=>clientCol(t)===c.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
-  let h=renderTasksTabs('client')+
+  let h=
     '<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Cliente</div><div class="d-bh-sub">Fica visível até a aprovação final — mesmo enviado ao designer · '+list.length+' tarefa'+(list.length===1?'':'s')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
+    '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
   CLIENT_COLS.forEach((c,i)=>{const tasks=byCol[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+c.color+'"></div><div class="kt" style="color:'+c.color+'">'+esc(c.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
     h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
@@ -1636,11 +1661,11 @@ function renderDesignerBoard(){
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
   const byStatus=STATUS.map(st=>list.filter(t=>designerCol(t)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const late=list.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
-  let h=renderTasksTabs('designers')+
+  let h=
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designer · '+esc((p.name||'').split(' ')[0]||'Designer')+'</div><div class="d-bh-sub">'+esc(p.role||'Designer')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
+    '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
   STATUS.forEach((st,i)=>{const tasks=byStatus[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
     h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
@@ -1783,11 +1808,11 @@ function renderSocialBoard(){
   // não a aprovação do cliente. Aprovação parcial do cliente NÃO vira "Concluído" aqui.
   const byCol=OPERATIONAL_COLS.map(c=>list.filter(t=>operationalCol(t)===c.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const late=list.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
-  let h=renderTasksTabs('socials')+
+  let h=
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowsocials">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Social · '+esc((p.name||'').split(' ')[0]||'Social Media')+'</div><div class="d-bh-sub">Fluxo operacional · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0"><div class="d-board-tools"><input class="inp" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div><div class="kanban">';
+    '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
   OPERATIONAL_COLS.forEach((c,i)=>{const tasks=byCol[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+c.color+'"></div><div class="kt" style="color:'+c.color+'">'+esc(c.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
     h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
@@ -2879,7 +2904,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.102-desktop-client-portal-partial-review-fix';
+const BUILD='1.0.103-desktop-board-filters-polish';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -2891,7 +2916,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.102 · Revisão parcial e portal</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.103 · Filtros premium</div></div>';
 }
 function renderConfig(){
   const u=state.user;
