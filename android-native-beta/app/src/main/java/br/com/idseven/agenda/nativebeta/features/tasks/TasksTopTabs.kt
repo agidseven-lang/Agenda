@@ -71,11 +71,13 @@ fun TasksTopTabs(
     ) {
         tabs.forEach { (key, label, onClick) ->
             val on = key == active
+            // 1.0.95 — chips MENOS arredondados, no mesmo raio/borda do campo "Buscar tarefa…"
+            // (SearchField = RoundedCornerShape(12.dp), borda Tokens.Line). Sem cápsula/pílula.
             Row(
-                Modifier.clip(RoundedCornerShape(999.dp))
+                Modifier.clip(RoundedCornerShape(12.dp))
                     .background(if (on) Tokens.Accent else Tokens.Surface)
-                    .border(1.dp, if (on) Color.Transparent else Tokens.Line, RoundedCornerShape(999.dp))
-                    .clickable { onClick() }.padding(horizontal = 14.dp, vertical = 9.dp),
+                    .border(1.dp, if (on) Tokens.Accent else Tokens.Line, RoundedCornerShape(12.dp))
+                    .clickable { onClick() }.padding(horizontal = 12.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
             ) {
