@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.18 / Desktop 1.0.108 / Android 1.0.96
+ * Agenda ID Seven · Worker V64.18 / Desktop 1.0.109 / Android 1.0.97
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = 'worker/real-flow-sync-fix';
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.96-beta-board-toolbar-inside-kanban-fix';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.97-beta-designer-sync-fix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.18 · Desktop 1.0.108 · Android 1.0.96-beta');
+console.log(' Worker V64.18 · Desktop 1.0.109 · Android 1.0.97-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -211,6 +211,27 @@ check('SYNC3', 'Mesma tarefa para a Social (viewer=social) → "andamento"', boa
 // Identidade: o id gravado (assigneeId/designerId) é o MESMO espaço do uid logado no Android.
 check('SYNC4', 'designerOf == id gravado (assigneeId/designerAssignment.designerId)', designerOf(justSentToDesigner) === 'D');
 
+/* ===================== PARTE A.4 — Designer MOVE: "Em andamento" sincroniza PC×Android =====================
+   Bug real: mover gravava só `status`; o quadro do Designer LÊ `designerFlowStatus` → card preso em
+   "A Fazer". Fix: mover no eixo do designer grava `designerFlowStatus`. Simula os dois caminhos. */
+console.log(`${C.b}\n[PARTE A.4] Designer move "Em andamento" sincroniza (designerFlowStatus = fonte única)${C.x}`);
+// patch CORRETO (1.0.97/1.0.109): grava designerFlowStatus, NÃO toca status.
+const moveDesigner = (t, s) => Object.assign({}, t, { designerFlowStatus: s });
+// patch ANTIGO/BUGADO: grava só status.
+const moveStatusOnly = (t, s) => Object.assign({}, t, { status: s });
+const D0 = justSentToDesigner;                                  // designerFlowStatus='afazer'
+const dMove = moveDesigner(D0, 'andamento');                    // designer move -> Em andamento (correto)
+const dBug = moveStatusOnly(D0, 'andamento');                   // caminho antigo (bug)
+check('MOVE1', 'Designer board do PC mostra "Em andamento" (designerCol)', designerCol(dMove) === 'andamento');
+check('MOVE2', 'Meu quadro do designer no Android mostra "Em andamento" (boardCol4For)', boardCol4For(dMove, 'D') === 'andamento');
+check('MOVE3', 'NÃO fica preso em "A Fazer"', boardCol4For(dMove, 'D') !== 'afazer' && designerCol(dMove) !== 'afazer');
+check('MOVE4', 'Social vê "Designer em produção" (operationalCol=aguardando_designer)', operationalCol(dMove) === 'aguardando_designer');
+check('MOVE5', 'Cliente vê "Em produção" (clientCol=producao)', clientCol(dMove) === 'producao');
+check('MOVE6', 'REGRESSÃO coberta: gravar só status deixaria preso em "A Fazer"', designerCol(dBug) === 'afazer');
+// Entrega: designer move -> Entregue (designerFlowStatus='concluido') => Social "Aguardando legendas".
+const dDone = moveDesigner(D0, 'concluido');
+check('MOVE7', 'Designer "Entregue" => Social "Aguardando legendas e posts"', operationalCol(dDone) === 'aguardando_legenda');
+
 /* ===================== PARTE B — Asserções estruturais (arquitetura de render) ===================== */
 const W = readWorker();
 const DH = readDesktop('desktop/src/renderer/index.html');
@@ -221,6 +242,7 @@ const KT_TABS = readAndroid(AND + 'features/tasks/TasksTopTabs.kt');
 const KT_SCREEN = readAndroid(AND + 'features/tasks/TasksScreen.kt');
 const KT_HUB = readAndroid(AND + 'features/tasks/BoardsHubScreen.kt');
 const KT_REPO = readAndroid(AND + 'data/TaskRepo.kt');
+const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
@@ -241,9 +263,9 @@ check('W12', 'Toast claro "Tema atualizado pela equipe"', /Tema atualizado pela 
 check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaState/.test(W) && /setInterval\(\s*pollState/.test(W));
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
-console.log(`${C.b}\n[PARTE B] Desktop 1.0.108 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.108', /"version":\s*"1\.0\.108"/.test(DP));
-// ===== ESTILO DOS CHIPS (1.0.108): menos arredondados + borda/raio do input + ícone Designers.
+console.log(`${C.b}\n[PARTE B] Desktop 1.0.109 — chips fixos + colunas por contexto + msg premium${C.x}`);
+check('D1', 'package.json versão 1.0.109', /"version":\s*"1\.0\.109"/.test(DP));
+// ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
 check('D_SHAPE2', 'Chips SEM cápsula: .tchip não usa border-radius:999px', !/border-radius:999px/.test(tchipCss));
@@ -287,18 +309,25 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.108', /Desktop 1\.0\.108/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.109', /Desktop 1\.0\.109/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.108 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.108/.test(DH) && /<title>ID Seven · Desktop 1\.0\.108/.test(DH) && /id="wpbadge">Desktop 1\.0\.108/.test(DH));
-check('D22', 'Login espelha o APK 1.0.96-beta-board-toolbar-inside-kanban-fix', /espelha o APK <b>1\.0\.96-beta-board-toolbar-inside-kanban-fix/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.108'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.109 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.109/.test(DH) && /<title>ID Seven · Desktop 1\.0\.109/.test(DH) && /id="wpbadge">Desktop 1\.0\.109/.test(DH));
+check('D22', 'Login espelha o APK 1.0.97-beta-designer-sync-fix', /espelha o APK <b>1\.0\.97-beta-designer-sync-fix/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.109'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
+// ===== SYNC DO DESIGNER (move grava designerFlowStatus) — Desktop =====
+const moveFn = (DH.match(/async function moveStatus\(taskId,newStatus\)\{[\s\S]*?\n\}/) || [''])[0];
+check('D_MOVE1', 'Desktop tem isDesignerAxisMove (detecta eixo do designer)', /function isDesignerAxisMove\(t\)\{return isDesignerFlow\(t\)/.test(DH));
+const dBranch = (moveFn.match(/if\(isDesignerAxisMove\(t\)\)\{[\s\S]*?return;\s*\}/) || [''])[0];
+check('D_MOVE2', 'moveStatus grava designerFlowStatus no eixo do designer', /designerFlowStatus:newStatus/.test(dBranch));
+check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({status:newStatus})', dBranch.length > 0 && !/\{status:newStatus/.test(dBranch));
+check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
-console.log(`${C.b}\n[PARTE B] Android 1.0.96-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.96-beta-board-toolbar-inside-kanban-fix', /versionName\s+"1\.0\.96-beta-board-toolbar-inside-kanban-fix"/.test(GRADLE));
-check('N2', 'versionCode >= 94', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 94; })());
+console.log(`${C.b}\n[PARTE B] Android 1.0.97-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
+check('N1', 'versionName 1.0.97-beta-designer-sync-fix', /versionName\s+"1\.0\.97-beta-designer-sync-fix"/.test(GRADLE));
+check('N2', 'versionCode >= 95', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 95; })());
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
 check('N_ICON', 'TasksTopTabs: ícone do Designers = Icons.Outlined.Image', /"designers"\s*->\s*Icons\.Outlined\.Image/.test(KT_TABS));
@@ -316,6 +345,12 @@ check('N4', 'TasksScreen usa boardCol4For(t, currentUid) no Meu quadro', /boardC
 // Equivalência de identidade/campo: Android lê designerAssignment.designerId.
 check('N5', 'TaskRepo lê designerAssignment.designerId (= assigneeId do Desktop)', /designerAssignment[\s\S]{0,40}designerId/.test(KT_REPO));
 check('N6', 'TaskRepo lê assigneeId (uid do designer logado)', /assigneeId\s*=\s*d\.getString\("assigneeId"\)/.test(KT_REPO));
+// ===== SYNC DO DESIGNER (move grava designerFlowStatus) — Android =====
+check('N_MOVE1', 'TaskContract.designerStatusPatch grava designerFlowStatus', /fun\s+designerStatusPatch\([\s\S]*?"designerFlowStatus"\s+to\s+newDesignerStatus/.test(KT_CONTRACT));
+check('N_MOVE2', 'TaskContract.designerStatusPatch NÃO grava status genérico', !/fun\s+designerStatusPatch\([\s\S]*?"status"\s+to/.test(KT_CONTRACT));
+check('N_MOVE3', 'TaskRepo.move tem parâmetro designerAxis', /fun\s+move\(task:[^)]*designerAxis:\s*Boolean/.test(KT_REPO));
+check('N_MOVE4', 'TaskRepo.move usa designerStatusPatch quando designerAxis', /if\s*\(designerAxis\)\s*TaskContract\.designerStatusPatch/.test(KT_REPO));
+check('N_MOVE5', 'TasksScreen detecta eixo do designer e chama move(...designerAxis)', /val designerAxis = TaskVisibility\.isDesignerFlow/.test(KT_SCREEN) && /TaskRepo\.move\(target, opt\.target, currentUid, designerAxis\)/.test(KT_SCREEN));
 // CORREÇÃO 3 (Android): colunas por contexto.
 check('N7', 'Colunas reduzidas: SOCIAL_COLS4 / DESIGNER_COLS3 / CLIENT_COLS4', /SOCIAL_COLS4/.test(KT_VIS) && /DESIGNER_COLS3/.test(KT_VIS) && /CLIENT_COLS4/.test(KT_VIS));
 check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerCol3)', /clientCol4\(t\)/.test(KT_SCREEN) && /designerCol3\(t\)/.test(KT_SCREEN));
@@ -326,7 +361,7 @@ check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|Gri
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.108 / Android 1.0.96-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.109 / Android 1.0.97-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
