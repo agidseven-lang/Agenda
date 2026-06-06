@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.13-agency-operational-phase-fix]
+   ID Seven — Cloudflare Worker  [V64.14-operational-status-consistency-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -90,7 +90,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.13-agency-operational-phase-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.14-operational-status-consistency-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -888,11 +888,18 @@ async function handleClientCronogramaView(token, env) {
         "Este link pode ter sido invalidado ou ainda não foi compartilhado. Fale com sua equipe ID Seven."), 404);
     }
     console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""}`);
-    // P2: se a aprovação FINAL já aconteceu, o cliente vê a tela de SUCESSO (não mais ações).
-    // V64.11: usa o eixo do CLIENTE (clientFlowStatus) — independente do status do designer.
-    if (task.finalApprovalCompleted === true || task.clientFlowStatus === "concluido" || task.status === "concluido" || task.workflowStage === "concluido") {
+    // P2: a tela de SUCESSO só aparece na aprovação FINAL REAL.
+    // V64.14 (status-consistency): o gate usa SÓ os sinais deliberados de encerramento final
+    // (finalApprovalCompleted / clientFlowStatus='concluido'). O status BRUTO do kanban
+    // (task.status / workflowStage = 'concluido'), que pode vir de mover o card manualmente,
+    // NÃO encerra mais a Visão do Cliente — evita tela final prematura.
+    if (task.finalApprovalCompleted === true || task.clientFlowStatus === "concluido") {
       return htmlResponse(renderClientSuccessHtml(task, token), 200);
     }
+    // V64.14: já aprovou a fase atual (temas/produção) e ainda NÃO é final? Mostra a
+    // confirmação INTERMEDIÁRIA (não a página de ações aberta como se nada tivesse ocorrido).
+    const acked = clientAckedPhase(task);
+    if (acked) return htmlResponse(renderClientPhaseAckHtml(task, token, acked), 200);
     return htmlResponse(renderClientHtml(task, token, env), 200);
   } catch (e) {
     // Blindagem: qualquer erro inesperado de render/query → HTML amigável (NUNCA tela branca/JSON/corpo vazio).
@@ -1228,6 +1235,45 @@ function phaseCopy(phase) {
     sub: "Você está aprovando apenas os temas. A equipe seguirá com a produção (designer + legendas + posts).",
     cta: "Aprovar temas e liberar produção",
   };
+}
+/* V64.14 — Fase JÁ aprovada pelo cliente (para mostrar confirmação intermediária no reabrir).
+   Retorna 'themes' | 'production' | null. NUNCA esconde uma aprovação ainda necessária:
+   - themes: aprovou e a produção ainda não está pronta (fase derivada continua 'themes').
+   - production: só quando a fase está EXPLICITAMENTE marcada 'production' E já aprovada.
+   - final é tratado pela tela de sucesso (não entra aqui). */
+function clientAckedPhase(task) {
+  const cr = (task.clientReview && task.clientReview.status) || "";
+  const approved = cr === "aprovado" || task.cronStatus === "aprovado_cliente" || task.clientFlowStatus === "aprovado";
+  if (!approved) return null;
+  const ph = clientPhase(task);
+  if (ph === "final") return null;
+  if (ph === "themes") return "themes";
+  if (ph === "production" && (task.clientApprovalPhase || "") === "production") return "production";
+  return null;
+}
+/* V64.14 — Página INTERMEDIÁRIA server-rendered (reabrir após aprovar temas/produção).
+   Mantém o MESMO link, sem botões de ação abertos, com linguagem da fase seguinte. */
+function renderClientPhaseAckHtml(task, token, phase) {
+  const cliente = escapeHtml(task.client || "Cliente");
+  const titulo = escapeHtml(task.title || "Cronograma");
+  const isThemes = phase === "themes";
+  const h2 = isThemes ? "Temas aprovados!" : "Legendas e artes aprovadas!";
+  const msg = isThemes
+    ? "A equipe seguirá para a etapa de produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final."
+    : "A equipe enviará a versão final completa para a sua aprovação. Em breve você receberá o aviso neste mesmo link.";
+  const next = isThemes ? "Aguardando produção · legendas e artes" : "Aguardando aprovação final";
+  return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
+'<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>\n' +
+'<title>' + cliente + ' · ' + titulo + ' · Visão do Cliente</title>\n<meta name="theme-color" content="#070810"/>\n' +
+'<meta name="robots" content="noindex,nofollow"/>\n' +
+'<style>' + CV_CSS + '</style></head><body>\n' +
+'<div class="wrap"><div class="topbar"><div class="brand">' + CV_LOGO + '<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div>' +
+  '<div class="secure">' + ICN.shield + '<span class="lbl">Link seguro</span></div></div>' +
+  '<div class="midwrap"><div class="midcard"><div class="mid-badge">' + ICN.check + '</div>' +
+    '<h2>' + h2 + '</h2><p>' + msg + '</p>' +
+    '<div class="phase-banner phase-' + (isThemes ? "production" : "final") + '" style="justify-content:center;margin-top:16px"><span class="phase-dot"></span><b>' + next + '</b></div>' +
+    '<div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>' +
+'</div></body></html>';
 }
 function statusLabel(t) {
   const cls = (t.cronStatus || "").toString();
