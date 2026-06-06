@@ -200,6 +200,19 @@ object TaskVisibility {
         return "producao"
     }
 
+    // Bucket de 4 colunas (afazer/andamento/revisao/concluido) para o quadro por papel e
+    // "Meu quadro". Para CRONOGRAMA deriva do eixo OPERACIONAL — assim o status BRUTO nunca
+    // coloca um cronograma em "Concluído" antes da aprovação final (paridade com o Desktop 1.0.100).
+    fun boardCol4(t: TaskItem): String {
+        if (Sectors.of(t.sector).key != "cronograma") return t.status ?: "afazer"
+        return when (operationalCol(t)) {
+            "concluido" -> "concluido"          // só quando isFullyComplete
+            "aguardando_revisao" -> "revisao"
+            "afazer" -> "afazer"
+            else -> "andamento"                 // producao/aguardando_designer/legenda/final
+        }
+    }
+
     // "Próxima ação" em destaque para a Social/Admin.
     // FASE de aprovação do cliente (themes/production/final) — espelha o Worker V64.13.
     fun clientApprovalPhase(t: TaskItem): String {

@@ -170,7 +170,9 @@ fun TasksScreen(
             isClientBoard -> TaskVisibility.clientCol(t)
             flow == "designer" -> TaskVisibility.designerCol(t)
             isSocialBoard -> TaskVisibility.operationalCol(t)
-            else -> t.status ?: "afazer"
+            // Role board / "Meu quadro": cronograma deriva do eixo operacional (boardCol4);
+            // status BRUTO nunca coloca cronograma em "Concluído" antes da aprovação final.
+            else -> TaskVisibility.boardCol4(t)
         }
     }
     val pager = rememberPagerState(pageCount = { cols.size })
