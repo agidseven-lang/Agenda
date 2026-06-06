@@ -60,7 +60,7 @@ fun DesignersHubScreen(
         .sortedBy { (u, id) -> (u?.name ?: id).lowercase() }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        tabsBar()
+        // 1.0.94 — título PRIMEIRO; chips ABAIXO do título (nunca acima / nunca soltos no topo).
         Row(Modifier.fillMaxWidth().padding(start = 12.dp, top = 8.dp, end = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(11.dp)).clickable { onBack() }, contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.KeyboardArrowLeft, contentDescription = "Voltar", tint = Tokens.Soft, modifier = Modifier.size(22.dp))
@@ -75,6 +75,7 @@ fun DesignersHubScreen(
                 Text("Cada designer em um quadro Kanban próprio", color = Tokens.Faint, fontSize = 11.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+        tabsBar()
         if (designers.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 EmptyState("Nenhuma tarefa com designer", "Envie um cronograma aprovado para um designer", Icons.Outlined.Group)

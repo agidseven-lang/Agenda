@@ -75,7 +75,7 @@ fun BoardsHubScreen(
     val designersLate = all.count { TaskVisibility.isDesignerFlow(it) && TaskDeadline.of(it)?.late == true }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
-        tabsBar()
+        // 1.0.94 — título PRIMEIRO; os chips vêm ABAIXO do título (nunca acima / nunca soltos no topo).
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 10.dp, end = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Quadros", color = Tokens.Ink, fontSize = 26.sp, fontWeight = FontWeight.Bold)
@@ -85,6 +85,7 @@ fun BoardsHubScreen(
                 Text("${all.size} tarefas", color = Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
+        tabsBar()
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp)) {
             // ADITIVO — "Meu quadro" (todos: minhas demandas/tarefas) — não remove a visão ampla.
             if (uid != null) {

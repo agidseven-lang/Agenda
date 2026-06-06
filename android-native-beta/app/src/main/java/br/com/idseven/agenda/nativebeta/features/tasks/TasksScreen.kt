@@ -181,7 +181,7 @@ fun TasksScreen(
     val pager = rememberPagerState(pageCount = { cols.size })
 
     Column(Modifier.fillMaxSize()) {
-        tabsBar()
+        // 1.0.94 — chips NÃO ficam mais no topo global; vão JUNTO da busca (abaixo dela).
         // P3/P4 — Cabeçalho dos fluxos separados (Cliente / um Designer).
         if (flow != null) {
             val isClient = flow == "client"
@@ -262,6 +262,9 @@ fun TasksScreen(
             }
         }
         SearchField(query, { query = it }, "Buscar tarefa…")
+        // 1.0.94 — chips de navegação (Meu quadro/Cliente/Designers/Social/Setores) JUNTO da busca,
+        // logo abaixo dela, no MESMO bloco — scroll horizontal elegante (nunca soltos no topo).
+        tabsBar()
         // Filtro "Minhas tarefas" + filtros de setor (ocultos no quadro de setor, por responsável e nos fluxos).
         if (lockedSector == null && personId == null && flow == null) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 2.dp)) {
