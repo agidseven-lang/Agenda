@@ -59,5 +59,18 @@ object TaskContract {
         return m
     }
 
+    // 1.0.97 — EIXO DO DESIGNER (fonte única): ao mover um card NO QUADRO DO DESIGNER, persiste
+    // `designerFlowStatus` (que é o campo que o quadro do Designer LÊ no Desktop e no Android).
+    // NÃO toca em `status` (eixo genérico) — assim o card do designer move de verdade em ambos.
+    // Mapeamento da coluna "Entregue" => designerFlowStatus="concluido".
+    fun designerStatusPatch(newDesignerStatus: String, task: TaskItem, nowMs: Long): Map<String, Any?> {
+        val m = hashMapOf<String, Any?>(
+            "designerFlowStatus" to newDesignerStatus,
+            "designerWorkflowStage" to newDesignerStatus,
+        )
+        if (newDesignerStatus != "afazer" && (task.startedAt == null || task.startedAt <= 0)) m["startedAt"] = nowMs
+        return m
+    }
+
     fun checklistPatch(items: List<ChecklistItem>): Map<String, Any?> = mapOf("checklist" to checklistMaps(items))
 }

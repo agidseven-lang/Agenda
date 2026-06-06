@@ -100,6 +100,17 @@ private fun moveOptions(status: String): List<MoveOpt> = when (status) {
     else -> listOf(MoveOpt("Reabrir tarefa", "andamento", "Voltar para Em andamento", Icons.Outlined.Refresh))
 }
 
+// 1.0.97 — opções de mover do QUADRO DO DESIGNER (3 colunas: A Fazer / Em andamento / Entregue).
+// Os alvos gravam designerFlowStatus (afazer/andamento/concluido) — fonte única do eixo do designer.
+private fun designerMoveOptions(curCol: String): List<MoveOpt> = when (curCol) {
+    "afazer" -> listOf(MoveOpt("Mover para Em andamento", "andamento", "Começar a produção", Icons.Filled.KeyboardArrowRight))
+    "concluido" -> listOf(MoveOpt("Reabrir (Em andamento)", "andamento", "Voltar a produzir", Icons.Outlined.Refresh))
+    else -> listOf( // andamento / revisao
+        MoveOpt("Marcar como Entregue", "concluido", "Entrega para a Social finalizar", Icons.Filled.KeyboardArrowRight),
+        MoveOpt("Voltar para A Fazer", "afazer", "Pausar e retornar", Icons.Filled.KeyboardArrowLeft),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(
@@ -344,11 +355,15 @@ fun TasksScreen(
                 Spacer(Modifier.height(2.dp))
                 Text(target.title?.ifBlank { null } ?: target.client ?: "Tarefa", color = Tokens.Soft, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(14.dp))
-                moveOptions(target.status ?: "afazer").forEach { opt ->
+                // 1.0.97 — se o card está no eixo do DESIGNER (quadro do designer OU eu sou o designer
+                // atribuído), as opções e a gravação usam designerFlowStatus (move de verdade no PC e no celular).
+                val designerAxis = TaskVisibility.isDesignerFlow(target) && (flow == "designer" || TaskVisibility.designerOf(target) == currentUid)
+                val opts = if (designerAxis) designerMoveOptions(TaskVisibility.designerCol(target)) else moveOptions(target.status ?: "afazer")
+                opts.forEach { opt ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp).clip(RoundedCornerShape(14.dp))
                             .background(TaskStatus.color(opt.target).copy(alpha = 0.12f))
-                            .clickable { scope.launch { TaskRepo.move(target, opt.target, currentUid) }; moveTarget = null }
+                            .clickable { scope.launch { TaskRepo.move(target, opt.target, currentUid, designerAxis) }; moveTarget = null }
                             .padding(vertical = 13.dp, horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

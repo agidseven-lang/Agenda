@@ -141,11 +141,15 @@ object TaskRepo {
             .addOnFailureListener { cont.resume(Result.failure(it)) }
     }
 
-    suspend fun move(task: TaskItem, newStatus: String, uid: String?): Result<Unit> {
+    // designerAxis=true: card no quadro do DESIGNER -> grava designerFlowStatus (fonte única do
+    // eixo do designer; Desktop e Android leem esse campo). Senão, grava o status genérico.
+    suspend fun move(task: TaskItem, newStatus: String, uid: String?, designerAxis: Boolean = false): Result<Unit> {
         val now = System.currentTimeMillis()
-        val patch = TaskContract.statusPatch(newStatus, uid, task, now).toMutableMap()
+        val patch = (if (designerAxis) TaskContract.designerStatusPatch(newStatus, task, now)
+                     else TaskContract.statusPatch(newStatus, uid, task, now)).toMutableMap()
+        val from = if (designerAxis) (task.designerFlowStatus ?: task.status ?: "afazer") else (task.status ?: "afazer")
         patch["history"] = FieldValue.arrayUnion(
-            mapOf("kind" to "moved", "at" to now, "byId" to uid, "from" to (task.status ?: "afazer"), "to" to newStatus)
+            mapOf("kind" to if (designerAxis) "designer_moved" else "moved", "at" to now, "byId" to uid, "from" to from, "to" to newStatus)
         )
         return update(task.id, patch)
     }
