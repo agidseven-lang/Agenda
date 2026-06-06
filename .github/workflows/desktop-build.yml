@@ -30,12 +30,22 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.98-desktop-agency-operational-phase-fix"
+      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.99-operational-status-consistency-fix"
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
+
+      # CI-only: deriva versao/labels do package.json real (evita rotulo defasado).
+      - name: Definir versao/labels a partir do package.json
+        run: |
+          VER="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$APP_DIR/package.json" | head -1)"
+          REF="${{ github.event.inputs.ref }}"; SUFFIX="${REF##*/}"
+          LABEL="${VER}-${SUFFIX}"
+          echo "VER_LABEL=$LABEL" >> "$GITHUB_ENV"
+          echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL}" >> "$GITHUB_ENV"
+          echo "VER_LABEL=$LABEL | DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL}"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -73,7 +83,7 @@ jobs:
           # VERSAO-DESKTOP.txt — prova do que esta dentro
           {
             echo "productName : Agenda ID Seven Desktop"
-            echo "versionName : 1.0.98-desktop-agency-operational-phase-fix"
+            echo "versionName : ${VER_LABEL}"
             echo "appId       : br.com.idseven.agenda.desktop"
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
@@ -83,7 +93,7 @@ jobs:
             fi
             echo "commit      : $GITHUB_SHA"
             echo "ref         : ${{ github.event.inputs.ref }}"
-            echo "espelha APK : 1.0.64-beta-build-artifact-version-fix"
+            echo "espelha APK : 1.0.87-beta-operational-status-consistency-fix"
           } > "$OUT/VERSAO-DESKTOP.txt"
           # RELATORIO-DESKTOP.txt — checagens
           {
@@ -157,7 +167,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.98-installer
+          name: agenda-id-seven-desktop-${{ env.VER_LABEL }}-installer
           path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
           if-no-files-found: error
           retention-days: 30
@@ -166,7 +176,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.98-bundle
+          name: agenda-id-seven-desktop-${{ env.VER_LABEL }}-bundle
           path: dist-pkg/
           if-no-files-found: error
           retention-days: 30
