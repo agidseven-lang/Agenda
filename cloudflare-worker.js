@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.18-real-flow-sync-fix]
+   ID Seven — Cloudflare Worker  [V64.19-client-caption-render-fix]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -95,7 +95,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.18-real-flow-sync-fix" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.19-client-caption-render-fix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -964,7 +964,7 @@ async function handleClientCronogramaState(token, env) {
       const c = (raw && typeof raw === "object") ? raw : {};
       const ov = ci["i" + i] || {};
       const tema = (typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || ("Conteúdo " + (i + 1)));
-      const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""));
+      const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.legenda === "string" ? c.legenda : (typeof c.caption === "string" ? c.caption : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""))));
       return { i, cs: ov.cs || c.cs || "", tema, legenda: (legRaw || "").toString(),
         feed: firstUrl(c.feed) || (c.feedImageUrl || ""), story: firstUrl(c.story || c.stories) || (c.storyImageUrl || "") };
     });
@@ -1687,7 +1687,7 @@ function renderClientHtml(task, token, env) {
       const cs = ov.cs || c.cs || "";
       if (cs === "aprovado") doneCount++;
       const tema = escapeHtml((typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || ("Conteúdo " + (i + 1))));
-      const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""));
+      const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.legenda === "string" ? c.legenda : (typeof c.caption === "string" ? c.caption : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""))));
       const leg = (legRaw || "").trim();
       const itemNote = (ov.note || c.csFeedback || "").toString().trim();
       const feedUrl = firstUrl(c.feed) || (c.feedImageUrl || "");
