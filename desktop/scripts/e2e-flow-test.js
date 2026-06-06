@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.18 / Desktop 1.0.106 / Android 1.0.94
+ * Agenda ID Seven · Worker V64.18 / Desktop 1.0.107 / Android 1.0.95
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = 'worker/real-flow-sync-fix';
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.94-beta-board-toolbar-placement-fix';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.95-beta-board-chip-shape-fix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.18 · Desktop 1.0.106 · Android 1.0.94-beta');
+console.log(' Worker V64.18 · Desktop 1.0.107 · Android 1.0.95-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -241,8 +241,15 @@ check('W12', 'Toast claro "Tema atualizado pela equipe"', /Tema atualizado pela 
 check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaState/.test(W) && /setInterval\(\s*pollState/.test(W));
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
-console.log(`${C.b}\n[PARTE B] Desktop 1.0.106 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.106', /"version":\s*"1\.0\.106"/.test(DP));
+console.log(`${C.b}\n[PARTE B] Desktop 1.0.107 — chips fixos + colunas por contexto + msg premium${C.x}`);
+check('D1', 'package.json versão 1.0.107', /"version":\s*"1\.0\.107"/.test(DP));
+// ===== ESTILO DOS CHIPS (1.0.107): menos arredondados + borda/raio do input + ícone Designers.
+const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
+check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
+check('D_SHAPE2', 'Chips SEM cápsula: .tchip não usa border-radius:999px', !/border-radius:999px/.test(tchipCss));
+check('D_SHAPE3', 'Chips com borda no estilo do input (1px solid var(--line))', /border:1px solid var\(--line\)/.test(tchipCss));
+check('D_ICON1', 'ICON.image existe (chip Designers passa a ter ícone)', /\n\s*image:'<rect /.test(DH));
+check('D_ICON2', 'tabIcon mapeia designers -> image', /designers:'image'/.test(DH));
 // CORREÇÃO 1: mensagem WhatsApp PREMIUM (assinatura + CTA; não é link cru).
 const msgFn = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [''])[0];
 check('D2', 'WhatsApp premium: assinatura "Equipe ID Seven"', /Equipe ID Seven/.test(msgFn));
@@ -275,18 +282,21 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.106', /Desktop 1\.0\.106/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.107', /Desktop 1\.0\.107/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.106 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.106/.test(DH) && /<title>ID Seven · Desktop 1\.0\.106/.test(DH) && /id="wpbadge">Desktop 1\.0\.106/.test(DH));
-check('D22', 'Login espelha o APK 1.0.94-beta-board-toolbar-placement-fix', /espelha o APK <b>1\.0\.94-beta-board-toolbar-placement-fix/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.106'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.107 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.107/.test(DH) && /<title>ID Seven · Desktop 1\.0\.107/.test(DH) && /id="wpbadge">Desktop 1\.0\.107/.test(DH));
+check('D22', 'Login espelha o APK 1.0.95-beta-board-chip-shape-fix', /espelha o APK <b>1\.0\.95-beta-board-chip-shape-fix/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.107'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
 
-console.log(`${C.b}\n[PARTE B] Android 1.0.94-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.94-beta-board-toolbar-placement-fix', /versionName\s+"1\.0\.94-beta-board-toolbar-placement-fix"/.test(GRADLE));
-check('N2', 'versionCode >= 92', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 92; })());
+console.log(`${C.b}\n[PARTE B] Android 1.0.95-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
+check('N1', 'versionName 1.0.95-beta-board-chip-shape-fix', /versionName\s+"1\.0\.95-beta-board-chip-shape-fix"/.test(GRADLE));
+check('N2', 'versionCode >= 93', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 93; })());
+// ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
+check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
+check('N_ICON', 'TasksTopTabs: ícone do Designers = Icons.Outlined.Image', /"designers"\s*->\s*Icons\.Outlined\.Image/.test(KT_TABS));
 // ===== PLACEMENT (mesma regra do Desktop): chips JUNTO da busca / abaixo do título, nunca soltos no topo.
 const iSearch = KT_SCREEN.indexOf('SearchField(query');
 const iTabsAfter = KT_SCREEN.indexOf('tabsBar()', iSearch);
@@ -311,7 +321,7 @@ check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|Gri
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.106 / Android 1.0.94-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.18 / Desktop 1.0.107 / Android 1.0.95-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
