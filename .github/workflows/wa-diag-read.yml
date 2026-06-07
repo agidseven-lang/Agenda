@@ -1,0 +1,39 @@
+# Lê o /wa-diag do Worker (hits recentes do preview) — só diagnóstico, sem tocar em nada.
+# Push-triggered numa branch dedicada; depois é só RE-RUN deste run após cada teste real
+# no WhatsApp para ver se o crawler (facebookexternalhit/WhatsApp) chegou ao Worker.
+name: Ler diagnostico de preview (/wa-diag)
+
+on:
+  push:
+    branches: [ "infra/wa-diag-read" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GET /wa-diag (hits recentes)
+        run: |
+          set -euo pipefail
+          B="https://aprovar.agendaidseven.com.br"
+          echo "== /wa-diag (ts mais recentes primeiro) =="
+          curl -sS --max-time 25 "$B/wa-diag" -o /tmp/diag.json
+          echo "Content-Type:"; curl -sS --max-time 25 -o /dev/null -w '%{content_type}\n' "$B/wa-diag"
+          echo "== total de hits =="
+          node -e 'const d=require("/tmp/diag.json");console.log("count:",d.count)'
+          echo "== hits (path | method | isBot | country | ua) =="
+          node -e '
+            const d=require("/tmp/diag.json");
+            for(const h of (d.hits||[])){
+              const t=new Date(Number(h.ts)).toISOString();
+              console.log(t+" | "+h.path+" | "+h.method+" | bot="+h.isBot+" | "+(h.country||"?")+" | "+(h.ua||"").slice(0,90));
+            }
+            const bots=(d.hits||[]).filter(h=>h.isBot || /facebookexternalhit|whatsapp|facebot|twitterbot/i.test(h.ua||""));
+            console.log("");
+            console.log("=== CRAWLERS DE PREVIEW DETECTADOS: "+bots.length+" ===");
+            for(const b of bots) console.log("  -> "+b.path+" | "+(b.ua||""));
+            if(bots.length===0) console.log("  (NENHUM crawler de preview chegou ao Worker ainda)");
+          '
