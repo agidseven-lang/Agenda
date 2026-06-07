@@ -1,0 +1,70 @@
+name: Publicar release Aurora Glass (Desktop 1.0.119 + Android 1.0.108)
+on:
+  push:
+    branches: [ "infra/publish-release-aurora" ]
+permissions:
+  contents: write
+env:
+  DESKTOP_RUN: "27101394646"
+  ANDROID_RUN: "27101549118"
+  DESKTOP_ARTIFACT: "agenda-id-seven-desktop-1.0.119-whatsapp-aurora-premium-card-installer"
+  ANDROID_ARTIFACT: "idseven-nativebeta-1.0.108-beta-whatsapp-aurora-premium-card"
+  TAG: "test/whatsapp-aurora-premium-1.0.119-1.0.108"
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar instalador Desktop (cross-run)
+        uses: actions/download-artifact@v4
+        with: { name: "${{ env.DESKTOP_ARTIFACT }}", path: dl/desktop, run-id: "${{ env.DESKTOP_RUN }}", github-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Baixar APK Android (cross-run)
+        uses: actions/download-artifact@v4
+        with: { name: "${{ env.ANDROID_ARTIFACT }}", path: dl/android, run-id: "${{ env.ANDROID_RUN }}", github-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: SHA-256
+        run: |
+          set -euo pipefail
+          find dl -type f | sort
+          EXE=$(ls dl/desktop/*.exe|head -1); MSI=$(ls dl/desktop/*.msi 2>/dev/null|head -1||true); APK=$(ls dl/android/*.apk|head -1)
+          EXE_SHA=$(sha256sum "$EXE"|cut -d' ' -f1); MSI_SHA=$([ -n "$MSI" ]&&sha256sum "$MSI"|cut -d' ' -f1||echo n/a); APK_SHA=$(sha256sum "$APK"|cut -d' ' -f1)
+          { echo "EXE $(basename "$EXE")  $EXE_SHA"; echo "MSI $([ -n "$MSI" ]&&basename "$MSI"||echo n/a)  $MSI_SHA"; echo "APK $(basename "$APK")  $APK_SHA"; } | tee SHA256SUMS.txt
+          { echo "EXE_NAME=$(basename "$EXE")"; echo "MSI_NAME=$([ -n "$MSI" ]&&basename "$MSI"||echo n/a)"; echo "APK_NAME=$(basename "$APK")"; echo "EXE_SHA=$EXE_SHA"; echo "MSI_SHA=$MSI_SHA"; echo "APK_SHA=$APK_SHA"; } >> "$GITHUB_ENV"
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "Card Aurora Glass — oficial (Desktop 1.0.119 + Android 1.0.108)"
+          prerelease: true
+          body: |
+            **Card premium oficial AURORA GLASS (B-final) em todo o fluxo de envio ao cliente**
+            - Worker **V64.27-aurora-card**: serve o card B-final em `/og/wa-card-v64-26.jpg` (`image/jpeg`, 1200×630); og:image aponta para o card.
+            - Desktop **1.0.119-whatsapp-aurora-premium-card** (run ${{ env.DESKTOP_RUN }}): card B-final **embutido** (`CARD_IMG_B64`, JPEG 1200×630) como fonte da verdade offline; modal "Enviar card premium ao cliente" exibe o novo card; botão primário único **"Preparar envio premium"** (gera/salva imagem real + copia legenda limpa + copia imagem + abre pasta + abre WhatsApp sem `send?text=`). Auto-preview do WhatsApp é só bônus, nunca a entrega principal.
+            - Android **1.0.108-beta-whatsapp-aurora-premium-card** (versionCode 106 · run ${{ env.ANDROID_RUN }}): paridade de versão (o app nativo não participa do envio do card — feature do operador no Desktop/Web).
+            - E2E gate APROVADO (0 falhas), incluindo prova byte-a-byte de que o card embutido no Desktop == o card servido pelo Worker.
+
+            Legenda enviada (limpa, sem URL técnica):
+            ```
+            Olá, [cliente]. 👋
+
+            Seu *cronograma [tipo]* já está disponível para avaliação.
+
+            Toque no link abaixo para revisar e aprovar:
+
+            https://aprovar.agendaidseven.com.br/cliente/cronograma/[TOKEN]
+
+            *Equipe ID Seven*
+            ```
+
+            SHA-256:
+            ```
+            EXE ${{ env.EXE_NAME }}
+                ${{ env.EXE_SHA }}
+            MSI ${{ env.MSI_NAME }}
+                ${{ env.MSI_SHA }}
+            APK ${{ env.APK_NAME }}
+                ${{ env.APK_SHA }}
+            ```
+          files: |
+            dl/desktop/*.exe
+            dl/desktop/*.msi
+            dl/android/*.apk
+            SHA256SUMS.txt
