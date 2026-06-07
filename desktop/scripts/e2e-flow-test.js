@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.21 / Desktop 1.0.113 / Android 1.0.101
+ * Agenda ID Seven · Worker V64.26 / Desktop 1.0.114 / Android 1.0.102
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.101-beta-premium-domain-link-fix';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.102-beta-cta-toque-no-link';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.21 · Desktop 1.0.113 · Android 1.0.101-beta');
+console.log(' Worker V64.26 · Desktop 1.0.114 · Android 1.0.102-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -265,7 +265,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.21-client-link-canonical-origin', /V64\.21-client-link-canonical-origin/.test(W));
+check('W1', 'Worker é V64.26-cta-toque-no-link', /V64\.26-cta-toque-no-link/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
 const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
@@ -273,14 +273,14 @@ check('W_CAP1', 'Portal lê a legenda de c.legenda (HTML inicial + /state) — 2
 check('W_CAP2', 'Precedência de legenda inclui ov.legenda E c.legenda', /typeof ov\.legenda === "string"\) \? ov\.legenda : \(typeof c\.legenda === "string"/.test(W));
 check('W_CAP3', '/state devolve campo JSON "legenda" e o card tem data-field="legenda"', /legenda: \(legRaw/.test(W) && /data-field="legenda"/.test(W));
 // ===== PREVIEW PREMIUM do link (V64.20): card grande clicável no WhatsApp =====
-check('W_OG1', 'og:image segue o domínio servido (ogBase) /og/aprovar.png 1200×630', /const ogImg = ogBase \+ "\/og\/aprovar\.png"/.test(W) && /og:image" content="' \+ ogImg \+ '"/.test(W) && /og:image:width" content="1200"/.test(W) && /og:image:height" content="630"/.test(W));
-check('W_OG2', 'Rota GET /og/aprovar.png serve o PNG embutido (ogBannerResponse + OG_BANNER_B64)', /url\.pathname === "\/og\/aprovar\.png"/.test(W) && /function ogBannerResponse\(\)/.test(W) && /const OG_BANNER_B64=/.test(W));
+check('W_OG1', 'og:image usa rota versionada SEM query (OG_IMG_PATH) 1200×630', /const OG_IMG_PATH = "\/og\/aprovar-v64-23\.png"/.test(W) && /const img = base \+ OG_IMG_PATH;/.test(W) && /og:image" content="' \+ img \+ '"/.test(W) && /og:image:width" content="1200"/.test(W) && /og:image:height" content="630"/.test(W));
+check('W_OG2', 'Rotas de imagem: PNG /og/aprovar(-vNN).png + JPEG canário (ogBannerResponse/jpgBannerResponse + B64)', /aprovar\(-v\[0-9/.test(W) && /function ogBannerResponse\(\)/.test(W) && /const OG_BANNER_B64=/.test(W) && /function jpgBannerResponse/.test(W) && /const OG_JPG_B64=/.test(W));
 check('W_OG3', 'og:title de AÇÃO "Aprovar cronograma — <cliente>"', /Aprovar cronograma — " \+ \(task\.client/.test(W));
 check('W_OG4', 'twitter:card summary_large_image (cartão GRANDE)', /name="twitter:card" content="summary_large_image"/.test(W));
 check('W_OG5', '<title>/og:title premium "Aprovação de cronograma"', /· Aprovação de cronograma<\/title>/.test(W));
 // V64.21 — canonical/OG seguem o domínio servido (origin-aware): premium quando servido pelo
 // domínio premium; workers.dev só como fallback. Nunca mais hardcoded em workers.dev.
-check('W_OG7', 'og:url/og:image usam ogBase (origin-aware; premium primário, workers.dev fallback)', /const ogBase = \(typeof origin === "string" && \/\^https:/.test(W) && /const publicUrl = ogBase \+ "\/cliente\/cronograma\/"/.test(W) && /idseven-push\.agidseven\.workers\.dev"/.test(W));
+check('W_OG7', 'OG origin-aware: ogClientBase + ogClientMeta no renderClientHtml (premium primário)', /function ogClientBase\(origin\)/.test(W) && /aprovar\.agendaidseven\.com\.br/.test(W) && /ogClientMeta\(origin, ogTitleRaw, ogDescRaw, "\/cliente\/cronograma\/" \+ token\)/.test(W));
 check('W_OG8', 'render recebe origin (handleClientCronogramaView→renderClientHtml(task,token,env,origin))', /renderClientHtml\(task, token, env, origin\)/.test(W) && /function renderClientHtml\(task, token, env, origin\)/.test(W));
 // Prova FORTE: o base64 embutido decodifica para um PNG real 1200×630.
 check('W_OG6', 'Banner embutido é um PNG VÁLIDO 1200×630', (() => {
@@ -307,7 +307,7 @@ check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaS
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.113', /"version":\s*"1\.0\.113"/.test(DP));
+check('D1', 'package.json versão 1.0.114', /"version":\s*"1\.0\.114"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -318,11 +318,11 @@ check('D_ICON2', 'tabIcon mapeia designers -> image', /designers:'image'/.test(D
 // CORREÇÃO 1: mensagem WhatsApp PREMIUM (assinatura + CTA; não é link cru).
 const msgFn = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [''])[0];
 check('D2', 'WhatsApp premium: assinatura "Equipe ID Seven"', /Equipe ID Seven/.test(msgFn));
-check('D3', 'WhatsApp premium: CTA de revisar/aprovar/ajustes', /aprovar ou solicitar ajustes|revisar os temas/.test(msgFn));
+check('D3', 'WhatsApp: CTA "Toque no cartão abaixo para revisar e aprovar."', /Toque no cartão abaixo para revisar e aprovar\./.test(msgFn));
 check('D4', 'WhatsApp premium: saudação com nome do cliente', /Olá, '\+nome/.test(msgFn));
-check('D_MSG1', 'WhatsApp premium: "área de aprovação" + "link seguro"', /área de aprovação pelo link seguro/.test(msgFn));
-check('D_MSG2', 'WhatsApp premium: "primeira etapa" + "próxima etapa de produção"', /A primeira etapa/.test(msgFn) && /próxima etapa de produção/.test(msgFn));
-check('D_MSG3', 'WhatsApp premium: link seguro 🔒 + assinatura em negrito *Equipe ID Seven*', /🔒 Acesse a sua área de aprovação/.test(msgFn) && /\*Equipe ID Seven\*/.test(msgFn));
+check('D_MSG1', 'WhatsApp: orientação principal = tocar no cartão', /Toque no cartão abaixo para revisar e aprovar\./.test(msgFn));
+check('D_MSG2', 'WhatsApp: "A primeira etapa" presente', /A primeira etapa/.test(msgFn));
+check('D_MSG3', 'WhatsApp: URL (p/ o card) + assinatura *Equipe ID Seven*', /\+\s*url\s*\+/.test(msgFn) && /\*Equipe ID Seven\*/.test(msgFn));
 // CORREÇÃO 4: upload de Feed/Story não pula para o 1º post (preserva scroll da lista).
 check('D_UPLOAD', 'Produção preserva o scroll ao anexar arte (_prodKeepScroll + restore)', /function _prodKeepScroll\(\)/.test(DH) && /_prodKeepScroll\(\);renderProductionModal\(\)/.test(DH) && /\.pr-list'\);if\(_pl&&state\._prodScroll\)/.test(DH));
 // ===== REGRA FINAL (teste real): CHIPS SOMENTE dentro do Kanban; NUNCA no hub "Quadros". =====
@@ -357,12 +357,12 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.113', /Desktop 1\.0\.113/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.114', /Desktop 1\.0\.114/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.113 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.113/.test(DH) && /<title>ID Seven · Desktop 1\.0\.113/.test(DH) && /id="wpbadge">Desktop 1\.0\.113/.test(DH));
-check('D22', 'Login espelha o APK 1.0.101-beta-premium-domain-link-fix', /espelha o APK <b>1\.0\.101-beta-premium-domain-link-fix/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.113'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.114 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.114/.test(DH) && /<title>ID Seven · Desktop 1\.0\.114/.test(DH) && /id="wpbadge">Desktop 1\.0\.114/.test(DH));
+check('D22', 'Login espelha o APK 1.0.102-beta-cta-toque-no-link', /espelha o APK <b>1\.0\.102-beta-cta-toque-no-link/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.114'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
 // DOMÍNIO PREMIUM do link do cliente (aprovar.agendaidseven.com.br); API interna fica em workers.dev.
@@ -377,8 +377,8 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.101-beta-premium-domain-link-fix', /versionName\s+"1\.0\.101-beta-premium-domain-link-fix"/.test(GRADLE));
-check('N2', 'versionCode >= 99 (acima do 98 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 99; })());
+check('N1', 'versionName 1.0.102-beta-cta-toque-no-link', /versionName\s+"1\.0\.102-beta-cta-toque-no-link"/.test(GRADLE));
+check('N2', 'versionCode >= 100 (acima do 99 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 100; })());
 check('N_PARITY', 'Android = bump de paridade: endpoint interno workers.dev intacto, SEM link de cliente', /idseven-push\.agidseven\.workers\.dev\/notify-assignee/.test(readAndroid(AND + 'core/PushNotify.kt')) && !/cliente\/cronograma/.test(readAndroid(AND + 'core/PushNotify.kt')));
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
@@ -459,7 +459,7 @@ console.log(`  ${C.d}NB${C.x} itens 7–13 (HTTP ao vivo c/ token real) provados
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.21 / Desktop 1.0.113 / Android 1.0.101-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.26 / Desktop 1.0.114 / Android 1.0.102-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
