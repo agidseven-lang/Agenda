@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.20 / Desktop 1.0.112 / Android 1.0.100
+ * Agenda ID Seven · Worker V64.21 / Desktop 1.0.113 / Android 1.0.101
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.100-beta-premium-client-domain';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.101-beta-premium-domain-link-fix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.20 · Desktop 1.0.112 · Android 1.0.100-beta');
+console.log(' Worker V64.21 · Desktop 1.0.113 · Android 1.0.101-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -265,7 +265,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.20-client-link-preview-premium', /V64\.20-client-link-preview-premium/.test(W));
+check('W1', 'Worker é V64.21-client-link-canonical-origin', /V64\.21-client-link-canonical-origin/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
 const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
@@ -273,11 +273,15 @@ check('W_CAP1', 'Portal lê a legenda de c.legenda (HTML inicial + /state) — 2
 check('W_CAP2', 'Precedência de legenda inclui ov.legenda E c.legenda', /typeof ov\.legenda === "string"\) \? ov\.legenda : \(typeof c\.legenda === "string"/.test(W));
 check('W_CAP3', '/state devolve campo JSON "legenda" e o card tem data-field="legenda"', /legenda: \(legRaw/.test(W) && /data-field="legenda"/.test(W));
 // ===== PREVIEW PREMIUM do link (V64.20): card grande clicável no WhatsApp =====
-check('W_OG1', 'og:image aponta para o banner /og/aprovar.png (1200×630)', /const ogImg = "https:\/\/idseven-push\.agidseven\.workers\.dev\/og\/aprovar\.png"/.test(W) && /og:image" content="' \+ ogImg \+ '"/.test(W) && /og:image:width" content="1200"/.test(W) && /og:image:height" content="630"/.test(W));
+check('W_OG1', 'og:image segue o domínio servido (ogBase) /og/aprovar.png 1200×630', /const ogImg = ogBase \+ "\/og\/aprovar\.png"/.test(W) && /og:image" content="' \+ ogImg \+ '"/.test(W) && /og:image:width" content="1200"/.test(W) && /og:image:height" content="630"/.test(W));
 check('W_OG2', 'Rota GET /og/aprovar.png serve o PNG embutido (ogBannerResponse + OG_BANNER_B64)', /url\.pathname === "\/og\/aprovar\.png"/.test(W) && /function ogBannerResponse\(\)/.test(W) && /const OG_BANNER_B64=/.test(W));
 check('W_OG3', 'og:title de AÇÃO "Aprovar cronograma — <cliente>"', /Aprovar cronograma — " \+ \(task\.client/.test(W));
 check('W_OG4', 'twitter:card summary_large_image (cartão GRANDE)', /name="twitter:card" content="summary_large_image"/.test(W));
 check('W_OG5', '<title>/og:title premium "Aprovação de cronograma"', /· Aprovação de cronograma<\/title>/.test(W));
+// V64.21 — canonical/OG seguem o domínio servido (origin-aware): premium quando servido pelo
+// domínio premium; workers.dev só como fallback. Nunca mais hardcoded em workers.dev.
+check('W_OG7', 'og:url/og:image usam ogBase (origin-aware; premium primário, workers.dev fallback)', /const ogBase = \(typeof origin === "string" && \/\^https:/.test(W) && /const publicUrl = ogBase \+ "\/cliente\/cronograma\/"/.test(W) && /idseven-push\.agidseven\.workers\.dev"/.test(W));
+check('W_OG8', 'render recebe origin (handleClientCronogramaView→renderClientHtml(task,token,env,origin))', /renderClientHtml\(task, token, env, origin\)/.test(W) && /function renderClientHtml\(task, token, env, origin\)/.test(W));
 // Prova FORTE: o base64 embutido decodifica para um PNG real 1200×630.
 check('W_OG6', 'Banner embutido é um PNG VÁLIDO 1200×630', (() => {
   const m = W.match(/const OG_BANNER_B64="([A-Za-z0-9+/=]+)"/); if (!m) return false;
@@ -303,7 +307,7 @@ check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaS
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.112', /"version":\s*"1\.0\.112"/.test(DP));
+check('D1', 'package.json versão 1.0.113', /"version":\s*"1\.0\.113"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -353,16 +357,16 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.112', /Desktop 1\.0\.112/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.113', /Desktop 1\.0\.113/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.112 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.112/.test(DH) && /<title>ID Seven · Desktop 1\.0\.112/.test(DH) && /id="wpbadge">Desktop 1\.0\.112/.test(DH));
-check('D22', 'Login espelha o APK 1.0.100-beta-premium-client-domain', /espelha o APK <b>1\.0\.100-beta-premium-client-domain/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.112'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.113 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.113/.test(DH) && /<title>ID Seven · Desktop 1\.0\.113/.test(DH) && /id="wpbadge">Desktop 1\.0\.113/.test(DH));
+check('D22', 'Login espelha o APK 1.0.101-beta-premium-domain-link-fix', /espelha o APK <b>1\.0\.101-beta-premium-domain-link-fix/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.113'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
 // DOMÍNIO PREMIUM do link do cliente (aprovar.agendaidseven.com.br); API interna fica em workers.dev.
-check('D_DOMAIN1', 'Link público do cliente usa aprovar.agendaidseven.com.br', /const CLIENT_LINK_BASE='https:\/\/aprovar\.agendaidseven\.com\.br'/.test(DH) && /buildPublicClientUrl\(token\)\{return CLIENT_LINK_BASE\+/.test(DH));
+check('D_DOMAIN1', 'Link público do cliente usa aprovar.agendaidseven.com.br', /const CLIENT_LINK_BASE='https:\/\/aprovar\.agendaidseven\.com\.br'/.test(DH) && /return CLIENT_LINK_BASE\+'\/cliente\/cronograma\/'\+t;/.test(DH));
 check('D_DOMAIN2', 'API interna (token/imagekit/notify) permanece em workers.dev (fallback vivo)', /const CLIENT_REVIEW_BASE='https:\/\/idseven-push\.agidseven\.workers\.dev'/.test(DH));
 // ===== SYNC DO DESIGNER (move grava designerFlowStatus) — Desktop =====
 const moveFn = (DH.match(/async function moveStatus\(taskId,newStatus\)\{[\s\S]*?\n\}/) || [''])[0];
@@ -373,8 +377,9 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.100-beta-premium-client-domain', /versionName\s+"1\.0\.100-beta-premium-client-domain"/.test(GRADLE));
-check('N2', 'versionCode >= 98', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 98; })());
+check('N1', 'versionName 1.0.101-beta-premium-domain-link-fix', /versionName\s+"1\.0\.101-beta-premium-domain-link-fix"/.test(GRADLE));
+check('N2', 'versionCode >= 99 (acima do 98 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 99; })());
+check('N_PARITY', 'Android = bump de paridade: endpoint interno workers.dev intacto, SEM link de cliente', /idseven-push\.agidseven\.workers\.dev\/notify-assignee/.test(readAndroid(AND + 'core/PushNotify.kt')) && !/cliente\/cronograma/.test(readAndroid(AND + 'core/PushNotify.kt')));
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
 check('N_ICON', 'TasksTopTabs: ícone do Designers = Icons.Outlined.Image', /"designers"\s*->\s*Icons\.Outlined\.Image/.test(KT_TABS));
@@ -404,11 +409,57 @@ check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerCol3)',
 check('N9', 'TaskVisibility mantém isFullyComplete (fonte única de conclusão)', /fun\s+isFullyComplete/.test(KT_VIS));
 check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|GridView|horizontalScroll/.test(KT_TABS));
 
+/* ===================== PARTE C — Link público premium do Desktop (token obrigatório) =====================
+   As 15 validações exigidas: o link do cliente SEMPRE usa o domínio premium e SEMPRE carrega
+   um token real; nunca termina em /cronograma/; nunca usa workers.dev; a mensagem do WhatsApp
+   leva o link COMPLETO. Aqui EXECUTAMOS as funções reais do Desktop (não é só regex). */
+console.log(`${C.b}\n[PARTE C] Link público premium do Desktop — token obrigatório (executa as funções reais)${C.x}`);
+let LINK = null;
+try {
+  const base = (DH.match(/const CLIENT_LINK_BASE='([^']+)'/) || [])[1] || '';
+  const review = (DH.match(/const CLIENT_REVIEW_BASE='([^']+)'/) || [])[1] || '';
+  const fnUrl = (DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/) || [''])[0];
+  const fnMsg = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [''])[0];
+  const code = `
+    const CLIENT_LINK_BASE=${JSON.stringify(base)};
+    const CLIENT_REVIEW_BASE=${JSON.stringify(review)};
+    ${fnUrl}
+    ${fnMsg}
+    return { CLIENT_LINK_BASE, CLIENT_REVIEW_BASE, buildPublicClientUrl, buildClientMessage };
+  `;
+  LINK = new Function(code)();
+} catch (e) {
+  check('LINK0', 'Funções de link do Desktop avaliáveis (CLIENT_LINK_BASE + buildPublicClientUrl + buildClientMessage)', false);
+}
+if (LINK) {
+  const TOKEN = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6'; // 48 hex (formato genReviewToken)
+  let url = '', threwEmpty = false, threwNull = false;
+  try { url = LINK.buildPublicClientUrl(TOKEN); } catch (e) { url = 'THREW:' + e.message; }
+  try { LINK.buildPublicClientUrl(''); } catch (e) { threwEmpty = true; }
+  try { LINK.buildPublicClientUrl(null); } catch (e) { threwNull = true; }
+  const msg = (() => { try { return LINK.buildClientMessage({ client: 'Hospital Visão', type: 'semanal', title: 'Cronograma X', token: TOKEN }); } catch (e) { return 'THREW:' + e.message; } })();
+
+  check('LINK1', '(1) Desktop gera link com domínio premium aprovar.agendaidseven.com.br', LINK.CLIENT_LINK_BASE === 'https://aprovar.agendaidseven.com.br' && url.startsWith('https://aprovar.agendaidseven.com.br/cliente/cronograma/'));
+  check('LINK2', '(3) O link contém token real depois de /cronograma/', /\/cliente\/cronograma\/[A-Za-z0-9_-]{8,}$/.test(url) && url.endsWith(TOKEN));
+  check('LINK3', '(4) O token não é vazio', url.split('/cliente/cronograma/')[1] === TOKEN && TOKEN.length >= 8);
+  check('LINK4', '(5) O link NÃO termina em /cronograma/', !/\/cliente\/cronograma\/?$/.test(url));
+  check('LINK5', '(6) O link NÃO usa workers.dev como domínio principal', !/workers\.dev/.test(url));
+  check('LINK6', 'Hardening: token vazio LANÇA (link nunca sai sem token)', threwEmpty === true);
+  check('LINK7', 'Hardening: token nulo LANÇA (link nunca sai sem token)', threwNull === true);
+  check('LINK8', '(14) Mensagem do WhatsApp usa o link COMPLETO com token', msg.indexOf(url) > -1 && msg.indexOf(TOKEN) > -1);
+  check('LINK9', '(15) Não há link incompleto no texto copiado (URL completa premium + token)', msg.indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/' + TOKEN) > -1 && !/workers\.dev/.test(msg) && !/cronograma\/(\s|\n|$)/.test(msg));
+  check('LINK10', 'API interna do app permanece em workers.dev (fallback vivo; não é o link do cliente)', LINK.CLIENT_REVIEW_BASE === 'https://idseven-push.agidseven.workers.dev');
+}
+// Itens 7–13 (HTTP AO VIVO: portal 200; og:title/og:description/og:image premium; /og/aprovar.png
+// image/png 1200×630; fallback workers.dev) são validados COM TOKEN REAL no workflow de CI
+// `validate-client-card.yml` (rede aberta) — provado verde antes do build.
+console.log(`  ${C.d}NB${C.x} itens 7–13 (HTTP ao vivo c/ token real) provados no CI validate-client-card.yml`);
+
 /* ===================== VEREDITO ===================== */
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.20 / Desktop 1.0.112 / Android 1.0.100-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.21 / Desktop 1.0.113 / Android 1.0.101-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
