@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.20-client-link-preview-premium]
+   ID Seven — Cloudflare Worker  [V64.21-client-link-canonical-origin]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -86,7 +86,7 @@ export default {
     {
       const cronoMatch = url.pathname.match(/^\/cliente\/cronograma\/([A-Za-z0-9_-]{4,128})\/?$/);
       if (cronoMatch && request.method === "GET") {
-        return handleClientCronogramaView(cronoMatch[1], env);
+        return handleClientCronogramaView(cronoMatch[1], env, url.origin);
       }
       const actionMatch = url.pathname.match(/^\/cliente\/cronograma\/([A-Za-z0-9_-]{4,128})\/action\/?$/);
       if (actionMatch && request.method === "POST") {
@@ -103,7 +103,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.20-client-link-preview-premium" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.21-client-link-canonical-origin" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -899,7 +899,7 @@ async function hmacSha1Hex(key, msg) {
    Aditivo: o POST grava clientLastAction = {type, at, note} (CAMPO NOVO), além de
    appendar a clientActions[] via array-merge — não toca cronWeeks, cs, lg, lgState, etc. */
 
-async function handleClientCronogramaView(token, env) {
+async function handleClientCronogramaView(token, env, origin) {
   try {
     if (!token) return htmlResponse(renderClientErrorHtml("Link inválido", "O link não contém um token válido."), 400);
     let accessToken;
@@ -928,7 +928,7 @@ async function handleClientCronogramaView(token, env) {
     // confirmação INTERMEDIÁRIA (não a página de ações aberta como se nada tivesse ocorrido).
     const acked = clientAckedPhase(task);
     if (acked) return htmlResponse(renderClientPhaseAckHtml(task, token, acked), 200);
-    return htmlResponse(renderClientHtml(task, token, env), 200);
+    return htmlResponse(renderClientHtml(task, token, env, origin), 200);
   } catch (e) {
     // Blindagem: qualquer erro inesperado de render/query → HTML amigável (NUNCA tela branca/JSON/corpo vazio).
     console.error("[CLIENT-VIEW] erro inesperado:", e && (e.stack || e.message));
@@ -1652,7 +1652,7 @@ function pollState(){fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/st
 setInterval(pollState,6000);
 `;
 
-function renderClientHtml(task, token, env) {
+function renderClientHtml(task, token, env, origin) {
   const cliente = escapeHtml(task.client || "Cliente");
   const titulo = escapeHtml(task.title || "Cronograma");
   const freq = escapeHtml(frequencyLabel(task));
@@ -1770,7 +1770,13 @@ function renderClientHtml(task, token, env) {
   }
 
   const pct = total ? Math.round(doneCount / total * 100) : 0;
-  const publicUrl = "https://idseven-push.agidseven.workers.dev/cliente/cronograma/" + escapeHtml(token);
+  // V64.21 — canonical/OG seguem o DOMÍNIO em que a página foi servida (origin). Quando
+  // aberto pelo domínio premium aprovar.agendaidseven.com.br, o card usa o premium; o
+  // workers.dev continua funcionando como FALLBACK (sem depender de host hardcoded).
+  const ogBase = (typeof origin === "string" && /^https:\/\//.test(origin))
+    ? origin
+    : "https://idseven-push.agidseven.workers.dev";
+  const publicUrl = ogBase + "/cliente/cronograma/" + escapeHtml(token);
   // V64.20 — PREVIEW PREMIUM do link (card clicável no WhatsApp = o "botão" possível no
   // compartilhamento por link). Título de ação + descrição + IMAGEM = LOGO da ID Seven (a pedido).
   // (Botão NATIVO no balão exige WhatsApp Business API/templates — não existe no link comum.)
@@ -1778,7 +1784,7 @@ function renderClientHtml(task, token, env) {
   const ogDescRaw = "Sua área de aprovação está pronta. Toque para revisar os temas, aprovar o que estiver correto e solicitar ajustes. Link seguro · Agenda ID Seven.";
   const ogTitle = escapeHtml(ogTitleRaw);
   const ogDesc = escapeHtml(ogDescRaw);
-  const ogImg = "https://idseven-push.agidseven.workers.dev/og/aprovar.png";  // banner premium 1200×630
+  const ogImg = ogBase + "/og/aprovar.png";  // banner premium 1200×630 (mesmo domínio da página)
 
   return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
 '<meta charset="utf-8"/>\n' +

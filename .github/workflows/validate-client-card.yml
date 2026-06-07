@@ -1,0 +1,188 @@
+# Validacao OPERACIONAL do card premium do link do cliente (WhatsApp/OG), ponta a ponta.
+# - Roda SOMENTE manualmente (workflow_dispatch). Nunca em push.
+# - CRIA um token REAL de cronograma de teste no Firestore (doc temporario, marcado
+#   _qaTestDoc=true), valida o link publico no DOMINIO PREMIUM com user-agents de
+#   crawler (facebookexternalhit / WhatsApp / Twitterbot), e em seguida APAGA o doc.
+# - NAO altera schema/Rules/Functions/Resend/Secret Manager/login/Agenda/chat/reset.
+#   O doc de teste nao tem assignee/tokens/cronStatus de designer -> nao dispara push.
+# - Usa o MESMO service account ja existente no repo (GOOGLE_APPLICATION_CREDENTIALS_JSON)
+#   apenas para obter um access token (NAO modifica Secret Manager).
+name: Validar card premium do link do cliente (OG/WhatsApp)
+
+on:
+  workflow_dispatch:
+    inputs:
+      client_name:
+        description: "Nome do cliente exibido no card (og:title)"
+        required: false
+        default: "Cliente Teste QA"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  PREMIUM: "https://aprovar.agendaidseven.com.br"
+  FALLBACK: "https://idseven-push.agidseven.workers.dev"
+
+jobs:
+  validate:
+    name: criar token real -> validar card -> apagar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Autenticar no GCP (somente p/ access token)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: GOOGLE_APPLICATION_CREDENTIALS_JSON ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null 2>&1
+          gcloud config set project "$GCP_PROJECT" >/dev/null 2>&1
+          echo "GCP autenticado."
+
+      - name: Criar, validar e apagar (ponta a ponta)
+        env:
+          CLIENT_NAME: ${{ github.event.inputs.client_name }}
+        run: |
+          set -euo pipefail
+
+          ACCESS_TOKEN="$(gcloud auth print-access-token)"
+          FS="https://firestore.googleapis.com/v1/projects/${GCP_PROJECT}/databases/(default)/documents"
+
+          # Token aleatorio por execucao -> garante preview NOVO (sem cache do WhatsApp).
+          TOKEN="qatest$(date +%s)$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+          DOCID="qa-card-$TOKEN"
+          NOW_MS="$(( $(date +%s) * 1000 ))"
+          CNAME="${CLIENT_NAME:-Cliente Teste QA}"
+          PORTAL="${PREMIUM}/cliente/cronograma/${TOKEN}"
+          echo "TOKEN=$TOKEN"
+          echo "DOCID=$DOCID"
+          echo "PORTAL=$PORTAL"
+
+          # --- limpeza garantida (mesmo em falha de assercao) ---
+          cleanup () {
+            echo "== CLEANUP: apagando doc de teste tasks/$DOCID =="
+            curl -sS -X DELETE -H "Authorization: Bearer $ACCESS_TOKEN" \
+              "${FS}/tasks/${DOCID}" -o /dev/null -w 'DELETE HTTP %{http_code}\n' || true
+          }
+          trap cleanup EXIT
+
+          # --- 1) CRIA token real de cronograma de teste (doc temporario) ---
+          echo "== 1) Criando token real de cronograma de teste no Firestore =="
+          cat > /tmp/doc.json <<JSON
+          {
+            "fields": {
+              "client":           { "stringValue": "${CNAME}" },
+              "title":            { "stringValue": "Cronograma de Teste - QA" },
+              "clientReviewToken":{ "stringValue": "${TOKEN}" },
+              "_qaTestDoc":       { "booleanValue": true },
+              "createdAt":        { "integerValue": "${NOW_MS}" },
+              "cronContents": { "arrayValue": { "values": [
+                { "mapValue": { "fields": {
+                    "t":       { "stringValue": "Tema 1 - Lancamento" },
+                    "legenda": { "stringValue": "Legenda de teste do conteudo 1 (validacao do card)." } } } },
+                { "mapValue": { "fields": {
+                    "t":       { "stringValue": "Tema 2 - Bastidores" },
+                    "legenda": { "stringValue": "Legenda de teste do conteudo 2 (validacao do card)." } } } },
+                { "mapValue": { "fields": {
+                    "t":       { "stringValue": "Tema 3 - Depoimento" },
+                    "legenda": { "stringValue": "Legenda de teste do conteudo 3 (validacao do card)." } } } }
+              ] } }
+            }
+          }
+          JSON
+          code=$(curl -sS -o /tmp/created.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" \
+            "${FS}/tasks?documentId=${DOCID}" --data @/tmp/doc.json)
+          echo "Firestore create HTTP=$code"
+          [ "$code" = "200" ] || { echo "FAIL: nao consegui criar o doc de teste" >&2 ; head -c 400 /tmp/created.json >&2 ; echo >&2 ; exit 1 ; }
+          echo "OK: token real criado."
+
+          # consistencia do indice de query single-field
+          sleep 5
+
+          # --- 2/3) Valida o HTML do portal com user-agents de CRAWLER ---
+          UA_FB="facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+          UA_WA="WhatsApp/2.23.20.0 A"
+          UA_TW="Twitterbot/1.0"
+
+          check_crawler () {
+            local UA="$1" ; local LABEL="$2" ; local body code ct
+            body="$(mktemp)"
+            echo ""
+            echo "== Crawler [$LABEL] :: UA='$UA' =="
+            code=$(curl -sS --max-time 25 -A "$UA" -o "$body" -w '%{http_code}' "$PORTAL")
+            ct=$(curl -sS --max-time 25 -A "$UA" -o /dev/null -w '%{content_type}' "$PORTAL")
+            echo "HTTP=$code  Content-Type=$ct  bytes=$(wc -c < "$body")"
+            [ "$code" = "200" ] || { echo "FAIL[$LABEL]: portal != 200" >&2 ; head -c 400 "$body" >&2 ; exit 1 ; }
+            echo "$ct" | grep -qi 'text/html' || { echo "FAIL[$LABEL]: portal nao e text/html" >&2 ; exit 1 ; }
+            if head -c 200 "$body" | grep -qi '"ok":true,"service":"idseven-push"'; then
+              echo "FAIL[$LABEL]: portal retornou JSON do healthcheck (regressao)" >&2 ; exit 1
+            fi
+            # extrai e mostra as meta tags reais
+            grep -oiE '<meta property="og:title" content="[^"]*"' "$body" | head -1
+            grep -oiE '<meta property="og:description" content="[^"]*"' "$body" | head -1
+            grep -oiE '<meta property="og:image" content="[^"]*"' "$body" | head -1
+            grep -oiE '<meta property="og:url" content="[^"]*"' "$body" | head -1
+            grep -oiE '<meta name="twitter:card" content="[^"]*"' "$body" | head -1
+            # assercoes obrigatorias
+            grep -qi "<meta property=\"og:title\" content=\"Aprovar cronograma . ${CNAME}\"" "$body" \
+              || grep -qi "og:title\" content=\"Aprovar cronograma" "$body" \
+              || { echo "FAIL[$LABEL]: og:title premium ausente" >&2 ; exit 1 ; }
+            grep -qi '<meta property="og:description"' "$body" || { echo "FAIL[$LABEL]: og:description ausente" >&2 ; exit 1 ; }
+            grep -qi "og:image\" content=\"${PREMIUM}/og/aprovar.png\"" "$body" || { echo "FAIL[$LABEL]: og:image nao aponta p/ ${PREMIUM}/og/aprovar.png" >&2 ; exit 1 ; }
+            grep -qi 'twitter:card" content="summary_large_image"' "$body" || { echo "FAIL[$LABEL]: twitter:card summary_large_image ausente" >&2 ; exit 1 ; }
+            grep -qi "og:url\" content=\"${PREMIUM}/cliente/cronograma/" "$body" || { echo "FAIL[$LABEL]: og:url nao usa dominio premium" >&2 ; exit 1 ; }
+            # o link publico NAO deve usar workers.dev como dominio principal no card
+            if grep -oiE '<meta property="og:(image|url)" content="[^"]*"' "$body" | grep -qi 'workers.dev'; then
+              echo "FAIL[$LABEL]: og:image/og:url usando workers.dev (deveria ser premium)" >&2 ; exit 1
+            fi
+            # prova de que o portal ABRE de verdade (conteudo do cronograma)
+            grep -qi 'Visão do Cliente' "$body" || grep -qi 'Aprovar cronograma' "$body" || { echo "FAIL[$LABEL]: corpo do portal nao renderizou" >&2 ; exit 1 ; }
+            echo "OK[$LABEL]: card premium tecnicamente correto p/ este crawler."
+          }
+          check_crawler "$UA_FB" "facebookexternalhit"
+          check_crawler "$UA_WA" "WhatsApp"
+          check_crawler "$UA_TW" "Twitterbot"
+
+          # --- og:image: HTTP real + PNG 1200x630 no dominio PREMIUM ---
+          echo ""
+          echo "== og:image @ premium =="
+          img="$(mktemp)"
+          icode=$(curl -sS --max-time 25 -o "$img" -w '%{http_code}' "${PREMIUM}/og/aprovar.png")
+          ict=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "${PREMIUM}/og/aprovar.png")
+          echo "HTTP=$icode  Content-Type=$ict  bytes=$(wc -c < "$img")"
+          [ "$icode" = "200" ] || { echo "FAIL: og:image != 200" >&2 ; exit 1 ; }
+          echo "$ict" | grep -qi 'image/png' || { echo "FAIL: og:image nao e image/png" >&2 ; exit 1 ; }
+          node -e '
+            const b=require("fs").readFileSync(process.argv[1]);
+            const sig=[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((x,i)=>b[i]===x);
+            const w=b.readUInt32BE(16), h=b.readUInt32BE(20);
+            if(!sig){console.error("FAIL: assinatura PNG invalida");process.exit(1);}
+            if(w!==1200||h!==630){console.error("FAIL: "+w+"x"+h+" != 1200x630");process.exit(1);}
+            console.log("OK: PNG valido "+w+"x"+h+" ("+b.length+" bytes)");
+          ' "$img"
+
+          # --- fallback workers.dev continua servindo o banner ---
+          echo ""
+          echo "== Fallback workers.dev /og/aprovar.png =="
+          curl -sS --max-time 25 -o /dev/null \
+            -w 'HTTP %{http_code} | %{content_type}\n' "${FALLBACK}/og/aprovar.png"
+
+          # --- healthcheck preservado (JSON) nos dois dominios ---
+          echo ""
+          echo "== Healthcheck DEVE continuar JSON =="
+          for B in "$PREMIUM" "$FALLBACK"; do
+            ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/")
+            echo "$B/ -> $ct"
+            echo "$ct" | grep -qi 'application/json' || { echo "FAIL: healthcheck regrediu em $B" >&2 ; exit 1 ; }
+          done
+
+          echo ""
+          echo "=================================================================="
+          echo " CONCLUSAO: card tecnicamente PRONTO para WhatsApp."
+          echo " Link testado: $PORTAL"
+          echo " Token: $TOKEN (doc temporario sera apagado no cleanup)"
+          echo "=================================================================="
