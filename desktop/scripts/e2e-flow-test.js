@@ -265,7 +265,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.27-aurora-card', /V64\.27-aurora-card/.test(W));
+check('W1', 'Worker é V64.28-wa-cloud-api', /V64\.28-wa-cloud-api/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
 const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
@@ -520,7 +520,7 @@ check('MEDIA_AB3', 'O card embutido no Desktop é o MESMO byte-a-byte que o Work
   return !!(dm && wm && dm[1] === wm[1]);
 })());
 check('MEDIA_AB4', '_wireGuidedSend usa o card embutido (atob(CARD_IMG_B64) → data:image/jpeg) com fetch(CARD_IMG_URL) só como fallback', /atob\(CARD_IMG_B64\)/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
-check('MEDIA_D2', 'Modal guiado: título "Enviar card premium ao cliente" + subtítulo (imagem real + link na legenda)', /Enviar card premium ao cliente/.test(DH) && /A imagem premium será enviada como mídia real\. O link de aprovação seguirá na legenda\./.test(DH));
+check('MEDIA_D2', 'Modal: título "Enviar card premium ao cliente" + subtítulo do envio automático (Cloud API)', /Enviar card premium ao cliente/.test(DH) && /Envio automático: o sistema manda a imagem do card \+ legenda direto pelo WhatsApp \(Cloud API\)/.test(DH));
 check('MEDIA_D5', 'Nome de arquivo claro agenda-id-seven-card-[cliente]-[token].jpg', /agenda-id-seven-card-'\+/.test(DH));
 // ===== 1.0.120 — ASSISTENTE GUIADO EM 3 ETAPAS (à prova de erro) =====
 check('GUIDED_1', 'Modal tem 3 ETAPAS (step1/step2/step3) com botões btnStep1/2/3', /id="step1"/.test(DH) && /id="step2"/.test(DH) && /id="step3"/.test(DH) && /id="btnStep1"/.test(DH) && /id="btnStep2"/.test(DH) && /id="btnStep3"/.test(DH));
@@ -547,11 +547,54 @@ check('MEDIA_IPC3', 'preload: expõe saveCardImage / copyCardImage / showInFolde
 // Token/link continuam válidos (reuso da PARTE C)
 check('MEDIA_LINK', 'Caption leva o link COMPLETO com token (premium, sem workers.dev)', LINK ? (LINK.buildClientMessage({client:'X',type:'semanal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'}).indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1) : false);
 
+/* ===================== PARTE E — ENVIO PREMIUM via WhatsApp Business Cloud API (V64.28 / 1.0.121) =====================
+   Entrega GARANTIDA: server-side, sem operador, sem preview. Token da Meta SÓ em secrets do Worker.
+   NB: o ENVIO REAL (message_id da Meta) só pode ser provado com credenciais reais — é FASE 3, fora do CI.
+   Aqui validamos a ARQUITETURA: rota inerte sem secrets, payload, caption limpa, e o gate do Desktop. */
+console.log(`${C.b}\n[PARTE E] WhatsApp Business Cloud API — rota segura + botão Desktop (arquitetura, sem credencial)${C.x}`);
+// ---- WORKER (rota preparada, inerte sem secrets) ----
+check('WA_W1', 'Worker tem a rota POST /client/send-premium-whatsapp', /url\.pathname === "\/client\/send-premium-whatsapp" && request\.method === "POST"/.test(W) && /function handleSendPremiumWhatsApp\(/.test(W));
+check('WA_W2', 'GATE de configuração: sem secrets → 503 WHATSAPP_CLOUD_API_NOT_CONFIGURED (não finge envio)', /function waConfigStatus\(env\)/.test(W) && /WHATSAPP_ACCESS_TOKEN/.test(W) && /WHATSAPP_PHONE_NUMBER_ID/.test(W) && /"WHATSAPP_CLOUD_API_NOT_CONFIGURED"/.test(W) && /\}, 503, env\)/.test(W));
+check('WA_W3', 'Sucesso SÓ com message_id real da Meta (messages[0].id)', /messages && metaJson\.messages\[0\] && metaJson\.messages\[0\]\.id/.test(W) && /ok: true, message_id: messageId/.test(W));
+check('WA_W4', 'Chama a Graph API da Meta (graph.facebook.com/.../messages) com Bearer do token (server-side)', /graph\.facebook\.com\//.test(W) && /\/messages"/.test(W) && /"Authorization": "Bearer " \+ env\.WHATSAPP_ACCESS_TOKEN/.test(W));
+check('WA_W5', 'Suporta template (produção) E imagem+legenda (janela 24h/teste); imagem = card oficial', /type: "template"/.test(W) && /type: "image"/.test(W) && /image: \{ link: cardUrl/.test(W) && /OG_IMG_PATH/.test(W));
+check('WA_W6', 'Resolve a task pelo token (queryTaskByToken) e valida telefone (E.164)', /queryTaskByToken\(env, accessToken, token\)/.test(W) && /function normalizePhoneE164\(/.test(W));
+check('WA_W7', 'Rota NÃO usa web.whatsapp/send?text/whatsapp:// (é API server-side)', (() => {
+  const fn = (W.match(/async function handleSendPremiumWhatsApp\([\s\S]*?\n\}/) || [''])[0];
+  return fn.length > 0 && fn.indexOf('send?text=') < 0 && fn.indexOf('web.whatsapp') < 0 && fn.indexOf('whatsapp://') < 0;
+})());
+// Executa as funções PURAS reais do Worker (prova de comportamento, sem credencial).
+(function(){
+  const cfgFn=(W.match(/function waConfigStatus\(env\)\s*\{[\s\S]*?\n\}/)||[''])[0];
+  const phFn=(W.match(/function normalizePhoneE164\(raw\)\s*\{[\s\S]*?\n\}/)||[''])[0];
+  const capFn=(W.match(/function buildPremiumCaption\(clientName, tipo, link\)\s*\{[\s\S]*?\n\}/)||[''])[0];
+  let mod=null;
+  try{ mod=new Function(`${cfgFn}\n${phFn}\n${capFn}\nreturn {waConfigStatus,normalizePhoneE164,buildPremiumCaption};`)(); }catch(e){ mod=null; }
+  check('WA_FN1','waConfigStatus: sem secrets → não configurado (lista o que falta)', !!mod && mod.waConfigStatus({}).configured===false && mod.waConfigStatus({}).missing.length===2);
+  check('WA_FN2','waConfigStatus: com os 2 secrets → configurado', !!mod && mod.waConfigStatus({WHATSAPP_ACCESS_TOKEN:'x',WHATSAPP_PHONE_NUMBER_ID:'1'}).configured===true);
+  check('WA_FN3','normalizePhoneE164: limpa máscara e exige 10–15 dígitos', !!mod && mod.normalizePhoneE164('55 (11) 98888-7777')==='5511988887777' && mod.normalizePhoneE164('123')===null);
+  const cap = mod ? mod.buildPremiumCaption('Hospital Visão','quinzenal','https://aprovar.agendaidseven.com.br/cliente/cronograma/TOKEN') : '';
+  check('WA_FN4','buildPremiumCaption: legenda limpa (saudação+assinatura+link), sem URL técnica', /^Olá, Hospital Visão\. /.test(cap) && /\*Equipe ID Seven\*$/.test(cap) && cap.indexOf('send?text=')<0 && cap.indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/TOKEN')>-1);
+})();
+// ---- DESKTOP (botão oficial "Enviar card premium agora") ----
+check('WA_D1', 'Desktop tem PREMIUM_SEND_URL = Worker + /client/send-premium-whatsapp (sem token Meta no client)', /const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE\+'\/client\/send-premium-whatsapp'/.test(DH) && !/WHATSAPP_ACCESS_TOKEN/.test(DH));
+check('WA_D2', 'Botão principal "Enviar card premium agora" + _wireAutoSend', /id="btnSendAuto"/.test(DH) && /Enviar card premium agora/.test(DH) && /function _wireAutoSend\(ctx\)/.test(DH));
+check('WA_D3', 'Chama SÓ a rota segura (fetch PREMIUM_SEND_URL) com payload token/clientName/phone/cronogramaTipo', /fetch\(PREMIUM_SEND_URL,\{method:'POST'/.test(DH) && /token:ctx\.token/.test(DH) && /clientName:ctx\.client/.test(DH) && /phone:phone/.test(DH) && /cronogramaTipo:ctx\.type/.test(DH));
+check('WA_D4', 'Sucesso SÓ com message_id real (data.message_id)', /data&&data\.ok&&data\.message_id/.test(DH));
+check('WA_D5', '503/NOT_CONFIGURED → mensagem clara de configuração (sem fallback WhatsApp Web)', /WHATSAPP_CLOUD_API_NOT_CONFIGURED/.test(DH) && /A integração WhatsApp Cloud API ainda não está configurada\. Configure as credenciais da Meta para habilitar o envio automático do card premium\./.test(DH));
+check('WA_D6', 'Fluxo automático NÃO usa web.whatsapp/send?text/whatsapp:// (corpo executável)', (() => {
+  const fn = (DH.match(/function _wireAutoSend\(ctx\)\{[\s\S]*?\n\}/) || [''])[0].replace(/^\s*\/\/.*$/gm,'');
+  return fn.length > 0 && fn.indexOf('send?text=') < 0 && fn.indexOf('web.whatsapp') < 0 && fn.indexOf('whatsapp://') < 0;
+})());
+check('WA_D7', 'Card Aurora Glass (B-final) segue como mídia oficial planejada (autoCardPreview usa CARD_IMG_B64)', /id="autoCardPreview"/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH));
+check('WA_D8', 'Envio manual rebaixado a TEMPORÁRIO (não definitivo): divisória explícita', /Enquanto a Cloud API não está ativa — envio manual \(temporário\)/.test(DH));
+
 /* ===================== VEREDITO ===================== */
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
-  console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.27-aurora-card / Desktop 1.0.120 / Android 1.0.109-beta${C.x}`);
+  console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes) — arquitetura validada.`);
+  console.log(`${C.y} BUILD AINDA BLOQUEADO: o envio premium oficial é via WhatsApp Business Cloud API.`);
+  console.log(`${C.y} NÃO gerar Desktop/Android até FASE 3 = envio REAL com message_id da Meta (precisa de secrets reais).${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {

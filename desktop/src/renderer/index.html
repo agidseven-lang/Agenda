@@ -803,6 +803,16 @@
   .gcs-status.ok{color:#34D399}
   .gcs-secondary{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)}
   .gcs-secondary .btn{width:auto;flex:0 0 auto;height:32px;padding:0 12px;font-size:11.5px}
+  /* 1.0.121 — bloco de ENVIO AUTOMÁTICO (oficial, via Cloud API) */
+  .gcs-auto{margin-top:14px;border:1px solid rgba(52,211,153,.30);border-radius:16px;padding:15px;background:linear-gradient(160deg,rgba(34,211,238,.06),rgba(16,185,129,.05))}
+  .gcs-auto .gcs-steplabel{color:#34D399}
+  .gcs-input{width:100%;height:46px;margin-top:11px;background:var(--surface2);border:1px solid var(--line);border-radius:11px;color:var(--ink);font-size:14px;padding:0 13px;box-sizing:border-box}
+  .gcs-input:focus{outline:none;border-color:#34D399}
+  .gcs-go#btnSendAuto{margin-top:11px}
+  .gcs-status.err{color:#F87171}
+  .gcs-status.blocked{color:#F59E0B}
+  .gcs-divider{display:flex;align-items:center;gap:10px;margin:18px 0 4px;color:var(--faint);font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+  .gcs-divider::before,.gcs-divider::after{content:"";flex:1;height:1px;background:var(--line-soft)}
 
   /* ===== Preview interno — visão do cliente ===== */
   .cv-sheet{position:relative;text-align:left}
@@ -2638,6 +2648,7 @@ function cronCtx(o){
     contents:(o.contents||o.cronContents||[]).filter(c=>c&&(c.tema||c.legenda||c.feedImageUrl||c.storyImageUrl)),
     assignee:o.assignee||'',
     token:o.clientReviewToken||null,
+    phone:(o.clientPhone||o.phone||o.clientWhatsapp||'').toString().trim(),
     startDate:o.startDate||'',startTime:o.startTime||'',endDate:o.endDate||'',endTime:o.endTime||'',
     dueDate:o.dueDate||o.due||'',dueTime:o.dueTime||'',
   };
@@ -2652,6 +2663,9 @@ function cronCtx(o){
 
 // API INTERNA do Worker (token/imagekit/notify) — SEMPRE workers.dev (sempre no ar; não depende de DNS).
 const CLIENT_REVIEW_BASE='https://idseven-push.agidseven.workers.dev';
+// 1.0.121 — ENVIO PREMIUM AUTOMÁTICO (oficial): rota segura do Worker que envia a imagem real do
+// card + legenda + link via WhatsApp Business Cloud API (server-side; token da Meta NUNCA no client).
+const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE+'/client/send-premium-whatsapp';
 // 1.0.112 — LINK PÚBLICO PREMIUM do cliente (domínio da marca). O mesmo Worker atende este
 // subdomínio (rota Cloudflare aprovar.agendaidseven.com.br/*). Requer o DNS+Route aplicados.
 const CLIENT_LINK_BASE='https://aprovar.agendaidseven.com.br';
@@ -2758,8 +2772,17 @@ async function openSendClientModal(taskOrForm){
     '<div class="gcs-head">'+
       '<div class="gcs-headic">'+svg('send')+'</div>'+
       '<div style="min-width:0"><div class="gcs-title">Enviar card premium ao cliente</div>'+
-        '<div class="gcs-sub">A imagem premium será enviada como mídia real. O link de aprovação seguirá na legenda.</div></div>'+
+        '<div class="gcs-sub">Envio automático: o sistema manda a imagem do card + legenda direto pelo WhatsApp (Cloud API), sem anexar nada à mão.</div></div>'+
     '</div>'+
+    /* ===== ENVIO AUTOMÁTICO (OFICIAL) — via WhatsApp Business Cloud API ===== */
+    '<div class="gcs-auto" id="autoBlock">'+
+      '<div class="gcs-steplabel">Envio automático · oficial</div>'+
+      '<div class="gcs-card"><img id="autoCardPreview" alt="Card premium Aurora Glass — Agenda ID Seven"/></div>'+
+      '<input id="waPhone" class="gcs-input" type="tel" autocomplete="off" placeholder="WhatsApp do cliente — ex.: 55 11 99999-9999" value="'+esc(ctx.phone||'')+'"/>'+
+      '<button class="gcs-go" id="btnSendAuto">'+svg('send')+'Enviar card premium agora</button>'+
+      '<div class="gcs-status" id="autoStatus">O card chega como imagem real + legenda + link, sem operador e sem preview. Depende da WhatsApp Cloud API configurada.</div>'+
+    '</div>'+
+    '<div class="gcs-divider"><span>Enquanto a Cloud API não está ativa — envio manual (temporário)</span></div>'+
     '<div class="gcs-checklist">'+
       '<div class="gcs-chk" id="chk1"><span class="gcs-dot">1</span>Card premium copiado</div>'+
       '<div class="gcs-chk" id="chk2"><span class="gcs-dot">2</span>Legenda copiada</div>'+
@@ -2795,7 +2818,56 @@ async function openSendClientModal(taskOrForm){
       '<button class="btn ghost" data-modalclose="1">Fechar</button>'+
     '</div>'+
   '</div></div>';
+  _wireAutoSend(ctx);
   _wireGuidedSend(ctx, msg, cardFile);
+}
+// 1.0.121-whatsapp-cloud-api-send — ENVIO AUTOMÁTICO OFICIAL (à prova de erro de verdade).
+// O botão "Enviar card premium agora" chama a rota SEGURA do Worker (POST /client/send-premium-whatsapp),
+// que envia a imagem real do card + legenda + link via WhatsApp Business Cloud API (server-side).
+// O token da Meta NUNCA fica no client. Sucesso SÓ é exibido com message_id real devolvido pela Meta.
+// Sem credenciais (503 WHATSAPP_CLOUD_API_NOT_CONFIGURED) → mensagem clara, sem cair para WhatsApp Web.
+function _wireAutoSend(ctx){
+  const $=id=>document.getElementById(id);
+  const img=$('autoCardPreview');
+  // Card oficial Aurora Glass embutido (mesma fonte do envio manual).
+  try{ if(img) img.src='data:image/jpeg;base64,'+CARD_IMG_B64; }catch(_){ if(img) img.src=CARD_IMG_URL; }
+  const btn=$('btnSendAuto'), status=$('autoStatus'), phoneEl=$('waPhone');
+  function setStatus(txt,cls){ if(!status)return; status.className='gcs-status'+(cls?(' '+cls):''); status.textContent=txt; }
+  if(!btn) return;
+  btn.addEventListener('click', async function(){
+    const phone=(phoneEl&&phoneEl.value||'').replace(/[^\d]/g,'');
+    if(phone.length<10){ setStatus('Informe o WhatsApp do cliente com DDD (ex.: 55 11 99999-9999).','err'); if(phoneEl)phoneEl.focus(); return; }
+    if(!ctx.token){ setStatus('Link do cliente sem token — gere o cronograma novamente.','err'); return; }
+    btn.disabled=true; const old=btn.innerHTML; btn.innerHTML=svg('send')+'Enviando…';
+    setStatus('Enviando o card premium pela WhatsApp Cloud API…');
+    // Payload: SOMENTE dados do cronograma/cliente. NENHUM segredo da Meta sai do client.
+    const payload={ token:ctx.token, clientName:ctx.client||'', phone:phone, cronogramaTipo:ctx.type||'' };
+    let r=null, data=null;
+    try{
+      r=await fetch(PREMIUM_SEND_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      try{ data=await r.json(); }catch(_){ data=null; }
+    }catch(e){
+      btn.disabled=false; btn.innerHTML=old;
+      setStatus('Sem conexão com o servidor de envio. Verifique a internet e tente de novo.','err'); return;
+    }
+    // Cloud API ainda não configurada (sem secrets) — mensagem clara, sem fallback para WhatsApp Web.
+    if((r&&r.status===503)||(data&&data.error==='WHATSAPP_CLOUD_API_NOT_CONFIGURED')){
+      btn.disabled=false; btn.innerHTML=old;
+      setStatus('A integração WhatsApp Cloud API ainda não está configurada. Configure as credenciais da Meta para habilitar o envio automático do card premium.','blocked');
+      return;
+    }
+    // Sucesso REAL: só com message_id devolvido pela Meta.
+    if(r&&r.ok&&data&&data.ok&&data.message_id){
+      btn.innerHTML=svg('check')+'Enviado'; btn.classList.add('is-done');
+      setStatus('Card premium enviado ao WhatsApp do cliente ✓ (id: '+esc(String(data.message_id))+').','ok');
+      flashToast('Card premium enviado pelo WhatsApp (Cloud API).');
+      return;
+    }
+    // Falha controlada — mostra o código retornado pelo Worker/Meta.
+    btn.disabled=false; btn.innerHTML=old;
+    const code=(data&&(data.error||data.status))||(r&&r.status)||'desconhecido';
+    setStatus('Não foi possível enviar agora. Código: '+esc(String(code))+'. Nenhuma mensagem foi enviada.','err');
+  });
 }
 // 1.0.120-whatsapp-guided-card-send — ASSISTENTE GUIADO em 3 ETAPAS BLOQUEADAS (à prova de erro).
 // ETAPA 1: gera/salva a imagem REAL do card (Aurora Glass), copia a imagem p/ o clipboard (se
