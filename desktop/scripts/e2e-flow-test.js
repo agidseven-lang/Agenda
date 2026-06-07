@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.26-whatsapp-media-card / Desktop 1.0.116-form-unlock-hotfix / Android 1.0.105
+ * Agenda ID Seven · Worker V64.26-whatsapp-media-card / Desktop 1.0.117-whatsapp-clean-send-hotfix / Android 1.0.106
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.105-beta-form-unlock-hotfix';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.106-beta-whatsapp-clean-send-hotfix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.26-whatsapp-media-card · Desktop 1.0.116 · Android 1.0.105-beta');
+console.log(' Worker V64.26-whatsapp-media-card · Desktop 1.0.117 · Android 1.0.106-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -307,7 +307,7 @@ check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaS
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.116', /"version":\s*"1\.0\.116"/.test(DP));
+check('D1', 'package.json versão 1.0.117', /"version":\s*"1\.0\.117"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -359,12 +359,32 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.116', /Desktop 1\.0\.116/.test(DH));
+check('D20', 'Rodapé mostra Desktop 1.0.117', /Desktop 1\.0\.117/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.116 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.116/.test(DH) && /<title>ID Seven · Desktop 1\.0\.116/.test(DH) && /id="wpbadge">Desktop 1\.0\.116/.test(DH));
-check('D22', 'Login espelha o APK 1.0.105-beta-form-unlock-hotfix', /espelha o APK <b>1\.0\.105-beta-form-unlock-hotfix/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.116'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D21', 'Login/título/watermark mostram 1.0.117 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.117/.test(DH) && /<title>ID Seven · Desktop 1\.0\.117/.test(DH) && /id="wpbadge">Desktop 1\.0\.117/.test(DH));
+check('D22', 'Login espelha o APK 1.0.106-beta-whatsapp-clean-send-hotfix', /espelha o APK <b>1\.0\.106-beta-whatsapp-clean-send-hotfix/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.117'/.test(DH) && /applyVersionLabels/.test(DH));
+// ===== 1.0.117 — ENVIO WHATSAPP LIMPO (nunca manda send?text= ao cliente) =====
+(function(){
+  // Extrai e executa as funções reais p/ provar o conteúdo do clipboard e a URL aberta.
+  const base=(DH.match(/const CLIENT_LINK_BASE='([^']+)'/)||[])[1];
+  const fnUrl=(DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
+  const fnMsg=(DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/)||[''])[0];
+  const fnPlain=(DH.match(/function openWhatsAppPlain\(\)\{[\s\S]*?\n\}/)||[''])[0];
+  const FORBID=['web.whatsapp.com/send','whatsapp://send','send?text=','%0A','%C3','encodeURIComponent','api.whatsapp.com/send'];
+  let clip=null,opened=[],msg='';
+  try{
+    const sb={window:{desktopAPI:{openExternal:u=>{opened.push(u);return Promise.resolve(true);}},open:u=>opened.push(u)},navigator:{clipboard:{writeText:t=>{clip=t;}}}}; sb.self=sb.window;
+    msg=new Function('sb',`const CLIENT_LINK_BASE=${JSON.stringify(base)};const window=sb.window,navigator=sb.navigator,self=sb.self;function copyToClipboard(t){navigator.clipboard.writeText(t);}${fnUrl}\n${fnMsg}\n${fnPlain}\nconst ctx={client:'C',type:'Quinzenal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'};const m=buildClientMessage(ctx);copyToClipboard(m);openWhatsAppPlain();return m;`)(sb);
+  }catch(e){ msg='THREW:'+e.message; }
+  check('CLEAN1','Clipboard recebe a MENSAGEM LIMPA (igual a buildClientMessage)', clip===msg && msg.indexOf('THREW:')<0);
+  check('CLEAN2','Clipboard SEM nenhuma URL técnica do WhatsApp (send?text=, web.whatsapp/send, codificado)', FORBID.every(x=>String(clip).indexOf(x)<0));
+  check('CLEAN3','Botão abre SOMENTE whatsapp:// ou https://web.whatsapp.com/ (sem texto na URL)', opened.length>0 && opened.every(u=>u==='whatsapp://'||u==='https://web.whatsapp.com/'));
+  check('CLEAN4','Clipboard leva o link REAL do cronograma (premium + token)', String(clip).indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1);
+  check('CLEAN5','Builders send?text= REMOVIDOS do código (sem buildWhatsAppWebUrl/AppUrl ativos)', !/function buildWhatsAppWebUrl/.test(DH) && !/function buildWhatsAppAppUrl/.test(DH) && /function openWhatsAppPlain\(\)/.test(DH));
+  check('CLEAN6','Fluxos de envio usam openWhatsAppPlain (não openWhatsApp com send?text)', !/openWhatsApp\(buildWhatsApp/.test(DH) && (DH.match(/openWhatsAppPlain\(\)/g)||[]).length>=2);
+})();
 // ===== HOTFIX 1.0.116 — wizard imune a snapshot de fundo (corrige "nada responde") =====
 check('FORM1', 'Guard renderFromSnapshot: snapshots NÃO repintam com form aberto', /function renderFromSnapshot\(\)\{ if\(state\.form\) return; render\(\); \}/.test(DH));
 check('FORM2', 'onSnapshot usa renderFromSnapshot (não render direto que destruía o input)', (DH.match(/renderFromSnapshot\(\);\}\)/g)||[]).length>=3);
@@ -384,8 +404,8 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.105-beta-form-unlock-hotfix', /versionName\s+"1\.0\.105-beta-form-unlock-hotfix"/.test(GRADLE));
-check('N2', 'versionCode >= 103 (acima do 102 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 103; })());
+check('N1', 'versionName 1.0.106-beta-whatsapp-clean-send-hotfix', /versionName\s+"1\.0\.106-beta-whatsapp-clean-send-hotfix"/.test(GRADLE));
+check('N2', 'versionCode >= 104 (acima do 103 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 104; })());
 check('N_PARITY', 'Android = bump de paridade: endpoint interno workers.dev intacto, SEM link de cliente', /idseven-push\.agidseven\.workers\.dev\/notify-assignee/.test(readAndroid(AND + 'core/PushNotify.kt')) && !/cliente\/cronograma/.test(readAndroid(AND + 'core/PushNotify.kt')));
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
@@ -486,7 +506,7 @@ check('MEDIA_D1', 'Desktop CARD_IMG_URL = aprovar.agendaidseven.com.br/og/wa-car
 check('MEDIA_D2', 'Modal "Preparar envio premium" + instrução "Envie esta imagem no WhatsApp e cole a mensagem"', /Preparar envio premium para WhatsApp/.test(DH) && /Envie esta imagem no WhatsApp e cole a mensagem abaixo\./.test(DH));
 check('MEDIA_D3', 'Modal busca a imagem real e liga os botões (_wirePremiumSend + fetch CARD_IMG_URL)', /function _wirePremiumSend\(/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
 check('MEDIA_D4', 'Botão PRIMÁRIO "Salvar imagem e abrir WhatsApp" + secundários (Copiar msg/img, Abrir pasta)', /id="btnSaveAndWa"/.test(DH) && /Salvar imagem e abrir WhatsApp/.test(DH) && /id="btnCopyMsg"/.test(DH) && /id="btnCopyImg"/.test(DH) && /id="btnOpenFolder"/.test(DH));
-check('MEDIA_D6', 'Fluxo primário salva imagem + abre pasta + copia msg + abre WhatsApp (ensureSaved/showInFolder/openWhatsApp)', /function ensureSaved\(\)/.test(DH) && /api\.showInFolder/.test(DH) && /openWhatsApp\(buildWhatsAppAppUrl\(msg\)/.test(DH));
+check('MEDIA_D6', 'Fluxo primário salva imagem + abre pasta + copia msg + abre WhatsApp LIMPO (ensureSaved/showInFolder/openWhatsAppPlain)', /function ensureSaved\(\)/.test(DH) && /api\.showInFolder/.test(DH) && /openWhatsAppPlain\(\)/.test(DH));
 check('MEDIA_D5', 'Nome de arquivo claro agenda-id-seven-card-[cliente]-[token].jpg', /agenda-id-seven-card-'\+/.test(DH));
 // Electron IPC (main + preload)
 check('MEDIA_IPC1', 'main: handlers save-card-image / copy-card-image / show-in-folder', /ipcMain\.handle\("save-card-image"/.test(MAIN) && /ipcMain\.handle\("copy-card-image"/.test(MAIN) && /ipcMain\.handle\("show-in-folder"/.test(MAIN));
@@ -499,7 +519,7 @@ check('MEDIA_LINK', 'Caption leva o link COMPLETO com token (premium, sem worker
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.26-whatsapp-media-card / Desktop 1.0.116 / Android 1.0.105-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.26-whatsapp-media-card / Desktop 1.0.117 / Android 1.0.106-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
