@@ -196,7 +196,7 @@ jobs:
             [ "$c" = "200" ] || { echo "FAIL: $P != 200" >&2; exit 1; }
             echo "$ctp" | grep -qi 'text/html' || { echo "FAIL: $P nao e text/html" >&2; exit 1; }
           done
-          for J in "/og/wa-card-v64-25-a.jpg" "/og/wa-card-v64-25-b.jpg" "/preview.jpg"; do
+          for J in "/og/wa-card-v64-25-a.jpg" "/og/wa-card-v64-25-b.jpg" "/preview.jpg" "/og/wa-card-v64-26.jpg"; do
             c=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$B$J")
             ctj=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B$J")
             echo "$J -> HTTP=$c $ctj"
