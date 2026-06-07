@@ -136,7 +136,7 @@ jobs:
               || grep -qi "og:title\" content=\"Aprovar cronograma" "$body" \
               || { echo "FAIL[$LABEL]: og:title premium ausente" >&2 ; exit 1 ; }
             grep -qi '<meta property="og:description"' "$body" || { echo "FAIL[$LABEL]: og:description ausente" >&2 ; exit 1 ; }
-            grep -qi "og:image\" content=\"${PREMIUM}/og/aprovar.png\"" "$body" || { echo "FAIL[$LABEL]: og:image nao aponta p/ ${PREMIUM}/og/aprovar.png" >&2 ; exit 1 ; }
+            grep -qiE "og:image\" content=\"${PREMIUM}/og/aprovar\.png(\?v=[0-9a-z.-]+)?\"" "$body" || { echo "FAIL[$LABEL]: og:image nao aponta p/ ${PREMIUM}/og/aprovar.png (com/sem cache-bust)" >&2 ; exit 1 ; }
             grep -qi 'twitter:card" content="summary_large_image"' "$body" || { echo "FAIL[$LABEL]: twitter:card summary_large_image ausente" >&2 ; exit 1 ; }
             grep -qi "og:url\" content=\"${PREMIUM}/cliente/cronograma/" "$body" || { echo "FAIL[$LABEL]: og:url nao usa dominio premium" >&2 ; exit 1 ; }
             # o link publico NAO deve usar workers.dev como dominio principal no card
