@@ -109,3 +109,41 @@ jobs:
           else
             echo "(sem client_share_token informado — pulei a prova com token real; informe no dispatch p/ validar dados de uma task real)"
           fi
+
+      # V64.20: prova REAL (rede aberta no runner) de que o banner premium do link
+      # responde image/png 1200x630, no dominio CUSTOM e no fallback workers.dev,
+      # SEM regredir o healthcheck JSON. Falha o job se qualquer assercao quebrar.
+      - name: Validar banner premium /og/aprovar.png (image/png 1200x630, custom + fallback)
+        run: |
+          set -euo pipefail
+          assert_png () {
+            local URL="$1" ; local LABEL="$2" ; local f
+            f=$(mktemp)
+            echo "== $LABEL :: $URL =="
+            local ct code
+            code=$(curl -sS --max-time 25 -o "$f" -w '%{http_code}' "$URL")
+            ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$URL")
+            local sz; sz=$(wc -c < "$f")
+            echo "HTTP=$code  Content-Type=$ct  bytes=$sz"
+            [ "$code" = "200" ] || { echo "FAIL[$LABEL]: status != 200" >&2 ; exit 1 ; }
+            echo "$ct" | grep -qi 'image/png' || { echo "FAIL[$LABEL]: Content-Type nao e image/png" >&2 ; exit 1 ; }
+            # assinatura PNG + dimensoes 1200x630 lidas do IHDR
+            node -e '
+              const b=require("fs").readFileSync(process.argv[1]);
+              const sig=[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((x,i)=>b[i]===x);
+              const w=b.readUInt32BE(16), h=b.readUInt32BE(20);
+              if(!sig){console.error("FAIL: assinatura PNG invalida");process.exit(1);}
+              if(w!==1200||h!==630){console.error("FAIL: dimensoes "+w+"x"+h+" != 1200x630");process.exit(1);}
+              console.log("OK: PNG valido "+w+"x"+h+" ("+b.length+" bytes)");
+            ' "$f"
+          }
+          assert_png "https://aprovar.agendaidseven.com.br/og/aprovar.png" "DOMINIO CUSTOM"
+          assert_png "https://idseven-push.agidseven.workers.dev/og/aprovar.png" "FALLBACK workers.dev"
+
+          echo "== Healthcheck DEVE continuar JSON nos dois dominios =="
+          for B in "https://aprovar.agendaidseven.com.br" "https://idseven-push.agidseven.workers.dev"; do
+            ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/")
+            echo "$B/ -> $ct"
+            echo "$ct" | grep -qi 'application/json' || { echo "FAIL: healthcheck regrediu em $B" >&2 ; exit 1 ; }
+          done
+          echo "OK: banner premium servido image/png 1200x630 no custom e no fallback; healthcheck preservado."
