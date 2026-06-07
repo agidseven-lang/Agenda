@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.27-aurora-card / Desktop 1.0.119-whatsapp-aurora-premium-card / Android 1.0.108
+ * Agenda ID Seven · Worker V64.27-aurora-card / Desktop 1.0.120-whatsapp-guided-card-send / Android 1.0.109
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.108-beta-whatsapp-aurora-premium-card';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.109-beta-whatsapp-guided-card-send';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.27-aurora-card · Desktop 1.0.119 · Android 1.0.108-beta (Card Aurora Glass B-final)');
+console.log(' Worker V64.27-aurora-card · Desktop 1.0.120 · Android 1.0.109-beta (Envio guiado em 3 etapas)');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -307,7 +307,7 @@ check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaS
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.119', /"version":\s*"1\.0\.119"/.test(DP));
+check('D1', 'package.json versão 1.0.120', /"version":\s*"1\.0\.120"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -359,31 +359,31 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check('D20', 'Rodapé mostra Desktop 1.0.119', /Desktop 1\.0\.119/.test(DH));
+check("D20", "Rodapé mostra Desktop 1.0.120", /Desktop 1\.0\.120/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.119 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.119/.test(DH) && /<title>ID Seven · Desktop 1\.0\.119/.test(DH) && /id="wpbadge">Desktop 1\.0\.119/.test(DH));
-check('D22', 'Login espelha o APK 1.0.108-beta-whatsapp-aurora-premium-card', /espelha o APK <b>1\.0\.108-beta-whatsapp-aurora-premium-card/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.119'/.test(DH) && /applyVersionLabels/.test(DH));
-// ===== 1.0.117 — ENVIO WHATSAPP LIMPO (nunca manda send?text= ao cliente) =====
+check('D21', 'Login/título/watermark mostram 1.0.120 (sem rótulo antigo)',
+  /<span class="pill-ver">Desktop 1\.0\.120/.test(DH) && /<title>ID Seven · Desktop 1\.0\.120/.test(DH) && /id="wpbadge">Desktop 1\.0\.120/.test(DH));
+check('D22', 'Login espelha o APK 1.0.109-beta-whatsapp-guided-card-send', /espelha o APK <b>1\.0\.109-beta-whatsapp-guided-card-send/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.120'/.test(DH) && /applyVersionLabels/.test(DH));
+// ===== 1.0.120 — ENVIO WHATSAPP LIMPO + WEB-ONLY (executa as funções reais) =====
 (function(){
-  // Extrai e executa as funções reais p/ provar o conteúdo do clipboard e a URL aberta.
+  // Extrai e executa as funções reais p/ provar o conteúdo do clipboard e a URL aberta (etapa 3).
   const base=(DH.match(/const CLIENT_LINK_BASE='([^']+)'/)||[])[1];
   const fnUrl=(DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnMsg=(DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/)||[''])[0];
-  const fnPlain=(DH.match(/function openWhatsAppPlain\(\)\{[\s\S]*?\n\}/)||[''])[0];
+  const fnWeb=(DH.match(/function openWhatsAppWebOnly\(\)\{[\s\S]*?\n\}/)||[''])[0];
   const FORBID=['web.whatsapp.com/send','whatsapp://send','send?text=','%0A','%C3','encodeURIComponent','api.whatsapp.com/send'];
   let clip=null,opened=[],msg='';
   try{
     const sb={window:{desktopAPI:{openExternal:u=>{opened.push(u);return Promise.resolve(true);}},open:u=>opened.push(u)},navigator:{clipboard:{writeText:t=>{clip=t;}}}}; sb.self=sb.window;
-    msg=new Function('sb',`const CLIENT_LINK_BASE=${JSON.stringify(base)};const window=sb.window,navigator=sb.navigator,self=sb.self;function copyToClipboard(t){navigator.clipboard.writeText(t);}${fnUrl}\n${fnMsg}\n${fnPlain}\nconst ctx={client:'C',type:'Quinzenal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'};const m=buildClientMessage(ctx);copyToClipboard(m);openWhatsAppPlain();return m;`)(sb);
+    msg=new Function('sb',`const CLIENT_LINK_BASE=${JSON.stringify(base)};const window=sb.window,navigator=sb.navigator,self=sb.self;function copyToClipboard(t){navigator.clipboard.writeText(t);}${fnUrl}\n${fnMsg}\n${fnWeb}\nconst ctx={client:'C',type:'Quinzenal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'};const m=buildClientMessage(ctx);copyToClipboard(m);openWhatsAppWebOnly();return m;`)(sb);
   }catch(e){ msg='THREW:'+e.message; }
-  check('CLEAN1','Clipboard recebe a MENSAGEM LIMPA (igual a buildClientMessage)', clip===msg && msg.indexOf('THREW:')<0);
-  check('CLEAN2','Clipboard SEM nenhuma URL técnica do WhatsApp (send?text=, web.whatsapp/send, codificado)', FORBID.every(x=>String(clip).indexOf(x)<0));
-  check('CLEAN3','Botão abre SOMENTE whatsapp:// ou https://web.whatsapp.com/ (sem texto na URL)', opened.length>0 && opened.every(u=>u==='whatsapp://'||u==='https://web.whatsapp.com/'));
+  check('CLEAN1','Clipboard (etapa 2) recebe a LEGENDA LIMPA (igual a buildClientMessage)', clip===msg && msg.indexOf('THREW:')<0);
+  check('CLEAN2','Clipboard SEM nenhuma URL técnica do WhatsApp (send?text=, web/send, codificado)', FORBID.every(x=>String(clip).indexOf(x)<0));
+  check('CLEAN3','Etapa 3 abre SOMENTE https://web.whatsapp.com/ (sem texto, sem app://)', opened.length===1 && opened[0]==='https://web.whatsapp.com/');
   check('CLEAN4','Clipboard leva o link REAL do cronograma (premium + token)', String(clip).indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1);
-  check('CLEAN5','Builders send?text= REMOVIDOS do código (sem buildWhatsAppWebUrl/AppUrl ativos)', !/function buildWhatsAppWebUrl/.test(DH) && !/function buildWhatsAppAppUrl/.test(DH) && /function openWhatsAppPlain\(\)/.test(DH));
-  check('CLEAN6','Fluxos de envio usam openWhatsAppPlain (não openWhatsApp com send?text)', !/openWhatsApp\(buildWhatsApp/.test(DH) && (DH.match(/openWhatsAppPlain\(\)/g)||[]).length>=2);
+  check('CLEAN5','Builders send?text= REMOVIDOS (sem buildWhatsAppWebUrl/AppUrl ativos)', !/function buildWhatsAppWebUrl/.test(DH) && !/function buildWhatsAppAppUrl/.test(DH));
+  check('CLEAN6','openWhatsAppWebOnly abre só web; código executável SEM nenhuma string send?text=', /function openWhatsAppWebOnly\(\)\{[\s\S]*?'https:\/\/web\.whatsapp\.com\/'/.test(DH) && !/send\?text=/.test(DH.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g,'')));
 })();
 // ===== HOTFIX 1.0.116 — wizard imune a snapshot de fundo (corrige "nada responde") =====
 check('FORM1', 'Guard renderFromSnapshot: snapshots NÃO repintam com form aberto', /function renderFromSnapshot\(\)\{ if\(state\.form\) return; render\(\); \}/.test(DH));
@@ -404,8 +404,8 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.108-beta-whatsapp-aurora-premium-card', /versionName\s+"1\.0\.108-beta-whatsapp-aurora-premium-card"/.test(GRADLE));
-check('N2', 'versionCode >= 106 (acima do 105 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 106; })());
+check('N1', 'versionName 1.0.109-beta-whatsapp-guided-card-send (paridade)', /versionName\s+"1\.0\.109-beta-whatsapp-guided-card-send"/.test(GRADLE));
+check('N2', 'versionCode >= 107 (acima do 106 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 107; })());
 check('N_PARITY', 'Android = bump de paridade: endpoint interno workers.dev intacto, SEM link de cliente', /idseven-push\.agidseven\.workers\.dev\/notify-assignee/.test(readAndroid(AND + 'core/PushNotify.kt')) && !/cliente\/cronograma/.test(readAndroid(AND + 'core/PushNotify.kt')));
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
@@ -519,13 +519,24 @@ check('MEDIA_AB3', 'O card embutido no Desktop é o MESMO byte-a-byte que o Work
   const wm = W.match(/const OG_JPG_B64="([A-Za-z0-9+/=]+)"/);
   return !!(dm && wm && dm[1] === wm[1]);
 })());
-check('MEDIA_AB4', '_wirePremiumSend usa o card embutido (atob(CARD_IMG_B64) → data:image/jpeg) com fetch(CARD_IMG_URL) só como fallback', /atob\(CARD_IMG_B64\)/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
-check('MEDIA_D2', 'Modal premium: título "Enviar card premium ao cliente" + subtítulo (imagem real + link na legenda)', /Enviar card premium ao cliente/.test(DH) && /A imagem premium será enviada como mídia real\. O link de aprovação seguirá na legenda\./.test(DH));
-check('MEDIA_D3', 'Modal busca a imagem real e liga os botões (_wirePremiumSend + fetch CARD_IMG_URL)', /function _wirePremiumSend\(/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
-check('MEDIA_D4', 'Botão PRIMÁRIO ÚNICO "Preparar envio premium" + secundários (Copiar legenda/imagem, Abrir pasta); SEM botão solto "Abrir WhatsApp"', /id="btnPrepare"/.test(DH) && /Preparar envio premium/.test(DH) && /id="btnCopyMsg"/.test(DH) && /id="btnCopyImg"/.test(DH) && /id="btnOpenFolder"/.test(DH) && !/id="btnSaveAndWa"/.test(DH) && !/id="btnOpenWa"/.test(DH));
-check('MEDIA_D7', 'Primário "Preparar envio premium" executa a sequência completa (copia legenda + ensureSaved + showInFolder + openWhatsAppPlain)', /on\('btnPrepare'/.test(DH) && /copyToClipboard\(msg\)/.test(DH) && /ensureSaved\(\)/.test(DH) && /api\.showInFolder/.test(DH) && /openWhatsAppPlain\(\)/.test(DH));
-check('MEDIA_D6', 'Fluxo primário salva imagem + abre pasta + copia msg + abre WhatsApp LIMPO (ensureSaved/showInFolder/openWhatsAppPlain)', /function ensureSaved\(\)/.test(DH) && /api\.showInFolder/.test(DH) && /openWhatsAppPlain\(\)/.test(DH));
+check('MEDIA_AB4', '_wireGuidedSend usa o card embutido (atob(CARD_IMG_B64) → data:image/jpeg) com fetch(CARD_IMG_URL) só como fallback', /atob\(CARD_IMG_B64\)/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
+check('MEDIA_D2', 'Modal guiado: título "Enviar card premium ao cliente" + subtítulo (imagem real + link na legenda)', /Enviar card premium ao cliente/.test(DH) && /A imagem premium será enviada como mídia real\. O link de aprovação seguirá na legenda\./.test(DH));
 check('MEDIA_D5', 'Nome de arquivo claro agenda-id-seven-card-[cliente]-[token].jpg', /agenda-id-seven-card-'\+/.test(DH));
+// ===== 1.0.120 — ASSISTENTE GUIADO EM 3 ETAPAS (à prova de erro) =====
+check('GUIDED_1', 'Modal tem 3 ETAPAS (step1/step2/step3) com botões btnStep1/2/3', /id="step1"/.test(DH) && /id="step2"/.test(DH) && /id="step3"/.test(DH) && /id="btnStep1"/.test(DH) && /id="btnStep2"/.test(DH) && /id="btnStep3"/.test(DH));
+check('GUIDED_2', 'Etapas 2 e 3 NASCEM bloqueadas (is-locked + botões disabled no HTML)', /class="gcs-step is-locked" id="step2"/.test(DH) && /class="gcs-step is-locked" id="step3"/.test(DH) && /id="btnStep2" disabled/.test(DH) && /id="btnStep3" disabled/.test(DH));
+check('GUIDED_3', 'Checklist com rótulos exatos: Card premium copiado / Legenda copiada / Link validado', /id="chk1"[^>]*>.*Card premium copiado/.test(DH) && /id="chk2"[^>]*>.*Legenda copiada/.test(DH) && /id="chk3"[^>]*>.*Link validado/.test(DH));
+check('GUIDED_4', 'Botões corretos: "1. Copiar card premium" / "2. Copiar legenda" / "3. Abrir WhatsApp"', /1\. Copiar card premium/.test(DH) && /2\. Copiar legenda/.test(DH) && /3\. Abrir WhatsApp/.test(DH));
+check('GUIDED_5', 'ETAPA 1 salva imagem + copia imagem + abre pasta; só conclui se imagem foi SALVA', /on\('btnStep1'/.test(DH) && /ensureSaved\(\)/.test(DH) && /if\(!p\|\|!st\.imgSaved\)/.test(DH) && /api\.copyCardImage/.test(DH) && /api\.showInFolder/.test(DH) && /st\.card=true/.test(DH));
+check('GUIDED_6', 'ETAPA 2 valida link+token e copia APENAS a legenda limpa (após etapa 1)', /on\('btnStep2'/.test(DH) && /if\(!st\.card\)\{/.test(DH) && /_gateValidLink\(ctx,msg\)/.test(DH) && /copyToClipboard\(msg\)/.test(DH) && /st\.legend=true/.test(DH));
+check('GUIDED_7', 'ETAPA 3 só abre WhatsApp se 1 E 2 completas (card+imgSaved+legend+link) e usa openWhatsAppWebOnly', /on\('btnStep3'/.test(DH) && /if\(!\(st\.card&&st\.imgSaved&&st\.legend&&st\.link\)\)/.test(DH) && /openWhatsAppWebOnly\(\)/.test(DH));
+check('GUIDED_8', 'GATE: refreshGate libera etapa3 só com card&&imgSaved&&legend&&link', /function refreshGate\(\)/.test(DH) && /const allReady = st\.card && st\.imgSaved && st\.legend && st\.link/.test(DH) && /b3\.disabled=!allReady/.test(DH));
+check('GUIDED_9', '_gateValidLink exige domínio premium + token, rejeita workers.dev e final /cronograma/', /function _gateValidLink\(ctx,msg\)/.test(DH) && /https:\/\/aprovar\.agendaidseven\.com\.br\/cliente\/cronograma\//.test(DH) && /workers\.dev/.test(DH) && /\\\/cliente\\\/cronograma\\\/\?\$/.test(DH));
+check('GUIDED_10', 'ANTI-ÍCONE-GIGANTE: CSS .gcs-sheet svg fixa 18px (blindagem) e header 20px', /\.gcs-sheet svg\{width:18px;height:18px/.test(DH) && /\.gcs-headic svg\{width:20px;height:20px\}/.test(DH));
+check('GUIDED_11', 'SEM botão solto antigo (btnPrepare/btnSaveAndWa/btnOpenWa) e SEM _wirePremiumSend', !/id="btnPrepare"/.test(DH) && !/id="btnSaveAndWa"/.test(DH) && !/id="btnOpenWa"/.test(DH) && !/function _wirePremiumSend/.test(DH));
+check('GUIDED_12', 'openWhatsAppWebOnly NUNCA usa send?text= / app:// (só https://web.whatsapp.com/)', /function openWhatsAppWebOnly\(\)\{/.test(DH) && /const WEB='https:\/\/web\.whatsapp\.com\/'/.test(DH) && !/openWhatsAppWebOnly[\s\S]{0,400}send\?text=/.test(DH));
+// Secundários discretos (apoio — NUNCA abrem WhatsApp)
+check('GUIDED_13', 'Secundários presentes (Copiar imagem/legenda, Abrir pasta, Testar link, Fechar) e NÃO abrem WhatsApp', /id="btnCopyImg"/.test(DH) && /id="btnCopyMsg"/.test(DH) && /id="btnOpenFolder"/.test(DH) && /data-clientview=/.test(DH) && !/on\('btnCopyImg'[\s\S]{0,300}openWhatsApp/.test(DH));
 // Electron IPC (main + preload)
 check('MEDIA_IPC1', 'main: handlers save-card-image / copy-card-image / show-in-folder', /ipcMain\.handle\("save-card-image"/.test(MAIN) && /ipcMain\.handle\("copy-card-image"/.test(MAIN) && /ipcMain\.handle\("show-in-folder"/.test(MAIN));
 check('MEDIA_IPC2', 'main: usa clipboard.writeImage + nativeImage (copiar imagem real)', /clipboard\.writeImage/.test(MAIN) && /nativeImage\.createFromBuffer/.test(MAIN));
@@ -537,7 +548,7 @@ check('MEDIA_LINK', 'Caption leva o link COMPLETO com token (premium, sem worker
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.27-aurora-card / Desktop 1.0.119 / Android 1.0.108-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.27-aurora-card / Desktop 1.0.120 / Android 1.0.109-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {

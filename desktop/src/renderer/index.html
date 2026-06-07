@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.119 (Domínio premium)</title>
+<title>ID Seven · Desktop 1.0.120 (Envio guiado)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -769,6 +769,41 @@
   .btn.sp-go{flex:1.3;color:#fff;border:none;background:linear-gradient(135deg,#5B6CFF 0%,#22D3EE 60%,#10B981 100%);box-shadow:0 8px 20px -10px rgba(34,211,238,.6)}
   .btn.sp-go:hover{filter:brightness(1.07)}
 
+  /* ===== 1.0.120 — ASSISTENTE GUIADO "Enviar card premium ao cliente" (3 etapas, à prova de erro) ===== */
+  .gcs-sheet{position:relative;text-align:left;padding:22px 22px 18px}
+  /* BLINDAGEM contra ícone gigante: TODO svg dentro do modal tem tamanho fixo. */
+  .gcs-sheet svg{width:18px;height:18px;flex:none}
+  .gcs-x{position:absolute;top:13px;right:13px;color:var(--faint)}
+  .gcs-head{display:flex;align-items:center;gap:13px;padding-right:36px}
+  .gcs-headic{width:42px;height:42px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;color:#10B981;background:linear-gradient(160deg,rgba(34,211,238,.20),rgba(16,185,129,.16));border:1px solid rgba(16,185,129,.32)}
+  .gcs-headic svg{width:20px;height:20px}
+  .gcs-title{font-size:18px;font-weight:800;letter-spacing:-.01em}
+  .gcs-sub{font-size:12.5px;color:var(--soft);margin-top:3px;line-height:1.45}
+  .gcs-checklist{display:flex;gap:8px;margin:16px 0 2px;flex-wrap:wrap}
+  .gcs-chk{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--faint);background:var(--surface);border:1px solid var(--line-soft);border-radius:10px;padding:7px 11px}
+  .gcs-chk .gcs-dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;background:var(--surface2);color:var(--faint);border:1px solid var(--line)}
+  .gcs-chk .gcs-dot svg{width:11px;height:11px}
+  .gcs-chk.is-done{color:#34D399;border-color:rgba(52,211,153,.4)}
+  .gcs-chk.is-done .gcs-dot{background:#34D399;color:#04140d;border-color:#34D399}
+  .gcs-step{margin-top:15px;border:1px solid var(--line-soft);border-radius:16px;padding:15px;background:var(--surface);transition:opacity .15s}
+  .gcs-step.is-locked{opacity:.45;filter:grayscale(.35)}
+  .gcs-steplabel{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--soft);display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .gcs-lock{font-weight:600;letter-spacing:0;text-transform:none;color:var(--faint);font-size:11px}
+  .gcs-card{border-radius:13px;overflow:hidden;border:1px solid var(--line-soft);background:var(--surface2)}
+  .gcs-card img{width:100%;display:block;aspect-ratio:1200/630;object-fit:cover}
+  .gcs-stepmsg{font-size:12px;color:var(--soft);margin:11px 0;line-height:1.45}
+  .gcs-legend{font-size:13px;color:var(--ink);line-height:1.55;margin:0 0 12px;white-space:pre-wrap;word-break:break-word;font-family:inherit;background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;padding:13px;max-height:230px;overflow:auto}
+  .gcs-go{width:100%;height:48px;border-radius:12px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:9px;color:#fff;border:none;cursor:pointer;background:linear-gradient(135deg,#5B6CFF 0%,#22D3EE 60%,#10B981 100%);box-shadow:0 8px 20px -10px rgba(34,211,238,.6)}
+  .gcs-go svg{width:18px;height:18px}
+  .gcs-go:hover:not(:disabled){filter:brightness(1.07)}
+  .gcs-go:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;filter:grayscale(.5)}
+  .gcs-go.is-done{background:linear-gradient(135deg,#10B981,#34D399);box-shadow:none}
+  .gcs-status{font-size:11.5px;color:var(--faint);margin-top:9px;display:flex;align-items:center;gap:6px;line-height:1.4}
+  .gcs-status svg{width:14px;height:14px;flex:none}
+  .gcs-status.ok{color:#34D399}
+  .gcs-secondary{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)}
+  .gcs-secondary .btn{width:auto;flex:0 0 auto;height:32px;padding:0 12px;font-size:11.5px}
+
   /* ===== Preview interno — visão do cliente ===== */
   .cv-sheet{position:relative;text-align:left}
   body.desktop .cv-sheet{max-width:560px}
@@ -1103,8 +1138,8 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.119 · Domínio premium</span><br>
-    espelha o APK <b>1.0.108-beta-whatsapp-aurora-premium-card</b> · ref app/main
+    <span class="pill-ver">Desktop 1.0.120 · Envio guiado</span><br>
+    espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b> · ref app/main
   </div>
 </section>
 
@@ -1118,7 +1153,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.119 · Domínio premium</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.120 · Envio guiado</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1134,7 +1169,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.119', tag:'Card Aurora Glass', apk:'1.0.108-beta-whatsapp-aurora-premium-card' };
+const APP_VER={ desktop:'1.0.120', tag:'Envio guiado', apk:'1.0.109-beta-whatsapp-guided-card-send' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1391,7 +1426,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.119 · Domínio premium</span><br>espelha o APK <b>1.0.108-beta-whatsapp-aurora-premium-card</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.120 · Envio guiado</span><br>espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2714,72 +2749,146 @@ async function openSendClientModal(taskOrForm){
   // de "Abrir WhatsApp" e usadas apenas em shell.openExternal.
   const shortTok=String(ctx.token||'').slice(0,8);
   const cardFile='agenda-id-seven-card-'+String(ctx.client||'cliente').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')+'-'+shortTok+'.jpg';
-  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet sp-sheet" style="max-width:680px;text-align:left;padding:24px 24px 20px">'+
-    '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
-    '<div style="display:flex;align-items:center;gap:13px">'+
-      '<div class="sp-ic" style="margin:0;flex:none">'+svg('send')+'</div>'+
-      '<div style="min-width:0"><div class="sp-title" style="text-align:left;margin:0;font-size:19px">Enviar card premium ao cliente</div>'+
-        '<div class="sp-sub" style="text-align:left;margin:3px 0 0">A imagem premium será enviada como mídia real. O link de aprovação seguirá na legenda.</div></div>'+
+  // 1.0.120-whatsapp-guided-card-send — ASSISTENTE GUIADO em 3 etapas BLOQUEADAS.
+  // Etapa 1 (card) -> Etapa 2 (legenda) -> Etapa 3 (abrir WhatsApp, só web). O WhatsApp NUNCA
+  // abre antes de a imagem ser salva e a legenda copiada. Sem botão solto "Abrir WhatsApp".
+  // Ícones SEMPRE pequenos (.gcs-sheet svg = 18px) — nada de check/avião gigante.
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet gcs-sheet" style="max-width:640px">'+
+    '<button class="iconbtn gcs-x" data-modalclose="1">'+svg('close')+'</button>'+
+    '<div class="gcs-head">'+
+      '<div class="gcs-headic">'+svg('send')+'</div>'+
+      '<div style="min-width:0"><div class="gcs-title">Enviar card premium ao cliente</div>'+
+        '<div class="gcs-sub">A imagem premium será enviada como mídia real. O link de aprovação seguirá na legenda.</div></div>'+
     '</div>'+
-    '<div style="margin-top:18px;border-radius:16px;overflow:hidden;border:1px solid var(--line-soft);background:var(--surface);box-shadow:0 14px 40px -22px rgba(0,0,0,.8)">'+
-      '<img id="cardImgPreview" alt="Card premium ID Seven" style="width:100%;display:block;aspect-ratio:1200/630;object-fit:cover;background:var(--surface2)"/>'+
+    '<div class="gcs-checklist">'+
+      '<div class="gcs-chk" id="chk1"><span class="gcs-dot">1</span>Card premium copiado</div>'+
+      '<div class="gcs-chk" id="chk2"><span class="gcs-dot">2</span>Legenda copiada</div>'+
+      '<div class="gcs-chk" id="chk3"><span class="gcs-dot">3</span>Link validado</div>'+
     '</div>'+
-    '<div id="cardImgStatus" style="font-size:11.5px;color:var(--faint);margin:7px 2px 0;display:flex;align-items:center;gap:6px">Gerando imagem do card…</div>'+
-    '<div style="font-size:11.5px;font-weight:800;letter-spacing:.05em;color:var(--soft);margin:18px 0 7px">LEGENDA QUE SERÁ ENVIADA</div>'+
-    '<pre class="sp-prev-msg" style="margin:0;max-height:none">'+esc(msg)+'</pre>'+
-    '<button class="btn sp-go" id="btnPrepare" style="width:100%;height:54px;margin-top:18px;font-size:15px;font-weight:800;border-radius:14px">'+svg('send')+'Preparar envio premium</button>'+
-    '<div id="prepareHint" style="font-size:12.5px;color:var(--faint);text-align:center;margin-top:9px;line-height:1.45">Salva a imagem, copia a legenda, abre a pasta e o WhatsApp. Depois é só anexar a imagem e colar a legenda.</div>'+
-    '<div style="display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)">'+
-      '<button class="btn ghost" id="btnCopyMsg" style="width:auto;flex:0 0 auto;height:34px;padding:0 13px;font-size:12px">Copiar legenda</button>'+
-      '<button class="btn ghost" id="btnCopyImg" style="width:auto;flex:0 0 auto;height:34px;padding:0 13px;font-size:12px">Copiar imagem</button>'+
-      '<button class="btn ghost" id="btnOpenFolder" style="width:auto;flex:0 0 auto;height:34px;padding:0 13px;font-size:12px">Abrir pasta</button>'+
-      '<button class="btn ghost" data-clientview="'+(ctx.isForm?'':esc(ctx.id))+'" style="width:auto;flex:0 0 auto;height:34px;padding:0 13px;font-size:12px">Testar link</button>'+
-      '<button class="btn ghost" data-modalclose="1" style="width:auto;flex:0 0 auto;height:34px;padding:0 13px;font-size:12px">Fechar</button>'+
+    /* ===== ETAPA 1 — CARD PREMIUM ===== */
+    '<div class="gcs-step" id="step1">'+
+      '<div class="gcs-steplabel">Etapa 1 · Card premium</div>'+
+      '<div class="gcs-card"><img id="cardImgPreview" alt="Card premium Aurora Glass — Agenda ID Seven"/></div>'+
+      '<div class="gcs-stepmsg">Cole ou arraste esta imagem no WhatsApp <b>antes</b> de enviar a legenda.</div>'+
+      '<button class="gcs-go" id="btnStep1">'+svg('copy')+'1. Copiar card premium</button>'+
+      '<div class="gcs-status" id="step1Status">Gerando imagem do card…</div>'+
+    '</div>'+
+    /* ===== ETAPA 2 — LEGENDA (bloqueada até a etapa 1) ===== */
+    '<div class="gcs-step is-locked" id="step2">'+
+      '<div class="gcs-steplabel">Etapa 2 · Legenda <span class="gcs-lock" id="lock2">conclua a etapa 1</span></div>'+
+      '<pre class="gcs-legend" id="legendBox">'+esc(msg)+'</pre>'+
+      '<button class="gcs-go" id="btnStep2" disabled>'+svg('copy')+'2. Copiar legenda</button>'+
+      '<div class="gcs-status" id="step2Status"></div>'+
+    '</div>'+
+    /* ===== ETAPA 3 — ABRIR WHATSAPP (bloqueada até etapas 1 e 2) ===== */
+    '<div class="gcs-step is-locked" id="step3">'+
+      '<div class="gcs-steplabel">Etapa 3 · Abrir WhatsApp <span class="gcs-lock" id="lock3">conclua as etapas 1 e 2</span></div>'+
+      '<div class="gcs-stepmsg">Cole primeiro o <b>card premium como imagem</b>. Depois cole a <b>legenda</b> copiada.</div>'+
+      '<button class="gcs-go" id="btnStep3" disabled>'+svg('send')+'3. Abrir WhatsApp</button>'+
+    '</div>'+
+    /* ===== Ações secundárias discretas (apoio — NUNCA abrem o WhatsApp) ===== */
+    '<div class="gcs-secondary">'+
+      '<button class="btn ghost" id="btnCopyImg">Copiar imagem</button>'+
+      '<button class="btn ghost" id="btnCopyMsg">Copiar legenda</button>'+
+      '<button class="btn ghost" id="btnOpenFolder">Abrir pasta</button>'+
+      '<button class="btn ghost" data-clientview="'+(ctx.isForm?'':esc(ctx.id))+'">Testar link</button>'+
+      '<button class="btn ghost" data-modalclose="1">Fechar</button>'+
     '</div>'+
   '</div></div>';
-  _wirePremiumSend(ctx, msg, cardFile);
+  _wireGuidedSend(ctx, msg, cardFile);
 }
-// 1.0.119-whatsapp-premium-definitive-send — fluxo À PROVA DE ERRO. O botão PRIMÁRIO único
-// "Preparar envio premium" executa TUDO em ordem: gera/baixa a imagem do card, salva em disco,
-// copia a LEGENDA LIMPA, copia a IMAGEM (se suportado), abre a pasta e abre o WhatsApp (sem
-// send?text=). Secundários são apoio. NUNCA manda só texto/link nem URL técnica do WhatsApp.
-async function _wirePremiumSend(ctx, msg, cardFile){
+// 1.0.120-whatsapp-guided-card-send — ASSISTENTE GUIADO em 3 ETAPAS BLOQUEADAS (à prova de erro).
+// ETAPA 1: gera/salva a imagem REAL do card (Aurora Glass), copia a imagem p/ o clipboard (se
+//          suportado) e abre a pasta. Só conclui se a imagem foi SALVA com sucesso.
+// ETAPA 2: valida link+token e copia APENAS a legenda limpa. Liberada só após a etapa 1.
+// ETAPA 3: abre SOMENTE https://web.whatsapp.com/ (sem send?text=). Liberada só após 1 e 2
+//          (imagem salva + legenda copiada + link validado). NUNCA antes.
+function _gateValidLink(ctx,msg){
+  let url='';
+  try{ url=buildPublicClientUrl(ctx&&ctx.token); }catch(_){ return {ok:false,url:''}; }
+  const ok = !!url
+    && url.indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/')===0
+    && !/\/cliente\/cronograma\/?$/.test(url)
+    && !/workers\.dev/.test(url)
+    && String(msg).indexOf(url)>-1;
+  return {ok:ok,url:url};
+}
+function openWhatsAppWebOnly(){
+  // ABRE SOMENTE https://web.whatsapp.com/ — nunca send?text=, nunca whatsapp://send.
+  const ext=window.desktopAPI&&window.desktopAPI.openExternal;
+  const WEB='https://web.whatsapp.com/';
+  if(ext){ try{ ext(WEB); }catch(_){ try{window.open(WEB,'_blank');}catch(__){} } }
+  else { try{window.open(WEB,'_blank');}catch(_){} }
+  return WEB;
+}
+async function _wireGuidedSend(ctx, msg, cardFile){
   const api=(window.desktopAPI||{});
   let bytes=null, savedPath=null;
-  const img=document.getElementById('cardImgPreview');
-  const status=document.getElementById('cardImgStatus');
+  const st={ card:false, legend:false, link:false, imgSaved:false };  // estado das etapas
+  const $=id=>document.getElementById(id);
+  const on=(id,fn)=>{const b=$(id); if(b) b.addEventListener('click',fn);};
+  const img=$('cardImgPreview'), s1=$('step1Status');
+  // Card OFICIAL Aurora Glass embutido (B-final): decodifica base64 -> bytes (sem rede).
   try{
-    // Card OFICIAL embutido (B-final Aurora Glass): decodifica base64 -> bytes (sem rede).
     const bin=atob(CARD_IMG_B64); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); bytes=u.buffer;
     if(img) img.src='data:image/jpeg;base64,'+CARD_IMG_B64;
-    if(status) status.innerHTML=svg('check')+'<span>Card premium Aurora pronto — '+esc(cardFile)+' (1200×630)</span>';
+    if(s1) s1.textContent='Pronto para copiar — '+cardFile+' (1200×630).';
   }catch(e){
-    try{ const r=await fetch(CARD_IMG_URL,{cache:'no-store'}); if(r.ok){ bytes=await r.arrayBuffer(); if(img) img.src=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'})); if(status) status.textContent='Card premium pronto.'; } }catch(_){ if(status) status.textContent='Não foi possível preparar a imagem do card.'; }
+    try{ const r=await fetch(CARD_IMG_URL,{cache:'no-store'}); if(r.ok){ bytes=await r.arrayBuffer(); if(img) img.src=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'})); if(s1) s1.textContent='Pronto para copiar (1200×630).'; } }catch(_){ if(s1) s1.textContent='Não foi possível preparar a imagem do card.'; }
   }
-  const on=(id,fn)=>{const b=document.getElementById(id); if(b) b.addEventListener('click',fn);};
+  function markChk(id){ const c=$(id); if(c){ c.classList.add('is-done'); const d=c.querySelector('.gcs-dot'); if(d) d.innerHTML=svg('check'); } }
+  function refreshGate(){
+    // Etapa 2 libera só após a etapa 1 (card salvo). Etapa 3 libera só após 1 E 2 completas.
+    const b2=$('btnStep2'), b3=$('btnStep3'), s2=$('step2'), s3=$('step3'), l3=$('lock3');
+    if(b2) b2.disabled=!st.card;
+    if(s2) s2.classList.toggle('is-locked',!st.card);
+    const allReady = st.card && st.imgSaved && st.legend && st.link;
+    if(b3) b3.disabled=!allReady;
+    if(s3) s3.classList.toggle('is-locked',!(st.card&&st.legend));
+    if(l3) l3.style.display=allReady?'none':'';
+  }
   async function ensureSaved(){
     if(savedPath) return savedPath;
     if(!bytes) return null;
-    if(api.saveCardImage){ const r=await api.saveCardImage(new Uint8Array(bytes),cardFile); if(r&&r.ok){ savedPath=r.path; return savedPath; } return null; }
-    try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'})); a.download=cardFile; a.click(); return cardFile; }catch(_){ return null; }
+    if(api.saveCardImage){ const r=await api.saveCardImage(new Uint8Array(bytes),cardFile); if(r&&r.ok){ savedPath=r.path; st.imgSaved=true; return savedPath; } return null; }
+    try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'})); a.download=cardFile; a.click(); savedPath=cardFile; st.imgSaved=true; return cardFile; }catch(_){ return null; }
   }
-  // ===== BOTÃO PRIMÁRIO ÚNICO — sequência premium completa (à prova de erro) =====
-  on('btnPrepare', async function(){
-    const hint=document.getElementById('prepareHint');
+  /* ===== ETAPA 1 — CARD PREMIUM ===== */
+  on('btnStep1', async function(){
     if(!bytes){ flashToast('Aguarde a imagem do card carregar (1s) e clique de novo.'); return; }
-    copyToClipboard(msg);                                  // 3) legenda limpa no clipboard
+    const p=await ensureSaved();                                   // salva a imagem REAL (st.imgSaved)
+    if(!p||!st.imgSaved){ if(s1){s1.classList.remove('ok');s1.textContent='Não foi possível salvar a imagem. Tente de novo.';} flashToast('Não foi possível salvar a imagem.'); return; }
     let imgCopied=false;
-    if(api.copyCardImage){ try{ const r=await api.copyCardImage(new Uint8Array(bytes)); imgCopied=!!(r&&r.ok); }catch(_){ } }  // 4) imagem no clipboard
-    const p=await ensureSaved();                           // 1-2) salva a imagem
-    if(p&&api.showInFolder) api.showInFolder(p);           // 5) abre a pasta
-    openWhatsAppPlain();                                   // 6) abre WhatsApp (SEM texto na URL)
-    if(hint){ hint.innerHTML='<b style="color:var(--ok,#34D399)">Pronto!</b> '+(p?('Imagem salva em <b>'+esc(p)+'</b>. '):'Imagem pronta. ')+'Legenda copiada'+(imgCopied?' e imagem copiada':'')+'. <b>Anexe a imagem e cole a legenda</b> no WhatsApp.'; }
-    flashToast('Pronto: anexe a imagem salva e cole a legenda copiada no WhatsApp.');  // 7) instrução
+    if(api.copyCardImage){ try{ const r=await api.copyCardImage(new Uint8Array(bytes)); imgCopied=!!(r&&r.ok); }catch(_){ } }  // copia a imagem (Ctrl+V)
+    if(api.showInFolder) api.showInFolder(p);                      // abre a pasta da imagem
+    st.card=true; markChk('chk1');
+    const b1=$('btnStep1'); if(b1){ b1.classList.add('is-done'); b1.innerHTML=svg('check')+'Card premium pronto'; }
+    if(s1){ s1.classList.add('ok'); s1.innerHTML=svg('check')+'<span>Imagem salva em <b>'+esc(p)+'</b>'+(imgCopied?' e copiada (Ctrl+V)':'')+'. Cole/arraste no WhatsApp antes da legenda.</span>'; }
+    refreshGate();
   });
-  // ===== Secundários (apoio) =====
-  on('btnCopyMsg',function(){ copyToClipboard(msg); flashToast('Legenda copiada. Cole abaixo da imagem no WhatsApp.'); });
-  on('btnCopyImg',async function(){ if(!bytes){flashToast('A imagem ainda não carregou.');return;} if(api.copyCardImage){const r=await api.copyCardImage(new Uint8Array(bytes)); flashToast((r&&r.ok)?'Imagem copiada — cole (Ctrl+V) no WhatsApp.':'Não foi possível copiar a imagem.');} else { const p=await ensureSaved(); flashToast(p?('Imagem salva: '+p):'Use "Preparar envio premium".'); } });
-  on('btnOpenFolder',async function(){ const p=await ensureSaved(); if(p&&api.showInFolder){api.showInFolder(p);flashToast('Pasta aberta: '+p);} else if(p){flashToast('Imagem salva: '+p);} else {flashToast('Não foi possível salvar/abrir a imagem.');} });
+  /* ===== ETAPA 2 — LEGENDA (só após etapa 1) ===== */
+  on('btnStep2', function(){
+    if(!st.card){ flashToast('Conclua a etapa 1 (card) primeiro.'); return; }
+    const lk=_gateValidLink(ctx,msg);                              // valida link real + token
+    if(!lk.ok){ flashToast('Link inválido — gere o cronograma novamente.'); return; }
+    st.link=true; markChk('chk3');
+    copyToClipboard(msg);                                          // copia APENAS a legenda limpa
+    st.legend=true; markChk('chk2');
+    const b2=$('btnStep2'); if(b2){ b2.classList.add('is-done'); b2.innerHTML=svg('check')+'Legenda copiada'; }
+    const s2=$('step2Status'); if(s2){ s2.classList.add('ok'); s2.innerHTML=svg('check')+'<span>Legenda copiada e link validado.</span>'; }
+    refreshGate();
+  });
+  /* ===== ETAPA 3 — ABRIR WHATSAPP (só após 1 e 2) ===== */
+  on('btnStep3', function(){
+    if(!(st.card&&st.imgSaved&&st.legend&&st.link)){ flashToast('Conclua as etapas 1 e 2 primeiro.'); return; }
+    openWhatsAppWebOnly();                                         // abre SOMENTE https://web.whatsapp.com/
+    flashToast('WhatsApp aberto. Cole a imagem (Ctrl+V) e depois cole a legenda.');
+  });
+  /* ===== Secundários (apoio — NUNCA abrem o WhatsApp) ===== */
+  on('btnCopyImg', async function(){ if(!bytes){flashToast('A imagem ainda não carregou.');return;} if(api.copyCardImage){const r=await api.copyCardImage(new Uint8Array(bytes)); flashToast((r&&r.ok)?'Imagem copiada — cole (Ctrl+V) no WhatsApp.':'Não foi possível copiar a imagem.');} else { const p=await ensureSaved(); flashToast(p?('Imagem salva: '+p):'Use a Etapa 1.'); } });
+  on('btnCopyMsg', function(){ copyToClipboard(msg); flashToast('Legenda copiada. Cole abaixo da imagem no WhatsApp.'); });
+  on('btnOpenFolder', async function(){ const p=await ensureSaved(); if(p&&api.showInFolder){api.showInFolder(p);flashToast('Pasta aberta: '+p);} else if(p){flashToast('Imagem salva: '+p);} else {flashToast('Não foi possível salvar/abrir a imagem.');} });
+  refreshGate();
 }
 /* ===== VISÃO DO CLIENTE — tela real (rota dedicada) =====
    Aberta via state.clientView=<taskId>. Le a tarefa AO VIVO de state.tasks
@@ -3094,7 +3203,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.119-whatsapp-aurora-premium-card';
+const BUILD='1.0.120-whatsapp-guided-card-send';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
