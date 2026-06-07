@@ -57,13 +57,36 @@ jobs:
           [ "$code" = "200" ] || { echo "::error:: criar doc falhou ($code)"; head -c 400 /tmp/c.json; exit 1; }
           sleep 5
 
-          echo "== Confirma card premium (UA WhatsApp) =="
+          echo "== Confirma card premium (UA WhatsApp) — V64.23 HTML minimo de crawler =="
           b="$(mktemp)"
-          st=$(curl -sS --max-time 25 -A "WhatsApp/2.23.20.0 A" -o "$b" -w '%{http_code}' "$PORTAL")
-          echo "HTTP=$st"
+          ct=$(curl -sS --max-time 25 -A "WhatsApp/2.23.20.0 A" -o "$b" -w '%{content_type}' "$PORTAL")
+          st=$(curl -sS --max-time 25 -A "WhatsApp/2.23.20.0 A" -o /dev/null -w '%{http_code}' "$PORTAL")
+          echo "HTTP=$st  Content-Type=$ct  bytes=$(wc -c < "$b")"
           [ "$st" = "200" ] || { echo "::error:: portal != 200"; exit 1; }
-          grep -oiE '<meta property="og:(title|image)" content="[^"]*"' "$b"
-          grep -qiE 'og:image" content="https://aprovar\.agendaidseven\.com\.br/og/aprovar\.png\?v=' "$b" || { echo "::error:: og:image premium ausente"; exit 1; }
+          echo "$ct" | grep -qi 'text/html' || { echo "::error:: nao e text/html"; exit 1; }
+          grep -oiE '<meta property="og:(title|image|url)" content="[^"]*"' "$b"
+          # og:image em rota VERSIONADA SEM querystring
+          grep -qiE 'og:image" content="https://aprovar\.agendaidseven\.com\.br/og/aprovar-v64-23\.png"' "$b" || { echo "::error:: og:image nao usa /og/aprovar-v64-23.png limpo"; exit 1; }
+          grep -qi '?v=' "$b" && { echo "::error:: ainda ha querystring no card"; exit 1; } || true
+          grep -qi 'og:title" content="Aprovar cronograma — Cliente Demo ID Seven"' "$b" || { echo "::error:: og:title personalizado ausente"; exit 1; }
+          grep -qi 'workers.dev' "$b" && { echo "::error:: workers.dev no card"; exit 1; } || true
+          # HTML minimo de crawler: NAO traz o portal pesado (sem CV_CSS/topbar)
+          grep -qi 'Visão do Cliente' "$b" && { echo "::error:: veio o portal completo (deveria ser HTML minimo)"; exit 1; } || true
+          echo "OK: crawler recebe HTML minimo com OG premium (img limpa, sem query)."
+
+          # imagem versionada limpa: image/png 1200x630
+          echo "== Imagem /og/aprovar-v64-23.png =="
+          img="$(mktemp)"
+          ict=$(curl -sS --max-time 25 -A "facebookexternalhit/1.1" -o "$img" -w '%{content_type}' "${PREMIUM}/og/aprovar-v64-23.png")
+          echo "Content-Type=$ict bytes=$(wc -c < "$img")"
+          echo "$ict" | grep -qi 'image/png' || { echo "::error:: imagem nao e image/png"; exit 1; }
+          node -e 'const b=require("fs").readFileSync(process.argv[1]);const s=[0x89,0x50,0x4e,0x47].every((x,i)=>b[i]===x);const w=b.readUInt32BE(16),h=b.readUInt32BE(20);if(!s||w!==1200||h!==630){console.error("FALHA PNG "+w+"x"+h);process.exit(1)}console.log("OK PNG "+w+"x"+h)' "$img"
+
+          # navegador normal continua recebendo o PORTAL COMPLETO
+          echo "== Navegador normal (deve vir o portal completo) =="
+          nb="$(mktemp)"
+          curl -sS --max-time 25 -A "Mozilla/5.0 Chrome/124" -o "$nb" "$PORTAL"
+          grep -qi 'Visão do Cliente' "$nb" && echo "OK: navegador recebe portal completo" || { echo "::error:: navegador nao recebeu portal"; exit 1; }
 
           echo ""
           echo "=================================================================="
