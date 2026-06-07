@@ -1,5 +1,5 @@
 /* ============================================================================
-   ID Seven — Cloudflare Worker  [V64.24-wa-card-canary-jpg]
+   ID Seven — Cloudflare Worker  [V64.25-wa-preview-diagnostics]
    ============================================================================
    COMPATIBILIDADE: esta versão usa EXATAMENTE o esquema de variáveis/secrets do
    Worker real `idseven-push` no Cloudflare (confirmado no painel):
@@ -114,17 +114,32 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }
 
+    // V64.25 — INSTRUMENTAÇÃO de diagnóstico do preview: registra (best-effort, não-bloqueante)
+    // TODO request a rotas de canário/preview/imagem, p/ PROVAR se o crawler real do WhatsApp/
+    // Facebook chega ao Worker e o que ele recebe. Grava em Firestore `waPreviewDiagnostics`
+    // (coleção NOVA e temporária; sem dados de cliente). Leitura em GET /wa-diag.
+    if (/^\/(wa-card-test|preview)/.test(url.pathname) || url.pathname.startsWith("/og/")) {
+      try { ctx.waitUntil(logWaDiag(env, request, url)); } catch (_) {}
+    }
+    if (url.pathname === "/wa-diag" && request.method === "GET") {
+      return handleWaDiagRead(env);
+    }
+
     if (url.pathname === "/imagekit-auth") {
       return handleImageKitAuth(request, env);
     }
 
-    // V64.24 — CANÁRIO OG ISOLADO (sem token, sem portal, sem detecção de UA).
-    // HTML mínimo p/ TODOS os user-agents + imagem JPEG. Isola formato/headers/cache.
-    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/wa-card-test-v64-24") {
-      return waCardTestHtml(request.method);
-    }
-    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/og/wa-card-v64-24.jpg") {
-      return jpgBannerResponse(request.method);
+    // V64.24/25 — CANÁRIOS OG ISOLADOS (sem token, sem portal, sem detecção de UA).
+    // HTML mínimo p/ TODOS os user-agents + imagem JPEG. Paths NOVOS a cada tentativa p/
+    // furar o cache do WhatsApp por URL. Imagem servida do mesmo JPEG (cache por path).
+    if (request.method === "GET" || request.method === "HEAD") {
+      const M = request.method;
+      const B = "https://aprovar.agendaidseven.com.br";
+      if (url.pathname === "/wa-card-test-v64-24") return waCardTestHtml(M);
+      if (url.pathname === "/wa-card-test-v64-25-a") return minCardHtml(M, { title: "Aprovar cronograma — Teste Premium A", desc: "Revise e aprove seu cronograma na area segura da Agenda ID Seven (canario A).", url: B + "/wa-card-test-v64-25-a", img: B + "/og/wa-card-v64-25-a.jpg" });
+      if (url.pathname === "/wa-card-test-v64-25-b") return minCardHtml(M, { title: "Aprovar cronograma — Teste Premium B", desc: "Revise e aprove seu cronograma na area segura da Agenda ID Seven (canario B).", url: B + "/wa-card-test-v64-25-b", img: B + "/og/wa-card-v64-25-b.jpg" });
+      if (url.pathname === "/preview") return minCardHtml(M, { title: "Teste Premium ID Seven", desc: "Preview premium de aprovacao.", url: B + "/preview", img: B + "/preview.jpg", twitter: false });
+      if (url.pathname === "/og/wa-card-v64-24.jpg" || url.pathname === "/og/wa-card-v64-25-a.jpg" || url.pathname === "/og/wa-card-v64-25-b.jpg" || url.pathname === "/preview.jpg") return jpgBannerResponse(M);
     }
 
     // V64.20/23 — banner premium 1200×630 do link (cartão grande no WhatsApp). PNG estático
@@ -179,7 +194,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.24-wa-card-canary-jpg" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.25-wa-preview-diagnostics" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -966,6 +981,84 @@ function jpgBannerResponse(method) {
   };
   // HEAD: mesmos headers, sem corpo.
   return new Response(method === "HEAD" ? null : bytes, { status: 200, headers });
+}
+
+// V64.25 — card OG mínimo genérico (canários novos /wa-card-test-v64-25-a|b e /preview).
+// HTML puro, OG no topo, JPEG; /preview omite twitter tags e usa texto ASCII (ultra simples).
+function minCardHtml(method, o) {
+  const t = escapeHtml(o.title), d = escapeHtml(o.desc), u = escapeHtml(o.url), img = escapeHtml(o.img);
+  let h = '<!doctype html>\n<html lang="pt-BR">\n<head>\n<meta charset="utf-8">\n' +
+    '<meta property="og:type" content="website">\n' +
+    '<meta property="og:site_name" content="Agenda ID Seven">\n' +
+    '<meta property="og:title" content="' + t + '">\n' +
+    '<meta property="og:description" content="' + d + '">\n' +
+    '<meta property="og:url" content="' + u + '">\n' +
+    '<meta property="og:image" content="' + img + '">\n' +
+    '<meta property="og:image:url" content="' + img + '">\n' +
+    '<meta property="og:image:secure_url" content="' + img + '">\n' +
+    '<meta property="og:image:type" content="image/jpeg">\n' +
+    '<meta property="og:image:width" content="1200">\n' +
+    '<meta property="og:image:height" content="630">\n';
+  if (o.twitter !== false) {
+    h += '<meta name="twitter:card" content="summary_large_image">\n' +
+      '<meta name="twitter:title" content="' + t + '">\n' +
+      '<meta name="twitter:image" content="' + img + '">\n';
+  }
+  h += '<title>' + t + '</title>\n</head>\n<body><a href="' + u + '">Abrir aprovacao</a></body>\n</html>';
+  return new Response(method === "HEAD" ? null : h, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120", "X-Content-Type-Options": "nosniff" },
+  });
+}
+
+// V64.25 — INSTRUMENTAÇÃO: grava metadados do request (NÃO bloqueante, best-effort) em
+// Firestore `waPreviewDiagnostics`. Sem dados de cliente — só headers do crawler/preview.
+function logWaDiag(env, request, url) {
+  const h = request.headers;
+  const rec = {
+    ts: Date.now(),
+    path: url.pathname,
+    method: request.method,
+    ua: (h.get("user-agent") || "").slice(0, 400),
+    ip: h.get("cf-connecting-ip") || "",
+    country: (request.cf && request.cf.country) || h.get("cf-ipcountry") || "",
+    accept: (h.get("accept") || "").slice(0, 200),
+    referer: (h.get("referer") || "").slice(0, 200),
+    cfRay: h.get("cf-ray") || "",
+    isBot: isCrawlerUA(h.get("user-agent")),
+  };
+  try { console.log("[WA-DIAG]", JSON.stringify(rec)); } catch (_) {}
+  return writeWaDiag(env, rec);
+}
+async function writeWaDiag(env, rec) {
+  try {
+    const at = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+    const u = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/waPreviewDiagnostics`;
+    const fields = {
+      ts: { integerValue: String(rec.ts) },
+      path: { stringValue: rec.path }, method: { stringValue: rec.method },
+      ua: { stringValue: rec.ua }, ip: { stringValue: rec.ip },
+      country: { stringValue: rec.country }, accept: { stringValue: rec.accept },
+      referer: { stringValue: rec.referer }, cfRay: { stringValue: rec.cfRay },
+      isBot: { booleanValue: !!rec.isBot },
+    };
+    await fetch(u, { method: "POST", headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" }, body: JSON.stringify({ fields }) });
+  } catch (_) { /* best-effort */ }
+}
+// GET /wa-diag → últimos hits (JSON) p/ provar se o crawler do WhatsApp/Facebook chegou.
+async function handleWaDiagRead(env) {
+  try {
+    const at = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+    const u = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+    const q = { structuredQuery: { from: [{ collectionId: "waPreviewDiagnostics" }], orderBy: [{ field: { fieldPath: "ts" }, direction: "DESCENDING" }], limit: 50 } };
+    const res = await fetch(u, { method: "POST", headers: { "Authorization": "Bearer " + at, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+    const rows = await res.json();
+    const hits = [];
+    for (const r of (Array.isArray(rows) ? rows : [])) { if (r.document) hits.push(decodeFields(r.document.fields)); }
+    return json({ ok: true, count: hits.length, hits }, 200, env);
+  } catch (e) {
+    return json({ ok: false, error: String((e && e.message) || e) }, 200, env);
+  }
 }
 
 // V64.24 — CANÁRIO OG ISOLADO: HTML mínimo para TODOS os user-agents (sem portal, sem
