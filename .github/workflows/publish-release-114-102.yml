@@ -1,0 +1,93 @@
+# Publica RELEASE de teste com os binarios ja buildados (Desktop 1.0.114 + Android 1.0.102).
+# Push-triggered numa branch dedicada de infra. Baixa artifacts cross-run, calcula SHA-256
+# do .exe/.msi/.apk e publica numa Release (link unico). NAO builda nada, NAO toca Worker.
+name: Publicar release teste (Desktop 1.0.114 + Android 1.0.102)
+
+on:
+  push:
+    branches: [ "infra/publish-release-114-102" ]
+
+permissions:
+  contents: write
+
+env:
+  DESKTOP_RUN: "27090603682"
+  ANDROID_RUN: "27090607085"
+  DESKTOP_ARTIFACT: "agenda-id-seven-desktop-1.0.114-client-link-preview-premium-installer"
+  ANDROID_ARTIFACT: "idseven-nativebeta-1.0.102-beta-cta-toque-no-link"
+  TAG: "test/cta-toque-no-link-1.0.114-1.0.102"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar instalador Desktop (cross-run)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.DESKTOP_ARTIFACT }}
+          path: dl/desktop
+          run-id: ${{ env.DESKTOP_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Baixar APK Android (cross-run)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ANDROID_ARTIFACT }}
+          path: dl/android
+          run-id: ${{ env.ANDROID_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Localizar binarios + SHA-256 (prova)
+        run: |
+          set -euo pipefail
+          echo "== conteudo baixado =="; find dl -type f | sort
+          EXE=$(ls dl/desktop/*.exe 2>/dev/null | head -1 || true)
+          MSI=$(ls dl/desktop/*.msi 2>/dev/null | head -1 || true)
+          APK=$(ls dl/android/*.apk 2>/dev/null | head -1 || true)
+          [ -n "$EXE" ] || { echo "::error:: .exe nao encontrado"; exit 1; }
+          [ -n "$APK" ] || { echo "::error:: .apk nao encontrado"; exit 1; }
+          EXE_SHA=$(sha256sum "$EXE" | cut -d' ' -f1)
+          MSI_SHA=$([ -n "$MSI" ] && sha256sum "$MSI" | cut -d' ' -f1 || echo "n/a")
+          APK_SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          {
+            echo "EXE  $(basename "$EXE")"; echo "     $EXE_SHA"
+            echo "MSI  $([ -n "$MSI" ] && basename "$MSI" || echo n/a)"; echo "     $MSI_SHA"
+            echo "APK  $(basename "$APK")"; echo "     $APK_SHA"
+          } | tee SHA256SUMS.txt
+          echo "EXE_NAME=$(basename "$EXE")" >> "$GITHUB_ENV"
+          echo "MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo n/a)" >> "$GITHUB_ENV"
+          echo "APK_NAME=$(basename "$APK")" >> "$GITHUB_ENV"
+          echo "EXE_SHA=$EXE_SHA" >> "$GITHUB_ENV"
+          echo "MSI_SHA=$MSI_SHA" >> "$GITHUB_ENV"
+          echo "APK_SHA=$APK_SHA" >> "$GITHUB_ENV"
+
+      - name: Publicar Release (link unico)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "Teste — Desktop 1.0.114 + Android 1.0.102 (CTA Toque no link)"
+          prerelease: true
+          body: |
+            **Build de teste — CTA "TOQUE NO LINK ABAIXO" no banner + mensagem WhatsApp atualizada**
+
+            - Desktop: **1.0.114-cta-toque-no-link** (run ${{ env.DESKTOP_RUN }})
+            - Android: **1.0.102-beta-cta-toque-no-link** (versionCode 100 · run ${{ env.ANDROID_RUN }}) — bump de paridade
+            - Worker: **V64.26-cta-toque-no-link** (banner com CTA "TOQUE NO LINK ABAIXO")
+
+            Mensagem do WhatsApp (gerada pelo Desktop): "Toque no cartão abaixo para revisar e aprovar." + link premium
+            `https://aprovar.agendaidseven.com.br/cliente/cronograma/<TOKEN>`
+
+            **SHA-256**
+            ```
+            EXE  ${{ env.EXE_NAME }}
+                 ${{ env.EXE_SHA }}
+            MSI  ${{ env.MSI_NAME }}
+                 ${{ env.MSI_SHA }}
+            APK  ${{ env.APK_NAME }}
+                 ${{ env.APK_SHA }}
+            ```
+          files: |
+            dl/desktop/*.exe
+            dl/desktop/*.msi
+            dl/android/*.apk
+            SHA256SUMS.txt
