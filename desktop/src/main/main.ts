@@ -5,8 +5,10 @@
  * - Autostart Windows opcional (sobe oculto na tray no login)
  * - Notifier + Reminder rodam aqui (sobrevivem a janela escondida)
  */
-import { app, BrowserWindow, Tray, ipcMain, Notification, shell } from "electron";
+import { app, BrowserWindow, Tray, ipcMain, Notification, shell, clipboard, nativeImage, dialog } from "electron";
 import path from "path";
+import fs from "fs";
+import os from "os";
 import { createTray } from "./tray";
 import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
@@ -131,6 +133,41 @@ app.whenReady().then(() => {
   ipcMain.handle("open-external", async (_e, url: string) => {
     try { await shell.openExternal(String(url)); return true; }
     catch { return false; }
+  });
+
+  // ===== 1.0.114 — ENVIO PREMIUM (imagem real do card p/ WhatsApp) =====
+  // Salva os bytes do card (JPG) em disco e devolve o caminho. Pasta padrão: Downloads.
+  ipcMain.handle("save-card-image", (_e, payload: { bytes: ArrayBuffer | Uint8Array; filename: string }) => {
+    try {
+      const dir = app.getPath("downloads") || os.tmpdir();
+      const safe = String(payload?.filename || "agenda-id-seven-card.jpg").replace(/[^A-Za-z0-9._-]/g, "_");
+      const dest = path.join(dir, safe);
+      fs.writeFileSync(dest, Buffer.from(payload.bytes as any));
+      return { ok: true, path: dest };
+    } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+  });
+  // Copia a IMAGEM do card para a área de transferência (usuário cola direto no WhatsApp).
+  ipcMain.handle("copy-card-image", (_e, bytes: ArrayBuffer | Uint8Array) => {
+    try {
+      const img = nativeImage.createFromBuffer(Buffer.from(bytes as any));
+      if (img.isEmpty()) return { ok: false, error: "imagem vazia" };
+      clipboard.writeImage(img);
+      return { ok: true };
+    } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+  });
+  // Revela o arquivo salvo no explorador de arquivos.
+  ipcMain.handle("show-in-folder", (_e, p: string) => {
+    try { shell.showItemInFolder(String(p)); return true; } catch { return false; }
+  });
+  // Diálogo "Salvar como…" (opcional) — devolve caminho escolhido + grava.
+  ipcMain.handle("save-card-image-as", async (_e, payload: { bytes: ArrayBuffer | Uint8Array; filename: string }) => {
+    try {
+      const safe = String(payload?.filename || "agenda-id-seven-card.jpg").replace(/[^A-Za-z0-9._-]/g, "_");
+      const r = await dialog.showSaveDialog({ defaultPath: safe, filters: [{ name: "Imagem", extensions: ["jpg", "jpeg", "png"] }] });
+      if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+      fs.writeFileSync(r.filePath, Buffer.from(payload.bytes as any));
+      return { ok: true, path: r.filePath };
+    } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
   });
 
   // Deep link no cold start (app aberto pelo proprio idseven://...).

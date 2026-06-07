@@ -18,6 +18,14 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   },
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
+  // 1.0.114 — ENVIO PREMIUM: imagem real do card p/ anexar no WhatsApp.
+  saveCardImage: (bytes: ArrayBuffer | Uint8Array, filename: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke("save-card-image", { bytes, filename }),
+  saveCardImageAs: (bytes: ArrayBuffer | Uint8Array, filename: string): Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }> =>
+    ipcRenderer.invoke("save-card-image-as", { bytes, filename }),
+  copyCardImage: (bytes: ArrayBuffer | Uint8Array): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke("copy-card-image", bytes),
+  showInFolder: (p: string): Promise<boolean> => ipcRenderer.invoke("show-in-folder", p),
   isDesktop: true,
-  version: "1.0.98-desktop-agency-operational-phase-fix",
+  version: "1.0.114-whatsapp-media-card-fix",
 });
