@@ -10,6 +10,10 @@
 name: Validar card premium do link do cliente (OG/WhatsApp)
 
 on:
+  # Push-triggered numa branch dedicada de infra (a API de workflow_dispatch so enxerga
+  # workflows da branch default; por isso usamos push, como no publish-test-release).
+  push:
+    branches: [ "infra/validate-client-card" ]
   workflow_dispatch:
     inputs:
       client_name:
