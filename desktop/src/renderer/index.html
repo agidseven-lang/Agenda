@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.115 (Domínio premium)</title>
+<title>ID Seven · Desktop 1.0.116 (Domínio premium)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1103,8 +1103,8 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.115 · Domínio premium</span><br>
-    espelha o APK <b>1.0.104-beta-whatsapp-real-card-send</b> · ref app/main
+    <span class="pill-ver">Desktop 1.0.116 · Domínio premium</span><br>
+    espelha o APK <b>1.0.105-beta-form-unlock-hotfix</b> · ref app/main
   </div>
 </section>
 
@@ -1118,7 +1118,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.115 · Domínio premium</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.116 · Domínio premium</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1134,7 +1134,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.115', tag:'Envio real do card', apk:'1.0.104-beta-whatsapp-real-card-send' };
+const APP_VER={ desktop:'1.0.116', tag:'Hotfix formulário', apk:'1.0.105-beta-form-unlock-hotfix' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1284,9 +1284,9 @@ function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeIte
 function startApp(u){state.user=u;saveSession(u);document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
 function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';renderLogin();}
 function subscribeData(){
-  unsub.users=db.collection('users').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}render();});
-  unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));render();});
-  unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=dedupById(s.docs.map(d=>Object.assign({id:d.id},d.data())));render();});
+  unsub.users=db.collection('users').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}renderFromSnapshot();});
+  unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderFromSnapshot();});
+  unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=dedupById(s.docs.map(d=>Object.assign({id:d.id},d.data())));renderFromSnapshot();});
 }
 // 1.0.104 — dedup defensivo por id: garante uma ÚNICA fonte por tarefa antes do render.
 // Se o snapshot trouxer (ou um fallback acumular) o mesmo id, mantém a última ocorrência.
@@ -1366,6 +1366,14 @@ async function pendingChange(p1,p2,btn){
 
 /* ---- APP RENDER ---- */
 const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'}];
+// 1.0.116-form-unlock-hotfix — CAUSA RAIZ do "nada responde": um snapshot do Firestore
+// (users/events/tasks) chegava enquanto o WIZARD de criação estava aberto e RECONSTRUÍA o
+// #content por baixo do usuário — destruindo o campo/clique/foco a cada atualização de dados
+// (em uma agência com vários usuários, isso é constante). Resultado: a tela parecia travada.
+// FIX: snapshots de fundo NÃO repintam enquanto há um formulário aberto (state.form). Os dados
+// continuam atualizando em memória; ações explícitas do usuário (Próximo/Voltar/etc.) seguem
+// chamando render() normalmente; ao salvar/fechar, render() reflete tudo.
+function renderFromSnapshot(){ if(state.form) return; render(); }
 function render(){
   if(!state.user)return;
   // 1.0.102 — NUNCA re-renderizar por baixo de uma edição aberta. Se há um modal aberto com
@@ -1383,7 +1391,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.115 · Domínio premium</span><br>espelha o APK <b>1.0.104-beta-whatsapp-real-card-send</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.116 · Domínio premium</span><br>espelha o APK <b>1.0.105-beta-form-unlock-hotfix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2612,10 +2620,10 @@ const CLIENT_REVIEW_BASE='https://idseven-push.agidseven.workers.dev';
 // 1.0.112 — LINK PÚBLICO PREMIUM do cliente (domínio da marca). O mesmo Worker atende este
 // subdomínio (rota Cloudflare aprovar.agendaidseven.com.br/*). Requer o DNS+Route aplicados.
 const CLIENT_LINK_BASE='https://aprovar.agendaidseven.com.br';
-// 1.0.115-whatsapp-media-card — imagem REAL do card premium (mesmo domínio), enviada como
+// 1.0.116-whatsapp-media-card — imagem REAL do card premium (mesmo domínio), enviada como
 // mídia no WhatsApp. Rota servida pelo Worker (image/jpeg 1200×630, sem query).
 const CARD_IMG_URL='https://aprovar.agendaidseven.com.br/og/wa-card-v64-26.jpg';
-// 1.0.115 — HARDENING: o link público do cliente NUNCA pode sair sem token. Se o token
+// 1.0.116 — HARDENING: o link público do cliente NUNCA pode sair sem token. Se o token
 // vier vazio/nulo, LANÇA (em vez de emitir .../cliente/cronograma/ sem token) — assim é
 // impossível copiar/enviar um link incompleto. O fluxo de envio já garante o token
 // (ensureReviewToken + read-back no Firestore) antes de montar a mensagem.
@@ -2637,7 +2645,7 @@ function buildClientMessage(ctx){
   const nome=(ctx&&ctx.client)||'cliente';
   const tipoRaw=((ctx&&ctx.type)||'').toLowerCase().trim();
   const url=buildPublicClientUrl(ctx&&ctx.token);
-  // 1.0.115-whatsapp-real-card-send — CAPTION CURTA e LIMPA. O card vai como IMAGEM REAL
+  // 1.0.116-whatsapp-real-card-send — CAPTION CURTA e LIMPA. O card vai como IMAGEM REAL
   // anexada; o link (com token) fica sozinho num bloco abaixo. SEM duplicar periodicidade
   // (nunca "cronograma semanal (cronograma quinzenal)") — um único tipo correto.
   const tdc = (!tipoRaw) ? 'cronograma'
@@ -2734,7 +2742,7 @@ async function openSendClientModal(taskOrForm){
   '</div></div>';
   _wirePremiumSend(ctx, msg, cardFile);
 }
-// 1.0.115-whatsapp-real-card-send — busca a imagem REAL do card (Worker) e liga o fluxo de
+// 1.0.116-whatsapp-real-card-send — busca a imagem REAL do card (Worker) e liga o fluxo de
 // envio premium. Botão PRIMÁRIO "Salvar imagem e abrir WhatsApp": salva o arquivo em Downloads,
 // abre a pasta (p/ arrastar/anexar), copia a mensagem e abre o WhatsApp. NÃO promete anexo
 // automático (o whatsapp:// só carrega texto) — garante a imagem pronta para anexar.
@@ -3081,7 +3089,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.115-whatsapp-real-card-send';
+const BUILD='1.0.116-form-unlock-hotfix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -3093,7 +3101,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.115 · Domínio premium</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.116 · Domínio premium</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -3126,7 +3134,7 @@ function openSheet(which){
   const u=state.user;let rows,title;
   if(which==='conta'){title='Conta';rows=[['Nome',u.name],['Função',u.role||'Não informado'],['E-mail',u.email||'Não informado'],['WhatsApp',u.phone||'Não informado'],['Status','Ativa'],['Permissão',u.admin?'Administrador':'Membro da equipe'],['ID do usuário',u.id]];}
   else if(which==='seguranca'){title='Segurança';rows=[['Sessão','Ativa neste navegador'],['Login','Custom (hash s2 / SHA-256)'],['UID',u.id],['Sessão salva','Local (localStorage)']];}
-  else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.104-beta-whatsapp-real-card-send'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
+  else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.105-beta-form-unlock-hotfix'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800;margin-bottom:10px">'+title+'</div>'+
     rows.map(r=>'<div class="infoline"><div class="il">'+esc(r[0])+'</div><div class="iv">'+esc(r[1])+'</div></div>').join('')+
     (which==='seguranca'?'<div style="height:14px"></div><button class="btn" data-logout="1" style="background:'+withAlpha('#F87171',.14)+';color:var(--red)">Sair da conta</button>':'')+'</div></div>';
@@ -3134,7 +3142,7 @@ function openSheet(which){
 
 /* ---- TASK FORM (wizard) ---- */
 function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],checklist:[],link:'',obs:'',_openContent:null};}
-function openTaskForm(sector){state.form=newForm(sector);if(sector)state.form.step=1;render();}
+function openTaskForm(sector){closeModal();state.form=newForm(sector);if(sector)state.form.step=1;render();}
 function tpl(){return state.form.sector?TEMPLATES[secOf(state.form.sector).key]:null;}
 function curSub(){const t=tpl();return (t&&t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;}
 function renderForm(){

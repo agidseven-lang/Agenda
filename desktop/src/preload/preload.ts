@@ -27,5 +27,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.invoke("copy-card-image", bytes),
   showInFolder: (p: string): Promise<boolean> => ipcRenderer.invoke("show-in-folder", p),
   isDesktop: true,
-  version: "1.0.115-whatsapp-real-card-send",
+  version: "1.0.116-form-unlock-hotfix",
 });
