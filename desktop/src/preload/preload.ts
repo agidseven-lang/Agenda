@@ -27,5 +27,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.invoke("copy-card-image", bytes),
   showInFolder: (p: string): Promise<boolean> => ipcRenderer.invoke("show-in-folder", p),
   isDesktop: true,
-  version: "1.0.116-form-unlock-hotfix",
+  version: "1.0.117-whatsapp-clean-send-hotfix",
 });
