@@ -534,7 +534,10 @@ check('GUIDED_8', 'GATE: refreshGate libera etapa3 só com card&&imgSaved&&legen
 check('GUIDED_9', '_gateValidLink exige domínio premium + token, rejeita workers.dev e final /cronograma/', /function _gateValidLink\(ctx,msg\)/.test(DH) && /https:\/\/aprovar\.agendaidseven\.com\.br\/cliente\/cronograma\//.test(DH) && /workers\.dev/.test(DH) && /\\\/cliente\\\/cronograma\\\/\?\$/.test(DH));
 check('GUIDED_10', 'ANTI-ÍCONE-GIGANTE: CSS .gcs-sheet svg fixa 18px (blindagem) e header 20px', /\.gcs-sheet svg\{width:18px;height:18px/.test(DH) && /\.gcs-headic svg\{width:20px;height:20px\}/.test(DH));
 check('GUIDED_11', 'SEM botão solto antigo (btnPrepare/btnSaveAndWa/btnOpenWa) e SEM _wirePremiumSend', !/id="btnPrepare"/.test(DH) && !/id="btnSaveAndWa"/.test(DH) && !/id="btnOpenWa"/.test(DH) && !/function _wirePremiumSend/.test(DH));
-check('GUIDED_12', 'openWhatsAppWebOnly NUNCA usa send?text= / app:// (só https://web.whatsapp.com/)', /function openWhatsAppWebOnly\(\)\{/.test(DH) && /const WEB='https:\/\/web\.whatsapp\.com\/'/.test(DH) && !/openWhatsAppWebOnly[\s\S]{0,400}send\?text=/.test(DH));
+check('GUIDED_12', 'openWhatsAppWebOnly NUNCA usa send?text= / app:// (corpo executável, sem comentários)', (() => {
+  const body = (DH.match(/function openWhatsAppWebOnly\(\)\{[\s\S]*?\n\}/) || [''])[0].replace(/^\s*\/\/.*$/gm, '');  // remove só linhas de comentário puro
+  return /const WEB='https:\/\/web\.whatsapp\.com\/'/.test(body) && body.indexOf('send?text=') < 0 && body.indexOf('whatsapp://send') < 0;
+})());
 // Secundários discretos (apoio — NUNCA abrem WhatsApp)
 check('GUIDED_13', 'Secundários presentes (Copiar imagem/legenda, Abrir pasta, Testar link, Fechar) e NÃO abrem WhatsApp', /id="btnCopyImg"/.test(DH) && /id="btnCopyMsg"/.test(DH) && /id="btnOpenFolder"/.test(DH) && /data-clientview=/.test(DH) && !/on\('btnCopyImg'[\s\S]{0,300}openWhatsApp/.test(DH));
 // Electron IPC (main + preload)
