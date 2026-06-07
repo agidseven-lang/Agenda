@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.114 (Domínio premium)</title>
+<title>ID Seven · Desktop 1.0.115 (Domínio premium)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1103,8 +1103,8 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.114 · Domínio premium</span><br>
-    espelha o APK <b>1.0.103-beta-whatsapp-media-card-fix</b> · ref app/main
+    <span class="pill-ver">Desktop 1.0.115 · Domínio premium</span><br>
+    espelha o APK <b>1.0.104-beta-whatsapp-real-card-send</b> · ref app/main
   </div>
 </section>
 
@@ -1118,7 +1118,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.114 · Domínio premium</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.115 · Domínio premium</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1134,7 +1134,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.114', tag:'Envio premium (imagem)', apk:'1.0.103-beta-whatsapp-media-card-fix' };
+const APP_VER={ desktop:'1.0.115', tag:'Envio real do card', apk:'1.0.104-beta-whatsapp-real-card-send' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1383,7 +1383,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.114 · Domínio premium</span><br>espelha o APK <b>1.0.103-beta-whatsapp-media-card-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.115 · Domínio premium</span><br>espelha o APK <b>1.0.104-beta-whatsapp-real-card-send</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2612,10 +2612,10 @@ const CLIENT_REVIEW_BASE='https://idseven-push.agidseven.workers.dev';
 // 1.0.112 — LINK PÚBLICO PREMIUM do cliente (domínio da marca). O mesmo Worker atende este
 // subdomínio (rota Cloudflare aprovar.agendaidseven.com.br/*). Requer o DNS+Route aplicados.
 const CLIENT_LINK_BASE='https://aprovar.agendaidseven.com.br';
-// 1.0.114-whatsapp-media-card — imagem REAL do card premium (mesmo domínio), enviada como
+// 1.0.115-whatsapp-media-card — imagem REAL do card premium (mesmo domínio), enviada como
 // mídia no WhatsApp. Rota servida pelo Worker (image/jpeg 1200×630, sem query).
 const CARD_IMG_URL='https://aprovar.agendaidseven.com.br/og/wa-card-v64-26.jpg';
-// 1.0.114 — HARDENING: o link público do cliente NUNCA pode sair sem token. Se o token
+// 1.0.115 — HARDENING: o link público do cliente NUNCA pode sair sem token. Se o token
 // vier vazio/nulo, LANÇA (em vez de emitir .../cliente/cronograma/ sem token) — assim é
 // impossível copiar/enviar um link incompleto. O fluxo de envio já garante o token
 // (ensureReviewToken + read-back no Firestore) antes de montar a mensagem.
@@ -2635,16 +2635,15 @@ function buildInternalClientLink(ctx){return 'idseven://client/'+((ctx&&ctx.id)|
 // (1) Mensagem profissional, texto humano, com LINK PÚBLICO HTTPS. Sem idseven://, sem encode.
 function buildClientMessage(ctx){
   const nome=(ctx&&ctx.client)||'cliente';
-  const tipo=((ctx&&ctx.type)||'').toLowerCase();
-  const proj=(ctx&&ctx.title)?String(ctx.title).trim():'';
+  const tipoRaw=((ctx&&ctx.type)||'').toLowerCase().trim();
   const url=buildPublicClientUrl(ctx&&ctx.token);
-  // 1.0.114-whatsapp-media-card — CAPTION OFICIAL: o card vai como IMAGEM REAL anexada e o
-  // link completo (com token) entra abaixo. Orientação principal: "Toque no link abaixo".
-  const etapa=proj
-    ? ('A primeira etapa do *'+proj+'* (cronograma '+tipo+') já está pronta para sua avaliação.')
-    : ('A primeira etapa do seu cronograma '+tipo+' de conteúdos já está pronta para sua avaliação.');
+  // 1.0.115-whatsapp-real-card-send — CAPTION CURTA e LIMPA. O card vai como IMAGEM REAL
+  // anexada; o link (com token) fica sozinho num bloco abaixo. SEM duplicar periodicidade
+  // (nunca "cronograma semanal (cronograma quinzenal)") — um único tipo correto.
+  const tdc = (!tipoRaw) ? 'cronograma'
+    : (tipoRaw.indexOf('cronograma')>=0 ? tipoRaw : ('cronograma '+tipoRaw));
   return 'Olá, '+nome+'. 👋\n\n'+
-    etapa+'\n\n'+
+    'Seu *'+tdc+'* já está disponível para avaliação.\n\n'+
     'Toque no link abaixo para revisar e aprovar:\n\n'+
     url+'\n\n'+
     '*Equipe ID Seven*';
@@ -2708,10 +2707,10 @@ async function openSendClientModal(taskOrForm){
     '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
     '<div class="sp-ic">'+svg('send')+'</div>'+
     '<div class="sp-title">Preparar envio premium para WhatsApp</div>'+
-    '<div class="sp-sub">Envie o <b>card premium como imagem</b> e cole a mensagem (com o link) abaixo. Assim o cliente vê sempre o visual premium — <b>sem depender</b> do preview automático do WhatsApp.</div>'+
-    '<div class="sp-lbl">1. CARD PREMIUM <span class="sp-lbl-note">(anexe como imagem)</span></div>'+
+    '<div class="sp-sub">O cliente precisa ver o <b>card premium como imagem</b>. <b>Anexe a imagem</b> no WhatsApp e <b>cole a mensagem</b> abaixo dela. O link vai no texto. O preview automático do WhatsApp é só bônus.</div>'+
+    '<div class="sp-lbl">1. CARD PREMIUM <span class="sp-lbl-note">(é ISTO que o cliente deve ver — anexe como imagem)</span></div>'+
     '<div class="sp-prev" style="text-align:center">'+
-      '<img id="cardImgPreview" alt="Card premium ID Seven" style="width:100%;max-width:520px;border-radius:12px;border:1px solid var(--line-soft);display:block;margin:0 auto 8px;background:var(--surface)"/>'+
+      '<img id="cardImgPreview" alt="Card premium ID Seven" style="width:100%;max-width:560px;border-radius:12px;border:1px solid var(--line-soft);display:block;margin:0 auto 8px;background:var(--surface)"/>'+
       '<div id="cardImgStatus" class="sp-prev-r">Gerando imagem do card…</div>'+
     '</div>'+
     '<div class="sp-lbl">2. MENSAGEM / LEGENDA <span class="sp-lbl-note">(cole abaixo da imagem)</span></div>'+
@@ -2723,38 +2722,53 @@ async function openSendClientModal(taskOrForm){
         '<div class="sp-cta-ext">'+svg('ext')+'</div>'+
       '</div>'+
     '</div>'+
-    '<div class="sp-warn">'+svg('info')+'<span><b>Anexe esta imagem no WhatsApp</b> e cole a mensagem copiada abaixo. O preview automático do WhatsApp é apenas bônus — a imagem garante o visual premium sempre.</span></div>'+
-    '<div class="sp-actions">'+
-      '<button class="btn ghost" data-modalclose="1">Cancelar</button>'+
+    '<div class="sp-warn">'+svg('info')+'<span><b>Envie esta imagem no WhatsApp e cole a mensagem abaixo.</b> Só "Abrir WhatsApp" manda apenas texto/link — para o cliente ver o card premium, a IMAGEM precisa ser anexada. Use o botão primário abaixo (salva a imagem, abre a pasta e o WhatsApp).</span></div>'+
+    '<div class="sp-actions" style="flex-wrap:wrap;gap:8px">'+
+      '<button class="btn sp-go" id="btnSaveAndWa" style="flex:1 1 100%">'+svg('send')+'Salvar imagem e abrir WhatsApp</button>'+
       '<button class="btn ghost" id="btnCopyMsg">'+svg('copy')+'Copiar mensagem</button>'+
       '<button class="btn ghost" id="btnCopyImg">'+svg('copy')+'Copiar imagem</button>'+
-      '<button class="btn ghost" id="btnSaveImg">'+svg('copy')+'Salvar imagem</button>'+
-      '<button class="btn sp-go" id="btnOpenWa">'+svg('send')+'Abrir WhatsApp</button>'+
+      '<button class="btn ghost" id="btnOpenFolder">'+svg('ext')+'Abrir pasta</button>'+
+      '<button class="btn ghost" data-clientview="'+(ctx.isForm?'':esc(ctx.id))+'">'+svg('eye')+'Testar link</button>'+
+      '<button class="btn ghost" data-modalclose="1">Fechar</button>'+
     '</div>'+
   '</div></div>';
   _wirePremiumSend(ctx, msg, cardFile);
 }
-// 1.0.114-whatsapp-media-card — busca a imagem REAL do card (Worker) e liga os botões do envio
-// premium: copiar mensagem, copiar imagem (clipboard nativo via Electron), salvar imagem (disco
-// + abrir pasta) e abrir WhatsApp já com a mensagem. NÃO promete envio automático.
+// 1.0.115-whatsapp-real-card-send — busca a imagem REAL do card (Worker) e liga o fluxo de
+// envio premium. Botão PRIMÁRIO "Salvar imagem e abrir WhatsApp": salva o arquivo em Downloads,
+// abre a pasta (p/ arrastar/anexar), copia a mensagem e abre o WhatsApp. NÃO promete anexo
+// automático (o whatsapp:// só carrega texto) — garante a imagem pronta para anexar.
 async function _wirePremiumSend(ctx, msg, cardFile){
   const api=(window.desktopAPI||{});
-  let bytes=null;
+  let bytes=null, savedPath=null;
   const img=document.getElementById('cardImgPreview');
   const status=document.getElementById('cardImgStatus');
   try{
     const r=await fetch(CARD_IMG_URL,{cache:'no-store'});
     if(!r.ok) throw new Error('HTTP '+r.status);
     bytes=await r.arrayBuffer();
-    const blob=new Blob([bytes],{type:'image/jpeg'});
-    if(img) img.src=URL.createObjectURL(blob);
+    if(img) img.src=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'}));
     if(status) status.textContent='Imagem pronta • '+cardFile+' (1200×630)';
   }catch(e){ if(status) status.textContent='Não foi possível carregar a imagem do card. Verifique a conexão e tente novamente.'; }
   const on=(id,fn)=>{const b=document.getElementById(id); if(b) b.addEventListener('click',fn);};
+  async function ensureSaved(){
+    if(savedPath) return savedPath;
+    if(!bytes) return null;
+    if(api.saveCardImage){ const r=await api.saveCardImage(new Uint8Array(bytes),cardFile); if(r&&r.ok){ savedPath=r.path; return savedPath; } return null; }
+    try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'})); a.download=cardFile; a.click(); return cardFile; }catch(_){ return null; }
+  }
+  // PRIMÁRIO: salva imagem + abre pasta + copia mensagem + abre WhatsApp.
+  on('btnSaveAndWa',async function(){
+    if(!bytes){flashToast('A imagem ainda não carregou. Aguarde 1s e tente de novo.');return;}
+    copyToClipboard(msg);
+    const p=await ensureSaved();
+    if(p&&api.showInFolder) api.showInFolder(p);
+    flashToast(p?('Imagem salva: '+p+'. Anexe-a no WhatsApp e cole a mensagem (já copiada).'):'Imagem pronta. Anexe no WhatsApp e cole a mensagem (já copiada).');
+    openWhatsApp(buildWhatsAppAppUrl(msg),buildWhatsAppWebUrl(msg));
+  });
   on('btnCopyMsg',function(){ copyToClipboard(msg); flashToast('Mensagem copiada. Cole abaixo da imagem no WhatsApp.'); });
-  on('btnCopyImg',async function(){ if(!bytes){flashToast('A imagem ainda não carregou.');return;} if(api.copyCardImage){const r=await api.copyCardImage(new Uint8Array(bytes)); flashToast((r&&r.ok)?'Imagem copiada — cole (Ctrl+V) no WhatsApp.':'Não foi possível copiar a imagem.');} else { flashToast('Use "Salvar imagem" e anexe o arquivo no WhatsApp.'); } });
-  on('btnSaveImg',async function(){ if(!bytes){flashToast('A imagem ainda não carregou.');return;} if(api.saveCardImage){const r=await api.saveCardImage(new Uint8Array(bytes),cardFile); if(r&&r.ok){flashToast('Imagem salva em: '+r.path); if(api.showInFolder)api.showInFolder(r.path);} else {flashToast('Não foi possível salvar a imagem.');}} else { try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'}));a.download=cardFile;a.click();flashToast('Imagem baixada: '+cardFile);}catch(_){flashToast('Recurso disponível no app Desktop.');} } });
-  on('btnOpenWa',function(){ copyToClipboard(msg); openWhatsApp(buildWhatsAppAppUrl(msg),buildWhatsAppWebUrl(msg)); });
+  on('btnCopyImg',async function(){ if(!bytes){flashToast('A imagem ainda não carregou.');return;} if(api.copyCardImage){const r=await api.copyCardImage(new Uint8Array(bytes)); flashToast((r&&r.ok)?'Imagem copiada — cole (Ctrl+V) no WhatsApp.':'Não foi possível copiar a imagem.');} else { const p=await ensureSaved(); flashToast(p?('Imagem salva: '+p+' — anexe no WhatsApp.'):'Use "Salvar imagem e abrir WhatsApp".'); } });
+  on('btnOpenFolder',async function(){ const p=await ensureSaved(); if(p&&api.showInFolder){api.showInFolder(p);flashToast('Pasta aberta: '+p);} else if(p){flashToast('Imagem salva: '+p);} else {flashToast('Não foi possível salvar/abrir a imagem.');} });
 }
 /* ===== VISÃO DO CLIENTE — tela real (rota dedicada) =====
    Aberta via state.clientView=<taskId>. Le a tarefa AO VIVO de state.tasks
@@ -3067,7 +3081,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.114-whatsapp-media-card-fix';
+const BUILD='1.0.115-whatsapp-real-card-send';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
@@ -3079,7 +3093,7 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.114 · Domínio premium</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.115 · Domínio premium</div></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -3112,7 +3126,7 @@ function openSheet(which){
   const u=state.user;let rows,title;
   if(which==='conta'){title='Conta';rows=[['Nome',u.name],['Função',u.role||'Não informado'],['E-mail',u.email||'Não informado'],['WhatsApp',u.phone||'Não informado'],['Status','Ativa'],['Permissão',u.admin?'Administrador':'Membro da equipe'],['ID do usuário',u.id]];}
   else if(which==='seguranca'){title='Segurança';rows=[['Sessão','Ativa neste navegador'],['Login','Custom (hash s2 / SHA-256)'],['UID',u.id],['Sessão salva','Local (localStorage)']];}
-  else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.103-beta-whatsapp-media-card-fix'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
+  else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.104-beta-whatsapp-real-card-send'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800;margin-bottom:10px">'+title+'</div>'+
     rows.map(r=>'<div class="infoline"><div class="il">'+esc(r[0])+'</div><div class="iv">'+esc(r[1])+'</div></div>').join('')+
     (which==='seguranca'?'<div style="height:14px"></div><button class="btn" data-logout="1" style="background:'+withAlpha('#F87171',.14)+';color:var(--red)">Sair da conta</button>':'')+'</div></div>';
