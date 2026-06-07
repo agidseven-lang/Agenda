@@ -1,6 +1,7 @@
-# DIAGNOSTICO do link REAL do cliente (por que o WhatsApp mostrou preview pobre).
+# DIAGNOSTICO/RE-VALIDACAO do link REAL do cliente (V64.22).
 # Push-triggered numa branch dedicada de infra. NAO cria/apaga nada, NAO toca Worker.
-# Apenas busca o link real com user-agents de crawler e despeja HTML/headers/og tags.
+# Busca o link real com user-agents de crawler, despeja og tags e ASSERTA que agora o
+# card premium (banner 1200x630 cache-busted) aparece mesmo quando o link cai em 404.
 name: Diagnostico card real (WhatsApp/OG)
 
 on:
@@ -12,57 +13,61 @@ permissions:
 
 env:
   REAL: "https://aprovar.agendaidseven.com.br/cliente/cronograma/5b6fff9b6a25b646e78c1430f084ba5c28004a3f34e082be5"
-  IMG: "https://aprovar.agendaidseven.com.br/og/aprovar.png"
+  IMGV: "https://aprovar.agendaidseven.com.br/og/aprovar.png?v=64-22"
 
 jobs:
   diagnose:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe do link real com crawlers
+      - name: Probe do link real com crawlers + assercoes
         run: |
           set -uo pipefail
           UA_FB="facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
           UA_WA="WhatsApp/2.23.20.0 A"
           UA_TW="Twitterbot/1.0"
-          UA_BR="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
+          FAIL=0
 
           probe () {
-            local UA="$1" LABEL="$2" body hdr
+            local UA="$1" LABEL="$2" body hdr og
             body="$(mktemp)"; hdr="$(mktemp)"
             echo ""
             echo "############################################################"
-            echo "## [$LABEL]  UA='$UA'"
+            echo "## [$LABEL]"
             echo "############################################################"
-            # -L segue redirect; -D headers; salva corpo
             curl -sS -L --max-time 30 -A "$UA" -D "$hdr" -o "$body" "$REAL" || echo "(curl falhou)"
-            echo "----- STATUS + HEADERS (com redirects) -----"
-            cat "$hdr"
-            echo "----- bytes do corpo: $(wc -c < "$body") -----"
-            echo "----- <head> (ate </head>) -----"
-            awk 'BEGIN{IGNORECASE=1} /<head/{f=1} f{print} /<\/head>/{exit}' "$body" | head -60
-            echo "----- META OG/twitter encontradas -----"
-            grep -oiE '<meta (property|name)="(og:[a-z:]+|twitter:[a-z]+)" content="[^"]*"' "$body" || echo "(NENHUMA meta og/twitter encontrada)"
-            echo "----- QUAL PAGINA renderizou? -----"
-            grep -qi 'Aprovar cronograma' "$body" && echo "  -> hero 'Aprovar cronograma' (renderClientHtml: TEM banner)" || true
-            grep -qi 'Cronograma aprovado com sucesso' "$body" && echo "  -> SUCCESS page (SEM og:image)" || true
-            grep -qi 'Temas aprovados!\|Legendas e artes aprovadas' "$body" && echo "  -> PHASE-ACK page (SEM og:image)" || true
-            grep -qi 'Cronograma não encontrado\|Link inválido\|Algo deu errado\|Indisponível' "$body" && echo "  -> ERROR page (SEM og:image premium)" || true
-            grep -qi '"ok":true,"service":"idseven-push"' "$body" && echo "  -> !!! FALLBACK JSON health (ERRADO)" || true
+            echo "----- status + content-type -----"
+            grep -iE '^HTTP/|^content-type:|^cache-control:|^location:' "$hdr" || true
+            echo "----- og/twitter encontradas -----"
+            og="$(grep -oiE '<meta (property|name)="(og:[a-z:_]+|twitter:[a-z]+)" content="[^"]*"' "$body" || true)"
+            echo "$og"
+            echo "----- assercoes [$LABEL] -----"
+            if echo "$og" | grep -qiE 'og:image" content="https://aprovar\.agendaidseven\.com\.br/og/aprovar\.png\?v=64-22"'; then
+              echo "  OK: og:image = banner premium cache-busted (?v=64-22)"
+            else
+              echo "  FALHA: og:image premium cache-busted AUSENTE"; FAIL=1
+            fi
+            echo "$og" | grep -qiE 'og:image:secure_url" content="https://aprovar' && echo "  OK: og:image:secure_url premium" || { echo "  FALHA: secure_url ausente"; FAIL=1; }
+            echo "$og" | grep -qiE 'twitter:card" content="summary_large_image"' && echo "  OK: twitter summary_large_image" || { echo "  FALHA: twitter card"; FAIL=1; }
+            if echo "$og" | grep -qi 'workers.dev'; then echo "  FALHA: workers.dev no card"; FAIL=1; else echo "  OK: sem workers.dev"; fi
           }
           probe "$UA_FB" "facebookexternalhit"
           probe "$UA_WA" "WhatsApp"
           probe "$UA_TW" "Twitterbot"
-          probe "$UA_BR" "Navegador (comparacao)"
 
-      - name: Probe da imagem og (headers que o WhatsApp avalia)
-        run: |
-          set -uo pipefail
-          echo "== HEAD $IMG (crawler) =="
-          curl -sS -L --max-time 30 -A "facebookexternalhit/1.1" -I "$IMG" || echo "(falhou)"
-          echo "== GET tamanho/tipo =="
-          curl -sS -L --max-time 30 -A "WhatsApp/2.23" -o /tmp/og.png -w 'HTTP %{http_code} | type=%{content_type} | bytes=%{size_download} | redirects=%{num_redirects}\n' "$IMG"
+          echo ""
+          echo "== og:image cache-busted ($IMGV) =="
+          ct=$(curl -sS -L --max-time 30 -A "WhatsApp/2.23" -o /tmp/og.png -w '%{content_type}' "$IMGV")
+          echo "content-type=$ct  bytes=$(wc -c < /tmp/og.png)"
+          echo "$ct" | grep -qi 'image/png' || { echo "FALHA: imagem nao e image/png"; FAIL=1; }
           node -e '
             const b=require("fs").readFileSync("/tmp/og.png");
             const sig=[0x89,0x50,0x4e,0x47].every((x,i)=>b[i]===x);
-            console.log("PNG sig:", sig, "dims:", b.readUInt32BE(16)+"x"+b.readUInt32BE(20), "bytes:", b.length);
-          ' || echo "(node check falhou)"
+            const w=b.readUInt32BE(16),h=b.readUInt32BE(20);
+            if(!sig||w!==1200||h!==630){console.error("FALHA: PNG "+w+"x"+h);process.exit(1);}
+            console.log("OK: PNG 1200x630 ("+b.length+" bytes)");
+          ' || FAIL=1
+
+          echo ""
+          echo "=================================================="
+          if [ "$FAIL" = "0" ]; then echo " RESULTADO: card premium presente no link real (mesmo 404)."; else echo " RESULTADO: AINDA HA FALHA — ver acima."; exit 1; fi
+          echo "=================================================="
