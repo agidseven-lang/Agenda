@@ -27,5 +27,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.invoke("copy-card-image", bytes),
   showInFolder: (p: string): Promise<boolean> => ipcRenderer.invoke("show-in-folder", p),
   isDesktop: true,
-  version: "1.0.118-whatsapp-premium-definitive-send",
+  version: "1.0.119-whatsapp-aurora-premium-card",
 });
