@@ -12,8 +12,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 102
-        versionName "1.0.104-beta-whatsapp-real-card-send"
+        versionCode 103
+        versionName "1.0.105-beta-form-unlock-hotfix"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
