@@ -1,0 +1,75 @@
+# Cria um link de cronograma de TESTE PERSISTENTE (token valido) para o usuario testar o
+# card premium no WhatsApp REAL agora — URL nova (sem cache do WhatsApp) e token valido
+# (portal abre). NAO apaga o doc (e marcado _qaTestDoc=true; pode ser removido depois).
+# Confirma o card premium (crawler) ANTES de imprimir a URL.
+name: Mint demo card link (teste real no WhatsApp)
+
+on:
+  push:
+    branches: [ "infra/mint-demo-card" ]
+
+permissions:
+  contents: read
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  PREMIUM: "https://aprovar.agendaidseven.com.br"
+
+jobs:
+  mint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Autenticar no GCP (somente p/ access token)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: secret ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null 2>&1
+          gcloud config set project "$GCP_PROJECT" >/dev/null 2>&1
+
+      - name: Criar token valido PERSISTENTE + confirmar card premium
+        run: |
+          set -euo pipefail
+          ACCESS_TOKEN="$(gcloud auth print-access-token)"
+          FS="https://firestore.googleapis.com/v1/projects/${GCP_PROJECT}/databases/(default)/documents"
+          TOKEN="demo$(date +%s)$(head -c5 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+          DOCID="qa-demo-$TOKEN"
+          NOW_MS="$(( $(date +%s) * 1000 ))"
+          PORTAL="${PREMIUM}/cliente/cronograma/${TOKEN}"
+
+          cat > /tmp/doc.json <<JSON
+          { "fields": {
+              "client":           { "stringValue": "Cliente Demo ID Seven" },
+              "title":            { "stringValue": "Cronograma Demo (teste do card)" },
+              "clientReviewToken":{ "stringValue": "${TOKEN}" },
+              "_qaTestDoc":       { "booleanValue": true },
+              "createdAt":        { "integerValue": "${NOW_MS}" },
+              "cronContents": { "arrayValue": { "values": [
+                { "mapValue": { "fields": { "t": { "stringValue": "Tema 1 - Lancamento" }, "legenda": { "stringValue": "Legenda do conteudo 1." } } } },
+                { "mapValue": { "fields": { "t": { "stringValue": "Tema 2 - Bastidores" }, "legenda": { "stringValue": "Legenda do conteudo 2." } } } },
+                { "mapValue": { "fields": { "t": { "stringValue": "Tema 3 - Depoimento" }, "legenda": { "stringValue": "Legenda do conteudo 3." } } } }
+              ] } }
+          } }
+          JSON
+          code=$(curl -sS -o /tmp/c.json -w '%{http_code}' -X POST -H "Authorization: Bearer $ACCESS_TOKEN" -H "Content-Type: application/json" "${FS}/tasks?documentId=${DOCID}" --data @/tmp/doc.json)
+          [ "$code" = "200" ] || { echo "::error:: criar doc falhou ($code)"; head -c 400 /tmp/c.json; exit 1; }
+          sleep 5
+
+          echo "== Confirma card premium (UA WhatsApp) =="
+          b="$(mktemp)"
+          st=$(curl -sS --max-time 25 -A "WhatsApp/2.23.20.0 A" -o "$b" -w '%{http_code}' "$PORTAL")
+          echo "HTTP=$st"
+          [ "$st" = "200" ] || { echo "::error:: portal != 200"; exit 1; }
+          grep -oiE '<meta property="og:(title|image)" content="[^"]*"' "$b"
+          grep -qiE 'og:image" content="https://aprovar\.agendaidseven\.com\.br/og/aprovar\.png\?v=' "$b" || { echo "::error:: og:image premium ausente"; exit 1; }
+
+          echo ""
+          echo "=================================================================="
+          echo " LINK DE TESTE (cole no WhatsApp — URL NOVA, card premium, portal abre):"
+          echo ""
+          echo "   $PORTAL"
+          echo ""
+          echo " (doc de teste persistente: tasks/$DOCID — _qaTestDoc=true; pode apagar depois)"
+          echo "=================================================================="
