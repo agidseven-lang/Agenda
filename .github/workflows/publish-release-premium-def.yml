@@ -1,0 +1,54 @@
+name: Publicar release premium definitivo (1.0.118 + 1.0.107)
+on:
+  push:
+    branches: [ "infra/publish-release-premium-def" ]
+permissions:
+  contents: write
+env:
+  DESKTOP_RUN: "27100378830"
+  ANDROID_RUN: "27100382034"
+  DESKTOP_ARTIFACT: "agenda-id-seven-desktop-1.0.118-whatsapp-premium-definitive-send-installer"
+  ANDROID_ARTIFACT: "idseven-nativebeta-1.0.107-beta-whatsapp-premium-definitive-send"
+  TAG: "test/whatsapp-premium-definitive-1.0.118-1.0.107"
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar instalador Desktop (cross-run)
+        uses: actions/download-artifact@v4
+        with: { name: "${{ env.DESKTOP_ARTIFACT }}", path: dl/desktop, run-id: "${{ env.DESKTOP_RUN }}", github-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: Baixar APK Android (cross-run)
+        uses: actions/download-artifact@v4
+        with: { name: "${{ env.ANDROID_ARTIFACT }}", path: dl/android, run-id: "${{ env.ANDROID_RUN }}", github-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: SHA-256
+        run: |
+          set -euo pipefail
+          find dl -type f | sort
+          EXE=$(ls dl/desktop/*.exe|head -1); MSI=$(ls dl/desktop/*.msi 2>/dev/null|head -1||true); APK=$(ls dl/android/*.apk|head -1)
+          EXE_SHA=$(sha256sum "$EXE"|cut -d' ' -f1); MSI_SHA=$([ -n "$MSI" ]&&sha256sum "$MSI"|cut -d' ' -f1||echo n/a); APK_SHA=$(sha256sum "$APK"|cut -d' ' -f1)
+          { echo "EXE $(basename "$EXE")  $EXE_SHA"; echo "MSI $([ -n "$MSI" ]&&basename "$MSI"||echo n/a)  $MSI_SHA"; echo "APK $(basename "$APK")  $APK_SHA"; } | tee SHA256SUMS.txt
+          { echo "EXE_NAME=$(basename "$EXE")"; echo "MSI_NAME=$([ -n "$MSI" ]&&basename "$MSI"||echo n/a)"; echo "APK_NAME=$(basename "$APK")"; echo "EXE_SHA=$EXE_SHA"; echo "MSI_SHA=$MSI_SHA"; echo "APK_SHA=$APK_SHA"; } >> "$GITHUB_ENV"
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "Envio premium DEFINITIVO (Desktop 1.0.118 + Android 1.0.107)"
+          prerelease: true
+          body: |
+            **Modal de envio premium REFEITO — botão primário único "Preparar envio premium" (à prova de erro)**
+            - Desktop **1.0.118-whatsapp-premium-definitive-send** (run ${{ env.DESKTOP_RUN }}): card premium grande + legenda limpa + 1 botão que salva imagem, copia legenda, copia imagem, abre pasta e abre WhatsApp (sem send?text=). Sem botão solto "Abrir WhatsApp".
+            - Android **1.0.107-beta-whatsapp-premium-definitive-send** (versionCode 105 · run ${{ env.ANDROID_RUN }}): paridade.
+            - Worker/card/OG: inalterados.
+            ```
+            EXE ${{ env.EXE_NAME }}
+                ${{ env.EXE_SHA }}
+            MSI ${{ env.MSI_NAME }}
+                ${{ env.MSI_SHA }}
+            APK ${{ env.APK_NAME }}
+                ${{ env.APK_SHA }}
+            ```
+          files: |
+            dl/desktop/*.exe
+            dl/desktop/*.msi
+            dl/android/*.apk
+            SHA256SUMS.txt
