@@ -147,3 +147,43 @@ jobs:
             echo "$ct" | grep -qi 'application/json' || { echo "FAIL: healthcheck regrediu em $B" >&2 ; exit 1 ; }
           done
           echo "OK: banner premium servido image/png 1200x630 no custom e no fallback; healthcheck preservado."
+
+      # V64.24 — CANARIO OG ISOLADO: HTML minimo p/ TODOS os UAs + imagem JPEG.
+      - name: Validar canario V64.24 (HTML minimo + JPEG, HEAD+GET)
+        run: |
+          set -euo pipefail
+          B="https://aprovar.agendaidseven.com.br"
+
+          echo "== Canario HTML /wa-card-test-v64-24 (GET, qualquer UA) =="
+          h=$(mktemp)
+          code=$(curl -sS --max-time 25 -o "$h" -w '%{http_code}' "$B/wa-card-test-v64-24")
+          ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/wa-card-test-v64-24")
+          echo "HTTP=$code  Content-Type=$ct  bytes=$(wc -c < "$h")"
+          [ "$code" = "200" ] || { echo "FAIL: canario != 200" >&2; exit 1; }
+          echo "$ct" | grep -qi 'text/html' || { echo "FAIL: canario nao e text/html" >&2; exit 1; }
+          # OG nos primeiros 1KB
+          head -c 1024 "$h" | grep -qi 'og:image" content="https://aprovar.agendaidseven.com.br/og/wa-card-v64-24.jpg"' || { echo "FAIL: og:image JPG ausente no topo" >&2; head -c 400 "$h"; exit 1; }
+          grep -qi 'og:image:type" content="image/jpeg"' "$h" || { echo "FAIL: og:image:type image/jpeg ausente" >&2; exit 1; }
+          grep -qi '?' <(grep -o 'wa-card-v64-24.jpg[^"]*' "$h" | head -1) && { echo "FAIL: querystring na imagem" >&2; exit 1; } || true
+          echo "OK: canario HTML minimo com OG/JPEG no topo."
+
+          echo "== Canario HEAD /wa-card-test-v64-24 =="
+          curl -sS --max-time 25 -I "$B/wa-card-test-v64-24" | grep -iE 'HTTP/|content-type' || { echo "FAIL: HEAD html" >&2; exit 1; }
+
+          echo "== Imagem JPEG /og/wa-card-v64-24.jpg (GET) =="
+          j=$(mktemp)
+          jcode=$(curl -sS --max-time 25 -o "$j" -w '%{http_code}' "$B/og/wa-card-v64-24.jpg")
+          jct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/og/wa-card-v64-24.jpg")
+          echo "HTTP=$jcode  Content-Type=$jct  bytes=$(wc -c < "$j")"
+          [ "$jcode" = "200" ] || { echo "FAIL: jpg != 200" >&2; exit 1; }
+          echo "$jct" | grep -qi 'image/jpeg' || { echo "FAIL: nao e image/jpeg" >&2; exit 1; }
+          node -e '
+            const b=require("fs").readFileSync(process.argv[1]);
+            const soi=b[0]===0xff&&b[1]===0xd8, eoi=b[b.length-2]===0xff&&b[b.length-1]===0xd9;
+            if(!soi||!eoi){console.error("FAIL: JPEG invalido (SOI/EOI)");process.exit(1);}
+            console.log("OK: JPEG valido ("+b.length+" bytes)");
+          ' "$j"
+
+          echo "== Imagem HEAD /og/wa-card-v64-24.jpg =="
+          curl -sS --max-time 25 -I "$B/og/wa-card-v64-24.jpg" | grep -iE 'HTTP/|content-type|content-length|cache-control' || { echo "FAIL: HEAD jpg" >&2; exit 1; }
+          echo "OK: canario V64.24 validado (HTML minimo + JPEG image/jpeg, HEAD+GET)."
