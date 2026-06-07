@@ -1,0 +1,82 @@
+# Publica RELEASE do HOTFIX (Desktop 1.0.116-form-unlock-hotfix + Android 1.0.105).
+name: Publicar release hotfix (form-unlock 1.0.116 + 1.0.105)
+
+on:
+  push:
+    branches: [ "infra/publish-release-formunlock" ]
+
+permissions:
+  contents: write
+
+env:
+  DESKTOP_RUN: "27097137333"
+  ANDROID_RUN: "27097140362"
+  DESKTOP_ARTIFACT: "agenda-id-seven-desktop-1.0.116-form-unlock-hotfix-installer"
+  ANDROID_ARTIFACT: "idseven-nativebeta-1.0.105-beta-form-unlock-hotfix"
+  TAG: "test/form-unlock-hotfix-1.0.116-1.0.105"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar instalador Desktop (cross-run)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.DESKTOP_ARTIFACT }}
+          path: dl/desktop
+          run-id: ${{ env.DESKTOP_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Baixar APK Android (cross-run)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ANDROID_ARTIFACT }}
+          path: dl/android
+          run-id: ${{ env.ANDROID_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Localizar binarios + SHA-256 (prova)
+        run: |
+          set -euo pipefail
+          echo "== baixado =="; find dl -type f | sort
+          EXE=$(ls dl/desktop/*.exe 2>/dev/null | head -1 || true)
+          MSI=$(ls dl/desktop/*.msi 2>/dev/null | head -1 || true)
+          APK=$(ls dl/android/*.apk 2>/dev/null | head -1 || true)
+          [ -n "$EXE" ] || { echo "::error:: .exe ausente"; exit 1; }
+          [ -n "$APK" ] || { echo "::error:: .apk ausente"; exit 1; }
+          EXE_SHA=$(sha256sum "$EXE" | cut -d' ' -f1)
+          MSI_SHA=$([ -n "$MSI" ] && sha256sum "$MSI" | cut -d' ' -f1 || echo "n/a")
+          APK_SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          { echo "EXE  $(basename "$EXE")"; echo "     $EXE_SHA";
+            echo "MSI  $([ -n "$MSI" ] && basename "$MSI" || echo n/a)"; echo "     $MSI_SHA";
+            echo "APK  $(basename "$APK")"; echo "     $APK_SHA"; } | tee SHA256SUMS.txt
+          { echo "EXE_NAME=$(basename "$EXE")"; echo "MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo n/a)";
+            echo "APK_NAME=$(basename "$APK")"; echo "EXE_SHA=$EXE_SHA"; echo "MSI_SHA=$MSI_SHA"; echo "APK_SHA=$APK_SHA"; } >> "$GITHUB_ENV"
+
+      - name: Publicar Release (link unico)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "HOTFIX — formulário de cronograma (Desktop 1.0.116 + Android 1.0.105)"
+          prerelease: true
+          body: |
+            **HOTFIX do travamento ("nada responde") no wizard de criação de cronograma**
+
+            - Desktop: **1.0.116-form-unlock-hotfix** (run ${{ env.DESKTOP_RUN }}) — CAUSA RAIZ: um snapshot do Firestore (users/events/tasks) repintava o `#content` por baixo do formulário aberto, destruindo clique/foco/digitação a cada atualização de dados. FIX: `renderFromSnapshot()` não repinta enquanto o wizard está aberto; `openTaskForm` faz `closeModal()` (limpa overlay preso). Provado por teste de regressão jsdom (campo sobrevive a snapshots) + E2E FORM1-4.
+            - Android: **1.0.105-beta-form-unlock-hotfix** (versionCode 103 · run ${{ env.ANDROID_RUN }}) — paridade. O `TaskFormScreen` usa `remember{mutableStateOf}` (sobrevive à recomposição), sem overlay/scrim — nenhum bug de bloqueio no código.
+            - **Worker / card / WhatsApp: INALTERADOS** nesta rodada.
+
+            **SHA-256**
+            ```
+            EXE  ${{ env.EXE_NAME }}
+                 ${{ env.EXE_SHA }}
+            MSI  ${{ env.MSI_NAME }}
+                 ${{ env.MSI_SHA }}
+            APK  ${{ env.APK_NAME }}
+                 ${{ env.APK_SHA }}
+            ```
+          files: |
+            dl/desktop/*.exe
+            dl/desktop/*.msi
+            dl/android/*.apk
+            SHA256SUMS.txt
