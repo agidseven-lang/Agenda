@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.26 / Desktop 1.0.114 / Android 1.0.102
+ * Agenda ID Seven · Worker V64.26-whatsapp-media-card / Desktop 1.0.114-whatsapp-media-card / Android 1.0.103
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.102-beta-cta-toque-no-link';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.103-beta-whatsapp-media-card-fix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.26 · Desktop 1.0.114 · Android 1.0.102-beta');
+console.log(' Worker V64.26-whatsapp-media-card · Desktop 1.0.114 · Android 1.0.103-beta');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -265,7 +265,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.26-cta-toque-no-link', /V64\.26-cta-toque-no-link/.test(W));
+check('W1', 'Worker é V64.26-whatsapp-media-card', /V64\.26-whatsapp-media-card/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
 const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
@@ -318,9 +318,9 @@ check('D_ICON2', 'tabIcon mapeia designers -> image', /designers:'image'/.test(D
 // CORREÇÃO 1: mensagem WhatsApp PREMIUM (assinatura + CTA; não é link cru).
 const msgFn = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [''])[0];
 check('D2', 'WhatsApp premium: assinatura "Equipe ID Seven"', /Equipe ID Seven/.test(msgFn));
-check('D3', 'WhatsApp: CTA "Toque no cartão abaixo para revisar e aprovar."', /Toque no cartão abaixo para revisar e aprovar\./.test(msgFn));
+check('D3', 'Caption: "Toque no link abaixo para revisar e aprovar:"', /Toque no link abaixo para revisar e aprovar:/.test(msgFn));
 check('D4', 'WhatsApp premium: saudação com nome do cliente', /Olá, '\+nome/.test(msgFn));
-check('D_MSG1', 'WhatsApp: orientação principal = tocar no cartão', /Toque no cartão abaixo para revisar e aprovar\./.test(msgFn));
+check('D_MSG1', 'Caption: orientação principal = "Toque no link abaixo"', /Toque no link abaixo para revisar e aprovar:/.test(msgFn));
 check('D_MSG2', 'WhatsApp: "A primeira etapa" presente', /A primeira etapa/.test(msgFn));
 check('D_MSG3', 'WhatsApp: URL (p/ o card) + assinatura *Equipe ID Seven*', /\+\s*url\s*\+/.test(msgFn) && /\*Equipe ID Seven\*/.test(msgFn));
 // CORREÇÃO 4: upload de Feed/Story não pula para o 1º post (preserva scroll da lista).
@@ -361,7 +361,7 @@ check('D20', 'Rodapé mostra Desktop 1.0.114', /Desktop 1\.0\.114/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
 check('D21', 'Login/título/watermark mostram 1.0.114 (sem rótulo antigo)',
   /<span class="pill-ver">Desktop 1\.0\.114/.test(DH) && /<title>ID Seven · Desktop 1\.0\.114/.test(DH) && /id="wpbadge">Desktop 1\.0\.114/.test(DH));
-check('D22', 'Login espelha o APK 1.0.102-beta-cta-toque-no-link', /espelha o APK <b>1\.0\.102-beta-cta-toque-no-link/.test(DH));
+check('D22', 'Login espelha o APK 1.0.103-beta-whatsapp-media-card-fix', /espelha o APK <b>1\.0\.103-beta-whatsapp-media-card-fix/.test(DH));
 check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.114'/.test(DH) && /applyVersionLabels/.test(DH));
 check('D24', 'SEM rótulo de versão defasado visível (1.0.103/1.0.64-beta) no login/título/badge',
   !/<title>ID Seven · Desktop 1\.0\.103/.test(DH) && !/pill-ver">Desktop 1\.0\.103/.test(DH) && !/espelha o APK <b>1\.0\.64-beta/.test(DH));
@@ -377,8 +377,8 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.102-beta-cta-toque-no-link', /versionName\s+"1\.0\.102-beta-cta-toque-no-link"/.test(GRADLE));
-check('N2', 'versionCode >= 100 (acima do 99 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 100; })());
+check('N1', 'versionName 1.0.103-beta-whatsapp-media-card-fix', /versionName\s+"1\.0\.103-beta-whatsapp-media-card-fix"/.test(GRADLE));
+check('N2', 'versionCode >= 101 (acima do 100 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 101; })());
 check('N_PARITY', 'Android = bump de paridade: endpoint interno workers.dev intacto, SEM link de cliente', /idseven-push\.agidseven\.workers\.dev\/notify-assignee/.test(readAndroid(AND + 'core/PushNotify.kt')) && !/cliente\/cronograma/.test(readAndroid(AND + 'core/PushNotify.kt')));
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
 check('N_SHAPE', 'TasksTopTabs: chips RoundedCornerShape(12.dp), sem cápsula (999.dp)', /RoundedCornerShape\(12\.dp\)/.test(KT_TABS) && !/RoundedCornerShape\(999\.dp\)/.test(KT_TABS));
@@ -455,11 +455,43 @@ if (LINK) {
 // `validate-client-card.yml` (rede aberta) — provado verde antes do build.
 console.log(`  ${C.d}NB${C.x} itens 7–13 (HTTP ao vivo c/ token real) provados no CI validate-client-card.yml`);
 
+/* ===================== PARTE D — Envio premium via IMAGEM REAL (não depende do preview) =====================
+   Decisão técnica: o card vai como IMAGEM REAL anexada no WhatsApp + link na legenda. O preview
+   automático do WhatsApp passa a ser BÔNUS. Valida Worker (rota da imagem), Desktop (URL + IPC +
+   modal) e a caption. */
+console.log(`${C.b}\n[PARTE D] Envio premium via imagem real (Worker img route + Desktop IPC/modal)${C.x}`);
+const MAIN = readDesktop('desktop/src/main/main.ts');
+const PRE = readDesktop('desktop/src/preload/preload.ts');
+// Worker: rota /og/wa-card-v64-26.jpg serve image/jpeg do JPEG embutido (1200×630 válido)
+check('MEDIA_W1', 'Worker serve /og/wa-card-v64-26.jpg (jpgBannerResponse + OG_JPG_B64)', /wa-card-v64-26\.jpg/.test(W) && /function jpgBannerResponse/.test(W) && /const OG_JPG_B64=/.test(W));
+check('MEDIA_W2', 'JPEG embutido é válido 1200×630 (SOI/EOI)', (() => {
+  const m = W.match(/const OG_JPG_B64="([A-Za-z0-9+/=]+)"/); if (!m) return false;
+  const b = Buffer.from(m[1], 'base64');
+  if (!(b[0] === 0xff && b[1] === 0xd8 && b[b.length - 2] === 0xff && b[b.length - 1] === 0xd9)) return false;
+  // dimensões: varre marcadores SOF0..SOF2
+  for (let i = 2; i < b.length - 9;) { if (b[i] !== 0xff) { i++; continue; } const mk = b[i + 1];
+    if (mk === 0xc0 || mk === 0xc1 || mk === 0xc2) { const h = b.readUInt16BE(i + 5), w = b.readUInt16BE(i + 7); return w === 1200 && h === 630; }
+    i += 2 + b.readUInt16BE(i + 2); }
+  return false;
+})());
+// Desktop: usa a imagem do card (URL premium versionada, sem query)
+check('MEDIA_D1', 'Desktop CARD_IMG_URL = aprovar.agendaidseven.com.br/og/wa-card-v64-26.jpg (sem query)', /const CARD_IMG_URL='https:\/\/aprovar\.agendaidseven\.com\.br\/og\/wa-card-v64-26\.jpg'/.test(DH));
+check('MEDIA_D2', 'Modal "Preparar envio premium para WhatsApp" + instrução de anexar imagem', /Preparar envio premium para WhatsApp/.test(DH) && /Anexe esta imagem no WhatsApp/.test(DH));
+check('MEDIA_D3', 'Modal busca a imagem real e liga os botões (_wirePremiumSend + fetch CARD_IMG_URL)', /function _wirePremiumSend\(/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
+check('MEDIA_D4', 'Botões: Copiar mensagem / Copiar imagem / Salvar imagem / Abrir WhatsApp', /id="btnCopyMsg"/.test(DH) && /id="btnCopyImg"/.test(DH) && /id="btnSaveImg"/.test(DH) && /id="btnOpenWa"/.test(DH));
+check('MEDIA_D5', 'Nome de arquivo claro agenda-id-seven-card-[cliente]-[token].jpg', /agenda-id-seven-card-'\+/.test(DH));
+// Electron IPC (main + preload)
+check('MEDIA_IPC1', 'main: handlers save-card-image / copy-card-image / show-in-folder', /ipcMain\.handle\("save-card-image"/.test(MAIN) && /ipcMain\.handle\("copy-card-image"/.test(MAIN) && /ipcMain\.handle\("show-in-folder"/.test(MAIN));
+check('MEDIA_IPC2', 'main: usa clipboard.writeImage + nativeImage (copiar imagem real)', /clipboard\.writeImage/.test(MAIN) && /nativeImage\.createFromBuffer/.test(MAIN));
+check('MEDIA_IPC3', 'preload: expõe saveCardImage / copyCardImage / showInFolder', /saveCardImage:/.test(PRE) && /copyCardImage:/.test(PRE) && /showInFolder:/.test(PRE));
+// Token/link continuam válidos (reuso da PARTE C)
+check('MEDIA_LINK', 'Caption leva o link COMPLETO com token (premium, sem workers.dev)', LINK ? (LINK.buildClientMessage({client:'X',type:'semanal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'}).indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1) : false);
+
 /* ===================== VEREDITO ===================== */
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes)`);
-  console.log(` Liberado para gerar build: Worker V64.26 / Desktop 1.0.114 / Android 1.0.102-beta${C.x}`);
+  console.log(` Liberado para gerar build: Worker V64.26-whatsapp-media-card / Desktop 1.0.114 / Android 1.0.103-beta${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
