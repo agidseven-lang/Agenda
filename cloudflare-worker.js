@@ -190,11 +190,18 @@ export default {
       }
     }
 
+    // V64.28 — ENVIO PREMIUM via WhatsApp Business Cloud API (entrega GARANTIDA: o sistema
+    // envia a IMAGEM real do card + legenda + link, sem operador, sem preview). Token/IDs
+    // ficam em SECRETS (nunca no client). Sem credenciais → 503 WHATSAPP_CLOUD_API_NOT_CONFIGURED.
+    if (url.pathname === "/client/send-premium-whatsapp" && request.method === "POST") {
+      return handleSendPremiumWhatsApp(request, env, url.origin);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.27-aurora-card" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.28-wa-cloud-api" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2110,6 +2117,138 @@ ogClientMeta(origin, "Aprovar cronograma — " + (task.client || "Cliente"), "Cr
 }
 
 /* ───────────────────────── HELPERS ───────────────────────── */
+/* ═════════════════ V64.28 — ENVIO PREMIUM via WhatsApp Business Cloud API ═════════════════
+   ENTREGA GARANTIDA: o sistema envia a IMAGEM real do card (Aurora Glass) + legenda + link
+   direto ao WhatsApp do cliente, SEM operador anexar nada e SEM depender do preview.
+
+   Secrets (Cloudflare Worker — `wrangler secret put`):
+     WHATSAPP_ACCESS_TOKEN        (obrigatório)  token permanente do System User (Meta)
+     WHATSAPP_PHONE_NUMBER_ID     (obrigatório)  Phone Number ID do número conectado à Cloud API
+     WHATSAPP_BUSINESS_ACCOUNT_ID (opcional)     WABA ID (diagnóstico/gestão)
+     WHATSAPP_TEMPLATE_NAME       (produção)     nome do template aprovado (header IMAGE)
+     WHATSAPP_TEMPLATE_LANG       (opcional)     idioma do template (default pt_BR)
+   Vars opcionais (não-secret):
+     WHATSAPP_GRAPH_VERSION       (opcional)     versão da Graph API (default v21.0)
+
+   SEM credenciais → 503 { ok:false, error:"WHATSAPP_CLOUD_API_NOT_CONFIGURED", missing:[...] }.
+   NUNCA usa web.whatsapp.com / send?text= / whatsapp:// — é API server-side.
+   Sucesso só é "ok:true" quando a Meta devolve messages[0].id (message_id real). */
+function waConfigStatus(env) {
+  const missing = [];
+  if (!env || !env.WHATSAPP_ACCESS_TOKEN) missing.push("WHATSAPP_ACCESS_TOKEN");
+  if (!env || !env.WHATSAPP_PHONE_NUMBER_ID) missing.push("WHATSAPP_PHONE_NUMBER_ID");
+  return { configured: missing.length === 0, missing };
+}
+// Telefone → E.164 só dígitos (Cloud API exige sem "+", sem espaços/parênteses).
+function normalizePhoneE164(raw) {
+  const d = String(raw || "").replace(/[^\d]/g, "");
+  if (d.length < 10 || d.length > 15) return null;   // E.164: 10–15 dígitos
+  return d;
+}
+// Legenda OFICIAL, limpa, premium — idêntica à do Desktop. SEM URL técnica do WhatsApp.
+function buildPremiumCaption(clientName, tipo, link) {
+  const nome = (clientName && String(clientName).trim()) || "cliente";
+  const t = String(tipo || "").toLowerCase().trim();
+  const tdc = !t ? "cronograma" : (t.indexOf("cronograma") >= 0 ? t : ("cronograma " + t));
+  return "Olá, " + nome + ". 👋\n\n" +
+    "Seu *" + tdc + "* já está disponível para avaliação.\n\n" +
+    "Toque no link abaixo para revisar e aprovar:\n\n" +
+    link + "\n\n" +
+    "*Equipe ID Seven*";
+}
+async function handleSendPremiumWhatsApp(request, env, origin) {
+  // 1) GATE de configuração: sem secrets reais, NÃO finge envio.
+  const cfg = waConfigStatus(env);
+  if (!cfg.configured) {
+    console.warn("[WA-CLOUD] não configurado; faltam:", cfg.missing.join(","));
+    return json({ ok: false, error: "WHATSAPP_CLOUD_API_NOT_CONFIGURED", missing: cfg.missing }, 503, env);
+  }
+  // 2) Payload + validações.
+  let body;
+  try { body = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
+  const token = (typeof body.token === "string" ? body.token.trim() : "");
+  if (!/^[A-Za-z0-9_-]{4,128}$/.test(token)) return json({ ok: false, error: "TOKEN_INVALIDO" }, 400, env);
+  const phone = normalizePhoneE164(body.phone);
+  if (!phone) return json({ ok: false, error: "TELEFONE_INVALIDO", hint: "use E.164, ex.: 5511999999999" }, 400, env);
+
+  // 3) Resolve a tarefa pelo token (mesma fonte do portal do cliente).
+  let accessToken;
+  try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, error: "AUTH_FIRESTORE_FALHOU", detail: String(e && e.message || e) }, 502, env); }
+  let task;
+  try { task = await queryTaskByToken(env, accessToken, token); }
+  catch (e) { return json({ ok: false, error: "FIRESTORE_QUERY_FALHOU", detail: String(e && e.message || e) }, 502, env); }
+  if (!task) return json({ ok: false, error: "CRONOGRAMA_NAO_ENCONTRADO" }, 404, env);
+
+  // 4) Conteúdo premium: card oficial (já hospedado) + legenda + link real.
+  const base = ogClientBase(origin);
+  const link = base + "/cliente/cronograma/" + token;
+  const cardUrl = base + OG_IMG_PATH;                       // /og/wa-card-v64-26.jpg (Aurora Glass, 1200×630)
+  const clientName = (typeof body.clientName === "string" && body.clientName.trim()) ? body.clientName.trim() : (task.client || "cliente");
+  const tipo = (typeof body.cronogramaTipo === "string" && body.cronogramaTipo.trim()) ? body.cronogramaTipo.trim() : "";
+  const caption = buildPremiumCaption(clientName, tipo, link);
+
+  // 5) Monta o payload da Cloud API. Em PRODUÇÃO (fora da janela de 24h) a Meta EXIGE template
+  //    aprovado com header de IMAGEM. Se WHATSAPP_TEMPLATE_NAME existir, usa template; senão,
+  //    envia imagem+legenda livre (só funciona dentro da janela de 24h — modo de TESTE).
+  const ver = (env.WHATSAPP_GRAPH_VERSION || "v21.0");
+  const endpoint = "https://graph.facebook.com/" + ver + "/" + env.WHATSAPP_PHONE_NUMBER_ID + "/messages";
+  let payload, mode;
+  if (env.WHATSAPP_TEMPLATE_NAME) {
+    mode = "template";
+    payload = {
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "template",
+      template: {
+        name: env.WHATSAPP_TEMPLATE_NAME,
+        language: { code: env.WHATSAPP_TEMPLATE_LANG || "pt_BR" },
+        components: [
+          { type: "header", parameters: [{ type: "image", image: { link: cardUrl } }] },
+          { type: "body", parameters: [
+            { type: "text", text: clientName },
+            { type: "text", text: (tipo || "cronograma") },
+          ] },
+          // Botão URL dinâmico (índice 0): o token completa a URL base do template.
+          { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: token }] },
+        ],
+      },
+    };
+  } else {
+    mode = "image";   // janela de 24h (teste) — imagem real + legenda
+    payload = {
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "image",
+      image: { link: cardUrl, caption: caption },
+    };
+  }
+
+  // 6) Envia via Cloud API.
+  let metaStatus = 0, metaText = "";
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + env.WHATSAPP_ACCESS_TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    metaStatus = res.status;
+    metaText = await res.text();
+  } catch (e) {
+    console.error("[WA-CLOUD] fetch Meta falhou:", e && e.message);
+    return json({ ok: false, error: "META_REQUEST_FALHOU", detail: String(e && e.message || e), mode }, 502, env);
+  }
+  let metaJson = null; try { metaJson = JSON.parse(metaText); } catch (_) {}
+  const messageId = metaJson && metaJson.messages && metaJson.messages[0] && metaJson.messages[0].id;
+  // 7) Sucesso REAL só com message_id devolvido pela Meta.
+  if (messageId) {
+    console.log("[WA-CLOUD] enviado mode=" + mode + " to=" + phone + " message_id=" + messageId);
+    return json({ ok: true, message_id: messageId, mode: mode, to: phone, taskId: task.id || null }, 200, env);
+  }
+  console.error("[WA-CLOUD] Meta NÃO confirmou (status=" + metaStatus + "):", metaText.slice(0, 400));
+  return json({ ok: false, error: "META_NAO_CONFIRMOU", status: metaStatus, mode: mode, meta: metaJson || metaText.slice(0, 600) }, 502, env);
+}
+
 function corsHeaders(env) {
   return {
     "Access-Control-Allow-Origin": (env && env.ALLOWED_ORIGIN) || "*",
