@@ -197,18 +197,11 @@ export default {
       return handleSendPremiumWhatsApp(request, env, url.origin);
     }
 
-    // V64.32 — LIMPEZA (TEMPORÁRIA): remove do Firestore qualquer cronograma marcado
-    // isCloudApiTest:true (dados de teste que não podem aparecer no Kanban real). Gate por
-    // chave = WHATSAPP_BUSINESS_ACCOUNT_ID. Suporta dryRun. Será removido após a limpeza.
-    if (url.pathname === "/admin/cleanup-test-cronogramas" && request.method === "POST") {
-      return handleCleanupTestCronogramas(request, env);
-    }
-
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.34-wa-cleanup" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.35-wa-cloud-api" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2168,97 +2161,6 @@ function buildPremiumCaption(clientName, tipo, link) {
     "Toque no link abaixo para revisar e aprovar:\n\n" +
     link + "\n\n" +
     "*Equipe ID Seven*";
-}
-// V64.33 — LIMPEZA TEMPORÁRIA: localiza e remove cronogramas de TESTE. Busca por VÁRIOS marcadores
-// (flag booleana E nome/título exatos do teste), porque a flag pode não estar indexada/persistida.
-const TEST_CLIENT = "Hospital Visão (Teste Cloud API)";
-const TEST_TITLE = "Cronograma de teste — Cloud API";
-async function runTasksQuery(env, accessToken, valueObj, field) {
-  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
-  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], where: { fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: valueObj } }, limit: 50 } };
-  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
-  if (!res.ok) { console.warn("[CLEANUP] runQuery " + field + " " + res.status); return []; }
-  const rows = await res.json(); const out = [];
-  for (const row of rows) { if (!row.document) continue; const id = row.document.name.split("/").pop(); out.push(Object.assign({ id }, decodeFields(row.document.fields))); }
-  return out;
-}
-// Considera "doc de teste" SOMENTE por marcadores inequívocos de teste/QA (nunca cliente real):
-//  - flag isCloudApiTest:true
-//  - o card de teste da Cloud API (cliente/título exatos)
-//  - seeds de QA/demo: id começa com "qa-demo", cliente "Cliente Demo ID Seven",
-//    título "Cronograma Demo (teste do card)".
-function isTestDoc(t) {
-  const c = t.client || "", ti = t.title || "", id = t.id || "";
-  return t.isCloudApiTest === true
-    || c === TEST_CLIENT || ti === TEST_TITLE
-    || c === "Cliente Demo ID Seven" || ti === "Cronograma Demo (teste do card)"
-    || /^qa-demo/i.test(id);
-}
-// VARREDURA-BASE (sem depender de índice): percorre TODAS as tasks e filtra por isTestDoc.
-// Robusto e seguro: a coleção é pequena e só remove docs com marcador inequívoco de teste.
-async function findTestTasks(env, accessToken) {
-  const all = await scanRecentTasks(env, accessToken);
-  return all.filter(isTestDoc);
-}
-async function deleteTaskDoc(env, accessToken, id) {
-  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${id}`;
-  const res = await fetch(url, { method: "DELETE", headers: { "Authorization": "Bearer " + accessToken } });
-  return res.ok;
-}
-// Varredura ampla (só p/ diagnóstico/identificação): lista tasks recentes (campos mínimos).
-async function scanRecentTasks(env, accessToken) {
-  const out = []; let pageToken = ""; let pages = 0;
-  do {
-    let url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks?pageSize=300`;
-    if (pageToken) url += "&pageToken=" + encodeURIComponent(pageToken);
-    const res = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
-    if (!res.ok) break;
-    const j = await res.json();
-    for (const d of (j.documents || [])) { const id = d.name.split("/").pop(); const f = decodeFields(d.fields); out.push({ id, client: f.client || null, title: f.title || null, cronStatus: f.cronStatus || null, isCloudApiTest: f.isCloudApiTest === true }); }
-    pageToken = j.nextPageToken || ""; pages++;
-  } while (pageToken && pages < 30);
-  return out;
-}
-async function handleCleanupTestCronogramas(request, env) {
-  let body; try { body = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
-  if (!env.WHATSAPP_BUSINESS_ACCOUNT_ID || body.key !== env.WHATSAPP_BUSINESS_ACCOUNT_ID) return json({ ok: false, error: "FORBIDDEN" }, 403, env);
-  const dryRun = body.dryRun === true;
-  let accessToken;
-  try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
-  catch (e) { return json({ ok: false, error: "AUTH_FIRESTORE_FALHOU", detail: String(e && e.message || e) }, 502, env); }
-  // Permite apagar por id explícito (diagnóstico): só se o doc for realmente de teste.
-  if (typeof body.deleteId === "string" && body.deleteId) {
-    const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${body.deleteId}`;
-    const r = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
-    if (!r.ok) return json({ ok: false, error: "DOC_NAO_ENCONTRADO", id: body.deleteId }, 404, env);
-    const doc = decodeFields((await r.json()).fields || {});
-    if (!isTestDoc(Object.assign({ id: body.deleteId }, doc))) return json({ ok: false, error: "NAO_E_DOC_DE_TESTE", id: body.deleteId, client: doc.client || null, title: doc.title || null }, 409, env);
-    const ok = dryRun ? true : await deleteTaskDoc(env, accessToken, body.deleteId);
-    return json({ ok: true, dryRun, deletedById: dryRun ? [] : [body.deleteId], client: doc.client || null, title: doc.title || null }, 200, env);
-  }
-  let found;
-  try { found = await findTestTasks(env, accessToken); }
-  catch (e) { return json({ ok: false, error: "FIRESTORE_QUERY_FALHOU", detail: String(e && e.message || e) }, 502, env); }
-  const audit = found.map(t => ({ id: t.id, client: t.client || null, title: t.title || null, sector: t.sector || null, cronStatus: t.cronStatus || null, isCloudApiTest: t.isCloudApiTest === true, createdAt: t.createdAt || null, token: t.clientReviewToken || null }));
-  const deleted = [];
-  if (!dryRun) {
-    for (const t of found) { if (isTestDoc(t)) { const ok = await deleteTaskDoc(env, accessToken, t.id); if (ok) deleted.push(t.id); } }
-  }
-  let remaining = found;
-  if (!dryRun) { try { remaining = await findTestTasks(env, accessToken); } catch (_) { remaining = []; } }
-  // Diagnóstico opcional: varredura completa + amostra/contagem totais p/ identificar o doc.
-  let scan = undefined, scanTotal = undefined, scanSample = undefined;
-  if (body.scan === true) {
-    try {
-      const all = await scanRecentTasks(env, accessToken);
-      scanTotal = all.length;
-      const re = /teste|test|cloud ?api|demo|hospital|vis[aã]o/i;
-      scan = all.filter(t => (t.client && re.test(t.client)) || (t.title && re.test(t.title)) || t.isCloudApiTest === true);
-      scanSample = all.slice(0, 40).map(t => ({ id: t.id, client: t.client, title: t.title, cronStatus: t.cronStatus, isCloudApiTest: t.isCloudApiTest }));
-    } catch (_) {}
-  }
-  console.log("[ADMIN-CLEANUP] dryRun=" + dryRun + " encontrados=" + found.length + " removidos=" + deleted.length + " restantes=" + remaining.length + " scanTotal=" + scanTotal);
-  return json({ ok: true, dryRun: dryRun, found: audit, deletedCount: deleted.length, deletedIds: deleted, remainingCount: remaining.length, scanTotal: scanTotal, scan: scan, scanSample: scanSample }, 200, env);
 }
 async function handleSendPremiumWhatsApp(request, env, origin) {
   // 1) GATE de configuração: sem secrets reais, NÃO finge envio.

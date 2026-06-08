@@ -25,10 +25,6 @@ on:
         description: "[FASE 3] telefone de teste em E.164 (ex.: 5583999999999) p/ receber o card real (opcional)"
         required: false
         type: string
-      cleanup_test_key:
-        description: "[LIMPEZA] chave (= WHATSAPP_BUSINESS_ACCOUNT_ID) p/ auditar+remover cronogramas isCloudApiTest:true (opcional)"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -261,25 +257,3 @@ jobs:
       # LIMPEZA — remove cronogramas de teste (isCloudApiTest:true) do Firestore.
       # 1) dryRun (auditoria read-only) → lista o que será removido.
       # 2) delete real → remove e re-consulta (remainingCount deve ser 0).
-      - name: "[LIMPEZA] Remover cronogramas de teste (isCloudApiTest:true)"
-        if: ${{ github.event.inputs.cleanup_test_key != '' }}
-        env:
-          CK: ${{ github.event.inputs.cleanup_test_key }}
-        run: |
-          set -euo pipefail
-          B="https://idseven-push.agidseven.workers.dev"
-          echo "== 1) AUDITORIA (dryRun=true) — read-only =="
-          aud=$(curl -sS --max-time 30 -X POST "$B/admin/cleanup-test-cronogramas" -H "Content-Type: application/json" \
-            --data "$(CK="$CK" node -e 'console.log(JSON.stringify({key:process.env.CK,dryRun:true,scan:true}))')")
-          echo "$aud"
-          echo "== 2) DELETE real + verificação pós-delete =="
-          del=$(curl -sS --max-time 30 -X POST "$B/admin/cleanup-test-cronogramas" -H "Content-Type: application/json" \
-            --data "$(CK="$CK" node -e 'console.log(JSON.stringify({key:process.env.CK,dryRun:false}))')")
-          echo "$del"
-          echo "$del" | node -e '
-            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
-              let j={};try{j=JSON.parse(s)}catch(e){console.error("FAIL: resposta nao-JSON");process.exit(1);}
-              if(j.ok!==true){console.error("FAIL: cleanup nao ok: "+s);process.exit(1);}
-              if(j.remainingCount!==0){console.error("FAIL: ainda restam "+j.remainingCount+" docs isCloudApiTest:true");process.exit(1);}
-              console.log("OK: limpeza concluida. removidos="+j.deletedCount+" restantes=0");
-            });'
