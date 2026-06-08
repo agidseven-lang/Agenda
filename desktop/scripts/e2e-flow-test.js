@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.27-aurora-card / Desktop 1.0.120-whatsapp-guided-card-send / Android 1.0.109
+ * Agenda ID Seven · Worker V64.27-aurora-card / Desktop 1.0.121-whatsapp-cloud-api-send / Android 1.0.109 (congelado)
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.27-aurora-card · Desktop 1.0.120 · Android 1.0.109-beta (Envio guiado em 3 etapas)');
+console.log(' Worker V64.31-wa-cloud-api · Desktop 1.0.121 · Android 1.0.109 (Cloud API — envio automatico)');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -265,7 +265,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.28-wa-cloud-api', /V64\.28-wa-cloud-api/.test(W));
+check('W1', 'Worker é V64.31-wa-cloud-api (Cloud API validada com message_id real)', /V64\.31-wa-cloud-api/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
 const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
@@ -307,7 +307,7 @@ check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaS
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check('D1', 'package.json versão 1.0.120', /"version":\s*"1\.0\.120"/.test(DP));
+check("D1", "package.json versão 1.0.121", /"version":\s*"1\.0\.121"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -359,12 +359,12 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check("D20", "Rodapé mostra Desktop 1.0.120", /Desktop 1\.0\.120/.test(DH));
+check("D20", "Rodapé mostra Desktop 1.0.121", /Desktop 1\.0\.121/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check('D21', 'Login/título/watermark mostram 1.0.120 (sem rótulo antigo)',
-  /<span class="pill-ver">Desktop 1\.0\.120/.test(DH) && /<title>ID Seven · Desktop 1\.0\.120/.test(DH) && /id="wpbadge">Desktop 1\.0\.120/.test(DH));
+check("D21", "Login/título/watermark mostram 1.0.121 (sem rótulo antigo)",
+  /<span class="pill-ver">Desktop 1\.0\.121/.test(DH) && /<title>ID Seven · Desktop 1\.0\.121/.test(DH) && /id="wpbadge">Desktop 1\.0\.121/.test(DH));
 check('D22', 'Login espelha o APK 1.0.109-beta-whatsapp-guided-card-send', /espelha o APK <b>1\.0\.109-beta-whatsapp-guided-card-send/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.120'/.test(DH) && /applyVersionLabels/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:'1\.0\.121'/.test(DH) && /applyVersionLabels/.test(DH));
 // ===== 1.0.120 — ENVIO WHATSAPP LIMPO + WEB-ONLY (executa as funções reais) =====
 (function(){
   // Extrai e executa as funções reais p/ provar o conteúdo do clipboard e a URL aberta (etapa 3).
@@ -555,7 +555,7 @@ console.log(`${C.b}\n[PARTE E] WhatsApp Business Cloud API — rota segura + bot
 // ---- WORKER (rota preparada, inerte sem secrets) ----
 check('WA_W1', 'Worker tem a rota POST /client/send-premium-whatsapp', /url\.pathname === "\/client\/send-premium-whatsapp" && request\.method === "POST"/.test(W) && /function handleSendPremiumWhatsApp\(/.test(W));
 check('WA_W2', 'GATE de configuração: sem secrets → 503 WHATSAPP_CLOUD_API_NOT_CONFIGURED (não finge envio)', /function waConfigStatus\(env\)/.test(W) && /WHATSAPP_ACCESS_TOKEN/.test(W) && /WHATSAPP_PHONE_NUMBER_ID/.test(W) && /"WHATSAPP_CLOUD_API_NOT_CONFIGURED"/.test(W) && /\}, 503, env\)/.test(W));
-check('WA_W3', 'Sucesso SÓ com message_id real da Meta (messages[0].id)', /messages && metaJson\.messages\[0\] && metaJson\.messages\[0\]\.id/.test(W) && /ok: true, message_id: messageId/.test(W));
+check('WA_W3', 'Sucesso SÓ com message_id real da Meta (messages[0].id) + resposta estruturada', /messages && metaJson\.messages\[0\] && metaJson\.messages\[0\]\.id/.test(W) && /ok: true, provider: "meta_whatsapp_cloud_api", message_id: messageId/.test(W) && /to: maskPhone\(phone\)/.test(W));
 check('WA_W4', 'Chama a Graph API da Meta (graph.facebook.com/.../messages) com Bearer do token (server-side)', /graph\.facebook\.com\//.test(W) && /\/messages"/.test(W) && /"Authorization": "Bearer " \+ env\.WHATSAPP_ACCESS_TOKEN/.test(W));
 check('WA_W5', 'Suporta template (produção) E imagem+legenda (janela 24h/teste); imagem = card oficial', /type: "template"/.test(W) && /type: "image"/.test(W) && /image: \{ link: cardUrl/.test(W) && /OG_IMG_PATH/.test(W));
 check('WA_W6', 'Resolve a task pelo token (queryTaskByToken) e valida telefone (E.164)', /queryTaskByToken\(env, accessToken, token\)/.test(W) && /function normalizePhoneE164\(/.test(W));
@@ -592,9 +592,9 @@ check('WA_D8', 'Envio manual rebaixado a TEMPORÁRIO (não definitivo): divisór
 /* ===================== VEREDITO ===================== */
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
-  console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes) — arquitetura validada.`);
-  console.log(`${C.y} BUILD AINDA BLOQUEADO: o envio premium oficial é via WhatsApp Business Cloud API.`);
-  console.log(`${C.y} NÃO gerar Desktop/Android até FASE 3 = envio REAL com message_id da Meta (precisa de secrets reais).${C.x}`);
+  console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes).`);
+  console.log(`${C.g} FASE 3 concluída: envio REAL via Cloud API confirmado com message_id da Meta.`);
+  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.121 (Cloud API). Android permanece CONGELADO até validar o Desktop.${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
