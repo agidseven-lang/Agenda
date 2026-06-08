@@ -217,6 +217,43 @@ jobs:
           echo "$dct" | grep -qi 'application/json' || { echo "FAIL: /wa-diag nao e JSON" >&2; exit 1; }
           echo "OK: V64.25 canarios+preview+wa-diag validados."
 
+      # V64.39 — URL DEDICADA DE COMPARTILHAMENTO /share/cronograma/:token.
+      # Prova (rede aberta) que a pagina leve serve OG premium (card 1200x630 image/jpeg
+      # absoluto HTTPS) e que a propria imagem responde 200 image/jpeg 1200x630. Token
+      # dummy basta: a pagina e estatica (nao consulta Firestore) — preview garantido.
+      - name: Validar /share/cronograma/:token (OG premium p/ WhatsApp)
+        run: |
+          set -euo pipefail
+          for B in "https://aprovar.agendaidseven.com.br" "https://idseven-push.agidseven.workers.dev"; do
+            URL="$B/share/cronograma/ci_dummy_token_0001"
+            echo "== SHARE :: $URL =="
+            h=$(mktemp)
+            code=$(curl -sS --max-time 25 -o "$h" -w '%{http_code}' "$URL")
+            ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$URL")
+            echo "HTTP=$code Content-Type=$ct bytes=$(wc -c < "$h")"
+            [ "$code" = "200" ] || { echo "FAIL: share != 200" >&2; head -c 400 "$h"; exit 1; }
+            echo "$ct" | grep -qi 'text/html' || { echo "FAIL: share nao e text/html" >&2; exit 1; }
+            grep -qi 'og:image" content="https://[^"]*/og/wa-card-v64-38.jpg"' "$h" || { echo "FAIL: og:image absoluto ausente" >&2; head -c 600 "$h"; exit 1; }
+            grep -qi 'og:image:secure_url" content="https://' "$h" || { echo "FAIL: og:image:secure_url ausente" >&2; exit 1; }
+            grep -qi 'og:image:type" content="image/jpeg"' "$h" || { echo "FAIL: og:image:type ausente" >&2; exit 1; }
+            grep -qi 'og:image:width" content="1200"' "$h" || { echo "FAIL: width 1200 ausente" >&2; exit 1; }
+            grep -qi 'og:image:height" content="630"' "$h" || { echo "FAIL: height 630 ausente" >&2; exit 1; }
+            grep -qi 'twitter:card" content="summary_large_image"' "$h" || { echo "FAIL: twitter summary_large_image ausente" >&2; exit 1; }
+            grep -qi 'og:title" content="' "$h" || { echo "FAIL: og:title ausente" >&2; exit 1; }
+            grep -qi 'og:description" content="' "$h" || { echo "FAIL: og:description ausente" >&2; exit 1; }
+            # OG ANTES de qualquer <script>
+            node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const i=s.indexOf("og:image"),j=s.indexOf("<script");if(i<0||(j>=0&&i>j)){console.error("FAIL: OG nao esta antes do <script>");process.exit(1);}console.log("OK: OG no topo do <head> ("+s.length+" bytes, leve)");' "$h"
+            # a imagem OG responde 200 image/jpeg 1200x630
+            j=$(mktemp)
+            jc=$(curl -sS --max-time 25 -o "$j" -w '%{http_code}' "$B/og/wa-card-v64-38.jpg")
+            jct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/og/wa-card-v64-38.jpg")
+            echo "og:image -> HTTP=$jc $jct bytes=$(wc -c < "$j")"
+            [ "$jc" = "200" ] || { echo "FAIL: og:image != 200" >&2; exit 1; }
+            echo "$jct" | grep -qi 'image/jpeg' || { echo "FAIL: og:image nao e image/jpeg" >&2; exit 1; }
+            node -e 'const b=require("fs").readFileSync(process.argv[1]);if(!(b[0]===0xff&&b[1]===0xd8)){console.error("FAIL: JPEG invalido");process.exit(1);}let w=0,h=0;for(let i=2;i<b.length-9;){if(b[i]!==0xff){i++;continue;}const m=b[i+1];if(m===0xc0||m===0xc1||m===0xc2){h=b.readUInt16BE(i+5);w=b.readUInt16BE(i+7);break;}i+=2+b.readUInt16BE(i+2);}if(w!==1200||h!==630){console.error("FAIL: dimensoes "+w+"x"+h);process.exit(1);}console.log("OK: og:image JPEG "+w+"x"+h);' "$j"
+            echo "OK: /share OG premium validado em $B"
+          done
+
       # FASE 3 — TESTE REAL de envio premium via WhatsApp Business Cloud API.
       # Só roda se wa_send_token E wa_send_phone forem informados no dispatch.
       # Telefone vai por ENV (não aparece no comando renderizado). A resposta já MASCARA o

@@ -98,6 +98,32 @@ function crawlerCardHtml(origin, clientName, token) {
     '<p><a href="' + escapeHtml(link) + '">Abrir área de aprovação</a></p>\n' +
     '</body></html>';
 }
+function shareCardHtml(origin, token) {
+  // V64.39 — pagina LEVE so para preview OG (WhatsApp/Facebook/Twitter/Telegram/LinkedIn).
+  // OG/Twitter PRIMEIRO no <head>, ANTES de qualquer script. og:image absoluto HTTPS 1200x630
+  // (image/jpeg). Humanos sao redirecionados (JS) ao portal; crawlers leem o card e param.
+  const base = ogClientBase(origin);
+  const title = "Aprovar cronograma \u2014 Agenda ID Seven";
+  const desc = "Seu cronograma esta pronto para avaliacao. Toque para revisar os temas, aprovar e solicitar ajustes. Link seguro \u00b7 Agenda ID Seven.";
+  const portal = base + "/cliente/cronograma/" + token;
+  const tj = JSON.stringify(token);
+  return '<!doctype html>\n<html lang="pt-BR"><head>\n<meta charset="utf-8"/>\n' +
+    ogClientMeta(origin, title, desc, "/share/cronograma/" + token) +
+    '<meta name="viewport" content="width=device-width, initial-scale=1"/>\n' +
+    '<title>' + escapeHtml(title) + '</title>\n' +
+    '<meta name="description" content="' + escapeHtml(desc) + '"/>\n' +
+    '<meta name="theme-color" content="#5B6CFF"/>\n' +
+    '<meta name="robots" content="noindex,nofollow"/>\n' +
+    '</head><body style="margin:0;background:#070810;color:#e9edef;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif">\n' +
+    '<div style="max-width:520px;margin:0 auto;padding:52px 22px;text-align:center">\n' +
+    '<h1 style="font-size:20px;margin:0 0 8px;font-weight:800">' + escapeHtml(title) + '</h1>\n' +
+    '<p style="color:#9aa3ad;line-height:1.5;margin:0 0 20px">' + escapeHtml(desc) + '</p>\n' +
+    '<p><a id="go" href="' + escapeHtml(portal) + '" style="display:inline-block;background:linear-gradient(135deg,#5B6CFF,#22D3EE 60%,#10B981);color:#fff;text-decoration:none;font-weight:800;padding:13px 22px;border-radius:12px">Abrir area de aprovacao \u2192</a></p>\n' +
+    '</div>\n' +
+    '<script>try{location.replace("/cliente/cronograma/"+' + tj + ');}catch(e){}</script>\n' +
+    '</body></html>';
+}
+
 function isCrawlerUA(ua) {
   return /facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|pinterest|googlebot|bingbot|embedly|redditbot|skypeuripreview|vkshare|whatsapp\/|ia_archiver/i.test(ua || "");
 }
@@ -190,6 +216,16 @@ export default {
       }
     }
 
+    // V64.39 — URL DEDICADA DE COMPARTILHAMENTO (preview premium garantido no WhatsApp).
+    // /share/cronograma/:token serve SOMENTE OG no <head> (card OG absoluto 1200x630, image/jpeg)
+    // e redireciona humanos (JS) ao portal. Nao depende de sniff de User-Agent nem do HTML pesado.
+    {
+      const shareMatch = url.pathname.match(/^\/share\/cronograma\/([A-Za-z0-9_-]{4,128})\/?$/);
+      if (shareMatch && request.method === "GET") {
+        return htmlResponse(shareCardHtml(url.origin, shareMatch[1]), 200);
+      }
+    }
+
     // V64.28 — ENVIO PREMIUM via WhatsApp Business Cloud API (entrega GARANTIDA: o sistema
     // envia a IMAGEM real do card + legenda + link, sem operador, sem preview). Token/IDs
     // ficam em SECRETS (nunca no client). Sem credenciais → 503 WHATSAPP_CLOUD_API_NOT_CONFIGURED.
@@ -201,7 +237,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.38-wa-card-link-cta" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.39-share-og" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
