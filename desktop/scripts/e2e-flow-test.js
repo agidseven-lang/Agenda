@@ -587,7 +587,13 @@ check('WA_D6', 'Fluxo automático NÃO usa web.whatsapp/send?text/whatsapp:// (c
   return fn.length > 0 && fn.indexOf('send?text=') < 0 && fn.indexOf('web.whatsapp') < 0 && fn.indexOf('whatsapp://') < 0;
 })());
 check('WA_D7', 'Card Aurora Glass (B-final) segue como mídia oficial planejada (autoCardPreview usa CARD_IMG_B64)', /id="autoCardPreview"/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH));
-check('WA_D8', 'Envio manual rebaixado a TEMPORÁRIO (não definitivo): divisória explícita', /Enquanto a Cloud API não está ativa — envio manual \(temporário\)/.test(DH));
+check('WA_D8', 'Envio manual fica em "Opções avançadas" recolhido (<details>), NÃO no fluxo principal', /<details class="gcs-adv"><summary>Opções avançadas — envio manual \(fallback\)<\/summary>/.test(DH) && /class="gcs-advbody"/.test(DH) && !/<details class="gcs-adv" open>/.test(DH));
+check('WA_D9', 'Ação principal é só o automático: btnSendAuto fora do <details>; etapas manuais (step1/2/3) DENTRO do advbody', (() => {
+  const auto = DH.indexOf('id="btnSendAuto"');
+  const adv = DH.indexOf('<details class="gcs-adv">');
+  const step1 = DH.indexOf('id="step1"');
+  return auto > -1 && adv > -1 && step1 > -1 && auto < adv && step1 > adv;  // auto antes do details; etapas depois
+})());
 
 /* ===================== PARTE F — BLINDAGEM contra dados de TESTE no Kanban real ===================== */
 console.log(`${C.b}\n[PARTE F] Dados de teste (isCloudApiTest/qa-demo) NUNCA renderizam no quadro${C.x}`);

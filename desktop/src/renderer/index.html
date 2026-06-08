@@ -813,6 +813,16 @@
   .gcs-status.blocked{color:#F59E0B}
   .gcs-divider{display:flex;align-items:center;gap:10px;margin:18px 0 4px;color:var(--faint);font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
   .gcs-divider::before,.gcs-divider::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+  /* 1.0.121 — ações primárias discretas + "Opções avançadas" (manual recolhido) */
+  .gcs-prim-actions{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:14px}
+  .gcs-prim-actions .btn{width:auto;flex:0 0 auto;height:32px;padding:0 13px;font-size:12px}
+  .gcs-adv{margin-top:16px;border-top:1px solid var(--line-soft);padding-top:10px}
+  .gcs-adv>summary{cursor:pointer;list-style:none;font-size:12px;font-weight:700;color:var(--soft);display:flex;align-items:center;gap:7px;padding:6px 2px}
+  .gcs-adv>summary::-webkit-details-marker{display:none}
+  .gcs-adv>summary::before{content:"▸";color:var(--faint);transition:transform .12s}
+  .gcs-adv[open]>summary::before{transform:rotate(90deg)}
+  .gcs-adv>summary:hover{color:var(--ink)}
+  .gcs-advbody{padding-top:6px;opacity:.92}
 
   /* ===== Preview interno — visão do cliente ===== */
   .cv-sheet{position:relative;text-align:left}
@@ -2795,41 +2805,45 @@ async function openSendClientModal(taskOrForm){
       '<button class="gcs-go" id="btnSendAuto">'+svg('send')+'Enviar card premium agora</button>'+
       '<div class="gcs-status" id="autoStatus">O card chega como imagem real + legenda + link, sem operador e sem preview. Depende da WhatsApp Cloud API configurada.</div>'+
     '</div>'+
-    '<div class="gcs-divider"><span>Enquanto a Cloud API não está ativa — envio manual (temporário)</span></div>'+
-    '<div class="gcs-checklist">'+
-      '<div class="gcs-chk" id="chk1"><span class="gcs-dot">1</span>Card premium copiado</div>'+
-      '<div class="gcs-chk" id="chk2"><span class="gcs-dot">2</span>Legenda copiada</div>'+
-      '<div class="gcs-chk" id="chk3"><span class="gcs-dot">3</span>Link validado</div>'+
-    '</div>'+
-    /* ===== ETAPA 1 — CARD PREMIUM ===== */
-    '<div class="gcs-step" id="step1">'+
-      '<div class="gcs-steplabel">Etapa 1 · Card premium</div>'+
-      '<div class="gcs-card"><img id="cardImgPreview" alt="Card premium Aurora Glass — Agenda ID Seven"/></div>'+
-      '<div class="gcs-stepmsg">Cole ou arraste esta imagem no WhatsApp <b>antes</b> de enviar a legenda.</div>'+
-      '<button class="gcs-go" id="btnStep1">'+svg('copy')+'1. Copiar card premium</button>'+
-      '<div class="gcs-status" id="step1Status">Gerando imagem do card…</div>'+
-    '</div>'+
-    /* ===== ETAPA 2 — LEGENDA (bloqueada até a etapa 1) ===== */
-    '<div class="gcs-step is-locked" id="step2">'+
-      '<div class="gcs-steplabel">Etapa 2 · Legenda <span class="gcs-lock" id="lock2">conclua a etapa 1</span></div>'+
-      '<pre class="gcs-legend" id="legendBox">'+esc(msg)+'</pre>'+
-      '<button class="gcs-go" id="btnStep2" disabled>'+svg('copy')+'2. Copiar legenda</button>'+
-      '<div class="gcs-status" id="step2Status"></div>'+
-    '</div>'+
-    /* ===== ETAPA 3 — ABRIR WHATSAPP (bloqueada até etapas 1 e 2) ===== */
-    '<div class="gcs-step is-locked" id="step3">'+
-      '<div class="gcs-steplabel">Etapa 3 · Abrir WhatsApp <span class="gcs-lock" id="lock3">conclua as etapas 1 e 2</span></div>'+
-      '<div class="gcs-stepmsg">Cole primeiro o <b>card premium como imagem</b>. Depois cole a <b>legenda</b> copiada.</div>'+
-      '<button class="gcs-go" id="btnStep3" disabled>'+svg('send')+'3. Abrir WhatsApp</button>'+
-    '</div>'+
-    /* ===== Ações secundárias discretas (apoio — NUNCA abrem o WhatsApp) ===== */
-    '<div class="gcs-secondary">'+
-      '<button class="btn ghost" id="btnCopyImg">Copiar imagem</button>'+
-      '<button class="btn ghost" id="btnCopyMsg">Copiar legenda</button>'+
-      '<button class="btn ghost" id="btnOpenFolder">Abrir pasta</button>'+
+    /* ===== Ações primárias discretas (não abrem WhatsApp) ===== */
+    '<div class="gcs-prim-actions">'+
       '<button class="btn ghost" data-clientview="'+(ctx.isForm?'':esc(ctx.id))+'">Testar link</button>'+
       '<button class="btn ghost" data-modalclose="1">Fechar</button>'+
     '</div>'+
+    /* ===== OPÇÕES AVANÇADAS — envio manual (fallback recolhido) ===== */
+    '<details class="gcs-adv"><summary>Opções avançadas — envio manual (fallback)</summary>'+
+      '<div class="gcs-advbody">'+
+        '<div class="gcs-stepmsg" style="margin-top:0">Use <b>apenas</b> se o envio automático estiver indisponível. Aqui você anexa a imagem e cola a legenda manualmente no WhatsApp.</div>'+
+        '<div class="gcs-checklist">'+
+          '<div class="gcs-chk" id="chk1"><span class="gcs-dot">1</span>Card premium copiado</div>'+
+          '<div class="gcs-chk" id="chk2"><span class="gcs-dot">2</span>Legenda copiada</div>'+
+          '<div class="gcs-chk" id="chk3"><span class="gcs-dot">3</span>Link validado</div>'+
+        '</div>'+
+        '<div class="gcs-step" id="step1">'+
+          '<div class="gcs-steplabel">Etapa 1 · Card premium</div>'+
+          '<div class="gcs-card"><img id="cardImgPreview" alt="Card premium Aurora Glass — Agenda ID Seven"/></div>'+
+          '<div class="gcs-stepmsg">Cole ou arraste esta imagem no WhatsApp <b>antes</b> de enviar a legenda.</div>'+
+          '<button class="gcs-go" id="btnStep1">'+svg('copy')+'1. Copiar card premium</button>'+
+          '<div class="gcs-status" id="step1Status">Gerando imagem do card…</div>'+
+        '</div>'+
+        '<div class="gcs-step is-locked" id="step2">'+
+          '<div class="gcs-steplabel">Etapa 2 · Legenda <span class="gcs-lock" id="lock2">conclua a etapa 1</span></div>'+
+          '<pre class="gcs-legend" id="legendBox">'+esc(msg)+'</pre>'+
+          '<button class="gcs-go" id="btnStep2" disabled>'+svg('copy')+'2. Copiar legenda</button>'+
+          '<div class="gcs-status" id="step2Status"></div>'+
+        '</div>'+
+        '<div class="gcs-step is-locked" id="step3">'+
+          '<div class="gcs-steplabel">Etapa 3 · Abrir WhatsApp <span class="gcs-lock" id="lock3">conclua as etapas 1 e 2</span></div>'+
+          '<div class="gcs-stepmsg">Cole primeiro o <b>card premium como imagem</b>. Depois cole a <b>legenda</b> copiada.</div>'+
+          '<button class="gcs-go" id="btnStep3" disabled>'+svg('send')+'3. Abrir WhatsApp</button>'+
+        '</div>'+
+        '<div class="gcs-secondary">'+
+          '<button class="btn ghost" id="btnCopyImg">Copiar imagem</button>'+
+          '<button class="btn ghost" id="btnCopyMsg">Copiar legenda</button>'+
+          '<button class="btn ghost" id="btnOpenFolder">Abrir pasta</button>'+
+        '</div>'+
+      '</div>'+
+    '</details>'+
   '</div></div>';
   _wireAutoSend(ctx);
   _wireGuidedSend(ctx, msg, cardFile);
