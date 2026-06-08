@@ -2203,11 +2203,16 @@ async function deleteTaskDoc(env, accessToken, id) {
 }
 // Varredura ampla (só p/ diagnóstico/identificação): lista tasks recentes (campos mínimos).
 async function scanRecentTasks(env, accessToken) {
-  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks?pageSize=80`;
-  const res = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
-  if (!res.ok) return [];
-  const j = await res.json(); const out = [];
-  for (const d of (j.documents || [])) { const id = d.name.split("/").pop(); const f = decodeFields(d.fields); out.push({ id, client: f.client || null, title: f.title || null, isCloudApiTest: f.isCloudApiTest === true }); }
+  const out = []; let pageToken = ""; let pages = 0;
+  do {
+    let url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks?pageSize=300`;
+    if (pageToken) url += "&pageToken=" + encodeURIComponent(pageToken);
+    const res = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
+    if (!res.ok) break;
+    const j = await res.json();
+    for (const d of (j.documents || [])) { const id = d.name.split("/").pop(); const f = decodeFields(d.fields); out.push({ id, client: f.client || null, title: f.title || null, cronStatus: f.cronStatus || null, isCloudApiTest: f.isCloudApiTest === true }); }
+    pageToken = j.nextPageToken || ""; pages++;
+  } while (pageToken && pages < 30);
   return out;
 }
 async function handleCleanupTestCronogramas(request, env) {
@@ -2239,8 +2244,8 @@ async function handleCleanupTestCronogramas(request, env) {
   if (!dryRun) { try { remaining = await findTestTasks(env, accessToken); } catch (_) { remaining = []; } }
   // Diagnóstico opcional: se nada casou pelos marcadores, lista tasks recentes p/ identificar o doc.
   let scan = undefined;
-  if (body.scan === true && found.length === 0) {
-    try { const all = await scanRecentTasks(env, accessToken); scan = all.filter(t => (t.client && /teste|test|cloud api/i.test(t.client)) || (t.title && /teste|test|cloud api/i.test(t.title)) || t.isCloudApiTest === true); } catch (_) {}
+  if (body.scan === true) {
+    try { const all = await scanRecentTasks(env, accessToken); const re = /teste|test|cloud ?api|demo|hospital|vis[aã]o/i; scan = all.filter(t => (t.client && re.test(t.client)) || (t.title && re.test(t.title)) || t.isCloudApiTest === true); } catch (_) {}
   }
   console.log("[ADMIN-CLEANUP] dryRun=" + dryRun + " encontrados=" + found.length + " removidos=" + deleted.length + " restantes=" + remaining.length);
   return json({ ok: true, dryRun: dryRun, found: audit, deletedCount: deleted.length, deletedIds: deleted, remainingCount: remaining.length, scan: scan }, 200, env);
