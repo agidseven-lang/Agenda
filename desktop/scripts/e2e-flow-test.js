@@ -265,7 +265,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.35-wa-cloud-api (Cloud API ativa; endpoints admin temporários removidos)', /V64\.35-wa-cloud-api/.test(W));
+check('W1', 'Worker é V64.36-wa-cloud-api (Cloud API ativa; endpoints admin temporários removidos)', /V64.36-wa-cloud-api/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
 const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
