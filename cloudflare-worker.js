@@ -201,7 +201,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.28-wa-cloud-api" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.29-wa-cloud-api" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2145,6 +2145,12 @@ function normalizePhoneE164(raw) {
   if (d.length < 10 || d.length > 15) return null;   // E.164: 10–15 dígitos
   return d;
 }
+// Mascara o telefone para resposta/log (nunca expõe o número completo).
+function maskPhone(d) {
+  const s = String(d || "");
+  if (s.length < 6) return "*****";
+  return s.slice(0, 2) + "*".repeat(Math.max(0, s.length - 4)) + s.slice(-2);
+}
 // Legenda OFICIAL, limpa, premium — idêntica à do Desktop. SEM URL técnica do WhatsApp.
 function buildPremiumCaption(clientName, tipo, link) {
   const nome = (clientName && String(clientName).trim()) || "cliente";
@@ -2168,7 +2174,7 @@ async function handleSendPremiumWhatsApp(request, env, origin) {
   try { body = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
   const token = (typeof body.token === "string" ? body.token.trim() : "");
   if (!/^[A-Za-z0-9_-]{4,128}$/.test(token)) return json({ ok: false, error: "TOKEN_INVALIDO" }, 400, env);
-  const phone = normalizePhoneE164(body.phone);
+  const phone = normalizePhoneE164(body.toPhone || body.phone);   // aceita toPhone (spec) e phone (Desktop atual)
   if (!phone) return json({ ok: false, error: "TELEFONE_INVALIDO", hint: "use E.164, ex.: 5511999999999" }, 400, env);
 
   // 3) Resolve a tarefa pelo token (mesma fonte do portal do cliente).
@@ -2191,7 +2197,7 @@ async function handleSendPremiumWhatsApp(request, env, origin) {
   // 5) Monta o payload da Cloud API. Em PRODUÇÃO (fora da janela de 24h) a Meta EXIGE template
   //    aprovado com header de IMAGEM. Se WHATSAPP_TEMPLATE_NAME existir, usa template; senão,
   //    envia imagem+legenda livre (só funciona dentro da janela de 24h — modo de TESTE).
-  const ver = (env.WHATSAPP_GRAPH_VERSION || "v21.0");
+  const ver = (env.WHATSAPP_GRAPH_VERSION || "v25.0");
   const endpoint = "https://graph.facebook.com/" + ver + "/" + env.WHATSAPP_PHONE_NUMBER_ID + "/messages";
   let payload, mode;
   if (env.WHATSAPP_TEMPLATE_NAME) {
@@ -2240,13 +2246,15 @@ async function handleSendPremiumWhatsApp(request, env, origin) {
   }
   let metaJson = null; try { metaJson = JSON.parse(metaText); } catch (_) {}
   const messageId = metaJson && metaJson.messages && metaJson.messages[0] && metaJson.messages[0].id;
-  // 7) Sucesso REAL só com message_id devolvido pela Meta.
+  // 7) Sucesso REAL só com message_id devolvido pela Meta. NUNCA loga token; telefone mascarado.
   if (messageId) {
-    console.log("[WA-CLOUD] enviado mode=" + mode + " to=" + phone + " message_id=" + messageId);
-    return json({ ok: true, message_id: messageId, mode: mode, to: phone, taskId: task.id || null }, 200, env);
+    console.log("[WA-CLOUD] enviado mode=" + mode + " to=" + maskPhone(phone) + " message_id=" + messageId);
+    return json({ ok: true, provider: "meta_whatsapp_cloud_api", message_id: messageId, to: maskPhone(phone), template: env.WHATSAPP_TEMPLATE_NAME || null, mode: mode }, 200, env);
   }
-  console.error("[WA-CLOUD] Meta NÃO confirmou (status=" + metaStatus + "):", metaText.slice(0, 400));
-  return json({ ok: false, error: "META_NAO_CONFIRMOU", status: metaStatus, mode: mode, meta: metaJson || metaText.slice(0, 600) }, 502, env);
+  // 8) Falha estruturada — repassa o erro da Meta SEM vazar token.
+  const me = (metaJson && metaJson.error) || {};
+  console.error("[WA-CLOUD] Meta NÃO confirmou (status=" + metaStatus + " code=" + (me.code || "") + "): " + String(me.message || metaText.slice(0, 200)));
+  return json({ ok: false, code: "META_WHATSAPP_SEND_FAILED", status: metaStatus, mode: mode, meta_error: { message: me.message || null, type: me.type || null, code: (me.code != null ? me.code : null), error_subcode: (me.error_subcode != null ? me.error_subcode : null), fbtrace_id: me.fbtrace_id || null } }, 502, env);
 }
 
 function corsHeaders(env) {
