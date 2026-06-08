@@ -520,7 +520,7 @@ check('MEDIA_AB3', 'O card embutido no Desktop é o MESMO byte-a-byte que o Work
   return !!(dm && wm && dm[1] === wm[1]);
 })());
 check('MEDIA_AB4', '_wireGuidedSend usa o card embutido (atob(CARD_IMG_B64) → data:image/jpeg) com fetch(CARD_IMG_URL) só como fallback', /atob\(CARD_IMG_B64\)/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
-check("MEDIA_D2", "Modal: título + subtítulo (envia direto ao WhatsApp do cliente)", /Enviar card premium ao cliente/.test(DH) && /Envia o card premium completo direto para o WhatsApp do cliente/.test(DH));
+check("MEDIA_D2", "Modal: título + subtítulo (automático p/ responsável; grupo = modo assistido)", /Enviar card premium ao cliente/.test(DH) && /Envio automático oficial para o <b>responsável<\/b>/.test(DH) && /grupo<\/b> do cliente, use o modo assistido/.test(DH));
 check('MEDIA_D5', 'Nome de arquivo claro agenda-id-seven-card-[cliente]-[token].jpg', /agenda-id-seven-card-'\+/.test(DH));
 // ===== 1.0.120 — ASSISTENTE GUIADO EM 3 ETAPAS (à prova de erro) =====
 check('GUIDED_1', 'Modal tem 3 ETAPAS (step1/step2/step3) com botões btnStep1/2/3', /id="step1"/.test(DH) && /id="step2"/.test(DH) && /id="step3"/.test(DH) && /id="btnStep1"/.test(DH) && /id="btnStep2"/.test(DH) && /id="btnStep3"/.test(DH));
@@ -578,7 +578,7 @@ check('WA_W7', 'Rota NÃO usa web.whatsapp/send?text/whatsapp:// (é API server-
 })();
 // ---- DESKTOP (botão oficial "Enviar card premium agora") ----
 check('WA_D1', 'Desktop tem PREMIUM_SEND_URL = Worker + /client/send-premium-whatsapp (sem token Meta no client)', /const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE\+'\/client\/send-premium-whatsapp'/.test(DH) && !/WHATSAPP_ACCESS_TOKEN/.test(DH));
-check('WA_D2', 'Botão principal único "Enviar para o WhatsApp do cliente" + _wireAutoSend; SEM "Testar link"', /id="btnSendAuto"/.test(DH) && /Enviar para o WhatsApp do cliente/.test(DH) && /function _wireAutoSend\(ctx\)/.test(DH) && !/Testar link/.test(DH));
+check('WA_D2', 'Botão principal "Enviar card premium ao responsável" + campo "WhatsApp do responsável" + _wireAutoSend; SEM "Testar link"', /id="btnSendAuto"/.test(DH) && /Enviar card premium ao responsável/.test(DH) && /WhatsApp do responsável pelo cliente/.test(DH) && /function _wireAutoSend\(ctx\)/.test(DH) && !/Testar link/.test(DH));
 check('WA_D2b', 'Cabeçalho do modal usa a MARCA ID Seven (gcs-headic.brand = var(--logo)), não ícone genérico', /<div class="gcs-headic brand"[^>]*aria-label="ID Seven"/.test(DH) && /\.gcs-headic\.brand\{background:var\(--logo\)/.test(DH));
 check('WA_D3', 'Chama SÓ a rota segura (fetch PREMIUM_SEND_URL) com payload token/clientName/phone/cronogramaTipo', /fetch\(PREMIUM_SEND_URL,\{method:'POST'/.test(DH) && /token:ctx\.token/.test(DH) && /clientName:ctx\.client/.test(DH) && /phone:phone/.test(DH) && /cronogramaTipo:ctx\.type/.test(DH));
 check('WA_D4', 'Sucesso SÓ com message_id real (data.message_id)', /data&&data\.ok&&data\.message_id/.test(DH));
@@ -588,7 +588,7 @@ check('WA_D6', 'Fluxo automático NÃO usa web.whatsapp/send?text/whatsapp:// (c
   return fn.length > 0 && fn.indexOf('send?text=') < 0 && fn.indexOf('web.whatsapp') < 0 && fn.indexOf('whatsapp://') < 0;
 })());
 check('WA_D7', 'Card Aurora Glass (B-final) segue como mídia oficial planejada (autoCardPreview usa CARD_IMG_B64)', /id="autoCardPreview"/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH));
-check('WA_D8', 'Envio manual fica em "Opções avançadas" recolhido (<details>), NÃO no fluxo principal', /<details class="gcs-adv"><summary>Opções avançadas — envio manual \(fallback\)<\/summary>/.test(DH) && /class="gcs-advbody"/.test(DH) && !/<details class="gcs-adv" open>/.test(DH));
+check('WA_D8', 'Grupo do cliente = "modo assistido" recolhido (<details>); deixa claro que a API NÃO posta no grupo', /<details class="gcs-adv"><summary>Enviar no grupo do cliente — modo assistido<\/summary>/.test(DH) && /A API oficial <b>não posta automaticamente<\/b> no grupo existente do cliente/.test(DH) && !/<details class="gcs-adv" open>/.test(DH));
 check('WA_D9', 'Ação principal é só o automático: btnSendAuto fora do <details>; etapas manuais (step1/2/3) DENTRO do advbody', (() => {
   const auto = DH.indexOf('id="btnSendAuto"');
   const adv = DH.indexOf('<details class="gcs-adv">');

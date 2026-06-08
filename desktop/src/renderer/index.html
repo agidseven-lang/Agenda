@@ -2797,23 +2797,24 @@ async function openSendClientModal(taskOrForm){
     '<div class="gcs-head">'+
       '<div class="gcs-headic brand" role="img" aria-label="ID Seven"></div>'+
       '<div style="min-width:0"><div class="gcs-title">Enviar card premium ao cliente</div>'+
-        '<div class="gcs-sub">Envia o card premium completo direto para o WhatsApp do cliente. Informe o número e clique em enviar.</div></div>'+
+        '<div class="gcs-sub">Envio automático oficial para o <b>responsável</b> (WhatsApp Cloud API). Para o <b>grupo</b> do cliente, use o modo assistido abaixo.</div></div>'+
     '</div>'+
-    /* ===== ENVIO AUTOMÁTICO (OFICIAL) — via WhatsApp Business Cloud API ===== */
+    /* ===== FLUXO PRINCIPAL — AUTOMÁTICO OFICIAL (responsável) via Cloud API ===== */
     '<div class="gcs-auto" id="autoBlock">'+
+      '<div class="gcs-steplabel">Enviar para o WhatsApp do responsável · oficial</div>'+
       '<div class="gcs-card"><img id="autoCardPreview" alt="Card premium Aurora Glass — Agenda ID Seven"/></div>'+
-      '<input id="waPhone" class="gcs-input" type="tel" autocomplete="off" placeholder="WhatsApp do cliente — ex.: 55 11 99999-9999" value="'+esc(ctx.phone||'')+'"/>'+
-      '<button class="gcs-go" id="btnSendAuto">'+svg('send')+'Enviar para o WhatsApp do cliente</button>'+
-      '<div class="gcs-status" id="autoStatus">O card premium completo chega direto no WhatsApp do cliente (imagem + texto + botão).</div>'+
+      '<input id="waPhone" class="gcs-input" type="tel" autocomplete="off" placeholder="WhatsApp do responsável pelo cliente — ex.: 55 11 99999-9999" value="'+esc(ctx.phone||'')+'"/>'+
+      '<button class="gcs-go" id="btnSendAuto">'+svg('send')+'Enviar card premium ao responsável</button>'+
+      '<div class="gcs-status" id="autoStatus">Vai pela WhatsApp Cloud API: imagem do card + texto + botão “Revisar e aprovar”. Confirmação com ID real da Meta.</div>'+
     '</div>'+
     /* ===== Ação primária discreta ===== */
     '<div class="gcs-prim-actions">'+
       '<button class="btn ghost" data-modalclose="1">Fechar</button>'+
     '</div>'+
-    /* ===== OPÇÕES AVANÇADAS — envio manual (fallback recolhido) ===== */
-    '<details class="gcs-adv"><summary>Opções avançadas — envio manual (fallback)</summary>'+
+    /* ===== GRUPO DO CLIENTE — MODO ASSISTIDO (recolhido) ===== */
+    '<details class="gcs-adv"><summary>Enviar no grupo do cliente — modo assistido</summary>'+
       '<div class="gcs-advbody">'+
-        '<div class="gcs-stepmsg" style="margin-top:0">Use <b>apenas</b> se o envio automático estiver indisponível. Aqui você anexa a imagem e cola a legenda manualmente no WhatsApp.</div>'+
+        '<div class="gcs-stepmsg" style="margin-top:0">A API oficial <b>não posta automaticamente</b> no grupo existente do cliente. Aqui o sistema <b>prepara o card e a legenda</b> — você cola no <b>grupo do WhatsApp Business do cliente</b>.</div>'+
         '<div class="gcs-checklist">'+
           '<div class="gcs-chk" id="chk1"><span class="gcs-dot">1</span>Card premium copiado</div>'+
           '<div class="gcs-chk" id="chk2"><span class="gcs-dot">2</span>Legenda copiada</div>'+
@@ -2822,7 +2823,7 @@ async function openSendClientModal(taskOrForm){
         '<div class="gcs-step" id="step1">'+
           '<div class="gcs-steplabel">Etapa 1 · Card premium</div>'+
           '<div class="gcs-card"><img id="cardImgPreview" alt="Card premium Aurora Glass — Agenda ID Seven"/></div>'+
-          '<div class="gcs-stepmsg">Cole ou arraste esta imagem no WhatsApp <b>antes</b> de enviar a legenda.</div>'+
+          '<div class="gcs-stepmsg">Cole ou arraste esta imagem no <b>grupo do cliente</b> antes de enviar a legenda.</div>'+
           '<button class="gcs-go" id="btnStep1">'+svg('copy')+'1. Copiar card premium</button>'+
           '<div class="gcs-status" id="step1Status">Gerando imagem do card…</div>'+
         '</div>'+
@@ -2834,7 +2835,7 @@ async function openSendClientModal(taskOrForm){
         '</div>'+
         '<div class="gcs-step is-locked" id="step3">'+
           '<div class="gcs-steplabel">Etapa 3 · Abrir WhatsApp <span class="gcs-lock" id="lock3">conclua as etapas 1 e 2</span></div>'+
-          '<div class="gcs-stepmsg">Cole primeiro o <b>card premium como imagem</b>. Depois cole a <b>legenda</b> copiada.</div>'+
+          '<div class="gcs-stepmsg">No <b>grupo do cliente</b>: cole primeiro o <b>card como imagem</b>, depois cole a <b>legenda</b>.</div>'+
           '<button class="gcs-go" id="btnStep3" disabled>'+svg('send')+'3. Abrir WhatsApp</button>'+
         '</div>'+
         '<div class="gcs-secondary">'+
@@ -2863,7 +2864,7 @@ function _wireAutoSend(ctx){
   if(!btn) return;
   btn.addEventListener('click', async function(){
     const phone=(phoneEl&&phoneEl.value||'').replace(/[^\d]/g,'');
-    if(phone.length<10){ setStatus('Informe o WhatsApp do cliente com DDD (ex.: 55 11 99999-9999).','err'); if(phoneEl)phoneEl.focus(); return; }
+    if(phone.length<10){ setStatus('Informe o WhatsApp do responsável com DDD (ex.: 55 11 99999-9999).','err'); if(phoneEl)phoneEl.focus(); return; }
     if(!ctx.token){ setStatus('Link do cliente sem token — gere o cronograma novamente.','err'); return; }
     btn.disabled=true; const old=btn.innerHTML; btn.innerHTML=svg('send')+'Enviando…';
     setStatus('Enviando o card premium pela WhatsApp Cloud API…');
@@ -2886,8 +2887,8 @@ function _wireAutoSend(ctx){
     // Sucesso REAL: só com message_id devolvido pela Meta.
     if(r&&r.ok&&data&&data.ok&&data.message_id){
       btn.innerHTML=svg('check')+'Enviado'; btn.classList.add('is-done');
-      setStatus('Card premium enviado ao WhatsApp do cliente ✓ (id: '+esc(String(data.message_id))+').','ok');
-      flashToast('Card premium enviado pelo WhatsApp (Cloud API).');
+      setStatus('Card premium enviado ao responsável ✓ (id: '+esc(String(data.message_id))+').','ok');
+      flashToast('Card premium enviado ao responsável (Cloud API).');
       return;
     }
     // Falha controlada — mostra o código retornado pelo Worker/Meta.
