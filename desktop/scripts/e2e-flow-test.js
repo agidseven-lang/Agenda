@@ -520,7 +520,7 @@ check('MEDIA_AB3', 'O card embutido no Desktop é o MESMO byte-a-byte que o Work
   return !!(dm && wm && dm[1] === wm[1]);
 })());
 check('MEDIA_AB4', '_wireGuidedSend usa o card embutido (atob(CARD_IMG_B64) → data:image/jpeg) com fetch(CARD_IMG_URL) só como fallback', /atob\(CARD_IMG_B64\)/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
-check('MEDIA_D2', 'Modal: título "Enviar card premium ao cliente" + subtítulo do envio automático (Cloud API)', /Enviar card premium ao cliente/.test(DH) && /Envio automático: o sistema manda a imagem do card \+ legenda direto pelo WhatsApp \(Cloud API\)/.test(DH));
+check("MEDIA_D2", "Modal: título + subtítulo (envia direto ao WhatsApp do cliente)", /Enviar card premium ao cliente/.test(DH) && /Envia o card premium completo direto para o WhatsApp do cliente/.test(DH));
 check('MEDIA_D5', 'Nome de arquivo claro agenda-id-seven-card-[cliente]-[token].jpg', /agenda-id-seven-card-'\+/.test(DH));
 // ===== 1.0.120 — ASSISTENTE GUIADO EM 3 ETAPAS (à prova de erro) =====
 check('GUIDED_1', 'Modal tem 3 ETAPAS (step1/step2/step3) com botões btnStep1/2/3', /id="step1"/.test(DH) && /id="step2"/.test(DH) && /id="step3"/.test(DH) && /id="btnStep1"/.test(DH) && /id="btnStep2"/.test(DH) && /id="btnStep3"/.test(DH));
@@ -578,7 +578,7 @@ check('WA_W7', 'Rota NÃO usa web.whatsapp/send?text/whatsapp:// (é API server-
 })();
 // ---- DESKTOP (botão oficial "Enviar card premium agora") ----
 check('WA_D1', 'Desktop tem PREMIUM_SEND_URL = Worker + /client/send-premium-whatsapp (sem token Meta no client)', /const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE\+'\/client\/send-premium-whatsapp'/.test(DH) && !/WHATSAPP_ACCESS_TOKEN/.test(DH));
-check('WA_D2', 'Botão principal "Enviar card premium agora" + _wireAutoSend', /id="btnSendAuto"/.test(DH) && /Enviar card premium agora/.test(DH) && /function _wireAutoSend\(ctx\)/.test(DH));
+check('WA_D2', 'Botão principal único "Enviar para o WhatsApp do cliente" + _wireAutoSend; SEM "Testar link"', /id="btnSendAuto"/.test(DH) && /Enviar para o WhatsApp do cliente/.test(DH) && /function _wireAutoSend\(ctx\)/.test(DH) && !/Testar link/.test(DH));
 check('WA_D3', 'Chama SÓ a rota segura (fetch PREMIUM_SEND_URL) com payload token/clientName/phone/cronogramaTipo', /fetch\(PREMIUM_SEND_URL,\{method:'POST'/.test(DH) && /token:ctx\.token/.test(DH) && /clientName:ctx\.client/.test(DH) && /phone:phone/.test(DH) && /cronogramaTipo:ctx\.type/.test(DH));
 check('WA_D4', 'Sucesso SÓ com message_id real (data.message_id)', /data&&data\.ok&&data\.message_id/.test(DH));
 check('WA_D5', '503/NOT_CONFIGURED → mensagem clara de configuração (sem fallback WhatsApp Web)', /WHATSAPP_CLOUD_API_NOT_CONFIGURED/.test(DH) && /A integração WhatsApp Cloud API ainda não está configurada\. Configure as credenciais da Meta para habilitar o envio automático do card premium\./.test(DH));

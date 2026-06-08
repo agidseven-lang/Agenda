@@ -2795,19 +2795,17 @@ async function openSendClientModal(taskOrForm){
     '<div class="gcs-head">'+
       '<div class="gcs-headic">'+svg('send')+'</div>'+
       '<div style="min-width:0"><div class="gcs-title">Enviar card premium ao cliente</div>'+
-        '<div class="gcs-sub">Envio automático: o sistema manda a imagem do card + legenda direto pelo WhatsApp (Cloud API), sem anexar nada à mão.</div></div>'+
+        '<div class="gcs-sub">Envia o card premium completo direto para o WhatsApp do cliente. Informe o número e clique em enviar.</div></div>'+
     '</div>'+
     /* ===== ENVIO AUTOMÁTICO (OFICIAL) — via WhatsApp Business Cloud API ===== */
     '<div class="gcs-auto" id="autoBlock">'+
-      '<div class="gcs-steplabel">Envio automático · oficial</div>'+
       '<div class="gcs-card"><img id="autoCardPreview" alt="Card premium Aurora Glass — Agenda ID Seven"/></div>'+
       '<input id="waPhone" class="gcs-input" type="tel" autocomplete="off" placeholder="WhatsApp do cliente — ex.: 55 11 99999-9999" value="'+esc(ctx.phone||'')+'"/>'+
-      '<button class="gcs-go" id="btnSendAuto">'+svg('send')+'Enviar card premium agora</button>'+
-      '<div class="gcs-status" id="autoStatus">O card chega como imagem real + legenda + link, sem operador e sem preview. Depende da WhatsApp Cloud API configurada.</div>'+
+      '<button class="gcs-go" id="btnSendAuto">'+svg('send')+'Enviar para o WhatsApp do cliente</button>'+
+      '<div class="gcs-status" id="autoStatus">O card premium completo chega direto no WhatsApp do cliente (imagem + texto + botão).</div>'+
     '</div>'+
-    /* ===== Ações primárias discretas (não abrem WhatsApp) ===== */
+    /* ===== Ação primária discreta ===== */
     '<div class="gcs-prim-actions">'+
-      '<button class="btn ghost" data-clientview="'+(ctx.isForm?'':esc(ctx.id))+'">Testar link</button>'+
       '<button class="btn ghost" data-modalclose="1">Fechar</button>'+
     '</div>'+
     /* ===== OPÇÕES AVANÇADAS — envio manual (fallback recolhido) ===== */
