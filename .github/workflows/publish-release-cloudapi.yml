@@ -5,9 +5,9 @@ on:
 permissions:
   contents: write
 env:
-  DESKTOP_RUN: "27161380010"
+  DESKTOP_RUN: "27166135724"
   DESKTOP_ARTIFACT: "agenda-id-seven-desktop-1.0.121-whatsapp-cloud-api-send-installer"
-  ANDROID_RUN: "27162112104"
+  ANDROID_RUN: "27166149471"
   ANDROID_ARTIFACT: "idseven-nativebeta-1.0.110-beta-whatsapp-cloud-api-parity"
   TAG: "test/whatsapp-cloud-api-1.0.121"
 jobs:
