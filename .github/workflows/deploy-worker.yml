@@ -17,6 +17,14 @@ on:
         description: "shareToken real de uma task p/ validar a rota pública /cliente/cronograma/<token> (opcional)"
         required: false
         type: string
+      wa_send_token:
+        description: "[FASE 3] token de um cronograma REAL p/ teste de envio premium via Cloud API (opcional)"
+        required: false
+        type: string
+      wa_send_phone:
+        description: "[FASE 3] telefone de teste em E.164 (ex.: 5583999999999) p/ receber o card real (opcional)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -208,3 +216,29 @@ jobs:
           echo "Content-Type=$dct ; corpo:"; head -c 300 /tmp/diag.json; echo
           echo "$dct" | grep -qi 'application/json' || { echo "FAIL: /wa-diag nao e JSON" >&2; exit 1; }
           echo "OK: V64.25 canarios+preview+wa-diag validados."
+
+      # FASE 3 — TESTE REAL de envio premium via WhatsApp Business Cloud API.
+      # Só roda se wa_send_token E wa_send_phone forem informados no dispatch.
+      # Telefone vai por ENV (não aparece no comando renderizado). A resposta já MASCARA o
+      # telefone e NUNCA contém token. Sucesso = message_id real da Meta.
+      - name: "[FASE 3] Envio REAL do card premium (Cloud API) — exige message_id"
+        if: ${{ github.event.inputs.wa_send_token != '' && github.event.inputs.wa_send_phone != '' }}
+        env:
+          WA_TOKEN: ${{ github.event.inputs.wa_send_token }}
+          WA_PHONE: ${{ github.event.inputs.wa_send_phone }}
+        run: |
+          set -euo pipefail
+          B="https://idseven-push.agidseven.workers.dev"
+          echo "== POST /client/send-premium-whatsapp (envio REAL; telefone oculto) =="
+          resp=$(curl -sS --max-time 30 -X POST "$B/client/send-premium-whatsapp" \
+            -H "Content-Type: application/json" \
+            --data "$(node -e 'console.log(JSON.stringify({token:process.env.WA_TOKEN,toPhone:process.env.WA_PHONE}))')")
+          echo "Resposta da rota (telefone mascarado, sem token):"
+          echo "$resp"
+          echo "$resp" | grep -q '"WHATSAPP_CLOUD_API_NOT_CONFIGURED"' && { echo "FAIL: secret WHATSAPP_ACCESS_TOKEN ausente no Worker" >&2; exit 1; } || true
+          echo "$resp" | node -e '
+            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+              let j={};try{j=JSON.parse(s)}catch(e){console.error("FAIL: resposta nao-JSON");process.exit(1);}
+              if(j.ok===true && j.message_id){console.log("OK: ENVIO REAL confirmado pela Meta. message_id="+j.message_id+" template="+j.template+" to="+j.to);process.exit(0);}
+              console.error("FAIL: Meta NAO confirmou. code="+(j.code||j.error)+" status="+(j.status||"")+" meta_error="+JSON.stringify(j.meta_error||{}));process.exit(1);
+            });'
