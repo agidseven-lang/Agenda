@@ -197,11 +197,18 @@ export default {
       return handleSendPremiumWhatsApp(request, env, url.origin);
     }
 
+    // V64.32 — LIMPEZA (TEMPORÁRIA): remove do Firestore qualquer cronograma marcado
+    // isCloudApiTest:true (dados de teste que não podem aparecer no Kanban real). Gate por
+    // chave = WHATSAPP_BUSINESS_ACCOUNT_ID. Suporta dryRun. Será removido após a limpeza.
+    if (url.pathname === "/admin/cleanup-test-cronogramas" && request.method === "POST") {
+      return handleCleanupTestCronogramas(request, env);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.31-wa-cloud-api" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.32-wa-cleanup" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2161,6 +2168,42 @@ function buildPremiumCaption(clientName, tipo, link) {
     "Toque no link abaixo para revisar e aprovar:\n\n" +
     link + "\n\n" +
     "*Equipe ID Seven*";
+}
+// V64.32 — LIMPEZA TEMPORÁRIA: lista (e, se !dryRun, remove) cronogramas de teste (isCloudApiTest:true).
+async function queryAllTasksByBool(env, accessToken, field, value) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], where: { fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: { booleanValue: value } } }, limit: 50 } };
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  if (!res.ok) throw new Error("runQuery " + field + " " + res.status + ": " + (await res.text()).slice(0, 200));
+  const rows = await res.json(); const out = [];
+  for (const row of rows) { if (!row.document) continue; const id = row.document.name.split("/").pop(); out.push(Object.assign({ id }, decodeFields(row.document.fields))); }
+  return out;
+}
+async function deleteTaskDoc(env, accessToken, id) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${id}`;
+  const res = await fetch(url, { method: "DELETE", headers: { "Authorization": "Bearer " + accessToken } });
+  return res.ok;
+}
+async function handleCleanupTestCronogramas(request, env) {
+  let body; try { body = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
+  if (!env.WHATSAPP_BUSINESS_ACCOUNT_ID || body.key !== env.WHATSAPP_BUSINESS_ACCOUNT_ID) return json({ ok: false, error: "FORBIDDEN" }, 403, env);
+  const dryRun = body.dryRun === true;
+  let accessToken;
+  try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, error: "AUTH_FIRESTORE_FALHOU", detail: String(e && e.message || e) }, 502, env); }
+  let found;
+  try { found = await queryAllTasksByBool(env, accessToken, "isCloudApiTest", true); }
+  catch (e) { return json({ ok: false, error: "FIRESTORE_QUERY_FALHOU", detail: String(e && e.message || e) }, 502, env); }
+  // Auditoria dos campos de cada doc encontrado (nunca apaga nada que não tenha a flag de teste).
+  const audit = found.map(t => ({ id: t.id, client: t.client || null, title: t.title || null, sector: t.sector || null, cronStatus: t.cronStatus || null, isCloudApiTest: t.isCloudApiTest === true, createdAt: t.createdAt || null, token: t.clientReviewToken || null }));
+  const deleted = [];
+  if (!dryRun) {
+    for (const t of found) { if (t.isCloudApiTest === true) { const ok = await deleteTaskDoc(env, accessToken, t.id); if (ok) deleted.push(t.id); } }
+  }
+  let remaining = found;
+  if (!dryRun) { try { remaining = await queryAllTasksByBool(env, accessToken, "isCloudApiTest", true); } catch (_) { remaining = []; } }
+  console.log("[ADMIN-CLEANUP] dryRun=" + dryRun + " encontrados=" + found.length + " removidos=" + deleted.length + " restantes=" + remaining.length);
+  return json({ ok: true, dryRun: dryRun, found: audit, deletedCount: deleted.length, deletedIds: deleted, remainingCount: remaining.length }, 200, env);
 }
 async function handleSendPremiumWhatsApp(request, env, origin) {
   // 1) GATE de configuração: sem secrets reais, NÃO finge envio.
