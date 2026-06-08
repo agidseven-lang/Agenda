@@ -2242,13 +2242,19 @@ async function handleCleanupTestCronogramas(request, env) {
   }
   let remaining = found;
   if (!dryRun) { try { remaining = await findTestTasks(env, accessToken); } catch (_) { remaining = []; } }
-  // Diagnóstico opcional: se nada casou pelos marcadores, lista tasks recentes p/ identificar o doc.
-  let scan = undefined;
+  // Diagnóstico opcional: varredura completa + amostra/contagem totais p/ identificar o doc.
+  let scan = undefined, scanTotal = undefined, scanSample = undefined;
   if (body.scan === true) {
-    try { const all = await scanRecentTasks(env, accessToken); const re = /teste|test|cloud ?api|demo|hospital|vis[aã]o/i; scan = all.filter(t => (t.client && re.test(t.client)) || (t.title && re.test(t.title)) || t.isCloudApiTest === true); } catch (_) {}
+    try {
+      const all = await scanRecentTasks(env, accessToken);
+      scanTotal = all.length;
+      const re = /teste|test|cloud ?api|demo|hospital|vis[aã]o/i;
+      scan = all.filter(t => (t.client && re.test(t.client)) || (t.title && re.test(t.title)) || t.isCloudApiTest === true);
+      scanSample = all.slice(0, 40).map(t => ({ id: t.id, client: t.client, title: t.title, cronStatus: t.cronStatus, isCloudApiTest: t.isCloudApiTest }));
+    } catch (_) {}
   }
-  console.log("[ADMIN-CLEANUP] dryRun=" + dryRun + " encontrados=" + found.length + " removidos=" + deleted.length + " restantes=" + remaining.length);
-  return json({ ok: true, dryRun: dryRun, found: audit, deletedCount: deleted.length, deletedIds: deleted, remainingCount: remaining.length, scan: scan }, 200, env);
+  console.log("[ADMIN-CLEANUP] dryRun=" + dryRun + " encontrados=" + found.length + " removidos=" + deleted.length + " restantes=" + remaining.length + " scanTotal=" + scanTotal);
+  return json({ ok: true, dryRun: dryRun, found: audit, deletedCount: deleted.length, deletedIds: deleted, remainingCount: remaining.length, scanTotal: scanTotal, scan: scan, scanSample: scanSample }, 200, env);
 }
 async function handleSendPremiumWhatsApp(request, env, origin) {
   // 1) GATE de configuração: sem secrets reais, NÃO finge envio.
