@@ -208,7 +208,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.33-wa-cleanup" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.34-wa-cleanup" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2182,19 +2182,23 @@ async function runTasksQuery(env, accessToken, valueObj, field) {
   for (const row of rows) { if (!row.document) continue; const id = row.document.name.split("/").pop(); out.push(Object.assign({ id }, decodeFields(row.document.fields))); }
   return out;
 }
-// Considera "doc de teste" só se tiver a flag OU exatamente o nome/título do teste (nunca dado real).
+// Considera "doc de teste" SOMENTE por marcadores inequívocos de teste/QA (nunca cliente real):
+//  - flag isCloudApiTest:true
+//  - o card de teste da Cloud API (cliente/título exatos)
+//  - seeds de QA/demo: id começa com "qa-demo", cliente "Cliente Demo ID Seven",
+//    título "Cronograma Demo (teste do card)".
 function isTestDoc(t) {
-  return t.isCloudApiTest === true || t.client === TEST_CLIENT || t.title === TEST_TITLE;
+  const c = t.client || "", ti = t.title || "", id = t.id || "";
+  return t.isCloudApiTest === true
+    || c === TEST_CLIENT || ti === TEST_TITLE
+    || c === "Cliente Demo ID Seven" || ti === "Cronograma Demo (teste do card)"
+    || /^qa-demo/i.test(id);
 }
+// VARREDURA-BASE (sem depender de índice): percorre TODAS as tasks e filtra por isTestDoc.
+// Robusto e seguro: a coleção é pequena e só remove docs com marcador inequívoco de teste.
 async function findTestTasks(env, accessToken) {
-  const byId = {};
-  const sets = await Promise.all([
-    runTasksQuery(env, accessToken, { booleanValue: true }, "isCloudApiTest"),
-    runTasksQuery(env, accessToken, { stringValue: TEST_CLIENT }, "client"),
-    runTasksQuery(env, accessToken, { stringValue: TEST_TITLE }, "title"),
-  ]);
-  for (const set of sets) for (const t of set) if (isTestDoc(t)) byId[t.id] = t;
-  return Object.values(byId);
+  const all = await scanRecentTasks(env, accessToken);
+  return all.filter(isTestDoc);
 }
 async function deleteTaskDoc(env, accessToken, id) {
   const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${id}`;
