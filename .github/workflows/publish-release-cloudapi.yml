@@ -1,0 +1,49 @@
+name: Publicar release Cloud API (Desktop 1.0.121 — envio automático)
+on:
+  push:
+    branches: [ "infra/publish-release-cloudapi" ]
+permissions:
+  contents: write
+env:
+  DESKTOP_RUN: "27161380010"
+  DESKTOP_ARTIFACT: "agenda-id-seven-desktop-1.0.121-whatsapp-cloud-api-send-installer"
+  TAG: "test/whatsapp-cloud-api-1.0.121"
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar instalador Desktop (cross-run)
+        uses: actions/download-artifact@v4
+        with: { name: "${{ env.DESKTOP_ARTIFACT }}", path: dl/desktop, run-id: "${{ env.DESKTOP_RUN }}", github-token: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: SHA-256
+        run: |
+          set -euo pipefail
+          find dl -type f | sort
+          EXE=$(ls dl/desktop/*.exe|head -1); MSI=$(ls dl/desktop/*.msi 2>/dev/null|head -1||true)
+          EXE_SHA=$(sha256sum "$EXE"|cut -d' ' -f1); MSI_SHA=$([ -n "$MSI" ]&&sha256sum "$MSI"|cut -d' ' -f1||echo n/a)
+          { echo "EXE $(basename "$EXE")  $EXE_SHA"; echo "MSI $([ -n "$MSI" ]&&basename "$MSI"||echo n/a)  $MSI_SHA"; } | tee SHA256SUMS.txt
+          { echo "EXE_NAME=$(basename "$EXE")"; echo "MSI_NAME=$([ -n "$MSI" ]&&basename "$MSI"||echo n/a)"; echo "EXE_SHA=$EXE_SHA"; echo "MSI_SHA=$MSI_SHA"; } >> "$GITHUB_ENV"
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: "Envio premium AUTOMÁTICO via WhatsApp Cloud API (Desktop 1.0.121)"
+          prerelease: true
+          body: |
+            **Entrega oficial: o sistema ENVIA o card premium pela WhatsApp Business Cloud API (sem operador, sem preview).**
+            - Worker **V64.31-wa-cloud-api**: rota `POST /client/send-premium-whatsapp` envia template `cronograma_aprovacao` (header imagem = card com marca ID Seven + body {{nome}}{{tipo}} + botão "Revisar e aprovar"). Token da Meta só em secret; telefone mascarado; sucesso só com `message_id`.
+            - **FASE 3 validada em produção:** envio real confirmado pela Meta com `message_id` real (template `cronograma_aprovacao`, mode template) e link público abrindo o cronograma (HTTP 200).
+            - Desktop **1.0.121-whatsapp-cloud-api-send** (run ${{ env.DESKTOP_RUN }}): botão principal **"Enviar card premium agora"** chama a rota segura do Worker (nenhum token Meta no client); estados loading/sucesso-com-message_id/erro; **sem fallback WhatsApp Web** no fluxo principal. Envio manual fica como apoio temporário.
+            - Android: **congelado** (não buildado) até a validação do Desktop.
+
+            SHA-256:
+            ```
+            EXE ${{ env.EXE_NAME }}
+                ${{ env.EXE_SHA }}
+            MSI ${{ env.MSI_NAME }}
+                ${{ env.MSI_SHA }}
+            ```
+          files: |
+            dl/desktop/*.exe
+            dl/desktop/*.msi
+            SHA256SUMS.txt
