@@ -110,8 +110,20 @@ object TaskRepo {
                 close(e); return@addSnapshotListener
             }
             val docs = snap?.documents ?: emptyList()
-            android.util.Log.d("TaskRepo", "tasks lidas do Firestore: ${docs.size}")
-            trySend(docs.map { map(it) })
+            // BLINDAGEM (1.0.110): nunca exibir dados de teste/QA no quadro real, mesmo que
+            // escapem para o Firestore. Marcadores inequívocos de teste (jamais cliente real).
+            val visible = docs.filter { d ->
+                val id = d.id
+                val client = d.getString("client") ?: ""
+                val title = d.getString("title") ?: ""
+                val isTest = (d.getBoolean("isCloudApiTest") == true) ||
+                    id.startsWith("qa-demo", ignoreCase = true) ||
+                    client == "Cliente Demo ID Seven" || title == "Cronograma Demo (teste do card)" ||
+                    client == "Hospital Visão (Teste Cloud API)" || title == "Cronograma de teste — Cloud API"
+                !isTest
+            }
+            android.util.Log.d("TaskRepo", "tasks lidas=${docs.size} visiveis=${visible.size} (dados de teste filtrados)")
+            trySend(visible.map { map(it) })
         }
         awaitClose { reg.remove() }
     }
