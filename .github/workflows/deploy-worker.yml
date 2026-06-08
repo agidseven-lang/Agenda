@@ -25,10 +25,6 @@ on:
         description: "[FASE 3] telefone de teste em E.164 (ex.: 5583999999999) p/ receber o card real (opcional)"
         required: false
         type: string
-      wa_admin_key:
-        description: "[FASE 3] chave admin (= WHATSAPP_BUSINESS_ACCOUNT_ID) p/ criar cronograma de teste se não houver token"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -226,24 +222,14 @@ jobs:
       # Telefone vai por ENV (não aparece no comando renderizado). A resposta já MASCARA o
       # telefone e NUNCA contém token. Sucesso = message_id real da Meta.
       - name: "[FASE 3] Envio REAL do card premium (Cloud API) — exige message_id"
-        if: ${{ github.event.inputs.wa_send_phone != '' }}
+        if: ${{ github.event.inputs.wa_send_token != '' && github.event.inputs.wa_send_phone != '' }}
         env:
           WA_TOKEN: ${{ github.event.inputs.wa_send_token }}
           WA_PHONE: ${{ github.event.inputs.wa_send_phone }}
-          WA_ADMIN_KEY: ${{ github.event.inputs.wa_admin_key }}
         run: |
           set -euo pipefail
           B="https://idseven-push.agidseven.workers.dev"
-
           TOKEN="$WA_TOKEN"
-          if [ -z "$TOKEN" ]; then
-            echo "== Sem token informado → criando cronograma de TESTE real no Firestore =="
-            cre=$(curl -sS --max-time 30 -X POST "$B/admin/create-test-cronograma" \
-              -H "Content-Type: application/json" \
-              --data "$(node -e 'console.log(JSON.stringify({key:process.env.WA_ADMIN_KEY}))')")
-            TOKEN=$(echo "$cre" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);if(j.ok&&j.token){console.log(j.token);}else{console.error("FAIL criar teste: "+s);process.exit(1);}}catch(e){console.error("FAIL parse criar teste: "+s);process.exit(1);}})')
-            echo "Cronograma de teste criado. (token capturado, não exibido por inteiro): ${TOKEN:0:8}…"
-          fi
 
           echo "== Validar link público GET /cliente/cronograma/<token> (deve 200 + HTML) =="
           code=$(curl -sS --max-time 25 -o /tmp/cv.html -w '%{http_code}' "$B/cliente/cronograma/$TOKEN")
