@@ -777,6 +777,8 @@
   .gcs-head{display:flex;align-items:center;gap:13px;padding-right:36px}
   .gcs-headic{width:42px;height:42px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;color:#10B981;background:linear-gradient(160deg,rgba(34,211,238,.20),rgba(16,185,129,.16));border:1px solid rgba(16,185,129,.32)}
   .gcs-headic svg{width:20px;height:20px}
+  /* 1.0.121 — marca ID Seven oficial no cabeçalho do modal (usa a logo embutida --logo) */
+  .gcs-headic.brand{background:var(--logo) center/contain no-repeat;border:none}
   .gcs-title{font-size:18px;font-weight:800;letter-spacing:-.01em}
   .gcs-sub{font-size:12.5px;color:var(--soft);margin-top:3px;line-height:1.45}
   .gcs-checklist{display:flex;gap:8px;margin:16px 0 2px;flex-wrap:wrap}
@@ -2793,7 +2795,7 @@ async function openSendClientModal(taskOrForm){
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet gcs-sheet" style="max-width:640px">'+
     '<button class="iconbtn gcs-x" data-modalclose="1">'+svg('close')+'</button>'+
     '<div class="gcs-head">'+
-      '<div class="gcs-headic">'+svg('send')+'</div>'+
+      '<div class="gcs-headic brand" role="img" aria-label="ID Seven"></div>'+
       '<div style="min-width:0"><div class="gcs-title">Enviar card premium ao cliente</div>'+
         '<div class="gcs-sub">Envia o card premium completo direto para o WhatsApp do cliente. Informe o número e clique em enviar.</div></div>'+
     '</div>'+
