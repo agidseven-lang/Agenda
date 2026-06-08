@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.38-wa-card-link-cta / Desktop 1.0.123-whatsapp-group-copy / Android 1.0.109 (congelado)
+ * Agenda ID Seven · Worker V64.38-wa-card-link-cta / Desktop 1.0.124-whatsapp-share-link / Android 1.0.109 (congelado)
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.38-wa-card-link-cta · Desktop 1.0.123 · Android 1.0.109 (fluxo PRINCIPAL: copiar mensagem p/ grupo)');
+console.log(' Worker V64.38-wa-card-link-cta · Desktop 1.0.124 · Android 1.0.109 (fluxo PRINCIPAL: copiar mensagem com link de preview)');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -265,7 +265,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.38-wa-card-link-cta (card sincronizado; endpoints admin temporários removidos)', /V64.38-wa-card-link-cta/.test(W));
+check('W1', 'Worker é V64.39-share-og (rota /share dedicada; endpoints admin temporários removidos)', /V64.39-share-og/.test(W));
 check('W1b', 'Worker NÃO tem endpoint admin temporário (create-test / cleanup-test)', !/\/admin\/create-test-cronograma/.test(W) && !/\/admin\/cleanup-test/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
@@ -311,9 +311,18 @@ check('W_APPROVE1', 'Portal tem CTA de aprovação por fase (phaseCopy.cta: Apro
 check('W_APPROVE2', 'Portal renderiza o botão primário de aprovação (data-act="approveAll" + phaseUi.cta) na barra de ações', /data-act="approveAll" data-phase="' \+ phase \+ '">' \+ ICN\.check \+ escapeHtml\(phaseUi\.cta\)/.test(W));
 check('W_APPROVE3', 'Portal tem aprovação por conteúdo + pedir ajuste/revisão (approveItem/reviseItem/revision)', /data-act="approveItem"/.test(W) && /data-act="reviseItem"/.test(W) && /data-act="revision"/.test(W));
 check('W_APPROVE4', 'Portal tem identidade Agenda ID Seven + Visão do Cliente + nome do cliente', /Agenda ID Seven<small>Visão do Cliente/.test(W) && /Preparado para <b>' \+ cliente/.test(W));
+// ===== V64.39 — URL DEDICADA /share/cronograma/:token (preview OG premium garantido no WhatsApp) =====
+{
+  const shareFn = (W.match(/function shareCardHtml\(origin, token\)\s*\{[\s\S]*?\n\}/) || [''])[0];
+  check('W_SHARE1', 'Worker tem rota GET /share/cronograma/:token → shareCardHtml (200 text/html)', /shareMatch && request\.method === "GET"/.test(W) && /htmlResponse\(shareCardHtml\(url\.origin, shareMatch\[1\]\), 200\)/.test(W) && shareFn.length > 0);
+  check('W_SHARE2', 'shareCardHtml monta OG premium via ogClientMeta (pathRel /share/cronograma/<token>)', /ogClientMeta\(origin, title, desc, "\/share\/cronograma\/" \+ token\)/.test(shareFn));
+  check('W_SHARE3', 'shareCardHtml redireciona humanos ao portal (location.replace /cliente/cronograma/) — crawler lê OG', /location\.replace\("\/cliente\/cronograma\/"/.test(shareFn));
+  check('W_SHARE4', 'OG vem ANTES de qualquer <script> no /share (crawler lê o card cedo)', shareFn.indexOf('ogClientMeta(') > -1 && (shareFn.indexOf('<script') < 0 || shareFn.indexOf('ogClientMeta(') < shareFn.indexOf('<script')));
+  check('W_SHARE5', 'ogClientMeta (usada pelo /share) gera OG completo: secure_url + image/jpeg + 1200x630 + twitter summary_large_image + og:image absoluto', /og:image:secure_url" content="' \+ img/.test(W) && /og:image:type" content="image\/jpeg"/.test(W) && /og:image:width" content="1200"/.test(W) && /og:image:height" content="630"/.test(W) && /twitter:card" content="summary_large_image"/.test(W) && /const img = base \+ OG_IMG_PATH;/.test(W));
+}
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check("D1", "package.json versão 1.0.123", /"version":\s*"1\.0\.123"/.test(DP));
+check("D1", "package.json versão 1.0.124", /"version":\s*"1\.0\.124"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -364,29 +373,30 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check("D20", "Rodapé mostra Desktop 1.0.123", /Desktop 1\.0\.123/.test(DH));
+check("D20", "Rodapé mostra Desktop 1.0.124", /Desktop 1\.0\.124/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check("D21", "Login/título/watermark mostram 1.0.123 (sem rótulo antigo)",
-  /<span class="pill-ver">Desktop 1\.0\.123/.test(DH) && /<title>ID Seven · Desktop 1\.0\.123/.test(DH) && /id="wpbadge">Desktop 1\.0\.123/.test(DH));
+check("D21", "Login/título/watermark mostram 1.0.124 (sem rótulo antigo)",
+  /<span class="pill-ver">Desktop 1\.0\.124/.test(DH) && /<title>ID Seven · Desktop 1\.0\.124/.test(DH) && /id="wpbadge">Desktop 1\.0\.124/.test(DH));
 check('D22', 'Login espelha o APK 1.0.109-beta-whatsapp-guided-card-send', /espelha o APK <b>1\.0\.109-beta-whatsapp-guided-card-send/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.123./.test(DH) && /applyVersionLabels/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.124./.test(DH) && /applyVersionLabels/.test(DH));
 // ===== 1.0.120 — ENVIO WHATSAPP LIMPO + WEB-ONLY (executa as funções reais) =====
 (function(){
   // Extrai e executa as funções reais p/ provar o conteúdo do clipboard e a URL aberta (etapa 3).
   const base=(DH.match(/const CLIENT_LINK_BASE='([^']+)'/)||[])[1];
   const fnUrl=(DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
+  const fnShare=(DH.match(/function buildShareClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnMsg=(DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnWeb=(DH.match(/function openWhatsAppWebOnly\(\)\{[\s\S]*?\n\}/)||[''])[0];
   const FORBID=['web.whatsapp.com/send','whatsapp://send','send?text=','%0A','%C3','encodeURIComponent','api.whatsapp.com/send'];
   let clip=null,opened=[],msg='';
   try{
     const sb={window:{desktopAPI:{openExternal:u=>{opened.push(u);return Promise.resolve(true);}},open:u=>opened.push(u)},navigator:{clipboard:{writeText:t=>{clip=t;}}}}; sb.self=sb.window;
-    msg=new Function('sb',`const CLIENT_LINK_BASE=${JSON.stringify(base)};const window=sb.window,navigator=sb.navigator,self=sb.self;function copyToClipboard(t){navigator.clipboard.writeText(t);}${fnUrl}\n${fnMsg}\n${fnWeb}\nconst ctx={client:'C',type:'Quinzenal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'};const m=buildClientMessage(ctx);copyToClipboard(m);openWhatsAppWebOnly();return m;`)(sb);
+    msg=new Function('sb',`const CLIENT_LINK_BASE=${JSON.stringify(base)};const window=sb.window,navigator=sb.navigator,self=sb.self;function copyToClipboard(t){navigator.clipboard.writeText(t);}${fnUrl}\n${fnShare}\n${fnMsg}\n${fnWeb}\nconst ctx={client:'C',type:'Quinzenal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'};const m=buildClientMessage(ctx);copyToClipboard(m);openWhatsAppWebOnly();return m;`)(sb);
   }catch(e){ msg='THREW:'+e.message; }
-  check('CLEAN1','Clipboard (etapa 2) recebe a LEGENDA LIMPA (igual a buildClientMessage)', clip===msg && msg.indexOf('THREW:')<0);
+  check('CLEAN1','Clipboard recebe a MENSAGEM LIMPA (igual a buildClientMessage)', clip===msg && msg.indexOf('THREW:')<0);
   check('CLEAN2','Clipboard SEM nenhuma URL técnica do WhatsApp (send?text=, web/send, codificado)', FORBID.every(x=>String(clip).indexOf(x)<0));
-  check('CLEAN3','Etapa 3 abre SOMENTE https://web.whatsapp.com/ (sem texto, sem app://)', opened.length===1 && opened[0]==='https://web.whatsapp.com/');
-  check('CLEAN4','Clipboard leva o link REAL do cronograma (premium + token)', String(clip).indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1);
+  check('CLEAN3','Abrir WhatsApp abre SOMENTE https://web.whatsapp.com/ (sem texto, sem app://)', opened.length===1 && opened[0]==='https://web.whatsapp.com/');
+  check('CLEAN4','Clipboard leva o link de COMPARTILHAMENTO (/share/, preview premium + token)', String(clip).indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1);
   check('CLEAN5','Builders send?text= REMOVIDOS (sem buildWhatsAppWebUrl/AppUrl ativos)', !/function buildWhatsAppWebUrl/.test(DH) && !/function buildWhatsAppAppUrl/.test(DH));
   check('CLEAN6','openWhatsAppWebOnly abre só web; código executável SEM nenhuma string send?text=', /function openWhatsAppWebOnly\(\)\{[\s\S]*?'https:\/\/web\.whatsapp\.com\/'/.test(DH) && !/send\?text=/.test(DH.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g,'')));
 })();
@@ -451,35 +461,42 @@ try {
   const base = (DH.match(/const CLIENT_LINK_BASE='([^']+)'/) || [])[1] || '';
   const review = (DH.match(/const CLIENT_REVIEW_BASE='([^']+)'/) || [])[1] || '';
   const fnUrl = (DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/) || [''])[0];
+  const fnShare = (DH.match(/function buildShareClientUrl\(token\)\{[\s\S]*?\n\}/) || [''])[0];
   const fnMsg = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [''])[0];
   const code = `
     const CLIENT_LINK_BASE=${JSON.stringify(base)};
     const CLIENT_REVIEW_BASE=${JSON.stringify(review)};
     ${fnUrl}
+    ${fnShare}
     ${fnMsg}
-    return { CLIENT_LINK_BASE, CLIENT_REVIEW_BASE, buildPublicClientUrl, buildClientMessage };
+    return { CLIENT_LINK_BASE, CLIENT_REVIEW_BASE, buildPublicClientUrl, buildShareClientUrl, buildClientMessage };
   `;
   LINK = new Function(code)();
 } catch (e) {
-  check('LINK0', 'Funções de link do Desktop avaliáveis (CLIENT_LINK_BASE + buildPublicClientUrl + buildClientMessage)', false);
+  check('LINK0', 'Funções de link do Desktop avaliáveis (buildPublicClientUrl + buildShareClientUrl + buildClientMessage)', false);
 }
 if (LINK) {
   const TOKEN = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6'; // 48 hex (formato genReviewToken)
-  let url = '', threwEmpty = false, threwNull = false;
+  let url = '', share = '', threwEmpty = false, threwNull = false, threwShareEmpty = false;
   try { url = LINK.buildPublicClientUrl(TOKEN); } catch (e) { url = 'THREW:' + e.message; }
+  try { share = LINK.buildShareClientUrl(TOKEN); } catch (e) { share = 'THREW:' + e.message; }
   try { LINK.buildPublicClientUrl(''); } catch (e) { threwEmpty = true; }
   try { LINK.buildPublicClientUrl(null); } catch (e) { threwNull = true; }
+  try { LINK.buildShareClientUrl(''); } catch (e) { threwShareEmpty = true; }
   const msg = (() => { try { return LINK.buildClientMessage({ client: 'Hospital Visão', type: 'semanal', title: 'Cronograma X', token: TOKEN }); } catch (e) { return 'THREW:' + e.message; } })();
 
-  check('LINK1', '(1) Desktop gera link com domínio premium aprovar.agendaidseven.com.br', LINK.CLIENT_LINK_BASE === 'https://aprovar.agendaidseven.com.br' && url.startsWith('https://aprovar.agendaidseven.com.br/cliente/cronograma/'));
-  check('LINK2', '(3) O link contém token real depois de /cronograma/', /\/cliente\/cronograma\/[A-Za-z0-9_-]{8,}$/.test(url) && url.endsWith(TOKEN));
+  check('LINK1', '(1) Portal usa domínio premium aprovar.agendaidseven.com.br/cliente/cronograma/', LINK.CLIENT_LINK_BASE === 'https://aprovar.agendaidseven.com.br' && url.startsWith('https://aprovar.agendaidseven.com.br/cliente/cronograma/'));
+  check('LINK2', '(3) Portal contém token real após /cronograma/', /\/cliente\/cronograma\/[A-Za-z0-9_-]{8,}$/.test(url) && url.endsWith(TOKEN));
   check('LINK3', '(4) O token não é vazio', url.split('/cliente/cronograma/')[1] === TOKEN && TOKEN.length >= 8);
-  check('LINK4', '(5) O link NÃO termina em /cronograma/', !/\/cliente\/cronograma\/?$/.test(url));
-  check('LINK5', '(6) O link NÃO usa workers.dev como domínio principal', !/workers\.dev/.test(url));
-  check('LINK6', 'Hardening: token vazio LANÇA (link nunca sai sem token)', threwEmpty === true);
-  check('LINK7', 'Hardening: token nulo LANÇA (link nunca sai sem token)', threwNull === true);
-  check('LINK8', '(14) Mensagem do WhatsApp usa o link COMPLETO com token', msg.indexOf(url) > -1 && msg.indexOf(TOKEN) > -1);
-  check('LINK9', '(15) Não há link incompleto no texto copiado (URL completa premium + token)', msg.indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/' + TOKEN) > -1 && !/workers\.dev/.test(msg) && !/cronograma\/(\s|\n|$)/.test(msg));
+  check('LINK4', '(5) Portal NÃO termina em /cronograma/', !/\/cliente\/cronograma\/?$/.test(url));
+  check('LINK5', '(6) Links NÃO usam workers.dev', !/workers\.dev/.test(url) && !/workers\.dev/.test(share));
+  check('LINK6', 'Hardening: token vazio LANÇA (portal nunca sai sem token)', threwEmpty === true);
+  check('LINK7', 'Hardening: token nulo LANÇA (portal nunca sai sem token)', threwNull === true);
+  // ===== SHARE: a MENSAGEM usa o link /share/ (preview OG premium), NÃO o link cru do portal =====
+  check('LINK_SHARE1', 'buildShareClientUrl = aprovar.agendaidseven.com.br/share/cronograma/<token>', share === 'https://aprovar.agendaidseven.com.br/share/cronograma/' + TOKEN);
+  check('LINK_SHARE2', 'Hardening: share sem token LANÇA', threwShareEmpty === true);
+  check('LINK8', '(14) Mensagem usa o link de COMPARTILHAMENTO completo com token', msg.indexOf(share) > -1 && msg.indexOf(TOKEN) > -1);
+  check('LINK9', 'Mensagem usa /share/ (gera preview premium) e NÃO o link cru do portal /cliente/cronograma/', /\/share\/cronograma\//.test(msg) && msg.indexOf('aprovar.agendaidseven.com.br/cliente/cronograma/') < 0 && !/workers\.dev/.test(msg));
   check('LINK10', 'API interna do app permanece em workers.dev (fallback vivo; não é o link do cliente)', LINK.CLIENT_REVIEW_BASE === 'https://idseven-push.agidseven.workers.dev');
 }
 // Itens 7–13 (HTTP AO VIVO: portal 200; og:title/og:description/og:image premium; /og/aprovar.png
@@ -535,7 +552,7 @@ check('GROUP_3', 'Prévia premium do LINK (gcs-lp: imagem do card + domínio apr
 const copyHandler = (DH.match(/on\('btnCopyGroupMsg',\s*function\(\)\{[\s\S]*?\n  \}\);/) || [''])[0];
 check('GROUP_4', 'Botão principal COPIA a mensagem (copyToClipboard(msg)) após validar o link público', copyHandler.length > 0 && /_gateValidLink\(ctx,msg\)/.test(copyHandler) && /copyToClipboard\(msg\)/.test(copyHandler));
 check('GROUP_5', 'Botão principal NÃO abre pasta nem salva/copia arquivo (sem showInFolder/ensureSaved/saveCardImage/copyCard)', copyHandler.length > 0 && !/showInFolder/.test(copyHandler) && !/ensureSaved/.test(copyHandler) && !/saveCardImage/.test(copyHandler) && !/copyCard\(/.test(copyHandler));
-check('GROUP_6', 'Secundários discretos: Abrir WhatsApp Business + Testar link (btnTestLink abre o link público)', /id="btnOpenWa"/.test(DH) && /id="btnTestLink"/.test(DH) && /on\('btnTestLink'/.test(DH) && /buildPublicClientUrl\(ctx&&ctx\.token\)/.test(DH));
+check('GROUP_6', 'Secundários discretos: Abrir WhatsApp Business + Testar link (btnTestLink abre o link de compartilhamento)', /id="btnOpenWa"/.test(DH) && /id="btnTestLink"/.test(DH) && /on\('btnTestLink'/.test(DH) && /buildShareClientUrl\(ctx&&ctx\.token\)/.test(DH));
 check('GROUP_7', 'Card-arquivo é FALLBACK recolhido (Opções avançadas <details>: Copiar card / Salvar e abrir pasta)', /<details class="gcs-adv"><summary>Opções avançadas: anexar o card como imagem \(fallback\)<\/summary>/.test(DH) && /id="btnCopyImg"/.test(DH) && /id="btnOpenFolder"/.test(DH));
 check('GROUP_8', 'SEM fluxo antigo de etapas como principal (sem btnPrepGroup / gchk1-3 / step1-3 / btnStep*)', !/id="btnPrepGroup"/.test(DH) && !/id="gchk1"/.test(DH) && !/id="step2"/.test(DH) && !/id="btnStep1"/.test(DH));
 check('GROUP_9', 'Wiring chama _wireGroupSend + _wireAutoSend; openWhatsAppWebOnly sem send?text=/app://', /_wireGroupSend\(ctx, msg, cardFile\);\s*\n?\s*_wireAutoSend\(ctx\);/.test(DH) && (() => { const b = (DH.match(/function openWhatsAppWebOnly\(\)\{[\s\S]*?\n\}/) || [''])[0].replace(/^\s*\/\/.*$/gm, ''); return /web\.whatsapp\.com\//.test(b) && b.indexOf('send?text=') < 0 && b.indexOf('whatsapp://send') < 0; })());
@@ -544,6 +561,7 @@ check('GROUP_10', 'ANTI-ÍCONE-GIGANTE: .gcs-sheet svg 18px + header 20px', /\.g
 (function(){
   const base=(DH.match(/const CLIENT_LINK_BASE='([^']+)'/)||[])[1];
   const fnUrl=(DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
+  const fnShare=(DH.match(/function buildShareClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnMsg=(DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnGate=(DH.match(/function _gateValidLink\(ctx,msg\)\{[\s\S]*?\n\}/)||[''])[0];
   const hbody=(copyHandler.match(/function\(\)\{([\s\S]*)\n  \}\);/)||['',''])[1];
@@ -561,12 +579,12 @@ check('GROUP_10', 'ANTI-ÍCONE-GIGANTE: .gcs-sheet svg 18px + header 20px', /\.g
       const $=id=>document.getElementById(id);
       function setStatus(txt,cls,html){}
       const api={ showInFolder(){sb.folder++;}, saveCardImage(){sb.saved++;return Promise.resolve({ok:true});}, copyCardImage(){sb.copied++;return Promise.resolve({ok:true});} };
-      ${fnUrl}\n${fnMsg}\n${fnGate}
+      ${fnUrl}\n${fnShare}\n${fnMsg}\n${fnGate}
       const msg=buildClientMessage(ctx);
       (function(){${hbody}})();
     `)(sb);
   }catch(e){ sb.clip='THREW:'+e.message; }
-  check('GROUP_FN1','1 clique copia a MENSAGEM COMPLETA (modelo aprovado + link público com token)', String(sb.clip).indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/'+TOKEN)>-1 && /^Olá, Hospital Visão\./.test(String(sb.clip)) && /Seu cronograma já está pronto para avaliação\./.test(String(sb.clip)) && /Acesse o link abaixo/.test(String(sb.clip)) && /Equipe ID Seven$/.test(String(sb.clip)));
+  check('GROUP_FN1','1 clique copia a MENSAGEM COMPLETA com o link de COMPARTILHAMENTO (/share/, preview premium)', String(sb.clip).indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/'+TOKEN)>-1 && String(sb.clip).indexOf('/cliente/cronograma/')<0 && /^Olá, Hospital Visão\./.test(String(sb.clip)) && /Seu cronograma já está pronto para avaliação\./.test(String(sb.clip)) && /Acesse o link abaixo/.test(String(sb.clip)) && /Equipe ID Seven$/.test(String(sb.clip)));
   check('GROUP_FN2','O clique PRINCIPAL NÃO abre pasta e NÃO salva/copia arquivo (folder=0, saved=0, copiedImg=0)', sb.folder===0 && sb.saved===0 && sb.copied===0 && String(sb.clip).indexOf('THREW:')<0);
   check('GROUP_FN3','Clipboard SEM URL técnica do WhatsApp (sem send?text= / web.whatsapp.com/send)', String(sb.clip).indexOf('send?text=')<0 && String(sb.clip).indexOf('web.whatsapp.com/send')<0);
 })();
@@ -575,7 +593,7 @@ check('MEDIA_IPC1', 'main: handlers save-card-image / copy-card-image / show-in-
 check('MEDIA_IPC2', 'main: usa clipboard.writeImage + nativeImage (copiar imagem real)', /clipboard\.writeImage/.test(MAIN) && /nativeImage\.createFromBuffer/.test(MAIN));
 check('MEDIA_IPC3', 'preload: expõe saveCardImage / copyCardImage / showInFolder', /saveCardImage:/.test(PRE) && /copyCardImage:/.test(PRE) && /showInFolder:/.test(PRE));
 // Token/link continuam válidos (reuso da PARTE C)
-check('MEDIA_LINK', 'Caption leva o link COMPLETO com token (premium, sem workers.dev)', LINK ? (LINK.buildClientMessage({client:'X',type:'semanal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'}).indexOf('https://aprovar.agendaidseven.com.br/cliente/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1) : false);
+check('MEDIA_LINK', 'Caption leva o link de COMPARTILHAMENTO completo (/share/, preview premium, sem workers.dev)', LINK ? (LINK.buildClientMessage({client:'X',type:'semanal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'}).indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1) : false);
 
 /* ===================== PARTE E — ENVIO PREMIUM via WhatsApp Business Cloud API (V64.28 / 1.0.121) =====================
    Entrega GARANTIDA: server-side, sem operador, sem preview. Token da Meta SÓ em secrets do Worker.
@@ -647,7 +665,7 @@ console.log(`${C.b}\n===========================================================
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes).`);
   console.log(`${C.g} Fluxo PRINCIPAL = grupo do cliente (card + legenda + link); botão real de aprovação no portal.`);
-  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.123 (grupo · copiar mensagem). Android segue por paridade após o Desktop.${C.x}`);
+  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.124 (grupo · link de preview). Android segue por paridade após o Desktop.${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
