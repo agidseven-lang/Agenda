@@ -265,7 +265,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.31-wa-cloud-api (Cloud API validada com message_id real)', /V64\.31-wa-cloud-api/.test(W));
+check('W1', 'Worker é V64.35-wa-cloud-api (Cloud API ativa; endpoints admin temporários removidos)', /V64\.35-wa-cloud-api/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
 const legReads = (W.match(/typeof c\.legenda === "string" \? c\.legenda/g) || []).length;
@@ -588,6 +588,20 @@ check('WA_D6', 'Fluxo automático NÃO usa web.whatsapp/send?text/whatsapp:// (c
 })());
 check('WA_D7', 'Card Aurora Glass (B-final) segue como mídia oficial planejada (autoCardPreview usa CARD_IMG_B64)', /id="autoCardPreview"/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH));
 check('WA_D8', 'Envio manual rebaixado a TEMPORÁRIO (não definitivo): divisória explícita', /Enquanto a Cloud API não está ativa — envio manual \(temporário\)/.test(DH));
+
+/* ===================== PARTE F — BLINDAGEM contra dados de TESTE no Kanban real ===================== */
+console.log(`${C.b}\n[PARTE F] Dados de teste (isCloudApiTest/qa-demo) NUNCA renderizam no quadro${C.x}`);
+check('GUARD1', 'Desktop define isTestTask (flag isCloudApiTest, qa-demo, seeds de teste)', /function isTestTask\(t\)\{/.test(DH) && /t\.isCloudApiTest===true/.test(DH) && /\/\^qa-demo\/i\.test\(id\)/.test(DH));
+check('GUARD2', 'onSnapshot de tasks FILTRA isTestTask antes de popular state.tasks', /collection\('tasks'\)\.onSnapshot[\s\S]*?\.filter\(t=>!isTestTask\(t\)\)/.test(DH));
+// Executa a função real: deve filtrar docs de teste e PRESERVAR clientes reais.
+(function(){
+  const fn=(DH.match(/function isTestTask\(t\)\{[\s\S]*?\n\}/)||[''])[0];
+  let isTestTask=null; try{ isTestTask=new Function('t', fn.replace(/^function isTestTask\(t\)\{/,'').replace(/\}$/,'')); }catch(e){}
+  const testDocs=[{id:'qa-demo-x'},{isCloudApiTest:true},{client:'Cliente Demo ID Seven'},{title:'Cronograma Demo (teste do card)'},{client:'Hospital Visão (Teste Cloud API)'}];
+  const realDocs=[{id:'abc',client:'OLHAR',title:'Cronograma Quinzenal — OLHAR'},{id:'x',client:'Dr. Hygor'},{id:'y',client:'CEO'}];
+  check('GUARD3', 'isTestTask MARCA todos os docs de teste como teste', !!isTestTask && testDocs.every(t=>isTestTask(t)===true));
+  check('GUARD4', 'isTestTask NÃO marca clientes reais (sem falso-positivo)', !!isTestTask && realDocs.every(t=>isTestTask(t)===false));
+})();
 
 /* ===================== VEREDITO ===================== */
 console.log(`${C.b}\n========================================================================`);

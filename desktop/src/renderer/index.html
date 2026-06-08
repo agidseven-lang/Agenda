@@ -1331,7 +1331,20 @@ function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch
 function subscribeData(){
   unsub.users=db.collection('users').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}renderFromSnapshot();});
   unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderFromSnapshot();});
-  unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=dedupById(s.docs.map(d=>Object.assign({id:d.id},d.data())));renderFromSnapshot();});
+  unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=dedupById(s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(t=>!isTestTask(t)));renderFromSnapshot();});
+}
+// 1.0.121 — BLINDAGEM: nunca renderizar dados de teste/QA no quadro operacional, mesmo que
+// algum escape para o Firestore. Marcadores inequívocos de teste (jamais cliente real):
+//  - flag isCloudApiTest:true
+//  - id começando com "qa-demo"
+//  - cliente/título de seeds conhecidos de teste.
+function isTestTask(t){
+  if(!t) return false;
+  const c=String(t.client||''), ti=String(t.title||''), id=String(t.id||'');
+  return t.isCloudApiTest===true
+    || /^qa-demo/i.test(id)
+    || c==='Cliente Demo ID Seven' || ti==='Cronograma Demo (teste do card)'
+    || c==='Hospital Visão (Teste Cloud API)' || ti==='Cronograma de teste — Cloud API';
 }
 // 1.0.104 — dedup defensivo por id: garante uma ÚNICA fonte por tarefa antes do render.
 // Se o snapshot trouxer (ou um fallback acumular) o mesmo id, mantém a última ocorrência.
