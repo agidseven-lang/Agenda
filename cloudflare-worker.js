@@ -208,7 +208,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.32-wa-cleanup" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.33-wa-cleanup" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2169,20 +2169,46 @@ function buildPremiumCaption(clientName, tipo, link) {
     link + "\n\n" +
     "*Equipe ID Seven*";
 }
-// V64.32 — LIMPEZA TEMPORÁRIA: lista (e, se !dryRun, remove) cronogramas de teste (isCloudApiTest:true).
-async function queryAllTasksByBool(env, accessToken, field, value) {
+// V64.33 — LIMPEZA TEMPORÁRIA: localiza e remove cronogramas de TESTE. Busca por VÁRIOS marcadores
+// (flag booleana E nome/título exatos do teste), porque a flag pode não estar indexada/persistida.
+const TEST_CLIENT = "Hospital Visão (Teste Cloud API)";
+const TEST_TITLE = "Cronograma de teste — Cloud API";
+async function runTasksQuery(env, accessToken, valueObj, field) {
   const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
-  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], where: { fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: { booleanValue: value } } }, limit: 50 } };
+  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], where: { fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: valueObj } }, limit: 50 } };
   const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
-  if (!res.ok) throw new Error("runQuery " + field + " " + res.status + ": " + (await res.text()).slice(0, 200));
+  if (!res.ok) { console.warn("[CLEANUP] runQuery " + field + " " + res.status); return []; }
   const rows = await res.json(); const out = [];
   for (const row of rows) { if (!row.document) continue; const id = row.document.name.split("/").pop(); out.push(Object.assign({ id }, decodeFields(row.document.fields))); }
   return out;
+}
+// Considera "doc de teste" só se tiver a flag OU exatamente o nome/título do teste (nunca dado real).
+function isTestDoc(t) {
+  return t.isCloudApiTest === true || t.client === TEST_CLIENT || t.title === TEST_TITLE;
+}
+async function findTestTasks(env, accessToken) {
+  const byId = {};
+  const sets = await Promise.all([
+    runTasksQuery(env, accessToken, { booleanValue: true }, "isCloudApiTest"),
+    runTasksQuery(env, accessToken, { stringValue: TEST_CLIENT }, "client"),
+    runTasksQuery(env, accessToken, { stringValue: TEST_TITLE }, "title"),
+  ]);
+  for (const set of sets) for (const t of set) if (isTestDoc(t)) byId[t.id] = t;
+  return Object.values(byId);
 }
 async function deleteTaskDoc(env, accessToken, id) {
   const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${id}`;
   const res = await fetch(url, { method: "DELETE", headers: { "Authorization": "Bearer " + accessToken } });
   return res.ok;
+}
+// Varredura ampla (só p/ diagnóstico/identificação): lista tasks recentes (campos mínimos).
+async function scanRecentTasks(env, accessToken) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks?pageSize=80`;
+  const res = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
+  if (!res.ok) return [];
+  const j = await res.json(); const out = [];
+  for (const d of (j.documents || [])) { const id = d.name.split("/").pop(); const f = decodeFields(d.fields); out.push({ id, client: f.client || null, title: f.title || null, isCloudApiTest: f.isCloudApiTest === true }); }
+  return out;
 }
 async function handleCleanupTestCronogramas(request, env) {
   let body; try { body = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
@@ -2191,19 +2217,33 @@ async function handleCleanupTestCronogramas(request, env) {
   let accessToken;
   try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
   catch (e) { return json({ ok: false, error: "AUTH_FIRESTORE_FALHOU", detail: String(e && e.message || e) }, 502, env); }
+  // Permite apagar por id explícito (diagnóstico): só se o doc for realmente de teste.
+  if (typeof body.deleteId === "string" && body.deleteId) {
+    const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${body.deleteId}`;
+    const r = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
+    if (!r.ok) return json({ ok: false, error: "DOC_NAO_ENCONTRADO", id: body.deleteId }, 404, env);
+    const doc = decodeFields((await r.json()).fields || {});
+    if (!isTestDoc(Object.assign({ id: body.deleteId }, doc))) return json({ ok: false, error: "NAO_E_DOC_DE_TESTE", id: body.deleteId, client: doc.client || null, title: doc.title || null }, 409, env);
+    const ok = dryRun ? true : await deleteTaskDoc(env, accessToken, body.deleteId);
+    return json({ ok: true, dryRun, deletedById: dryRun ? [] : [body.deleteId], client: doc.client || null, title: doc.title || null }, 200, env);
+  }
   let found;
-  try { found = await queryAllTasksByBool(env, accessToken, "isCloudApiTest", true); }
+  try { found = await findTestTasks(env, accessToken); }
   catch (e) { return json({ ok: false, error: "FIRESTORE_QUERY_FALHOU", detail: String(e && e.message || e) }, 502, env); }
-  // Auditoria dos campos de cada doc encontrado (nunca apaga nada que não tenha a flag de teste).
   const audit = found.map(t => ({ id: t.id, client: t.client || null, title: t.title || null, sector: t.sector || null, cronStatus: t.cronStatus || null, isCloudApiTest: t.isCloudApiTest === true, createdAt: t.createdAt || null, token: t.clientReviewToken || null }));
   const deleted = [];
   if (!dryRun) {
-    for (const t of found) { if (t.isCloudApiTest === true) { const ok = await deleteTaskDoc(env, accessToken, t.id); if (ok) deleted.push(t.id); } }
+    for (const t of found) { if (isTestDoc(t)) { const ok = await deleteTaskDoc(env, accessToken, t.id); if (ok) deleted.push(t.id); } }
   }
   let remaining = found;
-  if (!dryRun) { try { remaining = await queryAllTasksByBool(env, accessToken, "isCloudApiTest", true); } catch (_) { remaining = []; } }
+  if (!dryRun) { try { remaining = await findTestTasks(env, accessToken); } catch (_) { remaining = []; } }
+  // Diagnóstico opcional: se nada casou pelos marcadores, lista tasks recentes p/ identificar o doc.
+  let scan = undefined;
+  if (body.scan === true && found.length === 0) {
+    try { const all = await scanRecentTasks(env, accessToken); scan = all.filter(t => (t.client && /teste|test|cloud api/i.test(t.client)) || (t.title && /teste|test|cloud api/i.test(t.title)) || t.isCloudApiTest === true); } catch (_) {}
+  }
   console.log("[ADMIN-CLEANUP] dryRun=" + dryRun + " encontrados=" + found.length + " removidos=" + deleted.length + " restantes=" + remaining.length);
-  return json({ ok: true, dryRun: dryRun, found: audit, deletedCount: deleted.length, deletedIds: deleted, remainingCount: remaining.length }, 200, env);
+  return json({ ok: true, dryRun: dryRun, found: audit, deletedCount: deleted.length, deletedIds: deleted, remainingCount: remaining.length, scan: scan }, 200, env);
 }
 async function handleSendPremiumWhatsApp(request, env, origin) {
   // 1) GATE de configuração: sem secrets reais, NÃO finge envio.

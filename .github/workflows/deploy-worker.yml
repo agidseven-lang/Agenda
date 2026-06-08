@@ -270,7 +270,7 @@ jobs:
           B="https://idseven-push.agidseven.workers.dev"
           echo "== 1) AUDITORIA (dryRun=true) — read-only =="
           aud=$(curl -sS --max-time 30 -X POST "$B/admin/cleanup-test-cronogramas" -H "Content-Type: application/json" \
-            --data "$(CK="$CK" node -e 'console.log(JSON.stringify({key:process.env.CK,dryRun:true}))')")
+            --data "$(CK="$CK" node -e 'console.log(JSON.stringify({key:process.env.CK,dryRun:true,scan:true}))')")
           echo "$aud"
           echo "== 2) DELETE real + verificação pós-delete =="
           del=$(curl -sS --max-time 30 -X POST "$B/admin/cleanup-test-cronogramas" -H "Content-Type: application/json" \
