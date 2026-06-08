@@ -197,11 +197,18 @@ export default {
       return handleSendPremiumWhatsApp(request, env, url.origin);
     }
 
+    // V64.30 — ADMIN TEMPORÁRIO: cria um cronograma de TESTE e devolve token público (p/ validar
+    // a Cloud API ponta a ponta). Gate por chave = WHATSAPP_BUSINESS_ACCOUNT_ID. Será removido
+    // após o teste. Só cria um doc de teste (sem dados de cliente real).
+    if (url.pathname === "/admin/create-test-cronograma" && request.method === "POST") {
+      return handleCreateTestCronograma(request, env, url.origin);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.29-wa-cloud-api" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.30-wa-cloud-api" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2161,6 +2168,47 @@ function buildPremiumCaption(clientName, tipo, link) {
     "Toque no link abaixo para revisar e aprovar:\n\n" +
     link + "\n\n" +
     "*Equipe ID Seven*";
+}
+// V64.30 — ADMIN TEMPORÁRIO: cria um cronograma de teste real no Firestore e devolve o token
+// público. Gate: body.key === WHATSAPP_BUSINESS_ACCOUNT_ID. Remover após validar a Cloud API.
+async function handleCreateTestCronograma(request, env, origin) {
+  let body; try { body = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
+  if (!env.WHATSAPP_BUSINESS_ACCOUNT_ID || body.key !== env.WHATSAPP_BUSINESS_ACCOUNT_ID) {
+    return json({ ok: false, error: "FORBIDDEN" }, 403, env);
+  }
+  let accessToken;
+  try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, error: "AUTH_FIRESTORE_FALHOU", detail: String(e && e.message || e) }, 502, env); }
+  // token público (48 hex) — mesmo formato do genReviewToken do Desktop.
+  const a = new Uint8Array(24); (globalThis.crypto || crypto).getRandomValues(a);
+  const token = Array.from(a, b => b.toString(16).padStart(2, "0")).join("");
+  const base = ogClientBase(origin);
+  const link = base + "/cliente/cronograma/" + token;
+  const S = v => ({ stringValue: String(v) });
+  const content = (tema, leg) => ({ mapValue: { fields: { tema: S(tema), legenda: S(leg), feedImageUrl: S("https://aprovar.agendaidseven.com.br/og/wa-card-v64-26.jpg") } } });
+  const fields = {
+    client: S("Hospital Visão (Teste Cloud API)"),
+    title: S("Cronograma de teste — Cloud API"),
+    sector: S("cronograma"),
+    cronStatus: S("enviado_cliente"),
+    clientFlowStatus: S("enviado"),
+    clientReviewToken: S(token),
+    clientReviewUrl: S(link),
+    cronSub: S("quinzenal"),
+    isCloudApiTest: { booleanValue: true },
+    createdAt: { integerValue: String(Date.now()) },
+    cronContents: { arrayValue: { values: [content("Tema 1", "Legenda do tema 1"), content("Tema 2", "Legenda do tema 2"), content("Tema 3", "Legenda do tema 3")] } },
+  };
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks`;
+  let res, text;
+  try {
+    res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ fields }) });
+    text = await res.text();
+  } catch (e) { return json({ ok: false, error: "FIRESTORE_CREATE_FALHOU", detail: String(e && e.message || e) }, 502, env); }
+  if (!res.ok) return json({ ok: false, error: "FIRESTORE_CREATE_STATUS", status: res.status, detail: text.slice(0, 300) }, 502, env);
+  let id = null; try { id = JSON.parse(text).name.split("/").pop(); } catch (_) {}
+  console.log("[ADMIN] cronograma de teste criado id=" + id);
+  return json({ ok: true, token: token, link: link, taskId: id }, 200, env);
 }
 async function handleSendPremiumWhatsApp(request, env, origin) {
   // 1) GATE de configuração: sem secrets reais, NÃO finge envio.
