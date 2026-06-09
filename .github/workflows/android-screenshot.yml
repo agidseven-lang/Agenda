@@ -48,6 +48,16 @@ jobs:
       - name: Listar PNGs gerados
         if: always()
         run: ls -lh "$APP_DIR/app/build/outputs/roborazzi" || echo "nenhum PNG"
+      - name: Dump dos PNGs do role-aware do Designer em base64 (inspeção sem download)
+        if: always()
+        run: |
+          cd "$APP_DIR/app/build/outputs/roborazzi" || exit 0
+          for f in designer-role-designer-view.png designer-role-social-view.png; do
+            [ -f "$f" ] || continue
+            echo "=====B64START:$f====="
+            base64 -w0 "$f"; echo
+            echo "=====B64END:$f====="
+          done
       - name: Confirmar que NENHUM APK foi gerado
         if: always()
         run: |
