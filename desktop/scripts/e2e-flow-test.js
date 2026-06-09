@@ -1033,8 +1033,17 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     /CLIENT_REVIEW_BASE\+'\/cliente\/cronograma\/'\+encodeURIComponent\(token\)\+'\/team-action'/.test(mia));
   check('DH_TEAMFIX_ONLY_PENDING','envia SOMENTE os itens pendentes da fase (contentIndexes = pendingClientItems)',
     /const idxs=pend\.map\(p=>p\.idx\);/.test(mia) && /contentIndexes:idxs/.test(mia));
-  check('DH_TEAMFIX_AUTH_UID','autentica com uid do usuário logado (role-lookup no Worker) — SEM secret no app',
-    /uid:state\.user\.id/.test(mia) && mia.indexOf('X-Team-Key')===-1 && mia.indexOf('TEAM_API_KEY')===-1);
+  // V64.45 — AUTENTICAÇÃO FORTE: Bearer teamSessionJwt; uid declarado REMOVIDO do body.
+  check('DH_TEAMFIX_BEARER','autentica com Authorization: Bearer teamSessionJwt (de /team/session) — SEM secret e SEM uid declarado',
+    /'Authorization':'Bearer '\+jwt/.test(mia) && mia.indexOf('uid:state.user.id')===-1 && mia.indexOf('X-Team-Key')===-1 && mia.indexOf('TEAM_API_KEY')===-1);
+  check('DH_TEAMFIX_NO_JWT_HONEST','sem JWT na sessão → toast honesto pedindo novo login (não tenta sem credencial)',
+    /Sessão de equipe indisponível — saia e entre novamente/.test(mia) && /localStorage\.getItem\('wp_team_jwt'\)/.test(mia));
+  check('DH_TEAMFIX_401_EXPIRED','401 expired → limpa wp_team_jwt + toast de sessão expirada',
+    /res\.status===401&&r&&r\.expired/.test(mia) && /Sessão de equipe expirada/.test(mia));
+  check('DH_LOGIN_ACQUIRES_SESSION','doLogin adquire teamSessionJwt (acquireTeamSession) com a senha SÓ em trânsito; logout limpa o JWT',
+    /acquireTeamSession\(m\.id,password\);/.test(DH) && /async function acquireTeamSession\(uid,password\)/.test(DH) && /\/team\/session/.test(DH) && /localStorage\.removeItem\('wp_team_jwt'\)/.test((DH.match(/function clearSession\(\)\{[^\n]*\}/)||[''])[0]));
+  check('DH_NO_PASSWORD_STORED','senha NUNCA persistida (nenhum localStorage.setItem com password/pass/senha)',
+    !/localStorage\.setItem\([^)]*(password|senha)/i.test(DH));
   check('DH_TEAMFIX_IDEMPOTENCY','envia Idempotency-Key estável (uid|task|itens|janela 10s) — duplo clique não duplica',
     /'Idempotency-Key':idem/.test(mia) && /Math\.floor\(Date\.now\(\)\/10000\)/.test(mia));
   check('DH_TEAMFIX_NO_FAKE_OK','otimismo SÓ após resposta ok do Worker; erro vira toast honesto (sem fingir sucesso)',
@@ -1043,8 +1052,12 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   (function(){
     const W44 = readFromGit('worker/v64-42-team-adjust-idem-cleanup', 'cloudflare-worker.js');
     check('DH_W44_READ','Worker V64.44 legível (branch worker/v64-42-team-adjust-idem-cleanup)', W44.length>10000);
-    check('DH_W44_ROLE_LOOKUP','team-action valida uid via lookupTeamUser (users/{uid}: ativo + Social/Admin) — 403 caso contrário',
-      /async function lookupTeamUser/.test(W44) && /TEAM_ROLE_KW/.test(W44) && /unauthorized: requer X-Team-Key \(server\) ou uid de usuário Social\/Admin ativo/.test(W44));
+    check('DH_W45_JWT_REQUIRED','team-action sem Bearer/X-Team-Key → 401; JWT inválido/expirado → 401; uid no body NÃO aceito',
+      /unauthorized: Authorization Bearer <teamSessionJwt> obrigatório/.test(W44) && /await verifyTeamJwt\(env, m\[1\]\)/.test(W44) && (()=>{const h=(W44.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)||[''])[0];return h.length>0&&h.indexOf('payload.uid')===-1;})());
+    check('DH_W45_RELOOKUP','após JWT válido, Worker RECONSULTA role/status no Firestore (revogação imediata → 403)',
+      /lookupTeamUser\(env, accessToken, v\.uid\)/.test(W44) && /forbidden: usuário não é mais Social\/Admin ativo/.test(W44));
+    check('DH_W45_SESSION_ROUTE','rota /team/session emite JWT só com SENHA verificada server-side + role Social/Admin ativo',
+      /url\.pathname === "\/team\/session"/.test(W44) && /credenciais inválidas" \}, 401/.test(W44) && /usuário não autorizado \(Social\/Admin ativo requerido\)" \}, 403/.test(W44));
     check('DH_W44_CLEARS_PRESERVES_PHASE','rota limpa clientItems[iX].cs (nullValue) preservando phase + history equipe_corrigiu_item',
       /cs: \{ nullValue: null \}/.test(W44) && /equipe_corrigiu_item/.test(W44) && !/clientItems\." \+ key \+ "\.phase/.test(W44.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)[0]));
     check('DH_W44_NOTIFY','rota chama notifyWorkflowEvent(theme_adjusted_by_team|final_adjusted_by_team) na camada central',

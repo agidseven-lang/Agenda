@@ -1389,8 +1389,28 @@ async function doLogin(idOrPhone,password){
   if(!m)throw 'E-mail/WhatsApp ou senha incorretos.';
   const st=m.status||'';if(st==='pendente')throw 'Cadastro aguardando aprovação.';if(st==='removido'||st==='excluido')throw 'Conta inativa.';
   if(!await verifyPw(m.pass,m.salt,password))throw 'E-mail/WhatsApp ou senha incorretos.';
+  // detail-hierarchy-v2: adquire o teamSessionJwt do Worker (autenticação FORTE p/ ações
+  // de workflow). Fire-and-forget: falha NÃO bloqueia o login (a ação avisa na hora).
+  // A senha é usada SÓ nesta chamada HTTPS — nunca persistida no app.
+  acquireTeamSession(m.id,password);
   if(m.mustChangePassword){state.pending={user:m};return null;}
   return m;
+}
+/* Sessão de EQUIPE (Worker V64.45): POST /team/session {uid, password} → JWT HS256
+   ({sub, aud:'idseven-team', scope:'workflow:team_adjusted_item', exp:+12h}) assinado
+   server-side com TEAM_SESSION_SECRET. Guardamos APENAS o JWT (expira sozinho);
+   nenhum secret do Worker e nenhuma senha ficam no app. */
+async function acquireTeamSession(uid,password){
+  try{
+    const r=await fetch(CLIENT_REVIEW_BASE+'/team/session',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({uid:uid,password:password})});
+    const j=await r.json().catch(()=>null);
+    if(r.ok&&j&&j.ok===true&&j.token){localStorage.setItem('wp_team_jwt',j.token);return true;}
+    localStorage.removeItem('wp_team_jwt');
+    console.warn('team session indisponível:',(j&&j.error)||('HTTP '+r.status));
+  }catch(e){localStorage.removeItem('wp_team_jwt');console.warn('team session falhou:',e&&e.message);}
+  return false;
 }
 async function doRegister(name,role,phone,email,password){
   if(!name.trim()||!email.trim()||!password)throw 'Preencha nome, e-mail e senha.';
@@ -1398,7 +1418,7 @@ async function doRegister(name,role,phone,email,password){
   await db.collection('users').add({name:name.trim(),role:role.trim(),phone:phone.trim(),email:email.trim().toLowerCase(),pass,salt,status:'pendente',admin:false,createdAt:Date.now()});
 }
 function saveSession(u){localStorage.setItem('wp_uid',u.id);localStorage.setItem('wp_name',u.name||'');}
-function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');}
+function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');localStorage.removeItem('wp_team_jwt');}
 function startApp(u){state.user=u;saveSession(u);document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
 function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';renderLogin();}
 function subscribeData(){
@@ -2634,6 +2654,10 @@ async function markItemsAdjusted(taskId){
   const token=t.clientReviewToken||t.shareToken||'';
   if(!token){flashToast('Tarefa sem link de cliente — envie ao cliente antes de marcar correções.');return;}
   const idxs=pend.map(p=>p.idx);
+  // AUTENTICAÇÃO FORTE: Bearer teamSessionJwt (emitido em /team/session no login).
+  // uid declarado NÃO é enviado — a identidade vem do `sub` do JWT verificado no Worker.
+  const jwt=localStorage.getItem('wp_team_jwt')||'';
+  if(!jwt){flashToast('Sessão de equipe indisponível — saia e entre novamente para registrar correções com aviso ao cliente.');return;}
   // Idempotência: chave estável por (uid|tarefa|itens|janela de 10s) — o duplo clique
   // reaproveita a MESMA chave (replay no Worker); um novo ajuste depois gera chave nova.
   const idem=state.user.id+'|'+taskId+'|'+idxs.join(',')+'|'+Math.floor(Date.now()/10000);
@@ -2641,10 +2665,12 @@ async function markItemsAdjusted(taskId){
   try{
     const res=await fetch(CLIENT_REVIEW_BASE+'/cliente/cronograma/'+encodeURIComponent(token)+'/team-action',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Idempotency-Key':idem},
-      body:JSON.stringify({action:'adjustedItem',contentIndexes:idxs,uid:state.user.id,byName:state.user.name||''})
+      headers:{'Content-Type':'application/json','Idempotency-Key':idem,'Authorization':'Bearer '+jwt},
+      body:JSON.stringify({action:'adjustedItem',contentIndexes:idxs,byName:state.user.name||''})
     });
     r=await res.json();
+    if(res.status===401&&r&&r.expired){localStorage.removeItem('wp_team_jwt');
+      flashToast('Sessão de equipe expirada — saia e entre novamente para registrar correções.');return;}
     if(!res.ok||!r||r.ok!==true){flashToast('Não foi possível registrar a correção: '+((r&&r.error)||('HTTP '+res.status)));return;}
   }catch(e){flashToast('Falha de rede ao registrar a correção. Tente novamente.');return;}
   // Otimista APÓS confirmação do Worker (o onSnapshot confirma na sequência).
