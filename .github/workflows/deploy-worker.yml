@@ -239,8 +239,8 @@ jobs:
             grep -qi 'og:image:width" content="1200"' "$h" || { echo "FAIL: width 1200 ausente" >&2; exit 1; }
             grep -qi 'og:image:height" content="630"' "$h" || { echo "FAIL: height 630 ausente" >&2; exit 1; }
             grep -qi 'twitter:card" content="summary_large_image"' "$h" || { echo "FAIL: twitter summary_large_image ausente" >&2; exit 1; }
-            grep -qi 'og:title" content="' "$h" || { echo "FAIL: og:title ausente" >&2; exit 1; }
-            grep -qi 'og:description" content="' "$h" || { echo "FAIL: og:description ausente" >&2; exit 1; }
+            grep -q 'og:title" content="Aprovar cronograma"' "$h" || { echo "FAIL: og:title != 'Aprovar cronograma'" >&2; head -c 600 "$h"; exit 1; }
+            grep -q 'og:description" content="Seu cronograma está pronto para avaliação."' "$h" || { echo "FAIL: og:description != 'Seu cronograma está pronto para avaliação.'" >&2; head -c 600 "$h"; exit 1; }
             # OG ANTES de qualquer <script>
             node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const i=s.indexOf("og:image"),j=s.indexOf("<script");if(i<0||(j>=0&&i>j)){console.error("FAIL: OG nao esta antes do <script>");process.exit(1);}console.log("OK: OG no topo do <head> ("+s.length+" bytes, leve)");' "$h"
             # a imagem OG responde 200 image/jpeg 1200x630

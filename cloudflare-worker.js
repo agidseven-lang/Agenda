@@ -103,8 +103,8 @@ function shareCardHtml(origin, token) {
   // OG/Twitter PRIMEIRO no <head>, ANTES de qualquer script. og:image absoluto HTTPS 1200x630
   // (image/jpeg). Humanos sao redirecionados (JS) ao portal; crawlers leem o card e param.
   const base = ogClientBase(origin);
-  const title = "Aprovar cronograma \u2014 Agenda ID Seven";
-  const desc = "Seu cronograma esta pronto para avaliacao. Toque para revisar os temas, aprovar e solicitar ajustes. Link seguro \u00b7 Agenda ID Seven.";
+  const title = "Aprovar cronograma";
+  const desc = "Seu cronograma está pronto para avaliação.";
   const portal = base + "/cliente/cronograma/" + token;
   const tj = JSON.stringify(token);
   return '<!doctype html>\n<html lang="pt-BR"><head>\n<meta charset="utf-8"/>\n' +
@@ -237,7 +237,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.39-share-og" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.40-share-og-exact" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
