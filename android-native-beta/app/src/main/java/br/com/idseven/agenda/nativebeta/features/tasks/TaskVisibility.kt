@@ -152,6 +152,8 @@ object TaskVisibility {
         // task-flow-fix (paridade Desktop 1.0.128): "enviado ao designer" ≠ "designer produzindo".
         OpCol("aguardando_designer_iniciar", "Aguardando designer iniciar"),
         OpCol("aguardando_designer", "Designer em produção"),
+        // role-aware (paridade Desktop f96aa2e): designer corrigindo um ajuste (designerFlowStatus='revisao').
+        OpCol("aguardando_designer_revisao", "Designer em revisão"),
         OpCol("aguardando_legenda", "Aguardando legendas e posts"),
         OpCol("aguardando_revisao", "Ajuste solicitado pelo cliente"),
         OpCol("aguardando_final", "Aguardando aprovação final"),
@@ -200,7 +202,9 @@ object TaskVisibility {
             // task-flow-fix (paridade Desktop 1.0.128): "Designer em produção" SÓ quando o designer
             // realmente iniciou (andamento) ou está retrabalhando (revisao). Recém-enviado (afazer/
             // vazio) NÃO antecipa produção — fica "Aguardando designer iniciar" até a transição real.
-            if (dc == "andamento" || dc == "revisao") return "aguardando_designer"
+            // role-aware (paridade Desktop f96aa2e): andamento → em produção; revisao → em revisão; afazer → iniciar.
+            if (dc == "andamento") return "aguardando_designer"
+            if (dc == "revisao") return "aguardando_designer_revisao"
             return "aguardando_designer_iniciar"
         }
         // SEM designer atribuído: NUNCA mostrar produção/legenda/entrega.
@@ -228,16 +232,26 @@ object TaskVisibility {
         OpCol("afazer", "A Fazer"), OpCol("andamento", "Em andamento"),
         OpCol("revisao", "Revisão"), OpCol("concluido", "Finalizado"),
     )
-    val DESIGNER_COLS3 = listOf(
-        OpCol("afazer", "A Fazer"), OpCol("andamento", "Em andamento"), OpCol("entregue", "Entregue"),
+    // role-aware (paridade Desktop f96aa2e): o DESIGNER tem 4 colunas próprias (inclui Revisão/Ajuste).
+    val DESIGNER_COLS4 = listOf(
+        OpCol("afazer", "A Fazer"), OpCol("andamento", "Em andamento"),
+        OpCol("revisao", "Revisão/Ajuste"), OpCol("entregue", "Entregue"),
     )
     val CLIENT_COLS4 = listOf(
         ClientCol("enviado", "Enviado"), ClientCol("analise", "Em análise"),
         ClientCol("revisao", "Revisão solicitada"), ClientCol("aprovado", "Aprovado"),
     )
-    // Bucket de 3 colunas do DESIGNER (a partir do eixo de trabalho do designer).
-    fun designerCol3(t: TaskItem): String = when (designerCol(t)) {
-        "concluido" -> "entregue"; "afazer" -> "afazer"; else -> "andamento"
+    // Bucket de 4 colunas do DESIGNER (mantém a coluna própria de Revisão/Ajuste; não colapsa 'revisao').
+    fun designerColView(t: TaskItem): String = when (designerCol(t)) {
+        "concluido" -> "entregue"; "revisao" -> "revisao"; "afazer" -> "afazer"; else -> "andamento"
+    }
+    // "Próxima ação" CURTA na perspectiva do DESIGNER (o que ELE precisa fazer agora).
+    fun designerNextShort(t: TaskItem): String = when (designerColView(t)) {
+        "afazer" -> "Iniciar a produção"
+        "andamento" -> "Finalizar e entregar"
+        "revisao" -> "Corrigir o ajuste e reenviar"
+        "entregue" -> "Entregue — aguardando a Social"
+        else -> "Acompanhar"
     }
     // Bucket de 4 colunas do CLIENTE (a partir do eixo do cliente).
     fun clientCol4(t: TaskItem): String = when (clientCol(t)) {
@@ -289,6 +303,7 @@ object TaskVisibility {
         "aguardando_envio" -> "Temas aprovados. Próxima etapa: enviar o cronograma ao designer."
         "aguardando_designer_iniciar" -> "Enviado ao designer. Próxima etapa: aguardar o designer iniciar a produção."
         "aguardando_designer" -> "Designer produzindo. Próxima etapa: aguardar a entrega do designer."
+        "aguardando_designer_revisao" -> "Designer corrigindo um ajuste. Próxima etapa: aguardar a nova entrega do designer."
         "aguardando_legenda" -> "Designer entregou. Próxima etapa: revisar, adicionar legenda e posts (Feed/Story)."
         "aguardando_revisao" -> "Cliente pediu ajuste. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link."
         "aguardando_final" -> "Tudo pronto. Próxima etapa: reenviar ao cliente e aguardar a aprovação final."

@@ -100,13 +100,19 @@ private fun moveOptions(status: String): List<MoveOpt> = when (status) {
     else -> listOf(MoveOpt("Reabrir tarefa", "andamento", "Voltar para Em andamento", Icons.Outlined.Refresh))
 }
 
-// 1.0.97 — opções de mover do QUADRO DO DESIGNER (3 colunas: A Fazer / Em andamento / Entregue).
-// Os alvos gravam designerFlowStatus (afazer/andamento/concluido) — fonte única do eixo do designer.
+// role-aware (paridade Desktop f96aa2e) — opções de mover do QUADRO DO DESIGNER (4 colunas:
+// A Fazer / Em andamento / Revisão-Ajuste / Entregue). Os alvos gravam designerFlowStatus
+// (afazer/andamento/revisao/concluido) — fonte única do eixo do designer.
 private fun designerMoveOptions(curCol: String): List<MoveOpt> = when (curCol) {
     "afazer" -> listOf(MoveOpt("Mover para Em andamento", "andamento", "Começar a produção", Icons.Filled.KeyboardArrowRight))
-    "concluido" -> listOf(MoveOpt("Reabrir (Em andamento)", "andamento", "Voltar a produzir", Icons.Outlined.Refresh))
-    else -> listOf( // andamento / revisao
+    "concluido", "entregue" -> listOf(MoveOpt("Reabrir (Em andamento)", "andamento", "Voltar a produzir", Icons.Outlined.Refresh))
+    "revisao" -> listOf(
+        MoveOpt("Mover para Em andamento", "andamento", "Corrigir o ajuste", Icons.Filled.KeyboardArrowRight),
+        MoveOpt("Marcar como Entregue", "concluido", "Reentregar para a Social", Icons.Filled.KeyboardArrowRight),
+    )
+    else -> listOf( // andamento
         MoveOpt("Marcar como Entregue", "concluido", "Entrega para a Social finalizar", Icons.Filled.KeyboardArrowRight),
+        MoveOpt("Mover para Revisão/Ajuste", "revisao", "Há ajuste a corrigir", Icons.Filled.KeyboardArrowLeft),
         MoveOpt("Voltar para A Fazer", "afazer", "Pausar e retornar", Icons.Filled.KeyboardArrowLeft),
     )
 }
@@ -176,13 +182,13 @@ fun TasksScreen(
     val cols: List<BoardCol> = when {
         isClientBoard -> TaskVisibility.CLIENT_COLS4.map { BoardCol(it.key, it.label, it.label, clientCol4Color(it.key)) }
         isSocialBoard -> TaskVisibility.SOCIAL_COLS4.map { BoardCol(it.key, it.label, statusColShort(it.key), TaskStatus.color(it.key)) }
-        isDesignerBoard -> TaskVisibility.DESIGNER_COLS3.map { BoardCol(it.key, it.label, it.label, designerCol3Color(it.key)) }
+        isDesignerBoard -> TaskVisibility.DESIGNER_COLS4.map { BoardCol(it.key, it.label, it.label, designerColViewColor(it.key)) }
         else -> TaskStatus.COLUMNS.map { BoardCol(it, TaskStatus.label(it), statusColShort(it), TaskStatus.color(it)) }
     }
     val colKeyOf: (TaskItem) -> String = { t ->
         when {
             isClientBoard -> TaskVisibility.clientCol4(t)
-            isDesignerBoard -> TaskVisibility.designerCol3(t)
+            isDesignerBoard -> TaskVisibility.designerColView(t)
             isSocialBoard -> TaskVisibility.boardCol4(t)
             // Role board / "Meu quadro": designer-aware — cronograma recém-enviado ao designer
             // aparece em "A Fazer" para o próprio designer (corrige o desync PC×Android).
@@ -334,11 +340,15 @@ fun TasksScreen(
                             // Mesma regra do Desktop canDelTask: admin/gestão, ou criador, ou responsável.
                             val canDel = TaskVisibility.canSeeAllBoards(currentUser) ||
                                 (currentUid != null && (task.by == currentUid || task.assigneeId == currentUid))
+                            // role-aware: card na perspectiva do designer no quadro do designer OU
+                            // quando o usuário logado É o designer atribuído (paridade Desktop f96aa2e).
+                            val designerView = TaskVisibility.isDesignerFlow(task) && (isDesignerBoard || TaskVisibility.designerOf(task) == currentUid)
                             TaskCardPro(
                                 task, requester, assignee, canDel,
                                 onClick = { onTaskClick(task.id) },
                                 onMove = { moveTarget = task },
                                 onDelete = { deleteTarget = task },
+                                designerView = designerView,
                             )
                         }
                     }
@@ -434,18 +444,20 @@ private fun clientCol4Color(k: String): Color = when (k) {
     "enviado" -> Color(0xFF5B6CFF); "analise" -> Color(0xFF22D3EE)
     "revisao" -> Color(0xFFF59E0B); "aprovado" -> Color(0xFF34D399); else -> Color(0xFF6E7480)
 }
-private fun designerCol3Color(k: String): Color = when (k) {
-    "andamento" -> Color(0xFFF59E0B); "entregue" -> Color(0xFF34D399); else -> Color(0xFF9BA0AB)
+private fun designerColViewColor(k: String): Color = when (k) {
+    "andamento" -> Color(0xFFF59E0B); "revisao" -> Color(0xFF60A5FA); "entregue" -> Color(0xFF34D399); else -> Color(0xFF9BA0AB)
 }
 // Rótulos curtos + cores das colunas do eixo OPERACIONAL (7).
 private fun opColShort(k: String): String = when (k) {
     "producao" -> "Produção"; "aguardando_envio" -> "Enviar designer"
-    "aguardando_designer_iniciar" -> "Aguard. designer"; "aguardando_designer" -> "Designer"; "aguardando_legenda" -> "Legenda/post"
+    "aguardando_designer_iniciar" -> "Aguard. designer"; "aguardando_designer" -> "Designer"
+    "aguardando_designer_revisao" -> "Designer rev."; "aguardando_legenda" -> "Legenda/post"
     "aguardando_revisao" -> "Revisão"; "aguardando_final" -> "Aprov. final"; "concluido" -> "Concl."; else -> "A Fazer"
 }
 private fun opColColor(k: String): Color = when (k) {
     "producao" -> Color(0xFF22D3EE); "aguardando_envio" -> Color(0xFF22D3EE)
-    "aguardando_designer_iniciar" -> Color(0xFF7C83FF); "aguardando_designer" -> Color(0xFFA78BFA); "aguardando_legenda" -> Color(0xFF5B6CFF)
+    "aguardando_designer_iniciar" -> Color(0xFF7C83FF); "aguardando_designer" -> Color(0xFFA78BFA)
+    "aguardando_designer_revisao" -> Color(0xFF60A5FA); "aguardando_legenda" -> Color(0xFF5B6CFF)
     "aguardando_revisao" -> Color(0xFFF59E0B); "aguardando_final" -> Color(0xFF34D399); "concluido" -> Color(0xFF10B981)
     else -> Color(0xFF6E7480)
 }
@@ -491,7 +503,11 @@ internal fun TaskCardPro(
     onClick: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
+    designerView: Boolean = false,
 ) {
+    // role-aware (paridade Desktop f96aa2e): no quadro do DESIGNER, o card mostra o status/próxima
+    // ação DELE, sem o fluxo de aprovação do cliente como eixo principal.
+    val isDesignerCard = designerView && Sectors.of(task.sector).key == "cronograma" && TaskVisibility.hasDesigner(task)
     val sector = Sectors.of(task.sector)
     val total = task.checklist.size
     val done = task.checklist.count { it.d }
@@ -508,7 +524,11 @@ internal fun TaskCardPro(
         // CORREÇÃO (status-consistency): para CRONOGRAMA o chip mostra o STATUS OPERACIONAL
         // (não o status bruto) — evita "Concluído" contraditório com o fluxo real.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (sector.key == "cronograma") {
+            if (isDesignerCard) {
+                val dv = TaskVisibility.designerColView(task)
+                val dLbl = TaskVisibility.DESIGNER_COLS4.firstOrNull { it.key == dv }?.label ?: "A Fazer"
+                StatusChip(dLbl, designerColViewColor(dv))
+            } else if (sector.key == "cronograma") {
                 val op = TaskVisibility.operationalCol(task)
                 val opLbl = TaskVisibility.OPERATIONAL_COLS.firstOrNull { it.key == op }?.label ?: TaskStatus.label(task.status)
                 StatusChip(opLbl, opColColor(op))
@@ -564,7 +584,20 @@ internal fun TaskCardPro(
             color = Tokens.Ink, fontSize = 17.sp, fontWeight = FontWeight.Bold,
             lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
-        if (!task.cronStatus.isNullOrBlank()) {
+        if (isDesignerCard) {
+            // Perspectiva do DESIGNER: "Próxima" ação DELE (sem o status do fluxo do cliente).
+            Spacer(Modifier.height(9.dp))
+            val dc = designerColViewColor(TaskVisibility.designerColView(task))
+            Row(
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(dc.copy(alpha = 0.14f))
+                    .border(1.dp, dc.copy(alpha = 0.32f), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(7.dp).clip(CircleShape).background(dc))
+                Spacer(Modifier.width(7.dp))
+                Text("Próxima: " + TaskVisibility.designerNextShort(task), color = dc, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        } else if (!task.cronStatus.isNullOrBlank()) {
             Spacer(Modifier.height(9.dp))
             val cc = CronStatusUi.color(task.cronStatus)
             Row(
