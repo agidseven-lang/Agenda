@@ -1883,6 +1883,21 @@ function nextActionText(t){
   return 'Acompanhar o andamento.';
 }
 function opColOf(k){return OPERATIONAL_COLS.find(c=>c.key===k)||OPERATIONAL_COLS[0];}
+// ===== FASE 1 — STATUS UNIFICADO (clientStatusView) =====================================
+// FONTE ÚNICA de leitura do status VISUAL (badge) da tarefa. PURA, read-time e ADITIVA:
+// NÃO altera schema, NÃO altera bucketing de coluna e NÃO é usada por nenhum render ainda
+// (passo 1 — função dormente). É um wrapper FIEL de operationalCol(t):
+//  • cronograma  → key = operationalCol(t) (que já encadeia isFullyComplete > revisão >
+//                  reenvio/final > designer > envio > afazer > produção); label/color de OPERATIONAL_COLS.
+//  • outros setores → key = t.status; label/color de STATUS[] (stOf).
+// Garantia (E2E de não-regressão): clientStatusView(t).{key,label,color} === o que o badge
+// já mostra hoje via opColOf(operationalCol(t)) — mesmo resultado, agora em um lugar só.
+function clientStatusView(t){
+  if(!t)return {key:'afazer',label:'A Fazer',color:'#9BA0AB',axis:'status'};
+  if(secOf(t.sector).key!=='cronograma'){const s=stOf(t.status);return {key:(t.status||'afazer'),label:s.label,color:s.color,axis:'status'};}
+  const k=operationalCol(t);const c=opColOf(k);
+  return {key:k,label:c.label,color:c.color,axis:'operational'};
+}
 // Bucket de 4 colunas (afazer/andamento/revisao/concluido) para os quadros por SETOR e
 // "Meu quadro". Para CRONOGRAMA, deriva do eixo OPERACIONAL — assim o status BRUTO nunca
 // coloca um cronograma em "Concluído" antes da aprovação final real (paridade com o card).

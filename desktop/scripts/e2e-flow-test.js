@@ -667,6 +667,79 @@ check('GUARD2', 'onSnapshot de tasks FILTRA isTestTask antes de popular state.ta
   check('GUARD4', 'isTestTask NÃO marca clientes reais (sem falso-positivo)', !!isTestTask && realDocs.every(t=>isTestTask(t)===false));
 })();
 
+/* ===================== PARTE G — FASE 1: clientStatusView (não-regressão) =====================
+   Prova que a NOVA função pura clientStatusView(t) é um wrapper FIEL: para um conjunto
+   representativo de estados, .key === operationalCol(t) e .label/.color === opColOf(operationalCol(t)).
+   Executa o CÓDIGO REAL extraído do renderer (não é mock). Confirma também que a função ainda
+   está DORMENTE (passo 1): nenhum render — taskCard / detalhe / card de revisão — a chama. */
+console.log(`${C.b}\n[PARTE G] Fase 1 — clientStatusView é wrapper FIEL de operationalCol (não-regressão)${C.x}`);
+check('CSV_DEF', 'clientStatusView(t) existe e é função pura (retorna {key,label,color,axis})', /function clientStatusView\(t\)\{[\s\S]*?return \{key:k,label:c\.label,color:c\.color,axis:'operational'\};/.test(DH));
+// DORMENTE: ignora menções em comentários — fora de comentário só pode existir a DEFINIÇÃO.
+const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
+check('CSV_DORMANT', 'Passo 1: clientStatusView NÃO é chamada por nenhum render ainda (só a definição existe)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 1 && /function clientStatusView\(t\)/.test(DH_noc));
+// Render points seguem usando a derivação atual (inalterados).
+check('CSV_RENDER_UNCHANGED', 'taskCard/detalhe/revisão seguem usando opColOf(operationalCol(t)) (render INTACTO)', (DH.match(/opColOf\(operationalCol\(t\)\)/g)||[]).length >= 3);
+(function(){
+  // Extrai o CÓDIGO REAL do renderer e monta um módulo executável (sem DOM, sem rede).
+  const grab=(re)=>{const m=DH.match(re);return m?m[0]:'';};
+  const constArr=(name)=>grab(new RegExp('const '+name+'\\s*=\\s*\\[[\\s\\S]*?\\];'));
+  const fnDecl=(name)=>grab(new RegExp('function '+name+'\\([^)]*\\)\\{[\\s\\S]*?\\n\\}'));
+  const oneLine=(name)=>grab(new RegExp('function '+name+'\\([^)]*\\)\\{.*\\}'));
+  let mod=null, err=null;
+  try{
+    const pieces=[
+      constArr('SECTORS'), 'const SECTOR_ALIAS='+( (DH.match(/const SECTOR_ALIAS=\{[\s\S]*?\};/)||['const SECTOR_ALIAS={};'])[0].replace(/^const SECTOR_ALIAS=/,'') ),
+      constArr('STATUS'), constArr('CLIENT_COLS'), constArr('OPERATIONAL_COLS'),
+      oneLine('secOf'), oneLine('stOf'), oneLine('opColOf'),
+      oneLine('hasDesigner'), oneLine('designerOf'), oneLine('designerCol'),
+      oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'),
+      oneLine('designerDelivered'), oneLine('hasPendingItemRevision'),
+      fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('clientStatusView'),
+      'return {clientStatusView,operationalCol,opColOf};'
+    ];
+    mod=new Function(pieces.join('\n'))();
+  }catch(e){ err=e.message; }
+  check('CSV_EVAL', 'Funções reais (clientStatusView/operationalCol/opColOf) avaliáveis a partir do renderer', !!mod && !err);
+  if(mod){
+    // Estados representativos do cronograma (usam designerAssignment.designerId p/ hasDesigner REAL).
+    const D={designerAssignment:{designerId:'d'}};
+    const ESTADOS=[
+      ['afazer (rascunho)',                 {sector:'cronograma',status:'afazer'}],
+      ['enviado ao cliente',                {sector:'cronograma',clientSentBy:'u',cronStatus:'enviado_cliente'}],
+      ['temas aprovados (sem designer)',    {sector:'cronograma',clientFlowStatus:'aprovado',cronStatus:'aprovado_cliente'}],
+      ['enviado ao designer',               {sector:'cronograma',clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'afazer',cronStatus:'sent_to_designer'}],
+      ['designer em produção',              {sector:'cronograma',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'}],
+      ['designer entregou (falta legenda)', {sector:'cronograma',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido',cronContents:[{tema:'T1'}]}],
+      ['reenviado p/ aprovação final',      {sector:'cronograma',clientFlowStatus:'reenviado',cronStatus:'ready_for_final_client_review',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido',cronContents:[{tema:'T1',legenda:'L1',feedImageUrl:'f1'}]}],
+      ['cliente pediu ajuste (geral)',      {sector:'cronograma',clientReview:{status:'revisao'}}],
+      ['cliente pediu ajuste (item)',       {sector:'cronograma',clientItems:{i0:{cs:'em_revisao'}}}],
+      ['concluído (aprovação final)',       {sector:'cronograma',finalApprovalCompleted:true,clientFlowStatus:'concluido',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido',cronContents:[{tema:'T1',legenda:'L1',feedImageUrl:'f1'}]}],
+      ['setor NÃO-cronograma (designer)',   {sector:'designer',status:'andamento'}],
+      ['setor NÃO-cronograma (reuniao)',    {sector:'reuniao',status:'concluido'}],
+    ];
+    let keyOK=true, labelOK=true, colorOK=true; const linhas=[];
+    ESTADOS.forEach(([nome,t])=>{
+      const sv=mod.clientStatusView(t);
+      let expKey, expLabel, expColor;
+      if(t.sector!=='cronograma'){ expKey=t.status||'afazer'; }     // não-cronograma: status cru
+      else { expKey=mod.operationalCol(t); const c=mod.opColOf(expKey); expLabel=c.label; expColor=c.color; }
+      if(t.sector==='cronograma'){
+        if(sv.key!==expKey)keyOK=false;
+        if(sv.label!==expLabel)labelOK=false;
+        if(sv.color!==expColor)colorOK=false;
+      } else {
+        if(sv.key!==expKey)keyOK=false;
+      }
+      linhas.push(nome+' → '+sv.key+' / '+sv.label);
+    });
+    check('CSV_KEY',   'clientStatusView(t).key === operationalCol(t) em TODOS os estados de cronograma', keyOK);
+    check('CSV_LABEL', 'clientStatusView(t).label === opColOf(operationalCol(t)).label (badge idêntico)', labelOK);
+    check('CSV_COLOR', 'clientStatusView(t).color === opColOf(operationalCol(t)).color (cor idêntica)', colorOK);
+    check('CSV_NCRON', 'Setor não-cronograma: clientStatusView usa t.status (axis=status)', mod.clientStatusView({sector:'designer',status:'andamento'}).axis==='status');
+    console.log('  '+C.d+'estados provados: '+ESTADOS.length+C.x);
+  }
+})();
+
 /* ===================== VEREDITO ===================== */
 console.log(`${C.b}\n========================================================================`);
 if (BLOCKING === 0) {
