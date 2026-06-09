@@ -354,33 +354,40 @@ check('D_MSG3', 'Legenda: URL (p/ o card) + assinatura SEM markdown/emoji', /\+\
 check('D_MSG4', 'Legenda usa "acesse o link" (não promete botão nativo no grupo)', /Acesse o link abaixo/.test(msgFn));
 // CORREÇÃO 4: upload de Feed/Story não pula para o 1º post (preserva scroll da lista).
 check('D_UPLOAD', 'Produção preserva o scroll ao anexar arte (_prodKeepScroll + restore)', /function _prodKeepScroll\(\)/.test(DH) && /_prodKeepScroll\(\);renderProductionModal\(\)/.test(DH) && /\.pr-list'\);if\(_pl&&state\._prodScroll\)/.test(DH));
-// ===== REGRA (teste real): ABAS INTEGRADAS na toolbar de cada visão; NUNCA barra global flutuante. =====
-// task-flow-fix v2 (correção da regressão 1.0.128): as abas voltaram para a toolbar EMOLDURADA
-// de cada visão (boardToolbar nos kanbans, hubTabsBar nos hubs) — NÃO existe mais barra global.
-check('D5', 'boardToolbar() = BUSCA + ABAS na mesma moldura (integrada, abaixo do título)', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><input[^>]*><div class="tchips">'\+taskChips\(\)/.test(DH));
-// ===== REGRESSÃO 1.0.128 REVERTIDA: NÃO pode existir barra global flutuante/sticky de abas =====
+// ===== REGRA DEFINITIVA (teste real 1.0.129 reprovado): ABAS SÓ no Kanban/tarefas; NUNCA em hub de cards. =====
+// As abas (taskChips) vivem SOMENTE dentro do quadro Kanban (boardToolbar + renderBoard de setor).
+// NENHUM hub de seleção de setores/cards (renderHub/renderRoleBoards/renderDesignersHub/renderSocialsHub)
+// pode renderizar abas. Sem barra global, sem hubTabsBar, sem sticky.
+check('D5', 'boardToolbar() (Kanban) = BUSCA + ABAS na mesma moldura', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><input[^>]*><div class="tchips">'\+taskChips\(\)/.test(DH));
 check('D_TAB1', 'taskTabBar() REMOVIDA (sem barra global de abas)', !/function taskTabBar\b/.test(DH));
 check('D_TAB2', 'CSS .tasks-tabbar REMOVIDO (sem barra flutuante/sticky no topo da tela)', !/\.tasks-tabbar/.test(DH));
 check('D_TAB3', 'Dispatch da aba Tarefas NÃO prepende barra global (c.innerHTML=body)', /c\.innerHTML=body;/.test(DH) && !/c\.innerHTML=taskTabBar/.test(DH));
-check('D_TAB4', 'hubTabsBar() existe e é EMOLDURADA/INTEGRADA (d-board-tools tbar tbar-tabs), não flutuante', /function hubTabsBar\(\)\{return '<div class="d-board-tools tbar tbar-tabs"><div class="tchips">'\+taskChips\(\)/.test(DH));
+check('D_TAB4', 'hubTabsBar() REMOVIDA por completo (definição e chamadas)', !/function hubTabsBar/.test(DH) && !/hubTabsBar\(\)/.test(DH));
 check('D6', 'SEM barra de chips no topo global (tasksChipBar/tflow-fixed removidos)', !/function tasksChipBar/.test(DH) && !/tflow-fixed/.test(DH));
 check('D7', 'Dispatch NÃO usa nenhuma barra global (tasksChipBar/taskTabBar)', !/c\.innerHTML=tasksChipBar/.test(DH) && !/tasksChipBar\(/.test(DH) && !/taskTabBar\(/.test(DH));
-// HUB "Quadros" (renderHub): abas INTEGRADAS via hubTabsBar (não somem, não flutuam).
+// HUB "Quadros"/Setores (renderHub): SEM abas (nem taskChips, nem hubTabsBar, nem boardToolbar) — só cards.
 const hubFn = (DH.match(/function renderHub\(\)\{[\s\S]*?\n\}/) || [''])[0];
-check('D8a', 'HUB "Quadros" (Setores) tem as abas integradas via hubTabsBar()', hubFn.indexOf('hubTabsBar()') !== -1);
-check('D8b', 'HUB "Quadros" NÃO usa barra global nem boardToolbar (só hubTabsBar integrada)', hubFn.indexOf('taskTabBar') === -1 && hubFn.indexOf('boardToolbar()') === -1);
-// Hubs de LISTA (RoleBoards/Designers/Socials): abas INTEGRADAS via hubTabsBar (não somem em Designers).
+check('D8a', 'HUB "Quadros"/Setores NÃO renderiza abas (sem taskChips/hubTabsBar/boardToolbar)', hubFn.indexOf('taskChips(') === -1 && hubFn.indexOf('hubTabsBar') === -1 && hubFn.indexOf('boardToolbar') === -1);
+check('D8b', 'HUB "Quadros" NÃO contém a classe de chip de aba (.tchip) acima dos cards', hubFn.indexOf('tchip') === -1);
+// Hubs de LISTA (RoleBoards/Designers/Socials): também SEM abas (são telas de seleção de cards).
 const roleFn = (DH.match(/function renderRoleBoards\(\)\{[\s\S]*?\n\}/) || [''])[0];
 const dhubFn = (DH.match(/function renderDesignersHub\(\)\{[\s\S]*?\n\}/) || [''])[0];
 const shubFn = (DH.match(/function renderSocialsHub\(\)\{[\s\S]*?\n\}/) || [''])[0];
-check('D8c', 'Hubs de lista (RoleBoards/Designers/Socials) têm abas integradas via hubTabsBar()',
-  roleFn.indexOf('hubTabsBar()') !== -1 && dhubFn.indexOf('hubTabsBar()') !== -1 && shubFn.indexOf('hubTabsBar()') !== -1);
-// KANBAN tem a toolbar (busca + chips): Meu quadro / Cliente / Designer / Social / Setor.
-check('D8d', 'Kanban (PersonBoard/Client/Designer/Social) usa boardToolbar()',
+check('D8c', 'Hubs de lista (RoleBoards/Designers/Socials) NÃO renderizam abas (sem taskChips/hubTabsBar/boardToolbar)',
+  [roleFn,dhubFn,shubFn].every(fn => fn.indexOf('taskChips(')===-1 && fn.indexOf('hubTabsBar')===-1 && fn.indexOf('boardToolbar')===-1));
+// KANBAN tem a toolbar (busca + chips): Meu quadro / Cliente / Designer / Social.
+check('D8d', 'Kanban (PersonBoard/Client/Designer/Social) usa boardToolbar() (abas no contexto das tarefas)',
   /function renderPersonBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderClientFlowBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderDesignerBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderSocialBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH));
 // Kanban de Setor (renderBoard): abas integradas na toolbar (taskChips) + filtro "Minhas tarefas".
 const rbFn = (DH.match(/function renderBoard\(\)\{[\s\S]*?\n\}/) || [''])[0];
 check('D8e', 'Kanban de Setor (renderBoard) tem abas integradas (taskChips) + "Minhas tarefas"', rbFn.indexOf('taskChips(') !== -1 && /data-bmine="1"/.test(rbFn));
+// ===== GUARDAS DEFINITIVAS (falham se a regressão voltar): abas só no Kanban, nunca no hub =====
+check('D_HUBGUARD1', 'Nenhum hub (renderHub/RoleBoards/DesignersHub/SocialsHub) injeta abas/toolbar',
+  [hubFn,roleFn,dhubFn,shubFn].every(fn => !/taskChips\(|hubTabsBar|boardToolbar|tasks-tabbar/.test(fn)));
+check('D_HUBGUARD2', 'taskChips(): 1 definição + 2 chamadas (boardToolbar Kanban + renderBoard setor) = 3 ocorrências',
+  (DH.match(/taskChips\(\)/g) || []).length === 3
+  && /function boardToolbar\(\)\{[^}]*taskChips\(\)/.test(DH)
+  && rbFn.indexOf('taskChips()') !== -1);
 // CORREÇÃO 3: colunas por contexto (sem excesso).
 check('D9', 'Colunas Social = 4 (A Fazer/Em andamento/Revisão/Finalizado)', /const SOCIAL_COLS4=\[[\s\S]*?Finalizado/.test(DH) && (DH.match(/const SOCIAL_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4);
 check('D10', 'Colunas Designer = 3 (A Fazer/Em andamento/Entregue)', (DH.match(/const DESIGNER_COLS3=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 3);
