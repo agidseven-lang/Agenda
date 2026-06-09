@@ -85,7 +85,7 @@ fun SocialsHubScreen(
             items(socials, key = { it.second }) { (u, id) ->
                 val mine = tasks.filter { TaskVisibility.socialOf(it, users) == id }
                 val open = mine.count { TaskVisibility.operationalCol(it) != "concluido" }
-                val withDesigner = mine.count { TaskVisibility.operationalCol(it) == "aguardando_designer" }
+                val withDesigner = mine.count { val oc = TaskVisibility.operationalCol(it); oc == "aguardando_designer" || oc == "aguardando_designer_iniciar" }
                 val late = mine.count { TaskDeadline.of(it)?.late == true }
                 val nm = u?.name ?: "Social Media"
                 Row(

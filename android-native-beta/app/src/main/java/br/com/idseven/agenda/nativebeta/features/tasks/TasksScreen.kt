@@ -439,11 +439,13 @@ private fun designerCol3Color(k: String): Color = when (k) {
 }
 // Rótulos curtos + cores das colunas do eixo OPERACIONAL (7).
 private fun opColShort(k: String): String = when (k) {
-    "producao" -> "Produção"; "aguardando_envio" -> "Enviar designer"; "aguardando_designer" -> "Designer"; "aguardando_legenda" -> "Legenda/post"
+    "producao" -> "Produção"; "aguardando_envio" -> "Enviar designer"
+    "aguardando_designer_iniciar" -> "Aguard. designer"; "aguardando_designer" -> "Designer"; "aguardando_legenda" -> "Legenda/post"
     "aguardando_revisao" -> "Revisão"; "aguardando_final" -> "Aprov. final"; "concluido" -> "Concl."; else -> "A Fazer"
 }
 private fun opColColor(k: String): Color = when (k) {
-    "producao" -> Color(0xFF22D3EE); "aguardando_envio" -> Color(0xFF22D3EE); "aguardando_designer" -> Color(0xFFA78BFA); "aguardando_legenda" -> Color(0xFF5B6CFF)
+    "producao" -> Color(0xFF22D3EE); "aguardando_envio" -> Color(0xFF22D3EE)
+    "aguardando_designer_iniciar" -> Color(0xFF7C83FF); "aguardando_designer" -> Color(0xFFA78BFA); "aguardando_legenda" -> Color(0xFF5B6CFF)
     "aguardando_revisao" -> Color(0xFFF59E0B); "aguardando_final" -> Color(0xFF34D399); "concluido" -> Color(0xFF10B981)
     else -> Color(0xFF6E7480)
 }

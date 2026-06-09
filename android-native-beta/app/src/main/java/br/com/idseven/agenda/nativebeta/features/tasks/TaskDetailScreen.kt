@@ -316,7 +316,7 @@ private fun OperationalPanel(t: TaskItem) {
     val opKey = TaskVisibility.operationalCol(t)
     val opLabel = TaskVisibility.OPERATIONAL_COLS.firstOrNull { it.key == opKey }?.label ?: "Em produção"
     val accent = when (opKey) {
-        "producao" -> Color(0xFF22D3EE); "aguardando_designer" -> Color(0xFFA78BFA); "aguardando_legenda" -> Color(0xFF5B6CFF)
+        "producao" -> Color(0xFF22D3EE); "aguardando_designer_iniciar" -> Color(0xFF7C83FF); "aguardando_designer" -> Color(0xFFA78BFA); "aguardando_legenda" -> Color(0xFF5B6CFF)
         "aguardando_revisao" -> Color(0xFFF59E0B); "aguardando_final" -> Color(0xFF34D399); "concluido" -> Color(0xFF10B981)
         else -> Color(0xFF6E7480)
     }

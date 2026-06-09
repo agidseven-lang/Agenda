@@ -149,6 +149,8 @@ object TaskVisibility {
         OpCol("afazer", "A Fazer"),
         OpCol("producao", "Aguardando aprovação dos temas"),
         OpCol("aguardando_envio", "Aguardando envio ao designer"),
+        // task-flow-fix (paridade Desktop 1.0.128): "enviado ao designer" ≠ "designer produzindo".
+        OpCol("aguardando_designer_iniciar", "Aguardando designer iniciar"),
         OpCol("aguardando_designer", "Designer em produção"),
         OpCol("aguardando_legenda", "Aguardando legendas e posts"),
         OpCol("aguardando_revisao", "Ajuste solicitado pelo cliente"),
@@ -193,8 +195,13 @@ object TaskVisibility {
         if (cf == "revisao") return "aguardando_revisao"
         if (cf == "reenviado") return "aguardando_final"
         if (hasDesigner(t)) {
-            if (designerCol(t) != "concluido") return "aguardando_designer"
-            return if (pendingProduction(t)) "aguardando_legenda" else "aguardando_final"
+            val dc = designerCol(t)
+            if (dc == "concluido") return if (pendingProduction(t)) "aguardando_legenda" else "aguardando_final"
+            // task-flow-fix (paridade Desktop 1.0.128): "Designer em produção" SÓ quando o designer
+            // realmente iniciou (andamento) ou está retrabalhando (revisao). Recém-enviado (afazer/
+            // vazio) NÃO antecipa produção — fica "Aguardando designer iniciar" até a transição real.
+            if (dc == "andamento" || dc == "revisao") return "aguardando_designer"
+            return "aguardando_designer_iniciar"
         }
         // SEM designer atribuído: NUNCA mostrar produção/legenda/entrega.
         if (cf == "aprovado") return "aguardando_envio"   // temas aprovados → falta ENVIAR ao designer
@@ -280,6 +287,7 @@ object TaskVisibility {
         "afazer" -> "Criar o cronograma e enviar ao cliente."
         "producao" -> "Enviado ao cliente. Próxima etapa: aguardar o feedback do cliente sobre os temas."
         "aguardando_envio" -> "Temas aprovados. Próxima etapa: enviar o cronograma ao designer."
+        "aguardando_designer_iniciar" -> "Enviado ao designer. Próxima etapa: aguardar o designer iniciar a produção."
         "aguardando_designer" -> "Designer produzindo. Próxima etapa: aguardar a entrega do designer."
         "aguardando_legenda" -> "Designer entregou. Próxima etapa: revisar, adicionar legenda e posts (Feed/Story)."
         "aguardando_revisao" -> "Cliente pediu ajuste. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link."
