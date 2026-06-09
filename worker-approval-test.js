@@ -198,7 +198,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_42', 'Healthcheck retorna V64.42-team-adjust-idem-cleanup', /version: "V64\.42-team-adjust-idem-cleanup"/.test(SRC));
+check('C_HEALTH_V64_43', 'Healthcheck retorna V64.43-webpush-real-notify-engine (sucessor do V64.42)', /version: "V64\.43-webpush-real-notify-engine"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -224,7 +224,7 @@ check('C_SW_ROUTE', 'Rota GET /cliente/sw.js registrada e responde com SW', /\/c
 check('C_SW_CONTENT', 'clientSwResponse define push + notificationclick + Service-Worker-Allowed', /function clientSwResponse\(\)/.test(SRC) && /addEventListener\('push'/.test(SRC) && /addEventListener\('notificationclick'/.test(SRC) && /Service-Worker-Allowed/.test(SRC));
 check('C_FEATURE_FLAG', 'Portal injeta ENABLE_PUSH=true/false a partir de env.ENABLE_CLIENT_WEB_PUSH', /'var ENABLE_PUSH=' \+ JSON\.stringify\(env && env\.ENABLE_CLIENT_WEB_PUSH === "true"\)/.test(SRC));
 check('C_VAPID_PUBLIC_INJ', 'Portal injeta VAPID_PUBLIC_KEY (vazio se nao configurado)', /'var VAPID_PUBLIC_KEY=' \+ JSON\.stringify\(\(env && env\.VAPID_PUBLIC_KEY\) \|\| ""\)/.test(SRC));
-check('C_SETUP_PUSH_FN', 'CV_JS define setupClientWebPush() + urlBase64ToUint8Array + registra SW em /cliente/', /function setupClientWebPush\(\)/.test(SRC) && /function urlBase64ToUint8Array\(b\)/.test(SRC) && /swPath='\/cliente\/sw\.js'/.test(SRC) && /navigator\.serviceWorker\.register\(swPath/.test(SRC));
+check('C_SETUP_PUSH_FN', 'CV_JS define setupClientWebPush() + urlBase64ToUint8Array + registra SW em /cliente/', /function setupClientWebPush\(\)/.test(SRC) && /function urlBase64ToUint8Array\(b\)/.test(SRC) && /serviceWorker\.register\('\/cliente\/sw\.js',\{scope:'\/cliente\/'\}\)/.test(SRC));
 
 /* ===================== PARTE D — preservacao (nao quebrar o que existia) ===================== */
 console.log(`${C.b}\n[D] Preservacao: WhatsApp + /share + healthcheck endpoints intactos${C.x}`);
@@ -234,16 +234,110 @@ check('D_OG_LEGACY', 'Banner OG legado /og/aprovar*.png preservado', /function o
 check('D_PUSH_RELAY', 'handlePushRelay (FCM equipe) preservado', /async function handlePushRelay\(request, env\)/.test(SRC));
 check('D_CRON_SCHEDULED', 'scheduled handler (CRON lembretes) preservado', /async scheduled\(event, env, ctx\)[\s\S]{0,200}handleCronTrigger/.test(SRC));
 
-/* ===================== VEREDITO ===================== */
-console.log(`${C.b}\n==================================================================`);
-if (FAIL===0){
-  console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas).`);
-  console.log(`${C.g} approveItem nunca conclui · approveAll conclui só na fase final sem ajuste pendente · fases isoladas.${C.x}`);
-  console.log(`${C.b}==================================================================${C.x}`);
-  process.exit(0);
-} else {
-  console.log(`${C.r} RESULTADO: REPROVADO X  (${FAIL} falha(s))`);
-  FAILS.forEach(f=>console.log('   - '+f));
-  console.log(`${C.b}==================================================================${C.x}`);
-  process.exit(1);
+/* ===================== PARTE E — WEB PUSH REAL (round-trip criptográfico) =====================
+ * Extrai as funções REAIS do cloudflare-worker.js (brace matching + eval) e prova com a
+ * MESMA Web Crypto API do runtime de Workers (Node >=20 expõe globalThis.crypto):
+ *   E1) encryptWebPushPayload produz aes128gcm DECIFRÁVEL pelo navegador (RFC 8291):
+ *       gera chaves "browser" (ECDH P-256 + auth 16B), cifra com o código do Worker,
+ *       decifra com derivação RFC do lado do navegador e compara o payload.
+ *   E2) vapidJwt produz ES256 VÁLIDO (RFC 8292): assinatura verificada com a chave
+ *       pública + claims aud/exp/sub corretos.
+ * Round-trip REAL — sem mock de criptografia. */
+function extractFn(name){
+  const re=new RegExp('(?:async )?function '+name+'\\s*\\([^)]*\\)\\s*\\{');
+  const m=SRC.match(re); if(!m) throw new Error('função não encontrada: '+name);
+  const start=SRC.indexOf(m[0]); let depth=0;
+  for(let j=start+m[0].length-1;j<SRC.length;j++){const c=SRC[j];
+    if(c==='{')depth++; else if(c==='}'){depth--;if(depth===0)return SRC.slice(start,j+1);}}
+  throw new Error('chaves desbalanceadas: '+name);
 }
+const CRYPTO_FNS=['b64uToBytes','bytesToB64u','concatBytes','hkdfBits','encryptWebPushPayload','vapidJwt']
+  .map(extractFn).join('\n');
+// eval em escopo isolado com as MESMAS globais do runtime de Workers
+const evalScope={crypto:globalThis.crypto,atob,btoa,TextEncoder,TextDecoder,Uint8Array,Error,JSON,Math,Date,URL,console};
+const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes,bytesToB64u,concatBytes,hkdfBits,encryptWebPushPayload,vapidJwt};')(...Object.values(evalScope));
+
+(async function partE(){
+  console.log(`${C.b}\n[E] WEB PUSH REAL — round-trip criptográfico (RFC 8291/8292)${C.x}`);
+  const subtle=globalThis.crypto.subtle;
+  const enc=new TextEncoder();
+  try{
+    /* E1 — RFC 8291 aes128gcm: cifra (Worker) → decifra (navegador) */
+    const browser=await subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+    const browserPubRaw=new Uint8Array(await subtle.exportKey('raw',browser.publicKey));
+    const authSecret=globalThis.crypto.getRandomValues(new Uint8Array(16));
+    const PAYLOAD=JSON.stringify({title:'Ajuste do tema realizado',body:'Toque para revisar novamente.',openUrl:'/cliente/cronograma/tok123',tag:'theme_adjusted_by_team'});
+    const body=await W.encryptWebPushPayload(PAYLOAD,W.bytesToB64u(browserPubRaw),W.bytesToB64u(authSecret));
+    // header aes128gcm: salt(16) | rs(4) | idlen(1) | as_public(65) | ct
+    const salt=body.slice(0,16), rs=(body[16]<<24)|(body[17]<<16)|(body[18]<<8)|body[19], idlen=body[20];
+    const asPub=body.slice(21,21+idlen), ct=body.slice(21+idlen);
+    check('E1_HEADER','Header aes128gcm: salt=16B, rs=4096, keyid=as_public(65B)', salt.length===16&&rs===4096&&idlen===65);
+    // derivação RFC 8291 do lado do NAVEGADOR (browser privkey + as_public)
+    const asKey=await subtle.importKey('raw',asPub,{name:'ECDH',namedCurve:'P-256'},false,[]);
+    const ecdh=new Uint8Array(await subtle.deriveBits({name:'ECDH',public:asKey},browser.privateKey,256));
+    async function hkdf(saltB,ikmB,infoB,len){const k=await subtle.importKey('raw',ikmB,'HKDF',false,['deriveBits']);
+      return new Uint8Array(await subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt:saltB,info:infoB},k,len*8));}
+    const cat=(...a)=>{const t=a.reduce((s,x)=>s+x.length,0);const o=new Uint8Array(t);let off=0;for(const x of a){o.set(x,off);off+=x.length;}return o;};
+    const keyInfo=cat(enc.encode('WebPush: info\u0000'),browserPubRaw,asPub);
+    const ikm=await hkdf(authSecret,ecdh,keyInfo,32);
+    const cek=await hkdf(salt,ikm,enc.encode('Content-Encoding: aes128gcm\u0000'),16);
+    const nonce=await hkdf(salt,ikm,enc.encode('Content-Encoding: nonce\u0000'),12);
+    const aes=await subtle.importKey('raw',cek,'AES-GCM',false,['decrypt']);
+    const rec=new Uint8Array(await subtle.decrypt({name:'AES-GCM',iv:nonce},aes,ct));
+    check('E1_PAD','Registro decifrado termina com delimitador 0x02 (último registro RFC 8188)', rec[rec.length-1]===2);
+    const got=new TextDecoder().decode(rec.slice(0,rec.length-1));
+    check('E1_ROUNDTRIP','PAYLOAD decifrado pelo "navegador" === payload original (round-trip REAL)', got===PAYLOAD);
+    const parsed=JSON.parse(got);
+    check('E1_OPENURL','Payload carrega openUrl do MESMO link do cliente', parsed.openUrl==='/cliente/cronograma/tok123');
+
+    /* E2 — RFC 8292 VAPID JWT ES256 */
+    const vapid=await subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+    const vapidPubRaw=new Uint8Array(await subtle.exportKey('raw',vapid.publicKey));
+    const vapidJwkPriv=await subtle.exportKey('jwk',vapid.privateKey);
+    const env={VAPID_PUBLIC_KEY:W.bytesToB64u(vapidPubRaw),VAPID_PRIVATE_KEY:vapidJwkPriv.d,VAPID_SUBJECT:'mailto:contato@agendaidseven.com.br'};
+    const jwt=await W.vapidJwt(env,'https://fcm.googleapis.com');
+    const [h,c,s]=jwt.split('.');
+    check('E2_SHAPE','JWT tem 3 partes base64url', !!(h&&c&&s)&&jwt.split('.').length===3);
+    const hdr=JSON.parse(new TextDecoder().decode(W.b64uToBytes(h)));
+    const clm=JSON.parse(new TextDecoder().decode(W.b64uToBytes(c)));
+    check('E2_HEADER','Header {typ:JWT, alg:ES256}', hdr.typ==='JWT'&&hdr.alg==='ES256');
+    check('E2_CLAIMS','Claims aud=push service origin, sub=mailto, exp<=+24h',
+      clm.aud==='https://fcm.googleapis.com'&&/^mailto:/.test(clm.sub)&&clm.exp>Math.floor(Date.now()/1000)&&clm.exp<=Math.floor(Date.now()/1000)+86400);
+    const okSig=await subtle.verify({name:'ECDSA',hash:'SHA-256'},vapid.publicKey,W.b64uToBytes(s),enc.encode(h+'.'+c));
+    check('E2_SIGNATURE','Assinatura ES256 VERIFICADA com a chave pública VAPID', okSig===true);
+  }catch(e){
+    check('E_FATAL','Round-trip executa sem exceção — erro: '+(e&&e.message), false);
+  }
+
+  /* ===================== PARTE F — engine + envio real (estrutural) ===================== */
+  console.log(`${C.b}\n[F] Notification Engine + envio real (estrutura do código)${C.x}`);
+  check('F_NO_FAKE','REMOVIDO o placeholder VAPID_PRESENT_BUT_SEND_NOT_IMPLEMENTED', SRC.indexOf('VAPID_PRESENT_BUT_SEND_NOT_IMPLEMENTED')===-1);
+  check('F_SEND_REAL','sendWebPushTo faz POST real ao endpoint com aes128gcm + vapid', /async function sendWebPushTo/.test(SRC)&&/Content-Encoding": "aes128gcm"/.test(SRC)&&/"Authorization": "vapid t=" \+ jwt/.test(SRC)&&/fetch\(endpoint, \{ method: "POST", headers, body \}\)/.test(SRC));
+  check('F_GONE','Trata 404/410 como subscription morta (gone)', /res\.status === 404 \|\| res\.status === 410/.test(SRC)&&/gone: true/.test(SRC));
+  check('F_TTL_URGENCY_TOPIC','Headers TTL + Urgency + Topic presentes', /"TTL": String/.test(SRC)&&/"Urgency": \(opts && opts\.urgency\) \|\| "high"/.test(SRC)&&/headers\["Topic"\]/.test(SRC));
+  check('F_PRUNE','pruneClientPushSubs remove subscriptions mortas do Firestore', /async function pruneClientPushSubs/.test(SRC)&&/clientPushSubs: \{ arrayValue: \{ values \} \}/.test(SRC));
+  const evNames=['themes_sent_to_client','theme_adjusted_by_team','themes_approved_by_client','designer_assigned','designer_started','designer_delivered','final_content_sent_to_client','final_adjusted_by_team','final_approved_by_client'];
+  check('F_EVENTS_9','NOTIFY_EVENTS define os 9 eventos obrigatórios', evNames.every(n=>SRC.indexOf(n+':')>=0||SRC.indexOf('"'+n+'"')>=0||SRC.indexOf(n+' ')>=0));
+  check('F_ENGINE','notifyWorkflowEvent central com dedupKey via Cache API + log + fallback whatsapp_premium', /async function notifyWorkflowEvent/.test(SRC)&&/notify-dedup\.local/.test(SRC)&&/fallback = "whatsapp_premium"|fallback: "whatsapp_premium"/.test(SRC)&&/\[NOTIFY\]/.test(SRC));
+  check('F_HOOK_TEAM','team-action dispara theme_adjusted_by_team/final_adjusted_by_team', /final_adjusted_by_team" : "theme_adjusted_by_team/.test(SRC));
+  check('F_HOOK_APPROVE','aprovações do cliente disparam themes_approved_by_client/final_approved_by_client', /notifyWorkflowEvent\(env, task, "final_approved_by_client"/.test(SRC)&&/notifyWorkflowEvent\(env, task, "themes_approved_by_client"/.test(SRC));
+  check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
+  check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + 4 estados', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas no navegador/.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados para este cronograma/.test(SRC));
+  check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
+  check('F_VERSION','Healthcheck = V64.43-webpush-real-notify-engine', /version: "V64\.43-webpush-real-notify-engine"/.test(SRC));
+  check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
+
+  /* ===================== VEREDITO ===================== */
+  console.log(`${C.b}\n==================================================================`);
+  if (FAIL===0){
+    console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas).`);
+    console.log(`${C.g} approveItem nunca conclui · fases isoladas · Web Push REAL (round-trip RFC 8291 + VAPID ES256 verificados) · engine com 9 eventos + dedup + fallback WhatsApp.${C.x}`);
+    console.log(`${C.b}==================================================================${C.x}`);
+    process.exit(0);
+  } else {
+    console.log(`${C.r} RESULTADO: REPROVADO X  (${FAIL} falha(s))`);
+    FAILS.forEach(f=>console.log('   - '+f));
+    console.log(`${C.b}==================================================================${C.x}`);
+    process.exit(1);
+  }
+})();

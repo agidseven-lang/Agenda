@@ -263,7 +263,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.42-team-adjust-idem-cleanup" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.43-webpush-real-notify-engine" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1347,6 +1347,12 @@ async function handleClientCronogramaAction(token, request, env) {
   const g = await writeClientGranular(env, accessToken, task, { type, contentIndex: ci, note, value, at: now });
   // FINAL gating: só é "aprovação final" se a fase de entrada for 'final' E o eixo do cliente concluiu.
   const final = phaseIn === "final" && !!(g && (g.client === "concluido" || g.col === "concluido"));
+  // V64.43 — Notification Engine: confirmação ao cliente quando ele mesmo aprova
+  // (temas aprovados → produção liberada; aprovação final → cronograma concluído).
+  try {
+    if (g && g.client === "concluido") await notifyWorkflowEvent(env, task, "final_approved_by_client", { token });
+    else if (g && g.client === "aprovado") await notifyWorkflowEvent(env, task, "themes_approved_by_client", { token });
+  } catch (_) { /* best-effort */ }
   console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} phase=${phaseIn} final=${final} clientFlow=${(g && g.client) || ""} idem=${idemKey ? "yes" : "no"}`);
   const out = { ok: true, type, contentIndex: ci, at: now, final, phase: phaseIn, col: (g && g.col) || null, clientFlowStatus: (g && g.client) || null };
   const resp = json(out, 200, env);
@@ -1440,16 +1446,13 @@ async function handleClientCronogramaTeamAction(token, request, env) {
     console.warn("[TEAM-ACTION] erro:", e && e.message);
     return json({ ok: false, error: "erro: " + (e && e.message) }, 500, env);
   }
-  // Notifica cliente (best-effort) via Web Push. Sem VAPID configurado, vira no-op.
-  let pushResult = { sent: 0, skipped: "no_subscriptions_or_vapid" };
+  // V64.43 — Notification Engine: ajuste de TEMA (fase themes) ou ajuste FINAL (fase final).
+  // Web Push real ao cliente; sem subscription/VAPID, engine sinaliza fallback whatsapp_premium.
+  let pushResult = { sent: 0 };
   try {
-    const subs = Array.isArray(task.clientPushSubs) ? task.clientPushSubs : [];
-    if (subs.length) {
-      const payloadOut = { title: "Ajuste realizado", body: "Toque para revisar novamente.", openUrl: "/cliente/cronograma/" + token };
-      const r = await broadcastWebPush(env, subs, payloadOut);
-      pushResult = r;
-    }
-  } catch (e) { /* no-op */ }
+    const evType = clientPhase(task) === "final" ? "final_adjusted_by_team" : "theme_adjusted_by_team";
+    pushResult = await notifyWorkflowEvent(env, task, evType, { contentIndex: ci, token });
+  } catch (e) { pushResult = { sent: 0, error: e && e.message }; }
   console.log(`[TEAM-ACTION] task=${taskId} item=${ci} by=${byName} push=${JSON.stringify(pushResult)}`);
   return json({ ok: true, taskId, contentIndex: ci, at: now, push: pushResult }, 200, env);
 }
@@ -1509,15 +1512,234 @@ async function handleClientPushSubscribe(token, request, env) {
   return json({ ok: true, taskId: task.id, at: now, vapidConfigured: !!(env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY) }, 200, env);
 }
 
-/* V64.42 — envio de Web Push a uma lista de subscriptions; gated por VAPID_*. */
-async function broadcastWebPush(env, subs, payload) {
+/* ═══════════════ V64.43 — WEB PUSH REAL (RFC 8030 + 8291 + 8292) ═══════════════
+   Implementação 100% Web Crypto (suportada nativamente pelo runtime de Workers):
+   - ECDH P-256 (deriveBits)  → segredo compartilhado com a chave p256dh do navegador
+   - HKDF-SHA256 (deriveBits) → IKM/CEK/NONCE conforme RFC 8291 (aes128gcm)
+   - AES-128-GCM (encrypt)    → cifra o payload (registro único, delimitador 0x02)
+   - ECDSA P-256 (sign)       → VAPID JWT ES256 (RFC 8292)
+   Sem dependências externas. Sem mock: o envio é um POST real ao push service
+   (fcm.googleapis.com / mozilla / windows.com etc.) do endpoint da subscription. */
+
+function b64uToBytes(s) {
+  const pad = "=".repeat((4 - (s.length % 4)) % 4);
+  const b = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+function bytesToB64u(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function concatBytes() {
+  let total = 0;
+  for (let i = 0; i < arguments.length; i++) total += arguments[i].length;
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (let i = 0; i < arguments.length; i++) { out.set(arguments[i], off); off += arguments[i].length; }
+  return out;
+}
+async function hkdfBits(saltBytes, ikmBytes, infoBytes, len) {
+  const key = await crypto.subtle.importKey("raw", ikmBytes, "HKDF", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: saltBytes, info: infoBytes }, key, len * 8);
+  return new Uint8Array(bits);
+}
+
+/* RFC 8291 — cifra `payloadStr` para a subscription do navegador (p256dh + auth).
+   Retorna o corpo binário completo no formato aes128gcm:
+   salt(16) || rs(4) || idlen(1) || as_public(65) || ciphertext(payload+0x02+tag). */
+async function encryptWebPushPayload(payloadStr, p256dhB64u, authB64u) {
+  const uaPublic = b64uToBytes(p256dhB64u);            // ponto P-256 não comprimido (65 bytes)
+  const authSecret = b64uToBytes(authB64u);            // 16 bytes
+  if (uaPublic.length !== 65) throw new Error("p256dh inválida (esperado 65 bytes, veio " + uaPublic.length + ")");
+  if (authSecret.length !== 16) throw new Error("auth inválida (esperado 16 bytes, veio " + authSecret.length + ")");
+  const asKeys = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const asPublic = new Uint8Array(await crypto.subtle.exportKey("raw", asKeys.publicKey)); // 65 bytes
+  const uaKey = await crypto.subtle.importKey("raw", uaPublic, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: uaKey }, asKeys.privateKey, 256));
+  const enc = new TextEncoder();
+  // IKM = HKDF(salt=auth_secret, IKM=ecdh_secret, info="WebPush: info"||0x00||ua_public||as_public, 32)
+  const keyInfo = concatBytes(enc.encode("WebPush: info\u0000"), uaPublic, asPublic);
+  const ikm = await hkdfBits(authSecret, ecdhSecret, keyInfo, 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await hkdfBits(salt, ikm, enc.encode("Content-Encoding: aes128gcm\u0000"), 16);
+  const nonce = await hkdfBits(salt, ikm, enc.encode("Content-Encoding: nonce\u0000"), 12);
+  // registro único: payload || 0x02 (delimitador do ÚLTIMO registro, RFC 8188 §2)
+  const record = concatBytes(enc.encode(payloadStr), new Uint8Array([2]));
+  const aesKey = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, aesKey, record));
+  const rs = new Uint8Array([0, 0, 16, 0]); // record size 4096 (big-endian)
+  const header = concatBytes(salt, rs, new Uint8Array([asPublic.length]), asPublic);
+  return concatBytes(header, ct);
+}
+
+/* RFC 8292 — VAPID JWT (ES256). aud = origem do push service do endpoint;
+   exp = +12h; sub = mailto do responsável. Chaves: P-256 raw em base64url
+   (pública = 65 bytes não comprimida; privada = escalar d de 32 bytes). */
+async function vapidJwt(env, audience) {
+  const pubBytes = b64uToBytes(env.VAPID_PUBLIC_KEY);
+  const privBytes = b64uToBytes(env.VAPID_PRIVATE_KEY);
+  if (pubBytes.length !== 65) throw new Error("VAPID_PUBLIC_KEY inválida (esperado 65 bytes)");
+  if (privBytes.length !== 32) throw new Error("VAPID_PRIVATE_KEY inválida (esperado 32 bytes)");
+  const jwk = {
+    kty: "EC", crv: "P-256",
+    x: bytesToB64u(pubBytes.slice(1, 33)),
+    y: bytesToB64u(pubBytes.slice(33, 65)),
+    d: bytesToB64u(privBytes),
+  };
+  const key = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const enc = new TextEncoder();
+  const header = bytesToB64u(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const claims = bytesToB64u(enc.encode(JSON.stringify({
+    aud: audience,
+    exp: Math.floor(Date.now() / 1000) + 12 * 3600,
+    sub: env.VAPID_SUBJECT || "mailto:contato@agendaidseven.com.br",
+  })));
+  const signingInput = header + "." + claims;
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(signingInput)));
+  return signingInput + "." + bytesToB64u(sig);
+}
+
+/* RFC 8030 — POST real ao push service de UMA subscription.
+   Headers: Authorization vapid, Content-Encoding aes128gcm, TTL, Urgency, Topic.
+   404/410 = subscription morta (gone) → chamador remove do Firestore. */
+async function sendWebPushTo(env, sub, payloadObj, opts) {
+  const endpoint = sub && sub.endpoint;
+  const keys = sub && sub.keys;
+  if (!endpoint || !keys || !keys.p256dh || !keys.auth) return { ok: false, error: "subscription inválida" };
+  const audience = new URL(endpoint).origin;
+  const jwt = await vapidJwt(env, audience);
+  const body = await encryptWebPushPayload(JSON.stringify(payloadObj), keys.p256dh, keys.auth);
+  const headers = {
+    "Authorization": "vapid t=" + jwt + ", k=" + env.VAPID_PUBLIC_KEY,
+    "Content-Encoding": "aes128gcm",
+    "Content-Type": "application/octet-stream",
+    "Content-Length": String(body.length),
+    "TTL": String((opts && opts.ttl) || 86400),
+    "Urgency": (opts && opts.urgency) || "high",
+  };
+  if (opts && opts.topic) headers["Topic"] = String(opts.topic).replace(/[^A-Za-z0-9_\-=]/g, "").slice(0, 32);
+  const res = await fetch(endpoint, { method: "POST", headers, body });
+  if (res.status === 404 || res.status === 410) return { ok: false, gone: true, status: res.status };
+  if (res.status >= 200 && res.status < 300) return { ok: true, status: res.status };
+  let detail = "";
+  try { detail = (await res.text()).slice(0, 160); } catch (_) {}
+  return { ok: false, status: res.status, error: detail };
+}
+
+/* V64.43 — envio REAL a uma lista de subscriptions; gated por VAPID_*.
+   Retorna {sent, total, gone[], results[]}; gone[] = endpoints 404/410 a remover. */
+async function broadcastWebPush(env, subs, payload, opts) {
   if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
-    return { sent: 0, skipped: "VAPID_NOT_CONFIGURED" };
+    return { sent: 0, total: (subs && subs.length) || 0, gone: [], skipped: "VAPID_NOT_CONFIGURED" };
   }
-  // Implementacao real de Web Push exige ECDH P-256 + AES-GCM (RFC 8030/8291) + JWT VAPID.
-  // Esta versao deixa o caminho preparado mas NAO envia. Sera ativado quando os secrets
-  // forem provisionados e a logica de criptografia for adicionada num passo separado.
-  return { sent: 0, skipped: "VAPID_PRESENT_BUT_SEND_NOT_IMPLEMENTED", total: subs.length };
+  const results = [];
+  const gone = [];
+  for (const sub of subs) {
+    try {
+      const r = await sendWebPushTo(env, sub, payload, opts);
+      results.push(r);
+      if (r.gone && sub.endpoint) gone.push(sub.endpoint);
+    } catch (e) {
+      results.push({ ok: false, error: e && e.message });
+    }
+  }
+  return { sent: results.filter((r) => r.ok).length, total: subs.length, gone, results };
+}
+
+/* V64.43 — remove subscriptions mortas (404/410) do array tasks/{id}.clientPushSubs.
+   Reescreve o campo filtrado via updateMask (best-effort; falha não bloqueia o fluxo). */
+async function pruneClientPushSubs(env, task, goneEndpoints) {
+  const keep = (Array.isArray(task.clientPushSubs) ? task.clientPushSubs : [])
+    .filter((s) => s && goneEndpoints.indexOf(s.endpoint) < 0);
+  const accessToken = await getAccessToken(env, DATASTORE_SCOPE);
+  const values = keep.map((s) => ({ mapValue: { fields: {
+    endpoint: { stringValue: s.endpoint || "" },
+    keys: { mapValue: { fields: {
+      p256dh: { stringValue: (s.keys && s.keys.p256dh) || "" },
+      auth: { stringValue: (s.keys && s.keys.auth) || "" },
+    } } },
+    at: { integerValue: String(s.at || 0) },
+  } } }));
+  const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${task.id}`;
+  const body = { writes: [{
+    update: { name: docName, fields: { clientPushSubs: { arrayValue: { values } } } },
+    updateMask: { fieldPaths: ["clientPushSubs"] },
+  }] };
+  await fetch(`${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`, {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  console.log(`[PUSH-PRUNE] task=${task.id} removidas=${goneEndpoints.length} restantes=${keep.length}`);
+}
+
+/* ═══════════════ V64.43 — NOTIFICATION ENGINE central ═══════════════
+   notifyWorkflowEvent(env, task, eventType, payload?)
+   Tabela única: destinatário, fase, title/body. Canal principal do CLIENTE =
+   Web Push real; fallback = WhatsApp premium (card enviado pelo fluxo existente,
+   operado pela equipe — o engine sinaliza `fallback:'whatsapp_premium'`).
+   Eventos de EQUIPE seguem os fluxos FCM já existentes (/notify-assignee,
+   /notify-designer) — o engine registra e loga sem duplicar envio.
+   Dedup: 1 disparo por (taskId|evento|item) por 60s via Cache API. */
+const NOTIFY_EVENTS = {
+  themes_sent_to_client:        { to: "client", phase: "themes",     title: "Cronograma aguardando sua análise",  body: "Os temas do seu cronograma estão disponíveis para revisão. Toque para abrir." },
+  theme_adjusted_by_team:       { to: "client", phase: "themes",     title: "Ajuste do tema realizado",           body: "Toque para revisar novamente." },
+  themes_approved_by_client:    { to: "client", phase: "themes",     title: "Temas aprovados",                    body: "Produção liberada. Vamos te avisar quando a versão final estiver pronta." },
+  designer_assigned:            { to: "team",   phase: "production", title: "Designer atribuído",                 body: "O cronograma entrou na fila do designer." },
+  designer_started:             { to: "team",   phase: "production", title: "Designer em produção",               body: "O designer iniciou a produção do cronograma." },
+  designer_delivered:           { to: "team",   phase: "production", title: "Designer entregou",                  body: "Revise, adicione legendas e posts e envie ao cliente." },
+  final_content_sent_to_client: { to: "client", phase: "final",      title: "Legendas e posts disponíveis",       body: "Seu cronograma está pronto para aprovação final. Toque para abrir." },
+  final_adjusted_by_team:       { to: "client", phase: "final",      title: "Ajuste final realizado",             body: "Toque para revisar novamente." },
+  final_approved_by_client:     { to: "client", phase: "final",      title: "Cronograma aprovado com sucesso",    body: "Obrigado! A equipe seguirá com a finalização." },
+};
+
+async function notifyWorkflowEvent(env, task, eventType, payload) {
+  const ev = NOTIFY_EVENTS[eventType];
+  if (!ev) return { ok: false, error: "evento desconhecido: " + eventType };
+  const token = (task && (task.clientReviewToken || task.shareToken)) || (payload && payload.token) || "";
+  const openUrl = token ? ("/cliente/cronograma/" + token) : "/";
+  // anti-duplicidade: 1 disparo por (task|evento|item) numa janela de 60s
+  const dedupKey = `${(task && task.id) || ""}|${eventType}|${(payload && payload.contentIndex != null) ? payload.contentIndex : ""}`;
+  const dedupUrl = "https://notify-dedup.local/" + encodeURIComponent(dedupKey);
+  try {
+    const hit = await caches.default.match(new Request(dedupUrl));
+    if (hit) {
+      console.log(`[NOTIFY] dedup task=${task && task.id} event=${eventType}`);
+      return { ok: true, deduped: true, eventType };
+    }
+  } catch (_) { /* Cache API indisponível → segue sem dedup */ }
+
+  let result = { channel: "none", sent: 0 };
+  if (ev.to === "client") {
+    const subs = Array.isArray(task && task.clientPushSubs) ? task.clientPushSubs : [];
+    if (subs.length && env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY && env.VAPID_SUBJECT) {
+      const out = await broadcastWebPush(env, subs,
+        { title: ev.title, body: ev.body, openUrl, tag: eventType },
+        { topic: eventType, urgency: "high", ttl: 86400 });
+      result = { channel: "webpush", sent: out.sent, total: out.total };
+      if (out.gone && out.gone.length) {
+        try { await pruneClientPushSubs(env, task, out.gone); } catch (_) { /* best-effort */ }
+        result.pruned = out.gone.length;
+      }
+      if (!out.sent) result.fallback = "whatsapp_premium";
+    } else {
+      result = { channel: "none", sent: 0, fallback: "whatsapp_premium",
+                 reason: subs.length ? "VAPID_NOT_CONFIGURED" : "sem_subscription" };
+    }
+  } else {
+    // equipe: FCM já coberto por /notify-assignee e /notify-designer (fluxos existentes).
+    result = { channel: "fcm_existing_flows", sent: 0 };
+  }
+  try {
+    await caches.default.put(new Request(dedupUrl),
+      new Response("1", { status: 200, headers: { "Cache-Control": "public, max-age=60" } }));
+  } catch (_) { /* sem dedup persistido */ }
+  console.log(`[NOTIFY] task=${task && task.id} event=${eventType} phase=${ev.phase} to=${ev.to} result=${JSON.stringify(result)}`);
+  return Object.assign({ ok: true, eventType, phase: ev.phase, to: ev.to, openUrl }, result);
 }
 
 /* V64.16 — ESTADO JSON p/ TEMPO REAL. O portal faz polling leve e atualiza tema/legenda/Feed/
@@ -2104,6 +2326,12 @@ a{color:#b9a4ff;text-decoration:none}
 .midcard h2{margin:0 0 9px;font-size:22px;font-weight:800;color:var(--txt);letter-spacing:-.01em}
 .midcard p{margin:0 auto;max-width:420px;color:var(--mut);font-size:14px;line-height:1.6}
 .mid-foot{margin-top:16px;color:var(--faint);font-size:12px}
+/* V64.43 — CTA de avisos (Web Push) */
+.pushcta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line2);border-radius:var(--radius-sm);padding:13px 16px;margin:14px 0}
+.pushcta .pc-msg{color:var(--mut);font-size:13.5px;line-height:1.5}
+.pushcta.pc-ok{border-color:rgba(52,211,153,.4)}.pushcta.pc-ok .pc-msg{color:#9beecb}
+.pushcta.pc-warn{border-color:rgba(245,165,36,.35)}.pushcta.pc-warn .pc-msg{color:#f3cf8e}
+.pushcta .pc-btn{white-space:nowrap}
 `;
 
 const CV_JS = `
@@ -2231,27 +2459,41 @@ setInterval(pollState,6000);
    So roda quando ENABLE_PUSH=true E VAPID_PUBLIC_KEY presente. Sem secrets configurados,
    funcao vira no-op. Falhas silenciosas (cliente continua usando WhatsApp + polling normal). */
 function urlBase64ToUint8Array(b){try{var pad='='.repeat((4-b.length%4)%4);var s=(b+pad).replace(/-/g,'+').replace(/_/g,'/');var raw=atob(s);var out=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;}catch(_){return null;}}
-function setupClientWebPush(){
-  if(!ENABLE_PUSH||!VAPID_PUBLIC_KEY)return;
-  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
-  var swPath='/cliente/sw.js';
-  navigator.serviceWorker.register(swPath,{scope:'/cliente/'}).then(function(reg){
-    return reg.pushManager.getSubscription().then(function(s){
-      if(s)return s;
-      return Notification.requestPermission().then(function(p){
-        if(p!=='granted')return null;
-        var key=urlBase64ToUint8Array(VAPID_PUBLIC_KEY);if(!key)return null;
-        return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
-      });
+/* V64.43 — CTA explícito "Receber avisos deste cronograma" com 4 estados:
+   ativado ✓ · não permitido (fallback WhatsApp) · navegador incompatível (fallback
+   WhatsApp) · disponível (botão). NUNCA pede permissão sem clique do cliente. */
+function pushCtaState(msg,cls,btn){var el=document.getElementById('pushcta');if(!el)return;
+  el.style.display='flex';el.className='pushcta '+(cls||'');
+  el.innerHTML='<span class="pc-msg">'+msg+'</span>'+(btn?'<button class="ibtn pc-btn" id="pushctabtn">'+btn+'</button>':'');
+  var b=document.getElementById('pushctabtn');if(b)b.addEventListener('click',subscribeClientPush);}
+function registerPushSw(){return navigator.serviceWorker.register('/cliente/sw.js',{scope:'/cliente/'});}
+function sendSubToWorker(sub){var j=sub.toJSON();
+  return fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/push/subscribe',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({endpoint:j.endpoint,keys:j.keys})});}
+function subscribeClientPush(){
+  registerPushSw().then(function(reg){
+    return Notification.requestPermission().then(function(p){
+      if(p!=='granted'){pushCtaState('Notificações não permitidas no navegador. Você receberá os avisos pelo WhatsApp.','pc-warn',null);return null;}
+      var key=urlBase64ToUint8Array(VAPID_PUBLIC_KEY);if(!key)return null;
+      return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
     });
   }).then(function(sub){
     if(!sub)return;
-    var j=sub.toJSON();
-    fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/push/subscribe',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({endpoint:j.endpoint,keys:j.keys})
-    }).catch(function(){});
-  }).catch(function(){});
+    return sendSubToWorker(sub).then(function(){pushCtaState('Avisos ativados para este cronograma. Você será notificado a cada atualização. ✓','pc-ok',null);});
+  }).catch(function(){pushCtaState('Não foi possível ativar os avisos agora. Você receberá os avisos pelo WhatsApp.','pc-warn',null);});
+}
+function setupClientWebPush(){
+  var el=document.getElementById('pushcta');
+  if(!ENABLE_PUSH||!VAPID_PUBLIC_KEY){if(el)el.style.display='none';return;}
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)){
+    pushCtaState('Seu navegador não suporta avisos em tempo real. Você receberá os avisos pelo WhatsApp.','pc-warn',null);return;}
+  if(typeof Notification!=='undefined'&&Notification.permission==='denied'){
+    pushCtaState('Notificações não permitidas no navegador. Você receberá os avisos pelo WhatsApp.','pc-warn',null);return;}
+  registerPushSw().then(function(reg){return reg.pushManager.getSubscription();}).then(function(sub){
+    if(sub){sendSubToWorker(sub).catch(function(){});pushCtaState('Avisos ativados para este cronograma. ✓','pc-ok',null);}
+    else{pushCtaState('Quer ser avisado na hora a cada atualização deste cronograma?','', 'Receber avisos deste cronograma');}
+  }).catch(function(){pushCtaState('Você receberá os avisos pelo WhatsApp.','pc-warn',null);});
 }
 try{setupClientWebPush();}catch(_){}
 `;
@@ -2405,6 +2647,7 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
     '<div class="prog"><div class="prog-h"><span>Progresso de aprovação</span><span data-progtxt>' + doneCount + ' de ' + total + ' aprovados</span></div>' +
       '<div class="prog-bar"><div class="prog-fill" data-progfill style="width:' + Math.max(pct, 4) + '%"></div></div></div>' +
   '</section>' +
+  '<div id="pushcta" class="pushcta" style="display:none"></div>' +
   '<div class="sec"><h2>Conteúdos</h2><div class="legend"><span><i style="background:var(--ok)"></i>Aprovado</span><span><i style="background:var(--rev)"></i>Ajuste</span><span><i style="background:var(--faint)"></i>Pendente</span></div></div>' +
   '<div id="contents">' + contentsHtml + '</div>' +
   '<div class="sec"><h2>Observações gerais</h2></div>' +
@@ -2611,7 +2854,15 @@ async function handleSendPremiumWhatsApp(request, env, origin) {
   // 7) Sucesso REAL só com message_id devolvido pela Meta. NUNCA loga token; telefone mascarado.
   if (messageId) {
     console.log("[WA-CLOUD] enviado mode=" + mode + " to=" + maskPhone(phone) + " message_id=" + messageId);
-    return json({ ok: true, provider: "meta_whatsapp_cloud_api", message_id: messageId, to: maskPhone(phone), template: env.WHATSAPP_TEMPLATE_NAME || null, mode: mode }, 200, env);
+    // V64.43 — Notification Engine: envio do card = conteúdo disponível p/ o cliente.
+    // Dispara Web Push espelhando o evento (themes ou final); WhatsApp continua como
+    // canal principal deste fluxo — o push é o aviso imediato na tela do dispositivo.
+    let push = { sent: 0 };
+    try {
+      const evType = clientPhase(task) === "final" ? "final_content_sent_to_client" : "themes_sent_to_client";
+      push = await notifyWorkflowEvent(env, task, evType, { token });
+    } catch (_) { /* best-effort */ }
+    return json({ ok: true, provider: "meta_whatsapp_cloud_api", message_id: messageId, to: maskPhone(phone), template: env.WHATSAPP_TEMPLATE_NAME || null, mode: mode, push: { channel: push.channel || "none", sent: push.sent || 0 } }, 200, env);
   }
   // 8) Falha estruturada — repassa o erro da Meta SEM vazar token.
   const me = (metaJson && metaJson.error) || {};
