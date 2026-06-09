@@ -1083,6 +1083,33 @@
   body:not(.desktop) .d-board-tools.tbar .tchips{justify-content:flex-start;flex:1 1 100%}
   /* task-flow-fix — barra de ABAS dos HUBS (sem busca): mesma moldura integrada da toolbar,
      mas com as abas alinhadas à ESQUERDA (não há campo de busca à esquerda). NÃO é flutuante. */
+  /* ===== detail-hierarchy-v2 — HERO do detalhe (status + próxima + responsável + ações) ===== */
+  .det-hero{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+  .det-hero-status{display:flex;align-items:flex-start;gap:12px;border:1px solid;border-radius:13px;padding:14px 16px}
+  .det-hero-dot{width:11px;height:11px;border-radius:99px;flex:none;margin-top:4px}
+  .det-hero-l{font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+  .det-hero-s{font-size:12.5px;color:var(--soft);margin-top:2px}
+  .det-hero-next{background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:11px 14px}
+  .det-hero-nk{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .det-hero-nt{font-size:13.5px;color:var(--ink);margin-top:3px}
+  .det-hero-owner{display:flex;align-items:center;gap:10px;padding:2px 4px}
+  .det-hero-ava{width:30px;height:30px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;color:#fff;flex:none}
+  .det-hero-ava.own-social{background:linear-gradient(135deg,#22D3EE,#5B9BFF)}
+  .det-hero-ava.own-designer{background:linear-gradient(135deg,#F5A524,#C64BD8)}
+  .det-hero-ava.own-cliente{background:linear-gradient(135deg,#7C5CFF,#C64BD8)}
+  .det-hero-ava.own-none{background:var(--surface2);color:var(--faint)}
+  .det-hero-ok{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .det-hero-on{font-size:13px;font-weight:700}
+  .det-hero-or{font-size:11.5px;color:var(--soft);font-weight:600}
+  .det-hero-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:2px}
+  .det-teamfix{border-color:rgba(52,211,153,.45)!important;color:#9BEECB!important}
+  /* "Detalhes do fluxo" colapsado (nativo <details>) */
+  .det-flowdet{margin-top:14px;border:1px solid var(--line-soft);border-radius:13px;overflow:hidden}
+  .det-flowdet>summary{cursor:pointer;list-style:none;padding:11px 15px;font-size:12.5px;font-weight:700;color:var(--soft);background:var(--surface2);user-select:none}
+  .det-flowdet>summary::-webkit-details-marker{display:none}
+  .det-flowdet>summary::after{content:'▾';float:right;color:var(--faint);transition:transform .15s}
+  .det-flowdet[open]>summary::after{transform:rotate(180deg)}
+  .det-flowdet-body{padding:4px 15px 15px;border-top:1px solid var(--line-soft)}
   /* Resumo dos dois eixos no Detalhes */
   .det-flow{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px 15px}
   .det-flow-col{flex:1;min-width:160px}
@@ -1874,7 +1901,19 @@ function pendingStory(t){const a=Array.isArray(t.cronContents)?t.cronContents:[]
 function pendingProduction(t){return pendingLegend(t)||pendingFeed(t);}
 function designerDelivered(t){return hasDesigner(t)&&designerCol(t)==='concluido';}
 // Ajuste pedido pelo cliente em ALGUM conteúdo (aprovação parcial) — via clientItems granular.
-function hasPendingItemRevision(t){const ci=t&&t.clientItems;if(!ci||typeof ci!=='object')return false;return Object.keys(ci).some(k=>{const cs=ci[k]&&ci[k].cs;return cs==='em_revisao'||cs==='editado';});}
+/* detail-hierarchy-v2 — PHASE-AWARE (espelho do Worker V64.41): pendência de item só conta
+   na FASE ATUAL (clientItems.iX.phase === clientApprovalPhaseOf). Ajustes de TEMAS resolvidos
+   não contaminam a fase final — corrige o card preso em "Ajuste solicitado". */
+function pendingClientItems(t){const ci=t&&t.clientItems;if(!ci||typeof ci!=='object')return [];
+  const ph=clientApprovalPhaseOf(t);const out=[];
+  Object.keys(ci).forEach(k=>{const m=k.match(/^i(\d+)$/);if(!m)return;const it=ci[k]||{};
+    if((it.cs==='em_revisao'||it.cs==='editado')&&it.phase===ph)out.push({idx:+m[1],cs:it.cs,note:it.note||''});});
+  return out;}
+function hasPendingItemRevision(t){return pendingClientItems(t).length>0;}
+/* equipe já corrigiu (teamAdjustedAt) e cliente ainda não reanalisou? */
+function hasTeamAdjustedAwaiting(t){const ci=t&&t.clientItems;if(!ci||typeof ci!=='object')return false;
+  if(pendingClientItems(t).length)return false;
+  return Object.keys(ci).some(k=>{const it=ci[k];return it&&it.teamAdjustedAt&&!it.cs;});}
 /* ===== FONTE ÚNICA DA VERDADE — o fluxo está REALMENTE encerrado? =====
    "Concluído" exige aprovação FINAL do cliente E zero pendências operacionais.
    O status BRUTO do kanban (t.status) NUNCA, sozinho, conclui um cronograma. */
@@ -2414,23 +2453,24 @@ function openDetails(taskId){
     '<div class="det-title">'+esc(t.title||'Sem título')+'</div>'+
     (t.client?'<div class="det-client">'+svg('place')+'<span>'+esc(t.client)+'</span></div>':'')+
     '<div class="det-chips">'+((function(){
-        // CORREÇÃO (status-consistency): para cronograma, o chip principal mostra o STATUS
-        // OPERACIONAL (não o status bruto) — evita "Concluído" contraditório com a linha do tempo.
-        if(secOf(t.sector).key==='cronograma'){const oc=clientStatusView(t); // FASE 1 (passo 4): card de revisão lê a fonte única
-          return '<span class="rev-chip" style="background:'+withAlpha(oc.color,.16)+';color:'+oc.color+'"><span class="dotc" style="background:'+oc.color+'"></span>'+esc(oc.label)+'</span>';}
+        // detail-hierarchy-v2: UM único chip de estado no topo (sem status concorrentes).
+        // Cronograma usa a MESMA máquina de estados do hero (detailState) — nunca contradiz.
+        if(secOf(t.sector).key==='cronograma'){const dsc=detailState(t);
+          return '<span class="rev-chip" style="background:'+withAlpha(dsc.color,.16)+';color:'+dsc.color+'"><span class="dotc" style="background:'+dsc.color+'"></span>'+esc(dsc.label)+'</span>';}
         return '<span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>';
       })())+
-      (t.priority?'<span class="rev-chip" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">⚑ Prioridade alta</span>':'<span class="rev-chip rev-chip-soft">Prioridade normal</span>')+
-      (cron?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+
-      (t.cronStatus?'<span class="rev-chip" style="background:'+withAlpha(cronStatusColor(t.cronStatus),.16)+';color:'+cronStatusColor(t.cronStatus)+'"><span class="dotc" style="background:'+cronStatusColor(t.cronStatus)+'"></span>'+esc(cronStatusLabel(t.cronStatus))+'</span>':'')+'</div>'+
+      (t.priority?'<span class="rev-chip" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">⚑ Prioridade alta</span>':'')+
+      (cron?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+'</div>'+
     '<div class="det-body">'+
     // pessoas
     '<div class="det-people">'+
       '<div class="det-person">'+(asg?avatar(asg,44):emptyAv)+'<div class="det-person-m"><div class="det-person-l">Responsável pela execução</div><div class="det-person-n">'+esc(asgName||'Ninguém atribuído')+'</div>'+(asg&&asg.role?'<div class="det-person-r">'+esc(asg.role)+'</div>':'')+'</div></div>'+
       '<div class="det-person">'+(req?avatar(req,44):emptyAv)+'<div class="det-person-m"><div class="det-person-l">Enviado por</div><div class="det-person-n">'+esc(reqName)+'</div>'+(req&&req.role?'<div class="det-person-r">'+esc(req.role)+'</div>':'')+'</div></div>'+
     '</div>'+
-    flowSummaryBlock(t)+
-    opPanelBlock(t)+
+    // detail-hierarchy-v2: HERO (status+próxima+responsável+ações) no topo;
+    // os chips técnicos e a timeline moram em "Detalhes do fluxo" (colapsado).
+    detailHeroBlock(t)+
+    flowDetailsBlock(t)+
     // datas
     '<div class="det-sec">Datas</div><div class="det-dates">'+
       detDate('calendar','Criado em',fmtDateTimeBR(t.createdAt))+
@@ -2476,6 +2516,127 @@ function openDetails(taskId){
     detFooter(t,cron)+
   '</div></div>';
   document.getElementById('modalRoot').innerHTML=h;
+}
+/* ═════════ detail-hierarchy-v2 — MÁQUINA DE ESTADOS DO DETALHE (8 estados aprovados) ═════════
+   Hierarquia: 1 Status principal · 2 Próxima ação · 3 Responsável · 4 Ações · 5 Detalhes colapsados.
+   Linguagem humana; 1 status no topo; botões apenas da fase. */
+function detailState(t){
+  if(secOf(t.sector).key!=='cronograma'){const st=stOf(t.status);
+    return {key:'task_'+(t.status||'afazer'),color:st.color,label:st.label,sub:'',next:'',owner:'assignee',actions:[]};}
+  const cc=clientCol(t);const pend=pendingClientItems(t);
+  if(isFullyComplete(t))return {key:'concluido',color:'#34D399',label:'Concluído ✓',
+    sub:'O cliente aprovou a versão final. Cronograma encerrado.',
+    next:'Nada a fazer — aprovação final registrada'+(t.clientFinalApprovedAt?(' em '+fmtDateTimeBR(t.clientFinalApprovedAt)):'')+'.',
+    owner:'none',actions:['clientview']};
+  if(pend.length||(cc==='revisao'&&!hasTeamAdjustedAwaiting(t)))return {key:'cliente_ajuste',color:'#FB7185',
+    label:'Cliente pediu ajuste',
+    sub:pend.length?('Ajuste solicitado no Conteúdo '+pend.map(p=>p.idx+1).join(', ')+(pend[0].note?(': “'+pend[0].note+'”'):'.')):'O cliente pediu uma revisão geral.',
+    next:'Corrigir o conteúdo e marcar como corrigido — o cliente será avisado.',
+    owner:'social',actions:['fix','teamfix','clientview']};
+  if(cc==='revisao'&&hasTeamAdjustedAwaiting(t))return {key:'ajuste_aguardando',color:'#5B9BFF',
+    label:'Ajuste realizado — aguardando o cliente',
+    sub:'A correção foi feita e o cliente vai revisar no mesmo link.',
+    next:'Aguardar o cliente revisar o conteúdo corrigido. Nenhuma ação necessária agora.',
+    owner:'cliente',actions:['clientview']};
+  if(cc==='reenviado')return {key:'aguardando_final',color:'#5B9BFF',
+    label:'Aguardando aprovação final',
+    sub:'Legendas e posts foram enviados. O cliente foi avisado.',
+    next:'Aguardar o cliente aprovar a versão final no portal.',
+    owner:'cliente',actions:['clientview']};
+  if(hasDesigner(t)&&!designerDelivered(t)){const dc=designerCol(t);
+    if(dc==='afazer')return {key:'designer_aguardando',color:'#B9A4FF',
+      label:'Aguardando designer iniciar', sub:'A tarefa está no quadro do designer, em “A Fazer”.',
+      next:'Aguardar o designer iniciar a produção. Ele já foi notificado.',
+      owner:'designer',actions:['dboard','redesigner']};
+    if(dc==='revisao')return {key:'designer_revisao',color:'#60A5FA',
+      label:'Designer em revisão', sub:'O designer está revisando/ajustando as artes.',
+      next:'Aguardar o designer finalizar a revisão e entregar.',
+      owner:'designer',actions:['dboard']};
+    return {key:'designer_producao',color:'#F5A524',
+      label:'Designer em produção', sub:'O designer está produzindo as artes do cronograma.',
+      next:'Aguardar a entrega das artes pelo designer.',
+      owner:'designer',actions:['dboard']};}
+  if(designerDelivered(t))return {key:'designer_entregou',color:'#22D3B8',
+    label:'Designer entregou', sub:'As artes foram entregues. Falta legenda e post para a aprovação final.',
+    next:'Revisar as artes, adicionar legendas e posts e enviar ao cliente.',
+    owner:'social',actions:['prod','sendclient']};
+  if((cc==='aprovado'||cc==='producao')&&clientApproved(t)&&!isSentToDesigner(t))return {key:'temas_aprovados',color:'#34D399',
+    label:'Temas aprovados', sub:'O cliente aprovou todos os temas. Produção liberada.',
+    next:'Escolher o designer que vai produzir as artes deste cronograma.',
+    owner:'social',actions:['senddesigner','clientview']};
+  if(cc==='enviado')return {key:'aguardando_temas',color:'#22D3EE',
+    label:'Aguardando aprovação dos temas', sub:'Os temas foram enviados. O cliente foi avisado.',
+    next:'Aguardar o cliente analisar os temas no portal.',
+    owner:'cliente',actions:['clientview','edit']};
+  return {key:'preparacao',color:'#6E7480',
+    label:'Em preparação', sub:'O cronograma ainda não foi enviado ao cliente.',
+    next:'Preencher os temas e enviar ao cliente para aprovação.',
+    owner:'social',actions:['edit','sendclient']};
+}
+/* Responsável atual (avatar + nome + papel) a partir do estado. */
+function detailOwner(t,ds){
+  if(ds.owner==='none')return {ini:'✓',name:'Sem pendências',role:'Nenhuma ação necessária',cls:'own-none'};
+  if(ds.owner==='cliente')return {ini:initials(t.client||'C'),name:t.client||'Cliente',role:'Cliente — responsável agora',cls:'own-cliente'};
+  if(ds.owner==='designer'){const d=state.users.find(u=>u.id===designerOf(t));
+    return {ini:initials((d&&d.name)||'D'),name:(d&&d.name)||(t.designerAssignment&&t.designerAssignment.designerName)||'Designer',role:'Designer — responsável agora',cls:'own-designer'};}
+  if(ds.owner==='assignee'){const a=state.users.find(u=>u.id===t.assigneeId);
+    return {ini:initials((a&&a.name)||'?'),name:(a&&a.name)||'Responsável',role:'Responsável pela execução',cls:'own-social'};}
+  const sid=socialOf(t);const s=state.users.find(u=>u.id===sid);
+  return {ini:initials((s&&s.name)||'S'),name:(s&&s.name)||'Social Media',role:'Social Media — responsável agora',cls:'own-social'};
+}
+/* Botões da fase (apenas os relevantes). */
+function detailActionsHtml(t,ds){
+  const B={
+    fix:'<button class="btn dz-go" data-ceopen="'+t.id+'">'+svg('editnote')+'Corrigir conteúdo</button>',
+    teamfix:'<button class="btn det-teamfix" data-teamfix="'+t.id+'">'+svg('check')+'Marcar como corrigido</button>',
+    clientview:'<button class="btn cvw-open" data-clientview="'+t.id+'">'+svg('eye')+'Abrir visão do cliente</button>',
+    senddesigner:'<button class="btn dz-go" data-senddesigner="'+t.id+'">'+svg('group')+'Enviar para designer</button>',
+    redesigner:'<button class="btn ghost" data-senddesigner="'+t.id+'">'+svg('swap')+'Trocar designer</button>',
+    dboard:(hasDesigner(t)?'<button class="btn det-goboard" data-goboard="'+designerOf(t)+'">'+svg('grid')+'Ver quadro do designer</button>':''),
+    prod:'<button class="btn dz-go" data-prodopen="'+t.id+'">'+svg('movie')+'Legendas e artes</button>',
+    sendclient:(canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':''),
+    edit:'<button class="btn ce-edit" data-ceopen="'+t.id+'">'+svg('editnote')+'Editar conteúdos</button>',
+  };
+  return ds.actions.map(k=>B[k]||'').join('');
+}
+/* Bloco HERO do detalhe: status principal + próxima ação + responsável + ações. */
+function detailHeroBlock(t){
+  if(secOf(t.sector).key!=='cronograma')return '';
+  const ds=detailState(t);const ow=detailOwner(t,ds);
+  return '<div class="det-hero">'+
+    '<div class="det-hero-status" style="background:'+withAlpha(ds.color,.12)+';border-color:'+withAlpha(ds.color,.38)+'">'+
+      '<span class="det-hero-dot" style="background:'+ds.color+'"></span>'+
+      '<div><div class="det-hero-l" style="color:'+ds.color+'">'+esc(ds.label)+'</div>'+
+        (ds.sub?'<div class="det-hero-s">'+esc(ds.sub)+'</div>':'')+'</div></div>'+
+    '<div class="det-hero-next"><span class="det-hero-nk">Próxima ação</span><div class="det-hero-nt">'+esc(ds.next)+'</div></div>'+
+    '<div class="det-hero-owner"><span class="det-hero-ava '+ow.cls+'">'+esc(ow.ini)+'</span>'+
+      '<div><div class="det-hero-ok">Responsável agora</div><div class="det-hero-on">'+esc(ow.name)+' <span class="det-hero-or">· '+esc(ow.role.split('—')[1]||ow.role)+'</span></div></div></div>'+
+    '<div class="det-hero-actions">'+detailActionsHtml(t,ds)+'</div>'+
+  '</div>';
+}
+/* "Detalhes do fluxo" — bloco COLAPSADO (nativo <details>): os chips técnicos
+   (flowSummaryBlock) e a timeline operacional (opPanelBlock) moram aqui dentro. */
+function flowDetailsBlock(t){
+  if(secOf(t.sector).key!=='cronograma')return '';
+  return '<details class="det-flowdet"><summary>Detalhes do fluxo</summary>'+
+    '<div class="det-flowdet-body">'+flowSummaryBlock(t)+opPanelBlock(t)+'</div></details>';
+}
+/* "Marcar como corrigido" — destrava o card: zera cs dos itens pendentes da FASE atual
+   (mesma escrita da rota team-action do Worker V64.43, direto via Firestore da equipe). */
+async function markItemsAdjusted(taskId){
+  const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
+  const pend=pendingClientItems(t);if(!pend.length){flashToast('Nenhum ajuste pendente nesta fase.');return;}
+  const now=Date.now();const patch={updatedAt:now};
+  pend.forEach(p=>{const k='clientItems.i'+p.idx;
+    patch[k+'.cs']=null;patch[k+'.teamAdjustedAt']=now;patch[k+'.teamAdjustedBy']=state.user.name||'Equipe';});
+  patch.history=firebase.firestore.FieldValue.arrayUnion({type:'equipe_corrigiu_item',
+    label:'Equipe corrigiu '+(pend.length>1?('os conteúdos '+pend.map(p=>p.idx+1).join(', ')):('o conteúdo '+(pend[0].idx+1))),
+    at:now,byId:state.user.id,contentIndex:pend[0].idx});
+  // otimista: atualiza o objeto local p/ o modal refletir já (snapshot confirma depois)
+  pend.forEach(p=>{const it=(t.clientItems||{})['i'+p.idx];if(it){it.cs=null;it.teamAdjustedAt=now;it.teamAdjustedBy=state.user.name||'Equipe';}});
+  await db.collection('tasks').doc(taskId).update(patch);
+  flashToast('Correção registrada — o cliente será avisado para revisar.');
+  openDetails(taskId);
 }
 /* P1 — bloco de correções por conteúdo (quando o cliente pediu revisão/edição de itens). */
 // Resumo dos DOIS eixos no Detalhes: status do cliente + status do designer + prazos.
@@ -2616,25 +2777,13 @@ async function saveItemFix(taskId,idx,field,val,resend){
 // Footer premium do Detalhes — agrupado (cliente / tarefa), nunca corta: cada
 // grupo e flex-wrap com min-width, quebrando em 2 linhas quando necessario.
 function detFooter(t,cron){
-  const clientBtns=
-    (cron&&t.cronStatus?'<button class="btn cvw-open" data-clientview="'+t.id+'">'+svg('eye')+'Abrir Visão do cliente</button>':'')+
-    (cron?'<button class="btn ce-edit" data-ceopen="'+t.id+'">'+svg('editnote')+'Editar conteúdos</button>':'')+
-    (cron?'<button class="btn pr-go" data-prodopen="'+t.id+'">'+svg('movie')+'Legendas e artes</button>':'')+
-    (canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':'')+
-    // Apos APROVACAO do cliente -> habilita Enviar para designer (some apos enviado)
-    (clientApproved(t)&&!isSentToDesigner(t)?'<button class="btn dz-go" data-senddesigner="'+t.id+'">'+svg('group')+'Enviar para designer</button>':'');
+  // detail-hierarchy-v2: ações de FASE moram no hero (detailHeroBlock). O rodapé fica só
+  // com utilidades da tarefa — sem grupos "Ações do cliente"/"Ações da tarefa" concorrentes.
   const taskBtns=
     '<button class="btn ghost" data-move="'+t.id+'">'+svg('swap')+'Mover status</button>'+
     (canDelTask(t)?'<button class="btn btn-danger" data-del="'+t.id+'">'+svg('trash')+'Remover</button>':'')+
     '<button class="btn det-close" data-modalclose="1">'+svg('close')+'Fechar</button>';
-  let h='<div class="det-actions">';
-  if(clientBtns){
-    h+='<div class="det-act-group"><div class="det-act-lbl">Ações do cliente</div><div class="det-act-row">'+clientBtns+'</div></div>';
-    h+='<div class="det-act-group"><div class="det-act-lbl">Ações da tarefa</div><div class="det-act-row">'+taskBtns+'</div></div>';
-  }else{
-    h+='<div class="det-act-row det-act-row-solo">'+taskBtns+'</div>';
-  }
-  return h+'</div>';
+  return '<div class="det-actions"><div class="det-act-row det-act-row-solo">'+taskBtns+'</div></div>';
 }
 /* ===== Enviar para designer — modal premium + atribuicao isolada ===== */
 function openDesignerModal(taskId){
@@ -3869,6 +4018,9 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(el=g('[data-senddesigner]')){openDesignerModal(el.dataset.senddesigner);return;}
+  // detail-hierarchy-v2: marcar item(ns) como corrigido(s) + atalho p/ quadro do designer
+  if(el=g('[data-teamfix]')){await markItemsAdjusted(el.dataset.teamfix);return;}
+  if(el=g('[data-goboard]')){closeModal();state.flowView='designers';state.designerBoard=el.dataset.goboard;state.personBoard=null;state.boardSector=null;state.socialBoard=null;render();return;}
   if(el=g('[data-pickdesigner]')){const p=el.dataset.pickdesigner.split('|');openDesignerDeadline(p[0],p[1]);return;}
   if(el=g('[data-designersend]')){
     const p=el.dataset.designersend.split('|');const gid=id=>document.getElementById(id);

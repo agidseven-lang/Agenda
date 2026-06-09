@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.130-beta-task-tabs-kanban-only';
+const ANDROID_E2E_BRANCH = 'app/local-designer-role-parity';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -419,6 +419,8 @@ check('RA_PERSONBOARD', 'Meu quadro do designer usa card perspectiva designer p/
       constArr('OPERATIONAL_COLS'), constArr('DESIGNER_COLS4'),
       fnDecl('secOf'), fnDecl('stOf'), fnDecl('opColOf'), fnDecl('hasDesigner'), fnDecl('designerOf'), fnDecl('designerCol'),
       fnDecl('designerDelivered'), fnDecl('pendingLegend'), fnDecl('pendingFeed'), fnDecl('pendingStory'), fnDecl('pendingProduction'),
+      // detail-hierarchy-v2: hasPendingItemRevision agora é phase-aware e depende destas:
+      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'),
       fnDecl('hasPendingItemRevision'), fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'),
       fnDecl('designerColView'), fnDecl('designerStatusView'), fnDecl('designerNextShort'),
       'return {operationalCol,designerColView,designerStatusView,designerNextShort,opColOf};'
@@ -515,12 +517,24 @@ check('N_MOVE4', 'TaskRepo.move usa designerStatusPatch quando designerAxis', /i
 check('N_MOVE5', 'TasksScreen detecta eixo do designer e chama move(...designerAxis)', /val designerAxis = TaskVisibility\.isDesignerFlow/.test(KT_SCREEN) && /TaskRepo\.move\(target, opt\.target, currentUid, designerAxis\)/.test(KT_SCREEN));
 // ===== task-flow-fix (Android): paridade do estado "Designer em produção" =====
 check('N_FLOW1', 'Android tem o estado "aguardando_designer_iniciar" ("Aguardando designer iniciar")', /OpCol\("aguardando_designer_iniciar", "Aguardando designer iniciar"\)/.test(KT_VIS));
-check('N_FLOW2', 'Android operationalCol: andamento/revisao -> "aguardando_designer" (em produção)', /if \(dc == "andamento" \|\| dc == "revisao"\) return "aguardando_designer"/.test(KT_VIS));
+check('N_FLOW2', 'Android operationalCol: andamento -> "aguardando_designer"; revisao -> "aguardando_designer_revisao" (paridade f96aa2e)', /if \(dc == "andamento"\) return "aguardando_designer"/.test(KT_VIS) && /if \(dc == "revisao"\) return "aguardando_designer_revisao"/.test(KT_VIS));
 check('N_FLOW3', 'Android operationalCol: recém-enviado (afazer) -> "aguardando_designer_iniciar" (NÃO em produção)', /return "aguardando_designer_iniciar"/.test(KT_VIS));
 check('N_FLOW4', 'Android versionName = 1.0.130-beta-task-tabs-kanban-only', /versionName "1.0.130-beta-task-tabs-kanban-only"/.test(GRADLE));
 // CORREÇÃO 3 (Android): colunas por contexto.
-check('N7', 'Colunas reduzidas: SOCIAL_COLS4 / DESIGNER_COLS3 / CLIENT_COLS4', /SOCIAL_COLS4/.test(KT_VIS) && /DESIGNER_COLS3/.test(KT_VIS) && /CLIENT_COLS4/.test(KT_VIS));
-check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerCol3)', /clientCol4\(t\)/.test(KT_SCREEN) && /designerCol3\(t\)/.test(KT_SCREEN));
+check('N7', 'Colunas por papel: SOCIAL_COLS4 / DESIGNER_COLS4 / CLIENT_COLS4', /SOCIAL_COLS4/.test(KT_VIS) && /DESIGNER_COLS4/.test(KT_VIS) && /CLIENT_COLS4/.test(KT_VIS));
+check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerColView)', /clientCol4\(t\)/.test(KT_SCREEN) && /designerColView\(t\)/.test(KT_SCREEN));
+// ===== PASSO 3 — PARIDADE ANDROID do role-aware do Designer (espelha Desktop f96aa2e) =====
+check('N_RA1', 'Android DESIGNER_COLS4 = 4 colunas incl. "Revisão/Ajuste"', /val DESIGNER_COLS4 = listOf\([\s\S]*?OpCol\("revisao", "Revisão\/Ajuste"\)[\s\S]*?OpCol\("entregue"/.test(KT_VIS));
+check('N_RA2', 'Android designerColView NÃO colapsa revisao (coluna própria)', /fun designerColView\(t: TaskItem\): String = when \(designerCol\(t\)\) \{[\s\S]*?"revisao" -> "revisao"/.test(KT_VIS));
+check('N_RA3', 'Android OPERATIONAL_COLS tem "Designer em revisão"', /OpCol\("aguardando_designer_revisao", "Designer em revisão"\)/.test(KT_VIS));
+check('N_RA4', 'Android TaskCardPro é role-aware (designerView) — badge/próxima do designer', /designerView: Boolean = false/.test(KT_SCREEN) && /val isDesignerCard = designerView && Sectors\.of\(task\.sector\)\.key == "cronograma" && TaskVisibility\.hasDesigner\(task\)/.test(KT_SCREEN) && /TaskVisibility\.designerNextShort\(task\)/.test(KT_SCREEN));
+check('N_RA5', 'Android quadro do designer usa DESIGNER_COLS4 + designerColView + card designerView', /isDesignerBoard -> TaskVisibility\.DESIGNER_COLS4\.map/.test(KT_SCREEN) && /isDesignerBoard -> TaskVisibility\.designerColView\(t\)/.test(KT_SCREEN) && /designerView = designerView/.test(KT_SCREEN));
+check('N_RA6', 'Android designerNextShort existe (próxima ação do designer)', /fun designerNextShort\(t: TaskItem\): String = when \(designerColView\(t\)\)/.test(KT_VIS));
+// Roborazzi de paridade + workflow só-screenshot (sem APK)
+const KT_RATEST = readAndroid('android-native-beta/app/src/test/java/br/com/idseven/agenda/nativebeta/DesignerRoleScreenshotTest.kt');
+check('N_RA7', 'Teste Roborazzi do role-aware do Designer existe (perspectiva designer × social)', /class DesignerRoleScreenshotTest/.test(KT_RATEST) && /fun designer_perspective/.test(KT_RATEST) && /fun social_perspective/.test(KT_RATEST) && /designerView = designerView/.test(KT_RATEST));
+const WF_SHOT = readFromGit(ANDROID_E2E_BRANCH, '.github/workflows/android-screenshot.yml') || '';
+check('N_RA8', 'Workflow só-screenshot (Roborazzi, SEM assembleRelease/APK)', /recordRoborazziDebug/.test(WF_SHOT) && !/assembleRelease/.test(WF_SHOT) && /NENHUM APK foi gerado|nenhum \.apk/.test(WF_SHOT));
 check('N9', 'TaskVisibility mantém isFullyComplete (fonte única de conclusão)', /fun\s+isFullyComplete/.test(KT_VIS));
 check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|GridView|horizontalScroll/.test(KT_TABS));
 
@@ -747,11 +761,14 @@ console.log(`${C.b}\n[PARTE G] Fase 1 — clientStatusView é wrapper FIEL de op
 check('CSV_DEF', 'clientStatusView(t) existe e é função pura (retorna {key,label,color,axis})', /function clientStatusView\(t\)\{[\s\S]*?return \{key:k,label:c\.label,color:c\.color,axis:'operational'\};/.test(DH));
 // Escopo do passo 4 (fora de comentários): definição + 4 chamadas (taskCard, card de revisão, flowSummary, opPanel).
 const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
-check('CSV_SCOPE', 'clientStatusView: definição + 3 badges (taskCard/revisão/flowSummary) + 1 uso interno em taskTimeline (5 ocorrências)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 5 && /function clientStatusView\(t\)/.test(DH_noc));
-// taskCard MIGRADO.
-check('CSV_TASKCARD_MIGRATED', "taskCard cronograma usa const oc=clientStatusView(t) no badge", /key==='cronograma'\)\{const oc=clientStatusView\(t\);/.test(DH));
-// card de revisão MIGRADO (rev-chip).
-check('CSV_REVISAO_MIGRATED', 'Card de revisão usa clientStatusView(t) (rev-chip)', /const oc=clientStatusView\(t\);[^\n]*\n\s*return '<span class="rev-chip"/.test(DH));
+// detail-hierarchy-v2: o chip do DETALHE migrou da fonte clientStatusView p/ detailState
+// (a mesma máquina do hero — nunca contradiz). Restam 4 usos: definição + taskTimeline
+// interno + badge do taskCard (ternário designerView) + flowSummary "Status operacional".
+check('CSV_SCOPE', 'clientStatusView: definição + taskCard + flowSummary + uso interno taskTimeline (4 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 4 && /function clientStatusView\(t\)/.test(DH_noc));
+// taskCard MIGRADO (role-aware f96aa2e: ternário designerView).
+check('CSV_TASKCARD_MIGRATED', "taskCard cronograma usa designerView?designerStatusView:clientStatusView no badge", /key==='cronograma'\)\{const oc=designerView\?designerStatusView\(t\):clientStatusView\(t\);/.test(DH));
+// chip do detalhe MIGRADO p/ a máquina de estados (1 chip, sem status concorrentes).
+check('CSV_REVISAO_MIGRATED', 'Chip do detalhe usa detailState(t) (rev-chip único, sem contradição)', /const dsc=detailState\(t\);[\s\S]{0,200}rev-chip/.test(DH));
 // detalhe MIGRADO (flowSummaryBlock "Status operacional" + opPanelBlock "Próxima ação").
 check('CSV_DETALHE_MIGRATED', 'flowSummary "Status operacional" usa clientStatusView; opPanel migrou p/ taskTimeline (tl.current)', /const oc=clientStatusView\(t\);[^\n]*\n\s*h\+='<div class="det-flow-col"><div class="det-flow-lbl">Status operacional/.test(DH) && /function opPanelBlock\(t\)\{[\s\S]*?const tl=taskTimeline\(t\);[\s\S]*?const oc=tl\.current;/.test(DH));
 // NENHUM badge deriva mais de opColOf(operationalCol(t)) diretamente (só em comentários).
@@ -770,7 +787,10 @@ check('CSV_NO_OLD_BADGE', 'Nenhum badge usa mais const oc=opColOf(operationalCol
       oneLine('secOf'), oneLine('stOf'), oneLine('opColOf'),
       oneLine('hasDesigner'), oneLine('designerOf'), oneLine('designerCol'),
       oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'),
-      oneLine('designerDelivered'), oneLine('hasPendingItemRevision'),
+      oneLine('designerDelivered'),
+      // detail-hierarchy-v2: dependências phase-aware de hasPendingItemRevision
+      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'),
+      oneLine('hasPendingItemRevision'),
       fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('clientStatusView'),
       'return {clientStatusView,operationalCol,opColOf};'
     ];
@@ -847,6 +867,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       oneLine('secOf'), oneLine('stOf'), oneLine('opColOf'),
       oneLine('hasDesigner'), oneLine('designerOf'), oneLine('designerCol'), oneLine('designerDelivered'),
       oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'),
+      // detail-hierarchy-v2: dependências phase-aware de hasPendingItemRevision
+      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'),
       oneLine('hasPendingItemRevision'),
       fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('nextActionText'),
       fnDecl('clientStatusView'), fnDecl('_tlEventAt'),
@@ -941,6 +963,71 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   const hd=mod.opPanelBlock(FIX[0][1]);  // history kind designer_moved byId='d' (Marcos Dias)
   check('TL3_META','Detalhe inclui data+autor por marco (det-tl-meta + "por <nome>")', /det-tl-meta/.test(hd) && /por Marcos/.test(hd));
   console.log('  '+C.d+'fixtures provadas: '+FIX.length+' · humanização: '+RAWMAP.length+' · detalhe: '+FIX.length+C.x);
+})();
+
+/* ===================== DETAIL-HIERARCHY-V2 — máquina de estados do detalhe =====================
+ * Executa detailState/detailActionsHtml REAIS (extraídas do renderer) nos 8 estados aprovados
+ * e prova: status principal único, próxima ação, responsável, botões por fase, colapsável. */
+(function(){
+  console.log(`${C.b}\n[DH] Detalhe — hierarquia aprovada (8 estados + botões por fase)${C.x}`);
+  const grab=(re)=>{const m=DH.match(re);return m?m[0]:'';};
+  const fnDecl=(name)=>{const m=DH.match(new RegExp('(?:async )?function '+name+'\\s*\\([^)]*\\)\\s*\\{'));if(!m)return '';let s=DH.indexOf(m[0]),d=0;for(let i=s+m[0].length-1;i<DH.length;i++){const c=DH[i];if(c==='{')d++;else if(c==='}'){d--;if(d===0)return DH.slice(s,i+1);}}return '';};
+  const constArr=(n)=>grab(new RegExp('const '+n+'\\s*=\\s*\\[[\\s\\S]*?\\];'));
+  let mod=null,err=null;
+  try{
+    const pieces=[
+      constArr('SECTORS'),(DH.match(/const SECTOR_ALIAS=\{[\s\S]*?\};/)||['const SECTOR_ALIAS={};'])[0],
+      constArr('STATUS'),constArr('CLIENT_COLS'),constArr('OPERATIONAL_COLS'),
+      fnDecl('secOf'),fnDecl('stOf'),fnDecl('esc'),fnDecl('withAlpha'),fnDecl('initials'),fnDecl('svg'),
+      'const ICON={};',
+      fnDecl('hasDesigner'),fnDecl('designerOf'),fnDecl('designerCol'),fnDecl('designerDelivered'),
+      fnDecl('pendingLegend'),fnDecl('pendingFeed'),fnDecl('pendingStory'),fnDecl('pendingProduction'),
+      fnDecl('clientApprovalPhaseOf'),fnDecl('pendingClientItems'),fnDecl('hasTeamAdjustedAwaiting'),
+      fnDecl('hasPendingItemRevision'),fnDecl('isFullyComplete'),fnDecl('clientCol'),
+      fnDecl('clientApproved'),fnDecl('isSentToDesigner'),fnDecl('canSendToClient'),
+      fnDecl('fmtDateTimeBR'),
+      fnDecl('detailState'),fnDecl('detailActionsHtml'),
+      'function svgSafe(){return "";}',
+      'return {detailState,detailActionsHtml,hasPendingItemRevision,clientApprovalPhaseOf};'
+    ].join('\n');
+    mod=new Function('state',src=>{}) , mod=new Function('state',pieces)({users:[],user:{id:'u',name:'X'}});
+  }catch(e){err=e&&e.message;}
+  check('DH_EVAL','detailState/detailActionsHtml avaliáveis a partir do renderer real', !!mod && !err || (console.log('   err:',err),!!mod));
+  if(mod){
+    const FULL=[{tema:'T1',legenda:'L',feedImageUrl:'f'},{tema:'T2',legenda:'L',feedImageUrl:'f'}];
+    const TH=[{tema:'T1'},{tema:'T2'}];
+    const S={};
+    S.e1={sector:'cronograma',cronContents:TH,clientApprovalPhase:'themes',clientFlowStatus:'revisao',cronStatus:'em_revisao_cliente',clientReview:{status:'revisao'},clientItems:{i1:{cs:'em_revisao',phase:'themes',note:'trocar foto'}}};
+    S.e2={sector:'cronograma',cronContents:TH,clientApprovalPhase:'themes',clientFlowStatus:'revisao',cronStatus:'em_revisao_cliente',clientReview:{status:'revisao'},clientItems:{i1:{cs:null,phase:'themes',teamAdjustedAt:1,teamAdjustedBy:'X'}}};
+    S.e3={sector:'cronograma',cronContents:TH,clientApprovalPhase:'themes',clientFlowStatus:'aprovado',cronStatus:'aprovado_cliente',clientReview:{status:'aprovado'},clientItems:{}};
+    S.e4={sector:'cronograma',cronContents:TH,clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'afazer',clientItems:{}};
+    S.e5={sector:'cronograma',cronContents:TH,clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento',clientItems:{}};
+    S.e6={sector:'cronograma',cronContents:[{tema:'T1'},{tema:'T2'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido',clientItems:{}};
+    S.e7={sector:'cronograma',cronContents:FULL,clientApprovalPhase:'final',cronStatus:'ready_for_final_client_review',clientFlowStatus:'reenviado',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido',clientItems:{}};
+    S.e8={sector:'cronograma',cronContents:FULL,clientFlowStatus:'concluido',finalApprovalCompleted:true,operationalStatus:'concluido',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido',clientFinalApprovedAt:1718000000000,clientItems:{}};
+    const K=k=>mod.detailState(S[k]);
+    check('DH_S1','Estado 1: Cliente pediu ajuste (vermelho, owner=social, ações fix/teamfix)', K('e1').key==='cliente_ajuste' && K('e1').owner==='social' && K('e1').actions.indexOf('teamfix')>=0);
+    check('DH_S2','Estado 2: Ajuste realizado — aguardando cliente (owner=cliente, SEM teamfix)', K('e2').key==='ajuste_aguardando' && K('e2').owner==='cliente' && K('e2').actions.indexOf('teamfix')===-1);
+    check('DH_S3','Estado 3: Temas aprovados (owner=social, ação senddesigner presente)', K('e3').key==='temas_aprovados' && K('e3').actions.indexOf('senddesigner')>=0);
+    check('DH_S4','Estado 4: Aguardando designer iniciar (owner=designer)', K('e4').key==='designer_aguardando' && K('e4').owner==='designer');
+    check('DH_S5','Estado 5: Designer em produção', K('e5').key==='designer_producao');
+    check('DH_S6','Estado 6: Designer entregou (ações prod/sendclient)', K('e6').key==='designer_entregou' && K('e6').actions.indexOf('prod')>=0);
+    check('DH_S7','Estado 7: Aguardando aprovação final (owner=cliente)', K('e7').key==='aguardando_final' && K('e7').owner==='cliente');
+    check('DH_S8','Estado 8: Concluído (owner=none, SEM botões de envio/ajuste)', K('e8').key==='concluido' && K('e8').owner==='none' && K('e8').actions.indexOf('senddesigner')===-1 && K('e8').actions.indexOf('teamfix')===-1);
+    // anti-regressão central: o card NÃO fica preso em ajuste após correção da equipe + fase final limpa
+    check('DH_UNSTICK','Pendência de TEMAS resolvida (teamAdjusted) não trava: estado vira ajuste_aguardando (não cliente_ajuste)', K('e2').key!=='cliente_ajuste');
+    check('DH_PHASE_ISOLATION','Item em revisão de TEMAS não contamina a fase FINAL (hasPendingItemRevision=false na final)',
+      mod.hasPendingItemRevision({sector:'cronograma',cronContents:FULL,clientApprovalPhase:'final',clientItems:{i0:{cs:'em_revisao',phase:'themes'}}})===false);
+    check('DH_BTN_DESIGNER','Botão "Enviar para designer" SOMENTE no estado temas_aprovados (e1/e8 não têm)',
+      K('e3').actions.indexOf('senddesigner')>=0 && K('e1').actions.indexOf('senddesigner')===-1 && K('e8').actions.indexOf('senddesigner')===-1);
+  }
+  // ESTRUTURA do renderer
+  check('DH_HERO','openDetails usa detailHeroBlock + flowDetailsBlock (substitui blocos soltos)', /detailHeroBlock\(t\)\+\s*\n?\s*flowDetailsBlock\(t\)\+/.test(DH.replace(/\/\/[^\n]*\n/g,'\n')) || (/detailHeroBlock\(t\)\+/.test(DH) && /flowDetailsBlock\(t\)\+/.test(DH)));
+  check('DH_COLLAPSE','"Detalhes do fluxo" é <details> colapsado contendo flowSummaryBlock+opPanelBlock', /<details class="det-flowdet"><summary>Detalhes do fluxo<\/summary>/.test(DH) && /flowSummaryBlock\(t\)\+opPanelBlock\(t\)/.test(DH));
+  check('DH_NO_GROUPS','Rodapé SEM grupos de UI "Ações do cliente"/"Ações da tarefa" concorrentes', DH.indexOf('det-act-lbl">Ações do cliente')===-1 && DH.indexOf('det-act-lbl">Ações da tarefa')===-1);
+  check('DH_TEAMFIX_WRITE','markItemsAdjusted zera cs + grava teamAdjustedAt/By + history equipe_corrigiu_item', /async function markItemsAdjusted/.test(DH) && /teamAdjustedAt/.test(DH) && /equipe_corrigiu_item/.test(DH));
+  check('DH_HANDLERS','Handlers data-teamfix e data-goboard registrados', /data-teamfix\]/.test(DH) && /data-goboard\]/.test(DH));
+  check('DH_PHASEAWARE_FN','hasPendingItemRevision é phase-aware via pendingClientItems (espelho Worker V64.41)', /function hasPendingItemRevision\(t\)\{return pendingClientItems\(t\)\.length>0;\}/.test(DH) && /it\.phase===ph/.test(DH));
 })();
 
 /* ===================== VEREDITO ===================== */
