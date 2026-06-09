@@ -674,11 +674,15 @@ check('GUARD2', 'onSnapshot de tasks FILTRA isTestTask antes de popular state.ta
    está DORMENTE (passo 1): nenhum render — taskCard / detalhe / card de revisão — a chama. */
 console.log(`${C.b}\n[PARTE G] Fase 1 — clientStatusView é wrapper FIEL de operationalCol (não-regressão)${C.x}`);
 check('CSV_DEF', 'clientStatusView(t) existe e é função pura (retorna {key,label,color,axis})', /function clientStatusView\(t\)\{[\s\S]*?return \{key:k,label:c\.label,color:c\.color,axis:'operational'\};/.test(DH));
-// DORMENTE: ignora menções em comentários — fora de comentário só pode existir a DEFINIÇÃO.
+// Escopo do passo 3 (fora de comentários): SÓ a definição + o uso no taskCard chamam clientStatusView.
 const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
-check('CSV_DORMANT', 'Passo 1: clientStatusView NÃO é chamada por nenhum render ainda (só a definição existe)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 1 && /function clientStatusView\(t\)/.test(DH_noc));
-// Render points seguem usando a derivação atual (inalterados).
-check('CSV_RENDER_UNCHANGED', 'taskCard/detalhe/revisão seguem usando opColOf(operationalCol(t)) (render INTACTO)', (DH.match(/opColOf\(operationalCol\(t\)\)/g)||[]).length >= 3);
+check('CSV_SCOPE', 'Passo 3: clientStatusView usada APENAS no taskCard (2 ocorrências: definição + 1 chamada)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 2 && /function clientStatusView\(t\)/.test(DH_noc));
+// taskCard (ramo cronograma) MIGRADO: badge lê clientStatusView(t).
+check('CSV_TASKCARD_MIGRATED', "taskCard cronograma usa const oc=clientStatusView(t) no badge", /key==='cronograma'\)\{const oc=clientStatusView\(t\);\s*\n\s*return '<div class="tc-cron-st"/.test(DH));
+// detalhe e card de revisão NÃO migrados ainda: seguem com opColOf(operationalCol(t)).
+check('CSV_DETALHE_REVISAO_INTACTOS', 'Detalhe + card de revisão AINDA usam opColOf(operationalCol(t)) (não migrados)', (DH.match(/const oc=opColOf\(operationalCol\(t\)\);/g)||[]).length >= 2);
+// taskCard NÃO usa mais opColOf(operationalCol(t)) diretamente no badge (substituído).
+check('CSV_TASKCARD_NO_OLD', 'taskCard NÃO deriva mais o badge por opColOf(operationalCol(t)) (migrado p/ clientStatusView)', !/key==='cronograma'\)\{const oc=opColOf\(operationalCol\(t\)\);\s*\n\s*return '<div class="tc-cron-st"/.test(DH));
 (function(){
   // Extrai o CÓDIGO REAL do renderer e monta um módulo executável (sem DOM, sem rede).
   const grab=(re)=>{const m=DH.match(re);return m?m[0]:'';};

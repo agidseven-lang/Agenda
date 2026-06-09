@@ -2098,7 +2098,9 @@ function taskCard(t){
        '<div class="tc-title">'+esc(t.title||'Sem título')+'</div>'+
        ((function(){
          // V1.0.98 — Cronograma: mostra o STATUS OPERACIONAL (mais claro que cronStatus).
-         if(secOf(t.sector).key==='cronograma'){const oc=opColOf(operationalCol(t));
+         // FASE 1 (passo 3): o badge do cronograma agora lê a FONTE ÚNICA clientStatusView(t)
+         // (wrapper FIEL de opColOf(operationalCol(t)) — resultado visual idêntico ao anterior).
+         if(secOf(t.sector).key==='cronograma'){const oc=clientStatusView(t);
            return '<div class="tc-cron-st" style="color:'+oc.color+';background:'+withAlpha(oc.color,.14)+';border-color:'+withAlpha(oc.color,.32)+'"><span class="dotc"></span>'+esc(oc.label)+'</div>';}
          return t.cronStatus?('<div class="tc-cron-st" style="color:'+cronStatusColor(t.cronStatus)+';background:'+withAlpha(cronStatusColor(t.cronStatus),.14)+';border-color:'+withAlpha(cronStatusColor(t.cronStatus),.32)+'"><span class="dotc"></span>'+esc(cronStatusLabel(t.cronStatus))+'</div>'):'';
        })())+
