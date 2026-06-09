@@ -1,0 +1,75 @@
+# Validação visual/técnica do Android SEM gerar APK.
+# - Execução SOMENTE manual (workflow_dispatch). NÃO roda o build do APK, NÃO gera APK.
+# - Compila o módulo (recordRoborazziDebug) + renderiza screenshots reais (Roborazzi/Robolectric NATIVE, JVM).
+# - Prova de compilação + prévias reais antes de qualquer APK.
+name: "[manual] Android Screenshot (sem APK)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit a validar (Roborazzi, sem APK)"
+        required: true
+        default: "app/local-designer-role-parity"
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    env:
+      APP_DIR: "android-native-beta"
+    steps:
+      - name: Checkout (ref escolhido)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Restaurar google-services.json (secret texto puro)
+        env:
+          GOOGLE_SERVICES_JSON_BETA: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON_BETA" ]; then
+            echo "::error:: secret GOOGLE_SERVICES_JSON_BETA ausente."; exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_BETA" > "$APP_DIR/app/google-services.json"
+      - name: Compilar + Roborazzi (record) — SEM o build do APK/APK
+        run: |
+          cd "$APP_DIR"
+          chmod +x ./gradlew
+          ./gradlew :app:recordRoborazziDebug --no-daemon --stacktrace
+      - name: Listar PNGs gerados
+        if: always()
+        run: ls -lh "$APP_DIR/app/build/outputs/roborazzi" || echo "nenhum PNG"
+      - name: Confirmar que NENHUM APK foi gerado
+        if: always()
+        run: |
+          if find "$APP_DIR" -name "*.apk" | grep -q .; then
+            echo "::error:: APK encontrado — este workflow NÃO deve gerar APK"; find "$APP_DIR" -name "*.apk"; exit 1
+          fi
+          echo "OK: nenhum .apk gerado (validação só-screenshot)."
+      - name: Upload relatorio de teste (diagnostico)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-screenshot-test-report
+          path: |
+            android-native-beta/app/build/reports/tests/**
+            android-native-beta/app/build/test-results/**
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload screenshots (PNG)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-designer-role-screenshots
+          path: android-native-beta/app/build/outputs/roborazzi/*.png
+          if-no-files-found: error
+          retention-days: 30
