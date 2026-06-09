@@ -175,6 +175,12 @@ export default {
       return ogBannerResponse();
     }
 
+    // V64.42 — LOGO OFICIAL ID Seven servida same-origin para o portal do cliente.
+    // PNG 256x256 (~24KB) embutido como base64 — sem dep externa, sem CSP/CORS, cache 24h.
+    if (request.method === "GET" && (url.pathname === "/og/idseven-logo.png" || url.pathname === "/og/idseven-logo-256.png")) {
+      return idsevenLogoResponse();
+    }
+
     if (url.pathname === "/cron-test" && request.method === "POST") {
       return handleCronTest(request, env);
     }
@@ -214,6 +220,26 @@ export default {
       if (stateMatch && request.method === "GET") {
         return handleClientCronogramaState(stateMatch[1], env);
       }
+      // V64.42 — TEAM ACTION: equipe (Social/Admin) sinaliza correcao de item para o Worker
+      // limpar `clientItems[iX].cs` (destrancar o card preso em "Ajuste solicitado") e disparar
+      // a notificacao premium ao cliente (Web Push, quando habilitado). Gated por env.TEAM_API_KEY
+      // (header X-Team-Key). Sem chave configurada -> 503 TEAM_API_KEY_NOT_CONFIGURED.
+      const teamMatch = url.pathname.match(/^\/cliente\/cronograma\/([A-Za-z0-9_-]{4,128})\/team-action\/?$/);
+      if (teamMatch && request.method === "POST") {
+        return handleClientCronogramaTeamAction(teamMatch[1], request, env);
+      }
+      // V64.42 — PWA Web Push: cliente faz opt-in no portal (navegador pede permissao) e o
+      // browser gera uma PushSubscription. Esta rota grava a subscription em
+      // tasks/{id}.clientPushSubs[]; o envio real (sendClientWebPush) depende de env.VAPID_*.
+      const pushSubMatch = url.pathname.match(/^\/cliente\/cronograma\/([A-Za-z0-9_-]{4,128})\/push\/subscribe\/?$/);
+      if (pushSubMatch && request.method === "POST") {
+        return handleClientPushSubscribe(pushSubMatch[1], request, env);
+      }
+      // V64.42 — Service Worker do portal (escopo /cliente/). Mostra a notificacao quando o
+      // navegador recebe push em background. Servido same-origin (necessario p/ pushManager.subscribe).
+      if (url.pathname === "/cliente/sw.js" && request.method === "GET") {
+        return clientSwResponse();
+      }
     }
 
     // V64.39 — URL DEDICADA DE COMPARTILHAMENTO (preview premium garantido no WhatsApp).
@@ -237,7 +263,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.41-client-approval-phase-gate" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.42-team-adjust-idem-cleanup" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1010,6 +1036,60 @@ function ogBannerResponse() {
   });
 }
 
+// V64.42 — Service Worker do portal do cliente (escopo /cliente/). Mostra a notificacao
+// premium quando o navegador recebe push em background (aba fechada / tela bloqueada).
+// O click abre o portal no mesmo link (openUrl injetado no payload pelo Worker server-side).
+function clientSwResponse() {
+  const sw = `
+self.addEventListener('install', e => { self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
+self.addEventListener('push', function(event) {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (_) { data = {}; }
+  const title = data.title || 'Agenda ID Seven';
+  const body = data.body || '';
+  const url = data.openUrl || '/';
+  const options = { body: body, icon: '/og/idseven-logo.png', badge: '/og/idseven-logo.png', data: { url: url }, tag: data.tag || 'idseven-client', renotify: !!data.renotify };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+    for (const c of list) { if (c.url.indexOf(url) !== -1 && 'focus' in c) return c.focus(); }
+    if (clients.openWindow) return clients.openWindow(url);
+  }));
+});
+`;
+  return new Response(sw, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "public, max-age=600",
+      "Service-Worker-Allowed": "/cliente/",
+    },
+  });
+}
+
+// V64.42 — LOGO OFICIAL ID Seven (256x256 PNG otimizado, ~24KB). Mesmo asset usado pelo
+// instalador Desktop (desktop/build/icon.png) — redimensionado uma vez via PIL e embutido
+// como base64. Servido em /og/idseven-logo.png para o portal do cliente referenciar
+// same-origin (sem CSP/CORS, sem dependencia externa).
+function idsevenLogoResponse() {
+  const bin = atob(IDSEVEN_LOGO_B64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Response(bytes, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/png",
+      "Content-Length": String(bytes.length),
+      "Cache-Control": "public, max-age=86400, immutable",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
 // V64.24 — CANÁRIO: banner em JPEG (image/jpeg) 1200×630, rota limpa sem querystring.
 // Isola a hipótese "PNG x JPEG" no preview do WhatsApp. Content-Length explícito.
 function jpgBannerResponse(method) {
@@ -1220,6 +1300,24 @@ async function handleClientCronogramaView(token, env, origin) {
 }
 
 async function handleClientCronogramaAction(token, request, env) {
+  // V64.42 — IDEMPOTENCIA: cliente que clica 2x (rede lenta, duplo toque) NAO duplica acao.
+  // Usa Cloudflare Cache API (sempre disponivel, sem binding) com chave fake-URL e TTL 5 min.
+  // Header opcional: X-Idempotency-Key OU Idempotency-Key (RFC draft). Tolera ausencia.
+  const idemKey = request.headers.get("Idempotency-Key") || request.headers.get("X-Idempotency-Key") || "";
+  const idemUrl = idemKey ? `https://idempotency.local/cliente/${token}/${encodeURIComponent(idemKey)}` : null;
+  if (idemUrl) {
+    try {
+      const cached = await caches.default.match(new Request(idemUrl));
+      if (cached) {
+        const body = await cached.text();
+        return new Response(body, {
+          status: cached.status,
+          headers: { "Content-Type": "application/json", "X-Idempotency-Replayed": "true", "Access-Control-Allow-Origin": "*" },
+        });
+      }
+    } catch (_) { /* cache miss/erro -> processa normal */ }
+  }
+
   let payload = {};
   try { payload = await request.json(); } catch (_) { /* tolera body vazio */ }
   const type = (payload && typeof payload.action === "string") ? payload.action.trim() : "";
@@ -1249,8 +1347,177 @@ async function handleClientCronogramaAction(token, request, env) {
   const g = await writeClientGranular(env, accessToken, task, { type, contentIndex: ci, note, value, at: now });
   // FINAL gating: só é "aprovação final" se a fase de entrada for 'final' E o eixo do cliente concluiu.
   const final = phaseIn === "final" && !!(g && (g.client === "concluido" || g.col === "concluido"));
-  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} phase=${phaseIn} final=${final} clientFlow=${(g && g.client) || ""}`);
-  return json({ ok: true, type, contentIndex: ci, at: now, final, phase: phaseIn, col: (g && g.col) || null, clientFlowStatus: (g && g.client) || null }, 200, env);
+  console.log(`[CLIENT-ACTION] task=${task.id} type=${type} item=${ci} phase=${phaseIn} final=${final} clientFlow=${(g && g.client) || ""} idem=${idemKey ? "yes" : "no"}`);
+  const out = { ok: true, type, contentIndex: ci, at: now, final, phase: phaseIn, col: (g && g.col) || null, clientFlowStatus: (g && g.client) || null };
+  const resp = json(out, 200, env);
+  if (idemUrl) {
+    try {
+      const cacheable = new Response(JSON.stringify(out), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+      });
+      await caches.default.put(new Request(idemUrl), cacheable);
+    } catch (_) { /* cache write falhou -> ignorar */ }
+  }
+  return resp;
+}
+
+/* V64.42 — TEAM ACTION: rota servidora-servidora autenticada por env.TEAM_API_KEY.
+   Quando a equipe corrige um item (Desktop/Android), chama esta rota para o Worker
+   limpar `clientItems[iX].cs` (destrancar fluxo) + registrar history + disparar notificacao
+   ao cliente (Web Push, se habilitado). Mantem `phase` e adiciona `teamAdjustedAt`.
+   Sem env.TEAM_API_KEY -> 503 (rota planejada, ativada num secret futuro).
+   Body: { contentIndex: number, byName?: string, action?: 'adjustedItem' (default) } */
+async function handleClientCronogramaTeamAction(token, request, env) {
+  if (!env.TEAM_API_KEY) {
+    return json({ ok: false, error: "TEAM_API_KEY_NOT_CONFIGURED" }, 503, env);
+  }
+  const supplied = request.headers.get("X-Team-Key") || "";
+  if (supplied !== env.TEAM_API_KEY) {
+    return json({ ok: false, error: "unauthorized" }, 401, env);
+  }
+  let payload = {};
+  try { payload = await request.json(); } catch (_) { /* tolera body vazio */ }
+  const action = (payload && typeof payload.action === "string" && payload.action.trim()) || "adjustedItem";
+  if (action !== "adjustedItem") {
+    return json({ ok: false, error: "acao inválida (apenas adjustedItem nesta versao)" }, 400, env);
+  }
+  let ci = null;
+  if (payload && typeof payload.contentIndex === "number" && payload.contentIndex >= 0) ci = Math.floor(payload.contentIndex);
+  else if (payload && typeof payload.contentIndex === "string" && /^\d+$/.test(payload.contentIndex)) ci = parseInt(payload.contentIndex, 10);
+  if (ci == null) return json({ ok: false, error: "contentIndex obrigatorio" }, 400, env);
+  const byName = (payload && typeof payload.byName === "string") ? payload.byName.slice(0, 80) : "Equipe";
+
+  let accessToken;
+  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, error: "auth falhou: " + (e && e.message) }, 200, env); }
+
+  const task = await queryTaskByToken(env, accessToken, token);
+  if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
+
+  const now = Date.now();
+  const key = "i" + ci;
+  const taskId = task.id;
+  // updateMask cirurgico: zera cs do item e registra timestamp + autor.
+  const fields = {
+    clientItems: { mapValue: { fields: { [key]: { mapValue: { fields: {
+      cs: { nullValue: null },
+      teamAdjustedAt: { integerValue: String(now) },
+      teamAdjustedBy: { stringValue: byName },
+    } } } } } },
+    updatedAt: { integerValue: String(now) },
+  };
+  const mask = ["clientItems." + key + ".cs", "clientItems." + key + ".teamAdjustedAt", "clientItems." + key + ".teamAdjustedBy", "updatedAt"];
+  const histFields = {
+    type: { stringValue: "equipe_corrigiu_item" },
+    label: { stringValue: "Equipe corrigiu o conteúdo " + (ci + 1) },
+    at: { integerValue: String(now) },
+    by: { stringValue: byName },
+    channel: { stringValue: "team_internal" },
+    contentIndex: { integerValue: String(ci) },
+  };
+  const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}`;
+  const body = {
+    writes: [{
+      update: { name: docName, fields },
+      updateMask: { fieldPaths: mask },
+      updateTransforms: [{ fieldPath: "history", appendMissingElements: { values: [{ mapValue: { fields: histFields } }] } }],
+    }],
+  };
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const t = (await res.text()).slice(0, 240);
+      console.warn("[TEAM-ACTION] commit falhou:", res.status, t);
+      return json({ ok: false, error: "commit falhou: " + t }, 500, env);
+    }
+  } catch (e) {
+    console.warn("[TEAM-ACTION] erro:", e && e.message);
+    return json({ ok: false, error: "erro: " + (e && e.message) }, 500, env);
+  }
+  // Notifica cliente (best-effort) via Web Push. Sem VAPID configurado, vira no-op.
+  let pushResult = { sent: 0, skipped: "no_subscriptions_or_vapid" };
+  try {
+    const subs = Array.isArray(task.clientPushSubs) ? task.clientPushSubs : [];
+    if (subs.length) {
+      const payloadOut = { title: "Ajuste realizado", body: "Toque para revisar novamente.", openUrl: "/cliente/cronograma/" + token };
+      const r = await broadcastWebPush(env, subs, payloadOut);
+      pushResult = r;
+    }
+  } catch (e) { /* no-op */ }
+  console.log(`[TEAM-ACTION] task=${taskId} item=${ci} by=${byName} push=${JSON.stringify(pushResult)}`);
+  return json({ ok: true, taskId, contentIndex: ci, at: now, push: pushResult }, 200, env);
+}
+
+/* V64.42 — PWA Web Push: opt-in do cliente. O portal usa o Push API do navegador
+   (navigator.serviceWorker + pushManager.subscribe) e POSTa a PushSubscription aqui;
+   gravamos em tasks/{id}.clientPushSubs[] (array de subscriptions {endpoint, keys.p256dh, keys.auth}).
+   O envio (broadcastWebPush) so funciona com env.VAPID_PRIVATE_KEY/env.VAPID_PUBLIC_KEY/env.VAPID_SUBJECT
+   configurados — sem isso, broadcastWebPush retorna 'NOT_CONFIGURED'. */
+async function handleClientPushSubscribe(token, request, env) {
+  let payload;
+  try { payload = await request.json(); } catch (_) { return json({ ok: false, error: "JSON invalido" }, 400, env); }
+  if (!payload || typeof payload.endpoint !== "string" || !payload.endpoint || !payload.keys) {
+    return json({ ok: false, error: "subscription invalida (endpoint+keys obrigatorios)" }, 400, env);
+  }
+  let accessToken;
+  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, error: "auth: " + (e && e.message) }, 200, env); }
+
+  const task = await queryTaskByToken(env, accessToken, token);
+  if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
+
+  const now = Date.now();
+  const subEntry = {
+    endpoint: { stringValue: payload.endpoint.slice(0, 2000) },
+    keys: { mapValue: { fields: {
+      p256dh: { stringValue: String(payload.keys.p256dh || "").slice(0, 200) },
+      auth: { stringValue: String(payload.keys.auth || "").slice(0, 200) },
+    } } },
+    at: { integerValue: String(now) },
+    ua: { stringValue: (request.headers.get("user-agent") || "").slice(0, 200) },
+  };
+  // arrayUnion via appendMissingElements em clientPushSubs (array de maps)
+  const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${task.id}`;
+  const body = {
+    writes: [{
+      update: { name: docName, fields: { updatedAt: { integerValue: String(now) } } },
+      updateMask: { fieldPaths: ["updatedAt"] },
+      updateTransforms: [{ fieldPath: "clientPushSubs", appendMissingElements: { values: [{ mapValue: { fields: subEntry } }] } }],
+    }],
+  };
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:commit`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const t = (await res.text()).slice(0, 240);
+      return json({ ok: false, error: "commit falhou: " + t }, 500, env);
+    }
+  } catch (e) {
+    return json({ ok: false, error: "erro: " + (e && e.message) }, 500, env);
+  }
+  console.log(`[PUSH-SUB] task=${task.id} endpoint=${payload.endpoint.slice(0, 60)}...`);
+  return json({ ok: true, taskId: task.id, at: now, vapidConfigured: !!(env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY) }, 200, env);
+}
+
+/* V64.42 — envio de Web Push a uma lista de subscriptions; gated por VAPID_*. */
+async function broadcastWebPush(env, subs, payload) {
+  if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
+    return { sent: 0, skipped: "VAPID_NOT_CONFIGURED" };
+  }
+  // Implementacao real de Web Push exige ECDH P-256 + AES-GCM (RFC 8030/8291) + JWT VAPID.
+  // Esta versao deixa o caminho preparado mas NAO envia. Sera ativado quando os secrets
+  // forem provisionados e a logica de criptografia for adicionada num passo separado.
+  return { sent: 0, skipped: "VAPID_PRESENT_BUT_SEND_NOT_IMPLEMENTED", total: subs.length };
 }
 
 /* V64.16 — ESTADO JSON p/ TEMPO REAL. O portal faz polling leve e atualiza tema/legenda/Feed/
@@ -1414,6 +1681,21 @@ async function writeClientGranular(env, accessToken, task, e) {
     fields.operationalStatus = { stringValue: "concluido" };
     fields.clientClosedMessageShown = { booleanValue: true };
     mask.push("clientFinalApprovedAt", "clientFinalApprovedBy", "finalApprovalCompleted", "operationalStatus", "clientClosedMessageShown");
+  }
+
+  // V64.42 — LIMPEZA POR TRANSIÇÃO DE FASE: ao approveAll com SUCESSO de uma fase (themes ou
+  // final), zera `cs` dos itens DAQUELA fase. O chip vermelho ("em_revisao"/"editado") de itens
+  // já resolvidos não polui mais a tela das fases seguintes. Mantém `phase` (auditoria).
+  if (g.client === "aprovado" || g.client === "concluido") {
+    const phaseCleanup = phaseIn;
+    if (!fields.clientItems) fields.clientItems = { mapValue: { fields: {} } };
+    for (const k of Object.keys(_ci0)) {
+      const it = _ci0[k]; if (!it || it.phase !== phaseCleanup) continue;
+      const slot = fields.clientItems.mapValue.fields[k] || { mapValue: { fields: {} } };
+      slot.mapValue.fields.cs = { nullValue: null };
+      fields.clientItems.mapValue.fields[k] = slot;
+      mask.push("clientItems." + k + ".cs");
+    }
   }
 
   // entrada de histórico (arrayUnion via appendMissingElements — REST :commit)
@@ -1696,7 +1978,11 @@ const ICN = {
   lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
   chev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
 };
-const CV_LOGO = '<svg class="logo" viewBox="0 0 96 96" aria-label="ID Seven"><defs><linearGradient id="gcv" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#c64bd8"/></linearGradient></defs><circle cx="48" cy="48" r="43" fill="none" stroke="url(#gcv)" stroke-width="7"/><circle cx="48" cy="48" r="29" fill="#22d3b8"/><rect x="34" y="38" width="28" height="20" rx="3" fill="#fff"/><rect x="42" y="60" width="12" height="3" rx="1.5" fill="#fff"/><rect x="38" y="43" width="20" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="47.5" width="14" height="2.4" rx="1.2" fill="#0c2f2a"/><rect x="38" y="52" width="17" height="2.4" rx="1.2" fill="#0c2f2a"/></svg>';
+// V64.42 — LOGO OFICIAL ID Seven (256x256 PNG otimizado, ~24KB binario). Servida em
+// GET /og/idseven-logo.png (rota dedicada). CV_LOGO referencia a URL same-origin do
+// proprio Worker - mantem o portal autocontido sem dependencia externa.
+const IDSEVEN_LOGO_B64 = "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";
+const CV_LOGO = '<img class="logo" src="/og/idseven-logo.png" alt="ID Seven" width="44" height="44">';
 
 const CV_CSS = `
 :root{--bg:#070810;--bg2:#0c0e1a;--panel:#10131f;--panel2:#141826;--line:#1f2435;--line2:#2a3149;--txt:#EDEFF7;--mut:#9aa3bd;--faint:#6b7390;--brand1:#7c5cff;--brand2:#c64bd8;--teal:#22d3b8;--ok:#34d399;--okbg:rgba(52,211,153,.12);--warn:#f5a524;--rev:#fb7185;--revbg:rgba(251,113,133,.13);--info:#5b9bff;--infobg:rgba(91,155,255,.12);--radius:18px;--radius-sm:13px;--shadow:0 24px 70px -30px rgba(124,92,255,.55);--ff:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif}
@@ -1836,13 +2122,17 @@ function setLegenda(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[dat
 function bumpProgress(){var cards=document.querySelectorAll('#contents [data-card]');var done=0;cards.forEach(function(c){var b=c.querySelector('[data-badge]');if(b&&b.textContent.indexOf('Aprovado')>=0)done++;});var t=document.querySelector('[data-progtxt]');if(t)t.textContent=done+' de '+TOTAL+' aprovados';var f=document.querySelector('[data-progfill]');if(f)f.style.width=Math.max(TOTAL?Math.round(done/TOTAL*100):0,4)+'%';}
 function addHist(kind,label){var sec=document.querySelector('[data-histsec]');if(sec)sec.classList.remove('hide');var h=document.getElementById('hist');var d=document.createElement('div');d.className='hitem';var ic=kind==='ok'?'hb-ok':kind==='rev'?'hb-rev':kind==='edit'?'hb-edit':'hb-note';var sv=kind==='ok'?CIC.check:kind==='rev'?CIC.revise:kind==='edit'?CIC.edit:CIC.note;d.innerHTML='<div class="hicon '+ic+'">'+sv+'</div><div class="hmain"><div class="ht"></div></div><div class="htime">agora</div>';d.querySelector('.ht').textContent=label;h.insertBefore(d,h.firstChild);}
 function post(payload,btn,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){return r.json().then(function(j){return{ok:r.ok&&j&&j.ok,j:j};});}).then(function(res){if(btn)btn.disabled=false;if(res.ok){if(cb)cb(res.j);}else{toast((res.j&&res.j.error)||'Falha ao enviar.','err');}}).catch(function(){if(btn)btn.disabled=false;toast('Sem conexão. Tente novamente.','err');});}
-function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);if(!w)return;w.innerHTML='<div class="topbar"><div class="brand">'+(document.querySelector('.brand .logo')?document.querySelector('.brand .logo').outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div></div>'+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Cronograma aprovado com sucesso!</h1><p>Sua aprovação foi registrada. A equipe já foi notificada e seguirá com a finalização.</p><div class="succ-foot">Você já pode fechar esta página. 💜</div></div></div>';window.scrollTo(0,0);}
+// V64.42 — apos aprovacao, tenta fechar a janela; navegadores normais bloqueiam window.close()
+// quando a aba nao foi aberta por script — nesse caso, deixa a tela final visivel com a frase
+// fallback ja presente no card (succ-foot/mid-foot "Voce pode fechar esta pagina."). Sem alarme.
+function tryCloseOrShowNotice(){try{setTimeout(function(){try{window.close();}catch(_){ }},900);}catch(_){ }}
+function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);if(!w)return;w.innerHTML='<div class="topbar"><div class="brand">'+(document.querySelector('.brand .logo')?document.querySelector('.brand .logo').outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div></div>'+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Cronograma aprovado com sucesso!</h1><p>Sua aprovação foi registrada. A equipe já foi notificada e seguirá com a finalização.</p><div class="succ-foot">Você já pode fechar esta página. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
 // V64.13 — Confirmação INTERMEDIÁRIA: temas aprovados (NÃO encerra; mantém o cronograma ativo).
 // V64.17 — topbar premium reutilizável. Telas de ack/sucesso/feedback SUBSTITUEM a .wrap
 // inteira (sem formulário/cards ativos empilhados abaixo). Corrige duplicação no portal.
 function CV_TOP(){var lg=document.querySelector('.brand .logo');return '<div class="topbar"><div class="brand">'+(lg?lg.outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div><div class="secure">'+CIC.check+'<span class="lbl">Link seguro</span></div></div>';}
-function clientThemesApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Temas aprovados!</h2><p>A equipe seguirá com a produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);}
-function clientProductionApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Legendas e artes aprovadas!</h2><p>A equipe enviará a versão final completa para sua aprovação. Em breve você receberá o aviso neste mesmo link.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);}
+function clientThemesApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Temas aprovados!</h2><p>A equipe seguirá com a produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
+function clientProductionApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Legendas e artes aprovadas!</h2><p>A equipe enviará a versão final completa para sua aprovação. Em breve você receberá o aviso neste mesmo link.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
 // V64.17 — feedback PARCIAL: SUBSTITUI a .wrap por resumo read-only + "Aguardando ajuste da equipe".
 function clientFeedbackSent(){var w=document.querySelector('.wrap');if(!w)return;
   var rows='';document.querySelectorAll('#contents [data-card]').forEach(function(c){var i=+c.dataset.card;var b=c.querySelector('[data-badge]');var t=b?(b.textContent||''):'';
@@ -1936,6 +2226,34 @@ function pollState(){fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/st
   toast(changed.length?('Tema atualizado pela equipe — revise o Conteúdo '+(changed[0]+1)):'Atualizado pela equipe.','ok');
 }).catch(function(){liveTick(false);});}
 setInterval(pollState,6000);
+
+/* V64.42 — PWA Web Push: opt-in do cliente (browser pede permissao -> gera PushSubscription).
+   So roda quando ENABLE_PUSH=true E VAPID_PUBLIC_KEY presente. Sem secrets configurados,
+   funcao vira no-op. Falhas silenciosas (cliente continua usando WhatsApp + polling normal). */
+function urlBase64ToUint8Array(b){try{var pad='='.repeat((4-b.length%4)%4);var s=(b+pad).replace(/-/g,'+').replace(/_/g,'/');var raw=atob(s);var out=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;}catch(_){return null;}}
+function setupClientWebPush(){
+  if(!ENABLE_PUSH||!VAPID_PUBLIC_KEY)return;
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  var swPath='/cliente/sw.js';
+  navigator.serviceWorker.register(swPath,{scope:'/cliente/'}).then(function(reg){
+    return reg.pushManager.getSubscription().then(function(s){
+      if(s)return s;
+      return Notification.requestPermission().then(function(p){
+        if(p!=='granted')return null;
+        var key=urlBase64ToUint8Array(VAPID_PUBLIC_KEY);if(!key)return null;
+        return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+      });
+    });
+  }).then(function(sub){
+    if(!sub)return;
+    var j=sub.toJSON();
+    fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/push/subscribe',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({endpoint:j.endpoint,keys:j.keys})
+    }).catch(function(){});
+  }).catch(function(){});
+}
+try{setupClientWebPush();}catch(_){}
 `;
 
 function renderClientHtml(task, token, env, origin) {
@@ -2106,7 +2424,12 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
 ) + '</div></div>' +
 '<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
 '<div class="toast" id="toast"></div>' +
-'<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';\n' + CV_JS + '\n</script>\n' +
+'<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';\n' +
+// V64.42 — feature flag de PWA Web Push: o portal so mostra opt-in/subscribe quando ENABLE_PUSH=true.
+// VAPID_PUBLIC_KEY e injetada para uso em pushManager.subscribe (aplicationServerKey).
+'var ENABLE_PUSH=' + JSON.stringify(env && env.ENABLE_CLIENT_WEB_PUSH === "true") + ';' +
+'var VAPID_PUBLIC_KEY=' + JSON.stringify((env && env.VAPID_PUBLIC_KEY) || "") + ';\n' +
+CV_JS + '\n</script>\n' +
 '</body></html>';
 }
 

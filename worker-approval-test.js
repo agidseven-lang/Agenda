@@ -77,6 +77,21 @@ function applyAction(task, e){
   if (g.cs){ nt.cronStatus=g.cs; nt.clientReview={ status:g.rev }; }
   if (g.client){ nt.clientFlowStatus=g.client; nt.clientWorkflowStage=g.client; }
   if (g.client==='concluido'){ nt.finalApprovalCompleted=true; nt.operationalStatus='concluido'; }
+  // V64.42 — LIMPEZA POR TRANSICAO DE FASE: ao approveAll com sucesso (aprovado/concluido),
+  // zera `cs` dos itens da fase concluida (chip vermelho some, phase preservada).
+  if (g.client==='aprovado' || g.client==='concluido'){
+    for (const k of Object.keys(nt.clientItems)){
+      const it = nt.clientItems[k];
+      if (it && it.phase===phaseIn){ const cp=Object.assign({},it); cp.cs=null; nt.clientItems[k]=cp; }
+    }
+  }
+  return nt;
+}
+// V64.42 — espelho da rota /team-action: equipe corrigiu o item, Worker zera cs.
+function applyTeamAdjust(task, contentIndex, byName){
+  const nt = Object.assign({}, task); nt.clientItems = Object.assign({}, task.clientItems||{});
+  const key='i'+contentIndex; const prev=nt.clientItems[key]||{};
+  nt.clientItems[key] = Object.assign({}, prev, { cs:null, teamAdjustedAt:Date.now(), teamAdjustedBy:byName||'Equipe' });
   return nt;
 }
 const concluded = t => t.finalApprovalCompleted===true || t.clientFlowStatus==='concluido' || t.operationalStatus==='concluido';
@@ -147,6 +162,30 @@ tT = applyAction(tT, {type:'approveItem', contentIndex:1, at:2});
 tT = applyAction(tT, {type:'approveItem', contentIndex:2, at:3});
 check('THEMES_ITEMS_NO_ADVANCE', 'approveItem(todos os temas) NÃO seta clientFlowStatus=aprovado (só o approveAll faz)', tT.clientFlowStatus!=='aprovado' && !concluded(tT));
 
+/* ===================== PARTE A.4 — Limpeza por transição de fase (V64.42) ===================== */
+console.log(`${C.b}\n[A.4] V64.42 — Limpeza por fase ao approveAll com sucesso${C.x}`);
+// Cenario: cliente pediu ajuste em i1 (themes), equipe corrigiu (teamAdjust), cliente aprova tudo
+let tCl = { id:'cl1', cronContents:TH, clientApprovalPhase:'themes', clientItems:{} };
+tCl = applyAction(tCl, {type:'reviseItem', contentIndex:1, note:'trocar', at:4001});
+check('A4_REVISE_OK', 'reviseItem grava cs=em_revisao com phase=themes', tCl.clientItems.i1.cs==='em_revisao' && tCl.clientItems.i1.phase==='themes');
+// Sem teamAdjust, approveAll é BLOQUEADO por _pendingRev (regressao de V64.41)
+const tBlock = applyAction(tCl, {type:'approveAll', at:4002});
+check('A4_BLOCKS_WITHOUT_FIX', 'approveAll sem correcao da equipe vira feedback (clientFlowStatus=revisao)', tBlock.clientFlowStatus==='revisao' && !concluded(tBlock));
+// Com teamAdjust (V64.42), approveAll passa e a limpeza zera cs dos itens da fase themes
+const tFixed = applyTeamAdjust(tCl, 1, 'Marcos Dias');
+check('A4_TEAM_ADJUST_CLEARS', 'applyTeamAdjust(i1) zera cs do i1 e mantem phase', tFixed.clientItems.i1.cs===null && tFixed.clientItems.i1.phase==='themes');
+const tApr = applyAction(tFixed, {type:'approveAll', at:4003});
+check('A4_APPROVEALL_PASSES', 'approveAll(themes) com cs zerado libera producao (clientFlowStatus=aprovado)', tApr.clientFlowStatus==='aprovado' && !concluded(tApr));
+check('A4_PHASE_CLEANUP', 'V64.42 limpa cs de TODOS os items da fase themes apos approveAll bem-sucedido', tApr.clientItems.i1.cs===null);
+
+/* ===================== PARTE A.5 — Idempotencia (cliente cliclando duas vezes) ===================== */
+console.log(`${C.b}\n[A.5] Idempotency-Key — efeito unico para acoes do cliente${C.x}`);
+// O REDUTOR nao implementa cache (Cache API e do Worker), mas a chave deve garantir mesma resposta.
+const t1 = applyAction({ id:'i1', cronContents:TH, clientApprovalPhase:'themes', clientItems:{} }, {type:'reviseItem', contentIndex:0, note:'x', at:5001});
+const t2 = applyAction({ id:'i1', cronContents:TH, clientApprovalPhase:'themes', clientItems:{} }, {type:'reviseItem', contentIndex:0, note:'x', at:5001});
+check('A5_DETERMINISTIC', 'Mesma acao com mesmo at gera mesmo estado (idempotencia determinista)',
+  JSON.stringify(t1.clientItems.i0)===JSON.stringify(t2.clientItems.i0) && t1.cronStatus===t2.cronStatus);
+
 /* ===================== PARTE B — ASSERÇÕES ESTRUTURAIS (código real) ===================== */
 console.log(`${C.b}\n[B] Estrutura do cloudflare-worker.js REAL (corrigido)${C.x}`);
 check('W_NO_GLOBAL_COUNT', 'Removida a contagem global "approved.size >= total" do approveItem', SRC.indexOf('approved.size >= total')===-1);
@@ -156,6 +195,44 @@ check('W_PHASE_TAG', 'clientItems.iX é marcado com phase = clientPhase(task)', 
 check('W_PENDINGREV_PHASE', '_pendingRev é POR FASE (ph === phaseIn)', /\(cs === "em_revisao" \|\| cs === "editado"\) && \(ph === phaseIn\)/.test(SRC));
 check('W_FINAL_GATE', 'finalApprovalCompleted só dentro do bloco g.client === "concluido"', /if \(g\.client === "concluido"\) \{[\s\S]*?finalApprovalCompleted = \{ booleanValue: true \}/.test(SRC));
 check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.client (só approve/approveAll/approveG concluem)', !/approveItem[\s\S]{0,120}finalApprovalCompleted/.test(apItem));
+
+/* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
+console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
+check('C_HEALTH_V64_42', 'Healthcheck retorna V64.42-team-adjust-idem-cleanup', /version: "V64\.42-team-adjust-idem-cleanup"/.test(SRC));
+check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
+check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
+check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
+check('C_CV_LOGO_IMG', 'CV_LOGO usa <img> apontando para /og/idseven-logo.png (sem SVG placeholder)', /const CV_LOGO = '<img class="logo" src="\/og\/idseven-logo\.png"/.test(SRC));
+check('C_UX_TRYCLOSE_FN', 'tryCloseOrShowNotice presente no CV_JS', /function tryCloseOrShowNotice\(\)/.test(SRC) && /window\.close/.test(SRC));
+check('C_UX_TRYCLOSE_SUCC', 'clientSuccess() chama tryCloseOrShowNotice()', /function clientSuccess\(\)[\s\S]*?tryCloseOrShowNotice\(\);\}/.test(SRC));
+check('C_UX_TRYCLOSE_THEMES', 'clientThemesApproved() chama tryCloseOrShowNotice()', /function clientThemesApproved\(\)[\s\S]*?tryCloseOrShowNotice\(\);\}/.test(SRC));
+check('C_UX_TRYCLOSE_PROD', 'clientProductionApproved() chama tryCloseOrShowNotice()', /function clientProductionApproved\(\)[\s\S]*?tryCloseOrShowNotice\(\);\}/.test(SRC));
+check('C_PHASE_CLEANUP', 'LIMPEZA POR TRANSIÇÃO DE FASE — zera cs por phase apos approveAll bem-sucedido',
+  /LIMPEZA POR TRANSIÇÃO DE FASE/.test(SRC) && /if \(g\.client === "aprovado" \|\| g\.client === "concluido"\)/.test(SRC) && /clientItems\."\s*\+\s*k\s*\+\s*"\.cs/.test(SRC));
+check('C_TEAM_ROUTE', 'Rota POST /cliente/cronograma/:token/team-action registrada', /teamMatch[\s\S]{0,40}url\.pathname\.match/.test(SRC) && /\\\/team-action\\\/\?\$/.test(SRC) && /handleClientCronogramaTeamAction/.test(SRC));
+check('C_TEAM_AUTH', 'handleClientCronogramaTeamAction gated por env.TEAM_API_KEY (503 sem chave)', /handleClientCronogramaTeamAction[\s\S]{0,800}env\.TEAM_API_KEY[\s\S]{0,200}TEAM_API_KEY_NOT_CONFIGURED/.test(SRC));
+check('C_TEAM_XKEY', 'team-action valida header X-Team-Key === env.TEAM_API_KEY', /handleClientCronogramaTeamAction[\s\S]{0,1200}X-Team-Key/.test(SRC));
+check('C_TEAM_CLEARS_CS', 'team-action grava clientItems[iX].cs=null e teamAdjustedAt/By', /cs: \{ nullValue: null \}[\s\S]{0,200}teamAdjustedAt[\s\S]{0,200}teamAdjustedBy/.test(SRC));
+check('C_TEAM_HISTORY', 'team-action adiciona history com type=equipe_corrigiu_item', /equipe_corrigiu_item/.test(SRC));
+check('C_IDEM_HEADER', 'handleClientCronogramaAction le Idempotency-Key/X-Idempotency-Key', /handleClientCronogramaAction[\s\S]{0,400}Idempotency-Key[\s\S]{0,40}X-Idempotency-Key/.test(SRC));
+check('C_IDEM_CACHE', 'Idempotencia usa caches.default.match e caches.default.put', /caches\.default\.match\(new Request\(idemUrl\)\)/.test(SRC) && /caches\.default\.put\(new Request\(idemUrl\)/.test(SRC));
+check('C_IDEM_REPLAYED', 'Resposta em replay marca X-Idempotency-Replayed: true', /X-Idempotency-Replayed[\s\S]{0,40}true/.test(SRC));
+check('C_PUSH_SUB_ROUTE', 'Rota POST /cliente/cronograma/:token/push/subscribe registrada', /\/cliente\/cronograma\/.*\/push\/subscribe/.test(SRC) && /handleClientPushSubscribe/.test(SRC));
+check('C_PUSH_SUB_FIRESTORE', 'push subscribe grava em tasks.{id}.clientPushSubs[] via appendMissingElements', /clientPushSubs[\s\S]{0,200}appendMissingElements/.test(SRC));
+check('C_BROADCAST_GUARD', 'broadcastWebPush gated por VAPID_PRIVATE_KEY/PUBLIC/SUBJECT (retorna VAPID_NOT_CONFIGURED)', /function broadcastWebPush[\s\S]{0,400}VAPID_NOT_CONFIGURED/.test(SRC));
+check('C_SW_ROUTE', 'Rota GET /cliente/sw.js registrada e responde com SW', /\/cliente\/sw\.js[\s\S]{0,80}clientSwResponse\(\)/.test(SRC));
+check('C_SW_CONTENT', 'clientSwResponse define push + notificationclick + Service-Worker-Allowed', /function clientSwResponse\(\)/.test(SRC) && /addEventListener\('push'/.test(SRC) && /addEventListener\('notificationclick'/.test(SRC) && /Service-Worker-Allowed/.test(SRC));
+check('C_FEATURE_FLAG', 'Portal injeta ENABLE_PUSH=true/false a partir de env.ENABLE_CLIENT_WEB_PUSH', /'var ENABLE_PUSH=' \+ JSON\.stringify\(env && env\.ENABLE_CLIENT_WEB_PUSH === "true"\)/.test(SRC));
+check('C_VAPID_PUBLIC_INJ', 'Portal injeta VAPID_PUBLIC_KEY (vazio se nao configurado)', /'var VAPID_PUBLIC_KEY=' \+ JSON\.stringify\(\(env && env\.VAPID_PUBLIC_KEY\) \|\| ""\)/.test(SRC));
+check('C_SETUP_PUSH_FN', 'CV_JS define setupClientWebPush() + urlBase64ToUint8Array + registra SW em /cliente/', /function setupClientWebPush\(\)/.test(SRC) && /function urlBase64ToUint8Array\(b\)/.test(SRC) && /swPath='\/cliente\/sw\.js'/.test(SRC) && /navigator\.serviceWorker\.register\(swPath/.test(SRC));
+
+/* ===================== PARTE D — preservacao (nao quebrar o que existia) ===================== */
+console.log(`${C.b}\n[D] Preservacao: WhatsApp + /share + healthcheck endpoints intactos${C.x}`);
+check('D_WA_ROUTE', 'Rota POST /client/send-premium-whatsapp preservada', /\/client\/send-premium-whatsapp[\s\S]{0,80}handleSendPremiumWhatsApp/.test(SRC));
+check('D_SHARE_ROUTE', 'Rota GET /share/cronograma/:token preservada', /url\.pathname\.match\([^)]*share\\\/cronograma[^)]*\)/.test(SRC) && /function shareCardHtml/.test(SRC));
+check('D_OG_LEGACY', 'Banner OG legado /og/aprovar*.png preservado', /function ogBannerResponse\(\)/.test(SRC) && /\/og\\\/aprovar/.test(SRC));
+check('D_PUSH_RELAY', 'handlePushRelay (FCM equipe) preservado', /async function handlePushRelay\(request, env\)/.test(SRC));
+check('D_CRON_SCHEDULED', 'scheduled handler (CRON lembretes) preservado', /async scheduled\(event, env, ctx\)[\s\S]{0,200}handleCronTrigger/.test(SRC));
 
 /* ===================== VEREDITO ===================== */
 console.log(`${C.b}\n==================================================================`);
