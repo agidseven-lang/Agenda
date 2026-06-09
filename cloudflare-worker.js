@@ -263,7 +263,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.43-webpush-real-notify-engine" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.44-team-action-capability-auth" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1368,59 +1368,125 @@ async function handleClientCronogramaAction(token, request, env) {
   return resp;
 }
 
-/* V64.42 — TEAM ACTION: rota servidora-servidora autenticada por env.TEAM_API_KEY.
-   Quando a equipe corrige um item (Desktop/Android), chama esta rota para o Worker
-   limpar `clientItems[iX].cs` (destrancar fluxo) + registrar history + disparar notificacao
-   ao cliente (Web Push, se habilitado). Mantem `phase` e adiciona `teamAdjustedAt`.
-   Sem env.TEAM_API_KEY -> 503 (rota planejada, ativada num secret futuro).
-   Body: { contentIndex: number, byName?: string, action?: 'adjustedItem' (default) } */
+/* V64.44 — autorização de EQUIPE por capability + role-lookup (sem secret no app):
+   o chamador prova posse do clientReviewToken da tarefa (mesma capability do portal) e
+   declara `uid`; o Worker LÊ users/{uid} via service account e autoriza SOMENTE se o
+   usuário existe, está ativo e é Social/Admin (espelho do roleCat do app).
+   LIMITAÇÃO HONESTA: o uid é declarado (login custom s2/SHA-256 não emite credencial
+   verificável); autenticação FORTE por usuário exige Firebase Auth/emissor de sessão —
+   etapa futura separada. O privilégio concedido aqui NÃO excede o que o token já permite
+   no portal (approveItem do próprio cliente também limpa a pendência do item). */
+const TEAM_ROLE_KW = ["social", "gestor", "gerente", "diretor", "coordena", "supervisor", "admin", "dono", "owner", "ceo", "head"];
+function normRole(s) {
+  return (s || "").toLowerCase()
+    .replace(/[áâãà]/g, "a").replace(/[éê]/g, "e").replace(/í/g, "i")
+    .replace(/[óôõ]/g, "o").replace(/ú/g, "u").replace(/ç/g, "c").trim();
+}
+async function lookupTeamUser(env, accessToken, uid) {
+  if (!uid || !/^[A-Za-z0-9_-]{1,128}$/.test(uid)) return null;
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/users/${uid}`;
+  const res = await fetch(url, { headers: { "Authorization": "Bearer " + accessToken } });
+  if (!res.ok) return null;
+  const doc = await res.json();
+  const f = (doc && doc.fields) || {};
+  const status = (f.status && f.status.stringValue) || "";
+  if (status === "pendente" || status === "removido" || status === "excluido") return null;
+  const admin = !!(f.admin && f.admin.booleanValue);
+  const role = normRole(f.role && f.role.stringValue);
+  if (!admin && !TEAM_ROLE_KW.some((k) => role.indexOf(k) >= 0)) return null;
+  return { uid, name: (f.name && f.name.stringValue) || "", role: role, admin };
+}
+
+/* V64.44 — TEAM ACTION (camada CENTRAL de workflow): limpa clientItems[iX].cs (preserva
+   phase), registra history e chama notifyWorkflowEvent() — Web Push real quando configurado,
+   fallback whatsapp_premium sinalizado, dedup no engine, push NUNCA bloqueia a ação.
+   Auth (uma das duas):
+     a) X-Team-Key === env.TEAM_API_KEY (server-to-server; NUNCA embutida em app cliente);
+     b) body.uid de um usuário Social/Admin ATIVO (lookup REAL em users/{uid}) + capability
+        do token da tarefa na URL.
+   Idempotência: header Idempotency-Key (Cache API, TTL 300s) — duplo clique não duplica.
+   Body: { contentIndex | contentIndexes[], uid?, byName?, action?: 'adjustedItem' } */
 async function handleClientCronogramaTeamAction(token, request, env) {
-  if (!env.TEAM_API_KEY) {
-    return json({ ok: false, error: "TEAM_API_KEY_NOT_CONFIGURED" }, 503, env);
+  // Idempotência (replay devolve a resposta original, sem reaplicar)
+  const idemKey = request.headers.get("Idempotency-Key") || request.headers.get("X-Idempotency-Key") || "";
+  const idemUrl = idemKey ? `https://idempotency.local/team/${token}/${encodeURIComponent(idemKey)}` : null;
+  if (idemUrl) {
+    try {
+      const cached = await caches.default.match(new Request(idemUrl));
+      if (cached) {
+        const body = await cached.text();
+        return new Response(body, { status: cached.status, headers: { "Content-Type": "application/json", "X-Idempotency-Replayed": "true", "Access-Control-Allow-Origin": "*" } });
+      }
+    } catch (_) { /* segue sem replay */ }
   }
-  const supplied = request.headers.get("X-Team-Key") || "";
-  if (supplied !== env.TEAM_API_KEY) {
-    return json({ ok: false, error: "unauthorized" }, 401, env);
-  }
+
   let payload = {};
   try { payload = await request.json(); } catch (_) { /* tolera body vazio */ }
   const action = (payload && typeof payload.action === "string" && payload.action.trim()) || "adjustedItem";
   if (action !== "adjustedItem") {
     return json({ ok: false, error: "acao inválida (apenas adjustedItem nesta versao)" }, 400, env);
   }
-  let ci = null;
-  if (payload && typeof payload.contentIndex === "number" && payload.contentIndex >= 0) ci = Math.floor(payload.contentIndex);
-  else if (payload && typeof payload.contentIndex === "string" && /^\d+$/.test(payload.contentIndex)) ci = parseInt(payload.contentIndex, 10);
-  if (ci == null) return json({ ok: false, error: "contentIndex obrigatorio" }, 400, env);
-  const byName = (payload && typeof payload.byName === "string") ? payload.byName.slice(0, 80) : "Equipe";
+  // contentIndexes[] (vários itens) ou contentIndex (um)
+  const idxs = [];
+  const pushIdx = (v) => {
+    if (typeof v === "number" && v >= 0) idxs.push(Math.floor(v));
+    else if (typeof v === "string" && /^\d+$/.test(v)) idxs.push(parseInt(v, 10));
+  };
+  if (Array.isArray(payload && payload.contentIndexes)) payload.contentIndexes.forEach(pushIdx);
+  else if (payload && payload.contentIndex != null) pushIdx(payload.contentIndex);
+  const uniq = Array.from(new Set(idxs)).sort((a, b) => a - b).slice(0, 50);
+  if (!uniq.length) return json({ ok: false, error: "contentIndex(es) obrigatorio" }, 400, env);
 
   let accessToken;
   try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
   catch (e) { return json({ ok: false, error: "auth falhou: " + (e && e.message) }, 200, env); }
 
+  // ── Autorização ──
+  let byName = (payload && typeof payload.byName === "string") ? payload.byName.slice(0, 80) : "";
+  const suppliedKey = request.headers.get("X-Team-Key") || "";
+  const keyOk = !!(env.TEAM_API_KEY && suppliedKey === env.TEAM_API_KEY);
+  if (!keyOk) {
+    const teamUser = await lookupTeamUser(env, accessToken, payload && payload.uid);
+    if (!teamUser) {
+      console.warn(`[TEAM-ACTION] negado uid=${(payload && payload.uid) || "(vazio)"}`);
+      return json({ ok: false, error: "unauthorized: requer X-Team-Key (server) ou uid de usuário Social/Admin ativo" }, 403, env);
+    }
+    if (!byName) byName = teamUser.name || "Equipe";
+    console.log(`[TEAM-ACTION] autorizado por role-lookup uid=${teamUser.uid} role=${teamUser.role}${teamUser.admin ? "(admin)" : ""}`);
+  }
+  if (!byName) byName = "Equipe";
+
   const task = await queryTaskByToken(env, accessToken, token);
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
 
   const now = Date.now();
-  const key = "i" + ci;
   const taskId = task.id;
-  // updateMask cirurgico: zera cs do item e registra timestamp + autor.
-  const fields = {
-    clientItems: { mapValue: { fields: { [key]: { mapValue: { fields: {
+  // updateMask cirurgico POR item: zera cs (preserva phase) + autor/timestamp.
+  const itemsField = {};
+  const mask = ["updatedAt"];
+  uniq.forEach((ci) => {
+    const key = "i" + ci;
+    itemsField[key] = { mapValue: { fields: {
       cs: { nullValue: null },
       teamAdjustedAt: { integerValue: String(now) },
       teamAdjustedBy: { stringValue: byName },
-    } } } } } },
+    } } };
+    mask.push("clientItems." + key + ".cs", "clientItems." + key + ".teamAdjustedAt", "clientItems." + key + ".teamAdjustedBy");
+  });
+  const fields = {
+    clientItems: { mapValue: { fields: itemsField } },
     updatedAt: { integerValue: String(now) },
   };
-  const mask = ["clientItems." + key + ".cs", "clientItems." + key + ".teamAdjustedAt", "clientItems." + key + ".teamAdjustedBy", "updatedAt"];
+  const lbl = uniq.length > 1
+    ? "Equipe corrigiu os conteúdos " + uniq.map((i) => i + 1).join(", ")
+    : "Equipe corrigiu o conteúdo " + (uniq[0] + 1);
   const histFields = {
     type: { stringValue: "equipe_corrigiu_item" },
-    label: { stringValue: "Equipe corrigiu o conteúdo " + (ci + 1) },
+    label: { stringValue: lbl },
     at: { integerValue: String(now) },
     by: { stringValue: byName },
     channel: { stringValue: "team_internal" },
-    contentIndex: { integerValue: String(ci) },
+    contentIndex: { integerValue: String(uniq[0]) },
   };
   const docName = `projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${taskId}`;
   const body = {
@@ -1446,15 +1512,25 @@ async function handleClientCronogramaTeamAction(token, request, env) {
     console.warn("[TEAM-ACTION] erro:", e && e.message);
     return json({ ok: false, error: "erro: " + (e && e.message) }, 500, env);
   }
-  // V64.43 — Notification Engine: ajuste de TEMA (fase themes) ou ajuste FINAL (fase final).
-  // Web Push real ao cliente; sem subscription/VAPID, engine sinaliza fallback whatsapp_premium.
+  // Notification Engine (CAMADA CENTRAL): theme_adjusted_by_team / final_adjusted_by_team.
+  // Web Push real ao cliente quando há subscription+VAPID; senão fallback whatsapp_premium
+  // sinalizado. try/catch: falha de push NUNCA desfaz/bloqueia a ação de negócio.
   let pushResult = { sent: 0 };
   try {
     const evType = clientPhase(task) === "final" ? "final_adjusted_by_team" : "theme_adjusted_by_team";
-    pushResult = await notifyWorkflowEvent(env, task, evType, { contentIndex: ci, token });
+    pushResult = await notifyWorkflowEvent(env, task, evType, { contentIndex: uniq[0], token });
   } catch (e) { pushResult = { sent: 0, error: e && e.message }; }
-  console.log(`[TEAM-ACTION] task=${taskId} item=${ci} by=${byName} push=${JSON.stringify(pushResult)}`);
-  return json({ ok: true, taskId, contentIndex: ci, at: now, push: pushResult }, 200, env);
+  console.log(`[TEAM-ACTION] task=${taskId} itens=${uniq.join(",")} by=${byName} push=${JSON.stringify(pushResult)}`);
+  const out = { ok: true, taskId, contentIndexes: uniq, at: now, push: pushResult };
+  const resp = json(out, 200, env);
+  if (idemUrl) {
+    try {
+      await caches.default.put(new Request(idemUrl), new Response(JSON.stringify(out), {
+        status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+      }));
+    } catch (_) { /* sem persistir replay */ }
+  }
+  return resp;
 }
 
 /* V64.42 — PWA Web Push: opt-in do cliente. O portal usa o Push API do navegador

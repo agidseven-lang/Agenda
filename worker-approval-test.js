@@ -198,7 +198,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_43', 'Healthcheck retorna V64.43-webpush-real-notify-engine (sucessor do V64.42)', /version: "V64\.43-webpush-real-notify-engine"/.test(SRC));
+check('C_HEALTH_V64_44', 'Healthcheck retorna V64.44-team-action-capability-auth', /version: "V64\.44-team-action-capability-auth"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -210,8 +210,14 @@ check('C_UX_TRYCLOSE_PROD', 'clientProductionApproved() chama tryCloseOrShowNoti
 check('C_PHASE_CLEANUP', 'LIMPEZA POR TRANSIÇÃO DE FASE — zera cs por phase apos approveAll bem-sucedido',
   /LIMPEZA POR TRANSIÇÃO DE FASE/.test(SRC) && /if \(g\.client === "aprovado" \|\| g\.client === "concluido"\)/.test(SRC) && /clientItems\."\s*\+\s*k\s*\+\s*"\.cs/.test(SRC));
 check('C_TEAM_ROUTE', 'Rota POST /cliente/cronograma/:token/team-action registrada', /teamMatch[\s\S]{0,40}url\.pathname\.match/.test(SRC) && /\\\/team-action\\\/\?\$/.test(SRC) && /handleClientCronogramaTeamAction/.test(SRC));
-check('C_TEAM_AUTH', 'handleClientCronogramaTeamAction gated por env.TEAM_API_KEY (503 sem chave)', /handleClientCronogramaTeamAction[\s\S]{0,800}env\.TEAM_API_KEY[\s\S]{0,200}TEAM_API_KEY_NOT_CONFIGURED/.test(SRC));
-check('C_TEAM_XKEY', 'team-action valida header X-Team-Key === env.TEAM_API_KEY', /handleClientCronogramaTeamAction[\s\S]{0,1200}X-Team-Key/.test(SRC));
+// V64.44 — autorizacao dupla: X-Team-Key (server-to-server) OU uid Social/Admin via role-lookup REAL.
+check('C_TEAM_AUTH', 'team-action: sem X-Team-Key valida uid via lookupTeamUser (403 se nao for Social/Admin ativo)', /const keyOk = !!\(env\.TEAM_API_KEY && suppliedKey === env\.TEAM_API_KEY\)/.test(SRC) && /lookupTeamUser\(env, accessToken, payload && payload\.uid\)/.test(SRC) && /unauthorized: requer X-Team-Key \(server\) ou uid de usuário Social\/Admin ativo/.test(SRC));
+check('C_TEAM_XKEY', 'team-action mantém X-Team-Key p/ server-to-server (nunca embutida em app cliente)', /handleClientCronogramaTeamAction[\s\S]{0,2400}X-Team-Key/.test(SRC));
+check('C_TEAM_LOOKUP', 'lookupTeamUser: GET users/{uid} via service account + status ativo + role Social/Admin (TEAM_ROLE_KW) ou admin', /async function lookupTeamUser/.test(SRC) && /documents\/users\/\$\{uid\}/.test(SRC) && /TEAM_ROLE_KW/.test(SRC) && /status === "pendente" \|\| status === "removido" \|\| status === "excluido"/.test(SRC));
+check('C_TEAM_NO_SECRET_APP', 'NENHUM caminho exige secret no app: rota funciona com uid+capability do token', /b\) body\.uid de um usuário Social\/Admin ATIVO/.test(SRC));
+check('C_TEAM_MULTI', 'team-action aceita contentIndexes[] (varios itens) com dedupe/sort', /Array\.isArray\(payload && payload\.contentIndexes\)/.test(SRC) && /Array\.from\(new Set\(idxs\)\)\.sort/.test(SRC));
+check('C_TEAM_IDEM', 'team-action tem Idempotency-Key proprio (Cache API, replay X-Idempotency-Replayed)', /idempotency\.local\/team\//.test(SRC) && /handleClientCronogramaTeamAction[\s\S]{0,1200}Idempotency-Key/.test(SRC));
+check('C_TEAM_PUSH_SAFE', 'falha de push NUNCA bloqueia a acao (try/catch em notifyWorkflowEvent)', /try \{[\s\S]{0,250}notifyWorkflowEvent\(env, task, evType[\s\S]{0,120}\} catch \(e\) \{ pushResult = \{ sent: 0, error: e && e\.message \}; \}/.test(SRC));
 check('C_TEAM_CLEARS_CS', 'team-action grava clientItems[iX].cs=null e teamAdjustedAt/By', /cs: \{ nullValue: null \}[\s\S]{0,200}teamAdjustedAt[\s\S]{0,200}teamAdjustedBy/.test(SRC));
 check('C_TEAM_HISTORY', 'team-action adiciona history com type=equipe_corrigiu_item', /equipe_corrigiu_item/.test(SRC));
 check('C_IDEM_HEADER', 'handleClientCronogramaAction le Idempotency-Key/X-Idempotency-Key', /handleClientCronogramaAction[\s\S]{0,400}Idempotency-Key[\s\S]{0,40}X-Idempotency-Key/.test(SRC));
@@ -324,7 +330,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + 4 estados', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas no navegador/.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados para este cronograma/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.43-webpush-real-notify-engine', /version: "V64\.43-webpush-real-notify-engine"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.44-team-action-capability-auth', /version: "V64\.44-team-action-capability-auth"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== VEREDITO ===================== */
