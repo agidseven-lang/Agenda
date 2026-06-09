@@ -2622,21 +2622,36 @@ function flowDetailsBlock(t){
   return '<details class="det-flowdet"><summary>Detalhes do fluxo</summary>'+
     '<div class="det-flowdet-body">'+flowSummaryBlock(t)+opPanelBlock(t)+'</div></details>';
 }
-/* "Marcar como corrigido" — destrava o card: zera cs dos itens pendentes da FASE atual
-   (mesma escrita da rota team-action do Worker V64.43, direto via Firestore da equipe). */
+/* "Marcar como corrigido" — CAMADA CENTRAL (Worker V64.44 team-action). O Desktop NÃO
+   grava direto no Firestore para este evento: a rota central limpa clientItems[iX].cs
+   (preserva phase), registra history e chama notifyWorkflowEvent() — Web Push real ao
+   cliente quando configurado, fallback WhatsApp sinalizado, dedup + idempotência.
+   Auth: capability do clientReviewToken (URL) + uid Social/Admin validado por role-lookup
+   REAL no Worker (users/{uid} via service account). NENHUM secret embutido no app. */
 async function markItemsAdjusted(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const pend=pendingClientItems(t);if(!pend.length){flashToast('Nenhum ajuste pendente nesta fase.');return;}
-  const now=Date.now();const patch={updatedAt:now};
-  pend.forEach(p=>{const k='clientItems.i'+p.idx;
-    patch[k+'.cs']=null;patch[k+'.teamAdjustedAt']=now;patch[k+'.teamAdjustedBy']=state.user.name||'Equipe';});
-  patch.history=firebase.firestore.FieldValue.arrayUnion({type:'equipe_corrigiu_item',
-    label:'Equipe corrigiu '+(pend.length>1?('os conteúdos '+pend.map(p=>p.idx+1).join(', ')):('o conteúdo '+(pend[0].idx+1))),
-    at:now,byId:state.user.id,contentIndex:pend[0].idx});
-  // otimista: atualiza o objeto local p/ o modal refletir já (snapshot confirma depois)
+  const token=t.clientReviewToken||t.shareToken||'';
+  if(!token){flashToast('Tarefa sem link de cliente — envie ao cliente antes de marcar correções.');return;}
+  const idxs=pend.map(p=>p.idx);
+  // Idempotência: chave estável por (uid|tarefa|itens|janela de 10s) — o duplo clique
+  // reaproveita a MESMA chave (replay no Worker); um novo ajuste depois gera chave nova.
+  const idem=state.user.id+'|'+taskId+'|'+idxs.join(',')+'|'+Math.floor(Date.now()/10000);
+  let r=null;
+  try{
+    const res=await fetch(CLIENT_REVIEW_BASE+'/cliente/cronograma/'+encodeURIComponent(token)+'/team-action',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Idempotency-Key':idem},
+      body:JSON.stringify({action:'adjustedItem',contentIndexes:idxs,uid:state.user.id,byName:state.user.name||''})
+    });
+    r=await res.json();
+    if(!res.ok||!r||r.ok!==true){flashToast('Não foi possível registrar a correção: '+((r&&r.error)||('HTTP '+res.status)));return;}
+  }catch(e){flashToast('Falha de rede ao registrar a correção. Tente novamente.');return;}
+  // Otimista APÓS confirmação do Worker (o onSnapshot confirma na sequência).
+  const now=r.at||Date.now();
   pend.forEach(p=>{const it=(t.clientItems||{})['i'+p.idx];if(it){it.cs=null;it.teamAdjustedAt=now;it.teamAdjustedBy=state.user.name||'Equipe';}});
-  await db.collection('tasks').doc(taskId).update(patch);
-  flashToast('Correção registrada — o cliente será avisado para revisar.');
+  const pushed=(r.push&&r.push.sent)||0;
+  flashToast(pushed>0?'Correção registrada — cliente avisado por notificação.':'Correção registrada — o cliente verá ao abrir o link (aviso por WhatsApp se necessário).');
   openDetails(taskId);
 }
 /* P1 — bloco de correções por conteúdo (quando o cliente pediu revisão/edição de itens). */

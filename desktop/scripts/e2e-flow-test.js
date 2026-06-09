@@ -1025,7 +1025,39 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   check('DH_HERO','openDetails usa detailHeroBlock + flowDetailsBlock (substitui blocos soltos)', /detailHeroBlock\(t\)\+\s*\n?\s*flowDetailsBlock\(t\)\+/.test(DH.replace(/\/\/[^\n]*\n/g,'\n')) || (/detailHeroBlock\(t\)\+/.test(DH) && /flowDetailsBlock\(t\)\+/.test(DH)));
   check('DH_COLLAPSE','"Detalhes do fluxo" é <details> colapsado contendo flowSummaryBlock+opPanelBlock', /<details class="det-flowdet"><summary>Detalhes do fluxo<\/summary>/.test(DH) && /flowSummaryBlock\(t\)\+opPanelBlock\(t\)/.test(DH));
   check('DH_NO_GROUPS','Rodapé SEM grupos de UI "Ações do cliente"/"Ações da tarefa" concorrentes', DH.indexOf('det-act-lbl">Ações do cliente')===-1 && DH.indexOf('det-act-lbl">Ações da tarefa')===-1);
-  check('DH_TEAMFIX_WRITE','markItemsAdjusted zera cs + grava teamAdjustedAt/By + history equipe_corrigiu_item', /async function markItemsAdjusted/.test(DH) && /teamAdjustedAt/.test(DH) && /equipe_corrigiu_item/.test(DH));
+  // ═══ CORREÇÃO ARQUITETURAL: "Marcar como corrigido" passa pela CAMADA CENTRAL (Worker) ═══
+  const mia=(DH.match(/async function markItemsAdjusted\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];
+  check('DH_TEAMFIX_NO_DIRECT_WRITE','markItemsAdjusted NÃO grava direto no Firestore (sem db.collection/update/FieldValue)',
+    mia.length>0 && mia.indexOf('db.collection')===-1 && mia.indexOf('FieldValue')===-1 && mia.indexOf('.update(')===-1);
+  check('DH_TEAMFIX_CENTRAL','markItemsAdjusted chama a rota central do Worker (CLIENT_REVIEW_BASE + /team-action)',
+    /CLIENT_REVIEW_BASE\+'\/cliente\/cronograma\/'\+encodeURIComponent\(token\)\+'\/team-action'/.test(mia));
+  check('DH_TEAMFIX_ONLY_PENDING','envia SOMENTE os itens pendentes da fase (contentIndexes = pendingClientItems)',
+    /const idxs=pend\.map\(p=>p\.idx\);/.test(mia) && /contentIndexes:idxs/.test(mia));
+  check('DH_TEAMFIX_AUTH_UID','autentica com uid do usuário logado (role-lookup no Worker) — SEM secret no app',
+    /uid:state\.user\.id/.test(mia) && mia.indexOf('X-Team-Key')===-1 && mia.indexOf('TEAM_API_KEY')===-1);
+  check('DH_TEAMFIX_IDEMPOTENCY','envia Idempotency-Key estável (uid|task|itens|janela 10s) — duplo clique não duplica',
+    /'Idempotency-Key':idem/.test(mia) && /Math\.floor\(Date\.now\(\)\/10000\)/.test(mia));
+  check('DH_TEAMFIX_NO_FAKE_OK','otimismo SÓ após resposta ok do Worker; erro vira toast honesto (sem fingir sucesso)',
+    /if\(!res\.ok\|\|!r\|\|r\.ok!==true\)\{flashToast/.test(mia) && /Falha de rede ao registrar a correção/.test(mia));
+  // Worker (branch V64.44) — a rota central faz o trabalho completo:
+  (function(){
+    const W44 = readFromGit('worker/v64-42-team-adjust-idem-cleanup', 'cloudflare-worker.js');
+    check('DH_W44_READ','Worker V64.44 legível (branch worker/v64-42-team-adjust-idem-cleanup)', W44.length>10000);
+    check('DH_W44_ROLE_LOOKUP','team-action valida uid via lookupTeamUser (users/{uid}: ativo + Social/Admin) — 403 caso contrário',
+      /async function lookupTeamUser/.test(W44) && /TEAM_ROLE_KW/.test(W44) && /unauthorized: requer X-Team-Key \(server\) ou uid de usuário Social\/Admin ativo/.test(W44));
+    check('DH_W44_CLEARS_PRESERVES_PHASE','rota limpa clientItems[iX].cs (nullValue) preservando phase + history equipe_corrigiu_item',
+      /cs: \{ nullValue: null \}/.test(W44) && /equipe_corrigiu_item/.test(W44) && !/clientItems\." \+ key \+ "\.phase/.test(W44.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)[0]));
+    check('DH_W44_NOTIFY','rota chama notifyWorkflowEvent(theme_adjusted_by_team|final_adjusted_by_team) na camada central',
+      /final_adjusted_by_team" : "theme_adjusted_by_team/.test(W44));
+    check('DH_W44_PUSH_WHEN_SUBS','engine TENTA Web Push real quando há subscription+VAPID (broadcastWebPush)',
+      /subs\.length && env\.VAPID_PRIVATE_KEY && env\.VAPID_PUBLIC_KEY/.test(W44) && /await broadcastWebPush\(env, subs/.test(W44));
+    check('DH_W44_FALLBACK','engine registra fallback whatsapp_premium quando push indisponível/falha',
+      /fallback = "whatsapp_premium"|fallback: "whatsapp_premium"/.test(W44));
+    check('DH_W44_IDEM_ROUTE','rota team-action tem Idempotency-Key próprio (replay X-Idempotency-Replayed)',
+      /idempotency\.local\/team\//.test(W44));
+    check('DH_W44_PUSH_NEVER_BLOCKS','falha de push NUNCA bloqueia a ação (try/catch no notify)',
+      /catch \(e\) \{ pushResult = \{ sent: 0, error: e && e\.message \}; \}/.test(W44));
+  })();
   check('DH_HANDLERS','Handlers data-teamfix e data-goboard registrados', /data-teamfix\]/.test(DH) && /data-goboard\]/.test(DH));
   check('DH_PHASEAWARE_FN','hasPendingItemRevision é phase-aware via pendingClientItems (espelho Worker V64.41)', /function hasPendingItemRevision\(t\)\{return pendingClientItems\(t\)\.length>0;\}/.test(DH) && /it\.phase===ph/.test(DH));
 })();
