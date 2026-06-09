@@ -37,7 +37,9 @@ import org.robolectric.annotation.GraphicsMode
 // nas larguras 360dp e 412dp (validação mobile exigida).
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(application = Application::class, sdk = [34], qualifiers = "pt-rBR-w411dp-h914dp-xhdpi")
+// Janela ALTA (h3800dp): a coluna com os 8 estados mede ~3500dp; com a altura default (h914dp)
+// o Robolectric CLIPA a captura na janela e so o estado 1 sai no PNG.
+@Config(application = Application::class, sdk = [34], qualifiers = "pt-rBR-w411dp-h3800dp-xhdpi")
 class DetailHierarchyScreenshotTest {
 
     @get:Rule
