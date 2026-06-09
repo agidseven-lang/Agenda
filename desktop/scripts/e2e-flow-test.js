@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.130-beta-task-tabs-kanban-only';
+const ANDROID_E2E_BRANCH = 'app/local-designer-role-parity';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -515,12 +515,24 @@ check('N_MOVE4', 'TaskRepo.move usa designerStatusPatch quando designerAxis', /i
 check('N_MOVE5', 'TasksScreen detecta eixo do designer e chama move(...designerAxis)', /val designerAxis = TaskVisibility\.isDesignerFlow/.test(KT_SCREEN) && /TaskRepo\.move\(target, opt\.target, currentUid, designerAxis\)/.test(KT_SCREEN));
 // ===== task-flow-fix (Android): paridade do estado "Designer em produção" =====
 check('N_FLOW1', 'Android tem o estado "aguardando_designer_iniciar" ("Aguardando designer iniciar")', /OpCol\("aguardando_designer_iniciar", "Aguardando designer iniciar"\)/.test(KT_VIS));
-check('N_FLOW2', 'Android operationalCol: andamento/revisao -> "aguardando_designer" (em produção)', /if \(dc == "andamento" \|\| dc == "revisao"\) return "aguardando_designer"/.test(KT_VIS));
+check('N_FLOW2', 'Android operationalCol: andamento -> "aguardando_designer"; revisao -> "aguardando_designer_revisao" (paridade f96aa2e)', /if \(dc == "andamento"\) return "aguardando_designer"/.test(KT_VIS) && /if \(dc == "revisao"\) return "aguardando_designer_revisao"/.test(KT_VIS));
 check('N_FLOW3', 'Android operationalCol: recém-enviado (afazer) -> "aguardando_designer_iniciar" (NÃO em produção)', /return "aguardando_designer_iniciar"/.test(KT_VIS));
 check('N_FLOW4', 'Android versionName = 1.0.130-beta-task-tabs-kanban-only', /versionName "1.0.130-beta-task-tabs-kanban-only"/.test(GRADLE));
 // CORREÇÃO 3 (Android): colunas por contexto.
-check('N7', 'Colunas reduzidas: SOCIAL_COLS4 / DESIGNER_COLS3 / CLIENT_COLS4', /SOCIAL_COLS4/.test(KT_VIS) && /DESIGNER_COLS3/.test(KT_VIS) && /CLIENT_COLS4/.test(KT_VIS));
-check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerCol3)', /clientCol4\(t\)/.test(KT_SCREEN) && /designerCol3\(t\)/.test(KT_SCREEN));
+check('N7', 'Colunas por papel: SOCIAL_COLS4 / DESIGNER_COLS4 / CLIENT_COLS4', /SOCIAL_COLS4/.test(KT_VIS) && /DESIGNER_COLS4/.test(KT_VIS) && /CLIENT_COLS4/.test(KT_VIS));
+check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerColView)', /clientCol4\(t\)/.test(KT_SCREEN) && /designerColView\(t\)/.test(KT_SCREEN));
+// ===== PASSO 3 — PARIDADE ANDROID do role-aware do Designer (espelha Desktop f96aa2e) =====
+check('N_RA1', 'Android DESIGNER_COLS4 = 4 colunas incl. "Revisão/Ajuste"', /val DESIGNER_COLS4 = listOf\([\s\S]*?OpCol\("revisao", "Revisão\/Ajuste"\)[\s\S]*?OpCol\("entregue"/.test(KT_VIS));
+check('N_RA2', 'Android designerColView NÃO colapsa revisao (coluna própria)', /fun designerColView\(t: TaskItem\): String = when \(designerCol\(t\)\) \{[\s\S]*?"revisao" -> "revisao"/.test(KT_VIS));
+check('N_RA3', 'Android OPERATIONAL_COLS tem "Designer em revisão"', /OpCol\("aguardando_designer_revisao", "Designer em revisão"\)/.test(KT_VIS));
+check('N_RA4', 'Android TaskCardPro é role-aware (designerView) — badge/próxima do designer', /designerView: Boolean = false/.test(KT_SCREEN) && /val isDesignerCard = designerView && Sectors\.of\(task\.sector\)\.key == "cronograma" && TaskVisibility\.hasDesigner\(task\)/.test(KT_SCREEN) && /TaskVisibility\.designerNextShort\(task\)/.test(KT_SCREEN));
+check('N_RA5', 'Android quadro do designer usa DESIGNER_COLS4 + designerColView + card designerView', /isDesignerBoard -> TaskVisibility\.DESIGNER_COLS4\.map/.test(KT_SCREEN) && /isDesignerBoard -> TaskVisibility\.designerColView\(t\)/.test(KT_SCREEN) && /designerView = designerView/.test(KT_SCREEN));
+check('N_RA6', 'Android designerNextShort existe (próxima ação do designer)', /fun designerNextShort\(t: TaskItem\): String = when \(designerColView\(t\)\)/.test(KT_VIS));
+// Roborazzi de paridade + workflow só-screenshot (sem APK)
+const KT_RATEST = readAndroid('android-native-beta/app/src/test/java/br/com/idseven/agenda/nativebeta/DesignerRoleScreenshotTest.kt');
+check('N_RA7', 'Teste Roborazzi do role-aware do Designer existe (perspectiva designer × social)', /class DesignerRoleScreenshotTest/.test(KT_RATEST) && /fun designer_perspective/.test(KT_RATEST) && /fun social_perspective/.test(KT_RATEST) && /designerView = designerView/.test(KT_RATEST));
+const WF_SHOT = readFromGit(ANDROID_E2E_BRANCH, '.github/workflows/android-screenshot.yml') || '';
+check('N_RA8', 'Workflow só-screenshot (Roborazzi, SEM assembleRelease/APK)', /recordRoborazziDebug/.test(WF_SHOT) && !/assembleRelease/.test(WF_SHOT) && /NENHUM APK foi gerado|nenhum \.apk/.test(WF_SHOT));
 check('N9', 'TaskVisibility mantém isFullyComplete (fonte única de conclusão)', /fun\s+isFullyComplete/.test(KT_VIS));
 check('N10', 'TasksTopTabs com chips (paridade Desktop)', /Person|Visibility|GridView|horizontalScroll/.test(KT_TABS));
 
