@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.127 (Timeline)</title>
+<title>ID Seven · Desktop 1.0.128 (Fluxo)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -626,16 +626,22 @@
   .tc-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
   .tc-tag{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:9px;font-size:11.5px;font-weight:800;white-space:nowrap}
   /* FASE 2 (passo 2) — timeline COMPACTA do card (discreta, premium, ~3 linhas) */
+  /* task-flow-fix — timeline COMPACTA do card: legível e premium em qualquer largura.
+     Cada linha tem uma "etiqueta" curta (Agora/Próxima/Último) + valor que QUEBRA em até
+     2 linhas (line-clamp), em vez de cortar com reticências numa linha só. */
   .tc-tl{margin-top:12px;padding-top:11px;border-top:1px solid var(--line-soft)}
-  .tc-tl-rail{display:flex;align-items:center;gap:0;margin-bottom:8px}
+  .tc-tl-rail{display:flex;align-items:center;gap:0;margin-bottom:9px}
   .tc-tl-rail i{width:9px;height:9px;border-radius:50%;flex:none}
   .tc-tl-rail .ln{flex:1;height:2px;border-radius:1px;min-width:5px}
-  .tc-tl-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--soft);line-height:1.35;min-width:0}
+  .tc-tl-k{flex:none;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--faint);background:var(--surface2);border-radius:5px;padding:2px 6px;line-height:1.2;align-self:flex-start;margin-top:1px}
+  .tc-tl-row{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--soft);line-height:1.35;min-width:0}
   .tc-tl-row svg{width:13px;height:13px;flex:none;color:var(--faint)}
-  .tc-tl-now{font-weight:800;color:var(--ink);white-space:nowrap;flex:none}
-  .tc-tl-sep{color:var(--faint);flex:none}
-  .tc-tl-next{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-  .tc-tl-last{font-size:11px;color:var(--faint);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tc-tl-now{font-weight:800;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tc-tl-next{display:flex;align-items:flex-start;gap:7px;margin-top:5px;font-size:11.5px;color:var(--soft);line-height:1.35}
+  .tc-tl-next>span:last-child{min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tc-tl-last{display:flex;align-items:flex-start;gap:7px;margin-top:5px;font-size:11px;color:var(--faint);line-height:1.3}
+  .tc-tl-last>span:last-child{min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .tc-tag-soft{background:var(--surface2);color:var(--soft)}
   /* 4) Temas (premium) */
   .tc-themes{margin-top:14px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:14px}
@@ -1075,6 +1081,19 @@
   body:not(.desktop) .d-board-tools.tbar{flex-wrap:wrap}
   body:not(.desktop) .d-board-tools.tbar .bsearch{flex:1 1 100%}
   body:not(.desktop) .d-board-tools.tbar .tchips{justify-content:flex-start;flex:1 1 100%}
+  /* task-flow-fix — BARRA DE ABAS ÚNICA E PERSISTENTE (Meu quadro/Cliente/Designers/Social
+     Medias/Setores). Sempre visível, estável e alinhada em TODAS as visões; sticky no topo. */
+  .tasks-tabbar{display:flex;align-items:center;margin:0 0 12px;padding:6px 0 8px}
+  .tasks-tabbar .tchips{display:flex;align-items:center;gap:8px;flex:1 1 auto;overflow-x:auto;
+    scrollbar-width:none;padding-bottom:2px}
+  .tasks-tabbar .tchips::-webkit-scrollbar{display:none}
+  /* Desktop: gruda logo abaixo da topbar (z abaixo da topbar p/ não sobrepor), fundo sólido
+     para o conteúdo rolar por baixo de forma limpa. */
+  body.desktop .tasks-tabbar{position:sticky;top:var(--d-topbar);z-index:18;background:var(--bg);
+    margin:0 auto 12px;padding:10px 0 10px;border-bottom:1px solid var(--line-soft)}
+  /* Mobile/web do renderer: não-sticky (evita sobrepor a topbar), mas SEMPRE presente. */
+  body:not(.desktop) .tasks-tabbar{padding:4px 0 10px}
+  body:not(.desktop) .tasks-tabbar .tchips{flex-wrap:nowrap}
   /* Resumo dos dois eixos no Detalhes */
   .det-flow{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px 15px}
   .det-flow-col{flex:1;min-width:160px}
@@ -1185,7 +1204,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.127 · Timeline</span><br>
+    <span class="pill-ver">Desktop 1.0.128 · Fluxo</span><br>
     espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b> · ref app/main
   </div>
 </section>
@@ -1200,7 +1219,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.127 · Timeline</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.128 · Fluxo</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1216,7 +1235,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.127', tag:'Timeline', apk:'1.0.109-beta-whatsapp-guided-card-send' };
+const APP_VER={ desktop:'1.0.128', tag:'Fluxo', apk:'1.0.109-beta-whatsapp-guided-card-send' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1486,7 +1505,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.127 · Timeline</span><br>espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.128 · Fluxo</span><br>espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -1507,7 +1526,8 @@ function render(){
     else if(state.roleBoards){body=renderRoleBoards();}
     else if(state.boardSector){body=renderBoard();}
     else body=renderHub();
-    c.innerHTML=body;
+    // task-flow-fix — abas SEMPRE presentes e estáveis (1 só barra, acima de toda sub-view).
+    c.innerHTML=taskTabBar()+body;
     afterBoard();
   }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
@@ -1757,10 +1777,16 @@ function taskChips(){
 // de Tarefas (ver dispatch em render()). renderTasksTabs/boardToolbar NÃO emitem mais chips
 // (evita duplicar, sumir ou aparecer em container errado — exigência do teste real).
 function renderTasksTabs(active){return '';}
-// 1.0.106 — TOOLBAR ÚNICA da área de Tarefas: busca + chips na MESMA moldura, SEMPRE
-// abaixo do título da tela (NUNCA no topo global, NUNCA acima de "Quadros"). Os chips ficam
-// ao lado da busca (à direita no desktop; quebram para baixo no mobile, via CSS .d-board-tools.tbar).
-function boardToolbar(){return '<div class="d-board-tools tbar"><input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"><div class="tchips">'+taskChips()+'</div></div>';}
+// task-flow-fix — BARRA DE ABAS ÚNICA E PERSISTENTE (Meu quadro/Cliente/Designers/Social
+// Medias/Setores). Renderizada UMA única vez por render() (dispatch da aba "tarefas"), ACIMA
+// de QUALQUER sub-view — inclusive os HUBS (Designers/Social Medias/Setores). Sticky no topo
+// do #content (abaixo da topbar): nunca some, nunca sobe para fora da área útil, nunca duplica
+// e fica estável ao trocar de visão. Bug do teste real: ao abrir "Designers" as abas sumiam
+// porque os hubs de lista não traziam toolbar; agora a barra é global e independente da view.
+function taskTabBar(){return '<div class="tasks-tabbar"><div class="tchips">'+taskChips()+'</div></div>';}
+// 1.0.106 — TOOLBAR da sub-view: SOMENTE a BUSCA (as abas agora vivem em taskTabBar()).
+// Mantida abaixo do título; os hubs não a usam (não têm busca), mas SEMPRE têm as abas.
+function boardToolbar(){return '<div class="d-board-tools tbar"><input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div>';}
 function renderClientFlowBoard(){
   let list=state.tasks.filter(isClientFlow);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
@@ -1834,14 +1860,18 @@ function socialCol(t){
    A aprovação parcial do cliente NÃO conclui a operação: enquanto faltar designer,
    legenda, post ou aprovação final, a tarefa fica num estágio operacional aberto. */
 const OPERATIONAL_COLS=[
-  {key:'afazer',              label:'A Fazer',                          color:'#6E7480'},
-  {key:'producao',            label:'Aguardando aprovação dos temas',   color:'#22D3EE'},
-  {key:'aguardando_envio',    label:'Aguardando envio ao designer',     color:'#22D3EE'},
-  {key:'aguardando_designer', label:'Designer em produção',             color:'#A78BFA'},
-  {key:'aguardando_legenda',  label:'Aguardando legendas e posts',      color:'#5B6CFF'},
-  {key:'aguardando_revisao',  label:'Ajuste solicitado pelo cliente',   color:'#F59E0B'},
-  {key:'aguardando_final',    label:'Aguardando aprovação final',       color:'#34D399'},
-  {key:'concluido',           label:'Concluído final',                  color:'#10B981'},
+  {key:'afazer',                     label:'A Fazer',                          color:'#6E7480'},
+  {key:'producao',                   label:'Aguardando aprovação dos temas',   color:'#22D3EE'},
+  {key:'aguardando_envio',           label:'Aguardando envio ao designer',     color:'#22D3EE'},
+  // FLUXO CORRETO (task-flow-fix): "enviado ao designer" ≠ "designer produzindo".
+  // Designer recebeu mas AINDA NÃO iniciou (designerFlowStatus afazer/vazio) → este estado.
+  {key:'aguardando_designer_iniciar',label:'Aguardando designer iniciar',      color:'#7C83FF'},
+  // "Designer em produção" SÓ quando o designer move p/ "Em andamento" (designerFlowStatus='andamento').
+  {key:'aguardando_designer',        label:'Designer em produção',             color:'#A78BFA'},
+  {key:'aguardando_legenda',         label:'Aguardando legendas e posts',      color:'#5B6CFF'},
+  {key:'aguardando_revisao',         label:'Ajuste solicitado pelo cliente',   color:'#F59E0B'},
+  {key:'aguardando_final',           label:'Aguardando aprovação final',       color:'#34D399'},
+  {key:'concluido',                  label:'Concluído final',                  color:'#10B981'},
 ];
 const OP_KEYS=OPERATIONAL_COLS.map(c=>c.key);
 // Há produção pendente? (alguma legenda vazia OU algum Feed sem arte)
@@ -1874,8 +1904,13 @@ function operationalCol(t){
   if(cf==='revisao'||hasPendingItemRevision(t))return 'aguardando_revisao'; // cliente pediu ajuste
   if(cf==='reenviado')return 'aguardando_final';
   if(hasDesigner(t)){
-    if(designerCol(t)!=='concluido')return 'aguardando_designer';   // designer ainda produzindo
-    return pendingProduction(t)?'aguardando_legenda':'aguardando_final'; // entregou: falta legenda/post ou pronto p/ reenvio
+    const dc=designerCol(t);
+    if(dc==='concluido')return pendingProduction(t)?'aguardando_legenda':'aguardando_final'; // entregou: falta legenda/post ou pronto p/ reenvio
+    // FLUXO CORRETO (task-flow-fix): "Designer em produção" SÓ quando o designer realmente
+    // iniciou (andamento) ou está retrabalhando (revisao). Recém-enviado (afazer/vazio) NÃO
+    // pode antecipar "em produção" — fica "Aguardando designer iniciar" até a transição real.
+    if(dc==='andamento'||dc==='revisao')return 'aguardando_designer';
+    return 'aguardando_designer_iniciar';
   }
   // SEM designer atribuído: NUNCA mostrar produção/legenda/entrega.
   if(cf==='aprovado')return 'aguardando_envio';                          // temas aprovados → falta ENVIAR ao designer
@@ -1888,6 +1923,7 @@ function nextActionText(t){
     case 'afazer':              return 'Criar o cronograma e enviar ao cliente.';
     case 'producao':            return 'Enviado ao cliente. Próxima etapa: aguardar o feedback do cliente sobre os temas.';
     case 'aguardando_envio':    return 'Temas aprovados. Próxima etapa: enviar o cronograma ao designer.';
+    case 'aguardando_designer_iniciar': return 'Enviado ao designer. Próxima etapa: aguardar o designer iniciar a produção.';
     case 'aguardando_designer': return 'Designer produzindo. Próxima etapa: aguardar a entrega do designer.';
     case 'aguardando_legenda':  return 'Designer entregou. Próxima etapa: revisar, adicionar legenda e posts (Feed/Story).';
     case 'aguardando_revisao':  return 'Cliente pediu ajuste. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link.';
@@ -1895,6 +1931,23 @@ function nextActionText(t){
     case 'concluido':           return 'Aprovação final concluída. Tarefa encerrada operacionalmente.';
   }
   return 'Acompanhar o andamento.';
+}
+// task-flow-fix — "Próxima ação" CURTA p/ a timeline COMPACTA do card (sem cortar o essencial).
+// O texto completo continua em nextActionText (detalhe/painel). Mantém leitura premium em
+// largura estreita: cabe em até 2 linhas via line-clamp (CSS .tc-tl-next).
+function nextActionShort(t){
+  switch(operationalCol(t)){
+    case 'afazer':                      return 'Criar e enviar ao cliente';
+    case 'producao':                    return 'Aguardar feedback do cliente';
+    case 'aguardando_envio':            return 'Enviar ao designer';
+    case 'aguardando_designer_iniciar': return 'Aguardar o designer iniciar';
+    case 'aguardando_designer':         return 'Aguardar entrega do designer';
+    case 'aguardando_legenda':          return 'Adicionar legendas e posts';
+    case 'aguardando_revisao':          return 'Corrigir e reenviar ao cliente';
+    case 'aguardando_final':            return 'Aguardar aprovação final';
+    case 'concluido':                   return 'Tarefa encerrada';
+  }
+  return 'Acompanhar o andamento';
 }
 function opColOf(k){return OPERATIONAL_COLS.find(c=>c.key===k)||OPERATIONAL_COLS[0];}
 // ===== FASE 1 — STATUS UNIFICADO (clientStatusView) =====================================
@@ -1962,6 +2015,9 @@ function taskTimeline(t){
   const cf=clientCol(t);
   const hasD=hasDesigner(t);
   const delivered=designerDelivered(t);
+  // FLUXO CORRETO (task-flow-fix): o designer só está "em produção" quando moveu p/ andamento
+  // (ou retrabalho 'revisao'), ou já entregou. Recém-enviado (afazer) NÃO conta como produção.
+  const designerStarted=hasD&&(designerCol(t)==='andamento'||designerCol(t)==='revisao'||delivered);
   // MESMAS expressões do opPanelBlock (não-regressão de estado):
   const themesOk=(cf==='aprovado'||cf==='producao'||cf==='revisao'||cf==='reenviado'||cf==='concluido'||(t.clientReview&&t.clientReview.status==='aprovado'));
   const sent=(cf!=='afazer')||!!(t.clientSentBy||t.clientReviewToken||t.shareToken);
@@ -1975,7 +2031,7 @@ function taskTimeline(t){
     {key:'enviado_cliente',   label:'Enviado ao cliente',            done:!!sent,          ev:['enviado_cliente','enviou','share','link','sent_to_client']},
     {key:'temas_aprovados',   label:'Temas aprovados',               done:!!themesOk,      ev:['approveall','approve','aprovou','aprovado']},
     {key:'enviado_designer',  label:'Enviado ao designer',           done:!!hasD,          ev:['designer','sent_to_designer','atribu']},
-    {key:'designer_producao', label:'Designer em produção',          done:!!delivered,     ev:['designer_moved','andamento','producao']},
+    {key:'designer_producao', label:'Designer em produção',          done:!!designerStarted, ev:['designer_moved','andamento','producao']},
     {key:'designer_entregou', label:'Designer entregou',             done:!!delivered,     ev:['concluido','entreg','delivered']},
     {key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!prodOk,        ev:['social_producao','production','legenda','social_editou']},
     {key:'enviado_final',     label:'Enviado para aprovação final',  done:!!resent,        ev:['reenviado_cliente','final_review','reenviado']},
@@ -2086,7 +2142,7 @@ function renderSocialsHub(){
     '<div class="scr" style="padding-top:8px">';
   const cards=sm.length?sm.map(d=>{const tasks=state.tasks.filter(t=>socialOf(t)===d.u.id);
     const open=tasks.filter(t=>operationalCol(t)!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
-    const waiting=tasks.filter(t=>operationalCol(t)==='aguardando_designer').length;
+    const waiting=tasks.filter(t=>{const oc=operationalCol(t);return oc==='aguardando_designer'||oc==='aguardando_designer_iniciar';}).length;
     return '<button class="bcard" data-socialboard="'+d.u.id+'">'+avatar(d.u,44)+
       '<div class="bm"><div class="bl">'+esc(d.u.name||'Social Media')+'</div><div class="bd">'+esc(d.u.role||'Social Media')+'</div>'+
         '<div class="bp"><span class="pill" style="background:'+withAlpha('#22D3EE',.16)+';color:#22D3EE">'+open+' aberta'+(open===1?'':'s')+'</span>'+
@@ -2137,9 +2193,10 @@ function renderBoard(){
     '</div></div>'+
     '<div class="scr" style="padding-top:0"><div class="d-board-tools tbar">'+
       '<input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'">'+
+      // task-flow-fix: as abas (taskChips) agora vivem em taskTabBar() — aqui fica só o
+      // filtro contextual "Minhas tarefas" do quadro de setor (sem duplicar as abas).
       '<div class="tchips">'+
         (u?'<button class="chip" data-bmine="1" style="'+(boardMine?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Minhas tarefas</button>':'')+
-        taskChips()+
       '</div>'+
     '</div>';
     h+='<div class="kanban">';
@@ -2211,13 +2268,16 @@ function taskCardTimeline(t){
   });
   if(ajuste&&ajuste.state==='attention')rail+='<i title="Ajuste pedido pelo cliente" style="background:#F59E0B;margin-left:5px"></i>';
   const ownU=tl.owner&&tl.owner.id?state.users.find(u=>u.id===tl.owner.id):null;
-  const ownerTxt=(tl.owner&&tl.owner.role!=='—')?(tl.owner.role+(ownU&&ownU.name?(' · '+ownU.name.split(' ')[0]):'')):'Encerrado';
+  const ownerTxt=(tl.owner&&tl.owner.role!=='—')?(tl.owner.role+(ownU&&ownU.name?(' · '+ownU.name.split(' ')[0]):'')):'Fluxo encerrado';
+  const nextTxt=nextActionShort(t);   // task-flow-fix: texto CURTO (não corta o essencial)
   const lastTxt=tl.last?(esc(tl.last.label)+(tl.last.at?(' · '+_tlRelAgo(tl.last.at)):'')):'';
+  // Layout em LINHAS empilhadas (sem competir horizontalmente): "Agora" (responsável) ·
+  // "Próxima" (ação curta, até 2 linhas) · "Último" (evento humanizado, até 2 linhas).
   return '<div class="tc-tl">'+
     '<div class="tc-tl-rail">'+rail+'</div>'+
-    '<div class="tc-tl-row">'+svg('flag')+'<span class="tc-tl-now">'+esc(ownerTxt)+'</span>'+
-      (tl.next?'<span class="tc-tl-sep">·</span><span class="tc-tl-next">'+esc(tl.next)+'</span>':'')+'</div>'+
-    (lastTxt?'<div class="tc-tl-last">Último: '+lastTxt+'</div>':'')+
+    '<div class="tc-tl-row">'+svg('flag')+'<span class="tc-tl-k">Agora</span><span class="tc-tl-now">'+esc(ownerTxt)+'</span></div>'+
+    (nextTxt?'<div class="tc-tl-next"><span class="tc-tl-k">Próxima</span><span>'+esc(nextTxt)+'</span></div>':'')+
+    (lastTxt?'<div class="tc-tl-last"><span class="tc-tl-k">Último</span><span>'+lastTxt+'</span></div>':'')+
   '</div>';
 }
 function taskCard(t){
@@ -2581,8 +2641,9 @@ async function sendToDesigner(taskId,designerId,dl){
     // "Em produção" e ENTRA no quadro do designer em "A Fazer". Não some do Cliente.
     clientFlowStatus:'producao', clientWorkflowStage:'producao',
     designerFlowStatus:'afazer', designerWorkflowStage:'afazer',
-    // EIXO OPERACIONAL (snapshot): aguardando o designer entregar.
-    operationalStatus:'aguardando_designer', socialFlowStatus:'aguardando_designer', socialWorkflowStage:'aguardando_designer',
+    // EIXO OPERACIONAL (snapshot): designer recebeu mas AINDA NÃO iniciou. NÃO é "em produção"
+    // (task-flow-fix) — vira "aguardando_designer" só quando o designer mover p/ "Em andamento".
+    operationalStatus:'aguardando_designer_iniciar', socialFlowStatus:'aguardando_designer_iniciar', socialWorkflowStage:'aguardando_designer_iniciar',
     designerResponsibleId:designerId, designerResponsibleName:(d.name||''),
     pendingDesignerDelivery:true, pendingSocialReview:true, finalApprovalRequired:true, finalApprovalCompleted:false,
     // Preserva o DONO SOCIAL: a tarefa continua no quadro da Social Media mesmo após
@@ -3456,7 +3517,7 @@ function _editingNow(){
   const isField=(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable);
   if(!isField)return false;
   // Foco na busca/filtros da toolbar do quadro NUNCA bloqueia o render.
-  if(a.closest&&a.closest('.d-board-tools,.tbar,.tflow-tabs,.tflow-chipbar,.bsearch'))return false;
+  if(a.closest&&a.closest('.d-board-tools,.tbar,.tasks-tabbar,.tflow-tabs,.tflow-chipbar,.bsearch'))return false;
   // Só adia quando o foco está num campo do wizard de criação aberto.
   if(state.form&&a.closest&&a.closest('#content'))return true;
   return false;
@@ -3481,7 +3542,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.127-beta-task-timeline';
+const BUILD='1.0.128-beta-task-flow-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+

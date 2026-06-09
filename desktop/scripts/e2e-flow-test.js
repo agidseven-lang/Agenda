@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.38-wa-card-link-cta / Desktop 1.0.127-beta-task-timeline / Android 1.0.109 (congelado)
+ * Agenda ID Seven · Worker V64.38-wa-card-link-cta / Desktop 1.0.128-beta-task-flow-fix / Android 1.0.109 (congelado)
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -83,7 +83,13 @@ function operationalCol(t) {
   const cf = clientCol(t);
   if (cf === 'revisao' || hasPendingItemRevision(t)) return 'aguardando_revisao';
   if (cf === 'reenviado') return 'aguardando_final';
-  if (hasDesigner(t)) { if (designerCol(t) !== 'concluido') return 'aguardando_designer'; return pendingProduction(t) ? 'aguardando_legenda' : 'aguardando_final'; }
+  if (hasDesigner(t)) {
+    const dc = designerCol(t);
+    if (dc === 'concluido') return pendingProduction(t) ? 'aguardando_legenda' : 'aguardando_final';
+    // task-flow-fix: "Designer em produção" SÓ com andamento/revisao; recém-enviado (afazer) NÃO.
+    if (dc === 'andamento' || dc === 'revisao') return 'aguardando_designer';
+    return 'aguardando_designer_iniciar';
+  }
   if (cf === 'aprovado') return 'aguardando_envio';
   if (cf === 'afazer') return 'afazer';
   return 'producao';
@@ -126,7 +132,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.38-wa-card-link-cta · Desktop 1.0.127 · Android 1.0.109 (Fase 1 status unico + Fase 2 timeline)');
+console.log(' Worker V64.38-wa-card-link-cta · Desktop 1.0.128 · Android 1.0.109 (task-flow-fix: card legivel + abas estaveis + designer iniciar)');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -150,8 +156,8 @@ const FLOW = [
     { cliente: 'enviado', social: 'producao', designer: 'afazer', meu_quadro: 'andamento' }],
   ['24 Cliente aprova TODOS os temas', { sector: 'cronograma', status: 'andamento', clientFlowStatus: 'aprovado', cronStatus: 'aprovado_cliente', cronContents: TH },
     { cliente: 'aprovado', social: 'aguardando_envio', designer: 'afazer', meu_quadro: 'andamento' }],
-  ['28 Social envia ao Designer', { sector: 'cronograma', status: 'afazer', clientFlowStatus: 'producao', assignedDesignerId: 'd', designerFlowStatus: 'afazer', operationalStatus: 'aguardando_designer', cronStatus: 'sent_to_designer', cronContents: TH },
-    { cliente: 'producao', social: 'aguardando_designer', designer: 'afazer', meu_quadro: 'andamento' }],
+  ['28 Social envia ao Designer', { sector: 'cronograma', status: 'afazer', clientFlowStatus: 'producao', assignedDesignerId: 'd', designerFlowStatus: 'afazer', operationalStatus: 'aguardando_designer_iniciar', cronStatus: 'sent_to_designer', cronContents: TH },
+    { cliente: 'producao', social: 'aguardando_designer_iniciar', designer: 'afazer', meu_quadro: 'andamento' }],
   ['33 Designer em produção', { sector: 'cronograma', status: 'andamento', clientFlowStatus: 'producao', assignedDesignerId: 'd', designerFlowStatus: 'andamento', cronContents: TH },
     { cliente: 'producao', social: 'aguardando_designer', designer: 'andamento', meu_quadro: 'andamento' }],
   ['37 Designer entregou (faltam legendas)', { sector: 'cronograma', status: 'andamento', clientFlowStatus: 'producao', assignedDesignerId: 'd', designerFlowStatus: 'concluido', cronContents: TH },
@@ -175,7 +181,7 @@ for (const [name, t, exp] of FLOW) {
     if (got[r] !== exp[r]) { ok = false; errs.push(`${r}=${got[r]}!=${exp[r]}`); }
   }
   // Regra de ouro: antes de existir designer, nunca aguardando_legenda/designer/final/concluido na social.
-  if (!hasDesigner(t) && ['aguardando_legenda', 'aguardando_designer', 'aguardando_final', 'concluido'].includes(got.social) && got.social !== exp.social) { ok = false; errs.push('proibido pre-designer'); }
+  if (!hasDesigner(t) && ['aguardando_legenda', 'aguardando_designer', 'aguardando_designer_iniciar', 'aguardando_final', 'concluido'].includes(got.social) && got.social !== exp.social) { ok = false; errs.push('proibido pre-designer'); }
   const disp = r => (r === 'designer' && !hasDesigner(t)) ? '—' : got[r];
   console.log('  ' + pad(name, 38) + '| ' + ROLES.map(r => pad(disp(r), 14)).join('') + '| ' + (ok ? C.g + 'OK' + C.x : C.r + errs.join('; ') + C.x));
   if (!ok) { BLOCKING++; FAILS.push(`[A] passo "${name}": ${errs.join('; ')}`); }
@@ -222,10 +228,15 @@ const moveStatusOnly = (t, s) => Object.assign({}, t, { status: s });
 const D0 = justSentToDesigner;                                  // designerFlowStatus='afazer'
 const dMove = moveDesigner(D0, 'andamento');                    // designer move -> Em andamento (correto)
 const dBug = moveStatusOnly(D0, 'andamento');                   // caminho antigo (bug)
+// task-flow-fix (BUG DO TESTE REAL): enquanto o designer NÃO iniciar (afazer), a Social NÃO
+// pode ver "Designer em produção". Deve ver "Aguardando designer iniciar".
+check('FLOW_FIX1', 'Recém-enviado (afazer): Social vê "Aguardando designer iniciar" (NÃO "Designer em produção")', operationalCol(D0) === 'aguardando_designer_iniciar');
+check('FLOW_FIX2', 'Recém-enviado (afazer): operationalCol NUNCA é "aguardando_designer"', operationalCol(D0) !== 'aguardando_designer');
+check('FLOW_FIX3', 'Designer já em "A Fazer" no quadro dele enquanto Social aguarda iniciar', boardCol4For(D0, 'D') === 'afazer');
 check('MOVE1', 'Designer board do PC mostra "Em andamento" (designerCol)', designerCol(dMove) === 'andamento');
 check('MOVE2', 'Meu quadro do designer no Android mostra "Em andamento" (boardCol4For)', boardCol4For(dMove, 'D') === 'andamento');
 check('MOVE3', 'NÃO fica preso em "A Fazer"', boardCol4For(dMove, 'D') !== 'afazer' && designerCol(dMove) !== 'afazer');
-check('MOVE4', 'Social vê "Designer em produção" (operationalCol=aguardando_designer)', operationalCol(dMove) === 'aguardando_designer');
+check('MOVE4', 'Só APÓS mover p/ andamento a Social vê "Designer em produção" (operationalCol=aguardando_designer)', operationalCol(dMove) === 'aguardando_designer');
 check('MOVE5', 'Cliente vê "Em produção" (clientCol=producao)', clientCol(dMove) === 'producao');
 check('MOVE6', 'REGRESSÃO coberta: gravar só status deixaria preso em "A Fazer"', designerCol(dBug) === 'afazer');
 // Entrega: designer move -> Entregue (designerFlowStatus='concluido') => Social "Aguardando legendas".
@@ -324,7 +335,7 @@ check('W_APPROVE4', 'Portal tem identidade Agenda ID Seven + Visão do Cliente +
 }
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check("D1", "package.json versão 1.0.127", /"version":\s*"1\.0\.127"/.test(DP));
+check("D1", "package.json versão 1.0.128", /"version":\s*"1\.0\.128"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -344,9 +355,15 @@ check('D_MSG4', 'Legenda usa "acesse o link" (não promete botão nativo no grup
 // CORREÇÃO 4: upload de Feed/Story não pula para o 1º post (preserva scroll da lista).
 check('D_UPLOAD', 'Produção preserva o scroll ao anexar arte (_prodKeepScroll + restore)', /function _prodKeepScroll\(\)/.test(DH) && /_prodKeepScroll\(\);renderProductionModal\(\)/.test(DH) && /\.pr-list'\);if\(_pl&&state\._prodScroll\)/.test(DH));
 // ===== REGRA FINAL (teste real): CHIPS SOMENTE dentro do Kanban; NUNCA no hub "Quadros". =====
-check('D5', 'boardToolbar() contém BUSCA + CHIPS na mesma moldura', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><input[^>]*><div class="tchips">'\+taskChips\(\)/.test(DH));
+// task-flow-fix — abas saíram da boardToolbar (agora vivem na barra ÚNICA taskTabBar).
+check('D5', 'boardToolbar() contém SOMENTE a busca (sem chips/abas)', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><input[^>]*><\/div>';\}/.test(DH) && !/function boardToolbar\(\)\{[^}]*taskChips/.test(DH));
+// ===== BARRA DE ABAS ÚNICA E PERSISTENTE (correção do teste real: abas sumiam em "Designers") =====
+check('D_TAB1', 'taskTabBar() existe e renderiza as abas (taskChips) numa barra .tasks-tabbar', /function taskTabBar\(\)\{return '<div class="tasks-tabbar"><div class="tchips">'\+taskChips\(\)\+'<\/div><\/div>';\}/.test(DH));
+check('D_TAB2', 'Dispatch da aba Tarefas PREPENDE taskTabBar() a TODA sub-view (abas sempre presentes)', /c\.innerHTML=taskTabBar\(\)\+body;/.test(DH));
+check('D_TAB3', 'taskChips() tem FONTE ÚNICA (chamado só por taskTabBar — sem duplicar abas)', (DH.match(/\+taskChips\(\)/g) || []).length === 1);
+check('D_TAB4', '.tasks-tabbar é sticky no desktop (estável ao rolar/trocar de visão)', /body\.desktop \.tasks-tabbar\{position:sticky/.test(DH));
 check('D6', 'SEM barra de chips no topo global (tasksChipBar/tflow-fixed removidos)', !/function tasksChipBar/.test(DH) && !/tflow-fixed/.test(DH));
-check('D7', 'Dispatch NÃO prepende chips ao topo (c.innerHTML=body)', /c\.innerHTML=body;/.test(DH) && !/c\.innerHTML=tasksChipBar/.test(DH));
+check('D7', 'Dispatch NÃO usa a antiga barra global tasksChipBar/tflow-fixed', !/c\.innerHTML=tasksChipBar/.test(DH) && !/tasksChipBar\(/.test(DH));
 // HUB "Quadros" (renderHub) NÃO pode ter chips/toolbar — só título + cards.
 const hubFn = (DH.match(/function renderHub\(\)\{[\s\S]*?\n\}/) || [''])[0];
 check('D8a', 'HUB "Quadros" SEM toolbar/chips (renderHub não chama boardToolbar)', hubFn.indexOf('boardToolbar()') === -1);
@@ -360,7 +377,9 @@ check('D8c', 'Hubs de lista (RoleBoards/Designers/Socials) SEM boardToolbar/chip
 // KANBAN tem a toolbar (busca + chips): Meu quadro / Cliente / Designer / Social / Setor.
 check('D8d', 'Kanban (PersonBoard/Client/Designer/Social) usa boardToolbar()',
   /function renderPersonBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderClientFlowBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderDesignerBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH) && /function renderSocialBoard\(\)\{[\s\S]*?boardToolbar\(\)/.test(DH));
-check('D8e', 'Kanban de Setor (renderBoard) tem toolbar com taskChips()', /function renderBoard\(\)\{[\s\S]*?d-board-tools tbar[\s\S]*?taskChips\(\)/.test(DH));
+// task-flow-fix — renderBoard (setor) mantém só o filtro "Minhas tarefas"; as abas vêm da taskTabBar.
+const rbFn = (DH.match(/function renderBoard\(\)\{[\s\S]*?\n\}/) || [''])[0];
+check('D8e', 'Kanban de Setor (renderBoard) NÃO duplica as abas (sem taskChips inline) e mantém "Minhas tarefas"', rbFn.indexOf('taskChips(') === -1 && /data-bmine="1"/.test(rbFn));
 // CORREÇÃO 3: colunas por contexto (sem excesso).
 check('D9', 'Colunas Social = 4 (A Fazer/Em andamento/Revisão/Finalizado)', /const SOCIAL_COLS4=\[[\s\S]*?Finalizado/.test(DH) && (DH.match(/const SOCIAL_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4);
 check('D10', 'Colunas Designer = 3 (A Fazer/Em andamento/Entregue)', (DH.match(/const DESIGNER_COLS3=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 3);
@@ -375,12 +394,12 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check("D20", "Rodapé mostra Desktop 1.0.127", /Desktop 1\.0\.127/.test(DH));
+check("D20", "Rodapé mostra Desktop 1.0.128", /Desktop 1\.0\.128/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check("D21", "Login/título/watermark mostram 1.0.127 (sem rótulo antigo)",
-  /<span class="pill-ver">Desktop 1\.0\.127/.test(DH) && /<title>ID Seven · Desktop 1\.0\.127/.test(DH) && /id="wpbadge">Desktop 1\.0\.127/.test(DH));
+check("D21", "Login/título/watermark mostram 1.0.128 (sem rótulo antigo)",
+  /<span class="pill-ver">Desktop 1\.0\.128/.test(DH) && /<title>ID Seven · Desktop 1\.0\.128/.test(DH) && /id="wpbadge">Desktop 1\.0\.128/.test(DH));
 check('D22', 'Login espelha o APK 1.0.109-beta-whatsapp-guided-card-send', /espelha o APK <b>1\.0\.109-beta-whatsapp-guided-card-send/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.127./.test(DH) && /applyVersionLabels/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.128./.test(DH) && /applyVersionLabels/.test(DH));
 // ===== 1.0.120 — ENVIO WHATSAPP LIMPO + WEB-ONLY (executa as funções reais) =====
 (function(){
   // Extrai e executa as funções reais p/ provar o conteúdo do clipboard e a URL aberta (etapa 3).
@@ -812,7 +831,10 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     const resent=(cf==='reenviado'||cf==='concluido');
     const finalOk=!!(t.finalApprovalCompleted||cf==='concluido');
     const prodOk=(!mod.pendingLegend(t)&&!mod.pendingFeed(t));
-    const exp={temas_aprovados:!!themesOk,enviado_designer:!!hasD,designer_producao:!!delivered,designer_entregou:!!delivered,aguardando_legenda:!!prodOk,enviado_final:!!resent,concluido:!!finalOk};
+    // task-flow-fix: "designer_producao" só é done quando o designer iniciou (andamento/revisao) ou entregou.
+    const dc=(['afazer','andamento','revisao','concluido'].includes(t.designerFlowStatus))?t.designerFlowStatus:(t.status||'afazer');
+    const designerStarted=hasD&&(dc==='andamento'||dc==='revisao'||delivered);
+    const exp={temas_aprovados:!!themesOk,enviado_designer:!!hasD,designer_producao:!!designerStarted,designer_entregou:!!delivered,aguardando_legenda:!!prodOk,enviado_final:!!resent,concluido:!!finalOk};
     Object.keys(exp).forEach(k=>{ const m=ms(tl,k); if(!m||m.done!==exp[k]){ parityOK=false; } });
   });
   check('TL_NOTHROW',  'taskTimeline NÃO lança em nenhuma fixture (kind/type/clientActions/sem history/ajuste/concluída)', noThrow);
@@ -844,7 +866,7 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   const fHL=mod.taskTimeline({sector:'cronograma',history:[{type:'reenviado_cliente',label:'Reenviado ao cliente (versão FINAL)',at:1000}]});
   check('TL_HUMAN_KEEP', 'Último: preserva label já humano (com espaços) sem virar genérico', fHL.last.label==='Enviado para aprovação final' || fHL.last.label==='Reenviado ao cliente (versão FINAL)');
   // o card (taskCardTimeline) renderiza o label humanizado (esc(tl.last.label)) — sem código cru
-  check('TL_HUMAN_CARD', 'taskCardTimeline exibe "Último: "+ label humanizado (via tl.last.label)', /Último: '\+lastTxt/.test(DH) && /const lastTxt=tl\.last\?\(esc\(tl\.last\.label\)/.test(DH));
+  check('TL_HUMAN_CARD', 'taskCardTimeline exibe "Último" + label humanizado (via tl.last.label)', /tc-tl-k">Último<\/span><span>'\+lastTxt/.test(DH) && /const lastTxt=tl\.last\?\(esc\(tl\.last\.label\)/.test(DH));
   // ===== PASSO 3 — detalhe (opPanelBlock) renderizado a partir de taskTimeline =====
   const RAWALL=['designer_moved','reviseItem','approveAll','approveItem','sent_to_client','sent_to_designer','final_sent','final_review','reenviado_cliente','social_producao','em_revisao','clientActions','kind','type'];
   const stMap=(s)=> s==='done'?'done':(s==='current'||s==='attention')?'cur':'todo';
@@ -874,7 +896,7 @@ console.log(`${C.b}\n===========================================================
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes).`);
   console.log(`${C.g} Fluxo PRINCIPAL = grupo do cliente (card + legenda + link); botão real de aprovação no portal.`);
-  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.127-beta-task-timeline. Android segue por paridade após o Desktop.${C.x}`);
+  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.128-beta-task-flow-fix. Android segue por paridade após o Desktop.${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
