@@ -2172,7 +2172,7 @@ function openDetails(taskId){
     '<div class="det-chips">'+((function(){
         // CORREÇÃO (status-consistency): para cronograma, o chip principal mostra o STATUS
         // OPERACIONAL (não o status bruto) — evita "Concluído" contraditório com a linha do tempo.
-        if(secOf(t.sector).key==='cronograma'){const oc=opColOf(operationalCol(t));
+        if(secOf(t.sector).key==='cronograma'){const oc=clientStatusView(t); // FASE 1 (passo 4): card de revisão lê a fonte única
           return '<span class="rev-chip" style="background:'+withAlpha(oc.color,.16)+';color:'+oc.color+'"><span class="dotc" style="background:'+oc.color+'"></span>'+esc(oc.label)+'</span>';}
         return '<span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>';
       })())+
@@ -2250,7 +2250,7 @@ function flowSummaryBlock(t){
   }else{
     h+='<div class="det-flow-col"><div class="det-flow-lbl">Fluxo do designer</div><span class="det-flow-pill det-flow-soft">Ainda não enviado a designer</span></div>';
   }
-  const oc=opColOf(operationalCol(t));
+  const oc=clientStatusView(t); // FASE 1 (passo 4): detalhe lê a fonte única (idêntico a opColOf(operationalCol))
   h+='<div class="det-flow-col"><div class="det-flow-lbl">Status operacional</div>'+
     '<span class="det-flow-pill" style="background:'+withAlpha(oc.color,.16)+';color:'+oc.color+'"><span class="dotc" style="background:'+oc.color+'"></span>'+esc(oc.label)+'</span></div>';
   // V1.0.98 — Fase de aprovação do cliente (themes/production/final).
@@ -2273,7 +2273,7 @@ function clientApprovalPhaseOf(t){
 /* Painel "Próxima ação" + "Linha do tempo operacional" (10 etapas) no Detalhes. */
 function opPanelBlock(t){
   if(secOf(t.sector).key!=='cronograma')return '';
-  const oc=opColOf(operationalCol(t));
+  const oc=clientStatusView(t); // FASE 1 (passo 4): detalhe lê a fonte única (idêntico a opColOf(operationalCol))
   const cf=clientCol(t);const delivered=designerDelivered(t);const hasD=hasDesigner(t);
   const themesOk=(cf==='aprovado'||cf==='producao'||cf==='revisao'||cf==='reenviado'||cf==='concluido'||(t.clientReview&&t.clientReview.status==='aprovado'));
   const finalOk=!!(t.finalApprovalCompleted||cf==='concluido');
