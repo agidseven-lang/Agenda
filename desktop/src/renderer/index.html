@@ -1928,6 +1928,31 @@ function _tlEventAt(t, keys){
     consider((a.type||'')+' client', a.at, a.by||a.byId||null); }); }catch(_){ }
   return best;
 }
+// FASE 2 (passo 2.1) — HUMANIZAÇÃO de rótulos de evento (read-only). Mapeia kind/type internos
+// para texto humano; nunca expõe código técnico no card. Não altera history[]/clientActions[].
+const TL_EVENT_LABELS={
+  designer_moved:'Designer atualizou', designer_andamento:'Designer em produção', designer_done:'Designer entregou',
+  moved:'Tarefa movida', created:'Criado', criado:'Criado',
+  reviseItem:'Cliente pediu ajuste', revision:'Cliente pediu revisão', edit_request:'Cliente pediu edição',
+  approveAll:'Cliente aprovou tudo', approve:'Cliente aprovou', approveItem:'Cliente aprovou conteúdo',
+  editTheme:'Cliente editou tema', editLegenda:'Cliente editou legenda', noteItem:'Cliente comentou', comment:'Cliente comentou',
+  enviado_cliente:'Enviado ao cliente', sent_to_client:'Enviado ao cliente',
+  sent_to_designer:'Enviado ao designer', designer_atribuido:'Enviado ao designer',
+  social_producao:'Legendas/artes atualizadas', social_editou_conteudo:'Conteúdo editado', social_corrigiu:'Conteúdo corrigido',
+  reenviado_cliente:'Enviado para aprovação final', final_sent:'Enviado para aprovação final', final_review:'Enviado para aprovação final',
+  final_approved:'Aprovado final', ackFeedback:'Feedback enviado à equipe',
+};
+function _tlHumanLabel(ev){
+  if(!ev)return 'Atualização';
+  const key=(ev.kind||ev.type||'').toString();
+  if(TL_EVENT_LABELS[key])return TL_EVENT_LABELS[key];
+  const lbl=(ev.label||'').toString().trim();
+  // descarta "label" que pareça código (snake_case ou camelCase técnico).
+  const looksCode = (/^[a-z0-9]+(_[a-z0-9]+)+$/i.test(lbl)) || (/^[a-z]+[A-Z][a-zA-Z]*$/.test(lbl));
+  if(lbl && !looksCode) return lbl;
+  if(TL_EVENT_LABELS[lbl]) return TL_EVENT_LABELS[lbl];
+  return 'Atualização';
+}
 function taskTimeline(t){
   t=t||{};
   const cur=clientStatusView(t);
@@ -1969,13 +1994,14 @@ function taskTimeline(t){
     return {key:m.key,label:m.label,state:state,done:!!m.done,optional:!!m.optional,at:at,by:by};
   });
   // ÚLTIMO evento (cronológico) — o item mais recente de history[]/clientActions[].
+  // FASE 2 (passo 2.1): o rótulo é HUMANIZADO (via _tlHumanLabel) — nunca expõe kind/type cru.
   let last=null;
   try{
     const ev=[];
-    (Array.isArray(t.history)?t.history:[]).forEach(e=>{ if(e&&e.at) ev.push({label:(e.label||e.type||e.kind||'Atualização'),at:Number(e.at),by:e.byId||e.by||null}); });
+    (Array.isArray(t.history)?t.history:[]).forEach(e=>{ if(e&&e.at) ev.push({label:e.label,type:e.type,kind:e.kind,at:Number(e.at),by:e.byId||e.by||null}); });
     const ca=(t.clientActions&&typeof t.clientActions==='object')?t.clientActions:{};
-    Object.keys(ca).forEach(k=>{const a=ca[k];if(a&&a.at)ev.push({label:(a.type||'Ação do cliente'),at:Number(a.at),by:a.by||a.byId||null});});
-    if(ev.length){ ev.sort((a,b)=>b.at-a.at); last=ev[0]; }
+    Object.keys(ca).forEach(k=>{const a=ca[k];if(a&&a.at)ev.push({type:a.type,at:Number(a.at),by:a.by||a.byId||null});});
+    if(ev.length){ ev.sort((a,b)=>b.at-a.at); const e0=ev[0]; last={label:_tlHumanLabel(e0),at:e0.at,by:e0.by}; }
   }catch(_){ }
   if(!last){ // fallback: último marco "done" sem data
     for(let i=milestones.length-1;i>=0;i--){ if(milestones[i].done){ last={label:milestones[i].label,at:milestones[i].at||null,by:milestones[i].by||null}; break; } }

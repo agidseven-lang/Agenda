@@ -774,7 +774,9 @@ check('TL2_DETALHE_OPPANEL_INTACTO', "Detalhe (opPanelBlock) NÃO usa taskTimeli
       oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'),
       oneLine('hasPendingItemRevision'),
       fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('nextActionText'),
-      fnDecl('clientStatusView'), fnDecl('_tlEventAt'), fnDecl('taskTimeline'),
+      fnDecl('clientStatusView'), fnDecl('_tlEventAt'),
+      (DH.match(/const TL_EVENT_LABELS=\{[\s\S]*?\n\};/)||[''])[0], fnDecl('_tlHumanLabel'),
+      fnDecl('taskTimeline'),
       'return {taskTimeline,operationalCol,clientCol,hasDesigner,designerDelivered,pendingLegend,pendingFeed};'
     ];
     mod=new Function(pieces.join('\n'))();
@@ -815,7 +817,27 @@ check('TL2_DETALHE_OPPANEL_INTACTO', "Detalhe (opPanelBlock) NÃO usa taskTimeli
   const f5=mod.taskTimeline(FIX[4][1]); check('TL_AJUSTE', 'pedido de ajuste: marco "ajuste" state="attention"', ms(f5,'ajuste').state==='attention');
   const f6=mod.taskTimeline(FIX[5][1]); check('TL_CONCLUIDO', 'concluída: "concluido" done=true e nenhum marco "current"', ms(f6,'concluido').done===true && !f6.milestones.some(m=>m.state==='current'));
   check('TL_NEXT', 'taskTimeline.next === nextActionText (próxima ação)', typeof f1.next==='string' && f1.next.length>0);
-  console.log('  '+C.d+'fixtures provadas: '+FIX.length+C.x);
+  // ===== PASSO 2.1 — humanização do "Último:" (nenhum rótulo cru) =====
+  const RAWMAP=[
+    ['designer_moved',  {sector:'cronograma',history:[{kind:'designer_moved',at:1000,byId:'d'}]}, 'Designer atualizou'],
+    ['reviseItem',      {sector:'cronograma',clientActions:{a:{type:'reviseItem',at:1000,by:'cli'}}}, 'Cliente pediu ajuste'],
+    ['approveAll',      {sector:'cronograma',clientActions:{a:{type:'approveAll',at:1000,by:'cli'}}}, 'Cliente aprovou tudo'],
+    ['sent_to_client',  {sector:'cronograma',history:[{type:'sent_to_client',at:1000}]}, 'Enviado ao cliente'],
+    ['sent_to_designer',{sector:'cronograma',history:[{type:'sent_to_designer',at:1000}]}, 'Enviado ao designer'],
+  ];
+  const RAWCODES=['designer_moved','reviseItem','approveAll','sent_to_client','sent_to_designer'];
+  let mapOK=true, noRaw=true;
+  RAWMAP.forEach(([raw,t,exp])=>{ const tl=mod.taskTimeline(t); const lab=(tl.last&&tl.last.label)||'';
+    if(lab!==exp) mapOK=false;
+    if(RAWCODES.some(c=>lab.indexOf(c)>=0)) noRaw=false; });
+  check('TL_HUMAN_MAP', 'Último: mapeia designer_moved/reviseItem/approveAll/sent_to_client/sent_to_designer p/ texto humano', mapOK);
+  check('TL_HUMAN_NO_RAW', 'Último: NENHUM rótulo cru/técnico aparece (kind/type)', noRaw);
+  // rótulo já humano em history[].label é preservado (não vira "Atualização")
+  const fHL=mod.taskTimeline({sector:'cronograma',history:[{type:'reenviado_cliente',label:'Reenviado ao cliente (versão FINAL)',at:1000}]});
+  check('TL_HUMAN_KEEP', 'Último: preserva label já humano (com espaços) sem virar genérico', fHL.last.label==='Enviado para aprovação final' || fHL.last.label==='Reenviado ao cliente (versão FINAL)');
+  // o card (taskCardTimeline) renderiza o label humanizado (esc(tl.last.label)) — sem código cru
+  check('TL_HUMAN_CARD', 'taskCardTimeline exibe "Último: "+ label humanizado (via tl.last.label)', /Último: '\+lastTxt/.test(DH) && /const lastTxt=tl\.last\?\(esc\(tl\.last\.label\)/.test(DH));
+  console.log('  '+C.d+'fixtures provadas: '+FIX.length+' · humanização: '+RAWMAP.length+C.x);
 })();
 
 /* ===================== VEREDITO ===================== */
