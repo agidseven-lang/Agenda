@@ -86,8 +86,9 @@ function operationalCol(t) {
   if (hasDesigner(t)) {
     const dc = designerCol(t);
     if (dc === 'concluido') return pendingProduction(t) ? 'aguardando_legenda' : 'aguardando_final';
-    // task-flow-fix: "Designer em produção" SÓ com andamento/revisao; recém-enviado (afazer) NÃO.
-    if (dc === 'andamento' || dc === 'revisao') return 'aguardando_designer';
+    // task-flow-fix + role-aware (passo 2): andamento → em produção; revisao → em revisão; afazer → iniciar.
+    if (dc === 'andamento') return 'aguardando_designer';
+    if (dc === 'revisao') return 'aguardando_designer_revisao';
     return 'aguardando_designer_iniciar';
   }
   if (cf === 'aprovado') return 'aguardando_envio';
@@ -390,11 +391,49 @@ check('D_HUBGUARD2', 'taskChips(): 1 definição + 2 chamadas (boardToolbar Kanb
   && rbFn.indexOf('taskChips()') !== -1);
 // CORREÇÃO 3: colunas por contexto (sem excesso).
 check('D9', 'Colunas Social = 4 (A Fazer/Em andamento/Revisão/Finalizado)', /const SOCIAL_COLS4=\[[\s\S]*?Finalizado/.test(DH) && (DH.match(/const SOCIAL_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4);
-check('D10', 'Colunas Designer = 3 (A Fazer/Em andamento/Entregue)', (DH.match(/const DESIGNER_COLS3=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 3);
+check('D10', 'Colunas Designer = 4 (A Fazer/Em andamento/Revisão-Ajuste/Entregue)', (DH.match(/const DESIGNER_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4 && /label:'Revisão\/Ajuste'/.test(DH));
 check('D11', 'Colunas Cliente = 4 (Enviado/Em análise/Revisão solicitada/Aprovado)', (DH.match(/const CLIENT_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4);
 check('D12', 'Social board usa SOCIAL_COLS4 (não OPERATIONAL_COLS 8)', /const byCol=SOCIAL_COLS4\.map/.test(DH));
-check('D13', 'Designer board usa DESIGNER_COLS3', /const byStatus=DESIGNER_COLS3\.map/.test(DH));
+check('D13', 'Designer board usa DESIGNER_COLS4 (4 colunas) + designerColView + card perspectiva designer', /const byStatus=DESIGNER_COLS4\.map\(st=>list\.filter\(t=>designerColView\(t\)===st\.key\)/.test(DH) && /tasks\.map\(t=>taskCard\(t,'designer'\)\)/.test(DH));
 check('D14', 'Cliente board usa CLIENT_COLS4', /const byCol=CLIENT_COLS4\.map/.test(DH));
+// ===== PASSO 2 — VISÃO ROLE-AWARE DO DESIGNER (Desktop) =====
+check('RA_COLVIEW', 'designerColView mantém coluna própria de Revisão (não colapsa revisao→andamento)', /function designerColView\(t\)\{const c=designerCol\(t\);return c==='concluido'\?'entregue':\(c==='revisao'\?'revisao':/.test(DH));
+check('RA_STATUSVIEW', 'designerStatusView lê DESIGNER_COLS4 (badge do card do designer)', /function designerStatusView\(t\)\{const k=designerColView\(t\);const c=DESIGNER_COLS4\.find/.test(DH));
+check('RA_CARD_PARAM', 'taskCard é role-aware (persp), designerView só p/ cronograma c/ designer', /function taskCard\(t, persp\)\{[\s\S]*?const designerView = persp==='designer' && secOf\(t\.sector\)\.key==='cronograma' && hasDesigner\(t\);/.test(DH));
+check('RA_CARD_BADGE', 'badge do card usa designerStatusView quando designerView (senão clientStatusView)', /const oc=designerView\?designerStatusView\(t\):clientStatusView\(t\);/.test(DH));
+check('RA_CARD_TIMELINE', 'card escolhe designerCardTimeline × taskCardTimeline pela perspectiva', /designerView\?designerCardTimeline\(t\):taskCardTimeline\(t\)/.test(DH));
+// designerCardTimeline NÃO mostra o fluxo do cliente (sem taskTimeline/clientStatusView dentro dela)
+const dctFn = (DH.match(/function designerCardTimeline\(t\)\{[\s\S]*?\n\}/) || [''])[0];
+check('RA_DESIGNER_NO_CLIENT', 'designerCardTimeline NÃO usa taskTimeline/clientStatusView (perspectiva do designer)', dctFn.length>0 && dctFn.indexOf('taskTimeline(')===-1 && dctFn.indexOf('clientStatusView(')===-1);
+check('RA_OPCOL_REV', 'operationalCol: designerFlowStatus=revisao → aguardando_designer_revisao (distinto de produção)', /if\(dc==='revisao'\)return 'aguardando_designer_revisao';/.test(DH));
+check('RA_OPCOL_LABEL', 'OPERATIONAL_COLS tem "Designer em revisão" (aguardando_designer_revisao)', /key:'aguardando_designer_revisao',\s*label:'Designer em revisão'/.test(DH));
+check('RA_PERSONBOARD', 'Meu quadro do designer usa card perspectiva designer p/ tarefa atribuída a ele', /const cardFor=t=>\(hasDesigner\(t\)&&designerOf\(t\)===pid\)\?taskCard\(t,'designer'\):taskCard\(t\);/.test(DH));
+// Funcional (executa as funções REAIS extraídas): mapeamento do designer + estado social-side
+(function(){
+  const constArr = n => (DH.match(new RegExp('const '+n+'\\s*=\\s*\\[[\\s\\S]*?\\];'))||[''])[0];
+  const fnDecl = n => { const m=DH.match(new RegExp('function '+n+'\\s*\\([^)]*\\)\\s*\\{')); if(!m) return ''; let s=DH.indexOf(m[0]),d=0; for(let i=s+m[0].length-1;i<DH.length;i++){const c=DH[i];if(c==='{')d++;else if(c==='}'){d--;if(d===0)return DH.slice(s,i+1);}} return ''; };
+  let mod=null, err=null;
+  try {
+    const src = [
+      constArr('SECTORS'), (DH.match(/const SECTOR_ALIAS=\{[^\n]*\};/)||[''])[0], constArr('STATUS'), constArr('CLIENT_COLS'),
+      constArr('OPERATIONAL_COLS'), constArr('DESIGNER_COLS4'),
+      fnDecl('secOf'), fnDecl('stOf'), fnDecl('opColOf'), fnDecl('hasDesigner'), fnDecl('designerOf'), fnDecl('designerCol'),
+      fnDecl('designerDelivered'), fnDecl('pendingLegend'), fnDecl('pendingFeed'), fnDecl('pendingStory'), fnDecl('pendingProduction'),
+      fnDecl('hasPendingItemRevision'), fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'),
+      fnDecl('designerColView'), fnDecl('designerStatusView'), fnDecl('designerNextShort'),
+      'return {operationalCol,designerColView,designerStatusView,designerNextShort,opColOf};'
+    ].join('\n');
+    mod = new Function(src)();
+  } catch(e){ err=e&&e.message; }
+  check('RA_EVAL', 'Funções role-aware (designerColView/designerStatusView/operationalCol) avaliáveis', !!mod && !err);
+  if (mod){
+    const T = dfs => ({ sector:'cronograma', designerAssignment:{designerId:'d'}, designerFlowStatus:dfs, cronContents:[{tema:'T'}] });
+    check('RA_FN_AFAZER',  'designerColView afazer → afazer; Social vê "Aguardando designer iniciar"', mod.designerColView(T('afazer'))==='afazer' && mod.operationalCol(T('afazer'))==='aguardando_designer_iniciar');
+    check('RA_FN_ANDAMENTO','designerColView andamento → andamento; Social vê "Designer em produção"', mod.designerColView(T('andamento'))==='andamento' && mod.opColOf(mod.operationalCol(T('andamento'))).label==='Designer em produção');
+    check('RA_FN_REVISAO', 'designerColView revisao → revisao; Social vê "Designer em revisão"', mod.designerColView(T('revisao'))==='revisao' && mod.opColOf(mod.operationalCol(T('revisao'))).label==='Designer em revisão');
+    check('RA_FN_ENTREGUE','designerColView concluido → entregue; designerStatusView label "Entregue"', mod.designerColView(T('concluido'))==='entregue' && mod.designerStatusView(T('concluido')).label==='Entregue');
+  }
+})();
 // CORREÇÃO 6 (Desktop): boardCol4For designer-aware + usado no Meu quadro/Setor.
 check('D15', 'boardCol4For(t,uid) designer-aware definido', /function boardCol4For\(t,uid\)/.test(DH));
 check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4For\(t,pid\)/.test(DH));
@@ -787,7 +826,7 @@ check('TL_DEF', 'taskTimeline(t) existe e retorna {current,last,next,owner,miles
 const DH_noc2 = DH.replace(/^\s*\/\/.*$/gm,'');
 // Passo 2: taskTimeline agora é consumida APENAS pelo taskCardTimeline (definição + 1 uso).
 check('TL_CARD_WIRED', 'taskTimeline consumida por taskCardTimeline + opPanelBlock (3 ocorrências: definição + 2 usos)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 3 && /function taskTimeline\(t\)/.test(DH_noc2));
-check('TL2_CARD_RENDER', 'taskCard renderiza a timeline compacta (taskCardTimeline(t)) e taskCardTimeline usa taskTimeline(t)', /'<\/div>'\+\s*\n?\s*taskCardTimeline\(t\);/.test(DH) && /function taskCardTimeline\(t\)\{[\s\S]*?const tl=taskTimeline\(t\);/.test(DH));
+check('TL2_CARD_RENDER', 'taskCard escolhe timeline por perspectiva (designerCardTimeline × taskCardTimeline) e taskCardTimeline usa taskTimeline(t)', /\?designerCardTimeline\(t\):taskCardTimeline\(t\)\);/.test(DH) && /function taskCardTimeline\(t\)\{[\s\S]*?const tl=taskTimeline\(t\);/.test(DH));
 check('TL2_CARD_ONLY', 'taskCardTimeline existe e é chamado só no taskCard (definição + 1 chamada)', (DH_noc2.match(/taskCardTimeline\(/g)||[]).length === 2);
 check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard secOf!=cronograma -> "")', /function taskCardTimeline\(t\)\{\s*\n\s*if\(secOf\(t\.sector\)\.key!=='cronograma'\)return '';/.test(DH));
 // PASSO 3: o detalhe (opPanelBlock) AGORA usa taskTimeline(t) (timeline completa); sem steps[] próprios.

@@ -1684,9 +1684,13 @@ function renderPersonBoard(){
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
+  // role-aware (passo 2): no "Meu quadro" de um DESIGNER, a tarefa atribuída a ele aparece na
+  // perspectiva do designer (status/timeline do fluxo dele). Tarefas onde ele NÃO é o designer
+  // seguem operacional.
+  const cardFor=t=>(hasDesigner(t)&&designerOf(t)===pid)?taskCard(t,'designer'):taskCard(t);
   SOCIAL_COLS4.forEach((st,i)=>{const tasks=byStatus[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
+    h+=tasks.length?tasks.map(cardFor).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
     h+='</div></div>';});
   return h+'</div></div>';
 }
@@ -1810,16 +1814,16 @@ function renderDesignerBoard(){
   const id=state.designerBoard;const p=state.users.find(x=>x.id===id)||{id:id,name:'Designer'};
   let list=state.tasks.filter(t=>isDesignerFlow(t)&&designerOf(t)===id);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  const byStatus=DESIGNER_COLS3.map(st=>list.filter(t=>designerCol3(t)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const byStatus=DESIGNER_COLS4.map(st=>list.filter(t=>designerColView(t)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const late=list.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
   let h=
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designer · '+esc((p.name||'').split(' ')[0]||'Designer')+'</div><div class="d-bh-sub">'+esc(p.role||'Designer')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
     '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
-  DESIGNER_COLS3.forEach((st,i)=>{const tasks=byStatus[i];
+  DESIGNER_COLS4.forEach((st,i)=>{const tasks=byStatus[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
+    h+=tasks.length?tasks.map(t=>taskCard(t,'designer')).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
     h+='</div></div>';});
   return h+'</div></div>';
 }
@@ -1855,6 +1859,8 @@ const OPERATIONAL_COLS=[
   {key:'aguardando_designer_iniciar',label:'Aguardando designer iniciar',      color:'#7C83FF'},
   // "Designer em produção" SÓ quando o designer move p/ "Em andamento" (designerFlowStatus='andamento').
   {key:'aguardando_designer',        label:'Designer em produção',             color:'#A78BFA'},
+  // role-aware (passo 2): designer está corrigindo um ajuste (designerFlowStatus='revisao').
+  {key:'aguardando_designer_revisao',label:'Designer em revisão',              color:'#60A5FA'},
   {key:'aguardando_legenda',         label:'Aguardando legendas e posts',      color:'#5B6CFF'},
   {key:'aguardando_revisao',         label:'Ajuste solicitado pelo cliente',   color:'#F59E0B'},
   {key:'aguardando_final',           label:'Aguardando aprovação final',       color:'#34D399'},
@@ -1893,10 +1899,11 @@ function operationalCol(t){
   if(hasDesigner(t)){
     const dc=designerCol(t);
     if(dc==='concluido')return pendingProduction(t)?'aguardando_legenda':'aguardando_final'; // entregou: falta legenda/post ou pronto p/ reenvio
-    // FLUXO CORRETO (task-flow-fix): "Designer em produção" SÓ quando o designer realmente
-    // iniciou (andamento) ou está retrabalhando (revisao). Recém-enviado (afazer/vazio) NÃO
-    // pode antecipar "em produção" — fica "Aguardando designer iniciar" até a transição real.
-    if(dc==='andamento'||dc==='revisao')return 'aguardando_designer';
+    // FLUXO CORRETO (task-flow-fix + role-aware passo 2): "Designer em produção" SÓ quando o
+    // designer iniciou (andamento); "Designer em revisão" quando está corrigindo um ajuste
+    // (revisao); recém-enviado (afazer/vazio) → "Aguardando designer iniciar".
+    if(dc==='andamento')return 'aguardando_designer';
+    if(dc==='revisao')return 'aguardando_designer_revisao';
     return 'aguardando_designer_iniciar';
   }
   // SEM designer atribuído: NUNCA mostrar produção/legenda/entrega.
@@ -1912,6 +1919,7 @@ function nextActionText(t){
     case 'aguardando_envio':    return 'Temas aprovados. Próxima etapa: enviar o cronograma ao designer.';
     case 'aguardando_designer_iniciar': return 'Enviado ao designer. Próxima etapa: aguardar o designer iniciar a produção.';
     case 'aguardando_designer': return 'Designer produzindo. Próxima etapa: aguardar a entrega do designer.';
+    case 'aguardando_designer_revisao': return 'Designer corrigindo um ajuste. Próxima etapa: aguardar a nova entrega do designer.';
     case 'aguardando_legenda':  return 'Designer entregou. Próxima etapa: revisar, adicionar legenda e posts (Feed/Story).';
     case 'aguardando_revisao':  return 'Cliente pediu ajuste. Próxima etapa: corrigir o conteúdo e reenviar pelo mesmo link.';
     case 'aguardando_final':    return 'Tudo pronto. Próxima etapa: reenviar ao cliente e aguardar a aprovação final.';
@@ -1929,6 +1937,7 @@ function nextActionShort(t){
     case 'aguardando_envio':            return 'Enviar ao designer';
     case 'aguardando_designer_iniciar': return 'Aguardar o designer iniciar';
     case 'aguardando_designer':         return 'Aguardar entrega do designer';
+    case 'aguardando_designer_revisao': return 'Aguardar a correção do designer';
     case 'aguardando_legenda':          return 'Adicionar legendas e posts';
     case 'aguardando_revisao':          return 'Corrigir e reenviar ao cliente';
     case 'aguardando_final':            return 'Aguardar aprovação final';
@@ -2080,10 +2089,12 @@ const SOCIAL_COLS4=[
   {key:'revisao',   label:'Revisão',      color:'#60A5FA'},
   {key:'concluido', label:'Finalizado',   color:'#34D399'},
 ];
-const DESIGNER_COLS3=[
-  {key:'afazer',    label:'A Fazer',      color:'#9BA0AB'},
-  {key:'andamento', label:'Em andamento', color:'#F59E0B'},
-  {key:'entregue',  label:'Entregue',     color:'#34D399'},
+// role-aware (passo 2): o DESIGNER tem 4 colunas próprias (inclui Revisão/Ajuste).
+const DESIGNER_COLS4=[
+  {key:'afazer',    label:'A Fazer',        color:'#9BA0AB'},
+  {key:'andamento', label:'Em andamento',   color:'#F59E0B'},
+  {key:'revisao',   label:'Revisão/Ajuste', color:'#60A5FA'},
+  {key:'entregue',  label:'Entregue',       color:'#34D399'},
 ];
 const CLIENT_COLS4=[
   {key:'enviado',  label:'Enviado',             color:'#5B6CFF'},
@@ -2091,8 +2102,38 @@ const CLIENT_COLS4=[
   {key:'revisao',  label:'Revisão solicitada',  color:'#F59E0B'},
   {key:'aprovado', label:'Aprovado',            color:'#34D399'},
 ];
-// Bucket de 3 colunas do DESIGNER (a partir do eixo de trabalho do designer).
-function designerCol3(t){const c=designerCol(t);return c==='concluido'?'entregue':(c==='afazer'?'afazer':'andamento');}
+// Bucket de 4 colunas do DESIGNER (a partir do eixo de trabalho do designer). Mantém a coluna
+// própria de Revisão/Ajuste (não colapsa mais 'revisao' em 'andamento').
+function designerColView(t){const c=designerCol(t);return c==='concluido'?'entregue':(c==='revisao'?'revisao':(c==='afazer'?'afazer':'andamento'));}
+// Status VISUAL do DESIGNER (badge do card na perspectiva do designer): label/cor de DESIGNER_COLS4.
+function designerStatusView(t){const k=designerColView(t);const c=DESIGNER_COLS4.find(x=>x.key===k)||DESIGNER_COLS4[0];return {key:k,label:c.label,color:c.color};}
+// "Próxima ação" CURTA na perspectiva do DESIGNER (o que ELE precisa fazer agora).
+function designerNextShort(t){switch(designerColView(t)){
+  case 'afazer':    return 'Iniciar a produção';
+  case 'andamento': return 'Finalizar e entregar';
+  case 'revisao':   return 'Corrigir o ajuste e reenviar';
+  case 'entregue':  return 'Entregue — aguardando a Social';
+} return 'Acompanhar';}
+// Timeline COMPACTA do card na perspectiva do DESIGNER: mini-trilho do fluxo DELE (A Fazer →
+// Em andamento → Entregue, com marcador de Revisão) + "Sua etapa" + "Próxima". NÃO mostra o
+// fluxo/aprovação do cliente (isso é responsabilidade da Social/Admin, não do designer).
+function designerCardTimeline(t){
+  const cur=designerColView(t);
+  const order={afazer:0,andamento:1,revisao:1,entregue:2};
+  const ci=order[cur]==null?0:order[cur];
+  const steps=['afazer','andamento','entregue'];
+  let rail='';
+  steps.forEach((s,i)=>{const done=i<ci;const isc=i===ci;const col=done?'#34D399':(isc?designerStatusView(t).color:'#3a3f55');
+    rail+='<i style="background:'+col+'"></i>';
+    if(i<steps.length-1)rail+='<span class="ln" style="background:'+(done?'rgba(52,211,153,.35)':'var(--line)')+'"></span>';});
+  if(cur==='revisao')rail+='<i title="Ajuste a corrigir" style="background:#60A5FA;margin-left:5px"></i>';
+  const sv=designerStatusView(t);
+  return '<div class="tc-tl">'+
+    '<div class="tc-tl-rail">'+rail+'</div>'+
+    '<div class="tc-tl-row">'+svg('flag')+'<span class="tc-tl-k">Sua etapa</span><span class="tc-tl-now" style="color:'+sv.color+'">'+esc(sv.label)+'</span></div>'+
+    '<div class="tc-tl-next"><span class="tc-tl-k">Próxima</span><span>'+esc(designerNextShort(t))+'</span></div>'+
+  '</div>';
+}
 // Bucket de 4 colunas do CLIENTE (a partir do eixo do cliente).
 function clientCol4(t){const c=clientCol(t);
   if(c==='revisao')return 'revisao';
@@ -2129,7 +2170,7 @@ function renderSocialsHub(){
     '<div class="scr" style="padding-top:8px">';
   const cards=sm.length?sm.map(d=>{const tasks=state.tasks.filter(t=>socialOf(t)===d.u.id);
     const open=tasks.filter(t=>operationalCol(t)!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
-    const waiting=tasks.filter(t=>{const oc=operationalCol(t);return oc==='aguardando_designer'||oc==='aguardando_designer_iniciar';}).length;
+    const waiting=tasks.filter(t=>{const oc=operationalCol(t);return oc==='aguardando_designer'||oc==='aguardando_designer_iniciar'||oc==='aguardando_designer_revisao';}).length;
     return '<button class="bcard" data-socialboard="'+d.u.id+'">'+avatar(d.u,44)+
       '<div class="bm"><div class="bl">'+esc(d.u.name||'Social Media')+'</div><div class="bd">'+esc(d.u.role||'Social Media')+'</div>'+
         '<div class="bp"><span class="pill" style="background:'+withAlpha('#22D3EE',.16)+';color:#22D3EE">'+open+' aberta'+(open===1?'':'s')+'</span>'+
@@ -2266,7 +2307,12 @@ function taskCardTimeline(t){
     (lastTxt?'<div class="tc-tl-last"><span class="tc-tl-k">Último</span><span>'+lastTxt+'</span></div>':'')+
   '</div>';
 }
-function taskCard(t){
+// role-aware (passo 2): persp='designer' renderiza o card na PERSPECTIVA do designer (status e
+// timeline do fluxo DELE, sem o fluxo de aprovação do cliente). Demais (default) = operacional/
+// Social/Admin (comportamento atual). OBS: chamadas via .map(taskCard) passam o índice em persp
+// — por isso só ativamos quando persp==='designer' (qualquer outro valor = operacional).
+function taskCard(t, persp){
+  const designerView = persp==='designer' && secOf(t.sector).key==='cronograma' && hasDesigner(t);
   const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
   const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:(t.by?'—':'');
@@ -2293,14 +2339,16 @@ function taskCard(t){
          // V1.0.98 — Cronograma: mostra o STATUS OPERACIONAL (mais claro que cronStatus).
          // FASE 1 (passo 3): o badge do cronograma agora lê a FONTE ÚNICA clientStatusView(t)
          // (wrapper FIEL de opColOf(operationalCol(t)) — resultado visual idêntico ao anterior).
-         if(secOf(t.sector).key==='cronograma'){const oc=clientStatusView(t);
+         // role-aware (passo 2): no quadro do DESIGNER, o badge mostra o status DELE (A Fazer/
+         // Em andamento/Revisão/Entregue), não o status do fluxo do cliente.
+         if(secOf(t.sector).key==='cronograma'){const oc=designerView?designerStatusView(t):clientStatusView(t);
            return '<div class="tc-cron-st" style="color:'+oc.color+';background:'+withAlpha(oc.color,.14)+';border-color:'+withAlpha(oc.color,.32)+'"><span class="dotc"></span>'+esc(oc.label)+'</div>';}
          return t.cronStatus?('<div class="tc-cron-st" style="color:'+cronStatusColor(t.cronStatus)+';background:'+withAlpha(cronStatusColor(t.cronStatus),.14)+';border-color:'+withAlpha(cronStatusColor(t.cronStatus),.32)+'"><span class="dotc"></span>'+esc(cronStatusLabel(t.cronStatus))+'</div>'):'';
        })())+
        '<div class="tc-tags"><span class="tc-tag" style="color:'+s.color+';background:'+withAlpha(s.color,.14)+'">'+esc(s.label)+'</span>'+
          (cron?'<span class="tc-tag tc-tag-soft">'+esc(cron.label)+'</span>':'')+
          (t.priority?'<span class="tc-tag" style="color:#F87171;background:'+withAlpha('#F87171',.14)+'">⚑ Prioridade</span>':'')+'</div>'+
-       taskCardTimeline(t);   // FASE 2 (passo 2): timeline compacta e discreta (só cronograma)
+       (designerView?designerCardTimeline(t):taskCardTimeline(t));   // role-aware: timeline do designer × timeline do cliente
   // 4) Cronograma (temas reais) OU briefing curto
   if(cron&&cron.list.length){
     const show=cron.list.slice(0,3);const rest=cron.count-3;
@@ -2325,7 +2373,9 @@ function isDesignerAxisMove(t){return isDesignerFlow(t)&&((state.user&&designerO
 function designerMoveOpts(t){const cur=designerCol(t);
   if(cur==='afazer')return [{key:'andamento',label:'Em andamento',desc:'Começar a produção'}];
   if(cur==='concluido')return [{key:'andamento',label:'Reabrir (Em andamento)',desc:'Voltar a produzir'}];
-  return [{key:'concluido',label:'Entregue',desc:'Entrega para a Social finalizar'},{key:'afazer',label:'A Fazer',desc:'Pausar e retornar'}];
+  // role-aware (passo 2): em Revisão/Ajuste, o designer corrige e volta a produzir ou entrega.
+  if(cur==='revisao')return [{key:'andamento',label:'Em andamento',desc:'Corrigir o ajuste'},{key:'concluido',label:'Entregue',desc:'Reentregar para a Social'}];
+  return [{key:'concluido',label:'Entregue',desc:'Entrega para a Social finalizar'},{key:'revisao',label:'Revisão/Ajuste',desc:'Marcar que há ajuste a corrigir'},{key:'afazer',label:'A Fazer',desc:'Pausar e retornar'}];
 }
 function openMove(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
