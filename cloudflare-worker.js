@@ -1319,6 +1319,9 @@ async function writeClientGranular(env, accessToken, task, e) {
   if (perItem) {
     const key = "i" + e.contentIndex;
     const itemFields = { at: { integerValue: String(at) } };
+    // task-flow-fix (BUG #6): marca a FASE em que o item foi avaliado (themes/production/final),
+    // para que aprovações/ajustes de uma fase NÃO contaminem a decisão de outra fase.
+    itemFields.phase = { stringValue: clientPhase(task) };
     if (e.type === "approveItem") itemFields.cs = { stringValue: "aprovado" };
     else if (e.type === "reviseItem") { itemFields.cs = { stringValue: "em_revisao" }; if (e.note) itemFields.note = { stringValue: e.note }; }
     else if (e.type === "editTheme") { itemFields.cs = { stringValue: "editado" }; itemFields.theme = { stringValue: e.value }; }
@@ -1358,27 +1361,27 @@ async function writeClientGranular(env, accessToken, task, e) {
   };
   let g = STAT[e.type] || { cs: null, rev: null, htype: "cliente_acao", label: "Ação do cliente", col: null, stage: null, client: null };
 
-  // V64.16 — GATE de aprovação PARCIAL: se QUALQUER conteúdo tem ajuste/edição pendente,
-  // 'approve'/'approveAll' NÃO pode marcar tudo aprovado nem liberar produção. Vira feedback
-  // (revisão), preservando os aprovados individuais e o ajuste pedido. (bug do vídeo: T1 ok,
-  // T2 ajuste, T3 ok → continuava virando "Temas aprovados").
+  // V64.16 / task-flow-fix — GATE de aprovação PARCIAL, agora POR FASE: se QUALQUER conteúdo
+  // DA FASE ATUAL tem ajuste/edição pendente, 'approve'/'approveAll' NÃO conclui nem libera —
+  // vira feedback (revisão). Revisões de fases ANTERIORES (ex.: ajuste de tema já resolvido no
+  // reenvio) NÃO contaminam a fase final (filtra por phase === phaseIn).
   const _ci0 = (task.clientItems && typeof task.clientItems === "object") ? task.clientItems : {};
-  const _pendingRev = Object.keys(_ci0).some((k) => { const cs = _ci0[k] && _ci0[k].cs; return cs === "em_revisao" || cs === "editado"; });
+  const _pendingRev = Object.keys(_ci0).some((k) => {
+    const it = _ci0[k]; if (!it) return false;
+    const cs = it.cs; const ph = it.phase;
+    return (cs === "em_revisao" || cs === "editado") && (ph === phaseIn);
+  });
   if ((e.type === "approve" || e.type === "approveAll") && _pendingRev) {
     g = { cs: "em_revisao_cliente", rev: "revisao", htype: "cliente_enviou_feedback",
           label: "Cliente enviou feedback (há ajustes pendentes)", col: "revisao", stage: "revisao", client: "revisao" };
   }
 
-  // approveItem: só conclui/avança quando TODOS os conteúdos estiverem aprovados.
+  // task-flow-fix (BUG #6): approveItem aprova SOMENTE o item clicado e NUNCA conclui nem avança
+  // de fase. A conclusão/avanço só ocorre via ação EXPLÍCITA do cliente (approveAll). Antes, a
+  // contagem global de clientItems.cs==='aprovado' (sem separar fase) fazia o 1º item da fase
+  // final fechar tudo, porque as aprovações de TEMAS persistiam em clientItems.
   if (e.type === "approveItem") {
-    const arr = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
-    const total = arr.length;
-    const ci = (task.clientItems && typeof task.clientItems === "object") ? task.clientItems : {};
-    const approved = new Set();
-    for (const k of Object.keys(ci)) { if (ci[k] && ci[k].cs === "aprovado") approved.add(k); }
-    approved.add("i" + e.contentIndex);
-    if (total > 0 && approved.size >= total) g = Object.assign({}, approveG, { label: "Cliente aprovou todos os conteúdos" });
-    else g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo", col: null, stage: null, client: null };
+    g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo", col: null, stage: null, client: null };
   }
 
   if (g.cs) {
