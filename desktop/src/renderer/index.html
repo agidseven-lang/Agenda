@@ -2669,8 +2669,10 @@ async function markItemsAdjusted(taskId){
       body:JSON.stringify({action:'adjustedItem',contentIndexes:idxs,byName:state.user.name||''})
     });
     r=await res.json();
-    if(res.status===401&&r&&r.expired){localStorage.removeItem('wp_team_jwt');
-      flashToast('Sessão de equipe expirada — saia e entre novamente para registrar correções.');return;}
+    // hardening: QUALQUER 401 (expirado, adulterado, revogado) limpa o token e orienta
+    // novo login — nunca insiste com credencial inválida.
+    if(res.status===401){localStorage.removeItem('wp_team_jwt');
+      flashToast('Sessão de equipe expirada ou inválida — saia e entre novamente para registrar correções.');return;}
     if(!res.ok||!r||r.ok!==true){flashToast('Não foi possível registrar a correção: '+((r&&r.error)||('HTTP '+res.status)));return;}
   }catch(e){flashToast('Falha de rede ao registrar a correção. Tente novamente.');return;}
   // Otimista APÓS confirmação do Worker (o onSnapshot confirma na sequência).

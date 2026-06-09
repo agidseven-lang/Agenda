@@ -1038,8 +1038,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     /'Authorization':'Bearer '\+jwt/.test(mia) && mia.indexOf('uid:state.user.id')===-1 && mia.indexOf('X-Team-Key')===-1 && mia.indexOf('TEAM_API_KEY')===-1);
   check('DH_TEAMFIX_NO_JWT_HONEST','sem JWT na sessão → toast honesto pedindo novo login (não tenta sem credencial)',
     /Sessão de equipe indisponível — saia e entre novamente/.test(mia) && /localStorage\.getItem\('wp_team_jwt'\)/.test(mia));
-  check('DH_TEAMFIX_401_EXPIRED','401 expired → limpa wp_team_jwt + toast de sessão expirada',
-    /res\.status===401&&r&&r\.expired/.test(mia) && /Sessão de equipe expirada/.test(mia));
+  check('DH_TEAMFIX_401_CLEARS','QUALQUER 401 (expirado/adulterado/revogado) limpa wp_team_jwt + toast orientando novo login',
+    /if\(res\.status===401\)\{localStorage\.removeItem\('wp_team_jwt'\)/.test(mia) && /Sessão de equipe expirada ou inválida/.test(mia));
   check('DH_LOGIN_ACQUIRES_SESSION','doLogin adquire teamSessionJwt (acquireTeamSession) com a senha SÓ em trânsito; logout limpa o JWT',
     /acquireTeamSession\(m\.id,password\);/.test(DH) && /async function acquireTeamSession\(uid,password\)/.test(DH) && /\/team\/session/.test(DH) && /localStorage\.removeItem\('wp_team_jwt'\)/.test((DH.match(/function clearSession\(\)\{[^\n]*\}/)||[''])[0]));
   check('DH_NO_PASSWORD_STORED','senha NUNCA persistida (nenhum localStorage.setItem com password/pass/senha)',
@@ -1056,8 +1056,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       /unauthorized: Authorization Bearer <teamSessionJwt> obrigatório/.test(W44) && /await verifyTeamJwt\(env, m\[1\]\)/.test(W44) && (()=>{const h=(W44.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)||[''])[0];return h.length>0&&h.indexOf('payload.uid')===-1;})());
     check('DH_W45_RELOOKUP','após JWT válido, Worker RECONSULTA role/status no Firestore (revogação imediata → 403)',
       /lookupTeamUser\(env, accessToken, v\.uid\)/.test(W44) && /forbidden: usuário não é mais Social\/Admin ativo/.test(W44));
-    check('DH_W45_SESSION_ROUTE','rota /team/session emite JWT só com SENHA verificada server-side + role Social/Admin ativo',
-      /url\.pathname === "\/team\/session"/.test(W44) && /credenciais inválidas" \}, 401/.test(W44) && /usuário não autorizado \(Social\/Admin ativo requerido\)" \}, 403/.test(W44));
+    check('DH_W46_SESSION_HARDENED','/team/session blindada: senha em tempo constante + erro GENÉRICO 401 (não revela uid/role/senha) + rate limit 429 + TTL 4h',
+      /url\.pathname === "\/team\/session"/.test(W44) && /timingSafeEqualStr/.test(W44) && (W44.match(/credenciais inválidas" \}, 401/g)||[]).length>=3 && /muitas tentativas — aguarde alguns minutos" \}, 429/.test(W44) && /const TEAM_JWT_TTL_S = 4 \* 3600;/.test(W44) && !/Social\/Admin ativo requerido/.test((W44.match(/async function handleTeamSession[\s\S]*?\n\}/)||[''])[0]));
     check('DH_W44_CLEARS_PRESERVES_PHASE','rota limpa clientItems[iX].cs (nullValue) preservando phase + history equipe_corrigiu_item',
       /cs: \{ nullValue: null \}/.test(W44) && /equipe_corrigiu_item/.test(W44) && !/clientItems\." \+ key \+ "\.phase/.test(W44.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)[0]));
     check('DH_W44_NOTIFY','rota chama notifyWorkflowEvent(theme_adjusted_by_team|final_adjusted_by_team) na camada central',
