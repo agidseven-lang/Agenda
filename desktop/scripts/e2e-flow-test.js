@@ -676,13 +676,13 @@ console.log(`${C.b}\n[PARTE G] Fase 1 — clientStatusView é wrapper FIEL de op
 check('CSV_DEF', 'clientStatusView(t) existe e é função pura (retorna {key,label,color,axis})', /function clientStatusView\(t\)\{[\s\S]*?return \{key:k,label:c\.label,color:c\.color,axis:'operational'\};/.test(DH));
 // Escopo do passo 4 (fora de comentários): definição + 4 chamadas (taskCard, card de revisão, flowSummary, opPanel).
 const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
-check('CSV_SCOPE', 'clientStatusView: definição + 4 badges + 1 uso interno em taskTimeline (6 ocorrências)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 6 && /function clientStatusView\(t\)/.test(DH_noc));
+check('CSV_SCOPE', 'clientStatusView: definição + 3 badges (taskCard/revisão/flowSummary) + 1 uso interno em taskTimeline (5 ocorrências)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 5 && /function clientStatusView\(t\)/.test(DH_noc));
 // taskCard MIGRADO.
 check('CSV_TASKCARD_MIGRATED', "taskCard cronograma usa const oc=clientStatusView(t) no badge", /key==='cronograma'\)\{const oc=clientStatusView\(t\);/.test(DH));
 // card de revisão MIGRADO (rev-chip).
 check('CSV_REVISAO_MIGRATED', 'Card de revisão usa clientStatusView(t) (rev-chip)', /const oc=clientStatusView\(t\);[^\n]*\n\s*return '<span class="rev-chip"/.test(DH));
 // detalhe MIGRADO (flowSummaryBlock "Status operacional" + opPanelBlock "Próxima ação").
-check('CSV_DETALHE_MIGRATED', 'Detalhe (flowSummary + opPanel) usa clientStatusView(t)', /const oc=clientStatusView\(t\);[^\n]*\n\s*h\+='<div class="det-flow-col"><div class="det-flow-lbl">Status operacional/.test(DH) && /const oc=clientStatusView\(t\);[^\n]*\n\s*const cf=clientCol\(t\)/.test(DH));
+check('CSV_DETALHE_MIGRATED', 'flowSummary "Status operacional" usa clientStatusView; opPanel migrou p/ taskTimeline (tl.current)', /const oc=clientStatusView\(t\);[^\n]*\n\s*h\+='<div class="det-flow-col"><div class="det-flow-lbl">Status operacional/.test(DH) && /function opPanelBlock\(t\)\{[\s\S]*?const tl=taskTimeline\(t\);[\s\S]*?const oc=tl\.current;/.test(DH));
 // NENHUM badge deriva mais de opColOf(operationalCol(t)) diretamente (só em comentários).
 check('CSV_NO_OLD_BADGE', 'Nenhum badge usa mais const oc=opColOf(operationalCol(t)) (migração completa)', (DH.match(/const oc=opColOf\(operationalCol\(t\)\)/g)||[]).length === 0);
 (function(){
@@ -754,11 +754,15 @@ console.log(`${C.b}\n[PARTE H] Fase 2 (passo 1) — taskTimeline pura/dormente +
 check('TL_DEF', 'taskTimeline(t) existe e retorna {current,last,next,owner,milestones}', /function taskTimeline\(t\)\{[\s\S]*?return \{ current:cur, last:last, next:nextActionText\(t\), owner:owner, milestones:milestones \};/.test(DH));
 const DH_noc2 = DH.replace(/^\s*\/\/.*$/gm,'');
 // Passo 2: taskTimeline agora é consumida APENAS pelo taskCardTimeline (definição + 1 uso).
-check('TL_CARD_WIRED', 'taskTimeline usada só no taskCardTimeline (2 ocorrências: definição + 1 chamada)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 2 && /function taskTimeline\(t\)/.test(DH_noc2));
+check('TL_CARD_WIRED', 'taskTimeline consumida por taskCardTimeline + opPanelBlock (3 ocorrências: definição + 2 usos)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 3 && /function taskTimeline\(t\)/.test(DH_noc2));
 check('TL2_CARD_RENDER', 'taskCard renderiza a timeline compacta (taskCardTimeline(t)) e taskCardTimeline usa taskTimeline(t)', /'<\/div>'\+\s*\n?\s*taskCardTimeline\(t\);/.test(DH) && /function taskCardTimeline\(t\)\{[\s\S]*?const tl=taskTimeline\(t\);/.test(DH));
 check('TL2_CARD_ONLY', 'taskCardTimeline existe e é chamado só no taskCard (definição + 1 chamada)', (DH_noc2.match(/taskCardTimeline\(/g)||[]).length === 2);
 check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard secOf!=cronograma -> "")', /function taskCardTimeline\(t\)\{\s*\n\s*if\(secOf\(t\.sector\)\.key!=='cronograma'\)return '';/.test(DH));
-check('TL2_DETALHE_OPPANEL_INTACTO', "Detalhe (opPanelBlock) NÃO usa taskTimeline — segue com steps próprios", (()=>{const fn=(DH.match(/function opPanelBlock\(t\)\{[\s\S]*?\n\}/)||[''])[0];return fn.length>0 && fn.indexOf('taskTimeline(')<0 && /Linha do tempo operacional/.test(fn);})());
+// PASSO 3: o detalhe (opPanelBlock) AGORA usa taskTimeline(t) (timeline completa); sem steps[] próprios.
+(function(){const fn=(DH.match(/function opPanelBlock\(t\)\{[\s\S]*?\n\}/)||[''])[0];
+  check('TL3_DETALHE_MIGRATED', 'opPanelBlock usa taskTimeline(t) + tl.milestones.forEach + det-tl-meta', fn.length>0 && /const tl=taskTimeline\(t\);/.test(fn) && /tl\.milestones\.forEach/.test(fn) && /det-tl-meta/.test(fn));
+  check('TL3_NO_OLD_STEPS', 'opPanelBlock NÃO tem mais os steps antigos (Legenda final pronta / Feed (1080×1440))', fn.indexOf('Legenda final pronta')<0 && fn.indexOf('Feed (1080')<0 && fn.indexOf('const steps=[')<0);
+})();
 (function(){
   const grab=(re)=>{const m=DH.match(re);return m?m[0]:'';};
   const constArr=(name)=>grab(new RegExp('const '+name+'\\s*=\\s*\\[[\\s\\S]*?\\];'));
@@ -777,7 +781,11 @@ check('TL2_DETALHE_OPPANEL_INTACTO', "Detalhe (opPanelBlock) NÃO usa taskTimeli
       fnDecl('clientStatusView'), fnDecl('_tlEventAt'),
       (DH.match(/const TL_EVENT_LABELS=\{[\s\S]*?\n\};/)||[''])[0], fnDecl('_tlHumanLabel'),
       fnDecl('taskTimeline'),
-      'return {taskTimeline,operationalCol,clientCol,hasDesigner,designerDelivered,pendingLegend,pendingFeed};'
+      // deps p/ renderizar opPanelBlock (detalhe) no sandbox:
+      oneLine('esc'), oneLine('withAlpha'), fnDecl('fmtDateTimeBR'), fnDecl('_tlRelAgo'),
+      'function svg(){return "";}', 'const state={users:[{id:"d",name:"Marcos Dias"},{id:"ana",name:"Ana Lima"},{id:"cli",name:"Cliente"},{id:"jm",name:"João Marques"}]};',
+      fnDecl('opPanelBlock'),
+      'return {taskTimeline,operationalCol,clientCol,hasDesigner,designerDelivered,pendingLegend,pendingFeed,opPanelBlock};'
     ];
     mod=new Function(pieces.join('\n'))();
   }catch(e){ err=e&&e.message; }
@@ -837,7 +845,28 @@ check('TL2_DETALHE_OPPANEL_INTACTO', "Detalhe (opPanelBlock) NÃO usa taskTimeli
   check('TL_HUMAN_KEEP', 'Último: preserva label já humano (com espaços) sem virar genérico', fHL.last.label==='Enviado para aprovação final' || fHL.last.label==='Reenviado ao cliente (versão FINAL)');
   // o card (taskCardTimeline) renderiza o label humanizado (esc(tl.last.label)) — sem código cru
   check('TL_HUMAN_CARD', 'taskCardTimeline exibe "Último: "+ label humanizado (via tl.last.label)', /Último: '\+lastTxt/.test(DH) && /const lastTxt=tl\.last\?\(esc\(tl\.last\.label\)/.test(DH));
-  console.log('  '+C.d+'fixtures provadas: '+FIX.length+' · humanização: '+RAWMAP.length+C.x);
+  // ===== PASSO 3 — detalhe (opPanelBlock) renderizado a partir de taskTimeline =====
+  const RAWALL=['designer_moved','reviseItem','approveAll','approveItem','sent_to_client','sent_to_designer','final_sent','final_review','reenviado_cliente','social_producao','em_revisao','clientActions','kind','type'];
+  const stMap=(s)=> s==='done'?'done':(s==='current'||s==='attention')?'cur':'todo';
+  let rowsOK=true, detNoRaw=true, detParity=true, detThrow=false;
+  FIX.forEach(([nome,t])=>{
+    let html=''; try{ html=mod.opPanelBlock(t); }catch(e){ detThrow=true; return; }
+    const rows=(html.match(/det-tl-row/g)||[]).length;
+    if(rows!==10) rowsOK=false;
+    if(RAWALL.some(c=>html.indexOf(c)>=0)) detNoRaw=false;
+    // paridade de estados: classe de cada row === estado mapeado de taskTimeline.milestones
+    const cls=(html.match(/det-tl-row (done|cur|todo)/g)||[]).map(x=>x.split(' ')[1]);
+    const exp=mod.taskTimeline(t).milestones.map(m=>stMap(m.state));
+    if(cls.length!==exp.length||cls.some((c,k)=>c!==exp[k])) detParity=false;
+  });
+  check('TL3_RENDER_NOTHROW','opPanelBlock renderiza sem lançar em todas as fixtures', !detThrow);
+  check('TL3_ROWS','Detalhe mostra os 10 marcos canônicos (det-tl-row x10) em todas as fixtures', rowsOK);
+  check('TL3_NO_RAW','Detalhe NÃO exibe nenhum código interno (kind/type/clientActions)', detNoRaw);
+  check('TL3_STATE_PARITY','Estados do detalhe (done/cur/todo) IDÊNTICOS aos de taskTimeline', detParity);
+  // amostra: aguardando designer mostra data+autor humanizado no marco "Enviado ao designer"/"Designer em produção"
+  const hd=mod.opPanelBlock(FIX[0][1]);  // history kind designer_moved byId='d' (Marcos Dias)
+  check('TL3_META','Detalhe inclui data+autor por marco (det-tl-meta + "por <nome>")', /det-tl-meta/.test(hd) && /por Marcos/.test(hd));
+  console.log('  '+C.d+'fixtures provadas: '+FIX.length+' · humanização: '+RAWMAP.length+' · detalhe: '+FIX.length+C.x);
 })();
 
 /* ===================== VEREDITO ===================== */

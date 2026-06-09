@@ -1093,8 +1093,11 @@
   .det-tl-row{display:flex;align-items:center;gap:11px;padding:8px 2px}
   .det-tl-dot{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;flex:none;background:var(--surface);border:1px solid var(--line);color:var(--faint)}
   .det-tl-dot svg{width:14px;height:14px}
-  .det-tl-l{flex:1;font-size:13px;color:var(--soft)}
+  .det-tl-l{flex:1;font-size:13px;color:var(--soft);min-width:0}
   .det-tl-opt{color:var(--faint);font-size:11.5px}
+  /* FASE 2 (passo 3) — meta por marco no detalhe (data · relativo · autor) */
+  .det-tl-meta{font-size:11px;color:var(--faint);margin-top:2px;line-height:1.35;white-space:normal;word-break:break-word}
+  .det-tl-row.done .det-tl-meta{color:var(--soft)}
   .det-tl-s{font-size:11px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.04em}
   .det-tl-row.done .det-tl-dot{background:var(--green);border-color:transparent;color:#062}
   .det-tl-row.done .det-tl-l{color:var(--ink)}
@@ -2418,33 +2421,31 @@ function clientApprovalPhaseOf(t){
 /* Painel "Próxima ação" + "Linha do tempo operacional" (10 etapas) no Detalhes. */
 function opPanelBlock(t){
   if(secOf(t.sector).key!=='cronograma')return '';
-  const oc=clientStatusView(t); // FASE 1 (passo 4): detalhe lê a fonte única (idêntico a opColOf(operationalCol))
-  const cf=clientCol(t);const delivered=designerDelivered(t);const hasD=hasDesigner(t);
-  const themesOk=(cf==='aprovado'||cf==='producao'||cf==='revisao'||cf==='reenviado'||cf==='concluido'||(t.clientReview&&t.clientReview.status==='aprovado'));
-  const finalOk=!!(t.finalApprovalCompleted||cf==='concluido');
-  const resent=(cf==='reenviado'||cf==='concluido');
-  const steps=[
-    {l:'Cliente aprovou os temas', done:themesOk},
-    {l:'Enviado ao designer',       done:hasD},
-    {l:'Designer em produção',      done:delivered, cur:hasD&&!delivered},
-    {l:'Designer entregou',         done:delivered},
-    {l:'Legenda final pronta',      done:!pendingLegend(t)},
-    {l:'Feed (1080×1440) anexado',  done:!pendingFeed(t)},
-    {l:'Story (1080×1920) anexado', done:!pendingStory(t), opt:true},
-    {l:'Reenviado ao cliente',      done:resent},
-    {l:'Aprovação final do cliente',done:finalOk},
-    {l:'Conclusão operacional',     done:operationalCol(t)==='concluido'},
-  ];
+  // FASE 2 (passo 3): a timeline COMPLETA do detalhe lê a FONTE ÚNICA taskTimeline(t) — mesmos
+  // 10 marcos canônicos e os MESMOS estados (done/current/pending/attention) de hoje; acrescenta
+  // data + tempo relativo + autor (humanizado). Sem schema, sem dados, sem rótulos crus.
+  const tl=taskTimeline(t);
+  const oc=tl.current;
   let h='<div class="det-sec">Operação</div>'+
     '<div class="det-next" style="border-color:'+withAlpha(oc.color,.4)+'">'+
       '<div class="det-next-ic" style="background:'+withAlpha(oc.color,.16)+';color:'+oc.color+'">'+svg('flag')+'</div>'+
       '<div><div class="det-next-l">Próxima ação · <span style="color:'+oc.color+'">'+esc(oc.label)+'</span></div>'+
-        '<div class="det-next-t">'+esc(nextActionText(t))+'</div></div></div>';
+        '<div class="det-next-t">'+esc(tl.next)+'</div></div></div>';
   h+='<div class="det-sec" style="margin-top:18px">Linha do tempo operacional</div><div class="det-tl">';
-  steps.forEach((s,i)=>{const st=s.done?'done':(s.cur?'cur':'todo');
-    h+='<div class="det-tl-row '+st+'"><div class="det-tl-dot">'+(s.done?svg('check'):(i+1))+'</div>'+
-      '<div class="det-tl-l">'+esc(s.l)+(s.opt?' <span class="det-tl-opt">(quando aplicável)</span>':'')+'</div>'+
-      '<div class="det-tl-s">'+(s.done?'OK':(s.cur?'Em andamento':'Pendente'))+'</div></div>';});
+  tl.milestones.forEach((m,i)=>{
+    const isAjuste=(m.key==='ajuste');
+    const cls = (m.state==='done')?'done':((m.state==='current'||m.state==='attention')?'cur':'todo');
+    const stTxt = (m.state==='done')?'OK':(m.state==='current')?'Em andamento':(m.state==='attention')?'Atenção':(m.state==='optional')?'Se ocorrer':'Pendente';
+    const who=m.by?((state.users.find(u=>u.id===m.by)||{}).name||''):'';
+    const when=m.at?(fmtDateTimeBR(m.at)+' · '+_tlRelAgo(m.at)):'';
+    let meta=[when, who?('por '+who.split(' ')[0]):''].filter(Boolean).join(' · ');
+    if(!meta) meta=(m.state==='done')?'concluído':(isAjuste&&m.state==='optional')?'somente se o cliente pedir':'aguardando';
+    const dot=(m.state==='done')?svg('check'):((isAjuste&&m.state==='attention')?'!':(i+1));
+    h+='<div class="det-tl-row '+cls+'"><div class="det-tl-dot">'+dot+'</div>'+
+      '<div class="det-tl-l">'+esc(m.label)+((isAjuste&&m.state==='optional')?' <span class="det-tl-opt">(condicional)</span>':'')+
+        '<div class="det-tl-meta">'+esc(meta)+'</div></div>'+
+      '<div class="det-tl-s">'+stTxt+'</div></div>';
+  });
   h+='</div>';
   return h;
 }
