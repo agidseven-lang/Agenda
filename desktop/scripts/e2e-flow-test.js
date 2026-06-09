@@ -676,7 +676,7 @@ console.log(`${C.b}\n[PARTE G] Fase 1 — clientStatusView é wrapper FIEL de op
 check('CSV_DEF', 'clientStatusView(t) existe e é função pura (retorna {key,label,color,axis})', /function clientStatusView\(t\)\{[\s\S]*?return \{key:k,label:c\.label,color:c\.color,axis:'operational'\};/.test(DH));
 // Escopo do passo 4 (fora de comentários): definição + 4 chamadas (taskCard, card de revisão, flowSummary, opPanel).
 const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
-check('CSV_SCOPE', 'Passo 4: clientStatusView usada nos 3 badges visuais (5 ocorrências: definição + 4 chamadas)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 5 && /function clientStatusView\(t\)/.test(DH_noc));
+check('CSV_SCOPE', 'clientStatusView: definição + 4 badges + 1 uso interno em taskTimeline (6 ocorrências)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 6 && /function clientStatusView\(t\)/.test(DH_noc));
 // taskCard MIGRADO.
 check('CSV_TASKCARD_MIGRATED', "taskCard cronograma usa const oc=clientStatusView(t) no badge", /key==='cronograma'\)\{const oc=clientStatusView\(t\);/.test(DH));
 // card de revisão MIGRADO (rev-chip).
@@ -744,6 +744,73 @@ check('CSV_NO_OLD_BADGE', 'Nenhum badge usa mais const oc=opColOf(operationalCol
     check('CSV_NCRON', 'Setor não-cronograma: clientStatusView usa t.status (axis=status)', mod.clientStatusView({sector:'designer',status:'andamento'}).axis==='status');
     console.log('  '+C.d+'estados provados: '+ESTADOS.length+C.x);
   }
+})();
+
+/* ===================== PARTE H — FASE 2 (passo 1): taskTimeline (dormente) =====================
+   Prova: (a) taskTimeline existe e é DORMENTE (nenhum render a chama); (b) os estados dos
+   marcos são IDÊNTICOS às flags do opPanelBlock; (c) tolerância a history[] kind/type,
+   clientActions[], tarefa sem history, pedido de ajuste e tarefa concluída — sem lançar. */
+console.log(`${C.b}\n[PARTE H] Fase 2 (passo 1) — taskTimeline pura/dormente + paridade de estados${C.x}`);
+check('TL_DEF', 'taskTimeline(t) existe e retorna {current,last,next,owner,milestones}', /function taskTimeline\(t\)\{[\s\S]*?return \{ current:cur, last:last, next:nextActionText\(t\), owner:owner, milestones:milestones \};/.test(DH));
+const DH_noc2 = DH.replace(/^\s*\/\/.*$/gm,'');
+check('TL_DORMANT', 'Passo 1: taskTimeline NÃO é chamada por nenhum render (só a definição existe)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 1 && /function taskTimeline\(t\)/.test(DH_noc2));
+(function(){
+  const grab=(re)=>{const m=DH.match(re);return m?m[0]:'';};
+  const constArr=(name)=>grab(new RegExp('const '+name+'\\s*=\\s*\\[[\\s\\S]*?\\];'));
+  const fnDecl=(name)=>grab(new RegExp('function '+name+'\\([^)]*\\)\\{[\\s\\S]*?\\n\\}'));
+  const oneLine=(name)=>grab(new RegExp('function '+name+'\\([^)]*\\)\\{.*\\}'));
+  let mod=null, err=null;
+  try{
+    const pieces=[
+      constArr('SECTORS'), (DH.match(/const SECTOR_ALIAS=\{[\s\S]*?\};/)||['const SECTOR_ALIAS={};'])[0],
+      constArr('STATUS'), constArr('CLIENT_COLS'), constArr('OPERATIONAL_COLS'),
+      oneLine('secOf'), oneLine('stOf'), oneLine('opColOf'),
+      oneLine('hasDesigner'), oneLine('designerOf'), oneLine('designerCol'), oneLine('designerDelivered'),
+      oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'),
+      oneLine('hasPendingItemRevision'),
+      fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('nextActionText'),
+      fnDecl('clientStatusView'), fnDecl('_tlEventAt'), fnDecl('taskTimeline'),
+      'return {taskTimeline,operationalCol,clientCol,hasDesigner,designerDelivered,pendingLegend,pendingFeed};'
+    ];
+    mod=new Function(pieces.join('\n'))();
+  }catch(e){ err=e&&e.message; }
+  check('TL_EVAL', 'taskTimeline + deps avaliáveis a partir do renderer', !!mod && !err);
+  if(!mod){ console.log('  '+C.r+'erro: '+err+C.x); return; }
+  const ms=(tl,key)=>tl.milestones.find(m=>m.key===key);
+  // Fixtures obrigatórias
+  const FIX=[
+    ['history[] com kind',        {sector:'cronograma',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento',history:[{kind:'designer_moved',at:1000,byId:'d',from:'afazer',to:'andamento'}]}],
+    ['history[] com type',        {sector:'cronograma',clientFlowStatus:'reenviado',cronStatus:'ready_for_final_client_review',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido',cronContents:[{tema:'T',legenda:'L',feedImageUrl:'f'}],history:[{type:'reenviado_cliente',label:'Reenviado',at:2000,byId:'u',channel:'final_review'}]}],
+    ['clientActions[]',           {sector:'cronograma',clientReview:{status:'aprovado'},clientActions:{a1:{type:'approveAll',at:1500,by:'cli'}}}],
+    ['sem history',               {sector:'cronograma',clientSentBy:'u'}],
+    ['pedido de ajuste',          {sector:'cronograma',clientReview:{status:'revisao'},clientItems:{i0:{cs:'em_revisao',at:1234}}}],
+    ['concluída',                 {sector:'cronograma',finalApprovalCompleted:true,clientFlowStatus:'concluido',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido',cronContents:[{tema:'T',legenda:'L',feedImageUrl:'f'}],history:[{kind:'moved',at:3000,to:'concluido',byId:'u'}]}],
+  ];
+  let noThrow=true, shapeOK=true, parityOK=true;
+  FIX.forEach(([nome,t])=>{
+    let tl=null; try{ tl=mod.taskTimeline(t); }catch(e){ noThrow=false; tl=null; }
+    if(!tl){ return; }
+    if(!Array.isArray(tl.milestones)||tl.milestones.length!==10||!('current'in tl)||!('next'in tl)||!('owner'in tl)) shapeOK=false;
+    // PARIDADE com opPanelBlock (recálculo independente):
+    const cf=mod.clientCol(t), hasD=mod.hasDesigner(t), delivered=mod.designerDelivered(t);
+    const themesOk=(cf==='aprovado'||cf==='producao'||cf==='revisao'||cf==='reenviado'||cf==='concluido'||(t.clientReview&&t.clientReview.status==='aprovado'));
+    const resent=(cf==='reenviado'||cf==='concluido');
+    const finalOk=!!(t.finalApprovalCompleted||cf==='concluido');
+    const prodOk=(!mod.pendingLegend(t)&&!mod.pendingFeed(t));
+    const exp={temas_aprovados:!!themesOk,enviado_designer:!!hasD,designer_producao:!!delivered,designer_entregou:!!delivered,aguardando_legenda:!!prodOk,enviado_final:!!resent,concluido:!!finalOk};
+    Object.keys(exp).forEach(k=>{ const m=ms(tl,k); if(!m||m.done!==exp[k]){ parityOK=false; } });
+  });
+  check('TL_NOTHROW',  'taskTimeline NÃO lança em nenhuma fixture (kind/type/clientActions/sem history/ajuste/concluída)', noThrow);
+  check('TL_SHAPE',    'Sempre 10 marcos + {current,next,owner} presentes', shapeOK);
+  check('TL_STATE_PARITY', 'milestones[].done IDÊNTICO às flags do opPanelBlock (temas/designer/produção/entrega/legenda/final/concluído)', parityOK);
+  // Casos específicos
+  const f1=mod.taskTimeline(FIX[0][1]); check('TL_AT_KIND', 'history[] kind: marco "designer_producao" pega at=1000 (by=d)', ms(f1,'designer_producao').at===1000 && ms(f1,'designer_producao').by==='d');
+  const f3=mod.taskTimeline(FIX[2][1]); check('TL_AT_CLIENTACTIONS', 'clientActions approveAll: "temas_aprovados" done + at=1500', ms(f3,'temas_aprovados').done===true && ms(f3,'temas_aprovados').at===1500);
+  const f4=mod.taskTimeline(FIX[3][1]); check('TL_NOHISTORY_SAFE', 'sem history: não quebra; datas null; last via fallback', ms(f4,'criado').done===true && f4.last!==null);
+  const f5=mod.taskTimeline(FIX[4][1]); check('TL_AJUSTE', 'pedido de ajuste: marco "ajuste" state="attention"', ms(f5,'ajuste').state==='attention');
+  const f6=mod.taskTimeline(FIX[5][1]); check('TL_CONCLUIDO', 'concluída: "concluido" done=true e nenhum marco "current"', ms(f6,'concluido').done===true && !f6.milestones.some(m=>m.state==='current'));
+  check('TL_NEXT', 'taskTimeline.next === nextActionText (próxima ação)', typeof f1.next==='string' && f1.next.length>0);
+  console.log('  '+C.d+'fixtures provadas: '+FIX.length+C.x);
 })();
 
 /* ===================== VEREDITO ===================== */

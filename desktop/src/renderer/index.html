@@ -1898,6 +1898,85 @@ function clientStatusView(t){
   const k=operationalCol(t);const c=opColOf(k);
   return {key:k,label:c.label,color:c.color,axis:'operational'};
 }
+// ===== FASE 2 (passo 1) — TIMELINE OPERACIONAL (taskTimeline) ===========================
+// Função PURA, read-only e DORMENTE (nenhum render a usa ainda). Centraliza a leitura da
+// história operacional da tarefa reaproveitando EXATAMENTE as flags do opPanelBlock
+// (themesOk, hasDesigner, designerDelivered, pendingProduction, resent, finalOk) — os
+// estados dos marcos são idênticos aos de hoje. Acrescenta {current,last,next,owner} e
+// tenta enriquecer cada marco com {at,by} a partir de history[] (formato kind OU type),
+// clientActions[] e timestamps; tudo TOLERANTE: ausência de data/autor → null (sem quebrar).
+function _tlEventAt(t, keys){
+  // varre history[] (kind|type|label|channel) + clientActions[] buscando o evento mais recente
+  // cujo "rótulo" casa com alguma palavra-chave; devolve {at,by} ou null. Nunca lança.
+  let best=null;
+  const consider=(txt,at,by)=>{ if(!at)return; const s=(txt||'').toString().toLowerCase();
+    if(keys.some(k=>s.indexOf(k)>=0)){ if(!best||at>best.at) best={at:Number(at),by:by||null}; } };
+  try{ const h=Array.isArray(t&&t.history)?t.history:[]; h.forEach(e=>{ if(!e)return;
+    consider((e.kind||'')+' '+(e.type||'')+' '+(e.label||'')+' '+(e.channel||'')+' '+(e.to||''), e.at, e.byId||e.by||null); }); }catch(_){ }
+  try{ const ca=(t&&t.clientActions&&typeof t.clientActions==='object')?t.clientActions:{}; Object.keys(ca).forEach(k=>{const a=ca[k];if(!a)return;
+    consider((a.type||'')+' client', a.at, a.by||a.byId||null); }); }catch(_){ }
+  return best;
+}
+function taskTimeline(t){
+  t=t||{};
+  const cur=clientStatusView(t);
+  const cf=clientCol(t);
+  const hasD=hasDesigner(t);
+  const delivered=designerDelivered(t);
+  // MESMAS expressões do opPanelBlock (não-regressão de estado):
+  const themesOk=(cf==='aprovado'||cf==='producao'||cf==='revisao'||cf==='reenviado'||cf==='concluido'||(t.clientReview&&t.clientReview.status==='aprovado'));
+  const sent=(cf!=='afazer')||!!(t.clientSentBy||t.clientReviewToken||t.shareToken);
+  const prodOk=!pendingProduction(t);
+  const resent=(cf==='reenviado'||cf==='concluido');
+  const finalOk=!!(t.finalApprovalCompleted||cf==='concluido'||operationalCol(t)==='concluido');
+  const ajusteAtivo=!!((t.clientReview&&t.clientReview.status==='revisao')||hasPendingItemRevision(t));
+  // 10 marcos canônicos com o done reaproveitando as flags acima.
+  const RAW=[
+    {key:'criado',            label:'Criado',                        done:true,            ev:['criado','created']},
+    {key:'enviado_cliente',   label:'Enviado ao cliente',            done:!!sent,          ev:['enviado_cliente','enviou','share','link','sent_to_client']},
+    {key:'temas_aprovados',   label:'Temas aprovados',               done:!!themesOk,      ev:['approveall','approve','aprovou','aprovado']},
+    {key:'enviado_designer',  label:'Enviado ao designer',           done:!!hasD,          ev:['designer','sent_to_designer','atribu']},
+    {key:'designer_producao', label:'Designer em produção',          done:!!delivered,     ev:['designer_moved','andamento','producao']},
+    {key:'designer_entregou', label:'Designer entregou',             done:!!delivered,     ev:['concluido','entreg','delivered']},
+    {key:'aguardando_legenda',label:'Aguardando legenda / posts',    done:!!prodOk,        ev:['social_producao','production','legenda','social_editou']},
+    {key:'enviado_final',     label:'Enviado para aprovação final',  done:!!resent,        ev:['reenviado_cliente','final_review','reenviado']},
+    {key:'ajuste',            label:'Cliente pediu ajuste',          done:false, optional:true, active:ajusteAtivo, ev:['reviseitem','revision','revis','em_revisao','editou']},
+    {key:'concluido',         label:'Aprovado final / Concluído',    done:!!finalOk,       ev:['final','concluido','aprovado final','ackfeedback']},
+  ];
+  // "current" = primeiro marco não-concluído (ignorando o de ajuste), quando ainda não encerrou.
+  const firstPending = finalOk ? -1 : RAW.findIndex(m=>!m.done && m.key!=='ajuste');
+  const milestones=RAW.map((m,i)=>{
+    let state;
+    if(m.key==='ajuste') state=m.active?'attention':'optional';
+    else if(m.done) state='done';
+    else if(i===firstPending) state='current';
+    else state='pending';
+    const e=_tlEventAt(t,m.ev);
+    let at=e?e.at:null, by=e?e.by:null;
+    if(m.key==='criado'&&!at) at=t.createdAt||null;
+    if(m.key==='concluido'&&!at&&finalOk) at=t.doneAt||null;
+    return {key:m.key,label:m.label,state:state,done:!!m.done,optional:!!m.optional,at:at,by:by};
+  });
+  // ÚLTIMO evento (cronológico) — o item mais recente de history[]/clientActions[].
+  let last=null;
+  try{
+    const ev=[];
+    (Array.isArray(t.history)?t.history:[]).forEach(e=>{ if(e&&e.at) ev.push({label:(e.label||e.type||e.kind||'Atualização'),at:Number(e.at),by:e.byId||e.by||null}); });
+    const ca=(t.clientActions&&typeof t.clientActions==='object')?t.clientActions:{};
+    Object.keys(ca).forEach(k=>{const a=ca[k];if(a&&a.at)ev.push({label:(a.type||'Ação do cliente'),at:Number(a.at),by:a.by||a.byId||null});});
+    if(ev.length){ ev.sort((a,b)=>b.at-a.at); last=ev[0]; }
+  }catch(_){ }
+  if(!last){ // fallback: último marco "done" sem data
+    for(let i=milestones.length-1;i>=0;i--){ if(milestones[i].done){ last={label:milestones[i].label,at:milestones[i].at||null,by:milestones[i].by||null}; break; } }
+  }
+  // RESPONSÁVEL agora — papel que deve agir no estágio atual.
+  let owner={role:'—',id:null};
+  if(finalOk) owner={role:'—',id:null};
+  else if(hasD&&!delivered) owner={role:'Designer',id:designerOf(t)};
+  else if(operationalCol(t)==='aguardando_legenda'||operationalCol(t)==='aguardando_envio'||operationalCol(t)==='afazer') owner={role:'Social',id:(t.clientSentBy||t.by||t.assigneeId||null)};
+  else if(['enviado','producao','reenviado'].indexOf(cf)>=0||ajusteAtivo) owner={role:'Cliente',id:null};
+  return { current:cur, last:last, next:nextActionText(t), owner:owner, milestones:milestones };
+}
 // Bucket de 4 colunas (afazer/andamento/revisao/concluido) para os quadros por SETOR e
 // "Meu quadro". Para CRONOGRAMA, deriva do eixo OPERACIONAL — assim o status BRUTO nunca
 // coloca um cronograma em "Concluído" antes da aprovação final real (paridade com o card).
