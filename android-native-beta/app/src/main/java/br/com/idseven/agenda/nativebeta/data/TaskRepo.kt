@@ -100,6 +100,18 @@ object TaskRepo {
             clientApprovalPhase = d.getString("clientApprovalPhase"),
             designerEndDate = (d.get("designerAssignment") as? Map<*, *>)?.get("endDate") as? String ?: d.getString("endDate"),
             designerEndTime = (d.get("designerAssignment") as? Map<*, *>)?.get("endTime") as? String ?: d.getString("endTime"),
+            // detail-hierarchy-v2: estado POR ITEM do cliente (clientItems.iX) com tag de fase.
+            clientItems = (d.get("clientItems") as? Map<*, *>)?.entries?.mapNotNull { (k, v) ->
+                val key = k as? String ?: return@mapNotNull null
+                val m = v as? Map<*, *> ?: return@mapNotNull null
+                key to br.com.idseven.agenda.nativebeta.domain.ClientItemState(
+                    cs = m["cs"] as? String,
+                    phase = m["phase"] as? String,
+                    note = m["note"] as? String,
+                    teamAdjustedAt = (m["teamAdjustedAt"] as? Number)?.toLong(),
+                )
+            }?.toMap() ?: emptyMap(),
+            clientFinalApprovedAt = d.getLong("clientFinalApprovedAt"),
         )
     }
 

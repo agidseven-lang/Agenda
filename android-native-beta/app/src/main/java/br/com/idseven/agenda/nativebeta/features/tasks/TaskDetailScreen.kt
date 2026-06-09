@@ -129,9 +129,12 @@ fun TaskDetailScreen(
                 }
                 Spacer(Modifier.height(16.dp))
 
-                // Operação (eixo operacional: próxima ação + linha do tempo) — só cronograma.
+                // detail-hierarchy-v2 — HERO no topo (status principal + próxima ação +
+                // responsável agora) e painel técnico COLAPSADO em "Detalhes do fluxo".
                 if (Sectors.of(t.sector).key == "cronograma") {
-                    OperationalPanel(t)
+                    DetailHero(t, users)
+                    Spacer(Modifier.height(10.dp))
+                    FlowDetailsCollapsed(t)
                     Spacer(Modifier.height(16.dp))
                 }
 
@@ -198,26 +201,12 @@ fun TaskDetailScreen(
                     Card { Text(t.desc, color = Tokens.Ink, fontSize = 14.sp) }
                 }
 
-                // Fluxo Cronograma -> Cliente (somente leitura; compat com Desktop 1.0.78)
-                if (!t.cronStatus.isNullOrBlank() || t.clientReview != null) {
+                // detail-hierarchy-v2: a seção mostra apenas a RESPOSTA do cliente (nota/feedback).
+                // O status técnico (CronStatusUi) saiu daqui — o estado vive no HERO (sem contradição).
+                if (t.clientReview != null) {
                     Spacer(Modifier.height(16.dp))
-                    SectionLabel("Cronograma · cliente")
+                    SectionLabel("Resposta do cliente")
                     Card {
-                        t.cronStatus?.takeIf { it.isNotBlank() }?.let { cs ->
-                            val c = CronStatusUi.color(cs)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(8.dp).clip(RoundedCornerShape(999.dp)).background(c))
-                                Spacer(Modifier.width(10.dp))
-                                Text(CronStatusUi.label(cs), color = c, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            }
-                            t.clientSentBy?.let { sb ->
-                                val who = users.firstOrNull { it.id == sb }?.name
-                                if (!who.isNullOrBlank()) {
-                                    Spacer(Modifier.height(4.dp))
-                                    Text("Enviado por $who", color = Tokens.Soft, fontSize = 12.sp)
-                                }
-                            }
-                        }
                         t.clientReview?.let { cr ->
                             val rc = CronStatusUi.reviewColor(cr.status)
                             Spacer(Modifier.height(12.dp))
@@ -305,6 +294,100 @@ private fun InfoLine(label: String, value: String) {
 private fun IconBtn(icon: ImageVector, tint: Color, onClick: () -> Unit) {
     Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() }, contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+// ═════════ detail-hierarchy-v2 — HERO do detalhe (paridade com o Desktop aprovado) ═════════
+// 1 Status principal · 2 Próxima ação · 3 Responsável agora. Linguagem humana, sem termos
+// técnicos, sem status concorrentes. `internal` p/ o teste Roborazzi renderizar direto.
+@Composable
+internal fun DetailHero(t: TaskItem, users: List<UserLite>) {
+    val ds = TaskVisibility.detailState(t)
+    if (ds.label.isBlank()) return
+    val c = Color(ds.colorHex)
+    // 1 — STATUS PRINCIPAL
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
+            .background(c.copy(alpha = 0.12f)).border(1.dp, c.copy(alpha = 0.38f), RoundedCornerShape(13.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(Modifier.padding(top = 5.dp).size(11.dp).clip(RoundedCornerShape(99.dp)).background(c))
+        Spacer(Modifier.width(11.dp))
+        Column {
+            Text(ds.label, color = c, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            if (ds.sub.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(ds.sub, color = Tokens.Soft, fontSize = 12.5.sp, lineHeight = 17.sp)
+            }
+        }
+    }
+    Spacer(Modifier.height(9.dp))
+    // 2 — PRÓXIMA AÇÃO
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Tokens.Surface)
+            .border(1.dp, Tokens.Line, RoundedCornerShape(13.dp)).padding(12.dp),
+    ) {
+        Text("PRÓXIMA AÇÃO", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.1.sp)
+        Spacer(Modifier.height(3.dp))
+        Text(ds.next, color = Tokens.Ink, fontSize = 13.5.sp, lineHeight = 18.sp)
+    }
+    Spacer(Modifier.height(9.dp))
+    // 3 — RESPONSÁVEL AGORA
+    val ownerName: String; val ownerRole: String; val ownerColor: Color
+    when (ds.owner) {
+        "none" -> { ownerName = "Sem pendências"; ownerRole = "Nenhuma ação necessária"; ownerColor = Tokens.Surface2 }
+        "cliente" -> { ownerName = t.client ?: "Cliente"; ownerRole = "Cliente — responsável agora"; ownerColor = Color(0xFF7C5CFF) }
+        "designer" -> {
+            val d = users.firstOrNull { it.id == TaskVisibility.designerOf(t) }
+            ownerName = d?.name ?: t.assignedDesignerName ?: "Designer"
+            ownerRole = "Designer — responsável agora"; ownerColor = Color(0xFFF5A524)
+        }
+        else -> {
+            val sid = TaskVisibility.socialOf(t, users)
+            ownerName = users.firstOrNull { it.id == sid }?.name ?: "Social Media"
+            ownerRole = "Social Media — responsável agora"; ownerColor = Color(0xFF22D3EE)
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(30.dp).clip(RoundedCornerShape(99.dp)).background(ownerColor.copy(alpha = if (ds.owner == "none") 1f else 0.85f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                if (ds.owner == "none") "✓" else ownerName.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercase() }.joinToString(""),
+                color = if (ds.owner == "none") Tokens.Faint else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text("RESPONSÁVEL AGORA", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.1.sp)
+            Text(ownerName + "  ·  " + ownerRole.substringAfter("— "), color = Tokens.Ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+// "Detalhes do fluxo" COLAPSADO: o painel técnico (fase/próxima/timeline — OperationalPanel)
+// mora aqui dentro; fechado por padrão. Zero poluição no topo do detalhe.
+@Composable
+internal fun FlowDetailsCollapsed(t: TaskItem, initiallyOpen: Boolean = false) {
+    var open by remember { mutableStateOf(initiallyOpen) }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp))
+            .background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(13.dp)),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Detalhes do fluxo", color = Tokens.Soft, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(if (open) "▴" else "▾", color = Tokens.Faint, fontSize = 12.sp)
+        }
+        if (open) {
+            Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 14.dp)) {
+                OperationalPanel(t)
+            }
+        }
     }
 }
 

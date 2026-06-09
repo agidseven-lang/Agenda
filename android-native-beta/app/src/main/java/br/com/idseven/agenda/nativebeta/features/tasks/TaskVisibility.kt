@@ -297,6 +297,104 @@ object TaskVisibility {
         else -> "Aprovação de temas"
     }
 
+    // ═════════ detail-hierarchy-v2 — MÁQUINA DE ESTADOS DO DETALHE (espelho do Desktop) ═════════
+    // PHASE-AWARE (espelho Worker V64.41): pendência de item só conta na FASE ATUAL.
+    data class PendingItem(val idx: Int, val cs: String, val note: String)
+    fun pendingClientItems(t: TaskItem): List<PendingItem> {
+        val ph = clientApprovalPhase(t)
+        return t.clientItems.entries.mapNotNull { (k, v) ->
+            val m = Regex("^i(\\d+)$").find(k) ?: return@mapNotNull null
+            val cs = v.cs ?: return@mapNotNull null
+            if ((cs == "em_revisao" || cs == "editado") && v.phase == ph)
+                PendingItem(m.groupValues[1].toInt(), cs, v.note ?: "") else null
+        }.sortedBy { it.idx }
+    }
+    fun hasPendingItemRevision(t: TaskItem): Boolean = pendingClientItems(t).isNotEmpty()
+    // equipe já corrigiu (teamAdjustedAt) e o cliente ainda não reanalisou?
+    fun hasTeamAdjustedAwaiting(t: TaskItem): Boolean {
+        if (pendingClientItems(t).isNotEmpty()) return false
+        return t.clientItems.values.any { it.teamAdjustedAt != null && it.cs == null }
+    }
+    private fun clientApprovedFlag(t: TaskItem): Boolean =
+        t.cronStatus == "aprovado_cliente" || t.clientReview?.status == "aprovado"
+
+    // Estado ÚNICO do detalhe: 1 status principal + próxima ação + responsável + ações por fase.
+    // Hierarquia aprovada (mockup): nunca 5 status concorrentes; linguagem humana.
+    data class DetailState(
+        val key: String, val label: String, val sub: String, val next: String,
+        val owner: String,           // social | designer | cliente | none | assignee
+        val colorHex: Long,          // cor do status principal (Compose Color(colorHex))
+        val actions: List<String>,   // chaves de ações relevantes da fase (informativo no Android)
+    )
+    fun detailState(t: TaskItem): DetailState {
+        if (Sectors.of(t.sector).key != "cronograma") {
+            return DetailState("task_" + (t.status ?: "afazer"), "", "", "", "assignee", 0xFF6E7480, emptyList())
+        }
+        val cc = clientCol(t)
+        val pend = pendingClientItems(t)
+        if (isFullyComplete(t)) return DetailState(
+            "concluido", "Concluído ✓",
+            "O cliente aprovou a versão final. Cronograma encerrado.",
+            "Nada a fazer — aprovação final registrada.",
+            "none", 0xFF34D399, listOf("clientview"))
+        if (pend.isNotEmpty() || (cc == "revisao" && !hasTeamAdjustedAwaiting(t))) return DetailState(
+            "cliente_ajuste", "Cliente pediu ajuste",
+            if (pend.isNotEmpty()) "Ajuste solicitado no Conteúdo " + pend.joinToString(", ") { "${it.idx + 1}" } +
+                (pend.firstOrNull()?.note?.takeIf { it.isNotBlank() }?.let { ": “$it”" } ?: ".")
+            else "O cliente pediu uma revisão geral.",
+            "Corrigir o conteúdo e marcar como corrigido — o cliente será avisado.",
+            "social", 0xFFFB7185, listOf("fix", "teamfix", "clientview"))
+        if (cc == "revisao" && hasTeamAdjustedAwaiting(t)) return DetailState(
+            "ajuste_aguardando", "Ajuste realizado — aguardando o cliente",
+            "A correção foi feita e o cliente vai revisar no mesmo link.",
+            "Aguardar o cliente revisar o conteúdo corrigido. Nenhuma ação necessária agora.",
+            "cliente", 0xFF5B9BFF, listOf("clientview"))
+        if (cc == "reenviado") return DetailState(
+            "aguardando_final", "Aguardando aprovação final",
+            "Legendas e posts foram enviados. O cliente foi avisado.",
+            "Aguardar o cliente aprovar a versão final no portal.",
+            "cliente", 0xFF5B9BFF, listOf("clientview"))
+        if (hasDesigner(t) && !designerDelivered(t)) {
+            return when (designerCol(t)) {
+                "afazer" -> DetailState(
+                    "designer_aguardando", "Aguardando designer iniciar",
+                    "A tarefa está no quadro do designer, em “A Fazer”.",
+                    "Aguardar o designer iniciar a produção. Ele já foi notificado.",
+                    "designer", 0xFFB9A4FF, listOf("dboard"))
+                "revisao" -> DetailState(
+                    "designer_revisao", "Designer em revisão",
+                    "O designer está revisando/ajustando as artes.",
+                    "Aguardar o designer finalizar a revisão e entregar.",
+                    "designer", 0xFF60A5FA, listOf("dboard"))
+                else -> DetailState(
+                    "designer_producao", "Designer em produção",
+                    "O designer está produzindo as artes do cronograma.",
+                    "Aguardar a entrega das artes pelo designer.",
+                    "designer", 0xFFF5A524, listOf("dboard"))
+            }
+        }
+        if (designerDelivered(t)) return DetailState(
+            "designer_entregou", "Designer entregou",
+            "As artes foram entregues. Falta legenda e post para a aprovação final.",
+            "Revisar as artes, adicionar legendas e posts e enviar ao cliente (no Desktop).",
+            "social", 0xFF22D3B8, listOf("prod", "sendclient"))
+        if ((cc == "aprovado" || cc == "producao") && clientApprovedFlag(t) && !hasDesigner(t)) return DetailState(
+            "temas_aprovados", "Temas aprovados",
+            "O cliente aprovou todos os temas. Produção liberada.",
+            "Escolher o designer para produzir as artes (a atribuição é feita no Desktop).",
+            "social", 0xFF34D399, listOf("senddesigner", "clientview"))
+        if (cc == "enviado") return DetailState(
+            "aguardando_temas", "Aguardando aprovação dos temas",
+            "Os temas foram enviados. O cliente foi avisado.",
+            "Aguardar o cliente analisar os temas no portal.",
+            "cliente", 0xFF22D3EE, listOf("clientview"))
+        return DetailState(
+            "preparacao", "Em preparação",
+            "O cronograma ainda não foi enviado ao cliente.",
+            "Preencher os temas e enviar ao cliente para aprovação.",
+            "social", 0xFF6E7480, listOf("edit"))
+    }
+
     fun nextActionText(t: TaskItem): String = when (operationalCol(t)) {
         "afazer" -> "Criar o cronograma e enviar ao cliente."
         "producao" -> "Enviado ao cliente. Próxima etapa: aguardar o feedback do cliente sobre os temas."

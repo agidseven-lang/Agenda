@@ -87,6 +87,20 @@ data class TaskItem(
     // Conteúdos do cronograma (temas/legendas/artes) — escritos pelo Desktop.
     // Aceita `cronContents` (atual) e o alias legado `contents`. Compat: lista vazia em tarefas antigas.
     val cronContents: List<CronContent> = emptyList(),
+    // detail-hierarchy-v2 (aditivo): estado POR ITEM do cliente (clientItems.iX no Firestore,
+    // escrito pelo Worker V64.41+ com tag de fase). Compat: mapa vazio em tarefas antigas.
+    val clientItems: Map<String, ClientItemState> = emptyMap(),
+    // timestamp da aprovação FINAL do cliente (escrito pelo Worker na conclusão).
+    val clientFinalApprovedAt: Long? = null,
+)
+
+// detail-hierarchy-v2 — estado de UM conteúdo na visão do cliente (espelha clientItems.iX).
+// cs: 'em_revisao' | 'editado' | 'aprovado' | null (sem pendência). phase: themes/production/final.
+data class ClientItemState(
+    val cs: String? = null,
+    val phase: String? = null,
+    val note: String? = null,
+    val teamAdjustedAt: Long? = null,
 )
 
 // Um conteúdo do cronograma (um "tema" da semana/quinzena/mês). Aditivo, espelha o Desktop.
