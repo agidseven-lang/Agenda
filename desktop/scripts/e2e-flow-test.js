@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-designer-role-parity';
+const ANDROID_E2E_BRANCH = 'app/local-detail-hierarchy-v2';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -1028,6 +1028,30 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   check('DH_TEAMFIX_WRITE','markItemsAdjusted zera cs + grava teamAdjustedAt/By + history equipe_corrigiu_item', /async function markItemsAdjusted/.test(DH) && /teamAdjustedAt/.test(DH) && /equipe_corrigiu_item/.test(DH));
   check('DH_HANDLERS','Handlers data-teamfix e data-goboard registrados', /data-teamfix\]/.test(DH) && /data-goboard\]/.test(DH));
   check('DH_PHASEAWARE_FN','hasPendingItemRevision é phase-aware via pendingClientItems (espelho Worker V64.41)', /function hasPendingItemRevision\(t\)\{return pendingClientItems\(t\)\.length>0;\}/.test(DH) && /it\.phase===ph/.test(DH));
+})();
+
+/* ===================== N_DH — PARIDADE ANDROID do detail-hierarchy-v2 ===================== */
+(function(){
+  console.log(`${C.b}\n[N_DH] Android — paridade do detalhe (hierarquia aprovada)${C.x}`);
+  const KV = readFromGit(ANDROID_E2E_BRANCH, 'android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/features/tasks/TaskVisibility.kt');
+  const KD = readFromGit(ANDROID_E2E_BRANCH, 'android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/features/tasks/TaskDetailScreen.kt');
+  const KM = readFromGit(ANDROID_E2E_BRANCH, 'android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/domain/Models.kt');
+  const KR = readFromGit(ANDROID_E2E_BRANCH, 'android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/data/TaskRepo.kt');
+  const KT = readFromGit(ANDROID_E2E_BRANCH, 'android-native-beta/app/src/test/java/br/com/idseven/agenda/nativebeta/DetailHierarchyScreenshotTest.kt');
+  check('N_DH1','Models: ClientItemState (cs/phase/note/teamAdjustedAt) + TaskItem.clientItems map', /data class ClientItemState/.test(KM) && /val clientItems: Map<String, ClientItemState> = emptyMap\(\)/.test(KM));
+  check('N_DH2','TaskRepo.map parseia clientItems.iX com tag de fase + clientFinalApprovedAt', /clientItems = \(d\.get\("clientItems"\)/.test(KR) && /clientFinalApprovedAt = d\.getLong\("clientFinalApprovedAt"\)/.test(KR));
+  check('N_DH3','TaskVisibility: pendingClientItems PHASE-AWARE (v.phase == ph)', /fun pendingClientItems\(t: TaskItem\)/.test(KV) && /v\.phase == ph/.test(KV));
+  check('N_DH4','TaskVisibility: hasTeamAdjustedAwaiting (equipe corrigiu, cliente reanalisa)', /fun hasTeamAdjustedAwaiting\(t: TaskItem\)/.test(KV) && /teamAdjustedAt != null && it\.cs == null/.test(KV));
+  check('N_DH5','TaskVisibility: detailState com os 8 estados (mesmas chaves do Desktop)', /fun detailState\(t: TaskItem\): DetailState/.test(KV) &&
+    ['cliente_ajuste','ajuste_aguardando','temas_aprovados','designer_aguardando','designer_producao','designer_revisao','designer_entregou','aguardando_final','concluido'].every(k=>KV.indexOf('"'+k+'"')>=0));
+  check('N_DH6','detailState: labels humanos idênticos ao Desktop (Cliente pediu ajuste/Temas aprovados/Concluído ✓ …)',
+    /Cliente pediu ajuste/.test(KV) && /Ajuste realizado — aguardando o cliente/.test(KV) && /Temas aprovados/.test(KV) && /Aguardando designer iniciar/.test(KV) && /Designer em produção/.test(KV) && /Designer entregou/.test(KV) && /Aguardando aprovação final/.test(KV) && /Concluído ✓/.test(KV));
+  check('N_DH7','TaskDetailScreen: DetailHero (status+próxima+responsável) + FlowDetailsCollapsed no corpo', /DetailHero\(t, users\)/.test(KD) && /FlowDetailsCollapsed\(t\)/.test(KD) && /internal fun DetailHero/.test(KD) && /internal fun FlowDetailsCollapsed/.test(KD));
+  check('N_DH8','Detalhe SEM status técnico CronStatusUi no corpo (só a Resposta do cliente)', KD.indexOf('CronStatusUi.label(cs)')===-1 && /Resposta do cliente/.test(KD));
+  check('N_DH9','Painel técnico (OperationalPanel) DENTRO do colapsável', /if \(open\) \{[\s\S]{0,200}OperationalPanel\(t\)/.test(KD));
+  check('N_DH10','SEM botão de atribuir designer no Android (ação exclusiva do Desktop)', !/assignDesigner|sendToDesigner|pickDesigner/.test(KD));
+  check('N_DH11','Teste Roborazzi dos 8 estados nas larguras 360 e 412', /class DetailHierarchyScreenshotTest/.test(KT) && /detail-hierarchy-360\.png/.test(KT) && /detail-hierarchy-412\.png/.test(KT) && /renderColumn\("detail-360", 360/.test(KT) && /renderColumn\("detail-412", 412/.test(KT));
+  check('N_DH12','Role-aware do Designer (bcc021b) INTACTO na branch nova', /DESIGNER_COLS4/.test(KV) && /fun designerColView/.test(KV) && /aguardando_designer_revisao/.test(KV) && /fun designerNextShort/.test(KV));
 })();
 
 /* ===================== VEREDITO ===================== */
