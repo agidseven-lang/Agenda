@@ -753,7 +753,12 @@ check('CSV_NO_OLD_BADGE', 'Nenhum badge usa mais const oc=opColOf(operationalCol
 console.log(`${C.b}\n[PARTE H] Fase 2 (passo 1) — taskTimeline pura/dormente + paridade de estados${C.x}`);
 check('TL_DEF', 'taskTimeline(t) existe e retorna {current,last,next,owner,milestones}', /function taskTimeline\(t\)\{[\s\S]*?return \{ current:cur, last:last, next:nextActionText\(t\), owner:owner, milestones:milestones \};/.test(DH));
 const DH_noc2 = DH.replace(/^\s*\/\/.*$/gm,'');
-check('TL_DORMANT', 'Passo 1: taskTimeline NÃO é chamada por nenhum render (só a definição existe)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 1 && /function taskTimeline\(t\)/.test(DH_noc2));
+// Passo 2: taskTimeline agora é consumida APENAS pelo taskCardTimeline (definição + 1 uso).
+check('TL_CARD_WIRED', 'taskTimeline usada só no taskCardTimeline (2 ocorrências: definição + 1 chamada)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 2 && /function taskTimeline\(t\)/.test(DH_noc2));
+check('TL2_CARD_RENDER', 'taskCard renderiza a timeline compacta (taskCardTimeline(t)) e taskCardTimeline usa taskTimeline(t)', /'<\/div>'\+\s*\n?\s*taskCardTimeline\(t\);/.test(DH) && /function taskCardTimeline\(t\)\{[\s\S]*?const tl=taskTimeline\(t\);/.test(DH));
+check('TL2_CARD_ONLY', 'taskCardTimeline existe e é chamado só no taskCard (definição + 1 chamada)', (DH_noc2.match(/taskCardTimeline\(/g)||[]).length === 2);
+check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard secOf!=cronograma -> "")', /function taskCardTimeline\(t\)\{\s*\n\s*if\(secOf\(t\.sector\)\.key!=='cronograma'\)return '';/.test(DH));
+check('TL2_DETALHE_OPPANEL_INTACTO', "Detalhe (opPanelBlock) NÃO usa taskTimeline — segue com steps próprios", (()=>{const fn=(DH.match(/function opPanelBlock\(t\)\{[\s\S]*?\n\}/)||[''])[0];return fn.length>0 && fn.indexOf('taskTimeline(')<0 && /Linha do tempo operacional/.test(fn);})());
 (function(){
   const grab=(re)=>{const m=DH.match(re);return m?m[0]:'';};
   const constArr=(name)=>grab(new RegExp('const '+name+'\\s*=\\s*\\[[\\s\\S]*?\\];'));

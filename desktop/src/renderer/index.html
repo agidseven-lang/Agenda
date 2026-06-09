@@ -625,6 +625,17 @@
   .tc-title{font-size:17px;font-weight:800;margin-top:4px;line-height:1.3;letter-spacing:-.01em}
   .tc-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
   .tc-tag{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:9px;font-size:11.5px;font-weight:800;white-space:nowrap}
+  /* FASE 2 (passo 2) — timeline COMPACTA do card (discreta, premium, ~3 linhas) */
+  .tc-tl{margin-top:12px;padding-top:11px;border-top:1px solid var(--line-soft)}
+  .tc-tl-rail{display:flex;align-items:center;gap:0;margin-bottom:8px}
+  .tc-tl-rail i{width:9px;height:9px;border-radius:50%;flex:none}
+  .tc-tl-rail .ln{flex:1;height:2px;border-radius:1px;min-width:5px}
+  .tc-tl-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--soft);line-height:1.35;min-width:0}
+  .tc-tl-row svg{width:13px;height:13px;flex:none;color:var(--faint)}
+  .tc-tl-now{font-weight:800;color:var(--ink);white-space:nowrap;flex:none}
+  .tc-tl-sep{color:var(--faint);flex:none}
+  .tc-tl-next{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .tc-tl-last{font-size:11px;color:var(--faint);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tc-tag-soft{background:var(--surface2);color:var(--soft)}
   /* 4) Temas (premium) */
   .tc-themes{margin-top:14px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:14px}
@@ -2152,6 +2163,34 @@ function lastUpdate(t){
 }
 function briefLine(t){if(!t.desc)return '';const ln=String(t.desc).split('\n').map(x=>x.trim()).filter(Boolean);return ln[0]||'';}
 
+// FASE 2 (passo 2) — TIMELINE COMPACTA no card (fonte ÚNICA: taskTimeline(t)). Discreta e
+// premium: mini-rail de progresso + "responsável agora · próxima ação" + "último evento".
+// Só para CRONOGRAMA. Status atual continua no badge (clientStatusView). Sem alterar mais nada.
+function _tlRelAgo(ms){ if(!ms)return ''; const dif=Date.now()-Number(ms); if(dif<0||isNaN(dif))return '';
+  const mi=Math.floor(dif/60000); if(mi<1)return 'agora'; if(mi<60)return 'há '+mi+' min';
+  const hr=Math.floor(mi/60); if(hr<24)return 'há '+hr+'h'; const dd=Math.floor(hr/24); return 'há '+dd+' dia'+(dd>1?'s':''); }
+function taskCardTimeline(t){
+  if(secOf(t.sector).key!=='cronograma')return '';
+  const tl=taskTimeline(t);
+  const main=tl.milestones.filter(m=>m.key!=='ajuste');
+  const ajuste=tl.milestones.find(m=>m.key==='ajuste');
+  let rail='';
+  main.forEach((m,i)=>{
+    const col=m.state==='done'?'#34D399':(m.state==='current'?(tl.current&&tl.current.color||'#F59E0B'):'#3a3f55');
+    rail+='<i style="background:'+col+'"></i>';
+    if(i<main.length-1)rail+='<span class="ln" style="background:'+(m.state==='done'?'rgba(52,211,153,.35)':'var(--line)')+'"></span>';
+  });
+  if(ajuste&&ajuste.state==='attention')rail+='<i title="Ajuste pedido pelo cliente" style="background:#F59E0B;margin-left:5px"></i>';
+  const ownU=tl.owner&&tl.owner.id?state.users.find(u=>u.id===tl.owner.id):null;
+  const ownerTxt=(tl.owner&&tl.owner.role!=='—')?(tl.owner.role+(ownU&&ownU.name?(' · '+ownU.name.split(' ')[0]):'')):'Encerrado';
+  const lastTxt=tl.last?(esc(tl.last.label)+(tl.last.at?(' · '+_tlRelAgo(tl.last.at)):'')):'';
+  return '<div class="tc-tl">'+
+    '<div class="tc-tl-rail">'+rail+'</div>'+
+    '<div class="tc-tl-row">'+svg('flag')+'<span class="tc-tl-now">'+esc(ownerTxt)+'</span>'+
+      (tl.next?'<span class="tc-tl-sep">·</span><span class="tc-tl-next">'+esc(tl.next)+'</span>':'')+'</div>'+
+    (lastTxt?'<div class="tc-tl-last">Último: '+lastTxt+'</div>':'')+
+  '</div>';
+}
 function taskCard(t){
   const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
   const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
@@ -2185,7 +2224,8 @@ function taskCard(t){
        })())+
        '<div class="tc-tags"><span class="tc-tag" style="color:'+s.color+';background:'+withAlpha(s.color,.14)+'">'+esc(s.label)+'</span>'+
          (cron?'<span class="tc-tag tc-tag-soft">'+esc(cron.label)+'</span>':'')+
-         (t.priority?'<span class="tc-tag" style="color:#F87171;background:'+withAlpha('#F87171',.14)+'">⚑ Prioridade</span>':'')+'</div>';
+         (t.priority?'<span class="tc-tag" style="color:#F87171;background:'+withAlpha('#F87171',.14)+'">⚑ Prioridade</span>':'')+'</div>'+
+       taskCardTimeline(t);   // FASE 2 (passo 2): timeline compacta e discreta (só cronograma)
   // 4) Cronograma (temas reais) OU briefing curto
   if(cron&&cron.list.length){
     const show=cron.list.slice(0,3);const rest=cron.count-3;
