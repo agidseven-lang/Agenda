@@ -237,7 +237,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.40-share-og-exact" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.41-client-approval-phase-gate" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
