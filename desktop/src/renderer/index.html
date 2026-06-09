@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.125 (Grupo · link de preview)</title>
+<title>ID Seven · Desktop 1.0.126 (Grupo · abrir WhatsApp)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1171,7 +1171,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.125 · Grupo</span><br>
+    <span class="pill-ver">Desktop 1.0.126 · Grupo</span><br>
     espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b> · ref app/main
   </div>
 </section>
@@ -1186,7 +1186,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.125 · Grupo</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.126 · Grupo</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1202,7 +1202,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.125', tag:'Grupo', apk:'1.0.109-beta-whatsapp-guided-card-send' };
+const APP_VER={ desktop:'1.0.126', tag:'Grupo', apk:'1.0.109-beta-whatsapp-guided-card-send' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1472,7 +1472,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.125 · Grupo</span><br>espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.126 · Grupo</span><br>espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2816,11 +2816,11 @@ async function openSendClientModal(taskOrForm){
     '<div class="gcs-head">'+
       '<div class="gcs-headic brand" role="img" aria-label="ID Seven"></div>'+
       '<div style="min-width:0"><div class="gcs-title">Enviar no grupo do cliente</div>'+
-        '<div class="gcs-sub">Copie a mensagem pronta e cole no grupo do WhatsApp Business onde o cliente está.</div></div>'+
+        '<div class="gcs-sub">Abra o WhatsApp Business e envie a mensagem no grupo onde o cliente está.</div></div>'+
     '</div>'+
-    /* ===== FLUXO PRINCIPAL — COPIAR MENSAGEM PRONTA PARA O GRUPO ===== */
+    /* ===== FLUXO PRINCIPAL — ABRIR WHATSAPP BUSINESS (copia a mensagem + abre o app) ===== */
     '<div class="gcs-auto" id="groupBlock">'+
-      '<div class="gcs-steplabel">Mensagem pronta para colar no grupo do WhatsApp Business</div>'+
+      '<div class="gcs-steplabel">Publicar no grupo do WhatsApp Business do cliente</div>'+
       '<pre class="gcs-legend" id="groupLegendBox">'+esc(msg)+'</pre>'+
       /* Prévia de como o WhatsApp renderiza o LINK (card premium vem do OG público, não de arquivo) */
       '<div class="gcs-lp" id="groupLinkPreview">'+
@@ -2831,11 +2831,11 @@ async function openSendClientModal(taskOrForm){
           '<div class="gcs-lp-dom">aprovar.agendaidseven.com.br</div>'+
         '</div>'+
       '</div>'+
-      '<button class="gcs-go" id="btnCopyGroupMsg">'+svg('copy')+'Copiar mensagem para o grupo</button>'+
-      '<div class="gcs-status" id="groupStatus">Um clique copia o texto + link. Cole no grupo do cliente — o WhatsApp mostra a prévia premium do card automaticamente.</div>'+
+      '<button class="gcs-go" id="btnOpenWaMain">'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
+      '<div class="gcs-status" id="groupStatus">A mensagem será copiada automaticamente. No WhatsApp Business, escolha o grupo do cliente e cole.</div>'+
       '<div class="gcs-note">A prévia do card vem do <b>link público</b> (não de arquivo salvo). O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link.</div>'+
       '<div class="gcs-secondary">'+
-        '<button class="btn ghost" id="btnOpenWa">Abrir WhatsApp Business</button>'+
+        '<button class="btn ghost" id="btnCopyGroupMsg">Copiar mensagem</button>'+
         '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
       '</div>'+
     '</div>'+
@@ -2973,17 +2973,29 @@ async function _wireGroupSend(ctx, msg, cardFile){
     if(api.copyCardImage){ try{ const r=await api.copyCardImage(new Uint8Array(bytes)); return {ok:!!(r&&r.ok)}; }catch(_){ return {ok:false}; } }
     return {ok:false};
   }
-  /* ===== PRINCIPAL — COPIAR MENSAGEM PARA O GRUPO (1 clique, só texto+link) ===== */
-  on('btnCopyGroupMsg', function(){
-    const lk=_gateValidLink(ctx,msg);                              // valida link público real + token
-    if(!lk.ok){ setStatus('Link inválido — gere o cronograma novamente.','err'); flashToast('Link inválido — gere o cronograma novamente.'); return; }
-    copyToClipboard(msg);                                          // copia a MENSAGEM COMPLETA (texto + link)
-    const b=$('btnCopyGroupMsg'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'Mensagem copiada'; }
-    setStatus(svg('check')+'<span>Mensagem copiada. Cole no grupo do cliente (Ctrl+V) — a prévia premium do card aparece sozinha pelo link.</span>','ok',true);
-    flashToast('Mensagem copiada. Cole no grupo do WhatsApp Business do cliente.');
+  // Copia a MENSAGEM COMPLETA (texto + link /share) — valida o link antes. Sem pasta/arquivo.
+  function copyMsgClean(){
+    const lk=_gateValidLink(ctx,msg);                              // valida link público /share + token
+    if(!lk.ok){ setStatus('Link inválido — gere o cronograma novamente.','err'); flashToast('Link inválido — gere o cronograma novamente.'); return false; }
+    copyToClipboard(msg);                                          // copia a MENSAGEM COMPLETA (texto + link /share)
+    return true;
+  }
+  /* ===== PRINCIPAL — ABRIR WHATSAPP BUSINESS (copia a mensagem AUTOMATICAMENTE + abre o app) =====
+     É o fluxo que funcionou no teste real: 1 clique copia a mensagem e abre o WhatsApp Business.
+     Sem pasta, sem salvar arquivo, sem etapas. O link /share gera a prévia premium ao colar. */
+  on('btnOpenWaMain', function(){
+    if(!copyMsgClean()) return;                                    // 1) copia a mensagem automaticamente
+    openWhatsAppWebOnly();                                         // 2) abre o WhatsApp Business (só web.whatsapp.com/)
+    const b=$('btnOpenWaMain'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'WhatsApp aberto · mensagem copiada'; }
+    setStatus(svg('check')+'<span>Mensagem copiada e WhatsApp Business aberto. Escolha o grupo do cliente e cole (Ctrl+V) — a prévia premium aparece pelo link.</span>','ok',true);
+    flashToast('Mensagem copiada e WhatsApp Business aberto. Escolha o grupo do cliente e cole.');
   });
   /* ===== Secundários discretos ===== */
-  on('btnOpenWa', function(){ openWhatsAppWebOnly(); flashToast('WhatsApp Business aberto. Escolha o grupo do cliente e cole a mensagem (Ctrl+V).'); });
+  on('btnCopyGroupMsg', function(){                                // copia só a mensagem (se útil), sem abrir o WhatsApp
+    if(!copyMsgClean()) return;
+    const b=$('btnCopyGroupMsg'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'Mensagem copiada'; }
+    flashToast('Mensagem copiada. Cole no grupo do WhatsApp Business do cliente.');
+  });
   on('btnTestLink', function(){                                    // abre o LINK DE COMPARTILHAMENTO p/ conferir a prévia premium + portal
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ flashToast('Link inválido — gere o cronograma novamente.'); return; }
     const ext=api.openExternal; if(ext){ try{ ext(url); }catch(_){ try{window.open(url,'_blank');}catch(__){} } } else { try{window.open(url,'_blank');}catch(_){} }
@@ -3306,7 +3318,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.125-whatsapp-share-og-exact';
+const BUILD='1.0.126-whatsapp-open-wa-main';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+

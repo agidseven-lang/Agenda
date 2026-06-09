@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.38-wa-card-link-cta / Desktop 1.0.125-whatsapp-share-og-exact / Android 1.0.109 (congelado)
+ * Agenda ID Seven · Worker V64.38-wa-card-link-cta / Desktop 1.0.126-whatsapp-open-wa-main / Android 1.0.109 (congelado)
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -126,7 +126,7 @@ const pad = (s, n) => (String(s) + ' '.repeat(n)).slice(0, n);
 
 console.log(`${C.b}\n========================================================================`);
 console.log(' TESTE VIRTUAL E2E — fluxo de aprovação do cronograma');
-console.log(' Worker V64.38-wa-card-link-cta · Desktop 1.0.125 · Android 1.0.109 (fluxo PRINCIPAL: copiar mensagem com link de preview OG exato)');
+console.log(' Worker V64.38-wa-card-link-cta · Desktop 1.0.126 · Android 1.0.109 (fluxo PRINCIPAL: abrir WhatsApp Business + copiar mensagem)');
 console.log(`========================================================================${C.x}`);
 
 /* ===================== PARTE A — Fluxo de 48 passos (simulação por papel) ===================== */
@@ -324,7 +324,7 @@ check('W_APPROVE4', 'Portal tem identidade Agenda ID Seven + Visão do Cliente +
 }
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check("D1", "package.json versão 1.0.125", /"version":\s*"1\.0\.125"/.test(DP));
+check("D1", "package.json versão 1.0.126", /"version":\s*"1\.0\.126"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -375,12 +375,12 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check("D20", "Rodapé mostra Desktop 1.0.125", /Desktop 1\.0\.125/.test(DH));
+check("D20", "Rodapé mostra Desktop 1.0.126", /Desktop 1\.0\.126/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check("D21", "Login/título/watermark mostram 1.0.125 (sem rótulo antigo)",
-  /<span class="pill-ver">Desktop 1\.0\.125/.test(DH) && /<title>ID Seven · Desktop 1\.0\.125/.test(DH) && /id="wpbadge">Desktop 1\.0\.125/.test(DH));
+check("D21", "Login/título/watermark mostram 1.0.126 (sem rótulo antigo)",
+  /<span class="pill-ver">Desktop 1\.0\.126/.test(DH) && /<title>ID Seven · Desktop 1\.0\.126/.test(DH) && /id="wpbadge">Desktop 1\.0\.126/.test(DH));
 check('D22', 'Login espelha o APK 1.0.109-beta-whatsapp-guided-card-send', /espelha o APK <b>1\.0\.109-beta-whatsapp-guided-card-send/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.125./.test(DH) && /applyVersionLabels/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.126./.test(DH) && /applyVersionLabels/.test(DH));
 // ===== 1.0.120 — ENVIO WHATSAPP LIMPO + WEB-ONLY (executa as funções reais) =====
 (function(){
   // Extrai e executa as funções reais p/ provar o conteúdo do clipboard e a URL aberta (etapa 3).
@@ -544,51 +544,56 @@ check('MEDIA_AB3', 'O card embutido no Desktop é o MESMO byte-a-byte que o Work
   return !!(dm && wm && dm[1] === wm[1]);
 })());
 check('MEDIA_AB4', '_wireGroupSend usa o card embutido (atob(CARD_IMG_B64) → data:image/jpeg) com fetch(CARD_IMG_URL) só como fallback', /atob\(CARD_IMG_B64\)/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH) && /fetch\(CARD_IMG_URL/.test(DH));
-check("MEDIA_D2", "Modal PRINCIPAL: título 'Enviar no grupo do cliente' + subtítulo de COPIAR mensagem", /gcs-title">Enviar no grupo do cliente</.test(DH) && /Copie a mensagem pronta e cole no grupo do WhatsApp Business onde o cliente está\./.test(DH));
+check("MEDIA_D2", "Modal PRINCIPAL: título 'Enviar no grupo do cliente' + subtítulo de ABRIR WhatsApp", /gcs-title">Enviar no grupo do cliente</.test(DH) && /Abra o WhatsApp Business e envie a mensagem no grupo onde o cliente está\./.test(DH));
 check('MEDIA_D5', 'Nome de arquivo claro agenda-id-seven-card-[cliente]-[token].jpg', /agenda-id-seven-card-'\+/.test(DH));
-// ===== 1.0.123 — FLUXO PRINCIPAL "ENVIAR NO GRUPO": 1 BOTÃO copia a MENSAGEM (texto+link) =====
-check('GROUP_1', 'Título "Enviar no grupo do cliente" + subtítulo de COPIAR mensagem', /gcs-title">Enviar no grupo do cliente</.test(DH) && /Copie a mensagem pronta e cole no grupo do WhatsApp Business onde o cliente está\./.test(DH));
-check('GROUP_2', 'Botão principal ÚNICO "Copiar mensagem para o grupo" (id=btnCopyGroupMsg) + legenda pronta (groupLegendBox)', /id="btnCopyGroupMsg"[^>]*>[\s\S]{0,40}Copiar mensagem para o grupo/.test(DH) && /id="groupLegendBox"/.test(DH) && /id="groupBlock"/.test(DH));
+// ===== 1.0.126 — FLUXO PRINCIPAL "ENVIAR NO GRUPO": botão ABRE WhatsApp Business + copia a mensagem =====
+check('GROUP_1', 'Título "Enviar no grupo do cliente" + subtítulo de ABRIR WhatsApp', /gcs-title">Enviar no grupo do cliente</.test(DH) && /Abra o WhatsApp Business e envie a mensagem no grupo onde o cliente está\./.test(DH));
+check('GROUP_2', 'Botão principal "Abrir WhatsApp Business para enviar no grupo" (id=btnOpenWaMain) + legenda + texto de apoio', /id="btnOpenWaMain"[^>]*>[\s\S]{0,40}Abrir WhatsApp Business para enviar no grupo/.test(DH) && /id="groupLegendBox"/.test(DH) && /id="groupBlock"/.test(DH) && /A mensagem será copiada automaticamente\. No WhatsApp Business, escolha o grupo do cliente e cole\./.test(DH));
 check('GROUP_3', 'Prévia premium do LINK no modal = EXATO (Aprovar cronograma / Seu cronograma está pronto para avaliação. / aprovar.agendaidseven.com.br + imagem do card)', /id="groupLinkPreview"/.test(DH) && /id="groupCardPreview"/.test(DH) && /gcs-lp-title">Aprovar cronograma<\/div>/.test(DH) && /gcs-lp-desc">Seu cronograma está pronto para avaliação\.<\/div>/.test(DH) && /gcs-lp-dom">aprovar\.agendaidseven\.com\.br/.test(DH));
-// CRÍTICO (regra de UX): o botão principal COPIA a mensagem e NUNCA abre pasta nem salva/copia arquivo.
-const copyHandler = (DH.match(/on\('btnCopyGroupMsg',\s*function\(\)\{[\s\S]*?\n  \}\);/) || [''])[0];
-check('GROUP_4', 'Botão principal COPIA a mensagem (copyToClipboard(msg)) após validar o link público', copyHandler.length > 0 && /_gateValidLink\(ctx,msg\)/.test(copyHandler) && /copyToClipboard\(msg\)/.test(copyHandler));
-check('GROUP_5', 'Botão principal NÃO abre pasta nem salva/copia arquivo (sem showInFolder/ensureSaved/saveCardImage/copyCard)', copyHandler.length > 0 && !/showInFolder/.test(copyHandler) && !/ensureSaved/.test(copyHandler) && !/saveCardImage/.test(copyHandler) && !/copyCard\(/.test(copyHandler));
-check('GROUP_6', 'Secundários discretos: Abrir WhatsApp Business + Testar link (btnTestLink abre o link de compartilhamento)', /id="btnOpenWa"/.test(DH) && /id="btnTestLink"/.test(DH) && /on\('btnTestLink'/.test(DH) && /buildShareClientUrl\(ctx&&ctx\.token\)/.test(DH));
-check('GROUP_7', 'Card-arquivo é FALLBACK recolhido (Opções avançadas <details>: Copiar card / Salvar e abrir pasta)', /<details class="gcs-adv"><summary>Opções avançadas: anexar o card como imagem \(fallback\)<\/summary>/.test(DH) && /id="btnCopyImg"/.test(DH) && /id="btnOpenFolder"/.test(DH));
+// CRÍTICO (regra de UX): o botão principal COPIA a mensagem automaticamente + ABRE o WhatsApp; nunca pasta/arquivo.
+const primaryHandler = (DH.match(/on\('btnOpenWaMain',\s*function\(\)\{[\s\S]*?\n  \}\);/) || [''])[0];
+check('GROUP_4', 'Botão principal COPIA a mensagem automaticamente (copyMsgClean→copyToClipboard) E ABRE o WhatsApp (openWhatsAppWebOnly)', primaryHandler.length > 0 && /copyMsgClean\(\)/.test(primaryHandler) && /openWhatsAppWebOnly\(\)/.test(primaryHandler) && /function copyMsgClean\(\)\{[\s\S]*?copyToClipboard\(msg\)/.test(DH) && /function copyMsgClean\(\)\{[\s\S]*?_gateValidLink\(ctx,msg\)/.test(DH));
+check('GROUP_5', 'Botão principal NÃO abre pasta nem salva/copia arquivo (sem showInFolder/ensureSaved/saveCardImage/copyCard)', primaryHandler.length > 0 && !/showInFolder/.test(primaryHandler) && !/ensureSaved/.test(primaryHandler) && !/saveCardImage/.test(primaryHandler) && !/copyCard\(/.test(primaryHandler));
+check('GROUP_5b', 'Botão principal NÃO é apenas "Copiar mensagem" (reusa o fluxo de ABRIR WhatsApp que funcionou)', /id="btnOpenWaMain"/.test(DH) && !/id="btnOpenWaMain"[^>]*>[\s\S]{0,40}Copiar mensagem<\/button>/.test(DH));
+check('GROUP_6', 'Secundários discretos: "Copiar mensagem" (btnCopyGroupMsg) + "Testar link" (btnTestLink abre o /share)', /id="btnCopyGroupMsg"[^>]*>Copiar mensagem<\/button>/.test(DH) && /id="btnTestLink"/.test(DH) && /on\('btnTestLink'/.test(DH) && /buildShareClientUrl\(ctx&&ctx\.token\)/.test(DH));
+check('GROUP_7', 'Card-arquivo/pasta + Cloud API individual ficam em FALLBACK/avançado recolhido (<details>)', /<details class="gcs-adv"><summary>Opções avançadas: anexar o card como imagem \(fallback\)<\/summary>/.test(DH) && /id="btnCopyImg"/.test(DH) && /id="btnOpenFolder"/.test(DH) && /<details class="gcs-adv"><summary>Opção avançada: enviar para número individual com botão oficial<\/summary>/.test(DH));
 check('GROUP_8', 'SEM fluxo antigo de etapas como principal (sem btnPrepGroup / gchk1-3 / step1-3 / btnStep*)', !/id="btnPrepGroup"/.test(DH) && !/id="gchk1"/.test(DH) && !/id="step2"/.test(DH) && !/id="btnStep1"/.test(DH));
 check('GROUP_9', 'Wiring chama _wireGroupSend + _wireAutoSend; openWhatsAppWebOnly sem send?text=/app://', /_wireGroupSend\(ctx, msg, cardFile\);\s*\n?\s*_wireAutoSend\(ctx\);/.test(DH) && (() => { const b = (DH.match(/function openWhatsAppWebOnly\(\)\{[\s\S]*?\n\}/) || [''])[0].replace(/^\s*\/\/.*$/gm, ''); return /web\.whatsapp\.com\//.test(b) && b.indexOf('send?text=') < 0 && b.indexOf('whatsapp://send') < 0; })());
 check('GROUP_10', 'ANTI-ÍCONE-GIGANTE: .gcs-sheet svg 18px + header 20px', /\.gcs-sheet svg\{width:18px;height:18px/.test(DH) && /\.gcs-headic svg\{width:20px;height:20px\}/.test(DH));
-// Executa o handler PRINCIPAL real (1 clique): clipboard recebe a MENSAGEM; pasta/arquivo NUNCA são tocados.
+// Executa o handler PRINCIPAL real (btnOpenWaMain): clipboard recebe a MENSAGEM + WhatsApp é aberto; pasta/arquivo NUNCA tocados.
 (function(){
   const base=(DH.match(/const CLIENT_LINK_BASE='([^']+)'/)||[])[1];
   const fnUrl=(DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnShare=(DH.match(/function buildShareClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnMsg=(DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnGate=(DH.match(/function _gateValidLink\(ctx,msg\)\{[\s\S]*?\n\}/)||[''])[0];
-  const hbody=(copyHandler.match(/function\(\)\{([\s\S]*)\n  \}\);/)||['',''])[1];
+  const fnWeb=(DH.match(/function openWhatsAppWebOnly\(\)\{[\s\S]*?\n\}/)||[''])[0];
+  const fnCopyClean=(DH.match(/function copyMsgClean\(\)\{[\s\S]*?\n  \}/)||[''])[0];
+  const hbody=(primaryHandler.match(/function\(\)\{([\s\S]*)\n  \}\);/)||['',''])[1];
   const TOKEN='a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6';
-  const sb={clip:null,folder:0,saved:0,copied:0};
+  const sb={clip:null,opened:[],folder:0,saved:0,copied:0};
   try{
     new Function('sb',`
       const ctx={client:'Hospital Visão',type:'Quinzenal',title:'P',token:${JSON.stringify(TOKEN)}};
       const CLIENT_LINK_BASE=${JSON.stringify(base)};
+      const window={desktopAPI:{openExternal:u=>{sb.opened.push(String(u));return Promise.resolve(true);}},open:u=>sb.opened.push(String(u))}; const self=window;
       function copyToClipboard(t){sb.clip=t;}
       function flashToast(){}
       function svg(){return '';}
-      const _ids={btnCopyGroupMsg:{classList:{add(){}},set innerHTML(v){}},groupStatus:{className:'',set innerHTML(v){},set textContent(v){}}};
+      const _ids={btnOpenWaMain:{classList:{add(){}},set innerHTML(v){}},groupStatus:{className:'',set innerHTML(v){},set textContent(v){}}};
       const document={getElementById:(id)=>_ids[id]||null};
       const $=id=>document.getElementById(id);
       function setStatus(txt,cls,html){}
-      const api={ showInFolder(){sb.folder++;}, saveCardImage(){sb.saved++;return Promise.resolve({ok:true});}, copyCardImage(){sb.copied++;return Promise.resolve({ok:true});} };
-      ${fnUrl}\n${fnShare}\n${fnMsg}\n${fnGate}
+      const api={ openExternal:window.desktopAPI.openExternal, showInFolder(){sb.folder++;}, saveCardImage(){sb.saved++;return Promise.resolve({ok:true});}, copyCardImage(){sb.copied++;return Promise.resolve({ok:true});} };
+      ${fnUrl}\n${fnShare}\n${fnMsg}\n${fnGate}\n${fnWeb}\n${fnCopyClean}
       const msg=buildClientMessage(ctx);
       (function(){${hbody}})();
     `)(sb);
   }catch(e){ sb.clip='THREW:'+e.message; }
   check('GROUP_FN1','1 clique copia a MENSAGEM COMPLETA com o link de COMPARTILHAMENTO (/share/, preview premium)', String(sb.clip).indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/'+TOKEN)>-1 && String(sb.clip).indexOf('/cliente/cronograma/')<0 && /^Olá, Hospital Visão\./.test(String(sb.clip)) && /Seu cronograma já está pronto para avaliação\./.test(String(sb.clip)) && /Acesse o link abaixo/.test(String(sb.clip)) && /Equipe ID Seven$/.test(String(sb.clip)));
-  check('GROUP_FN2','O clique PRINCIPAL NÃO abre pasta e NÃO salva/copia arquivo (folder=0, saved=0, copiedImg=0)', sb.folder===0 && sb.saved===0 && sb.copied===0 && String(sb.clip).indexOf('THREW:')<0);
-  check('GROUP_FN3','Clipboard SEM URL técnica do WhatsApp (sem send?text= / web.whatsapp.com/send)', String(sb.clip).indexOf('send?text=')<0 && String(sb.clip).indexOf('web.whatsapp.com/send')<0);
+  check('GROUP_FN2','O clique PRINCIPAL ABRE o WhatsApp (SOMENTE https://web.whatsapp.com/)', sb.opened.length===1 && sb.opened[0]==='https://web.whatsapp.com/');
+  check('GROUP_FN3','O clique PRINCIPAL NÃO abre pasta e NÃO salva/copia arquivo (folder=0, saved=0, copiedImg=0)', sb.folder===0 && sb.saved===0 && sb.copied===0 && String(sb.clip).indexOf('THREW:')<0);
+  check('GROUP_FN4','Clipboard SEM URL técnica do WhatsApp (sem send?text= / web.whatsapp.com/send)', String(sb.clip).indexOf('send?text=')<0 && String(sb.clip).indexOf('web.whatsapp.com/send')<0);
 })();
 // Electron IPC (main + preload)
 check('MEDIA_IPC1', 'main: handlers save-card-image / copy-card-image / show-in-folder', /ipcMain\.handle\("save-card-image"/.test(MAIN) && /ipcMain\.handle\("copy-card-image"/.test(MAIN) && /ipcMain\.handle\("show-in-folder"/.test(MAIN));
@@ -640,12 +645,12 @@ check('WA_D6', 'Fluxo automático NÃO usa web.whatsapp/send?text/whatsapp:// (c
 })());
 check('WA_D7', 'Card Aurora Glass (B-final) segue como mídia oficial planejada (autoCardPreview usa CARD_IMG_B64)', /id="autoCardPreview"/.test(DH) && /data:image\/jpeg;base64,'\+CARD_IMG_B64/.test(DH));
 check('WA_D8', 'Individual = "Opção avançada" recolhida (<details>, não open); rótulo correto', /<details class="gcs-adv"><summary>Opção avançada: enviar para número individual com botão oficial<\/summary>/.test(DH) && !/<details class="gcs-adv" open>/.test(DH));
-check('WA_D9', 'GRUPO é principal: btnCopyGroupMsg ANTES do <details>; individual (btnSendAuto + WhatsApp do responsável) DENTRO/depois do <details>', (() => {
-  const prim = DH.indexOf('id="btnCopyGroupMsg"');
+check('WA_D9', 'GRUPO é principal: btnOpenWaMain ANTES do <details>; individual (btnSendAuto + WhatsApp do responsável) DENTRO/depois do <details>', (() => {
+  const prim = DH.indexOf('id="btnOpenWaMain"');
   const adv = DH.indexOf('Opção avançada: enviar para número individual');
   const auto = DH.indexOf('id="btnSendAuto"');
   const resp = DH.indexOf('WhatsApp do responsável');
-  return prim > -1 && adv > -1 && auto > -1 && prim < adv && auto > adv && resp > adv;  // grupo (copiar msg) antes; individual depois
+  return prim > -1 && adv > -1 && auto > -1 && prim < adv && auto > adv && resp > adv;  // grupo (abrir WhatsApp) antes; individual depois
 })());
 
 /* ===================== PARTE F — BLINDAGEM contra dados de TESTE no Kanban real ===================== */
@@ -667,7 +672,7 @@ console.log(`${C.b}\n===========================================================
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes).`);
   console.log(`${C.g} Fluxo PRINCIPAL = grupo do cliente (card + legenda + link); botão real de aprovação no portal.`);
-  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.125 (grupo · link de preview OG exato). Android segue por paridade após o Desktop.${C.x}`);
+  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.126 (grupo · abrir WhatsApp Business). Android segue por paridade após o Desktop.${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
