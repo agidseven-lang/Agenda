@@ -1081,19 +1081,9 @@
   body:not(.desktop) .d-board-tools.tbar{flex-wrap:wrap}
   body:not(.desktop) .d-board-tools.tbar .bsearch{flex:1 1 100%}
   body:not(.desktop) .d-board-tools.tbar .tchips{justify-content:flex-start;flex:1 1 100%}
-  /* task-flow-fix — BARRA DE ABAS ÚNICA E PERSISTENTE (Meu quadro/Cliente/Designers/Social
-     Medias/Setores). Sempre visível, estável e alinhada em TODAS as visões; sticky no topo. */
-  .tasks-tabbar{display:flex;align-items:center;margin:0 0 12px;padding:6px 0 8px}
-  .tasks-tabbar .tchips{display:flex;align-items:center;gap:8px;flex:1 1 auto;overflow-x:auto;
-    scrollbar-width:none;padding-bottom:2px}
-  .tasks-tabbar .tchips::-webkit-scrollbar{display:none}
-  /* Desktop: gruda logo abaixo da topbar (z abaixo da topbar p/ não sobrepor), fundo sólido
-     para o conteúdo rolar por baixo de forma limpa. */
-  body.desktop .tasks-tabbar{position:sticky;top:var(--d-topbar);z-index:18;background:var(--bg);
-    margin:0 auto 12px;padding:10px 0 10px;border-bottom:1px solid var(--line-soft)}
-  /* Mobile/web do renderer: não-sticky (evita sobrepor a topbar), mas SEMPRE presente. */
-  body:not(.desktop) .tasks-tabbar{padding:4px 0 10px}
-  body:not(.desktop) .tasks-tabbar .tchips{flex-wrap:nowrap}
+  /* task-flow-fix — barra de ABAS dos HUBS (sem busca): mesma moldura integrada da toolbar,
+     mas com as abas alinhadas à ESQUERDA (não há campo de busca à esquerda). NÃO é flutuante. */
+  .d-board-tools.tbar.tbar-tabs .tchips{justify-content:flex-start;flex:1 1 auto}
   /* Resumo dos dois eixos no Detalhes */
   .det-flow{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:13px;padding:13px 15px}
   .det-flow-col{flex:1;min-width:160px}
@@ -1526,8 +1516,7 @@ function render(){
     else if(state.roleBoards){body=renderRoleBoards();}
     else if(state.boardSector){body=renderBoard();}
     else body=renderHub();
-    // task-flow-fix — abas SEMPRE presentes e estáveis (1 só barra, acima de toda sub-view).
-    c.innerHTML=taskTabBar()+body;
+    c.innerHTML=body;
     afterBoard();
   }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
@@ -1633,7 +1622,7 @@ function afterAgenda(){const s=document.getElementById('agSearch');if(s)s.oninpu
 /* ---- HUB ---- */
 function renderHub(){
   const u=state.user;const vis=visibleTasks(u,state.tasks);
-  let h='<div class="scr-head"><div class="row"><div style="flex:1"><div class="h-title">Quadros</div><div class="h-sub">Gestão por setor da agência</div></div><span class="badge-round">'+vis.length+' tarefas</span></div></div>'+'<div class="scr" style="padding-top:8px">';
+  let h='<div class="scr-head"><div class="row"><div style="flex:1"><div class="h-title">Quadros</div><div class="h-sub">Gestão por setor da agência</div></div><span class="badge-round">'+vis.length+' tarefas</span></div></div>'+'<div class="scr" style="padding-top:8px">'+hubTabsBar();
   // ADITIVO — Meu quadro (todos) + Quadros por responsável (admin). Não remove a visão por setor.
   const myOpen=u?state.tasks.filter(t=>(t.assigneeId===u.id||t.by===u.id)&&t.status!=='concluido').length:0;
   let nav='';
@@ -1674,7 +1663,7 @@ function renderRoleBoards(){
   let h='<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="hub">'+svg('back')+'</button>'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Quadros por responsável</div><div class="d-bh-sub">Cada pessoa em um quadro isolado — sem misturar</div></div></div></div>'+
-    '<div class="scr" style="padding-top:8px">';
+    '<div class="scr" style="padding-top:8px">'+hubTabsBar();
   const cards=people.map(p=>{const mine=state.tasks.filter(t=>t.assigneeId===p.id||t.by===p.id);const open=mine.filter(t=>t.status!=='concluido').length;
     return '<button class="bcard" data-personboard="'+p.id+'">'+avatar(p,44)+
       '<div class="bm"><div class="bl">'+esc(p.name||'—')+'</div><div class="bd">'+esc(p.role||'Equipe')+'</div>'+
@@ -1777,16 +1766,16 @@ function taskChips(){
 // de Tarefas (ver dispatch em render()). renderTasksTabs/boardToolbar NÃO emitem mais chips
 // (evita duplicar, sumir ou aparecer em container errado — exigência do teste real).
 function renderTasksTabs(active){return '';}
-// task-flow-fix — BARRA DE ABAS ÚNICA E PERSISTENTE (Meu quadro/Cliente/Designers/Social
-// Medias/Setores). Renderizada UMA única vez por render() (dispatch da aba "tarefas"), ACIMA
-// de QUALQUER sub-view — inclusive os HUBS (Designers/Social Medias/Setores). Sticky no topo
-// do #content (abaixo da topbar): nunca some, nunca sobe para fora da área útil, nunca duplica
-// e fica estável ao trocar de visão. Bug do teste real: ao abrir "Designers" as abas sumiam
-// porque os hubs de lista não traziam toolbar; agora a barra é global e independente da view.
-function taskTabBar(){return '<div class="tasks-tabbar"><div class="tchips">'+taskChips()+'</div></div>';}
-// 1.0.106 — TOOLBAR da sub-view: SOMENTE a BUSCA (as abas agora vivem em taskTabBar()).
-// Mantida abaixo do título; os hubs não a usam (não têm busca), mas SEMPRE têm as abas.
-function boardToolbar(){return '<div class="d-board-tools tbar"><input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"></div>';}
+// task-flow-fix (correção da regressão 1.0.128): as abas voltam para a TOOLBAR INTEGRADA de
+// cada visão (emoldurada, DENTRO da área de Quadros, logo abaixo do título) — NÃO mais como
+// barra global flutuante/sticky no topo da tela. Removida a antiga barra global de abas.
+// 1.0.106 — TOOLBAR da sub-view (kanban): BUSCA + ABAS na MESMA moldura, abaixo do título.
+function boardToolbar(){return '<div class="d-board-tools tbar"><input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"><div class="tchips">'+taskChips()+'</div></div>';}
+// Barra de ABAS integrada para os HUBS (Setores/Designers/Social Medias/Responsáveis): mesmas
+// abas, mesmo estilo emoldurado da toolbar dos quadros, posicionada DENTRO da área de Quadros
+// (logo abaixo do título do hub) — nunca flutuando no topo. Sem busca (o hub não tem lista a
+// filtrar). Garante que as abas NÃO somem ao entrar em Designers/Social Medias/Setores.
+function hubTabsBar(){return '<div class="d-board-tools tbar tbar-tabs"><div class="tchips">'+taskChips()+'</div></div>';}
 function renderClientFlowBoard(){
   let list=state.tasks.filter(isClientFlow);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
@@ -1807,7 +1796,7 @@ function renderDesignersHub(){
   let h='<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#A78BFA',.18)+';color:#A78BFA">'+svg('group')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designers</div><div class="d-bh-sub">Cada designer em um quadro Kanban próprio</div></div></div></div>'+
-    '<div class="scr" style="padding-top:8px">';
+    '<div class="scr" style="padding-top:8px">'+hubTabsBar();
   const cards=dz.length?dz.map(d=>{const tasks=state.tasks.filter(t=>isDesignerFlow(t)&&designerOf(t)===d.u.id);
     const open=tasks.filter(t=>designerCol(t)!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
     return '<button class="bcard" data-designerboard="'+d.u.id+'">'+avatar(d.u,44)+
@@ -2139,7 +2128,7 @@ function renderSocialsHub(){
   let h='<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3EE',.18)+';color:#22D3EE">'+svg('group')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Social Medias</div><div class="d-bh-sub">Cada Social Media em um quadro próprio — sem misturar</div></div></div></div>'+
-    '<div class="scr" style="padding-top:8px">';
+    '<div class="scr" style="padding-top:8px">'+hubTabsBar();
   const cards=sm.length?sm.map(d=>{const tasks=state.tasks.filter(t=>socialOf(t)===d.u.id);
     const open=tasks.filter(t=>operationalCol(t)!=='concluido').length;const late=tasks.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
     const waiting=tasks.filter(t=>{const oc=operationalCol(t);return oc==='aguardando_designer'||oc==='aguardando_designer_iniciar';}).length;
@@ -2193,10 +2182,9 @@ function renderBoard(){
     '</div></div>'+
     '<div class="scr" style="padding-top:0"><div class="d-board-tools tbar">'+
       '<input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'">'+
-      // task-flow-fix: as abas (taskChips) agora vivem em taskTabBar() — aqui fica só o
-      // filtro contextual "Minhas tarefas" do quadro de setor (sem duplicar as abas).
       '<div class="tchips">'+
         (u?'<button class="chip" data-bmine="1" style="'+(boardMine?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Minhas tarefas</button>':'')+
+        taskChips()+
       '</div>'+
     '</div>';
     h+='<div class="kanban">';
@@ -3517,7 +3505,7 @@ function _editingNow(){
   const isField=(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable);
   if(!isField)return false;
   // Foco na busca/filtros da toolbar do quadro NUNCA bloqueia o render.
-  if(a.closest&&a.closest('.d-board-tools,.tbar,.tasks-tabbar,.tflow-tabs,.tflow-chipbar,.bsearch'))return false;
+  if(a.closest&&a.closest('.d-board-tools,.tbar,.tflow-tabs,.tflow-chipbar,.bsearch'))return false;
   // Só adia quando o foco está num campo do wizard de criação aberto.
   if(state.form&&a.closest&&a.closest('#content'))return true;
   return false;
