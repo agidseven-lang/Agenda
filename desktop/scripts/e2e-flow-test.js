@@ -29,7 +29,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const WORKER_BRANCH = "worker/client-link-preview-premium";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
-const ANDROID_E2E_BRANCH = 'app/local-1.0.109-beta-whatsapp-guided-card-send';
+const ANDROID_E2E_BRANCH = 'app/local-1.0.128-beta-task-flow-fix';
 
 function readFromGit(branch, relPath) {
   try { return execSync(`git show ${branch}:${relPath}`, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }); }
@@ -398,7 +398,7 @@ check("D20", "Rodapé mostra Desktop 1.0.128", /Desktop 1\.0\.128/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
 check("D21", "Login/título/watermark mostram 1.0.128 (sem rótulo antigo)",
   /<span class="pill-ver">Desktop 1\.0\.128/.test(DH) && /<title>ID Seven · Desktop 1\.0\.128/.test(DH) && /id="wpbadge">Desktop 1\.0\.128/.test(DH));
-check('D22', 'Login espelha o APK 1.0.109-beta-whatsapp-guided-card-send', /espelha o APK <b>1\.0\.109-beta-whatsapp-guided-card-send/.test(DH));
+check('D22', 'Login espelha o APK 1.0.128-beta-task-flow-fix', /espelha o APK <b>1\.0\.128-beta-task-flow-fix/.test(DH));
 check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.128./.test(DH) && /applyVersionLabels/.test(DH));
 // ===== 1.0.120 — ENVIO WHATSAPP LIMPO + WEB-ONLY (executa as funções reais) =====
 (function(){
@@ -440,7 +440,7 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.109-beta-whatsapp-guided-card-send (paridade)', /versionName\s+"1\.0\.109-beta-whatsapp-guided-card-send"/.test(GRADLE));
+check('N1', 'versionName 1.0.128-beta-task-flow-fix (paridade Desktop)', /versionName\s+"1\.0\.128-beta-task-flow-fix"/.test(GRADLE));
 check('N2', 'versionCode >= 107 (acima do 106 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 107; })());
 check('N_PARITY', 'Android = bump de paridade: endpoint interno workers.dev intacto, SEM link de cliente', /idseven-push\.agidseven\.workers\.dev\/notify-assignee/.test(readAndroid(AND + 'core/PushNotify.kt')) && !/cliente\/cronograma/.test(readAndroid(AND + 'core/PushNotify.kt')));
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
@@ -466,6 +466,11 @@ check('N_MOVE2', 'TaskContract.designerStatusPatch NÃO grava status genérico',
 check('N_MOVE3', 'TaskRepo.move tem parâmetro designerAxis', /fun\s+move\(task:[^)]*designerAxis:\s*Boolean/.test(KT_REPO));
 check('N_MOVE4', 'TaskRepo.move usa designerStatusPatch quando designerAxis', /if\s*\(designerAxis\)\s*TaskContract\.designerStatusPatch/.test(KT_REPO));
 check('N_MOVE5', 'TasksScreen detecta eixo do designer e chama move(...designerAxis)', /val designerAxis = TaskVisibility\.isDesignerFlow/.test(KT_SCREEN) && /TaskRepo\.move\(target, opt\.target, currentUid, designerAxis\)/.test(KT_SCREEN));
+// ===== task-flow-fix (Android): paridade do estado "Designer em produção" =====
+check('N_FLOW1', 'Android tem o estado "aguardando_designer_iniciar" ("Aguardando designer iniciar")', /OpCol\("aguardando_designer_iniciar", "Aguardando designer iniciar"\)/.test(KT_VIS));
+check('N_FLOW2', 'Android operationalCol: andamento/revisao -> "aguardando_designer" (em produção)', /if \(dc == "andamento" \|\| dc == "revisao"\) return "aguardando_designer"/.test(KT_VIS));
+check('N_FLOW3', 'Android operationalCol: recém-enviado (afazer) -> "aguardando_designer_iniciar" (NÃO em produção)', /return "aguardando_designer_iniciar"/.test(KT_VIS));
+check('N_FLOW4', 'Android versionName = 1.0.128-beta-task-flow-fix', /versionName "1\.0\.128-beta-task-flow-fix"/.test(GRADLE));
 // CORREÇÃO 3 (Android): colunas por contexto.
 check('N7', 'Colunas reduzidas: SOCIAL_COLS4 / DESIGNER_COLS3 / CLIENT_COLS4', /SOCIAL_COLS4/.test(KT_VIS) && /DESIGNER_COLS3/.test(KT_VIS) && /CLIENT_COLS4/.test(KT_VIS));
 check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerCol3)', /clientCol4\(t\)/.test(KT_SCREEN) && /designerCol3\(t\)/.test(KT_SCREEN));
