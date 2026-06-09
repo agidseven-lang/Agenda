@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.124 (Grupo · link de preview)</title>
+<title>ID Seven · Desktop 1.0.125 (Grupo · link de preview)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1171,7 +1171,7 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.124 · Grupo</span><br>
+    <span class="pill-ver">Desktop 1.0.125 · Grupo</span><br>
     espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b> · ref app/main
   </div>
 </section>
@@ -1186,7 +1186,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.124 · Grupo</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.125 · Grupo</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1202,7 +1202,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.124', tag:'Grupo', apk:'1.0.109-beta-whatsapp-guided-card-send' };
+const APP_VER={ desktop:'1.0.125', tag:'Grupo', apk:'1.0.109-beta-whatsapp-guided-card-send' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1472,7 +1472,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.124 · Grupo</span><br>espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.125 · Grupo</span><br>espelha o APK <b>1.0.109-beta-whatsapp-guided-card-send</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2826,8 +2826,8 @@ async function openSendClientModal(taskOrForm){
       '<div class="gcs-lp" id="groupLinkPreview">'+
         '<div class="gcs-lp-img"><img id="groupCardPreview" alt="Prévia do link — card premium Agenda ID Seven"/></div>'+
         '<div class="gcs-lp-meta">'+
-          '<div class="gcs-lp-title">Aprovar cronograma — Agenda ID Seven</div>'+
-          '<div class="gcs-lp-desc">Seu cronograma está pronto para avaliação. Toque para revisar os temas, aprovar e solicitar ajustes. Link seguro · Agenda ID Seven.</div>'+
+          '<div class="gcs-lp-title">Aprovar cronograma</div>'+
+          '<div class="gcs-lp-desc">Seu cronograma está pronto para avaliação.</div>'+
           '<div class="gcs-lp-dom">aprovar.agendaidseven.com.br</div>'+
         '</div>'+
       '</div>'+
@@ -3306,7 +3306,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.124-whatsapp-share-link';
+const BUILD='1.0.125-whatsapp-share-og-exact';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
