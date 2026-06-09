@@ -254,6 +254,37 @@ jobs:
             echo "OK: /share OG premium validado em $B"
           done
 
+      # V64.40 — PROVA com o User-Agent REAL do crawler (facebookexternalhit + WhatsApp + Twitterbot).
+      # O /share NAO faz sniff de UA, entao o robo recebe EXATAMENTE o mesmo OG. Esta prova busca a
+      # pagina e a imagem com os UAs reais e confirma og:title/og:description/og:image + image 200.
+      - name: Validar /share com User-Agent REAL do WhatsApp/Facebook (crawler)
+        run: |
+          set -euo pipefail
+          UAS=("facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" "WhatsApp/2.2412.5 A" "Twitterbot/1.0")
+          for B in "https://aprovar.agendaidseven.com.br" "https://idseven-push.agidseven.workers.dev"; do
+            URL="$B/share/cronograma/ci_crawler_token_0001"
+            for UA in "${UAS[@]}"; do
+              echo "== CRAWLER UA='$UA' :: $URL =="
+              h=$(mktemp)
+              code=$(curl -sS --max-time 25 -A "$UA" -o "$h" -w '%{http_code}' "$URL")
+              ct=$(curl -sS --max-time 25 -A "$UA" -o /dev/null -w '%{content_type}' "$URL")
+              echo "HTTP=$code Content-Type=$ct bytes=$(wc -c < "$h")"
+              [ "$code" = "200" ] || { echo "FAIL: crawler nao recebeu 200" >&2; head -c 500 "$h"; exit 1; }
+              echo "$ct" | grep -qi 'text/html' || { echo "FAIL: nao e text/html p/ o crawler" >&2; exit 1; }
+              grep -q 'og:title" content="Aprovar cronograma"' "$h" || { echo "FAIL: og:title errado p/ o crawler" >&2; head -c 600 "$h"; exit 1; }
+              grep -q 'og:description" content="Seu cronograma está pronto para avaliação."' "$h" || { echo "FAIL: og:description errado p/ o crawler" >&2; exit 1; }
+              grep -qi 'og:image" content="https://[^"]*/og/wa-card-v64-38.jpg"' "$h" || { echo "FAIL: og:image absoluto ausente p/ o crawler" >&2; exit 1; }
+              j=$(mktemp)
+              jc=$(curl -sS --max-time 25 -A "$UA" -o "$j" -w '%{http_code}' "$B/og/wa-card-v64-38.jpg")
+              jct=$(curl -sS --max-time 25 -A "$UA" -o /dev/null -w '%{content_type}' "$B/og/wa-card-v64-38.jpg")
+              echo "og:image (UA crawler) -> HTTP=$jc $jct bytes=$(wc -c < "$j")"
+              [ "$jc" = "200" ] || { echo "FAIL: og:image != 200 p/ o crawler" >&2; exit 1; }
+              echo "$jct" | grep -qi 'image/jpeg' || { echo "FAIL: og:image nao e image/jpeg p/ o crawler" >&2; exit 1; }
+              echo "OK: crawler '$UA' recebe OG premium + imagem em $B"
+            done
+          done
+          echo "PROVA: o robo do WhatsApp/Facebook recebe o card OG identico ao validado (sem sniff de UA)."
+
       # FASE 3 — TESTE REAL de envio premium via WhatsApp Business Cloud API.
       # Só roda se wa_send_token E wa_send_phone forem informados no dispatch.
       # Telefone vai por ENV (não aparece no comando renderizado). A resposta já MASCARA o
