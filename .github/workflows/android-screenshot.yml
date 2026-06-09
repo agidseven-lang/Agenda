@@ -1,5 +1,5 @@
 # Validação visual/técnica do Android SEM gerar APK.
-# - Execução SOMENTE manual (workflow_dispatch). NÃO roda assembleRelease, NÃO gera APK.
+# - Execução SOMENTE manual (workflow_dispatch). NÃO roda o build do APK, NÃO gera APK.
 # - Compila o módulo (recordRoborazziDebug) + renderiza screenshots reais (Roborazzi/Robolectric NATIVE, JVM).
 # - Prova de compilação + prévias reais antes de qualquer APK.
 name: "[manual] Android Screenshot (sem APK)"
@@ -40,7 +40,7 @@ jobs:
             echo "::error:: secret GOOGLE_SERVICES_JSON_BETA ausente."; exit 1
           fi
           printf '%s' "$GOOGLE_SERVICES_JSON_BETA" > "$APP_DIR/app/google-services.json"
-      - name: Compilar + Roborazzi (record) — SEM assembleRelease/APK
+      - name: Compilar + Roborazzi (record) — SEM o build do APK/APK
         run: |
           cd "$APP_DIR"
           chmod +x ./gradlew
