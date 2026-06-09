@@ -269,7 +269,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.45-team-session-jwt" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.46-team-session-hardened" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1457,33 +1457,104 @@ async function sha256HexW(s) {
   const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, "0")).join("");
 }
+
+/* ═══════ V64.46 — HARDENING da autenticação de equipe ═══════
+   - timingSafeEqualStr: comparação em TEMPO CONSTANTE (digere ambos os lados com
+     SHA-256 e compara por XOR acumulado — independe do tamanho, sem early-exit).
+   - rate limit por uid E por IP (CF-Connecting-IP): 5 tentativas inválidas/5min →
+     bloqueio de 15min (backoff). Estado em Cache API (sem KV). LIMITAÇÃO HONESTA:
+     Cache API é por datacenter e não-atômica — é mitigação best-effort; rate limit
+     global exigiria KV/Durable Object (binding novo = mudança de deploy futura).
+   - erros EXTERNOS genéricos ("credenciais inválidas") — não revela se uid existe,
+     se a role está errada ou se a senha está errada; detalhe só em log interno.
+   - logs com uid MASCARADO; nunca senha/hash/JWT/secret.
+   - TTL do JWT: 4h (reduzido de 12h). */
+const TEAM_JWT_TTL_S = 4 * 3600;
+const TEAM_RL_MAX = 5;          // tentativas inválidas por janela
+const TEAM_RL_WINDOW_S = 300;   // janela de contagem (5 min)
+const TEAM_RL_BLOCK_S = 900;    // bloqueio/backoff (15 min)
+function maskUid(v) { const s = String(v || ""); return s ? (s.slice(0, 3) + "…") : "(vazio)"; }
+function rlDecide(state, nowS) {
+  if (state && state.until && nowS < state.until) return { blocked: true, retryAfter: state.until - nowS };
+  return { blocked: false };
+}
+function rlOnFail(state, nowS) {
+  const inWindow = state && typeof state.first === "number" && (nowS - state.first) < TEAM_RL_WINDOW_S;
+  const s = inWindow ? { fails: (state.fails || 0) + 1, first: state.first } : { fails: 1, first: nowS };
+  if (s.fails >= TEAM_RL_MAX) s.until = nowS + TEAM_RL_BLOCK_S;
+  return s;
+}
+async function rlGet(key) {
+  try { const r = await caches.default.match(new Request("https://ratelimit.local/" + key)); return r ? await r.json() : null; }
+  catch (_) { return null; }
+}
+async function rlPut(key, state, ttlS) {
+  try { await caches.default.put(new Request("https://ratelimit.local/" + key), new Response(JSON.stringify(state), { headers: { "Cache-Control": "public, max-age=" + ttlS } })); }
+  catch (_) { /* best-effort */ }
+}
+async function rlClear(key) {
+  try { await caches.default.delete(new Request("https://ratelimit.local/" + key)); } catch (_) { /* best-effort */ }
+}
+async function timingSafeEqualStr(a, b) {
+  const enc = new TextEncoder();
+  const da = new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode("tse|" + String(a))));
+  const db_ = new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode("tse|" + String(b))));
+  let diff = 0;
+  for (let i = 0; i < da.length; i++) diff |= da[i] ^ db_[i];
+  return diff === 0;
+}
+
+/* CORS/ORIGEM (auditoria documentada): o Desktop é Electron — o renderer envia Origin
+   "null"/file, então restrição por Origin NÃO se aplica a ele (e o navegador é quem
+   aplica CORS, não o servidor). corsHeaders(env) continua emitindo ALLOWED_ORIGIN p/
+   contextos web. A PROTEÇÃO REAL destas rotas é a autenticação (senha server-side +
+   JWT + rate limit), não o CORS. */
 async function handleTeamSession(request, env) {
   if (!env.TEAM_SESSION_SECRET) return json({ ok: false, error: "TEAM_SESSION_NOT_CONFIGURED" }, 503, env);
   let p;
-  try { p = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
+  try { p = await request.json(); } catch (_) { return json({ ok: false, error: "credenciais inválidas" }, 401, env); }
   const uid = (p && typeof p.uid === "string") ? p.uid.trim() : "";
   const password = (p && typeof p.password === "string") ? p.password : "";
-  if (!uid || !password) return json({ ok: false, error: "uid e password obrigatórios" }, 400, env);
+  if (!uid || !password) return json({ ok: false, error: "credenciais inválidas" }, 401, env);
+  const nowS = Math.floor(Date.now() / 1000);
+  const ip = request.headers.get("CF-Connecting-IP") || "0.0.0.0";
+  const kUid = "team-session/uid/" + uid;
+  const kIp = "team-session/ip/" + ip;
+  const stUid = await rlGet(kUid);
+  const stIp = await rlGet(kIp);
+  if (rlDecide(stUid, nowS).blocked || rlDecide(stIp, nowS).blocked) {
+    console.warn(`[TEAM-SESSION] rate-limited uid=${maskUid(uid)} ip=${maskUid(ip)}`);
+    return json({ ok: false, error: "muitas tentativas — aguarde alguns minutos" }, 429, env);
+  }
   let accessToken;
   try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
-  catch (e) { return json({ ok: false, error: "auth: " + (e && e.message) }, 502, env); }
+  catch (e) { return json({ ok: false, error: "indisponível no momento" }, 502, env); }
   const u = await lookupTeamUser(env, accessToken, uid);
-  if (!u) {
-    console.warn(`[TEAM-SESSION] negado uid=${uid} (inexistente/inativo/sem role de equipe)`);
-    return json({ ok: false, error: "usuário não autorizado (Social/Admin ativo requerido)" }, 403, env);
-  }
-  // prova de identidade: senha verificada SERVER-SIDE (nunca logada).
+  // prova de identidade: senha verificada SERVER-SIDE em tempo constante (nunca logada).
   let okPw = false;
-  if (u.pass && u.pass.startsWith("s2:") && u.salt) okPw = (u.pass === ("s2:" + await sha256HexW(u.salt + "|" + password)));
-  else if (u.pass) okPw = (u.pass === djb2Hash(password));
-  if (!okPw) {
-    console.warn(`[TEAM-SESSION] senha inválida uid=${uid}`);
+  if (u && u.pass && u.pass.startsWith("s2:") && u.salt) {
+    okPw = await timingSafeEqualStr(u.pass, "s2:" + await sha256HexW(u.salt + "|" + password));
+  } else if (u && u.pass) {
+    okPw = await timingSafeEqualStr(u.pass, djb2Hash(password));
+  } else {
+    // uid inexistente/sem role: compare DUMMY p/ aproximar o tempo do caminho real
+    // (não revela por timing se o usuário existe).
+    await timingSafeEqualStr("s2:" + await sha256HexW("dummy|" + password), "s2:nunca-bate");
+  }
+  if (!u || !okPw) {
+    const fU = rlOnFail(stUid, nowS);
+    const fI = rlOnFail(stIp, nowS);
+    await rlPut(kUid, fU, TEAM_RL_BLOCK_S + TEAM_RL_WINDOW_S);
+    await rlPut(kIp, fI, TEAM_RL_BLOCK_S + TEAM_RL_WINDOW_S);
+    // log interno com uid mascarado + código do motivo; resposta EXTERNA genérica.
+    console.warn(`[TEAM-SESSION] negado uid=${maskUid(uid)} code=${!u ? "USER" : "PW"} fails=${fU.fails}${fU.until ? " (bloqueado)" : ""}`);
     return json({ ok: false, error: "credenciais inválidas" }, 401, env);
   }
-  const now = Math.floor(Date.now() / 1000);
-  const jwt = await signTeamJwt(env, { sub: uid, name: u.name || "", aud: TEAM_JWT_AUD, scope: TEAM_JWT_SCOPE, iat: now, exp: now + 12 * 3600 });
-  console.log(`[TEAM-SESSION] emitido uid=${uid} exp=+12h`);
-  return json({ ok: true, token: jwt, expiresIn: 12 * 3600 }, 200, env);
+  await rlClear(kUid);
+  await rlClear(kIp);
+  const jwt = await signTeamJwt(env, { sub: uid, name: u.name || "", aud: TEAM_JWT_AUD, scope: TEAM_JWT_SCOPE, iat: nowS, exp: nowS + TEAM_JWT_TTL_S });
+  console.log(`[TEAM-SESSION] emitido uid=${maskUid(uid)} ttl=${TEAM_JWT_TTL_S}s`);
+  return json({ ok: true, token: jwt, expiresIn: TEAM_JWT_TTL_S }, 200, env);
 }
 
 /* V64.45 — TEAM ACTION (camada CENTRAL de workflow): limpa clientItems[iX].cs (preserva
@@ -1523,7 +1594,8 @@ async function handleClientCronogramaTeamAction(token, request, env) {
   // ── AUTENTICAÇÃO FORTE (antes de QUALQUER efeito, inclusive replay de idempotência) ──
   let byName = (payload && typeof payload.byName === "string") ? payload.byName.slice(0, 80) : "";
   const suppliedKey = request.headers.get("X-Team-Key") || "";
-  const keyOk = !!(env.TEAM_API_KEY && suppliedKey === env.TEAM_API_KEY);
+  // comparação em tempo constante (hardening V64.46) — só server-to-server.
+  const keyOk = !!(env.TEAM_API_KEY && await timingSafeEqualStr(suppliedKey, env.TEAM_API_KEY));
   if (!keyOk) {
     const authz = request.headers.get("Authorization") || "";
     const m = authz.match(/^Bearer\s+(.+)$/i);
@@ -1539,11 +1611,11 @@ async function handleClientCronogramaTeamAction(token, request, env) {
     // reconsulta role/status no Firestore ANTES de executar (revogação imediata).
     const teamUser = await lookupTeamUser(env, accessToken, v.uid);
     if (!teamUser) {
-      console.warn(`[TEAM-ACTION] negado: uid=${v.uid} não é mais Social/Admin ativo`);
+      console.warn(`[TEAM-ACTION] negado: uid=${maskUid(v.uid)} não é mais Social/Admin ativo`);
       return json({ ok: false, error: "forbidden: usuário não é mais Social/Admin ativo" }, 403, env);
     }
     if (!byName) byName = teamUser.name || v.name || "Equipe";
-    console.log(`[TEAM-ACTION] autorizado por teamSessionJwt uid=${teamUser.uid} role=${teamUser.role}${teamUser.admin ? "(admin)" : ""}`);
+    console.log(`[TEAM-ACTION] autorizado por teamSessionJwt uid=${maskUid(teamUser.uid)} role=${teamUser.role}${teamUser.admin ? "(admin)" : ""}`);
   }
   if (!byName) byName = "Equipe";
 

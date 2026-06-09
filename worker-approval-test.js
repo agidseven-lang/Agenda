@@ -198,7 +198,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_45', 'Healthcheck retorna V64.45-team-session-jwt', /version: "V64\.45-team-session-jwt"/.test(SRC));
+check('C_HEALTH_V64_46', 'Healthcheck retorna V64.46-team-session-hardened', /version: "V64\.46-team-session-hardened"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -333,7 +333,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + 4 estados', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas no navegador/.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados para este cronograma/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.45-team-session-jwt', /version: "V64\.45-team-session-jwt"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.46-team-session-hardened', /version: "V64\.46-team-session-hardened"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -379,10 +379,54 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   }
   // Estruturais da rota /team/session + ordem auth→efeitos
   check('G10_ROUTE','Rota POST /team/session registrada e gated por TEAM_SESSION_SECRET (503)', /url\.pathname === "\/team\/session" && request\.method === "POST"/.test(SRC) && /TEAM_SESSION_NOT_CONFIGURED" \}, 503/.test(SRC));
-  check('G11_PASSWORD_PROOF','Sessão exige SENHA verificada server-side (s2 + djb2 legado); credencial inválida → 401', /okPw = \(u\.pass === \("s2:" \+ await sha256HexW\(u\.salt \+ "\|" \+ password\)\)\)/.test(SRC) && /credenciais inválidas" \}, 401/.test(SRC));
-  check('G12_SESSION_ROLE','Sessão só para Social/Admin ATIVO (lookupTeamUser; 403 caso contrário)', /usuário não autorizado \(Social\/Admin ativo requerido\)" \}, 403/.test(SRC));
+  check('G11_PASSWORD_PROOF','Sessão verifica a SENHA server-side em TEMPO CONSTANTE (timingSafeEqualStr) — s2 + djb2 legado', /okPw = await timingSafeEqualStr\(u\.pass, "s2:" \+ await sha256HexW\(u\.salt \+ "\|" \+ password\)\)/.test(SRC) && /timingSafeEqualStr\(u\.pass, djb2Hash\(password\)\)/.test(SRC));
+  check('G12_SESSION_GENERIC','Sessão NÃO revela motivo: uid inexistente/role errada/senha errada → MESMO erro genérico 401 "credenciais inválidas"', (()=>{const h=(SRC.match(/async function handleTeamSession[\s\S]*?\n\}/)||[''])[0];return h.length>0 && !/Social\/Admin ativo requerido/.test(h) && !/senha inválida/.test(h) && (h.match(/credenciais inválidas/g)||[]).length>=3;})());
   check('G13_NOTIFY_AFTER_AUTH','notifyWorkflowEvent só DEPOIS da autorização (ordem no handler)', (()=>{const h=(SRC.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)||[''])[0];const a=h.indexOf('AUTENTICAÇÃO FORTE');const n=h.indexOf('notifyWorkflowEvent');return a>=0&&n>a;})());
   check('G14_NO_PASSWORD_LOG','Senha NUNCA aparece em console.log/warn da sessão', (()=>{const h=(SRC.match(/async function handleTeamSession[\s\S]*?\n\}/)||[''])[0];return h.length>0 && !/console\.(log|warn|error)\([^)]*password/.test(h);})());
+
+  /* ===================== PARTE H — HARDENING V64.46 (funcional + estrutural) ===================== */
+  console.log(`${C.b}\n[H] Hardening da sessão de equipe (rate limit · timing-safe · logs limpos · TTL)${C.x}`);
+  try{
+    // FUNCIONAL: extrai rlDecide/rlOnFail/timingSafeEqualStr/maskUid REAIS e prova em Node.
+    const H_FNS=['rlDecide','rlOnFail','maskUid','timingSafeEqualStr'].map(extractFn).join('\n');
+    const hScope={crypto:globalThis.crypto,TextEncoder,Uint8Array,String,JSON,Math,console,
+      TEAM_RL_MAX:5,TEAM_RL_WINDOW_S:300,TEAM_RL_BLOCK_S:900};
+    const H=new Function(...Object.keys(hScope),
+      "const TEAM_RL_MAX_=TEAM_RL_MAX,TEAM_RL_WINDOW_S_=TEAM_RL_WINDOW_S,TEAM_RL_BLOCK_S_=TEAM_RL_BLOCK_S;\n"+
+      H_FNS.replace(/TEAM_RL_MAX/g,'TEAM_RL_MAX_').replace(/TEAM_RL_WINDOW_S/g,'TEAM_RL_WINDOW_S_').replace(/TEAM_RL_BLOCK_S/g,'TEAM_RL_BLOCK_S_')+
+      '\nreturn {rlDecide,rlOnFail,maskUid,timingSafeEqualStr};')(...Object.values(hScope));
+    // H1 — 5ª senha errada bloqueia; antes disso não bloqueia
+    let st=null;const t0=1000000;
+    for(let i=0;i<4;i++){st=H.rlOnFail(st,t0+i);}
+    check('H1_FOUR_FAILS_OK','4 tentativas inválidas ainda NÃO bloqueiam', H.rlDecide(st,t0+10).blocked===false && st.fails===4);
+    st=H.rlOnFail(st,t0+5);
+    const dec=H.rlDecide(st,t0+10);
+    check('H2_FIFTH_BLOCKS','5ª tentativa inválida BLOQUEIA com backoff de 15min', st.fails===5 && dec.blocked===true && dec.retryAfter>0 && st.until===t0+5+900);
+    check('H3_BACKOFF_EXPIRES','Bloqueio expira após o backoff (não é permanente)', H.rlDecide(st,t0+5+901).blocked===false);
+    check('H4_WINDOW_RESET','Falhas FORA da janela de 5min reiniciam a contagem (não acumulam p/ sempre)', H.rlOnFail({fails:4,first:t0},t0+301).fails===1);
+    // H5 — comparação em tempo constante (funcional)
+    check('H5_TSE','timingSafeEqualStr: igual→true; diferente→false; tamanhos diferentes→false',
+      (await H.timingSafeEqualStr('abc','abc'))===true && (await H.timingSafeEqualStr('abc','abd'))===false && (await H.timingSafeEqualStr('abc','abcd'))===false);
+    check('H6_MASK','maskUid mascara (3 chars + …) e tolera vazio', H.maskUid('joaomarques123')==='joa…' && H.maskUid('')==='(vazio)');
+  }catch(e){
+    check('H_FATAL','Parte H executa sem exceção — erro: '+(e&&e.message), false);
+  }
+  // ESTRUTURAIS
+  const hs=(SRC.match(/async function handleTeamSession[\s\S]*?\n\}/)||[''])[0];
+  const ha=(SRC.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)||[''])[0];
+  check('H7_RL_APPLIED','Sessão aplica rate limit por uid E por IP (CF-Connecting-IP) com 429 genérico',
+    /team-session\/uid\//.test(hs) && /team-session\/ip\//.test(hs) && /CF-Connecting-IP/.test(hs) && /muitas tentativas — aguarde alguns minutos" \}, 429/.test(hs));
+  check('H8_RL_RESET_ON_SUCCESS','Sucesso LIMPA os contadores (rlClear uid+ip)', (hs.match(/await rlClear\(/g)||[]).length>=2);
+  check('H9_DUMMY_COMPARE','uid inexistente executa compare DUMMY (não revela existência por timing)', /compare DUMMY/.test(hs) && /dummy\|/.test(hs));
+  check('H10_TTL_4H','TTL do JWT reduzido para 4h (TEAM_JWT_TTL_S = 4*3600; sem 12h)', /const TEAM_JWT_TTL_S = 4 \* 3600;/.test(SRC) && /exp: nowS \+ TEAM_JWT_TTL_S/.test(hs) && hs.indexOf('12 * 3600')===-1);
+  check('H11_LOGS_MASKED','Logs da sessão e da team-action usam maskUid; nunca senha/hash/JWT/secret',
+    (()=>{const logs=(hs.match(/console\.\w+\([^;]*\)/g)||[]).concat(ha.match(/console\.\w+\([^;]*\)/g)||[]);
+      return logs.length>0 && logs.every(l=>!/password|u\.pass|\+ jwt|TEAM_SESSION_SECRET|sha256HexW/.test(l)) && logs.filter(l=>/uid=/.test(l)).every(l=>/maskUid/.test(l));})());
+  check('H12_XKEY_TSE','X-Team-Key comparada em tempo constante (timingSafeEqualStr)', /timingSafeEqualStr\(suppliedKey, env\.TEAM_API_KEY\)/.test(ha));
+  check('H13_REJECT_NO_NOTIFY','Rejeição (401/403/429) ocorre ANTES de notifyWorkflowEvent/commit/idem-cache (sem efeito colateral)',
+    (()=>{const auth=ha.indexOf('AUTENTICAÇÃO FORTE');const notify=ha.indexOf('notifyWorkflowEvent');const idemPut=ha.indexOf('caches.default.put');return auth>=0&&notify>auth&&idemPut>notify;})());
+  check('H14_CORS_DOC','CORS/origem auditado e documentado (Electron envia Origin null/file; proteção real = autenticação)', /CORS\/ORIGEM \(auditoria documentada\)/.test(SRC) && /Electron/.test(SRC));
+  check('H15_GENERIC_400','Body inválido/incompleto também responde genérico (sem distinguir uid/senha ausentes)', (()=>{const m=hs.match(/credenciais inválidas" \}, 401/g);return m&&m.length>=3;})());
 
   /* ===================== VEREDITO ===================== */
   console.log(`${C.b}\n==================================================================`);
