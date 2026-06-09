@@ -8,7 +8,11 @@
 #   - FCM_CLIENT_EMAIL       (service account — e-mail)
 #   - FCM_PRIVATE_KEY        (service account — chave privada PEM)
 #   - IMAGEKIT_PRIVATE_KEY   (ImageKit)
-#   - WHATSAPP_ACCESS_TOKEN  (token permanente do System User da Meta) — ÚNICO segredo da Cloud API
+#   - WHATSAPP_ACCESS_TOKEN  (token permanente do System User da Meta) — segredo da Cloud API
+#   - TEAM_SESSION_SECRET    (V64.46 — assina o teamSessionJwt; rotacionar invalida sessões)
+#   - TEAM_API_KEY           (V64.46 — opcional, somente server-to-server/testes)
+#   - VAPID_PUBLIC_KEY       (V64.46 — Web Push; P-256 pública 65B base64url; é pública por natureza)
+#   - VAPID_PRIVATE_KEY      (V64.46 — Web Push; escalar d 32B base64url; rotacionar invalida subscriptions)
 # Confirme que esses secrets já existem no Worker antes de publicar.
 # ============================================================================
 
@@ -35,3 +39,6 @@ WHATSAPP_BUSINESS_ACCOUNT_ID = "874634135665971"
 WHATSAPP_TEMPLATE_NAME = "cronograma_aprovacao"
 WHATSAPP_TEMPLATE_LANG = "pt_BR"
 WHATSAPP_GRAPH_VERSION = "v25.0"
+# V64.46 — Web Push do CLIENTE (vars NÃO-secretas; as chaves VAPID são secrets).
+VAPID_SUBJECT = "mailto:contato@agendaidseven.com.br"
+ENABLE_CLIENT_WEB_PUSH = "true"
