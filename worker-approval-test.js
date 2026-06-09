@@ -198,7 +198,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_44', 'Healthcheck retorna V64.44-team-action-capability-auth', /version: "V64\.44-team-action-capability-auth"/.test(SRC));
+check('C_HEALTH_V64_45', 'Healthcheck retorna V64.45-team-session-jwt', /version: "V64\.45-team-session-jwt"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -211,12 +211,15 @@ check('C_PHASE_CLEANUP', 'LIMPEZA POR TRANSIÇÃO DE FASE — zera cs por phase 
   /LIMPEZA POR TRANSIÇÃO DE FASE/.test(SRC) && /if \(g\.client === "aprovado" \|\| g\.client === "concluido"\)/.test(SRC) && /clientItems\."\s*\+\s*k\s*\+\s*"\.cs/.test(SRC));
 check('C_TEAM_ROUTE', 'Rota POST /cliente/cronograma/:token/team-action registrada', /teamMatch[\s\S]{0,40}url\.pathname\.match/.test(SRC) && /\\\/team-action\\\/\?\$/.test(SRC) && /handleClientCronogramaTeamAction/.test(SRC));
 // V64.44 — autorizacao dupla: X-Team-Key (server-to-server) OU uid Social/Admin via role-lookup REAL.
-check('C_TEAM_AUTH', 'team-action: sem X-Team-Key valida uid via lookupTeamUser (403 se nao for Social/Admin ativo)', /const keyOk = !!\(env\.TEAM_API_KEY && suppliedKey === env\.TEAM_API_KEY\)/.test(SRC) && /lookupTeamUser\(env, accessToken, payload && payload\.uid\)/.test(SRC) && /unauthorized: requer X-Team-Key \(server\) ou uid de usuário Social\/Admin ativo/.test(SRC));
+// V64.45 — AUTENTICACAO FORTE: Bearer teamSessionJwt obrigatorio (sem X-Team-Key) + re-lookup.
+check('C_TEAM_AUTH', 'team-action: sem X-Team-Key EXIGE Bearer JWT (401) e valida assinatura/exp/aud/scope', /const m = authz\.match\(\/\^Bearer\\s\+\(\.\+\)\$\/i\)/.test(SRC) && /unauthorized: Authorization Bearer <teamSessionJwt> obrigatório/.test(SRC) && /await verifyTeamJwt\(env, m\[1\]\)/.test(SRC));
+check('C_TEAM_NO_BODY_UID', 'uid declarado no body NAO e aceito como prova (caminho removido do handler)', (()=>{const h=(SRC.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)||[''])[0];return h.length>0 && h.indexOf('payload.uid')===-1;})());
+check('C_TEAM_RELOOKUP', 'apos JWT valido, RECONSULTA role/status no Firestore antes de executar (403 se revogado)', /lookupTeamUser\(env, accessToken, v\.uid\)/.test(SRC) && /forbidden: usuário não é mais Social\/Admin ativo/.test(SRC));
 check('C_TEAM_XKEY', 'team-action mantém X-Team-Key p/ server-to-server (nunca embutida em app cliente)', /handleClientCronogramaTeamAction[\s\S]{0,2400}X-Team-Key/.test(SRC));
 check('C_TEAM_LOOKUP', 'lookupTeamUser: GET users/{uid} via service account + status ativo + role Social/Admin (TEAM_ROLE_KW) ou admin', /async function lookupTeamUser/.test(SRC) && /documents\/users\/\$\{uid\}/.test(SRC) && /TEAM_ROLE_KW/.test(SRC) && /status === "pendente" \|\| status === "removido" \|\| status === "excluido"/.test(SRC));
-check('C_TEAM_NO_SECRET_APP', 'NENHUM caminho exige secret no app: rota funciona com uid+capability do token', /b\) body\.uid de um usuário Social\/Admin ATIVO/.test(SRC));
+check('C_TEAM_NO_SECRET_APP', 'NENHUM secret no app: Bearer vem de /team/session (senha verificada server-side); X-Team-Key so server-to-server', /Authorization: Bearer <teamSessionJwt> emitido por \/team\/session/.test(SRC));
 check('C_TEAM_MULTI', 'team-action aceita contentIndexes[] (varios itens) com dedupe/sort', /Array\.isArray\(payload && payload\.contentIndexes\)/.test(SRC) && /Array\.from\(new Set\(idxs\)\)\.sort/.test(SRC));
-check('C_TEAM_IDEM', 'team-action tem Idempotency-Key proprio (Cache API, replay X-Idempotency-Replayed)', /idempotency\.local\/team\//.test(SRC) && /handleClientCronogramaTeamAction[\s\S]{0,1200}Idempotency-Key/.test(SRC));
+check('C_TEAM_IDEM', 'team-action mantem Idempotency-Key (Cache API, replay) — verificada APOS a autorizacao', /idempotency\.local\/team\//.test(SRC) && (()=>{const h=(SRC.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)||[''])[0];const a=h.indexOf('AUTENTICAÇÃO FORTE');const i=h.indexOf('idempotency.local/team');return a>=0&&i>a;})());
 check('C_TEAM_PUSH_SAFE', 'falha de push NUNCA bloqueia a acao (try/catch em notifyWorkflowEvent)', /try \{[\s\S]{0,250}notifyWorkflowEvent\(env, task, evType[\s\S]{0,120}\} catch \(e\) \{ pushResult = \{ sent: 0, error: e && e\.message \}; \}/.test(SRC));
 check('C_TEAM_CLEARS_CS', 'team-action grava clientItems[iX].cs=null e teamAdjustedAt/By', /cs: \{ nullValue: null \}[\s\S]{0,200}teamAdjustedAt[\s\S]{0,200}teamAdjustedBy/.test(SRC));
 check('C_TEAM_HISTORY', 'team-action adiciona history com type=equipe_corrigiu_item', /equipe_corrigiu_item/.test(SRC));
@@ -330,8 +333,56 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + 4 estados', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas no navegador/.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados para este cronograma/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.44-team-action-capability-auth', /version: "V64\.44-team-action-capability-auth"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.45-team-session-jwt', /version: "V64\.45-team-session-jwt"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
+
+  /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
+   * Extrai signTeamJwt/verifyTeamJwt/sha256HexW/djb2Hash REAIS do Worker e prova com a MESMA
+   * Web Crypto: emissão→verificação ok; assinatura adulterada/expirado/aud/scope/secret errado
+   * REJEITADOS; prova de senha s2 e djb2 funcionam. Sem mock de criptografia. */
+  console.log(`${C.b}\n[G] TEAM SESSION JWT — autenticação forte (round-trip real)${C.x}`);
+  try{
+    const JWT_FNS=['b64uToBytes','bytesToB64u','teamHmacKey','signTeamJwt','verifyTeamJwt','djb2Hash','sha256HexW']
+      .map(extractFn).join('\n');
+    const scope2={crypto:globalThis.crypto,atob,btoa,TextEncoder,TextDecoder,Uint8Array,Error,JSON,Math,Date,String,Array,console,
+      TEAM_JWT_AUD:'idseven-team',TEAM_JWT_SCOPE:'workflow:team_adjusted_item'};
+    const G=new Function(...Object.keys(scope2),
+      "const TEAM_JWT_AUD_=TEAM_JWT_AUD,TEAM_JWT_SCOPE_=TEAM_JWT_SCOPE;\n"+
+      JWT_FNS.replace(/TEAM_JWT_AUD/g,'TEAM_JWT_AUD_').replace(/TEAM_JWT_SCOPE/g,'TEAM_JWT_SCOPE_')+
+      '\nreturn {signTeamJwt,verifyTeamJwt,djb2Hash,sha256HexW};')(...Object.values(scope2));
+    const env={TEAM_SESSION_SECRET:'segredo-de-teste-bem-grande-1234567890'};
+    const nowS=Math.floor(Date.now()/1000);
+    const claims={sub:'jm',name:'João',aud:'idseven-team',scope:'workflow:team_adjusted_item',iat:nowS,exp:nowS+3600};
+    const jwt=await G.signTeamJwt(env,claims);
+    const v1=await G.verifyTeamJwt(env,jwt);
+    check('G1_VALID','JWT emitido é verificado (assinatura+exp+aud+scope) e devolve uid', v1.ok===true && v1.uid==='jm');
+    const tampered=jwt.slice(0,-4)+(jwt.slice(-4)==='AAAA'?'BBBB':'AAAA');
+    check('G2_TAMPERED','Assinatura adulterada é REJEITADA', (await G.verifyTeamJwt(env,tampered)).ok===false);
+    const expJwt=await G.signTeamJwt(env,Object.assign({},claims,{exp:nowS-10}));
+    const vExp=await G.verifyTeamJwt(env,expJwt);
+    check('G3_EXPIRED','Token expirado é REJEITADO (flag expired)', vExp.ok===false && vExp.expired===true);
+    const audJwt=await G.signTeamJwt(env,Object.assign({},claims,{aud:'outra'}));
+    check('G4_AUD','aud errada é REJEITADA', (await G.verifyTeamJwt(env,audJwt)).ok===false);
+    const scJwt=await G.signTeamJwt(env,Object.assign({},claims,{scope:'outra:coisa'}));
+    check('G5_SCOPE','scope sem workflow:team_adjusted_item é REJEITADO', (await G.verifyTeamJwt(env,scJwt)).ok===false);
+    const vWrong=await G.verifyTeamJwt({TEAM_SESSION_SECRET:'outro-segredo'},jwt);
+    check('G6_WRONG_SECRET','JWT assinado com outro secret é REJEITADO', vWrong.ok===false);
+    const vNoCfg=await G.verifyTeamJwt({},jwt);
+    check('G7_NOT_CONFIGURED','Sem TEAM_SESSION_SECRET → TEAM_SESSION_NOT_CONFIGURED (nunca aceita)', vNoCfg.ok===false && vNoCfg.error==='TEAM_SESSION_NOT_CONFIGURED');
+    // prova de senha (paridade com verifyPw do app)
+    const salt='abc123';const pw='Senha!Forte';
+    const stored='s2:'+await G.sha256HexW(salt+'|'+pw);
+    check('G8_S2','Verificação s2:SHA-256(salt|senha) bate com o formato do app', stored===('s2:'+await G.sha256HexW(salt+'|'+pw)) && stored!==('s2:'+await G.sha256HexW(salt+'|'+'errada')));
+    check('G9_DJB2','Hash legado djb2 idêntico ao do app (h+uint32)', /^h\d+$/.test(G.djb2Hash('x')) && G.djb2Hash('abc')===G.djb2Hash('abc') && G.djb2Hash('abc')!==G.djb2Hash('abd'));
+  }catch(e){
+    check('G_FATAL','Parte G executa sem exceção — erro: '+(e&&e.message), false);
+  }
+  // Estruturais da rota /team/session + ordem auth→efeitos
+  check('G10_ROUTE','Rota POST /team/session registrada e gated por TEAM_SESSION_SECRET (503)', /url\.pathname === "\/team\/session" && request\.method === "POST"/.test(SRC) && /TEAM_SESSION_NOT_CONFIGURED" \}, 503/.test(SRC));
+  check('G11_PASSWORD_PROOF','Sessão exige SENHA verificada server-side (s2 + djb2 legado); credencial inválida → 401', /okPw = \(u\.pass === \("s2:" \+ await sha256HexW\(u\.salt \+ "\|" \+ password\)\)\)/.test(SRC) && /credenciais inválidas" \}, 401/.test(SRC));
+  check('G12_SESSION_ROLE','Sessão só para Social/Admin ATIVO (lookupTeamUser; 403 caso contrário)', /usuário não autorizado \(Social\/Admin ativo requerido\)" \}, 403/.test(SRC));
+  check('G13_NOTIFY_AFTER_AUTH','notifyWorkflowEvent só DEPOIS da autorização (ordem no handler)', (()=>{const h=(SRC.match(/async function handleClientCronogramaTeamAction[\s\S]*?\n\}/)||[''])[0];const a=h.indexOf('AUTENTICAÇÃO FORTE');const n=h.indexOf('notifyWorkflowEvent');return a>=0&&n>a;})());
+  check('G14_NO_PASSWORD_LOG','Senha NUNCA aparece em console.log/warn da sessão', (()=>{const h=(SRC.match(/async function handleTeamSession[\s\S]*?\n\}/)||[''])[0];return h.length>0 && !/console\.(log|warn|error)\([^)]*password/.test(h);})());
 
   /* ===================== VEREDITO ===================== */
   console.log(`${C.b}\n==================================================================`);

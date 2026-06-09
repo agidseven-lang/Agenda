@@ -259,11 +259,17 @@ export default {
       return handleSendPremiumWhatsApp(request, env, url.origin);
     }
 
+    // V64.45 — sessão de EQUIPE: emite teamSessionJwt (HS256) após verificar a SENHA real
+    // server-side + role Social/Admin ativo. Gated por env.TEAM_SESSION_SECRET (503 sem ele).
+    if (url.pathname === "/team/session" && request.method === "POST") {
+      return handleTeamSession(request, env);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.44-team-action-capability-auth" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.45-team-session-jwt" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1394,32 +1400,105 @@ async function lookupTeamUser(env, accessToken, uid) {
   const admin = !!(f.admin && f.admin.booleanValue);
   const role = normRole(f.role && f.role.stringValue);
   if (!admin && !TEAM_ROLE_KW.some((k) => role.indexOf(k) >= 0)) return null;
-  return { uid, name: (f.name && f.name.stringValue) || "", role: role, admin };
+  // salt/pass: usados SOMENTE pela rota /team/session p/ prova de senha; nunca logados.
+  return { uid, name: (f.name && f.name.stringValue) || "", role: role, admin,
+           salt: (f.salt && f.salt.stringValue) || "", pass: (f.pass && f.pass.stringValue) || "" };
 }
 
-/* V64.44 — TEAM ACTION (camada CENTRAL de workflow): limpa clientItems[iX].cs (preserva
+/* ═══════════════ V64.45 — TEAM SESSION JWT (autenticação FORTE da equipe) ═══════════════
+   PROVA DE IDENTIDADE: a senha REAL do usuário (única credencial que NÃO está legível no
+   Firestore — o hash `pass` é client-readable, então hash-como-prova seria forjável).
+   POST /team/session {uid, password} → Worker verifica s2:SHA-256(salt|senha) server-side
+   contra users/{uid}.pass + role Social/Admin ATIVO → emite JWT HS256 assinado com
+   env.TEAM_SESSION_SECRET (server-side; NUNCA no app):
+     { sub: uid, name, aud: "idseven-team", scope: "workflow:team_adjusted_item",
+       iat, exp: +12h }
+   A team-action exige Authorization: Bearer <jwt> (assinatura+exp+aud+scope) E reconsulta
+   role/status no Firestore antes de executar (revogação imediata ao desativar o usuário).
+   Sem env.TEAM_SESSION_SECRET → 503 (gated por secret, como VAPID). */
+const TEAM_JWT_AUD = "idseven-team";
+const TEAM_JWT_SCOPE = "workflow:team_adjusted_item";
+async function teamHmacKey(env) {
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(env.TEAM_SESSION_SECRET),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+async function signTeamJwt(env, claims) {
+  const enc = new TextEncoder();
+  const h = bytesToB64u(enc.encode(JSON.stringify({ typ: "JWT", alg: "HS256" })));
+  const c = bytesToB64u(enc.encode(JSON.stringify(claims)));
+  const key = await teamHmacKey(env);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(h + "." + c)));
+  return h + "." + c + "." + bytesToB64u(sig);
+}
+async function verifyTeamJwt(env, jwt) {
+  if (!env.TEAM_SESSION_SECRET) return { ok: false, error: "TEAM_SESSION_NOT_CONFIGURED" };
+  const parts = (jwt || "").split(".");
+  if (parts.length !== 3) return { ok: false, error: "jwt malformado" };
+  const enc = new TextEncoder();
+  let okSig = false;
+  try {
+    const key = await teamHmacKey(env);
+    okSig = await crypto.subtle.verify("HMAC", key, b64uToBytes(parts[2]), enc.encode(parts[0] + "." + parts[1]));
+  } catch (_) { okSig = false; }
+  if (!okSig) return { ok: false, error: "assinatura inválida" };
+  let claims;
+  try { claims = JSON.parse(new TextDecoder().decode(b64uToBytes(parts[1]))); }
+  catch (_) { return { ok: false, error: "claims inválidas" }; }
+  const now = Math.floor(Date.now() / 1000);
+  if (!claims.exp || claims.exp < now) return { ok: false, error: "token expirado", expired: true };
+  if (claims.aud !== TEAM_JWT_AUD) return { ok: false, error: "aud inválida" };
+  if (String(claims.scope || "").split(" ").indexOf(TEAM_JWT_SCOPE) < 0) return { ok: false, error: "scope insuficiente" };
+  if (!claims.sub) return { ok: false, error: "sub ausente" };
+  return { ok: true, uid: claims.sub, name: claims.name || "" };
+}
+// Paridade com o login do app (verifyPw): s2:SHA-256(salt|senha) atual + djb2 legado.
+function djb2Hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return "h" + (h >>> 0); }
+async function sha256HexW(s) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(b)).map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+async function handleTeamSession(request, env) {
+  if (!env.TEAM_SESSION_SECRET) return json({ ok: false, error: "TEAM_SESSION_NOT_CONFIGURED" }, 503, env);
+  let p;
+  try { p = await request.json(); } catch (_) { return json({ ok: false, error: "JSON inválido" }, 400, env); }
+  const uid = (p && typeof p.uid === "string") ? p.uid.trim() : "";
+  const password = (p && typeof p.password === "string") ? p.password : "";
+  if (!uid || !password) return json({ ok: false, error: "uid e password obrigatórios" }, 400, env);
+  let accessToken;
+  try { accessToken = await getAccessToken(env, DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, error: "auth: " + (e && e.message) }, 502, env); }
+  const u = await lookupTeamUser(env, accessToken, uid);
+  if (!u) {
+    console.warn(`[TEAM-SESSION] negado uid=${uid} (inexistente/inativo/sem role de equipe)`);
+    return json({ ok: false, error: "usuário não autorizado (Social/Admin ativo requerido)" }, 403, env);
+  }
+  // prova de identidade: senha verificada SERVER-SIDE (nunca logada).
+  let okPw = false;
+  if (u.pass && u.pass.startsWith("s2:") && u.salt) okPw = (u.pass === ("s2:" + await sha256HexW(u.salt + "|" + password)));
+  else if (u.pass) okPw = (u.pass === djb2Hash(password));
+  if (!okPw) {
+    console.warn(`[TEAM-SESSION] senha inválida uid=${uid}`);
+    return json({ ok: false, error: "credenciais inválidas" }, 401, env);
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const jwt = await signTeamJwt(env, { sub: uid, name: u.name || "", aud: TEAM_JWT_AUD, scope: TEAM_JWT_SCOPE, iat: now, exp: now + 12 * 3600 });
+  console.log(`[TEAM-SESSION] emitido uid=${uid} exp=+12h`);
+  return json({ ok: true, token: jwt, expiresIn: 12 * 3600 }, 200, env);
+}
+
+/* V64.45 — TEAM ACTION (camada CENTRAL de workflow): limpa clientItems[iX].cs (preserva
    phase), registra history e chama notifyWorkflowEvent() — Web Push real quando configurado,
    fallback whatsapp_premium sinalizado, dedup no engine, push NUNCA bloqueia a ação.
-   Auth (uma das duas):
+   AUTENTICAÇÃO FORTE (uma das duas):
      a) X-Team-Key === env.TEAM_API_KEY (server-to-server; NUNCA embutida em app cliente);
-     b) body.uid de um usuário Social/Admin ATIVO (lookup REAL em users/{uid}) + capability
-        do token da tarefa na URL.
-   Idempotência: header Idempotency-Key (Cache API, TTL 300s) — duplo clique não duplica.
-   Body: { contentIndex | contentIndexes[], uid?, byName?, action?: 'adjustedItem' } */
+     b) Authorization: Bearer <teamSessionJwt> emitido por /team/session (assinatura HS256
+        + exp + aud + scope verificados) E reconsulta de role/status no Firestore ANTES de
+        executar. O clientReviewToken da URL apenas IDENTIFICA a tarefa — NÃO autoriza.
+        uid declarado no body NÃO é aceito como prova de identidade.
+   Idempotência: header Idempotency-Key (Cache API, TTL 300s) — verificada APÓS a
+   autorização (replay nunca vaza resposta a chamador não autenticado).
+   Body: { contentIndex | contentIndexes[], byName?, action?: 'adjustedItem' } */
 async function handleClientCronogramaTeamAction(token, request, env) {
-  // Idempotência (replay devolve a resposta original, sem reaplicar)
-  const idemKey = request.headers.get("Idempotency-Key") || request.headers.get("X-Idempotency-Key") || "";
-  const idemUrl = idemKey ? `https://idempotency.local/team/${token}/${encodeURIComponent(idemKey)}` : null;
-  if (idemUrl) {
-    try {
-      const cached = await caches.default.match(new Request(idemUrl));
-      if (cached) {
-        const body = await cached.text();
-        return new Response(body, { status: cached.status, headers: { "Content-Type": "application/json", "X-Idempotency-Replayed": "true", "Access-Control-Allow-Origin": "*" } });
-      }
-    } catch (_) { /* segue sem replay */ }
-  }
-
   let payload = {};
   try { payload = await request.json(); } catch (_) { /* tolera body vazio */ }
   const action = (payload && typeof payload.action === "string" && payload.action.trim()) || "adjustedItem";
@@ -1441,20 +1520,45 @@ async function handleClientCronogramaTeamAction(token, request, env) {
   try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
   catch (e) { return json({ ok: false, error: "auth falhou: " + (e && e.message) }, 200, env); }
 
-  // ── Autorização ──
+  // ── AUTENTICAÇÃO FORTE (antes de QUALQUER efeito, inclusive replay de idempotência) ──
   let byName = (payload && typeof payload.byName === "string") ? payload.byName.slice(0, 80) : "";
   const suppliedKey = request.headers.get("X-Team-Key") || "";
   const keyOk = !!(env.TEAM_API_KEY && suppliedKey === env.TEAM_API_KEY);
   if (!keyOk) {
-    const teamUser = await lookupTeamUser(env, accessToken, payload && payload.uid);
-    if (!teamUser) {
-      console.warn(`[TEAM-ACTION] negado uid=${(payload && payload.uid) || "(vazio)"}`);
-      return json({ ok: false, error: "unauthorized: requer X-Team-Key (server) ou uid de usuário Social/Admin ativo" }, 403, env);
+    const authz = request.headers.get("Authorization") || "";
+    const m = authz.match(/^Bearer\s+(.+)$/i);
+    if (!m) {
+      console.warn("[TEAM-ACTION] negado: sem Bearer/X-Team-Key");
+      return json({ ok: false, error: "unauthorized: Authorization Bearer <teamSessionJwt> obrigatório (obtido em /team/session) ou X-Team-Key server-to-server" }, 401, env);
     }
-    if (!byName) byName = teamUser.name || "Equipe";
-    console.log(`[TEAM-ACTION] autorizado por role-lookup uid=${teamUser.uid} role=${teamUser.role}${teamUser.admin ? "(admin)" : ""}`);
+    const v = await verifyTeamJwt(env, m[1]);
+    if (!v.ok) {
+      console.warn("[TEAM-ACTION] negado: jwt " + v.error);
+      return json({ ok: false, error: "unauthorized: " + v.error, expired: !!v.expired }, 401, env);
+    }
+    // reconsulta role/status no Firestore ANTES de executar (revogação imediata).
+    const teamUser = await lookupTeamUser(env, accessToken, v.uid);
+    if (!teamUser) {
+      console.warn(`[TEAM-ACTION] negado: uid=${v.uid} não é mais Social/Admin ativo`);
+      return json({ ok: false, error: "forbidden: usuário não é mais Social/Admin ativo" }, 403, env);
+    }
+    if (!byName) byName = teamUser.name || v.name || "Equipe";
+    console.log(`[TEAM-ACTION] autorizado por teamSessionJwt uid=${teamUser.uid} role=${teamUser.role}${teamUser.admin ? "(admin)" : ""}`);
   }
   if (!byName) byName = "Equipe";
+
+  // Idempotência (replay devolve a resposta original, sem reaplicar) — APÓS a autorização.
+  const idemKey = request.headers.get("Idempotency-Key") || request.headers.get("X-Idempotency-Key") || "";
+  const idemUrl = idemKey ? `https://idempotency.local/team/${token}/${encodeURIComponent(idemKey)}` : null;
+  if (idemUrl) {
+    try {
+      const cached = await caches.default.match(new Request(idemUrl));
+      if (cached) {
+        const body = await cached.text();
+        return new Response(body, { status: cached.status, headers: { "Content-Type": "application/json", "X-Idempotency-Replayed": "true", "Access-Control-Allow-Origin": "*" } });
+      }
+    } catch (_) { /* segue sem replay */ }
+  }
 
   const task = await queryTaskByToken(env, accessToken, token);
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
