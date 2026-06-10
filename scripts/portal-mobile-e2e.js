@@ -136,6 +136,14 @@ const tapSel=async(p,sel)=>{
     check('[v64.52] produção SEM livebar flutuante (estado vai p/ o diag)',!float.livebar&&!!float.liveDiag,JSON.stringify(float.fixedIds));
     await p3.screenshot({path:'/tmp/audit/m7-sem-livebar-390.png'});
     await p3.close();
+    // mesma prova em 412×915 (exigência da reprovação 1.0.137: 390 E 412)
+    const p4=await newPortalPage(b,{w:412,h:915,withSub:true});
+    await new Promise(r=>setTimeout(r,6500));
+    const f4=await p4.evaluate(()=>({livebar:!!document.getElementById('livebar'),
+      liveDiag:localStorage.getItem('wp_diag_liveTick_tok_mobile_e2e_123')}));
+    check('[v64.52][412x915] produção SEM livebar flutuante',!f4.livebar&&!!f4.liveDiag);
+    await p4.screenshot({path:'/tmp/audit/m7-sem-livebar-412.png'});
+    await p4.close();
   }
   // cenário: inscrição EXISTENTE confirmada → SEM gate, indicador discreto
   const p2=await newPortalPage(b,{w:390,h:844,withSub:true});
