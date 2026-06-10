@@ -232,7 +232,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_51', 'Healthcheck retorna V64.51-mobile-touch-footer', /version: "V64\.51-mobile-touch-footer"/.test(SRC));
+check('C_HEALTH_V64_52', 'Healthcheck retorna V64.52-clean-ui', /version: "V64\.52-clean-ui"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -367,7 +367,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + estados (ativado/negado/incompatível/disponível)', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados ✓/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.51-mobile-touch-footer', /version: "V64\.51-mobile-touch-footer"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.52-clean-ui', /version: "V64\.52-clean-ui"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -632,6 +632,15 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     try{new Function(sw);}catch(e){okSw=false;errSw=e.message;}
     check('M3_SW_SERVIDO','Service Worker SERVIDO compila sem SyntaxError', okSw, errSw);
   }catch(e){check('M_FATAL','Parte M executa — erro: '+(e&&e.message),false);}
+
+  /* ═══ PARTE N — V64.52 (UI limpa: livebar SÓ no debug; push intocado) ═══ */
+  console.log(`${C.b}\n[N] V64.52 — sem toast flutuante em produção; push preservado${C.x}`);
+  check('N1_LIVEBAR_GATED','liveTick NÃO cria elemento flutuante em produção (só com ?debug=1) e registra estado no diag',
+    (()=>{const f=(SRC.match(/function liveTick\(ok\)\{[\s\S]*?\n\}/)||[''])[0];return /diagSet\('liveTick'/.test(f)&&/indexOf\('debug=1'\)<0/.test(f)&&f.indexOf('removeChild(LIVE_EL)')>=0;})());
+  check('N2_LIVEBAR_TOP','No debug, o indicador fica no TOPO (não compete com os botões fixos inferiores)',
+    /left:10px;top:10px;z-index:94/.test(SRC));
+  check('N3_PUSH_INTOCADO','Web Push INTOCADO: subscribe/test/engine/SW (sw-version V64.51 inalterado, payload icon/badge/tag=dedupKey)',
+    /async function handleClientPushTest/.test(SRC) && /sw-version: V64\.51-mobile-touch-footer/.test(SRC) && /tag: dedupKey,/.test(SRC) && /icon: "\/og\/idseven-logo\.png", badge: "\/og\/idseven-badge\.png"/.test(SRC));
 
   /* ===================== VEREDITO ===================== */
   console.log(`${C.b}\n==================================================================`);

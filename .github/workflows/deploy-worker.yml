@@ -115,11 +115,11 @@ jobs:
           echo "== 1) HEALTHCHECK deve ser V64.47 =="
           for i in 1 2 3; do
             H=$(curl -sS --max-time 20 "$B/")
-            echo "$H" | grep -q '"V64.51-mobile-touch-footer"' && break
+            echo "$H" | grep -q '"V64.52-clean-ui"' && break
             echo "(tentativa $i: versao ainda nao propagou; aguardando 5s)"; sleep 5
           done
           echo "$H"
-          echo "$H" | grep -q '"V64.51-mobile-touch-footer"' || { echo "FAIL: healthcheck nao e V64.51" >&2; exit 1; }
+          echo "$H" | grep -q '"V64.52-clean-ui"' || { echo "FAIL: healthcheck nao e V64.52" >&2; exit 1; }
 
           echo "== 2) LOGO oficial /og/idseven-logo.png (image/png) =="
           lc=$(curl -sS --max-time 20 -o /tmp/logo.png -w '%{http_code}' "$B/og/idseven-logo.png")

@@ -123,6 +123,20 @@ const tapSel=async(p,sel)=>{
     await p.close();
   }
 
+  // V64.52 — produção SEM toast flutuante: livebar ausente; únicos fixed = gactions (+pgate qdo aberto)
+  {
+    const p3=await newPortalPage(b,{w:390,h:844,withSub:true});
+    await new Promise(r=>setTimeout(r,6500));   // espera 1 ciclo do poller (6s)
+    const float=await p3.evaluate(()=>{
+      const fixed=[...document.querySelectorAll('body *')].filter(el=>getComputedStyle(el).position==='fixed'&&el.offsetParent!==null||getComputedStyle(el).position==='fixed');
+      return {livebar:!!document.getElementById('livebar'),
+        fixedIds:fixed.map(e=>e.id||e.className).filter(c=>c&&String(c).indexOf('gactions')<0&&String(c).indexOf('toast')<0&&String(c).indexOf('scrim')<0&&String(c).indexOf('inner')<0).slice(0,6),
+        liveDiag:localStorage.getItem('wp_diag_liveTick_tok_mobile_e2e_123')};
+    });
+    check('[v64.52] produção SEM livebar flutuante (estado vai p/ o diag)',!float.livebar&&!!float.liveDiag,JSON.stringify(float.fixedIds));
+    await p3.screenshot({path:'/tmp/audit/m7-sem-livebar-390.png'});
+    await p3.close();
+  }
   // cenário: inscrição EXISTENTE confirmada → SEM gate, indicador discreto
   const p2=await newPortalPage(b,{w:390,h:844,withSub:true});
   const noGate=await p2.evaluate(()=>({gate:!!document.getElementById('pgate'),

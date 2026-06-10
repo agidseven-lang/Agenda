@@ -280,7 +280,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.51-mobile-touch-footer" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.52-clean-ui" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2848,10 +2848,14 @@ document.addEventListener('click',function(e){
 var LAST_SIG=null, FEEDBACK_MODE=false, FEEDBACK_BASE=null, LIVE_EL=null;
 // Indicador discreto e PERSISTENTE de atualização automática (canto inferior).
 function liveTick(ok){
+  // V64.52 — SEM toast flutuante em produção (cobria textos/botões no mobile). O estado da
+  // atualização automática vive no diagnóstico; o elemento só existe com ?debug=1.
+  diagSet('liveTick',(ok?'ok':'falha')+' @'+new Date().toISOString());
+  if((location.search||'').indexOf('debug=1')<0){if(LIVE_EL&&LIVE_EL.parentNode){LIVE_EL.parentNode.removeChild(LIVE_EL);LIVE_EL=null;}return;}
   if(!LIVE_EL){LIVE_EL=document.createElement('div');LIVE_EL.id='livebar';
-    LIVE_EL.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:50;display:flex;align-items:center;gap:8px;padding:7px 13px;border-radius:999px;background:rgba(20,22,30,.92);border:1px solid var(--line);color:var(--mut);font-size:12px;backdrop-filter:blur(6px);box-shadow:0 10px 30px -12px rgba(0,0,0,.6)';
+    LIVE_EL.style.cssText='position:fixed;left:10px;top:10px;z-index:94;display:flex;align-items:center;gap:8px;padding:6px 11px;border-radius:999px;background:rgba(20,22,30,.92);border:1px solid var(--line);color:var(--mut);font-size:11px';
     document.body.appendChild(LIVE_EL);}
-  LIVE_EL.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+(ok?'#34D399':'#9aa0aa')+';box-shadow:0 0 0 3px '+(ok?'rgba(52,211,153,.18)':'rgba(154,160,170,.14)')+'"></span><span>Atualização automática ativa · verificado agora</span>';
+  LIVE_EL.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+(ok?'#34D399':'#9aa0aa')+'"></span><span>Atualização automática ativa</span>';
 }
 // Mostra, na tela "Feedback enviado!", o aviso CLARO de que a equipe atualizou + recarrega o mesmo link.
 function teamUpdated(){
