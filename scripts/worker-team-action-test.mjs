@@ -18,31 +18,19 @@ import readline from 'node:readline/promises';
 const B = 'https://idseven-push.agidseven.workers.dev';
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-function askHidden(promptText) {
-  return new Promise((resolve) => {
-    process.stdout.write(promptText);
-    const stdin = process.stdin;
-    const wasRaw = stdin.isRaw;
-    stdin.setRawMode && stdin.setRawMode(true);
-    let s = '';
-    const onData = (c) => {
-      c = c.toString('utf8');
-      if (c === '\r' || c === '\n') {
-        stdin.setRawMode && stdin.setRawMode(wasRaw || false);
-        stdin.off('data', onData);
-        process.stdout.write('\n');
-        resolve(s);
-      } else if (c === '') { // Ctrl+C
-        process.stdout.write('\n');
-        process.exit(1);
-      } else if (c === '' || c === '\b') {
-        s = s.slice(0, -1);
-      } else {
-        s += c;
-      }
-    };
-    stdin.on('data', onData);
-  });
+async function askHidden(promptText) {
+  // Pipe/automacao (nao-TTY): sem eco por natureza — usa a leitura normal.
+  if (!process.stdin.isTTY) return rl.question(promptText);
+  // TTY: silencia o ECO do readline durante a digitacao (a senha nunca aparece).
+  const orig = rl._writeToOutput ? rl._writeToOutput.bind(rl) : null;
+  rl._writeToOutput = (str) => { if (orig && String(str).includes(promptText)) orig(promptText); };
+  try {
+    const ans = await rl.question(promptText);
+    process.stdout.write('\n');
+    return ans;
+  } finally {
+    if (orig) rl._writeToOutput = orig;
+  }
 }
 
 const uid = (await rl.question('UID do usuário Social/Admin (id do doc em users/): ')).trim();
