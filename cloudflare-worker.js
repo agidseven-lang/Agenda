@@ -269,7 +269,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.48-content-sent-footer-sync" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.49-assisted-push-explicit-close" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1964,15 +1964,16 @@ async function pruneClientPushSubs(env, task, goneEndpoints) {
    /notify-designer) — o engine registra e loga sem duplicar envio.
    Dedup: 1 disparo por (taskId|evento|item) por 60s via Cache API. */
 const NOTIFY_EVENTS = {
-  themes_sent_to_client:        { to: "client", phase: "themes",     title: "Cronograma aguardando sua análise",  body: "Os temas do seu cronograma estão disponíveis para revisão. Toque para abrir." },
-  theme_adjusted_by_team:       { to: "client", phase: "themes",     title: "Ajuste do tema realizado",           body: "Toque para revisar novamente." },
-  themes_approved_by_client:    { to: "client", phase: "themes",     title: "Temas aprovados",                    body: "Produção liberada. Vamos te avisar quando a versão final estiver pronta." },
+  // V64.49 — copy EXATA aprovada para o cliente (título/mensagem por evento).
+  themes_sent_to_client:        { to: "client", phase: "themes",     title: "Cronograma disponível para análise", body: "Os temas do seu cronograma estão prontos para revisão." },
+  theme_adjusted_by_team:       { to: "client", phase: "themes",     title: "Tema corrigido",                     body: "O tema ajustado foi reenviado. Toque para revisar." },
+  themes_approved_by_client:    { to: "client", phase: "themes",     title: "Temas aprovados",                    body: "A etapa de temas foi aprovada com sucesso." },
   designer_assigned:            { to: "team",   phase: "production", title: "Designer atribuído",                 body: "O cronograma entrou na fila do designer." },
   designer_started:             { to: "team",   phase: "production", title: "Designer em produção",               body: "O designer iniciou a produção do cronograma." },
   designer_delivered:           { to: "team",   phase: "production", title: "Designer entregou",                  body: "Revise, adicione legendas e posts e envie ao cliente." },
-  final_content_sent_to_client: { to: "client", phase: "final",      title: "Legendas e posts disponíveis",       body: "Seu cronograma está pronto para aprovação final. Toque para abrir." },
-  final_adjusted_by_team:       { to: "client", phase: "final",      title: "Ajuste final realizado",             body: "Toque para revisar novamente." },
-  final_approved_by_client:     { to: "client", phase: "final",      title: "Cronograma aprovado com sucesso",    body: "Obrigado! A equipe seguirá com a finalização." },
+  final_content_sent_to_client: { to: "client", phase: "final",      title: "Legendas e posts disponíveis",       body: "As legendas e os posts estão prontos para sua análise." },
+  final_adjusted_by_team:       { to: "client", phase: "final",      title: "Ajuste final realizado",             body: "As correções finais foram enviadas. Toque para revisar." },
+  final_approved_by_client:     { to: "client", phase: "final",      title: "Cronograma finalizado",              body: "Seu cronograma foi aprovado com sucesso." },
 };
 
 async function notifyWorkflowEvent(env, task, eventType, payload) {
@@ -1995,8 +1996,10 @@ async function notifyWorkflowEvent(env, task, eventType, payload) {
   if (ev.to === "client") {
     const subs = Array.isArray(task && task.clientPushSubs) ? task.clientPushSubs : [];
     if (subs.length && env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY && env.VAPID_SUBJECT) {
+      // V64.49 — PRECISÃO: o payload carrega eventType/taskId/phase além de título/corpo/URL.
       const out = await broadcastWebPush(env, subs,
-        { title: ev.title, body: ev.body, openUrl, tag: eventType },
+        { title: ev.title, body: ev.body, openUrl, tag: eventType,
+          eventType, taskId: (task && task.id) || "", phase: ev.phase },
         { topic: eventType, urgency: "high", ttl: 86400 });
       result = { channel: "webpush", sent: out.sent, total: out.total };
       if (out.gone && out.gone.length) {
@@ -2155,26 +2158,11 @@ async function writeClientGranular(env, accessToken, task, e) {
   // final fechar tudo, porque as aprovações de TEMAS persistiam em clientItems.
   if (e.type === "approveItem") {
     g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo", col: null, stage: null, client: null };
-    // V64.47 — FECHAMENTO DA FASE NÃO-FINAL: quando o item aprovado é o ÚLTIMO pendente e
-    // TODOS os conteúdos da fase ATUAL ficam aprovados (contagem POR FASE, item legado sem
-    // phase NÃO conta), a fase fecha: globais viram 'aprovado' (clientReview/cronStatus/
-    // clientFlowStatus). Corrige o bug do ciclo ajuste→correção→aprovação em que os globais
-    // ficavam presos em 'revisao' e o card travava em "Ajuste solicitado".
-    // Na fase FINAL permanece o BUG#6: concluir SÓ via approveAll explícito do cliente.
-    if (!isFinalPhase) {
-      const arr = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
-      const total = arr.length;
-      let allApproved = total > 0;
-      for (let i = 0; i < total; i++) {
-        const it = _ci0["i" + i];
-        const cs = (i === e.contentIndex) ? "aprovado" : ((it && it.phase === phaseIn) ? it.cs : null);
-        if (cs !== "aprovado") { allApproved = false; break; }
-      }
-      if (allApproved) {
-        g = Object.assign({}, approveG, { htype: "cliente_aprovou", label: "Cliente aprovou todos os temas da fase" });
-        console.log(`[CLIENT-ACTION] fase ${phaseIn} FECHADA via approveItem (todos os ${total} conteúdos aprovados)`);
-      }
-    }
+    // V64.49 — REGRA EXPLÍCITA (reprovação 1.0.134): aprovar o ÚLTIMO item NUNCA fecha a
+    // fase automaticamente. Quem fecha é SEMPRE o botão final do portal ("Aprovar temas" →
+    // approveAll). O rodapé dinâmico (syncFooter) garante o CTA correto quando tudo está
+    // aprovado, e o approveAll permanece phase-aware (V64.47) — o doc não trava mais em
+    // 'revisao' herdado porque o gate de pendência conta SÓ itens da fase atual.
   }
 
   if (g.cs) {
@@ -2394,7 +2382,7 @@ function phaseCopy(phase) {
     kicker: "Aprovação de temas",
     title: "Aprovação de temas",
     sub: "Você está aprovando apenas os temas. A equipe seguirá com a produção (designer + legendas + posts).",
-    cta: "Aprovar temas e liberar produção",
+    cta: "Aprovar temas",
   };
 }
 /* V64.14 — Fase JÁ aprovada pelo cliente (para mostrar confirmação intermediária no reabrir).
@@ -2636,6 +2624,14 @@ a{color:#b9a4ff;text-decoration:none}
 .pushcta.pc-ok{border-color:rgba(52,211,153,.4)}.pushcta.pc-ok .pc-msg{color:#9beecb}
 .pushcta.pc-warn{border-color:rgba(245,165,36,.35)}.pushcta.pc-warn .pc-msg{color:#f3cf8e}
 .pushcta .pc-btn{white-space:nowrap}
+#pgate{position:fixed;inset:0;z-index:90;background:rgba(5,6,12,.78);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:20px}
+#pgate .pg-card{max-width:430px;width:100%;background:var(--panel);border:1px solid var(--line2);border-radius:18px;padding:26px 22px;text-align:center;box-shadow:0 30px 80px -20px rgba(0,0,0,.7)}
+#pgate h3{margin:12px 0 8px;font-size:19px;line-height:1.3}
+#pgate p{color:var(--mut);font-size:13.5px;line-height:1.55;margin:0 0 14px}
+#pgate .btn{width:100%;margin-top:10px;justify-content:center}
+#pgate .pg-ic{width:46px;height:46px;border-radius:14px;margin:0 auto;background:rgba(91,108,255,.16);color:#8b96ff;display:flex;align-items:center;justify-content:center}
+#pgate .pg-ic svg{width:22px;height:22px}
+#pgate .pg-foot{color:var(--faint);font-size:11.5px;margin-top:12px}
 `;
 
 const CV_JS = `
@@ -2651,7 +2647,7 @@ function setBadge(i,cs){var c=card(i);if(!c)return;var b=c.querySelector('[data-
 /* V64.48 — RODAPÉ DINÂMICO (bug 1.0.133): o botão principal segue o estado REAL dos badges
    NESTA sessão. Com QUALQUER ajuste/edição pendente → "Enviar feedback" (nunca "Aprovar
    temas e liberar produção"); só com tudo sem pendência → CTA de aprovação da fase. */
-function footerCta(){return PHASE==='final'?'Aprovar versão final':(PHASE==='production'?'Aprovar legendas e artes':'Aprovar temas e liberar produção');}
+function footerCta(){return PHASE==='final'?'Aprovar versão final':(PHASE==='production'?'Aprovar legendas e artes':'Aprovar temas');}
 function anyRevBadge(){var any=false;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){var t=(b.textContent||'');if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)any=true;});return any;}
 function syncFooter(){
   var inner=document.querySelector('.gactions .inner');if(!inner)return;
@@ -2702,13 +2698,9 @@ document.addEventListener('click',function(e){
   var act=a.dataset.act,i=a.dataset.i!=null?+a.dataset.i:null;
   if(act==='approveItem'){post({action:'approveItem',contentIndex:i},a,function(j){
     setBadge(i,'aprovado');bumpProgress();addHist('ok','Aprovou Conteúdo '+(i+1));
-    // V64.47 — se este era o ÚLTIMO conteúdo pendente, o Worker FECHOU a fase
-    // (clientFlowStatus='aprovado'): mostra a tela de fase aprovada (nunca na fase final).
-    if(j&&j.clientFlowStatus==='aprovado'&&j.phase!=='final'){
-      addHist('ok','Todos os conteúdos aprovados — fase concluída');
-      if(j.phase==='production'){clientProductionApproved();}else{clientThemesApproved();}
-      return;
-    }
+    // V64.49 — aprovar item NUNCA fecha a fase nem mostra tela final automaticamente.
+    // O rodapé sincroniza: com tudo aprovado, o botão final "Aprovar temas" fica disponível
+    // e SÓ ele fecha a fase (approveAll explícito).
     toast('Conteúdo '+(i+1)+' aprovado','ok');syncFooter();});}
   else if(act==='reviseItem'){openInput('Pedir ajuste — Conteúdo '+(i+1),'Descreva o que ajustar neste conteúdo. A equipe é notificada.','rev','',true,function(v){if(!v.trim())return;post({action:'reviseItem',contentIndex:i,note:v},null,function(){setBadge(i,'em_revisao');setItemNote(i,v);addHist('rev','Pediu ajuste em Conteúdo '+(i+1));toast('Ajuste solicitado','ok');syncFooter();});});}
   else if(act==='editTheme'){openInput('Editar tema — Conteúdo '+(i+1),'Sugira um novo tema para este conteúdo.','ok',getText(i,'tema'),false,function(v){if(!v.trim())return;post({action:'editTheme',contentIndex:i,value:v},null,function(){setTheme(i,v);setBadge(i,'editado');addHist('edit','Editou o tema de Conteúdo '+(i+1));toast('Tema atualizado','ok');syncFooter();});});}
@@ -2813,28 +2805,63 @@ function sendSubToWorker(sub){var j=sub.toJSON();
   return fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/push/subscribe',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({endpoint:j.endpoint,keys:j.keys})});}
-function subscribeClientPush(){
+function subscribeClientPush(cb){
+  if(cb&&typeof cb!=='function')cb=null;            // tolera o event do click handler
+  var done=function(ok){if(cb)cb(ok===true);};
   registerPushSw().then(function(reg){
     return Notification.requestPermission().then(function(p){
-      if(p!=='granted'){pushCtaState('Notificações não permitidas no navegador. Você receberá os avisos pelo WhatsApp.','pc-warn',null);return null;}
-      var key=urlBase64ToUint8Array(VAPID_PUBLIC_KEY);if(!key)return null;
+      if(p!=='granted'){pushCtaState('Notificações não permitidas. Vamos manter o WhatsApp como canal de aviso.','pc-warn',null);done(false);return null;}
+      var key=urlBase64ToUint8Array(VAPID_PUBLIC_KEY);if(!key){done(false);return null;}
       return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
     });
   }).then(function(sub){
     if(!sub)return;
-    return sendSubToWorker(sub).then(function(){pushCtaState('Avisos ativados para este cronograma. Você será notificado a cada atualização. ✓','pc-ok',null);});
-  }).catch(function(){pushCtaState('Não foi possível ativar os avisos agora. Você receberá os avisos pelo WhatsApp.','pc-warn',null);});
+    return sendSubToWorker(sub).then(function(){pushCtaState('Avisos ativados ✓ Você será notificado a cada atualização deste cronograma.','pc-ok',null);done(true);});
+  }).catch(function(){pushCtaState('Não foi possível ativar os avisos agora. Vamos manter o WhatsApp como canal de aviso.','pc-warn',null);done(false);});
+}
+/* V64.49 — ATIVAÇÃO ASSISTIDA no PRIMEIRO acesso: bloco destacado ANTES da análise.
+   Permissão SÓ no clique (Notification.requestPermission dentro de subscribeClientPush);
+   "Continuar sem avisos" registra a escolha (por cronograma) e mantém o WhatsApp como
+   canal; negado → fallback WhatsApp SEM loop; já inscrito → só o indicador discreto. */
+function pushGateClose(){var g=document.getElementById('pgate');if(g&&g.parentNode)g.parentNode.removeChild(g);}
+function pushGateShow(){
+  if(document.getElementById('pgate'))return;
+  var d=document.createElement('div');d.id='pgate';
+  d.innerHTML='<div class="pg-card"><div class="pg-ic">'+CIC.check+'</div>'+
+    '<h3>Receba avisos deste cronograma em tempo real</h3>'+
+    '<p>Para receber avisos quando a equipe enviar ajustes, legendas, posts ou finalizar o cronograma, ative as notificações deste cronograma.</p>'+
+    '<button class="btn primary" id="pgOn">Ativar avisos em tempo real</button>'+
+    '<button class="btn ghost" id="pgSkip">Continuar sem avisos</button>'+
+    '<div class="pg-foot">Sem a ativação, os avisos continuam chegando pelo WhatsApp.</div></div>';
+  document.body.appendChild(d);
+  document.getElementById('pgOn').addEventListener('click',function(){
+    var b=this;b.disabled=true;b.textContent='Ativando…';
+    subscribeClientPush(function(ok){pushGateClose();
+      if(ok){toast('Avisos ativados com sucesso','ok');}
+      else{toast('Você continuará recebendo avisos pelo WhatsApp.','ok');}});
+  });
+  document.getElementById('pgSkip').addEventListener('click',function(){
+    try{localStorage.setItem('wp_gate_skip_'+TOKEN,'1');}catch(_){}
+    pushGateClose();
+    pushCtaState('Você continuará recebendo avisos pelo WhatsApp.','pc-warn','Ativar avisos em tempo real');
+    toast('Você continuará recebendo avisos pelo WhatsApp.','ok');
+  });
 }
 function setupClientWebPush(){
   var el=document.getElementById('pushcta');
   if(!ENABLE_PUSH||!VAPID_PUBLIC_KEY){if(el)el.style.display='none';return;}
+  var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent||'');
   if(!('serviceWorker' in navigator)||!('PushManager' in window)){
-    pushCtaState('Seu navegador não suporta avisos em tempo real. Você receberá os avisos pelo WhatsApp.','pc-warn',null);return;}
+    pushCtaState(isIOS
+      ?'No iPhone, para receber avisos com a tela bloqueada, adicione este portal à Tela de Início e ative as notificações. Enquanto isso, você recebe os avisos pelo WhatsApp.'
+      :'Seu navegador não suporta avisos em tempo real. Você receberá os avisos pelo WhatsApp.','pc-warn',null);return;}
   if(typeof Notification!=='undefined'&&Notification.permission==='denied'){
-    pushCtaState('Notificações não permitidas no navegador. Você receberá os avisos pelo WhatsApp.','pc-warn',null);return;}
+    pushCtaState('Notificações não permitidas. Vamos manter o WhatsApp como canal de aviso.','pc-warn',null);return;}
   registerPushSw().then(function(reg){return reg.pushManager.getSubscription();}).then(function(sub){
-    if(sub){sendSubToWorker(sub).catch(function(){});pushCtaState('Avisos ativados para este cronograma. ✓','pc-ok',null);}
-    else{pushCtaState('Quer ser avisado na hora a cada atualização deste cronograma?','', 'Receber avisos deste cronograma');}
+    if(sub){sendSubToWorker(sub).catch(function(){});pushCtaState('Avisos ativados ✓','pc-ok',null);return;}
+    pushCtaState('Quer ser avisado na hora a cada atualização deste cronograma?','', 'Receber avisos deste cronograma');
+    var skip=false;try{skip=localStorage.getItem('wp_gate_skip_'+TOKEN)==='1';}catch(_){}
+    if(!skip)pushGateShow();   // PRIMEIRO acesso sem inscrição: ativação assistida
   }).catch(function(){pushCtaState('Você receberá os avisos pelo WhatsApp.','pc-warn',null);});
 }
 try{setupClientWebPush();}catch(_){}

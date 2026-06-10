@@ -70,21 +70,10 @@ function applyAction(task, e){
   if ((e.type==='approve'||e.type==='approveAll') && _pendingRev){
     g = { cs:'em_revisao_cliente', rev:'revisao', client:'revisao' };
   }
-  // approveItem NUNCA conclui a tarefa; mas (V64.47) FECHA a fase NÃO-final quando o item
-  // aprovado é o último pendente e TODOS os conteúdos da fase atual ficam aprovados.
+  // V64.49 — approveItem NUNCA conclui a tarefa NEM fecha fase (nem na themes): o
+  // fechamento é SEMPRE explícito via approveAll (botão final "Aprovar temas" do portal).
   if (e.type==='approveItem'){
     g = { cs:null, rev:null, client:null };
-    if (!isFinalPhase){
-      const arr = Array.isArray(task.cronWeeks)?task.cronWeeks:(Array.isArray(task.cronContents)?task.cronContents:[]);
-      const total = arr.length;
-      let allApproved = total>0;
-      for (let i=0;i<total;i++){
-        const it=_ci0['i'+i];
-        const cs=(i===e.contentIndex)?'aprovado':((it&&it.phase===phaseIn)?it.cs:null);
-        if (cs!=='aprovado'){ allApproved=false; break; }
-      }
-      if (allApproved){ g = Object.assign({}, approveG); }
-    }
   }
 
   const nt = Object.assign({}, task); nt.clientItems = ci;
@@ -174,9 +163,11 @@ let tT = { id:'w', cronContents:TH, clientApprovalPhase:'themes', clientItems:{}
 tT = applyAction(tT, {type:'approveItem', contentIndex:0, at:1});
 tT = applyAction(tT, {type:'approveItem', contentIndex:1, at:2});
 tT = applyAction(tT, {type:'approveItem', contentIndex:2, at:3});
-// V64.47 — REGRA NOVA (bug 1.0.132): aprovar o ÚLTIMO tema FECHA a fase themes
-// (clientFlowStatus='aprovado'), mas NUNCA conclui a tarefa (concluir = só approveAll na final).
-check('THEMES_ITEMS_CLOSE_PHASE', 'approveItem do ÚLTIMO tema FECHA a fase themes (clientFlowStatus=aprovado) sem concluir a tarefa', tT.clientFlowStatus==='aprovado' && tT.clientReview && tT.clientReview.status==='aprovado' && !concluded(tT));
+// V64.49 — REGRA EXPLÍCITA (reprovação 1.0.134): aprovar o ÚLTIMO tema NÃO fecha a fase —
+// o fechamento exige o botão final do portal ("Aprovar temas" → approveAll).
+check('THEMES_ITEMS_NEED_EXPLICIT', 'approveItem do ÚLTIMO tema NÃO fecha a fase (clientFlowStatus segue não-aprovado)', tT.clientFlowStatus!=='aprovado' && !concluded(tT));
+const tTdone = applyAction(tT, {type:'approveAll', at:4});
+check('THEMES_EXPLICIT_CLOSES', 'approveAll explícito (botão "Aprovar temas") FECHA a fase themes sem concluir a tarefa', tTdone.clientFlowStatus==='aprovado' && tTdone.clientReview && tTdone.clientReview.status==='aprovado' && !concluded(tTdone));
 
 /* ═══ PARTE A.6 — CENÁRIO EXATO DO BUG 1.0.132 (reprovação do teste real) ═══
  * 3 temas → aprova 1 e 2 → pede ajuste no 3 → equipe corrige (team-action) →
@@ -190,7 +181,9 @@ check('A6_STUCK_STATE', 'Após o pedido de ajuste, globais ficam em revisão (es
 tR = applyTeamAdjust(tR, 2, 'João Marques');           // equipe corrigiu (Marcar como corrigido)
 check('A6_TEAM_FIXED', 'team-action limpa cs do item 3 (aguardando nova análise)', tR.clientItems.i2.cs===null && tR.clientFlowStatus==='revisao');
 tR = applyAction(tR, {type:'approveItem', contentIndex:2, at:7004});   // cliente aprova o corrigido
-check('A6_PHASE_CLOSED', 'Aprovar o tema corrigido FECHA a fase: clientFlowStatus=aprovado + clientReview=aprovado + cronStatus=aprovado_cliente', tR.clientFlowStatus==='aprovado' && tR.clientReview.status==='aprovado' && tR.cronStatus==='aprovado_cliente');
+check('A6_ITEM_NOT_CLOSE', 'V64.49: aprovar o tema corrigido NÃO fecha a fase sozinho (espera o botão final)', tR.clientFlowStatus!=='aprovado' && tR.clientItems.i2.cs==='aprovado');
+tR = applyAction(tR, {type:'approveAll', at:7004.5});                  // botão final "Aprovar temas"
+check('A6_PHASE_CLOSED', 'Botão final (approveAll) FECHA a fase mesmo com clientReview=revisao herdado: clientFlowStatus=aprovado + clientReview=aprovado + cronStatus=aprovado_cliente', tR.clientFlowStatus==='aprovado' && tR.clientReview.status==='aprovado' && tR.cronStatus==='aprovado_cliente');
 check('A6_NOT_CONCLUDED', 'Fase fechada NÃO conclui a tarefa (finalApprovalCompleted ausente)', !concluded(tR));
 check('A6_NO_PENDING', 'pendingClientItems(themes) vazio após o fechamento (cleanup zerou cs da fase)', Object.keys(tR.clientItems).every(k=>tR.clientItems[k].cs==null || tR.clientItems[k].cs==='aprovado'? (tR.clientItems[k].cs==null||true):true) && !Object.keys(tR.clientItems).some(k=>{const it=tR.clientItems[k];return (it.cs==='em_revisao'||it.cs==='editado')&&it.phase==='themes';}));
 check('A6_CLEANUP', 'Cleanup de transição zerou cs dos itens da fase themes', tR.clientItems.i0.cs===null && tR.clientItems.i1.cs===null && tR.clientItems.i2.cs===null);
@@ -231,7 +224,7 @@ check('A5_DETERMINISTIC', 'Mesma acao com mesmo at gera mesmo estado (idempotenc
 console.log(`${C.b}\n[B] Estrutura do cloudflare-worker.js REAL (corrigido)${C.x}`);
 check('W_NO_GLOBAL_COUNT', 'Removida a contagem global "approved.size >= total" do approveItem', SRC.indexOf('approved.size >= total')===-1);
 const apItem = (SRC.match(/if \(e\.type === "approveItem"\) \{[\s\S]*?\n  \}/)||[''])[0];
-check('W_APPROVEITEM_PHASE_CLOSE', 'approveItem: fecha fase NÃO-final quando todos aprovados (gated !isFinalPhase, phase-aware, item legado não conta) e NUNCA toca finalApprovalCompleted', /htype: "cliente_aprovou_item"/.test(apItem) && /if \(!isFinalPhase\)/.test(apItem) && /it\.phase === phaseIn\) \? it\.cs : null/.test(apItem) && apItem.indexOf('finalApprovalCompleted')===-1);
+check('W_APPROVEITEM_NEVER_CLOSES', 'V64.49: approveItem NUNCA fecha fase (sem bloco de fechamento; só marca o item) e NUNCA toca finalApprovalCompleted', /htype: "cliente_aprovou_item"/.test(apItem) && apItem.indexOf('if (!isFinalPhase)')===-1 && apItem.indexOf('FECHADA via approveItem')===-1 && apItem.indexOf('finalApprovalCompleted')===-1 && /NUNCA fecha a/.test(apItem));
 check('W_PHASE_TAG', 'clientItems.iX é marcado com phase = clientPhase(task)', /itemFields\.phase = \{ stringValue: clientPhase\(task\) \}/.test(SRC));
 check('W_PENDINGREV_PHASE', '_pendingRev é POR FASE (ph === phaseIn)', /\(cs === "em_revisao" \|\| cs === "editado"\) && \(ph === phaseIn\)/.test(SRC));
 check('W_FINAL_GATE', 'finalApprovalCompleted só dentro do bloco g.client === "concluido"', /if \(g\.client === "concluido"\) \{[\s\S]*?finalApprovalCompleted = \{ booleanValue: true \}/.test(SRC));
@@ -239,7 +232,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_48', 'Healthcheck retorna V64.48-content-sent-footer-sync', /version: "V64\.48-content-sent-footer-sync"/.test(SRC));
+check('C_HEALTH_V64_49', 'Healthcheck retorna V64.49-assisted-push-explicit-close', /version: "V64\.49-assisted-push-explicit-close"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -372,9 +365,9 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_TEAM','team-action dispara theme_adjusted_by_team/final_adjusted_by_team', /final_adjusted_by_team" : "theme_adjusted_by_team/.test(SRC));
   check('F_HOOK_APPROVE','aprovações do cliente disparam themes_approved_by_client/final_approved_by_client', /notifyWorkflowEvent\(env, task, "final_approved_by_client"/.test(SRC)&&/notifyWorkflowEvent\(env, task, "themes_approved_by_client"/.test(SRC));
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
-  check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + 4 estados', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas no navegador/.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados para este cronograma/.test(SRC));
+  check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + estados (ativado/negado/incompatível/disponível)', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados ✓/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.48-content-sent-footer-sync', /version: "V64\.48-content-sent-footer-sync"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.49-assisted-push-explicit-close', /version: "V64\.49-assisted-push-explicit-close"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -492,9 +485,45 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('I9_FOOTER_CALLS','syncFooter chamado em approveItem/reviseItem/editTheme/editLegenda + applyState (poller tempo real)',
     (()=>{const n=(SRC.match(/syncFooter\(\);/g)||[]).length;return n>=5 && /toast\('Ajuste solicitado','ok'\);syncFooter\(\);/.test(SRC) && /syncFooter\(\);\s*\/\/ V64\.48/.test(SRC);})());
   check('I10_FOOTER_CTA_PHASE','footerCta segue a fase (final/production/themes) — paridade com phaseCopy do server-render',
-    /PHASE==='final'\?'Aprovar versão final':\(PHASE==='production'\?'Aprovar legendas e artes':'Aprovar temas e liberar produção'\)/.test(SRC));
+    /PHASE==='final'\?'Aprovar versão final':\(PHASE==='production'\?'Aprovar legendas e artes':'Aprovar temas'\)/.test(SRC));
   check('I11_FOOTER_SERVER_PARITY','rodapé server-rendered (load) continua decidindo por pendingRevision (sem regressão)',
     /pendingRevision\s*\n?\s*\?\s*'<div class="gstat">Há <b>ajustes solicitados/.test(SRC));
+
+  /* ===================== PARTE J — V64.49 (ativação assistida + copy exata + fechamento explícito) ===================== */
+  console.log(`${C.b}\n[J] V64.49 — ativação assistida de avisos + copy exata + fechamento explícito${C.x}`);
+  check('J1_GATE_FN','pushGateShow/pushGateClose existem (bloco destacado no 1º acesso)',
+    /function pushGateShow\(\)/.test(SRC) && /function pushGateClose\(\)/.test(SRC));
+  check('J2_GATE_COPY','Gate tem título/texto/botões EXATOS da especificação',
+    /Receba avisos deste cronograma em tempo real/.test(SRC) && /ative as notificações deste cronograma\./.test(SRC) && /Ativar avisos em tempo real/.test(SRC) && /Continuar sem avisos/.test(SRC));
+  check('J3_GATE_NO_AUTOPROMPT','Gate NÃO pede permissão sem clique (requestPermission só dentro de subscribeClientPush)',
+    (()=>{const g=(SRC.match(/function pushGateShow\(\)\{[\s\S]*?\n\}/)||[''])[0];return g.length>0&&g.indexOf('requestPermission')===-1&&/subscribeClientPush\(function\(ok\)/.test(g);})());
+  check('J4_GATE_SKIP','"Continuar sem avisos" registra a escolha (localStorage por TOKEN) e mostra fallback WhatsApp',
+    /wp_gate_skip_'\+TOKEN/.test(SRC) && /Você continuará recebendo avisos pelo WhatsApp\./.test(SRC));
+  check('J5_GATE_ONCE','Já inscrito NÃO vê o gate (return antes) e vê indicador discreto "Avisos ativados ✓"',
+    /if\(sub\)\{sendSubToWorker\(sub\)\.catch\(function\(\)\{\}\);pushCtaState\('Avisos ativados ✓','pc-ok',null\);return;\}/.test(SRC));
+  check('J6_GATE_DENIED','Permissão negada → fallback WhatsApp SEM loop (mensagem exata, sem reabrir gate)',
+    (()=>{const f=(SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/)||[''])[0];const i=f.indexOf("permission==='denied'");const gate=f.indexOf('pushGateShow');return i>=0&&gate>i&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(f);})());
+  check('J7_GATE_IOS','iOS sem suporte → instrução de Tela de Início + fallback WhatsApp',
+    /No iPhone, para receber avisos com a tela bloqueada, adicione este portal à Tela de Início/.test(SRC) && /iPad\|iPhone\|iPod/.test(SRC));
+  check('J8_GATE_SUCCESS','Ativação com sucesso mostra "Avisos ativados" (toast "Avisos ativados com sucesso")',
+    /Avisos ativados com sucesso/.test(SRC) && /Avisos ativados ✓/.test(SRC));
+  // copy EXATA por evento (títulos + mensagens da especificação)
+  const COPY=[['themes_sent_to_client','Cronograma disponível para análise','Os temas do seu cronograma estão prontos para revisão.'],
+    ['theme_adjusted_by_team','Tema corrigido','O tema ajustado foi reenviado. Toque para revisar.'],
+    ['themes_approved_by_client','Temas aprovados','A etapa de temas foi aprovada com sucesso.'],
+    ['final_content_sent_to_client','Legendas e posts disponíveis','As legendas e os posts estão prontos para sua análise.'],
+    ['final_adjusted_by_team','Ajuste final realizado','As correções finais foram enviadas. Toque para revisar.'],
+    ['final_approved_by_client','Cronograma finalizado','Seu cronograma foi aprovado com sucesso.']];
+  check('J9_NOTIFY_COPY','NOTIFY_EVENTS com títulos/mensagens EXATOS dos 6 eventos do cliente',
+    COPY.every(([ev,t,b])=>{const re=new RegExp(ev+":\\s*\\{[^}]*title: \""+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+"\"[^}]*body: \""+b.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+"\"");return re.test(SRC);}));
+  check('J10_NOTIFY_PRECISION','Payload do push carrega eventType + taskId + phase (além de title/body/openUrl/tag)',
+    /eventType, taskId: \(task && task\.id\) \|\| "", phase: ev\.phase/.test(SRC));
+  check('J11_NOTIFY_TRUTH','Resultado NUNCA mente: channel webpush só com sent; fallback whatsapp_premium sinalizado quando não enviou',
+    /if \(!out\.sent\) result\.fallback = "whatsapp_premium"/.test(SRC) && /reason: subs\.length \? "VAPID_NOT_CONFIGURED" : "sem_subscription"/.test(SRC));
+  check('J12_ITEM_NO_AUTOFINISH','CV_JS: aprovar item NÃO mostra tela final automaticamente (sem clientThemesApproved no callback de approveItem)',
+    (()=>{const m=SRC.match(/if\(act==='approveItem'\)\{post\([\s\S]*?\}\);\}/);if(!m)return false;return m[0].indexOf('clientThemesApproved')===-1&&m[0].indexOf('clientProductionApproved')===-1&&/syncFooter\(\)/.test(m[0]);})());
+  check('J13_CTA_APROVAR_TEMAS','CTA da fase de temas = "Aprovar temas" (server phaseCopy + footerCta)',
+    /cta: "Aprovar temas",/.test(SRC) && /:'Aprovar temas'\)/.test(SRC.match(/function footerCta[\s\S]{0,200}/)[0]));
 
   /* ===================== VEREDITO ===================== */
   console.log(`${C.b}\n==================================================================`);
