@@ -1,6 +1,6 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.137",
+  "version": "1.0.138",
   "description": "Agenda ID Seven Desktop — premium client domain link fix (Electron)",
   "main": "dist/main/main.js",
   "private": true,
