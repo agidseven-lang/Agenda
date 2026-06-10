@@ -93,7 +93,7 @@ jobs:
             fi
             echo "commit      : $GITHUB_SHA"
             echo "ref         : ${{ github.event.inputs.ref }}"
-            echo "espelha APK : 1.0.87-beta-operational-status-consistency-fix"
+            echo "espelha APK : ${VER_LABEL}"
           } > "$OUT/VERSAO-DESKTOP.txt"
           # RELATORIO-DESKTOP.txt — checagens
           {
