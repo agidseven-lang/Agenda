@@ -168,28 +168,32 @@ fun TaskDetailScreen(
                     }
                 }
 
-                Spacer(Modifier.height(18.dp))
-                SectionLabel(if (total > 0) "Checklist · $done/$total concluídos" else "Checklist")
-                Card {
-                    if (total == 0) {
-                        Text("Nenhum checklist cadastrado", color = Tokens.Faint, fontSize = 13.sp)
-                    } else {
-                        LinearProgressIndicator(progress = { done.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)), color = Tokens.Green, trackColor = Tokens.Surface2)
-                        Spacer(Modifier.height(10.dp))
-                        t.checklist.forEachIndexed { idx, item ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth().clickable {
-                                    scope.launch {
-                                        val nl = t.checklist.toMutableList()
-                                        nl[idx] = item.copy(d = !item.d)
-                                        TaskRepo.setChecklist(t.id, nl)
-                                    }
-                                }.padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(if (item.d) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked, contentDescription = null, tint = if (item.d) Tokens.Green else Tokens.Faint, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(10.dp))
-                                Text(item.t, color = if (item.d) Tokens.Faint else Tokens.Ink, fontSize = 14.sp, textDecoration = if (item.d) TextDecoration.LineThrough else TextDecoration.None)
+                // Checklist — oculto p/ cronograma (fluxo tem etapas próprias; dados antigos
+                // permanecem no banco, apenas não são exibidos).
+                if (sector.key != "cronograma") {
+                    Spacer(Modifier.height(18.dp))
+                    SectionLabel(if (total > 0) "Checklist · $done/$total concluídos" else "Checklist")
+                    Card {
+                        if (total == 0) {
+                            Text("Nenhum checklist cadastrado", color = Tokens.Faint, fontSize = 13.sp)
+                        } else {
+                            LinearProgressIndicator(progress = { done.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)), color = Tokens.Green, trackColor = Tokens.Surface2)
+                            Spacer(Modifier.height(10.dp))
+                            t.checklist.forEachIndexed { idx, item ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        scope.launch {
+                                            val nl = t.checklist.toMutableList()
+                                            nl[idx] = item.copy(d = !item.d)
+                                            TaskRepo.setChecklist(t.id, nl)
+                                        }
+                                    }.padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(if (item.d) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked, contentDescription = null, tint = if (item.d) Tokens.Green else Tokens.Faint, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(item.t, color = if (item.d) Tokens.Faint else Tokens.Ink, fontSize = 14.sp, textDecoration = if (item.d) TextDecoration.LineThrough else TextDecoration.None)
+                                }
                             }
                         }
                     }

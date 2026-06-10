@@ -652,7 +652,8 @@ internal fun TaskCardPro(
             Text(task.desc, color = Tokens.Faint, fontSize = 12.5.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
         }
         // 6) CHECKLIST — barra + contador
-        if (total > 0) {
+        // Reprovação 1.0.137: cronograma não exibe checklist (sem função no fluxo).
+        if (total > 0 && sector.key != "cronograma") {
             Spacer(Modifier.height(13.dp))
             LinearProgressIndicator(progress = { done.toFloat() / total.toFloat() }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)), color = Tokens.Green, trackColor = Tokens.Surface2)
             Spacer(Modifier.height(5.dp))

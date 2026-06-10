@@ -110,12 +110,12 @@ fun TaskFormScreen(
         val tpl = TaskTemplates.forSector(key)
         subtype = tpl?.subtypes?.firstOrNull()?.key ?: ""
         extra.clear(); contentOpen.clear()
-        if (editId == null) setChecklist(tpl?.subtypeOf(subtype)?.checklist ?: tpl?.checklist.orEmpty())
+        if (editId == null) setChecklist(if (sector == "cronograma") emptyList() else (tpl?.subtypeOf(subtype)?.checklist ?: tpl?.checklist.orEmpty()))
     }
     // Troca o SUBFORMULÁRIO conforme a escolha (Semanal/Quinzenal/Mensal ou 4/6/12).
     fun applySubtype(key: String) {
         subtype = key; extra.clear(); contentOpen.clear()
-        if (editId == null) setChecklist(TaskTemplates.forSector(sector)?.subtypeOf(key)?.checklist.orEmpty())
+        if (editId == null) setChecklist(if (sector == "cronograma") emptyList() else TaskTemplates.forSector(sector)?.subtypeOf(key)?.checklist.orEmpty())
     }
 
     LaunchedEffect(editId) {
@@ -311,20 +311,24 @@ fun TaskFormScreen(
                         Label("Briefing · ${sec.label}")
                         tpl?.fields?.forEach { f -> TemplateField(f, extra[f.key] ?: "") { extra[f.key] = it }; Spacer(Modifier.height(12.dp)) }
                     }
-                    Label("Link / anexo"); AppTextField(link, { link = it }, "URL (Drive, Figma, etc.)"); Spacer(Modifier.height(12.dp))
-                    Label("Observações livres"); AppTextField(desc, { desc = it }, "Notas adicionais…"); Spacer(Modifier.height(14.dp))
-                    Label("Checklist")
-                    checklist.forEachIndexed { idx, item ->
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-                            Box(Modifier.weight(1f)) { AppTextField(item.t, { checklist[idx] = item.copy(t = it) }, "Item ${idx + 1}") }
-                            Spacer(Modifier.width(8.dp))
-                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(10.dp)).clickable { checklist.removeAt(idx) }, contentAlignment = Alignment.Center) {
-                                Icon(Icons.Outlined.Close, contentDescription = "Remover", tint = Tokens.Red, modifier = Modifier.size(18.dp))
+                    // Reprovação 1.0.137: CRONOGRAMA não usa Link/Observações/Checklist no fluxo
+                    // real (temas→designer→legendas→aprovação final). Demais setores preservam.
+                    if (sector != "cronograma") {
+                        Label("Link / anexo"); AppTextField(link, { link = it }, "URL (Drive, Figma, etc.)"); Spacer(Modifier.height(12.dp))
+                        Label("Observações livres"); AppTextField(desc, { desc = it }, "Notas adicionais…"); Spacer(Modifier.height(14.dp))
+                        Label("Checklist")
+                        checklist.forEachIndexed { idx, item ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                                Box(Modifier.weight(1f)) { AppTextField(item.t, { checklist[idx] = item.copy(t = it) }, "Item ${idx + 1}") }
+                                Spacer(Modifier.width(8.dp))
+                                Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(10.dp)).clickable { checklist.removeAt(idx) }, contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Outlined.Close, contentDescription = "Remover", tint = Tokens.Red, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
-                    }
-                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { checklist.add(ChecklistItem("", false)) }.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
-                        Text("+ Adicionar item", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { checklist.add(ChecklistItem("", false)) }.padding(vertical = 12.dp), contentAlignment = Alignment.Center) {
+                            Text("+ Adicionar item", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
                 else -> {
