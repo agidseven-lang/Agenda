@@ -232,7 +232,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_52', 'Healthcheck retorna V64.52-clean-ui', /version: "V64\.52-clean-ui"/.test(SRC));
+check('C_HEALTH_V64_52', 'Healthcheck retorna V64.53-premium-portal', /version: "V64\.53-premium-portal"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -367,7 +367,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + estados (ativado/negado/incompatível/disponível)', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados ✓/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.52-clean-ui', /version: "V64\.52-clean-ui"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.53-premium-portal', /version: "V64\.53-premium-portal"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -486,8 +486,9 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     (()=>{const n=(SRC.match(/syncFooter\(\);/g)||[]).length;return n>=5 && /toast\('Ajuste solicitado','ok'\);syncFooter\(\);/.test(SRC) && /syncFooter\(\);\s*\/\/ V64\.48/.test(SRC);})());
   check('I10_FOOTER_CTA_PHASE','footerCta segue a fase (final/production/themes) — paridade com phaseCopy do server-render',
     /PHASE==='final'\?'Aprovar versão final':\(PHASE==='production'\?'Aprovar legendas e artes':'Aprovar temas'\)/.test(SRC));
-  check('I11_FOOTER_SERVER_PARITY','rodapé server-rendered (load) continua decidindo por pendingRevision (sem regressão)',
-    /pendingRevision\s*\n?\s*\?\s*'<div class="gstat">Há <b>ajustes solicitados/.test(SRC));
+  check('I11_FOOTER_SERVER_PARITY','rodapé server-rendered (load) continua decidindo por pendingRevision (sem regressão; V64.53: barra só-botões + guia no fluxo)',
+    /pendingRevision\s*\n?\s*\?\s*'<button class="btn ghost" data-act="revision">/.test(SRC) &&
+    /<div class="guide" id="guide">[\s\S]{0,400}ajustes solicitados/.test(SRC));
 
   /* ===================== PARTE J — V64.49 (ativação assistida + copy exata + fechamento explícito) ===================== */
   console.log(`${C.b}\n[J] V64.49 — ativação assistida de avisos + copy exata + fechamento explícito${C.x}`);
@@ -592,8 +593,9 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   console.log(`${C.b}\n[L] V64.51 — portal mobile: toque, rodapé 3 estados, gate, payload${C.x}`);
   check('L1_GACTIONS_TOUCH','Barra inferior fixa NÃO engole toques: .gactions pointer-events:none + filhos auto',
     /\.gactions\{[^}]*pointer-events:none\}/.test(SRC) && /\.gactions \.inner > \*\{pointer-events:auto\}/.test(SRC));
-  check('L2_WRAP_MOBILE_PAD','Respiro real no mobile: .wrap padding-bottom 240px (<560px) acima da barra empilhada',
-    /@media\(max-width:560px\)\{\.wrap\{padding-bottom:240px\}\}/.test(SRC));
+  check('L2_WRAP_MOBILE_PAD','Respiro real no mobile: padding do .wrap dirigido pela ALTURA REAL do CTA (--cta-h medido) — sem regra duplicada',
+    /@media\(max-width:560px\)\{\.wrap\{padding:18px 14px calc\(var\(--cta-h,168px\) \+ 22px\)\}\}/.test(SRC) &&
+    /function ctaPad\(\)/.test(SRC) && !/padding:18px 14px 150px/.test(SRC) && !/padding-bottom:240px/.test(SRC));
   check('L3_FOOTER_SERVER_3','Server-render com 3 estados (pendingRevision / _allApprovedR / revisão orientada)',
     /pendingRevision[\s\S]{0,500}_allApprovedR[\s\S]{0,900}reviewNext/.test(SRC));
   check('L4_REVIEWNEXT','reviewNext abre/rola até o 1º conteúdo pendente (expande o card + diag expandedItem)',
@@ -642,6 +644,71 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('N3_PUSH_INTOCADO','Web Push INTOCADO: subscribe/test/engine/SW (sw-version V64.51 inalterado, payload icon/badge/tag=dedupKey)',
     /async function handleClientPushTest/.test(SRC) && /sw-version: V64\.51-mobile-touch-footer/.test(SRC) && /tag: dedupKey,/.test(SRC) && /icon: "\/og\/idseven-logo\.png", badge: "\/og\/idseven-badge\.png"/.test(SRC));
 
+  /* ═══════════ PARTE O — V64.53 (precisão POR EVENTO: engine executado de verdade) ═══════════ */
+  console.log(`${C.b}\n[O] V64.53 — 6 eventos do fluxo: engine REAL com sent/fallback/reason por endpoint${C.x}`);
+  await (async()=>{
+    const fx=(name)=>{const re=new RegExp('(?:async )?function '+name+'\\s*\\(');const m=SRC.match(re);if(!m)throw new Error('fn '+name);
+      let st=SRC.indexOf(m[0]),d=0,i=SRC.indexOf('{',st);
+      for(let j=i;j<SRC.length;j++){const c=SRC[j];if(c==='{')d++;else if(c==='}'){d--;if(d===0)return SRC.slice(st,j+1);}}};
+    const cx=(name)=>{const st=SRC.indexOf('const '+name+' = {');if(st<0)throw new Error('const '+name);
+      let d=0;for(let j=SRC.indexOf('{',st);j<SRC.length;j++){const c=SRC[j];if(c==='{')d++;else if(c==='}'){d--;if(d===0)return SRC.slice(st,j+2);}}};
+    // Engine real + stubs: broadcastWebPush capturado, Cache API em memória (prova dedup).
+    const calls=[];let pushOk=true;
+    const cacheMem=new Map();
+    const cachesStub={default:{match:async(req)=>cacheMem.get(req.url||req)||null,put:async(req,res)=>{cacheMem.set(req.url||req,res);}}};
+    const scopeO={
+      console:{log:()=>{},warn:()=>{},error:()=>{}},
+      caches:cachesStub,
+      Request:function(u){this.url=u;},
+      Response:function(b,o){this.body=b;this.opts=o;},
+      broadcastWebPush:async(env,subs,payload,opts)=>{calls.push({subs,payload,opts});
+        return pushOk?{sent:subs.length,total:subs.length,results:subs.map(()=>({ok:true,status:201})),gone:[]}
+                     :{sent:0,total:subs.length,results:subs.map(()=>({ok:false,status:410,gone:true})),gone:[0]};},
+      maskEndpoint:(e)=>'masked('+String(e||'').slice(-8)+')',
+      pruneClientPushSubs:async()=>{},
+    };
+    const OM=new Function(...Object.keys(scopeO),cx('NOTIFY_EVENTS')+'\n'+fx('notifyWorkflowEvent')+'\nreturn {NOTIFY_EVENTS,notifyWorkflowEvent};')(...Object.values(scopeO));
+    const env={VAPID_PRIVATE_KEY:'k',VAPID_PUBLIC_KEY:'K',VAPID_SUBJECT:'mailto:x@x'};
+    const SIX=[
+      ['themes_sent_to_client','themes'],
+      ['theme_adjusted_by_team','themes'],
+      ['themes_approved_by_client','themes'],
+      ['final_content_sent_to_client','final'],
+      ['final_adjusted_by_team','final'],
+      ['final_approved_by_client','final'],
+    ];
+    for(const [evt,phase] of SIX){
+      const task={id:'t-'+evt,clientReviewToken:'tokO_'+evt,clientPushSubs:[{endpoint:'https://fcm.googleapis.com/fcm/send/ABCDEFGH'+evt}]};
+      const r=await OM.notifyWorkflowEvent(env,task,evt,{});
+      const c=calls[calls.length-1];
+      check('O_'+evt.toUpperCase(),evt+' → push REAL: phase='+phase+' + openUrl do MESMO link + tag=dedupKey + icon/badge ID Seven + sent=1',
+        r.ok===true && r.eventType===evt && r.phase===phase && r.channel==='webpush' && r.sent===1 &&
+        r.openUrl==='/cliente/cronograma/tokO_'+evt &&
+        r.results.length===1 && r.results[0].ok===true && r.results[0].status===201 && /masked\(/.test(r.results[0].endpoint) &&
+        c.payload.tag===('t-'+evt+'|'+evt+'|') && c.payload.eventType===evt && c.payload.taskId==='t-'+evt && c.payload.phase===phase &&
+        c.payload.icon==='/og/idseven-logo.png' && c.payload.badge==='/og/idseven-badge.png' && c.opts.topic===evt);
+    }
+    // dedup: o MESMO evento na janela de 60s não dispara de novo (deduped:true, sem broadcast)
+    const t2={id:'t-dedup',clientReviewToken:'tokD',clientPushSubs:[{endpoint:'https://e/1'}]};
+    const before=calls.length;
+    const r1=await OM.notifyWorkflowEvent(env,t2,'themes_sent_to_client',{});
+    const r2=await OM.notifyWorkflowEvent(env,t2,'themes_sent_to_client',{});
+    check('O_DEDUP_60S','dedup: 2º disparo do MESMO task|evento na janela → deduped:true, sem novo POST',
+      r1.sent===1 && r2.deduped===true && calls.length===before+1);
+    // eventos DIFERENTES da mesma task NÃO se bloqueiam (dedupKey inclui o evento)
+    const r3=await OM.notifyWorkflowEvent(env,t2,'theme_adjusted_by_team',{});
+    check('O_DEDUP_PER_EVENT','dedup é por EVENTO: evento diferente da mesma task dispara normalmente',r3.sent===1&&!r3.deduped);
+    // sem subscription → fallback whatsapp_premium com reason verdadeiro (nunca mascarado como envio)
+    const r4=await OM.notifyWorkflowEvent(env,{id:'t-nosub',clientReviewToken:'tokN',clientPushSubs:[]},'themes_sent_to_client',{});
+    check('O_FALLBACK_SEM_SUB','sem subscription → sent=0 + fallback=whatsapp_premium + reason=sem_subscription',
+      r4.sent===0 && r4.fallback==='whatsapp_premium' && r4.reason==='sem_subscription');
+    // endpoint falha (410) com subscription presente → reason=send_failed (ERRO real, não 'sem_subscription')
+    pushOk=false;
+    const r5=await OM.notifyWorkflowEvent(env,{id:'t-fail',clientReviewToken:'tokF',clientPushSubs:[{endpoint:'https://e/2'}]},'final_approved_by_client',{});
+    check('O_SEND_FAILED_HONESTO','endpoint falhou COM subscription → reason=send_failed + status real por endpoint (410/gone)',
+      r5.sent===0 && r5.reason==='send_failed' && r5.fallback==='whatsapp_premium' && r5.results[0].gone===true && r5.results[0].status===410);
+    pushOk=true;
+  })();
   /* ===================== VEREDITO ===================== */
   console.log(`${C.b}\n==================================================================`);
   if (FAIL===0){

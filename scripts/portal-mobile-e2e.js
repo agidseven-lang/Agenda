@@ -29,7 +29,7 @@ async function newPortalPage(b,{w,h,withSub}){
       const j=(o)=>({ok:true,status:200,json:async()=>o,text:async()=>JSON.stringify(o)});
       if(u.includes('/push/subscribe'))return j({ok:true,taskId:'t-mobile',vapidConfigured:true});
       if(u.includes('/push/test'))return j({ok:true,sent:1,total:1,results:[{endpoint:'https://fcm.googleapis.com/…FAKE',ok:true,status:201}]});
-      if(u.includes('/state'))return j({ok:false});
+      if(u.includes('/state'))return j(window.__stateResp||{ok:false});
       if(u.includes('/api')||u.includes('cronograma'))return j({ok:true,phase:'themes'});
       return j({ok:true});
     };
@@ -83,10 +83,27 @@ const tapSel=async(p,sel)=>{
       if(!now)await tapSel(p,`[data-card="${i}"] .chead`);   // garante aberto p/ o resto
     }
     if(tag==='390x844')await p.screenshot({path:'/tmp/audit/m2-cards-abertos-390.png'});
-    // rodapé com 0/3: NÃO pode oferecer finalização
-    const f0=await p.evaluate(()=>({txt:document.querySelector('.gactions .inner').textContent,
+    // rodapé com 0/3: NÃO pode oferecer finalização. V64.53: orientação no #guide
+    // (fluxo da página) e barra fixa SÓ com botões — nunca texto atrás de botão.
+    const f0=await p.evaluate(()=>({guide:(document.getElementById('guide')||{}).textContent||'',
+      inner:document.querySelector('.gactions .inner').textContent.trim(),
       temAprovar:!!document.querySelector('[data-act="approveAll"]'),temRevisar:!!document.querySelector('[data-act="reviewNext"]')}));
-    check(`[${tag}] 0/3: rodapé SEM 'Aprovar temas' (orienta revisão)`,!f0.temAprovar&&f0.temRevisar&&f0.txt.includes('cada conteúdo'));
+    check(`[${tag}] 0/3: rodapé SEM 'Aprovar temas' (orienta revisão no guia)`,!f0.temAprovar&&f0.temRevisar&&f0.guide.includes('cada conteúdo'));
+    check(`[${tag}] barra fixa SÓ-botões (sem parágrafo na barra)`,f0.inner.length<46,JSON.stringify(f0.inner));
+    // PROVA DE NÃO-SOBREPOSIÇÃO: --cta-h medido >= altura real da barra; o conteúdo
+    // termina ACIMA dela mesmo rolado até o fim (nenhum texto sob os botões).
+    const ov=await p.evaluate(()=>{const ga=document.querySelector('.gactions');const gh=ga.offsetHeight;
+      const cta=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cta-h'))||0;
+      window.scrollTo(0,document.documentElement.scrollHeight);
+      const gr=ga.getBoundingClientRect();
+      // probe no CENTRO do botão primário (a casca da barra é pointer-events:none de propósito)
+      const btn=ga.querySelector('.btn.primary')||ga.querySelector('.btn');const br=btn.getBoundingClientRect();
+      const probe=document.elementFromPoint(Math.round(br.left+br.width/2),Math.round(br.top+br.height/2));
+      let lastBottom=0;document.querySelectorAll('.wrap > *').forEach(el=>{const r=el.getBoundingClientRect();if(r.height>0)lastBottom=Math.max(lastBottom,r.bottom);});
+      return {gh,cta,probeNaBarra:btn.contains(probe)||probe===btn,lastBottom:Math.round(lastBottom),barTop:Math.round(gr.top)};});
+    check(`[${tag}] --cta-h cobre a barra real (cta=${ov.cta} >= barra=${ov.gh})`,ov.cta>=ov.gh-1&&ov.gh<150);
+    check(`[${tag}] conteúdo termina ACIMA da barra rolado até o fim (${ov.lastBottom} <= ${ov.barTop})`,ov.lastBottom<=ov.barTop+1&&ov.probeNaBarra);
+    await p.evaluate(()=>window.scrollTo(0,0));
     // aprovar 1 e 2 por toque
     for(const i of [0,1]){
       await p.evaluate(i=>{const c=document.querySelector(`[data-card="${i}"]`);c.classList.add('is-open');c.scrollIntoView({block:'center'});},i);
@@ -101,8 +118,9 @@ const tapSel=async(p,sel)=>{
     await p.evaluate(()=>{document.getElementById('sIn').value='trocar a foto de capa';});
     await tapSel(p,'[data-x="send"]');
     const fr=await p.evaluate(()=>({fb:!!document.querySelector('[data-act="ackFeedback"]'),
-      txt:document.querySelector('.gactions .inner').textContent}));
-    check(`[${tag}] ajuste pendente: rodapé 'Enviar feedback' (sem Aprovar temas)`,fr.fb&&fr.txt.includes('ajustes solicitados'));
+      guide:(document.getElementById('guide')||{}).textContent||'',
+      temAprovar:!!document.querySelector('[data-act="approveAll"]')}));
+    check(`[${tag}] ajuste pendente: rodapé 'Enviar feedback' (sem Aprovar temas; guia explica)`,fr.fb&&!fr.temAprovar&&fr.guide.includes('ajustes solicitados'));
     if(tag==='390x844')await p.screenshot({path:'/tmp/audit/m3-feedback-390.png'});
     // aprovar o 3 (corrigido) → 3/3 → AGORA aparece 'Aprovar temas'; item NÃO fechou a fase
     await p.evaluate(()=>{const c=document.querySelector('[data-card="2"]');c.classList.add('is-open');c.scrollIntoView({block:'center'});});
@@ -113,14 +131,53 @@ const tapSel=async(p,sel)=>{
     check(`[${tag}] 3/3: botão final 'Aprovar temas' aparece e a fase NÃO fechou sozinha`,
       f3.temAprovar&&f3.cta.includes('Aprovar temas')&&!f3.midcard);
     if(tag==='390x844')await p.screenshot({path:'/tmp/audit/m4-aprovar-390.png'});
-    // clique final fecha a fase (tela 'Temas aprovados e enviados!')
+    // clique final fecha a fase → tela PREMIUM 'Temas aprovados' (V64.53)
     await p.evaluate(()=>{document.querySelector('[data-act="approveAll"]').scrollIntoView({block:'center'});});
     await tapSel(p,'[data-act="approveAll"]');
     await new Promise(r=>setTimeout(r,400));
-    const done=await p.evaluate(()=>document.body.textContent.includes('Temas aprovados e enviados!'));
-    check(`[${tag}] clique em 'Aprovar temas' fecha a fase (tela de confirmação)`,done);
+    const done=await p.evaluate(()=>({succ:!!document.querySelector('.succcard'),
+      h1:(document.querySelector('.succcard h1')||{}).textContent||'',
+      p:(document.querySelector('.succcard p')||{}).textContent||'',
+      ga:!!document.querySelector('.gactions'),
+      closeBtn:!!document.querySelector('[data-act="closePage"]'),
+      note:document.body.textContent.includes('Você já pode fechar esta página')}));
+    check(`[${tag}] 'Aprovar temas' → tela premium 'Temas aprovados' (copy exata da produção)`,
+      done.succ&&done.h1==='Temas aprovados'&&done.p.includes('produção das artes, legendas e posts'));
+    check(`[${tag}] sucesso SEM barra fixa antiga + fallback 'Fechar página' visível`,!done.ga&&done.closeBtn&&done.note);
+    // PERSISTÊNCIA: o /state passa a devolver estado VÁLIDO e DIFERENTE (sem SUCCESS_MODE o
+    // poller repintaria o cronograma) → espera 2 ciclos (13s) e a tela de sucesso FICA.
+    await p.evaluate(()=>{window.__stateResp={ok:true,finalDone:false,pendingRevision:false,
+      items:[{cs:'aprovado',tema:'X1',legenda:'L'},{cs:'aprovado',tema:'X2',legenda:'L'},{cs:'aprovado',tema:'X3',legenda:'L'}]};});
+    await new Promise(r=>setTimeout(r,13000));
+    const persist=await p.evaluate(()=>({succ:!!document.querySelector('.succcard'),
+      cards:document.querySelectorAll('#contents [data-card]').length,
+      h1:(document.querySelector('.succcard h1')||{}).textContent||''}));
+    check(`[${tag}] sucesso PERSISTE após 2 ciclos do poller (sem voltar ao cronograma)`,
+      persist.succ&&persist.h1==='Temas aprovados'&&persist.cards===0);
+    if(tag==='390x844')await p.screenshot({path:'/tmp/audit/m8-sucesso-temas-390.png'});
     if(tag==='412x915')await p.screenshot({path:'/tmp/audit/m5-fase-fechada-412.png'});
     await p.close();
+  }
+
+  // V64.53 — ESTADO F: aprovação final → tela 'Cronograma finalizado com sucesso'
+  // (o poller detecta finalDone e encerra; a tela PERSISTE — SUCCESS_MODE trava re-render).
+  {
+    const pf=await newPortalPage(b,{w:390,h:844,withSub:true});
+    await pf.evaluate(()=>{window.__stateResp={ok:true,finalDone:true,items:[]};});
+    await new Promise(r=>setTimeout(r,7000));
+    const fin=await pf.evaluate(()=>({succ:!!document.querySelector('.succcard'),
+      h1:(document.querySelector('.succcard h1')||{}).textContent||'',
+      ga:!!document.querySelector('.gactions'),
+      closeBtn:!!document.querySelector('[data-act="closePage"]'),
+      note:document.body.textContent.includes('Você já pode fechar esta página')}));
+    check("[finalDone] tela premium 'Cronograma finalizado com sucesso' + sem barra + 'Fechar página'",
+      fin.succ&&fin.h1==='Cronograma finalizado com sucesso'&&!fin.ga&&fin.closeBtn&&fin.note);
+    await new Promise(r=>setTimeout(r,7000));
+    const fin2=await pf.evaluate(()=>({h1:(document.querySelector('.succcard h1')||{}).textContent||'',
+      cards:document.querySelectorAll('#contents [data-card]').length}));
+    check("[finalDone] tela final PERSISTE após novo ciclo do poller",fin2.h1==='Cronograma finalizado com sucesso'&&fin2.cards===0);
+    await pf.screenshot({path:'/tmp/audit/m9-final-390.png'});
+    await pf.close();
   }
 
   // V64.52 — produção SEM toast flutuante: livebar ausente; únicos fixed = gactions (+pgate qdo aberto)

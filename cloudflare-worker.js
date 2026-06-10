@@ -280,7 +280,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.52-clean-ui" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.53-premium-portal" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2583,9 +2583,8 @@ const CV_CSS = `
 *,*::before,*::after{box-sizing:border-box}html,body{margin:0;padding:0}
 body{background:radial-gradient(1100px 520px at 12% -8%,rgba(124,92,255,.20),transparent 60%),radial-gradient(900px 480px at 105% 0%,rgba(198,75,216,.14),transparent 55%),radial-gradient(700px 600px at 50% 120%,rgba(34,211,184,.07),transparent 60%),var(--bg);color:var(--txt);font:15px/1.55 var(--ff);-webkit-font-smoothing:antialiased;min-height:100vh}
 a{color:#b9a4ff;text-decoration:none}
-.wrap{max-width:1180px;margin:0 auto;padding:30px 22px 160px}
-@media(max-width:560px){.wrap{padding-bottom:240px}}
-@media(max-width:560px){.wrap{padding:18px 14px 150px}}
+.wrap{max-width:1180px;margin:0 auto;padding:30px 22px calc(var(--cta-h,120px) + 36px)}
+@media(max-width:560px){.wrap{padding:18px 14px calc(var(--cta-h,168px) + 22px)}}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px}
 .brand{display:flex;align-items:center;gap:12px}.brand .logo{width:44px;height:44px;flex:0 0 44px;filter:drop-shadow(0 6px 16px rgba(124,92,255,.45))}
 .brand .bn{font-weight:800;letter-spacing:.2px;font-size:15px}.brand .bn small{display:block;font-weight:600;font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint);margin-top:1px}
@@ -2647,9 +2646,17 @@ a{color:#b9a4ff;text-decoration:none}
 .hb-ok{background:var(--okbg);color:var(--ok)}.hb-rev{background:var(--revbg);color:var(--rev)}.hb-edit{background:rgba(124,92,255,.12);color:#b9a4ff}.hb-note{background:var(--infobg);color:var(--info)}
 .hmain{flex:1;min-width:0}.hmain .ht{font-size:13.5px;font-weight:600}.hmain .hdiff{margin-top:7px;font-size:12px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 10px}.hdiff .new{color:var(--ok)}
 .htime{flex:0 0 auto;font-size:11px;color:var(--faint);white-space:nowrap}
-.gactions{position:fixed;left:0;right:0;bottom:0;z-index:50;background:linear-gradient(180deg,rgba(7,8,16,0),rgba(7,8,16,.88) 34%,var(--bg) 70%);padding:20px 0 max(18px,env(safe-area-inset-bottom));pointer-events:none}
+.gactions{position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(9,10,18,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,.07);box-shadow:0 -14px 38px -20px rgba(0,0,0,.85);padding:12px 0 max(12px,env(safe-area-inset-bottom));pointer-events:none}
 .gactions .inner > *{pointer-events:auto}
-.gactions .inner{max-width:1180px;margin:0 auto;padding:0 22px;display:flex;align-items:center;gap:12px}@media(max-width:560px){.gactions .inner{padding:0 14px;flex-wrap:wrap}}
+.gactions .inner{max-width:1180px;margin:0 auto;padding:0 22px;display:flex;align-items:center;justify-content:flex-end;gap:12px}
+@media(max-width:560px){.gactions .inner{padding:0 14px;flex-wrap:nowrap}.gactions .inner .btn{flex:1 1 0;justify-content:center;padding:13px 10px;font-size:14px;white-space:nowrap}}
+/* V64.53 — a ORIENTAÇÃO sai da barra fixa e vira um cartão-guia no fluxo da página
+   (nunca mais texto atrás de botão); a barra fica SÓ com as ações. */
+.guide{display:flex;gap:11px;align-items:flex-start;margin:18px 0 4px;padding:13px 15px;background:linear-gradient(135deg,rgba(91,108,255,.10),rgba(110,91,255,.05));border:1px solid rgba(91,108,255,.24);border-radius:14px;font-size:13.5px;line-height:1.55;color:var(--mut)}
+.guide svg{flex:none;width:17px;height:17px;color:#9aa6ff;margin-top:2px}
+.guide b{color:var(--ink)}
+.succ-close-note{position:relative;z-index:1;margin-top:22px;color:var(--faint);font-size:12.5px}
+.succ-close{position:relative;z-index:1;margin-top:12px;width:auto;padding:13px 30px}
 .gstat{flex:1;min-width:0;font-size:12.5px;color:var(--mut)}.gstat b{color:var(--txt)}@media(max-width:560px){.gstat{flex:1 0 100%;order:-1;margin-bottom:2px}}
 .btn{appearance:none;border:0;border-radius:14px;padding:14px 20px;font-size:14.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:.14s;white-space:nowrap}.btn svg{width:16px;height:16px}
 .btn:active{transform:translateY(1px)}.btn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--line2);color:var(--txt)}.btn.ghost:hover{border-color:var(--brand1)}
@@ -2737,22 +2744,30 @@ function anyRevBadge(){return badgeStats().rev>0;}
    Aprovar temas (finalização); pendentes sem ajuste → orientação (NUNCA finalização). */
 function syncFooter(){
   var inner=document.querySelector('.gactions .inner');if(!inner)return;
-  var st=badgeStats();var state;
+  var guide=document.getElementById('guide');
+  var st=badgeStats();var state;var gtxt='';
   if(st.rev>0){state='feedback';
-    inner.innerHTML='<div class="gstat">Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</div>'+
-      '<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir mais ajustes</button>'+
+    gtxt='<span>Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</span>';
+    inner.innerHTML='<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir mais ajustes</button>'+
       '<button class="btn primary" data-act="ackFeedback">'+CIC.check+'Enviar feedback</button>';
   }else if(st.total>0&&st.apr>=st.total){state='approve';
-    inner.innerHTML='<div class="gstat">Todos os temas foram aprovados. Confirme para a equipe seguir com a produção.</div>'+
-      '<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
+    gtxt='<span>Todos os temas foram aprovados. Confirme em <b>'+footerCta()+'</b> para a equipe seguir com a produção.</span>';
+    inner.innerHTML='<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
       '<button class="btn primary" data-act="approveAll" data-phase="'+PHASE+'">'+CIC.check+footerCta()+'</button>';
   }else{state='review';
-    inner.innerHTML='<div class="gstat">Toque em <b>cada conteúdo</b> acima para revisar e aprovar ('+st.apr+' de '+st.total+'). O botão final aparece quando todos estiverem aprovados.</div>'+
-      '<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
+    gtxt='<span>Toque em <b>cada conteúdo</b> abaixo para revisar e aprovar ('+st.apr+' de '+st.total+'). O botão final aparece quando todos estiverem aprovados.</span>';
+    inner.innerHTML='<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
       '<button class="btn primary" data-act="reviewNext">'+CIC.check+'Revisar temas</button>';
   }
+  if(guide)guide.innerHTML=CIC.note+gtxt;
+  ctaPad();
   diagSet('footerState',state+' ('+st.apr+'/'+st.total+(st.rev?(' rev='+st.rev):'')+')');
 }
+/* V64.53 — a página SEMPRE termina acima da barra fixa: mede a altura real do CTA e
+   aplica como respiro do .wrap via --cta-h (qualquer estado/idioma/tamanho de fonte). */
+function ctaPad(){var ga=document.querySelector('.gactions');var h=(ga&&ga.offsetParent!==null)?ga.offsetHeight:(ga?ga.offsetHeight:0);document.documentElement.style.setProperty('--cta-h',(h||0)+'px');}
+window.addEventListener('resize',ctaPad);
+setTimeout(ctaPad,0);
 function setItemNote(i,note){var c=card(i);if(!c)return;var slot=c.querySelector('[data-noteslot]');if(slot)slot.style.display='';var box=c.querySelector('[data-itemnote]');if(box)box.textContent=note;}
 function setTheme(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-field="tema"]');if(el)el.textContent=v;var h=c.querySelector('.ctitle h3');if(h)h.textContent=v;}
 function setLegenda(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-field="legenda"]');if(!el)return;var d=document.createElement('div');d.className='fval';d.setAttribute('data-field','legenda');d.textContent=v;el.parentNode.replaceChild(d,el);}
@@ -2763,15 +2778,17 @@ function post(payload,btn,cb){if(btn)btn.disabled=true;fetch(URLX,{method:'POST'
 // quando a aba nao foi aberta por script — nesse caso, deixa a tela final visivel com a frase
 // fallback ja presente no card (succ-foot/mid-foot "Voce pode fechar esta pagina."). Sem alarme.
 function tryCloseOrShowNotice(){try{setTimeout(function(){try{window.close();}catch(_){ }},900);}catch(_){ }}
-function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.querySelector('.gactions');if(ga)ga.parentNode.removeChild(ga);if(!w)return;w.innerHTML='<div class="topbar"><div class="brand">'+(document.querySelector('.brand .logo')?document.querySelector('.brand .logo').outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div></div>'+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Cronograma aprovado com sucesso!</h1><p>Sua aprovação foi registrada. A equipe já foi notificada e seguirá com a finalização.</p><div class="succ-foot">Você já pode fechar esta página. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
+function clientSuccess(){endFlowScreen();var w=document.querySelector('.wrap');if(!w)return;w.innerHTML='<div class="topbar"><div class="brand">'+(document.querySelector('.brand .logo')?document.querySelector('.brand .logo').outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div></div>'+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Cronograma finalizado com sucesso</h1><p>Sua aprovação foi registrada. A equipe já foi notificada e seguirá com a publicação dos conteúdos.</p>'+closeBlock()+'</div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
 // V64.13 — Confirmação INTERMEDIÁRIA: temas aprovados (NÃO encerra; mantém o cronograma ativo).
 // V64.17 — topbar premium reutilizável. Telas de ack/sucesso/feedback SUBSTITUEM a .wrap
 // inteira (sem formulário/cards ativos empilhados abaixo). Corrige duplicação no portal.
 function CV_TOP(){var lg=document.querySelector('.brand .logo');return '<div class="topbar"><div class="brand">'+(lg?lg.outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div><div class="secure">'+CIC.check+'<span class="lbl">Link seguro</span></div></div>';}
-function clientThemesApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Temas aprovados e enviados!</h2><p>A equipe seguirá com a produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
-function clientProductionApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Legendas e artes aprovadas!</h2><p>A equipe enviará a versão final completa para sua aprovação. Em breve você receberá o aviso neste mesmo link.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
+function closeBlock(){return '<div class="succ-close-note">Você já pode fechar esta página.</div><button class="btn primary succ-close" data-act="closePage">Fechar página</button>';}
+function endFlowScreen(){SUCCESS_MODE=true;var ga=document.querySelector('.gactions');if(ga&&ga.parentNode)ga.parentNode.removeChild(ga);document.documentElement.style.setProperty('--cta-h','0px');}
+function clientThemesApproved(){endFlowScreen();var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Temas aprovados</h1><p>A equipe seguirá para a produção das artes, legendas e posts. Quando a versão final estiver pronta, você recebe o aviso neste mesmo link.</p>'+closeBlock()+'</div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
+function clientProductionApproved(){endFlowScreen();var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="succwrap"><div class="succcard"><div class="succ-badge">'+CIC.check+'</div><h1>Legendas e artes aprovadas</h1><p>A equipe enviará a versão final completa para a sua aprovação. Você recebe o aviso neste mesmo link.</p>'+closeBlock()+'</div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
 // V64.17 — feedback PARCIAL: SUBSTITUI a .wrap por resumo read-only + "Aguardando ajuste da equipe".
-function clientFeedbackSent(){var w=document.querySelector('.wrap');if(!w)return;
+function clientFeedbackSent(){var ga=document.querySelector('.gactions');if(ga&&ga.parentNode)ga.parentNode.removeChild(ga);document.documentElement.style.setProperty('--cta-h','0px');var w=document.querySelector('.wrap');if(!w)return;
   var rows='';document.querySelectorAll('#contents [data-card]').forEach(function(c){var i=+c.dataset.card;var b=c.querySelector('[data-badge]');var t=b?(b.textContent||''):'';
     var lbl=t.indexOf('Aprovado')>=0?'Aprovado':(t.indexOf('Ajuste')>=0?'Ajuste solicitado':(t.indexOf('Editado')>=0?'Editado':'Pendente'));
     rows+='<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px"><span style="color:var(--mut)">Conteúdo '+(i+1)+'</span><b>'+lbl+'</b></div>';});
@@ -2842,10 +2859,11 @@ document.addEventListener('click',function(e){
       if(j&&j.phase==='production'){addHist('ok','Aprovou legendas e artes');clientProductionApproved();return;}
       addHist('ok','Aprovou o cronograma');toast('Aprovação registrada','ok');
     });}
+  else if(act==='closePage'){try{window.close();}catch(_){ }}
   else if(act==='sendGenObs'){var ta=document.getElementById('genObs');var v=ta?ta.value.trim():'';if(!v){toast('Escreva uma observação primeiro.','err');return;}post({action:'comment',note:v},a,function(){if(ta)ta.value='';addHist('note','Comentou no cronograma');toast('Observação enviada','ok');});}
 });
 /* V64.16/18 — TEMPO REAL: polling leve do MESMO link (sem reabrir, sem gerar link novo). */
-var LAST_SIG=null, FEEDBACK_MODE=false, FEEDBACK_BASE=null, LIVE_EL=null;
+var LAST_SIG=null, FEEDBACK_MODE=false, FEEDBACK_BASE=null, LIVE_EL=null, SUCCESS_MODE=false;
 // Indicador discreto e PERSISTENTE de atualização automática (canto inferior).
 function liveTick(ok){
   // V64.52 — SEM toast flutuante em produção (cobria textos/botões no mobile). O estado da
@@ -2873,7 +2891,11 @@ function applyState(j,changed){
   if(changed&&changed.length){var f=card(changed[0]);if(f&&f.scrollIntoView)try{f.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}}
   syncFooter();   // V64.48 — rodapé acompanha o estado vindo do servidor (tempo real)
 }
-function pollState(){fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+function pollState(){
+  // V64.53 — depois do sucesso a tela é FINAL: o poller para (antes, applyState/reload
+  // re-pintavam o cronograma por cima de 'Temas aprovados').
+  if(SUCCESS_MODE)return;
+  fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
   if(!j||!j.ok){liveTick(false);return;}
   liveTick(true);
   var sig=JSON.stringify((j.items||[]).map(function(x){return [x.cs,x.tema,x.legenda,x.feed,x.story];}));
@@ -3201,6 +3223,11 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
       '<div class="prog-bar"><div class="prog-fill" data-progfill style="width:' + Math.max(pct, 4) + '%"></div></div></div>' +
   '</section>' +
   '<div id="pushcta" class="pushcta" style="display:none"></div>' +
+  '<div class="guide" id="guide">' + ICN.note + (pendingRevision
+    ? '<span>Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</span>'
+    : (_allApprovedR
+    ? '<span>Todos os temas foram aprovados. Confirme em <b>' + escapeHtml(phaseUi.cta) + '</b> para a equipe seguir com a produção.</span>'
+    : '<span>Toque em <b>cada conteúdo</b> abaixo para revisar e aprovar. O botão final aparece quando todos estiverem aprovados.</span>')) + '</div>' +
   '<div class="sec"><h2>Conteúdos</h2><div class="legend"><span><i style="background:var(--ok)"></i>Aprovado</span><span><i style="background:var(--rev)"></i>Ajuste</span><span><i style="background:var(--faint)"></i>Pendente</span></div></div>' +
   '<div id="contents">' + contentsHtml + '</div>' +
   '<div class="sec"><h2>Observações gerais</h2></div>' +
@@ -3211,16 +3238,13 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
   '<div class="foot">Link público seguro · Agenda ID Seven · ' + new Date().getFullYear() + '</div>' +
 '</div>' +
 '<div class="gactions"><div class="inner">' + (pendingRevision
-  ? '<div class="gstat">Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</div>' +
-    '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir mais ajustes</button>' +
-    '<button class="btn primary" data-act="ackFeedback">' + ICN.check + 'Enviar feedback para a equipe</button>'
+  ? '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir mais ajustes</button>' +
+    '<button class="btn primary" data-act="ackFeedback">' + ICN.check + 'Enviar feedback</button>'
   : (_allApprovedR
-  ? '<div class="gstat">Todos os temas foram aprovados. Confirme para a equipe seguir com a produção.</div>' +
-    '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
+  ? '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
     '<button class="btn primary" data-act="approveAll" data-phase="' + phase + '">' + ICN.check + escapeHtml(phaseUi.cta) + '</button>'
   // V64.51 — itens pendentes SEM ajuste: NUNCA oferecer a finalização; orientar a revisão.
-  : '<div class="gstat">Toque em <b>cada conteúdo</b> acima para revisar e aprovar. O botão final aparece quando todos estiverem aprovados.</div>' +
-    '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
+  : '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
     '<button class="btn primary" data-act="reviewNext">' + ICN.check + 'Revisar temas</button>'
 )) + '</div></div>' +
 '<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
