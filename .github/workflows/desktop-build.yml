@@ -15,9 +15,9 @@ name: "[manual] Desktop Build (Windows)"
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: desktop/hotfix-client-link-persist)"
+        description: "Branch/commit a buildar (default: desktop/local-detail-hierarchy-v2)"
         required: true
-        default: "desktop/hotfix-client-link-persist"
+        default: "desktop/local-detail-hierarchy-v2"
 
 permissions:
   contents: read
@@ -37,15 +37,15 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref }}
 
-      # CI-only: deriva versao/labels do package.json real (evita rotulo defasado).
-      - name: Definir versao/labels a partir do package.json
+      # CI-only: label FIXO desta versao de TESTE + validacao de que o package.json bate.
+      - name: Definir versao/labels (1.0.132-beta-workflow-v64-46-test)
         run: |
+          LABEL="1.0.132-beta-workflow-v64-46-test"
           VER="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$APP_DIR/package.json" | head -1)"
-          REF="${{ github.event.inputs.ref }}"; SUFFIX="${REF##*/}"
-          LABEL="${VER}-${SUFFIX}"
+          if [ "$VER" != "1.0.132" ]; then echo "::error::package.json version=$VER (esperado 1.0.132)"; exit 1; fi
           echo "VER_LABEL=$LABEL" >> "$GITHUB_ENV"
           echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL}" >> "$GITHUB_ENV"
-          echo "VER_LABEL=$LABEL | DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL}"
+          echo "VER_LABEL=$LABEL | DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL} | package.json=$VER"
 
       - name: Setup Node
         uses: actions/setup-node@v4
