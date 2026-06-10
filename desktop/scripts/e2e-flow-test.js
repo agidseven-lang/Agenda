@@ -400,8 +400,8 @@ check('D14', 'Cliente board usa CLIENT_COLS4', /const byCol=CLIENT_COLS4\.map/.t
 check('RA_COLVIEW', 'designerColView mantém coluna própria de Revisão (não colapsa revisao→andamento)', /function designerColView\(t\)\{const c=designerCol\(t\);return c==='concluido'\?'entregue':\(c==='revisao'\?'revisao':/.test(DH));
 check('RA_STATUSVIEW', 'designerStatusView lê DESIGNER_COLS4 (badge do card do designer)', /function designerStatusView\(t\)\{const k=designerColView\(t\);const c=DESIGNER_COLS4\.find/.test(DH));
 check('RA_CARD_PARAM', 'taskCard é role-aware (persp), designerView só p/ cronograma c/ designer', /function taskCard\(t, persp\)\{[\s\S]*?const designerView = persp==='designer' && secOf\(t\.sector\)\.key==='cronograma' && hasDesigner\(t\);/.test(DH));
-check('RA_CARD_BADGE', 'badge do card usa designerStatusView quando designerView (senão clientStatusView)', /const oc=designerView\?designerStatusView\(t\):clientStatusView\(t\);/.test(DH));
-check('RA_CARD_TIMELINE', 'card escolhe designerCardTimeline × taskCardTimeline pela perspectiva', /designerView\?designerCardTimeline\(t\):taskCardTimeline\(t\)/.test(DH));
+check('RA_CARD_BADGE', 'badge do card por perspectiva: designerStatusView / clientFacingStatusView / clientStatusView', /const oc=designerView\?designerStatusView\(t\):\(clientView\?clientFacingStatusView\(t\):clientStatusView\(t\)\);/.test(DH));
+check('RA_CARD_TIMELINE', 'card escolhe designerCardTimeline × taskCardTimeline pela perspectiva', /designerView\?designerCardTimeline\(t\):taskCardTimeline\(t,clientView\?'client':null\)/.test(DH));
 // designerCardTimeline NÃO mostra o fluxo do cliente (sem taskTimeline/clientStatusView dentro dela)
 const dctFn = (DH.match(/function designerCardTimeline\(t\)\{[\s\S]*?\n\}/) || [''])[0];
 check('RA_DESIGNER_NO_CLIENT', 'designerCardTimeline NÃO usa taskTimeline/clientStatusView (perspectiva do designer)', dctFn.length>0 && dctFn.indexOf('taskTimeline(')===-1 && dctFn.indexOf('clientStatusView(')===-1);
@@ -766,7 +766,7 @@ const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
 // interno + badge do taskCard (ternário designerView) + flowSummary "Status operacional".
 check('CSV_SCOPE', 'clientStatusView: definição + taskCard + flowSummary + uso interno taskTimeline (4 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 4 && /function clientStatusView\(t\)/.test(DH_noc));
 // taskCard MIGRADO (role-aware f96aa2e: ternário designerView).
-check('CSV_TASKCARD_MIGRATED', "taskCard cronograma usa designerView?designerStatusView:clientStatusView no badge", /key==='cronograma'\)\{const oc=designerView\?designerStatusView\(t\):clientStatusView\(t\);/.test(DH));
+check('CSV_TASKCARD_MIGRATED', "taskCard cronograma: badge por perspectiva (designer/cliente/operacional) na fonte única", /key==='cronograma'\)\{const oc=designerView\?designerStatusView\(t\):\(clientView\?clientFacingStatusView\(t\):clientStatusView\(t\)\);/.test(DH));
 // chip do detalhe MIGRADO p/ a máquina de estados (1 chip, sem status concorrentes).
 check('CSV_REVISAO_MIGRATED', 'Chip do detalhe usa detailState(t) (rev-chip único, sem contradição)', /const dsc=detailState\(t\);[\s\S]{0,200}rev-chip/.test(DH));
 // detalhe MIGRADO (flowSummaryBlock "Status operacional" + opPanelBlock "Próxima ação").
@@ -846,9 +846,9 @@ check('TL_DEF', 'taskTimeline(t) existe e retorna {current,last,next,owner,miles
 const DH_noc2 = DH.replace(/^\s*\/\/.*$/gm,'');
 // Passo 2: taskTimeline agora é consumida APENAS pelo taskCardTimeline (definição + 1 uso).
 check('TL_CARD_WIRED', 'taskTimeline consumida por taskCardTimeline + opPanelBlock (3 ocorrências: definição + 2 usos)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 3 && /function taskTimeline\(t\)/.test(DH_noc2));
-check('TL2_CARD_RENDER', 'taskCard escolhe timeline por perspectiva (designerCardTimeline × taskCardTimeline) e taskCardTimeline usa taskTimeline(t)', /\?designerCardTimeline\(t\):taskCardTimeline\(t\)\);/.test(DH) && /function taskCardTimeline\(t\)\{[\s\S]*?const tl=taskTimeline\(t\);/.test(DH));
+check('TL2_CARD_RENDER', 'taskCard escolhe timeline por perspectiva (designerCardTimeline × taskCardTimeline) e taskCardTimeline usa taskTimeline(t)', /\?designerCardTimeline\(t\):taskCardTimeline\(t,clientView\?'client':null\)\);/.test(DH) && /function taskCardTimeline\(t,persp\)\{[\s\S]*?const tl=taskTimeline\(t\);/.test(DH));
 check('TL2_CARD_ONLY', 'taskCardTimeline existe e é chamado só no taskCard (definição + 1 chamada)', (DH_noc2.match(/taskCardTimeline\(/g)||[]).length === 2);
-check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard secOf!=cronograma -> "")', /function taskCardTimeline\(t\)\{\s*\n\s*if\(secOf\(t\.sector\)\.key!=='cronograma'\)return '';/.test(DH));
+check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard secOf!=cronograma -> "")', /function taskCardTimeline\(t,persp\)\{\s*\n\s*if\(secOf\(t\.sector\)\.key!=='cronograma'\)return '';/.test(DH));
 // PASSO 3: o detalhe (opPanelBlock) AGORA usa taskTimeline(t) (timeline completa); sem steps[] próprios.
 (function(){const fn=(DH.match(/function opPanelBlock\(t\)\{[\s\S]*?\n\}/)||[''])[0];
   check('TL3_DETALHE_MIGRATED', 'opPanelBlock usa taskTimeline(t) + tl.milestones.forEach + det-tl-meta', fn.length>0 && /const tl=taskTimeline\(t\);/.test(fn) && /tl\.milestones\.forEach/.test(fn) && /det-tl-meta/.test(fn));
@@ -987,8 +987,13 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       fnDecl('clientApproved'),fnDecl('isSentToDesigner'),fnDecl('canSendToClient'),
       fnDecl('fmtDateTimeBR'),
       fnDecl('detailState'),fnDecl('detailActionsHtml'),
+      // ciclo 1.0.133 — quadro Cliente (bucket + linguagem) e badge do designer:
+      constArr('DESIGNER_COLS4'),constArr('CLIENT_COLS4'),
+      fnDecl('operationalCol'),fnDecl('opColOf'),fnDecl('clientCol4'),
+      fnDecl('clientFacingStatusView'),fnDecl('clientFacingNextShort'),
+      fnDecl('designerColView'),fnDecl('designerStatusView'),
       'function svgSafe(){return "";}',
-      'return {detailState,detailActionsHtml,hasPendingItemRevision,clientApprovalPhaseOf};'
+      'return {detailState,detailActionsHtml,hasPendingItemRevision,clientApprovalPhaseOf,clientCol4,clientCol,clientFacingStatusView,clientFacingNextShort,designerStatusView,operationalCol};'
     ].join('\n');
     mod=new Function('state',src=>{}) , mod=new Function('state',pieces)({users:[],user:{id:'u',name:'X'}});
   }catch(e){err=e&&e.message;}
@@ -1098,10 +1103,67 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   // Worker V64.47 (branch) — fechamento canônico server-side:
   (function(){
     const W47=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
-    check('DH_W47_PHASE_CLOSE','Worker V64.47: approveItem fecha fase NÃO-final quando todos aprovados (gated !isFinalPhase)', /V64\.47 — FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /if \(!isFinalPhase\)/.test(W47) && /version: "V64\.47-themes-phase-close"/.test(W47));
+    check('DH_W47_PHASE_CLOSE','Worker: approveItem fecha fase NÃO-final quando todos aprovados (gated !isFinalPhase) — V64.48 atual', /V64\.47 — FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /if \(!isFinalPhase\)/.test(W47) && /version: "V64\.48-content-sent-footer-sync"/.test(W47));
     check('DH_W47_PENDING_PHASEAWARE','Worker V64.47: pendingRevision do portal/state é phase-aware com override allApproved', /const pendingRevision = !allApproved && \(itemPending/.test(W47) && /const pendingRevision = !_allApprovedR && \(_itemPendingR/.test(W47));
     check('DH_W47_ACK_CANONICO','Portal: ackFeedback canônico (allOk→approveAll real; final→reload p/ confirmação; pendência→Feedback enviado)', /allOk&&PHASE==='final'\)\{location\.reload\(\)/.test(W47) && /if\(allOk\)\{post\(\{action:'approveAll'\}/.test(W47) && /clientFeedbackSent\(\);return;\}/.test(W47));
     check('DH_W47_PORTAL_MSG','Portal: tela "Temas aprovados e enviados!" quando a fase fecha', /Temas aprovados e enviados!/.test(W47));
+  })();
+
+  /* ═══ CY2 — REPROVAÇÃO PARCIAL 1.0.133 (cenários A–F do reteste real) ═══ */
+  console.log(`${C.b}\n[CY2] Correções da reprovação parcial 1.0.133 (quadro Cliente / status / notificação / card)${C.x}`);
+  if(mod&&mod.clientCol4){
+    const TH3=[{tema:'T1'},{tema:'T2'},{tema:'T3'}];
+    const FULL3=[{tema:'T1',legenda:'L',feedImageUrl:'f'},{tema:'T2',legenda:'L',feedImageUrl:'f'},{tema:'T3',legenda:'L',feedImageUrl:'f'}];
+    // Cenário B7/B8 — temas aprovados NÃO vai para "Aprovado": fica "Em análise".
+    const TEMAS_OK={sector:'cronograma',cronContents:TH3,clientApprovalPhase:'themes',clientFlowStatus:'aprovado',cronStatus:'aprovado_cliente',clientReview:{status:'aprovado'}};
+    check('CY2_B_NAO_APROVADO','Temas aprovados → quadro Cliente em "Em análise" (analise), NÃO "Aprovado"', mod.clientCol4(TEMAS_OK)==='analise');
+    check('CY2_B_STATUS','Status do Cliente nessa fase = "Temas aprovados — produção em andamento"', mod.clientFacingStatusView(TEMAS_OK).label==='Temas aprovados — produção em andamento');
+    check('CY2_B_SOCIAL','Social vê "Aguardando envio ao designer" (operacional intacto)', mod.operationalCol(TEMAS_OK)==='aguardando_envio');
+    check('CY2_B_BTN','Botão "Enviar para designer" disponível (detailState temas_aprovados)', mod.detailState(TEMAS_OK).key==='temas_aprovados' && mod.detailState(TEMAS_OK).actions.indexOf('senddesigner')>=0);
+    // Cenário A — feedback parcial: card em revisão, sem liberar designer.
+    const PARCIAL={sector:'cronograma',cronContents:TH3,clientApprovalPhase:'themes',clientFlowStatus:'revisao',cronStatus:'em_revisao_cliente',clientReview:{status:'revisao'},
+      clientItems:{i0:{cs:'aprovado',phase:'themes'},i1:{cs:'aprovado',phase:'themes'},i2:{cs:'em_revisao',phase:'themes',note:'trocar'}}};
+    check('CY2_A_REVISAO','Feedback parcial → quadro Cliente "Revisão solicitada" (revisao)', mod.clientCol4(PARCIAL)==='revisao');
+    check('CY2_A_SEM_DESIGNER','Feedback parcial NÃO libera designer (detailState=cliente_ajuste, sem senddesigner)', mod.detailState(PARCIAL).key==='cliente_ajuste' && mod.detailState(PARCIAL).actions.indexOf('senddesigner')<0);
+    // Cenário C — designer em produção: leitura coerente entre papéis.
+    const DPROD={sector:'cronograma',cronContents:TH3,clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
+    check('CY2_C_DESIGNER_BADGE','Designer vê badge "Em produção" (específico, não genérico)', mod.designerStatusView(DPROD).label==='Em produção');
+    check('CY2_C_SOCIAL','Social vê "Designer em produção" (mesma etapa, leitura coerente)', mod.operationalCol(DPROD)==='aguardando_designer');
+    check('CY2_C_CLIENTE_LANG','Quadro Cliente vê "A equipe está produzindo as artes" (linguagem simples)', mod.clientFacingStatusView(DPROD).label==='A equipe está produzindo as artes');
+    // Cenário D — designer entregou: aguardando legendas/posts.
+    const DDONE={sector:'cronograma',cronContents:TH3,clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido'};
+    check('CY2_D_SOCIAL','Entrega do designer → Social "Aguardando legendas e posts"', mod.operationalCol(DDONE)==='aguardando_legenda');
+    check('CY2_D_CLIENTE','Quadro Cliente → "Aguardando legendas e posts" e SEM "Aprovado"', mod.clientFacingStatusView(DDONE).label==='Aguardando legendas e posts' && mod.clientCol4(DDONE)==='analise');
+    // Cenário E — aprovação FINAL: só agora o Cliente vai para "Aprovado".
+    const FINAL={sector:'cronograma',cronContents:FULL3,clientApprovalPhase:'final',clientFlowStatus:'concluido',finalApprovalCompleted:true,designerAssignment:{designerId:'d'},designerFlowStatus:'concluido'};
+    check('CY2_E_APROVADO','Aprovação final (finalApprovalCompleted) → quadro Cliente "Aprovado"', mod.clientCol4(FINAL)==='aprovado');
+    check('CY2_E_CONCLUIDO','Status Cliente = "Cronograma concluído"', mod.clientFacingStatusView(FINAL).label==='Cronograma concluído');
+    // Reenviado (versão final no portal) → continua "Em análise" com linguagem certa.
+    const REENV={sector:'cronograma',cronContents:FULL3,clientApprovalPhase:'final',clientFlowStatus:'reenviado',cronStatus:'ready_for_final_client_review',designerAssignment:{designerId:'d'},designerFlowStatus:'concluido'};
+    check('CY2_E_REENVIADO','Versão final enviada → Cliente "Em análise" + "Versão final disponível para análise"', mod.clientCol4(REENV)==='analise' && mod.clientFacingStatusView(REENV).label==='Versão final disponível para análise');
+    // Problema 5 — linguagem: nenhum estado do quadro Cliente expõe jargão interno.
+    const ALL=[TEMAS_OK,PARCIAL,DPROD,DDONE,FINAL,REENV];
+    check('CY2_LANG_CLEAN','Nenhum status do quadro Cliente contém "designer iniciar"/"Aguardando envio" (jargão interno)',
+      ALL.every(t=>{const l=mod.clientFacingStatusView(t).label+' '+mod.clientFacingNextShort(t);return l.indexOf('designer iniciar')<0&&l.indexOf('Aguardando envio')<0;}));
+  } else { check('CY2_EVAL','eval do ciclo 1.0.133 indisponível', false); }
+  // FONTE — quadro Cliente usa perspectiva client no card (badge + próxima):
+  check('CY2_SRC_BOARD','renderClientFlowBoard renderiza taskCard(t,\'client\')', /h\+=tasks\.length\?tasks\.map\(t=>taskCard\(t,'client'\)\)\.join/.test(DH));
+  check('CY2_SRC_COL4','clientCol4: "Aprovado" SÓ p/ concluido; aprovado/producao/reenviado → analise', /if\(c==='concluido'\)return 'aprovado';\s*\n\s*if\(c==='aprovado'\|\|c==='producao'\|\|c==='reenviado'\)return 'analise';/.test(DH));
+  // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
+  check('CY2_CSS_KCOL','CSS: .kcol max-height calc(100vh - 252px) + fallback p/ telas baixas (232px)', /max-height:calc\(100vh - 252px\);overflow:hidden;/.test(DH) && /@media\(max-height:760px\)\{body\.desktop \.kanban \.kcol\{max-height:calc\(100vh - 232px\)\}\}/.test(DH));
+  check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 + scrollbar-gutter (último card nunca corta)', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1;min-height:0;scrollbar-gutter:stable\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:2px\}/.test(DH));
+  // Problema 1 — gatilho do push de envio (Desktop → Worker contentSent, best-effort).
+  check('CY2_SENT_TRIGGER','persistClientSend chama team-action contentSent com Bearer JWT + Idempotency-Key (best-effort)',
+    (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];return fn.indexOf("action:'contentSent'")>=0&&fn.indexOf("'Authorization':'Bearer '+jwt")>=0&&fn.indexOf("'Idempotency-Key':idem")>=0&&fn.indexOf('catch')>=0;})());
+  check('CY2_SENT_401','contentSent: 401 limpa wp_team_jwt (sem insistir com credencial inválida)',
+    (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];return /res\.status===401\)\{localStorage\.removeItem\('wp_team_jwt'\)/.test(fn);})());
+  // Worker V64.48 (branch) — contentSent + rodapé dinâmico do portal:
+  (function(){
+    const W48=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
+    check('CY2_W48_CONTENTSENT','Worker: team-action aceita contentSent e dispara themes_sent_to_client/final_content_sent_to_client', /action !== "adjustedItem" && action !== "contentSent"/.test(W48) && /final_content_sent_to_client" : "themes_sent_to_client"/.test(W48) && /notifyWorkflowEvent\(env, task, evSent/.test(W48));
+    check('CY2_W48_NO_WRITE','Worker: contentSent NÃO escreve no Firestore (apenas notifica + loga)', (()=>{const b=(W48.match(/if \(action === "contentSent"\) \{[\s\S]*?\n  \}/)||[''])[0];return b.length>0&&b.indexOf(':commit')<0&&b.indexOf('writes:')<0;})());
+    check('CY2_W48_FOOTER','Portal: syncFooter dinâmico — ajuste pendente → "Enviar feedback" (nunca CTA de aprovação)', /function syncFooter\(\)/.test(W48) && /function anyRevBadge\(\)/.test(W48) && (W48.match(/syncFooter\(\);/g)||[]).length>=5);
+    check('CY2_W48_VERSION','Worker healthcheck = V64.48-content-sent-footer-sync', /version: "V64\.48-content-sent-footer-sync"/.test(W48));
   })();
 })();
 

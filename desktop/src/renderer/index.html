@@ -374,18 +374,24 @@
     display:grid;grid-template-columns:repeat(4,minmax(300px,1fr));gap:18px;
     align-items:start;margin-top:12px;
   }
+  /* Bug 1.0.133 (card cortado): a pilha real acima das colunas (topbar+head+toolbar) passa
+     de 220px — a coluna estourava a viewport e o último card ficava cortado embaixo.
+     Offset corrigido (252px), .kbody com min-height:0 (overflow correto em flex) e
+     respiro inferior maior para o último card nunca encostar no corte da coluna. */
   body.desktop .kanban .kcol{
     background:var(--surface);border:1px solid var(--line);border-radius:16px;
-    display:flex;flex-direction:column;max-height:calc(100vh - 220px);overflow:hidden;
+    display:flex;flex-direction:column;max-height:calc(100vh - 252px);overflow:hidden;
   }
+  @media(max-height:760px){body.desktop .kanban .kcol{max-height:calc(100vh - 232px)}}
   body.desktop .kanban .kcol .khead{
     display:flex;align-items:center;gap:10px;padding:14px 14px 12px;border-bottom:1px solid var(--line-soft)
   }
   body.desktop .kanban .kcol .khead .cc{width:10px;height:10px;border-radius:50%;flex:none}
   body.desktop .kanban .kcol .khead .kt{font-size:14px;font-weight:800;flex:1;letter-spacing:.01em}
   body.desktop .kanban .kcol .khead .kn{background:var(--surface2);border-radius:999px;font-size:12px;font-weight:800;padding:3px 10px;color:var(--soft)}
-  body.desktop .kanban .kcol .kbody{padding:12px 12px 12px;overflow-y:auto;flex:1}
+  body.desktop .kanban .kcol .kbody{padding:12px 12px 24px;overflow-y:auto;flex:1;min-height:0;scrollbar-gutter:stable}
   body.desktop .kanban .kcol .tc{margin-bottom:12px;padding:18px;border-radius:16px}
+  body.desktop .kanban .kcol .kbody .tc:last-child{margin-bottom:2px}
   body.desktop .kanban .kcol .tc .tt{font-size:14.5px}
   body.desktop .kanban .kcol .tc .ds{font-size:12px}
   body.desktop .kanban .kcol .tc .move{height:36px;font-size:12px;margin-top:10px}
@@ -1841,7 +1847,7 @@ function renderClientFlowBoard(){
     '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
   CLIENT_COLS4.forEach((c,i)=>{const tasks=byCol[i];
     h+='<div class="kcol"><div class="khead"><div class="cc" style="background:'+c.color+'"></div><div class="kt" style="color:'+c.color+'">'+esc(c.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(taskCard).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
+    h+=tasks.length?tasks.map(t=>taskCard(t,'client')).join(''):'<div class="emptyline" style="text-align:center;padding:18px 6px">Sem tarefas</div>';
     h+='</div></div>';});
   return h+'</div></div>';
 }
@@ -2181,7 +2187,10 @@ const CLIENT_COLS4=[
 // própria de Revisão/Ajuste (não colapsa mais 'revisao' em 'andamento').
 function designerColView(t){const c=designerCol(t);return c==='concluido'?'entregue':(c==='revisao'?'revisao':(c==='afazer'?'afazer':'andamento'));}
 // Status VISUAL do DESIGNER (badge do card na perspectiva do designer): label/cor de DESIGNER_COLS4.
-function designerStatusView(t){const k=designerColView(t);const c=DESIGNER_COLS4.find(x=>x.key===k)||DESIGNER_COLS4[0];return {key:k,label:c.label,color:c.color};}
+// Bug 1.0.133 (status discrepante): a COLUNA continua "Em andamento", mas o badge do card é
+// ESPECÍFICO — "Em produção" — coerente com o "Designer em produção" que a Social vê.
+function designerStatusView(t){const k=designerColView(t);const c=DESIGNER_COLS4.find(x=>x.key===k)||DESIGNER_COLS4[0];
+  return {key:k,label:(k==='andamento'?'Em produção':c.label),color:c.color};}
 // "Próxima ação" CURTA na perspectiva do DESIGNER (o que ELE precisa fazer agora).
 function designerNextShort(t){switch(designerColView(t)){
   case 'afazer':    return 'Iniciar a produção';
@@ -2210,12 +2219,43 @@ function designerCardTimeline(t){
   '</div>';
 }
 // Bucket de 4 colunas do CLIENTE (a partir do eixo do cliente).
+// REGRA DEFINITIVA (bug 1.0.133): a coluna "Aprovado" do quadro Cliente é SÓ a conclusão
+// REAL do cronograma (aprovação final — clientCol 'concluido' via isFullyComplete).
+// Temas aprovados ('aprovado') é etapa INTERMEDIÁRIA → fica em "Em análise" com a produção.
 function clientCol4(t){const c=clientCol(t);
   if(c==='revisao')return 'revisao';
-  if(c==='aprovado'||c==='concluido')return 'aprovado';
-  if(c==='producao'||c==='reenviado')return 'analise';
+  if(c==='concluido')return 'aprovado';
+  if(c==='aprovado'||c==='producao'||c==='reenviado')return 'analise';
   return 'enviado';                                   // afazer/enviado
 }
+// Linguagem do QUADRO CLIENTE (bug 1.0.133): o card da aba Cliente NÃO usa o jargão
+// operacional interno ("Aguardando designer iniciar" etc.). Status simples, na linguagem
+// que o cliente entenderia — derivado dos MESMOS eixos (clientCol/operationalCol), só leitura.
+function clientFacingStatusView(t){
+  const c=clientCol(t);
+  if(c==='concluido')return {key:'concluido',label:'Cronograma concluído',color:'#10B981'};
+  if(c==='revisao')return {key:'revisao',label:'Ajuste solicitado — equipe corrigindo',color:'#F59E0B'};
+  if(c==='reenviado')return {key:'final',label:'Versão final disponível para análise',color:'#34D399'};
+  if(c==='aprovado'||c==='producao'){
+    const oc=operationalCol(t);
+    if(oc==='aguardando_envio')return {key:'temas_ok',label:'Temas aprovados — produção em andamento',color:'#34D399'};
+    if(oc==='aguardando_legenda')return {key:'legendas',label:'Aguardando legendas e posts',color:'#5B6CFF'};
+    if(oc==='aguardando_final')return {key:'final',label:'Versão final disponível para análise',color:'#34D399'};
+    return {key:'producao',label:'A equipe está produzindo as artes',color:'#A78BFA'};
+  }
+  if(c==='enviado')return {key:'enviado',label:'Temas enviados — aguardando análise',color:'#22D3EE'};
+  return {key:'preparacao',label:'Em preparação',color:'#6E7480'};
+}
+// "Próxima" CURTA do card do QUADRO CLIENTE — mesma linguagem simples (sem jargão interno).
+function clientFacingNextShort(t){switch(clientFacingStatusView(t).key){
+  case 'temas_ok':  return 'Equipe inicia a produção das artes';
+  case 'producao':  return 'Aguardar a produção das artes';
+  case 'legendas':  return 'Equipe adiciona legendas e posts';
+  case 'final':     return 'Aguardar a aprovação final do cliente';
+  case 'revisao':   return 'Equipe corrige e reenvia ao cliente';
+  case 'enviado':   return 'Aguardar a análise dos temas';
+  case 'concluido': return 'Cronograma encerrado';
+} return 'Acompanhar o andamento';}
 // Bucket de 4 colunas DERIVADO DO PAPEL DE QUEM VÊ. Se quem abre o quadro é o DESIGNER
 // atribuído à tarefa, usa o eixo de trabalho do designer (assim um cronograma recém-enviado
 // cai em "A Fazer" do designer — paridade com o Android). Senão, usa o eixo operacional.
@@ -2357,7 +2397,7 @@ function briefLine(t){if(!t.desc)return '';const ln=String(t.desc).split('\n').m
 function _tlRelAgo(ms){ if(!ms)return ''; const dif=Date.now()-Number(ms); if(dif<0||isNaN(dif))return '';
   const mi=Math.floor(dif/60000); if(mi<1)return 'agora'; if(mi<60)return 'há '+mi+' min';
   const hr=Math.floor(mi/60); if(hr<24)return 'há '+hr+'h'; const dd=Math.floor(hr/24); return 'há '+dd+' dia'+(dd>1?'s':''); }
-function taskCardTimeline(t){
+function taskCardTimeline(t,persp){
   if(secOf(t.sector).key!=='cronograma')return '';
   const tl=taskTimeline(t);
   const main=tl.milestones.filter(m=>m.key!=='ajuste');
@@ -2371,7 +2411,8 @@ function taskCardTimeline(t){
   if(ajuste&&ajuste.state==='attention')rail+='<i title="Ajuste pedido pelo cliente" style="background:#F59E0B;margin-left:5px"></i>';
   const ownU=tl.owner&&tl.owner.id?state.users.find(u=>u.id===tl.owner.id):null;
   const ownerTxt=(tl.owner&&tl.owner.role!=='—')?(tl.owner.role+(ownU&&ownU.name?(' · '+ownU.name.split(' ')[0]):'')):'Fluxo encerrado';
-  const nextTxt=nextActionShort(t);   // task-flow-fix: texto CURTO (não corta o essencial)
+  // task-flow-fix: texto CURTO (não corta o essencial); quadro Cliente = linguagem simples.
+  const nextTxt=persp==='client'?clientFacingNextShort(t):nextActionShort(t);
   const lastTxt=tl.last?(esc(tl.last.label)+(tl.last.at?(' · '+_tlRelAgo(tl.last.at)):'')):'';
   // Layout em LINHAS empilhadas (sem competir horizontalmente): "Agora" (responsável) ·
   // "Próxima" (ação curta, até 2 linhas) · "Último" (evento humanizado, até 2 linhas).
@@ -2388,6 +2429,8 @@ function taskCardTimeline(t){
 // — por isso só ativamos quando persp==='designer' (qualquer outro valor = operacional).
 function taskCard(t, persp){
   const designerView = persp==='designer' && secOf(t.sector).key==='cronograma' && hasDesigner(t);
+  // Bug 1.0.133: no QUADRO CLIENTE o badge usa linguagem do cliente (clientFacingStatusView).
+  const clientView = persp==='client' && secOf(t.sector).key==='cronograma';
   const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
   const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:(t.by?'—':'');
@@ -2416,14 +2459,14 @@ function taskCard(t, persp){
          // (wrapper FIEL de opColOf(operationalCol(t)) — resultado visual idêntico ao anterior).
          // role-aware (passo 2): no quadro do DESIGNER, o badge mostra o status DELE (A Fazer/
          // Em andamento/Revisão/Entregue), não o status do fluxo do cliente.
-         if(secOf(t.sector).key==='cronograma'){const oc=designerView?designerStatusView(t):clientStatusView(t);
+         if(secOf(t.sector).key==='cronograma'){const oc=designerView?designerStatusView(t):(clientView?clientFacingStatusView(t):clientStatusView(t));
            return '<div class="tc-cron-st" style="color:'+oc.color+';background:'+withAlpha(oc.color,.14)+';border-color:'+withAlpha(oc.color,.32)+'"><span class="dotc"></span>'+esc(oc.label)+'</div>';}
          return t.cronStatus?('<div class="tc-cron-st" style="color:'+cronStatusColor(t.cronStatus)+';background:'+withAlpha(cronStatusColor(t.cronStatus),.14)+';border-color:'+withAlpha(cronStatusColor(t.cronStatus),.32)+'"><span class="dotc"></span>'+esc(cronStatusLabel(t.cronStatus))+'</div>'):'';
        })())+
        '<div class="tc-tags"><span class="tc-tag" style="color:'+s.color+';background:'+withAlpha(s.color,.14)+'">'+esc(s.label)+'</span>'+
          (cron?'<span class="tc-tag tc-tag-soft">'+esc(cron.label)+'</span>':'')+
          (t.priority?'<span class="tc-tag" style="color:#F87171;background:'+withAlpha('#F87171',.14)+'">⚑ Prioridade</span>':'')+'</div>'+
-       (designerView?designerCardTimeline(t):taskCardTimeline(t));   // role-aware: timeline do designer × timeline do cliente
+       (designerView?designerCardTimeline(t):taskCardTimeline(t,clientView?'client':null));   // role-aware: timeline por perspectiva
   // 4) Cronograma (temas reais) OU briefing curto
   if(cron&&cron.list.length){
     const show=cron.list.slice(0,3);const rest=cron.count-3;
@@ -3694,6 +3737,26 @@ async function persistClientSend(taskId){
     });
     if(t){t.clientFlowStatus=cflow;t.clientApprovalPhase=phase;}
   }catch(e){console.warn('persistClientSend',e);}
+  // Bug 1.0.133 (notificação inicial): o envio real é manual (WhatsApp Business) e NUNCA
+  // passava pelo Worker — themes_sent_to_client não disparava nem com avisos ativados.
+  // Avisa o Notification Engine via team-action 'contentSent' (Bearer teamSessionJwt +
+  // idempotência). BEST-EFFORT: sem JWT ou sem rede, segue em silêncio — o WhatsApp
+  // continua sendo o canal principal; o Worker loga push real × fallback whatsapp_premium.
+  try{
+    const token=t&&(t.clientReviewToken||t.shareToken)||'';
+    const jwt=localStorage.getItem('wp_team_jwt')||'';
+    if(token&&jwt){
+      const idem=(u.id||'')+'|sent|'+taskId+'|'+Math.floor(now/10000);
+      const res=await fetch(CLIENT_REVIEW_BASE+'/cliente/cronograma/'+encodeURIComponent(token)+'/team-action',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Idempotency-Key':idem,'Authorization':'Bearer '+jwt},
+        body:JSON.stringify({action:'contentSent',byName:u.name||''})
+      });
+      if(res.status===401){localStorage.removeItem('wp_team_jwt');}
+      else{const j=await res.json().catch(()=>null);
+        console.log('[contentSent] push=',j&&j.push?JSON.stringify(j.push):'(sem resposta)');}
+    }
+  }catch(e){console.warn('contentSent (best-effort)',e&&e.message);}
 }
 function copyToClipboard(text){try{navigator.clipboard&&navigator.clipboard.writeText(text);}catch(_){}}
 // Copia SOMENTE a mensagem humana completa (buildClientMessage), montada do
