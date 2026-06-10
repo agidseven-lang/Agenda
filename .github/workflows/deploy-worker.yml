@@ -137,17 +137,18 @@ jobs:
           echo "$bct" | grep -qi 'image/png' || { echo "FAIL: badge nao e image/png" >&2; exit 1; }
           [ "$(wc -c < /tmp/badge.png)" -gt 300 ] || { echo "FAIL: badge muito pequeno" >&2; exit 1; }
 
-          echo "== 3) Service Worker /cliente/sw.js (V64.50: showNotification + icon/badge/data + click) =="
+          echo "== 3) Service Worker /cliente/sw.js (V64.51: showNotification + icon/badge/data + click) =="
           swc=$(curl -sS --max-time 20 -o /tmp/sw.js -w '%{http_code}' "$B/cliente/sw.js")
           [ "$swc" = "200" ] || { echo "FAIL: sw.js != 200" >&2; exit 1; }
           grep -q "addEventListener('push'" /tmp/sw.js || { echo "FAIL: sw sem handler push" >&2; exit 1; }
           grep -q "sw-version: V64.51-mobile-touch-footer" /tmp/sw.js || { echo "FAIL: sw nao e V64.50" >&2; exit 1; }
-          grep -q "event.waitUntil(self.registration.showNotification(title, options))" /tmp/sw.js || { echo "FAIL: sw sem showNotification/waitUntil" >&2; exit 1; }
+          grep -q "self.registration.showNotification(title, options)" /tmp/sw.js || { echo "FAIL: sw sem showNotification" >&2; exit 1; }
+          grep -q "event.waitUntil(Promise.all(" /tmp/sw.js || { echo "FAIL: sw sem waitUntil(Promise.all)" >&2; exit 1; }
           grep -q "/og/idseven-badge.png" /tmp/sw.js || { echo "FAIL: sw sem badge dedicado" >&2; exit 1; }
           grep -q "/og/idseven-logo.png" /tmp/sw.js || { echo "FAIL: sw sem icon oficial" >&2; exit 1; }
           grep -q "eventType: data.eventType" /tmp/sw.js || { echo "FAIL: sw sem data{eventType}" >&2; exit 1; }
           grep -q "notificationclick" /tmp/sw.js || { echo "FAIL: sw sem notificationclick" >&2; exit 1; }
-          echo "sw.js V64.50 OK"
+          echo "sw.js V64.51 OK"
           grep -q "addEventListener('notificationclick'" /tmp/sw.js || { echo "FAIL: sw sem notificationclick" >&2; exit 1; }
           echo "OK: SW serve push + notificationclick"
 
