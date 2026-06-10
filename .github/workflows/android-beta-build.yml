@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: app/local-1.0.81-workflow-stage-deadline-fix)"
+        description: "Branch/commit a buildar (default: app/local-detail-hierarchy-v2)"
         required: true
-        default: "app/local-1.0.81-workflow-stage-deadline-fix"
+        default: "app/local-detail-hierarchy-v2"
       resolve_urls:
         description: "Resolver URLs reais das Functions Gen2 via gcloud (true/false)"
         required: false
