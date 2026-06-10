@@ -349,6 +349,7 @@ fun TasksScreen(
                                 onMove = { moveTarget = task },
                                 onDelete = { deleteTarget = task },
                                 designerView = designerView,
+                                clientView = isClientBoard,
                             )
                         }
                     }
@@ -504,10 +505,13 @@ internal fun TaskCardPro(
     onMove: () -> Unit,
     onDelete: () -> Unit,
     designerView: Boolean = false,
+    clientView: Boolean = false,
 ) {
     // role-aware (paridade Desktop f96aa2e): no quadro do DESIGNER, o card mostra o status/próxima
     // ação DELE, sem o fluxo de aprovação do cliente como eixo principal.
     val isDesignerCard = designerView && Sectors.of(task.sector).key == "cronograma" && TaskVisibility.hasDesigner(task)
+    // bug 1.0.133: no quadro CLIENTE o badge usa linguagem do cliente (clientFacingStatusView).
+    val isClientCard = clientView && Sectors.of(task.sector).key == "cronograma"
     val sector = Sectors.of(task.sector)
     val total = task.checklist.size
     val done = task.checklist.count { it.d }
@@ -525,9 +529,12 @@ internal fun TaskCardPro(
         // (não o status bruto) — evita "Concluído" contraditório com o fluxo real.
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (isDesignerCard) {
+                // bug 1.0.133: badge ESPECÍFICO do designer ("Em produção"; coluna segue "Em andamento").
                 val dv = TaskVisibility.designerColView(task)
-                val dLbl = TaskVisibility.DESIGNER_COLS4.firstOrNull { it.key == dv }?.label ?: "A Fazer"
-                StatusChip(dLbl, designerColViewColor(dv))
+                StatusChip(TaskVisibility.designerCardLabel(task), designerColViewColor(dv))
+            } else if (isClientCard) {
+                val cf = TaskVisibility.clientFacingStatusView(task)
+                StatusChip(cf.label, Color(cf.colorHex))
             } else if (sector.key == "cronograma") {
                 val op = TaskVisibility.operationalCol(task)
                 val opLbl = TaskVisibility.OPERATIONAL_COLS.firstOrNull { it.key == op }?.label ?: TaskStatus.label(task.status)

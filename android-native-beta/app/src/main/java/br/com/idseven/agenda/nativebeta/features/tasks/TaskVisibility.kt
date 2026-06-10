@@ -257,12 +257,42 @@ object TaskVisibility {
         "entregue" -> "Entregue — aguardando a Social"
         else -> "Acompanhar"
     }
+    // Status VISUAL do card do DESIGNER (bug 1.0.133 — status discrepante): a COLUNA segue
+    // "Em andamento", mas o badge do card é ESPECÍFICO — "Em produção" — coerente com o
+    // "Designer em produção" que a Social vê (paridade Desktop designerStatusView).
+    fun designerCardLabel(t: TaskItem): String {
+        val k = designerColView(t)
+        if (k == "andamento") return "Em produção"
+        return DESIGNER_COLS4.firstOrNull { it.key == k }?.label ?: "A Fazer"
+    }
+
     // Bucket de 4 colunas do CLIENTE (a partir do eixo do cliente).
+    // REGRA DEFINITIVA (bug 1.0.133): a coluna "Aprovado" do quadro Cliente é SÓ a conclusão
+    // REAL (clientCol 'concluido' via isFullyComplete). Temas aprovados é etapa INTERMEDIÁRIA
+    // → fica em "Em análise" enquanto a produção anda (paridade Desktop clientCol4).
     fun clientCol4(t: TaskItem): String = when (clientCol(t)) {
         "revisao" -> "revisao"
-        "aprovado", "concluido" -> "aprovado"
-        "producao", "reenviado" -> "analise"
+        "concluido" -> "aprovado"
+        "aprovado", "producao", "reenviado" -> "analise"
         else -> "enviado"
+    }
+
+    // Linguagem do QUADRO CLIENTE (bug 1.0.133): sem jargão operacional interno
+    // ("Aguardando designer iniciar" etc.) — status simples, na perspectiva do cliente
+    // (paridade Desktop clientFacingStatusView).
+    data class ClientFacing(val key: String, val label: String, val colorHex: Long)
+    fun clientFacingStatusView(t: TaskItem): ClientFacing = when (clientCol(t)) {
+        "concluido" -> ClientFacing("concluido", "Cronograma concluído", 0xFF10B981)
+        "revisao" -> ClientFacing("revisao", "Ajuste solicitado — equipe corrigindo", 0xFFF59E0B)
+        "reenviado" -> ClientFacing("final", "Versão final disponível para análise", 0xFF34D399)
+        "aprovado", "producao" -> when (operationalCol(t)) {
+            "aguardando_envio" -> ClientFacing("temas_ok", "Temas aprovados — produção em andamento", 0xFF34D399)
+            "aguardando_legenda" -> ClientFacing("legendas", "Aguardando legendas e posts", 0xFF5B6CFF)
+            "aguardando_final" -> ClientFacing("final", "Versão final disponível para análise", 0xFF34D399)
+            else -> ClientFacing("producao", "A equipe está produzindo as artes", 0xFFA78BFA)
+        }
+        "enviado" -> ClientFacing("enviado", "Temas enviados — aguardando análise", 0xFF22D3EE)
+        else -> ClientFacing("preparacao", "Em preparação", 0xFF6E7480)
     }
     // 1.0.93 — bucket de 4 colunas DERIVADO DO PAPEL DE QUEM VÊ. Se quem abre o quadro é o
     // DESIGNER atribuído à tarefa, usa o eixo de trabalho do designer — assim um cronograma
