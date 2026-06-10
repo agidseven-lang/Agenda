@@ -99,9 +99,9 @@ class DetailHierarchyScreenshotTest {
             cronStatus = "ready_for_final_client_review", clientFlowStatus = "reenviado",
             assignedDesignerId = "d", assignedDesignerName = "Marcos Dias", designerFlowStatus = "concluido",
         ),
-        // V64.47 (bug 1.0.132): doc PRESO — globais 'revisao' herdados + 3/3 itens aprovados
-        // na fase themes. A LEITURA destrava: deve renderizar como TEMAS APROVADOS.
-        "8b · Bug 1.0.132: doc preso destravado (revisão herdada + 3/3 aprovados)" to base.copy(
+        // V64.49: globais 'revisao' herdados + 3/3 itens aprovados na fase themes — o
+        // fechamento é SÓ explícito: renderiza "Temas aprovados — aguardando confirmação".
+        "8b · V64.49: 3/3 aprovados aguardando confirmação do cliente (revisão herdada)" to base.copy(
             clientApprovalPhase = "themes", clientFlowStatus = "revisao", cronStatus = "em_revisao_cliente",
             clientReview = ClientReview("revisao", "trocar a foto", 1_749_400_000_000L, "Cliente"),
             clientItems = mapOf(

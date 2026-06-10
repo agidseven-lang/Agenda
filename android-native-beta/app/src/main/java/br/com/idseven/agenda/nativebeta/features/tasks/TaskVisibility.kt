@@ -80,9 +80,9 @@ object TaskVisibility {
         if (CLIENT_KEYS.contains(v)) {
             // 'concluido' explícito só vale se o fluxo realmente encerrou; senão ainda é reenvio.
             if (v == "concluido" && !isFullyComplete(t)) return "reenviado"
-            // V64.47 (bug 1.0.132): 'revisao' HERDADO com TODOS os itens da fase aprovados
-            // (ciclo ajuste→correção→aprovação antes do fechamento server-side) NÃO trava.
-            if (v == "revisao" && allPhaseItemsApproved(t)) return "aprovado"
+            // V64.49: o fechamento é SÓ explícito (botão "Aprovar temas" → approveAll); o
+            // estado "tudo aprovado com 'revisao' herdado" vira AGUARDANDO CONFIRMAÇÃO
+            // (tratado em operationalCol/clientCol4/clientFacingStatusView/detailState).
             return v
         }
         val ws = t.cronStatus ?: ""  // workflowStage não está no modelo; usa cronStatus + review
@@ -90,7 +90,6 @@ object TaskVisibility {
         // CORREÇÃO (status-consistency): status BRUTO do kanban (t.status=='concluido') NÃO força
         // mais 'concluido'. Conclusão só via isFullyComplete (aprovação final real + sem pendências).
         if (isFullyComplete(t)) return "concluido"
-        if ((cr == "revisao" || ws == "em_revisao_cliente" || ws == "editado_cliente") && allPhaseItemsApproved(t)) return "aprovado"
         if (cr == "revisao" || ws == "em_revisao_cliente" || ws == "editado_cliente") return "revisao"
         if (ws == "ready_for_final_client_review" || ws == "reenviado_cliente") return "reenviado"
         if (hasDesigner(t) || ws == "sent_to_designer") return "producao"
@@ -198,6 +197,9 @@ object TaskVisibility {
         if (Sectors.of(t.sector).key != "cronograma") return t.status ?: "afazer"
         if (isFullyComplete(t)) return "concluido"                          // ÚNICO caminho para concluído
         val cf = clientCol(t)
+        // V64.49: tudo aprovado com 'revisao' herdado = aguardando o cliente CONFIRMAR no
+        // portal (botão "Aprovar temas") → Social vê "Aguardando aprovação dos temas".
+        if (cf == "revisao" && !hasPendingItemRevision(t) && allPhaseItemsApproved(t)) return "producao"
         if (cf == "revisao") return "aguardando_revisao"
         if (cf == "reenviado") return "aguardando_final"
         if (hasDesigner(t)) {
@@ -257,12 +259,12 @@ object TaskVisibility {
         "entregue" -> "Entregue — aguardando a Social"
         else -> "Acompanhar"
     }
-    // Status VISUAL do card do DESIGNER (bug 1.0.133 — status discrepante): a COLUNA segue
-    // "Em andamento", mas o badge do card é ESPECÍFICO — "Em produção" — coerente com o
-    // "Designer em produção" que a Social vê (paridade Desktop designerStatusView).
+    // Status VISUAL do card do DESIGNER (reprovação 1.0.134): a COLUNA segue "Em andamento",
+    // mas o badge do card é IGUAL ao que a Social vê — "Designer em produção" — leitura
+    // idêntica da mesma etapa em todos os papéis (paridade Desktop designerStatusView).
     fun designerCardLabel(t: TaskItem): String {
         val k = designerColView(t)
-        if (k == "andamento") return "Em produção"
+        if (k == "andamento") return "Designer em produção"
         return DESIGNER_COLS4.firstOrNull { it.key == k }?.label ?: "A Fazer"
     }
 
@@ -270,11 +272,16 @@ object TaskVisibility {
     // REGRA DEFINITIVA (bug 1.0.133): a coluna "Aprovado" do quadro Cliente é SÓ a conclusão
     // REAL (clientCol 'concluido' via isFullyComplete). Temas aprovados é etapa INTERMEDIÁRIA
     // → fica em "Em análise" enquanto a produção anda (paridade Desktop clientCol4).
-    fun clientCol4(t: TaskItem): String = when (clientCol(t)) {
-        "revisao" -> "revisao"
-        "concluido" -> "aprovado"
-        "aprovado", "producao", "reenviado" -> "analise"
-        else -> "enviado"
+    fun clientCol4(t: TaskItem): String {
+        val c = clientCol(t)
+        // aguardando confirmação do cliente (tudo aprovado, sem o clique final) → Em análise
+        if (c == "revisao" && allPhaseItemsApproved(t)) return "analise"
+        return when (c) {
+            "revisao" -> "revisao"
+            "concluido" -> "aprovado"
+            "aprovado", "producao", "reenviado" -> "analise"
+            else -> "enviado"
+        }
     }
 
     // Linguagem do QUADRO CLIENTE (bug 1.0.133): sem jargão operacional interno
@@ -283,7 +290,9 @@ object TaskVisibility {
     data class ClientFacing(val key: String, val label: String, val colorHex: Long)
     fun clientFacingStatusView(t: TaskItem): ClientFacing = when (clientCol(t)) {
         "concluido" -> ClientFacing("concluido", "Cronograma concluído", 0xFF10B981)
-        "revisao" -> ClientFacing("revisao", "Ajuste solicitado — equipe corrigindo", 0xFFF59E0B)
+        "revisao" ->
+            if (allPhaseItemsApproved(t)) ClientFacing("aguarda_confirmacao", "Temas aprovados — aguardando confirmação", 0xFF22D3EE)
+            else ClientFacing("revisao", "Ajuste solicitado — equipe corrigindo", 0xFFF59E0B)
         "reenviado" -> ClientFacing("final", "Versão final disponível para análise", 0xFF34D399)
         "aprovado", "producao" -> when (operationalCol(t)) {
             "aguardando_envio" -> ClientFacing("temas_ok", "Temas aprovados — produção em andamento", 0xFF34D399)
@@ -363,7 +372,7 @@ object TaskVisibility {
         return true
     }
     private fun clientApprovedFlag(t: TaskItem): Boolean =
-        t.cronStatus == "aprovado_cliente" || t.clientReview?.status == "aprovado" || allPhaseItemsApproved(t)
+        t.cronStatus == "aprovado_cliente" || t.clientReview?.status == "aprovado"
 
     // Estado ÚNICO do detalhe: 1 status principal + próxima ação + responsável + ações por fase.
     // Hierarquia aprovada (mockup): nunca 5 status concorrentes; linguagem humana.
@@ -384,6 +393,13 @@ object TaskVisibility {
             "O cliente aprovou a versão final. Cronograma encerrado.",
             "Nada a fazer — aprovação final registrada.",
             "none", 0xFF34D399, listOf("clientview"))
+        // V64.49: cliente aprovou TODOS os itens mas falta a confirmação final no portal
+        // (botão "Aprovar temas") — globais seguem 'revisao' herdado. NÃO é ajuste pendente.
+        if (cc == "revisao" && pend.isEmpty() && allPhaseItemsApproved(t)) return DetailState(
+            "aguardando_confirmacao", "Temas aprovados — aguardando confirmação",
+            "O cliente aprovou todos os temas. Falta a confirmação final no portal (botão “Aprovar temas”).",
+            "Aguardar o cliente confirmar a aprovação no portal. Nenhuma ação necessária agora.",
+            "cliente", 0xFF22D3EE, listOf("clientview"))
         if (pend.isNotEmpty() || (cc == "revisao" && !hasTeamAdjustedAwaiting(t))) return DetailState(
             "cliente_ajuste", "Cliente pediu ajuste",
             if (pend.isNotEmpty()) "Ajuste solicitado no Conteúdo " + pend.joinToString(", ") { "${it.idx + 1}" } +
