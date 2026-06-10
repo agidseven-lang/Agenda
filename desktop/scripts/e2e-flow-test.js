@@ -400,7 +400,7 @@ check('D14', 'Cliente board usa CLIENT_COLS4', /const byCol=CLIENT_COLS4\.map/.t
 check('RA_COLVIEW', 'designerColView mantém coluna própria de Revisão (não colapsa revisao→andamento)', /function designerColView\(t\)\{const c=designerCol\(t\);return c==='concluido'\?'entregue':\(c==='revisao'\?'revisao':/.test(DH));
 check('RA_STATUSVIEW', 'designerStatusView lê DESIGNER_COLS4 (badge do card do designer)', /function designerStatusView\(t\)\{const k=designerColView\(t\);const c=DESIGNER_COLS4\.find/.test(DH));
 check('RA_CARD_PARAM', 'taskCard é role-aware (persp), designerView só p/ cronograma c/ designer', /function taskCard\(t, persp\)\{[\s\S]*?const designerView = persp==='designer' && secOf\(t\.sector\)\.key==='cronograma' && hasDesigner\(t\);/.test(DH));
-check('RA_CARD_BADGE', 'badge do card por perspectiva: designerStatusView / clientFacingStatusView / clientStatusView', /const oc=designerView\?designerStatusView\(t\):\(clientView\?clientFacingStatusView\(t\):clientStatusView\(t\)\);/.test(DH));
+check('RA_CARD_BADGE', 'card por perspectiva: chip superior do designer = designerStatusView (sem badge duplicado); cliente/operacional no badge do corpo', /const _mst=designerView\?designerStatusView\(t\):st;/.test(DH) && /if\(designerView\)return '';/.test(DH) && /const oc=clientView\?clientFacingStatusView\(t\):clientStatusView\(t\);/.test(DH));
 check('RA_CARD_TIMELINE', 'card escolhe designerCardTimeline × taskCardTimeline pela perspectiva', /designerView\?designerCardTimeline\(t\):taskCardTimeline\(t,clientView\?'client':null\)/.test(DH));
 // designerCardTimeline NÃO mostra o fluxo do cliente (sem taskTimeline/clientStatusView dentro dela)
 const dctFn = (DH.match(/function designerCardTimeline\(t\)\{[\s\S]*?\n\}/) || [''])[0];
@@ -766,7 +766,7 @@ const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
 // interno + badge do taskCard (ternário designerView) + flowSummary "Status operacional".
 check('CSV_SCOPE', 'clientStatusView: definição + taskCard + flowSummary + uso interno taskTimeline (4 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 4 && /function clientStatusView\(t\)/.test(DH_noc));
 // taskCard MIGRADO (role-aware f96aa2e: ternário designerView).
-check('CSV_TASKCARD_MIGRATED', "taskCard cronograma: badge por perspectiva (designer/cliente/operacional) na fonte única", /key==='cronograma'\)\{const oc=designerView\?designerStatusView\(t\):\(clientView\?clientFacingStatusView\(t\):clientStatusView\(t\)\);/.test(DH));
+check('CSV_TASKCARD_MIGRATED', "taskCard cronograma: badge por perspectiva na fonte única (designerView sem duplicata)", /key==='cronograma'\)\{\s*\n\s*if\(designerView\)return '';/.test(DH) && /const oc=clientView\?clientFacingStatusView\(t\):clientStatusView\(t\);/.test(DH));
 // chip do detalhe MIGRADO p/ a máquina de estados (1 chip, sem status concorrentes).
 check('CSV_REVISAO_MIGRATED', 'Chip do detalhe usa detailState(t) (rev-chip único, sem contradição)', /const dsc=detailState\(t\);[\s\S]{0,200}rev-chip/.test(DH));
 // detalhe MIGRADO (flowSummaryBlock "Status operacional" + opPanelBlock "Próxima ação").
@@ -1106,7 +1106,7 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   // Worker V64.47 (branch) — fechamento canônico server-side:
   (function(){
     const W47=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
-    check('DH_W49_NO_AUTOCLOSE','Worker: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito) — V64.50 atual', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.50-push-proof-diag"/.test(W47));
+    check('DH_W49_NO_AUTOCLOSE','Worker: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito) — V64.51 atual', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.51-mobile-touch-footer"/.test(W47));
     check('DH_W47_PENDING_PHASEAWARE','Worker V64.47: pendingRevision do portal/state é phase-aware com override allApproved', /const pendingRevision = !allApproved && \(itemPending/.test(W47) && /const pendingRevision = !_allApprovedR && \(_itemPendingR/.test(W47));
     check('DH_W47_ACK_CANONICO','Portal: ackFeedback canônico (allOk→approveAll real; final→reload p/ confirmação; pendência→Feedback enviado)', /allOk&&PHASE==='final'\)\{location\.reload\(\)/.test(W47) && /if\(allOk\)\{post\(\{action:'approveAll'\}/.test(W47) && /clientFeedbackSent\(\);return;\}/.test(W47));
     check('DH_W47_PORTAL_MSG','Portal: tela "Temas aprovados e enviados!" quando a fase fecha', /Temas aprovados e enviados!/.test(W47));
@@ -1207,8 +1207,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       /result\.reason = "send_failed"; result\.error = "push_send_failed";/.test(W50) && /subsFound=\$\{subsFound\}/.test(W50) && /function maskEndpoint/.test(W50));
     check('CY4_W50_INTEROP','Harness do Worker PROVA interop RFC 8291/8292 com implementação independente (K1/K2 presentes)',
       /K1_INTEROP_RFC8291/.test(HT) && /K2_VAPID_VERIFY/.test(HT) && /createDecipheriv\('aes-128-gcm'/.test(HT));
-    check('CY4_W50_BADGE','Ícone/badge ID Seven: badge monocromático dedicado + SW com icon/badge/data + sw versionado',
-      /IDSEVEN_BADGE_B64/.test(W50) && /badge: '\/og\/idseven-badge\.png'/.test(W50) && /sw-version: V64\.50/.test(W50));
+    check('CY4_W50_BADGE','Ícone/badge ID Seven: badge dedicado no SW E no payload + sw versionado V64.51',
+      /IDSEVEN_BADGE_B64/.test(W50) && /data\.badge \|\| '\/og\/idseven-badge\.png'/.test(W50) && /badge: "\/og\/idseven-badge\.png"/.test(W50) && /sw-version: V64\.51/.test(W50));
   })();
   check('CY4_SENT_HONESTO','Desktop: contentSent NUNCA falha em silêncio (sem JWT → aviso; send_failed → aviso com erro real; sent>0 → confirmação)',
     (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];
@@ -1218,13 +1218,40 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     check('CY4_DESIGNER_EXATO','Quadro Designer: status do card EXATAMENTE "Designer em produção"', mod.designerStatusView(DPROD2).label==='Designer em produção');
   }
 
+  /* ═══ CY5 — REPROVAÇÃO 1.0.136 (portal mobile + kanban estrutural + designer exato) ═══ */
+  console.log(`${C.b}\n[CY5] V64.51 — CV_JS servido, toque mobile, rodapé 3 estados, kanban min-width${C.x}`);
+  (function(){
+    const W51=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
+    // O ensinamento da 1.0.136: compilar o que o NAVEGADOR recebe.
+    let servedOk=false,servedErr='';
+    try{const st=W51.indexOf('const CV_JS = \u0060');const en=W51.indexOf('\n\u0060;',st);
+      const served=eval(W51.slice(st+14,en+2));new Function(served);servedOk=true;
+      servedOk=servedOk&&served.includes('pushGateShow')&&served.includes('reviewNext')&&served.includes('pushDebugPanel');
+    }catch(e){servedErr=e.message;}
+    check('CY5_W51_CVJS_SERVIDO','CV_JS SERVIDO compila e contém gate+reviewNext+debug (portal não morre mais em SyntaxError)',servedOk,servedErr);
+    check('CY5_W51_TOUCH','Barra inferior não engole toques (pointer-events:none + inner auto) + respiro mobile 240px',
+      /\.gactions\{[^}]*pointer-events:none\}/.test(W51) && /\.gactions \.inner > \*\{pointer-events:auto\}/.test(W51) && /padding-bottom:240px/.test(W51));
+    check('CY5_W51_FOOTER3','Rodapé 3 estados no server-render e no syncFooter (0/3 NUNCA mostra finalização)',
+      /reviewNext/.test(W51) && /st\.apr>=st\.total/.test(W51) && /Revise e aprove cada tema antes de finalizar/.test(W51));
+    check('CY5_W51_E2E_MOBILE','E2E mobile versionado no branch do worker (scripts/portal-mobile-e2e.js, toque puro 390/412)',
+      readFromGit('worker/v64-42-team-adjust-idem-cleanup','scripts/portal-mobile-e2e.js').includes('touchscreen.tap'));
+  })();
+  check('CY5_KANBAN_MINW','Kanban: coluna com largura mínima REAL (320px) + scroll horizontal do board (nunca espremer)',
+    /grid-template-columns:repeat\(4,minmax\(320px,1fr\)\)/.test(DH) && /\.kanban\{[\s\S]{0,300}overflow-x:auto/.test(DH) && /\.kanban \.kcol\{min-width:320px\}/.test(DH));
+  check('CY5_KANBAN_BOARDMODE','board-mode: kanban rola na horizontal mantendo colunas em altura total',
+    /#content\.board-mode \.kanban\{flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden\}/.test(DH));
+  if(mod&&mod.designerStatusView){
+    const DT={sector:'cronograma',cronContents:[{tema:'T'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
+    check('CY5_DESIGNER_TOPCHIP','Chip do card do designer = EXATAMENTE "Designer em produção" (fonte designerStatusView)', mod.designerStatusView(DT).label==='Designer em produção');
+  }
+
   // Worker V64.48 (branch) — contentSent + rodapé dinâmico do portal:
   (function(){
     const W48=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
     check('CY2_W48_CONTENTSENT','Worker: team-action aceita contentSent e dispara themes_sent_to_client/final_content_sent_to_client', /action !== "adjustedItem" && action !== "contentSent"/.test(W48) && /final_content_sent_to_client" : "themes_sent_to_client"/.test(W48) && /notifyWorkflowEvent\(env, task, evSent/.test(W48));
     check('CY2_W48_NO_WRITE','Worker: contentSent NÃO escreve no Firestore (apenas notifica + loga)', (()=>{const b=(W48.match(/if \(action === "contentSent"\) \{[\s\S]*?\n  \}/)||[''])[0];return b.length>0&&b.indexOf(':commit')<0&&b.indexOf('writes:')<0;})());
     check('CY2_W48_FOOTER','Portal: syncFooter dinâmico — ajuste pendente → "Enviar feedback" (nunca CTA de aprovação)', /function syncFooter\(\)/.test(W48) && /function anyRevBadge\(\)/.test(W48) && (W48.match(/syncFooter\(\);/g)||[]).length>=5);
-    check('CY2_W48_VERSION','Worker healthcheck = V64.50-push-proof-diag', /version: "V64\.50-push-proof-diag"/.test(W48));
+    check('CY2_W48_VERSION','Worker healthcheck = V64.51-mobile-touch-footer', /version: "V64\.51-mobile-touch-footer"/.test(W48));
   })();
 })();
 

@@ -370,10 +370,15 @@
   body.desktop .d-agenda-month .d-cal-card{padding:18px}
 
   /* KANBAN — 4 colunas lado a lado */
+  /* Reprovação 1.0.136: coluna NUNCA é espremida. Largura mínima REAL (320px) e, se a
+     janela/zoom não der espaço (ex.: 1366 com escala 125% → viewport ~1092px), o BOARD
+     rola na horizontal — cards mantêm o tamanho legível em qualquer resolução. */
   body.desktop .kanban{
-    display:grid;grid-template-columns:repeat(4,minmax(300px,1fr));gap:18px;
-    align-items:start;margin-top:12px;
+    display:grid;grid-template-columns:repeat(4,minmax(320px,1fr));gap:18px;
+    align-items:start;margin-top:12px;overflow-x:auto;overscroll-behavior-x:contain;
+    padding-bottom:8px;scrollbar-gutter:stable;
   }
+  body.desktop .kanban .kcol{min-width:320px}
   /* Reprovação 1.0.135 (card cortado): FIX ESTRUTURAL, sem cálculo em px.
      Nas telas de quadro o #content vira coluna FLEX na altura real da janela
      (qualquer resolução/zoom/taskbar): cabeçalho e toolbar são flex-none e o
@@ -384,7 +389,7 @@
   body.desktop #content.board-mode > .scr-head{flex:none;width:100%}
   body.desktop #content.board-mode > .scr{flex:1 1 auto;min-height:0;width:100%;display:flex;flex-direction:column;overflow:visible}
   body.desktop #content.board-mode .d-board-tools{flex:none}
-  body.desktop #content.board-mode .kanban{flex:1 1 auto;min-height:0}
+  body.desktop #content.board-mode .kanban{flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden}
   body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:none;min-height:0}
   /* fallback (telas sem board-mode): limite conservador para nunca estourar a janela */
   body.desktop .kanban .kcol{
@@ -2455,7 +2460,10 @@ function taskCard(t, persp){
     chk='<div class="tc-chk"><div class="tc-chk-bar"><div style="width:'+pct+'%"></div></div><div class="tc-chk-l">'+done+' de '+t.checklist.length+' no checklist</div></div>';}
   let h='<div class="tc">';
   // 1a) Linha de meta — status (esq) + prazo (dir)
-  h+='<div class="tc-meta"><span class="tc-st" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span><div style="flex:1"></div>'+
+  // Reprovação 1.0.136: na perspectiva do DESIGNER o chip superior mostra o STATUS DELE
+  // ("Designer em produção"), não o status bruto do kanban ("Em andamento").
+  const _mst=designerView?designerStatusView(t):st;
+  h+='<div class="tc-meta"><span class="tc-st" style="background:'+withAlpha(_mst.color,.16)+';color:'+_mst.color+'"><span class="dotc" style="background:'+_mst.color+'"></span>'+esc(_mst.label)+'</span><div style="flex:1"></div>'+
      (d?'<span class="tc-due" style="background:'+withAlpha(d.color,.16)+';color:'+d.color+'">'+esc(d.text)+'</span>':'')+'</div>';
   // 1b) Responsavel — avatar grande + nome (ate 2 linhas) + cargo, largura total
   h+='<div class="tc-person">'+
@@ -2475,7 +2483,9 @@ function taskCard(t, persp){
          // (wrapper FIEL de opColOf(operationalCol(t)) — resultado visual idêntico ao anterior).
          // role-aware (passo 2): no quadro do DESIGNER, o badge mostra o status DELE (A Fazer/
          // Em andamento/Revisão/Entregue), não o status do fluxo do cliente.
-         if(secOf(t.sector).key==='cronograma'){const oc=designerView?designerStatusView(t):(clientView?clientFacingStatusView(t):clientStatusView(t));
+         if(secOf(t.sector).key==='cronograma'){
+           if(designerView)return '';   // chip superior já mostra "Designer em produção" (sem duplicar)
+           const oc=clientView?clientFacingStatusView(t):clientStatusView(t);
            return '<div class="tc-cron-st" style="color:'+oc.color+';background:'+withAlpha(oc.color,.14)+';border-color:'+withAlpha(oc.color,.32)+'"><span class="dotc"></span>'+esc(oc.label)+'</div>';}
          return t.cronStatus?('<div class="tc-cron-st" style="color:'+cronStatusColor(t.cronStatus)+';background:'+withAlpha(cronStatusColor(t.cronStatus),.14)+';border-color:'+withAlpha(cronStatusColor(t.cronStatus),.32)+'"><span class="dotc"></span>'+esc(cronStatusLabel(t.cronStatus))+'</div>'):'';
        })())+
