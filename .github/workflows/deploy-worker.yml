@@ -129,10 +129,25 @@ jobs:
           echo "$lct" | grep -qi 'image/png' || { echo "FAIL: logo nao e image/png" >&2; exit 1; }
           [ "$(wc -c < /tmp/logo.png)" -gt 10000 ] || { echo "FAIL: logo muito pequena" >&2; exit 1; }
 
-          echo "== 3) Service Worker /cliente/sw.js =="
+          echo "== 2b) BADGE monocromatico /og/idseven-badge.png (V64.50) =="
+          bc=$(curl -sS --max-time 20 -o /tmp/badge.png -w '%{http_code}' "$B/og/idseven-badge.png")
+          bct=$(curl -sS --max-time 20 -o /dev/null -w '%{content_type}' "$B/og/idseven-badge.png")
+          echo "HTTP=$bc CT=$bct bytes=$(wc -c < /tmp/badge.png)"
+          [ "$bc" = "200" ] || { echo "FAIL: badge != 200" >&2; exit 1; }
+          echo "$bct" | grep -qi 'image/png' || { echo "FAIL: badge nao e image/png" >&2; exit 1; }
+          [ "$(wc -c < /tmp/badge.png)" -gt 300 ] || { echo "FAIL: badge muito pequeno" >&2; exit 1; }
+
+          echo "== 3) Service Worker /cliente/sw.js (V64.50: showNotification + icon/badge/data + click) =="
           swc=$(curl -sS --max-time 20 -o /tmp/sw.js -w '%{http_code}' "$B/cliente/sw.js")
           [ "$swc" = "200" ] || { echo "FAIL: sw.js != 200" >&2; exit 1; }
           grep -q "addEventListener('push'" /tmp/sw.js || { echo "FAIL: sw sem handler push" >&2; exit 1; }
+          grep -q "sw-version: V64.50-push-proof-diag" /tmp/sw.js || { echo "FAIL: sw nao e V64.50" >&2; exit 1; }
+          grep -q "event.waitUntil(self.registration.showNotification(title, options))" /tmp/sw.js || { echo "FAIL: sw sem showNotification/waitUntil" >&2; exit 1; }
+          grep -q "badge: '/og/idseven-badge.png'" /tmp/sw.js || { echo "FAIL: sw sem badge dedicado" >&2; exit 1; }
+          grep -q "icon: '/og/idseven-logo.png'" /tmp/sw.js || { echo "FAIL: sw sem icon oficial" >&2; exit 1; }
+          grep -q "eventType: data.eventType" /tmp/sw.js || { echo "FAIL: sw sem data{eventType}" >&2; exit 1; }
+          grep -q "notificationclick" /tmp/sw.js || { echo "FAIL: sw sem notificationclick" >&2; exit 1; }
+          echo "sw.js V64.50 OK"
           grep -q "addEventListener('notificationclick'" /tmp/sw.js || { echo "FAIL: sw sem notificationclick" >&2; exit 1; }
           echo "OK: SW serve push + notificationclick"
 
