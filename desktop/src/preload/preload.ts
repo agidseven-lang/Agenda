@@ -27,5 +27,5 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.invoke("copy-card-image", bytes),
   showInFolder: (p: string): Promise<boolean> => ipcRenderer.invoke("show-in-folder", p),
   isDesktop: true,
-  version: "1.0.136-beta-push-proof-v64-50-test",
+  version: "1.0.137-beta-portal-fix-v64-51-test",
 });
