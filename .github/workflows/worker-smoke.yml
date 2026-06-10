@@ -1,0 +1,35 @@
+# Smoke-check SOMENTE LEITURA do Worker em produção (sem deploy, sem escrita).
+name: "[manual] Worker Smoke (read-only)"
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Healthcheck + assets + SW (V64.50)
+        run: |
+          set -euo pipefail
+          for B in "https://aprovar.agendaidseven.com.br" "https://idseven-push.agidseven.workers.dev"; do
+            echo "== $B =="
+            H=$(curl -sS --max-time 25 "$B/healthcheck")
+            echo "$H" | grep -q '"V64.50-push-proof-diag"' || { echo "FAIL healthcheck: $H" >&2; exit 1; }
+            echo "healthcheck V64.50 OK"
+            for A in /og/idseven-logo.png /og/idseven-badge.png; do
+              code=$(curl -sS --max-time 25 -o /tmp/a -w '%{http_code}' "$B$A")
+              ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B$A")
+              [ "$code" = "200" ] || { echo "FAIL $A code=$code" >&2; exit 1; }
+              echo "$ct" | grep -qi image/png || { echo "FAIL $A ct=$ct" >&2; exit 1; }
+              echo "$A -> 200 image/png ($(wc -c </tmp/a) bytes)"
+            done
+            SW=$(curl -sS --max-time 25 "$B/cliente/sw.js")
+            echo "$SW" | grep -q "sw-version: V64.50-push-proof-diag" || { echo "FAIL sw versao" >&2; exit 1; }
+            echo "$SW" | grep -q "showNotification(title, options)" || { echo "FAIL sw showNotification" >&2; exit 1; }
+            echo "$SW" | grep -q "badge: '/og/idseven-badge.png'" || { echo "FAIL sw badge" >&2; exit 1; }
+            echo "$SW" | grep -q "notificationclick" || { echo "FAIL sw click" >&2; exit 1; }
+            echo "sw.js V64.50 OK (showNotification + icon/badge/data + notificationclick)"
+            P=$(curl -sS --max-time 25 "$B/cliente/cronograma/ci_dummy_token_0001" || true)
+            echo "$P" | grep -q "pushDebugPanel\|Receba avisos" && echo "portal entrega gate+debug JS OK" || echo "AVISO: token dummy nao renderiza portal completo (esperado)"
+          done
+          echo "SMOKE OK"
