@@ -280,7 +280,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.50-push-proof-diag" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.51-mobile-touch-footer" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1060,7 +1060,7 @@ function clientSwResponse() {
   const sw = `
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
-// sw-version: V64.50-push-proof-diag
+// sw-version: V64.51-mobile-touch-footer
 self.addEventListener('push', function(event) {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) { data = {}; }
@@ -1068,10 +1068,15 @@ self.addEventListener('push', function(event) {
   const body = data.body || '';
   const url = data.openUrl || '/';
   const options = { body: body,
-    icon: '/og/idseven-logo.png', badge: '/og/idseven-badge.png',
+    icon: data.icon || '/og/idseven-logo.png', badge: data.badge || '/og/idseven-badge.png',
     data: { url: url, eventType: data.eventType || '', taskId: data.taskId || '', phase: data.phase || '' },
     tag: data.tag || 'idseven-client', renotify: !!data.renotify };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+      for (const c of list) { try { c.postMessage({ type: 'idseven-push', eventType: options.data.eventType, at: Date.now() }); } catch (_) {} }
+    })
+  ]));
 });
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
@@ -1791,6 +1796,7 @@ async function handleClientPushTest(token, request, env) {
   const out = await broadcastWebPush(env, subs,
     { title: "Teste de avisos — Agenda ID Seven", body: "Os avisos deste cronograma estão funcionando. 💜",
       openUrl: "/cliente/cronograma/" + token, tag: "idseven-push-test",
+      icon: "/og/idseven-logo.png", badge: "/og/idseven-badge.png",
       eventType: "push_test", taskId: task.id, phase: "test" },
     { topic: "push_test", urgency: "high", ttl: 600 });
   if (out.gone && out.gone.length) { try { await pruneClientPushSubs(env, task, out.gone); } catch (_) {} }
@@ -2063,7 +2069,8 @@ async function notifyWorkflowEvent(env, task, eventType, payload) {
     if (subs.length && env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY && env.VAPID_SUBJECT) {
       // V64.49 — PRECISÃO: o payload carrega eventType/taskId/phase além de título/corpo/URL.
       const out = await broadcastWebPush(env, subs,
-        { title: ev.title, body: ev.body, openUrl, tag: eventType,
+        { title: ev.title, body: ev.body, openUrl, tag: dedupKey,
+          icon: "/og/idseven-logo.png", badge: "/og/idseven-badge.png",
           eventType, taskId: (task && task.id) || "", phase: ev.phase },
         { topic: eventType, urgency: "high", ttl: 86400 });
       result = { channel: "webpush", sent: out.sent, total: out.total };
@@ -2577,6 +2584,7 @@ const CV_CSS = `
 body{background:radial-gradient(1100px 520px at 12% -8%,rgba(124,92,255,.20),transparent 60%),radial-gradient(900px 480px at 105% 0%,rgba(198,75,216,.14),transparent 55%),radial-gradient(700px 600px at 50% 120%,rgba(34,211,184,.07),transparent 60%),var(--bg);color:var(--txt);font:15px/1.55 var(--ff);-webkit-font-smoothing:antialiased;min-height:100vh}
 a{color:#b9a4ff;text-decoration:none}
 .wrap{max-width:1180px;margin:0 auto;padding:30px 22px 160px}
+@media(max-width:560px){.wrap{padding-bottom:240px}}
 @media(max-width:560px){.wrap{padding:18px 14px 150px}}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:22px}
 .brand{display:flex;align-items:center;gap:12px}.brand .logo{width:44px;height:44px;flex:0 0 44px;filter:drop-shadow(0 6px 16px rgba(124,92,255,.45))}
@@ -2639,7 +2647,8 @@ a{color:#b9a4ff;text-decoration:none}
 .hb-ok{background:var(--okbg);color:var(--ok)}.hb-rev{background:var(--revbg);color:var(--rev)}.hb-edit{background:rgba(124,92,255,.12);color:#b9a4ff}.hb-note{background:var(--infobg);color:var(--info)}
 .hmain{flex:1;min-width:0}.hmain .ht{font-size:13.5px;font-weight:600}.hmain .hdiff{margin-top:7px;font-size:12px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 10px}.hdiff .new{color:var(--ok)}
 .htime{flex:0 0 auto;font-size:11px;color:var(--faint);white-space:nowrap}
-.gactions{position:fixed;left:0;right:0;bottom:0;z-index:50;background:linear-gradient(180deg,rgba(7,8,16,0),rgba(7,8,16,.88) 34%,var(--bg) 70%);padding:20px 0 max(18px,env(safe-area-inset-bottom))}
+.gactions{position:fixed;left:0;right:0;bottom:0;z-index:50;background:linear-gradient(180deg,rgba(7,8,16,0),rgba(7,8,16,.88) 34%,var(--bg) 70%);padding:20px 0 max(18px,env(safe-area-inset-bottom));pointer-events:none}
+.gactions .inner > *{pointer-events:auto}
 .gactions .inner{max-width:1180px;margin:0 auto;padding:0 22px;display:flex;align-items:center;gap:12px}@media(max-width:560px){.gactions .inner{padding:0 14px;flex-wrap:wrap}}
 .gstat{flex:1;min-width:0;font-size:12.5px;color:var(--mut)}.gstat b{color:var(--txt)}@media(max-width:560px){.gstat{flex:1 0 100%;order:-1;margin-bottom:2px}}
 .btn{appearance:none;border:0;border-radius:14px;padding:14px 20px;font-size:14.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:.14s;white-space:nowrap}.btn svg{width:16px;height:16px}
@@ -2721,18 +2730,28 @@ function setBadge(i,cs){var c=card(i);if(!c)return;var b=c.querySelector('[data-
    NESTA sessão. Com QUALQUER ajuste/edição pendente → "Enviar feedback" (nunca "Aprovar
    temas e liberar produção"); só com tudo sem pendência → CTA de aprovação da fase. */
 function footerCta(){return PHASE==='final'?'Aprovar versão final':(PHASE==='production'?'Aprovar legendas e artes':'Aprovar temas');}
-function anyRevBadge(){var any=false;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){var t=(b.textContent||'');if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)any=true;});return any;}
+function badgeStats(){var total=0,apr=0,rev=0;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){total++;var t=(b.textContent||'');
+  if(t.indexOf('Aprovado')>=0)apr++;else if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)rev++;});return {total:total,apr:apr,rev:rev};}
+function anyRevBadge(){return badgeStats().rev>0;}
+/* V64.51 — 3 ESTADOS REAIS: ajuste pendente → Enviar feedback; TODOS aprovados →
+   Aprovar temas (finalização); pendentes sem ajuste → orientação (NUNCA finalização). */
 function syncFooter(){
   var inner=document.querySelector('.gactions .inner');if(!inner)return;
-  if(anyRevBadge()){
+  var st=badgeStats();var state;
+  if(st.rev>0){state='feedback';
     inner.innerHTML='<div class="gstat">Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</div>'+
       '<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir mais ajustes</button>'+
       '<button class="btn primary" data-act="ackFeedback">'+CIC.check+'Enviar feedback</button>';
-  }else{
-    inner.innerHTML='<div class="gstat">Você pode aprovar tudo, ajustar itens específicos ou pedir uma revisão geral — <b>sem obrigação de editar todos.</b></div>'+
+  }else if(st.total>0&&st.apr>=st.total){state='approve';
+    inner.innerHTML='<div class="gstat">Todos os temas foram aprovados. Confirme para a equipe seguir com a produção.</div>'+
       '<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
       '<button class="btn primary" data-act="approveAll" data-phase="'+PHASE+'">'+CIC.check+footerCta()+'</button>';
+  }else{state='review';
+    inner.innerHTML='<div class="gstat">Toque em <b>cada conteúdo</b> acima para revisar e aprovar ('+st.apr+' de '+st.total+'). O botão final aparece quando todos estiverem aprovados.</div>'+
+      '<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
+      '<button class="btn primary" data-act="reviewNext">'+CIC.check+'Revisar temas</button>';
   }
+  diagSet('footerState',state+' ('+st.apr+'/'+st.total+(st.rev?(' rev='+st.rev):'')+')');
 }
 function setItemNote(i,note){var c=card(i);if(!c)return;var slot=c.querySelector('[data-noteslot]');if(slot)slot.style.display='';var box=c.querySelector('[data-itemnote]');if(box)box.textContent=note;}
 function setTheme(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-field="tema"]');if(el)el.textContent=v;var h=c.querySelector('.ctitle h3');if(h)h.textContent=v;}
@@ -2763,8 +2782,12 @@ function clientFeedbackSent(){var w=document.querySelector('.wrap');if(!w)return
 function getText(i,field){var c=card(i);if(!c)return'';var el=c.querySelector('[data-field="'+field+'"]');if(!el||el.classList.contains('pend'))return'';return el.textContent||'';}
 function sheetForm(title,desc,kind,val,multiline){var inp=multiline?'<textarea id="sIn" placeholder="Escreva aqui...">'+(val||'')+'</textarea>':'<input id="sIn" value="'+(val||'').replace(/"/g,'&quot;')+'"/>';return '<h3></h3><div class="sd"></div>'+inp+'<div class="srow"><button class="btn ghost" data-x="cancel">Cancelar</button><button class="btn '+(kind==='rev'?'warn':'primary')+'" data-x="send">'+(kind==='rev'?'Enviar':'Salvar')+'</button></div>';}
 function openInput(title,desc,kind,val,multiline,cb){openSheet(sheetForm(title,desc,kind,val,multiline));sheet.querySelector('h3').textContent=title;sheet.querySelector('.sd').textContent=desc;pending=cb;}
+diagSet('cardClickBound','1');
 document.addEventListener('click',function(e){
-  var tg=e.target.closest&&e.target.closest('[data-toggle]');if(tg){tg.closest('.card').classList.toggle('is-open');return;}
+  var tg=e.target.closest&&e.target.closest('[data-toggle]');if(tg){var cc=tg.closest('.card');cc.classList.toggle('is-open');
+    diagSet('cardClickFired','i'+(cc.dataset.card||'?')+' @'+new Date().toISOString());
+    if(cc.classList.contains('is-open'))diagSet('expandedItem','i'+(cc.dataset.card||'?'));
+    return;}
   if(e.target===scrim){closeSheet();return;}
   var sx=e.target.closest&&e.target.closest('[data-x]');if(sx){if(sx.dataset.x==='cancel'){closeSheet();}else{var v=(sheet.querySelector('#sIn')||{}).value||'';var cb=pending;closeSheet();if(cb)cb(v);}return;}
   var a=e.target.closest&&e.target.closest('[data-act]');if(!a)return;
@@ -2792,7 +2815,15 @@ document.addEventListener('click',function(e){
       if(j&&j.phase==='production'){clientProductionApproved();}else{clientThemesApproved();}
     });return;}
     clientFeedbackSent();return;}
+  else if(act==='reviewNext'){
+    var first=null;document.querySelectorAll('#contents [data-card]').forEach(function(c){if(first)return;var b=c.querySelector('[data-badge]');var t=b?(b.textContent||''):'';
+      if(t.indexOf('Aprovado')<0&&t.indexOf('Ajuste')<0)first=c;});
+    if(first){first.classList.add('is-open');try{first.scrollIntoView({behavior:'smooth',block:'center'});}catch(_){first.scrollIntoView();}diagSet('expandedItem','i'+first.dataset.card);}
+  }
   else if(act==='approveAll'){var ph=a.getAttribute('data-phase')||'themes';
+    // V64.51 — defesa extra: pendente SEM ajuste não finaliza; orienta a revisão item a item.
+    var stG=badgeStats();
+    if(stG.rev===0&&stG.apr<stG.total){toast('Revise e aprove cada tema antes de finalizar ('+stG.apr+' de '+stG.total+').','err');syncFooter();return;}
     // V64.16 — GATE client-side: se algum conteúdo está com ajuste/edição pedido, NÃO aprova tudo.
     var anyRev=false;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){var t=(b.textContent||'');if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)anyRev=true;});
     if(anyRev){toast('Há ajuste pendente — enviando como feedback.','ok');post({action:'approveAll'},a,function(){addHist('rev','Enviou feedback (ajustes pendentes)');clientFeedbackSent();});return;}
@@ -2889,6 +2920,7 @@ function sendSubToWorker(sub){var j=sub.toJSON();
 function subscribeClientPush(cb){
   if(cb&&typeof cb!=='function')cb=null;            // tolera o event do click handler
   var done=function(ok){if(cb)cb(ok===true);};
+  pushCtaState('Ativando avisos…','',null);
   registerPushSw().then(function(reg){
     return Notification.requestPermission().then(function(p){
       if(p!=='granted'){pushCtaState('Notificações não permitidas. Vamos manter o WhatsApp como canal de aviso.','pc-warn',null);done(false);return null;}
@@ -2912,6 +2944,9 @@ function pushGateClose(){var g=document.getElementById('pgate');if(g&&g.parentNo
 function pushGateShow(){
   if(document.getElementById('pgate'))return;
   var d=document.createElement('div');d.id='pgate';
+  // estilos críticos INLINE: se o CSS externo falhar, o gate continua VISÍVEL (jamais um
+  // overlay transparente bloqueando os toques nos cards).
+  d.style.cssText='position:fixed;inset:0;z-index:90;background:rgba(5,6,12,.82);display:flex;align-items:center;justify-content:center;padding:20px';
   d.innerHTML='<div class="pg-card"><div class="pg-ic">'+CIC.check+'</div>'+
     '<h3>Receba avisos deste cronograma em tempo real</h3>'+
     '<p>Para receber avisos quando a equipe enviar ajustes, legendas, posts ou finalizar o cronograma, ative as notificações deste cronograma.</p>'+
@@ -2919,6 +2954,7 @@ function pushGateShow(){
     '<button class="btn ghost" id="pgSkip">Continuar sem avisos</button>'+
     '<div class="pg-foot">Sem a ativação, os avisos continuam chegando pelo WhatsApp.</div></div>';
   document.body.appendChild(d);
+  diagSet('gateRendered','1 @'+new Date().toISOString());
   document.getElementById('pgOn').addEventListener('click',function(){
     var b=this;b.disabled=true;b.textContent='Ativando…';
     subscribeClientPush(function(ok){pushGateClose();
@@ -2947,7 +2983,9 @@ function setupClientWebPush(){
       diagSet('endpoint',(sub.endpoint||'').slice(-12));
       sendSubToWorker(sub).then(function(resp){
         if(resp&&resp.ok===true){pushCtaState('Avisos ativados ✓','pc-ok',null);}
-        else{pushCtaState('Sua inscrição existe no navegador, mas o servidor não confirmou ('+((resp&&resp.error)||('HTTP '+(resp&&resp._http)))+'). Toque para reativar.','pc-warn','Reativar avisos');}
+        else{pushCtaState('Sua inscrição existe no navegador, mas o servidor não confirmou ('+((resp&&resp.error)||('HTTP '+(resp&&resp._http)))+'). Toque para reativar.','pc-warn','Reativar avisos');
+          var skip2=false;try{skip2=localStorage.getItem('wp_gate_skip_'+TOKEN)==='1';}catch(_){}
+          if(!skip2)pushGateShow();}
       }).catch(function(){pushCtaState('Avisos ativados no navegador (servidor não respondeu agora — verificaremos no próximo acesso).','pc-ok',null);});
       return;}
     pushCtaState('Quer ser avisado na hora a cada atualização deste cronograma?','', 'Receber avisos deste cronograma');
@@ -2960,18 +2998,26 @@ function setupClientWebPush(){
 function pushDebugPanel(){
   if((location.search||'').indexOf('debug=1')<0)return;
   var d=document.createElement('div');d.id='pdbg';
-  d.style.cssText='position:fixed;left:10px;bottom:54px;z-index:95;max-width:340px;background:rgba(10,12,22,.96);border:1px solid #2a2e44;border-radius:12px;padding:12px;font:11px/1.6 monospace;color:#cdd3e6;white-space:pre-wrap;word-break:break-all';
+  d.style.cssText='position:fixed;left:10px;bottom:54px;z-index:95;max-width:340px;background:rgba(10,12,22,.96);border:1px solid #2a2e44;border-radius:12px;padding:12px;font:11px/1.7 monospace;color:#cdd3e6;word-break:break-all';
   document.body.appendChild(d);
+  function row(k,v){return '<span style="color:#8b93ad">'+k+':</span> '+v+'<br>';}
   function render(info){
-    d.innerHTML='<b style="color:#8b96ff">DIAG AVISOS · V64.50</b>\n'
-      +'permission: '+(typeof Notification!=='undefined'?Notification.permission:'(sem API)')+'\n'
-      +'sw.scope: '+(info.scope||'-')+'\n'
-      +'hasController: '+(!!(navigator.serviceWorker&&navigator.serviceWorker.controller))+'\n'
-      +'endpoint(fim): …'+(diagGet('endpoint')||'-')+'\n'
-      +'lastSubscribeStatus: '+(diagGet('lastSubscribeStatus')||'-')+'\n'
-      +'lastPushTest: '+(diagGet('lastPushTest')||'-')+'\n'
-      +'lastNotificationClick: '+(diagGet('lastClick')||'-')+'\n'
-      +'token(fim): …'+TOKEN.slice(-6)+' · phase: '+PHASE+'\n'
+    d.innerHTML='<b style="color:#8b96ff">DIAG AVISOS · V64.51</b><br>'
+      +row('permission',(typeof Notification!=='undefined'?Notification.permission:'(sem API)'))
+      +row('sw.scope',info.scope||'-')
+      +row('hasController',String(!!(navigator.serviceWorker&&navigator.serviceWorker.controller)))
+      +row('endpoint(fim)','…'+(diagGet('endpoint')||'-'))
+      +row('lastSubscribeStatus',diagGet('lastSubscribeStatus')||'-')
+      +row('lastPushTest',diagGet('lastPushTest')||'-')
+      +row('lastPushEvent',diagGet('lastPushEvent')||'-')
+      +row('lastNotificationClick',diagGet('lastClick')||'-')
+      +row('gateRendered',diagGet('gateRendered')||'-')
+      +row('footerState',diagGet('footerState')||'-')
+      +row('cardClickBound',diagGet('cardClickBound')||'-')
+      +row('cardClickFired',diagGet('cardClickFired')||'-')
+      +row('expandedItem',diagGet('expandedItem')||'-')
+      +row('approveBtn',document.querySelector('[data-act="approveAll"]')?'sim':'nao')
+      +row('token(fim)','…'+TOKEN.slice(-6)+' · phase: '+PHASE)
       +'<button id="pdbgTest" class="ibtn" style="margin-top:6px">Enviar push de teste</button>';
     var b=document.getElementById('pdbgTest');
     if(b)b.addEventListener('click',function(){b.disabled=true;b.textContent='Enviando…';
@@ -2984,7 +3030,7 @@ function pushDebugPanel(){
   function refresh(){
     if(!('serviceWorker' in navigator)){render({scope:'(sem suporte)'});return;}
     navigator.serviceWorker.getRegistration('/cliente/').then(function(reg){
-      render({scope:reg?reg.scope:'(não registrado)'});
+      render({scope:reg?reg.scope:'(nao registrado)'});
     }).catch(function(){render({scope:'(erro)'});});
   }
   refresh();
@@ -2992,6 +3038,7 @@ function pushDebugPanel(){
 try{setupClientWebPush();}catch(_){}
 try{if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',function(e){
   if(e&&e.data&&e.data.type==='idseven-click')diagSet('lastClick',(e.data.eventType||'?')+' @'+new Date(e.data.at).toISOString());
+  if(e&&e.data&&e.data.type==='idseven-push')diagSet('lastPushEvent',(e.data.eventType||'?')+' @'+new Date(e.data.at).toISOString());
 });}catch(_){}
 try{pushDebugPanel();}catch(_){}
 `;
@@ -3163,10 +3210,15 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
   ? '<div class="gstat">Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</div>' +
     '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir mais ajustes</button>' +
     '<button class="btn primary" data-act="ackFeedback">' + ICN.check + 'Enviar feedback para a equipe</button>'
-  : '<div class="gstat">Você pode aprovar tudo, ajustar itens específicos ou pedir uma revisão geral — <b>sem obrigação de editar todos.</b></div>' +
+  : (_allApprovedR
+  ? '<div class="gstat">Todos os temas foram aprovados. Confirme para a equipe seguir com a produção.</div>' +
     '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
     '<button class="btn primary" data-act="approveAll" data-phase="' + phase + '">' + ICN.check + escapeHtml(phaseUi.cta) + '</button>'
-) + '</div></div>' +
+  // V64.51 — itens pendentes SEM ajuste: NUNCA oferecer a finalização; orientar a revisão.
+  : '<div class="gstat">Toque em <b>cada conteúdo</b> acima para revisar e aprovar. O botão final aparece quando todos estiverem aprovados.</div>' +
+    '<button class="btn ghost" data-act="revision">' + ICN.revise + 'Pedir revisão</button>' +
+    '<button class="btn primary" data-act="reviewNext">' + ICN.check + 'Revisar temas</button>'
+)) + '</div></div>' +
 '<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
 '<div class="toast" id="toast"></div>' +
 '<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';var PHASE=' + JSON.stringify(phase) + ';\n' +

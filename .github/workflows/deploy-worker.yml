@@ -115,11 +115,11 @@ jobs:
           echo "== 1) HEALTHCHECK deve ser V64.47 =="
           for i in 1 2 3; do
             H=$(curl -sS --max-time 20 "$B/")
-            echo "$H" | grep -q '"V64.50-push-proof-diag"' && break
+            echo "$H" | grep -q '"V64.51-mobile-touch-footer"' && break
             echo "(tentativa $i: versao ainda nao propagou; aguardando 5s)"; sleep 5
           done
           echo "$H"
-          echo "$H" | grep -q '"V64.50-push-proof-diag"' || { echo "FAIL: healthcheck nao e V64.50" >&2; exit 1; }
+          echo "$H" | grep -q '"V64.51-mobile-touch-footer"' || { echo "FAIL: healthcheck nao e V64.51" >&2; exit 1; }
 
           echo "== 2) LOGO oficial /og/idseven-logo.png (image/png) =="
           lc=$(curl -sS --max-time 20 -o /tmp/logo.png -w '%{http_code}' "$B/og/idseven-logo.png")
@@ -141,10 +141,10 @@ jobs:
           swc=$(curl -sS --max-time 20 -o /tmp/sw.js -w '%{http_code}' "$B/cliente/sw.js")
           [ "$swc" = "200" ] || { echo "FAIL: sw.js != 200" >&2; exit 1; }
           grep -q "addEventListener('push'" /tmp/sw.js || { echo "FAIL: sw sem handler push" >&2; exit 1; }
-          grep -q "sw-version: V64.50-push-proof-diag" /tmp/sw.js || { echo "FAIL: sw nao e V64.50" >&2; exit 1; }
+          grep -q "sw-version: V64.51-mobile-touch-footer" /tmp/sw.js || { echo "FAIL: sw nao e V64.50" >&2; exit 1; }
           grep -q "event.waitUntil(self.registration.showNotification(title, options))" /tmp/sw.js || { echo "FAIL: sw sem showNotification/waitUntil" >&2; exit 1; }
-          grep -q "badge: '/og/idseven-badge.png'" /tmp/sw.js || { echo "FAIL: sw sem badge dedicado" >&2; exit 1; }
-          grep -q "icon: '/og/idseven-logo.png'" /tmp/sw.js || { echo "FAIL: sw sem icon oficial" >&2; exit 1; }
+          grep -q "/og/idseven-badge.png" /tmp/sw.js || { echo "FAIL: sw sem badge dedicado" >&2; exit 1; }
+          grep -q "/og/idseven-logo.png" /tmp/sw.js || { echo "FAIL: sw sem icon oficial" >&2; exit 1; }
           grep -q "eventType: data.eventType" /tmp/sw.js || { echo "FAIL: sw sem data{eventType}" >&2; exit 1; }
           grep -q "notificationclick" /tmp/sw.js || { echo "FAIL: sw sem notificationclick" >&2; exit 1; }
           echo "sw.js V64.50 OK"

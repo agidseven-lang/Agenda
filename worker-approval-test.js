@@ -232,7 +232,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_50', 'Healthcheck retorna V64.50-push-proof-diag', /version: "V64\.50-push-proof-diag"/.test(SRC));
+check('C_HEALTH_V64_51', 'Healthcheck retorna V64.51-mobile-touch-footer', /version: "V64\.51-mobile-touch-footer"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -367,7 +367,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + estados (ativado/negado/incompatível/disponível)', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados ✓/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.50-push-proof-diag', /version: "V64\.50-push-proof-diag"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.51-mobile-touch-footer', /version: "V64\.51-mobile-touch-footer"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -480,8 +480,8 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     csBlock.length>0 && /\[TEAM-ACTION\] contentSent/.test(csBlock) && /push: pushSent/.test(csBlock));
   check('I7_FOOTER_FN','CV_JS tem syncFooter() + anyRevBadge() + footerCta() (rodapé dinâmico)',
     /function syncFooter\(\)/.test(SRC) && /function anyRevBadge\(\)/.test(SRC) && /function footerCta\(\)/.test(SRC));
-  check('I8_FOOTER_FEEDBACK_BTN','com ajuste/edição pendente o rodapé vira "Enviar feedback" (ackFeedback), nunca CTA de aprovação',
-    (()=>{const f=(SRC.match(/function syncFooter\(\)\{[\s\S]*?\n\}/)||[''])[0];if(!f)return false;const fb=f.indexOf('ackFeedback');const ap=f.indexOf('approveAll');return fb>=0&&ap>fb&&/anyRevBadge\(\)/.test(f)&&f.indexOf('Enviar feedback')>=0;})());
+  check('I8_FOOTER_FEEDBACK_BTN','rodapé 3 ESTADOS: ajuste→Enviar feedback; 3/3→approveAll; pendente→reviewNext (NUNCA finalização)',
+    (()=>{const f=(SRC.match(/function syncFooter\(\)\{[\s\S]*?\n\}/)||[''])[0];if(!f)return false;const fb=f.indexOf('ackFeedback');const ap=f.indexOf('approveAll');const rv=f.indexOf('reviewNext');return fb>=0&&ap>fb&&rv>ap&&/st\.apr>=st\.total/.test(f)&&f.indexOf('Enviar feedback')>=0;})());
   check('I9_FOOTER_CALLS','syncFooter chamado em approveItem/reviseItem/editTheme/editLegenda + applyState (poller tempo real)',
     (()=>{const n=(SRC.match(/syncFooter\(\);/g)||[]).length;return n>=5 && /toast\('Ajuste solicitado','ok'\);syncFooter\(\);/.test(SRC) && /syncFooter\(\);\s*\/\/ V64\.48/.test(SRC);})());
   check('I10_FOOTER_CTA_PHASE','footerCta segue a fase (final/production/themes) — paridade com phaseCopy do server-render',
@@ -499,8 +499,8 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     (()=>{const g=(SRC.match(/function pushGateShow\(\)\{[\s\S]*?\n\}/)||[''])[0];return g.length>0&&g.indexOf('requestPermission')===-1&&/subscribeClientPush\(function\(ok\)/.test(g);})());
   check('J4_GATE_SKIP','"Continuar sem avisos" registra a escolha (localStorage por TOKEN) e mostra fallback WhatsApp',
     /wp_gate_skip_'\+TOKEN/.test(SRC) && /Você continuará recebendo avisos pelo WhatsApp\./.test(SRC));
-  check('J5_GATE_ONCE','Já inscrito NÃO vê o gate (return antes) e a UI confirma SÓ com ok:true do servidor',
-    (()=>{const f=(SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/)||[''])[0];const sub=f.indexOf('if(sub){');const gate=f.indexOf('pushGateShow');return sub>=0&&gate>sub&&/resp&&resp\.ok===true\)\{pushCtaState\('Avisos ativados ✓','pc-ok',null\);\}/.test(f)&&/return;\}/.test(f.slice(sub,gate));})());
+  check('J5_GATE_ONCE','Inscrito CONFIRMADO não vê gate; inscrição existente NÃO confirmada reabre o gate (sem skip)',
+    (()=>{const f=(SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/)||[''])[0];return /resp&&resp\.ok===true\)\{pushCtaState\('Avisos ativados ✓','pc-ok',null\);\}/.test(f)&&/servidor não confirmou/.test(f)&&(f.match(/pushGateShow\(\)/g)||[]).length>=2;})());
   check('J6_GATE_DENIED','Permissão negada → fallback WhatsApp SEM loop (mensagem exata, sem reabrir gate)',
     (()=>{const f=(SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/)||[''])[0];const i=f.indexOf("permission==='denied'");const gate=f.indexOf('pushGateShow');return i>=0&&gate>i&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(f);})());
   check('J7_GATE_IOS','iOS sem suporte → instrução de Tela de Início + fallback WhatsApp',
@@ -573,12 +573,12 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     /maskEndpoint\(subs\[i\] && subs\[i\]\.endpoint\)/.test(SRC) && /\[PUSH-TEST\]/.test(SRC));
   check('K8_NOTIFY_FULL_LOG','[NOTIFY] loga eventType, phase, openUrl, dedupKey, subsFound e o resultado por endpoint',
     /openUrl=\$\{openUrl\} dedupKey=\$\{dedupKey\} subsFound=\$\{subsFound\}/.test(SRC));
-  check('K9_BADGE','Badge monocromático dedicado: IDSEVEN_BADGE_B64 + rota /og/idseven-badge.png + SW usa badge dedicado',
-    /const IDSEVEN_BADGE_B64 = "[A-Za-z0-9+/=]{200,}"/.test(SRC) && /\/og\/idseven-badge\.png/.test(SRC) && /badge: '\/og\/idseven-badge\.png'/.test(SRC));
-  check('K10_SW_DATA','SW: showNotification com waitUntil + data{url,eventType,taskId,phase} + notificationclick abre o MESMO link e reporta o clique',
-    /event\.waitUntil\(self\.registration\.showNotification\(title, options\)\)/.test(SRC) && /eventType: data\.eventType/.test(SRC) && /idseven-click/.test(SRC));
-  check('K11_SW_VERSIONED','SW versionado (sw-version: V64.50) — força atualização do SW antigo nos clientes',
-    /sw-version: V64\.50-push-proof-diag/.test(SRC));
+  check('K9_BADGE','Badge monocromático dedicado: IDSEVEN_BADGE_B64 + rota + SW/payload usam o badge',
+    /const IDSEVEN_BADGE_B64 = "[A-Za-z0-9+/=]{200,}"/.test(SRC) && /\/og\/idseven-badge\.png/.test(SRC) && /data\.badge \|\| '\/og\/idseven-badge\.png'/.test(SRC) && /badge: "\/og\/idseven-badge\.png"/.test(SRC));
+  check('K10_SW_DATA','SW: showNotification dentro de waitUntil + data{url,eventType,taskId,phase} + click abre o MESMO link + reporta push/click à página',
+    /self\.registration\.showNotification\(title, options\)/.test(SRC) && /event\.waitUntil\(Promise\.all\(/.test(SRC) && /eventType: data\.eventType/.test(SRC) && /idseven-click/.test(SRC) && /idseven-push/.test(SRC));
+  check('K11_SW_VERSIONED','SW versionado (sw-version: V64.51) — força atualização do SW antigo nos clientes',
+    /sw-version: V64\.51-mobile-touch-footer/.test(SRC));
   check('K12_MASK','maskEndpoint nunca expõe o token do push service (origem + 8 últimos chars)',
     /function maskEndpoint\(e\)/.test(SRC) && /e\.slice\(-8\)/.test(SRC));
   check('K13_SUBSCRIBE_OK_REAL','/push/subscribe devolve ok:true SOMENTE após commit confirmado no Firestore (res.ok); falha → ok:false com erro',
@@ -587,6 +587,51 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
       return fail>=0&&okret>fail&&/if \(!res\.ok\)/.test(h);})());
   check('K14_PRUNE_410','Subscription morta (404/410) é removida (prune) e nunca reutilizada',
     /if \(res\.status === 404 \|\| res\.status === 410\) return \{ ok: false, gone: true/.test(SRC) && /async function pruneClientPushSubs/.test(SRC));
+
+  /* ═══════════ PARTE L — V64.51 (toque mobile + rodapé 3 estados + gate blindado) ═══════════ */
+  console.log(`${C.b}\n[L] V64.51 — portal mobile: toque, rodapé 3 estados, gate, payload${C.x}`);
+  check('L1_GACTIONS_TOUCH','Barra inferior fixa NÃO engole toques: .gactions pointer-events:none + filhos auto',
+    /\.gactions\{[^}]*pointer-events:none\}/.test(SRC) && /\.gactions \.inner > \*\{pointer-events:auto\}/.test(SRC));
+  check('L2_WRAP_MOBILE_PAD','Respiro real no mobile: .wrap padding-bottom 240px (<560px) acima da barra empilhada',
+    /@media\(max-width:560px\)\{\.wrap\{padding-bottom:240px\}\}/.test(SRC));
+  check('L3_FOOTER_SERVER_3','Server-render com 3 estados (pendingRevision / _allApprovedR / revisão orientada)',
+    /pendingRevision[\s\S]{0,500}_allApprovedR[\s\S]{0,900}reviewNext/.test(SRC));
+  check('L4_REVIEWNEXT','reviewNext abre/rola até o 1º conteúdo pendente (expande o card + diag expandedItem)',
+    /act==='reviewNext'/.test(SRC) && /first\.classList\.add\('is-open'\)/.test(SRC) && /diagSet\('expandedItem'/.test(SRC));
+  check('L5_APPROVEALL_GUARD','approveAll com pendentes SEM ajuste NÃO finaliza (toast + re-sync do rodapé)',
+    /stG\.rev===0&&stG\.apr<stG\.total/.test(SRC) && /Revise e aprove cada tema antes de finalizar/.test(SRC));
+  check('L6_GATE_INLINE','Gate com estilos CRÍTICOS inline (nunca overlay invisível bloqueando toques)',
+    /d\.style\.cssText='position:fixed;inset:0;z-index:90/.test(SRC));
+  check('L7_DIAG_NEW','Painel debug com gateRendered/footerState/cardClickBound/cardClickFired/expandedItem/approveBtn/lastPushEvent',
+    /row\('gateRendered'/.test(SRC) && /row\('footerState'/.test(SRC) && /row\('cardClickBound'/.test(SRC) && /row\('cardClickFired'/.test(SRC) && /row\('expandedItem'/.test(SRC) && /row\('approveBtn'/.test(SRC) && /row\('lastPushEvent'/.test(SRC));
+  check('L8_PAYLOAD_FULL','Payload do push inclui icon+badge+tag=dedupKey (e o /push/test idem)',
+    /tag: dedupKey,\s*\n\s*icon: "\/og\/idseven-logo\.png", badge: "\/og\/idseven-badge\.png"/.test(SRC) && (SRC.match(/icon: "\/og\/idseven-logo\.png", badge: "\/og\/idseven-badge\.png"/g)||[]).length>=2);
+  check('L9_SW_PUSH_MSG','SW reporta o push recebido à página (idseven-push → lastPushEvent) sem perder o showNotification',
+    /event\.waitUntil\(Promise\.all\(\[\s*\n\s*self\.registration\.showNotification\(title, options\),/.test(SRC));
+  check('L10_ATIVANDO','Estado intermediário "Ativando avisos…" exibido ao iniciar a ativação',
+    /pushCtaState\('Ativando avisos…','',null\);/.test(SRC));
+  check('L11_TOGGLE_HEADER','Card inteiro do tema abre pelo cabeçalho (chead data-toggle, cursor pointer)',
+    /class="chead" data-toggle="/.test(SRC) && /\.chead\{[^}]*cursor:pointer/.test(SRC));
+
+  /* ═══ PARTE M — COMPILAÇÃO DO CÓDIGO SERVIDO (a lição da 1.0.136) ═══
+   * O CV_JS/SW são template literals: um escape errado no arquivo vira SyntaxError SÓ no
+   * script SERVIDO (o node --check do arquivo não pega). Estes checks compilam o que o
+   * NAVEGADOR recebe — se quebrar, o portal inteiro morre (gate/toques/rodapé). */
+  console.log(`${C.b}\n[M] Código SERVIDO compila (CV_JS + Service Worker pós-template)${C.x}`);
+  try{
+    const st=SRC.indexOf('const CV_JS = \u0060');
+    const en=SRC.indexOf('\n\u0060;',st);
+    const served=eval(SRC.slice(st+14,en+2));
+    let ok=true,err='';
+    try{new Function(served);}catch(e){ok=false;err=e.message;}
+    check('M1_CVJS_SERVIDO','CV_JS SERVIDO (template processado) compila sem SyntaxError', ok, err);
+    check('M2_CVJS_COMPLETO','CV_JS servido contém o fluxo inteiro (gate, syncFooter 3 estados, toggle, debug, poll)',
+      served.includes('pushGateShow')&&served.includes('reviewNext')&&served.includes('data-toggle')&&served.includes('pushDebugPanel')&&served.includes('pollState'));
+    const sw=(SRC.match(/const sw = \u0060([\s\S]*?)\u0060;/)||[])[1]||'';
+    let okSw=true,errSw='';
+    try{new Function(sw);}catch(e){okSw=false;errSw=e.message;}
+    check('M3_SW_SERVIDO','Service Worker SERVIDO compila sem SyntaxError', okSw, errSw);
+  }catch(e){check('M_FATAL','Parte M executa — erro: '+(e&&e.message),false);}
 
   /* ===================== VEREDITO ===================== */
   console.log(`${C.b}\n==================================================================`);
