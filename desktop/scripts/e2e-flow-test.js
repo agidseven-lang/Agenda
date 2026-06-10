@@ -1189,6 +1189,19 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   check('N_DH10','SEM botão de atribuir designer no Android (ação exclusiva do Desktop)', !/assignDesigner|sendToDesigner|pickDesigner/.test(KD));
   check('N_DH11','Teste Roborazzi dos 8 estados nas larguras 360 e 412', /class DetailHierarchyScreenshotTest/.test(KT) && /detail-hierarchy-360\.png/.test(KT) && /detail-hierarchy-412\.png/.test(KT) && /renderColumn\("detail-360", 360/.test(KT) && /renderColumn\("detail-412", 412/.test(KT));
   check('N_DH12','Role-aware do Designer (bcc021b) INTACTO na branch nova', /DESIGNER_COLS4/.test(KV) && /fun designerColView/.test(KV) && /aguardando_designer_revisao/.test(KV) && /fun designerNextShort/.test(KV));
+  // ── N_CY2 — paridade Android do ciclo 1.0.133 (quadro Cliente / linguagem / badge designer) ──
+  const KS = readFromGit(ANDROID_E2E_BRANCH, 'android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/features/tasks/TasksScreen.kt');
+  const KC2 = readFromGit(ANDROID_E2E_BRANCH, 'android-native-beta/app/src/test/java/br/com/idseven/agenda/nativebeta/ClientBoardCycle2ScreenshotTest.kt');
+  check('N_CY2_COL4','clientCol4 Android espelha o Desktop: Aprovado SÓ p/ concluido; aprovado/producao/reenviado → analise',
+    /"concluido" -> "aprovado"/.test(KV) && /"aprovado", "producao", "reenviado" -> "analise"/.test(KV) && !/"aprovado", "concluido" -> "aprovado"/.test(KV));
+  check('N_CY2_FACING','clientFacingStatusView Android com os MESMOS textos do Desktop (linguagem simples)',
+    /fun clientFacingStatusView/.test(KV) && /Temas aprovados — produção em andamento/.test(KV) && /A equipe está produzindo as artes/.test(KV) && /Aguardando legendas e posts/.test(KV) && /Versão final disponível para análise/.test(KV) && /Cronograma concluído/.test(KV));
+  check('N_CY2_DESIGNER_BADGE','designerCardLabel: badge "Em produção" no card do designer (coluna segue "Em andamento")',
+    /fun designerCardLabel/.test(KV) && /if \(k == "andamento"\) return "Em produção"/.test(KV) && /designerCardLabel\(task\)/.test(KS));
+  check('N_CY2_CARD_CLIENTVIEW','TaskCardPro tem clientView e o quadro Cliente passa clientView=isClientBoard',
+    /clientView: Boolean = false/.test(KS) && /clientView = isClientBoard/.test(KS) && /clientFacingStatusView\(task\)/.test(KS));
+  check('N_CY2_SHOT','Roborazzi ClientBoardCycle2ScreenshotTest (6 casos, 360/412) presente',
+    /class ClientBoardCycle2ScreenshotTest/.test(KC2) && /client-board-cycle2-360\.png/.test(KC2) && /client-board-cycle2-412\.png/.test(KC2) && /Em análise — temas aprovados/.test(KC2));
 })();
 
 /* ===================== VEREDITO ===================== */
