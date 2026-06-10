@@ -374,24 +374,32 @@
     display:grid;grid-template-columns:repeat(4,minmax(300px,1fr));gap:18px;
     align-items:start;margin-top:12px;
   }
-  /* Bug 1.0.133 (card cortado): a pilha real acima das colunas (topbar+head+toolbar) passa
-     de 220px — a coluna estourava a viewport e o último card ficava cortado embaixo.
-     Offset corrigido (252px), .kbody com min-height:0 (overflow correto em flex) e
-     respiro inferior maior para o último card nunca encostar no corte da coluna. */
+  /* Reprovação 1.0.135 (card cortado): FIX ESTRUTURAL, sem cálculo em px.
+     Nas telas de quadro o #content vira coluna FLEX na altura real da janela
+     (qualquer resolução/zoom/taskbar): cabeçalho e toolbar são flex-none e o
+     kanban ocupa o restante (flex:1 + min-height:0). As colunas têm height:100%
+     e SÓ o .kbody rola — topo (header da coluna) sempre visível, base sempre
+     dentro da janela, último card com respiro + scroll-margin. */
+  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:16px!important}
+  body.desktop #content.board-mode > .scr-head{flex:none;width:100%}
+  body.desktop #content.board-mode > .scr{flex:1 1 auto;min-height:0;width:100%;display:flex;flex-direction:column;overflow:visible}
+  body.desktop #content.board-mode .d-board-tools{flex:none}
+  body.desktop #content.board-mode .kanban{flex:1 1 auto;min-height:0}
+  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:none;min-height:0}
+  /* fallback (telas sem board-mode): limite conservador para nunca estourar a janela */
   body.desktop .kanban .kcol{
     background:var(--surface);border:1px solid var(--line);border-radius:16px;
-    display:flex;flex-direction:column;max-height:var(--kanban-h,calc(100vh - 252px));overflow:hidden;
+    display:flex;flex-direction:column;max-height:calc(100vh - 252px);overflow:hidden;
   }
-  @media(max-height:760px){body.desktop .kanban .kcol{max-height:var(--kanban-h,calc(100vh - 232px))}}
   body.desktop .kanban .kcol .khead{
     display:flex;align-items:center;gap:10px;padding:14px 14px 12px;border-bottom:1px solid var(--line-soft)
   }
   body.desktop .kanban .kcol .khead .cc{width:10px;height:10px;border-radius:50%;flex:none}
   body.desktop .kanban .kcol .khead .kt{font-size:14px;font-weight:800;flex:1;letter-spacing:.01em}
   body.desktop .kanban .kcol .khead .kn{background:var(--surface2);border-radius:999px;font-size:12px;font-weight:800;padding:3px 10px;color:var(--soft)}
-  body.desktop .kanban .kcol .kbody{padding:12px 12px 24px;overflow-y:auto;flex:1;min-height:0;scrollbar-gutter:stable}
+  body.desktop .kanban .kcol .kbody{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;scrollbar-gutter:stable}
   body.desktop .kanban .kcol .tc{margin-bottom:12px;padding:18px;border-radius:16px}
-  body.desktop .kanban .kcol .kbody .tc:last-child{margin-bottom:2px}
+  body.desktop .kanban .kcol .kbody .tc:last-child{margin-bottom:4px;scroll-margin-bottom:12px}
   body.desktop .kanban .kcol .tc .tt{font-size:14.5px}
   body.desktop .kanban .kcol .tc .ds{font-size:12px}
   body.desktop .kanban .kcol .tc .move{height:36px;font-size:12px;margin-top:10px}
@@ -1553,6 +1561,7 @@ function render(){
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
   const c=document.getElementById('content');
+  c.classList.remove('board-mode');
   if(state.clientView){c.innerHTML=renderClientView();afterClientView();return;}
   if(state.form){c.innerHTML=renderForm();afterForm();return;}
   if(state.tab==='hoje')c.innerHTML=renderHoje();
@@ -1570,6 +1579,8 @@ function render(){
     else if(state.boardSector){body=renderBoard();}
     else body=renderHub();
     c.innerHTML=body;
+    // fix estrutural do corte: telas com kanban usam o layout flex de altura real
+    if(isDesktop()&&body.indexOf('class="kanban"')>=0)c.classList.add('board-mode');
     afterBoard();
   }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
@@ -2488,23 +2499,7 @@ function taskCard(t, persp){
   return h+'</div>';
 }
 function canDelTask(t){const u=state.user;return !!u&&(canSeeAll(u)||t.by===u.id||t.assigneeId===u.id);}
-function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};try{fitKanban();}catch(_){}}
-// Reprovação 1.0.134 (card cortado): a altura da coluna era um chute fixo (252px) que errava
-// conforme resolução/zoom — o fim da coluna caía abaixo da janela e cortava botões/ícones.
-// CORREÇÃO ESTRUTURAL: mede o TOPO REAL do kanban na viewport e fixa a altura exata
-// (innerHeight - topo - respiro). Recalculada a cada render, resize e scroll do conteúdo —
-// o fim da coluna NUNCA passa da janela; o último card termina dentro dela (1366×768,
-// 1600×900, 1920×1080 e qualquer zoom).
-function fitKanban(){
-  document.querySelectorAll('.kanban').forEach(k=>{
-    const top=Math.round(k.getBoundingClientRect().top);
-    const h=Math.max(320,window.innerHeight-top-16);
-    k.style.setProperty('--kanban-h',h+'px');
-  });
-}
-window.addEventListener('resize',()=>{try{fitKanban();}catch(_){}});
-(function(){const c=document.getElementById('content');if(c&&!c.__fitk){c.__fitk=true;
-  c.addEventListener('scroll',()=>{if(window.__fitkRaf)return;window.__fitkRaf=requestAnimationFrame(()=>{window.__fitkRaf=null;try{fitKanban();}catch(_){}});},{passive:true});}})();
+function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};}
 
 // 1.0.109 — eixo do DESIGNER: card no quadro do designer (ou sou o designer atribuído).
 // Mover grava designerFlowStatus (fonte única lida pelo quadro do designer no PC e no Android).
@@ -3771,6 +3766,7 @@ async function persistClientSend(taskId){
   try{
     const token=t&&(t.clientReviewToken||t.shareToken)||'';
     const jwt=localStorage.getItem('wp_team_jwt')||'';
+    if(token&&!jwt){flashToast('Aviso em tempo real NÃO enviado (sessão de equipe ausente) — saia e entre novamente. O cliente ainda recebe pelo WhatsApp.');}
     if(token&&jwt){
       const idem=(u.id||'')+'|sent|'+taskId+'|'+Math.floor(now/10000);
       const res=await fetch(CLIENT_REVIEW_BASE+'/cliente/cronograma/'+encodeURIComponent(token)+'/team-action',{
@@ -3778,9 +3774,12 @@ async function persistClientSend(taskId){
         headers:{'Content-Type':'application/json','Idempotency-Key':idem,'Authorization':'Bearer '+jwt},
         body:JSON.stringify({action:'contentSent',byName:u.name||''})
       });
-      if(res.status===401){localStorage.removeItem('wp_team_jwt');}
+      if(res.status===401){localStorage.removeItem('wp_team_jwt');
+        flashToast('Aviso em tempo real NÃO enviado (sessão expirada) — saia e entre novamente. O cliente ainda recebe pelo WhatsApp.');}
       else{const j=await res.json().catch(()=>null);
-        console.log('[contentSent] push=',j&&j.push?JSON.stringify(j.push):'(sem resposta)');}
+        const p=j&&j.push;console.log('[contentSent] push=',p?JSON.stringify(p):'(sem resposta)');
+        if(p&&p.sent>0)flashToast('Cliente avisado por notificação em tempo real.');
+        else if(p&&p.reason==='send_failed')flashToast('Falha REAL no envio do aviso ('+(p.error||'push_send_failed')+') — cliente segue avisado pelo WhatsApp.');}
     }
   }catch(e){console.warn('contentSent (best-effort)',e&&e.message);}
 }

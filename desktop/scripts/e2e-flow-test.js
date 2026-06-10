@@ -1106,7 +1106,7 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   // Worker V64.47 (branch) — fechamento canônico server-side:
   (function(){
     const W47=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
-    check('DH_W49_NO_AUTOCLOSE','Worker V64.49: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito)', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.49-assisted-push-explicit-close"/.test(W47));
+    check('DH_W49_NO_AUTOCLOSE','Worker: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito) — V64.50 atual', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.50-push-proof-diag"/.test(W47));
     check('DH_W47_PENDING_PHASEAWARE','Worker V64.47: pendingRevision do portal/state é phase-aware com override allApproved', /const pendingRevision = !allApproved && \(itemPending/.test(W47) && /const pendingRevision = !_allApprovedR && \(_itemPendingR/.test(W47));
     check('DH_W47_ACK_CANONICO','Portal: ackFeedback canônico (allOk→approveAll real; final→reload p/ confirmação; pendência→Feedback enviado)', /allOk&&PHASE==='final'\)\{location\.reload\(\)/.test(W47) && /if\(allOk\)\{post\(\{action:'approveAll'\}/.test(W47) && /clientFeedbackSent\(\);return;\}/.test(W47));
     check('DH_W47_PORTAL_MSG','Portal: tela "Temas aprovados e enviados!" quando a fase fecha', /Temas aprovados e enviados!/.test(W47));
@@ -1153,8 +1153,9 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   check('CY2_SRC_BOARD','renderClientFlowBoard renderiza taskCard(t,\'client\')', /h\+=tasks\.length\?tasks\.map\(t=>taskCard\(t,'client'\)\)\.join/.test(DH));
   check('CY2_SRC_COL4','clientCol4: "Aprovado" SÓ p/ concluido; aprovado/producao/reenviado → analise', /if\(c==='concluido'\)return 'aprovado';\s*\n\s*if\(c==='aprovado'\|\|c==='producao'\|\|c==='reenviado'\)return 'analise';/.test(DH));
   // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
-  check('CY2_CSS_KCOL','Card cortado (fix estrutural): .kcol usa var(--kanban-h) medida do topo REAL + fallback CSS', /max-height:var\(--kanban-h,calc\(100vh - 252px\)\);overflow:hidden;/.test(DH) && /function fitKanban\(\)/.test(DH));
-  check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 + scrollbar-gutter (último card nunca corta)', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1;min-height:0;scrollbar-gutter:stable\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:2px\}/.test(DH));
+  check('CY2_CSS_KCOL','Card cortado (fix ESTRUTURAL): board-mode flex (altura real da janela) + coluna height:100% sem px de chute',
+    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:100%;max-height:none;min-height:0\}/.test(DH));
+  check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 + scrollbar-gutter + scroll-margin no último card', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;scrollbar-gutter:stable\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:4px;scroll-margin-bottom:12px\}/.test(DH));
   // Problema 1 — gatilho do push de envio (Desktop → Worker contentSent, best-effort).
   check('CY2_SENT_TRIGGER','persistClientSend chama team-action contentSent com Bearer JWT + Idempotency-Key (best-effort)',
     (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];return fn.indexOf("action:'contentSent'")>=0&&fn.indexOf("'Authorization':'Bearer '+jwt")>=0&&fn.indexOf("'Idempotency-Key':idem")>=0&&fn.indexOf('catch')>=0;})());
@@ -1177,10 +1178,10 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     check('CY3_E_CLOSED','Após o botão final (approveAll): detailState=temas_aprovados + senddesigner disponível', mod.detailState(CONF).key==='temas_aprovados' && mod.detailState(CONF).actions.indexOf('senddesigner')>=0);
   } else { check('CY3_EVAL','eval CY3 indisponível', false); }
   // D — card cortado: fix estrutural medido (fitKanban) ligado em render/resize/scroll.
-  check('CY3_FIT_WIRED','fitKanban chamado no afterBoard + listeners de resize e scroll do conteúdo',
-    /afterBoard\(\)\{[\s\S]{0,400}try\{fitKanban\(\);\}catch\(_\)\{\}\}/.test(DH) && /window\.addEventListener\('resize',\(\)=>\{try\{fitKanban\(\);\}/.test(DH) && /addEventListener\('scroll',/.test(DH));
-  check('CY3_FIT_MATH','fitKanban: altura = innerHeight - topo medido - respiro (mínimo 320px)',
-    /window\.innerHeight-top-16/.test(DH) && /Math\.max\(320,/.test(DH) && /setProperty\('--kanban-h'/.test(DH));
+  check('CY3_FIT_WIRED','board-mode ligado pela presença REAL de kanban no corpo (e removido nas demais telas)',
+    /c\.classList\.remove\('board-mode'\);/.test(DH) && /if\(isDesktop\(\)&&body\.indexOf\('class="kanban"'\)>=0\)c\.classList\.add\('board-mode'\);/.test(DH));
+  check('CY3_FIT_MATH','SEM cálculo frágil: nenhum fitKanban/--kanban-h restante (layout 100% estrutural)',
+    DH.indexOf('fitKanban')<0 && DH.indexOf('--kanban-h')<0);
   // Worker V64.49 (branch) — gate assistido + copy + fechamento explícito:
   (function(){
     const W49=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
@@ -1193,13 +1194,37 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     check('CY3_W49_IOS','iOS sem suporte → instrução Tela de Início + fallback WhatsApp', /adicione este portal à Tela de Início/.test(W49));
   })();
 
+  /* ═══ CY4 — FALHA PÓS-ATIVAÇÃO DO PUSH (V64.50) + card estrutural + honestidade ═══ */
+  console.log(`${C.b}\n[CY4] V64.50 — push pós-ativação (verdade/diagnóstico/teste) + envio honesto${C.x}`);
+  (function(){
+    const W50=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
+    const HT=readFromGit('worker/v64-42-team-adjust-idem-cleanup','worker-approval-test.js');
+    check('CY4_W50_SUB_TRUTH','Portal: "Avisos ativados" SÓ com ok:true confirmado do /push/subscribe (status real interpretado)',
+      /b\._http=r\.status;if\(!r\.ok\)b\.ok=false;/.test(W50) && /if\(resp&&resp\.ok===true\)\{pushCtaState\('Avisos ativados ✓/.test(W50) && /NÃO conseguimos salvar a inscrição no servidor/.test(W50));
+    check('CY4_W50_PUSHTEST','Rota /push/test real (capability=token, rate-limit 30s, ZERO escrita) + painel ?debug=1 completo',
+      /async function handleClientPushTest/.test(W50) && /push-test-rl\.local/.test(W50) && /function pushDebugPanel/.test(W50) && /lastSubscribeStatus/.test(W50) && /lastPushTest/.test(W50));
+    check('CY4_W50_TRUTH_LOG','Engine NUNCA mente: send_failed ≠ sem_subscription; log [NOTIFY] com subsFound + status por endpoint mascarado',
+      /result\.reason = "send_failed"; result\.error = "push_send_failed";/.test(W50) && /subsFound=\$\{subsFound\}/.test(W50) && /function maskEndpoint/.test(W50));
+    check('CY4_W50_INTEROP','Harness do Worker PROVA interop RFC 8291/8292 com implementação independente (K1/K2 presentes)',
+      /K1_INTEROP_RFC8291/.test(HT) && /K2_VAPID_VERIFY/.test(HT) && /createDecipheriv\('aes-128-gcm'/.test(HT));
+    check('CY4_W50_BADGE','Ícone/badge ID Seven: badge monocromático dedicado + SW com icon/badge/data + sw versionado',
+      /IDSEVEN_BADGE_B64/.test(W50) && /badge: '\/og\/idseven-badge\.png'/.test(W50) && /sw-version: V64\.50/.test(W50));
+  })();
+  check('CY4_SENT_HONESTO','Desktop: contentSent NUNCA falha em silêncio (sem JWT → aviso; send_failed → aviso com erro real; sent>0 → confirmação)',
+    (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];
+      return fn.indexOf('Aviso em tempo real NÃO enviado (sessão de equipe ausente)')>=0 && fn.indexOf("p.reason==='send_failed'")>=0 && fn.indexOf('Cliente avisado por notificação em tempo real.')>=0;})());
+  if(mod&&mod.designerStatusView){
+    const DPROD2={sector:'cronograma',cronContents:[{tema:'T'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
+    check('CY4_DESIGNER_EXATO','Quadro Designer: status do card EXATAMENTE "Designer em produção"', mod.designerStatusView(DPROD2).label==='Designer em produção');
+  }
+
   // Worker V64.48 (branch) — contentSent + rodapé dinâmico do portal:
   (function(){
     const W48=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
     check('CY2_W48_CONTENTSENT','Worker: team-action aceita contentSent e dispara themes_sent_to_client/final_content_sent_to_client', /action !== "adjustedItem" && action !== "contentSent"/.test(W48) && /final_content_sent_to_client" : "themes_sent_to_client"/.test(W48) && /notifyWorkflowEvent\(env, task, evSent/.test(W48));
     check('CY2_W48_NO_WRITE','Worker: contentSent NÃO escreve no Firestore (apenas notifica + loga)', (()=>{const b=(W48.match(/if \(action === "contentSent"\) \{[\s\S]*?\n  \}/)||[''])[0];return b.length>0&&b.indexOf(':commit')<0&&b.indexOf('writes:')<0;})());
     check('CY2_W48_FOOTER','Portal: syncFooter dinâmico — ajuste pendente → "Enviar feedback" (nunca CTA de aprovação)', /function syncFooter\(\)/.test(W48) && /function anyRevBadge\(\)/.test(W48) && (W48.match(/syncFooter\(\);/g)||[]).length>=5);
-    check('CY2_W48_VERSION','Worker healthcheck = V64.49-assisted-push-explicit-close', /version: "V64\.49-assisted-push-explicit-close"/.test(W48));
+    check('CY2_W48_VERSION','Worker healthcheck = V64.50-push-proof-diag', /version: "V64\.50-push-proof-diag"/.test(W48));
   })();
 })();
 
