@@ -374,11 +374,11 @@
      janela/zoom não der espaço (ex.: 1366 com escala 125% → viewport ~1092px), o BOARD
      rola na horizontal — cards mantêm o tamanho legível em qualquer resolução. */
   body.desktop .kanban{
-    display:grid;grid-template-columns:repeat(4,minmax(320px,1fr));gap:18px;
+    display:grid;grid-template-columns:repeat(4,minmax(300px,1fr));gap:18px;
     align-items:start;margin-top:12px;overflow-x:auto;overscroll-behavior-x:contain;
     padding-bottom:8px;scrollbar-gutter:stable;
   }
-  body.desktop .kanban .kcol{min-width:320px}
+  body.desktop .kanban .kcol{min-width:300px}
   /* Reprovação 1.0.135 (card cortado): FIX ESTRUTURAL, sem cálculo em px.
      Nas telas de quadro o #content vira coluna FLEX na altura real da janela
      (qualquer resolução/zoom/taskbar): cabeçalho e toolbar são flex-none e o

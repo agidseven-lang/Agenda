@@ -1236,8 +1236,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     check('CY5_W51_E2E_MOBILE','E2E mobile versionado no branch do worker (scripts/portal-mobile-e2e.js, toque puro 390/412)',
       readFromGit('worker/v64-42-team-adjust-idem-cleanup','scripts/portal-mobile-e2e.js').includes('touchscreen.tap'));
   })();
-  check('CY5_KANBAN_MINW','Kanban: coluna com largura mínima REAL (320px) + scroll horizontal do board (nunca espremer)',
-    /grid-template-columns:repeat\(4,minmax\(320px,1fr\)\)/.test(DH) && /\.kanban\{[\s\S]{0,300}overflow-x:auto/.test(DH) && /\.kanban \.kcol\{min-width:320px\}/.test(DH));
+  check('CY5_KANBAN_MINW','Kanban: coluna com largura mínima REAL (300px) + scroll horizontal do board (nunca espremer)',
+    /grid-template-columns:repeat\(4,minmax\(300px,1fr\)\)/.test(DH) && /\.kanban\{[\s\S]{0,300}overflow-x:auto/.test(DH) && /\.kanban \.kcol\{min-width:300px\}/.test(DH));
   check('CY5_KANBAN_BOARDMODE','board-mode: kanban rola na horizontal mantendo colunas em altura total',
     /#content\.board-mode \.kanban\{flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden\}/.test(DH));
   if(mod&&mod.designerStatusView){
