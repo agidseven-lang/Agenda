@@ -269,7 +269,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.47-themes-phase-close" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.48-content-sent-footer-sync" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1573,10 +1573,15 @@ async function handleClientCronogramaTeamAction(token, request, env) {
   let payload = {};
   try { payload = await request.json(); } catch (_) { /* tolera body vazio */ }
   const action = (payload && typeof payload.action === "string" && payload.action.trim()) || "adjustedItem";
-  if (action !== "adjustedItem") {
-    return json({ ok: false, error: "acao inválida (apenas adjustedItem nesta versao)" }, 400, env);
+  // V64.48 — 'contentSent': a equipe acabou de ENVIAR o cronograma ao cliente (WhatsApp
+  // Business manual). Dispara o Notification Engine (themes_sent_to_client ou
+  // final_content_sent_to_client conforme a fase) SEM escrever no Firestore — o Desktop já
+  // gravou o envio. Com subscription → Web Push imediato; sem → fallback whatsapp_premium
+  // sinalizado e logado. Mesma autenticação forte de adjustedItem.
+  if (action !== "adjustedItem" && action !== "contentSent") {
+    return json({ ok: false, error: "acao inválida (apenas adjustedItem ou contentSent)" }, 400, env);
   }
-  // contentIndexes[] (vários itens) ou contentIndex (um)
+  // contentIndexes[] (vários itens) ou contentIndex (um) — exigido só em adjustedItem.
   const idxs = [];
   const pushIdx = (v) => {
     if (typeof v === "number" && v >= 0) idxs.push(Math.floor(v));
@@ -1585,7 +1590,7 @@ async function handleClientCronogramaTeamAction(token, request, env) {
   if (Array.isArray(payload && payload.contentIndexes)) payload.contentIndexes.forEach(pushIdx);
   else if (payload && payload.contentIndex != null) pushIdx(payload.contentIndex);
   const uniq = Array.from(new Set(idxs)).sort((a, b) => a - b).slice(0, 50);
-  if (!uniq.length) return json({ ok: false, error: "contentIndex(es) obrigatorio" }, 400, env);
+  if (action === "adjustedItem" && !uniq.length) return json({ ok: false, error: "contentIndex(es) obrigatorio" }, 400, env);
 
   let accessToken;
   try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
@@ -1634,6 +1639,27 @@ async function handleClientCronogramaTeamAction(token, request, env) {
 
   const task = await queryTaskByToken(env, accessToken, token);
   if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
+
+  // V64.48 — contentSent: SÓ notifica (nenhuma escrita no banco; o envio já foi gravado
+  // pelo Desktop). O resultado do engine (channel/sent/fallback/reason) volta ao chamador
+  // e fica no log — prova real de push × fallback WhatsApp.
+  if (action === "contentSent") {
+    let pushSent = { sent: 0 };
+    try {
+      const evSent = clientPhase(task) === "final" ? "final_content_sent_to_client" : "themes_sent_to_client";
+      pushSent = await notifyWorkflowEvent(env, task, evSent, { token });
+    } catch (e) { pushSent = { sent: 0, error: e && e.message }; }
+    console.log(`[TEAM-ACTION] contentSent task=${task.id} by=${byName} push=${JSON.stringify(pushSent)}`);
+    const outSent = { ok: true, taskId: task.id, action: "contentSent", push: pushSent };
+    if (idemUrl) {
+      try {
+        await caches.default.put(new Request(idemUrl), new Response(JSON.stringify(outSent), {
+          status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+        }));
+      } catch (_) { /* sem persistir replay */ }
+    }
+    return json(outSent, 200, env);
+  }
 
   const now = Date.now();
   const taskId = task.id;
@@ -2622,6 +2648,23 @@ function closeSheet(){scrim.classList.remove('on');pending=null;}
 function badgeInfo(cs){if(cs==='aprovado')return['b-ok','var(--ok)','Aprovado'];if(cs==='em_revisao')return['b-rev','var(--rev)','Ajuste pedido'];if(cs==='editado')return['b-edit','#b9a4ff','Editado'];return['b-pend','var(--faint)','Pendente'];}
 function card(i){return document.querySelector('[data-card="'+i+'"]');}
 function setBadge(i,cs){var c=card(i);if(!c)return;var b=c.querySelector('[data-badge]');var x=badgeInfo(cs);b.className='badge '+x[0];b.innerHTML='<span class="bd" style="background:'+x[1]+'"></span>'+x[2];}
+/* V64.48 — RODAPÉ DINÂMICO (bug 1.0.133): o botão principal segue o estado REAL dos badges
+   NESTA sessão. Com QUALQUER ajuste/edição pendente → "Enviar feedback" (nunca "Aprovar
+   temas e liberar produção"); só com tudo sem pendência → CTA de aprovação da fase. */
+function footerCta(){return PHASE==='final'?'Aprovar versão final':(PHASE==='production'?'Aprovar legendas e artes':'Aprovar temas e liberar produção');}
+function anyRevBadge(){var any=false;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){var t=(b.textContent||'');if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)any=true;});return any;}
+function syncFooter(){
+  var inner=document.querySelector('.gactions .inner');if(!inner)return;
+  if(anyRevBadge()){
+    inner.innerHTML='<div class="gstat">Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</div>'+
+      '<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir mais ajustes</button>'+
+      '<button class="btn primary" data-act="ackFeedback">'+CIC.check+'Enviar feedback</button>';
+  }else{
+    inner.innerHTML='<div class="gstat">Você pode aprovar tudo, ajustar itens específicos ou pedir uma revisão geral — <b>sem obrigação de editar todos.</b></div>'+
+      '<button class="btn ghost" data-act="revision">'+CIC.revise+'Pedir revisão</button>'+
+      '<button class="btn primary" data-act="approveAll" data-phase="'+PHASE+'">'+CIC.check+footerCta()+'</button>';
+  }
+}
 function setItemNote(i,note){var c=card(i);if(!c)return;var slot=c.querySelector('[data-noteslot]');if(slot)slot.style.display='';var box=c.querySelector('[data-itemnote]');if(box)box.textContent=note;}
 function setTheme(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-field="tema"]');if(el)el.textContent=v;var h=c.querySelector('.ctitle h3');if(h)h.textContent=v;}
 function setLegenda(i,v){var c=card(i);if(!c)return;var el=c.querySelector('[data-field="legenda"]');if(!el)return;var d=document.createElement('div');d.className='fval';d.setAttribute('data-field','legenda');d.textContent=v;el.parentNode.replaceChild(d,el);}
@@ -2666,10 +2709,10 @@ document.addEventListener('click',function(e){
       if(j.phase==='production'){clientProductionApproved();}else{clientThemesApproved();}
       return;
     }
-    toast('Conteúdo '+(i+1)+' aprovado','ok');});}
-  else if(act==='reviseItem'){openInput('Pedir ajuste — Conteúdo '+(i+1),'Descreva o que ajustar neste conteúdo. A equipe é notificada.','rev','',true,function(v){if(!v.trim())return;post({action:'reviseItem',contentIndex:i,note:v},null,function(){setBadge(i,'em_revisao');setItemNote(i,v);addHist('rev','Pediu ajuste em Conteúdo '+(i+1));toast('Ajuste solicitado','ok');});});}
-  else if(act==='editTheme'){openInput('Editar tema — Conteúdo '+(i+1),'Sugira um novo tema para este conteúdo.','ok',getText(i,'tema'),false,function(v){if(!v.trim())return;post({action:'editTheme',contentIndex:i,value:v},null,function(){setTheme(i,v);setBadge(i,'editado');addHist('edit','Editou o tema de Conteúdo '+(i+1));toast('Tema atualizado','ok');});});}
-  else if(act==='editLegenda'){openInput('Editar legenda — Conteúdo '+(i+1),'Ajuste a legenda deste conteúdo do jeito que preferir.','ok',getText(i,'legenda'),true,function(v){post({action:'editLegenda',contentIndex:i,value:v},null,function(){setLegenda(i,v);setBadge(i,'editado');addHist('edit','Editou a legenda de Conteúdo '+(i+1));toast('Legenda atualizada','ok');});});}
+    toast('Conteúdo '+(i+1)+' aprovado','ok');syncFooter();});}
+  else if(act==='reviseItem'){openInput('Pedir ajuste — Conteúdo '+(i+1),'Descreva o que ajustar neste conteúdo. A equipe é notificada.','rev','',true,function(v){if(!v.trim())return;post({action:'reviseItem',contentIndex:i,note:v},null,function(){setBadge(i,'em_revisao');setItemNote(i,v);addHist('rev','Pediu ajuste em Conteúdo '+(i+1));toast('Ajuste solicitado','ok');syncFooter();});});}
+  else if(act==='editTheme'){openInput('Editar tema — Conteúdo '+(i+1),'Sugira um novo tema para este conteúdo.','ok',getText(i,'tema'),false,function(v){if(!v.trim())return;post({action:'editTheme',contentIndex:i,value:v},null,function(){setTheme(i,v);setBadge(i,'editado');addHist('edit','Editou o tema de Conteúdo '+(i+1));toast('Tema atualizado','ok');syncFooter();});});}
+  else if(act==='editLegenda'){openInput('Editar legenda — Conteúdo '+(i+1),'Ajuste a legenda deste conteúdo do jeito que preferir.','ok',getText(i,'legenda'),true,function(v){post({action:'editLegenda',contentIndex:i,value:v},null,function(){setLegenda(i,v);setBadge(i,'editado');addHist('edit','Editou a legenda de Conteúdo '+(i+1));toast('Legenda atualizada','ok');syncFooter();});});}
   else if(act==='noteItem'){openInput('Observação — Conteúdo '+(i+1),'Deixe uma observação específica para este conteúdo.','ok','',true,function(v){if(!v.trim())return;post({action:'noteItem',contentIndex:i,note:v},null,function(){setItemNote(i,v);addHist('note','Comentou em Conteúdo '+(i+1));toast('Observação registrada','ok');});});}
   else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar no cronograma como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
   else if(act==='ackFeedback'){
@@ -2728,6 +2771,7 @@ function applyState(j,changed){
   // Destaca os conteúdos que a equipe mexeu (anel + scroll até o primeiro).
   (changed||[]).forEach(function(i){var c=card(i);if(!c)return;c.style.transition='box-shadow .3s';c.style.boxShadow='0 0 0 2px #34D399, 0 0 0 6px rgba(52,211,153,.18)';setTimeout(function(){c.style.boxShadow='';},4000);});
   if(changed&&changed.length){var f=card(changed[0]);if(f&&f.scrollIntoView)try{f.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}}
+  syncFooter();   // V64.48 — rodapé acompanha o estado vindo do servidor (tempo real)
 }
 function pollState(){fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
   if(!j||!j.ok){liveTick(false);return;}

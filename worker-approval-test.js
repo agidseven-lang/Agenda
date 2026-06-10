@@ -239,7 +239,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_47', 'Healthcheck retorna V64.47-themes-phase-close', /version: "V64\.47-themes-phase-close"/.test(SRC));
+check('C_HEALTH_V64_48', 'Healthcheck retorna V64.48-content-sent-footer-sync', /version: "V64\.48-content-sent-footer-sync"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -374,7 +374,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + 4 estados', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas no navegador/.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados para este cronograma/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.47-themes-phase-close', /version: "V64\.47-themes-phase-close"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.48-content-sent-footer-sync', /version: "V64\.48-content-sent-footer-sync"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -468,6 +468,33 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     (()=>{const auth=ha.indexOf('AUTENTICAÇÃO FORTE');const notify=ha.indexOf('notifyWorkflowEvent');const idemPut=ha.indexOf('caches.default.put');return auth>=0&&notify>auth&&idemPut>notify;})());
   check('H14_CORS_DOC','CORS/origem auditado e documentado (Electron envia Origin null/file; proteção real = autenticação)', /CORS\/ORIGEM \(auditoria documentada\)/.test(SRC) && /Electron/.test(SRC));
   check('H15_GENERIC_400','Body inválido/incompleto também responde genérico (sem distinguir uid/senha ausentes)', (()=>{const m=hs.match(/credenciais inválidas" \}, 401/g);return m&&m.length>=3;})());
+
+  /* ===================== PARTE I — V64.48 (notificação de envio + rodapé dinâmico) ===================== */
+  console.log(`${C.b}\n[I] V64.48 — contentSent (push do envio real) + rodapé dinâmico do portal${C.x}`);
+  const haI=ha;
+  const csBlock=(haI.match(/if \(action === "contentSent"\) \{[\s\S]*?\n  \}/)||[''])[0];
+  check('I1_CONTENTSENT_ACTION','team-action aceita action contentSent (além de adjustedItem)',
+    /action !== "adjustedItem" && action !== "contentSent"/.test(haI));
+  check('I2_CONTENTSENT_EVENTS','contentSent dispara themes_sent_to_client (themes) / final_content_sent_to_client (final)',
+    csBlock.length>0 && /final_content_sent_to_client" : "themes_sent_to_client"/.test(csBlock) && /notifyWorkflowEvent\(env, task, evSent/.test(csBlock));
+  check('I3_CONTENTSENT_NO_WRITE','contentSent NÃO escreve no Firestore (sem commit/writes — o Desktop já gravou o envio)',
+    csBlock.length>0 && csBlock.indexOf(':commit')===-1 && csBlock.indexOf('writes:')===-1 && csBlock.indexOf('updateMask')===-1);
+  check('I4_CONTENTSENT_IDX_OPT','contentIndex segue OBRIGATÓRIO em adjustedItem e dispensado em contentSent',
+    /action === "adjustedItem" && !uniq\.length/.test(haI));
+  check('I5_CONTENTSENT_AFTER_AUTH','contentSent executa DEPOIS da autenticação forte e do replay de idempotência',
+    (()=>{const a=haI.indexOf('AUTENTICAÇÃO FORTE');const idem=haI.indexOf('Idempotency-Key');const cs=haI.indexOf('if (action === "contentSent")');return a>=0&&idem>a&&cs>idem&&cs>haI.indexOf('queryTaskByToken');})());
+  check('I6_CONTENTSENT_LOGGED','resultado do engine (channel/sent/fallback) volta na resposta E no log',
+    csBlock.length>0 && /\[TEAM-ACTION\] contentSent/.test(csBlock) && /push: pushSent/.test(csBlock));
+  check('I7_FOOTER_FN','CV_JS tem syncFooter() + anyRevBadge() + footerCta() (rodapé dinâmico)',
+    /function syncFooter\(\)/.test(SRC) && /function anyRevBadge\(\)/.test(SRC) && /function footerCta\(\)/.test(SRC));
+  check('I8_FOOTER_FEEDBACK_BTN','com ajuste/edição pendente o rodapé vira "Enviar feedback" (ackFeedback), nunca CTA de aprovação',
+    (()=>{const f=(SRC.match(/function syncFooter\(\)\{[\s\S]*?\n\}/)||[''])[0];if(!f)return false;const fb=f.indexOf('ackFeedback');const ap=f.indexOf('approveAll');return fb>=0&&ap>fb&&/anyRevBadge\(\)/.test(f)&&f.indexOf('Enviar feedback')>=0;})());
+  check('I9_FOOTER_CALLS','syncFooter chamado em approveItem/reviseItem/editTheme/editLegenda + applyState (poller tempo real)',
+    (()=>{const n=(SRC.match(/syncFooter\(\);/g)||[]).length;return n>=5 && /toast\('Ajuste solicitado','ok'\);syncFooter\(\);/.test(SRC) && /syncFooter\(\);\s*\/\/ V64\.48/.test(SRC);})());
+  check('I10_FOOTER_CTA_PHASE','footerCta segue a fase (final/production/themes) — paridade com phaseCopy do server-render',
+    /PHASE==='final'\?'Aprovar versão final':\(PHASE==='production'\?'Aprovar legendas e artes':'Aprovar temas e liberar produção'\)/.test(SRC));
+  check('I11_FOOTER_SERVER_PARITY','rodapé server-rendered (load) continua decidindo por pendingRevision (sem regressão)',
+    /pendingRevision\s*\n?\s*\?\s*'<div class="gstat">Há <b>ajustes solicitados/.test(SRC));
 
   /* ===================== VEREDITO ===================== */
   console.log(`${C.b}\n==================================================================`);
