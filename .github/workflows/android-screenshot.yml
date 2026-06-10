@@ -52,7 +52,7 @@ jobs:
         if: always()
         run: |
           cd "$APP_DIR/app/build/outputs/roborazzi" || exit 0
-          for f in detail-hierarchy-360.png detail-hierarchy-412.png; do
+          for f in detail-hierarchy-360.png detail-hierarchy-412.png client-board-cycle2-360.png client-board-cycle2-412.png; do
             [ -f "$f" ] || continue
             echo "=====B64START:$f====="
             base64 -w0 "$f"; echo
