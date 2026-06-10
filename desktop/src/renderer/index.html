@@ -380,9 +380,9 @@
      respiro inferior maior para o último card nunca encostar no corte da coluna. */
   body.desktop .kanban .kcol{
     background:var(--surface);border:1px solid var(--line);border-radius:16px;
-    display:flex;flex-direction:column;max-height:calc(100vh - 252px);overflow:hidden;
+    display:flex;flex-direction:column;max-height:var(--kanban-h,calc(100vh - 252px));overflow:hidden;
   }
-  @media(max-height:760px){body.desktop .kanban .kcol{max-height:calc(100vh - 232px)}}
+  @media(max-height:760px){body.desktop .kanban .kcol{max-height:var(--kanban-h,calc(100vh - 232px))}}
   body.desktop .kanban .kcol .khead{
     display:flex;align-items:center;gap:10px;padding:14px 14px 12px;border-bottom:1px solid var(--line-soft)
   }
@@ -1774,9 +1774,9 @@ function clientCol(t){
   if(CLIENT_COLS.some(c=>c.key===v)){
     // 'concluido' explícito só vale se o fluxo realmente encerrou; senão ainda é reenvio/aprov. final.
     if(v==='concluido'&&!isFullyComplete(t))return 'reenviado';
-    // V64.47 (bug 1.0.132): estado 'revisao' HERDADO com TODOS os itens da fase aprovados
-    // (ciclo ajuste→correção→aprovação antes do fechamento server-side) NÃO trava — vira aprovado.
-    if(v==='revisao'&&allPhaseItemsApproved(t))return 'aprovado';
+    // V64.49: o fechamento da fase é SÓ explícito (botão "Aprovar temas" → approveAll).
+    // O estado "todos os itens aprovados com global 'revisao' herdado" NÃO vira 'aprovado'
+    // aqui — ele é tratado como AGUARDANDO CONFIRMAÇÃO do cliente (ver clientCol4/detailState).
     return v;
   }
   const ws=(t&&t.workflowStage||'').toString();
@@ -1785,7 +1785,6 @@ function clientCol(t){
   // CORREÇÃO (status-consistency): o status BRUTO do kanban (t.status==='concluido')
   // NÃO força mais a coluna 'concluido'. Conclusão só via isFullyComplete (aprovação final real).
   if(isFullyComplete(t))return 'concluido';
-  if((cr==='revisao'||cs==='em_revisao_cliente'||cs==='editado_cliente')&&allPhaseItemsApproved(t))return 'aprovado';
   if(cr==='revisao'||cs==='em_revisao_cliente'||cs==='editado_cliente')return 'revisao';
   if(cs==='ready_for_final_client_review'||cs==='reenviado_cliente')return 'reenviado';
   if(hasDesigner(t)||cs==='sent_to_designer'||ws==='producao'||ws==='entrega'||ws==='revisao_final')return 'producao';
@@ -1975,6 +1974,9 @@ function operationalCol(t){
   if(secOf(t.sector).key!=='cronograma')return t.status||'afazer';
   if(isFullyComplete(t))return 'concluido';                              // ÚNICO caminho para concluído
   const cf=clientCol(t);
+  // V64.49: todos os itens aprovados com 'revisao' herdado = aguardando o cliente CONFIRMAR
+  // no portal (botão "Aprovar temas") — para a Social isso é "Aguardando aprovação dos temas".
+  if(cf==='revisao'&&!hasPendingItemRevision(t)&&allPhaseItemsApproved(t))return 'producao';
   if(cf==='revisao'||hasPendingItemRevision(t))return 'aguardando_revisao'; // cliente pediu ajuste
   if(cf==='reenviado')return 'aguardando_final';
   if(hasDesigner(t)){
@@ -2187,10 +2189,10 @@ const CLIENT_COLS4=[
 // própria de Revisão/Ajuste (não colapsa mais 'revisao' em 'andamento').
 function designerColView(t){const c=designerCol(t);return c==='concluido'?'entregue':(c==='revisao'?'revisao':(c==='afazer'?'afazer':'andamento'));}
 // Status VISUAL do DESIGNER (badge do card na perspectiva do designer): label/cor de DESIGNER_COLS4.
-// Bug 1.0.133 (status discrepante): a COLUNA continua "Em andamento", mas o badge do card é
-// ESPECÍFICO — "Em produção" — coerente com o "Designer em produção" que a Social vê.
+// Reprovação 1.0.134: a COLUNA continua "Em andamento", mas o badge do card é IGUAL ao que
+// a Social vê — "Designer em produção" — leitura idêntica da mesma etapa em todos os papéis.
 function designerStatusView(t){const k=designerColView(t);const c=DESIGNER_COLS4.find(x=>x.key===k)||DESIGNER_COLS4[0];
-  return {key:k,label:(k==='andamento'?'Em produção':c.label),color:c.color};}
+  return {key:k,label:(k==='andamento'?'Designer em produção':c.label),color:c.color};}
 // "Próxima ação" CURTA na perspectiva do DESIGNER (o que ELE precisa fazer agora).
 function designerNextShort(t){switch(designerColView(t)){
   case 'afazer':    return 'Iniciar a produção';
@@ -2223,6 +2225,7 @@ function designerCardTimeline(t){
 // REAL do cronograma (aprovação final — clientCol 'concluido' via isFullyComplete).
 // Temas aprovados ('aprovado') é etapa INTERMEDIÁRIA → fica em "Em análise" com a produção.
 function clientCol4(t){const c=clientCol(t);
+  if(c==='revisao'&&allPhaseItemsApproved(t))return 'analise';   // aguardando confirmação do cliente
   if(c==='revisao')return 'revisao';
   if(c==='concluido')return 'aprovado';
   if(c==='aprovado'||c==='producao'||c==='reenviado')return 'analise';
@@ -2234,6 +2237,7 @@ function clientCol4(t){const c=clientCol(t);
 function clientFacingStatusView(t){
   const c=clientCol(t);
   if(c==='concluido')return {key:'concluido',label:'Cronograma concluído',color:'#10B981'};
+  if(c==='revisao'&&allPhaseItemsApproved(t))return {key:'aguarda_confirmacao',label:'Temas aprovados — aguardando confirmação',color:'#22D3EE'};
   if(c==='revisao')return {key:'revisao',label:'Ajuste solicitado — equipe corrigindo',color:'#F59E0B'};
   if(c==='reenviado')return {key:'final',label:'Versão final disponível para análise',color:'#34D399'};
   if(c==='aprovado'||c==='producao'){
@@ -2248,6 +2252,7 @@ function clientFacingStatusView(t){
 }
 // "Próxima" CURTA do card do QUADRO CLIENTE — mesma linguagem simples (sem jargão interno).
 function clientFacingNextShort(t){switch(clientFacingStatusView(t).key){
+  case 'aguarda_confirmacao':return 'Cliente confirma a aprovação no portal';
   case 'temas_ok':  return 'Equipe inicia a produção das artes';
   case 'producao':  return 'Aguardar a produção das artes';
   case 'legendas':  return 'Equipe adiciona legendas e posts';
@@ -2483,7 +2488,23 @@ function taskCard(t, persp){
   return h+'</div>';
 }
 function canDelTask(t){const u=state.user;return !!u&&(canSeeAll(u)||t.by===u.id||t.assigneeId===u.id);}
-function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};}
+function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};try{fitKanban();}catch(_){}}
+// Reprovação 1.0.134 (card cortado): a altura da coluna era um chute fixo (252px) que errava
+// conforme resolução/zoom — o fim da coluna caía abaixo da janela e cortava botões/ícones.
+// CORREÇÃO ESTRUTURAL: mede o TOPO REAL do kanban na viewport e fixa a altura exata
+// (innerHeight - topo - respiro). Recalculada a cada render, resize e scroll do conteúdo —
+// o fim da coluna NUNCA passa da janela; o último card termina dentro dela (1366×768,
+// 1600×900, 1920×1080 e qualquer zoom).
+function fitKanban(){
+  document.querySelectorAll('.kanban').forEach(k=>{
+    const top=Math.round(k.getBoundingClientRect().top);
+    const h=Math.max(320,window.innerHeight-top-16);
+    k.style.setProperty('--kanban-h',h+'px');
+  });
+}
+window.addEventListener('resize',()=>{try{fitKanban();}catch(_){}});
+(function(){const c=document.getElementById('content');if(c&&!c.__fitk){c.__fitk=true;
+  c.addEventListener('scroll',()=>{if(window.__fitkRaf)return;window.__fitkRaf=requestAnimationFrame(()=>{window.__fitkRaf=null;try{fitKanban();}catch(_){}});},{passive:true});}})();
 
 // 1.0.109 — eixo do DESIGNER: card no quadro do designer (ou sou o designer atribuído).
 // Mover grava designerFlowStatus (fonte única lida pelo quadro do designer no PC e no Android).
@@ -2607,6 +2628,13 @@ function detailState(t){
     sub:'O cliente aprovou a versão final. Cronograma encerrado.',
     next:'Nada a fazer — aprovação final registrada'+(t.clientFinalApprovedAt?(' em '+fmtDateTimeBR(t.clientFinalApprovedAt)):'')+'.',
     owner:'none',actions:['clientview']};
+  // V64.49: cliente aprovou TODOS os itens mas ainda não confirmou no portal (botão
+  // "Aprovar temas") — globais seguem 'revisao' herdado. NÃO é ajuste pendente.
+  if(cc==='revisao'&&!pend.length&&allPhaseItemsApproved(t))return {key:'aguardando_confirmacao',color:'#22D3EE',
+    label:'Temas aprovados — aguardando confirmação',
+    sub:'O cliente aprovou todos os temas. Falta a confirmação final no portal (botão “Aprovar temas”).',
+    next:'Aguardar o cliente confirmar a aprovação no portal. Nenhuma ação necessária agora.',
+    owner:'cliente',actions:['clientview']};
   if(pend.length||(cc==='revisao'&&!hasTeamAdjustedAwaiting(t)))return {key:'cliente_ajuste',color:'#FB7185',
     label:'Cliente pediu ajuste',
     sub:pend.length?('Ajuste solicitado no Conteúdo '+pend.map(p=>p.idx+1).join(', ')+(pend[0].note?(': “'+pend[0].note+'”'):'.')):'O cliente pediu uma revisão geral.',
@@ -3171,9 +3199,7 @@ function designerUsers(){
     && (!state.user||u.id!==state.user.id) && isDesignerCandidate(u));
 }
 // Cliente respondeu de forma que habilita envio ao designer (aprovou)?
-function clientApproved(t){return t&&(t.cronStatus==='aprovado_cliente'||t.cronStatus==='client_approved'||(t.clientReview&&t.clientReview.status==='aprovado')
-  // V64.47 (bug 1.0.132): todos os itens da fase aprovados = aprovado, mesmo com global 'revisao' herdado
-  ||allPhaseItemsApproved(t));}
+function clientApproved(t){return t&&(t.cronStatus==='aprovado_cliente'||t.cronStatus==='client_approved'||(t.clientReview&&t.clientReview.status==='aprovado'));}
 function isSentToDesigner(t){return t&&(t.cronStatus==='sent_to_designer'||t.designerAssignment);}
 function cronStatusLabel(k){return (CRON_STATES[k]||{label:k}).label;}
 function cronStatusColor(k){return (CRON_STATES[k]||{color:'#9BA0AB'}).color;}

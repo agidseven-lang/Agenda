@@ -1090,20 +1090,23 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       clientItems:{i0:{cs:'aprovado',phase:'themes'},i1:{cs:'aprovado',phase:'themes'},
                    i2:{cs:'aprovado',phase:'themes',teamAdjustedAt:1,teamAdjustedBy:'João'}}};
     const dsStuck=mod.detailState(STUCK);
-    check('DH_CYCLE_UNSTUCK','Doc PRESO (globais revisao + 3/3 itens aprovados) → detailState=temas_aprovados (NÃO cliente_ajuste)', dsStuck.key==='temas_aprovados');
-    check('DH_CYCLE_DESIGNER_BTN','Doc PRESO → ação senddesigner DISPONÍVEL (Enviar para designer aparece)', dsStuck.actions.indexOf('senddesigner')>=0);
-    check('DH_CYCLE_NO_PENDING','Doc PRESO → pendingClientItems vazio (nenhum item antigo bloqueia)', mod.hasPendingItemRevision(STUCK)===false);
+    // V64.49: o fechamento é SÓ explícito — o doc com 3/3 aprovados e global 'revisao' herdado
+    // NÃO vira "Temas aprovados": fica AGUARDANDO CONFIRMAÇÃO (sem "Cliente pediu ajuste").
+    check('DH_CYCLE_WAIT_CONFIRM','3/3 itens aprovados + revisao herdado → detailState=aguardando_confirmacao (NÃO cliente_ajuste)', dsStuck.key==='aguardando_confirmacao');
+    check('DH_CYCLE_NO_DESIGNER_BTN','Aguardando confirmação NÃO libera designer (sem senddesigner até o botão final do portal)', dsStuck.actions.indexOf('senddesigner')<0 && dsStuck.actions.indexOf('clientview')>=0);
+    check('DH_CYCLE_NO_PENDING','Doc com tudo aprovado → pendingClientItems vazio (nenhum item antigo bloqueia)', mod.hasPendingItemRevision(STUCK)===false);
     // item LEGADO sem phase NÃO conta como aprovado (conservador — não fecha indevidamente)
     const LEGACY=Object.assign({},STUCK,{clientItems:{i0:{cs:'aprovado'},i1:{cs:'aprovado',phase:'themes'},i2:{cs:'aprovado',phase:'themes'}}});
     check('DH_CYCLE_LEGACY_SAFE','Item legado SEM phase não conta: doc não fecha indevidamente (continua cliente_ajuste)', mod.detailState(LEGACY).key==='cliente_ajuste');
   }
   check('DH_CYCLE_FN','allPhaseItemsApproved existe e exige cs=aprovado + phase da fase atual em TODOS os itens', /function allPhaseItemsApproved\(t\)/.test(DH) && /it\.cs==='aprovado'&&it\.phase===ph/.test(DH));
-  check('DH_CYCLE_CLIENTCOL','clientCol destrava: revisao herdado + allPhaseItemsApproved → aprovado (explícito E derivado)', /v==='revisao'&&allPhaseItemsApproved\(t\)\)return 'aprovado'/.test(DH) && /&&allPhaseItemsApproved\(t\)\)return 'aprovado';/.test(DH));
-  check('DH_CYCLE_CLIENTAPPROVED','clientApproved inclui allPhaseItemsApproved (gate do botão designer destrava)', /\|\|allPhaseItemsApproved\(t\)\);\}/.test(DH));
+  check('DH_CYCLE_CLIENTCOL','V64.49: clientCol NÃO converte mais revisao herdado em aprovado (fechamento só explícito)', !/allPhaseItemsApproved\(t\)\)return 'aprovado'/.test(DH));
+  check('DH_CYCLE_CLIENTAPPROVED','V64.49: clientApproved NÃO inclui mais allPhaseItemsApproved (designer só após botão final)', !/\|\|allPhaseItemsApproved\(t\)\);\}/.test(DH));
+  check('DH_CYCLE_OPCOL','operationalCol: revisao herdado + tudo aprovado → producao (Social vê Aguardando aprovação dos temas)', /cf==='revisao'&&!hasPendingItemRevision\(t\)&&allPhaseItemsApproved\(t\)\)return 'producao';/.test(DH));
   // Worker V64.47 (branch) — fechamento canônico server-side:
   (function(){
     const W47=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
-    check('DH_W47_PHASE_CLOSE','Worker: approveItem fecha fase NÃO-final quando todos aprovados (gated !isFinalPhase) — V64.48 atual', /V64\.47 — FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /if \(!isFinalPhase\)/.test(W47) && /version: "V64\.48-content-sent-footer-sync"/.test(W47));
+    check('DH_W49_NO_AUTOCLOSE','Worker V64.49: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito)', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.49-assisted-push-explicit-close"/.test(W47));
     check('DH_W47_PENDING_PHASEAWARE','Worker V64.47: pendingRevision do portal/state é phase-aware com override allApproved', /const pendingRevision = !allApproved && \(itemPending/.test(W47) && /const pendingRevision = !_allApprovedR && \(_itemPendingR/.test(W47));
     check('DH_W47_ACK_CANONICO','Portal: ackFeedback canônico (allOk→approveAll real; final→reload p/ confirmação; pendência→Feedback enviado)', /allOk&&PHASE==='final'\)\{location\.reload\(\)/.test(W47) && /if\(allOk\)\{post\(\{action:'approveAll'\}/.test(W47) && /clientFeedbackSent\(\);return;\}/.test(W47));
     check('DH_W47_PORTAL_MSG','Portal: tela "Temas aprovados e enviados!" quando a fase fecha', /Temas aprovados e enviados!/.test(W47));
@@ -1127,7 +1130,7 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     check('CY2_A_SEM_DESIGNER','Feedback parcial NÃO libera designer (detailState=cliente_ajuste, sem senddesigner)', mod.detailState(PARCIAL).key==='cliente_ajuste' && mod.detailState(PARCIAL).actions.indexOf('senddesigner')<0);
     // Cenário C — designer em produção: leitura coerente entre papéis.
     const DPROD={sector:'cronograma',cronContents:TH3,clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
-    check('CY2_C_DESIGNER_BADGE','Designer vê badge "Em produção" (específico, não genérico)', mod.designerStatusView(DPROD).label==='Em produção');
+    check('CY2_C_DESIGNER_BADGE','Designer vê badge "Designer em produção" (idêntico ao da Social — leitura coerente)', mod.designerStatusView(DPROD).label==='Designer em produção');
     check('CY2_C_SOCIAL','Social vê "Designer em produção" (mesma etapa, leitura coerente)', mod.operationalCol(DPROD)==='aguardando_designer');
     check('CY2_C_CLIENTE_LANG','Quadro Cliente vê "A equipe está produzindo as artes" (linguagem simples)', mod.clientFacingStatusView(DPROD).label==='A equipe está produzindo as artes');
     // Cenário D — designer entregou: aguardando legendas/posts.
@@ -1150,20 +1153,53 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   check('CY2_SRC_BOARD','renderClientFlowBoard renderiza taskCard(t,\'client\')', /h\+=tasks\.length\?tasks\.map\(t=>taskCard\(t,'client'\)\)\.join/.test(DH));
   check('CY2_SRC_COL4','clientCol4: "Aprovado" SÓ p/ concluido; aprovado/producao/reenviado → analise', /if\(c==='concluido'\)return 'aprovado';\s*\n\s*if\(c==='aprovado'\|\|c==='producao'\|\|c==='reenviado'\)return 'analise';/.test(DH));
   // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
-  check('CY2_CSS_KCOL','CSS: .kcol max-height calc(100vh - 252px) + fallback p/ telas baixas (232px)', /max-height:calc\(100vh - 252px\);overflow:hidden;/.test(DH) && /@media\(max-height:760px\)\{body\.desktop \.kanban \.kcol\{max-height:calc\(100vh - 232px\)\}\}/.test(DH));
+  check('CY2_CSS_KCOL','Card cortado (fix estrutural): .kcol usa var(--kanban-h) medida do topo REAL + fallback CSS', /max-height:var\(--kanban-h,calc\(100vh - 252px\)\);overflow:hidden;/.test(DH) && /function fitKanban\(\)/.test(DH));
   check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 + scrollbar-gutter (último card nunca corta)', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1;min-height:0;scrollbar-gutter:stable\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:2px\}/.test(DH));
   // Problema 1 — gatilho do push de envio (Desktop → Worker contentSent, best-effort).
   check('CY2_SENT_TRIGGER','persistClientSend chama team-action contentSent com Bearer JWT + Idempotency-Key (best-effort)',
     (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];return fn.indexOf("action:'contentSent'")>=0&&fn.indexOf("'Authorization':'Bearer '+jwt")>=0&&fn.indexOf("'Idempotency-Key':idem")>=0&&fn.indexOf('catch')>=0;})());
   check('CY2_SENT_401','contentSent: 401 limpa wp_team_jwt (sem insistir com credencial inválida)',
     (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];return /res\.status===401\)\{localStorage\.removeItem\('wp_team_jwt'\)/.test(fn);})());
+  /* ═══ CY3 — REPROVAÇÃO PARCIAL 1.0.134 (fechamento explícito / card / designer / avisos) ═══ */
+  console.log(`${C.b}\n[CY3] Correções da reprovação parcial 1.0.134${C.x}`);
+  if(mod&&mod.clientCol4){
+    const TH3b=[{tema:'T1'},{tema:'T2'},{tema:'T3'}];
+    // C — aprovar o último item NÃO fecha: estado "aguardando confirmação" em TODOS os eixos.
+    const WAITC={sector:'cronograma',cronContents:TH3b,clientApprovalPhase:'themes',clientFlowStatus:'revisao',cronStatus:'em_revisao_cliente',
+      clientReview:{status:'revisao',note:'trocar foto'},
+      clientItems:{i0:{cs:'aprovado',phase:'themes'},i1:{cs:'aprovado',phase:'themes'},i2:{cs:'aprovado',phase:'themes',teamAdjustedAt:1}}};
+    check('CY3_C_BOARD','Tudo aprovado sem confirmação → quadro Cliente "Em análise" (não Revisão, não Aprovado)', mod.clientCol4(WAITC)==='analise');
+    check('CY3_C_FACING','Status do Cliente = "Temas aprovados — aguardando confirmação"', mod.clientFacingStatusView(WAITC).label==='Temas aprovados — aguardando confirmação');
+    check('CY3_C_SOCIAL','Social vê "Aguardando aprovação dos temas" (producao) — não "Ajuste solicitado"', mod.operationalCol(WAITC)==='producao');
+    check('CY3_C_DETAIL','detailState=aguardando_confirmacao (dono: cliente; sem senddesigner)', mod.detailState(WAITC).key==='aguardando_confirmacao' && mod.detailState(WAITC).actions.indexOf('senddesigner')<0);
+    // E — explicitamente fechado (clientFlowStatus aprovado via botão final) → libera o designer.
+    const CONF={sector:'cronograma',cronContents:TH3b,clientApprovalPhase:'themes',clientFlowStatus:'aprovado',cronStatus:'aprovado_cliente',clientReview:{status:'aprovado'}};
+    check('CY3_E_CLOSED','Após o botão final (approveAll): detailState=temas_aprovados + senddesigner disponível', mod.detailState(CONF).key==='temas_aprovados' && mod.detailState(CONF).actions.indexOf('senddesigner')>=0);
+  } else { check('CY3_EVAL','eval CY3 indisponível', false); }
+  // D — card cortado: fix estrutural medido (fitKanban) ligado em render/resize/scroll.
+  check('CY3_FIT_WIRED','fitKanban chamado no afterBoard + listeners de resize e scroll do conteúdo',
+    /afterBoard\(\)\{[\s\S]{0,400}try\{fitKanban\(\);\}catch\(_\)\{\}\}/.test(DH) && /window\.addEventListener\('resize',\(\)=>\{try\{fitKanban\(\);\}/.test(DH) && /addEventListener\('scroll',/.test(DH));
+  check('CY3_FIT_MATH','fitKanban: altura = innerHeight - topo medido - respiro (mínimo 320px)',
+    /window\.innerHeight-top-16/.test(DH) && /Math\.max\(320,/.test(DH) && /setProperty\('--kanban-h'/.test(DH));
+  // Worker V64.49 (branch) — gate assistido + copy + fechamento explícito:
+  (function(){
+    const W49=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
+    check('CY3_W49_GATE','Portal: ativação assistida no 1º acesso (pushGateShow + botões exatos + skip por TOKEN)',
+      /function pushGateShow\(\)/.test(W49) && /Receba avisos deste cronograma em tempo real/.test(W49) && /Ativar avisos em tempo real/.test(W49) && /Continuar sem avisos/.test(W49) && /wp_gate_skip_'\+TOKEN/.test(W49));
+    check('CY3_W49_COPY','Notificações com copy EXATA (Cronograma disponível p/ análise · Tema corrigido · Cronograma finalizado)',
+      /Cronograma disponível para análise/.test(W49) && /O tema ajustado foi reenviado\. Toque para revisar\./.test(W49) && /Cronograma finalizado/.test(W49) && /Seu cronograma foi aprovado com sucesso\./.test(W49));
+    check('CY3_W49_ITEM','CV_JS: aprovar item não abre tela final; rodapé oferece o botão final "Aprovar temas"',
+      (()=>{const m=W49.match(/if\(act==='approveItem'\)\{post\([\s\S]*?\}\);\}/);return m&&m[0].indexOf('clientThemesApproved')===-1&&/:'Aprovar temas'\)/.test(W49);})());
+    check('CY3_W49_IOS','iOS sem suporte → instrução Tela de Início + fallback WhatsApp', /adicione este portal à Tela de Início/.test(W49));
+  })();
+
   // Worker V64.48 (branch) — contentSent + rodapé dinâmico do portal:
   (function(){
     const W48=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
     check('CY2_W48_CONTENTSENT','Worker: team-action aceita contentSent e dispara themes_sent_to_client/final_content_sent_to_client', /action !== "adjustedItem" && action !== "contentSent"/.test(W48) && /final_content_sent_to_client" : "themes_sent_to_client"/.test(W48) && /notifyWorkflowEvent\(env, task, evSent/.test(W48));
     check('CY2_W48_NO_WRITE','Worker: contentSent NÃO escreve no Firestore (apenas notifica + loga)', (()=>{const b=(W48.match(/if \(action === "contentSent"\) \{[\s\S]*?\n  \}/)||[''])[0];return b.length>0&&b.indexOf(':commit')<0&&b.indexOf('writes:')<0;})());
     check('CY2_W48_FOOTER','Portal: syncFooter dinâmico — ajuste pendente → "Enviar feedback" (nunca CTA de aprovação)', /function syncFooter\(\)/.test(W48) && /function anyRevBadge\(\)/.test(W48) && (W48.match(/syncFooter\(\);/g)||[]).length>=5);
-    check('CY2_W48_VERSION','Worker healthcheck = V64.48-content-sent-footer-sync', /version: "V64\.48-content-sent-footer-sync"/.test(W48));
+    check('CY2_W48_VERSION','Worker healthcheck = V64.49-assisted-push-explicit-close', /version: "V64\.49-assisted-push-explicit-close"/.test(W48));
   })();
 })();
 
@@ -1196,10 +1232,17 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     /"concluido" -> "aprovado"/.test(KV) && /"aprovado", "producao", "reenviado" -> "analise"/.test(KV) && !/"aprovado", "concluido" -> "aprovado"/.test(KV));
   check('N_CY2_FACING','clientFacingStatusView Android com os MESMOS textos do Desktop (linguagem simples)',
     /fun clientFacingStatusView/.test(KV) && /Temas aprovados — produção em andamento/.test(KV) && /A equipe está produzindo as artes/.test(KV) && /Aguardando legendas e posts/.test(KV) && /Versão final disponível para análise/.test(KV) && /Cronograma concluído/.test(KV));
-  check('N_CY2_DESIGNER_BADGE','designerCardLabel: badge "Em produção" no card do designer (coluna segue "Em andamento")',
-    /fun designerCardLabel/.test(KV) && /if \(k == "andamento"\) return "Em produção"/.test(KV) && /designerCardLabel\(task\)/.test(KS));
+  check('N_CY2_DESIGNER_BADGE','designerCardLabel: badge "Designer em produção" no card do designer (coluna segue "Em andamento")',
+    /fun designerCardLabel/.test(KV) && /if \(k == "andamento"\) return "Designer em produção"/.test(KV) && /designerCardLabel\(task\)/.test(KS));
   check('N_CY2_CARD_CLIENTVIEW','TaskCardPro tem clientView e o quadro Cliente passa clientView=isClientBoard',
     /clientView: Boolean = false/.test(KS) && /clientView = isClientBoard/.test(KS) && /clientFacingStatusView\(task\)/.test(KS));
+  // ── N_CY3 — paridade Android do ciclo 1.0.134 (fechamento explícito) ──
+  check('N_CY3_NO_UNSTICK','clientCol Android NÃO converte mais revisao herdado em aprovado (V64.49)',
+    !/allPhaseItemsApproved\(t\)\) return "aprovado"/.test(KV));
+  check('N_CY3_WAIT_CONFIRM','Estado aguardando_confirmacao espelhado (detailState + clientCol4 analise + facing + opcol producao)',
+    /"aguardando_confirmacao", "Temas aprovados — aguardando confirmação"/.test(KV) && /if \(c == "revisao" && allPhaseItemsApproved\(t\)\) return "analise"/.test(KV) && /aguarda_confirmacao", "Temas aprovados — aguardando confirmação"/.test(KV) && /if \(cf == "revisao" && !hasPendingItemRevision\(t\) && allPhaseItemsApproved\(t\)\) return "producao"/.test(KV));
+  check('N_CY3_APPROVED_FLAG','clientApprovedFlag NÃO inclui mais allPhaseItemsApproved (designer só após botão final)',
+    !/clientReview\?\.status == "aprovado" \|\| allPhaseItemsApproved/.test(KV));
   check('N_CY2_SHOT','Roborazzi ClientBoardCycle2ScreenshotTest (6 casos, 360/412) presente',
     /class ClientBoardCycle2ScreenshotTest/.test(KC2) && /client-board-cycle2-360\.png/.test(KC2) && /client-board-cycle2-412\.png/.test(KC2) && /Em análise — temas aprovados/.test(KC2));
 })();
