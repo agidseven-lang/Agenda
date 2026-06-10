@@ -232,7 +232,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_49', 'Healthcheck retorna V64.49-assisted-push-explicit-close', /version: "V64\.49-assisted-push-explicit-close"/.test(SRC));
+check('C_HEALTH_V64_50', 'Healthcheck retorna V64.50-push-proof-diag', /version: "V64\.50-push-proof-diag"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -367,7 +367,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + estados (ativado/negado/incompatível/disponível)', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados ✓/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.49-assisted-push-explicit-close', /version: "V64\.49-assisted-push-explicit-close"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.50-push-proof-diag', /version: "V64\.50-push-proof-diag"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -499,8 +499,8 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     (()=>{const g=(SRC.match(/function pushGateShow\(\)\{[\s\S]*?\n\}/)||[''])[0];return g.length>0&&g.indexOf('requestPermission')===-1&&/subscribeClientPush\(function\(ok\)/.test(g);})());
   check('J4_GATE_SKIP','"Continuar sem avisos" registra a escolha (localStorage por TOKEN) e mostra fallback WhatsApp',
     /wp_gate_skip_'\+TOKEN/.test(SRC) && /Você continuará recebendo avisos pelo WhatsApp\./.test(SRC));
-  check('J5_GATE_ONCE','Já inscrito NÃO vê o gate (return antes) e vê indicador discreto "Avisos ativados ✓"',
-    /if\(sub\)\{sendSubToWorker\(sub\)\.catch\(function\(\)\{\}\);pushCtaState\('Avisos ativados ✓','pc-ok',null\);return;\}/.test(SRC));
+  check('J5_GATE_ONCE','Já inscrito NÃO vê o gate (return antes) e a UI confirma SÓ com ok:true do servidor',
+    (()=>{const f=(SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/)||[''])[0];const sub=f.indexOf('if(sub){');const gate=f.indexOf('pushGateShow');return sub>=0&&gate>sub&&/resp&&resp\.ok===true\)\{pushCtaState\('Avisos ativados ✓','pc-ok',null\);\}/.test(f)&&/return;\}/.test(f.slice(sub,gate));})());
   check('J6_GATE_DENIED','Permissão negada → fallback WhatsApp SEM loop (mensagem exata, sem reabrir gate)',
     (()=>{const f=(SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/)||[''])[0];const i=f.indexOf("permission==='denied'");const gate=f.indexOf('pushGateShow');return i>=0&&gate>i&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(f);})());
   check('J7_GATE_IOS','iOS sem suporte → instrução de Tela de Início + fallback WhatsApp',
@@ -518,12 +518,75 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     COPY.every(([ev,t,b])=>{const re=new RegExp(ev+":\\s*\\{[^}]*title: \""+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+"\"[^}]*body: \""+b.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+"\"");return re.test(SRC);}));
   check('J10_NOTIFY_PRECISION','Payload do push carrega eventType + taskId + phase (além de title/body/openUrl/tag)',
     /eventType, taskId: \(task && task\.id\) \|\| "", phase: ev\.phase/.test(SRC));
-  check('J11_NOTIFY_TRUTH','Resultado NUNCA mente: channel webpush só com sent; fallback whatsapp_premium sinalizado quando não enviou',
-    /if \(!out\.sent\) result\.fallback = "whatsapp_premium"/.test(SRC) && /reason: subs\.length \? "VAPID_NOT_CONFIGURED" : "sem_subscription"/.test(SRC));
+  check('J11_NOTIFY_TRUTH','Resultado NUNCA mente: falha de envio com subscription = send_failed (erro real), nunca confundida com sem_subscription',
+    /if \(!out\.sent\) \{ result\.fallback = "whatsapp_premium"; result\.reason = "send_failed"; result\.error = "push_send_failed"; \}/.test(SRC) && /reason: subs\.length \? "VAPID_NOT_CONFIGURED" : "sem_subscription"/.test(SRC));
   check('J12_ITEM_NO_AUTOFINISH','CV_JS: aprovar item NÃO mostra tela final automaticamente (sem clientThemesApproved no callback de approveItem)',
     (()=>{const m=SRC.match(/if\(act==='approveItem'\)\{post\([\s\S]*?\}\);\}/);if(!m)return false;return m[0].indexOf('clientThemesApproved')===-1&&m[0].indexOf('clientProductionApproved')===-1&&/syncFooter\(\)/.test(m[0]);})());
   check('J13_CTA_APROVAR_TEMAS','CTA da fase de temas = "Aprovar temas" (server phaseCopy + footerCta)',
     /cta: "Aprovar temas",/.test(SRC) && /:'Aprovar temas'\)/.test(SRC.match(/function footerCta[\s\S]{0,200}/)[0]));
+
+  /* ═══════════ PARTE K — V64.50 (prova pós-ativação: interop real + verdade + diagnóstico) ═══════════ */
+  console.log(`${C.b}\n[K] V64.50 — push pós-ativação: interop RFC 8291/8292 + verdade na inscrição + diagnóstico${C.x}`);
+  // K1/K2 — INTEROP REAL: cifra com o código DO WORKER e decifra com implementação
+  // INDEPENDENTE (node:crypto, seguindo a RFC à letra — o mesmo caminho do Chrome).
+  try{
+    const nodeCrypto=require('node:crypto');
+    const kfn=n=>{const m=SRC.match(new RegExp('(?:async )?function '+n+'\\s*\\([^)]*\\)\\s*\\{'));if(!m)throw new Error('NF '+n);
+      let st=SRC.indexOf(m[0]),d=0;for(let i=st+m[0].length-1;i<SRC.length;i++){const c=SRC[i];if(c==='{')d++;else if(c==='}'){d--;if(d===0)return SRC.slice(st,i+1);}}};
+    const kmod=new Function(['b64uToBytes','bytesToB64u','concatBytes','hkdfBits','encryptWebPushPayload','vapidJwt']
+      .map(kfn).join('\n')+'\nreturn {encryptWebPushPayload,vapidJwt};')();
+    const ua=nodeCrypto.createECDH('prime256v1');ua.generateKeys();
+    const uaPub=ua.getPublicKey();const auth=nodeCrypto.randomBytes(16);
+    const b64u=b=>Buffer.from(b).toString('base64url');
+    const payload=JSON.stringify({title:'t',body:'interop',openUrl:'/x',tag:'x',eventType:'e',taskId:'id',phase:'themes'});
+    const body=Buffer.from(await kmod.encryptWebPushPayload(payload,b64u(uaPub),b64u(auth)));
+    const salt=body.subarray(0,16),rs=body.readUInt32BE(16),idlen=body[20];
+    const asPub=body.subarray(21,21+idlen),ct=body.subarray(21+idlen);
+    const hk=(sa,ikm,info,len)=>Buffer.from(nodeCrypto.hkdfSync('sha256',ikm,sa,info,len));
+    const ikm=hk(auth,ua.computeSecret(asPub),Buffer.concat([Buffer.from('WebPush: info\0'),uaPub,asPub]),32);
+    const dec=nodeCrypto.createDecipheriv('aes-128-gcm',hk(salt,ikm,Buffer.from('Content-Encoding: aes128gcm\0'),16),hk(salt,ikm,Buffer.from('Content-Encoding: nonce\0'),12));
+    dec.setAuthTag(ct.subarray(ct.length-16));
+    const plain=Buffer.concat([dec.update(ct.subarray(0,ct.length-16)),dec.final()]);
+    check('K1_INTEROP_RFC8291','Payload cifrado pelo Worker é decifrado por implementação INDEPENDENTE (node:crypto, RFC 8291) — formato aes128gcm/idlen/0x02 corretos',
+      idlen===65 && rs===4096 && plain[plain.length-1]===2 && plain.subarray(0,plain.length-1).toString()===payload);
+    const vk=nodeCrypto.generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+    const j=vk.publicKey.export({format:'jwk'});
+    const pub65=Buffer.concat([Buffer.from([4]),Buffer.from(j.x,'base64url'),Buffer.from(j.y,'base64url')]);
+    const envK={VAPID_PUBLIC_KEY:b64u(pub65),VAPID_PRIVATE_KEY:b64u(Buffer.from(vk.privateKey.export({format:'jwk'}).d,'base64url')),VAPID_SUBJECT:'mailto:x@y.z'};
+    const jwt=await kmod.vapidJwt(envK,'https://fcm.googleapis.com');
+    const [h2,c2,s2]=jwt.split('.');
+    const okSig=nodeCrypto.verify('sha256',Buffer.from(h2+'.'+c2),{key:vk.publicKey,dsaEncoding:'ieee-p1363'},Buffer.from(s2,'base64url'));
+    const cl=JSON.parse(Buffer.from(c2,'base64url').toString());
+    check('K2_VAPID_VERIFY','VAPID JWT assinado pelo Worker verifica com chave pública independente; aud = origem do endpoint; exp ≤ 24h',
+      okSig===true && cl.aud==='https://fcm.googleapis.com' && (cl.exp-Date.now()/1e3)<=24*3600+60);
+  }catch(e){check('K_INTEROP_FATAL','Interop executa sem exceção — erro: '+(e&&e.message),false);}
+  // K3..K12 — verdade na inscrição + diagnóstico + teste + badge
+  check('K3_SUB_TRUTH','sendSubToWorker interpreta a resposta (json+status) e "Avisos ativados" SÓ com ok:true confirmado',
+    /b\._http=r\.status;if\(!r\.ok\)b\.ok=false;/.test(SRC) && /if\(resp&&resp\.ok===true\)\{pushCtaState\('Avisos ativados ✓/.test(SRC));
+  check('K4_SUB_FAIL_HONESTO','Falha ao salvar inscrição mostra o ERRO REAL + fallback WhatsApp + botão Tentar novamente',
+    /NÃO conseguimos salvar a inscrição no servidor/.test(SRC) && /'Tentar novamente'/.test(SRC));
+  check('K5_DIAG_PANEL','Painel ?debug=1: permission, sw.scope, hasController, endpoint mascarado, lastSubscribeStatus, lastPushTest, lastNotificationClick, token/phase',
+    /function pushDebugPanel\(\)/.test(SRC) && /debug=1/.test(SRC) && /hasController/.test(SRC) && /lastSubscribeStatus/.test(SRC) && /lastPushTest/.test(SRC) && /lastNotificationClick/.test(SRC));
+  check('K6_PUSHTEST_ROUTE','Rota POST /push/test: envia push real às subscriptions do cronograma SEM alterar a tarefa + rate-limit 30s',
+    /push\\\/test/.test(SRC) && /async function handleClientPushTest/.test(SRC) && /push-test-rl\.local/.test(SRC) && (()=>{const h=(SRC.match(/async function handleClientPushTest[\s\S]*?\n\}/)||[''])[0];return h.indexOf(':commit')<0&&h.indexOf('writes:')<0;})());
+  check('K7_PUSHTEST_TRUTH','push/test devolve sent/total/results com endpoint MASCARADO + status real do POST',
+    /maskEndpoint\(subs\[i\] && subs\[i\]\.endpoint\)/.test(SRC) && /\[PUSH-TEST\]/.test(SRC));
+  check('K8_NOTIFY_FULL_LOG','[NOTIFY] loga eventType, phase, openUrl, dedupKey, subsFound e o resultado por endpoint',
+    /openUrl=\$\{openUrl\} dedupKey=\$\{dedupKey\} subsFound=\$\{subsFound\}/.test(SRC));
+  check('K9_BADGE','Badge monocromático dedicado: IDSEVEN_BADGE_B64 + rota /og/idseven-badge.png + SW usa badge dedicado',
+    /const IDSEVEN_BADGE_B64 = "[A-Za-z0-9+/=]{200,}"/.test(SRC) && /\/og\/idseven-badge\.png/.test(SRC) && /badge: '\/og\/idseven-badge\.png'/.test(SRC));
+  check('K10_SW_DATA','SW: showNotification com waitUntil + data{url,eventType,taskId,phase} + notificationclick abre o MESMO link e reporta o clique',
+    /event\.waitUntil\(self\.registration\.showNotification\(title, options\)\)/.test(SRC) && /eventType: data\.eventType/.test(SRC) && /idseven-click/.test(SRC));
+  check('K11_SW_VERSIONED','SW versionado (sw-version: V64.50) — força atualização do SW antigo nos clientes',
+    /sw-version: V64\.50-push-proof-diag/.test(SRC));
+  check('K12_MASK','maskEndpoint nunca expõe o token do push service (origem + 8 últimos chars)',
+    /function maskEndpoint\(e\)/.test(SRC) && /e\.slice\(-8\)/.test(SRC));
+  check('K13_SUBSCRIBE_OK_REAL','/push/subscribe devolve ok:true SOMENTE após commit confirmado no Firestore (res.ok); falha → ok:false com erro',
+    (()=>{const h=(SRC.match(/async function handleClientPushSubscribe[\s\S]*?\n\}/)||[''])[0];
+      const fail=h.indexOf('commit falhou');const okret=h.indexOf('ok: true, taskId');
+      return fail>=0&&okret>fail&&/if \(!res\.ok\)/.test(h);})());
+  check('K14_PRUNE_410','Subscription morta (404/410) é removida (prune) e nunca reutilizada',
+    /if \(res\.status === 404 \|\| res\.status === 410\) return \{ ok: false, gone: true/.test(SRC) && /async function pruneClientPushSubs/.test(SRC));
 
   /* ===================== VEREDITO ===================== */
   console.log(`${C.b}\n==================================================================`);

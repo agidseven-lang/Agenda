@@ -180,6 +180,10 @@ export default {
     if (request.method === "GET" && (url.pathname === "/og/idseven-logo.png" || url.pathname === "/og/idseven-logo-256.png")) {
       return idsevenLogoResponse();
     }
+    // V64.50 — badge MONOCROMÁTICO (96x96, branco/alpha) p/ a notificação Android.
+    if (request.method === "GET" && url.pathname === "/og/idseven-badge.png") {
+      return idsevenBadgeResponse();
+    }
 
     if (url.pathname === "/cron-test" && request.method === "POST") {
       return handleCronTest(request, env);
@@ -235,6 +239,13 @@ export default {
       if (pushSubMatch && request.method === "POST") {
         return handleClientPushSubscribe(pushSubMatch[1], request, env);
       }
+      // V64.50 — PUSH DE TESTE controlado: envia um push real SÓ para as subscriptions
+      // DESTE cronograma, sem alterar nenhum estado da tarefa. Capability = o próprio
+      // token do link (mesmo nível de acesso da página); rate-limit 30s via Cache API.
+      const pushTestMatch = url.pathname.match(/^\/cliente\/cronograma\/([A-Za-z0-9_-]{4,128})\/push\/test\/?$/);
+      if (pushTestMatch && request.method === "POST") {
+        return handleClientPushTest(pushTestMatch[1], request, env);
+      }
       // V64.42 — Service Worker do portal (escopo /cliente/). Mostra a notificacao quando o
       // navegador recebe push em background. Servido same-origin (necessario p/ pushManager.subscribe).
       if (url.pathname === "/cliente/sw.js" && request.method === "GET") {
@@ -269,7 +280,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.49-assisted-push-explicit-close" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.50-push-proof-diag" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1049,19 +1060,25 @@ function clientSwResponse() {
   const sw = `
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
+// sw-version: V64.50-push-proof-diag
 self.addEventListener('push', function(event) {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) { data = {}; }
   const title = data.title || 'Agenda ID Seven';
   const body = data.body || '';
   const url = data.openUrl || '/';
-  const options = { body: body, icon: '/og/idseven-logo.png', badge: '/og/idseven-logo.png', data: { url: url }, tag: data.tag || 'idseven-client', renotify: !!data.renotify };
+  const options = { body: body,
+    icon: '/og/idseven-logo.png', badge: '/og/idseven-badge.png',
+    data: { url: url, eventType: data.eventType || '', taskId: data.taskId || '', phase: data.phase || '' },
+    tag: data.tag || 'idseven-client', renotify: !!data.renotify };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || '/';
+  const ev = (event.notification.data && event.notification.data.eventType) || '';
   event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+    for (const c of list) { try { c.postMessage({ type: 'idseven-click', url: url, eventType: ev, at: Date.now() }); } catch (_) {} }
     for (const c of list) { if (c.url.indexOf(url) !== -1 && 'focus' in c) return c.focus(); }
     if (clients.openWindow) return clients.openWindow(url);
   }));
@@ -1081,6 +1098,13 @@ self.addEventListener('notificationclick', function(event) {
 // instalador Desktop (desktop/build/icon.png) — redimensionado uma vez via PIL e embutido
 // como base64. Servido em /og/idseven-logo.png para o portal do cliente referenciar
 // same-origin (sem CSP/CORS, sem dependencia externa).
+function idsevenBadgeResponse() {
+  const bin = atob(IDSEVEN_BADGE_B64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Response(bytes, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" } });
+}
+const IDSEVEN_BADGE_B64 = "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAACrklEQVR42u1dy47EMAhr0Pz/L3fPu9JsmwSwIeY4GilgA6F5kOuSSCQSiUQiOVFGFUXv+76njRtjiIAksKuSMk4AnZmMcSLwTESMk4FnIGIIeCwRQ8BjiTCBj9V7VDJgxiORY1MQsAtAhMGMOg028DPyLpN+FF6GrMPR+g6kMUzLAijdTeCv6eM1yY9s8CusUGbaYwIfW+6awMeSYAIfS4IxGVGdhDQC3rJdHfxZO1aiwAQ+lgSrGLad0pF5e39X8Gfsm4mCzyV5BC/SqUze/2zj3989o8AyQ7Py8sMKCW4EVN1S9K7sZnF483873fvRmzN2svdn2PY0hl0SqGwTUDX9uG2oRO4HdE0/q3atgv3feHaa90eAv4PDUXNAtudrKWIT/DZnQ08oN90J6DIBs6Sdb3osR0DnZecV21bxaJ2CKhyT/CDBiDS2yhlV6AWNqHmm0gFhQ6cBbxKqnc42JPjeJFS8TU8zCe+SULVspqqCVkFkXGIoW4ZmeTLLdwzld8AMCdW7qBirl70BtkMLm/Dj6VEksIHvfjzd9SagMwkVPf/b+IZWYJaEbp2zjMEL3pLQcY/aWEKxe7kZQgD7B1DWOGGX9CINiAaHyfP/08WQ7Ie1gEkEH3pPmBGsalulxmCQ1xiM4D/pZAxh6AEeAnwPu43JuBOvthqTN6ySUNX7pwjwvp5ZORI8Lyxa5fDtkLbMGxTP9Zqn8VhTz4xehlJyl4TKef+XHZGKdKpqomy2iNQQ6TGdwE+ZhKuTEK1/yvH0E5p3Q46ndyYhqyde6j3hKiRkNiQcCKVZKySEDbB2NWzRgHIgdU/v1D3dw7v1fgBJ/awXNAg/YvSGzIFfw5StiytNsux66yU9sMPoLUlwpOo11evQ11QZiNB7wgAy9KJ20SUDiUQikUgkzeQHCw0kxe91ei8AAAAASUVORK5CYII=";
 function idsevenLogoResponse() {
   const bin = atob(IDSEVEN_LOGO_B64);
   const bytes = new Uint8Array(bin.length);
@@ -1740,6 +1764,47 @@ async function handleClientCronogramaTeamAction(token, request, env) {
    gravamos em tasks/{id}.clientPushSubs[] (array de subscriptions {endpoint, keys.p256dh, keys.auth}).
    O envio (broadcastWebPush) so funciona com env.VAPID_PRIVATE_KEY/env.VAPID_PUBLIC_KEY/env.VAPID_SUBJECT
    configurados — sem isso, broadcastWebPush retorna 'NOT_CONFIGURED'. */
+/* V64.50 — endpoint mascarado p/ logs/respostas (origem + últimos 8 chars; nunca o token FCM inteiro). */
+function maskEndpoint(e) {
+  try { const u = new URL(e); return u.origin + "/…" + e.slice(-8); } catch (_) { return "(endpoint inválido)"; }
+}
+/* V64.50 — PUSH DE TESTE: dispara um push real para as subscriptions DESTE cronograma.
+   NÃO altera nenhum estado da tarefa. Devolve o resultado VERDADEIRO por endpoint
+   (status do POST ao push service, gone, erro) — prova fim-a-fim pós-ativação. */
+async function handleClientPushTest(token, request, env) {
+  // rate-limit: 1 teste por token a cada 30s (Cache API, best-effort)
+  const rlUrl = "https://push-test-rl.local/" + encodeURIComponent(token);
+  try {
+    const hit = await caches.default.match(new Request(rlUrl));
+    if (hit) return json({ ok: false, error: "aguarde 30s entre testes" }, 429, env);
+  } catch (_) {}
+  let accessToken;
+  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+  catch (e) { return json({ ok: false, error: "auth: " + (e && e.message) }, 200, env); }
+  const task = await queryTaskByToken(env, accessToken, token);
+  if (!task) return json({ ok: false, error: "token inválido" }, 404, env);
+  const subs = Array.isArray(task.clientPushSubs) ? task.clientPushSubs : [];
+  if (!subs.length) {
+    console.log(`[PUSH-TEST] task=${task.id} subsFound=0 → sem_subscription`);
+    return json({ ok: true, sent: 0, total: 0, reason: "sem_subscription" }, 200, env);
+  }
+  const out = await broadcastWebPush(env, subs,
+    { title: "Teste de avisos — Agenda ID Seven", body: "Os avisos deste cronograma estão funcionando. 💜",
+      openUrl: "/cliente/cronograma/" + token, tag: "idseven-push-test",
+      eventType: "push_test", taskId: task.id, phase: "test" },
+    { topic: "push_test", urgency: "high", ttl: 600 });
+  if (out.gone && out.gone.length) { try { await pruneClientPushSubs(env, task, out.gone); } catch (_) {} }
+  const results = (out.results || []).map((r, i) => ({
+    endpoint: maskEndpoint(subs[i] && subs[i].endpoint), ok: !!r.ok,
+    status: r.status || 0, gone: !!r.gone, error: r.error || null,
+  }));
+  console.log(`[PUSH-TEST] task=${task.id} subsFound=${subs.length} sent=${out.sent} results=${JSON.stringify(results)}`);
+  try {
+    await caches.default.put(new Request(rlUrl), new Response("1", { status: 200, headers: { "Cache-Control": "public, max-age=30" } }));
+  } catch (_) {}
+  return json({ ok: true, sent: out.sent, total: out.total, pruned: (out.gone || []).length, results }, 200, env);
+}
+
 async function handleClientPushSubscribe(token, request, env) {
   let payload;
   try { payload = await request.json(); } catch (_) { return json({ ok: false, error: "JSON invalido" }, 400, env); }
@@ -2002,11 +2067,18 @@ async function notifyWorkflowEvent(env, task, eventType, payload) {
           eventType, taskId: (task && task.id) || "", phase: ev.phase },
         { topic: eventType, urgency: "high", ttl: 86400 });
       result = { channel: "webpush", sent: out.sent, total: out.total };
+      // V64.50 — VERDADE no log: status REAL do POST por endpoint (mascarado). Falha de envio
+      // com subscription presente é ERRO (reason=send_failed), NUNCA confundida com
+      // 'sem_subscription'; o fallback WhatsApp é informado como fallback, não como envio.
+      result.results = (out.results || []).map((r, i) => ({
+        endpoint: maskEndpoint(subs[i] && subs[i].endpoint), ok: !!r.ok,
+        status: r.status || 0, gone: !!r.gone, error: r.error || null,
+      }));
       if (out.gone && out.gone.length) {
         try { await pruneClientPushSubs(env, task, out.gone); } catch (_) { /* best-effort */ }
         result.pruned = out.gone.length;
       }
-      if (!out.sent) result.fallback = "whatsapp_premium";
+      if (!out.sent) { result.fallback = "whatsapp_premium"; result.reason = "send_failed"; result.error = "push_send_failed"; }
     } else {
       result = { channel: "none", sent: 0, fallback: "whatsapp_premium",
                  reason: subs.length ? "VAPID_NOT_CONFIGURED" : "sem_subscription" };
@@ -2019,7 +2091,8 @@ async function notifyWorkflowEvent(env, task, eventType, payload) {
     await caches.default.put(new Request(dedupUrl),
       new Response("1", { status: 200, headers: { "Cache-Control": "public, max-age=60" } }));
   } catch (_) { /* sem dedup persistido */ }
-  console.log(`[NOTIFY] task=${task && task.id} event=${eventType} phase=${ev.phase} to=${ev.to} result=${JSON.stringify(result)}`);
+  const subsFound = (ev.to === "client") ? ((Array.isArray(task && task.clientPushSubs) ? task.clientPushSubs : []).length) : null;
+  console.log(`[NOTIFY] task=${task && task.id} event=${eventType} phase=${ev.phase} to=${ev.to} openUrl=${openUrl} dedupKey=${dedupKey} subsFound=${subsFound} result=${JSON.stringify(result)}`);
   return Object.assign({ ok: true, eventType, phase: ev.phase, to: ev.to, openUrl }, result);
 }
 
@@ -2801,10 +2874,18 @@ function pushCtaState(msg,cls,btn){var el=document.getElementById('pushcta');if(
   el.innerHTML='<span class="pc-msg">'+msg+'</span>'+(btn?'<button class="ibtn pc-btn" id="pushctabtn">'+btn+'</button>':'');
   var b=document.getElementById('pushctabtn');if(b)b.addEventListener('click',subscribeClientPush);}
 function registerPushSw(){return navigator.serviceWorker.register('/cliente/sw.js',{scope:'/cliente/'});}
+function diagSet(k,v){try{localStorage.setItem('wp_diag_'+k+'_'+TOKEN,String(v));}catch(_){}}
+function diagGet(k){try{return localStorage.getItem('wp_diag_'+k+'_'+TOKEN)||'';}catch(_){return '';}}
+/* V64.50 — VERDADE na inscrição: devolve {ok,_http,...} REAIS do Worker. "Avisos
+   ativados" SÓ aparece com ok:true confirmado (subscription SALVA no servidor). */
 function sendSubToWorker(sub){var j=sub.toJSON();
   return fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/push/subscribe',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({endpoint:j.endpoint,keys:j.keys})});}
+    body:JSON.stringify({endpoint:j.endpoint,keys:j.keys})
+  }).then(function(r){return r.json().catch(function(){return {ok:false,error:'resposta inválida'};})
+    .then(function(b){b=b||{};b._http=r.status;if(!r.ok)b.ok=false;
+      diagSet('lastSubscribeStatus',(b.ok===true?'ok':'FALHOU')+' http='+r.status+(b.error?(' '+b.error):''));
+      return b;});});}
 function subscribeClientPush(cb){
   if(cb&&typeof cb!=='function')cb=null;            // tolera o event do click handler
   var done=function(ok){if(cb)cb(ok===true);};
@@ -2816,8 +2897,12 @@ function subscribeClientPush(cb){
     });
   }).then(function(sub){
     if(!sub)return;
-    return sendSubToWorker(sub).then(function(){pushCtaState('Avisos ativados ✓ Você será notificado a cada atualização deste cronograma.','pc-ok',null);done(true);});
-  }).catch(function(){pushCtaState('Não foi possível ativar os avisos agora. Vamos manter o WhatsApp como canal de aviso.','pc-warn',null);done(false);});
+    diagSet('endpoint',(sub.endpoint||'').slice(-12));
+    return sendSubToWorker(sub).then(function(resp){
+      if(resp&&resp.ok===true){pushCtaState('Avisos ativados ✓ Você será notificado a cada atualização deste cronograma.','pc-ok',null);done(true);}
+      else{pushCtaState('Sua permissão foi dada, mas NÃO conseguimos salvar a inscrição no servidor ('+((resp&&resp.error)||('HTTP '+(resp&&resp._http)))+'). Vamos manter o WhatsApp como canal de aviso.','pc-warn','Tentar novamente');done(false);}
+    });
+  }).catch(function(e){diagSet('lastSubscribeStatus','EXCEPTION '+(e&&e.message));pushCtaState('Não foi possível ativar os avisos agora. Vamos manter o WhatsApp como canal de aviso.','pc-warn','Tentar novamente');done(false);});
 }
 /* V64.49 — ATIVAÇÃO ASSISTIDA no PRIMEIRO acesso: bloco destacado ANTES da análise.
    Permissão SÓ no clique (Notification.requestPermission dentro de subscribeClientPush);
@@ -2858,13 +2943,57 @@ function setupClientWebPush(){
   if(typeof Notification!=='undefined'&&Notification.permission==='denied'){
     pushCtaState('Notificações não permitidas. Vamos manter o WhatsApp como canal de aviso.','pc-warn',null);return;}
   registerPushSw().then(function(reg){return reg.pushManager.getSubscription();}).then(function(sub){
-    if(sub){sendSubToWorker(sub).catch(function(){});pushCtaState('Avisos ativados ✓','pc-ok',null);return;}
+    if(sub){
+      diagSet('endpoint',(sub.endpoint||'').slice(-12));
+      sendSubToWorker(sub).then(function(resp){
+        if(resp&&resp.ok===true){pushCtaState('Avisos ativados ✓','pc-ok',null);}
+        else{pushCtaState('Sua inscrição existe no navegador, mas o servidor não confirmou ('+((resp&&resp.error)||('HTTP '+(resp&&resp._http)))+'). Toque para reativar.','pc-warn','Reativar avisos');}
+      }).catch(function(){pushCtaState('Avisos ativados no navegador (servidor não respondeu agora — verificaremos no próximo acesso).','pc-ok',null);});
+      return;}
     pushCtaState('Quer ser avisado na hora a cada atualização deste cronograma?','', 'Receber avisos deste cronograma');
     var skip=false;try{skip=localStorage.getItem('wp_gate_skip_'+TOKEN)==='1';}catch(_){}
     if(!skip)pushGateShow();   // PRIMEIRO acesso sem inscrição: ativação assistida
   }).catch(function(){pushCtaState('Você receberá os avisos pelo WhatsApp.','pc-warn',null);});
 }
+/* V64.50 — DIAGNÓSTICO INTERNO (?debug=1): estado REAL de permissão/SW/subscription/
+   inscrição salva + botão de PUSH DE TESTE fim-a-fim (rota /push/test, sem tocar na tarefa). */
+function pushDebugPanel(){
+  if((location.search||'').indexOf('debug=1')<0)return;
+  var d=document.createElement('div');d.id='pdbg';
+  d.style.cssText='position:fixed;left:10px;bottom:54px;z-index:95;max-width:340px;background:rgba(10,12,22,.96);border:1px solid #2a2e44;border-radius:12px;padding:12px;font:11px/1.6 monospace;color:#cdd3e6;white-space:pre-wrap;word-break:break-all';
+  document.body.appendChild(d);
+  function render(info){
+    d.innerHTML='<b style="color:#8b96ff">DIAG AVISOS · V64.50</b>\n'
+      +'permission: '+(typeof Notification!=='undefined'?Notification.permission:'(sem API)')+'\n'
+      +'sw.scope: '+(info.scope||'-')+'\n'
+      +'hasController: '+(!!(navigator.serviceWorker&&navigator.serviceWorker.controller))+'\n'
+      +'endpoint(fim): …'+(diagGet('endpoint')||'-')+'\n'
+      +'lastSubscribeStatus: '+(diagGet('lastSubscribeStatus')||'-')+'\n'
+      +'lastPushTest: '+(diagGet('lastPushTest')||'-')+'\n'
+      +'lastNotificationClick: '+(diagGet('lastClick')||'-')+'\n'
+      +'token(fim): …'+TOKEN.slice(-6)+' · phase: '+PHASE+'\n'
+      +'<button id="pdbgTest" class="ibtn" style="margin-top:6px">Enviar push de teste</button>';
+    var b=document.getElementById('pdbgTest');
+    if(b)b.addEventListener('click',function(){b.disabled=true;b.textContent='Enviando…';
+      fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/push/test',{method:'POST'})
+        .then(function(r){return r.json();}).then(function(j){
+          diagSet('lastPushTest','sent='+j.sent+'/'+(j.total||0)+(j.reason?(' reason='+j.reason):'')+(j.results?(' '+JSON.stringify(j.results)):''));
+          refresh();
+        }).catch(function(e){diagSet('lastPushTest','ERRO '+(e&&e.message));refresh();});});
+  }
+  function refresh(){
+    if(!('serviceWorker' in navigator)){render({scope:'(sem suporte)'});return;}
+    navigator.serviceWorker.getRegistration('/cliente/').then(function(reg){
+      render({scope:reg?reg.scope:'(não registrado)'});
+    }).catch(function(){render({scope:'(erro)'});});
+  }
+  refresh();
+}
 try{setupClientWebPush();}catch(_){}
+try{if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',function(e){
+  if(e&&e.data&&e.data.type==='idseven-click')diagSet('lastClick',(e.data.eventType||'?')+' @'+new Date(e.data.at).toISOString());
+});}catch(_){}
+try{pushDebugPanel();}catch(_){}
 `;
 
 function renderClientHtml(task, token, env, origin) {
