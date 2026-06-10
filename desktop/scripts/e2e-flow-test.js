@@ -940,7 +940,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   const fHL=mod.taskTimeline({sector:'cronograma',history:[{type:'reenviado_cliente',label:'Reenviado ao cliente (versão FINAL)',at:1000}]});
   check('TL_HUMAN_KEEP', 'Último: preserva label já humano (com espaços) sem virar genérico', fHL.last.label==='Enviado para aprovação final' || fHL.last.label==='Reenviado ao cliente (versão FINAL)');
   // o card (taskCardTimeline) renderiza o label humanizado (esc(tl.last.label)) — sem código cru
-  check('TL_HUMAN_CARD', 'taskCardTimeline exibe "Último" + label humanizado (via tl.last.label)', /tc-tl-k">Último<\/span><span>'\+lastTxt/.test(DH) && /const lastTxt=tl\.last\?\(esc\(tl\.last\.label\)/.test(DH));
+  check('TL_HUMAN_CARD', 'V64.53: card com timeline COMPACTA (Agora+Próxima, SEM linha Último no card); humanização (_tlHumanLabel) preservada na fonte única p/ o Detalhes',
+    !/tc-tl-k">Último</.test(DH) && /_tlHumanLabel\(e0\)/.test(DH) && /tc-tl-k">Agora</.test(DH) && /tc-tl-next/.test(DH));
   // ===== PASSO 3 — detalhe (opPanelBlock) renderizado a partir de taskTimeline =====
   const RAWALL=['designer_moved','reviseItem','approveAll','approveItem','sent_to_client','sent_to_designer','final_sent','final_review','reenviado_cliente','social_producao','em_revisao','clientActions','kind','type'];
   const stMap=(s)=> s==='done'?'done':(s==='current'||s==='attention')?'cur':'todo';
@@ -1041,8 +1042,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   // V64.45 — AUTENTICAÇÃO FORTE: Bearer teamSessionJwt; uid declarado REMOVIDO do body.
   check('DH_TEAMFIX_BEARER','autentica com Authorization: Bearer teamSessionJwt (de /team/session) — SEM secret e SEM uid declarado',
     /'Authorization':'Bearer '\+jwt/.test(mia) && mia.indexOf('uid:state.user.id')===-1 && mia.indexOf('X-Team-Key')===-1 && mia.indexOf('TEAM_API_KEY')===-1);
-  check('DH_TEAMFIX_NO_JWT_HONEST','sem JWT na sessão → toast honesto pedindo novo login (não tenta sem credencial)',
-    /Sessão de equipe indisponível — saia e entre novamente/.test(mia) && /localStorage\.getItem\('wp_team_jwt'\)/.test(mia));
+  check('DH_TEAMFIX_NO_JWT_HONEST','sem JWT → modal de RENOVAÇÃO na hora (senha não persistida); recusa = erro claro, nunca silêncio',
+    /ensureTeamSession\(\)/.test(mia) && /Correção NÃO registrada — sessão de equipe não renovada/.test(mia) && /localStorage\.getItem\('wp_team_jwt'\)/.test(mia));
   check('DH_TEAMFIX_401_CLEARS','QUALQUER 401 (expirado/adulterado/revogado) limpa wp_team_jwt + toast orientando novo login',
     /if\(res\.status===401\)\{localStorage\.removeItem\('wp_team_jwt'\)/.test(mia) && /Sessão de equipe expirada ou inválida/.test(mia));
   check('DH_LOGIN_ACQUIRES_SESSION','doLogin adquire teamSessionJwt (acquireTeamSession) com a senha SÓ em trânsito; logout limpa o JWT',
@@ -1106,10 +1107,10 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   // Worker V64.47 (branch) — fechamento canônico server-side:
   (function(){
     const W47=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
-    check('DH_W49_NO_AUTOCLOSE','Worker: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito) — V64.52 atual', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.52-clean-ui"/.test(W47));
+    check('DH_W49_NO_AUTOCLOSE','Worker: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito) — V64.53 atual', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.53-premium-portal"/.test(W47));
     check('DH_W47_PENDING_PHASEAWARE','Worker V64.47: pendingRevision do portal/state é phase-aware com override allApproved', /const pendingRevision = !allApproved && \(itemPending/.test(W47) && /const pendingRevision = !_allApprovedR && \(_itemPendingR/.test(W47));
     check('DH_W47_ACK_CANONICO','Portal: ackFeedback canônico (allOk→approveAll real; final→reload p/ confirmação; pendência→Feedback enviado)', /allOk&&PHASE==='final'\)\{location\.reload\(\)/.test(W47) && /if\(allOk\)\{post\(\{action:'approveAll'\}/.test(W47) && /clientFeedbackSent\(\);return;\}/.test(W47));
-    check('DH_W47_PORTAL_MSG','Portal: tela "Temas aprovados e enviados!" quando a fase fecha', /Temas aprovados e enviados!/.test(W47));
+    check('DH_W47_PORTAL_MSG','Portal: tela premium "Temas aprovados" quando a fase fecha (V64.53, copy exata + persistência)', /<h1>Temas aprovados<\/h1>/.test(W47) && /SUCCESS_MODE/.test(W47));
   })();
 
   /* ═══ CY2 — REPROVAÇÃO PARCIAL 1.0.133 (cenários A–F do reteste real) ═══ */
@@ -1153,8 +1154,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   check('CY2_SRC_BOARD','renderClientFlowBoard renderiza taskCard(t,\'client\')', /h\+=tasks\.length\?tasks\.map\(t=>taskCard\(t,'client'\)\)\.join/.test(DH));
   check('CY2_SRC_COL4','clientCol4: "Aprovado" SÓ p/ concluido; aprovado/producao/reenviado → analise', /if\(c==='concluido'\)return 'aprovado';\s*\n\s*if\(c==='aprovado'\|\|c==='producao'\|\|c==='reenviado'\)return 'analise';/.test(DH));
   // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
-  check('CY2_CSS_KCOL','Card cortado (fix ESTRUTURAL): board-mode flex (altura real da janela) + coluna height:100% sem px de chute',
-    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:100%;max-height:none;min-height:0\}/.test(DH));
+  check('CY2_CSS_KCOL','Card cortado (fix ESTRUTURAL V64.53): board-mode flex + coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar)',
+    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:auto;max-height:100%;min-height:0\}/.test(DH));
   check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 + scrollbar-gutter + scroll-margin no último card', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;scrollbar-gutter:stable\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:4px;scroll-margin-bottom:12px\}/.test(DH));
   // Problema 1 — gatilho do push de envio (Desktop → Worker contentSent, best-effort).
   check('CY2_SENT_TRIGGER','persistClientSend chama team-action contentSent com Bearer JWT + Idempotency-Key (best-effort)',
@@ -1212,7 +1213,7 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   })();
   check('CY4_SENT_HONESTO','Desktop: contentSent NUNCA falha em silêncio (sem JWT → aviso; send_failed → aviso com erro real; sent>0 → confirmação)',
     (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];
-      return fn.indexOf('Aviso em tempo real NÃO enviado (sessão de equipe ausente)')>=0 && fn.indexOf("p.reason==='send_failed'")>=0 && fn.indexOf('Cliente avisado por notificação em tempo real.')>=0;})());
+      return fn.indexOf('Aviso em tempo real NÃO enviado — sessão de equipe não renovada')>=0 && fn.indexOf("p.reason==='send_failed'")>=0 && fn.indexOf('Cliente avisado por notificação em tempo real.')>=0 && fn.indexOf('ensureTeamSession()')>=0;})());
   if(mod&&mod.designerStatusView){
     const DPROD2={sector:'cronograma',cronContents:[{tema:'T'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
     check('CY4_DESIGNER_EXATO','Quadro Designer: status do card EXATAMENTE "Designer em produção"', mod.designerStatusView(DPROD2).label==='Designer em produção');
@@ -1229,8 +1230,8 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       servedOk=servedOk&&served.includes('pushGateShow')&&served.includes('reviewNext')&&served.includes('pushDebugPanel');
     }catch(e){servedErr=e.message;}
     check('CY5_W51_CVJS_SERVIDO','CV_JS SERVIDO compila e contém gate+reviewNext+debug (portal não morre mais em SyntaxError)',servedOk,servedErr);
-    check('CY5_W51_TOUCH','Barra inferior não engole toques (pointer-events:none + inner auto) + respiro mobile 240px',
-      /\.gactions\{[^}]*pointer-events:none\}/.test(W51) && /\.gactions \.inner > \*\{pointer-events:auto\}/.test(W51) && /padding-bottom:240px/.test(W51));
+    check('CY5_W51_TOUCH','Barra inferior não engole toques (pointer-events:none + inner auto) + respiro mobile dirigido por --cta-h (V64.53)',
+      /\.gactions\{[^}]*pointer-events:none\}/.test(W51) && /\.gactions \.inner > \*\{pointer-events:auto\}/.test(W51) && /calc\(var\(--cta-h,168px\) \+ 22px\)/.test(W51));
     check('CY5_W51_FOOTER3','Rodapé 3 estados no server-render e no syncFooter (0/3 NUNCA mostra finalização)',
       /reviewNext/.test(W51) && /st\.apr>=st\.total/.test(W51) && /Revise e aprove cada tema antes de finalizar/.test(W51));
     check('CY5_W51_E2E_MOBILE','E2E mobile versionado no branch do worker (scripts/portal-mobile-e2e.js, toque puro 390/412)',
@@ -1276,13 +1277,46 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       /Checklist — oculto p\/ cronograma/.test(KD6) && /if \(sector\.key != "cronograma"\) \{\s*\n\s*Spacer\(Modifier\.height\(18\.dp\)\)\s*\n\s*SectionLabel\(if \(total > 0\)/.test(KD6));
   })();
 
+  /* ═══ CY7 — REPROVAÇÃO 1.0.138 (push por evento / portal premium / card compacto) ═══ */
+  console.log(`${C.b}\n[CY7] V64.53 — envio inicial dispara push, portal premium, card cabe na coluna real${C.x}`);
+  check('CY7_SEND_TRIGGER','Botão REAL do grupo (btnOpenWaMain) e o Copiar mensagem chamam persistClientSend (causa-raiz da notificação inicial)',
+    (()=>{const m=DH.match(/on\('btnOpenWaMain'[\s\S]{0,1600}?\}\);/);const c=DH.match(/on\('btnCopyGroupMsg'[\s\S]{0,600}?\}\);/);
+      return !!m&&m[0].indexOf('persistClientSend(ctx.id)')>=0&&!!c&&c[0].indexOf('persistClientSend(ctx.id)')>=0;})());
+  check('CY7_SEND_CHAIN','persistClientSend → POST team-action contentSent (Bearer teamSessionJwt + Idempotency-Key) → Notification Engine',
+    (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];
+      return fn.indexOf("action:'contentSent'")>=0&&fn.indexOf("'Authorization':'Bearer '+jwt")>=0&&fn.indexOf("'Idempotency-Key':idem")>=0;})());
+  check('CY7_JWT_RENEW','JWT ausente/expirado → modal de renovação (exp checado localmente; senha em <input type=password>, NUNCA persistida)',
+    /function teamJwtValid\(\)/.test(DH) && /function ensureTeamSession\(\)/.test(DH) &&
+    /id="tsPw" type="password"/.test(DH) && !/localStorage\.setItem\('[^']*pw/i.test(DH) &&
+    /não fica salva/.test(DH));
+  check('CY7_CARD_COMPACT','Card COMPACTO: identidade em 1 linha (tc-who) + temas em linha única + rodapé único (sem tc-person/tc-origin/lista de temas no card)',
+    (()=>{const tc=(DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0];
+      return tc.indexOf('tc-who')>=0&&tc.indexOf('tc-themes-line')>=0&&tc.indexOf('tc-footrow')>=0&&
+             tc.indexOf('tc-person')<0&&tc.indexOf('tc-origin')<0&&tc.indexOf('tc-themes-h')<0;})());
+  check('CY7_KCOL_AUTO','Coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar) + scrollbar fina do kbody + chrome enxuto no board-mode',
+    /kcol\{height:auto;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
+    /#content\.board-mode \.kcol \.kbody\{padding:8px 10px 10px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
+  (function(){
+    const W53=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
+    check('CY7_W53_VERSION','Worker healthcheck = V64.53-premium-portal (SW V64.51 INTOCADO)',
+      /version: "V64\.53-premium-portal"/.test(W53) && /sw-version: V64\.51-mobile-touch-footer/.test(W53));
+    check('CY7_W53_SUCCESS','Telas premium: "Temas aprovados" + "Cronograma finalizado com sucesso" + SUCCESS_MODE trava o poller + Fechar página',
+      /SUCCESS_MODE=false/.test(W53) && /if\(SUCCESS_MODE\)return/.test(W53) &&
+      /<h1>Temas aprovados<\/h1>/.test(W53) && /produção das artes, legendas e posts/.test(W53) &&
+      /<h1>Cronograma finalizado com sucesso<\/h1>/.test(W53) &&
+      /function endFlowScreen\(\)/.test(W53) && /data-act="closePage"/.test(W53) && /Você já pode fechar esta página/.test(W53));
+    check('CY7_W53_FOOTER','Barra fixa SÓ-botões + guia no fluxo (#guide) + respiro dirigido por --cta-h medido (ctaPad)',
+      /<div class="guide" id="guide">/.test(W53) && /function ctaPad\(\)/.test(W53) &&
+      /calc\(var\(--cta-h,168px\) \+ 22px\)/.test(W53) && !/class="gstat"/.test(W53));
+  })();
+
   // Worker V64.48 (branch) — contentSent + rodapé dinâmico do portal:
   (function(){
     const W48=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
     check('CY2_W48_CONTENTSENT','Worker: team-action aceita contentSent e dispara themes_sent_to_client/final_content_sent_to_client', /action !== "adjustedItem" && action !== "contentSent"/.test(W48) && /final_content_sent_to_client" : "themes_sent_to_client"/.test(W48) && /notifyWorkflowEvent\(env, task, evSent/.test(W48));
     check('CY2_W48_NO_WRITE','Worker: contentSent NÃO escreve no Firestore (apenas notifica + loga)', (()=>{const b=(W48.match(/if \(action === "contentSent"\) \{[\s\S]*?\n  \}/)||[''])[0];return b.length>0&&b.indexOf(':commit')<0&&b.indexOf('writes:')<0;})());
     check('CY2_W48_FOOTER','Portal: syncFooter dinâmico — ajuste pendente → "Enviar feedback" (nunca CTA de aprovação)', /function syncFooter\(\)/.test(W48) && /function anyRevBadge\(\)/.test(W48) && (W48.match(/syncFooter\(\);/g)||[]).length>=5);
-    check('CY2_W48_VERSION','Worker healthcheck = V64.52-clean-ui', /version: "V64\.52-clean-ui"/.test(W48));
+    check('CY2_W48_VERSION','Worker healthcheck = V64.53-premium-portal', /version: "V64\.53-premium-portal"/.test(W48));
   })();
 })();
 

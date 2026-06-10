@@ -394,8 +394,61 @@
   body.desktop #content.board-mode > .scr-head{flex:none;width:100%}
   body.desktop #content.board-mode > .scr{flex:1 1 auto;min-height:0;width:100%;display:flex;flex-direction:column;overflow:visible}
   body.desktop #content.board-mode .d-board-tools{flex:none}
+  body.desktop #content.board-mode{padding-top:calc(var(--d-topbar) + 4px)!important}
+  body.desktop #content.board-mode .d-board-head{margin-bottom:2px}
+  body.desktop #content.board-mode .d-board-head .d-bh-icon{width:40px;height:40px;border-radius:12px}
+  body.desktop #content.board-mode .d-board-head .d-bh-icon svg{width:21px;height:21px}
+  body.desktop #content.board-mode .d-board-head .d-bh-title{font-size:19px}
+  body.desktop #content.board-mode .d-board-tools.tbar{margin:8px 0 2px;padding:7px 12px}
+  body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:32px}
+  body.desktop #content.board-mode .kanban{margin-top:8px}
+  body.desktop #content.board-mode .kcol .khead{padding:10px 14px 9px}
+  body.desktop #content.board-mode .kcol .kbody{padding:8px 10px 10px}
+  body.desktop #content.board-mode .kcol .kbody .tc:last-child{margin-bottom:0}
+  /* Escala 125% (viewport ~1092×614): camada EXTRA de compactação — o card continua
+     com TODO o conteúdo, só mais denso, para caber inteiro na coluna real. */
+  @media(max-height:660px){
+    body.desktop #content.board-mode{padding-top:calc(var(--d-topbar) + 2px)!important}
+    body.desktop #content.board-mode .d-board-head .d-bh-icon{width:34px;height:34px;border-radius:10px}
+    body.desktop #content.board-mode .d-board-head .d-bh-icon svg{width:18px;height:18px}
+    body.desktop #content.board-mode .d-board-head .d-bh-title{font-size:17px}
+    body.desktop #content.board-mode .d-board-head .d-bh-sub{font-size:11px}
+    body.desktop #content.board-mode .d-board-tools.tbar{margin:6px 0 2px;padding:5px 10px}
+    body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:28px}
+    body.desktop #content.board-mode .kanban{margin-top:6px}
+    body.desktop #content.board-mode .kcol .khead{padding:8px 12px 7px}
+    body.desktop #content.board-mode .kcol .khead .kt{font-size:13px}
+    body.desktop #content.board-mode .kcol .kbody{padding:6px 8px 8px}
+    body.desktop .kanban .kcol .tc{padding:11px}
+    body.desktop .kanban .kcol .tc .tc-meta{margin-bottom:7px}
+    body.desktop .kanban .kcol .tc .tc-who{margin-top:3px}
+    body.desktop .kanban .kcol .tc .tc-body{margin-top:8px}
+    body.desktop .kanban .kcol .tc .tc-title{font-size:13.5px}
+    body.desktop .kanban .kcol .tc .tc-cron-st{margin-top:4px;padding:3px 9px;font-size:10.5px}
+    body.desktop .kanban .kcol .tc .tc-tags{margin-top:6px}
+    body.desktop .kanban .kcol .tc .tc-tag{padding:4px 9px;font-size:10.5px}
+    body.desktop .kanban .kcol .tc .tc-tl{margin-top:6px;padding-top:5px}
+    body.desktop .kanban .kcol .tc .tc-tl-rail{margin-bottom:4px}
+    body.desktop .kanban .kcol .tc .tc-themes-line{margin-top:6px;padding:5px 9px;font-size:10.5px}
+    body.desktop .kanban .kcol .tc .tc-footrow{margin-top:7px;padding-top:7px}
+    body.desktop .kanban .kcol .tc .tc-act{height:28px;font-size:11px;padding:0 10px}
+    body.desktop .kanban .kcol .tc .move{height:28px}
+    body.desktop .kanban .kcol .tc .tc-who .av{width:28px!important;height:28px!important;font-size:10px!important}
+    body.desktop .kanban .kcol .tc .tc-st,body.desktop .kanban .kcol .tc .tc-due{padding:3px 8px;font-size:10px}
+    body.desktop .kanban .kcol .tc .tc-title{font-size:13px;line-height:1.2}
+    body.desktop .kanban .kcol .tc .tc-tl-row,body.desktop .kanban .kcol .tc .tc-tl-next{font-size:10.5px}
+    body.desktop .kanban .kcol .tc .tc-tl-rail i{width:7px;height:7px}
+    body.desktop .kanban .kcol .tc .tc-footrow{margin-top:5px;padding-top:5px}
+  }
   body.desktop #content.board-mode .kanban{flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden}
-  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:none;min-height:0}
+  /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
+     (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
+     cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
+  body.desktop #content.board-mode .kanban .kcol{height:auto;max-height:100%;min-height:0}
+  body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
+  body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
+  body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
+  body.desktop .kanban .kcol .kbody:hover::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border:2px solid transparent;background-clip:content-box}
   /* fallback (telas sem board-mode): limite conservador para nunca estourar a janela */
   body.desktop .kanban .kcol{
     background:var(--surface);border:1px solid var(--line);border-radius:16px;
@@ -408,11 +461,12 @@
   body.desktop .kanban .kcol .khead .kt{font-size:14px;font-weight:800;flex:1;letter-spacing:.01em}
   body.desktop .kanban .kcol .khead .kn{background:var(--surface2);border-radius:999px;font-size:12px;font-weight:800;padding:3px 10px;color:var(--soft)}
   body.desktop .kanban .kcol .kbody{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;scrollbar-gutter:stable}
-  body.desktop .kanban .kcol .tc{margin-bottom:12px;padding:18px;border-radius:16px}
+  body.desktop .kanban .kcol .tc{margin-bottom:12px;padding:14px;border-radius:16px}
   body.desktop .kanban .kcol .kbody .tc:last-child{margin-bottom:4px;scroll-margin-bottom:12px}
   body.desktop .kanban .kcol .tc .tt{font-size:14.5px}
   body.desktop .kanban .kcol .tc .ds{font-size:12px}
-  body.desktop .kanban .kcol .tc .move{height:36px;font-size:12px;margin-top:10px}
+  body.desktop .kanban .kcol .tc .move{height:32px;font-size:12px;margin-top:0}
+  body.desktop .kanban .kcol .tc .tc-act{height:32px;font-size:12px;padding:0 12px}
   body.desktop .kanban .colsel,body.desktop .kanban .colhead{display:none}
   body.desktop .d-board-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
   body.desktop .d-board-head .d-bh-icon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none}
@@ -627,11 +681,26 @@
      ===================================================================== */
   .tc{padding:18px}
   /* 1a) Meta row: status (esq) + prazo (dir) */
-  .tc-meta{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+  .tc-meta{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .tc-st{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
   .tc-st .dotc{width:6px;height:6px;border-radius:50%;flex:none}
   .tc-due{padding:5px 11px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
   /* 1b) Pessoa: avatar grande + nome (ate 2 linhas, largura total) */
+  /* Identidade COMPACTA do card (reprovação 1.0.138): 1 linha, mesma informação. */
+  .tc-who{display:flex;align-items:center;gap:10px;margin-top:6px;min-width:0}
+  .tc-who .av{flex:none}
+  .tc-who-m{flex:1;min-width:0}
+  .tc-who .tc-asg-n{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tc-who-sub{font-size:11px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Temas em LINHA ÚNICA (lista completa no Detalhes). */
+  .tc-themes-line{display:flex;align-items:center;gap:7px;margin-top:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;font-size:11.5px;color:var(--soft);min-width:0}
+  .tc-themes-line svg{width:14px;height:14px;flex:none;color:var(--faint)}
+  .tc-themes-line b{flex:none;color:var(--ink);font-weight:800}
+  .tc-themes-line span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* Rodapé ÚNICO: prazo + ações na mesma linha. */
+  .tc-footrow{display:flex;align-items:center;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line-soft)}
+  .tc-footrow .tc-prazo{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tc-footrow .tc-actions{margin-top:0;flex:none}
   .tc-person{display:flex;align-items:center;gap:13px}
   .tc-person .av{flex:none}
   .tc-av-empty{display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--surface2);color:var(--faint);flex:none}
@@ -644,17 +713,18 @@
   .tc-origin svg{width:15px;height:15px;color:var(--faint);flex:none;margin-top:1px}
   .tc-origin b{color:var(--ink);font-weight:700}
   /* 3) Corpo */
-  .tc-body{margin-top:14px}
+  .tc-body{margin-top:10px}
   .tc-client{font-size:10.5px;font-weight:800;color:var(--soft);letter-spacing:.06em;text-transform:uppercase}
-  .tc-title{font-size:17px;font-weight:800;margin-top:4px;line-height:1.3;letter-spacing:-.01em}
-  .tc-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+  .tc-title{font-size:15px;font-weight:800;margin-top:3px;line-height:1.25;letter-spacing:-.01em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tc-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
   .tc-tag{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:9px;font-size:11.5px;font-weight:800;white-space:nowrap}
   /* FASE 2 (passo 2) — timeline COMPACTA do card (discreta, premium, ~3 linhas) */
   /* task-flow-fix — timeline COMPACTA do card: legível e premium em qualquer largura.
      Cada linha tem uma "etiqueta" curta (Agora/Próxima/Último) + valor que QUEBRA em até
      2 linhas (line-clamp), em vez de cortar com reticências numa linha só. */
-  .tc-tl{margin-top:12px;padding-top:11px;border-top:1px solid var(--line-soft)}
-  .tc-tl-rail{display:flex;align-items:center;gap:0;margin-bottom:9px}
+  .tc-tl{margin-top:8px;padding-top:7px;border-top:1px solid var(--line-soft)}
+  .tc-tl-next>span:last-child{-webkit-line-clamp:1 !important}
+  .tc-tl-rail{display:flex;align-items:center;gap:0;margin-bottom:6px}
   .tc-tl-rail i{width:9px;height:9px;border-radius:50%;flex:none}
   .tc-tl-rail .ln{flex:1;height:2px;border-radius:1px;min-width:5px}
   .tc-tl-k{flex:none;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
@@ -918,7 +988,7 @@
   .flash-toast svg{width:16px;height:16px;color:var(--accent);flex:none}
 
   /* Chip cronStatus no card */
-  .tc-cron-st{display:inline-flex;align-items:center;gap:7px;margin-top:8px;padding:5px 11px;border-radius:8px;font-size:11px;font-weight:800;background:rgba(34,211,238,.12);color:#22D3EE;border:1px solid rgba(34,211,238,.22)}
+  .tc-cron-st{display:inline-flex;align-items:center;gap:7px;margin-top:6px;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:800;background:rgba(34,211,238,.12);color:#22D3EE;border:1px solid rgba(34,211,238,.22)}
   .tc-cron-st .dotc{width:6px;height:6px;border-radius:50%;background:currentColor}
 
   /* ===== VISÃO DO CLIENTE — tela real (rota dedicada) ===== */
@@ -1435,6 +1505,44 @@ async function acquireTeamSession(uid,password){
     console.warn('team session indisponível:',(j&&j.error)||('HTTP '+r.status));
   }catch(e){localStorage.removeItem('wp_team_jwt');console.warn('team session falhou:',e&&e.message);}
   return false;
+}
+/* Reprovação 1.0.138 — JWT só era emitido no LOGIN com senha; quem restaura a sessão
+   salva (wp_uid) ficava dias com JWT expirado (TTL 12h) e os avisos ao cliente falhavam
+   com um toast genérico. Agora: validade checada localmente (exp do payload) e, quando
+   ausente/expirado, um modal pede a senha SÓ para renovar a sessão de equipe — a senha
+   vai direto ao /team/session e NUNCA é persistida. */
+function teamJwtValid(){
+  try{const j=localStorage.getItem('wp_team_jwt')||'';if(!j)return false;
+    const p=JSON.parse(atob(j.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return ((p.exp||0)*1000)>Date.now()+60000;          // 60s de folga p/ não expirar em voo
+  }catch(_){return false;}
+}
+function ensureTeamSession(){
+  if(teamJwtValid())return Promise.resolve(true);
+  return new Promise(resolve=>{
+    const u=state.user||{};
+    document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg-keep="1"><div class="sheet" style="max-width:420px">'+
+      '<div class="grab"></div><div style="font-size:17px;font-weight:800;margin-bottom:6px">Renovar sessão de equipe</div>'+
+      '<div style="font-size:13px;color:var(--soft);line-height:1.5;margin-bottom:12px">Para avisar o cliente em tempo real, confirme sua senha. Ela é usada apenas nesta confirmação e não fica salva.</div>'+
+      '<input class="inp" id="tsPw" type="password" autocomplete="current-password" placeholder="Sua senha de acesso">'+
+      '<div id="tsErr" style="font-size:12.5px;color:var(--red);min-height:18px;margin-top:6px"></div>'+
+      '<div class="row" style="gap:10px;margin-top:8px">'+
+        '<button class="btn ghost" id="tsCancel" style="flex:1">Agora não</button>'+
+        '<button class="btn" id="tsGo" style="flex:1.4">Renovar e avisar</button>'+
+      '</div></div></div>';
+    const done=ok=>{closeModal();resolve(ok);};
+    document.getElementById('tsCancel').addEventListener('click',()=>done(false));
+    document.getElementById('tsGo').addEventListener('click',async()=>{
+      const pw=(document.getElementById('tsPw')||{}).value||'';
+      const err=document.getElementById('tsErr');
+      if(!pw){if(err)err.textContent='Digite a senha.';return;}
+      if(err)err.textContent='';
+      const ok=await acquireTeamSession((state.user&&state.user.id)||u.id,pw);
+      if(ok){flashToast('Sessão de equipe renovada.');done(true);}
+      else if(err)err.textContent='Senha incorreta ou serviço indisponível. Tente novamente.';
+    });
+    const inp=document.getElementById('tsPw');if(inp)inp.focus();
+  });
 }
 async function doRegister(name,role,phone,email,password){
   if(!name.trim()||!email.trim()||!password)throw 'Preencha nome, e-mail e senha.';
@@ -2439,14 +2547,13 @@ function taskCardTimeline(t,persp){
   const ownerTxt=(tl.owner&&tl.owner.role!=='—')?(tl.owner.role+(ownU&&ownU.name?(' · '+ownU.name.split(' ')[0]):'')):'Fluxo encerrado';
   // task-flow-fix: texto CURTO (não corta o essencial); quadro Cliente = linguagem simples.
   const nextTxt=persp==='client'?clientFacingNextShort(t):nextActionShort(t);
-  const lastTxt=tl.last?(esc(tl.last.label)+(tl.last.at?(' · '+_tlRelAgo(tl.last.at)):'')):'';
-  // Layout em LINHAS empilhadas (sem competir horizontalmente): "Agora" (responsável) ·
-  // "Próxima" (ação curta, até 2 linhas) · "Último" (evento humanizado, até 2 linhas).
+  // Reprovação 1.0.138 — timeline COMPACTA no card: rail + "Agora" + "Próxima" (1 linha).
+  // A linha "Último" (evento humanizado) sai do card e permanece no Detalhes — eram
+  // ~104px que ajudavam o card a não caber na coluna real (372px @1366×768).
   return '<div class="tc-tl">'+
     '<div class="tc-tl-rail">'+rail+'</div>'+
     '<div class="tc-tl-row">'+svg('flag')+'<span class="tc-tl-k">Agora</span><span class="tc-tl-now">'+esc(ownerTxt)+'</span></div>'+
     (nextTxt?'<div class="tc-tl-next"><span class="tc-tl-k">Próxima</span><span>'+esc(nextTxt)+'</span></div>':'')+
-    (lastTxt?'<div class="tc-tl-last"><span class="tc-tl-k">Último</span><span>'+lastTxt+'</span></div>':'')+
   '</div>';
 }
 // role-aware (passo 2): persp='designer' renderiza o card na PERSPECTIVA do designer (status e
@@ -2472,14 +2579,18 @@ function taskCard(t, persp){
   const _mst=designerView?designerStatusView(t):st;
   h+='<div class="tc-meta"><span class="tc-st" style="background:'+withAlpha(_mst.color,.16)+';color:'+_mst.color+'"><span class="dotc" style="background:'+_mst.color+'"></span>'+esc(_mst.label)+'</span><div style="flex:1"></div>'+
      (d?'<span class="tc-due" style="background:'+withAlpha(d.color,.16)+';color:'+d.color+'">'+esc(d.text)+'</span>':'')+'</div>';
-  // 1b) Responsavel — avatar grande + nome (ate 2 linhas) + cargo, largura total
-  h+='<div class="tc-person">'+
-       (asgName?avatar(asg||{name:asgName,id:t.assigneeId},52):'<div class="av tc-av-empty" style="width:52px;height:52px">'+svg('person')+'</div>')+
-       '<div class="tc-person-m"><div class="tc-asg-n">'+esc(asgName||'Sem responsável')+'</div>'+
-         '<div class="tc-asg-r">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
+  // 1b) IDENTIDADE COMPACTA (reprovação 1.0.138): avatar 52px + caixa "Enviado por"
+  // somavam ~110px e o card (700-752px) não cabia nos 372px visíveis da coluna em
+  // 1366×768 real. Agora UMA linha: avatar 34px + responsável/cargo + origem — mesma
+  // informação, sem duplicidade visual (data completa continua no Detalhes).
+  const _whoSub=[asg&&asg.role?asg.role:'Responsável',
+                 reqName?('por '+reqName.split(' ')[0]):null,
+                 t.createdAt?fmtDateTimeBR(t.createdAt):null].filter(Boolean).join(' · ');
+  h+='<div class="tc-who">'+
+       (asgName?avatar(asg||{name:asgName,id:t.assigneeId},34):'<div class="av tc-av-empty" style="width:34px;height:34px">'+svg('person')+'</div>')+
+       '<div class="tc-who-m"><div class="tc-asg-n">'+esc(asgName||'Sem responsável')+'</div>'+
+         '<div class="tc-who-sub">'+esc(_whoSub)+'</div></div>'+
      '</div>';
-  // 2) Origem — enviado por + criado em
-  h+='<div class="tc-origin">'+svg('person')+'<span>Enviado por <b>'+esc(reqName||'—')+'</b>'+(t.createdAt?' · '+fmtDateTimeBR(t.createdAt):'')+'</span></div>';
   // 3) Corpo
   h+='<div class="tc-body">'+
        (t.client?'<div class="tc-client">'+esc(t.client)+'</div>':'')+
@@ -2500,19 +2611,20 @@ function taskCard(t, persp){
          (cron?'<span class="tc-tag tc-tag-soft">'+esc(cron.label)+'</span>':'')+
          (t.priority?'<span class="tc-tag" style="color:#F87171;background:'+withAlpha('#F87171',.14)+'">⚑ Prioridade</span>':'')+'</div>'+
        (designerView?designerCardTimeline(t):taskCardTimeline(t,clientView?'client':null));   // role-aware: timeline por perspectiva
-  // 4) Cronograma (temas reais) OU briefing curto
+  // 4) Cronograma — temas em LINHA ÚNICA compacta (a lista completa vive no Detalhes;
+  // antes eram ~166px que estouravam a coluna). Demais setores: briefing curto.
   if(cron&&cron.list.length){
-    const show=cron.list.slice(0,3);const rest=cron.count-3;
-    h+='<div class="tc-themes"><div class="tc-themes-h">Temas</div>'+
-       show.map(c=>'<div class="tc-theme"><span class="tc-theme-n">'+(c._i+1)+'</span><span class="tc-theme-t">'+esc(c.tema||'(sem tema)')+'</span></div>').join('')+
-       (rest>0?'<div class="tc-more">+ '+rest+' conteúdo'+(rest>1?'s':'')+'</div>':'')+'</div>';
+    const names=cron.list.map(c=>c.tema||'(sem tema)').join(', ');
+    h+='<div class="tc-themes-line">'+svg('checklist')+'<b>'+cron.count+' tema'+(cron.count>1?'s':'')+'</b><span>'+esc(names)+'</span></div>';
   }else{const b=briefLine(t);if(b)h+='<div class="tc-brief">'+esc(b)+'</div>';}
   h+='</div>'+chk;
-  // 5) Rodape — prazo + acoes
-  h+='<div class="tc-foot">'+((t.dueDate||t.due)?'<span class="tc-prazo">'+svg('clock')+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span>':'<span class="tc-prazo tc-prazo-empty">'+svg('clock')+'Sem prazo</span>')+'</div>'+
-     '<div class="tc-actions"><button class="tc-act tc-detail" data-detail="'+t.id+'">'+svg('eye')+'Detalhes</button>'+
-       '<button class="tc-act move" data-move="'+t.id+'">'+svg('swap')+'Mover</button>'+
-       (canDelTask(t)?'<button class="tc-act del-btn" data-del="'+t.id+'" title="Remover tarefa">'+svg('trash')+'</button>':'')+'</div>';
+  // 5) Rodapé ÚNICO — prazo à esquerda + ações à direita (antes eram 2 blocos ~76px).
+  h+='<div class="tc-footrow">'+
+       ((t.dueDate||t.due)?'<span class="tc-prazo">'+svg('clock')+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span>':'<span class="tc-prazo tc-prazo-empty">'+svg('clock')+'Sem prazo</span>')+
+       '<div class="tc-actions"><button class="tc-act tc-detail" data-detail="'+t.id+'">'+svg('eye')+'Detalhes</button>'+
+         '<button class="tc-act move" data-move="'+t.id+'">'+svg('swap')+'Mover</button>'+
+         (canDelTask(t)?'<button class="tc-act del-btn" data-del="'+t.id+'" title="Remover tarefa">'+svg('trash')+'</button>':'')+'</div>'+
+     '</div>';
   return h+'</div>';
 }
 function canDelTask(t){const u=state.user;return !!u&&(canSeeAll(u)||t.by===u.id||t.assigneeId===u.id);}
@@ -2754,8 +2866,10 @@ async function markItemsAdjusted(taskId){
   const idxs=pend.map(p=>p.idx);
   // AUTENTICAÇÃO FORTE: Bearer teamSessionJwt (emitido em /team/session no login).
   // uid declarado NÃO é enviado — a identidade vem do `sub` do JWT verificado no Worker.
+  // JWT ausente/expirado → modal de renovação na hora (senha não persistida).
+  if(!(await ensureTeamSession())){flashToast('Correção NÃO registrada — sessão de equipe não renovada.');return;}
   const jwt=localStorage.getItem('wp_team_jwt')||'';
-  if(!jwt){flashToast('Sessão de equipe indisponível — saia e entre novamente para registrar correções com aviso ao cliente.');return;}
+  if(!jwt){flashToast('Sessão de equipe indisponível — tente novamente.');return;}
   // Idempotência: chave estável por (uid|tarefa|itens|janela de 10s) — o duplo clique
   // reaproveita a MESMA chave (replay no Worker); um novo ajuste depois gera chave nova.
   const idem=state.user.id+'|'+taskId+'|'+idxs.join(',')+'|'+Math.floor(Date.now()/10000);
@@ -3540,12 +3654,19 @@ async function _wireGroupSend(ctx, msg, cardFile){
     const b=$('btnOpenWaMain'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'WhatsApp aberto · mensagem copiada'; }
     setStatus(svg('check')+'<span>Mensagem copiada e WhatsApp Business aberto. Escolha o grupo do cliente e cole (Ctrl+V) — a prévia premium aparece pelo link.</span>','ok',true);
     flashToast('Mensagem copiada e WhatsApp Business aberto. Escolha o grupo do cliente e cole.');
+    // Reprovação 1.0.138 (causa-raiz da notificação inicial): este é o botão REAL usado
+    // pela Social e ele NÃO registrava o envio — sem persistClientSend não há contentSent
+    // e o Notification Engine nunca recebe themes_sent_to_client. O registro roda em
+    // segundo plano (não trava o WhatsApp); o dedup de 60s do engine cobre o duplo clique.
+    if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
   });
   /* ===== Secundários discretos ===== */
   on('btnCopyGroupMsg', function(){                                // copia só a mensagem (se útil), sem abrir o WhatsApp
     if(!copyMsgClean()) return;
     const b=$('btnCopyGroupMsg'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'Mensagem copiada'; }
     flashToast('Mensagem copiada. Cole no grupo do WhatsApp Business do cliente.');
+    // Copiar a mensagem É o passo de envio manual no grupo — registra igual.
+    if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
   });
   on('btnTestLink', function(){                                    // abre o LINK DE COMPARTILHAMENTO p/ conferir a prévia premium + portal
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ flashToast('Link inválido — gere o cronograma novamente.'); return; }
@@ -3782,8 +3903,12 @@ async function persistClientSend(taskId){
   // continua sendo o canal principal; o Worker loga push real × fallback whatsapp_premium.
   try{
     const token=t&&(t.clientReviewToken||t.shareToken)||'';
+    // JWT ausente/expirado → modal de renovação (senha não persistida). Recusou? Erro
+    // CLARO, nunca silêncio: o cliente segue avisado pelo WhatsApp, sem push.
+    if(token&&!(await ensureTeamSession())){
+      flashToast('Aviso em tempo real NÃO enviado — sessão de equipe não renovada. O cliente ainda recebe pelo WhatsApp.');
+    }
     const jwt=localStorage.getItem('wp_team_jwt')||'';
-    if(token&&!jwt){flashToast('Aviso em tempo real NÃO enviado (sessão de equipe ausente) — saia e entre novamente. O cliente ainda recebe pelo WhatsApp.');}
     if(token&&jwt){
       const idem=(u.id||'')+'|sent|'+taskId+'|'+Math.floor(now/10000);
       const res=await fetch(CLIENT_REVIEW_BASE+'/cliente/cronograma/'+encodeURIComponent(token)+'/team-action',{
