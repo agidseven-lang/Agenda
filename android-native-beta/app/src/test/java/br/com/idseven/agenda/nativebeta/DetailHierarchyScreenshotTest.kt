@@ -99,6 +99,17 @@ class DetailHierarchyScreenshotTest {
             cronStatus = "ready_for_final_client_review", clientFlowStatus = "reenviado",
             assignedDesignerId = "d", assignedDesignerName = "Marcos Dias", designerFlowStatus = "concluido",
         ),
+        // V64.47 (bug 1.0.132): doc PRESO — globais 'revisao' herdados + 3/3 itens aprovados
+        // na fase themes. A LEITURA destrava: deve renderizar como TEMAS APROVADOS.
+        "8b · Bug 1.0.132: doc preso destravado (revisão herdada + 3/3 aprovados)" to base.copy(
+            clientApprovalPhase = "themes", clientFlowStatus = "revisao", cronStatus = "em_revisao_cliente",
+            clientReview = ClientReview("revisao", "trocar a foto", 1_749_400_000_000L, "Cliente"),
+            clientItems = mapOf(
+                "i0" to ClientItemState(cs = "aprovado", phase = "themes"),
+                "i1" to ClientItemState(cs = "aprovado", phase = "themes"),
+                "i2" to ClientItemState(cs = "aprovado", phase = "themes", teamAdjustedAt = 1_749_500_000_000L),
+            ),
+        ),
         "8 · Concluído" to base.copy(
             cronContents = fullContents, clientFlowStatus = "concluido", finalApprovalCompleted = true,
             operationalStatus = "concluido", status = "concluido", clientFinalApprovedAt = 1_749_600_000_000L,

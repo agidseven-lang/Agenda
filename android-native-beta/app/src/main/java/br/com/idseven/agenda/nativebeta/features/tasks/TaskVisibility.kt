@@ -80,6 +80,9 @@ object TaskVisibility {
         if (CLIENT_KEYS.contains(v)) {
             // 'concluido' explícito só vale se o fluxo realmente encerrou; senão ainda é reenvio.
             if (v == "concluido" && !isFullyComplete(t)) return "reenviado"
+            // V64.47 (bug 1.0.132): 'revisao' HERDADO com TODOS os itens da fase aprovados
+            // (ciclo ajuste→correção→aprovação antes do fechamento server-side) NÃO trava.
+            if (v == "revisao" && allPhaseItemsApproved(t)) return "aprovado"
             return v
         }
         val ws = t.cronStatus ?: ""  // workflowStage não está no modelo; usa cronStatus + review
@@ -87,6 +90,7 @@ object TaskVisibility {
         // CORREÇÃO (status-consistency): status BRUTO do kanban (t.status=='concluido') NÃO força
         // mais 'concluido'. Conclusão só via isFullyComplete (aprovação final real + sem pendências).
         if (isFullyComplete(t)) return "concluido"
+        if ((cr == "revisao" || ws == "em_revisao_cliente" || ws == "editado_cliente") && allPhaseItemsApproved(t)) return "aprovado"
         if (cr == "revisao" || ws == "em_revisao_cliente" || ws == "editado_cliente") return "revisao"
         if (ws == "ready_for_final_client_review" || ws == "reenviado_cliente") return "reenviado"
         if (hasDesigner(t) || ws == "sent_to_designer") return "producao"
@@ -315,8 +319,21 @@ object TaskVisibility {
         if (pendingClientItems(t).isNotEmpty()) return false
         return t.clientItems.values.any { it.teamAdjustedAt != null && it.cs == null }
     }
+    // V64.47 (bug 1.0.132) — TODOS os conteúdos da FASE ATUAL aprovados pelo cliente?
+    // (espelho do fechamento de fase do Worker/Desktop; item legado sem phase NÃO conta).
+    // Destrava docs com o global 'revisao' herdado do ciclo ajuste→correção→aprovação.
+    fun allPhaseItemsApproved(t: TaskItem): Boolean {
+        val total = t.cronContents.size
+        if (total == 0 || t.clientItems.isEmpty()) return false
+        val ph = clientApprovalPhase(t)
+        for (i in 0 until total) {
+            val it = t.clientItems["i$i"] ?: return false
+            if (!(it.cs == "aprovado" && it.phase == ph)) return false
+        }
+        return true
+    }
     private fun clientApprovedFlag(t: TaskItem): Boolean =
-        t.cronStatus == "aprovado_cliente" || t.clientReview?.status == "aprovado"
+        t.cronStatus == "aprovado_cliente" || t.clientReview?.status == "aprovado" || allPhaseItemsApproved(t)
 
     // Estado ÚNICO do detalhe: 1 status principal + próxima ação + responsável + ações por fase.
     // Hierarquia aprovada (mockup): nunca 5 status concorrentes; linguagem humana.
