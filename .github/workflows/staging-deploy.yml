@@ -1,0 +1,374 @@
+name: staging-deploy
+
+# ============================================================================
+# IDMedic — Deploy REAL do staging persistente na VPS (Hostinger)
+# ============================================================================
+# Executa, a partir do runner do GitHub Actions (que tem internet plena),
+# o provisionamento na VPS 2.25.195.37 via SSH:
+#   pacote (rsync) -> .env gerado NA VPS (segredos fortes, nunca exibidos)
+#   -> docker compose up -d --build (Postgres persistente + backend staging +
+#   Caddy/HTTPS) -> Flyway V001-V027 -> seed sintético -> smoke público sob
+#   HTTPS (logins, RBAC, leituras sensíveis, cookies, CORS, TLS) -> backup +
+#   teste de restore não destrutivo + cron.
+#
+# Segredos exigidos (Settings -> Secrets and variables -> Actions):
+#   STAGING_SSH_PASSWORD  senha root da VPS   (ou STAGING_SSH_KEY: chave
+#                         privada OpenSSH autorizada em /root/.ssh)
+#   STAGING_ACME_EMAIL    e-mail para certificados Let's Encrypt
+# Nunca colar esses valores em chat/arquivo/relatório. O GitHub mascara
+# secrets nos logs; os segredos gerados na VPS nunca são impressos.
+# ============================================================================
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy staging persistente (VPS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VPS_HOST: 2.25.195.37
+      VPS_USER: root
+      API_DOMAIN: api-staging.idmedic.com.br
+      WEB_DOMAIN: app-staging.idmedic.com.br
+      APP_DIR: /opt/idmedic/app
+      ENV_FILE_VPS: /opt/idmedic/secrets/.env.staging
+      BACKUP_DIR: /opt/idmedic/backups
+      DIAG: /tmp/diag.txt
+      SSHPASS: ${{ secrets.STAGING_SSH_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guarda de escopo (sem V028; artefatos presentes)
+        run: |
+          set -e
+          : > "$DIAG"
+          echo "== [0] contexto ==" >> "$DIAG"
+          echo "commit=$GITHUB_SHA ref=$GITHUB_REF_NAME run=$GITHUB_RUN_ID" >> "$DIAG"
+          if ls apps/backend/src/main/resources/db/migration/ | grep -q '^V028'; then
+            echo "::error title=STAGING_DIAG::V028 detectada no repositório — fora do escopo autorizado; abortando deploy"
+            exit 1
+          fi
+          for f in infra/docker-compose.staging.yml infra/caddy/Caddyfile infra/staging/backup.sh infra/staging/restore.sh scripts/seed-staging-synthetic.sql scripts/validate-staging-smoke.sh; do
+            [ -f "$f" ] || { echo "::error title=STAGING_DIAG::artefato obrigatório ausente: $f"; exit 1; }
+          done
+          MAXV=$(ls apps/backend/src/main/resources/db/migration/ | grep -oE '^V[0-9]+' | sort -V | tail -1)
+          echo "escopo OK: maior migration=$MAXV, sem V028, artefatos presentes" >> "$DIAG"
+
+      - name: Pré-flight público (DNS + portas) — não exige secrets
+        run: |
+          set +e
+          echo "== [1] dns/portas (visão pública do runner) ==" >> "$DIAG"
+          for d in "$API_DOMAIN" "$WEB_DOMAIN"; do
+            ip=$(getent ahosts "$d" | awk '{print $1; exit}')
+            echo "dns $d -> ${ip:-NAO-RESOLVE}" >> "$DIAG"
+            [ "$ip" = "$VPS_HOST" ] || echo "[ALERTA] $d não aponta para $VPS_HOST" >> "$DIAG"
+          done
+          for p in 22 80 443; do
+            timeout 5 bash -c "</dev/tcp/$VPS_HOST/$p" 2>/dev/null && s="aberta" || s="fechada/filtrada"
+            echo "porta $p: $s" >> "$DIAG"
+          done
+          exit 0
+
+      - name: Pré-checagem de secrets (fail-fast com instruções)
+        env:
+          K: ${{ secrets.STAGING_SSH_KEY }}
+          A: ${{ secrets.STAGING_ACME_EMAIL }}
+        run: |
+          miss=""
+          [ -z "$K" ] && [ -z "$SSHPASS" ] && miss="STAGING_SSH_KEY (ou STAGING_SSH_PASSWORD)"
+          [ -z "$A" ] && miss="${miss:+$miss; }STAGING_ACME_EMAIL"
+          if [ -n "$miss" ]; then
+            msg="Secrets ausentes: ${miss}%0AAdicionar em https://github.com/idsevenoficial-beep/idmedic/settings/secrets/actions%0A- STAGING_SSH_PASSWORD = senha root da VPS (ou STAGING_SSH_KEY = chave privada autorizada)%0A- STAGING_ACME_EMAIL = e-mail para Let's Encrypt%0AEsses valores nunca devem ser colados no chat nem versionados."
+            echo "::error title=STAGING_DIAG::$msg"
+            exit 1
+          fi
+          echo "== [2] secrets ==" >> "$DIAG"
+          echo "secrets presentes (valores nunca exibidos)" >> "$DIAG"
+
+      - name: Preparar acesso SSH (chave ou senha)
+        env:
+          K: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=60"
+          if [ -n "$K" ]; then
+            printf '%s\n' "$K" > ~/.ssh/staging_key && chmod 600 ~/.ssh/staging_key
+            echo "RSH=ssh -i $HOME/.ssh/staging_key $OPTS" >> "$GITHUB_ENV"
+            echo "modo ssh: chave" >> "$DIAG"
+          else
+            sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq sshpass >/dev/null
+            echo "RSH=sshpass -e ssh $OPTS" >> "$GITHUB_ENV"
+            echo "modo ssh: senha (sshpass -e; valor mascarado)" >> "$DIAG"
+          fi
+
+      - name: Pré-requisitos na VPS (docker, compose, rsync, diretórios)
+        run: |
+          set -e
+          echo "== [3] vps pré-requisitos ==" >> "$DIAG"
+          $RSH "$VPS_USER@$VPS_HOST" 'bash -s' <<'EOS' >> "$DIAG" 2>&1
+          set -e
+          echo "host: $(hostname) | $(. /etc/os-release; echo "$PRETTY_NAME")"
+          docker --version
+          docker compose version
+          command -v rsync >/dev/null || { apt-get update -qq && apt-get install -y -qq rsync; }
+          command -v curl  >/dev/null || apt-get install -y -qq curl
+          mkdir -p /opt/idmedic/app /opt/idmedic/backups /opt/idmedic/logs /opt/idmedic/secrets
+          chmod 700 /opt/idmedic/secrets
+          echo "disco: $(df -h / | tail -1 | awk '{print $4" livres de "$2}')"
+          echo "memoria: $(free -m | awk 'NR==2{print $7" MB disponiveis de "$2" MB"}')"
+          EOS
+
+      - name: Setup Node 20 (build da web no runner)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build da web (VITE_API_BASE_URL=https://api-staging)
+        run: |
+          set -e
+          echo "== [4] build web ==" >> "$DIAG"
+          cd apps/web
+          npm ci --no-audit --no-fund > /tmp/npmci.log 2>&1 || { tail -20 /tmp/npmci.log >> "$DIAG"; echo "::error title=STAGING_DIAG::npm ci falhou"; exit 1; }
+          VITE_API_BASE_URL="https://$API_DOMAIN" npm run build > /tmp/webbuild.log 2>&1 || { tail -30 /tmp/webbuild.log >> "$DIAG"; echo "::error title=STAGING_DIAG::build da web falhou"; exit 1; }
+          test -f dist/index.html
+          echo "web build OK (dist/index.html presente; API=https://$API_DOMAIN)" >> "$DIAG"
+
+      - name: Sincronizar pacote para a VPS (rsync → /opt/idmedic/app)
+        run: |
+          set -e
+          echo "== [5] rsync ==" >> "$DIAG"
+          echo "$GITHUB_SHA" > DEPLOY_COMMIT
+          rsync -az --delete \
+            --exclude '.git' --exclude 'node_modules' \
+            --exclude 'apps/android' --exclude 'apps/ios' --exclude 'docs' \
+            --exclude 'apps/backend/build' --exclude '.gradle' --exclude 'validation-logs' \
+            -e "$RSH" ./ "$VPS_USER@$VPS_HOST:$APP_DIR/"
+          $RSH "$VPS_USER@$VPS_HOST" "echo \"deploy_commit=\$(cat $APP_DIR/DEPLOY_COMMIT)\"; chmod +x $APP_DIR/infra/staging/*.sh $APP_DIR/scripts/*.sh 2>/dev/null || true" >> "$DIAG"
+          echo "pacote sincronizado em $APP_DIR (sem .git/android/ios/docs/builds)" >> "$DIAG"
+
+      - name: Gerar/preservar .env.staging na VPS (segredos fortes; nunca exibidos)
+        env:
+          ACME: ${{ secrets.STAGING_ACME_EMAIL }}
+        run: |
+          set -e
+          echo "== [6] env staging ==" >> "$DIAG"
+          $RSH "$VPS_USER@$VPS_HOST" "ACME_IN='$ACME' bash -s" <<'EOS' >> "$DIAG" 2>&1
+          set -e
+          F=/opt/idmedic/secrets/.env.staging
+          if [ -f "$F" ]; then
+            echo "env: preservado (já existia) — segredos NÃO rotacionados (rotacionar POSTGRES_PASSWORD com volume existente quebraria o banco)"
+          else
+            PGPW=$(openssl rand -hex 24)
+            JWT=$(openssl rand -base64 64 | tr -d '\n=')
+            umask 077
+            cat > "$F" <<ENV
+          API_DOMAIN=api-staging.idmedic.com.br
+          WEB_DOMAIN=app-staging.idmedic.com.br
+          ACME_EMAIL=$ACME_IN
+          POSTGRES_DB=idmedic_staging
+          POSTGRES_USER=idmedic_staging
+          POSTGRES_PASSWORD=$PGPW
+          BACKEND_PORT=8080
+          JWT_SECRET=$JWT
+          JWT_ISSUER=idmedic-staging
+          JWT_ACCESS_TTL_MINUTES=15
+          JWT_REFRESH_TTL_DAYS=7
+          LOG_LEVEL=INFO
+          CORS_ALLOWED_ORIGINS=https://app-staging.idmedic.com.br
+          ENV
+            chmod 600 "$F"
+            echo "env: criado agora (POSTGRES_PASSWORD=hex48 e JWT_SECRET~86c gerados na VPS; chmod 600; valores nunca exibidos)"
+          fi
+          ls -l "$F" | awk '{print "perms:",$1," owner:",$3}'
+          EOS
+
+      - name: Subir stack (compose up -d --build) e aguardar backend healthy
+        run: |
+          set -e
+          echo "== [7] compose up + health ==" >> "$DIAG"
+          $RSH "$VPS_USER@$VPS_HOST" 'bash -s' <<'EOS' >> "$DIAG" 2>&1
+          set -e
+          cd /opt/idmedic/app
+          C="docker compose -f infra/docker-compose.staging.yml --env-file /opt/idmedic/secrets/.env.staging"
+          $C config -q && echo "compose config: OK (interpolação completa)"
+          echo "compose up -d --build (build do backend na VPS pode levar vários minutos no 1º run)..."
+          $C up -d --build > /tmp/up.log 2>&1 || { tail -40 /tmp/up.log; exit 1; }
+          tail -5 /tmp/up.log
+          ok=0; st=desconhecido
+          for i in $(seq 1 100); do
+            st=$(docker inspect -f '{{.State.Health.Status}}' idmedic-staging-backend 2>/dev/null || echo nao-criado)
+            if [ "$st" = "healthy" ]; then ok=1; echo "backend: healthy (tentativa $i)"; break; fi
+            probe=$(docker run --rm --network idmedic-staging-net curlimages/curl:8.10.1 -s -o /dev/null -w '%{http_code}' --max-time 5 http://backend:8080/api/v1/health 2>/dev/null || echo 000)
+            if [ "$probe" = "200" ]; then
+              ok=1
+              echo "backend: UP confirmado via probe HTTP na rede interna (tentativa $i)"
+              [ "$st" != "healthy" ] && echo "[OBS] healthcheck do container ainda '$st' (provável wget ausente na imagem JRE) — backend funcional; correção cosmética do healthcheck pode ser feita em fase futura"
+              break
+            fi
+            sleep 6
+          done
+          echo "--- containers ---"
+          $C ps
+          if [ "$ok" != "1" ]; then
+            echo "--- backend logs (tail, filtrado) ---"
+            docker logs --tail 100 idmedic-staging-backend 2>&1 | grep -viE 'password|secret|jwt' | tail -70
+            exit 1
+          fi
+          EOS
+
+      - name: Migrations V001–V027 + seed sintético (verificações no banco)
+        run: |
+          set -e
+          echo "== [8] flyway + seed ==" >> "$DIAG"
+          $RSH "$VPS_USER@$VPS_HOST" 'bash -s' <<'EOS' >> "$DIAG" 2>&1
+          set -e
+          cd /opt/idmedic/app
+          C="docker compose -f infra/docker-compose.staging.yml --env-file /opt/idmedic/secrets/.env.staging"
+          FL=$($C exec -T postgres psql -U idmedic_staging -d idmedic_staging -At -c "select max(version)||'|'||count(*) from flyway_schema_history where success")
+          echo "flyway max|count = $FL"
+          [ "$FL" = "027|27" ] || { echo "ERRO: esperado 027|27"; exit 1; }
+          $C --profile seed run --rm --no-deps seed > /tmp/seed.log 2>&1 || { echo "SEED FALHOU:"; tail -20 /tmp/seed.log; exit 1; }
+          echo "seed: OK (idempotente; ON_ERROR_STOP)"
+          U=$($C exec -T postgres psql -U idmedic_staging -d idmedic_staging -At -c "select count(*) from usuarios where tenant_id='aa000000-0000-4000-8000-000000000001'")
+          echo "usuarios sintéticos = $U"
+          [ "$U" = "6" ] || { echo "ERRO: esperado 6 usuários sintéticos"; exit 1; }
+          EOS
+
+      - name: Smoke público sob HTTPS (runner → domínios reais)
+        run: |
+          set +e
+          export LC_ALL=C.UTF-8 LANG=C.UTF-8
+          echo "== [9] smoke público HTTPS ==" >> "$DIAG"
+          API="https://$API_DOMAIN"; ORIGIN="https://$WEB_DOMAIN"
+          R=/tmp/smoke.txt; : > "$R"; fail=0
+          chk(){ echo "$1" >> "$R"; }
+
+          ok=0
+          for i in $(seq 1 40); do
+            c=$(curl -s -o /dev/null -w "%{http_code}" "$API/api/v1/health" 2>/dev/null)
+            [ "$c" = "200" ] && { ok=1; chk "[OK] health $API/api/v1/health -> 200 (TLS válido; tentativa $i)"; break; }
+            sleep 6
+          done
+          if [ "$ok" != "1" ]; then
+            chk "[FAIL] health sob HTTPS não respondeu 200 (último código: ${c:-sem-conexão}) — possível ACME/Caddy pendente"
+            cat "$R" >> "$DIAG"; enc=$(sed 's/%/%25/g' "$DIAG" | sed ':a;N;$!ba;s/\r//g; s/\n/%0A/g'); echo "::error title=STAGING_DIAG::$enc"; exit 1
+          fi
+          CERT=$(echo | openssl s_client -servername "$API_DOMAIN" -connect "$API_DOMAIN:443" 2>/dev/null | openssl x509 -noout -issuer -enddate 2>/dev/null | tr '\n' ' ')
+          chk "[INFO] cert API: $CERT"
+
+          chk "=== script oficial validate-staging-smoke.sh (HTTPS: Secure é falha dura) ==="
+          STAGING_API_URL="$API" SMOKE_WEB_ORIGIN="$ORIGIN" \
+          SMOKE_MEDICO_EMAIL="medico@staging.idmedic.example" SMOKE_MEDICO_SENHA='Staging#Medico2026!' \
+            bash scripts/validate-staging-smoke.sh >> "$R" 2>&1
+          se=$?; chk "smoke.sh exit=$se"; [ "$se" = "0" ] || fail=1
+
+          chk "=== logins por perfil (HTTPS) ==="
+          for pair in \
+            "ADMIN_TENANT admin-tenant@staging.idmedic.example Staging#Admin2026!" \
+            "RECEPCAO recepcao@staging.idmedic.example Staging#Recep2026!" \
+            "FINANCEIRO financeiro@staging.idmedic.example Staging#Fin2026!" \
+            "RH rh@staging.idmedic.example Staging#Rh2026!"; do
+            set -- $pair; role=$1; em=$2; pw=$3
+            code=$(curl -s -o /tmp/lg.json -w "%{http_code}" -X POST "$API/api/v1/auth/login" -H "Content-Type: application/json" -H "Origin: $ORIGIN" -d "{\"email\":\"$em\",\"senha\":\"$pw\"}")
+            [ "$code" = "200" ] && chk "[OK] login $role 200" || { chk "[FAIL] login $role -> $code"; fail=1; }
+          done
+
+          chk "=== MEDICO fluxo web: cookie sob HTTPS (asserts duros) ==="
+          HDRS=$(curl -s -D - -o /tmp/lgm.json -X POST "$API/api/v1/auth/login" -H "Content-Type: application/json" -H "Origin: $ORIGIN" -H "X-IDMedic-Client: web" -d '{"email":"medico@staging.idmedic.example","senha":"Staging#Medico2026!"}')
+          code=$(printf '%s' "$HDRS" | head -1 | awk '{print $2}')
+          [ "$code" = "200" ] && chk "[OK] login MEDICO (web) 200" || { chk "[FAIL] login MEDICO (web) -> $code"; fail=1; }
+          CK=$(printf '%s' "$HDRS" | tr -d '\r' | grep -i '^set-cookie: idmedic_rt=')
+          printf '%s' "$CK" | grep -q 'Secure'   && chk "[OK] cookie Secure (sob HTTPS real)" || { chk "[FAIL] cookie sem Secure"; fail=1; }
+          printf '%s' "$CK" | grep -qi 'HttpOnly' && chk "[OK] cookie HttpOnly" || { chk "[FAIL] cookie sem HttpOnly"; fail=1; }
+          printf '%s' "$CK" | grep -q 'SameSite=Strict' && chk "[OK] cookie SameSite=Strict" || { chk "[FAIL] cookie sem SameSite=Strict"; fail=1; }
+          TEN=$(sed -n 's/.*"tenantId":"\([^"]*\)".*/\1/p' /tmp/lgm.json)
+          [ "$TEN" = "aa000000-0000-4000-8000-000000000001" ] && chk "[OK] login expõe apenas o próprio tenant (ADR-006)" || { chk "[FAIL] tenant inesperado no login: ${TEN:-ausente}"; fail=1; }
+
+          chk "=== endpoints autenticados (MEDICO): listas + detalhes sensíveis + prontuário ==="
+          TOK=$(curl -s -X POST "$API/api/v1/auth/login" -H "Content-Type: application/json" -H "Origin: $ORIGIN" -d '{"email":"medico@staging.idmedic.example","senha":"Staging#Medico2026!"}' | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+          if [ -n "$TOK" ]; then
+            for p in /api/v1/medicos/me /api/v1/consultas /api/v1/exames /api/v1/documentos-clinicos /api/v1/notificacoes /api/v1/notificacoes/resumo /api/v1/notificacoes/preferencias \
+                     /api/v1/consultas/aa000000-0000-4000-8000-000000000102 \
+                     /api/v1/exames/aa000000-0000-4000-8000-000000000202 \
+                     /api/v1/documentos-clinicos/aa000000-0000-4000-8000-000000000301 \
+                     /api/v1/pacientes/aa000000-0000-4000-8000-0000000000e1/prontuario; do
+              c=$(curl -s -o /tmp/r.json -w "%{http_code}" -H "Authorization: Bearer $TOK" "$API$p")
+              [ "$c" = "200" ] && chk "[OK] GET $p 200" || { chk "[FAIL] GET $p -> $c"; fail=1; }
+            done
+            grep -qiE '"tenant_id"|"tenantId"' /tmp/r.json && { chk "[FAIL] tenant em payload de prontuário"; fail=1; } || chk "[OK] sem tenant_id em payloads inspecionados"
+            c=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOK" "$API/api/v1/financeiro/lancamentos"); [ "$c" = "403" ] && chk "[OK] RBAC: MEDICO em financeiro -> 403" || { chk "[FAIL] RBAC MEDICO financeiro -> $c"; fail=1; }
+          else
+            chk "[FAIL] sem accessToken MEDICO"; fail=1
+          fi
+          TOKF=$(curl -s -X POST "$API/api/v1/auth/login" -H "Content-Type: application/json" -H "Origin: $ORIGIN" -d '{"email":"financeiro@staging.idmedic.example","senha":"Staging#Fin2026!"}' | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+          c=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer ${TOKF}" "$API/api/v1/financeiro/lancamentos"); [ "$c" = "200" ] && chk "[OK] RBAC: FINANCEIRO em financeiro -> 200" || { chk "[FAIL] RBAC FINANCEIRO -> $c"; fail=1; }
+
+          chk "=== CORS restrito + HSTS + web SPA ==="
+          ACAO=$(curl -s -D - -o /dev/null -H "Origin: $ORIGIN" "$API/api/v1/health" | tr -d '\r' | grep -i '^access-control-allow-origin:' | awk '{print $2}')
+          [ "$ACAO" = "$ORIGIN" ] && chk "[OK] CORS reflete exatamente a origem da web" || { chk "[FAIL] CORS allow-origin='$ACAO' (esperado $ORIGIN)"; fail=1; }
+          [ "$ACAO" = "*" ] && { chk "[FAIL] CORS com * (proibido)"; fail=1; }
+          curl -sI "$API/api/v1/health" | grep -qi strict-transport-security && chk "[OK] HSTS na API" || chk "[INFO] HSTS ausente na API"
+          W=$(curl -s -o /tmp/web.html -w "%{http_code}" "$ORIGIN/")
+          [ "$W" = "200" ] && grep -q 'id="root"' /tmp/web.html && chk "[OK] web publicada (SPA root presente) sob HTTPS" || { chk "[FAIL] web -> $W ou SPA ausente"; fail=1; }
+          curl -sI "$ORIGIN/" | grep -qi strict-transport-security && chk "[OK] HSTS na web" || chk "[INFO] HSTS ausente na web"
+
+          chk "=== erros seguros + refresh/logout (fluxo mobile) ==="
+          c=$(curl -s -o /dev/null -w "%{http_code}" "$API/api/v1/consultas"); [ "$c" = "401" ] && chk "[OK] anônimo /consultas -> 401" || { chk "[FAIL] anônimo -> $c"; fail=1; }
+          c=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API/api/v1/auth/login" -H "Content-Type: application/json" -d '{"email":"x","senha":""}'); { [ "$c" = "422" ] || [ "$c" = "400" ]; } && chk "[OK] login inválido -> $c" || { chk "[FAIL] login inválido -> $c"; fail=1; }
+          RT=$(curl -s -X POST "$API/api/v1/auth/login" -H "Content-Type: application/json" -d '{"email":"medico@staging.idmedic.example","senha":"Staging#Medico2026!"}' | sed -n 's/.*"refreshToken":"\([^"]*\)".*/\1/p')
+          c=$(curl -s -o /tmp/rf.json -w "%{http_code}" -X POST "$API/api/v1/auth/refresh" -H "Content-Type: application/json" -d "{\"refreshToken\":\"$RT\"}"); [ "$c" = "200" ] && chk "[OK] refresh (mobile) 200" || { chk "[FAIL] refresh -> $c"; fail=1; }
+          RT2=$(sed -n 's/.*"refreshToken":"\([^"]*\)".*/\1/p' /tmp/rf.json); [ -n "$RT2" ] || RT2="$RT"
+          c=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API/api/v1/auth/logout" -H "Content-Type: application/json" -d "{\"refreshToken\":\"$RT2\"}"); [ "$c" = "204" ] && chk "[OK] logout 204" || { chk "[FAIL] logout -> $c"; fail=1; }
+
+          chk "RESULT fail=$fail"
+          cat "$R" >> "$DIAG"
+          [ "$fail" = "0" ] || { enc=$(sed 's/%/%25/g' "$DIAG" | sed ':a;N;$!ba;s/\r//g; s/\n/%0A/g'); echo "::error title=STAGING_DIAG::$enc"; exit 1; }
+
+      - name: Backup + teste de restore (não destrutivo) + cron diário
+        run: |
+          set -e
+          echo "== [10] backup/restore/cron ==" >> "$DIAG"
+          $RSH "$VPS_USER@$VPS_HOST" 'bash -s' <<'EOS' >> "$DIAG" 2>&1
+          set -e
+          export ENV_FILE=/opt/idmedic/secrets/.env.staging
+          export BACKUP_DIR=/opt/idmedic/backups
+          export COMPOSE_FILE=/opt/idmedic/app/infra/docker-compose.staging.yml
+          bash /opt/idmedic/app/infra/staging/backup.sh
+          L=$(ls -1t /opt/idmedic/backups/idmedic_staging_*.dump | head -1)
+          echo "dump: $(basename "$L") ($(du -h "$L" | cut -f1))"
+          C="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
+          $C exec -T postgres dropdb -U idmedic_staging --if-exists idmedic_restore_test
+          $C exec -T postgres createdb -U idmedic_staging idmedic_restore_test
+          $C exec -T postgres pg_restore -U idmedic_staging -d idmedic_restore_test --no-owner --no-privileges < "$L"
+          RC=$($C exec -T postgres psql -U idmedic_staging -d idmedic_restore_test -At -c "select count(*) from usuarios")
+          echo "restore-test (base temporária) usuarios = $RC"
+          $C exec -T postgres dropdb -U idmedic_staging idmedic_restore_test
+          [ "$RC" = "6" ] || { echo "ERRO: restore-test esperava 6"; exit 1; }
+          cat > /etc/cron.d/idmedic-backup <<'CRON'
+          0 3 * * * root ENV_FILE=/opt/idmedic/secrets/.env.staging BACKUP_DIR=/opt/idmedic/backups COMPOSE_FILE=/opt/idmedic/app/infra/docker-compose.staging.yml bash /opt/idmedic/app/infra/staging/backup.sh >> /opt/idmedic/logs/backup.log 2>&1
+          CRON
+          chmod 644 /etc/cron.d/idmedic-backup
+          echo "cron diário 03:00 instalado (/etc/cron.d/idmedic-backup)"
+          echo "rollback: dados/schema via infra/staging/restore.sh <dump>; aplicação via redeploy da imagem anterior"
+          EOS
+
+      - name: Evidências (sucesso)
+        if: success()
+        run: |
+          enc=$(tail -c 60000 "$DIAG" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\r//g; s/\n/%0A/g')
+          echo "::warning title=STAGING_DIAG::$enc"
+
+      - name: Evidências (falha)
+        if: failure()
+        run: |
+          enc=$(tail -c 60000 "$DIAG" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\r//g; s/\n/%0A/g')
+          echo "::error title=STAGING_DIAG::$enc"
