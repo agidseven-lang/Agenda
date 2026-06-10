@@ -420,7 +420,7 @@ check('RA_PERSONBOARD', 'Meu quadro do designer usa card perspectiva designer p/
       fnDecl('secOf'), fnDecl('stOf'), fnDecl('opColOf'), fnDecl('hasDesigner'), fnDecl('designerOf'), fnDecl('designerCol'),
       fnDecl('designerDelivered'), fnDecl('pendingLegend'), fnDecl('pendingFeed'), fnDecl('pendingStory'), fnDecl('pendingProduction'),
       // detail-hierarchy-v2: hasPendingItemRevision agora é phase-aware e depende destas:
-      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'),
+      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       fnDecl('hasPendingItemRevision'), fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'),
       fnDecl('designerColView'), fnDecl('designerStatusView'), fnDecl('designerNextShort'),
       'return {operationalCol,designerColView,designerStatusView,designerNextShort,opColOf};'
@@ -789,7 +789,7 @@ check('CSV_NO_OLD_BADGE', 'Nenhum badge usa mais const oc=opColOf(operationalCol
       oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'),
       oneLine('designerDelivered'),
       // detail-hierarchy-v2: dependências phase-aware de hasPendingItemRevision
-      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'),
+      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       oneLine('hasPendingItemRevision'),
       fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('clientStatusView'),
       'return {clientStatusView,operationalCol,opColOf};'
@@ -868,7 +868,7 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       oneLine('hasDesigner'), oneLine('designerOf'), oneLine('designerCol'), oneLine('designerDelivered'),
       oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'),
       // detail-hierarchy-v2: dependências phase-aware de hasPendingItemRevision
-      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'),
+      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       oneLine('hasPendingItemRevision'),
       fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('nextActionText'),
       fnDecl('clientStatusView'), fnDecl('_tlEventAt'),
@@ -982,7 +982,7 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
       'const ICON={};',
       fnDecl('hasDesigner'),fnDecl('designerOf'),fnDecl('designerCol'),fnDecl('designerDelivered'),
       fnDecl('pendingLegend'),fnDecl('pendingFeed'),fnDecl('pendingStory'),fnDecl('pendingProduction'),
-      fnDecl('clientApprovalPhaseOf'),fnDecl('pendingClientItems'),fnDecl('hasTeamAdjustedAwaiting'),
+      fnDecl('clientApprovalPhaseOf'),fnDecl('pendingClientItems'),fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       fnDecl('hasPendingItemRevision'),fnDecl('isFullyComplete'),fnDecl('clientCol'),
       fnDecl('clientApproved'),fnDecl('isSentToDesigner'),fnDecl('canSendToClient'),
       fnDecl('fmtDateTimeBR'),
@@ -1073,6 +1073,36 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   })();
   check('DH_HANDLERS','Handlers data-teamfix e data-goboard registrados', /data-teamfix\]/.test(DH) && /data-goboard\]/.test(DH));
   check('DH_PHASEAWARE_FN','hasPendingItemRevision é phase-aware via pendingClientItems (espelho Worker V64.41)', /function hasPendingItemRevision\(t\)\{return pendingClientItems\(t\)\.length>0;\}/.test(DH) && /it\.phase===ph/.test(DH));
+
+  /* ═══ DH_CYCLE — BUG 1.0.132 (reprovação do teste real): doc PRESO destrava na LEITURA ═══
+   * Fixture exata do estado herdado: globais 'revisao' + TODOS os itens da fase aprovados
+   * (ciclo aprova 2 → ajusta 1 → equipe corrige → cliente aprova o corrigido, ANTES do
+   * fechamento server-side V64.47). O Desktop deve ler como APROVADO. */
+  if(mod){
+    const STUCK={sector:'cronograma',cronContents:[{tema:'T1'},{tema:'T2'},{tema:'T3'}],
+      clientApprovalPhase:'themes',clientFlowStatus:'revisao',cronStatus:'em_revisao_cliente',
+      clientReview:{status:'revisao',note:'trocar foto'},
+      clientItems:{i0:{cs:'aprovado',phase:'themes'},i1:{cs:'aprovado',phase:'themes'},
+                   i2:{cs:'aprovado',phase:'themes',teamAdjustedAt:1,teamAdjustedBy:'João'}}};
+    const dsStuck=mod.detailState(STUCK);
+    check('DH_CYCLE_UNSTUCK','Doc PRESO (globais revisao + 3/3 itens aprovados) → detailState=temas_aprovados (NÃO cliente_ajuste)', dsStuck.key==='temas_aprovados');
+    check('DH_CYCLE_DESIGNER_BTN','Doc PRESO → ação senddesigner DISPONÍVEL (Enviar para designer aparece)', dsStuck.actions.indexOf('senddesigner')>=0);
+    check('DH_CYCLE_NO_PENDING','Doc PRESO → pendingClientItems vazio (nenhum item antigo bloqueia)', mod.hasPendingItemRevision(STUCK)===false);
+    // item LEGADO sem phase NÃO conta como aprovado (conservador — não fecha indevidamente)
+    const LEGACY=Object.assign({},STUCK,{clientItems:{i0:{cs:'aprovado'},i1:{cs:'aprovado',phase:'themes'},i2:{cs:'aprovado',phase:'themes'}}});
+    check('DH_CYCLE_LEGACY_SAFE','Item legado SEM phase não conta: doc não fecha indevidamente (continua cliente_ajuste)', mod.detailState(LEGACY).key==='cliente_ajuste');
+  }
+  check('DH_CYCLE_FN','allPhaseItemsApproved existe e exige cs=aprovado + phase da fase atual em TODOS os itens', /function allPhaseItemsApproved\(t\)/.test(DH) && /it\.cs==='aprovado'&&it\.phase===ph/.test(DH));
+  check('DH_CYCLE_CLIENTCOL','clientCol destrava: revisao herdado + allPhaseItemsApproved → aprovado (explícito E derivado)', /v==='revisao'&&allPhaseItemsApproved\(t\)\)return 'aprovado'/.test(DH) && /&&allPhaseItemsApproved\(t\)\)return 'aprovado';/.test(DH));
+  check('DH_CYCLE_CLIENTAPPROVED','clientApproved inclui allPhaseItemsApproved (gate do botão designer destrava)', /\|\|allPhaseItemsApproved\(t\)\);\}/.test(DH));
+  // Worker V64.47 (branch) — fechamento canônico server-side:
+  (function(){
+    const W47=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
+    check('DH_W47_PHASE_CLOSE','Worker V64.47: approveItem fecha fase NÃO-final quando todos aprovados (gated !isFinalPhase)', /V64\.47 — FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /if \(!isFinalPhase\)/.test(W47) && /version: "V64\.47-themes-phase-close"/.test(W47));
+    check('DH_W47_PENDING_PHASEAWARE','Worker V64.47: pendingRevision do portal/state é phase-aware com override allApproved', /const pendingRevision = !allApproved && \(itemPending/.test(W47) && /const pendingRevision = !_allApprovedR && \(_itemPendingR/.test(W47));
+    check('DH_W47_ACK_CANONICO','Portal: ackFeedback canônico (allOk→approveAll real; final→reload p/ confirmação; pendência→Feedback enviado)', /allOk&&PHASE==='final'\)\{location\.reload\(\)/.test(W47) && /if\(allOk\)\{post\(\{action:'approveAll'\}/.test(W47) && /clientFeedbackSent\(\);return;\}/.test(W47));
+    check('DH_W47_PORTAL_MSG','Portal: tela "Temas aprovados e enviados!" quando a fase fecha', /Temas aprovados e enviados!/.test(W47));
+  })();
 })();
 
 /* ===================== N_DH — PARIDADE ANDROID do detail-hierarchy-v2 ===================== */

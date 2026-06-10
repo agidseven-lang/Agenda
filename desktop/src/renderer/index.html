@@ -1768,6 +1768,9 @@ function clientCol(t){
   if(CLIENT_COLS.some(c=>c.key===v)){
     // 'concluido' explícito só vale se o fluxo realmente encerrou; senão ainda é reenvio/aprov. final.
     if(v==='concluido'&&!isFullyComplete(t))return 'reenviado';
+    // V64.47 (bug 1.0.132): estado 'revisao' HERDADO com TODOS os itens da fase aprovados
+    // (ciclo ajuste→correção→aprovação antes do fechamento server-side) NÃO trava — vira aprovado.
+    if(v==='revisao'&&allPhaseItemsApproved(t))return 'aprovado';
     return v;
   }
   const ws=(t&&t.workflowStage||'').toString();
@@ -1776,6 +1779,7 @@ function clientCol(t){
   // CORREÇÃO (status-consistency): o status BRUTO do kanban (t.status==='concluido')
   // NÃO força mais a coluna 'concluido'. Conclusão só via isFullyComplete (aprovação final real).
   if(isFullyComplete(t))return 'concluido';
+  if((cr==='revisao'||cs==='em_revisao_cliente'||cs==='editado_cliente')&&allPhaseItemsApproved(t))return 'aprovado';
   if(cr==='revisao'||cs==='em_revisao_cliente'||cs==='editado_cliente')return 'revisao';
   if(cs==='ready_for_final_client_review'||cs==='reenviado_cliente')return 'reenviado';
   if(hasDesigner(t)||cs==='sent_to_designer'||ws==='producao'||ws==='entrega'||ws==='revisao_final')return 'producao';
@@ -1935,6 +1939,17 @@ function hasPendingItemRevision(t){return pendingClientItems(t).length>0;}
 function hasTeamAdjustedAwaiting(t){const ci=t&&t.clientItems;if(!ci||typeof ci!=='object')return false;
   if(pendingClientItems(t).length)return false;
   return Object.keys(ci).some(k=>{const it=ci[k];return it&&it.teamAdjustedAt&&!it.cs;});}
+/* V64.47 (bug 1.0.132) — TODOS os conteúdos da FASE ATUAL aprovados pelo cliente?
+   (espelho do fechamento de fase do Worker; item legado sem phase NÃO conta).
+   Destrava docs com o global 'revisao' herdado do ciclo ajuste→correção→aprovação. */
+function allPhaseItemsApproved(t){
+  const ci=t&&t.clientItems;if(!ci||typeof ci!=='object')return false;
+  const arr=Array.isArray(t&&t.cronContents)?t.cronContents:[];const total=arr.length;
+  if(!total)return false;
+  const ph=clientApprovalPhaseOf(t);
+  for(let i=0;i<total;i++){const it=ci['i'+i];if(!(it&&it.cs==='aprovado'&&it.phase===ph))return false;}
+  return true;
+}
 /* ===== FONTE ÚNICA DA VERDADE — o fluxo está REALMENTE encerrado? =====
    "Concluído" exige aprovação FINAL do cliente E zero pendências operacionais.
    O status BRUTO do kanban (t.status) NUNCA, sozinho, conclui um cronograma. */
@@ -3113,7 +3128,9 @@ function designerUsers(){
     && (!state.user||u.id!==state.user.id) && isDesignerCandidate(u));
 }
 // Cliente respondeu de forma que habilita envio ao designer (aprovou)?
-function clientApproved(t){return t&&(t.cronStatus==='aprovado_cliente'||t.cronStatus==='client_approved'||(t.clientReview&&t.clientReview.status==='aprovado'));}
+function clientApproved(t){return t&&(t.cronStatus==='aprovado_cliente'||t.cronStatus==='client_approved'||(t.clientReview&&t.clientReview.status==='aprovado')
+  // V64.47 (bug 1.0.132): todos os itens da fase aprovados = aprovado, mesmo com global 'revisao' herdado
+  ||allPhaseItemsApproved(t));}
 function isSentToDesigner(t){return t&&(t.cronStatus==='sent_to_designer'||t.designerAssignment);}
 function cronStatusLabel(k){return (CRON_STATES[k]||{label:k}).label;}
 function cronStatusColor(k){return (CRON_STATES[k]||{color:'#9BA0AB'}).color;}
