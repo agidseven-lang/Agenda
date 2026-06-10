@@ -112,14 +112,14 @@ jobs:
         run: |
           set -euo pipefail
           B="https://idseven-push.agidseven.workers.dev"
-          echo "== 1) HEALTHCHECK deve ser V64.46 =="
+          echo "== 1) HEALTHCHECK deve ser V64.47 =="
           for i in 1 2 3; do
             H=$(curl -sS --max-time 20 "$B/")
-            echo "$H" | grep -q '"V64.46-team-session-hardened"' && break
+            echo "$H" | grep -q '"V64.47-themes-phase-close"' && break
             echo "(tentativa $i: versao ainda nao propagou; aguardando 5s)"; sleep 5
           done
           echo "$H"
-          echo "$H" | grep -q '"V64.46-team-session-hardened"' || { echo "FAIL: healthcheck nao e V64.46" >&2; exit 1; }
+          echo "$H" | grep -q '"V64.47-themes-phase-close"' || { echo "FAIL: healthcheck nao e V64.47" >&2; exit 1; }
 
           echo "== 2) LOGO oficial /og/idseven-logo.png (image/png) =="
           lc=$(curl -sS --max-time 20 -o /tmp/logo.png -w '%{http_code}' "$B/og/idseven-logo.png")
