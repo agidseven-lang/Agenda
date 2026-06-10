@@ -1106,7 +1106,7 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
   // Worker V64.47 (branch) — fechamento canônico server-side:
   (function(){
     const W47=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
-    check('DH_W49_NO_AUTOCLOSE','Worker: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito) — V64.51 atual', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.51-mobile-touch-footer"/.test(W47));
+    check('DH_W49_NO_AUTOCLOSE','Worker: approveItem NUNCA fecha fase (auto-close removido; fechamento = approveAll explícito) — V64.52 atual', !/FECHAMENTO DA FASE NÃO-FINAL/.test(W47) && /NUNCA fecha a/.test(W47) && /version: "V64\.52-clean-ui"/.test(W47));
     check('DH_W47_PENDING_PHASEAWARE','Worker V64.47: pendingRevision do portal/state é phase-aware com override allApproved', /const pendingRevision = !allApproved && \(itemPending/.test(W47) && /const pendingRevision = !_allApprovedR && \(_itemPendingR/.test(W47));
     check('DH_W47_ACK_CANONICO','Portal: ackFeedback canônico (allOk→approveAll real; final→reload p/ confirmação; pendência→Feedback enviado)', /allOk&&PHASE==='final'\)\{location\.reload\(\)/.test(W47) && /if\(allOk\)\{post\(\{action:'approveAll'\}/.test(W47) && /clientFeedbackSent\(\);return;\}/.test(W47));
     check('DH_W47_PORTAL_MSG','Portal: tela "Temas aprovados e enviados!" quando a fase fecha', /Temas aprovados e enviados!/.test(W47));
@@ -1245,13 +1245,44 @@ check('TL2_CRON_GUARD', 'timeline do card só renderiza p/ cronograma (guard sec
     check('CY5_DESIGNER_TOPCHIP','Chip do card do designer = EXATAMENTE "Designer em produção" (fonte designerStatusView)', mod.designerStatusView(DT).label==='Designer em produção');
   }
 
+  /* ═══ CY6 — REPROVAÇÃO 1.0.137 (board full-width / form limpo / livebar) ═══ */
+  console.log(`${C.b}\n[CY6] V64.52 — largura útil real, formulário limpo, sem toast flutuante${C.x}`);
+  check('CY6_BOARD_FULLWIDTH','Telas de quadro SEM o cap de 1400px (board usa a largura útil real) + padding lateral 24px',
+    /#content\.board-mode > \*\{max-width:none\}/.test(DH) && /padding-left:24px!important;padding-right:24px!important/.test(DH));
+  check('CY6_FORM_SEM_CHECKLIST','Formulário do CRONOGRAMA sem Checklist/+Adicionar item (demais setores preservados)',
+    /if\(f\.sector!=='cronograma'\)h\+=checklistHtml\(sub\.checklist\);/.test(DH) && /checklistHtml\(t\.checklist\)/.test(DH));
+  check('CY6_FORM_SEM_LINK_OBS','Formulário do CRONOGRAMA sem Link/anexo e sem Observações livres',
+    /if\(f\.sector!=='cronograma'\)\{\s*\n\s*h\+='<div style="height:6px"><\/div><div class="lbl">Link \/ anexo/.test(DH));
+  check('CY6_CARD_SEM_CHK','Card do cronograma NÃO mostra "x de y no checklist" (dados antigos preservados, só ocultos)',
+    /secOf\(t\.sector\)\.key!=='cronograma'&&Array\.isArray\(t\.checklist\)/.test(DH));
+  check('CY6_DET_SEM_CHK','Detalhe do cronograma NÃO exibe checklist sem função',
+    /checklist \(leitura\) — oculto p\/ cronograma/.test(DH));
+  (function(){
+    const W52=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
+    check('CY6_W52_LIVEBAR','Portal sem toast flutuante em produção (liveTick só no debug, estado no diag)',
+      (()=>{const f=(W52.match(/function liveTick\(ok\)\{[\s\S]*?\n\}/)||[''])[0];return /diagSet\('liveTick'/.test(f)&&/indexOf\('debug=1'\)<0/.test(f);})());
+    check('CY6_W52_PUSH_INTOCADO','Push preservado no V64.52 (sw-version V64.51 inalterado + /push/test + payload icon/badge)',
+      /sw-version: V64\.51-mobile-touch-footer/.test(W52) && /async function handleClientPushTest/.test(W52) && /icon: "\/og\/idseven-logo\.png", badge: "\/og\/idseven-badge\.png"/.test(W52));
+  })();
+  (function(){ // paridade ANDROID da limpeza do cronograma
+    const KF6 = readAndroid(AND + 'features/tasks/TaskFormScreen.kt');
+    const KS6 = readAndroid(AND + 'features/tasks/TasksScreen.kt');
+    const KD6 = readAndroid(AND + 'features/tasks/TaskDetailScreen.kt');
+    check('CY6_AND_FORM','Android form: cronograma sem Link/Obs/Checklist + sem injeção dos 5 itens default (2 pontos)',
+      /if \(sector != "cronograma"\) \{[\s\S]{0,200}Link \/ anexo/.test(KF6) && (KF6.match(/if \(sector == "cronograma"\) emptyList\(\)/g)||[]).length===2);
+    check('CY6_AND_CARD','Android card: cronograma sem barra "x de y no checklist" (demais setores preservados)',
+      /if \(total > 0 && sector\.key != "cronograma"\)/.test(KS6));
+    check('CY6_AND_DET','Android detalhe: seção Checklist oculta no cronograma (dados antigos intactos no banco)',
+      /Checklist — oculto p\/ cronograma/.test(KD6) && /if \(sector\.key != "cronograma"\) \{\s*\n\s*Spacer\(Modifier\.height\(18\.dp\)\)\s*\n\s*SectionLabel\(if \(total > 0\)/.test(KD6));
+  })();
+
   // Worker V64.48 (branch) — contentSent + rodapé dinâmico do portal:
   (function(){
     const W48=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
     check('CY2_W48_CONTENTSENT','Worker: team-action aceita contentSent e dispara themes_sent_to_client/final_content_sent_to_client', /action !== "adjustedItem" && action !== "contentSent"/.test(W48) && /final_content_sent_to_client" : "themes_sent_to_client"/.test(W48) && /notifyWorkflowEvent\(env, task, evSent/.test(W48));
     check('CY2_W48_NO_WRITE','Worker: contentSent NÃO escreve no Firestore (apenas notifica + loga)', (()=>{const b=(W48.match(/if \(action === "contentSent"\) \{[\s\S]*?\n  \}/)||[''])[0];return b.length>0&&b.indexOf(':commit')<0&&b.indexOf('writes:')<0;})());
     check('CY2_W48_FOOTER','Portal: syncFooter dinâmico — ajuste pendente → "Enviar feedback" (nunca CTA de aprovação)', /function syncFooter\(\)/.test(W48) && /function anyRevBadge\(\)/.test(W48) && (W48.match(/syncFooter\(\);/g)||[]).length>=5);
-    check('CY2_W48_VERSION','Worker healthcheck = V64.51-mobile-touch-footer', /version: "V64\.51-mobile-touch-footer"/.test(W48));
+    check('CY2_W48_VERSION','Worker healthcheck = V64.52-clean-ui', /version: "V64\.52-clean-ui"/.test(W48));
   })();
 })();
 

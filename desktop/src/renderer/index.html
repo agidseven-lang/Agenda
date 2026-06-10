@@ -385,7 +385,12 @@
      kanban ocupa o restante (flex:1 + min-height:0). As colunas têm height:100%
      e SÓ o .kbody rola — topo (header da coluna) sempre visível, base sempre
      dentro da janela, último card com respiro + scroll-margin. */
-  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:16px!important}
+  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:16px!important;padding-left:24px!important;padding-right:24px!important}
+  /* Reprovação 1.0.137: o cap de 1400px deixava ~200px ociosos nas laterais enquanto as
+     colunas ficavam estreitas. Nas telas de QUADRO o cap cai: o board usa a largura útil
+     REAL (viewport - sidebar - 48px) — colunas largas quando há espaço; scroll horizontal
+     SÓ quando a janela realmente não comporta 4 colunas confortáveis (≥300px). */
+  body.desktop #content.board-mode > *{max-width:none}
   body.desktop #content.board-mode > .scr-head{flex:none;width:100%}
   body.desktop #content.board-mode > .scr{flex:1 1 auto;min-height:0;width:100%;display:flex;flex-direction:column;overflow:visible}
   body.desktop #content.board-mode .d-board-tools{flex:none}
@@ -2456,7 +2461,9 @@ function taskCard(t, persp){
   const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:(t.by?'—':'');
   const cron=cronOf(t);
-  let chk='';if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;const pct=Math.round(done/t.checklist.length*100);
+  // Reprovação 1.0.137: cronograma NÃO exibe checklist (sem função no fluxo); dados antigos
+  // permanecem no banco — apenas não aparecem na UI do cronograma.
+  let chk='';if(secOf(t.sector).key!=='cronograma'&&Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;const pct=Math.round(done/t.checklist.length*100);
     chk='<div class="tc-chk"><div class="tc-chk-bar"><div style="width:'+pct+'%"></div></div><div class="tc-chk-l">'+done+' de '+t.checklist.length+' no checklist</div></div>';}
   let h='<div class="tc">';
   // 1a) Linha de meta — status (esq) + prazo (dir)
@@ -2589,8 +2596,8 @@ function openDetails(taskId){
     h+='<div class="det-sec">Conteúdos do cronograma <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span></div>';
     h+=cron.list.length?('<div class="det-contents">'+cron.list.map(c=>'<div class="det-content"><div class="det-content-n">'+(c._i+1)+'</div><div class="det-content-m"><div class="det-content-t">'+esc(c.tema||'(sem tema)')+'</div>'+(c.legenda?'<div class="det-content-l">'+esc(c.legenda)+'</div>':'')+'</div></div>').join('')+'</div>'):'<div class="emptyline">Nenhum conteúdo preenchido.</div>';
   }else if(t.desc){h+='<div class="det-sec">Briefing</div><div class="det-desc">'+esc(t.desc)+'</div>';}
-  // checklist (leitura)
-  if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;
+  // checklist (leitura) — oculto p/ cronograma (sem função no fluxo atual)
+  if(secOf(t.sector).key!=='cronograma'&&Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;
     h+='<div class="det-sec">Checklist <span class="det-sec-c">'+done+' / '+t.checklist.length+'</span></div><div class="det-check">'+
       t.checklist.map(c=>'<div class="det-check-i"><span class="det-check-b '+(c.d?'on':'')+'">'+(c.d?'✓':'')+'</span><span class="'+(c.d?'det-check-done':'')+'">'+esc(c.t||'')+'</span></div>').join('')+'</div>';}
   if(t.link)h+='<div class="det-sec">Link / anexo</div><div class="det-link">'+esc(t.link)+'</div>';
@@ -3997,10 +4004,15 @@ function stepBriefing(){const f=state.form;const t=tpl();const s=secOf(f.sector)
           h+='<div class="content-card '+(open?'open':'')+'"><button class="ch" data-content="'+i+'"><span class="cd '+(filled?'fill':'')+'"></span><span class="ct">Conteúdo '+(i+1)+'</span><span style="color:var(--soft)">'+(open?'▲':'▼')+'</span></button><div class="cb"><div class="lbl">Tema</div><input class="inp" data-ctema="'+i+'" placeholder="Tema do conteúdo '+(i+1)+'" value="'+esc(c.tema||'')+'"><div style="height:8px"></div><div class="lbl">Legenda</div><textarea class="inp" data-cleg="'+i+'" placeholder="Legenda do conteúdo '+(i+1)+'">'+esc(c.legenda||'')+'</textarea></div></div>';}}
       if(sub.items){h+='<div class="lbl" style="margin-top:6px">Itens do pacote</div>';
         for(let i=0;i<sub.items;i++)h+='<div class="row" style="gap:10px;margin-bottom:8px"><div style="width:80px;font-size:11.5px;font-weight:700;color:var(--faint)">'+esc(sub.itemLabel||'Item')+' '+(i+1)+'</div><input class="inp" data-item="'+i+'" placeholder="Descrição" value="'+esc(f.items[i]||'')+'"></div>';}
-      h+=checklistHtml(sub.checklist);
+      // Reprovação 1.0.137: CRONOGRAMA não usa checklist — o fluxo real é temas→designer→
+      // legendas→aprovação final. Demais setores mantêm o checklist do briefing.
+      if(f.sector!=='cronograma')h+=checklistHtml(sub.checklist);
     }
   }else if(t){h+='<div class="lbl">Briefing · '+esc(s.label)+'</div>'+fieldsHtml(t.fields)+checklistHtml(t.checklist);}
-  h+='<div style="height:6px"></div><div class="lbl">Link / anexo</div><input class="inp" id="fLink" placeholder="URL (Drive, Figma, etc.)" value="'+esc(f.link)+'"><div style="height:12px"></div><div class="lbl">Observações livres</div><textarea class="inp" id="fObs" placeholder="Notas adicionais…">'+esc(f.obs)+'</textarea>';
+  // CRONOGRAMA: sem Link/anexo e sem Observações livres (sem função no fluxo atual).
+  if(f.sector!=='cronograma'){
+    h+='<div style="height:6px"></div><div class="lbl">Link / anexo</div><input class="inp" id="fLink" placeholder="URL (Drive, Figma, etc.)" value="'+esc(f.link)+'"><div style="height:12px"></div><div class="lbl">Observações livres</div><textarea class="inp" id="fObs" placeholder="Notas adicionais…">'+esc(f.obs)+'</textarea>';
+  }
   return h;
 }
 function fieldsHtml(fields){const f=state.form;return (fields||[]).map(fl=>{const v=f.fields[fl.k]||'';
