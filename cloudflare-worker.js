@@ -269,7 +269,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.46-team-session-hardened" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.47-themes-phase-close" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -2014,10 +2014,16 @@ async function handleClientCronogramaState(token, env) {
       return { i, cs: ov.cs || c.cs || "", tema, legenda: (legRaw || "").toString(),
         feed: firstUrl(c.feed) || (c.feedImageUrl || ""), story: firstUrl(c.story || c.stories) || (c.storyImageUrl || "") };
     });
-    const pendingRevision = Object.keys(ci).some((k) => { const cs = ci[k] && ci[k].cs; return cs === "em_revisao" || cs === "editado"; })
-      || (task.clientReview && task.clientReview.status === "revisao");
+    // V64.47 — pendência POR FASE + override "todos aprovados": item de outra fase não conta;
+    // se TODOS os conteúdos da fase atual estão aprovados, NÃO há pendência mesmo que o
+    // clientReview.status global ainda esteja 'revisao' (estado herdado do ciclo de ajuste).
+    const ph = clientPhase(task);
+    const itemPending = Object.keys(ci).some((k) => { const it = ci[k]; const cs = it && it.cs; return (cs === "em_revisao" || cs === "editado") && it.phase === ph; });
+    let allApproved = out.length > 0;
+    for (let i = 0; i < out.length; i++) { const it = ci["i" + i]; if (!(it && it.cs === "aprovado" && it.phase === ph)) { allApproved = false; break; } }
+    const pendingRevision = !allApproved && (itemPending || (task.clientReview && task.clientReview.status === "revisao"));
     const finalDone = task.finalApprovalCompleted === true || task.clientFlowStatus === "concluido";
-    return json({ ok: true, phase: clientPhase(task), pendingRevision, finalDone, updatedAt: task.updatedAt || 0, items: out }, 200, env);
+    return json({ ok: true, phase: ph, pendingRevision, phaseApproved: allApproved, finalDone, updatedAt: task.updatedAt || 0, items: out }, 200, env);
   } catch (e) {
     return json({ ok: false, error: "err" }, 200, env);
   }
@@ -2123,6 +2129,26 @@ async function writeClientGranular(env, accessToken, task, e) {
   // final fechar tudo, porque as aprovações de TEMAS persistiam em clientItems.
   if (e.type === "approveItem") {
     g = { cs: null, rev: null, htype: "cliente_aprovou_item", label: "Cliente aprovou um conteúdo", col: null, stage: null, client: null };
+    // V64.47 — FECHAMENTO DA FASE NÃO-FINAL: quando o item aprovado é o ÚLTIMO pendente e
+    // TODOS os conteúdos da fase ATUAL ficam aprovados (contagem POR FASE, item legado sem
+    // phase NÃO conta), a fase fecha: globais viram 'aprovado' (clientReview/cronStatus/
+    // clientFlowStatus). Corrige o bug do ciclo ajuste→correção→aprovação em que os globais
+    // ficavam presos em 'revisao' e o card travava em "Ajuste solicitado".
+    // Na fase FINAL permanece o BUG#6: concluir SÓ via approveAll explícito do cliente.
+    if (!isFinalPhase) {
+      const arr = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
+      const total = arr.length;
+      let allApproved = total > 0;
+      for (let i = 0; i < total; i++) {
+        const it = _ci0["i" + i];
+        const cs = (i === e.contentIndex) ? "aprovado" : ((it && it.phase === phaseIn) ? it.cs : null);
+        if (cs !== "aprovado") { allApproved = false; break; }
+      }
+      if (allApproved) {
+        g = Object.assign({}, approveG, { htype: "cliente_aprovou", label: "Cliente aprovou todos os temas da fase" });
+        console.log(`[CLIENT-ACTION] fase ${phaseIn} FECHADA via approveItem (todos os ${total} conteúdos aprovados)`);
+      }
+    }
   }
 
   if (g.cs) {
@@ -2611,7 +2637,7 @@ function clientSuccess(){var w=document.querySelector('.wrap');var ga=document.q
 // V64.17 — topbar premium reutilizável. Telas de ack/sucesso/feedback SUBSTITUEM a .wrap
 // inteira (sem formulário/cards ativos empilhados abaixo). Corrige duplicação no portal.
 function CV_TOP(){var lg=document.querySelector('.brand .logo');return '<div class="topbar"><div class="brand">'+(lg?lg.outerHTML:'')+'<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div><div class="secure">'+CIC.check+'<span class="lbl">Link seguro</span></div></div>';}
-function clientThemesApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Temas aprovados!</h2><p>A equipe seguirá com a produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
+function clientThemesApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Temas aprovados e enviados!</h2><p>A equipe seguirá com a produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
 function clientProductionApproved(){var w=document.querySelector('.wrap');if(!w)return;w.innerHTML=CV_TOP()+'<div class="midwrap"><div class="midcard"><div class="mid-badge">'+CIC.check+'</div><h2>Legendas e artes aprovadas!</h2><p>A equipe enviará a versão final completa para sua aprovação. Em breve você receberá o aviso neste mesmo link.</p><div class="mid-foot">Você pode fechar esta página — vamos te avisar. 💜</div></div></div>';window.scrollTo(0,0);tryCloseOrShowNotice();}
 // V64.17 — feedback PARCIAL: SUBSTITUI a .wrap por resumo read-only + "Aguardando ajuste da equipe".
 function clientFeedbackSent(){var w=document.querySelector('.wrap');if(!w)return;
@@ -2631,13 +2657,33 @@ document.addEventListener('click',function(e){
   var sx=e.target.closest&&e.target.closest('[data-x]');if(sx){if(sx.dataset.x==='cancel'){closeSheet();}else{var v=(sheet.querySelector('#sIn')||{}).value||'';var cb=pending;closeSheet();if(cb)cb(v);}return;}
   var a=e.target.closest&&e.target.closest('[data-act]');if(!a)return;
   var act=a.dataset.act,i=a.dataset.i!=null?+a.dataset.i:null;
-  if(act==='approveItem'){post({action:'approveItem',contentIndex:i},a,function(){setBadge(i,'aprovado');bumpProgress();addHist('ok','Aprovou Conteúdo '+(i+1));toast('Conteúdo '+(i+1)+' aprovado','ok');});}
+  if(act==='approveItem'){post({action:'approveItem',contentIndex:i},a,function(j){
+    setBadge(i,'aprovado');bumpProgress();addHist('ok','Aprovou Conteúdo '+(i+1));
+    // V64.47 — se este era o ÚLTIMO conteúdo pendente, o Worker FECHOU a fase
+    // (clientFlowStatus='aprovado'): mostra a tela de fase aprovada (nunca na fase final).
+    if(j&&j.clientFlowStatus==='aprovado'&&j.phase!=='final'){
+      addHist('ok','Todos os conteúdos aprovados — fase concluída');
+      if(j.phase==='production'){clientProductionApproved();}else{clientThemesApproved();}
+      return;
+    }
+    toast('Conteúdo '+(i+1)+' aprovado','ok');});}
   else if(act==='reviseItem'){openInput('Pedir ajuste — Conteúdo '+(i+1),'Descreva o que ajustar neste conteúdo. A equipe é notificada.','rev','',true,function(v){if(!v.trim())return;post({action:'reviseItem',contentIndex:i,note:v},null,function(){setBadge(i,'em_revisao');setItemNote(i,v);addHist('rev','Pediu ajuste em Conteúdo '+(i+1));toast('Ajuste solicitado','ok');});});}
   else if(act==='editTheme'){openInput('Editar tema — Conteúdo '+(i+1),'Sugira um novo tema para este conteúdo.','ok',getText(i,'tema'),false,function(v){if(!v.trim())return;post({action:'editTheme',contentIndex:i,value:v},null,function(){setTheme(i,v);setBadge(i,'editado');addHist('edit','Editou o tema de Conteúdo '+(i+1));toast('Tema atualizado','ok');});});}
   else if(act==='editLegenda'){openInput('Editar legenda — Conteúdo '+(i+1),'Ajuste a legenda deste conteúdo do jeito que preferir.','ok',getText(i,'legenda'),true,function(v){post({action:'editLegenda',contentIndex:i,value:v},null,function(){setLegenda(i,v);setBadge(i,'editado');addHist('edit','Editou a legenda de Conteúdo '+(i+1));toast('Legenda atualizada','ok');});});}
   else if(act==='noteItem'){openInput('Observação — Conteúdo '+(i+1),'Deixe uma observação específica para este conteúdo.','ok','',true,function(v){if(!v.trim())return;post({action:'noteItem',contentIndex:i,note:v},null,function(){setItemNote(i,v);addHist('note','Comentou em Conteúdo '+(i+1));toast('Observação registrada','ok');});});}
   else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar no cronograma como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
-  else if(act==='ackFeedback'){clientFeedbackSent();return;}
+  else if(act==='ackFeedback'){
+    // V64.47 — "Enviar feedback" agora é CANÔNICO: se TODOS os conteúdos estão aprovados,
+    // envia approveAll de verdade (fecha a fase no servidor) e mostra "Temas aprovados e
+    // enviados"; na fase FINAL recarrega p/ o CTA com confirmação explícita (nunca conclui
+    // sem confirmação); com ajuste pendente, mantém a tela "Feedback enviado".
+    var allOk=true;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){if((b.textContent||'').indexOf('Aprovado')<0)allOk=false;});
+    if(allOk&&PHASE==='final'){location.reload();return;}
+    if(allOk){post({action:'approveAll'},a,function(j){
+      addHist('ok','Aprovou todos os conteúdos');
+      if(j&&j.phase==='production'){clientProductionApproved();}else{clientThemesApproved();}
+    });return;}
+    clientFeedbackSent();return;}
   else if(act==='approveAll'){var ph=a.getAttribute('data-phase')||'themes';
     // V64.16 — GATE client-side: se algum conteúdo está com ajuste/edição pedido, NÃO aprova tudo.
     var anyRev=false;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){var t=(b.textContent||'');if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)anyRev=true;});
@@ -2764,11 +2810,15 @@ function renderClientHtml(task, token, env, origin) {
   // Tela de sucesso só aparece quando a fase é 'final' (gating do clientSuccess).
   const phase = clientPhase(task);
   const phaseUi = phaseCopy(phase);
-  // V64.15 — aprovação PARCIAL: algum conteúdo com ajuste/edição pedido? Então NÃO mostrar
-  // o CTA global "Aprovar todos" como se tudo estivesse ok.
-  const pendingRevision = Object.keys(cItems).some(function (k) {
-    const cs = cItems[k] && cItems[k].cs; return cs === "em_revisao" || cs === "editado";
-  }) || (task.clientReview && task.clientReview.status === "revisao");
+  // V64.15/V64.47 — aprovação PARCIAL POR FASE: só pendência da fase ATUAL esconde o CTA
+  // "Aprovar todos". Se TODOS os conteúdos da fase estão aprovados, o portal volta ao CTA
+  // normal mesmo com clientReview.status='revisao' herdado (ciclo ajuste→correção→aprovação).
+  const _itemPendingR = Object.keys(cItems).some(function (k) {
+    const it = cItems[k]; const cs = it && it.cs; return (cs === "em_revisao" || cs === "editado") && it.phase === phase;
+  });
+  let _allApprovedR = total > 0;
+  for (let _i = 0; _i < total; _i++) { const _it = cItems["i" + _i]; if (!(_it && _it.cs === "aprovado" && _it.phase === phase)) { _allApprovedR = false; break; } }
+  const pendingRevision = !_allApprovedR && (_itemPendingR || (task.clientReview && task.clientReview.status === "revisao"));
 
   function firstUrl(v) {
     if (!v) return "";
@@ -2919,7 +2969,7 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
 ) + '</div></div>' +
 '<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
 '<div class="toast" id="toast"></div>' +
-'<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';\n' +
+'<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';var PHASE=' + JSON.stringify(phase) + ';\n' +
 // V64.42 — feature flag de PWA Web Push: o portal so mostra opt-in/subscribe quando ENABLE_PUSH=true.
 // VAPID_PUBLIC_KEY e injetada para uso em pushManager.subscribe (aplicationServerKey).
 'var ENABLE_PUSH=' + JSON.stringify(env && env.ENABLE_CLIENT_WEB_PUSH === "true") + ';' +
