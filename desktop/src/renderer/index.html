@@ -1476,6 +1476,40 @@
   .cvw-note-tx{flex:1;min-width:0;font-size:13.5px;color:var(--ink);line-height:1.6}
   @media (max-width:720px){.cvw-grid{grid-template-columns:1fr}.cvw-scroll{padding:12px 16px 36px}.cvw-arts{grid-template-columns:1fr 1fr}}
   @media (max-width:440px){.cvw-arts{grid-template-columns:1fr}}
+
+  /* =====================================================================
+     RETOQUE DE QUALIDADE — paleta navy + efeitos do print de referência
+     (amostragem pixel a pixel: fundo rgb(8,13,27)→(3,9,18) com vinheta;
+      colunas azul-profundo; card com gradiente interno azulado claro→escuro;
+      Nova tarefa 74,66,251→gloss→121,63,224; Detalhes 87,97,233→62,52,240;
+      véu âmbar atrás do header da coluna ativa; busca em poço escuro)
+     ===================================================================== */
+  body.desktop{
+    --surface:#101729; --surface2:#1A2138;
+    --line:rgba(150,170,255,.10); --line-soft:rgba(150,170,255,.07);
+    background:radial-gradient(1400px 900px at 70% -12%, #0E1730 0%, #0A0F22 40%, #060B18 72%, #040810 100%) fixed;
+  }
+  body.desktop .nav{background:linear-gradient(180deg,#070E20 0%,#060B1A 60%,#050917 100%)}
+  body.desktop .kanban .kcol{background:linear-gradient(180deg,#151B30 0%,#0F1426 100%);
+    border-color:rgba(150,170,255,.08);box-shadow:0 22px 44px -26px rgba(0,0,0,.65)}
+  body.desktop .kanban .kcol.kcol-live{
+    background:linear-gradient(180deg,#161C32,#101529) padding-box,
+      linear-gradient(140deg,rgba(34,211,238,.65),rgba(99,102,241,.55) 38%,rgba(244,114,182,.55)) border-box;
+    box-shadow:0 0 40px -10px color-mix(in srgb,var(--kc) 30%,transparent),0 18px 40px -20px rgba(0,0,0,.7)}
+  body.desktop .kanban .kcol.kcol-live .khead{background:linear-gradient(180deg,color-mix(in srgb,var(--kc) 12%,transparent),transparent)}
+  body.desktop .tcv4{background:linear-gradient(180deg,rgba(96,134,255,.075) 0%,rgba(40,58,110,.05) 32%,rgba(4,7,16,.3) 100%),#0C1120;
+    border-color:rgba(150,170,255,.11);
+    box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 26px 50px -24px rgba(0,0,0,.8)}
+  body.desktop .tcv4-origin{background:rgba(4,8,20,.5)}
+  body.desktop .tcv4-themes{background:rgba(9,14,30,.55);border-color:rgba(150,170,255,.07)}
+  body.desktop .d-board-tools.tbar .bsearch{background:rgba(4,7,16,.8) !important;border-color:rgba(150,170,255,.08)}
+  body.desktop .nav .new-task-btn{background:linear-gradient(115deg,#4A42FB 0%,#8B7BFF 48%,#7B3FE0 100%);
+    box-shadow:0 10px 26px -8px rgba(104,77,255,.6),inset 0 1px 0 rgba(255,255,255,.32)}
+  body.desktop .tcv4 .tcv4-btn-main{background:linear-gradient(110deg,#5761E9 0%,#4A38F0 100%);
+    box-shadow:0 8px 20px -8px rgba(83,86,240,.6),inset 0 1px 0 rgba(255,255,255,.22)}
+  body.desktop .tcv4 .tcv4-btn-main:hover{background:linear-gradient(110deg,#6670F2 0%,#5947F8 100%)}
+  body.desktop .kempty-ic{color:rgba(150,172,220,.30)}
+  body.desktop .kempty{border-color:rgba(150,170,255,.10)}
 </style>
 </head>
 <body>
