@@ -38,9 +38,9 @@ jobs:
           ref: ${{ github.event.inputs.ref }}
 
       # CI-only: label FIXO desta versao de TESTE + validacao de que o package.json bate.
-      - name: Definir versao/labels (1.0.140-beta-premium-board-v64-53-test)
+      - name: Definir versao/labels (1.0.140-beta-card-v4-4-parity)
         run: |
-          LABEL="1.0.140-beta-premium-board-v64-53-test"
+          LABEL="1.0.140-beta-card-v4-4-parity"
           VER="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$APP_DIR/package.json" | head -1)"
           if [ "$VER" != "1.0.140" ]; then echo "::error::package.json version=$VER (esperado 1.0.140)"; exit 1; fi
           echo "VER_LABEL=$LABEL" >> "$GITHUB_ENV"
