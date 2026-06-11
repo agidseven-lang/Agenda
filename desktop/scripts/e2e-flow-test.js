@@ -1240,7 +1240,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('CY5_KANBAN_MINW','Kanban: coluna com largura mínima REAL (300px) + scroll horizontal do board (nunca espremer)',
     /grid-template-columns:repeat\(4,minmax\(300px,1fr\)\)/.test(DH) && /\.kanban\{[\s\S]{0,300}overflow-x:auto/.test(DH) && /\.kanban \.kcol\{min-width:300px\}/.test(DH));
   check('CY5_KANBAN_BOARDMODE','board-mode (referência): flex gap 15, altura IGUAL, coluna EM FOCO 1.16x mais larga',
-    /display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;\s*\n\s*gap:15px;align-items:stretch\}/.test(DH) && /\.kcol\.kcol-live\{flex:1\.16 1 0\}/.test(DH));
+    /display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;\s*\n\s*gap:15px;align-items:stretch;justify-content:safe center\}/.test(DH) && /\.kcol\.kcol-live\{flex:1\.16 1 0;max-width:380px\}/.test(DH));
   if(mod&&mod.designerStatusView){
     const DT={sector:'cronograma',cronContents:[{tema:'T'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
     check('CY5_DESIGNER_TOPCHIP','Chip do card do designer = EXATAMENTE "Designer em produção" (fonte designerStatusView)', mod.designerStatusView(DT).label==='Designer em produção');
@@ -1295,7 +1295,16 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
              tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Colunas de ALTURA IGUAL (referência) + 1 card inteiro sem scrollbar + scrollbar fina + chrome enxuto',
     /kcol\{height:100%;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
-    /#content\.board-mode \.kcol \.kbody\{padding:31px 7px 0\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
+    /#content\.board-mode \.kcol \.kbody\{padding:31px 7px 0;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH) &&
+    /\.tc:last-child:not\(:only-child\)\{margin-bottom:14px\}/.test(DH));
+  check('CY8_LAUDO_141','Laudo 1.0.141: perfil flex:none (não estica) + coluna com teto de largura + popover ⋯ FIXED ancorado (nunca cortado)',
+    /\.sb-user\{display:flex !important;flex:none !important/.test(DH) &&
+    /\.kanban \.kcol\{flex:1 1 0;min-width:232px;max-width:340px\}/.test(DH) && /\.kcol\.kcol-live\{flex:1\.16 1 0;max-width:380px\}/.test(DH) &&
+    /\.tcv4-menu\{display:none;position:fixed;z-index:80;min-width:198px/.test(DH) &&
+    DH.indexOf("m.style.left=lf+'px';m.style.top=tp+'px';")>=0 &&
+    DH.indexOf('document.body.appendChild(m);m.classList.add(\'open\');')>=0 &&
+    /function closeCardMenus\(\)/.test(DH) && DH.indexOf("document.addEventListener('scroll',closeCardMenus,true);")>=0 &&
+    /scroll-snap-align:start;scroll-margin-top:14px/.test(DH));
   (function(){
     const W53=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
     check('CY7_W53_VERSION','Worker healthcheck = V64.53-premium-portal (SW V64.51 INTOCADO)',

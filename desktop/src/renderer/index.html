@@ -403,7 +403,9 @@
   /* Reprovação 1.0.140: a foto flutuante do topo direito colidia com os chips do
      quadro. No desktop o perfil vive no CANTO INFERIOR ESQUERDO da sidebar. */
   body.desktop #app > .topbar{display:none !important}
-  body.desktop .nav .sb-user{display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:flex-start !important;gap:9px !important;width:100%;margin-top:auto;padding:7px 9px !important;border-radius:10px;text-align:left;transition:background .12s}
+  /* flex:none anula o flex:1 do .nav button base: sem ele o botão de perfil ESTICAVA e engolia
+     todo o espaço livre da coluna em telas altas (perfil "flutuando" com buraco enorme abaixo). */
+  body.desktop .nav .sb-user{display:flex !important;flex:none !important;flex-direction:row !important;align-items:center !important;justify-content:flex-start !important;gap:9px !important;width:100%;margin-top:auto;padding:7px 9px !important;border-radius:10px;text-align:left;transition:background .12s}
   body.desktop .nav .sb-user .su-m{display:flex;flex-direction:column;min-width:0}
   body.desktop .nav .sb-user:hover{background:rgba(255,255,255,.05)}
   body.desktop .nav .sb-user .av{flex:none}
@@ -420,8 +422,14 @@
   body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:28px}
   body.desktop #content.board-mode .kanban{margin-top:20px}
   body.desktop #content.board-mode .kcol .khead{padding:6px 12px 5px}
-  body.desktop #content.board-mode .kcol .kbody{padding:31px 7px 0}
+  /* scroll-snap proximity + scroll-padding: ao rolar, o card acomoda INTEIRO com respiro —
+     nunca para "decapitado" contra o header da coluna. */
+  body.desktop #content.board-mode .kcol .kbody{padding:31px 7px 0;scroll-snap-type:y proximity;scroll-padding-top:14px}
+  body.desktop #content.board-mode .kcol .kbody .tc{scroll-snap-align:start;scroll-margin-top:14px}
   body.desktop #content.board-mode .kcol .kbody .tc:last-child{margin-bottom:0}
+  /* respiro na BASE só quando a coluna tem 2+ cards (corte na base reprovado na 1.0.141);
+     com 1 card a coluna mantém o encaixe exato aprovado na V4.5 — sem scrollbar interna. */
+  body.desktop #content.board-mode .kcol .kbody .tc:last-child:not(:only-child){margin-bottom:14px}
   /* Notebook com taskbar (altura útil ~689): chrome + card no modo justo validado */
   @media(max-height:740px){
     body.desktop #content.board-mode{padding-top:5px!important}
@@ -443,10 +451,12 @@
     body.desktop #content.board-mode .kcol .kbody{padding:5px 8px 5px}
   }
   body.desktop #content.board-mode .kanban{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
-    gap:15px;align-items:stretch}
-  body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px}
+    gap:15px;align-items:stretch;justify-content:safe center}
+  /* max-width: em telas grandes a coluna NÃO balona (card "esticado" reprovado na 1.0.141);
+     em 1366×768 as colunas ficam abaixo do teto — paridade com a referência intacta. */
+  body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px;max-width:340px}
   /* referência: a coluna EM FOCO (com cards) respira mais que as vazias */
-  body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0}
+  body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:380px}
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
@@ -553,11 +563,23 @@
   .tcv4 .tcv4-btn-main:hover{background:linear-gradient(135deg,#6878ff,#8a6cff);color:#fff}
   .tcv4 .tcv4-btn-dots{width:30px !important;padding:0 !important;font-size:14px !important;letter-spacing:.5px;color:var(--faint)}
   .tcv4-more{position:relative;display:inline-flex}
-  .tcv4-menu{display:none;position:absolute;right:0;bottom:40px;z-index:30;min-width:160px;padding:5px;background:#14151d;border:1px solid rgba(255,255,255,.09);border-radius:12px;box-shadow:0 18px 40px -12px rgba(0,0,0,.8)}
-  .tcv4-more.open .tcv4-menu{display:block}
-  .tcv4-menu-it{display:flex;align-items:center;gap:8px;width:100%;padding:9px 11px;border-radius:8px;font-size:12px;font-weight:650;color:var(--red);text-align:left}
-  .tcv4-menu-it svg{width:14px;height:14px}
-  .tcv4-menu-it:hover{background:rgba(248,113,113,.1)}
+  /* Popover premium do "⋯" — position:FIXED + PORTAL (ao abrir, o nó vai para o <body>):
+     o card tem container-type (contain:layout), que tornaria o CARD o containing block do
+     fixed e o kbody voltaria a cortá-lo. No body, nada corta o popover — nunca. */
+  .tcv4-menu{display:none;position:fixed;z-index:80;min-width:198px;padding:6px;
+    background:rgba(18,19,27,.96);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.10);border-radius:13px;
+    box-shadow:0 24px 56px -16px rgba(0,0,0,.78),0 2px 8px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.05)}
+  .tcv4-menu.open{display:block;animation:tcv4MenuIn .14s ease}
+  @keyframes tcv4MenuIn{from{opacity:0;transform:translateY(4px) scale(.985)}to{opacity:1;transform:none}}
+  /* especificidade .tcv4-menu > .del-btn legado (pílula 42×42 vermelha, linha ~793) — era ELE
+     que deixava o item "Excluir tarefa" com cara de remendo vermelho bruto dentro do popup. */
+  .tcv4-menu .tcv4-menu-it{display:flex;align-items:center;gap:9px;width:100%;height:auto;flex:none;
+    background:transparent;border:0;padding:9px 11px;border-radius:9px;justify-content:flex-start;
+    font-size:12.5px;font-weight:650;color:#F1A8A8;text-align:left;white-space:nowrap;transition:background .12s,color .12s}
+  .tcv4-menu .tcv4-menu-it svg{width:15px;height:15px;flex:none;opacity:.9}
+  .tcv4-menu .tcv4-menu-it:hover{background:rgba(248,113,113,.12);color:#FBCACA;transform:none}
+  .tcv4-menu .tcv4-menu-it:focus-visible{outline:2px solid rgba(248,113,113,.55);outline-offset:1px}
   /* escala 125% (~614px úteis): temas viram contador; origem entra na linha do cargo */
   @media(max-height:660px){
     .tcv4-name{-webkit-line-clamp:1}
@@ -1782,6 +1804,7 @@ function render(){
   // até o usuário fechar/salvar. Corrige o modal de correção sumindo em tempo real.
   if(_editingNow()){_deferRender=true;return;}
   _deferRender=false;
+  if(typeof closeCardMenus==='function')closeCardMenus(); // popover ⋯ é portal no <body>: nunca sobrevive a um re-render
   document.getElementById('topAvatar').innerHTML='<button class="topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,38)+'</button>';
   const nav=document.getElementById('bottomNav');
   if(isDesktop()){
@@ -4412,6 +4435,17 @@ async function saveTask(){const f=state.form;
    injetados em #modalRoot, que e IRMAO de #app. Preso em #app, nenhum clique
    dentro de um modal era capturado -> seletor de responsavel/mover status/
    sheets ficavam mortos. Em document, captura tudo (com guarda de sessao). */
+// popover '⋯' do card V4: PORTAL no <body> (escapa contain/overflow). Fecha devolvendo o nó
+// ao card de origem; fecha também em rolagem/resize/Escape para não ficar "órfão" do botão.
+function closeCardMenus(){
+  document.querySelectorAll('.tcv4-menu.open').forEach(m=>{m.classList.remove('open');m.style.left='';m.style.top='';
+    const host=document.querySelector('[data-cardmenu="'+(m.dataset.menuOf||'')+'"]');
+    const w=host&&host.closest('.tcv4-more');if(w)w.appendChild(m);else m.remove();});
+  document.querySelectorAll('.tcv4-more.open').forEach(x=>x.classList.remove('open'));
+}
+document.addEventListener('scroll',closeCardMenus,true);
+window.addEventListener('resize',closeCardMenus);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeCardMenus();});
 document.addEventListener('click',async e=>{
   if(!state.user)return;                       // login tem seu proprio handler
   if(!(e.target&&e.target.closest))return;
@@ -4440,11 +4474,18 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
   if(el=g('[data-agf]')){agFilter=el.dataset.agf;render();return;}
   if(el=g('[data-day]')){agSel=el.dataset.day;render();return;}
-  // menu '⋯' do card V4: alterna o popup (Excluir); clique fora fecha todos.
+  // menu '⋯' do card V4: popover FIXED via PORTAL no <body>, ancorado ao botão (abre para
+  // cima; vira para baixo se faltar espaço; nunca é cortado). Clique fora fecha todos.
   if(el=g('[data-cardmenu]')){const w=el.closest('.tcv4-more');const open=w.classList.contains('open');
-    document.querySelectorAll('.tcv4-more.open').forEach(x=>x.classList.remove('open'));
-    if(!open)w.classList.add('open');return;}
-  document.querySelectorAll('.tcv4-more.open').forEach(x=>x.classList.remove('open'));
+    closeCardMenus();
+    if(!open){w.classList.add('open');const m=w.querySelector('.tcv4-menu');if(m){
+      document.body.appendChild(m);m.classList.add('open');
+      const r=el.getBoundingClientRect(),mw=m.offsetWidth,mh=m.offsetHeight;
+      let lf=Math.max(8,Math.min(r.right-mw,window.innerWidth-mw-8));
+      let tp=r.top-mh-8;if(tp<8)tp=Math.min(r.bottom+8,window.innerHeight-mh-8);
+      m.style.left=lf+'px';m.style.top=tp+'px';}}
+    return;}
+  closeCardMenus();
   if(el=g('[data-detail]')){openDetails(el.dataset.detail);return;}
   if(el=g('[data-move]')){openMove(el.dataset.move);return;}
   if(el=g('[data-domove]')){const parts=el.dataset.domove.split('|');await moveStatus(parts[0],parts[1]);return;}
