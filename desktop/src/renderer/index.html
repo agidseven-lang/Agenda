@@ -522,7 +522,7 @@
   .tcv4-role{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--soft);margin-top:1px}
   .tcv4-avw{position:relative;flex:none;display:inline-flex}
   /* referência: presença = bolinha verde com anel escuro no canto inferior direito da FOTO */
-  .tcv4-presence{position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--green);border:2px solid #14151d;box-shadow:0 0 5px rgba(52,211,153,.7)}
+  .tcv4-presence{position:absolute;left:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--green);border:2px solid #14151d;box-shadow:0 0 5px rgba(52,211,153,.7)}
   .tcv4-origin{display:flex;align-items:flex-start;gap:7px;margin-top:15px;padding:5px 10px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:10px;font-size:10.5px;color:var(--soft);line-height:1.35}
   .tcv4-origin svg{width:11px;height:11px;flex:none;margin-top:1px;opacity:.7}
   .tcv4-origin b{color:var(--ink);font-weight:700}
@@ -538,7 +538,7 @@
   /* o chip de ESTÁGIO é o portador do status no quadro do cliente: nunca clipar — rótulos
      além da largura da linha quebram em 2 linhas dentro do chip (sem corte de informação). */
   .tcv4-chips .tcv4-chip:first-child{max-width:100%;white-space:normal;line-height:1.3;text-align:left}
-  .tcv4-chip-soft{color:var(--soft);background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(160,175,210,.28)}
+  .tcv4-chip-soft{color:#C7CEE9;background:rgba(86,104,196,.22);box-shadow:inset 0 0 0 1px rgba(150,168,235,.3)}
   .tcv4-rail{display:flex;align-items:center;margin-top:10px;padding:0 1px}
   .tcv4-rail i{width:6px;height:6px;border-radius:50%;background:rgba(59,130,246,.75);flex:none}
   .tcv4-rail i.done{background:var(--green)}
@@ -556,7 +556,7 @@
   .tcv4-themes{margin-top:6px;padding:8px 11px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:10px}
   .tcv4-themes-h{font-size:8px;font-weight:780;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
   .tcv4-theme{display:flex;align-items:center;gap:8px;padding:3.5px 0;min-width:0}
-  .tcv4-theme-n{flex:none;width:17px;height:17px;border-radius:5px;background:rgba(91,108,255,.2);color:#aab4ff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .tcv4-theme-n{flex:none;width:17px;height:17px;border-radius:5px;background:#4250C7;color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
   .tcv4-theme-t{flex:1;min-width:0;font-size:11.5px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tcv4-theme-t em{font-style:normal;font-size:10.5px;color:var(--ink);font-weight:650}
   .tcv4-circ{flex:none;width:15px;height:15px;border-radius:50%;border:1.5px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center}
@@ -1504,9 +1504,9 @@
   body.desktop .d-board-tools.tbar .bsearch{background:rgba(4,7,16,.8) !important;border-color:rgba(150,170,255,.08)}
   body.desktop .nav .new-task-btn{background:linear-gradient(115deg,#4A42FB 0%,#8B7BFF 48%,#7B3FE0 100%);
     box-shadow:0 10px 26px -8px rgba(104,77,255,.6),inset 0 1px 0 rgba(255,255,255,.32)}
-  body.desktop .tcv4 .tcv4-btn-main{background:linear-gradient(110deg,#5761E9 0%,#4A38F0 100%);
+  body.desktop .tcv4 .tcv4-btn-main{background:linear-gradient(110deg,#4F5BEC 0%,#7C3BEF 100%);
     box-shadow:0 8px 20px -8px rgba(83,86,240,.6),inset 0 1px 0 rgba(255,255,255,.22)}
-  body.desktop .tcv4 .tcv4-btn-main:hover{background:linear-gradient(110deg,#6670F2 0%,#5947F8 100%)}
+  body.desktop .tcv4 .tcv4-btn-main:hover{background:linear-gradient(110deg,#5E69F3 0%,#8B4DF6 100%)}
   body.desktop .kempty-ic{color:rgba(150,172,220,.30)}
   body.desktop .kempty{border-color:rgba(150,170,255,.10)}
 </style>
@@ -2784,7 +2784,7 @@ function taskCard(t, persp){
   // 1) pill de STATUS + prazo
   h+='<div class="tcv4-top">'+
        '<span class="tcv4-st" style="color:'+topSt.color+';background:'+withAlpha(topSt.color,.13)+';border-color:'+withAlpha(topSt.color,.3)+'" title="'+esc(topSt.label)+'"><span class="dotc" style="background:'+topSt.color+'"></span><b>'+esc(designerView?topSt.label.replace('Designer em ','Em '):topSt.label)+'</b></span>'+
-       (d?'<span class="tcv4-due" style="color:'+d.color+';background:'+withAlpha(d.color,.13)+';border-color:'+withAlpha(d.color,.3)+'">'+esc(dShort)+'</span>':'')+
+       (d?'<span class="tcv4-due" style="color:'+d.color+';background:'+withAlpha(d.color,.18)+';border-color:'+withAlpha(d.color,.35)+'">'+esc(dShort)+'</span>':'')+
      '</div>';
   // 2) pessoa — avatar grande + nome (2 linhas) + cargo com presença
   h+='<div class="tcv4-person">'+

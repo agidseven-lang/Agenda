@@ -1302,7 +1302,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     DH.indexOf('document.body.style.zoom=z>1.005?z.toFixed(3):\'\';')>=0 && /--fitz/.test(DH) &&
     /grid-template-rows:calc\(100vh\/var\(--fitz,1\)\)/.test(DH) &&
     /\.tcv4-avw\{position:relative;flex:none;display:inline-flex\}/.test(DH) &&
-    /\.tcv4-presence\{position:absolute;right:-1px;bottom:-1px;width:9px;height:9px/.test(DH) &&
+    /\.tcv4-presence\{position:absolute;left:-1px;bottom:-1px;width:9px;height:9px/.test(DH) &&
     /\.kanban\{display:flex;flex:1 1 auto;/.test(DH) && /\.kcol\{height:100%;max-height:100%;min-height:0\}/.test(DH) &&
     /\.tcv4-st b\{font-weight:750;white-space:normal;display:-webkit-box;-webkit-line-clamp:2/.test(DH) &&
     /\.tcv4-chips\{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px\}/.test(DH) &&
