@@ -418,7 +418,6 @@
   body.desktop .nav .sb-user .su-m{flex:1;min-width:0}
   body.desktop .nav .sb-user .su-n{font-size:12px;font-weight:750;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   body.desktop .nav .sb-user .su-r{font-size:10px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
-  body.desktop .nav .sb-footer{margin-top:8px}
   body.desktop #content.board-mode .d-board-head{margin-bottom:0}
   body.desktop #content.board-mode .d-board-head .d-bh-icon{width:40px;height:40px;border-radius:12px}
   body.desktop #content.board-mode .d-board-head .d-bh-icon svg{width:21px;height:21px}
@@ -1891,10 +1890,7 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
-      '<button class="sb-user topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,30)+
-        '<span class="su-m"><span class="su-n">'+esc((state.user.name||'').split(' ')[0]||'Perfil')+'</span>'+
-        '<span class="su-r">'+esc(state.user.role||'Meu perfil')+'</span></span></button>'+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.142 · Fluxo</span><i class="sbf-dot"></i><br>espelha o APK <b>1.0.142-beta-laudo-141-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.142 · Fluxo</span><i class="sbf-dot"></i><br>espelho · APK <b>1.0.142-beta-laudo-141-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2167,7 +2163,7 @@ function taskChips(){
   const tabs=[{k:'mine',l:'Meu quadro',a:'data-myboard="1"'}];
   if(see){tabs.push({k:'client',l:'Cliente',a:'data-flowclient="1"'});
     tabs.push({k:'designers',l:'Designers',a:'data-flowdesigners="1"'});
-    tabs.push({k:'socials',l:'Social Medias',a:'data-flowsocials="1"'});}
+    tabs.push({k:'socials',l:'Social Midias',a:'data-flowsocials="1"'});}
   tabs.push({k:'hub',l:'Setores',a:'data-board="hub"'});
   return tabs.map(t=>'<button class="tchip'+(t.k===act?' on':'')+'" '+t.a+'>'+svg(tabIcon(t.k))+'<span>'+esc(t.l)+'</span></button>').join('');
 }
