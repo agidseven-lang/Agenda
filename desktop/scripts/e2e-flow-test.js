@@ -1239,8 +1239,8 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   })();
   check('CY5_KANBAN_MINW','Kanban: coluna com largura mínima REAL (300px) + scroll horizontal do board (nunca espremer)',
     /grid-template-columns:repeat\(4,minmax\(300px,1fr\)\)/.test(DH) && /\.kanban\{[\s\S]{0,300}overflow-x:auto/.test(DH) && /\.kanban \.kcol\{min-width:300px\}/.test(DH));
-  check('CY5_KANBAN_BOARDMODE','board-mode (spec da referência): 4 colunas minmax(250px,1fr) gap 10, altura IGUAL (stretch)',
-    /grid-template-columns:repeat\(4,minmax\(250px,1fr\)\);gap:10px;align-items:stretch\}/.test(DH));
+  check('CY5_KANBAN_BOARDMODE','board-mode (spec da referência): 4 colunas minmax(246px,1fr) gap 15, altura IGUAL (stretch)',
+    /grid-template-columns:repeat\(4,minmax\(246px,1fr\)\);gap:15px;align-items:stretch\}/.test(DH));
   if(mod&&mod.designerStatusView){
     const DT={sector:'cronograma',cronContents:[{tema:'T'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
     check('CY5_DESIGNER_TOPCHIP','Chip do card do designer = EXATAMENTE "Designer em produção" (fonte designerStatusView)', mod.designerStatusView(DT).label==='Designer em produção');
@@ -1248,8 +1248,8 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
 
   /* ═══ CY6 — REPROVAÇÃO 1.0.137 (board full-width / form limpo / livebar) ═══ */
   console.log(`${C.b}\n[CY6] V64.52 — largura útil real, formulário limpo, sem toast flutuante${C.x}`);
-  check('CY6_BOARD_FULLWIDTH','Telas de quadro SEM o cap de 1400px (board usa a largura útil real) + padding lateral 24px',
-    /#content\.board-mode > \*\{max-width:none\}/.test(DH) && /padding-left:24px!important;padding-right:24px!important/.test(DH));
+  check('CY6_BOARD_FULLWIDTH','Telas de quadro SEM o cap de 1400px (board usa a largura útil real) + padding lateral 34px (referência)',
+    /#content\.board-mode > \*\{max-width:none\}/.test(DH) && /padding-left:34px!important;padding-right:34px!important/.test(DH));
   check('CY6_FORM_SEM_CHECKLIST','Formulário do CRONOGRAMA sem Checklist/+Adicionar item (demais setores preservados)',
     /if\(f\.sector!=='cronograma'\)h\+=checklistHtml\(sub\.checklist\);/.test(DH) && /checklistHtml\(t\.checklist\)/.test(DH));
   check('CY6_FORM_SEM_LINK_OBS','Formulário do CRONOGRAMA sem Link/anexo e sem Observações livres',
@@ -1295,7 +1295,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
              tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Colunas de ALTURA IGUAL (referência) + 1 card inteiro sem scrollbar + scrollbar fina + chrome enxuto',
     /kcol\{height:100%;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
-    /#content\.board-mode \.kcol \.kbody\{padding:6px 9px 0\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
+    /#content\.board-mode \.kcol \.kbody\{padding:10px 7px 0\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
   (function(){
     const W53=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
     check('CY7_W53_VERSION','Worker healthcheck = V64.53-premium-portal (SW V64.51 INTOCADO)',
