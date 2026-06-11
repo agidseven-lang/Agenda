@@ -400,7 +400,7 @@ check('D14', 'Cliente board usa CLIENT_COLS4', /const byCol=CLIENT_COLS4\.map/.t
 check('RA_COLVIEW', 'designerColView mantém coluna própria de Revisão (não colapsa revisao→andamento)', /function designerColView\(t\)\{const c=designerCol\(t\);return c==='concluido'\?'entregue':\(c==='revisao'\?'revisao':/.test(DH));
 check('RA_STATUSVIEW', 'designerStatusView lê DESIGNER_COLS4 (badge do card do designer)', /function designerStatusView\(t\)\{const k=designerColView\(t\);const c=DESIGNER_COLS4\.find/.test(DH));
 check('RA_CARD_PARAM', 'taskCard é role-aware (persp), designerView só p/ cronograma c/ designer', /function taskCard\(t, persp\)\{[\s\S]*?const designerView = persp==='designer' && secOf\(t\.sector\)\.key==='cronograma' && hasDesigner\(t\);/.test(DH));
-check('RA_CARD_BADGE', 'card V3 por perspectiva: estágio na FONTE ÚNICA (designerStatusView × clientFacing × clientStatusView), sem duplicata', /const stage=isCron\?\(designerView\?designerStatusView\(t\):\(clientView\?clientFacingStatusView\(t\):clientStatusView\(t\)\)\):/.test(DH));
+check('RA_CARD_BADGE', 'card V4 por perspectiva: pill superior designerStatusView no quadro do designer; estágio na fonte única', /const topSt=designerView\?designerStatusView\(t\):st;/.test(DH) && /const stage=isCron\?\(designerView\?designerStatusView\(t\):\(clientView\?clientFacingStatusView\(t\):clientStatusView\(t\)\)\):null;/.test(DH));
 check('RA_CARD_TIMELINE', 'card V2: progresso por perspectiva (eixo do designer × taskTimeline) dentro do taskCard', (()=>{const tc=(DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0];return /if\(designerView\)\{/.test(tc)&&/designerNextShort\(t\)/.test(tc)&&/const tl=taskTimeline\(t\);/.test(tc);})());
 // progresso do designerView NÃO mostra o fluxo do cliente (eixo próprio dentro do taskCard)
 const dctFn = ((DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0].match(/if\(designerView\)\{[\s\S]*?\}else\{/)||[''])[0];
@@ -766,7 +766,7 @@ const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
 // interno + badge do taskCard (ternário designerView) + flowSummary "Status operacional".
 check('CSV_SCOPE', 'clientStatusView: definição + taskCard + flowSummary + uso interno taskTimeline (4 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 4 && /function clientStatusView\(t\)/.test(DH_noc));
 // taskCard MIGRADO (role-aware f96aa2e: ternário designerView).
-check('CSV_TASKCARD_MIGRATED', "taskCard V3 cronograma: UM estágio por perspectiva (fonte única), sem badge concorrente", /const stage=isCron\?\(designerView\?designerStatusView\(t\)/.test(DH) && /function stageIcon\(key\)/.test(DH) && /title="Status: '\+esc\(stage\.label\)/.test(DH));
+check('CSV_TASKCARD_MIGRATED', "taskCard V3 cronograma: UM estágio por perspectiva (fonte única), sem badge concorrente", /const stage=isCron\?\(designerView\?designerStatusView\(t\)/.test(DH) && (DH.match(/tcv4-chip/g)||[]).length>=3 && /tcv4-st\b/.test(DH));
 // chip do detalhe MIGRADO p/ a máquina de estados (1 chip, sem status concorrentes).
 check('CSV_REVISAO_MIGRATED', 'Chip do detalhe usa detailState(t) (rev-chip único, sem contradição)', /const dsc=detailState\(t\);[\s\S]{0,200}rev-chip/.test(DH));
 // detalhe MIGRADO (flowSummaryBlock "Status operacional" + opPanelBlock "Próxima ação").
@@ -846,7 +846,7 @@ check('TL_DEF', 'taskTimeline(t) existe e retorna {current,last,next,owner,miles
 const DH_noc2 = DH.replace(/^\s*\/\/.*$/gm,'');
 // Passo 2: taskTimeline agora é consumida APENAS pelo taskCardTimeline (definição + 1 uso).
 check('TL_CARD_WIRED', 'taskTimeline consumida pelo card V2 + opPanelBlock (3 ocorrências: definição + 2 usos; helpers antigos REMOVIDOS)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 3 && /function taskTimeline\(t\)/.test(DH_noc2) && !/taskCardTimeline|designerCardTimeline/.test(DH_noc2));
-check('TL2_CARD_RENDER', 'card V3: anel de progresso SVG + próxima ação (fontes únicas por perspectiva)', /tcv3-ring/.test(DH) && /stroke-dasharray/.test(DH) && /tcv3-next/.test(DH) && /clientView\?clientFacingNextShort\(t\):nextActionShort\(t\)/.test(DH));
+check('TL2_CARD_RENDER', 'card V4 (referência): trilho de pontos + ETAPA/PRÓXIMA (fontes únicas por perspectiva)', /tcv4-rail/.test(DH) && /tcv4-steps/.test(DH) && /tcv4-next/.test(DH) && /clientView\?clientFacingNextShort\(t\):nextActionShort\(t\)/.test(DH));
 check('TL2_CARD_ONLY', 'helpers de timeline do card antigos REMOVIDOS (sem código morto)', !/taskCardTimeline\(/.test(DH_noc2) && !/designerCardTimeline\(/.test(DH_noc2));
 check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora; isCron guard)', /let prog=null;\s*\n\s*if\(isCron\)\{/.test(DH));
 // PASSO 3: o detalhe (opPanelBlock) AGORA usa taskTimeline(t) (timeline completa); sem steps[] próprios.
@@ -941,7 +941,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('TL_HUMAN_KEEP', 'Último: preserva label já humano (com espaços) sem virar genérico', fHL.last.label==='Enviado para aprovação final' || fHL.last.label==='Reenviado ao cliente (versão FINAL)');
   // o card (taskCardTimeline) renderiza o label humanizado (esc(tl.last.label)) — sem código cru
   check('TL_HUMAN_CARD', 'card V2: Etapa atual + Próxima ação no bloco de progresso (sem linha Último no card); humanização preservada p/ o Detalhes',
-    /_tlHumanLabel\(e0\)/.test(DH) && /tcv3-badge/.test(DH) && /tcv3-next/.test(DH) && !/Último</.test((DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0]));
+    /_tlHumanLabel\(e0\)/.test(DH) && /tcv4-rail/.test(DH) && /tcv4-next/.test(DH) && !/Último</.test((DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0]));
   // ===== PASSO 3 — detalhe (opPanelBlock) renderizado a partir de taskTimeline =====
   const RAWALL=['designer_moved','reviseItem','approveAll','approveItem','sent_to_client','sent_to_designer','final_sent','final_review','reenviado_cliente','social_producao','em_revisao','clientActions','kind','type'];
   const stMap=(s)=> s==='done'?'done':(s==='current'||s==='attention')?'cur':'todo';
@@ -1291,8 +1291,8 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     /não fica salva/.test(DH));
   check('CY7_CARD_COMPACT','Card PREMIUM V2: accent + header(identidade) + cliente/título/estágio + progresso segmentado + chips + rodapé de ações; densidade gradual por viewport',
     (()=>{const tc=(DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0];
-      return ['tcv3-hero','tcv3-badge','tcv3-client','tcv3-title','tcv3-ring','tcv3-meta','tcv3-foot','tcv3-actions','stageIcon(stage.key)'].every(k=>tc.indexOf(k)>=0)&&
-             tc.indexOf('tc-person')<0;})() && /@media\(max-height:759px\)\{\s*\n\s*\.tcv3\{/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
+      return ['tcv4-top','tcv4-st','tcv4-due','tcv4-person','tcv4-origin','tcv4-client','tcv4-title','tcv4-chips','tcv4-rail','tcv4-themes','tcv4-circ','tcv4-date','tcv4-foot','data-cardmenu'].every(k=>tc.indexOf(k)>=0)&&
+             tc.indexOf('tc-person')<0;})() && /@media\(max-height:759px\)\{\s*\n\s*\.tcv4\{/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar) + scrollbar fina do kbody + chrome enxuto no board-mode',
     /kcol\{height:auto;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
     /#content\.board-mode \.kcol \.kbody\{padding:8px 10px 10px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
