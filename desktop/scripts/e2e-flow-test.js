@@ -1305,7 +1305,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     /\.tcv4-presence\{position:absolute;left:-1px;bottom:-1px;width:9px;height:9px/.test(DH) &&
     /\.kanban\{display:flex;flex:1 1 auto;/.test(DH) && /\.kcol\{height:100%;max-height:100%;min-height:0\}/.test(DH) &&
     /\.tcv4-st b\{font-weight:750;white-space:normal;display:-webkit-box;-webkit-line-clamp:2/.test(DH) &&
-    /\.tcv4-chips\{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px\}/.test(DH) &&
+    /\.tcv4-chips\{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px\}/.test(DH) &&
     /\.tcv4-chips \.tcv4-chip:first-child\{max-width:100%;white-space:normal;line-height:1\.3;text-align:left\}/.test(DH) &&
     /\.tcv4-step b\{font-size:11px;font-weight:740;min-width:0;white-space:normal;display:-webkit-box;-webkit-line-clamp:2/.test(DH));
   check('CY8_LAUDO_141','Laudo 1.0.141: perfil flex:none (não estica) + coluna com teto de largura + popover ⋯ FIXED ancorado (nunca cortado)',

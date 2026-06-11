@@ -515,7 +515,7 @@
   .tcv4-st b{font-weight:750;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25;text-align:left}
   .tcv4-st .dotc{width:6px;height:6px;border-radius:50%;flex:none}
   .tcv4-due{flex:none;font-variant-numeric:tabular-nums}
-  .tcv4-person{display:flex;align-items:center;gap:10px;margin-top:30px;min-width:0}
+  .tcv4-person{display:flex;align-items:center;gap:10px;margin-top:8px;min-width:0}
   .tcv4-person .av{flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.08) !important}
   .tcv4-person-m{flex:1;min-width:0}
   .tcv4-name{font-size:14px;font-weight:740;line-height:1.3;letter-spacing:-.01em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -523,7 +523,7 @@
   .tcv4-avw{position:relative;flex:none;display:inline-flex}
   /* referência: presença = bolinha verde com anel escuro no canto inferior direito da FOTO */
   .tcv4-presence{position:absolute;left:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--green);border:2px solid #14151d;box-shadow:0 0 5px rgba(52,211,153,.7)}
-  .tcv4-origin{display:flex;align-items:flex-start;gap:7px;margin-top:15px;padding:5px 10px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:10px;font-size:10.5px;color:var(--soft);line-height:1.35}
+  .tcv4-origin{display:flex;align-items:flex-start;gap:7px;margin-top:13px;padding:5px 10px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:10px;font-size:10.5px;color:var(--soft);line-height:1.35}
   .tcv4-origin svg{width:11px;height:11px;flex:none;margin-top:1px;opacity:.7}
   .tcv4-origin b{color:var(--ink);font-weight:700}
   .tcv4-main{margin-top:8px}
@@ -532,28 +532,28 @@
   /* wrap: chip de estágio longo ocupa a linha; os demais fluem p/ a linha seguinte — sem corte.
      métricas compactas (gap/padding) p/ os 3 chips da referência caberem em UMA linha na
      largura real da coluna (antes o 3º chip era cortado em silêncio pelo overflow:hidden). */
-  .tcv4-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+  .tcv4-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
   .tcv4-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 6px;border-radius:7px;font-size:10px;font-weight:720;white-space:nowrap;min-width:0;flex:0 1 auto;overflow:hidden}
   .tcv4-chip .dotc{width:4px;height:4px;border-radius:50%;flex:none}
   /* o chip de ESTÁGIO é o portador do status no quadro do cliente: nunca clipar — rótulos
      além da largura da linha quebram em 2 linhas dentro do chip (sem corte de informação). */
   .tcv4-chips .tcv4-chip:first-child{max-width:100%;white-space:normal;line-height:1.3;text-align:left}
   .tcv4-chip-soft{color:#C7CEE9;background:rgba(86,104,196,.22);box-shadow:inset 0 0 0 1px rgba(150,168,235,.3)}
-  .tcv4-rail{display:flex;align-items:center;margin-top:10px;padding:0 1px}
+  .tcv4-rail{display:flex;align-items:center;margin-top:18px;padding:0 1px}
   .tcv4-rail i{width:6px;height:6px;border-radius:50%;background:rgba(59,130,246,.75);flex:none}
   .tcv4-rail i.done{background:var(--green)}
   .tcv4-rail i.cur{width:8px;height:8px}
   .tcv4-rail i.att{background:#F59E0B;margin-left:6px;box-shadow:0 0 6px rgba(245,158,11,.7)}
   .tcv4-rail .ln{flex:1;height:1.5px;background:rgba(255,255,255,.08);border-radius:1px;min-width:3px}
   .tcv4-rail .ln.done{background:color-mix(in srgb,var(--green) 45%,transparent)}
-  .tcv4-steps{margin-top:4px}
+  .tcv4-steps{margin-top:11px}
   .tcv4-step{display:flex;align-items:baseline;gap:6px;min-width:0;margin-top:3px}
   .tcv4-step svg{width:10px;height:10px;flex:none;color:var(--faint);align-self:center}
   .tcv4-k{flex:none;font-size:7.5px;font-weight:780;letter-spacing:.09em;text-transform:uppercase;color:var(--faint)}
   .tcv4-k-pad{margin-left:16px}
   .tcv4-step b{font-size:11px;font-weight:740;min-width:0;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3}
   .tcv4-next{font-size:11px;font-weight:550;color:var(--soft);min-width:0;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
-  .tcv4-themes{margin-top:6px;padding:8px 11px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:10px}
+  .tcv4-themes{margin-top:10px;padding:8px 11px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:10px}
   .tcv4-themes-h{font-size:8px;font-weight:780;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
   .tcv4-theme{display:flex;align-items:center;gap:8px;padding:3.5px 0;min-width:0}
   .tcv4-theme-n{flex:none;width:17px;height:17px;border-radius:5px;background:#4250C7;color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
@@ -569,7 +569,7 @@
   .tcv4-mini-n.ok{background:rgba(52,211,153,.16);border-color:rgba(52,211,153,.45);color:var(--green)}
   .tcv4-mini-n.rev{background:rgba(245,158,11,.16);border-color:rgba(245,158,11,.45);color:#F59E0B}
   .tcv4-chkline{margin-top:8px;font-size:9.5px;color:var(--faint);font-variant-numeric:tabular-nums}
-  .tcv4-date{display:flex;align-items:center;gap:7px;margin-top:11px;padding-top:9px;border-top:1px solid rgba(255,255,255,.055);font-size:11.5px;font-weight:680;color:var(--ink)}
+  .tcv4-date{display:flex;align-items:center;gap:7px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.055);font-size:11.5px;font-weight:680;color:var(--ink)}
   .tcv4-date svg{width:11px;height:11px;color:var(--faint)}
   .tcv4-foot{display:flex;align-items:center;gap:7px;margin-top:8px}
   .tcv4 .tcv4-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px !important;flex:none !important;width:auto !important;margin:0 !important;padding:0 12px !important;border:none !important;border-radius:9px;font-size:11.5px !important;font-weight:740;color:var(--soft);background:rgba(255,255,255,.05);box-shadow:none;transition:background .14s,color .14s,transform .1s}
@@ -601,7 +601,6 @@
      quando o estágio é longo ("Aguardando aprovação dos temas") — status legível SEM corte
      E card inteiro sem scroll. No frame da referência (768) o ritmo integral permanece. */
   @media(max-height:740px){
-    .tcv4-person{margin-top:16px}
     .tcv4-avw .av{width:44px !important;height:44px !important;font-size:15px !important}
     .tcv4-name{font-size:13px}
     .tcv4-origin{margin-top:11px;padding:4px 9px}
