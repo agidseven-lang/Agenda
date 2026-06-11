@@ -274,16 +274,16 @@
     backdrop-filter:none;height:calc(100vh/var(--fitz,1));overflow-y:auto;
   }
   body.desktop .nav .sb-brand{
-    display:flex;align-items:center;gap:11px;padding:6px 6px 18px 6px;border-bottom:1px solid var(--line-soft);margin-bottom:14px
+    display:flex;align-items:center;gap:11px;padding:4px 6px 13px 6px;border-bottom:1px solid var(--line-soft);margin-bottom:10px
   }
   body.desktop .nav .sb-brand .logo.sm{width:32px;height:32px;border-radius:10px;font-size:15px}
   body.desktop .nav .sb-brand .nm{font-size:13.5px;font-weight:800;letter-spacing:-.01em}
   body.desktop .nav .sb-brand .sy{font-size:11px;color:var(--soft);display:flex;align-items:center;gap:5px;margin-top:2px}
   body.desktop .nav .sb-brand .dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
-  body.desktop .nav .sb-sect{font-size:10px;font-weight:800;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;padding:14px 10px 6px}
+  body.desktop .nav .sb-sect{font-size:10px;font-weight:800;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;padding:10px 10px 5px}
   body.desktop .nav button.sb-item{
     flex:none !important;flex-direction:row !important;align-items:center !important;
-    gap:10px !important;padding:8px 10px !important;border-radius:10px;
+    gap:10px !important;padding:6px 10px !important;border-radius:10px;
     color:var(--soft) !important;font-size:12.5px !important;font-weight:600 !important;
     justify-content:flex-start !important;width:100%;text-align:left;transition:background .12s,color .12s;
   }
@@ -314,7 +314,7 @@
   body.desktop .nav .new-task-btn .new-task-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex:none}
   body.desktop .nav .new-task-btn .new-task-icon svg{width:18px !important;height:18px !important;display:block}
   body.desktop .nav .new-task-btn .new-task-label{line-height:1;display:inline-flex;align-items:center;white-space:nowrap}
-  body.desktop .nav .sb-footer{margin-top:auto;padding:14px 6px 4px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--faint);line-height:1.5}
+  body.desktop .nav .sb-footer{margin-top:auto;padding:10px 11px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.02);font-size:11px;color:var(--faint);line-height:1.5}
   body.desktop .nav .sb-footer .sbf-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:7px;box-shadow:0 0 5px rgba(52,211,153,.7)}
   body.desktop .nav .sb-footer .ver{display:inline-block;background:rgba(91,108,255,.14);color:var(--accent);font-weight:800;padding:3px 9px;border-radius:999px;margin-bottom:6px;font-size:10.5px}
 
@@ -405,6 +405,10 @@
   /* Reprovação 1.0.140: a foto flutuante do topo direito colidia com os chips do
      quadro. No desktop o perfil vive no CANTO INFERIOR ESQUERDO da sidebar. */
   body.desktop #app > .topbar{display:none !important}
+  /* avatar do canto superior direito — presente no print de referência */
+  .corner-avatar{display:none}
+  body.desktop .corner-avatar{display:flex;position:fixed;top:10px;right:16px;z-index:40;border-radius:50%;padding:0;box-shadow:0 0 0 2px rgba(91,108,255,.45);transition:transform .12s, box-shadow .12s}
+  body.desktop .corner-avatar:hover{transform:scale(1.05);box-shadow:0 0 0 3px rgba(91,108,255,.35)}
   /* flex:none anula o flex:1 do .nav button base: sem ele o botão de perfil ESTICAVA e engolia
      todo o espaço livre da coluna em telas altas (perfil "flutuando" com buraco enorme abaixo). */
   body.desktop .nav .sb-user{display:flex !important;flex:none !important;flex-direction:row !important;align-items:center !important;justify-content:flex-start !important;gap:9px !important;width:100%;margin-top:auto;padding:7px 9px !important;border-radius:10px;text-align:left;transition:background .12s}
@@ -490,10 +494,9 @@
   body.desktop .kanban .kcol.kcol-live .khead{border-bottom-color:color-mix(in srgb,var(--kc) 28%,transparent)}
   /* empty state premium (referência): ícone + título + apoio, centralizado */
   .kempty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;
-    flex:1;min-height:280px;height:100%;margin:3px 2px;padding:22px 14px;border:1.5px dashed rgba(255,255,255,.08);border-radius:13px}
-  .kempty-ic{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;
-    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);color:var(--faint);margin-bottom:6px}
-  .kempty-ic svg{width:22px;height:22px}
+    flex:1;min-height:280px;height:100%;margin:3px 2px;padding:22px 14px 30%;border:1.5px dashed rgba(255,255,255,.08);border-radius:13px}
+  .kempty-ic{width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.26);margin-bottom:10px}
+  .kempty-ic svg{width:52px;height:52px}
   .kempty-t{font-size:11.5px;font-weight:750;color:var(--soft)}
   .kempty-s{font-size:10px;color:var(--faint);line-height:1.5;max-width:190px}
   body.desktop .kanban .kcol .kbody{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;scrollbar-gutter:stable}
@@ -516,7 +519,7 @@
   .tcv4-person{display:flex;align-items:center;gap:10px;margin-top:30px;min-width:0}
   .tcv4-person .av{flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.08) !important}
   .tcv4-person-m{flex:1;min-width:0}
-  .tcv4-name{font-size:12.5px;font-weight:740;line-height:1.3;letter-spacing:-.01em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tcv4-name{font-size:14px;font-weight:740;line-height:1.3;letter-spacing:-.01em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .tcv4-role{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--soft);margin-top:1px}
   .tcv4-avw{position:relative;flex:none;display:inline-flex}
   /* referência: presença = bolinha verde com anel escuro no canto inferior direito da FOTO */
@@ -538,7 +541,7 @@
   .tcv4-chips .tcv4-chip:first-child{max-width:100%;white-space:normal;line-height:1.3;text-align:left}
   .tcv4-chip-soft{color:var(--soft);background:rgba(255,255,255,.06)}
   .tcv4-rail{display:flex;align-items:center;margin-top:10px;padding:0 1px}
-  .tcv4-rail i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.13);flex:none}
+  .tcv4-rail i{width:6px;height:6px;border-radius:50%;background:rgba(59,130,246,.75);flex:none}
   .tcv4-rail i.done{background:var(--green)}
   .tcv4-rail i.cur{width:8px;height:8px}
   .tcv4-rail i.att{background:#F59E0B;margin-left:6px;box-shadow:0 0 6px rgba(245,158,11,.7)}
@@ -553,10 +556,10 @@
   .tcv4-next{font-size:11px;font-weight:550;color:var(--soft);min-width:0;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
   .tcv4-themes{margin-top:6px;padding:8px 11px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:10px}
   .tcv4-themes-h{font-size:8px;font-weight:780;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
-  .tcv4-theme{display:flex;align-items:center;gap:8px;padding:5px 0;min-width:0}
+  .tcv4-theme{display:flex;align-items:center;gap:8px;padding:3.5px 0;min-width:0}
   .tcv4-theme-n{flex:none;width:17px;height:17px;border-radius:5px;background:rgba(91,108,255,.2);color:#aab4ff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
   .tcv4-theme-t{flex:1;min-width:0;font-size:11.5px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .tcv4-theme-t em{font-style:normal;font-size:10.5px;color:var(--green);font-weight:700}
+  .tcv4-theme-t em{font-style:normal;font-size:10.5px;color:var(--ink);font-weight:650}
   .tcv4-circ{flex:none;width:15px;height:15px;border-radius:50%;border:1.5px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center}
   .tcv4-circ.ok{border-color:var(--green);background:rgba(52,211,153,.15);color:var(--green)}
   .tcv4-circ.ok svg{width:9px;height:9px}
@@ -600,6 +603,8 @@
      E card inteiro sem scroll. No frame da referência (768) o ritmo integral permanece. */
   @media(max-height:740px){
     .tcv4-person{margin-top:16px}
+    .tcv4-avw .av{width:44px !important;height:44px !important;font-size:15px !important}
+    .tcv4-name{font-size:13px}
     .tcv4-origin{margin-top:11px;padding:4px 9px}
     .tcv4-main{margin-top:6px}
     .tcv4-chips{margin-top:9px}
@@ -706,13 +711,13 @@
      ===================================================================== */
   /* Sidebar refino: respiro, brand, sync com leve pulse */
   body.desktop .nav{padding:20px 16px 16px;gap:3px;background:linear-gradient(180deg,#0D0E14 0%,#0B0C11 100%)}
-  body.desktop .nav .sb-brand{padding:4px 6px 16px;margin-bottom:12px}
-  body.desktop .nav .sb-brand .logo.sm{width:40px;height:40px;border-radius:13px;font-size:19px;box-shadow:0 4px 14px -6px rgba(91,108,255,.6)}
+  body.desktop .nav .sb-brand{padding:4px 6px 14px;margin-bottom:10px}
+  body.desktop .nav .sb-brand .logo.sm{width:32px;height:32px;border-radius:10px;font-size:15px;box-shadow:0 4px 14px -6px rgba(91,108,255,.6)}
   body.desktop .nav .sb-brand .dot{box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:syncpulse 2.4s ease-out infinite}
   @keyframes syncpulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 5px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
-  body.desktop .nav .sb-sect{padding:16px 10px 6px;font-size:10px;letter-spacing:.1em}
-  body.desktop .nav button.sb-item{height:42px;padding:0 12px !important;gap:13px !important;border-radius:10px}
-  body.desktop .nav button.sb-item svg{width:19px !important;height:19px !important;opacity:.85}
+  body.desktop .nav .sb-sect{padding:11px 10px 5px;font-size:10px;letter-spacing:.1em}
+  body.desktop .nav button.sb-item{height:30px;padding:0 10px !important;gap:11px !important;border-radius:10px}
+  body.desktop .nav button.sb-item svg{width:17px !important;height:17px !important;opacity:.85}
   body.desktop .nav button.sb-item.on svg{opacity:1}
   body.desktop .nav .sb-footer{font-size:10.5px}
   body.desktop .nav .sb-footer .ver{font-size:10px;padding:3px 10px}
@@ -1838,6 +1843,12 @@ function render(){
   if(typeof closeCardMenus==='function')closeCardMenus(); // popover ⋯ é portal no <body>: nunca sobrevive a um re-render
   document.getElementById('topAvatar').innerHTML='<button class="topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,38)+'</button>';
   const nav=document.getElementById('bottomNav');
+  // print de referência: avatar do usuário fixo no canto superior direito (clique → perfil)
+  let _ca=document.getElementById('cornerAvatar');
+  if(isDesktop()){
+    if(!_ca){_ca=document.createElement('button');_ca.id='cornerAvatar';_ca.className='corner-avatar topav-btn';_ca.setAttribute('data-tab','perfil');_ca.title='Abrir perfil';document.body.appendChild(_ca);}
+    _ca.innerHTML=avatar(state.user,38);
+  }else if(_ca){_ca.remove();}
   if(isDesktop()){
     nav.innerHTML=
       '<div class="sb-brand"><div class="logo sm brandlogo"></div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
@@ -2048,7 +2059,7 @@ function renderPersonBoard(){
   const cardFor=t=>(hasDesigner(t)&&designerOf(t)===pid)?taskCard(t,'designer'):taskCard(t);
   SOCIAL_COLS4.forEach((st,i)=>{const tasks=byStatus[i];
     h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+st.color+'"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(cardFor).join(''):kemptyHtml();
+    h+=tasks.length?tasks.map(cardFor).join(''):kemptyHtml(st.key);
     h+='</div></div>';});
   return h+'</div></div>';
 }
@@ -2150,7 +2161,7 @@ function renderClientFlowBoard(){
     '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
   CLIENT_COLS4.forEach((c,i)=>{const tasks=byCol[i];
     h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+c.color+'"><div class="khead"><div class="cc" style="background:'+c.color+'"></div><div class="kt" style="color:'+c.color+'">'+esc(c.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(t=>taskCard(t,'client')).join(''):kemptyHtml();
+    h+=tasks.length?tasks.map(t=>taskCard(t,'client')).join(''):kemptyHtml(c.key);
     h+='</div></div>';});
   return h+'</div></div>';
 }
@@ -2184,7 +2195,7 @@ function renderDesignerBoard(){
     '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
   DESIGNER_COLS4.forEach((st,i)=>{const tasks=byStatus[i];
     h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+st.color+'"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(t=>taskCard(t,'designer')).join(''):kemptyHtml();
+    h+=tasks.length?tasks.map(t=>taskCard(t,'designer')).join(''):kemptyHtml(st.key);
     h+='</div></div>';});
   return h+'</div></div>';
 }
@@ -2605,7 +2616,7 @@ function renderSocialBoard(){
     '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
   SOCIAL_COLS4.forEach((c,i)=>{const tasks=byCol[i];
     h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+c.color+'"><div class="khead"><div class="cc" style="background:'+c.color+'"></div><div class="kt" style="color:'+c.color+'">'+esc(c.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(taskCard).join(''):kemptyHtml();
+    h+=tasks.length?tasks.map(taskCard).join(''):kemptyHtml(c.key);
     h+='</div></div>';});
   return h+'</div></div>';
 }
@@ -2640,7 +2651,7 @@ function renderBoard(){
       const tasks=byStatus[i];
       h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+st.color+'"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
       if(tasks.length)h+=tasks.map(taskCard).join('');
-      else h+=kemptyHtml();
+      else h+=kemptyHtml(st.key);
       h+='</div></div>';
     });
     h+='</div>';
@@ -2734,7 +2745,7 @@ function taskCard(t, persp){
     }
   }
   let chk='';
-  if(!isCron&&Array.isArray(t.checklist)&&t.checklist.length){
+  if(Array.isArray(t.checklist)&&t.checklist.length){
     const done=t.checklist.filter(c=>c.d).length;
     chk='<div class="tcv4-chkline">'+done+' de '+t.checklist.length+' no checklist</div>';
   }
@@ -2742,12 +2753,12 @@ function taskCard(t, persp){
   let h='<div class="tc tcv4" style="--acc:'+acc+'">';
   // 1) pill de STATUS + prazo
   h+='<div class="tcv4-top">'+
-       '<span class="tcv4-st" style="color:'+topSt.color+';background:'+withAlpha(topSt.color,.13)+';border-color:'+withAlpha(topSt.color,.3)+'" title="'+esc(topSt.label)+'"><span class="dotc" style="background:'+topSt.color+'"></span><b>'+esc(topSt.label)+'</b></span>'+
+       '<span class="tcv4-st" style="color:'+topSt.color+';background:'+withAlpha(topSt.color,.13)+';border-color:'+withAlpha(topSt.color,.3)+'" title="'+esc(topSt.label)+'"><span class="dotc" style="background:'+topSt.color+'"></span><b>'+esc(designerView?topSt.label.replace('Designer em ','Em '):topSt.label)+'</b></span>'+
        (d?'<span class="tcv4-due" style="color:'+d.color+';background:'+withAlpha(d.color,.13)+';border-color:'+withAlpha(d.color,.3)+'">'+esc(dShort)+'</span>':'')+
      '</div>';
   // 2) pessoa — avatar grande + nome (2 linhas) + cargo com presença
   h+='<div class="tcv4-person">'+
-       '<span class="tcv4-avw">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},36):'<div class="av" style="width:36px;height:36px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>')+'<i class="tcv4-presence"></i></span>'+
+       '<span class="tcv4-avw">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},52):'<div class="av" style="width:52px;height:52px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>')+'<i class="tcv4-presence"></i></span>'+
        '<div class="tcv4-person-m"><div class="tcv4-name">'+esc(asgName||'Sem responsável')+'</div>'+
          '<div class="tcv4-role">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
      '</div>';
@@ -2777,7 +2788,7 @@ function taskCard(t, persp){
     if(prog.attention)rail+='<i class="att" title="Ajuste pedido pelo cliente"></i>';
     h+='<div class="tcv4-rail">'+rail+'</div>';
     const etapaLbl=designerView?'Sua etapa':'Etapa';
-    const etapaVal=designerView?(stage?stage.label:topSt.label):(prog.owner||((stage||topSt).label));
+    const etapaVal=designerView?(stage?stage.label:topSt.label).replace('Designer em ','Em '):(prog.owner||((stage||topSt).label));
     h+='<div class="tcv4-steps">'+
          '<div class="tcv4-step">'+svg('flag')+'<span class="tcv4-k">'+etapaLbl+'</span><b style="color:'+acc+'">'+esc(etapaVal)+'</b></div>'+
          (prog.next?'<div class="tcv4-step"><span class="tcv4-k tcv4-k-pad">Próxima</span><span class="tcv4-next">'+esc(prog.next)+'</span></div>':'')+
@@ -2816,8 +2827,17 @@ function taskCard(t, persp){
      '</div>';
   return h+'</div>';
 }
-function kemptyHtml(){
-  return '<div class="kempty"><div class="kempty-ic">'+svg('checklist')+'</div>'+
+function kemptyHtml(kind){
+  // print de referência: coluna vazia tem ícone PRÓPRIO (doc+, doc+lupa, check) em line-art,
+  // sem tile de fundo, posicionado acima do centro.
+  const k=String(kind||'');
+  const IC={
+   plus:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="4"/><path d="M16 14h12M16 20h8"/><circle cx="34" cy="34" r="9" fill="#0D0E14"/><path d="M34 30v8M30 34h8"/></svg>',
+   search:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="4"/><path d="M16 14h12M16 20h8"/><circle cx="31" cy="31" r="7" fill="#0D0E14"/><circle cx="31" cy="31" r="6.5"/><path d="M36 36l5 5"/></svg>',
+   check:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="16"/><path d="M17 24.5l5 5 9-10"/></svg>',
+   list:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="28" height="36" rx="4"/><path d="M17 16h14M17 24h14M17 32h9"/></svg>'};
+  const ic=/afazer/.test(k)?IC.plus:(/revis|ajuste/.test(k)?IC.search:(/aprovado|concluido|entregue/.test(k)?IC.check:IC.list));
+  return '<div class="kempty"><div class="kempty-ic">'+ic+'</div>'+
     '<div class="kempty-t">Nenhuma tarefa aqui</div>'+
     '<div class="kempty-s">Tarefas adicionadas ficarão visíveis nesta coluna.</div></div>';
 }
