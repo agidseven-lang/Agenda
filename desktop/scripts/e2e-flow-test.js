@@ -1155,7 +1155,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('CY2_SRC_COL4','clientCol4: "Aprovado" SÓ p/ concluido; aprovado/producao/reenviado → analise', /if\(c==='concluido'\)return 'aprovado';\s*\n\s*if\(c==='aprovado'\|\|c==='producao'\|\|c==='reenviado'\)return 'analise';/.test(DH));
   // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
   check('CY2_CSS_KCOL','Card cortado (fix ESTRUTURAL V64.53): board-mode flex + coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar)',
-    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:100%;max-height:100%;min-height:0\}/.test(DH));
+    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:auto;max-height:100%;min-height:0\}/.test(DH));
   check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 + scrollbar-gutter + scroll-margin no último card', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;scrollbar-gutter:stable\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:4px;scroll-margin-bottom:12px\}/.test(DH));
   // Problema 1 — gatilho do push de envio (Desktop → Worker contentSent, best-effort).
   check('CY2_SENT_TRIGGER','persistClientSend chama team-action contentSent com Bearer JWT + Idempotency-Key (best-effort)',
@@ -1240,7 +1240,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('CY5_KANBAN_MINW','Kanban: coluna com largura mínima REAL (300px) + scroll horizontal do board (nunca espremer)',
     /grid-template-columns:repeat\(4,minmax\(300px,1fr\)\)/.test(DH) && /\.kanban\{[\s\S]{0,300}overflow-x:auto/.test(DH) && /\.kanban \.kcol\{min-width:300px\}/.test(DH));
   check('CY5_KANBAN_BOARDMODE','board-mode (referência): flex gap 15, altura IGUAL, coluna EM FOCO 1.16x mais larga',
-    /display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;\s*\n\s*gap:15px;align-items:stretch;justify-content:safe center\}/.test(DH) && /\.kcol\.kcol-live\{flex:1\.16 1 0;max-width:380px\}/.test(DH));
+    /display:flex;flex:0 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;\s*\n\s*gap:15px;align-items:stretch;justify-content:safe center\}/.test(DH) && /\.kcol\.kcol-live\{flex:1\.16 1 0;max-width:380px\}/.test(DH));
   if(mod&&mod.designerStatusView){
     const DT={sector:'cronograma',cronContents:[{tema:'T'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
     check('CY5_DESIGNER_TOPCHIP','Chip do card do designer = EXATAMENTE "Designer em produção" (fonte designerStatusView)', mod.designerStatusView(DT).label==='Designer em produção');
@@ -1294,9 +1294,15 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
       return ['tcv4-top','tcv4-st','tcv4-due','tcv4-person','tcv4-origin','tcv4-client','tcv4-title','tcv4-chips','tcv4-rail','tcv4-themes','tcv4-circ','tcv4-date','tcv4-foot','data-cardmenu'].every(k=>tc.indexOf(k)>=0)&&
              tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Colunas de ALTURA IGUAL (referência) + 1 card inteiro sem scrollbar + scrollbar fina + chrome enxuto',
-    /kcol\{height:100%;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
+    /kcol\{height:auto;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
     /#content\.board-mode \.kcol \.kbody\{padding:31px 7px 0;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH) &&
     /\.tc:last-child:not\(:only-child\)\{margin-bottom:14px\}/.test(DH));
+  check('CY9_PROPORCAO_STATUS','Reprovação 1.0.142: quadro abraça o conteúdo (card proporcional à coluna em qualquer tela) + status NUNCA truncado grosseiramente',
+    /\.kanban\{display:flex;flex:0 1 auto;/.test(DH) && /\.kcol\{height:auto;max-height:100%;min-height:0\}/.test(DH) &&
+    /\.tcv4-st b\{font-weight:750;white-space:normal;display:-webkit-box;-webkit-line-clamp:2/.test(DH) &&
+    /\.tcv4-chips\{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px\}/.test(DH) &&
+    /\.tcv4-chips \.tcv4-chip:first-child\{max-width:100%;white-space:normal;line-height:1\.3;text-align:left\}/.test(DH) &&
+    /\.tcv4-step b\{font-size:11px;font-weight:740;min-width:0;white-space:normal;display:-webkit-box;-webkit-line-clamp:2/.test(DH));
   check('CY8_LAUDO_141','Laudo 1.0.141: perfil flex:none (não estica) + coluna com teto de largura + popover ⋯ FIXED ancorado (nunca cortado)',
     /\.sb-user\{display:flex !important;flex:none !important/.test(DH) &&
     /\.kanban \.kcol\{flex:1 1 0;min-width:232px;max-width:340px\}/.test(DH) && /\.kcol\.kcol-live\{flex:1\.16 1 0;max-width:380px\}/.test(DH) &&
