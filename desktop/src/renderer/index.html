@@ -255,12 +255,13 @@
   body.desktop #app{
     display:grid !important;
     grid-template-columns:var(--d-side) 1fr;
-    grid-template-rows:100vh;
+    grid-template-rows:calc(100vh/var(--fitz,1));
     max-width:none !important;
     margin:0 !important;
-    min-height:100vh;
+    min-height:calc(100vh/var(--fitz,1));
     box-shadow:none !important;
   }
+  body.desktop{min-height:calc(100vh/var(--fitz,1))}
   /* SIDEBAR (vira a nav) */
   body.desktop .nav{
     position:relative !important;
@@ -270,7 +271,7 @@
     display:flex !important;flex-direction:column;justify-content:flex-start;align-items:stretch;
     gap:3px;padding:14px 12px 14px 12px;
     background:#0D0E14;border-top:none;border-right:1px solid var(--line-soft);
-    backdrop-filter:none;height:100vh;overflow-y:auto;
+    backdrop-filter:none;height:calc(100vh/var(--fitz,1));overflow-y:auto;
   }
   body.desktop .nav .sb-brand{
     display:flex;align-items:center;gap:11px;padding:6px 6px 18px 6px;border-bottom:1px solid var(--line-soft);margin-bottom:14px
@@ -314,6 +315,7 @@
   body.desktop .nav .new-task-btn .new-task-icon svg{width:18px !important;height:18px !important;display:block}
   body.desktop .nav .new-task-btn .new-task-label{line-height:1;display:inline-flex;align-items:center;white-space:nowrap}
   body.desktop .nav .sb-footer{margin-top:auto;padding:14px 6px 4px;border-top:1px solid var(--line-soft);font-size:11px;color:var(--faint);line-height:1.5}
+  body.desktop .nav .sb-footer .sbf-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:7px;box-shadow:0 0 5px rgba(52,211,153,.7)}
   body.desktop .nav .sb-footer .ver{display:inline-block;background:rgba(91,108,255,.14);color:var(--accent);font-weight:800;padding:3px 9px;border-radius:999px;margin-bottom:6px;font-size:10.5px}
 
   /* TOPBAR + CONTENT */
@@ -334,7 +336,7 @@
   body.desktop #app > .content{
     grid-column:2;grid-row:1;
     padding:calc(var(--d-topbar) + 8px) 32px 48px 32px !important;
-    overflow-y:auto;height:100vh;
+    overflow-y:auto;height:calc(100vh/var(--fitz,1));
   }
   body.desktop #app > .content > *{max-width:var(--d-maxw);margin-left:auto;margin-right:auto}
   body.desktop .scr,body.desktop .scr-head{padding-left:0;padding-right:0}
@@ -389,7 +391,7 @@
      kanban ocupa o restante (flex:1 + min-height:0). As colunas têm height:100%
      e SÓ o .kbody rola — topo (header da coluna) sempre visível, base sempre
      dentro da janela, último card com respiro + scroll-margin. */
-  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:16px!important;padding-left:34px!important;padding-right:34px!important}
+  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:calc(100vh/var(--fitz,1));padding-bottom:16px!important;padding-left:34px!important;padding-right:34px!important}
   /* Reprovação 1.0.137: o cap de 1400px deixava ~200px ociosos nas laterais enquanto as
      colunas ficavam estreitas. Nas telas de QUADRO o cap cai: o board usa a largura útil
      REAL (viewport - sidebar - 48px) — colunas largas quando há espaço; scroll horizontal
@@ -450,11 +452,11 @@
     body.desktop #content.board-mode .kcol .khead{padding:8px 12px 7px}
     body.desktop #content.board-mode .kcol .kbody{padding:5px 8px 5px}
   }
-  /* flex:0 1 auto + kcol height:auto — o quadro abraça o CONTEÚDO (coluna mais alta) em vez
-     de esticar até o chão: a relação card × coluna da referência (~92%) vale em QUALQUER
-     tela (na 1080p a coluna esticava p/ 845px e o card ficava em 55%, "perdido"). Com muitos
-     cards o quadro encolhe até caber (min-height:0) e o kbody rola. */
-  body.desktop #content.board-mode .kanban{display:flex;flex:0 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
+  /* FIEL À REFERÊNCIA: colunas preenchem a altura (como no print autoritativo — a coluna
+     se estende ~50px abaixo do card e chega perto da borda da janela). Em telas MAIORES que
+     1366×768 o fitZoom() escala a composição inteira: a relação card × coluna do print vale
+     em qualquer tela (sem coluna gigante com card perdido). */
+  body.desktop #content.board-mode .kanban{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
     gap:15px;align-items:stretch;justify-content:safe center}
   /* max-width: em telas grandes a coluna NÃO balona (card "esticado" reprovado na 1.0.141);
      em 1366×768 as colunas ficam abaixo do teto — paridade com a referência intacta. */
@@ -464,9 +466,7 @@
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
-  /* height:auto habilita o align-items:stretch: TODAS as colunas = altura da mais alta
-     (pares uniformes, como na referência), limitadas à janela (max-height). */
-  body.desktop #content.board-mode .kanban .kcol{height:auto;max-height:100%;min-height:0}
+  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:0}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
@@ -518,7 +518,9 @@
   .tcv4-person-m{flex:1;min-width:0}
   .tcv4-name{font-size:12.5px;font-weight:740;line-height:1.3;letter-spacing:-.01em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .tcv4-role{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--soft);margin-top:1px}
-  .tcv4-presence{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 4px rgba(52,211,153,.8)}
+  .tcv4-avw{position:relative;flex:none;display:inline-flex}
+  /* referência: presença = bolinha verde com anel escuro no canto inferior direito da FOTO */
+  .tcv4-presence{position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--green);border:2px solid #14151d;box-shadow:0 0 5px rgba(52,211,153,.7)}
   .tcv4-origin{display:flex;align-items:flex-start;gap:7px;margin-top:15px;padding:5px 10px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:10px;font-size:10.5px;color:var(--soft);line-height:1.35}
   .tcv4-origin svg{width:11px;height:11px;flex:none;margin-top:1px;opacity:.7}
   .tcv4-origin b{color:var(--ink);font-weight:700}
@@ -1847,7 +1849,7 @@ function render(){
       '<button class="sb-user topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,30)+
         '<span class="su-m"><span class="su-n">'+esc((state.user.name||'').split(' ')[0]||'Perfil')+'</span>'+
         '<span class="su-r">'+esc(state.user.role||'Meu perfil')+'</span></span></button>'+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.142 · Fluxo</span><br>espelha o APK <b>1.0.142-beta-laudo-141-fix</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.142 · Fluxo</span><i class="sbf-dot"></i><br>espelha o APK <b>1.0.142-beta-laudo-141-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -2136,7 +2138,7 @@ function renderTasksTabs(active){return '';}
 // quadro Kanban/tarefas (colunas/cards/busca). NUNCA nos hubs de seleção de setores/cards
 // (renderHub/renderRoleBoards/renderDesignersHub/renderSocialsHub). Esses hubs de cards NÃO
 // renderizam abas — nenhuma barra de abas no hub de seleção de setores.
-function boardToolbar(){return '<div class="d-board-tools tbar"><span class="bsearch-wrap"><input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"><kbd class="bsearch-kbd">Ctrl K</kbd></span><div class="tchips">'+taskChips()+'</div></div>';}
+function boardToolbar(){return '<div class="d-board-tools tbar"><span class="bsearch-wrap"><input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'"><kbd class="bsearch-kbd">⌘ K</kbd></span><div class="tchips">'+taskChips()+'</div></div>';}
 function renderClientFlowBoard(){
   let list=state.tasks.filter(isClientFlow);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
@@ -2745,9 +2747,9 @@ function taskCard(t, persp){
      '</div>';
   // 2) pessoa — avatar grande + nome (2 linhas) + cargo com presença
   h+='<div class="tcv4-person">'+
-       (asgName?avatar(asg||{name:asgName,id:t.assigneeId},36):'<div class="av" style="width:36px;height:36px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>')+
+       '<span class="tcv4-avw">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},36):'<div class="av" style="width:36px;height:36px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>')+'<i class="tcv4-presence"></i></span>'+
        '<div class="tcv4-person-m"><div class="tcv4-name">'+esc(asgName||'Sem responsável')+'</div>'+
-         '<div class="tcv4-role">'+esc(asg&&asg.role?asg.role:'Responsável')+'<i class="tcv4-presence"></i></div></div>'+
+         '<div class="tcv4-role">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
      '</div>';
   // 3) caixa "Enviado por"
   if(reqName)h+='<div class="tcv4-origin">'+svg('person')+'<span>Enviado por <b>'+esc(reqName)+'</b>'+(t.createdAt?' · '+fmtDateTimeBR(t.createdAt):'')+'</span></div>';
@@ -4464,6 +4466,18 @@ async function saveTask(){const f=state.form;
    injetados em #modalRoot, que e IRMAO de #app. Preso em #app, nenhum clique
    dentro de um modal era capturado -> seletor de responsavel/mover status/
    sheets ficavam mortos. Em document, captura tudo (com guarda de sessao). */
+// FIEL À REFERÊNCIA em qualquer tela: o print autoritativo é um frame 1366×768. Em telas
+// MAIORES, escala a composição inteira (zoom) — a relação card × coluna × quadro do print
+// vale em 1080p/1440p, em vez de coluna gigante com card perdido. Em telas ≤ referência,
+// zoom 1 (os media de altura cuidam do encaixe). Teto 1.5 p/ não exagerar em 4K.
+function fitZoom(){
+  if(typeof isDesktop==='function'&&!isDesktop())return;
+  const z=Math.min(1.5,Math.max(1,Math.min(window.innerWidth/1366,window.innerHeight/812)));
+  document.body.style.zoom=z>1.005?z.toFixed(3):'';
+  document.documentElement.style.setProperty('--fitz',z>1.005?z.toFixed(3):'1');
+}
+window.addEventListener('resize',fitZoom);
+fitZoom();
 // popover '⋯' do card V4: PORTAL no <body> (escapa contain/overflow). Fecha devolvendo o nó
 // ao card de origem; fecha também em rolagem/resize/Escape para não ficar "órfão" do botão.
 function closeCardMenus(){
@@ -4509,10 +4523,17 @@ document.addEventListener('click',async e=>{
     closeCardMenus();
     if(!open){w.classList.add('open');const m=w.querySelector('.tcv4-menu');if(m){
       document.body.appendChild(m);m.classList.add('open');
-      const r=el.getBoundingClientRect(),mw=m.offsetWidth,mh=m.offsetHeight;
+      // calibração: sob zoom (fitZoom), 'left:Npx' não pinta em N px de viewport — mede-se
+      // onde 0 e 100 caem de verdade e converte (funciona em zoom legado E padronizado).
+      m.style.left='0px';m.style.top='0px';
+      const c0=m.getBoundingClientRect();
+      m.style.left='100px';m.style.top='100px';
+      const c1=m.getBoundingClientRect();
+      const kx=(c1.left-c0.left)/100||1,ky=(c1.top-c0.top)/100||1;
+      const r=el.getBoundingClientRect(),mr0=m.getBoundingClientRect(),mw=mr0.width,mh=mr0.height;
       let lf=Math.max(8,Math.min(r.right-mw,window.innerWidth-mw-8));
       let tp=r.top-mh-8;if(tp<8)tp=Math.min(r.bottom+8,window.innerHeight-mh-8);
-      m.style.left=lf+'px';m.style.top=tp+'px';}}
+      m.style.left=((lf-c0.left)/kx)+'px';m.style.top=((tp-c0.top)/ky)+'px';}}
     return;}
   closeCardMenus();
   if(el=g('[data-detail]')){openDetails(el.dataset.detail);return;}
