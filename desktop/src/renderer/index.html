@@ -423,9 +423,9 @@
   body.desktop #content.board-mode .d-board-head .d-bh-icon svg{width:21px;height:21px}
   body.desktop #content.board-mode .d-board-head .d-bh-title{font-size:19px}
   body.desktop #content.board-mode .d-board-tools.tbar{margin:17px 0 2px;padding:3px 12px}
-  body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:28px;padding:0 12px;font-size:11.5px}
-  body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:28px}
-  body.desktop #content.board-mode .kanban{margin-top:35px}
+  body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:34px;padding:0 13px;font-size:11.5px;border-radius:10px}
+  body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:34px;border-radius:10px}
+  body.desktop #content.board-mode .kanban{margin-top:29px}
   body.desktop #content.board-mode .kcol .khead{padding:6px 12px 5px}
   /* scroll-snap proximity + scroll-padding: ao rolar, o card acomoda INTEIRO com respiro —
      nunca para "decapitado" contra o header da coluna. */
@@ -437,6 +437,8 @@
   body.desktop #content.board-mode .kcol .kbody .tc:last-child:not(:only-child){margin-bottom:14px}
   /* Notebook com taskbar (altura útil ~689): chrome + card no modo justo validado */
   @media(max-height:740px){
+    body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:28px}
+    body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:28px}
     body.desktop #content.board-mode{padding-top:5px!important}
     body.desktop #content.board-mode .d-board-tools.tbar{margin:5px 0 2px}
     body.desktop #content.board-mode .kanban{margin-top:5px}
@@ -1489,11 +1491,12 @@
   }
   body.desktop .nav{background:linear-gradient(180deg,#070E20 0%,#060B1A 60%,#050917 100%)}
   body.desktop .kanban .kcol{background:linear-gradient(180deg,#151B30 0%,#0F1426 100%);
-    border-color:rgba(150,170,255,.08);box-shadow:0 22px 44px -26px rgba(0,0,0,.65)}
+    border-color:rgba(160,175,230,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 22px 44px -26px rgba(0,0,0,.65)}
   body.desktop .kanban .kcol.kcol-live{
     background:linear-gradient(180deg,#161C32,#101529) padding-box,
       linear-gradient(140deg,rgba(34,211,238,.85),rgba(99,102,241,.7) 38%,rgba(244,114,182,.7)) border-box;
-    box-shadow:0 0 22px -6px color-mix(in srgb,var(--kc) 32%,transparent),
+    box-shadow:inset 0 16px 34px -24px rgba(34,211,238,.35),
+      0 0 22px -6px color-mix(in srgb,var(--kc) 32%,transparent),
       0 -6px 26px -12px rgba(34,211,238,.30),
       0 0 54px -18px rgba(96,140,255,.38),0 18px 40px -20px rgba(0,0,0,.7)}
   body.desktop .kanban .kcol.kcol-live .khead{background:linear-gradient(180deg,color-mix(in srgb,var(--kc) 12%,transparent),transparent)}
