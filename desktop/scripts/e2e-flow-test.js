@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
  * TESTE VIRTUAL PONTA A PONTA (E2E) — fluxo de aprovação do cronograma
- * Agenda ID Seven · Worker V64.38-wa-card-link-cta / Desktop 1.0.138-beta-clean-ui-v64-52-test / Android 1.0.138 (paridade)
+ * Agenda ID Seven · Worker V64.38-wa-card-link-cta / Desktop 1.0.139-beta-event-precision-v64-53-test / Android 1.0.139 (paridade)
  * ---------------------------------------------------------------------
  * REGRA OBRIGATÓRIA: este teste roda ANTES de qualquer build. Se QUALQUER
  * falha bloqueante ocorrer, sai com código 1 — e NENHUM build deve ser
@@ -336,7 +336,7 @@ check('W_APPROVE4', 'Portal tem identidade Agenda ID Seven + Visão do Cliente +
 }
 
 console.log(`${C.b}\n[PARTE B] Desktop 1.0.110 — chips fixos + colunas por contexto + msg premium${C.x}`);
-check("D1", "package.json versão 1.0.138", /"version":\s*"1.0.138"/.test(DP));
+check("D1", "package.json versão 1.0.139", /"version":\s*"1.0.139"/.test(DP));
 // ===== ESTILO DOS CHIPS (1.0.107+): menos arredondados + borda/raio do input + ícone Designers.
 const tchipCss = (DH.match(/\.tchip\{[^}]*\}/) || [''])[0];
 check('D_SHAPE1', 'Chips MENOS arredondados: .tchip border-radius:11px (igual ao input)', /border-radius:11px/.test(tchipCss));
@@ -443,12 +443,12 @@ check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
 check('D19', 'Render idempotente preservado (dedupById)', /state\.tasks\s*=\s*dedupById\(/.test(DH));
-check("D20", "Rodapé mostra Desktop 1.0.138", /Desktop 1\.0\.138/.test(DH));
+check("D20", "Rodapé mostra Desktop 1.0.139", /Desktop 1\.0\.139/.test(DH));
 // CORREÇÃO crítica (teste real): rótulo de versão do LOGIN não pode ficar defasado.
-check("D21", "Login/título/watermark mostram 1.0.138 (sem rótulo antigo)",
-  /<span class="pill-ver">Desktop 1\.0\.138/.test(DH) && /<title>ID Seven · Desktop 1\.0\.138/.test(DH) && /id="wpbadge">Desktop 1\.0\.138/.test(DH));
-check('D22', 'Login espelha o APK 1.0.138-beta-clean-ui-v64-52-test', /espelha o APK <b>1.0.138-beta-clean-ui-v64-52-test/.test(DH));
-check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.138./.test(DH) && /applyVersionLabels/.test(DH));
+check("D21", "Login/título/watermark mostram 1.0.139 (sem rótulo antigo)",
+  /<span class="pill-ver">Desktop 1\.0\.139/.test(DH) && /<title>ID Seven · Desktop 1\.0\.139/.test(DH) && /id="wpbadge">Desktop 1\.0\.139/.test(DH));
+check('D22', 'Login espelha o APK 1.0.139-beta-event-precision-v64-53-test', /espelha o APK <b>1.0.139-beta-event-precision-v64-53-test/.test(DH));
+check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\s*desktop:.1\.0\.139./.test(DH) && /applyVersionLabels/.test(DH));
 // ===== 1.0.120 — ENVIO WHATSAPP LIMPO + WEB-ONLY (executa as funções reais) =====
 (function(){
   // Extrai e executa as funções reais p/ provar o conteúdo do clipboard e a URL aberta (etapa 3).
@@ -489,7 +489,7 @@ check('D_MOVE3', 'No eixo do designer, moveStatus NÃO grava status genérico ({
 check('D_MOVE4', 'openMove oferece opções por eixo do designer (designerMoveOpts)', /function designerMoveOpts\(t\)/.test(DH) && /isDesignerAxisMove\(t\)\s*\?\s*designerMoveOpts/.test(DH));
 
 console.log(`${C.b}\n[PARTE B] Android 1.0.98-beta — designer em A Fazer + colunas + leitura do campo${C.x}`);
-check('N1', 'versionName 1.0.138-beta-clean-ui-v64-52-test (paridade Desktop)', /versionName\s+"1.0.138-beta-clean-ui-v64-52-test"/.test(GRADLE));
+check('N1', 'versionName 1.0.139-beta-event-precision-v64-53-test (paridade Desktop)', /versionName\s+"1.0.139-beta-event-precision-v64-53-test"/.test(GRADLE));
 check('N2', 'versionCode >= 107 (acima do 106 anterior)', (() => { const m = GRADLE.match(/versionCode\s+(\d+)/); return m && Number(m[1]) >= 107; })());
 check('N_PARITY', 'Android = bump de paridade: endpoint interno workers.dev intacto, SEM link de cliente', /idseven-push\.agidseven\.workers\.dev\/notify-assignee/.test(readAndroid(AND + 'core/PushNotify.kt')) && !/cliente\/cronograma/.test(readAndroid(AND + 'core/PushNotify.kt')));
 // ESTILO DOS CHIPS (Android): menos arredondados (12.dp, não 999.dp) + ícone Designers.
@@ -519,7 +519,7 @@ check('N_MOVE5', 'TasksScreen detecta eixo do designer e chama move(...designerA
 check('N_FLOW1', 'Android tem o estado "aguardando_designer_iniciar" ("Aguardando designer iniciar")', /OpCol\("aguardando_designer_iniciar", "Aguardando designer iniciar"\)/.test(KT_VIS));
 check('N_FLOW2', 'Android operationalCol: andamento -> "aguardando_designer"; revisao -> "aguardando_designer_revisao" (paridade f96aa2e)', /if \(dc == "andamento"\) return "aguardando_designer"/.test(KT_VIS) && /if \(dc == "revisao"\) return "aguardando_designer_revisao"/.test(KT_VIS));
 check('N_FLOW3', 'Android operationalCol: recém-enviado (afazer) -> "aguardando_designer_iniciar" (NÃO em produção)', /return "aguardando_designer_iniciar"/.test(KT_VIS));
-check('N_FLOW4', 'Android versionName = 1.0.138-beta-clean-ui-v64-52-test', /versionName "1.0.138-beta-clean-ui-v64-52-test"/.test(GRADLE));
+check('N_FLOW4', 'Android versionName = 1.0.139-beta-event-precision-v64-53-test', /versionName "1.0.139-beta-event-precision-v64-53-test"/.test(GRADLE));
 // CORREÇÃO 3 (Android): colunas por contexto.
 check('N7', 'Colunas por papel: SOCIAL_COLS4 / DESIGNER_COLS4 / CLIENT_COLS4', /SOCIAL_COLS4/.test(KT_VIS) && /DESIGNER_COLS4/.test(KT_VIS) && /CLIENT_COLS4/.test(KT_VIS));
 check('N8', 'TasksScreen aplica colunas por contexto (clientCol4/designerColView)', /clientCol4\(t\)/.test(KT_SCREEN) && /designerColView\(t\)/.test(KT_SCREEN));
@@ -1369,7 +1369,7 @@ console.log(`${C.b}\n===========================================================
 if (BLOCKING === 0) {
   console.log(`${C.g} RESULTADO: APROVADO ✔  (0 falhas bloqueantes).`);
   console.log(`${C.g} Fluxo PRINCIPAL = grupo do cliente (card + legenda + link); botão real de aprovação no portal.`);
-  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.138-beta-clean-ui-v64-52-test. Android segue por paridade após o Desktop.${C.x}`);
+  console.log(`${C.g} Liberado para buildar DESKTOP 1.0.139-beta-event-precision-v64-53-test. Android segue por paridade após o Desktop.${C.x}`);
   console.log(`${C.b}========================================================================${C.x}`);
   process.exit(0);
 } else {
