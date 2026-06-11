@@ -476,7 +476,7 @@
   body.desktop .kanban .kcol .kbody:hover::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border:2px solid transparent;background-clip:content-box}
   /* fallback (telas sem board-mode): limite conservador para nunca estourar a janela */
   body.desktop .kanban .kcol{
-    background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    background:var(--surface);border:1px solid var(--line);border-radius:10px;
     display:flex;flex-direction:column;max-height:calc(100vh - 252px);overflow:hidden;
   }
   body.desktop .kanban .kcol .khead{
@@ -484,7 +484,7 @@
   }
   body.desktop .kanban .kcol .khead .cc{width:8px;height:8px;border-radius:50%;flex:none}
   body.desktop .kanban .kcol .khead .kt{font-size:12px;font-weight:760;flex:1;letter-spacing:.01em}
-  body.desktop .kanban .kcol .khead .kn{background:var(--surface2);border-radius:999px;font-size:10.5px;font-weight:800;padding:2px 8px;color:var(--soft)}
+  body.desktop .kanban .kcol .khead .kn{background:var(--surface2);border-radius:7px;font-size:10.5px;font-weight:800;padding:2px 8px;color:var(--soft)}
   /* coluna ATIVA (com cards): contorno na cor da etapa + leve brilho (referência) */
   body.desktop .kanban .kcol.kcol-live{border:1px solid transparent;
     background:linear-gradient(var(--surface),var(--surface)) padding-box,
@@ -493,15 +493,15 @@
   body.desktop .kanban .kcol.kcol-live .khead{border-bottom-color:color-mix(in srgb,var(--kc) 28%,transparent)}
   /* empty state premium (referência): ícone + título + apoio, centralizado */
   .kempty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;
-    flex:1;min-height:280px;height:100%;margin:3px 2px;padding:22px 14px 30%;border:1.5px dashed rgba(255,255,255,.08);border-radius:13px}
+    flex:1;min-height:280px;height:100%;margin:3px 2px;padding:22px 14px 30%;border:1.5px dashed rgba(255,255,255,.08);border-radius:10px}
   .kempty-ic{width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.26);margin-bottom:10px}
   .kempty-ic svg{width:52px;height:52px}
   .kempty-t{font-size:11.5px;font-weight:750;color:var(--soft)}
   .kempty-s{font-size:10px;color:var(--faint);line-height:1.5;max-width:190px}
   body.desktop .kanban .kcol .kbody{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0}
-  body.desktop .kanban .kcol .tc{margin-bottom:12px;border-radius:16px}
+  body.desktop .kanban .kcol .tc{margin-bottom:12px;border-radius:10px}
   /* ═══════════ CARD V4 — fiel à referência aprovada (premium glass) ═══════════ */
-  .tcv4{position:relative;padding:13px 13px 9px !important;border-radius:15px;container-type:inline-size;
+  .tcv4{position:relative;padding:13px 13px 9px !important;border-radius:10px;container-type:inline-size;
     border:1px solid rgba(255,255,255,.07);
     background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.008) 40%),var(--surface);
     box-shadow:0 1px 0 rgba(255,255,255,.045) inset,0 16px 36px -20px rgba(0,0,0,.7);
@@ -1492,8 +1492,9 @@
     border-color:rgba(150,170,255,.08);box-shadow:0 22px 44px -26px rgba(0,0,0,.65)}
   body.desktop .kanban .kcol.kcol-live{
     background:linear-gradient(180deg,#161C32,#101529) padding-box,
-      linear-gradient(140deg,rgba(34,211,238,.65),rgba(99,102,241,.55) 38%,rgba(244,114,182,.55)) border-box;
-    box-shadow:0 0 40px -10px color-mix(in srgb,var(--kc) 30%,transparent),0 18px 40px -20px rgba(0,0,0,.7)}
+      linear-gradient(140deg,rgba(34,211,238,.85),rgba(99,102,241,.7) 38%,rgba(244,114,182,.7)) border-box;
+    box-shadow:0 0 18px -4px color-mix(in srgb,var(--kc) 38%,transparent),
+      0 0 60px -16px rgba(96,140,255,.45),0 18px 40px -20px rgba(0,0,0,.7)}
   body.desktop .kanban .kcol.kcol-live .khead{background:linear-gradient(180deg,color-mix(in srgb,var(--kc) 12%,transparent),transparent)}
   body.desktop .tcv4{background:linear-gradient(180deg,rgba(96,134,255,.075) 0%,rgba(40,58,110,.05) 32%,rgba(4,7,16,.3) 100%),#0C1120;
     border-color:rgba(150,170,255,.11);
@@ -2861,10 +2862,10 @@ function kemptyHtml(kind){
   // sem tile de fundo, posicionado acima do centro.
   const k=String(kind||'');
   const IC={
-   plus:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="4"/><path d="M16 14h12M16 20h8"/><circle cx="34" cy="34" r="9" fill="#6E5BFF" stroke="none"/><path d="M34 30.5v7M30.5 34h7" stroke="#fff"/></svg>',
-   search:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="4"/><path d="M16 14h12M16 20h8"/><circle cx="31" cy="31" r="7" fill="#0D0E14"/><circle cx="31" cy="31" r="6.5"/><path d="M36 36l5 5"/></svg>',
-   check:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="16"/><path d="M17 24.5l5 5 9-10"/></svg>',
-   list:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="28" height="36" rx="4"/><path d="M17 16h14M17 24h14M17 32h9"/></svg>'};
+   plus:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="2.5"/><path d="M16 14h12M16 20h8"/><circle cx="34" cy="34" r="9" fill="#6E5BFF" stroke="none"/><path d="M34 30.5v7M30.5 34h7" stroke="#fff"/></svg>',
+   search:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="2.5"/><path d="M16 14h12M16 20h8"/><circle cx="31" cy="31" r="7" fill="#0D0E14"/><circle cx="31" cy="31" r="6.5"/><path d="M36 36l5 5"/></svg>',
+   check:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="16"/><path d="M17 24.5l5 5 9-10"/></svg>',
+   list:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="28" height="36" rx="2.5"/><path d="M17 16h14M17 24h14M17 32h9"/></svg>'};
   const ic=/afazer/.test(k)?IC.plus:(/revis|ajuste/.test(k)?IC.search:(/aprovado|concluido|entregue/.test(k)?IC.check:IC.list));
   return '<div class="kempty"><div class="kempty-ic">'+ic+'</div>'+
     '<div class="kempty-t">Nenhuma tarefa aqui</div>'+
