@@ -1493,20 +1493,20 @@
   body.desktop .kanban .kcol.kcol-live{
     background:linear-gradient(180deg,#161C32,#101529) padding-box,
       linear-gradient(140deg,rgba(34,211,238,.85),rgba(99,102,241,.7) 38%,rgba(244,114,182,.7)) border-box;
-    box-shadow:0 0 26px -2px color-mix(in srgb,var(--kc) 42%,transparent),
-      0 -8px 34px -10px rgba(34,211,238,.4),0 10px 40px -12px rgba(244,114,182,.28),
-      0 0 70px -16px rgba(96,140,255,.5),0 18px 40px -20px rgba(0,0,0,.7)}
+    box-shadow:0 0 22px -6px color-mix(in srgb,var(--kc) 32%,transparent),
+      0 -6px 26px -12px rgba(34,211,238,.30),
+      0 0 54px -18px rgba(96,140,255,.38),0 18px 40px -20px rgba(0,0,0,.7)}
   body.desktop .kanban .kcol.kcol-live .khead{background:linear-gradient(180deg,color-mix(in srgb,var(--kc) 12%,transparent),transparent)}
   body.desktop .tcv4{background:linear-gradient(180deg,rgba(96,134,255,.075) 0%,rgba(40,58,110,.05) 32%,rgba(4,7,16,.3) 100%),#0C1120;
     border-color:rgba(150,170,255,.11);
     box-shadow:0 1px 0 rgba(255,255,255,.07) inset,0 26px 50px -24px rgba(0,0,0,.8)}
   body.desktop .tcv4-origin{background:rgba(4,8,20,.5)}
   body.desktop .tcv4-themes{background:rgba(9,14,30,.55);border-color:rgba(150,170,255,.07)}
-  body.desktop .d-board-tools.tbar .bsearch{background:rgba(4,7,16,.8) !important;border-color:rgba(150,170,255,.08);box-shadow:inset 0 2px 6px rgba(0,0,0,.45)}
+  body.desktop .d-board-tools.tbar .bsearch{background:rgba(4,7,16,.8) !important;border-color:rgba(150,170,255,.08);box-shadow:inset 0 1px 4px rgba(0,0,0,.35)}
   body.desktop .nav .new-task-btn{background:linear-gradient(115deg,#4A42FB 0%,#8B7BFF 48%,#7B3FE0 100%);
     box-shadow:0 10px 26px -8px rgba(104,77,255,.6),inset 0 1px 0 rgba(255,255,255,.32)}
   body.desktop .tcv4 .tcv4-btn-main{background:linear-gradient(110deg,#4F5BEC 0%,#7C3BEF 100%);
-    box-shadow:0 10px 26px -6px rgba(124,77,255,.75),0 3px 10px -2px rgba(83,86,240,.5),inset 0 1px 0 rgba(255,255,255,.25)}
+    box-shadow:0 8px 22px -6px rgba(124,77,255,.6),inset 0 1px 0 rgba(255,255,255,.22)}
   body.desktop .tcv4 .tcv4-btn-main:hover{background:linear-gradient(110deg,#5E69F3 0%,#8B4DF6 100%)}
   body.desktop .kempty-ic{color:rgba(160,178,220,.38)}
   body.desktop .kempty{border-color:rgba(150,170,255,.10)}
@@ -2863,10 +2863,10 @@ function kemptyHtml(kind){
   // sem tile de fundo, posicionado acima do centro.
   const k=String(kind||'');
   const IC={
-   plus:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"><rect x="10" y="6" width="24" height="32" rx="2"/><path d="M16 14h12M16 20h8"/><circle cx="34" cy="34" r="9" fill="#6E5BFF" stroke="none"/><path d="M34 30.5v7M30.5 34h7" stroke="#fff"/></svg>',
-   search:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"><rect x="10" y="6" width="24" height="32" rx="2"/><path d="M16 14h12M16 20h8"/><circle cx="31" cy="31" r="7" fill="#0D0E14"/><circle cx="31" cy="31" r="6.5"/><path d="M36 36l5 5"/></svg>',
-   check:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"><circle cx="24" cy="24" r="16"/><path d="M17 24.5l5 5 9-10"/></svg>',
-   list:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" stroke-linejoin="miter"><rect x="10" y="6" width="28" height="36" rx="2"/><path d="M17 16h14M17 24h14M17 32h9"/></svg>'};
+   plus:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="3"/><path d="M16 14h12M16 20h8"/><circle cx="34" cy="34" r="9" fill="#6E5BFF" stroke="none"/><path d="M34 30.5v7M30.5 34h7" stroke="#fff"/></svg>',
+   search:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="3"/><path d="M16 14h12M16 20h8"/><circle cx="31" cy="31" r="7" fill="#0D0E14"/><circle cx="31" cy="31" r="6.5"/><path d="M36 36l5 5"/></svg>',
+   check:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="16"/><path d="M17 24.5l5 5 9-10"/></svg>',
+   list:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="28" height="36" rx="3"/><path d="M17 16h14M17 24h14M17 32h9"/></svg>'};
   const ic=/afazer/.test(k)?IC.plus:(/revis|ajuste/.test(k)?IC.search:(/aprovado|concluido|entregue/.test(k)?IC.check:IC.list));
   return '<div class="kempty"><div class="kempty-ic">'+ic+'</div>'+
     '<div class="kempty-t">Nenhuma tarefa aqui</div>'+
