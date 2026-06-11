@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ID Seven · Desktop 1.0.141 (Fluxo)</title>
+<title>ID Seven · Desktop 1.0.142 (Fluxo)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0A0B10">
 <style>
@@ -1455,8 +1455,8 @@
   <div id="loginBanner" style="width:100%"></div>
   <div id="loginForm" style="width:100%"></div>
   <div class="vfooter">
-    <span class="pill-ver">Desktop 1.0.141 · Fluxo</span><br>
-    espelha o APK <b>1.0.141-beta-card-v4-5-final</b> · ref app/main
+    <span class="pill-ver">Desktop 1.0.142 · Fluxo</span><br>
+    espelha o APK <b>1.0.142-beta-laudo-141-fix</b> · ref app/main
   </div>
 </section>
 
@@ -1470,7 +1470,7 @@
   <nav class="nav" id="bottomNav"></nav>
 </div>
 
-<div class="wpbadge" id="wpbadge">Desktop 1.0.141 · Fluxo</div>
+<div class="wpbadge" id="wpbadge">Desktop 1.0.142 · Fluxo</div>
 <div id="modalRoot"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -1486,7 +1486,7 @@ const db=firebase.firestore();
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
-const APP_VER={ desktop:'1.0.141', tag:'Fluxo', apk:'1.0.141-beta-card-v4-5-final' };
+const APP_VER={ desktop:'1.0.142', tag:'Fluxo', apk:'1.0.142-beta-laudo-141-fix' };
 (function applyVersionLabels(){
   try{
     var label='Desktop '+APP_VER.desktop+' · '+APP_VER.tag;
@@ -1818,7 +1818,7 @@ function render(){
       '<button class="sb-user topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,30)+
         '<span class="su-m"><span class="su-n">'+esc((state.user.name||'').split(' ')[0]||'Perfil')+'</span>'+
         '<span class="su-r">'+esc(state.user.role||'Meu perfil')+'</span></span></button>'+
-      '<div class="sb-footer"><span class="ver">Desktop 1.0.141 · Fluxo</span><br>espelha o APK <b>1.0.141-beta-card-v4-5-final</b></div>';
+      '<div class="sb-footer"><span class="ver">Desktop 1.0.142 · Fluxo</span><br>espelha o APK <b>1.0.142-beta-laudo-141-fix</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
   }
@@ -4181,7 +4181,7 @@ function renderChat(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
-const BUILD='1.0.141-beta-card-v4-5-final';
+const BUILD='1.0.142-beta-laudo-141-fix';
 function renderPerfil(){
   const u=state.user;
   return '<div class="scr"><div class="pcard">'+avatar(u,92)+
