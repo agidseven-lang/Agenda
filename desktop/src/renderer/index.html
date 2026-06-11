@@ -400,7 +400,17 @@
   body.desktop #content.board-mode .d-board-tools{flex:none}
   body.desktop #content.board-mode{padding-top:19px!important}
   /* referência: sem faixa de topbar nos quadros — só o avatar flutua à direita */
-  body.desktop #app:has(#content.board-mode) > .topbar{background:transparent;border-bottom:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  /* Reprovação 1.0.140: a foto flutuante do topo direito colidia com os chips do
+     quadro. No desktop o perfil vive no CANTO INFERIOR ESQUERDO da sidebar. */
+  body.desktop #app > .topbar{display:none !important}
+  body.desktop .nav .sb-user{display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:flex-start !important;gap:9px !important;width:100%;margin-top:auto;padding:7px 9px !important;border-radius:10px;text-align:left;transition:background .12s}
+  body.desktop .nav .sb-user .su-m{display:flex;flex-direction:column;min-width:0}
+  body.desktop .nav .sb-user:hover{background:rgba(255,255,255,.05)}
+  body.desktop .nav .sb-user .av{flex:none}
+  body.desktop .nav .sb-user .su-m{flex:1;min-width:0}
+  body.desktop .nav .sb-user .su-n{font-size:12px;font-weight:750;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body.desktop .nav .sb-user .su-r{font-size:10px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  body.desktop .nav .sb-footer{margin-top:8px}
   body.desktop #content.board-mode .d-board-head{margin-bottom:0}
   body.desktop #content.board-mode .d-board-head .d-bh-icon{width:40px;height:40px;border-radius:12px}
   body.desktop #content.board-mode .d-board-head .d-bh-icon svg{width:21px;height:21px}
@@ -417,7 +427,7 @@
     body.desktop #content.board-mode{padding-top:5px!important}
     body.desktop #content.board-mode .d-board-tools.tbar{margin:5px 0 2px}
     body.desktop #content.board-mode .kanban{margin-top:5px}
-    body.desktop #content.board-mode .kcol .kbody{padding:6px 7px 0}
+    body.desktop #content.board-mode .kcol .kbody{padding-top:14px}
   }
   /* Escala 125% (viewport ~1092×614): só o CHROME do quadro encolhe — o card V2
      já cabe por arquitetura, sem densificação. */
@@ -548,20 +558,6 @@
   .tcv4-menu-it{display:flex;align-items:center;gap:8px;width:100%;padding:9px 11px;border-radius:8px;font-size:12px;font-weight:650;color:var(--red);text-align:left}
   .tcv4-menu-it svg{width:14px;height:14px}
   .tcv4-menu-it:hover{background:rgba(248,113,113,.1)}
-  /* Notebook com taskbar (~689 útil): ritmo justo do card (modo validado) */
-  @media(max-height:740px){
-    .tcv4{padding:12px 12px 11px !important}
-    .tcv4-person{margin-top:10px}
-    .tcv4-origin{margin-top:9px;padding:7px 10px}
-    .tcv4-main{margin-top:10px}
-    .tcv4-chips{margin-top:9px}
-    .tcv4-rail{margin-top:11px}
-    .tcv4-steps{margin-top:8px}
-    .tcv4-themes{margin-top:10px;padding:8px 10px}
-    .tcv4-theme{padding:3px 0}
-    .tcv4-date{margin-top:9px;padding-top:8px}
-    .tcv4-foot{margin-top:9px}
-  }
   /* escala 125% (~614px úteis): temas viram contador; origem entra na linha do cargo */
   @media(max-height:660px){
     .tcv4-name{-webkit-line-clamp:1}
@@ -1796,6 +1792,9 @@ function render(){
       TABS.map(sbItem).join('')+
       '<div class="sb-sect">Sistema</div>'+
       sbItem({k:'config',l:'Configurações',i:'gear'})+
+      '<button class="sb-user topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,30)+
+        '<span class="su-m"><span class="su-n">'+esc((state.user.name||'').split(' ')[0]||'Perfil')+'</span>'+
+        '<span class="su-r">'+esc(state.user.role||'Meu perfil')+'</span></span></button>'+
       '<div class="sb-footer"><span class="ver">Desktop 1.0.140 · Fluxo</span><br>espelha o APK <b>1.0.140-beta-card-v4-4-parity</b></div>';
   }else{
     nav.innerHTML=TABS.slice(0,3).map(navBtn).join('')+'<button class="fab" data-fab="1">'+svg('add')+'</button>'+TABS.slice(3).map(navBtn).join('');
