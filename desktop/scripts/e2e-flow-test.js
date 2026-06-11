@@ -846,7 +846,7 @@ check('TL_DEF', 'taskTimeline(t) existe e retorna {current,last,next,owner,miles
 const DH_noc2 = DH.replace(/^\s*\/\/.*$/gm,'');
 // Passo 2: taskTimeline agora é consumida APENAS pelo taskCardTimeline (definição + 1 uso).
 check('TL_CARD_WIRED', 'taskTimeline consumida pelo card V2 + opPanelBlock (3 ocorrências: definição + 2 usos; helpers antigos REMOVIDOS)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 3 && /function taskTimeline\(t\)/.test(DH_noc2) && !/taskCardTimeline|designerCardTimeline/.test(DH_noc2));
-check('TL2_CARD_RENDER', 'card V2: barra segmentada + Etapa/Próxima derivadas de taskTimeline (cliente) e do eixo do designer (designerView)', /tcv2-bar/.test(DH) && /tcv2-prog-top/.test(DH) && /clientView\?clientFacingNextShort\(t\):nextActionShort\(t\)/.test(DH));
+check('TL2_CARD_RENDER', 'card V2.1: estágio em linha própria + barra segmentada + próxima ação (fontes únicas por perspectiva)', /tcv2-stage-row/.test(DH) && /tcv2-bar-row/.test(DH) && /tcv2-next/.test(DH) && /clientView\?clientFacingNextShort\(t\):nextActionShort\(t\)/.test(DH));
 check('TL2_CARD_ONLY', 'helpers de timeline do card antigos REMOVIDOS (sem código morto)', !/taskCardTimeline\(/.test(DH_noc2) && !/designerCardTimeline\(/.test(DH_noc2));
 check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora; isCron guard)', /let prog=null;\s*\n\s*if\(isCron\)\{/.test(DH));
 // PASSO 3: o detalhe (opPanelBlock) AGORA usa taskTimeline(t) (timeline completa); sem steps[] próprios.
@@ -941,7 +941,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('TL_HUMAN_KEEP', 'Último: preserva label já humano (com espaços) sem virar genérico', fHL.last.label==='Enviado para aprovação final' || fHL.last.label==='Reenviado ao cliente (versão FINAL)');
   // o card (taskCardTimeline) renderiza o label humanizado (esc(tl.last.label)) — sem código cru
   check('TL_HUMAN_CARD', 'card V2: Etapa atual + Próxima ação no bloco de progresso (sem linha Último no card); humanização preservada p/ o Detalhes',
-    /_tlHumanLabel\(e0\)/.test(DH) && /tcv2-k">Etapa</.test(DH) && /tcv2-k">Próxima</.test(DH) && !/Último</.test((DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0]));
+    /_tlHumanLabel\(e0\)/.test(DH) && /tcv2-stage-row/.test(DH) && /tcv2-next/.test(DH) && !/Último</.test((DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0]));
   // ===== PASSO 3 — detalhe (opPanelBlock) renderizado a partir de taskTimeline =====
   const RAWALL=['designer_moved','reviseItem','approveAll','approveItem','sent_to_client','sent_to_designer','final_sent','final_review','reenviado_cliente','social_producao','em_revisao','clientActions','kind','type'];
   const stMap=(s)=> s==='done'?'done':(s==='current'||s==='attention')?'cur':'todo';
@@ -1291,7 +1291,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     /não fica salva/.test(DH));
   check('CY7_CARD_COMPACT','Card PREMIUM V2: accent + header(identidade) + cliente/título/estágio + progresso segmentado + chips + rodapé de ações; densidade gradual por viewport',
     (()=>{const tc=(DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0];
-      return ['tcv2-accent','tcv2-head','tcv2-client','tcv2-title','tcv2-stage','tcv2-prog','tcv2-bar','tcv2-chips','tcv2-foot'].every(k=>tc.indexOf(k)>=0)&&
+      return ['tcv2-accent','tcv2-head','tcv2-client','tcv2-title','tcv2-status','tcv2-stage-row','tcv2-bar','tcv2-meta','tcv2-foot'].every(k=>tc.indexOf(k)>=0)&&
              tc.indexOf('tc-person')<0&&tc.indexOf('tc-who')<0;})() && /@media\(max-height:759px\)\{\s*\n\s*\.tcv2-head/.test(DH));
   check('CY7_KCOL_AUTO','Coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar) + scrollbar fina do kbody + chrome enxuto no board-mode',
     /kcol\{height:auto;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&

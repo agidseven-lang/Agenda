@@ -444,7 +444,7 @@
   .tcv2{position:relative;overflow:hidden;padding:0 !important;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.018),rgba(255,255,255,0) 38%),var(--surface)}
   .tcv2-accent{height:3px;background:linear-gradient(90deg,var(--acc),transparent 78%);opacity:.85}
   .tcv2-head{display:flex;align-items:center;gap:11px;padding:13px 16px 0;min-width:0}
-  .tcv2-head .av{flex:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 45%,transparent) !important}
+  .tcv2-head .av{flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.07) !important}
   .tcv2-head-m{flex:1;min-width:0}
   .tcv2-name{font-size:14px;font-weight:750;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tcv2-sub{font-size:11px;color:var(--faint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -453,27 +453,24 @@
   .tcv2-due svg{width:12px;height:12px}
   .tcv2-st .dotc{width:6px;height:6px;border-radius:50%}
   .tcv2-main{padding:13px 16px 0}
-  .tcv2-client{font-size:10px;font-weight:800;color:var(--accent);letter-spacing:.09em;text-transform:uppercase;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tcv2-client{font-size:10px;font-weight:750;color:var(--soft);letter-spacing:.09em;text-transform:uppercase;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85}
   .tcv2-title{font-size:15.5px;font-weight:800;line-height:1.3;letter-spacing:-.012em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .tcv2-stage{display:inline-flex;align-items:center;gap:7px;margin-top:9px;padding:6px 11px;border-radius:9px;font-size:11.5px;font-weight:750;border:1px solid;max-width:100%}
-  .tcv2-stage .dotc{width:6px;height:6px;border-radius:50%;flex:none}
-  .tcv2-prog{margin:12px 16px 0;padding:10px 12px;background:rgba(255,255,255,.022);border:1px solid var(--line-soft);border-radius:12px}
-  .tcv2-k{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
-  .tcv2-prog-top{display:flex;align-items:center;gap:8px;min-width:0}
-  .tcv2-prog-top b{font-size:12px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .tcv2-prog-n{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--soft);flex:none}
+  .tcv2-status{margin:13px 16px 0}
+  .tcv2-stage-row{display:flex;align-items:flex-start;gap:8px;min-width:0}
+  .tcv2-stage-row .dotc{width:7px;height:7px;border-radius:50%;flex:none;margin-top:4px}
+  .tcv2-stage-row b{font-size:12.5px;font-weight:750;min-width:0;line-height:1.4;letter-spacing:-.005em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tcv2-bar-row{display:flex;align-items:center;gap:9px;margin-top:9px}
+  .tcv2-bar-row .tcv2-bar{flex:1;margin-top:0}
+  .tcv2-prog-n{font-size:10.5px;font-weight:650;color:var(--faint);flex:none;font-variant-numeric:tabular-nums}
   .tcv2-att{flex:none;font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#F59E0B;background:rgba(245,158,11,.14);padding:2px 7px;border-radius:999px}
-  .tcv2-bar{display:flex;gap:4px;margin-top:8px}
-  .tcv2-bar i{flex:1;height:5px;border-radius:99px;background:var(--line)}
-  .tcv2-bar i.done{background:linear-gradient(90deg,#34D399,#22C9A8)}
-  .tcv2-bar i.cur{box-shadow:0 0 8px -1px currentColor}
-  .tcv2-next{display:flex;align-items:baseline;gap:8px;margin-top:8px;font-size:11.5px;line-height:1.45;color:var(--soft);min-width:0}
-  .tcv2-next>span:last-child{min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .tcv2-chips{display:flex;flex-wrap:wrap;gap:7px;padding:11px 16px 0}
-  .tcv2-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:750;white-space:nowrap}
-  .tcv2-chip svg{width:11px;height:11px}
-  .tcv2-chip-soft{color:var(--soft);background:var(--surface2)}
-  .tcv2-themes{margin:11px 16px 0;border:1px solid var(--line-soft);border-radius:12px;padding:10px 12px;display:none}
+  .tcv2-bar{display:flex;gap:3px;margin-top:9px}
+  .tcv2-bar i{flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,.07)}
+  .tcv2-next{margin-top:8px;font-size:11.5px;line-height:1.5;color:var(--soft);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tcv2-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:12px 16px 0;font-size:11px;color:var(--faint);font-weight:600}
+  .tcv2-meta>span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .tcv2-meta svg{width:12px;height:12px}
+  .tcv2-sep{width:3px;height:3px;border-radius:50%;background:var(--line);flex:none}
+  .tcv2-themes{margin:12px 16px 0;padding:10px 0 0;border-top:1px solid var(--line-soft);display:none}
   .tcv2-theme{display:flex;align-items:center;gap:9px;padding:4px 0;font-size:12px;color:var(--ink);min-width:0}
   .tcv2-theme>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tcv2-theme-n{flex:none;width:18px;height:18px;border-radius:6px;background:rgba(91,108,255,.16);color:#9aa6ff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
@@ -490,7 +487,10 @@
   .tcv2-prazo-empty{color:var(--faint);font-weight:500}
   .tcv2-actions{flex:none;display:flex;align-items:center;gap:7px}
   .tcv2 .tc-act{height:33px;padding:0 13px;font-size:12px;border-radius:10px;margin:0}
-  .tcv2 .tc-act.tc-del{width:33px;padding:0;justify-content:center}
+  .tcv2 .tc-act.move{background:transparent;border-color:transparent;color:var(--soft)}
+  .tcv2 .tc-act.move:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+  .tcv2 .tc-act.tc-del{width:33px;padding:0;justify-content:center;background:transparent;border-color:transparent;color:var(--faint)}
+  .tcv2 .tc-act.tc-del:hover{color:var(--red);background:rgba(248,113,113,.10)}
   .tcv2 .tc-act svg{width:14px;height:14px}
   /* DENSIDADE GRADUAL PREMIUM — mesma arquitetura, respiro proporcional ao viewport.
      Compacto (notebooks 1366×768 reais): espaçamentos −15%, nada removido. */
@@ -500,11 +500,10 @@
     .tcv2-name{font-size:13.5px}
     .tcv2-main{padding:10px 14px 0}
     .tcv2-title{font-size:14.5px}
-    .tcv2-stage{margin-top:7px;padding:5px 10px;font-size:11px}
-    .tcv2-prog{margin:9px 14px 0;padding:8px 11px}
-    .tcv2-bar{margin-top:6px}
+    .tcv2-status{margin:10px 14px 0}
+    .tcv2-bar{margin-top:7px}
     .tcv2-next{margin-top:6px;font-size:11px}
-    .tcv2-chips{padding:8px 14px 0}
+    .tcv2-meta{padding:9px 14px 0}
     .tcv2-themes{margin:9px 14px 0}
     .tcv2-chk{margin:9px 14px 0}
     .tcv2-brief{padding:8px 14px 0}
@@ -517,10 +516,9 @@
     .tcv2-head{padding:9px 12px 0}
     .tcv2-head .av{width:30px !important;height:30px !important;font-size:11px !important}
     .tcv2-main{padding:8px 12px 0}
-    .tcv2-stage{margin-top:6px;padding:4px 9px}
-    .tcv2-prog{margin:8px 12px 0;padding:7px 10px}
-    .tcv2-next>span:last-child{-webkit-line-clamp:1}
-    .tcv2-chips{padding:7px 12px 0}
+    .tcv2-status{margin:8px 12px 0}
+    .tcv2-next{-webkit-line-clamp:1}
+    .tcv2-meta{padding:8px 12px 0}
     .tcv2-foot{margin-top:8px;padding:8px 12px 9px}
     .tcv2 .tc-act{height:29px;padding:0 11px}
     .tcv2 .tc-act.tc-del{width:29px}
@@ -2642,33 +2640,41 @@ function taskCard(t, persp){
   h+='<div class="tcv2-main">'+
        (t.client?'<div class="tcv2-client">'+esc(t.client)+'</div>':'')+
        '<div class="tcv2-title" title="'+esc(t.title||'')+'">'+esc(t.title||'Sem título')+'</div>'+
-       (stage?'<div class="tcv2-stage" style="color:'+stage.color+';background:'+withAlpha(stage.color,.11)+';border-color:'+withAlpha(stage.color,.30)+'"><span class="dotc" style="background:'+stage.color+'"></span>'+esc(stage.label)+'</div>':
-        (t.cronStatus?'<div class="tcv2-stage" style="color:'+cronStatusColor(t.cronStatus)+';background:'+withAlpha(cronStatusColor(t.cronStatus),.11)+';border-color:'+withAlpha(cronStatusColor(t.cronStatus),.30)+'"><span class="dotc" style="background:'+cronStatusColor(t.cronStatus)+'"></span>'+esc(cronStatusLabel(t.cronStatus))+'</div>':''))+
      '</div>';
   // PROGRESSO — barra segmentada + responsável da etapa + próxima ação
-  if(prog){
-    let segs='';
-    for(let i2=0;i2<prog.total;i2++){
-      const cls=i2<prog.done?'done':(i2===prog.curIdx?'cur':'');
-      segs+='<i class="'+cls+'"'+(i2===prog.curIdx?' style="background:'+prog.color+'"':'')+'></i>';
-    }
-    h+='<div class="tcv2-prog">'+
-         '<div class="tcv2-prog-top"><span class="tcv2-k">Etapa</span><b style="color:'+prog.color+'">'+esc(prog.owner)+'</b>'+
-           '<span class="tcv2-prog-n">'+Math.min(prog.done+(prog.curIdx>=0?1:0),prog.total)+' de '+prog.total+'</span>'+
+  // BLOCO ÚNICO DE STATUS — uma cor dominante (a do estágio), sem caixas aninhadas:
+  // linha do estágio → barra segmentada na MESMA cor → próxima ação em cinza.
+  if(stage||t.cronStatus){
+    const stColor=stage?stage.color:cronStatusColor(t.cronStatus);
+    const stLabel=stage?stage.label:cronStatusLabel(t.cronStatus);
+    // estágio em linha PRÓPRIA (quebra, nunca trunca); contador + ajuste na linha da barra
+    h+='<div class="tcv2-status">'+
+         '<div class="tcv2-stage-row"><span class="dotc" style="background:'+stColor+'"></span>'+
+           '<b style="color:'+stColor+'">'+esc(stLabel)+'</b></div>';
+    if(prog){
+      let segs='';
+      for(let i2=0;i2<prog.total;i2++){
+        const on=i2<prog.done||i2===prog.curIdx;
+        segs+='<i'+(on?' style="background:'+withAlpha(stColor,i2===prog.curIdx?1:.55)+'"':'')+'></i>';
+      }
+      h+='<div class="tcv2-bar-row"><div class="tcv2-bar">'+segs+'</div>'+
+           '<span class="tcv2-prog-n">'+Math.min(prog.done+(prog.curIdx>=0?1:0),prog.total)+'/'+prog.total+'</span>'+
            (prog.attention?'<span class="tcv2-att" title="Ajuste pedido pelo cliente">ajuste</span>':'')+'</div>'+
-         '<div class="tcv2-bar">'+segs+'</div>'+
-         (prog.next?'<div class="tcv2-next" title="'+esc(prog.next)+'"><span class="tcv2-k">Próxima</span><span>'+esc(prog.next)+'</span></div>':'')+
-       '</div>';
+         (prog.next?'<div class="tcv2-next" title="'+esc(prog.next)+'">'+esc(prog.next)+'</div>':'');
+    }
+    h+='</div>';
   }
   // CONTEÚDO — chips informativos; lista de temas só no modo expandido (telas altas)
+  // METADADOS — texto discreto numa linha (sem bolhas); urgência colore só o prazo.
   const _due=(t.dueDate||t.due)||'';const _dd=_due?_due.split('-'):null;
   const dueTxt=_dd&&_dd.length===3?(+_dd[2]+' '+MES[+_dd[1]-1]):'';
-  h+='<div class="tcv2-chips">'+
-       (dueTxt?'<span class="tcv2-chip" style="color:'+(d?d.color:'var(--soft)')+';background:'+withAlpha(d?d.color:'#9BA0AB',.12)+'" title="Prazo: '+esc(fmtDateBR(_due))+(t.dueTime?' às '+esc(t.dueTime):'')+'">'+svg('clock')+esc(dueTxt)+(d?' · '+esc(dShort):'')+'</span>':'<span class="tcv2-chip tcv2-chip-soft">'+svg('clock')+'Sem prazo</span>')+
-       '<span class="tcv2-chip" style="color:'+s.color+';background:'+withAlpha(s.color,.12)+'">'+esc(s.label)+'</span>'+
-       (cron?'<span class="tcv2-chip tcv2-chip-soft">'+esc(cron.label)+' · '+cron.count+' tema'+(cron.count>1?'s':'')+'</span>':'')+
-       (t.priority?'<span class="tcv2-chip" style="color:#F87171;background:'+withAlpha('#F87171',.12)+'">⚑ Prioridade</span>':'')+
-     '</div>';
+  const metaBits=[];
+  if(dueTxt)metaBits.push('<span'+(d?' style="color:'+d.color+';font-weight:700"':'')+' title="Prazo: '+esc(fmtDateBR(_due))+(t.dueTime?' às '+esc(t.dueTime):'')+'">'+svg('clock')+esc(dueTxt)+(d?' · '+esc(dShort):'')+'</span>');
+  else metaBits.push('<span>'+svg('clock')+'Sem prazo</span>');
+  if(cron)metaBits.push('<span>'+esc(cron.label)+' · '+cron.count+' tema'+(cron.count>1?'s':'')+'</span>');
+  else metaBits.push('<span>'+esc(s.label)+'</span>');
+  if(t.priority)metaBits.push('<span style="color:#F87171;font-weight:700">⚑ Prioridade</span>');
+  h+='<div class="tcv2-meta">'+metaBits.join('<i class="tcv2-sep"></i>')+'</div>';
   if(cron&&cron.list.length){
     const show=cron.list.slice(0,3);const rest=cron.count-show.length;
     h+='<div class="tcv2-themes">'+
