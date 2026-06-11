@@ -359,7 +359,7 @@ check('D_UPLOAD', 'Produção preserva o scroll ao anexar arte (_prodKeepScroll 
 // As abas (taskChips) vivem SOMENTE dentro do quadro Kanban (boardToolbar + renderBoard de setor).
 // NENHUM hub de seleção de setores/cards (renderHub/renderRoleBoards/renderDesignersHub/renderSocialsHub)
 // pode renderizar abas. Sem barra global, sem hubTabsBar, sem sticky.
-check('D5', 'boardToolbar() (Kanban) = BUSCA + ABAS na mesma moldura', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><input[^>]*><div class="tchips">'\+taskChips\(\)/.test(DH));
+check('D5', 'boardToolbar() (Kanban) = BUSCA (com atalho Ctrl K) + ABAS na mesma moldura', /function boardToolbar\(\)\{return '<div class="d-board-tools tbar"><span class="bsearch-wrap"><input[^>]*><kbd class="bsearch-kbd">Ctrl K<\/kbd><\/span><div class="tchips">'\+taskChips\(\)/.test(DH));
 check('D_TAB1', 'taskTabBar() REMOVIDA (sem barra global de abas)', !/function taskTabBar\b/.test(DH));
 check('D_TAB2', 'CSS .tasks-tabbar REMOVIDO (sem barra flutuante/sticky no topo da tela)', !/\.tasks-tabbar/.test(DH));
 check('D_TAB3', 'Dispatch da aba Tarefas NÃO prepende barra global (c.innerHTML=body)', /c\.innerHTML=body;/.test(DH) && !/c\.innerHTML=taskTabBar/.test(DH));
@@ -1239,8 +1239,8 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   })();
   check('CY5_KANBAN_MINW','Kanban: coluna com largura mínima REAL (300px) + scroll horizontal do board (nunca espremer)',
     /grid-template-columns:repeat\(4,minmax\(300px,1fr\)\)/.test(DH) && /\.kanban\{[\s\S]{0,300}overflow-x:auto/.test(DH) && /\.kanban \.kcol\{min-width:300px\}/.test(DH));
-  check('CY5_KANBAN_BOARDMODE','board-mode: kanban rola na horizontal mantendo colunas em altura total',
-    /#content\.board-mode \.kanban\{flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden\}/.test(DH));
+  check('CY5_KANBAN_BOARDMODE','board-mode (spec da referência): 4 colunas minmax(232px,1fr) gap 12, hscroll só quando não cabe',
+    /#content\.board-mode \.kanban\{flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;\s*\n\s*grid-template-columns:repeat\(4,minmax\(232px,1fr\)\);gap:12px\}/.test(DH));
   if(mod&&mod.designerStatusView){
     const DT={sector:'cronograma',cronContents:[{tema:'T'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
     check('CY5_DESIGNER_TOPCHIP','Chip do card do designer = EXATAMENTE "Designer em produção" (fonte designerStatusView)', mod.designerStatusView(DT).label==='Designer em produção');
@@ -1292,10 +1292,10 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('CY7_CARD_COMPACT','Card PREMIUM V2: accent + header(identidade) + cliente/título/estágio + progresso segmentado + chips + rodapé de ações; densidade gradual por viewport',
     (()=>{const tc=(DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0];
       return ['tcv4-top','tcv4-st','tcv4-due','tcv4-person','tcv4-origin','tcv4-client','tcv4-title','tcv4-chips','tcv4-rail','tcv4-themes','tcv4-circ','tcv4-date','tcv4-foot','data-cardmenu'].every(k=>tc.indexOf(k)>=0)&&
-             tc.indexOf('tc-person')<0;})() && /@media\(max-height:759px\)\{\s*\n\s*\.tcv4\{/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
+             tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar) + scrollbar fina do kbody + chrome enxuto no board-mode',
     /kcol\{height:auto;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
-    /#content\.board-mode \.kcol \.kbody\{padding:8px 10px 10px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
+    /#content\.board-mode \.kcol \.kbody\{padding:6px 9px 3px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
   (function(){
     const W53=readFromGit('worker/v64-42-team-adjust-idem-cleanup','cloudflare-worker.js');
     check('CY7_W53_VERSION','Worker healthcheck = V64.53-premium-portal (SW V64.51 INTOCADO)',
