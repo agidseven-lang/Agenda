@@ -1156,7 +1156,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
   check('CY2_CSS_KCOL','Card cortado (fix ESTRUTURAL V64.53): board-mode flex + coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar)',
     /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:calc\(100vh\/var\(--fitz,1\)\)/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:100%;max-height:100%;min-height:0\}/.test(DH));
-  check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 + scrollbar-gutter + scroll-margin no último card', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;scrollbar-gutter:stable\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:4px;scroll-margin-bottom:12px\}/.test(DH));
+  check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 (sem gutter assimétrico — card centrado como a referência) + scroll-margin no último card', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:4px;scroll-margin-bottom:12px\}/.test(DH));
   // Problema 1 — gatilho do push de envio (Desktop → Worker contentSent, best-effort).
   check('CY2_SENT_TRIGGER','persistClientSend chama team-action contentSent com Bearer JWT + Idempotency-Key (best-effort)',
     (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];return fn.indexOf("action:'contentSent'")>=0&&fn.indexOf("'Authorization':'Bearer '+jwt")>=0&&fn.indexOf("'Idempotency-Key':idem")>=0&&fn.indexOf('catch')>=0;})());
@@ -1295,7 +1295,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
              tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Colunas de ALTURA IGUAL (referência) + 1 card inteiro sem scrollbar + scrollbar fina + chrome enxuto',
     /kcol\{height:100%;max-height:100%;min-height:0\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
-    /#content\.board-mode \.kcol \.kbody\{padding:31px 7px 0;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH) &&
+    /#content\.board-mode \.kcol \.kbody\{padding:16px 7px 0;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH) &&
     /\.tc:last-child:not\(:only-child\)\{margin-bottom:14px\}/.test(DH));
   check('CY9_PROPORCAO_STATUS','Fidelidade à referência: fitZoom escala a composição em telas grandes + colunas preenchem altura (como o print) + status NUNCA truncado + presença no canto do avatar',
     /function fitZoom\(\)/.test(DH) && /Math\.min\(1\.5,Math\.max\(1,Math\.min\(window\.innerWidth\/1366,window\.innerHeight\/812\)\)\)/.test(DH) &&
