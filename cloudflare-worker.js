@@ -214,6 +214,11 @@ export default {
       return handleSlaDiscover(request, env);
     }
 
+    // V64.58 — LENTE LEGADO (measure-only): baseline real por status/dueDate/sector.
+    if (url.pathname === "/sla-legacy-baseline" && request.method === "POST") {
+      return handleSlaLegacyBaseline(request, env);
+    }
+
     // ADITIVO (V64.6): Visão pública do CLIENTE em HTML premium.
     // Rota servida pelo Worker porque o link compartilhado via WhatsApp aponta para
     // https://idseven-push.agidseven.workers.dev/cliente/cronograma/<token>. Antes
@@ -295,7 +300,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.57-sla-discover" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.58-legacy-baseline" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -3979,5 +3984,71 @@ async function handleSlaDiscover(request, env) {
   return json({ ok: true, mode: "discover-read-only", report: { now: nowMs, diag, aggregate: slaDiscoverAggregate(tasks, nowMs, tz), probes } }, 200, env);
 }
 
+/* ── FASE 4.4 (V64.58): LENTE LEGADO — BASELINE READ-ONLY (measure-only) ──
+   Mede o modelo REAL de produção (campo `status` + dueDate/startDate/sector/
+   assigneeId) SEM tocar em nada: sem alerta pessoal, sem lock, sem push, sem
+   escrita, sem slaEvents, sem designerSla. Agregados ANÔNIMOS por construção:
+   responsáveis viram pseudônimos estáveis (resp01..respNN por volume); nenhuma
+   resposta contém id de doc, título, cliente, nome, telefone, e-mail ou token. */
+function slaLegacyAggregate(tasks, nowMs, tz) {
+  const agg = { analyzed: tasks.length,
+    countsByStatus: {}, bySector: {}, byAssignee: {},
+    overdueByDueDate: 0, dueFuture: 0, semDueDate: 0, semAssignee: 0, semSector: 0,
+    overdueBySector: {}, overdueByAssignee: {},
+    overdueMagnitude: { ate_1d: 0, d1_3: 0, d3_7: 0, mais_7d: 0 },
+    ageDays: { d0_7: 0, d8_30: 0, d31_90: 0, d90p: 0, semCreatedAt: 0 } };
+  /* pseudônimos estáveis: assigneeId → resp01.. (ordenado por volume no fim) */
+  const rawAssignee = {};
+  for (const t of tasks) {
+    const st = (typeof t.status === "string" && t.status) ? t.status : "(sem status)";
+    agg.countsByStatus[st] = (agg.countsByStatus[st] || 0) + 1;
+    const sec = (typeof t.sector === "string" && t.sector) ? t.sector : null;
+    if (sec) agg.bySector[sec] = (agg.bySector[sec] || 0) + 1; else agg.semSector++;
+    const asg = (typeof t.assigneeId === "string" && t.assigneeId) ? t.assigneeId : null;
+    if (asg) rawAssignee[asg] = (rawAssignee[asg] || 0) + 1; else agg.semAssignee++;
+    const due = taskDueMs(t, tz);
+    const active = st !== "concluido" && st !== "cancelada" && st !== "excluido";
+    if (!due) agg.semDueDate++;
+    else if (due < nowMs && active) {
+      agg.overdueByDueDate++;
+      if (sec) agg.overdueBySector[sec] = (agg.overdueBySector[sec] || 0) + 1;
+      if (asg) agg.overdueByAssignee[asg] = (agg.overdueByAssignee[asg] || 0) + 1;
+      const d = (nowMs - due) / 86400000;
+      if (d <= 1) agg.overdueMagnitude.ate_1d++; else if (d <= 3) agg.overdueMagnitude.d1_3++;
+      else if (d <= 7) agg.overdueMagnitude.d3_7++; else agg.overdueMagnitude.mais_7d++;
+    } else if (due >= nowMs) agg.dueFuture++;
+    const age = t.createdAt ? (nowMs - t.createdAt) / 86400000 : null;
+    if (age == null) agg.ageDays.semCreatedAt++;
+    else if (age <= 7) agg.ageDays.d0_7++; else if (age <= 30) agg.ageDays.d8_30++;
+    else if (age <= 90) agg.ageDays.d31_90++; else agg.ageDays.d90p++;
+  }
+  /* anonimização: ids de responsável NUNCA saem — viram resp01..respNN */
+  const ordered = Object.keys(rawAssignee).sort((a, b) => rawAssignee[b] - rawAssignee[a]);
+  const alias = {}; ordered.forEach((id, i) => { alias[id] = "resp" + String(i + 1).padStart(2, "0"); });
+  for (const id of ordered) agg.byAssignee[alias[id]] = rawAssignee[id];
+  const odA = {}; for (const id of Object.keys(agg.overdueByAssignee)) odA[alias[id] || "resp??"] = agg.overdueByAssignee[id];
+  agg.overdueByAssignee = odA;
+  return agg;
+}
+async function handleSlaLegacyBaseline(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env ausente)." }, 403, env);
+  const nowMs = Date.now();
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  const STATUSES = ["afazer", "andamento", "revisao", "concluido"];
+  const diag = { queries: {}, totalQueried: 0 };
+  const all = [];
+  for (const st of STATUSES) {     /* igualdade pura: robusta, índice default, read-only */
+    const r = await slaRunQuery(env, accessToken,
+      { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: st } } }, 300);
+    diag.queries[st] = { status: r.ok ? 200 : r.status, count: r.tasks.length, error: r.ok ? null : (r.errBody || null) };
+    diag.totalQueried += r.tasks.length;
+    for (const t of r.tasks) all.push(t);
+  }
+  const aggregate = slaLegacyAggregate(all, nowMs, tz);
+  return json({ ok: true, mode: "legacy-baseline-read-only", report: { now: nowMs, diag, aggregate } }, 200, env);
+}
+
 /* export p/ testes unitários (node) — não interfere no runtime do Worker. */
-export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover };
+export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover, slaLegacyAggregate, handleSlaLegacyBaseline };

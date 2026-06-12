@@ -77,6 +77,7 @@ const SUITE = [
   ["POST", "/imagekit-auth", { token: "abc", expire: 9999999999 }, "assinatura ImageKit"],
   ["POST", "/sla-dryrun", {}, "rota NOVA (na V64.53 cai no relay; na V64.54 = 403)"],
   ["POST", "/sla-reschedule-plan", { taskId: "TT1" }, "rota NOVA (idem)"],
+  ["POST", "/sla-legacy-baseline", {}, "rota NOVA V64.58 (idem: 403 sem env)"],
 ];
 const results = {};
 for (const W of [["OLD", OLD], ["NEW", NEW]]) {

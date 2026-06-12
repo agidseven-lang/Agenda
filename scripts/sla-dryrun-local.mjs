@@ -55,9 +55,9 @@ function makeFetchStub(opts) {
       const body = init && init.body ? String(init.body) : "";
       if (opts.inFails && body.includes('"IN"'))
         return new Response(JSON.stringify({ error: { code: 400, message: "simulated: IN rejected" } }), { status: 400 });
-      let rows = FIXTURES;
-      const eq = body.match(/"op":"EQUAL".*?"stringValue":"(\w+)"/s);
-      if (eq) rows = FIXTURES.filter((t) => t.designerFlowStatus === eq[1]);
+      let rows = opts.legacyFixtures || FIXTURES;
+      const eq = body.match(/"fieldPath":"([\w.]+)"\s*\},\s*"op":"EQUAL".*?"stringValue":"([\w-]+)"/s);
+      if (eq) rows = rows.filter((t) => String(t[eq[1]] ?? (eq[1].includes(".") ? eq[1].split(".").reduce((o, k) => (o || {})[k], t) : undefined)) === eq[2]);
       return new Response(JSON.stringify(rows.map((t) => ({ document: { name: "projects/x/databases/(default)/documents/tasks/" + t.id, fields: S.slaEncodeFields(t) } }))), { status: 200 });
     }
     if (url.includes("/documents/slaEvents?documentId=")) {
@@ -131,6 +131,34 @@ console.log("== E) V64.57: /sla-discover — agregados anônimos read-only ==");
   ok("histograma de status legado (1 andamento/1 afazer/1 concluido; betas não têm status)", agg.valueHistograms.status.andamento === 1 && agg.valueHistograms.status.afazer === 1 && agg.valueHistograms.status.concluido === 1, agg.valueHistograms.status);
   ok("atraso REAL por dueDate detectado no legado (L1 vencida e não concluída)", agg.overdueByDueDate >= 1, { overdue: agg.overdueByDueDate });
   ok("ZERO dados sensíveis no agregado (sem títulos/clientes/ids)", !JSON.stringify(agg).includes("SENSIVEL") && !JSON.stringify(agg).includes("L1")); }
+
+console.log("== F) V64.58: /sla-legacy-baseline — lente legado measure-only ==");
+{ const D = 86400000;
+  const LEG = [
+    { id: "SENS-ID-1", title: "SENSIVEL-T", client: "SENSIVEL-C", status: "afazer",    sector: "copy",   assigneeId: "uid-AAA", dueDate: dstr(now + 2 * D), dueTime: "18:00", createdAt: now - 2 * D },
+    { id: "SENS-ID-2", title: "X", client: "Y", status: "andamento", sector: "design", assigneeId: "uid-AAA", dueDate: dstr(now - 2 * D), dueTime: "18:00", createdAt: now - 10 * D },
+    { id: "SENS-ID-3", title: "X", client: "Y", status: "andamento", sector: "design", assigneeId: "uid-BBB", dueDate: dstr(now - 5 * D), dueTime: "18:00", createdAt: now - 40 * D },
+    { id: "SENS-ID-4", title: "X", client: "Y", status: "revisao",   sector: "copy",   dueDate: dstr(now - 10 * D), dueTime: "18:00", createdAt: now - 100 * D },
+    { id: "SENS-ID-5", title: "X", client: "Y", status: "concluido", sector: "design", assigneeId: "uid-BBB", dueDate: dstr(now - 3 * D), dueTime: "18:00" },
+    { id: "SENS-ID-6", title: "X", client: "Y", status: "afazer" }];
+  const wmod = (await import(pathToFileURL(TMP).href)).default;
+  const { stub, calls } = makeFetchStub({ legacyFixtures: LEG }); globalThis.fetch = stub;
+  const req2 = (p2, b) => new Request("https://x" + p2, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b || {}) });
+  const r403 = await wmod.fetch(req2("/sla-legacy-baseline", {}), { FCM_PROJECT_ID: "t", FCM_CLIENT_EMAIL: "t", FCM_PRIVATE_KEY: PEM }, {});
+  ok("SEM env → 403", r403.status === 403);
+  const r = await wmod.fetch(req2("/sla-legacy-baseline", {}), baseEnv, {});
+  const j = await r.json(); const a = j.report.aggregate;
+  console.log("  agregado:", JSON.stringify(a).slice(0, 400));
+  ok("modo legacy-baseline-read-only, 200", r.status === 200 && j.mode === "legacy-baseline-read-only");
+  ok("contagens por status (2 afazer/2 andamento/1 revisao/1 concluido)", a.countsByStatus.afazer === 2 && a.countsByStatus.andamento === 2 && a.countsByStatus.revisao === 1 && a.countsByStatus.concluido === 1, a.countsByStatus);
+  ok("ATRASADAS por dueDate = 3 (2 andamento + 1 revisao vencidas; concluída NÃO conta)", a.overdueByDueDate === 3, a);
+  ok("magnitude do atraso bucketizada (1-3d, 3-7d, +7d)", a.overdueMagnitude.d1_3 === 1 && a.overdueMagnitude.d3_7 === 1 && a.overdueMagnitude.mais_7d === 1, a.overdueMagnitude);
+  ok("setores copy/design + semSector/semDueDate/semAssignee contados", a.bySector.copy === 2 && a.bySector.design === 3 && a.semSector === 1 && a.semDueDate === 1 && a.semAssignee === 2, a);
+  ok("responsáveis PSEUDONIMIZADOS (resp01/resp02; uid nunca sai)", a.byAssignee.resp01 === 2 && a.byAssignee.resp02 === 2 && !JSON.stringify(a).includes("uid-"), a.byAssignee);
+  ok("atraso por responsável pseudonimizado", (a.overdueByAssignee.resp01 || 0) + (a.overdueByAssignee.resp02 || 0) === 2, a.overdueByAssignee);
+  ok("ZERO dados sensíveis (sem títulos/clientes/ids de doc)", !JSON.stringify(j).includes("SENS"), null);
+  ok("ZERO escrita / ZERO FCM na lente legado", calls.writes.length === 0 && calls.fcm === 0);
+  ok("diag por consulta presente (4 igualdades 200)", Object.values(j.report.diag.queries).every(q => q.status === 200) && j.report.diag.totalQueried === 6, j.report.diag); }
 
 console.log(`\nRESULTADO DRY-RUN LOCAL: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail ? 1 : 0);
