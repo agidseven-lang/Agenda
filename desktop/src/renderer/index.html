@@ -441,7 +441,7 @@
   body.desktop #content.board-mode .d-board-tools.tbar .bsearch-wrap{flex:0 1 400px}
   body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:36px;padding:0 13px;font-size:11.5px;border-radius:10px}
   body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:36px;border-radius:10px}
-  body.desktop #content.board-mode .kanban{margin-top:29px}
+  body.desktop #content.board-mode .kanban{margin-top:24px}
   body.desktop #content.board-mode .kcol .khead{padding:6px 12px 5px}
   /* scroll-snap proximity + scroll-padding: ao rolar, o card acomoda INTEIRO com respiro —
      nunca para "decapitado" contra o header da coluna. */
@@ -533,7 +533,10 @@
      à direita em Full HD (causa-raiz do desalinhamento com o botão "Setores"). */
   @media(min-width:1700px){
     body.desktop #content.board-mode .kanban{gap:20px}
-    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;border-radius:12px}
+    /* contrato 1.0.147 (reprovação parcial Full HD): coluna NÃO estica até a base útil em
+       Full HD (causava ratio card×coluna 0.825 com 89px de vazio no rodapé). Cap real em px
+       — card ainda dominante, respiro premium, baseUtil ~85px (zona morta da referência). */
+    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;max-height:815px;border-radius:12px}
     body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:484px}
   }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
