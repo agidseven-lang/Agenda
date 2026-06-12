@@ -267,13 +267,12 @@
   body.desktop.authed #app{
     display:grid !important;
     grid-template-columns:var(--d-side) 1fr;
-    grid-template-rows:calc(100vh/var(--fitz,1));
+    grid-template-rows:100vh;
     max-width:none !important;
     margin:0 !important;
-    min-height:calc(100vh/var(--fitz,1));
+    min-height:100vh;
     box-shadow:none !important;
   }
-  body.desktop{min-height:calc(100vh/var(--fitz,1))}
   /* SIDEBAR (vira a nav) */
   body.desktop .nav{
     position:relative !important;
@@ -283,7 +282,7 @@
     display:flex !important;flex-direction:column;justify-content:flex-start;align-items:stretch;
     gap:3px;padding:14px 12px 14px 12px;
     background:#0D0E14;border-top:none;border-right:1px solid var(--line-soft);
-    backdrop-filter:none;height:calc(100vh/var(--fitz,1));overflow-y:auto;
+    backdrop-filter:none;height:100vh;overflow-y:auto;
   }
   body.desktop .nav .sb-brand{
     display:flex;align-items:center;gap:11px;padding:4px 6px 13px 6px;border-bottom:1px solid var(--line-soft);margin-bottom:10px
@@ -348,7 +347,7 @@
   body.desktop #app > .content{
     grid-column:2;grid-row:1;
     padding:calc(var(--d-topbar) + 8px) 32px 48px 32px !important;
-    overflow-y:auto;height:calc(100vh/var(--fitz,1));
+    overflow-y:auto;height:100vh;
   }
   body.desktop #app > .content > *{max-width:var(--d-maxw);margin-left:auto;margin-right:auto}
   body.desktop .scr,body.desktop .scr-head{padding-left:0;padding-right:0}
@@ -403,7 +402,7 @@
      kanban ocupa o restante (flex:1 + min-height:0). As colunas têm height:100%
      e SÓ o .kbody rola — topo (header da coluna) sempre visível, base sempre
      dentro da janela, último card com respiro + scroll-margin. */
-  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:calc(100vh/var(--fitz,1));padding-bottom:16px!important;padding-left:34px!important;padding-right:34px!important}
+  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:16px!important;padding-left:34px!important;padding-right:34px!important}
   /* Reprovação 1.0.137: o cap de 1400px deixava ~200px ociosos nas laterais enquanto as
      colunas ficavam estreitas. Nas telas de QUADRO o cap cai: o board usa a largura útil
      REAL (viewport - sidebar - 48px) — colunas largas quando há espaço; scroll horizontal
@@ -470,8 +469,8 @@
     body.desktop #content.board-mode .kcol .kbody{padding:5px 8px 5px}
   }
   /* Colunas ABRAÇAM o conteúdo (altura = coluna mais alta, limitada à janela): com card de
-     cronograma (alto) fica como a referência; com cards curtos (tarefas comuns) NÃO sobra um
-     poço de vazio abaixo do card. fitZoom mantém a composição do print em telas grandes. */
+     cronograma (alto) a proporção card×coluna (~86-92%) vale em QUALQUER tela; com cards
+     curtos não sobra poço de vazio. Sem zoom/transform global — escopo só do quadro. */
   body.desktop #content.board-mode .kanban{display:flex;flex:0 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
     gap:15px;align-items:stretch;justify-content:safe center}
   /* max-width: em telas grandes a coluna NÃO balona (card "esticado" reprovado na 1.0.141);
@@ -1777,8 +1776,8 @@ async function doRegister(name,role,phone,email,password){
 }
 function saveSession(u){localStorage.setItem('wp_uid',u.id);localStorage.setItem('wp_name',u.name||'');}
 function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');localStorage.removeItem('wp_team_jwt');}
-function startApp(u){state.user=u;saveSession(u);document.body.classList.add("authed");fitZoom();document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
-function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');fitZoom();if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';renderLogin();}
+function startApp(u){state.user=u;saveSession(u);document.body.classList.add("authed");document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
+function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';renderLogin();}
 function subscribeData(){
   unsub.users=db.collection('users').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}renderFromSnapshot();});
   unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderFromSnapshot();});
@@ -4533,21 +4532,6 @@ async function saveTask(){const f=state.form;
    injetados em #modalRoot, que e IRMAO de #app. Preso em #app, nenhum clique
    dentro de um modal era capturado -> seletor de responsavel/mover status/
    sheets ficavam mortos. Em document, captura tudo (com guarda de sessao). */
-// FIEL À REFERÊNCIA em qualquer tela: o print autoritativo é um frame 1366×768. Em telas
-// MAIORES, escala a composição inteira (zoom) — a relação card × coluna × quadro do print
-// vale em 1080p/1440p, em vez de coluna gigante com card perdido. Em telas ≤ referência,
-// zoom 1 (os media de altura cuidam do encaixe). Teto 1.5 p/ não exagerar em 4K.
-function fitZoom(){
-  if(typeof isDesktop==='function'&&!isDesktop())return;
-  // escopo: o zoom do Design Contract vale APENAS para o app autenticado.
-  // A tela de login NUNCA é escalada (regressão 1.0.143: login ampliado/cortado em 1080p).
-  const authed=document.body.classList.contains('authed');
-  const z=authed?Math.min(1.5,Math.max(1,Math.min(window.innerWidth/1366,window.innerHeight/812))):1;
-  document.body.style.zoom=z>1.005?z.toFixed(3):'';
-  document.documentElement.style.setProperty('--fitz',z>1.005?z.toFixed(3):'1');
-}
-window.addEventListener('resize',fitZoom);
-fitZoom();
 // popover '⋯' do card V4: PORTAL no <body> (escapa contain/overflow). Fecha devolvendo o nó
 // ao card de origem; fecha também em rolagem/resize/Escape para não ficar "órfão" do botão.
 function closeCardMenus(){
@@ -4593,8 +4577,8 @@ document.addEventListener('click',async e=>{
     closeCardMenus();
     if(!open){w.classList.add('open');const m=w.querySelector('.tcv4-menu');if(m){
       document.body.appendChild(m);m.classList.add('open');
-      // calibração: sob zoom (fitZoom), 'left:Npx' não pinta em N px de viewport — mede-se
-      // onde 0 e 100 caem de verdade e converte (funciona em zoom legado E padronizado).
+      // calibração: mede onde 0 e 100 caem de verdade e converte — posicionamento exato
+      // independentemente de qualquer escala/zoom de SO ou do Chromium.
       m.style.left='0px';m.style.top='0px';
       const c0=m.getBoundingClientRect();
       m.style.left='100px';m.style.top='100px';

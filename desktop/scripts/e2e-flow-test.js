@@ -1155,7 +1155,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('CY2_SRC_COL4','clientCol4: "Aprovado" SÓ p/ concluido; aprovado/producao/reenviado → analise', /if\(c==='concluido'\)return 'aprovado';\s*\n\s*if\(c==='aprovado'\|\|c==='producao'\|\|c==='reenviado'\)return 'analise';/.test(DH));
   // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
   check('CY2_CSS_KCOL','Card cortado (fix ESTRUTURAL V64.53): board-mode flex + coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar)',
-    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:calc\(100vh\/var\(--fitz,1\)\)/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:auto;max-height:100%;min-height:380px\}/.test(DH));
+    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:auto;max-height:100%;min-height:380px\}/.test(DH));
   check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 (sem gutter assimétrico — card centrado como a referência) + scroll-margin no último card', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:4px;scroll-margin-bottom:12px\}/.test(DH));
   // Problema 1 — gatilho do push de envio (Desktop → Worker contentSent, best-effort).
   check('CY2_SENT_TRIGGER','persistClientSend chama team-action contentSent com Bearer JWT + Idempotency-Key (best-effort)',
@@ -1297,10 +1297,9 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     /kcol\{height:auto;max-height:100%;min-height:380px\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
     /#content\.board-mode \.kcol \.kbody\{padding:16px 7px 0;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH) &&
     /\.tc:last-child:not\(:only-child\)\{margin-bottom:14px\}/.test(DH));
-  check('CY9_PROPORCAO_STATUS','Fidelidade à referência: fitZoom escala a composição em telas grandes + colunas preenchem altura (como o print) + status NUNCA truncado + presença no canto do avatar',
-    /function fitZoom\(\)/.test(DH) && /Math\.min\(1\.5,Math\.max\(1,Math\.min\(window\.innerWidth\/1366,window\.innerHeight\/812\)\)\)/.test(DH) &&
-    DH.indexOf('document.body.style.zoom=z>1.005?z.toFixed(3):\'\';')>=0 && /--fitz/.test(DH) &&
-    /grid-template-rows:calc\(100vh\/var\(--fitz,1\)\)/.test(DH) &&
+  check('CY9_PROPORCAO_STATUS','Escopo limpo (reprovação 1.0.144): ZERO zoom/scale global (fitZoom removido) + colunas abraçam conteúdo (proporção em qualquer tela) + status nunca truncado + presença no canto do avatar',
+    DH.indexOf('fitZoom')<0 && DH.indexOf('--fitz')<0 && !/document\.body\.style\.zoom/.test(DH) &&
+    /grid-template-rows:100vh/.test(DH) &&
     /\.tcv4-avw\{position:relative;flex:none;display:inline-flex\}/.test(DH) &&
     /\.tcv4-presence\{position:absolute;left:-1px;bottom:-1px;width:9px;height:9px/.test(DH) &&
     /\.kanban\{display:flex;flex:0 1 auto;/.test(DH) && /\.kcol\{height:auto;max-height:100%;min-height:380px\}/.test(DH) &&
