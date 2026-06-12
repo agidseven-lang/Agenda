@@ -1,0 +1,108 @@
+/* ════════════════════════════════════════════════════════════════════════
+   DRY-RUN LOCAL do runSlaEnginePass REAL (FASE 4.3) — rede 100% stubada.
+   Prova: (a) modo dry-run = ZERO escritas; (b) gating: write:true SEM flag
+   slaEngine continua sem escrever; (c) com SLA_WRITE+flag: cria slaEvents
+   com ID=dedupKey e a 2ª passada cai em 409 (dedupSkipped, sem duplicar);
+   (d) NENHUMA chamada ao FCM em nenhum modo (push real inexistente na fase).
+   Uso: node scripts/sla-dryrun-local.mjs
+   ════════════════════════════════════════════════════════════════════════ */
+import { copyFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+import { generateKeyPairSync } from "node:crypto";
+import path from "node:path";
+
+const SRC = path.resolve(import.meta.dirname, "..", "cloudflare-worker.js");
+const TMP = "/tmp/idseven-worker-dryrun.mjs";
+copyFileSync(SRC, TMP);
+const { __slaCore: S } = await import(pathToFileURL(TMP).href);
+
+const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const PEM = privateKey.export({ type: "pkcs8", format: "pem" });
+const baseEnv = { FCM_PROJECT_ID: "test-project", FCM_CLIENT_EMAIL: "sla@test", FCM_PRIVATE_KEY: PEM, APP_TZ_OFFSET_MINUTES: "-180", SLA_ENGINE_ENABLED: "true" };
+
+/* fixtures relativos a AGORA: 1 atrasada, 1 perto do prazo, 1 ok, 1 entregue,
+   +2 em produção do MESMO designer (WIP hard 2 → 3 em produção = excedido) */
+const now = Date.now(), MIN = 60000;
+/* epoch UTC → "data/hora LOCAL -3" (inverso exato do slaToMs do worker) */
+const dstr = (ms) => new Date(ms + (-180) * MIN).toISOString().slice(0, 10);
+const tstr = (ms) => new Date(ms + (-180) * MIN).toISOString().slice(11, 16);
+const mk = (id, designer, flow, startOff, endOff, extra) => Object.assign({
+  id, designerFlowStatus: flow,
+  designerAssignment: { designerId: designer, assignedBy: "S1", assignedAt: now - 120 * MIN,
+    startDate: dstr(now + startOff), startTime: tstr(now + startOff),
+    endDate: dstr(now + endOff), endTime: tstr(now + endOff) },
+  startedAt: flow === "afazer" ? null : now - 90 * MIN, doneAt: null }, extra || {});
+const FIXTURES = [
+  mk("T-ATRASADA", "D1", "andamento", -180 * MIN, -45 * MIN),               // entrega_atrasada → vermelho+lock candidate
+  mk("T-PERTO",    "D1", "andamento", -180 * MIN, +20 * MIN),               // entrega_proxima → laranja
+  mk("T-OK",       "D2", "andamento", -180 * MIN, +600 * MIN),              // em_producao
+  mk("T-FEITA",    "D2", "concluido", -300 * MIN, -60 * MIN, { doneAt: now - 70 * MIN }),
+  mk("T-WIP3",     "D1", "andamento", -180 * MIN, +600 * MIN),              // 3º andamento de D1 → WIP excedido
+  mk("T-NAOINI",   "D3", "afazer",    -40 * MIN,  +300 * MIN),              // inicio_atrasado >30min → candidato
+];
+
+function makeFetchStub(opts) {
+  const calls = { fcm: 0, writes: [], created: new Set(opts.preCreated || []) };
+  const stub = async (url, init) => {
+    url = String(url);
+    if (url.includes("oauth2.googleapis.com/token")) return new Response(JSON.stringify({ access_token: "stub-token", expires_in: 3600 }), { status: 200 });
+    if (url.includes("fcm.googleapis.com")) { calls.fcm++; return new Response("{}", { status: 200 }); }
+    if (url.includes("documents/appConfig/flags")) {
+      if (!opts.flagsOn) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ fields: S.slaEncodeFields({ slaEngine: true }) }), { status: 200 });
+    }
+    if (url.includes("documents:runQuery")) {
+      const rows = FIXTURES.map((t) => ({ document: { name: "projects/x/databases/(default)/documents/tasks/" + t.id, fields: S.slaEncodeFields(t) } }));
+      return new Response(JSON.stringify(rows), { status: 200 });
+    }
+    if (url.includes("/documents/slaEvents?documentId=")) {
+      const id = decodeURIComponent(url.split("documentId=")[1]);
+      if (calls.created.has(id)) return new Response(JSON.stringify({ error: { status: "ALREADY_EXISTS" } }), { status: 409 });
+      calls.created.add(id); calls.writes.push({ kind: "slaEvent", id });
+      return new Response("{}", { status: 200 });
+    }
+    if ((init && init.method) === "PATCH" && url.includes("/documents/tasks/")) {
+      calls.writes.push({ kind: "designerSla", url: url.split("/documents/")[1].split("?")[0] });
+      return new Response("{}", { status: 200 });
+    }
+    return new Response("{}", { status: 200 });
+  };
+  return { stub, calls };
+}
+
+let pass = 0, fail = 0;
+const ok = (n, c, x) => { if (c) { pass++; console.log("  PASS", n); } else { fail++; console.log("  FAIL", n, x !== undefined ? JSON.stringify(x) : ""); } };
+
+console.log("== A) DRY-RUN PURO (default do cron com SLA_ENGINE_ENABLED, sem SLA_WRITE) ==");
+{ const { stub, calls } = makeFetchStub({}); globalThis.fetch = stub;
+  const r = await S.runSlaEnginePass(baseEnv, {});
+  console.log("  relatório:", JSON.stringify({ scanned: r.scanned, writeAllowed: r.writeAllowed, computed: r.computed.map(c => c.taskId + "=" + c.slaStatus + "/" + c.slaSeverity + (c.blockedCandidate ? "+LOCKcand" : "")), eventos: r.events.map(e => e.eventType), wouldNotify: r.wouldNotify.length, wouldLock: r.wouldLock.length, writes: r.writes }, null, 1));
+  ok("varreu 6 tarefas, writeAllowed=false", r.scanned === 6 && r.writeAllowed === false);
+  ok("ZERO escritas no Firestore", r.writes === 0 && calls.writes.length === 0, calls.writes);
+  ok("ZERO chamadas FCM (nenhum push real)", calls.fcm === 0);
+  ok("T-ATRASADA → entrega_atrasada vermelho + candidato a bloqueio (só registro)", r.computed.some(c => c.taskId === "T-ATRASADA" && c.slaStatus === "entrega_atrasada" && c.blockedCandidate));
+  ok("T-PERTO → entrega_proxima laranja", r.computed.some(c => c.taskId === "T-PERTO" && c.slaStatus === "entrega_proxima"));
+  ok("T-NAOINI → inicio_atrasado", r.computed.some(c => c.taskId === "T-NAOINI" && c.slaStatus === "inicio_atrasado"));
+  ok("wouldNotify SIMULADOS (laranja+vermelho) sem envio", r.wouldNotify.length >= 3 && r.wouldNotify.every(w => w.simulated));
+  ok("wouldLock SIMULADO p/ D1 e D3 — designerLocks NÃO gravado", r.wouldLock.length >= 2 && !calls.writes.some(w => String(w.url || "").includes("designerLocks")));
+  ok("WIP D1=3 > hard 2 marcado (simulação)", r.wip && r.wip.D1 && r.wip.D1.inProduction === 3 && r.wip.D1.exceeded === true); }
+
+console.log("== B) GATING: write:true SEM flag slaEngine → continua sem escrever ==");
+{ const { stub, calls } = makeFetchStub({}); globalThis.fetch = stub;
+  const r = await S.runSlaEnginePass(Object.assign({}, baseEnv, { SLA_WRITE: "true" }), { write: true });
+  ok("flag OFF no doc → writeAllowed=false, 0 escritas", r.writeAllowed === false && r.writes === 0 && calls.writes.length === 0); }
+
+console.log("== C) MODO WRITE (flag ligada via doc stub) + IDEMPOTÊNCIA 409 ==");
+{ const s1 = makeFetchStub({ flagsOn: true }); globalThis.fetch = s1.stub;
+  const r1 = await S.runSlaEnginePass(Object.assign({}, baseEnv, { SLA_WRITE: "true" }), { write: true });
+  const createdIds = s1.calls.writes.filter(w => w.kind === "slaEvent").map(w => w.id);
+  ok("1ª passada grava slaEvents com ID=dedupKey", r1.writeAllowed === true && createdIds.length > 0, createdIds.slice(0, 3));
+  ok("IDs determinísticos (taskId__tipo__âncora)", createdIds.every(id => /^T-.+__designer_.+__\d+$/.test(id)), createdIds[0]);
+  const s2 = makeFetchStub({ flagsOn: true, preCreated: createdIds }); globalThis.fetch = s2.stub;
+  const r2 = await S.runSlaEnginePass(Object.assign({}, baseEnv, { SLA_WRITE: "true" }), { write: true });
+  const recreated = s2.calls.writes.filter(w => w.kind === "slaEvent");
+  ok("2ª passada: mesmos eventos caem em 409 → dedupSkipped, ZERO duplicatas", recreated.length === 0 && r2.dedupSkipped >= createdIds.length, { dedupSkipped: r2.dedupSkipped });
+  ok("FCM continua ZERO mesmo em modo write (push real OFF na fase)", s1.calls.fcm === 0 && s2.calls.fcm === 0); }
+
+console.log(`\nRESULTADO DRY-RUN LOCAL: ${pass} PASS, ${fail} FAIL`);
+process.exit(fail ? 1 : 0);

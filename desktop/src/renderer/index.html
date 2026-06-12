@@ -3381,6 +3381,18 @@ function openDesignerModal(taskId){
     '<div class="sp-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button></div>'+
   '</div></div>';
 }
+/* ═══ DESIGNER SLA — CONTRATO (FASE 4.1, autorização limitada) ═══
+   Flags TODAS OFF; nenhum comportamento/visual muda nesta fase. O renderer
+   apenas SEMEIA task.designerSla (modelo aditivo) na atribuição — quem computa
+   estado/eventos é o Worker (server-time), em dry-run. */
+const SLA_CONTRACT={
+  FLAGS:{slaEngine:false,slaNotifications:false,operationalBlocking:false,wipLimits:false,slaPanel:false,slaCardBadges:false},
+  DEFAULTS:{startWarningMinutes:30,finishWarningMinutes:30,wipHardPerDesigner:2},
+  COLLECTIONS:['slaEvents','designerLocks','wipLimits','adminOverrides','kanbanMetricsDaily']};
+function slaLocalMs(dateStr,timeStr){ if(!dateStr)return 0;
+  const m=String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return 0;
+  let hh=23,mm=59;const t=String(timeStr||'').match(/^(\d{1,2}):(\d{2})$/);if(t){hh=+t[1];mm=+t[2];}
+  return Date.UTC(+m[1],+m[2]-1,+m[3],hh,mm)+180*60000; /* TZ -3 (mesmo APP_TZ do Worker) */ }
 async function sendToDesigner(taskId,designerId,dl){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const d=state.users.find(u=>u.id===designerId);if(!d)return;
@@ -3390,6 +3402,13 @@ async function sendToDesigner(taskId,designerId,dl){
     assignedAt:now,assignedBy:u.id||null,status:'sent',
     startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',obs:dl.obs||''};
   const patch={
+    // SLA seed (FASE 4.2, aditivo): estado inicial; o Worker recalcula com relógio
+    // de servidor. isBlocked SEMPRE false nesta fase (bloqueio real OFF).
+    designerSla:{assignedDesignerId:designerId,assignedById:u.id||null,assignedAt:now,
+      plannedStartAt:slaLocalMs(dl.startDate,dl.startTime),plannedFinishAt:slaLocalMs(dl.endDate,dl.endTime),
+      startWarningMinutes:SLA_CONTRACT.DEFAULTS.startWarningMinutes,finishWarningMinutes:SLA_CONTRACT.DEFAULTS.finishWarningMinutes,
+      slaStatus:'aguardando_inicio',slaSeverity:'ok',isBlocked:false,blockedCandidate:false,
+      rescheduleCount:0,lastComputedAt:0,seedSource:'desktop'},
     designerAssignment:assignment,
     assigneeId:designerId,                 // isola no quadro do designer (visibleTasks)
     assignee:d.name||'',

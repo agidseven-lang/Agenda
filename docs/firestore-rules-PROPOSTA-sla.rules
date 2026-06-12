@@ -1,0 +1,73 @@
+// ════════════════════════════════════════════════════════════════════════════
+// PROPOSTA de Firestore Security Rules — Designer SLA Engine (FASE 4.x)
+// ════════════════════════════════════════════════════════════════════════════
+// STATUS: *** NÃO APLICADA — DOCUMENTO DE REVISÃO ***
+// Esta proposta NÃO foi deployada, NÃO substitui configuração atual e NÃO deve
+// ser aplicada sem autorização explícita + janela de teste. O projeto hoje NÃO
+// versiona rules neste repositório (firebase.json declara apenas functions);
+// o enforcement atual é client-side (aviso explícito em TaskVisibility.kt).
+//
+// OBJETIVOS DA PROPOSTA (quando autorizada):
+//  1. Coleções de auditoria imutáveis (slaEvents/adminOverrides): create-only.
+//  2. designerLocks/wipLimits/kanbanMetricsDaily/appConfig: escrita SÓ pela
+//     service account do Worker (request.auth == null nas REST com OAuth de SA
+//     não passa por rules — SA ignora rules; o ponto é NEGAR escrita a clientes).
+//  3. Bloqueio operacional não-burlável: update de tasks que altere o eixo do
+//     designer é negado se designerLocks/{uid} estiver ativo sem override.
+//  4. Zero impacto nas leituras atuais (compatibilidade com listeners de hoje).
+//
+// LIMITAÇÃO HONESTA: o app atual usa auth própria (não Firebase Auth) em parte
+// dos fluxos; a cláusula 3 só é executável quando request.auth.uid for confiável
+// em TODOS os clientes. Pré-requisito a validar ANTES de aplicar.
+// ════════════════════════════════════════════════════════════════════════════
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin()  { return signedIn()
+      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.admin == true; }
+    function lockActive(uid) {
+      return exists(/databases/$(database)/documents/designerLocks/$(uid))
+        && get(/databases/$(database)/documents/designerLocks/$(uid)).data.isBlocked == true
+        && get(/databases/$(database)/documents/designerLocks/$(uid)).data.overrideActive != true;
+    }
+    function touchesDesignerAxis() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['designerFlowStatus','designerWorkflowStage','startedAt']);
+    }
+
+    // ── Auditoria imutável ──
+    match /slaEvents/{eventId} {
+      allow read: if signedIn();
+      allow create: if signedIn();          // ID = dedupKey (idempotência por construção)
+      allow update, delete: if false;       // ninguém apaga trilha (nem admin)
+    }
+    match /adminOverrides/{overrideId} {
+      allow read: if signedIn();
+      allow create: if isAdmin()
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 5;   // motivo OBRIGATÓRIO
+      allow update, delete: if false;
+    }
+
+    // ── Estado mantido pelo Worker (clientes só leem) ──
+    match /designerLocks/{designerId}     { allow read: if signedIn(); allow write: if false; }
+    match /wipLimits/{scopeId}            { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /kanbanMetricsDaily/{day}       { allow read: if signedIn(); allow write: if false; }
+    match /kanbanMetricsByDesigner/{uid}  { allow read: if signedIn(); allow write: if false; }
+    match /appConfig/{doc}                { allow read: if signedIn(); allow write: if isAdmin(); }
+
+    // ── Bloqueio operacional NÃO-burlável (núcleo da fase de enforcement) ──
+    match /tasks/{taskId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn() && (
+        !touchesDesignerAxis()
+        || !lockActive(request.auth.uid)
+        || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+  }
+}

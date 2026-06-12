@@ -66,11 +66,17 @@ export default {
       return handleNotifyDesigner(request, env);
     }
 
+    // ADITIVO (FASE 4.3 — autorização limitada): inspeção do Designer SLA Engine.
+    // 403 se env SLA_ENGINE_ENABLED ausente (= estado de produção). Nunca envia push.
+    if (url.pathname === "/sla-dryrun" && request.method === "POST") {
+      return handleSlaDryRun(request, env);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.5-designer-notify" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.6-sla-core-dryrun" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -79,6 +85,17 @@ export default {
         console.error("[CRON] erro fatal:", e && e.message);
       })
     );
+    // FASE 4.3 (autorização limitada): passada do SLA Engine SEPARADA do cron
+    // existente (não toca handleCronTrigger). Sem env SLA_ENGINE_ENABLED="true"
+    // (estado atual do painel) este bloco é um no-op absoluto. Mesmo ligado:
+    // dry-run, sem push, sem lock; escrita só com SLA_WRITE + flag slaEngine.
+    if (env && env.SLA_ENGINE_ENABLED === "true") {
+      ctx.waitUntil(
+        runSlaEnginePass(env, { write: env.SLA_WRITE === "true" }).then((r) => {
+          console.log("[SLA] pass:", JSON.stringify({ scanned: r.scanned, events: r.events.length, wouldNotify: r.wouldNotify.length, wouldLock: r.wouldLock.length, writes: r.writes, dedupSkipped: r.dedupSkipped }));
+        }).catch((e) => console.error("[SLA] erro:", e && e.message))
+      );
+    }
   },
 };
 
@@ -807,3 +824,284 @@ function b64url(bytes) {
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGNER SLA ENGINE — NÚCLEO SEGURO (FASE 4.1–4.3, AUTORIZAÇÃO LIMITADA)
+   ════════════════════════════════════════════════════════════════════════════
+   MODO SEGURO OBRIGATÓRIO:
+   - O engine SÓ executa se env.SLA_ENGINE_ENABLED === "true" (var NÃO existe no
+     painel → em produção o cron atual segue 100% intocado).
+   - Mesmo executando, roda em DRY-RUN: NENHUMA escrita acontece a menos que
+     env.SLA_WRITE === "true" E appConfig/flags.slaEngine === true (flag OFF).
+   - PUSH REAL: NUNCA nesta fase — o "envio" é um stub que apenas registra
+     wouldNotify (simulated). slaNotifications permanece OFF.
+   - BLOQUEIO REAL: NUNCA nesta fase — calcula blockedCandidate, registra evento,
+     NÃO escreve designerLocks. operationalBlocking permanece OFF.
+   - Rota de inspeção: POST /sla-dryrun (sempre dry-run; nunca envia push).
+   Rollback: remover a var SLA_ENGINE_ENABLED (ou nunca criá-la). Zero migração.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const SLA_DEFAULTS = {
+  startWarningMinutes: 30,        // alerta laranja de INÍCIO: 30min antes (autorizado)
+  finishWarningMinutes: 30,       // alerta laranja de ENTREGA: 30min antes (autorizado)
+  criticalStartOverdueMinutes: 30,// início atrasado vira CRÍTICO (candidato a bloqueio) após 30min
+  wipHardPerDesigner: 2,          // WIP hard inicial por designer (autorizado) — SIMULAÇÃO apenas
+};
+const SLA_FLAG_DEFAULTS = {       // contrato de feature flags — TODAS OFF por padrão
+  slaEngine: false, slaNotifications: false, operationalBlocking: false,
+  wipLimits: false, slaPanel: false, slaCardBadges: false,
+};
+const SLA_EVENT_TYPES = [
+  "designer_task_assigned", "designer_task_started", "designer_task_completed",
+  "designer_start_warning", "designer_start_overdue",
+  "designer_finish_warning", "designer_finish_overdue",
+  "designer_blocked_by_overdue", "designer_unblocked",
+  "designer_admin_override", "designer_wip_limit_reached",
+];
+
+/* "YYYY-MM-DD"+"HH:MM" (TZ local do app) → epoch ms UTC. Sem data → 0. */
+function slaToMs(dateStr, timeStr, tzOffsetMinutes) {
+  if (!dateStr) return 0;
+  const dm = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dm) return 0;
+  let hh = 23, mm = 59;
+  if (timeStr) { const tm = String(timeStr).match(/^(\d{1,2}):(\d{2})$/); if (tm) { hh = +tm[1]; mm = +tm[2]; } }
+  return Date.UTC(+dm[1], +dm[2] - 1, +dm[3], hh, mm) - (tzOffsetMinutes == null ? -180 : tzOffsetMinutes) * 60000;
+}
+
+/* Plano de SLA a partir do designerAssignment EXISTENTE (modelo aditivo: nada renomeado).
+   Fallback de término: dueDate/dueTime (já gravados pelo sendToDesigner desde 1.0.88). */
+function slaPlanFromAssignment(t, tz) {
+  const da = (t && t.designerAssignment) || {};
+  const sla = (t && t.designerSla) || {};
+  const plannedStartAt  = sla.plannedStartAt  || slaToMs(da.startDate || t.startDate, da.startTime || t.startTime, tz);
+  const plannedFinishAt = sla.plannedFinishAt || slaToMs(da.endDate || t.endDate || t.dueDate, da.endTime || t.endTime || t.dueTime, tz);
+  return { plannedStartAt, plannedFinishAt };
+}
+
+function slaStarted(t) {
+  const df = (t && t.designerFlowStatus) || "";
+  if (df === "andamento" || df === "revisao" || df === "concluido") return true;
+  const assignedAt = (t && t.designerAssignment && t.designerAssignment.assignedAt) || 0;
+  return !!(t && t.startedAt && (!assignedAt || t.startedAt >= assignedAt));
+}
+function slaDelivered(t) { return !!(t && (t.designerFlowStatus === "concluido")); }
+function slaCancelled(t) { return !!(t && (t.cancelled === true || t.status === "cancelada")); }
+
+/* ───── STATE MACHINE PURA (idempotente, relógio do SERVIDOR) ─────
+   Estados: aguardando_inicio | inicio_proximo | inicio_atrasado | em_producao |
+            entrega_proxima | entrega_atrasada | entregue | cancelada
+   (bloqueada_por_atraso é DERIVADA: blockedCandidate=true; reprogramada é
+    metadado: rescheduleCount>0 — o estado recalcula sobre o novo prazo.) */
+function computeSlaStatus(task, nowMs, cfg, tz) {
+  const C = Object.assign({}, SLA_DEFAULTS, cfg || {});
+  const { plannedStartAt, plannedFinishAt } = slaPlanFromAssignment(task, tz);
+  const startWarnMs  = C.startWarningMinutes * 60000;
+  const finishWarnMs = C.finishWarningMinutes * 60000;
+  const out = {
+    plannedStartAt, plannedFinishAt,
+    startWarningAt:  plannedStartAt  ? plannedStartAt  - startWarnMs  : 0,
+    finishWarningAt: plannedFinishAt ? plannedFinishAt - finishWarnMs : 0,
+    slaStatus: "aguardando_inicio", slaSeverity: "ok", blockedCandidate: false,
+    overdueMs: 0,
+  };
+  if (slaCancelled(task)) { out.slaStatus = "cancelada"; return out; }
+  if (slaDelivered(task)) { out.slaStatus = "entregue"; return out; }
+  if (!slaStarted(task)) {
+    if (plannedStartAt && nowMs > plannedStartAt) {
+      out.slaStatus = "inicio_atrasado"; out.slaSeverity = "vermelho";
+      out.overdueMs = nowMs - plannedStartAt;
+      out.blockedCandidate = out.overdueMs >= C.criticalStartOverdueMinutes * 60000;
+    } else if (plannedStartAt && nowMs >= out.startWarningAt) {
+      out.slaStatus = "inicio_proximo"; out.slaSeverity = "laranja";
+    }
+    return out;
+  }
+  if (plannedFinishAt && nowMs > plannedFinishAt) {
+    out.slaStatus = "entrega_atrasada"; out.slaSeverity = "vermelho";
+    out.overdueMs = nowMs - plannedFinishAt;
+    out.blockedCandidate = true;   // entrega atrasada = candidato a bloqueio (regra central)
+  } else if (plannedFinishAt && nowMs >= out.finishWarningAt) {
+    out.slaStatus = "entrega_proxima"; out.slaSeverity = "laranja";
+  } else {
+    out.slaStatus = "em_producao";
+  }
+  return out;
+}
+
+/* dedupKey determinístico = ID do doc em slaEvents → idempotência POR CONSTRUÇÃO
+   (criar 2x o mesmo evento falha com ALREADY_EXISTS; reprogramar muda a âncora). */
+function slaDedupKey(taskId, eventType, anchorMs) {
+  return String(taskId) + "__" + String(eventType) + "__" + String(anchorMs || 0);
+}
+
+function buildSlaEvent(p) {
+  return {
+    tenantId: p.tenantId || "idseven", taskId: p.taskId, designerId: p.designerId || null,
+    actorId: p.actorId || "sla-engine", actorRole: p.actorRole || "system",
+    eventType: p.eventType, oldStatus: p.oldStatus || null, newStatus: p.newStatus || null,
+    timestamp: p.timestamp, source: p.source || "worker-cron",
+    dedupKey: slaDedupKey(p.taskId, p.eventType, p.anchorMs),
+    metadata: p.metadata || {}, reason: p.reason || null,
+    simulated: p.simulated !== false,   // FASE 4.x: tudo nasce simulado
+  };
+}
+
+/* Deriva eventos NOVOS desta passada (warnings/overdues ancorados no prazo →
+   reprogramação gera novas âncoras SEM duplicar as antigas). prevSla = designerSla
+   gravado (ou {}); comp = computeSlaStatus(...). */
+function deriveSlaEvents(prevSla, comp, task, nowMs) {
+  const ev = [];
+  const t = task; const prev = prevSla || {};
+  const base = { taskId: t.id, designerId: (t.designerAssignment && t.designerAssignment.designerId) || t.assigneeId || null, timestamp: nowMs };
+  const push = (eventType, anchorMs, extra) => ev.push(buildSlaEvent(Object.assign({}, base, { eventType, anchorMs }, extra || {})));
+  if (!prev.assignedEventAt && t.designerAssignment && t.designerAssignment.assignedAt)
+    push("designer_task_assigned", t.designerAssignment.assignedAt, { newStatus: "aguardando_inicio", metadata: { assignedBy: t.designerAssignment.assignedBy || null } });
+  if (!prev.startedEventAt && slaStarted(t) && !slaDelivered(t))
+    push("designer_task_started", t.startedAt || 0, { oldStatus: "aguardando_inicio", newStatus: "em_producao" });
+  if (!prev.completedEventAt && slaDelivered(t))
+    push("designer_task_completed", t.doneAt || comp.plannedFinishAt, { newStatus: "entregue" });
+  if (comp.slaStatus === "inicio_proximo"   && !prev.startWarningSentAt)
+    push("designer_start_warning",  comp.plannedStartAt,  { newStatus: comp.slaStatus });
+  if (comp.slaStatus === "inicio_atrasado"  && !prev.startOverdueSentAt)
+    push("designer_start_overdue",  comp.plannedStartAt,  { newStatus: comp.slaStatus, metadata: { overdueMs: comp.overdueMs } });
+  if (comp.slaStatus === "entrega_proxima"  && !prev.finishWarningSentAt)
+    push("designer_finish_warning", comp.plannedFinishAt, { newStatus: comp.slaStatus });
+  if (comp.slaStatus === "entrega_atrasada" && !prev.finishOverdueSentAt)
+    push("designer_finish_overdue", comp.plannedFinishAt, { newStatus: comp.slaStatus, metadata: { overdueMs: comp.overdueMs } });
+  if (comp.blockedCandidate && !prev.blockedEventAt)
+    push("designer_blocked_by_overdue", comp.plannedFinishAt || comp.plannedStartAt, { newStatus: "bloqueada_por_atraso", reason: "atraso ativo (simulação — bloqueio real OFF)" });
+  if (!comp.blockedCandidate && prev.blockedEventAt && !prev.unblockedEventAt && (comp.slaStatus === "entregue" || comp.slaStatus === "em_producao"))
+    push("designer_unblocked", nowMs, { oldStatus: "bloqueada_por_atraso", newStatus: comp.slaStatus });
+  return ev;
+}
+
+/* WIP — SIMULAÇÃO (autorização: simular, sem bloquear). */
+function simulateWip(tasks, cfg) {
+  const C = Object.assign({}, SLA_DEFAULTS, cfg || {});
+  const byDesigner = {};
+  for (const t of tasks) {
+    const d = (t.designerAssignment && t.designerAssignment.designerId) || null;
+    if (!d) continue;
+    byDesigner[d] = byDesigner[d] || { designerId: d, inProduction: 0, taskIds: [], hard: C.wipHardPerDesigner, exceeded: false };
+    if (t.designerFlowStatus === "andamento") { byDesigner[d].inProduction++; byDesigner[d].taskIds.push(t.id); }
+  }
+  const events = [];
+  for (const d of Object.keys(byDesigner)) {
+    const w = byDesigner[d];
+    w.exceeded = w.inProduction > w.hard;
+    if (w.exceeded)
+      events.push(buildSlaEvent({ taskId: w.taskIds[w.taskIds.length - 1], designerId: d, eventType: "designer_wip_limit_reached", anchorMs: w.inProduction, timestamp: Date.now(), newStatus: null, metadata: { wip: w.inProduction, hard: w.hard }, reason: "WIP acima do limite (simulação — wipLimits OFF)" }));
+  }
+  return { byDesigner, events };
+}
+
+/* cria slaEvents/{dedupKey} — falha silenciosa se já existe (idempotência). */
+async function slaCreateEvent(env, accessToken, ev) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/slaEvents?documentId=${encodeURIComponent(ev.dedupKey)}`;
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ fields: slaEncodeFields(ev) }) });
+  if (res.status === 409) return { created: false, dedup: true };
+  if (!res.ok) { console.warn("[SLA] createEvent falhou:", res.status); return { created: false, dedup: false }; }
+  return { created: true, dedup: false };
+}
+function slaEncodeValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === "boolean") return { booleanValue: v };
+  if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === "object") return { mapValue: { fields: slaEncodeFields(v) } };
+  return { stringValue: String(v) };
+}
+function slaEncodeFields(obj) { const f = {}; for (const k of Object.keys(obj || {})) f[k] = slaEncodeValue(obj[k]); return f; }
+
+async function slaGetFlags(env, accessToken) {
+  const doc = await getDoc(env, accessToken, "appConfig", "flags").catch(() => null);
+  return Object.assign({}, SLA_FLAG_DEFAULTS, doc || {});
+}
+
+/* tarefas ativas no eixo do designer (IN-filter; índice single-field default). */
+async function slaQueryActiveDesignerTasks(env, accessToken) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], where: { fieldFilter: { field: { fieldPath: "designerFlowStatus" }, op: "IN", value: { arrayValue: { values: [{ stringValue: "afazer" }, { stringValue: "andamento" }, { stringValue: "revisao" }, { stringValue: "concluido" }] } } } }, limit: 300 } };
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  if (!res.ok) { console.warn("[SLA] query tasks falhou:", res.status); return []; }
+  const rows = await res.json(); const out = [];
+  for (const row of rows) { if (!row.document) continue; const id = row.document.name.split("/").pop(); out.push(Object.assign({ id }, decodeFields(row.document.fields))); }
+  return out;
+}
+
+/* PASSADA DO ENGINE.
+   write=false (DEFAULT): zero escrita — só computa e reporta (dry-run absoluto).
+   write=true: exige env.SLA_WRITE==="true" + flags.slaEngine===true; grava
+   slaEvents (ID=dedupKey) + task.designerSla (com marcadores *SentAt = registro
+   do EVENTO, não de push — push real continua OFF). NUNCA envia FCM, NUNCA
+   escreve designerLocks nesta fase. */
+async function runSlaEnginePass(env, opts) {
+  const o = opts || {}; const nowMs = Date.now();
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  const flags = await slaGetFlags(env, accessToken);
+  const writeAllowed = o.write === true && (env && env.SLA_WRITE === "true") && flags.slaEngine === true;
+  const tasks = await slaQueryActiveDesignerTasks(env, accessToken);
+  const report = { now: nowMs, scanned: tasks.length, flags, writeAllowed, computed: [], events: [], wouldNotify: [], wouldLock: [], writes: 0, dedupSkipped: 0 };
+  for (const t of tasks) {
+    if (!t.designerAssignment || !t.designerAssignment.designerId) continue;
+    const prev = t.designerSla || {};
+    const comp = computeSlaStatus(t, nowMs, SLA_DEFAULTS, tz);
+    const evs = deriveSlaEvents(prev, comp, t, nowMs);
+    report.computed.push({ taskId: t.id, designerId: t.designerAssignment.designerId, slaStatus: comp.slaStatus, slaSeverity: comp.slaSeverity, blockedCandidate: comp.blockedCandidate, plannedStartAt: comp.plannedStartAt, plannedFinishAt: comp.plannedFinishAt });
+    for (const ev of evs) {
+      report.events.push(ev);
+      if (ev.eventType.indexOf("warning") >= 0 || ev.eventType.indexOf("overdue") >= 0)
+        report.wouldNotify.push({ taskId: ev.taskId, designerId: ev.designerId, type: ev.eventType, simulated: true });
+      if (ev.eventType === "designer_blocked_by_overdue")
+        report.wouldLock.push({ designerId: ev.designerId, taskId: ev.taskId, simulated: true });
+      if (writeAllowed) {
+        const r = await slaCreateEvent(env, accessToken, ev);
+        if (r.created) report.writes++; else if (r.dedup) report.dedupSkipped++;
+      }
+    }
+    if (writeAllowed) {
+      const markers = {};
+      for (const ev of evs) {
+        if (ev.eventType === "designer_start_warning")  markers.startWarningSentAt  = nowMs;
+        if (ev.eventType === "designer_start_overdue")  markers.startOverdueSentAt  = nowMs;
+        if (ev.eventType === "designer_finish_warning") markers.finishWarningSentAt = nowMs;
+        if (ev.eventType === "designer_finish_overdue") markers.finishOverdueSentAt = nowMs;
+        if (ev.eventType === "designer_task_assigned")  markers.assignedEventAt     = nowMs;
+        if (ev.eventType === "designer_task_started")   markers.startedEventAt      = nowMs;
+        if (ev.eventType === "designer_task_completed") markers.completedEventAt    = nowMs;
+        if (ev.eventType === "designer_blocked_by_overdue") markers.blockedEventAt  = nowMs;
+        if (ev.eventType === "designer_unblocked")      markers.unblockedEventAt    = nowMs;
+      }
+      const slaPatch = Object.assign({}, prev, markers, {
+        assignedDesignerId: t.designerAssignment.designerId,
+        plannedStartAt: comp.plannedStartAt, plannedFinishAt: comp.plannedFinishAt,
+        startWarningAt: comp.startWarningAt, finishWarningAt: comp.finishWarningAt,
+        slaStatus: comp.slaStatus, slaSeverity: comp.slaSeverity,
+        blockedCandidate: comp.blockedCandidate, isBlocked: false,  // bloqueio REAL desligado
+        lastComputedAt: nowMs, engineMode: "dry-run-phase-4.3",
+      });
+      const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${t.id}?updateMask.fieldPaths=designerSla`;
+      await fetch(url, { method: "PATCH", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ fields: { designerSla: { mapValue: { fields: slaEncodeFields(slaPatch) } } } }) }).catch((e) => console.warn("[SLA] patch designerSla:", e && e.message));
+      report.writes++;
+    }
+  }
+  const wip = simulateWip(tasks, SLA_DEFAULTS);
+  report.wip = wip.byDesigner;
+  for (const ev of wip.events) report.events.push(ev);
+  return report;
+}
+
+/* POST /sla-dryrun — inspeção sob demanda. SEMPRE sem push e sem lock.
+   Sem body.write: zero escrita. Com {"write":true}: ainda exige SLA_WRITE +
+   flag slaEngine (OFF por padrão → continua sem escrever). */
+async function handleSlaDryRun(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env SLA_ENGINE_ENABLED ausente) — comportamento de produção intocado." }, 403, env);
+  let body = {}; try { body = await request.json(); } catch (_) {}
+  const report = await runSlaEnginePass(env, { write: body && body.write === true });
+  return json({ ok: true, mode: report.writeAllowed ? "write" : "dry-run", report }, 200, env);
+}
+
+/* export p/ testes unitários (node) — não interfere no runtime do Worker. */
+export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, slaEncodeFields, runSlaEnginePass };
