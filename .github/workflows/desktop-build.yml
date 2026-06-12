@@ -71,14 +71,17 @@ jobs:
         run: |
           ASAR="dist-installer/win-unpacked/resources/app.asar"
           if [ ! -f "$ASAR" ]; then echo "::error::app.asar nao encontrado em $ASAR"; ls -R dist-installer | head -50; exit 1; fi
-          npx @electron/asar extract-file "$ASAR" src/renderer/index.html
+          # extract COMPLETO (extract-file falha no Windows: separador de caminho interno e '\')
+          rm -rf asar-x
+          npx @electron/asar extract "$ASAR" asar-x
+          if [ ! -f asar-x/src/renderer/index.html ]; then echo "::error::index.html ausente no asar extraido"; find asar-x -maxdepth 3 -type d | head -30; exit 1; fi
           SHA_SRC=$(sha256sum src/renderer/index.html | awk '{print $1}')
-          SHA_PKG=$(sha256sum index.html | awk '{print $1}')
+          SHA_PKG=$(sha256sum asar-x/src/renderer/index.html | awk '{print $1}')
           echo "SHA-256 renderer fonte (auditado) : $SHA_SRC"
           echo "SHA-256 renderer empacotado(asar) : $SHA_PKG"
           if [ "$SHA_SRC" != "$SHA_PKG" ]; then echo "::error::renderer empacotado DIFERE da fonte auditada"; exit 1; fi
           echo "OK: renderer empacotado e byte a byte o renderer auditado."
-          rm -f index.html
+          rm -rf asar-x
           echo "GREP de proibidos no renderer empacotado (deve ser vazio):"
           ! grep -nE "fitZoom|--fitz|body\.style\.zoom" src/renderer/index.html || { echo "::error::padrao proibido encontrado"; exit 1; }
           echo "OK: sem fitZoom / --fitz / body.style.zoom."
