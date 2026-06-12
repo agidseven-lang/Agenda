@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingLeft="26dp"
+        android:paddingRight="26dp"
+        android:paddingTop="48dp"
+        android:paddingBottom="28dp">
+
+        <!-- Brand -->
+        <ImageView
+            android:layout_width="84dp"
+            android:layout_height="84dp"
+            android:src="@drawable/logo"
+            android:contentDescription="ID Seven" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="ID Seven"
+            android:textColor="@color/accent"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Agenda e Gestor de Tarefas"
+            android:textColor="@color/inkSoft"
+            android:textSize="14sp" />
+
+        <!-- Segmento Entrar / Criar cadastro -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@drawable/seg_container"
+            android:padding="5dp"
+            android:layout_marginTop="30dp">
+            <TextView android:id="@+id/segLogin" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Entrar" android:textSize="14sp" android:textStyle="bold" android:textColor="@color/ink" android:background="@drawable/seg_on" android:paddingTop="11dp" android:paddingBottom="11dp" android:clickable="true" android:focusable="true" />
+            <TextView android:id="@+id/segReg" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Criar cadastro" android:textSize="14sp" android:textColor="@color/inkSoft" android:paddingTop="11dp" android:paddingBottom="11dp" android:clickable="true" android:focusable="true" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/errBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/err_bg"
+            android:padding="12dp"
+            android:textColor="@color/late"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- LOGIN -->
+        <LinearLayout
+            android:id="@+id/loginForm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="20dp">
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="E-MAIL OU WHATSAPP" android:textColor="@color/inkFaint" android:textSize="11sp" android:textStyle="bold" android:layout_marginBottom="8dp" />
+            <EditText android:id="@+id/lUser" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="seu e-mail ou número" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:background="@drawable/field_bg" android:padding="14dp" android:inputType="text" android:layout_marginBottom="18dp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SENHA" android:textColor="@color/inkFaint" android:textSize="11sp" android:textStyle="bold" android:layout_marginBottom="8dp" />
+            <EditText android:id="@+id/lPass" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="sua senha" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:background="@drawable/field_bg" android:padding="14dp" android:inputType="textPassword" android:layout_marginBottom="20dp" />
+
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/doLogin" android:layout_width="match_parent" android:layout_height="56dp" android:text="Entrar" android:textColor="#ffffff" android:textStyle="bold" android:background="@drawable/btn_primary" android:stateListAnimator="@null" />
+        </LinearLayout>
+
+        <!-- CADASTRO -->
+        <LinearLayout
+            android:id="@+id/regForm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="20dp"
+            android:visibility="gone">
+
+            <TextView android:layout_width="96dp" android:layout_height="96dp" android:background="@drawable/photo_ring" android:gravity="center" android:text="SUA\nFOTO" android:textColor="@color/inkFaint" android:textSize="10sp" android:layout_gravity="center_horizontal" android:layout_marginBottom="6dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Foto será adicionada na próxima etapa" android:textColor="@color/inkFaint" android:textSize="11sp" android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="NOME COMPLETO" android:textColor="@color/inkFaint" android:textSize="11sp" android:textStyle="bold" android:layout_marginBottom="8dp" />
+            <EditText android:id="@+id/rName" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Seu nome" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:background="@drawable/field_bg" android:padding="14dp" android:layout_marginBottom="16dp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="FUNÇÃO NA AGÊNCIA" android:textColor="@color/inkFaint" android:textSize="11sp" android:textStyle="bold" android:layout_marginBottom="8dp" />
+            <EditText android:id="@+id/rRole" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Ex.: Filmmaker, Social media" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:background="@drawable/field_bg" android:padding="14dp" android:layout_marginBottom="16dp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="WHATSAPP (COM DDD)" android:textColor="@color/inkFaint" android:textSize="11sp" android:textStyle="bold" android:layout_marginBottom="8dp" />
+            <EditText android:id="@+id/rPhone" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Ex.: 88 9 9999-9999" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:background="@drawable/field_bg" android:padding="14dp" android:inputType="phone" android:layout_marginBottom="16dp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="E-MAIL" android:textColor="@color/inkFaint" android:textSize="11sp" android:textStyle="bold" android:layout_marginBottom="8dp" />
+            <EditText android:id="@+id/rEmail" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="voce@agencia.com" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:background="@drawable/field_bg" android:padding="14dp" android:inputType="textEmailAddress" android:layout_marginBottom="16dp" />
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SENHA" android:textColor="@color/inkFaint" android:textSize="11sp" android:textStyle="bold" android:layout_marginBottom="8dp" />
+            <EditText android:id="@+id/rPass" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="crie uma senha" android:textColorHint="@color/inkFaint" android:textColor="@color/ink" android:background="@drawable/field_bg" android:padding="14dp" android:inputType="textPassword" android:layout_marginBottom="20dp" />
+
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/doReg" android:layout_width="match_parent" android:layout_height="56dp" android:text="Enviar cadastro para aprovação" android:textColor="#ffffff" android:textStyle="bold" android:background="@drawable/btn_primary" android:stateListAnimator="@null" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="26dp"
+            android:text="Desenvolvido por ID Seven · Miercohévisk Niheb F N Carlôto"
+            android:textColor="@color/inkFaint"
+            android:textSize="10sp"
+            android:alpha="0.6"
+            android:gravity="center" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="build: 0.2.15-detalhe-align"
+            android:textColor="@color/accent"
+            android:textSize="10sp"
+            android:gravity="center" />
+    </LinearLayout>
+</ScrollView>

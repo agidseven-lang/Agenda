@@ -1,0 +1,22 @@
+<resources>
+    <!-- Paleta REAL do PWA (tema escuro :root) -->
+    <color name="bg">#0a0b10</color>
+    <color name="surface">#15171f</color>
+    <color name="surface2">#1c1f29</color>
+    <color name="line">#262a36</color>
+    <color name="ink">#f1f2f4</color>
+    <color name="inkSoft">#9ba0ab</color>
+    <color name="inkFaint">#6e7480</color>
+    <color name="accent">#5b6cff</color>
+    <color name="ic_launcher_background">#0a0b10</color>
+
+    <!-- Cores por tipo de compromisso (iguais ao PWA) -->
+    <color name="t_grav">#ef4444</color>
+    <color name="t_foto">#f59e0b</color>
+    <color name="t_reuni">#60a5fa</color>
+    <color name="t_edicao">#a78bfa</color>
+    <color name="t_outro">#9ca3af</color>
+
+    <color name="late">#f87171</color>
+    <color name="ok">#34d399</color>
+</resources>
