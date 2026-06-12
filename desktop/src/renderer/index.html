@@ -440,12 +440,10 @@
   body.desktop #content.board-mode .kcol .khead{padding:6px 12px 5px}
   /* scroll-snap proximity + scroll-padding: ao rolar, o card acomoda INTEIRO com respiro —
      nunca para "decapitado" contra o header da coluna. */
-  body.desktop #content.board-mode .kcol .kbody{padding:16px 7px 0;scroll-snap-type:y proximity;scroll-padding-top:14px}
+  body.desktop #content.board-mode .kcol .kbody{padding:16px 10px 14px;scroll-snap-type:y proximity;scroll-padding-top:14px}
   body.desktop #content.board-mode .kcol .kbody .tc{scroll-snap-align:start;scroll-margin-top:14px}
   body.desktop #content.board-mode .kcol .kbody .tc:last-child{margin-bottom:0}
-  /* respiro na BASE só quando a coluna tem 2+ cards (corte na base reprovado na 1.0.141);
-     com 1 card a coluna mantém o encaixe exato aprovado na V4.5 — sem scrollbar interna. */
-  body.desktop #content.board-mode .kcol .kbody .tc:last-child:not(:only-child){margin-bottom:14px}
+
   /* Notebook com taskbar (altura útil ~689): chrome + card no modo justo validado */
   @media(max-height:740px){
     body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:28px}
@@ -453,7 +451,7 @@
     body.desktop #content.board-mode{padding-top:5px!important}
     body.desktop #content.board-mode .d-board-tools.tbar{margin:5px 0 2px}
     body.desktop #content.board-mode .kanban{margin-top:5px}
-    body.desktop #content.board-mode .kcol .kbody{padding-top:14px}
+    body.desktop #content.board-mode .kcol .kbody{padding:14px 8px 12px}
   }
   /* Escala 125% (viewport ~1092×614): só o CHROME do quadro encolhe — o card V2
      já cabe por arquitetura, sem densificação. */
@@ -479,7 +477,7 @@
     body.desktop #content.board-mode .kcol .khead{padding:9px 15px 8px}
     body.desktop #content.board-mode .kcol .khead .kt{font-size:14.5px}
     body.desktop #content.board-mode .kcol .khead .kn{font-size:12px;padding:3px 10px}
-    body.desktop #content.board-mode .kcol .kbody{padding:20px 9px 0}
+    body.desktop #content.board-mode .kcol .kbody{padding:20px 12px 16px}
     body.desktop #content.board-mode .tcv4{padding:17px 17px 12px !important;border-radius:12px}
     body.desktop #content.board-mode .tcv4-st,body.desktop #content.board-mode .tcv4-due{font-size:12px;padding:4px 9px}
     body.desktop #content.board-mode .tcv4-st .dotc{width:7px;height:7px}
@@ -514,11 +512,11 @@
     body.desktop #content.board-mode .kempty-t{font-size:14px}
     body.desktop #content.board-mode .kempty-s{font-size:12px}
   }
-  /* Colunas ABRAÇAM o conteúdo (altura = coluna mais alta, limitada à janela): com card de
-     cronograma (alto) a proporção card×coluna (~86-92%) vale em QUALQUER tela; com cards
-     curtos não sobra poço de vazio. Sem zoom/transform global — escopo só do quadro. */
-  body.desktop #content.board-mode .kanban{display:flex;flex:0 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
-    gap:15px;align-items:stretch;justify-content:safe center}
+  /* Colunas ocupam a ÁREA ÚTIL VERTICAL (referência): descem até ~16px da base.
+     Eixo esquerdo do board = eixo da busca/filtros (sem centralização).
+     Sem zoom/transform — escopo exclusivo do quadro. */
+  body.desktop #content.board-mode .kanban{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
+    gap:15px;align-items:stretch}
   /* max-width: em telas grandes a coluna NÃO balona (card "esticado" reprovado na 1.0.141);
      em 1366×768 as colunas ficam abaixo do teto — paridade com a referência intacta. */
   body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px;max-width:340px}
@@ -527,9 +525,7 @@
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
-  /* piso premium: coluna nunca fica raquítica (≥380px); teto = janela; entre o piso e o
-     teto, abraça a coluna mais alta (pares iguais via stretch). */
-  body.desktop #content.board-mode .kanban .kcol{height:auto;max-height:100%;min-height:380px}
+  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:380px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
@@ -2730,7 +2726,7 @@ function renderBoard(){
       '<button class="iconbtn" data-board="back">'+svg('back')+'</button>'+
       '<div class="d-bh-icon" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div>'+
       '<div style="flex:1;min-width:0"><div class="d-bh-title">Quadro de '+esc(s.label)+'</div><div class="d-bh-sub">'+esc(s.desc)+'</div></div>'+
-      '<button class="btn" data-board="new" style="width:auto;height:auto;padding:10px 18px;border-radius:12px;font-size:13.5px">+ Nova tarefa</button>'+
+      (isDesktop()?'':'<button class="btn" data-board="new" style="width:auto;height:auto;padding:10px 18px;border-radius:12px;font-size:13.5px">+ Nova tarefa</button>')+
     '</div></div>'+
     '<div class="scr" style="padding-top:0"><div class="d-board-tools tbar">'+
       '<input class="inp bsearch" id="bSearch" placeholder="Buscar tarefa…" value="'+esc(boardQuery)+'">'+
