@@ -1,0 +1,40 @@
+# Dry-run da automação do Worker — SEM deploy, SEM token, SEM secrets.
+# Execução SOMENTE manual. Roda `microjanela.mjs dry-run`: gera o bundle local
+# (hash + versão) e LÊ o GET / de produção. Não altera nada em lugar nenhum.
+name: "[manual] Worker SLA — dry-run (sem deploy)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit (default: desktop/local-detail-hierarchy-v2)"
+        required: true
+        default: "desktop/local-detail-hierarchy-v2"
+
+permissions:
+  contents: read
+
+jobs:
+  dryrun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: microjanela dry-run (sem token; nada é alterado)
+        run: node scripts/worker-ops/microjanela.mjs dry-run
+      - name: Relatório no log
+        if: always()
+        run: |
+          for f in worker-ops-logs/*/relatorio.txt worker-ops-logs/*/bundle.sha256.txt; do
+            echo "===== $f ====="; cat "$f" || true; done
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-dryrun-logs
+          path: worker-ops-logs/
+          retention-days: 14
