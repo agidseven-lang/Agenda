@@ -290,7 +290,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.55-sla-baseline-ready" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.56-sla-baseline-ready" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -3762,15 +3762,47 @@ async function slaGetFlags(env, accessToken) {
   return Object.assign({}, SLA_FLAG_DEFAULTS, doc || {});
 }
 
-/* tarefas ativas no eixo do designer (IN-filter; índice single-field default). */
-async function slaQueryActiveDesignerTasks(env, accessToken) {
+/* tarefas ativas no eixo do designer.
+   V64.56 (correção do scanned:0 observado na janela de 12/06): a versão anterior
+   usava UM filtro IN e, se o Firestore o rejeitasse, ENGOLIA o erro retornando
+   lista vazia — indistinguível de "zero tarefas" sem logs. Agora:
+   1) tenta o IN; 2) se falhar OU vier vazio, faz fallback com 4 consultas de
+      IGUALDADE (à prova de índice: igualdade usa o índice single-field default)
+      e mescla por id; 3) TODA a telemetria vai em queryDiagnostics no relatório
+      (status HTTP, corpo de erro truncado, contagem por estratégia) — a próxima
+      janela conta a própria história sem depender de Observability. Read-only. */
+async function slaRunQuery(env, accessToken, where, limit) {
   const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
-  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], where: { fieldFilter: { field: { fieldPath: "designerFlowStatus" }, op: "IN", value: { arrayValue: { values: [{ stringValue: "afazer" }, { stringValue: "andamento" }, { stringValue: "revisao" }, { stringValue: "concluido" }] } } } }, limit: 300 } };
+  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], where, limit: limit || 300 } };
   const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
-  if (!res.ok) { console.warn("[SLA] query tasks falhou:", res.status); return []; }
+  if (!res.ok) {
+    const errBody = (await res.text().catch(() => "")).slice(0, 200);
+    return { ok: false, status: res.status, errBody, tasks: [] };
+  }
   const rows = await res.json(); const out = [];
   for (const row of rows) { if (!row.document) continue; const id = row.document.name.split("/").pop(); out.push(Object.assign({ id }, decodeFields(row.document.fields))); }
-  return out;
+  return { ok: true, status: 200, tasks: out };
+}
+async function slaQueryActiveDesignerTasks(env, accessToken) {
+  const FLOWS = ["afazer", "andamento", "revisao", "concluido"];
+  const diag = { strategy: null, inStatus: null, inError: null, inCount: 0, eqStatus: {}, eqCounts: {}, merged: 0 };
+  const rIn = await slaRunQuery(env, accessToken,
+    { fieldFilter: { field: { fieldPath: "designerFlowStatus" }, op: "IN", value: { arrayValue: { values: FLOWS.map((v) => ({ stringValue: v })) } } } }, 300);
+  diag.inStatus = rIn.status; diag.inCount = rIn.tasks.length;
+  if (!rIn.ok) diag.inError = rIn.errBody || null;
+  if (rIn.ok && rIn.tasks.length > 0) { diag.strategy = "in"; diag.merged = rIn.tasks.length; return { tasks: rIn.tasks, diag }; }
+  /* fallback: 4 igualdades mescladas por id (read-only; índice default garante) */
+  const byId = {};
+  for (const v of FLOWS) {
+    const r = await slaRunQuery(env, accessToken,
+      { fieldFilter: { field: { fieldPath: "designerFlowStatus" }, op: "EQUAL", value: { stringValue: v } } }, 150);
+    diag.eqStatus[v] = r.ok ? 200 : r.status; diag.eqCounts[v] = r.tasks.length;
+    if (!r.ok && !diag.inError) diag.inError = r.errBody || null;
+    for (const t of r.tasks) byId[t.id] = t;
+  }
+  const merged = Object.values(byId);
+  diag.strategy = "equality-fallback"; diag.merged = merged.length;
+  return { tasks: merged, diag };
 }
 
 /* PASSADA DO ENGINE.
@@ -3795,10 +3827,12 @@ async function runSlaEnginePass(env, opts) {
   const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
   const flags = await slaGetFlags(env, accessToken);
   const writeAllowed = o.write === true && (env && env.SLA_WRITE === "true") && flags.slaEngine === true;
-  const allTasks = await slaQueryActiveDesignerTasks(env, accessToken);
+  const qres = await slaQueryActiveDesignerTasks(env, accessToken);
+  const allTasks = qres.tasks;
   /* backfill controlado: teto de tarefas por passada + relatório de paginação */
   const tasks = allTasks.slice(0, cfg.maxTasksPerPass);
   const report = { now: nowMs, activatedAt: activatedAtMs || null, scanned: tasks.length, flags, writeAllowed,
+    queryDiagnostics: qres.diag,
     pagination: { totalQueried: allTasks.length, analyzed: tasks.length, remaining: Math.max(0, allTasks.length - tasks.length), truncatedTasks: allTasks.length > tasks.length, maxTasksPerPass: cfg.maxTasksPerPass, maxEventsPerPass: cfg.maxEventsPerPass, eventsCapped: false },
     computed: [], events: [], retroIgnored: [], wouldNotify: [], wouldLock: [], writes: 0, dedupSkipped: 0 };
   for (const t of tasks) {

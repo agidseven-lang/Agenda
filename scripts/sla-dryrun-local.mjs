@@ -52,8 +52,13 @@ function makeFetchStub(opts) {
       return new Response(JSON.stringify({ fields: S.slaEncodeFields({ slaEngine: true }) }), { status: 200 });
     }
     if (url.includes("documents:runQuery")) {
-      const rows = FIXTURES.map((t) => ({ document: { name: "projects/x/databases/(default)/documents/tasks/" + t.id, fields: S.slaEncodeFields(t) } }));
-      return new Response(JSON.stringify(rows), { status: 200 });
+      const body = init && init.body ? String(init.body) : "";
+      if (opts.inFails && body.includes('"IN"'))
+        return new Response(JSON.stringify({ error: { code: 400, message: "simulated: IN rejected" } }), { status: 400 });
+      let rows = FIXTURES;
+      const eq = body.match(/"op":"EQUAL".*?"stringValue":"(\w+)"/s);
+      if (eq) rows = FIXTURES.filter((t) => t.designerFlowStatus === eq[1]);
+      return new Response(JSON.stringify(rows.map((t) => ({ document: { name: "projects/x/databases/(default)/documents/tasks/" + t.id, fields: S.slaEncodeFields(t) } }))), { status: 200 });
     }
     if (url.includes("/documents/slaEvents?documentId=")) {
       const id = decodeURIComponent(url.split("documentId=")[1]);
@@ -103,6 +108,17 @@ console.log("== C) MODO WRITE (flag ligada via doc stub) + IDEMPOTÊNCIA 409 =="
   const recreated = s2.calls.writes.filter(w => w.kind === "slaEvent");
   ok("2ª passada: mesmos eventos caem em 409 → dedupSkipped, ZERO duplicatas", recreated.length === 0 && r2.dedupSkipped >= createdIds.length, { dedupSkipped: r2.dedupSkipped });
   ok("FCM continua ZERO mesmo em modo write (push real OFF na fase)", s1.calls.fcm === 0 && s2.calls.fcm === 0); }
+
+console.log("== D) V64.56: IN rejeitado (400) → fallback por IGUALDADE + diagnóstico no relatório ==");
+{ const { stub, calls } = makeFetchStub({ inFails: true }); globalThis.fetch = stub;
+  const r = await S.runSlaEnginePass(baseEnv, {});
+  ok("fallback varre as 6 tarefas mesmo com IN falhando", r.scanned === 6, { scanned: r.scanned, diag: r.queryDiagnostics });
+  ok("queryDiagnostics expõe a falha do IN (status 400 + corpo) e a estratégia", r.queryDiagnostics && r.queryDiagnostics.inStatus === 400 && /IN rejected/.test(r.queryDiagnostics.inError || "") && r.queryDiagnostics.strategy === "equality-fallback", r.queryDiagnostics);
+  ok("contagens por igualdade preenchidas (andamento=4: ATRASADA/PERTO/OK/WIP3)", r.queryDiagnostics.eqCounts && r.queryDiagnostics.eqCounts.andamento === 4 && r.queryDiagnostics.merged === 6, r.queryDiagnostics.eqCounts);
+  ok("fallback continua read-only (0 escritas, 0 FCM)", calls.writes.length === 0 && calls.fcm === 0); }
+{ const { stub } = makeFetchStub({}); globalThis.fetch = stub;     // caminho feliz: IN funciona
+  const r = await S.runSlaEnginePass(baseEnv, {});
+  ok("caminho feliz: estratégia 'in' com diagnóstico presente", r.queryDiagnostics && r.queryDiagnostics.strategy === "in" && r.queryDiagnostics.merged === 6, r.queryDiagnostics); }
 
 console.log(`\nRESULTADO DRY-RUN LOCAL: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail ? 1 : 0);
