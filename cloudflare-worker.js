@@ -209,6 +209,11 @@ export default {
       return handleSlaReschedulePlan(request, env);
     }
 
+    // Descoberta de schema/valores REAIS (read-only absoluto; agregados anônimos).
+    if (url.pathname === "/sla-discover" && request.method === "POST") {
+      return handleSlaDiscover(request, env);
+    }
+
     // ADITIVO (V64.6): Visão pública do CLIENTE em HTML premium.
     // Rota servida pelo Worker porque o link compartilhado via WhatsApp aponta para
     // https://idseven-push.agidseven.workers.dev/cliente/cronograma/<token>. Antes
@@ -290,7 +295,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.56-sla-baseline-ready" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.57-sla-discover" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -3928,5 +3933,51 @@ async function handleSlaReschedulePlan(request, env) {
   return json({ ok: true, mode: "plan-only", plan }, 200, env);
 }
 
+/* ── FASE 4.4 (descoberta): POST /sla-discover — read-only ABSOLUTO.
+   Motivo (janela de 12/06): o baseline mediu scanned:0 e a auditoria de código
+   mostrou que o app WEB de produção grava o fluxo no campo genérico `status`;
+   o eixo `designerFlowStatus` só é escrito pelos apps beta. Esta rota lê uma
+   AMOSTRA de tarefas reais e devolve APENAS agregados anônimos (presença de
+   campos + histogramas de valores enum + contagens de atraso por dueDate) —
+   sem ids, títulos, clientes ou nomes. Exige SLA_ENGINE_ENABLED; nunca escreve. */
+const SLA_DISCOVER_FIELDS = ["status","designerFlowStatus","designerWorkflowStage","cronStatus","clientFlowStatus","socialFlowStatus","operationalStatus","designerAssignment","designerSla","dueDate","endDate","startDate","assigneeId","socialOwnerId","by","sector"];
+function slaDiscoverAggregate(tasks, nowMs, tz) {
+  const agg = { sampled: tasks.length, fieldPresence: {}, valueHistograms: { status: {}, designerFlowStatus: {}, cronStatus: {}, clientFlowStatus: {}, sector: {} }, overdueByDueDate: 0, dueDateFuture: 0, withDesignerAssignment: 0, withDesignerSla: 0, ageDays: { d0_7: 0, d8_30: 0, d31_90: 0, d90p: 0 } };
+  for (const f of SLA_DISCOVER_FIELDS) agg.fieldPresence[f] = 0;
+  for (const t of tasks) {
+    for (const f of SLA_DISCOVER_FIELDS) if (t[f] !== undefined && t[f] !== null && t[f] !== "") agg.fieldPresence[f]++;
+    for (const f of Object.keys(agg.valueHistograms)) { const v = t[f]; if (typeof v === "string" && v && v.length <= 40) agg.valueHistograms[f][v] = (agg.valueHistograms[f][v] || 0) + 1; }
+    if (t.designerAssignment && t.designerAssignment.designerId) agg.withDesignerAssignment++;
+    if (t.designerSla) agg.withDesignerSla++;
+    const due = taskDueMs(t, tz);
+    if (due) { if (due < nowMs && t.status !== "concluido" && t.status !== "cancelada") agg.overdueByDueDate++; else if (due >= nowMs) agg.dueDateFuture++; }
+    const age = t.createdAt ? (nowMs - t.createdAt) / 86400000 : null;
+    if (age != null) { if (age <= 7) agg.ageDays.d0_7++; else if (age <= 30) agg.ageDays.d8_30++; else if (age <= 90) agg.ageDays.d31_90++; else agg.ageDays.d90p++; }
+  }
+  return agg;
+}
+async function handleSlaDiscover(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env ausente)." }, 403, env);
+  const nowMs = Date.now();
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  /* amostra: tarefas mais recentes por createdAt (índice single-field default) */
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }], limit: 60 } };
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  const diag = { sampleStatus: res.ok ? 200 : res.status, sampleError: null };
+  let tasks = [];
+  if (!res.ok) diag.sampleError = (await res.text().catch(() => "")).slice(0, 200);
+  else { const rows = await res.json(); for (const row of rows) { if (!row.document) continue; tasks.push(decodeFields(row.document.fields)); } }
+  /* sondas de igualdade (contagens; read-only) */
+  const probes = {};
+  for (const [name, field, value] of [["cron_sent_to_designer", "cronStatus", "sent_to_designer"], ["assignment_sent", "designerAssignment.status", "sent"], ["status_andamento", "status", "andamento"]]) {
+    const r = await slaRunQuery(env, accessToken, { fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: { stringValue: value } } }, 100);
+    probes[name] = r.ok ? r.tasks.length : ("erro " + r.status);
+  }
+  return json({ ok: true, mode: "discover-read-only", report: { now: nowMs, diag, aggregate: slaDiscoverAggregate(tasks, nowMs, tz), probes } }, 200, env);
+}
+
 /* export p/ testes unitários (node) — não interfere no runtime do Worker. */
-export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass };
+export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover };

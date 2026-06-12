@@ -120,5 +120,17 @@ console.log("== D) V64.56: IN rejeitado (400) → fallback por IGUALDADE + diagn
   const r = await S.runSlaEnginePass(baseEnv, {});
   ok("caminho feliz: estratégia 'in' com diagnóstico presente", r.queryDiagnostics && r.queryDiagnostics.strategy === "in" && r.queryDiagnostics.merged === 6, r.queryDiagnostics); }
 
+console.log("== E) V64.57: /sla-discover — agregados anônimos read-only ==");
+{ const LEGACY = [
+    { id: "L1", title: "SENSIVEL-titulo", client: "SENSIVEL-cliente", status: "andamento", dueDate: dstr(now - 120 * MIN), dueTime: tstr(now - 120 * MIN), createdAt: now - 3 * 86400000, assigneeId: "U9", sector: "design" },
+    { id: "L2", title: "X", client: "Y", status: "afazer", dueDate: dstr(now + 600 * MIN), dueTime: tstr(now + 600 * MIN), createdAt: now - 40 * 86400000, sector: "copy" },
+    { id: "L3", title: "X", client: "Y", status: "concluido", createdAt: now - 100 * 86400000 }];
+  const MIX = LEGACY.concat([FIXTURES[0], FIXTURES[3]]);   // 2 beta com designerAssignment
+  const agg = S.slaDiscoverAggregate(MIX, now, -180);
+  ok("amostra=5; presença de campos contada (status=5, designerAssignment via withDesignerAssignment=2)", agg.sampled === 5 && agg.fieldPresence.status === 3 && agg.withDesignerAssignment === 2, agg.fieldPresence);
+  ok("histograma de status legado (1 andamento/1 afazer/1 concluido; betas não têm status)", agg.valueHistograms.status.andamento === 1 && agg.valueHistograms.status.afazer === 1 && agg.valueHistograms.status.concluido === 1, agg.valueHistograms.status);
+  ok("atraso REAL por dueDate detectado no legado (L1 vencida e não concluída)", agg.overdueByDueDate >= 1, { overdue: agg.overdueByDueDate });
+  ok("ZERO dados sensíveis no agregado (sem títulos/clientes/ids)", !JSON.stringify(agg).includes("SENSIVEL") && !JSON.stringify(agg).includes("L1")); }
+
 console.log(`\nRESULTADO DRY-RUN LOCAL: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail ? 1 : 0);
