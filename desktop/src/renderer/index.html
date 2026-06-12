@@ -469,11 +469,10 @@
     body.desktop #content.board-mode .kcol .khead{padding:8px 12px 7px}
     body.desktop #content.board-mode .kcol .kbody{padding:5px 8px 5px}
   }
-  /* FIEL À REFERÊNCIA: colunas preenchem a altura (como no print autoritativo — a coluna
-     se estende ~50px abaixo do card e chega perto da borda da janela). Em telas MAIORES que
-     1366×768 o fitZoom() escala a composição inteira: a relação card × coluna do print vale
-     em qualquer tela (sem coluna gigante com card perdido). */
-  body.desktop #content.board-mode .kanban{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
+  /* Colunas ABRAÇAM o conteúdo (altura = coluna mais alta, limitada à janela): com card de
+     cronograma (alto) fica como a referência; com cards curtos (tarefas comuns) NÃO sobra um
+     poço de vazio abaixo do card. fitZoom mantém a composição do print em telas grandes. */
+  body.desktop #content.board-mode .kanban{display:flex;flex:0 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
     gap:15px;align-items:stretch;justify-content:safe center}
   /* max-width: em telas grandes a coluna NÃO balona (card "esticado" reprovado na 1.0.141);
      em 1366×768 as colunas ficam abaixo do teto — paridade com a referência intacta. */
@@ -483,7 +482,7 @@
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
-  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:0}
+  body.desktop #content.board-mode .kanban .kcol{height:auto;max-height:100%;min-height:0}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
