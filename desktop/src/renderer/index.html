@@ -482,7 +482,9 @@
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
-  body.desktop #content.board-mode .kanban .kcol{height:auto;max-height:100%;min-height:0}
+  /* piso premium: coluna nunca fica raquítica (≥380px); teto = janela; entre o piso e o
+     teto, abraça a coluna mais alta (pares iguais via stretch). */
+  body.desktop #content.board-mode .kanban .kcol{height:auto;max-height:100%;min-height:380px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
