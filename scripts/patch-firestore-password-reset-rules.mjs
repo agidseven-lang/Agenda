@@ -1,0 +1,176 @@
+#!/usr/bin/env node
+// scripts/patch-firestore-password-reset-rules.mjs
+//
+// Patch idempotente: injeta o bloco match /passwordResetRequests/{reqId} no
+// firestore.rules de PRODUCAO (passado como entrada) sem reformatar nada mais
+// e sem remover nenhuma linha existente. Trabalha por LINHAS para preservar
+// integralmente o arquivo de origem.
+//
+// Estrategia de insercao:
+//   1) Preferencia: inserir IMEDIATAMENTE ANTES da linha que contem "match /{document=**}".
+//   2) Fallback: inserir antes da linha que fecha "match /databases/{database}/documents".
+//
+// Uso: node patch-firestore-password-reset-rules.mjs <input> <output>
+// Sai com codigo 0 quando o bloco ja existe (idempotente — escreve input no output).
+
+import fs from 'node:fs';
+import process from 'node:process';
+
+const [, , inPath, outPath] = process.argv;
+if (!inPath || !outPath) {
+  console.error('Uso: patch-firestore-password-reset-rules.mjs <input> <output>');
+  process.exit(2);
+}
+
+function abort(msg) { console.error(`::error:: ${msg}`); process.exit(1); }
+
+const input = fs.readFileSync(inPath, 'utf8');
+
+// ---------- Validacoes do INPUT ----------
+if (!/rules_version\s*=\s*'2'/.test(input)) abort("input nao contem rules_version = '2'");
+if (!input.includes('service cloud.firestore')) abort('input nao contem "service cloud.firestore"');
+if (!input.includes('match /databases/{database}/documents')) abort('input nao contem match /databases/{database}/documents');
+// Cercas markdown ``` no input indicam regras corrompidas (copia/cola de Markdown).
+if (/^[ \t]*```/m.test(input)) abort('input contem cerca markdown (```), provavel copia corrompida');
+// Contagem de crases no input — sera o BASELINE para detectar se o patch introduz crase.
+const inputBackticks = (input.match(/`/g) || []).length;
+
+// ---------- Idempotencia ----------
+// Idempotente para AMBOS os blocos (passwordResetRequests + passwordResetCodes).
+// So sai antecipadamente se TUDO ja estiver presente.
+const hasReq = /match\s+\/passwordResetRequests\b/.test(input);
+const hasCodes = /match\s+\/passwordResetCodes\b/.test(input);
+if (hasReq && hasCodes) {
+  console.log('Ambos os blocos (passwordResetRequests + passwordResetCodes) JA presentes — patch idempotente (no-op).');
+  fs.writeFileSync(outPath, input, 'utf8');
+  process.exit(0);
+}
+
+// ---------- Blocos a inserir (sem markdown, sem crases) ----------
+// Apenas blocos que ainda nao existem no input sao incluidos.
+const REQ_BLOCK = [
+  '',
+  '    // -------- INICIO injetado: passwordResetRequests (legado 1.0.37-1.0.38) --------',
+  '    // Reset por admin (legado). Mantido para nao quebrar instalacoes antigas.',
+  '    // App 1.0.39+ usa Cloud Functions e nao escreve mais aqui.',
+  '    match /passwordResetRequests/{reqId} {',
+  '      allow get, list: if false;',
+  '      allow update, delete: if false;',
+  '',
+  '      allow create: if',
+  '        request.resource.data.keys().hasOnly([',
+  "          'identifier','kind','phoneDigits','createdAt',",
+  "          'status','source','handledBy','handledAt'",
+  '        ]) &&',
+  '        request.resource.data.keys().hasAll([',
+  "          'identifier','kind','phoneDigits','createdAt',",
+  "          'status','source','handledBy','handledAt'",
+  '        ]) &&',
+  '        request.resource.data.identifier is string &&',
+  '        request.resource.data.identifier.size() >= 3 &&',
+  '        request.resource.data.identifier.size() <= 120 &&',
+  '        request.resource.data.kind is string &&',
+  '        (',
+  "          request.resource.data.kind == 'email' ||",
+  "          request.resource.data.kind == 'phone'",
+  '        ) &&',
+  '        request.resource.data.phoneDigits is string &&',
+  '        request.resource.data.phoneDigits.size() <= 20 &&',
+  '        (',
+  "          request.resource.data.kind != 'phone' ||",
+  '          request.resource.data.phoneDigits.size() >= 8',
+  '        ) &&',
+  '        request.resource.data.createdAt is number &&',
+  '        request.resource.data.createdAt > 0 &&',
+  "        request.resource.data.status == 'pending' &&",
+  "        request.resource.data.source == 'nativebeta' &&",
+  '        request.resource.data.handledBy == null &&',
+  '        request.resource.data.handledAt == null;',
+  '    }',
+  '    // -------- FIM injetado: passwordResetRequests --------',
+];
+const CODES_BLOCK = [
+  '',
+  '    // -------- INICIO injetado: passwordResetCodes (self-service 1.0.39+) --------',
+  '    // Codigos de redefinicao gerenciados APENAS pelas Cloud Functions',
+  '    // (requestPasswordReset / confirmPasswordReset) via Admin SDK, que',
+  '    // bypassa estas rules. Cliente NAO tem acesso direto.',
+  '    match /passwordResetCodes/{codeId} {',
+  '      allow read, list, write: if false;',
+  '    }',
+  '    // -------- FIM injetado: passwordResetCodes --------',
+];
+const BLOCK_LINES = [];
+if (!hasReq) BLOCK_LINES.push(...REQ_BLOCK);
+if (!hasCodes) BLOCK_LINES.push(...CODES_BLOCK);
+
+// ---------- Localizar ponto de insercao por LINHAS ----------
+const lines = input.split('\n');
+let insertIdx = -1;
+let mode = '';
+
+const wildIdx = lines.findIndex((l) => /match\s+\/\{document=\*\*\}\s*\{/.test(l));
+if (wildIdx >= 0) {
+  insertIdx = wildIdx;
+  mode = 'antes de match /{document=**}';
+} else {
+  // Fallback: linha que abre match /databases/{database}/documents -> contar profundidade
+  // de chaves por linha ate a linha que fecha esse bloco; inserir ANTES dessa linha.
+  const startIdx = lines.findIndex((l) => /match\s+\/databases\/\{database\}\/documents\s*\{/.test(l));
+  if (startIdx < 0) abort('nao foi possivel localizar a linha de match /databases/{database}/documents');
+
+  // Profundidade INICIA contando o '{' da propria linha startIdx.
+  let depth = 0;
+  for (let i = startIdx; i < lines.length; i++) {
+    const opens = (lines[i].match(/\{/g) || []).length;
+    const closes = (lines[i].match(/\}/g) || []).length;
+    depth += opens - closes;
+    if (i > startIdx && depth === 0) {
+      // a linha 'i' contem o '}' que fecha o bloco /databases.
+      insertIdx = i;
+      mode = 'antes da linha que fecha match /databases (fallback)';
+      break;
+    }
+  }
+  if (insertIdx < 0) abort('nao foi possivel localizar fechamento do bloco /databases');
+}
+
+const out = [...lines.slice(0, insertIdx), ...BLOCK_LINES, ...lines.slice(insertIdx)];
+const patched = out.join('\n');
+
+console.log(`Insercao: ${mode} (linha ${insertIdx + 1}).`);
+
+// ---------- Validacoes do OUTPUT ----------
+if (!/rules_version\s*=\s*'2'/.test(patched)) abort('output perdeu rules_version');
+if (!patched.includes('service cloud.firestore')) abort('output perdeu service cloud.firestore');
+if (!patched.includes('match /databases/{database}/documents')) abort('output perdeu match /databases');
+const occReq = (patched.match(/match\s+\/passwordResetRequests\b/g) || []).length;
+if (occReq !== 1) abort(`passwordResetRequests aparece ${occReq}x (esperado 1)`);
+const occCodes = (patched.match(/match\s+\/passwordResetCodes\b/g) || []).length;
+if (occCodes !== 1) abort(`passwordResetCodes aparece ${occCodes}x (esperado 1)`);
+// Cerca markdown ``` permanece BLOQUEADA em qualquer hipotese.
+if (/^[ \t]*```/m.test(patched)) abort('output contem cerca markdown (```)');
+// Crase SOLTA: o input pode ter crases legitimas em comentarios de producao
+// (ex.: // veja `status` em users). O patch nao pode INTRODUZIR crases — comparamos
+// a contagem antes/depois. Permitimos igualdade; aborta se aumentou.
+const outputBackticks = (patched.match(/`/g) || []).length;
+if (outputBackticks > inputBackticks) {
+  abort(`patch introduziu ${outputBackticks - inputBackticks} crase(s) novas (input=${inputBackticks}, output=${outputBackticks})`);
+}
+const opens = (patched.match(/\{/g) || []).length;
+const closes = (patched.match(/\}/g) || []).length;
+if (opens !== closes) abort(`chaves desbalanceadas: ${opens} { vs ${closes} }`);
+
+// ---------- Garantia: nenhuma linha do input foi removida (so adicoes) ----------
+const inLines = lines;
+const outLines = out;
+let j = 0;
+for (let i = 0; i < inLines.length; i++) {
+  while (j < outLines.length && outLines[j] !== inLines[i]) j++;
+  if (j >= outLines.length) abort(`linha do input perdida no output (idx ${i}): ${JSON.stringify(inLines[i])}`);
+  j++;
+}
+
+fs.writeFileSync(outPath, patched, 'utf8');
+const added = outLines.length - inLines.length;
+console.log(`OK: ${outPath} escrito; ${added} linha(s) adicionada(s); 0 linha(s) removida(s).`);
