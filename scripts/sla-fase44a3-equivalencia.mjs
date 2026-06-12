@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════════════════
-   FASE 4.4-A3 — EQUIVALÊNCIA V64.5 (produção) × V64.7 (pacote de baseline)
+   FASE 4.4-A3-rev — EQUIVALÊNCIA V64.53-premium-portal (produção REAL) × V64.54 (pacote)
    ════════════════════════════════════════════════════════════════════════
-   Executa AS DUAS versões reais do worker (V64.5 extraída do git @0a356fd e
-   V64.7 = HEAD) contra os MESMOS cenários, com rede stubada idêntica, e
+   Executa AS DUAS versões reais do worker (V64.53 extraída de origin/worker/v64-42-team-adjust-idem-cleanup e
+   V64.54 = HEAD) contra os MESMOS cenários, com rede stubada idêntica, e
    compara as respostas byte a byte (única diferença tolerada: string de
    versão no GET /). Prova:
    1. SEM env SLA_*: V64.7 responde IDÊNTICO ao V64.5 em todas as rotas;
@@ -10,7 +10,7 @@
    3. com SLA_ENGINE_ENABLED e SEM SLA_WRITE: read-only (0 escritas SLA);
    4. SEM SLA_ACTIVATED_AT: 0 eventos elegíveis;
    5. /sla-dryrun nunca chama FCM.
-   Pré: git show 0a356fd:cloudflare-worker.js > /tmp/worker-PROD-v645.mjs
+   Pré: git show origin/worker/v64-42-team-adjust-idem-cleanup:cloudflare-worker.js > /tmp/worker-PROD-v6453.mjs
    Uso: node scripts/sla-fase44a3-equivalencia.mjs
    ════════════════════════════════════════════════════════════════════════ */
 import { copyFileSync } from "node:fs";
@@ -19,9 +19,9 @@ import { generateKeyPairSync } from "node:crypto";
 import path from "node:path";
 
 const NEW_SRC = path.resolve(import.meta.dirname, "..", "cloudflare-worker.js");
-copyFileSync(NEW_SRC, "/tmp/worker-NEW-v647.mjs");
-const NEW = (await import(pathToFileURL("/tmp/worker-NEW-v647.mjs").href));
-const OLD = (await import(pathToFileURL("/tmp/worker-PROD-v645.mjs").href));
+copyFileSync(NEW_SRC, "/tmp/worker-NEW-v654.mjs");
+const NEW = (await import(pathToFileURL("/tmp/worker-NEW-v654.mjs").href));
+const OLD = (await import(pathToFileURL("/tmp/worker-PROD-v6453.mjs").href));
 const S = NEW.__slaCore;
 
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -67,7 +67,7 @@ const norm = (s) => s
   .replace(/"signature":"[0-9a-f]{40}"/g, '"signature":"HMAC40"');         // assinatura derivada do token
 
 /* ── 1) EQUIVALÊNCIA rota a rota, SEM env SLA_* ── */
-console.log("== 1) EQUIVALÊNCIA V64.5 × V64.7 (env de produção, sem vars SLA) ==");
+console.log("== 1) EQUIVALÊNCIA V64.53 × V64.54 (env de produção, sem vars SLA) ==");
 const SUITE = [
   ["GET", "/", null, "status do serviço"],
   ["POST", "/cron-test", {}, "cron dry-run (lembretes)"],
@@ -75,7 +75,7 @@ const SUITE = [
   ["POST", "/notify-designer", { id: "TT1" }, "push premium ao designer"],
   ["POST", "/", { tokens: ["tok-A"], title: "t", body: "b" }, "push relay"],
   ["POST", "/imagekit-auth", { token: "abc", expire: 9999999999 }, "assinatura ImageKit"],
-  ["POST", "/sla-dryrun", {}, "rota NOVA (na V64.5 cai no relay; na V64.7 = 403)"],
+  ["POST", "/sla-dryrun", {}, "rota NOVA (na V64.53 cai no relay; na V64.54 = 403)"],
   ["POST", "/sla-reschedule-plan", { taskId: "TT1" }, "rota NOVA (idem)"],
 ];
 const results = {};
@@ -93,12 +93,12 @@ for (let i = 0; i < SUITE.length; i++) {
   if (!isNewRoute)
     ok(`${o.route} — resposta IDÊNTICA (status ${o.status}) [${SUITE[i][3]}]`, o.status === n.status && o.body === n.body && o.fcm === n.fcm, { old: o, new: n });
   else
-    ok(`${n.route} — V64.5: relay genérico (${o.status}); V64.7: 403 bloqueado sem env`, n.status === 403 && /desabilitado/.test(n.body), { old: o.status, new: n.status });
+    ok(`${n.route} — V64.53: relay genérico (${o.status}); V64.54: 403 bloqueado sem env`, n.status === 403 && /desabilitado/.test(n.body), { old: o.status, new: n.status });
 }
 ok("nenhuma rota legada gravou em coleções SLA (nas duas versões)", results.OLD.concat(results.NEW).every((r) => r.writes === 0));
 
 /* ── 2) /sla-dryrun read-only mesmo HABILITADO (sem SLA_WRITE / sem SLA_ACTIVATED_AT) ── */
-console.log("== 2) V64.7 com SLA_ENGINE_ENABLED=true (cenário do baseline 4.4-A4) ==");
+console.log("== 2) V64.54 com SLA_ENGINE_ENABLED=true (cenário do baseline 4.4-A4) ==");
 { const { stub, calls } = makeStub(); globalThis.fetch = stub;
   const env = Object.assign({}, prodEnv, { SLA_ENGINE_ENABLED: "true" });   // ÚNICA var do baseline
   const r = await call(NEW, "POST", "/sla-dryrun", {}, env);
@@ -117,7 +117,7 @@ console.log("== 3) scheduled() — paridade do cron ==");
     await Promise.all(bg.map((p) => p.catch(() => {})));
     results[W[0] + "_cron"] = { fcm: calls.fcm, slaTouches: calls.log.filter((l) => /slaEvents|designerLocks/.test(l)).length, tarefas: calls.log.filter((l) => l.includes("runQuery")).length };
   }
-  ok("cron V64.7 SEM env SLA: mesmas chamadas de rede que V64.5 (zero toque SLA)",
+  ok("cron V64.54 SEM env SLA: mesmas chamadas de rede que V64.53 (zero toque SLA)",
     JSON.stringify(results.OLD_cron) === JSON.stringify(results.NEW_cron) && results.NEW_cron.slaTouches === 0, { old: results.OLD_cron, new: results.NEW_cron }); }
 
 console.log(`\nRESULTADO EQUIVALÊNCIA 4.4-A3: ${pass} PASS, ${fail} FAIL`);
