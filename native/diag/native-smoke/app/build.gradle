@@ -1,0 +1,35 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+
+android {
+    namespace "br.com.idseven.agenda.smoke"
+    compileSdk 34
+
+    defaultConfig {
+        // applicationId DIFERENTE p/ coexistir com os outros APKs sem conflito de cache.
+        applicationId "br.com.idseven.agenda.smoke"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        debug {
+            // debug = standalone e auto-assinado (debug keystore). Sem JS, sem Metro.
+        }
+    }
+
+    // Alinha Java e Kotlin no MESMO target (17) — corrige o erro de JVM-target inconsistente.
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    // Nenhuma dependência extra: Activity puro do Android.
+}
