@@ -468,13 +468,51 @@
     body.desktop #content.board-mode .kcol .khead{padding:8px 12px 7px}
     body.desktop #content.board-mode .kcol .kbody{padding:5px 8px 5px}
   }
-  /* ===== QUADRO DE TAREFAS — sistema de tamanho (escopo EXCLUSIVO do board) ===== */
-  /* Degrau de densidade: em telas largas (≥1700px) o CONTEÚDO DO QUADRO sobe um degrau
-     p/ manter a presença do card da referência (fontes/cards proporcionais à janela).
-     Escopo restrito a .kanban dentro de board-mode — login/Hoje/Hub/formulários/modais
-     NUNCA são afetados (regra de ouro da reprovação 1.0.144: nada global). */
+  /* ===== QUADRO — BREAKPOINT REAL ≥1700px (dimensões explícitas, SEM zoom/scale) =====
+     Em monitores grandes o quadro usa medidas REAIS maiores (colunas, fontes, paddings,
+     avatar, botões) p/ manter a presença do card da referência. Escopo EXCLUSIVO de
+     body.desktop #content.board-mode — nenhuma outra tela é afetada. */
   @media(min-width:1700px){
-    body.desktop #content.board-mode .kanban{zoom:1.28}
+    body.desktop #content.board-mode .kanban{gap:20px}
+    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;border-radius:12px}
+    body.desktop #content.board-mode .kanban .kcol.kcol-live{max-width:484px}
+    body.desktop #content.board-mode .kcol .khead{padding:9px 15px 8px}
+    body.desktop #content.board-mode .kcol .khead .kt{font-size:14.5px}
+    body.desktop #content.board-mode .kcol .khead .kn{font-size:12px;padding:3px 10px}
+    body.desktop #content.board-mode .kcol .kbody{padding:20px 9px 0}
+    body.desktop #content.board-mode .tcv4{padding:17px 17px 12px !important;border-radius:12px}
+    body.desktop #content.board-mode .tcv4-st,body.desktop #content.board-mode .tcv4-due{font-size:12px;padding:4px 9px}
+    body.desktop #content.board-mode .tcv4-st .dotc{width:7px;height:7px}
+    body.desktop #content.board-mode .tcv4-person{margin-top:11px;gap:13px}
+    body.desktop #content.board-mode .tcv4-avw .av{width:64px !important;height:64px !important;font-size:21px !important}
+    body.desktop #content.board-mode .tcv4-presence{width:12px;height:12px}
+    body.desktop #content.board-mode .tcv4-name{font-size:17.5px}
+    body.desktop #content.board-mode .tcv4-role{font-size:12.5px}
+    body.desktop #content.board-mode .tcv4-origin{margin-top:16px;padding:7px 12px;font-size:13px;border-radius:10px}
+    body.desktop #content.board-mode .tcv4-client{font-size:12px}
+    body.desktop #content.board-mode .tcv4-title{font-size:19px}
+    body.desktop #content.board-mode .tcv4-chips{margin-top:8px;gap:7px}
+    body.desktop #content.board-mode .tcv4-chip{font-size:12.5px;padding:4px 8px;border-radius:8px}
+    body.desktop #content.board-mode .tcv4-rail{margin-top:22px}
+    body.desktop #content.board-mode .tcv4-rail i{width:8px;height:8px}
+    body.desktop #content.board-mode .tcv4-rail i.cur{width:10px;height:10px}
+    body.desktop #content.board-mode .tcv4-steps{margin-top:14px}
+    body.desktop #content.board-mode .tcv4-k{font-size:9.5px}
+    body.desktop #content.board-mode .tcv4-step b{font-size:13.5px}
+    body.desktop #content.board-mode .tcv4-next{font-size:13.5px}
+    body.desktop #content.board-mode .tcv4-themes{margin-top:13px;padding:11px 14px;border-radius:10px}
+    body.desktop #content.board-mode .tcv4-theme{padding:5px 0;gap:10px}
+    body.desktop #content.board-mode .tcv4-theme-n{width:21px;height:21px;font-size:11.5px;border-radius:6px}
+    body.desktop #content.board-mode .tcv4-theme-t{font-size:14px}
+    body.desktop #content.board-mode .tcv4-circ{width:21px;height:21px}
+    body.desktop #content.board-mode .tcv4-chkline{font-size:11.5px;margin-top:10px}
+    body.desktop #content.board-mode .tcv4-date{font-size:14px;margin-top:11px;padding-top:10px}
+    body.desktop #content.board-mode .tcv4 .tcv4-btn{height:38px !important;font-size:14px !important;border-radius:10px;padding:0 16px !important}
+    body.desktop #content.board-mode .tcv4 .tcv4-btn svg{width:17px;height:17px}
+    body.desktop #content.board-mode .kempty-ic{width:70px;height:70px}
+    body.desktop #content.board-mode .kempty-ic svg{width:64px;height:64px}
+    body.desktop #content.board-mode .kempty-t{font-size:14px}
+    body.desktop #content.board-mode .kempty-s{font-size:12px}
   }
   /* Colunas ABRAÇAM o conteúdo (altura = coluna mais alta, limitada à janela): com card de
      cronograma (alto) a proporção card×coluna (~86-92%) vale em QUALQUER tela; com cards
