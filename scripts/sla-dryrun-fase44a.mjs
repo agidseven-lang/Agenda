@@ -99,7 +99,7 @@ const ok = (n, c, x) => { if (c) { pass++; console.log("  PASS", n); } else { fa
 console.log("== REGRESSÃO DO WORKER EXISTENTE ==");
 { const r = await worker.fetch(new Request("https://x/", { method: "GET" }), env, {});
   const j = await r.json();
-  ok("GET / responde ok com a versão nova", r.status === 200 && j.ok === true && /V64\.6/.test(j.version), j); }
+  ok("GET / responde ok com a versão nova", r.status === 200 && j.ok === true && /V64\.7/.test(j.version), j); }
 { const r = await worker.fetch(req("/cron-test", {}), env, {});  // DRY-RUN por padrão (rota antiga)
   ok("POST /cron-test (rota antiga) segue funcional em dry-run", r.status === 200); }
 const writesAfterLegacy = net.writeAttempts.length;
