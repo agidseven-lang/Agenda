@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════════
-   FASE 4.4-A3-rev — EQUIVALÊNCIA V64.53-premium-portal (produção REAL) × V64.54 (pacote)
+   FASE 4.4-A4-rev2 — EQUIVALÊNCIA EM FORMA DE BUNDLE: repro-V64.53 × V64.55 (artefato de deploy)
    ════════════════════════════════════════════════════════════════════════
    Executa AS DUAS versões reais do worker (V64.53 extraída de origin/worker/v64-42-team-adjust-idem-cleanup e
    V64.54 = HEAD) contra os MESMOS cenários, com rede stubada idêntica, e
@@ -19,7 +19,7 @@ import { generateKeyPairSync } from "node:crypto";
 import path from "node:path";
 
 const NEW_SRC = path.resolve(import.meta.dirname, "..", "cloudflare-worker.js");
-copyFileSync(NEW_SRC, "/tmp/worker-NEW-v654.mjs");
+copyFileSync("/tmp/worker-v655-bundle.js", "/tmp/worker-NEW-v654.mjs");  // FORMA BUNDLE (igual ao editor)
 const NEW = (await import(pathToFileURL("/tmp/worker-NEW-v654.mjs").href));
 const OLD = (await import(pathToFileURL("/tmp/worker-PROD-v6453.mjs").href));
 const S = NEW.__slaCore;

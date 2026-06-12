@@ -290,7 +290,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.54-sla-baseline-ready" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.55-sla-baseline-ready" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
