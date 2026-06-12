@@ -160,5 +160,34 @@ console.log("== F) V64.58: /sla-legacy-baseline — lente legado measure-only ==
   ok("ZERO escrita / ZERO FCM na lente legado", calls.writes.length === 0 && calls.fcm === 0);
   ok("diag por consulta presente (4 igualdades 200)", Object.values(j.report.diag.queries).every(q => q.status === 200) && j.report.diag.totalQueried === 6, j.report.diag); }
 
+console.log("== G) V64.59: /sla-legacy-risk — risco antes do vencimento (read-only) ==");
+{ const D = 86400000, HH = 3600000;
+  const RISK = [
+    /* início vencido (start passada, afazer), vence em <24h, sem dono → ALTO */
+    { id: "SENS-R1", title: "SENSIVEL", client: "SENSIVEL", status: "afazer", sector: "design", startDate: dstr(now - 2 * D), startTime: "09:00", dueDate: dstr(now + 10 * HH), dueTime: tstr(now + 10 * HH), createdAt: now - 10 * D },
+    /* saudável: começa amanhã, vence em 10d, com dono */
+    { id: "SENS-R2", title: "X", client: "Y", status: "afazer", sector: "copy", assigneeId: "uid-Z", startDate: dstr(now + 1 * D), startTime: "09:00", dueDate: dstr(now + 10 * D), dueTime: "18:00", createdAt: now - 1 * D },
+    /* janela estourada: andamento, base 10d atrás, due ontem */
+    { id: "SENS-R3", title: "X", client: "Y", status: "andamento", sector: "design", assigneeId: "uid-Z", startDate: dstr(now - 10 * D), startTime: "09:00", dueDate: dstr(now - 1 * D), dueTime: "18:00", createdAt: now - 12 * D },
+    /* fila parada >30d, sem datas de início, vence em 5d */
+    { id: "SENS-R4", title: "X", client: "Y", status: "afazer", sector: "copy", dueDate: dstr(now + 5 * D), dueTime: "18:00", createdAt: now - 40 * D }];
+  const wmod = (await import(pathToFileURL(TMP).href)).default;
+  const { stub, calls } = makeFetchStub({ legacyFixtures: RISK }); globalThis.fetch = stub;
+  const req3 = (p3, b) => new Request("https://x" + p3, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b || {}) });
+  const r403 = await wmod.fetch(req3("/sla-legacy-risk", {}), { FCM_PROJECT_ID: "t", FCM_CLIENT_EMAIL: "t", FCM_PRIVATE_KEY: PEM }, {});
+  ok("SEM env → 403", r403.status === 403);
+  const r = await wmod.fetch(req3("/sla-legacy-risk", {}), baseEnv, {});
+  const j = await r.json(); const a = j.report.aggregate;
+  console.log("  agregado:", JSON.stringify(a).slice(0, 420));
+  ok("modo legacy-risk-read-only, 200; analisa só ativas (4)", r.status === 200 && j.mode === "legacy-risk-read-only" && a.analyzed === 4);
+  ok("início vencido detectado (R1: start -2d, afazer) c/ magnitude d1_3", a.inicioVencido.total === 1 && a.inicioVencido.magnitude.d1_3 === 1 && a.inicioVencido.porSetor.design === 1, a.inicioVencido);
+  ok("venceEm: 1 em <24h (R1), 1 jaVencida (R3), 1 em 3-7d (R4), 1 em +7d (R2)", a.venceEm.h24 === 1 && a.venceEm.jaVencida === 1 && a.venceEm.d3_7 === 1 && a.venceEm.mais_7d === 1, a.venceEm);
+  ok("fila parada: R4 >30d marcada", a.filaParadaAfazer.mais_30d === 1, a.filaParadaAfazer);
+  ok("consumo de janela: R3 ESTOUROU; R2 <50%", a.consumoJanela.estourou === 1 && a.consumoJanela.ate_50 === 1, a.consumoJanela);
+  ok("risco: R1 ALTO (2+3+1 sem dono); R2 baixo", a.risco.alto >= 1 && a.risco.baixo >= 1 && a.risco.porSetor.design && a.risco.porResp.resp01, a.risco);
+  ok("missing: semStartDate=1 (R4), semAssignee=2 (R1,R4)", a.semStartDate === 1 && a.semAssignee === 2, a);
+  ok("ZERO dados sensíveis (sem SENS/uid-)", !JSON.stringify(j).includes("SENS") && !JSON.stringify(j).includes("uid-"));
+  ok("ZERO escrita / ZERO FCM na rota de risco", calls.writes.length === 0 && calls.fcm === 0); }
+
 console.log(`\nRESULTADO DRY-RUN LOCAL: ${pass} PASS, ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

@@ -219,6 +219,11 @@ export default {
       return handleSlaLegacyBaseline(request, env);
     }
 
+    // V64.59 — RISCO antes do vencimento (última extensão da lente legado; read-only).
+    if (url.pathname === "/sla-legacy-risk" && request.method === "POST") {
+      return handleSlaLegacyRisk(request, env);
+    }
+
     // ADITIVO (V64.6): Visão pública do CLIENTE em HTML premium.
     // Rota servida pelo Worker porque o link compartilhado via WhatsApp aponta para
     // https://idseven-push.agidseven.workers.dev/cliente/cronograma/<token>. Antes
@@ -300,7 +305,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.58-legacy-baseline" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-legacy-risk" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -4050,5 +4055,100 @@ async function handleSlaLegacyBaseline(request, env) {
   return json({ ok: true, mode: "legacy-baseline-read-only", report: { now: nowMs, diag, aggregate } }, 200, env);
 }
 
+/* ── FASE 4.4 (V64.59): RISCO DE ATRASO ANTES DO VENCIMENTO — read-only.
+   Última extensão da lente legado (autorizada como termômetro temporário em
+   paralelo à adoção das betas). Usa SOMENTE campos existentes (status/startDate/
+   dueDate/createdAt/sector/assigneeId) e devolve SÓ agregados anônimos
+   (responsável vira respNN; nenhum id/título/cliente/nome/texto livre sai). */
+function slaLegacyRiskAggregate(tasks, nowMs, tz) {
+  const D = 86400000, H = 3600000;
+  const agg = { analyzed: tasks.length,
+    inicioVencido: { total: 0, porSetor: {}, porResp: {}, magnitude: { ate_1d: 0, d1_3: 0, d3_7: 0, mais_7d: 0 } },
+    venceEm: { h24: 0, h24_72: 0, d3_7: 0, mais_7d: 0, jaVencida: 0 },
+    filaParadaAfazer: { d0_2: 0, d3_7: 0, d8_30: 0, mais_30d: 0 },
+    consumoJanela: { ate_50: 0, p50_80: 0, p80_100: 0, estourou: 0, semJanela: 0 },
+    risco: { alto: 0, medio: 0, baixo: 0, porSetor: {}, porResp: {} },
+    semAssignee: 0, semStartDate: 0, semDueDate: 0, semSector: 0 };
+  const rawResp = {}; const respRisk = {}; const respStart = {};
+  for (const t of tasks) {
+    const st = t.status || "";
+    const sec = (typeof t.sector === "string" && t.sector) ? t.sector : null;
+    if (!sec) agg.semSector++;
+    const asg = (typeof t.assigneeId === "string" && t.assigneeId) ? t.assigneeId : null;
+    if (asg) rawResp[asg] = (rawResp[asg] || 0) + 1; else agg.semAssignee++;
+    const startMs = slaToMs(t.startDate, t.startTime, tz);
+    const dueMs = taskDueMs(t, tz);
+    if (!startMs) agg.semStartDate++;
+    if (!dueMs) agg.semDueDate++;
+    let pontos = 0;
+    /* 1) início vencido: startDate no passado + ainda afazer */
+    if (startMs && startMs < nowMs && st === "afazer") {
+      agg.inicioVencido.total++; pontos += 2;
+      if (sec) agg.inicioVencido.porSetor[sec] = (agg.inicioVencido.porSetor[sec] || 0) + 1;
+      if (asg) respStart[asg] = (respStart[asg] || 0) + 1;
+      const d = (nowMs - startMs) / D;
+      if (d <= 1) agg.inicioVencido.magnitude.ate_1d++; else if (d <= 3) agg.inicioVencido.magnitude.d1_3++;
+      else if (d <= 7) agg.inicioVencido.magnitude.d3_7++; else agg.inicioVencido.magnitude.mais_7d++;
+    }
+    /* 2) vence em breve (somente ativas) */
+    if (dueMs && st !== "concluido" && st !== "cancelada") {
+      const left = dueMs - nowMs;
+      if (left < 0) { agg.venceEm.jaVencida++; pontos += 3; }
+      else if (left < 24 * H) { agg.venceEm.h24++; pontos += 3; }
+      else if (left < 72 * H) { agg.venceEm.h24_72++; pontos += 2; }
+      else if (left < 7 * D) { agg.venceEm.d3_7++; pontos += 1; }
+      else agg.venceEm.mais_7d++;
+    }
+    /* 3) fila parada (idade em afazer) */
+    if (st === "afazer" && t.createdAt) {
+      const idade = (nowMs - t.createdAt) / D;
+      if (idade <= 2) agg.filaParadaAfazer.d0_2++; else if (idade <= 7) agg.filaParadaAfazer.d3_7++;
+      else if (idade <= 30) { agg.filaParadaAfazer.d8_30++; pontos += 1; }
+      else { agg.filaParadaAfazer.mais_30d++; pontos += 2; }
+    }
+    /* 4) consumo da janela: base = startDate (ou createdAt) → dueDate */
+    const baseMs = startMs || t.createdAt || 0;
+    if (dueMs && baseMs && dueMs > baseMs && st !== "concluido" && st !== "cancelada") {
+      const ratio = (nowMs - baseMs) / (dueMs - baseMs);
+      if (ratio < 0.5) agg.consumoJanela.ate_50++;
+      else if (ratio < 0.8) agg.consumoJanela.p50_80++;
+      else if (ratio <= 1) { agg.consumoJanela.p80_100++; pontos += 1; }
+      else { agg.consumoJanela.estourou++; pontos += 2; }
+    } else agg.consumoJanela.semJanela++;
+    if (!asg && st !== "concluido") pontos += 1;   /* fila sem dono = risco */
+    /* nível de risco agregado */
+    const nivel = pontos >= 4 ? "alto" : (pontos >= 2 ? "medio" : "baixo");
+    agg.risco[nivel]++;
+    if (sec) { agg.risco.porSetor[sec] = agg.risco.porSetor[sec] || { alto: 0, medio: 0, baixo: 0 }; agg.risco.porSetor[sec][nivel]++; }
+    if (asg) { respRisk[asg] = respRisk[asg] || { alto: 0, medio: 0, baixo: 0 }; respRisk[asg][nivel]++; }
+  }
+  /* pseudonimização estável (respNN por volume) — ids NUNCA saem */
+  const ordered = Object.keys(rawResp).sort((a, b) => rawResp[b] - rawResp[a]);
+  const alias = {}; ordered.forEach((id, i) => { alias[id] = "resp" + String(i + 1).padStart(2, "0"); });
+  for (const id of ordered) {
+    if (respRisk[id]) agg.risco.porResp[alias[id]] = respRisk[id];
+    if (respStart[id]) agg.inicioVencido.porResp[alias[id]] = respStart[id];
+  }
+  return agg;
+}
+async function handleSlaLegacyRisk(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env ausente)." }, 403, env);
+  const nowMs = Date.now();
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  const STATUSES = ["afazer", "andamento", "revisao"];   /* só ativas: risco é da fila viva */
+  const diag = { queries: {}, totalQueried: 0 };
+  const all = [];
+  for (const st of STATUSES) {
+    const r = await slaRunQuery(env, accessToken,
+      { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: st } } }, 300);
+    diag.queries[st] = { status: r.ok ? 200 : r.status, count: r.tasks.length, error: r.ok ? null : (r.errBody || null) };
+    diag.totalQueried += r.tasks.length;
+    for (const t of r.tasks) all.push(t);
+  }
+  return json({ ok: true, mode: "legacy-risk-read-only", report: { now: nowMs, diag, aggregate: slaLegacyRiskAggregate(all, nowMs, tz) } }, 200, env);
+}
+
 /* export p/ testes unitários (node) — não interfere no runtime do Worker. */
-export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover, slaLegacyAggregate, handleSlaLegacyBaseline };
+export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover, slaLegacyAggregate, handleSlaLegacyBaseline, slaLegacyRiskAggregate, handleSlaLegacyRisk };
