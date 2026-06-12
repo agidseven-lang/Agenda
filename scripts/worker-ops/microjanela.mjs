@@ -80,11 +80,15 @@ function passoBundleLocal() {
   save("bundle.sha256.txt", `${h}  ${distFiles[0]}\nversao=${ver}\n`);
   return { hash: h, ver };
 }
-async function passoEstadoProducao() {
-  const r = await http("GET", URL_BASE + "/");
+async function passoEstadoProducao(softFail) {
+  const r = await http("GET", URL_BASE + "/").catch((e) => ({ status: 0, text: String(e) }));
   log(`— produção GET / → ${r.status} ${r.text.slice(0, 120)}`);
   save("producao-get.json", r.text);
-  if (r.status !== 200) fail("GET / de produção não respondeu 200");
+  const bloqueioSandbox = /Host not in allowlist/i.test(r.text);
+  if (r.status !== 200) {
+    if (softFail) { log(`  (aviso, não-fatal no dry-run: produção inacessível${bloqueioSandbox ? " — bloqueio de REDE deste ambiente, não do worker" : ""})`); return null; }
+    fail("GET / de produção não respondeu 200" + (bloqueioSandbox ? " (bloqueio de rede do ambiente — rode da sua máquina ou libere o host no allowlist)" : ""));
+  }
   return JSON.parse(r.text);
 }
 async function passo403(quando) {
@@ -181,7 +185,7 @@ guardSemVarsProibidas();
 try {
   if (modo === "dry-run") {
     const b = passoBundleLocal();
-    const prod = await passoEstadoProducao().catch(() => null);
+    const prod = await passoEstadoProducao(true);   // dry-run: leitura de produção é informativa, nunca fatal
     log(`RESUMO dry-run: pacote=${b.ver} (${b.hash.slice(0, 12)}…) | produção=${prod ? prod.version : "inacessível"} | NENHUM deploy feito.`);
     flushReport("OK (dry-run)");
   } else if (modo === "deploy") {
