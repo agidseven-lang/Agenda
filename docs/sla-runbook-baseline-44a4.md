@@ -1,3 +1,10 @@
+# RUNBOOK HUMANO v3 — ⚠️ SUSPENSO NO PASSO A4 (16:18 UTC 12/06)
+# Descoberta: o conteúdo do EDITOR Cloudflare (produção) NÃO é byte-idêntico à
+# fonte do git (provável bundle wrangler/esbuild: hash 2702312d…, sem o literal
+# "export default"). O hash A4 deste runbook é INVÁLIDO como portão. NÃO seguir
+# para B1 com este documento — aguardar runbook v4 após análise do backup real.
+# O backup copiado do editor CONTINUA sendo o artefato de rollback correto.
+# (v3 original abaixo, mantido para histórico)
 # RUNBOOK HUMANO v3 (4.4-A4-PREP-v3 — base REAL de produção V64.53) — BASELINE REAL READ-ONLY
 Worker `idseven-push` · pacote V64.54-sla-baseline-ready · executor: humano (painel Cloudflare)
 Versão canônica. NADA foi executado; este documento é o roteiro operacional.
