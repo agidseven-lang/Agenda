@@ -82,13 +82,13 @@ class MobileContract146ScreenshotTest {
 
     @Test fun board_1tarefa_390x844() = renderCards(
         390, "m146-board-1tarefa-390.png", "EM ANÁLISE · 1",
-        listOf(task("a", "Cronograma Semanal · Feed", "Hospital Visão", "sent_to_client")),
+        listOf(task("a", "Cronograma Semanal · Feed", "Hospital Visão", "enviado_cliente")),
     )
 
     @Test fun board_2tarefas_390x844() = renderCards(
         390, "m146-board-2tarefas-390.png", "EM ANÁLISE · 2",
         listOf(
-            task("a", "Cronograma Semanal · Feed", "Hospital Visão", "sent_to_client"),
+            task("a", "Cronograma Semanal · Feed", "Hospital Visão", "enviado_cliente"),
             task("b", "Cronograma Quinzenal · Stories", "Clínica Bella Pelle", "sent_to_designer"),
         ),
     )
@@ -98,7 +98,11 @@ class MobileContract146ScreenshotTest {
         listOf(task("a", "Cronograma Mensal · Feed + Stories + Reels", "Clínica Oftalmológica Visão Premium de Niterói LTDA", "sent_to_designer")),
     )
 
-    @Test fun tablet_nao_quebra_800() = renderCards(
+    // "+w880dp" alarga a TELA simulada (Robolectric merge) — sem isso o box de 800dp
+    // seria clampado aos 411dp do qualifier da classe e a prova tablet seria falsa.
+    @Test
+    @Config(qualifiers = "+w880dp")
+    fun tablet_nao_quebra_800() = renderCards(
         800, "m146-tablet-800.png", "EM ANÁLISE · 1",
         listOf(task("a", "Cronograma semanal", "Hospital Visão", "sent_to_designer")),
     )
