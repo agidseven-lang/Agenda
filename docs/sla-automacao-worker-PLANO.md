@@ -55,8 +55,8 @@ Permissão extra do token: NENHUMA — `Workers Scripts: Edit` já cobre setting
 Produção foi historicamente publicada via `wrangler deploy` (provado pela
 assinatura do bundle no seu backup). Automatizar com a MESMA ferramenta elimina
 de vez a divergência de forma (bundle × fonte) e dá: versionamento de deployments
-no painel (auditável), rollback nativo (`wrangler rollback`) e env temporária por
-deploy (`--var`), removida com um deploy limpo — sem nunca tocar nos secrets.
+no painel (auditável) e rollback nativo (`wrangler rollback`). A env temporária
+NÃO passa pelo wrangler (ver 3a): é gerida pela API por variável.
 
 ## 4. O script único: `scripts/worker-ops/microjanela.mjs`
 Cobre todos os passos que você fazia à mão. Modos:
@@ -83,13 +83,17 @@ node scripts/worker-ops/microjanela.mjs full sla-legacy-risk
 - A env temporária é removida num bloco `finally` — falha de rede/coleta NÃO deixa
   a env ligada; e o script ainda re-verifica 403 nas 3 rotas ao final.
 - Anomalia na coleta (`writeAllowed:true` ou `writes>0`) → aborto + remoção da env.
-- Nada destrutivo: sem deletes; secrets intocados; cada passo logado.
+- Snapshot de variáveis antes/depois (nomes apenas): aborto se a env já existir
+  antes; alerta crítico se persistir depois; alerta se qualquer outra var
+  aparecer/sumir. Deploy de código aborta se QUALQUER nome de var sumir.
+- Nada destrutivo: o único DELETE possível é da própria SLA_ENGINE_ENABLED;
+  secrets/vars existentes intocados; cada passo logado.
 
 ## 6. Logs e arquivos gerados (auditoria)
 Por execução, em `worker-ops-logs/<timestamp>/`:
 `relatorio.txt` (passo a passo com horários e status final) · `bundle.sha256.txt`
 · `backup-producao-<hash8>.js` · `deployments-antes.txt` · `producao-get.json`
-· `deploy-limpo.txt` / `deploy-com-env.txt` · `<rota>-<timestamp>.json` (a coleta)
+· `deploy-codigo.txt` · `vars-antes-*.txt` / `vars-depois-*.txt` (SÓ nomes+tipos) · `<rota>-<timestamp>.json` (a coleta)
 · `rollback.txt` (quando aplicável). A pasta inteira é a evidência da janela.
 
 ## 7. Critérios de sucesso/falha (automáticos)
