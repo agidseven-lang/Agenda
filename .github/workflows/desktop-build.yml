@@ -38,11 +38,11 @@ jobs:
           ref: ${{ github.event.inputs.ref }}
 
       # CI-only: label FIXO desta versao de TESTE + validacao de que o package.json bate.
-      - name: Definir versao/labels (1.0.145-beta-board-contract-final)
+      - name: Definir versao/labels (1.0.146-beta-board-rebuild)
         run: |
-          LABEL="1.0.145-beta-board-contract-final"
+          LABEL="1.0.146-beta-board-rebuild"
           VER="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$APP_DIR/package.json" | head -1)"
-          if [ "$VER" != "1.0.145" ]; then echo "::error::package.json version=$VER (esperado 1.0.145)"; exit 1; fi
+          if [ "$VER" != "1.0.146" ]; then echo "::error::package.json version=$VER (esperado 1.0.146)"; exit 1; fi
           echo "VER_LABEL=$LABEL" >> "$GITHUB_ENV"
           echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL}" >> "$GITHUB_ENV"
           echo "VER_LABEL=$LABEL | DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL} | package.json=$VER"
@@ -63,6 +63,25 @@ jobs:
       - name: electron-builder (NSIS + MSI)
         working-directory: ${{ env.APP_DIR }}
         run: npx electron-builder --win nsis msi --publish never
+
+      # PROVA exigida no reteste 1.0.146: o renderer DENTRO do app.asar empacotado
+      # deve ser byte a byte identico ao renderer auditado do repo. Falha = build invalido.
+      - name: Prova renderer empacotado == renderer auditado (byte a byte)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          ASAR="dist-installer/win-unpacked/resources/app.asar"
+          if [ ! -f "$ASAR" ]; then echo "::error::app.asar nao encontrado em $ASAR"; ls -R dist-installer | head -50; exit 1; fi
+          npx @electron/asar extract-file "$ASAR" src/renderer/index.html
+          SHA_SRC=$(sha256sum src/renderer/index.html | awk '{print $1}')
+          SHA_PKG=$(sha256sum index.html | awk '{print $1}')
+          echo "SHA-256 renderer fonte (auditado) : $SHA_SRC"
+          echo "SHA-256 renderer empacotado(asar) : $SHA_PKG"
+          if [ "$SHA_SRC" != "$SHA_PKG" ]; then echo "::error::renderer empacotado DIFERE da fonte auditada"; exit 1; fi
+          echo "OK: renderer empacotado e byte a byte o renderer auditado."
+          rm -f index.html
+          echo "GREP de proibidos no renderer empacotado (deve ser vazio):"
+          ! grep -nE "fitZoom|--fitz|body\.style\.zoom" src/renderer/index.html || { echo "::error::padrao proibido encontrado"; exit 1; }
+          echo "OK: sem fitZoom / --fitz / body.style.zoom."
 
       - name: Empacotar bundle (instalador + relatorios)
         working-directory: ${{ env.APP_DIR }}
