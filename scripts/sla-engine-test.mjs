@@ -12,6 +12,8 @@ const SRC = path.resolve(import.meta.dirname, "..", "cloudflare-worker.js");
 const TMP = "/tmp/idseven-worker-under-test.mjs";
 copyFileSync(SRC, TMP);
 const { __slaCore: S } = await import(pathToFileURL(TMP).href);
+/* corte=1ms (tudo elegível) nos testes legados; o corte é testado em separado */
+const derive = (prev, comp, task, now) => S.deriveSlaEvents(prev, comp, task, now, 1).events;
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => {
@@ -60,7 +62,7 @@ console.log("== 6. conclusão encerra SLA/bloqueio ==");
 c = S.computeSlaStatus(mk({ designerFlowStatus: "concluido", startedAt: t0, doneAt: tF + 60 * MIN }), tF + 61 * MIN);
 ok("estado=entregue mesmo após atraso; sem candidato a bloqueio", c.slaStatus === "entregue" && !c.blockedCandidate, c);
 { const prev = { blockedEventAt: 1, finishOverdueSentAt: 1, assignedEventAt: 1, startedEventAt: 1 };
-  const evs = S.deriveSlaEvents(prev, c, mk({ designerFlowStatus: "concluido", startedAt: t0, doneAt: tF + 60 * MIN, id: "T1" }), tF + 61 * MIN);
+  const evs = derive(prev, c, mk({ designerFlowStatus: "concluido", startedAt: t0, doneAt: tF + 60 * MIN, id: "T1" }), tF + 61 * MIN);
   ok("gera designer_task_completed + designer_unblocked", evs.some(e => e.eventType === "designer_task_completed") && evs.some(e => e.eventType === "designer_unblocked"), evs.map(e => e.eventType)); }
 
 console.log("== 7. reprogramação preserva histórico (âncora nova, sem duplicar antiga) ==");
@@ -72,7 +74,7 @@ console.log("== 7. reprogramação preserva histórico (âncora nova, sem duplic
   const newKey = S.slaDedupKey("T1", "designer_finish_warning", c2.plannedFinishAt);
   ok("novo prazo → novo dedupKey (re-alerta permitido)", newKey !== oldKey, { oldKey, newKey });
   ok("estado recalculado sobre o novo prazo (entrega_proxima)", c2.slaStatus === "entrega_proxima", c2);
-  const evs = S.deriveSlaEvents({ finishWarningSentAt: 111, assignedEventAt: 1 }, c2, t2, tF2 - 10 * MIN);
+  const evs = derive({ finishWarningSentAt: 111, assignedEventAt: 1 }, c2, t2, tF2 - 10 * MIN);
   ok("marcador antigo NÃO suprime a nova âncora? (suprime até reset — comportamento documentado: reschedule zera marcadores na rota de reprogramação)", evs.every(e => e.eventType !== "designer_finish_warning"), evs.map(e => e.eventType)); }
 
 console.log("== 8. dedupKey idempotente (mesma entrada → mesmo ID; evento não duplica) ==");
@@ -80,26 +82,61 @@ console.log("== 8. dedupKey idempotente (mesma entrada → mesmo ID; evento não
   const k2 = S.slaDedupKey("T1", "designer_finish_overdue", tF);
   ok("determinístico", k1 === k2 && k1 === "T1__designer_finish_overdue__" + tF, k1);
   const cc = S.computeSlaStatus(mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 5 * MIN);
-  const first = S.deriveSlaEvents({ assignedEventAt: 1, startedEventAt: 1 }, cc, mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 5 * MIN);
+  const first = derive({ assignedEventAt: 1, startedEventAt: 1 }, cc, mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 5 * MIN);
   ok("1ª passada emite finish_overdue", first.some(e => e.eventType === "designer_finish_overdue"));
-  const second = S.deriveSlaEvents({ assignedEventAt: 1, startedEventAt: 1, finishOverdueSentAt: Date.now() }, cc, mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 6 * MIN);
+  const second = derive({ assignedEventAt: 1, startedEventAt: 1, finishOverdueSentAt: Date.now() }, cc, mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 6 * MIN);
   ok("2ª passada (marcador setado) NÃO re-emite", second.every(e => e.eventType !== "designer_finish_overdue"), second.map(e => e.eventType)); }
 
 console.log("== 9. WIP simulado (hard=2) — sem bloquear ==");
 { const tasks = [
     mk({ id: "A", designerFlowStatus: "andamento" }), mk({ id: "B", designerFlowStatus: "andamento" }),
     mk({ id: "C", designerFlowStatus: "andamento" }), mk({ id: "D", designerFlowStatus: "afazer" })];
-  const w = S.simulateWip(tasks);
-  ok("conta 3 em produção p/ D1 e marca exceeded (hard 2)", w.byDesigner.D1.inProduction === 3 && w.byDesigner.D1.exceeded === true, w.byDesigner);
-  ok("emite designer_wip_limit_reached SIMULADO (reason explícito)", w.events.length === 1 && w.events[0].eventType === "designer_wip_limit_reached" && w.events[0].simulated === true && /simula/i.test(w.events[0].reason), w.events); }
+  const w = S.simulateWip(tasks);   // default = modo OBSERVE (4.4-A2)
+  ok("WIP OBSERVADO=3 p/ D1; soft/hard excedidos MARCADOS", w.byDesigner.D1.observed === 3 && w.byDesigner.D1.softExceeded && w.byDesigner.D1.hardExceeded, w.byDesigner);
+  ok("modo OBSERVE: NENHUM evento de limite (sem bloqueio assumido)", w.events.length === 0, w.events);
+  const we = S.simulateWip(tasks, { wipMode: "enforce" });
+  ok("modo ENFORCE (futuro): emite wip_limit_reached SIMULADO", we.events.length === 1 && we.events[0].eventType === "designer_wip_limit_reached" && we.events[0].simulated === true, we.events);
+  const locks = { D1: { designerId: "D1" } };
+  const wb = S.simulateWip(tasks, {}, locks);
+  ok("atraso ativo ⇒ effectiveLimit 0 (bloqueante-por-atraso, simulado)", wb.byDesigner.D1.blockingByOverdue === true && wb.byDesigner.D1.effectiveLimit === 0, wb.byDesigner.D1); }
+
+console.log("== 12. CORTE TEMPORAL slaActivatedAt (4.4-A2) ==");
+{ const cc = S.computeSlaStatus(mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 5 * MIN);
+  const semCorte = S.deriveSlaEvents({}, cc, mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 5 * MIN, 0);
+  ok("SEM SLA_ACTIVATED_AT: ZERO eventos emitidos (tudo retroativo)", semCorte.events.length === 0 && semCorte.retro.length > 0, semCorte.retro.length);
+  const corteFuturo = S.deriveSlaEvents({}, cc, mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 5 * MIN, tF + 999 * MIN);
+  ok("corte APÓS as âncoras: tudo retroIgnored", corteFuturo.events.length === 0 && corteFuturo.retro.length > 0);
+  const cortePassado = S.deriveSlaEvents({}, cc, mk({ designerFlowStatus: "andamento", startedAt: t0 }), tF + 5 * MIN, 1);
+  ok("corte ANTES das âncoras: eventos elegíveis emitidos", cortePassado.events.length > 0 && cortePassado.retro.length === 0); }
+
+console.log("== 13. LOCK CONSOLIDADO por designer (4.4-A2) ==");
+{ const comps = [
+    { taskId: "A", designerId: "D1", blockedCandidate: true, overdueMs: 50 * MIN, plannedFinishAt: tF },
+    { taskId: "B", designerId: "D1", blockedCandidate: true, overdueMs: 200 * MIN, plannedFinishAt: tF - 100 * MIN },
+    { taskId: "C", designerId: "D2", blockedCandidate: true, overdueMs: 10 * MIN, plannedFinishAt: tF },
+    { taskId: "D", designerId: "D1", blockedCandidate: false, overdueMs: 0 }];
+  const L = S.consolidateLocks(comps);
+  ok("1 lock por designer (D1 e D2, não 3)", Object.keys(L).length === 2, Object.keys(L));
+  ok("tarefas críticas viram METADATA (D1 com 2 tasks)", L.D1.tasks.length === 2);
+  ok("prioridade = atraso mais grave (B, 200min) + deadline mais antigo", L.D1.worstTaskId === "B" && L.D1.oldestDeadlineMs === tF - 100 * MIN, L.D1);
+  ok("simulated=true (nenhum lock real)", L.D1.simulated === true && L.D2.simulated === true); }
+
+console.log("== 14. PLANO de reprogramação (dry-run, 4.4-A2) ==");
+{ const t = mk({ designerFlowStatus: "andamento", startedAt: t0, designerSla: { rescheduleCount: 1, finishWarningSentAt: 123, finishOverdueSentAt: 456 } });
+  const plan = S.planReschedule(t, { endDate: "2026-06-16", endTime: "18:00" }, tF, TZ);
+  ok("NÃO aplica (applied=false, dryRun=true)", plan.applied === false && plan.dryRun === true);
+  ok("reseta marcadores do prazo ANTIGO (finish*SentAt → null)", plan.wouldPatch.designerSla.finishWarningSentAt === null && plan.wouldPatch.designerSla.finishOverdueSentAt === null && plan.markersReset.includes("finishWarningSentAt"));
+  ok("NÃO reseta marcadores de início (prazo de início inalterado)", !plan.markersReset.includes("startWarningSentAt"));
+  ok("preserva histórico: rescheduleCount 1→2 + historyEntry from/to", plan.wouldPatch.designerSla.rescheduleCount === 2 && plan.historyEntry.kind === "designer_deadline_rescheduled" && plan.historyEntry.from.plannedFinishAt === tF, plan.historyEntry);
+  ok("âncora de dedup MUDA (novo prazo pode alertar de novo)", plan.dedupAnchorChange.newFinishAnchor !== plan.dedupAnchorChange.oldFinishAnchor); }
 
 console.log("== 10. transições de ciclo de vida (assigned/started) ==");
 { const cA = S.computeSlaStatus(mk(), t0 - 60 * MIN);
-  const evs = S.deriveSlaEvents({}, cA, mk(), t0 - 60 * MIN);
+  const evs = derive({}, cA, mk(), t0 - 60 * MIN);
   ok("1ª vez: designer_task_assigned", evs.some(e => e.eventType === "designer_task_assigned"));
   const tS = mk({ designerFlowStatus: "andamento", startedAt: t0 - 1 * MIN });
   const cS = S.computeSlaStatus(tS, t0);
-  const evs2 = S.deriveSlaEvents({ assignedEventAt: 1 }, cS, tS, t0);
+  const evs2 = derive({ assignedEventAt: 1 }, cS, tS, t0);
   ok("início real: designer_task_started (gancho startedAt existente)", evs2.some(e => e.eventType === "designer_task_started")); }
 
 console.log("== 11. todo evento nasce SIMULADO e com envelope completo ==");

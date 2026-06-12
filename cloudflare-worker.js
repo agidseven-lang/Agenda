@@ -72,6 +72,11 @@ export default {
       return handleSlaDryRun(request, env);
     }
 
+    // FASE 4.4-A2: plano de reprogramação SOMENTE dry-run (read-only, nunca aplica).
+    if (url.pathname === "/sla-reschedule-plan" && request.method === "POST") {
+      return handleSlaReschedulePlan(request, env);
+    }
+
     if (request.method === "POST") {
       return handlePushRelay(request, env);
     }
@@ -845,7 +850,15 @@ const SLA_DEFAULTS = {
   startWarningMinutes: 30,        // alerta laranja de INÍCIO: 30min antes (autorizado)
   finishWarningMinutes: 30,       // alerta laranja de ENTREGA: 30min antes (autorizado)
   criticalStartOverdueMinutes: 30,// início atrasado vira CRÍTICO (candidato a bloqueio) após 30min
-  wipHardPerDesigner: 2,          // WIP hard inicial por designer (autorizado) — SIMULAÇÃO apenas
+  /* WIP (FASE 4.4-A2): separação observado/soft/hard/bloqueante-por-atraso.
+     wipMode "observe" = NUNCA assume bloqueio hard sem calibração real (risco 1 da 4.4-A).
+     Valores soft/hard são CALIBRÁVEIS (env/wipLimits) — hard 2 segue como ponto de partida. */
+  wipMode: "observe",             // observe | enforce (enforce só em fase futura autorizada)
+  wipSoftPerDesigner: 2,          // limiar de ALERTA (soft)
+  wipHardPerDesigner: 2,          // limiar de BLOQUEIO (hard) — inerte em modo observe
+  /* Backfill controlado (FASE 4.4-A2 — risco 2 da 4.4-A): */
+  maxTasksPerPass: 200,           // teto de tarefas analisadas por passada
+  maxEventsPerPass: 300,          // teto de eventos (simulados/elegíveis) por passada
 };
 const SLA_FLAG_DEFAULTS = {       // contrato de feature flags — TODAS OFF por padrão
   slaEngine: false, slaNotifications: false, operationalBlocking: false,
@@ -949,12 +962,22 @@ function buildSlaEvent(p) {
 
 /* Deriva eventos NOVOS desta passada (warnings/overdues ancorados no prazo →
    reprogramação gera novas âncoras SEM duplicar as antigas). prevSla = designerSla
-   gravado (ou {}); comp = computeSlaStatus(...). */
-function deriveSlaEvents(prevSla, comp, task, nowMs) {
+   gravado (ou {}); comp = computeSlaStatus(...).
+   FASE 4.4-A2 — CORTE TEMPORAL OBRIGATÓRIO (slaActivatedAt): evento cuja ÂNCORA
+   (prazo/atribuição/início/conclusão) é ANTERIOR à ativação é RETROATIVO e NÃO
+   é emitido — vai para retro[] (contado/reportado). activatedAtMs ausente/0 =
+   NADA é elegível (sem autorização explícita não há emissão alguma).
+   Retorna { events:[], retro:[] }. */
+function deriveSlaEvents(prevSla, comp, task, nowMs, activatedAtMs) {
   const ev = [];
   const t = task; const prev = prevSla || {};
+  const cutMs = (typeof activatedAtMs === "number" && activatedAtMs > 0) ? activatedAtMs : Infinity;
+  const retro = [];
   const base = { taskId: t.id, designerId: (t.designerAssignment && t.designerAssignment.designerId) || t.assigneeId || null, timestamp: nowMs };
-  const push = (eventType, anchorMs, extra) => ev.push(buildSlaEvent(Object.assign({}, base, { eventType, anchorMs }, extra || {})));
+  const push = (eventType, anchorMs, extra) => {
+    if ((anchorMs || 0) < cutMs) { retro.push({ taskId: t.id, eventType, anchorMs: anchorMs || 0 }); return; }
+    ev.push(buildSlaEvent(Object.assign({}, base, { eventType, anchorMs }, extra || {})));
+  };
   if (!prev.assignedEventAt && t.designerAssignment && t.designerAssignment.assignedAt)
     push("designer_task_assigned", t.designerAssignment.assignedAt, { newStatus: "aguardando_inicio", metadata: { assignedBy: t.designerAssignment.assignedBy || null } });
   if (!prev.startedEventAt && slaStarted(t) && !slaDelivered(t))
@@ -973,25 +996,75 @@ function deriveSlaEvents(prevSla, comp, task, nowMs) {
     push("designer_blocked_by_overdue", comp.plannedFinishAt || comp.plannedStartAt, { newStatus: "bloqueada_por_atraso", reason: "atraso ativo (simulação — bloqueio real OFF)" });
   if (!comp.blockedCandidate && prev.blockedEventAt && !prev.unblockedEventAt && (comp.slaStatus === "entregue" || comp.slaStatus === "em_producao"))
     push("designer_unblocked", nowMs, { oldStatus: "bloqueada_por_atraso", newStatus: comp.slaStatus });
-  return ev;
+  return { events: ev, retro };
 }
 
-/* WIP — SIMULAÇÃO (autorização: simular, sem bloquear). */
-function simulateWip(tasks, cfg) {
+/* ── FASE 4.4-A2: LOCK CONSOLIDADO POR DESIGNER (1 lock; tarefas críticas como
+   metadata; prioridade = atraso mais grave/mais antigo). PURO — não escreve. ── */
+function consolidateLocks(computedList) {
+  const locks = {};
+  for (const c of computedList) {
+    if (!c.blockedCandidate || !c.designerId) continue;
+    const L = locks[c.designerId] = locks[c.designerId] || { designerId: c.designerId, candidate: true, simulated: true, tasks: [], worstTaskId: null, worstOverdueMs: -1, oldestDeadlineMs: Infinity };
+    L.tasks.push({ taskId: c.taskId, slaStatus: c.slaStatus, overdueMs: c.overdueMs || 0, deadlineMs: c.plannedFinishAt || c.plannedStartAt || 0 });
+    if ((c.overdueMs || 0) > L.worstOverdueMs) { L.worstOverdueMs = c.overdueMs || 0; L.worstTaskId = c.taskId; }
+    const dl = c.plannedFinishAt || c.plannedStartAt || 0;
+    if (dl && dl < L.oldestDeadlineMs) L.oldestDeadlineMs = dl;
+  }
+  return locks;
+}
+
+/* ── FASE 4.4-A2: PLANO de reprogramação (dry-run, PURO — nada é aplicado).
+   Quando o prazo muda: reseta os marcadores do deadline ANTIGO (novas âncoras
+   poderão alertar), incrementa rescheduleCount e preserva histórico. ── */
+function planReschedule(task, newPlan, nowMs, tz) {
+  const prev = (task && task.designerSla) || {};
+  const cur = slaPlanFromAssignment(task, tz);
+  const newStartAt  = newPlan.startDate ? slaToMs(newPlan.startDate, newPlan.startTime, tz) : cur.plannedStartAt;
+  const newFinishAt = newPlan.endDate   ? slaToMs(newPlan.endDate, newPlan.endTime, tz)     : cur.plannedFinishAt;
+  const slaPatch = { plannedStartAt: newStartAt, plannedFinishAt: newFinishAt,
+    rescheduleCount: (prev.rescheduleCount || 0) + 1, lastRescheduleAt: nowMs };
+  const markersReset = [];
+  if (newFinishAt !== cur.plannedFinishAt) { slaPatch.finishWarningSentAt = null; slaPatch.finishOverdueSentAt = null; markersReset.push("finishWarningSentAt", "finishOverdueSentAt"); }
+  if (newStartAt !== cur.plannedStartAt)   { slaPatch.startWarningSentAt = null;  slaPatch.startOverdueSentAt = null;  markersReset.push("startWarningSentAt", "startOverdueSentAt"); }
+  return {
+    applied: false, dryRun: true,
+    taskId: task && task.id, wouldPatch: { designerSla: slaPatch },
+    historyEntry: { kind: "designer_deadline_rescheduled", at: nowMs,
+      from: { plannedStartAt: cur.plannedStartAt, plannedFinishAt: cur.plannedFinishAt },
+      to: { plannedStartAt: newStartAt, plannedFinishAt: newFinishAt } },
+    markersReset,
+    dedupAnchorChange: { oldFinishAnchor: cur.plannedFinishAt, newFinishAnchor: newFinishAt },
+  };
+}
+
+/* WIP — SIMULAÇÃO CALIBRÁVEL (FASE 4.4-A2). Separa com clareza:
+   - observed: contagem real de tarefas em produção (fato, sem juízo);
+   - soft: limiar de ALERTA (softExceeded);
+   - hard: limiar de BLOQUEIO (hardExceeded) — INERTE em wipMode "observe";
+   - blockingByOverdue: atraso ativo ⇒ limite efetivo 0 (APENAS simulado).
+   Em modo "observe" (default) NENHUM evento de limite é emitido — só observação
+   no relatório, para calibração com dados reais antes de qualquer enforcement. */
+function simulateWip(tasks, cfg, locksByDesigner) {
   const C = Object.assign({}, SLA_DEFAULTS, cfg || {});
   const byDesigner = {};
   for (const t of tasks) {
     const d = (t.designerAssignment && t.designerAssignment.designerId) || null;
     if (!d) continue;
-    byDesigner[d] = byDesigner[d] || { designerId: d, inProduction: 0, taskIds: [], hard: C.wipHardPerDesigner, exceeded: false };
-    if (t.designerFlowStatus === "andamento") { byDesigner[d].inProduction++; byDesigner[d].taskIds.push(t.id); }
+    byDesigner[d] = byDesigner[d] || { designerId: d, observed: 0, taskIds: [],
+      soft: C.wipSoftPerDesigner, hard: C.wipHardPerDesigner, mode: C.wipMode,
+      softExceeded: false, hardExceeded: false, blockingByOverdue: false, effectiveLimit: C.wipHardPerDesigner };
+    if (t.designerFlowStatus === "andamento") { byDesigner[d].observed++; byDesigner[d].taskIds.push(t.id); }
   }
   const events = [];
   for (const d of Object.keys(byDesigner)) {
     const w = byDesigner[d];
-    w.exceeded = w.inProduction > w.hard;
-    if (w.exceeded)
-      events.push(buildSlaEvent({ taskId: w.taskIds[w.taskIds.length - 1], designerId: d, eventType: "designer_wip_limit_reached", anchorMs: w.inProduction, timestamp: Date.now(), newStatus: null, metadata: { wip: w.inProduction, hard: w.hard }, reason: "WIP acima do limite (simulação — wipLimits OFF)" }));
+    w.softExceeded = w.observed > w.soft;
+    w.hardExceeded = w.observed > w.hard;
+    w.blockingByOverdue = !!(locksByDesigner && locksByDesigner[d]);
+    w.effectiveLimit = w.blockingByOverdue ? 0 : w.hard;   // atraso ativo ⇒ 0 (simulação)
+    if (w.hardExceeded && C.wipMode === "enforce")          // NUNCA em "observe"
+      events.push(buildSlaEvent({ taskId: w.taskIds[w.taskIds.length - 1], designerId: d, eventType: "designer_wip_limit_reached", anchorMs: w.observed, timestamp: Date.now(), newStatus: null, metadata: { observed: w.observed, soft: w.soft, hard: w.hard }, reason: "WIP acima do hard (simulação — wipLimits OFF)" }));
   }
   return { byDesigner, events };
 }
@@ -1038,17 +1111,37 @@ async function slaQueryActiveDesignerTasks(env, accessToken) {
 async function runSlaEnginePass(env, opts) {
   const o = opts || {}; const nowMs = Date.now();
   const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  /* FASE 4.4-A2 — corte temporal OBRIGATÓRIO: sem env SLA_ACTIVATED_AT (epoch ms
+     ou ISO) NENHUM evento é elegível (tudo retroativo). Impede rajada de backfill
+     sem autorização explícita. */
+  const activatedAtRaw = (env && env.SLA_ACTIVATED_AT) || "";
+  const activatedAtMs = /^\d+$/.test(activatedAtRaw) ? parseInt(activatedAtRaw, 10) : (activatedAtRaw ? Date.parse(activatedAtRaw) : 0);
+  const cfg = Object.assign({}, SLA_DEFAULTS, {
+    maxTasksPerPass: parseInt((env && env.SLA_MAX_TASKS_PER_PASS) || "", 10) || SLA_DEFAULTS.maxTasksPerPass,
+    maxEventsPerPass: parseInt((env && env.SLA_MAX_EVENTS_PER_PASS) || "", 10) || SLA_DEFAULTS.maxEventsPerPass,
+    wipMode: (env && env.SLA_WIP_MODE) || SLA_DEFAULTS.wipMode,
+  });
   const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
   const flags = await slaGetFlags(env, accessToken);
   const writeAllowed = o.write === true && (env && env.SLA_WRITE === "true") && flags.slaEngine === true;
-  const tasks = await slaQueryActiveDesignerTasks(env, accessToken);
-  const report = { now: nowMs, scanned: tasks.length, flags, writeAllowed, computed: [], events: [], wouldNotify: [], wouldLock: [], writes: 0, dedupSkipped: 0 };
+  const allTasks = await slaQueryActiveDesignerTasks(env, accessToken);
+  /* backfill controlado: teto de tarefas por passada + relatório de paginação */
+  const tasks = allTasks.slice(0, cfg.maxTasksPerPass);
+  const report = { now: nowMs, activatedAt: activatedAtMs || null, scanned: tasks.length, flags, writeAllowed,
+    pagination: { totalQueried: allTasks.length, analyzed: tasks.length, remaining: Math.max(0, allTasks.length - tasks.length), truncatedTasks: allTasks.length > tasks.length, maxTasksPerPass: cfg.maxTasksPerPass, maxEventsPerPass: cfg.maxEventsPerPass, eventsCapped: false },
+    computed: [], events: [], retroIgnored: [], wouldNotify: [], wouldLock: [], writes: 0, dedupSkipped: 0 };
   for (const t of tasks) {
     if (!t.designerAssignment || !t.designerAssignment.designerId) continue;
     const prev = t.designerSla || {};
-    const comp = computeSlaStatus(t, nowMs, SLA_DEFAULTS, tz);
-    const evs = deriveSlaEvents(prev, comp, t, nowMs);
-    report.computed.push({ taskId: t.id, designerId: t.designerAssignment.designerId, slaStatus: comp.slaStatus, slaSeverity: comp.slaSeverity, blockedCandidate: comp.blockedCandidate, plannedStartAt: comp.plannedStartAt, plannedFinishAt: comp.plannedFinishAt });
+    const comp = computeSlaStatus(t, nowMs, cfg, tz);
+    const der = deriveSlaEvents(prev, comp, t, nowMs, activatedAtMs);
+    for (const r of der.retro) report.retroIgnored.push(r);
+    let evs = der.events;
+    if (report.events.length + evs.length > cfg.maxEventsPerPass) {       // teto de eventos
+      evs = evs.slice(0, Math.max(0, cfg.maxEventsPerPass - report.events.length));
+      report.pagination.eventsCapped = true;
+    }
+    report.computed.push({ taskId: t.id, designerId: t.designerAssignment.designerId, client: t.client || null, demandType: t.cronSub || t.sector || null, slaStatus: comp.slaStatus, slaSeverity: comp.slaSeverity, blockedCandidate: comp.blockedCandidate, overdueMs: comp.overdueMs || 0, plannedStartAt: comp.plannedStartAt, plannedFinishAt: comp.plannedFinishAt });
     for (const ev of evs) {
       report.events.push(ev);
       if (ev.eventType.indexOf("warning") >= 0 || ev.eventType.indexOf("overdue") >= 0)
@@ -1086,9 +1179,18 @@ async function runSlaEnginePass(env, opts) {
       report.writes++;
     }
   }
-  const wip = simulateWip(tasks, SLA_DEFAULTS);
+  /* FASE 4.4-A2 — lock CONSOLIDADO: 1 candidato por designer (tarefas críticas
+     como metadata; prioridade pelo atraso mais grave/mais antigo). Só simulação. */
+  const locks = consolidateLocks(report.computed);
+  report.locksConsolidated = locks;
+  report.wouldLock = Object.values(locks).map((L) => ({ designerId: L.designerId, worstTaskId: L.worstTaskId, worstOverdueMs: L.worstOverdueMs, tasks: L.tasks.length, simulated: true }));
+  const wip = simulateWip(tasks, cfg, locks);
   report.wip = wip.byDesigner;
   for (const ev of wip.events) report.events.push(ev);
+  /* agregados p/ calibração (FASE 4.4-A2): por designer / cliente / tipo */
+  const agg = (key) => { const m = {}; for (const c of report.computed) { const k = c[key] || "?"; m[k] = m[k] || { total: 0, atrasadas: 0, laranja: 0 }; m[k].total++; if (c.slaSeverity === "vermelho") m[k].atrasadas++; if (c.slaSeverity === "laranja") m[k].laranja++; } return m; };
+  report.totals = { byDesigner: agg("designerId"), byClient: agg("client"), byType: agg("demandType"),
+    retroIgnored: report.retroIgnored.length, eligibleEvents: report.events.length };
   return report;
 }
 
@@ -1103,5 +1205,23 @@ async function handleSlaDryRun(request, env) {
   return json({ ok: true, mode: report.writeAllowed ? "write" : "dry-run", report }, 200, env);
 }
 
+/* POST /sla-reschedule-plan — FASE 4.4-A2: fluxo de reprogramação SOMENTE
+   PLANEJADO (dry-run): lê a tarefa (read-only), devolve o patch que SERIA
+   aplicado (reset de marcadores do prazo antigo + rescheduleCount + history).
+   NUNCA escreve. Exige SLA_ENGINE_ENABLED (sem a env = 403, produção intocada). */
+async function handleSlaReschedulePlan(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env ausente)." }, 403, env);
+  let body = {}; try { body = await request.json(); } catch (_) {}
+  if (!body.taskId) return json({ ok: false, error: "taskId obrigatório" }, 400, env);
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  const task = await getDoc(env, accessToken, "tasks", body.taskId);
+  if (!task) return json({ ok: false, error: "tarefa não encontrada" }, 404, env);
+  task.id = body.taskId;
+  const plan = planReschedule(task, { startDate: body.startDate, startTime: body.startTime, endDate: body.endDate, endTime: body.endTime }, Date.now(), tz);
+  return json({ ok: true, mode: "plan-only", plan }, 200, env);
+}
+
 /* export p/ testes unitários (node) — não interfere no runtime do Worker. */
-export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, slaEncodeFields, runSlaEnginePass };
+export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass };

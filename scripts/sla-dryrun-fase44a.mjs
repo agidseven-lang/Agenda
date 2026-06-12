@@ -27,6 +27,7 @@ const env = {
   FCM_PROJECT_ID: "validacao-44a", FCM_CLIENT_EMAIL: "sla@validacao", APP_TZ_OFFSET_MINUTES: "-180",
   FCM_PRIVATE_KEY: privateKey.export({ type: "pkcs8", format: "pem" }),
   SLA_ENGINE_ENABLED: "true",          // libera APENAS a simulação read-only
+  SLA_ACTIVATED_AT: String(Date.now() - 72 * 3600000),  // corte 72h atrás: dataset todo elegível (cenário "antes")
   /* SLA_WRITE: ausente DE PROPÓSITO — escrita real impossível nesta fase */
 };
 
@@ -127,7 +128,7 @@ console.log("reprogramadas (rescheduleCount>0, metadado):", reprogramadas, "| ca
 console.log("eventos que SERIAM gerados:", rep.events.length, JSON.stringify(evByType));
 console.log("notificações SIMULADAS (laranja+vermelho):", rep.wouldNotify.length);
 console.log("designers que SERIAM bloqueados (simulação):", lockedDesigners.length, lockedDesigners);
-console.log("WIP simulado:", JSON.stringify(Object.fromEntries(Object.entries(rep.wip).map(([d, w]) => [d, w.inProduction + "/" + w.hard + (w.exceeded ? " EXCEDIDO" : "")]))));
+console.log("WIP simulado:", JSON.stringify(Object.fromEntries(Object.entries(rep.wip).map(([d, w]) => [d, w.observed + "/" + w.hard + (w.hardExceeded ? " EXCEDIDO" : "") + (w.blockingByOverdue ? " BLOQ-ATRASO(efetivo 0)" : "")]))));
 console.log("amostra (5 tarefas, estados DIVERSOS, sem dados sensíveis):");
 { const seen = new Set();
   for (const c of rep.computed) {

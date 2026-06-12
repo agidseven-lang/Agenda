@@ -18,7 +18,7 @@ const { __slaCore: S } = await import(pathToFileURL(TMP).href);
 
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PEM = privateKey.export({ type: "pkcs8", format: "pem" });
-const baseEnv = { FCM_PROJECT_ID: "test-project", FCM_CLIENT_EMAIL: "sla@test", FCM_PRIVATE_KEY: PEM, APP_TZ_OFFSET_MINUTES: "-180", SLA_ENGINE_ENABLED: "true" };
+const baseEnv = { FCM_PROJECT_ID: "test-project", FCM_CLIENT_EMAIL: "sla@test", FCM_PRIVATE_KEY: PEM, APP_TZ_OFFSET_MINUTES: "-180", SLA_ENGINE_ENABLED: "true", SLA_ACTIVATED_AT: "1" };  /* corte=1ms: tudo elegível p/ estes testes */
 
 /* fixtures relativos a AGORA: 1 atrasada, 1 perto do prazo, 1 ok, 1 entregue,
    +2 em produção do MESMO designer (WIP hard 2 → 3 em produção = excedido) */
@@ -85,7 +85,7 @@ console.log("== A) DRY-RUN PURO (default do cron com SLA_ENGINE_ENABLED, sem SLA
   ok("T-NAOINI → inicio_atrasado", r.computed.some(c => c.taskId === "T-NAOINI" && c.slaStatus === "inicio_atrasado"));
   ok("wouldNotify SIMULADOS (laranja+vermelho) sem envio", r.wouldNotify.length >= 3 && r.wouldNotify.every(w => w.simulated));
   ok("wouldLock SIMULADO p/ D1 e D3 — designerLocks NÃO gravado", r.wouldLock.length >= 2 && !calls.writes.some(w => String(w.url || "").includes("designerLocks")));
-  ok("WIP D1=3 > hard 2 marcado (simulação)", r.wip && r.wip.D1 && r.wip.D1.inProduction === 3 && r.wip.D1.exceeded === true); }
+  ok("WIP D1 observado=3 > hard 2 marcado (simulação, modo observe)", r.wip && r.wip.D1 && r.wip.D1.observed === 3 && r.wip.D1.hardExceeded === true); }
 
 console.log("== B) GATING: write:true SEM flag slaEngine → continua sem escrever ==");
 { const { stub, calls } = makeFetchStub({}); globalThis.fetch = stub;
