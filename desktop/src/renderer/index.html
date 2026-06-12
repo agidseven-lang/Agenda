@@ -55,6 +55,15 @@
   .brand .sub{color:var(--soft);font-size:13px;font-weight:500}
   #login .title{font-size:22px;font-weight:800;margin:28px 0 4px}
   #login .subtitle{font-size:13px;color:var(--soft);text-align:center;line-height:1.5;max-width:380px}
+  /* telas baixas (escala 125% ≈ 614px úteis): login compacto SEM scroll — escopo restrito a #login */
+  @media(max-height:660px){
+    #login{padding:18px 26px}
+    #login .logo.lg{width:54px;height:54px;border-radius:15px;font-size:26px}
+    #login .brand{gap:8px;margin-bottom:4px}
+    #login .brand h1{font-size:22px}
+    #login .title{font-size:19px;margin:14px 0 2px}
+    #login .vfooter{margin-top:14px}
+  }
   .fld{width:100%;margin-top:12px}
   .fld label{display:block;font-size:11px;font-weight:700;color:var(--faint);letter-spacing:.04em;text-transform:uppercase;margin-bottom:7px}
   .inp{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--ink);
@@ -252,7 +261,10 @@
     /* shell */
   }
   body.desktop #login{max-width:520px}
-  body.desktop #app{
+  /* ISOLAMENTO (regressão 1.0.143): o shell autenticado SÓ monta com body.authed.
+     Antes do login, #app permanece display:none — nada do app shell (sidebar/grid)
+     pinta atrás da tela de login (era a causa do scroll indevido e do bloco escuro). */
+  body.desktop.authed #app{
     display:grid !important;
     grid-template-columns:var(--d-side) 1fr;
     grid-template-rows:calc(100vh/var(--fitz,1));
@@ -1764,8 +1776,8 @@ async function doRegister(name,role,phone,email,password){
 }
 function saveSession(u){localStorage.setItem('wp_uid',u.id);localStorage.setItem('wp_name',u.name||'');}
 function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');localStorage.removeItem('wp_team_jwt');}
-function startApp(u){state.user=u;saveSession(u);document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
-function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';renderLogin();}
+function startApp(u){state.user=u;saveSession(u);document.body.classList.add("authed");fitZoom();document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
+function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');fitZoom();if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';renderLogin();}
 function subscribeData(){
   unsub.users=db.collection('users').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}renderFromSnapshot();});
   unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderFromSnapshot();});
@@ -4526,7 +4538,10 @@ async function saveTask(){const f=state.form;
 // zoom 1 (os media de altura cuidam do encaixe). Teto 1.5 p/ não exagerar em 4K.
 function fitZoom(){
   if(typeof isDesktop==='function'&&!isDesktop())return;
-  const z=Math.min(1.5,Math.max(1,Math.min(window.innerWidth/1366,window.innerHeight/812)));
+  // escopo: o zoom do Design Contract vale APENAS para o app autenticado.
+  // A tela de login NUNCA é escalada (regressão 1.0.143: login ampliado/cortado em 1080p).
+  const authed=document.body.classList.contains('authed');
+  const z=authed?Math.min(1.5,Math.max(1,Math.min(window.innerWidth/1366,window.innerHeight/812))):1;
   document.body.style.zoom=z>1.005?z.toFixed(3):'';
   document.documentElement.style.setProperty('--fitz',z>1.005?z.toFixed(3):'1');
 }
