@@ -27,7 +27,31 @@ zonas, billing, usuários. O que consegue: publicar versões do worker e ler o
 script — exatamente o necessário. Secrets do worker (FCM_*, IMAGEKIT_*) **não são
 tocados** pelos deploys do wrangler (preservados pelo Cloudflare).
 
-## 3. Por que wrangler (decisão técnica)
+## 3a. LAUDO TÉCNICO — risco `wrangler --var` × `keep_vars` (revisão exigida)
+O risco apontado é REAL e o desenho original foi corrigido. Comportamento do wrangler:
+1. `wrangler deploy` SEM `keep_vars`: as variáveis comuns do Worker passam a ser
+   EXATAMENTE as do wrangler.toml + `--var` — **qualquer var criada só no painel
+   é APAGADA silenciosamente**. (Secrets nunca são apagados por deploy.)
+2. `--keep-vars`/`keep_vars=true`: nenhuma var existente é apagada — MAS, se a
+   env temporária fosse uma var comum, ela seria PRESERVADA pelo keep-vars e a
+   "remoção por deploy limpo" FALHARIA. Exatamente a armadilha da Opção B.
+CONCLUSÃO: ligar/desligar env via deploy é o mecanismo errado. Correção adotada
+(Opção A): deploy de CÓDIGO sempre com `--keep-vars` (nada existente é apagado;
+provado por snapshot antes/depois com aborto se qualquer nome sumir) e a env
+temporária via **Cloudflare API por variável**:
+- `PUT  /accounts/{id}/workers/scripts/idseven-push/secrets`
+  body `{"name":"SLA_ENGINE_ENABLED","text":"true","type":"secret_text"}`
+  → adiciona SÓ essa variável (binding secret_text; o worker a lê igualzinho:
+  `env.SLA_ENGINE_ENABLED === "true"`). Nenhuma outra var é lida ou escrita.
+- `DELETE /accounts/{id}/workers/scripts/idseven-push/secrets/SLA_ENGINE_ENABLED`
+  → remove SÓ ela (retry ×3 no `finally`; 404 = já ausente = ok).
+- Snapshot `GET /settings` ANTES e DEPOIS: o log registra SOMENTE nomes+tipos
+  (valores nunca são gravados); aborto se a env já existir antes; alerta crítico
+  se persistir depois; alerta se qualquer outro nome aparecer/sumir.
+- O 403 final é verificado por chamada REAL nas 3 rotas, sempre.
+Permissão extra do token: NENHUMA — `Workers Scripts: Edit` já cobre settings/secrets.
+
+## 3b. Por que wrangler para o CÓDIGO (decisão técnica)
 Produção foi historicamente publicada via `wrangler deploy` (provado pela
 assinatura do bundle no seu backup). Automatizar com a MESMA ferramenta elimina
 de vez a divergência de forma (bundle × fonte) e dá: versionamento de deployments
@@ -40,8 +64,8 @@ Cobre todos os passos que você fazia à mão. Modos:
 | Comando | O que faz | Toca produção? |
 |---|---|---|
 | `node scripts/worker-ops/microjanela.mjs dry-run` | gera o bundle EXATO de deploy localmente (hash + versão) e lê o estado atual de produção (`GET /`) | NÃO (só leitura) |
-| `… deploy` | backup do script ativo via API (conteúdo + SHA-256) → `wrangler deploy` SEM env SLA → valida versão no `GET /` → confirma **403 nas 3 rotas SLA** | SIM (com backup + rollback prontos) |
-| `… janela <rota>` | liga `SLA_ENGINE_ENABLED=true` (deploy `--var`) → **UMA** coleta da rota → salva o JSON → **remove a env num `finally`** (mesmo em erro) → re-confirma 403 | SIM (janela completa, ~60s) |
+| `… deploy` | backup do script ativo via API (conteúdo+SHA-256) → snapshot de vars → `wrangler deploy --keep-vars` → valida versão → **snapshot pós-deploy com aborto se qualquer var tiver sumido** → 403 nas 3 rotas | SIM (com backup + rollback prontos) |
+| `… janela <rota>` | snapshot de vars (nomes) → liga a env via **API PUT /secrets** (atômico) → **UMA** coleta → salva JSON → **DELETE /secrets no `finally`** (retry ×3, mesmo em erro) → snapshot final (prova ausência) → re-confirma 403 real | SIM (janela completa, ~60s) |
 | `… full <rota>` | `deploy` + `janela` em sequência com abortos automáticos | SIM |
 | `… rollback` | `wrangler rollback` para o deployment anterior (alternativa byte-exata: redeploy do `backup-producao-*.js` salvo) | SIM (restauração) |
 
