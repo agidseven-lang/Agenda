@@ -206,10 +206,12 @@ try {
     if (modo === "full") { passoBundleLocal(); await passoBackup(); deployCode(); await passoVersao("V64\\."); await passo403("pós-deploy"); }
     const snapAntes = await snapshotVars("antes-da-janela");
     if (snapAntes.has("SLA_ENGINE_ENABLED")) fail("SLA_ENGINE_ENABLED já existe ANTES da janela — estado sujo; remova e reexecute.");
+    for (const v of ["SLA_WRITE", "SLA_ACTIVATED_AT"])
+      if (snapAntes.has(v)) fail(`binding PROIBIDO '${v}' existe no worker — abortando por contrato (nunca deve existir nesta fase).`);
     let coletaOk = false;
     try {
       await envOn();                                            // API: adiciona SÓ a env
-      await new Promise((r) => setTimeout(r, 5000));
+      await new Promise((r) => setTimeout(r, 10000));           // propagação (coleta é ÚNICA, sem retry)
       const r = await http("POST", `${URL_BASE}/${rota}`, {});  // UMA coleta
       log(`— coleta /${rota} → ${r.status}`);
       if (r.status !== 200) throw new Error(`coleta respondeu ${r.status}`);

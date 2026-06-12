@@ -1,0 +1,65 @@
+# Micro-janela SLA read-only — Worker idseven-push.
+# Execução SOMENTE manual (workflow_dispatch). Nesta primeira rodada o único
+# modo permitido é `janela` e a única rota é `sla-legacy-risk` (inputs do tipo
+# choice: o GitHub recusa qualquer outro valor; deploy/full/rollback NÃO
+# existem aqui). O script liga SLA_ENGINE_ENABLED via API por variável,
+# faz UMA coleta, remove a env em `finally` (retry ×3), prova ausência por
+# snapshot (só nomes+tipos) e re-confirma 403 nas 3 rotas.
+# NÃO faz deploy de código. NÃO toca SLA_WRITE / SLA_ACTIVATED_AT (abortos
+# hard-coded no script). Logs nunca contêm valores de secrets.
+name: "[manual] Worker SLA — micro-janela read-only"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Modo (apenas 'janela' autorizado nesta fase)"
+        required: true
+        type: choice
+        options:
+          - janela
+      route:
+        description: "Rota (apenas 'sla-legacy-risk' autorizada nesta fase)"
+        required: true
+        type: choice
+        options:
+          - sla-legacy-risk
+      ref:
+        description: "Branch/commit (default: desktop/local-detail-hierarchy-v2)"
+        required: true
+        default: "desktop/local-detail-hierarchy-v2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-microjanela
+  cancel-in-progress: false
+
+jobs:
+  janela:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: micro-janela (env temporária via API; remoção garantida em finally)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/worker-ops/microjanela.mjs "${{ github.event.inputs.mode }}" "${{ github.event.inputs.route }}"
+      - name: Relatório no log (relatorio.txt + snapshots de nomes + coleta JSON)
+        if: always()
+        run: |
+          for f in worker-ops-logs/*/relatorio.txt worker-ops-logs/*/vars-*.txt worker-ops-logs/*/sla-*.json; do
+            echo "===== $f ====="; cat "$f" || true; echo; done
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-microjanela-logs
+          path: worker-ops-logs/
+          retention-days: 30
