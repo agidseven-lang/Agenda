@@ -12,8 +12,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 124
-        versionName "1.0.144-beta-shell-hug-fix"
+        versionCode 125
+        versionName "1.0.145-beta-board-contract-final"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
