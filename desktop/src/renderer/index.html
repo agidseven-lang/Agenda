@@ -634,6 +634,10 @@
   .tcv4-menu .tcv4-menu-it svg{width:15px;height:15px;flex:none;opacity:.9}
   .tcv4-menu .tcv4-menu-it:hover{background:rgba(248,113,113,.12);color:#FBCACA;transform:none}
   .tcv4-menu .tcv4-menu-it:focus-visible{outline:2px solid rgba(248,113,113,.55);outline-offset:1px}
+  /* item de ação NÃO-destrutiva (reenviar notificação): hover/azul neutro, não vermelho */
+  .tcv4-menu .tcv4-menu-it.tcv4-menu-act{color:var(--ink)}
+  .tcv4-menu .tcv4-menu-it.tcv4-menu-act:hover{background:rgba(91,108,255,.14);color:#Ccd6ff}
+  .tcv4-menu .tcv4-menu-it.tcv4-menu-act:focus-visible{outline:2px solid rgba(91,108,255,.55)}
   /* notebook (≤740px úteis): respiros internos -2 a -14px financiam a linha extra de chips
      quando o estágio é longo ("Aguardando aprovação dos temas") — status legível SEM corte
      E card inteiro sem scroll. No frame da referência (768) o ritmo integral permanece. */
@@ -2892,8 +2896,11 @@ function taskCard(t, persp){
   h+='<div class="tcv4-foot">'+
        '<button class="tcv4-btn tcv4-btn-main tc-detail" data-detail="'+t.id+'">'+svg('eye')+'<span>Detalhes</span></button>'+
        '<button class="tcv4-btn move" data-move="'+t.id+'">'+svg('swap')+'<span>Mover</span></button>'+
-       (canDelTask(t)?'<span class="tcv4-more"><button class="tcv4-btn tcv4-btn-dots" data-cardmenu="'+t.id+'" title="Mais ações">···</button>'+
-         '<span class="tcv4-menu" data-menu-of="'+t.id+'"><button class="tcv4-menu-it del-btn" data-del="'+t.id+'">'+svg('trash')+'Excluir tarefa</button></span></span>':'')+
+       ((canDelTask(t)||hasDesigner(t))?'<span class="tcv4-more"><button class="tcv4-btn tcv4-btn-dots" data-cardmenu="'+t.id+'" title="Mais ações">···</button>'+
+         '<span class="tcv4-menu" data-menu-of="'+t.id+'">'+
+           (hasDesigner(t)?'<button class="tcv4-menu-it tcv4-menu-act" data-resend="'+t.id+'">'+svg('send')+'Reenviar notificação</button>':'')+
+           (canDelTask(t)?'<button class="tcv4-menu-it del-btn" data-del="'+t.id+'">'+svg('trash')+'Excluir tarefa</button>':'')+
+         '</span></span>':'')+
      '</div>';
   return h+'</div>';
 }
@@ -4172,22 +4179,51 @@ function flashToast(msg,ms){
   t.innerHTML=svg('info')+'<span>'+esc(msg)+'</span>';t.classList.add('show');
   clearTimeout(window.__ft);window.__ft=setTimeout(()=>t.classList.remove('show'),ms||2600);
 }
-/* Lê a resposta REAL do Worker /notify-designer e diz o que aconteceu de fato —
-   substitui o "Notificação disparada" otimista (que mentia quando o designer
-   estava sem token FCM ou a notificação já fora enviada). Não toca Worker/Android. */
+/* Lê a resposta REAL do Worker /notify-designer e classifica o que aconteceu de fato —
+   substitui o "Notificação disparada" otimista (que mentia quando o designer estava sem
+   token FCM, já fora notificado ou o Worker recusou). NÃO toca Worker/Android/Firestore.
+   Categorias (status HTTP + campo reason do Worker):
+     enviado · ja_notificado · sem_token · sem_destinatario · erro_payload ·
+     erro_worker · sem_rede. Sucesso só quando ok:true E sent>0 (ou já notificado). */
+function classifyDesignerNotify(httpStatus, r){
+  const reason=(r&&r.reason)||'';
+  if(httpStatus===0) return {cat:'sem_rede', ok:false, msg:'sem conexão de rede ('+reason+')'};
+  if(httpStatus===400 || /json inválido|id obrigat/i.test(reason)) return {cat:'erro_payload', ok:false, msg:'erro de payload na chamada ('+reason+')'};
+  if(r&&r.ok&&Number(r.sent)>0) return {cat:'enviado', ok:true, sent:r.sent, tokens:r.tokens, msg:'notificado em '+r.sent+'/'+r.tokens+' dispositivo'+(r.tokens>1?'s':'')};
+  if(/ja notificado/i.test(reason)) return {cat:'ja_notificado', ok:true, msg:'já notificado nesta atribuição (dedupe do Worker)'};
+  if(/sem token/i.test(reason)) return {cat:'sem_token', ok:false, msg:'designer SEM token FCM (não recebeu no celular)'};
+  if(/sem designer atribu|tarefa nao encontrada/i.test(reason)) return {cat:'sem_destinatario', ok:false, msg:'sem destinatário ('+reason+')'};
+  if(/fcm nao aceitou|auth falhou/i.test(reason)) return {cat:'erro_worker', ok:false, msg:'erro do Worker ('+reason+')'};
+  return {cat:'erro_worker', ok:false, msg:'falha não classificada ('+(reason||('HTTP '+httpStatus))+')'};
+}
 async function notifyDesignerNow(taskId,designerName){
-  let r;
+  let r=null, httpStatus=0;
   try{
     const res=await fetch(CLIENT_REVIEW_BASE+'/notify-designer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:taskId})});
+    httpStatus=res.status;
     r=await res.json().catch(()=>({ok:false,reason:'resposta inválida ('+res.status+')'}));
-  }catch(e){ r={ok:false,reason:'sem rede ('+((e&&e.message)||'falha')+')'}; }
+  }catch(e){ httpStatus=0; r={ok:false,reason:(e&&e.message)||'falha'}; }
   const nm=designerName||'designer';
-  if(r&&r.ok&&Number(r.sent)>0){ flashToast('✓ '+nm+' notificado ('+r.sent+'/'+r.tokens+' dispositivo'+(r.tokens>1?'s':'')+').'); }
-  else if(r&&/ja notificado/i.test(r.reason||'')){ flashToast('✓ '+nm+' já havia sido notificado desta atribuição.'); }
-  else if(r&&/sem token/i.test(r.reason||'')){ flashToast('⚠ Tarefa atribuída, mas '+nm+' está SEM notificações no celular (sem token FCM). Peça para abrir o app e permitir notificações; depois reenvie.',7000); }
-  else { flashToast('⚠ Tarefa atribuída, mas a notificação falhou: '+((r&&r.reason)||'motivo desconhecido')+'.',7000); }
-  console.log('[notify-designer]',taskId,'→',JSON.stringify(r));
-  return r;
+  const c=classifyDesignerNotify(httpStatus,r);
+  if(c.cat==='enviado')          flashToast('✓ '+nm+' '+c.msg+'.');
+  else if(c.cat==='ja_notificado') flashToast('✓ '+nm+': '+c.msg+'.');
+  else if(c.cat==='sem_token')   flashToast('⚠ Tarefa atribuída, mas o '+nm+' está SEM notificações no celular (sem token FCM). Peça para abrir o app logado e permitir notificações; depois use "Reenviar notificação".',8000);
+  else if(c.cat==='sem_destinatario') flashToast('⚠ Notificação não enviada: '+c.msg+'.',8000);
+  else if(c.cat==='erro_payload') flashToast('⚠ Notificação falhou (payload): '+c.msg+'. Tente "Reenviar notificação".',8000);
+  else if(c.cat==='sem_rede')    flashToast('⚠ Tarefa atribuída, mas '+c.msg+'. Use "Reenviar notificação" quando voltar a conexão.',8000);
+  else                           flashToast('⚠ Tarefa atribuída, mas a notificação falhou: '+c.msg+'. Tente "Reenviar notificação".',8000);
+  console.log('[notify-designer]',taskId,'http='+httpStatus,'cat='+c.cat,'→',JSON.stringify(r));
+  return Object.assign({httpStatus,raw:r},c);
+}
+/* Reenvio controlado da notificação ao designer (não reatribui, não toca Worker/Android):
+   apenas reexecuta a chamada /notify-designer e mostra o motivo real de novo. */
+async function resendDesignerNotify(taskId){
+  const t=(state.tasks||[]).find(x=>x.id===taskId);
+  const dId=t&&((t.designerAssignment&&t.designerAssignment.designerId)||t.assigneeId);
+  const d=dId&&(state.users||[]).find(u=>u.id===dId);
+  if(!dId){ flashToast('Esta tarefa não tem designer atribuído para notificar.',5000); return; }
+  flashToast('Reenviando notificação ao designer…');
+  return notifyDesignerNow(taskId,(d&&d.name)||'designer');
 }
 async function persistClientSend(taskId){
   const now=Date.now();const u=state.user||{};
@@ -4654,6 +4690,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-detail]')){openDetails(el.dataset.detail);return;}
   if(el=g('[data-move]')){openMove(el.dataset.move);return;}
   if(el=g('[data-domove]')){const parts=el.dataset.domove.split('|');await moveStatus(parts[0],parts[1]);return;}
+  if(el=g('[data-resend]')){closeCardMenus();await resendDesignerNotify(el.dataset.resend);return;}
   if(el=g('[data-del]')){openDeleteConfirm(el.dataset.del);return;}
   if(el=g('[data-dodelete]')){await deleteTask(el.dataset.dodelete);return;}
   if(el=g('[data-modalclose]')){closeModal();return;}
