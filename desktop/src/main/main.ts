@@ -89,21 +89,11 @@ function createWindow() {
   });
   mainWin.removeMenu();
   mainWin.loadFile(path.join(app.getAppPath(), "src", "renderer", "index.html"));
-  // Zoom uniforme proporcional ao tamanho da janela (preserva proporção do print
-  // 1366×768 em qualquer tela; mesmo template, em escala maior). Cálculo:
-  // zoom = max(1, min(w/1366, h/768)). Reaplica em resize.
-  const BASE_W = 1366, BASE_H = 768;
-  const fitZoom = (): void => {
-    if (!mainWin) return;
-    const [w, h] = mainWin.getContentSize();
-    const z = Math.max(1, Math.min(w / BASE_W, h / BASE_H));
-    mainWin.webContents.setZoomFactor(z);
-  };
+  // Garante nitidez 1:1 (sem zoom acidental). Windows respeita HiDPI nativamente.
   mainWin.webContents.on("did-finish-load", () => {
+    mainWin?.webContents.setZoomFactor(1.0);
     mainWin?.webContents.setVisualZoomLevelLimits(1, 1);
-    fitZoom();
   });
-  mainWin.on("resize", fitZoom);
 
   // Fechar = esconde na tray (nao encerra). Quit real so pelo menu da tray.
   mainWin.on("close", (e) => {
