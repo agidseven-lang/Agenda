@@ -402,7 +402,7 @@
      kanban ocupa o restante (flex:1 + min-height:0). As colunas têm height:100%
      e SÓ o .kbody rola — topo (header da coluna) sempre visível, base sempre
      dentro da janela, último card com respiro + scroll-margin. */
-  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:16px!important;padding-left:34px!important;padding-right:34px!important;scrollbar-gutter:auto}
+  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:16px!important;padding-left:34px!important;padding-right:34px!important}
   /* Reprovação 1.0.137: o cap de 1400px deixava ~200px ociosos nas laterais enquanto as
      colunas ficavam estreitas. Nas telas de QUADRO o cap cai: o board usa a largura útil
      REAL (viewport - sidebar - 48px) — colunas largas quando há espaço; scroll horizontal
@@ -418,9 +418,7 @@
   body.desktop #app > .topbar{display:none !important}
   /* avatar do canto superior direito — presente no print de referência */
   .corner-avatar{display:none}
-  /* referência (contrato 1.0.147): avatar do canto a 18px do topo e com a borda DIREITA
-     alinhada ao eixo direito do board (right = padding lateral do content = 34px). */
-  body.desktop .corner-avatar{display:flex;position:fixed;top:18px;right:34px;z-index:40;border-radius:50%;padding:0;box-shadow:0 0 0 2px rgba(91,108,255,.45);transition:transform .12s, box-shadow .12s}
+  body.desktop .corner-avatar{display:flex;position:fixed;top:10px;right:16px;z-index:40;border-radius:50%;padding:0;box-shadow:0 0 0 2px rgba(91,108,255,.45);transition:transform .12s, box-shadow .12s}
   body.desktop .corner-avatar:hover{transform:scale(1.05);box-shadow:0 0 0 3px rgba(91,108,255,.35)}
   /* flex:none anula o flex:1 do .nav button base: sem ele o botão de perfil ESTICAVA e engolia
      todo o espaço livre da coluna em telas altas (perfil "flutuando" com buraco enorme abaixo). */
@@ -435,17 +433,14 @@
   body.desktop #content.board-mode .d-board-head .d-bh-icon{width:40px;height:40px;border-radius:12px}
   body.desktop #content.board-mode .d-board-head .d-bh-icon svg{width:21px;height:21px}
   body.desktop #content.board-mode .d-board-head .d-bh-title{font-size:19px}
-  /* referência (contrato 1.0.147): a linha busca/filtros NÃO tem caixa-painel — elementos
-     soltos sobre o fundo, busca alinhada ao eixo da 1ª coluna e "Setores" fechando com a última. */
-  body.desktop #content.board-mode .d-board-tools.tbar{margin:17px 0 2px;padding:3px 0;background:transparent;border-color:transparent;box-shadow:none}
-  body.desktop #content.board-mode .d-board-tools.tbar .bsearch-wrap{flex:0 1 400px}
-  body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:36px;padding:0 13px;font-size:11.5px;border-radius:10px}
-  body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:36px;border-radius:10px}
+  body.desktop #content.board-mode .d-board-tools.tbar{margin:17px 0 2px;padding:3px 12px}
+  body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:34px;padding:0 13px;font-size:11.5px;border-radius:10px}
+  body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:34px;border-radius:10px}
   body.desktop #content.board-mode .kanban{margin-top:29px}
   body.desktop #content.board-mode .kcol .khead{padding:6px 12px 5px}
   /* scroll-snap proximity + scroll-padding: ao rolar, o card acomoda INTEIRO com respiro —
      nunca para "decapitado" contra o header da coluna. */
-  body.desktop #content.board-mode .kcol .kbody{padding:16px 16px 14px;scroll-snap-type:y proximity;scroll-padding-top:14px}
+  body.desktop #content.board-mode .kcol .kbody{padding:16px 10px 14px;scroll-snap-type:y proximity;scroll-padding-top:14px}
   body.desktop #content.board-mode .kcol .kbody .tc{scroll-snap-align:start;scroll-margin-top:14px}
   body.desktop #content.board-mode .kcol .kbody .tc:last-child{margin-bottom:0}
 
@@ -456,7 +451,7 @@
     body.desktop #content.board-mode{padding-top:5px!important}
     body.desktop #content.board-mode .d-board-tools.tbar{margin:5px 0 2px}
     body.desktop #content.board-mode .kanban{margin-top:5px}
-    body.desktop #content.board-mode .kcol .kbody{padding:14px 12px 12px}
+    body.desktop #content.board-mode .kcol .kbody{padding:14px 8px 12px}
   }
   /* Escala 125% (viewport ~1092×614): só o CHROME do quadro encolhe — o card V2
      já cabe por arquitetura, sem densificação. */
@@ -465,23 +460,63 @@
     body.desktop #content.board-mode .d-board-head .d-bh-icon{width:34px;height:34px;border-radius:10px}
     body.desktop #content.board-mode .d-board-head .d-bh-icon svg{width:18px;height:18px}
     body.desktop #content.board-mode .d-board-head .d-bh-title{font-size:17px}
-    body.desktop #content.board-mode .d-board-tools.tbar{margin:6px 0 2px;padding:5px 0}
+    body.desktop #content.board-mode .d-board-tools.tbar{margin:6px 0 2px;padding:5px 10px}
     body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:28px}
     body.desktop #content.board-mode .kanban{margin-top:6px}
     body.desktop #content.board-mode .kcol .khead{padding:8px 12px 7px}
-    body.desktop #content.board-mode .kcol .kbody{padding:5px 10px 5px}
+    body.desktop #content.board-mode .kcol .kbody{padding:5px 8px 5px}
   }
-  /* ===== QUADRO ≥1700px — contrato 1.0.149 (Opção B definitiva): CARD ENXUTO =====
-     Decisão do usuário (reprovação F0): o card NÃO infla em nenhuma resolução — fonts,
-     avatar, paddings e espaçamentos do card permanecem os mesmos do print de referência.
-     Quem preenche a tela grande é a COLUNA/quadro (altura), não o card. Por isso o antigo
-     bloco de "tokens verticais maiores do card" em ≥1700 foi REMOVIDO. Só a geometria
-     HORIZONTAL da coluna (largura/gap) é tratada por largura, mais abaixo. */
+  /* ===== QUADRO — BREAKPOINT REAL ≥1700px (dimensões explícitas, SEM zoom/scale) =====
+     Em monitores grandes o quadro usa medidas REAIS maiores (colunas, fontes, paddings,
+     avatar, botões) p/ manter a presença do card da referência. Escopo EXCLUSIVO de
+     body.desktop #content.board-mode — nenhuma outra tela é afetada. */
+  @media(min-width:1700px){
+    body.desktop #content.board-mode .kanban{gap:20px}
+    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;border-radius:12px}
+    body.desktop #content.board-mode .kanban .kcol.kcol-live{max-width:484px}
+    body.desktop #content.board-mode .kcol .khead{padding:9px 15px 8px}
+    body.desktop #content.board-mode .kcol .khead .kt{font-size:14.5px}
+    body.desktop #content.board-mode .kcol .khead .kn{font-size:12px;padding:3px 10px}
+    body.desktop #content.board-mode .kcol .kbody{padding:20px 12px 16px}
+    body.desktop #content.board-mode .tcv4{padding:17px 17px 12px !important;border-radius:12px}
+    body.desktop #content.board-mode .tcv4-st,body.desktop #content.board-mode .tcv4-due{font-size:12px;padding:4px 9px}
+    body.desktop #content.board-mode .tcv4-st .dotc{width:7px;height:7px}
+    body.desktop #content.board-mode .tcv4-person{margin-top:11px;gap:13px}
+    body.desktop #content.board-mode .tcv4-avw .av{width:64px !important;height:64px !important;font-size:21px !important}
+    body.desktop #content.board-mode .tcv4-presence{width:12px;height:12px}
+    body.desktop #content.board-mode .tcv4-name{font-size:17.5px}
+    body.desktop #content.board-mode .tcv4-role{font-size:12.5px}
+    body.desktop #content.board-mode .tcv4-origin{margin-top:16px;padding:7px 12px;font-size:13px;border-radius:10px}
+    body.desktop #content.board-mode .tcv4-client{font-size:12px}
+    body.desktop #content.board-mode .tcv4-title{font-size:19px}
+    body.desktop #content.board-mode .tcv4-chips{margin-top:8px;gap:7px}
+    body.desktop #content.board-mode .tcv4-chip{font-size:12.5px;padding:4px 8px;border-radius:8px}
+    body.desktop #content.board-mode .tcv4-rail{margin-top:22px}
+    body.desktop #content.board-mode .tcv4-rail i{width:8px;height:8px}
+    body.desktop #content.board-mode .tcv4-rail i.cur{width:10px;height:10px}
+    body.desktop #content.board-mode .tcv4-steps{margin-top:14px}
+    body.desktop #content.board-mode .tcv4-k{font-size:9.5px}
+    body.desktop #content.board-mode .tcv4-step b{font-size:13.5px}
+    body.desktop #content.board-mode .tcv4-next{font-size:13.5px}
+    body.desktop #content.board-mode .tcv4-themes{margin-top:13px;padding:11px 14px;border-radius:10px}
+    body.desktop #content.board-mode .tcv4-theme{padding:5px 0;gap:10px}
+    body.desktop #content.board-mode .tcv4-theme-n{width:21px;height:21px;font-size:11.5px;border-radius:6px}
+    body.desktop #content.board-mode .tcv4-theme-t{font-size:14px}
+    body.desktop #content.board-mode .tcv4-circ{width:21px;height:21px}
+    body.desktop #content.board-mode .tcv4-chkline{font-size:11.5px;margin-top:10px}
+    body.desktop #content.board-mode .tcv4-date{font-size:14px;margin-top:11px;padding-top:10px}
+    body.desktop #content.board-mode .tcv4 .tcv4-btn{height:38px !important;font-size:14px !important;border-radius:10px;padding:0 16px !important}
+    body.desktop #content.board-mode .tcv4 .tcv4-btn svg{width:17px;height:17px}
+    body.desktop #content.board-mode .kempty-ic{width:70px;height:70px}
+    body.desktop #content.board-mode .kempty-ic svg{width:64px;height:64px}
+    body.desktop #content.board-mode .kempty-t{font-size:14px}
+    body.desktop #content.board-mode .kempty-s{font-size:12px}
+  }
   /* Colunas ocupam a ÁREA ÚTIL VERTICAL (referência): descem até ~16px da base.
      Eixo esquerdo do board = eixo da busca/filtros (sem centralização).
      Sem zoom/transform — escopo exclusivo do quadro. */
   body.desktop #content.board-mode .kanban{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
-    gap:15px;align-items:stretch;scrollbar-gutter:auto;padding:0 0 2px}
+    gap:15px;align-items:stretch}
   /* max-width: em telas grandes a coluna NÃO balona (card "esticado" reprovado na 1.0.141);
      em 1366×768 as colunas ficam abaixo do teto — paridade com a referência intacta. */
   body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px;max-width:340px}
@@ -490,21 +525,7 @@
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
-  /* contrato 1.0.149 (template do usuário): a COLUNA tem o tamanho do CARD — o card enxuto
-     PREENCHE a coluna com respiro pequeno embaixo (NÃO estica até a tela). Cap de altura
-     fixo, igual em toda resolução; colunas equ-altura (stretch) com placeholder centrado
-     nas vazias, exatamente como o print de referência. */
   body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:380px}
-  /* ≥1700: larguras REAIS da rampa declaradas DEPOIS da base — antes, a cascata (mesma
-     especificidade, base depois no arquivo) matava max-width/gap e o board sobrava ~168px
-     à direita em Full HD (causa-raiz do desalinhamento com o botão "Setores"). */
-  @media(min-width:1700px){
-    body.desktop #content.board-mode .kanban{gap:20px}
-    /* contrato 1.0.149: em Full HD só a LARGURA da coluna cresce (card não estica em largura,
-       reprovação 1.0.141). A ALTURA segue o cap do template (coluna = tamanho do card). */
-    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;border-radius:12px}
-    body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:484px}
-  }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
@@ -544,9 +565,7 @@
   .tcv4:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--acc) 40%,rgba(255,255,255,.09));
     box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 22px 46px -20px rgba(0,0,0,.8),0 0 22px -6px color-mix(in srgb,var(--acc) 35%,transparent)}
   .tcv4-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  /* referência (contrato 1.0.147): status/prazo são retângulos arredondados (~10px),
-     NÃO pílulas 999 — acabamento técnico, menos inflado. */
-  .tcv4-st,.tcv4-due{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:10px;border:1px solid;font-size:9.5px;font-weight:740;min-width:0;letter-spacing:-.005em}
+  .tcv4-st,.tcv4-due{display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:999px;border:1px solid;font-size:9.5px;font-weight:740;min-width:0;letter-spacing:-.005em}
   /* status é informação crítica: NUNCA truncar de forma grosseira — quebra elegante (até 2
      linhas) quando o rótulo é longo (ex.: "Aguardando aprovação dos temas"). */
   .tcv4-st b{font-weight:750;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25;text-align:left}
@@ -1924,7 +1943,7 @@ function render(){
   let _ca=document.getElementById('cornerAvatar');
   if(isDesktop()){
     if(!_ca){_ca=document.createElement('button');_ca.id='cornerAvatar';_ca.className='corner-avatar topav-btn';_ca.setAttribute('data-tab','perfil');_ca.title='Abrir perfil';document.body.appendChild(_ca);}
-    _ca.innerHTML=avatar(state.user,34);
+    _ca.innerHTML=avatar(state.user,38);
   }else if(_ca){_ca.remove();}
   if(isDesktop()){
     nav.innerHTML=
@@ -3354,18 +3373,6 @@ function openDesignerModal(taskId){
     '<div class="sp-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button></div>'+
   '</div></div>';
 }
-/* ═══ DESIGNER SLA — CONTRATO (FASE 4.1, autorização limitada) ═══
-   Flags TODAS OFF; nenhum comportamento/visual muda nesta fase. O renderer
-   apenas SEMEIA task.designerSla (modelo aditivo) na atribuição — quem computa
-   estado/eventos é o Worker (server-time), em dry-run. */
-const SLA_CONTRACT={
-  FLAGS:{slaEngine:false,slaNotifications:false,operationalBlocking:false,wipLimits:false,slaPanel:false,slaCardBadges:false},
-  DEFAULTS:{startWarningMinutes:30,finishWarningMinutes:30,wipHardPerDesigner:2},
-  COLLECTIONS:['slaEvents','designerLocks','wipLimits','adminOverrides','kanbanMetricsDaily']};
-function slaLocalMs(dateStr,timeStr){ if(!dateStr)return 0;
-  const m=String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return 0;
-  let hh=23,mm=59;const t=String(timeStr||'').match(/^(\d{1,2}):(\d{2})$/);if(t){hh=+t[1];mm=+t[2];}
-  return Date.UTC(+m[1],+m[2]-1,+m[3],hh,mm)+180*60000; /* TZ -3 (mesmo APP_TZ do Worker) */ }
 async function sendToDesigner(taskId,designerId,dl){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const d=state.users.find(u=>u.id===designerId);if(!d)return;
@@ -3375,13 +3382,6 @@ async function sendToDesigner(taskId,designerId,dl){
     assignedAt:now,assignedBy:u.id||null,status:'sent',
     startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',obs:dl.obs||''};
   const patch={
-    // SLA seed (FASE 4.2, aditivo): estado inicial; o Worker recalcula com relógio
-    // de servidor. isBlocked SEMPRE false nesta fase (bloqueio real OFF).
-    designerSla:{assignedDesignerId:designerId,assignedById:u.id||null,assignedAt:now,
-      plannedStartAt:slaLocalMs(dl.startDate,dl.startTime),plannedFinishAt:slaLocalMs(dl.endDate,dl.endTime),
-      startWarningMinutes:SLA_CONTRACT.DEFAULTS.startWarningMinutes,finishWarningMinutes:SLA_CONTRACT.DEFAULTS.finishWarningMinutes,
-      slaStatus:'aguardando_inicio',slaSeverity:'ok',isBlocked:false,blockedCandidate:false,
-      rescheduleCount:0,lastComputedAt:0,seedSource:'desktop'},
     designerAssignment:assignment,
     assigneeId:designerId,                 // isola no quadro do designer (visibleTasks)
     assignee:d.name||'',
