@@ -539,6 +539,14 @@
     body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;max-height:815px;border-radius:12px}
     body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:484px}
   }
+  /* contrato 1.0.148 (reprovação F0 em notebook): a rampa 1.0.147 só capava a coluna
+     em ≥1700px. Em viewports ALTOS com largura <1700 (1440×900, 1600×900, 1680×1050)
+     a coluna esticava (max-height:100%) com card ~494 → ratio 0.57–0.71 e 150–322px de
+     vazio embaixo. Cap por ALTURA (não por largura) devolve o card dominante (ratio
+     ~0.87–0.90) SEM tocar 1366×768 (vh<800) nem 1920 (≥1700). Vale p/ Meu quadro E Setores. */
+  @media (min-height:800px) and (max-width:1699px){
+    body.desktop #content.board-mode .kanban .kcol{max-height:550px}
+  }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
@@ -3446,11 +3454,12 @@ async function sendToDesigner(taskId,designerId,dl){
   Object.assign(t,{designerAssignment:assignment,assigneeId:designerId,assignee:d.name||'',assigneeName:d.name||'',cronStatus:'sent_to_designer',status:'afazer',
     clientFlowStatus:'producao',clientWorkflowStage:'producao',designerFlowStatus:'afazer',designerWorkflowStage:'afazer',
     startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',dueDate:dl.endDate||'',dueTime:dl.endTime||''});
-  closeModal();render();flashToast('Enviado para '+(d.name||'designer')+'. Notificação disparada.');
+  closeModal();render();flashToast('Enviado para '+(d.name||'designer')+'…');
   try{
     await db.collection('tasks').doc(taskId).update(patch);
-    fetch(CLIENT_REVIEW_BASE+'/notify-designer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:taskId})}).catch(()=>{});
-  }catch(e){console.warn('sendToDesigner',e);}
+    // notificação: aguarda a resposta REAL do Worker e informa o motivo (sucesso/sem token/já notificado)
+    await notifyDesignerNow(taskId,d.name);
+  }catch(e){console.warn('sendToDesigner',e);flashToast('Tarefa atribuída, mas houve erro ao salvar/notificar: '+((e&&e.message)||'falha')+'.',7000);}
 }
 /* 2º passo do envio ao designer: PRAZO obrigatório (início + término, data+hora) + observação. */
 function openDesignerDeadline(taskId,designerId){
@@ -4199,11 +4208,28 @@ async function clientReviewAction(taskId,kind,note){
   try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('clientReviewAction',e);}
   flashToast(kind==='aprovar'?'Cronograma aprovado. Equipe notificada.':kind==='revisao'?'Revisão enviada à equipe.':'Edição enviada à equipe.');
 }
-function flashToast(msg){
+function flashToast(msg,ms){
   let t=document.getElementById('flashToast');
   if(!t){t=document.createElement('div');t.id='flashToast';t.className='flash-toast';document.body.appendChild(t);}
   t.innerHTML=svg('info')+'<span>'+esc(msg)+'</span>';t.classList.add('show');
-  clearTimeout(window.__ft);window.__ft=setTimeout(()=>t.classList.remove('show'),2600);
+  clearTimeout(window.__ft);window.__ft=setTimeout(()=>t.classList.remove('show'),ms||2600);
+}
+/* Lê a resposta REAL do Worker /notify-designer e diz o que aconteceu de fato —
+   substitui o "Notificação disparada" otimista (que mentia quando o designer
+   estava sem token FCM ou a notificação já fora enviada). Não toca Worker/Android. */
+async function notifyDesignerNow(taskId,designerName){
+  let r;
+  try{
+    const res=await fetch(CLIENT_REVIEW_BASE+'/notify-designer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:taskId})});
+    r=await res.json().catch(()=>({ok:false,reason:'resposta inválida ('+res.status+')'}));
+  }catch(e){ r={ok:false,reason:'sem rede ('+((e&&e.message)||'falha')+')'}; }
+  const nm=designerName||'designer';
+  if(r&&r.ok&&Number(r.sent)>0){ flashToast('✓ '+nm+' notificado ('+r.sent+'/'+r.tokens+' dispositivo'+(r.tokens>1?'s':'')+').'); }
+  else if(r&&/ja notificado/i.test(r.reason||'')){ flashToast('✓ '+nm+' já havia sido notificado desta atribuição.'); }
+  else if(r&&/sem token/i.test(r.reason||'')){ flashToast('⚠ Tarefa atribuída, mas '+nm+' está SEM notificações no celular (sem token FCM). Peça para abrir o app e permitir notificações; depois reenvie.',7000); }
+  else { flashToast('⚠ Tarefa atribuída, mas a notificação falhou: '+((r&&r.reason)||'motivo desconhecido')+'.',7000); }
+  console.log('[notify-designer]',taskId,'→',JSON.stringify(r));
+  return r;
 }
 async function persistClientSend(taskId){
   const now=Date.now();const u=state.user||{};
