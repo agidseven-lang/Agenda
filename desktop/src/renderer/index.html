@@ -466,66 +466,49 @@
     body.desktop #content.board-mode .kcol .khead{padding:8px 12px 7px}
     body.desktop #content.board-mode .kcol .kbody{padding:5px 8px 5px}
   }
-  /* ===== QUADRO — BREAKPOINT REAL ≥1700px (dimensões explícitas, SEM zoom/scale) =====
-     Em monitores grandes o quadro usa medidas REAIS maiores (colunas, fontes, paddings,
-     avatar, botões) p/ manter a presença do card da referência. Escopo EXCLUSIVO de
-     body.desktop #content.board-mode — nenhuma outra tela é afetada. */
-  @media(min-width:1700px){
-    body.desktop #content.board-mode .kanban{gap:20px}
-    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;border-radius:12px}
-    body.desktop #content.board-mode .kanban .kcol.kcol-live{max-width:484px}
-    body.desktop #content.board-mode .kcol .khead{padding:9px 15px 8px}
-    body.desktop #content.board-mode .kcol .khead .kt{font-size:14.5px}
-    body.desktop #content.board-mode .kcol .khead .kn{font-size:12px;padding:3px 10px}
-    body.desktop #content.board-mode .kcol .kbody{padding:20px 12px 16px}
-    body.desktop #content.board-mode .tcv4{padding:17px 17px 12px !important;border-radius:12px}
-    body.desktop #content.board-mode .tcv4-st,body.desktop #content.board-mode .tcv4-due{font-size:12px;padding:4px 9px}
-    body.desktop #content.board-mode .tcv4-st .dotc{width:7px;height:7px}
-    body.desktop #content.board-mode .tcv4-person{margin-top:11px;gap:13px}
-    body.desktop #content.board-mode .tcv4-avw .av{width:64px !important;height:64px !important;font-size:21px !important}
-    body.desktop #content.board-mode .tcv4-presence{width:12px;height:12px}
-    body.desktop #content.board-mode .tcv4-name{font-size:17.5px}
-    body.desktop #content.board-mode .tcv4-role{font-size:12.5px}
-    body.desktop #content.board-mode .tcv4-origin{margin-top:16px;padding:7px 12px;font-size:13px;border-radius:10px}
-    body.desktop #content.board-mode .tcv4-client{font-size:12px}
-    body.desktop #content.board-mode .tcv4-title{font-size:19px}
-    body.desktop #content.board-mode .tcv4-chips{margin-top:8px;gap:7px}
-    body.desktop #content.board-mode .tcv4-chip{font-size:12.5px;padding:4px 8px;border-radius:8px}
-    body.desktop #content.board-mode .tcv4-rail{margin-top:22px}
-    body.desktop #content.board-mode .tcv4-rail i{width:8px;height:8px}
-    body.desktop #content.board-mode .tcv4-rail i.cur{width:10px;height:10px}
-    body.desktop #content.board-mode .tcv4-steps{margin-top:14px}
-    body.desktop #content.board-mode .tcv4-k{font-size:9.5px}
-    body.desktop #content.board-mode .tcv4-step b{font-size:13.5px}
-    body.desktop #content.board-mode .tcv4-next{font-size:13.5px}
-    body.desktop #content.board-mode .tcv4-themes{margin-top:13px;padding:11px 14px;border-radius:10px}
-    body.desktop #content.board-mode .tcv4-theme{padding:5px 0;gap:10px}
-    body.desktop #content.board-mode .tcv4-theme-n{width:21px;height:21px;font-size:11.5px;border-radius:6px}
-    body.desktop #content.board-mode .tcv4-theme-t{font-size:14px}
-    body.desktop #content.board-mode .tcv4-circ{width:21px;height:21px}
-    body.desktop #content.board-mode .tcv4-chkline{font-size:11.5px;margin-top:10px}
-    body.desktop #content.board-mode .tcv4-date{font-size:14px;margin-top:11px;padding-top:10px}
-    body.desktop #content.board-mode .tcv4 .tcv4-btn{height:38px !important;font-size:14px !important;border-radius:10px;padding:0 16px !important}
-    body.desktop #content.board-mode .tcv4 .tcv4-btn svg{width:17px;height:17px}
-    body.desktop #content.board-mode .kempty-ic{width:70px;height:70px}
-    body.desktop #content.board-mode .kempty-ic svg{width:64px;height:64px}
-    body.desktop #content.board-mode .kempty-t{font-size:14px}
-    body.desktop #content.board-mode .kempty-s{font-size:12px}
-  }
+  /* ===== QUADRO ≥1700px — INFLAÇÃO NEUTRALIZADA (autorizado: card compacto = referência) =====
+     O bloco de breakpoint de telas largas que inflava avatar(64)/fontes(17.5-19)/paddings(17)/
+     botões(38)/chips foi REMOVIDO. O card mantém as proporções compactas/refinadas da
+     referência em qualquer largura. Alinhamento horizontal vem das regras base
+     (.kcol max-width:none). Preenchimento vertical do card único = gaps clamp (abaixo). */
   /* Colunas ocupam a ÁREA ÚTIL VERTICAL (referência): descem até ~16px da base.
      Eixo esquerdo do board = eixo da busca/filtros (sem centralização).
      Sem zoom/transform — escopo exclusivo do quadro. */
   body.desktop #content.board-mode .kanban{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
     gap:15px;align-items:stretch}
-  /* max-width: em telas grandes a coluna NÃO balona (card "esticado" reprovado na 1.0.141);
-     em 1366×768 as colunas ficam abaixo do teto — paridade com a referência intacta. */
-  body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px;max-width:340px}
+  /* HORIZONTAL (autorizado): colunas PREENCHEM a largura útil — flex:1 distribui 100% e a
+     última coluna alinha com o eixo direito da toolbar (botão "Setores"). max-width:none
+     remove o teto que deixava sobra à direita em monitor largo. min-width preserva o
+     scroll-x controlado em telas estreitas. */
+  body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px;max-width:none}
   /* referência: a coluna EM FOCO (com cards) respira mais que as vazias */
-  body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:380px}
+  body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:none}
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
   body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:380px}
+  /* VERTICAL (autorizado): COLUNA COM 1 CARD preenche a altura via DISTRIBUIÇÃO CONTROLADA.
+     • .kbody vira flex column (multi-card empilha; kempty centralizado — inalterados).
+     • Card único (.tc.tcv4:only-child) = flex column + flex:1 → ocupa a altura da coluna.
+     • A SOBRA é distribuída pelos GAPS entre blocos via clamp(base, X·vh, TETO): cada respiro
+       cresce com a altura ATÉ UM LIMITE — em 1366 fica compacto (≈referência), em monitor
+       grande os respiros crescem uniformes (sem buraco único, sem space-between bruto).
+     • Rodapé (.tcv4-foot) ancora na base (margin-top:auto); os clamps absorvem a maior
+       parte da sobra → resíduo mínimo. NÃO infla fonte/avatar/chips/botões (só margens). */
+  body.desktop #content.board-mode .kanban .kcol .kbody{display:flex;flex-direction:column}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:1 1 auto;display:flex;flex-direction:column}
+  /* gap = margem-base (piso, = 1366) + crescimento SÓ acima de 768px de altura, com teto.
+     Em 1366 (vh=768) cada gap = base → card NÃO transborda; em telas altas cresce uniforme. */
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:clamp(8px,calc(8px + 0.11 * (100vh - 768px)),44px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:clamp(13px,calc(13px + 0.09 * (100vh - 768px)),38px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:clamp(8px,calc(8px + 0.09 * (100vh - 768px)),36px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:clamp(6px,calc(6px + 0.05 * (100vh - 768px)),22px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:clamp(11px,calc(11px + 0.11 * (100vh - 768px)),46px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:clamp(8px,calc(8px + 0.08 * (100vh - 768px)),32px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:clamp(8px,calc(8px + 0.10 * (100vh - 768px)),40px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:clamp(8px,calc(8px + 0.05 * (100vh - 768px)),22px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:clamp(6px,calc(6px + 0.08 * (100vh - 768px)),30px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:auto;padding-top:clamp(0px,calc(0.06 * (100vh - 768px)),24px)}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
