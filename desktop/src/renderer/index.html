@@ -441,7 +441,7 @@
   body.desktop #content.board-mode .d-board-tools.tbar .bsearch-wrap{flex:0 1 400px}
   body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:36px;padding:0 13px;font-size:11.5px;border-radius:10px}
   body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:36px;border-radius:10px}
-  body.desktop #content.board-mode .kanban{margin-top:24px}
+  body.desktop #content.board-mode .kanban{margin-top:29px}
   body.desktop #content.board-mode .kcol .khead{padding:6px 12px 5px}
   /* scroll-snap proximity + scroll-padding: ao rolar, o card acomoda INTEIRO com respiro —
      nunca para "decapitado" contra o header da coluna. */
@@ -494,7 +494,7 @@
      PREENCHE a coluna com respiro pequeno embaixo (NÃO estica até a tela). Cap de altura
      fixo, igual em toda resolução; colunas equ-altura (stretch) com placeholder centrado
      nas vazias, exatamente como o print de referência. */
-  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:560px;min-height:380px}
+  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:380px}
   /* ≥1700: larguras REAIS da rampa declaradas DEPOIS da base — antes, a cascata (mesma
      especificidade, base depois no arquivo) matava max-width/gap e o board sobrava ~168px
      à direita em Full HD (causa-raiz do desalinhamento com o botão "Setores"). */
@@ -502,7 +502,7 @@
     body.desktop #content.board-mode .kanban{gap:20px}
     /* contrato 1.0.149: em Full HD só a LARGURA da coluna cresce (card não estica em largura,
        reprovação 1.0.141). A ALTURA segue o cap do template (coluna = tamanho do card). */
-    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;max-height:560px;border-radius:12px}
+    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;border-radius:12px}
     body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:484px}
   }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
