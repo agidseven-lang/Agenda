@@ -472,8 +472,8 @@
      body.desktop #content.board-mode — nenhuma outra tela é afetada. */
   @media(min-width:1700px){
     body.desktop #content.board-mode .kanban{gap:20px}
-    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;border-radius:12px}
-    body.desktop #content.board-mode .kanban .kcol.kcol-live{max-width:484px}
+    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:none;min-height:470px;border-radius:12px}
+    body.desktop #content.board-mode .kanban .kcol.kcol-live{max-width:none}
     body.desktop #content.board-mode .kcol .khead{padding:9px 15px 8px}
     body.desktop #content.board-mode .kcol .khead .kt{font-size:14.5px}
     body.desktop #content.board-mode .kcol .khead .kn{font-size:12px;padding:3px 10px}
@@ -517,11 +517,13 @@
      Sem zoom/transform — escopo exclusivo do quadro. */
   body.desktop #content.board-mode .kanban{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
     gap:15px;align-items:stretch}
-  /* max-width: em telas grandes a coluna NÃO balona (card "esticado" reprovado na 1.0.141);
-     em 1366×768 as colunas ficam abaixo do teto — paridade com a referência intacta. */
-  body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px;max-width:340px}
+  /* 1.0.146-rec (autorizado): colunas PREENCHEM a largura útil — flex:1 distribui 100% e a
+     última coluna alinha com o eixo direito da toolbar ("Setores"). max-width:none remove o
+     teto que deixava sobra à direita. min-width preserva scroll-x controlado em telas estreitas.
+     Não toca fonte/avatar/chips/botões (tamanhos do card inalterados). */
+  body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px;max-width:none}
   /* referência: a coluna EM FOCO (com cards) respira mais que as vazias */
-  body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:380px}
+  body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:none}
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
