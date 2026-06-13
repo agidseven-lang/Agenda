@@ -471,49 +471,12 @@
     body.desktop #content.board-mode .kcol .khead{padding:8px 12px 7px}
     body.desktop #content.board-mode .kcol .kbody{padding:5px 10px 5px}
   }
-  /* ===== QUADRO — BREAKPOINT REAL ≥1700px (dimensões explícitas, SEM zoom/scale) =====
-     Em monitores grandes o quadro usa medidas REAIS maiores (colunas, fontes, paddings,
-     avatar, botões) p/ manter a presença do card da referência. Escopo EXCLUSIVO de
-     body.desktop #content.board-mode — nenhuma outra tela é afetada. */
-  @media(min-width:1700px){
-    body.desktop #content.board-mode .kcol .khead{padding:9px 15px 8px}
-    body.desktop #content.board-mode .kcol .khead .kt{font-size:14.5px}
-    body.desktop #content.board-mode .kcol .khead .kn{font-size:12px;padding:3px 10px}
-    body.desktop #content.board-mode .kcol .kbody{padding:24px 18px 18px}
-    body.desktop #content.board-mode .tcv4{padding:20px 20px 16px !important;border-radius:12px}
-    body.desktop #content.board-mode .tcv4-st,body.desktop #content.board-mode .tcv4-due{font-size:12px;padding:4px 9px}
-    body.desktop #content.board-mode .tcv4-st .dotc{width:7px;height:7px}
-    body.desktop #content.board-mode .tcv4-person{margin-top:16px;gap:14px}
-    body.desktop #content.board-mode .tcv4-avw .av{width:72px !important;height:72px !important;font-size:23px !important}
-    body.desktop #content.board-mode .tcv4-presence{width:12px;height:12px}
-    body.desktop #content.board-mode .tcv4-name{font-size:17.5px}
-    body.desktop #content.board-mode .tcv4-role{font-size:12.5px}
-    body.desktop #content.board-mode .tcv4-origin{margin-top:20px;padding:10px 13px;font-size:13px;border-radius:10px}
-    body.desktop #content.board-mode .tcv4-client{font-size:12px}
-    body.desktop #content.board-mode .tcv4-title{font-size:19px}
-    body.desktop #content.board-mode .tcv4-chips{margin-top:11px;gap:7px}
-    body.desktop #content.board-mode .tcv4-chip{font-size:12.5px;padding:4px 8px;border-radius:8px}
-    body.desktop #content.board-mode .tcv4-rail{margin-top:27px}
-    body.desktop #content.board-mode .tcv4-rail i{width:8px;height:8px}
-    body.desktop #content.board-mode .tcv4-rail i.cur{width:10px;height:10px}
-    body.desktop #content.board-mode .tcv4-steps{margin-top:18px}
-    body.desktop #content.board-mode .tcv4-k{font-size:9.5px}
-    body.desktop #content.board-mode .tcv4-step b{font-size:13.5px}
-    body.desktop #content.board-mode .tcv4-next{font-size:13.5px}
-    body.desktop #content.board-mode .tcv4-themes{margin-top:17px;padding:14px 16px;border-radius:10px}
-    body.desktop #content.board-mode .tcv4-theme{padding:9px 0;gap:11px}
-    body.desktop #content.board-mode .tcv4-theme-n{width:24px;height:24px;font-size:12px;border-radius:6px}
-    body.desktop #content.board-mode .tcv4-theme-t{font-size:14px}
-    body.desktop #content.board-mode .tcv4-circ{width:24px;height:24px}
-    body.desktop #content.board-mode .tcv4-chkline{font-size:11.5px;margin-top:14px}
-    body.desktop #content.board-mode .tcv4-date{font-size:14px;margin-top:15px;padding-top:14px}
-    body.desktop #content.board-mode .tcv4 .tcv4-btn{height:42px !important;font-size:14px !important;border-radius:10px;padding:0 16px !important}
-    body.desktop #content.board-mode .tcv4 .tcv4-btn svg{width:17px;height:17px}
-    body.desktop #content.board-mode .kempty-ic{width:70px;height:70px}
-    body.desktop #content.board-mode .kempty-ic svg{width:64px;height:64px}
-    body.desktop #content.board-mode .kempty-t{font-size:14px}
-    body.desktop #content.board-mode .kempty-s{font-size:12px}
-  }
+  /* ===== QUADRO ≥1700px — contrato 1.0.149 (Opção B definitiva): CARD ENXUTO =====
+     Decisão do usuário (reprovação F0): o card NÃO infla em nenhuma resolução — fonts,
+     avatar, paddings e espaçamentos do card permanecem os mesmos do print de referência.
+     Quem preenche a tela grande é a COLUNA/quadro (altura), não o card. Por isso o antigo
+     bloco de "tokens verticais maiores do card" em ≥1700 foi REMOVIDO. Só a geometria
+     HORIZONTAL da coluna (largura/gap) é tratada por largura, mais abaixo. */
   /* Colunas ocupam a ÁREA ÚTIL VERTICAL (referência): descem até ~16px da base.
      Eixo esquerdo do board = eixo da busca/filtros (sem centralização).
      Sem zoom/transform — escopo exclusivo do quadro. */
@@ -533,19 +496,12 @@
      à direita em Full HD (causa-raiz do desalinhamento com o botão "Setores"). */
   @media(min-width:1700px){
     body.desktop #content.board-mode .kanban{gap:20px}
-    /* contrato 1.0.147 (reprovação parcial Full HD): coluna NÃO estica até a base útil em
-       Full HD (causava ratio card×coluna 0.825 com 89px de vazio no rodapé). Cap real em px
-       — card ainda dominante, respiro premium, baseUtil ~85px (zona morta da referência). */
-    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;max-height:815px;border-radius:12px}
+    /* contrato 1.0.149: em Full HD só a LARGURA da coluna cresce (card não estica em largura,
+       reprovação 1.0.141). A ALTURA não é mais capada (max-height removido) — a coluna
+       PREENCHE a área útil vertical e o card enxuto fica no topo, com a área abaixo dele
+       sendo a própria coluna (premium), como pedido na reprovação F0. */
+    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;border-radius:12px}
     body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:484px}
-  }
-  /* contrato 1.0.148 (reprovação F0 em notebook): a rampa 1.0.147 só capava a coluna
-     em ≥1700px. Em viewports ALTOS com largura <1700 (1440×900, 1600×900, 1680×1050)
-     a coluna esticava (max-height:100%) com card ~494 → ratio 0.57–0.71 e 150–322px de
-     vazio embaixo. Cap por ALTURA (não por largura) devolve o card dominante (ratio
-     ~0.87–0.90) SEM tocar 1366×768 (vh<800) nem 1920 (≥1700). Vale p/ Meu quadro E Setores. */
-  @media (min-height:800px) and (max-width:1699px){
-    body.desktop #content.board-mode .kanban .kcol{max-height:550px}
   }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
