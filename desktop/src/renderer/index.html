@@ -490,17 +490,19 @@
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
-  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:380px}
+  /* contrato 1.0.149 (template do usuário): a COLUNA tem o tamanho do CARD — o card enxuto
+     PREENCHE a coluna com respiro pequeno embaixo (NÃO estica até a tela). Cap de altura
+     fixo, igual em toda resolução; colunas equ-altura (stretch) com placeholder centrado
+     nas vazias, exatamente como o print de referência. */
+  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:560px;min-height:380px}
   /* ≥1700: larguras REAIS da rampa declaradas DEPOIS da base — antes, a cascata (mesma
      especificidade, base depois no arquivo) matava max-width/gap e o board sobrava ~168px
      à direita em Full HD (causa-raiz do desalinhamento com o botão "Setores"). */
   @media(min-width:1700px){
     body.desktop #content.board-mode .kanban{gap:20px}
     /* contrato 1.0.149: em Full HD só a LARGURA da coluna cresce (card não estica em largura,
-       reprovação 1.0.141). A ALTURA não é mais capada (max-height removido) — a coluna
-       PREENCHE a área útil vertical e o card enxuto fica no topo, com a área abaixo dele
-       sendo a própria coluna (premium), como pedido na reprovação F0. */
-    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;border-radius:12px}
+       reprovação 1.0.141). A ALTURA segue o cap do template (coluna = tamanho do card). */
+    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;max-height:560px;border-radius:12px}
     body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:484px}
   }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
