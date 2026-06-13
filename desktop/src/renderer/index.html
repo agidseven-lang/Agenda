@@ -475,7 +475,7 @@
      Em monitores grandes o quadro usa medidas REAIS maiores (colunas, fontes, paddings,
      avatar, botões) p/ manter a presença do card da referência. Escopo EXCLUSIVO de
      body.desktop #content.board-mode — nenhuma outra tela é afetada. */
-  @media(min-width:1700px){
+  @media(min-width:1700px),(min-height:1000px){
     body.desktop #content.board-mode .kcol .khead{padding:9px 15px 8px}
     body.desktop #content.board-mode .kcol .khead .kt{font-size:14.5px}
     body.desktop #content.board-mode .kcol .khead .kn{font-size:12px;padding:3px 10px}
@@ -539,13 +539,38 @@
     body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;min-height:470px;max-height:815px;border-radius:12px}
     body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:484px}
   }
-  /* contrato 1.0.148 (reprovação F0 em notebook): a rampa 1.0.147 só capava a coluna
-     em ≥1700px. Em viewports ALTOS com largura <1700 (1440×900, 1600×900, 1680×1050)
-     a coluna esticava (max-height:100%) com card ~494 → ratio 0.57–0.71 e 150–322px de
-     vazio embaixo. Cap por ALTURA (não por largura) devolve o card dominante (ratio
-     ~0.87–0.90) SEM tocar 1366×768 (vh<800) nem 1920 (≥1700). Vale p/ Meu quadro E Setores. */
-  @media (min-height:800px) and (max-width:1699px){
-    body.desktop #content.board-mode .kanban .kcol{max-height:550px}
+  /* contrato 1.0.148 (Opção B — reprovação F0 notebook): a rampa 1.0.147 (card grande +
+     coluna capada) só existia em ≥1700px. Em notebooks (1440/1600/1680) a coluna preenchia
+     a tela mas o card ficava pequeno (ratio 0.57–0.71, 150–322px de vazio). Aqui o QUADRO
+     preenche a altura útil E o card cresce de forma graduada por ALTURA de tela, mantendo
+     ratio ~0.87–0.90, sem bloat. 1366 (vh<840) e 1920 (≥1700) ficam intactos.
+     Tier MÉDIO (notebooks ~900px de altura): card cresce moderado (entre base e o de Full HD). */
+  @media (min-height:840px) and (max-height:999px) and (max-width:1699px){
+    body.desktop #content.board-mode .kcol .khead{padding:8px 14px 7px}
+    body.desktop #content.board-mode .kcol .kbody{padding:20px 16px 16px}
+    body.desktop #content.board-mode .tcv4{padding:17px 17px 13px !important;border-radius:12px}
+    body.desktop #content.board-mode .tcv4-st,body.desktop #content.board-mode .tcv4-due{font-size:11.5px;padding:4px 9px}
+    body.desktop #content.board-mode .tcv4-person{margin-top:13px;gap:12px}
+    body.desktop #content.board-mode .tcv4-avw .av{width:64px !important;height:64px !important;font-size:21px !important}
+    body.desktop #content.board-mode .tcv4-name{font-size:16px}
+    body.desktop #content.board-mode .tcv4-role{font-size:12px}
+    body.desktop #content.board-mode .tcv4-origin{margin-top:16px;padding:9px 12px;font-size:12px;border-radius:9px}
+    body.desktop #content.board-mode .tcv4-title{font-size:17px}
+    body.desktop #content.board-mode .tcv4-chips{margin-top:9px;gap:6px}
+    body.desktop #content.board-mode .tcv4-chip{font-size:12px;padding:4px 8px;border-radius:8px}
+    body.desktop #content.board-mode .tcv4-themes{margin-top:13px;padding:11px 14px;border-radius:9px}
+    body.desktop #content.board-mode .tcv4-theme{padding:7px 0;gap:10px}
+    body.desktop #content.board-mode .tcv4-theme-n{width:22px;height:22px;font-size:11.5px;border-radius:6px}
+    body.desktop #content.board-mode .tcv4-theme-t{font-size:13.5px}
+    body.desktop #content.board-mode .tcv4-date{font-size:13px;margin-top:13px;padding-top:12px}
+    body.desktop #content.board-mode .tcv4 .tcv4-btn{height:38px !important;font-size:13px !important;border-radius:9px;padding:0 14px !important}
+    /* coluna preenche a altura útil com respiro premium (não estica até o card pequeno) */
+    body.desktop #content.board-mode .kanban .kcol{max-height:calc(100vh - 188px)}
+  }
+  /* Tier ALTO largura<1700 (ex.: 1680×1050): usa o card grande (herda os tokens ≥1700/altura
+     via min-height:1000) e capa a coluna p/ ratio premium em vez de esticar até a base. */
+  @media (min-height:1000px) and (max-width:1699px){
+    body.desktop #content.board-mode .kanban .kcol{max-height:820px}
   }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
