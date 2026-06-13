@@ -1155,8 +1155,8 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('CY2_SRC_COL4','clientCol4: "Aprovado" SÓ p/ concluido; aprovado/producao/reenviado → analise', /if\(c==='concluido'\)return 'aprovado';\s*\n\s*if\(c==='aprovado'\|\|c==='producao'\|\|c==='reenviado'\)return 'analise';/.test(DH));
   // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
   check('CY2_CSS_KCOL','Card cortado (fix ESTRUTURAL V64.53): board-mode flex + coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar)',
-    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:100%;max-height:100%;min-height:380px\}/.test(DH));
-  check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 (sem gutter assimétrico — card centrado como a referência) + scroll-margin no último card', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;\n    display:flex;flex-direction:column\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:4px;scroll-margin-bottom:12px\}/.test(DH));
+    /#content\.board-mode\{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh/.test(DH) && /#content\.board-mode \.kanban \.kcol\{height:100%;max-height:560px;min-height:380px\}/.test(DH));
+  check('CY2_CSS_KBODY','CSS: .kbody padding inferior 24px + min-height:0 (sem gutter assimétrico — card centrado como a referência) + scroll-margin no último card', /\.kbody\{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0\}/.test(DH) && /\.kbody \.tc:last-child\{margin-bottom:4px;scroll-margin-bottom:12px\}/.test(DH));
   // Problema 1 — gatilho do push de envio (Desktop → Worker contentSent, best-effort).
   check('CY2_SENT_TRIGGER','persistClientSend chama team-action contentSent com Bearer JWT + Idempotency-Key (best-effort)',
     (()=>{const fn=(DH.match(/async function persistClientSend\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];return fn.indexOf("action:'contentSent'")>=0&&fn.indexOf("'Authorization':'Bearer '+jwt")>=0&&fn.indexOf("'Idempotency-Key':idem")>=0&&fn.indexOf('catch')>=0;})());
@@ -1294,14 +1294,14 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
       return ['tcv4-top','tcv4-st','tcv4-due','tcv4-person','tcv4-origin','tcv4-client','tcv4-title','tcv4-chips','tcv4-rail','tcv4-themes','tcv4-circ','tcv4-date','tcv4-foot','data-cardmenu'].every(k=>tc.indexOf(k)>=0)&&
              tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Colunas de ALTURA IGUAL (referência) + 1 card inteiro sem scrollbar + scrollbar fina + chrome enxuto',
-    /kcol\{height:100%;max-height:100%;min-height:380px\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
+    /kcol\{height:100%;max-height:560px;min-height:380px\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
     /#content\.board-mode \.kcol \.kbody\{padding:16px 16px 14px;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
   check('CY9_PROPORCAO_STATUS','Escopo limpo (reprovação 1.0.144): ZERO zoom/scale global (fitZoom removido) + colunas abraçam conteúdo (proporção em qualquer tela) + status nunca truncado + presença no canto do avatar',
     DH.indexOf('fitZoom')<0 && DH.indexOf('--fitz')<0 && !/document\.body\.style\.zoom/.test(DH) &&
     /grid-template-rows:100vh/.test(DH) &&
     /\.tcv4-avw\{position:relative;flex:none;display:inline-flex\}/.test(DH) &&
     /\.tcv4-presence\{position:absolute;left:-1px;bottom:-1px;width:9px;height:9px/.test(DH) &&
-    DH.indexOf("zoom:1.28")<0 && !/\.kanban\{zoom/.test(DH) && /@media\(min-width:1700px\)/.test(DH) && /\.kcol\{min-width:300px;max-width:432px;border-radius:12px\}/.test(DH) && /\.kanban\{display:flex;flex:1 1 auto;/.test(DH) && /\.kcol\{height:100%;max-height:100%;min-height:380px\}/.test(DH) &&
+    DH.indexOf("zoom:1.28")<0 && !/\.kanban\{zoom/.test(DH) && /@media\(min-width:1700px\)/.test(DH) && /\.kcol\{min-width:300px;max-width:432px;max-height:560px;border-radius:12px\}/.test(DH) && /\.kanban\{display:flex;flex:1 1 auto;/.test(DH) && /\.kcol\{height:100%;max-height:560px;min-height:380px\}/.test(DH) &&
     /\.tcv4-st b\{font-weight:750;white-space:normal;display:-webkit-box;-webkit-line-clamp:2/.test(DH) &&
     /\.tcv4-chips\{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px\}/.test(DH) &&
     /\.tcv4-chips \.tcv4-chip:first-child\{max-width:100%;white-space:normal;line-height:1\.3;text-align:left\}/.test(DH) &&

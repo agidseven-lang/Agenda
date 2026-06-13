@@ -441,7 +441,7 @@
   body.desktop #content.board-mode .d-board-tools.tbar .bsearch-wrap{flex:0 1 400px}
   body.desktop #content.board-mode .d-board-tools.tbar .tchips>button{height:36px;padding:0 13px;font-size:11.5px;border-radius:10px}
   body.desktop #content.board-mode .d-board-tools.tbar .bsearch{height:36px;border-radius:10px}
-  body.desktop #content.board-mode .kanban{margin-top:8px}
+  body.desktop #content.board-mode .kanban{margin-top:24px}
   body.desktop #content.board-mode .kcol .khead{padding:6px 12px 5px}
   /* scroll-snap proximity + scroll-padding: ao rolar, o card acomoda INTEIRO com respiro —
      nunca para "decapitado" contra o header da coluna. */
@@ -490,18 +490,19 @@
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
-  /* contrato 1.0.150 (reprovação visual F0): COLUNAS ALTAS preenchem a tela (abaixoQuadro
-     ~28px), CARD ALTO preenche a coluna inteira — crescimento por DISTRIBUIÇÃO ESTRUTURAL
-     (gaps internos), NÃO por inflar fontes/avatar/padding. Cap de coluna removido. */
-  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:380px}
+  /* contrato 1.0.149 (template do usuário): a COLUNA tem o tamanho do CARD — o card enxuto
+     PREENCHE a coluna com respiro pequeno embaixo (NÃO estica até a tela). Cap de altura
+     fixo, igual em toda resolução; colunas equ-altura (stretch) com placeholder centrado
+     nas vazias, exatamente como o print de referência. */
+  body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:560px;min-height:380px}
   /* ≥1700: larguras REAIS da rampa declaradas DEPOIS da base — antes, a cascata (mesma
      especificidade, base depois no arquivo) matava max-width/gap e o board sobrava ~168px
      à direita em Full HD (causa-raiz do desalinhamento com o botão "Setores"). */
   @media(min-width:1700px){
     body.desktop #content.board-mode .kanban{gap:20px}
-    /* contrato 1.0.150 ≥1700: largura cresce (300–432/484), altura SEM cap → coluna preenche
-       área útil; card alto via distribuição estrutural. */
-    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;border-radius:12px}
+    /* contrato 1.0.149: em Full HD só a LARGURA da coluna cresce (card não estica em largura,
+       reprovação 1.0.141). A ALTURA segue o cap do template (coluna = tamanho do card). */
+    body.desktop #content.board-mode .kanban .kcol{min-width:300px;max-width:432px;max-height:560px;border-radius:12px}
     body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:484px}
   }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
@@ -532,40 +533,14 @@
   .kempty-ic svg{width:52px;height:52px}
   .kempty-t{font-size:11.5px;font-weight:750;color:var(--soft)}
   .kempty-s{font-size:10px;color:var(--faint);line-height:1.5;max-width:190px}
-  body.desktop .kanban .kcol .kbody{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0;
-    display:flex;flex-direction:column}
-  /* contrato 1.0.150: coluna ativa com EXATAMENTE 1 card → o card preenche a altura do
-     kbody (flex:1). Com vários cards, comportamento padrão (empilhamento + scroll). */
-  body.desktop .kanban .kcol-live .kbody > .tc:only-child{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;margin-bottom:0}
-  body.desktop .kanban .kcol-live .kbody > .tcv4{flex:1 1 auto;min-height:0}
+  body.desktop .kanban .kcol .kbody{padding:12px 12px 24px;overflow-y:auto;flex:1 1 auto;min-height:0}
   body.desktop .kanban .kcol .tc{margin-bottom:12px;border-radius:10px}
   /* ═══════════ CARD V4 — fiel à referência aprovada (premium glass) ═══════════ */
   .tcv4{position:relative;padding:13px 13px 9px !important;border-radius:10px;container-type:inline-size;
-    /* contrato 1.0.150: flex vertical p/ DISTRIBUIÇÃO ESTRUTURAL — card preenche a coluna,
-       rodapé colado embaixo via .tcv4-foot{margin-top:auto}. Sem inflar fontes/avatar/padding. */
-    display:flex;flex-direction:column;
     border:1px solid rgba(255,255,255,.07);
     background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.008) 40%),var(--surface);
     box-shadow:0 1px 0 rgba(255,255,255,.045) inset,0 16px 36px -20px rgba(0,0,0,.7);
     transition:transform .16s ease,border-color .16s ease,box-shadow .2s ease}
-  /* coluna ativa: card preenche a área interna útil da coluna (kbody) e DISTRIBUI
-     o espaço extra ENTRE TODOS os blocos via space-between (distribuição estrutural). */
-  body.desktop .kanban .kcol-live .kbody > .tcv4{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;justify-content:space-between}
-  /* DISTRIBUIÇÃO ESTRUTURAL: em telas altas, AUMENTA as margens ENTRE OS BLOCOS do card
-     (margin-top de cada bloco escala com a altura via clamp). Não toca fontes/avatar/padding.
-     Vale só na coluna ativa com 1 card (.kcol-live > kbody > tc:only-child > .tcv4). */
-  @media (min-height:840px){
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-person{margin-top:clamp(8px, 1.4vh, 22px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-origin{margin-top:clamp(13px, 1.7vh, 26px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-cli{margin-top:clamp(11px, 1.5vh, 22px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-chips{margin-top:clamp(6px, 1.0vh, 16px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-rail{margin-top:clamp(14px, 1.8vh, 26px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-steps{margin-top:clamp(10px, 1.4vh, 22px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-themes{margin-top:clamp(10px, 1.5vh, 24px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-chkline{margin-top:clamp(8px, 1.2vh, 18px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-date{margin-top:clamp(8px, 1.2vh, 20px);padding-top:clamp(7px, 1.0vh, 14px)}
-    body.desktop .kanban .kcol-live .kbody > .tcv4 > .tcv4-foot{margin-top:clamp(8px, 1.4vh, 22px)}
-  }
   .tcv4:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--acc) 40%,rgba(255,255,255,.09));
     box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 22px 46px -20px rgba(0,0,0,.8),0 0 22px -6px color-mix(in srgb,var(--acc) 35%,transparent)}
   .tcv4-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -616,11 +591,6 @@
   .tcv4-step b{font-size:11px;font-weight:740;min-width:0;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3}
   .tcv4-next{font-size:11px;font-weight:550;color:var(--soft);min-width:0;line-height:1.4;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
   .tcv4-themes{margin-top:10px;padding:8px 11px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:8px}
-  /* contrato 1.0.150: na coluna ativa com 1 card, o bloco TEMAS é o crescível —
-     consome o espaço extra entre o "Em produção"/etapa e o rodapé, mantendo todos os
-     demais blocos no tamanho compacto da referência (sem inflar fontes/avatar/padding). */
-  /* removidas regras de "themes cresce" — agora a distribuição é estrutural pelo
-     justify-content:space-between do card flex (sobe). */
   .tcv4-themes-h{font-size:8px;font-weight:780;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
   .tcv4-theme{display:flex;align-items:center;gap:8px;padding:3.5px 0;min-width:0}
   .tcv4-theme-n{flex:none;width:17px;height:17px;border-radius:5px;background:#4250C7;color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
