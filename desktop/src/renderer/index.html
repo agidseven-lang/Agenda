@@ -528,6 +528,23 @@
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */
   body.desktop #content.board-mode .kanban .kcol{height:100%;max-height:100%;min-height:380px}
+  /* 1.0.146-rec2 (autorizado): COLUNA COM 1 CARD — o card preenche a área interna da
+     coluna (referência). Estrutural via flex, sem inflar fonte/avatar/chips/botões.
+     • .kbody vira flex column no board-mode (já tinha overflow-y:auto e flex:1 1 auto —
+       só agrega display/direction; vários cards continuam empilhando, kempty centralizado).
+     • Quando o .kbody tem APENAS UM card (.tc.tcv4:only-child), esse card vira flex column
+       com flex:1 e cresce até preencher o kbody; conteúdo flui natural do topo e o rodapé
+       (.tcv4-foot, botões Detalhes/Mover/⋯) ancora na base com margin-top:auto.
+     • COLUNA COM VÁRIOS CARDS — inalterada: cards mantêm tamanho natural, empilham com
+       gap (margin-bottom existente) e o .kbody rola.
+     Escopo: somente board-mode. Não toca fontes/avatar/chips/botões. */
+  body.desktop #content.board-mode .kanban .kcol .kbody{display:flex;flex-direction:column}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{
+    flex:1 1 auto;display:flex;flex-direction:column;
+  }
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{
+    margin-top:auto;
+  }
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
