@@ -4774,6 +4774,65 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   const uid=localStorage.getItem('wp_uid');
   if(uid){try{const doc=await db.collection('users').doc(uid).get();if(doc.exists){startApp(Object.assign({id:doc.id},doc.data()));return;}}catch(_){}clearSession();}
 })();
+
+/* ════════ DIAGNÓSTICO TEMPORÁRIO READ-ONLY (Ctrl+Shift+D) — removível ════════
+   SOMENTE LEITURA: lê DOM + state e copia um JSON para a área de transferência.
+   NÃO escreve em Firestore, NÃO chama Worker, NÃO envia notificação, NÃO altera
+   estado do app, NÃO apaga nada. Clipboard via textarea+execCommand (contextIsolation
+   não dá require no renderer). Bloco isolado — basta removê-lo para desinstalar. */
+(function(){
+  function _r(el){if(!el)return null;var r=el.getBoundingClientRect();return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height),right:Math.round(r.right),bottom:Math.round(r.bottom)};}
+  function _copy(s){try{var ta=document.createElement('textarea');ta.value=s;ta.style.position='fixed';ta.style.left='-9999px';ta.style.top='0';document.body.appendChild(ta);ta.focus();ta.select();var ok=document.execCommand('copy');document.body.removeChild(ta);if(ok)return true;}catch(_){}try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s);return true;}}catch(_){}return false;}
+  function _diag(){
+    try{
+      var kb=document.querySelector('.kanban');
+      var tb=document.querySelector('.d-board-tools,.tbar');
+      var chips=[].slice.call(document.querySelectorAll('.tchips button,.chip,button'));
+      var setores=chips.filter(function(b){return /setores/i.test((b.textContent||'').trim());})[0]||null;
+      var cols=[].slice.call(document.querySelectorAll('.kanban .kcol'));
+      var lastCol=cols.length?cols[cols.length-1]:null;
+      var colData=cols.map(function(c){
+        var head=c.querySelector('.kt');
+        var body=c.querySelector('.kbody');
+        var cards=body?[].slice.call(body.children).filter(function(el){return el.classList&&(el.classList.contains('tcv4')||el.classList.contains('tc'));}):[];
+        return {label:head?head.textContent.trim():null,classes:c.className,data:Object.assign({},c.dataset||{}),
+          rect:_r(c),nCards:cards.length,empty:cards.length===0,one:cards.length===1,many:cards.length>1,
+          bodyScroll:body?(body.scrollHeight>body.clientHeight+2):null,
+          cards:cards.map(function(cd){var fo=cd.querySelector('.tcv4-foot');return {rect:_r(cd),classes:cd.className,
+            flexGrow:getComputedStyle(cd).flexGrow,onlyChild:cd.matches('.tc.tcv4:only-child'),
+            insideBelow:_r(c)?Math.round(c.getBoundingClientRect().bottom-cd.getBoundingClientRect().bottom):null,
+            footRect:_r(fo)};})};
+      });
+      var tasks=[];try{tasks=(state&&state.tasks)||[];}catch(_){}
+      var cron=tasks.filter(function(t){try{return t.sector&&/cronograma/i.test(JSON.stringify(t.sector));}catch(_){return false;}}).map(function(t){
+        return {id:t.id,title:t.title,sector:(t.sector&&t.sector.key)||t.sector,status:t.status,cronStatus:t.cronStatus,
+          createdAt:t.createdAt,updatedAt:t.updatedAt,by:t.by,assigneeId:t.assigneeId,assignee:t.assignee,
+          designerAssignment:t.designerAssignment||null,clientFlowStatus:t.clientFlowStatus,src:t.src};});
+      var ver=null;try{ver=APP_VER.desktop;}catch(_){}
+      var st={};try{st={tab:state.tab,boardSector:state.boardSector,flowView:state.flowView,designerBoard:state.designerBoard};}catch(_){}
+      var out={
+        window:{innerWidth:innerWidth,innerHeight:innerHeight,devicePixelRatio:devicePixelRatio,
+          version:ver,state:st,ts:new Date().toISOString(),userAgentPlatform:(navigator&&navigator.platform)||null},
+        geometry:{toolbar:_r(tb),kanban:_r(kb),setores:_r(setores),
+          setoresRight:setores?Math.round(setores.getBoundingClientRect().right):null,
+          lastColRight:lastCol?Math.round(lastCol.getBoundingClientRect().right):null,
+          diffLastColSetores:(lastCol&&setores)?Math.round(setores.getBoundingClientRect().right-lastCol.getBoundingClientRect().right):null,
+          diffKanbanToolbarRight:(kb&&tb)?Math.round(tb.getBoundingClientRect().right-kb.getBoundingClientRect().right):null,
+          belowKanban:kb?Math.round(innerHeight-kb.getBoundingClientRect().bottom):null,
+          docOverflowX:document.documentElement.scrollWidth>innerWidth+1},
+        nCols:cols.length,columns:colData,cronTasks:cron
+      };
+      var json=JSON.stringify(out,null,2);
+      var ok=_copy(json);
+      try{flashToast(ok?'Diagnóstico copiado para a área de transferência':'Diagnóstico gerado (veja o console — clipboard falhou)',6000);}catch(_){}
+      try{console.log('[DIAG-READONLY]\n'+json);}catch(_){}
+    }catch(e){try{flashToast('Diagnóstico falhou: '+((e&&e.message)||'erro'),6000);}catch(_){}try{console.error('[DIAG-READONLY] erro',e);}catch(_){}}
+  }
+  document.addEventListener('keydown',function(e){
+    if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='D'||e.key==='d'||e.keyCode===68)){e.preventDefault();_diag();}
+  });
+})();
+/* ════════ FIM DIAGNÓSTICO TEMPORÁRIO READ-ONLY ════════ */
 </script>
 </body>
 </html>
