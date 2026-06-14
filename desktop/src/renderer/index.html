@@ -497,18 +497,19 @@
        parte da sobra → resíduo mínimo. NÃO infla fonte/avatar/chips/botões (só margens). */
   body.desktop #content.board-mode .kanban .kcol .kbody{display:flex;flex-direction:column}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:1 1 auto;display:flex;flex-direction:column}
-  /* gap = margem-base (piso, = 1366) + crescimento SÓ acima de 768px de altura, com teto.
-     Em 1366 (vh=768) cada gap = base → card NÃO transborda; em telas altas cresce uniforme. */
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:clamp(8px,calc(8px + 0.11 * (100vh - 768px)),44px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:clamp(13px,calc(13px + 0.09 * (100vh - 768px)),38px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:clamp(8px,calc(8px + 0.09 * (100vh - 768px)),36px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:clamp(6px,calc(6px + 0.05 * (100vh - 768px)),22px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:clamp(11px,calc(11px + 0.11 * (100vh - 768px)),46px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:clamp(8px,calc(8px + 0.08 * (100vh - 768px)),32px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:clamp(8px,calc(8px + 0.10 * (100vh - 768px)),40px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:clamp(8px,calc(8px + 0.05 * (100vh - 768px)),22px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:clamp(6px,calc(6px + 0.08 * (100vh - 768px)),30px)}
-  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:auto;padding-top:clamp(0px,calc(0.06 * (100vh - 768px)),24px)}
+  /* gap = margem-base (= ritmo da referência) + crescimento controlado por clamp com TETO
+     em cada gap. Foot fixo tight (sem margin-top:auto → sem buraco no rodapé). TEMAS
+     absorve o restante via flex-grow com max-height (sem virar gigantesco). */
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:clamp(8px,calc(8px + 0.06 * (100vh - 768px)),26px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:clamp(13px,calc(13px + 0.07 * (100vh - 768px)),32px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:clamp(8px,calc(8px + 0.05 * (100vh - 768px)),24px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:clamp(6px,calc(6px + 0.03 * (100vh - 768px)),16px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:clamp(11px,calc(11px + 0.07 * (100vh - 768px)),32px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:clamp(8px,calc(8px + 0.05 * (100vh - 768px)),24px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:clamp(8px,calc(8px + 0.06 * (100vh - 768px)),26px);flex:1 1 auto;max-height:clamp(105px,calc(105px + 0.78 * (100vh - 768px)),300px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:clamp(8px,calc(8px + 0.03 * (100vh - 768px)),18px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:clamp(6px,calc(6px + 0.03 * (100vh - 768px)),16px)}
+  body.desktop .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:clamp(12px,calc(12px + 0.01 * (100vh - 768px)),16px);padding-top:0}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar{width:8px}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-track{background:transparent}
   body.desktop .kanban .kcol .kbody::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);border-radius:99px;border:2px solid transparent;background-clip:content-box}
