@@ -23,17 +23,18 @@
     --d-maxw:1400px;     /* desktop content cap */
     --d-side:216px;      /* desktop sidebar width (referência medida) */
     --d-topbar:64px;     /* desktop topbar height */
-    /* Frame responsivo do Kanban (Proposta A): toolbar + colunas no mesmo eixo.
-       frame 1173 → 4 col de ~282px → card ~260px (aspect ~0.534 ≈ referência 0.530).
-       Em telas largas o frame fica centralizado (não estica e não vira paisagem). */
-    --kanban-frame-max-width:1173px;
+    /* Frame responsivo do Kanban (Opção 2 — intermediário premium): toolbar + colunas
+       no mesmo eixo. frame 1450 → 4 col de ~351px → card ~329px (aspect ~0.68, retrato
+       com presença). Centralizado em telas largas, com vazio lateral mínimo (~75px/lado
+       em 1920). Não vira paisagem (Opção 3) nem ilha estreita (Opção 1). */
+    --kanban-frame-max-width:1450px;
     --kanban-col-gap:15px;
     --kanban-card-gutter:11px;
-    /* piso da coluna = largura-alvo do card+gutter. Em 1600/1920 o flex preenche o
-       frame (colunas ~282/card ~260). Em 1366 as colunas NÃO encolhem abaixo disto:
-       o card fica fiel (~258×487, aspect ~0.53, sem scroll vertical) e o Kanban
-       rola na horizontal (overflow-x controlado) — referência preservada. */
+    /* piso da coluna: preserva o card em telas estreitas sem comprimir. Em 1366 as colunas
+       NÃO encolhem abaixo disto → card fica fiel (~257×487, sem scroll vertical) e o board
+       rola na horizontal (controlado). Em 1600/1920 o flex preenche o frame (floor não pega). */
     --kanban-col-min:279px;
+  }
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html{color-scheme:dark}
