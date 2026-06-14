@@ -1,0 +1,64 @@
+{
+  "_schema": "kanban-reference-metrics v1",
+  "_source_file": "desktop/design/reference/reference-kanban-full.png",
+  "_sha256": "f61b5b95a1c9a0f92866be57d58e771ab2f579e01489ab59110d67a881046868",
+  "_measurement_method": "Pillow 11.x + NumPy. Per-row / per-column activity analysis on raster.",
+  "_origin_note": "Image is a GPT-generated render approved by the user as visual contract. Measured as raster geometry, not as CSS.",
+
+  "image": {
+    "width_px": 1118,
+    "height_px": 620,
+    "aspect_ratio_w_over_h": 1.803,
+    "color_mode": "RGBA",
+    "bytes": 737129
+  },
+
+  "background_color": {
+    "_method": "Sample of pixels (10..14, 10..14) — top-left calm area.",
+    "rgb": [4, 7, 16],
+    "hex": "#040710"
+  },
+
+  "detected_column_gaps": {
+    "_method": "Per-column count of strong content pixels (luminance>50 OR saturation>30). Quiet runs (count<15) of length >=8 are candidates for between-column gaps OR within-column empty bands.",
+    "_caveat": "Detection cannot distinguish between 'gap between columns' and 'large empty area inside an empty column'. Manual review required to map runs to actual column boundaries.",
+    "candidate_gaps": [
+      {"x_start": 0,    "x_end": 11,   "width_px": 12, "role_guess": "left margin of image"},
+      {"x_start": 173,  "x_end": 224,  "width_px": 52, "role_guess": "possibly between col-1 and col-2 OR inside an empty column"},
+      {"x_start": 227,  "x_end": 249,  "width_px": 23, "role_guess": "ambiguous"},
+      {"x_start": 350,  "x_end": 407,  "width_px": 58, "role_guess": "ambiguous"},
+      {"x_start": 648,  "x_end": 702,  "width_px": 55, "role_guess": "ambiguous"},
+      {"x_start": 797,  "x_end": 822,  "width_px": 26, "role_guess": "ambiguous"},
+      {"x_start": 913,  "x_end": 931,  "width_px": 19, "role_guess": "ambiguous"},
+      {"x_start": 1014, "x_end": 1062, "width_px": 49, "role_guess": "possibly right-side margin/last gap"},
+      {"x_start": 1088, "x_end": 1117, "width_px": 30, "role_guess": "right margin of image"}
+    ]
+  },
+
+  "kanban_columns": {
+    "_method": "NOT directly segmented. The reference is rendered with 4 columns ('A Fazer', 'Em andamento', 'Revisão/Ajuste', 'Entregue') per the visible header text in the image.",
+    "expected_column_count": 4,
+    "exact_column_x_boundaries": "não medido (column-gap detection ambiguous; would need manual annotation or header-circle detection)",
+    "active_column_visual_treatment": "presente — coluna ativa exibe borda em gradiente colorido (visível na referência); exata cor/largura da borda não medida"
+  },
+
+  "card_within_kanban": {
+    "_method": "Reference shows ONE card in 'Em andamento'. Not extracted as a separate bbox here — use reference-task-card.png for card-level metrics.",
+    "note": "The standalone reference-task-card.png (280×532) is the source of truth for card metrics. This kanban-full image contributes overall app width and column-layout context only."
+  },
+
+  "not_measured": [
+    "exact x boundaries of each of the 4 columns",
+    "column inner padding (kbody padding)",
+    "card x-position within active column",
+    "header bar geometry above the kanban",
+    "sidebar geometry (image may be a kanban-only crop — not visible if so)",
+    "exact 'kcol-live' border gradient colors and width"
+  ],
+
+  "measurement_limitations": [
+    "GPT-generated image may not be pixel-faithful to real CSS rendering — measurements describe the reference render, not the DOM.",
+    "Column-gap detection is ambiguous: empty columns produce large quiet bands that look identical to inter-column gaps.",
+    "Full Kanban metrics at sub-column granularity require manual annotation, not automated raster scanning."
+  ]
+}

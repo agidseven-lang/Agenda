@@ -1,0 +1,97 @@
+{
+  "_schema": "card-reference-metrics v1",
+  "_source_file": "desktop/design/reference/reference-task-card.png",
+  "_sha256": "b43045910a956312c1333559ca9d30b2ffce4ea96c5f51b466727318775345cf",
+  "_measurement_method": "Pillow 11.x (Python 3.11) + NumPy. Pixel-level analysis. No OCR, no manual annotation, no estimation by memory.",
+  "_origin_note": "Image is a GPT-generated render approved by the user as visual contract. It is NOT a screenshot of an existing app, therefore exact CSS/em values are not recoverable; we measure raster geometry only.",
+
+  "image": {
+    "width_px": 280,
+    "height_px": 532,
+    "aspect_ratio_w_over_h": 0.5263,
+    "color_mode": "RGBA",
+    "bytes": 193770
+  },
+
+  "card_outer": {
+    "_method": "Background = mean RGB of pixels (0..3, 0..3). Card body = pixels with color distance > 8 from background, measured per row across all 532 rows.",
+    "background_color_rgb": [5, 9, 19],
+    "background_color_hex": "#050913",
+    "card_body_left_x_median_px": 7,
+    "card_body_right_x_median_px": 276,
+    "card_body_width_median_px": 270,
+    "card_body_top_y_first_solid_px": 14,
+    "card_body_bottom_y_last_solid_px": 522,
+    "card_body_height_solid_px": 509,
+    "image_margin_top_px": 0,
+    "image_margin_bottom_px": 10,
+    "image_margin_left_px_median": 7,
+    "image_margin_right_px_median": 3,
+    "corner_radius_estimate_px": "≈12 (left edge transitions from x=14 at y=0 to x=7 at y=12; symmetric on right). NOT measured by curve fit — estimated from edge transition only.",
+    "border_thickness_px": "não medido (1px border invisible against gradient at this resolution)",
+    "border_color": "não medido",
+    "shadow_glow": "não medido (image has no transparent halo around card; if glow exists, it is part of the bg)"
+  },
+
+  "detected_inter_block_gaps": {
+    "_method": "Per-row count of 'strong content' pixels (luminance>120 OR saturation>60). Quiet runs (strong<4) of length >=3 are inter-block separators. Coordinates are absolute y from image top.",
+    "gaps": [
+      {"y_start": 0,   "y_end": 11,  "length_px": 12, "role": "top_margin_above_header"},
+      {"y_start": 41,  "y_end": 64,  "length_px": 24, "role": "between_header_pills_and_avatar"},
+      {"y_start": 149, "y_end": 166, "length_px": 18, "role": "between_avatar_name_role_and_enviado_por"},
+      {"y_start": 186, "y_end": 203, "length_px": 18, "role": "inside_or_after_enviado_por_box"},
+      {"y_start": 255, "y_end": 276, "length_px": 22, "role": "between_title_chips_block_and_rail"},
+      {"y_start": 314, "y_end": 337, "length_px": 24, "role": "between_etapa_proxima_and_temas"},
+      {"y_start": 410, "y_end": 426, "length_px": 17, "role": "between_temas_and_checklist_or_date"},
+      {"y_start": 432, "y_end": 449, "length_px": 18, "role": "between_checklist_date_and_footer_buttons"},
+      {"y_start": 504, "y_end": 519, "length_px": 16, "role": "bottom_margin_below_footer"},
+      {"y_start": 522, "y_end": 531, "length_px": 10, "role": "image_bottom_margin"}
+    ]
+  },
+
+  "blocks_approximate_yband": {
+    "_method": "Y-bands inferred from gap detection above. Each block sits between two detected gaps. Y values are inclusive. THESE ARE APPROXIMATIONS, not segmentation-grade.",
+    "_caveat": "Without per-pixel segmentation or OCR, exact x positions and widths of internal sub-elements are NOT measured.",
+    "01_card_outer":          { "x": 7, "y_top": 14, "x_right": 276, "y_bottom": 522, "width": 270, "height": 509 },
+    "02_header_status_due":   { "y_top": 12, "y_bottom": 40,  "approx_height": 29,  "x_layout": "two pills, status left + due right, justify-space-between" },
+    "03_avatar_name_role":    { "y_top": 65, "y_bottom": 148, "approx_height": 84,  "notes": "avatar circle ~y65..145; name 2 lines + role"},
+    "04_enviado_por_box":     { "y_top": 167, "y_bottom": 209, "approx_height": 43, "notes": "dark inner box with icon + Enviado por + author + date"},
+    "05_cliente_label":       { "y_top": "não medido (vazio no print de referência)", "notes": "Not visible in reference render — block may be absent or empty in this fixture"},
+    "06_title":               { "y_top": 220, "y_bottom": 254, "approx_height": 35,  "notes": "ULTRA label above + bold title 'Cronograma semanal'"},
+    "07_chips":               { "y_top": 277, "y_bottom": 313, "approx_height": 37,  "notes": "3 chips wrap row: Em produção / Cronograma / Semanal"},
+    "08_progress_rail":       { "y_top": 338, "y_bottom": 355, "approx_height": 18,  "notes": "dots + connecting line"},
+    "09_etapa_proxima":       { "y_top": 356, "y_bottom": 409, "approx_height": 54,  "notes": "'P SUA ETAPA Em produção' + 'PRÓXIMA Finalizar e entregar'"},
+    "10_temas_box":           { "y_top": 350, "y_bottom": 449, "approx_height": 100, "notes": "Box header 'TEMAS' + 3 rows (Tema 1 / 2 / 3 corrigido) + check circles right"},
+    "11_checklist_text":      { "y_top": 450, "y_bottom": 470, "approx_height": 21,  "notes": "'0 de 5 no checklist' single line"},
+    "12_date":                { "y_top": "merged with 11 in detection — não separável sem OCR", "approx_height": "não medido" },
+    "13_footer_buttons":      { "y_top": 472, "y_bottom": 503, "approx_height": 32,  "notes": "Detalhes (gradient) + Mover + ⋯ — 3 buttons row, height ~32px"},
+    "14_border_glow_shadow":  "não medido como camada separada (image flatten)",
+    "15_icons":               "não medido individualmente (requires OCR/symbol detection)",
+    "16_menu_dots":           "ícone ⋯ visível no rodapé; menu flutuante por definição não está aberto na referência"
+  },
+
+  "color_samples_sparse": {
+    "_method": "Direct pixel reads at probed coordinates. Many probes hit card-background instead of intended element due to lack of segmentation. Reporting only colors that are unambiguously content.",
+    "background_outside_card_hex": "#050913",
+    "card_body_calm_area_hex": "#0A0E1C",
+    "button_detalhes_gradient_sample_hex": "#3B36F6",
+    "other_chip_and_text_colors": "não medido com confiança sem segmentação manual"
+  },
+
+  "not_measured": [
+    "exact px-level position of each sub-element within a block",
+    "exact font sizes (image is raster; no metadata)",
+    "exact border-radius (no curve fit performed)",
+    "shadow/glow extent (no alpha halo in image)",
+    "chip backgrounds and text colors (sampling unreliable without segmentation)",
+    "icon stroke widths and sizes",
+    "exact gap between each pair of adjacent elements at sub-block level"
+  ],
+
+  "measurement_limitations": [
+    "Reference image is 280×532 RGBA. Card occupies essentially the entire image with no transparent halo, so 'glow' / 'shadow' cannot be measured as a separate layer.",
+    "GPT-generated renders may contain non-pixel-perfect blocks (rendered text rather than from a real DOM); measurements are of the rendered raster, not of CSS values.",
+    "All y-bands for blocks 02..13 are inferred from inter-block gap detection. They are approximate (±a few px) and should be used as a coarse vertical layout contract, not as a sub-pixel spec.",
+    "X-positions of internal elements were NOT systematically measured (would require per-block segmentation)."
+  ]
+}
