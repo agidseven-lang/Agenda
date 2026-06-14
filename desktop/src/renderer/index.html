@@ -23,6 +23,17 @@
     --d-maxw:1400px;     /* desktop content cap */
     --d-side:216px;      /* desktop sidebar width (referência medida) */
     --d-topbar:64px;     /* desktop topbar height */
+    /* Frame responsivo do Kanban (Proposta A): toolbar + colunas no mesmo eixo.
+       frame 1173 → 4 col de ~282px → card ~260px (aspect ~0.534 ≈ referência 0.530).
+       Em telas largas o frame fica centralizado (não estica e não vira paisagem). */
+    --kanban-frame-max-width:1173px;
+    --kanban-col-gap:15px;
+    --kanban-card-gutter:11px;
+    /* piso da coluna = largura-alvo do card+gutter. Em 1600/1920 o flex preenche o
+       frame (colunas ~282/card ~260). Em 1366 as colunas NÃO encolhem abaixo disto:
+       o card fica fiel (~258×487, aspect ~0.53, sem scroll vertical) e o Kanban
+       rola na horizontal (overflow-x controlado) — referência preservada. */
+    --kanban-col-min:279px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html{color-scheme:dark}
@@ -409,7 +420,9 @@
      SÓ quando a janela realmente não comporta 4 colunas confortáveis (≥300px). */
   body.desktop #content.board-mode > *{max-width:none}
   body.desktop #content.board-mode > .scr-head{flex:none;width:100%}
-  body.desktop #content.board-mode > .scr{flex:1 1 auto;min-height:0;width:100%;display:flex;flex-direction:column;overflow:visible}
+  /* FRAME do Kanban: toolbar + colunas no MESMO container, com teto e centralizado.
+     Setores (na toolbar) fica alinhado à última coluna por construção (mesmo frame). */
+  body.desktop #content.board-mode > .scr{flex:1 1 auto;min-height:0;width:100%;max-width:var(--kanban-frame-max-width);margin-inline:auto;display:flex;flex-direction:column;overflow:visible}
   body.desktop #content.board-mode .d-board-tools{flex:none}
   body.desktop #content.board-mode{padding-top:19px!important}
   /* referência: sem faixa de topbar nos quadros — só o avatar flutua à direita */
@@ -475,14 +488,14 @@
      Eixo esquerdo do board = eixo da busca/filtros (sem centralização).
      Sem zoom/transform — escopo exclusivo do quadro. */
   body.desktop #content.board-mode .kanban{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;
-    gap:15px;align-items:stretch}
+    gap:var(--kanban-col-gap);align-items:stretch}
   /* HORIZONTAL (autorizado): colunas PREENCHEM a largura útil — flex:1 distribui 100% e a
      última coluna alinha com o eixo direito da toolbar (botão "Setores"). max-width:none
      remove o teto que deixava sobra à direita em monitor largo. min-width preserva o
      scroll-x controlado em telas estreitas. */
-  body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:232px;max-width:none}
-  /* referência: a coluna EM FOCO (com cards) respira mais que as vazias */
-  body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.16 1 0;max-width:none}
+  body.desktop #content.board-mode .kanban .kcol{flex:1 1 0;min-width:var(--kanban-col-min);max-width:none}
+  /* Frame A: colunas iguais (referência). A coluna ativa NÃO é mais larga que as vazias. */
+  body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1 1 0;max-width:none}
   /* Reprovação 1.0.138: coluna NÃO estica até o chão — cresce só até caber na janela
      (max-height). Coluna com 1 card = card inteiro, sem scrollbar interna. Com vários
      cards, SÓ o .kbody rola, com barra fina/discreta afastada dos cards. */

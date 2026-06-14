@@ -1239,8 +1239,18 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   })();
   check('CY5_KANBAN_MINW','Kanban: coluna com largura mínima REAL (300px) + scroll horizontal do board (nunca espremer)',
     /grid-template-columns:repeat\(4,minmax\(300px,1fr\)\)/.test(DH) && /\.kanban\{[\s\S]{0,300}overflow-x:auto/.test(DH) && /\.kanban \.kcol\{min-width:300px\}/.test(DH));
-  check('CY5_KANBAN_BOARDMODE','board-mode (referência): flex gap 15, altura IGUAL, coluna EM FOCO 1.16x mais larga',
-    /display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;\s*\n\s*gap:15px;align-items:stretch\}/.test(DH) && /\.kcol\.kcol-live\{flex:1\.16 1 0;max-width:none\}/.test(DH));
+  check('CY5_KANBAN_BOARDMODE','board-mode (Proposta A): Kanban flex + gap por TOKEN (computado=15px) + 4 colunas IGUAIS (ativa NÃO mais larga)',
+    /\.kanban\{display:flex;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;\s*\n\s*gap:var\(--kanban-col-gap\);align-items:stretch\}/.test(DH) &&
+    /--kanban-col-gap:15px/.test(DH) &&
+    /\.kanban \.kcol\{flex:1 1 0;min-width:var\(--kanban-col-min\);max-width:none\}/.test(DH) &&
+    /--kanban-col-min:279px/.test(DH) &&
+    /\.kcol\.kcol-live\{flex:1 1 0;max-width:none\}/.test(DH));
+  check('CY5_KANBAN_FRAME','Proposta A: FRAME compartilhado (.scr) com max-width tokenizado + centralizado (margin-inline:auto); toolbar+Kanban no MESMO eixo; abas/Setores à direita (justify-content:flex-end); card SEM max-width isolado',
+    /--kanban-frame-max-width:1173px/.test(DH) &&
+    /#content\.board-mode > \.scr\{[^}]*max-width:var\(--kanban-frame-max-width\);margin-inline:auto/.test(DH) &&
+    /class="scr"[^>]*>'\+boardToolbar\(\)\+'<div class="kanban"/.test(DH) &&
+    /\.d-board-tools\.tbar \.tchips\{[^}]*justify-content:flex-end\}/.test(DH) &&
+    !/\.kbody>\.tc\.tcv4\{width:100%;max-width:260px;align-self:center\}/.test(DH));
   if(mod&&mod.designerStatusView){
     const DT={sector:'cronograma',cronContents:[{tema:'T'}],clientFlowStatus:'producao',designerAssignment:{designerId:'d'},designerFlowStatus:'andamento'};
     check('CY5_DESIGNER_TOPCHIP','Chip do card do designer = EXATAMENTE "Designer em produção" (fonte designerStatusView)', mod.designerStatusView(DT).label==='Designer em produção');
@@ -1308,7 +1318,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     /\.tcv4-step b\{font-size:11px;font-weight:740;min-width:0;white-space:normal;display:-webkit-box;-webkit-line-clamp:2/.test(DH));
   check('CY8_LAUDO_141','Laudo 1.0.141: perfil flex:none (não estica) + coluna com teto de largura + popover ⋯ FIXED ancorado (nunca cortado)',
     /\.sb-user\{display:flex !important;flex:none !important/.test(DH) &&
-    /\.kanban \.kcol\{flex:1 1 0;min-width:232px;max-width:none\}/.test(DH) && /\.kcol\.kcol-live\{flex:1\.16 1 0;max-width:none\}/.test(DH) &&
+    /\.kanban \.kcol\{flex:1 1 0;min-width:var\(--kanban-col-min\);max-width:none\}/.test(DH) && /\.kcol\.kcol-live\{flex:1 1 0;max-width:none\}/.test(DH) &&
     /\.tcv4-menu\{display:none;position:fixed;z-index:80;min-width:198px/.test(DH) &&
     DH.indexOf("m.style.left=((lf-c0.left)/kx)+'px';m.style.top=((tp-c0.top)/ky)+'px';")>=0 &&
     DH.indexOf('document.body.appendChild(m);m.classList.add(\'open\');')>=0 &&
