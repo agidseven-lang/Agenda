@@ -1,9 +1,8 @@
-Kanban visual reference assets
-
-These PNG files are the user-provided GPT-enhanced visual references to be used as the golden reference for the Kanban/card visual comparison.
+Definitive visual reference assets for Agenda ID Seven Kanban/Card visual audit.
 
 Files:
-- reference-kanban-full.png: full Kanban/app reference
-- reference-task-card.png: cropped task-card reference
+- reference-app-full.png: full-screen app reference (macro-layout reference).
+- reference-kanban-frame.png: prior GPT-enhanced Kanban frame/card reference crop.
+- reference-task-card.png: task card crop reference.
 
-Use only for measurement/comparison. Do not treat these as production code.
+Use these files as the only official visual reference package. Measure them as visual models, not as immutable pixel-perfect app dimensions.
