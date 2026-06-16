@@ -5119,64 +5119,156 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   if(uid){try{const doc=await db.collection('users').doc(uid).get();if(doc.exists){startApp(Object.assign({id:doc.id},doc.data()));return;}}catch(_){}clearSession();}
 })();
 
-/* ════════ DIAGNÓSTICO TEMPORÁRIO READ-ONLY (Ctrl+Shift+D) — removível ════════
-   SOMENTE LEITURA: lê DOM + state e copia um JSON para a área de transferência.
-   NÃO escreve em Firestore, NÃO chama Worker, NÃO envia notificação, NÃO altera
-   estado do app, NÃO apaga nada. Clipboard via textarea+execCommand (contextIsolation
-   não dá require no renderer). Bloco isolado — basta removê-lo para desinstalar. */
+/* ════════ IN-APP-DIAGNOSTIC-V1 — overlay visual READ-ONLY (Ctrl+Shift+D / #debug-board) ════════
+   SOMENTE LEITURA: mede o DOM real em runtime e DESENHA caixas/linhas + medidas na tela
+   do proprio app instalado. NAO escreve em Firestore, NAO chama Worker, NAO notifica, NAO
+   altera estado, NAO cria/move/apaga tarefa, NAO muda regra de negocio. Sem zoom. Bloco
+   isolado e removivel. Tambem copia um JSON para a area de transferencia (debug). */
 (function(){
-  function _r(el){if(!el)return null;var r=el.getBoundingClientRect();return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height),right:Math.round(r.right),bottom:Math.round(r.bottom)};}
+  var ON=false, NODE=null, RAF=0;
+  function _r(el){if(!el)return null;var r=el.getBoundingClientRect();return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height),right:Math.round(r.right),bottom:Math.round(r.bottom),top:Math.round(r.top),left:Math.round(r.left)};}
   function _copy(s){try{var ta=document.createElement('textarea');ta.value=s;ta.style.position='fixed';ta.style.left='-9999px';ta.style.top='0';document.body.appendChild(ta);ta.focus();ta.select();var ok=document.execCommand('copy');document.body.removeChild(ta);if(ok)return true;}catch(_){}try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s);return true;}}catch(_){}return false;}
-  function _diag(){
+  /* coleta TODAS as regras CSS (inclui dentro de @media cujo conditionText casa) que setam `prop` no elemento */
+  function _rulesFor(el,prop){
+    var out=[];
+    function scan(rules){
+      if(!rules)return;
+      for(var j=0;j<rules.length;j++){var rule=rules[j];
+        if(rule.type===4){ /* @media */ try{ if(window.matchMedia(rule.conditionText).matches) scan(rule.cssRules); }catch(_){} continue; }
+        if(rule.type!==1)continue;
+        var val; try{val=rule.style.getPropertyValue(prop);}catch(_){val='';}
+        if(!val)continue;
+        try{ if(el.matches(rule.selectorText)) out.push({sel:rule.selectorText,val:val,imp:rule.style.getPropertyPriority(prop)==='important'}); }catch(_){}
+      }
+    }
+    for(var i=0;i<document.styleSheets.length;i++){var rs;try{rs=document.styleSheets[i].cssRules;}catch(_){continue;}scan(rs);}
+    return out;
+  }
+  function _spec(sel){/* especificidade aproximada [ids, classes/attrs/pseudo-classes, elementos] */
+    try{var s=sel.replace(/::?[a-z-]+(\([^)]*\))?/gi,function(m){return /^::/.test(m)?' E ':' C ';});
+      var ids=(s.match(/#[\w-]+/g)||[]).length;
+      var cls=(s.match(/\.[\w-]+|\[[^\]]*\]|\bC\b/g)||[]).length;
+      var els=(s.match(/(^|[\s>+~])[a-z][\w-]*/gi)||[]).length;
+      return ids*10000+cls*100+els;}catch(_){return 0;}
+  }
+  function _winner(el,prop){var m=_rulesFor(el,prop);if(!m.length)return null;
+    /* ordena por [!important, especificidade, ordem de aparicao] — espelha o cascade real */
+    var idx=0;m.forEach(function(x){x._i=idx++;x._s=_spec(x.sel);});
+    var sorted=m.slice().sort(function(a,b){if(a.imp!==b.imp)return a.imp?1:-1;if(a._s!==b._s)return a._s-b._s;return a._i-b._i;});
+    var w=sorted[sorted.length-1];return {selector:w.sel,value:w.val,important:w.imp,totalMatches:m.length};}
+  function _box(parent,x,y,w,h,color,label,labelTop){
+    var b=document.createElement('div');
+    b.style.cssText='position:fixed;left:'+x+'px;top:'+y+'px;width:'+Math.max(0,w)+'px;height:'+Math.max(0,h)+'px;border:2px solid '+color+';box-sizing:border-box;pointer-events:none;z-index:2147483600;border-radius:3px';
+    if(label){var t=document.createElement('div');t.textContent=label;
+      t.style.cssText='position:absolute;'+(labelTop?'top:-18px':'bottom:-18px')+';left:0;font:700 11px/1.2 ui-monospace,Menlo,Consolas,monospace;color:#fff;background:'+color+';padding:1px 5px;border-radius:3px;white-space:nowrap';
+      b.appendChild(t);}
+    parent.appendChild(b);return b;
+  }
+  function _fill(parent,x,y,w,h,color,label){
+    var b=document.createElement('div');
+    b.style.cssText='position:fixed;left:'+x+'px;top:'+y+'px;width:'+Math.max(0,w)+'px;height:'+Math.max(0,h)+'px;background:'+color+';pointer-events:none;z-index:2147483590;display:flex;align-items:center;justify-content:center';
+    if(label){var t=document.createElement('div');t.textContent=label;t.style.cssText='font:800 13px/1.2 ui-monospace,Menlo,Consolas,monospace;color:#fff;text-shadow:0 1px 3px #000';b.appendChild(t);}
+    parent.appendChild(b);return b;
+  }
+  function draw(){
+    if(NODE){NODE.remove();NODE=null;}
+    var board=document.querySelector('.kanban');
+    var live=document.querySelector('.kcol.kcol-live')||document.querySelector('.kcol');
+    if(!board||!live)return;
+    var kb=live.querySelector('.kbody');
+    var card=kb&&kb.querySelector('.tc.tcv4, .tc');
+    var foot=card&&card.querySelector('.tcv4-foot');
+    NODE=document.createElement('div');NODE.id='diagOverlay';NODE.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483580';
+    document.body.appendChild(NODE);
+    var br=_r(board),lr=_r(live),kr=kb&&_r(kb),cr=card&&_r(card),fr=foot&&_r(foot);
+    _box(NODE,br.x,br.y,br.w,br.h,'#3B82F6','BOARD '+br.w+'x'+br.h,true);
+    _box(NODE,lr.x,lr.y,lr.w,lr.h,'#EF4444','COLUNA ATIVA '+lr.w+'x'+lr.h,true);
+    if(kr)_box(NODE,kr.x,kr.y,kr.w,kr.h,'#F59E0B','kbody '+kr.w+'x'+kr.h,false);
+    if(cr)_box(NODE,cr.x,cr.y,cr.w,cr.h,'#A855F7','CARD '+cr.w+'x'+cr.h,true);
+    if(fr)_box(NODE,fr.x,fr.y,fr.w,fr.h,'#22D3EE','foot',false);
+    /* AREA VAZIA INFERIOR: do bottom do card ate o bottom da coluna ativa */
+    if(cr){var gapH=lr.bottom-cr.bottom; if(gapH>0)_fill(NODE,cr.x,cr.bottom,cr.w,gapH,'rgba(239,68,68,.45)',(gapH)+'px VAZIO');}
+    /* painel de metricas */
+    var panel=document.createElement('div');
+    panel.style.cssText='position:fixed;top:8px;right:8px;max-width:420px;max-height:94vh;overflow:auto;background:rgba(8,10,18,.96);border:1px solid #334;border-radius:10px;padding:12px 14px;z-index:2147483647;font:600 12px/1.5 ui-monospace,Menlo,Consolas,monospace;color:#E5E9F5;pointer-events:auto;box-shadow:0 16px 40px -12px #000';
+    var cards=kb?[].slice.call(kb.children).filter(function(el){return el.classList&&(el.classList.contains('tcv4')||el.classList.contains('tc'));}):[];
+    var ccs=card?getComputedStyle(card):null;
+    var kcs=kb?getComputedStyle(kb):null;
+    var wFlex=card?_winner(card,'flex-grow'):null;
+    var wMinH=card?_winner(card,'min-height'):null;
+    var wKbPad=kb?_winner(kb,'padding-bottom'):null;
+    var wCardPad=card?_winner(card,'padding-bottom'):null;
+    var ver=null;try{ver=APP_VER.desktop;}catch(_){}
+    function row(k,v){return '<div style="display:flex;gap:8px;justify-content:space-between"><span style="color:#9aa3bd">'+k+'</span><span style="color:#fff;text-align:right">'+v+'</span></div>';}
+    var gapCardKb=(cr&&kr)?(kr.bottom-cr.bottom):'-';
+    var gapCardLive=(cr&&lr)?(lr.bottom-cr.bottom):'-';
+    var gapFootCard=(cr&&fr)?(cr.bottom-fr.bottom):'-';
+    panel.innerHTML=
+      '<div style="font:800 13px/1.4 ui-monospace;color:#7DD3FC;margin-bottom:6px">IN-APP-DIAGNOSTIC-V1 · '+(ver||'?')+'</div>'+
+      '<div style="color:#FCA5A5;font-weight:800;margin-bottom:6px">VAZIO cardBottom→colunaBottom = '+gapCardLive+'px</div>'+
+      row('viewport', innerWidth+'x'+innerHeight+' dpr'+devicePixelRatio)+
+      row('coluna ativa h', lr.h)+
+      row('kbody h / clientH', (kr?kr.h:'-')+' / '+(kb?kb.clientHeight:'-'))+
+      row('card h', cr?cr.h:'-')+
+      row('card top / bottom', (cr?cr.top:'-')+' / '+(cr?cr.bottom:'-'))+
+      row('coluna bottom', lr.bottom)+
+      row('gap card→kbody', gapCardKb+'px')+
+      row('gap card→coluna', '<b style="color:#FCA5A5">'+gapCardLive+'px</b>')+
+      row('gap foot→cardBottom', gapFootCard+'px')+
+      row('card scrollH/clientH', card?(card.scrollHeight+'/'+card.clientHeight+(card.scrollHeight>card.clientHeight+1?' SCROLL':'')):'-')+
+      row('kbody scrollH/clientH', kb?(kb.scrollHeight+'/'+kb.clientHeight+(kb.scrollHeight>kb.clientHeight+1?' SCROLL':'')):'-')+
+      '<hr style="border-color:#223;margin:6px 0">'+
+      row('# cards na coluna', cards.length)+
+      row(':only-child bate?', card?(card.matches('.tc.tcv4:only-child')?'SIM':'NAO'):'-')+
+      row('card.className', card?('<span style="font-size:10px">'+card.className+'</span>'):'-')+
+      '<hr style="border-color:#223;margin:6px 0">'+
+      '<div style="color:#9aa3bd;margin-bottom:2px">COMPUTED (card):</div>'+
+      row('flex', ccs?ccs.flex:'-')+
+      row('flex-grow', ccs?ccs.flexGrow:'-')+
+      row('min-height', ccs?ccs.minHeight:'-')+
+      row('height', ccs?ccs.height:'-')+
+      row('padding-bottom', ccs?ccs.paddingBottom:'-')+
+      row('margin-bottom', ccs?ccs.marginBottom:'-')+
+      row('kbody padding-bottom', kcs?kcs.paddingBottom:'-')+
+      '<hr style="border-color:#223;margin:6px 0">'+
+      '<div style="color:#9aa3bd;margin-bottom:2px">CASCADE VENCEDOR:</div>'+
+      '<div style="font-size:10px;color:#fff">flex-grow: '+(wFlex?(wFlex.value+(wFlex.important?' !imp':'')+' ('+wFlex.totalMatches+' regras)<br>'+wFlex.selector):'-')+'</div>'+
+      '<div style="font-size:10px;color:#fff;margin-top:4px">min-height: '+(wMinH?(wMinH.value+(wMinH.important?' !imp':'')+'<br>'+wMinH.selector):'-')+'</div>'+
+      '<div style="font-size:10px;color:#fff;margin-top:4px">kbody pad-bottom: '+(wKbPad?(wKbPad.value+(wKbPad.important?' !imp':'')+'<br>'+wKbPad.selector):'-')+'</div>'+
+      '<div style="font-size:10px;color:#fff;margin-top:4px">card pad-bottom: '+(wCardPad?(wCardPad.value+(wCardPad.important?' !imp':'')+'<br>'+wCardPad.selector):'-')+'</div>'+
+      '<hr style="border-color:#223;margin:6px 0">'+
+      '<div style="color:#9aa3bd;font-size:10px">Ctrl+Shift+D p/ ligar/desligar · medidas tambem copiadas p/ clipboard</div>';
+    NODE.appendChild(panel);
+    /* clipboard JSON */
     try{
-      var kb=document.querySelector('.kanban');
-      var tb=document.querySelector('.d-board-tools,.tbar');
-      var chips=[].slice.call(document.querySelectorAll('.tchips button,.chip,button'));
-      var setores=chips.filter(function(b){return /setores/i.test((b.textContent||'').trim());})[0]||null;
-      var cols=[].slice.call(document.querySelectorAll('.kanban .kcol'));
-      var lastCol=cols.length?cols[cols.length-1]:null;
-      var colData=cols.map(function(c){
-        var head=c.querySelector('.kt');
-        var body=c.querySelector('.kbody');
-        var cards=body?[].slice.call(body.children).filter(function(el){return el.classList&&(el.classList.contains('tcv4')||el.classList.contains('tc'));}):[];
-        return {label:head?head.textContent.trim():null,classes:c.className,data:Object.assign({},c.dataset||{}),
-          rect:_r(c),nCards:cards.length,empty:cards.length===0,one:cards.length===1,many:cards.length>1,
-          bodyScroll:body?(body.scrollHeight>body.clientHeight+2):null,
-          cards:cards.map(function(cd){var fo=cd.querySelector('.tcv4-foot');return {rect:_r(cd),classes:cd.className,
-            flexGrow:getComputedStyle(cd).flexGrow,onlyChild:cd.matches('.tc.tcv4:only-child'),
-            insideBelow:_r(c)?Math.round(c.getBoundingClientRect().bottom-cd.getBoundingClientRect().bottom):null,
-            footRect:_r(fo)};})};
-      });
-      var tasks=[];try{tasks=(state&&state.tasks)||[];}catch(_){}
-      var cron=tasks.filter(function(t){try{return t.sector&&/cronograma/i.test(JSON.stringify(t.sector));}catch(_){return false;}}).map(function(t){
-        return {id:t.id,title:t.title,sector:(t.sector&&t.sector.key)||t.sector,status:t.status,cronStatus:t.cronStatus,
-          createdAt:t.createdAt,updatedAt:t.updatedAt,by:t.by,assigneeId:t.assigneeId,assignee:t.assignee,
-          designerAssignment:t.designerAssignment||null,clientFlowStatus:t.clientFlowStatus,src:t.src};});
-      var ver=null;try{ver=APP_VER.desktop;}catch(_){}
-      var st={};try{st={tab:state.tab,boardSector:state.boardSector,flowView:state.flowView,designerBoard:state.designerBoard};}catch(_){}
-      var out={
-        window:{innerWidth:innerWidth,innerHeight:innerHeight,devicePixelRatio:devicePixelRatio,
-          version:ver,state:st,ts:new Date().toISOString(),userAgentPlatform:(navigator&&navigator.platform)||null},
-        geometry:{toolbar:_r(tb),kanban:_r(kb),setores:_r(setores),
-          setoresRight:setores?Math.round(setores.getBoundingClientRect().right):null,
-          lastColRight:lastCol?Math.round(lastCol.getBoundingClientRect().right):null,
-          diffLastColSetores:(lastCol&&setores)?Math.round(setores.getBoundingClientRect().right-lastCol.getBoundingClientRect().right):null,
-          diffKanbanToolbarRight:(kb&&tb)?Math.round(tb.getBoundingClientRect().right-kb.getBoundingClientRect().right):null,
-          belowKanban:kb?Math.round(innerHeight-kb.getBoundingClientRect().bottom):null,
-          docOverflowX:document.documentElement.scrollWidth>innerWidth+1},
-        nCols:cols.length,columns:colData,cronTasks:cron
-      };
-      var json=JSON.stringify(out,null,2);
-      var ok=_copy(json);
-      try{flashToast(ok?'Diagnóstico copiado para a área de transferência':'Diagnóstico gerado (veja o console — clipboard falhou)',6000);}catch(_){}
-      try{console.log('[DIAG-READONLY]\n'+json);}catch(_){}
-    }catch(e){try{flashToast('Diagnóstico falhou: '+((e&&e.message)||'erro'),6000);}catch(_){}try{console.error('[DIAG-READONLY] erro',e);}catch(_){}}
+      var out={ver:ver,viewport:{w:innerWidth,h:innerHeight,dpr:devicePixelRatio},
+        liveH:lr.h, kbodyH:kr?kr.h:null, kbodyClientH:kb?kb.clientHeight:null, cardH:cr?cr.h:null,
+        gap_card_to_kbody:gapCardKb, gap_card_to_coluna:gapCardLive, gap_foot_to_cardBottom:gapFootCard,
+        nCards:cards.length, onlyChild:card?card.matches('.tc.tcv4:only-child'):null,
+        cardComputed:ccs?{flex:ccs.flex,flexGrow:ccs.flexGrow,minHeight:ccs.minHeight,height:ccs.height,paddingBottom:ccs.paddingBottom,marginBottom:ccs.marginBottom}:null,
+        kbodyPaddingBottom:kcs?kcs.paddingBottom:null,
+        winner_flexGrow:wFlex, winner_minHeight:wMinH, winner_kbodyPadBottom:wKbPad, winner_cardPadBottom:wCardPad};
+      _copy(JSON.stringify(out,null,2));
+      try{console.log('[IN-APP-DIAGNOSTIC-V1]\n'+JSON.stringify(out,null,2));}catch(_){}
+    }catch(_){}
+  }
+  function loop(){if(!ON)return;draw();RAF=requestAnimationFrame(function(){/* redraw on next frame only when toggled; keep light */});}
+  function toggle(force){
+    ON=(typeof force==='boolean')?force:!ON;
+    if(ON){draw();window.addEventListener('resize',draw);window.addEventListener('scroll',draw,true);
+      try{flashToast('Diagnóstico VISUAL ligado (Ctrl+Shift+D p/ desligar) — medidas copiadas',5000);}catch(_){}}
+    else{if(NODE){NODE.remove();NODE=null;}window.removeEventListener('resize',draw);window.removeEventListener('scroll',draw,true);
+      try{flashToast('Diagnóstico desligado',2500);}catch(_){}}
   }
   document.addEventListener('keydown',function(e){
-    if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='D'||e.key==='d'||e.keyCode===68)){e.preventDefault();_diag();}
+    if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='D'||e.key==='d'||e.keyCode===68)){e.preventDefault();toggle();}
   });
+  /* ativar por hash #debug-board */
+  function _hashCheck(){if(/debug-board/.test(location.hash||'')){toggle(true);}}
+  window.addEventListener('hashchange',_hashCheck);
+  setTimeout(_hashCheck,800);
 })();
-/* ════════ FIM DIAGNÓSTICO TEMPORÁRIO READ-ONLY ════════ */
+/* ════════ FIM IN-APP-DIAGNOSTIC-V1 ════════ */
 </script>
 </body>
 </html>
