@@ -454,7 +454,7 @@
   body.desktop #content.board-mode .kcol .khead{padding:6px 12px 5px}
   /* scroll-snap proximity + scroll-padding: ao rolar, o card acomoda INTEIRO com respiro —
      nunca para "decapitado" contra o header da coluna. */
-  body.desktop #content.board-mode .kcol .kbody{padding:16px 10px 4px;scroll-snap-type:y proximity;scroll-padding-top:14px}
+  body.desktop #content.board-mode .kcol .kbody{padding:16px 10px 2px;scroll-snap-type:y proximity;scroll-padding-top:14px}
   body.desktop #content.board-mode .kcol .kbody .tc{scroll-snap-align:start;scroll-margin-top:14px}
   body.desktop #content.board-mode .kcol .kbody .tc:last-child{margin-bottom:0}
 
@@ -544,7 +544,7 @@
   /* V2.3.2: card = altura natural do conteúdo (flex:0 0 auto) -> scrollHeight==clientHeight
      (ZERO overflow lógico). A escala por banda (abaixo) garante natural <= kbody (sem
      scroll-V). Respiro restante fica EXTERNO abaixo do card (na coluna). */
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:0 0 auto !important;margin-top:0 !important;margin-bottom:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:1 1 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important}
   /* ═══ CARD-LAYOUT-V2.3 — densidade interna proporcional à referência ═══
      O card cresceu para 408px (vs ref 280), mas as escalas internas continuavam
      do tamanho original — proporcionalmente 1.46x MENORES que a referência. Esta
