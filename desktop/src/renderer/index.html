@@ -27,7 +27,7 @@
        no mesmo eixo. frame 1450 → 4 col de ~351px → card ~329px (aspect ~0.68, retrato
        com presença). Centralizado em telas largas, com vazio lateral mínimo (~75px/lado
        em 1920). Não vira paisagem (Opção 3) nem ilha estreita (Opção 1). */
-    --kanban-frame-max-width:1450px;
+    --kanban-frame-max-width:1500px;
     --kanban-col-gap:15px;
     --kanban-card-gutter:11px;
     /* piso da coluna: preserva o card em telas estreitas sem comprimir. Em 1366 as colunas
@@ -414,7 +414,7 @@
      kanban ocupa o restante (flex:1 + min-height:0). As colunas têm height:100%
      e SÓ o .kbody rola — topo (header da coluna) sempre visível, base sempre
      dentro da janela, último card com respiro + scroll-margin. */
-  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:16px!important;padding-left:34px!important;padding-right:34px!important}
+  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:6px!important;padding-left:34px!important;padding-right:34px!important}
   /* Reprovação 1.0.137: o cap de 1400px deixava ~200px ociosos nas laterais enquanto as
      colunas ficavam estreitas. Nas telas de QUADRO o cap cai: o board usa a largura útil
      REAL (viewport - sidebar - 48px) — colunas largas quando há espaço; scroll horizontal
@@ -423,7 +423,7 @@
   body.desktop #content.board-mode > .scr-head{flex:none;width:100%}
   /* FRAME do Kanban: toolbar + colunas no MESMO container, com teto e centralizado.
      Setores (na toolbar) fica alinhado à última coluna por construção (mesmo frame). */
-  body.desktop #content.board-mode > .scr{flex:1 1 auto;min-height:0;width:100%;max-width:var(--kanban-frame-max-width);margin-inline:auto;display:flex;flex-direction:column;overflow:visible}
+  body.desktop #content.board-mode > .scr{flex:1 1 auto;min-height:0;width:100%;max-width:var(--kanban-frame-max-width);margin-inline:auto;display:flex;flex-direction:column;overflow:visible;padding-bottom:5px}
   body.desktop #content.board-mode .d-board-tools{flex:none}
   body.desktop #content.board-mode{padding-top:19px!important}
   /* referência: sem faixa de topbar nos quadros — só o avatar flutua à direita */
@@ -643,18 +643,15 @@
   /* Chips/status verticais em TODAS as resoluções (um abaixo do outro). */
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important}
-  /* V2.3.4: as 4 colunas com a MESMA largura (flex:1 igual em todas). O destaque
-     da coluna ativa permanece visual (border-gradient + box-shadow já existente
-     em .kcol.kcol-live), nunca por largura. */
-  @media (min-height:1000px){
-    body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1 1 0 !important}
-  }
-  @media (min-height:850px) and (max-height:999px){
-    body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1 1 0 !important}
-  }
-  @media (max-height:849px){
-    body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1 1 0 !important}
-  }
+  /* REFERENCE-LOCK-V1.1: larguras das colunas seguem o MAPA da referencia (medido
+     na reference-app-full.png): col1~302, col2(ativa)~388, col3~331, col4~389.
+     NAO sao iguais. flex-basis:0 (da regra base) + flex-grow proporcional por posicao
+     reproduz a relacao visual (col1 menor, col2/col4 dominantes, col3 intermediaria).
+     A coluna ativa (kcol-live) mantem so o realce visual (borda/sombra), nao largura. */
+  body.desktop #content.board-mode .kanban .kcol:nth-child(1){flex-grow:0.80}
+  body.desktop #content.board-mode .kanban .kcol:nth-child(2){flex-grow:1.00}
+  body.desktop #content.board-mode .kanban .kcol:nth-child(3){flex-grow:0.86}
+  body.desktop #content.board-mode .kanban .kcol:nth-child(4){flex-grow:1.00}
 @media (min-height:1000px){
  body.desktop #content.board-mode .kanban .kcol .kbody{padding-left:5px !important;padding-right:5px !important}
  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4{padding:17px 14px 15px !important}
@@ -710,31 +707,29 @@
  .tcv4 .tcv4-btn{height:31px !important}.tcv4-date{padding-top:8px !important}
  .tcv4-name{line-height:1.4 !important}.tcv4-title{line-height:1.4 !important}.tcv4-step{margin-top:3px !important}}
 
-  /* ═══ CARD-V2.3.5 — colunas iguais + quadro proporcional ao card (sem buraco interno) ═══
-     4 colunas com a MESMA largura E mesma altura. O QUADRO encolhe para a altura do
-     card (.kanban flex:0 1 auto) em vez de esticar o card até o rodapé da janela —
-     sobra de altura vai PARA FORA do quadro (abaixo dele), nunca para dentro do card.
-     Card com aspect natural ~0.52-0.58 por banda (fiel à referência). Escala interna
-     reduzida vs V2.3.4 para a altura natural do card bater o aspect-alvo. */
-  /* V2.3.5 estrutural: o QUADRO encolhe para o conteudo (flex:0 1 auto) em vez de
-     preencher a janela (flex:1). 1 card => quadro proporcional ao card + espaco
-     abaixo; muitos cards => min-height:0 deixa o quadro caber na janela e SO o
-     .kbody rolar (sem corte, sem scroll de pagina). Colunas seguem iguais. */
-  body.desktop #content.board-mode .kanban{flex:0 1 auto !important}
+  /* ═══ CARD-REFERENCE-LOCK-V1 — alinhamento ao mapa real da referencia ═══
+     A reference-app-full.png (1796x1018) tem: board top=216, board bot=1013 (h=797,
+     78% da viewport) e a coluna ativa (388 wide) com card de 707 alto (rel_h ~0.89,
+     aspect ~0.55). V2.3.5 reproduzia o aspect mas encolhia o board (flex:0 1 auto),
+     deixando 109px vazios embaixo. REFERENCE-LOCK restaura board flex:1 1 auto (board
+     preenche a viewport como no mapa), nao impoe colunas iguais (coluna ativa com
+     leve dominancia: flex-grow 1.10) e aumenta a respiracao interna do card para a
+     altura natural se aproximar do mapa (~720 alto, com ~75px de sobra abaixo do
+     card dentro do .kbody, como na referencia). */
 @media (min-height:1040px){
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:15px 16px 11px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:13.5px !important;padding:4px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:9px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:18px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:18px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:65px !important;height:65px !important;font-size:23px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:18px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:13px !important}
@@ -759,16 +754,16 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:13px 15px 8px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:13.5px !important;padding:4px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:11px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:11px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:17px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:17px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:65px !important;height:65px !important;font-size:23px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:18px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:13px !important}
@@ -793,16 +788,16 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:11px 14px 5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:4px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:12.5px !important;padding:3px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:9px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:9px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:12px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:12px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:58px !important;height:58px !important;font-size:21px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:17px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:12px !important}
@@ -827,16 +822,16 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:9px 13px 4px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:3px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:12px !important;padding:3px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:4px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:4px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:5px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:5px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:52px !important;height:52px !important;font-size:19px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:16px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:11.5px !important}

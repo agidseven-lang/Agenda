@@ -1246,7 +1246,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     /--kanban-col-min:279px/.test(DH) &&
     /\.kcol\.kcol-live\{flex:1 1 0;max-width:none\}/.test(DH));
   check('CY5_KANBAN_FRAME','Proposta A: FRAME compartilhado (.scr) com max-width tokenizado + centralizado (margin-inline:auto); toolbar+Kanban no MESMO eixo; abas/Setores à direita (justify-content:flex-end); card SEM max-width isolado',
-    /--kanban-frame-max-width:1450px/.test(DH) &&
+    /--kanban-frame-max-width:1500px/.test(DH) &&
     /#content\.board-mode > \.scr\{[^}]*max-width:var\(--kanban-frame-max-width\);margin-inline:auto/.test(DH) &&
     /class="scr"[^>]*>'\+boardToolbar\(\)\+'<div class="kanban"/.test(DH) &&
     /\.d-board-tools\.tbar \.tchips\{[^}]*justify-content:flex-end\}/.test(DH) &&
