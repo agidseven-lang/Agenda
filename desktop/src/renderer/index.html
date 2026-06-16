@@ -545,6 +545,14 @@
      (ZERO overflow lógico). A escala por banda (abaixo) garante natural <= kbody (sem
      scroll-V). Respiro restante fica EXTERNO abaixo do card (na coluna). */
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:1 1 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important}
+  /* ═══ SINGLE-CARD-DOM-LOCK — preenchimento por classe REAL (não :only-child) ═══
+     Quando JS marca a .kbody com .kbody-single-card (=existe exatamente 1 .tc.tcv4 real),
+     o card preenche TODA a altura util da kbody e a kbody zera o padding-bottom — o card
+     toca a borda inferior da coluna, eliminando o vazio visivel. Robusto contra
+     placeholders/drop-zones/ghost-nodes (a contagem so olha .tc.tcv4 reais). Maior
+     especificidade que as regras :only-child anteriores (vence o cascade). */
+  body.desktop #content.board-mode .kcol .kbody.kbody-single-card{padding-bottom:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody.kbody-single-card>.tc.tcv4{flex:1 1 auto !important;min-height:0 !important;height:100% !important;margin-top:0 !important;margin-bottom:0 !important}
   /* ═══ CARD-LAYOUT-V2.3 — densidade interna proporcional à referência ═══
      O card cresceu para 408px (vs ref 280), mas as escalas internas continuavam
      do tamanho original — proporcionalmente 1.46x MENORES que a referência. Esta
@@ -5118,6 +5126,52 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   const uid=localStorage.getItem('wp_uid');
   if(uid){try{const doc=await db.collection('users').doc(uid).get();if(doc.exists){startApp(Object.assign({id:doc.id},doc.data()));return;}}catch(_){}clearSession();}
 })();
+
+/* ════════ SINGLE-CARD-DOM-LOCK ═══════════════════════════════════════════════════
+   Marca cada .kbody que contem EXATAMENTE 1 .tc.tcv4 real com a classe
+   .kbody-single-card. A CSS que faz o card preencher a coluna passa a depender
+   dessa classe (nao mais de :only-child) — robusto contra placeholders/drop-zones/
+   ghost nodes que possam aparecer entre o card e a kbody em runtime.
+   READ-ONLY no DOM (so adiciona/remove uma classe na .kbody). Nao toca dados,
+   nao chama Firestore/Worker, nao cria/move/apaga tarefa, nao notifica, sem zoom. */
+(function(){
+  function isRealCard(el){return !!(el&&el.classList&&el.classList.contains('tc')&&el.classList.contains('tcv4'));}
+  function syncSingleCardBodies(){
+    try{
+      var kbs=document.querySelectorAll('.kanban .kcol .kbody');
+      for(var i=0;i<kbs.length;i++){var kb=kbs[i],n=0;
+        for(var j=0;j<kb.children.length;j++){if(isRealCard(kb.children[j]))n++;}
+        kb.classList.toggle('kbody-single-card', n===1);
+      }
+    }catch(_){}
+  }
+  /* MutationObserver no #content: pega re-renders (innerHTML rebuild) e qualquer
+     mutação posterior (drag-drop, ghost-node, modais sobre o board, etc.). */
+  var _scheduled=false;
+  function schedule(){if(_scheduled)return;_scheduled=true;
+    (window.requestAnimationFrame||function(f){return setTimeout(f,16);})(function(){_scheduled=false;syncSingleCardBodies();});}
+  var _mo=null;
+  function ensureObserver(){
+    if(_mo)return;
+    var root=document.getElementById('content')||document.body;
+    try{_mo=new MutationObserver(schedule);_mo.observe(root,{childList:true,subtree:true});}catch(_){}
+  }
+  /* hook seguro em render() — passa o retorno original, sem alterar comportamento */
+  function hookRender(){
+    if(typeof window.render!=='function')return false;
+    if(window.render.__singleCardHooked)return true;
+    var _orig=window.render;
+    window.render=function(){var r=_orig.apply(this,arguments);schedule();ensureObserver();return r;};
+    window.render.__singleCardHooked=true;
+    return true;
+  }
+  /* tenta hook imediatamente; se render ainda nao existe, retenta */
+  if(!hookRender()){var _tries=0;var _iv=setInterval(function(){_tries++;if(hookRender()||_tries>40){clearInterval(_iv);ensureObserver();schedule();}},100);}
+  /* sync inicial */
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){ensureObserver();schedule();});
+  else{ensureObserver();schedule();}
+})();
+/* ════════ FIM SINGLE-CARD-DOM-LOCK ═══════════════════════════════════════════════ */
 
 /* ════════ IN-APP-DIAGNOSTIC-V1 — overlay visual READ-ONLY (Ctrl+Shift+D / #debug-board) ════════
    SOMENTE LEITURA: mede o DOM real em runtime e DESENHA caixas/linhas + medidas na tela
