@@ -544,7 +544,7 @@
   /* V2.3.2: card = altura natural do conteúdo (flex:0 0 auto) -> scrollHeight==clientHeight
      (ZERO overflow lógico). A escala por banda (abaixo) garante natural <= kbody (sem
      scroll-V). Respiro restante fica EXTERNO abaixo do card (na coluna). */
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:1 1 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:0 0 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important}
   /* ═══ SINGLE-CARD-DOM-LOCK — preenchimento por classe REAL (não :only-child) ═══
      Quando JS marca a .kbody com .kbody-single-card (=existe exatamente 1 .tc.tcv4 real),
      o card preenche TODA a altura util da kbody e a kbody zera o padding-bottom — o card
@@ -552,15 +552,14 @@
      placeholders/drop-zones/ghost-nodes (a contagem so olha .tc.tcv4 reais). Maior
      especificidade que as regras :only-child anteriores (vence o cascade). */
   body.desktop #content.board-mode .kcol .kbody.kbody-single-card{padding-bottom:0 !important}
-  /* CARD-INTERNAL-FOOTER-LOCK — classe dupla (.kbody-single-card.kbody-single-card) eleva
-     a especificidade ACIMA das bandas :only-child (que vêm depois no arquivo), garantindo
-     que estas regras VENÇAM o cascade no app real.
-     - o card é flex column e preenche a kbody (cardBottom→kbody≈0);
-     - o rodapé ANCORA na base via margin-top:auto → a sobra vai PARA CIMA do rodapé,
-       nunca abaixo dos botões → footBottom→cardBottom = só o padding (~6px);
-     - a escala interna por banda (abaixo) mantém a sobra-acima-do-rodapé pequena. */
-  body.desktop #content.board-mode .kanban .kcol .kbody.kbody-single-card.kbody-single-card>.tc.tcv4{display:flex !important;flex-direction:column !important;flex:1 1 auto !important;min-height:0 !important;height:100% !important;margin-top:0 !important;margin-bottom:0 !important;padding-bottom:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody.kbody-single-card.kbody-single-card>.tc.tcv4>.tcv4-foot{margin-top:auto !important}
+  /* SINGLE-CARD natural-fit — REVERSAO do flex:1/height:100% e do margin-top:auto.
+     O card volta a ter ALTURA NATURAL do conteudo (flex:0 0 auto). Sem esticar a caixa,
+     sem ancorar o rodape — porque qualquer um desses dois deixa um buraco em alguma
+     parte do card quando o natural < coluna. A unica forma de NAO haver buraco interno
+     e o conteudo encaixar naturalmente, com o residual (se houver) ficando ABAIXO do
+     card (kbody pad-bottom=0 minimiza isso). A classe dupla garante que estas regras
+     vencam o cascade das bandas :only-child. */
+  body.desktop #content.board-mode .kanban .kcol .kbody.kbody-single-card.kbody-single-card>.tc.tcv4{flex:0 0 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important}
   /* ═══ CARD-LAYOUT-V2.3 — densidade interna proporcional à referência ═══
      O card cresceu para 408px (vs ref 280), mas as escalas internas continuavam
      do tamanho original — proporcionalmente 1.46x MENORES que a referência. Esta
@@ -733,19 +732,19 @@
      altura natural se aproximar do mapa (~720 alto, com ~75px de sobra abaixo do
      card dentro do .kbody, como na referencia). */
 @media (min-height:1040px){
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:15px 16px 15px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:15px 16px 8px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:13.5px !important;padding:4px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:30px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:26px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:27px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:27px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:68px !important;height:68px !important;font-size:24px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:18px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:13px !important}
@@ -767,19 +766,19 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-btn-dots{width:35px !important}
 }
 @media (min-height:1000px) and (max-height:1039px){
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:13px 15px 10px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:13px 15px 3px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:13.5px !important;padding:4px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:24px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:21px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:22px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:22px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:68px !important;height:68px !important;font-size:24px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:18px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:13px !important}
@@ -801,19 +800,19 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-btn-dots{width:35px !important}
 }
 @media (min-height:850px) and (max-height:999px){
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:11px 14px 7px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:11px 14px 3px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:4px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:12.5px !important;padding:3px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:15px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:16px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:16px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:58px !important;height:58px !important;font-size:21px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:17px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:12px !important}
@@ -835,7 +834,7 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-btn-dots{width:34px !important}
 }
 @media (max-height:849px){
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:9px 13px 4px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:9px 13px 1px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:3px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:12px !important;padding:3px 10px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:8px !important}
@@ -847,7 +846,7 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:8px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:8px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:8px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:7px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:8px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:52px !important;height:52px !important;font-size:19px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:16px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:11.5px !important}
