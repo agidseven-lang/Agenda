@@ -541,8 +541,7 @@
   /* coluna ativa dominante + card preenche a altura da coluna; foot ancora na base.
      V2.1: peso da coluna ativa e teto de altura do card calibrados POR BREAKPOINT
      (bandas @media height logo abaixo) — sem cortes, sem espaço morto interno. */
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:1 1 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:auto !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:1 1 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important;justify-content:space-between !important}
   /* V2.1 — calibração fina por breakpoint da coluna ativa e teto do card */
   @media (min-height:1000px){
     body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.293 1 0 !important}
