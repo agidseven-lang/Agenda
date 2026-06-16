@@ -530,6 +530,30 @@
      Reproduz a referência app-full (card aspect ~0.52-0.55) por banda de viewport:
      alto em telas ≥1000px, compacto em telas menores (evita scroll-V do card único).
      Frame/colunas/toolbar/Setores INALTERADOS. */
+  /* CARD-LAYOUT-V2 — coluna ativa com peso visual maior + card com aspect fiel
+     - padding-top reduzido p/ eliminar overflow inferior do board (cut bottom);
+     - kcol-live com peso flex maior que as demais (referência app-full mostra
+       coluna ativa dominante);
+     - card único usa aspect-ratio fiel ao recorte da referência (0.523) —
+       altura encaixa proporcional à largura, sem espaço morto INTERNO; o foot
+       ancora na base via margin-top:auto, distribuindo respiro natural. */
+  body.desktop #content.board-mode{padding-top:14px !important}
+  /* coluna ativa dominante + card preenche a altura da coluna; foot ancora na base.
+     V2.1: peso da coluna ativa e teto de altura do card calibrados POR BREAKPOINT
+     (bandas @media height logo abaixo) — sem cortes, sem espaço morto interno. */
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{flex:1 1 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:auto !important}
+  /* V2.1 — calibração fina por breakpoint da coluna ativa e teto do card */
+  @media (min-height:1000px){
+    body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.293 1 0 !important}
+    body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{max-height:745px !important}
+  }
+  @media (min-height:850px) and (max-height:999px){
+    body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1.20 1 0 !important}
+  }
+  @media (max-height:849px){
+    body.desktop #content.board-mode .kanban .kcol.kcol-live{flex:1 1 0 !important}
+  }
 @media (min-height:1000px){
  body.desktop #content.board-mode .kanban .kcol .kbody{padding-left:5px !important;padding-right:5px !important}
  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4{padding:17px 14px 15px !important}
