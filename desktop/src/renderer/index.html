@@ -559,7 +559,7 @@
      e o conteudo encaixar naturalmente, com o residual (se houver) ficando ABAIXO do
      card (kbody pad-bottom=0 minimiza isso). A classe dupla garante que estas regras
      vencam o cascade das bandas :only-child. */
-  body.desktop #content.board-mode .kanban .kcol .kbody.kbody-single-card.kbody-single-card>.tc.tcv4{flex:0 0 auto !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody.kbody-single-card.kbody-single-card>.tc.tcv4{display:flex !important;flex-direction:column !important;flex:1 1 auto !important;height:100% !important;min-height:0 !important;margin-top:0 !important;margin-bottom:0 !important;justify-content:space-between !important}
   /* ═══ CARD-LAYOUT-V2.3 — densidade interna proporcional à referência ═══
      O card cresceu para 408px (vs ref 280), mas as escalas internas continuavam
      do tamanho original — proporcionalmente 1.46x MENORES que a referência. Esta
