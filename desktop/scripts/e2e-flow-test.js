@@ -1246,7 +1246,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     /--kanban-col-min:279px/.test(DH) &&
     /\.kcol\.kcol-live\{flex:1 1 0;max-width:none\}/.test(DH));
   check('CY5_KANBAN_FRAME','Proposta A: FRAME compartilhado (.scr) com max-width tokenizado + centralizado (margin-inline:auto); toolbar+Kanban no MESMO eixo; abas/Setores à direita (justify-content:flex-end); card SEM max-width isolado',
-    /--kanban-frame-max-width:1500px/.test(DH) &&
+    /--kanban-frame-max-width:1700px/.test(DH) &&
     /#content\.board-mode > \.scr\{[^}]*max-width:var\(--kanban-frame-max-width\);margin-inline:auto/.test(DH) &&
     /class="scr"[^>]*>'\+boardToolbar\(\)\+'<div class="kanban"/.test(DH) &&
     /\.d-board-tools\.tbar \.tchips\{[^}]*justify-content:flex-end\}/.test(DH) &&
@@ -1259,7 +1259,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   /* ═══ CY6 — REPROVAÇÃO 1.0.137 (board full-width / form limpo / livebar) ═══ */
   console.log(`${C.b}\n[CY6] V64.52 — largura útil real, formulário limpo, sem toast flutuante${C.x}`);
   check('CY6_BOARD_FULLWIDTH','Telas de quadro SEM o cap de 1400px (board usa a largura útil real) + padding lateral 34px (referência)',
-    /#content\.board-mode > \*\{max-width:none\}/.test(DH) && /padding-left:34px!important;padding-right:34px!important/.test(DH));
+    /#content\.board-mode > \*\{max-width:none\}/.test(DH) && /padding-left:12px!important;padding-right:12px!important/.test(DH));
   check('CY6_FORM_SEM_CHECKLIST','Formulário do CRONOGRAMA sem Checklist/+Adicionar item (demais setores preservados)',
     /if\(f\.sector!=='cronograma'\)h\+=checklistHtml\(sub\.checklist\);/.test(DH) && /checklistHtml\(t\.checklist\)/.test(DH));
   check('CY6_FORM_SEM_LINK_OBS','Formulário do CRONOGRAMA sem Link/anexo e sem Observações livres',

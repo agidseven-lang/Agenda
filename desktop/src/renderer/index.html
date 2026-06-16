@@ -27,7 +27,7 @@
        no mesmo eixo. frame 1450 → 4 col de ~351px → card ~329px (aspect ~0.68, retrato
        com presença). Centralizado em telas largas, com vazio lateral mínimo (~75px/lado
        em 1920). Não vira paisagem (Opção 3) nem ilha estreita (Opção 1). */
-    --kanban-frame-max-width:1500px;
+    --kanban-frame-max-width:1700px;
     --kanban-col-gap:15px;
     --kanban-card-gutter:11px;
     /* piso da coluna: preserva o card em telas estreitas sem comprimir. Em 1366 as colunas
@@ -414,7 +414,7 @@
      kanban ocupa o restante (flex:1 + min-height:0). As colunas têm height:100%
      e SÓ o .kbody rola — topo (header da coluna) sempre visível, base sempre
      dentro da janela, último card com respiro + scroll-margin. */
-  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:6px!important;padding-left:34px!important;padding-right:34px!important}
+  body.desktop #content.board-mode{display:flex;flex-direction:column;align-items:center;overflow:hidden;height:100vh;padding-bottom:6px!important;padding-left:12px!important;padding-right:12px!important}
   /* Reprovação 1.0.137: o cap de 1400px deixava ~200px ociosos nas laterais enquanto as
      colunas ficavam estreitas. Nas telas de QUADRO o cap cai: o board usa a largura útil
      REAL (viewport - sidebar - 48px) — colunas largas quando há espaço; scroll horizontal
@@ -720,17 +720,17 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:15px 16px 11px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:13.5px !important;padding:4px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:18px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:18px !important;padding-top:0 !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:65px !important;height:65px !important;font-size:23px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:24px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:24px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:68px !important;height:68px !important;font-size:24px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:18px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:13px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-origin{font-size:14px !important;padding:8px 12px !important}
@@ -754,17 +754,17 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:13px 15px 8px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:13.5px !important;padding:4px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:17px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:17px !important;padding-top:0 !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:65px !important;height:65px !important;font-size:23px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:20px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:20px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:68px !important;height:68px !important;font-size:24px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:18px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:13px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-origin{font-size:14px !important;padding:7px 12px !important}
@@ -788,16 +788,16 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:11px 14px 5px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:4px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:12.5px !important;padding:3px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:12px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:12px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:14px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:14px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:58px !important;height:58px !important;font-size:21px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:17px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:12px !important}
@@ -822,16 +822,16 @@
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child{padding:9px 13px 4px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips{flex-direction:column !important;align-items:flex-start !important;gap:3px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-chips .tcv4-chip{align-self:flex-start !important;max-width:100% !important;font-size:12px !important;padding:3px 10px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:5px !important}
-  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:5px !important;padding-top:0 !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-person{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-origin{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-main{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chips{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-rail{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-steps{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-themes{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-chkline{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-date{margin-top:6px !important}
+  body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child>.tcv4-foot{margin-top:6px !important;padding-top:0 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-avw .av{width:52px !important;height:52px !important;font-size:19px !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-name{font-size:16px !important;line-height:1.25 !important}
   body.desktop #content.board-mode .kanban .kcol .kbody>.tc.tcv4:only-child .tcv4-role{font-size:11.5px !important}
