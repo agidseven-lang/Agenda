@@ -1305,7 +1305,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
              tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Colunas de ALTURA IGUAL (referência) + 1 card inteiro sem scrollbar + scrollbar fina + chrome enxuto',
     /kcol\{height:100%;max-height:100%;min-height:380px\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
-    /#content\.board-mode \.kcol \.kbody\{padding:16px 10px 14px;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
+    /#content\.board-mode \.kcol \.kbody\{padding:16px 10px 8px;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
   check('CY9_PROPORCAO_STATUS','Escopo limpo (reprovação 1.0.144): ZERO zoom/scale global (fitZoom removido) + colunas abraçam conteúdo (proporção em qualquer tela) + status nunca truncado + presença no canto do avatar',
     DH.indexOf('fitZoom')<0 && DH.indexOf('--fitz')<0 && !/document\.body\.style\.zoom/.test(DH) &&
     /grid-template-rows:100vh/.test(DH) &&
