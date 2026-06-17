@@ -764,7 +764,7 @@ const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
 // detail-hierarchy-v2: o chip do DETALHE migrou da fonte clientStatusView p/ detailState
 // (a mesma máquina do hero — nunca contradiz). Restam 4 usos: definição + taskTimeline
 // interno + badge do taskCard (ternário designerView) + flowSummary "Status operacional".
-check('CSV_SCOPE', 'clientStatusView: definição + taskCard + kbv2Card + flowSummary + uso interno taskTimeline (5 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 5 && /function clientStatusView\(t\)/.test(DH_noc));
+check('CSV_SCOPE', 'clientStatusView: definição + taskCard + kbv2Card + kbv2DeriveStatus fallback + flowSummary + uso interno taskTimeline (6 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 6 && /function clientStatusView\(t\)/.test(DH_noc));
 // taskCard MIGRADO (role-aware f96aa2e: ternário designerView).
 check('CSV_TASKCARD_MIGRATED', "taskCard V3 cronograma: UM estágio por perspectiva (fonte única), sem badge concorrente", /const stage=isCron\?\(designerView\?designerStatusView\(t\)/.test(DH) && (DH.match(/tcv4-chip/g)||[]).length>=3 && /tcv4-st\b/.test(DH));
 // chip do detalhe MIGRADO p/ a máquina de estados (1 chip, sem status concorrentes).
@@ -1287,6 +1287,14 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('F11_DEFER_WATCHDOG','F1.1 — watchdog do _deferRender (1500ms) descongela quando não há edição real, evita "tela parada"',
     /function _armDeferWatchdog\(\)/.test(DH)
     && /_deferRenderAt=Date\.now\(\);_armDeferWatchdog\(\);/.test(DH));
+  check('F12_DERIVE_STATUS_FN','F1.2 — kbv2DeriveStatus(t,persp): fonte única do chip de status no topo do card; default com designer → designerStatusView',
+    /function kbv2DeriveStatus\(t, persp\)/.test(DH)
+    && /if\(hasDesigner\(t\) && typeof designerStatusView==='function'\)\s*return designerStatusView\(t\);/.test(DH)
+    && /const topSt=kbv2DeriveStatus\(t, persp\);/.test(DH));
+  check('F12_MOVE_OPTIMISTIC','F1.2 — otimismo local em moveStatus (designer + social): aplica patch no state e re-renderiza ANTES do db.update — reflexo imediato no card',
+    /F1\.2 — OTIMISMO LOCAL/.test(DH)
+    && /Object\.assign\(t, optimistic\);/.test(DH)
+    && /Object\.assign\(t, optimisticSoc\);/.test(DH));
   check('F1_SLA_CSS','CSS do chip SLA presente (azul/laranja/vermelho/verde) no bloco kbv2-styles',
     /\.kbv2-sla-azul\{/.test(DH) && /\.kbv2-sla-laranja\{/.test(DH) && /\.kbv2-sla-vermelho\{/.test(DH) && /\.kbv2-sla-verde\{/.test(DH));
   check('F1_HISTORY_CANON','history do eixo designer padronizado aditivo (axis/from/to/byUid/atMs/source) sem remover campos legados',

@@ -3419,6 +3419,21 @@ function kbv2SlaLocal(t,nowMs){
   if(now>=pd-wF)return {state:'warning_finish',sev:'laranja',label:'Entrega próxima'};
   return {state:'running',sev:'azul',label:'Em prazo'};
 }
+// F1.2 — derivação CENTRAL de status para o topo do card. Fonte única de verdade por perspectiva.
+// - designer/client: usam as views já existentes (designerStatusView/clientFacingStatusView).
+// - default (Social/Hub): se tem designer atribuído, usa designerStatusView (resolve "Social vê A Fazer
+//   enquanto designer já moveu" — status genérico não é tocado por moveStatus).
+function kbv2DeriveStatus(t, persp){
+  const isCron = secOf(t.sector).key==='cronograma';
+  if(persp==='designer' && isCron && hasDesigner(t))
+    return designerStatusView(t);
+  if(persp==='client' && isCron)
+    return (typeof clientFacingStatusView==='function')?clientFacingStatusView(t):(typeof clientStatusView==='function'?clientStatusView(t):stOf(t.status));
+  // default: Social/Hub/Setor — se há designer atribuído, deriva do eixo do designer.
+  if(hasDesigner(t) && typeof designerStatusView==='function')
+    return designerStatusView(t);
+  return stOf(t.status);
+}
 function kbv2Card(t, persp){
   const designerView = persp==='designer' && secOf(t.sector).key==='cronograma' && hasDesigner(t);
   const clientView = persp==='client' && secOf(t.sector).key==='cronograma';
@@ -3427,7 +3442,8 @@ function kbv2Card(t, persp){
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'';
   const cron=cronOf(t);const isCron=s.key==='cronograma';
   const stage=isCron?(designerView?designerStatusView(t):(clientView?clientFacingStatusView(t):clientStatusView(t))):null;
-  const topSt=designerView?designerStatusView(t):st;
+  // F1.2 — fonte única do status no topo (resolve "Social vê A Fazer enquanto designer já moveu").
+  const topSt=kbv2DeriveStatus(t, persp);
   const acc=(stage&&stage.color)||topSt.color;
   let prog=null;
   if(isCron){
@@ -3572,13 +3588,33 @@ async function moveStatus(taskId,newStatus){
       else if(newStatus==='revisao')patch.status='revisao';
       else if(newStatus==='concluido'||newStatus==='entregue'){patch.status='concluido';patch.doneAt=now;patch.doneBy=state.user.id;}
     }
-    closeModal();await db.collection('tasks').doc(taskId).update(patch);return;
+    // F1.2 — OTIMISMO LOCAL: aplica o patch (sem o arrayUnion, que não pode ser mesclado direto)
+    // no state ANTES do round-trip Firestore. Garante reflexo IMEDIATO no card/coluna.
+    const optimistic={};
+    for(const k in patch){ if(k!=='history' && k.indexOf('.')<0) optimistic[k]=patch[k]; }
+    if(patch['designerSla.startedAt']||patch['designerSla.finishedAt']){
+      optimistic.designerSla=Object.assign({},t.designerSla||{},
+        patch['designerSla.startedAt']?{startedAt:patch['designerSla.startedAt']}:null,
+        patch['designerSla.finishedAt']?{finishedAt:patch['designerSla.finishedAt']}:null);
+    }
+    Object.assign(t, optimistic);
+    closeModal();render();
+    try{ await db.collection('tasks').doc(taskId).update(patch); }
+    catch(e){ console.warn('moveStatus(designer):',e); }
+    return;
   }
   const old=t.status||'afazer';
   const patch={status:newStatus,history:firebase.firestore.FieldValue.arrayUnion({kind:'moved',at:now,byId:state.user.id,from:old,to:newStatus})};
   if(newStatus!=='afazer'&&!t.startedAt)patch.startedAt=now;
   if(newStatus==='concluido'){patch.doneAt=now;patch.doneBy=state.user.id;}
-  closeModal();await db.collection('tasks').doc(taskId).update(patch);
+  // F1.2 — OTIMISMO LOCAL (eixo social) idem ramo designer.
+  const optimisticSoc={status:newStatus};
+  if(patch.startedAt)optimisticSoc.startedAt=patch.startedAt;
+  if(patch.doneAt){optimisticSoc.doneAt=patch.doneAt;optimisticSoc.doneBy=patch.doneBy;}
+  Object.assign(t, optimisticSoc);
+  closeModal();render();
+  try{ await db.collection('tasks').doc(taskId).update(patch); }
+  catch(e){ console.warn('moveStatus(social):',e); }
 }
 function detDate(ic,l,v){return '<div class="det-date">'+svg(ic)+'<div class="det-date-m"><div class="det-date-l">'+esc(l)+'</div><div class="det-date-v">'+esc(v)+'</div></div></div>';}
 function openDetails(taskId){
