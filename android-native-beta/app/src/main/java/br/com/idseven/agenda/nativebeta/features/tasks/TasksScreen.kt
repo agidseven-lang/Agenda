@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -325,13 +326,17 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
             Pill(sector.label, sector.color)
             if (task.priority) { Spacer(Modifier.width(8.dp)); Pill("Prioridade alta", Tokens.Red) }
         }
-        // 8-10. responsável + prazo
+        // 8-10. responsável + cargo + prazo (F1.1: cargo do assignee adicionado)
         Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (!task.assignee.isNullOrBlank()) {
                 Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee, 36.dp)
                 Spacer(Modifier.width(8.dp))
-                Text(UserColor.firstName(task.assignee), color = Tokens.Soft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(UserColor.firstName(task.assignee), color = Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val role = assignee?.role
+                    if (!role.isNullOrBlank()) Text(role, color = Tokens.Faint, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             } else {
                 Text("Sem responsável", color = Tokens.Faint, fontSize = 12.sp, modifier = Modifier.weight(1f, fill = false))
             }
@@ -342,6 +347,57 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
                 Text(DateUtil.prazo(task.dueDate, task.dueTime), color = Tokens.Faint, fontSize = 12.sp)
             }
         }
+        // F1.1 — SUA ETAPA / PRÓXIMA (derivado dos eixos: prioriza designerFlowStatus quando há designer)
+        run {
+            val dfs = task.designerFlowStatus
+            val hasDesigner = task.designerAssignment?.designerId != null
+            val etapaCur = when {
+                hasDesigner && dfs == "andamento" -> "Em produção"
+                hasDesigner && dfs == "revisao" -> "Em revisão"
+                hasDesigner && (dfs == "entregue" || dfs == "concluido") -> "Entregue"
+                hasDesigner -> "Aguardando designer iniciar"
+                task.status == "andamento" -> "Em andamento"
+                task.status == "revisao" -> "Em revisão"
+                task.status == "concluido" -> "Concluído"
+                else -> "A fazer"
+            }
+            val etapaNext = when {
+                hasDesigner && (dfs == null || dfs == "afazer") -> "Designer iniciar produção"
+                hasDesigner && dfs == "andamento" -> "Entregar à Social"
+                hasDesigner && dfs == "revisao" -> "Corrigir e reentregar"
+                hasDesigner && (dfs == "entregue" || dfs == "concluido") -> "Validar e enviar ao cliente"
+                task.status == "concluido" -> "—"
+                else -> "Iniciar tarefa"
+            }
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("SUA ETAPA", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.05.sp, modifier = Modifier.width(70.dp))
+                    Text(etapaCur, color = Tokens.Ink, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("PRÓXIMA", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.05.sp, modifier = Modifier.width(70.dp))
+                    Text(etapaNext, color = Tokens.Soft, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        // F1.1 — TEMAS (quando há cronContents). Mostra até 3 itens; preserva layout enxuto.
+        val temas = task.cronContents.filter { !it.tema.isNullOrBlank() }
+        if (temas.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text(if (temas.size > 1) "TEMAS" else "TEMA", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp)
+            Spacer(Modifier.height(4.dp))
+            temas.take(3).forEachIndexed { i, c ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(18.dp).clip(RoundedCornerShape(6.dp)).background(Tokens.Accent.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                        Text("${i + 1}", color = Tokens.Accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(c.tema ?: "", color = Tokens.Soft, fontSize = 12.5.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                if (i < temas.take(3).lastIndex) Spacer(Modifier.height(3.dp))
+            }
+        }
         // 12. checklist progress
         if (total > 0) {
             Spacer(Modifier.height(12.dp))
@@ -349,15 +405,25 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
             Spacer(Modifier.height(4.dp))
             Text("$done de $total no checklist", color = Tokens.Faint, fontSize = 11.sp)
         }
-        // 13. mover
+        // 13. footer: Detalhes + Mover (F1.1 — paridade com Desktop)
         Spacer(Modifier.height(14.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Tokens.Accent.copy(alpha = 0.12f)).clickable { onMove() }.padding(vertical = 11.dp),
-            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Outlined.SwapHoriz, contentDescription = null, tint = Tokens.Accent, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text("Mover status", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Tokens.Accent).clickable { onClick() }.padding(vertical = 11.dp),
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.Visibility, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Detalhes", color = androidx.compose.ui.graphics.Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            Row(
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Tokens.Accent.copy(alpha = 0.12f)).clickable { onMove() }.padding(vertical = 11.dp),
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.SwapHoriz, contentDescription = null, tint = Tokens.Accent, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Mover", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

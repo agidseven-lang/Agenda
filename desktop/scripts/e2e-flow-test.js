@@ -1273,6 +1273,20 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     && /kbv2-sla kbv2-sla-'\+_sla\.sev/.test(DH)
     && /_sla\.sev!=='neutro'\?/.test(DH)
     && /--kacc:'\+_slaAcc\+'/.test(DH));
+  check('F11_TOP_TWO_ZONES','F1.1 — top do card em 2 zonas estáveis (status à esquerda; .kbv2-top-r agrupa SLA+due lado a lado à direita) e SEM margin-left:auto',
+    /<div class="kbv2-top-r">/.test(DH)
+    && /\.kbv2-top-r\{[^}]*display:flex/.test(DH)
+    && /\.kbv2-card-top\{[^}]*justify-content:space-between/.test(DH)
+    && !/\.kbv2-due\{ margin-left:auto/.test(DH));
+  check('F11_SOCIAL_DERIVES_DESIGNER','F1.1 — socialCol não-cronograma deriva de designerFlowStatus quando há designer atribuído (resolve "Social vê A Fazer enquanto designer já avançou")',
+    /if\(hasDesigner\(t\)\)\{[\s\S]*?const d=designerCol\(t\);[\s\S]*?return t\.status\|\|'afazer';/.test(DH));
+  check('F11_MOVE_PROPAGATES','F1.1 — moveStatus do designer propaga p/ os eixos visíveis (cronograma→clientFlowStatus; não-cron→status/doneAt)',
+    /\/\/ F1\.1 \(fluxo coerente\) — propagar para os eixos visíveis/.test(DH)
+    && /if\(isCron\)\{[\s\S]*?patch\.clientFlowStatus='producao'[\s\S]*?patch\.clientFlowStatus='reenviado'/.test(DH)
+    && /patch\.status='concluido';patch\.doneAt=now/.test(DH));
+  check('F11_DEFER_WATCHDOG','F1.1 — watchdog do _deferRender (1500ms) descongela quando não há edição real, evita "tela parada"',
+    /function _armDeferWatchdog\(\)/.test(DH)
+    && /_deferRenderAt=Date\.now\(\);_armDeferWatchdog\(\);/.test(DH));
   check('F1_SLA_CSS','CSS do chip SLA presente (azul/laranja/vermelho/verde) no bloco kbv2-styles',
     /\.kbv2-sla-azul\{/.test(DH) && /\.kbv2-sla-laranja\{/.test(DH) && /\.kbv2-sla-vermelho\{/.test(DH) && /\.kbv2-sla-verde\{/.test(DH));
   check('F1_HISTORY_CANON','history do eixo designer padronizado aditivo (axis/from/to/byUid/atMs/source) sem remover campos legados',

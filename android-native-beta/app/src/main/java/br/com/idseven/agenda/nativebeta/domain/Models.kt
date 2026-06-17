@@ -63,7 +63,23 @@ data class TaskItem(
     // F1 (1.0.147) — aditivos; compatíveis com dados antigos (null quando ausentes).
     val designerFlowStatus: String? = null,
     val designerSla: DesignerSla? = null,
+    // F1.1 — paridade mobile: campos para o card mobile exibir o mesmo que o Desktop.
+    val clientFlowStatus: String? = null,
+    val designerAssignment: DesignerAssignment? = null,
+    val cronContents: List<CronContent> = emptyList(),
 )
+
+// F1.1 — semente do "Enviar ao designer" (Desktop grava). Aditivo.
+data class DesignerAssignment(
+    val designerId: String? = null,
+    val designerName: String? = null,
+    val designerAvatar: String? = null,
+    val assignedAt: Long? = null,
+    val assignedBy: String? = null,
+)
+
+// F1.1 — conteúdo de cronograma (tema + legenda). Aditivo; vazio em tarefas comuns.
+data class CronContent(val tema: String? = null, val legenda: String? = null)
 
 // F1 — semente de SLA do designer (gravada pelo Desktop ao "Enviar ao designer").
 data class DesignerSla(

@@ -1,6 +1,8 @@
 package br.com.idseven.agenda.nativebeta.data
 
 import br.com.idseven.agenda.nativebeta.domain.ChecklistItem
+import br.com.idseven.agenda.nativebeta.domain.CronContent
+import br.com.idseven.agenda.nativebeta.domain.DesignerAssignment
 import br.com.idseven.agenda.nativebeta.domain.DesignerSla
 import br.com.idseven.agenda.nativebeta.domain.TaskHistory
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
@@ -51,6 +53,19 @@ object TaskRepo {
             seedAt = (slaMap["seedAt"] as? Number)?.toLong(),
             seedBy = slaMap["seedBy"] as? String,
         ) else null
+        // F1.1 — designerAssignment (mapa) + cronContents (lista). Aditivos null-safe.
+        val daMap = d.get("designerAssignment") as? Map<*, *>
+        val designerAssignment = if (daMap != null) DesignerAssignment(
+            designerId = daMap["designerId"] as? String,
+            designerName = daMap["designerName"] as? String,
+            designerAvatar = daMap["designerAvatar"] as? String,
+            assignedAt = (daMap["assignedAt"] as? Number)?.toLong(),
+            assignedBy = daMap["assignedBy"] as? String,
+        ) else null
+        val cronList = (d.get("cronContents") as? List<*>) ?: (d.get("contents") as? List<*>) ?: emptyList<Any?>()
+        val cronContents = cronList.mapNotNull { it as? Map<*, *> }.map {
+            CronContent(tema = it["tema"] as? String, legenda = it["legenda"] as? String)
+        }
         return TaskItem(
             id = d.id,
             title = d.getString("title"),
@@ -75,6 +90,9 @@ object TaskRepo {
             history = history,
             designerFlowStatus = d.getString("designerFlowStatus"),
             designerSla = designerSla,
+            clientFlowStatus = d.getString("clientFlowStatus"),
+            designerAssignment = designerAssignment,
+            cronContents = cronContents,
         )
     }
 
