@@ -1981,9 +1981,9 @@ body.desktop .kbv2-card-origin b{ color:var(--kbv2-ink); font-weight:700; }
 body.desktop .kbv2-tier{ font-size:11px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#6d5efc; }
 body.desktop .kbv2-title{ font-size:18px; font-weight:800; color:var(--kbv2-ink); line-height:1.25; letter-spacing:-.01em; margin-top:4px; }
 body.desktop .kbv2-card-chips{ display:flex; gap:7px; flex-wrap:wrap; }
-body.desktop .kbv2-chip{ font-size:12px; font-weight:600; padding:5px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:6px; line-height:1.2; }
+body.desktop .kbv2-chip{ font-size:12px; font-weight:700; padding:5px 10px; border-radius:8px; border:1px solid transparent; display:inline-flex; align-items:center; gap:6px; line-height:1.2; }
 body.desktop .kbv2-chip-dot{ width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
-body.desktop .kbv2-chip-soft{ background:#f1f4fa; color:#5f6a80; }
+body.desktop .kbv2-chip-soft{ background:#eef0ff; color:#3f43c7; border-color:#d4d8fb; }
 body.desktop .kbv2-card-rail{ display:flex; align-items:center; gap:0; padding:3px 2px; }
 body.desktop .kbv2-card-rail i{ width:10px; height:10px; border-radius:50%; background:#dde3ee; flex:0 0 auto; }
 body.desktop .kbv2-card-rail i.done{ background:#2fcf8f; }
@@ -2149,6 +2149,8 @@ const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Ago
 const DOW=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
 function dayShort(date){const[y,m,d]=date.split('-').map(Number);const dt=new Date(y,m-1,d);return ['dom','seg','ter','qua','qui','sex','sáb'][dt.getDay()]+', '+d+' de '+MONTHS[m-1].toLowerCase();}
 function withAlpha(hex,a){const n=parseInt(hex.slice(1),16);return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
+// KANBANBOARDV2: versão ESCURA/legível de uma cor para texto de chip sobre fundo CLARO (mantém o matiz).
+function kbv2Ink(hex){const n=parseInt(hex.slice(1),16);const f=.5;return 'rgb('+Math.round(((n>>16)&255)*f)+','+Math.round(((n>>8)&255)*f)+','+Math.round((n&255)*f)+')';}
 
 const ICON={
   movie:'<rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor" stroke-width="2" fill="none"/><polygon points="10 8 16 12 10 16" fill="currentColor"/>',
@@ -3404,8 +3406,8 @@ function kbv2Card(t, persp){
   let h='<div class="kbv2-card" style="--kacc:'+acc+'">';
   // 1) topo: status + prazo
   h+='<div class="kbv2-card-top">'+
-       '<span class="kbv2-status" style="color:'+topSt.color+';background:'+withAlpha(topSt.color,.12)+';border-color:'+withAlpha(topSt.color,.28)+'"><i class="kbv2-status-dot" style="background:'+topSt.color+'"></i>'+esc(topLabel)+'</span>'+
-       (d?'<span class="kbv2-due" style="color:'+d.color+';background:'+withAlpha(d.color,.14)+';border-color:'+withAlpha(d.color,.30)+'">'+esc(dShort)+'</span>':'')+
+       '<span class="kbv2-status" style="color:'+kbv2Ink(topSt.color)+';background:'+withAlpha(topSt.color,.18)+';border-color:'+withAlpha(topSt.color,.48)+'"><i class="kbv2-status-dot" style="background:'+topSt.color+'"></i>'+esc(topLabel)+'</span>'+
+       (d?'<span class="kbv2-due" style="color:'+kbv2Ink(d.color)+';background:'+withAlpha(d.color,.18)+';border-color:'+withAlpha(d.color,.48)+'">'+esc(dShort)+'</span>':'')+
      '</div>';
   // 2) perfil
   h+='<div class="kbv2-card-profile">'+
@@ -3422,11 +3424,11 @@ function kbv2Card(t, persp){
      '</div>';
   // 6) chips: estágio + setor + periodicidade
   h+='<div class="kbv2-card-chips">'+
-       (stage&&!designerView?'<span class="kbv2-chip" style="color:'+stage.color+';background:'+withAlpha(stage.color,.12)+'"><i class="kbv2-chip-dot" style="background:'+stage.color+'"></i>'+esc(stage.label)+'</span>':
-        (designerView?'<span class="kbv2-chip" style="color:'+topSt.color+';background:'+withAlpha(topSt.color,.12)+'"><i class="kbv2-chip-dot" style="background:'+topSt.color+'"></i>'+esc(topLabel)+'</span>':''))+
-       '<span class="kbv2-chip" style="color:'+s.color+';background:'+withAlpha(s.color,.12)+'">'+esc(s.label)+'</span>'+
+       (stage&&!designerView?'<span class="kbv2-chip" style="color:'+kbv2Ink(stage.color)+';background:'+withAlpha(stage.color,.16)+';border-color:'+withAlpha(stage.color,.42)+'"><i class="kbv2-chip-dot" style="background:'+stage.color+'"></i>'+esc(stage.label)+'</span>':
+        (designerView?'<span class="kbv2-chip" style="color:'+kbv2Ink(topSt.color)+';background:'+withAlpha(topSt.color,.16)+';border-color:'+withAlpha(topSt.color,.42)+'"><i class="kbv2-chip-dot" style="background:'+topSt.color+'"></i>'+esc(topLabel)+'</span>':''))+
+       '<span class="kbv2-chip" style="color:'+kbv2Ink(s.color)+';background:'+withAlpha(s.color,.16)+';border-color:'+withAlpha(s.color,.42)+'"><i class="kbv2-chip-dot" style="background:'+s.color+'"></i>'+esc(s.label)+'</span>'+
        (cron&&cron.label&&cron.label!==s.label?'<span class="kbv2-chip kbv2-chip-soft">'+esc(cron.label)+'</span>':'')+
-       (t.priority?'<span class="kbv2-chip" style="color:#EF4444;background:'+withAlpha('#EF4444',.12)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+
+       (t.priority?'<span class="kbv2-chip" style="color:'+kbv2Ink('#EF4444')+';background:'+withAlpha('#EF4444',.16)+';border-color:'+withAlpha('#EF4444',.42)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+
      '</div>';
   // 7) trilho + 8) etapa
   if(prog){
@@ -3440,7 +3442,7 @@ function kbv2Card(t, persp){
     const etapaLbl=designerView?'Sua etapa':'Etapa';
     const etapaVal=designerView?(stage?stage.label:topSt.label).replace('Designer em ','Em '):(prog.owner||((stage||topSt).label));
     h+='<div class="kbv2-card-stage">'+
-         '<div class="kbv2-srow"><span class="kbv2-sk">'+esc(etapaLbl)+'</span><span class="kbv2-sv" style="color:'+acc+'">'+esc(etapaVal)+'</span></div>'+
+         '<div class="kbv2-srow"><span class="kbv2-sk">'+esc(etapaLbl)+'</span><span class="kbv2-sv" style="color:'+kbv2Ink(acc)+'">'+esc(etapaVal)+'</span></div>'+
          (prog.next?'<div class="kbv2-srow"><span class="kbv2-sk">Próxima</span><span class="kbv2-sv2">'+esc(prog.next)+'</span></div>':'')+
        '</div>';
   }
