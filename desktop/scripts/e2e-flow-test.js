@@ -1534,8 +1534,8 @@ console.log(`${C.b}\n[FASE PRODUÇÃO 1] Flow Engine canônico (Social → Desig
 
 /* ─── [PROD1.1] HOTFIX visual: card preenche a coluna + popover do menu sem overlap ─── */
 console.log(`${C.b}\n[PROD1.1] Hotfix de regressões visuais (layout do card + menu "⋯")${C.x}`);
-check('PROD11_CARD_FILL','Card ÚNICO preenche a coluna (sem buraco na base): .kbv2-card:only-child flex:1 1 auto + rodapé margin-top:auto',
-  /\.kbv2-column-body>\.kbv2-card:only-child\{ flex:1 1 auto; \}/.test(DH) && /\.kbv2-column-body>\.kbv2-card:only-child>\.kbv2-card-footer\{ margin-top:auto; \}/.test(DH));
+check('PROD12_CARD_NATURAL','Card de ALTURA NATURAL: SEM esticar (sem :only-child flex:1 1 auto / sem margin-top:auto no footer); rodapé no fluxo normal (margin-top:2px) — sem vazio interno',
+  !/\.kbv2-card:only-child\{ flex:1 1 auto; \}/.test(DH) && !/:only-child>\.kbv2-card-footer\{ margin-top:auto; \}/.test(DH) && /\.kbv2-card-footer\{ display:flex; gap:8px; margin-top:2px; \}/.test(DH));
 check('PROD11_MENU_BELOW','Menu "⋯" abre PARA BAIXO por padrão e ancora no fundo do viewport se não couber (não cobre o conteúdo acima do botão)',
   /let tp=r\.bottom\+8;if\(tp\+mh>window\.innerHeight-8\)tp=Math\.max\(8,window\.innerHeight-mh-8\);/.test(DH) && !/let tp=r\.top-mh-8;if\(tp<8\)/.test(DH));
 check('PROD11_SLA_PRESERVED','Chip SLA preservado (CSS .kbv2-sla azul/laranja/vermelho/verde intactos)',
