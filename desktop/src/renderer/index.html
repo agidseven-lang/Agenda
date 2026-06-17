@@ -2018,10 +2018,21 @@ body.desktop .kbv2-card-chk{ font-size:12.5px; color:#8b94a6; }
 body.desktop .kbv2-card-date{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--kbv2-ink); font-weight:600; }
 body.desktop .kbv2-card-date svg{ width:15px; height:15px; color:#6f7889; }
 body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
-/* PROD1.2 — card de ALTURA NATURAL (proporcional ao conteúdo): rodapé no FLUXO NORMAL,
-   logo após data/temas, com respiro pequeno (gap 13px do card + margin-top 2px). NÃO esticar
-   o card (sem flex:1 / height:100% / min-height / margin-top:auto no footer) — isso criava
-   vazio interno. A coluna segue full-height; o card NÃO. Flow Engine/SLA/BLACK PREMIUM intactos. */
+/* PROD1.4 — card NATURAL-HEIGHT (proporcional ao conteúdo; rodapé no FLUXO NORMAL, respiro
+   pequeno). NÃO usar no card: flex:1 / height:100% / min-height / justify-content:space-between
+   / margin-top:auto. O vazio da coluna é resolvido FORA do card: um FILLER da PRÓPRIA COLUNA
+   (.kbv2-column-filler) ocupa o espaço restante abaixo do card, sem esticar o card nem empurrar
+   o rodapé. min-height:0 → some quando a coluna está cheia (nunca força scroll); cresce só quando
+   sobra espaço. O card tem min-height:auto (conteúdo), então NUNCA é cortado/encolhido. */
+body.desktop .kbv2-column-filler{
+  flex:1 1 auto; min-height:0; margin-top:2px; box-sizing:border-box;
+  display:flex; align-items:center; justify-content:center;
+  border:1.5px dashed rgba(255,255,255,.07); border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.020),rgba(255,255,255,.004));
+  color:#5b6373; cursor:pointer; transition:border-color .12s, background .12s, color .12s;
+}
+body.desktop .kbv2-column-filler svg{ width:18px; height:18px; opacity:.6; }
+body.desktop .kbv2-column-filler:hover{ border-color:rgba(124,108,255,.40); color:#9d8bff; background:rgba(124,108,255,.045); }
 body.desktop .kbv2-btn{ height:40px; border-radius:11px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:var(--kbv2-ink); font-size:13.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; }
 body.desktop .kbv2-btn svg{ width:16px; height:16px; }
 body.desktop .kbv2-btn:hover{ background:rgba(255,255,255,.09); }
@@ -3617,7 +3628,7 @@ function kbv2BoardHtml(cols, cardFn){
     const live=c.tasks.length?' kbv2-column-active':'';
     h+='<section class="kbv2-column'+live+'" style="--kc:'+c.color+'">'+
          '<div class="kbv2-column-header"><span class="kbv2-cdot" style="background:'+c.color+'"></span><span class="kbv2-ctitle">'+esc(c.label)+'</span><span class="kbv2-ccount">'+c.tasks.length+'</span></div>'+
-         '<div class="kbv2-column-body">'+(c.tasks.length?c.tasks.map(fn).join(''):kbv2Empty(c.key))+'</div>'+
+         '<div class="kbv2-column-body">'+(c.tasks.length?(c.tasks.map(fn).join('')+'<div class="kbv2-column-filler" data-fab="1" title="Adicionar tarefa">'+svg('plus')+'</div>'):kbv2Empty(c.key))+'</div>'+
          '<button class="kbv2-column-add" data-fab="1">'+svg('plus')+'<span>Adicionar tarefa</span></button>'+
        '</section>';
   });
