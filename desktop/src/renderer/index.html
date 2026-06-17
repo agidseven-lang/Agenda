@@ -1915,6 +1915,114 @@
   body.desktop .kempty-ic{color:rgba(160,178,220,.38)}
   body.desktop .kempty{border-color:rgba(150,170,255,.10)}
 </style>
+<style id="kbv2-styles">
+/* ════════ KANBANBOARDV2 — "Minimal Premium Workflow": board CLARO premium ════════
+   Isolado: só atua sob body.desktop nas classes .kbv2-*. Não toca em .tcv4/.kcol/.kbody. */
+body.desktop{ --kbv2-ink:#1c2335; --kbv2-ink2:#3a4357; }
+body.desktop .kbv2-board-surface{
+  flex:1 1 auto; min-height:0; display:flex; flex-direction:column;
+  margin-top:14px; padding:18px; border-radius:22px;
+  background:linear-gradient(180deg,#f6f8fc 0%,#eef2f9 100%);
+  border:1px solid #e3e8f1; box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 18px 40px -28px rgba(20,30,60,.25);
+  overflow-y:auto; overflow-x:hidden;
+}
+body.desktop .kbv2-board{ display:flex; gap:18px; align-items:stretch; width:100%; flex:1 1 auto; min-height:0; }
+/* coluna clara */
+body.desktop .kbv2-column{
+  flex:1 1 0; min-width:0; display:flex; flex-direction:column;
+  background:#ffffff; border:1px solid #e7ecf4; border-radius:18px;
+  box-shadow:0 1px 2px rgba(20,30,60,.04), 0 14px 30px -22px rgba(20,30,60,.18);
+}
+body.desktop .kbv2-column-active{
+  border-color:#c7ccf7;
+  background:linear-gradient(180deg,#fbfbff 0%,#f4f4ff 100%);
+  box-shadow:0 0 0 1px rgba(109,94,252,.22), 0 22px 46px -26px rgba(80,70,200,.38);
+}
+body.desktop .kbv2-column-header{ display:flex; align-items:center; gap:9px; padding:15px 16px 12px; flex:0 0 auto; }
+body.desktop .kbv2-column-header .kbv2-cdot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; box-shadow:0 0 0 3px rgba(0,0,0,.03); }
+body.desktop .kbv2-column-header .kbv2-ctitle{ font-size:14.5px; font-weight:700; color:var(--kbv2-ink); letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.desktop .kbv2-column-header .kbv2-ccount{ margin-left:auto; min-width:24px; height:22px; padding:0 8px; border-radius:7px; background:#f1f4fa; color:#69748c; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+body.desktop .kbv2-column-body{ flex:1 1 auto; display:flex; flex-direction:column; gap:14px; padding:4px 14px 0; min-height:0; overflow-y:auto; overflow-x:hidden; }
+body.desktop .kbv2-column-add{
+  flex:0 0 auto; margin:12px 14px 14px; height:42px; border-radius:12px;
+  border:1px dashed #d7deea; background:transparent; color:#76808f;
+  display:flex; align-items:center; justify-content:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer;
+}
+body.desktop .kbv2-column-add svg{ width:16px; height:16px; }
+body.desktop .kbv2-column-add:hover{ background:#f4f6fb; color:#5b6cff; border-color:#c3cdf5; }
+/* empty state claro */
+body.desktop .kbv2-empty{ flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:26px 16px; }
+body.desktop .kbv2-empty-ic{ width:58px; height:58px; border-radius:16px; background:#f3f5fb; border:1px solid #e9edf5; color:#aab3c6; display:flex; align-items:center; justify-content:center; }
+body.desktop .kbv2-empty-ic svg{ width:30px; height:30px; }
+body.desktop .kbv2-empty-t{ font-size:14px; font-weight:600; color:#5b6478; }
+body.desktop .kbv2-empty-s{ font-size:12.5px; color:#9aa3b6; max-width:200px; line-height:1.5; }
+
+/* ───────── CARD claro premium ───────── */
+body.desktop .kbv2-card{
+  position:relative; display:flex; flex-direction:column; gap:13px;
+  padding:16px; border-radius:16px; background:#ffffff; border:1px solid #e7ecf4;
+  box-shadow:0 1px 2px rgba(20,30,60,.05), 0 12px 30px -20px rgba(20,30,60,.22);
+}
+body.desktop .kbv2-card::before{ content:""; position:absolute; left:16px; right:16px; top:0; height:3px; border-radius:0 0 3px 3px; background:var(--kacc,#6d5efc); opacity:.85; }
+body.desktop .kbv2-card-top{ display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; }
+body.desktop .kbv2-status,body.desktop .kbv2-due{ font-size:12px; font-weight:700; padding:6px 11px; border-radius:9px; border:1px solid transparent; display:inline-flex; align-items:center; gap:7px; line-height:1.25; }
+body.desktop .kbv2-status-dot{ width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+body.desktop .kbv2-due{ margin-left:auto; font-weight:600; }
+body.desktop .kbv2-card-profile{ display:flex; align-items:center; gap:12px; }
+body.desktop .kbv2-av{ position:relative; flex:0 0 auto; }
+body.desktop .kbv2-av .av{ width:48px; height:48px; border-radius:50%; }
+body.desktop .kbv2-presence{ position:absolute; right:0; bottom:0; width:12px; height:12px; border-radius:50%; background:#2fcf8f; border:2px solid #fff; }
+body.desktop .kbv2-pm{ min-width:0; }
+body.desktop .kbv2-name{ font-size:15px; font-weight:700; color:var(--kbv2-ink); line-height:1.25; }
+body.desktop .kbv2-role{ font-size:12.5px; color:#79839a; margin-top:2px; }
+body.desktop .kbv2-card-origin{ display:flex; align-items:center; gap:9px; padding:9px 12px; border-radius:11px; background:#f6f8fc; border:1px solid #eef1f7; font-size:12.5px; color:#5b6478; line-height:1.35; }
+body.desktop .kbv2-card-origin svg{ width:16px; height:16px; color:#9aa3b6; flex:0 0 auto; }
+body.desktop .kbv2-card-origin b{ color:var(--kbv2-ink); font-weight:700; }
+body.desktop .kbv2-tier{ font-size:11px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#6d5efc; }
+body.desktop .kbv2-title{ font-size:18px; font-weight:800; color:var(--kbv2-ink); line-height:1.25; letter-spacing:-.01em; margin-top:4px; }
+body.desktop .kbv2-card-chips{ display:flex; gap:7px; flex-wrap:wrap; }
+body.desktop .kbv2-chip{ font-size:12px; font-weight:600; padding:5px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:6px; line-height:1.2; }
+body.desktop .kbv2-chip-dot{ width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
+body.desktop .kbv2-chip-soft{ background:#f1f4fa; color:#5f6a80; }
+body.desktop .kbv2-card-rail{ display:flex; align-items:center; gap:0; padding:3px 2px; }
+body.desktop .kbv2-card-rail i{ width:10px; height:10px; border-radius:50%; background:#dde3ee; flex:0 0 auto; }
+body.desktop .kbv2-card-rail i.done{ background:#2fcf8f; }
+body.desktop .kbv2-card-rail i.att{ background:#f59e0b; margin-left:6px; }
+body.desktop .kbv2-card-rail .ln{ flex:1 1 auto; height:3px; background:#e6eaf2; }
+body.desktop .kbv2-card-rail .ln.done{ background:#9fe3c6; }
+body.desktop .kbv2-card-stage{ display:flex; flex-direction:column; gap:6px; }
+body.desktop .kbv2-srow{ display:flex; gap:8px; font-size:13px; align-items:baseline; }
+body.desktop .kbv2-sk{ flex:0 0 auto; min-width:66px; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#95a0b5; }
+body.desktop .kbv2-sv{ font-weight:700; }
+body.desktop .kbv2-sv2{ color:var(--kbv2-ink2,#3a4357); }
+body.desktop .kbv2-card-themes{ border:1px solid #eef1f7; border-radius:12px; overflow:hidden; background:#fbfcfe; }
+body.desktop .kbv2-themes-h{ font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#95a0b5; padding:9px 12px; background:#f5f7fb; }
+body.desktop .kbv2-theme{ display:flex; align-items:flex-start; gap:10px; padding:9px 12px; border-top:1px solid #eef1f7; font-size:13px; color:#3a4357; line-height:1.4; }
+body.desktop .kbv2-theme-n{ flex:0 0 auto; width:20px; height:20px; border-radius:7px; background:#ece9ff; color:#6d5efc; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+body.desktop .kbv2-theme-t{ flex:1 1 auto; min-width:0; }
+body.desktop .kbv2-card-chk{ font-size:12.5px; color:#79839a; }
+body.desktop .kbv2-card-date{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--kbv2-ink); font-weight:600; }
+body.desktop .kbv2-card-date svg{ width:15px; height:15px; color:#9aa3b6; }
+body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
+body.desktop .kbv2-btn{ height:40px; border-radius:11px; border:1px solid #e3e8f1; background:#f7f9fc; color:var(--kbv2-ink); font-size:13.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; }
+body.desktop .kbv2-btn svg{ width:16px; height:16px; }
+body.desktop .kbv2-btn:hover{ background:#eef2f8; }
+body.desktop .kbv2-btn-main{ flex:1 1 auto; border:0; color:#fff; background:linear-gradient(135deg,#6d5efc,#4d7cff); box-shadow:0 8px 20px -8px rgba(80,70,240,.55); }
+body.desktop .kbv2-btn-main:hover{ filter:brightness(1.05); }
+body.desktop .kbv2-btn:not(.kbv2-btn-main):not(.kbv2-btn-dots){ flex:1 1 auto; }
+body.desktop .kbv2-btn-dots{ width:44px; flex:0 0 auto; font-size:18px; }
+/* menu popover ⋯ (portal no <body> quando aberto) */
+body.desktop .kbv2-more{ position:relative; display:inline-flex; }
+body.desktop .kbv2-menu{ display:none; position:fixed; z-index:9999; min-width:210px; background:#fff; border:1px solid #e3e8f1; border-radius:12px; box-shadow:0 18px 44px -12px rgba(20,30,60,.35); padding:6px; }
+body.desktop .kbv2-menu.open{ display:block; }
+body.desktop .kbv2-menu-it{ width:100%; display:flex; align-items:center; gap:10px; padding:10px 11px; border:0; background:transparent; border-radius:9px; font-size:13.5px; font-weight:600; color:var(--kbv2-ink); cursor:pointer; text-align:left; }
+body.desktop .kbv2-menu-it svg{ width:16px; height:16px; color:#9aa3b6; }
+body.desktop .kbv2-menu-it:hover{ background:#f4f6fb; }
+body.desktop .kbv2-menu-del{ color:#e0483d; } body.desktop .kbv2-menu-del svg{ color:#e0483d; }
+/* responsividade por altura: telas baixas compactam o card (sem zoom) */
+@media (max-height:940px){ body.desktop .kbv2-card{ gap:11px; padding:14px } body.desktop .kbv2-av .av{ width:44px;height:44px } body.desktop .kbv2-title{ font-size:17px } body.desktop .kbv2-theme{ padding:7px 12px } body.desktop .kbv2-btn{ height:38px } body.desktop .kbv2-column-body{ gap:12px } }
+@media (max-height:800px){ body.desktop .kbv2-card{ gap:9px; padding:12px } body.desktop .kbv2-av .av{ width:40px;height:40px } body.desktop .kbv2-title{ font-size:16px } body.desktop .kbv2-name{ font-size:14px } body.desktop .kbv2-card-origin{ padding:7px 10px; font-size:11.5px } body.desktop .kbv2-theme{ padding:6px 11px; font-size:12.5px } body.desktop .kbv2-btn{ height:35px; font-size:13px } body.desktop .kbv2-status,body.desktop .kbv2-due{ padding:5px 9px; font-size:11px } body.desktop .kbv2-board{ gap:14px } body.desktop .kbv2-board-surface{ padding:14px } }
+</style>
 </head>
 <body>
 
@@ -2319,7 +2427,7 @@ function render(){
     else body=renderHub();
     c.innerHTML=body;
     // fix estrutural do corte: telas com kanban usam o layout flex de altura real
-    if(isDesktop()&&body.indexOf('class="kanban"')>=0)c.classList.add('board-mode');
+    if(isDesktop()&&(body.indexOf('class="kanban"')>=0||body.indexOf('kbv2-board-surface')>=0))c.classList.add('board-mode');
     afterBoard();
   }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
@@ -2487,16 +2595,12 @@ function renderPersonBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
-  // role-aware (passo 2): no "Meu quadro" de um DESIGNER, a tarefa atribuída a ele aparece na
-  // perspectiva do designer (status/timeline do fluxo dele). Tarefas onde ele NÃO é o designer
-  // seguem operacional.
-  const cardFor=t=>(hasDesigner(t)&&designerOf(t)===pid)?taskCard(t,'designer'):taskCard(t);
-  SOCIAL_COLS4.forEach((st,i)=>{const tasks=byStatus[i];
-    h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+st.color+'"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(cardFor).join(''):kemptyHtml(st.key);
-    h+='</div></div>';});
-  return h+'</div></div>';
+    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    // role-aware: no "Meu quadro" de um DESIGNER, a tarefa atribuída a ele aparece na
+    // perspectiva do designer; tarefas onde ele NÃO é o designer seguem operacional.
+    kbv2BoardHtml(SOCIAL_COLS4.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})),
+      t=>(hasDesigner(t)&&designerOf(t)===pid)?kbv2Card(t,'designer'):kbv2Card(t));
+  return h+'</div>';
 }
 
 /* ===== P3/P4 — Fluxo do Cliente x Fluxo dos Designers ===== */
@@ -2593,12 +2697,9 @@ function renderClientFlowBoard(){
     '<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Cliente</div><div class="d-bh-sub">Fica visível até a aprovação final — mesmo enviado ao designer · '+list.length+' tarefa'+(list.length===1?'':'s')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
-  CLIENT_COLS4.forEach((c,i)=>{const tasks=byCol[i];
-    h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+c.color+'"><div class="khead"><div class="cc" style="background:'+c.color+'"></div><div class="kt" style="color:'+c.color+'">'+esc(c.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(t=>taskCard(t,'client')).join(''):kemptyHtml(c.key);
-    h+='</div></div>';});
-  return h+'</div></div>';
+    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    kbv2BoardHtml(CLIENT_COLS4.map((c,i)=>({label:c.label,color:c.color,key:c.key,tasks:byCol[i]})), t=>kbv2Card(t,'client'));
+  return h+'</div>';
 }
 function renderDesignersHub(){
   const dz=designerBoardsList();
@@ -2627,12 +2728,9 @@ function renderDesignerBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designer · '+esc((p.name||'').split(' ')[0]||'Designer')+'</div><div class="d-bh-sub">'+esc(p.role||'Designer')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
-  DESIGNER_COLS4.forEach((st,i)=>{const tasks=byStatus[i];
-    h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+st.color+'"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(t=>taskCard(t,'designer')).join(''):kemptyHtml(st.key);
-    h+='</div></div>';});
-  return h+'</div></div>';
+    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    kbv2BoardHtml(DESIGNER_COLS4.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})), t=>kbv2Card(t,'designer'));
+  return h+'</div>';
 }
 
 /* ===== FLUXO DAS SOCIAL MEDIAS (eixo próprio, por Social Media) ===== */
@@ -3048,12 +3146,9 @@ function renderSocialBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowsocials">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Social · '+esc((p.name||'').split(' ')[0]||'Social Media')+'</div><div class="d-bh-sub">Fluxo operacional · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+'<div class="kanban">';
-  SOCIAL_COLS4.forEach((c,i)=>{const tasks=byCol[i];
-    h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+c.color+'"><div class="khead"><div class="cc" style="background:'+c.color+'"></div><div class="kt" style="color:'+c.color+'">'+esc(c.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-    h+=tasks.length?tasks.map(taskCard).join(''):kemptyHtml(c.key);
-    h+='</div></div>';});
-  return h+'</div></div>';
+    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    kbv2BoardHtml(SOCIAL_COLS4.map((c,i)=>({label:c.label,color:c.color,key:c.key,tasks:byCol[i]})));
+  return h+'</div>';
 }
 
 /* ---- KANBAN ---- */
@@ -3081,15 +3176,7 @@ function renderBoard(){
         taskChips()+
       '</div>'+
     '</div>';
-    h+='<div class="kanban">';
-    STATUS.forEach((st,i)=>{
-      const tasks=byStatus[i];
-      h+='<div class="kcol'+(tasks.length?' kcol-live':'')+'" style="--kc:'+st.color+'"><div class="khead"><div class="cc" style="background:'+st.color+'"></div><div class="kt" style="color:'+st.color+'">'+esc(st.label)+'</div><div class="kn">'+tasks.length+'</div></div><div class="kbody">';
-      if(tasks.length)h+=tasks.map(taskCard).join('');
-      else h+=kemptyHtml(st.key);
-      h+='</div></div>';
-    });
-    h+='</div>';
+    h+=kbv2BoardHtml(STATUS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})));
     return h+'</div>';
   }
   // Mobile: mantém o seletor de coluna única (paridade APK)
@@ -3266,6 +3353,131 @@ function kemptyHtml(kind){
   return '<div class="kempty"><div class="kempty-ic">'+ic+'</div>'+
     '<div class="kempty-t">Nenhuma tarefa aqui</div>'+
     '<div class="kempty-s">Tarefas adicionadas ficarão visíveis nesta coluna.</div></div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KANBANBOARDV2 — componente visual ISOLADO ("Minimal Premium Workflow").
+   Shell dark + board CLARO premium. Markup/CSS próprios (.kbv2-*), SEM herdar
+   .tcv4/.tc/.kcol/.kbody/:only-child/.kbody-single-card. Reaproveita SOMENTE as
+   fontes de dados do app (designerStatusView × clientFacing × clientStatusView ×
+   taskTimeline × cronOf), e os handlers existentes (data-detail/move/cardmenu/del/resend).
+   ═══════════════════════════════════════════════════════════════════════════ */
+function kbv2Empty(kind){
+  const k=String(kind||'');
+  const IC={
+   plus:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="3"/><path d="M16 14h12M16 20h8"/><circle cx="34" cy="34" r="9" fill="#6E5BFF" stroke="none"/><path d="M34 30.5v7M30.5 34h7" stroke="#fff"/></svg>',
+   search:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="24" height="32" rx="3"/><path d="M16 14h12M16 20h8"/><circle cx="31" cy="31" r="7" fill="#fff"/><circle cx="31" cy="31" r="6.5"/><path d="M36 36l5 5"/></svg>',
+   check:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="16"/><path d="M17 24.5l5 5 9-10"/></svg>',
+   list:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="28" height="36" rx="3"/><path d="M17 16h14M17 24h14M17 32h9"/></svg>'};
+  const ic=/afazer/.test(k)?IC.plus:(/revis|ajuste/.test(k)?IC.search:(/aprovado|concluido|entregue/.test(k)?IC.check:IC.list));
+  return '<div class="kbv2-empty"><div class="kbv2-empty-ic">'+ic+'</div>'+
+    '<div class="kbv2-empty-t">Nenhuma tarefa aqui</div>'+
+    '<div class="kbv2-empty-s">Tarefas adicionadas ficarão visíveis nesta coluna.</div></div>';
+}
+function kbv2Card(t, persp){
+  const designerView = persp==='designer' && secOf(t.sector).key==='cronograma' && hasDesigner(t);
+  const clientView = persp==='client' && secOf(t.sector).key==='cronograma';
+  const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
+  const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
+  const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'';
+  const cron=cronOf(t);const isCron=s.key==='cronograma';
+  const stage=isCron?(designerView?designerStatusView(t):(clientView?clientFacingStatusView(t):clientStatusView(t))):null;
+  const topSt=designerView?designerStatusView(t):st;
+  const acc=(stage&&stage.color)||topSt.color;
+  let prog=null;
+  if(isCron){
+    if(designerView){
+      const cur=designerColView(t);const ci=cur==='entregue'?3:(cur==='afazer'?0:1);
+      prog={total:3,done:ci===3?3:ci,curIdx:ci===3?-1:ci,next:designerNextShort(t),attention:cur==='revisao'};
+    }else{
+      const tl=taskTimeline(t);const main=tl.milestones.filter(m=>m.key!=='ajuste');
+      const ownU=tl.owner&&tl.owner.id?state.users.find(u=>u.id===tl.owner.id):null;
+      prog={total:main.length,done:main.filter(m=>m.state==='done').length,
+            curIdx:main.findIndex(m=>m.state==='current'),
+            owner:(tl.owner&&tl.owner.role!=='—')?(tl.owner.role+(ownU&&ownU.name?(' · '+ownU.name.split(' ')[0]):'')):'Concluído',
+            next:clientView?clientFacingNextShort(t):nextActionShort(t),
+            attention:!!tl.milestones.find(m=>m.key==='ajuste'&&m.state==='attention')};
+    }
+  }
+  const topLabel=designerView?topSt.label.replace('Designer em ','Em '):topSt.label;
+  const dShort=d?d.text:'';
+  let h='<div class="kbv2-card" style="--kacc:'+acc+'">';
+  // 1) topo: status + prazo
+  h+='<div class="kbv2-card-top">'+
+       '<span class="kbv2-status" style="color:'+topSt.color+';background:'+withAlpha(topSt.color,.12)+';border-color:'+withAlpha(topSt.color,.28)+'"><i class="kbv2-status-dot" style="background:'+topSt.color+'"></i>'+esc(topLabel)+'</span>'+
+       (d?'<span class="kbv2-due" style="color:'+d.color+';background:'+withAlpha(d.color,.14)+';border-color:'+withAlpha(d.color,.30)+'">'+esc(dShort)+'</span>':'')+
+     '</div>';
+  // 2) perfil
+  h+='<div class="kbv2-card-profile">'+
+       '<span class="kbv2-av">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},48):'<div class="av" style="width:48px;height:48px">'+svg('person')+'</div>')+'<i class="kbv2-presence"></i></span>'+
+       '<div class="kbv2-pm"><div class="kbv2-name">'+esc(asgName||'Sem responsável')+'</div>'+
+         '<div class="kbv2-role">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
+     '</div>';
+  // 3) enviado por
+  if(reqName)h+='<div class="kbv2-card-origin">'+svg('person')+'<span>Enviado por <b>'+esc(reqName)+'</b>'+(t.createdAt?' · '+fmtDateTimeBR(t.createdAt):'')+'</span></div>';
+  // 4-5) tier (cliente) + título
+  h+='<div class="kbv2-card-main">'+
+       (t.client?'<div class="kbv2-tier">'+esc(t.client)+'</div>':'')+
+       '<div class="kbv2-title" title="'+esc(t.title||'')+'">'+esc(t.title||'Sem título')+'</div>'+
+     '</div>';
+  // 6) chips: estágio + setor + periodicidade
+  h+='<div class="kbv2-card-chips">'+
+       (stage&&!designerView?'<span class="kbv2-chip" style="color:'+stage.color+';background:'+withAlpha(stage.color,.12)+'"><i class="kbv2-chip-dot" style="background:'+stage.color+'"></i>'+esc(stage.label)+'</span>':
+        (designerView?'<span class="kbv2-chip" style="color:'+topSt.color+';background:'+withAlpha(topSt.color,.12)+'"><i class="kbv2-chip-dot" style="background:'+topSt.color+'"></i>'+esc(topLabel)+'</span>':''))+
+       '<span class="kbv2-chip" style="color:'+s.color+';background:'+withAlpha(s.color,.12)+'">'+esc(s.label)+'</span>'+
+       (cron&&cron.label&&cron.label!==s.label?'<span class="kbv2-chip kbv2-chip-soft">'+esc(cron.label)+'</span>':'')+
+       (t.priority?'<span class="kbv2-chip" style="color:#EF4444;background:'+withAlpha('#EF4444',.12)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+
+     '</div>';
+  // 7) trilho + 8) etapa
+  if(prog){
+    let rail='';
+    for(let i2=0;i2<prog.total;i2++){
+      const cls=i2<prog.done?'done':(i2===prog.curIdx?'cur':'');
+      rail+='<i class="'+cls+'"'+(i2===prog.curIdx?' style="background:'+acc+';box-shadow:0 0 0 4px '+withAlpha(acc,.18)+'"':'')+'></i>'+(i2<prog.total-1?'<span class="ln'+(i2<prog.done?' done':'')+'"></span>':'');
+    }
+    if(prog.attention)rail+='<i class="att" title="Ajuste pedido pelo cliente"></i>';
+    h+='<div class="kbv2-card-rail">'+rail+'</div>';
+    const etapaLbl=designerView?'Sua etapa':'Etapa';
+    const etapaVal=designerView?(stage?stage.label:topSt.label).replace('Designer em ','Em '):(prog.owner||((stage||topSt).label));
+    h+='<div class="kbv2-card-stage">'+
+         '<div class="kbv2-srow"><span class="kbv2-sk">'+esc(etapaLbl)+'</span><span class="kbv2-sv" style="color:'+acc+'">'+esc(etapaVal)+'</span></div>'+
+         (prog.next?'<div class="kbv2-srow"><span class="kbv2-sk">Próxima</span><span class="kbv2-sv2">'+esc(prog.next)+'</span></div>':'')+
+       '</div>';
+  }
+  // 9) TEMA(S)
+  if(cron&&cron.list.length){
+    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">'+(cron.list.length>1?'Temas':'Tema')+'</div>'+
+       cron.list.map(c=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(c._i+1)+'</span><span class="kbv2-theme-t">'+esc(c.tema||'(sem tema)')+'</span></div>').join('')+
+     '</div>';
+  }
+  if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;h+='<div class="kbv2-card-chk">'+done+' de '+t.checklist.length+' no checklist</div>';}
+  // 10) data
+  if(t.dueDate||t.due)h+='<div class="kbv2-card-date">'+svg('calendar')+'<span>'+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span></div>';
+  // 11) footer ações (reutiliza handlers existentes via data-*)
+  h+='<div class="kbv2-card-footer">'+
+       '<button class="kbv2-btn kbv2-btn-main" data-detail="'+t.id+'">'+svg('eye')+'<span>Detalhes</span></button>'+
+       '<button class="kbv2-btn" data-move="'+t.id+'">'+svg('swap')+'<span>Mover</span></button>'+
+       ((canDelTask(t)||hasDesigner(t))?'<span class="kbv2-more"><button class="kbv2-btn kbv2-btn-dots" data-cardmenu="'+t.id+'" title="Mais ações">⋯</button>'+
+         '<span class="kbv2-menu" data-menu-of="'+t.id+'">'+
+           (hasDesigner(t)?'<button class="kbv2-menu-it" data-resend="'+t.id+'">'+svg('send')+'Reenviar notificação</button>':'')+
+           (canDelTask(t)?'<button class="kbv2-menu-it kbv2-menu-del" data-del="'+t.id+'">'+svg('trash')+'Excluir tarefa</button>':'')+
+         '</span></span>':'')+
+     '</div>';
+  return h+'</div>';
+}
+// Board V2: superfície clara + colunas iguais (align-items:stretch). cols=[{label,color,key,tasks}], cardFn(t)
+function kbv2BoardHtml(cols, cardFn){
+  const fn=cardFn||(t=>kbv2Card(t));
+  let h='<div class="kbv2-board-surface"><div class="kbv2-board">';
+  cols.forEach(c=>{
+    const live=c.tasks.length?' kbv2-column-active':'';
+    h+='<section class="kbv2-column'+live+'" style="--kc:'+c.color+'">'+
+         '<div class="kbv2-column-header"><span class="kbv2-cdot" style="background:'+c.color+'"></span><span class="kbv2-ctitle">'+esc(c.label)+'</span><span class="kbv2-ccount">'+c.tasks.length+'</span></div>'+
+         '<div class="kbv2-column-body">'+(c.tasks.length?c.tasks.map(fn).join(''):kbv2Empty(c.key))+'</div>'+
+         '<button class="kbv2-column-add" data-fab="1">'+svg('plus')+'<span>Adicionar tarefa</span></button>'+
+       '</section>';
+  });
+  return h+'</div></div>';
 }
 function canDelTask(t){const u=state.user;return !!u&&(canSeeAll(u)||t.by===u.id||t.assigneeId===u.id);}
 function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=()=>{boardQuery=s.value;const p=s.selectionStart;render();const n=document.getElementById('bSearch');if(n){n.focus();n.setSelectionRange(p,p);}};}
@@ -4962,10 +5174,10 @@ async function saveTask(){const f=state.form;
 // popover '⋯' do card V4: PORTAL no <body> (escapa contain/overflow). Fecha devolvendo o nó
 // ao card de origem; fecha também em rolagem/resize/Escape para não ficar "órfão" do botão.
 function closeCardMenus(){
-  document.querySelectorAll('.tcv4-menu.open').forEach(m=>{m.classList.remove('open');m.style.left='';m.style.top='';
+  document.querySelectorAll('.tcv4-menu.open, .kbv2-menu.open').forEach(m=>{m.classList.remove('open');m.style.left='';m.style.top='';
     const host=document.querySelector('[data-cardmenu="'+(m.dataset.menuOf||'')+'"]');
-    const w=host&&host.closest('.tcv4-more');if(w)w.appendChild(m);else m.remove();});
-  document.querySelectorAll('.tcv4-more.open').forEach(x=>x.classList.remove('open'));
+    const w=host&&host.closest('.tcv4-more, .kbv2-more');if(w)w.appendChild(m);else m.remove();});
+  document.querySelectorAll('.tcv4-more.open, .kbv2-more.open').forEach(x=>x.classList.remove('open'));
 }
 document.addEventListener('scroll',closeCardMenus,true);
 window.addEventListener('resize',closeCardMenus);
@@ -5000,9 +5212,9 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-day]')){agSel=el.dataset.day;render();return;}
   // menu '⋯' do card V4: popover FIXED via PORTAL no <body>, ancorado ao botão (abre para
   // cima; vira para baixo se faltar espaço; nunca é cortado). Clique fora fecha todos.
-  if(el=g('[data-cardmenu]')){const w=el.closest('.tcv4-more');const open=w.classList.contains('open');
+  if(el=g('[data-cardmenu]')){const w=el.closest('.tcv4-more, .kbv2-more');const open=w.classList.contains('open');
     closeCardMenus();
-    if(!open){w.classList.add('open');const m=w.querySelector('.tcv4-menu');if(m){
+    if(!open){w.classList.add('open');const m=w.querySelector('.tcv4-menu, .kbv2-menu');if(m){
       document.body.appendChild(m);m.classList.add('open');
       // calibração: mede onde 0 e 100 caem de verdade e converte — posicionamento exato
       // independentemente de qualquer escala/zoom de SO ou do Chromium.

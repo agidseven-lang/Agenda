@@ -394,7 +394,7 @@ check('D9', 'Colunas Social = 4 (A Fazer/Em andamento/Revisão/Finalizado)', /co
 check('D10', 'Colunas Designer = 4 (A Fazer/Em andamento/Revisão-Ajuste/Entregue)', (DH.match(/const DESIGNER_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4 && /label:'Revisão\/Ajuste'/.test(DH));
 check('D11', 'Colunas Cliente = 4 (Enviado/Em análise/Revisão solicitada/Aprovado)', (DH.match(/const CLIENT_COLS4=\[([\s\S]*?)\];/)||['',''])[1].split('{key').length - 1 === 4);
 check('D12', 'Social board usa SOCIAL_COLS4 (não OPERATIONAL_COLS 8)', /const byCol=SOCIAL_COLS4\.map/.test(DH));
-check('D13', 'Designer board usa DESIGNER_COLS4 (4 colunas) + designerColView + card perspectiva designer', /const byStatus=DESIGNER_COLS4\.map\(st=>list\.filter\(t=>designerColView\(t\)===st\.key\)/.test(DH) && /tasks\.map\(t=>taskCard\(t,'designer'\)\)/.test(DH));
+check('D13', 'Designer board usa DESIGNER_COLS4 (4 colunas) + designerColView + card KANBANBOARDV2 perspectiva designer', /const byStatus=DESIGNER_COLS4\.map\(st=>list\.filter\(t=>designerColView\(t\)===st\.key\)/.test(DH) && /kbv2BoardHtml\(DESIGNER_COLS4\.map[\s\S]*?t=>kbv2Card\(t,'designer'\)\)/.test(DH));
 check('D14', 'Cliente board usa CLIENT_COLS4', /const byCol=CLIENT_COLS4\.map/.test(DH));
 // ===== PASSO 2 — VISÃO ROLE-AWARE DO DESIGNER (Desktop) =====
 check('RA_COLVIEW', 'designerColView mantém coluna própria de Revisão (não colapsa revisao→andamento)', /function designerColView\(t\)\{const c=designerCol\(t\);return c==='concluido'\?'entregue':\(c==='revisao'\?'revisao':/.test(DH));
@@ -407,7 +407,7 @@ const dctFn = ((DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0
 check('RA_DESIGNER_NO_CLIENT', 'progresso do card na perspectiva do DESIGNER usa o eixo dele (designerColView/designerNextShort), sem taskTimeline/clientStatusView', dctFn.length>0 && dctFn.indexOf('designerColView(')>=0 && dctFn.indexOf('designerNextShort(')>=0 && dctFn.indexOf('taskTimeline(')===-1 && dctFn.indexOf('clientStatusView(')===-1);
 check('RA_OPCOL_REV', 'operationalCol: designerFlowStatus=revisao → aguardando_designer_revisao (distinto de produção)', /if\(dc==='revisao'\)return 'aguardando_designer_revisao';/.test(DH));
 check('RA_OPCOL_LABEL', 'OPERATIONAL_COLS tem "Designer em revisão" (aguardando_designer_revisao)', /key:'aguardando_designer_revisao',\s*label:'Designer em revisão'/.test(DH));
-check('RA_PERSONBOARD', 'Meu quadro do designer usa card perspectiva designer p/ tarefa atribuída a ele', /const cardFor=t=>\(hasDesigner\(t\)&&designerOf\(t\)===pid\)\?taskCard\(t,'designer'\):taskCard\(t\);/.test(DH));
+check('RA_PERSONBOARD', 'Meu quadro do designer usa card KANBANBOARDV2 perspectiva designer p/ tarefa atribuída a ele', /\(hasDesigner\(t\)&&designerOf\(t\)===pid\)\?kbv2Card\(t,'designer'\):kbv2Card\(t\)/.test(DH));
 // Funcional (executa as funções REAIS extraídas): mapeamento do designer + estado social-side
 (function(){
   const constArr = n => (DH.match(new RegExp('const '+n+'\\s*=\\s*\\[[\\s\\S]*?\\];'))||[''])[0];
@@ -764,7 +764,7 @@ const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
 // detail-hierarchy-v2: o chip do DETALHE migrou da fonte clientStatusView p/ detailState
 // (a mesma máquina do hero — nunca contradiz). Restam 4 usos: definição + taskTimeline
 // interno + badge do taskCard (ternário designerView) + flowSummary "Status operacional".
-check('CSV_SCOPE', 'clientStatusView: definição + taskCard + flowSummary + uso interno taskTimeline (4 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 4 && /function clientStatusView\(t\)/.test(DH_noc));
+check('CSV_SCOPE', 'clientStatusView: definição + taskCard + kbv2Card + flowSummary + uso interno taskTimeline (5 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 5 && /function clientStatusView\(t\)/.test(DH_noc));
 // taskCard MIGRADO (role-aware f96aa2e: ternário designerView).
 check('CSV_TASKCARD_MIGRATED', "taskCard V3 cronograma: UM estágio por perspectiva (fonte única), sem badge concorrente", /const stage=isCron\?\(designerView\?designerStatusView\(t\)/.test(DH) && (DH.match(/tcv4-chip/g)||[]).length>=3 && /tcv4-st\b/.test(DH));
 // chip do detalhe MIGRADO p/ a máquina de estados (1 chip, sem status concorrentes).
@@ -845,7 +845,7 @@ console.log(`${C.b}\n[PARTE H] Fase 2 (passo 1) — taskTimeline pura/dormente +
 check('TL_DEF', 'taskTimeline(t) existe e retorna {current,last,next,owner,milestones}', /function taskTimeline\(t\)\{[\s\S]*?return \{ current:cur, last:last, next:nextActionText\(t\), owner:owner, milestones:milestones \};/.test(DH));
 const DH_noc2 = DH.replace(/^\s*\/\/.*$/gm,'');
 // Passo 2: taskTimeline agora é consumida APENAS pelo taskCardTimeline (definição + 1 uso).
-check('TL_CARD_WIRED', 'taskTimeline consumida pelo card V2 + opPanelBlock (3 ocorrências: definição + 2 usos; helpers antigos REMOVIDOS)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 3 && /function taskTimeline\(t\)/.test(DH_noc2) && !/taskCardTimeline|designerCardTimeline/.test(DH_noc2));
+check('TL_CARD_WIRED', 'taskTimeline consumida pelo card V2 + kbv2Card + opPanelBlock (4 ocorrências: definição + 3 usos; helpers antigos REMOVIDOS)', (DH_noc2.match(/taskTimeline\(/g)||[]).length === 4 && /function taskTimeline\(t\)/.test(DH_noc2) && !/taskCardTimeline|designerCardTimeline/.test(DH_noc2));
 check('TL2_CARD_RENDER', 'card V4 (referência): trilho de pontos + ETAPA/PRÓXIMA (fontes únicas por perspectiva)', /tcv4-rail/.test(DH) && /tcv4-steps/.test(DH) && /tcv4-next/.test(DH) && /clientView\?clientFacingNextShort\(t\):nextActionShort\(t\)/.test(DH));
 check('TL2_CARD_ONLY', 'helpers de timeline do card antigos REMOVIDOS (sem código morto)', !/taskCardTimeline\(/.test(DH_noc2) && !/designerCardTimeline\(/.test(DH_noc2));
 check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora; isCron guard)', /let prog=null;\s*\n\s*if\(isCron\)\{/.test(DH));
@@ -1151,7 +1151,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
       ALL.every(t=>{const l=mod.clientFacingStatusView(t).label+' '+mod.clientFacingNextShort(t);return l.indexOf('designer iniciar')<0&&l.indexOf('Aguardando envio')<0;}));
   } else { check('CY2_EVAL','eval do ciclo 1.0.133 indisponível', false); }
   // FONTE — quadro Cliente usa perspectiva client no card (badge + próxima):
-  check('CY2_SRC_BOARD','renderClientFlowBoard renderiza taskCard(t,\'client\')', /h\+=tasks\.length\?tasks\.map\(t=>taskCard\(t,'client'\)\)\.join/.test(DH));
+  check('CY2_SRC_BOARD','renderClientFlowBoard renderiza card KANBANBOARDV2 perspectiva cliente', /kbv2BoardHtml\(CLIENT_COLS4\.map[\s\S]*?t=>kbv2Card\(t,'client'\)\)/.test(DH));
   check('CY2_SRC_COL4','clientCol4: "Aprovado" SÓ p/ concluido; aprovado/producao/reenviado → analise', /if\(c==='concluido'\)return 'aprovado';\s*\n\s*if\(c==='aprovado'\|\|c==='producao'\|\|c==='reenviado'\)return 'analise';/.test(DH));
   // Problema 6 — card cortado: coluna com offset realista + respiro no fim do scroll.
   check('CY2_CSS_KCOL','Card cortado (fix ESTRUTURAL V64.53): board-mode flex + coluna height:auto/max-height:100% (1 card = inteiro, sem scrollbar)',
@@ -1179,8 +1179,8 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     check('CY3_E_CLOSED','Após o botão final (approveAll): detailState=temas_aprovados + senddesigner disponível', mod.detailState(CONF).key==='temas_aprovados' && mod.detailState(CONF).actions.indexOf('senddesigner')>=0);
   } else { check('CY3_EVAL','eval CY3 indisponível', false); }
   // D — card cortado: fix estrutural medido (fitKanban) ligado em render/resize/scroll.
-  check('CY3_FIT_WIRED','board-mode ligado pela presença REAL de kanban no corpo (e removido nas demais telas)',
-    /c\.classList\.remove\('board-mode'\);/.test(DH) && /if\(isDesktop\(\)&&body\.indexOf\('class="kanban"'\)>=0\)c\.classList\.add\('board-mode'\);/.test(DH));
+  check('CY3_FIT_WIRED','board-mode ligado pela presença REAL do board (kanban legado OU kbv2-board-surface) no corpo',
+    /c\.classList\.remove\('board-mode'\);/.test(DH) && /if\(isDesktop\(\)&&\(body\.indexOf\('class="kanban"'\)>=0\|\|body\.indexOf\('kbv2-board-surface'\)>=0\)\)c\.classList\.add\('board-mode'\);/.test(DH));
   check('CY3_FIT_MATH','SEM cálculo frágil: nenhum fitKanban/--kanban-h restante (layout 100% estrutural)',
     DH.indexOf('fitKanban')<0 && DH.indexOf('--kanban-h')<0);
   // Worker V64.49 (branch) — gate assistido + copy + fechamento explícito:
@@ -1248,7 +1248,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
   check('CY5_KANBAN_FRAME','Proposta A: FRAME compartilhado (.scr) com max-width tokenizado + centralizado (margin-inline:auto); toolbar+Kanban no MESMO eixo; abas/Setores à direita (justify-content:flex-end); card SEM max-width isolado',
     /--kanban-frame-max-width:1700px/.test(DH) &&
     /#content\.board-mode > \.scr\{[^}]*max-width:var\(--kanban-frame-max-width\);margin-inline:auto/.test(DH) &&
-    /class="scr"[^>]*>'\+boardToolbar\(\)\+'<div class="kanban"/.test(DH) &&
+    /class="scr"[^>]*>'\+boardToolbar\(\)\+\s*kbv2BoardHtml\(/.test(DH) &&
     /\.d-board-tools\.tbar \.tchips\{[^}]*justify-content:flex-end\}/.test(DH) &&
     !/\.kbody>\.tc\.tcv4\{width:100%;max-width:260px;align-self:center\}/.test(DH));
   if(mod&&mod.designerStatusView){
