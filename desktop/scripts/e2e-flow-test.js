@@ -1301,8 +1301,15 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     /não fica salva/.test(DH));
   check('CY7_CARD_COMPACT','Card PREMIUM V2: accent + header(identidade) + cliente/título/estágio + progresso segmentado + chips + rodapé de ações; densidade gradual por viewport',
     (()=>{const tc=(DH.match(/function taskCard\(t, persp\)\{[\s\S]*?\n\}/)||[''])[0];
-      return ['tcv4-top','tcv4-st','tcv4-due','tcv4-person','tcv4-origin','tcv4-client','tcv4-title','tcv4-chips','tcv4-rail','tcv4-themes','tcv4-circ','tcv4-date','tcv4-foot','data-cardmenu'].every(k=>tc.indexOf(k)>=0)&&
-             tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
+      // V64.x — design TEMAS aprovado pelo usuário (commit 0ee2b85): cada
+      // linha mostra APENAS o badge (tcv4-theme-n) + nome do tema
+      // (tcv4-theme-t). Sem círculo de estado por tema (tcv4-circ), sem
+      // mini-fileira (tcv4-mini) e sem rodapé "+N conteúdos"
+      // (tcv4-theme-more). A asserção exige presença dos tokens do novo
+      // design e ausência dos tokens removidos.
+      const required=['tcv4-top','tcv4-st','tcv4-due','tcv4-person','tcv4-origin','tcv4-client','tcv4-title','tcv4-chips','tcv4-rail','tcv4-themes','tcv4-theme-n','tcv4-theme-t','tcv4-date','tcv4-foot','data-cardmenu'];
+      const forbidden=['tcv4-circ','tcv4-mini','tcv4-theme-more'];
+      return required.every(k=>tc.indexOf(k)>=0) && forbidden.every(k=>tc.indexOf(k)<0) && tc.indexOf('tc-person')<0;})() && /@media\(max-height:660px\)\{[\s\S]{0,200}tcv4/.test(DH) && /@font-face\{font-family:'InterVar'/.test(DH));
   check('CY7_KCOL_AUTO','Colunas de ALTURA IGUAL (referência) + 1 card inteiro sem scrollbar + scrollbar fina + chrome enxuto',
     /kcol\{height:100%;max-height:100%;min-height:380px\}/.test(DH) && /kbody::-webkit-scrollbar\{width:8px\}/.test(DH) &&
     /#content\.board-mode \.kcol \.kbody\{padding:16px 10px 2px;scroll-snap-type:y proximity;scroll-padding-top:14px\}/.test(DH) && /#content\.board-mode \.kcol \.kbody \.tc:last-child\{margin-bottom:0\}/.test(DH));
