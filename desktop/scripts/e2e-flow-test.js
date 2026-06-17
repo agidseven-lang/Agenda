@@ -1532,11 +1532,14 @@ console.log(`${C.b}\n[FASE PRODUÇÃO 1] Flow Engine canônico (Social → Desig
   }
 })();
 
-/* ─── [PROD1.1] HOTFIX visual: card preenche a coluna + popover do menu sem overlap ─── */
-console.log(`${C.b}\n[PROD1.1] Hotfix de regressões visuais (layout do card + menu "⋯")${C.x}`);
-check('PROD14_COLUMN_FILLER','Vazio resolvido FORA do card: card NATURAL (sem flex:1/space-between no :only-child; sem margin-top:auto no footer; rodapé margin-top:2px) + filler da COLUNA (.kbv2-column-filler flex:1 1 auto) preenchendo o espaço restante',
-  !/:only-child\{ flex:1 1 auto/.test(DH) && !/:only-child>\.kbv2-card-footer\{ margin-top:auto; \}/.test(DH)
-  && /\.kbv2-column-filler\{[\s\S]*?flex:1 1 auto/.test(DH) && /class="kbv2-column-filler"/.test(DH)
+/* ─── [PROD1.6] Visual: card ÚNICO preenche a coluna (opção B) + popover do menu sem overlap ─── */
+console.log(`${C.b}\n[PROD1.6] Card único preenche a coluna (opção B) + regressões visuais (menu "⋯", SLA, Flow Engine)${C.x}`);
+check('PROD16_CARD_FILL_KEYBREATHS','Card ÚNICO preenche 100% a coluna (opção B): .kbv2-card:only-child flex:1 1 auto + respiro distribuído em 3 cortes (origem·temas·rodapé) via margin-top:auto (rodapé na base). SEM filler, SEM space-between bruto (não é A), SEM zoom de fonte (não é C); footer-base intacto (margin-top:2px)',
+  !/kbv2-column-filler/.test(DH)
+  && /\.kbv2-column-body>\.kbv2-card:only-child\{ flex:1 1 auto; \}/.test(DH)
+  && /:only-child>\.kbv2-card-origin,[\s\S]*?:only-child>\.kbv2-card-themes,[\s\S]*?:only-child>\.kbv2-card-footer\{ margin-top:auto; \}/.test(DH)
+  && !/:only-child\{ flex:1 1 auto; justify-content:space-between/.test(DH)
+  && !/kbv2-card:only-child \.kbv2-title\{ font-size/.test(DH)
   && /\.kbv2-card-footer\{ display:flex; gap:8px; margin-top:2px; \}/.test(DH));
 check('PROD11_MENU_BELOW','Menu "⋯" abre PARA BAIXO por padrão e ancora no fundo do viewport se não couber (não cobre o conteúdo acima do botão)',
   /let tp=r\.bottom\+8;if\(tp\+mh>window\.innerHeight-8\)tp=Math\.max\(8,window\.innerHeight-mh-8\);/.test(DH) && !/let tp=r\.top-mh-8;if\(tp<8\)/.test(DH));
