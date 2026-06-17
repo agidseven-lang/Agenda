@@ -2018,6 +2018,11 @@ body.desktop .kbv2-card-chk{ font-size:12.5px; color:#8b94a6; }
 body.desktop .kbv2-card-date{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--kbv2-ink); font-weight:600; }
 body.desktop .kbv2-card-date svg{ width:15px; height:15px; color:#6f7889; }
 body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
+/* PROD1.1 — corrige o "buraco" na base: o card ÚNICO da coluna preenche a altura
+   (a coluna estica por align-items:stretch) e o rodapé fica ancorado embaixo. Multi-card
+   mantém empilhamento natural. Não altera Flow Engine, BLACK PREMIUM nem o chip SLA. */
+body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:1 1 auto; }
+body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-top:auto; }
 body.desktop .kbv2-btn{ height:40px; border-radius:11px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:var(--kbv2-ink); font-size:13.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; }
 body.desktop .kbv2-btn svg{ width:16px; height:16px; }
 body.desktop .kbv2-btn:hover{ background:rgba(255,255,255,.09); }
@@ -5400,8 +5405,9 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
   if(el=g('[data-agf]')){agFilter=el.dataset.agf;render();return;}
   if(el=g('[data-day]')){agSel=el.dataset.day;render();return;}
-  // menu '⋯' do card V4: popover FIXED via PORTAL no <body>, ancorado ao botão (abre para
-  // cima; vira para baixo se faltar espaço; nunca é cortado). Clique fora fecha todos.
+  // menu '⋯' do card V4: popover FIXED via PORTAL no <body>, ancorado ao botão. PROD1.1:
+  // abre PARA BAIXO por padrão (não cobre temas/infos acima do botão); se não couber abaixo,
+  // ancora no rodapé do viewport — nunca sobe sobre o conteúdo do card. Clique fora fecha todos.
   if(el=g('[data-cardmenu]')){const w=el.closest('.tcv4-more, .kbv2-more');const open=w.classList.contains('open');
     closeCardMenus();
     if(!open){w.classList.add('open');const m=w.querySelector('.tcv4-menu, .kbv2-menu');if(m){
@@ -5415,7 +5421,8 @@ document.addEventListener('click',async e=>{
       const kx=(c1.left-c0.left)/100||1,ky=(c1.top-c0.top)/100||1;
       const r=el.getBoundingClientRect(),mr0=m.getBoundingClientRect(),mw=mr0.width,mh=mr0.height;
       let lf=Math.max(8,Math.min(r.right-mw,window.innerWidth-mw-8));
-      let tp=r.top-mh-8;if(tp<8)tp=Math.min(r.bottom+8,window.innerHeight-mh-8);
+      // PROD1.1: PARA BAIXO por padrão; se não couber, ancora no fundo do viewport (sem cobrir o conteúdo acima).
+      let tp=r.bottom+8;if(tp+mh>window.innerHeight-8)tp=Math.max(8,window.innerHeight-mh-8);
       m.style.left=((lf-c0.left)/kx)+'px';m.style.top=((tp-c0.top)/ky)+'px';}}
     return;}
   closeCardMenus();
