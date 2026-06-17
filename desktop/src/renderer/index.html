@@ -2640,6 +2640,9 @@ const CLIENT_COLS=[
 ];
 // Coluna do cliente: usa clientFlowStatus (gravado por Worker/Desktop); senão deriva (compat).
 function clientCol(t){
+  // Fase Produção 1 — D2: aprovação FINAL do cliente é a ÚNICA conclusão (mesma regra canônica de
+  // COMPLETED do Flow Engine; inline p/ manter clientCol pura e avaliável no sandbox do e2e).
+  if(t&&(t.finalApprovalCompleted===true||t.clientApprovedFlag===true||t.operationalStatus==='concluido'||t.cronStatus==='aprovado_final'||t.clientFlowStatus==='concluido'))return 'concluido';
   const v=(t&&t.clientFlowStatus||'').toString();
   if(CLIENT_COLS.some(c=>c.key===v)){
     // 'concluido' explícito só vale se o fluxo realmente encerrou; senão ainda é reenvio/aprov. final.
@@ -2762,6 +2765,8 @@ function socialOf(t){
 function socialUsers(){return state.users.filter(u=>u&&!['pendente','removido','excluido'].includes(u.status||'')&&isSocialUser(u));}
 // Coluna do quadro da Social Media: cronograma deriva do eixo do cliente; demais usam status.
 function socialCol(t){
+  // Fase Produção 1 — D2: conclusão final canônica reflete imediatamente na coluna da Social.
+  if(t&&(t.finalApprovalCompleted===true||t.clientApprovedFlag===true||t.operationalStatus==='concluido'||t.cronStatus==='aprovado_final'||t.clientFlowStatus==='concluido'))return 'concluido';
   if(secOf(t.sector).key==='cronograma'){const c=clientCol(t);
     if(c==='concluido')return 'concluido';if(c==='revisao')return 'revisao';if(c==='afazer')return 'afazer';
     return 'andamento';}                 // enviado/aprovado/producao/reenviado = em andamento (produzindo/acompanhando)
@@ -3419,16 +3424,83 @@ function kbv2SlaLocal(t,nowMs){
   if(now>=pd-wF)return {state:'warning_finish',sev:'laranja',label:'Entrega próxima'};
   return {state:'running',sev:'azul',label:'Em prazo'};
 }
-// F1.2 — derivação CENTRAL de status para o topo do card. Fonte única de verdade por perspectiva.
-// - designer/client: usam as views já existentes (designerStatusView/clientFacingStatusView).
-// - default (Social/Hub): se tem designer atribuído, usa designerStatusView (resolve "Social vê A Fazer
-//   enquanto designer já moveu" — status genérico não é tocado por moveStatus).
+/* ===================================================================
+ * FASE PRODUÇÃO 1 — FLOW ENGINE CANÔNICO  (Social → Designer → Cliente)
+ * Fonte ÚNICA de verdade do fluxo do CRONOGRAMA. Puro / read-only / ADITIVO:
+ * NÃO grava campos, NÃO cria collection/índice, NÃO altera schema, NÃO liga
+ * SLA_ENGINE/SLA_WRITE. Apenas INTERPRETA campos JÁ existentes
+ * (designerFlowStatus · clientFlowStatus · cronStatus · status ·
+ * finalApprovalCompleted) numa máquina de 8 fases e deriva, por perspectiva,
+ * {col,label,color,next}. Corrige: status incoerente entre telas, status
+ * duplicado no card (D1) e conclusão prematura/ausente (D2). Preserva 100% o
+ * visual BLACK PREMIUM — só muda textos/derivações. */
+const TASK_PHASE={
+  PLANNING:'planning',                                 // Social planeja; designer não atribuído
+  AWAITING_DESIGNER:'awaiting_designer',               // designer atribuído, ainda não iniciou
+  DESIGNER_PRODUCING:'designer_producing',             // designerFlowStatus='andamento'
+  DESIGNER_REVISING:'designer_revising',               // designerFlowStatus='revisao'
+  DESIGNER_DELIVERED:'designer_delivered',             // designer entregou; Social ainda NÃO reenviou ao cliente
+  AWAITING_CLIENT_APPROVAL:'awaiting_client_approval', // Social reenviou ao cliente (aguardando aprovação final)
+  CLIENT_REQUESTED_CHANGES:'client_requested_changes', // cliente pediu ajuste
+  COMPLETED:'completed'                                // aprovação FINAL do cliente — ÚNICA conclusão
+};
+// Sinais canônicos (lêem só campos já existentes; nenhuma escrita).
+function flowCompletedSignal(t){return !!(t&&(t.finalApprovalCompleted===true||t.clientApprovedFlag===true||t.operationalStatus==='concluido'||t.cronStatus==='aprovado_final'||t.clientFlowStatus==='concluido'));}
+function flowSentToClientSignal(t){const cs=(t&&t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||(t&&t.clientApprovalPhase==='final');}
+function flowClientChangesSignal(t){const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();return cr==='revisao'||(t&&t.clientFlowStatus==='revisao')||hasPendingItemRevision(t);}
+// FONTE ÚNICA — fase canônica da tarefa. Determinística e ORDENADA (terminal → designer).
+function deriveCanonicalTaskState(t){
+  if(!t)return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:false};
+  const isCron=secOf(t.sector).key==='cronograma';
+  if(!isCron){
+    const s=(t.status||'afazer');
+    const phase=s==='concluido'?TASK_PHASE.COMPLETED:(s==='revisao'?TASK_PHASE.DESIGNER_REVISING:(s==='andamento'?TASK_PHASE.DESIGNER_PRODUCING:TASK_PHASE.AWAITING_DESIGNER));
+    return {phase:phase,owner:'social',isCron:false};
+  }
+  if(flowCompletedSignal(t)||isFullyComplete(t))return {phase:TASK_PHASE.COMPLETED,owner:'social',isCron:true};
+  if(flowClientChangesSignal(t))return {phase:TASK_PHASE.CLIENT_REQUESTED_CHANGES,owner:'social',isCron:true};
+  if(flowSentToClientSignal(t))return {phase:TASK_PHASE.AWAITING_CLIENT_APPROVAL,owner:'client',isCron:true};
+  if(hasDesigner(t)){
+    const dc=designerCol(t);const dfs=(t.designerFlowStatus||'').toString();
+    if(dc==='concluido'||dfs==='entregue')return {phase:TASK_PHASE.DESIGNER_DELIVERED,owner:'social',isCron:true};
+    if(dc==='revisao')return {phase:TASK_PHASE.DESIGNER_REVISING,owner:'designer',isCron:true};
+    if(dc==='andamento')return {phase:TASK_PHASE.DESIGNER_PRODUCING,owner:'designer',isCron:true};
+    return {phase:TASK_PHASE.AWAITING_DESIGNER,owner:'designer',isCron:true};
+  }
+  return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:true};
+}
+// Rótulos canônicos por (fase × papel): col(coluna do papel) · label · color · next. Texto/cor numa SÓ fonte.
+const FLOW_LABELS={
+  planning:{social:{col:'afazer',label:'Em planejamento',color:'#9BA0AB',next:'Criar e enviar ao cliente'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'enviado',label:'Em preparação',color:'#6E7480',next:'Aguardar os temas'}},
+  awaiting_designer:{social:{col:'andamento',label:'Aguardando designer iniciar',color:'#7C83FF',next:'Aguardar o designer iniciar'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Iniciar a produção'},client:{col:'analise',label:'Temas aprovados — produção será iniciada',color:'#22D3EE',next:'Equipe inicia a produção'}},
+  designer_producing:{social:{col:'andamento',label:'Designer em produção',color:'#A78BFA',next:'Aguardar a entrega do designer'},designer:{col:'andamento',label:'Designer em produção',color:'#F59E0B',next:'Finalizar e entregar'},client:{col:'analise',label:'Equipe em produção',color:'#A78BFA',next:'Aguardar a produção das artes'}},
+  designer_revising:{social:{col:'revisao',label:'Designer em revisão/ajuste',color:'#60A5FA',next:'Aguardar a correção do designer'},designer:{col:'revisao',label:'Revisão/Ajuste',color:'#60A5FA',next:'Corrigir o ajuste e reenviar'},client:{col:'analise',label:'A equipe está produzindo as artes',color:'#A78BFA',next:'Aguardar a produção das artes'}},
+  designer_delivered:{social:{col:'andamento',label:'Designer entregou — enviar ao cliente',color:'#34D399',next:'Revisar e enviar ao cliente'},designer:{col:'entregue',label:'Entregue',color:'#34D399',next:'Entregue — aguardando a Social'},client:{col:'analise',label:'A equipe está finalizando as artes',color:'#A78BFA',next:'Aguardar a versão final'}},
+  awaiting_client_approval:{social:{col:'andamento',label:'Aguardando aprovação do cliente',color:'#34D399',next:'Aguardar a aprovação do cliente'},designer:{col:'entregue',label:'Entregue',color:'#34D399',next:'Entregue — com o cliente'},client:{col:'analise',label:'Versão final disponível para análise',color:'#34D399',next:'Aprovar ou pedir ajuste'}},
+  client_requested_changes:{social:{col:'revisao',label:'Cliente pediu ajuste',color:'#F59E0B',next:'Corrigir e reenviar ao cliente'},designer:{col:'entregue',label:'Entregue',color:'#34D399',next:'Aguardando decisão da Social'},client:{col:'revisao',label:'Ajuste solicitado — equipe corrigindo',color:'#F59E0B',next:'Equipe corrige e reenvia'}},
+  completed:{social:{col:'concluido',label:'Concluído final',color:'#10B981',next:'Tarefa encerrada'},designer:{col:'entregue',label:'Concluído',color:'#10B981',next:'Concluído'},client:{col:'aprovado',label:'Aprovado',color:'#34D399',next:'Cronograma encerrado'}}
+};
+function flowRole(persp){return persp==='designer'?'designer':(persp==='client'?'client':'social');}
+// Perspectiva canônica (fonte única do chip/coluna/etapa/próxima por papel).
+function deriveCanonicalPerspective(t,persp){
+  const cs=deriveCanonicalTaskState(t);const role=flowRole(persp);
+  const base=(FLOW_LABELS[cs.phase]&&FLOW_LABELS[cs.phase][role])||FLOW_LABELS.planning[role];
+  return {phase:cs.phase,key:base.col,col:base.col,label:base.label,color:base.color,next:base.next};
+}
+function deriveSocialPerspective(t){return deriveCanonicalPerspective(t,'social');}
+function deriveDesignerPerspective(t){return deriveCanonicalPerspective(t,'designer');}
+function deriveClientPerspective(t){return deriveCanonicalPerspective(t,'client');}
+function deriveBoardColumn(t,persp){return deriveCanonicalPerspective(t,persp).col;}
+function deriveTaskLabels(t,persp){
+  const p=deriveCanonicalPerspective(t,persp);
+  const top=(persp==='designer')?p.label.replace('Designer em ','Em '):p.label;
+  return {top:top,etapaLabel:(persp==='designer'?'Sua etapa':'Etapa'),etapaValue:top,nextLabel:'Próxima',nextValue:p.next};
+}
+// Fase Produção 1 — kbv2DeriveStatus agora DELEGA ao Flow Engine no cronograma. Mantém o
+// comportamento legado (F1.2) só para setores NÃO-cronograma.
 function kbv2DeriveStatus(t, persp){
   const isCron = secOf(t.sector).key==='cronograma';
-  if(persp==='designer' && isCron && hasDesigner(t))
-    return designerStatusView(t);
-  if(persp==='client' && isCron)
-    return (typeof clientFacingStatusView==='function')?clientFacingStatusView(t):(typeof clientStatusView==='function'?clientStatusView(t):stOf(t.status));
+  if(isCron){ const p=deriveCanonicalPerspective(t, persp); return {key:p.key,label:p.label,color:p.color}; }
   // default: Social/Hub/Setor — se há designer atribuído, deriva do eixo do designer.
   if(hasDesigner(t) && typeof designerStatusView==='function')
     return designerStatusView(t);
@@ -3489,8 +3561,9 @@ function kbv2Card(t, persp){
      '</div>';
   // 6) chips: estágio + setor + periodicidade
   h+='<div class="kbv2-card-chips">'+
-       (stage&&!designerView?'<span class="kbv2-chip" style="color:'+stage.color+';background:'+withAlpha(stage.color,.18)+';border-color:'+withAlpha(stage.color,.46)+'"><i class="kbv2-chip-dot" style="background:'+stage.color+'"></i>'+esc(stage.label)+'</span>':
-        (designerView?'<span class="kbv2-chip" style="color:'+topSt.color+';background:'+withAlpha(topSt.color,.18)+';border-color:'+withAlpha(topSt.color,.46)+'"><i class="kbv2-chip-dot" style="background:'+topSt.color+'"></i>'+esc(topLabel)+'</span>':''))+
+       /* Fase Produção 1 — D1: chip de STATUS removido do card (o status já está no topo, sem
+          duplicidade). Chips internos = setor + periodicidade + prioridade (categoria/subetapa). */
+       ''+
        '<span class="kbv2-chip" style="color:'+s.color+';background:'+withAlpha(s.color,.18)+';border-color:'+withAlpha(s.color,.46)+'"><i class="kbv2-chip-dot" style="background:'+s.color+'"></i>'+esc(s.label)+'</span>'+
        (cron&&cron.label&&cron.label!==s.label?'<span class="kbv2-chip kbv2-chip-soft">'+esc(cron.label)+'</span>':'')+
        (t.priority?'<span class="kbv2-chip" style="color:#F87171;background:'+withAlpha('#EF4444',.18)+';border-color:'+withAlpha('#EF4444',.46)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+

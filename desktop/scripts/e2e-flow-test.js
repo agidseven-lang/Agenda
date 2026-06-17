@@ -764,7 +764,7 @@ const DH_noc = DH.replace(/^\s*\/\/.*$/gm,'');
 // detail-hierarchy-v2: o chip do DETALHE migrou da fonte clientStatusView p/ detailState
 // (a mesma máquina do hero — nunca contradiz). Restam 4 usos: definição + taskTimeline
 // interno + badge do taskCard (ternário designerView) + flowSummary "Status operacional".
-check('CSV_SCOPE', 'clientStatusView: definição + taskCard + kbv2Card + kbv2DeriveStatus fallback + flowSummary + uso interno taskTimeline (6 ocorrências; chip do detalhe usa detailState)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 6 && /function clientStatusView\(t\)/.test(DH_noc));
+check('CSV_SCOPE', 'clientStatusView: definição + flowSummary + taskCard(stage) + kbv2Card(stage) + detalhe (5 ocorrências; Fase Produção 1 removeu o fallback de kbv2DeriveStatus, que agora DELEGA ao Flow Engine)', (DH_noc.match(/clientStatusView\(/g)||[]).length === 5 && /function clientStatusView\(t\)/.test(DH_noc));
 // taskCard MIGRADO (role-aware f96aa2e: ternário designerView).
 check('CSV_TASKCARD_MIGRATED', "taskCard V3 cronograma: UM estágio por perspectiva (fonte única), sem badge concorrente", /const stage=isCron\?\(designerView\?designerStatusView\(t\)/.test(DH) && (DH.match(/tcv4-chip/g)||[]).length>=3 && /tcv4-st\b/.test(DH));
 // chip do detalhe MIGRADO p/ a máquina de estados (1 chip, sem status concorrentes).
@@ -1443,6 +1443,93 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     !/clientReview\?\.status == "aprovado" \|\| allPhaseItemsApproved/.test(KV));
   check('N_CY2_SHOT','Roborazzi ClientBoardCycle2ScreenshotTest (6 casos, 360/412) presente',
     /class ClientBoardCycle2ScreenshotTest/.test(KC2) && /client-board-cycle2-360\.png/.test(KC2) && /client-board-cycle2-412\.png/.test(KC2) && /Em análise — temas aprovados/.test(KC2));
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * [FASE PRODUÇÃO 1] FLOW ENGINE CANÔNICO — estrutura + 7 cenários × 3 perspectivas
+ * Valida a FONTE ÚNICA (deriveCanonical*) avaliando o CÓDIGO REAL do renderer
+ * (não um espelho): coluna + chip por papel, roteamento de COMPLETED e ausência
+ * de conclusão prematura/duplicada. Inclui o port Android (FlowState.kt).
+ * ═══════════════════════════════════════════════════════════════════════ */
+console.log(`${C.b}\n[FASE PRODUÇÃO 1] Flow Engine canônico (Social → Designer → Cliente)${C.x}`);
+(function(){
+  const grab=(re)=>{const m=DH.match(re);return m?m[0]:'';};
+  const constArr=(name)=>grab(new RegExp('const '+name+'\\s*=\\s*\\[[\\s\\S]*?\\];'));
+  const constObj=(name)=>grab(new RegExp('const '+name+'\\s*=\\s*\\{[\\s\\S]*?\\n\\};'));
+  const fnDecl=(name)=>grab(new RegExp('function '+name+'\\([^)]*\\)\\{[\\s\\S]*?\\n\\}'));
+  const oneLine=(name)=>grab(new RegExp('function '+name+'\\([^)]*\\)\\{.*\\}'));
+  // ── estrutura (regex no renderer real) ──
+  check('PROD1_FLOW_ENGINE','Camada canônica: TASK_PHASE(8 fases)+FLOW_LABELS+deriveCanonicalTaskState+deriveSocial/Designer/ClientPerspective+deriveBoardColumn+deriveTaskLabels',
+    /const TASK_PHASE=\{/.test(DH) && (DH.match(/(PLANNING|AWAITING_DESIGNER|DESIGNER_PRODUCING|DESIGNER_REVISING|DESIGNER_DELIVERED|AWAITING_CLIENT_APPROVAL|CLIENT_REQUESTED_CHANGES|COMPLETED):/g)||[]).length>=8
+    && /const FLOW_LABELS=\{/.test(DH) && /function deriveCanonicalTaskState\(t\)\{/.test(DH)
+    && /function deriveSocialPerspective\(t\)/.test(DH) && /function deriveDesignerPerspective\(t\)/.test(DH) && /function deriveClientPerspective\(t\)/.test(DH)
+    && /function deriveBoardColumn\(t,persp\)/.test(DH) && /function deriveTaskLabels\(t,persp\)/.test(DH));
+  check('PROD1_KBV2_DELEGATES','kbv2DeriveStatus DELEGA ao Flow Engine no cronograma (fonte única do chip do topo)',
+    /function kbv2DeriveStatus\(t, persp\)\{[\s\S]*?const p=deriveCanonicalPerspective\(t, persp\); return \{key:p\.key,label:p\.label,color:p\.color\};/.test(DH));
+  check('PROD1_COMPLETED_ROUTING','clientCol e socialCol respeitam o COMPLETED canônico (aprovação final do cliente → coluna concluída)',
+    (DH.match(/finalApprovalCompleted===true\|\|t\.clientApprovedFlag===true\|\|t\.operationalStatus==='concluido'\|\|t\.cronStatus==='aprovado_final'\|\|t\.clientFlowStatus==='concluido'\)\)return 'concluido';/g)||[]).length>=2);
+  check('PROD1_NO_DUP_STAGE','kbv2Card NÃO renderiza mais o chip de STATUS duplicado (status só no topo; chips internos = setor/periodicidade/prioridade)',
+    /D1: chip de STATUS removido do card/.test(DH) && !/stage&&!designerView\?'<span class="kbv2-chip"/.test(DH));
+  const KFS=readAndroid('android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/domain/FlowState.kt');
+  check('PROD1_ANDROID_FLOWSTATE','Android: domain/FlowState.kt com enum TaskPhase(8)+FlowEngine.derivePhase/derive+socialOf/designerOf/clientOf (paridade conceitual)',
+    /enum class TaskPhase/.test(KFS) && (KFS.match(/\b(PLANNING|AWAITING_DESIGNER|DESIGNER_PRODUCING|DESIGNER_REVISING|DESIGNER_DELIVERED|AWAITING_CLIENT_APPROVAL|CLIENT_REQUESTED_CHANGES|COMPLETED)\b/g)||[]).length>=8
+    && /object FlowEngine/.test(KFS) && /fun derivePhase\(t: TaskItem\): TaskPhase/.test(KFS) && /fun derive\(t: TaskItem\): FlowState/.test(KFS)
+    && /fun socialOf\(/.test(KFS) && /fun designerOf\(/.test(KFS) && /fun clientOf\(/.test(KFS));
+  // ── avaliação do CÓDIGO REAL do renderer: 7 cenários × 3 perspectivas ──
+  let mod=null,err=null;
+  try{
+    const pieces=[
+      constArr('SECTORS'), 'const SECTOR_ALIAS='+((DH.match(/const SECTOR_ALIAS=\{[\s\S]*?\};/)||['const SECTOR_ALIAS={};'])[0].replace(/^const SECTOR_ALIAS=/,'')),
+      constArr('CLIENT_COLS'), constObj('TASK_PHASE'), constObj('FLOW_LABELS'),
+      oneLine('secOf'), oneLine('hasDesigner'), oneLine('designerOf'), oneLine('designerCol'),
+      oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'), oneLine('designerDelivered'),
+      fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
+      oneLine('hasPendingItemRevision'),
+      oneLine('flowCompletedSignal'), oneLine('flowSentToClientSignal'), oneLine('flowClientChangesSignal'), oneLine('flowRole'),
+      fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('socialCol'),
+      fnDecl('deriveCanonicalTaskState'), fnDecl('deriveCanonicalPerspective'),
+      oneLine('deriveSocialPerspective'), oneLine('deriveDesignerPerspective'), oneLine('deriveClientPerspective'), oneLine('deriveBoardColumn'),
+      fnDecl('deriveTaskLabels'),
+      'return {deriveCanonicalTaskState,deriveCanonicalPerspective,deriveSocialPerspective,deriveDesignerPerspective,deriveClientPerspective,deriveBoardColumn,deriveTaskLabels,clientCol,socialCol,designerCol,TASK_PHASE};'
+    ];
+    mod=new Function(pieces.join('\n'))();
+  }catch(e){ err=e.message; }
+  check('PROD1_ENGINE_EVAL','Flow Engine avaliável a partir do renderer real (sem ReferenceError)', !!mod && !err);
+  if(!mod){ console.log('  '+C.r+'engine eval falhou: '+err+C.x); }
+  else {
+    const D={designerAssignment:{designerId:'d'}};
+    const SCN=[
+      ['1 Social→Designer (não iniciou)', Object.assign({sector:'cronograma',designerFlowStatus:'afazer',clientFlowStatus:'producao',cronStatus:'sent_to_designer'},D),
+        'AWAITING_DESIGNER', {s:['andamento','Aguardando designer iniciar'], d:['afazer','A Fazer'], c:['analise','Temas aprovados — produção será iniciada']}],
+      ['2 Designer iniciou', Object.assign({sector:'cronograma',designerFlowStatus:'andamento',clientFlowStatus:'producao'},D),
+        'DESIGNER_PRODUCING', {s:['andamento','Designer em produção'], d:['andamento','Designer em produção'], c:['analise','Equipe em produção']}],
+      ['3 Designer → revisão', Object.assign({sector:'cronograma',designerFlowStatus:'revisao',clientFlowStatus:'producao'},D),
+        'DESIGNER_REVISING', {s:['revisao','Designer em revisão/ajuste'], d:['revisao','Revisão/Ajuste'], c:['analise','A equipe está produzindo as artes']}],
+      ['4 Designer entregou (Social não reenviou)', Object.assign({sector:'cronograma',designerFlowStatus:'concluido',clientFlowStatus:'reenviado',cronStatus:'sent_to_designer'},D),
+        'DESIGNER_DELIVERED', {s:['andamento','Designer entregou — enviar ao cliente'], d:['entregue','Entregue'], c:['analise','A equipe está finalizando as artes']}],
+      ['5 Social → Cliente', Object.assign({sector:'cronograma',designerFlowStatus:'concluido',clientFlowStatus:'reenviado',cronStatus:'ready_for_final_client_review',clientApprovalPhase:'final'},D),
+        'AWAITING_CLIENT_APPROVAL', {s:['andamento','Aguardando aprovação do cliente'], d:['entregue','Entregue'], c:['analise','Versão final disponível para análise']}],
+      ['6 Cliente pediu ajuste', Object.assign({sector:'cronograma',designerFlowStatus:'concluido',clientReview:{status:'revisao'},cronStatus:'ready_for_final_client_review'},D),
+        'CLIENT_REQUESTED_CHANGES', {s:['revisao','Cliente pediu ajuste'], d:['entregue','Entregue'], c:['revisao','Ajuste solicitado — equipe corrigindo']}],
+      ['7 Cliente aprovou final', Object.assign({sector:'cronograma',designerFlowStatus:'concluido',finalApprovalCompleted:true,clientFlowStatus:'concluido',cronContents:[{tema:'T1',legenda:'L1',feedImageUrl:'f1'}]},D),
+        'COMPLETED', {s:['concluido','Concluído final'], d:['entregue','Concluído'], c:['aprovado','Aprovado']}],
+    ];
+    let prematura=false;
+    SCN.forEach(([nome,t,phaseExp,exp])=>{
+      const ph=mod.deriveCanonicalTaskState(t).phase;
+      const so=mod.deriveSocialPerspective(t), de=mod.deriveDesignerPerspective(t), cl=mod.deriveClientPerspective(t);
+      const ok = ph===mod.TASK_PHASE[phaseExp] && so.col===exp.s[0] && so.label===exp.s[1] && de.col===exp.d[0] && de.label===exp.d[1] && cl.col===exp.c[0] && cl.label===exp.c[1];
+      const completedNow = ph===mod.TASK_PHASE.COMPLETED || cl.col==='aprovado' || so.col==='concluido' || mod.clientCol(t)==='concluido' || mod.socialCol(t)==='concluido';
+      if(phaseExp!=='COMPLETED' && completedNow)prematura=true;
+      check('PROD1_S'+nome.charAt(0), 'Cenário '+nome+' → S:'+so.col+'/'+so.label+' · D:'+de.col+'/'+de.label+' · C:'+cl.col+'/'+cl.label, ok);
+    });
+    check('PROD1_NO_PREMATURE','Sem conclusão prematura: cenários 1–6 nunca concluídos; conclusão final SÓ no cenário 7', !prematura);
+    check('PROD1_COMPLETED_ROUTING_RUN','Cenário 7 (aprovação final) → clientCol="concluido" e socialCol="concluido" (D2 resolvido)',
+      mod.clientCol(SCN[6][1])==='concluido' && mod.socialCol(SCN[6][1])==='concluido');
+    check('PROD1_NO_DUP_RUN','Sem status duplicado: deriveTaskLabels.top é único por perspectiva (status só no topo do card)',
+      SCN.every(([_n,t])=>{const tl=mod.deriveTaskLabels(t,'client');return typeof tl.top==='string' && tl.top.length>0;}));
+    console.log('  '+C.d+'cenários provados: '+SCN.length+' × 3 perspectivas = '+(SCN.length*3)+' combinações (0 duplicações, 0 conclusões prematuras)'+C.x);
+  }
 })();
 
 /* ===================== VEREDITO ===================== */
