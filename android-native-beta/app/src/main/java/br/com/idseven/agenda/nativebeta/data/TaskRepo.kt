@@ -1,6 +1,7 @@
 package br.com.idseven.agenda.nativebeta.data
 
 import br.com.idseven.agenda.nativebeta.domain.ChecklistItem
+import br.com.idseven.agenda.nativebeta.domain.DesignerSla
 import br.com.idseven.agenda.nativebeta.domain.TaskHistory
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import com.google.firebase.firestore.DocumentSnapshot
@@ -40,6 +41,16 @@ object TaskRepo {
                 to = m["to"] as? String,
             )
         }
+        // F1 — semente designerSla (aditiva; ausente em tarefas antigas → null, não quebra).
+        val slaMap = d.get("designerSla") as? Map<*, *>
+        val designerSla = if (slaMap != null) DesignerSla(
+            planStartAt = (slaMap["planStartAt"] as? Number)?.toLong(),
+            planDueAt = (slaMap["planDueAt"] as? Number)?.toLong(),
+            startedAt = (slaMap["startedAt"] as? Number)?.toLong(),
+            finishedAt = (slaMap["finishedAt"] as? Number)?.toLong(),
+            seedAt = (slaMap["seedAt"] as? Number)?.toLong(),
+            seedBy = slaMap["seedBy"] as? String,
+        ) else null
         return TaskItem(
             id = d.id,
             title = d.getString("title"),
@@ -62,6 +73,8 @@ object TaskRepo {
             doneBy = d.getString("doneBy"),
             checklist = checklist,
             history = history,
+            designerFlowStatus = d.getString("designerFlowStatus"),
+            designerSla = designerSla,
         )
     }
 

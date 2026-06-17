@@ -60,6 +60,19 @@ data class TaskItem(
     val doneBy: String?,
     val checklist: List<ChecklistItem>,
     val history: List<TaskHistory>,
+    // F1 (1.0.147) — aditivos; compatíveis com dados antigos (null quando ausentes).
+    val designerFlowStatus: String? = null,
+    val designerSla: DesignerSla? = null,
+)
+
+// F1 — semente de SLA do designer (gravada pelo Desktop ao "Enviar ao designer").
+data class DesignerSla(
+    val planStartAt: Long? = null,
+    val planDueAt: Long? = null,
+    val startedAt: Long? = null,
+    val finishedAt: Long? = null,
+    val seedAt: Long? = null,
+    val seedBy: String? = null,
 )
 
 data class ChecklistItem(val t: String, val d: Boolean)

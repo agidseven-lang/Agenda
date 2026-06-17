@@ -1256,6 +1256,30 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     check('CY5_DESIGNER_TOPCHIP','Chip do card do designer = EXATAMENTE "Designer em produção" (fonte designerStatusView)', mod.designerStatusView(DT).label==='Designer em produção');
   }
 
+  /* ═══ F1 (1.0.147) — semente designerSla + SLA visual local (sem Worker/Rules/push) ═══ */
+  console.log(`${C.b}\n[F1] 1.0.147 — Designer SLA: semente + derivação visual local${C.x}`);
+  check('F1_SLA_SEED','sendToDesigner grava semente designerSla{planStartAt,planDueAt,seedAt,seedBy} em ms (dtMs) + patch + otimista',
+    /const planStartAt=dl\.startDate\?dtMs\(dl\.startDate,dl\.startTime\|\|'00:00'\):null;/.test(DH)
+    && /const planDueAt=dl\.endDate\?dtMs\(dl\.endDate,dl\.endTime\|\|'23:59'\):null;/.test(DH)
+    && /const designerSla=\{planStartAt:planStartAt,planDueAt:planDueAt,seedAt:now,seedBy:u\.id\|\|null\};/.test(DH)
+    && /designerSla:designerSla,\s*\/\/ F1/.test(DH));
+  check('F1_SLA_DERIVE','kbv2SlaLocal deriva 8 estados locais (not_started/running/warning_start/overdue_start/warning_finish/overdue_finish/completed/invalid_or_missing) com thresholds 30/30/60',
+    /function kbv2SlaLocal\(t,nowMs\)/.test(DH)
+    && /const KBV2_SLA=\{warnStartMin:30,warnFinishMin:30,criticalAfterMin:60\};/.test(DH)
+    && /'not_started'/.test(DH) && /'warning_start'/.test(DH) && /'overdue_start'/.test(DH)
+    && /'warning_finish'/.test(DH) && /'overdue_finish'/.test(DH) && /'invalid_or_missing'/.test(DH) && /'completed'/.test(DH));
+  check('F1_SLA_CHIP','kbv2Card exibe chip SLA local discreto + acento do card por severidade; sem designerSla = neutro (sem chip, não quebra)',
+    /const _sla=kbv2SlaLocal\(t\);/.test(DH)
+    && /kbv2-sla kbv2-sla-'\+_sla\.sev/.test(DH)
+    && /_sla\.sev!=='neutro'\?/.test(DH)
+    && /--kacc:'\+_slaAcc\+'/.test(DH));
+  check('F1_SLA_CSS','CSS do chip SLA presente (azul/laranja/vermelho/verde) no bloco kbv2-styles',
+    /\.kbv2-sla-azul\{/.test(DH) && /\.kbv2-sla-laranja\{/.test(DH) && /\.kbv2-sla-vermelho\{/.test(DH) && /\.kbv2-sla-verde\{/.test(DH));
+  check('F1_HISTORY_CANON','history do eixo designer padronizado aditivo (axis/from/to/byUid/atMs/source) sem remover campos legados',
+    /axis:'designerFlowStatus',from:old,to:newStatus,byUid:\(state\.user&&state\.user\.id\)\|\|null,byId:state\.user\.id,at:now,atMs:now,source:'desktop'/.test(DH));
+  check('F1_ADDITIVE_SAFE','F1 é aditiva: legados preservados (startDate/startTime/dueDate/dueTime/startedAt/doneAt ainda gravados em sendToDesigner)',
+    /dueDate:dl\.endDate\|\|'',dueTime:dl\.endTime\|\|''/.test(DH) && /startDate:dl\.startDate\|\|'',startTime:dl\.startTime\|\|''/.test(DH));
+
   /* ═══ CY6 — REPROVAÇÃO 1.0.137 (board full-width / form limpo / livebar) ═══ */
   console.log(`${C.b}\n[CY6] V64.52 — largura útil real, formulário limpo, sem toast flutuante${C.x}`);
   check('CY6_BOARD_FULLWIDTH','Telas de quadro SEM o cap de 1400px (board usa a largura útil real) + padding lateral 34px (referência)',

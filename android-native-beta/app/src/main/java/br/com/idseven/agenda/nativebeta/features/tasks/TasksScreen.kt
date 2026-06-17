@@ -64,6 +64,7 @@ import br.com.idseven.agenda.nativebeta.designsystem.components.SearchField
 import br.com.idseven.agenda.nativebeta.designsystem.components.SkeletonList
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
+import br.com.idseven.agenda.nativebeta.domain.SlaContract
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.TaskSort
@@ -287,6 +288,9 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
             Box(Modifier.size(8.dp).clip(CircleShape).background(TaskStatus.color(task.status)))
             Spacer(Modifier.width(7.dp))
             Text(TaskStatus.label(task.status), color = TaskStatus.color(task.status), fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+            // F1 — chip SLA local (discreto). Sem designerSla = neutro (sem chip; não quebra).
+            val sla = SlaContract.derive(task)
+            if (sla.sev != "neutro") { Spacer(Modifier.width(6.dp)); Pill(sla.label, sla.color) }
             Spacer(Modifier.weight(1f))
             if (deadline != null) Pill(deadline.text, deadline.color)
         }
