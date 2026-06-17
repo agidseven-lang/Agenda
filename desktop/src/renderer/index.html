@@ -1976,9 +1976,12 @@ body.desktop .kbv2-presence{ position:absolute; right:0; bottom:0; width:12px; h
 body.desktop .kbv2-pm{ min-width:0; }
 body.desktop .kbv2-name{ font-size:15px; font-weight:700; color:var(--kbv2-ink); line-height:1.25; }
 body.desktop .kbv2-role{ font-size:12.5px; color:#8b94a6; margin-top:2px; }
-body.desktop .kbv2-card-origin{ display:flex; align-items:center; gap:9px; padding:9px 12px; border-radius:11px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06); font-size:12.5px; color:#aab3c4; line-height:1.35; }
-body.desktop .kbv2-card-origin svg{ width:16px; height:16px; color:#6f7889; flex:0 0 auto; }
+body.desktop .kbv2-card-origin{ display:flex; align-items:flex-start; gap:9px; padding:9px 12px; border-radius:11px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06); font-size:12.5px; color:#aab3c4; line-height:1.35; }
+body.desktop .kbv2-card-origin svg{ width:16px; height:16px; color:#6f7889; flex:0 0 auto; margin-top:1px; }
 body.desktop .kbv2-card-origin b{ color:var(--kbv2-ink); font-weight:700; }
+body.desktop .kbv2-origin-tx{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+body.desktop .kbv2-origin-l1{ color:#c6cdda; }
+body.desktop .kbv2-origin-l2{ color:#8b94a6; font-size:12px; }
 body.desktop .kbv2-tier{ font-size:11px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#9d8bff; }
 body.desktop .kbv2-title{ font-size:18px; font-weight:800; color:var(--kbv2-ink); line-height:1.25; letter-spacing:-.01em; margin-top:4px; }
 body.desktop .kbv2-card-chips{ display:flex; gap:7px; flex-wrap:wrap; }
@@ -3417,7 +3420,7 @@ function kbv2Card(t, persp){
          '<div class="kbv2-role">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
      '</div>';
   // 3) enviado por
-  if(reqName)h+='<div class="kbv2-card-origin">'+svg('person')+'<span>Enviado por <b>'+esc(reqName)+'</b>'+(t.createdAt?' · '+fmtDateTimeBR(t.createdAt):'')+'</span></div>';
+  if(reqName)h+='<div class="kbv2-card-origin">'+svg('person')+'<div class="kbv2-origin-tx"><div class="kbv2-origin-l1">Enviado por <b>'+esc(reqName)+'</b></div>'+(t.createdAt?'<div class="kbv2-origin-l2">'+fmtDateTimeBR(t.createdAt)+'</div>':'')+'</div></div>';
   // 4-5) tier (cliente) + título
   h+='<div class="kbv2-card-main">'+
        (t.client?'<div class="kbv2-tier">'+esc(t.client)+'</div>':'')+
