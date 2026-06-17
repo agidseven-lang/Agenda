@@ -954,7 +954,7 @@
   .tcv4-themes{margin-top:10px;padding:8px 11px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.05);border-radius:8px}
   .tcv4-themes-h{font-size:8px;font-weight:780;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
   .tcv4-theme{display:flex;align-items:center;gap:8px;padding:3.5px 0;min-width:0}
-  .tcv4-theme-n{flex:none;width:17px;height:17px;border-radius:5px;background:#4250C7;color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .tcv4-theme-n{flex:none;width:19px;height:19px;border-radius:6px;background:linear-gradient(140deg,#6D6AF5,#8B5CF6);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 2px 6px -2px rgba(124,92,246,.5)}
   .tcv4-theme-t{flex:1;min-width:0;font-size:11.5px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tcv4-theme-t em{font-style:normal;font-size:10.5px;color:var(--ink);font-weight:650}
   .tcv4-circ{flex:none;width:15px;height:15px;border-radius:50%;border:1.5px solid rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center}
@@ -3229,26 +3229,14 @@ function taskCard(t, persp){
          (prog.next?'<div class="tcv4-step"><span class="tcv4-k tcv4-k-pad">Próxima</span><span class="tcv4-next">'+esc(prog.next)+'</span></div>':'')+
        '</div>';
   }
-  // 8) TEMAS com círculo de estado por item (aprovado ✓ · ajuste ● · corrigido ✓)
+  // 8) TEMAS — design aprovado: APENAS o ícone (badge) + o nome do tema.
+  //    Sem círculo de estado, sem mini-fileira e sem "+N conteúdos"
+  //    (referência do usuário: "apenas o espaço do ícone e o tema").
   if(cron&&cron.list.length){
-    const lim=3;const show=cron.list.slice(0,lim);const rest=cron.count-show.length;
-    const mini=cron.list.slice(0,6).map(c=>{
-      const ci=(t.clientItems||{})['i'+c._i]||{};
-      const cls=ci.cs==='aprovado'||(ci.teamAdjustedAt&&!ci.cs)?'ok':(ci.cs==='em_revisao'||ci.cs==='editado'?'rev':'');
-      return '<span class="tcv4-mini-n '+cls+'" title="'+esc(c.tema||('Conteúdo '+(c._i+1)))+'">'+(c._i+1)+'</span>';
-    }).join('')+(cron.count>6?'<span class="tcv4-mini-n">+'+(cron.count-6)+'</span>':'');
     h+='<div class="tcv4-themes"><div class="tcv4-themes-h">Temas</div>'+
-       '<div class="tcv4-mini">'+mini+'</div>'+
-       show.map(c=>{
-         const ci=(t.clientItems||{})['i'+c._i]||{};
-         const fixed=ci.teamAdjustedAt&&!ci.cs;
-         const ok=ci.cs==='aprovado';
-         const rev=ci.cs==='em_revisao'||ci.cs==='editado';
-         const circ=ok||fixed?'<span class="tcv4-circ ok">'+svg('check')+'</span>':
-                    (rev?'<span class="tcv4-circ rev" title="Ajuste solicitado"></span>':'<span class="tcv4-circ"></span>');
-         return '<div class="tcv4-theme"><span class="tcv4-theme-n">'+(c._i+1)+'</span><span class="tcv4-theme-t">'+esc(c.tema||'(sem tema)')+(fixed?' <em>corrigido</em>':'')+'</span>'+circ+'</div>';
-       }).join('')+
-       (rest>0?'<div class="tcv4-theme-more">+ '+rest+' conteúdo'+(rest>1?'s':'')+'</div>':'')+'</div>';
+       cron.list.map(c=>'<div class="tcv4-theme"><span class="tcv4-theme-n">'+(c._i+1)+'</span>'+
+         '<span class="tcv4-theme-t">'+esc(c.tema||'(sem tema)')+'</span></div>').join('')+
+     '</div>';
   }
   h+=chk;
   // 9) data limite
