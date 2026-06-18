@@ -1,24 +1,29 @@
-# Micro-janela SLA read-only — Worker idseven-push.
-# Execução SOMENTE manual (workflow_dispatch). Modo permitido: `janela`.
-# Rotas read-only permitidas (lentes de medição F2.6.2): sla-legacy-risk,
-# sla-discover, sla-legacy-baseline, sla-dryrun (inputs choice: o GitHub recusa
-# qualquer outro valor; sla-reschedule-plan/deploy/full/rollback NÃO existem
-# aqui). O script liga SLA_ENGINE_ENABLED via API por variável, faz UMA coleta,
-# remove a env em `finally` (retry ×3), prova ausência por snapshot (só
-# nomes+tipos) e re-confirma 403 nas rotas.
-# NÃO faz deploy de código. NÃO toca SLA_WRITE / SLA_ACTIVATED_AT (abortos
-# hard-coded no script). Logs nunca contêm valores de secrets.
-name: "[manual] Worker SLA — micro-janela read-only"
+# Micro-janela SLA — Worker idseven-push. Execução SOMENTE manual
+# (workflow_dispatch); NUNCA em push. Modos: `janela` (read-only) e
+# `janela-write` (escrita controlada, gated — F2.9.1).
+# Rotas read-only (lentes F2.6.2): sla-legacy-risk, sla-discover,
+# sla-legacy-baseline, sla-dryrun (inputs choice: o GitHub recusa qualquer outro
+# valor). O modo `janela` liga SLA_ENGINE_ENABLED via API, faz UMA coleta, remove
+# a env em `finally` (retry ×3), prova ausência por snapshot (só nomes+tipos) e
+# re-confirma 403. NÃO faz deploy de código. NÃO toca SLA_WRITE/SLA_ACTIVATED_AT.
+# O modo `janela-write` (rota sla-dryrun apenas) liga SLA_ENGINE_ENABLED +,
+# temporariamente, SLA_WRITE e SLA_ACTIVATED_AT (corte = plannedStartAt do alvo),
+# escreve no MÁXIMO 1 evento designer_start_warning e SÓ se o 3º gate
+# (appConfig/flags.slaEngine, toggle MANUAL no Firestore) estiver ON — esse flag
+# NUNCA é tocado por este workflow. Todas as envs SLA_* são removidas no `finally`
+# (retry ×3) + 403 reconfirmado. Logs nunca contêm valores de secrets.
+name: "[manual] Worker SLA — micro-janela (read-only + janela-write gated)"
 
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Modo (apenas 'janela' autorizado nesta fase)"
+        description: "Modo: 'janela' (read-only) | 'janela-write' (escrita gated 1 evento; exige route=sla-dryrun + toggle manual flags.slaEngine)"
         required: true
         type: choice
         options:
           - janela
+          - janela-write
       route:
         description: "Rota read-only (lentes de medição F2.6.2; sla-reschedule-plan NÃO entra — exige taskId / não é agregado anônimo)"
         required: true

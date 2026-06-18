@@ -20,11 +20,21 @@
           finally mesmo se a coleta falhar — e confirma 403 final.
      node scripts/worker-ops/microjanela.mjs full <rota>
         → deploy + janela + verificação, em sequência, com aborto automático.
+     node scripts/worker-ops/microjanela.mjs janela-write sla-dryrun
+        → ESCRITA CONTROLADA (gated). PREFLIGHT read-only (só SLA_ENGINE_ENABLED)
+          exige scanned>=1 + slaStatus="inicio_proximo" + alvo
+          designer_start_warning (aborta se overdue/blocked/started). SÓ ENTÃO
+          liga SLA_WRITE + SLA_ACTIVATED_AT=<plannedStartAt> e faz UMA passada
+          write:true. NÃO toca appConfig/flags.slaEngine — 3º gate é toggle
+          MANUAL no Firestore; sem ele writeAllowed=false e 0 escrita (gate
+          triplo segura). Remove TODAS as envs SLA_* no finally + 403.
      node scripts/worker-ops/microjanela.mjs rollback
         → restaura o backup mais recente (redeploy byte-exato do que rodava).
 
    CADEADOS DE SEGURANÇA (hard-coded):
-     - JAMAIS define SLA_WRITE ou SLA_ACTIVATED_AT (guard explícito);
+     - SLA_WRITE/SLA_ACTIVATED_AT: SÓ no modo janela-write (gated, temporário,
+       removido no finally); os demais modos JAMAIS os definem;
+     - appConfig/flags.slaEngine NUNCA é tocado por este script (toggle manual);
      - só coleta nas 3 rotas read-only autorizadas;
      - env temporária SEMPRE removida (finally + verificação 403);
      - aborto imediato se qualquer verificação falhar (e remove a env);
@@ -178,6 +188,26 @@ async function passoVersao(esperadaRe) {
   log(`  versão confirmada: ${j.version}`);
 }
 
+/* ── HELPERS GENÉRICOS DE SECRET (usados SÓ pelo modo janela-write) ──
+   PUT/DELETE /secrets/{name} é atômico por variável (não toca nenhuma outra).
+   O valor NUNCA vai para o log (apenas o nome). SLA_ACTIVATED_AT (timestamp de
+   corte) é derivado de dado de tarefa público e é logado à parte como evidência. */
+async function secretOn(name, value) {
+  log(`— [janela-write] ligando ${name} via API (PUT secrets — atômico; valor REDIGIDO)`);
+  const r = await cfApi("PUT", "/secrets", { name, text: String(value), type: "secret_text" });
+  if (!r.ok) fail(`PUT ${name} falhou: API ${r.status} ${r.text.slice(0, 160)}`);
+}
+async function secretOff(name) {
+  for (let i = 1; i <= 3; i++) {
+    const r = await cfApi("DELETE", `/secrets/${name}`);
+    if (r.ok || r.status === 404) { log(`— [janela-write] ${name} REMOVIDA via API (tentativa ${i}; 404 = já ausente)`); return true; }
+    log(`  remoção de ${name} falhou (API ${r.status}) — retry ${i}/3`);
+    await new Promise((x) => setTimeout(x, 2000));
+  }
+  log(`✗ CRÍTICO: não consegui remover ${name} — remova MANUALMENTE no painel AGORA.`);
+  return false;
+}
+
 /* ── MODOS ── */
 const modo = process.argv[2];
 const rota = process.argv[3];
@@ -232,6 +262,105 @@ try {
     if (!coletaOk) fail("coleta falhou (env já removida e 403 confirmado)");
     log(`RESUMO janela: coleta de /${rota} salva, env removida, 403 confirmado nas 3 rotas.`);
     flushReport("OK (janela)");
+  } else if (modo === "janela-write") {
+    /* ════ ESCRITA CONTROLADA DE 1 EVENTO (gated, F2.9.1) ════
+       NÃO toca appConfig/flags.slaEngine — o 3º gate (flags.slaEngine===true) é
+       um toggle MANUAL no Firestore. Sem ele, writeAllowed=false e a passada
+       escreve ZERO (gate triplo segura mesmo com SLA_WRITE+SLA_ACTIVATED_AT).
+       Estrutura: A preflight read-only → B1 prova-seca COM corte (0 escrita,
+       exige EXATAMENTE 1 evento alvo; QUALQUER outro aborta ANTES de habilitar a
+       escrita) → B2 escrita gated → C finally remove TODAS as envs SLA_*.
+       Endurecimento sobre o A→B literal: B1 prova a unicidade do alvo com a env
+       de corte porém SEM SLA_WRITE (0 escrita), impedindo escrever um 2º evento
+       caso o flags.slaEngine já esteja ligado. */
+    guardToken();
+    if (rota !== "sla-dryrun") fail(`janela-write só permite a rota 'sla-dryrun' (recebido: '${rota}').`);
+    const snapAntes = await snapshotVars("antes-da-janela-write");
+    for (const v of ["SLA_ENGINE_ENABLED", "SLA_WRITE", "SLA_ACTIVATED_AT"])
+      if (snapAntes.has(v)) fail(`binding '${v}' já existe ANTES da janela-write — estado sujo; remova e reexecute.`);
+    let writeFeito = false;
+    try {
+      /* ── A — PREFLIGHT read-only (só SLA_ENGINE_ENABLED; SEM corte → tudo retro) ── */
+      await secretOn("SLA_ENGINE_ENABLED", "true");
+      await new Promise((r) => setTimeout(r, 12000));               // propagação do secret
+      const rA = await http("POST", `${URL_BASE}/sla-dryrun`, {});  // write:false
+      log(`— [A/preflight] /sla-dryrun {} → ${rA.status}`);
+      if (rA.status !== 200) throw new Error(`preflight respondeu ${rA.status}`);
+      save(`janela-write-A-preflight-${STAMP}.json`, rA.text);
+      const jA = JSON.parse(rA.text).report || {};
+      if (jA.writeAllowed !== false) throw new Error("[A] writeAllowed !== false no preflight — ANOMALIA, abortando");
+      if ((jA.writes || 0) !== 0)    throw new Error("[A] writes !== 0 no preflight — ANOMALIA, abortando");
+      if ((jA.scanned || 0) < 1)     throw new Error("[A] scanned < 1 (nenhuma tarefa de designer ativa) — janela fechada");
+      const alvos = (jA.computed || []).filter((c) => c.slaStatus === "inicio_proximo");
+      if (alvos.length === 0) throw new Error("[A] nenhuma tarefa em 'inicio_proximo' — fora da janela (cedo/tarde demais)");
+      if (alvos.length > 1)   throw new Error(`[A] ${alvos.length} tarefas em 'inicio_proximo' — janela-write exige EXATAMENTE 1 alvo; abortando`);
+      const piores = (jA.computed || []).filter((c) => c.blockedCandidate === true || /atrasad/.test(c.slaStatus || ""));
+      if (piores.length) throw new Error(`[A] ${piores.length} tarefa(s) em estado pior (atraso/bloqueio) no scan — abortando por segurança`);
+      const alvo = alvos[0];
+      const cutoffMs = alvo.plannedStartAt;
+      if (!Number.isFinite(cutoffMs) || cutoffMs <= 0) throw new Error("[A] plannedStartAt do alvo inválido — abortando");
+      log(`— [A] alvo: task=${alvo.taskId} designer=${alvo.designerId} slaStatus=${alvo.slaStatus} | corte SLA_ACTIVATED_AT=${cutoffMs}`);
+
+      /* ── B1 — PROVA-SECA COM CORTE (SLA_ACTIVATED_AT, SEM SLA_WRITE → writeAllowed=false → 0 escrita).
+         Com o corte = plannedStartAt do alvo, o designer_task_assigned (âncora anterior)
+         vira retro e SÓ o designer_start_warning (âncora == corte) seria emitido.
+         Exige EXATAMENTE 1 evento, do alvo; qualquer outro aborta SEM habilitar escrita. */
+      await secretOn("SLA_ACTIVATED_AT", String(cutoffMs));
+      await new Promise((r) => setTimeout(r, 12000));
+      const rB1 = await http("POST", `${URL_BASE}/sla-dryrun`, { write: true });  // sem SLA_WRITE ⇒ writeAllowed=false
+      log(`— [B1/prova-seca] /sla-dryrun {write:true} (SEM SLA_WRITE) → ${rB1.status}`);
+      if (rB1.status !== 200) throw new Error(`prova-seca respondeu ${rB1.status}`);
+      save(`janela-write-B1-prova-seca-${STAMP}.json`, rB1.text);
+      const jB1 = JSON.parse(rB1.text).report || {};
+      if (jB1.writeAllowed !== false) throw new Error("[B1] writeAllowed !== false sem SLA_WRITE — ANOMALIA, abortando");
+      if ((jB1.writes || 0) !== 0)    throw new Error("[B1] writes !== 0 sem SLA_WRITE — ANOMALIA, abortando");
+      const evsB1 = jB1.events || [];
+      if (evsB1.length !== 1) throw new Error(`[B1] esperava EXATAMENTE 1 evento com o corte, veio ${evsB1.length} — abortando (não habilito escrita)`);
+      if (evsB1[0].eventType !== "designer_start_warning") throw new Error(`[B1] evento inesperado '${evsB1[0].eventType}' (esperado designer_start_warning) — abortando`);
+      if (evsB1[0].taskId !== alvo.taskId) throw new Error(`[B1] evento de outra tarefa (${evsB1[0].taskId} ≠ alvo ${alvo.taskId}) — abortando`);
+      log("— [B1] OK: exatamente 1 evento designer_start_warning do alvo passaria o corte; 0 escrita até aqui.");
+
+      /* ── B2 — ESCRITA GATED (adiciona SLA_WRITE). writeAllowed = flags.slaEngine===true
+         (toggle MANUAL no Firestore, NÃO tocado aqui). flags OFF → writes=0; ON → writes≤2. */
+      await secretOn("SLA_WRITE", "true");
+      await new Promise((r) => setTimeout(r, 12000));
+      const rB2 = await http("POST", `${URL_BASE}/sla-dryrun`, { write: true });
+      log(`— [B2/escrita] /sla-dryrun {write:true} (SLA_WRITE + SLA_ACTIVATED_AT) → ${rB2.status}`);
+      if (rB2.status !== 200) throw new Error(`escrita respondeu ${rB2.status}`);
+      save(`janela-write-B2-escrita-${STAMP}.json`, rB2.text);
+      const jB2 = JSON.parse(rB2.text).report || {};
+      const evsB2 = jB2.events || [];
+      if (evsB2.length > 1) throw new Error(`[B2] mais de 1 evento (${evsB2.length}) — abortando (gate de segurança)`);
+      if (!evsB2.every((e) => e.eventType === "designer_start_warning")) throw new Error("[B2] evento não-warning presente — abortando");
+      if ((jB2.writes || 0) > 2) throw new Error(`[B2] writes=${jB2.writes} > 2 — acima do esperado (1 slaEvents + 1 designerSla); abortando`);
+      /* wouldNotify é SEMPRE não-vazio para um warning (1 entrada simulada por
+         construção, linha ~3868 do worker) — por isso NÃO abortamos em não-vazio;
+         exigimos que TODAS as entradas sejam simulated===true. Push real é
+         estruturalmente impossível: runSlaEnginePass não chama FCM/WebPush/WhatsApp. */
+      const notifyOk = (jB2.wouldNotify || []).every((w) => w.simulated === true);
+      if (!notifyOk) throw new Error("[B2] wouldNotify com entrada NÃO simulada — abortando (nenhum push real é permitido)");
+      writeFeito = jB2.writeAllowed === true && (jB2.writes || 0) > 0;
+      log(`— [B2] writeAllowed=${jB2.writeAllowed} writes=${jB2.writes || 0} events=${evsB2.length} wouldNotify=${(jB2.wouldNotify || []).length} (todas simuladas=${notifyOk})`);
+      if (!writeFeito)
+        log("— [B2] 3º gate (flags.slaEngine) FECHADO → 0 escrita real (esperado se o toggle manual não foi ligado). Tooling validada; escrita real exige o toggle no Firestore.");
+      else
+        log(`— [B2] ESCRITA REAL efetuada: ${jB2.writes} doc(s) (1 slaEvents designer_start_warning + 1 designerSla). Push real: NENHUM (estrutural).`);
+    } finally {
+      log("— [C/finally] removendo TODAS as envs SLA_* via API (garantido mesmo em erro)");
+      await secretOff("SLA_WRITE");
+      await secretOff("SLA_ACTIVATED_AT");
+      await secretOff("SLA_ENGINE_ENABLED");
+      await new Promise((r) => setTimeout(r, 5000));
+      const snapDepois = await snapshotVars("depois-da-janela-write");
+      for (const v of ["SLA_ENGINE_ENABLED", "SLA_WRITE", "SLA_ACTIVATED_AT"])
+        if (snapDepois.has(v)) log(`✗ CRÍTICO: '${v}' AINDA presente no snapshot final — remover MANUALMENTE no painel AGORA.`);
+      for (const n of snapAntes) if (!snapDepois.has(n)) log(`✗ ALERTA: variável '${n}' ausente no snapshot final (não tocada por este script — investigar).`);
+      for (const n of snapDepois) if (!snapAntes.has(n) && !["SLA_ENGINE_ENABLED", "SLA_WRITE", "SLA_ACTIVATED_AT"].includes(n)) log(`✗ ALERTA: variável nova '${n}' no snapshot final (não criada por este script).`);
+      await passo403("final, pós-remoção (janela-write)");
+    }
+    if (!writeFeito) log("RESUMO janela-write: B1 provou 1 único evento (0 escrita); B2 com 0 escrita real (3º gate flags.slaEngine fechado); envs SLA_* removidas; 403 confirmado.");
+    else             log("RESUMO janela-write: B1 provou 1 único evento; B2 ESCREVEU 1 designer_start_warning (gate aberto); envs SLA_* removidas; 403 confirmado; push real NENHUM.");
+    flushReport(writeFeito ? "OK (janela-write — escrita real)" : "OK (janela-write — 0 escrita, gate fechado)");
   } else if (modo === "rollback") {
     guardToken();
     log("— rollback: wrangler rollback (volta ao deployment anterior do próprio Cloudflare)");
@@ -241,7 +370,7 @@ try {
     log("RESUMO rollback: deployment anterior restaurado. (Alternativa byte-exata: redeploy do backup-producao-*.js do log mais recente.)");
     flushReport("OK (rollback)");
   } else {
-    console.log("uso: node scripts/worker-ops/microjanela.mjs <dry-run|deploy|janela <rota>|full <rota>|rollback>");
+    console.log("uso: node scripts/worker-ops/microjanela.mjs <dry-run|deploy|janela <rota>|full <rota>|janela-write sla-dryrun|rollback>");
     console.log("rotas:", ROTAS_AUTORIZADAS.join(" | "));
     process.exit(2);
   }
