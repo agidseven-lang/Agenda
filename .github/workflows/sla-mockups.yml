@@ -1,7 +1,8 @@
 # F3.3.0 — Gera os MOCKUPS visuais premium do sistema de alertas SLA (estáticos)
-# via Playwright/Chromium headless e publica os PNGs como artifact para o owner
-# validar. NÃO chama provider, NÃO envia FCM/Web Push/WhatsApp, NÃO escreve no
-# Firestore, NÃO faz deploy/release. Apenas renderiza HTML estático -> PNG.
+# via Playwright/Chromium headless, publica os PNGs como artifact E os COMMITA em
+# docs/sla-mockups/ no branch de trabalho (para o owner revisar diretamente / o
+# agente relê via git pull e anexa). NÃO chama provider, NÃO envia FCM/Web Push/
+# WhatsApp, NÃO escreve no Firestore, NÃO faz deploy/release. Só HTML estático -> PNG.
 name: "[manual] SLA mockups (F3.3.0 — design premium, PNGs)"
 
 on:
@@ -13,7 +14,7 @@ on:
       - 'desktop/scripts/sla-mockups/**'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: sla-mockups
@@ -24,6 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: desktop/local-detail-hierarchy-v2
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -34,7 +38,7 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Renderizar mockups -> PNGs
         run: node desktop/scripts/sla-mockups/shoot.mjs
-      - name: Upload mockups (PNGs)
+      - name: Upload mockups (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -42,3 +46,18 @@ jobs:
           path: desktop/sla-mockups-out/
           if-no-files-found: error
           retention-days: 30
+      - name: Commitar previews no branch (para revisão do owner)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf docs/sla-mockups && mkdir -p docs/sla-mockups
+          cp desktop/sla-mockups-out/*.png docs/sla-mockups/
+          cp desktop/sla-mockups-out/manifest.json docs/sla-mockups/ 2>/dev/null || true
+          git add docs/sla-mockups
+          if git diff --cached --quiet; then
+            echo "nada a commitar"
+          else
+            git commit -m "F3.3.0: previews PNG dos mockups para revisao visual [skip ci]"
+            git pull --rebase origin desktop/local-detail-hierarchy-v2 || true
+            git push origin HEAD:desktop/local-detail-hierarchy-v2
+          fi

@@ -41,6 +41,9 @@ for (const id of shots) {
 // visão geral (página inteira)
 await page.screenshot({ path: path.join(OUT, '00-overview.png'), fullPage: true });
 done.unshift('00-overview.png');
+// preview-board único exigido pelo owner (mesma imagem da visão geral, nome dedicado)
+fs.copyFileSync(path.join(OUT, '00-overview.png'), path.join(OUT, 'F3.3.0-mockups-preview-board.png'));
+done.unshift('F3.3.0-mockups-preview-board.png');
 
 fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify({ generated: new Date().toISOString(), shots: done, pageErrors: errors }, null, 2));
 console.log('MOCKUPS GERADOS:', JSON.stringify(done, null, 2));
