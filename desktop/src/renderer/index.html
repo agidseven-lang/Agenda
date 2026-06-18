@@ -2405,6 +2405,107 @@ const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{
 // continuam atualizando em memória; ações explícitas do usuário (Próximo/Voltar/etc.) seguem
 // chamando render() normalmente; ao salvar/fechar, render() reflete tudo.
 function renderFromSnapshot(){ if(state.form) return; render(); }
+
+/* ============================================================================
+ * F3.2.1 — NOTIFICAÇÕES SLA IN-APP (READ-SIDE / LOCAL) — ADITIVO, SEM BACKEND
+ * Deriva alertas SLA das tarefas JÁ visíveis (visibleTasks + kbv2SlaLocal).
+ * NÃO envia push (FCM/Web Push/WhatsApp), NÃO lê slaEvents, NÃO escreve no
+ * Firestore. Estado lido é LOCAL (localStorage: idseven.slaInApp.read).
+ * Sino fixo (portal no <body>, FORA de #app → sobrevive a re-render).
+ * ========================================================================== */
+var SLAIB_READ_KEY='idseven.slaInApp.read';
+var SLAIB_EVENT_BY_STATE={warning_start:'designer_start_warning',overdue_start:'designer_start_overdue',warning_finish:'designer_finish_warning',overdue_finish:'designer_finish_overdue'};
+function slaibEsc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function slaibLoadRead(){try{return JSON.parse(localStorage.getItem(SLAIB_READ_KEY)||'{}')||{};}catch(_){return {};}}
+function slaibSaveRead(o){try{localStorage.setItem(SLAIB_READ_KEY,JSON.stringify(o||{}));}catch(_){}}
+function slaibKey(taskId,eventType,anchorMs){return taskId+'__'+eventType+'__'+(anchorMs||0);}
+function slaibSevColor(sev){return sev==='vermelho'?'vermelho':(sev==='laranja'?'laranja':'neutro');}
+function slaibCompute(){
+  var u=state.user; if(!u) return [];
+  var vis=(typeof visibleTasks==='function')?visibleTasks(u,state.tasks||[]):(state.tasks||[]);
+  var now=Date.now(), out=[];
+  for(var i=0;i<vis.length;i++){
+    var t=vis[i]; if(!t) continue;
+    var sla=kbv2SlaLocal(t,now);
+    var ev=SLAIB_EVENT_BY_STATE[sla&&sla.state]; if(!ev) continue;   // só warning/overdue de início/entrega
+    var ds=t.designerSla||{};
+    var anchor=(sla.state.indexOf('start')>=0)?(Number(ds.planStartAt)||0):(Number(ds.planDueAt)||0);
+    out.push({taskId:t.id,eventType:ev,state:sla.state,sev:sla.sev,label:sla.label,client:t.client||'',title:t.title||'',anchorMs:anchor,key:slaibKey(t.id,ev,anchor)});
+  }
+  out.sort(function(a,b){var r=((b.sev==='vermelho')?1:0)-((a.sev==='vermelho')?1:0); if(r) return r; return (b.anchorMs||0)-(a.anchorMs||0);});
+  return out;
+}
+function slaibEnsureStyle(){
+  if(document.getElementById('slaib-style')) return;
+  var st=document.createElement('style'); st.id='slaib-style';
+  st.textContent='.slaib-bell{position:fixed;right:18px;bottom:18px;z-index:4000;width:46px;height:46px;border-radius:50%;background:#1b2030;border:1px solid rgba(255,255,255,.10);color:#e8ecf4;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:20px}'
+   +'.slaib-bell:hover{background:#222a3d}'
+   +'.slaib-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#ff6b61;color:#fff;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center}'
+   +'.slaib-ov{position:fixed;inset:0;z-index:4001;background:rgba(4,7,14,.55);display:flex;align-items:flex-end;justify-content:flex-end}'
+   +'.slaib-panel{width:min(380px,92vw);max-height:72vh;margin:0 16px 78px 0;background:#121722;border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 16px 50px rgba(0,0,0,.5)}'
+   +'.slaib-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08)}'
+   +'.slaib-hd b{font-size:14px;color:#eef2f8}'
+   +'.slaib-allread{font-size:12px;color:#9fb0c8;background:none;border:0;cursor:pointer}'
+   +'.slaib-list{overflow:auto;padding:6px}'
+   +'.slaib-empty{padding:22px 14px;color:#8b97a8;font-size:13px;text-align:center}'
+   +'.slaib-it{display:flex;gap:10px;padding:10px;border-radius:12px;align-items:flex-start}'
+   +'.slaib-it:hover{background:rgba(255,255,255,.04)}'
+   +'.slaib-it.unread{background:rgba(127,166,255,.06)}'
+   +'.slaib-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:0 0 auto}'
+   +'.slaib-dot.vermelho{background:#ff6b61}.slaib-dot.laranja{background:#f2a93b}.slaib-dot.neutro{background:#7fa6ff}'
+   +'.slaib-bd{flex:1;min-width:0}.slaib-bd .t{font-size:13px;color:#e8ecf4;font-weight:700}'
+   +'.slaib-bd .s{font-size:12px;color:#9fb0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.slaib-acts{display:flex;gap:8px;margin-top:6px}.slaib-acts button{font-size:11px;border:1px solid rgba(255,255,255,.12);background:#1a2030;color:#cfe;border-radius:8px;padding:4px 8px;cursor:pointer}';
+  document.head.appendChild(st);
+}
+function slaibRenderPanel(items,read){
+  var ov=document.getElementById('slaib-ov'); if(!ov) return;
+  read=read||slaibLoadRead();
+  var rows=items.length?items.map(function(x){
+    var isR=!!read[x.key];
+    var sub=(x.client?slaibEsc(x.client)+' · ':'')+slaibEsc(x.title||x.taskId);
+    return '<div class="slaib-it'+(isR?'':' unread')+'"><span class="slaib-dot '+slaibSevColor(x.sev)+'"></span>'
+      +'<div class="slaib-bd"><div class="t">'+slaibEsc(x.label||x.eventType)+'</div><div class="s">'+sub+'</div>'
+      +'<div class="slaib-acts"><button data-slaib-open="'+slaibEsc(x.taskId)+'">Abrir tarefa</button>'
+      +(isR?'':'<button data-slaib-read="'+slaibEsc(x.key)+'">Marcar lida</button>')+'</div></div></div>';
+  }).join(''):'<div class="slaib-empty">Sem alertas de SLA.</div>';
+  var listEl=ov.querySelector('.slaib-list'); if(listEl) listEl.innerHTML=rows;
+}
+function slaibOpenTask(taskId){
+  var t=(state.tasks||[]).find(function(x){return x.id===taskId;});
+  if(!t){ if(typeof flashToast==='function')flashToast('Tarefa indisponível (pode ter sido removida).'); return; }
+  if(typeof openDetails==='function'){ try{openDetails(taskId);return;}catch(_){} }
+  if(typeof flashToast==='function')flashToast('Não foi possível abrir a tarefa.');
+}
+function slaibToggle(){
+  var ov=document.getElementById('slaib-ov'); if(ov){ov.remove();return;}
+  ov=document.createElement('div'); ov.id='slaib-ov'; ov.className='slaib-ov';
+  ov.innerHTML='<div class="slaib-panel"><div class="slaib-hd"><b>Alertas de SLA</b><button class="slaib-allread" id="slaib-allread">Marcar todas como lidas</button></div><div class="slaib-list"></div></div>';
+  ov.addEventListener('click',function(e){
+    if(e.target===ov){ov.remove();return;}
+    var o=e.target.closest&&e.target.closest('[data-slaib-open]'); if(o){var id=o.getAttribute('data-slaib-open');ov.remove();slaibOpenTask(id);return;}
+    var r=e.target.closest&&e.target.closest('[data-slaib-read]'); if(r){var rd=slaibLoadRead();rd[r.getAttribute('data-slaib-read')]=Date.now();slaibSaveRead(rd);slaibRender();return;}
+    if(e.target.id==='slaib-allread'){var its=slaibCompute(),rd2=slaibLoadRead();its.forEach(function(x){rd2[x.key]=Date.now();});slaibSaveRead(rd2);slaibRender();return;}
+  });
+  document.body.appendChild(ov);
+  slaibRenderPanel(slaibCompute(),slaibLoadRead());
+}
+function slaibRender(){
+  var bell=document.getElementById('slaib-bell');
+  var authed=!!(state.user)&&document.body.classList.contains('authed');
+  if(!authed){ if(bell)bell.remove(); var ov0=document.getElementById('slaib-ov'); if(ov0)ov0.remove(); return; }
+  slaibEnsureStyle();
+  var items=slaibCompute(), read=slaibLoadRead();
+  var unread=items.filter(function(x){return !read[x.key];});
+  if(!bell){ bell=document.createElement('div'); bell.id='slaib-bell'; bell.className='slaib-bell'; bell.title='Alertas de SLA'; bell.innerHTML='⏰<span class="slaib-count" id="slaib-count"></span>'; bell.addEventListener('click',slaibToggle); document.body.appendChild(bell); }
+  var cnt=document.getElementById('slaib-count');
+  if(cnt){ if(unread.length){cnt.style.display='flex';cnt.textContent=String(unread.length);} else {cnt.style.display='none';} }
+  if(document.getElementById('slaib-ov')) slaibRenderPanel(items,read);
+}
+function slaibRefresh(){ try{ slaibRender(); }catch(_){} }
+if(typeof renderFromSnapshot==='function'){ var _slaib_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_slaib_rfs.apply(this,arguments); slaibRefresh(); return r; }; }
+try{ setInterval(slaibRefresh,30000); }catch(_){}
+try{ setTimeout(slaibRefresh,0); }catch(_){}
 function render(){
   if(!state.user)return;
   // 1.0.102 — NUNCA re-renderizar por baixo de uma edição aberta. Se há um modal aberto com
