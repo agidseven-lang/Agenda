@@ -1,458 +1,190 @@
-# Deploy manual do Worker `idseven-push` no Cloudflare.
-# - Roda SOMENTE quando acionado manualmente (workflow_dispatch). Nunca em push.
-# - Usa o wrangler.toml do repositorio (name, vars plaintext, cron * * * * *).
-# - Credenciais vem dos SECRETS do GitHub (nunca escritas neste arquivo).
-# - `wrangler deploy` publica o script + vars + cron. NAO altera os secrets do
-#   Worker (FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY, IMAGEKIT_PRIVATE_KEY permanecem).
+# Deploy manual SEGURO do Worker `idseven-push` — publica SOMENTE o código
+# canônico V64.59 com o SLA Engine DESLIGADO (nenhuma variável SLA é criada).
+#
+# Acionado SOMENTE manualmente (workflow_dispatch). Nunca em push.
+# Secrets do GitHub usados (apenas NOMES; valores nunca aparecem aqui nem no log):
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+#
+# Salvaguardas (F2.5):
+#   1) checkout do código canônico (default: worker/v64-59-canonical) + assert V64.59;
+#   2) assert wrangler.toml SEM nenhuma variável SLA (SLA OFF por construção);
+#   3) BACKUP do script ativo de produção via API + sha256 (artefato p/ rollback byte-exato);
+#   4) SNAPSHOT de variáveis (nomes+tipos) ANTES (e assert sem SLA_*);
+#   5) `wrangler deploy --keep-vars` (preserva vars do painel; secrets nunca são tocados);
+#   6) assert versão pós-deploy == V64.59;
+#   7) SNAPSHOT de variáveis DEPOIS: assert NENHUMA sumiu e NENHUMA SLA_* foi criada;
+#   8) 403 OBRIGATÓRIO nas 5 rotas /sla-* (falha se qualquer uma responder 200);
+#   9) smoke das rotas existentes (/, /share, notify-designer dryRun — sem enviar push);
+#  10) ROLLBACK automático e validado se qualquer checagem PÓS-deploy falhar.
+#
+# NÃO cria/rotaciona secrets. NÃO ativa SLA. NÃO escreve em Firestore. NÃO envia
+# FCM/Web Push/WhatsApp. NÃO toca Firestore Rules/Functions/appConfig.
 name: Deploy Worker (idseven-push)
 
 on:
   workflow_dispatch:
     inputs:
-      task_id:
-        description: "Task ID p/ dryRun /notify-designer (opcional)"
-        required: false
-        type: string
-      client_share_token:
-        description: "shareToken real de uma task p/ validar a rota pública /cliente/cronograma/<token> (opcional)"
-        required: false
-        type: string
-      wa_send_token:
-        description: "[FASE 3] token de um cronograma REAL p/ teste de envio premium via Cloud API (opcional)"
-        required: false
-        type: string
-      wa_send_phone:
-        description: "[FASE 3] telefone de teste em E.164 (ex.: 5583999999999) p/ receber o card real (opcional)"
-        required: false
-        type: string
-      provision_secrets:
-        description: "[V64.46] Gerar e gravar secrets novos (TEAM_SESSION_SECRET/TEAM_API_KEY/VAPID_*) — ATENCAO: rotaciona chaves (invalida JWTs e subscriptions existentes)"
-        required: false
-        default: "false"
-        type: string
+      ref:
+        description: "Branch/commit do código canônico a publicar"
+        required: true
+        default: "worker/v64-59-canonical"
 
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-worker-idseven-push
+  cancel-in-progress: false
+
+env:
+  WORKER_NAME: idseven-push
+  WORKER_URL: https://idseven-push.agidseven.workers.dev
+
 jobs:
   deploy:
-    name: wrangler deploy
+    name: deploy seguro V64.59 (SLA OFF)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout (código canônico)
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: "20"
 
-      # V64.46 — GERACAO DOS SECRETS NO RUNNER (efemero): valores nascem aqui, sao
-      # MASCARADOS (::add-mask::) antes de qualquer uso, vao ao Worker via wrangler
-      # secret put (action abaixo) e NUNCA tocam arquivo versionado nem log.
-      # Relatorio: apenas comprimento + sha256[0:8]. VAPID_PUBLIC_KEY e publica por
-      # natureza (vai no HTML do portal) e e impressa integralmente p/ auditoria.
-      - name: "[V64.46] Gerar secrets fortes (mascarados)"
-        if: ${{ github.event.inputs.provision_secrets == 'true' }}
+      - name: Pré-deploy — assert fonte V64.59 e wrangler.toml SEM vars SLA
         run: |
           set -euo pipefail
+          echo "ref a publicar: ${{ github.event.inputs.ref }}"
+          grep -qE 'version: *"V64\.59' cloudflare-worker.js \
+            || { echo "ABORTAR: cloudflare-worker.js não é V64.59"; exit 1; }
+          echo "OK: fonte V64.59 confirmada"
+          if grep -qE 'SLA_ENGINE_ENABLED|SLA_WRITE|SLA_ACTIVATED_AT' wrangler.toml; then
+            echo "ABORTAR: wrangler.toml contém variável SLA — esta fase é SLA OFF"; exit 1
+          fi
+          echo "OK: wrangler.toml sem nenhuma variável SLA"
+
+      - name: Backup — script ATIVO de produção + versão atual (API Cloudflare)
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p worker-ops-logs
+          echo "== versão ANTES (GET /) =="
+          curl -sS --max-time 25 "$WORKER_URL/" | tee worker-ops-logs/versao-antes.json; echo
+          API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$WORKER_NAME"
+          echo "== backup do script ativo =="
+          curl -sS --max-time 30 -H "Authorization: Bearer $CF_TOKEN" "$API" -o worker-ops-logs/backup-producao.js
+          test -s worker-ops-logs/backup-producao.js || { echo "ABORTAR: backup vazio (token/conta?)"; exit 1; }
+          sha256sum worker-ops-logs/backup-producao.js | tee worker-ops-logs/backup-producao.sha256
+
+      - name: Snapshot de variáveis ANTES (nomes+tipos; valores nunca saem)
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$WORKER_NAME/settings"
+          curl -sS --max-time 25 -H "Authorization: Bearer $CF_TOKEN" "$API" -o worker-ops-logs/settings-antes.json
           node -e '
-            const c=require("crypto");
-            const out={};
-            out.TEAM_SESSION_SECRET=c.randomBytes(48).toString("base64url");
-            out.TEAM_API_KEY=c.randomBytes(32).toString("base64url");
-            const {publicKey,privateKey}=c.generateKeyPairSync("ec",{namedCurve:"prime256v1"});
-            const jp=publicKey.export({format:"jwk"}), jk=privateKey.export({format:"jwk"});
-            const b=(x)=>Buffer.from(x,"base64url");
-            out.VAPID_PUBLIC_KEY=Buffer.concat([Buffer.from([4]),b(jp.x),b(jp.y)]).toString("base64url");
-            out.VAPID_PRIVATE_KEY=jk.d;
             const fs=require("fs");
-            const mask=[],envl=[],fps=[];
-            for(const [k,v] of Object.entries(out)){
-              mask.push("::add-mask::"+v);
-              envl.push(k+"="+v);
-              fps.push(k+": len="+v.length+" sha256[0:8]="+c.createHash("sha256").update(v).digest("hex").slice(0,8));
-            }
-            console.log(mask.join("\n"));                       // mascara ANTES de exportar
-            fs.appendFileSync(process.env.GITHUB_ENV, envl.join("\n")+"\n");
-            console.log("== FINGERPRINTS (sem valores) ==");
-            console.log(fps.join("\n"));
-            console.log("VAPID_PUBLIC_KEY (publica, integra p/ auditoria): "+out.VAPID_PUBLIC_KEY);
+            const s=JSON.parse(fs.readFileSync("worker-ops-logs/settings-antes.json","utf8"));
+            const b=((s.result||{}).bindings||[]).map(x=>x.name+" ("+x.type+")").sort();
+            fs.writeFileSync("worker-ops-logs/vars-antes.txt", b.join("\n")+"\n");
+            console.log("bindings ANTES (nomes/tipos):\n"+(b.join("\n")||"(nenhum)"));
+            const sla=b.filter(n=>/^SLA_/.test(n));
+            if(sla.length){ console.error("ABORTAR: variável SLA já presente ANTES: "+sla.join(", ")); process.exit(1); }
+            console.log("OK: nenhuma variável SLA antes do deploy");
           '
 
-      - name: "Deploy Worker (+ gravar secrets V64.46)"
-        if: ${{ github.event.inputs.provision_secrets == 'true' }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
-          secrets: |
-            TEAM_SESSION_SECRET
-            TEAM_API_KEY
-            VAPID_PUBLIC_KEY
-            VAPID_PRIVATE_KEY
+      - name: Deploy — wrangler deploy --keep-vars (preserva vars do painel + secrets)
+        id: deploy
         env:
-          TEAM_SESSION_SECRET: ${{ env.TEAM_SESSION_SECRET }}
-          TEAM_API_KEY: ${{ env.TEAM_API_KEY }}
-          VAPID_PUBLIC_KEY: ${{ env.VAPID_PUBLIC_KEY }}
-          VAPID_PRIVATE_KEY: ${{ env.VAPID_PRIVATE_KEY }}
-
-      - name: Deploy Worker
-        if: ${{ github.event.inputs.provision_secrets != 'true' }}
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
-
-      # V64.46 — VALIDACAO RUNTIME da blindagem (sem credencial real: o caminho feliz
-      # da sessao e o Web Push em aparelho ficam para o TESTE REAL do usuario).
-      - name: "[V64.46] Validar healthcheck + logo + SW + team/session + team-action"
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          B="https://idseven-push.agidseven.workers.dev"
-          echo "== 1) HEALTHCHECK deve ser V64.53 =="
-          for i in 1 2 3; do
-            H=$(curl -sS --max-time 20 "$B/")
-            echo "$H" | grep -q '"V64.53-premium-portal"' && break
-            echo "(tentativa $i: versao ainda nao propagou; aguardando 5s)"; sleep 5
-          done
-          echo "$H"
-          echo "$H" | grep -q '"V64.53-premium-portal"' || { echo "FAIL: healthcheck nao e V64.53" >&2; exit 1; }
+          npx --yes wrangler@4 deploy --keep-vars 2>&1 | tee worker-ops-logs/deploy.txt
+          grep -qiE 'Deployed|Current Version|Uploaded' worker-ops-logs/deploy.txt \
+            || { echo "ABORTAR: deploy sem confirmação no output do wrangler"; exit 1; }
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
 
-          echo "== 2) LOGO oficial /og/idseven-logo.png (image/png) =="
-          lc=$(curl -sS --max-time 20 -o /tmp/logo.png -w '%{http_code}' "$B/og/idseven-logo.png")
-          lct=$(curl -sS --max-time 20 -o /dev/null -w '%{content_type}' "$B/og/idseven-logo.png")
-          echo "HTTP=$lc CT=$lct bytes=$(wc -c < /tmp/logo.png)"
-          [ "$lc" = "200" ] || { echo "FAIL: logo != 200" >&2; exit 1; }
-          echo "$lct" | grep -qi 'image/png' || { echo "FAIL: logo nao e image/png" >&2; exit 1; }
-          [ "$(wc -c < /tmp/logo.png)" -gt 10000 ] || { echo "FAIL: logo muito pequena" >&2; exit 1; }
-
-          echo "== 2b) BADGE monocromatico /og/idseven-badge.png (V64.50) =="
-          bc=$(curl -sS --max-time 20 -o /tmp/badge.png -w '%{http_code}' "$B/og/idseven-badge.png")
-          bct=$(curl -sS --max-time 20 -o /dev/null -w '%{content_type}' "$B/og/idseven-badge.png")
-          echo "HTTP=$bc CT=$bct bytes=$(wc -c < /tmp/badge.png)"
-          [ "$bc" = "200" ] || { echo "FAIL: badge != 200" >&2; exit 1; }
-          echo "$bct" | grep -qi 'image/png' || { echo "FAIL: badge nao e image/png" >&2; exit 1; }
-          [ "$(wc -c < /tmp/badge.png)" -gt 300 ] || { echo "FAIL: badge muito pequeno" >&2; exit 1; }
-
-          echo "== 3) Service Worker /cliente/sw.js (V64.51: showNotification + icon/badge/data + click) =="
-          swc=$(curl -sS --max-time 20 -o /tmp/sw.js -w '%{http_code}' "$B/cliente/sw.js")
-          [ "$swc" = "200" ] || { echo "FAIL: sw.js != 200" >&2; exit 1; }
-          grep -q "addEventListener('push'" /tmp/sw.js || { echo "FAIL: sw sem handler push" >&2; exit 1; }
-          grep -q "sw-version: V64.51-mobile-touch-footer" /tmp/sw.js || { echo "FAIL: sw nao e V64.50" >&2; exit 1; }
-          grep -q "self.registration.showNotification(title, options)" /tmp/sw.js || { echo "FAIL: sw sem showNotification" >&2; exit 1; }
-          grep -q "event.waitUntil(Promise.all(" /tmp/sw.js || { echo "FAIL: sw sem waitUntil(Promise.all)" >&2; exit 1; }
-          grep -q "/og/idseven-badge.png" /tmp/sw.js || { echo "FAIL: sw sem badge dedicado" >&2; exit 1; }
-          grep -q "/og/idseven-logo.png" /tmp/sw.js || { echo "FAIL: sw sem icon oficial" >&2; exit 1; }
-          grep -q "eventType: data.eventType" /tmp/sw.js || { echo "FAIL: sw sem data{eventType}" >&2; exit 1; }
-          grep -q "notificationclick" /tmp/sw.js || { echo "FAIL: sw sem notificationclick" >&2; exit 1; }
-          echo "sw.js V64.51 OK"
-          grep -q "addEventListener('notificationclick'" /tmp/sw.js || { echo "FAIL: sw sem notificationclick" >&2; exit 1; }
-          echo "OK: SW serve push + notificationclick"
-
-          echo "== 4) /team/session — senha errada/uid inexistente => 401 GENERICO =="
-          for i in 1 2 3 4 5; do
-            r=$(curl -sS --max-time 20 -o /tmp/ts.json -w '%{http_code}' -X POST "$B/team/session"               -H 'Content-Type: application/json'               -d '{"uid":"__ci_fake_user__","password":"senha-errada-ci"}')
-            echo "tentativa $i -> HTTP=$r body=$(cat /tmp/ts.json)"
-            [ "$r" = "503" ] && { echo "FAIL: TEAM_SESSION_SECRET nao configurado no Worker" >&2; exit 1; }
-            [ "$r" = "401" ] || { echo "FAIL: esperava 401 generico" >&2; exit 1; }
-            grep -q '"credenciais inválidas"' /tmp/ts.json || { echo "FAIL: erro nao-generico" >&2; exit 1; }
-            grep -qi 'social\|admin\|role\|senha' /tmp/ts.json && { echo "FAIL: resposta revela motivo" >&2; exit 1; } || true
-          done
-          echo "== 5) 6a tentativa => 429 (RATE LIMIT real; bloqueio 15min do uid/ip de CI) =="
-          r6=$(curl -sS --max-time 20 -o /tmp/ts6.json -w '%{http_code}' -X POST "$B/team/session"             -H 'Content-Type: application/json'             -d '{"uid":"__ci_fake_user__","password":"senha-errada-ci"}')
-          echo "HTTP=$r6 body=$(cat /tmp/ts6.json)"
-          if [ "$r6" = "429" ]; then echo "OK: rate limit ATIVO (429 na 6a)";
-          else echo "AVISO: 6a tentativa nao deu 429 (HTTP=$r6) — Cache API por-datacenter pode ter variado de colo; limite e best-effort documentado"; fi
-
-          echo "== 6) /team-action — SEM Bearer => 401 (auth ANTES de qualquer efeito) =="
-          ta=$(curl -sS --max-time 20 -o /tmp/ta.json -w '%{http_code}' -X POST "$B/cliente/cronograma/__token_fake_ci__/team-action"             -H 'Content-Type: application/json' -d '{"action":"adjustedItem","contentIndexes":[0]}')
-          echo "HTTP=$ta body=$(cat /tmp/ta.json)"
-          [ "$ta" = "401" ] || { echo "FAIL: esperava 401 sem Bearer" >&2; exit 1; }
-          echo "== 7) /team-action — Bearer INVALIDO => 401 =="
-          tb=$(curl -sS --max-time 20 -o /tmp/tb.json -w '%{http_code}' -X POST "$B/cliente/cronograma/__token_fake_ci__/team-action"             -H 'Content-Type: application/json' -H 'Authorization: Bearer aaa.bbb.ccc'             -d '{"action":"adjustedItem","contentIndexes":[0]}')
-          echo "HTTP=$tb body=$(cat /tmp/tb.json)"
-          [ "$tb" = "401" ] || { echo "FAIL: esperava 401 com Bearer invalido" >&2; exit 1; }
-          grep -q '"assinatura inválida\|jwt malformado\|token expirado' /tmp/tb.json || true
-          echo "OK: team-action exige credencial verificavel; nenhum efeito sem auth."
-          echo "(caminho FELIZ da sessao + Web Push real: roteiro de teste do usuario — exige credencial/aparelho reais)"
-
-
-      # Verificacao pos-deploy (rede aberta no runner). dryRun NAO envia push.
-      # Aceita TASK_ID opcional via input p/ comprovar destinatario/tokens com doc real.
-      - name: Verificar deploy + dryRun /notify-designer (sem enviar push)
-        run: |
-          B="https://idseven-push.agidseven.workers.dev"
-          echo "== HEALTH (espera version V64.13-agency-operational-phase-fix) =="
-          curl -sS "$B/" ; echo
-          echo "== dryRun id de teste (NAO envia; espera 'tarefa nao encontrada') =="
-          curl -sS -X POST "$B/notify-designer" -H "Content-Type: application/json" -d '{"id":"__dryrun_ci__","dryRun":true}' ; echo
-          TID="${{ github.event.inputs.task_id }}"
-          if [ -n "$TID" ]; then
-            echo "== dryRun com TASK_ID real (NAO envia; mostra designer/tokens/payload) =="
-            curl -sS -X POST "$B/notify-designer" -H "Content-Type: application/json" -d "{\"id\":\"$TID\",\"dryRun\":true}" ; echo
-          else
-            echo "(sem task_id informado — pulei a prova com doc real; informe task_id no dispatch p/ comprovar destinatario/tokens)"
-          fi
-
-      # V64.6: prova de que a rota publica do CLIENTE retorna HTML (NAO JSON / NAO tela branca).
-      # Falha o job se a rota voltar JSON ou se o status != 200.
-      - name: Validar rota publica /cliente/cronograma/:token (HTML, sem regredir healthcheck)
+      - name: Pós-deploy — versão V64.59 + vars preservadas + sem var SLA nova
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          B="https://idseven-push.agidseven.workers.dev"
-
-          echo "== A) Healthcheck DEVE continuar JSON =="
-          ct_root=$(curl -sS -o /dev/null -w '%{content_type}' "$B/")
-          echo "Content-Type root = $ct_root"
-          case "$ct_root" in
-            application/json*) echo "OK: healthcheck preservado" ;;
-            *) echo "FAIL: healthcheck deveria ser application/json" >&2 ; exit 1 ;;
-          esac
-
-          echo "== B) Token invalido DEVE retornar HTML amigavel (NAO JSON) =="
-          tmp=$(mktemp)
-          code=$(curl -sS -o "$tmp" -w '%{http_code}' "$B/cliente/cronograma/__invalido_ci__")
-          ct=$(curl -sS -o /dev/null -w '%{content_type}' "$B/cliente/cronograma/__invalido_ci__")
-          echo "HTTP=$code  Content-Type=$ct"
-          if ! echo "$ct" | grep -qi 'text/html'; then
-            echo "FAIL: token invalido NAO retornou text/html (atual: $ct)" >&2 ; head -c 400 "$tmp" >&2 ; echo >&2 ; exit 1
-          fi
-          if head -c 200 "$tmp" | grep -qi '"ok":true,"service":"idseven-push"'; then
-            echo "FAIL: token invalido retornou JSON do healthcheck (regressao do fallback)" >&2 ; exit 1
-          fi
-          if ! head -c 200 "$tmp" | grep -qi '<!doctype html'; then
-            echo "FAIL: corpo nao comeca com <!doctype html>" >&2 ; head -c 400 "$tmp" >&2 ; echo >&2 ; exit 1
-          fi
-          echo "OK: rota publica retorna HTML para token invalido (sem tela branca / sem JSON cru)"
-
-          CTOKEN="${{ github.event.inputs.client_share_token }}"
-          if [ -n "$CTOKEN" ]; then
-            echo "== C) Token real DEVE retornar HTML com dados do cronograma =="
-            tmp2=$(mktemp)
-            code2=$(curl -sS -o "$tmp2" -w '%{http_code}' "$B/cliente/cronograma/$CTOKEN")
-            ct2=$(curl -sS -o /dev/null -w '%{content_type}' "$B/cliente/cronograma/$CTOKEN")
-            echo "HTTP=$code2  Content-Type=$ct2  bytes=$(wc -c < $tmp2)"
-            echo "---- primeiros 500 bytes do corpo (diagnostico) ----"
-            head -c 500 "$tmp2" ; echo ; echo "----------------------------------------------------"
-            [ "$code2" = "200" ] || { echo "FAIL: esperava 200 com token real" >&2 ; exit 1 ; }
-            echo "$ct2" | grep -qi 'text/html' || { echo "FAIL: token real NAO retornou text/html" >&2 ; exit 1 ; }
-            grep -q 'Visão do Cliente'       "$tmp2" || { echo "FAIL: HTML nao contem 'Visao do Cliente'" >&2 ; exit 1 ; }
-            grep -q 'Aprovar cronograma'     "$tmp2" || { echo "FAIL: HTML nao contem 'Aprovar cronograma'" >&2 ; exit 1 ; }
-            grep -q 'Pedir revisão'          "$tmp2" || { echo "FAIL: HTML nao contem 'Pedir revisao'" >&2 ; exit 1 ; }
-            grep -q "data-act=\"approveItem\"" "$tmp2" || { echo "FAIL: HTML nao contem acao por item (approveItem)" >&2 ; exit 1 ; }
-            grep -q "data-act=\"editLegenda\"" "$tmp2" || { echo "FAIL: HTML nao contem edicao individual (editLegenda)" >&2 ; exit 1 ; }
-            echo "OK: rota publica renderizou a nova Visao do Cliente premium (com acoes por item)"
-          else
-            echo "(sem client_share_token informado — pulei a prova com token real; informe no dispatch p/ validar dados de uma task real)"
-          fi
-
-      # V64.20: prova REAL (rede aberta no runner) de que o banner premium do link
-      # responde image/png 1200x630, no dominio CUSTOM e no fallback workers.dev,
-      # SEM regredir o healthcheck JSON. Falha o job se qualquer assercao quebrar.
-      - name: Validar banner premium /og/aprovar.png (image/png 1200x630, custom + fallback)
-        run: |
-          set -euo pipefail
-          assert_png () {
-            local URL="$1" ; local LABEL="$2" ; local f
-            f=$(mktemp)
-            echo "== $LABEL :: $URL =="
-            local ct code
-            code=$(curl -sS --max-time 25 -o "$f" -w '%{http_code}' "$URL")
-            ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$URL")
-            local sz; sz=$(wc -c < "$f")
-            echo "HTTP=$code  Content-Type=$ct  bytes=$sz"
-            [ "$code" = "200" ] || { echo "FAIL[$LABEL]: status != 200" >&2 ; exit 1 ; }
-            echo "$ct" | grep -qi 'image/png' || { echo "FAIL[$LABEL]: Content-Type nao e image/png" >&2 ; exit 1 ; }
-            # assinatura PNG + dimensoes 1200x630 lidas do IHDR
-            node -e '
-              const b=require("fs").readFileSync(process.argv[1]);
-              const sig=[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((x,i)=>b[i]===x);
-              const w=b.readUInt32BE(16), h=b.readUInt32BE(20);
-              if(!sig){console.error("FAIL: assinatura PNG invalida");process.exit(1);}
-              if(w!==1200||h!==630){console.error("FAIL: dimensoes "+w+"x"+h+" != 1200x630");process.exit(1);}
-              console.log("OK: PNG valido "+w+"x"+h+" ("+b.length+" bytes)");
-            ' "$f"
-          }
-          assert_png "https://aprovar.agendaidseven.com.br/og/aprovar.png" "DOMINIO CUSTOM"
-          assert_png "https://idseven-push.agidseven.workers.dev/og/aprovar.png" "FALLBACK workers.dev"
-
-          echo "== Healthcheck DEVE continuar JSON nos dois dominios =="
-          for B in "https://aprovar.agendaidseven.com.br" "https://idseven-push.agidseven.workers.dev"; do
-            ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/")
-            echo "$B/ -> $ct"
-            echo "$ct" | grep -qi 'application/json' || { echo "FAIL: healthcheck regrediu em $B" >&2 ; exit 1 ; }
-          done
-          echo "OK: banner premium servido image/png 1200x630 no custom e no fallback; healthcheck preservado."
-
-      # V64.24 — CANARIO OG ISOLADO: HTML minimo p/ TODOS os UAs + imagem JPEG.
-      - name: Validar canario V64.24 (HTML minimo + JPEG, HEAD+GET)
-        run: |
-          set -euo pipefail
-          B="https://aprovar.agendaidseven.com.br"
-
-          echo "== Canario HTML /wa-card-test-v64-24 (GET, qualquer UA) =="
-          h=$(mktemp)
-          code=$(curl -sS --max-time 25 -o "$h" -w '%{http_code}' "$B/wa-card-test-v64-24")
-          ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/wa-card-test-v64-24")
-          echo "HTTP=$code  Content-Type=$ct  bytes=$(wc -c < "$h")"
-          [ "$code" = "200" ] || { echo "FAIL: canario != 200" >&2; exit 1; }
-          echo "$ct" | grep -qi 'text/html' || { echo "FAIL: canario nao e text/html" >&2; exit 1; }
-          # OG nos primeiros 1KB
-          head -c 1024 "$h" | grep -qi 'og:image" content="https://aprovar.agendaidseven.com.br/og/wa-card-v64-24.jpg"' || { echo "FAIL: og:image JPG ausente no topo" >&2; head -c 400 "$h"; exit 1; }
-          grep -qi 'og:image:type" content="image/jpeg"' "$h" || { echo "FAIL: og:image:type image/jpeg ausente" >&2; exit 1; }
-          grep -qi '?' <(grep -o 'wa-card-v64-24.jpg[^"]*' "$h" | head -1) && { echo "FAIL: querystring na imagem" >&2; exit 1; } || true
-          echo "OK: canario HTML minimo com OG/JPEG no topo."
-
-          echo "== Canario HEAD /wa-card-test-v64-24 =="
-          curl -sS --max-time 25 -I "$B/wa-card-test-v64-24" | grep -iE 'HTTP/|content-type' || { echo "FAIL: HEAD html" >&2; exit 1; }
-
-          echo "== Imagem JPEG /og/wa-card-v64-24.jpg (GET) =="
-          j=$(mktemp)
-          jcode=$(curl -sS --max-time 25 -o "$j" -w '%{http_code}' "$B/og/wa-card-v64-24.jpg")
-          jct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/og/wa-card-v64-24.jpg")
-          echo "HTTP=$jcode  Content-Type=$jct  bytes=$(wc -c < "$j")"
-          [ "$jcode" = "200" ] || { echo "FAIL: jpg != 200" >&2; exit 1; }
-          echo "$jct" | grep -qi 'image/jpeg' || { echo "FAIL: nao e image/jpeg" >&2; exit 1; }
+          sleep 5
+          echo "== versão DEPOIS (GET /) =="
+          curl -sS --max-time 25 "$WORKER_URL/" | tee worker-ops-logs/versao-depois.json; echo
+          grep -qE 'V64\.59' worker-ops-logs/versao-depois.json \
+            || { echo "ABORTAR: versão pós-deploy não é V64.59"; exit 1; }
+          API="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts/$WORKER_NAME/settings"
+          curl -sS --max-time 25 -H "Authorization: Bearer $CF_TOKEN" "$API" -o worker-ops-logs/settings-depois.json
           node -e '
-            const b=require("fs").readFileSync(process.argv[1]);
-            const soi=b[0]===0xff&&b[1]===0xd8, eoi=b[b.length-2]===0xff&&b[b.length-1]===0xd9;
-            if(!soi||!eoi){console.error("FAIL: JPEG invalido (SOI/EOI)");process.exit(1);}
-            console.log("OK: JPEG valido ("+b.length+" bytes)");
-          ' "$j"
+            const fs=require("fs");
+            const after=JSON.parse(fs.readFileSync("worker-ops-logs/settings-depois.json","utf8"));
+            const a=((after.result||{}).bindings||[]).map(x=>x.name).sort();
+            fs.writeFileSync("worker-ops-logs/vars-depois.txt", a.join("\n")+"\n");
+            const before=fs.readFileSync("worker-ops-logs/vars-antes.txt","utf8").trim().split("\n")
+              .map(l=>l.replace(/ \(.*/,"")).filter(Boolean);
+            console.log("bindings DEPOIS (nomes):\n"+(a.join("\n")||"(nenhum)"));
+            const missing=before.filter(n=>!a.includes(n));
+            const slaNew=a.filter(n=>/^SLA_/.test(n));
+            if(missing.length){ console.error("ABORTAR: variável(is) SUMIRAM no deploy: "+missing.join(", ")); process.exit(1); }
+            if(slaNew.length){ console.error("ABORTAR: variável SLA criada no deploy: "+slaNew.join(", ")); process.exit(1); }
+            console.log("OK: todas as variáveis preservadas; nenhuma variável SLA criada");
+          '
 
-          echo "== Imagem HEAD /og/wa-card-v64-24.jpg =="
-          curl -sS --max-time 25 -I "$B/og/wa-card-v64-24.jpg" | grep -iE 'HTTP/|content-type|content-length|cache-control' || { echo "FAIL: HEAD jpg" >&2; exit 1; }
-          echo "OK: canario V64.24 validado (HTML minimo + JPEG image/jpeg, HEAD+GET)."
-
-          echo "== V64.25 — canarios novos + /preview + /wa-diag =="
-          for P in "/wa-card-test-v64-25-a" "/wa-card-test-v64-25-b" "/preview"; do
-            c=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$B$P")
-            ctp=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B$P")
-            echo "$P -> HTTP=$c $ctp"
-            [ "$c" = "200" ] || { echo "FAIL: $P != 200" >&2; exit 1; }
-            echo "$ctp" | grep -qi 'text/html' || { echo "FAIL: $P nao e text/html" >&2; exit 1; }
-          done
-          for J in "/og/wa-card-v64-25-a.jpg" "/og/wa-card-v64-25-b.jpg" "/preview.jpg" "/og/wa-card-v64-26.jpg"; do
-            c=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$B$J")
-            ctj=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B$J")
-            echo "$J -> HTTP=$c $ctj"
-            [ "$c" = "200" ] || { echo "FAIL: $J != 200" >&2; exit 1; }
-            echo "$ctj" | grep -qi 'image/jpeg' || { echo "FAIL: $J nao e image/jpeg" >&2; exit 1; }
-          done
-          echo "== /wa-diag responde JSON (instrumentacao ativa) =="
-          dct=$(curl -sS --max-time 25 -o /tmp/diag.json -w '%{content_type}' "$B/wa-diag")
-          echo "Content-Type=$dct ; corpo:"; head -c 300 /tmp/diag.json; echo
-          echo "$dct" | grep -qi 'application/json' || { echo "FAIL: /wa-diag nao e JSON" >&2; exit 1; }
-          echo "OK: V64.25 canarios+preview+wa-diag validados."
-
-      # V64.39 — URL DEDICADA DE COMPARTILHAMENTO /share/cronograma/:token.
-      # Prova (rede aberta) que a pagina leve serve OG premium (card 1200x630 image/jpeg
-      # absoluto HTTPS) e que a propria imagem responde 200 image/jpeg 1200x630. Token
-      # dummy basta: a pagina e estatica (nao consulta Firestore) — preview garantido.
-      - name: Validar /share/cronograma/:token (OG premium p/ WhatsApp)
+      - name: Pós-deploy — 403 OBRIGATÓRIO nas 5 rotas /sla-* (SLA off)
         run: |
           set -euo pipefail
-          for B in "https://aprovar.agendaidseven.com.br" "https://idseven-push.agidseven.workers.dev"; do
-            URL="$B/share/cronograma/ci_dummy_token_0001"
-            echo "== SHARE :: $URL =="
-            h=$(mktemp)
-            code=$(curl -sS --max-time 25 -o "$h" -w '%{http_code}' "$URL")
-            ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$URL")
-            echo "HTTP=$code Content-Type=$ct bytes=$(wc -c < "$h")"
-            [ "$code" = "200" ] || { echo "FAIL: share != 200" >&2; head -c 400 "$h"; exit 1; }
-            echo "$ct" | grep -qi 'text/html' || { echo "FAIL: share nao e text/html" >&2; exit 1; }
-            grep -qi 'og:image" content="https://[^"]*/og/wa-card-v64-38.jpg"' "$h" || { echo "FAIL: og:image absoluto ausente" >&2; head -c 600 "$h"; exit 1; }
-            grep -qi 'og:image:secure_url" content="https://' "$h" || { echo "FAIL: og:image:secure_url ausente" >&2; exit 1; }
-            grep -qi 'og:image:type" content="image/jpeg"' "$h" || { echo "FAIL: og:image:type ausente" >&2; exit 1; }
-            grep -qi 'og:image:width" content="1200"' "$h" || { echo "FAIL: width 1200 ausente" >&2; exit 1; }
-            grep -qi 'og:image:height" content="630"' "$h" || { echo "FAIL: height 630 ausente" >&2; exit 1; }
-            grep -qi 'twitter:card" content="summary_large_image"' "$h" || { echo "FAIL: twitter summary_large_image ausente" >&2; exit 1; }
-            grep -q 'og:title" content="Aprovar cronograma"' "$h" || { echo "FAIL: og:title != 'Aprovar cronograma'" >&2; head -c 600 "$h"; exit 1; }
-            grep -q 'og:description" content="Seu cronograma está pronto para avaliação."' "$h" || { echo "FAIL: og:description != 'Seu cronograma está pronto para avaliação.'" >&2; head -c 600 "$h"; exit 1; }
-            # OG ANTES de qualquer <script>
-            node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");const i=s.indexOf("og:image"),j=s.indexOf("<script");if(i<0||(j>=0&&i>j)){console.error("FAIL: OG nao esta antes do <script>");process.exit(1);}console.log("OK: OG no topo do <head> ("+s.length+" bytes, leve)");' "$h"
-            # a imagem OG responde 200 image/jpeg 1200x630
-            j=$(mktemp)
-            jc=$(curl -sS --max-time 25 -o "$j" -w '%{http_code}' "$B/og/wa-card-v64-38.jpg")
-            jct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/og/wa-card-v64-38.jpg")
-            echo "og:image -> HTTP=$jc $jct bytes=$(wc -c < "$j")"
-            [ "$jc" = "200" ] || { echo "FAIL: og:image != 200" >&2; exit 1; }
-            echo "$jct" | grep -qi 'image/jpeg' || { echo "FAIL: og:image nao e image/jpeg" >&2; exit 1; }
-            node -e 'const b=require("fs").readFileSync(process.argv[1]);if(!(b[0]===0xff&&b[1]===0xd8)){console.error("FAIL: JPEG invalido");process.exit(1);}let w=0,h=0;for(let i=2;i<b.length-9;){if(b[i]!==0xff){i++;continue;}const m=b[i+1];if(m===0xc0||m===0xc1||m===0xc2){h=b.readUInt16BE(i+5);w=b.readUInt16BE(i+7);break;}i+=2+b.readUInt16BE(i+2);}if(w!==1200||h!==630){console.error("FAIL: dimensoes "+w+"x"+h);process.exit(1);}console.log("OK: og:image JPEG "+w+"x"+h);' "$j"
-            echo "OK: /share OG premium validado em $B"
+          fail=0
+          for r in sla-dryrun sla-reschedule-plan sla-discover sla-legacy-baseline sla-legacy-risk; do
+            code=$(curl -s --max-time 25 -o /dev/null -w "%{http_code}" -X POST "$WORKER_URL/$r" \
+              -H "Content-Type: application/json" -d '{}')
+            echo "/$r -> $code"
+            [ "$code" = "403" ] || { echo "FALHA: /$r retornou $code (esperado 403 — SLA NÃO deve estar ativo)"; fail=1; }
           done
+          [ "$fail" = "0" ] || { echo "ABORTAR: rota /sla-* não-403 — SLA pode estar ativo"; exit 1; }
+          echo "OK: 5/5 rotas /sla-* retornaram 403 (SLA desligado)"
 
-      # V64.40 — PROVA com o User-Agent REAL do crawler (facebookexternalhit + WhatsApp + Twitterbot).
-      # O /share NAO faz sniff de UA, entao o robo recebe EXATAMENTE o mesmo OG. Esta prova busca a
-      # pagina e a imagem com os UAs reais e confirma og:title/og:description/og:image + image 200.
-      - name: Validar /share com User-Agent REAL do WhatsApp/Facebook (crawler)
+      - name: Pós-deploy — smoke das rotas existentes (/, /share, notify-designer dryRun)
         run: |
           set -euo pipefail
-          UAS=("facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" "WhatsApp/2.2412.5 A" "Twitterbot/1.0")
-          for B in "https://aprovar.agendaidseven.com.br" "https://idseven-push.agidseven.workers.dev"; do
-            URL="$B/share/cronograma/ci_crawler_token_0001"
-            for UA in "${UAS[@]}"; do
-              echo "== CRAWLER UA='$UA' :: $URL =="
-              h=$(mktemp)
-              code=$(curl -sS --max-time 25 -A "$UA" -o "$h" -w '%{http_code}' "$URL")
-              ct=$(curl -sS --max-time 25 -A "$UA" -o /dev/null -w '%{content_type}' "$URL")
-              echo "HTTP=$code Content-Type=$ct bytes=$(wc -c < "$h")"
-              [ "$code" = "200" ] || { echo "FAIL: crawler nao recebeu 200" >&2; head -c 500 "$h"; exit 1; }
-              echo "$ct" | grep -qi 'text/html' || { echo "FAIL: nao e text/html p/ o crawler" >&2; exit 1; }
-              grep -q 'og:title" content="Aprovar cronograma"' "$h" || { echo "FAIL: og:title errado p/ o crawler" >&2; head -c 600 "$h"; exit 1; }
-              grep -q 'og:description" content="Seu cronograma está pronto para avaliação."' "$h" || { echo "FAIL: og:description errado p/ o crawler" >&2; exit 1; }
-              grep -qi 'og:image" content="https://[^"]*/og/wa-card-v64-38.jpg"' "$h" || { echo "FAIL: og:image absoluto ausente p/ o crawler" >&2; exit 1; }
-              j=$(mktemp)
-              jc=$(curl -sS --max-time 25 -A "$UA" -o "$j" -w '%{http_code}' "$B/og/wa-card-v64-38.jpg")
-              jct=$(curl -sS --max-time 25 -A "$UA" -o /dev/null -w '%{content_type}' "$B/og/wa-card-v64-38.jpg")
-              echo "og:image (UA crawler) -> HTTP=$jc $jct bytes=$(wc -c < "$j")"
-              [ "$jc" = "200" ] || { echo "FAIL: og:image != 200 p/ o crawler" >&2; exit 1; }
-              echo "$jct" | grep -qi 'image/jpeg' || { echo "FAIL: og:image nao e image/jpeg p/ o crawler" >&2; exit 1; }
-              echo "OK: crawler '$UA' recebe OG premium + imagem em $B"
-            done
-          done
-          echo "PROVA: o robo do WhatsApp/Facebook recebe o card OG identico ao validado (sem sniff de UA)."
+          echo "== GET / =="; curl -sS --max-time 25 "$WORKER_URL/"; echo
+          echo "== /share (rota pública existe; não pode 5xx) =="
+          sc=$(curl -s --max-time 25 -o /dev/null -w "%{http_code}" "$WORKER_URL/share/cronograma/__smoke_ci__")
+          echo "/share/cronograma/__smoke_ci__ -> $sc"
+          [ "$sc" -lt 500 ] || { echo "ABORTAR: /share retornou 5xx"; exit 1; }
+          echo "== notify-designer dryRun (NÃO envia push) =="
+          curl -sS --max-time 25 -X POST "$WORKER_URL/notify-designer" \
+            -H "Content-Type: application/json" -d '{"id":"__dryrun_ci__","dryRun":true}'; echo
 
-      # FASE 3 — TESTE REAL de envio premium via WhatsApp Business Cloud API.
-      # Só roda se wa_send_token E wa_send_phone forem informados no dispatch.
-      # Telefone vai por ENV (não aparece no comando renderizado). A resposta já MASCARA o
-      # telefone e NUNCA contém token. Sucesso = message_id real da Meta.
-      - name: "[FASE 3] Envio REAL do card premium (Cloud API) — exige message_id"
-        if: ${{ github.event.inputs.wa_send_token != '' && github.event.inputs.wa_send_phone != '' }}
+      - name: Rollback AUTOMÁTICO se a validação pós-deploy falhou (validado)
+        if: ${{ failure() && steps.deploy.outputs.deployed == 'true' }}
         env:
-          WA_TOKEN: ${{ github.event.inputs.wa_send_token }}
-          WA_PHONE: ${{ github.event.inputs.wa_send_phone }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          set -euo pipefail
-          B="https://idseven-push.agidseven.workers.dev"
-          TOKEN="$WA_TOKEN"
+          set -uo pipefail
+          echo "Falha PÓS-deploy detectada — revertendo ao deployment anterior do Cloudflare"
+          npx --yes wrangler@4 rollback --name "$WORKER_NAME" -y 2>&1 | tee worker-ops-logs/rollback.txt \
+            || npx --yes wrangler@4 rollback -y 2>&1 | tee -a worker-ops-logs/rollback.txt || true
+          sleep 5
+          echo "== versão após rollback (deve voltar à anterior) =="
+          curl -sS --max-time 25 "$WORKER_URL/" | tee worker-ops-logs/versao-rollback.json; echo
+          echo "Alternativa byte-exata: redeploy de worker-ops-logs/backup-producao.js (artefato)."
 
-          echo "== Validar link público GET /cliente/cronograma/<token> (deve 200 + HTML) =="
-          code=$(curl -sS --max-time 25 -o /tmp/cv.html -w '%{http_code}' "$B/cliente/cronograma/$TOKEN")
-          ct=$(curl -sS --max-time 25 -o /dev/null -w '%{content_type}' "$B/cliente/cronograma/$TOKEN")
-          echo "HTTP=$code Content-Type=$ct bytes=$(wc -c < /tmp/cv.html)"
-          [ "$code" = "200" ] || { echo "FAIL: link público != 200" >&2; exit 1; }
-          echo "$ct" | grep -qi 'text/html' || { echo "FAIL: link público não é HTML" >&2; exit 1; }
-          grep -qi 'Aprovar cronograma' /tmp/cv.html || { echo "FAIL: portal não renderizou o cronograma" >&2; exit 1; }
-          echo "OK: link público abre o cronograma."
-
-          echo "== POST /client/send-premium-whatsapp (envio REAL; telefone oculto) =="
-          resp=$(curl -sS --max-time 30 -X POST "$B/client/send-premium-whatsapp" \
-            -H "Content-Type: application/json" \
-            --data "$(TOKEN="$TOKEN" node -e 'console.log(JSON.stringify({token:process.env.TOKEN,toPhone:process.env.WA_PHONE}))')")
-          echo "Resposta da rota (telefone mascarado, sem token):"
-          echo "$resp"
-          echo "$resp" | grep -q '"WHATSAPP_CLOUD_API_NOT_CONFIGURED"' && { echo "FAIL: secret WHATSAPP_ACCESS_TOKEN ausente no Worker" >&2; exit 1; } || true
-          echo "$resp" | node -e '
-            let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
-              let j={};try{j=JSON.parse(s)}catch(e){console.error("FAIL: resposta nao-JSON");process.exit(1);}
-              if(j.ok===true && j.message_id){console.log("OK: ENVIO REAL confirmado pela Meta. message_id="+j.message_id+" template="+j.template+" to="+j.to);process.exit(0);}
-              console.error("FAIL: Meta NAO confirmou. code="+(j.code||j.error)+" status="+(j.status||"")+" meta_error="+JSON.stringify(j.meta_error||{}));process.exit(1);
-            });'
-
-      # LIMPEZA — remove cronogramas de teste (isCloudApiTest:true) do Firestore.
-      # 1) dryRun (auditoria read-only) → lista o que será removido.
-      # 2) delete real → remove e re-consulta (remainingCount deve ser 0).
+      - name: Upload evidências (backup, snapshots, versões, deploy/rollback logs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-worker-evidence
+          path: worker-ops-logs/
+          retention-days: 30
