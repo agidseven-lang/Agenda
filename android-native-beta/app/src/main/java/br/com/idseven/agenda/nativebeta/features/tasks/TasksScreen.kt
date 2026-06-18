@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Send
@@ -279,12 +280,14 @@ private fun ColumnHeader(st: String, count: Int) {
     }
 }
 
-// ── PROD1.7 — paleta/medidas do card premium (paridade com o KANBANBOARDV2 BLACK PREMIUM do Desktop) ──
+// ── PROD1.7-C — medidas ESPELHANDO o card BLACK PREMIUM do Desktop (kbv2) 1:1, responsivo ──
 private val CardGradTop = Color(0xFF161D2E)
 private val CardGradBot = Color(0xFF121726)
 private val CardPresenceRing = Color(0xFF141A29)
 private val RailFuture = Color(0xFF313A4D)
+private val RailDone = Color(0xFF2FCF8F)
 private val TierViolet = Color(0xFF9D8BFF)
+private val ChipSoft = Color(0xFFBCAEFF)
 private val BtnGradA = Color(0xFF6D5EFC)
 private val BtnGradB = Color(0xFF4D7CFF)
 
@@ -345,37 +348,37 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
-            .shadow(16.dp, RoundedCornerShape(20.dp), clip = false)
-            .clip(RoundedCornerShape(20.dp))
+            .shadow(14.dp, RoundedCornerShape(16.dp), clip = false)
+            .clip(RoundedCornerShape(16.dp))
             .background(Brush.verticalGradient(listOf(CardGradTop, CardGradBot)))
-            .border(1.dp, accent.copy(alpha = 0.30f), RoundedCornerShape(20.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
             .clickable { onClick() },
     ) {
-        // acento superior (inset, rente ao topo) — espelha o ::before do card Desktop
+        // acento superior (inset 16, rente ao topo) — ::before do .kbv2-card
         Box(
-            Modifier.padding(start = 18.dp, end = 18.dp).fillMaxWidth().height(3.dp)
+            Modifier.padding(start = 16.dp, end = 16.dp).fillMaxWidth().height(3.dp)
                 .clip(RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
-                .background(accent.copy(alpha = 0.9f)),
+                .background(accent),
         )
-        Column(Modifier.padding(18.dp)) {
-            // 1. TOP — status canônico + SLA + prazo (wrap responsivo)
+        Column(Modifier.padding(16.dp)) {
+            // 1. TOP — status + SLA + prazo (chips "grandes" como o Desktop)
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CardChip(flow.statusLabel, accent, dot = true, strong = true, maxLines = 2)
+                CardChip(flow.statusLabel, accent, dot = true, big = true, maxLines = 2)
                 val sla = SlaContract.derive(task)
-                if (sla.sev != "neutro" && sla.label.isNotBlank()) CardChip(sla.label, sla.color, dot = true, strong = false)
-                if (deadline != null) CardChip(deadline.text, deadline.color, dot = false, strong = false)
+                if (sla.sev != "neutro" && sla.label.isNotBlank()) CardChip(sla.label, sla.color, dot = true, big = true)
+                if (deadline != null) CardChip(deadline.text, deadline.color, dot = false, big = true)
             }
-            // 2. PERFIL — responsável (avatar + presença) + nome + cargo
+            // 2. PERFIL — responsável (avatar 48 + presença) + nome + cargo
             Spacer(Modifier.height(13.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box {
-                    Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee ?: "?", 52.dp)
+                    Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee ?: "?", 48.dp)
                     Box(
-                        Modifier.align(Alignment.BottomEnd).size(14.dp).clip(CircleShape)
+                        Modifier.align(Alignment.BottomEnd).size(12.dp).clip(CircleShape)
                             .background(Tokens.Green).border(2.dp, CardPresenceRing, CircleShape),
                     )
                 }
@@ -383,20 +386,20 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
                 Column(Modifier.weight(1f)) {
                     Text(
                         task.assignee?.ifBlank { null } ?: "Sem responsável",
-                        color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold,
-                        lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        color = Tokens.Ink, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                        lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                     val role = assignee?.role
                     Text(
                         if (!role.isNullOrBlank()) role else "Responsável",
                         color = Tokens.Soft, fontSize = 12.5.sp, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp),
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             }
             // 3. ORIGEM — "Enviado por" + data (caixa sutil)
             if (requester != null || task.createdAt != null) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(13.dp))
                 OriginBox(UserColor.firstName(requester?.name).ifBlank { "—" }, task.createdAt?.let { DateUtil.fmtMs(it) })
             }
             // 4. CLIENTE (kicker) + TÍTULO
@@ -404,121 +407,133 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
             if (!task.client.isNullOrBlank()) {
                 Text(
                     task.client.uppercase(), color = TierViolet, fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold, letterSpacing = 0.08.sp,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 0.09.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(4.dp))
             }
             Text(
                 task.title?.ifBlank { null } ?: task.client ?: "Sem título",
-                color = Tokens.Ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold,
-                lineHeight = 24.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                color = Tokens.Ink, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
+                lineHeight = 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
-            // 5. CHIPS — setor + prioridade
-            Spacer(Modifier.height(11.dp))
+            // 5. CHIPS de classificação — setor + conteúdos (soft) + prioridade
+            Spacer(Modifier.height(13.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                CardChip(sector.label, sector.color, dot = true, strong = false)
+                CardChip(sector.label, sector.color, dot = true, big = false)
                 if (task.cronContents.isNotEmpty()) {
                     val nc = task.cronContents.size
-                    CardChip(if (nc == 1) "1 conteúdo" else "$nc conteúdos", TierViolet, dot = false, strong = false)
+                    CardChip(if (nc == 1) "1 conteúdo" else "$nc conteúdos", ChipSoft, dot = false, big = false)
                 }
-                if (task.priority) CardChip("Prioridade alta", Tokens.Red, dot = true, strong = false)
+                if (task.priority) CardChip("Prioridade alta", Tokens.Red, dot = true, big = false)
             }
             // 6. TRILHO de progresso (derivado da fase do Flow Engine)
             Spacer(Modifier.height(13.dp))
             FlowRail(flow.stage, accent, flow.completed)
-            // 7. ETAPA / PRÓXIMA (painel sutil)
-            Spacer(Modifier.height(12.dp))
-            StagePanel(flow.actor, accent, flow.next)
+            // 7. ETAPA / PRÓXIMA — linhas planas (igual ao .kbv2-card-stage, sem caixa)
+            Spacer(Modifier.height(13.dp))
+            StageRows(flow.actor, accent, flow.next)
             // 8. TEMAS (cronograma) — caixa com cabeçalho + itens numerados
             if (temas.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(13.dp))
                 ThemesBox(temas)
             }
             // 9. checklist (se houver)
             if (total > 0) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(13.dp))
                 LinearProgressIndicator(
                     progress = { done.toFloat() / total.toFloat() },
                     modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                     color = Tokens.Green, trackColor = Tokens.Surface2,
                 )
-                Spacer(Modifier.height(4.dp))
-                Text("$done de $total no checklist", color = Tokens.Faint, fontSize = 11.sp)
+                Spacer(Modifier.height(5.dp))
+                Text("$done de $total no checklist", color = Tokens.Faint, fontSize = 12.sp)
             }
             // 10. DATA / PRAZO
             if (!task.dueDate.isNullOrBlank()) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(13.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Schedule, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(7.dp))
-                    Text(DateUtil.prazo(task.dueDate, task.dueTime), color = Tokens.Ink, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.width(8.dp))
+                    Text(DateUtil.prazo(task.dueDate, task.dueTime), color = Tokens.Ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
-            // 11. FOOTER — Detalhes (gradiente) + Mover (contorno)
-            Spacer(Modifier.height(15.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp), verticalAlignment = Alignment.CenterVertically) {
+            // 11. FOOTER — Detalhes (gradiente) + Mover (contorno) + ⋯ (igual ao .kbv2-card-footer)
+            Spacer(Modifier.height(13.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                    modifier = Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(11.dp))
                         .background(Brush.horizontalGradient(listOf(BtnGradA, BtnGradB)))
-                        .clickable { onClick() }.padding(vertical = 14.dp),
+                        .clickable { onClick() },
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Outlined.Visibility, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Outlined.Visibility, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(7.dp))
                     Text("Detalhes", color = Color.White, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
                 }
                 Row(
-                    modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
+                    modifier = Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(11.dp))
                         .background(Color.White.copy(alpha = 0.05f))
-                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
-                        .clickable { onMove() }.padding(vertical = 14.dp),
+                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(11.dp))
+                        .clickable { onMove() },
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Outlined.SwapHoriz, contentDescription = null, tint = Tokens.Ink, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Outlined.SwapHoriz, contentDescription = null, tint = Tokens.Ink, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(7.dp))
                     Text("Mover", color = Tokens.Ink, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                }
+                Box(
+                    modifier = Modifier.size(width = 44.dp, height = 40.dp).clip(RoundedCornerShape(11.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(11.dp))
+                        .clickable { onMove() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.MoreHoriz, contentDescription = "Mais ações", tint = Tokens.Soft, modifier = Modifier.size(20.dp))
                 }
             }
         }
     }
 }
 
-// Chip premium: fundo translúcido da cor + borda sutil + ponto opcional (espelha .kbv2-status/.kbv2-chip).
+// Chip premium: fundo translúcido + borda sutil + ponto opcional.
+// big=true → status/SLA/prazo (pad 6×11, r9, dot7); big=false → classificação (pad 5×10, r8, dot6) — igual ao Desktop.
 @Composable
-private fun CardChip(text: String, color: Color, dot: Boolean, strong: Boolean, maxLines: Int = 1) {
+private fun CardChip(text: String, color: Color, dot: Boolean, big: Boolean, maxLines: Int = 1) {
+    val radius = if (big) 9.dp else 8.dp
+    val dotSz = if (big) 7.dp else 6.dp
     Row(
-        modifier = Modifier.clip(RoundedCornerShape(9.dp))
-            .background(color.copy(alpha = if (strong) 0.18f else 0.14f))
-            .border(1.dp, color.copy(alpha = if (strong) 0.46f else 0.34f), RoundedCornerShape(9.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier = Modifier.clip(RoundedCornerShape(radius))
+            .background(color.copy(alpha = if (big) 0.18f else 0.16f))
+            .border(1.dp, color.copy(alpha = if (big) 0.46f else 0.34f), RoundedCornerShape(radius))
+            .padding(horizontal = if (big) 11.dp else 10.dp, vertical = if (big) 6.dp else 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (dot) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(color))
-            Spacer(Modifier.width(7.dp))
+            Box(Modifier.size(dotSz).clip(CircleShape).background(color))
+            Spacer(Modifier.width(if (big) 7.dp else 6.dp))
         }
         Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, lineHeight = 14.sp, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
     }
 }
 
-// Trilho de progresso: 4 paradas, concluídas (verde) · atual (acento, com brilho) · futuras (cinza).
+// Trilho de progresso: pontos 10dp + linhas (concluído verde · atual acento c/ leve brilho · futuro cinza) — igual ao .kbv2-card-rail.
 @Composable
 private fun FlowRail(stage: Int, accent: Color, completed: Boolean) {
     val steps = 4
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
         for (i in 0 until steps) {
             val isDone = completed || i < stage
             val isCur = !completed && i == stage
-            val dotColor = when { isDone -> Tokens.Green; isCur -> accent; else -> RailFuture }
+            val dotColor = when { isDone -> RailDone; isCur -> accent; else -> RailFuture }
             Box(contentAlignment = Alignment.Center) {
-                if (isCur) Box(Modifier.size(18.dp).clip(CircleShape).background(accent.copy(alpha = 0.20f)))
-                Box(Modifier.size(if (isCur) 12.dp else 9.dp).clip(CircleShape).background(dotColor))
+                if (isCur) Box(Modifier.size(16.dp).clip(CircleShape).background(accent.copy(alpha = 0.20f)))
+                Box(Modifier.size(10.dp).clip(CircleShape).background(dotColor))
             }
             if (i < steps - 1) {
                 Box(
-                    Modifier.weight(1f).height(3.dp).padding(horizontal = 3.dp).clip(RoundedCornerShape(2.dp))
-                        .background(if (completed || i < stage) Tokens.Green.copy(alpha = 0.7f) else RailFuture),
+                    Modifier.weight(1f).height(3.dp).padding(horizontal = 2.dp).clip(RoundedCornerShape(2.dp))
+                        .background(if (completed || i < stage) RailDone else RailFuture),
                 )
             }
         }
@@ -535,35 +550,29 @@ private fun OriginBox(name: String, dateText: String?) {
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.Send, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(15.dp))
+        Icon(Icons.Outlined.Send, contentDescription = null, tint = Tokens.Faint, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(9.dp))
         Column(Modifier.weight(1f)) {
             Row {
                 Text("Enviado por ", color = Tokens.Soft, fontSize = 12.5.sp)
                 Text(name, color = Tokens.Ink, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             }
-            if (dateText != null) Text(dateText, color = Tokens.Faint, fontSize = 11.5.sp, modifier = Modifier.padding(top = 1.dp))
+            if (dateText != null) Text(dateText, color = Tokens.Faint, fontSize = 12.sp, modifier = Modifier.padding(top = 1.dp))
         }
     }
 }
 
-// Painel ETAPA / PRÓXIMA (rótulos canônicos do Flow Engine).
+// ETAPA / PRÓXIMA — linhas planas (sem caixa), igual ao .kbv2-card-stage do Desktop.
 @Composable
-private fun StagePanel(actor: String, actorColor: Color, next: String) {
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.03f))
-            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("ETAPA", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp, modifier = Modifier.width(64.dp))
-            Text(actor, color = actorColor, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+private fun StageRows(actor: String, actorColor: Color, next: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.Top) {
+            Text("ETAPA", color = Tokens.Faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.05.sp, modifier = Modifier.width(66.dp).padding(top = 1.dp))
+            Text(actor, color = actorColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
         Row(verticalAlignment = Alignment.Top) {
-            Text("PRÓXIMA", color = Tokens.Faint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp, modifier = Modifier.width(64.dp).padding(top = 1.dp))
-            Text(next, color = Tokens.Soft, fontSize = 12.5.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text("PRÓXIMA", color = Tokens.Faint, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.05.sp, modifier = Modifier.width(66.dp).padding(top = 1.dp))
+            Text(next, color = Tokens.Soft, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         }
     }
 }
@@ -578,14 +587,14 @@ private fun ThemesBox(themes: List<String>) {
     ) {
         Text(
             "TEMAS", color = Tokens.Soft, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.10.sp,
-            modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.04f)).padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.04f)).padding(horizontal = 12.dp, vertical = 9.dp),
         )
         val show = themes.take(3)
         show.forEachIndexed { i, t ->
             if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.06f)))
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.Top) {
-                Box(Modifier.size(20.dp).clip(RoundedCornerShape(7.dp)).background(Tokens.Accent.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
-                    Text("${i + 1}", color = Tokens.Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Box(Modifier.size(20.dp).clip(RoundedCornerShape(7.dp)).background(ChipSoft.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+                    Text("${i + 1}", color = ChipSoft, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.width(10.dp))
                 Text(t, color = Tokens.Soft, fontSize = 13.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(top = 1.dp))
