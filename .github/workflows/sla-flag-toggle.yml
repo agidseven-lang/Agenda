@@ -1,0 +1,137 @@
+# Toggle MANUAL e auditável de appConfig/flags.slaEngine (3º gate do Designer SLA).
+# Escreve SOMENTE o campo booleano `slaEngine` no doc Firestore appConfig/flags,
+# via REST com updateMask.fieldPaths=slaEngine, usando o service account JÁ
+# existente nos secrets (GOOGLE_APPLICATION_CREDENTIALS_JSON).
+#
+# GARANTIAS (por construção):
+#  - Execução SOMENTE manual (workflow_dispatch); NUNCA em push/schedule.
+#  - confirm=TOGGLE obrigatório; concurrency impede 2 execuções simultâneas.
+#  - O SA vai só para um arquivo temporário do runner, com umask 077, e é
+#    removido no finally (step `if: always()`); nem o SA nem o token são impressos.
+#  - Snapshot ANTES/DEPOIS; prova que SÓ slaEngine mudou (as outras 5 flags são
+#    comparadas e devem permanecer idênticas).
+#  - selftest = true -> verifica -> false (termina SEMPRE em false; trap de
+#    segurança nunca deixa true); set-false é rollback idempotente.
+#  - NÃO faz deploy. NÃO toca Worker/Functions/Rules/Desktop/Android. NÃO aciona
+#    janela-write. NÃO seta SLA_WRITE/SLA_ACTIVATED_AT. NÃO cria slaEvents.
+#    NÃO envia FCM/Web Push/WhatsApp. NÃO usa actions/checkout (não lê o repo).
+name: "[manual] SLA flag toggle (appConfig/flags.slaEngine)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "selftest (true->false, prova controle) | set-true | set-false (rollback idempotente)"
+        required: true
+        type: choice
+        options:
+          - selftest
+          - set-true
+          - set-false
+      confirm:
+        description: "Digite TOGGLE para confirmar (qualquer outro valor aborta)"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sla-flag-toggle
+  cancel-in-progress: false
+
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GCP_PROJECT: "agenda-id-seven"
+      DOC_URL: "https://firestore.googleapis.com/v1/projects/agenda-id-seven/databases/(default)/documents/appConfig/flags"
+    steps:
+      - name: Guard confirm
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "TOGGLE" ]; then
+            echo "::error:: confirm != TOGGLE — abortando (nada foi tocado)."
+            exit 1
+          fi
+
+      - name: Auth service account (arquivo temporário; nunca impresso)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ] || { echo "::error:: GOOGLE_APPLICATION_CREDENTIALS_JSON ausente."; exit 1; }
+          umask 077
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" >/dev/null 2>&1
+          gcloud config set project "$GCP_PROJECT" >/dev/null 2>&1
+          echo "SA ativada (valor NÃO impresso)."
+
+      - name: Toggle slaEngine (somente este campo; snapshot antes/depois; prova de imutabilidade das demais)
+        run: |
+          set -euo pipefail
+          ACTION="${{ github.event.inputs.action }}"
+          TOKEN="$(gcloud auth print-access-token)"
+          [ -n "$TOKEN" ] || { echo "::error:: token vazio"; exit 1; }
+
+          flag() {
+            local body
+            body="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$DOC_URL" 2>/dev/null || echo '{}')"
+            printf '%s' "$body" | jq -r '.fields.slaEngine.booleanValue // "absent"'
+          }
+          others() {
+            local body
+            body="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$DOC_URL" 2>/dev/null || echo '{}')"
+            printf '%s' "$body" | jq -Sc '{slaNotifications:(.fields.slaNotifications.booleanValue//null),operationalBlocking:(.fields.operationalBlocking.booleanValue//null),wipLimits:(.fields.wipLimits.booleanValue//null),slaPanel:(.fields.slaPanel.booleanValue//null),slaCardBadges:(.fields.slaCardBadges.booleanValue//null)}'
+          }
+          setflag() {
+            curl -fsS -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              "${DOC_URL}?updateMask.fieldPaths=slaEngine" \
+              -d "{\"fields\":{\"slaEngine\":{\"booleanValue\":$1}}}" >/dev/null
+          }
+          restore_false() {
+            local i
+            for i in 1 2 3; do
+              if setflag false; then sleep 2; [ "$(flag)" = "false" ] && return 0; fi
+              sleep 2
+            done
+            return 1
+          }
+
+          echo "== ANTES =="
+          A_OTHERS="$(others)"
+          echo "slaEngine(antes)=$(flag) ; outras=$A_OTHERS"
+
+          case "$ACTION" in
+            selftest)
+              trap 'setflag false >/dev/null 2>&1 || true' EXIT   # rede de segurança: nunca deixa true
+              echo "== set true =="
+              setflag true; sleep 2
+              [ "$(flag)" = "true" ] || { echo "::error:: set-true não confirmou (slaEngine != true)"; exit 1; }
+              [ "$(others)" = "$A_OTHERS" ] || { echo "::error:: outra flag mudou no set-true"; exit 1; }
+              echo "== restaurar false =="
+              if ! restore_false; then echo "::error:: NÃO consegui restaurar slaEngine=false"; exit 1; fi
+              [ "$(others)" = "$A_OTHERS" ] || { echo "::error:: outra flag mudou no set-false"; exit 1; }
+              echo "SELFTEST OK: slaEngine=false ao final; 5 outras flags preservadas ($A_OTHERS)."
+              ;;
+            set-true)
+              setflag true; sleep 2
+              [ "$(flag)" = "true" ] || { echo "::error:: set-true não confirmou"; exit 1; }
+              [ "$(others)" = "$A_OTHERS" ] || { echo "::error:: outra flag mudou"; exit 1; }
+              echo "OK: slaEngine=true. LEMBRETE: rode action=set-false após a janela."
+              ;;
+            set-false)
+              if ! restore_false; then echo "::error:: set-false não confirmou"; exit 1; fi
+              [ "$(others)" = "$A_OTHERS" ] || { echo "::error:: outra flag mudou"; exit 1; }
+              echo "OK: slaEngine=false (rollback idempotente)."
+              ;;
+            *)
+              echo "::error:: ação inválida: $ACTION"; exit 1 ;;
+          esac
+
+          echo "== DEPOIS =="
+          echo "slaEngine(depois)=$(flag) ; outras=$(others)"
+
+      - name: Limpeza SA (finally)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json" 2>/dev/null || true
