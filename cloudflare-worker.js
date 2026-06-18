@@ -199,6 +199,31 @@ export default {
       return handleNotifyDesigner(request, env);
     }
 
+    // ADITIVO (FASE 4.4-A3-rev/V64.54): Designer SLA Engine — inspeção dry-run.
+    // 403 se env SLA_ENGINE_ENABLED ausente (= estado de produção). Nunca envia push.
+    if (url.pathname === "/sla-dryrun" && request.method === "POST") {
+      return handleSlaDryRun(request, env);
+    }
+    // Plano de reprogramação SOMENTE dry-run (read-only, nunca aplica).
+    if (url.pathname === "/sla-reschedule-plan" && request.method === "POST") {
+      return handleSlaReschedulePlan(request, env);
+    }
+
+    // Descoberta de schema/valores REAIS (read-only absoluto; agregados anônimos).
+    if (url.pathname === "/sla-discover" && request.method === "POST") {
+      return handleSlaDiscover(request, env);
+    }
+
+    // V64.58 — LENTE LEGADO (measure-only): baseline real por status/dueDate/sector.
+    if (url.pathname === "/sla-legacy-baseline" && request.method === "POST") {
+      return handleSlaLegacyBaseline(request, env);
+    }
+
+    // V64.59 — RISCO antes do vencimento (última extensão da lente legado; read-only).
+    if (url.pathname === "/sla-legacy-risk" && request.method === "POST") {
+      return handleSlaLegacyRisk(request, env);
+    }
+
     // ADITIVO (V64.6): Visão pública do CLIENTE em HTML premium.
     // Rota servida pelo Worker porque o link compartilhado via WhatsApp aponta para
     // https://idseven-push.agidseven.workers.dev/cliente/cronograma/<token>. Antes
@@ -280,7 +305,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.53-premium-portal" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-legacy-risk" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -289,6 +314,18 @@ export default {
         console.error("[CRON] erro fatal:", e && e.message);
       })
     );
+  
+    // FASE 4.4 (autorização limitada): passada do SLA Engine SEPARADA do cron
+    // existente (não toca handleCronTrigger). Sem env SLA_ENGINE_ENABLED="true"
+    // este bloco é um no-op absoluto. Mesmo ligado: dry-run, sem push, sem lock;
+    // escrita só com SLA_WRITE + flag slaEngine (ambas inexistentes nesta fase).
+    if (env && env.SLA_ENGINE_ENABLED === "true") {
+      ctx.waitUntil(
+        runSlaEnginePass(env, { write: env.SLA_WRITE === "true" }).then((r) => {
+          console.log("[SLA] pass:", JSON.stringify({ scanned: r.scanned, events: r.events.length, wouldNotify: r.wouldNotify.length, wouldLock: r.wouldLock.length, writes: r.writes, dedupSkipped: r.dedupSkipped }));
+        }).catch((e) => console.error("[SLA] erro:", e && e.message))
+      );
+    }
   },
 };
 
@@ -3478,3 +3515,640 @@ function b64url(bytes) {
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DESIGNER SLA ENGINE — NÚCLEO SEGURO (FASE 4.1–4.3, AUTORIZAÇÃO LIMITADA)
+   ════════════════════════════════════════════════════════════════════════════
+   MODO SEGURO OBRIGATÓRIO:
+   - O engine SÓ executa se env.SLA_ENGINE_ENABLED === "true" (var NÃO existe no
+     painel → em produção o cron atual segue 100% intocado).
+   - Mesmo executando, roda em DRY-RUN: NENHUMA escrita acontece a menos que
+     env.SLA_WRITE === "true" E appConfig/flags.slaEngine === true (flag OFF).
+   - PUSH REAL: NUNCA nesta fase — o "envio" é um stub que apenas registra
+     wouldNotify (simulated). slaNotifications permanece OFF.
+   - BLOQUEIO REAL: NUNCA nesta fase — calcula blockedCandidate, registra evento,
+     NÃO escreve designerLocks. operationalBlocking permanece OFF.
+   - Rota de inspeção: POST /sla-dryrun (sempre dry-run; nunca envia push).
+   Rollback: remover a var SLA_ENGINE_ENABLED (ou nunca criá-la). Zero migração.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const SLA_DEFAULTS = {
+  startWarningMinutes: 30,        // alerta laranja de INÍCIO: 30min antes (autorizado)
+  finishWarningMinutes: 30,       // alerta laranja de ENTREGA: 30min antes (autorizado)
+  criticalStartOverdueMinutes: 30,// início atrasado vira CRÍTICO (candidato a bloqueio) após 30min
+  /* WIP (FASE 4.4-A2): separação observado/soft/hard/bloqueante-por-atraso.
+     wipMode "observe" = NUNCA assume bloqueio hard sem calibração real (risco 1 da 4.4-A).
+     Valores soft/hard são CALIBRÁVEIS (env/wipLimits) — hard 2 segue como ponto de partida. */
+  wipMode: "observe",             // observe | enforce (enforce só em fase futura autorizada)
+  wipSoftPerDesigner: 2,          // limiar de ALERTA (soft)
+  wipHardPerDesigner: 2,          // limiar de BLOQUEIO (hard) — inerte em modo observe
+  /* Backfill controlado (FASE 4.4-A2 — risco 2 da 4.4-A): */
+  maxTasksPerPass: 200,           // teto de tarefas analisadas por passada
+  maxEventsPerPass: 300,          // teto de eventos (simulados/elegíveis) por passada
+};
+const SLA_FLAG_DEFAULTS = {       // contrato de feature flags — TODAS OFF por padrão
+  slaEngine: false, slaNotifications: false, operationalBlocking: false,
+  wipLimits: false, slaPanel: false, slaCardBadges: false,
+};
+const SLA_EVENT_TYPES = [
+  "designer_task_assigned", "designer_task_started", "designer_task_completed",
+  "designer_start_warning", "designer_start_overdue",
+  "designer_finish_warning", "designer_finish_overdue",
+  "designer_blocked_by_overdue", "designer_unblocked",
+  "designer_admin_override", "designer_wip_limit_reached",
+];
+
+/* "YYYY-MM-DD"+"HH:MM" (TZ local do app) → epoch ms UTC. Sem data → 0. */
+function slaToMs(dateStr, timeStr, tzOffsetMinutes) {
+  if (!dateStr) return 0;
+  const dm = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dm) return 0;
+  let hh = 23, mm = 59;
+  if (timeStr) { const tm = String(timeStr).match(/^(\d{1,2}):(\d{2})$/); if (tm) { hh = +tm[1]; mm = +tm[2]; } }
+  return Date.UTC(+dm[1], +dm[2] - 1, +dm[3], hh, mm) - (tzOffsetMinutes == null ? -180 : tzOffsetMinutes) * 60000;
+}
+
+/* Plano de SLA a partir do designerAssignment EXISTENTE (modelo aditivo: nada renomeado).
+   Fallback de término: dueDate/dueTime (já gravados pelo sendToDesigner desde 1.0.88). */
+function slaPlanFromAssignment(t, tz) {
+  const da = (t && t.designerAssignment) || {};
+  const sla = (t && t.designerSla) || {};
+  const plannedStartAt  = sla.plannedStartAt  || slaToMs(da.startDate || t.startDate, da.startTime || t.startTime, tz);
+  const plannedFinishAt = sla.plannedFinishAt || slaToMs(da.endDate || t.endDate || t.dueDate, da.endTime || t.endTime || t.dueTime, tz);
+  return { plannedStartAt, plannedFinishAt };
+}
+
+function slaStarted(t) {
+  const df = (t && t.designerFlowStatus) || "";
+  if (df === "andamento" || df === "revisao" || df === "concluido") return true;
+  const assignedAt = (t && t.designerAssignment && t.designerAssignment.assignedAt) || 0;
+  return !!(t && t.startedAt && (!assignedAt || t.startedAt >= assignedAt));
+}
+function slaDelivered(t) { return !!(t && (t.designerFlowStatus === "concluido")); }
+function slaCancelled(t) { return !!(t && (t.cancelled === true || t.status === "cancelada")); }
+
+/* ───── STATE MACHINE PURA (idempotente, relógio do SERVIDOR) ─────
+   Estados: aguardando_inicio | inicio_proximo | inicio_atrasado | em_producao |
+            entrega_proxima | entrega_atrasada | entregue | cancelada
+   (bloqueada_por_atraso é DERIVADA: blockedCandidate=true; reprogramada é
+    metadado: rescheduleCount>0 — o estado recalcula sobre o novo prazo.) */
+function computeSlaStatus(task, nowMs, cfg, tz) {
+  const C = Object.assign({}, SLA_DEFAULTS, cfg || {});
+  const { plannedStartAt, plannedFinishAt } = slaPlanFromAssignment(task, tz);
+  const startWarnMs  = C.startWarningMinutes * 60000;
+  const finishWarnMs = C.finishWarningMinutes * 60000;
+  const out = {
+    plannedStartAt, plannedFinishAt,
+    startWarningAt:  plannedStartAt  ? plannedStartAt  - startWarnMs  : 0,
+    finishWarningAt: plannedFinishAt ? plannedFinishAt - finishWarnMs : 0,
+    slaStatus: "aguardando_inicio", slaSeverity: "ok", blockedCandidate: false,
+    overdueMs: 0,
+  };
+  if (slaCancelled(task)) { out.slaStatus = "cancelada"; return out; }
+  if (slaDelivered(task)) { out.slaStatus = "entregue"; return out; }
+  if (!slaStarted(task)) {
+    if (plannedStartAt && nowMs > plannedStartAt) {
+      out.slaStatus = "inicio_atrasado"; out.slaSeverity = "vermelho";
+      out.overdueMs = nowMs - plannedStartAt;
+      out.blockedCandidate = out.overdueMs >= C.criticalStartOverdueMinutes * 60000;
+    } else if (plannedStartAt && nowMs >= out.startWarningAt) {
+      out.slaStatus = "inicio_proximo"; out.slaSeverity = "laranja";
+    }
+    return out;
+  }
+  if (plannedFinishAt && nowMs > plannedFinishAt) {
+    out.slaStatus = "entrega_atrasada"; out.slaSeverity = "vermelho";
+    out.overdueMs = nowMs - plannedFinishAt;
+    out.blockedCandidate = true;   // entrega atrasada = candidato a bloqueio (regra central)
+  } else if (plannedFinishAt && nowMs >= out.finishWarningAt) {
+    out.slaStatus = "entrega_proxima"; out.slaSeverity = "laranja";
+  } else {
+    out.slaStatus = "em_producao";
+  }
+  return out;
+}
+
+/* dedupKey determinístico = ID do doc em slaEvents → idempotência POR CONSTRUÇÃO
+   (criar 2x o mesmo evento falha com ALREADY_EXISTS; reprogramar muda a âncora). */
+function slaDedupKey(taskId, eventType, anchorMs) {
+  return String(taskId) + "__" + String(eventType) + "__" + String(anchorMs || 0);
+}
+
+function buildSlaEvent(p) {
+  return {
+    tenantId: p.tenantId || "idseven", taskId: p.taskId, designerId: p.designerId || null,
+    actorId: p.actorId || "sla-engine", actorRole: p.actorRole || "system",
+    eventType: p.eventType, oldStatus: p.oldStatus || null, newStatus: p.newStatus || null,
+    timestamp: p.timestamp, source: p.source || "worker-cron",
+    dedupKey: slaDedupKey(p.taskId, p.eventType, p.anchorMs),
+    metadata: p.metadata || {}, reason: p.reason || null,
+    simulated: p.simulated !== false,   // FASE 4.x: tudo nasce simulado
+  };
+}
+
+/* Deriva eventos NOVOS desta passada (warnings/overdues ancorados no prazo →
+   reprogramação gera novas âncoras SEM duplicar as antigas). prevSla = designerSla
+   gravado (ou {}); comp = computeSlaStatus(...).
+   FASE 4.4-A2 — CORTE TEMPORAL OBRIGATÓRIO (slaActivatedAt): evento cuja ÂNCORA
+   (prazo/atribuição/início/conclusão) é ANTERIOR à ativação é RETROATIVO e NÃO
+   é emitido — vai para retro[] (contado/reportado). activatedAtMs ausente/0 =
+   NADA é elegível (sem autorização explícita não há emissão alguma).
+   Retorna { events:[], retro:[] }. */
+function deriveSlaEvents(prevSla, comp, task, nowMs, activatedAtMs) {
+  const ev = [];
+  const t = task; const prev = prevSla || {};
+  const cutMs = (typeof activatedAtMs === "number" && activatedAtMs > 0) ? activatedAtMs : Infinity;
+  const retro = [];
+  const base = { taskId: t.id, designerId: (t.designerAssignment && t.designerAssignment.designerId) || t.assigneeId || null, timestamp: nowMs };
+  const push = (eventType, anchorMs, extra) => {
+    if ((anchorMs || 0) < cutMs) { retro.push({ taskId: t.id, eventType, anchorMs: anchorMs || 0 }); return; }
+    ev.push(buildSlaEvent(Object.assign({}, base, { eventType, anchorMs }, extra || {})));
+  };
+  if (!prev.assignedEventAt && t.designerAssignment && t.designerAssignment.assignedAt)
+    push("designer_task_assigned", t.designerAssignment.assignedAt, { newStatus: "aguardando_inicio", metadata: { assignedBy: t.designerAssignment.assignedBy || null } });
+  if (!prev.startedEventAt && slaStarted(t) && !slaDelivered(t))
+    push("designer_task_started", t.startedAt || 0, { oldStatus: "aguardando_inicio", newStatus: "em_producao" });
+  if (!prev.completedEventAt && slaDelivered(t))
+    push("designer_task_completed", t.doneAt || comp.plannedFinishAt, { newStatus: "entregue" });
+  if (comp.slaStatus === "inicio_proximo"   && !prev.startWarningSentAt)
+    push("designer_start_warning",  comp.plannedStartAt,  { newStatus: comp.slaStatus });
+  if (comp.slaStatus === "inicio_atrasado"  && !prev.startOverdueSentAt)
+    push("designer_start_overdue",  comp.plannedStartAt,  { newStatus: comp.slaStatus, metadata: { overdueMs: comp.overdueMs } });
+  if (comp.slaStatus === "entrega_proxima"  && !prev.finishWarningSentAt)
+    push("designer_finish_warning", comp.plannedFinishAt, { newStatus: comp.slaStatus });
+  if (comp.slaStatus === "entrega_atrasada" && !prev.finishOverdueSentAt)
+    push("designer_finish_overdue", comp.plannedFinishAt, { newStatus: comp.slaStatus, metadata: { overdueMs: comp.overdueMs } });
+  if (comp.blockedCandidate && !prev.blockedEventAt)
+    push("designer_blocked_by_overdue", comp.plannedFinishAt || comp.plannedStartAt, { newStatus: "bloqueada_por_atraso", reason: "atraso ativo (simulação — bloqueio real OFF)" });
+  if (!comp.blockedCandidate && prev.blockedEventAt && !prev.unblockedEventAt && (comp.slaStatus === "entregue" || comp.slaStatus === "em_producao"))
+    push("designer_unblocked", nowMs, { oldStatus: "bloqueada_por_atraso", newStatus: comp.slaStatus });
+  return { events: ev, retro };
+}
+
+/* ── FASE 4.4-A2: LOCK CONSOLIDADO POR DESIGNER (1 lock; tarefas críticas como
+   metadata; prioridade = atraso mais grave/mais antigo). PURO — não escreve. ── */
+function consolidateLocks(computedList) {
+  const locks = {};
+  for (const c of computedList) {
+    if (!c.blockedCandidate || !c.designerId) continue;
+    const L = locks[c.designerId] = locks[c.designerId] || { designerId: c.designerId, candidate: true, simulated: true, tasks: [], worstTaskId: null, worstOverdueMs: -1, oldestDeadlineMs: Infinity };
+    L.tasks.push({ taskId: c.taskId, slaStatus: c.slaStatus, overdueMs: c.overdueMs || 0, deadlineMs: c.plannedFinishAt || c.plannedStartAt || 0 });
+    if ((c.overdueMs || 0) > L.worstOverdueMs) { L.worstOverdueMs = c.overdueMs || 0; L.worstTaskId = c.taskId; }
+    const dl = c.plannedFinishAt || c.plannedStartAt || 0;
+    if (dl && dl < L.oldestDeadlineMs) L.oldestDeadlineMs = dl;
+  }
+  return locks;
+}
+
+/* ── FASE 4.4-A2: PLANO de reprogramação (dry-run, PURO — nada é aplicado).
+   Quando o prazo muda: reseta os marcadores do deadline ANTIGO (novas âncoras
+   poderão alertar), incrementa rescheduleCount e preserva histórico. ── */
+function planReschedule(task, newPlan, nowMs, tz) {
+  const prev = (task && task.designerSla) || {};
+  const cur = slaPlanFromAssignment(task, tz);
+  const newStartAt  = newPlan.startDate ? slaToMs(newPlan.startDate, newPlan.startTime, tz) : cur.plannedStartAt;
+  const newFinishAt = newPlan.endDate   ? slaToMs(newPlan.endDate, newPlan.endTime, tz)     : cur.plannedFinishAt;
+  const slaPatch = { plannedStartAt: newStartAt, plannedFinishAt: newFinishAt,
+    rescheduleCount: (prev.rescheduleCount || 0) + 1, lastRescheduleAt: nowMs };
+  const markersReset = [];
+  if (newFinishAt !== cur.plannedFinishAt) { slaPatch.finishWarningSentAt = null; slaPatch.finishOverdueSentAt = null; markersReset.push("finishWarningSentAt", "finishOverdueSentAt"); }
+  if (newStartAt !== cur.plannedStartAt)   { slaPatch.startWarningSentAt = null;  slaPatch.startOverdueSentAt = null;  markersReset.push("startWarningSentAt", "startOverdueSentAt"); }
+  return {
+    applied: false, dryRun: true,
+    taskId: task && task.id, wouldPatch: { designerSla: slaPatch },
+    historyEntry: { kind: "designer_deadline_rescheduled", at: nowMs,
+      from: { plannedStartAt: cur.plannedStartAt, plannedFinishAt: cur.plannedFinishAt },
+      to: { plannedStartAt: newStartAt, plannedFinishAt: newFinishAt } },
+    markersReset,
+    dedupAnchorChange: { oldFinishAnchor: cur.plannedFinishAt, newFinishAnchor: newFinishAt },
+  };
+}
+
+/* WIP — SIMULAÇÃO CALIBRÁVEL (FASE 4.4-A2). Separa com clareza:
+   - observed: contagem real de tarefas em produção (fato, sem juízo);
+   - soft: limiar de ALERTA (softExceeded);
+   - hard: limiar de BLOQUEIO (hardExceeded) — INERTE em wipMode "observe";
+   - blockingByOverdue: atraso ativo ⇒ limite efetivo 0 (APENAS simulado).
+   Em modo "observe" (default) NENHUM evento de limite é emitido — só observação
+   no relatório, para calibração com dados reais antes de qualquer enforcement. */
+function simulateWip(tasks, cfg, locksByDesigner) {
+  const C = Object.assign({}, SLA_DEFAULTS, cfg || {});
+  const byDesigner = {};
+  for (const t of tasks) {
+    const d = (t.designerAssignment && t.designerAssignment.designerId) || null;
+    if (!d) continue;
+    byDesigner[d] = byDesigner[d] || { designerId: d, observed: 0, taskIds: [],
+      soft: C.wipSoftPerDesigner, hard: C.wipHardPerDesigner, mode: C.wipMode,
+      softExceeded: false, hardExceeded: false, blockingByOverdue: false, effectiveLimit: C.wipHardPerDesigner };
+    if (t.designerFlowStatus === "andamento") { byDesigner[d].observed++; byDesigner[d].taskIds.push(t.id); }
+  }
+  const events = [];
+  for (const d of Object.keys(byDesigner)) {
+    const w = byDesigner[d];
+    w.softExceeded = w.observed > w.soft;
+    w.hardExceeded = w.observed > w.hard;
+    w.blockingByOverdue = !!(locksByDesigner && locksByDesigner[d]);
+    w.effectiveLimit = w.blockingByOverdue ? 0 : w.hard;   // atraso ativo ⇒ 0 (simulação)
+    if (w.hardExceeded && C.wipMode === "enforce")          // NUNCA em "observe"
+      events.push(buildSlaEvent({ taskId: w.taskIds[w.taskIds.length - 1], designerId: d, eventType: "designer_wip_limit_reached", anchorMs: w.observed, timestamp: Date.now(), newStatus: null, metadata: { observed: w.observed, soft: w.soft, hard: w.hard }, reason: "WIP acima do hard (simulação — wipLimits OFF)" }));
+  }
+  return { byDesigner, events };
+}
+
+/* cria slaEvents/{dedupKey} — falha silenciosa se já existe (idempotência). */
+async function slaCreateEvent(env, accessToken, ev) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/slaEvents?documentId=${encodeURIComponent(ev.dedupKey)}`;
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ fields: slaEncodeFields(ev) }) });
+  if (res.status === 409) return { created: false, dedup: true };
+  if (!res.ok) { console.warn("[SLA] createEvent falhou:", res.status); return { created: false, dedup: false }; }
+  return { created: true, dedup: false };
+}
+function slaEncodeValue(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === "boolean") return { booleanValue: v };
+  if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  if (typeof v === "object") return { mapValue: { fields: slaEncodeFields(v) } };
+  return { stringValue: String(v) };
+}
+function slaEncodeFields(obj) { const f = {}; for (const k of Object.keys(obj || {})) f[k] = slaEncodeValue(obj[k]); return f; }
+
+async function slaGetFlags(env, accessToken) {
+  const doc = await getDoc(env, accessToken, "appConfig", "flags").catch(() => null);
+  return Object.assign({}, SLA_FLAG_DEFAULTS, doc || {});
+}
+
+/* tarefas ativas no eixo do designer.
+   V64.56 (correção do scanned:0 observado na janela de 12/06): a versão anterior
+   usava UM filtro IN e, se o Firestore o rejeitasse, ENGOLIA o erro retornando
+   lista vazia — indistinguível de "zero tarefas" sem logs. Agora:
+   1) tenta o IN; 2) se falhar OU vier vazio, faz fallback com 4 consultas de
+      IGUALDADE (à prova de índice: igualdade usa o índice single-field default)
+      e mescla por id; 3) TODA a telemetria vai em queryDiagnostics no relatório
+      (status HTTP, corpo de erro truncado, contagem por estratégia) — a próxima
+      janela conta a própria história sem depender de Observability. Read-only. */
+async function slaRunQuery(env, accessToken, where, limit) {
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], where, limit: limit || 300 } };
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  if (!res.ok) {
+    const errBody = (await res.text().catch(() => "")).slice(0, 200);
+    return { ok: false, status: res.status, errBody, tasks: [] };
+  }
+  const rows = await res.json(); const out = [];
+  for (const row of rows) { if (!row.document) continue; const id = row.document.name.split("/").pop(); out.push(Object.assign({ id }, decodeFields(row.document.fields))); }
+  return { ok: true, status: 200, tasks: out };
+}
+async function slaQueryActiveDesignerTasks(env, accessToken) {
+  const FLOWS = ["afazer", "andamento", "revisao", "concluido"];
+  const diag = { strategy: null, inStatus: null, inError: null, inCount: 0, eqStatus: {}, eqCounts: {}, merged: 0 };
+  const rIn = await slaRunQuery(env, accessToken,
+    { fieldFilter: { field: { fieldPath: "designerFlowStatus" }, op: "IN", value: { arrayValue: { values: FLOWS.map((v) => ({ stringValue: v })) } } } }, 300);
+  diag.inStatus = rIn.status; diag.inCount = rIn.tasks.length;
+  if (!rIn.ok) diag.inError = rIn.errBody || null;
+  if (rIn.ok && rIn.tasks.length > 0) { diag.strategy = "in"; diag.merged = rIn.tasks.length; return { tasks: rIn.tasks, diag }; }
+  /* fallback: 4 igualdades mescladas por id (read-only; índice default garante) */
+  const byId = {};
+  for (const v of FLOWS) {
+    const r = await slaRunQuery(env, accessToken,
+      { fieldFilter: { field: { fieldPath: "designerFlowStatus" }, op: "EQUAL", value: { stringValue: v } } }, 150);
+    diag.eqStatus[v] = r.ok ? 200 : r.status; diag.eqCounts[v] = r.tasks.length;
+    if (!r.ok && !diag.inError) diag.inError = r.errBody || null;
+    for (const t of r.tasks) byId[t.id] = t;
+  }
+  const merged = Object.values(byId);
+  diag.strategy = "equality-fallback"; diag.merged = merged.length;
+  return { tasks: merged, diag };
+}
+
+/* PASSADA DO ENGINE.
+   write=false (DEFAULT): zero escrita — só computa e reporta (dry-run absoluto).
+   write=true: exige env.SLA_WRITE==="true" + flags.slaEngine===true; grava
+   slaEvents (ID=dedupKey) + task.designerSla (com marcadores *SentAt = registro
+   do EVENTO, não de push — push real continua OFF). NUNCA envia FCM, NUNCA
+   escreve designerLocks nesta fase. */
+async function runSlaEnginePass(env, opts) {
+  const o = opts || {}; const nowMs = Date.now();
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  /* FASE 4.4-A2 — corte temporal OBRIGATÓRIO: sem env SLA_ACTIVATED_AT (epoch ms
+     ou ISO) NENHUM evento é elegível (tudo retroativo). Impede rajada de backfill
+     sem autorização explícita. */
+  const activatedAtRaw = (env && env.SLA_ACTIVATED_AT) || "";
+  const activatedAtMs = /^\d+$/.test(activatedAtRaw) ? parseInt(activatedAtRaw, 10) : (activatedAtRaw ? Date.parse(activatedAtRaw) : 0);
+  const cfg = Object.assign({}, SLA_DEFAULTS, {
+    maxTasksPerPass: parseInt((env && env.SLA_MAX_TASKS_PER_PASS) || "", 10) || SLA_DEFAULTS.maxTasksPerPass,
+    maxEventsPerPass: parseInt((env && env.SLA_MAX_EVENTS_PER_PASS) || "", 10) || SLA_DEFAULTS.maxEventsPerPass,
+    wipMode: (env && env.SLA_WIP_MODE) || SLA_DEFAULTS.wipMode,
+  });
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  const flags = await slaGetFlags(env, accessToken);
+  const writeAllowed = o.write === true && (env && env.SLA_WRITE === "true") && flags.slaEngine === true;
+  const qres = await slaQueryActiveDesignerTasks(env, accessToken);
+  const allTasks = qres.tasks;
+  /* backfill controlado: teto de tarefas por passada + relatório de paginação */
+  const tasks = allTasks.slice(0, cfg.maxTasksPerPass);
+  const report = { now: nowMs, activatedAt: activatedAtMs || null, scanned: tasks.length, flags, writeAllowed,
+    queryDiagnostics: qres.diag,
+    pagination: { totalQueried: allTasks.length, analyzed: tasks.length, remaining: Math.max(0, allTasks.length - tasks.length), truncatedTasks: allTasks.length > tasks.length, maxTasksPerPass: cfg.maxTasksPerPass, maxEventsPerPass: cfg.maxEventsPerPass, eventsCapped: false },
+    computed: [], events: [], retroIgnored: [], wouldNotify: [], wouldLock: [], writes: 0, dedupSkipped: 0 };
+  for (const t of tasks) {
+    if (!t.designerAssignment || !t.designerAssignment.designerId) continue;
+    const prev = t.designerSla || {};
+    const comp = computeSlaStatus(t, nowMs, cfg, tz);
+    const der = deriveSlaEvents(prev, comp, t, nowMs, activatedAtMs);
+    for (const r of der.retro) report.retroIgnored.push(r);
+    let evs = der.events;
+    if (report.events.length + evs.length > cfg.maxEventsPerPass) {       // teto de eventos
+      evs = evs.slice(0, Math.max(0, cfg.maxEventsPerPass - report.events.length));
+      report.pagination.eventsCapped = true;
+    }
+    report.computed.push({ taskId: t.id, designerId: t.designerAssignment.designerId, client: t.client || null, demandType: t.cronSub || t.sector || null, slaStatus: comp.slaStatus, slaSeverity: comp.slaSeverity, blockedCandidate: comp.blockedCandidate, overdueMs: comp.overdueMs || 0, plannedStartAt: comp.plannedStartAt, plannedFinishAt: comp.plannedFinishAt });
+    for (const ev of evs) {
+      report.events.push(ev);
+      if (ev.eventType.indexOf("warning") >= 0 || ev.eventType.indexOf("overdue") >= 0)
+        report.wouldNotify.push({ taskId: ev.taskId, designerId: ev.designerId, type: ev.eventType, simulated: true });
+      if (ev.eventType === "designer_blocked_by_overdue")
+        report.wouldLock.push({ designerId: ev.designerId, taskId: ev.taskId, simulated: true });
+      if (writeAllowed) {
+        const r = await slaCreateEvent(env, accessToken, ev);
+        if (r.created) report.writes++; else if (r.dedup) report.dedupSkipped++;
+      }
+    }
+    if (writeAllowed) {
+      const markers = {};
+      for (const ev of evs) {
+        if (ev.eventType === "designer_start_warning")  markers.startWarningSentAt  = nowMs;
+        if (ev.eventType === "designer_start_overdue")  markers.startOverdueSentAt  = nowMs;
+        if (ev.eventType === "designer_finish_warning") markers.finishWarningSentAt = nowMs;
+        if (ev.eventType === "designer_finish_overdue") markers.finishOverdueSentAt = nowMs;
+        if (ev.eventType === "designer_task_assigned")  markers.assignedEventAt     = nowMs;
+        if (ev.eventType === "designer_task_started")   markers.startedEventAt      = nowMs;
+        if (ev.eventType === "designer_task_completed") markers.completedEventAt    = nowMs;
+        if (ev.eventType === "designer_blocked_by_overdue") markers.blockedEventAt  = nowMs;
+        if (ev.eventType === "designer_unblocked")      markers.unblockedEventAt    = nowMs;
+      }
+      const slaPatch = Object.assign({}, prev, markers, {
+        assignedDesignerId: t.designerAssignment.designerId,
+        plannedStartAt: comp.plannedStartAt, plannedFinishAt: comp.plannedFinishAt,
+        startWarningAt: comp.startWarningAt, finishWarningAt: comp.finishWarningAt,
+        slaStatus: comp.slaStatus, slaSeverity: comp.slaSeverity,
+        blockedCandidate: comp.blockedCandidate, isBlocked: false,  // bloqueio REAL desligado
+        lastComputedAt: nowMs, engineMode: "dry-run-phase-4.3",
+      });
+      const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${t.id}?updateMask.fieldPaths=designerSla`;
+      await fetch(url, { method: "PATCH", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ fields: { designerSla: { mapValue: { fields: slaEncodeFields(slaPatch) } } } }) }).catch((e) => console.warn("[SLA] patch designerSla:", e && e.message));
+      report.writes++;
+    }
+  }
+  /* FASE 4.4-A2 — lock CONSOLIDADO: 1 candidato por designer (tarefas críticas
+     como metadata; prioridade pelo atraso mais grave/mais antigo). Só simulação. */
+  const locks = consolidateLocks(report.computed);
+  report.locksConsolidated = locks;
+  report.wouldLock = Object.values(locks).map((L) => ({ designerId: L.designerId, worstTaskId: L.worstTaskId, worstOverdueMs: L.worstOverdueMs, tasks: L.tasks.length, simulated: true }));
+  const wip = simulateWip(tasks, cfg, locks);
+  report.wip = wip.byDesigner;
+  for (const ev of wip.events) report.events.push(ev);
+  /* agregados p/ calibração (FASE 4.4-A2): por designer / cliente / tipo */
+  const agg = (key) => { const m = {}; for (const c of report.computed) { const k = c[key] || "?"; m[k] = m[k] || { total: 0, atrasadas: 0, laranja: 0 }; m[k].total++; if (c.slaSeverity === "vermelho") m[k].atrasadas++; if (c.slaSeverity === "laranja") m[k].laranja++; } return m; };
+  report.totals = { byDesigner: agg("designerId"), byClient: agg("client"), byType: agg("demandType"),
+    retroIgnored: report.retroIgnored.length, eligibleEvents: report.events.length };
+  return report;
+}
+
+/* POST /sla-dryrun — inspeção sob demanda. SEMPRE sem push e sem lock.
+   Sem body.write: zero escrita. Com {"write":true}: ainda exige SLA_WRITE +
+   flag slaEngine (OFF por padrão → continua sem escrever). */
+async function handleSlaDryRun(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env SLA_ENGINE_ENABLED ausente) — comportamento de produção intocado." }, 403, env);
+  let body = {}; try { body = await request.json(); } catch (_) {}
+  const report = await runSlaEnginePass(env, { write: body && body.write === true });
+  return json({ ok: true, mode: report.writeAllowed ? "write" : "dry-run", report }, 200, env);
+}
+
+/* POST /sla-reschedule-plan — FASE 4.4-A2: fluxo de reprogramação SOMENTE
+   PLANEJADO (dry-run): lê a tarefa (read-only), devolve o patch que SERIA
+   aplicado (reset de marcadores do prazo antigo + rescheduleCount + history).
+   NUNCA escreve. Exige SLA_ENGINE_ENABLED (sem a env = 403, produção intocada). */
+async function handleSlaReschedulePlan(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env ausente)." }, 403, env);
+  let body = {}; try { body = await request.json(); } catch (_) {}
+  if (!body.taskId) return json({ ok: false, error: "taskId obrigatório" }, 400, env);
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  const task = await getDoc(env, accessToken, "tasks", body.taskId);
+  if (!task) return json({ ok: false, error: "tarefa não encontrada" }, 404, env);
+  task.id = body.taskId;
+  const plan = planReschedule(task, { startDate: body.startDate, startTime: body.startTime, endDate: body.endDate, endTime: body.endTime }, Date.now(), tz);
+  return json({ ok: true, mode: "plan-only", plan }, 200, env);
+}
+
+/* ── FASE 4.4 (descoberta): POST /sla-discover — read-only ABSOLUTO.
+   Motivo (janela de 12/06): o baseline mediu scanned:0 e a auditoria de código
+   mostrou que o app WEB de produção grava o fluxo no campo genérico `status`;
+   o eixo `designerFlowStatus` só é escrito pelos apps beta. Esta rota lê uma
+   AMOSTRA de tarefas reais e devolve APENAS agregados anônimos (presença de
+   campos + histogramas de valores enum + contagens de atraso por dueDate) —
+   sem ids, títulos, clientes ou nomes. Exige SLA_ENGINE_ENABLED; nunca escreve. */
+const SLA_DISCOVER_FIELDS = ["status","designerFlowStatus","designerWorkflowStage","cronStatus","clientFlowStatus","socialFlowStatus","operationalStatus","designerAssignment","designerSla","dueDate","endDate","startDate","assigneeId","socialOwnerId","by","sector"];
+function slaDiscoverAggregate(tasks, nowMs, tz) {
+  const agg = { sampled: tasks.length, fieldPresence: {}, valueHistograms: { status: {}, designerFlowStatus: {}, cronStatus: {}, clientFlowStatus: {}, sector: {} }, overdueByDueDate: 0, dueDateFuture: 0, withDesignerAssignment: 0, withDesignerSla: 0, ageDays: { d0_7: 0, d8_30: 0, d31_90: 0, d90p: 0 } };
+  for (const f of SLA_DISCOVER_FIELDS) agg.fieldPresence[f] = 0;
+  for (const t of tasks) {
+    for (const f of SLA_DISCOVER_FIELDS) if (t[f] !== undefined && t[f] !== null && t[f] !== "") agg.fieldPresence[f]++;
+    for (const f of Object.keys(agg.valueHistograms)) { const v = t[f]; if (typeof v === "string" && v && v.length <= 40) agg.valueHistograms[f][v] = (agg.valueHistograms[f][v] || 0) + 1; }
+    if (t.designerAssignment && t.designerAssignment.designerId) agg.withDesignerAssignment++;
+    if (t.designerSla) agg.withDesignerSla++;
+    const due = taskDueMs(t, tz);
+    if (due) { if (due < nowMs && t.status !== "concluido" && t.status !== "cancelada") agg.overdueByDueDate++; else if (due >= nowMs) agg.dueDateFuture++; }
+    const age = t.createdAt ? (nowMs - t.createdAt) / 86400000 : null;
+    if (age != null) { if (age <= 7) agg.ageDays.d0_7++; else if (age <= 30) agg.ageDays.d8_30++; else if (age <= 90) agg.ageDays.d31_90++; else agg.ageDays.d90p++; }
+  }
+  return agg;
+}
+async function handleSlaDiscover(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env ausente)." }, 403, env);
+  const nowMs = Date.now();
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  /* amostra: tarefas mais recentes por createdAt (índice single-field default) */
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const q = { structuredQuery: { from: [{ collectionId: "tasks" }], orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }], limit: 60 } };
+  const res = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" }, body: JSON.stringify(q) });
+  const diag = { sampleStatus: res.ok ? 200 : res.status, sampleError: null };
+  let tasks = [];
+  if (!res.ok) diag.sampleError = (await res.text().catch(() => "")).slice(0, 200);
+  else { const rows = await res.json(); for (const row of rows) { if (!row.document) continue; tasks.push(decodeFields(row.document.fields)); } }
+  /* sondas de igualdade (contagens; read-only) */
+  const probes = {};
+  for (const [name, field, value] of [["cron_sent_to_designer", "cronStatus", "sent_to_designer"], ["assignment_sent", "designerAssignment.status", "sent"], ["status_andamento", "status", "andamento"]]) {
+    const r = await slaRunQuery(env, accessToken, { fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: { stringValue: value } } }, 100);
+    probes[name] = r.ok ? r.tasks.length : ("erro " + r.status);
+  }
+  return json({ ok: true, mode: "discover-read-only", report: { now: nowMs, diag, aggregate: slaDiscoverAggregate(tasks, nowMs, tz), probes } }, 200, env);
+}
+
+/* ── FASE 4.4 (V64.58): LENTE LEGADO — BASELINE READ-ONLY (measure-only) ──
+   Mede o modelo REAL de produção (campo `status` + dueDate/startDate/sector/
+   assigneeId) SEM tocar em nada: sem alerta pessoal, sem lock, sem push, sem
+   escrita, sem slaEvents, sem designerSla. Agregados ANÔNIMOS por construção:
+   responsáveis viram pseudônimos estáveis (resp01..respNN por volume); nenhuma
+   resposta contém id de doc, título, cliente, nome, telefone, e-mail ou token. */
+function slaLegacyAggregate(tasks, nowMs, tz) {
+  const agg = { analyzed: tasks.length,
+    countsByStatus: {}, bySector: {}, byAssignee: {},
+    overdueByDueDate: 0, dueFuture: 0, semDueDate: 0, semAssignee: 0, semSector: 0,
+    overdueBySector: {}, overdueByAssignee: {},
+    overdueMagnitude: { ate_1d: 0, d1_3: 0, d3_7: 0, mais_7d: 0 },
+    ageDays: { d0_7: 0, d8_30: 0, d31_90: 0, d90p: 0, semCreatedAt: 0 } };
+  /* pseudônimos estáveis: assigneeId → resp01.. (ordenado por volume no fim) */
+  const rawAssignee = {};
+  for (const t of tasks) {
+    const st = (typeof t.status === "string" && t.status) ? t.status : "(sem status)";
+    agg.countsByStatus[st] = (agg.countsByStatus[st] || 0) + 1;
+    const sec = (typeof t.sector === "string" && t.sector) ? t.sector : null;
+    if (sec) agg.bySector[sec] = (agg.bySector[sec] || 0) + 1; else agg.semSector++;
+    const asg = (typeof t.assigneeId === "string" && t.assigneeId) ? t.assigneeId : null;
+    if (asg) rawAssignee[asg] = (rawAssignee[asg] || 0) + 1; else agg.semAssignee++;
+    const due = taskDueMs(t, tz);
+    const active = st !== "concluido" && st !== "cancelada" && st !== "excluido";
+    if (!due) agg.semDueDate++;
+    else if (due < nowMs && active) {
+      agg.overdueByDueDate++;
+      if (sec) agg.overdueBySector[sec] = (agg.overdueBySector[sec] || 0) + 1;
+      if (asg) agg.overdueByAssignee[asg] = (agg.overdueByAssignee[asg] || 0) + 1;
+      const d = (nowMs - due) / 86400000;
+      if (d <= 1) agg.overdueMagnitude.ate_1d++; else if (d <= 3) agg.overdueMagnitude.d1_3++;
+      else if (d <= 7) agg.overdueMagnitude.d3_7++; else agg.overdueMagnitude.mais_7d++;
+    } else if (due >= nowMs) agg.dueFuture++;
+    const age = t.createdAt ? (nowMs - t.createdAt) / 86400000 : null;
+    if (age == null) agg.ageDays.semCreatedAt++;
+    else if (age <= 7) agg.ageDays.d0_7++; else if (age <= 30) agg.ageDays.d8_30++;
+    else if (age <= 90) agg.ageDays.d31_90++; else agg.ageDays.d90p++;
+  }
+  /* anonimização: ids de responsável NUNCA saem — viram resp01..respNN */
+  const ordered = Object.keys(rawAssignee).sort((a, b) => rawAssignee[b] - rawAssignee[a]);
+  const alias = {}; ordered.forEach((id, i) => { alias[id] = "resp" + String(i + 1).padStart(2, "0"); });
+  for (const id of ordered) agg.byAssignee[alias[id]] = rawAssignee[id];
+  const odA = {}; for (const id of Object.keys(agg.overdueByAssignee)) odA[alias[id] || "resp??"] = agg.overdueByAssignee[id];
+  agg.overdueByAssignee = odA;
+  return agg;
+}
+async function handleSlaLegacyBaseline(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env ausente)." }, 403, env);
+  const nowMs = Date.now();
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  const STATUSES = ["afazer", "andamento", "revisao", "concluido"];
+  const diag = { queries: {}, totalQueried: 0 };
+  const all = [];
+  for (const st of STATUSES) {     /* igualdade pura: robusta, índice default, read-only */
+    const r = await slaRunQuery(env, accessToken,
+      { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: st } } }, 300);
+    diag.queries[st] = { status: r.ok ? 200 : r.status, count: r.tasks.length, error: r.ok ? null : (r.errBody || null) };
+    diag.totalQueried += r.tasks.length;
+    for (const t of r.tasks) all.push(t);
+  }
+  const aggregate = slaLegacyAggregate(all, nowMs, tz);
+  return json({ ok: true, mode: "legacy-baseline-read-only", report: { now: nowMs, diag, aggregate } }, 200, env);
+}
+
+/* ── FASE 4.4 (V64.59): RISCO DE ATRASO ANTES DO VENCIMENTO — read-only.
+   Última extensão da lente legado (autorizada como termômetro temporário em
+   paralelo à adoção das betas). Usa SOMENTE campos existentes (status/startDate/
+   dueDate/createdAt/sector/assigneeId) e devolve SÓ agregados anônimos
+   (responsável vira respNN; nenhum id/título/cliente/nome/texto livre sai). */
+function slaLegacyRiskAggregate(tasks, nowMs, tz) {
+  const D = 86400000, H = 3600000;
+  const agg = { analyzed: tasks.length,
+    inicioVencido: { total: 0, porSetor: {}, porResp: {}, magnitude: { ate_1d: 0, d1_3: 0, d3_7: 0, mais_7d: 0 } },
+    venceEm: { h24: 0, h24_72: 0, d3_7: 0, mais_7d: 0, jaVencida: 0 },
+    filaParadaAfazer: { d0_2: 0, d3_7: 0, d8_30: 0, mais_30d: 0 },
+    consumoJanela: { ate_50: 0, p50_80: 0, p80_100: 0, estourou: 0, semJanela: 0 },
+    risco: { alto: 0, medio: 0, baixo: 0, porSetor: {}, porResp: {} },
+    semAssignee: 0, semStartDate: 0, semDueDate: 0, semSector: 0 };
+  const rawResp = {}; const respRisk = {}; const respStart = {};
+  for (const t of tasks) {
+    const st = t.status || "";
+    const sec = (typeof t.sector === "string" && t.sector) ? t.sector : null;
+    if (!sec) agg.semSector++;
+    const asg = (typeof t.assigneeId === "string" && t.assigneeId) ? t.assigneeId : null;
+    if (asg) rawResp[asg] = (rawResp[asg] || 0) + 1; else agg.semAssignee++;
+    const startMs = slaToMs(t.startDate, t.startTime, tz);
+    const dueMs = taskDueMs(t, tz);
+    if (!startMs) agg.semStartDate++;
+    if (!dueMs) agg.semDueDate++;
+    let pontos = 0;
+    /* 1) início vencido: startDate no passado + ainda afazer */
+    if (startMs && startMs < nowMs && st === "afazer") {
+      agg.inicioVencido.total++; pontos += 2;
+      if (sec) agg.inicioVencido.porSetor[sec] = (agg.inicioVencido.porSetor[sec] || 0) + 1;
+      if (asg) respStart[asg] = (respStart[asg] || 0) + 1;
+      const d = (nowMs - startMs) / D;
+      if (d <= 1) agg.inicioVencido.magnitude.ate_1d++; else if (d <= 3) agg.inicioVencido.magnitude.d1_3++;
+      else if (d <= 7) agg.inicioVencido.magnitude.d3_7++; else agg.inicioVencido.magnitude.mais_7d++;
+    }
+    /* 2) vence em breve (somente ativas) */
+    if (dueMs && st !== "concluido" && st !== "cancelada") {
+      const left = dueMs - nowMs;
+      if (left < 0) { agg.venceEm.jaVencida++; pontos += 3; }
+      else if (left < 24 * H) { agg.venceEm.h24++; pontos += 3; }
+      else if (left < 72 * H) { agg.venceEm.h24_72++; pontos += 2; }
+      else if (left < 7 * D) { agg.venceEm.d3_7++; pontos += 1; }
+      else agg.venceEm.mais_7d++;
+    }
+    /* 3) fila parada (idade em afazer) */
+    if (st === "afazer" && t.createdAt) {
+      const idade = (nowMs - t.createdAt) / D;
+      if (idade <= 2) agg.filaParadaAfazer.d0_2++; else if (idade <= 7) agg.filaParadaAfazer.d3_7++;
+      else if (idade <= 30) { agg.filaParadaAfazer.d8_30++; pontos += 1; }
+      else { agg.filaParadaAfazer.mais_30d++; pontos += 2; }
+    }
+    /* 4) consumo da janela: base = startDate (ou createdAt) → dueDate */
+    const baseMs = startMs || t.createdAt || 0;
+    if (dueMs && baseMs && dueMs > baseMs && st !== "concluido" && st !== "cancelada") {
+      const ratio = (nowMs - baseMs) / (dueMs - baseMs);
+      if (ratio < 0.5) agg.consumoJanela.ate_50++;
+      else if (ratio < 0.8) agg.consumoJanela.p50_80++;
+      else if (ratio <= 1) { agg.consumoJanela.p80_100++; pontos += 1; }
+      else { agg.consumoJanela.estourou++; pontos += 2; }
+    } else agg.consumoJanela.semJanela++;
+    if (!asg && st !== "concluido") pontos += 1;   /* fila sem dono = risco */
+    /* nível de risco agregado */
+    const nivel = pontos >= 4 ? "alto" : (pontos >= 2 ? "medio" : "baixo");
+    agg.risco[nivel]++;
+    if (sec) { agg.risco.porSetor[sec] = agg.risco.porSetor[sec] || { alto: 0, medio: 0, baixo: 0 }; agg.risco.porSetor[sec][nivel]++; }
+    if (asg) { respRisk[asg] = respRisk[asg] || { alto: 0, medio: 0, baixo: 0 }; respRisk[asg][nivel]++; }
+  }
+  /* pseudonimização estável (respNN por volume) — ids NUNCA saem */
+  const ordered = Object.keys(rawResp).sort((a, b) => rawResp[b] - rawResp[a]);
+  const alias = {}; ordered.forEach((id, i) => { alias[id] = "resp" + String(i + 1).padStart(2, "0"); });
+  for (const id of ordered) {
+    if (respRisk[id]) agg.risco.porResp[alias[id]] = respRisk[id];
+    if (respStart[id]) agg.inicioVencido.porResp[alias[id]] = respStart[id];
+  }
+  return agg;
+}
+async function handleSlaLegacyRisk(request, env) {
+  if ((env && env.SLA_ENGINE_ENABLED) !== "true")
+    return json({ ok: false, error: "SLA engine desabilitado (env ausente)." }, 403, env);
+  const nowMs = Date.now();
+  const tz = parseInt((env && env.APP_TZ_OFFSET_MINUTES) || "-180", 10);
+  const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+  const STATUSES = ["afazer", "andamento", "revisao"];   /* só ativas: risco é da fila viva */
+  const diag = { queries: {}, totalQueried: 0 };
+  const all = [];
+  for (const st of STATUSES) {
+    const r = await slaRunQuery(env, accessToken,
+      { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: st } } }, 300);
+    diag.queries[st] = { status: r.ok ? 200 : r.status, count: r.tasks.length, error: r.ok ? null : (r.errBody || null) };
+    diag.totalQueried += r.tasks.length;
+    for (const t of r.tasks) all.push(t);
+  }
+  return json({ ok: true, mode: "legacy-risk-read-only", report: { now: nowMs, diag, aggregate: slaLegacyRiskAggregate(all, nowMs, tz) } }, 200, env);
+}
+
+/* export p/ testes unitários (node) — não interfere no runtime do Worker. */
+export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover, slaLegacyAggregate, handleSlaLegacyBaseline, slaLegacyRiskAggregate, handleSlaLegacyRisk };
