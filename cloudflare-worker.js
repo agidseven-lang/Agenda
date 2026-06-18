@@ -3820,6 +3820,53 @@ async function slaQueryActiveDesignerTasks(env, accessToken) {
   return { tasks: merged, diag };
 }
 
+/* ── F3.1 — SIMULAÇÃO DE NOTIFICAÇÃO (LOG-ONLY, PURA) ──────────────────────────
+   Monta o PLANO de notificação a partir de report.computed (estado SLA atual).
+   NÃO ENVIA NADA: não chama sendToTokens/FCM, Web Push (VAPID) nem WhatsApp —
+   apenas constrói strings e calcula quais gates BLOQUEARIAM o envio real.
+   F3.1: escopo = SOMENTE designer_start_warning; canal = fcm; destinatário =
+   designer da tarefa (cliente NUNCA é alvo; sem designer ⇒ sem plano).
+   Envio real é PROIBIDO nesta fase: realSendBlockedBy contém SEMPRE
+   "F3.1-log-only" e simulated é SEMPRE true. Nenhum provider é implementado. */
+const SLA_NOTIFY_EVENTS_F31 = ["designer_start_warning"];
+function slaNotifyTitleBody(eventType, c) {
+  if (eventType === "designer_start_warning")
+    return { title: "SLA: início em ~30 min", body: (c.client ? c.client + " — " : "") + "inicie a produção desta tarefa." };
+  return { title: "SLA", body: "" };
+}
+function simulateSlaNotifications(report, env) {
+  const flags = (report && report.flags) || {};
+  const notifyEnabled = !!(env && env.SLA_NOTIFY_ENABLED === "true");
+  const dryRun = !(env && env.SLA_NOTIFY_DRYRUN === "false");   // default: simulação (true) salvo "false" explícito
+  const allowlist = String((env && env.SLA_NOTIFY_ALLOWLIST) || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const plan = [];
+  for (const c of ((report && report.computed) || [])) {
+    if (c.slaStatus !== "inicio_proximo") continue;            // F3.1: só o gatilho de start_warning
+    const recipientUserId = c.designerId || null;
+    if (!recipientUserId) continue;                            // sem designer ⇒ sem plano (nunca cliente, sem fallback)
+    const eventType = "designer_start_warning";
+    const anchorMs = c.plannedStartAt || 0;
+    const blocked = ["F3.1-log-only"];                         // hard-block desta fase (sempre presente)
+    if (flags.slaNotifications !== true) blocked.push("flags.slaNotifications=false");
+    if (!notifyEnabled) blocked.push("SLA_NOTIFY_ENABLED!=true");
+    if (dryRun) blocked.push("SLA_NOTIFY_DRYRUN!=false");
+    if (allowlist.length === 0) blocked.push("allowlist-empty");
+    else if (!allowlist.includes(recipientUserId)) blocked.push("recipient-not-in-allowlist");
+    const tb = slaNotifyTitleBody(eventType, c);
+    plan.push({
+      eventType, recipientUserId, recipientRole: "designer", channel: "fcm",
+      severity: "warning", severityColor: "laranja",
+      title: tb.title, body: tb.body,
+      deepLink: "idseven://task/" + c.taskId,
+      deliveryDedupKey: slaDedupKey(c.taskId, eventType, anchorMs) + "__notify__fcm",
+      taskId: c.taskId, anchorMs,
+      simulated: true, realSendBlockedBy: blocked,
+    });
+  }
+  return { dryRun, enabled: notifyEnabled, slaNotificationsFlag: flags.slaNotifications === true,
+    allowlistCount: allowlist.length, scope: SLA_NOTIFY_EVENTS_F31, realSendImplemented: false, plan };
+}
+
 /* PASSADA DO ENGINE.
    write=false (DEFAULT): zero escrita — só computa e reporta (dry-run absoluto).
    write=true: exige env.SLA_WRITE==="true" + flags.slaEngine===true; grava
@@ -3911,6 +3958,11 @@ async function runSlaEnginePass(env, opts) {
   const agg = (key) => { const m = {}; for (const c of report.computed) { const k = c[key] || "?"; m[k] = m[k] || { total: 0, atrasadas: 0, laranja: 0 }; m[k].total++; if (c.slaSeverity === "vermelho") m[k].atrasadas++; if (c.slaSeverity === "laranja") m[k].laranja++; } return m; };
   report.totals = { byDesigner: agg("designerId"), byClient: agg("client"), byType: agg("demandType"),
     retroIgnored: report.retroIgnored.length, eligibleEvents: report.events.length };
+  /* F3.1 — plano de notificação SIMULADO (log-only; NENHUM envio; gates calculados). */
+  const notif = simulateSlaNotifications(report, env);
+  report.notify = { dryRun: notif.dryRun, enabled: notif.enabled, slaNotificationsFlag: notif.slaNotificationsFlag,
+    allowlistCount: notif.allowlistCount, scope: notif.scope, realSendImplemented: notif.realSendImplemented };
+  report.slaNotificationPlan = notif.plan;
   return report;
 }
 
@@ -4151,4 +4203,4 @@ async function handleSlaLegacyRisk(request, env) {
 }
 
 /* export p/ testes unitários (node) — não interfere no runtime do Worker. */
-export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover, slaLegacyAggregate, handleSlaLegacyBaseline, slaLegacyRiskAggregate, handleSlaLegacyRisk };
+export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover, slaLegacyAggregate, handleSlaLegacyBaseline, slaLegacyRiskAggregate, handleSlaLegacyRisk, simulateSlaNotifications };
