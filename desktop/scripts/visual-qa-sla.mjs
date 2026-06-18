@@ -71,6 +71,26 @@ await page.waitForSelector('.slaib-panel', { timeout: 6000 });
 await page.waitForTimeout(300);
 await page.screenshot({ path: path.join(OUT, '03-panel.png') });
 
+// Fase E — abre o DETALHE da tarefa overdue (t2) e captura o bloco "SLA do designer"
+await page.evaluate(() => {
+  try { const ov = document.getElementById('slaib-ov'); if (ov) ov.remove(); } catch (_) {}
+  try { openDetails('t2'); } catch (_) {}
+});
+await page.waitForSelector('.det-sheet', { timeout: 6000 });
+await page.waitForTimeout(300);
+await page.screenshot({ path: path.join(OUT, '04-detail-sla.png') });
+const detail = await page.evaluate(() => {
+  const secs = [...document.querySelectorAll('#modalRoot .det-sec')].map(e => e.textContent || '');
+  const txt = document.getElementById('modalRoot')?.textContent || '';
+  return {
+    hasSlaSection: secs.some(s => /SLA do designer/i.test(s)),
+    hasPrazoEncerrado: /Prazo encerrado/.test(txt),
+    hasAtraso: /Atraso de/.test(txt),
+    hasInicioPlanejado: /Início planejado/.test(txt),
+    hasPrazoFinal: /Prazo final \/ término/.test(txt),
+  };
+});
+
 const data = await page.evaluate(() => {
   const a = document.getElementById('cornerAvatar').getBoundingClientRect();
   const b = document.getElementById('slaib-bell').getBoundingClientRect();
@@ -86,8 +106,9 @@ const data = await page.evaluate(() => {
     items,
   };
 });
-fs.writeFileSync(path.join(OUT, 'qa-report.json'), JSON.stringify({ data, errors }, null, 2));
+fs.writeFileSync(path.join(OUT, 'qa-report.json'), JSON.stringify({ data, detail, errors }, null, 2));
 console.log('QA REPORT:', JSON.stringify(data, null, 2));
+console.log('DETAIL (Fase E):', JSON.stringify(detail, null, 2));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
 
 await browser.close(); server.close();
@@ -102,5 +123,10 @@ if (!data.items.some(i => i.sev === 'laranja')) fail.push('sem alerta laranja (p
 if (!data.items.some(i => i.sev === 'vermelho')) fail.push('sem alerta vermelho (prazo encerrado)');
 if (!data.items.some(i => /Faltam \d+ min/.test(i.msg))) fail.push('sem texto "Faltam X min"');
 if (!data.items.some(i => /ultrapassado/i.test(i.msg))) fail.push('sem texto "ultrapassado"');
+// Fase E — bloco SLA na tela de detalhe
+if (!detail.hasSlaSection) fail.push('detalhe sem seção "SLA do designer"');
+if (!detail.hasPrazoEncerrado) fail.push('detalhe (t2 overdue) sem status "Prazo encerrado"');
+if (!detail.hasAtraso) fail.push('detalhe sem "Atraso de …"');
+if (!detail.hasInicioPlanejado || !detail.hasPrazoFinal) fail.push('detalhe sem datas planejadas (início/prazo final)');
 if (fail.length) { console.error('::error::VISUAL QA FALHOU: ' + fail.join(' | ')); process.exit(1); }
-console.log('VISUAL QA OK — sino alinhado, SVG, laranja+vermelho por prazo final, textos corretos.');
+console.log('VISUAL QA OK — sino alinhado, SVG, laranja+vermelho por prazo final, textos; detalhe com bloco SLA.');

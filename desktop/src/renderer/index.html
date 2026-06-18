@@ -2441,6 +2441,7 @@ function slaibVisible(u){
   });
 }
 function slaibFmtHM(ms){try{var d=new Date(ms);var p=function(n){return (n<10?'0':'')+n;};return p(d.getHours())+':'+p(d.getMinutes());}catch(_){return '';}}
+function slaibFmtDur(ms){ms=Math.max(0,ms);var m=Math.round(ms/60000);if(m<60)return m+' min';var h=Math.floor(m/60),r=m%60;if(h<24)return h+'h'+(r?(' '+r+'min'):'');var d=Math.floor(h/24);return d+'d '+(h%24)+'h';}
 /* Alerta SLA por PRAZO FINAL (read-only). Retorna null se não há alerta. Independe de "iniciou":
  * o que importa é o término (planDueAt). Concluída => sem alerta. */
 function slaibFinishAlert(t,now){
@@ -3898,6 +3899,7 @@ function openDetails(taskId){
     // detail-hierarchy-v2: HERO (status+próxima+responsável+ações) no topo;
     // os chips técnicos e a timeline moram em "Detalhes do fluxo" (colapsado).
     detailHeroBlock(t)+
+    detailSlaBlock(t)+
     flowDetailsBlock(t)+
     // datas
     '<div class="det-sec">Datas</div><div class="det-dates">'+
@@ -4048,6 +4050,38 @@ function detailHeroBlock(t){
       '<div><div class="det-hero-ok">Responsável agora</div><div class="det-hero-on">'+esc(ow.name)+' <span class="det-hero-or">· '+esc(ow.role.split('—')[1]||ow.role)+'</span></div></div></div>'+
     '<div class="det-hero-actions">'+detailActionsHtml(t,ds)+'</div>'+
   '</div>';
+}
+/* F3.2.4 (Fase E) — BLOCO SLA DO DESIGNER (read-only): separa o status de PRAZO/SLA
+ * do status de FLUXO (que vive no HERO). Mostra status SLA por PRAZO FINAL, datas
+ * planejadas e tempo restante/atraso. NÃO grava nada; só lê designerSla. */
+function detailSla(t){
+  var ds=t&&t.designerSla; if(!ds) return null;
+  var pd=Number(ds.planDueAt); if(!pd||isNaN(pd)) return null;
+  var now=Date.now();
+  var ps=Number(ds.planStartAt)||0;
+  var finished=Number(ds.finishedAt)||(typeof t.doneAt==='number'?t.doneAt:0);
+  var delivered=(finished>0)||(t.designerFlowStatus==='entregue'||t.designerFlowStatus==='concluido'||t.status==='concluido');
+  var o={planStartAt:ps,planDueAt:pd};
+  if(delivered){o.state='completed';o.label='Concluída';o.color='#37D196';o.rem='Entrega concluída';return o;}
+  if(now>pd){o.state='overdue';o.label='Prazo encerrado';o.color='#FF6B61';o.rem='Atraso de '+slaibFmtDur(now-pd);return o;}
+  if(now>=pd-SLAIB_FINISH_WARN_MS){o.state='warning';o.label='Prazo próximo';o.color='#F2A93B';o.rem='Faltam '+slaibFmtDur(pd-now);return o;}
+  o.state='normal';o.label='Dentro do prazo';o.color='#7FA6FF';o.rem='Faltam '+slaibFmtDur(pd-now);return o;
+}
+function detailSlaBlock(t){
+  var s=detailSla(t); if(!s) return '';
+  var startStr=s.planStartAt?fmtDateTimeBR(s.planStartAt):'Não definido';
+  var dueStr=s.planDueAt?fmtDateTimeBR(s.planDueAt):'Não definido';
+  return '<div class="det-sec">SLA do designer</div>'+
+    '<div class="det-cresp" style="display:block;border-color:'+withAlpha(s.color,.4)+';background:'+withAlpha(s.color,.10)+'">'+
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+        '<span class="rev-chip" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'"><span class="dotc" style="background:'+s.color+'"></span>'+esc(s.label)+'</span>'+
+        '<span style="color:'+s.color+';font-weight:800;font-size:13px">'+esc(s.rem)+'</span>'+
+      '</div>'+
+      '<div style="display:flex;gap:26px;margin-top:12px;flex-wrap:wrap">'+
+        '<div><div style="color:var(--faint);font-size:11px;margin-bottom:2px">Início planejado</div><div style="color:var(--ink);font-size:13px;font-weight:600">'+esc(startStr)+'</div></div>'+
+        '<div><div style="color:var(--faint);font-size:11px;margin-bottom:2px">Prazo final / término</div><div style="color:var(--ink);font-size:13px;font-weight:600">'+esc(dueStr)+'</div></div>'+
+      '</div>'+
+    '</div>';
 }
 /* "Detalhes do fluxo" — bloco COLAPSADO (nativo <details>): os chips técnicos
    (flowSummaryBlock) e a timeline operacional (opPanelBlock) moram aqui dentro. */

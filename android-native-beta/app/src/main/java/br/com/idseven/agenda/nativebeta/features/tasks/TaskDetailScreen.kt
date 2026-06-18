@@ -54,6 +54,7 @@ import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
+import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.TaskStatus
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
@@ -142,6 +143,30 @@ fun TaskDetailScreen(
                     if (!t.link.isNullOrBlank()) { Divider(); InfoLine("Link", t.link) }
                 }
                 Spacer(Modifier.height(16.dp))
+
+                // SLA do designer (Fase E): separa STATUS DE FLUXO de STATUS DE PRAZO/SLA.
+                // Só aparece quando há prazo final de designer (designerSla.planDueAt).
+                val sla = slaDeadline(t)
+                if (sla != null) {
+                    SectionLabel("SLA do designer")
+                    Card {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Pill(flowLabelOf(t), Tokens.Soft)
+                            Spacer(Modifier.width(8.dp))
+                            Pill(sla.label, sla.color)
+                        }
+                        Divider()
+                        InfoLine("Início", if (sla.startMs > 0) DateUtil.fmtMs(sla.startMs) else "Não definido")
+                        Divider()
+                        InfoLine("Prazo final", DateUtil.fmtMs(sla.dueMs))
+                        Divider()
+                        InfoLine(if (sla.state == "overdue") "Atraso" else "Restante", sla.rem)
+                        Divider()
+                        Text("PRÓXIMA AÇÃO", color = Tokens.Faint, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
+                        Text(nextActionOf(t, sla.state), color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
 
                 // Status e prioridade
                 SectionLabel("Status")
@@ -251,5 +276,56 @@ private fun InfoLine(label: String, value: String) {
 private fun IconBtn(icon: ImageVector, tint: Color, onClick: () -> Unit) {
     Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(12.dp)).clickable { onClick() }, contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+/* ── Fase E — SLA do designer (read-only): STATUS DE PRAZO/SLA por PRAZO FINAL,
+ * separado do STATUS DE FLUXO. Espelha a regra do sino (designerSla.planDueAt). ── */
+private data class SlaDeadlineInfo(
+    val state: String, val label: String, val color: Color, val rem: String, val startMs: Long, val dueMs: Long,
+)
+
+private fun slaDeadline(t: TaskItem, now: Long = System.currentTimeMillis()): SlaDeadlineInfo? {
+    val ds = t.designerSla ?: return null
+    val pd = ds.planDueAt ?: return null
+    if (pd <= 0L) return null
+    val ps = ds.planStartAt ?: 0L
+    val finished = ds.finishedAt ?: t.doneAt
+    val delivered = (finished != null && finished > 0L) ||
+        t.designerFlowStatus == "entregue" || t.designerFlowStatus == "concluido" || t.status == "concluido"
+    val azul = Color(0xFF7FA6FF); val laranja = Color(0xFFF2A93B); val vermelho = Color(0xFFFF6B61); val verde = Color(0xFF37D196)
+    return when {
+        delivered -> SlaDeadlineInfo("completed", "Concluída", verde, "Entrega concluída", ps, pd)
+        now > pd -> SlaDeadlineInfo("overdue", "Prazo encerrado", vermelho, "Atraso de " + fmtDur(now - pd), ps, pd)
+        now >= pd - 30L * 60000L -> SlaDeadlineInfo("warning", "Prazo próximo", laranja, "Faltam " + fmtDur(pd - now), ps, pd)
+        else -> SlaDeadlineInfo("normal", "Dentro do prazo", azul, "Faltam " + fmtDur(pd - now), ps, pd)
+    }
+}
+
+private fun fmtDur(ms: Long): String {
+    val mm = (if (ms < 0) 0 else ms) / 60000
+    if (mm < 60) return "$mm min"
+    val h = mm / 60; val r = mm % 60
+    if (h < 24) return if (r > 0) "${h}h ${r}min" else "${h}h"
+    val d = h / 24
+    return "${d}d ${h % 24}h"
+}
+
+private fun flowLabelOf(t: TaskItem): String = when {
+    t.status == "concluido" || t.designerFlowStatus == "concluido" -> "Concluída"
+    t.designerFlowStatus == "entregue" -> "Entregue"
+    t.designerFlowStatus == "revisao" -> "Em revisão"
+    t.designerFlowStatus == "andamento" -> "Em produção"
+    else -> "Aguardando iniciar"
+}
+
+private fun nextActionOf(t: TaskItem, slaState: String): String {
+    if (slaState == "completed") return "Entrega concluída"
+    if (slaState == "overdue") return "Concluir agora ou sinalizar atraso"
+    return when (t.designerFlowStatus) {
+        "andamento" -> "Concluir demanda"
+        "revisao" -> "Revisar entrega"
+        "entregue" -> "Aguardar cliente"
+        else -> "Iniciar produção"
     }
 }
