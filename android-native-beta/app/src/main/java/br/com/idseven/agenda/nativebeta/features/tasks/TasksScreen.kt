@@ -355,7 +355,7 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
                 .clip(RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
                 .background(accent.copy(alpha = 0.9f)),
         )
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(18.dp)) {
             // 1. TOP — status canônico + SLA + prazo (wrap responsivo)
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -371,9 +371,9 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
             Spacer(Modifier.height(13.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box {
-                    Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee ?: "?", 46.dp)
+                    Avatar(assignee?.photo, UserColor.of(assignee?.id, assignee?.color), task.assignee ?: "?", 52.dp)
                     Box(
-                        Modifier.align(Alignment.BottomEnd).size(13.dp).clip(CircleShape)
+                        Modifier.align(Alignment.BottomEnd).size(14.dp).clip(CircleShape)
                             .background(Tokens.Green).border(2.dp, CardPresenceRing, CircleShape),
                     )
                 }
@@ -381,8 +381,8 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
                 Column(Modifier.weight(1f)) {
                     Text(
                         task.assignee?.ifBlank { null } ?: "Sem responsável",
-                        color = Tokens.Ink, fontSize = 15.sp, fontWeight = FontWeight.Bold,
-                        lineHeight = 18.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        color = Tokens.Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold,
+                        lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                     val role = assignee?.role
                     Text(
@@ -409,13 +409,17 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
             }
             Text(
                 task.title?.ifBlank { null } ?: task.client ?: "Sem título",
-                color = Tokens.Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                color = Tokens.Ink, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold,
+                lineHeight = 24.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             // 5. CHIPS — setor + prioridade
             Spacer(Modifier.height(11.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 CardChip(sector.label, sector.color, dot = true, strong = false)
+                if (task.cronContents.isNotEmpty()) {
+                    val nc = task.cronContents.size
+                    CardChip(if (nc == 1) "1 conteúdo" else "$nc conteúdos", TierViolet, dot = false, strong = false)
+                }
                 if (task.priority) CardChip("Prioridade alta", Tokens.Red, dot = true, strong = false)
             }
             // 6. TRILHO de progresso (derivado da fase do Flow Engine)
@@ -455,7 +459,7 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
                 Row(
                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
                         .background(Brush.horizontalGradient(listOf(BtnGradA, BtnGradB)))
-                        .clickable { onClick() }.padding(vertical = 12.dp),
+                        .clickable { onClick() }.padding(vertical = 14.dp),
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(Icons.Outlined.Visibility, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -466,7 +470,7 @@ private fun TaskCardPro(task: TaskItem, requester: UserLite?, assignee: UserLite
                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
                         .background(Color.White.copy(alpha = 0.05f))
                         .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
-                        .clickable { onMove() }.padding(vertical = 12.dp),
+                        .clickable { onMove() }.padding(vertical = 14.dp),
                     horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(Icons.Outlined.SwapHoriz, contentDescription = null, tint = Tokens.Ink, modifier = Modifier.size(18.dp))
@@ -506,8 +510,8 @@ private fun FlowRail(stage: Int, accent: Color, completed: Boolean) {
             val isCur = !completed && i == stage
             val dotColor = when { isDone -> Tokens.Green; isCur -> accent; else -> RailFuture }
             Box(contentAlignment = Alignment.Center) {
-                if (isCur) Box(Modifier.size(16.dp).clip(CircleShape).background(accent.copy(alpha = 0.18f)))
-                Box(Modifier.size(if (isCur) 11.dp else 9.dp).clip(CircleShape).background(dotColor))
+                if (isCur) Box(Modifier.size(18.dp).clip(CircleShape).background(accent.copy(alpha = 0.20f)))
+                Box(Modifier.size(if (isCur) 12.dp else 9.dp).clip(CircleShape).background(dotColor))
             }
             if (i < steps - 1) {
                 Box(
