@@ -2209,7 +2209,8 @@ const ICON={
   swap:'<path d="M7 7h11l-3-3M17 17H6l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
   trash:'<path d="M4 7h16M9 7V5.2A1.2 1.2 0 0 1 10.2 4h3.6A1.2 1.2 0 0 1 15 5.2V7M6.5 7l.8 12.1A1.2 1.2 0 0 0 8.5 20.2h7a1.2 1.2 0 0 0 1.2-1.1L17.5 7M10 11v5M14 11v5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   place:'<path d="M12 22s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>',
-  notes:'<path d="M5 5h14M5 10h14M5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'};
+  notes:'<path d="M5 5h14M5 10h14M5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  bell:'<path d="M18 8.5a6 6 0 1 0-12 0c0 5.5-1.5 7-2.4 7.8a.6.6 0 0 0 .4 1.05h16a.6.6 0 0 0 .4-1.05c-.9-.8-2.4-2.3-2.4-7.8z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.1 20.2a2 2 0 0 0 3.8 0" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>'};
 function svg(n,cls){return '<svg viewBox="0 0 24 24" fill="none" class="'+(cls||'')+'">'+(ICON[n]||'')+'</svg>';}
 
 const state={user:null,users:[],events:[],tasks:[],tab:'hoje',boardSector:null,personBoard:null,roleBoards:false,form:null,pending:null,clientView:null,clientAction:null};
@@ -2420,9 +2421,25 @@ function slaibLoadRead(){try{return JSON.parse(localStorage.getItem(SLAIB_READ_K
 function slaibSaveRead(o){try{localStorage.setItem(SLAIB_READ_KEY,JSON.stringify(o||{}));}catch(_){}}
 function slaibKey(taskId,eventType,anchorMs){return taskId+'__'+eventType+'__'+(anchorMs||0);}
 function slaibSevColor(sev){return sev==='vermelho'?'vermelho':(sev==='laranja'?'laranja':'neutro');}
+/* Conjunto candidato ao sino = SUPERSET do que o usuário enxerga como card/chip:
+ * canSeeAll → todas; senão canSeeTask (assigneeId|by) UNIÃO designerOf(t)===uid
+ * (o designer vê o chip no "quadro do designer", que filtra por designerOf). Defensivo:
+ * garante paridade chip↔sino mesmo se assigneeId e designerAssignment.designerId divergirem.
+ * NÃO lê/escreve Firestore; só filtra state.tasks já carregado. */
+function slaibVisible(u){
+  var all=state.tasks||[];
+  if(typeof canSeeAll==='function'&&canSeeAll(u)) return all;
+  var uid=u&&u.id;
+  return all.filter(function(t){
+    if(!t) return false;
+    var seen=(typeof canSeeTask==='function')?canSeeTask(u,t):(t.assigneeId===uid||t.by===uid);
+    var isDes=(typeof designerOf==='function')&&designerOf(t)===uid;
+    return seen||isDes;
+  });
+}
 function slaibCompute(){
   var u=state.user; if(!u) return [];
-  var vis=(typeof visibleTasks==='function')?visibleTasks(u,state.tasks||[]):(state.tasks||[]);
+  var vis=slaibVisible(u);
   var now=Date.now(), out=[];
   for(var i=0;i<vis.length;i++){
     var t=vis[i]; if(!t) continue;
@@ -2438,11 +2455,13 @@ function slaibCompute(){
 function slaibEnsureStyle(){
   if(document.getElementById('slaib-style')) return;
   var st=document.createElement('style'); st.id='slaib-style';
-  st.textContent='.slaib-bell{position:fixed;right:18px;bottom:18px;z-index:4000;width:46px;height:46px;border-radius:50%;background:#1b2030;border:1px solid rgba(255,255,255,.10);color:#e8ecf4;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:20px}'
+  st.textContent='.slaib-bell{position:fixed;top:12px;right:14px;z-index:41;width:40px;height:40px;border-radius:50%;background:#1b2030;border:1px solid rgba(255,255,255,.10);color:#e8ecf4;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35)}'
+   +'body.desktop .slaib-bell{top:11px;right:66px;width:38px;height:38px}'   /* canto superior direito, à ESQUERDA do avatar fixo (corner-avatar: top:10 right:16 38px), sem sobrepor */
+   +'.slaib-bell svg{width:21px;height:21px;display:block}'
    +'.slaib-bell:hover{background:#222a3d}'
-   +'.slaib-count{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#ff6b61;color:#fff;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center}'
-   +'.slaib-ov{position:fixed;inset:0;z-index:4001;background:rgba(4,7,14,.55);display:flex;align-items:flex-end;justify-content:flex-end}'
-   +'.slaib-panel{width:min(380px,92vw);max-height:72vh;margin:0 16px 78px 0;background:#121722;border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 16px 50px rgba(0,0,0,.5)}'
+   +'.slaib-count{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#ff6b61;color:#fff;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;box-shadow:0 0 0 2px #0b0e14}'
+   +'.slaib-ov{position:fixed;inset:0;z-index:4001;background:rgba(4,7,14,.55);display:flex;align-items:flex-start;justify-content:flex-end}'
+   +'.slaib-panel{width:min(380px,92vw);max-height:72vh;margin:58px 16px 0 0;background:#121722;border:1px solid rgba(255,255,255,.10);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 16px 50px rgba(0,0,0,.5)}'
    +'.slaib-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08)}'
    +'.slaib-hd b{font-size:14px;color:#eef2f8}'
    +'.slaib-allread{font-size:12px;color:#9fb0c8;background:none;border:0;cursor:pointer}'
@@ -2497,7 +2516,7 @@ function slaibRender(){
   slaibEnsureStyle();
   var items=slaibCompute(), read=slaibLoadRead();
   var unread=items.filter(function(x){return !read[x.key];});
-  if(!bell){ bell=document.createElement('div'); bell.id='slaib-bell'; bell.className='slaib-bell'; bell.title='Alertas de SLA'; bell.innerHTML='⏰<span class="slaib-count" id="slaib-count"></span>'; bell.addEventListener('click',slaibToggle); document.body.appendChild(bell); }
+  if(!bell){ bell=document.createElement('div'); bell.id='slaib-bell'; bell.className='slaib-bell'; bell.title='Alertas de SLA'; bell.innerHTML=(typeof svg==='function'?svg('bell'):'')+'<span class="slaib-count" id="slaib-count"></span>'; bell.addEventListener('click',slaibToggle); document.body.appendChild(bell); }
   var cnt=document.getElementById('slaib-count');
   if(cnt){ if(unread.length){cnt.style.display='flex';cnt.textContent=String(unread.length);} else {cnt.style.display='none';} }
   if(document.getElementById('slaib-ov')) slaibRenderPanel(items,read);

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -121,12 +120,10 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
 
     // Notificações: canais, permissão (Android 13+) e registro do token FCM.
     val context = LocalContext.current
-    // F3.2.2 — contador read-side de alertas SLA (local; sem backend/push).
+    // F3.2.2 — contador read-side de alertas SLA (local; sem backend/push). `slaBump`
+    // força recomputo após marcar lida(s); `slaUnread` é calculado mais abaixo, com `route`
+    // entre as chaves do remember para zerar/atualizar ao voltar da tela de alertas.
     var slaBump by remember { mutableStateOf(0) }
-    val slaUnread = remember(tasksState, currentUser, slaBump) {
-        val rd = SlaReadStore.read(context)
-        SlaInApp.items(currentUser, tasksState.itemsOrEmpty()).count { it.key !in rd }
-    }
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         Notifications.ensure(context)
@@ -178,10 +175,27 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route ?: "hoje"
     val isTab = tabs.any { it.route == route }
+    // Contador de alertas SLA não lidos. `route` entre as chaves garante recomputo (zerar/
+    // atualizar) ao retornar da tela "slaAlerts"; `slaBump` cobre marcações na própria tela.
+    val slaUnread = remember(tasksState, currentUser, slaBump, route) {
+        val rd = SlaReadStore.read(context)
+        SlaInApp.items(currentUser, tasksState.itemsOrEmpty()).count { it.key !in rd }
+    }
 
     Scaffold(
         containerColor = Tokens.Bg,
-        topBar = { if (isTab) AppTopbar(title = "ID Seven", subtitle = "sincronizado", currentUser = currentUser) },
+        topBar = {
+            if (isTab) Box(Modifier.fillMaxWidth()) {
+                AppTopbar(title = "ID Seven", subtitle = "sincronizado", currentUser = currentUser)
+                // Sino SLA no canto superior direito, à ESQUERDA do avatar (avatar 40dp +
+                // padding horizontal 20dp do topbar), centralizado na vertical, sem sobrepor.
+                SlaBell(
+                    unread = slaUnread,
+                    onClick = { nav.navigate("slaAlerts") },
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 68.dp),
+                )
+            }
+        },
         bottomBar = {
             if (isTab) BottomBar(
                 tabs = tabs,
@@ -197,7 +211,6 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             )
         },
     ) { padding ->
-        Box(Modifier.fillMaxSize()) {
         NavHost(nav, startDestination = "hoje", modifier = Modifier.padding(padding)) {
             composable("hoje") {
                 DashboardScreen(
@@ -299,12 +312,6 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     onChanged = { slaBump++ },
                 )
             }
-        }
-            if (isTab) SlaBell(
-                unread = slaUnread,
-                onClick = { nav.navigate("slaAlerts") },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(padding).padding(16.dp),
-            )
         }
     }
 }

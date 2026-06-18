@@ -2,6 +2,7 @@ package br.com.idseven.agenda.nativebeta.core
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -85,10 +86,21 @@ object SlaReadStore {
 
 @Composable
 fun SlaBell(unread: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(modifier.size(44.dp).clip(CircleShape).background(Color(0xFF1B2030)).clickable { onClick() }, contentAlignment = Alignment.Center) {
-        Icon(Icons.Outlined.Notifications, contentDescription = "Alertas de SLA", tint = Color(0xFFE8ECF4), modifier = Modifier.size(22.dp))
+    // Box EXTERNO sem clip: o recorte circular fica só no disco do sino, NUNCA no badge
+    // (antes o .clip(CircleShape) do Box externo cortava o contador no canto → "cortado").
+    Box(modifier.size(40.dp).clickable { onClick() }, contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.matchParentSize().clip(CircleShape).background(Color(0xFF1B2030)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Outlined.Notifications, contentDescription = "Alertas de SLA", tint = Color(0xFFE8ECF4), modifier = Modifier.size(21.dp))
+        }
         if (unread > 0) {
-            Box(Modifier.align(Alignment.TopEnd).size(16.dp).clip(CircleShape).background(Color(0xFFFF6B61)), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.align(Alignment.TopEnd).size(17.dp).clip(CircleShape)
+                    .background(Color(0xFFFF6B61)).border(2.dp, Color(0xFF0B0E14), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
                 Text(if (unread > 9) "9+" else unread.toString(), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
         }
