@@ -277,7 +277,10 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.40-share-og-exact (OG /share exato; endpoints admin temporários removidos)', /V64.40-share-og-exact/.test(W));
+check('W1', 'Worker é V64.41-client-approval-phase-gate ou superior (rota OG /share presente; endpoints admin temporários removidos) — pin de versão atualizado p/ a fonte real (branch worker/client-link-preview-premium)',
+  /version:\s*"V(?:64\.(?:4[1-9]|[5-9]\d)|6[5-9]|[7-9]\d)[^"]*"/.test(W)
+  && /shareCardHtml/.test(W)
+  && !/\/admin\/create-test-cronograma/.test(W) && !/\/admin\/cleanup-test/.test(W));
 check('W1b', 'Worker NÃO tem endpoint admin temporário (create-test / cleanup-test)', !/\/admin\/create-test-cronograma/.test(W) && !/\/admin\/cleanup-test/.test(W));
 // ===== CORREÇÃO PRINCIPAL: legenda do conteúdo APARECE para o cliente (lê c.legenda) =====
 // Antes lia só ov.legenda/c.lg/c.l -> legenda nunca aparecia (Desktop salva c.legenda).
