@@ -77,12 +77,12 @@ jobs:
           flag() {
             local body
             body="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$DOC_URL" 2>/dev/null || echo '{}')"
-            printf '%s' "$body" | jq -r '.fields.slaEngine.booleanValue // "absent"'
+            printf '%s' "$body" | jq -r '.fields.slaEngine.booleanValue | if type=="boolean" then tostring else "absent" end'
           }
           others() {
             local body
             body="$(curl -fsS -H "Authorization: Bearer $TOKEN" "$DOC_URL" 2>/dev/null || echo '{}')"
-            printf '%s' "$body" | jq -Sc '{slaNotifications:(.fields.slaNotifications.booleanValue//null),operationalBlocking:(.fields.operationalBlocking.booleanValue//null),wipLimits:(.fields.wipLimits.booleanValue//null),slaPanel:(.fields.slaPanel.booleanValue//null),slaCardBadges:(.fields.slaCardBadges.booleanValue//null)}'
+            printf '%s' "$body" | jq -Sc '{slaNotifications:(.fields.slaNotifications.booleanValue|if type=="boolean" then . else null end),operationalBlocking:(.fields.operationalBlocking.booleanValue|if type=="boolean" then . else null end),wipLimits:(.fields.wipLimits.booleanValue|if type=="boolean" then . else null end),slaPanel:(.fields.slaPanel.booleanValue|if type=="boolean" then . else null end),slaCardBadges:(.fields.slaCardBadges.booleanValue|if type=="boolean" then . else null end)}'
           }
           setflag() {
             curl -fsS -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
