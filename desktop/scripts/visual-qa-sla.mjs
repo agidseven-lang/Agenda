@@ -71,7 +71,24 @@ await page.waitForSelector('.slaib-panel', { timeout: 6000 });
 await page.waitForTimeout(300);
 await page.screenshot({ path: path.join(OUT, '03-panel.png') });
 
-// Fase E — abre o DETALHE da tarefa overdue (t2) e captura o bloco "SLA do designer"
+// Captura itens do painel ENQUANTO ele está aberto (antes de fechar p/ abrir o detalhe).
+const data = await page.evaluate(() => {
+  const a = document.getElementById('cornerAvatar').getBoundingClientRect();
+  const b = document.getElementById('slaib-bell').getBoundingClientRect();
+  const items = [...document.querySelectorAll('.slaib-it')].map(el => ({
+    label: el.querySelector('.t')?.textContent || '',
+    msg: el.querySelector('.msg')?.textContent || '',
+    sev: (el.querySelector('.slaib-dot')?.className || '').replace('slaib-dot', '').trim(),
+  }));
+  return {
+    bellHasSvg: !!document.querySelector('#slaib-bell svg'),
+    count: document.getElementById('slaib-count')?.textContent || '',
+    align: { dTop: Math.round(b.top - a.top), gap: Math.round(a.left - b.right), bellH: Math.round(b.height), avatarH: Math.round(a.height) },
+    items,
+  };
+});
+
+// Fase E — fecha o painel e abre o DETALHE da tarefa overdue (t2)
 await page.evaluate(() => {
   try { const ov = document.getElementById('slaib-ov'); if (ov) ov.remove(); } catch (_) {}
   try { openDetails('t2'); } catch (_) {}
@@ -88,22 +105,6 @@ const detail = await page.evaluate(() => {
     hasAtraso: /Atraso de/.test(txt),
     hasInicioPlanejado: /Início planejado/.test(txt),
     hasPrazoFinal: /Prazo final \/ término/.test(txt),
-  };
-});
-
-const data = await page.evaluate(() => {
-  const a = document.getElementById('cornerAvatar').getBoundingClientRect();
-  const b = document.getElementById('slaib-bell').getBoundingClientRect();
-  const items = [...document.querySelectorAll('.slaib-it')].map(el => ({
-    label: el.querySelector('.t')?.textContent || '',
-    msg: el.querySelector('.msg')?.textContent || '',
-    sev: (el.querySelector('.slaib-dot')?.className || '').replace('slaib-dot', '').trim(),
-  }));
-  return {
-    bellHasSvg: !!document.querySelector('#slaib-bell svg'),
-    count: document.getElementById('slaib-count')?.textContent || '',
-    align: { dTop: Math.round(b.top - a.top), gap: Math.round(a.left - b.right), bellH: Math.round(b.height), avatarH: Math.round(a.height) },
-    items,
   };
 });
 fs.writeFileSync(path.join(OUT, 'qa-report.json'), JSON.stringify({ data, detail, errors }, null, 2));
