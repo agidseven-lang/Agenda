@@ -1,0 +1,45 @@
+# QA VISUAL AUTOMATIZADO do sino SLA in-app (Desktop renderer) via Playwright/Chromium
+# headless. Gera SCREENSHOTS como artifact (para revisão visual sem instalar nada) e
+# valida numericamente: alinhamento sino↔avatar, ícone SVG, alertas laranja/vermelho por
+# PRAZO FINAL e textos. NÃO faz login real, NÃO consulta Firestore, NÃO envia push,
+# NÃO publica, NÃO faz release/deploy. Read-only sobre o renderer auditado.
+name: "[manual] Desktop Visual QA (sino SLA — screenshots)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/desktop-visual-qa.yml'
+      - 'desktop/scripts/visual-qa-sla.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-visual-qa
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Rodar QA visual (screenshots + gates de alinhamento/cores/textos)
+        run: node desktop/scripts/visual-qa-sla.mjs
+      - name: Upload screenshots + relatório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-sla-visual-qa
+          path: desktop/qa-out/
+          if-no-files-found: error
+          retention-days: 14
