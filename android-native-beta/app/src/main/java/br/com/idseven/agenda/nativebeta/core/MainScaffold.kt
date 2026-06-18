@@ -121,6 +121,12 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
 
     // Notificações: canais, permissão (Android 13+) e registro do token FCM.
     val context = LocalContext.current
+    // F3.2.2 — contador read-side de alertas SLA (local; sem backend/push).
+    var slaBump by remember { mutableStateOf(0) }
+    val slaUnread = remember(tasksState, currentUser, slaBump) {
+        val rd = SlaReadStore.read(context)
+        SlaInApp.items(currentUser, tasksState.itemsOrEmpty()).count { it.key !in rd }
+    }
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         Notifications.ensure(context)
@@ -191,6 +197,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             )
         },
     ) { padding ->
+        Box(Modifier.fillMaxSize()) {
         NavHost(nav, startDestination = "hoje", modifier = Modifier.padding(padding)) {
             composable("hoje") {
                 DashboardScreen(
@@ -283,6 +290,21 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     initialSector = entry.arguments?.getString("sector"),
                 )
             }
+            composable("slaAlerts") {
+                SlaAlertsScreen(
+                    tasks = tasksState.itemsOrEmpty(),
+                    currentUser = currentUser,
+                    onOpenTask = { nav.navigate("task/$it") },
+                    onBack = { nav.popBackStack() },
+                    onChanged = { slaBump++ },
+                )
+            }
+        }
+            if (isTab) SlaBell(
+                unread = slaUnread,
+                onClick = { nav.navigate("slaAlerts") },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(padding).padding(16.dp),
+            )
         }
     }
 }
