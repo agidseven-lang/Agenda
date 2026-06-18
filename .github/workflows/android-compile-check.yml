@@ -1,0 +1,44 @@
+# TEMPORÁRIO — F3.2.2-VALIDATE. Valida a COMPILAÇÃO do app Android beta
+# (compileDebugKotlin) para o candidato SLA in-app read-side.
+# NÃO gera APK, NÃO assemble, NÃO bundle, NÃO assina, NÃO faz upload de artefato,
+# NÃO publica, NÃO release, NÃO deploy. Único secret usado: GOOGLE_SERVICES_JSON_BETA
+# (exigido pelo plugin google-services em tempo de build); nunca é impresso.
+name: "[manual] Android compile-check (beta, sem APK)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - 'android-native-beta/**'
+      - '.github/workflows/android-compile-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-compile-check
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Restaurar google-services.json (secret; o plugin google-services exige)
+        env:
+          GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
+        run: |
+          if [ -z "$GS_JSON" ]; then echo "::error::GOOGLE_SERVICES_JSON_BETA ausente"; exit 1; fi
+          printf '%s' "$GS_JSON" > android-native-beta/app/google-services.json
+          echo "google-services.json gravado ($(wc -c < android-native-beta/app/google-services.json) bytes)."
+      - name: compileDebugKotlin (compile-only; sem APK / sem release / sem upload)
+        working-directory: android-native-beta
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:compileDebugKotlin --no-daemon --stacktrace
