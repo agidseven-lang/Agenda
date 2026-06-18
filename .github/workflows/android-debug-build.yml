@@ -1,0 +1,58 @@
+# TEMPORÁRIO — F3.2.3. Gera um APK **DEBUG** do app beta para TESTE VISUAL
+# INTERNO (sideload em device de teste). NÃO é release, NÃO assina release,
+# NÃO publica, NÃO sobe para loja, NÃO faz deploy. Assinatura = debug keystore.
+# Sobe o app-debug.apk como ARTIFACT de CI (download manual interno).
+# Único secret: GOOGLE_SERVICES_JSON_BETA (plugin google-services); nunca impresso.
+name: "[manual] Android DEBUG build (beta, APK interno p/ teste visual)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/android-debug-build.yml'   # auto-dispara só ao adicionar/alterar ESTE arquivo
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-debug-build
+  cancel-in-progress: true
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Debug keystore (assinatura de DEBUG; nunca release)
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -v -keystore ~/.android/debug.keystore \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+      - name: Restaurar google-services.json (secret; exigido pelo plugin)
+        env:
+          GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
+        run: |
+          if [ -z "$GS_JSON" ]; then echo "::error::GOOGLE_SERVICES_JSON_BETA ausente"; exit 1; fi
+          printf '%s' "$GS_JSON" > android-native-beta/app/google-services.json
+      - name: assembleDebug (DEBUG; sem release; sem assinatura release; sem loja)
+        working-directory: android-native-beta
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Upload APK DEBUG (artifact interno; NÃO é release, NÃO vai p/ loja)
+        uses: actions/upload-artifact@v4
+        with:
+          name: idseven-nativebeta-DEBUG-${{ github.sha }}
+          path: android-native-beta/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
