@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F3.3.0 — Mockups SLA premium (ID Seven)</title>
+<style>
+  :root{
+    --bg:#0a0c12; --bg2:#0e111a; --surface:#141a26; --surface2:#1b2230; --surface3:#222a3a;
+    --line:rgba(255,255,255,.09); --line2:rgba(255,255,255,.14);
+    --ink:#eef2f8; --soft:#9fb0c8; --faint:#6b7689;
+    --accent:#5b6cff; --cyan:#22d3ee; --pink:#f472b6;
+    --azul:#7fa6ff; --laranja:#f2a93b; --vermelho:#ff5b51; --verde:#37d196;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(91,108,255,.10), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgba(34,211,238,.06), transparent 55%),
+      var(--bg);
+    color:var(--ink);font-family:-apple-system,Segoe UI,Roboto,Inter,system-ui,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:28px}
+  .page-h{max-width:1320px;margin:0 auto 22px;display:flex;align-items:center;gap:14px}
+  .seven{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--cyan),var(--accent) 55%,var(--pink));color:#fff;font-weight:900;font-size:24px;
+    box-shadow:0 8px 24px -8px rgba(91,108,255,.7)}
+  .page-h h1{font-size:20px;margin:0;font-weight:800;letter-spacing:-.01em}
+  .page-h .sub{font-size:12.5px;color:var(--soft);margin-top:2px}
+  .grid{max-width:1320px;margin:0 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:26px;align-items:start}
+  section[data-shot]{background:linear-gradient(180deg,var(--bg2),var(--bg));border:1px solid var(--line);border-radius:20px;padding:18px;overflow:hidden}
+  .cap{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+  .cap .n{width:22px;height:22px;border-radius:7px;background:var(--surface3);color:var(--soft);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .cap b{font-size:13.5px;font-weight:800}
+  .cap span{font-size:11.5px;color:var(--faint)}
+  svg{display:block}
+  /* ---- generic chips/buttons ---- */
+  .chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:800;padding:6px 11px;border-radius:9px;border:1px solid transparent;line-height:1;white-space:nowrap}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .c-azul{color:var(--azul);background:rgba(127,166,255,.14);border-color:rgba(127,166,255,.34)}
+  .c-laranja{color:var(--laranja);background:rgba(242,169,59,.15);border-color:rgba(242,169,59,.40)}
+  .c-vermelho{color:var(--vermelho);background:rgba(255,91,81,.15);border-color:rgba(255,91,81,.42)}
+  .c-verde{color:var(--verde);background:rgba(55,209,150,.15);border-color:rgba(55,209,150,.36)}
+  .c-soft{color:var(--soft);background:rgba(255,255,255,.05);border-color:var(--line)}
+  .btn{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:10px;border:1px solid var(--line2);background:var(--surface2);color:#dfe7f5;cursor:default}
+  .btn.pri{background:linear-gradient(180deg,#6675ff,#5562f0);border-color:transparent;color:#fff;box-shadow:0 8px 18px -8px rgba(91,108,255,.8)}
+  .btn.warn{background:linear-gradient(180deg,#f4b455,#e89a2b);border-color:transparent;color:#241400}
+  .btn.dang{background:linear-gradient(180deg,#ff6a61,#f24b41);border-color:transparent;color:#fff}
+  .av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;color:#fff;flex:0 0 auto}
+  .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  .muted{color:var(--soft)}.faint{color:var(--faint)}
+  .pri-tag{font-size:10px;font-weight:800;letter-spacing:.04em;color:#ffd0a8;background:rgba(242,169,59,.16);border:1px solid rgba(242,169,59,.4);padding:3px 7px;border-radius:999px}
+  /* ---- operational panel ---- */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .panel-h{display:flex;align-items:center;gap:10px;padding:13px 15px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.03),transparent)}
+  .panel-h b{font-size:14px;font-weight:800}
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;color:var(--verde);margin-left:auto}
+  .live i{width:7px;height:7px;border-radius:50%;background:var(--verde);box-shadow:0 0 0 0 rgba(55,209,150,.6);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(55,209,150,.55)}70%{box-shadow:0 0 0 7px rgba(55,209,150,0)}100%{box-shadow:0 0 0 0 rgba(55,209,150,0)}}
+  .grp{padding:10px 12px 4px;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--faint);text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  .grp .ct{margin-left:auto;color:var(--soft)}
+  .row{display:flex;align-items:center;gap:12px;margin:8px 12px;padding:12px;border-radius:13px;background:var(--surface2);border:1px solid var(--line);position:relative}
+  .row.red{border-color:rgba(255,91,81,.34);background:linear-gradient(180deg,rgba(255,91,81,.07),var(--surface2))}
+  .row.org{border-color:rgba(242,169,59,.30);background:linear-gradient(180deg,rgba(242,169,59,.06),var(--surface2))}
+  .row .bar{position:absolute;left:0;top:8px;bottom:8px;width:4px;border-radius:4px}
+  .row.red .bar{background:var(--vermelho)} .row.org .bar{background:var(--laranja)}
+  .row .bd{flex:1;min-width:0;margin-left:6px}
+  .row .t{font-size:13.5px;font-weight:700;color:var(--ink)}
+  .row .s{font-size:11.5px;color:var(--soft);margin-top:2px}
+  .row .timer{text-align:right;flex:0 0 auto}
+  .row .timer .big{font-size:17px;font-weight:900;line-height:1}
+  .row .timer .lbl{font-size:10px;color:var(--faint);margin-top:3px}
+  .red .big{color:var(--vermelho)} .org .big{color:var(--laranja)}
+  /* ---- kanban card ---- */
+  .kcard{width:300px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;position:relative;overflow:hidden}
+  .kcard:before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
+  .kcard.org:before{background:var(--laranja)} .kcard.red:before{background:var(--vermelho)}
+  .kc-top{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:11px}
+  .kc-mid{display:flex;align-items:center;gap:11px}
+  .kc-name{font-size:14.5px;font-weight:800}.kc-role{font-size:11.5px;color:var(--soft)}
+  .kc-title{font-size:13.5px;font-weight:700;margin:12px 0 3px}.kc-client{font-size:11.5px;color:var(--faint)}
+  .kc-foot{display:flex;align-items:center;gap:8px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line)}
+  .countbox{margin-left:auto;text-align:right}
+  .countbox .big{font-size:16px;font-weight:900;line-height:1}.countbox .lbl{font-size:10px;color:var(--faint)}
+  /* ---- bell central ---- */
+  .central{width:360px;background:#121722;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 30px 60px -20px rgba(0,0,0,.7)}
+  .central-h{display:flex;align-items:center;gap:10px;padding:14px 15px;border-bottom:1px solid var(--line)}
+  .central-h b{font-size:14.5px;font-weight:800}
+  .central-h .all{margin-left:auto;font-size:11.5px;color:var(--soft)}
+  .it{display:flex;gap:11px;padding:11px 14px;align-items:flex-start}
+  .it+.it{border-top:1px solid rgba(255,255,255,.05)}
+  .it .ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .it.red .ic{background:rgba(255,91,81,.16);color:var(--vermelho)} .it.org .ic{background:rgba(242,169,59,.16);color:var(--laranja)}
+  .it .t{font-size:13px;font-weight:800}.it .m{font-size:12px;color:var(--soft);margin-top:2px;line-height:1.35}
+  .it .acts{display:flex;gap:8px;margin-top:8px}
+  .it .acts a{font-size:11px;font-weight:700;padding:5px 9px;border-radius:8px;border:1px solid var(--line2);color:#cfe}
+  .badgebell{position:relative;width:44px;height:44px;border-radius:50%;background:var(--surface2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center}
+  .badgebell .cnt{position:absolute;top:-5px;right:-5px;min-width:20px;height:20px;border-radius:10px;background:var(--vermelho);color:#fff;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px #121722;padding:0 5px}
+  .empty{padding:34px 16px;text-align:center;color:var(--faint);font-size:12.5px}
+  /* ---- detail ---- */
+  .det{width:360px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .det .seclbl{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--faint);text-transform:uppercase;margin:2px 0 9px}
+  .slaCard{border-radius:14px;border:1px solid;padding:13px}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px dashed rgba(255,255,255,.07);font-size:12.5px}
+  .kv:first-of-type{border-top:0}.kv .k{color:var(--faint)}.kv .v{font-weight:700}
+  /* ---- phone frame ---- */
+  .phone{width:330px;border-radius:34px;background:#05070c;border:1px solid #20283a;padding:12px 12px 16px;box-shadow:0 30px 70px -25px rgba(0,0,0,.8);position:relative}
+  .phone .scr{border-radius:24px;overflow:hidden;background:#0a0d15;min-height:120px}
+  .notch{width:130px;height:22px;background:#05070c;border-radius:0 0 14px 14px;position:absolute;left:50%;transform:translateX(-50%);top:12px;z-index:5}
+  .sb{display:flex;align-items:center;justify-content:space-between;padding:9px 16px 6px;font-size:11px;color:#cdd6e6;font-weight:700}
+  .sb .r{display:flex;gap:6px;align-items:center}
+  /* lockscreen */
+  .lock{background:
+      radial-gradient(120% 80% at 50% 0%, rgba(91,108,255,.18), transparent 55%),
+      linear-gradient(180deg,#0c1018,#070a10);min-height:560px;padding-bottom:18px}
+  .lock .clock{text-align:center;padding:26px 0 4px}
+  .lock .clock .h{font-size:54px;font-weight:300;letter-spacing:1px;color:#f2f5fb}
+  .lock .clock .d{font-size:13px;color:#aab6c8;margin-top:2px}
+  .notif{margin:14px 12px 0;background:rgba(20,26,38,.92);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:18px;padding:12px;display:flex;gap:11px;align-items:flex-start}
+  .notif.red{border-color:rgba(255,91,81,.5);box-shadow:0 0 0 1px rgba(255,91,81,.25),0 18px 40px -16px rgba(255,91,81,.4)}
+  .notif.org{border-color:rgba(242,169,59,.45)}
+  .notif .app{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--soft);font-weight:700;margin-bottom:4px}
+  .notif .miniseven{width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,var(--cyan),var(--accent) 55%,var(--pink));color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center}
+  .notif .nt{font-size:13.5px;font-weight:800}.notif .nb{font-size:12px;color:var(--soft);margin-top:2px;line-height:1.4}
+  .notif .meta{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .tagmini{font-size:10px;font-weight:800;padding:3px 7px;border-radius:7px;border:1px solid var(--line2);color:var(--soft);display:inline-flex;gap:5px;align-items:center}
+  /* windows toast */
+  .toast{width:360px;background:#1b1b1f;border:1px solid #34343c;border-radius:10px;padding:14px;display:flex;gap:12px;align-items:flex-start;box-shadow:0 24px 50px -18px rgba(0,0,0,.8)}
+  .toast .ico{width:46px;height:46px;border-radius:10px;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+  .toast .tt{font-size:13.5px;font-weight:800;color:#fff}.toast .tb{font-size:12px;color:#c6c9d2;margin-top:3px;line-height:1.4}
+  .toast .win{font-size:10.5px;color:#8a8f9c;margin-top:8px;display:flex;gap:6px;align-items:center}
+  .toast .acts{display:flex;gap:8px;margin-top:10px}
+  .toast .acts a{font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:7px;background:#2b2b32;color:#dfe3ec;border:1px solid #3a3a44}
+  .twocol{display:flex;gap:16px;flex-wrap:wrap}
+  /* sound/vibration legend */
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .lg{background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:13px}
+  .lg .h{display:flex;align-items:center;gap:9px;font-weight:800;font-size:13px}
+  .lg .wave{display:flex;align-items:flex-end;gap:3px;height:26px;margin-top:10px}
+  .lg .wave i{width:4px;border-radius:3px;background:currentColor;opacity:.85}
+  .lg .desc{font-size:11.5px;color:var(--soft);margin-top:8px;line-height:1.4}
+  .full{grid-column:1 / -1}
+</style></head>
+<body>
+  <div class="page-h">
+    <div class="seven">7</div>
+    <div><h1>Agenda ID Seven — Sistema de Alertas SLA (mock visual premium)</h1>
+    <div class="sub">F3.3.0 · proposta estática para validação · alerta por PRAZO FINAL · laranja 30min antes · vermelho após o prazo · sem envio real</div></div>
+  </div>
+
+  <div class="grid">
+
+  <!-- 02/03 CARDS -->
+  <section data-shot="03-card-laranja">
+    <div class="cap"><span class="n">3</span><b>Card no quadro — Prazo próximo (laranja)</b><span>chip SLA separado do fluxo</span></div>
+    <div class="kcard org">
+      <div class="kc-top">
+        <span class="chip c-azul"><span class="dot"></span>Em produção</span>
+        <span class="chip c-laranja"><span class="dot"></span>Prazo próximo</span>
+      </div>
+      <div class="kc-mid"><div class="av" style="background:linear-gradient(135deg,#7a5cff,#5562f0)">MA</div>
+        <div><div class="kc-name">Marina Alves</div><div class="kc-role">Designer</div></div></div>
+      <div class="kc-title">Carrossel institucional</div><div class="kc-client">Café Aurora</div>
+      <div class="kc-foot">
+        <span class="chip c-laranja" style="font-size:11px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>até 19:10</span>
+        <div class="countbox"><div class="big" style="color:var(--laranja)">18<span style="font-size:11px">min</span></div><div class="lbl">para concluir</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section data-shot="04-card-vermelho">
+    <div class="cap"><span class="n">4</span><b>Card no quadro — Prazo encerrado (vermelho)</b><span>urgência, persistente</span></div>
+    <div class="kcard red">
+      <div class="kc-top">
+        <span class="chip c-azul"><span class="dot"></span>Em produção</span>
+        <span class="chip c-vermelho"><span class="dot"></span>Prazo encerrado</span>
+      </div>
+      <div class="kc-mid"><div class="av" style="background:linear-gradient(135deg,#7a5cff,#5562f0)">MA</div>
+        <div><div class="kc-name">Marina Alves</div><div class="kc-role">Designer</div></div></div>
+      <div class="kc-title">Cronograma semanal</div><div class="kc-client">Boa Forma</div>
+      <div class="kc-foot">
+        <span class="chip c-vermelho" style="font-size:11px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3 2 20h20L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>prazo 18:45</span>
+        <div class="countbox"><div class="big" style="color:var(--vermelho)">+7<span style="font-size:11px">min</span></div><div class="lbl">de atraso</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 01 PANEL DESKTOP -->
+  <section data-shot="01-painel-operacional" class="full">
+    <div class="cap"><span class="n">1</span><b>Painel operacional no quadro do designer (Desktop)</b><span>acompanhar prazos sem depender do sino · tempo real</span></div>
+    <div class="panel">
+      <div class="panel-h">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="var(--accent)" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="var(--accent)" stroke-width="2"/></svg>
+        <b>Acompanhamento de prazos</b>
+        <span class="live"><i></i>EM TEMPO REAL</span>
+      </div>
+      <div class="grp" style="color:var(--vermelho)">Atrasadas <span class="ct">2</span></div>
+      <div class="row red"><span class="bar"></span>
+        <div class="av" style="background:linear-gradient(135deg,#ff7a70,#f24b41)">MA</div>
+        <div class="bd"><div class="t">Cronograma semanal <span class="pri-tag" style="color:#ffb4ad;background:rgba(255,91,81,.16);border-color:rgba(255,91,81,.4)">PRIORIDADE</span></div>
+          <div class="s">Boa Forma · Marina Alves · prazo final 18:45</div></div>
+        <div class="timer"><div class="big">+7 min</div><div class="lbl">de atraso</div></div>
+        <a class="btn dang" style="margin-left:12px">Abrir tarefa</a>
+      </div>
+      <div class="row red"><span class="bar"></span>
+        <div class="av" style="background:linear-gradient(135deg,#8a7bff,#5562f0)">RP</div>
+        <div class="bd"><div class="t">Reels lançamento</div><div class="s">Studio Lux · Rafael Pires · prazo final 17:30</div></div>
+        <div class="timer"><div class="big">+22 min</div><div class="lbl">de atraso</div></div>
+        <a class="btn dang" style="margin-left:12px">Abrir tarefa</a>
+      </div>
+      <div class="grp" style="color:var(--laranja);margin-top:6px">Prazo próximo <span class="ct">2</span></div>
+      <div class="row org"><span class="bar"></span>
+        <div class="av" style="background:linear-gradient(135deg,#7a5cff,#5562f0)">MA</div>
+        <div class="bd"><div class="t">Carrossel institucional</div><div class="s">Café Aurora · Marina Alves · prazo final 19:10</div></div>
+        <div class="timer"><div class="big">18 min</div><div class="lbl">restantes</div></div>
+        <a class="btn warn" style="margin-left:12px">Abrir tarefa</a>
+      </div>
+      <div class="row org"><span class="bar"></span>
+        <div class="av" style="background:linear-gradient(135deg,#36d1c4,#1f9fb0)">VW</div>
+        <div class="bd"><div class="t">Stories promo</div><div class="s">Vita Wear · Vânia W. · prazo final 19:20</div></div>
+        <div class="timer"><div class="big">29 min</div><div class="lbl">restantes</div></div>
+        <a class="btn warn" style="margin-left:12px">Abrir tarefa</a>
+      </div>
+      <div style="height:8px"></div>
+    </div>
+  </section>
+
+  <!-- 05 CENTRAL/SINO -->
+  <section data-shot="05-central-sino">
+    <div class="cap"><span class="n">5</span><b>Central / sino in-app premium</b><span>agrupado por severidade</span></div>
+    <div class="twocol">
+      <div class="central">
+        <div class="central-h">
+          <div class="badgebell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.7 21a2 2 0 0 1-3.4 0" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/></svg><span class="cnt">4</span></div>
+          <b>Alertas de SLA</b><span class="all">Marcar todas</span>
+        </div>
+        <div class="grp" style="color:var(--vermelho)">Prazo encerrado <span class="ct">2</span></div>
+        <div class="it red"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3 2 20h20L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17v.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div><div class="t">Prazo encerrado — ação urgente</div><div class="m">Boa Forma · Cronograma semanal — atraso de 7 min. Conclua imediatamente.</div>
+          <div class="acts"><a>Abrir tarefa</a><a>Marcar lida</a></div></div></div>
+        <div class="it red"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3 2 20h20L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17v.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div><div class="t">Prazo encerrado — ação urgente</div><div class="m">Studio Lux · Reels lançamento — atraso de 22 min.</div>
+          <div class="acts"><a>Abrir tarefa</a><a>Marcar lida</a></div></div></div>
+        <div class="grp" style="color:var(--laranja)">Prazo próximo <span class="ct">2</span></div>
+        <div class="it org"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div><div class="t">Prazo próximo — conclua em breve</div><div class="m">Café Aurora · Carrossel — faltam 18 min, até 19:10.</div>
+          <div class="acts"><a>Abrir tarefa</a><a>Marcar lida</a></div></div></div>
+        <div class="it org"><div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+          <div><div class="t">Prazo próximo — conclua em breve</div><div class="m">Vita Wear · Stories promo — faltam 29 min, até 19:20.</div>
+          <div class="acts"><a>Abrir tarefa</a><a>Marcar lida</a></div></div></div>
+      </div>
+      <div class="central" style="width:240px;align-self:flex-start">
+        <div class="central-h"><div class="badgebell"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.7 21a2 2 0 0 1-3.4 0" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/></svg></div><b>Alertas de SLA</b></div>
+        <div class="empty"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" style="margin:0 auto 10px"><path d="M5 13l4 4L19 7" stroke="var(--verde)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Tudo em dia.<br>Sem prazos próximos ou vencidos.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 DETALHE -->
+  <section data-shot="06-detalhe-sla">
+    <div class="cap"><span class="n">6</span><b>Tela de detalhe — SLA profissional</b><span>fluxo × SLA separados</span></div>
+    <div class="det">
+      <div class="seclbl">SLA do designer</div>
+      <div class="slaCard" style="border-color:rgba(255,91,81,.42);background:linear-gradient(180deg,rgba(255,91,81,.08),transparent)">
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="chip c-soft"><span class="dot" style="background:var(--azul)"></span>Em produção</span>
+          <span class="chip c-vermelho"><span class="dot"></span>Prazo encerrado</span>
+          <span style="margin-left:auto;color:var(--vermelho);font-weight:800;font-size:13px">Atraso de 7 min</span>
+        </div>
+        <div class="kv"><span class="k">Início planejado</span><span class="v">18/06 · 17:45</span></div>
+        <div class="kv"><span class="k">Prazo final / término</span><span class="v">18/06 · 18:45</span></div>
+        <div class="kv"><span class="k">Tempo</span><span class="v" style="color:var(--vermelho)">vencido há 7 min</span></div>
+        <div class="kv"><span class="k">Responsável</span><span class="v">Marina Alves</span></div>
+        <div class="kv"><span class="k">Próxima ação</span><span class="v">Concluir agora ou sinalizar atraso</span></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px"><a class="btn dang" style="flex:1;justify-content:center">Concluir demanda</a><a class="btn" style="flex:1;justify-content:center">Sinalizar atraso</a></div>
+    </div>
+  </section>
+
+  <!-- 07 ANDROID APP ABERTO -->
+  <section data-shot="07-android-app-aberto">
+    <div class="cap"><span class="n">7</span><b>Android — app aberto (heads-up in-app)</b><span>banner no topo</span></div>
+    <div class="phone"><div class="notch"></div>
+      <div class="sb"><span>19:08</span><span class="r">5G ▾ ▮▮▮ 84%</span></div>
+      <div class="scr" style="padding:10px 0 14px">
+        <div class="notif red" style="margin-top:6px"><div style="flex:1">
+          <div class="app"><span class="miniseven">7</span>Agenda ID Seven · agora</div>
+          <div class="nt" style="color:var(--vermelho)">Prazo encerrado — ação urgente</div>
+          <div class="nb">O prazo de “Cronograma semanal” acabou. Conclua imediatamente ou sinalize atraso em até 10 min.</div>
+          <div class="meta"><span class="tagmini" style="color:var(--vermelho);border-color:rgba(255,91,81,.4)">prazo 18:45</span>
+            <span class="tagmini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 10v4h3l4 4V6L6 10H3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9a4 4 0 0 1 0 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>som</span>
+            <span class="tagmini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="7" y="3" width="10" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9v6M21 9v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>vibração forte</span></div>
+        </div></div>
+        <div class="notif org"><div style="flex:1">
+          <div class="app"><span class="miniseven">7</span>Agenda ID Seven · agora</div>
+          <div class="nt" style="color:var(--laranja)">Prazo próximo — conclua em breve</div>
+          <div class="nb">Faltam 18 minutos para concluir “Carrossel institucional”. Prazo final: 19:10.</div>
+          <div class="meta"><span class="tagmini" style="color:var(--laranja);border-color:rgba(242,169,59,.4)">faltam 18 min</span>
+            <span class="tagmini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 10v4h3l4 4V6L6 10H3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>som</span></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 ANDROID LOCK LARANJA -->
+  <section data-shot="08-android-lockscreen-laranja">
+    <div class="cap"><span class="n">8</span><b>Android — lockscreen (laranja)</b><span>app fechado / tela bloqueada</span></div>
+    <div class="phone"><div class="notch"></div>
+      <div class="sb"><span>19:08</span><span class="r">5G ▾ ▮▮▮ 84%</span></div>
+      <div class="scr lock">
+        <div class="clock"><div class="h">19:08</div><div class="d">quarta-feira, 18 de junho</div></div>
+        <div class="notif org">
+          <div style="flex:1">
+            <div class="app"><span class="miniseven">7</span>Agenda ID Seven · agora</div>
+            <div class="nt" style="color:var(--laranja)">Prazo próximo — conclua em breve</div>
+            <div class="nb">Faltam 30 minutos para concluir “Cronograma semanal”. Prazo final: 18:45. Finalize a demanda dentro do prazo.</div>
+            <div class="meta"><span class="tagmini" style="color:var(--laranja);border-color:rgba(242,169,59,.4)">faltam 30 min</span>
+              <span class="tagmini">som suave</span><span class="tagmini">vibração curta</span><span class="tagmini">toque → abrir tarefa</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 ANDROID LOCK VERMELHO -->
+  <section data-shot="09-android-lockscreen-vermelho">
+    <div class="cap"><span class="n">9</span><b>Android — lockscreen (vermelho)</b><span>prioridade máxima / full-screen</span></div>
+    <div class="phone"><div class="notch"></div>
+      <div class="sb"><span>18:52</span><span class="r">5G ▾ ▮▮▮ 83%</span></div>
+      <div class="scr lock">
+        <div class="clock"><div class="h">18:52</div><div class="d">quarta-feira, 18 de junho</div></div>
+        <div class="notif red">
+          <div style="flex:1">
+            <div class="app"><span class="miniseven">7</span>Agenda ID Seven · AGORA</div>
+            <div class="nt" style="color:var(--vermelho)">Prazo encerrado — ação urgente</div>
+            <div class="nb">O prazo de “Cronograma semanal” acabou. Conclua a demanda imediatamente ou sinalize atraso em até 10 minutos.</div>
+            <div class="meta"><span class="tagmini" style="color:var(--vermelho);border-color:rgba(255,91,81,.45)">atraso +7 min</span>
+              <span class="tagmini">som de alarme</span><span class="tagmini">vibração forte</span><span class="tagmini">prioridade máxima</span></div>
+            <div style="display:flex;gap:8px;margin-top:10px"><a class="btn dang" style="flex:1;justify-content:center;padding:8px">Abrir tarefa</a><a class="btn" style="flex:1;justify-content:center;padding:8px;background:#2a3346">Sinalizar atraso</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 DESKTOP TOAST -->
+  <section data-shot="10-desktop-notification">
+    <div class="cap"><span class="n">10</span><b>Desktop — notificação (Windows/Electron)</b><span>app aberto/minimizado na bandeja</span></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="toast"><div class="ico" style="background:rgba(255,91,81,.16)"><span class="miniseven" style="width:30px;height:30px;border-radius:8px;font-size:15px">7</span></div>
+        <div style="flex:1"><div class="tt">Prazo encerrado — ação urgente</div>
+          <div class="tb">O prazo de “Cronograma semanal” (Boa Forma) acabou. Conclua imediatamente ou sinalize atraso em até 10 min.</div>
+          <div class="acts"><a>Abrir tarefa</a><a>Sinalizar atraso</a></div>
+          <div class="win"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 10v4h3l4 4V6L6 10H3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>som · Agenda ID Seven · agora</div></div>
+      </div>
+      <div class="toast"><div class="ico" style="background:rgba(242,169,59,.16)"><span class="miniseven" style="width:30px;height:30px;border-radius:8px;font-size:15px">7</span></div>
+        <div style="flex:1"><div class="tt">Prazo próximo — conclua em breve</div>
+          <div class="tb">Faltam 18 minutos para concluir “Carrossel institucional” (Café Aurora). Prazo final: 19:10.</div>
+          <div class="acts"><a>Abrir tarefa</a></div>
+          <div class="win"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 10v4h3l4 4V6L6 10H3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>som · Agenda ID Seven · agora</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 SOM/VIBRACAO -->
+  <section data-shot="11-som-vibracao">
+    <div class="cap"><span class="n">11</span><b>Som & vibração — representação</b><span>laranja suave × vermelho urgente</span></div>
+    <div class="legend">
+      <div class="lg" style="color:var(--laranja)"><div class="h"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 10v4h3l4 4V6L6 10H3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9a4 4 0 0 1 0 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Laranja — suave</div>
+        <div class="wave"><i style="height:30%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:65%"></i><i style="height:35%"></i><i style="height:50%"></i><i style="height:30%"></i></div>
+        <div class="desc">Som curto de notificação · vibração curta [0,250ms] · canal HIGH.</div></div>
+      <div class="lg" style="color:var(--vermelho)"><div class="h"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 10v4h3l4 4V6L6 10H3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 8a6 6 0 0 1 0 8M19 5a10 10 0 0 1 0 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Vermelho — urgente</div>
+        <div class="wave"><i style="height:70%"></i><i style="height:100%"></i><i style="height:85%"></i><i style="height:100%"></i><i style="height:60%"></i><i style="height:95%"></i><i style="height:80%"></i></div>
+        <div class="desc">Som de alarme · vibração forte [0,500,250,500] · lockscreen · bypass DND.</div></div>
+    </div>
+    <div style="margin-top:14px;display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:12px">
+      <div class="seven" style="width:34px;height:34px;border-radius:9px;font-size:17px">7</div>
+      <div style="font-size:12px;color:var(--soft)">Branding <b style="color:var(--ink)">ID Seven</b> em todos os alertas: marca “7” em gradiente, ícone de sino monocromático <b>ic_notify</b>, cor por severidade.</div>
+    </div>
+  </section>
+
+  </div>
+</body></html>

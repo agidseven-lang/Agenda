@@ -1,0 +1,44 @@
+# F3.3.0 — Gera os MOCKUPS visuais premium do sistema de alertas SLA (estáticos)
+# via Playwright/Chromium headless e publica os PNGs como artifact para o owner
+# validar. NÃO chama provider, NÃO envia FCM/Web Push/WhatsApp, NÃO escreve no
+# Firestore, NÃO faz deploy/release. Apenas renderiza HTML estático -> PNG.
+name: "[manual] SLA mockups (F3.3.0 — design premium, PNGs)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/sla-mockups.yml'
+      - 'desktop/scripts/sla-mockups/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sla-mockups
+  cancel-in-progress: true
+
+jobs:
+  mockups:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Renderizar mockups -> PNGs
+        run: node desktop/scripts/sla-mockups/shoot.mjs
+      - name: Upload mockups (PNGs)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sla-mockups-f330
+          path: desktop/sla-mockups-out/
+          if-no-files-found: error
+          retention-days: 30
