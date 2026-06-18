@@ -175,9 +175,13 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route ?: "hoje"
     val isTab = tabs.any { it.route == route }
-    // Contador de alertas SLA não lidos. `route` entre as chaves garante recomputo (zerar/
-    // atualizar) ao retornar da tela "slaAlerts"; `slaBump` cobre marcações na própria tela.
-    val slaUnread = remember(tasksState, currentUser, slaBump, route) {
+    // Tempo real (read-side, sem backend): tick a cada 30s p/ o contador refletir a entrada
+    // em "prazo próximo" (laranja) e a virada para "prazo encerrado" (vermelho) sem refresh.
+    var slaTick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); slaTick++ } }
+    // Contador de alertas SLA não lidos. `route` garante recomputo ao voltar de "slaAlerts";
+    // `slaBump` cobre marcações; `slaTick` cobre a passagem do tempo (prazo final).
+    val slaUnread = remember(tasksState, currentUser, slaBump, route, slaTick) {
         val rd = SlaReadStore.read(context)
         SlaInApp.items(currentUser, tasksState.itemsOrEmpty()).count { it.key !in rd }
     }

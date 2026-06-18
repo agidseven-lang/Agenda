@@ -22,49 +22,63 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import br.com.idseven.agenda.nativebeta.domain.SlaContract
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskVisibility
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /* ============================================================================
- * F3.2.2 — NOTIFICAÇÕES SLA IN-APP (READ-SIDE / LOCAL) — paridade com o Desktop.
- * Deriva alertas das tarefas JÁ observadas pelo app (TaskVisibility.visibleTasks
- * + SlaContract.derive). NÃO envia FCM/push, NÃO lê slaEvents, NÃO escreve no
- * Firestore, NÃO cria coleção, NÃO altera o fluxo de tarefas. Estado lido é
- * LOCAL (SharedPreferences). Escopo: designer start/finish warning/overdue.
+ * F3.2.4 — SLA IN-APP (READ-SIDE / LOCAL) — paridade com o Desktop.
+ * CONCEITO: o sino é SLA OPERACIONAL por PRAZO FINAL (designerSla.planDueAt):
+ *   laranja  = faltam <= 30min para o término (designer_finish_warning);
+ *   vermelho = término ultrapassado (designer_finish_overdue).
+ * NÃO é por início: start_* é status de FLUXO (fica no card), nunca no sino.
+ * NÃO envia FCM/push, NÃO lê slaEvents, NÃO escreve no Firestore, NÃO cria
+ * coleção, NÃO altera o fluxo de tarefas. Estado lido = LOCAL (SharedPreferences).
  * ========================================================================== */
 
 data class SlaInAppItem(
-    val taskId: String, val eventType: String, val state: String, val sev: String,
-    val label: String, val client: String, val title: String, val anchorMs: Long, val key: String,
+    val taskId: String, val eventType: String, val sev: String, val label: String,
+    val text: String, val client: String, val title: String, val anchorMs: Long, val key: String,
 )
 
 object SlaInApp {
-    private val EVENT_BY_STATE = mapOf(
-        "warning_start" to "designer_start_warning",
-        "overdue_start" to "designer_start_overdue",
-        "warning_finish" to "designer_finish_warning",
-        "overdue_finish" to "designer_finish_overdue",
-    )
+    private const val FINISH_WARN_MS = 30 * 60000L
 
     fun items(user: UserLite?, tasks: List<TaskItem>, nowMs: Long = System.currentTimeMillis()): List<SlaInAppItem> {
         val vis = TaskVisibility.visibleTasks(user, tasks)
+        val hm = SimpleDateFormat("HH:mm", Locale.getDefault())
         val out = ArrayList<SlaInAppItem>()
         for (t in vis) {
-            val sla = SlaContract.derive(t, nowMs)
-            val ev = EVENT_BY_STATE[sla.state] ?: continue
             val ds = t.designerSla
-            val anchor = if (sla.state.contains("start")) (ds?.planStartAt ?: 0L) else (ds?.planDueAt ?: 0L)
+            val finished = ds?.finishedAt ?: t.doneAt
+            val delivered = (finished != null && finished > 0L) ||
+                t.designerFlowStatus == "entregue" || t.designerFlowStatus == "concluido" || t.status == "concluido"
+            if (delivered) continue
+            val pd = ds?.planDueAt ?: continue
+            if (pd <= 0L) continue
+            val event: String; val sev: String; val label: String; val text: String
+            if (nowMs > pd) {
+                val over = kotlin.math.max(1L, Math.round((nowMs - pd) / 60000.0))
+                event = "designer_finish_overdue"; sev = "vermelho"; label = "Prazo encerrado"
+                text = "Prazo ultrapassado há $over min. Conclua imediatamente."
+            } else if (nowMs >= pd - FINISH_WARN_MS) {
+                val left = kotlin.math.max(1L, Math.round((pd - nowMs) / 60000.0))
+                event = "designer_finish_warning"; sev = "laranja"; label = "Prazo próximo"
+                text = "Faltam $left min — conclua até ${hm.format(Date(pd))}."
+            } else {
+                continue
+            }
             out.add(
                 SlaInAppItem(
-                    taskId = t.id, eventType = ev, state = sla.state, sev = sla.sev,
-                    label = sla.label, client = t.client ?: "", title = t.title ?: t.id,
-                    anchorMs = anchor, key = "${t.id}__${ev}__$anchor",
+                    taskId = t.id, eventType = event, sev = sev, label = label, text = text,
+                    client = t.client ?: "", title = t.title ?: t.id, anchorMs = pd, key = "${t.id}__${event}__$pd",
                 ),
             )
         }
-        out.sortWith(compareByDescending<SlaInAppItem> { it.sev == "vermelho" }.thenByDescending { it.anchorMs })
+        out.sortWith(compareByDescending<SlaInAppItem> { it.sev == "vermelho" }.thenBy { it.anchorMs })
         return out
     }
 }
@@ -114,6 +128,9 @@ fun SlaAlertsScreen(
 ) {
     val ctx = LocalContext.current
     var bump by remember { mutableStateOf(0) }
+    // Tempo real (read-side, sem backend): recomputa a cada 30s p/ atualizar contagem
+    // regressiva e a transição laranja→vermelho mesmo sem mudança nas tarefas.
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); bump++ } }
     val read = remember(bump) { SlaReadStore.read(ctx) }
     val alerts = remember(tasks, currentUser, bump) { SlaInApp.items(currentUser, tasks) }
     Column(Modifier.fillMaxSize().background(Color(0xFF0B0E14))) {
@@ -148,6 +165,9 @@ fun SlaAlertsScreen(
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(a.label.ifBlank { a.eventType }, color = Color(0xFFE8ECF4), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            if (a.text.isNotBlank()) {
+                                Text(a.text, color = Color(0xFFCDD6E6), fontSize = 12.sp)
+                            }
                             Text(
                                 (if (a.client.isNotBlank()) a.client + " · " else "") + a.title,
                                 color = Color(0xFF9FB0C8), fontSize = 12.sp, maxLines = 1,
