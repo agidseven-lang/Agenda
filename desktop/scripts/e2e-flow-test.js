@@ -27,7 +27,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const WORKER_BRANCH = "worker/client-link-preview-premium";
+const WORKER_BRANCH = "worker/v64-59-canonical";
 const ANDROID_BRANCH = 'app/local-1.0.92-beta-client-flow-e2e-fix'; // base anterior (fallback)
 const ANDROID_E2E_BRANCH = 'app/local-detail-hierarchy-v2';
 
@@ -277,7 +277,7 @@ const KT_CONTRACT = readAndroid(AND + 'data/TaskContract.kt');
 const GRADLE = readAndroid('android-native-beta/app/build.gradle');
 
 console.log(`${C.b}\n[PARTE B] Worker V64.18 — portal atualiza no MESMO link, claro (vídeo real)${C.x}`);
-check('W1', 'Worker é V64.41-client-approval-phase-gate ou superior (rota OG /share presente; endpoints admin temporários removidos) — pin de versão atualizado p/ a fonte real (branch worker/client-link-preview-premium)',
+check('W1', 'Worker é V64.41-client-approval-phase-gate ou superior (canônico V64.59-legacy-risk; rota OG /share presente; endpoints admin temporários removidos) — fonte canônica (branch worker/v64-59-canonical)',
   /version:\s*"V(?:64\.(?:4[1-9]|[5-9]\d)|6[5-9]|[7-9]\d)[^"]*"/.test(W)
   && /shareCardHtml/.test(W)
   && !/\/admin\/create-test-cronograma/.test(W) && !/\/admin\/cleanup-test/.test(W));
@@ -322,7 +322,7 @@ check('W12', 'Toast claro "Tema atualizado pela equipe"', /Tema atualizado pela 
 check('W13', 'Endpoint GET /state + poller periódico', /handleClientCronogramaState/.test(W) && /setInterval\(\s*pollState/.test(W));
 check('W14', 'Gate parcial preservado (server + client)', /em_revisao_cliente/.test(W) && /anyRev/.test(W) && /clientFeedbackSent\(\)/.test(W));
 // ===== PORTAL TEM BOTÃO REAL DE APROVAÇÃO (o botão NÃO vive no grupo; vive no portal) =====
-check('W_APPROVE1', 'Portal tem CTA de aprovação por fase (phaseCopy.cta: Aprovar temas/legendas/versão final)', /function phaseCopy\(phase\)/.test(W) && /cta: "Aprovar versão final"/.test(W) && /cta: "Aprovar temas e liberar produção"/.test(W));
+check('W_APPROVE1', 'Portal tem CTA de aprovação por fase (phaseCopy: versão final + legendas/artes + temas) — copy alinhado ao canônico V64.59 / deployado V64.53 ("Aprovar temas")', /function phaseCopy\(phase\)/.test(W) && /cta: "Aprovar versão final"/.test(W) && /cta: "Aprovar legendas e artes"/.test(W) && /cta: "Aprovar temas/.test(W));
 check('W_APPROVE2', 'Portal renderiza o botão primário de aprovação (data-act="approveAll" + phaseUi.cta) na barra de ações', /data-act="approveAll" data-phase="' \+ phase \+ '">' \+ ICN\.check \+ escapeHtml\(phaseUi\.cta\)/.test(W));
 check('W_APPROVE3', 'Portal tem aprovação por conteúdo + pedir ajuste/revisão (approveItem/reviseItem/revision)', /data-act="approveItem"/.test(W) && /data-act="reviseItem"/.test(W) && /data-act="revision"/.test(W));
 check('W_APPROVE4', 'Portal tem identidade Agenda ID Seven + Visão do Cliente + nome do cliente', /Agenda ID Seven<small>Visão do Cliente/.test(W) && /Preparado para <b>' \+ cliente/.test(W));
