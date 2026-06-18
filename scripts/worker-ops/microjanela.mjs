@@ -38,7 +38,7 @@ import path from "node:path";
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const URL_BASE = process.env.WORKER_URL || "https://idseven-push.agidseven.workers.dev";
 const WORKER_NAME = "idseven-push";
-const ROTAS_AUTORIZADAS = ["sla-dryrun", "sla-legacy-baseline", "sla-legacy-risk"];
+const ROTAS_AUTORIZADAS = ["sla-dryrun", "sla-legacy-baseline", "sla-legacy-risk", "sla-discover"];
 const STAMP = new Date().toISOString().replace(/[:.]/g, "-");
 const LOGDIR = path.join(ROOT, "worker-ops-logs", STAMP);
 mkdirSync(LOGDIR, { recursive: true });
