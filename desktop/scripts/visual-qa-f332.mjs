@@ -95,7 +95,8 @@ const widget = await page.evaluate(() => {
     groups: grps, redBeforeAmber: grps.indexOf('red') === 0 && grps.includes('amber'),
     hasAtrasada: /Atrasada h[áa] \d+ min/.test(txt), hasFaltam: /Faltam \d+ min/.test(txt),
     has10min: /Conclua a tarefa atrasada em até 10 min ou sinalize atraso/.test(txt),
-    hasOpenBtn: !!w.querySelector('[data-sla-open]'), hasBadge: !!w.querySelector('.slamon-badge'),
+    hasOpenBtn: !!w.querySelector('[data-sla-open]'), hasBadge: !!w.querySelector('.slamon-seg'),
+    hasLive: !!w.querySelector('.slamon-live'), hasHero: /Atraso máx\.|Vence em/.test(txt), hasProgress: !!w.querySelector('.slaop-prog'),
     monitorTitle: /Monitor de prazos/.test(txt), inBoardPanel,
   };
 });
@@ -196,7 +197,10 @@ if (!widget.redBeforeAmber) fail.push('vermelho não antes do laranja');
 if (!widget.hasAtrasada || !widget.hasFaltam) fail.push('faltam textos de tempo');
 if (!widget.has10min) fail.push('vermelho sem regra dos 10 min');
 if (!widget.hasOpenBtn) fail.push('sem botão Abrir tarefa');
-if (!widget.hasBadge) fail.push('widget sem badge de quantidade');
+if (!widget.hasBadge) fail.push('widget sem contadores segmentados (.slamon-seg)');
+if (!widget.hasLive) fail.push('widget sem selo "ao vivo" (tempo real)');
+if (!widget.hasHero) fail.push('widget sem métrica ao vivo (atraso máx./vence em)');
+if (!widget.hasProgress) fail.push('dropdown sem barra de progresso de tempo');
 // CARD restaurado/íntegro
 if (!card.found) fail.push('card de cronograma não encontrado');
 if (card.found && card.found.compressed) fail.push('card AMPUTADO/comprimido');

@@ -2507,7 +2507,8 @@ function slaPanelRow(t,now,dtMsFn){
   if(!designerId) return null;                     // exclusão: sem designer responsável
   var d=resolveTaskDisplayState(t,now,dtMsFn);     // FONTE ÚNICA (mesmo estado do card/detalhe)
   if(!d.inPanel) return null;                       // entregue/dentro do prazo/sem prazo → fora do painel
-  return {taskId:t.id,sev:d.sev,bucket:(d.sev==='vermelho'?'overdue':'warning'),finishMs:d.finishMs,
+  var startMs=Number(t.designerSla&&t.designerSla.planStartAt)||0;   // p/ a barra de progresso de tempo
+  return {taskId:t.id,sev:d.sev,bucket:(d.sev==='vermelho'?'overdue':'warning'),finishMs:d.finishMs,startMs:startMs,
           overdueMin:d.overdueMin,remainingMin:d.remainingMin,title:t.title||'',client:t.client||'',designerId:designerId};
 }
 function slaPanelDerive(tasks,now,dtMsFn){
@@ -2582,6 +2583,17 @@ function slaibEnsureStyle(){
    +'.slamon-kicker{font-size:8.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:rgba(233,238,247,.46)}'
    +'.slamon-status{font-size:13px;font-weight:800;letter-spacing:.01em;margin-top:3px;white-space:nowrap}'
    +'.slamon-badge{flex:0 0 auto;min-width:24px;height:24px;padding:0 7px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;box-shadow:0 4px 10px -3px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.28)}'
+   /* contadores SEGMENTADOS por severidade (breakdown rico) + selo "ao vivo" pulsante (tempo real) */
+   +'.slamon-segs{display:inline-flex;align-items:center;gap:6px;margin-left:1px}'
+   +'.slamon-seg{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;border-radius:9px;font-size:12.5px;font-weight:800;border:1px solid transparent;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}.slamon-seg svg{width:12px;height:12px}'
+   +'.slamon-seg.red{color:#ffb0a8;background:rgba(255,107,97,.15);border-color:rgba(255,107,97,.36)}'
+   +'.slamon-seg.amber{color:#f6c074;background:rgba(242,169,59,.15);border-color:rgba(242,169,59,.34)}'
+   +'.slamon-live{display:inline-flex;align-items:center;gap:4px;margin-left:7px;color:#5fe0b1;font-size:8px;font-weight:800;letter-spacing:.12em}'
+   +'.slamon-live i{width:5px;height:5px;border-radius:50%;background:#46d39e;animation:slamonLive 1.7s ease-out infinite}'
+   +'@keyframes slamonLive{0%{box-shadow:0 0 0 0 rgba(70,211,158,.6)}70%{box-shadow:0 0 0 5px rgba(70,211,158,0)}100%{box-shadow:0 0 0 0 rgba(70,211,158,0)}}'
+   /* barra de progresso de tempo (consumo da janela de SLA) nas linhas do dropdown */
+   +'.slaop-prog{position:relative;height:4px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:8px}.slaop-prog>span{display:block;height:100%;border-radius:3px}'
+   +'.slaop-it.red .slaop-prog>span{background:linear-gradient(90deg,#ff8c84,#ff5247)}.slaop-it.amber .slaop-prog>span{background:linear-gradient(90deg,#f6c074,#e8941f)}'
    /* severidade: orb (gradiente radial + anel + glow) + cor do status + acento da borda */
    +'.slamon.green .slamon-orb{background:radial-gradient(120% 120% at 30% 20%,rgba(70,211,158,.34),rgba(55,209,150,.12));box-shadow:0 0 0 1px rgba(55,209,150,.40),0 6px 16px -6px rgba(55,209,150,.6)}.slamon.green .slamon-orb .slamon-ic{color:#5ee0b0}.slamon.green .slamon-status{color:#7ce7c0}.slamon.green .slamon-chip{border-color:rgba(55,209,150,.26)}'
    +'.slamon.amber .slamon-orb{background:radial-gradient(120% 120% at 30% 20%,rgba(244,184,96,.36),rgba(242,169,59,.12));box-shadow:0 0 0 1px rgba(242,169,59,.42),0 6px 16px -6px rgba(242,169,59,.6)}.slamon.amber .slamon-orb .slamon-ic{color:#ffce86}.slamon.amber .slamon-status{color:#f6c074}.slamon.amber .slamon-chip{border-color:rgba(242,169,59,.30)}.slamon.amber .slamon-badge{background:linear-gradient(180deg,#f6b94f,#e8941f)}'
@@ -2714,11 +2726,15 @@ var slaMonOpen=false;  // estado do dropdown do widget (persiste entre refreshes
 function slaOpRowHtml(x){
   var cls=(x.sev==='vermelho')?'red':'amber';
   var meta=(x.client?slaibEsc(x.client)+' · ':'')+'resp. '+slaOpName(x.designerId)+' · prazo '+slaibFmtHM(x.finishMs);
-  var time=(x.sev==='vermelho')?('Atrasada há '+x.overdueMin+' min'):('Faltam '+x.remainingMin+' min');
+  var time=(x.sev==='vermelho')?('Atrasada há '+slaMonDur(x.overdueMin)):('Faltam '+slaMonDur(x.remainingMin));
   var rule=(x.sev==='vermelho')?'<div class="slaop-rule">Conclua a tarefa atrasada em até 10 min ou sinalize atraso.</div>':'';
+  // barra de progresso = consumo da janela de SLA (início→término), em tempo real
+  var pct=100, now=Date.now();
+  if(x.sev!=='vermelho'){ pct=(x.startMs>0&&x.finishMs>x.startMs)?Math.round((now-x.startMs)/(x.finishMs-x.startMs)*100):82; pct=Math.max(5,Math.min(99,pct)); }
+  var prog='<div class="slaop-prog"><span style="width:'+pct+'%"></span></div>';
   return '<div class="slaop-it '+cls+'"><span class="bar"></span>'
     +'<div class="tx"><div class="slaop-t">'+slaibEsc(x.title||x.taskId)+'</div><div class="slaop-meta">'+meta+'</div>'
-    +'<div class="slaop-time">'+time+'</div>'+rule+'</div>'
+    +'<div class="slaop-time">'+time+'</div>'+prog+rule+'</div>'
     +'<button class="slaop-open" data-sla-open="'+slaibEsc(x.taskId)+'">Abrir tarefa</button></div>';
 }
 function slaOpGrpHtml(kind,rows){
@@ -2732,22 +2748,39 @@ function slaOpGrpHtml(kind,rows){
  * Atrasadas▸Prazo próximo (regra 10min) e "Abrir tarefa". Mesma fonte/escopo do sino
  * (slaibVisible + PANEL-CORE). NÃO envia/escreve nada. */
 function slaMonData(){
-  var u=state.user; if(!u) return {overdue:[],warning:[],rows:[],total:0};
+  var u=state.user; if(!u) return {overdue:[],warning:[],rows:[],total:0,nextMs:0,horizonMin:0};
   var vis=(typeof slaibVisible==='function')?slaibVisible(u):(state.tasks||[]);
-  return slaPanelDerive(vis,Date.now(),(typeof dtMs==='function'?dtMs:null));
+  var now=Date.now(), f=(typeof dtMs==='function'?dtMs:null);
+  var d=slaPanelDerive(vis,now,f);
+  // PRÓXIMO prazo (tempo real): menor término futuro entre tarefas ainda EM PRAZO (running).
+  var nextMs=0;
+  for(var i=0;i<vis.length;i++){ var t=vis[i]; if(!t||!t.designerSla) continue;
+    var st=resolveTaskDisplayState(t,now,f);
+    if(st.state==='running'&&st.finishMs>now&&(!nextMs||st.finishMs<nextMs)) nextMs=st.finishMs; }
+  d.nextMs=nextMs;
+  d.horizonMin=nextMs?Math.max(1,Math.round((nextMs-now)/60000)):0;
+  return d;
 }
 function slaMonDropInner(d){
-  var hd='<div class="slamon-pop-hd"><span class="pic">'+SLAOP_CLOCK_SVG+'</span><span class="hx">Monitor de prazos<small>Prazo final · tempo real</small></span></div>';
-  if(!d.total) return hd+'<div class="slamon-empty"><span class="eic">'+SLAOP_CHECK_SVG+'</span><div><div class="et">Tudo em dia</div><div class="es">Nenhuma tarefa atrasada ou com prazo próximo.</div></div></div>';
+  var hd='<div class="slamon-pop-hd"><span class="pic">'+SLAOP_CLOCK_SVG+'</span><span class="hx">Monitor de prazos<small>Prazo final · <span class="slamon-live"><i></i>ao vivo</span></small></span></div>';
+  if(!d.total) return hd+'<div class="slamon-empty"><span class="eic">'+SLAOP_CHECK_SVG+'</span><div><div class="et">Tudo em dia</div><div class="es">'+(d.nextMs?('Próximo término às '+slaibFmtHM(d.nextMs)+' ('+slaMonDur(d.horizonMin)+').'):'Nenhuma tarefa atrasada ou com prazo próximo.')+'</div></div></div>';
   return hd+(d.overdue.length?slaOpGrpHtml('red',d.overdue):'')+(d.warning.length?slaOpGrpHtml('amber',d.warning):'');
 }
-/* Status ao vivo do chip — resumo legível por severidade (riqueza de detalhe sem poluir). */
+/* min → "Xh Ym" / "Ym" (legível, p/ horizonte e métricas ao vivo do chip). */
+function slaMonDur(min){ min=Math.max(0,Math.round(min||0)); if(min<60) return min+' min'; var h=Math.floor(min/60),m=min%60; return m?(h+'h '+m+'min'):(h+'h'); }
+/* Status HERÓI ao vivo do chip — métrica mais crítica do momento (tempo real). */
 function slaMonStatusText(d){
-  if(!d||!d.total) return 'Tudo em dia';
-  var r=d.overdue.length, a=d.warning.length;
-  if(r&&a) return r+(r>1?' atrasadas':' atrasada')+' · '+a+(a>1?' próximas':' próxima');
-  if(r) return r+(r>1?' tarefas atrasadas':' tarefa atrasada');
-  return a+(a>1?' prazos próximos':' prazo próximo');
+  if(!d||!d.total) return d&&d.nextMs?('Próximo prazo em '+slaMonDur(d.horizonMin)):'Tudo em dia';
+  if(d.overdue.length) return 'Atraso máx. '+slaMonDur(d.overdue[0].overdueMin);
+  return 'Vence em '+slaMonDur(d.warning[0].remainingMin);
+}
+/* Contadores SEGMENTADOS por severidade (breakdown rico) — vermelho e/ou laranja. */
+function slaMonSegs(d){
+  if(!d||!d.total) return '';
+  var s='';
+  if(d.overdue.length) s+='<span class="slamon-seg red" title="Atrasadas">'+SLAOP_ALERT_SVG+d.overdue.length+'</span>';
+  if(d.warning.length) s+='<span class="slamon-seg amber" title="Prazo próximo">'+SLAOP_CLOCK_SVG+d.warning.length+'</span>';
+  return '<span class="slamon-segs">'+s+'</span>';
 }
 function slaMonAlign(){
   var w=document.getElementById('sla-monitor'); if(!w) return;
@@ -2769,11 +2802,11 @@ function slaMonRender(){
   if(!w){ w=document.createElement('div'); w.id='sla-monitor'; document.body.appendChild(w); }
   w.className='slamon '+sev+(slaMonOpen?' open':'');
   var icon=(sev==='green')?SLAOP_SHIELD_SVG:(sev==='red'?SLAOP_ALERT_SVG:SLAOP_CLOCK_SVG);
-  var trailing=(sev==='green')?'':('<span class="slamon-badge">'+d.total+'</span>');
   var chip='<button class="slamon-chip" data-slamon-toggle="1" title="Monitor de prazos">'
     +'<span class="slamon-orb"><span class="slamon-ic">'+icon+'</span></span>'
-    +'<span class="slamon-txt"><span class="slamon-kicker">Monitor SLA</span><span class="slamon-status">'+slaMonStatusText(d)+'</span></span>'
-    +trailing+'</button>';
+    +'<span class="slamon-txt"><span class="slamon-kicker">Monitor SLA<span class="slamon-live"><i></i>ao vivo</span></span>'
+      +'<span class="slamon-status">'+slaMonStatusText(d)+'</span></span>'
+    +slaMonSegs(d)+'</button>';
   w.innerHTML=chip+'<div class="slamon-pop">'+slaMonDropInner(d)+'</div>';
   slaMonAlign();
 }
