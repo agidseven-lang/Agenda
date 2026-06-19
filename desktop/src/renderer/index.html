@@ -2566,23 +2566,40 @@ function slaibEnsureStyle(){
    /* ── F3.3.2 (reteste #4) — SLA MONITOR: WIDGET FLUTUANTE no topo-direito (fixed),
       FORA do fluxo do Kanban (zero altura no board). Chip premium + dropdown ancorado. ── */
    +'.slamon{position:fixed;z-index:42}'
-   +'.slamon-chip{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 13px;border-radius:999px;border:1px solid transparent;cursor:pointer;font-weight:800;font-size:12.5px;box-shadow:0 6px 18px -10px rgba(0,0,0,.5)}'
-   +'.slamon-chip .slamon-ic{display:flex;align-items:center;justify-content:center}.slamon-chip .slamon-ic svg{width:16px;height:16px;display:block}'
-   +'.slamon-chip .slamon-tx{white-space:nowrap}'
-   +'.slamon-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}'
-   +'.slamon.green .slamon-chip{color:#46d39e;border-color:rgba(55,209,150,.42);background:rgba(55,209,150,.10)}'
-   +'.slamon.amber .slamon-chip{color:#f4b860;border-color:rgba(242,169,59,.45);background:rgba(242,169,59,.12)}'
-   +'.slamon.red .slamon-chip{color:#ff8c84;border-color:rgba(255,107,97,.48);background:rgba(255,107,97,.13)}'
-   +'.slamon.amber .slamon-badge{background:#f2a93b}.slamon.red .slamon-badge{background:#ff6b61}'
-   +'.slamon-chip:hover{filter:brightness(1.08)}'
+   /* CHIP PREMIUM — cápsula de vidro com profundidade (gradiente em camadas, brilho interno
+      no topo, sombra projetada), orb de ícone com gradiente radial + anel + glow por severidade,
+      bloco tipográfico em 2 linhas (kicker + status ao vivo) e contador refinado com brilho. */
+   +'.slamon-chip{position:relative;display:inline-flex;align-items:center;gap:11px;height:46px;padding:0 15px 0 7px;border-radius:15px;border:1px solid rgba(255,255,255,.08);cursor:pointer;'
+     +'background:linear-gradient(180deg,rgba(31,38,54,.94),rgba(17,22,32,.96));'
+     +'box-shadow:0 16px 36px -16px rgba(0,0,0,.78),0 2px 6px -2px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08),inset 0 0 0 1px rgba(255,255,255,.015);'
+     +'-webkit-backdrop-filter:blur(13px) saturate(1.35);backdrop-filter:blur(13px) saturate(1.35);'
+     +'transition:transform .16s cubic-bezier(.2,.8,.2,1),box-shadow .16s,border-color .16s}'
+   +'.slamon-chip:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.15);box-shadow:0 22px 46px -16px rgba(0,0,0,.82),0 3px 8px -2px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.11)}'
+   +'.slamon-chip:active{transform:translateY(0)}'
+   +'.slamon-orb{position:relative;flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center}'
+   +'.slamon-orb .slamon-ic{position:relative;z-index:1;display:flex;align-items:center;justify-content:center}.slamon-orb .slamon-ic svg{width:17px;height:17px;display:block}'
+   +'.slamon-txt{display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;min-width:0}'
+   +'.slamon-kicker{font-size:8.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:rgba(233,238,247,.46)}'
+   +'.slamon-status{font-size:13px;font-weight:800;letter-spacing:.01em;margin-top:3px;white-space:nowrap}'
+   +'.slamon-badge{flex:0 0 auto;min-width:24px;height:24px;padding:0 7px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;box-shadow:0 4px 10px -3px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.28)}'
+   /* severidade: orb (gradiente radial + anel + glow) + cor do status + acento da borda */
+   +'.slamon.green .slamon-orb{background:radial-gradient(120% 120% at 30% 20%,rgba(70,211,158,.34),rgba(55,209,150,.12));box-shadow:0 0 0 1px rgba(55,209,150,.40),0 6px 16px -6px rgba(55,209,150,.6)}.slamon.green .slamon-orb .slamon-ic{color:#5ee0b0}.slamon.green .slamon-status{color:#7ce7c0}.slamon.green .slamon-chip{border-color:rgba(55,209,150,.26)}'
+   +'.slamon.amber .slamon-orb{background:radial-gradient(120% 120% at 30% 20%,rgba(244,184,96,.36),rgba(242,169,59,.12));box-shadow:0 0 0 1px rgba(242,169,59,.42),0 6px 16px -6px rgba(242,169,59,.6)}.slamon.amber .slamon-orb .slamon-ic{color:#ffce86}.slamon.amber .slamon-status{color:#f6c074}.slamon.amber .slamon-chip{border-color:rgba(242,169,59,.30)}.slamon.amber .slamon-badge{background:linear-gradient(180deg,#f6b94f,#e8941f)}'
+   +'.slamon.red .slamon-orb{background:radial-gradient(120% 120% at 30% 20%,rgba(255,140,132,.40),rgba(255,107,97,.14));box-shadow:0 0 0 1px rgba(255,107,97,.46),0 6px 18px -6px rgba(255,107,97,.7)}.slamon.red .slamon-orb .slamon-ic{color:#ffb0a8}.slamon.red .slamon-status{color:#ff9a90}.slamon.red .slamon-chip{border-color:rgba(255,107,97,.34)}.slamon.red .slamon-badge{background:linear-gradient(180deg,#ff7d72,#e8483c)}'
+   /* pulso sutil de urgência (vermelho) ao redor do orb */
+   +'.slamon.red .slamon-orb::after{content:"";position:absolute;inset:-3px;border-radius:13px;border:1px solid rgba(255,107,97,.55);animation:slamonPulse 1.9s ease-out infinite;pointer-events:none}'
+   +'@keyframes slamonPulse{0%{opacity:.7;transform:scale(.9)}70%{opacity:0;transform:scale(1.2)}100%{opacity:0;transform:scale(1.2)}}'
+   +'@media (prefers-reduced-motion:reduce){.slamon.red .slamon-orb::after{animation:none;opacity:.45}}'
    /* dropdown premium ancorado à DIREITA do widget (overlay; não empurra/corta o board) */
-   +'.slamon-pop{position:absolute;top:46px;right:0;width:360px;max-width:92vw;display:none;max-height:min(64vh,460px);overflow:auto;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:#121722;box-shadow:0 24px 60px rgba(0,0,0,.6);padding:8px}'
-   +'.slamon.open .slamon-pop{display:block}'
-   +'.slamon-pop-hd{display:flex;align-items:center;gap:9px;padding:8px 8px 7px;font-size:13px;font-weight:800;color:#eef2f8}'
-   +'.slamon-pop-hd .pic{width:24px;height:24px;border-radius:7px;background:rgba(242,169,59,.14);color:#f2a93b;display:flex;align-items:center;justify-content:center}.slamon-pop-hd .pic svg{width:14px;height:14px}'
-   +'.slamon-empty{display:flex;align-items:center;gap:11px;padding:12px 10px}'
-   +'.slamon-empty .eic{width:32px;height:32px;border-radius:10px;background:rgba(55,209,150,.14);color:#37d196;display:flex;align-items:center;justify-content:center;flex:0 0 auto}.slamon-empty .eic svg{width:18px;height:18px}'
-   +'.slamon-empty .et{font-size:13px;font-weight:800;color:#dfe6f1}.slamon-empty .es{font-size:11.5px;color:#8b97a8;margin-top:1px}'
+   +'.slamon-pop{position:absolute;top:54px;right:0;width:374px;max-width:92vw;display:none;max-height:min(64vh,470px);overflow:auto;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:linear-gradient(180deg,rgba(22,28,40,.99),rgba(14,18,27,.99));box-shadow:0 30px 72px -20px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.06);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);padding:9px}'
+   +'.slamon.open .slamon-pop{display:block;animation:slamonPop .18s cubic-bezier(.2,.8,.2,1)}'
+   +'@keyframes slamonPop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}'
+   +'.slamon-pop-hd{display:flex;align-items:center;gap:10px;padding:9px 9px 11px;margin-bottom:4px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13.5px;font-weight:800;color:#eef2f8}'
+   +'.slamon-pop-hd .pic{width:28px;height:28px;border-radius:9px;background:radial-gradient(120% 120% at 30% 20%,rgba(244,184,96,.30),rgba(242,169,59,.1));box-shadow:0 0 0 1px rgba(242,169,59,.32);color:#f6c074;display:flex;align-items:center;justify-content:center;flex:0 0 auto}.slamon-pop-hd .pic svg{width:15px;height:15px}'
+   +'.slamon-pop-hd .hx{display:flex;flex-direction:column;line-height:1}.slamon-pop-hd .hx small{font-size:8.5px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:rgba(233,238,247,.42);margin-top:4px}'
+   +'.slamon-empty{display:flex;align-items:center;gap:12px;padding:14px 11px}'
+   +'.slamon-empty .eic{width:36px;height:36px;border-radius:11px;background:radial-gradient(120% 120% at 30% 20%,rgba(70,211,158,.30),rgba(55,209,150,.1));box-shadow:0 0 0 1px rgba(55,209,150,.34);color:#5ee0b0;display:flex;align-items:center;justify-content:center;flex:0 0 auto}.slamon-empty .eic svg{width:19px;height:19px}'
+   +'.slamon-empty .et{font-size:13.5px;font-weight:800;color:#e7edf6}.slamon-empty .es{font-size:11.5px;color:#8b97a8;margin-top:2px}'
    +'.slaop-grp{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:6px 4px 3px}'
    +'.slaop-grp .pd{width:7px;height:7px;border-radius:50%}'
    +'.slaop-grp.red{color:#ff8c84}.slaop-grp.red .pd{background:#ff6b61}.slaop-grp.amber{color:#f4b860}.slaop-grp.amber .pd{background:#f2a93b}'
@@ -2690,6 +2707,8 @@ function slaHeaderAlign(){
  * = openDetails. NÃO envia/escreve nada — só lê state.tasks já carregado. */
 var SLAOP_CLOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 var SLAOP_CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+var SLAOP_ALERT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+var SLAOP_SHIELD_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>';
 function slaOpName(id){ if(!id) return '—'; var u=(state.users||[]).find(function(x){return x&&x.id===id;}); var n=((u&&(u.name||u.displayName))||'').trim(); return n?slaibEsc(n.split(' ')[0]):'—'; }
 var slaMonOpen=false;  // estado do dropdown do widget (persiste entre refreshes do ticker)
 function slaOpRowHtml(x){
@@ -2718,9 +2737,17 @@ function slaMonData(){
   return slaPanelDerive(vis,Date.now(),(typeof dtMs==='function'?dtMs:null));
 }
 function slaMonDropInner(d){
-  var hd='<div class="slamon-pop-hd"><span class="pic">'+SLAOP_CLOCK_SVG+'</span>Monitor de prazos</div>';
+  var hd='<div class="slamon-pop-hd"><span class="pic">'+SLAOP_CLOCK_SVG+'</span><span class="hx">Monitor de prazos<small>Prazo final · tempo real</small></span></div>';
   if(!d.total) return hd+'<div class="slamon-empty"><span class="eic">'+SLAOP_CHECK_SVG+'</span><div><div class="et">Tudo em dia</div><div class="es">Nenhuma tarefa atrasada ou com prazo próximo.</div></div></div>';
   return hd+(d.overdue.length?slaOpGrpHtml('red',d.overdue):'')+(d.warning.length?slaOpGrpHtml('amber',d.warning):'');
+}
+/* Status ao vivo do chip — resumo legível por severidade (riqueza de detalhe sem poluir). */
+function slaMonStatusText(d){
+  if(!d||!d.total) return 'Tudo em dia';
+  var r=d.overdue.length, a=d.warning.length;
+  if(r&&a) return r+(r>1?' atrasadas':' atrasada')+' · '+a+(a>1?' próximas':' próxima');
+  if(r) return r+(r>1?' tarefas atrasadas':' tarefa atrasada');
+  return a+(a>1?' prazos próximos':' prazo próximo');
 }
 function slaMonAlign(){
   var w=document.getElementById('sla-monitor'); if(!w) return;
@@ -2741,9 +2768,12 @@ function slaMonRender(){
   var sev=d.overdue.length?'red':(d.warning.length?'amber':'green');
   if(!w){ w=document.createElement('div'); w.id='sla-monitor'; document.body.appendChild(w); }
   w.className='slamon '+sev+(slaMonOpen?' open':'');
-  var chip=(sev==='green')
-    ? '<button class="slamon-chip" data-slamon-toggle="1" title="Monitor de prazos"><span class="slamon-ic">'+SLAOP_CHECK_SVG+'</span><span class="slamon-tx">Prazos · em dia</span></button>'
-    : '<button class="slamon-chip" data-slamon-toggle="1" title="Monitor de prazos"><span class="slamon-ic">'+SLAOP_CLOCK_SVG+'</span><span class="slamon-tx">Prazos</span><span class="slamon-badge">'+d.total+'</span></button>';
+  var icon=(sev==='green')?SLAOP_SHIELD_SVG:(sev==='red'?SLAOP_ALERT_SVG:SLAOP_CLOCK_SVG);
+  var trailing=(sev==='green')?'':('<span class="slamon-badge">'+d.total+'</span>');
+  var chip='<button class="slamon-chip" data-slamon-toggle="1" title="Monitor de prazos">'
+    +'<span class="slamon-orb"><span class="slamon-ic">'+icon+'</span></span>'
+    +'<span class="slamon-txt"><span class="slamon-kicker">Monitor SLA</span><span class="slamon-status">'+slaMonStatusText(d)+'</span></span>'
+    +trailing+'</button>';
   w.innerHTML=chip+'<div class="slamon-pop">'+slaMonDropInner(d)+'</div>';
   slaMonAlign();
 }
