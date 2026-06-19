@@ -30,7 +30,7 @@
   },
   "count": {
     "min": 18,
-    "hm": "15:18"
+    "hm": "15:25"
   },
   "rbac": {
     "editPrazoDesigner": false
@@ -52,7 +52,7 @@
       "hasFooter": true,
       "hasThemes": true,
       "cardH": 497,
-      "bodyH": 379
+      "bodyH": 406
     }
   },
   "whole1920": {
