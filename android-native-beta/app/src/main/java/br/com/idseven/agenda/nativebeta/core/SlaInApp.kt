@@ -116,7 +116,8 @@ object SlaInApp {
         val vis = TaskVisibility.visibleTasks(user, tasks)
         val rows = ArrayList<SlaOpRow>()
         for (t in vis) {
-            if (t.designerSla == null) continue
+            // F3.3.2 (reteste owner) — gate RELAXADO no painel: qualquer tarefa do designer com
+            // prazo final válido conta (não exige designerSla; o sino/items() segue estrito).
             val designerId = (t.designerAssignment?.designerId ?: t.assigneeId) ?: continue
             if (delivered(t)) continue
             val pd = finishMs(t); if (pd <= 0L) continue
@@ -248,6 +249,7 @@ fun SlaAlertsScreen(
  * ========================================================================== */
 private val OP_RED = Color(0xFFFF6B61)
 private val OP_AMBER = Color(0xFFF2A93B)
+private val OP_GREEN = Color(0xFF37D196)
 
 @Composable
 fun SlaOpPanel(
@@ -261,7 +263,8 @@ fun SlaOpPanel(
     // Tempo real (read-side): recomputa a cada 30s p/ contagem regressiva e laranja→vermelho.
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); bump++ } }
     val data = remember(tasks, currentUser, users, bump) { SlaInApp.panel(currentUser, tasks, users) }
-    if (data.total == 0) return
+    // F3.3.2 (reteste owner): o painel APARECE SEMPRE no topo do quadro. Sem alertas ⇒ estado
+    // vazio "Tudo em dia" (a área principal nunca some; só as listas internas).
 
     Column(
         modifier
@@ -281,15 +284,32 @@ fun SlaOpPanel(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("Operação · SLA por prazo final", color = Color(0xFFEEF2F8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("Prazo próximo e atrasadas — em tempo real", color = Color(0xFF8B97A8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Acompanhamento de prazos", color = Color(0xFFEEF2F8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Prazo final das demandas — em tempo real", color = Color(0xFF8B97A8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            if (data.total == 0) OpPill("Tudo em dia", OP_GREEN)
             if (data.overdue.isNotEmpty()) OpPill("${data.overdue.size} atrasada" + (if (data.overdue.size == 1) "" else "s"), OP_RED)
             if (data.warning.isNotEmpty()) { Spacer(Modifier.width(6.dp)); OpPill("${data.warning.size} próx.", OP_AMBER) }
         }
-        if (data.overdue.isNotEmpty()) OpSection("Atrasadas", OP_RED, data.overdue, onOpenTask)
-        if (data.warning.isNotEmpty()) OpSection("Prazo próximo", OP_AMBER, data.warning, onOpenTask)
-        Spacer(Modifier.height(8.dp))
+        if (data.total == 0) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(OP_GREEN.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                    Text("✓", color = OP_GREEN, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(11.dp))
+                Column {
+                    Text("Tudo em dia", color = Color(0xFFDFE6F1), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Nenhuma tarefa atrasada ou com prazo próximo.", color = Color(0xFF8B97A8), fontSize = 11.5.sp)
+                }
+            }
+        } else {
+            if (data.overdue.isNotEmpty()) OpSection("Atrasadas", OP_RED, data.overdue, onOpenTask)
+            if (data.warning.isNotEmpty()) OpSection("Prazo próximo", OP_AMBER, data.warning, onOpenTask)
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
 

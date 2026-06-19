@@ -2468,30 +2468,30 @@ function slaPanelDelivered(t){
   var fs=(t&&t.designerFlowStatus)||'', st=(t&&t.status)||'';
   return fs==='entregue'||fs==='concluido'||fs==='cancelado'||st==='concluido'||st==='cancelado'||st==='removido';
 }
-function slaPanelRow(t,now,dtMsFn){
+function slaPanelRow(t,now,dtMsFn,requireSla){
   if(!t) return null;
-  if(!t.designerSla) return null;                  // gate: tarefa SLA-rastreada (paridade com o sino atual)
+  if(requireSla && !t.designerSla) return null;    // sino (requireSla=true): só tarefas SLA-rastreadas (comportamento F3.2.4 aprovado)
   var designerId=(t.designerAssignment&&t.designerAssignment.designerId)||t.assigneeId||null;
   if(!designerId) return null;                     // exclusão: sem designer responsável
   if(slaPanelDelivered(t)) return null;            // exclusão: entregue/concluída/cancelada/removida
-  var pd=slaPanelFinishMs(t,dtMsFn); if(!pd) return null;   // exclusão: sem prazo final válido
+  var pd=slaPanelFinishMs(t,dtMsFn); if(!pd) return null;   // exclusão: sem prazo final válido (plannedFinishAt→planDueAt→assignment.end→due)
   if(now>=pd){ var over=Math.max(1,Math.round((now-pd)/60000));
     return {taskId:t.id,sev:'vermelho',bucket:'overdue',finishMs:pd,overdueMin:over,remainingMin:0,title:t.title||'',client:t.client||'',designerId:designerId}; }
   if(now>=pd-SLA_PANEL_WARN_MS){ var left=Math.max(1,Math.round((pd-now)/60000));
     return {taskId:t.id,sev:'laranja',bucket:'warning',finishMs:pd,overdueMin:0,remainingMin:left,title:t.title||'',client:t.client||'',designerId:designerId}; }
   return null;                                      // dentro do prazo (>30min) — fora do painel
 }
-function slaPanelDerive(tasks,now,dtMsFn){
-  var rows=[]; (tasks||[]).forEach(function(t){ var r=slaPanelRow(t,now,dtMsFn); if(r) rows.push(r); });
+function slaPanelDerive(tasks,now,dtMsFn,requireSla){
+  var rows=[]; (tasks||[]).forEach(function(t){ var r=slaPanelRow(t,now,dtMsFn,requireSla); if(r) rows.push(r); });
   rows.sort(function(a,b){ var r=((b.sev==='vermelho')?1:0)-((a.sev==='vermelho')?1:0); if(r) return r; return (a.finishMs||0)-(b.finishMs||0); });
   return { overdue:rows.filter(function(x){return x.sev==='vermelho';}),
            warning:rows.filter(function(x){return x.sev==='laranja';}), rows:rows, total:rows.length };
 }
 /* F3.3.2-PANEL-CORE END */
-/* Alerta SLA por PRAZO FINAL p/ o SINO (read-only). Deriva do PANEL-CORE (sino↔painel 1:1).
- * Mantém os textos já aprovados do sino (F3.2.4). Retorna null se não há alerta. */
+/* Alerta SLA por PRAZO FINAL p/ o SINO (read-only). Deriva do PANEL-CORE com requireSla=true
+ * (sino mantém escopo F3.2.4: só tarefas SLA-rastreadas). Textos aprovados. null = sem alerta. */
 function slaibFinishAlert(t,now){
-  var r=slaPanelRow(t,now||Date.now(),(typeof dtMs==='function'?dtMs:null)); if(!r) return null;
+  var r=slaPanelRow(t,now||Date.now(),(typeof dtMs==='function'?dtMs:null),true); if(!r) return null;
   if(r.sev==='vermelho') return {sev:'vermelho',event:'designer_finish_overdue',label:'Prazo encerrado',
     text:'Prazo ultrapassado há '+r.overdueMin+' min. Conclua imediatamente.',anchorMs:r.finishMs};
   return {sev:'laranja',event:'designer_finish_warning',label:'Prazo próximo',
@@ -2565,7 +2565,14 @@ function slaibEnsureStyle(){
    +'.slaop-time{font-size:12px;font-weight:800;margin-top:3px}.slaop-it.red .slaop-time{color:#ff8c84}.slaop-it.amber .slaop-time{color:#f4b860}'
    +'.slaop-open{flex:0 0 auto;font-size:11.5px;font-weight:700;border:1px solid rgba(127,166,255,.32);background:rgba(127,166,255,.10);color:#bcd0ff;border-radius:9px;padding:7px 11px;cursor:pointer;white-space:nowrap}'
    +'.slaop-open:hover{background:rgba(127,166,255,.18)}'
-   +'.slaop-emptyrow{padding:14px 12px;color:#8b97a8;font-size:12px;text-align:center}';
+   +'.slaop-emptyrow{padding:14px 12px;color:#8b97a8;font-size:12px;text-align:center}'
+   /* estado vazio "Tudo em dia" (painel aparece SEMPRE) */
+   +'.slaop-pill.ok{background:rgba(55,209,150,.13);color:#46d39e;border-color:rgba(55,209,150,.32)}.slaop-pill.ok .pd{background:#37d196}'
+   +'.slaop-empty{display:flex;align-items:center;gap:12px;padding:15px 16px}'
+   +'.slaop-empty-ic{width:34px;height:34px;border-radius:10px;background:rgba(55,209,150,.14);color:#37d196;display:flex;align-items:center;justify-content:center;flex:0 0 auto}'
+   +'.slaop-empty-ic svg{width:19px;height:19px}'
+   +'.slaop-empty-t{font-size:13.5px;font-weight:800;color:#dfe6f1}'
+   +'.slaop-empty-s{font-size:12px;color:#8b97a8;margin-top:1px}';
   document.head.appendChild(st);
 }
 function slaibRenderPanel(items,read){
@@ -2642,6 +2649,7 @@ function slaHeaderAlign(){
  * próximo (laranja); vermelho acima. Contador dinâmico via slaibRefresh (30s). Abrir tarefa
  * = openDetails. NÃO envia/escreve nada — só lê state.tasks já carregado. */
 var SLAOP_CLOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+var SLAOP_CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
 function slaOpName(id){ if(!id) return '—'; var u=(state.users||[]).find(function(x){return x&&x.id===id;}); var n=((u&&(u.name||u.displayName))||'').trim(); return n?slaibEsc(n.split(' ')[0]):'—'; }
 function slaOpTasksFor(scopeId){ if(!scopeId) return []; return (state.tasks||[]).filter(function(t){ return t && ((typeof designerOf==='function'&&designerOf(t)===scopeId)||t.assigneeId===scopeId); }); }
 function slaOpRowHtml(x){
@@ -2658,18 +2666,29 @@ function slaOpSecHtml(kind,rows){
   var body=rows.length?rows.map(slaOpRowHtml).join(''):'<div class="slaop-emptyrow">Nada por aqui.</div>';
   return '<section class="slaop-sec '+(red?'red':'amber')+'"><div class="slaop-sec-hd"><span class="pd"></span>'+title+'<span class="slaop-n">'+rows.length+'</span></div><div class="slaop-rows">'+body+'</div></section>';
 }
+/* F3.3.2 (reteste owner) — o painel APARECE SEMPRE no topo do quadro do designer.
+ * Sem alertas ⇒ estado vazio profissional "Tudo em dia" (a área principal NUNCA some;
+ * só as listas internas é que somem quando não há alerta). requireSla NÃO é passado
+ * (gate relaxado): qualquer tarefa do designer com prazo final válido conta. */
 function slaOpPanelHtml(scopeId){
   var d=slaPanelDerive(slaOpTasksFor(scopeId),Date.now(),(typeof dtMs==='function'?dtMs:null));
-  if(!d.total) return '';
+  var head=function(counts){
+    return '<div class="slaop-hd"><span class="slaop-ic">'+SLAOP_CLOCK_SVG+'</span>'
+      +'<div><div class="slaop-ti">Acompanhamento de prazos</div><div class="slaop-sub">Prazo final das demandas — atualiza em tempo real</div></div>'
+      +'<div class="slaop-counts">'+counts+'</div></div>';
+  };
+  var open='<div class="slaop" id="sla-oppanel" data-scope="'+slaibEsc(scopeId||'')+'">';
+  if(!d.total){
+    var okPill='<span class="slaop-pill ok"><span class="pd"></span>Tudo em dia</span>';
+    var empty='<div class="slaop-empty"><span class="slaop-empty-ic">'+SLAOP_CHECK_SVG+'</span>'
+      +'<div><div class="slaop-empty-t">Tudo em dia</div><div class="slaop-empty-s">Nenhuma tarefa atrasada ou com prazo próximo.</div></div></div>';
+    return open+head(okPill)+empty+'</div>';
+  }
   var secs=[]; if(d.overdue.length) secs.push(slaOpSecHtml('red',d.overdue)); if(d.warning.length) secs.push(slaOpSecHtml('amber',d.warning));
   var one=(secs.length<2)?' slaop-one':'';
-  var counts='<span class="slaop-pill red"><span class="pd"></span>'+d.overdue.length+' atrasada'+(d.overdue.length===1?'':'s')+'</span>'
-    +'<span class="slaop-pill amber"><span class="pd"></span>'+d.warning.length+' prazo próximo</span>';
-  return '<div class="slaop" id="sla-oppanel" data-scope="'+slaibEsc(scopeId||'')+'">'
-    +'<div class="slaop-hd"><span class="slaop-ic">'+SLAOP_CLOCK_SVG+'</span>'
-    +'<div><div class="slaop-ti">Operação · SLA por prazo final</div><div class="slaop-sub">Entregas com prazo próximo e atrasadas — em tempo real</div></div>'
-    +'<div class="slaop-counts">'+counts+'</div></div>'
-    +'<div class="slaop-body'+one+'">'+secs.join('')+'</div></div>';
+  var counts=(d.overdue.length?'<span class="slaop-pill red"><span class="pd"></span>'+d.overdue.length+' atrasada'+(d.overdue.length===1?'':'s')+'</span>':'')
+    +(d.warning.length?'<span class="slaop-pill amber"><span class="pd"></span>'+d.warning.length+' prazo próximo</span>':'');
+  return open+head(counts)+'<div class="slaop-body'+one+'">'+secs.join('')+'</div></div>';
 }
 function slaOpPanelRefresh(){
   var host=document.getElementById('sla-oppanel'); if(!host) return;

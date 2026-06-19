@@ -56,6 +56,7 @@ async function scenario(kind) {
     let tasks = [];
     if (kind === 'amber') tasks = amber.concat(calm);
     else if (kind === 'red') tasks = red.concat(calm);
+    else if (kind === 'empty') tasks = calm;            // sem alertas → estado vazio "Tudo em dia"
     else tasks = red.concat(amber).concat(calm);
     state.tasks = tasks;
     document.body.classList.add('desktop', 'authed');
@@ -86,6 +87,26 @@ await scenario('red'); await shotPanel('f332-03-panel-vermelho.png');
 await scenario('both'); await shotPanel('f332-04-panel-ambos.png');
 // (1) quadro do designer com painel (full)
 await page.screenshot({ path: path.join(OUT, 'f332-01-board-panel.png') });
+
+// (0) REPROVAÇÃO OWNER — quadro do designer SEM alertas: painel APARECE com estado vazio "Tudo em dia"
+await scenario('empty');
+await shotPanel('f332-11-painel-vazio.png');
+await page.screenshot({ path: path.join(OUT, 'f332-12-board-vazio.png') });
+const emptyPanel = await page.evaluate(() => {
+  const host = document.getElementById('sla-oppanel');
+  if (!host) return { present: false };
+  const txt = host.textContent || '';
+  return {
+    present: true,
+    hasTitle: /Acompanhamento de prazos/.test(txt),
+    hasTudoEmDia: /Tudo em dia/.test(txt),
+    hasEmptyMsg: /Nenhuma tarefa atrasada ou com prazo pr[óo]ximo/.test(txt),
+    sections: host.querySelectorAll('.slaop-sec').length,
+  };
+});
+
+// volta ao cenário "ambos" para os gates de seções
+await scenario('both');
 
 // gate: derivação do painel (2 seções, ordem, textos)
 const panel = await page.evaluate(() => {
@@ -147,8 +168,9 @@ for (const [w, h, nm] of [[1366, 768, 'f332-08-1366x768.png'], [1600, 900, 'f332
   await page.screenshot({ path: path.join(OUT, nm) });
 }
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ panel, detail, header, errors }, null, 2));
-console.log('PANEL:', JSON.stringify(panel)); console.log('DETAIL:', JSON.stringify(detail)); console.log('HEADER:', JSON.stringify(header));
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ panel, emptyPanel, detail, header, errors }, null, 2));
+console.log('PANEL:', JSON.stringify(panel)); console.log('EMPTY:', JSON.stringify(emptyPanel));
+console.log('DETAIL:', JSON.stringify(detail)); console.log('HEADER:', JSON.stringify(header));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
 await browser.close(); server.close();
 
@@ -156,6 +178,12 @@ await browser.close(); server.close();
 const fail = [];
 if (errors.length) fail.push('pageerror no renderer: ' + errors[0]);
 if (!panel.present) fail.push('painel operacional ausente');
+// REPROVAÇÃO OWNER — painel deve aparecer SEMPRE, inclusive sem alertas (estado vazio)
+if (!emptyPanel.present) fail.push('painel NÃO aparece no quadro SEM alertas (regressão do reteste)');
+if (emptyPanel.present && !emptyPanel.hasTitle) fail.push('estado vazio sem título "Acompanhamento de prazos"');
+if (emptyPanel.present && !emptyPanel.hasTudoEmDia) fail.push('estado vazio sem "Tudo em dia"');
+if (emptyPanel.present && !emptyPanel.hasEmptyMsg) fail.push('estado vazio sem a mensagem de apoio');
+if (emptyPanel.present && emptyPanel.sections !== 0) fail.push('estado vazio não deveria mostrar seções');
 if (!(panel.sections || []).includes('red') || !(panel.sections || []).includes('amber')) fail.push('painel sem as 2 seções (vermelho+laranja)');
 if (!panel.redBeforeAmber) fail.push('vermelho não está antes do laranja');
 if (!panel.hasAtrasada) fail.push('sem texto "Atrasada há X min"');

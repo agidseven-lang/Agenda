@@ -32,6 +32,11 @@
   .pill{font-size:11.5px;font-weight:800;border-radius:999px;padding:5px 10px;white-space:nowrap}
   .pill.red{color:var(--red);background:rgba(255,107,97,.14);border:1px solid rgba(255,107,97,.34)}
   .pill.amber{color:var(--amber);background:rgba(242,169,59,.14);border:1px solid rgba(242,169,59,.34);margin-left:6px}
+  .pill.ok{color:#46d39e;background:rgba(55,209,150,.14);border:1px solid rgba(55,209,150,.34)}
+  .empty{display:flex;align-items:center;gap:11px;padding:4px 12px 14px}
+  .empty-ic{width:32px;height:32px;border-radius:10px;background:rgba(55,209,150,.14);color:#37d196;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex:0 0 auto}
+  .empty-t{color:#dfe6f1;font-size:13px;font-weight:800}
+  .empty-s{color:var(--faint);font-size:11.5px;margin-top:1px}
   .op-sec{padding:2px 10px}
   .op-sec-h{display:flex;align-items:center;gap:7px;padding:5px 0}
   .op-sec-h .pd{width:8px;height:8px;border-radius:50%}
@@ -105,11 +110,13 @@
   function section(title,kind,arr){if(!arr.length)return '';
     return `<div class="op-sec ${kind}"><div class="op-sec-h"><span class="pd"></span><b>${title}</b><span class="n">${arr.length}</span></div>`
       +arr.map(x=>row(x,kind)).join('')+`</div>`;}
-  function panel(red,amber){const ov=red.length,wn=amber.length;
-    let pills=''; if(ov)pills+=`<span class="pill red">${ov} atrasada${ov===1?'':'s'}</span>`; if(wn)pills+=`<span class="pill amber">${wn} próx.</span>`;
-    return `<div class="op"><div class="op-hd"><div class="op-ic">${clock}</div>`
-      +`<div class="op-h-t"><b>Operação · SLA por prazo final</b><span>Prazo próximo e atrasadas — em tempo real</span></div>${pills}</div>`
-      +section('Atrasadas','red',red)+section('Prazo próximo','amber',amber)+`<div style="height:8px"></div></div>`;}
+  function panel(red,amber){const ov=red.length,wn=amber.length,total=ov+wn;
+    let pills=''; if(!total)pills+=`<span class="pill ok">Tudo em dia</span>`;
+    if(ov)pills+=`<span class="pill red">${ov} atrasada${ov===1?'':'s'}</span>`; if(wn)pills+=`<span class="pill amber">${wn} próx.</span>`;
+    const head=`<div class="op-hd"><div class="op-ic">${clock}</div>`
+      +`<div class="op-h-t"><b>Acompanhamento de prazos</b><span>Prazo final das demandas — em tempo real</span></div>${pills}</div>`;
+    if(!total){ return `<div class="op">${head}<div class="empty"><div class="empty-ic">✓</div><div><div class="empty-t">Tudo em dia</div><div class="empty-s">Nenhuma tarefa atrasada ou com prazo próximo.</div></div></div></div>`; }
+    return `<div class="op">${head}`+section('Atrasadas','red',red)+section('Prazo próximo','amber',amber)+`<div style="height:8px"></div></div>`;}
   function statusbar(){return `<div class="sbar"><span>9:41</span><div class="dots"><i></i><i></i><i></i> <span>100%</span></div></div>`;}
   function topbar(unread){return `<div class="topbar"><div class="ttl">Tarefas</div>`
       +`<div class="bell">${bellSvg}${unread?`<span class="cnt">${unread}</span>`:''}</div><div class="av">M</div></div>`;}
@@ -131,6 +138,7 @@
 
   const frames=[
     ['and-01-quadro-painel', 'Quadro/lista com painel operacional (390×844)', board(390,844,RED,AMBER)],
+    ['and-09-painel-vazio','Painel — SEM alertas (estado vazio "Tudo em dia")', `<div style="padding:14px;background:var(--bg)">${panel([],[])}</div>`],
     ['and-02-painel-laranja','Painel — apenas laranja', `<div style="padding:14px;background:var(--bg)">${panel([],AMBER)}</div>`],
     ['and-03-painel-vermelho','Painel — apenas vermelho', `<div style="padding:14px;background:var(--bg)">${panel(RED,[])}</div>`],
     ['and-04-painel-ambos','Painel — laranja + vermelho', `<div style="padding:14px;background:var(--bg)">${panel(RED,AMBER)}</div>`],

@@ -94,10 +94,29 @@ ok('11 planDueAt fallback', slaPanelFinishMs(withSla({ planDueAt: NOW + 42 * MIN
   ok('19 zero deploy (core sem wrangler/deploy)', dirty === false);
   ok('20 zero provider real chamado', threw === false && dirty === false); }
 
+// === REPROVAÇÃO OWNER (Teste B) — painel deve aparecer no fluxo real ===
+// 21 — gate RELAXADO (painel): tarefa SEM designerSla, mas com designer + dueDate vencido → APARECE.
+//      (era a causa de tarefas reais não-semeadas não entrarem no painel)
+{ const t = { id: 'R1', title: 'Tarefa real', client: 'Cliente', status: 'andamento',
+    designerAssignment: { designerId: 'D1' }, dueDate: '2026-06-18', dueTime: '12:00' }; // sem designerSla
+  const r = slaPanelRow(t, NOW, dtMsStub); // requireSla omitido (painel)
+  ok('21 relaxado: sem designerSla + due vencido => aparece', !!r && r.bucket === 'overdue'); }
+// 22 — gate ESTRITO (sino, requireSla=true): MESMA tarefa sem designerSla → NÃO aparece (sino inalterado)
+{ const t = { id: 'R1', title: 'Tarefa real', client: 'Cliente', status: 'andamento',
+    designerAssignment: { designerId: 'D1' }, dueDate: '2026-06-18', dueTime: '12:00' };
+  ok('22 estrito (sino): sem designerSla => fora', slaPanelRow(t, NOW, dtMsStub, true) === null); }
+// 23 — board calmo (nenhuma elegível) => derive total 0 (dispara o estado vazio "Tudo em dia")
+{ const d = derive([withSla({ planDueAt: NOW + 240 * MIN }), withSla({ planDueAt: NOW - 7 * MIN }, { status: 'concluido' })]);
+  ok('23 calmo => total 0 (estado vazio)', d.total === 0 && d.overdue.length === 0 && d.warning.length === 0); }
+
 // Bônus — WARN window = 30min; exatamente -30min é laranja; -31min fica fora
 ok('B1 janela = 30min', SLA_PANEL_WARN_MS === 30 * 60000);
 ok('B2 -30min exato => laranja', row(withSla({ planDueAt: NOW + 30 * MIN })) && row(withSla({ planDueAt: NOW + 30 * MIN })).sev === 'laranja');
 ok('B3 -31min => fora do painel', row(withSla({ planDueAt: NOW + 31 * MIN })) === null);
+// B4 — painel HTML aparece SEMPRE: o renderer não retorna '' quando vazio (regressão do reteste).
+{ const html = src; const i2 = html.indexOf('function slaOpPanelHtml');
+  const seg = html.slice(i2, i2 + 900);
+  ok('B4 slaOpPanelHtml não tem "return \'\'" (aparece sempre)', i2 > 0 && !/if\(!d\.total\)\s*return\s*'';/.test(seg) && /Tudo em dia/.test(seg)); }
 
 console.log('\nF3.3.2 PANEL RESULT: ' + pass + ' PASS / ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);
