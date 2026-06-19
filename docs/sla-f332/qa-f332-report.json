@@ -26,6 +26,7 @@
     "graceVisible": true,
     "critVisible": true,
     "graceMsgVisible": true,
+    "orange30Visible": true,
     "hasOpenBtn": true,
     "hasSeg": true,
     "hasLive": true,
@@ -33,6 +34,20 @@
     "hasProgress": true,
     "monitorTitle": true,
     "inBoardPanel": false
+  },
+  "flicker": {
+    "ok": true,
+    "wasOpen": true,
+    "stayedOpen": true,
+    "notRebuilt": true
+  },
+  "notif": {
+    "present": true,
+    "hasAvatar": true,
+    "hasName": true,
+    "hasDesc": true,
+    "hasSound": true,
+    "bottomRight": true
   },
   "cut": {
     "1366x768": {
