@@ -52,11 +52,7 @@ const DATASTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
 // V64.23 — og:image agora aponta para uma ROTA VERSIONADA SEM querystring
 // (/og/aprovar-v64-23.png). Alguns previews (WhatsApp) ignoram/cacheiam mal querystrings —
 // uma URL limpa e versionada no path é a forma mais robusta de cache-busting.
-// V64.60 (CACHE-BUST do preview — preparado p/ Caminho B, SEM deploy automático): og:image
-// em PATH NOVO p/ forçar WhatsApp/Facebook a re-buscar a imagem (o cache de preview é por URL).
-// Mesma arte JPEG premium 1200x630 (OG_JPG_B64) servida abaixo; o path antigo
-// /og/wa-card-v64-38.jpg continua servido → links já compartilhados NÃO quebram. Sem JS.
-const OG_IMG_PATH = "/og/wa-card-v64-60.jpg";
+const OG_IMG_PATH = "/og/wa-card-v64-38.jpg";
 function ogClientBase(origin) {
   return (typeof origin === "string" && /^https:\/\//.test(origin)) ? origin : "https://aprovar.agendaidseven.com.br";
 }
@@ -169,7 +165,7 @@ export default {
       if (url.pathname === "/wa-card-test-v64-25-a") return minCardHtml(M, { title: "Aprovar cronograma — Teste Premium A", desc: "Revise e aprove seu cronograma na area segura da Agenda ID Seven (canario A).", url: B + "/wa-card-test-v64-25-a", img: B + "/og/wa-card-v64-25-a.jpg" });
       if (url.pathname === "/wa-card-test-v64-25-b") return minCardHtml(M, { title: "Aprovar cronograma — Teste Premium B", desc: "Revise e aprove seu cronograma na area segura da Agenda ID Seven (canario B).", url: B + "/wa-card-test-v64-25-b", img: B + "/og/wa-card-v64-25-b.jpg" });
       if (url.pathname === "/preview") return minCardHtml(M, { title: "Teste Premium ID Seven", desc: "Preview premium de aprovacao.", url: B + "/preview", img: B + "/preview.jpg", twitter: false });
-      if (url.pathname === "/og/wa-card-v64-24.jpg" || url.pathname === "/og/wa-card-v64-25-a.jpg" || url.pathname === "/og/wa-card-v64-25-b.jpg" || url.pathname === "/preview.jpg" || url.pathname === "/og/wa-card-v64-26.jpg" || url.pathname === "/og/wa-card-v64-38.jpg" || url.pathname === "/og/wa-card-v64-60.jpg") return jpgBannerResponse(M);
+      if (url.pathname === "/og/wa-card-v64-24.jpg" || url.pathname === "/og/wa-card-v64-25-a.jpg" || url.pathname === "/og/wa-card-v64-25-b.jpg" || url.pathname === "/preview.jpg" || url.pathname === "/og/wa-card-v64-26.jpg" || url.pathname === "/og/wa-card-v64-38.jpg") return jpgBannerResponse(M);
     }
 
     // V64.20/23 — banner premium 1200×630 do link (cartão grande no WhatsApp). PNG estático
