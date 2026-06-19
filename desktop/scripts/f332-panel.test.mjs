@@ -94,17 +94,16 @@ ok('11 planDueAt fallback', slaPanelFinishMs(withSla({ planDueAt: NOW + 42 * MIN
   ok('19 zero deploy (core sem wrangler/deploy)', dirty === false);
   ok('20 zero provider real chamado', threw === false && dirty === false); }
 
-// === REPROVAÇÃO OWNER (Teste B) — painel deve aparecer no fluxo real ===
-// 21 — gate RELAXADO (painel): tarefa SEM designerSla, mas com designer + dueDate vencido → APARECE.
-//      (era a causa de tarefas reais não-semeadas não entrarem no painel)
+// === REGRA DE FLUXO (reteste #3): SLA só começa no ENVIO ao designer (semente designerSla) ===
+// 21 — tarefa SEM designerSla (criação inicial do cronograma), mesmo com designer + dueDate vencido → NÃO entra no painel
 { const t = { id: 'R1', title: 'Tarefa real', client: 'Cliente', status: 'andamento',
     designerAssignment: { designerId: 'D1' }, dueDate: '2026-06-18', dueTime: '12:00' }; // sem designerSla
-  const r = slaPanelRow(t, NOW, dtMsStub); // requireSla omitido (painel)
-  ok('21 relaxado: sem designerSla + due vencido => aparece', !!r && r.bucket === 'overdue'); }
-// 22 — gate ESTRITO (sino, requireSla=true): MESMA tarefa sem designerSla → NÃO aparece (sino inalterado)
+  ok('21 sem designerSla (não enviada) => fora do painel', slaPanelRow(t, NOW, dtMsStub) === null); }
+// 22 — a MESMA tarefa, agora COM designerSla (enviada ao designer) → entra
 { const t = { id: 'R1', title: 'Tarefa real', client: 'Cliente', status: 'andamento',
-    designerAssignment: { designerId: 'D1' }, dueDate: '2026-06-18', dueTime: '12:00' };
-  ok('22 estrito (sino): sem designerSla => fora', slaPanelRow(t, NOW, dtMsStub, true) === null); }
+    designerAssignment: { designerId: 'D1' }, designerSla: { planStartAt: NOW - 60 * MIN, planDueAt: NOW - 5 * MIN } };
+  const r = slaPanelRow(t, NOW, dtMsStub);
+  ok('22 com designerSla (enviada) => aparece (overdue)', !!r && r.bucket === 'overdue'); }
 // 23 — board calmo (nenhuma elegível) => derive total 0 (dispara o estado vazio "Tudo em dia")
 { const d = derive([withSla({ planDueAt: NOW + 240 * MIN }), withSla({ planDueAt: NOW - 7 * MIN }, { status: 'concluido' })]);
   ok('23 calmo => total 0 (estado vazio)', d.total === 0 && d.overdue.length === 0 && d.warning.length === 0); }
@@ -118,8 +117,10 @@ ok('B3 -31min => fora do painel', row(withSla({ planDueAt: NOW + 31 * MIN })) ==
   const seg = html.slice(i2, i2 + 1400);
   ok('B4 slaOpPanelHtml não tem "return \'\'" (aparece sempre)', i2 > 0 && !/if\(!d\.total\)\s*return\s*'';/.test(seg) && /Tudo em dia/.test(seg)); }
 // === REPROVAÇÃO PÓS-RETESTE 2 — compactação + Kanban preservado + RBAC (asserções de fonte) ===
-// B5 — painel COMPACTO: estado verde em barra fina (slaop-green) + lista de alertas com scroll próprio (slaop-list)
-ok('B5 painel compacto (slaop-green + slaop-list)', /slaop-green/.test(src) && /class="slaop-list"/.test(src) && /max-height:150px;overflow:auto/.test(src));
+// B5 — painel = BARRA fina + POPOVER flutuante (overlay; não consome altura do Kanban)
+ok('B5 painel barra+popover (overlay)', /slaop-green/.test(src) && /class="slaop-pop"/.test(src) && /\.slaop-pop\{position:absolute/.test(src) && /data-sla-toggle/.test(src));
+// B5b — alerta vermelho traz a regra operacional dos 10 minutos
+ok('B5b vermelho regra 10 min', /Conclua a tarefa atrasada em até 10 min ou sinalize atraso\./.test(src));
 // B6 — card NUNCA encolhe: base flex:0 0 auto + only-child flex:1 0 auto (corrige corte topo/rodapé)
 ok('B6 card não encolhe (flex-shrink:0)', /\.kbv2-card\{[\s\S]*?flex:0 0 auto;/.test(src) && /kbv2-card:only-child\{ flex:1 0 auto; \}/.test(src));
 // B7 — "Sua etapa / Próxima ação" redesenhada premium (ícones + pill)
@@ -128,7 +129,7 @@ ok('B7 etapa redesenhada (kbv2-stage2 + pill + ícones)', /kbv2-stage2/.test(src
 ok('B8 Editar prazo RBAC (canSeeAll)', /canSeeAll\(state\.user\)[\s\S]{0,80}data-sla-editprazo/.test(src) && /function slaEditPrazoOpen/.test(src));
 // B9 — modal de editar prazo NÃO grava (sem fetch/setDoc; save bloqueado "pendente de autorização")
 { const i3 = src.indexOf('function slaEditPrazoOpen'); const seg2 = src.slice(i3, i3 + 2600);
-  ok('B9 editar prazo não escreve (zero write)', i3 > 0 && !/\bfetch\b|setDoc|updateDoc|addDoc/.test(seg2) && /pendente de autoriza/i.test(seg2)); }
+  ok('B9 editar prazo não escreve (zero write)', i3 > 0 && !/\bfetch\b|setDoc|updateDoc|addDoc/.test(seg2) && /(aguardando autoriza|nada é gravado)/i.test(seg2)); }
 
 console.log('\nF3.3.2 PANEL RESULT: ' + pass + ' PASS / ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);

@@ -128,8 +128,8 @@ object SlaInApp {
         val vis = TaskVisibility.visibleTasks(user, tasks)
         val rows = ArrayList<SlaOpRow>()
         for (t in vis) {
-            // F3.3.2 (reteste owner) — gate RELAXADO no painel: qualquer tarefa do designer com
-            // prazo final válido conta (não exige designerSla; o sino/items() segue estrito).
+            // F3.3.2 (regra de fluxo): SLA só começa no ENVIO ao designer (semente designerSla).
+            if (t.designerSla == null) continue
             val designerId = (t.designerAssignment?.designerId ?: t.assigneeId) ?: continue
             if (delivered(t)) continue
             val pd = finishMs(t); if (pd <= 0L) continue
@@ -363,6 +363,12 @@ private fun OpRow(r: SlaOpRow, color: Color, onOpenTask: (String) -> Unit) {
                 if (r.sev == "vermelho") "Atrasada há ${r.overdueMin} min" else "Faltam ${r.remainingMin} min",
                 color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold,
             )
+            if (r.sev == "vermelho") {
+                Text(
+                    "Conclua em até 10 min ou sinalize atraso.",
+                    color = Color(0xFFFFB0A8), fontSize = 10.5.sp, modifier = Modifier.padding(top = 1.dp),
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         Box(

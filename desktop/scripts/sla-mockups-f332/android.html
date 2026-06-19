@@ -51,6 +51,7 @@
   .it .t{color:var(--ink);font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .it .m{color:var(--soft);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
   .it .tm{font-size:12px;font-weight:800;margin-top:2px}
+  .it .rule{font-size:10px;color:#ffb0a8;background:rgba(255,107,97,.1);border-radius:5px;padding:2px 6px;margin-top:3px;display:inline-block}
   .it.red .tm{color:var(--red)}.it.amber .tm{color:var(--amber)}
   .it .open{flex:0 0 auto;font-size:11.5px;font-weight:800;color:#BCD0FF;background:rgba(127,166,255,.10);border:1px solid rgba(127,166,255,.33);border-radius:9px;padding:7px 10px}
   /* seletor de colunas + cards (contexto do quadro) */
@@ -105,7 +106,8 @@
   function row(x,kind){const red=kind==='red';
     return `<div class="it ${red?'red':'amber'}"><div class="bar"></div><div class="bd">`
       +`<div class="t">${x.t}</div><div class="m">${x.c} · resp. ${x.r} · prazo ${x.due}</div>`
-      +`<div class="tm">${red?('Atrasada há '+x.over+' min'):('Faltam '+x.left+' min')}</div></div>`
+      +`<div class="tm">${red?('Atrasada há '+x.over+' min'):('Faltam '+x.left+' min')}</div>`
+      +(red?`<div class="rule">Conclua em até 10 min ou sinalize atraso.</div>`:``)+`</div>`
       +`<div class="open">Abrir</div></div>`;}
   function section(title,kind,arr){if(!arr.length)return '';
     return `<div class="op-sec ${kind}"><div class="op-sec-h"><span class="pd"></span><b>${title}</b><span class="n">${arr.length}</span></div>`
