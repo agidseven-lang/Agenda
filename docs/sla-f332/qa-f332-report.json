@@ -1,0 +1,27 @@
+{
+  "panel": {
+    "present": true,
+    "sections": [
+      "red",
+      "amber"
+    ],
+    "redBeforeAmber": true,
+    "hasAtrasada": true,
+    "hasFaltam": true,
+    "hasOpenBtn": true,
+    "counts": "2 atrasadas2 prazo próximo"
+  },
+  "detail": {
+    "hasSla": true,
+    "hasPrazoEncerrado": true,
+    "hasAtraso": true
+  },
+  "header": {
+    "ok": true,
+    "avatarLogoDelta": 0,
+    "bellAvatarTopDelta": 0,
+    "bellAvatarGap": 10,
+    "hasLogo": true
+  },
+  "errors": []
+}
