@@ -105,6 +105,8 @@ const widgetGreen = await page.evaluate(() => { const w = document.getElementByI
 await page.screenshot({ path: path.join(OUT, 'f332-12-widget-verde.png') });
 await scenario('amber'); await openMon(); await page.screenshot({ path: path.join(OUT, 'f332-02-widget-laranja.png') });
 await scenario('red'); await openMon(); await page.screenshot({ path: path.join(OUT, 'f332-03-widget-vermelho.png') });
+// captura o widget no cenário AMBOS (vermelho com grace+crítico E laranja) — cobre todos os gates
+await scenario('both'); await openMon(); await page.screenshot({ path: path.join(OUT, 'f332-04-widget-ambos.png') });
 const widget = await page.evaluate(() => {
   const w = document.getElementById('sla-monitor'); if (!w) return { present: false };
   const cs = getComputedStyle(w); const txt = w.textContent || '';
