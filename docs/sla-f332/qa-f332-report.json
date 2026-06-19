@@ -14,6 +14,9 @@
     "has10min": true,
     "hasOpenBtn": true,
     "hasBadge": true,
+    "hasLive": true,
+    "hasHero": true,
+    "hasProgress": true,
     "monitorTitle": true,
     "inBoardPanel": false
   },
