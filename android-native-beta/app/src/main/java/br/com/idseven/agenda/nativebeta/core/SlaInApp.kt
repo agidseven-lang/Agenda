@@ -299,7 +299,7 @@ fun SlaOpPanel(
                 Text("Acompanhamento de prazos", color = Color(0xFFEEF2F8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 // F3.3.2 (reteste): estado verde COMPACTO — mensagem inline no subtítulo (sem bloco extra).
                 Text(
-                    if (data.total == 0) "Tudo em dia — nenhuma tarefa atrasada ou com prazo próximo" else "Prazo final das demandas — em tempo real",
+                    if (data.total == 0) "Nenhuma tarefa atrasada ou com prazo próximo." else "Prazo final das demandas — em tempo real",
                     color = Color(0xFF8B97A8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }

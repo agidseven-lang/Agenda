@@ -102,7 +102,7 @@ const emptyPanel = await page.evaluate(() => {
     present: true,
     hasTitle: /Acompanhamento de prazos/.test(txt),
     hasTudoEmDia: /Tudo em dia/.test(txt),
-    hasEmptyMsg: /Nenhuma tarefa atrasada ou com prazo pr[óo]ximo/.test(txt),
+    hasEmptyMsg: /Nenhuma tarefa atrasada ou com prazo pr[óo]ximo/i.test(txt),
     groups: host.querySelectorAll('.slaop-grp').length,
     height: Math.round(host.getBoundingClientRect().height),  // estado verde deve ser COMPACTO
   };
