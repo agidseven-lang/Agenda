@@ -19,7 +19,7 @@
     "present": true,
     "hasTitle": true,
     "hasTudoEmDia": true,
-    "hasEmptyMsg": false,
+    "hasEmptyMsg": true,
     "groups": 0,
     "height": 46
   },
