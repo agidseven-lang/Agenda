@@ -111,12 +111,14 @@
     return `<div class="op-sec ${kind}"><div class="op-sec-h"><span class="pd"></span><b>${title}</b><span class="n">${arr.length}</span></div>`
       +arr.map(x=>row(x,kind)).join('')+`</div>`;}
   function panel(red,amber){const ov=red.length,wn=amber.length,total=ov+wn;
-    let pills=''; if(!total)pills+=`<span class="pill ok">Tudo em dia</span>`;
-    if(ov)pills+=`<span class="pill red">${ov} atrasada${ov===1?'':'s'}</span>`; if(wn)pills+=`<span class="pill amber">${wn} próx.</span>`;
-    const head=`<div class="op-hd"><div class="op-ic">${clock}</div>`
-      +`<div class="op-h-t"><b>Acompanhamento de prazos</b><span>Prazo final das demandas — em tempo real</span></div>${pills}</div>`;
-    if(!total){ return `<div class="op">${head}<div class="empty"><div class="empty-ic">✓</div><div><div class="empty-t">Tudo em dia</div><div class="empty-s">Nenhuma tarefa atrasada ou com prazo próximo.</div></div></div></div>`; }
-    return `<div class="op">${head}`+section('Atrasadas','red',red)+section('Prazo próximo','amber',amber)+`<div style="height:8px"></div></div>`;}
+    if(!total){ // estado verde COMPACTO: barra única, mensagem inline no subtítulo
+      return `<div class="op"><div class="op-hd"><div class="op-ic">${clock}</div>`
+        +`<div class="op-h-t"><b>Acompanhamento de prazos</b><span>Tudo em dia — nenhuma tarefa atrasada ou com prazo próximo</span></div>`
+        +`<span class="pill ok">Tudo em dia</span></div></div>`; }
+    let pills=''; if(ov)pills+=`<span class="pill red">${ov} atrasada${ov===1?'':'s'}</span>`; if(wn)pills+=`<span class="pill amber">${wn} próx.</span>`;
+    const head=`<div class="op-hd hdr"><div class="op-ic">${clock}</div>`
+      +`<div class="op-h-t"><b>Acompanhamento de prazos</b></div>${pills}</div>`;
+    return `<div class="op">${head}<div class="op-listwrap">`+section('Atrasadas','red',red)+section('Prazo próximo','amber',amber)+`</div><div style="height:6px"></div></div>`;}
   function statusbar(){return `<div class="sbar"><span>9:41</span><div class="dots"><i></i><i></i><i></i> <span>100%</span></div></div>`;}
   function topbar(unread){return `<div class="topbar"><div class="ttl">Tarefas</div>`
       +`<div class="bell">${bellSvg}${unread?`<span class="cnt">${unread}</span>`:''}</div><div class="av">M</div></div>`;}
@@ -146,10 +148,21 @@
         `<div class="sinohd"><span>Voltar</span><b>Alertas de SLA</b><span>Marcar todas</span></div>`
         +`<div class="sino-it red"><div class="dot"></div><div><div class="l">Prazo encerrado</div><div class="x">Prazo ultrapassado há 7 min. Conclua imediatamente.</div><div class="s">Boa Forma · Reels de lançamento</div></div></div>`
         +`<div class="sino-it amber"><div class="dot"></div><div><div class="l">Prazo próximo</div><div class="x">Faltam 18 min — conclua até 12:05.</div><div class="s">Boa Forma · Cronograma semanal</div></div></div>`)],
-    ['and-06-detalhe-sla','Detalhe da tarefa — SLA do designer', phoneShell(390,844,
+    ['and-06-detalhe-sla','Detalhe — SLA do designer + Editar prazo (Social/Admin)', phoneShell(390,844,
         `<div class="det"><div class="h">Reels de lançamento</div><div class="sub">Boa Forma · Cronograma</div>`
         +`<div class="sec">SLA do designer</div><div class="slabox"><div class="row1"><span class="lbl"><span class="pd"></span>Prazo encerrado</span><span class="rem">Atraso de 7 min</span></div>`
-        +`<div class="grid"><div><div class="k">Início planejado</div><div class="v">18/06 09:00</div></div><div><div class="k">Prazo final / término</div><div class="v">18/06 11:20</div></div></div></div></div>`)],
+        +`<div class="grid"><div><div class="k">Início planejado</div><div class="v">18/06 09:00</div></div><div><div class="k">Prazo final / término</div><div class="v">18/06 11:20</div></div></div>`
+        +`<div style="border-top:1px solid rgba(255,255,255,.08);margin-top:12px;padding-top:11px"><span style="color:#5B6CFF;font-size:13px;font-weight:800">✎  Editar prazo</span></div></div></div>`)],
+    ['and-10-editar-prazo','Editar prazo — modal RBAC (sem gravar nesta fase)', phoneShell(390,844,
+        `<div class="det"><div class="h" style="opacity:.4">Reels de lançamento</div></div>`
+        +`<div style="position:absolute;inset:0;background:rgba(4,7,14,.6);display:flex;align-items:center;justify-content:center;padding:22px">`
+        +`<div style="width:100%;background:#121722;border:1px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden">`
+        +`<div style="padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.08);color:#eef2f8;font-size:15px;font-weight:800">✎ Editar prazo</div>`
+        +`<div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px">`
+        +`<div><div class="k" style="color:#9fb0c8;font-size:11px;font-weight:700;text-transform:uppercase">Início planejado</div><div style="background:#0e1320;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 11px;color:#e8ecf4;font-size:13px;margin-top:4px">18/06/2026 09:00</div></div>`
+        +`<div><div class="k" style="color:#9fb0c8;font-size:11px;font-weight:700;text-transform:uppercase">Prazo final / término</div><div style="background:#0e1320;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 11px;color:#e8ecf4;font-size:13px;margin-top:4px">18/06/2026 11:20</div></div>`
+        +`<div style="font-size:12px;color:#f4b860;background:rgba(242,169,59,.1);border:1px solid rgba(242,169,59,.28);border-radius:10px;padding:9px 11px;line-height:1.4">Apenas Social Media e Administradores. Gravação segura será habilitada após autorização — nada é gravado nesta fase.</div>`
+        +`</div><div style="display:flex;justify-content:flex-end;padding:13px 18px;border-top:1px solid rgba(255,255,255,.08)"><span style="color:#bcd0ff;font-size:13px;font-weight:700">Fechar</span></div></div></div>`)],
     ['and-07-390x844','Tela 390×844', board(390,844,RED,AMBER)],
     ['and-08-412x915','Tela 412×915', board(412,915,RED,AMBER)],
   ];

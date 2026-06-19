@@ -1961,6 +1961,10 @@ body.desktop .kbv2-empty-s{ font-size:12.5px; color:#828c9e; max-width:200px; li
 /* ───────── CARD dark premium ───────── */
 body.desktop .kbv2-card{
   position:relative; display:flex; flex-direction:column; gap:13px;
+  /* F3.3.2 (reteste): NUNCA encolher o card abaixo do conteúdo — se a coluna ficar curta
+     (ex.: painel SLA ocupando altura), a COLUNA rola (.kbv2-column-body overflow-y:auto)
+     em vez de comprimir/cortar o card. flex-shrink:0 preserva o card aprovado inteiro. */
+  flex:0 0 auto;
   padding:16px; border-radius:16px; background:linear-gradient(180deg,#161d2e,#121726); border:1px solid rgba(255,255,255,.08);
   box-shadow:0 1px 2px rgba(0,0,0,.35), 0 16px 36px -20px rgba(0,0,0,.65);
 }
@@ -2009,6 +2013,16 @@ body.desktop .kbv2-srow{ display:flex; gap:8px; font-size:13px; align-items:base
 body.desktop .kbv2-sk{ flex:0 0 auto; min-width:66px; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#8a93a7; }
 body.desktop .kbv2-sv{ font-weight:700; }
 body.desktop .kbv2-sv2{ color:var(--kbv2-ink2,#c2cad8); }
+/* F3.3.2 (reteste) — "Sua etapa / Próxima ação" premium (ícone + micro-label + pill) */
+body.desktop .kbv2-stage2{ display:flex; flex-direction:column; gap:9px; }
+body.desktop .kbv2-st2-row{ display:flex; align-items:flex-start; gap:10px; }
+body.desktop .kbv2-st2-ic{ width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; margin-top:1px; }
+body.desktop .kbv2-st2-ic svg{ width:15px; height:15px; }
+body.desktop .kbv2-st2-ic-next{ color:#9aa4b6; background:rgba(255,255,255,.05); }
+body.desktop .kbv2-st2-tx{ min-width:0; display:flex; flex-direction:column; gap:3px; }
+body.desktop .kbv2-st2-k{ font-size:10.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:#8a93a7; }
+body.desktop .kbv2-st2-pill{ align-self:flex-start; font-size:12.5px; font-weight:800; padding:3px 10px; border-radius:8px; border:1px solid transparent; line-height:1.3; }
+body.desktop .kbv2-st2-next{ font-size:13px; font-weight:600; color:var(--kbv2-ink2,#c2cad8); line-height:1.3; }
 body.desktop .kbv2-card-themes{ border:1px solid rgba(255,255,255,.07); border-radius:12px; overflow:hidden; background:rgba(255,255,255,.025); }
 body.desktop .kbv2-themes-h{ font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#8a93a7; padding:9px 12px; background:rgba(255,255,255,.04); }
 body.desktop .kbv2-theme{ display:flex; align-items:flex-start; gap:10px; padding:9px 12px; border-top:1px solid rgba(255,255,255,.06); font-size:13px; color:#c6cdda; line-height:1.4; }
@@ -2024,7 +2038,7 @@ body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
    que o flexbox DIVIDE IGUALMENTE entre esses 3 pontos; o rodapé ancora na base. Aplica SÓ quando
    há exatamente 1 card na coluna (:only-child) — colunas multi-card mantêm altura natural + scroll.
    Sem filler/drop-zone, sem bloco duplicado, sem 2º "+". */
-body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:1 1 auto; }
+body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:1 0 auto; }  /* card único PREENCHE a coluna (grow) mas NUNCA encolhe (shrink:0) — sem corte */
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-origin,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-themes,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-top:auto; }
@@ -2534,45 +2548,52 @@ function slaibEnsureStyle(){
    +'.slaib-bd .msg{font-size:12px;color:#cdd6e6;margin-top:1px}'
    +'.slaib-bd .s{font-size:12px;color:#9fb0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
    +'.slaib-acts{display:flex;gap:8px;margin-top:6px}.slaib-acts button{font-size:11px;border:1px solid rgba(255,255,255,.12);background:#1a2030;color:#cfe;border-radius:8px;padding:4px 8px;cursor:pointer}'
-   /* ── F3.3.2 — PAINEL OPERACIONAL SLA (topo do quadro do designer) ── */
-   +'.slaop{margin:0 0 16px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:linear-gradient(180deg,rgba(22,28,42,.92),rgba(14,18,28,.92));box-shadow:0 12px 34px -18px rgba(0,0,0,.6);overflow:hidden;flex:0 0 auto}'
-   +'.slaop-hd{display:flex;align-items:center;gap:11px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06)}'
-   +'.slaop-hd .slaop-ic{width:30px;height:30px;border-radius:9px;background:rgba(242,169,59,.14);color:#f2a93b;display:flex;align-items:center;justify-content:center;flex:0 0 auto}'
-   +'.slaop-hd .slaop-ic svg{width:17px;height:17px}'
-   +'.slaop-hd .slaop-ti{font-size:14px;font-weight:800;color:#eef2f8;letter-spacing:-.01em}'
-   +'.slaop-hd .slaop-sub{font-size:11.5px;color:#8b97a8;margin-top:1px}'
-   +'.slaop-hd .slaop-counts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}'
-   +'.slaop-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;border:1px solid transparent}'
+   /* ── F3.3.2 (reteste) — PAINEL OPERACIONAL SLA COMPACTO (não invade o Kanban) ── */
+   +'.slaop{margin:0 0 10px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:linear-gradient(180deg,rgba(22,28,42,.92),rgba(14,18,28,.92));box-shadow:0 10px 26px -18px rgba(0,0,0,.55);overflow:hidden;flex:0 0 auto}'
+   +'.slaop-hd{display:flex;align-items:center;gap:10px;padding:9px 13px}'
+   +'.slaop.has-alerts .slaop-hd{border-bottom:1px solid rgba(255,255,255,.06)}'
+   +'.slaop-ic{width:26px;height:26px;border-radius:8px;background:rgba(242,169,59,.14);color:#f2a93b;display:flex;align-items:center;justify-content:center;flex:0 0 auto}'
+   +'.slaop-ic svg{width:15px;height:15px}.slaop-ic.ok{background:rgba(55,209,150,.14);color:#37d196}'
+   +'.slaop-ti{font-size:13px;font-weight:800;color:#eef2f8;letter-spacing:-.01em;white-space:nowrap;flex:0 0 auto}'
+   +'.slaop-sub{font-size:11.5px;color:#8b97a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;min-width:0}'
+   +'.slaop-counts{margin-left:auto;display:flex;gap:7px;flex:0 0 auto}'
+   +'.slaop-pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;padding:4px 10px;border-radius:999px;border:1px solid transparent;white-space:nowrap}'
    +'.slaop-pill .pd{width:7px;height:7px;border-radius:50%}'
    +'.slaop-pill.red{background:rgba(255,107,97,.13);color:#ff8c84;border-color:rgba(255,107,97,.32)}.slaop-pill.red .pd{background:#ff6b61}'
    +'.slaop-pill.amber{background:rgba(242,169,59,.13);color:#f4b860;border-color:rgba(242,169,59,.32)}.slaop-pill.amber .pd{background:#f2a93b}'
-   +'.slaop-body{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 16px}'
-   +'.slaop-body.slaop-one{grid-template-columns:1fr}'
-   +'@media(max-width:1180px){.slaop-body{grid-template-columns:1fr}}'
-   +'.slaop-sec{border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.015);overflow:hidden;display:flex;flex-direction:column}'
-   +'.slaop-sec.red{border-color:rgba(255,107,97,.30)}.slaop-sec.amber{border-color:rgba(242,169,59,.26)}'
-   +'.slaop-sec-hd{display:flex;align-items:center;gap:8px;padding:9px 13px;font-size:12.5px;font-weight:800;border-bottom:1px solid rgba(255,255,255,.05)}'
-   +'.slaop-sec.red .slaop-sec-hd{color:#ff8c84;background:rgba(255,107,97,.06)}.slaop-sec.amber .slaop-sec-hd{color:#f4b860;background:rgba(242,169,59,.05)}'
-   +'.slaop-sec-hd .pd{width:8px;height:8px;border-radius:50%}.slaop-sec.red .pd{background:#ff6b61}.slaop-sec.amber .pd{background:#f2a93b}'
-   +'.slaop-sec-hd .slaop-n{margin-left:auto;min-width:22px;height:20px;padding:0 7px;border-radius:7px;background:rgba(255,255,255,.06);color:#cdd6e6;display:flex;align-items:center;justify-content:center;font-size:11.5px}'
-   +'.slaop-rows{padding:6px;display:flex;flex-direction:column;gap:6px;max-height:228px;overflow:auto}'
-   +'.slaop-it{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:11px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05)}'
-   +'.slaop-it:hover{background:rgba(255,255,255,.045)}'
-   +'.slaop-bar{width:4px;align-self:stretch;border-radius:3px;flex:0 0 auto}.slaop-it.red .slaop-bar{background:#ff6b61}.slaop-it.amber .slaop-bar{background:#f2a93b}'
-   +'.slaop-bd{flex:1;min-width:0}'
-   +'.slaop-t{font-size:13px;font-weight:700;color:#e8ecf4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
-   +'.slaop-meta{font-size:11.5px;color:#9fb0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}'
-   +'.slaop-time{font-size:12px;font-weight:800;margin-top:3px}.slaop-it.red .slaop-time{color:#ff8c84}.slaop-it.amber .slaop-time{color:#f4b860}'
-   +'.slaop-open{flex:0 0 auto;font-size:11.5px;font-weight:700;border:1px solid rgba(127,166,255,.32);background:rgba(127,166,255,.10);color:#bcd0ff;border-radius:9px;padding:7px 11px;cursor:pointer;white-space:nowrap}'
-   +'.slaop-open:hover{background:rgba(127,166,255,.18)}'
-   +'.slaop-emptyrow{padding:14px 12px;color:#8b97a8;font-size:12px;text-align:center}'
-   /* estado vazio "Tudo em dia" (painel aparece SEMPRE) */
    +'.slaop-pill.ok{background:rgba(55,209,150,.13);color:#46d39e;border-color:rgba(55,209,150,.32)}.slaop-pill.ok .pd{background:#37d196}'
-   +'.slaop-empty{display:flex;align-items:center;gap:12px;padding:15px 16px}'
-   +'.slaop-empty-ic{width:34px;height:34px;border-radius:10px;background:rgba(55,209,150,.14);color:#37d196;display:flex;align-items:center;justify-content:center;flex:0 0 auto}'
-   +'.slaop-empty-ic svg{width:19px;height:19px}'
-   +'.slaop-empty-t{font-size:13.5px;font-weight:800;color:#dfe6f1}'
-   +'.slaop-empty-s{font-size:12px;color:#8b97a8;margin-top:1px}';
+   /* lista: ALTURA MÁXIMA controlada + scroll PRÓPRIO (nunca no card); cai em telas baixas */
+   +'.slaop-list{max-height:150px;overflow:auto;padding:6px 8px 8px;display:flex;flex-direction:column;gap:5px}'
+   +'@media(max-height:820px){body.desktop .slaop-list{max-height:104px}}'
+   +'@media(max-height:720px){body.desktop .slaop-list{max-height:82px}}'
+   +'.slaop-grp{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:5px 4px 1px}'
+   +'.slaop-grp .pd{width:7px;height:7px;border-radius:50%}'
+   +'.slaop-grp.red{color:#ff8c84}.slaop-grp.red .pd{background:#ff6b61}.slaop-grp.amber{color:#f4b860}.slaop-grp.amber .pd{background:#f2a93b}'
+   +'.slaop-grp .slaop-n{margin-left:4px;min-width:18px;height:17px;padding:0 6px;border-radius:6px;background:rgba(255,255,255,.07);color:#cdd6e6;display:flex;align-items:center;justify-content:center;font-size:10.5px}'
+   +'.slaop-it{display:flex;align-items:center;gap:10px;padding:6px 9px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)}'
+   +'.slaop-it:hover{background:rgba(255,255,255,.05)}'
+   +'.slaop-it .bar{width:3px;align-self:stretch;min-height:22px;border-radius:3px;flex:0 0 auto}.slaop-it.red .bar{background:#ff6b61}.slaop-it.amber .bar{background:#f2a93b}'
+   +'.slaop-it .tx{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}'
+   +'.slaop-t{font-size:12.5px;font-weight:700;color:#e8ecf4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.slaop-meta{font-size:11px;color:#9fb0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.slaop-time{flex:0 0 auto;font-size:11.5px;font-weight:800;white-space:nowrap}.slaop-it.red .slaop-time{color:#ff8c84}.slaop-it.amber .slaop-time{color:#f4b860}'
+   +'.slaop-open{flex:0 0 auto;font-size:11px;font-weight:700;border:1px solid rgba(127,166,255,.32);background:rgba(127,166,255,.10);color:#bcd0ff;border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap}'
+   +'.slaop-open:hover{background:rgba(127,166,255,.18)}'
+   /* F3.3.2 — botão "Editar prazo" (RBAC: Social/Admin) + modal seguro (sem escrita nesta fase) */
+   +'.slaedit-btn{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;border:1px solid rgba(127,166,255,.34);background:rgba(127,166,255,.10);color:#bcd0ff;border-radius:10px;padding:8px 13px;cursor:pointer}'
+   +'.slaedit-btn svg{width:15px;height:15px}.slaedit-btn:hover{background:rgba(127,166,255,.18)}'
+   +'.slaedit-ov{position:fixed;inset:0;z-index:5000;background:rgba(4,7,14,.6);display:flex;align-items:center;justify-content:center;padding:20px}'
+   +'.slaedit-modal{width:min(440px,94vw);background:#121722;border:1px solid rgba(255,255,255,.1);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden}'
+   +'.slaedit-hd{padding:15px 18px;border-bottom:1px solid rgba(255,255,255,.08);font-size:15px;font-weight:800;color:#eef2f8;display:flex;align-items:center;gap:9px}.slaedit-hd svg{width:18px;height:18px;color:#bcd0ff}'
+   +'.slaedit-bd{padding:16px 18px;display:flex;flex-direction:column;gap:13px}'
+   +'.slaedit-f{display:flex;flex-direction:column;gap:5px}'
+   +'.slaedit-f label{font-size:11px;font-weight:700;color:#9fb0c8;text-transform:uppercase;letter-spacing:.05em}'
+   +'.slaedit-f input{background:#0e1320;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 11px;color:#e8ecf4;font-size:13px}'
+   +'.slaedit-note{font-size:12px;color:#f4b860;background:rgba(242,169,59,.10);border:1px solid rgba(242,169,59,.28);border-radius:10px;padding:9px 11px;line-height:1.4}'
+   +'.slaedit-ft{display:flex;justify-content:flex-end;gap:9px;padding:13px 18px;border-top:1px solid rgba(255,255,255,.08)}'
+   +'.slaedit-ft button{font-size:13px;font-weight:700;border-radius:10px;padding:9px 15px;cursor:pointer;border:1px solid transparent}'
+   +'.slaedit-cancel{background:#1a2030;color:#cdd6e6;border-color:rgba(255,255,255,.12)}'
+   +'.slaedit-save{background:rgba(127,166,255,.16);color:#bcd0ff;border-color:rgba(127,166,255,.4)}';
   document.head.appendChild(st);
 }
 function slaibRenderPanel(items,read){
@@ -2656,39 +2677,38 @@ function slaOpRowHtml(x){
   var cls=(x.sev==='vermelho')?'red':'amber';
   var meta=(x.client?slaibEsc(x.client)+' · ':'')+'resp. '+slaOpName(x.designerId)+' · prazo '+slaibFmtHM(x.finishMs);
   var time=(x.sev==='vermelho')?('Atrasada há '+x.overdueMin+' min'):('Faltam '+x.remainingMin+' min');
-  return '<div class="slaop-it '+cls+'"><span class="slaop-bar"></span>'
-    +'<div class="slaop-bd"><div class="slaop-t">'+slaibEsc(x.title||x.taskId)+'</div>'
-    +'<div class="slaop-meta">'+meta+'</div><div class="slaop-time">'+time+'</div></div>'
+  return '<div class="slaop-it '+cls+'"><span class="bar"></span>'
+    +'<div class="tx"><div class="slaop-t">'+slaibEsc(x.title||x.taskId)+'</div><div class="slaop-meta">'+meta+'</div></div>'
+    +'<span class="slaop-time">'+time+'</span>'
     +'<button class="slaop-open" data-sla-open="'+slaibEsc(x.taskId)+'">Abrir tarefa</button></div>';
 }
-function slaOpSecHtml(kind,rows){
+function slaOpGrpHtml(kind,rows){
   var red=(kind==='red'); var title=red?'Atrasadas':'Prazo próximo';
-  var body=rows.length?rows.map(slaOpRowHtml).join(''):'<div class="slaop-emptyrow">Nada por aqui.</div>';
-  return '<section class="slaop-sec '+(red?'red':'amber')+'"><div class="slaop-sec-hd"><span class="pd"></span>'+title+'<span class="slaop-n">'+rows.length+'</span></div><div class="slaop-rows">'+body+'</div></section>';
+  return '<div class="slaop-grp '+(red?'red':'amber')+'"><span class="pd"></span>'+title+'<span class="slaop-n">'+rows.length+'</span></div>'
+    + rows.map(slaOpRowHtml).join('');
 }
-/* F3.3.2 (reteste owner) — o painel APARECE SEMPRE no topo do quadro do designer.
- * Sem alertas ⇒ estado vazio profissional "Tudo em dia" (a área principal NUNCA some;
- * só as listas internas é que somem quando não há alerta). requireSla NÃO é passado
- * (gate relaxado): qualquer tarefa do designer com prazo final válido conta. */
+/* F3.3.2 (reteste owner) — o painel APARECE SEMPRE no topo do quadro, mas COMPACTO:
+ * sem alertas ⇒ barra fina verde "Tudo em dia"; com alertas ⇒ cabeçalho + lista com
+ * ALTURA MÁXIMA e scroll PRÓPRIO (nunca no card → Kanban preservado). Vermelho antes do
+ * laranja. requireSla NÃO é passado (gate relaxado): qualquer tarefa do designer com prazo. */
 function slaOpPanelHtml(scopeId){
   var d=slaPanelDerive(slaOpTasksFor(scopeId),Date.now(),(typeof dtMs==='function'?dtMs:null));
-  var head=function(counts){
-    return '<div class="slaop-hd"><span class="slaop-ic">'+SLAOP_CLOCK_SVG+'</span>'
-      +'<div><div class="slaop-ti">Acompanhamento de prazos</div><div class="slaop-sub">Prazo final das demandas — atualiza em tempo real</div></div>'
-      +'<div class="slaop-counts">'+counts+'</div></div>';
-  };
-  var open='<div class="slaop" id="sla-oppanel" data-scope="'+slaibEsc(scopeId||'')+'">';
+  var open='<div class="slaop'+(d.total?' has-alerts':' slaop-green')+'" id="sla-oppanel" data-scope="'+slaibEsc(scopeId||'')+'">';
   if(!d.total){
-    var okPill='<span class="slaop-pill ok"><span class="pd"></span>Tudo em dia</span>';
-    var empty='<div class="slaop-empty"><span class="slaop-empty-ic">'+SLAOP_CHECK_SVG+'</span>'
-      +'<div><div class="slaop-empty-t">Tudo em dia</div><div class="slaop-empty-s">Nenhuma tarefa atrasada ou com prazo próximo.</div></div></div>';
-    return open+head(okPill)+empty+'</div>';
+    return open
+      +'<div class="slaop-hd"><span class="slaop-ic ok">'+SLAOP_CHECK_SVG+'</span>'
+      +'<span class="slaop-ti">Acompanhamento de prazos</span>'
+      +'<span class="slaop-sub">· Tudo em dia — nenhuma tarefa atrasada ou com prazo próximo</span>'
+      +'<span class="slaop-counts"><span class="slaop-pill ok"><span class="pd"></span>Tudo em dia</span></span></div></div>';
   }
-  var secs=[]; if(d.overdue.length) secs.push(slaOpSecHtml('red',d.overdue)); if(d.warning.length) secs.push(slaOpSecHtml('amber',d.warning));
-  var one=(secs.length<2)?' slaop-one':'';
   var counts=(d.overdue.length?'<span class="slaop-pill red"><span class="pd"></span>'+d.overdue.length+' atrasada'+(d.overdue.length===1?'':'s')+'</span>':'')
     +(d.warning.length?'<span class="slaop-pill amber"><span class="pd"></span>'+d.warning.length+' prazo próximo</span>':'');
-  return open+head(counts)+'<div class="slaop-body'+one+'">'+secs.join('')+'</div></div>';
+  var list=(d.overdue.length?slaOpGrpHtml('red',d.overdue):'')+(d.warning.length?slaOpGrpHtml('amber',d.warning):'');
+  return open
+    +'<div class="slaop-hd"><span class="slaop-ic">'+SLAOP_CLOCK_SVG+'</span>'
+    +'<span class="slaop-ti">Acompanhamento de prazos</span>'
+    +'<span class="slaop-counts">'+counts+'</span></div>'
+    +'<div class="slaop-list">'+list+'</div></div>';
 }
 function slaOpPanelRefresh(){
   var host=document.getElementById('sla-oppanel'); if(!host) return;
@@ -2699,6 +2719,32 @@ function slaOpPanelRefresh(){
 }
 if(typeof window!=='undefined' && !window.__slaOpClickBound){ window.__slaOpClickBound=true;
   try{ document.addEventListener('click',function(e){ var o=e.target.closest&&e.target.closest('[data-sla-open]'); if(o){ if(e.preventDefault)e.preventDefault(); slaibOpenTask(o.getAttribute('data-sla-open')); } }); }catch(_){}
+}
+/* F3.3.2 — "Editar prazo": modal seguro RBAC (Social/Admin). NÃO grava no Firestore nesta
+ * fase (estrutura visual + dupla checagem de permissão); a gravação segura virá com autorização. */
+function slaEditPrazoOpen(taskId){
+  if(!(typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user))){ if(typeof flashToast==='function')flashToast('Sem permissão para editar prazo.'); return; }
+  var t=(state.tasks||[]).find(function(x){return x.id===taskId;}); if(!t){ if(typeof flashToast==='function')flashToast('Tarefa indisponível.'); return; }
+  var ds=t.designerSla||{};
+  var toLocal=function(ms){ ms=Number(ms)||0; if(!ms) return ''; var d=new Date(ms),p=function(n){return(n<10?'0':'')+n;}; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); };
+  var startV=toLocal(ds.planStartAt), dueV=toLocal(slaPanelFinishMs(t,(typeof dtMs==='function'?dtMs:null)));
+  var old=document.getElementById('slaedit-ov'); if(old) old.remove();
+  var ov=document.createElement('div'); ov.className='slaedit-ov'; ov.id='slaedit-ov';
+  ov.innerHTML='<div class="slaedit-modal"><div class="slaedit-hd">'+svg('editnote')+'<span>Editar prazo — '+slaibEsc(t.title||t.client||'tarefa')+'</span></div>'
+    +'<div class="slaedit-bd">'
+    +'<div class="slaedit-f"><label>Início planejado</label><input type="datetime-local" id="slaedit-start" value="'+startV+'"></div>'
+    +'<div class="slaedit-f"><label>Prazo final / término</label><input type="datetime-local" id="slaedit-due" value="'+dueV+'"></div>'
+    +'<div class="slaedit-note">Apenas Social Media e Administradores podem ajustar o prazo. A gravação segura (via Worker + auditoria) será habilitada após autorização — nesta fase nada é gravado.</div>'
+    +'</div>'
+    +'<div class="slaedit-ft"><button class="slaedit-cancel" id="slaedit-cancel">Cancelar</button><button class="slaedit-save" id="slaedit-save">Salvar prazo</button></div></div>';
+  ov.addEventListener('click',function(e){
+    if(e.target===ov||e.target.id==='slaedit-cancel'){ ov.remove(); return; }
+    if(e.target.id==='slaedit-save'){ if(typeof flashToast==='function')flashToast('Edição de prazo pendente de autorização — nada foi gravado (F3.3.2).'); ov.remove(); return; }
+  });
+  document.body.appendChild(ov);
+}
+if(typeof window!=='undefined' && !window.__slaEditBound){ window.__slaEditBound=true;
+  try{ document.addEventListener('click',function(e){ var o=e.target.closest&&e.target.closest('[data-sla-editprazo]'); if(o){ if(e.preventDefault)e.preventDefault(); slaEditPrazoOpen(o.getAttribute('data-sla-editprazo')); } }); }catch(_){}
 }
 function slaibRender(){
   var bell=document.getElementById('slaib-bell');
@@ -3900,11 +3946,21 @@ function kbv2Card(t, persp){
     }
     if(prog.attention)rail+='<i class="att" title="Ajuste pedido pelo cliente"></i>';
     h+='<div class="kbv2-card-rail">'+rail+'</div>';
-    const etapaLbl=designerView?'Sua etapa':'Etapa';
+    const etapaLbl=designerView?'Sua etapa':'Etapa atual';
     const etapaVal=designerView?(stage?stage.label:topSt.label).replace('Designer em ','Em '):(prog.owner||((stage||topSt).label));
-    h+='<div class="kbv2-card-stage">'+
-         '<div class="kbv2-srow"><span class="kbv2-sk">'+esc(etapaLbl)+'</span><span class="kbv2-sv" style="color:'+acc+'">'+esc(etapaVal)+'</span></div>'+
-         (prog.next?'<div class="kbv2-srow"><span class="kbv2-sk">Próxima</span><span class="kbv2-sv2">'+esc(prog.next)+'</span></div>':'')+
+    /* F3.3.2 (reteste) — área "Sua etapa / Próxima" redesenhada premium: ícone + micro-label
+       + pill da etapa atual; ícone + "Próxima ação" + texto. Hierarquia clara, dark premium. */
+    h+='<div class="kbv2-stage2">'+
+         '<div class="kbv2-st2-row">'+
+           '<span class="kbv2-st2-ic" style="color:'+acc+';background:'+withAlpha(acc,.14)+'">'+svg('flag')+'</span>'+
+           '<div class="kbv2-st2-tx"><div class="kbv2-st2-k">'+esc(etapaLbl)+'</div>'+
+             '<span class="kbv2-st2-pill" style="color:'+acc+';background:'+withAlpha(acc,.16)+';border-color:'+withAlpha(acc,.34)+'">'+esc(etapaVal)+'</span></div>'+
+         '</div>'+
+         (prog.next?'<div class="kbv2-st2-row">'+
+           '<span class="kbv2-st2-ic kbv2-st2-ic-next">'+svg('arr')+'</span>'+
+           '<div class="kbv2-st2-tx"><div class="kbv2-st2-k">Próxima ação</div>'+
+             '<div class="kbv2-st2-next">'+esc(prog.next)+'</div></div>'+
+         '</div>':'')+
        '</div>';
   }
   // 9) TEMA(S)
@@ -4226,6 +4282,10 @@ function detailSlaBlock(t){
         '<div><div style="color:var(--faint);font-size:11px;margin-bottom:2px">Início planejado</div><div style="color:var(--ink);font-size:13px;font-weight:600">'+esc(startStr)+'</div></div>'+
         '<div><div style="color:var(--faint);font-size:11px;margin-bottom:2px">Prazo final / término</div><div style="color:var(--ink);font-size:13px;font-weight:600">'+esc(dueStr)+'</div></div>'+
       '</div>'+
+      /* F3.3.2 — "Editar prazo": SÓ Social Media/Admin (canSeeAll). Designer comum/Cliente não veem. */
+      ((typeof canSeeAll==='function'&&state.user&&canSeeAll(state.user))
+        ? '<div style="margin-top:13px"><button class="slaedit-btn" data-sla-editprazo="'+esc(t.id)+'">'+svg('editnote')+'<span>Editar prazo</span></button></div>'
+        : '')+
     '</div>';
 }
 /* "Detalhes do fluxo" — bloco COLAPSADO (nativo <details>): os chips técnicos

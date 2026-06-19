@@ -55,6 +55,7 @@ import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
+import br.com.idseven.agenda.nativebeta.core.SlaRbac
 import br.com.idseven.agenda.nativebeta.domain.TaskStatus
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
@@ -74,6 +75,10 @@ fun TaskDetailScreen(
     val flow = remember(id) { TaskRepo.task(id) }
     val task by flow.collectAsState(initial = null)
     var confirmDelete by remember { mutableStateOf(false) }
+    // F3.3.2 — "Editar prazo": SÓ Social Media/Admin (SlaRbac); designer comum/cliente não veem.
+    val currentUser = remember(users, currentUid) { users.firstOrNull { it.id == currentUid } }
+    val canEditPrazo = remember(currentUser) { SlaRbac.canEditPrazo(currentUser) }
+    var showEditPrazo by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
         // Cabeçalho
@@ -164,6 +169,27 @@ fun TaskDetailScreen(
                         Divider()
                         Text("PRÓXIMA AÇÃO", color = Tokens.Faint, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.06.sp, modifier = Modifier.padding(top = 10.dp, bottom = 2.dp))
                         Text(nextActionOf(t, sla.state), color = Tokens.Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        if (canEditPrazo) {
+                            Divider()
+                            Text(
+                                "✎  Editar prazo", color = Tokens.Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 10.dp).clickable { showEditPrazo = true },
+                            )
+                        }
+                    }
+                    if (showEditPrazo) {
+                        AlertDialog(
+                            onDismissRequest = { showEditPrazo = false },
+                            confirmButton = { TextButton(onClick = { showEditPrazo = false }) { Text("Fechar") } },
+                            title = { Text("Editar prazo") },
+                            text = {
+                                Text(
+                                    "Início planejado: " + (if (sla.startMs > 0) DateUtil.fmtMs(sla.startMs) else "Não definido") +
+                                        "\nPrazo final: " + DateUtil.fmtMs(sla.dueMs) +
+                                        "\n\nApenas Social Media e Administradores podem ajustar o prazo. A gravação segura (via Worker + auditoria) será habilitada após autorização — nesta fase nada é gravado.",
+                                )
+                            },
+                        )
                     }
                     Spacer(Modifier.height(16.dp))
                 }

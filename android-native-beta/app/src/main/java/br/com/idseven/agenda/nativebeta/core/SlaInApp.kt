@@ -53,6 +53,18 @@ data class SlaOpRow(
 )
 data class SlaOpData(val overdue: List<SlaOpRow>, val warning: List<SlaOpRow>, val total: Int)
 
+// F3.3.2 — RBAC do "Editar prazo": Social Media + Admin (espelha canSeeAll do Desktop).
+// Designer comum / Cliente NÃO podem. (admin == true) OU cargo contém palavra de gestão.
+object SlaRbac {
+    private val MANAGER_KW = listOf("social", "gestor", "gerente", "diretor", "coordena", "supervisor", "admin", "dono", "owner", "ceo", "head")
+    fun canEditPrazo(u: UserLite?): Boolean {
+        if (u == null) return false
+        if (u.admin) return true
+        val r = (u.role ?: "").lowercase()
+        return MANAGER_KW.any { r.contains(it) }
+    }
+}
+
 object SlaInApp {
     private const val FINISH_WARN_MS = 30 * 60000L
 
@@ -285,27 +297,17 @@ fun SlaOpPanel(
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text("Acompanhamento de prazos", color = Color(0xFFEEF2F8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("Prazo final das demandas — em tempo real", color = Color(0xFF8B97A8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // F3.3.2 (reteste): estado verde COMPACTO — mensagem inline no subtítulo (sem bloco extra).
+                Text(
+                    if (data.total == 0) "Tudo em dia — nenhuma tarefa atrasada ou com prazo próximo" else "Prazo final das demandas — em tempo real",
+                    color = Color(0xFF8B97A8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
             }
             if (data.total == 0) OpPill("Tudo em dia", OP_GREEN)
             if (data.overdue.isNotEmpty()) OpPill("${data.overdue.size} atrasada" + (if (data.overdue.size == 1) "" else "s"), OP_RED)
             if (data.warning.isNotEmpty()) { Spacer(Modifier.width(6.dp)); OpPill("${data.warning.size} próx.", OP_AMBER) }
         }
-        if (data.total == 0) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 13.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(OP_GREEN.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    Text("✓", color = OP_GREEN, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.width(11.dp))
-                Column {
-                    Text("Tudo em dia", color = Color(0xFFDFE6F1), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text("Nenhuma tarefa atrasada ou com prazo próximo.", color = Color(0xFF8B97A8), fontSize = 11.5.sp)
-                }
-            }
-        } else {
+        if (data.total > 0) {
             if (data.overdue.isNotEmpty()) OpSection("Atrasadas", OP_RED, data.overdue, onOpenTask)
             if (data.warning.isNotEmpty()) OpSection("Prazo próximo", OP_AMBER, data.warning, onOpenTask)
             Spacer(Modifier.height(8.dp))

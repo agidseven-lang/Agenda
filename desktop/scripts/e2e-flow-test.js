@@ -1537,9 +1537,9 @@ console.log(`${C.b}\n[FASE PRODUÇÃO 1] Flow Engine canônico (Social → Desig
 
 /* ─── [PROD1.6] Visual: card ÚNICO preenche a coluna (opção B) + popover do menu sem overlap ─── */
 console.log(`${C.b}\n[PROD1.6] Card único preenche a coluna (opção B) + regressões visuais (menu "⋯", SLA, Flow Engine)${C.x}`);
-check('PROD16_CARD_FILL_KEYBREATHS','Card ÚNICO preenche 100% a coluna (opção B): .kbv2-card:only-child flex:1 1 auto + respiro distribuído em 3 cortes (origem·temas·rodapé) via margin-top:auto (rodapé na base). SEM filler, SEM space-between bruto (não é A), SEM zoom de fonte (não é C); footer-base intacto (margin-top:2px)',
+check('PROD16_CARD_FILL_KEYBREATHS','Card ÚNICO preenche a coluna (grow) mas NUNCA encolhe (F3.3.2: flex:1 0 auto — sem corte quando o painel SLA ocupa altura) + respiro distribuído em 3 cortes (origem·temas·rodapé) via margin-top:auto (rodapé na base). SEM filler, SEM space-between bruto (não é A), SEM zoom de fonte (não é C); footer-base intacto (margin-top:2px)',
   !/kbv2-column-filler/.test(DH)
-  && /\.kbv2-column-body>\.kbv2-card:only-child\{ flex:1 1 auto; \}/.test(DH)
+  && /\.kbv2-column-body>\.kbv2-card:only-child\{ flex:1 0 auto; \}/.test(DH)
   && /:only-child>\.kbv2-card-origin,[\s\S]*?:only-child>\.kbv2-card-themes,[\s\S]*?:only-child>\.kbv2-card-footer\{ margin-top:auto; \}/.test(DH)
   && !/:only-child\{ flex:1 1 auto; justify-content:space-between/.test(DH)
   && !/kbv2-card:only-child \.kbv2-title\{ font-size/.test(DH)

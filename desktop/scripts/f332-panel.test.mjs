@@ -115,8 +115,20 @@ ok('B2 -30min exato => laranja', row(withSla({ planDueAt: NOW + 30 * MIN })) && 
 ok('B3 -31min => fora do painel', row(withSla({ planDueAt: NOW + 31 * MIN })) === null);
 // B4 — painel HTML aparece SEMPRE: o renderer não retorna '' quando vazio (regressão do reteste).
 { const html = src; const i2 = html.indexOf('function slaOpPanelHtml');
-  const seg = html.slice(i2, i2 + 900);
+  const seg = html.slice(i2, i2 + 1400);
   ok('B4 slaOpPanelHtml não tem "return \'\'" (aparece sempre)', i2 > 0 && !/if\(!d\.total\)\s*return\s*'';/.test(seg) && /Tudo em dia/.test(seg)); }
+// === REPROVAÇÃO PÓS-RETESTE 2 — compactação + Kanban preservado + RBAC (asserções de fonte) ===
+// B5 — painel COMPACTO: estado verde em barra fina (slaop-green) + lista de alertas com scroll próprio (slaop-list)
+ok('B5 painel compacto (slaop-green + slaop-list)', /slaop-green/.test(src) && /class="slaop-list"/.test(src) && /max-height:150px;overflow:auto/.test(src));
+// B6 — card NUNCA encolhe: base flex:0 0 auto + only-child flex:1 0 auto (corrige corte topo/rodapé)
+ok('B6 card não encolhe (flex-shrink:0)', /\.kbv2-card\{[\s\S]*?flex:0 0 auto;/.test(src) && /kbv2-card:only-child\{ flex:1 0 auto; \}/.test(src));
+// B7 — "Sua etapa / Próxima ação" redesenhada premium (ícones + pill)
+ok('B7 etapa redesenhada (kbv2-stage2 + pill + ícones)', /kbv2-stage2/.test(src) && /kbv2-st2-pill/.test(src) && /kbv2-st2-ic/.test(src));
+// B8 — "Editar prazo" gated por canSeeAll (Social/Admin); designer comum não vê
+ok('B8 Editar prazo RBAC (canSeeAll)', /canSeeAll\(state\.user\)[\s\S]{0,80}data-sla-editprazo/.test(src) && /function slaEditPrazoOpen/.test(src));
+// B9 — modal de editar prazo NÃO grava (sem fetch/setDoc; save bloqueado "pendente de autorização")
+{ const i3 = src.indexOf('function slaEditPrazoOpen'); const seg2 = src.slice(i3, i3 + 2600);
+  ok('B9 editar prazo não escreve (zero write)', i3 > 0 && !/\bfetch\b|setDoc|updateDoc|addDoc/.test(seg2) && /pendente de autoriza/i.test(seg2)); }
 
 console.log('\nF3.3.2 PANEL RESULT: ' + pass + ' PASS / ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);
