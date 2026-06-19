@@ -432,7 +432,10 @@
   body.desktop #app > .topbar{display:none !important}
   /* avatar do canto superior direito — presente no print de referência */
   .corner-avatar{display:none}
-  body.desktop .corner-avatar{display:flex;position:fixed;top:10px;right:16px;z-index:40;border-radius:50%;padding:0;box-shadow:0 0 0 2px rgba(91,108,255,.45);transition:transform .12s, box-shadow .12s}
+  /* F3.3.2 (feedback do owner): cluster topo-direito deslocado ~1,5cm à esquerda (≈56px). O sino
+     e o SLA Monitor seguem o avatar em runtime (slaibAlign/slaMonAlign), então deslocar o avatar
+     desloca o conjunto inteiro mantendo o alinhamento. */
+  body.desktop .corner-avatar{display:flex;position:fixed;top:10px;right:72px;z-index:40;border-radius:50%;padding:0;box-shadow:0 0 0 2px rgba(91,108,255,.45);transition:transform .12s, box-shadow .12s}
   body.desktop .corner-avatar:hover{transform:scale(1.05);box-shadow:0 0 0 3px rgba(91,108,255,.35)}
   /* flex:none anula o flex:1 do .nav button base: sem ele o botão de perfil ESTICAVA e engolia
      todo o espaço livre da coluna em telas altas (perfil "flutuando" com buraco enorme abaixo). */
@@ -2038,7 +2041,7 @@ body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
    que o flexbox DIVIDE IGUALMENTE entre esses 3 pontos; o rodapé ancora na base. Aplica SÓ quando
    há exatamente 1 card na coluna (:only-child) — colunas multi-card mantêm altura natural + scroll.
    Sem filler/drop-zone, sem bloco duplicado, sem 2º "+". */
-body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:1 1 auto; }
+body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:1 0 auto; }
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-origin,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-themes,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-top:auto; }
@@ -2574,7 +2577,7 @@ function slaibEnsureStyle(){
   if(document.getElementById('slaib-style')) return;
   var st=document.createElement('style'); st.id='slaib-style';
   st.textContent='.slaib-bell{position:fixed;top:12px;right:14px;z-index:41;width:40px;height:40px;border-radius:50%;background:#1b2030;border:1px solid rgba(255,255,255,.10);color:#e8ecf4;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35)}'
-   +'body.desktop .slaib-bell{top:11px;right:66px;width:38px;height:38px}'   /* canto superior direito, à ESQUERDA do avatar fixo (corner-avatar: top:10 right:16 38px), sem sobrepor */
+   +'body.desktop .slaib-bell{top:11px;right:122px;width:38px;height:38px}'   /* à ESQUERDA do avatar (corner-avatar deslocado p/ right:72); runtime: slaibAlign segue o avatar */
    +'.slaib-bell svg{width:21px;height:21px;display:block}'
    +'.slaib-bell:hover{background:#222a3d}'
    +'.slaib-count{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#ff6b61;color:#fff;font-size:11px;font-weight:800;display:none;align-items:center;justify-content:center;box-shadow:0 0 0 2px #0b0e14}'
@@ -2642,6 +2645,14 @@ function slaibEnsureStyle(){
    +'.slamon-empty{display:flex;align-items:center;gap:12px;padding:14px 11px}'
    +'.slamon-empty .eic{width:36px;height:36px;border-radius:11px;background:radial-gradient(120% 120% at 30% 20%,rgba(70,211,158,.30),rgba(55,209,150,.1));box-shadow:0 0 0 1px rgba(55,209,150,.34);color:#5ee0b0;display:flex;align-items:center;justify-content:center;flex:0 0 auto}.slamon-empty .eic svg{width:19px;height:19px}'
    +'.slamon-empty .et{font-size:13.5px;font-weight:800;color:#e7edf6}.slamon-empty .es{font-size:11.5px;color:#8b97a8;margin-top:2px}'
+   /* FASE 5 — barra FIXA de bloqueio operacional (atraso crítico). Flutua abaixo do header;
+      NÃO empurra o board (position:fixed). Só aparece p/ o designer com tarefa crítica. */
+   +'.sla-block{position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:43;display:flex;align-items:center;gap:12px;max-width:92vw;padding:10px 14px;border-radius:14px;background:linear-gradient(180deg,#3a1410,#27100d);border:1px solid rgba(255,107,97,.5);box-shadow:0 18px 40px -16px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.06)}'
+   +'.sla-block .sb-ic{width:30px;height:30px;border-radius:9px;background:radial-gradient(120% 120% at 30% 20%,rgba(255,140,132,.4),rgba(255,107,97,.14));box-shadow:0 0 0 1px rgba(255,107,97,.5);color:#ffb0a8;display:flex;align-items:center;justify-content:center;flex:0 0 auto}.sla-block .sb-ic svg{width:17px;height:17px}'
+   +'.sla-block .sb-tx{color:#ffd9d4;font-size:12.5px;line-height:1.3}.sla-block .sb-tx b{color:#fff}'
+   +'.sla-block button{flex:0 0 auto;height:32px;padding:0 12px;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid transparent}'
+   +'.sla-block .sb-open{background:linear-gradient(180deg,#ff7d72,#e8483c);color:#fff}'
+   +'.sla-block .sb-sig{background:rgba(255,255,255,.08);color:#ffd9d4;border-color:rgba(255,255,255,.18)}'
    +'.slaop-grp{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:6px 4px 3px}'
    +'.slaop-grp .pd{width:7px;height:7px;border-radius:50%}'
    +'.slaop-grp.red{color:#ff8c84}.slaop-grp.red .pd{background:#ff6b61}.slaop-grp.amber{color:#f4b860}.slaop-grp.amber .pd{background:#f2a93b}'
@@ -2655,6 +2666,7 @@ function slaibEnsureStyle(){
    +'.slaop-time{font-size:12px;font-weight:800}.slaop-it.red .slaop-time{color:#ff8c84}.slaop-it.amber .slaop-time{color:#f4b860}'
    +'.slaop-rule{font-size:10.5px;color:#ffb0a8;background:rgba(255,107,97,.10);border-radius:6px;padding:3px 7px;margin-top:1px}'
    +'.slaop-rule.crit{color:#fff;background:linear-gradient(90deg,#ff5247,#e8392d);font-weight:800}'
+   +'.slaop-rule.sub{background:transparent;padding:2px 7px 0;font-weight:700;color:#ffc7c1}'
    +'.slaop-open{flex:0 0 auto;align-self:center;font-size:11px;font-weight:700;border:1px solid rgba(127,166,255,.32);background:rgba(127,166,255,.10);color:#bcd0ff;border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap}'
    +'.slaop-open:hover{background:rgba(127,166,255,.18)}'
    /* F3.3.2 — botão "Editar prazo" (RBAC: Social/Admin) + modal seguro (sem escrita nesta fase) */
@@ -2762,8 +2774,8 @@ function slaOpRowHtml(x){
   // após esgotada, o estado crítico. (read-only; sem escalonamento/push real nesta fase.)
   var rule=(x.sev==='vermelho')
     ? (x.critical
-        ? '<div class="slaop-rule crit">Atraso crítico — sinalize imediatamente.</div>'
-        : '<div class="slaop-rule">Restam '+slaMonDur(x.graceRemainingMin)+' para concluir ou sinalizar atraso.</div>')
+        ? '<div class="slaop-rule crit">Atraso crítico — sinalize atraso imediatamente.</div>'
+        : '<div class="slaop-rule">Você tem 10 minutos para concluir a tarefa.</div><div class="slaop-rule sub">Restam '+slaMonDur(x.graceRemainingMin)+' para concluir ou sinalizar atraso.</div>')
     : '';
   // barra de progresso = consumo da janela de SLA (início→término), em tempo real
   var pct=100, now=Date.now();
@@ -2852,6 +2864,8 @@ if(typeof window!=='undefined' && !window.__slaMonBound){ window.__slaMonBound=t
     var w=document.getElementById('sla-monitor');
     var o=e.target.closest&&e.target.closest('[data-sla-open]');
     if(o){ if(e.preventDefault)e.preventDefault(); slaMonOpen=false; if(w)w.classList.remove('open'); slaibOpenTask(o.getAttribute('data-sla-open')); return; }
+    var sig=e.target.closest&&e.target.closest('[data-sla-signal]');
+    if(sig){ if(e.preventDefault)e.preventDefault(); if(typeof flashToast==='function')flashToast('Sinalização de atraso preparada. Gravação real aguarda autorização operacional.'); return; }
     var tog=e.target.closest&&e.target.closest('[data-slamon-toggle]');
     if(tog){ if(e.preventDefault)e.preventDefault(); slaMonOpen=!slaMonOpen; slaMonRender(); return; }
     if(slaMonOpen && w && !w.contains(e.target)){ slaMonOpen=false; slaMonRender(); }   // clique fora fecha
@@ -2921,7 +2935,50 @@ function slaMonScheduleBoundary(){
     _slaBoundaryTimer=setTimeout(function(){ try{ slaibRefresh(); }catch(_){} }, delay);
   }catch(_){}
 }
-function slaibRefresh(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaMonScheduleBoundary(); }catch(_){}
+/* F3.3.2 (FASE 5 — BLOQUEIO OPERACIONAL, escopo aprovado pelo owner: DESIGNER responsável;
+   Admin/Social SUPERVISIONAM e NÃO são bloqueados). Retorna a tarefa em ATRASO CRÍTICO
+   (now >= prazo final + 10min, não entregue) atribuída ao DESIGNER atual, ou null.
+   Guarda 100% in-app: NÃO grava no Firestore, sem push, sem deploy. */
+function slaCriticalFor(u){
+  u=u||state.user; if(!u) return null;
+  if(typeof canSeeAll==='function' && canSeeAll(u)) return null;     // Admin/Social supervisionam (não bloqueia)
+  var now=Date.now(), f=(typeof dtMs==='function'?dtMs:null);
+  var vis=(typeof slaibVisible==='function')?slaibVisible(u):(state.tasks||[]);
+  for(var i=0;i<vis.length;i++){ var t=vis[i]; if(!t||!t.designerSla) continue;
+    var resp=(t.designerAssignment&&t.designerAssignment.designerId)||t.assigneeId||null;
+    if(resp!==u.id) continue;                                        // só a tarefa do designer atual
+    var d=resolveTaskDisplayState(t,now,f);
+    if(d.state==='overdue' && d.critical) return t;                  // atraso crítico (>10min)
+  }
+  return null;
+}
+/* Guarda de avanço: bloqueia mover/iniciar/concluir OUTRAS tarefas enquanto houver atraso crítico.
+   Permite agir na PRÓPRIA tarefa crítica (concluir/abrir destrava). Retorna true se BLOQUEOU. */
+function slaGuardBlocked(taskId){
+  try{
+    var blk=slaCriticalFor(state.user);
+    if(blk && blk.id!==taskId){
+      if(typeof flashToast==='function')flashToast('Existe uma tarefa em atraso crítico. Conclua ou sinalize atraso antes de continuar outras tarefas.');
+      try{ slaBlockRender(); }catch(_){}
+      return true;
+    }
+  }catch(_){}
+  return false;
+}
+function slaBlockRender(){
+  var authed=!!(state.user)&&document.body.classList.contains('authed');
+  var el=document.getElementById('sla-block');
+  var blk=authed?slaCriticalFor(state.user):null;
+  if(!blk){ if(el)el.remove(); document.body.classList.remove('sla-blocked'); return; }
+  slaibEnsureStyle();
+  document.body.classList.add('sla-blocked');
+  if(!el){ el=document.createElement('div'); el.id='sla-block'; el.className='sla-block'; document.body.appendChild(el); }
+  el.innerHTML='<span class="sb-ic">'+SLAOP_ALERT_SVG+'</span>'
+    +'<span class="sb-tx"><b>Tarefa em atraso crítico.</b> Conclua ou sinalize atraso antes de continuar outras tarefas.</span>'
+    +'<button class="sb-open" data-sla-open="'+slaibEsc(blk.id)+'">Abrir tarefa</button>'
+    +'<button class="sb-sig" data-sla-signal="'+slaibEsc(blk.id)+'">Sinalizar atraso</button>';
+}
+function slaibRefresh(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaBlockRender(); }catch(_){} try{ slaMonScheduleBoundary(); }catch(_){}
   /* re-alinha o cluster sino/avatar/widget APÓS o layout assentar (corrige desalinho de timing
      em fonte/reflow que o owner mediu) */
   try{ requestAnimationFrame(function(){ try{ slaHeaderAlign(); }catch(_){} }); }catch(_){} }
@@ -2929,6 +2986,11 @@ try{ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(function
 try{ window.addEventListener('load',function(){ try{ slaHeaderAlign(); }catch(_){} }); }catch(_){}
 if(typeof renderFromSnapshot==='function'){ var _slaib_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_slaib_rfs.apply(this,arguments); slaibRefresh(); return r; }; }
 try{ setInterval(slaibRefresh,30000); }catch(_){}                 /* tempo real (read-side): contador, cor e contagem regressiva */
+/* F3.3.2 (precisão do contador): tick de 1s SÓ quando há contador ATIVO (laranja/vermelho/crítico
+   na visão) — mantém "Vence em X"/tolerância exatos com o relógio real, sem custo quando calmo. */
+function slaMonHasActive(){ try{ var d=slaMonData(); return !!(d&&d.total); }catch(_){ return false; } }
+function slaTick(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaBlockRender(); }catch(_){} }
+try{ setInterval(function(){ if(slaMonHasActive()) slaTick(); },1000); }catch(_){}
 try{ window.addEventListener('resize',function(){ slaHeaderAlign(); }); }catch(_){}
 try{ setTimeout(slaibRefresh,0); }catch(_){}
 function render(){
@@ -4173,6 +4235,7 @@ function designerMoveOpts(t){const cur=designerCol(t);
   return [{key:'concluido',label:'Entregue',desc:'Entrega para a Social finalizar'},{key:'revisao',label:'Revisão/Ajuste',desc:'Marcar que há ajuste a corrigir'},{key:'afazer',label:'A Fazer',desc:'Pausar e retornar'}];
 }
 function openMove(taskId){
+  if(slaGuardBlocked(taskId))return;   // FASE 5: atraso crítico bloqueia mover OUTRAS tarefas
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const opts=isDesignerAxisMove(t)
     ? designerMoveOpts(t).map(o=>({key:o.key,label:o.label,desc:o.desc,color:stOf(o.key).color}))
@@ -4181,6 +4244,7 @@ function openMove(taskId){
     opts.map(st=>'<button class="moveopt" data-domove="'+t.id+'|'+st.key+'" style="background:'+withAlpha(st.color,.12)+'"><div class="icb" style="background:'+withAlpha(st.color,.18)+';color:'+st.color+'">'+svg('swap')+'</div><div><div style="font-size:14px;font-weight:800;color:'+st.color+'">'+st.label+'</div><div style="font-size:11.5px;color:var(--faint)">'+st.desc+'</div></div></button>').join('')+'</div></div>';
 }
 async function moveStatus(taskId,newStatus){
+  if(slaGuardBlocked(taskId))return;   // FASE 5: atraso crítico bloqueia avançar/concluir OUTRAS tarefas
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;const now=Date.now();
   if(isDesignerAxisMove(t)){
     // EIXO DO DESIGNER (fonte única): grava designerFlowStatus; NÃO toca em status genérico nem doneAt.

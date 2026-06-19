@@ -87,7 +87,7 @@ await page.evaluate(() => {
   document.body.classList.remove('authed');
   const app = document.getElementById('app'); if (app) app.style.display = 'none';
   const login = document.getElementById('login'); if (login) login.classList.remove('hidden');
-  ['cornerAvatar', 'sla-monitor', 'slaib-bell', 'slaib-ov'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+  ['cornerAvatar', 'sla-monitor', 'slaib-bell', 'slaib-ov', 'sla-block'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
   try { slaibRefresh(); } catch (_) {}
 });
 await page.waitForTimeout(300);
@@ -117,7 +117,8 @@ const widget = await page.evaluate(() => {
     cls: w.className, open: w.className.includes('open'), groups: grps,
     redBeforeAmber: grps.indexOf('red') === 0 && grps.includes('amber'),
     hasAtrasada: /Atrasada h[áa] \d+/.test(txt), hasFaltam: /Faltam \d+/.test(txt),
-    graceVisible: /para concluir ou sinalizar atraso/.test(txt), critVisible: /Atraso cr[ií]tico — sinalize imediatamente/.test(txt),
+    graceVisible: /para concluir ou sinalizar atraso/.test(txt), critVisible: /Atraso cr[ií]tico — sinalize atraso imediatamente/.test(txt),
+    graceMsgVisible: /Você tem 10 minutos para concluir a tarefa/.test(txt),
     hasOpenBtn: !!w.querySelector('[data-sla-open]'), hasSeg: !!w.querySelector('.slamon-seg'),
     hasLive: !!w.querySelector('.slamon-live'), hasHero: /Atraso máx\.|Vence em/.test(txt),
     hasProgress: !!w.querySelector('.slaop-prog'), monitorTitle: /Monitor de prazos/.test(txt), inBoardPanel,
@@ -205,6 +206,43 @@ const orangeImmediate = await page.evaluate(() => {
   return { amberNow: !!w && /amber/.test(w.className), hasBoundary: typeof slaMonScheduleBoundary === 'function' };
 });
 
+// ===================== FASE 5 — bloqueio operacional (atraso crítico, escopo designer) =====================
+const block = await page.evaluate(({ PNG1x1 }) => {
+  const NOW = Date.now(), MIN = 60000;
+  const designer = { id: 'dz1', name: 'Marina Alves', role: 'Designer', photo: PNG1x1 };
+  const admin = { id: 'owner', name: 'Owner Admin', role: 'Administrador', admin: true };
+  state.users = [designer, admin];
+  const crit = { id: 'crit', title: 'Tarefa crítica', client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', designerAssignment: { designerId: 'dz1', designerName: 'Marina Alves' }, designerFlowStatus: 'andamento', designerSla: { planStartAt: NOW - 120 * MIN, planDueAt: NOW - 15 * MIN } };
+  const other = { id: 'other', title: 'Outra tarefa', client: 'X', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', designerAssignment: { designerId: 'dz1', designerName: 'Marina Alves' }, designerFlowStatus: 'andamento', designerSla: { planStartAt: NOW - 60 * MIN, planDueAt: NOW + 90 * MIN } };
+  state.tasks = [crit, other];
+  // DESIGNER: bloqueado p/ outras; pode agir na crítica; banner aparece
+  state.user = designer; document.body.classList.add('authed'); slaibRefresh();
+  const critFound = (typeof slaCriticalFor === 'function') ? (slaCriticalFor(designer) || {}).id : null;
+  const blocksOther = (typeof slaGuardBlocked === 'function') ? slaGuardBlocked('other') : null;
+  const allowsCrit = (typeof slaGuardBlocked === 'function') ? slaGuardBlocked('crit') : null;
+  const bannerForDesigner = !!document.getElementById('sla-block');
+  // ADMIN: supervisiona, NÃO bloqueado, sem banner
+  state.user = admin; slaibRefresh();
+  const adminCrit = (typeof slaCriticalFor === 'function') ? slaCriticalFor(admin) : 'fn?';
+  const adminBlocks = (typeof slaGuardBlocked === 'function') ? slaGuardBlocked('other') : null;
+  const bannerForAdmin = !!document.getElementById('sla-block');
+  return {
+    designerBlocksOther: critFound === 'crit' && blocksOther === true && allowsCrit === false && bannerForDesigner === true,
+    adminNotBlocked: adminCrit === null && adminBlocks === false && bannerForAdmin === false,
+  };
+}, { PNG1x1 });
+// screenshot do bloqueio (designer)
+await page.evaluate(({ PNG1x1 }) => {
+  const NOW = Date.now(), MIN = 60000;
+  const designer = { id: 'dz1', name: 'Marina Alves', role: 'Designer', photo: PNG1x1 };
+  state.user = designer; state.users = [designer];
+  state.tasks = [{ id: 'crit', title: 'Reels de lançamento', client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', designerAssignment: { designerId: 'dz1', designerName: 'Marina Alves' }, designerFlowStatus: 'andamento', designerSla: { planStartAt: NOW - 120 * MIN, planDueAt: NOW - 15 * MIN } }];
+  state.tab = 'tarefas'; state.personBoard = 'dz1'; document.body.classList.add('desktop', 'authed');
+  try { render(); } catch (_) {} try { slaibRefresh(); } catch (_) {}
+}, { PNG1x1 });
+await page.waitForTimeout(300);
+await page.screenshot({ path: path.join(OUT, 'f332-16-bloqueio-critico.png') });
+
 // ===================== detalhe + Editar prazo (admin) + RBAC designer =====================
 await scenario('red');
 await page.evaluate(() => { try { openDetails('r1'); } catch (_) {} });
@@ -242,6 +280,7 @@ const header = await page.evaluate(() => {
     monPresent: !!m, monAvatarCyDelta: m ? Math.round(Math.abs(m.cy - a.cy)) : null, monLeftOfBell: m ? (m.right <= b.left + 4) : false,
     clusterAligned: m ? (Math.abs(b.cy - a.cy) <= 2 && Math.abs(m.cy - a.cy) <= 3) : (Math.abs(b.cy - a.cy) <= 2),
     badgeAbsolute: badgeAbs,
+    avatarRightInset: Math.round(window.innerWidth - a.right), shiftedLeft: (window.innerWidth - a.right) >= 50,
   };
 });
 for (const [w, h, nm] of [[1366, 768, 'f332-08-1366x768.png'], [1920, 1080, 'f332-10-1920x1080.png']]) {
@@ -249,9 +288,9 @@ for (const [w, h, nm] of [[1366, 768, 'f332-08-1366x768.png'], [1920, 1080, 'f33
   await page.screenshot({ path: path.join(OUT, nm) });
 }
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, cut, card, consist, orangeImmediate, detail, editPrazo, rbac, header, errors }, null, 2));
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, cut, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, errors }, null, 2));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
-console.log('CARD:', JSON.stringify(card)); console.log('CONSIST:', JSON.stringify(consist)); console.log('ORANGE:', JSON.stringify(orangeImmediate));
+console.log('CARD:', JSON.stringify(card)); console.log('CONSIST:', JSON.stringify(consist)); console.log('ORANGE:', JSON.stringify(orangeImmediate)); console.log('BLOCK:', JSON.stringify(block));
 console.log('DETAIL:', JSON.stringify(detail)); console.log('EDIT:', JSON.stringify(editPrazo)); console.log('RBAC:', JSON.stringify(rbac)); console.log('HEADER:', JSON.stringify(header));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
 await browser.close(); server.close();
@@ -272,8 +311,9 @@ if (!widget.open) fail.push('dropdown não abriu');
 if (!widget.monitorTitle) fail.push('dropdown sem "Monitor de prazos"');
 if (!widget.redBeforeAmber) fail.push('vermelho não antes do laranja');
 if (!widget.hasAtrasada || !widget.hasFaltam) fail.push('faltam textos de tempo');
-if (!widget.graceVisible) fail.push('redGraceWindowVisible falhou (sem "para concluir ou sinalizar atraso")');
-if (!widget.critVisible) fail.push('estado crítico (>10min) não exibido');
+if (!widget.graceVisible) fail.push('redGraceCountdownVisible falhou (sem "para concluir ou sinalizar atraso")');
+if (!widget.graceMsgVisible) fail.push('redGraceMessageVisible falhou (sem "Você tem 10 minutos para concluir a tarefa")');
+if (!widget.critVisible) fail.push('redCriticalVisibleAfter10min falhou (estado crítico não exibido)');
 if (!widget.hasOpenBtn) fail.push('sem Abrir tarefa');
 if (!widget.hasSeg || !widget.hasLive || !widget.hasHero) fail.push('widget v2 sem segmentos/ao vivo/herói');
 if (!widget.hasProgress) fail.push('dropdown sem barra de progresso');
@@ -294,8 +334,11 @@ if (card.anyInicioAtrasado) fail.push('card mostra "Início atrasado" (proibido)
 // status/fuso/laranja
 if (!consist.statusConsistent) fail.push('statusConsistent falhou (card/painel/detalhe divergem)');
 if (!consist.timeMathConsistent) fail.push('timeMathConsistent falhou (contagem/fuso)');
-if (!orangeImmediate.amberNow) fail.push('orangeTransitionDelayAcceptable falhou (amber não imediato)');
+if (!orangeImmediate.amberNow) fail.push('orangeTransitionImmediate falhou (amber não imediato)');
 if (!orangeImmediate.hasBoundary) fail.push('boundary timer ausente');
+// FASE 5 — bloqueio operacional (atraso crítico)
+if (!block.designerBlocksOther) fail.push('criticalOverdueBlocksOtherTasks falhou (designer não foi bloqueado)');
+if (!block.adminNotBlocked) fail.push('admin/social foi bloqueado indevidamente (escopo errado)');
 // detalhe/rbac/editar
 if (!detail.hasSla || !detail.editPrazoAdmin) fail.push('detalhe/Editar prazo (admin) incompleto');
 if (!detail.graceInDetail) fail.push('detalhe sem janela de 10 min no vermelho');
@@ -307,6 +350,7 @@ if (header.ok && !header.clusterAligned) fail.push('headerClusterAligned falhou 
 if (header.ok && (header.bellAvatarGap < 4 || header.bellAvatarGap > 24)) fail.push('folga sino↔avatar fora (' + header.bellAvatarGap + ')');
 if (header.ok && !header.badgeAbsolute) fail.push('badgeDoesNotShiftBell falhou (badge não é absolute)');
 if (header.ok && header.monPresent && !header.monLeftOfBell) fail.push('widget não está à esquerda do sino');
+if (header.ok && !header.shiftedLeft) fail.push('headerShiftedLeft falhou (cluster não deslocado ~1,5cm; inset=' + header.avatarRightInset + ')');
 
 if (fail.length) { console.error('::error::QA F3.3.2 FALHOU: ' + fail.join(' | ')); process.exit(1); }
 console.log('QA F3.3.2 OK — login sem widgets; coluna multi-card sem corte (1366/1600); avatar real; widget verde/laranja/vermelho com janela 10min + crítico; status/fuso coerentes; laranja imediato; header cluster alinhado; Editar prazo RBAC honesto.');
