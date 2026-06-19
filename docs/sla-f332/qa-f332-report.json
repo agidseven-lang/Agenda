@@ -11,6 +11,13 @@
     "hasOpenBtn": true,
     "counts": "2 atrasadas2 prazo próximo"
   },
+  "emptyPanel": {
+    "present": true,
+    "hasTitle": true,
+    "hasTudoEmDia": true,
+    "hasEmptyMsg": true,
+    "sections": 0
+  },
   "detail": {
     "hasSla": true,
     "hasPrazoEncerrado": true,
