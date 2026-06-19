@@ -1,7 +1,7 @@
 {
   "panel": {
     "present": true,
-    "sections": [
+    "groups": [
       "red",
       "amber"
     ],
@@ -9,19 +9,28 @@
     "hasAtrasada": true,
     "hasFaltam": true,
     "hasOpenBtn": true,
-    "counts": "2 atrasadas2 prazo próximo"
+    "height": 211,
+    "listScrolls": true,
+    "cardsTotal": 6,
+    "cardsCut": 0,
+    "stage2": 6
   },
   "emptyPanel": {
     "present": true,
     "hasTitle": true,
     "hasTudoEmDia": true,
-    "hasEmptyMsg": true,
-    "sections": 0
+    "hasEmptyMsg": false,
+    "groups": 0,
+    "height": 46
   },
   "detail": {
     "hasSla": true,
     "hasPrazoEncerrado": true,
-    "hasAtraso": true
+    "hasAtraso": true,
+    "editPrazoAdmin": true
+  },
+  "rbac": {
+    "editPrazoDesigner": false
   },
   "header": {
     "ok": true,
@@ -29,6 +38,11 @@
     "bellAvatarTopDelta": 0,
     "bellAvatarGap": 10,
     "hasLogo": true
+  },
+  "tight": {
+    "cardsTotal": 6,
+    "cardsCut": 0,
+    "panelHeight": 165
   },
   "errors": []
 }
