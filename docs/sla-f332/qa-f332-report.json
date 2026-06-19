@@ -25,6 +25,7 @@
     "hasFaltam": true,
     "graceVisible": true,
     "critVisible": true,
+    "graceMsgVisible": true,
     "hasOpenBtn": true,
     "hasSeg": true,
     "hasLive": true,
@@ -71,6 +72,10 @@
     "amberNow": true,
     "hasBoundary": true
   },
+  "block": {
+    "designerBlocksOther": true,
+    "adminNotBlocked": true
+  },
   "detail": {
     "hasSla": true,
     "editPrazoAdmin": true,
@@ -90,7 +95,9 @@
     "monAvatarCyDelta": 1,
     "monLeftOfBell": true,
     "clusterAligned": true,
-    "badgeAbsolute": true
+    "badgeAbsolute": true,
+    "avatarRightInset": 72,
+    "shiftedLeft": true
   },
   "errors": []
 }
