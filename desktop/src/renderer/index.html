@@ -1943,7 +1943,7 @@ body.desktop .kbv2-column-header{ display:flex; align-items:center; gap:9px; pad
 body.desktop .kbv2-column-header .kbv2-cdot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; box-shadow:0 0 0 3px rgba(255,255,255,.04); }
 body.desktop .kbv2-column-header .kbv2-ctitle{ font-size:14.5px; font-weight:700; color:var(--kbv2-ink); letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 body.desktop .kbv2-column-header .kbv2-ccount{ margin-left:auto; min-width:24px; height:22px; padding:0 8px; border-radius:7px; background:rgba(255,255,255,.06); color:#aeb6c6; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
-body.desktop .kbv2-column-body{ flex:1 1 auto; display:flex; flex-direction:column; gap:14px; padding:4px 14px 0; min-height:0; overflow-y:auto; overflow-x:hidden; }
+body.desktop .kbv2-column-body{ flex:1 1 auto; display:flex; flex-direction:column; gap:14px; padding:4px 14px 12px; min-height:0; overflow-y:auto; overflow-x:hidden; }
 body.desktop .kbv2-column-add{
   flex:0 0 auto; margin:12px 14px 14px; height:42px; border-radius:12px;
   border:1px dashed rgba(255,255,255,.12); background:transparent; color:#8b94a6;
@@ -1961,6 +1961,10 @@ body.desktop .kbv2-empty-s{ font-size:12.5px; color:#828c9e; max-width:200px; li
 /* ───────── CARD dark premium ───────── */
 body.desktop .kbv2-card{
   position:relative; display:flex; flex-direction:column; gap:13px;
+  /* F3.3.2 (correção do corte real): NÃO encolher dentro da coluna flex que rola — sem
+     flex-shrink o flexbox comprimia/amputava os cards quando havia 2+ na coluna. Agora o card
+     mantém a altura natural e a COLUNA rola (o widget SLA é flutuante, não disputa altura). */
+  flex:0 0 auto;
   padding:16px; border-radius:16px; background:linear-gradient(180deg,#161d2e,#121726); border:1px solid rgba(255,255,255,.08);
   box-shadow:0 1px 2px rgba(0,0,0,.35), 0 16px 36px -20px rgba(0,0,0,.65);
 }
@@ -2178,6 +2182,19 @@ function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;
 function first(s){return (s||'').trim().split(/\s+/)[0]||'';}
 function initials(n){const p=(n||'').trim().split(/\s+/);return ((p[0]||'')[0]||'')+((p[1]||'')[0]||'');}
 function photoOf(u){if(!u)return'';for(const k of ['photo','photoUrl','avatar','avatarUrl','image','imageUrl','picture','foto']){if(u[k]&&String(u[k]).trim())return u[k];}return'';}
+/* F3.3.2 (correção: foto do responsável sumindo) — resolve o responsável REAL do card de forma
+   robusta. Tenta o diretório carregado por assigneeId → designer (designerAssignment) → criador
+   (by); se o perfil não estiver carregado, usa dados DENORMALIZADOS (nome/foto) — assim a foto
+   real nunca é substituída por fallback genérico quando existe um responsável válido. */
+function respOf(t){
+  if(!t)return null;
+  const ids=[t.assigneeId,(t.designerAssignment&&t.designerAssignment.designerId),t.by];
+  for(const id of ids){ if(id){ const u=(state.users||[]).find(x=>x&&x.id===id); if(u)return u; } }
+  const da=t.designerAssignment||{};
+  if(da.designerId||da.designerName)return {id:da.designerId||t.assigneeId,name:da.designerName||t.assignee||'',role:da.designerRole||'',photo:da.designerPhoto||da.photo||t.assigneePhoto||''};
+  if(t.assignee||t.assigneeId)return {id:t.assigneeId,name:t.assignee||'',photo:t.assigneePhoto||t.photo||''};
+  return null;
+}
 function avatar(u,size){const ph=photoOf(u);const col=userColor(u&&u.id);const st='width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*0.36)+'px;box-shadow:0 0 0 2px '+col+'55';if(ph&&/^https?:|^data:/.test(ph))return '<div class="av" style="'+st+';background-image:url(\''+esc(ph)+'\')"></div>';return '<div class="av" style="'+st+';background:'+col+'">'+esc(initials(u&&u.name).toUpperCase())+'</div>';}
 const MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const DOW=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
@@ -2311,7 +2328,7 @@ async function doRegister(name,role,phone,email,password){
 function saveSession(u){localStorage.setItem('wp_uid',u.id);localStorage.setItem('wp_name',u.name||'');}
 function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');localStorage.removeItem('wp_team_jwt');}
 function startApp(u){state.user=u;saveSession(u);document.body.classList.add("authed");document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
-function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';renderLogin();}
+function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}
 function subscribeData(){
   unsub.users=db.collection('users').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}renderFromSnapshot();});
   unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderFromSnapshot();});
@@ -2460,7 +2477,8 @@ function slaibFmtDur(ms){ms=Math.max(0,ms);var m=Math.round(ms/60000);if(m<60)re
  * designerAssignment.endDate/endTime → dueDate/dueTime. Exclui entregue/concluída/
  * cancelada/removida, sem designer e sem prazo válido. NÃO envia nada, NÃO escreve. */
 /* F3.3.2-PANEL-CORE BEGIN */
-var SLA_PANEL_WARN_MS=30*60000;
+var SLA_PANEL_WARN_MS=30*60000;   // janela LARANJA (prazo próximo): finish-30min <= now < finish
+var SLA_PANEL_GRACE_MS=10*60000;  // tolerância VERMELHA: 10 min após o finish p/ concluir/sinalizar
 function slaPanelFinishMs(t,dtMsFn){
   var ds=(t&&t.designerSla)||{};
   var pf=Number(ds.plannedFinishAt); if(pf>0) return pf;          // 1) plannedFinishAt (engine)
@@ -2488,14 +2506,19 @@ function resolveTaskDisplayState(t,now,dtMsFn){
   now=now||Date.now();
   var hasSla=!!(t&&t.designerSla);
   var finishMs=slaPanelFinishMs(t,dtMsFn)||0;
-  if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,label:'Concluído',remainingMin:0,overdueMin:0,hasSla:hasSla,inPanel:false};
-  if(!hasSla||!finishMs)   return {sev:'neutro',state:'none',finishMs:finishMs,label:'',remainingMin:0,overdueMin:0,hasSla:hasSla,inPanel:false};
+  if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,label:'Concluído',remainingMin:0,overdueMin:0,graceRemainingMin:0,critical:false,hasSla:hasSla,inPanel:false};
+  if(!hasSla||!finishMs)   return {sev:'neutro',state:'none',finishMs:finishMs,label:'',remainingMin:0,overdueMin:0,graceRemainingMin:0,critical:false,hasSla:hasSla,inPanel:false};
   if(now>=finishMs){ var over=Math.max(1,Math.round((now-finishMs)/60000));
-    return {sev:'vermelho',state:'overdue',finishMs:finishMs,label:'Prazo encerrado',remainingMin:0,overdueMin:over,hasSla:true,inPanel:true}; }
+    // F3.3.2 (regra operacional do owner): após o prazo final há uma JANELA DE TOLERÂNCIA de
+    // 10 min p/ concluir ou sinalizar atraso; passados os 10 min ⇒ atraso crítico (read-only,
+    // sem escalonamento/push real nesta fase).
+    var graceLeft=Math.max(0,Math.round((finishMs+SLA_PANEL_GRACE_MS-now)/60000));
+    var critical=(now>=finishMs+SLA_PANEL_GRACE_MS);
+    return {sev:'vermelho',state:'overdue',finishMs:finishMs,label:'Prazo encerrado',remainingMin:0,overdueMin:over,graceRemainingMin:graceLeft,critical:critical,hasSla:true,inPanel:true}; }
   if(now>=finishMs-SLA_PANEL_WARN_MS){ var left=Math.max(1,Math.round((finishMs-now)/60000));
-    return {sev:'laranja',state:'warning',finishMs:finishMs,label:'Prazo próximo',remainingMin:left,overdueMin:0,hasSla:true,inPanel:true}; }
+    return {sev:'laranja',state:'warning',finishMs:finishMs,label:'Prazo próximo',remainingMin:left,overdueMin:0,graceRemainingMin:0,critical:false,hasSla:true,inPanel:true}; }
   var rem=Math.max(1,Math.round((finishMs-now)/60000));
-  return {sev:'azul',state:'running',finishMs:finishMs,label:'Em prazo',remainingMin:rem,overdueMin:0,hasSla:true,inPanel:false};
+  return {sev:'azul',state:'running',finishMs:finishMs,label:'Em prazo',remainingMin:rem,overdueMin:0,graceRemainingMin:0,critical:false,hasSla:true,inPanel:false};
 }
 function slaPanelRow(t,now,dtMsFn){
   if(!t) return null;
@@ -2509,7 +2532,8 @@ function slaPanelRow(t,now,dtMsFn){
   if(!d.inPanel) return null;                       // entregue/dentro do prazo/sem prazo → fora do painel
   var startMs=Number(t.designerSla&&t.designerSla.planStartAt)||0;   // p/ a barra de progresso de tempo
   return {taskId:t.id,sev:d.sev,bucket:(d.sev==='vermelho'?'overdue':'warning'),finishMs:d.finishMs,startMs:startMs,
-          overdueMin:d.overdueMin,remainingMin:d.remainingMin,title:t.title||'',client:t.client||'',designerId:designerId};
+          overdueMin:d.overdueMin,remainingMin:d.remainingMin,graceRemainingMin:d.graceRemainingMin,critical:d.critical,
+          title:t.title||'',client:t.client||'',designerId:designerId};
 }
 function slaPanelDerive(tasks,now,dtMsFn){
   var rows=[]; (tasks||[]).forEach(function(t){ var r=slaPanelRow(t,now,dtMsFn); if(r) rows.push(r); });
@@ -2522,8 +2546,14 @@ function slaPanelDerive(tasks,now,dtMsFn){
  * ambos exigem designerSla = SLA iniciado no envio ao designer). Textos aprovados. */
 function slaibFinishAlert(t,now){
   var r=slaPanelRow(t,now||Date.now(),(typeof dtMs==='function'?dtMs:null)); if(!r) return null;
-  if(r.sev==='vermelho') return {sev:'vermelho',event:'designer_finish_overdue',label:'Prazo encerrado',
-    text:'Prazo ultrapassado há '+r.overdueMin+' min. Conclua imediatamente.',anchorMs:r.finishMs};
+  if(r.sev==='vermelho'){
+    // mesma regra de tolerância de 10 min do monitor/card/detalhe (fonte única)
+    var grace=r.critical
+      ? 'Atraso crítico — sinalize imediatamente.'
+      : 'Restam '+r.graceRemainingMin+' min para concluir ou sinalizar atraso.';
+    return {sev:'vermelho',event:'designer_finish_overdue',label:'Prazo encerrado',
+      text:'Atrasada há '+r.overdueMin+' min. '+grace,anchorMs:r.finishMs};
+  }
   return {sev:'laranja',event:'designer_finish_warning',label:'Prazo próximo',
     text:'Faltam '+r.remainingMin+' min — conclua até '+slaibFmtHM(r.finishMs)+'.',anchorMs:r.finishMs};
 }
@@ -2624,6 +2654,7 @@ function slaibEnsureStyle(){
    +'.slaop-meta{font-size:11px;color:#9fb0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
    +'.slaop-time{font-size:12px;font-weight:800}.slaop-it.red .slaop-time{color:#ff8c84}.slaop-it.amber .slaop-time{color:#f4b860}'
    +'.slaop-rule{font-size:10.5px;color:#ffb0a8;background:rgba(255,107,97,.10);border-radius:6px;padding:3px 7px;margin-top:1px}'
+   +'.slaop-rule.crit{color:#fff;background:linear-gradient(90deg,#ff5247,#e8392d);font-weight:800}'
    +'.slaop-open{flex:0 0 auto;align-self:center;font-size:11px;font-weight:700;border:1px solid rgba(127,166,255,.32);background:rgba(127,166,255,.10);color:#bcd0ff;border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap}'
    +'.slaop-open:hover{background:rgba(127,166,255,.18)}'
    /* F3.3.2 — botão "Editar prazo" (RBAC: Social/Admin) + modal seguro (sem escrita nesta fase) */
@@ -2727,7 +2758,13 @@ function slaOpRowHtml(x){
   var cls=(x.sev==='vermelho')?'red':'amber';
   var meta=(x.client?slaibEsc(x.client)+' · ':'')+'resp. '+slaOpName(x.designerId)+' · prazo '+slaibFmtHM(x.finishMs);
   var time=(x.sev==='vermelho')?('Atrasada há '+slaMonDur(x.overdueMin)):('Faltam '+slaMonDur(x.remainingMin));
-  var rule=(x.sev==='vermelho')?'<div class="slaop-rule">Conclua a tarefa atrasada em até 10 min ou sinalize atraso.</div>':'';
+  // F3.3.2 (regra operacional): vermelho mostra a JANELA de 10 min p/ concluir/sinalizar e,
+  // após esgotada, o estado crítico. (read-only; sem escalonamento/push real nesta fase.)
+  var rule=(x.sev==='vermelho')
+    ? (x.critical
+        ? '<div class="slaop-rule crit">Atraso crítico — sinalize imediatamente.</div>'
+        : '<div class="slaop-rule">Restam '+slaMonDur(x.graceRemainingMin)+' para concluir ou sinalizar atraso.</div>')
+    : '';
   // barra de progresso = consumo da janela de SLA (início→término), em tempo real
   var pct=100, now=Date.now();
   if(x.sev!=='vermelho'){ pct=(x.startMs>0&&x.finishMs>x.startMs)?Math.round((now-x.startMs)/(x.finishMs-x.startMs)*100):82; pct=Math.max(5,Math.min(99,pct)); }
@@ -2839,7 +2876,7 @@ function slaEditPrazoOpen(taskId){
     +'<div class="slaedit-ft"><button class="slaedit-cancel" id="slaedit-cancel">Cancelar</button><button class="slaedit-save" id="slaedit-save">Salvar prazo</button></div></div>';
   ov.addEventListener('click',function(e){
     if(e.target===ov||e.target.id==='slaedit-cancel'){ ov.remove(); return; }
-    if(e.target.id==='slaedit-save'){ if(typeof flashToast==='function')flashToast('Edição de prazo pronta, aguardando autorização operacional para gravação real.'); ov.remove(); return; }
+    if(e.target.id==='slaedit-save'){ if(typeof flashToast==='function')flashToast('Edição de prazo preparada. Gravação real aguarda autorização operacional.'); ov.remove(); return; }
   });
   document.body.appendChild(ov);
 }
@@ -2859,7 +2896,37 @@ function slaibRender(){
   slaHeaderAlign();
   if(document.getElementById('slaib-ov')) slaibRenderPanel(items,read);
 }
-function slaibRefresh(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} }
+/* F3.3.2 (correção: laranja/vermelho não imediatos) — BOUNDARY TIMER: além do tick de 30s
+   (que atualiza o contador), agenda um disparo ÚNICO exatamente no próximo limite temporal de SLA
+   (finish-30min ⇒ laranja · finish ⇒ vermelho · finish+10min ⇒ crítico). Assim a transição de cor
+   aparece quase instantaneamente, sem esperar o próximo tick. Read-only, sem rede. */
+var _slaBoundaryTimer=null;
+function slaMonNextBoundary(now){
+  var u=state.user; if(!u) return 0;
+  var vis=(typeof slaibVisible==='function')?slaibVisible(u):(state.tasks||[]);
+  var f=(typeof dtMs==='function'?dtMs:null), best=0;
+  for(var i=0;i<vis.length;i++){ var t=vis[i]; if(!t||!t.designerSla) continue;
+    if(slaPanelDelivered(t)) continue;
+    var fin=slaPanelFinishMs(t,f); if(!fin) continue;
+    var bs=[fin-SLA_PANEL_WARN_MS, fin, fin+SLA_PANEL_GRACE_MS];
+    for(var k=0;k<bs.length;k++){ if(bs[k]>now && (!best||bs[k]<best)) best=bs[k]; }
+  }
+  return best;
+}
+function slaMonScheduleBoundary(){
+  try{
+    if(_slaBoundaryTimer){ clearTimeout(_slaBoundaryTimer); _slaBoundaryTimer=null; }
+    var now=Date.now(), b=slaMonNextBoundary(now); if(!b) return;
+    var delay=Math.max(250, Math.min(b-now+200, 30*60000));   // dispara no limite (cap 30min)
+    _slaBoundaryTimer=setTimeout(function(){ try{ slaibRefresh(); }catch(_){} }, delay);
+  }catch(_){}
+}
+function slaibRefresh(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaMonScheduleBoundary(); }catch(_){}
+  /* re-alinha o cluster sino/avatar/widget APÓS o layout assentar (corrige desalinho de timing
+     em fonte/reflow que o owner mediu) */
+  try{ requestAnimationFrame(function(){ try{ slaHeaderAlign(); }catch(_){} }); }catch(_){} }
+try{ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(function(){ try{ slaHeaderAlign(); }catch(_){} }); }catch(_){}
+try{ window.addEventListener('load',function(){ try{ slaHeaderAlign(); }catch(_){} }); }catch(_){}
 if(typeof renderFromSnapshot==='function'){ var _slaib_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_slaib_rfs.apply(this,arguments); slaibRefresh(); return r; }; }
 try{ setInterval(slaibRefresh,30000); }catch(_){}                 /* tempo real (read-side): contador, cor e contagem regressiva */
 try{ window.addEventListener('resize',function(){ slaHeaderAlign(); }); }catch(_){}
@@ -3744,7 +3811,7 @@ function taskCard(t, persp){
   const designerView = persp==='designer' && secOf(t.sector).key==='cronograma' && hasDesigner(t);
   const clientView = persp==='client' && secOf(t.sector).key==='cronograma';
   const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
-  const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
+  const asg=respOf(t);const asgName=asg?(asg.name||''):'';
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'';
   const cron=cronOf(t);const isCron=s.key==='cronograma';
   const stage=isCron?(designerView?designerStatusView(t):(clientView?clientFacingStatusView(t):clientStatusView(t))):null;
@@ -3973,7 +4040,7 @@ function kbv2Card(t, persp){
   const designerView = persp==='designer' && secOf(t.sector).key==='cronograma' && hasDesigner(t);
   const clientView = persp==='client' && secOf(t.sector).key==='cronograma';
   const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
-  const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
+  const asg=respOf(t);const asgName=asg?(asg.name||''):'';
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'';
   const cron=cronOf(t);const isCron=s.key==='cronograma';
   const stage=isCron?(designerView?designerStatusView(t):(clientView?clientFacingStatusView(t):clientStatusView(t))):null;
@@ -4166,7 +4233,7 @@ function detDate(ic,l,v){return '<div class="det-date">'+svg(ic)+'<div class="de
 function openDetails(taskId){
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;
   const s=secOf(t.sector);const st=stOf(t.status);
-  const asg=t.assigneeId?state.users.find(u=>u.id===t.assigneeId):null;const asgName=asg?asg.name:(t.assignee||'');
+  const asg=respOf(t);const asgName=asg?(asg.name||''):'';
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'—';
   const cron=cronOf(t);const upd=lastUpdate(t);
   const emptyAv='<div class="av" style="width:44px;height:44px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>';
@@ -4357,7 +4424,8 @@ function detailSla(t){
   var now=Date.now(), pd=d.finishMs;
   var o={planStartAt:Number(ds.planStartAt)||0,planDueAt:pd,state:d.state};
   if(d.state==='completed'){o.label='Concluída';o.color='#37D196';o.rem='Entrega concluída';return o;}
-  if(d.state==='overdue'){o.label='Prazo encerrado';o.color='#FF6B61';o.rem='Atraso de '+slaibFmtDur(now-pd);return o;}
+  if(d.state==='overdue'){o.label='Prazo encerrado';o.color='#FF6B61';
+    o.rem='Atrasada há '+slaibFmtDur(now-pd)+' · '+(d.critical?'Atraso crítico — sinalize imediatamente':'Restam '+d.graceRemainingMin+' min para concluir ou sinalizar atraso');return o;}
   if(d.state==='warning'){o.label='Prazo próximo';o.color='#F2A93B';o.rem='Faltam '+slaibFmtDur(pd-now);return o;}
   o.label='Dentro do prazo';o.color='#7FA6FF';o.rem='Faltam '+slaibFmtDur(pd-now);return o;
 }

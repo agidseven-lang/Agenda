@@ -138,10 +138,18 @@ ok('B3 -31min => fora do painel', row(withSla({ planDueAt: NOW + 31 * MIN })) ==
 ok('B4 widget flutuante (fixed) fora do board', /function slaMonRender\(/.test(src) && /\.slamon\{position:fixed/.test(src) && !/slaOpPanelHtml\(pid\)\+boardToolbar|slaOpPanelHtml\(id\)\+boardToolbar/.test(src) && !/function slaOpPanelHtml/.test(src));
 // B5 — widget: chip premium (verde/laranja/vermelho) + dropdown ancorado (Monitor de prazos)
 ok('B5 widget chip + dropdown', /slamon-chip/.test(src) && /slamon-pop/.test(src) && /Monitor de prazos/.test(src) && /data-slamon-toggle/.test(src));
-// B5b — alerta vermelho traz a regra operacional dos 10 minutos
-ok('B5b vermelho regra 10 min', /Conclua a tarefa atrasada em até 10 min ou sinalize atraso\./.test(src));
+// B5b — vermelho traz a JANELA de 10 min (tolerância) + estado crítico após esgotar
+ok('B5b vermelho regra 10 min (grace + crítico)', /para concluir ou sinalizar atraso/.test(src) && /Atraso cr[ií]tico — sinalize imediatamente/.test(src));
+// C7 — grace window: atraso < 10 min ⇒ graceRemainingMin>0, não crítico
+{ const d = resolveTaskDisplayState(withSla({ planDueAt: NOW - 3 * MIN }), NOW, dtMsStub);
+  ok('C7 grace dentro de 10 min', d.state === 'overdue' && d.graceRemainingMin === 7 && d.critical === false); }
+// C8 — grace esgotada: atraso > 10 min ⇒ graceRemainingMin=0, crítico
+{ const d = resolveTaskDisplayState(withSla({ planDueAt: NOW - 15 * MIN }), NOW, dtMsStub);
+  ok('C8 grace esgotada => crítico', d.state === 'overdue' && d.graceRemainingMin === 0 && d.critical === true); }
+// C9 — slaPanelRow propaga grace/critical (fonte única alimenta o painel)
+{ const r = row(withSla({ planDueAt: NOW - 3 * MIN })); ok('C9 row propaga grace', !!r && r.graceRemainingMin === 7 && r.critical === false); }
 // B6 — Kanban/card RESTAURADO ao aprovado: card sem flex-shrink:0; only-child volta a flex:1 1 auto.
-ok('B6 Kanban restaurado (card aprovado)', !/\.kbv2-card\{[\s\S]{0,120}flex:0 0 auto;/.test(src) && /kbv2-card:only-child\{ flex:1 1 auto; \}/.test(src));
+ok('B6 card NÃO comprime (flex:0 0 auto) + only-child preenche (flex:1 1 auto)', /\.kbv2-card\{[\s\S]{0,400}flex:0 0 auto;/.test(src) && /kbv2-card:only-child\{ flex:1 1 auto; \}/.test(src));
 // B6b — chip SLA do card é por PRAZO FINAL (delega à fonte única; sem "Início atrasado")
 ok('B6b chip SLA do card finish-based', /function kbv2SlaLocal[\s\S]{0,400}resolveTaskDisplayState\(/.test(src) && !/label:'Início atrasado'/.test(src));
 // B6c — FONTE ÚNICA: card (kbv2SlaLocal), widget/sino (slaPanelRow) e detalhe (detailSla) TODOS
