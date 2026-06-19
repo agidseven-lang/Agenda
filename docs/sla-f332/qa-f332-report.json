@@ -1,72 +1,55 @@
 {
-  "panel": {
+  "widget": {
     "present": true,
+    "position": "fixed",
+    "cls": "slamon red open",
+    "open": true,
     "groups": [
       "red",
       "amber"
     ],
-    "open": true,
     "redBeforeAmber": true,
     "hasAtrasada": true,
     "hasFaltam": true,
-    "has10minRule": true,
+    "has10min": true,
     "hasOpenBtn": true,
-    "barHeight": 42,
-    "popOverlay": true
+    "hasBadge": true,
+    "monitorTitle": true,
+    "inBoardPanel": false
   },
-  "emptyPanel": {
-    "present": true,
-    "hasTitle": true,
-    "hasTudoEmDia": true,
-    "hasEmptyMsg": true,
-    "groups": 0,
-    "barHeight": 42
+  "widgetGreen": {
+    "cls": "slamon green",
+    "fixed": "fixed"
+  },
+  "card": {
+    "found": {
+      "compressed": false,
+      "hasFooter": true,
+      "hasThemes": true,
+      "avatarReal": true,
+      "slaChip": "Em prazo"
+    },
+    "anyInicioAtrasado": false
+  },
+  "count": {
+    "min": 18
   },
   "detail": {
     "hasSla": true,
-    "hasPrazoEncerrado": true,
-    "hasAtraso": true,
     "editPrazoAdmin": true
-  },
-  "count": {
-    "min": 18,
-    "hm": "15:25"
   },
   "rbac": {
     "editPrazoDesigner": false
   },
   "header": {
     "ok": true,
+    "bellAvatarTopDelta": 0,
+    "bellAvatarGap": 10,
     "avatarLogoDelta": 0,
     "hasLogo": true,
-    "bellAvatarTopDelta": 0,
-    "bellAvatarGap": 10
-  },
-  "whole1366": {
-    "total": 6,
-    "compressed": 0,
-    "clipped": 1,
-    "found": true,
-    "detail": {
-      "whole": false,
-      "hasFooter": true,
-      "hasThemes": true,
-      "cardH": 497,
-      "bodyH": 406
-    }
-  },
-  "whole1920": {
-    "total": 6,
-    "compressed": 0,
-    "clipped": 0,
-    "found": true,
-    "detail": {
-      "whole": true,
-      "hasFooter": true,
-      "hasThemes": true,
-      "cardH": 482,
-      "bodyH": 683
-    }
+    "monPresent": true,
+    "monAvatarCenterDelta": 1,
+    "monLeftOfBell": true
   },
   "errors": []
 }
