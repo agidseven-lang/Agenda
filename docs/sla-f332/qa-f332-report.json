@@ -1,28 +1,56 @@
 {
+  "login": {
+    "hasBell": false,
+    "hasSlaMonitor": false,
+    "hasCornerAvatar": false,
+    "loginVisible": true
+  },
+  "widgetGreen": {
+    "cls": "slamon green",
+    "fixed": "fixed"
+  },
   "widget": {
     "present": true,
     "position": "fixed",
+    "width": 260.703125,
+    "vw": 1600,
     "cls": "slamon red open",
     "open": true,
     "groups": [
-      "red",
-      "amber"
+      "red"
     ],
-    "redBeforeAmber": true,
+    "redBeforeAmber": false,
     "hasAtrasada": true,
-    "hasFaltam": true,
-    "has10min": true,
+    "hasFaltam": false,
+    "graceVisible": true,
+    "critVisible": true,
     "hasOpenBtn": true,
-    "hasBadge": true,
+    "hasSeg": true,
     "hasLive": true,
     "hasHero": true,
     "hasProgress": true,
     "monitorTitle": true,
     "inBoardPanel": false
   },
-  "widgetGreen": {
-    "cls": "slamon green",
-    "fixed": "fixed"
+  "cut": {
+    "1366x768": {
+      "ok": true,
+      "n": 6,
+      "clippedCards": 0,
+      "footerVisible": true,
+      "addNotOverlap": true,
+      "colInViewport": true,
+      "scrolls": true
+    },
+    "1600x900": {
+      "ok": true,
+      "n": 6,
+      "clippedCards": 0,
+      "footerVisible": true,
+      "addNotOverlap": true,
+      "colInViewport": true,
+      "scrolls": true
+    }
   },
   "card": {
     "found": {
@@ -30,29 +58,38 @@
       "hasFooter": true,
       "hasThemes": true,
       "avatarReal": true,
-      "slaChip": "Em prazo"
+      "noSemResp": true
     },
     "anyInicioAtrasado": false
   },
-  "count": {
-    "min": 18
+  "consist": {
+    "statusConsistent": true,
+    "timeMathConsistent": true
+  },
+  "orangeImmediate": {
+    "amberNow": true,
+    "hasBoundary": true
   },
   "detail": {
     "hasSla": true,
-    "editPrazoAdmin": true
+    "editPrazoAdmin": true,
+    "graceInDetail": true
+  },
+  "editPrazo": {
+    "honest": true
   },
   "rbac": {
     "editPrazoDesigner": false
   },
   "header": {
     "ok": true,
-    "bellAvatarTopDelta": 0,
+    "bellAvatarCyDelta": 1,
     "bellAvatarGap": 10,
-    "avatarLogoDelta": 0,
-    "hasLogo": true,
     "monPresent": true,
-    "monAvatarCenterDelta": 1,
-    "monLeftOfBell": true
+    "monAvatarCyDelta": 1,
+    "monLeftOfBell": true,
+    "clusterAligned": true,
+    "badgeAbsolute": true
   },
   "errors": []
 }
