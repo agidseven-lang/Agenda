@@ -1946,7 +1946,7 @@ body.desktop .kbv2-column-header{ display:flex; align-items:center; gap:9px; pad
 body.desktop .kbv2-column-header .kbv2-cdot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto; box-shadow:0 0 0 3px rgba(255,255,255,.04); }
 body.desktop .kbv2-column-header .kbv2-ctitle{ font-size:14.5px; font-weight:700; color:var(--kbv2-ink); letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 body.desktop .kbv2-column-header .kbv2-ccount{ margin-left:auto; min-width:24px; height:22px; padding:0 8px; border-radius:7px; background:rgba(255,255,255,.06); color:#aeb6c6; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
-body.desktop .kbv2-column-body{ flex:1 1 auto; display:flex; flex-direction:column; gap:14px; padding:4px 14px 12px; min-height:0; overflow-y:auto; overflow-x:hidden; }
+body.desktop .kbv2-column-body{ flex:1 1 auto; display:flex; flex-direction:column; gap:14px; padding:4px 14px 12px; min-height:0; overflow-y:auto; overflow-x:hidden; scroll-snap-type:y proximity; scroll-padding:6px 0 14px; }
 body.desktop .kbv2-column-add{
   flex:0 0 auto; margin:12px 14px 14px; height:42px; border-radius:12px;
   border:1px dashed rgba(255,255,255,.12); background:transparent; color:#8b94a6;
@@ -1968,6 +1968,7 @@ body.desktop .kbv2-card{
      flex-shrink o flexbox comprimia/amputava os cards quando havia 2+ na coluna. Agora o card
      mantém a altura natural e a COLUNA rola (o widget SLA é flutuante, não disputa altura). */
   flex:0 0 auto;
+  scroll-snap-align:start;   /* rolagem alinha o card inteiro no topo (ver card completo com naturalidade) */
   padding:16px; border-radius:16px; background:linear-gradient(180deg,#161d2e,#121726); border:1px solid rgba(255,255,255,.08);
   box-shadow:0 1px 2px rgba(0,0,0,.35), 0 16px 36px -20px rgba(0,0,0,.65);
 }
@@ -2653,6 +2654,16 @@ function slaibEnsureStyle(){
    +'.sla-block button{flex:0 0 auto;height:32px;padding:0 12px;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer;border:1px solid transparent}'
    +'.sla-block .sb-open{background:linear-gradient(180deg,#ff7d72,#e8483c);color:#fff}'
    +'.sla-block .sb-sig{background:rgba(255,255,255,.08);color:#ffd9d4;border-color:rgba(255,255,255,.18)}'
+   /* FASE 7 (PREVIEW/MOCK) — toast de notificação desktop in-app, canto inferior direito. */
+   +'.sla-notif{position:fixed;right:18px;bottom:18px;z-index:60;width:360px;max-width:92vw}'
+   +'.sla-notif .snf-card{display:flex;gap:12px;align-items:flex-start;padding:13px 14px;border-radius:16px;background:linear-gradient(180deg,rgba(26,32,46,.99),rgba(17,22,32,.99));border:1px solid rgba(255,255,255,.10);box-shadow:0 26px 60px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.07)}'
+   +'.sla-notif .snf-av{flex:0 0 auto;width:44px;height:44px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(91,108,255,.45)}'
+   +'.sla-notif .snf-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#5B6CFF,#22D3EE);color:#fff;font-weight:800;font-size:17px}'
+   +'.sla-notif .snf-bd{flex:1 1 auto;min-width:0}'
+   +'.sla-notif .snf-hd{display:flex;align-items:center;justify-content:space-between;gap:8px}.sla-notif .snf-hd b{color:#eef2f8;font-size:13.5px;font-weight:800}.sla-notif .snf-tm{color:#8b97a8;font-size:11px;flex:0 0 auto}'
+   +'.sla-notif .snf-ti{color:#cdd6e6;font-size:12.5px;font-weight:700;margin-top:2px}.sla-notif .snf-ds{color:#9fb0c8;font-size:12px;margin-top:2px;line-height:1.35}'
+   +'.sla-notif .snf-ctx{color:#7f8aa0;font-size:11px;margin-top:4px}'
+   +'.sla-notif .snf-snd{flex:0 0 auto;width:24px;height:24px;border-radius:7px;background:rgba(91,108,255,.16);color:#9db0ff;display:flex;align-items:center;justify-content:center}.sla-notif .snf-snd svg{width:14px;height:14px}'
    +'.slaop-grp{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:6px 4px 3px}'
    +'.slaop-grp .pd{width:7px;height:7px;border-radius:50%}'
    +'.slaop-grp.red{color:#ff8c84}.slaop-grp.red .pd{background:#ff6b61}.slaop-grp.amber{color:#f4b860}.slaop-grp.amber .pd{background:#f2a93b}'
@@ -2667,6 +2678,7 @@ function slaibEnsureStyle(){
    +'.slaop-rule{font-size:10.5px;color:#ffb0a8;background:rgba(255,107,97,.10);border-radius:6px;padding:3px 7px;margin-top:1px}'
    +'.slaop-rule.crit{color:#fff;background:linear-gradient(90deg,#ff5247,#e8392d);font-weight:800}'
    +'.slaop-rule.sub{background:transparent;padding:2px 7px 0;font-weight:700;color:#ffc7c1}'
+   +'.slaop-rule.ambermsg{color:#f6c074;background:rgba(242,169,59,.12)}'
    +'.slaop-open{flex:0 0 auto;align-self:center;font-size:11px;font-weight:700;border:1px solid rgba(127,166,255,.32);background:rgba(127,166,255,.10);color:#bcd0ff;border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap}'
    +'.slaop-open:hover{background:rgba(127,166,255,.18)}'
    /* F3.3.2 — botão "Editar prazo" (RBAC: Social/Admin) + modal seguro (sem escrita nesta fase) */
@@ -2766,24 +2778,28 @@ var SLAOP_ALERT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 var SLAOP_SHIELD_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>';
 function slaOpName(id){ if(!id) return '—'; var u=(state.users||[]).find(function(x){return x&&x.id===id;}); var n=((u&&(u.name||u.displayName))||'').trim(); return n?slaibEsc(n.split(' ')[0]):'—'; }
 var slaMonOpen=false;  // estado do dropdown do widget (persiste entre refreshes do ticker)
+function slaOpRowTime(x){ return (x.sev==='vermelho')?('Atrasada há '+slaMonDur(x.overdueMin)):('Faltam '+slaMonDur(x.remainingMin)); }
+function slaOpRowGrace(x){ return 'Restam '+slaMonDur(x.graceRemainingMin)+' para concluir ou sinalizar atraso.'; }
+function slaOpRowPct(x){ if(x.sev==='vermelho') return 100; var p=(x.startMs>0&&x.finishMs>x.startMs)?Math.round((Date.now()-x.startMs)/(x.finishMs-x.startMs)*100):82; return Math.max(5,Math.min(99,p)); }
 function slaOpRowHtml(x){
   var cls=(x.sev==='vermelho')?'red':'amber';
   var meta=(x.client?slaibEsc(x.client)+' · ':'')+'resp. '+slaOpName(x.designerId)+' · prazo '+slaibFmtHM(x.finishMs);
-  var time=(x.sev==='vermelho')?('Atrasada há '+slaMonDur(x.overdueMin)):('Faltam '+slaMonDur(x.remainingMin));
-  // F3.3.2 (regra operacional): vermelho mostra a JANELA de 10 min p/ concluir/sinalizar e,
-  // após esgotada, o estado crítico. (read-only; sem escalonamento/push real nesta fase.)
-  var rule=(x.sev==='vermelho')
-    ? (x.critical
-        ? '<div class="slaop-rule crit">Atraso crítico — sinalize atraso imediatamente.</div>'
-        : '<div class="slaop-rule">Você tem 10 minutos para concluir a tarefa.</div><div class="slaop-rule sub">Restam '+slaMonDur(x.graceRemainingMin)+' para concluir ou sinalizar atraso.</div>')
-    : '';
-  // barra de progresso = consumo da janela de SLA (início→término), em tempo real
-  var pct=100, now=Date.now();
-  if(x.sev!=='vermelho'){ pct=(x.startMs>0&&x.finishMs>x.startMs)?Math.round((now-x.startMs)/(x.finishMs-x.startMs)*100):82; pct=Math.max(5,Math.min(99,pct)); }
-  var prog='<div class="slaop-prog"><span style="width:'+pct+'%"></span></div>';
-  return '<div class="slaop-it '+cls+'"><span class="bar"></span>'
+  // F3.3.2 (regra operacional, texto exato do owner):
+  //  laranja → "Você tem 30 minutos para concluir esta tarefa." (janela de prazo próximo)
+  //  vermelho → "Você tem 10 minutos para concluir esta tarefa." + contador da tolerância;
+  //             esgotados os 10 min → atraso crítico. (read-only; sem push/gravação.)
+  var rule;
+  if(x.sev==='vermelho'){
+    rule = x.critical
+      ? '<div class="slaop-rule crit">Atraso crítico — sinalize atraso imediatamente.</div>'
+      : '<div class="slaop-rule">Você tem 10 minutos para concluir esta tarefa.</div><div class="slaop-rule sub" data-grace>'+slaOpRowGrace(x)+'</div>';
+  } else {
+    rule = '<div class="slaop-rule ambermsg">Você tem 30 minutos para concluir esta tarefa.</div>';
+  }
+  var prog='<div class="slaop-prog"><span style="width:'+slaOpRowPct(x)+'%"></span></div>';
+  return '<div class="slaop-it '+cls+'" data-row="'+slaibEsc(x.taskId)+'"><span class="bar"></span>'
     +'<div class="tx"><div class="slaop-t">'+slaibEsc(x.title||x.taskId)+'</div><div class="slaop-meta">'+meta+'</div>'
-    +'<div class="slaop-time">'+time+'</div>'+prog+rule+'</div>'
+    +'<div class="slaop-time" data-time>'+slaOpRowTime(x)+'</div>'+prog+rule+'</div>'
     +'<button class="slaop-open" data-sla-open="'+slaibEsc(x.taskId)+'">Abrir tarefa</button></div>';
 }
 function slaOpGrpHtml(kind,rows){
@@ -2841,6 +2857,24 @@ function slaMonAlign(){
     else { w.style.top='12px'; w.style.right='120px'; }
   }catch(_){}
 }
+/* F3.3.2 (FASE 6 — anti-flicker): assinatura ESTRUTURAL (severidade + ids + crítico + nextMs).
+   Quando só os CONTADORES mudam (tick de 1s), atualizamos os textos EM LUGAR (sem reconstruir
+   innerHTML) → o dropdown não pisca, não fecha sozinho e não perde o estado aberto. O 'open' é
+   puramente visual (classe CSS) e NÃO entra na assinatura → abrir/fechar nunca reconstrói. */
+function slaMonSig(d,sev){
+  return sev+'#'+d.overdue.map(function(x){return x.taskId+(x.critical?'!':'.');}).join(',')+'|'+d.warning.map(function(x){return x.taskId;}).join(',')+'|'+(d.nextMs?'n':'');
+}
+function slaMonUpdateCounters(d){
+  var w=document.getElementById('sla-monitor'); if(!w) return;
+  var st=w.querySelector('.slamon-status'); if(st) st.textContent=slaMonStatusText(d);
+  (d.rows||[]).forEach(function(x){
+    var sel='.slaop-it[data-row="'+((window.CSS&&CSS.escape)?CSS.escape(x.taskId):x.taskId)+'"]';
+    var row=w.querySelector(sel); if(!row) return;
+    var tm=row.querySelector('[data-time]'); if(tm) tm.textContent=slaOpRowTime(x);
+    var gc=row.querySelector('[data-grace]'); if(gc&&x.sev==='vermelho'&&!x.critical) gc.textContent=slaOpRowGrace(x);
+    var pr=row.querySelector('.slaop-prog>span'); if(pr&&x.sev!=='vermelho') pr.style.width=slaOpRowPct(x)+'%';
+  });
+}
 function slaMonRender(){
   var authed=!!(state.user)&&document.body.classList.contains('authed');
   var w=document.getElementById('sla-monitor');
@@ -2848,6 +2882,8 @@ function slaMonRender(){
   slaibEnsureStyle();
   var d=slaMonData();
   var sev=d.overdue.length?'red':(d.warning.length?'amber':'green');
+  var sig=slaMonSig(d,sev);
+  if(w && w.getAttribute('data-sig')===sig){ slaMonUpdateCounters(d); slaMonAlign(); return; }  // só contadores → em lugar (sem flicker)
   if(!w){ w=document.createElement('div'); w.id='sla-monitor'; document.body.appendChild(w); }
   w.className='slamon '+sev+(slaMonOpen?' open':'');
   var icon=(sev==='green')?SLAOP_SHIELD_SVG:(sev==='red'?SLAOP_ALERT_SVG:SLAOP_CLOCK_SVG);
@@ -2857,7 +2893,26 @@ function slaMonRender(){
       +'<span class="slamon-status">'+slaMonStatusText(d)+'</span></span>'
     +slaMonSegs(d)+'</button>';
   w.innerHTML=chip+'<div class="slamon-pop">'+slaMonDropInner(d)+'</div>';
+  w.setAttribute('data-sig',sig);
   slaMonAlign();
+}
+/* FASE 7 (PREVIEW/MOCK — aguarda autorização p/ wiring completo): desenha o toast de notificação
+   desktop in-app (canto inferior direito) com avatar/nome/título/descrição/horário/contexto + selo
+   de som. NÃO é disparado por eventos reais ainda (evita spam/falso positivo sem o dedup aprovado);
+   serve de preview visual + alvo de QA. Wiring (eventos de fluxo → main Notification c/ ícone/som +
+   in-app) será feito após autorização. NÃO envia FCM/WebPush, NÃO grava Firestore. */
+function slaNotifPreview(p){
+  p=p||{}; var el=document.getElementById('sla-notif'); if(el)el.remove();
+  el=document.createElement('div'); el.id='sla-notif'; el.className='sla-notif';
+  var nm=p.name||'', av=(p.photo&&/^https?:|^data:/.test(p.photo))
+    ? '<div class="snf-av" style="background-image:url(\''+esc(p.photo)+'\')"></div>'
+    : '<div class="snf-av gen">'+esc((nm[0]||'?').toUpperCase())+'</div>';
+  el.innerHTML='<div class="snf-card">'+av
+    +'<div class="snf-bd"><div class="snf-hd"><b>'+esc(nm)+'</b><span class="snf-tm">'+esc(p.time||'')+'</span></div>'
+    +'<div class="snf-ti">'+esc(p.title||'')+'</div><div class="snf-ds">'+esc(p.desc||'')+'</div>'
+    +(p.context?'<div class="snf-ctx">'+esc(p.context)+'</div>':'')+'</div>'
+    +'<span class="snf-snd" title="Som ativado">'+(typeof svg==='function'?svg('bell'):'')+'</span></div>';
+  document.body.appendChild(el);
 }
 if(typeof window!=='undefined' && !window.__slaMonBound){ window.__slaMonBound=true;
   try{ document.addEventListener('click',function(e){
@@ -2867,8 +2922,8 @@ if(typeof window!=='undefined' && !window.__slaMonBound){ window.__slaMonBound=t
     var sig=e.target.closest&&e.target.closest('[data-sla-signal]');
     if(sig){ if(e.preventDefault)e.preventDefault(); if(typeof flashToast==='function')flashToast('Sinalização de atraso preparada. Gravação real aguarda autorização operacional.'); return; }
     var tog=e.target.closest&&e.target.closest('[data-slamon-toggle]');
-    if(tog){ if(e.preventDefault)e.preventDefault(); slaMonOpen=!slaMonOpen; slaMonRender(); return; }
-    if(slaMonOpen && w && !w.contains(e.target)){ slaMonOpen=false; slaMonRender(); }   // clique fora fecha
+    if(tog){ if(e.preventDefault)e.preventDefault(); slaMonOpen=!slaMonOpen; if(w){ w.classList.toggle('open',slaMonOpen); if(slaMonOpen){ try{ slaMonUpdateCounters(slaMonData()); }catch(_){} } } return; }  // só classe (sem rebuild → sem flicker)
+    if(slaMonOpen && w && !w.contains(e.target)){ slaMonOpen=false; w.classList.remove('open'); }   // clique fora fecha (só classe)
   }); }catch(_){}
 }
 /* F3.3.2 — "Editar prazo": modal seguro RBAC (Social/Admin). NÃO grava no Firestore nesta

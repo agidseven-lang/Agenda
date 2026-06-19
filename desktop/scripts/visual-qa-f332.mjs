@@ -118,12 +118,38 @@ const widget = await page.evaluate(() => {
     redBeforeAmber: grps.indexOf('red') === 0 && grps.includes('amber'),
     hasAtrasada: /Atrasada h[áa] \d+/.test(txt), hasFaltam: /Faltam \d+/.test(txt),
     graceVisible: /para concluir ou sinalizar atraso/.test(txt), critVisible: /Atraso cr[ií]tico — sinalize atraso imediatamente/.test(txt),
-    graceMsgVisible: /Você tem 10 minutos para concluir a tarefa/.test(txt),
+    graceMsgVisible: /Você tem 10 minutos para concluir esta tarefa/.test(txt), orange30Visible: /Você tem 30 minutos para concluir esta tarefa/.test(txt),
     hasOpenBtn: !!w.querySelector('[data-sla-open]'), hasSeg: !!w.querySelector('.slamon-seg'),
     hasLive: !!w.querySelector('.slamon-live'), hasHero: /Atraso máx\.|Vence em/.test(txt),
     hasProgress: !!w.querySelector('.slaop-prog'), monitorTitle: /Monitor de prazos/.test(txt), inBoardPanel,
   };
 });
+
+// ===================== FASE 6 — anti-flicker do dropdown =====================
+// abre o dropdown, marca o nó .slamon-pop, dispara ticks/refreshes e confere que ele NÃO foi
+// reconstruído (mesmo nó) nem fechou sozinho → sem flicker.
+const flicker = await page.evaluate(() => {
+  const w = document.getElementById('sla-monitor'); if (!w) return { ok: false };
+  if (!w.classList.contains('open')) { const b = w.querySelector('[data-slamon-toggle]'); if (b) b.click(); }
+  const pop = w.querySelector('.slamon-pop'); if (pop) pop.setAttribute('data-mark', 'X');
+  const openBefore = w.classList.contains('open');
+  try { slaibRefresh(); } catch (_) {} try { slaTick(); } catch (_) {} try { slaibRefresh(); } catch (_) {}
+  const w2 = document.getElementById('sla-monitor'); const pop2 = w2 && w2.querySelector('.slamon-pop');
+  return { ok: true, wasOpen: openBefore, stayedOpen: !!(w2 && w2.classList.contains('open')), notRebuilt: !!(pop2 && pop2.getAttribute('data-mark') === 'X') };
+});
+
+// ===================== FASE 7 — preview/mock da notificação desktop =====================
+await page.evaluate(({ PNG1x1 }) => {
+  if (typeof slaNotifPreview === 'function') slaNotifPreview({ photo: PNG1x1, name: 'Marina Alves', time: 'agora', title: 'Cliente aprovou os temas', desc: 'Boa Forma — Cronograma semanal: temas aprovados. Inicie a produção.', context: 'Cronograma · Boa Forma · etapa: produção' });
+}, { PNG1x1 });
+await page.waitForTimeout(180);
+const notif = await page.evaluate(() => {
+  const el = document.getElementById('sla-notif'); if (!el) return { present: false };
+  const av = el.querySelector('.snf-av'); const avStyle = av ? (av.getAttribute('style') || '') : '';
+  return { present: true, hasAvatar: /background-image/.test(avStyle), hasName: /Marina Alves/.test(el.textContent || ''), hasDesc: /temas aprovados/.test(el.textContent || ''), hasSound: !!el.querySelector('.snf-snd'), bottomRight: getComputedStyle(el).position === 'fixed' };
+});
+await page.screenshot({ path: path.join(OUT, 'f332-17-notificacao-preview.png') });
+await page.evaluate(() => { const el = document.getElementById('sla-notif'); if (el) el.remove(); });
 
 // ===================== COLUNA MULTI-CARD (corte real) =====================
 const cut = {};
@@ -288,7 +314,8 @@ for (const [w, h, nm] of [[1366, 768, 'f332-08-1366x768.png'], [1920, 1080, 'f33
   await page.screenshot({ path: path.join(OUT, nm) });
 }
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, cut, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, errors }, null, 2));
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, errors }, null, 2));
+console.log('FLICKER:', JSON.stringify(flicker)); console.log('NOTIF:', JSON.stringify(notif));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
 console.log('CARD:', JSON.stringify(card)); console.log('CONSIST:', JSON.stringify(consist)); console.log('ORANGE:', JSON.stringify(orangeImmediate)); console.log('BLOCK:', JSON.stringify(block));
 console.log('DETAIL:', JSON.stringify(detail)); console.log('EDIT:', JSON.stringify(editPrazo)); console.log('RBAC:', JSON.stringify(rbac)); console.log('HEADER:', JSON.stringify(header));
@@ -312,7 +339,16 @@ if (!widget.monitorTitle) fail.push('dropdown sem "Monitor de prazos"');
 if (!widget.redBeforeAmber) fail.push('vermelho não antes do laranja');
 if (!widget.hasAtrasada || !widget.hasFaltam) fail.push('faltam textos de tempo');
 if (!widget.graceVisible) fail.push('redGraceCountdownVisible falhou (sem "para concluir ou sinalizar atraso")');
-if (!widget.graceMsgVisible) fail.push('redGraceMessageVisible falhou (sem "Você tem 10 minutos para concluir a tarefa")');
+if (!widget.graceMsgVisible) fail.push('redText10Visible falhou (sem "Você tem 10 minutos para concluir esta tarefa")');
+if (!widget.orange30Visible) fail.push('orangeText30Visible falhou (sem "Você tem 30 minutos para concluir esta tarefa")');
+// anti-flicker do dropdown
+if (flicker.ok && !flicker.stayedOpen) fail.push('noPanelFlicker falhou (dropdown fechou sozinho no refresh)');
+if (flicker.ok && !flicker.notRebuilt) fail.push('noPanelFlicker falhou (dropdown reconstruído no tick → pisca)');
+// preview da notificação desktop (FASE 7 — mock)
+if (!notif.present) fail.push('desktopNotificationPreviewVisible falhou (sem preview)');
+if (notif.present && !notif.hasAvatar) fail.push('notificationHasAvatar falhou');
+if (notif.present && !notif.hasName) fail.push('notificationHasUserName falhou');
+if (notif.present && !notif.hasSound) fail.push('notificationHasSoundConfigured falhou (sem selo de som)');
 if (!widget.critVisible) fail.push('redCriticalVisibleAfter10min falhou (estado crítico não exibido)');
 if (!widget.hasOpenBtn) fail.push('sem Abrir tarefa');
 if (!widget.hasSeg || !widget.hasLive || !widget.hasHero) fail.push('widget v2 sem segmentos/ao vivo/herói');

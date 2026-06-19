@@ -139,9 +139,16 @@ ok('B4 widget flutuante (fixed) fora do board', /function slaMonRender\(/.test(s
 // B5 — widget: chip premium (verde/laranja/vermelho) + dropdown ancorado (Monitor de prazos)
 ok('B5 widget chip + dropdown', /slamon-chip/.test(src) && /slamon-pop/.test(src) && /Monitor de prazos/.test(src) && /data-slamon-toggle/.test(src));
 // B5b — vermelho traz a JANELA de 10 min (tolerância) + estado crítico após esgotar
-ok('B5b vermelho regra 10 min (msg + grace + crítico)', /Você tem 10 minutos para concluir a tarefa/.test(src) && /para concluir ou sinalizar atraso/.test(src) && /Atraso cr[ií]tico — sinalize atraso imediatamente/.test(src));
+ok('B5b laranja 30min + vermelho 10min (msg + grace + crítico)', /Você tem 30 minutos para concluir esta tarefa/.test(src) && /Você tem 10 minutos para concluir esta tarefa/.test(src) && /para concluir ou sinalizar atraso/.test(src) && /Atraso cr[ií]tico — sinalize atraso imediatamente/.test(src));
 // B10 — guarda de bloqueio operacional (FASE 5) existe e respeita escopo (Admin/Social via canSeeAll não bloqueia)
 ok('B10 bloqueio operacional (FASE 5)', /function slaCriticalFor\(/.test(src) && /function slaGuardBlocked\(/.test(src) && /canSeeAll\(u\)\) return null/.test(src) && /function moveStatus[\s\S]{0,120}slaGuardBlocked/.test(src));
+// B11 — notificação desktop (main) com SOM ligado (silent:false)
+{ let nt=''; try{ nt=fs.readFileSync(path.resolve(__dirname,'..','src','main','notifier.ts'),'utf8'); }catch(_){}
+  ok('B11 notificação desktop com som (silent:false)', /silent:\s*false/.test(nt)); }
+// B12 — toast in-app de notificação (preview/mock FASE 7) com avatar/nome/descrição
+ok('B12 preview de notificação in-app (avatar/nome/desc)', /function slaNotifPreview\(/.test(src) && /snf-av/.test(src) && /snf-ds/.test(src));
+// B13 — anti-flicker: render por assinatura + toggle só por classe (sem rebuild do dropdown)
+ok('B13 dropdown sem flicker (assinatura + classList.toggle)', /data-sig/.test(src) && /function slaMonUpdateCounters\(/.test(src) && /classList\.toggle\('open'/.test(src));
 // C7 — grace window: atraso < 10 min ⇒ graceRemainingMin>0, não crítico
 { const d = resolveTaskDisplayState(withSla({ planDueAt: NOW - 3 * MIN }), NOW, dtMsStub);
   ok('C7 grace dentro de 10 min', d.state === 'overdue' && d.graceRemainingMin === 7 && d.critical === false); }
