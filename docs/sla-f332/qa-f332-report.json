@@ -12,16 +12,17 @@
   "widget": {
     "present": true,
     "position": "fixed",
-    "width": 260.703125,
+    "width": 310.703125,
     "vw": 1600,
     "cls": "slamon red open",
     "open": true,
     "groups": [
-      "red"
+      "red",
+      "amber"
     ],
-    "redBeforeAmber": false,
+    "redBeforeAmber": true,
     "hasAtrasada": true,
-    "hasFaltam": false,
+    "hasFaltam": true,
     "graceVisible": true,
     "critVisible": true,
     "hasOpenBtn": true,
