@@ -3573,8 +3573,11 @@ function slaToMs(dateStr, timeStr, tzOffsetMinutes) {
 function slaPlanFromAssignment(t, tz) {
   const da = (t && t.designerAssignment) || {};
   const sla = (t && t.designerSla) || {};
-  const plannedStartAt  = sla.plannedStartAt  || slaToMs(da.startDate || t.startDate, da.startTime || t.startTime, tz);
-  const plannedFinishAt = sla.plannedFinishAt || slaToMs(da.endDate || t.endDate || t.dueDate, da.endTime || t.endTime || t.dueTime, tz);
+  // F3.3.1 — fonte única do prazo (compat aditiva, sem renomear nada):
+  // preferência: plannedStartAt/plannedFinishAt (engine) → planStartAt/planDueAt (seed in-app
+  // F3.2.x, ms) → datas do designerAssignment/tarefa (string). plannedFinishAt sempre prevalece.
+  const plannedStartAt  = sla.plannedStartAt  || sla.planStartAt || slaToMs(da.startDate || t.startDate, da.startTime || t.startTime, tz);
+  const plannedFinishAt = sla.plannedFinishAt || sla.planDueAt   || slaToMs(da.endDate || t.endDate || t.dueDate, da.endTime || t.endTime || t.dueTime, tz);
   return { plannedStartAt, plannedFinishAt };
 }
 
@@ -3867,6 +3870,87 @@ function simulateSlaNotifications(report, env) {
     allowlistCount: allowlist.length, scope: SLA_NOTIFY_EVENTS_F31, realSendImplemented: false, plan };
 }
 
+/* ════════ F3.3.1 — NOTIFICATION ENGINE v2 (LOG-ONLY, FINISH-BASED) ════════
+   SLA OPERACIONAL por PRAZO FINAL (plannedFinishAt), INDEPENDENTE de "iniciou":
+     laranja  = plannedFinishAt-30min <= now < plannedFinishAt  → designer_finish_warning
+     vermelho = now >= plannedFinishAt                          → designer_finish_overdue
+   start_* NÃO é mais a regra principal do sino operacional. NENHUM envio real:
+   esta função SÓ monta um plano (não chama sendToTokens/broadcastWebPush/WhatsApp,
+   não escreve Firestore). providerCalled=false por construção. */
+const SLA_NOTIFY_FINISH_EVENTS = ["designer_finish_warning", "designer_finish_overdue"];
+/* ms epoch → "HH:mm" no fuso do app (tz = offset em minutos; default -180 = BRT). */
+function slaFmtHM(ms, tz) {
+  const off = (tz == null ? -180 : tz);
+  const d = new Date((Number(ms) || 0) + off * 60000);
+  const p = (n) => (n < 10 ? "0" : "") + n;
+  return p(d.getUTCHours()) + ":" + p(d.getUTCMinutes());
+}
+function slaNotifyTitleBodyV2(eventType, c, tz) {
+  const nome = c.title || c.client || "demanda";
+  if (eventType === "designer_finish_warning") {
+    const mins = Math.max(1, Math.round((c._minRemainingMs || 0) / 60000));
+    return { title: "Prazo próximo — conclua em breve",
+      body: "Faltam " + mins + " minutos para concluir '" + nome + "'. Prazo final: " + slaFmtHM(c.plannedFinishAt, tz) + ". Finalize a demanda dentro do prazo." };
+  }
+  return { title: "Prazo encerrado — ação urgente",
+    body: "O prazo de '" + nome + "' acabou. Conclua a demanda imediatamente ou sinalize atraso em até 10 minutos." };
+}
+function buildSlaNotificationPlanV2(report, env, nowMs, tz) {
+  const now = nowMs || Date.now();
+  const flags = (report && report.flags) || {};
+  const finishWarnMs = SLA_DEFAULTS.finishWarningMinutes * 60000;     // 30min
+  const notifyEnabled = !!(env && env.SLA_NOTIFY_ENABLED === "true");
+  const dryRunEnv = !(env && env.SLA_NOTIFY_DRYRUN === "false");
+  const allowlist = String((env && env.SLA_NOTIFY_ALLOWLIST) || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const cooldownMin = parseInt((env && env.SLA_NOTIFY_COOLDOWN_MIN) || "10", 10) || 10;
+  const plan = []; const seen = new Set(); const redByTask = new Set();
+  let warning = 0, overdue = 0;
+  for (const c of ((report && report.computed) || [])) {
+    const designerId = c.designerId || null;
+    if (!designerId) continue;                                          // sem designer ⇒ sem plano
+    if (c.slaStatus === "entregue" || c.slaStatus === "cancelada") continue; // concluída/removida ⇒ nunca
+    const pd = Number(c.plannedFinishAt) || 0;
+    if (!pd) continue;                                                  // sem prazo final ⇒ nunca
+    let eventType, severity, severityColor, minRemMs = 0, minOverMs = 0;
+    if (now >= pd) { eventType = "designer_finish_overdue"; severity = "critical"; severityColor = "vermelho"; minOverMs = now - pd; }
+    else if (now >= pd - finishWarnMs) { eventType = "designer_finish_warning"; severity = "warning"; severityColor = "laranja"; minRemMs = pd - now; }
+    else continue;                                                      // fora da janela ⇒ sem plano
+    const dedupKey = slaDedupKey(c.taskId, eventType, pd);
+    if (seen.has(dedupKey)) continue;                                   // dedup: 1 por (task,event,âncora)
+    if (eventType === "designer_finish_overdue") {                      // cooldown: 1 vermelho por tarefa/passada (anti-avalanche)
+      const cd = String(c.taskId) + "__finish_overdue_cooldown";
+      if (redByTask.has(cd)) continue;
+      redByTask.add(cd);
+    }
+    seen.add(dedupKey);
+    const cc = Object.assign({}, c, { _minRemainingMs: minRemMs, _minOverdueMs: minOverMs });
+    const tb = slaNotifyTitleBodyV2(eventType, cc, tz);
+    const blocked = ["F3.3.1-log-only"];                               // hard-block desta fase (sempre presente)
+    if (flags.slaNotifications !== true) blocked.push("flags.slaNotifications=false");
+    if (!notifyEnabled) blocked.push("SLA_NOTIFY_ENABLED!=true");
+    if (dryRunEnv) blocked.push("SLA_NOTIFY_DRYRUN!=false");
+    if (allowlist.length === 0) blocked.push("allowlist-empty");
+    else if (!allowlist.includes(designerId)) blocked.push("recipient-not-in-allowlist");
+    if (eventType === "designer_finish_warning") warning++; else overdue++;
+    plan.push({
+      taskId: c.taskId, taskTitle: c.title || null, clientName: c.client || null,
+      designerId, designerName: c.designerName || null, plannedFinishAt: pd,
+      eventType, severity, severityColor,
+      minutesRemaining: minRemMs ? Math.max(1, Math.round(minRemMs / 60000)) : null,
+      minutesOverdue: minOverMs ? Math.max(1, Math.round(minOverMs / 60000)) : null,
+      channels: ["android_fcm", "desktop_inapp", "desktop_native_future"],
+      title: tb.title, body: tb.body, deepLink: "idseven://task/" + c.taskId,
+      dedupKey, cooldownMin: eventType === "designer_finish_overdue" ? cooldownMin : null,
+      reason: eventType === "designer_finish_warning" ? "prazo final em <=30min" : "prazo final ultrapassado",
+      blockedReason: blocked, dryRun: true, providerCalled: false, simulated: true,
+    });
+  }
+  return { engine: "v2-finish", finishBased: true, dryRun: true, providerCalled: false,
+    enabled: notifyEnabled, slaNotificationsFlag: flags.slaNotifications === true,
+    allowlistCount: allowlist.length, cooldownMin, scope: SLA_NOTIFY_FINISH_EVENTS,
+    realSendImplemented: false, counts: { warning, overdue, total: plan.length }, plan };
+}
+
 /* PASSADA DO ENGINE.
    write=false (DEFAULT): zero escrita — só computa e reporta (dry-run absoluto).
    write=true: exige env.SLA_WRITE==="true" + flags.slaEngine===true; grava
@@ -3908,7 +3992,7 @@ async function runSlaEnginePass(env, opts) {
       evs = evs.slice(0, Math.max(0, cfg.maxEventsPerPass - report.events.length));
       report.pagination.eventsCapped = true;
     }
-    report.computed.push({ taskId: t.id, designerId: t.designerAssignment.designerId, client: t.client || null, demandType: t.cronSub || t.sector || null, slaStatus: comp.slaStatus, slaSeverity: comp.slaSeverity, blockedCandidate: comp.blockedCandidate, overdueMs: comp.overdueMs || 0, plannedStartAt: comp.plannedStartAt, plannedFinishAt: comp.plannedFinishAt });
+    report.computed.push({ taskId: t.id, title: t.title || null, designerId: t.designerAssignment.designerId, client: t.client || null, demandType: t.cronSub || t.sector || null, slaStatus: comp.slaStatus, slaSeverity: comp.slaSeverity, blockedCandidate: comp.blockedCandidate, overdueMs: comp.overdueMs || 0, plannedStartAt: comp.plannedStartAt, plannedFinishAt: comp.plannedFinishAt });
     for (const ev of evs) {
       report.events.push(ev);
       if (ev.eventType.indexOf("warning") >= 0 || ev.eventType.indexOf("overdue") >= 0)
@@ -3958,11 +4042,13 @@ async function runSlaEnginePass(env, opts) {
   const agg = (key) => { const m = {}; for (const c of report.computed) { const k = c[key] || "?"; m[k] = m[k] || { total: 0, atrasadas: 0, laranja: 0 }; m[k].total++; if (c.slaSeverity === "vermelho") m[k].atrasadas++; if (c.slaSeverity === "laranja") m[k].laranja++; } return m; };
   report.totals = { byDesigner: agg("designerId"), byClient: agg("client"), byType: agg("demandType"),
     retroIgnored: report.retroIgnored.length, eligibleEvents: report.events.length };
-  /* F3.1 — plano de notificação SIMULADO (log-only; NENHUM envio; gates calculados). */
-  const notif = simulateSlaNotifications(report, env);
-  report.notify = { dryRun: notif.dryRun, enabled: notif.enabled, slaNotificationsFlag: notif.slaNotificationsFlag,
-    allowlistCount: notif.allowlistCount, scope: notif.scope, realSendImplemented: notif.realSendImplemented };
-  report.slaNotificationPlan = notif.plan;
+  /* F3.3.1 — plano de notificação v2 LOG-ONLY por PRAZO FINAL (principal; NENHUM envio;
+     providerCalled=false). Substitui o simulador start-based (F3.1) como regra principal. */
+  const notifV2 = buildSlaNotificationPlanV2(report, env, nowMs, tz);
+  report.notify = { engine: notifV2.engine, finishBased: true, dryRun: notifV2.dryRun, providerCalled: notifV2.providerCalled,
+    enabled: notifV2.enabled, slaNotificationsFlag: notifV2.slaNotificationsFlag, allowlistCount: notifV2.allowlistCount,
+    cooldownMin: notifV2.cooldownMin, scope: notifV2.scope, realSendImplemented: notifV2.realSendImplemented, counts: notifV2.counts };
+  report.slaNotificationPlan = notifV2.plan;
   return report;
 }
 
@@ -4203,4 +4289,5 @@ async function handleSlaLegacyRisk(request, env) {
 }
 
 /* export p/ testes unitários (node) — não interfere no runtime do Worker. */
-export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover, slaLegacyAggregate, handleSlaLegacyBaseline, slaLegacyRiskAggregate, handleSlaLegacyRisk, simulateSlaNotifications };
+export const __slaCore = { SLA_DEFAULTS, SLA_FLAG_DEFAULTS, SLA_EVENT_TYPES, slaToMs, slaPlanFromAssignment, slaStarted, computeSlaStatus, slaDedupKey, buildSlaEvent, deriveSlaEvents, simulateWip, consolidateLocks, planReschedule, slaEncodeFields, runSlaEnginePass, slaDiscoverAggregate, handleSlaDiscover, slaLegacyAggregate, handleSlaLegacyBaseline, slaLegacyRiskAggregate, handleSlaLegacyRisk, simulateSlaNotifications,
+  SLA_NOTIFY_FINISH_EVENTS, slaFmtHM, slaNotifyTitleBodyV2, buildSlaNotificationPlanV2 };
