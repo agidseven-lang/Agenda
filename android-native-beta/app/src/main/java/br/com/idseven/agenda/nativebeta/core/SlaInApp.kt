@@ -23,7 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.style.TextOverflow
-import br.com.idseven.agenda.nativebeta.domain.EventStatus
+import br.com.idseven.agenda.nativebeta.domain.SlaContract
+import br.com.idseven.agenda.nativebeta.domain.TaskDisplayState
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskVisibility
@@ -66,51 +67,30 @@ object SlaRbac {
 }
 
 object SlaInApp {
-    private const val FINISH_WARN_MS = 30 * 60000L
-
-    /* F3.3.2 — fonte ÚNICA do prazo final (paridade c/ Desktop PANEL-CORE e F3.3.1):
-       plannedFinishAt → planDueAt → dueDate/dueTime. (Android não tem assignment.endDate.) */
-    fun finishMs(t: TaskItem): Long {
-        val ds = t.designerSla
-        ds?.plannedFinishAt?.let { if (it > 0L) return it }
-        ds?.planDueAt?.let { if (it > 0L) return it }
-        val due = EventStatus.dtMs(t.dueDate, (t.dueTime?.ifBlank { null }) ?: "23:59")
-        return if (due != null && due > 0L) due else 0L
-    }
-
-    // Entregue/concluída/cancelada/removida ⇒ nunca alerta (exclusões do painel).
-    private fun delivered(t: TaskItem): Boolean {
-        val finished = t.designerSla?.finishedAt ?: t.doneAt
-        if (finished != null && finished > 0L) return true
-        val fs = t.designerFlowStatus; val st = t.status
-        return fs == "entregue" || fs == "concluido" || fs == "cancelado" ||
-            st == "concluido" || st == "cancelado" || st == "removido"
-    }
+    /* F3.3.2 — prazo final e exclusões vêm da FONTE ÚNICA (SlaContract), igual ao chip do card
+       e ao detalhe (paridade c/ Desktop resolveTaskDisplayState). Sem reimplementar limiares aqui. */
+    fun finishMs(t: TaskItem): Long = SlaContract.finishMs(t)
 
     fun items(user: UserLite?, tasks: List<TaskItem>, nowMs: Long = System.currentTimeMillis()): List<SlaInAppItem> {
         val vis = TaskVisibility.visibleTasks(user, tasks)
         val hm = SimpleDateFormat("HH:mm", Locale.getDefault())
         val out = ArrayList<SlaInAppItem>()
         for (t in vis) {
-            if (t.designerSla == null) continue                                   // gate: SLA-rastreada
             (t.designerAssignment?.designerId ?: t.assigneeId) ?: continue         // sem designer responsável
-            if (delivered(t)) continue
-            val pd = finishMs(t); if (pd <= 0L) continue                           // sem prazo final válido
-            val event: String; val sev: String; val label: String; val text: String
-            if (nowMs >= pd) {
-                val over = kotlin.math.max(1L, Math.round((nowMs - pd) / 60000.0))
-                event = "designer_finish_overdue"; sev = "vermelho"; label = "Prazo encerrado"
-                text = "Prazo ultrapassado há $over min. Conclua imediatamente."
-            } else if (nowMs >= pd - FINISH_WARN_MS) {
-                val left = kotlin.math.max(1L, Math.round((pd - nowMs) / 60000.0))
-                event = "designer_finish_warning"; sev = "laranja"; label = "Prazo próximo"
-                text = "Faltam $left min — conclua até ${hm.format(Date(pd))}."
+            val d = SlaContract.resolve(t, nowMs)                                  // FONTE ÚNICA
+            if (!d.inPanel) continue                                               // só vermelho/laranja entram no sino
+            val pd = d.finishMs
+            val event: String; val text: String
+            if (d.sev == "vermelho") {
+                event = "designer_finish_overdue"
+                text = "Prazo ultrapassado há ${d.overdueMin} min. Conclua imediatamente."
             } else {
-                continue
+                event = "designer_finish_warning"
+                text = "Faltam ${d.remainingMin} min — conclua até ${hm.format(Date(pd))}."
             }
             out.add(
                 SlaInAppItem(
-                    taskId = t.id, eventType = event, sev = sev, label = label, text = text,
+                    taskId = t.id, eventType = event, sev = d.sev, label = d.label, text = text,
                     client = t.client ?: "", title = t.title ?: t.id, anchorMs = pd, key = "${t.id}__${event}__$pd",
                 ),
             )
@@ -119,8 +99,8 @@ object SlaInApp {
         return out
     }
 
-    /* F3.3.2 — derivação do PAINEL OPERACIONAL por PRAZO FINAL. Duas seções:
-       Atrasadas (vermelho) e Prazo próximo (laranja). Vermelho ordenado antes. READ-SIDE puro. */
+    /* F3.3.2 — derivação do PAINEL OPERACIONAL por PRAZO FINAL (FONTE ÚNICA SlaContract.resolve).
+       Duas seções: Atrasadas (vermelho) e Prazo próximo (laranja). Vermelho antes. READ-SIDE puro. */
     fun panel(
         user: UserLite?, tasks: List<TaskItem>, users: List<UserLite>,
         nowMs: Long = System.currentTimeMillis(),
@@ -129,24 +109,19 @@ object SlaInApp {
         val rows = ArrayList<SlaOpRow>()
         for (t in vis) {
             // F3.3.2 (regra de fluxo): SLA só começa no ENVIO ao designer (semente designerSla).
-            if (t.designerSla == null) continue
             val designerId = (t.designerAssignment?.designerId ?: t.assigneeId) ?: continue
-            if (delivered(t)) continue
-            val pd = finishMs(t); if (pd <= 0L) continue
+            val d = SlaContract.resolve(t, nowMs)                                  // FONTE ÚNICA
+            if (!d.inPanel) continue
             val resp = users.firstOrNull { it.id == designerId }?.name?.trim()
                 ?.split(" ")?.firstOrNull()?.ifBlank { null }
                 ?: t.designerAssignment?.designerName?.trim()?.split(" ")?.firstOrNull() ?: "—"
-            if (nowMs >= pd) {
-                val over = kotlin.math.max(1L, Math.round((nowMs - pd) / 60000.0))
-                rows.add(SlaOpRow(t.id, "vermelho", "overdue", pd, 0L, over, t.title ?: t.id, t.client ?: "", resp))
-            } else if (nowMs >= pd - FINISH_WARN_MS) {
-                val left = kotlin.math.max(1L, Math.round((pd - nowMs) / 60000.0))
-                rows.add(SlaOpRow(t.id, "laranja", "warning", pd, left, 0L, t.title ?: t.id, t.client ?: "", resp))
-            }
+            rows.add(SlaOpRow(t.id, d.sev, d.bucketOf(), d.finishMs, d.remainingMin, d.overdueMin, t.title ?: t.id, t.client ?: "", resp))
         }
         rows.sortWith(compareByDescending<SlaOpRow> { it.sev == "vermelho" }.thenBy { it.finishMs })
         return SlaOpData(rows.filter { it.sev == "vermelho" }, rows.filter { it.sev == "laranja" }, rows.size)
     }
+
+    private fun TaskDisplayState.bucketOf(): String = if (sev == "vermelho") "overdue" else "warning"
 
     fun hm(ms: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms))
 }

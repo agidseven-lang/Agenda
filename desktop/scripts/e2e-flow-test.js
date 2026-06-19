@@ -1266,11 +1266,12 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
     && /const planDueAt=dl\.endDate\?dtMs\(dl\.endDate,dl\.endTime\|\|'23:59'\):null;/.test(DH)
     && /const designerSla=\{planStartAt:planStartAt,planDueAt:planDueAt,seedAt:now,seedBy:u\.id\|\|null\};/.test(DH)
     && /designerSla:designerSla,\s*\/\/ F1/.test(DH));
-  check('F1_SLA_DERIVE','kbv2SlaLocal deriva 8 estados locais (not_started/running/warning_start/overdue_start/warning_finish/overdue_finish/completed/invalid_or_missing) com thresholds 30/30/60',
+  check('F1_SLA_DERIVE','kbv2SlaLocal deriva por PRAZO FINAL (F3.3.2): running/warning_finish/overdue_finish/completed/invalid_or_missing (sem estados de início; chip SLA = prazo final, fluxo/início fica no chip de etapa)',
     /function kbv2SlaLocal\(t,nowMs\)/.test(DH)
     && /const KBV2_SLA=\{warnStartMin:30,warnFinishMin:30,criticalAfterMin:60\};/.test(DH)
-    && /'not_started'/.test(DH) && /'warning_start'/.test(DH) && /'overdue_start'/.test(DH)
-    && /'warning_finish'/.test(DH) && /'overdue_finish'/.test(DH) && /'invalid_or_missing'/.test(DH) && /'completed'/.test(DH));
+    && /'running'/.test(DH) && /'warning_finish'/.test(DH) && /'overdue_finish'/.test(DH)
+    && /'invalid_or_missing'/.test(DH) && /'completed'/.test(DH)
+    && /slaPanelFinishMs\(t,/.test(DH) && !/'overdue_start'/.test(DH));
   check('F1_SLA_CHIP','kbv2Card exibe chip SLA local discreto + acento do card por severidade; sem designerSla = neutro (sem chip, não quebra)',
     /const _sla=kbv2SlaLocal\(t\);/.test(DH)
     && /kbv2-sla kbv2-sla-'\+_sla\.sev/.test(DH)
@@ -1537,9 +1538,9 @@ console.log(`${C.b}\n[FASE PRODUÇÃO 1] Flow Engine canônico (Social → Desig
 
 /* ─── [PROD1.6] Visual: card ÚNICO preenche a coluna (opção B) + popover do menu sem overlap ─── */
 console.log(`${C.b}\n[PROD1.6] Card único preenche a coluna (opção B) + regressões visuais (menu "⋯", SLA, Flow Engine)${C.x}`);
-check('PROD16_CARD_FILL_KEYBREATHS','Card ÚNICO preenche a coluna (grow) mas NUNCA encolhe (F3.3.2: flex:1 0 auto — sem corte quando o painel SLA ocupa altura) + respiro distribuído em 3 cortes (origem·temas·rodapé) via margin-top:auto (rodapé na base). SEM filler, SEM space-between bruto (não é A), SEM zoom de fonte (não é C); footer-base intacto (margin-top:2px)',
+check('PROD16_CARD_FILL_KEYBREATHS','Card ÚNICO preenche 100% a coluna (opção B): .kbv2-card:only-child flex:1 1 auto + respiro distribuído em 3 cortes (origem·temas·rodapé) via margin-top:auto (rodapé na base). SEM filler, SEM space-between bruto (não é A), SEM zoom de fonte (não é C); footer-base intacto (margin-top:2px)',
   !/kbv2-column-filler/.test(DH)
-  && /\.kbv2-column-body>\.kbv2-card:only-child\{ flex:1 0 auto; \}/.test(DH)
+  && /\.kbv2-column-body>\.kbv2-card:only-child\{ flex:1 1 auto; \}/.test(DH)
   && /:only-child>\.kbv2-card-origin,[\s\S]*?:only-child>\.kbv2-card-themes,[\s\S]*?:only-child>\.kbv2-card-footer\{ margin-top:auto; \}/.test(DH)
   && !/:only-child\{ flex:1 1 auto; justify-content:space-between/.test(DH)
   && !/kbv2-card:only-child \.kbv2-title\{ font-size/.test(DH)

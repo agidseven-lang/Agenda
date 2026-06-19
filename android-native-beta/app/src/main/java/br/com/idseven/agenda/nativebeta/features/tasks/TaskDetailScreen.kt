@@ -53,6 +53,7 @@ import br.com.idseven.agenda.nativebeta.designsystem.components.LoadingState
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.Sectors
+import br.com.idseven.agenda.nativebeta.domain.SlaContract
 import br.com.idseven.agenda.nativebeta.domain.TaskDeadline
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.core.SlaRbac
@@ -313,17 +314,17 @@ private data class SlaDeadlineInfo(
 
 private fun slaDeadline(t: TaskItem, now: Long = System.currentTimeMillis()): SlaDeadlineInfo? {
     val ds = t.designerSla ?: return null
-    val pd = ds.planDueAt ?: return null
-    if (pd <= 0L) return null
+    // FONTE ÚNICA (SlaContract.resolve): mesmo prazo final/estado do chip do card, do painel e do
+    // sino. Sem reimplementar limiares aqui (paridade c/ Desktop detailSla→resolveTaskDisplayState).
+    val d = SlaContract.resolve(t, now)
+    if (d.state == "none") return null
     val ps = ds.planStartAt ?: 0L
-    val finished = ds.finishedAt ?: t.doneAt
-    val delivered = (finished != null && finished > 0L) ||
-        t.designerFlowStatus == "entregue" || t.designerFlowStatus == "concluido" || t.status == "concluido"
+    val pd = d.finishMs
     val azul = Color(0xFF7FA6FF); val laranja = Color(0xFFF2A93B); val vermelho = Color(0xFFFF6B61); val verde = Color(0xFF37D196)
-    return when {
-        delivered -> SlaDeadlineInfo("completed", "Concluída", verde, "Entrega concluída", ps, pd)
-        now > pd -> SlaDeadlineInfo("overdue", "Prazo encerrado", vermelho, "Atraso de " + fmtDur(now - pd), ps, pd)
-        now >= pd - 30L * 60000L -> SlaDeadlineInfo("warning", "Prazo próximo", laranja, "Faltam " + fmtDur(pd - now), ps, pd)
+    return when (d.state) {
+        "completed" -> SlaDeadlineInfo("completed", "Concluída", verde, "Entrega concluída", ps, pd)
+        "overdue" -> SlaDeadlineInfo("overdue", "Prazo encerrado", vermelho, "Atraso de " + fmtDur(now - pd), ps, pd)
+        "warning" -> SlaDeadlineInfo("warning", "Prazo próximo", laranja, "Faltam " + fmtDur(pd - now), ps, pd)
         else -> SlaDeadlineInfo("normal", "Dentro do prazo", azul, "Faltam " + fmtDur(pd - now), ps, pd)
     }
 }

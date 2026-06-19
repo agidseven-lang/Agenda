@@ -26,8 +26,8 @@ globalThis.XMLHttpRequest = function () { throw new Error('PROVIDER-CALL-DETECTE
 // dtMs stub: "YYYY-MM-DD"+"HH:mm" → epoch ms (UTC determinístico p/ o teste).
 const dtMsStub = (d, t) => { if (!d) return 0; const [Y, Mo, Da] = String(d).split('-').map(Number); const [h, m] = String(t || '23:59').split(':').map(Number); return Date.UTC(Y, (Mo || 1) - 1, Da || 1, h || 0, m || 0); };
 
-const api = new Function(core + '\n;return { SLA_PANEL_WARN_MS, slaPanelFinishMs, slaPanelDelivered, slaPanelRow, slaPanelDerive };')();
-const { slaPanelFinishMs, slaPanelRow, slaPanelDerive, SLA_PANEL_WARN_MS } = api;
+const api = new Function(core + '\n;return { SLA_PANEL_WARN_MS, slaPanelFinishMs, slaPanelDelivered, resolveTaskDisplayState, slaPanelRow, slaPanelDerive };')();
+const { slaPanelFinishMs, resolveTaskDisplayState, slaPanelRow, slaPanelDerive, SLA_PANEL_WARN_MS } = api;
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name); } };
@@ -108,21 +108,48 @@ ok('11 planDueAt fallback', slaPanelFinishMs(withSla({ planDueAt: NOW + 42 * MIN
 { const d = derive([withSla({ planDueAt: NOW + 240 * MIN }), withSla({ planDueAt: NOW - 7 * MIN }, { status: 'concluido' })]);
   ok('23 calmo => total 0 (estado vazio)', d.total === 0 && d.overdue.length === 0 && d.warning.length === 0); }
 
+// === FONTE ÚNICA DE VERDADE (resolveTaskDisplayState) — exigência do owner ===
+// C1 — estado canônico atrasado (vermelho/overdue) por prazo final
+{ const d = resolveTaskDisplayState(withSla({ planDueAt: NOW - 7 * MIN }), NOW, dtMsStub);
+  ok('C1 resolve => overdue/vermelho', d.state === 'overdue' && d.sev === 'vermelho' && d.overdueMin === 7 && d.inPanel === true); }
+// C2 — estado canônico prazo próximo (laranja/warning)
+{ const d = resolveTaskDisplayState(withSla({ planDueAt: NOW + 18 * MIN }), NOW, dtMsStub);
+  ok('C2 resolve => warning/laranja', d.state === 'warning' && d.sev === 'laranja' && d.remainingMin === 18 && d.inPanel === true); }
+// C3 — dentro do prazo (>30min): azul/running, FORA do painel (mas é estado válido p/ o card)
+{ const d = resolveTaskDisplayState(withSla({ planDueAt: NOW + 120 * MIN }), NOW, dtMsStub);
+  ok('C3 resolve => running/azul fora do painel', d.state === 'running' && d.sev === 'azul' && d.inPanel === false); }
+// C4 — entregue/concluída => completed/verde
+{ const d = resolveTaskDisplayState(withSla({ planDueAt: NOW - 7 * MIN }, { status: 'concluido' }), NOW, dtMsStub);
+  ok('C4 resolve => completed/verde', d.state === 'completed' && d.sev === 'verde' && d.inPanel === false); }
+// C5 — sem designerSla => none/neutro (sem chip, fora do painel)
+{ const d = resolveTaskDisplayState({ id: 'X', designerAssignment: { designerId: 'D1' }, dueDate: '2026-06-18', dueTime: '12:00' }, NOW, dtMsStub);
+  ok('C5 resolve => none/neutro', d.state === 'none' && d.sev === 'neutro' && d.inPanel === false); }
+// C6 — o painel/widget (slaPanelRow) é DERIVADO de resolveTaskDisplayState: mesma severidade
+{ const t = withSla({ planDueAt: NOW + 18 * MIN }); const d = resolveTaskDisplayState(t, NOW, dtMsStub); const r = row(t);
+  ok('C6 slaPanelRow deriva da fonte única', !!r && r.sev === d.sev && r.finishMs === d.finishMs && r.remainingMin === d.remainingMin); }
+
 // Bônus — WARN window = 30min; exatamente -30min é laranja; -31min fica fora
 ok('B1 janela = 30min', SLA_PANEL_WARN_MS === 30 * 60000);
 ok('B2 -30min exato => laranja', row(withSla({ planDueAt: NOW + 30 * MIN })) && row(withSla({ planDueAt: NOW + 30 * MIN })).sev === 'laranja');
 ok('B3 -31min => fora do painel', row(withSla({ planDueAt: NOW + 31 * MIN })) === null);
 // B4 — painel HTML aparece SEMPRE: o renderer não retorna '' quando vazio (regressão do reteste).
-{ const html = src; const i2 = html.indexOf('function slaOpPanelHtml');
-  const seg = html.slice(i2, i2 + 1400);
-  ok('B4 slaOpPanelHtml não tem "return \'\'" (aparece sempre)', i2 > 0 && !/if\(!d\.total\)\s*return\s*'';/.test(seg) && /Tudo em dia/.test(seg)); }
-// === REPROVAÇÃO PÓS-RETESTE 2 — compactação + Kanban preservado + RBAC (asserções de fonte) ===
-// B5 — painel = BARRA fina + POPOVER flutuante (overlay; não consome altura do Kanban)
-ok('B5 painel barra+popover (overlay)', /slaop-green/.test(src) && /class="slaop-pop"/.test(src) && /\.slaop-pop\{position:absolute/.test(src) && /data-sla-toggle/.test(src));
+// === REPROVAÇÃO #4 — WIDGET flutuante top-right + Kanban RESTAURADO (asserções de fonte) ===
+// B4 — SLA Monitor é WIDGET FLUTUANTE (position:fixed), FORA do board; NÃO há painel inline no board.
+ok('B4 widget flutuante (fixed) fora do board', /function slaMonRender\(/.test(src) && /\.slamon\{position:fixed/.test(src) && !/slaOpPanelHtml\(pid\)\+boardToolbar|slaOpPanelHtml\(id\)\+boardToolbar/.test(src) && !/function slaOpPanelHtml/.test(src));
+// B5 — widget: chip premium (verde/laranja/vermelho) + dropdown ancorado (Monitor de prazos)
+ok('B5 widget chip + dropdown', /slamon-chip/.test(src) && /slamon-pop/.test(src) && /Monitor de prazos/.test(src) && /data-slamon-toggle/.test(src));
 // B5b — alerta vermelho traz a regra operacional dos 10 minutos
 ok('B5b vermelho regra 10 min', /Conclua a tarefa atrasada em até 10 min ou sinalize atraso\./.test(src));
-// B6 — card NUNCA encolhe: base flex:0 0 auto + only-child flex:1 0 auto (corrige corte topo/rodapé)
-ok('B6 card não encolhe (flex-shrink:0)', /\.kbv2-card\{[\s\S]*?flex:0 0 auto;/.test(src) && /kbv2-card:only-child\{ flex:1 0 auto; \}/.test(src));
+// B6 — Kanban/card RESTAURADO ao aprovado: card sem flex-shrink:0; only-child volta a flex:1 1 auto.
+ok('B6 Kanban restaurado (card aprovado)', !/\.kbv2-card\{[\s\S]{0,120}flex:0 0 auto;/.test(src) && /kbv2-card:only-child\{ flex:1 1 auto; \}/.test(src));
+// B6b — chip SLA do card é por PRAZO FINAL (delega à fonte única; sem "Início atrasado")
+ok('B6b chip SLA do card finish-based', /function kbv2SlaLocal[\s\S]{0,400}resolveTaskDisplayState\(/.test(src) && !/label:'Início atrasado'/.test(src));
+// B6c — FONTE ÚNICA: card (kbv2SlaLocal), widget/sino (slaPanelRow) e detalhe (detailSla) TODOS
+// derivam de resolveTaskDisplayState (status/prazo coerentes entre telas — exigência do owner).
+ok('B6c fonte única de status/prazo', /function resolveTaskDisplayState\(/.test(src)
+  && /function kbv2SlaLocal[\s\S]{0,600}resolveTaskDisplayState\(/.test(src)
+  && /function slaPanelRow[\s\S]{0,600}resolveTaskDisplayState\(/.test(src)
+  && /function detailSla\([\s\S]{0,600}resolveTaskDisplayState\(/.test(src));
 // B7 — "Sua etapa / Próxima ação" redesenhada premium (ícones + pill)
 ok('B7 etapa redesenhada (kbv2-stage2 + pill + ícones)', /kbv2-stage2/.test(src) && /kbv2-st2-pill/.test(src) && /kbv2-st2-ic/.test(src));
 // B8 — "Editar prazo" gated por canSeeAll (Social/Admin); designer comum não vê
