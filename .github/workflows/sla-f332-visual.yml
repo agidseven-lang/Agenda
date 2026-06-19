@@ -1,0 +1,85 @@
+# F3.3.2 — QA VISUAL do PAINEL OPERACIONAL SLA.
+#  - Desktop: roda o renderer REAL (Playwright/Chromium headless), captura os 10
+#    screenshots exigidos e aplica gates numéricos (2 seções, vermelho>laranja,
+#    textos, detalhe SLA, header em esquadro avatar↔logo / sino↔avatar).
+#  - Android: renderiza os frames mockup (fiéis ao Compose SlaOpPanel) — 8 telas.
+#  Publica os PNGs como artifact E os commita em docs/sla-f332/ no branch (revisão
+#  do owner / o agente relê via git pull). NÃO envia FCM/Web Push/WhatsApp, NÃO
+#  escreve Firestore, NÃO faz deploy/release. Só HTML/renderer estático -> PNG.
+name: "[manual] SLA F3.3.2 — QA visual painel operacional (PNGs)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/sla-f332-visual.yml'
+      - 'desktop/scripts/visual-qa-f332.mjs'
+      - 'desktop/scripts/sla-mockups-f332/**'
+      - 'desktop/src/renderer/index.html'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sla-f332-visual
+  cancel-in-progress: true
+
+jobs:
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: desktop/local-detail-hierarchy-v2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: QA Desktop (renderer real) — 10 telas + gates
+        id: deskqa
+        continue-on-error: true
+        run: node desktop/scripts/visual-qa-f332.mjs
+      - name: Mockups Android — 8 frames (fiéis ao Compose)
+        id: android
+        continue-on-error: true
+        run: node desktop/scripts/sla-mockups-f332/shoot.mjs
+      - name: Upload screenshots (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sla-f332-visual
+          path: |
+            desktop/qa-f332-out/
+            desktop/sla-f332-out/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Commitar previews no branch (revisão do owner)
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf docs/sla-f332 && mkdir -p docs/sla-f332
+          cp desktop/qa-f332-out/*.png docs/sla-f332/ 2>/dev/null || true
+          cp desktop/qa-f332-out/*.json docs/sla-f332/ 2>/dev/null || true
+          cp desktop/sla-f332-out/*.png docs/sla-f332/ 2>/dev/null || true
+          cp desktop/sla-f332-out/manifest.json docs/sla-f332/android-manifest.json 2>/dev/null || true
+          git add docs/sla-f332
+          if git diff --cached --quiet; then
+            echo "nada a commitar"
+          else
+            git commit -m "F3.3.2: previews PNG do painel operacional (Desktop QA + Android mockups) [skip ci]"
+            git pull --rebase origin desktop/local-detail-hierarchy-v2 || true
+            git push origin HEAD:desktop/local-detail-hierarchy-v2
+          fi
+      - name: Enforce gates (build verde só se Desktop QA e Android passarem)
+        if: always()
+        run: |
+          if [ "${{ steps.deskqa.outcome }}" != "success" ]; then echo "::error::Desktop QA F3.3.2 falhou"; exit 1; fi
+          if [ "${{ steps.android.outcome }}" != "success" ]; then echo "::error::Android mockups F3.3.2 falharam"; exit 1; fi
+          echo "QA F3.3.2 verde (Desktop + Android)."

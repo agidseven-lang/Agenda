@@ -1,0 +1,154 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>F3.3.2 — Android · Painel Operacional SLA (mockup fiel ao Compose)</title>
+<style>
+  :root{--bg:#0B0E14;--card:#141A29;--ink:#E8ECF4;--ink2:#EEF2F8;--soft:#9FB0C8;--faint:#8B97A8;
+        --red:#FF6B61;--amber:#F2A93B;--blue:#7FA6FF;--line:rgba(255,255,255,.09)}
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+  body{background:#070a10;padding:26px;display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start}
+  .cap{color:#7f8aa0;font-size:12px;margin:0 0 8px;font-weight:700;letter-spacing:.02em}
+  /* moldura do telefone */
+  .phone{background:var(--bg);border-radius:30px;border:1px solid #20283a;overflow:hidden;
+         box-shadow:0 30px 70px -30px rgba(0,0,0,.8);position:relative;display:flex;flex-direction:column}
+  .sbar{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;color:#cfd6e4;font-size:12px;font-weight:700}
+  .sbar .dots{display:flex;gap:5px;align-items:center}
+  .sbar .dots i{width:5px;height:5px;border-radius:50%;background:#7f8aa0;display:inline-block}
+  .topbar{display:flex;align-items:center;gap:10px;padding:8px 14px 4px}
+  .topbar .ttl{font-size:19px;font-weight:800;color:var(--ink2);flex:1}
+  .bell{width:38px;height:38px;border-radius:50%;background:#1B2030;display:flex;align-items:center;justify-content:center;position:relative;color:#E8ECF4}
+  .bell svg{width:20px;height:20px}
+  .bell .cnt{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;border-radius:9px;background:var(--red);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg);padding:0 3px}
+  .av{width:34px;height:34px;border-radius:50%;background:#5B6CFF;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .search{margin:6px 14px 4px;height:40px;border-radius:12px;background:#10151f;border:1px solid var(--line);display:flex;align-items:center;padding:0 13px;color:#7f8aa0;font-size:13px}
+  .chips{display:flex;gap:8px;padding:4px 14px;overflow:hidden}
+  .chip{font-size:11.5px;font-weight:700;color:#aeb9cc;background:#11161f;border:1px solid var(--line);border-radius:999px;padding:6px 11px;white-space:nowrap}
+  .chip.on{color:#bcd0ff;background:rgba(127,166,255,.12);border-color:rgba(127,166,255,.35)}
+  /* PAINEL OPERACIONAL (espelha SlaOpPanel.kt) */
+  .op{margin:8px 12px;border-radius:16px;background:var(--card);border:1px solid var(--line);overflow:hidden}
+  .op-hd{display:flex;align-items:center;gap:10px;padding:11px 12px 9px 14px}
+  .op-ic{width:28px;height:28px;border-radius:9px;background:rgba(242,169,59,.14);display:flex;align-items:center;justify-content:center;font-size:14px}
+  .op-h-t{flex:1;min-width:0}
+  .op-h-t b{display:block;color:var(--ink2);font-size:13.5px;font-weight:800}
+  .op-h-t span{display:block;color:var(--faint);font-size:11px;margin-top:1px}
+  .pill{font-size:11.5px;font-weight:800;border-radius:999px;padding:5px 10px;white-space:nowrap}
+  .pill.red{color:var(--red);background:rgba(255,107,97,.14);border:1px solid rgba(255,107,97,.34)}
+  .pill.amber{color:var(--amber);background:rgba(242,169,59,.14);border:1px solid rgba(242,169,59,.34);margin-left:6px}
+  .op-sec{padding:2px 10px}
+  .op-sec-h{display:flex;align-items:center;gap:7px;padding:5px 0}
+  .op-sec-h .pd{width:8px;height:8px;border-radius:50%}
+  .op-sec-h b{font-size:12.5px;font-weight:800}
+  .op-sec-h .n{margin-left:7px;background:rgba(255,255,255,.08);color:#cdd6e6;font-size:11px;font-weight:800;border-radius:7px;padding:1px 7px}
+  .op-sec.red .pd{background:var(--red)}.op-sec.red b{color:var(--red)}
+  .op-sec.amber .pd{background:var(--amber)}.op-sec.amber b{color:var(--amber)}
+  .it{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-radius:11px;padding:8px 9px;margin-bottom:6px}
+  .it .bar{width:4px;height:34px;border-radius:3px;flex:0 0 auto}
+  .it.red .bar{background:var(--red)}.it.amber .bar{background:var(--amber)}
+  .it .bd{flex:1;min-width:0}
+  .it .t{color:var(--ink);font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .it .m{color:var(--soft);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .it .tm{font-size:12px;font-weight:800;margin-top:2px}
+  .it.red .tm{color:var(--red)}.it.amber .tm{color:var(--amber)}
+  .it .open{flex:0 0 auto;font-size:11.5px;font-weight:800;color:#BCD0FF;background:rgba(127,166,255,.10);border:1px solid rgba(127,166,255,.33);border-radius:9px;padding:7px 10px}
+  /* seletor de colunas + cards (contexto do quadro) */
+  .cols{display:flex;gap:6px;padding:8px 13px}
+  .col{flex:1;text-align:center;border-radius:10px;background:#11161f;border:1px solid var(--line);padding:6px 0}
+  .col.on{background:rgba(127,166,255,.16);border-color:rgba(127,166,255,.5)}
+  .col .cl{font-size:10px;font-weight:800;color:#8b97a8}.col.on .cl{color:#bcd0ff}
+  .col .cv{font-size:15px;font-weight:800;color:#aeb9cc}.col.on .cv{color:#bcd0ff}
+  .cards{padding:4px 14px}
+  .tc{background:#121826;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+  .tc .tt{color:var(--ink);font-size:14px;font-weight:800}
+  .tc .ts{color:var(--soft);font-size:12px;margin-top:3px}
+  .tc .chiprow{display:flex;gap:6px;margin-top:9px}
+  .tc .st{font-size:11px;font-weight:800;border-radius:8px;padding:4px 9px}
+  /* navbar inferior */
+  .nav{margin-top:auto;height:58px;border-top:1px solid var(--line);background:#0c1018;display:flex;align-items:center;justify-content:space-around;color:#6f7889}
+  .nav b{font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .nav .ico{width:20px;height:20px;border-radius:6px;background:#252d3f}
+  .nav .on{color:#bcd0ff}.nav .on .ico{background:#5B6CFF}
+  /* detalhe SLA */
+  .det{padding:14px}
+  .det .h{color:var(--ink2);font-size:17px;font-weight:800;margin-bottom:3px}
+  .det .sub{color:var(--soft);font-size:12px;margin-bottom:14px}
+  .det .sec{color:var(--faint);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin:14px 0 8px}
+  .slabox{border-radius:14px;padding:13px;border:1px solid rgba(255,107,97,.4);background:rgba(255,107,97,.1)}
+  .slabox .row1{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .slabox .lbl{font-size:12px;font-weight:800;color:var(--red);background:rgba(255,107,97,.16);border-radius:999px;padding:4px 10px;display:flex;align-items:center;gap:6px}
+  .slabox .lbl .pd{width:7px;height:7px;border-radius:50%;background:var(--red)}
+  .slabox .rem{color:var(--red);font-weight:800;font-size:13px}
+  .slabox .grid{display:flex;gap:26px;margin-top:12px;flex-wrap:wrap}
+  .slabox .k{color:var(--faint);font-size:11px;margin-bottom:2px}
+  .slabox .v{color:var(--ink);font-size:13px;font-weight:700}
+  /* sino aberto */
+  .sinohd{display:flex;align-items:center;justify-content:space-between;padding:16px 14px}
+  .sinohd b{color:var(--ink2);font-size:15px;font-weight:800}.sinohd span{color:var(--soft);font-size:12px}
+  .sino-it{display:flex;gap:10px;padding:11px 14px}
+  .sino-it .dot{width:9px;height:9px;border-radius:50%;margin-top:4px}
+  .sino-it.red .dot{background:var(--red)}.sino-it.amber .dot{background:var(--amber)}
+  .sino-it .l{color:var(--ink);font-size:13px;font-weight:800}
+  .sino-it .x{color:#CDD6E6;font-size:12px;margin-top:1px}
+  .sino-it .s{color:var(--soft);font-size:12px;margin-top:1px}
+</style></head>
+<body>
+<script>
+  // dados (mesmos textos/ordem do SlaOpPanel.kt): vermelho antes do laranja
+  const RED=[{t:'Reels de lançamento',c:'Boa Forma',r:'Marina',due:'11:20',over:7},
+             {t:'Arte campanha de verão',c:'Clínica Vita',r:'Marina',due:'10:50',over:23}];
+  const AMBER=[{t:'Cronograma semanal',c:'Boa Forma',r:'Marina',due:'12:05',left:18},
+               {t:'Carrossel institucional',c:'Studio Lumen',r:'Marina',due:'12:14',left:27}];
+  const clock='<svg viewBox="0 0 24 24" fill="none" stroke="#F2A93B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+  const bellSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
+  function row(x,kind){const red=kind==='red';
+    return `<div class="it ${red?'red':'amber'}"><div class="bar"></div><div class="bd">`
+      +`<div class="t">${x.t}</div><div class="m">${x.c} · resp. ${x.r} · prazo ${x.due}</div>`
+      +`<div class="tm">${red?('Atrasada há '+x.over+' min'):('Faltam '+x.left+' min')}</div></div>`
+      +`<div class="open">Abrir</div></div>`;}
+  function section(title,kind,arr){if(!arr.length)return '';
+    return `<div class="op-sec ${kind}"><div class="op-sec-h"><span class="pd"></span><b>${title}</b><span class="n">${arr.length}</span></div>`
+      +arr.map(x=>row(x,kind)).join('')+`</div>`;}
+  function panel(red,amber){const ov=red.length,wn=amber.length;
+    let pills=''; if(ov)pills+=`<span class="pill red">${ov} atrasada${ov===1?'':'s'}</span>`; if(wn)pills+=`<span class="pill amber">${wn} próx.</span>`;
+    return `<div class="op"><div class="op-hd"><div class="op-ic">${clock}</div>`
+      +`<div class="op-h-t"><b>Operação · SLA por prazo final</b><span>Prazo próximo e atrasadas — em tempo real</span></div>${pills}</div>`
+      +section('Atrasadas','red',red)+section('Prazo próximo','amber',amber)+`<div style="height:8px"></div></div>`;}
+  function statusbar(){return `<div class="sbar"><span>9:41</span><div class="dots"><i></i><i></i><i></i> <span>100%</span></div></div>`;}
+  function topbar(unread){return `<div class="topbar"><div class="ttl">Tarefas</div>`
+      +`<div class="bell">${bellSvg}${unread?`<span class="cnt">${unread}</span>`:''}</div><div class="av">M</div></div>`;}
+  function chips(){return `<div class="chips"><span class="chip on">Minhas tarefas</span><span class="chip">Todos</span><span class="chip">Cronograma</span></div>`;}
+  function cols(){return `<div class="cols">`
+      +`<div class="col on"><div class="cl">A Fazer</div><div class="cv">2</div></div>`
+      +`<div class="col"><div class="cl">Andam.</div><div class="cv">3</div></div>`
+      +`<div class="col"><div class="cl">Revisão</div><div class="cv">1</div></div>`
+      +`<div class="col"><div class="cl">Concl.</div><div class="cv">4</div></div></div>`;}
+  function cards(){return `<div class="cards">`
+      +`<div class="tc"><div class="tt">Reels de lançamento</div><div class="ts">Boa Forma · entrega hoje</div><div class="chiprow"><span class="st" style="color:#FF6B61;background:rgba(255,107,97,.15)">Entrega atrasada</span></div></div>`
+      +`<div class="tc"><div class="tt">Cronograma semanal</div><div class="ts">Boa Forma · em produção</div><div class="chiprow"><span class="st" style="color:#F2A93B;background:rgba(242,169,59,.15)">Entrega próxima</span></div></div>`
+      +`</div>`;}
+  function navbar(){return `<div class="nav"><b class="on"><span class="ico"></span>Tarefas</b><b><span class="ico"></span>Agenda</b><b><span class="ico"></span>Equipe</b><b><span class="ico"></span>Perfil</b></div>`;}
+  function board(w,h,red,amber){const unread=red.length+amber.length;
+    return `<div class="phone" style="width:${w}px;height:${h}px">${statusbar()}${topbar(unread)}${chips()}`
+      +panel(red,amber)+cols()+cards()+navbar()+`</div>`;}
+  function phoneShell(w,h,inner){return `<div class="phone" style="width:${w}px;height:${h}px">${statusbar()}${inner}</div>`;}
+
+  const frames=[
+    ['and-01-quadro-painel', 'Quadro/lista com painel operacional (390×844)', board(390,844,RED,AMBER)],
+    ['and-02-painel-laranja','Painel — apenas laranja', `<div style="padding:14px;background:var(--bg)">${panel([],AMBER)}</div>`],
+    ['and-03-painel-vermelho','Painel — apenas vermelho', `<div style="padding:14px;background:var(--bg)">${panel(RED,[])}</div>`],
+    ['and-04-painel-ambos','Painel — laranja + vermelho', `<div style="padding:14px;background:var(--bg)">${panel(RED,AMBER)}</div>`],
+    ['and-05-sino','Central / sino aberta', phoneShell(390,844,
+        `<div class="sinohd"><span>Voltar</span><b>Alertas de SLA</b><span>Marcar todas</span></div>`
+        +`<div class="sino-it red"><div class="dot"></div><div><div class="l">Prazo encerrado</div><div class="x">Prazo ultrapassado há 7 min. Conclua imediatamente.</div><div class="s">Boa Forma · Reels de lançamento</div></div></div>`
+        +`<div class="sino-it amber"><div class="dot"></div><div><div class="l">Prazo próximo</div><div class="x">Faltam 18 min — conclua até 12:05.</div><div class="s">Boa Forma · Cronograma semanal</div></div></div>`)],
+    ['and-06-detalhe-sla','Detalhe da tarefa — SLA do designer', phoneShell(390,844,
+        `<div class="det"><div class="h">Reels de lançamento</div><div class="sub">Boa Forma · Cronograma</div>`
+        +`<div class="sec">SLA do designer</div><div class="slabox"><div class="row1"><span class="lbl"><span class="pd"></span>Prazo encerrado</span><span class="rem">Atraso de 7 min</span></div>`
+        +`<div class="grid"><div><div class="k">Início planejado</div><div class="v">18/06 09:00</div></div><div><div class="k">Prazo final / término</div><div class="v">18/06 11:20</div></div></div></div></div>`)],
+    ['and-07-390x844','Tela 390×844', board(390,844,RED,AMBER)],
+    ['and-08-412x915','Tela 412×915', board(412,915,RED,AMBER)],
+  ];
+  for(const [id,cap,html] of frames){
+    const wrap=document.createElement('div');
+    wrap.innerHTML=`<div class="cap">${cap}</div><div data-shot="${id}">${html}</div>`;
+    document.body.appendChild(wrap);
+  }
+</script>
+</body></html>

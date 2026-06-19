@@ -2442,25 +2442,60 @@ function slaibVisible(u){
 }
 function slaibFmtHM(ms){try{var d=new Date(ms);var p=function(n){return (n<10?'0':'')+n;};return p(d.getHours())+':'+p(d.getMinutes());}catch(_){return '';}}
 function slaibFmtDur(ms){ms=Math.max(0,ms);var m=Math.round(ms/60000);if(m<60)return m+' min';var h=Math.floor(m/60),r=m%60;if(h<24)return h+'h'+(r?(' '+r+'min'):'');var d=Math.floor(h/24);return d+'d '+(h%24)+'h';}
-/* Alerta SLA por PRAZO FINAL (read-only). Retorna null se não há alerta. Independe de "iniciou":
- * o que importa é o término (planDueAt). Concluída => sem alerta. */
-function slaibFinishAlert(t,now){
-  var ds=t&&t.designerSla; if(!ds) return null;
+/* ════ F3.3.2 — PANEL-CORE (derivação PURA read-side do painel operacional SLA) ════
+ * Fonte ÚNICA da regra por PRAZO FINAL, compartilhada pelo SINO e pelo PAINEL OPERACIONAL
+ * (paridade 1:1). Pura: sem DOM, sem state, sem rede — testável isolada
+ * (desktop/scripts/f332-panel.test.mjs extrai entre os sentinelas e injeta dtMs).
+ * Prazo final (MESMA lógica da F3.3.1): plannedFinishAt → planDueAt →
+ * designerAssignment.endDate/endTime → dueDate/dueTime. Exclui entregue/concluída/
+ * cancelada/removida, sem designer e sem prazo válido. NÃO envia nada, NÃO escreve. */
+/* F3.3.2-PANEL-CORE BEGIN */
+var SLA_PANEL_WARN_MS=30*60000;
+function slaPanelFinishMs(t,dtMsFn){
+  var ds=(t&&t.designerSla)||{};
+  var pf=Number(ds.plannedFinishAt); if(pf>0) return pf;          // 1) plannedFinishAt (engine)
+  var pd=Number(ds.planDueAt); if(pd>0) return pd;                // 2) planDueAt (semente in-app)
+  var f=dtMsFn||(typeof dtMs==='function'?dtMs:function(){return 0;});
+  var da=(t&&t.designerAssignment)||{};
+  if(da.endDate){ var e=Number(f(da.endDate,da.endTime||'23:59'))||0; if(e>0) return e; } // 3) assignment.end
+  var dd=t&&(t.dueDate||t.due); if(dd){ var d=Number(f(dd,(t&&t.dueTime)||'23:59'))||0; if(d>0) return d; } // 4) due
+  return 0;
+}
+function slaPanelDelivered(t){
+  var ds=(t&&t.designerSla)||{};
   var finished=Number(ds.finishedAt)||(typeof (t&&t.doneAt)==='number'?t.doneAt:0);
-  var delivered=(finished>0)||(t&&(t.designerFlowStatus==='entregue'||t.designerFlowStatus==='concluido'||t.status==='concluido'));
-  if(delivered) return null;
-  var pd=Number(ds.planDueAt); if(!pd||isNaN(pd)) return null;
-  if(now>pd){
-    var over=Math.max(1,Math.round((now-pd)/60000));
-    return {sev:'vermelho',event:'designer_finish_overdue',label:'Prazo encerrado',
-            text:'Prazo ultrapassado há '+over+' min. Conclua imediatamente.',anchorMs:pd};
-  }
-  if(now>=pd-SLAIB_FINISH_WARN_MS){
-    var left=Math.max(1,Math.round((pd-now)/60000));
-    return {sev:'laranja',event:'designer_finish_warning',label:'Prazo próximo',
-            text:'Faltam '+left+' min — conclua até '+slaibFmtHM(pd)+'.',anchorMs:pd};
-  }
-  return null;
+  if(finished>0) return true;
+  var fs=(t&&t.designerFlowStatus)||'', st=(t&&t.status)||'';
+  return fs==='entregue'||fs==='concluido'||fs==='cancelado'||st==='concluido'||st==='cancelado'||st==='removido';
+}
+function slaPanelRow(t,now,dtMsFn){
+  if(!t) return null;
+  if(!t.designerSla) return null;                  // gate: tarefa SLA-rastreada (paridade com o sino atual)
+  var designerId=(t.designerAssignment&&t.designerAssignment.designerId)||t.assigneeId||null;
+  if(!designerId) return null;                     // exclusão: sem designer responsável
+  if(slaPanelDelivered(t)) return null;            // exclusão: entregue/concluída/cancelada/removida
+  var pd=slaPanelFinishMs(t,dtMsFn); if(!pd) return null;   // exclusão: sem prazo final válido
+  if(now>=pd){ var over=Math.max(1,Math.round((now-pd)/60000));
+    return {taskId:t.id,sev:'vermelho',bucket:'overdue',finishMs:pd,overdueMin:over,remainingMin:0,title:t.title||'',client:t.client||'',designerId:designerId}; }
+  if(now>=pd-SLA_PANEL_WARN_MS){ var left=Math.max(1,Math.round((pd-now)/60000));
+    return {taskId:t.id,sev:'laranja',bucket:'warning',finishMs:pd,overdueMin:0,remainingMin:left,title:t.title||'',client:t.client||'',designerId:designerId}; }
+  return null;                                      // dentro do prazo (>30min) — fora do painel
+}
+function slaPanelDerive(tasks,now,dtMsFn){
+  var rows=[]; (tasks||[]).forEach(function(t){ var r=slaPanelRow(t,now,dtMsFn); if(r) rows.push(r); });
+  rows.sort(function(a,b){ var r=((b.sev==='vermelho')?1:0)-((a.sev==='vermelho')?1:0); if(r) return r; return (a.finishMs||0)-(b.finishMs||0); });
+  return { overdue:rows.filter(function(x){return x.sev==='vermelho';}),
+           warning:rows.filter(function(x){return x.sev==='laranja';}), rows:rows, total:rows.length };
+}
+/* F3.3.2-PANEL-CORE END */
+/* Alerta SLA por PRAZO FINAL p/ o SINO (read-only). Deriva do PANEL-CORE (sino↔painel 1:1).
+ * Mantém os textos já aprovados do sino (F3.2.4). Retorna null se não há alerta. */
+function slaibFinishAlert(t,now){
+  var r=slaPanelRow(t,now||Date.now(),(typeof dtMs==='function'?dtMs:null)); if(!r) return null;
+  if(r.sev==='vermelho') return {sev:'vermelho',event:'designer_finish_overdue',label:'Prazo encerrado',
+    text:'Prazo ultrapassado há '+r.overdueMin+' min. Conclua imediatamente.',anchorMs:r.finishMs};
+  return {sev:'laranja',event:'designer_finish_warning',label:'Prazo próximo',
+    text:'Faltam '+r.remainingMin+' min — conclua até '+slaibFmtHM(r.finishMs)+'.',anchorMs:r.finishMs};
 }
 function slaibCompute(){
   var u=state.user; if(!u) return [];
@@ -2498,7 +2533,39 @@ function slaibEnsureStyle(){
    +'.slaib-bd{flex:1;min-width:0}.slaib-bd .t{font-size:13px;color:#e8ecf4;font-weight:700}'
    +'.slaib-bd .msg{font-size:12px;color:#cdd6e6;margin-top:1px}'
    +'.slaib-bd .s{font-size:12px;color:#9fb0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
-   +'.slaib-acts{display:flex;gap:8px;margin-top:6px}.slaib-acts button{font-size:11px;border:1px solid rgba(255,255,255,.12);background:#1a2030;color:#cfe;border-radius:8px;padding:4px 8px;cursor:pointer}';
+   +'.slaib-acts{display:flex;gap:8px;margin-top:6px}.slaib-acts button{font-size:11px;border:1px solid rgba(255,255,255,.12);background:#1a2030;color:#cfe;border-radius:8px;padding:4px 8px;cursor:pointer}'
+   /* ── F3.3.2 — PAINEL OPERACIONAL SLA (topo do quadro do designer) ── */
+   +'.slaop{margin:0 0 16px;border:1px solid rgba(255,255,255,.09);border-radius:16px;background:linear-gradient(180deg,rgba(22,28,42,.92),rgba(14,18,28,.92));box-shadow:0 12px 34px -18px rgba(0,0,0,.6);overflow:hidden;flex:0 0 auto}'
+   +'.slaop-hd{display:flex;align-items:center;gap:11px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06)}'
+   +'.slaop-hd .slaop-ic{width:30px;height:30px;border-radius:9px;background:rgba(242,169,59,.14);color:#f2a93b;display:flex;align-items:center;justify-content:center;flex:0 0 auto}'
+   +'.slaop-hd .slaop-ic svg{width:17px;height:17px}'
+   +'.slaop-hd .slaop-ti{font-size:14px;font-weight:800;color:#eef2f8;letter-spacing:-.01em}'
+   +'.slaop-hd .slaop-sub{font-size:11.5px;color:#8b97a8;margin-top:1px}'
+   +'.slaop-hd .slaop-counts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}'
+   +'.slaop-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;border:1px solid transparent}'
+   +'.slaop-pill .pd{width:7px;height:7px;border-radius:50%}'
+   +'.slaop-pill.red{background:rgba(255,107,97,.13);color:#ff8c84;border-color:rgba(255,107,97,.32)}.slaop-pill.red .pd{background:#ff6b61}'
+   +'.slaop-pill.amber{background:rgba(242,169,59,.13);color:#f4b860;border-color:rgba(242,169,59,.32)}.slaop-pill.amber .pd{background:#f2a93b}'
+   +'.slaop-body{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px 16px}'
+   +'.slaop-body.slaop-one{grid-template-columns:1fr}'
+   +'@media(max-width:1180px){.slaop-body{grid-template-columns:1fr}}'
+   +'.slaop-sec{border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.015);overflow:hidden;display:flex;flex-direction:column}'
+   +'.slaop-sec.red{border-color:rgba(255,107,97,.30)}.slaop-sec.amber{border-color:rgba(242,169,59,.26)}'
+   +'.slaop-sec-hd{display:flex;align-items:center;gap:8px;padding:9px 13px;font-size:12.5px;font-weight:800;border-bottom:1px solid rgba(255,255,255,.05)}'
+   +'.slaop-sec.red .slaop-sec-hd{color:#ff8c84;background:rgba(255,107,97,.06)}.slaop-sec.amber .slaop-sec-hd{color:#f4b860;background:rgba(242,169,59,.05)}'
+   +'.slaop-sec-hd .pd{width:8px;height:8px;border-radius:50%}.slaop-sec.red .pd{background:#ff6b61}.slaop-sec.amber .pd{background:#f2a93b}'
+   +'.slaop-sec-hd .slaop-n{margin-left:auto;min-width:22px;height:20px;padding:0 7px;border-radius:7px;background:rgba(255,255,255,.06);color:#cdd6e6;display:flex;align-items:center;justify-content:center;font-size:11.5px}'
+   +'.slaop-rows{padding:6px;display:flex;flex-direction:column;gap:6px;max-height:228px;overflow:auto}'
+   +'.slaop-it{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:11px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05)}'
+   +'.slaop-it:hover{background:rgba(255,255,255,.045)}'
+   +'.slaop-bar{width:4px;align-self:stretch;border-radius:3px;flex:0 0 auto}.slaop-it.red .slaop-bar{background:#ff6b61}.slaop-it.amber .slaop-bar{background:#f2a93b}'
+   +'.slaop-bd{flex:1;min-width:0}'
+   +'.slaop-t{font-size:13px;font-weight:700;color:#e8ecf4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+   +'.slaop-meta{font-size:11.5px;color:#9fb0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}'
+   +'.slaop-time{font-size:12px;font-weight:800;margin-top:3px}.slaop-it.red .slaop-time{color:#ff8c84}.slaop-it.amber .slaop-time{color:#f4b860}'
+   +'.slaop-open{flex:0 0 auto;font-size:11.5px;font-weight:700;border:1px solid rgba(127,166,255,.32);background:rgba(127,166,255,.10);color:#bcd0ff;border-radius:9px;padding:7px 11px;cursor:pointer;white-space:nowrap}'
+   +'.slaop-open:hover{background:rgba(127,166,255,.18)}'
+   +'.slaop-emptyrow{padding:14px 12px;color:#8b97a8;font-size:12px;text-align:center}';
   document.head.appendChild(st);
 }
 function slaibRenderPanel(items,read){
@@ -2556,6 +2623,64 @@ function slaibAlign(bell){
     bell.style.top=''; bell.style.height=''; bell.style.width=''; bell.style.right=''; bell.style.bottom='';
   }catch(_){}
 }
+/* F3.3.2 — HEADER em esquadro: avatar (#cornerAvatar) e sino no MESMO eixo vertical da logo
+ * "ID Seven" (sidebar .sb-brand .logo). Mede em runtime; o sino segue o avatar (slaibAlign). */
+function slaHeaderAlign(){
+  try{
+    if(!document.body.classList.contains('desktop')){ slaibAlign(); return; }
+    var av=document.getElementById('cornerAvatar');
+    var logo=document.querySelector('#bottomNav .sb-brand .logo')||document.querySelector('.nav .sb-brand .logo');
+    if(av&&logo){
+      var lr=logo.getBoundingClientRect();
+      if(lr&&lr.height){ var avH=av.getBoundingClientRect().height||38; av.style.top=Math.round(lr.top+lr.height/2-avH/2)+'px'; }
+    }
+    slaibAlign();
+  }catch(_){ try{ slaibAlign(); }catch(__){} }
+}
+/* ── F3.3.2 — PAINEL OPERACIONAL SLA (read-side, topo do quadro do designer) ──
+ * Reusa o PANEL-CORE (mesma regra do sino). Duas seções: Atrasadas (vermelho) e Prazo
+ * próximo (laranja); vermelho acima. Contador dinâmico via slaibRefresh (30s). Abrir tarefa
+ * = openDetails. NÃO envia/escreve nada — só lê state.tasks já carregado. */
+var SLAOP_CLOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+function slaOpName(id){ if(!id) return '—'; var u=(state.users||[]).find(function(x){return x&&x.id===id;}); var n=((u&&(u.name||u.displayName))||'').trim(); return n?slaibEsc(n.split(' ')[0]):'—'; }
+function slaOpTasksFor(scopeId){ if(!scopeId) return []; return (state.tasks||[]).filter(function(t){ return t && ((typeof designerOf==='function'&&designerOf(t)===scopeId)||t.assigneeId===scopeId); }); }
+function slaOpRowHtml(x){
+  var cls=(x.sev==='vermelho')?'red':'amber';
+  var meta=(x.client?slaibEsc(x.client)+' · ':'')+'resp. '+slaOpName(x.designerId)+' · prazo '+slaibFmtHM(x.finishMs);
+  var time=(x.sev==='vermelho')?('Atrasada há '+x.overdueMin+' min'):('Faltam '+x.remainingMin+' min');
+  return '<div class="slaop-it '+cls+'"><span class="slaop-bar"></span>'
+    +'<div class="slaop-bd"><div class="slaop-t">'+slaibEsc(x.title||x.taskId)+'</div>'
+    +'<div class="slaop-meta">'+meta+'</div><div class="slaop-time">'+time+'</div></div>'
+    +'<button class="slaop-open" data-sla-open="'+slaibEsc(x.taskId)+'">Abrir tarefa</button></div>';
+}
+function slaOpSecHtml(kind,rows){
+  var red=(kind==='red'); var title=red?'Atrasadas':'Prazo próximo';
+  var body=rows.length?rows.map(slaOpRowHtml).join(''):'<div class="slaop-emptyrow">Nada por aqui.</div>';
+  return '<section class="slaop-sec '+(red?'red':'amber')+'"><div class="slaop-sec-hd"><span class="pd"></span>'+title+'<span class="slaop-n">'+rows.length+'</span></div><div class="slaop-rows">'+body+'</div></section>';
+}
+function slaOpPanelHtml(scopeId){
+  var d=slaPanelDerive(slaOpTasksFor(scopeId),Date.now(),(typeof dtMs==='function'?dtMs:null));
+  if(!d.total) return '';
+  var secs=[]; if(d.overdue.length) secs.push(slaOpSecHtml('red',d.overdue)); if(d.warning.length) secs.push(slaOpSecHtml('amber',d.warning));
+  var one=(secs.length<2)?' slaop-one':'';
+  var counts='<span class="slaop-pill red"><span class="pd"></span>'+d.overdue.length+' atrasada'+(d.overdue.length===1?'':'s')+'</span>'
+    +'<span class="slaop-pill amber"><span class="pd"></span>'+d.warning.length+' prazo próximo</span>';
+  return '<div class="slaop" id="sla-oppanel" data-scope="'+slaibEsc(scopeId||'')+'">'
+    +'<div class="slaop-hd"><span class="slaop-ic">'+SLAOP_CLOCK_SVG+'</span>'
+    +'<div><div class="slaop-ti">Operação · SLA por prazo final</div><div class="slaop-sub">Entregas com prazo próximo e atrasadas — em tempo real</div></div>'
+    +'<div class="slaop-counts">'+counts+'</div></div>'
+    +'<div class="slaop-body'+one+'">'+secs.join('')+'</div></div>';
+}
+function slaOpPanelRefresh(){
+  var host=document.getElementById('sla-oppanel'); if(!host) return;
+  var fresh=slaOpPanelHtml(host.getAttribute('data-scope')||'');
+  if(!fresh){ host.remove(); return; }
+  var tmp=document.createElement('div'); tmp.innerHTML=fresh; var nn=tmp.firstChild;
+  if(nn&&host.parentNode) host.parentNode.replaceChild(nn,host);
+}
+if(typeof window!=='undefined' && !window.__slaOpClickBound){ window.__slaOpClickBound=true;
+  try{ document.addEventListener('click',function(e){ var o=e.target.closest&&e.target.closest('[data-sla-open]'); if(o){ if(e.preventDefault)e.preventDefault(); slaibOpenTask(o.getAttribute('data-sla-open')); } }); }catch(_){}
+}
 function slaibRender(){
   var bell=document.getElementById('slaib-bell');
   var authed=!!(state.user)&&document.body.classList.contains('authed');
@@ -2566,13 +2691,13 @@ function slaibRender(){
   if(!bell){ bell=document.createElement('div'); bell.id='slaib-bell'; bell.className='slaib-bell'; bell.title='Alertas de SLA'; bell.innerHTML=(typeof svg==='function'?svg('bell'):'')+'<span class="slaib-count" id="slaib-count"></span>'; bell.addEventListener('click',slaibToggle); document.body.appendChild(bell); }
   var cnt=document.getElementById('slaib-count');
   if(cnt){ if(unread.length){cnt.style.display='flex';cnt.textContent=String(unread.length);} else {cnt.style.display='none';} }
-  slaibAlign(bell);
+  slaHeaderAlign();
   if(document.getElementById('slaib-ov')) slaibRenderPanel(items,read);
 }
-function slaibRefresh(){ try{ slaibRender(); }catch(_){} }
+function slaibRefresh(){ try{ slaibRender(); }catch(_){} try{ slaOpPanelRefresh(); }catch(_){} }
 if(typeof renderFromSnapshot==='function'){ var _slaib_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_slaib_rfs.apply(this,arguments); slaibRefresh(); return r; }; }
 try{ setInterval(slaibRefresh,30000); }catch(_){}                 /* tempo real (read-side): contador, cor e contagem regressiva */
-try{ window.addEventListener('resize',function(){ slaibAlign(); }); }catch(_){}
+try{ window.addEventListener('resize',function(){ slaHeaderAlign(); }); }catch(_){}
 try{ setTimeout(slaibRefresh,0); }catch(_){}
 function render(){
   if(!state.user)return;
@@ -2790,7 +2915,7 @@ function renderPersonBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">'+(isMe?'Meu quadro':'Quadro de '+esc((p.name||'').split(' ')[0]||'Responsável'))+'</div><div class="d-bh-sub">'+esc(p.role||'Fluxo individual')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    '<div class="scr" style="padding-top:0">'+slaOpPanelHtml(pid)+boardToolbar()+
     // role-aware: no "Meu quadro" de um DESIGNER, a tarefa atribuída a ele aparece na
     // perspectiva do designer; tarefas onde ele NÃO é o designer seguem operacional.
     kbv2BoardHtml(SOCIAL_COLS4.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})),
@@ -2926,7 +3051,7 @@ function renderDesignerBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designer · '+esc((p.name||'').split(' ')[0]||'Designer')+'</div><div class="d-bh-sub">'+esc(p.role||'Designer')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    '<div class="scr" style="padding-top:0">'+slaOpPanelHtml(id)+boardToolbar()+
     kbv2BoardHtml(DESIGNER_COLS4.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})), t=>kbv2Card(t,'designer'));
   return h+'</div>';
 }
@@ -4056,15 +4181,16 @@ function detailHeroBlock(t){
  * planejadas e tempo restante/atraso. NÃO grava nada; só lê designerSla. */
 function detailSla(t){
   var ds=t&&t.designerSla; if(!ds) return null;
-  var pd=Number(ds.planDueAt); if(!pd||isNaN(pd)) return null;
+  /* F3.3.2 — mesmo prazo final do painel/sino (PANEL-CORE): plannedFinishAt→planDueAt→assignment.end→due. */
+  var pd=slaPanelFinishMs(t,(typeof dtMs==='function'?dtMs:null)); if(!pd) return null;
   var now=Date.now();
   var ps=Number(ds.planStartAt)||0;
   var finished=Number(ds.finishedAt)||(typeof t.doneAt==='number'?t.doneAt:0);
   var delivered=(finished>0)||(t.designerFlowStatus==='entregue'||t.designerFlowStatus==='concluido'||t.status==='concluido');
   var o={planStartAt:ps,planDueAt:pd};
   if(delivered){o.state='completed';o.label='Concluída';o.color='#37D196';o.rem='Entrega concluída';return o;}
-  if(now>pd){o.state='overdue';o.label='Prazo encerrado';o.color='#FF6B61';o.rem='Atraso de '+slaibFmtDur(now-pd);return o;}
-  if(now>=pd-SLAIB_FINISH_WARN_MS){o.state='warning';o.label='Prazo próximo';o.color='#F2A93B';o.rem='Faltam '+slaibFmtDur(pd-now);return o;}
+  if(now>=pd){o.state='overdue';o.label='Prazo encerrado';o.color='#FF6B61';o.rem='Atraso de '+slaibFmtDur(now-pd);return o;}
+  if(now>=pd-SLA_PANEL_WARN_MS){o.state='warning';o.label='Prazo próximo';o.color='#F2A93B';o.rem='Faltam '+slaibFmtDur(pd-now);return o;}
   o.state='normal';o.label='Dentro do prazo';o.color='#7FA6FF';o.rem='Faltam '+slaibFmtDur(pd-now);return o;
 }
 function detailSlaBlock(t){

@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
+import br.com.idseven.agenda.nativebeta.domain.EventStatus
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.features.tasks.TaskVisibility
@@ -44,23 +46,46 @@ data class SlaInAppItem(
     val text: String, val client: String, val title: String, val anchorMs: Long, val key: String,
 )
 
+// F3.3.2 — linha do PAINEL OPERACIONAL (read-side). Mesma regra/severidade do sino.
+data class SlaOpRow(
+    val taskId: String, val sev: String, val bucket: String, val finishMs: Long,
+    val remainingMin: Long, val overdueMin: Long, val title: String, val client: String, val responsavel: String,
+)
+data class SlaOpData(val overdue: List<SlaOpRow>, val warning: List<SlaOpRow>, val total: Int)
+
 object SlaInApp {
     private const val FINISH_WARN_MS = 30 * 60000L
+
+    /* F3.3.2 — fonte ÚNICA do prazo final (paridade c/ Desktop PANEL-CORE e F3.3.1):
+       plannedFinishAt → planDueAt → dueDate/dueTime. (Android não tem assignment.endDate.) */
+    fun finishMs(t: TaskItem): Long {
+        val ds = t.designerSla
+        ds?.plannedFinishAt?.let { if (it > 0L) return it }
+        ds?.planDueAt?.let { if (it > 0L) return it }
+        val due = EventStatus.dtMs(t.dueDate, (t.dueTime?.ifBlank { null }) ?: "23:59")
+        return if (due != null && due > 0L) due else 0L
+    }
+
+    // Entregue/concluída/cancelada/removida ⇒ nunca alerta (exclusões do painel).
+    private fun delivered(t: TaskItem): Boolean {
+        val finished = t.designerSla?.finishedAt ?: t.doneAt
+        if (finished != null && finished > 0L) return true
+        val fs = t.designerFlowStatus; val st = t.status
+        return fs == "entregue" || fs == "concluido" || fs == "cancelado" ||
+            st == "concluido" || st == "cancelado" || st == "removido"
+    }
 
     fun items(user: UserLite?, tasks: List<TaskItem>, nowMs: Long = System.currentTimeMillis()): List<SlaInAppItem> {
         val vis = TaskVisibility.visibleTasks(user, tasks)
         val hm = SimpleDateFormat("HH:mm", Locale.getDefault())
         val out = ArrayList<SlaInAppItem>()
         for (t in vis) {
-            val ds = t.designerSla
-            val finished = ds?.finishedAt ?: t.doneAt
-            val delivered = (finished != null && finished > 0L) ||
-                t.designerFlowStatus == "entregue" || t.designerFlowStatus == "concluido" || t.status == "concluido"
-            if (delivered) continue
-            val pd = ds?.planDueAt ?: continue
-            if (pd <= 0L) continue
+            if (t.designerSla == null) continue                                   // gate: SLA-rastreada
+            (t.designerAssignment?.designerId ?: t.assigneeId) ?: continue         // sem designer responsável
+            if (delivered(t)) continue
+            val pd = finishMs(t); if (pd <= 0L) continue                           // sem prazo final válido
             val event: String; val sev: String; val label: String; val text: String
-            if (nowMs > pd) {
+            if (nowMs >= pd) {
                 val over = kotlin.math.max(1L, Math.round((nowMs - pd) / 60000.0))
                 event = "designer_finish_overdue"; sev = "vermelho"; label = "Prazo encerrado"
                 text = "Prazo ultrapassado há $over min. Conclua imediatamente."
@@ -81,6 +106,36 @@ object SlaInApp {
         out.sortWith(compareByDescending<SlaInAppItem> { it.sev == "vermelho" }.thenBy { it.anchorMs })
         return out
     }
+
+    /* F3.3.2 — derivação do PAINEL OPERACIONAL por PRAZO FINAL. Duas seções:
+       Atrasadas (vermelho) e Prazo próximo (laranja). Vermelho ordenado antes. READ-SIDE puro. */
+    fun panel(
+        user: UserLite?, tasks: List<TaskItem>, users: List<UserLite>,
+        nowMs: Long = System.currentTimeMillis(),
+    ): SlaOpData {
+        val vis = TaskVisibility.visibleTasks(user, tasks)
+        val rows = ArrayList<SlaOpRow>()
+        for (t in vis) {
+            if (t.designerSla == null) continue
+            val designerId = (t.designerAssignment?.designerId ?: t.assigneeId) ?: continue
+            if (delivered(t)) continue
+            val pd = finishMs(t); if (pd <= 0L) continue
+            val resp = users.firstOrNull { it.id == designerId }?.name?.trim()
+                ?.split(" ")?.firstOrNull()?.ifBlank { null }
+                ?: t.designerAssignment?.designerName?.trim()?.split(" ")?.firstOrNull() ?: "—"
+            if (nowMs >= pd) {
+                val over = kotlin.math.max(1L, Math.round((nowMs - pd) / 60000.0))
+                rows.add(SlaOpRow(t.id, "vermelho", "overdue", pd, 0L, over, t.title ?: t.id, t.client ?: "", resp))
+            } else if (nowMs >= pd - FINISH_WARN_MS) {
+                val left = kotlin.math.max(1L, Math.round((pd - nowMs) / 60000.0))
+                rows.add(SlaOpRow(t.id, "laranja", "warning", pd, left, 0L, t.title ?: t.id, t.client ?: "", resp))
+            }
+        }
+        rows.sortWith(compareByDescending<SlaOpRow> { it.sev == "vermelho" }.thenBy { it.finishMs })
+        return SlaOpData(rows.filter { it.sev == "vermelho" }, rows.filter { it.sev == "laranja" }, rows.size)
+    }
+
+    fun hm(ms: Long): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(ms))
 }
 
 object SlaReadStore {
@@ -182,5 +237,116 @@ fun SlaAlertsScreen(
                 }
             }
         }
+    }
+}
+
+/* ============================================================================
+ * F3.3.2 — PAINEL OPERACIONAL SLA (read-side) no TOPO do quadro do designer.
+ * Por PRAZO FINAL: "Atrasadas" (vermelho) acima de "Prazo próximo" (laranja).
+ * Contador dinâmico (ticker 30s). Não cobre cards (altura limitada), não envia
+ * nada, não escreve, não toca navbar. Vazio ⇒ não renderiza (sem poluir).
+ * ========================================================================== */
+private val OP_RED = Color(0xFFFF6B61)
+private val OP_AMBER = Color(0xFFF2A93B)
+
+@Composable
+fun SlaOpPanel(
+    currentUser: UserLite?,
+    tasks: List<TaskItem>,
+    users: List<UserLite>,
+    onOpenTask: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var bump by remember { mutableStateOf(0) }
+    // Tempo real (read-side): recomputa a cada 30s p/ contagem regressiva e laranja→vermelho.
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(30_000); bump++ } }
+    val data = remember(tasks, currentUser, users, bump) { SlaInApp.panel(currentUser, tasks, users) }
+    if (data.total == 0) return
+
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFF141A29))
+            .border(1.dp, Color(0x16FFFFFF), RoundedCornerShape(16.dp)),
+    ) {
+        // Cabeçalho + contadores
+        Row(
+            Modifier.fillMaxWidth().padding(start = 14.dp, end = 12.dp, top = 11.dp, bottom = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(28.dp).clip(RoundedCornerShape(9.dp)).background(OP_AMBER.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                Text("⏱", fontSize = 14.sp)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Operação · SLA por prazo final", color = Color(0xFFEEF2F8), fontSize = 13.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Prazo próximo e atrasadas — em tempo real", color = Color(0xFF8B97A8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (data.overdue.isNotEmpty()) OpPill("${data.overdue.size} atrasada" + (if (data.overdue.size == 1) "" else "s"), OP_RED)
+            if (data.warning.isNotEmpty()) { Spacer(Modifier.width(6.dp)); OpPill("${data.warning.size} próx.", OP_AMBER) }
+        }
+        if (data.overdue.isNotEmpty()) OpSection("Atrasadas", OP_RED, data.overdue, onOpenTask)
+        if (data.warning.isNotEmpty()) OpSection("Prazo próximo", OP_AMBER, data.warning, onOpenTask)
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun OpPill(text: String, color: Color) {
+    Box(
+        Modifier.clip(RoundedCornerShape(999.dp)).background(color.copy(alpha = 0.14f))
+            .border(1.dp, color.copy(alpha = 0.34f), RoundedCornerShape(999.dp)).padding(horizontal = 10.dp, vertical = 5.dp),
+    ) { Text(text, color = color, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+}
+
+@Composable
+private fun OpSection(title: String, color: Color, rows: List<SlaOpRow>, onOpenTask: (String) -> Unit) {
+    val shown = rows.take(4)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 2.dp)) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+            Spacer(Modifier.width(7.dp))
+            Text(title, color = color, fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(7.dp))
+            Box(Modifier.clip(RoundedCornerShape(7.dp)).background(Color(0x14FFFFFF)).padding(horizontal = 7.dp, vertical = 1.dp)) {
+                Text("${rows.size}", color = Color(0xFFCDD6E6), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        shown.forEach { r -> OpRow(r, color, onOpenTask); Spacer(Modifier.height(6.dp)) }
+        if (rows.size > shown.size) {
+            Text("+${rows.size - shown.size} mais", color = Color(0xFF8B97A8), fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp, bottom = 4.dp))
+        }
+    }
+}
+
+@Composable
+private fun OpRow(r: SlaOpRow, color: Color, onOpenTask: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(11.dp)).background(Color(0x09FFFFFF))
+            .border(1.dp, Color(0x10FFFFFF), RoundedCornerShape(11.dp)).clickable { onOpenTask(r.taskId) }
+            .padding(start = 9.dp, end = 9.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(4.dp).height(34.dp).clip(RoundedCornerShape(3.dp)).background(color))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(r.title.ifBlank { r.taskId }, color = Color(0xFFE8ECF4), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                (if (r.client.isNotBlank()) r.client + " · " else "") + "resp. " + r.responsavel + " · prazo " + SlaInApp.hm(r.finishMs),
+                color = Color(0xFF9FB0C8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                if (r.sev == "vermelho") "Atrasada há ${r.overdueMin} min" else "Faltam ${r.remainingMin} min",
+                color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier.clip(RoundedCornerShape(9.dp)).background(Color(0x1A7FA6FF))
+                .border(1.dp, Color(0x547FA6FF), RoundedCornerShape(9.dp)).clickable { onOpenTask(r.taskId) }
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+        ) { Text("Abrir", color = Color(0xFFBCD0FF), fontSize = 11.5.sp, fontWeight = FontWeight.Bold) }
     }
 }

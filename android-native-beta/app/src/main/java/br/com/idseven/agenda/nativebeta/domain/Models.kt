@@ -85,6 +85,9 @@ data class CronContent(val tema: String? = null, val legenda: String? = null)
 data class DesignerSla(
     val planStartAt: Long? = null,
     val planDueAt: Long? = null,
+    // F3.3.2 — prazo final canônico do engine (paridade com a F3.3.1). Aditivo, nullable:
+    // quando ausente, o painel/sino caem em planDueAt → dueDate/dueTime (compat total).
+    val plannedFinishAt: Long? = null,
     val startedAt: Long? = null,
     val finishedAt: Long? = null,
     val seedAt: Long? = null,

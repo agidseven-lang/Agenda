@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import br.com.idseven.agenda.nativebeta.core.SlaOpPanel
 import br.com.idseven.agenda.nativebeta.core.UiList
 import br.com.idseven.agenda.nativebeta.core.errorMessage
 import br.com.idseven.agenda.nativebeta.core.isLoading
@@ -170,6 +171,9 @@ fun TasksScreen(
                 Sectors.ALL.forEach { s -> SectorChip(s.label, s.color, sectorFilter == s.key) { sectorFilter = s.key } }
             }
         }
+        // F3.3.2 — PAINEL OPERACIONAL SLA no topo do quadro (read-side, por prazo final).
+        // Vazio ⇒ não renderiza. Não cobre cards, não quebra o scroll do pager abaixo.
+        SlaOpPanel(currentUser = currentUser, tasks = all, users = users, onOpenTask = onTaskClick)
         // Seletor/indicador de coluna
         Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 8.dp)) {
             TaskStatus.COLUMNS.forEachIndexed { i, st ->
