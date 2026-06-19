@@ -5,15 +5,14 @@
       "red",
       "amber"
     ],
+    "open": true,
     "redBeforeAmber": true,
     "hasAtrasada": true,
     "hasFaltam": true,
+    "has10minRule": true,
     "hasOpenBtn": true,
-    "height": 211,
-    "listScrolls": true,
-    "cardsTotal": 6,
-    "cardsCut": 0,
-    "stage2": 6
+    "barHeight": 42,
+    "popOverlay": true
   },
   "emptyPanel": {
     "present": true,
@@ -21,7 +20,7 @@
     "hasTudoEmDia": true,
     "hasEmptyMsg": true,
     "groups": 0,
-    "height": 46
+    "barHeight": 42
   },
   "detail": {
     "hasSla": true,
@@ -29,20 +28,45 @@
     "hasAtraso": true,
     "editPrazoAdmin": true
   },
+  "count": {
+    "min": 18,
+    "hm": "15:18"
+  },
   "rbac": {
     "editPrazoDesigner": false
   },
   "header": {
     "ok": true,
     "avatarLogoDelta": 0,
+    "hasLogo": true,
     "bellAvatarTopDelta": 0,
-    "bellAvatarGap": 10,
-    "hasLogo": true
+    "bellAvatarGap": 10
   },
-  "tight": {
-    "cardsTotal": 6,
-    "cardsCut": 0,
-    "panelHeight": 165
+  "whole1366": {
+    "total": 6,
+    "compressed": 0,
+    "clipped": 1,
+    "found": true,
+    "detail": {
+      "whole": false,
+      "hasFooter": true,
+      "hasThemes": true,
+      "cardH": 497,
+      "bodyH": 379
+    }
+  },
+  "whole1920": {
+    "total": 6,
+    "compressed": 0,
+    "clipped": 0,
+    "found": true,
+    "detail": {
+      "whole": true,
+      "hasFooter": true,
+      "hasThemes": true,
+      "cardH": 482,
+      "bodyH": 683
+    }
   },
   "errors": []
 }
