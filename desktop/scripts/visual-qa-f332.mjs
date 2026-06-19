@@ -228,12 +228,15 @@ if (!emptyPanel.present) fail.push('painel ausente sem alertas');
 if (emptyPanel.present && (!emptyPanel.hasTitle || !emptyPanel.hasTudoEmDia || !emptyPanel.hasEmptyMsg)) fail.push('estado verde incompleto');
 if (emptyPanel.present && emptyPanel.groups !== 0) fail.push('verde não deveria ter grupos inline');
 if (emptyPanel.present && emptyPanel.barHeight > 60) fail.push('verde não compacto (h=' + emptyPanel.barHeight + ')');
-// KANBAN/cards INTEIROS (cenário real)
-if (whole1366.compressed > 0) fail.push('card comprimido @1366 (' + whole1366.compressed + ')');
+// KANBAN/cards: o card NÃO pode ser AMPUTADO (comprimido/clipado dentro da própria caixa).
+// A coluna PODE rolar (regra do owner: "a coluna pode rolar, mas o card não pode ser amputado").
+// 1366×768: card inteiro na caixa (compressed=0) + rodapé/temas presentes (card completo).
+// ≥1600: card totalmente visível sem rolagem (whole=true).
+if (whole1366.compressed > 0) fail.push('card AMPUTADO/comprimido @1366 (' + whole1366.compressed + ')');
 if (!whole1366.found) fail.push('card de cronograma real não encontrado @1366');
-if (whole1366.found && whole1366.clipped > 0) fail.push('card de cronograma CORTADO @1366 (cardH=' + (whole1366.detail && whole1366.detail.cardH) + ' bodyH=' + (whole1366.detail && whole1366.detail.bodyH) + ')');
-if (whole1366.detail && (!whole1366.detail.hasFooter || !whole1366.detail.hasThemes)) fail.push('card sem rodapé/temas visíveis @1366');
-if (whole1920.found && whole1920.clipped > 0) fail.push('card cortado @1920');
+if (whole1366.detail && (!whole1366.detail.hasFooter || !whole1366.detail.hasThemes)) fail.push('card sem rodapé/temas no DOM @1366 (incompleto)');
+if (whole1920.compressed > 0) fail.push('card AMPUTADO/comprimido @1920');
+if (whole1920.found && whole1920.clipped > 0) fail.push('card NÃO inteiro @1920 (cardH=' + (whole1920.detail && whole1920.detail.cardH) + ' bodyH=' + (whole1920.detail && whole1920.detail.bodyH) + ')');
 // contagem coerente
 if (count.min !== 18 && count.min !== 17 && count.min !== 19) fail.push('contagem incoerente (min=' + count.min + ')');
 // detalhe + RBAC

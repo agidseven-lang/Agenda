@@ -1951,6 +1951,13 @@ body.desktop .kbv2-column-add{
 }
 body.desktop .kbv2-column-add svg{ width:16px; height:16px; }
 body.desktop .kbv2-column-add:hover{ background:rgba(255,255,255,.05); color:#9d8bff; border-color:rgba(124,108,255,.45); }
+/* F3.3.2 (reteste) — em telas BAIXAS, recupera altura do board (chrome menor) p/ o card de
+   cronograma caber com o mínimo de rolagem. Não altera o card em si (continua inteiro). */
+@media (max-height:820px){
+  body.desktop .kbv2-column-add{ height:34px; margin:8px 12px 10px; }
+  body.desktop .kbv2-column-header{ padding:10px 14px 8px; }
+  body.desktop #content.board-mode > .scr > .slaop{ margin-bottom:6px; }
+}
 /* empty state dark */
 body.desktop .kbv2-empty{ flex:1 1 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:26px 16px; }
 body.desktop .kbv2-empty-ic{ width:58px; height:58px; border-radius:16px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:#6f7889; display:flex; align-items:center; justify-content:center; }
