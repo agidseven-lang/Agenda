@@ -505,7 +505,7 @@
   "flowDetect": {
     "baselineSilent": true,
     "reviewFired": true,
-    "completedFired": false
+    "completedFired": true
   },
   "errors": []
 }
