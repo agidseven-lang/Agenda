@@ -158,7 +158,7 @@ ok('B13 dropdown sem flicker (assinatura + classList.toggle)', /data-sig/.test(s
 // C9 — slaPanelRow propaga grace/critical (fonte única alimenta o painel)
 { const r = row(withSla({ planDueAt: NOW - 3 * MIN })); ok('C9 row propaga grace', !!r && r.graceRemainingMin === 7 && r.critical === false); }
 // B6 — Kanban/card RESTAURADO ao aprovado: card sem flex-shrink:0; only-child volta a flex:1 1 auto.
-ok('B6 card NÃO comprime (flex:0 0 auto) + only-child preenche sem encolher (flex:1 0 auto)', /\.kbv2-card\{[\s\S]{0,400}flex:0 0 auto;/.test(src) && /kbv2-card:only-child\{ flex:1 0 auto; \}/.test(src));
+ok('B6 card NÃO comprime (flex:0 0 auto) + only-child preenche E encolhe p/ caber (flex:1 1 auto + min-height:0)', /\.kbv2-card\{[\s\S]{0,400}flex:0 0 auto;/.test(src) && /kbv2-card:only-child\{ flex:1 1 auto; min-height:0; \}/.test(src));
 // B6b — chip SLA do card é por PRAZO FINAL (delega à fonte única; sem "Início atrasado")
 ok('B6b chip SLA do card finish-based', /function kbv2SlaLocal[\s\S]{0,400}resolveTaskDisplayState\(/.test(src) && !/label:'Início atrasado'/.test(src));
 // B6c — FONTE ÚNICA: card (kbv2SlaLocal), widget/sino (slaPanelRow) e detalhe (detailSla) TODOS

@@ -2042,7 +2042,11 @@ body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
    que o flexbox DIVIDE IGUALMENTE entre esses 3 pontos; o rodapé ancora na base. Aplica SÓ quando
    há exatamente 1 card na coluna (:only-child) — colunas multi-card mantêm altura natural + scroll.
    Sem filler/drop-zone, sem bloco duplicado, sem 2º "+". */
-body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:1 0 auto; }
+/* CARD ÚNICO: flex:1 1 auto + min-height:0 — preenche a coluna quando há sobra (cresce, com
+   respiro distribuído via margin-top:auto) E encolhe para CABER quando o conteúdo passaria da
+   coluna (shrink confiável contra a .kbv2-column-body de altura definida — fecha o card inteiro
+   sem depender de % max-height). O excedente vai para a lista de temas (CARD-FIT-NOTEBOOK). */
+body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:1 1 auto; min-height:0; }
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-origin,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-themes,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-top:auto; }
@@ -2119,21 +2123,24 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
   body.desktop .kbv2-card>.kbv2-card-origin,
   body.desktop .kbv2-card>.kbv2-card-rail,
   body.desktop .kbv2-card>.kbv2-card-chk{ display:none }
-  body.desktop .kbv2-card{ gap:8px; padding:12px }
-  body.desktop .kbv2-av .av{ width:40px; height:40px }
+  body.desktop .kbv2-card{ gap:7px; padding:12px }
+  body.desktop .kbv2-av .av{ width:38px; height:38px }
   body.desktop .kbv2-name{ font-size:14px }
   body.desktop .kbv2-role{ font-size:11.5px }
-  body.desktop .kbv2-title{ font-size:16px; margin-top:2px }
+  body.desktop .kbv2-title{ font-size:16px; margin-top:1px; line-height:1.2 }
+  body.desktop .kbv2-tier{ font-size:10.5px }
   body.desktop .kbv2-theme{ padding:6px 11px; font-size:12.5px }
-  body.desktop .kbv2-themes-h{ padding:7px 11px }
+  body.desktop .kbv2-themes-h{ padding:6px 11px }
   body.desktop .kbv2-btn{ height:34px; font-size:13px }
-  body.desktop .kbv2-status,body.desktop .kbv2-due,body.desktop .kbv2-sla{ padding:5px 9px; font-size:11px }
+  body.desktop .kbv2-status,body.desktop .kbv2-due,body.desktop .kbv2-sla{ padding:4px 9px; font-size:10.5px }
+  body.desktop .kbv2-card-top{ gap:6px }
   body.desktop .kbv2-card-chips{ gap:6px }
   body.desktop .kbv2-card-chips .kbv2-chip{ padding:4px 9px; font-size:11.5px }
-  body.desktop .kbv2-stage2{ gap:6px }
-  body.desktop .kbv2-st2-ic{ width:22px; height:22px }
-  body.desktop .kbv2-st2-row{ gap:9px }
-  body.desktop .kbv2-st2-pill{ padding:3px 9px; font-size:12px }
+  body.desktop .kbv2-stage2{ gap:5px }
+  body.desktop .kbv2-st2-ic{ width:21px; height:21px }
+  body.desktop .kbv2-st2-row{ gap:8px }
+  body.desktop .kbv2-st2-tx{ gap:2px }
+  body.desktop .kbv2-st2-pill{ padding:2px 9px; font-size:12px }
   body.desktop .kbv2-st2-next{ font-size:12.5px }
   body.desktop .kbv2-card-date{ font-size:12.5px }
 }
@@ -2146,15 +2153,17 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
   body.desktop .kbv2-column-header .kbv2-ccount{ height:20px }
   body.desktop .kbv2-column-add{ height:32px; margin:5px 11px 7px }
   body.desktop .kbv2-column-body{ gap:8px; padding:3px 11px 7px }
-  body.desktop .kbv2-card{ gap:7px; padding:11px }
-  body.desktop .kbv2-av .av{ width:38px; height:38px }
+  body.desktop .kbv2-card{ gap:6px; padding:11px }
+  body.desktop .kbv2-av .av{ width:36px; height:36px }
   body.desktop .kbv2-name{ font-size:13.5px }
-  body.desktop .kbv2-title{ font-size:15.5px }
+  body.desktop .kbv2-title{ font-size:15px }
   body.desktop .kbv2-theme{ padding:5px 11px; font-size:12px }
-  body.desktop .kbv2-themes-h{ padding:6px 11px; font-size:10px }
-  body.desktop .kbv2-stage2{ gap:5px }
-  body.desktop .kbv2-st2-ic{ width:21px; height:21px }
-  body.desktop .kbv2-btn{ height:32px; font-size:12.5px }
+  body.desktop .kbv2-themes-h{ padding:5px 11px; font-size:10px }
+  body.desktop .kbv2-status,body.desktop .kbv2-due,body.desktop .kbv2-sla{ padding:4px 8px; font-size:10px }
+  body.desktop .kbv2-stage2{ gap:4px }
+  body.desktop .kbv2-st2-ic{ width:20px; height:20px }
+  body.desktop .kbv2-st2-row{ gap:8px }
+  body.desktop .kbv2-btn{ height:31px; font-size:12.5px }
   body.desktop .kbv2-card-date{ font-size:12px }
 }
 </style>
