@@ -477,7 +477,11 @@
   },
   "toastClick": {
     "clicked": true,
-    "openedDetail": false
+    "openedDetail": false,
+    "viaClick": false,
+    "viaRoute": false,
+    "inTasks": true,
+    "hasOpenDetails": true
   },
   "errors": []
 }
