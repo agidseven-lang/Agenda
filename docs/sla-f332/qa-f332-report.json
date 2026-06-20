@@ -487,7 +487,7 @@
     "warningFired": true,
     "overdueFired": true,
     "criticalFired": true,
-    "warningText": "Você tem 30 minutos para concluir esta tarefa.\nTarefa warn — Boa Forma\nPrazo final: 15:52",
+    "warningText": "Você tem 30 minutos para concluir esta tarefa.\nTarefa warn — Boa Forma\nPrazo final: 17:25",
     "overdueText": "Você tem 10 minutos para concluir esta tarefa.\nTarefa over — Boa Forma\nRestam 7:00 para concluir ou sinalizar atraso.",
     "criticalText": "Sinalize atraso imediatamente ou conclua a tarefa.\nTarefa crit — Boa Forma",
     "warningCtx": "Boa Forma · Vence em 18:00",
@@ -534,6 +534,25 @@
     "idRealAvatar": true,
     "idNoPhotoInitials": true,
     "idDenormReal": true
+  },
+  "cardLayoutDetect": {
+    "notificationCardWidthIncreased": true,
+    "noEssentialEllipsis": true,
+    "notificationTitleFullyVisible": true,
+    "actorNameFullyVisible": true,
+    "responsibleNameVisible": true,
+    "slaOrangeMessageFullyVisible": true,
+    "slaRedMessageFullyVisible": true,
+    "taskContextVisible": true,
+    "notificationStillBottomRight": true,
+    "notificationPremiumLayout": true,
+    "widths": [
+      420,
+      420,
+      420,
+      420,
+      420
+    ]
   },
   "errors": []
 }
