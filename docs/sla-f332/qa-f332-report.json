@@ -477,9 +477,9 @@
   },
   "toastClick": {
     "clicked": true,
-    "openedDetail": false,
-    "viaClick": false,
-    "viaRoute": false,
+    "openedDetail": true,
+    "viaClick": true,
+    "viaRoute": true,
     "inTasks": true,
     "hasOpenDetails": true
   },
