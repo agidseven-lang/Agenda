@@ -219,5 +219,13 @@ ok('P7 elapsed floor (T+1s=0:01)', slaElapsed(1000) === '0:01' && slaElapsed(400
 // F3 — criação inicial (planning, sem designer) não tem SLA.
 ok('F3 planning sem SLA', resolveTaskDisplayState({ id: 'PL', sector: 'cronograma' }, NOW, dtMsStub).inPanel === false);
 
+// ===================== MONITOR CALMO ANTES DOS 30min (regressão "33 min") =====================
+// slaPanelDerive alimenta o SLA Monitor: antes de T-30min NÃO há warning ⇒ chip verde/calmo.
+const deriveAt = (deltaMs) => slaPanelDerive([withSla({ planDueAt: FIN })], FIN + deltaMs, dtMsStub);
+{ const d = deriveAt(-33 * MIN); ok('M1 T-33min => monitor calmo (0 warning/overdue)', d.total === 0 && d.warning.length === 0 && d.overdue.length === 0); }
+{ const d = deriveAt(-31 * MIN); ok('M2 T-31min => ainda calmo', d.total === 0 && d.warning.length === 0); }
+{ const d = deriveAt(-30 * MIN); ok('M3 T-30min => ENTRA em warning (1)', d.total === 1 && d.warning.length === 1 && d.overdue.length === 0); }
+{ const d = deriveAt(0); ok('M4 T => overdue (1)', d.total === 1 && d.overdue.length === 1); }
+
 console.log('\nF3.3.2 PANEL RESULT: ' + pass + ' PASS / ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);

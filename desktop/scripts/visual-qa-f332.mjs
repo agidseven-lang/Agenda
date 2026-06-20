@@ -786,7 +786,34 @@ const cardLayoutDetect = {
   avatarBgs: all.map((m) => (m.avatarBg || '').slice(0, 28)),
 };
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, recipientDetect, identityDetect, cardLayoutDetect, errors }, null, 2));
+// ===================== REGRESSÃO LARANJA — SLA MONITOR pontual aos 30min (não antes) =====================
+// Antes de T-30min o chip fica VERDE/calmo ("Tudo em dia"), sem contagem "em X min". Exatamente em
+// T-30min vira AMBAR com "Vence em 30:00"; +1s "29:59". (PROBLEM 2 do reteste do owner.)
+await clearToasts();
+const readMon = (deltaSec) => page.evaluate((ds) => {
+  const NOW = Date.now(), MIN = 60000;
+  state.users = [{ id: 'dz1', name: 'Marina Alves', role: 'Designer' }];
+  state.user = { id: 'dz1', name: 'Marina Alves', role: 'Designer' };
+  state.tasks = [{ id: 'mp', title: 'Cronograma semanal', client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', designerAssignment: { designerId: 'dz1' }, designerFlowStatus: 'andamento', designerSla: { planStartAt: NOW - 120 * MIN, planDueAt: NOW + ds * 1000 } }];
+  slaMonRender();
+  const w = document.getElementById('sla-monitor');
+  return { cls: w ? w.className : '', st: w ? ((w.querySelector('.slamon-status') || {}).textContent || '') : '' };
+}, deltaSec);
+const monCalm = await readMon(33 * 60);       // 33 min → calmo
+await page.screenshot({ path: path.join(OUT, 'f332-45-monitor-calmo-33min.png'), clip: { x: 980, y: 0, width: 620, height: 150 } });
+const monOrange = await readMon(30 * 60);      // 30 min exato → laranja 30:00
+await page.screenshot({ path: path.join(OUT, 'f332-46-monitor-laranja-3000.png'), clip: { x: 980, y: 0, width: 620, height: 150 } });
+const mon2959 = await readMon(30 * 60 - 1);    // T-30min+1s → 29:59
+const monitorPrecision = {
+  calmGreenNoCountdown: /(^|\s)green(\s|$)/.test(monCalm.cls) && /Tudo em dia/.test(monCalm.st) && !/Vence em/.test(monCalm.st) && !/\b33\b/.test(monCalm.st),
+  orangeAt30Exact: /(^|\s)amber(\s|$)/.test(monOrange.cls) && /Vence em 30:00/.test(monOrange.st),
+  counter2959: /Vence em 29:59/.test(mon2959.st),
+  calmStatus: monCalm.st, orangeStatus: monOrange.st, c2959Status: mon2959.st,
+};
+console.log('MONITORPRECISION:', JSON.stringify(monitorPrecision));
+await clearToasts();
+
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, recipientDetect, identityDetect, cardLayoutDetect, monitorPrecision, errors }, null, 2));
 console.log('FLICKER:', JSON.stringify(flicker)); console.log('NOTIF:', JSON.stringify(notif));
 console.log('TALL:', JSON.stringify(tall));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
@@ -956,6 +983,10 @@ if (!cardLayoutDetect.notificationAvatarRealPhoto) fail.push('notificationAvatar
 // kanban/login preservados (confirmação dedicada desta fase; espelha os campos reais já medidos)
 if (!(card && card.found && !card.found.compressed)) fail.push('kanbanPreserved falhou (card do Kanban regrediu/comprimido)');
 if (login.hasBell || login.hasSlaMonitor) fail.push('loginPreserved falhou (login com sino/monitor)');
+// REGRESSÃO LARANJA — SLA Monitor pontual aos 30min (PROBLEM 2 do owner)
+if (!monitorPrecision.calmGreenNoCountdown) fail.push('orangeDoesNotFireBeforeTMinus30 falhou (chip não-calmo/contagem antes dos 30min: ' + JSON.stringify(monitorPrecision.calmStatus) + ')');
+if (!monitorPrecision.orangeAt30Exact) fail.push('orangeFiresExactlyAtTMinus30 falhou (não virou laranja "Vence em 30:00": ' + JSON.stringify(monitorPrecision.orangeStatus) + ')');
+if (!monitorPrecision.counter2959) fail.push('orangeCounterAt2959AfterOneSecond falhou (' + JSON.stringify(monitorPrecision.c2959Status) + ')');
 
 if (fail.length) { console.error('::error::QA F3.3.2 FALHOU: ' + fail.join(' | ')); process.exit(1); }
 console.log('QA F3.3.2 OK — login sem widgets; coluna multi-card sem corte (1366/1600); avatar real; widget verde/laranja/vermelho com janela 10min + crítico; status/fuso coerentes; laranja imediato; header cluster alinhado; Editar prazo RBAC honesto.');

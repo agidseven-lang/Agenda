@@ -99,7 +99,7 @@ ok('flow awaiting_designer ignorado (notifier do main cobre)', notifFlowEvent('p
 
 // ===================== FASE 6 — HUB no main (toast x nativa, dedup, som, clique) =====================
 ok('hub: handler IPC notify', /ipcMain\.handle\("notify"/.test(mainTs));
-ok('hub: decide por janela ATIVA', /function windowActive\(\)/.test(mainTs) && /isFocused\(\)/.test(mainTs));
+ok('hub: decide por janela VISÍVEL (isVisible+!isMinimized; NÃO exige foco)', /function windowActive\(\)/.test(mainTs) && /isVisible\(\)\s*&&\s*!w\.isMinimized\(\)/.test(mainTs) && !/isFocused\(\)\s*\)/.test(mainTs.slice(mainTs.indexOf('function windowActive'), mainTs.indexOf('function windowActive')+400)));
 ok('hub: toast quando focado', /webContents\.send\("notif-toast"/.test(mainTs));
 ok('hub: nativa quando não focado', /new Notification\(/.test(mainTs));
 ok('hub: dedup por dedupKey', /_notifSeen/.test(mainTs) && /dedupKey/.test(mainTs));
@@ -153,6 +153,11 @@ ok('precisão: contagem regressiva ARREDONDA P/ CIMA (slaCount=ceil)', /function
 ok('precisão: tempo decorrido ARREDONDA P/ BAIXO (slaElapsed=floor)', /function slaElapsed\(ms\)\{ return slaMMSSfmt\(ms,'down'\); \}/.test(html));
 ok('precisão: toast laranja "Vence em" usa slaCount (ceil)', /Vence em '\+slaCount\(d\.remainingMs\)/.test(html));
 ok('precisão: boundary timer DISPARA notifScanSla no limite exato', /_slaBoundaryTimer=setTimeout\(function\(\)\{[\s\S]*?notifScanSla\(\)/.test(html));
+// REGRESSÃO (canal): app ABERTO/VISÍVEL usa toast premium (nativo só minimizado/bandeja)
+ok('canal: app visível-sem-foco usa toast in-app (não exige isFocused)', /janela ABERTA e VISÍVEL/.test(mainTs) && /return !!\(w && !w\.isDestroyed\(\) && w\.isVisible\(\) && !w\.isMinimized\(\)\);/.test(mainTs));
+ok('canal: hub manda notif-toast quando visível, Notification nativa senão (sem duplicar)', /if \(windowActive\(\)\) \{[\s\S]*?webContents\.send\("notif-toast"[\s\S]*?return \{ ok: true, channel: "toast" \};/.test(mainTs) && /new Notification\(/.test(mainTs));
+// REGRESSÃO (laranja): chip calmo NÃO mostra "em X min" antes da janela de 30min
+ok('monitor: chip calmo = "Tudo em dia" (sem contagem antes dos 30min)', /if\(!d\|\|!d\.total\) return 'Tudo em dia';/.test(html) && !/Próximo prazo em '\+slaMonDur/.test(html));
 // FASE 5/3 (correção destinatário/avatar) — SLA pessoal por designer + foto real
 ok('renderer: roteador de destinatários definido', /function resolveNotificationTargets\(/.test(html));
 ok('renderer: notifScanSla aplica a porta do roteador (SLA pessoal)', /var tg=resolveNotificationTargets\(\{ eventType:'sla_warning'[\s\S]*?if\(!tg\.shouldNotifyCurrentUser\) continue;/.test(html));

@@ -45,8 +45,12 @@ function _appIcon(): string | undefined {
   try { return path.join(app.getAppPath(), "build", "icon.png"); } catch { return undefined; }
 }
 function windowActive(): boolean {
+  // REGRA DE CANAL (correção de regressão): janela ABERTA e VISÍVEL ⇒ TOAST premium in-app —
+  // mesmo SEM foco (usuário pode estar olhando o app atrás de outra janela). Só cai p/ a nativa
+  // do SO quando minimizada/bandeja/oculta (isVisible()=false). NÃO exigir isFocused() — exigir
+  // foco fazia "aberto sem foco" virar nativo genérico (a regressão reportada).
   const w = mainWin;
-  return !!(w && !w.isDestroyed() && w.isVisible() && !w.isMinimized() && w.isFocused());
+  return !!(w && !w.isDestroyed() && w.isVisible() && !w.isMinimized());
 }
 function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } {
   try {

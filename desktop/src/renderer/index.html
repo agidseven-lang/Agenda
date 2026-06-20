@@ -2951,7 +2951,7 @@ function slaMonData(){
 }
 function slaMonDropInner(d){
   var hd='<div class="slamon-pop-hd"><span class="pic">'+SLAOP_CLOCK_SVG+'</span><span class="hx">Monitor de prazos<small>Prazo final · <span class="slamon-live"><i></i>ao vivo</span></small></span></div>';
-  if(!d.total) return hd+'<div class="slamon-empty"><span class="eic">'+SLAOP_CHECK_SVG+'</span><div><div class="et">Tudo em dia</div><div class="es">'+(d.nextMs?('Próximo término às '+slaibFmtHM(d.nextMs)+' ('+slaMonDur(d.horizonMin)+').'):'Nenhuma tarefa atrasada ou com prazo próximo.')+'</div></div></div>';
+  if(!d.total) return hd+'<div class="slamon-empty"><span class="eic">'+SLAOP_CHECK_SVG+'</span><div><div class="et">Tudo em dia</div><div class="es">'+(d.nextMs?('Próximo término às '+slaibFmtHM(d.nextMs)+'. O alerta surge 30 min antes.'):'Nenhuma tarefa atrasada ou com prazo próximo.')+'</div></div></div>';
   return hd+(d.overdue.length?slaOpGrpHtml('red',d.overdue):'')+(d.warning.length?slaOpGrpHtml('amber',d.warning):'');
 }
 /* min → "Xh Ym" / "Ym" (legível, p/ horizonte e métricas ao vivo do chip). */
@@ -2967,7 +2967,10 @@ function slaElapsed(ms){ return slaMMSSfmt(ms,'down'); }
 function _slaMs(ms,minFallback){ return (ms!=null)?ms:((minFallback||0)*60000); }
 /* Status HERÓI ao vivo do chip — métrica mais crítica do momento (tempo real). */
 function slaMonStatusText(d){
-  if(!d||!d.total) return d&&d.nextMs?('Próximo prazo em '+slaMonDur(d.horizonMin)):'Tudo em dia';
+  // CALMO (sem laranja/vermelho): chip NÃO mostra contagem "em X min" — isso fazia parecer alerta
+  // antes da hora. O alerta laranja só nasce dentro da janela de 30min ("Vence em mm:ss"). O próximo
+  // término (horário) fica no detalhe do dropdown, não no chip.
+  if(!d||!d.total) return 'Tudo em dia';
   if(d.overdue.length) return 'Atraso máx. '+slaElapsed(_slaMs(d.overdue[0].overdueMs,d.overdue[0].overdueMin));
   return 'Vence em '+slaCount(_slaMs(d.warning[0].remainingMs,d.warning[0].remainingMin));
 }
