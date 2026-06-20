@@ -162,6 +162,14 @@ ok('renderer: toast escolhe identidade por tipo (SLA=designer, fluxo=ator)', /va
 ok('renderer: avatar NUNCA usa inicial do título (usa primIni do NOME)', /primIni\|\|/.test(html) && !/String\(nm\)\.trim\(\)\[0\]/.test(html));
 ok('renderer: linha do RESPONSÁVEL com mini-foto (ntf-resp)', /ntf-resp/.test(html) && /Responsável: /.test(html));
 ok('renderer: SLA com título personalizado + prazo final', /prazo próximo/.test(html) && /Prazo final: /.test(html));
+// FASE (correção corte/reticências) — card mais largo + campos essenciais SEM ellipsis
+ok('card: largura aumentada (420px) + min-width', /\.ntf\{[^}]*width:420px[^}]*min-width:340px/.test(html));
+ok('card: título em até 2 linhas (line-clamp) sem nowrap-ellipsis', /\.ntf-hd b\{[^}]*-webkit-line-clamp:2/.test(html) && /\.ntf-hd b\{[^}]*white-space:normal/.test(html));
+ok('card: contexto/prazo SEM reticência (wrap)', /\.ntf-ctx\{[^}]*white-space:normal/.test(html) && !/\.ntf-ctx\{[^}]*text-overflow:ellipsis/.test(html));
+ok('card: responsável SEM reticência (wrap)', /\.ntf-resp span:last-child\{[^}]*white-space:normal/.test(html) && !/\.ntf-resp span:last-child\{[^}]*text-overflow:ellipsis/.test(html));
+ok('card: corpo multilinha (white-space:normal + overflow-wrap)', /\.ntf-ds\{[^}]*white-space:normal[^}]*overflow-wrap:anywhere/.test(html));
+ok('card: altura máxima com scroll só em caso extremo (.ntf-bd)', /\.ntf-bd\{[^}]*max-height:72vh[^}]*overflow-y:auto/.test(html));
+ok('card: zero text-overflow:ellipsis em campos essenciais (ti/ds/ctx/resp)', !/\.ntf-ti\{[^}]*text-overflow:ellipsis/.test(html) && !/\.ntf-ds\{[^}]*text-overflow:ellipsis/.test(html));
 // FASE 3 — notifier do main entrega IDs p/ o renderer resolver foto/nome reais
 ok('notifier: designer_assigned entrega actorId(assignedBy)+responsibleId(designerId)', /actorId: da\.assignedBy/.test(notifierTs) && /responsibleId: da\.designerId/.test(notifierTs));
 ok('notifier: designer_assigned entrega foto denormalizada do designer', /responsibleAvatar: da\.designerAvatar/.test(notifierTs));

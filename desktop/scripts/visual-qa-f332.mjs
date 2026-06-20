@@ -702,7 +702,75 @@ await page.evaluate((AV) => {
 await toastShot('f332-39-identidade-avatar-nome.png');
 await clearToasts();
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, recipientDetect, identityDetect, errors }, null, 2));
+// ===================== F3.3.3 (correção CORTE/RETICÊNCIAS) — CARD LARGO, INFORMAÇÃO COMPLETA =====================
+// Renderiza os 5 tipos com conteúdo LONGO real (nomes/títulos/clientes compridos) e mede: largura
+// aumentada, zero reticência em campos essenciais, título em até 2 linhas, corpo/contexto/responsável
+// completos, ainda no canto inferior direito e premium.
+await page.evaluate((AV) => {
+  state.users = [
+    { id: 'soc1', name: 'Arydyjany Carlôto', role: 'Social Media', photo: AV },
+    { id: 'dz1', name: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', role: 'Designer', photo: AV },
+  ];
+  state.user = { id: 'dz1', name: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', role: 'Designer', photo: AV };
+  state.tasks = [{ id: 'tL', title: 'Cronograma semanal de conteúdo — campanha institucional de junho', client: 'Hospital Visão Oftalmologia Avançada', sector: 'cronograma', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1', designerName: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', designerAvatar: AV, assignedBy: 'soc1' } }];
+}, PNG1x1);
+const TT = 'Cronograma semanal de conteúdo — campanha institucional de junho';
+const CL = 'Hospital Visão Oftalmologia Avançada';
+const TLINE = TT + ' — ' + CL;
+const cardCases = [
+  { key: 'attr', shot: 'f332-40-card-atribuicao.png', p: { eventType: 'designer_assigned', taskId: 'tL', taskTitle: TT, clientName: CL, actorId: 'soc1', responsibleId: 'dz1', title: 'x', etapa: 'Aguardando produção', severity: 'info', sound: false } },
+  { key: 'orange', shot: 'f332-41-card-laranja.png', p: { eventType: 'sla_warning', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', responsibleAvatar: PNG1x1, title: 'Miercohévisk, prazo próximo', body: 'Você tem 30 minutos para concluir esta tarefa.\n' + TLINE + '\nPrazo final: 16:30', context: CL + ' · Vence em 29:58', severity: 'warning', sound: false } },
+  { key: 'red', shot: 'f332-42-card-vermelho.png', p: { eventType: 'sla_overdue', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', responsibleAvatar: PNG1x1, title: 'Miercohévisk, prazo encerrado', body: 'Você tem 10 minutos para concluir esta tarefa.\n' + TLINE + '\nRestam 9:30 para concluir ou sinalizar atraso.', context: 'Atrasada há 0:30 · restam 9:30 p/ sinalizar', severity: 'critical', sound: false } },
+  { key: 'critical', shot: 'f332-43-card-critico.png', p: { eventType: 'sla_critical', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', responsibleAvatar: PNG1x1, title: 'Miercohévisk, atraso crítico', body: 'Sinalize atraso imediatamente ou conclua a tarefa.\n' + TLINE, context: CL + ' · Atrasada há 12:30', severity: 'critical', sound: false } },
+  { key: 'flow', shot: 'f332-44-card-fluxo.png', p: { eventType: 'flow_in_review', taskId: 'tL', taskTitle: TT, clientName: CL, actorId: 'soc1', responsibleId: 'dz1', title: 'Enviado para revisão', body: 'Arydyjany moveu para Em revisão', context: CL + ' · Responsável: Miercohévisk Niheb Ferreira Nascimento Carlôto', etapa: 'Em revisão', severity: 'info', sound: false } },
+];
+const measure = () => page.evaluate(() => {
+  const n = document.querySelector('#notif-stack .ntf'); if (!n) return { present: false };
+  const r = n.getBoundingClientRect();
+  const q = (s) => n.querySelector(s);
+  const cs = (el) => el ? getComputedStyle(el) : null;
+  const vClip = (el) => el ? (el.scrollHeight > el.clientHeight + 2) : false;
+  const hClip = (el) => el ? (el.scrollWidth > el.clientWidth + 2) : false;
+  const b = q('.ntf-hd b'), ds = q('.ntf-ds'), ctx = q('.ntf-ctx'), resp = q('.ntf-resp span:last-child'), av = q('.ntf-av');
+  const stack = document.getElementById('notif-stack'), scs = getComputedStyle(stack);
+  const card = q('.ntf-card'), ccs = getComputedStyle(card);
+  return {
+    present: true, width: Math.round(r.width),
+    titleWS: b ? cs(b).whiteSpace : '', titleHClip: hClip(b), titleVClip: vClip(b), titleText: b ? b.textContent : '',
+    bodyWS: ds ? cs(ds).whiteSpace : '', bodyHClip: hClip(ds), bodyVClip: vClip(ds), bodyText: ds ? ds.textContent : '',
+    ctxWS: ctx ? cs(ctx).whiteSpace : '', ctxHClip: hClip(ctx), ctxText: ctx ? ctx.textContent : '',
+    respWS: resp ? cs(resp).whiteSpace : '', respHClip: hClip(resp), respText: resp ? resp.textContent : '',
+    avatar: !!av, avatarReal: av ? /background-image/.test(av.getAttribute('style') || '') : false,
+    bottomRight: scs.position === 'fixed' && parseInt(scs.right) >= 0 && parseInt(scs.bottom) >= 0,
+    premium: /gradient/.test(ccs.backgroundImage || '') && parseFloat(ccs.borderTopLeftRadius) >= 10 && (ccs.boxShadow || '').length > 4,
+  };
+});
+const clm = {};
+for (const c of cardCases) {
+  await clearToasts();
+  await page.evaluate((pp) => window.notifShowToast(pp), c.p);
+  await page.waitForTimeout(150);
+  await toastShot(c.shot);
+  clm[c.key] = await measure();
+}
+await clearToasts();
+const all = Object.values(clm);
+const every = (fn) => all.every(fn);
+const cardLayoutDetect = {
+  notificationCardWidthIncreased: every((m) => m.present && m.width >= 400),
+  noEssentialEllipsis: every((m) => !m.titleHClip && !m.bodyHClip && !m.ctxHClip && !m.respHClip),
+  notificationTitleFullyVisible: every((m) => m.titleText && !m.titleVClip && m.titleWS !== 'nowrap'),
+  actorNameFullyVisible: /Arydyjany Carlôto atribuiu uma tarefa/.test(clm.attr.titleText || '') && !clm.attr.titleVClip,
+  responsibleNameVisible: /Miercohévisk Niheb Ferreira Nascimento Carlôto/.test(clm.attr.respText || '') && !clm.attr.respHClip && /Miercohévisk Niheb Ferreira Nascimento Carlôto/.test(clm.flow.respText || ''),
+  slaOrangeMessageFullyVisible: /Você tem 30 minutos para concluir esta tarefa\./.test(clm.orange.bodyText || '') && !clm.orange.bodyVClip && !clm.orange.bodyHClip,
+  slaRedMessageFullyVisible: /Você tem 10 minutos para concluir esta tarefa\./.test(clm.red.bodyText || '') && !clm.red.bodyVClip && !clm.red.bodyHClip,
+  taskContextVisible: !clm.orange.ctxHClip && !clm.red.ctxHClip && /Vence em/.test(clm.orange.ctxText || ''),
+  notificationStillBottomRight: every((m) => m.bottomRight),
+  notificationPremiumLayout: every((m) => m.premium && m.avatar),
+  widths: all.map((m) => m.width),
+};
+
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, recipientDetect, identityDetect, cardLayoutDetect, errors }, null, 2));
 console.log('FLICKER:', JSON.stringify(flicker)); console.log('NOTIF:', JSON.stringify(notif));
 console.log('TALL:', JSON.stringify(tall));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
@@ -712,6 +780,7 @@ console.log('TOAST:', JSON.stringify(toast)); console.log('TOASTCLICK:', JSON.st
 console.log('NOTIFDETECT:', JSON.stringify(notifDetect)); console.log('FLOWDETECT:', JSON.stringify(flowDetect));
 console.log('RECIPIENTDETECT:', JSON.stringify(recipientDetect));
 console.log('IDENTITYDETECT:', JSON.stringify(identityDetect));
+console.log('CARDLAYOUTDETECT:', JSON.stringify(cardLayoutDetect));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
 await browser.close(); server.close();
 
@@ -856,6 +925,20 @@ if (!identityDetect.noPhotoTitleHasActor) fail.push('noPhotoTitleHasActor falhou
 if (!identityDetect.idRealAvatar) fail.push('idRealAvatar falhou (resolveUserIdentity não retornou foto real)');
 if (!identityDetect.idNoPhotoInitials) fail.push('idNoPhotoInitials falhou (resolveUserIdentity sem foto deveria dar iniciais)');
 if (!identityDetect.idDenormReal) fail.push('idDenormReal falhou (resolveUserIdentity não aceitou foto denormalizada)');
+// F3.3.3 (correção CORTE/RETICÊNCIAS) — card largo, informação completa
+if (!cardLayoutDetect.notificationCardWidthIncreased) fail.push('notificationCardWidthIncreased falhou (card não alargou >=400px; ' + JSON.stringify(cardLayoutDetect.widths) + ')');
+if (!cardLayoutDetect.noEssentialEllipsis) fail.push('noEssentialEllipsis falhou (campo essencial com reticência/corte horizontal)');
+if (!cardLayoutDetect.notificationTitleFullyVisible) fail.push('notificationTitleFullyVisible falhou (título cortado/clipado)');
+if (!cardLayoutDetect.actorNameFullyVisible) fail.push('actorNameFullyVisible falhou (nome do autor cortado no título)');
+if (!cardLayoutDetect.responsibleNameVisible) fail.push('responsibleNameVisible falhou (responsável incompleto)');
+if (!cardLayoutDetect.slaOrangeMessageFullyVisible) fail.push('slaOrangeMessageFullyVisible falhou (mensagem 30min cortada)');
+if (!cardLayoutDetect.slaRedMessageFullyVisible) fail.push('slaRedMessageFullyVisible falhou (mensagem 10min cortada)');
+if (!cardLayoutDetect.taskContextVisible) fail.push('taskContextVisible falhou (contexto/tarefa escondido)');
+if (!cardLayoutDetect.notificationStillBottomRight) fail.push('notificationStillBottomRight falhou (saiu do canto inferior direito)');
+if (!cardLayoutDetect.notificationPremiumLayout) fail.push('notificationPremiumLayout falhou (perdeu visual premium/avatar)');
+// kanban/login preservados (confirmação dedicada desta fase; espelha os campos reais já medidos)
+if (!(card && card.found && !card.found.compressed)) fail.push('kanbanPreserved falhou (card do Kanban regrediu/comprimido)');
+if (login.hasBell || login.hasSlaMonitor) fail.push('loginPreserved falhou (login com sino/monitor)');
 
 if (fail.length) { console.error('::error::QA F3.3.2 FALHOU: ' + fail.join(' | ')); process.exit(1); }
 console.log('QA F3.3.2 OK — login sem widgets; coluna multi-card sem corte (1366/1600); avatar real; widget verde/laranja/vermelho com janela 10min + crítico; status/fuso coerentes; laranja imediato; header cluster alinhado; Editar prazo RBAC honesto.');
