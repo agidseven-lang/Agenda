@@ -507,5 +507,19 @@
     "reviewFired": true,
     "completedFired": true
   },
+  "recipientDetect": {
+    "socialNoSla": true,
+    "designerGetsSla": true,
+    "designerSlaType": "sla_personal",
+    "designerSlaAvatarReal": true,
+    "designerSlaResponsible": "Marina Alves",
+    "routerSlaSocialExcluded": true,
+    "routerSlaDesignerIncluded": true,
+    "routerFlowSocialIncluded": true,
+    "socialFlowFired": true,
+    "avatarFromDirectory": true,
+    "avatarFromDenorm": true,
+    "avatarNoneEmpty": true
+  },
   "errors": []
 }
