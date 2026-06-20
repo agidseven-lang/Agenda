@@ -3164,6 +3164,9 @@ try{ setTimeout(slaibRefresh,0); }catch(_){}
 /* F3.3.3-NOTIF-CORE BEGIN */
 var NOTIF_SEEN_KEY='idseven.notif.seen.v1';
 function notifSev(slaSev){ return slaSev==='vermelho'?'critical':(slaSev==='laranja'?'warning':(slaSev==='verde'?'success':'info')); }
+/* ETAPA/STATUS canônico -> rótulo humano (nunca expõe a chave crua na notificação). */
+var NOTIF_PHASE_LABEL={planning:'Planejamento',awaiting_designer:'Aguardando designer',designer_producing:'Em produção',designer_revising:'Em revisão',designer_delivered:'Entregue pelo designer',awaiting_client_approval:'Enviado ao cliente',client_requested_changes:'Ajuste solicitado',completed:'Concluída'};
+function notifPhaseLabel(ph){ return NOTIF_PHASE_LABEL[ph]||''; }
 /* transição de FASE canônica (deriveCanonicalTaskState) -> evento de notificação.
    awaiting_designer fica com o notifier do main (designer_assigned) — não duplicar. */
 function notifFlowEvent(prevPhase,curPhase){
@@ -3178,6 +3181,42 @@ function notifFlowEvent(prevPhase,curPhase){
     default: return null;
   }
 }
+/* ROTEADOR DE DESTINATÁRIOS (PURO/testável — sem deps externas). Modelo por-renderer: cada usuário
+   roda o seu próprio cliente, então o alvo EFETIVO é o usuário logado — o roteador devolve
+   shouldNotifyCurrentUser (a PORTA real do disparo) + a classificação (notificationType) e os
+   conjuntos alvo/excluído (p/ QA e contrato). Regra de negócio do owner:
+   • TIPO 1 — SLA (eventos sla_ e operational_block) é PESSOAL: dispara SÓ p/ o designer responsável
+     (designerAssignment.designerId → assigneeId). Social/Cliente/Admin/gestor NÃO recebem, a não
+     ser que sejam, eles mesmos, o responsável da tarefa.
+   • TIPO 2 — FLUXO (flow_*) é de EQUIPE: designer responsável + autor + atribuído + supervisão
+     (quem "vê tudo": Admin/Social/gestor). */
+function resolveNotificationTargets(o){
+  o=o||{};
+  var ev=o.eventType||'';
+  var task=o.task||{};
+  var curId=(o.currentUser&&o.currentUser.id)||'';
+  var seeAll=!!o.currentUserCanSeeAll;
+  var respId=(task.designerAssignment&&task.designerAssignment.designerId)||task.assigneeId||null;
+  var byId=task.by||null, asgId=task.assigneeId||null;
+  var isSla=/^sla_/.test(ev)||ev==='operational_block';
+  var out={ eventType:ev, taskId:task.id||'', notificationType:'team_flow',
+            targetUserIds:[], excludedUserIds:[], shouldNotifyCurrentUser:false, reason:'',
+            actor:o.actor||null, responsible:o.responsible||null };
+  if(isSla){
+    out.notificationType='sla_personal';
+    out.targetUserIds=respId?[respId]:[];
+    out.shouldNotifyCurrentUser=(!!respId&&curId===respId);
+    out.reason=out.shouldNotifyCurrentUser?'designer responsável (SLA pessoal)':'não é o designer responsável — SLA é pessoal';
+    if(curId&&curId!==respId) out.excludedUserIds=[curId];
+    return out;
+  }
+  out.notificationType='team_flow';
+  var team={}; [respId,byId,asgId].forEach(function(x){ if(x) team[String(x)]=1; });
+  out.targetUserIds=Object.keys(team);
+  out.shouldNotifyCurrentUser=(seeAll||(!!curId&&!!team[curId]));
+  out.reason=out.shouldNotifyCurrentUser?(seeAll?'supervisão (vê tudo)':'parte da equipe da tarefa'):'fora da equipe da tarefa';
+  return out;
+}
 function notifBuildPayload(o){
   o=o||{};
   var taskId=o.taskId||'';
@@ -3187,7 +3226,9 @@ function notifBuildPayload(o){
     eventId:o.eventId||(eventType+':'+taskId+':'+anchor),
     eventType:eventType, taskId:taskId, taskTitle:o.taskTitle||'', clientName:o.clientName||'',
     actorId:o.actorId||'', actorName:o.actorName||'', actorAvatar:o.actorAvatar||'',
+    responsibleId:o.responsibleId||'', responsibleName:o.responsibleName||'', responsibleAvatar:o.responsibleAvatar||'',
     targetUserId:o.targetUserId||'',
+    notificationType:o.notificationType||'', etapa:o.etapa||'', status:o.status||'',
     title:o.title||'', body:o.body||'', context:o.context||'',
     createdAt:o.createdAt||Date.now(),
     severity:o.severity||'info', sound:(o.sound!==false),
@@ -3203,6 +3244,35 @@ function notifSaveSeen(o){ try{ localStorage.setItem(NOTIF_SEEN_KEY,JSON.stringi
 function notifSeenHas(k){ var m=notifLoadSeen(); return !!m[k]; }
 function notifSeenMark(k){ var m=notifLoadSeen(); m[k]=Date.now(); var ks=Object.keys(m); if(ks.length>400){ var cut=Date.now()-7*24*3600*1000; ks.forEach(function(x){ if(m[x]<cut) delete m[x]; }); } notifSaveSeen(m); }
 function notifNowHM(){ try{ var d=new Date(); var p=function(n){return (n<10?'0':'')+n;}; return p(d.getHours())+':'+p(d.getMinutes()); }catch(_){ return ''; } }
+
+/* IDENTIDADE p/ notificação — FOTO REAL sempre que existir. Prioridade: perfil no diretório
+   (state.users) → dados DENORMALIZADOS no card → iniciais SÓ como último recurso (sem foto).
+   Nunca cai em letra genérica havendo foto real (regra do owner). */
+function notifIdentity(id,fbName,fbPhoto){
+  var u=null; try{ if(id&&Array.isArray(state.users)) u=state.users.find(function(x){return x&&x.id===id;}); }catch(_){}
+  var name=(u&&u.name)||fbName||'';
+  var photo=''; try{ photo=u?photoOf(u):''; }catch(_){}
+  if(!photo&&fbPhoto&&String(fbPhoto).trim()) photo=fbPhoto;   // foto denormalizada do card (ainda é REAL)
+  return { id:(u&&u.id)||id||'', name:name, avatar:photo||'' };
+}
+/* RESPONSÁVEL real do card (designer → atribuído → autor), via respOf + foto real. */
+function notifResponsible(t){
+  var r=null; try{ r=respOf(t); }catch(_){} r=r||{};
+  var fp=''; try{ fp=photoOf(r); }catch(_){}
+  return notifIdentity(r.id,r.name,fp);
+}
+/* ATOR — quem fez a ação (último evento de history[]/clientActions[]). Sem evento de autor,
+   recai no RESPONSÁVEL (proxy razoável: foi o trabalho dele que moveu a etapa). */
+function notifLastActorId(t){
+  try{
+    var ev=[]; (Array.isArray(t.history)?t.history:[]).forEach(function(e){ if(e&&e.at) ev.push({at:Number(e.at),by:e.byId||e.by||null}); });
+    var ca=(t&&t.clientActions&&typeof t.clientActions==='object')?t.clientActions:{};
+    Object.keys(ca).forEach(function(k){ var a=ca[k]; if(a&&a.at) ev.push({at:Number(a.at),by:a.by||a.byId||null}); });
+    if(ev.length){ ev.sort(function(a,b){return b.at-a.at;}); return ev[0].by||null; }
+  }catch(_){}
+  return null;
+}
+function notifActor(t){ var aid=notifLastActorId(t); if(aid){ var id=notifIdentity(aid,'',''); if(id.id||id.name) return id; } return notifResponsible(t); }
 
 /* SOM por severidade (WebAudio local — toast). A nativa do SO usa o som padrão (limitação documentada). */
 var _notifAC=null;
@@ -3255,7 +3325,9 @@ function notifRoute(deep){
 function notifShowToast(p){
   try{
     p=p||{}; var stack=notifEnsureStack(); var sev=p.severity||'info';
-    var nm=p.actorName||p.title||'Agenda ID Seven'; var photo=p.actorAvatar||'';
+    var nm=p.actorName||p.responsibleName||p.title||'Agenda ID Seven';
+    // FOTO REAL sempre que existir: ator → responsável → (só então) letra. Nunca letra havendo foto.
+    var photo=p.actorAvatar||p.responsibleAvatar||'';
     var icon=sev==='critical'?'bell':(sev==='warning'?'clock':(sev==='success'?'check':'info'));
     var el=document.createElement('div'); el.className='ntf ntf-'+sev; if(p.action&&p.action.deep) el.setAttribute('data-deep',p.action.deep);
     var av=photo?'<div class="ntf-av" style="background-image:url(\''+esc(photo)+'\')"></div>':'<div class="ntf-av gen">'+esc((String(nm).trim()[0]||'?').toUpperCase())+'</div>';
@@ -3294,34 +3366,34 @@ function notifEmit(p){
   }catch(_){}
 }
 
-/* DETECÇÃO: fluxo canônico (diff de FASE entre snapshots). Baseline por usuário (sem histórico). */
+/* DETECÇÃO: fluxo canônico (diff de FASE entre snapshots). Baseline por usuário (sem histórico).
+   O destinatário (eu/equipe/supervisão) é decidido pelo roteador resolveNotificationTargets. */
 var _notifPhase={}, _notifBaseline=false, _notifUid=null;
-function notifIsMine(t){
-  var u=state.user; if(!u||!t) return false;
-  if(t.assigneeId===u.id||t.by===u.id) return true;
-  try{ if(typeof designerOf==='function'&&designerOf(t)===u.id) return true; }catch(_){}
-  try{ var r=respOf(t); if(r&&r.id===u.id) return true; }catch(_){}
-  return false;
-}
 function notifScanFlow(){
   try{
     if(!state.user) return;
     if(state.user.id!==_notifUid){ _notifUid=state.user.id; _notifPhase={}; _notifBaseline=false; }
     var tasks=state.tasks||[], firstRun=!_notifBaseline;
+    var seeAll=(typeof canSeeAll==='function')&&canSeeAll(state.user);
     for(var i=0;i<tasks.length;i++){
       var t=tasks[i]; if(!t||!t.id) continue;
       var cur=''; try{ cur=(deriveCanonicalTaskState(t)||{}).phase||''; }catch(_){ cur=''; }
       var prev=_notifPhase[t.id]; _notifPhase[t.id]=cur;
       if(firstRun||prev===undefined||prev===cur) continue;   // baseline/tarefa-nova/sem-mudança
-      if(!notifIsMine(t)) continue;
       var ev=notifFlowEvent(prev,cur); if(!ev) continue;
-      var resp=null; try{ resp=respOf(t); }catch(_){}
+      // TIPO 2 — FLUXO é de EQUIPE: roteia p/ designer+autor+atribuído+supervisão (vê-tudo).
+      var tg=resolveNotificationTargets({ eventType:ev.eventType, task:t, currentUser:state.user, currentUserCanSeeAll:seeAll });
+      if(!tg.shouldNotifyCurrentUser) continue;
+      var resp=notifResponsible(t), actor=notifActor(t), etapa=notifPhaseLabel(cur), who=first(actor.name||'');
       notifEmit(notifBuildPayload({
         eventType:ev.eventType, taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
-        actorName:(resp&&resp.name)||'', actorAvatar:(resp?photoOf(resp):''),
-        targetUserId:state.user.id, severity:ev.severity, sound:true,
-        title:ev.title, body:(t.client?(t.client+' — '):'')+(t.title||'Tarefa'),
-        context:(t.client?(t.client+' · '):'')+'Fluxo', anchor:cur, action:{type:'detail',deep:'detail/'+t.id}
+        actorId:actor.id, actorName:actor.name, actorAvatar:actor.avatar,
+        responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
+        targetUserId:state.user.id, notificationType:tg.notificationType, etapa:etapa, status:cur,
+        severity:ev.severity, sound:true, title:ev.title,
+        body:(who?(who+' moveu para '+etapa):('Movido para '+etapa)),
+        context:(t.client?(t.client+' · '):'')+(resp.name?('Responsável: '+resp.name):('Etapa: '+etapa)),
+        anchor:cur, action:{type:'detail',deep:'detail/'+t.id}
       }));
     }
     _notifBaseline=true;
@@ -3335,11 +3407,19 @@ function notifScanSla(){
     try{ vis=slaibVisible(state.user)||[]; }catch(_){ vis=[]; }
     for(var i=0;i<vis.length;i++){
       var t=vis[i]; if(!t) continue;
+      // TIPO 1 — SLA é PESSOAL: dispara SOMENTE p/ o designer responsável. Social/Cliente/Admin/gestor
+      // (que "veem tudo" no painel) NÃO recebem laranja/vermelho de tarefa que não é deles. A porta é o
+      // roteador puro (mesma regra de slaCriticalFor). A sub-severidade (warning/overdue/critical) divide
+      // o mesmo critério de destinatário, então basta classificar uma vez.
+      var tg=resolveNotificationTargets({ eventType:'sla_warning', task:t, currentUser:state.user });
+      if(!tg.shouldNotifyCurrentUser) continue;
       var d=resolveTaskDisplayState(t,now,f); if(!d||!d.inPanel) continue;
-      var resp=null; try{ resp=respOf(t); }catch(_){}
+      var resp=notifResponsible(t);
       var base={ taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
-        actorName:(resp&&resp.name)||'', actorAvatar:(resp?photoOf(resp):''),
-        targetUserId:state.user.id, anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
+        actorId:resp.id, actorName:resp.name, actorAvatar:resp.avatar,
+        responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
+        targetUserId:state.user.id, notificationType:'sla_personal', etapa:'SLA', status:d.state,
+        anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
       if(d.state==='warning'){
         // LARANJA — texto canônico do owner + contador mm:ss (snapshot no disparo).
         notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
@@ -3359,10 +3439,14 @@ function notifScanSla(){
         }
       }
     }
+    // Bloqueio operacional — já é PESSOAL do designer (slaCriticalFor retorna null p/ quem vê tudo).
     var blk=null; try{ blk=slaCriticalFor(state.user); }catch(_){}
-    if(blk){ var d2=resolveTaskDisplayState(blk,now,f);
+    if(blk){ var d2=resolveTaskDisplayState(blk,now,f); var rb=notifResponsible(blk);
       notifEmit(notifBuildPayload({ eventType:'operational_block', taskId:blk.id, taskTitle:blk.title||'Tarefa', clientName:blk.client||'',
-        targetUserId:state.user.id, severity:'critical', sound:true, anchor:(d2&&d2.finishMs)||0,
+        actorId:rb.id, actorName:rb.name, actorAvatar:rb.avatar,
+        responsibleId:rb.id, responsibleName:rb.name, responsibleAvatar:rb.avatar,
+        targetUserId:state.user.id, notificationType:'sla_personal', etapa:'SLA', status:'operational_block',
+        severity:'critical', sound:true, anchor:(d2&&d2.finishMs)||0,
         title:'Tarefa em atraso crítico', body:'Conclua ou sinalize atraso antes de continuar outras tarefas.',
         context:'Bloqueio operacional', dedupKey:'operational_block:'+blk.id+':'+((d2&&d2.finishMs)||0),
         action:{type:'detail',deep:'detail/'+blk.id} })); }
@@ -3377,7 +3461,7 @@ try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} },30000); }catch(_
 /* receber TOAST do HUB do main (janela focada/visível) */
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifShowToast(p); }); } }catch(_){}
 /* exposto p/ QA/testes (não afeta produção) */
-try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifScanFlow=notifScanFlow; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; window.__notifResetFlow=function(){ _notifPhase={}; _notifBaseline=false; _notifUid=null; }; }catch(_){}
+try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifScanFlow=notifScanFlow; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; window.resolveNotificationTargets=resolveNotificationTargets; window.notifIdentity=notifIdentity; window.notifResponsible=notifResponsible; window.notifActor=notifActor; window.notifPhaseLabel=notifPhaseLabel; window.__notifResetFlow=function(){ _notifPhase={}; _notifBaseline=false; _notifUid=null; }; }catch(_){}
 
 function render(){
   if(!state.user)return;

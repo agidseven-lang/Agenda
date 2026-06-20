@@ -560,7 +560,77 @@ const flowDetect = await page.evaluate(async () => {
   return { baselineSilent: baseline === 0, reviewFired: review.includes('flow_in_review'), completedFired: done.includes('flow_completed') };
 });
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, errors }, null, 2));
+// ===================== F3.3.3 (correção) — DESTINATÁRIO + AVATAR REAL =====================
+// Prova cirúrgica do owner: o alerta laranja/vermelho de SLA vai SÓ p/ o designer responsável.
+// Social Media (vê tudo) NÃO recebe SLA pessoal — mas RECEBE fluxo de equipe. Avatar = foto REAL.
+const recipientDetect = await page.evaluate(() => {
+  const NOW = Date.now(), MIN = 60000;
+  const AV = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const designer = { id: 'dz1', name: 'Marina Alves', role: 'Designer', photo: AV };
+  const social = { id: 'soc1', name: 'Paula Social', role: 'Social Media' };
+  const admin = { id: 'adm1', name: 'Owner Admin', admin: true };
+  const mkCrit = () => ({ id: 'tcrit', title: 'Cronograma crítico', client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1', designerName: 'Marina Alves', designerPhoto: AV }, designerFlowStatus: 'andamento', designerSla: { planStartAt: NOW - 120 * MIN, planDueAt: NOW - 15 * MIN } });
+  const reset = () => { try { localStorage.removeItem('idseven.notif.seen.v1'); } catch (_) {} if (window.__notifResetFlow) window.__notifResetFlow(); };
+
+  // (A) SOCIAL logada: SLA NÃO dispara (pessoal do designer).
+  state.users = [designer, social, admin]; state.user = social; state.tasks = [mkCrit()];
+  reset(); window.__notifSuppress = false; window.__notifCapture = [];
+  window.notifScanSla();
+  const socialSla = (window.__notifCapture || []).slice();
+
+  // (B) DESIGNER logado: SLA dispara (responsável) com avatar/nome REAL.
+  state.user = designer; state.tasks = [mkCrit()];
+  reset(); window.__notifCapture = [];
+  window.notifScanSla();
+  const designerSla = (window.__notifCapture || []).slice();
+  const dCap = designerSla[0] || null;
+
+  // (C) Roteador puro (contrato): SLA=sla_personal só designer; FLUXO=team_flow inclui Social.
+  const taskR = { id: 'tcrit', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1' } };
+  const rSlaSocial = window.resolveNotificationTargets({ eventType: 'sla_overdue', task: taskR, currentUser: social, currentUserCanSeeAll: true });
+  const rSlaDesigner = window.resolveNotificationTargets({ eventType: 'sla_overdue', task: taskR, currentUser: designer });
+  const rFlowSocial = window.resolveNotificationTargets({ eventType: 'flow_sent_to_client', task: taskR, currentUser: social, currentUserCanSeeAll: true });
+
+  // (D) FLUXO real: Social (supervisão/equipe) RECEBE a transição.
+  state.user = social;
+  const tflow = { id: 'tflow', title: 'Cronograma fluxo', client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1' }, designerFlowStatus: 'andamento' };
+  state.tasks = [tflow];
+  reset(); window.__notifCapture = [];
+  window.notifScanFlow();                                   // baseline (silenciosa)
+  const flowBase = (window.__notifCapture || []).length;
+  tflow.designerFlowStatus = 'revisao'; window.__notifCapture = []; window.notifScanFlow();
+  const socialFlow = (window.__notifCapture || []).map((c) => c.eventType);
+
+  // (E) AVATAR REAL: diretório → denormalizado → vazio (toast usa letra só sem foto).
+  const idReal = window.notifIdentity('dz1', '', '');            // foto no diretório
+  const idDenorm = window.notifIdentity('zzz', 'Sem Perfil', AV);// sem diretório, foto denormalizada
+  const idNone = window.notifIdentity('zzz', 'Sem Foto', '');    // sem foto em lugar nenhum
+
+  try { const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; } catch (_) {}
+  window.__notifSuppress = true; window.__notifCapture = null;
+  return {
+    socialNoSla: socialSla.length === 0,
+    designerGetsSla: designerSla.length >= 1,
+    designerSlaType: dCap && dCap.notificationType,
+    designerSlaAvatarReal: !!(dCap && dCap.actorAvatar === AV),
+    designerSlaResponsible: dCap && dCap.responsibleName,
+    routerSlaSocialExcluded: rSlaSocial.shouldNotifyCurrentUser === false && rSlaSocial.notificationType === 'sla_personal',
+    routerSlaDesignerIncluded: rSlaDesigner.shouldNotifyCurrentUser === true,
+    routerFlowSocialIncluded: rFlowSocial.shouldNotifyCurrentUser === true && rFlowSocial.notificationType === 'team_flow',
+    socialFlowFired: flowBase === 0 && socialFlow.includes('flow_in_review'),
+    avatarFromDirectory: idReal.avatar === AV,
+    avatarFromDenorm: idDenorm.avatar === AV,
+    avatarNoneEmpty: idNone.avatar === '',
+  };
+});
+// PRINT visual da correção: SLA do designer (avatar/nome real) + fluxo de equipe lado a lado.
+await clearToasts();
+await showToast({ severity: 'critical', notificationType: 'sla_personal', title: 'Prazo encerrado', actorName: 'Marina Alves', actorAvatar: PNG1x1, responsibleName: 'Marina Alves', responsibleAvatar: PNG1x1, taskTitle: 'Cronograma — Boa Forma', body: 'Você tem 10 minutos para concluir esta tarefa.', context: 'Boa Forma · Atrasada há 5:00 · restam 5:00 p/ sinalizar', action: { deep: 'detail/tcrit' }, sound: false });
+await showToast({ severity: 'info', notificationType: 'team_flow', title: 'Enviado para revisão', actorName: 'Marina Alves', actorAvatar: PNG1x1, responsibleName: 'Marina Alves', responsibleAvatar: PNG1x1, taskTitle: 'Cronograma fluxo — Boa Forma', body: 'Marina moveu para Em revisão', context: 'Boa Forma · Responsável: Marina Alves', action: { deep: 'detail/tflow' }, sound: false });
+await toastShot('f332-38-destinatario-avatar.png');
+await clearToasts();
+
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, recipientDetect, errors }, null, 2));
 console.log('FLICKER:', JSON.stringify(flicker)); console.log('NOTIF:', JSON.stringify(notif));
 console.log('TALL:', JSON.stringify(tall));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
@@ -568,6 +638,7 @@ console.log('CARD:', JSON.stringify(card)); console.log('CONSIST:', JSON.stringi
 console.log('DETAIL:', JSON.stringify(detail)); console.log('EDIT:', JSON.stringify(editPrazo)); console.log('RBAC:', JSON.stringify(rbac)); console.log('HEADER:', JSON.stringify(header));
 console.log('TOAST:', JSON.stringify(toast)); console.log('TOASTCLICK:', JSON.stringify(toastClick));
 console.log('NOTIFDETECT:', JSON.stringify(notifDetect)); console.log('FLOWDETECT:', JSON.stringify(flowDetect));
+console.log('RECIPIENTDETECT:', JSON.stringify(recipientDetect));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
 await browser.close(); server.close();
 
@@ -686,6 +757,19 @@ if (!notifDetect.dedupBlocksSecond) fail.push('noDuplicateNotifications falhou (
 if (!flowDetect.baselineSilent) fail.push('flowBaselineSilent falhou (1ª carga gerou avalanche)');
 if (!flowDetect.reviewFired) fail.push('flowStatusNotificationWorks falhou (transição p/ revisão não disparou)');
 if (!flowDetect.completedFired) fail.push('flowCompletedNotificationWorks falhou (conclusão não disparou)');
+// F3.3.3 (correção) — DESTINATÁRIO do SLA (designer, não Social) + AVATAR REAL
+if (!recipientDetect.socialNoSla) fail.push('slaNotToSocial falhou (Social Media RECEBEU SLA pessoal)');
+if (!recipientDetect.designerGetsSla) fail.push('slaToDesigner falhou (designer responsável NÃO recebeu SLA)');
+if (recipientDetect.designerSlaType !== 'sla_personal') fail.push('slaTypePersonal falhou (notificationType != sla_personal)');
+if (!recipientDetect.designerSlaAvatarReal) fail.push('slaAvatarReal falhou (SLA do designer sem foto real)');
+if (!recipientDetect.designerSlaResponsible) fail.push('slaResponsibleName falhou (sem nome do responsável)');
+if (!recipientDetect.routerSlaSocialExcluded) fail.push('routerSlaSocialExcluded falhou (roteador não exclui Social do SLA)');
+if (!recipientDetect.routerSlaDesignerIncluded) fail.push('routerSlaDesignerIncluded falhou (roteador não inclui o designer no SLA)');
+if (!recipientDetect.routerFlowSocialIncluded) fail.push('routerFlowSocialIncluded falhou (roteador não inclui Social no fluxo)');
+if (!recipientDetect.socialFlowFired) fail.push('flowToTeamSocial falhou (Social não recebeu fluxo de equipe)');
+if (!recipientDetect.avatarFromDirectory) fail.push('avatarFromDirectory falhou (não usou foto real do diretório)');
+if (!recipientDetect.avatarFromDenorm) fail.push('avatarFromDenorm falhou (não usou foto denormalizada quando existe)');
+if (!recipientDetect.avatarNoneEmpty) fail.push('avatarNoneEmpty falhou (deveria cair p/ vazio sem foto)');
 
 if (fail.length) { console.error('::error::QA F3.3.2 FALHOU: ' + fail.join(' | ')); process.exit(1); }
 console.log('QA F3.3.2 OK — login sem widgets; coluna multi-card sem corte (1366/1600); avatar real; widget verde/laranja/vermelho com janela 10min + crítico; status/fuso coerentes; laranja imediato; header cluster alinhado; Editar prazo RBAC honesto.');

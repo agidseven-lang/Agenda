@@ -24,21 +24,62 @@ const B = '/* F3.3.3-NOTIF-CORE BEGIN */', E = '/* F3.3.3-NOTIF-CORE END */';
 const i = html.indexOf(B), j = html.indexOf(E);
 if (i < 0 || j < 0 || j < i) { console.error('::error:: NOTIF-CORE não encontrado em index.html'); process.exit(1); }
 const core = html.slice(i + B.length, j);
-const apiCore = new Function(core + '\n;return { notifSev, notifFlowEvent, notifBuildPayload };')();
-const { notifSev, notifFlowEvent, notifBuildPayload } = apiCore;
+const apiCore = new Function(core + '\n;return { notifSev, notifFlowEvent, notifBuildPayload, resolveNotificationTargets, notifPhaseLabel };')();
+const { notifSev, notifFlowEvent, notifBuildPayload, resolveNotificationTargets, notifPhaseLabel } = apiCore;
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name); } };
 
-// ===================== FASE 2 — CONTRATO (19 campos) =====================
-const p = notifBuildPayload({ eventType: 'sla_warning', taskId: 'T1', taskTitle: 'Cronograma', clientName: 'Boa Forma', actorName: 'Marina', actorAvatar: 'data:img', targetUserId: 'U1', title: 'Prazo próximo', body: 'faltam 18 min', context: 'SLA', severity: 'warning', anchor: 123, action: { type: 'detail', deep: 'detail/T1' } });
-['eventId', 'eventType', 'taskId', 'taskTitle', 'clientName', 'actorId', 'actorName', 'actorAvatar', 'targetUserId', 'title', 'body', 'context', 'createdAt', 'severity', 'sound', 'action', 'dedupKey', 'source', 'providerCalled'].forEach((k) => ok('contrato tem ' + k, k in p));
+// ===================== FASE 2/3 — CONTRATO (enriquecido: ator + responsável + tipo + etapa) =====================
+const p = notifBuildPayload({ eventType: 'sla_warning', taskId: 'T1', taskTitle: 'Cronograma', clientName: 'Boa Forma', actorId: 'U9', actorName: 'Marina', actorAvatar: 'data:img', responsibleId: 'U9', responsibleName: 'Marina', responsibleAvatar: 'data:img2', notificationType: 'sla_personal', etapa: 'SLA', status: 'warning', targetUserId: 'U1', title: 'Prazo próximo', body: 'faltam 18 min', context: 'SLA', severity: 'warning', anchor: 123, action: { type: 'detail', deep: 'detail/T1' } });
+['eventId', 'eventType', 'taskId', 'taskTitle', 'clientName', 'actorId', 'actorName', 'actorAvatar', 'responsibleId', 'responsibleName', 'responsibleAvatar', 'targetUserId', 'notificationType', 'etapa', 'status', 'title', 'body', 'context', 'createdAt', 'severity', 'sound', 'action', 'dedupKey', 'source', 'providerCalled'].forEach((k) => ok('contrato tem ' + k, k in p));
 ok('providerCalled=false', p.providerCalled === false);
 ok('sound default=true', p.sound === true);
 ok('sound=false respeitado', notifBuildPayload({ eventType: 'x', sound: false }).sound === false);
 ok('dedupKey estável (type:task:anchor)', p.dedupKey === 'sla_warning:T1:123');
 ok('action.deep=detail/T1', p.action.deep === 'detail/T1');
 ok('source default=renderer', p.source === 'renderer');
+// FASE 3 — ator (quem fez) + responsável (designer) carregados no contrato
+ok('contrato carrega responsável (id/nome/foto)', p.responsibleId === 'U9' && p.responsibleName === 'Marina' && p.responsibleAvatar === 'data:img2');
+ok('contrato carrega ator (id/nome/foto)', p.actorId === 'U9' && p.actorName === 'Marina' && p.actorAvatar === 'data:img');
+ok('contrato carrega notificationType', p.notificationType === 'sla_personal');
+ok('contrato carrega etapa/status', p.etapa === 'SLA' && p.status === 'warning');
+
+// ===================== FASE 4 — etapa canônica -> rótulo humano (nunca chave crua) =====================
+ok('etapa designer_producing -> Em produção', notifPhaseLabel('designer_producing') === 'Em produção');
+ok('etapa awaiting_client_approval -> Enviado ao cliente', notifPhaseLabel('awaiting_client_approval') === 'Enviado ao cliente');
+ok('etapa client_requested_changes -> Ajuste solicitado', notifPhaseLabel('client_requested_changes') === 'Ajuste solicitado');
+ok('etapa completed -> Concluída', notifPhaseLabel('completed') === 'Concluída');
+ok('etapa desconhecida -> vazio (sem chave crua)', notifPhaseLabel('xpto') === '');
+
+// ===================== FASE 5 — ROTEADOR: SLA é PESSOAL (só o designer responsável) =====================
+const desId = 'DES1', socId = 'SOC1', admId = 'ADM1';
+const taskDes = { id: 'T1', designerAssignment: { designerId: desId }, assigneeId: 'A1', by: socId };
+// SLA -> o designer responsável RECEBE
+let r = resolveNotificationTargets({ eventType: 'sla_overdue', task: taskDes, currentUser: { id: desId } });
+ok('SLA: tipo = sla_personal', r.notificationType === 'sla_personal');
+ok('SLA: designer responsável RECEBE', r.shouldNotifyCurrentUser === true);
+ok('SLA: alvo = só o designer', r.targetUserIds.length === 1 && r.targetUserIds[0] === desId);
+// SLA -> Social Media NÃO recebe (mesmo "vendo tudo")
+let rSoc = resolveNotificationTargets({ eventType: 'sla_overdue', task: taskDes, currentUser: { id: socId }, currentUserCanSeeAll: true });
+ok('SLA: Social Media NÃO recebe (canSeeAll ignorado p/ SLA)', rSoc.shouldNotifyCurrentUser === false);
+ok('SLA: Social entra em excluídos', rSoc.excludedUserIds.indexOf(socId) >= 0);
+// SLA -> Admin NÃO recebe
+let rAdm = resolveNotificationTargets({ eventType: 'sla_warning', task: taskDes, currentUser: { id: admId }, currentUserCanSeeAll: true });
+ok('SLA: Admin NÃO recebe', rAdm.shouldNotifyCurrentUser === false);
+// SLA crítico/bloqueio seguem a MESMA regra pessoal
+ok('SLA crítico é sla_personal', resolveNotificationTargets({ eventType: 'sla_critical', task: taskDes, currentUser: { id: socId }, currentUserCanSeeAll: true }).shouldNotifyCurrentUser === false);
+ok('bloqueio operacional é pessoal (só designer)', resolveNotificationTargets({ eventType: 'operational_block', task: taskDes, currentUser: { id: socId }, currentUserCanSeeAll: true }).shouldNotifyCurrentUser === false);
+ok('bloqueio operacional: designer recebe', resolveNotificationTargets({ eventType: 'operational_block', task: taskDes, currentUser: { id: desId } }).shouldNotifyCurrentUser === true);
+
+// ===================== FASE 6 — ROTEADOR: FLUXO é de EQUIPE (Social/Designer/Admin/responsável) =====================
+let f = resolveNotificationTargets({ eventType: 'flow_production_started', task: taskDes, currentUser: { id: desId } });
+ok('FLUXO: tipo = team_flow', f.notificationType === 'team_flow');
+ok('FLUXO: designer (equipe) recebe', f.shouldNotifyCurrentUser === true);
+ok('FLUXO: autor/Social (equipe) recebe', resolveNotificationTargets({ eventType: 'flow_sent_to_client', task: taskDes, currentUser: { id: socId } }).shouldNotifyCurrentUser === true);
+ok('FLUXO: supervisão (vê tudo) recebe', resolveNotificationTargets({ eventType: 'flow_completed', task: taskDes, currentUser: { id: 'X' }, currentUserCanSeeAll: true }).shouldNotifyCurrentUser === true);
+ok('FLUXO: fora da equipe e sem supervisão NÃO recebe', resolveNotificationTargets({ eventType: 'flow_completed', task: taskDes, currentUser: { id: 'OUTSIDER' } }).shouldNotifyCurrentUser === false);
+ok('FLUXO: alvo inclui designer+autor+atribuído', f.targetUserIds.indexOf(desId) >= 0 && f.targetUserIds.indexOf(socId) >= 0 && f.targetUserIds.indexOf('A1') >= 0);
 
 // ===================== severidade (SLA -> contrato) =====================
 ok('sev vermelho->critical', notifSev('vermelho') === 'critical');
@@ -106,6 +147,13 @@ ok('renderer: notif vermelha texto canônico', /Você tem 10 minutos para conclu
 ok('renderer: notif crítica texto canônico', /Sinalize atraso imediatamente ou conclua a tarefa\./.test(html));
 ok('renderer: dedup marcado APÓS entregar (reentrega em falha transitória)', /if\(delivered\) notifSeenMark\(key\)/.test(html));
 ok('renderer: contador ao vivo no Monitor usa mm:ss', /slaMMSS\(_slaMs\(/.test(html));
+// FASE 5/3 (correção destinatário/avatar) — SLA pessoal por designer + foto real
+ok('renderer: roteador de destinatários definido', /function resolveNotificationTargets\(/.test(html));
+ok('renderer: notifScanSla aplica a porta do roteador (SLA pessoal)', /var tg=resolveNotificationTargets\(\{ eventType:'sla_warning'[\s\S]*?if\(!tg\.shouldNotifyCurrentUser\) continue;/.test(html));
+ok('renderer: notifScanFlow roteia por EQUIPE (currentUserCanSeeAll)', /var tg=resolveNotificationTargets\(\{ eventType:ev\.eventType[\s\S]*?currentUserCanSeeAll:seeAll/.test(html));
+ok('renderer: identidade com FOTO REAL (diretório->denormalizado->letra)', /function notifIdentity\(/.test(html) && /function notifResponsible\(/.test(html) && /function notifActor\(/.test(html));
+ok('renderer: toast prefere foto real do ator->responsável (nunca letra havendo foto)', /p\.actorAvatar\|\|p\.responsibleAvatar/.test(html));
+ok('renderer: contrato carrega responsável + notificationType + etapa', /responsibleId:o\.responsibleId/.test(html) && /notificationType:o\.notificationType/.test(html) && /etapa:o\.etapa/.test(html));
 
 // ===================== não regrediu o aprovado (F3.3.2) =====================
 ok('preservado: card Kanban Opção 2 (themes-list rola)', /kbv2-themes-list/.test(html) && /CARD-FIT-NOTEBOOK/.test(html));
