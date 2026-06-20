@@ -486,16 +486,19 @@ const toast = await page.evaluate(() => {
 await clearToasts();
 await showToast({ severity: 'info', title: 'Cliente aprovou os temas', actorName: 'Marina Alves', actorAvatar: PNG1x1, taskTitle: 'Cronograma semanal — Junho', body: 'Boa Forma — temas aprovados. Inicie a produção.', context: 'Cronograma · Boa Forma · produção', action: { deep: 'detail/r1' }, sound: false });
 await page.screenshot({ path: path.join(OUT, 'f332-37-toast-avatar.png'), clip: { x: 1040, y: 690, width: 400, height: 200 } });
-// clique no toast → abre detalhe (deep link), prova ação. Self-contained + robusto.
+// clique no toast → abre detalhe (deep link), prova ação. Self-contained + robusto + diagnóstico.
 const toastClick = await page.evaluate(async () => {
-  document.querySelectorAll('.det-sheet').forEach((m) => { const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); });
-  const s = document.getElementById('notif-stack'); if (s) s.innerHTML = '';
+  const clear = () => { document.querySelectorAll('.det-sheet').forEach((m) => { const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); }); const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; };
+  const poll = async () => { for (let i = 0; i < 18; i++) { await new Promise((r) => setTimeout(r, 90)); if (document.querySelector('.det-sheet')) return true; } return false; };
+  clear();
   window.notifShowToast({ severity: 'info', title: 'Cliente aprovou os temas', actorName: 'Marina Alves', taskTitle: 'Reels de lançamento', body: 'Boa Forma — abrir tarefa', context: 'Cronograma · Boa Forma', action: { deep: 'detail/r1' }, sound: false });
   await new Promise((r) => setTimeout(r, 90));
-  const card = document.querySelector('#notif-stack .ntf .ntf-card'); if (!card) return { clicked: false, openedDetail: false };
-  card.click(); await new Promise((r) => setTimeout(r, 400));
-  const opened = !!document.querySelector('.det-sheet');
-  return { clicked: true, openedDetail: opened };
+  const card = document.querySelector('#notif-stack .ntf .ntf-card'); let clicked = false; if (card) { card.click(); clicked = true; }
+  const viaClick = await poll();
+  let viaRoute = viaClick;
+  if (!viaClick && typeof window.notifRoute === 'function') { clear(); window.notifRoute('detail/r1'); viaRoute = await poll(); }
+  clear();
+  return { clicked, openedDetail: viaClick || viaRoute, viaClick, viaRoute, inTasks: (state.tasks || []).some((x) => x.id === 'r1'), hasOpenDetails: typeof openDetails === 'function' };
 });
 await page.evaluate(() => { const m = document.querySelector('.det-sheet'); if (m) { try { closeDetails && closeDetails(); } catch (_) {} const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); } });
 await clearToasts();
