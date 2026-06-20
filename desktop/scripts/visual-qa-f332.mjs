@@ -460,12 +460,12 @@ await showToast({ severity: 'critical', title: 'Tarefa em atraso crítico', acto
 await toastShot('f332-35-toast-critico.png');
 // 7) múltiplos toasts (stack sem poluir — limite 4)
 await clearToasts();
-await page.evaluate(() => {
-  window.notifShowToast({ severity: 'info', title: 'Nova tarefa para você', actorName: 'Owner Admin', taskTitle: 'Stories semanais', body: 'Boa Forma — Stories semanais', context: 'Tarefa · Boa Forma', sound: false });
-  window.notifShowToast({ severity: 'success', title: 'Designer entregou', actorName: 'Marina Alves', taskTitle: 'Carrossel institucional', body: 'Studio Lumen — Carrossel', context: 'Fluxo', sound: false });
-  window.notifShowToast({ severity: 'warning', title: 'Prazo próximo', actorName: 'Marina Alves', taskTitle: 'Arte campanha', body: 'Clínica Vita — faltam 22 min.', context: 'SLA do designer', sound: false });
-  window.notifShowToast({ severity: 'critical', title: 'Atraso crítico', actorName: 'Marina Alves', taskTitle: 'Pôster evento', body: 'Clínica Vita — sinalize o atraso imediatamente.', context: 'SLA do designer · crítico', sound: false });
-});
+await page.evaluate((AV) => {
+  window.notifShowToast({ severity: 'info', title: 'Nova tarefa para você', actorName: 'Owner Admin', actorAvatar: AV, taskTitle: 'Stories semanais', body: 'Boa Forma — Stories semanais', context: 'Tarefa · Boa Forma', sound: false });
+  window.notifShowToast({ severity: 'success', title: 'Designer entregou', actorName: 'Marina Alves', actorAvatar: AV, taskTitle: 'Carrossel institucional', body: 'Studio Lumen — Carrossel', context: 'Fluxo', sound: false });
+  window.notifShowToast({ severity: 'warning', title: 'Prazo próximo', actorName: 'Marina Alves', actorAvatar: AV, taskTitle: 'Arte campanha', body: 'Clínica Vita — faltam 22 min.', context: 'SLA do designer', sound: false });
+  window.notifShowToast({ severity: 'critical', title: 'Atraso crítico', actorName: 'Marina Alves', actorAvatar: AV, taskTitle: 'Pôster evento', body: 'Clínica Vita — sinalize o atraso imediatamente.', context: 'SLA do designer · crítico', sound: false });
+}, PNG1x1);
 await toastShot('f332-36-toast-multi.png');
 const toast = await page.evaluate(() => {
   const stack = document.getElementById('notif-stack');
@@ -486,11 +486,15 @@ const toast = await page.evaluate(() => {
 await clearToasts();
 await showToast({ severity: 'info', title: 'Cliente aprovou os temas', actorName: 'Marina Alves', actorAvatar: PNG1x1, taskTitle: 'Cronograma semanal — Junho', body: 'Boa Forma — temas aprovados. Inicie a produção.', context: 'Cronograma · Boa Forma · produção', action: { deep: 'detail/r1' }, sound: false });
 await page.screenshot({ path: path.join(OUT, 'f332-37-toast-avatar.png'), clip: { x: 1040, y: 690, width: 400, height: 200 } });
-// clique no toast → abre detalhe (deep link), prova ação
+// clique no toast → abre detalhe (deep link), prova ação. Self-contained + robusto.
 const toastClick = await page.evaluate(async () => {
-  const card = document.querySelector('#notif-stack .ntf .ntf-card'); if (!card) return { clicked: false };
-  card.click(); await new Promise((r) => setTimeout(r, 220));
-  const opened = !!document.querySelector('.det-sheet') || !!document.querySelector('[id*="modal"] .det-sheet');
+  document.querySelectorAll('.det-sheet').forEach((m) => { const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); });
+  const s = document.getElementById('notif-stack'); if (s) s.innerHTML = '';
+  window.notifShowToast({ severity: 'info', title: 'Cliente aprovou os temas', actorName: 'Marina Alves', taskTitle: 'Reels de lançamento', body: 'Boa Forma — abrir tarefa', context: 'Cronograma · Boa Forma', action: { deep: 'detail/r1' }, sound: false });
+  await new Promise((r) => setTimeout(r, 90));
+  const card = document.querySelector('#notif-stack .ntf .ntf-card'); if (!card) return { clicked: false, openedDetail: false };
+  card.click(); await new Promise((r) => setTimeout(r, 400));
+  const opened = !!document.querySelector('.det-sheet');
   return { clicked: true, openedDetail: opened };
 });
 await page.evaluate(() => { const m = document.querySelector('.det-sheet'); if (m) { try { closeDetails && closeDetails(); } catch (_) {} const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); } });
