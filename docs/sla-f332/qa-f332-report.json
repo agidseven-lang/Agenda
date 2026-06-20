@@ -487,9 +487,9 @@
     "warningFired": true,
     "overdueFired": true,
     "criticalFired": true,
-    "warningText": "Você tem 30 minutos para concluir esta tarefa.",
-    "overdueText": "Você tem 10 minutos para concluir esta tarefa.",
-    "criticalText": "Sinalize atraso imediatamente ou conclua a tarefa.",
+    "warningText": "Você tem 30 minutos para concluir esta tarefa.\nTarefa warn — Boa Forma\nPrazo final: 15:52",
+    "overdueText": "Você tem 10 minutos para concluir esta tarefa.\nTarefa over — Boa Forma\nRestam 7:00 para concluir ou sinalizar atraso.",
+    "criticalText": "Sinalize atraso imediatamente ou conclua a tarefa.\nTarefa crit — Boa Forma",
     "warningCtx": "Boa Forma · Vence em 18:00",
     "overdueCtx": "Atrasada há 3:00 · restam 7:00 p/ sinalizar",
     "overdueSev": "critical",
@@ -520,6 +520,20 @@
     "avatarFromDirectory": true,
     "avatarFromDenorm": true,
     "avatarNoneEmpty": true
+  },
+  "identityDetect": {
+    "attrAvatarReal": true,
+    "attrTitleHasActor": true,
+    "attrNotLetterN": true,
+    "attrRespRowReal": true,
+    "slaAvatarReal": true,
+    "slaTitlePersonalized": true,
+    "noPhotoActorInitials": true,
+    "noPhotoNotLetterN": true,
+    "noPhotoTitleHasActor": true,
+    "idRealAvatar": true,
+    "idNoPhotoInitials": true,
+    "idDenormReal": true
   },
   "errors": []
 }
