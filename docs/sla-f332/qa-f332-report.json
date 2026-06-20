@@ -470,7 +470,7 @@
       "critical"
     ],
     "withAvatar": true,
-    "avatarReal": false,
+    "avatarReal": true,
     "hasContext": true,
     "hasSevIcon": true,
     "hasClose": true
