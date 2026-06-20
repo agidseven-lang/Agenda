@@ -61,23 +61,28 @@ function buildScenario(kind, asUser, PNG1x1) {
     for (let i = 1; i <= 6; i++) tasks.push(mk('m' + i, 'Cronograma ' + i + ' — Cliente ' + i, 'Cliente ' + i, 40 + i * 7, {
       cronContents: [{ tema: 'Tema A do card ' + i, legenda: '' }, { tema: 'Tema B', legenda: '' }],
     }));
-  } else if (kind === 'socialtall') {
-    // CORTE REAL (notebook): 1 card SOCIAL ALTO em "Meu quadro" — topo+perfil+origem+título+chips+
-    // etapa/próxima+5 temas+checklist+data+rodapé. É o card que corta topo E rodapé no notebook.
-    // SEM designerAssignment => renderPersonBoard usa kbv2Card(t) operacional (perspectiva social).
+  } else if (kind.indexOf('socialtall') === 0) {
+    // CARD SOCIAL em "Meu quadro" — topo+perfil+origem+título+chips+etapa/próxima+TEMAS+checklist+
+    // data+rodapé. 'socialtall<N>' controla a qtde de temas (1/3/5...). SEM designerAssignment =>
+    // renderPersonBoard usa kbv2Card(t) operacional (perspectiva social). Com a Opção 2 aprovada,
+    // o card aparece INTEIRO; com muitos temas longos, SÓ a caixa de temas rola por dentro.
+    const nThemes = Math.max(1, parseInt(kind.replace('socialtall', ''), 10) || 5);
+    const pool = [
+      'Dia dos Namorados — campanha de relacionamento',
+      'Reels institucional — bastidores da equipe',
+      'Carrossel educativo — dicas de saúde da semana',
+      'Stories enquete — engajamento do público',
+      'Post motivacional — frase da semana',
+      'Live de lançamento — divulgação do evento',
+      'Depoimento de cliente — prova social',
+    ];
     tasks = [{
       id: 'stall', title: 'Cronograma semanal — Junho', client: 'Boa Forma',
       sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', by: 'owner', priority: true,
       createdAt: NOW - 3 * 24 * 60 * MIN,
       dueDate: new Date(NOW + 2 * 24 * 60 * MIN).toISOString().slice(0, 10), dueTime: '18:00',
       designerSla: { planStartAt: NOW - 120 * MIN, planDueAt: NOW + 120 * MIN, startedAt: NOW - 100 * MIN },
-      cronContents: [
-        { tema: 'Dia dos Namorados — campanha de relacionamento', legenda: '' },
-        { tema: 'Reels institucional — bastidores da equipe', legenda: '' },
-        { tema: 'Carrossel educativo — dicas de saúde da semana', legenda: '' },
-        { tema: 'Stories enquete — engajamento do público', legenda: '' },
-        { tema: 'Post motivacional — frase da semana', legenda: '' },
-      ],
+      cronContents: Array.from({ length: nThemes }, (_, i) => ({ tema: pool[i % pool.length], legenda: '' })),
       checklist: [{ t: 'Briefing aprovado', d: true }, { t: 'Referências coletadas', d: true }, { t: 'Roteiro dos posts', d: false }, { t: 'Aprovação final', d: false }],
     }];
   } else tasks = tasks.concat(red, amber);
@@ -209,7 +214,7 @@ for (const [w, h] of [[1366, 768], [1600, 900]]) {
 // sem compressão/amputação, com ações e Adicionar visíveis e coluna rolável. Capturas: topo,
 // meio, base (rodapé+Adicionar) e coluna inteira.
 const tall = {};
-async function shotTall(w, h, tag) {
+async function shotCol(name) {
   const clip = await page.evaluate(() => {
     const cards = [...document.querySelectorAll('.kbv2-card')];
     const card = cards.find(c => (c.textContent || '').includes('Cronograma semanal — Junho'));
@@ -217,61 +222,71 @@ async function shotTall(w, h, tag) {
     if (!col) return null; const r = col.getBoundingClientRect();
     return { x: Math.max(0, Math.floor(r.left - 8)), y: Math.max(0, Math.floor(r.top - 8)), width: Math.min(window.innerWidth, Math.ceil(r.width + 16)), height: Math.min(window.innerHeight, Math.ceil(r.height + 16)) };
   });
-  await page.screenshot({ path: path.join(OUT, `f332-20-socialtall-${w}x${h}-${tag}.png`), clip: clip || undefined });
+  await page.screenshot({ path: path.join(OUT, name), clip: clip || undefined });
 }
-for (const [w, h] of [[1366, 768], [1280, 720], [1366, 680]]) {
-  await page.setViewportSize({ width: w, height: h });
-  await scenario('socialtall', 'designer'); await page.waitForTimeout(340);
-  const m = await page.evaluate(() => {
+async function measureTall() {
+  return await page.evaluate(() => {
     const cards = [...document.querySelectorAll('.kbv2-card')];
     const card = cards.find(c => (c.textContent || '').includes('Cronograma semanal — Junho'));
     if (!card) return { ok: false };
-    const body = card.closest('.kbv2-column-body');
-    const col = card.closest('.kbv2-column');
+    const body = card.closest('.kbv2-column-body'); const col = card.closest('.kbv2-column');
     const add = col ? col.querySelector('.kbv2-column-add') : null;
     const footer = card.querySelector('.kbv2-card-footer');
+    const themes = card.querySelector('.kbv2-card-themes'); const list = card.querySelector('.kbv2-themes-list');
     const av = card.querySelector('.kbv2-av .av'); const avStyle = av ? (av.getAttribute('style') || '') : '';
-    // 1) natural, sem compressão (flex:0 0 auto => scrollHeight == clientHeight)
-    const compressed = card.scrollHeight > card.clientHeight + 2;
-    // 2) cabe INTEIRO na área visível da coluna (topo + rodapé juntos, em um frame)
-    const cardH = Math.round(card.getBoundingClientRect().height);
-    const bodyH = Math.round(body.clientHeight);
-    const fitsWhole = cardH <= bodyH + 2;
-    const overflowPx = Math.max(0, cardH - bodyH);
-    // 3) topo do card visível ao rolar p/ cima
     body.scrollTop = 0;
-    let cR = card.getBoundingClientRect(); let bR = body.getBoundingClientRect();
-    const topVisible = cR.top >= bR.top - 4;
-    // 4) rodapé/ações visíveis ao rolar p/ baixo
-    body.scrollTop = body.scrollHeight;
-    bR = body.getBoundingClientRect(); const fR = footer.getBoundingClientRect();
-    const bottomVisible = fR.bottom <= bR.bottom + 4 && fR.top >= bR.top - 4;
+    // sem compressão/amputação do CARD (o overflow vai p/ a lista de temas, não p/ o card)
+    const compressed = card.scrollHeight > card.clientHeight + 2;
+    const cardH = Math.round(card.getBoundingClientRect().height); const bodyH = Math.round(body.clientHeight);
+    const overflowPx = Math.max(0, cardH - bodyH);
+    // CARD INTEIRO dentro da área visível da coluna (topo E rodapé juntos, sem rolar a coluna)
+    const cR = card.getBoundingClientRect(); const bR = body.getBoundingClientRect();
+    const cardInBody = cR.top >= bR.top - 2 && cR.bottom <= bR.bottom + 2;
+    // cada seção essencial inteiramente DENTRO do card (nada cortado)
+    const within = (el) => { if (!el) return false; const r = el.getBoundingClientRect(); return r.top >= cR.top - 2 && r.bottom <= cR.bottom + 2; };
+    const topEl = card.querySelector('.kbv2-card-top'), prof = card.querySelector('.kbv2-card-profile'),
+      title = card.querySelector('.kbv2-title'), stage = card.querySelector('.kbv2-stage2'), date = card.querySelector('.kbv2-card-date');
+    const allInside = within(topEl) && within(prof) && within(title) && within(themes) && within(date) && within(footer);
+    // rolagem interna SÓ na lista de temas (quando necessário)
+    const themesScrolls = !!list && list.scrollHeight > list.clientHeight + 2;
+    const themeEls = [...card.querySelectorAll('.kbv2-theme')];
+    const minThemeH = themeEls.length ? Math.min(...themeEls.map(e => Math.round(e.getBoundingClientRect().height))) : 0;
+    // pelo menos 1 tema visível na janela da lista (sem rolar a lista)
+    const listR = list ? list.getBoundingClientRect() : null;
+    const firstTheme = themeEls[0] ? themeEls[0].getBoundingClientRect() : null;
+    const firstThemeVisible = !!(listR && firstTheme && firstTheme.top >= listR.top - 2 && firstTheme.top < listR.bottom);
     const addR = add ? add.getBoundingClientRect() : null;
-    const colR = col.getBoundingClientRect();
     const addNotOverlap = !addR || addR.top >= bR.bottom - 2;
     const addVisible = !addR || (addR.bottom <= window.innerHeight + 2 && addR.top >= 0);
-    const colInViewport = colR.bottom <= window.innerHeight + 2;
-    body.scrollTop = 0;
+    const colR = col.getBoundingClientRect(); const colInViewport = colR.bottom <= window.innerHeight + 2;
     return {
-      ok: true, cardH, bodyH, fitsWhole, overflowPx, compressed,
-      topVisible, bottomVisible, addNotOverlap, addVisible, colInViewport,
-      columnScrolls: body.scrollHeight > body.clientHeight + 2,
-      hasThemes: !!card.querySelector('.kbv2-card-themes'), themeCount: card.querySelectorAll('.kbv2-theme').length,
-      hasDate: !!card.querySelector('.kbv2-card-date'), hasStage: !!card.querySelector('.kbv2-stage2'),
+      ok: true, cardH, bodyH, overflowPx, compressed, cardInBody, allInside,
+      themesScrolls, themeCount: themeEls.length, minThemeH, firstThemeVisible,
+      topVisible: within(topEl), bottomVisible: within(footer),
+      addNotOverlap, addVisible, colInViewport,
+      hasThemes: !!themes, hasDate: !!date, hasStage: !!stage,
       hasActions: !!(card.querySelector('[data-detail]') && card.querySelector('[data-move]')),
       avatarReal: /background-image/.test(avStyle),
     };
   });
-  tall[w + 'x' + h] = m;
-  // capturas: topo / meio / base (rodapé+Adicionar)
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.kbv2-column-body')].find(x => (x.textContent || '').includes('Cronograma semanal — Junho')); if (b) b.scrollTop = 0; });
-  await page.waitForTimeout(80); await shotTall(w, h, 'topo');
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.kbv2-column-body')].find(x => (x.textContent || '').includes('Cronograma semanal — Junho')); if (b) b.scrollTop = Math.max(0, (b.scrollHeight - b.clientHeight) / 2); });
-  await page.waitForTimeout(80); await shotTall(w, h, 'meio');
-  await page.evaluate(() => { const b = [...document.querySelectorAll('.kbv2-column-body')].find(x => (x.textContent || '').includes('Cronograma semanal — Junho')); if (b) b.scrollTop = b.scrollHeight; });
-  await page.waitForTimeout(80); await shotTall(w, h, 'base');
-  if (w === 1366 && h === 768) await page.screenshot({ path: path.join(OUT, 'f332-21-socialtall-fullpage.png') });
 }
+// 1 e 3 temas: card INTEIRO sem rolagem interna. 5 temas: card INTEIRO com rolagem SÓ nos temas.
+for (const [w, h] of [[1366, 768], [1280, 720], [1366, 680]]) {
+  await page.setViewportSize({ width: w, height: h });
+  for (const n of [1, 3, 5]) {
+    await scenario('socialtall' + n, 'designer'); await page.waitForTimeout(320);
+    tall[w + 'x' + h + '-t' + n] = await measureTall();
+    if (w === 1366 && h === 768) await shotCol('f332-20-socialtall-768-' + n + 'tema.png');
+  }
+  // print do owner: 5 temas longos, card inteiro com rolagem interna, nas 3 resoluções
+  await scenario('socialtall5', 'designer'); await page.waitForTimeout(260);
+  await shotCol('f332-22-socialtall5-' + w + 'x' + h + '.png');
+}
+// 5 temas com a LISTA rolada até o fim (prova: rola só dentro da caixa; resto do card intacto)
+await page.setViewportSize({ width: 1366, height: 768 }); await scenario('socialtall5', 'designer'); await page.waitForTimeout(260);
+await page.evaluate(() => { const l = document.querySelector('.kbv2-themes-list'); if (l) l.scrollTop = l.scrollHeight; });
+await page.waitForTimeout(140); await shotCol('f332-23-socialtall5-temas-rolados.png');
+await page.screenshot({ path: path.join(OUT, 'f332-21-socialtall-fullpage.png') });
 
 // ===================== CARD real (avatar/temas/rodapé) =====================
 await page.setViewportSize({ width: 1600, height: 900 });
@@ -451,19 +466,26 @@ for (const k of Object.keys(cut)) { const c = cut[k];
          if (!c.footerVisible) fail.push('cardBottomActionsVisible falhou em ' + k);
          if (!c.addNotOverlap) fail.push('addButtonNotOverlapping falhou em ' + k);
          if (!c.colInViewport) fail.push('coluna estoura a tela em ' + k); } }
-// ===== CARD SOCIAL ALTO — inteiro no notebook (FASE 4: 10 métricas) =====
+// ===== CARD SOCIAL — SEMPRE INTEIRO no notebook; só a lista de temas rola (Opção 2) =====
 for (const k of Object.keys(tall)) { const t = tall[k];
   if (!t.ok) { fail.push('socialtall ' + k + ' sem card'); continue; }
-  if (t.compressed) fail.push('cardNotCompressed falhou em ' + k + ' (card amputado/comprimido)');
-  if (!t.fitsWhole) fail.push('cardWhole falhou em ' + k + ' (card não cabe inteiro; sobra ' + t.overflowPx + 'px → corta topo/rodapé)');
+  const n = parseInt((k.split('-t')[1] || ''), 10) || 0;
+  const h = parseInt((k.split('x')[1] || '').split('-')[0], 10) || 0;
+  if (t.compressed) fail.push('cardNotCompressed falhou em ' + k + ' (card comprimido/amputado)');
+  if (!t.cardInBody) fail.push('cardWhole falhou em ' + k + ' (card não inteiro; sobra ' + t.overflowPx + 'px → corta topo/rodapé)');
+  if (!t.allInside) fail.push('cardSectionsInside falhou em ' + k + ' (seção essencial cortada)');
   if (!t.topVisible) fail.push('cardTopVisible falhou em ' + k);
-  if (!t.bottomVisible) fail.push('cardBottomVisible falhou em ' + k + ' (rodapé/ações não visíveis ao rolar)');
+  if (!t.bottomVisible) fail.push('cardBottomVisible falhou em ' + k + ' (rodapé não visível)');
   if (!t.hasActions) fail.push('cardActionsVisible falhou em ' + k + ' (Detalhes/Mover ausentes)');
   if (!t.addNotOverlap) fail.push('addButtonNotOverlapping falhou em ' + k);
   if (!t.avatarReal) fail.push('avatarRealVisible falhou em ' + k);
   if (!t.hasThemes) fail.push('topicsVisible falhou em ' + k + ' (temas ausentes)');
+  if (!t.firstThemeVisible) fail.push('themeVisible falhou em ' + k + ' (nenhum tema visível na caixa)');
+  if (t.minThemeH < 24) fail.push('themeLegible falhou em ' + k + ' (tema < 24px: ' + t.minThemeH + ')');
   if (!t.hasDate) fail.push('dueDateVisible falhou em ' + k);
-  if (!t.colInViewport) fail.push('columnInViewport falhou em ' + k + ' (coluna estoura a tela)');
+  if (!t.colInViewport) fail.push('columnInViewport falhou em ' + k);
+  // 1 tema nunca rola por dentro; ≤3 temas não rolam por dentro a ≥768 (cabem). 5 temas: rolam só na caixa.
+  if (t.themesScrolls && (n === 1 || (n <= 3 && h >= 768))) fail.push('themesNoScrollWhenFits falhou em ' + k + ' (' + n + ' tema(s) não deviam rolar internamente)');
 }
 // card real
 if (!card.found) fail.push('card de cronograma não encontrado');
