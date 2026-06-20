@@ -61,6 +61,25 @@ function buildScenario(kind, asUser, PNG1x1) {
     for (let i = 1; i <= 6; i++) tasks.push(mk('m' + i, 'Cronograma ' + i + ' — Cliente ' + i, 'Cliente ' + i, 40 + i * 7, {
       cronContents: [{ tema: 'Tema A do card ' + i, legenda: '' }, { tema: 'Tema B', legenda: '' }],
     }));
+  } else if (kind === 'socialtall') {
+    // CORTE REAL (notebook): 1 card SOCIAL ALTO em "Meu quadro" — topo+perfil+origem+título+chips+
+    // etapa/próxima+5 temas+checklist+data+rodapé. É o card que corta topo E rodapé no notebook.
+    // SEM designerAssignment => renderPersonBoard usa kbv2Card(t) operacional (perspectiva social).
+    tasks = [{
+      id: 'stall', title: 'Cronograma semanal — Junho', client: 'Boa Forma',
+      sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', by: 'owner', priority: true,
+      createdAt: NOW - 3 * 24 * 60 * MIN,
+      dueDate: new Date(NOW + 2 * 24 * 60 * MIN).toISOString().slice(0, 10), dueTime: '18:00',
+      designerSla: { planStartAt: NOW - 120 * MIN, planDueAt: NOW + 120 * MIN, startedAt: NOW - 100 * MIN },
+      cronContents: [
+        { tema: 'Dia dos Namorados — campanha de relacionamento', legenda: '' },
+        { tema: 'Reels institucional — bastidores da equipe', legenda: '' },
+        { tema: 'Carrossel educativo — dicas de saúde da semana', legenda: '' },
+        { tema: 'Stories enquete — engajamento do público', legenda: '' },
+        { tema: 'Post motivacional — frase da semana', legenda: '' },
+      ],
+      checklist: [{ t: 'Briefing aprovado', d: true }, { t: 'Referências coletadas', d: true }, { t: 'Roteiro dos posts', d: false }, { t: 'Aprovação final', d: false }],
+    }];
   } else tasks = tasks.concat(red, amber);
   state.tasks = tasks;
   document.body.classList.add('desktop', 'authed');
@@ -181,6 +200,77 @@ for (const [w, h] of [[1366, 768], [1600, 900]]) {
   });
   cut[w + 'x' + h] = r;
   await page.screenshot({ path: path.join(OUT, 'f332-05-multicard-' + w + 'x' + h + '.png') });
+}
+
+// ===================== CARD SOCIAL ALTO — corte topo/rodapé no notebook =====================
+// Reproduz o cenário REAL do owner: "Meu quadro", 1 card Social ALTO (foto/nome/cliente/título
+// "Cronograma semanal — Junho"/chips/etapa/próxima/5 temas/checklist/data/rodapé) + "Adicionar
+// tarefa". Mede, em resoluções de notebook, se o card aparece INTEIRO (topo E rodapé juntos),
+// sem compressão/amputação, com ações e Adicionar visíveis e coluna rolável. Capturas: topo,
+// meio, base (rodapé+Adicionar) e coluna inteira.
+const tall = {};
+async function shotTall(w, h, tag) {
+  const clip = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.kbv2-card')];
+    const card = cards.find(c => (c.textContent || '').includes('Cronograma semanal — Junho'));
+    const col = card ? card.closest('.kbv2-column') : (document.querySelector('.kbv2-column-active') || document.querySelector('.kbv2-column'));
+    if (!col) return null; const r = col.getBoundingClientRect();
+    return { x: Math.max(0, Math.floor(r.left - 8)), y: Math.max(0, Math.floor(r.top - 8)), width: Math.min(window.innerWidth, Math.ceil(r.width + 16)), height: Math.min(window.innerHeight, Math.ceil(r.height + 16)) };
+  });
+  await page.screenshot({ path: path.join(OUT, `f332-20-socialtall-${w}x${h}-${tag}.png`), clip: clip || undefined });
+}
+for (const [w, h] of [[1366, 768], [1280, 720], [1366, 680]]) {
+  await page.setViewportSize({ width: w, height: h });
+  await scenario('socialtall', 'designer'); await page.waitForTimeout(340);
+  const m = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.kbv2-card')];
+    const card = cards.find(c => (c.textContent || '').includes('Cronograma semanal — Junho'));
+    if (!card) return { ok: false };
+    const body = card.closest('.kbv2-column-body');
+    const col = card.closest('.kbv2-column');
+    const add = col ? col.querySelector('.kbv2-column-add') : null;
+    const footer = card.querySelector('.kbv2-card-footer');
+    const av = card.querySelector('.kbv2-av .av'); const avStyle = av ? (av.getAttribute('style') || '') : '';
+    // 1) natural, sem compressão (flex:0 0 auto => scrollHeight == clientHeight)
+    const compressed = card.scrollHeight > card.clientHeight + 2;
+    // 2) cabe INTEIRO na área visível da coluna (topo + rodapé juntos, em um frame)
+    const cardH = Math.round(card.getBoundingClientRect().height);
+    const bodyH = Math.round(body.clientHeight);
+    const fitsWhole = cardH <= bodyH + 2;
+    const overflowPx = Math.max(0, cardH - bodyH);
+    // 3) topo do card visível ao rolar p/ cima
+    body.scrollTop = 0;
+    let cR = card.getBoundingClientRect(); let bR = body.getBoundingClientRect();
+    const topVisible = cR.top >= bR.top - 4;
+    // 4) rodapé/ações visíveis ao rolar p/ baixo
+    body.scrollTop = body.scrollHeight;
+    bR = body.getBoundingClientRect(); const fR = footer.getBoundingClientRect();
+    const bottomVisible = fR.bottom <= bR.bottom + 4 && fR.top >= bR.top - 4;
+    const addR = add ? add.getBoundingClientRect() : null;
+    const colR = col.getBoundingClientRect();
+    const addNotOverlap = !addR || addR.top >= bR.bottom - 2;
+    const addVisible = !addR || (addR.bottom <= window.innerHeight + 2 && addR.top >= 0);
+    const colInViewport = colR.bottom <= window.innerHeight + 2;
+    body.scrollTop = 0;
+    return {
+      ok: true, cardH, bodyH, fitsWhole, overflowPx, compressed,
+      topVisible, bottomVisible, addNotOverlap, addVisible, colInViewport,
+      columnScrolls: body.scrollHeight > body.clientHeight + 2,
+      hasThemes: !!card.querySelector('.kbv2-card-themes'), themeCount: card.querySelectorAll('.kbv2-theme').length,
+      hasDate: !!card.querySelector('.kbv2-card-date'), hasStage: !!card.querySelector('.kbv2-stage2'),
+      hasActions: !!(card.querySelector('[data-detail]') && card.querySelector('[data-move]')),
+      avatarReal: /background-image/.test(avStyle),
+    };
+  });
+  tall[w + 'x' + h] = m;
+  // capturas: topo / meio / base (rodapé+Adicionar)
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.kbv2-column-body')].find(x => (x.textContent || '').includes('Cronograma semanal — Junho')); if (b) b.scrollTop = 0; });
+  await page.waitForTimeout(80); await shotTall(w, h, 'topo');
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.kbv2-column-body')].find(x => (x.textContent || '').includes('Cronograma semanal — Junho')); if (b) b.scrollTop = Math.max(0, (b.scrollHeight - b.clientHeight) / 2); });
+  await page.waitForTimeout(80); await shotTall(w, h, 'meio');
+  await page.evaluate(() => { const b = [...document.querySelectorAll('.kbv2-column-body')].find(x => (x.textContent || '').includes('Cronograma semanal — Junho')); if (b) b.scrollTop = b.scrollHeight; });
+  await page.waitForTimeout(80); await shotTall(w, h, 'base');
+  if (w === 1366 && h === 768) await page.screenshot({ path: path.join(OUT, 'f332-21-socialtall-fullpage.png') });
 }
 
 // ===================== CARD real (avatar/temas/rodapé) =====================
@@ -314,8 +404,9 @@ for (const [w, h, nm] of [[1366, 768, 'f332-08-1366x768.png'], [1920, 1080, 'f33
   await page.screenshot({ path: path.join(OUT, nm) });
 }
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, errors }, null, 2));
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, errors }, null, 2));
 console.log('FLICKER:', JSON.stringify(flicker)); console.log('NOTIF:', JSON.stringify(notif));
+console.log('TALL:', JSON.stringify(tall));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
 console.log('CARD:', JSON.stringify(card)); console.log('CONSIST:', JSON.stringify(consist)); console.log('ORANGE:', JSON.stringify(orangeImmediate)); console.log('BLOCK:', JSON.stringify(block));
 console.log('DETAIL:', JSON.stringify(detail)); console.log('EDIT:', JSON.stringify(editPrazo)); console.log('RBAC:', JSON.stringify(rbac)); console.log('HEADER:', JSON.stringify(header));
@@ -360,6 +451,20 @@ for (const k of Object.keys(cut)) { const c = cut[k];
          if (!c.footerVisible) fail.push('cardBottomActionsVisible falhou em ' + k);
          if (!c.addNotOverlap) fail.push('addButtonNotOverlapping falhou em ' + k);
          if (!c.colInViewport) fail.push('coluna estoura a tela em ' + k); } }
+// ===== CARD SOCIAL ALTO — inteiro no notebook (FASE 4: 10 métricas) =====
+for (const k of Object.keys(tall)) { const t = tall[k];
+  if (!t.ok) { fail.push('socialtall ' + k + ' sem card'); continue; }
+  if (t.compressed) fail.push('cardNotCompressed falhou em ' + k + ' (card amputado/comprimido)');
+  if (!t.fitsWhole) fail.push('cardWhole falhou em ' + k + ' (card não cabe inteiro; sobra ' + t.overflowPx + 'px → corta topo/rodapé)');
+  if (!t.topVisible) fail.push('cardTopVisible falhou em ' + k);
+  if (!t.bottomVisible) fail.push('cardBottomVisible falhou em ' + k + ' (rodapé/ações não visíveis ao rolar)');
+  if (!t.hasActions) fail.push('cardActionsVisible falhou em ' + k + ' (Detalhes/Mover ausentes)');
+  if (!t.addNotOverlap) fail.push('addButtonNotOverlapping falhou em ' + k);
+  if (!t.avatarReal) fail.push('avatarRealVisible falhou em ' + k);
+  if (!t.hasThemes) fail.push('topicsVisible falhou em ' + k + ' (temas ausentes)');
+  if (!t.hasDate) fail.push('dueDateVisible falhou em ' + k);
+  if (!t.colInViewport) fail.push('columnInViewport falhou em ' + k + ' (coluna estoura a tela)');
+}
 // card real
 if (!card.found) fail.push('card de cronograma não encontrado');
 if (card.found && card.found.compressed) fail.push('card AMPUTADO/comprimido');
