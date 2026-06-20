@@ -2595,6 +2595,25 @@ function slaPanelFinishMs(t,dtMsFn){
   var dd=t&&(t.dueDate||t.due); if(dd){ var d=Number(f(dd,(t&&t.dueTime)||'23:59'))||0; if(d>0) return d; } // 4) due
   return 0;
 }
+/* FONTE CANÔNICA ÚNICA DE PRAZO (FASE 2) — wrapper estruturado sobre slaPanelFinishMs (o ms real
+   vem dele, garantindo que card/detalhe/monitor/sino/toast/bloqueio usem o MESMO prazo). Expõe
+   metadados p/ auditoria/depuração. Read-only; nunca grava. Ordem: plannedFinishAt → planDueAt →
+   designerAssignment.endDate → dueDate. */
+function resolveCanonicalDeadline(t,dtMsFn){
+  var f=dtMsFn||(typeof dtMs==='function'?dtMs:null);
+  var ds=(t&&t.designerSla)||{}, da=(t&&t.designerAssignment)||{};
+  var src='none';
+  if(Number(ds.plannedFinishAt)>0) src='designerSla.plannedFinishAt';
+  else if(Number(ds.planDueAt)>0) src='designerSla.planDueAt';
+  else if(da.endDate && Number(f?f(da.endDate,da.endTime||'23:59'):0)>0) src='designerAssignment.endDate';
+  else if((t&&(t.dueDate||t.due)) && Number(f?f((t.dueDate||t.due),(t&&t.dueTime)||'23:59'):0)>0) src='dueDate';
+  var ms=slaPanelFinishMs(t,f)||0;                 // FONTE ÚNICA real (não duplica a lógica)
+  var valid=ms>0; var tz=''; try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone||''; }catch(_){}
+  return { plannedFinishAtMs:ms, plannedFinishAtDate:valid?new Date(ms):null,
+    plannedFinishAtLabel:(valid&&typeof slaibFmtHM==='function')?slaibFmtHM(ms):'',
+    sourceField:valid?src:'none', timezone:tz, isValid:valid,
+    debugReason:valid?('prazo via '+src):'sem prazo válido (designerSla/assignment/due ausentes)' };
+}
 function slaPanelDelivered(t){
   var ds=(t&&t.designerSla)||{};
   var finished=Number(ds.finishedAt)||(typeof (t&&t.doneAt)==='number'?t.doneAt:0);
@@ -2882,8 +2901,8 @@ var SLAOP_ALERT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 var SLAOP_SHIELD_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>';
 function slaOpName(id){ if(!id) return '—'; var u=(state.users||[]).find(function(x){return x&&x.id===id;}); var n=((u&&(u.name||u.displayName))||'').trim(); return n?slaibEsc(n.split(' ')[0]):'—'; }
 var slaMonOpen=false;  // estado do dropdown do widget (persiste entre refreshes do ticker)
-function slaOpRowTime(x){ return (x.sev==='vermelho')?('Atrasada há '+slaMMSS(_slaMs(x.overdueMs,x.overdueMin))):('Faltam '+slaMMSS(_slaMs(x.remainingMs,x.remainingMin))); }
-function slaOpRowGrace(x){ return 'Restam '+slaMMSS(_slaMs(x.graceRemainingMs,x.graceRemainingMin))+' para concluir ou sinalizar atraso.'; }
+function slaOpRowTime(x){ return (x.sev==='vermelho')?('Atrasada há '+slaElapsed(_slaMs(x.overdueMs,x.overdueMin))):('Faltam '+slaCount(_slaMs(x.remainingMs,x.remainingMin))); }
+function slaOpRowGrace(x){ return 'Restam '+slaCount(_slaMs(x.graceRemainingMs,x.graceRemainingMin))+' para concluir ou sinalizar atraso.'; }
 function slaOpRowPct(x){ if(x.sev==='vermelho') return 100; var p=(x.startMs>0&&x.finishMs>x.startMs)?Math.round((Date.now()-x.startMs)/(x.finishMs-x.startMs)*100):82; return Math.max(5,Math.min(99,p)); }
 function slaOpRowHtml(x){
   var cls=(x.sev==='vermelho')?'red':'amber';
@@ -2938,13 +2957,19 @@ function slaMonDropInner(d){
 /* min → "Xh Ym" / "Ym" (legível, p/ horizonte e métricas ao vivo do chip). */
 function slaMonDur(min){ min=Math.max(0,Math.round(min||0)); if(min<60) return min+' min'; var h=Math.floor(min/60),m=min%60; return m?(h+'h '+m+'min'):(h+'h'); }
 /* F3.3.3 (precisão): ms → "M:SS" dentro da janela (contador ao vivo, 1s); >60min cai p/ "Xh Ym". */
-function slaMMSS(ms){ ms=Math.max(0,ms||0); var s=Math.round(ms/1000); var m=Math.floor(s/60), ss=s%60; if(m<60) return m+':'+(ss<10?'0':'')+ss; var h=Math.floor(m/60),mm=m%60; return mm?(h+'h '+mm+'min'):(h+'h'); }
+function slaMMSSfmt(ms,mode){ ms=Math.max(0,ms||0); var s=(mode==='up')?Math.ceil(ms/1000):((mode==='down')?Math.floor(ms/1000):Math.round(ms/1000)); var m=Math.floor(s/60), ss=s%60; if(m<60) return m+':'+(ss<10?'0':'')+ss; var h=Math.floor(m/60),mm=m%60; return mm?(h+'h '+mm+'min'):(h+'h'); }
+function slaMMSS(ms){ return slaMMSSfmt(ms,'round'); }      /* compat */
+/* CONTAGEM REGRESSIVA (vence em / faltam / restam): ARREDONDA P/ CIMA — "30:00" no instante exato
+   do prazo-30min e só vira "29:59" 1s depois. Não adianta. */
+function slaCount(ms){ return slaMMSSfmt(ms,'up'); }
+/* TEMPO DECORRIDO (atrasada há): ARREDONDA P/ BAIXO — "0:00" no instante do prazo, "0:01" 1s após. */
+function slaElapsed(ms){ return slaMMSSfmt(ms,'down'); }
 function _slaMs(ms,minFallback){ return (ms!=null)?ms:((minFallback||0)*60000); }
 /* Status HERÓI ao vivo do chip — métrica mais crítica do momento (tempo real). */
 function slaMonStatusText(d){
   if(!d||!d.total) return d&&d.nextMs?('Próximo prazo em '+slaMonDur(d.horizonMin)):'Tudo em dia';
-  if(d.overdue.length) return 'Atraso máx. '+slaMMSS(_slaMs(d.overdue[0].overdueMs,d.overdue[0].overdueMin));
-  return 'Vence em '+slaMMSS(_slaMs(d.warning[0].remainingMs,d.warning[0].remainingMin));
+  if(d.overdue.length) return 'Atraso máx. '+slaElapsed(_slaMs(d.overdue[0].overdueMs,d.overdue[0].overdueMin));
+  return 'Vence em '+slaCount(_slaMs(d.warning[0].remainingMs,d.warning[0].remainingMin));
 }
 /* Contadores SEGMENTADOS por severidade (breakdown rico) — vermelho e/ou laranja. */
 function slaMonSegs(d){
@@ -3093,8 +3118,10 @@ function slaMonScheduleBoundary(){
   try{
     if(_slaBoundaryTimer){ clearTimeout(_slaBoundaryTimer); _slaBoundaryTimer=null; }
     var now=Date.now(), b=slaMonNextBoundary(now); if(!b) return;
-    var delay=Math.max(250, Math.min(b-now+200, 30*60000));   // dispara no limite (cap 30min)
-    _slaBoundaryTimer=setTimeout(function(){ try{ slaibRefresh(); }catch(_){} }, delay);
+    var delay=Math.max(80, Math.min(b-now+120, 30*60000));   // dispara no limite exato (cap 30min)
+    // No limite EXATO: atualiza monitor/sino/card (slaibRefresh) E dispara a NOTIFICAÇÃO (toast) —
+    // sem o notifScanSla aqui, o toast laranja só sairia no poll de 30s (até 30s atrasado).
+    _slaBoundaryTimer=setTimeout(function(){ try{ slaibRefresh(); }catch(_){} try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){} }, delay);
   }catch(_){}
 }
 /* F3.3.2 (FASE 5 — BLOQUEIO OPERACIONAL, escopo aprovado pelo owner: DESIGNER responsável;
@@ -3489,18 +3516,18 @@ function notifScanSla(){
         // LARANJA — texto canônico + prazo final/contador no contexto.
         notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
           title:(fn?fn+', ':'')+'prazo próximo', body:'Você tem 30 minutos para concluir esta tarefa.',
-          context:'Prazo final: '+pf+' · Vence em '+slaMMSS(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
+          context:'Prazo final: '+pf+' · Vence em '+slaCount(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
       } else if(d.state==='overdue'){
         if(d.critical){
           // CRÍTICO — esgotada a tolerância de 10 min.
           notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_critical', severity:'critical', sound:true,
             title:(fn?fn+', ':'')+'atraso crítico', body:'Sinalize atraso imediatamente ou conclua a tarefa.',
-            context:'Atrasada há '+slaMMSS(d.overdueMs), dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
+            context:'Atrasada há '+slaElapsed(d.overdueMs), dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
         } else {
           // VERMELHO — texto canônico + contagem regressiva (mm:ss) no contexto.
           notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_overdue', severity:'critical', sound:true,
             title:(fn?fn+', ':'')+'prazo encerrado', body:'Você tem 10 minutos para concluir esta tarefa.',
-            context:'Restam '+slaMMSS(d.graceRemainingMs)+' · atrasada há '+slaMMSS(d.overdueMs), dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
+            context:'Restam '+slaCount(d.graceRemainingMs)+' · atrasada há '+slaElapsed(d.overdueMs), dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
         }
       }
     }

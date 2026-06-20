@@ -26,8 +26,10 @@ globalThis.XMLHttpRequest = function () { throw new Error('PROVIDER-CALL-DETECTE
 // dtMs stub: "YYYY-MM-DD"+"HH:mm" → epoch ms (UTC determinístico p/ o teste).
 const dtMsStub = (d, t) => { if (!d) return 0; const [Y, Mo, Da] = String(d).split('-').map(Number); const [h, m] = String(t || '23:59').split(':').map(Number); return Date.UTC(Y, (Mo || 1) - 1, Da || 1, h || 0, m || 0); };
 
-const api = new Function(core + '\n;return { SLA_PANEL_WARN_MS, slaPanelFinishMs, slaPanelDelivered, resolveTaskDisplayState, slaPanelRow, slaPanelDerive };')();
-const { slaPanelFinishMs, resolveTaskDisplayState, slaPanelRow, slaPanelDerive, SLA_PANEL_WARN_MS } = api;
+// formatadores de contador (fora do PANEL-CORE) — extrai p/ testar precisão ceil/floor.
+const fmtBlock = (src.match(/function slaMMSSfmt\([\s\S]*?function _slaMs\([^}]*\}/) || [''])[0];
+const api = new Function(core + '\n' + fmtBlock + '\n;return { SLA_PANEL_WARN_MS, SLA_PANEL_GRACE_MS, slaPanelFinishMs, slaPanelDelivered, resolveTaskDisplayState, resolveCanonicalDeadline, slaPanelRow, slaPanelDerive, slaCount, slaElapsed, slaMMSS };')();
+const { slaPanelFinishMs, resolveTaskDisplayState, resolveCanonicalDeadline, slaPanelRow, slaPanelDerive, SLA_PANEL_WARN_MS, SLA_PANEL_GRACE_MS, slaCount, slaElapsed } = api;
 
 let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name); } };
@@ -175,6 +177,47 @@ ok('B8 Editar prazo RBAC (canSeeAll)', /canSeeAll\(state\.user\)[\s\S]{0,80}data
 // B9 — modal de editar prazo NÃO grava (sem fetch/setDoc; save bloqueado "pendente de autorização")
 { const i3 = src.indexOf('function slaEditPrazoOpen'); const seg2 = src.slice(i3, i3 + 2600);
   ok('B9 editar prazo não escreve (zero write)', i3 > 0 && !/\bfetch\b|setDoc|updateDoc|addDoc/.test(seg2) && /(aguardando autoriza|nada é gravado)/i.test(seg2)); }
+
+// ===================== PRECISÃO TEMPORAL DO ALERTA LARANJA (relógio simulado) =====================
+// Prazo final FIXO; varia-se o "agora". Fonte = designerSla.planDueAt (ms). dtMsStub não interfere.
+const FIN = NOW;                                   // prazo final = NOW (epoch ms)
+const at = (deltaMs) => resolveTaskDisplayState(withSla({ planDueAt: FIN }), FIN + deltaMs, dtMsStub);
+// 1) T-30min-1s → ainda NÃO é laranja (running/azul)
+{ const d = at(-30 * MIN - 1000); ok('P1 T-30min-1s => NÃO laranja', d.state === 'running' && d.sev === 'azul' && d.inPanel === false); }
+// 2) T-30min exato → laranja, remainingMs = 30min, contador "30:00"
+{ const d = at(-30 * MIN); ok('P2 T-30min => laranja + 30:00', d.state === 'warning' && d.sev === 'laranja' && d.remainingMs === 30 * MIN && slaCount(d.remainingMs) === '30:00'); }
+// 3) T-30min+1s → contador "29:59" (ceil: não adianta)
+{ const d = at(-30 * MIN + 1000); ok('P3 T-30min+1s => 29:59', d.state === 'warning' && slaCount(d.remainingMs) === '29:59'); }
+// 3b) +120ms (atraso real do boundary timer) ainda mostra 30:00 (ceil)
+{ const d = at(-30 * MIN + 120); ok('P3b T-30min+120ms => 30:00 (ceil)', slaCount(d.remainingMs) === '30:00'); }
+// 4) T-1s → laranja, contador "00:01"
+{ const d = at(-1000); ok('P4 T-1s => 0:01', d.state === 'warning' && slaCount(d.remainingMs) === '0:01'); }
+// 5) T exato → vermelho (overdue), laranja encerra
+{ const d = at(0); ok('P5 T => vermelho/overdue (laranja off)', d.state === 'overdue' && d.sev === 'vermelho' && d.critical === false); }
+// 6) T+10min → atraso crítico
+{ const d = at(10 * MIN); ok('P6 T+10min => crítico', d.state === 'overdue' && d.critical === true); }
+// 6b) T+10min-1s → ainda vermelho não-crítico
+{ const d = at(10 * MIN - 1000); ok('P6b T+10min-1s => vermelho não-crítico', d.state === 'overdue' && d.critical === false); }
+// 7) elapsed "atrasada há" arredonda p/ baixo (floor): em T+1s => 0:01; em T+0.4s => 0:00
+ok('P7 elapsed floor (T+1s=0:01)', slaElapsed(1000) === '0:01' && slaElapsed(400) === '0:00');
+// 7b) grace countdown ceil: 10:00 no instante do prazo
+{ const d = at(0); ok('P7b grace 10:00 no prazo (ceil)', slaCount(d.graceRemainingMs) === '10:00'); }
+// 8) prazo canônico IGUAL entre card/monitor/toast: todos derivam de resolveCanonicalDeadline/finishMs
+{ const t = withSla({ planDueAt: FIN }); const cd = resolveCanonicalDeadline(t, dtMsStub); const ds = resolveTaskDisplayState(t, FIN - MIN, dtMsStub); const r = row(t);
+  ok('P8 prazo canônico único (card=monitor=toast)', cd.plannedFinishAtMs === FIN && ds.finishMs === FIN && r.finishMs === FIN && cd.isValid === true && cd.sourceField === 'designerSla.planDueAt'); }
+// 9) fonte canônica: plannedFinishAt > planDueAt > assignment.end > due (ordem)
+{ const t = { designerSla: { plannedFinishAt: FIN + 5 * MIN, planDueAt: FIN }, designerAssignment: { designerId: 'D1', endDate: '2026-06-18', endTime: '10:00' }, dueDate: '2026-06-19', dueTime: '09:00' };
+  ok('P9 ordem da fonte (plannedFinishAt vence)', resolveCanonicalDeadline(t, dtMsStub).plannedFinishAtMs === FIN + 5 * MIN && resolveCanonicalDeadline(t, dtMsStub).sourceField === 'designerSla.plannedFinishAt'); }
+
+// ===================== VALIDAÇÃO DO FLUXO (comportamento atual == matriz ideal) =====================
+// F1 — SLA do designer só nasce APÓS envio (designerSla presente). Sem designerSla ⇒ fora do painel.
+{ const semSla = { id: 'NS', sector: 'cronograma', designerAssignment: { designerId: 'D1' }, dueDate: '2026-06-19', dueTime: '09:00' };
+  ok('F1 sem designerSla => fora do painel (SLA não nasceu)', resolveTaskDisplayState(semSla, NOW, dtMsStub).inPanel === false && row(semSla) === null); }
+// F2 — tarefa SEM designer não entra no painel mesmo com designerSla (exclusão por responsável).
+{ const semDes = { id: 'ND', sector: 'cronograma', designerSla: { planDueAt: NOW + 10 * MIN } };
+  ok('F2 sem designer => sem linha no painel', row(semDes) === null); }
+// F3 — criação inicial (planning, sem designer) não tem SLA.
+ok('F3 planning sem SLA', resolveTaskDisplayState({ id: 'PL', sector: 'cronograma' }, NOW, dtMsStub).inPanel === false);
 
 console.log('\nF3.3.2 PANEL RESULT: ' + pass + ' PASS / ' + fail + ' FAIL');
 process.exit(fail ? 1 : 0);
