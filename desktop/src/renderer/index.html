@@ -3229,7 +3229,7 @@ function notifBuildPayload(o){
     responsibleId:o.responsibleId||'', responsibleName:o.responsibleName||'', responsibleAvatar:o.responsibleAvatar||'',
     targetUserId:o.targetUserId||'',
     notificationType:o.notificationType||'', etapa:o.etapa||'', status:o.status||'',
-    title:o.title||'', body:o.body||'', context:o.context||'',
+    title:o.title||'', subtitle:o.subtitle||'', body:o.body||'', context:o.context||'',
     createdAt:o.createdAt||Date.now(),
     severity:o.severity||'info', sound:(o.sound!==false),
     action:o.action||{type:(taskId?'detail':'board'),deep:(taskId?('detail/'+taskId):'')},
@@ -3307,17 +3307,17 @@ function notifEnsureStack(){
       '.notif-stack{position:fixed;right:18px;bottom:18px;z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none}'
      +'.ntf{pointer-events:auto;width:420px;min-width:340px;max-width:94vw;transform:translateY(8px);opacity:0;transition:transform .18s ease,opacity .18s ease}'
      +'.ntf.in{transform:translateY(0);opacity:1}'
-     +'.ntf-card{position:relative;display:flex;gap:13px;align-items:flex-start;padding:14px 38px 14px 17px;border-radius:16px;cursor:pointer;background:linear-gradient(180deg,rgba(26,32,46,.99),rgba(17,22,32,.99));border:1px solid rgba(255,255,255,.10);box-shadow:0 26px 60px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.07)}'
+     +'.ntf-card{position:relative;display:flex;gap:12px;align-items:flex-start;padding:12px 34px 12px 15px;border-radius:15px;cursor:pointer;background:linear-gradient(180deg,rgba(26,32,46,.99),rgba(17,22,32,.99));border:1px solid rgba(255,255,255,.10);box-shadow:0 26px 60px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.07)}'
      +'.ntf-card::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 4px 4px 0;background:var(--nac,#5B6CFF)}'
      +'.ntf-info{--nac:#5B6CFF}.ntf-success{--nac:#2FCF8F}.ntf-warning{--nac:#F2A93B}.ntf-critical{--nac:#EF4444}'
      +'.ntf-av{flex:0 0 auto;width:44px;height:44px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(91,108,255,.45)}'
      +'.ntf-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#5B6CFF,#22D3EE);color:#fff;font-weight:800;font-size:17px}'
      +'.ntf-bd{flex:1 1 auto;min-width:0;max-height:72vh;overflow-y:auto;overflow-x:hidden}'
      +'.ntf-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}.ntf-hd b{color:#eef2f8;font-size:13.5px;font-weight:800;line-height:1.3;flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.ntf-tm{color:#8b97a8;font-size:11px;flex:0 0 auto;margin-top:1px}'
-     +'.ntf-ti{color:#cdd6e6;font-size:12.5px;font-weight:700;margin-top:3px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
-     +'.ntf-ds{color:#9fb0c8;font-size:12px;margin-top:3px;line-height:1.42;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
-     +'.ntf-ctx{color:#7f8aa0;font-size:11px;margin-top:5px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
-     +'.ntf-resp{display:flex;align-items:flex-start;gap:6px;margin-top:6px;color:#9fb0c8;font-size:11.5px;line-height:1.3}.ntf-resp span:last-child{white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntf-ti{color:#cdd6e6;font-size:12.5px;font-weight:700;margin-top:2px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntf-ds{color:#9fb0c8;font-size:12px;margin-top:2px;line-height:1.38;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntf-ctx{color:#7f8aa0;font-size:11px;margin-top:4px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
+     +'.ntf-resp{display:flex;align-items:center;gap:6px;margin-top:5px;color:#9fb0c8;font-size:11.5px;line-height:1.25}.ntf-resp span:last-child{white-space:normal;overflow-wrap:anywhere;word-break:break-word}'
      +'.ntf-resp-av{flex:0 0 auto;width:18px;height:18px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 1.5px rgba(91,108,255,.5)}'
      +'.ntf-resp-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#5B6CFF,#22D3EE);color:#fff;font-weight:800;font-size:9px}'
      +'.ntf-sev{flex:0 0 auto;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--nac) 20%,transparent);color:var(--nac)}.ntf-sev svg{width:14px;height:14px}'
@@ -3350,12 +3350,14 @@ function notifNormalize(p){
     p.actorId=actor.userId||p.actorId||''; if(actor.name)p.actorName=actor.name; if(actor.avatarUrl)p.actorAvatar=actor.avatarUrl;
     p.responsibleId=resp.userId||p.responsibleId||''; if(resp.name)p.responsibleName=resp.name; if(resp.avatarUrl)p.responsibleAvatar=resp.avatarUrl;
     p._actorIni=actor.initials; p._respIni=resp.initials;
-    // ATRIBUIÇÃO: título com o ATOR resolvido; corpo profissional (responsável vai no respRow c/ foto).
+    // ATRIBUIÇÃO: título com o ATOR; subtítulo = tarefa·cliente; responsável vai no respRow (mini-foto);
+    // etapa fica no contexto. Compacto, sem repetir o responsável nem o autor.
     if(p.eventType==='designer_assigned'||p.eventType==='task_assigned'){
       if(actor.name) p.title=actor.name+' atribuiu uma tarefa';
       else if(!p.title||/^Novo cronograma atribu/i.test(p.title)) p.title='Nova tarefa atribuída a você';
-      var linha=(p.clientName?((p.taskTitle||'Tarefa')+' — '+p.clientName):(p.taskTitle||'Tarefa'));
-      p.body=linha+'\nEtapa: '+(p.etapa||'Aguardando produção');
+      p.subtitle=(p.clientName?((p.taskTitle||'Tarefa')+' — '+p.clientName):(p.taskTitle||'Tarefa'));
+      p.body='';
+      p.context='Etapa: '+(p.etapa||'Aguardando produção');
     }
   }catch(_){}
   return p;
@@ -3378,8 +3380,10 @@ function notifShowToast(p){
     var av = primPhoto ? ('<div class="ntf-av" style="background-image:url(\''+esc(primPhoto)+'\')"></div>')
            : (primName ? ('<div class="ntf-av gen">'+esc(primIni||'?')+'</div>')
                        : ('<div class="ntf-av gen" title="Agenda ID Seven">'+(typeof svg==='function'?svg('bell'):'')+'</div>'));
-    // sub: pessoa+tarefa só p/ eventos genéricos; em atribuição/SLA o nome já está no título e o detalhe no corpo.
-    var sub=(isSla||p.eventType==='designer_assigned'||p.eventType==='task_assigned')?'':(primName?(primName+(p.taskTitle?(' · '+p.taskTitle):'')):(p.taskTitle||''));
+    var isAttr=(p.eventType==='designer_assigned'||p.eventType==='task_assigned');
+    // SUBTÍTULO compacto: usa p.subtitle quando definido (cada tipo manda só o essencial),
+    // senão cai p/ a regra antiga (pessoa·tarefa nos eventos genéricos).
+    var sub=(p.subtitle!=null)?p.subtitle:((isSla||isAttr)?'':(primName?(primName+(p.taskTitle?(' · '+p.taskTitle):'')):(p.taskTitle||'')));
     // linha do RESPONSÁVEL (com mini-foto) p/ fluxo/atribuição quando distinto do ator.
     var respRow='';
     if(!isSla && p.responsibleName && p.responsibleName!==primName){
@@ -3390,7 +3394,7 @@ function notifShowToast(p){
     el.innerHTML='<div class="ntf-card">'+av
       +'<div class="ntf-bd"><div class="ntf-hd"><b>'+esc(p.title||'')+'</b><span class="ntf-tm">'+esc(p.time||notifNowHM())+'</span></div>'
       +(sub?'<div class="ntf-ti">'+esc(sub)+'</div>':'')
-      +'<div class="ntf-ds">'+esc(p.body||'').replace(/\n/g,'<br>')+'</div>'
+      +(p.body?'<div class="ntf-ds">'+esc(p.body).replace(/\n/g,'<br>')+'</div>':'')
       +respRow
       +(p.context?'<div class="ntf-ctx">'+esc(p.context)+'</div>':'')+'</div>'
       +'<span class="ntf-sev" title="'+esc(sev)+'">'+(typeof svg==='function'?svg(icon):'')+'</span>'
@@ -3440,16 +3444,18 @@ function notifScanFlow(){
       // TIPO 2 — FLUXO é de EQUIPE: roteia p/ designer+autor+atribuído+supervisão (vê-tudo).
       var tg=resolveNotificationTargets({ eventType:ev.eventType, task:t, currentUser:state.user, currentUserCanSeeAll:seeAll });
       if(!tg.shouldNotifyCurrentUser) continue;
-      var resp=notifResponsible(t), actor=notifActor(t), etapa=notifPhaseLabel(cur), who=first(actor.name||'');
+      var resp=notifResponsible(t), actor=notifActor(t), etapa=notifPhaseLabel(cur);
+      // COMPACTO: título = etapa (ev.title); subtítulo = autor; corpo = tarefa·cliente; responsável
+      // vai no respRow (mini-foto). Sem repetir autor/responsável/etapa em várias linhas.
       notifEmit(notifBuildPayload({
         eventType:ev.eventType, taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
         actorId:actor.id, actorName:actor.name, actorAvatar:actor.avatar,
         responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
         targetUserId:state.user.id, notificationType:tg.notificationType, etapa:etapa, status:cur,
         severity:ev.severity, sound:true, title:ev.title,
-        body:(who?(who+' moveu para '+etapa):('Movido para '+etapa)),
-        context:(t.client?(t.client+' · '):'')+(resp.name?('Responsável: '+resp.name):('Etapa: '+etapa)),
-        anchor:cur, action:{type:'detail',deep:'detail/'+t.id}
+        subtitle:(actor.name||''),
+        body:(t.title||'Tarefa')+(t.client?(' — '+t.client):''),
+        context:'', anchor:cur, action:{type:'detail',deep:'detail/'+t.id}
       }));
     }
     _notifBaseline=true;
@@ -3472,27 +3478,29 @@ function notifScanSla(){
       var d=resolveTaskDisplayState(t,now,f); if(!d||!d.inPanel) continue;
       var resp=notifResponsible(t);
       var fn=first(resp.name||''), tl=(t.title||'Tarefa')+(t.client?(' — '+t.client):''), pf=slaibFmtHM(d.finishMs);
+      // COMPACTO: título personalizado; subtítulo = tarefa·cliente; corpo = SÓ a mensagem essencial;
+      // contexto = prazo/contador enxuto. (avatar = designer; sem repetição.)
       var base={ taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
         actorId:resp.id, actorName:resp.name, actorAvatar:resp.avatar,
         responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
         targetUserId:state.user.id, notificationType:'sla_personal', etapa:'SLA', status:d.state,
-        anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
+        subtitle:tl, anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
       if(d.state==='warning'){
-        // LARANJA — título personalizado + texto canônico + tarefa + prazo final (avatar = designer).
+        // LARANJA — texto canônico + prazo final/contador no contexto.
         notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
-          title:(fn?fn+', ':'')+'prazo próximo', body:'Você tem 30 minutos para concluir esta tarefa.\n'+tl+'\nPrazo final: '+pf,
-          context:(t.client?(t.client+' · '):'')+'Vence em '+slaMMSS(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
+          title:(fn?fn+', ':'')+'prazo próximo', body:'Você tem 30 minutos para concluir esta tarefa.',
+          context:'Prazo final: '+pf+' · Vence em '+slaMMSS(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
       } else if(d.state==='overdue'){
         if(d.critical){
           // CRÍTICO — esgotada a tolerância de 10 min.
           notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_critical', severity:'critical', sound:true,
-            title:(fn?fn+', ':'')+'atraso crítico', body:'Sinalize atraso imediatamente ou conclua a tarefa.\n'+tl,
-            context:(t.client?(t.client+' · '):'')+'Atrasada há '+slaMMSS(d.overdueMs), dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
+            title:(fn?fn+', ':'')+'atraso crítico', body:'Sinalize atraso imediatamente ou conclua a tarefa.',
+            context:'Atrasada há '+slaMMSS(d.overdueMs), dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
         } else {
-          // VERMELHO — título personalizado + texto canônico + tarefa + contagem regressiva (mm:ss).
+          // VERMELHO — texto canônico + contagem regressiva (mm:ss) no contexto.
           notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_overdue', severity:'critical', sound:true,
-            title:(fn?fn+', ':'')+'prazo encerrado', body:'Você tem 10 minutos para concluir esta tarefa.\n'+tl+'\nRestam '+slaMMSS(d.graceRemainingMs)+' para concluir ou sinalizar atraso.',
-            context:'Atrasada há '+slaMMSS(d.overdueMs)+' · restam '+slaMMSS(d.graceRemainingMs)+' p/ sinalizar', dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
+            title:(fn?fn+', ':'')+'prazo encerrado', body:'Você tem 10 minutos para concluir esta tarefa.',
+            context:'Restam '+slaMMSS(d.graceRemainingMs)+' · atrasada há '+slaMMSS(d.overdueMs), dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
         }
       }
     }

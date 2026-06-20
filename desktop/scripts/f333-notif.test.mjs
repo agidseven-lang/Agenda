@@ -31,8 +31,8 @@ let pass = 0, fail = 0;
 const ok = (name, cond) => { if (cond) { pass++; console.log('PASS', name); } else { fail++; console.log('FAIL', name); } };
 
 // ===================== FASE 2/3 — CONTRATO (enriquecido: ator + responsável + tipo + etapa) =====================
-const p = notifBuildPayload({ eventType: 'sla_warning', taskId: 'T1', taskTitle: 'Cronograma', clientName: 'Boa Forma', actorId: 'U9', actorName: 'Marina', actorAvatar: 'data:img', responsibleId: 'U9', responsibleName: 'Marina', responsibleAvatar: 'data:img2', notificationType: 'sla_personal', etapa: 'SLA', status: 'warning', targetUserId: 'U1', title: 'Prazo próximo', body: 'faltam 18 min', context: 'SLA', severity: 'warning', anchor: 123, action: { type: 'detail', deep: 'detail/T1' } });
-['eventId', 'eventType', 'taskId', 'taskTitle', 'clientName', 'actorId', 'actorName', 'actorAvatar', 'responsibleId', 'responsibleName', 'responsibleAvatar', 'targetUserId', 'notificationType', 'etapa', 'status', 'title', 'body', 'context', 'createdAt', 'severity', 'sound', 'action', 'dedupKey', 'source', 'providerCalled'].forEach((k) => ok('contrato tem ' + k, k in p));
+const p = notifBuildPayload({ eventType: 'sla_warning', taskId: 'T1', taskTitle: 'Cronograma', clientName: 'Boa Forma', actorId: 'U9', actorName: 'Marina', actorAvatar: 'data:img', responsibleId: 'U9', responsibleName: 'Marina', responsibleAvatar: 'data:img2', notificationType: 'sla_personal', etapa: 'SLA', status: 'warning', targetUserId: 'U1', title: 'Prazo próximo', subtitle: 'Cronograma — Boa Forma', body: 'faltam 18 min', context: 'SLA', severity: 'warning', anchor: 123, action: { type: 'detail', deep: 'detail/T1' } });
+['eventId', 'eventType', 'taskId', 'taskTitle', 'clientName', 'actorId', 'actorName', 'actorAvatar', 'responsibleId', 'responsibleName', 'responsibleAvatar', 'targetUserId', 'notificationType', 'etapa', 'status', 'title', 'subtitle', 'body', 'context', 'createdAt', 'severity', 'sound', 'action', 'dedupKey', 'source', 'providerCalled'].forEach((k) => ok('contrato tem ' + k, k in p));
 ok('providerCalled=false', p.providerCalled === false);
 ok('sound default=true', p.sound === true);
 ok('sound=false respeitado', notifBuildPayload({ eventType: 'x', sound: false }).sound === false);
@@ -170,6 +170,13 @@ ok('card: responsável SEM reticência (wrap)', /\.ntf-resp span:last-child\{[^}
 ok('card: corpo multilinha (white-space:normal + overflow-wrap)', /\.ntf-ds\{[^}]*white-space:normal[^}]*overflow-wrap:anywhere/.test(html));
 ok('card: altura máxima com scroll só em caso extremo (.ntf-bd)', /\.ntf-bd\{[^}]*max-height:72vh[^}]*overflow-y:auto/.test(html));
 ok('card: zero text-overflow:ellipsis em campos essenciais (ti/ds/ctx/resp)', !/\.ntf-ti\{[^}]*text-overflow:ellipsis/.test(html) && !/\.ntf-ds\{[^}]*text-overflow:ellipsis/.test(html));
+// FASE (compactar sem cortar) — subtítulo dedicado + remoção de redundância
+ok('compacto: contrato tem subtitle', /subtitle:o\.subtitle/.test(html));
+ok('compacto: toast usa p.subtitle (linha enxuta)', /p\.subtitle!=null/.test(html) && /\(sub\?'<div class="ntf-ti">/.test(html));
+ok('compacto: corpo do toast é condicional (sem div vazio)', /p\.body\?'<div class="ntf-ds">/.test(html));
+ok('compacto: SLA laranja corpo = só a mensagem (tarefa vai no subtítulo)', /body:'Você tem 30 minutos para concluir esta tarefa\.',/.test(html) && /subtitle:tl/.test(html));
+ok('compacto: fluxo sem "Responsável" duplicado no contexto (vai no respRow)', /subtitle:\(actor\.name\|\|''\)/.test(html) && /context:'', anchor:cur/.test(html));
+ok('compacto: atribuição etapa no contexto + subtítulo tarefa·cliente', /p\.subtitle=\(p\.clientName\?/.test(html) && /p\.context='Etapa: '/.test(html));
 // FASE 3 — notifier do main entrega IDs p/ o renderer resolver foto/nome reais
 ok('notifier: designer_assigned entrega actorId(assignedBy)+responsibleId(designerId)', /actorId: da\.assignedBy/.test(notifierTs) && /responsibleId: da\.designerId/.test(notifierTs));
 ok('notifier: designer_assigned entrega foto denormalizada do designer', /responsibleAvatar: da\.designerAvatar/.test(notifierTs));
