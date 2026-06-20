@@ -69,6 +69,68 @@
       "scrolls": true
     }
   },
+  "tall": {
+    "1366x768": {
+      "ok": true,
+      "cardH": 863,
+      "bodyH": 429,
+      "fitsWhole": false,
+      "overflowPx": 434,
+      "compressed": false,
+      "topVisible": true,
+      "bottomVisible": true,
+      "addNotOverlap": true,
+      "addVisible": true,
+      "colInViewport": true,
+      "columnScrolls": true,
+      "hasThemes": true,
+      "themeCount": 5,
+      "hasDate": true,
+      "hasStage": true,
+      "hasActions": true,
+      "avatarReal": true
+    },
+    "1280x720": {
+      "ok": true,
+      "cardH": 945,
+      "bodyH": 399,
+      "fitsWhole": false,
+      "overflowPx": 546,
+      "compressed": false,
+      "topVisible": true,
+      "bottomVisible": true,
+      "addNotOverlap": true,
+      "addVisible": true,
+      "colInViewport": true,
+      "columnScrolls": true,
+      "hasThemes": true,
+      "themeCount": 5,
+      "hasDate": true,
+      "hasStage": true,
+      "hasActions": true,
+      "avatarReal": true
+    },
+    "1366x680": {
+      "ok": true,
+      "cardH": 863,
+      "bodyH": 359,
+      "fitsWhole": false,
+      "overflowPx": 504,
+      "compressed": false,
+      "topVisible": true,
+      "bottomVisible": true,
+      "addNotOverlap": true,
+      "addVisible": true,
+      "colInViewport": true,
+      "columnScrolls": true,
+      "hasThemes": true,
+      "themeCount": 5,
+      "hasDate": true,
+      "hasStage": true,
+      "hasActions": true,
+      "avatarReal": true
+    }
+  },
   "card": {
     "found": {
       "compressed": false,
