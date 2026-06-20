@@ -541,18 +541,19 @@ const notifDetect = await page.evaluate(() => {
 const flowDetect = await page.evaluate(async () => {
   const designer = { id: 'dz1', name: 'Marina Alves', role: 'Designer' };
   state.users = [designer]; state.user = designer;
-  const t = { id: 'flowt', title: 'Cronograma X', client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', designerAssignment: { designerId: 'dz1' }, designerFlowStatus: 'andamento' };
-  state.tasks = [t];
+  // CRONOGRAMA: produção → revisão (fluxo do designer). Conclusão de cronograma = aprovação
+  // final do cliente (regra canônica), então a CONCLUSÃO é testada numa tarefa NÃO-cronograma.
+  const tc = { id: 'flowc', title: 'Cronograma X', client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', designerAssignment: { designerId: 'dz1' }, designerFlowStatus: 'andamento' };
+  const tn = { id: 'flown', title: 'Arte avulsa', client: 'Clínica Vita', sector: 'design', status: 'andamento', assigneeId: 'dz1' };
+  state.tasks = [tc, tn];
   try { localStorage.removeItem('idseven.notif.seen.v1'); } catch (_) {}
   if (window.__notifResetFlow) window.__notifResetFlow();
   window.__notifSuppress = false; window.__notifCapture = [];
   window.notifScanFlow(); // baseline (não notifica histórico)
   const baseline = (window.__notifCapture || []).length;
-  // transição real de status: produção → revisão
-  t.designerFlowStatus = 'revisao'; window.__notifCapture = []; window.notifScanFlow();
+  tc.designerFlowStatus = 'revisao'; window.__notifCapture = []; window.notifScanFlow();
   const review = (window.__notifCapture || []).map((c) => c.eventType);
-  // transição: conclusão
-  t.status = 'concluido'; t.designerFlowStatus = 'entregue'; window.__notifCapture = []; window.notifScanFlow();
+  tn.status = 'concluido'; window.__notifCapture = []; window.notifScanFlow();   // conclusão (não-cronograma)
   const done = (window.__notifCapture || []).map((c) => c.eventType);
   try { const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; } catch (_) {}
   window.__notifSuppress = true; window.__notifCapture = null;
