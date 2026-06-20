@@ -99,6 +99,13 @@ ok('renderer: clique abre tarefa (detail/ via openDetails)', /function notifRout
 ok('renderer: recebe toast do hub (onNotifToast)', /onNotifToast/.test(html));
 ok('renderer: contrato providerCalled=false', /providerCalled:false/.test(html));
 ok('renderer: NÃO chama provider real na emissão', !/sendWhatsApp|sendFcm|webpush|pushManager/i.test(core));
+// F3.3.3 (reteste) — precisão de contador + textos canônicos + dedup pós-entrega
+ok('renderer: contador mm:ss (slaMMSS) + ms brutos no estado', /function slaMMSS\(/.test(html) && /remainingMs:/.test(html) && /overdueMs:/.test(html) && /graceRemainingMs:/.test(html));
+ok('renderer: notif laranja texto canônico', /Você tem 30 minutos para concluir esta tarefa\./.test(html));
+ok('renderer: notif vermelha texto canônico', /Você tem 10 minutos para concluir esta tarefa\./.test(html));
+ok('renderer: notif crítica texto canônico', /Sinalize atraso imediatamente ou conclua a tarefa\./.test(html));
+ok('renderer: dedup marcado APÓS entregar (reentrega em falha transitória)', /if\(delivered\) notifSeenMark\(key\)/.test(html));
+ok('renderer: contador ao vivo no Monitor usa mm:ss', /slaMMSS\(_slaMs\(/.test(html));
 
 // ===================== não regrediu o aprovado (F3.3.2) =====================
 ok('preservado: card Kanban Opção 2 (themes-list rola)', /kbv2-themes-list/.test(html) && /CARD-FIT-NOTEBOOK/.test(html));

@@ -504,13 +504,69 @@ const toastClick = await page.evaluate(async () => {
 await page.evaluate(() => { const m = document.querySelector('.det-sheet'); if (m) { try { closeDetails && closeDetails(); } catch (_) {} const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); } });
 await clearToasts();
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, errors }, null, 2));
+// ===================== F3.3.3 — DETECÇÃO REAL (laranja/vermelho/crítico/dedup/usuário) =====================
+// Reproduz o reteste: tarefas do designer logado em warning/overdue/critical → notifScanSla detecta
+// e EMITE (espião __notifCapture). Prova: vermelho dispara, textos canônicos, severidade, dedup, escopo.
+const notifDetect = await page.evaluate(() => {
+  const NOW = Date.now(), MIN = 60000, AV = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const designer = { id: 'dz1', name: 'Marina Alves', role: 'Designer', photo: AV }; const owner = { id: 'owner', name: 'Owner Admin', admin: true };
+  state.users = [designer, owner]; state.user = designer;
+  const mk = (id, off, extra) => Object.assign({ id, title: 'Tarefa ' + id, client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', designerAssignment: { designerId: 'dz1' }, designerFlowStatus: 'andamento', designerSla: { planStartAt: NOW - 120 * MIN, planDueAt: NOW + off * MIN } }, extra || {});
+  const warn = mk('warn', 18), over = mk('over', -3), crit = mk('crit', -15);
+  const other = Object.assign(mk('other', -3), { assigneeId: 'zzz', designerAssignment: { designerId: 'zzz' } }); // NÃO é do dz1
+  state.tasks = [warn, over, crit, other];
+  try { localStorage.removeItem('idseven.notif.seen.v1'); } catch (_) {}
+  window.__notifSuppress = false; window.__notifCapture = [];
+  window.notifScanSla();
+  const caps = (window.__notifCapture || []).slice();
+  window.__notifCapture = []; window.notifScanSla(); // 2º scan: dedup deve bloquear
+  const second = (window.__notifCapture || []).slice();
+  const by = (t) => caps.find((c) => c.eventType === t) || null;
+  const w = by('sla_warning'), o = by('sla_overdue'), c = by('sla_critical');
+  try { const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; } catch (_) {}
+  window.__notifSuppress = true; window.__notifCapture = null;
+  return {
+    warningFired: !!w, overdueFired: !!o, criticalFired: !!c,
+    warningText: w && w.body, overdueText: o && o.body, criticalText: c && c.body,
+    warningCtx: w && w.context, overdueCtx: o && o.context,
+    overdueSev: o && o.severity, criticalSev: c && c.severity, warningSev: w && w.severity,
+    overdueOpensTask: !!(o && o.action && o.action.deep === 'detail/over'),
+    overdueHasAvatar: !!(o && o.actorAvatar), overdueHasUser: !!(o && o.actorName),
+    noWrongUser: !caps.some((c) => c.taskId === 'other'),
+    dedupBlocksSecond: second.length === 0,
+    firstCount: caps.length,
+  };
+});
+// flow/status real (diff de fase canônica → emite). Baseline silenciosa + transição = dispara.
+const flowDetect = await page.evaluate(async () => {
+  const designer = { id: 'dz1', name: 'Marina Alves', role: 'Designer' };
+  state.users = [designer]; state.user = designer;
+  const t = { id: 'flowt', title: 'Cronograma X', client: 'Boa Forma', sector: 'cronograma', status: 'andamento', assigneeId: 'dz1', designerAssignment: { designerId: 'dz1' }, designerFlowStatus: 'andamento' };
+  state.tasks = [t];
+  try { localStorage.removeItem('idseven.notif.seen.v1'); } catch (_) {}
+  if (window.__notifResetFlow) window.__notifResetFlow();
+  window.__notifSuppress = false; window.__notifCapture = [];
+  window.notifScanFlow(); // baseline (não notifica histórico)
+  const baseline = (window.__notifCapture || []).length;
+  // transição real de status: produção → revisão
+  t.designerFlowStatus = 'revisao'; window.__notifCapture = []; window.notifScanFlow();
+  const review = (window.__notifCapture || []).map((c) => c.eventType);
+  // transição: conclusão
+  t.status = 'concluido'; t.designerFlowStatus = 'entregue'; window.__notifCapture = []; window.notifScanFlow();
+  const done = (window.__notifCapture || []).map((c) => c.eventType);
+  try { const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; } catch (_) {}
+  window.__notifSuppress = true; window.__notifCapture = null;
+  return { baselineSilent: baseline === 0, reviewFired: review.includes('flow_in_review'), completedFired: done.includes('flow_completed') };
+});
+
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, errors }, null, 2));
 console.log('FLICKER:', JSON.stringify(flicker)); console.log('NOTIF:', JSON.stringify(notif));
 console.log('TALL:', JSON.stringify(tall));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
 console.log('CARD:', JSON.stringify(card)); console.log('CONSIST:', JSON.stringify(consist)); console.log('ORANGE:', JSON.stringify(orangeImmediate)); console.log('BLOCK:', JSON.stringify(block));
 console.log('DETAIL:', JSON.stringify(detail)); console.log('EDIT:', JSON.stringify(editPrazo)); console.log('RBAC:', JSON.stringify(rbac)); console.log('HEADER:', JSON.stringify(header));
 console.log('TOAST:', JSON.stringify(toast)); console.log('TOASTCLICK:', JSON.stringify(toastClick));
+console.log('NOTIFDETECT:', JSON.stringify(notifDetect)); console.log('FLOWDETECT:', JSON.stringify(flowDetect));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
 await browser.close(); server.close();
 
@@ -612,6 +668,23 @@ if (!toast.hasClose) fail.push('toastClose falhou (sem botão fechar)');
 if (!toast.capped) fail.push('toastStackCapped falhou (stack > 4 — poluindo a tela)');
 for (const s of ['info', 'success', 'warning', 'critical']) if (!toast.severities.includes(s)) fail.push('toastSeverity ' + s + ' ausente no stack');
 if (!toastClick.clicked || !toastClick.openedDetail) fail.push('toastClickOpensTask falhou (clique não abriu o detalhe)');
+// F3.3.3 — DETECÇÃO real de SLA (o vermelho do reteste) + dedup + escopo + textos canônicos
+if (!notifDetect.warningFired) fail.push('orangeDesktopNotificationWorks falhou (laranja não detectado)');
+if (!notifDetect.overdueFired) fail.push('redDesktopNotificationWorks falhou (VERMELHO não detectado)');
+if (!notifDetect.criticalFired) fail.push('redCriticalNotificationWorks falhou (crítico não detectado)');
+if (!/30 minutos/.test(notifDetect.warningText || '')) fail.push('orangeText30 falhou (texto canônico ausente)');
+if (!/10 minutos/.test(notifDetect.overdueText || '')) fail.push('redText10 falhou (texto canônico ausente)');
+if (!/(\d+:\d{2})/.test(notifDetect.overdueCtx || '')) fail.push('redGraceCountdownVisible falhou (sem contador mm:ss)');
+if (notifDetect.overdueSev !== 'critical' || notifDetect.warningSev !== 'warning') fail.push('notifSeverity falhou (laranja=warning, vermelho=critical)');
+if (!notifDetect.overdueHasAvatar) fail.push('notificationHasAvatar falhou (SLA)');
+if (!notifDetect.overdueHasUser) fail.push('notificationHasUserName falhou (SLA)');
+if (!notifDetect.overdueOpensTask) fail.push('notificationOpensTask falhou (deep detail ausente)');
+if (!notifDetect.noWrongUser) fail.push('notifWrongUser falhou (notificou tarefa de outro usuário)');
+if (!notifDetect.dedupBlocksSecond) fail.push('noDuplicateNotifications falhou (2º scan repetiu)');
+// fluxo/status em tempo real
+if (!flowDetect.baselineSilent) fail.push('flowBaselineSilent falhou (1ª carga gerou avalanche)');
+if (!flowDetect.reviewFired) fail.push('flowStatusNotificationWorks falhou (transição p/ revisão não disparou)');
+if (!flowDetect.completedFired) fail.push('flowCompletedNotificationWorks falhou (conclusão não disparou)');
 
 if (fail.length) { console.error('::error::QA F3.3.2 FALHOU: ' + fail.join(' | ')); process.exit(1); }
 console.log('QA F3.3.2 OK — login sem widgets; coluna multi-card sem corte (1366/1600); avatar real; widget verde/laranja/vermelho com janela 10min + crítico; status/fuso coerentes; laranja imediato; header cluster alinhado; Editar prazo RBAC honesto.');

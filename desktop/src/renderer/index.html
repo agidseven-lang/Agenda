@@ -2612,19 +2612,20 @@ function resolveTaskDisplayState(t,now,dtMsFn){
   now=now||Date.now();
   var hasSla=!!(t&&t.designerSla);
   var finishMs=slaPanelFinishMs(t,dtMsFn)||0;
-  if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,label:'Concluído',remainingMin:0,overdueMin:0,graceRemainingMin:0,critical:false,hasSla:hasSla,inPanel:false};
-  if(!hasSla||!finishMs)   return {sev:'neutro',state:'none',finishMs:finishMs,label:'',remainingMin:0,overdueMin:0,graceRemainingMin:0,critical:false,hasSla:hasSla,inPanel:false};
+  if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,label:'Concluído',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
+  if(!hasSla||!finishMs)   return {sev:'neutro',state:'none',finishMs:finishMs,label:'',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(now>=finishMs){ var over=Math.max(1,Math.round((now-finishMs)/60000));
     // F3.3.2 (regra operacional do owner): após o prazo final há uma JANELA DE TOLERÂNCIA de
     // 10 min p/ concluir ou sinalizar atraso; passados os 10 min ⇒ atraso crítico (read-only,
     // sem escalonamento/push real nesta fase).
+    // F3.3.3 (precisão): além dos minutos arredondados, exponho os ms BRUTOS p/ contador mm:ss.
     var graceLeft=Math.max(0,Math.round((finishMs+SLA_PANEL_GRACE_MS-now)/60000));
     var critical=(now>=finishMs+SLA_PANEL_GRACE_MS);
-    return {sev:'vermelho',state:'overdue',finishMs:finishMs,label:'Prazo encerrado',remainingMin:0,overdueMin:over,graceRemainingMin:graceLeft,critical:critical,hasSla:true,inPanel:true}; }
+    return {sev:'vermelho',state:'overdue',finishMs:finishMs,label:'Prazo encerrado',remainingMin:0,overdueMin:over,graceRemainingMin:graceLeft,remainingMs:0,overdueMs:(now-finishMs),graceRemainingMs:Math.max(0,finishMs+SLA_PANEL_GRACE_MS-now),critical:critical,hasSla:true,inPanel:true}; }
   if(now>=finishMs-SLA_PANEL_WARN_MS){ var left=Math.max(1,Math.round((finishMs-now)/60000));
-    return {sev:'laranja',state:'warning',finishMs:finishMs,label:'Prazo próximo',remainingMin:left,overdueMin:0,graceRemainingMin:0,critical:false,hasSla:true,inPanel:true}; }
+    return {sev:'laranja',state:'warning',finishMs:finishMs,label:'Prazo próximo',remainingMin:left,overdueMin:0,graceRemainingMin:0,remainingMs:Math.max(0,finishMs-now),overdueMs:0,graceRemainingMs:0,critical:false,hasSla:true,inPanel:true}; }
   var rem=Math.max(1,Math.round((finishMs-now)/60000));
-  return {sev:'azul',state:'running',finishMs:finishMs,label:'Em prazo',remainingMin:rem,overdueMin:0,graceRemainingMin:0,critical:false,hasSla:true,inPanel:false};
+  return {sev:'azul',state:'running',finishMs:finishMs,label:'Em prazo',remainingMin:rem,overdueMin:0,graceRemainingMin:0,remainingMs:Math.max(0,finishMs-now),overdueMs:0,graceRemainingMs:0,critical:false,hasSla:true,inPanel:false};
 }
 function slaPanelRow(t,now,dtMsFn){
   if(!t) return null;
@@ -2638,7 +2639,8 @@ function slaPanelRow(t,now,dtMsFn){
   if(!d.inPanel) return null;                       // entregue/dentro do prazo/sem prazo → fora do painel
   var startMs=Number(t.designerSla&&t.designerSla.planStartAt)||0;   // p/ a barra de progresso de tempo
   return {taskId:t.id,sev:d.sev,bucket:(d.sev==='vermelho'?'overdue':'warning'),finishMs:d.finishMs,startMs:startMs,
-          overdueMin:d.overdueMin,remainingMin:d.remainingMin,graceRemainingMin:d.graceRemainingMin,critical:d.critical,
+          overdueMin:d.overdueMin,remainingMin:d.remainingMin,graceRemainingMin:d.graceRemainingMin,
+          remainingMs:d.remainingMs,overdueMs:d.overdueMs,graceRemainingMs:d.graceRemainingMs,critical:d.critical,
           title:t.title||'',client:t.client||'',designerId:designerId};
 }
 function slaPanelDerive(tasks,now,dtMsFn){
@@ -2880,8 +2882,8 @@ var SLAOP_ALERT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 var SLAOP_SHIELD_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>';
 function slaOpName(id){ if(!id) return '—'; var u=(state.users||[]).find(function(x){return x&&x.id===id;}); var n=((u&&(u.name||u.displayName))||'').trim(); return n?slaibEsc(n.split(' ')[0]):'—'; }
 var slaMonOpen=false;  // estado do dropdown do widget (persiste entre refreshes do ticker)
-function slaOpRowTime(x){ return (x.sev==='vermelho')?('Atrasada há '+slaMonDur(x.overdueMin)):('Faltam '+slaMonDur(x.remainingMin)); }
-function slaOpRowGrace(x){ return 'Restam '+slaMonDur(x.graceRemainingMin)+' para concluir ou sinalizar atraso.'; }
+function slaOpRowTime(x){ return (x.sev==='vermelho')?('Atrasada há '+slaMMSS(_slaMs(x.overdueMs,x.overdueMin))):('Faltam '+slaMMSS(_slaMs(x.remainingMs,x.remainingMin))); }
+function slaOpRowGrace(x){ return 'Restam '+slaMMSS(_slaMs(x.graceRemainingMs,x.graceRemainingMin))+' para concluir ou sinalizar atraso.'; }
 function slaOpRowPct(x){ if(x.sev==='vermelho') return 100; var p=(x.startMs>0&&x.finishMs>x.startMs)?Math.round((Date.now()-x.startMs)/(x.finishMs-x.startMs)*100):82; return Math.max(5,Math.min(99,p)); }
 function slaOpRowHtml(x){
   var cls=(x.sev==='vermelho')?'red':'amber';
@@ -2935,11 +2937,14 @@ function slaMonDropInner(d){
 }
 /* min → "Xh Ym" / "Ym" (legível, p/ horizonte e métricas ao vivo do chip). */
 function slaMonDur(min){ min=Math.max(0,Math.round(min||0)); if(min<60) return min+' min'; var h=Math.floor(min/60),m=min%60; return m?(h+'h '+m+'min'):(h+'h'); }
+/* F3.3.3 (precisão): ms → "M:SS" dentro da janela (contador ao vivo, 1s); >60min cai p/ "Xh Ym". */
+function slaMMSS(ms){ ms=Math.max(0,ms||0); var s=Math.round(ms/1000); var m=Math.floor(s/60), ss=s%60; if(m<60) return m+':'+(ss<10?'0':'')+ss; var h=Math.floor(m/60),mm=m%60; return mm?(h+'h '+mm+'min'):(h+'h'); }
+function _slaMs(ms,minFallback){ return (ms!=null)?ms:((minFallback||0)*60000); }
 /* Status HERÓI ao vivo do chip — métrica mais crítica do momento (tempo real). */
 function slaMonStatusText(d){
   if(!d||!d.total) return d&&d.nextMs?('Próximo prazo em '+slaMonDur(d.horizonMin)):'Tudo em dia';
-  if(d.overdue.length) return 'Atraso máx. '+slaMonDur(d.overdue[0].overdueMin);
-  return 'Vence em '+slaMonDur(d.warning[0].remainingMin);
+  if(d.overdue.length) return 'Atraso máx. '+slaMMSS(_slaMs(d.overdue[0].overdueMs,d.overdue[0].overdueMin));
+  return 'Vence em '+slaMMSS(_slaMs(d.warning[0].remainingMs,d.warning[0].remainingMin));
 }
 /* Contadores SEGMENTADOS por severidade (breakdown rico) — vermelho e/ou laranja. */
 function slaMonSegs(d){
@@ -3279,10 +3284,13 @@ function notifEmit(p){
   try{
     if(window.__notifSuppress) return;   /* QA: silencia a auto-detecção; o toast direto segue funcionando */
     if(!p) return; var key=p.dedupKey||p.eventId; if(!key) return;
-    if(notifSeenHas(key)) return; notifSeenMark(key);
+    if(notifSeenHas(key)) return;
+    var delivered=false;
     var api=window.desktopAPI;
-    if(api&&typeof api.notify==='function'){ try{ api.notify(p); return; }catch(_){} }
-    notifShowToast(p);   // sem Electron (navegador/QA)
+    if(api&&typeof api.notify==='function'){ try{ api.notify(p); delivered=true; }catch(_){ delivered=false; } }
+    if(!delivered){ try{ notifShowToast(p); delivered=true; }catch(_){ delivered=false; } }   // sem Electron (navegador/QA)
+    if(delivered) notifSeenMark(key);    // só dedup APÓS entregar — falha transitória reentrega no próximo tick
+    try{ if(window.__notifCapture) window.__notifCapture.push(p); }catch(_){}   // QA: espião de detecção
   }catch(_){}
 }
 
@@ -3333,18 +3341,21 @@ function notifScanSla(){
         actorName:(resp&&resp.name)||'', actorAvatar:(resp?photoOf(resp):''),
         targetUserId:state.user.id, anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
       if(d.state==='warning'){
+        // LARANJA — texto canônico do owner + contador mm:ss (snapshot no disparo).
         notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
-          title:'Prazo próximo', body:(t.client?(t.client+' — '):'')+(t.title||'Tarefa')+': faltam '+d.remainingMin+' min.',
-          context:'SLA do designer', dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
+          title:'Prazo próximo', body:'Você tem 30 minutos para concluir esta tarefa.',
+          context:(t.client?(t.client+' · '):'')+'Vence em '+slaMMSS(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
       } else if(d.state==='overdue'){
         if(d.critical){
+          // CRÍTICO — esgotada a tolerância de 10 min.
           notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_critical', severity:'critical', sound:true,
-            title:'Atraso crítico', body:(t.client?(t.client+' — '):'')+(t.title||'Tarefa')+': sinalize o atraso imediatamente.',
-            context:'SLA do designer · crítico', dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
+            title:'Atraso crítico', body:'Sinalize atraso imediatamente ou conclua a tarefa.',
+            context:(t.client?(t.client+' · '):'')+'Atrasada há '+slaMMSS(d.overdueMs), dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
         } else {
+          // VERMELHO — texto canônico + atraso real + contagem regressiva da tolerância (mm:ss).
           notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_overdue', severity:'critical', sound:true,
-            title:'Prazo encerrado', body:(t.client?(t.client+' — '):'')+(t.title||'Tarefa')+': atrasada há '+d.overdueMin+' min ('+d.graceRemainingMin+' min p/ sinalizar).',
-            context:'SLA do designer', dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
+            title:'Prazo encerrado', body:'Você tem 10 minutos para concluir esta tarefa.',
+            context:'Atrasada há '+slaMMSS(d.overdueMs)+' · restam '+slaMMSS(d.graceRemainingMs)+' p/ sinalizar', dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
         }
       }
     }
@@ -3366,7 +3377,7 @@ try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} },30000); }catch(_
 /* receber TOAST do HUB do main (janela focada/visível) */
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifShowToast(p); }); } }catch(_){}
 /* exposto p/ QA/testes (não afeta produção) */
-try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; }catch(_){}
+try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifScanFlow=notifScanFlow; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; window.__notifResetFlow=function(){ _notifPhase={}; _notifBaseline=false; _notifUid=null; }; }catch(_){}
 
 function render(){
   if(!state.user)return;
