@@ -3802,10 +3802,17 @@ const CLIENT_COLS=[
   {key:'concluido', label:'Concluído final',             color:'#10B981'},
 ];
 // Coluna do cliente: usa clientFlowStatus (gravado por Worker/Desktop); senão deriva (compat).
+/* F3.3.4 (item A) — FONTE ÚNICA read-side de CONCLUSÃO. Predicado canônico: aprovação FINAL do
+   cliente é a ÚNICA conclusão. Campo a campo IDÊNTICO à regra que estava inline em
+   flowCompletedSignal e em clientCol (equivalência provada no teste f334b). Read-only: não grava.
+   OBS: isFullyComplete NÃO é roteado por aqui — tem guardas duras + subconjunto de campos
+   (não é equivalente); mantido como está p/ não mudar comportamento aprovado. */
+function isTaskCompleted(t){
+  return !!(t&&(t.finalApprovalCompleted===true||t.clientApprovedFlag===true||t.operationalStatus==='concluido'||t.cronStatus==='aprovado_final'||t.clientFlowStatus==='concluido'));
+}
 function clientCol(t){
-  // Fase Produção 1 — D2: aprovação FINAL do cliente é a ÚNICA conclusão (mesma regra canônica de
-  // COMPLETED do Flow Engine; inline p/ manter clientCol pura e avaliável no sandbox do e2e).
-  if(t&&(t.finalApprovalCompleted===true||t.clientApprovedFlag===true||t.operationalStatus==='concluido'||t.cronStatus==='aprovado_final'||t.clientFlowStatus==='concluido'))return 'concluido';
+  // Conclusão = FONTE ÚNICA isTaskCompleted (mesma regra canônica; antes era inline aqui).
+  if(isTaskCompleted(t))return 'concluido';
   const v=(t&&t.clientFlowStatus||'').toString();
   if(CLIENT_COLS.some(c=>c.key===v)){
     // 'concluido' explícito só vale se o fluxo realmente encerrou; senão ainda é reenvio/aprov. final.
@@ -3929,7 +3936,8 @@ function socialUsers(){return state.users.filter(u=>u&&!['pendente','removido','
 // Coluna do quadro da Social Media: cronograma deriva do eixo do cliente; demais usam status.
 function socialCol(t){
   // Fase Produção 1 — D2: conclusão final canônica reflete imediatamente na coluna da Social.
-  if(t&&(t.finalApprovalCompleted===true||t.clientApprovedFlag===true||t.operationalStatus==='concluido'||t.cronStatus==='aprovado_final'||t.clientFlowStatus==='concluido'))return 'concluido';
+  // F3.3.4 item A: FONTE ÚNICA isTaskCompleted (regra idêntica; antes era inline aqui).
+  if(isTaskCompleted(t))return 'concluido';
   if(secOf(t.sector).key==='cronograma'){const c=clientCol(t);
     if(c==='concluido')return 'concluido';if(c==='revisao')return 'revisao';if(c==='afazer')return 'afazer';
     return 'andamento';}                 // enviado/aprovado/producao/reenviado = em andamento (produzindo/acompanhando)
@@ -4602,7 +4610,7 @@ const TASK_PHASE={
   COMPLETED:'completed'                                // aprovação FINAL do cliente — ÚNICA conclusão
 };
 // Sinais canônicos (lêem só campos já existentes; nenhuma escrita).
-function flowCompletedSignal(t){return !!(t&&(t.finalApprovalCompleted===true||t.clientApprovedFlag===true||t.operationalStatus==='concluido'||t.cronStatus==='aprovado_final'||t.clientFlowStatus==='concluido'));}
+function flowCompletedSignal(t){return isTaskCompleted(t);}  /* F3.3.4 item A — FONTE ÚNICA (idêntico ao inline anterior) */
 function flowSentToClientSignal(t){const cs=(t&&t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||(t&&t.clientApprovalPhase==='final');}
 function flowClientChangesSignal(t){const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();return cr==='revisao'||(t&&t.clientFlowStatus==='revisao')||hasPendingItemRevision(t);}
 // FONTE ÚNICA — fase canônica da tarefa. Determinística e ORDENADA (terminal → designer).

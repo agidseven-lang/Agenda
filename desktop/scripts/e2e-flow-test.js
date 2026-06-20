@@ -424,7 +424,7 @@ check('RA_PERSONBOARD', 'Meu quadro do designer usa card KANBANBOARDV2 perspecti
       fnDecl('designerDelivered'), fnDecl('pendingLegend'), fnDecl('pendingFeed'), fnDecl('pendingStory'), fnDecl('pendingProduction'),
       // detail-hierarchy-v2: hasPendingItemRevision agora é phase-aware e depende destas:
       fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
-      fnDecl('hasPendingItemRevision'), fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'),
+      fnDecl('hasPendingItemRevision'), fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), fnDecl('operationalCol'),
       fnDecl('designerColView'), fnDecl('designerStatusView'), fnDecl('designerNextShort'),
       'return {operationalCol,designerColView,designerStatusView,designerNextShort,opColOf};'
     ].join('\n');
@@ -794,7 +794,7 @@ check('CSV_NO_OLD_BADGE', 'Nenhum badge usa mais const oc=opColOf(operationalCol
       // detail-hierarchy-v2: dependências phase-aware de hasPendingItemRevision
       fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       oneLine('hasPendingItemRevision'),
-      fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('clientStatusView'),
+      fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('clientStatusView'),
       'return {clientStatusView,operationalCol,opColOf};'
     ];
     mod=new Function(pieces.join('\n'))();
@@ -873,7 +873,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
       // detail-hierarchy-v2: dependências phase-aware de hasPendingItemRevision
       fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       oneLine('hasPendingItemRevision'),
-      fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('nextActionText'),
+      fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('nextActionText'),
       fnDecl('clientStatusView'), fnDecl('_tlEventAt'),
       (DH.match(/const TL_EVENT_LABELS=\{[\s\S]*?\n\};/)||[''])[0], fnDecl('_tlHumanLabel'),
       fnDecl('taskTimeline'),
@@ -987,7 +987,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
       fnDecl('hasDesigner'),fnDecl('designerOf'),fnDecl('designerCol'),fnDecl('designerDelivered'),
       fnDecl('pendingLegend'),fnDecl('pendingFeed'),fnDecl('pendingStory'),fnDecl('pendingProduction'),
       fnDecl('clientApprovalPhaseOf'),fnDecl('pendingClientItems'),fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
-      fnDecl('hasPendingItemRevision'),fnDecl('isFullyComplete'),fnDecl('clientCol'),
+      fnDecl('hasPendingItemRevision'),fnDecl('isFullyComplete'),fnDecl('isTaskCompleted'),fnDecl('clientCol'),
       fnDecl('clientApproved'),fnDecl('isSentToDesigner'),fnDecl('canSendToClient'),
       fnDecl('fmtDateTimeBR'),
       fnDecl('detailState'),fnDecl('detailActionsHtml'),
@@ -1470,8 +1470,12 @@ console.log(`${C.b}\n[FASE PRODUÇÃO 1] Flow Engine canônico (Social → Desig
     && /function deriveBoardColumn\(t,persp\)/.test(DH) && /function deriveTaskLabels\(t,persp\)/.test(DH));
   check('PROD1_KBV2_DELEGATES','kbv2DeriveStatus DELEGA ao Flow Engine no cronograma (fonte única do chip do topo)',
     /function kbv2DeriveStatus\(t, persp\)\{[\s\S]*?const p=deriveCanonicalPerspective\(t, persp\); return \{key:p\.key,label:p\.label,color:p\.color\};/.test(DH));
-  check('PROD1_COMPLETED_ROUTING','clientCol e socialCol respeitam o COMPLETED canônico (aprovação final do cliente → coluna concluída)',
-    (DH.match(/finalApprovalCompleted===true\|\|t\.clientApprovedFlag===true\|\|t\.operationalStatus==='concluido'\|\|t\.cronStatus==='aprovado_final'\|\|t\.clientFlowStatus==='concluido'\)\)return 'concluido';/g)||[]).length>=2);
+  check('PROD1_COMPLETED_ROUTING','clientCol e socialCol respeitam o COMPLETED canônico via FONTE ÚNICA isTaskCompleted (F3.3.4 item A)',
+    // F3.3.4 item A: a regra de conclusão foi unificada em isTaskCompleted (1 definição com os 5
+    // campos) e clientCol/socialCol/flowCompletedSignal roteiam por ela (sem cópias inline).
+    /function isTaskCompleted\(t\)\{\s*return !!\(t&&\(t\.finalApprovalCompleted===true\|\|t\.clientApprovedFlag===true\|\|t\.operationalStatus==='concluido'\|\|t\.cronStatus==='aprovado_final'\|\|t\.clientFlowStatus==='concluido'\)\);\s*\}/.test(DH)
+    && (DH.match(/if\(isTaskCompleted\(t\)\)return 'concluido';/g)||[]).length>=2
+    && /function flowCompletedSignal\(t\)\{return isTaskCompleted\(t\);\}/.test(DH));
   check('PROD1_NO_DUP_STAGE','kbv2Card NÃO renderiza mais o chip de STATUS duplicado (status só no topo; chips internos = setor/periodicidade/prioridade)',
     /D1: chip de STATUS removido do card/.test(DH) && !/stage&&!designerView\?'<span class="kbv2-chip"/.test(DH));
   const KFS=readAndroid('android-native-beta/app/src/main/java/br/com/idseven/agenda/nativebeta/domain/FlowState.kt');
@@ -1490,7 +1494,7 @@ console.log(`${C.b}\n[FASE PRODUÇÃO 1] Flow Engine canônico (Social → Desig
       fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       oneLine('hasPendingItemRevision'),
       oneLine('flowCompletedSignal'), oneLine('flowSentToClientSignal'), oneLine('flowClientChangesSignal'), oneLine('flowRole'),
-      fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('socialCol'),
+      fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), fnDecl('socialCol'),
       fnDecl('deriveCanonicalTaskState'), fnDecl('deriveCanonicalPerspective'),
       oneLine('deriveSocialPerspective'), oneLine('deriveDesignerPerspective'), oneLine('deriveClientPerspective'), oneLine('deriveBoardColumn'),
       fnDecl('deriveTaskLabels'),
