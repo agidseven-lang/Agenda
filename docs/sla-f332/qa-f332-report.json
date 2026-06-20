@@ -458,5 +458,26 @@
     "avatarRightInset": 72,
     "shiftedLeft": true
   },
+  "toast": {
+    "present": true,
+    "count": 4,
+    "capped": true,
+    "bottomRight": true,
+    "severities": [
+      "info",
+      "success",
+      "warning",
+      "critical"
+    ],
+    "withAvatar": true,
+    "avatarReal": false,
+    "hasContext": true,
+    "hasSevIcon": true,
+    "hasClose": true
+  },
+  "toastClick": {
+    "clicked": true,
+    "openedDetail": false
+  },
   "errors": []
 }
