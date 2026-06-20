@@ -13,6 +13,13 @@ const RENDER_DIR = path.resolve('desktop/src/renderer');
 const OUT = path.resolve('desktop/qa-f332-out');
 fs.mkdirSync(OUT, { recursive: true });
 const PNG1x1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+// Avatares REAIS visíveis (foto-silhueta em gradiente) p/ os prints — provam que a foto real
+// renderiza no círculo (o PNG1x1 transparente aparecia como círculo "preto"/placeholder).
+const svgAvatar = (c1, c2) => 'data:image/svg+xml;base64,' + Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c1 + '"/><stop offset="1" stop-color="' + c2 + '"/></linearGradient></defs><rect width="96" height="96" fill="url(#g)"/><circle cx="48" cy="37" r="17" fill="#ffffff" opacity="0.96"/><path d="M16 88 C16 63 80 63 80 88 Z" fill="#ffffff" opacity="0.96"/></svg>'
+).toString('base64');
+const AVA = svgAvatar('#7C5CFF', '#22D3EE'); // autor/Social — roxo→ciano
+const AVD = svgAvatar('#F2A93B', '#EF6F4E'); // designer — laranja→coral
 
 const server = http.createServer((req, res) => {
   let f = (req.url || '/').split('?')[0]; if (f === '/' || f === '') f = '/index.html';
@@ -625,8 +632,8 @@ const recipientDetect = await page.evaluate(() => {
 });
 // PRINT visual da correção: SLA do designer (avatar/nome real) + fluxo de equipe lado a lado.
 await clearToasts();
-await showToast({ severity: 'critical', notificationType: 'sla_personal', title: 'Prazo encerrado', actorName: 'Marina Alves', actorAvatar: PNG1x1, responsibleName: 'Marina Alves', responsibleAvatar: PNG1x1, taskTitle: 'Cronograma — Boa Forma', body: 'Você tem 10 minutos para concluir esta tarefa.', context: 'Boa Forma · Atrasada há 5:00 · restam 5:00 p/ sinalizar', action: { deep: 'detail/tcrit' }, sound: false });
-await showToast({ severity: 'info', notificationType: 'team_flow', title: 'Enviado para revisão', actorName: 'Marina Alves', actorAvatar: PNG1x1, responsibleName: 'Marina Alves', responsibleAvatar: PNG1x1, taskTitle: 'Cronograma fluxo — Boa Forma', body: 'Marina moveu para Em revisão', context: 'Boa Forma · Responsável: Marina Alves', action: { deep: 'detail/tflow' }, sound: false });
+await showToast({ severity: 'critical', notificationType: 'sla_personal', title: 'Miercohévisk, prazo encerrado', actorName: 'Miercohévisk Carlôto', actorAvatar: AVD, responsibleName: 'Miercohévisk Carlôto', responsibleAvatar: AVD, subtitle: 'Cronograma — Boa Forma', body: 'Você tem 10 minutos para concluir esta tarefa.', context: 'Restam 5:00 · atrasada há 5:00', action: { deep: 'detail/tcrit' }, sound: false });
+await showToast({ severity: 'info', notificationType: 'team_flow', title: 'Enviado para revisão', actorName: 'Arydyjany Carlôto', actorAvatar: AVA, responsibleName: 'Miercohévisk Carlôto', responsibleAvatar: AVD, subtitle: 'Arydyjany Carlôto', body: 'Cronograma fluxo — Boa Forma', action: { deep: 'detail/tflow' }, sound: false });
 await toastShot('f332-38-destinatario-avatar.png');
 await clearToasts();
 
@@ -692,13 +699,13 @@ const identityDetect = await page.evaluate(() => {
 });
 // PRINT visual: atribuição com foto+nome reais da Social + responsável (mini-foto); SLA do designer.
 await clearToasts();
-await page.evaluate((AV) => {
-  state.users = [{ id: 'soc1', name: 'Arydyjany Carlôto', role: 'Social Media', photo: AV }, { id: 'dz1', name: 'Miercohévisk Carlôto', role: 'Designer', photo: AV }];
-  state.user = { id: 'dz1', name: 'Miercohévisk Carlôto', role: 'Designer', photo: AV };
-  state.tasks = [{ id: 'tatt', title: 'Cronograma semanal', client: 'Hospital Visão', sector: 'cronograma', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1', designerName: 'Miercohévisk Carlôto', designerAvatar: AV, assignedBy: 'soc1' } }];
+await page.evaluate(({ AVA, AVD }) => {
+  state.users = [{ id: 'soc1', name: 'Arydyjany Carlôto', role: 'Social Media', photo: AVA }, { id: 'dz1', name: 'Miercohévisk Carlôto', role: 'Designer', photo: AVD }];
+  state.user = { id: 'dz1', name: 'Miercohévisk Carlôto', role: 'Designer', photo: AVD };
+  state.tasks = [{ id: 'tatt', title: 'Cronograma semanal', client: 'Hospital Visão', sector: 'cronograma', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1', designerName: 'Miercohévisk Carlôto', designerAvatar: AVD, assignedBy: 'soc1' } }];
   window.notifShowToast({ eventType: 'designer_assigned', taskId: 'tatt', taskTitle: 'Cronograma semanal', clientName: 'Hospital Visão', actorId: 'soc1', responsibleId: 'dz1', title: 'Nova tarefa atribuida a voce', etapa: 'Aguardando produção', sound: false });
-  window.notifShowToast({ eventType: 'sla_warning', taskId: 'tatt', taskTitle: 'Cronograma semanal', clientName: 'Hospital Visão', responsibleId: 'dz1', responsibleName: 'Miercohévisk Carlôto', responsibleAvatar: AV, title: 'Miercohévisk, prazo próximo', body: 'Você tem 30 minutos para concluir esta tarefa.\nCronograma semanal — Hospital Visão\nPrazo final: 16:30', sound: false });
-}, PNG1x1);
+  window.notifShowToast({ eventType: 'sla_warning', taskId: 'tatt', taskTitle: 'Cronograma semanal', clientName: 'Hospital Visão', responsibleId: 'dz1', responsibleName: 'Miercohévisk Carlôto', responsibleAvatar: AVD, title: 'Miercohévisk, prazo próximo', subtitle: 'Cronograma semanal — Hospital Visão', body: 'Você tem 30 minutos para concluir esta tarefa.', context: 'Prazo final: 16:30 · Vence em 29:58', sound: false });
+}, { AVA, AVD });
 await toastShot('f332-39-identidade-avatar-nome.png');
 await clearToasts();
 
@@ -706,14 +713,14 @@ await clearToasts();
 // Renderiza os 5 tipos com conteúdo LONGO real (nomes/títulos/clientes compridos) e mede: largura
 // aumentada, zero reticência em campos essenciais, título em até 2 linhas, corpo/contexto/responsável
 // completos, ainda no canto inferior direito e premium.
-await page.evaluate((AV) => {
+await page.evaluate(({ AVA, AVD }) => {
   state.users = [
-    { id: 'soc1', name: 'Arydyjany Carlôto', role: 'Social Media', photo: AV },
-    { id: 'dz1', name: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', role: 'Designer', photo: AV },
+    { id: 'soc1', name: 'Arydyjany Carlôto', role: 'Social Media', photo: AVA },
+    { id: 'dz1', name: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', role: 'Designer', photo: AVD },
   ];
-  state.user = { id: 'dz1', name: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', role: 'Designer', photo: AV };
-  state.tasks = [{ id: 'tL', title: 'Cronograma semanal de conteúdo — campanha institucional de junho', client: 'Hospital Visão Oftalmologia Avançada', sector: 'cronograma', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1', designerName: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', designerAvatar: AV, assignedBy: 'soc1' } }];
-}, PNG1x1);
+  state.user = { id: 'dz1', name: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', role: 'Designer', photo: AVD };
+  state.tasks = [{ id: 'tL', title: 'Cronograma semanal de conteúdo — campanha institucional de junho', client: 'Hospital Visão Oftalmologia Avançada', sector: 'cronograma', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1', designerName: 'Miercohévisk Niheb Ferreira Nascimento Carlôto', designerAvatar: AVD, assignedBy: 'soc1' } }];
+}, { AVA, AVD });
 const TT = 'Cronograma semanal de conteúdo — campanha institucional de junho';
 const CL = 'Hospital Visão Oftalmologia Avançada';
 const TLINE = TT + ' — ' + CL;
@@ -722,9 +729,9 @@ const cardCases = [
   // atribuição: notifNormalize preenche título/subtítulo/contexto a partir dos IDs.
   { key: 'attr', shot: 'f332-40-card-atribuicao.png', p: { eventType: 'designer_assigned', taskId: 'tL', taskTitle: TT, clientName: CL, actorId: 'soc1', responsibleId: 'dz1', etapa: 'Aguardando produção', severity: 'info', sound: false } },
   // SLA (compacto): subtítulo = tarefa·cliente; corpo = SÓ a mensagem; contexto = prazo/contador.
-  { key: 'orange', shot: 'f332-41-card-laranja.png', p: { eventType: 'sla_warning', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: DZNAME, responsibleAvatar: PNG1x1, title: 'Miercohévisk, prazo próximo', subtitle: TLINE, body: 'Você tem 30 minutos para concluir esta tarefa.', context: 'Prazo final: 16:30 · Vence em 29:58', severity: 'warning', sound: false } },
-  { key: 'red', shot: 'f332-42-card-vermelho.png', p: { eventType: 'sla_overdue', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: DZNAME, responsibleAvatar: PNG1x1, title: 'Miercohévisk, prazo encerrado', subtitle: TLINE, body: 'Você tem 10 minutos para concluir esta tarefa.', context: 'Restam 9:30 · atrasada há 0:30', severity: 'critical', sound: false } },
-  { key: 'critical', shot: 'f332-43-card-critico.png', p: { eventType: 'sla_critical', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: DZNAME, responsibleAvatar: PNG1x1, title: 'Miercohévisk, atraso crítico', subtitle: TLINE, body: 'Sinalize atraso imediatamente ou conclua a tarefa.', context: 'Atrasada há 12:30', severity: 'critical', sound: false } },
+  { key: 'orange', shot: 'f332-41-card-laranja.png', p: { eventType: 'sla_warning', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: DZNAME, responsibleAvatar: AVD, title: 'Miercohévisk, prazo próximo', subtitle: TLINE, body: 'Você tem 30 minutos para concluir esta tarefa.', context: 'Prazo final: 16:30 · Vence em 29:58', severity: 'warning', sound: false } },
+  { key: 'red', shot: 'f332-42-card-vermelho.png', p: { eventType: 'sla_overdue', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: DZNAME, responsibleAvatar: AVD, title: 'Miercohévisk, prazo encerrado', subtitle: TLINE, body: 'Você tem 10 minutos para concluir esta tarefa.', context: 'Restam 9:30 · atrasada há 0:30', severity: 'critical', sound: false } },
+  { key: 'critical', shot: 'f332-43-card-critico.png', p: { eventType: 'sla_critical', taskId: 'tL', taskTitle: TT, clientName: CL, responsibleId: 'dz1', responsibleName: DZNAME, responsibleAvatar: AVD, title: 'Miercohévisk, atraso crítico', subtitle: TLINE, body: 'Sinalize atraso imediatamente ou conclua a tarefa.', context: 'Atrasada há 12:30', severity: 'critical', sound: false } },
   // fluxo (compacto): subtítulo = autor; corpo = tarefa·cliente; responsável no respRow; sem contexto.
   { key: 'flow', shot: 'f332-44-card-fluxo.png', p: { eventType: 'flow_in_review', taskId: 'tL', taskTitle: TT, clientName: CL, actorId: 'soc1', responsibleId: 'dz1', title: 'Enviado para revisão', subtitle: 'Arydyjany Carlôto', body: TLINE, context: '', etapa: 'Em revisão', severity: 'info', sound: false } },
 ];
@@ -745,6 +752,8 @@ const measure = () => page.evaluate(() => {
     ctxWS: ctx ? cs(ctx).whiteSpace : '', ctxHClip: hClip(ctx), ctxText: ctx ? ctx.textContent : '',
     respWS: resp ? cs(resp).whiteSpace : '', respHClip: hClip(resp), respText: resp ? resp.textContent : '',
     avatar: !!av, avatarReal: av ? /background-image/.test(av.getAttribute('style') || '') : false,
+    avatarGen: av ? av.classList.contains('gen') : false,
+    avatarBg: av ? (getComputedStyle(av).backgroundImage || '') : '',
     bottomRight: scs.position === 'fixed' && parseInt(scs.right) >= 0 && parseInt(scs.bottom) >= 0,
     premium: /gradient/.test(ccs.backgroundImage || '') && parseFloat(ccs.borderTopLeftRadius) >= 10 && (ccs.boxShadow || '').length > 4,
   };
@@ -771,7 +780,10 @@ const cardLayoutDetect = {
   taskContextVisible: !clm.orange.ctxHClip && !clm.red.ctxHClip && /Vence em/.test(clm.orange.ctxText || ''),
   notificationStillBottomRight: every((m) => m.bottomRight),
   notificationPremiumLayout: every((m) => m.premium && m.avatar),
+  // FOTO REAL renderizada no círculo (não placeholder): background-image carrega a imagem real.
+  notificationAvatarRealPhoto: every((m) => !m.avatarGen && /url\(.*data:image\/(svg|png|jpeg|jpg)/.test(m.avatarBg)),
   widths: all.map((m) => m.width),
+  avatarBgs: all.map((m) => (m.avatarBg || '').slice(0, 28)),
 };
 
 fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, recipientDetect, identityDetect, cardLayoutDetect, errors }, null, 2));
@@ -940,6 +952,7 @@ if (!cardLayoutDetect.slaRedMessageFullyVisible) fail.push('slaRedMessageFullyVi
 if (!cardLayoutDetect.taskContextVisible) fail.push('taskContextVisible falhou (contexto/tarefa escondido)');
 if (!cardLayoutDetect.notificationStillBottomRight) fail.push('notificationStillBottomRight falhou (saiu do canto inferior direito)');
 if (!cardLayoutDetect.notificationPremiumLayout) fail.push('notificationPremiumLayout falhou (perdeu visual premium/avatar)');
+if (!cardLayoutDetect.notificationAvatarRealPhoto) fail.push('notificationAvatarRealPhoto falhou (avatar placeholder/preto; foto real não renderizou; bgs=' + JSON.stringify(cardLayoutDetect.avatarBgs) + ')');
 // kanban/login preservados (confirmação dedicada desta fase; espelha os campos reais já medidos)
 if (!(card && card.found && !card.found.compressed)) fail.push('kanbanPreserved falhou (card do Kanban regrediu/comprimido)');
 if (login.hasBell || login.hasSlaMonitor) fail.push('loginPreserved falhou (login com sino/monitor)');
