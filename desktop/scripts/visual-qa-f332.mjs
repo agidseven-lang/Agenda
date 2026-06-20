@@ -488,7 +488,8 @@ await showToast({ severity: 'info', title: 'Cliente aprovou os temas', actorName
 await page.screenshot({ path: path.join(OUT, 'f332-37-toast-avatar.png'), clip: { x: 1040, y: 690, width: 400, height: 200 } });
 // clique no toast → abre detalhe (deep link), prova ação. Self-contained + robusto + diagnóstico.
 const toastClick = await page.evaluate(async () => {
-  const clear = () => { document.querySelectorAll('.det-sheet').forEach((m) => { const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); }); const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; };
+  // NÃO remover #modalRoot (openDetails injeta nele). Garante que exista e só esvazia.
+  const clear = () => { let mr = document.getElementById('modalRoot'); if (!mr) { mr = document.createElement('div'); mr.id = 'modalRoot'; document.body.appendChild(mr); } mr.innerHTML = ''; const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; };
   const poll = async () => { for (let i = 0; i < 18; i++) { await new Promise((r) => setTimeout(r, 90)); if (document.querySelector('.det-sheet')) return true; } return false; };
   clear();
   window.notifShowToast({ severity: 'info', title: 'Cliente aprovou os temas', actorName: 'Marina Alves', taskTitle: 'Reels de lançamento', body: 'Boa Forma — abrir tarefa', context: 'Cronograma · Boa Forma', action: { deep: 'detail/r1' }, sound: false });
