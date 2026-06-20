@@ -488,8 +488,9 @@ for (const k of Object.keys(tall)) { const t = tall[k];
   if (t.minThemeH < 24) fail.push('themeLegible falhou em ' + k + ' (tema < 24px: ' + t.minThemeH + ')');
   if (!t.hasDate) fail.push('dueDateVisible falhou em ' + k);
   if (!t.colInViewport) fail.push('columnInViewport falhou em ' + k);
-  // 1 tema nunca rola por dentro; ≤2 temas não rolam a ≥768 (cabem). 3+ temas: rolam só na caixa se preciso.
-  if (t.themesScrolls && (n === 1 || (n <= 2 && h >= 768))) fail.push('themesNoScrollWhenFits falhou em ' + k + ' (' + n + ' tema(s) não deviam rolar internamente)');
+  // 1 tema cabe inteiro SEM rolagem interna no notebook padrão (≥768). Em telas menores (720/680) e
+  // com mais temas, a caixa de temas rola por dentro ("sempre que couber") — o card segue INTEIRO.
+  if (t.themesScrolls && n === 1 && h >= 768) fail.push('themesNoScrollWhenFits falhou em ' + k + ' (1 tema deveria caber sem rolagem interna a ' + h + 'px)');
 }
 // card real
 if (!card.found) fail.push('card de cronograma não encontrado');
