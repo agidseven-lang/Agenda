@@ -67,6 +67,11 @@ data class TaskItem(
     val clientFlowStatus: String? = null,
     val designerAssignment: DesignerAssignment? = null,
     val cronContents: List<CronContent> = emptyList(),
+    // F3.3.6-C — paridade de fluxo (LEITURA aditiva; default null = dados antigos não quebram).
+    // Gravados por Desktop/Worker; o Android só LÊ (nunca grava).
+    val cronStatus: String? = null,
+    val operationalStatus: String? = null,
+    val finalApprovalCompleted: Boolean? = null,
 )
 
 // F1.1 — semente do "Enviar ao designer" (Desktop grava). Aditivo.

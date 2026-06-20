@@ -10,6 +10,8 @@ import kotlin.system.exitProcess
 class AgendaApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // F3.3.6-C — rastreio de foreground (read-side; decide banner in-app × notif de sistema).
+        try { AppForeground.register(this) } catch (e: Throwable) { Log.e(TAG, "Falha ao registrar AppForeground", e) }
         try {
             val previous = Thread.getDefaultUncaughtExceptionHandler()
             Thread.setDefaultUncaughtExceptionHandler { thread, ex ->

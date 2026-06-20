@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -52,6 +53,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import br.com.idseven.agenda.nativebeta.data.UserSession
+import br.com.idseven.agenda.nativebeta.domain.TaskPhase
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTopbar
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.features.agenda.AgendaScreen
@@ -186,6 +188,39 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         SlaInApp.items(currentUser, tasksState.itemsOrEmpty()).count { it.key !in rd }
     }
 
+    // F3.3.6-C — notificações in-app (read-side; sem push, sem escrita). Derivadas dos StateFlows.
+    var seenBump by remember { mutableStateOf(0) }
+    val tasksList = tasksState.itemsOrEmpty()
+    // SLA pessoal: SOMENTE o designer responsável. Recomputa no tick e ao marcar como visto.
+    val slaBanner = remember(tasksList, currentUser, users, slaTick, seenBump) {
+        val seen = InAppSeenStore.read(context)
+        InAppNotif.slaItems(currentUser, tasksList, users).filter { it.key !in seen }
+    }
+    // Fluxo/equipe: detecta TRANSIÇÃO de fase entre snapshots (o 1º snapshot apenas semeia → sem spam).
+    val prevPhases = remember { mutableStateOf<Map<String, TaskPhase>>(emptyMap()) }
+    val phasesSeeded = remember { mutableStateOf(false) }
+    var flowQueue by remember { mutableStateOf<List<InAppNotifItem>>(emptyList()) }
+    LaunchedEffect(tasksList, currentUser, users) {
+        val curr = InAppNotif.phaseMap(currentUser, tasksList)
+        if (phasesSeeded.value) {
+            val seen = InAppSeenStore.read(context)
+            val add = InAppNotif.flowItems(currentUser, tasksList, users, prevPhases.value).filter { it.key !in seen }
+            if (add.isNotEmpty()) flowQueue = (flowQueue + add).distinctBy { it.key }
+        } else {
+            phasesSeeded.value = true
+        }
+        prevPhases.value = curr
+    }
+    // Fila final: crítico → vermelho → SLA antes de fluxo → mais antigo primeiro.
+    val bannerItems = remember(slaBanner, flowQueue) {
+        (slaBanner + flowQueue).sortedWith(
+            compareByDescending<InAppNotifItem> { it.critical }
+                .thenByDescending { it.sev == "vermelho" }
+                .thenByDescending { it.kind == "sla" }
+                .thenBy { it.anchorMs },
+        )
+    }
+
     Scaffold(
         containerColor = Tokens.Bg,
         topBar = {
@@ -215,6 +250,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
             )
         },
     ) { padding ->
+        Box(Modifier.fillMaxSize()) {
         NavHost(nav, startDestination = "hoje", modifier = Modifier.padding(padding)) {
             composable("hoje") {
                 DashboardScreen(
@@ -316,6 +352,20 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     onChanged = { slaBump++ },
                 )
             }
+        }
+        // F3.3.6-C — banner premium in-app no TOPO (só nas abas; sobre o conteúdo). Read-side.
+        if (isTab) {
+            InAppBanner(
+                items = bannerItems,
+                onOpen = { dl -> DeepLink.pending.value = dl },
+                onSeen = { key ->
+                    InAppSeenStore.markSeen(context, key)
+                    flowQueue = flowQueue.filter { it.key != key }
+                    seenBump++
+                },
+                modifier = Modifier.align(Alignment.TopCenter).padding(padding),
+            )
+        }
         }
     }
 }

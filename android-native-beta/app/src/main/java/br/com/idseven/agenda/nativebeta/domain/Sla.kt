@@ -21,12 +21,15 @@ data class TaskDisplayState(
     val overdueMin: Long,
     val hasSla: Boolean,
     val inPanel: Boolean,     // true só p/ vermelho/laranja (entram no painel/sino)
+    val critical: Boolean = false, // F3.3.6-C — crítico VISUAL (now ≥ finish + criticalAfterMin). NÃO bloqueia.
 )
 
 object SlaContract {
     const val warnStartMin = 30
     const val warnFinishMin = 30
-    const val criticalAfterMin = 60
+    // F3.3.6-C — crítico VISUAL alinhado ao Desktop (GRACE_MS = 10min): crítico após finish + 10min.
+    // Apenas visual no mobile nesta etapa (sem hard block operacional).
+    const val criticalAfterMin = 10
 
     // Cores por severidade (idênticas ao Desktop): azul/laranja/vermelho/verde; neutro = sem chip.
     private val AZUL = Color(0xFF7FA6FF)
@@ -63,6 +66,11 @@ object SlaContract {
         val wF = warnFinishMin * 60000L
         if (nowMs >= finish) {
             val over = kotlin.math.max(1L, Math.round((nowMs - finish) / 60000.0))
+            // F3.3.6-C — crítico VISUAL após finish + criticalAfterMin (10min). Mesma severidade
+            // (vermelho) e inPanel; flag critical=true para banner/painel escalarem o visual. Sem bloqueio.
+            if (nowMs >= finish + criticalAfterMin * 60000L) {
+                return TaskDisplayState("critical", "vermelho", "Atraso crítico", finish, 0L, over, true, true, critical = true)
+            }
             return TaskDisplayState("overdue", "vermelho", "Prazo encerrado", finish, 0L, over, true, true)
         }
         if (nowMs >= finish - wF) {
@@ -80,6 +88,7 @@ object SlaContract {
         return when (d.state) {
             "completed" -> SlaLocal("completed", "verde", "Concluído", VERDE)
             "none" -> SlaLocal("invalid_or_missing", "neutro", "", NEUTRO)
+            "critical" -> SlaLocal("critical_finish", "vermelho", "Atraso crítico", VERMELHO)
             "overdue" -> SlaLocal("overdue_finish", "vermelho", "Prazo encerrado", VERMELHO)
             "warning" -> SlaLocal("warning_finish", "laranja", "Prazo próximo", LARANJA)
             else -> SlaLocal("running", "azul", "Em prazo", AZUL)

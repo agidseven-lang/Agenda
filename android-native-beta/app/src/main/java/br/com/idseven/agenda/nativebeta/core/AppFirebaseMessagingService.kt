@@ -45,10 +45,16 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
                 else -> null
             }
             // Notificação IMEDIATA: heads-up normal no canal de imediatos; toque navega direto.
-            Notifications.notify(
-                this, System.currentTimeMillis().toInt(), Notifications.CH_IMMEDIATE,
-                title, body, deepLink = deepLink, subText = subText,
-            )
+            // F3.3.6-C — sem duplicidade local+FCM: se o app está em FOREGROUND, o banner in-app
+            // (derivado do snapshot local) cobre a tarefa, então suprimimos a notificação de SISTEMA
+            // apenas para type=="task". Background/tela bloqueada mantêm a notificação de sistema.
+            val suppressForeground = AppForeground.isForeground && data["type"] == "task"
+            if (!suppressForeground) {
+                Notifications.notify(
+                    this, System.currentTimeMillis().toInt(), Notifications.CH_IMMEDIATE,
+                    title, body, deepLink = deepLink, subText = subText,
+                )
+            }
 
             // Este aparelho É o do responsável (a Function só envia ao responsável).
             // Agenda o lembrete premium de 1h aqui, cobrindo o caso de B não abrir o app

@@ -12,12 +12,12 @@ import androidx.compose.ui.graphics.Color
 // de 8 fases e deriva, por perspectiva (Social/Designer/Cliente),
 // {col, label, color, next}. Mesma fonte ÚNICA de verdade do fluxo do Desktop.
 //
-// NOTA DE PARIDADE: o TaskItem do Android NÃO carrega cronStatus /
-// finalApprovalCompleted / operationalStatus, então a distinção fina entre
-// "designer entregou (Social ainda não reenviou)" e "Social reenviou ao
-// cliente" é colapsada em AWAITING_CLIENT_APPROVAL (ambas têm
-// clientFlowStatus = "reenviado"). As perspectivas Designer/Cliente continuam
-// corretas (designer vê "Entregue"; cliente vê "Versão final disponível").
+// NOTA DE PARIDADE (F3.3.6-C): o TaskItem agora LÊ cronStatus / operationalStatus /
+// finalApprovalCompleted (aditivos, default null). Quando presentes, derivePhase separa
+// "designer entregou (Social ainda não reenviou)" de "Social reenviou ao cliente"
+// (AWAITING_CLIENT_APPROVAL via cronStatus) e reconhece a conclusão FINAL (paridade com
+// isTaskCompleted do Desktop). Sem esses campos (dados antigos), o comportamento anterior é
+// integralmente preservado (clientFlowStatus="reenviado" → AWAITING_CLIENT_APPROVAL).
 // =====================================================================
 
 enum class TaskPhase {
@@ -72,9 +72,22 @@ object FlowEngine {
         }
         val cfs = t.clientFlowStatus ?: ""
         val dfs = t.designerFlowStatus ?: ""
-        if (cfs == "concluido") return TaskPhase.COMPLETED
+        val cron = t.cronStatus ?: ""
+        val delivered = hasDesigner(t) && (dfs == "concluido" || dfs == "entregue")
+        // F3.3.6-C — usa cronStatus/operationalStatus/finalApprovalCompleted QUANDO existirem (aditivo).
+        // Sem esses campos (dados antigos), o comportamento anterior é integralmente preservado.
+        // 1) terminal — aprovação FINAL do cliente (paridade c/ isTaskCompleted do Desktop).
+        if (cfs == "concluido" || cron == "aprovado_final" ||
+            t.operationalStatus == "concluido" || t.finalApprovalCompleted == true) return TaskPhase.COMPLETED
+        // 2) cliente pediu ajuste.
         if (cfs == "revisao") return TaskPhase.CLIENT_REQUESTED_CHANGES
+        // 3) Social reenviou ao cliente — cronStatus é o sinal canônico (separa de "designer entregou").
+        if (cron == "ready_for_final_client_review" || cron == "reenviado_cliente") return TaskPhase.AWAITING_CLIENT_APPROVAL
+        // 4) designer entregou e há cronStatus que NÃO indica reenvio → entrega ainda com a Social.
+        if (delivered && cron.isNotBlank()) return TaskPhase.DESIGNER_DELIVERED
+        // 5) compat de dados antigos (sem cronStatus): clientFlowStatus="reenviado" → aguardando cliente.
         if (cfs == "reenviado") return TaskPhase.AWAITING_CLIENT_APPROVAL
+        // 6) eixo do designer.
         if (hasDesigner(t)) {
             return when (dfs) {
                 "concluido", "entregue" -> TaskPhase.DESIGNER_DELIVERED

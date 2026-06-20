@@ -51,6 +51,7 @@ data class SlaInAppItem(
 data class SlaOpRow(
     val taskId: String, val sev: String, val bucket: String, val finishMs: Long,
     val remainingMin: Long, val overdueMin: Long, val title: String, val client: String, val responsavel: String,
+    val critical: Boolean = false,
 )
 data class SlaOpData(val overdue: List<SlaOpRow>, val warning: List<SlaOpRow>, val total: Int)
 
@@ -81,7 +82,10 @@ object SlaInApp {
             if (!d.inPanel) continue                                               // só vermelho/laranja entram no sino
             val pd = d.finishMs
             val event: String; val text: String
-            if (d.sev == "vermelho") {
+            if (d.critical) {
+                event = "designer_finish_critical"
+                text = "Atraso crítico há ${d.overdueMin} min. Conclua imediatamente ou sinalize."
+            } else if (d.sev == "vermelho") {
                 event = "designer_finish_overdue"
                 text = "Prazo ultrapassado há ${d.overdueMin} min. Conclua imediatamente."
             } else {
@@ -115,7 +119,7 @@ object SlaInApp {
             val resp = users.firstOrNull { it.id == designerId }?.name?.trim()
                 ?.split(" ")?.firstOrNull()?.ifBlank { null }
                 ?: t.designerAssignment?.designerName?.trim()?.split(" ")?.firstOrNull() ?: "—"
-            rows.add(SlaOpRow(t.id, d.sev, d.bucketOf(), d.finishMs, d.remainingMin, d.overdueMin, t.title ?: t.id, t.client ?: "", resp))
+            rows.add(SlaOpRow(t.id, d.sev, d.bucketOf(), d.finishMs, d.remainingMin, d.overdueMin, t.title ?: t.id, t.client ?: "", resp, d.critical))
         }
         rows.sortWith(compareByDescending<SlaOpRow> { it.sev == "vermelho" }.thenBy { it.finishMs })
         return SlaOpData(rows.filter { it.sev == "vermelho" }, rows.filter { it.sev == "laranja" }, rows.size)
@@ -335,12 +339,15 @@ private fun OpRow(r: SlaOpRow, color: Color, onOpenTask: (String) -> Unit) {
                 color = Color(0xFF9FB0C8), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Text(
-                if (r.sev == "vermelho") "Atrasada há ${r.overdueMin} min" else "Faltam ${r.remainingMin} min",
+                if (r.critical) "Atraso crítico há ${r.overdueMin} min"
+                else if (r.sev == "vermelho") "Atrasada há ${r.overdueMin} min"
+                else "Faltam ${r.remainingMin} min",
                 color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold,
             )
             if (r.sev == "vermelho") {
                 Text(
-                    "Conclua em até 10 min ou sinalize atraso.",
+                    if (r.critical) "Atraso crítico — conclua imediatamente ou sinalize."
+                    else "Conclua em até 10 min ou sinalize atraso.",
                     color = Color(0xFFFFB0A8), fontSize = 10.5.sp, modifier = Modifier.padding(top = 1.dp),
                 )
             }

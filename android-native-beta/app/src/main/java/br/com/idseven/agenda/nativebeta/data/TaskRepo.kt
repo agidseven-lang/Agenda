@@ -93,6 +93,10 @@ object TaskRepo {
             clientFlowStatus = d.getString("clientFlowStatus"),
             designerAssignment = designerAssignment,
             cronContents = cronContents,
+            // F3.3.6-C — leitura aditiva (Desktop/Worker gravam; Android só lê). Ausentes → null.
+            cronStatus = d.getString("cronStatus"),
+            operationalStatus = d.getString("operationalStatus"),
+            finalApprovalCompleted = d.getBoolean("finalApprovalCompleted"),
         )
     }
 

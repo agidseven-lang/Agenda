@@ -82,7 +82,7 @@ countEq('TaskPhase tem exatamente 8 fases (vírgulas+última)', enumBlk,
 const dp = ktFn(SRC.flow, 'fun derivePhase(t: TaskItem): TaskPhase');
 ok('derivePhase existe', dp.length > 0);
 // ordenação determinística terminal → cliente → designer → planning
-inc('derivePhase: terminal cfs=concluido → COMPLETED', dp, 'if (cfs == "concluido") return TaskPhase.COMPLETED');
+inc('derivePhase: terminal COMPLETED (cfs concluido | cron aprovado_final | operationalStatus | finalApprovalCompleted)', dp, 'finalApprovalCompleted == true) return TaskPhase.COMPLETED');
 inc('derivePhase: cfs=revisao → CLIENT_REQUESTED_CHANGES', dp, 'if (cfs == "revisao") return TaskPhase.CLIENT_REQUESTED_CHANGES');
 inc('derivePhase: cfs=reenviado → AWAITING_CLIENT_APPROVAL', dp, 'if (cfs == "reenviado") return TaskPhase.AWAITING_CLIENT_APPROVAL');
 inc('derivePhase: designer concluido/entregue → DESIGNER_DELIVERED', dp, '"concluido", "entregue" -> TaskPhase.DESIGNER_DELIVERED');
@@ -102,20 +102,20 @@ inc('FlowEngine.derive devolve FlowState(phase, social, designer, client)', SRC.
   'return FlowState(p, socialOf(p), designerOf(p), clientOf(p))');
 
 // =============================================================================
-// FASE 1-GAP — TaskItem Android não carrega cronStatus/operationalStatus/finalApproval
-// (colapso DESIGNER_DELIVERED ↔ AWAITING_CLIENT_APPROVAL). CONGELAR como está.
+// FASE 1 — RESOLVIDO em F3.3.6-C: TaskItem agora LÊ cronStatus/operationalStatus/
+// finalApprovalCompleted (aditivo). derivePhase separa DELIVERED/AWAITING/COMPLETED.
 // =============================================================================
-hr('FASE 1-GAP — campos de fluxo ausentes no TaskItem Android (congelado)');
+hr('FASE 1 (F3.3.6-C) — campos de fluxo agora LIDOS no TaskItem Android');
 const taskItem = ctor(SRC.models, 'data class TaskItem(');
 ok('TaskItem extraído', taskItem.length > 0);
 inc('TaskItem TEM designerFlowStatus', taskItem, 'designerFlowStatus');
 inc('TaskItem TEM clientFlowStatus', taskItem, 'clientFlowStatus');
-out('GAP: TaskItem NÃO tem cronStatus', taskItem, 'cronStatus');
-out('GAP: TaskItem NÃO tem operationalStatus', taskItem, 'operationalStatus');
-out('GAP: TaskItem NÃO tem finalApprovalCompleted', taskItem, 'finalApprovalCompleted');
-out('GAP: TaskItem NÃO tem clientApprovedFlag', taskItem, 'clientApprovedFlag');
-rx('GAP documentado no cabeçalho de FlowState.kt (cronStatus/finalApproval/operationalStatus)',
-  SRC.flow, /N[ÃA]O carrega cronStatus[\s\S]*?finalApprovalCompleted[\s\S]*?operationalStatus/);
+inc('F3.3.6-C: TaskItem TEM cronStatus', taskItem, 'cronStatus');
+inc('F3.3.6-C: TaskItem TEM operationalStatus', taskItem, 'operationalStatus');
+inc('F3.3.6-C: TaskItem TEM finalApprovalCompleted', taskItem, 'finalApprovalCompleted');
+out('TaskItem segue SEM clientApprovedFlag (não incluído nesta etapa)', taskItem, 'clientApprovedFlag');
+rx('F3.3.6-C: derivePhase usa os campos novos (terminal por finalApprovalCompleted)',
+  SRC.flow, /finalApprovalCompleted == true/);
 
 // =============================================================================
 // FASE 2 — CONTRATO DE SLA (Sla.kt / SlaContract + SlaInApp.kt)
@@ -139,15 +139,17 @@ inc('resolve: janela laranja = warnFinishMin*60000', res, 'val wF = warnFinishMi
 inc('resolve: limiar vermelho em now ≥ finish', res, 'if (nowMs >= finish)');
 inc('resolve: limiar laranja em now ≥ finish - wF', res, 'if (nowMs >= finish - wF)');
 
-hr('FASE 2-GAP — Android: SEM grace, SEM crítico, SEM bloqueio (constantes mortas)');
-// criticalAfterMin/warnStartMin declarados MAS nunca referenciados (1 ocorrência cada = só a const).
-countEq('GAP: criticalAfterMin declarado e NUNCA usado no read-side', SRC.sla, /criticalAfterMin/g, 1);
-countEq('GAP: warnStartMin declarado e NUNCA usado (Android dropou "início atrasado")', SRC.sla, /warnStartMin/g, 1);
-out('GAP: resolve() NÃO tem branch "critical"', res, 'critical');
-out('GAP: resolve() NÃO tem branch de bloqueio operacional ("block")', res, 'block');
-// nota de divergência: Desktop usa GRACE_MS=10min + crítico/bloqueio; Android para em "overdue".
-ok('NOTA: Desktop crítico = finish+10min; Android criticalAfterMin=60 (const morta) — NÃO alinhar agora',
-  /criticalAfterMin = 60/.test(SRC.sla));
+hr('FASE 2 (F3.3.6-C) — crítico VISUAL finish+10min; SEM hard block; warnStartMin segue morto');
+// F3.3.6-C: criticalAfterMin agora é USADO no resolve (declaração + uso ≥ 2 ocorrências).
+ok('F3.3.6-C: criticalAfterMin agora USADO (≥2 ocorrências)', (SRC.sla.match(/criticalAfterMin/g) || []).length >= 2);
+inc('F3.3.6-C: criticalAfterMin = 10 (alinhado ao Desktop GRACE)', SRC.sla, 'const val criticalAfterMin = 10');
+inc('F3.3.6-C: resolve usa criticalAfterMin (finish + 10min)', res, 'finish + criticalAfterMin * 60000L');
+inc('F3.3.6-C: resolve TEM branch crítico (vermelho)', res, '"critical", "vermelho"');
+// warnStartMin permanece declarado e não referenciado (Android dropou "início atrasado").
+countEq('warnStartMin segue declarado e NÃO usado', SRC.sla, /warnStartMin/g, 1);
+// DECISÃO APROVADA: crítico é apenas VISUAL — resolve NÃO bloqueia (sem hard block).
+out('SEM hard block: resolve() não tem bloqueio operacional ("block")', res, 'block');
+inc('crítico flag visual em TaskDisplayState (critical: Boolean)', SRC.sla, 'val critical: Boolean');
 
 hr('FASE 2 — escopo designer (SLA pessoal só com designer) + RBAC Editar prazo');
 // SLA pessoal nasce só após atribuição ao designer (gate idêntico em items() e panel()).
@@ -159,8 +161,9 @@ inc('RBAC Editar prazo: admin pode', rbac, 'if (u.admin) return true');
 inc('RBAC Editar prazo: cargo de gestão pode', rbac, 'MANAGER_KW.any');
 inc('eventos de SLA: designer_finish_overdue', SRC.inapp, 'designer_finish_overdue');
 inc('eventos de SLA: designer_finish_warning', SRC.inapp, 'designer_finish_warning');
-// "10 min" aparece só como CÓPIA estática no painel (não é grace/bloqueio funcional).
-inc('GAP: "10 min" é só texto estático do painel (sem grace funcional)', SRC.inapp, 'Conclua em até 10 min ou sinalize atraso.');
+// F3.3.6-C: "10 min" agora é a janela de GRACE funcional (overdue 0–10min); crítico após 10min.
+inc('copy da janela de grace (overdue < 10min)', SRC.inapp, 'Conclua em até 10 min ou sinalize atraso.');
+inc('F3.3.6-C: copy crítica escalada (overdue ≥ 10min)', SRC.inapp, 'Atraso crítico — conclua imediatamente ou sinalize.');
 
 // =============================================================================
 // FASE 3 — CONTRATO DE NOTIFICAÇÃO (FCM service + canais + permissões)
@@ -200,13 +203,12 @@ for (const perm of ['POST_NOTIFICATIONS', 'USE_EXACT_ALARM', 'SCHEDULE_EXACT_ALA
 inc('Manifest registra AppFirebaseMessagingService', SRC.manifest, '.core.AppFirebaseMessagingService');
 inc('Manifest: intent-filter MESSAGING_EVENT', SRC.manifest, 'com.google.firebase.MESSAGING_EVENT');
 
-hr('FASE 3-GAP — Android sempre posta notificação do SISTEMA (sem toast in-app premium)');
-// Diferente do Desktop (toast premium quando visível ↔ nativa quando minimizado), o Android
-// SEMPRE posta notificação do sistema no onMessageReceived — não há supressão app-aberto nem
-// card in-app. CONGELAR como está (não criar banner premium na Fase B; só Fase C autorizada).
-out('GAP: onMessageReceived NÃO checa app em foreground', omr, 'foreground');
-out('GAP: onMessageReceived NÃO tem toast/banner in-app', omr, 'Toast');
-inc('GAP: onMessageReceived SEMPRE chama Notifications.notify (sistema)', omr, 'Notifications.notify(');
+hr('FASE 3 (F3.3.6-C) — supressão em foreground; sistema mantido em background');
+// F3.3.6-C: app em foreground → banner in-app cobre a tarefa; notif de SISTEMA suprimida só p/ task.
+// Background/tela bloqueada seguem com a notificação de sistema (preservado).
+inc('F3.3.6-C: onMessageReceived checa foreground (AppForeground.isForeground)', omr, 'AppForeground.isForeground');
+inc('F3.3.6-C: supressão condicional só para type=="task"', omr, 'data["type"] == "task"');
+inc('background mantém Notifications.notify (sistema)', omr, 'Notifications.notify(');
 // payload de paridade do Desktop ausente no consumo do Android:
 for (const f of ['actorName', 'actorAvatar', 'responsibleName', 'responsibleAvatar', 'plannedFinishAt', 'notificationType', 'severity', 'etapa']) {
   out('GAP: FCM service NÃO consome ' + f, omr, f);
