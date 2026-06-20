@@ -2082,14 +2082,18 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-track{ background:transparent;
 body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.16); border-radius:8px; border:2px solid transparent; background-clip:content-box; }
 body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.28); background-clip:content-box; }
 
-/* ─── NOTEBOOK — recupera "chrome" (superfície/cabeçalho da coluna/Adicionar) e densifica o
-   card (premium, sem comprimir conteúdo) p/ MAXIMIZAR a área visível e caber o máximo inteiro;
-   o excedente de temas rola na caixa (CARD-FIT-NOTEBOOK). Faixas: ≤940 / ≤820 / ≤720. */
+/* ─── NOTEBOOK — para o card caber INTEIRO com TEMAS visíveis, o espaço é dado a quem o owner
+   exige sempre visível (foto/nome/status/cliente/título/etapa/próxima/data/botões + TEMAS). Os
+   blocos SECUNDÁRIOS (não exigidos) saem do card no notebook: "Enviado por" (origem), trilho de
+   progresso e a linha "x de y no checklist" — continuam no Detalhes e em telas grandes. Soma-se
+   recuperação de "chrome" (cabeçalho do quadro/coluna, toolbar, superfície, Adicionar) e
+   densidade premium. Assim sobra altura REAL para a caixa de temas (CARD-FIT-NOTEBOOK).
+   Faixas: ≤940 / ≤820 / ≤720. */
 @media (max-height:940px){
-  body.desktop .kbv2-board-surface{ margin-top:10px; padding:14px }
+  body.desktop .kbv2-board-surface{ margin-top:9px; padding:13px }
   body.desktop .kbv2-board{ gap:14px }
-  body.desktop .kbv2-column-header{ padding:12px 15px 9px }
-  body.desktop .kbv2-column-add{ height:40px; margin:9px 13px 11px }
+  body.desktop .kbv2-column-header{ padding:11px 15px 9px }
+  body.desktop .kbv2-column-add{ height:39px; margin:9px 13px 10px }
   body.desktop .kbv2-column-body{ gap:12px }
   body.desktop .kbv2-card{ gap:11px; padding:14px }
   body.desktop .kbv2-av .av{ width:44px; height:44px }
@@ -2098,48 +2102,59 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
   body.desktop .kbv2-btn{ height:38px }
 }
 @media (max-height:820px){
-  body.desktop #content.board-mode{ padding-top:8px !important }
-  body.desktop #content.board-mode .d-board-tools.tbar{ margin:8px 0 2px }
-  body.desktop .kbv2-board-surface{ margin-top:7px; padding:11px }
+  /* chrome do quadro */
+  body.desktop #content.board-mode{ padding-top:6px !important }
+  body.desktop #content.board-mode .d-board-head .d-bh-icon{ width:32px; height:32px; border-radius:9px }
+  body.desktop #content.board-mode .d-board-head .d-bh-icon svg{ width:17px; height:17px }
+  body.desktop #content.board-mode .d-board-head .d-bh-title{ font-size:16px }
+  body.desktop #content.board-mode .d-board-head .d-bh-sub{ display:none }
+  body.desktop #content.board-mode .d-board-tools.tbar{ margin:7px 0 2px; padding:3px 10px }
+  body.desktop .kbv2-board-surface{ margin-top:6px; padding:10px }
   body.desktop .kbv2-board{ gap:12px }
-  body.desktop .kbv2-column-header{ padding:10px 13px 8px }
+  body.desktop .kbv2-column-header{ padding:9px 13px 7px }
   body.desktop .kbv2-column-header .kbv2-ctitle{ font-size:13.5px }
-  body.desktop .kbv2-column-add{ height:36px; margin:7px 12px 9px; font-size:12.5px }
-  body.desktop .kbv2-column-body{ gap:10px; padding:4px 12px 9px }
+  body.desktop .kbv2-column-add{ height:34px; margin:6px 12px 8px; font-size:12.5px }
+  body.desktop .kbv2-column-body{ gap:9px; padding:4px 12px 8px }
+  /* card: blocos secundários saem (espaço p/ temas); essenciais seguem premium */
+  body.desktop .kbv2-card>.kbv2-card-origin,
+  body.desktop .kbv2-card>.kbv2-card-rail,
+  body.desktop .kbv2-card>.kbv2-card-chk{ display:none }
   body.desktop .kbv2-card{ gap:8px; padding:12px }
   body.desktop .kbv2-av .av{ width:40px; height:40px }
   body.desktop .kbv2-name{ font-size:14px }
   body.desktop .kbv2-role{ font-size:11.5px }
   body.desktop .kbv2-title{ font-size:16px; margin-top:2px }
-  body.desktop .kbv2-card-origin{ padding:7px 10px; font-size:11.5px }
   body.desktop .kbv2-theme{ padding:6px 11px; font-size:12.5px }
   body.desktop .kbv2-themes-h{ padding:7px 11px }
-  body.desktop .kbv2-btn{ height:35px; font-size:13px }
+  body.desktop .kbv2-btn{ height:34px; font-size:13px }
   body.desktop .kbv2-status,body.desktop .kbv2-due,body.desktop .kbv2-sla{ padding:5px 9px; font-size:11px }
   body.desktop .kbv2-card-chips{ gap:6px }
-  body.desktop .kbv2-stage2{ gap:7px }
-  body.desktop .kbv2-st2-ic{ width:23px; height:23px }
+  body.desktop .kbv2-card-chips .kbv2-chip{ padding:4px 9px; font-size:11.5px }
+  body.desktop .kbv2-stage2{ gap:6px }
+  body.desktop .kbv2-st2-ic{ width:22px; height:22px }
   body.desktop .kbv2-st2-row{ gap:9px }
+  body.desktop .kbv2-st2-pill{ padding:3px 9px; font-size:12px }
+  body.desktop .kbv2-st2-next{ font-size:12.5px }
   body.desktop .kbv2-card-date{ font-size:12.5px }
 }
 @media (max-height:720px){
-  body.desktop #content.board-mode{ padding-top:5px !important }
-  body.desktop .kbv2-board-surface{ margin-top:5px; padding:9px; border-radius:16px }
+  body.desktop #content.board-mode{ padding-top:4px !important }
+  body.desktop #content.board-mode .d-board-tools.tbar{ margin:5px 0 2px }
+  body.desktop .kbv2-board-surface{ margin-top:4px; padding:8px; border-radius:16px }
   body.desktop .kbv2-board{ gap:10px }
-  body.desktop .kbv2-column-header{ padding:8px 12px 7px }
+  body.desktop .kbv2-column-header{ padding:7px 12px 6px }
   body.desktop .kbv2-column-header .kbv2-ccount{ height:20px }
-  body.desktop .kbv2-column-add{ height:33px; margin:6px 11px 8px }
-  body.desktop .kbv2-column-body{ gap:9px; padding:3px 11px 8px }
+  body.desktop .kbv2-column-add{ height:32px; margin:5px 11px 7px }
+  body.desktop .kbv2-column-body{ gap:8px; padding:3px 11px 7px }
   body.desktop .kbv2-card{ gap:7px; padding:11px }
   body.desktop .kbv2-av .av{ width:38px; height:38px }
   body.desktop .kbv2-name{ font-size:13.5px }
   body.desktop .kbv2-title{ font-size:15.5px }
-  body.desktop .kbv2-card-origin{ padding:6px 10px; font-size:11px }
   body.desktop .kbv2-theme{ padding:5px 11px; font-size:12px }
   body.desktop .kbv2-themes-h{ padding:6px 11px; font-size:10px }
-  body.desktop .kbv2-stage2{ gap:6px }
-  body.desktop .kbv2-st2-ic{ width:22px; height:22px }
-  body.desktop .kbv2-btn{ height:33px; font-size:12.5px }
+  body.desktop .kbv2-stage2{ gap:5px }
+  body.desktop .kbv2-st2-ic{ width:21px; height:21px }
+  body.desktop .kbv2-btn{ height:32px; font-size:12.5px }
   body.desktop .kbv2-card-date{ font-size:12px }
 }
 </style>

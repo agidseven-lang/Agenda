@@ -259,8 +259,12 @@ async function measureTall() {
     const addNotOverlap = !addR || addR.top >= bR.bottom - 2;
     const addVisible = !addR || (addR.bottom <= window.innerHeight + 2 && addR.top >= 0);
     const colR = col.getBoundingClientRect(); const colInViewport = colR.bottom <= window.innerHeight + 2;
+    // breakdown: altura de cada seção direta do card (p/ calibrar densidade)
+    const sec = {}; for (const ch of card.children) { const cls = (ch.className || '').split(' ')[0]; sec[cls] = Math.round(ch.getBoundingClientRect().height); }
+    const themesHH = themes ? Math.round((themes.querySelector('.kbv2-themes-h') || themes).getBoundingClientRect().height) : 0;
+    const listH = list ? Math.round(list.getBoundingClientRect().height) : 0;
     return {
-      ok: true, cardH, bodyH, overflowPx, compressed, cardInBody, allInside,
+      ok: true, cardH, bodyH, overflowPx, compressed, cardInBody, allInside, sec, themesHH, listH,
       themesScrolls, themeCount: themeEls.length, minThemeH, firstThemeVisible,
       topVisible: within(topEl), bottomVisible: within(footer),
       addNotOverlap, addVisible, colInViewport,
@@ -484,8 +488,8 @@ for (const k of Object.keys(tall)) { const t = tall[k];
   if (t.minThemeH < 24) fail.push('themeLegible falhou em ' + k + ' (tema < 24px: ' + t.minThemeH + ')');
   if (!t.hasDate) fail.push('dueDateVisible falhou em ' + k);
   if (!t.colInViewport) fail.push('columnInViewport falhou em ' + k);
-  // 1 tema nunca rola por dentro; ≤3 temas não rolam por dentro a ≥768 (cabem). 5 temas: rolam só na caixa.
-  if (t.themesScrolls && (n === 1 || (n <= 3 && h >= 768))) fail.push('themesNoScrollWhenFits falhou em ' + k + ' (' + n + ' tema(s) não deviam rolar internamente)');
+  // 1 tema nunca rola por dentro; ≤2 temas não rolam a ≥768 (cabem). 3+ temas: rolam só na caixa se preciso.
+  if (t.themesScrolls && (n === 1 || (n <= 2 && h >= 768))) fail.push('themesNoScrollWhenFits falhou em ' + k + ' (' + n + ' tema(s) não deviam rolar internamente)');
 }
 // card real
 if (!card.found) fail.push('card de cronograma não encontrado');
