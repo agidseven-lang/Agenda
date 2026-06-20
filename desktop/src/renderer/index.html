@@ -3150,6 +3150,224 @@ function slaTick(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(
 try{ setInterval(function(){ if(slaMonHasActive()) slaTick(); },1000); }catch(_){}
 try{ window.addEventListener('resize',function(){ slaHeaderAlign(); }); }catch(_){}
 try{ setTimeout(slaibRefresh,0); }catch(_){}
+
+/* ═══════════════════ F3.3.3 — NOTIFICAÇÕES DESKTOP EM TEMPO REAL ═══════════════════
+   Local/Electron only. Detecta eventos (fluxo canônico + SLA + bloqueio) no renderer,
+   monta o CONTRATO único e ROTEIA: window.desktopAPI.notify (o HUB do main decide toast
+   in-app x nativa) ou, sem Electron (navegador/QA), mostra o TOAST direto. Dedup local
+   (localStorage). NUNCA chama FCM/Web Push/WhatsApp/Firestore-write (providerCalled=false). */
+/* F3.3.3-NOTIF-CORE BEGIN */
+var NOTIF_SEEN_KEY='idseven.notif.seen.v1';
+function notifSev(slaSev){ return slaSev==='vermelho'?'critical':(slaSev==='laranja'?'warning':(slaSev==='verde'?'success':'info')); }
+/* transição de FASE canônica (deriveCanonicalTaskState) -> evento de notificação.
+   awaiting_designer fica com o notifier do main (designer_assigned) — não duplicar. */
+function notifFlowEvent(prevPhase,curPhase){
+  if(prevPhase===curPhase) return null;
+  switch(curPhase){
+    case 'designer_producing':       return {eventType:'flow_production_started', title:'Produção iniciada',            severity:'info'};
+    case 'designer_revising':        return {eventType:'flow_in_review',          title:'Enviado para revisão',         severity:'info'};
+    case 'designer_delivered':       return {eventType:'flow_designer_delivered', title:'Designer entregou',             severity:'success'};
+    case 'awaiting_client_approval': return {eventType:'flow_sent_to_client',     title:'Cronograma enviado ao cliente',severity:'info'};
+    case 'client_requested_changes': return {eventType:'flow_client_changes',     title:'Cliente solicitou ajuste',     severity:'warning'};
+    case 'completed':                return {eventType:'flow_completed',          title:'Tarefa concluída',             severity:'success'};
+    default: return null;
+  }
+}
+function notifBuildPayload(o){
+  o=o||{};
+  var taskId=o.taskId||'';
+  var anchor=(o.anchor!=null?o.anchor:(o.createdAt!=null?o.createdAt:''));
+  var eventType=o.eventType||'';
+  return {
+    eventId:o.eventId||(eventType+':'+taskId+':'+anchor),
+    eventType:eventType, taskId:taskId, taskTitle:o.taskTitle||'', clientName:o.clientName||'',
+    actorId:o.actorId||'', actorName:o.actorName||'', actorAvatar:o.actorAvatar||'',
+    targetUserId:o.targetUserId||'',
+    title:o.title||'', body:o.body||'', context:o.context||'',
+    createdAt:o.createdAt||Date.now(),
+    severity:o.severity||'info', sound:(o.sound!==false),
+    action:o.action||{type:(taskId?'detail':'board'),deep:(taskId?('detail/'+taskId):'')},
+    dedupKey:o.dedupKey||(eventType+':'+taskId+':'+anchor),
+    source:o.source||'renderer', providerCalled:false
+  };
+}
+/* F3.3.3-NOTIF-CORE END */
+
+function notifLoadSeen(){ try{ return JSON.parse(localStorage.getItem(NOTIF_SEEN_KEY)||'{}')||{}; }catch(_){ return {}; } }
+function notifSaveSeen(o){ try{ localStorage.setItem(NOTIF_SEEN_KEY,JSON.stringify(o||{})); }catch(_){} }
+function notifSeenHas(k){ var m=notifLoadSeen(); return !!m[k]; }
+function notifSeenMark(k){ var m=notifLoadSeen(); m[k]=Date.now(); var ks=Object.keys(m); if(ks.length>400){ var cut=Date.now()-7*24*3600*1000; ks.forEach(function(x){ if(m[x]<cut) delete m[x]; }); } notifSaveSeen(m); }
+function notifNowHM(){ try{ var d=new Date(); var p=function(n){return (n<10?'0':'')+n;}; return p(d.getHours())+':'+p(d.getMinutes()); }catch(_){ return ''; } }
+
+/* SOM por severidade (WebAudio local — toast). A nativa do SO usa o som padrão (limitação documentada). */
+var _notifAC=null;
+function notifSound(sev){
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    _notifAC=_notifAC||new AC(); var ac=_notifAC; if(ac.state==='suspended'){ try{ ac.resume(); }catch(_){} }
+    var seq=sev==='critical'?[[880,0],[660,0.12],[880,0.24]]:(sev==='warning'?[[740,0],[600,0.12]]:[[660,0]]);
+    seq.forEach(function(pr){ var o=ac.createOscillator(),g=ac.createGain(),t0=ac.currentTime+pr[1]; o.type='sine'; o.frequency.value=pr[0];
+      g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(0.16,t0+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t0+0.18);
+      o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0+0.2); });
+  }catch(_){}
+}
+
+/* TOAST in-app premium (fila/stack, severidade, clique→abrir, X, auto-dismiss) */
+function notifEnsureStack(){
+  var s=document.getElementById('notif-stack'); if(s) return s;
+  s=document.createElement('div'); s.id='notif-stack'; s.className='notif-stack'; document.body.appendChild(s);
+  if(!document.getElementById('notif-style')){
+    var st=document.createElement('style'); st.id='notif-style';
+    st.textContent=
+      '.notif-stack{position:fixed;right:18px;bottom:18px;z-index:9000;display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:none}'
+     +'.ntf{pointer-events:auto;width:360px;max-width:92vw;transform:translateY(8px);opacity:0;transition:transform .18s ease,opacity .18s ease}'
+     +'.ntf.in{transform:translateY(0);opacity:1}'
+     +'.ntf-card{position:relative;display:flex;gap:12px;align-items:flex-start;padding:13px 30px 13px 16px;border-radius:16px;cursor:pointer;background:linear-gradient(180deg,rgba(26,32,46,.99),rgba(17,22,32,.99));border:1px solid rgba(255,255,255,.10);box-shadow:0 26px 60px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.07)}'
+     +'.ntf-card::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 4px 4px 0;background:var(--nac,#5B6CFF)}'
+     +'.ntf-info{--nac:#5B6CFF}.ntf-success{--nac:#2FCF8F}.ntf-warning{--nac:#F2A93B}.ntf-critical{--nac:#EF4444}'
+     +'.ntf-av{flex:0 0 auto;width:44px;height:44px;border-radius:50%;background-size:cover;background-position:center;box-shadow:0 0 0 2px rgba(91,108,255,.45)}'
+     +'.ntf-av.gen{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#5B6CFF,#22D3EE);color:#fff;font-weight:800;font-size:17px}'
+     +'.ntf-bd{flex:1 1 auto;min-width:0}'
+     +'.ntf-hd{display:flex;align-items:center;justify-content:space-between;gap:8px}.ntf-hd b{color:#eef2f8;font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ntf-tm{color:#8b97a8;font-size:11px;flex:0 0 auto}'
+     +'.ntf-ti{color:#cdd6e6;font-size:12.5px;font-weight:700;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+     +'.ntf-ds{color:#9fb0c8;font-size:12px;margin-top:2px;line-height:1.35}'
+     +'.ntf-ctx{color:#7f8aa0;font-size:11px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+     +'.ntf-sev{flex:0 0 auto;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--nac) 20%,transparent);color:var(--nac)}.ntf-sev svg{width:14px;height:14px}'
+     +'.ntf-x{position:absolute;top:8px;right:9px;width:20px;height:20px;border:0;border-radius:6px;background:transparent;color:#7f8aa0;font-size:15px;line-height:1;cursor:pointer}.ntf-x:hover{background:rgba(255,255,255,.08);color:#cdd6e6}';
+    document.head.appendChild(st);
+  }
+  return s;
+}
+function notifRoute(deep){
+  try{
+    if(!deep||!state.user) return;
+    if(deep.indexOf('detail/')===0){ var id=deep.slice(7); if(typeof openDetails==='function'){ try{ openDetails(id); return; }catch(_){} } deep='board/'; }
+    if(deep.indexOf('client/')===0){ if(typeof openClientView==='function') openClientView(deep.slice(7)); return; }
+    if(deep.indexOf('board/')===0){ state.tab='tarefas'; state.boardSector=deep.slice(6)||null; render(); return; }
+    if(deep==='agenda'){ state.tab='agenda'; state.boardSector=null; render(); return; }
+  }catch(_){}
+}
+function notifShowToast(p){
+  try{
+    p=p||{}; var stack=notifEnsureStack(); var sev=p.severity||'info';
+    var nm=p.actorName||p.title||'Agenda ID Seven'; var photo=p.actorAvatar||'';
+    var icon=sev==='critical'?'bell':(sev==='warning'?'clock':(sev==='success'?'check':'info'));
+    var el=document.createElement('div'); el.className='ntf ntf-'+sev; if(p.action&&p.action.deep) el.setAttribute('data-deep',p.action.deep);
+    var av=photo?'<div class="ntf-av" style="background-image:url(\''+esc(photo)+'\')"></div>':'<div class="ntf-av gen">'+esc((String(nm).trim()[0]||'?').toUpperCase())+'</div>';
+    var sub=p.actorName?(p.actorName+(p.taskTitle?(' · '+p.taskTitle):'')):(p.taskTitle||'');
+    el.innerHTML='<div class="ntf-card">'+av
+      +'<div class="ntf-bd"><div class="ntf-hd"><b>'+esc(p.title||'')+'</b><span class="ntf-tm">'+esc(p.time||notifNowHM())+'</span></div>'
+      +(sub?'<div class="ntf-ti">'+esc(sub)+'</div>':'')
+      +'<div class="ntf-ds">'+esc(p.body||'')+'</div>'
+      +(p.context?'<div class="ntf-ctx">'+esc(p.context)+'</div>':'')+'</div>'
+      +'<span class="ntf-sev" title="'+esc(sev)+'">'+(typeof svg==='function'?svg(icon):'')+'</span>'
+      +'<button class="ntf-x" title="Fechar" aria-label="Fechar">×</button></div>';
+    stack.appendChild(el);
+    try{ requestAnimationFrame(function(){ el.classList.add('in'); }); }catch(_){ el.classList.add('in'); }
+    var dismiss=function(){ try{ el.classList.remove('in'); setTimeout(function(){ if(el&&el.parentNode) el.parentNode.removeChild(el); },200); }catch(_){} };
+    var xb=el.querySelector('.ntf-x'); if(xb) xb.addEventListener('click',function(ev){ ev.stopPropagation(); dismiss(); });
+    var cd=el.querySelector('.ntf-card'); if(cd) cd.addEventListener('click',function(){ notifRoute(p.action&&p.action.deep); dismiss(); });
+    if(p.sound!==false) notifSound(sev);
+    var ttl=sev==='critical'?11000:(sev==='warning'?8000:6000); setTimeout(dismiss,ttl);
+    var all=stack.querySelectorAll('.ntf'); if(all.length>4){ for(var i=0;i<all.length-4;i++){ if(all[i]&&all[i].parentNode) all[i].parentNode.removeChild(all[i]); } }
+    return el;
+  }catch(_){ return null; }
+}
+
+/* ROTEAMENTO: Electron (HUB do main decide canal) ou fallback direto (navegador/QA). Dedup local. */
+function notifEmit(p){
+  try{
+    if(window.__notifSuppress) return;   /* QA: silencia a auto-detecção; o toast direto segue funcionando */
+    if(!p) return; var key=p.dedupKey||p.eventId; if(!key) return;
+    if(notifSeenHas(key)) return; notifSeenMark(key);
+    var api=window.desktopAPI;
+    if(api&&typeof api.notify==='function'){ try{ api.notify(p); return; }catch(_){} }
+    notifShowToast(p);   // sem Electron (navegador/QA)
+  }catch(_){}
+}
+
+/* DETECÇÃO: fluxo canônico (diff de FASE entre snapshots). Baseline por usuário (sem histórico). */
+var _notifPhase={}, _notifBaseline=false, _notifUid=null;
+function notifIsMine(t){
+  var u=state.user; if(!u||!t) return false;
+  if(t.assigneeId===u.id||t.by===u.id) return true;
+  try{ if(typeof designerOf==='function'&&designerOf(t)===u.id) return true; }catch(_){}
+  try{ var r=respOf(t); if(r&&r.id===u.id) return true; }catch(_){}
+  return false;
+}
+function notifScanFlow(){
+  try{
+    if(!state.user) return;
+    if(state.user.id!==_notifUid){ _notifUid=state.user.id; _notifPhase={}; _notifBaseline=false; }
+    var tasks=state.tasks||[], firstRun=!_notifBaseline;
+    for(var i=0;i<tasks.length;i++){
+      var t=tasks[i]; if(!t||!t.id) continue;
+      var cur=''; try{ cur=(deriveCanonicalTaskState(t)||{}).phase||''; }catch(_){ cur=''; }
+      var prev=_notifPhase[t.id]; _notifPhase[t.id]=cur;
+      if(firstRun||prev===undefined||prev===cur) continue;   // baseline/tarefa-nova/sem-mudança
+      if(!notifIsMine(t)) continue;
+      var ev=notifFlowEvent(prev,cur); if(!ev) continue;
+      var resp=null; try{ resp=respOf(t); }catch(_){}
+      notifEmit(notifBuildPayload({
+        eventType:ev.eventType, taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
+        actorName:(resp&&resp.name)||'', actorAvatar:(resp?photoOf(resp):''),
+        targetUserId:state.user.id, severity:ev.severity, sound:true,
+        title:ev.title, body:(t.client?(t.client+' — '):'')+(t.title||'Tarefa'),
+        context:(t.client?(t.client+' · '):'')+'Fluxo', anchor:cur, action:{type:'detail',deep:'detail/'+t.id}
+      }));
+    }
+    _notifBaseline=true;
+  }catch(_){}
+}
+/* DETECÇÃO: SLA (laranja/vermelho/crítico) + bloqueio operacional — escopo do usuário logado. */
+function notifScanSla(){
+  try{
+    if(!state.user) return;
+    var now=Date.now(), f=(typeof dtMs==='function'?dtMs:null), vis=[];
+    try{ vis=slaibVisible(state.user)||[]; }catch(_){ vis=[]; }
+    for(var i=0;i<vis.length;i++){
+      var t=vis[i]; if(!t) continue;
+      var d=resolveTaskDisplayState(t,now,f); if(!d||!d.inPanel) continue;
+      var resp=null; try{ resp=respOf(t); }catch(_){}
+      var base={ taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
+        actorName:(resp&&resp.name)||'', actorAvatar:(resp?photoOf(resp):''),
+        targetUserId:state.user.id, anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
+      if(d.state==='warning'){
+        notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
+          title:'Prazo próximo', body:(t.client?(t.client+' — '):'')+(t.title||'Tarefa')+': faltam '+d.remainingMin+' min.',
+          context:'SLA do designer', dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
+      } else if(d.state==='overdue'){
+        if(d.critical){
+          notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_critical', severity:'critical', sound:true,
+            title:'Atraso crítico', body:(t.client?(t.client+' — '):'')+(t.title||'Tarefa')+': sinalize o atraso imediatamente.',
+            context:'SLA do designer · crítico', dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
+        } else {
+          notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_overdue', severity:'critical', sound:true,
+            title:'Prazo encerrado', body:(t.client?(t.client+' — '):'')+(t.title||'Tarefa')+': atrasada há '+d.overdueMin+' min ('+d.graceRemainingMin+' min p/ sinalizar).',
+            context:'SLA do designer', dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
+        }
+      }
+    }
+    var blk=null; try{ blk=slaCriticalFor(state.user); }catch(_){}
+    if(blk){ var d2=resolveTaskDisplayState(blk,now,f);
+      notifEmit(notifBuildPayload({ eventType:'operational_block', taskId:blk.id, taskTitle:blk.title||'Tarefa', clientName:blk.client||'',
+        targetUserId:state.user.id, severity:'critical', sound:true, anchor:(d2&&d2.finishMs)||0,
+        title:'Tarefa em atraso crítico', body:'Conclua ou sinalize atraso antes de continuar outras tarefas.',
+        context:'Bloqueio operacional', dedupKey:'operational_block:'+blk.id+':'+((d2&&d2.finishMs)||0),
+        action:{type:'detail',deep:'detail/'+blk.id} })); }
+  }catch(_){}
+}
+function notifScan(){ notifScanFlow(); notifScanSla(); }
+
+/* hooks: cada snapshot de dados + tick do SLA (transições por TEMPO) + intervalo de segurança */
+if(typeof renderFromSnapshot==='function'){ var _notif_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_notif_rfs.apply(this,arguments); try{ notifScan(); }catch(_){} return r; }; }
+if(typeof slaTick==='function'){ var _notif_tk=slaTick; slaTick=function(){ var r=_notif_tk.apply(this,arguments); try{ notifScanSla(); }catch(_){} return r; }; }
+try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} },30000); }catch(_){}
+/* receber TOAST do HUB do main (janela focada/visível) */
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifShowToast(p); }); } }catch(_){}
+/* exposto p/ QA/testes (não afeta produção) */
+try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; }catch(_){}
+
 function render(){
   if(!state.user)return;
   // 1.0.102 — NUNCA re-renderizar por baixo de uma edição aberta. Se há um modal aberto com
@@ -6325,7 +6543,7 @@ function stepNext(){const f=state.form;
 }
 
 /* ---- BOOT ---- */
-try{window.desktopAPI&&window.desktopAPI.onNotifOpen(function(t){if(!state.user)return;if(t&&t.indexOf("client/")===0){openClientView(t.slice(7));return;}else if(t&&t.indexOf("board/")===0){state.tab="tarefas";state.boardSector=t.slice(6);}else if(t=="agenda"){state.tab="agenda";state.boardSector=null;}render();})}catch(_){}
+try{window.desktopAPI&&window.desktopAPI.onNotifOpen(function(t){if(!state.user)return;if(typeof notifRoute==='function'){notifRoute(t);return;}if(t&&t.indexOf("client/")===0){openClientView(t.slice(7));return;}else if(t&&t.indexOf("board/")===0){state.tab="tarefas";state.boardSector=t.slice(6);}else if(t=="agenda"){state.tab="agenda";state.boardSector=null;}render();})}catch(_){}
 function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta.focus();}}
 (async function boot(){
   renderLogin();

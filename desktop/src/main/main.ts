@@ -23,6 +23,56 @@ let quitting = false;
 // AUMID p/ toasts no Windows respeitarem o app
 if (process.platform === "win32") app.setAppUserModelId("br.com.idseven.agenda.desktop");
 
+// ===================================================================
+// F3.3.3 — HUB de NOTIFICAÇÕES DESKTOP (local, sem provider externo).
+// Canal único: se a janela está FOCADA/visível -> TOAST in-app premium
+// (renderer); senão (minimizado/tray/sem foco) -> Notification NATIVA do
+// SO. Dedup por dedupKey. Som por severidade só no toast (a nativa usa o
+// som padrão do SO; limitação documentada). NUNCA chama FCM/Web Push/
+// WhatsApp/Firestore — só Electron Notification local.
+// ===================================================================
+type NotifPayload = {
+  eventId?: string; eventType?: string; taskId?: string; taskTitle?: string; clientName?: string;
+  actorId?: string; actorName?: string; actorAvatar?: string; targetUserId?: string;
+  title?: string; body?: string; context?: string; createdAt?: number;
+  severity?: "info" | "success" | "warning" | "critical"; sound?: boolean;
+  action?: { type?: string; deep?: string }; dedupKey?: string; source?: string; providerCalled?: boolean;
+};
+const _notifSeen = new Set<string>();
+function _appIcon(): string | undefined {
+  try { return path.join(app.getAppPath(), "build", "icon.png"); } catch { return undefined; }
+}
+function windowActive(): boolean {
+  const w = mainWin;
+  return !!(w && !w.isDestroyed() && w.isVisible() && !w.isMinimized() && w.isFocused());
+}
+function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } {
+  try {
+    if (!p || typeof p !== "object") return { ok: false, channel: "none" };
+    const key = String(p.dedupKey || `${p.eventType || "evt"}:${p.taskId || ""}:${p.createdAt || ""}`);
+    if (_notifSeen.has(key)) return { ok: true, channel: "dedup" };
+    _notifSeen.add(key);
+    if (_notifSeen.size > 4000) { const it = _notifSeen.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; _notifSeen.delete(v.value); } }
+    const deep = (p.action && p.action.deep) ? String(p.action.deep) : "";
+    if (windowActive()) {
+      mainWin?.webContents.send("notif-toast", p);
+      return { ok: true, channel: "toast" };
+    }
+    const n = new Notification({
+      title: String(p.title || "Agenda ID Seven"),
+      body: String(p.body || ""),
+      silent: p.sound === false,
+      icon: _appIcon(),
+    });
+    n.on("click", () => {
+      const w = mainWin;
+      if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
+    });
+    n.show();
+    return { ok: true, channel: "native" };
+  } catch { return { ok: false, channel: "error" }; }
+}
+
 // Locale pt-BR: faz os inputs nativos date/time exibirem dd/mm/aaaa e HH:mm.
 app.commandLine.appendSwitch("lang", "pt-BR");
 
@@ -123,6 +173,9 @@ app.whenReady().then(() => {
     new Notification({ title: "Agenda ID Seven", body: "Notificacao de teste OK." }).show();
     return true;
   });
+  // F3.3.3 — renderer pede notificação (fluxo/SLA/bloqueio detectados no renderer).
+  // O HUB decide o canal (toast in-app x nativa) e faz dedup. Sem provider externo.
+  ipcMain.handle("notify", (_e, payload: NotifPayload) => deliverNotification(payload));
   ipcMain.handle("autostart-get", () => isAutoStart());
   ipcMain.handle("autostart-set", (_e, v: boolean) => { setAutoStart(v); return isAutoStart(); });
   ipcMain.handle("app-quit", () => { realQuit(); });
@@ -183,8 +236,10 @@ app.whenReady().then(() => {
     if (stopNotifier) stopNotifier();
     if (stopReminder) stopReminder();
     if (uid) {
-      stopNotifier = startNotifier(() => mainWin, uid);
-      stopReminder = startReminder(() => mainWin, uid);
+      // F3.3.3 — notifier/reminder roteiam pelo HUB (ganham toast in-app quando focado,
+      // mantêm a nativa quando minimizado/tray). Mesmos eventos/dedup de antes.
+      stopNotifier = startNotifier(() => mainWin, uid, deliverNotification);
+      stopReminder = startReminder(() => mainWin, uid, deliverNotification);
     }
   });
   ipcMain.on("session-logout", () => {

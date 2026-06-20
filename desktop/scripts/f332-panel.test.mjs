@@ -142,9 +142,10 @@ ok('B5 widget chip + dropdown', /slamon-chip/.test(src) && /slamon-pop/.test(src
 ok('B5b laranja 30min + vermelho 10min (msg + grace + crítico)', /Você tem 30 minutos para concluir esta tarefa/.test(src) && /Você tem 10 minutos para concluir esta tarefa/.test(src) && /para concluir ou sinalizar atraso/.test(src) && /Atraso cr[ií]tico — sinalize atraso imediatamente/.test(src));
 // B10 — guarda de bloqueio operacional (FASE 5) existe e respeita escopo (Admin/Social via canSeeAll não bloqueia)
 ok('B10 bloqueio operacional (FASE 5)', /function slaCriticalFor\(/.test(src) && /function slaGuardBlocked\(/.test(src) && /canSeeAll\(u\)\) return null/.test(src) && /function moveStatus[\s\S]{0,120}slaGuardBlocked/.test(src));
-// B11 — notificação desktop (main) com SOM ligado (silent:false)
-{ let nt=''; try{ nt=fs.readFileSync(path.resolve(__dirname,'..','src','main','notifier.ts'),'utf8'); }catch(_){}
-  ok('B11 notificação desktop com som (silent:false)', /silent:\s*false/.test(nt)); }
+// B11 — notificação desktop (main) com SOM: HUB usa silent:p.sound===false (som ligado por
+// padrão) e os payloads do notifier carregam sound:true (F3.3.3 — roteado pelo hub).
+{ let mn='', nt=''; try{ mn=fs.readFileSync(path.resolve(__dirname,'..','src','main','main.ts'),'utf8'); }catch(_){} try{ nt=fs.readFileSync(path.resolve(__dirname,'..','src','main','notifier.ts'),'utf8'); }catch(_){}
+  ok('B11 notificação desktop com som (hub silent:p.sound===false + payload sound:true)', /silent:\s*p\.sound\s*===\s*false/.test(mn) && /sound:\s*true/.test(nt)); }
 // B12 — toast in-app de notificação (preview/mock FASE 7) com avatar/nome/descrição
 ok('B12 preview de notificação in-app (avatar/nome/desc)', /function slaNotifPreview\(/.test(src) && /snf-av/.test(src) && /snf-ds/.test(src));
 // B13 — anti-flicker: render por assinatura + toggle só por classe (sem rebuild do dropdown)

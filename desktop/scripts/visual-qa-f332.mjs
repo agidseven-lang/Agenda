@@ -31,6 +31,9 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 await page.goto(base, { waitUntil: 'load' });
 await page.waitForFunction(() => typeof window.render === 'function' && typeof window.slaMonRender === 'function' && typeof window.resolveTaskDisplayState === 'function', { timeout: 25000 });
+// F3.3.3 — silencia a AUTO-detecção de notificações durante o QA (sem Electron ela cairia no
+// toast direto e poluiria os outros prints). A seção de TOAST chama notifShowToast diretamente.
+await page.evaluate(() => { window.__notifSuppress = true; });
 // injeta o builder de cenário NO PAGE (usa globals do renderer: state/render/slaibRefresh)
 
 // ---- helpers de cenário ----
@@ -423,12 +426,83 @@ for (const [w, h, nm] of [[1366, 768, 'f332-08-1366x768.png'], [1920, 1080, 'f33
   await page.screenshot({ path: path.join(OUT, nm) });
 }
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, errors }, null, 2));
+// ===================== F3.3.3 — TOAST in-app premium (notificações em tempo real) =====================
+// Renderiza os toasts REAIS (window.notifShowToast — fallback direto sem Electron) SOBRE o quadro
+// aprovado, prova severidades/avatar/stack/clique, e captura os prints exigidos pelo owner.
+await page.setViewportSize({ width: 1440, height: 900 });
+await scenario('both', 'designer'); await page.waitForTimeout(220);
+const toastShot = async (name) => { await page.waitForTimeout(160); await page.screenshot({ path: path.join(OUT, name) }); };
+const clearToasts = () => page.evaluate(() => { const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; });
+async function showToast(p) { await page.evaluate((pp) => window.notifShowToast(pp), p); await page.waitForTimeout(140); }
+// 1) criação de tarefa (info) + avatar real
+await clearToasts();
+await showToast({ severity: 'info', title: 'Nova tarefa para você', actorName: 'Owner Admin', actorAvatar: PNG1x1, taskTitle: 'Cronograma semanal — Junho', body: 'Boa Forma — Cronograma semanal — Junho', context: 'Tarefa · Boa Forma', action: { deep: 'detail/stall' }, sound: false });
+await toastShot('f332-30-toast-criacao.png');
+// 2) cliente aprovou temas (success)
+await clearToasts();
+await showToast({ severity: 'success', title: 'Tarefa concluída', actorName: 'Cliente Boa Forma', actorAvatar: PNG1x1, taskTitle: 'Cronograma semanal — Junho', body: 'Boa Forma — Cronograma semanal — Junho', context: 'Boa Forma · Fluxo', action: { deep: 'detail/stall' }, sound: false });
+await toastShot('f332-31-toast-cliente-aprovou.png');
+// 3) atribuição ao designer (info)
+await clearToasts();
+await showToast({ severity: 'info', title: 'Novo cronograma atribuído', actorName: 'Marina Alves', actorAvatar: PNG1x1, taskTitle: 'Cronograma semanal — Junho', body: 'Boa Forma — Cronograma\nAcesse para iniciar a produção.', context: 'Cronograma · Boa Forma', action: { deep: 'board/cronograma' }, sound: false });
+await toastShot('f332-32-toast-designer.png');
+// 4) SLA laranja (warning)
+await clearToasts();
+await showToast({ severity: 'warning', title: 'Prazo próximo', actorName: 'Marina Alves', actorAvatar: PNG1x1, taskTitle: 'Reels de lançamento', body: 'Boa Forma — Reels de lançamento: faltam 18 min.', context: 'SLA do designer', action: { deep: 'detail/r1' }, sound: false });
+await toastShot('f332-33-toast-laranja.png');
+// 5) SLA vermelho (critical/overdue)
+await clearToasts();
+await showToast({ severity: 'critical', title: 'Prazo encerrado', actorName: 'Marina Alves', actorAvatar: PNG1x1, taskTitle: 'Reels de lançamento', body: 'Boa Forma — Reels: atrasada há 6 min (4 min p/ sinalizar).', context: 'SLA do designer', action: { deep: 'detail/r1' }, sound: false });
+await toastShot('f332-34-toast-vermelho.png');
+// 6) atraso crítico + bloqueio (critical)
+await clearToasts();
+await showToast({ severity: 'critical', title: 'Tarefa em atraso crítico', actorName: 'Marina Alves', actorAvatar: PNG1x1, taskTitle: 'Pôster evento', body: 'Conclua ou sinalize atraso antes de continuar outras tarefas.', context: 'Bloqueio operacional', action: { deep: 'detail/rc' }, sound: false });
+await toastShot('f332-35-toast-critico.png');
+// 7) múltiplos toasts (stack sem poluir — limite 4)
+await clearToasts();
+await page.evaluate(() => {
+  window.notifShowToast({ severity: 'info', title: 'Nova tarefa para você', actorName: 'Owner Admin', taskTitle: 'Stories semanais', body: 'Boa Forma — Stories semanais', context: 'Tarefa · Boa Forma', sound: false });
+  window.notifShowToast({ severity: 'success', title: 'Designer entregou', actorName: 'Marina Alves', taskTitle: 'Carrossel institucional', body: 'Studio Lumen — Carrossel', context: 'Fluxo', sound: false });
+  window.notifShowToast({ severity: 'warning', title: 'Prazo próximo', actorName: 'Marina Alves', taskTitle: 'Arte campanha', body: 'Clínica Vita — faltam 22 min.', context: 'SLA do designer', sound: false });
+  window.notifShowToast({ severity: 'critical', title: 'Atraso crítico', actorName: 'Marina Alves', taskTitle: 'Pôster evento', body: 'Clínica Vita — sinalize o atraso imediatamente.', context: 'SLA do designer · crítico', sound: false });
+});
+await toastShot('f332-36-toast-multi.png');
+const toast = await page.evaluate(() => {
+  const stack = document.getElementById('notif-stack');
+  const items = stack ? [...stack.querySelectorAll('.ntf')] : [];
+  const cs = stack ? getComputedStyle(stack) : null;
+  const sevClasses = items.map((e) => (e.className.match(/ntf-(info|success|warning|critical)/) || [])[1]).filter(Boolean);
+  const withAvatar = (() => { const a = document.querySelector('.ntf-av'); return !!a; })();
+  // avatar real (background-image) em um toast com foto
+  const avatarReal = items.some((e) => { const a = e.querySelector('.ntf-av'); return a && /background-image/.test(a.getAttribute('style') || ''); });
+  return {
+    present: items.length > 0, count: items.length, capped: items.length <= 4,
+    bottomRight: !!cs && cs.position === 'fixed' && parseInt(cs.right) >= 0 && parseInt(cs.bottom) >= 0,
+    severities: [...new Set(sevClasses)], withAvatar, avatarReal,
+    hasContext: !!document.querySelector('.ntf-ctx'), hasSevIcon: !!document.querySelector('.ntf-sev svg'), hasClose: !!document.querySelector('.ntf-x'),
+  };
+});
+// 8) avatar real isolado (close-up) + clique abre detalhe
+await clearToasts();
+await showToast({ severity: 'info', title: 'Cliente aprovou os temas', actorName: 'Marina Alves', actorAvatar: PNG1x1, taskTitle: 'Cronograma semanal — Junho', body: 'Boa Forma — temas aprovados. Inicie a produção.', context: 'Cronograma · Boa Forma · produção', action: { deep: 'detail/r1' }, sound: false });
+await page.screenshot({ path: path.join(OUT, 'f332-37-toast-avatar.png'), clip: { x: 1040, y: 690, width: 400, height: 200 } });
+// clique no toast → abre detalhe (deep link), prova ação
+const toastClick = await page.evaluate(async () => {
+  const card = document.querySelector('#notif-stack .ntf .ntf-card'); if (!card) return { clicked: false };
+  card.click(); await new Promise((r) => setTimeout(r, 220));
+  const opened = !!document.querySelector('.det-sheet') || !!document.querySelector('[id*="modal"] .det-sheet');
+  return { clicked: true, openedDetail: opened };
+});
+await page.evaluate(() => { const m = document.querySelector('.det-sheet'); if (m) { try { closeDetails && closeDetails(); } catch (_) {} const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); } });
+await clearToasts();
+
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, errors }, null, 2));
 console.log('FLICKER:', JSON.stringify(flicker)); console.log('NOTIF:', JSON.stringify(notif));
 console.log('TALL:', JSON.stringify(tall));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
 console.log('CARD:', JSON.stringify(card)); console.log('CONSIST:', JSON.stringify(consist)); console.log('ORANGE:', JSON.stringify(orangeImmediate)); console.log('BLOCK:', JSON.stringify(block));
 console.log('DETAIL:', JSON.stringify(detail)); console.log('EDIT:', JSON.stringify(editPrazo)); console.log('RBAC:', JSON.stringify(rbac)); console.log('HEADER:', JSON.stringify(header));
+console.log('TOAST:', JSON.stringify(toast)); console.log('TOASTCLICK:', JSON.stringify(toastClick));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
 await browser.close(); server.close();
 
@@ -519,6 +593,17 @@ if (header.ok && (header.bellAvatarGap < 4 || header.bellAvatarGap > 24)) fail.p
 if (header.ok && !header.badgeAbsolute) fail.push('badgeDoesNotShiftBell falhou (badge não é absolute)');
 if (header.ok && header.monPresent && !header.monLeftOfBell) fail.push('widget não está à esquerda do sino');
 if (header.ok && !header.shiftedLeft) fail.push('headerShiftedLeft falhou (cluster não deslocado ~1,5cm; inset=' + header.avatarRightInset + ')');
+// F3.3.3 — TOAST in-app premium (notificações em tempo real)
+if (!toast.present) fail.push('toastPresent falhou (nenhum toast renderizado)');
+if (!toast.bottomRight) fail.push('toastBottomRight falhou (stack não é fixed no canto inferior direito)');
+if (!toast.withAvatar) fail.push('toastHasAvatar falhou (sem avatar no toast)');
+if (!toast.avatarReal) fail.push('toastAvatarReal falhou (avatar real/foto ausente)');
+if (!toast.hasContext) fail.push('toastHasContext falhou (sem contexto da tarefa)');
+if (!toast.hasSevIcon) fail.push('toastSeverityIcon falhou (sem ícone de severidade)');
+if (!toast.hasClose) fail.push('toastClose falhou (sem botão fechar)');
+if (!toast.capped) fail.push('toastStackCapped falhou (stack > 4 — poluindo a tela)');
+for (const s of ['info', 'success', 'warning', 'critical']) if (!toast.severities.includes(s)) fail.push('toastSeverity ' + s + ' ausente no stack');
+if (!toastClick.clicked || !toastClick.openedDetail) fail.push('toastClickOpensTask falhou (clique não abriu o detalhe)');
 
 if (fail.length) { console.error('::error::QA F3.3.2 FALHOU: ' + fail.join(' | ')); process.exit(1); }
 console.log('QA F3.3.2 OK — login sem widgets; coluna multi-card sem corte (1366/1600); avatar real; widget verde/laranja/vermelho com janela 10min + crítico; status/fuso coerentes; laranja imediato; header cluster alinhado; Editar prazo RBAC honesto.');

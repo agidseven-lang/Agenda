@@ -16,6 +16,13 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   onNotifOpen: (cb: (target: string) => void) => {
     ipcRenderer.on("notif-open", (_e, t: string) => cb(t));
   },
+  // F3.3.3 — NOTIFICAÇÕES DESKTOP EM TEMPO REAL (local, sem provider externo)
+  // renderer -> main: pede uma notificação; o HUB do main decide toast in-app x nativa
+  notify: (payload: any): Promise<{ ok: boolean; channel?: string }> => ipcRenderer.invoke("notify", payload),
+  // main -> renderer: mostrar TOAST in-app premium (quando a janela está focada/visível)
+  onNotifToast: (cb: (payload: any) => void) => {
+    ipcRenderer.on("notif-toast", (_e, p: any) => cb(p));
+  },
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   // 1.0.114 — ENVIO PREMIUM: imagem real do card p/ anexar no WhatsApp.
