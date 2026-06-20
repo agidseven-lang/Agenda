@@ -483,5 +483,29 @@
     "inTasks": true,
     "hasOpenDetails": true
   },
+  "notifDetect": {
+    "warningFired": true,
+    "overdueFired": true,
+    "criticalFired": true,
+    "warningText": "Você tem 30 minutos para concluir esta tarefa.",
+    "overdueText": "Você tem 10 minutos para concluir esta tarefa.",
+    "criticalText": "Sinalize atraso imediatamente ou conclua a tarefa.",
+    "warningCtx": "Boa Forma · Vence em 18:00",
+    "overdueCtx": "Atrasada há 3:00 · restam 7:00 p/ sinalizar",
+    "overdueSev": "critical",
+    "criticalSev": "critical",
+    "warningSev": "warning",
+    "overdueOpensTask": true,
+    "overdueHasAvatar": true,
+    "overdueHasUser": true,
+    "noWrongUser": true,
+    "dedupBlocksSecond": true,
+    "firstCount": 4
+  },
+  "flowDetect": {
+    "baselineSilent": true,
+    "reviewFired": true,
+    "completedFired": false
+  },
   "errors": []
 }
