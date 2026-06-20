@@ -33,7 +33,9 @@ if (process.platform === "win32") app.setAppUserModelId("br.com.idseven.agenda.d
 // ===================================================================
 type NotifPayload = {
   eventId?: string; eventType?: string; taskId?: string; taskTitle?: string; clientName?: string;
-  actorId?: string; actorName?: string; actorAvatar?: string; targetUserId?: string;
+  actorId?: string; actorName?: string; actorAvatar?: string;
+  responsibleId?: string; responsibleName?: string; responsibleAvatar?: string;
+  targetUserId?: string; notificationType?: string; etapa?: string; status?: string;
   title?: string; body?: string; context?: string; createdAt?: number;
   severity?: "info" | "success" | "warning" | "critical"; sound?: boolean;
   action?: { type?: string; deep?: string }; dedupKey?: string; source?: string; providerCalled?: boolean;

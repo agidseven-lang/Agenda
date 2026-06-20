@@ -630,7 +630,79 @@ await showToast({ severity: 'info', notificationType: 'team_flow', title: 'Envia
 await toastShot('f332-38-destinatario-avatar.png');
 await clearToasts();
 
-fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, recipientDetect, errors }, null, 2));
+// ===================== F3.3.3 (correção AVATAR "N") — IDENTIDADE VISUAL DO TOAST =====================
+// Reproduz o bug do owner: a atribuição vinha do HUB/main SEM avatar e o toast caía na inicial do
+// TÍTULO ("N" de "Novo..."). Agora o renderer resolve a FOTO/NOME reais por actorId/responsibleId.
+const identityDetect = await page.evaluate(() => {
+  const AV = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const social = { id: 'soc1', name: 'Arydyjany Carlôto', role: 'Social Media', photo: AV };
+  const designer = { id: 'dz1', name: 'Miercohévisk Carlôto', role: 'Designer', photo: AV };
+  const socialNoPhoto = { id: 'soc2', name: 'Paula Souza', role: 'Social Media' }; // SEM foto
+  state.users = [social, designer, socialNoPhoto]; state.user = designer;
+  state.tasks = [{ id: 'tatt', title: 'Cronograma semanal', client: 'Hospital Visão', sector: 'cronograma', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1', designerName: 'Miercohévisk Carlôto', designerAvatar: AV, assignedBy: 'soc1' } }];
+  const clear = () => { const s = document.getElementById('notif-stack'); if (s) s.innerHTML = ''; };
+  const first = () => document.querySelector('#notif-stack .ntf');
+  const avOf = (n) => n && n.querySelector('.ntf-av');
+  const titleOf = (n) => (n && n.querySelector('.ntf-hd b') ? n.querySelector('.ntf-hd b').textContent : '') || '';
+
+  // (A) ATRIBUIÇÃO como o HUB/main entrega: SEM actorAvatar; actorId resolve no diretório.
+  clear();
+  window.notifShowToast({ eventType: 'designer_assigned', taskId: 'tatt', taskTitle: 'Cronograma semanal', clientName: 'Hospital Visão', actorId: 'soc1', responsibleId: 'dz1', title: 'Nova tarefa atribuida a voce', body: 'x', etapa: 'Aguardando produção', sound: false });
+  const a = first(), aAv = avOf(a);
+  const aPhoto = aAv ? /background-image/.test(aAv.getAttribute('style') || '') : false;
+  const aTxt = aAv ? (aAv.textContent || '').trim() : '';
+  const aTitle = titleOf(a);
+  const aResp = a ? a.querySelector('.ntf-resp') : null;
+  const aRespReal = !!(aResp && aResp.querySelector('.ntf-resp-av') && /background-image/.test((aResp.querySelector('.ntf-resp-av').getAttribute('style') || ''))) && /Miercohévisk/.test(aResp ? aResp.textContent : '');
+
+  // (B) SLA laranja: avatar = foto do designer responsável + título personalizado.
+  clear();
+  window.notifShowToast({ eventType: 'sla_warning', taskId: 'tatt', taskTitle: 'Cronograma semanal', clientName: 'Hospital Visão', responsibleId: 'dz1', responsibleName: 'Miercohévisk Carlôto', responsibleAvatar: AV, title: 'Miercohévisk, prazo próximo', body: 'Você tem 30 minutos para concluir esta tarefa.', sound: false });
+  const b = first(), bAv = avOf(b);
+  const bPhoto = bAv ? /background-image/.test(bAv.getAttribute('style') || '') : false;
+  const bTitle = titleOf(b);
+
+  // (C) ATRIBUIÇÃO sem foto do ator: avatar = INICIAIS do ATOR (Paula Souza -> "PS"), NUNCA "N".
+  clear();
+  window.notifShowToast({ eventType: 'designer_assigned', taskId: 'tatt', taskTitle: 'Arte', clientName: 'Cliente', actorId: 'soc2', responsibleId: 'dz1', title: 'Nova tarefa atribuida a voce', body: 'x', sound: false });
+  const c = first(), cAv = avOf(c);
+  const cTxt = cAv ? (cAv.textContent || '').trim() : '';
+  const cPhoto = cAv ? /background-image/.test(cAv.getAttribute('style') || '') : false;
+  const cTitle = titleOf(c);
+
+  // (D) resolveUserIdentity (unidade)
+  const idR = window.resolveUserIdentity('soc1', {});
+  const idNo = window.resolveUserIdentity('soc2', {});
+  const idDen = window.resolveUserIdentity('zzz', { name: 'Fulano', avatar: AV });
+  clear();
+  return {
+    attrAvatarReal: aPhoto && aTxt === '',
+    attrTitleHasActor: /Arydyjany Carlôto atribuiu uma tarefa/.test(aTitle),
+    attrNotLetterN: aTxt !== 'N',
+    attrRespRowReal: aRespReal,
+    slaAvatarReal: bPhoto,
+    slaTitlePersonalized: /Miercohévisk, prazo próximo/.test(bTitle),
+    noPhotoActorInitials: cTxt === 'PS' && !cPhoto,
+    noPhotoNotLetterN: cTxt !== 'N',
+    noPhotoTitleHasActor: /Paula Souza atribuiu uma tarefa/.test(cTitle),
+    idRealAvatar: idR.hasRealAvatar === true && idR.avatarUrl === AV && idR.name === 'Arydyjany Carlôto',
+    idNoPhotoInitials: idNo.hasRealAvatar === false && idNo.avatarUrl === '' && idNo.initials === 'PS',
+    idDenormReal: idDen.hasRealAvatar === true && idDen.avatarUrl === AV,
+  };
+});
+// PRINT visual: atribuição com foto+nome reais da Social + responsável (mini-foto); SLA do designer.
+await clearToasts();
+await page.evaluate((AV) => {
+  state.users = [{ id: 'soc1', name: 'Arydyjany Carlôto', role: 'Social Media', photo: AV }, { id: 'dz1', name: 'Miercohévisk Carlôto', role: 'Designer', photo: AV }];
+  state.user = { id: 'dz1', name: 'Miercohévisk Carlôto', role: 'Designer', photo: AV };
+  state.tasks = [{ id: 'tatt', title: 'Cronograma semanal', client: 'Hospital Visão', sector: 'cronograma', assigneeId: 'dz1', by: 'soc1', designerAssignment: { designerId: 'dz1', designerName: 'Miercohévisk Carlôto', designerAvatar: AV, assignedBy: 'soc1' } }];
+  window.notifShowToast({ eventType: 'designer_assigned', taskId: 'tatt', taskTitle: 'Cronograma semanal', clientName: 'Hospital Visão', actorId: 'soc1', responsibleId: 'dz1', title: 'Nova tarefa atribuida a voce', etapa: 'Aguardando produção', sound: false });
+  window.notifShowToast({ eventType: 'sla_warning', taskId: 'tatt', taskTitle: 'Cronograma semanal', clientName: 'Hospital Visão', responsibleId: 'dz1', responsibleName: 'Miercohévisk Carlôto', responsibleAvatar: AV, title: 'Miercohévisk, prazo próximo', body: 'Você tem 30 minutos para concluir esta tarefa.\nCronograma semanal — Hospital Visão\nPrazo final: 16:30', sound: false });
+}, PNG1x1);
+await toastShot('f332-39-identidade-avatar-nome.png');
+await clearToasts();
+
+fs.writeFileSync(path.join(OUT, 'qa-f332-report.json'), JSON.stringify({ login, widgetGreen, widget, flicker, notif, cut, tall, card, consist, orangeImmediate, block, detail, editPrazo, rbac, header, toast, toastClick, notifDetect, flowDetect, recipientDetect, identityDetect, errors }, null, 2));
 console.log('FLICKER:', JSON.stringify(flicker)); console.log('NOTIF:', JSON.stringify(notif));
 console.log('TALL:', JSON.stringify(tall));
 console.log('LOGIN:', JSON.stringify(login)); console.log('WIDGET:', JSON.stringify(widget)); console.log('CUT:', JSON.stringify(cut));
@@ -639,6 +711,7 @@ console.log('DETAIL:', JSON.stringify(detail)); console.log('EDIT:', JSON.string
 console.log('TOAST:', JSON.stringify(toast)); console.log('TOASTCLICK:', JSON.stringify(toastClick));
 console.log('NOTIFDETECT:', JSON.stringify(notifDetect)); console.log('FLOWDETECT:', JSON.stringify(flowDetect));
 console.log('RECIPIENTDETECT:', JSON.stringify(recipientDetect));
+console.log('IDENTITYDETECT:', JSON.stringify(identityDetect));
 if (errors.length) console.log('PAGE ERRORS:\n' + errors.join('\n'));
 await browser.close(); server.close();
 
@@ -770,6 +843,19 @@ if (!recipientDetect.socialFlowFired) fail.push('flowToTeamSocial falhou (Social
 if (!recipientDetect.avatarFromDirectory) fail.push('avatarFromDirectory falhou (não usou foto real do diretório)');
 if (!recipientDetect.avatarFromDenorm) fail.push('avatarFromDenorm falhou (não usou foto denormalizada quando existe)');
 if (!recipientDetect.avatarNoneEmpty) fail.push('avatarNoneEmpty falhou (deveria cair p/ vazio sem foto)');
+// F3.3.3 (correção AVATAR "N") — identidade visual real no toast
+if (!identityDetect.attrAvatarReal) fail.push('attrAvatarReal falhou (atribuição não mostrou foto real do actor)');
+if (!identityDetect.attrTitleHasActor) fail.push('attrTitleHasActor falhou (título não virou "<actor> atribuiu uma tarefa")');
+if (!identityDetect.attrNotLetterN) fail.push('attrNotLetterN falhou (avatar ainda usa a letra do título)');
+if (!identityDetect.attrRespRowReal) fail.push('attrRespRowReal falhou (linha do responsável sem foto/nome real)');
+if (!identityDetect.slaAvatarReal) fail.push('slaAvatarReal falhou (SLA não mostrou foto do designer)');
+if (!identityDetect.slaTitlePersonalized) fail.push('slaTitlePersonalized falhou (título SLA não personalizado)');
+if (!identityDetect.noPhotoActorInitials) fail.push('noPhotoActorInitials falhou (sem foto deveria mostrar iniciais do ator)');
+if (!identityDetect.noPhotoNotLetterN) fail.push('noPhotoNotLetterN falhou (fallback caiu na letra do título "N")');
+if (!identityDetect.noPhotoTitleHasActor) fail.push('noPhotoTitleHasActor falhou (título sem nome do ator)');
+if (!identityDetect.idRealAvatar) fail.push('idRealAvatar falhou (resolveUserIdentity não retornou foto real)');
+if (!identityDetect.idNoPhotoInitials) fail.push('idNoPhotoInitials falhou (resolveUserIdentity sem foto deveria dar iniciais)');
+if (!identityDetect.idDenormReal) fail.push('idDenormReal falhou (resolveUserIdentity não aceitou foto denormalizada)');
 
 if (fail.length) { console.error('::error::QA F3.3.2 FALHOU: ' + fail.join(' | ')); process.exit(1); }
 console.log('QA F3.3.2 OK — login sem widgets; coluna multi-card sem corte (1366/1600); avatar real; widget verde/laranja/vermelho com janela 10min + crítico; status/fuso coerentes; laranja imediato; header cluster alinhado; Editar prazo RBAC honesto.');

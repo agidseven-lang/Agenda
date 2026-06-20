@@ -12,12 +12,14 @@
 import { BrowserWindow } from "electron";
 import { listen } from "./firebase";
 
-type Task = { id: string; title?: string; client?: string; sector?: string; assigneeId?: string; by?: string; createdAt?: number };
+type Task = { id: string; title?: string; client?: string; sector?: string; assigneeId?: string; assignee?: string; assigneeName?: string; assigneePhoto?: string; by?: string; createdAt?: number };
 type Event = { id: string; title?: string; date?: string; start?: string; ownerId?: string; by?: string; createdAt?: number };
 
 export type NotifPayload = {
   eventId?: string; eventType?: string; taskId?: string; taskTitle?: string; clientName?: string;
-  actorId?: string; actorName?: string; actorAvatar?: string; targetUserId?: string;
+  actorId?: string; actorName?: string; actorAvatar?: string;
+  responsibleId?: string; responsibleName?: string; responsibleAvatar?: string;
+  targetUserId?: string; notificationType?: string; etapa?: string; status?: string;
   title?: string; body?: string; context?: string; createdAt?: number;
   severity?: "info" | "success" | "warning" | "critical"; sound?: boolean;
   action?: { type?: string; deep?: string }; dedupKey?: string; source?: string; providerCalled?: boolean;
@@ -41,8 +43,12 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
       deliver({
         eventType: "task_assigned", source: "notifier", providerCalled: false,
         taskId: t.id, taskTitle: t.title || "Sem titulo", clientName: t.client || "",
+        // ATOR = quem atribuiu (criador); RESPONSAVEL = eu (assignee). IDs p/ o renderer
+        // resolver foto/nome REAIS no diretorio (state.users). Avatar do toast NUNCA vem do titulo.
+        actorId: t.by || "", responsibleId: t.assigneeId || "",
+        responsibleName: t.assignee || t.assigneeName || "", responsibleAvatar: t.assigneePhoto || "",
         targetUserId: state.uid, createdAt: created || Date.now(),
-        title: "Nova tarefa para voce",
+        title: "Nova tarefa atribuida a voce",
         body: (t.title || "Sem titulo") + (t.client ? ` - ${t.client}` : ""),
         context: t.client ? `Tarefa - ${t.client}` : "Tarefa",
         severity: "info", sound: true,
@@ -63,13 +69,19 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
       if (da.assignedBy && da.assignedBy === state.uid) return;
       const at = Number(da.assignedAt) || 0;
       if (at && at < state.sinceMs) return;                    // atribuicao anterior ao login
-      const linha = `${t.client ? t.client + " — " : ""}${t.title || "Cronograma"}`;
+      const linha = `${t.title || "Cronograma"}${t.client ? " — " + t.client : ""}`;
+      const byName = da.assignedByName || "";
       deliver({
         eventType: "designer_assigned", source: "notifier", providerCalled: false,
         taskId: t.id, taskTitle: t.title || "Cronograma", clientName: t.client || "",
-        actorName: da.assignedByName || "", targetUserId: state.uid, createdAt: at || Date.now(),
-        title: "Novo cronograma atribuido",
-        body: `${linha}\nAcesse para iniciar a producao.`,
+        // ATOR = Social/quem atribuiu (actorId = assignedBy p/ o renderer puxar a FOTO real);
+        // RESPONSAVEL = designer (nome/foto denormalizados no proprio designerAssignment).
+        actorId: da.assignedBy || "", actorName: byName, actorAvatar: da.assignedByAvatar || da.assignedByPhoto || "",
+        responsibleId: da.designerId || "", responsibleName: da.designerName || "", responsibleAvatar: da.designerAvatar || da.designerPhoto || "",
+        targetUserId: state.uid, createdAt: at || Date.now(), etapa: "Aguardando produção",
+        // titulo nativo (app minimizado): personaliza se houver nome; o renderer reescreve no toast.
+        title: byName ? `${byName} atribuiu uma tarefa` : "Nova tarefa atribuida a voce",
+        body: `${linha}${da.designerName ? `\nResponsável: ${da.designerName}` : ""}\nEtapa: Aguardando produção`,
         context: t.client ? `Cronograma - ${t.client}` : "Cronograma",
         severity: "info", sound: true,
         action: { type: "board", deep: `board/${t.sector || ""}` },

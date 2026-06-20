@@ -152,8 +152,21 @@ ok('renderer: roteador de destinatários definido', /function resolveNotificatio
 ok('renderer: notifScanSla aplica a porta do roteador (SLA pessoal)', /var tg=resolveNotificationTargets\(\{ eventType:'sla_warning'[\s\S]*?if\(!tg\.shouldNotifyCurrentUser\) continue;/.test(html));
 ok('renderer: notifScanFlow roteia por EQUIPE (currentUserCanSeeAll)', /var tg=resolveNotificationTargets\(\{ eventType:ev\.eventType[\s\S]*?currentUserCanSeeAll:seeAll/.test(html));
 ok('renderer: identidade com FOTO REAL (diretório->denormalizado->letra)', /function notifIdentity\(/.test(html) && /function notifResponsible\(/.test(html) && /function notifActor\(/.test(html));
-ok('renderer: toast prefere foto real do ator->responsável (nunca letra havendo foto)', /p\.actorAvatar\|\|p\.responsibleAvatar/.test(html));
+ok('renderer: toast usa foto ESTRITA da identidade principal (responsável p/ SLA, ator p/ fluxo)', /var primPhoto= isSla \? \(p\.responsibleAvatar\|\|''\) : \(p\.actorAvatar\|\|''\)/.test(html));
 ok('renderer: contrato carrega responsável + notificationType + etapa', /responsibleId:o\.responsibleId/.test(html) && /notificationType:o\.notificationType/.test(html) && /etapa:o\.etapa/.test(html));
+// FASE 2/6 (correção avatar "N") — identidade única + normalização do toast
+ok('renderer: resolveUserIdentity (foto real/iniciais/role/hasRealAvatar)', /function resolveUserIdentity\(/.test(html) && /hasRealAvatar/.test(html) && /avatarUrl/.test(html) && /initials/.test(html));
+ok('renderer: notifNormalize resolve ator+responsável e reescreve atribuição', /function notifNormalize\(/.test(html) && /atribuiu uma tarefa/.test(html));
+ok('renderer: notifResponsible usa designerAvatar do designerAssignment', /da\.designerAvatar\|\|da\.designerPhoto/.test(html));
+ok('renderer: toast escolhe identidade por tipo (SLA=designer, fluxo=ator)', /var primName = isSla/.test(html) && /var primPhoto= isSla/.test(html));
+ok('renderer: avatar NUNCA usa inicial do título (usa primIni do NOME)', /primIni\|\|/.test(html) && !/String\(nm\)\.trim\(\)\[0\]/.test(html));
+ok('renderer: linha do RESPONSÁVEL com mini-foto (ntf-resp)', /ntf-resp/.test(html) && /Responsável: /.test(html));
+ok('renderer: SLA com título personalizado + prazo final', /prazo próximo/.test(html) && /Prazo final: /.test(html));
+// FASE 3 — notifier do main entrega IDs p/ o renderer resolver foto/nome reais
+ok('notifier: designer_assigned entrega actorId(assignedBy)+responsibleId(designerId)', /actorId: da\.assignedBy/.test(notifierTs) && /responsibleId: da\.designerId/.test(notifierTs));
+ok('notifier: designer_assigned entrega foto denormalizada do designer', /responsibleAvatar: da\.designerAvatar/.test(notifierTs));
+ok('notifier: task_assigned entrega actorId(by)+responsibleId(assigneeId)', /actorId: t\.by/.test(notifierTs) && /responsibleId: t\.assigneeId/.test(notifierTs));
+ok('notifier: não usa mais título genérico "Novo cronograma atribuido"', !/Novo cronograma atribuido/.test(notifierTs));
 
 // ===================== não regrediu o aprovado (F3.3.2) =====================
 ok('preservado: card Kanban Opção 2 (themes-list rola)', /kbv2-themes-list/.test(html) && /CARD-FIT-NOTEBOOK/.test(html));
