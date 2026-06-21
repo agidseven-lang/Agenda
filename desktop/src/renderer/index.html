@@ -3841,6 +3841,17 @@ var notifDetailId=null;
 function notifHistoryLoad(){ try{ var a=JSON.parse(localStorage.getItem(NOTIF_HIST_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(_){ return []; } }
 function notifHistorySave(a){ try{ localStorage.setItem(NOTIF_HIST_KEY,JSON.stringify(a||[])); }catch(_){} }
 /* APPEND read-side: dedup por dedupKey (não duplica já-deduplicado), trim do payload aprovado, retenção. */
+/* F3.3.10-FIX — a captura NUNCA pode reconstruir a tela ativa enquanto o usuário edita/digita
+   (mesma invariante do render(): _editingNow). Cobre o wizard "Nova tarefa"/edição (state.form),
+   modais com campos e QUALQUER input/textarea/select/contenteditable em foco (ex.: a própria busca
+   da Central). Quando ocupado, a captura é PASSIVA: só atualiza o badge — não rouba o foco nem
+   apaga o formulário. (Regressão F3.3.10-DESKTOP: campos da "Nova tarefa" não aceitavam digitação.) */
+function ncCaptureBusy(){ try{
+  if(typeof state!=='undefined'&&state&&state.form) return true;
+  if(typeof _editingNow==='function'&&_editingNow()) return true;
+  var a=document.activeElement; if(a){ var tg=(a.tagName||'').toUpperCase(); if(a.isContentEditable||tg==='INPUT'||tg==='TEXTAREA'||tg==='SELECT') return true; }
+  return false;
+}catch(_){ return false; } }
 function notifHistoryAppend(p){ try{
   if(!p) return; var key=String(p.dedupKey||p.eventId||''); if(!key) return;
   var a=notifHistoryLoad();
@@ -3854,7 +3865,7 @@ function notifHistoryAppend(p){ try{
   var cut=Date.now()-NOTIF_HIST_TTL; a=a.filter(function(x){ return (Number(x.createdAt)||0)>=cut; });
   if(a.length>NOTIF_HIST_CAP) a=a.slice(0,NOTIF_HIST_CAP);
   notifHistorySave(a);
-  try{ if(typeof state!=='undefined'&&state&&state.tab==='notificacoes'){ var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } } notifBadgeRefresh(); }catch(_){}
+  try{ if(typeof state!=='undefined'&&state&&state.tab==='notificacoes'&&!ncCaptureBusy()){ var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } } notifBadgeRefresh(); }catch(_){}
 }catch(_){} }
 function notifHistoryUnread(){ var a=notifHistoryLoad(),n=0; for(var i=0;i<a.length;i++) if(!a[i].read) n++; return n; }
 function notifHistoryMarkRead(id){ var a=notifHistoryLoad(),ch=false; for(var i=0;i<a.length;i++) if(a[i].eventId===id&&!a[i].read){a[i].read=true;ch=true;} if(ch) notifHistorySave(a); }
