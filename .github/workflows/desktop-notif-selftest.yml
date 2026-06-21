@@ -1,0 +1,94 @@
+name: "[manual] Desktop Notif SelfTest (Windows REAL, read-only)"
+
+# Prova de CANAL em Windows REAL (runner CI), NAO headless. Builda o app e roda com
+# IDSEVEN_SELFTEST=1 -> runNotifSelfTest() exercita o deliverNotification REAL nos 3 estados
+# (visivel->toast, minimizado->NATIVA, oculto/bandeja->NATIVA), SEM Firestore/write/deploy.
+# Coleta o log local (idseven-notif-diag.log) + screenshots (best-effort) como artifacts.
+# NAO publica, NAO faz deploy, NAO instala (roda direto via electron .). SO diagnostico.
+
+"on":
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit a testar (default: desktop/local-detail-hierarchy-v2)"
+        required: false
+        default: "desktop/local-detail-hierarchy-v2"
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (ref escolhido)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm install
+        working-directory: desktop
+        run: npm ci || npm install
+
+      - name: Build (tsc main/preload + renderer)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Rodar self-test (Electron, Windows REAL, IDSEVEN_SELFTEST=1)
+        working-directory: desktop
+        shell: pwsh
+        env:
+          IDSEVEN_SELFTEST: "1"
+        run: |
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          # Loop de screenshots (best-effort; sessao do runner pode nao renderizar toast nativo)
+          $shot = Start-Job {
+            Add-Type -AssemblyName System.Windows.Forms,System.Drawing
+            for ($i=0; $i -lt 12; $i++) {
+              try {
+                $bnd=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+                $bmp=New-Object System.Drawing.Bitmap($bnd.Width,$bnd.Height)
+                $g=[System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen(0,0,0,0,$bmp.Size)
+                $bmp.Save("$using:PWD\out\shot-$i.png"); $g.Dispose(); $bmp.Dispose()
+              } catch {}
+              Start-Sleep -Seconds 2
+            }
+          }
+          # Roda o app; ele executa a sequencia e chama app.exit(0) ao final (failsafe 30s).
+          $p = Start-Process -FilePath "npx" -ArgumentList "electron","." -NoNewWindow -PassThru -RedirectStandardOutput "out\electron-out.txt" -RedirectStandardError "out\electron-err.txt"
+          if (-not $p.WaitForExit(120000)) { Write-Host "timeout -> kill"; try { $p.Kill() } catch {} }
+          Wait-Job $shot -Timeout 30 | Out-Null; Receive-Job $shot | Out-Null; Remove-Job $shot -Force -ErrorAction SilentlyContinue
+          Write-Host "electron exit: $($p.ExitCode)"
+
+      - name: Coletar diag log
+        if: always()
+        shell: pwsh
+        run: |
+          $log = "$env:APPDATA\agenda-id-seven-desktop\idseven-notif-diag.log"
+          New-Item -ItemType Directory -Force -Path desktop\out | Out-Null
+          Write-Host "================ DIAG LOG ($log) ================"
+          if (Test-Path $log) {
+            Copy-Item $log "desktop\out\idseven-notif-diag.log" -Force
+            Get-Content $log
+          } else {
+            Write-Host "LOG NAO ENCONTRADO. Conteudo de APPDATA:"
+            Get-ChildItem "$env:APPDATA" | Select-Object Name | Format-Table -AutoSize
+          }
+          Write-Host "================ electron-out.txt ================"
+          if (Test-Path "desktop\out\electron-out.txt") { Get-Content "desktop\out\electron-out.txt" | Select-Object -Last 40 }
+          Write-Host "================ electron-err.txt ================"
+          if (Test-Path "desktop\out\electron-err.txt") { Get-Content "desktop\out\electron-err.txt" | Select-Object -Last 40 }
+
+      - name: Upload artifact (log + screenshots)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-notif-selftest
+          path: desktop/out/
+          if-no-files-found: warn
