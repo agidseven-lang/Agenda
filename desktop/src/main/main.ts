@@ -12,6 +12,7 @@ import os from "os";
 import { createTray } from "./tray";
 import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
+import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
 import { startReminder } from "./reminder";
 
 let mainWin: BrowserWindow | null = null;
@@ -56,8 +57,9 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
   try {
     if (!p || typeof p !== "object") return { ok: false, channel: "none" };
     const key = String(p.dedupKey || `${p.eventType || "evt"}:${p.taskId || ""}:${p.createdAt || ""}`);
-    if (_notifSeen.has(key)) return { ok: true, channel: "dedup" };
+    if (_notifSeen.has(key)) { diag("deliver.dedup", { key }); return { ok: true, channel: "dedup" }; }
     _notifSeen.add(key);
+    diag("deliver.begin", { eventType: p.eventType, taskId: p.taskId, targetUserId: p.targetUserId, actorId: p.actorId, responsibleId: p.responsibleId, dedupKey: key, windowActive: windowActive(), visible: !!(mainWin && !mainWin.isDestroyed() && mainWin.isVisible()), minimized: !!(mainWin && !mainWin.isDestroyed() && mainWin.isMinimized()) });
     if (_notifSeen.size > 4000) { const it = _notifSeen.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; _notifSeen.delete(v.value); } }
     // F3.3.10 — CAPTURA p/ a Central (histórico local no renderer). CAPTURE-ONLY: encaminha o MESMO
     // payload já deduplicado, sem alterar roteamento/toast/nativa/dedup/som/severidade/destino. Nunca
@@ -66,6 +68,7 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
     const deep = (p.action && p.action.deep) ? String(p.action.deep) : "";
     if (windowActive()) {
       mainWin?.webContents.send("notif-toast", p);
+      diag("deliver.toast", { dedupKey: key, taskId: p.taskId });
       return { ok: true, channel: "toast" };
     }
     const n = new Notification({
@@ -75,12 +78,14 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       icon: _appIcon(),
     });
     n.on("click", () => {
+      diag("native.click", { dedupKey: key, deep });
       const w = mainWin;
       if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
     });
     n.show();
+    diag("deliver.native", { dedupKey: key, deep, taskId: p.taskId, title: String(p.title || ""), hasClick: true });
     return { ok: true, channel: "native" };
-  } catch { return { ok: false, channel: "error" }; }
+  } catch (e) { diag("deliver.error", { err: String(((e as any) && (e as any).message) || e) }); return { ok: false, channel: "error" }; }
 }
 
 // Locale pt-BR: faz os inputs nativos date/time exibirem dd/mm/aaaa e HH:mm.
@@ -168,8 +173,16 @@ function createWindow() {
     if (!quitting) {
       e.preventDefault();
       mainWin?.hide();
+      diag("window.close→hide(tray)", { quitting }); // F3.3.10-DIAG: prova que X vai p/ bandeja (não quit)
+    } else {
+      diag("window.close→quit", { quitting });
     }
   });
+  // F3.3.10-DIAG — lifecycle (só log; não altera comportamento)
+  mainWin.on("minimize", () => diag("window.minimize"));
+  mainWin.on("restore", () => diag("window.restore"));
+  mainWin.on("show", () => diag("window.show"));
+  mainWin.on("hide", () => diag("window.hide(tray)"));
 }
 
 function realQuit() {
@@ -180,6 +193,7 @@ function realQuit() {
 }
 
 app.whenReady().then(() => {
+  diag("app.ready", { diagPath: diagPath() }); // F3.3.10-DIAG: caminho do log impresso no próprio log
   createWindow();
   tray = createTray(
     () => mainWin,
@@ -189,8 +203,12 @@ app.whenReady().then(() => {
   // IPC do renderer
   ipcMain.handle("notif-test", () => {
     new Notification({ title: "Agenda ID Seven", body: "Notificacao de teste OK." }).show();
+    diag("notif-test.shown");
     return true;
   });
+  // F3.3.10-DIAG — renderer envia eventos p/ o MESMO arquivo de log local (scan/Central/visibility).
+  ipcMain.on("diag-log", (_e, tag: string, data?: unknown) => { try { diag("renderer." + String(tag), data); } catch { /* */ } });
+  ipcMain.handle("diag-path", () => diagPath());
   // F3.3.3 — renderer pede notificação (fluxo/SLA/bloqueio detectados no renderer).
   // O HUB decide o canal (toast in-app x nativa) e faz dedup. Sem provider externo.
   ipcMain.handle("notify", (_e, payload: NotifPayload) => deliverNotification(payload));
@@ -251,6 +269,7 @@ app.whenReady().then(() => {
 
   // Renderer avisa o uid logado -> ligamos os listeners de notificacao
   ipcMain.on("session-login", (_e, uid: string) => {
+    diag("session-login", { uid }); // F3.3.10-DIAG
     if (stopNotifier) stopNotifier();
     if (stopReminder) stopReminder();
     if (uid) {

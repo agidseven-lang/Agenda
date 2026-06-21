@@ -31,7 +31,10 @@ const ok = (n, c) => { if (c) pass++; else { fail++; console.log('FAIL:', n); } 
 ok('main: notifier inicia no session-login', /ipcMain\.on\("session-login"[\s\S]*?startNotifier\(\(\) => mainWin, uid, deliverNotification\)/.test(mainTs));
 ok('main: X (close) esconde na bandeja, processo vivo (hide, não quit)', /on\("close",[\s\S]*?if \(!quitting\)[\s\S]*?mainWin\?\.hide\(\)/.test(mainTs));
 ok('main: window-all-closed não encerra (vive na bandeja)', /window-all-closed[\s\S]*?if \(!quitting\) e\.preventDefault/.test(mainTs));
-ok('main: notifier só para em logout/Sair (não no minimize/hide)', /function realQuit\(\)[\s\S]*?stopNotifier\(\)/.test(mainTs) && !/on\("minimize"[\s\S]*?stopNotifier/.test(mainTs));
+// O notifier só pode parar em realQuit/logout — NUNCA num handler de minimize/hide. Escopo por
+// statement (mesma linha do handler): os handlers são one-liners; não deixar o [\s\S]*? varrer o
+// arquivo até o stopNotifier do realQuit (falso-positivo após a instrumentação DIAG de lifecycle).
+ok('main: notifier só para em logout/Sair (não no minimize/hide)', /function realQuit\(\)[\s\S]*?stopNotifier\(\)/.test(mainTs) && !/on\("minimize"[^\n]*stopNotifier/.test(mainTs) && !/on\("hide"[^\n]*stopNotifier/.test(mainTs));
 ok('main: deliverNotification usa NATIVA quando !windowActive', /if \(windowActive\(\)\) \{[\s\S]*?send\("notif-toast"[\s\S]*?return \{ ok: true, channel: "toast" \};\s*\}\s*const n = new Notification\(/.test(mainTs));
 ok('main: windowActive = visível e não-minimizado (minimizado/oculto → nativa)', /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
 ok('main: Notification nativa tem click handler (abre a tarefa via deep link)', /n\.on\("click"[\s\S]*?send\("notif-open", deep\)/.test(mainTs));

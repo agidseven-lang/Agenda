@@ -4,6 +4,7 @@ import {
   collection, initializeFirestore, onSnapshot,
   query, QuerySnapshot, DocumentData,
 } from "firebase/firestore";
+import { diag } from "./diag";
 
 export const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBbeZ5M9iNgzw5382iCIDKB-G2QqKuwAes",
@@ -27,5 +28,15 @@ export function listen<T extends DocumentData>(
   name: string,
   cb: (snap: QuerySnapshot<T>) => void
 ) {
-  return onSnapshot(query(collection(db, name)) as any, (s: any) => cb(s as any));
+  // F3.3.10-DIAG — loga cada snapshot recebido pelo MAIN (prova se o realtime chega em background)
+  // + erros de transporte. NÃO altera o comportamento: só chama cb e segue.
+  diag("firestore.listen.attach", { col: name });
+  return onSnapshot(
+    query(collection(db, name)) as any,
+    (s: any) => {
+      try { diag("firestore.snapshot", { col: name, size: s.size, changes: (s.docChanges && s.docChanges() || []).length }); } catch { /* */ }
+      cb(s as any);
+    },
+    (err: any) => { try { diag("firestore.error", { col: name, err: String((err && err.message) || err) }); } catch { /* */ } }
+  );
 }

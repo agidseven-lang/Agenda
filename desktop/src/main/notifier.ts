@@ -11,6 +11,7 @@
  */
 import { BrowserWindow } from "electron";
 import { listen } from "./firebase";
+import { diag } from "./diag";
 
 type Task = { id: string; title?: string; client?: string; sector?: string; assigneeId?: string; assignee?: string; assigneeName?: string; assigneePhoto?: string; by?: string; createdAt?: number };
 type Event = { id: string; title?: string; date?: string; start?: string; ownerId?: string; by?: string; createdAt?: number };
@@ -30,6 +31,7 @@ export type NotifierState = { uid: string; sinceMs: number };
 
 export function startNotifier(getWin: () => BrowserWindow | null, uid: string, deliver: Deliver) {
   const state: NotifierState = { uid, sinceMs: Date.now() };
+  diag("notifier.start", { uid, sinceMs: state.sinceMs }); // F3.3.10-DIAG (só log)
 
   // tasks: nova tarefa atribuida a mim
   const u1 = listen<Task>("tasks", (snap) => {
@@ -66,9 +68,10 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
       const t = { id: ch.doc.id, ...(ch.doc.data() as any) } as any;
       const da = t.designerAssignment;
       if (!da || da.designerId !== state.uid) return;          // nao fui eu o designer escolhido
-      if (da.assignedBy && da.assignedBy === state.uid) return;
+      if (da.assignedBy && da.assignedBy === state.uid) { diag("notifier.assign.skip", { taskId: t.id, reason: "self" }); return; }
       const at = Number(da.assignedAt) || 0;
-      if (at && at < state.sinceMs) return;                    // atribuicao anterior ao login
+      if (at && at < state.sinceMs) { diag("notifier.assign.skip", { taskId: t.id, reason: "before-login", at, sinceMs: state.sinceMs }); return; } // atribuicao anterior ao login
+      diag("notifier.assign.match", { taskId: t.id, type: ch.type, designerId: da.designerId, assignedBy: da.assignedBy, at, dedupKey: `designer_assigned:${t.id}:${at}` }); // F3.3.10-DIAG (só log)
       const linha = `${t.title || "Cronograma"}${t.client ? " — " + t.client : ""}`;
       const byName = da.assignedByName || "";
       deliver({

@@ -3470,10 +3470,13 @@ function notifIsAttrEvent(p){ var e=p&&p.eventType; return e==='designer_assigne
 function notifAttrToastOnce(p){ try{ var k=String((p&&(p.dedupKey||p.eventId))||''); if(!k) return false; if(notifAttrToastSeen[k]) return false; notifAttrToastSeen[k]=1; notifShowToast(p); return true; }catch(_){ return false; } }
 
 /* ROTEAMENTO: Electron (HUB do main decide canal) ou fallback direto (navegador/QA). Dedup local. */
+/* F3.3.10-DIAG — log local (via main) de eventos do renderer; build instrumentada (sem rede/Firestore). */
+function ncDiag(t,d){ try{ if(window.desktopAPI&&typeof window.desktopAPI.diagLog==='function') window.desktopAPI.diagLog(t,d); }catch(_){} }
 function notifEmit(p){
   try{
     if(window.__notifSuppress) return;   /* QA: silencia a auto-detecção; o toast direto segue funcionando */
     if(!p) return; var key=p.dedupKey||p.eventId; if(!key) return;
+    ncDiag('notifEmit',{eventType:p.eventType,dedupKey:key,seen:notifSeenHas(key)});
     if(notifSeenHas(key)) return;
     var delivered=false;
     var api=window.desktopAPI;
@@ -3620,6 +3623,10 @@ function notifScanAssign(){
 if(typeof renderFromSnapshot==='function'){ var _notif_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_notif_rfs.apply(this,arguments); try{ notifScan(); }catch(_){} return r; }; }
 if(typeof slaTick==='function'){ var _notif_tk=slaTick; slaTick=function(){ var r=_notif_tk.apply(this,arguments); try{ notifScanSla(); }catch(_){} return r; }; }
 try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} try{ notifScanAssign(); }catch(_){} },30000); }catch(_){}
+/* F3.3.10-DIAG — registra transições de visibilidade do RENDERER (prova quando o Chromium congela a
+   janela minimizada/bandeja → por que a entrega em background depende do MAIN/notifier, nunca suspenso).
+   Só log local via main; não altera comportamento. Removível. */
+try{ document.addEventListener('visibilitychange', function(){ try{ ncDiag('visibility',{state:document.visibilityState}); }catch(_){} }); ncDiag('boot',{state:(typeof document!=='undefined'?document.visibilityState:'?')}); }catch(_){}
 /* receber TOAST do HUB do main (janela focada/visível) */
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ if(notifIsAttrEvent(p)){ notifAttrToastOnce(p); } else { notifShowToast(p); } try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} }); } }catch(_){}
 /* F3.3.10 — onNotifHistory (captura 100% toast×nativa via hub do main) é registrado UMA vez no bloco F3.3.10-NOTIF-CENTRAL. */
@@ -3919,7 +3926,7 @@ function ncCaptureBusy(){ try{
 function notifHistoryAppend(p){ try{
   if(!p) return; var key=String(p.dedupKey||p.eventId||''); if(!key) return;
   var a=notifHistoryLoad();
-  for(var i=0;i<a.length;i++){ if(a[i].dedupKey===key) return; }
+  for(var i=0;i<a.length;i++){ if(a[i].dedupKey===key){ ncDiag('central.dedup',{dedupKey:key}); return; } }
   a.unshift({ eventId:p.eventId||key, dedupKey:key, eventType:p.eventType||'', taskId:p.taskId||'',
     taskTitle:p.taskTitle||'', clientName:p.clientName||'', actorName:p.actorName||'', actorAvatar:p.actorAvatar||'',
     responsibleName:p.responsibleName||'', responsibleAvatar:p.responsibleAvatar||'', notificationType:p.notificationType||'',
@@ -3929,6 +3936,7 @@ function notifHistoryAppend(p){ try{
   var cut=Date.now()-NOTIF_HIST_TTL; a=a.filter(function(x){ return (Number(x.createdAt)||0)>=cut; });
   if(a.length>NOTIF_HIST_CAP) a=a.slice(0,NOTIF_HIST_CAP);
   notifHistorySave(a);
+  ncDiag('central.capture',{dedupKey:key,eventType:p.eventType||'',total:a.length});
   try{ if(typeof state!=='undefined'&&state&&state.tab==='notificacoes'&&!ncCaptureBusy()){ var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } } notifBadgeRefresh(); }catch(_){}
 }catch(_){} }
 function notifHistoryUnread(){ var a=notifHistoryLoad(),n=0; for(var i=0;i<a.length;i++) if(!a[i].read) n++; return n; }

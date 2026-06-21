@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   onNotifHistory: (cb: (payload: any) => void) => {
     ipcRenderer.on("notif-history", (_e, p: any) => cb(p));
   },
+  // F3.3.10-DIAG — renderer escreve eventos no log local do main (sem rede/Firestore). Build instrumentada.
+  diagLog: (tag: string, data?: any) => { try { ipcRenderer.send("diag-log", tag, data); } catch { /* */ } },
+  diagPath: (): Promise<string> => ipcRenderer.invoke("diag-path"),
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   // 1.0.114 — ENVIO PREMIUM: imagem real do card p/ anexar no WhatsApp.
