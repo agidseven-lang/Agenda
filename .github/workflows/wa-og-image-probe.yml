@@ -1,0 +1,90 @@
+name: "[manual] WA OG Image Probe (read-only)"
+
+# Mede o og:image do card premium (dimensoes + bytes + headers) e da o VEREDITO C7:
+# o WhatsApp tem limite pratico de imagem MENOR que o Facebook (imagens grandes sao
+# DROPADAS -> preview generico mesmo com OG perfeito). SOMENTE curl GET + ImageMagick
+# identify. SEM deploy, SEM secrets, SEM Firestore, SEM tocar Worker/Cloudflare.
+
+"on":
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "URL do og:image"
+        required: false
+        default: "https://aprovar.agendaidseven.com.br/og/wa-card-v64-38.jpg"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar e analisar og:image (dimensoes + tamanho + veredito C7)
+        env:
+          IMG_URL: ${{ github.event.inputs.image }}
+        run: |
+          set +e
+          IMG="${IMG_URL:-https://aprovar.agendaidseven.com.br/og/wa-card-v64-38.jpg}"
+          mkdir -p out
+          curl -sS -L -m 40 -A "facebookexternalhit/1.1" -D out/headers-og.txt -o out/og.jpg \
+            -w "HTTP=%{http_code}\nCT=%{content_type}\nSIZE=%{size_download}\nTIME=%{time_total}\nFINAL=%{url_effective}\n" \
+            "$IMG" > out/metrics.txt 2>out/curlerr.txt
+
+          CODE="$(grep '^HTTP=' out/metrics.txt | cut -d= -f2)"
+          CT="$(grep '^CT=' out/metrics.txt | cut -d= -f2)"
+          TIME="$(grep '^TIME=' out/metrics.txt | cut -d= -f2)"
+          BYTES="$(stat -c%s out/og.jpg 2>/dev/null || echo 0)"
+          KB=$(( BYTES / 1024 ))
+          DIM="$(identify -format '%wx%h' out/og.jpg 2>/dev/null || echo '?x?')"
+          FMT="$(identify -format '%m' out/og.jpg 2>/dev/null || echo '?')"
+          W="$(echo "$DIM" | cut -dx -f1)"; H="$(echo "$DIM" | cut -dx -f2)"
+          case "$W" in ''|*[!0-9]*) W=0;; esac
+          case "$H" in ''|*[!0-9]*) H=0;; esac
+          RATIO="?"; if [ "$H" -gt 0 ]; then RATIO="$(awk "BEGIN{printf \"%.2f\", $W/$H}")"; fi
+
+          isjpeg=NAO; echo "$CT" | grep -qi 'image/jpeg' && isjpeg=SIM
+          dimok=NAO; [ "$W" -ge 200 ] && [ "$H" -ge 200 ] && dimok=SIM
+          wa600=NAO; [ "$BYTES" -gt 0 ] && [ "$BYTES" -le 614400 ] && wa600=SIM
+          wa1mb=NAO; [ "$BYTES" -gt 0 ] && [ "$BYTES" -le 1048576 ] && wa1mb=SIM
+          fb5mb=NAO; [ "$BYTES" -gt 0 ] && [ "$BYTES" -le 5242880 ] && fb5mb=SIM
+
+          {
+            echo "================ OG IMAGE PROBE (C7) ================"
+            echo "Gerado (UTC): $(date -u)"
+            echo "URL        : $IMG"
+            echo "HTTP       : $CODE"
+            echo "Content-Type: $CT (formato real: $FMT)"
+            echo "Bytes      : $BYTES  (${KB} KB)"
+            echo "Dimensoes  : $DIM   (aspect ${RATIO}:1)"
+            echo "Tempo (s)  : $TIME"
+            echo "--- headers relevantes ---"
+            grep -iE '^content-length:|^content-type:|^cache-control:|^cf-cache-status:|^age:|^last-modified:|^etag:|^cf-ray:|^server:' out/headers-og.txt | tr -d '\r' | sed 's/^/  /'
+            echo ""
+            echo "================ VEREDITO C7 (WhatsApp/Meta) ================"
+            echo "200 + image/jpeg ................... : $([ "$CODE" = 200 ] && echo "$isjpeg" || echo NAO)"
+            echo "Dimensoes >= 200x200 .............. : $dimok ($DIM)"
+            echo "<= 600 KB (render confiavel no WA) . : $wa600 (${KB} KB)"
+            echo "<= 1 MB (limite pratico comum WA) .. : $wa1mb"
+            echo "<= 5 MB (limite Facebook) .......... : $fb5mb"
+            echo ""
+            if [ "$wa600" = "SIM" ] && [ "$dimok" = "SIM" ] && [ "$isjpeg" = "SIM" ] && [ "$CODE" = "200" ]; then
+              echo "-> C7 DESCARTADO: imagem 200, JPEG, ${DIM}, ${KB}KB (<=600KB) — dentro do que o WhatsApp renderiza."
+              echo "   Se ainda aparece generico em link NOVO, a causa NAO e a imagem; e o WhatsApp (scrape assincrono/cache)."
+            elif [ "$CODE" != "200" ] || [ "$isjpeg" != "SIM" ]; then
+              echo "-> C7 CONFIRMADO (grave): og:image nao retorna 200/JPEG — imagem quebrada."
+            elif [ "$wa600" != "SIM" ]; then
+              echo "-> C7 SUSPEITO: imagem ${KB}KB pode exceder o limite pratico do WhatsApp (~600KB) -> WA dropa a imagem"
+              echo "   e mostra preview generico, mesmo com OG perfeito (Facebook aceita ate 5MB; WhatsApp nao)."
+            else
+              echo "-> C7 PARCIAL: revisar dimensoes/aspect ($DIM / ${RATIO}:1)."
+            fi
+          } | tee out/og-image-report.txt
+
+      - name: Upload artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wa-og-image-probe
+          path: out/
+          if-no-files-found: warn
