@@ -651,6 +651,9 @@ const identityDetect = await page.evaluate(() => {
   const first = () => document.querySelector('#notif-stack .ntf');
   const avOf = (n) => n && n.querySelector('.ntf-av');
   const titleOf = (n) => (n && n.querySelector('.ntf-hd b') ? n.querySelector('.ntf-hd b').textContent : '') || '';
+  // F3.3.10 — toast de ATRIBUIÇÃO reorganizado (aprovado): linha 1 = NOME do ator (.ntf-hd b);
+  // linha 2 "atribuiu uma tarefa" (.ntf-ti). Antes era tudo no título; o gate agora valida o novo layout.
+  const line2Of = (n) => (n && n.querySelector('.ntf-ti') ? n.querySelector('.ntf-ti').textContent : '') || '';
 
   // (A) ATRIBUIÇÃO como o HUB/main entrega: SEM actorAvatar; actorId resolve no diretório.
   clear();
@@ -659,6 +662,7 @@ const identityDetect = await page.evaluate(() => {
   const aPhoto = aAv ? /background-image/.test(aAv.getAttribute('style') || '') : false;
   const aTxt = aAv ? (aAv.textContent || '').trim() : '';
   const aTitle = titleOf(a);
+  const aLine2 = line2Of(a);
   const aResp = a ? a.querySelector('.ntf-resp') : null;
   const aRespReal = !!(aResp && aResp.querySelector('.ntf-resp-av') && /background-image/.test((aResp.querySelector('.ntf-resp-av').getAttribute('style') || ''))) && /Miercohévisk/.test(aResp ? aResp.textContent : '');
 
@@ -676,6 +680,7 @@ const identityDetect = await page.evaluate(() => {
   const cTxt = cAv ? (cAv.textContent || '').trim() : '';
   const cPhoto = cAv ? /background-image/.test(cAv.getAttribute('style') || '') : false;
   const cTitle = titleOf(c);
+  const cLine2 = line2Of(c);
 
   // (D) resolveUserIdentity (unidade)
   const idR = window.resolveUserIdentity('soc1', {});
@@ -684,14 +689,14 @@ const identityDetect = await page.evaluate(() => {
   clear();
   return {
     attrAvatarReal: aPhoto && aTxt === '',
-    attrTitleHasActor: /Arydyjany Carlôto atribuiu uma tarefa/.test(aTitle),
+    attrTitleHasActor: /Arydyjany Carlôto/.test(aTitle) && /atribuiu uma tarefa/.test(aLine2),
     attrNotLetterN: aTxt !== 'N',
     attrRespRowReal: aRespReal,
     slaAvatarReal: bPhoto,
     slaTitlePersonalized: /Miercohévisk, prazo próximo/.test(bTitle),
     noPhotoActorInitials: cTxt === 'PS' && !cPhoto,
     noPhotoNotLetterN: cTxt !== 'N',
-    noPhotoTitleHasActor: /Paula Souza atribuiu uma tarefa/.test(cTitle),
+    noPhotoTitleHasActor: /Paula Souza/.test(cTitle) && /atribuiu uma tarefa/.test(cLine2),
     idRealAvatar: idR.hasRealAvatar === true && idR.avatarUrl === AV && idR.name === 'Arydyjany Carlôto',
     idNoPhotoInitials: idNo.hasRealAvatar === false && idNo.avatarUrl === '' && idNo.initials === 'PS',
     idDenormReal: idDen.hasRealAvatar === true && idDen.avatarUrl === AV,
@@ -742,12 +747,13 @@ const measure = () => page.evaluate(() => {
   const cs = (el) => el ? getComputedStyle(el) : null;
   const vClip = (el) => el ? (el.scrollHeight > el.clientHeight + 2) : false;
   const hClip = (el) => el ? (el.scrollWidth > el.clientWidth + 2) : false;
-  const b = q('.ntf-hd b'), ds = q('.ntf-ds'), ctx = q('.ntf-ctx'), resp = q('.ntf-resp span:last-child'), av = q('.ntf-av');
+  const b = q('.ntf-hd b'), ds = q('.ntf-ds'), ctx = q('.ntf-ctx'), resp = q('.ntf-resp span:last-child'), av = q('.ntf-av'), l2 = q('.ntf-ti');
   const stack = document.getElementById('notif-stack'), scs = getComputedStyle(stack);
   const card = q('.ntf-card'), ccs = getComputedStyle(card);
   return {
     present: true, width: Math.round(r.width),
     titleWS: b ? cs(b).whiteSpace : '', titleHClip: hClip(b), titleVClip: vClip(b), titleText: b ? b.textContent : '',
+    line2Text: l2 ? l2.textContent : '', line2HClip: hClip(l2), line2VClip: vClip(l2),
     bodyWS: ds ? cs(ds).whiteSpace : '', bodyHClip: hClip(ds), bodyVClip: vClip(ds), bodyText: ds ? ds.textContent : '',
     ctxWS: ctx ? cs(ctx).whiteSpace : '', ctxHClip: hClip(ctx), ctxText: ctx ? ctx.textContent : '',
     respWS: resp ? cs(resp).whiteSpace : '', respHClip: hClip(resp), respText: resp ? resp.textContent : '',
@@ -773,7 +779,7 @@ const cardLayoutDetect = {
   notificationCardWidthIncreased: every((m) => m.present && m.width >= 400),
   noEssentialEllipsis: every((m) => !m.titleHClip && !m.bodyHClip && !m.ctxHClip && !m.respHClip),
   notificationTitleFullyVisible: every((m) => m.titleText && !m.titleVClip && m.titleWS !== 'nowrap'),
-  actorNameFullyVisible: /Arydyjany Carlôto atribuiu uma tarefa/.test(clm.attr.titleText || '') && !clm.attr.titleVClip,
+  actorNameFullyVisible: /Arydyjany Carlôto/.test(clm.attr.titleText || '') && !clm.attr.titleVClip && /atribuiu uma tarefa/.test(clm.attr.line2Text || '') && !clm.attr.line2HClip,
   responsibleNameVisible: /Miercohévisk Niheb Ferreira Nascimento Carlôto/.test(clm.attr.respText || '') && !clm.attr.respHClip && /Miercohévisk Niheb Ferreira Nascimento Carlôto/.test(clm.flow.respText || ''),
   slaOrangeMessageFullyVisible: /Você tem 30 minutos para concluir esta tarefa\./.test(clm.orange.bodyText || '') && !clm.orange.bodyVClip && !clm.orange.bodyHClip,
   slaRedMessageFullyVisible: /Você tem 10 minutos para concluir esta tarefa\./.test(clm.red.bodyText || '') && !clm.red.bodyVClip && !clm.red.bodyHClip,
@@ -957,7 +963,7 @@ if (!recipientDetect.avatarFromDenorm) fail.push('avatarFromDenorm falhou (não 
 if (!recipientDetect.avatarNoneEmpty) fail.push('avatarNoneEmpty falhou (deveria cair p/ vazio sem foto)');
 // F3.3.3 (correção AVATAR "N") — identidade visual real no toast
 if (!identityDetect.attrAvatarReal) fail.push('attrAvatarReal falhou (atribuição não mostrou foto real do actor)');
-if (!identityDetect.attrTitleHasActor) fail.push('attrTitleHasActor falhou (título não virou "<actor> atribuiu uma tarefa")');
+if (!identityDetect.attrTitleHasActor) fail.push('attrTitleHasActor falhou (linha 1 != nome do ator OU falta a linha "atribuiu uma tarefa")');
 if (!identityDetect.attrNotLetterN) fail.push('attrNotLetterN falhou (avatar ainda usa a letra do título)');
 if (!identityDetect.attrRespRowReal) fail.push('attrRespRowReal falhou (linha do responsável sem foto/nome real)');
 if (!identityDetect.slaAvatarReal) fail.push('slaAvatarReal falhou (SLA não mostrou foto do designer)');
@@ -972,7 +978,7 @@ if (!identityDetect.idDenormReal) fail.push('idDenormReal falhou (resolveUserIde
 if (!cardLayoutDetect.notificationCardWidthIncreased) fail.push('notificationCardWidthIncreased falhou (card não alargou >=400px; ' + JSON.stringify(cardLayoutDetect.widths) + ')');
 if (!cardLayoutDetect.noEssentialEllipsis) fail.push('noEssentialEllipsis falhou (campo essencial com reticência/corte horizontal)');
 if (!cardLayoutDetect.notificationTitleFullyVisible) fail.push('notificationTitleFullyVisible falhou (título cortado/clipado)');
-if (!cardLayoutDetect.actorNameFullyVisible) fail.push('actorNameFullyVisible falhou (nome do autor cortado no título)');
+if (!cardLayoutDetect.actorNameFullyVisible) fail.push('actorNameFullyVisible falhou (nome do ator cortado OU linha "atribuiu uma tarefa" ausente/cortada)');
 if (!cardLayoutDetect.responsibleNameVisible) fail.push('responsibleNameVisible falhou (responsável incompleto)');
 if (!cardLayoutDetect.slaOrangeMessageFullyVisible) fail.push('slaOrangeMessageFullyVisible falhou (mensagem 30min cortada)');
 if (!cardLayoutDetect.slaRedMessageFullyVisible) fail.push('slaRedMessageFullyVisible falhou (mensagem 10min cortada)');
