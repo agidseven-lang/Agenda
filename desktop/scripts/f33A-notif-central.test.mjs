@@ -94,8 +94,13 @@ ok('NOTIF-CENTRAL persiste só em localStorage', /localStorage\.setItem\(NOTIF_H
 
 // ── captura renderer (hooks) ──
 ok('notifEmit captura no histórico (capture-only)', /if\(delivered\)\{ try\{ if\(typeof notifHistoryAppend==='function'\) notifHistoryAppend\(p\); \}catch\(_\)\{\} \}/.test(html));
-ok('onNotifToast também captura', /onNotifToast\(function\(p\)\{ notifShowToast\(p\); try\{ if\(typeof notifHistoryAppend==='function'\) notifHistoryAppend\(p\); \}catch\(_\)\{\} \}\)/.test(html));
-ok('toast premium aprovado intacto (notifShowToast continua sendo chamado)', /onNotifToast\(function\(p\)\{ notifShowToast\(p\);/.test(html));
+ok('onNotifToast também captura no histórico', /onNotifToast\(function\(p\)\{[\s\S]*?if\(typeof notifHistoryAppend==='function'\) notifHistoryAppend\(p\);/.test(html));
+ok('toast premium intacto p/ não-atribuição (notifShowToast no else)', /onNotifToast\(function\(p\)\{ if\(notifIsAttrEvent\(p\)\)\{ notifAttrToastOnce\(p\); \} else \{ notifShowToast\(p\); \}/.test(html));
+// F3.3.10-FIX — toast de atribuição (Social → Designer): compensação cirúrgica, deduplicada, escopada
+ok('compensação: notifAttrToastOnce chama notifShowToast', /function notifAttrToastOnce\(p\)\{[\s\S]*?notifShowToast\(p\)/.test(html));
+ok('compensação: só designer_assigned/task_assigned', /function notifIsAttrEvent\(p\)\{ var e=p&&p\.eventType; return e==='designer_assigned'\|\|e==='task_assigned'; \}/.test(html));
+ok('compensação: dedup por dedupKey (não duplica)', /if\(notifAttrToastSeen\[k\]\) return false; notifAttrToastSeen\[k\]=1;/.test(html));
+ok('compensação: onNotifHistory só com janela visível', /onNotifHistory\(function\(p\)\{[\s\S]*?if\(notifIsAttrEvent\(p\) && \(typeof document==='undefined'\|\|document\.visibilityState!=='hidden'\)\) notifAttrToastOnce\(p\)/.test(html));
 ok('tab Notificações aditiva', /\{k:'notificacoes',l:'Notifica[çc][õo]es',i:'bell'\}/.test(html));
 ok('render() roteia notificacoes', /else if\(state\.tab==='notificacoes'\)\{c\.innerHTML=renderNotifCentral\(\);afterNotifCentral\(\);\}/.test(html));
 ok('badge de não-lidas no nav (aditivo)', /notifNavBadge\(t\.k\)/.test(html));
