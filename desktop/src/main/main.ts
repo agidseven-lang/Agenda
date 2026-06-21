@@ -14,6 +14,7 @@ import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
 import { startReminder } from "./reminder";
+import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
 
 let mainWin: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -71,20 +72,33 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
       diag("deliver.toast", { dedupKey: key, taskId: p.taskId });
       return { ok: true, channel: "toast" };
     }
-    const n = new Notification({
-      title: String(p.title || "Agenda ID Seven"),
-      body: String(p.body || ""),
-      silent: p.sound === false,
-      icon: _appIcon(),
-    });
-    n.on("click", () => {
-      diag("native.click", { dedupKey: key, deep });
-      const w = mainWin;
-      if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
-    });
-    n.show();
-    diag("deliver.native", { dedupKey: key, deep, taskId: p.taskId, title: String(p.title || ""), hasClick: true });
-    return { ok: true, channel: "native" };
+    // BACKGROUND (minimizado/oculto/bandeja) — F3.3.10-BG: a entrega visual CONFIÁVEL é a janela
+    // PREMIUM própria do app (controlada pelo main, aparece mesmo com a mainWindow hidden e NÃO
+    // depende da Notification nativa do Windows). A nativa do SO vira FALLBACK só se a janela
+    // premium não puder ser exibida. Clique → reabre a mainWindow e navega (deep link). A captura
+    // p/ a Central já foi feita acima (notif-history), independente do canal.
+    const bgOk = showBgNotify(p);
+    let nativeOk = false;
+    if (!bgOk) {
+      try {
+        const n = new Notification({
+          title: String(p.title || "Agenda ID Seven"),
+          body: String(p.body || ""),
+          silent: p.sound === false,
+          icon: _appIcon(),
+        });
+        n.on("click", () => {
+          diag("native.click", { dedupKey: key, deep });
+          const w = mainWin;
+          if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
+        });
+        n.show();
+        nativeOk = true;
+      } catch (e2) { diag("native.fallback.error", { err: String(((e2 as any) && (e2 as any).message) || e2) }); }
+    }
+    const channel = bgOk ? "bg-window" : (nativeOk ? "native" : "none");
+    diag("deliver.bg", { dedupKey: key, deep, taskId: p.taskId, title: String(p.title || ""), channel, fallbackNative: !bgOk });
+    return { ok: bgOk || nativeOk, channel };
   } catch (e) { diag("deliver.error", { err: String(((e as any) && (e as any).message) || e) }); return { ok: false, channel: "error" }; }
 }
 
@@ -241,6 +255,7 @@ function realQuit() {
   quitting = true;
   if (stopNotifier) stopNotifier();
   if (stopReminder) stopReminder();
+  try { stopBgNotify(); } catch { /* */ }
   app.quit();
 }
 
@@ -251,6 +266,13 @@ app.whenReady().then(() => {
     () => mainWin,
     { isAutoStart, setAutoStart, quit: realQuit }
   );
+
+  // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
+  // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
+  initBgNotify((deep: string) => {
+    const w = mainWin;
+    if (w && !w.isDestroyed()) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
+  });
 
   // IPC do renderer
   ipcMain.handle("notif-test", () => {

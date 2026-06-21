@@ -109,7 +109,7 @@ ok('badge de não-lidas no nav (aditivo)', /notifNavBadge\(t\.k\)/.test(html));
 ok('main.ts encaminha notif-history (capture)', /webContents\.send\("notif-history", p\)/.test(mainTs));
 ok('main.ts captura em try/catch (não afeta entrega)', /try \{ mainWin\?\.webContents\.send\("notif-history", p\); \} catch/.test(mainTs));
 ok('main.ts: toast premium aprovado intacto', /webContents\.send\("notif-toast", p\)/.test(mainTs) && /channel: "toast"/.test(mainTs));
-ok('main.ts: nativa aprovada intacta', /new Notification\(/.test(mainTs) && /channel: "native"/.test(mainTs));
+ok('main.ts: nativa preservada como FALLBACK + janela premium primaria (bg-window)', /new Notification\(/.test(mainTs) && /showBgNotify\(p\)/.test(mainTs) && /"bg-window"/.test(mainTs));
 ok('main.ts: windowActive (regra de canal) intacta', /function windowActive\(\)/.test(mainTs) && /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
 ok('main.ts: backgroundThrottling:false (timers em background)', /backgroundThrottling:\s*false/.test(mainTs));
 ok('main.ts: switches anti-backgrounding (SLA confiável minimizado/bandeja)', /disable-background-timer-throttling/.test(mainTs) && /disable-renderer-backgrounding/.test(mainTs) && /disable-backgrounding-occluded-windows/.test(mainTs));

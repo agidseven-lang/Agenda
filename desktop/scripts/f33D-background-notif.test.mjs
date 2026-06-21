@@ -45,7 +45,7 @@ ok('baseline sinceMs (não dispara atribuição anterior ao login)', /_notifAssi
 ok('roteamento: só o designer logado emite p/ si', /da\.designerId===me && da\.assignedBy!==me/.test(html0));
 ok('safety interval também roda notifScanAssign', /setInterval\(function\(\)\{ try\{ notifScanSla\(\); \}catch\(_\)\{\} try\{ notifScanAssign\(\); \}catch\(_\)\{\} \},30000\)/.test(html0));
 // contrato de canal no main (real): windowActive → toast; senão NATIVA
-ok('main: windowActive → toast, senão Notification nativa', /if \(windowActive\(\)\) \{[\s\S]*?send\("notif-toast"[\s\S]*?\}\s*const n = new Notification\(/.test(mainTs));
+ok('main: windowActive → toast; background → janela premium (showBgNotify) c/ nativa fallback', /if \(windowActive\(\)\) \{[\s\S]*?return \{ ok: true, channel: "toast" \};\s*\}[\s\S]*?const bgOk = showBgNotify\(p\);[\s\S]*?if \(!bgOk\) \{[\s\S]*?new Notification\(/.test(mainTs));
 ok('main: windowActive = visível e não-minimizado (minimizado/oculto → nativa)', /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
 ok('main: switches anti-suspensão de background', /disable-renderer-backgrounding/.test(mainTs) && /disable-background-timer-throttling/.test(mainTs));
 
@@ -83,7 +83,7 @@ function go(){ var R={}; try{
   notifScanAssign();
   R.notified = window.__N.map(function(p){ return {type:p.eventType,key:p.dedupKey,target:p.targetUserId,task:p.taskId,title:p.title}; });
   // canal (replica deliverNotification do main): aberto/visível=toast; minimizado/oculto=nativa
-  function chan(w){ return (w.visible && !w.minimized) ? 'toast' : 'native'; }
+  function chan(w){ return (w.visible && !w.minimized) ? 'toast' : 'bg-window'; }
   R.chan_visible=chan({visible:true,minimized:false});
   R.chan_minimized=chan({visible:true,minimized:true});
   R.chan_tray=chan({visible:false,minimized:false});
@@ -113,8 +113,8 @@ ok('DOM: NÃO emite atribuição feita por mim (tMine)', !N.some(x => x.task==='
 ok('DOM: NÃO emite atribuição de OUTRO designer (tOther) — usuário certo', !N.some(x => x.task==='tOther'));
 ok('DOM: nenhum duplicado (1 por tarefa elegível)', N.length === 2);
 ok('canal: app aberto/visível → toast', Rj.chan_visible === 'toast');
-ok('canal: app minimizado → nativa', Rj.chan_minimized === 'native');
-ok('canal: app na bandeja/oculto → nativa', Rj.chan_tray === 'native');
+ok('canal: app minimizado → janela premium (bg-window)', Rj.chan_minimized === 'bg-window');
+ok('canal: app na bandeja/oculto → janela premium (bg-window)', Rj.chan_tray === 'bg-window');
 
 console.log('\nF3.3.10 BACKGROUND-NOTIF (estático+DOM): ' + pass + ' PASS / ' + fail + ' FAIL');
 if (fail) { console.error('::error:: detecção de atribuição em background divergiu do contrato'); process.exit(1); }

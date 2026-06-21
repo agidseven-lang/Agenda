@@ -35,7 +35,8 @@ ok('main: window-all-closed não encerra (vive na bandeja)', /window-all-closed[
 // statement (mesma linha do handler): os handlers são one-liners; não deixar o [\s\S]*? varrer o
 // arquivo até o stopNotifier do realQuit (falso-positivo após a instrumentação DIAG de lifecycle).
 ok('main: notifier só para em logout/Sair (não no minimize/hide)', /function realQuit\(\)[\s\S]*?stopNotifier\(\)/.test(mainTs) && !/on\("minimize"[^\n]*stopNotifier/.test(mainTs) && !/on\("hide"[^\n]*stopNotifier/.test(mainTs));
-ok('main: deliverNotification usa NATIVA quando !windowActive', /if \(windowActive\(\)\) \{[\s\S]*?send\("notif-toast"[\s\S]*?return \{ ok: true, channel: "toast" \};\s*\}\s*const n = new Notification\(/.test(mainTs));
+ok('main: background usa JANELA PREMIUM propria (showBgNotify) — nao depende so da nativa', /return \{ ok: true, channel: "toast" \};\s*\}[\s\S]*?const bgOk = showBgNotify\(p\);/.test(mainTs) && /import \{[^}]*showBgNotify[^}]*\} from "\.\/bgNotify"/.test(mainTs));
+ok('main: nativa do Windows vira FALLBACK (so se a janela premium falhar)', /if \(!bgOk\) \{[\s\S]*?const n = new Notification\(/.test(mainTs));
 ok('main: windowActive = visível e não-minimizado (minimizado/oculto → nativa)', /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
 ok('main: Notification nativa tem click handler (abre a tarefa via deep link)', /n\.on\("click"[\s\S]*?send\("notif-open", deep\)/.test(mainTs));
 ok('firebase(main): transporte long-polling (onSnapshot realtime em Node)', /initializeFirestore\(fbApp, \{ experimentalForceLongPolling: true \}\)/.test(fbTs));
@@ -72,7 +73,7 @@ function deliver(p) {
   const key = String(p.dedupKey || `${p.eventType}:${p.taskId}:${p.createdAt}`);
   if (seen.has(key)) return { ok: true, channel: 'dedup' };
   seen.add(key);
-  const channel = windowActive() ? 'toast' : 'native';
+  const channel = windowActive() ? 'toast' : 'bg-window'; // F3.3.10-BG: background = janela premium propria (nativa = fallback)
   delivered.push({ key, channel, eventType: p.eventType, taskId: p.taskId, taskTitle: p.taskTitle, clientName: p.clientName, responsibleName: p.responsibleName, actorName: p.actorName, target: p.targetUserId, deep: p.action && p.action.deep, title: p.title, body: p.body });
   return { ok: true, channel };
 }
@@ -107,8 +108,8 @@ fire([ch('modified', 'tOld', { title: 'Antiga', designerAssignment: { designerId
 
 const byTask = (t) => delivered.find((d) => d.taskId === t);
 ok('A — app aberto: atribuição → canal TOAST', byTask('tA') && byTask('tA').channel === 'toast' && byTask('tA').eventType === 'designer_assigned');
-ok('B — minimizado: atribuição → Notification NATIVA', byTask('tB') && byTask('tB').channel === 'native');
-ok('C — X/bandeja (hide): atribuição → Notification NATIVA', byTask('tC') && byTask('tC').channel === 'native');
+ok('B — minimizado: atribuição → JANELA PREMIUM propria (bg-window)', byTask('tB') && byTask('tB').channel === 'bg-window');
+ok('C — X/bandeja (hide): atribuição → JANELA PREMIUM propria (bg-window)', byTask('tC') && byTask('tC').channel === 'bg-window');
 ok('payload completo: tarefa+cliente+responsável+deep', byTask('tA') && byTask('tA').taskTitle === 'Cronograma semanal' && byTask('tA').clientName === 'Hospital Visão' && byTask('tA').responsibleName === 'Marina Dias' && /^detail\/|^board\//.test(byTask('tA').deep || ''));
 ok('dedupKey = designer_assigned:<id>:<assignedAt>', byTask('tA') && byTask('tA').key === 'designer_assigned:tA:' + (NOW + 1000));
 ok('dedup: reenvio do mesmo docChange NÃO duplica', delivered.filter((d) => d.taskId === 'tB').length === 1);
