@@ -1,9 +1,9 @@
 name: "[manual] WA OG Image Probe (read-only)"
 
-# Mede o og:image do card premium (dimensoes + bytes + headers) e da o VEREDITO C7:
-# o WhatsApp tem limite pratico de imagem MENOR que o Facebook (imagens grandes sao
-# DROPADAS -> preview generico mesmo com OG perfeito). SOMENTE curl GET + ImageMagick
-# identify. SEM deploy, SEM secrets, SEM Firestore, SEM tocar Worker/Cloudflare.
+# Mede o og:image do card premium (dimensoes + bytes + formato REAL + headers) e da o VEREDITO C7:
+# o WhatsApp tem limite pratico de imagem MENOR que o Facebook (imagens grandes sao DROPADAS ->
+# preview generico mesmo com OG perfeito). SOMENTE curl GET + file/magic-bytes/PIL. SEM deploy,
+# SEM secrets, SEM Firestore, SEM tocar Worker/Cloudflare.
 
 "on":
   workflow_dispatch:
@@ -20,7 +20,7 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Baixar e analisar og:image (dimensoes + tamanho + veredito C7)
+      - name: Baixar e analisar og:image (formato real + dimensoes + tamanho + veredito C7)
         env:
           IMG_URL: ${{ github.event.inputs.image }}
         run: |
@@ -36,46 +36,53 @@ jobs:
           TIME="$(grep '^TIME=' out/metrics.txt | cut -d= -f2)"
           BYTES="$(stat -c%s out/og.jpg 2>/dev/null || echo 0)"
           KB=$(( BYTES / 1024 ))
-          DIM="$(identify -format '%wx%h' out/og.jpg 2>/dev/null || echo '?x?')"
-          FMT="$(identify -format '%m' out/og.jpg 2>/dev/null || echo '?')"
+          MAGIC="$(xxd -p -l 3 out/og.jpg 2>/dev/null || echo '')"     # ffd8ff = JPEG valido
+          FILEINFO="$(file -b out/og.jpg 2>/dev/null || echo '?')"
+          # dimensoes: tenta PIL; senao identify; senao do `file`
+          DIM="$(python3 -c 'from PIL import Image; im=Image.open("out/og.jpg"); print("%dx%d"%im.size)' 2>/dev/null)"
+          [ -z "$DIM" ] && DIM="$(identify -format '%wx%h' out/og.jpg 2>/dev/null)"
+          [ -z "$DIM" ] && DIM="$(echo "$FILEINFO" | grep -oE '[0-9]+ ?x ?[0-9]+' | head -1 | tr -d ' ')"
+          [ -z "$DIM" ] && DIM="?x?"
           W="$(echo "$DIM" | cut -dx -f1)"; H="$(echo "$DIM" | cut -dx -f2)"
           case "$W" in ''|*[!0-9]*) W=0;; esac
           case "$H" in ''|*[!0-9]*) H=0;; esac
           RATIO="?"; if [ "$H" -gt 0 ]; then RATIO="$(awk "BEGIN{printf \"%.2f\", $W/$H}")"; fi
 
-          isjpeg=NAO; echo "$CT" | grep -qi 'image/jpeg' && isjpeg=SIM
+          isjpegCT=NAO; echo "$CT" | grep -qi 'image/jpeg' && isjpegCT=SIM
+          isjpegMAGIC=NAO; [ "$MAGIC" = "ffd8ff" ] && isjpegMAGIC=SIM
           dimok=NAO; [ "$W" -ge 200 ] && [ "$H" -ge 200 ] && dimok=SIM
           wa600=NAO; [ "$BYTES" -gt 0 ] && [ "$BYTES" -le 614400 ] && wa600=SIM
-          wa1mb=NAO; [ "$BYTES" -gt 0 ] && [ "$BYTES" -le 1048576 ] && wa1mb=SIM
           fb5mb=NAO; [ "$BYTES" -gt 0 ] && [ "$BYTES" -le 5242880 ] && fb5mb=SIM
 
           {
             echo "================ OG IMAGE PROBE (C7) ================"
             echo "Gerado (UTC): $(date -u)"
-            echo "URL        : $IMG"
-            echo "HTTP       : $CODE"
-            echo "Content-Type: $CT (formato real: $FMT)"
-            echo "Bytes      : $BYTES  (${KB} KB)"
-            echo "Dimensoes  : $DIM   (aspect ${RATIO}:1)"
-            echo "Tempo (s)  : $TIME"
-            echo "--- headers relevantes ---"
+            echo "URL          : $IMG"
+            echo "HTTP         : $CODE"
+            echo "Content-Type : $CT"
+            echo "Formato real : $FILEINFO"
+            echo "Magic bytes  : $MAGIC  (ffd8ff = JPEG valido)"
+            echo "Bytes        : $BYTES  (${KB} KB)"
+            echo "Dimensoes    : $DIM   (aspect ${RATIO}:1)"
+            echo "Tempo (s)    : $TIME"
+            echo "--- headers ---"
             grep -iE '^content-length:|^content-type:|^cache-control:|^cf-cache-status:|^age:|^last-modified:|^etag:|^cf-ray:|^server:' out/headers-og.txt | tr -d '\r' | sed 's/^/  /'
             echo ""
             echo "================ VEREDITO C7 (WhatsApp/Meta) ================"
-            echo "200 + image/jpeg ................... : $([ "$CODE" = 200 ] && echo "$isjpeg" || echo NAO)"
+            echo "HTTP 200 .......................... : $([ "$CODE" = 200 ] && echo SIM || echo NAO)"
+            echo "Content-Type image/jpeg ........... : $isjpegCT"
+            echo "JPEG REAL (magic ffd8ff) .......... : $isjpegMAGIC ($FILEINFO)"
             echo "Dimensoes >= 200x200 .............. : $dimok ($DIM)"
             echo "<= 600 KB (render confiavel no WA) . : $wa600 (${KB} KB)"
-            echo "<= 1 MB (limite pratico comum WA) .. : $wa1mb"
             echo "<= 5 MB (limite Facebook) .......... : $fb5mb"
             echo ""
-            if [ "$wa600" = "SIM" ] && [ "$dimok" = "SIM" ] && [ "$isjpeg" = "SIM" ] && [ "$CODE" = "200" ]; then
-              echo "-> C7 DESCARTADO: imagem 200, JPEG, ${DIM}, ${KB}KB (<=600KB) — dentro do que o WhatsApp renderiza."
-              echo "   Se ainda aparece generico em link NOVO, a causa NAO e a imagem; e o WhatsApp (scrape assincrono/cache)."
-            elif [ "$CODE" != "200" ] || [ "$isjpeg" != "SIM" ]; then
-              echo "-> C7 CONFIRMADO (grave): og:image nao retorna 200/JPEG — imagem quebrada."
+            if [ "$CODE" = "200" ] && [ "$isjpegMAGIC" = "SIM" ] && [ "$isjpegCT" = "SIM" ] && [ "$wa600" = "SIM" ] && [ "$dimok" = "SIM" ]; then
+              echo "-> C7 DESCARTADO: JPEG real ${DIM}, ${KB}KB (<=600KB), image/jpeg, 200 — dentro do que o WhatsApp renderiza."
+              echo "   Link NOVO ainda generico => causa NAO e a imagem; e o WhatsApp (scrape assincrono/cache de 1a leitura)."
+            elif [ "$isjpegMAGIC" != "SIM" ]; then
+              echo "-> C7 CONFIRMADO: bytes nao sao JPEG valido (magic=$MAGIC, file=$FILEINFO) — WhatsApp pode rejeitar a imagem."
             elif [ "$wa600" != "SIM" ]; then
-              echo "-> C7 SUSPEITO: imagem ${KB}KB pode exceder o limite pratico do WhatsApp (~600KB) -> WA dropa a imagem"
-              echo "   e mostra preview generico, mesmo com OG perfeito (Facebook aceita ate 5MB; WhatsApp nao)."
+              echo "-> C7 SUSPEITO: ${KB}KB pode exceder o limite pratico do WhatsApp (~600KB)."
             else
               echo "-> C7 PARCIAL: revisar dimensoes/aspect ($DIM / ${RATIO}:1)."
             fi
