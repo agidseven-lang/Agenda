@@ -3576,12 +3576,50 @@ function notifScanSla(){
         action:{type:'detail',deep:'detail/'+blk.id} })); }
   }catch(_){}
 }
-function notifScan(){ notifScanFlow(); notifScanSla(); }
+function notifScan(){ notifScanFlow(); notifScanSla(); notifScanAssign(); }
+
+/* F3.3.10-FIX (background) — DETECÇÃO de ATRIBUIÇÃO no RENDERER (espelha o notifier do main u1/u1b).
+   Garante a entrega mesmo quando o listener Firestore do MAIN fica suspenso com o app em background
+   (Windows pode suspender o processo minimizado/bandeja). Emite pelo MESMO caminho aprovado
+   (notifEmit → api.notify → HUB do main: toast premium com app aberto / NATIVA minimizado/bandeja),
+   com dedupKey IDÊNTICO ao do main (designer_assigned:<id>:<assignedAt> e task_assigned:<id>) → o HUB
+   deduplica; NUNCA duplica. Baseline por sinceMs: não dispara atribuições anteriores ao login.
+   Roteamento: só o próprio designer/atribuído emite p/ si (não notifica usuário errado). */
+var _notifAssignUid=null, _notifAssignSince=0;
+function notifScanAssign(){
+  try{
+    if(!state.user) return; var me=state.user.id; if(!me) return;
+    if(me!==_notifAssignUid){ _notifAssignUid=me; _notifAssignSince=Date.now(); }
+    var tasks=state.tasks||[];
+    for(var i=0;i<tasks.length;i++){
+      var t=tasks[i]; if(!t||!t.id) continue;
+      var da=t.designerAssignment;
+      if(da && da.designerId===me && da.assignedBy!==me){
+        var at=Number(da.assignedAt)||0; if(!at || at<_notifAssignSince) continue;
+        var linha=(t.title||'Cronograma')+(t.client?(' — '+t.client):'');
+        notifEmit(notifBuildPayload({ eventType:'designer_assigned', taskId:t.id, taskTitle:t.title||'Cronograma', clientName:t.client||'',
+          actorId:da.assignedBy||'', actorName:da.assignedByName||'', actorAvatar:da.assignedByAvatar||da.assignedByPhoto||'',
+          responsibleId:da.designerId||'', responsibleName:da.designerName||'', responsibleAvatar:da.designerAvatar||da.designerPhoto||'',
+          targetUserId:me, etapa:'Aguardando produção', severity:'info', sound:true, anchor:at,
+          title:(da.assignedByName?da.assignedByName+' atribuiu uma tarefa':'Nova tarefa atribuída a você'),
+          body:linha+(da.designerName?('\nResponsável: '+da.designerName):'')+'\nEtapa: Aguardando produção',
+          dedupKey:'designer_assigned:'+t.id+':'+at, action:{type:'board',deep:'board/'+(t.sector||'')} }));
+      } else if(t.assigneeId===me && t.by!==me && !da){
+        var ct=Number(t.createdAt)||0; if(!ct || ct<_notifAssignSince) continue;
+        notifEmit(notifBuildPayload({ eventType:'task_assigned', taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
+          actorId:t.by||'', responsibleId:t.assigneeId||'', responsibleName:t.assignee||t.assigneeName||'',
+          targetUserId:me, severity:'info', sound:true, anchor:ct,
+          title:'Nova tarefa atribuída a você', body:(t.title||'Tarefa')+(t.client?(' — '+t.client):''),
+          dedupKey:'task_assigned:'+t.id, action:{type:'board',deep:'board/'+(t.sector||'')} }));
+      }
+    }
+  }catch(_){}
+}
 
 /* hooks: cada snapshot de dados + tick do SLA (transições por TEMPO) + intervalo de segurança */
 if(typeof renderFromSnapshot==='function'){ var _notif_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_notif_rfs.apply(this,arguments); try{ notifScan(); }catch(_){} return r; }; }
 if(typeof slaTick==='function'){ var _notif_tk=slaTick; slaTick=function(){ var r=_notif_tk.apply(this,arguments); try{ notifScanSla(); }catch(_){} return r; }; }
-try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} },30000); }catch(_){}
+try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} try{ notifScanAssign(); }catch(_){} },30000); }catch(_){}
 /* receber TOAST do HUB do main (janela focada/visível) */
 try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ if(notifIsAttrEvent(p)){ notifAttrToastOnce(p); } else { notifShowToast(p); } try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} }); } }catch(_){}
 /* F3.3.10 — onNotifHistory (captura 100% toast×nativa via hub do main) é registrado UMA vez no bloco F3.3.10-NOTIF-CENTRAL. */
