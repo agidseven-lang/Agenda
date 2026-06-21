@@ -1,0 +1,180 @@
+name: "[manual] WA Card Live Diag (read-only)"
+
+# =====================================================================
+# DIAGNOSTICO HTTP READ-ONLY do card premium do WhatsApp em producao.
+# SOMENTE curl GET em URLs publicas (aprovar.agendaidseven.com.br).
+#  - SEM deploy, SEM secrets, SEM checkout do repo.
+#  - NAO altera Worker/Desktop/Android/Firebase/Cloudflare/notificacoes.
+#  - NAO grava Firestore, NAO envia FCM/WebPush/WhatsApp, NAO publica.
+# Coleta o que o crawler (facebookexternalhit / WhatsApp) recebe e gera
+# artifacts + relatorio (criterios C1..C5). Execucao SO manual.
+# =====================================================================
+
+"on":
+  workflow_dispatch:
+    inputs:
+      token:
+        description: "Token de teste p/ /share/cronograma/<token>"
+        required: false
+        default: "teste1234567890"
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe producao (curl read-only) + relatorio
+        env:
+          INPUT_TOKEN: ${{ github.event.inputs.token }}
+        run: |
+          set +e
+          B="https://aprovar.agendaidseven.com.br"
+          TOK="${INPUT_TOKEN:-teste1234567890}"
+          [ -z "$TOK" ] && TOK="teste1234567890"
+          SHARE="$B/share/cronograma/$TOK"
+          mkdir -p out
+          WFMT='HTTP_CODE=%{http_code}\nFINAL_URL=%{url_effective}\nNUM_REDIRECTS=%{num_redirects}\nCONTENT_TYPE=%{content_type}\nSIZE_DOWNLOAD=%{size_download}\nTIME_TOTAL=%{time_total}\nREMOTE_IP=%{remote_ip}\n'
+
+          probe() { # url headers body metrics [ua]
+            local url="$1" h="$2" b="$3" m="$4" ua="$5"
+            if [ -n "$ua" ]; then
+              curl -sS -L -m 35 -A "$ua" -D "$h" -o "$b" -w "$WFMT" "$url" > "$m" 2>"${m}.err"
+            else
+              curl -sS -L -m 35 -D "$h" -o "$b" -w "$WFMT" "$url" > "$m" 2>"${m}.err"
+            fi
+            echo "CURL_EXIT=$?" >> "$m"
+          }
+
+          probe "$B/"                       out/headers-root.txt           out/body-root.txt            out/metrics-root.txt           ""
+          probe "$SHARE"                    out/headers-share-default.txt  out/body-share-default.html  out/metrics-share-default.txt  ""
+          probe "$SHARE"                    out/headers-share-facebook.txt out/body-share-facebook.html out/metrics-share-facebook.txt "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+          probe "$SHARE"                    out/headers-share-whatsapp.txt out/body-share-whatsapp.html out/metrics-share-whatsapp.txt "WhatsApp/2.0"
+          probe "$B/og/wa-card-v64-38.jpg"  out/headers-og-image.txt       out/og-image-dl.bin          out/metrics-og-image.txt       "facebookexternalhit/1.1"
+          probe "$B/wa-diag"                out/headers-wa-diag.txt        out/body-wa-diag.txt         out/metrics-wa-diag.txt        ""
+
+          mget() { grep -E "^$2=" "$1" 2>/dev/null | head -1 | cut -d= -f2- ; }
+          hget() { grep -i "^$2:" "$1" 2>/dev/null | head -1 | tr -d '\r' ; }
+          og_get() { # file property|name value
+            grep -oiE "<meta[^>]+$2=[\"']$3[\"'][^>]*>" "$1" 2>/dev/null | head -1 \
+              | grep -oiE "content=[\"'][^\"']*[\"']" | head -1 | sed -E "s/^content=[\"']//I; s/[\"']\$//"
+          }
+
+          OG_CODE="$(mget out/metrics-og-image.txt HTTP_CODE)"
+          OG_CT="$(mget out/metrics-og-image.txt CONTENT_TYPE)"
+          if [ "$OG_CODE" = "200" ]; then cp out/og-image-dl.bin out/og-image.jpg; fi
+
+          # og-extract-report.txt
+          {
+            echo "===== OG EXTRACT REPORT ====="
+            echo "Gerado (UTC): $(date -u)"
+            echo "Base: $B | Token de teste: $TOK"
+            echo "Share URL: $SHARE"
+            echo ""
+            for V in default facebook whatsapp; do
+              f="out/body-share-$V.html"; m="out/metrics-share-$V.txt"
+              echo "----- /share (UA=$V) -----"
+              echo "HTTP_CODE      : $(mget "$m" HTTP_CODE)"
+              echo "FINAL_URL      : $(mget "$m" FINAL_URL)"
+              echo "NUM_REDIRECTS  : $(mget "$m" NUM_REDIRECTS)"
+              echo "CONTENT_TYPE   : $(mget "$m" CONTENT_TYPE)"
+              echo "Cache-Control  : $(hget "out/headers-share-$V.txt" 'cache-control')"
+              echo "og:title       : $(og_get "$f" property 'og:title')"
+              echo "og:description : $(og_get "$f" property 'og:description')"
+              echo "og:image       : $(og_get "$f" property 'og:image')"
+              echo "og:url         : $(og_get "$f" property 'og:url')"
+              echo "og:type        : $(og_get "$f" property 'og:type')"
+              echo "twitter:card   : $(og_get "$f" name 'twitter:card')"
+              if grep -qi 'Aprovar cronograma' "$f" 2>/dev/null && grep -qi 'wa-card-v64-38.jpg' "$f" 2>/dev/null; then
+                echo "PREMIUM_OG     : YES"
+              else
+                echo "PREMIUM_OG     : NO"
+              fi
+              echo ""
+            done
+            ABS="NO"; case "$(og_get out/body-share-facebook.html property 'og:image')" in https://*) ABS="YES";; esac
+            echo "----- og:image (UA=facebook) -----"
+            echo "HTTP_CODE               : $OG_CODE"
+            echo "CONTENT_TYPE            : $OG_CT"
+            echo "Cache-Control           : $(hget out/headers-og-image.txt 'cache-control')"
+            echo "og:image absoluta HTTPS : $ABS"
+            echo "og:image 200            : $([ "$OG_CODE" = "200" ] && echo YES || echo NO)"
+            echo "og:image image/jpeg     : $(echo "$OG_CT" | grep -qi 'image/jpeg' && echo YES || echo NO)"
+          } > out/og-extract-report.txt
+
+          # variaveis p/ criterios
+          ROOT_CODE="$(mget out/metrics-root.txt HTTP_CODE)"
+          ROOT_IS_WORKER="NO"; grep -qi 'idseven-push' out/body-root.txt 2>/dev/null && ROOT_IS_WORKER="YES"
+          DEF_CODE="$(mget out/metrics-share-default.txt HTTP_CODE)"
+          FB_CODE="$(mget out/metrics-share-facebook.txt HTTP_CODE)"
+          WA_CODE="$(mget out/metrics-share-whatsapp.txt HTTP_CODE)"
+          FB_PREMIUM="NO"; grep -qi 'Aprovar cronograma' out/body-share-facebook.html 2>/dev/null && grep -qi 'wa-card-v64-38.jpg' out/body-share-facebook.html 2>/dev/null && FB_PREMIUM="YES"
+          CHALLENGE="NO"
+          grep -qiE 'just a moment|attention required|challenge-platform|error 1020|cf-error-details' out/body-share-facebook.html 2>/dev/null && CHALLENGE="YES"
+          [ -n "$(hget out/headers-share-facebook.txt 'cf-mitigated')" ] && CHALLENGE="YES"
+          OG_JPEG="NO"; echo "$OG_CT" | grep -qi 'image/jpeg' && OG_JPEG="YES"
+
+          # diagnostic-summary.md
+          {
+            echo "# WA Card Live Diag - Resumo"
+            echo ""
+            echo "- Gerado (UTC): $(date -u)"
+            echo "- Base: $B"
+            echo "- Token de teste (NOVO): $TOK"
+            echo "- Share URL: $SHARE"
+            echo ""
+            echo "## Status HTTP"
+            echo "| Alvo | UA | HTTP | Content-Type | Redirects | Final URL |"
+            echo "|---|---|---|---|---|---|"
+            echo "| / (raiz) | default | $ROOT_CODE | $(mget out/metrics-root.txt CONTENT_TYPE) | $(mget out/metrics-root.txt NUM_REDIRECTS) | $(mget out/metrics-root.txt FINAL_URL) |"
+            echo "| /share | default | $DEF_CODE | $(mget out/metrics-share-default.txt CONTENT_TYPE) | $(mget out/metrics-share-default.txt NUM_REDIRECTS) | $(mget out/metrics-share-default.txt FINAL_URL) |"
+            echo "| /share | facebookexternalhit | $FB_CODE | $(mget out/metrics-share-facebook.txt CONTENT_TYPE) | $(mget out/metrics-share-facebook.txt NUM_REDIRECTS) | $(mget out/metrics-share-facebook.txt FINAL_URL) |"
+            echo "| /share | WhatsApp/2.0 | $WA_CODE | $(mget out/metrics-share-whatsapp.txt CONTENT_TYPE) | $(mget out/metrics-share-whatsapp.txt NUM_REDIRECTS) | $(mget out/metrics-share-whatsapp.txt FINAL_URL) |"
+            echo "| /og/...jpg | facebookexternalhit | $OG_CODE | $OG_CT | $(mget out/metrics-og-image.txt NUM_REDIRECTS) | $(mget out/metrics-og-image.txt FINAL_URL) |"
+            echo "| /wa-diag | default | $(mget out/metrics-wa-diag.txt HTTP_CODE) | $(mget out/metrics-wa-diag.txt CONTENT_TYPE) | - | - |"
+            echo ""
+            echo "## Cabecalhos Cloudflare (share, UA facebook)"
+            echo "- $(hget out/headers-share-facebook.txt 'server')"
+            echo "- $(hget out/headers-share-facebook.txt 'cf-ray')"
+            echo "- $(hget out/headers-share-facebook.txt 'cf-cache-status')"
+            echo "- $(hget out/headers-share-facebook.txt 'cache-control')"
+            echo "- $(hget out/headers-share-facebook.txt 'cf-mitigated')"
+            echo ""
+            echo "## OG recebido pelo crawler (UA facebook)"
+            echo "- og:title: $(og_get out/body-share-facebook.html property 'og:title')"
+            echo "- og:image: $(og_get out/body-share-facebook.html property 'og:image')"
+            echo "- PREMIUM_OG: $FB_PREMIUM"
+            echo "- og:image 200: $([ "$OG_CODE" = "200" ] && echo YES || echo NO) | image/jpeg: $OG_JPEG"
+            echo ""
+            echo "## Leitura dos criterios (C1..C5)"
+            echo "- C1 route/DNS (raiz bate no worker idseven-push?): ROOT_IS_WORKER=$ROOT_IS_WORKER (HTTP $ROOT_CODE). $([ "$ROOT_IS_WORKER" = "YES" ] && echo 'OK - dominio no worker.' || echo 'SUSPEITO - raiz NAO retornou o worker idseven-push.')"
+            echo "- C2 WAF/Bot Fight (crawler bloqueado?): FB_HTTP=$FB_CODE vs DEFAULT_HTTP=$DEF_CODE ; challenge=$CHALLENGE. $([ "$FB_CODE" = "$DEF_CODE" ] && [ "$CHALLENGE" = "NO" ] && echo 'OK - crawler tratado igual ao curl padrao.' || echo 'SUSPEITO - crawler difere / challenge.')"
+            echo "- C4 worker divergente (OG premium vivo == validado?): FB_PREMIUM=$FB_PREMIUM. $([ "$FB_PREMIUM" = "YES" ] && echo 'OK - OG vivo == aprovado.' || echo 'SUSPEITO - OG vivo != aprovado.')"
+            echo "- C5 og:image (200 + image/jpeg + absoluta HTTPS): code=$OG_CODE ct=$OG_CT abs=$ABS."
+            echo "- C3 cache WhatsApp: so e causa SE C1/C2/C4/C5 OK (server entrega premium no token NOVO). Entao preview generico em link ANTIGO = cache -> reenviar com link novo. NAO afirmar sem C1/C2/C4/C5 verdes."
+            echo ""
+            echo "## Veredito automatico"
+            if [ "$ROOT_IS_WORKER" = "YES" ] && [ "$FB_PREMIUM" = "YES" ] && [ "$OG_CODE" = "200" ] && [ "$OG_JPEG" = "YES" ] && [ "$CHALLENGE" = "NO" ] && [ "$FB_CODE" = "200" ]; then
+              echo "-> Producao ENTREGA o card premium correto ao crawler para o token de teste NOVO."
+              echo "-> Logo, se o link ANTIGO mostra generico, a causa provavel e C3 (cache do WhatsApp) - reenviar com link novo."
+            else
+              echo "-> Producao NAO entrega o card premium corretamente ao crawler. Ver C1/C2/C4/C5 acima para a causa viva."
+            fi
+          } > out/diagnostic-summary.md
+
+          rm -f out/og-image-dl.bin out/*.err 2>/dev/null
+
+          echo "================ DIAGNOSTIC SUMMARY ================"
+          cat out/diagnostic-summary.md
+          echo ""
+          echo "================ OG EXTRACT REPORT ================"
+          cat out/og-extract-report.txt
+
+      - name: Upload artifacts (diagnostico)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wa-card-live-diag
+          path: out/
+          if-no-files-found: warn
