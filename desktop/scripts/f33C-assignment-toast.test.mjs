@@ -39,6 +39,8 @@ ok('helper notifIsAttrEvent escopa designer_assigned/task_assigned', /function n
 ok('notifAttrToastOnce dedup por dedupKey e chama notifShowToast', /function notifAttrToastOnce\(p\)\{[\s\S]*?notifAttrToastSeen\[k\][\s\S]*?notifShowToast\(p\)/.test(html));
 ok('onNotifToast: atribuição via once-guard, demais via notifShowToast', /onNotifToast\(function\(p\)\{ if\(notifIsAttrEvent\(p\)\)\{ notifAttrToastOnce\(p\); \} else \{ notifShowToast\(p\); \}/.test(html));
 ok('onNotifHistory compensa atribuição só com janela visível', /onNotifHistory\(function\(p\)\{[\s\S]*?if\(notifIsAttrEvent\(p\) && \(typeof document==='undefined'\|\|document\.visibilityState!=='hidden'\)\) notifAttrToastOnce\(p\)/.test(html));
+ok('toast de atribuição tem layout em linhas próprio (isAttr)', /if\(isAttr\)\{[\s\S]*?ntf-ti">atribuiu uma tarefa<\/div>[\s\S]*?ntf-attr-task[\s\S]*?ntf-attr-cli/.test(html));
+ok('layout de atribuição não afeta demais toasts (else mantém estrutura)', /\} else \{\s*el\.innerHTML='<div class="ntf-card">'\+av/.test(html));
 
 if (!CHROME) {
   console.log('\nF3.3.10 ASSIGNMENT-TOAST (estático): ' + pass + ' PASS / ' + fail + ' FAIL');
@@ -72,6 +74,13 @@ function go(){
     vis('hidden'); clearNtf(); b=nNtf(); window.__cbs.hist(mk('designer_assigned:t1:C')); R.C_nativeOnly_hidden=nNtf()-b;
     vis('visible'); clearNtf(); b=nNtf(); var pD={eventType:'sla_warning',taskId:'t9',taskTitle:'Arte',clientName:'X',severity:'warning',title:'prazo próximo',responsibleName:'Miercohévisk Niheb',sound:false,action:{type:'detail',deep:'detail/t9'},dedupKey:'sla_warning:t9'}; window.__cbs.hist(pD); window.__cbs.toast(pD); R.D_sla_bothChannels=nNtf()-b;
     vis('visible'); clearNtf(); b=nNtf(); window.__cbs.hist({eventType:'sla_warning',taskId:'t8',title:'x',severity:'warning',sound:false,dedupKey:'sla_warning:t8'}); R.E_sla_historyOnly=nNtf()-b;
+    // F — estrutura em linhas do toast de atribuição (Problema 2): nome / "atribuiu uma tarefa" / tarefa / cliente / responsável / etapa
+    vis('visible'); clearNtf(); window.__cbs.hist(mk('designer_assigned:t1:F'));
+    var nf=document.querySelector('.ntf');
+    R.struct = nf ? { who:(nf.querySelector('.ntf-hd b')||{}).textContent||'', line2:(nf.querySelector('.ntf-ti')||{}).textContent||'', task:(nf.querySelector('.ntf-attr-task')||{}).textContent||'', cli:(nf.querySelector('.ntf-attr-cli')||{}).textContent||'', resp:(nf.querySelector('.ntf-resp')||{}).textContent||'', etapa:(nf.querySelector('.ntf-ctx')||{}).textContent||'' } : null;
+    // controle: SLA NÃO usa o layout de atribuição
+    clearNtf(); window.__cbs.toast({eventType:'sla_warning',taskId:'t7',taskTitle:'Arte',clientName:'X',severity:'warning',title:'prazo próximo',sound:false,dedupKey:'sla_warning:t7'});
+    var ns=document.querySelector('.ntf'); R.sla_hasAttrLayout = !!(ns && ns.querySelector('.ntf-attr-task'));
   }catch(e){ R.ERROR=String(e&&e.stack||e); }
   document.getElementById('RESULT').textContent='RESULT_JSON='+JSON.stringify(R);
 }
@@ -97,6 +106,14 @@ ok('B — atribuição (history+toast): exatamente 1 toast (sem duplicar)', R.B_
 ok('C — atribuição + janela oculta: 0 toast in-app (nativa cuida)', R.C_nativeOnly_hidden === 0);
 ok('D — sla (history+toast): 1 toast (inalterado)', R.D_sla_bothChannels === 1);
 ok('E — sla só por captura: 0 toast (captura é só histórico p/ não-atribuição)', R.E_sla_historyOnly === 0);
+// F — estrutura em linhas (Problema 2): sem cortar/espremer informação
+ok('F — linha 1 = nome de quem atribuiu', R.struct && R.struct.who === 'Arydyjany Carlôto');
+ok('F — linha 2 = "atribuiu uma tarefa"', R.struct && R.struct.line2 === 'atribuiu uma tarefa');
+ok('F — linha 3 = tarefa (Cronograma semanal)', R.struct && R.struct.task === 'Cronograma semanal');
+ok('F — linha 4 = cliente (Hospital Visão)', R.struct && R.struct.cli === 'Hospital Visão');
+ok('F — Responsável (designer) presente', R.struct && /Respons[áa]vel:\s*Miercohévisk Niheb/.test(R.struct.resp));
+ok('F — Etapa presente', R.struct && /Etapa:/.test(R.struct.etapa));
+ok('F — SLA NÃO usa o layout de atribuição (não afeta outros toasts)', R.sla_hasAttrLayout === false);
 
 console.log('\nF3.3.10 ASSIGNMENT-TOAST (estático+DOM): ' + pass + ' PASS / ' + fail + ' FAIL');
 if (fail) { console.error('::error:: toast de atribuição divergiu do contrato'); process.exit(1); }

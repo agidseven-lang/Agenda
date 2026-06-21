@@ -85,6 +85,14 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
 
 // Locale pt-BR: faz os inputs nativos date/time exibirem dd/mm/aaaa e HH:mm.
 app.commandLine.appendSwitch("lang", "pt-BR");
+// F3.3.10-FIX (minimizado/bandeja) — mantém o renderer e seus timers (scan de SLA, boundary timer)
+// rodando em velocidade normal quando a janela está minimizada/oculta/ocluída na bandeja. Sem isso,
+// o Chromium "backgrounda" o renderer e laranja/vermelho/crítico podem atrasar/não disparar a NATIVA.
+// (Complementa backgroundThrottling:false da janela — sozinho às vezes não basta.) Não altera
+// roteamento/dedup/severidade/som; só garante que o tempo seja respeitado em background.
+app.commandLine.appendSwitch("disable-background-timer-throttling");
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 
 // Deep link idseven:// -> abre a tela "Visão do cliente" no Desktop.
 // Registra o app como handler do esquema (sem backend). Em dev usa argv.

@@ -111,6 +111,9 @@ ok('main.ts captura em try/catch (não afeta entrega)', /try \{ mainWin\?\.webCo
 ok('main.ts: toast premium aprovado intacto', /webContents\.send\("notif-toast", p\)/.test(mainTs) && /channel: "toast"/.test(mainTs));
 ok('main.ts: nativa aprovada intacta', /new Notification\(/.test(mainTs) && /channel: "native"/.test(mainTs));
 ok('main.ts: windowActive (regra de canal) intacta', /function windowActive\(\)/.test(mainTs) && /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
+ok('main.ts: backgroundThrottling:false (timers em background)', /backgroundThrottling:\s*false/.test(mainTs));
+ok('main.ts: switches anti-backgrounding (SLA confiável minimizado/bandeja)', /disable-background-timer-throttling/.test(mainTs) && /disable-renderer-backgrounding/.test(mainTs) && /disable-backgrounding-occluded-windows/.test(mainTs));
+ok('main.ts: setAppUserModelId (toast nativo Windows confiável)', /setAppUserModelId\("br\.com\.idseven\.agenda\.desktop"\)/.test(mainTs));
 ok('preload expõe onNotifHistory', /onNotifHistory:\s*\(cb/.test(preloadTs));
 ok('preload: onNotifToast aprovado intacto', /onNotifToast:\s*\(cb/.test(preloadTs));
 
