@@ -88,6 +88,51 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
   } catch (e) { diag("deliver.error", { err: String(((e as any) && (e as any).message) || e) }); return { ok: false, channel: "error" }; }
 }
 
+// F3.3.10-DIAG SELFTEST — GATED por IDSEVEN_SELFTEST=1 (NUNCA setado em produção → zero efeito).
+// Prova, em Windows REAL (runner de CI), o CANAL do deliverNotification nos 3 estados, SEM
+// Firestore/rede/write (payload sintético): visível→toast, minimizado→NATIVA, oculto/bandeja→NATIVA.
+// Também loga Notification.isSupported(). O app se encerra sozinho ao fim. Removível (sentinela DIAG).
+function runNotifSelfTest() {
+  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  const synth = (n: number, state: string) => ({
+    eventType: "selftest", source: "selftest", providerCalled: false,
+    taskId: "ST" + n, taskTitle: "Selftest " + n, title: "Selftest " + n,
+    body: "estado: " + state, severity: "info" as const, sound: false,
+    action: { type: "board", deep: "board/" }, dedupKey: "selftest:" + n,
+    targetUserId: "selftest", createdAt: Date.now(),
+  });
+  // failsafe: encerra o processo mesmo se algo travar (CI não pode pendurar)
+  const hardExit = setTimeout(() => { try { quitting = true; app.exit(0); } catch { /* */ } }, 30000);
+  (async () => {
+    try {
+      diag("selftest.begin", { notificationSupported: Notification.isSupported(), platform: process.platform, aumidWin: process.platform === "win32" });
+      const w = mainWin;
+      if (w && !w.isDestroyed()) { w.show(); w.focus(); }
+      await wait(2000);
+      diag("selftest.state", { phase: "visible", windowActive: windowActive() });
+      diag("selftest.deliver", { n: 1, expect: "toast", channel: deliverNotification(synth(1, "visible")).channel });
+      await wait(2500);
+      if (w && !w.isDestroyed()) w.minimize();
+      await wait(2000);
+      diag("selftest.state", { phase: "minimized", windowActive: windowActive() });
+      diag("selftest.deliver", { n: 2, expect: "native", channel: deliverNotification(synth(2, "minimized")).channel });
+      await wait(3000);
+      if (w && !w.isDestroyed()) w.hide();
+      await wait(2000);
+      diag("selftest.state", { phase: "hidden(tray)", windowActive: windowActive() });
+      diag("selftest.deliver", { n: 3, expect: "native", channel: deliverNotification(synth(3, "hidden")).channel });
+      await wait(3000);
+      diag("selftest.end", { ok: true });
+    } catch (e) {
+      diag("selftest.error", { err: String(((e as any) && (e as any).message) || e) });
+    } finally {
+      clearTimeout(hardExit);
+      quitting = true;
+      setTimeout(() => { try { app.exit(0); } catch { /* */ } }, 1200);
+    }
+  })();
+}
+
 // Locale pt-BR: faz os inputs nativos date/time exibirem dd/mm/aaaa e HH:mm.
 app.commandLine.appendSwitch("lang", "pt-BR");
 // F3.3.10-FIX (minimizado/bandeja) — mantém o renderer e seus timers (scan de SLA, boundary timer)
@@ -299,6 +344,9 @@ app.whenReady().then(() => {
       });
     } catch { /* heartbeat de diagnóstico nunca pode quebrar o app */ }
   }, 30000);
+
+  // F3.3.10-DIAG SELFTEST — só roda sob IDSEVEN_SELFTEST=1 (prova de canal em Windows REAL no CI).
+  if (process.env.IDSEVEN_SELFTEST === "1") { try { runNotifSelfTest(); } catch { /* */ } }
 });
 
 // Nao encerrar quando todas as janelas fecharem (vivemos na tray).
