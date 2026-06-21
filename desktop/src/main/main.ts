@@ -104,8 +104,14 @@ function runNotifSelfTest() {
   // failsafe: encerra o processo mesmo se algo travar (CI não pode pendurar)
   const hardExit = setTimeout(() => { try { quitting = true; app.exit(0); } catch { /* */ } }, 30000);
   (async () => {
+    let stopST: (() => void) | null = null;
     try {
       diag("selftest.begin", { notificationSupported: Notification.isSupported(), platform: process.platform, aumidWin: process.platform === "win32" });
+      // Liga o notifier REAL (read-only) p/ PROVAR que o listener Firestore do MAIN conecta e
+      // recebe snapshot em Windows (transporte long-polling). uid sintético → não entrega nada
+      // (nenhum doc casa), só comprova firestore.listen.attach + firestore.snapshot no main.
+      try { stopST = startNotifier(() => mainWin, "selftest-uid", deliverNotification); diag("selftest.notifier.started", {}); }
+      catch (e2) { diag("selftest.notifier.error", { err: String(((e2 as any) && (e2 as any).message) || e2) }); }
       const w = mainWin;
       if (w && !w.isDestroyed()) { w.show(); w.focus(); }
       await wait(2000);
@@ -126,6 +132,7 @@ function runNotifSelfTest() {
     } catch (e) {
       diag("selftest.error", { err: String(((e as any) && (e as any).message) || e) });
     } finally {
+      try { if (stopST) stopST(); } catch { /* */ }
       clearTimeout(hardExit);
       quitting = true;
       setTimeout(() => { try { app.exit(0); } catch { /* */ } }, 1200);
