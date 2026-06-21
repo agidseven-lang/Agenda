@@ -1,0 +1,56 @@
+name: "[manual] WA Share Meta Probe (read-only)"
+
+# Dump de TODAS as meta OG/Twitter do HTML vivo de /share/cronograma/<token> (UA facebook),
+# p/ provar se a resposta do Worker DEPLOYADO inclui og:image:width/height/secure_url/type.
+# SOMENTE curl GET. SEM deploy/secrets/Firestore; nao toca Worker/Cloudflare/Desktop/notificacoes.
+
+"on":
+  workflow_dispatch:
+    inputs:
+      token:
+        description: "Token real"
+        required: false
+        default: "017a8ae53316949945ff8e4276c4865659f13cd2524064d8"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dump meta OG/Twitter da resposta viva
+        env:
+          TOK: ${{ github.event.inputs.token }}
+        run: |
+          set +e
+          T="${TOK:-017a8ae53316949945ff8e4276c4865659f13cd2524064d8}"
+          U="https://aprovar.agendaidseven.com.br/share/cronograma/$T"
+          mkdir -p out
+          curl -sS -L -m 35 -A "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" -o out/body.html -D out/headers.txt "$U"
+          echo "================ META OG/TWITTER (resposta viva) ================"
+          grep -oiE '<meta[[:space:]]+(property|name)="(og|twitter)[^"]*"[^>]*>' out/body.html | tee out/meta.txt
+          echo ""
+          echo "================ CHECKLIST ================"
+          chk(){ if grep -qi "$2" out/body.html; then echo "OK   $1"; else echo "FALTA $1"; fi; }
+          chk "og:title"            'property="og:title"'
+          chk "og:description"      'property="og:description"'
+          chk "og:image"            'property="og:image"'
+          chk "og:image:secure_url" 'property="og:image:secure_url"'
+          chk "og:image:type"       'property="og:image:type"'
+          chk "og:image:width"      'property="og:image:width"'
+          chk "og:image:height"     'property="og:image:height"'
+          chk "og:url"              'property="og:url"'
+          chk "twitter:card"        'name="twitter:card"'
+          echo ""
+          echo "og:image:width  = $(grep -oiE '<meta[^>]*og:image:width[^>]*>' out/body.html | head -1)"
+          echo "og:image:height = $(grep -oiE '<meta[^>]*og:image:height[^>]*>' out/body.html | head -1)"
+          echo "bytes(html)=$(stat -c%s out/body.html)  http=$(grep -m1 -oE 'HTTP/[^ ]+ [0-9]+' out/headers.txt)"
+
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wa-share-meta-probe
+          path: out/
+          if-no-files-found: warn
