@@ -280,9 +280,25 @@ app.whenReady().then(() => {
     }
   });
   ipcMain.on("session-logout", () => {
+    diag("session-logout"); // F3.3.10-DIAG
     if (stopNotifier) { stopNotifier(); stopNotifier = null; }
     if (stopReminder) { stopReminder(); stopReminder = null; }
   });
+
+  // F3.3.10-DIAG — HEARTBEAT do MAIN: prova que o processo principal (e o notifier) seguem VIVOS
+  // com a janela minimizada/oculta/bandeja. Se após uma atribuição em background não houver
+  // firestore.snapshot mas houver main.alive, isola "listener silencioso" de "processo morto".
+  // Só log local (sem rede/Firestore/efeito). Removível com as sentinelas F3.3.10-DIAG.
+  setInterval(() => {
+    try {
+      const w = mainWin;
+      diag("main.alive", {
+        notifier: !!stopNotifier, reminder: !!stopReminder,
+        visible: !!(w && !w.isDestroyed() && w.isVisible()),
+        minimized: !!(w && !w.isDestroyed() && w.isMinimized()),
+      });
+    } catch { /* heartbeat de diagnóstico nunca pode quebrar o app */ }
+  }, 30000);
 });
 
 // Nao encerrar quando todas as janelas fecharem (vivemos na tray).

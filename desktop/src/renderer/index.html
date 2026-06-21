@@ -3623,6 +3623,11 @@ function notifScanAssign(){
 if(typeof renderFromSnapshot==='function'){ var _notif_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_notif_rfs.apply(this,arguments); try{ notifScan(); }catch(_){} return r; }; }
 if(typeof slaTick==='function'){ var _notif_tk=slaTick; slaTick=function(){ var r=_notif_tk.apply(this,arguments); try{ notifScanSla(); }catch(_){} return r; }; }
 try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} try{ notifScanAssign(); }catch(_){} },30000); }catch(_){}
+/* F3.3.10-DIAG — HEARTBEAT do RENDERER (intervalo próprio, não altera a varredura aprovada): prova se o
+   timer do renderer SOBREVIVE minimizado/bandeja (Chromium pode congelar a janela oculta). Se houver
+   scan.tick com vis:'hidden', a varredura de SLA roda em background; se sumir ao ocultar, o SLA depende
+   do MAIN (não-suspenso) — isola a causa do Cenário D. Só log local; removível com as sentinelas. */
+try{ setInterval(function(){ try{ ncDiag('scan.tick',{vis:(typeof document!=='undefined'?document.visibilityState:'?'),sla:(function(){try{return (slaibVisible(state.user)||[]).length;}catch(_){return -1;}})(),tasks:((state&&state.tasks&&state.tasks.length)||0)}); }catch(_){} },30000); }catch(_){}
 /* F3.3.10-DIAG — registra transições de visibilidade do RENDERER (prova quando o Chromium congela a
    janela minimizada/bandeja → por que a entrega em background depende do MAIN/notifier, nunca suspenso).
    Só log local via main; não altera comportamento. Removível. */
