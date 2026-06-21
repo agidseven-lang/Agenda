@@ -2532,7 +2532,7 @@ async function pendingChange(p1,p2,btn){
 }
 
 /* ---- APP RENDER ---- */
-const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'relatorios',l:'Relatórios',i:'bars'}];
+const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'relatorios',l:'Relatórios',i:'bars'},{k:'notificacoes',l:'Notificações',i:'bell'}];
 // 1.0.119-form-unlock-hotfix — CAUSA RAIZ do "nada responde": um snapshot do Firestore
 // (users/events/tasks) chegava enquanto o WIZARD de criação estava aberto e RECONSTRUÍA o
 // #content por baixo do usuário — destruindo o campo/clique/foco a cada atualização de dados
@@ -3454,6 +3454,7 @@ function notifEmit(p){
     if(api&&typeof api.notify==='function'){ try{ api.notify(p); delivered=true; }catch(_){ delivered=false; } }
     if(!delivered){ try{ notifShowToast(p); delivered=true; }catch(_){ delivered=false; } }   // sem Electron (navegador/QA)
     if(delivered) notifSeenMark(key);    // só dedup APÓS entregar — falha transitória reentrega no próximo tick
+    if(delivered){ try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} }   // F3.3.10: histórico local (cobre fallback sem Electron; deduped) — capture-only, nunca afeta a entrega
     try{ if(window.__notifCapture) window.__notifCapture.push(p); }catch(_){}   // QA: espião de detecção
   }catch(_){}
 }
@@ -3556,7 +3557,8 @@ if(typeof renderFromSnapshot==='function'){ var _notif_rfs=renderFromSnapshot; r
 if(typeof slaTick==='function'){ var _notif_tk=slaTick; slaTick=function(){ var r=_notif_tk.apply(this,arguments); try{ notifScanSla(); }catch(_){} return r; }; }
 try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} },30000); }catch(_){}
 /* receber TOAST do HUB do main (janela focada/visível) */
-try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifShowToast(p); }); } }catch(_){}
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifShowToast(p); try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} }); } }catch(_){}
+/* F3.3.10 — onNotifHistory (captura 100% toast×nativa via hub do main) é registrado UMA vez no bloco F3.3.10-NOTIF-CENTRAL. */
 /* exposto p/ QA/testes (não afeta produção) */
 try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifScanFlow=notifScanFlow; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; window.resolveNotificationTargets=resolveNotificationTargets; window.resolveUserIdentity=resolveUserIdentity; window.notifNormalize=notifNormalize; window.notifIdentity=notifIdentity; window.notifResponsible=notifResponsible; window.notifActor=notifActor; window.notifPhaseLabel=notifPhaseLabel; window.__notifResetFlow=function(){ _notifPhase={}; _notifBaseline=false; _notifUid=null; }; }catch(_){}
 
@@ -3617,9 +3619,10 @@ function render(){
   else if(state.tab==='config')c.innerHTML=renderConfig();
   else if(state.tab==='exec'){c.innerHTML=renderExecPanel();afterExecPanel();}
   else if(state.tab==='relatorios'){c.innerHTML=renderReports();afterReports();}
+  else if(state.tab==='notificacoes'){c.innerHTML=renderNotifCentral();afterNotifCentral();}
 }
-function navBtn(t){const on=state.tab===t.k&&!state.form;return '<button class="'+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+'<span>'+t.l+'</span></button>';}
-function sbItem(t){const on=state.tab===t.k&&!state.form;return '<button class="sb-item '+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+'<span>'+t.l+'</span></button>';}
+function navBtn(t){const on=state.tab===t.k&&!state.form;return '<button class="'+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+(typeof notifNavBadge==='function'?notifNavBadge(t.k):'')+'<span>'+t.l+'</span></button>';}
+function sbItem(t){const on=state.tab===t.k&&!state.form;return '<button class="sb-item '+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+(typeof notifNavBadge==='function'?notifNavBadge(t.k):'')+'<span>'+t.l+'</span></button>';}
 
 /* ════════════════════════ F3.3.8-EXEC-CORE BEGIN ════════════════════════
    Painel Executivo de SLA & Produtividade — TELA NOVA, ADITIVA, 100% READ-SIDE.
@@ -3824,6 +3827,146 @@ function afterReports(){
   var ex=document.querySelectorAll('[data-rep-export]'); for(var m=0;m<ex.length;m++){ (function(b){ b.onclick=function(){ var u=state.user; var now=Date.now(); var vis=(typeof visibleTasks==='function')?visibleTasks(u,state.tasks||[]):(state.tasks||[]); var R=slaExecReports(vis,state.users||[],now,reportFilters); var kind=b.getAttribute('data-rep-export'); var stamp=new Date().toISOString().slice(0,10); if(kind==='csv'){ execDownload('relatorio-atraso-'+stamp+'.csv','text/csv;charset=utf-8',toCSV(R.taskRows)); } else { execDownload('relatorio-atraso-'+stamp+'.json','application/json;charset=utf-8',JSON.stringify({geradoEm:new Date().toISOString(),filtros:reportFilters,kpis:R.kpis,porDesigner:R.porDesigner,porCliente:R.porCliente,porTipo:R.porTipo,periodo:R.periodo,reincidentes:R.reincidentes,tarefas:R.taskRows},null,2)); } }; })(ex[m]); }
 }
 /* ════════════════════════ F3.3.9-REPORTS-CORE END ════════════════════════ */
+
+/* ════════════════════════ F3.3.10-NOTIF-CENTRAL BEGIN ════════════════════════
+   Central de Notificações & Histórico — TELA NOVA, ADITIVA, 100% LOCAL/READ-SIDE (tab 'notificacoes').
+   CAPTURA (capture-only) o MESMO payload já entregue/deduplicado: notifEmit (renderer) + onNotifToast
+   (in-app do main) + onNotifHistory (hub do main = 100%, toast OU nativa). NÃO altera roteamento/toast/
+   nativa/dedup/som/severidade/destino/payload aprovados; NÃO grava Firestore; NÃO chama provider; NÃO
+   envia a backend. Store SÓ em localStorage. Removível (sentinelas + tab + 3 linhas de captura). */
+var NOTIF_HIST_KEY='idseven.notif.history.v1';
+var NOTIF_HIST_CAP=300, NOTIF_HIST_TTL=30*24*3600*1000;   // retenção local: 300 itens / 30 dias
+var notifCentralFilters={tipo:'',sev:'',designer:'',cliente:'',q:''};
+var notifDetailId=null;
+function notifHistoryLoad(){ try{ var a=JSON.parse(localStorage.getItem(NOTIF_HIST_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(_){ return []; } }
+function notifHistorySave(a){ try{ localStorage.setItem(NOTIF_HIST_KEY,JSON.stringify(a||[])); }catch(_){} }
+/* APPEND read-side: dedup por dedupKey (não duplica já-deduplicado), trim do payload aprovado, retenção. */
+function notifHistoryAppend(p){ try{
+  if(!p) return; var key=String(p.dedupKey||p.eventId||''); if(!key) return;
+  var a=notifHistoryLoad();
+  for(var i=0;i<a.length;i++){ if(a[i].dedupKey===key) return; }
+  a.unshift({ eventId:p.eventId||key, dedupKey:key, eventType:p.eventType||'', taskId:p.taskId||'',
+    taskTitle:p.taskTitle||'', clientName:p.clientName||'', actorName:p.actorName||'', actorAvatar:p.actorAvatar||'',
+    responsibleName:p.responsibleName||'', responsibleAvatar:p.responsibleAvatar||'', notificationType:p.notificationType||'',
+    etapa:p.etapa||'', status:p.status||'', title:p.title||'', subtitle:p.subtitle||'', body:p.body||'', context:p.context||'',
+    severity:p.severity||'info', createdAt:Number(p.createdAt)||Date.now(),
+    deep:(p.action&&p.action.deep)||(p.taskId?('detail/'+p.taskId):''), read:false });
+  var cut=Date.now()-NOTIF_HIST_TTL; a=a.filter(function(x){ return (Number(x.createdAt)||0)>=cut; });
+  if(a.length>NOTIF_HIST_CAP) a=a.slice(0,NOTIF_HIST_CAP);
+  notifHistorySave(a);
+  try{ if(typeof state!=='undefined'&&state&&state.tab==='notificacoes'){ var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } } notifBadgeRefresh(); }catch(_){}
+}catch(_){} }
+function notifHistoryUnread(){ var a=notifHistoryLoad(),n=0; for(var i=0;i<a.length;i++) if(!a[i].read) n++; return n; }
+function notifHistoryMarkRead(id){ var a=notifHistoryLoad(),ch=false; for(var i=0;i<a.length;i++) if(a[i].eventId===id&&!a[i].read){a[i].read=true;ch=true;} if(ch) notifHistorySave(a); }
+function notifHistoryMarkAll(){ var a=notifHistoryLoad(); for(var i=0;i<a.length;i++) a[i].read=true; notifHistorySave(a); }
+function notifHistoryClear(){ notifHistorySave([]); notifDetailId=null; }
+function notifBadgeRefresh(){ try{ var u=notifHistoryUnread(); var el=document.getElementById('navbadge-notif'); if(el){ el.textContent=(u>9?'9+':String(u)); el.style.display=u>0?'':'none'; } }catch(_){} }
+function notifNavBadge(k){ if(k!=='notificacoes') return ''; var u=notifHistoryUnread(); return '<span class="nc-navbadge" id="navbadge-notif"'+(u>0?'':' style="display:none"')+'>'+(u>9?'9+':String(u))+'</span>'; }
+function notifTypeLabel(x){ var e=(x&&x.eventType)||''; if(e.indexOf('sla_')===0||e==='operational_block') return 'SLA'; if(e.indexOf('flow_')===0) return 'Fluxo'; if(/assign/i.test(e)) return 'Atribuição'; return 'Sistema'; }
+function ncSev(s){ return s==='critical'?'#FF6B61':s==='warning'?'#F2A93B':s==='success'?'#37D196':s==='info'?'#7FA6FF':'#8B94A6'; }
+function ncTypeHex(t){ return t==='Atribuição'?'#7C83FF':t==='Fluxo'?'#7FA6FF':t==='SLA'?'#F2A93B':'#8B94A6'; }
+function notifHistoryFilter(a){ var f=notifCentralFilters, q=(f.q||'').toLowerCase();
+  return (a||[]).filter(function(x){
+    if(f.tipo && notifTypeLabel(x)!==f.tipo) return false;
+    if(f.sev && (x.severity||'')!==f.sev) return false;
+    if(f.designer && (x.responsibleName||'')!==f.designer) return false;
+    if(f.cliente && (x.clientName||'')!==f.cliente) return false;
+    if(q){ var hay=((x.title||'')+' '+(x.subtitle||'')+' '+(x.taskTitle||'')+' '+(x.clientName||'')+' '+(x.actorName||'')+' '+(x.responsibleName||'')).toLowerCase(); if(hay.indexOf(q)<0) return false; }
+    return true; }); }
+function ncDayLabel(ts){ var d=new Date(Number(ts)||0), now=new Date(); var sd=function(x){return x.getFullYear()+'-'+x.getMonth()+'-'+x.getDate();}; var y=new Date(now.getTime()-86400000); if(sd(d)===sd(now))return 'Hoje'; if(sd(d)===sd(y))return 'Ontem'; var p=function(n){return (n<10?'0':'')+n;}; return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear(); }
+function ncTimeHM(ts){ var d=new Date(Number(ts)||0), p=function(n){return (n<10?'0':'')+n;}; return p(d.getHours())+':'+p(d.getMinutes()); }
+function ncAvatar(url,name,size){ if(url&&/^https?:|^data:/.test(url)) return '<span class="nc-av" style="width:'+size+'px;height:'+size+'px;background-image:url(\''+esc(url)+'\')"></span>'; var col=(typeof userColor==='function')?userColor(name||''):'#7C83FF'; var ini=(typeof initials==='function')?initials(name||''):((name||'?').slice(0,1)); return '<span class="nc-av nc-av-i" style="width:'+size+'px;height:'+size+'px;background:'+col+';font-size:'+Math.round(size*0.4)+'px">'+esc((ini||'?').toUpperCase())+'</span>'; }
+var NC_CSS='.nc-navbadge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;border-radius:8px;background:#FF6B61;color:#fff;font-size:9px;font-weight:800;padding:0 4px;margin-left:6px}'
++'.nc-wrap{padding:18px 22px 26px;max-width:1000px;margin:0 auto}'
++'.nc-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}.nc-ttl{font-size:21px;font-weight:800;color:#EEF2F8}.nc-subh{font-size:12.5px;color:#6E7480;margin-top:3px}.nc-sp{flex:1}'
++'.nc-badge{font-size:12px;font-weight:800;color:#fff;background:#FF6B61;border-radius:999px;padding:5px 11px}'
++'.nc-act{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#9FB0C8;background:#141A29;border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:7px 11px;cursor:pointer}.nc-act.danger{color:#ffb4ad;border-color:rgba(242,65,90,.3)}'
++'.nc-tb{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}'
++'.nc-search{flex:1;min-width:260px;display:flex;align-items:center;gap:8px;background:#141A29;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:0 12px}'
++'.nc-search input{flex:1;background:transparent;border:0;outline:0;color:#E8ECF4;font-size:13px;padding:9px 0}'
++'.nc-fl{background:#141A29;border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:8px 10px;font-size:12px;color:#cdd6e6;cursor:pointer}'
++'.nc-grp{margin-bottom:8px}.nc-day{font-size:11.5px;font-weight:700;color:#6E7480;text-transform:uppercase;letter-spacing:.5px;padding:6px 4px 8px}'
++'.nc-row{position:relative;display:flex;align-items:center;gap:12px;background:#121826;border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:12px 14px 12px 18px;margin-bottom:8px;cursor:pointer}'
++'.nc-row.unread{background:#141B2B;border-color:rgba(124,131,255,.22)}'
++'.nc-acc{position:absolute;left:7px;top:12px;bottom:12px;width:3px;border-radius:3px;opacity:0}.nc-row.unread .nc-acc{opacity:1}'
++'.nc-dot{width:9px;height:9px;border-radius:50%;flex:none}'
++'.nc-av{display:inline-block;border-radius:50%;background-size:cover;background-position:center;flex:none}.nc-av-i{display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700}'
++'.nc-body{flex:1;min-width:0}.nc-l1{display:flex;align-items:center;gap:8px}.nc-l1 b{font-size:14px;font-weight:700;color:#EEF2F8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
++'.nc-type{font-size:10.5px;font-weight:800;border-radius:6px;padding:2px 7px;flex:none}'
++'.nc-crit{font-size:9.5px;font-weight:900;color:#FFD7D2;background:rgba(242,65,90,.2);border:1px solid rgba(242,65,90,.47);border-radius:5px;padding:1px 6px;flex:none}'
++'.nc-sub{font-size:12.5px;color:#9FB0C8;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nc-ctx{font-size:11.5px;font-weight:600;margin-top:3px}'
++'.nc-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}.nc-time{font-size:11.5px;color:#6E7480}.nc-ur{width:9px;height:9px;border-radius:50%;background:#7C83FF}'
++'.nc-open{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:#7C83FF;background:rgba(124,131,255,.1);border:1px solid rgba(124,131,255,.27);border-radius:8px;padding:5px 9px}'
++'.nc-empty{height:430px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px}.nc-eic{width:66px;height:66px;border-radius:18px;background:#141A29;display:flex;align-items:center;justify-content:center;color:#6E7480}.nc-eic svg{width:30px;height:30px}.nc-et{font-size:17px;font-weight:700;color:#EEF2F8}.nc-es{font-size:13px;color:#9FB0C8;max-width:440px}'
++'.nc-foot{margin-top:8px;font-size:11px;color:#6E7480;display:flex;align-items:center;gap:7px}.nc-foot i{width:6px;height:6px;border-radius:50%;background:#37D196;display:inline-block}'
++'.nc-dimwrap{position:relative}.nc-detail{position:fixed;top:0;right:0;bottom:0;width:400px;max-width:92vw;background:#0E121C;border-left:1px solid rgba(255,255,255,.12);box-shadow:-26px 0 60px rgba(0,0,0,.6);padding:16px 18px;z-index:60;overflow:auto}'
++'.nc-dh{display:flex;align-items:center;gap:8px;margin-bottom:14px}.nc-dx{margin-left:auto;color:#6E7480;font-size:16px;cursor:pointer}'
++'.nc-dtop{display:flex;align-items:center;gap:12px;margin-bottom:14px}.nc-dtitle{font-size:16px;font-weight:800;color:#EEF2F8}.nc-dwhen{font-size:12px;color:#6E7480;margin-top:2px}'
++'.nc-drow{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);font-size:12.5px}.nc-drow span{color:#6E7480}.nc-drow b{color:#E8ECF4;font-weight:600;text-align:right}'
++'.nc-dcta{margin-top:16px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:13px;font-weight:800;color:#fff;background:#7C83FF;border-radius:11px;padding:11px;cursor:pointer}';
+function ncEnsureStyle(){ if(document.getElementById('nc-style'))return; var s=document.createElement('style'); s.id='nc-style'; s.textContent=NC_CSS; document.head.appendChild(s); }
+function ncRow(x){ var col=ncSev(x.severity); var tp=notifTypeLabel(x); var tph=ncTypeHex(tp); var crit=(x.severity==='critical'&&(x.eventType==='sla_critical'||x.status==='operational_block'));
+  return '<div class="nc-row'+(x.read?'':' unread')+'" data-nc-open="'+esc(x.eventId)+'">'
+    +'<div class="nc-acc" style="background:'+col+'"></div><div class="nc-dot" style="background:'+col+';box-shadow:0 0 8px '+col+'"></div>'
+    +ncAvatar(x.responsibleAvatar||x.actorAvatar,x.responsibleName||x.actorName||x.taskTitle,38)
+    +'<div class="nc-body"><div class="nc-l1"><span class="nc-type" style="color:'+tph+';background:'+tph+'22">'+esc(tp)+'</span><b>'+esc(x.title||tp)+'</b>'+(crit?'<span class="nc-crit">CRÍTICO</span>':'')+'</div>'
+    +'<div class="nc-sub">'+esc(x.subtitle||((x.clientName?x.clientName+' · ':'')+(x.taskTitle||'')))+'</div>'+(x.context?'<div class="nc-ctx" style="color:'+col+'">'+esc(x.context)+'</div>':'')+'</div>'
+    +'<div class="nc-right"><div class="nc-time">'+ncTimeHM(x.createdAt)+'</div>'+(x.read?'':'<div class="nc-ur"></div>')+(x.deep?'<div class="nc-open" data-nc-deep="'+esc(x.deep)+'" data-nc-id="'+esc(x.eventId)+'">Abrir tarefa '+svg('arr')+'</div>':'')+'</div></div>';
+}
+function renderNotifCentral(){
+  ncEnsureStyle();
+  var all=notifHistoryLoad(); var unread=notifHistoryUnread();
+  var desSet={},cliSet={}; all.forEach(function(x){ if(x.responsibleName)desSet[x.responsibleName]=1; if(x.clientName)cliSet[x.clientName]=1; });
+  function sel(name,label,opts){ var cur=notifCentralFilters[name]||''; var o='<option value="">'+label+': Todos</option>'; opts.forEach(function(p){ var v=(p instanceof Array)?p[0]:p, t=(p instanceof Array)?p[1]:p; o+='<option value="'+esc(v)+'"'+(cur===v?' selected':'')+'>'+esc(label)+': '+esc(t)+'</option>'; }); return '<select class="nc-fl" data-nc-filter="'+name+'">'+o+'</select>'; }
+  var h='<div class="scr nc-wrap"><div class="nc-head"><div><div class="nc-ttl">Notificações</div><div class="nc-subh">Central &amp; histórico · local · read-only</div></div><span class="nc-sp"></span>'
+    +(unread>0?'<span class="nc-badge">'+unread+' não lidas</span>':'')
+    +'<span class="nc-act" data-nc-markall>'+svg('arr')+'Marcar todas</span><span class="nc-act danger" data-nc-clear>Limpar histórico</span></div>';
+  if(all.length>0){
+    h+='<div class="nc-tb"><div class="nc-search">'+svg('person')+'<input id="ncSearch" placeholder="Buscar por título, tarefa ou cliente…" value="'+esc(notifCentralFilters.q||'')+'"></div>'
+      +sel('tipo','Tipo',['Atribuição','Fluxo','SLA','Sistema'])
+      +sel('sev','Severidade',[['critical','Crítico'],['warning','Atenção'],['success','Sucesso'],['info','Info']])
+      +sel('designer','Designer',Object.keys(desSet).sort())
+      +sel('cliente','Cliente',Object.keys(cliSet).sort())+'</div>';
+  }
+  if(all.length===0){
+    h+='<div class="nc-empty"><div class="nc-eic">'+svg('bell')+'</div><div class="nc-et">Nenhuma notificação por aqui</div><div class="nc-es">Alertas de SLA, fluxo, atribuições e ações importantes aparecem aqui — mesmo depois que o toast some.</div></div></div>';
+    return h;
+  }
+  var list=notifHistoryFilter(all);
+  if(list.length===0){ h+='<div class="nc-empty"><div class="nc-eic">'+svg('bell')+'</div><div class="nc-et">Nada encontrado</div><div class="nc-es">Nenhuma notificação corresponde à busca/filtros atuais.</div></div></div>'; return h; }
+  var curDay=null;
+  for(var i=0;i<list.length;i++){ var x=list[i]; var dl=ncDayLabel(x.createdAt); if(dl!==curDay){ if(curDay!==null) h+='</div>'; h+='<div class="nc-grp"><div class="nc-day">'+esc(dl)+'</div>'; curDay=dl; } h+=ncRow(x); }
+  if(curDay!==null) h+='</div>';
+  // detalhe
+  if(notifDetailId){ var d=null; for(var j=0;j<all.length;j++) if(all[j].eventId===notifDetailId){ d=all[j]; break; }
+    if(d){ var col=ncSev(d.severity), tp=notifTypeLabel(d), tph=ncTypeHex(tp), crit=(d.severity==='critical'&&(d.eventType==='sla_critical'||d.status==='operational_block'));
+      h+='<div class="nc-detail"><div class="nc-dh"><span class="nc-type" style="color:'+tph+';background:'+tph+'22">'+esc(tp)+'</span>'+(crit?'<span class="nc-crit">CRÍTICO</span>':'')+'<span class="nc-dx" data-nc-close>✕</span></div>'
+        +'<div class="nc-dtop">'+ncAvatar(d.responsibleAvatar||d.actorAvatar,d.responsibleName||d.actorName||d.taskTitle,52)+'<div><div class="nc-dtitle">'+esc(d.title||tp)+'</div><div class="nc-dwhen">'+esc(ncDayLabel(d.createdAt))+' · '+ncTimeHM(d.createdAt)+'</div></div></div>'
+        +(d.taskTitle?'<div class="nc-drow"><span>Tarefa</span><b>'+esc(d.taskTitle)+'</b></div>':'')
+        +(d.clientName?'<div class="nc-drow"><span>Cliente</span><b>'+esc(d.clientName)+'</b></div>':'')
+        +(d.responsibleName?'<div class="nc-drow"><span>Responsável</span><b>'+esc(d.responsibleName)+'</b></div>':'')
+        +(d.actorName?'<div class="nc-drow"><span>Origem/ator</span><b>'+esc(d.actorName)+'</b></div>':'')
+        +(d.etapa?'<div class="nc-drow"><span>Etapa</span><b>'+esc(d.etapa)+'</b></div>':'')
+        +'<div class="nc-drow"><span>Severidade</span><b style="color:'+col+'">'+esc(d.severity||'info')+'</b></div>'
+        +((d.body||d.context)?'<div class="nc-drow"><span>Detalhe</span><b>'+esc(d.context||d.body)+'</b></div>':'')
+        +(d.deep?'<div class="nc-dcta" data-nc-deep="'+esc(d.deep)+'" data-nc-id="'+esc(d.eventId)+'">Abrir tarefa '+svg('arr')+'</div>':'')+'</div>';
+    }
+  }
+  h+='<div class="nc-foot"><i></i>Histórico LOCAL (localStorage) · read-only · dedup · retenção 300 itens/30 dias · não grava no Firestore</div></div>';
+  return h;
+}
+function afterNotifCentral(){
+  var s=document.getElementById('ncSearch'); if(s){ s.oninput=function(){ notifCentralFilters.q=s.value; var p=s.selectionStart; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); var n=document.getElementById('ncSearch'); if(n){ n.focus(); try{ n.setSelectionRange(p,p); }catch(_){} } } }; }
+  var fs=document.querySelectorAll('[data-nc-filter]'); for(var i=0;i<fs.length;i++){ (function(sel){ sel.onchange=function(){ notifCentralFilters[sel.getAttribute('data-nc-filter')]=sel.value; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } }; })(fs[i]); }
+  var ma=document.querySelector('[data-nc-markall]'); if(ma) ma.onclick=function(){ notifHistoryMarkAll(); var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } notifBadgeRefresh(); };
+  var cl=document.querySelector('[data-nc-clear]'); if(cl) cl.onclick=function(){ if(window.confirm('Limpar todo o histórico local de notificações? Esta ação é local e não afeta o Firestore.')){ notifHistoryClear(); var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } notifBadgeRefresh(); } };
+  var opens=document.querySelectorAll('[data-nc-deep]'); for(var k=0;k<opens.length;k++){ (function(b){ b.onclick=function(e){ if(e&&e.stopPropagation)e.stopPropagation(); notifHistoryMarkRead(b.getAttribute('data-nc-id')); notifBadgeRefresh(); var deep=b.getAttribute('data-nc-deep'); try{ if(typeof notifRoute==='function') notifRoute(deep); }catch(_){} }; })(opens[k]); }
+  var rows=document.querySelectorAll('[data-nc-open]'); for(var r=0;r<rows.length;r++){ (function(rw){ rw.onclick=function(){ var id=rw.getAttribute('data-nc-open'); notifHistoryMarkRead(id); notifDetailId=id; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } notifBadgeRefresh(); }; })(rows[r]); }
+  var cx=document.querySelector('[data-nc-close]'); if(cx) cx.onclick=function(){ notifDetailId=null; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } };
+}
+/* registro do canal de captura 100% (hub do main → histórico local). Capture-only. */
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} }); } }catch(_){}
+/* ════════════════════════ F3.3.10-NOTIF-CENTRAL END ════════════════════════ */
 
 /* ---- HOJE ---- */
 function renderHoje(){

@@ -59,6 +59,10 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
     if (_notifSeen.has(key)) return { ok: true, channel: "dedup" };
     _notifSeen.add(key);
     if (_notifSeen.size > 4000) { const it = _notifSeen.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; _notifSeen.delete(v.value); } }
+    // F3.3.10 — CAPTURA p/ a Central (histórico local no renderer). CAPTURE-ONLY: encaminha o MESMO
+    // payload já deduplicado, sem alterar roteamento/toast/nativa/dedup/som/severidade/destino. Nunca
+    // pode impedir a entrega — por isso vem em try/catch isolado e ANTES da decisão toast×nativa.
+    try { mainWin?.webContents.send("notif-history", p); } catch { /* captura nunca afeta a notificação real */ }
     const deep = (p.action && p.action.deep) ? String(p.action.deep) : "";
     if (windowActive()) {
       mainWin?.webContents.send("notif-toast", p);

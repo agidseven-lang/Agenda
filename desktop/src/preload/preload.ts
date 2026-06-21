@@ -23,6 +23,11 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   onNotifToast: (cb: (payload: any) => void) => {
     ipcRenderer.on("notif-toast", (_e, p: any) => cb(p));
   },
+  // F3.3.10 — main -> renderer: CAPTURA p/ a Central de Notificações (histórico local). Capture-only:
+  // o main encaminha o MESMO payload já entregue (toast OU nativa), sem alterar roteamento/entrega.
+  onNotifHistory: (cb: (payload: any) => void) => {
+    ipcRenderer.on("notif-history", (_e, p: any) => cb(p));
+  },
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
   // 1.0.114 — ENVIO PREMIUM: imagem real do card p/ anexar no WhatsApp.
