@@ -2344,7 +2344,8 @@ const ICON={
   place:'<path d="M12 22s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="2" fill="none"/>',
   notes:'<path d="M5 5h14M5 10h14M5 15h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
   bell:'<path d="M18 8.5a6 6 0 1 0-12 0c0 5.5-1.5 7-2.4 7.8a.6.6 0 0 0 .4 1.05h16a.6.6 0 0 0 .4-1.05c-.9-.8-2.4-2.3-2.4-7.8z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.1 20.2a2 2 0 0 0 3.8 0" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
-  gauge:'<path d="M4 18a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M12 18l4-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="18" r="1.5" fill="currentColor"/>'};
+  gauge:'<path d="M4 18a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M12 18l4-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="18" r="1.5" fill="currentColor"/>',
+  bars:'<path d="M4 20V11M10 20V5M16 20v-6M22 20H2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'};
 function svg(n,cls){return '<svg viewBox="0 0 24 24" fill="none" class="'+(cls||'')+'">'+(ICON[n]||'')+'</svg>';}
 
 const state={user:null,users:[],events:[],tasks:[],tab:'hoje',boardSector:null,personBoard:null,roleBoards:false,form:null,pending:null,clientView:null,clientAction:null};
@@ -2531,7 +2532,7 @@ async function pendingChange(p1,p2,btn){
 }
 
 /* ---- APP RENDER ---- */
-const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'}];
+const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'relatorios',l:'Relatórios',i:'bars'}];
 // 1.0.119-form-unlock-hotfix — CAUSA RAIZ do "nada responde": um snapshot do Firestore
 // (users/events/tasks) chegava enquanto o WIZARD de criação estava aberto e RECONSTRUÍA o
 // #content por baixo do usuário — destruindo o campo/clique/foco a cada atualização de dados
@@ -3615,6 +3616,7 @@ function render(){
   else if(state.tab==='perfil')c.innerHTML=renderPerfil();
   else if(state.tab==='config')c.innerHTML=renderConfig();
   else if(state.tab==='exec'){c.innerHTML=renderExecPanel();afterExecPanel();}
+  else if(state.tab==='relatorios'){c.innerHTML=renderReports();afterReports();}
 }
 function navBtn(t){const on=state.tab===t.k&&!state.form;return '<button class="'+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+'<span>'+t.l+'</span></button>';}
 function sbItem(t){const on=state.tab===t.k&&!state.form;return '<button class="sb-item '+(on?'on':'')+'" data-tab="'+t.k+'">'+svg(t.i)+'<span>'+t.l+'</span></button>';}
@@ -3738,6 +3740,90 @@ function afterExecPanel(){
   var fl=document.querySelectorAll('[data-exec-filter]'); for(var j=0;j<fl.length;j++){ (function(sel){ sel.onchange=function(){ execFilters[sel.getAttribute('data-exec-filter')]=sel.value; render(); }; })(fl[j]); }
 }
 /* ════════════════════════ F3.3.8-EXEC-CORE END ════════════════════════ */
+
+/* ════════════════════════ F3.3.9-REPORTS-CORE BEGIN ════════════════════════
+   Relatórios de Atraso + Exportação — TELA NOVA, ADITIVA, 100% READ-SIDE (tab 'relatorios').
+   REUSA (sem alterar) o F3.3.8-EXEC-CORE (slaExecAggregate/execApplyFilters/execTaskDesignerId/
+   execSevHex/execEnsureStyle) e as fontes congeladas (resolveTaskDisplayState/isTaskCompleted/
+   resolveCanonicalDeadline/slaibFmtHM/designerSla/designerAssignment). Exportação LOCAL via Blob/
+   download — SEM IPC/main.ts, SEM Firestore-write, SEM upload, SEM backend. Removível (sentinelas+tab). */
+var reportFilters={periodo:'7d',designer:'',cliente:'',tipo:'',statusSLA:'',soAtrasados:false,concluidas:''};
+function repPeriodDays(p){return p==='hoje'?1:(p==='30d'?30:(p==='all'?30:7));}
+function execTaskLateCount(t,now,dm){ var h=(t&&t.history)||[]; var c=0; for(var i=0;i<h.length;i++){ var e=h[i]||{}; var s=((e.kind||'')+'|'+(e.to||'')+'|'+(e.from||'')).toLowerCase(); if(s.indexOf('atras')>=0||s.indexOf('overdue')>=0||s.indexOf('late')>=0||e.to==='revisao'||e.to==='revisão')c++; } var d=resolveTaskDisplayState(t,now,dm); if(d.state==='overdue')c=Math.max(c,1); return c; }
+function execPeriodBuckets(list,now,dm,days){ days=days||7; var b={},labels=[]; for(var i=days-1;i>=0;i--){ var k=new Date(now-i*86400000).toISOString().slice(0,10); b[k]=0; labels.push(k); } (list||[]).forEach(function(t){ var d=resolveTaskDisplayState(t,now,dm); if(d.state!=='overdue')return; var fm=d.finishMs||0; if(!fm)return; var k=new Date(fm).toISOString().slice(0,10); if(k in b)b[k]++; }); return labels.map(function(k){return {day:k,count:b[k]};}); }
+function reportsFilter(tasks,f,now,dm){ f=f||{}; now=now||Date.now(); dm=dm||(typeof dtMs==='function'?dtMs:null);
+  var list=execApplyFilters(tasks,{designer:f.designer,cliente:f.cliente,tipo:f.tipo,statusSLA:f.statusSLA,periodo:f.periodo},now,dm);
+  if(f.soAtrasados) list=list.filter(function(t){return resolveTaskDisplayState(t,now,dm).state==='overdue';});
+  if(f.concluidas==='sim') list=list.filter(function(t){return isTaskCompleted(t);}); else if(f.concluidas==='nao') list=list.filter(function(t){return !isTaskCompleted(t);});
+  return list; }
+/* AGREGADOR PURO/DETERMINÍSTICO dos relatórios — reusa slaExecAggregate + deriva período/reincidentes/histórico. */
+function slaExecReports(tasks,users,now,filtros){ now=now||Date.now(); var dm=(typeof dtMs==='function'?dtMs:null); filtros=filtros||{};
+  var list=reportsFilter(tasks,filtros,now,dm);
+  var agg=slaExecAggregate(list,users,now,{periodo:'all'});
+  var periodo=execPeriodBuckets(list,now,dm,repPeriodDays(filtros.periodo));
+  var overdueMins=[],concl=0,conclNoPrazo=0,reincid=[],historico=[],taskRows=[];
+  var hm=function(ms){ return ms?((typeof slaibFmtHM==='function')?slaibFmtHM(ms):new Date(ms).toISOString().slice(11,16)):''; };
+  (list||[]).forEach(function(t){ var d=resolveTaskDisplayState(t,now,dm); var done=isTaskCompleted(t); var hasSla=!!(t&&t.designerSla);
+    if(d.state==='overdue') overdueMins.push(d.overdueMin);
+    if(done&&hasSla){ concl++; var fin=Number(t.designerSla&&t.designerSla.finishedAt)||0; if(fin&&d.finishMs&&fin<=d.finishMs)conclNoPrazo++; }
+    var lc=execTaskLateCount(t,now,dm); var desId=execTaskDesignerId(t); var dn=(users||[]).filter(function(x){return x.id===desId;})[0];
+    if(lc>=2) reincid.push({taskId:t.id,title:t.title||t.id,client:t.client||'',designer:(dn&&dn.name)||'',lateCount:lc});
+    if(lc>=1){ var steps=(((t.history)||[]).map(function(e){return (e.kind||e.to||'evento');})); if(!steps.length) steps=['enviado',(d.label||d.state)]; historico.push({taskId:t.id,title:t.title||t.id,designer:(dn&&dn.name)||'',lateCount:lc,sev:(d.critical?'critico':d.sev),steps:steps.slice(-7)}); }
+    if(d.state==='overdue'||d.critical){ taskRows.push({tarefa:t.title||t.id,cliente:t.client||'',tipo:t.sector||'',designer:(dn&&dn.name)||'',status_sla:(d.critical?'critico':d.sev),atraso_min:d.overdueMin,reincidencias:lc,prazo:hm(d.finishMs),concluida:done?'sim':'nao'}); } });
+  reincid.sort(function(a,b){return b.lateCount-a.lateCount;}); historico.sort(function(a,b){return b.lateCount-a.lateCount;});
+  var atrasoMedio=overdueMins.length?Math.round(overdueMins.reduce(function(a,b){return a+b;},0)/overdueMins.length):0;
+  var pctNoPrazo=concl>0?Math.round(conclNoPrazo/concl*100):100;
+  return {totais:agg.totais,porDesigner:agg.porDesigner,porCliente:agg.porCliente,porTipo:agg.porTipo,periodo:periodo,
+    criticas:agg.criticasRecentes,reincidentes:reincid.slice(0,12),historico:historico.slice(0,10),taskRows:taskRows,
+    kpis:{atrasoMedio:atrasoMedio,pctNoPrazo:pctNoPrazo,reincidentes:reincid.length,criticas:agg.totais.critico},count:list.length}; }
+/* Serializadores PUROS + download LOCAL (Blob). Sem rede/IPC/Firestore. */
+function toCSV(rows){ if(!rows||!rows.length)return ''; var cols=Object.keys(rows[0]); var e=function(v){v=(v==null?'':String(v)); return /[";\n]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v;}; return cols.join(';')+'\n'+rows.map(function(r){return cols.map(function(c){return e(r[c]);}).join(';');}).join('\n'); }
+function execDownload(name,mime,text){ try{ var blob=new Blob([text],{type:mime}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); setTimeout(function(){ try{document.body.removeChild(a);URL.revokeObjectURL(url);}catch(_){}} ,0); return true; }catch(e){ return false; } }
+var REP_CSS='.rep-wrap{padding:18px 22px 26px;max-width:1340px;margin:0 auto}'
++'.rep-tg{font-size:12px;color:#9FB0C8;background:#141A29;border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:7px 10px;cursor:pointer}'
++'.rep-tg.on{color:#ffd7d2;border-color:rgba(242,65,90,.4);background:rgba(242,65,90,.12)}'
++'.rep-exp{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#37D196;background:rgba(55,209,150,.10);border:1px solid rgba(55,209,150,.34);border-radius:9px;padding:7px 11px;cursor:pointer}.rep-exp svg{width:14px;height:14px}'
++'.rep-pbars{display:flex;align-items:flex-end;gap:14px;height:120px;padding:6px 4px 0}'
++'.rep-pb{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%}'
++'.rep-pbcol{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}.rep-pbfill{width:60%;border-radius:6px 6px 0 0;min-height:6px}'
++'.rep-pbn{font-size:12px;font-weight:700;color:#E8ECF4}.rep-pbl{font-size:11px;color:#6E7480}'
++'.rep-tl{display:flex;align-items:center;flex-wrap:wrap}.rep-tlstep{display:flex;align-items:center;gap:4px;font-size:11px;color:#9FB0C8}.rep-tlstep i{width:8px;height:8px;border-radius:50%}.rep-tlsep{width:14px;height:1px;background:rgba(255,255,255,.12);margin:0 5px}';
+function repEnsureStyle(){ if(document.getElementById('rep-style'))return; var s=document.createElement('style'); s.id='rep-style'; s.textContent=REP_CSS; document.head.appendChild(s); }
+function repStepColor(s){ s=(s||'').toString().toLowerCase(); if(/atras|overdue|late|crit/.test(s))return execSevHex(/crit/.test(s)?'critico':'vermelho'); if(/revis/.test(s))return execSevHex('laranja'); if(/concl|entreg|aprov/.test(s))return execSevHex('verde'); if(/produ|andamento/.test(s))return execSevHex('azul'); return '#8B94A6'; }
+function renderReports(){
+  execEnsureStyle(); repEnsureStyle();
+  var u=state.user; var now=Date.now();
+  var vis=(typeof visibleTasks==='function')?visibleTasks(u,state.tasks||[]):(state.tasks||[]);
+  var R=slaExecReports(vis,state.users||[],now,reportFilters);
+  var desMap={},cliMap={},tipoMap={};
+  (vis||[]).forEach(function(t){var id=execTaskDesignerId(t); if(id){var us=(state.users||[]).filter(function(x){return x.id===id;})[0]; desMap[id]=(us&&us.name)?us.name:id;} if(t.client)cliMap[t.client]=1; if(t.sector)tipoMap[t.sector]=1;});
+  function optSel(name,label,map,isName){ var cur=reportFilters[name]||''; var o='<option value="">'+label+': Todos</option>'; Object.keys(map).sort().forEach(function(k){ var txt=isName?map[k]:k; o+='<option value="'+esc(k)+'"'+(cur===k?' selected':'')+'>'+esc(label)+': '+esc(txt)+'</option>'; }); return '<select class="exec-fl" data-rep-filter="'+name+'">'+o+'</select>'; }
+  var statusSel='<select class="exec-fl" data-rep-filter="statusSLA"><option value="">Status SLA: Todos</option>'+[['azul','No prazo'],['laranja','Laranja'],['vermelho','Atrasadas'],['critico','Críticas'],['concluido','Concluídas']].map(function(p){return '<option value="'+p[0]+'"'+(reportFilters.statusSLA===p[0]?' selected':'')+'>Status: '+p[1]+'</option>';}).join('')+'</select>';
+  var conclSel='<select class="exec-fl" data-rep-filter="concluidas"><option value="">Conclusão: Todas</option><option value="sim"'+(reportFilters.concluidas==='sim'?' selected':'')+'>Só concluídas</option><option value="nao"'+(reportFilters.concluidas==='nao'?' selected':'')+'>Não concluídas</option></select>';
+  var per=[['hoje','Hoje'],['7d','7 dias'],['30d','30 dias'],['all','Tudo']].map(function(p){return '<button class="'+(reportFilters.periodo===p[0]?'on':'')+'" data-rep-period="'+p[0]+'">'+p[1]+'</button>';}).join('');
+  var dl='<svg viewBox="0 0 24 24" fill="none" style="width:1em;height:1em;vertical-align:-2px"><path d="M12 3v12M7 11l5 5 5-5M5 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var h='<div class="scr rep-wrap"><div class="exec-head"><div><div class="exec-ttl">Relatórios de Atraso</div><div class="exec-sub"><i></i>Operacional · read-only · exportável</div></div><div class="exec-seg">'+per+'</div></div>'
+    +'<div class="exec-filters">'+optSel('designer','Designer',desMap,true)+optSel('cliente','Cliente',cliMap,false)+optSel('tipo','Tipo',tipoMap,false)+statusSel+conclSel
+    +'<span class="rep-tg'+(reportFilters.soAtrasados?' on':'')+'" data-rep-toggle="soAtrasados">Só atrasados</span>'
+    +'<span style="flex:1"></span><span class="rep-exp" data-rep-export="csv">'+dl+'Exportar CSV</span><span class="rep-exp" data-rep-export="json">'+dl+'Exportar JSON</span></div>';
+  if(R.count===0){ h+='<div class="exec-empty"><div class="exec-empty-ic">'+svg('bars')+'</div><div class="exec-empty-t">Sem dados no período selecionado</div><div class="exec-empty-s">Nenhuma tarefa nos filtros atuais. Ajuste o período/filtros — a exportação gera um arquivo vazio com cabeçalho.</div></div></div>'; return h; }
+  var K=R.kpis;
+  h+='<div class="exec-kpis">'+execKpi('Atraso médio',(K.atrasoMedio||0)+' min',execSevHex('laranja'),'no período')+execKpi('% entrega no prazo',(K.pctNoPrazo||0)+'%',execSevHex('azul'),'concluídas no prazo')+execKpi('Reincidentes',K.reincidentes,execSevHex('vermelho'),'≥ 2 atrasos')+execKpi('Críticas',K.criticas,execSevHex('critico'),'atraso > 10 min')+'</div>';
+  var pmax=Math.max.apply(null,R.periodo.map(function(p){return p.count;}).concat([1]));
+  h+='<div class="exec-card"><div class="exec-card-h"><b>Atrasos por período</b><span class="exec-card-sub">'+R.periodo.length+' dias · por prazo final</span></div><div class="rep-pbars">'+R.periodo.map(function(p){var col=p.count>=4?execSevHex('vermelho'):p.count>=2?execSevHex('laranja'):execSevHex('azul');return '<div class="rep-pb"><div class="rep-pbcol"><div class="rep-pbfill" style="height:'+Math.max(6,p.count/pmax*100)+'%;background:'+col+'"></div></div><div class="rep-pbn">'+p.count+'</div><div class="rep-pbl">'+esc(p.day.slice(5))+'</div></div>';}).join('')+'</div></div>';
+  h+='<div class="exec-grid"><div class="exec-card exec-big"><div class="exec-card-h"><b>Atrasos por designer</b><span class="exec-card-sub">'+R.porDesigner.length+' · por risco</span></div><table class="exec-tbl"><thead><tr><th>Designer</th><th class="c">Atrasadas</th><th class="c">Críticas</th><th class="c">Atraso méd.</th><th>% no prazo</th></tr></thead><tbody>'+(R.porDesigner.map(execDesRow).join('')||'<tr><td colspan="5" style="color:#6E7480">Sem designers.</td></tr>')+'</tbody></table></div><div class="exec-col"><div class="exec-card"><div class="exec-card-h"><b>Atrasos por cliente</b></div>'+execMiniList(R.porCliente.slice(0,6).map(function(c){return {t:c.k,v:(c.critico?c.critico+' crít · ':'')+c.atras+' atraso'+(c.atras>1?'s':''),col:execSevHex(c.critico?'critico':'vermelho'),dot:execSevHex(c.critico?'critico':'vermelho')};}))+'</div><div class="exec-card"><div class="exec-card-h"><b>Atrasos por tipo</b></div>'+execMiniList(R.porTipo.slice(0,6).map(function(x){return {t:x.k,v:x.atras+' atraso'+(x.atras>1?'s':''),col:execSevHex('laranja'),dot:execSevHex('laranja')};}))+'</div></div></div>';
+  h+='<div class="exec-grid exec-g2"><div class="exec-card"><div class="exec-card-h"><b>Tarefas críticas</b><span class="exec-card-sub">atraso &gt; 10 min</span></div>'+execMiniList(R.criticas.map(function(o){var dn=(state.users||[]).filter(function(x){return x.id===o.desId;})[0];return {t:(o.t.client?o.t.client+' · ':'')+(o.t.title||o.t.id),v:'Atraso '+o.d.overdueMin+' min'+(dn?' · '+first(dn.name):''),col:execSevHex(o.d.critical?'critico':'vermelho'),dot:execSevHex(o.d.critical?'critico':'vermelho')};}))+'</div><div class="exec-card"><div class="exec-card-h"><b>Reincidentes em atraso</b><span class="exec-card-sub">≥ 2 atrasos</span></div>'+execMiniList(R.reincidentes.map(function(r){return {t:(r.client?r.client+' · ':'')+r.title,v:r.lateCount+'× · '+(first(r.designer)||'—'),col:execSevHex(r.lateCount>=3?'critico':'laranja'),dot:execSevHex(r.lateCount>=3?'critico':'laranja')};}))+'</div></div>';
+  h+='<div class="exec-card"><div class="exec-card-h"><b>Histórico resumido por tarefa</b><span class="exec-card-sub">linha do tempo de SLA · derivado de history</span></div><table class="exec-tbl"><thead><tr><th>Tarefa</th><th>Responsável</th><th class="c">Atrasos</th><th>Linha do tempo</th></tr></thead><tbody>'+(R.historico.map(function(x){return '<tr><td>'+esc(x.title)+'</td><td style="color:#9FB0C8">'+esc(first(x.designer)||'—')+'</td><td class="c">'+execPill(x.lateCount+'×',x.lateCount>=3?'critico':x.lateCount>=2?'laranja':'verde')+'</td><td><div class="rep-tl">'+x.steps.map(function(s,i){return '<span class="rep-tlstep"><i style="background:'+repStepColor(s)+'"></i>'+esc(s)+'</span>'+(i<x.steps.length-1?'<span class="rep-tlsep"></span>':'');}).join('')+'</div></td></tr>';}).join('')||'<tr><td colspan="4" style="color:#6E7480">Sem histórico de atraso no período.</td></tr>')+'</tbody></table></div>';
+  h+='<div class="exec-foot"><i></i>Derivado do snapshot ao vivo · read-only · exportação LOCAL (CSV/JSON via download) · não grava no Firestore</div></div>';
+  return h;
+}
+function afterReports(){
+  var ps=document.querySelectorAll('[data-rep-period]'); for(var i=0;i<ps.length;i++){ (function(b){ b.onclick=function(){ reportFilters.periodo=b.getAttribute('data-rep-period'); render(); }; })(ps[i]); }
+  var fs=document.querySelectorAll('[data-rep-filter]'); for(var j=0;j<fs.length;j++){ (function(sel){ sel.onchange=function(){ reportFilters[sel.getAttribute('data-rep-filter')]=sel.value; render(); }; })(fs[j]); }
+  var tg=document.querySelectorAll('[data-rep-toggle]'); for(var k=0;k<tg.length;k++){ (function(b){ b.onclick=function(){ var n=b.getAttribute('data-rep-toggle'); reportFilters[n]=!reportFilters[n]; render(); }; })(tg[k]); }
+  var ex=document.querySelectorAll('[data-rep-export]'); for(var m=0;m<ex.length;m++){ (function(b){ b.onclick=function(){ var u=state.user; var now=Date.now(); var vis=(typeof visibleTasks==='function')?visibleTasks(u,state.tasks||[]):(state.tasks||[]); var R=slaExecReports(vis,state.users||[],now,reportFilters); var kind=b.getAttribute('data-rep-export'); var stamp=new Date().toISOString().slice(0,10); if(kind==='csv'){ execDownload('relatorio-atraso-'+stamp+'.csv','text/csv;charset=utf-8',toCSV(R.taskRows)); } else { execDownload('relatorio-atraso-'+stamp+'.json','application/json;charset=utf-8',JSON.stringify({geradoEm:new Date().toISOString(),filtros:reportFilters,kpis:R.kpis,porDesigner:R.porDesigner,porCliente:R.porCliente,porTipo:R.porTipo,periodo:R.periodo,reincidentes:R.reincidentes,tarefas:R.taskRows},null,2)); } }; })(ex[m]); }
+}
+/* ════════════════════════ F3.3.9-REPORTS-CORE END ════════════════════════ */
 
 /* ---- HOJE ---- */
 function renderHoje(){
