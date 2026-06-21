@@ -6085,6 +6085,16 @@ function buildShareClientUrl(token){
   if(!t){throw new Error('buildShareClientUrl: link de compartilhamento NUNCA pode sair sem token');}
   return CLIENT_LINK_BASE+'/share/cronograma/'+t;
 }
+// V64.40 — CACHE-BUST do preview do WhatsApp/Meta. Aplicado SOMENTE no link ENVIADO/COMPARTILHADO
+// (mensagem ao cliente). O Worker ignora a querystring (rota usa so url.pathname), entao serve o
+// MESMO card premium; o ?v=<timestamp> faz o WhatsApp tratar como URL nova e raspar o card na hora
+// (evita o preview generico por cache/scrape). NAO altera token/path/dominio/rota nem o link salvo.
+function withWhatsAppPreviewBust(url){
+  var u=(url==null?'':String(url));
+  if(!u) return u;
+  var sep=u.indexOf('?')>-1?'&':'?';
+  return u+sep+'v='+Date.now();
+}
 // Token seguro, aleatorio, nao previsivel (48 hex). Capability do link publico.
 function genReviewToken(){
   const a=new Uint8Array(24);(self.crypto||window.crypto).getRandomValues(a);
@@ -6099,7 +6109,7 @@ function buildClientMessage(ctx){
   // 1.0.124 — a mensagem usa o LINK DE COMPARTILHAMENTO (/share/...), que gera a prévia premium
   // do card no WhatsApp (OG dedicado) e redireciona ao portal. Sem asteriscos/emoji; modelo aprovado.
   // O botão "Revisar e aprovar" vive no PORTAL (aberto pelo link) — não há botão dentro do grupo.
-  const url=buildShareClientUrl(ctx&&ctx.token);
+  const url=withWhatsAppPreviewBust(buildShareClientUrl(ctx&&ctx.token));
   return 'Olá, '+nome+'.\n'+
     'Seu cronograma já está pronto para avaliação.\n\n'+
     'Acesse o link abaixo para revisar os temas, aprovar ou solicitar ajustes:\n\n'+

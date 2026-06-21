@@ -458,18 +458,34 @@ check('D23', 'Fonte única APP_VER define a versão exibida', /const APP_VER=\{\
   const base=(DH.match(/const CLIENT_LINK_BASE='([^']+)'/)||[])[1];
   const fnUrl=(DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnShare=(DH.match(/function buildShareClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
+  const fnBust=(DH.match(/function withWhatsAppPreviewBust\(url\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnMsg=(DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnWeb=(DH.match(/function openWhatsAppWebOnly\(\)\{[\s\S]*?\n\}/)||[''])[0];
   const FORBID=['web.whatsapp.com/send','whatsapp://send','send?text=','%0A','%C3','encodeURIComponent','api.whatsapp.com/send'];
   let clip=null,opened=[],msg='';
   try{
     const sb={window:{desktopAPI:{openExternal:u=>{opened.push(u);return Promise.resolve(true);}},open:u=>opened.push(u)},navigator:{clipboard:{writeText:t=>{clip=t;}}}}; sb.self=sb.window;
-    msg=new Function('sb',`const CLIENT_LINK_BASE=${JSON.stringify(base)};const window=sb.window,navigator=sb.navigator,self=sb.self;function copyToClipboard(t){navigator.clipboard.writeText(t);}${fnUrl}\n${fnShare}\n${fnMsg}\n${fnWeb}\nconst ctx={client:'C',type:'Quinzenal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'};const m=buildClientMessage(ctx);copyToClipboard(m);openWhatsAppWebOnly();return m;`)(sb);
+    msg=new Function('sb',`const CLIENT_LINK_BASE=${JSON.stringify(base)};const window=sb.window,navigator=sb.navigator,self=sb.self;function copyToClipboard(t){navigator.clipboard.writeText(t);}${fnUrl}\n${fnShare}\n${fnBust}\n${fnMsg}\n${fnWeb}\nconst ctx={client:'C',type:'Quinzenal',title:'P',token:'a1b2c3d4e5f6a1b2c3d4e5f6'};const m=buildClientMessage(ctx);copyToClipboard(m);openWhatsAppWebOnly();return m;`)(sb);
   }catch(e){ msg='THREW:'+e.message; }
   check('CLEAN1','Clipboard recebe a MENSAGEM LIMPA (igual a buildClientMessage)', clip===msg && msg.indexOf('THREW:')<0);
   check('CLEAN2','Clipboard SEM nenhuma URL técnica do WhatsApp (send?text=, web/send, codificado)', FORBID.every(x=>String(clip).indexOf(x)<0));
   check('CLEAN3','Abrir WhatsApp abre SOMENTE https://web.whatsapp.com/ (sem texto, sem app://)', opened.length===1 && opened[0]==='https://web.whatsapp.com/');
   check('CLEAN4','Clipboard leva o link de COMPARTILHAMENTO (/share/, preview premium + token)', String(clip).indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6')>-1);
+  // ===== V64.40 — CACHE-BUST do link de compartilhamento no WhatsApp (preview fresco) =====
+  check('BUST_MSG','Mensagem do WhatsApp leva o link COM cache-bust (?v=)', String(clip).indexOf('/share/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6?v=')>-1);
+  check('BUST_NOCLI','Mensagem NAO usa /cliente/cronograma (preview e /share)', String(clip).indexOf('/cliente/cronograma')<0);
+  (function(){
+    let bust=null; try{ bust=new Function(fnBust+';return withWhatsAppPreviewBust;')(); }catch(_){ bust=null; }
+    check('BUST0','helper withWhatsAppPreviewBust existe e e funcao', fnBust.length>0 && typeof bust==='function');
+    const SH='https://aprovar.agendaidseven.com.br/share/cronograma/a1b2c3d4e5f6a1b2c3d4e5f6';
+    const noq = bust ? bust(SH) : '';
+    const wq  = bust ? bust(SH+'?x=1') : '';
+    check('BUST1','Link SEM query vira ?v=<timestamp>', noq.indexOf(SH+'?v=')>-1 && /v=[0-9]+$/.test(noq));
+    check('BUST2','Link COM query vira &v=<timestamp>', wq.indexOf(SH+'?x=1&v=')>-1 && /v=[0-9]+$/.test(wq));
+    check('BUST3','Token permanece identico antes do ?v=', noq.indexOf(SH+'?v=')>-1);
+    check('BUST4','Dominio aprovar.agendaidseven.com.br + rota /share preservados', noq.indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/')===0);
+    check('BUST5','NAO usa /cliente/cronograma', noq.indexOf('/cliente/cronograma')<0);
+  })();
   check('CLEAN5','Builders send?text= REMOVIDOS (sem buildWhatsAppWebUrl/AppUrl ativos)', !/function buildWhatsAppWebUrl/.test(DH) && !/function buildWhatsAppAppUrl/.test(DH));
   check('CLEAN6','openWhatsAppWebOnly abre só web; código executável SEM nenhuma string send?text=', /function openWhatsAppWebOnly\(\)\{[\s\S]*?'https:\/\/web\.whatsapp\.com\/'/.test(DH) && !/send\?text=/.test(DH.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g,'')));
 })();
@@ -552,12 +568,14 @@ try {
   const review = (DH.match(/const CLIENT_REVIEW_BASE='([^']+)'/) || [])[1] || '';
   const fnUrl = (DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/) || [''])[0];
   const fnShare = (DH.match(/function buildShareClientUrl\(token\)\{[\s\S]*?\n\}/) || [''])[0];
+  const fnBust = (DH.match(/function withWhatsAppPreviewBust\(url\)\{[\s\S]*?\n\}/) || [''])[0];
   const fnMsg = (DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/) || [''])[0];
   const code = `
     const CLIENT_LINK_BASE=${JSON.stringify(base)};
     const CLIENT_REVIEW_BASE=${JSON.stringify(review)};
     ${fnUrl}
     ${fnShare}
+    ${fnBust}
     ${fnMsg}
     return { CLIENT_LINK_BASE, CLIENT_REVIEW_BASE, buildPublicClientUrl, buildShareClientUrl, buildClientMessage };
   `;
@@ -653,6 +671,7 @@ check('GROUP_10', 'ANTI-ÍCONE-GIGANTE: .gcs-sheet svg 18px + header 20px', /\.g
   const base=(DH.match(/const CLIENT_LINK_BASE='([^']+)'/)||[])[1];
   const fnUrl=(DH.match(/function buildPublicClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnShare=(DH.match(/function buildShareClientUrl\(token\)\{[\s\S]*?\n\}/)||[''])[0];
+  const fnBust=(DH.match(/function withWhatsAppPreviewBust\(url\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnMsg=(DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnGate=(DH.match(/function _gateValidLink\(ctx,msg\)\{[\s\S]*?\n\}/)||[''])[0];
   const fnWeb=(DH.match(/function openWhatsAppWebOnly\(\)\{[\s\S]*?\n\}/)||[''])[0];
@@ -673,7 +692,7 @@ check('GROUP_10', 'ANTI-ÍCONE-GIGANTE: .gcs-sheet svg 18px + header 20px', /\.g
       const $=id=>document.getElementById(id);
       function setStatus(txt,cls,html){}
       const api={ openExternal:window.desktopAPI.openExternal, showInFolder(){sb.folder++;}, saveCardImage(){sb.saved++;return Promise.resolve({ok:true});}, copyCardImage(){sb.copied++;return Promise.resolve({ok:true});} };
-      ${fnUrl}\n${fnShare}\n${fnMsg}\n${fnGate}\n${fnWeb}\n${fnCopyClean}
+      ${fnUrl}\n${fnShare}\n${fnBust}\n${fnMsg}\n${fnGate}\n${fnWeb}\n${fnCopyClean}
       const msg=buildClientMessage(ctx);
       (function(){${hbody}})();
     `)(sb);
