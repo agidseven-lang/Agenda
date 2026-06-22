@@ -17,6 +17,7 @@ on:
       - '.github/workflows/f3317-r4-validation.yml'
       - 'desktop/scripts/f33N-assign-baseline-fix.test.mjs'
       - 'desktop/scripts/f33D-background-notif.test.mjs'
+      - 'desktop/scripts/e2e-flow-test.js'
 
 permissions:
   contents: read
@@ -68,9 +69,7 @@ jobs:
             node "desktop/scripts/$t.test.mjs"
           done
 
-      - name: E2E (fluxo lógico de 48 passos + asserções estruturais das 3 plataformas)
-        run: node desktop/scripts/e2e-flow-test.js
-
+      # DIFF-ZERO ANTES do E2E: garante que esta prova SEMPRE roda (mesmo que o E2E falhe).
       - name: Prova DIFF-ZERO nos arquivos protegidos (ac66826 -> HEAD)
         run: |
           set -e
@@ -83,3 +82,6 @@ jobs:
           fi
           echo "OK: protegidos com diff-zero ($BASE -> HEAD) — notifier.ts/main.ts/bgNotify.ts/bgnotify.html/preloads/sw/firebase-sw/Worker/Android intocados."
           echo "Único delta de produto na R4 é desktop/src/renderer/index.html (notifScanAssign)."
+
+      - name: E2E (fluxo lógico de 48 passos + asserções estruturais; cross-branch ausente = SKIP tolerante)
+        run: node desktop/scripts/e2e-flow-test.js
