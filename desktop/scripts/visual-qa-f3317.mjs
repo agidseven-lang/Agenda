@@ -113,8 +113,18 @@ let fail = [];
 if (report.steps.every(s => s.chip == null)) fail.push('cards não renderizaram (chip nulo em tudo)');
 const noDup = report.steps.every(s => !s.chip || !s.etapa || s.chip !== s.etapa);
 if (!noDup) fail.push('status duplicado (chip==etapa)');
+// "Concluído" é SINAL ESTRUTURAL: coluna terminal EXATA, nunca substring no texto livre do chip.
+// Terminais reais por papel: Social="Concluído", Cliente="Aprovado". (Designer="Entregue" é a raia
+// normal de entrega — já aparece em delivered/* e NÃO é conclusão; por isso fica fora do conjunto.)
+const TERMINAL_COL = /^(conclu[ií]do|finalizado|aprovado)$/i;
+const isTerminalCol = (s) => TERMINAL_COL.test((s.column || '').trim());
 const preFinal = report.steps.filter(s => /assign|start|delivered|sentfinal|revision/.test(s.step));
-if (preFinal.some(s => /finaliz|conclu[ií]d|aprovad/i.test((s.column || '') + '|' + (s.chip || '')))) fail.push('Concluído/Finalizado antes do final');
+const earlyTerminal = preFinal.filter(isTerminalCol);
+if (earlyTerminal.length) fail.push('coluna terminal (Concluído/Finalizado/Aprovado) antes do final: ' + earlyTerminal.map(s => s.step + '="' + s.column + '"').join(', '));
+// e o cenário final DEVE atingir a coluna terminal estrutural (social=Concluído, client=Aprovado;
+// designer permanece em "Entregue" por design, então é excluído desta exigência estrutural).
+const finalsStruct = report.steps.filter(s => /^final\//.test(s.step) && s.step !== 'final/designer');
+if (!finalsStruct.length || !finalsStruct.every(isTerminalCol)) fail.push('cenário final não atingiu coluna terminal estrutural (Concluído/Aprovado)');
 if (!report.realtime.changedNoReload) fail.push('realtime: Social não passou a "Designer em produção" sem reload');
 if (!/produção/i.test(find('assign/designer').column === null ? '' : (find('start/designer').chip || ''))) fail.push('Designer não vê "Designer em produção" ao iniciar');
 if (!/conclu[ií]d/i.test((find('final/social').chip || '') + (find('final/social').column || ''))) fail.push('aprovação final não refletiu Concluído');
