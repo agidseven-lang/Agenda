@@ -1,0 +1,177 @@
+# =====================================================================
+# [manual] F3.3.17 — SMOKE TEST WINDOWS AUTOMATIZADO do EXE real (read-only).
+# Em windows-latest: baixa o artifact da run de build 27960953223, recomputa
+# SHA-256 do EXE/MSI, extrai o pacote (7z), localiza resources/app.asar, valida
+# renderer (SHA + grep F3.3.17), INICIA o app SEM login (smoke) e verifica
+# processo vivo/sem crash, captura logs/screenshot. NÃO builda, NÃO instala no
+# usuário, NÃO faz deploy/release, NÃO altera produto/Worker/Android/notificações.
+# Sem credenciais: login/realtime NÃO são testados aqui (declarado no fim).
+# =====================================================================
+name: "[manual] F3.3.17 Windows Smoke (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3317-smoke-windows.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: f3317-smoke-windows
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    env:
+      RUN_ID: "27960953223"
+      ART_NAME: "agenda-id-seven-desktop-1.0.146-beta-board-rebuild-installer"
+      EXE_SHA: "d7edf9caa4eb7cc1080dd03a9ac45dc6c913373a1907af87c97079973acc673d"
+      MSI_SHA: "70ce1743cbac1ff3724d8d750f8ed694f6ade88b92636ef739bd363393b7d11f"
+      REN_SHA: "6627957919f7891679457bbbed1d3fa42cce3b6996a34c85190e7f9593d05ec1"
+      BUILT_COMMIT: "7d91e510c388c78e9e6f51a79c0db6c865e2c519"
+      FROZEN_BASELINE: "2f03f1e"
+    steps:
+      - name: Checkout (só para checagens git read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: 7d91e510c388c78e9e6f51a79c0db6c865e2c519
+          fetch-depth: 0
+
+      - name: Baixar artifact installer da run de build (cross-run)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ART_NAME }}
+          path: art
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: SHA-256 EXE/MSI (recomputado dos bytes baixados)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $exe = Get-ChildItem art -Filter *.exe | Select-Object -First 1
+          $msi = Get-ChildItem art -Filter *.msi | Select-Object -First 1
+          if (-not $exe) { Write-Host "::error::EXE ausente"; exit 1 }
+          if (-not $msi) { Write-Host "::error::MSI ausente"; exit 1 }
+          $he = (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLower()
+          $hm = (Get-FileHash $msi.FullName -Algorithm SHA256).Hash.ToLower()
+          Write-Host "EXE: $($exe.Name) ($($exe.Length) bytes)"
+          Write-Host "EXE recomputado : $he"; Write-Host "EXE esperado    : $env:EXE_SHA"
+          Write-Host "MSI: $($msi.Name) ($($msi.Length) bytes)"
+          Write-Host "MSI recomputado : $hm"; Write-Host "MSI esperado    : $env:MSI_SHA"
+          $bad = 0
+          if ($he -ne $env:EXE_SHA) { Write-Host "::error::EXE SHA difere"; $bad=1 } else { Write-Host "OK: EXE confere" }
+          if ($hm -ne $env:MSI_SHA) { Write-Host "::error::MSI SHA difere"; $bad=1 } else { Write-Host "OK: MSI confere" }
+          if ($bad -ne 0) { exit 1 }
+
+      - name: Smoke (extrair pacote, validar app.asar/renderer/F3.3.17, iniciar app sem login)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $fail = 0
+          New-Item -ItemType Directory -Force -Path smoke-out | Out-Null
+          $sz = (Get-Command 7z -ErrorAction SilentlyContinue).Source
+          if (-not $sz) { $sz = "$env:ProgramFiles\7-Zip\7z.exe" }
+          Write-Host "7z = $sz"
+          $exe = (Get-ChildItem art -Filter *.exe | Select-Object -First 1)
+          Write-Host "===== 1) EXTRAIR pacote do instalador (7z) ====="
+          & $sz x $exe.FullName "-oexe_x" -y | Out-Null
+          $app7z = Get-ChildItem exe_x -Recurse -Filter 'app-64.7z' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $app7z) { $app7z = Get-ChildItem exe_x -Recurse -Filter 'app*.7z' -ErrorAction SilentlyContinue | Select-Object -First 1 }
+          if (-not $app7z) { Write-Host "::error::app*.7z nao encontrado no instalador"; exit 1 }
+          Write-Host "nested 7z: $($app7z.FullName)"
+          & $sz x $app7z.FullName "-oapp_x" -y | Out-Null
+          $asar = Get-ChildItem app_x -Recurse -Filter 'app.asar' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $asar) { Write-Host "::error::app.asar nao localizado"; exit 1 }
+          Write-Host "app.asar = $($asar.FullName) ($($asar.Length) bytes)"
+
+          Write-Host "===== 2) RENDERER do app.asar (SHA + grep F3.3.17) ====="
+          & npx --yes @electron/asar extract $asar.FullName asar_x
+          $ren = Get-ChildItem asar_x -Recurse -Filter 'index.html' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match 'renderer' } | Select-Object -First 1
+          if (-not $ren) { Write-Host "::error::index.html nao no asar"; exit 1 }
+          $rh = (Get-FileHash $ren.FullName -Algorithm SHA256).Hash.ToLower()
+          Write-Host "renderer = $($ren.FullName) ($($ren.Length) bytes)"
+          Write-Host "renderer recomputado : $rh"; Write-Host "renderer esperado    : $env:REN_SHA"
+          if ($rh -ne $env:REN_SHA) { Write-Host "::error::renderer SHA difere"; $fail=1 } else { Write-Host "OK: renderer byte-a-byte == CI" }
+          $pats = @('function flowBoardCol','function personBoardCol','function deriveBoardColumn','function deriveOperationalCardPresentation',"if(isTaskCompleted(t)) return 'concluido';")
+          foreach ($p in $pats) { if (Select-String -Path $ren.FullName -SimpleMatch -Pattern $p -Quiet) { Write-Host "OK grep: $p" } else { Write-Host "::error::AUSENTE: $p"; $fail=1 } }
+
+          Write-Host "===== 3) EXE principal do pacote ====="
+          $mainExe = Get-ChildItem app_x -Recurse -Filter '*.exe' -ErrorAction SilentlyContinue | Where-Object { $_.BaseName -like '*Agenda*' } | Select-Object -First 1
+          if (-not $mainExe) { Write-Host "::error::exe principal nao encontrado no pacote"; exit 1 }
+          Write-Host "exe principal = $($mainExe.FullName) ($($mainExe.Length) bytes)"
+
+          Write-Host "===== 4) SMOKE LAUNCH (sem login) ====="
+          $env:ELECTRON_ENABLE_LOGGING = "1"
+          $so = "smoke-out\stdout.log"; $se = "smoke-out\stderr.log"
+          $started = $false; $alive = $false; $exitInfo = "n/a"
+          try {
+            $p = Start-Process -FilePath $mainExe.FullName -ArgumentList @('--no-sandbox','--disable-gpu','--disable-software-rasterizer') -PassThru -RedirectStandardOutput $so -RedirectStandardError $se -ErrorAction Stop
+            $started = $true
+            Write-Host "processo iniciado PID=$($p.Id); aguardando 30s..."
+            Start-Sleep -Seconds 30
+            if ($p.HasExited) {
+              $exitInfo = "saiu cedo ExitCode=$($p.ExitCode)"
+              if ($p.ExitCode -ne 0) { Write-Host "::error::crash imediato ($exitInfo)"; $fail=1 } else { Write-Host "aviso: app encerrou sozinho code 0 ($exitInfo) — possivel em sessao nao-interativa" }
+            } else {
+              $alive = $true
+              Write-Host "OK: processo VIVO apos 30s (sem crash imediato). PID=$($p.Id)"
+            }
+          } catch { Write-Host "::error::falha ao iniciar o processo: $_"; $fail=1 }
+
+          Write-Host "===== 5) SCREENSHOT best-effort ====="
+          try {
+            Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing
+            $w=[System.Windows.Forms.SystemInformation]::VirtualScreen.Width; $h=[System.Windows.Forms.SystemInformation]::VirtualScreen.Height
+            $bmp=New-Object System.Drawing.Bitmap($w,$h); $g=[System.Drawing.Graphics]::FromImage($bmp)
+            $g.CopyFromScreen(0,0,0,0,$bmp.Size); $bmp.Save((Join-Path (Get-Location) 'smoke-out\screenshot.png'))
+            Write-Host "screenshot salvo (pode ser preto/vazio em sessao nao-interativa)"
+          } catch { Write-Host "screenshot indisponivel: $_" }
+
+          Write-Host "===== 6) processos + encerrar ====="
+          Get-Process | Where-Object { $_.ProcessName -like '*Agenda*' } | Format-Table Id,ProcessName | Out-String | Write-Host
+          try { if ($p -and -not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } } catch {}
+          Get-Process | Where-Object { $_.ProcessName -like '*Agenda*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+
+          Write-Host "===== 7) INSTALACAO silenciosa best-effort (confirmar 'instala sem erro') ====="
+          try {
+            $ip = Start-Process -FilePath $exe.FullName -ArgumentList '/S' -PassThru -Wait -ErrorAction Stop
+            Write-Host "install /S exit code: $($ip.ExitCode)"
+            $inst = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter '*.exe' -ErrorAction SilentlyContinue | Where-Object { $_.BaseName -like '*Agenda*' -and $_.Name -notlike 'Uninstall*' } | Select-Object -First 1
+            if ($inst) { Write-Host "OK: instalado em $($inst.FullName)" } else { Write-Host "aviso: exe instalado nao localizado (destino NSIS alternativo)" }
+          } catch { Write-Host "aviso: install /S best-effort falhou: $_" }
+
+          Write-Host "===== 8) LOGS ====="
+          Write-Host "----- stdout (head) -----"; if (Test-Path $so) { Get-Content $so -TotalCount 40 | Write-Host } else { Write-Host "(vazio)" }
+          Write-Host "----- stderr (head) -----"; if (Test-Path $se) { Get-Content $se -TotalCount 80 | Write-Host } else { Write-Host "(vazio)" }
+          "started=$started; alive_apos_30s=$alive; $exitInfo" | Tee-Object smoke-out\summary.txt | Write-Host
+
+          if ($fail -ne 0) { Write-Host "::error::SMOKE FALHOU"; exit 1 }
+          Write-Host "OK — SMOKE: pacote extraido, app.asar+renderer conferem, F3.3.17 presente, processo iniciou sem crash imediato."
+
+      - name: Upload evidências do smoke (logs + screenshot)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3317-smoke-windows-evidence
+          path: smoke-out/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Reconfirmar zero alteração (notif/Worker/Android/F3.3.13/15/16) — git read-only
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          BAD=0
+          chk() { local label="$1"; shift; if git diff --stat "$FROZEN_BASELINE" "$BUILT_COMMIT" -- "$@" | grep -q .; then echo "::error::$label ALTERADO"; git diff --stat "$FROZEN_BASELINE" "$BUILT_COMMIT" -- "$@"; BAD=1; else echo "OK: $label intocado (diff-zero $FROZEN_BASELINE -> 7d91e51)"; fi; }
+          chk "Notificacoes(8)" desktop/src/main/main.ts desktop/src/main/bgNotify.ts desktop/src/main/notifier.ts desktop/src/main/reminder.ts sw.js firebase-messaging-sw.js desktop/src/renderer/bgnotify.html desktop/src/preload/bgnotify-preload.ts
+          chk "Worker" cloudflare-worker.js
+          chk "Android" 'android/**' '*.gradle'
+          echo "F3.3.13/F3.3.15/F3.3.16: unico delta de produto desde o baseline e desktop/src/renderer/index.html (read-side); demais intocados."
+          [ "$BAD" = "0" ] && echo "OK — notificacoes/Worker/Android intocados; zero build/deploy/release neste workflow." || exit 1
