@@ -5895,7 +5895,7 @@ async function sendToDesigner(taskId,designerId,dl){
   const planDueAt=dl.endDate?dtMs(dl.endDate,dl.endTime||'23:59'):null;
   const designerSla={planStartAt:planStartAt,planDueAt:planDueAt,seedAt:now,seedBy:u.id||null};
   const assignment={designerId:designerId,designerName:d.name||'',designerAvatar:d.photo||d.avatar||'',
-    assignedAt:now,assignedBy:u.id||null,status:'sent',
+    assignedAt:now,assignedBy:u.id||null,assignedByName:u.name||'',assignedByAvatar:u.photo||u.avatar||'',status:'sent',
     startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',obs:dl.obs||''};
   const patch={
     designerAssignment:assignment,
