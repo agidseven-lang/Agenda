@@ -3671,19 +3671,40 @@ function notifScan(){ notifScanFlow(); notifScanSla(); notifScanAssign(); }
    (Windows pode suspender o processo minimizado/bandeja). Emite pelo MESMO caminho aprovado
    (notifEmit → api.notify → HUB do main: toast premium com app aberto / NATIVA minimizado/bandeja),
    com dedupKey IDÊNTICO ao do main (designer_assigned:<id>:<assignedAt> e task_assigned:<id>) → o HUB
-   deduplica; NUNCA duplica. Baseline por sinceMs: não dispara atribuições anteriores ao login.
+   deduplica; NUNCA duplica. Baseline por SEMENTE no 1º snapshot + dedup persistente (F3.3.17-R4,
+   robusto a clock-skew entre máquinas): não dispara o histórico já presente ao (re)login, só o NOVO.
    Roteamento: só o próprio designer/atribuído emite p/ si (não notifica usuário errado). */
-var _notifAssignUid=null, _notifAssignSince=0;
+var _notifAssignUid=null;
+/* F3.3.17-R4 — chave ESTÁVEL da atribuição/tarefa nova p/ ESTE usuário (destinatário), ou ''.
+   designer_assigned:<taskId>:<assignedAt> (cronograma → designer) | task_assigned:<taskId> (tarefa direta).
+   Anti-eco embutido: exige designerId/assigneeId === me e autor (assignedBy/by) !== me. */
+function notifAssignKeyOf(t,me){
+  if(!t||!t.id) return '';
+  var da=t.designerAssignment;
+  if(da && da.designerId===me && da.assignedBy!==me){ var at=Number(da.assignedAt)||0; return at?('designer_assigned:'+t.id+':'+at):''; }
+  if(t.assigneeId===me && t.by!==me && !da){ var ct=Number(t.createdAt)||0; return ct?('task_assigned:'+t.id):''; }
+  return '';
+}
 function notifScanAssign(){
   try{
     if(!state.user) return; var me=state.user.id; if(!me) return;
-    if(me!==_notifAssignUid){ _notifAssignUid=me; _notifAssignSince=Date.now(); }
     var tasks=state.tasks||[];
+    /* F3.3.17-R4 — BASELINE ROBUSTO A CLOCK-SKEW (corrige o bug físico em 2 máquinas): NÃO comparar
+       assignedAt (relógio de QUEM GRAVA — a Social) contra um horário do relógio de QUEM LÊ (o Designer);
+       isso suprimia atribuições NOVAS quando os relógios divergiam. Em vez disso, na 1ª varredura COM dados
+       após (re)login SEMEIA o histórico existente como "visto" (sem notificar) e passa a notificar só chaves
+       NOVAS, via dedup PERSISTENTE (notifSeen). Só sela o baseline com tasks.length>0 p/ não perder o seed
+       caso as tarefas cheguem num snapshot posterior ao 1º render. */
+    if(me!==_notifAssignUid && tasks.length){
+      for(var s=0;s<tasks.length;s++){ var ks=notifAssignKeyOf(tasks[s],me); if(ks) notifSeenMark(ks); }
+      _notifAssignUid=me;
+    }
+    if(me!==_notifAssignUid) return;   // dados ainda não chegaram: não notificar até semear o baseline
     for(var i=0;i<tasks.length;i++){
       var t=tasks[i]; if(!t||!t.id) continue;
       var da=t.designerAssignment;
       if(da && da.designerId===me && da.assignedBy!==me){
-        var at=Number(da.assignedAt)||0; if(!at || at<_notifAssignSince) continue;
+        var at=Number(da.assignedAt)||0; if(!at) continue;
         var linha=(t.title||'Cronograma')+(t.client?(' — '+t.client):'');
         notifEmit(notifBuildPayload({ eventType:'designer_assigned', taskId:t.id, taskTitle:t.title||'Cronograma', clientName:t.client||'',
           actorId:da.assignedBy||'', actorName:da.assignedByName||'', actorAvatar:da.assignedByAvatar||da.assignedByPhoto||'',
@@ -3693,7 +3714,7 @@ function notifScanAssign(){
           body:linha+(da.designerName?('\nResponsável: '+da.designerName):'')+'\nEtapa: Aguardando produção',
           dedupKey:'designer_assigned:'+t.id+':'+at, action:{type:'board',deep:'board/'+(t.sector||'')} }));
       } else if(t.assigneeId===me && t.by!==me && !da){
-        var ct=Number(t.createdAt)||0; if(!ct || ct<_notifAssignSince) continue;
+        var ct=Number(t.createdAt)||0; if(!ct) continue;
         notifEmit(notifBuildPayload({ eventType:'task_assigned', taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
           actorId:t.by||'', responsibleId:t.assigneeId||'', responsibleName:t.assignee||t.assigneeName||'',
           targetUserId:me, severity:'info', sound:true, anchor:ct,
