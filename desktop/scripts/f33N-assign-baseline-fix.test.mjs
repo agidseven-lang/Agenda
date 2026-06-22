@@ -22,7 +22,12 @@ import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
 const HTML = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');           // NOVO (árvore)
-const OLD_HTML = execSync('git show HEAD:desktop/src/renderer/index.html', { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); // ANTIGO (R3 física)
+// ANTIGO = renderer da build FÍSICA 1.0.146/R3 (commit pré-R4): notifScanAssign com gate por horário.
+// Ref FIXA (não 'HEAD', que já é a correção). Em CI exige checkout com fetch-depth:0.
+const OLD_REF = 'ac66826';
+let OLD_HTML;
+try { OLD_HTML = execSync('git show ' + OLD_REF + ':desktop/src/renderer/index.html', { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); }
+catch (e) { console.error('::error:: não foi possível ler o renderer ANTIGO em ' + OLD_REF + ' (CI precisa de fetch-depth:0): ' + (e && e.message)); process.exit(2); }
 const NOTIFIER = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'notifier.ts'), 'utf8');
 const MAIN = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'main.ts'), 'utf8');
 
@@ -197,6 +202,30 @@ let liveSkewPayload = null;
   ok('[10] PATH B: notifier (protegido) AINDA suprime sob skew — path A (renderer) cobre via dedup/HUB', skew.length === 0);
 }
 
+/* ===== 11) GENERALIDADE — a correção NÃO é hardcoded p/ nomes/IDs; vale p/ qualquer Social/Designer ===== */
+{
+  const COMBOS = [
+    { s: { id: 'u_001', name: 'João da Silva', photo: 'a.jpg' }, d: { id: 'u_777', name: 'Zoé Müller', photo: 'b.jpg' } },
+    { s: { id: 'X1', name: '社交媒体运营', photo: '' }, d: { id: 'Y2', name: 'Designer 测试', photo: 'p.png' } },
+    { s: { id: 'admin-42', name: "O'Brien & Co.", photo: 'x' }, d: { id: 'dz.9', name: 'Ana-Lúcia Çörner', photo: 'y' } },
+    { s: { id: 'sm', name: 'S', photo: '' }, d: { id: 'dz', name: 'D', photo: '' } },
+  ];
+  let genOk = true, why = '';
+  for (const c of COMBOS) {
+    const tNo = { id: 'tk', title: 'T', client: 'C', sector: 'cronograma', by: c.s.id };
+    const tA = { id: 'tk', title: 'T', client: 'C', sector: 'cronograma', by: c.s.id, assigneeId: c.d.id, designerAssignment: { designerId: c.d.id, designerName: c.d.name, designerAvatar: c.d.photo, assignedAt: AT_SKEW, assignedBy: c.s.id, assignedByName: c.s.name, assignedByAvatar: c.s.photo } };
+    // destinatário (Designer) recebe 1, sob clock-skew, com ator=Social/responsável=Designer
+    const rd = makeRunner(HTML, NEW_SCAN, READER_NOW); rd.state.user.id = c.d.id; rd.state.tasks = [tNo]; rd.scan(); rd.state.tasks = [tA]; rd.scan();
+    const p = rd.captured[0] || {};
+    // autor (Social) NÃO recebe eco
+    const rs = makeRunner(HTML, NEW_SCAN, READER_NOW); rs.state.user.id = c.s.id; rs.state.tasks = [tNo]; rs.scan(); rs.state.tasks = [tA]; rs.scan();
+    if (!(rd.captured.length === 1 && p.actorId === c.s.id && p.actorName === c.s.name && p.responsibleId === c.d.id && p.responsibleName === c.d.name && p.targetUserId === c.d.id && rs.captured.length === 0)) { genOk = false; why = JSON.stringify(c.s.id + '→' + c.d.id + ' rd=' + rd.captured.length + ' rs=' + rs.captured.length); break; }
+  }
+  ok('[11] GENERALIDADE: corrige p/ QUALQUER Social/Designer (IDs/nomes/unicode), sem hardcode' + (genOk ? '' : ' ' + why), genOk);
+  // confirma estrutural: a fonte não referencia nomes/IDs de pessoas reais
+  ok('[11] fonte do fix usa só campos estruturais (sem nome/ID hardcoded)', !/Arydyjany|Miercohé|sm_ary|dz_mier/.test(fnSrc(HTML, 'notifScanAssign') + fnSrc(HTML, 'notifAssignKeyOf')));
+}
+
 /* ===== resumo ===== */
 console.log('\n==== F3.3.17-R4 — BUG (antigo) × CORREÇÃO (novo) do baseline da notificação ====');
 if (errs.length) console.log('\n' + errs.join('\n') + '\n');
@@ -210,6 +239,7 @@ console.log('[7] anti-eco                       : Social não recebe; auto-atrib
 console.log('[8] payload                        : ator=Social, responsável=Designer');
 console.log('[9] HUB main (inalterado)          : visível→toast, oculta→bg-window');
 console.log('[10] path B notifier (protegido)   : redundante; segue skew-gated, path A cobre');
+console.log('[11] generalidade                  : vale p/ qualquer Social/Designer (sem hardcode)');
 console.log('\n' + pass + ' PASS / ' + fail + ' FAIL');
 if (fail) { console.error('::error:: prova do bug/correção falhou'); process.exit(1); }
 console.log('OK — bug do clock-skew reproduzido no código ANTIGO e corrigido no NOVO (confinado ao index.html):');

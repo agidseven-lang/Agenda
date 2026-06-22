@@ -11,7 +11,7 @@
  * DOM (Chromium): carrega o renderer real, captura desktopAPI.notify, e prova que notifScanAssign:
  *   - EMITE designer_assigned p/ atribuição NOVA ao designer logado (dedupKey designer_assigned:<id>:<at>);
  *   - EMITE task_assigned p/ tarefa nova atribuída a mim (dedupKey task_assigned:<id>);
- *   - NÃO emite atribuição anterior ao login (baseline sinceMs);
+ *   - NÃO emite o histórico semeado no 1º snapshot (baseline R4 por semente + dedup, robusto a clock-skew);
  *   - NÃO emite atribuição feita por mim mesmo;
  *   - NÃO emite atribuição de OUTRO designer (não notifica usuário errado).
  * Estático: wiring (notifScan chama notifScanAssign), formato de dedupKey, baseline, e contrato de
@@ -41,7 +41,9 @@ ok('notifScanAssign existe', /function notifScanAssign\(\)/.test(html0));
 ok('notifScan chama notifScanAssign', /function notifScan\(\)\{ notifScanFlow\(\); notifScanSla\(\); notifScanAssign\(\); \}/.test(html0));
 ok('dedupKey designer_assigned idêntico ao main (<id>:<assignedAt>)', /dedupKey:'designer_assigned:'\+t\.id\+':'\+at/.test(html0));
 ok('dedupKey task_assigned idêntico ao main (<id>)', /dedupKey:'task_assigned:'\+t\.id/.test(html0));
-ok('baseline sinceMs (não dispara atribuição anterior ao login)', /_notifAssignSince=Date\.now\(\)/.test(html0) && /at<_notifAssignSince\) continue/.test(html0));
+// F3.3.17-R4 — baseline robusto a clock-skew: SEMENTE do histórico no 1º snapshot + dedup persistente,
+// SEM comparar assignedAt (relógio de quem grava) com o relógio de quem lê (removido o gate at<_notifAssignSince).
+ok('baseline R4: semeia histórico no 1º snapshot + dedup persistente (sem comparar relógios)', /notifSeenMark\(ks\)/.test(html0) && /function notifAssignKeyOf/.test(html0) && !/at<_notifAssignSince/.test(html0));
 ok('roteamento: só o designer logado emite p/ si', /da\.designerId===me && da\.assignedBy!==me/.test(html0));
 ok('safety interval também roda notifScanAssign', /setInterval\(function\(\)\{ try\{ notifScanSla\(\); \}catch\(_\)\{\} try\{ notifScanAssign\(\); \}catch\(_\)\{\} \},30000\)/.test(html0));
 // contrato de canal no main (real): windowActive → toast; senão NATIVA
@@ -71,15 +73,17 @@ function go(){ var R={}; try{
   state.users=[{id:'social1',name:'Arydyjany Carlôto',role:'Social Media'},{id:'designer1',name:'Designer Um',role:'Designer'},{id:'designerX',name:'Outro',role:'Designer'}];
   state.events=[];
   document.body.classList.add('authed'); var ap=document.getElementById('app'); if(ap) ap.style.display='flex'; applyDesktopClass();
-  // baseline já no passado (1h atrás) -> atribuições com at>=baseline são "novas"
-  window._notifAssignUid='designer1'; window._notifAssignSince=NOW-H;
-  state.tasks=[
-    {id:'tNew',title:'Cronograma semanal',client:'Hospital Visão',sector:'cronograma',designerAssignment:{designerId:'designer1',assignedBy:'social1',assignedByName:'Arydyjany Carlôto',designerName:'Designer Um',assignedAt:NOW}},
-    {id:'tOld',title:'Antigo',client:'Y',designerAssignment:{designerId:'designer1',assignedBy:'social1',assignedAt:NOW-2*H}},
-    {id:'tMine',title:'Eu atribui',client:'Z',designerAssignment:{designerId:'designer1',assignedBy:'designer1',assignedAt:NOW}},
-    {id:'tOther',title:'De outro',client:'W',designerAssignment:{designerId:'designerX',assignedBy:'social1',assignedAt:NOW}},
-    {id:'tTask',title:'Tarefa comum',client:'ACME',sector:'copywriting',assigneeId:'designer1',by:'social1',createdAt:NOW}
-  ];
+  // F3.3.17-R4 — baseline por SEMENTE (robusto a clock-skew): a 1ª varredura SEMEIA o histórico já
+  // presente (sem notificar); só atribuições que CHEGAM depois (chave nova) disparam. NÃO pré-seta
+  // relógio (o bug antigo era comparar assignedAt da Social com o relógio do Designer).
+  var tNew={id:'tNew',title:'Cronograma semanal',client:'Hospital Visão',sector:'cronograma',designerAssignment:{designerId:'designer1',assignedBy:'social1',assignedByName:'Arydyjany Carlôto',designerName:'Designer Um',assignedAt:NOW}};
+  var tOld={id:'tOld',title:'Antigo',client:'Y',designerAssignment:{designerId:'designer1',assignedBy:'social1',assignedAt:NOW-2*H}};
+  var tMine={id:'tMine',title:'Eu atribui',client:'Z',designerAssignment:{designerId:'designer1',assignedBy:'designer1',assignedAt:NOW}};
+  var tOther={id:'tOther',title:'De outro',client:'W',designerAssignment:{designerId:'designerX',assignedBy:'social1',assignedAt:NOW}};
+  var tTask={id:'tTask',title:'Tarefa comum',client:'ACME',sector:'copywriting',assigneeId:'designer1',by:'social1',createdAt:NOW};
+  state.tasks=[tOld,tMine,tOther];             // 1º snapshot = histórico → SEMEIA (não notifica)
+  notifScanAssign();
+  state.tasks=[tNew,tOld,tMine,tOther,tTask];  // chegam as NOVAS (tNew/tTask) → só elas disparam
   notifScanAssign();
   R.notified = window.__N.map(function(p){ return {type:p.eventType,key:p.dedupKey,target:p.targetUserId,task:p.taskId,title:p.title}; });
   // canal (replica deliverNotification do main): aberto/visível=toast; minimizado/oculto=nativa

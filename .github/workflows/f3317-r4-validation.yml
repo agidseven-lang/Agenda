@@ -1,0 +1,85 @@
+# =====================================================================
+# [manual] F3.3.17-R4 — VALIDAÇÃO READ-ONLY da correção do baseline da notificação
+# de atribuição (Social → Designer) robusto a CLOCK-SKEW entre máquinas.
+# Roda em CI (ubuntu): a prova bug×correção (f33N), a suíte de notificação completa
+# (inclui f33C/f33D em Chromium REAL), R1/R2/R3 (f33K/f33L) e fluxo (f33H/f33I/f33J),
+# o e2e lógico+estrutural, tsc (main+preload), syntax check e a prova de DIFF-ZERO nos
+# arquivos protegidos de notificação/Worker/Android.
+# SOMENTE validação: NÃO faz build/deploy/release/merge, NÃO altera produto/protegidos.
+# =====================================================================
+name: "[manual] F3.3.17-R4 Notification Baseline Validation (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3317-r4-validation.yml'
+      - 'desktop/scripts/f33N-assign-baseline-fix.test.mjs'
+      - 'desktop/scripts/f33D-background-notif.test.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3317-r4-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # f33N lê o renderer ANTIGO (commit ac66826) e a prova de diff-zero usa baseline pré-R4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Chromium real (testes DOM f33C/f33D no renderer real)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          echo "CHROME_BIN=$(node -e "console.log(require('playwright').chromium.executablePath())")" >> "$GITHUB_ENV"
+
+      - name: tsc (main + preload) — nenhum TS alterado na R4
+        run: |
+          cd desktop
+          npm ci
+          npx tsc -p tsconfig.json --noEmit
+          echo "tsc OK"
+
+      - name: Syntax check (node --check em todos os scripts .mjs/.js)
+        run: |
+          set -e
+          for f in desktop/scripts/*.mjs desktop/scripts/*.js; do node --check "$f"; done
+          echo "syntax OK"
+
+      - name: Suíte de notificação + R1/R2/R3 + fluxo + R4 (node)
+        run: |
+          set -e
+          for t in \
+            f333-notif f33A-notif-central f33C-assignment-toast f33D-background-notif \
+            f33E-main-notifier f33F-bg-notify f33H-hotfix-ui f33I-flow-presentation \
+            f33J-flow-columns f33K-notif-actor f33L-account-anchor f33N-assign-baseline-fix; do
+            echo "==================== $t ===================="
+            node "desktop/scripts/$t.test.mjs"
+          done
+
+      - name: E2E (fluxo lógico de 48 passos + asserções estruturais das 3 plataformas)
+        run: node desktop/scripts/e2e-flow-test.js
+
+      - name: Prova DIFF-ZERO nos arquivos protegidos (ac66826 -> HEAD)
+        run: |
+          set -e
+          BASE=ac66826
+          PROT="desktop/src/main/ desktop/src/preload/ desktop/src/renderer/bgnotify.html sw.js firebase-messaging-sw.js cloudflare-worker.js android"
+          if git diff --stat "$BASE" HEAD -- $PROT | grep .; then
+            echo "::error:: arquivos protegidos ALTERADOS desde $BASE"
+            git diff --stat "$BASE" HEAD -- $PROT
+            exit 1
+          fi
+          echo "OK: protegidos com diff-zero ($BASE -> HEAD) — notifier.ts/main.ts/bgNotify.ts/bgnotify.html/preloads/sw/firebase-sw/Worker/Android intocados."
+          echo "Único delta de produto na R4 é desktop/src/renderer/index.html (notifScanAssign)."
