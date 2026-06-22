@@ -19,6 +19,14 @@ on:
         description: "Token real de um cronograma p/ a prova de OG (qualquer token serve: o card OG é por rota)"
         required: false
         default: "737427b62499f780f7d341363a664135bd471cb3c35ea403"
+  # F3.3.14 — gatilho push ESCOPADO (read-only): roda SO quando este workflow ou o script de
+  # validacao mudam, na branch desktop. NAO inclui index.html (controlado) nem dispara outros
+  # workflows. Necessario porque o dispatch por API exige o workflow na branch padrao (main).
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3314-hotfix-validation.yml'
+      - 'desktop/scripts/visual-qa-f3314.mjs'
 
 permissions:
   contents: read
