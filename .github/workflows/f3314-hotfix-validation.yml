@@ -57,7 +57,7 @@ jobs:
         run: |
           set -e
           OUT="desktop/qa-out-f3314"; mkdir -p "$OUT"
-          TOKEN="${{ github.event.inputs.token }}"
+          TOKEN="${{ github.event.inputs.token }}"; TOKEN="${TOKEN:-737427b62499f780f7d341363a664135bd471cb3c35ea403}"   # fallback p/ evento push (inputs vazio)
           V="$(date +%s)"
           URL="https://aprovar.agendaidseven.com.br/share/cronograma/${TOKEN}?v=${V}"
           echo "== GET share (UA WhatsApp) == $URL" | tee "$OUT/og-proof.txt"
