@@ -1,0 +1,48 @@
+# =====================================================================
+# [manual] F3.3.17-R2 — VALIDAÇÃO READ-ONLY: âncora global de conta (.sb-user),
+# logout e gate de overlays por tela. Playwright/Chromium headless sobre o renderer
+# REAL (viewport 1440 → isDesktop): prova .sb-user (conta/perfil/logout) visível em
+# Hoje/Quadros/Kanban; overlays operacionais (cornerAvatar/Monitor/sino) só no Kanban
+# (F3.3.15 preservada); logout limpa wp_uid+state e volta ao login. SOMENTE validação:
+# NÃO faz build/deploy/release, NÃO altera produto/Worker/Android/notificações.
+# =====================================================================
+name: "[manual] F3.3.17-R2 Account/Logout/Overlay Validation (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3317-r2-validation.yml'
+      - 'desktop/scripts/visual-qa-r2.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3317-r2-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: QA comportamental (.sb-user + logout + overlays por tela)
+        run: node desktop/scripts/visual-qa-r2.mjs
+      - name: Upload evidências (screenshots + relatório)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3317-r2-validation
+          path: desktop/qa-out-r2/
+          if-no-files-found: error
+          retention-days: 14
