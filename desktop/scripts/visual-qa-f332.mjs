@@ -400,7 +400,19 @@ const detail = await page.evaluate(() => {
 await page.evaluate(() => { const b = document.querySelector('[data-sla-editprazo]'); if (b) b.click(); });
 await page.waitForSelector('#slaedit-ov', { timeout: 4000 }).catch(() => {});
 await page.waitForTimeout(160); await page.screenshot({ path: path.join(OUT, 'f332-13-editar-prazo-admin.png') });
-const editPrazo = await page.evaluate(() => { const ov = document.getElementById('slaedit-ov'); const t = ov ? ov.textContent : ''; if (ov) ov.remove(); return { honest: /Gravação real aguarda autorização operacional|nada é gravado/i.test(t) }; });
+const editPrazo = await page.evaluate(() => {
+  // F3.3.13 (aprovada): "Editar prazo" agora GRAVA de verdade com read-back; nao existe mais a
+  // mensagem antiga de "nada e gravado". honest = overlay reflete gravacao real + confirmacao no
+  // servidor (read-back) + form de salvar (Salvar prazo + inputs de inicio/prazo).
+  const ov = document.getElementById('slaedit-ov');
+  const t = ov ? ov.textContent : '';
+  const hasSave = !!(ov && ov.querySelector('#slaedit-save'));
+  const hasInputs = !!(ov && ov.querySelector('#slaedit-start') && ov.querySelector('#slaedit-due'));
+  const realWriteNote = /grava|read-back|confirma|servidor/i.test(t);
+  const noOldStub = !/nada é gravado|aguarda autoriza/i.test(t);
+  if (ov) ov.remove();
+  return { honest: realWriteNote && hasSave && hasInputs && noOldStub, realWriteNote, hasSave, hasInputs, noOldStub };
+});
 await page.evaluate(() => { const m = document.querySelector('.det-sheet'); if (m) { try { closeDetails && closeDetails(); } catch (_) {} const o = m.closest('.modal,.ov,[id*="modal"]'); if (o) o.remove(); } });
 
 await scenario('red', 'designer');
@@ -911,7 +923,7 @@ if (!block.adminNotBlocked) fail.push('admin/social foi bloqueado indevidamente 
 // detalhe/rbac/editar
 if (!detail.hasSla || !detail.editPrazoAdmin) fail.push('detalhe/Editar prazo (admin) incompleto');
 if (!detail.graceInDetail) fail.push('detalhe sem janela de 10 min no vermelho');
-if (!editPrazo.honest) fail.push('Editar prazo sem mensagem honesta de bloqueio');
+if (!editPrazo.honest) fail.push('Editar prazo: overlay nao reflete gravacao real + read-back (F3.3.13) — ' + JSON.stringify(editPrazo));
 if (rbac.editPrazoDesigner) fail.push('Editar prazo VISÍVEL p/ Designer (RBAC falhou)');
 // header cluster
 if (!header.ok) fail.push('header sem avatar/sino');
