@@ -67,6 +67,25 @@ ok('render: barra app sem usuário (if(!state.user)return)', /function render\(\
 ok('R1: assignedByName no assignment', /assignedByName:u\.name/.test(HTML));
 ok('R1: assignedByAvatar no assignment', /assignedByAvatar:u\.photo\|\|u\.avatar/.test(HTML));
 
-console.log('\nF3.3.17-R2 ACCOUNT ANCHOR: '+pass+' PASS / '+fail+' FAIL');
+/* ===== 6) F3.3.17-R3 — contrato VISUAL do .sb-user (CSS premium + posição) ===== */
+function ruleOf(sel){ const a=HTML.indexOf(sel+'{'); if(a<0)return ''; return HTML.slice(a, HTML.indexOf('}', a)); }
+const suRule = ruleOf('body.desktop .nav .sb-user');
+const footRule = ruleOf('body.desktop .nav .sb-footer');
+const suM = ruleOf('body.desktop .nav .sb-user .su-m');
+const suN = ruleOf('body.desktop .nav .sb-user .su-n');
+const suR = ruleOf('body.desktop .nav .sb-user .su-r');
+const avRule = ruleOf('body.desktop .nav .sb-user .av');
+ok('R3: .sb-user min-height (2 linhas confortáveis)', /min-height:\s*5[4-9]px|min-height:\s*6\dpx/.test(suRule));
+ok('R3: .sb-user mantém margin-top:auto (ÚNICA âncora inferior)', /margin-top:\s*auto/.test(suRule));
+ok('R3: .sb-user margin-bottom (respiro até o card de versão)', /margin-bottom:\s*1[0-6]px/.test(suRule));
+ok('R3: .sb-user padding confortável (9px 11px, não 7px 9px)', /padding:\s*9px 11px/.test(suRule) && !/padding:\s*7px 9px/.test(suRule));
+ok('R3: .sb-user acabamento premium (borda + glass)', /border:1px solid/.test(suRule) && /background:linear-gradient/.test(suRule));
+ok('R3: .sb-footer SEM margin-top:auto duplicado (corrige flutuar alto)', !/margin-top:\s*auto/.test(footRule));
+ok('R3: .su-m flex:1 + min-width:0 (texto usa o espaço)', /flex:1/.test(suM) && /min-width:0/.test(suM));
+ok('R3: .su-n legível 13px + ellipsis (trunca só se inevitável)', /font-size:13px/.test(suN) && /text-overflow:ellipsis/.test(suN));
+ok('R3: .su-r legível 11px + ellipsis (cargo não some)', /font-size:11px/.test(suR) && /text-overflow:ellipsis/.test(suR));
+ok('R3: avatar flex:0 0 auto (não esmaga)', /flex:0 0 auto/.test(avRule));
+
+console.log('\nF3.3.17-R2/R3 ACCOUNT ANCHOR: '+pass+' PASS / '+fail+' FAIL');
 if(fail){ console.error('::error:: contrato da âncora de conta divergiu'); process.exit(1); }
-console.log('OK — .sb-user (conta/perfil/logout) no Desktop; F3.3.15/logout/boot/R1 preservados; sem overlay operacional no nav.');
+console.log('OK — .sb-user (conta/perfil/logout) Desktop + acabamento premium R3 (posição/respiro/legibilidade); F3.3.15/logout/boot/R1 preservados.');
