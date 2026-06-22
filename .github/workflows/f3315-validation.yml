@@ -1,0 +1,53 @@
+# =====================================================================
+# [manual] F3.3.15 — VALIDAÇÃO READ-ONLY: GATE REAL dos overlays (BUG1) +
+# ALINHAMENTO ao BLOCO ESQUERDO do header (BUG2). SOMENTE validação/evidência.
+# NÃO faz deploy/release/build final, NÃO altera Worker/Cloudflare/Firebase/
+# Android/Firestore, NÃO toca F3.3.13. Execução manual (workflow_dispatch) e por
+# push ESCOPADO (só este workflow + o script de validação), na branch desktop.
+#   - Playwright/Chromium headless: Hoje + Quadros(hub) limpos; Meu quadro e
+#     Designer (Kanban real) com overlays; medição do header (bloco direito vs
+#     bloco esquerdo, Δ<=2px); screenshots em 1366x768, 1350x689, 1920x1080.
+# =====================================================================
+name: "[manual] F3.3.15 Gate+Align Validation (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3315-validation.yml'
+      - 'desktop/scripts/visual-qa-f3315.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3315-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: QA visual (gate real + header alinhado ao bloco esquerdo + screenshots 3 resoluções)
+        run: node desktop/scripts/visual-qa-f3315.mjs
+
+      - name: Upload evidências (screenshots + relatório)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3315-gate-align-validation
+          path: desktop/qa-out-f3315/
+          if-no-files-found: error
+          retention-days: 14

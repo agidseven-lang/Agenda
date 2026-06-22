@@ -2883,28 +2883,38 @@ function slaibAlign(bell){
 function slaHeaderAlign(){
   try{
     if(!document.body.classList.contains('desktop')){ slaibAlign(); return; }
-    var av=document.getElementById('cornerAvatar'); if(!av) return;
-    var logo=document.querySelector('#bottomNav .sb-brand .logo')||document.querySelector('.nav .sb-brand .logo');
-    if(logo){ var lr=logo.getBoundingClientRect(); if(lr&&lr.height){ var avH=av.getBoundingClientRect().height||38; av.style.top=Math.round(lr.top+lr.height/2-avH/2)+'px'; } }
-    var c=av.getBoundingClientRect(); slaClusterAlign(c.top+c.height/2, c);   // BUG2 — eixo ÚNICO = centro real do avatar
+    slaClusterAlign();
   }catch(_){ try{ slaibAlign(); }catch(__){} }
 }
-/* F3.3.14 (BUG2) — centraliza sino + Monitor SLA no MESMO centro Y do avatar, medindo a altura
-   REAL de cada um (sem o fallback fixo 38 que gerava ~4px de desvio). SÓ posicionamento (top/right/
-   height); não toca clique/drag/dropdown/lógica. */
-function slaClusterAlign(centerY, avr){
+/* F3.3.15 (BUG2) — EIXO = centro vertical do BLOCO ESQUERDO REAL do header do quadro (.d-board-head:
+   botão voltar + avatar esquerdo + título/cargo). Mede o container único; se faltar, compõe pelos
+   rects reais (voltar + avatar + título). */
+function slaHeaderTargetCenterY(){
+  var left=document.querySelector('#content.board-mode .d-board-head');
+  if(left){ var r=left.getBoundingClientRect(); if(r&&r.height) return r.top+r.height/2; }
+  var sels=['#content.board-mode .scr-head .iconbtn','#content.board-mode .d-bh-icon','#content.board-mode .d-bh-title'];
+  var rects=[]; for(var i=0;i<sels.length;i++){ var e=document.querySelector(sels[i]); if(e){ var rr=e.getBoundingClientRect(); if(rr&&rr.height) rects.push(rr); } }
+  if(rects.length){ var top=Math.min.apply(null,rects.map(function(x){return x.top;})); var bot=Math.max.apply(null,rects.map(function(x){return x.bottom;})); return top+(bot-top)/2; }
+  return null;
+}
+/* Centraliza Monitor SLA + sino + avatar direito no MESMO centro Y do bloco esquerdo (BUG2, Δ<=2px).
+   Mede a altura REAL de cada elemento; só posicionamento (top/right/height); sem flex/dropdown/lógica. */
+function slaClusterAlign(){
   try{
-    avr=avr||(function(){var a=document.getElementById('cornerAvatar');return a&&a.getBoundingClientRect();})();
-    if(centerY==null){ if(!avr||!avr.height) return; centerY=avr.top+avr.height/2; }
+    if(!document.body.classList.contains('desktop')) return;
+    var cy=slaHeaderTargetCenterY();
+    if(cy==null) return;   // sem header de quadro real → nada a alinhar (overlays nem existem)
+    var av=document.getElementById('cornerAvatar');
+    if(av){ var ah=av.getBoundingClientRect().height||38; av.style.top=Math.round(cy-ah/2)+'px'; }
     var bell=document.getElementById('slaib-bell');
-    if(bell&&avr){ var bh=Math.round(avr.height)||38; bell.style.height=bh+'px'; bell.style.width=bh+'px';
-      bell.style.top=Math.round(centerY-bh/2)+'px'; bell.style.right=Math.round(window.innerWidth-avr.left+10)+'px';
+    if(bell){ var bh=(av?Math.round(av.getBoundingClientRect().height):0)||Math.round(bell.getBoundingClientRect().height)||38;
+      bell.style.height=bh+'px'; bell.style.width=bh+'px'; bell.style.top=Math.round(cy-bh/2)+'px';
+      if(av){ var ar=av.getBoundingClientRect(); bell.style.right=Math.round(window.innerWidth-ar.left+10)+'px'; }
       bell.style.bottom='auto'; bell.style.left='auto'; }
     var w=document.getElementById('sla-monitor');
     if(w){ var chip=w.querySelector('.slamon-chip'); var ch=(chip&&chip.getBoundingClientRect().height); if(!ch||ch<8) ch=(w.getBoundingClientRect().height||46);
-      w.style.top=Math.round(centerY-ch/2)+'px';
-      var ref=bell||document.getElementById('cornerAvatar'); var rr=ref&&ref.getBoundingClientRect();
-      if(rr&&rr.width) w.style.right=Math.round(window.innerWidth-rr.left+10)+'px'; }
+      w.style.top=Math.round(cy-ch/2)+'px';
+      var refE=bell||av; var rr2=refE&&refE.getBoundingClientRect(); if(rr2&&rr2.width) w.style.right=Math.round(window.innerWidth-rr2.left+10)+'px'; }
   }catch(_){}
 }
 /* ── F3.3.2 — PAINEL OPERACIONAL SLA (read-side, topo do quadro do designer) ──
@@ -2998,12 +3008,7 @@ function slaMonSegs(d){
   if(d.warning.length) s+='<span class="slamon-seg amber" title="Prazo próximo">'+SLAOP_CLOCK_SVG+d.warning.length+'</span>';
   return '<span class="slamon-segs">'+s+'</span>';
 }
-function slaMonAlign(){
-  var bell=document.getElementById('slaib-bell'); var av=document.getElementById('cornerAvatar');
-  var ref=bell||av; var r=ref&&ref.getBoundingClientRect();
-  if(r&&r.width){ slaClusterAlign(r.top+r.height/2); }
-  else { var w=document.getElementById('sla-monitor'); if(w){ w.style.top='12px'; w.style.right='120px'; } }
-}
+function slaMonAlign(){ try{ slaClusterAlign(); }catch(_){} }
 /* F3.3.2 (FASE 6 — anti-flicker): assinatura ESTRUTURAL (severidade + ids + crítico + nextMs).
    Quando só os CONTADORES mudam (tick de 1s), atualizamos os textos EM LUGAR (sem reconstruir
    innerHTML) → o dropdown não pisca, não fecha sozinho e não perde o estado aberto. O 'open' é
@@ -3022,14 +3027,24 @@ function slaMonUpdateCounters(d){
     var pr=row.querySelector('.slaop-prog>span'); if(pr&&x.sev!=='vermelho') pr.style.width=slaOpRowPct(x)+'%';
   });
 }
-/* F3.3.14 (BUG1) — contexto de QUADRO: overlays operacionais (Monitor SLA, sino, avatar do
-   quadro) só existem em state.tab==='tarefas'. Fora dali (Dashboard/Hoje/Agenda/...) são REMOVIDOS
-   da árvore (não display:none). Perfil/Notificações continuam na sidebar. */
-function isBoardContext(){ return !!(typeof state!=='undefined' && state && state.tab==='tarefas'); }
+/* F3.3.15 (BUG1) — GATE REAL: overlays operacionais (Monitor SLA, sino e avatar do quadro) só
+   existem dentro do KANBAN REAL (colunas/cards), não na aba genérica. A aba "tarefas" inclui a tela
+   "Quadros"/hubs/listas, onde NÃO devem aparecer. Sinal canônico do Kanban real = #content.board-mode
+   (render() adiciona só quando o corpo tem a superfície kbv2/kanban — emitida apenas por renderBoard/
+   renderPersonBoard/renderDesignerBoard/renderSocialBoard/renderClientFlowBoard) + a superfície real
+   presente no DOM. Fora dali → REMOVIDOS da árvore (não display:none). */
+function isOperationalBoardContext(){
+  try{
+    if(typeof state==='undefined' || !state) return false;
+    if(state.tab!=='tarefas' || state.form || state.clientView) return false;
+    var c=document.getElementById('content');
+    return !!(c && c.classList.contains('board-mode') && c.querySelector('.kbv2-board-surface, .kanban .kcol'));
+  }catch(_){ return false; }
+}
 function slaMonRender(){
   var authed=!!(state.user)&&document.body.classList.contains('authed');
   var w=document.getElementById('sla-monitor');
-  if(!authed || !isBoardContext()){ if(w)w.remove(); return; }
+  if(!authed || !isOperationalBoardContext()){ if(w)w.remove(); return; }
   slaibEnsureStyle();
   var d=slaMonData();
   var sev=d.overdue.length?'red':(d.warning.length?'amber':'green');
@@ -3150,7 +3165,7 @@ if(typeof window!=='undefined' && !window.__slaEditBound){ window.__slaEditBound
 function slaibRender(){
   var bell=document.getElementById('slaib-bell');
   var authed=!!(state.user)&&document.body.classList.contains('authed');
-  if(!authed || !isBoardContext()){ if(bell)bell.remove(); var ov0=document.getElementById('slaib-ov'); if(ov0)ov0.remove(); return; }
+  if(!authed || !isOperationalBoardContext()){ if(bell)bell.remove(); var ov0=document.getElementById('slaib-ov'); if(ov0)ov0.remove(); return; }
   slaibEnsureStyle();
   var items=slaibCompute(), read=slaibLoadRead();
   var unread=items.filter(function(x){return !read[x.key];});
@@ -3230,9 +3245,17 @@ function slaBlockRender(){
     +'<button class="sb-open" data-sla-open="'+slaibEsc(blk.id)+'">Abrir tarefa</button>'
     +'<button class="sb-sig" data-sla-signal="'+slaibEsc(blk.id)+'">Sinalizar atraso</button>';
 }
-function slaibRefresh(){ try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaBlockRender(); }catch(_){} try{ slaMonScheduleBoundary(); }catch(_){}
-  /* re-alinha o cluster sino/avatar/widget APÓS o layout assentar (corrige desalinho de timing
-     em fonte/reflow que o owner mediu) */
+function slaibRefresh(){
+  /* F3.3.15 (BUG1) — o avatar operacional do quadro segue o MESMO gate dos overlays: só existe no
+     Kanban real; fora dele é REMOVIDO da árvore (não display:none). */
+  try{ var _ca=document.getElementById('cornerAvatar');
+    if(isDesktop() && isOperationalBoardContext()){
+      if(!_ca){ _ca=document.createElement('button'); _ca.id='cornerAvatar'; _ca.className='corner-avatar topav-btn'; _ca.setAttribute('data-tab','perfil'); _ca.title='Abrir perfil'; document.body.appendChild(_ca); }
+      _ca.innerHTML=avatar(state.user,38);
+    } else if(_ca){ _ca.remove(); }
+  }catch(_){}
+  try{ slaibRender(); }catch(_){} try{ slaMonRender(); }catch(_){} try{ slaBlockRender(); }catch(_){} try{ slaMonScheduleBoundary(); }catch(_){}
+  /* re-alinha o cluster (avatar/sino/Monitor) ao BLOCO ESQUERDO do header APÓS o layout assentar */
   try{ requestAnimationFrame(function(){ try{ slaHeaderAlign(); }catch(_){} }); }catch(_){} }
 try{ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(function(){ try{ slaHeaderAlign(); }catch(_){} }); }catch(_){}
 try{ window.addEventListener('load',function(){ try{ slaHeaderAlign(); }catch(_){} }); }catch(_){}
@@ -3706,15 +3729,9 @@ function render(){
   if(typeof closeCardMenus==='function')closeCardMenus(); // popover ⋯ é portal no <body>: nunca sobrevive a um re-render
   document.getElementById('topAvatar').innerHTML='<button class="topav-btn" data-tab="perfil" title="Abrir perfil">'+avatar(state.user,38)+'</button>';
   const nav=document.getElementById('bottomNav');
-  // print de referência: avatar do usuário fixo no canto superior direito (clique → perfil)
-  let _ca=document.getElementById('cornerAvatar');
-  if(isDesktop() && isBoardContext()){
-    if(!_ca){_ca=document.createElement('button');_ca.id='cornerAvatar';_ca.className='corner-avatar topav-btn';_ca.setAttribute('data-tab','perfil');_ca.title='Abrir perfil';document.body.appendChild(_ca);}
-    _ca.innerHTML=avatar(state.user,38);
-  }else if(_ca){_ca.remove();}
-  /* F3.3.14 (BUG1) — reavalia overlays do quadro a cada render (remove na hora ao sair; recria ao
-     entrar). render() não dispara slaibRefresh por si só, então força aqui. */
-  try{ if(typeof slaibRefresh==='function') slaibRefresh(); }catch(_){}
+  // F3.3.15 (BUG1) — o avatar operacional e os overlays do quadro são geridos por slaibRefresh()
+  // APÓS o render (quando #content.board-mode já reflete o Kanban real). NÃO criar aqui: neste ponto
+  // o board-mode ainda não foi recalculado para o render atual. Hook no wrapper de render() abaixo.
   if(isDesktop()){
     nav.innerHTML=
       '<div class="sb-brand"><div class="logo sm brandlogo"></div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
@@ -7295,7 +7312,7 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
     if(typeof window.render!=='function')return false;
     if(window.render.__singleCardHooked)return true;
     var _orig=window.render;
-    window.render=function(){var r=_orig.apply(this,arguments);schedule();ensureObserver();return r;};
+    window.render=function(){var r=_orig.apply(this,arguments);try{if(typeof slaibRefresh==='function')slaibRefresh();}catch(_){}schedule();ensureObserver();return r;};
     window.render.__singleCardHooked=true;
     return true;
   }
