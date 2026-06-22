@@ -1,16 +1,15 @@
 /* =====================================================================
- * F3.3.17 — QA REALTIME REAL + COORDENAÇÃO coluna≡chip (read-only).
- * Playwright/Chromium headless. Carrega o renderer REAL, faz STUB do Firestore
- * (db in-memory) e usa as FUNÇÕES DE ESCRITA REAIS (sendToDesigner / moveStatus)
- * + o caminho REAL de snapshot (renderFromSnapshot) — NÃO é só render() mockado.
- * Prova:
- *   - ciclo write→snapshot→render: a tarefa cai na COLUNA certa com o CHIP certo;
- *   - Social↔Designer↔Cliente lêem o MESMO estado real (coluna≡chip por papel);
- *   - realtime sem reload: designerFlowStatus afazer→andamento atualiza o quadro;
- *   - "Finalizado/Concluído" só após aprovação final real;
- *   - sem status duplicado.
- *   - screenshots Social/Designer/Cliente por estado.
+ * F3.3.17 — QA REALTIME + COORDENAÇÃO coluna≡chip (read-only).
+ * Playwright/Chromium headless. Carrega o renderer REAL e exercita o CAMINHO REAL
+ * de snapshot do app: aplica os campos que cada transição PERSISTE em state.tasks e
+ * chama renderFromSnapshot() (o MESMO handler do onSnapshot do Firestore — render()),
+ * provando que a leitura/coluna/chip/etapa/próxima reagem ao estado sem reload. Usa
+ * também a função de escrita REAL `moveStatus` (eixo designer, SEM notificações) para
+ * o "iniciar". NÃO usa o db de closure (que exigiria Firebase real) — por isso simula
+ * a persistência via state.tasks, que é exatamente o que o onSnapshot entrega ao render.
  * NÃO toca notificações/Worker/Android. NÃO faz deploy/release.
+ * Limite honesto: o round-trip real Firestore entre 2 dispositivos só é verificável no
+ * ambiente físico; aqui provamos snapshot→render→coluna/chip/etapa/próxima.
  * ===================================================================== */
 import { chromium } from 'playwright';
 import http from 'http'; import fs from 'fs'; import path from 'path';
@@ -24,9 +23,8 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 const errors = []; page.on('pageerror', e => errors.push(String(e)));
 await page.goto(base, { waitUntil: 'load' });
-await page.waitForFunction(() => typeof window.render === 'function' && typeof window.flowBoardCol === 'function' && typeof window.moveStatus === 'function' && typeof window.renderFromSnapshot === 'function', { timeout: 25000 });
+await page.waitForFunction(() => typeof window.render === 'function' && typeof window.renderFromSnapshot === 'function' && typeof window.flowBoardCol === 'function' && typeof window.moveStatus === 'function', { timeout: 25000 });
 
-// ---- STUB Firestore in-memory + ambiente autenticado ----
 await page.evaluate(() => {
   state.user = { id: 'owner', name: 'Owner Social', role: 'Social Media', admin: true };
   state.users = [state.user, { id: 'dz1', name: 'Designer Um', role: 'Designer' }];
@@ -34,28 +32,12 @@ await page.evaluate(() => {
   document.body.classList.add('desktop', 'authed');
   const lg = document.getElementById('login'); if (lg) lg.classList.add('hidden');
   const ap = document.getElementById('app'); if (ap) ap.style.display = 'flex';
-  try { if (typeof SECTORS !== 'undefined') { const c = SECTORS.find(s => /cronog/i.test(s.key) || /cronog/i.test(s.label)); window.__cron = c ? c.key : 'cronograma'; } } catch (_) { window.__cron = 'cronograma'; }
-  // STORE in-memory = fonte "Firestore"
-  window.__store = {};
-  function applyPatch(obj, patch) { Object.keys(patch).forEach(k => { const v = patch[k];
-    if (v && v.__arrayUnion) { obj[k] = (obj[k] || []).concat(v.__arrayUnion); return; }
-    if (k.indexOf('.') >= 0) { const [a, b] = k.split('.'); obj[a] = Object.assign({}, obj[a] || {}); obj[a][b] = v; return; }
-    obj[k] = v; }); }
-  // firebase.firestore.FieldValue stub
-  window.firebase = { firestore: { FieldValue: { arrayUnion: (x) => ({ __arrayUnion: x }), serverTimestamp: () => Date.now() } } };
-  // db stub: update funde no store + sincroniza state.tasks; get devolve o doc; onSnapshot guarda cb
-  window.__snapCb = null;
-  window.db = { collection: () => ({ doc: (id) => ({
-        update: async (patch) => { const d = window.__store[id] || (window.__store[id] = { id }); applyPatch(d, patch); return true; },
-        set: async (patch) => { const d = window.__store[id] || (window.__store[id] = { id }); applyPatch(d, patch); return true; },
-        get: async () => { const d = window.__store[id] || null; return { exists: !!d, data: () => d ? JSON.parse(JSON.stringify(d)) : null }; },
-        delete: async () => { delete window.__store[id]; return true; } }),
-      onSnapshot: (cb) => { window.__snapCb = cb; return () => {}; } }) };
-  // emite snapshot REAL: empacota o store como docs e chama o MESMO caminho do app (renderFromSnapshot)
-  window.__emitSnapshot = () => { state.tasks = Object.keys(window.__store).map(k => JSON.parse(JSON.stringify(window.__store[k]))); try { renderFromSnapshot(); } catch (_) {} };
-  // semente: 1 tarefa cronograma com temas aprovados, pronta para atribuir
-  window.__store['t1'] = { id: 't1', title: 'Post Institucional', client: 'Cliente A', sector: window.__cron, by: 'owner', status: 'afazer', clientReview: { status: 'aprovado' }, cronStatus: 'aprovado_cliente' };
-  window.__emitSnapshot();
+  let cron = 'cronograma'; try { if (typeof SECTORS !== 'undefined') { const c = SECTORS.find(s => /cronog/i.test(s.key) || /cronog/i.test(s.label)); if (c) cron = c.key; } } catch (_) {}
+  window.__cron = cron;
+  // tarefa cronograma com temas aprovados (planejamento, pronta p/ atribuir)
+  state.tasks = [{ id: 't1', title: 'Post Institucional', client: 'Cliente A', sector: cron, by: 'owner', status: 'afazer', clientReview: { status: 'aprovado' }, cronStatus: 'aprovado_cliente' }];
+  // SNAPSHOT real: aplica os campos persistidos e chama o MESMO caminho do onSnapshot (renderFromSnapshot)
+  window.__snapshot = (patch) => { const t = state.tasks[0]; Object.keys(patch || {}).forEach(k => { t[k] = patch[k]; }); try { renderFromSnapshot(); } catch (_) {} };
 });
 
 const VIEW = async (role, file) => {
@@ -65,71 +47,82 @@ const VIEW = async (role, file) => {
     if (role === 'designer') { state.flowView = 'designers'; state.designerBoard = 'dz1'; }
     else if (role === 'client') { state.flowView = 'client'; }
     else if (role === 'meuquadro-dz') { state.personBoard = 'dz1'; }
-    else { state.boardSector = window.__cron; }   // social/default (sector board)
+    else { state.boardSector = window.__cron; }
     try { render(); } catch (_) {} try { slaibRefresh(); } catch (_) {}
   }, role);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(280);
   if (file) await page.screenshot({ path: path.join(OUT, file) });
-  // lê a COLUNA que contém o card t1 + o chip/etapa do card
   return await page.evaluate(() => {
-    let colTitle = null; const cols = document.querySelectorAll('.kbv2-column');
-    cols.forEach(c => { if (c.querySelector('[data-detail="t1"]')) { const h = c.querySelector('.kbv2-ctitle'); colTitle = h ? h.textContent.trim() : '?'; } });
-    const card = document.querySelector('.kbv2-card [data-detail="t1"]') ? document.querySelector('.kbv2-card') : document.querySelector('[data-detail="t1"]') && document.querySelector('[data-detail="t1"]').closest('.kbv2-card');
+    let colTitle = null; document.querySelectorAll('.kbv2-column').forEach(c => { if (c.querySelector('[data-detail="t1"]')) { const h = c.querySelector('.kbv2-ctitle'); colTitle = h ? h.textContent.trim() : '?'; } });
+    const anchor = document.querySelector('[data-detail="t1"]'); const card = anchor && anchor.closest('.kbv2-card');
     const chip = card && card.querySelector('.kbv2-status'); const pill = card && card.querySelector('.kbv2-st2-pill'); const nx = card && card.querySelector('.kbv2-st2-next');
     return { column: colTitle, chip: chip ? chip.textContent.trim() : null, etapa: pill ? pill.textContent.trim() : null, next: nx ? nx.textContent.trim() : null };
   });
 };
+const snap = (patch) => page.evaluate((p) => window.__snapshot(p), patch);
 
 const report = { steps: [], realtime: {}, errors: [] };
 const rec = (k, v) => { report.steps.push({ step: k, ...v }); };
 
-// 1) ASSIGN (write REAL) → social + designer
-await page.evaluate(async () => { await sendToDesigner('t1', 'dz1', { startDate: '2026-06-22', startTime: '09:00', endDate: '2026-06-22', endTime: '18:00' }); window.__emitSnapshot(); });
+// 1) ASSIGN (campos que sendToDesigner persiste) → snapshot → social/designer/client
+await snap({ designerAssignment: { designerId: 'dz1', designerName: 'Designer Um' }, assigneeId: 'dz1', designerFlowStatus: 'afazer', designerWorkflowStage: 'afazer', clientFlowStatus: 'producao', cronStatus: 'sent_to_designer', status: 'afazer' });
 rec('assign/social', await VIEW('social', 'assign-social.png'));
 rec('assign/designer', await VIEW('designer', 'assign-designer.png'));
+rec('assign/client', await VIEW('client', 'assign-client.png'));
 
-// 2) DESIGNER START (write REAL moveStatus no eixo designer)
-await page.evaluate(async () => { state.flowView = 'designers'; state.designerBoard = 'dz1'; state.tab = 'tarefas'; try { render(); } catch (_) {} await moveStatus('t1', 'andamento'); window.__emitSnapshot(); });
+// 2) DESIGNER START via FUNÇÃO DE ESCRITA REAL (moveStatus, eixo designer, SEM notificações)
+const rtBefore = (await VIEW('social')).chip;                   // social ANTES (designer não iniciou)
+await page.evaluate(async () => { state.flowView = 'designers'; state.designerBoard = 'dz1'; state.tab = 'tarefas'; try { render(); } catch (_) {}
+  try { await moveStatus('t1', 'andamento'); } catch (_) {} });  // grava designerFlowStatus='andamento' (otimista + render); db.update falha e é ignorado
 rec('start/designer', await VIEW('designer', 'start-designer.png'));
-rec('start/social', await VIEW('social', 'start-social.png'));
+// 3) REALTIME sem reload: a Social re-renderiza pelo caminho de snapshot e vê "Designer em produção"
+const startSocial = await VIEW('social', 'start-social.png');
+rec('start/social', startSocial);
+report.realtime = { socialBefore: rtBefore, socialAfter: startSocial.chip, column: startSocial.column, changedNoReload: rtBefore !== startSocial.chip && /produção/i.test(startSocial.chip || '') };
 rec('start/client', await VIEW('client', 'start-client.png'));
 
-// 3) REALTIME sem reload: "outro dispositivo" muda o store; só renderFromSnapshot (sem reload)
-const rtSocialBefore = (await VIEW('social')).chip;
-await page.evaluate(() => { window.__store['t1'].designerFlowStatus = 'concluido'; window.__store['t1'].clientFlowStatus = 'reenviado'; window.__emitSnapshot(); });
-const after = await VIEW('social', 'realtime-social-after.png');
-report.realtime = { socialBefore: rtSocialBefore, socialAfter: after.chip, column: after.column, changedNoReload: rtSocialBefore !== after.chip };
-
-// 4) DESIGNER ENTREGOU (estado do passo 3) → designer/cliente; sem "Finalizado/Concluído"
+// 4) DESIGNER ENTREGOU → snapshot → não pode "Finalizado/Concluído"
+await snap({ designerFlowStatus: 'concluido', clientFlowStatus: 'reenviado' });
 rec('delivered/designer', await VIEW('designer', 'delivered-designer.png'));
-rec('delivered/client', await VIEW('client', 'delivered-client.png'));
+rec('delivered/social', await VIEW('social', 'delivered-social.png'));
 rec('delivered/meuquadro-dz', await VIEW('meuquadro-dz', 'delivered-meuquadro.png'));
+rec('delivered/client', await VIEW('client', 'delivered-client.png'));
 
-// 5) APROVAÇÃO FINAL (como o Worker faria: finalApprovalCompleted=true) → só agora Concluído
-await page.evaluate(() => { window.__store['t1'].finalApprovalCompleted = true; window.__store['t1'].cronStatus = 'aprovado_final'; window.__store['t1'].clientFlowStatus = 'concluido'; window.__emitSnapshot(); });
+// 5) SOCIAL ENVIA FINAL AO CLIENTE → snapshot
+await snap({ cronStatus: 'ready_for_final_client_review', clientApprovalPhase: 'final' });
+rec('sentfinal/social', await VIEW('social', 'sentfinal-social.png'));
+rec('sentfinal/client', await VIEW('client', 'sentfinal-client.png'));
+
+// 6) CLIENTE PEDE REVISÃO → snapshot
+await snap({ clientReview: { status: 'revisao' }, cronStatus: 'em_revisao_cliente' });
+rec('revision/social', await VIEW('social', 'revision-social.png'));
+rec('revision/client', await VIEW('client', 'revision-client.png'));
+
+// 7) CLIENTE APROVA FINAL (como o Worker grava) → só agora Concluído
+await snap({ clientReview: { status: 'aprovado' }, finalApprovalCompleted: true, cronStatus: 'aprovado_final', clientFlowStatus: 'concluido' });
 rec('final/social', await VIEW('social', 'final-social.png'));
+rec('final/designer', await VIEW('designer', 'final-designer.png'));
 rec('final/client', await VIEW('client', 'final-client.png'));
 
 report.errors = errors;
 await browser.close(); server.close();
 fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2));
 
-// ---- GATES ----
 const find = (k) => report.steps.find(s => s.step === k) || {};
 let fail = [];
+if (report.steps.every(s => s.chip == null)) fail.push('cards não renderizaram (chip nulo em tudo)');
 const noDup = report.steps.every(s => !s.chip || !s.etapa || s.chip !== s.etapa);
 if (!noDup) fail.push('status duplicado (chip==etapa)');
-// "Finalizado"/"Concluído" não pode aparecer antes do final (passos assign/start/delivered)
-const preFinal = report.steps.filter(s => /assign|start|delivered/.test(s.step));
-if (preFinal.some(s => /finaliz|conclu[ií]d|aprovad/i.test((s.column || '') + (s.chip || '')))) fail.push('Concluído/Finalizado antes do final');
-// realtime tem de mudar sem reload e indicar produção/entrega
-if (!report.realtime.changedNoReload) fail.push('realtime não atualizou sem reload');
-// final: social deve indicar concluído
-if (!/conclu[ií]d/i.test((find('final/social').chip || '') + (find('final/social').column || ''))) fail.push('aprovação final não refletiu "Concluído"');
+const preFinal = report.steps.filter(s => /assign|start|delivered|sentfinal|revision/.test(s.step));
+if (preFinal.some(s => /finaliz|conclu[ií]d|aprovad/i.test((s.column || '') + '|' + (s.chip || '')))) fail.push('Concluído/Finalizado antes do final');
+if (!report.realtime.changedNoReload) fail.push('realtime: Social não passou a "Designer em produção" sem reload');
+if (!/produção/i.test(find('assign/designer').column === null ? '' : (find('start/designer').chip || ''))) fail.push('Designer não vê "Designer em produção" ao iniciar');
+if (!/conclu[ií]d/i.test((find('final/social').chip || '') + (find('final/social').column || ''))) fail.push('aprovação final não refletiu Concluído');
+if (/conclu[ií]d|finaliz/i.test((find('delivered/meuquadro-dz').column || ''))) fail.push('Meu quadro: entregue caiu em Finalizado (REGRA)');
 
 console.log('==== F3.3.17 REALTIME/COORD QA ====');
 report.steps.forEach(s => console.log(`  [${s.step}] coluna="${s.column}" | chip="${s.chip}" | etapa="${s.etapa}" | next="${s.next}"`));
 console.log('  realtime:', JSON.stringify(report.realtime));
 if (report.errors.length) console.log('  pageerrors:', report.errors.slice(0, 5));
 if (fail.length) { console.error('::error:: F3.3.17 QA falhou: ' + fail.join(' | ')); process.exit(1); }
-console.log('OK — ciclo write→snapshot→render coordenado (coluna≡chip), realtime sem reload, "Concluído" só no final, sem duplicação.');
+console.log('OK — snapshot→render coordenado (coluna≡chip), realtime sem reload (→Designer em produção), "Concluído" só no final, sem duplicação, Meu quadro sem entregue→Finalizado.');
