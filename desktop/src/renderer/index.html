@@ -5150,6 +5150,8 @@ function kbv2SlaLocal(t,nowMs){
  * visual BLACK PREMIUM — só muda textos/derivações. */
 const TASK_PHASE={
   PLANNING:'planning',                                 // Social planeja; designer não atribuído
+  THEMES_SENT:'themes_sent',                           // F3.3.17-R5/C1 — temas enviados ao cliente (sem designer)
+  THEMES_APPROVED:'themes_approved',                   // F3.3.17-R5/C1 — cliente aprovou os temas; aguardando envio ao designer
   AWAITING_DESIGNER:'awaiting_designer',               // designer atribuído, ainda não iniciou
   DESIGNER_PRODUCING:'designer_producing',             // designerFlowStatus='andamento'
   DESIGNER_REVISING:'designer_revising',               // designerFlowStatus='revisao'
@@ -5162,6 +5164,9 @@ const TASK_PHASE={
 function flowCompletedSignal(t){return isTaskCompleted(t);}  /* F3.3.4 item A — FONTE ÚNICA (idêntico ao inline anterior) */
 function flowSentToClientSignal(t){const cs=(t&&t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||(t&&t.clientApprovalPhase==='final');}
 function flowClientChangesSignal(t){const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();return cr==='revisao'||(t&&t.clientFlowStatus==='revisao')||hasPendingItemRevision(t);}
+/* F3.3.17-R5/C1 — sub-jornada de TEMAS (só ANTES de haver designer; lê campos já existentes). */
+function flowThemesApprovedSignal(t){if(hasDesigner(t))return false;const cf=(t&&t.clientFlowStatus||'').toString();const cr=(t&&t.clientReview&&t.clientReview.status||'').toString();const ph=(t&&t.clientApprovalPhase||'').toString();return cf==='aprovado'||(cr==='aprovado'&&ph!=='final'&&ph!=='production');}
+function flowThemesSentSignal(t){if(hasDesigner(t))return false;const cf=(t&&t.clientFlowStatus||'').toString();const cs=(t&&t.cronStatus||'').toString();const ph=(t&&t.clientApprovalPhase||'').toString();if(ph==='final')return false;return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente'||!!(t&&(t.clientSentBy||t.clientReviewToken||t.shareToken));}
 // FONTE ÚNICA — fase canônica da tarefa. Determinística e ORDENADA (terminal → designer).
 function deriveCanonicalTaskState(t){
   if(!t)return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:false};
@@ -5181,11 +5186,17 @@ function deriveCanonicalTaskState(t){
     if(dc==='andamento')return {phase:TASK_PHASE.DESIGNER_PRODUCING,owner:'designer',isCron:true};
     return {phase:TASK_PHASE.AWAITING_DESIGNER,owner:'designer',isCron:true};
   }
+  // F3.3.17-R5/C1 — SEM designer: distinguir a sub-jornada de TEMAS do planejamento puro
+  // (aprovação de TEMAS NUNCA é conclusão — terminal só via flowCompletedSignal acima).
+  if(flowThemesApprovedSignal(t))return {phase:TASK_PHASE.THEMES_APPROVED,owner:'social',isCron:true};
+  if(flowThemesSentSignal(t))return {phase:TASK_PHASE.THEMES_SENT,owner:'client',isCron:true};
   return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:true};
 }
 // Rótulos canônicos por (fase × papel): col(coluna do papel) · label · color · next. Texto/cor numa SÓ fonte.
 const FLOW_LABELS={
   planning:{social:{col:'afazer',label:'Em planejamento',color:'#9BA0AB',next:'Criar e enviar ao cliente'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'enviado',label:'Em preparação',color:'#6E7480',next:'Aguardar os temas'}},
+  themes_sent:{social:{col:'andamento',label:'Temas enviados ao cliente',color:'#7C83FF',next:'Aguardar aprovação dos temas'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'analise',label:'Temas para sua aprovação',color:'#22D3EE',next:'Aprovar ou pedir ajuste dos temas'}},
+  themes_approved:{social:{col:'andamento',label:'Temas aprovados — enviar ao designer',color:'#34D399',next:'Atribuir e enviar ao designer'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Aguardando atribuição'},client:{col:'analise',label:'Temas aprovados — produção em breve',color:'#22D3EE',next:'Aguardar a produção das artes'}},
   awaiting_designer:{social:{col:'andamento',label:'Aguardando designer iniciar',color:'#7C83FF',next:'Aguardar o designer iniciar'},designer:{col:'afazer',label:'A Fazer',color:'#9BA0AB',next:'Iniciar a produção'},client:{col:'analise',label:'Temas aprovados — produção será iniciada',color:'#22D3EE',next:'Equipe inicia a produção'}},
   designer_producing:{social:{col:'andamento',label:'Designer em produção',color:'#A78BFA',next:'Aguardar a entrega do designer'},designer:{col:'andamento',label:'Designer em produção',color:'#F59E0B',next:'Finalizar e entregar'},client:{col:'analise',label:'Equipe em produção',color:'#A78BFA',next:'Aguardar a produção das artes'}},
   designer_revising:{social:{col:'revisao',label:'Designer em revisão/ajuste',color:'#60A5FA',next:'Aguardar a correção do designer'},designer:{col:'revisao',label:'Revisão/Ajuste',color:'#60A5FA',next:'Corrigir o ajuste e reenviar'},client:{col:'analise',label:'A equipe está produzindo as artes',color:'#A78BFA',next:'Aguardar a produção das artes'}},
@@ -5963,9 +5974,10 @@ async function sendToDesigner(taskId,designerId,dl){
   };
   if(dl.obs&&String(dl.obs).trim())patch.desc=String(dl.obs).trim();
   // otimista
-  Object.assign(t,{designerAssignment:assignment,designerSla:designerSla,assigneeId:designerId,assignee:d.name||'',assigneeName:d.name||'',cronStatus:'sent_to_designer',status:'afazer',
-    clientFlowStatus:'producao',clientWorkflowStage:'producao',designerFlowStatus:'afazer',designerWorkflowStage:'afazer',
-    startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',dueDate:dl.endDate||'',dueTime:dl.endTime||''});
+  // F3.3.17-R5/C4 — estado OTIMISTA = MESMOS campos do patch persistido (menos history), para a UI ler
+  // o estado COMPLETO antes do snapshot (inclui socialOwnerId/operationalStatus/finalApprovalCompleted),
+  // eliminando o card piscar/sumir do quadro da Social. O snapshot substitui o array depois, sem perda.
+  {const _opt={};for(const _k in patch){if(_k!=='history')_opt[_k]=patch[_k];}Object.assign(t,_opt);}
   closeModal();render();flashToast('Enviado para '+(d.name||'designer')+'…');
   try{
     await db.collection('tasks').doc(taskId).update(patch);
@@ -6713,6 +6725,14 @@ async function clientReviewAction(taskId,kind,note){
   const now=Date.now();const u=state.user||{};
   const t=state.tasks.find(x=>x.id===taskId)||null;
   const review={status:m.rev,note:note||'',at:now,byId:u.id||null,byName:u.name||''};
+  // F3.3.17-R5/C3 — a Cliente Vision do Desktop NÃO finaliza (conclusão é EXCLUSIVA do portal/Worker).
+  // Revisão sempre reflete (clientFlowStatus:'revisao' → Social/Designer/Cliente enxergam revisão);
+  // aprovação só AVANÇA TEMAS (clientFlowStatus:'aprovado') quando ainda não há designer e a fase é de
+  // temas; NUNCA grava finalApprovalCompleted/operationalStatus nem conclui localmente.
+  const ph=(t&&t.clientApprovalPhase||'themes').toString();
+  let cfs=null;
+  if(kind==='revisao') cfs='revisao';
+  else if(kind==='aprovar' && !hasDesigner(t) && ph!=='final' && ph!=='production') cfs='aprovado';
   const patch={
     cronStatus:m.cronStatus,
     clientReview:review,
@@ -6722,9 +6742,10 @@ async function clientReviewAction(taskId,kind,note){
       at:now,client:(t&&t.client)||(state._clientFallback&&state._clientFallback.client)||'',channel:'client_vision',note:note||''
     })
   };
+  if(cfs) patch.clientFlowStatus=cfs;   // C3: revisão visível / temas aprovados — sem campos de conclusão
   // atualizacao otimista (refletir imediato mesmo antes do round-trip),
   // tanto na tarefa ao vivo quanto no fallback (recem-criada ainda sem snapshot)
-  if(t){t.cronStatus=m.cronStatus;t.clientReview=review;}
+  if(t){t.cronStatus=m.cronStatus;t.clientReview=review;if(cfs)t.clientFlowStatus=cfs;}
   if(state._clientFallback&&state._clientFallback.id===taskId){state._clientFallback.status=m.cronStatus;state._clientFallback._review=review;}
   state.clientAction=null;render();
   try{await db.collection('tasks').doc(taskId).update(patch);}catch(e){console.warn('clientReviewAction',e);}
