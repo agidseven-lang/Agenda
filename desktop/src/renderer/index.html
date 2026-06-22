@@ -3077,14 +3077,58 @@ function slaEditPrazoOpen(taskId){
     +'<div class="slaedit-bd">'
     +'<div class="slaedit-f"><label>Início planejado</label><input type="datetime-local" id="slaedit-start" value="'+startV+'"></div>'
     +'<div class="slaedit-f"><label>Prazo final / término</label><input type="datetime-local" id="slaedit-due" value="'+dueV+'"></div>'
-    +'<div class="slaedit-note">Apenas Social Media e Administradores podem ajustar o prazo. A gravação segura (via Worker + auditoria) será habilitada após autorização — nesta fase nada é gravado.</div>'
+    +'<div class="slaedit-note">Apenas Social Media e Administradores podem ajustar o prazo. São gravados somente o início e o prazo final, com confirmação (read-back) no servidor.</div>'
     +'</div>'
     +'<div class="slaedit-ft"><button class="slaedit-cancel" id="slaedit-cancel">Cancelar</button><button class="slaedit-save" id="slaedit-save">Salvar prazo</button></div></div>';
   ov.addEventListener('click',function(e){
     if(e.target===ov||e.target.id==='slaedit-cancel'){ ov.remove(); return; }
-    if(e.target.id==='slaedit-save'){ if(typeof flashToast==='function')flashToast('Edição de prazo preparada. Gravação real aguarda autorização operacional.'); ov.remove(); return; }
+    if(e.target.id==='slaedit-save'){ slaEditPrazoCommit(taskId, ov); return; }
   });
   document.body.appendChild(ov);
+}
+/* F3.3.13 — GRAVAÇÃO REAL do "Editar prazo" (write-path mínimo autorizado). Persiste SOMENTE os campos
+   de prazo via dotted-path update (preserva TODO o resto de designerSla e da tarefa). plannedFinishAt é
+   ESPELHADO p/ o novo prazo SOMENTE se já existir (>0) na tarefa — nunca cria o campo onde não havia.
+   Sem editedAt/editedBy/history/timestamp extra. Read-back obrigatório: só declara sucesso se o servidor
+   confirmar planStartAt, planDueAt, (plannedFinishAt se existia) e slaPanelFinishMs()==prazo editado;
+   senão recarrega o estado real do servidor (sem otimismo falso). */
+async function slaEditPrazoCommit(taskId, ov){
+  var startEl=document.getElementById('slaedit-start'), dueEl=document.getElementById('slaedit-due');
+  if(!startEl||!dueEl){ if(typeof flashToast==='function')flashToast('Campos de prazo indisponíveis.'); return; }
+  var f=(typeof dtMs==='function'?dtMs:null);
+  var toMs=function(v){ v=String(v||''); var i=v.indexOf('T'); if(i<0||!f) return 0; return Number(f(v.slice(0,i),v.slice(i+1)||'00:00'))||0; };
+  var startMs=toMs(startEl.value), dueMs=toMs(dueEl.value);
+  if(!startMs||!dueMs){ if(typeof flashToast==='function')flashToast('Datas inválidas — verifique início e prazo final.'); return; }
+  if(dueMs<=startMs){ if(typeof flashToast==='function')flashToast('O prazo final deve ser maior que o início.'); return; }
+  var t=(state.tasks||[]).find(function(x){return x.id===taskId;}); if(!t){ if(typeof flashToast==='function')flashToast('Tarefa indisponível.'); return; }
+  // ESPELHAMENTO CONDICIONAL: só toca plannedFinishAt se ele JÁ existir e for válido (>0). Nunca cria.
+  var hadPF=Number(t.designerSla&&t.designerSla.plannedFinishAt)>0;
+  var patch={}; patch['designerSla.planStartAt']=startMs; patch['designerSla.planDueAt']=dueMs;
+  if(hadPF) patch['designerSla.plannedFinishAt']=dueMs;
+  var btn=document.getElementById('slaedit-save'); if(btn)btn.disabled=true;
+  try{
+    await db.collection('tasks').doc(taskId).update(patch);
+    // READ-BACK: relê do servidor e confirma exatamente o que ficou gravado (sem assumir nada)
+    var snap=await db.collection('tasks').doc(taskId).get();
+    var fresh=(snap&&typeof snap.data==='function')?snap.data():null;
+    var fds=(fresh&&fresh.designerSla)||{};
+    var okStart=Number(fds.planStartAt)===startMs, okDue=Number(fds.planDueAt)===dueMs;
+    var okPF=hadPF?(Number(fds.plannedFinishAt)===dueMs):true;
+    var okCanon=fresh?(Number(slaPanelFinishMs(fresh,f))===dueMs):false;
+    if(fresh&&okStart&&okDue&&okPF&&okCanon){
+      t.designerSla=Object.assign({},t.designerSla||{},fresh.designerSla||{}); // reflete o REAL do servidor
+      if(typeof render==='function')render();
+      if(ov&&ov.remove)ov.remove();
+      if(typeof flashToast==='function')flashToast('Prazo atualizado e confirmado no servidor.');
+    }else{
+      if(fresh){ t.designerSla=Object.assign({},t.designerSla||{},fresh.designerSla||{}); if(typeof render==='function')render(); } // recarrega estado real
+      if(btn)btn.disabled=false;
+      if(typeof flashToast==='function')flashToast('Não foi possível confirmar o prazo no servidor — nada foi assumido (estado recarregado).');
+    }
+  }catch(err){
+    if(btn)btn.disabled=false;
+    if(typeof flashToast==='function')flashToast('Erro ao salvar o prazo: '+((err&&err.message)||err));
+  }
 }
 if(typeof window!=='undefined' && !window.__slaEditBound){ window.__slaEditBound=true;
   try{ document.addEventListener('click',function(e){ var o=e.target.closest&&e.target.closest('[data-sla-editprazo]'); if(o){ if(e.preventDefault)e.preventDefault(); slaEditPrazoOpen(o.getAttribute('data-sla-editprazo')); } }); }catch(_){}

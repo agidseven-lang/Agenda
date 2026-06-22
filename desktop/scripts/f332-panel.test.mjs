@@ -174,9 +174,16 @@ ok('B6c fonte única de status/prazo', /function resolveTaskDisplayState\(/.test
 ok('B7 etapa redesenhada (kbv2-stage2 + pill + ícones)', /kbv2-stage2/.test(src) && /kbv2-st2-pill/.test(src) && /kbv2-st2-ic/.test(src));
 // B8 — "Editar prazo" gated por canSeeAll (Social/Admin); designer comum não vê
 ok('B8 Editar prazo RBAC (canSeeAll)', /canSeeAll\(state\.user\)[\s\S]{0,80}data-sla-editprazo/.test(src) && /function slaEditPrazoOpen/.test(src));
-// B9 — modal de editar prazo NÃO grava (sem fetch/setDoc; save bloqueado "pendente de autorização")
-{ const i3 = src.indexOf('function slaEditPrazoOpen'); const seg2 = src.slice(i3, i3 + 2600);
-  ok('B9 editar prazo não escreve (zero write)', i3 > 0 && !/\bfetch\b|setDoc|updateDoc|addDoc/.test(seg2) && /(aguardando autoriza|nada é gravado)/i.test(seg2)); }
+// B9 — F3.3.13: "Editar prazo" agora GRAVA, mas SÓ os campos de prazo autorizados (Opção A):
+//   dotted-path planStartAt+planDueAt; espelha plannedFinishAt só se já existia; read-back canônico;
+//   sem editedAt/editedBy/history/campo novo. (Detalhe completo em f33G-editprazo-write.test.mjs.)
+{ const i3 = src.indexOf('async function slaEditPrazoCommit'); const i4 = src.indexOf('__slaEditBound', i3 > 0 ? i3 : 0); const seg2 = i3 > 0 ? src.slice(i3, i4) : '';
+  ok('B9 editar prazo grava SÓ campos de prazo (Opção A) + read-back', i3 > 0
+    && /patch\['designerSla\.planStartAt'\]=startMs; patch\['designerSla\.planDueAt'\]=dueMs;/.test(seg2)
+    && /if\(hadPF\) patch\['designerSla\.plannedFinishAt'\]=dueMs;/.test(seg2)
+    && /\.doc\(taskId\)\.get\(\)/.test(seg2)
+    && /okCanon=fresh\?\(Number\(slaPanelFinishMs\(fresh,f\)\)===dueMs\):false;/.test(seg2)
+    && !/designerSla\.editedAt|designerSla\.editedBy|history/.test(seg2)); }
 
 // ===================== PRECISÃO TEMPORAL DO ALERTA LARANJA (relógio simulado) =====================
 // Prazo final FIXO; varia-se o "agora". Fonte = designerSla.planDueAt (ms). dtMsStub não interfere.
