@@ -1,0 +1,75 @@
+# =====================================================================
+# [manual] F3.3.14 — VALIDAÇÃO READ-ONLY da hotfix BUG1 (Dashboard limpo) +
+# BUG2 (header do quadro alinhado) + prova viva do OG (BUG3, Worker INTOCADO).
+#
+# SOMENTE validação/evidência. NÃO faz deploy, NÃO publica release, NÃO gera
+# instalador, NÃO altera Worker/Cloudflare/Firebase/Android, NÃO toca Firestore,
+# NÃO mexe na F3.3.13. Execução SOMENTE manual (workflow_dispatch).
+#   - Playwright/Chromium headless: screenshots Dashboard+Quadro em 1366x768,
+#     1350x689, 1920x1080 + medição do centro vertical do header (<=2px).
+#   - curl read-only do /share/cronograma (UA WhatsApp) + da og:image (prova
+#     que o Worker já entrega OG premium — sem alterar nada).
+# =====================================================================
+name: "[manual] F3.3.14 Hotfix Validation (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      token:
+        description: "Token real de um cronograma p/ a prova de OG (qualquer token serve: o card OG é por rota)"
+        required: false
+        default: "737427b62499f780f7d341363a664135bd471cb3c35ea403"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3314-hotfix-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: QA visual (Dashboard limpo + header alinhado <=2px + screenshots 3 resoluções)
+        run: node desktop/scripts/visual-qa-f3314.mjs
+
+      - name: Prova viva do OG (BUG3 — read-only; Worker NÃO é alterado)
+        run: |
+          set -e
+          OUT="desktop/qa-out-f3314"; mkdir -p "$OUT"
+          TOKEN="${{ github.event.inputs.token }}"
+          V="$(date +%s)"
+          URL="https://aprovar.agendaidseven.com.br/share/cronograma/${TOKEN}?v=${V}"
+          echo "== GET share (UA WhatsApp) == $URL" | tee "$OUT/og-proof.txt"
+          curl -sS -m 30 -A "WhatsApp/2.23.20.0" -L "$URL" -D "$OUT/share-headers.txt" -o "$OUT/share-body.html" -w "HTTP %{http_code} | ct=%{content_type}\n" | tee -a "$OUT/og-proof.txt"
+          echo "-- OG meta extraídas --" | tee -a "$OUT/og-proof.txt"
+          grep -oiE '<meta property="og:(title|description|url|image|image:secure_url|image:type|image:width|image:height)"[^>]*>' "$OUT/share-body.html" | tee -a "$OUT/og-proof.txt" || true
+          grep -oiE '<meta name="twitter:card"[^>]*>' "$OUT/share-body.html" | tee -a "$OUT/og-proof.txt" || true
+          IMG="$(grep -oiE '<meta property="og:image" content="[^"]+"' "$OUT/share-body.html" | head -1 | sed -E 's/.*content="([^"]+)".*/\1/')"
+          echo "== og:image == $IMG" | tee -a "$OUT/og-proof.txt"
+          if [ -n "$IMG" ]; then
+            curl -sS -m 30 -A "WhatsApp/2.23.20.0" -L "$IMG" -D "$OUT/ogimg-headers.txt" -o "$OUT/ogimg.bin" -w "OG-IMAGE HTTP %{http_code} | ct=%{content_type} | bytes=%{size_download}\n" | tee -a "$OUT/og-proof.txt"
+            file "$OUT/ogimg.bin" | tee -a "$OUT/og-proof.txt" || true
+          fi
+          echo "(prova read-only — nenhuma alteração no Worker/Cloudflare)" | tee -a "$OUT/og-proof.txt"
+
+      - name: Upload evidências (screenshots + relatório + prova OG)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3314-hotfix-validation
+          path: desktop/qa-out-f3314/
+          if-no-files-found: error
+          retention-days: 14

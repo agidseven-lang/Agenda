@@ -2883,15 +2883,29 @@ function slaibAlign(bell){
 function slaHeaderAlign(){
   try{
     if(!document.body.classList.contains('desktop')){ slaibAlign(); return; }
-    var av=document.getElementById('cornerAvatar');
+    var av=document.getElementById('cornerAvatar'); if(!av) return;
     var logo=document.querySelector('#bottomNav .sb-brand .logo')||document.querySelector('.nav .sb-brand .logo');
-    if(av&&logo){
-      var lr=logo.getBoundingClientRect();
-      if(lr&&lr.height){ var avH=av.getBoundingClientRect().height||38; av.style.top=Math.round(lr.top+lr.height/2-avH/2)+'px'; }
-    }
-    slaibAlign();
-    try{ slaMonAlign(); }catch(_){}   // widget SLA segue o sino/avatar (mesmo eixo)
+    if(logo){ var lr=logo.getBoundingClientRect(); if(lr&&lr.height){ var avH=av.getBoundingClientRect().height||38; av.style.top=Math.round(lr.top+lr.height/2-avH/2)+'px'; } }
+    var c=av.getBoundingClientRect(); slaClusterAlign(c.top+c.height/2, c);   // BUG2 — eixo ÚNICO = centro real do avatar
   }catch(_){ try{ slaibAlign(); }catch(__){} }
+}
+/* F3.3.14 (BUG2) — centraliza sino + Monitor SLA no MESMO centro Y do avatar, medindo a altura
+   REAL de cada um (sem o fallback fixo 38 que gerava ~4px de desvio). SÓ posicionamento (top/right/
+   height); não toca clique/drag/dropdown/lógica. */
+function slaClusterAlign(centerY, avr){
+  try{
+    avr=avr||(function(){var a=document.getElementById('cornerAvatar');return a&&a.getBoundingClientRect();})();
+    if(centerY==null){ if(!avr||!avr.height) return; centerY=avr.top+avr.height/2; }
+    var bell=document.getElementById('slaib-bell');
+    if(bell&&avr){ var bh=Math.round(avr.height)||38; bell.style.height=bh+'px'; bell.style.width=bh+'px';
+      bell.style.top=Math.round(centerY-bh/2)+'px'; bell.style.right=Math.round(window.innerWidth-avr.left+10)+'px';
+      bell.style.bottom='auto'; bell.style.left='auto'; }
+    var w=document.getElementById('sla-monitor');
+    if(w){ var chip=w.querySelector('.slamon-chip'); var ch=(chip&&chip.getBoundingClientRect().height); if(!ch||ch<8) ch=(w.getBoundingClientRect().height||46);
+      w.style.top=Math.round(centerY-ch/2)+'px';
+      var ref=bell||document.getElementById('cornerAvatar'); var rr=ref&&ref.getBoundingClientRect();
+      if(rr&&rr.width) w.style.right=Math.round(window.innerWidth-rr.left+10)+'px'; }
+  }catch(_){}
 }
 /* ── F3.3.2 — PAINEL OPERACIONAL SLA (read-side, topo do quadro do designer) ──
  * Reusa o PANEL-CORE (mesma regra do sino). Duas seções: Atrasadas (vermelho) e Prazo
@@ -2985,14 +2999,10 @@ function slaMonSegs(d){
   return '<span class="slamon-segs">'+s+'</span>';
 }
 function slaMonAlign(){
-  var w=document.getElementById('sla-monitor'); if(!w) return;
-  try{
-    var chip=w.querySelector('.slamon-chip'); var ch=(chip&&chip.getBoundingClientRect().height)||38;
-    var ref=document.getElementById('slaib-bell')||document.getElementById('cornerAvatar');
-    var r=ref&&ref.getBoundingClientRect();
-    if(r&&r.width){ w.style.top=Math.round(r.top+r.height/2-ch/2)+'px'; w.style.right=Math.round(window.innerWidth-r.left+10)+'px'; }
-    else { w.style.top='12px'; w.style.right='120px'; }
-  }catch(_){}
+  var bell=document.getElementById('slaib-bell'); var av=document.getElementById('cornerAvatar');
+  var ref=bell||av; var r=ref&&ref.getBoundingClientRect();
+  if(r&&r.width){ slaClusterAlign(r.top+r.height/2); }
+  else { var w=document.getElementById('sla-monitor'); if(w){ w.style.top='12px'; w.style.right='120px'; } }
 }
 /* F3.3.2 (FASE 6 — anti-flicker): assinatura ESTRUTURAL (severidade + ids + crítico + nextMs).
    Quando só os CONTADORES mudam (tick de 1s), atualizamos os textos EM LUGAR (sem reconstruir
@@ -3012,10 +3022,14 @@ function slaMonUpdateCounters(d){
     var pr=row.querySelector('.slaop-prog>span'); if(pr&&x.sev!=='vermelho') pr.style.width=slaOpRowPct(x)+'%';
   });
 }
+/* F3.3.14 (BUG1) — contexto de QUADRO: overlays operacionais (Monitor SLA, sino, avatar do
+   quadro) só existem em state.tab==='tarefas'. Fora dali (Dashboard/Hoje/Agenda/...) são REMOVIDOS
+   da árvore (não display:none). Perfil/Notificações continuam na sidebar. */
+function isBoardContext(){ return !!(typeof state!=='undefined' && state && state.tab==='tarefas'); }
 function slaMonRender(){
   var authed=!!(state.user)&&document.body.classList.contains('authed');
   var w=document.getElementById('sla-monitor');
-  if(!authed){ if(w)w.remove(); return; }
+  if(!authed || !isBoardContext()){ if(w)w.remove(); return; }
   slaibEnsureStyle();
   var d=slaMonData();
   var sev=d.overdue.length?'red':(d.warning.length?'amber':'green');
@@ -3136,7 +3150,7 @@ if(typeof window!=='undefined' && !window.__slaEditBound){ window.__slaEditBound
 function slaibRender(){
   var bell=document.getElementById('slaib-bell');
   var authed=!!(state.user)&&document.body.classList.contains('authed');
-  if(!authed){ if(bell)bell.remove(); var ov0=document.getElementById('slaib-ov'); if(ov0)ov0.remove(); return; }
+  if(!authed || !isBoardContext()){ if(bell)bell.remove(); var ov0=document.getElementById('slaib-ov'); if(ov0)ov0.remove(); return; }
   slaibEnsureStyle();
   var items=slaibCompute(), read=slaibLoadRead();
   var unread=items.filter(function(x){return !read[x.key];});
@@ -3694,10 +3708,13 @@ function render(){
   const nav=document.getElementById('bottomNav');
   // print de referência: avatar do usuário fixo no canto superior direito (clique → perfil)
   let _ca=document.getElementById('cornerAvatar');
-  if(isDesktop()){
+  if(isDesktop() && isBoardContext()){
     if(!_ca){_ca=document.createElement('button');_ca.id='cornerAvatar';_ca.className='corner-avatar topav-btn';_ca.setAttribute('data-tab','perfil');_ca.title='Abrir perfil';document.body.appendChild(_ca);}
     _ca.innerHTML=avatar(state.user,38);
   }else if(_ca){_ca.remove();}
+  /* F3.3.14 (BUG1) — reavalia overlays do quadro a cada render (remove na hora ao sair; recria ao
+     entrar). render() não dispara slaibRefresh por si só, então força aqui. */
+  try{ if(typeof slaibRefresh==='function') slaibRefresh(); }catch(_){}
   if(isDesktop()){
     nav.innerHTML=
       '<div class="sb-brand"><div class="logo sm brandlogo"></div><div><div class="nm">ID Seven</div><div class="sy"><span class="dot"></span>sincronizado</div></div></div>'+
