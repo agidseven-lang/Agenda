@@ -1,0 +1,55 @@
+# =====================================================================
+# [manual] F3.3.16 — VALIDAÇÃO READ-ONLY: fonte única do card (fluxo Social→
+# Designer→Cliente) + prova realtime. SOMENTE validação/evidência. NÃO faz
+# deploy/release/build final, NÃO altera Worker/Cloudflare/Firebase/Android/
+# Firestore, NÃO toca F3.3.13/F3.3.15/Flow Engine/colunas. Execução manual
+# (workflow_dispatch) e por push ESCOPADO (só este workflow + o script de QA).
+#   - Playwright/Chromium headless: matriz A–H × papéis via a função real
+#     deriveOperationalCardPresentation (chip=fase, etapa=responsável, next),
+#     sem status duplicado, "Concluído" só no final; screenshots Social/Designer/
+#     Cliente por estado; prova realtime (designerFlowStatus afazer→andamento
+#     atualiza o quadro da Social sem reload).
+# =====================================================================
+name: "[manual] F3.3.16 Flow Presentation Validation (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3316-validation.yml'
+      - 'desktop/scripts/visual-qa-f3316.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3316-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: QA fluxo (fonte única + realtime + screenshots A–H por papel)
+        run: node desktop/scripts/visual-qa-f3316.mjs
+
+      - name: Upload evidências (screenshots + relatório)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3316-flow-validation
+          path: desktop/qa-out-f3316/
+          if-no-files-found: error
+          retention-days: 14
