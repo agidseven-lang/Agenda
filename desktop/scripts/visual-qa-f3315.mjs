@@ -141,6 +141,13 @@ report.viewports.forEach(v => {
   console.log(`  [${v.viewport}] Hoje.overlay=${v.hoje.anyOverlay} | Hub.overlay=${v.hub.anyOverlay} | MeuQuadro.allOverlays=${v.meuquadro.allOverlays} ΔgrupoY=${v.meuquadro.deltaGroupY}px | Designer.allOverlays=${v.designer.allOverlays} ΔgrupoY=${v.designer.deltaGroupY}px | back→hub.overlay=${v.transition_back_hub.anyOverlay}`);
 });
 console.log(`  dashboardClean=${report.dashboardClean} hubClean=${report.hubClean} boardsHaveOverlays=${report.boardsHaveOverlays} headerAligned(Δ<=2)=${report.headerAligned} transitionClean=${report.transitionClean} ΔgrupoY_max=${Math.round(report.maxDeltaGroupY * 100) / 100}px`);
+console.log('---- MEDIÇÃO POR ELEMENTO (Kanban real) ----');
+report.viewports.forEach(v => {
+  ['meuquadro', 'designer'].forEach(scr => {
+    const m = v[scr];
+    console.log(`  [${v.viewport}] ${scr}: leftGroupCenterY=${m.leftGroupCenterY} | rightGroupCenterY=${m.rightGroupCenterY} | deltaGroupY=${m.deltaGroupY} | backButtonCenterY=${m.backButtonCenterY} | leftAvatarCenterY=${m.leftAvatarCenterY} | monitorCenterY=${m.monitorCenterY} | bellCenterY=${m.bellCenterY} | rightAvatarCenterY=${m.rightAvatarCenterY}`);
+  });
+});
 if (report.errors.length) console.log('  pageerrors:', report.errors.slice(0, 5));
 const failGate = !report.dashboardClean || !report.hubClean || !report.boardsHaveOverlays || !report.headerAligned || !report.transitionClean;
 if (failGate) { console.error('::error:: F3.3.15 visual QA falhou (ver flags acima)'); process.exit(1); }
