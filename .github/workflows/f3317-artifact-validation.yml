@@ -1,0 +1,124 @@
+# =====================================================================
+# [manual] F3.3.17 — VALIDAÇÃO REDUNDANTE do ARTIFACT já gerado (read-only).
+# Baixa o artifact da run de build 27960953223 (acessível de dentro do
+# Actions, onde *.blob.core.windows.net é permitido), extrai o instalador,
+# localiza resources/app.asar, RECOMPUTA SHA-256 do EXE/MSI e do renderer
+# empacotado, e faz grep literal das funções da F3.3.17. NÃO builda, NÃO faz
+# deploy/release, NÃO altera produto/Worker/Android/notificações. Valida
+# SOMENTE o artifact já existente da run 27960953223.
+# =====================================================================
+name: "[manual] F3.3.17 Artifact Redundant Validation (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3317-artifact-validation.yml'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: f3317-artifact-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      RUN_ID: "27960953223"
+      ART_NAME: "agenda-id-seven-desktop-1.0.146-beta-board-rebuild-installer"
+      EXE_SHA: "d7edf9caa4eb7cc1080dd03a9ac45dc6c913373a1907af87c97079973acc673d"
+      MSI_SHA: "70ce1743cbac1ff3724d8d750f8ed694f6ade88b92636ef739bd363393b7d11f"
+      REN_SHA: "6627957919f7891679457bbbed1d3fa42cce3b6996a34c85190e7f9593d05ec1"
+      BUILT_COMMIT: "7d91e510c388c78e9e6f51a79c0db6c865e2c519"
+      FROZEN_BASELINE: "2f03f1e"
+    steps:
+      - name: Checkout (somente para checagens git read-only)
+        uses: actions/checkout@v4
+        with:
+          ref: 7d91e510c388c78e9e6f51a79c0db6c865e2c519
+          fetch-depth: 0
+
+      - name: Baixar o artifact installer da run de build (cross-run)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ART_NAME }}
+          path: art
+          run-id: ${{ env.RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Garantir 7z
+        run: |
+          SZ="$(command -v 7z || command -v 7zz || command -v 7za || true)"
+          if [ -z "$SZ" ]; then sudo apt-get update -y >/dev/null 2>&1 && sudo apt-get install -y p7zip-full >/dev/null 2>&1; fi
+          SZ="$(command -v 7z || command -v 7zz || command -v 7za || true)"
+          echo "SZ=$SZ" >> "$GITHUB_ENV"
+          echo "7z bin: $SZ"; test -n "$SZ"
+
+      - name: Validar artefato (estrutura, SHA EXE/MSI, app.asar, renderer, grep)
+        run: |
+          set -uo pipefail
+          FAIL=0
+          echo "===== 1) ESTRUTURA DO ARTIFACT (run ${RUN_ID}) ====="
+          find art -type f -printf '%P  (%s bytes)\n' | sort
+
+          EXE="$(find art -iname '*.exe' | head -1)"
+          MSI="$(find art -iname '*.msi' | head -1)"
+          ZIP="$(find art -iname '*.zip' | head -1)"
+          echo "EXE=$EXE"; echo "MSI=$MSI"; echo "ZIP=$ZIP"
+          [ -n "$EXE" ] || { echo "::error::EXE ausente no artifact"; exit 1; }
+          [ -n "$MSI" ] || { echo "::error::MSI ausente no artifact"; exit 1; }
+          [ -n "$ZIP" ] && echo "OK: ZIP presente" || echo "aviso: ZIP nao presente (ok se installer puro)"
+
+          echo "===== 2) SHA-256 EXE/MSI (recomputado a partir dos bytes baixados) ====="
+          G_EXE="$(sha256sum "$EXE" | awk '{print $1}')"
+          G_MSI="$(sha256sum "$MSI" | awk '{print $1}')"
+          echo "EXE recomputado : $G_EXE"; echo "EXE esperado    : $EXE_SHA"
+          [ "$G_EXE" = "$EXE_SHA" ] && echo "OK: EXE confere" || { echo "::error::EXE SHA difere"; FAIL=1; }
+          echo "MSI recomputado : $G_MSI"; echo "MSI esperado    : $MSI_SHA"
+          [ "$G_MSI" = "$MSI_SHA" ] && echo "OK: MSI confere" || { echo "::error::MSI SHA difere"; FAIL=1; }
+
+          echo "===== 3) EXTRAIR app.asar do instalador ====="
+          "$SZ" x "$EXE" -oexe_x -y >/dev/null 2>&1 || echo "aviso: extracao EXE retornou nao-zero (continuo)"
+          APP7Z="$(find exe_x -iname 'app*.7z' 2>/dev/null | head -1)"
+          if [ -n "$APP7Z" ]; then echo "nested 7z: $APP7Z"; "$SZ" x "$APP7Z" -oapp_x -y >/dev/null 2>&1 || true; fi
+          ASAR="$(find app_x exe_x -path '*resources/app.asar' 2>/dev/null | head -1)"
+          [ -z "$ASAR" ] && ASAR="$(find app_x exe_x -name 'app.asar' 2>/dev/null | head -1)"
+          if [ -z "$ASAR" ]; then
+            echo "app.asar nao achado via EXE; tentando MSI..."
+            "$SZ" x "$MSI" -omsi_x -y >/dev/null 2>&1 || true
+            ASAR="$(find msi_x -name 'app.asar' 2>/dev/null | head -1)"
+          fi
+          [ -n "$ASAR" ] || { echo "::error::app.asar nao localizado"; echo '--- exe_x (amostra) ---'; find exe_x -maxdepth 2 2>/dev/null | head -40; exit 1; }
+          echo "app.asar = $ASAR ($(stat -c%s "$ASAR") bytes)"
+
+          echo "===== 4) EXTRAIR RENDERER de dentro do app.asar ====="
+          npx --yes @electron/asar extract "$ASAR" asar_x
+          REN="$(find asar_x -path '*src/renderer/index.html' | head -1)"
+          [ -n "$REN" ] || { echo "::error::index.html ausente no app.asar"; find asar_x -maxdepth 3 -type d | head -30; exit 1; }
+          echo "renderer empacotado = $REN ($(stat -c%s "$REN") bytes)"
+          G_REN="$(sha256sum "$REN" | awk '{print $1}')"
+          echo "renderer recomputado : $G_REN"; echo "renderer esperado    : $REN_SHA"
+          [ "$G_REN" = "$REN_SHA" ] && echo "OK: renderer empacotado byte-a-byte == CI" || { echo "::error::renderer SHA difere"; FAIL=1; }
+
+          echo "===== 5) GREP LITERAL das funcoes F3.3.17 no renderer EMPACOTADO ====="
+          PATS=( "function flowBoardCol" "function personBoardCol" "function deriveBoardColumn" "function deriveOperationalCardPresentation" "if(isTaskCompleted(t)) return 'concluido';" )
+          for pat in "${PATS[@]}"; do
+            if grep -qF -- "$pat" "$REN"; then echo "OK  encontrado: $pat"; else echo "::error::AUSENTE: $pat"; FAIL=1; fi
+          done
+
+          echo "===== 6) RESULTADO ====="
+          if [ "$FAIL" = "0" ]; then echo "OK — ARTIFACT (run ${RUN_ID}) CONTEM A F3.3.17; EXE/MSI/renderer conferem byte-a-byte."; else echo "::error::validacao redundante FALHOU"; exit 1; fi
+
+      - name: Reconfirmar zero alteração (notif/Worker/Android) — git read-only
+        run: |
+          set -uo pipefail
+          BAD=0
+          chk() { local label="$1"; shift; if git diff --stat "$FROZEN_BASELINE" "$BUILT_COMMIT" -- "$@" | grep -q .; then echo "::error::$label ALTERADO"; git diff --stat "$FROZEN_BASELINE" "$BUILT_COMMIT" -- "$@"; BAD=1; else echo "OK: $label intocado (diff-zero $FROZEN_BASELINE -> 7d91e51)"; fi; }
+          chk "Notificacoes(8)" desktop/src/main/main.ts desktop/src/main/bgNotify.ts desktop/src/main/notifier.ts desktop/src/main/reminder.ts sw.js firebase-messaging-sw.js desktop/src/renderer/bgnotify.html desktop/src/preload/bgnotify-preload.ts
+          chk "Worker" cloudflare-worker.js
+          chk "Android" 'android/**' '*.gradle'
+          [ "$BAD" = "0" ] && echo "OK — notificacoes/Worker/Android intocados; zero build/deploy/release neste workflow." || exit 1
