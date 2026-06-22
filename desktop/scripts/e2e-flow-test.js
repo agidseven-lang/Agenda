@@ -441,7 +441,7 @@ check('RA_PERSONBOARD', 'Meu quadro do designer usa card KANBANBOARDV2 perspecti
 })();
 // CORREÇÃO 6 (Desktop): boardCol4For designer-aware + usado no Meu quadro/Setor.
 check('D15', 'boardCol4For(t,uid) designer-aware definido', /function boardCol4For\(t,uid\)/.test(DH));
-check('D16', 'Meu quadro usa boardCol4For (designer vê em A Fazer)', /boardCol4For\(t,pid\)/.test(DH));
+check('D16', 'Meu quadro usa personBoardCol (nao-iniciado->A Fazer; ENTREGUE!=Finalizado; Finalizado so no final real)', /list\.filter\(t=>personBoardCol\(t,pid\)===st\.key\)/.test(DH) && /function personBoardCol\(t, pid\)\{/.test(DH) && /if\(isTaskCompleted\(t\)\) return 'concluido';/.test(DH) && /if\(dc==='afazer'\) return 'afazer';/.test(DH));
 // CORREÇÃO 4: edição de tema responde no 1º clique.
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));

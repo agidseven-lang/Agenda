@@ -1,0 +1,47 @@
+# =====================================================================
+# [manual] F3.3.17 — VALIDAÇÃO READ-ONLY: fluxo operacional real (write→snapshot→
+# render), coordenação coluna≡chip Social/Designer/Cliente + realtime sem reload.
+# SOMENTE validação/evidência. NÃO faz deploy/release/build, NÃO altera Worker/
+# Cloudflare/Firebase/Android/Firestore/notificações. Execução manual + push
+# ESCOPADO (só este workflow + o script de QA).
+# =====================================================================
+name: "[manual] F3.3.17 Flow Realtime/Coordination Validation (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3317-validation.yml'
+      - 'desktop/scripts/visual-qa-f3317.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3317-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Instalar Playwright (chromium)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: QA fluxo real (write→snapshot→render + coluna≡chip + realtime + screenshots)
+        run: node desktop/scripts/visual-qa-f3317.mjs
+      - name: Upload evidências (screenshots + relatório)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3317-flow-realtime-validation
+          path: desktop/qa-out-f3317/
+          if-no-files-found: error
+          retention-days: 14

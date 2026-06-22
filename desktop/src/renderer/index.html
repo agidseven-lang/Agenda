@@ -4287,7 +4287,7 @@ function renderPersonBoard(){
   const isMe=state.user&&state.user.id===pid;
   let list=state.tasks.filter(t=>t.assigneeId===pid||t.by===pid);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  const byStatus=SOCIAL_COLS4.map(st=>list.filter(t=>boardCol4For(t,pid)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const byStatus=SOCIAL_COLS4.map(st=>list.filter(t=>personBoardCol(t,pid)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const backTo=isMe?'hub':(roleCat(state.user)==='ADMIN'?'roleboards':'hub');
   let h=
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
@@ -4400,7 +4400,7 @@ function boardToolbar(){return '<div class="d-board-tools tbar"><span class="bse
 function renderClientFlowBoard(){
   let list=state.tasks.filter(isClientFlow);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  const byCol=CLIENT_COLS4.map(c=>list.filter(t=>clientCol4(t)===c.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const byCol=CLIENT_COLS4.map(c=>list.filter(t=>flowBoardCol(t,'client')===c.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   let h=
     '<div class="scr-head"><div class="d-board-head">'+
     '<div class="d-bh-icon" style="background:'+withAlpha('#22D3B8',.18)+';color:#22D3B8">'+svg('eye')+'</div>'+
@@ -4860,7 +4860,7 @@ function renderSocialBoard(){
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
   // EIXO OPERACIONAL: a Social vê o estágio REAL (aguardando designer/legenda/aprovação final),
   // não a aprovação do cliente. Aprovação parcial do cliente NÃO vira "Concluído" aqui.
-  const byCol=SOCIAL_COLS4.map(c=>list.filter(t=>boardCol4(t)===c.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const byCol=SOCIAL_COLS4.map(c=>list.filter(t=>flowBoardCol(t,'social')===c.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const late=list.filter(t=>{const x=taskDeadline(t);return x&&x.late;}).length;
   let h=
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowsocials">'+svg('back')+'</button>'+
@@ -4878,8 +4878,8 @@ function renderBoard(){
   let list=visibleTasks(u,state.tasks).filter(t=>secOf(t.sector).key===s.key);
   if(boardMine&&u)list=list.filter(t=>t.assigneeId===u.id||t.by===u.id);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  const counts=STATUS.map(st=>list.filter(t=>boardCol4For(t,u&&u.id)===st.key).length);
-  const byStatus=STATUS.map(st=>list.filter(t=>boardCol4For(t,u&&u.id)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  const counts=STATUS.map(st=>list.filter(t=>flowBoardCol(t,'social')===st.key).length);
+  const byStatus=STATUS.map(st=>list.filter(t=>flowBoardCol(t,'social')===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const cur=STATUS[boardCol];
   if(isDesktop()){
     // Desktop: 4 colunas lado a lado, cada uma com seu scroll
@@ -5175,6 +5175,31 @@ function deriveSocialPerspective(t){return deriveCanonicalPerspective(t,'social'
 function deriveDesignerPerspective(t){return deriveCanonicalPerspective(t,'designer');}
 function deriveClientPerspective(t){return deriveCanonicalPerspective(t,'client');}
 function deriveBoardColumn(t,persp){return deriveCanonicalPerspective(t,persp).col;}
+/* F3.3.17 — COLUNA do quadro = MESMA fonte do chip (Flow Engine canônico) no CRONOGRAMA → coluna≡chip
+   por papel. Fora do cronograma mantém eixo legado (idêntico ao chip não-cron). SÓ leitura. */
+function flowBoardCol(t, role){
+  if(secOf(t.sector).key!=='cronograma'){
+    if(role==='designer') return designerColView(t);
+    if(role==='client') return clientCol4(t);
+    return (t&&t.status)||'afazer';
+  }
+  return deriveBoardColumn(t, role);
+}
+/* F3.3.17 — "Meu quadro" (board primário, 4 colunas social): lente POR-TAREFA coerente com o chip e
+   com a REGRA ABSOLUTA — "Finalizado" SÓ na aprovação final real (isTaskCompleted). Designer-dono:
+   não-iniciou→A Fazer; em produção/ajuste→respectivo; ENTREGUE(não-final)→Em andamento (NUNCA
+   Finalizado). Social-dono: canônico social (col≡chip). Não-cron: status legado. */
+function personBoardCol(t, pid){
+  if(secOf(t.sector).key!=='cronograma') return (t&&t.status)||'afazer';
+  if(isTaskCompleted(t)) return 'concluido';
+  if(hasDesigner(t)&&designerOf(t)===pid){
+    var dc=designerCol(t);
+    if(dc==='afazer') return 'afazer';
+    if(dc==='revisao') return 'revisao';
+    return 'andamento';                       /* andamento OU entregue(não-final) → Em andamento */
+  }
+  return deriveBoardColumn(t,'social');
+}
 function deriveTaskLabels(t,persp){
   const p=deriveCanonicalPerspective(t,persp);
   const top=(persp==='designer')?p.label.replace('Designer em ','Em '):p.label;
