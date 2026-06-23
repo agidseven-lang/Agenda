@@ -457,7 +457,7 @@ check('RA_PERSONBOARD', 'Meu quadro do designer usa card KANBANBOARDV2 perspecti
       fnDecl('designerDelivered'), fnDecl('pendingLegend'), fnDecl('pendingFeed'), fnDecl('pendingStory'), fnDecl('pendingProduction'),
       // detail-hierarchy-v2: hasPendingItemRevision agora é phase-aware e depende destas:
       fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
-      fnDecl('hasPendingItemRevision'), fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), fnDecl('operationalCol'),
+      fnDecl('hasPendingItemRevision'), fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), fnDecl('flowSentToClientSignal'), fnDecl('operationalCol'),
       fnDecl('designerColView'), fnDecl('designerStatusView'), fnDecl('designerNextShort'),
       'return {operationalCol,designerColView,designerStatusView,designerNextShort,opColOf};'
     ].join('\n');
@@ -474,7 +474,7 @@ check('RA_PERSONBOARD', 'Meu quadro do designer usa card KANBANBOARDV2 perspecti
 })();
 // CORREÇÃO 6 (Desktop): boardCol4For designer-aware + usado no Meu quadro/Setor.
 check('D15', 'boardCol4For(t,uid) designer-aware definido', /function boardCol4For\(t,uid\)/.test(DH));
-check('D16', 'Meu quadro usa personBoardCol (nao-iniciado->A Fazer; ENTREGUE!=Finalizado; Finalizado so no final real)', /list\.filter\(t=>personBoardCol\(t,pid\)===st\.key\)/.test(DH) && /function personBoardCol\(t, pid\)\{/.test(DH) && /if\(isTaskCompleted\(t\)\) return 'concluido';/.test(DH) && /if\(dc==='afazer'\) return 'afazer';/.test(DH));
+check('D16', 'Meu quadro: eixo social usa personBoardCol (ENTREGUE!=Finalizado; Finalizado so no final real); eixo DESIGNER (R5.1) usa DESIGNER_COLS4+designerColView (coluna "Entregue")', /list\.filter\(t=>colOf\(t\)===st\.key\)/.test(DH) && /const colOf=designerBoardView\?\(t=>designerColView\(t\)\):\(t=>personBoardCol\(t,pid\)\);/.test(DH) && /const COLS=designerBoardView\?DESIGNER_COLS4:SOCIAL_COLS4;/.test(DH) && /function personBoardCol\(t, pid\)\{/.test(DH) && /if\(isTaskCompleted\(t\)\) return 'concluido';/.test(DH) && /if\(dc==='afazer'\) return 'afazer';/.test(DH));
 // CORREÇÃO 4: edição de tema responde no 1º clique.
 check('D17', 'openItemFix: autofocus no #ifIn', /id="ifIn"[^>]*autofocus/.test(DH));
 check('D18', 'openItemFix: foco via rAF + timeout', /requestAnimationFrame\(function\(\)\{_focusIf\(\)/.test(DH));
@@ -846,7 +846,7 @@ check('CSV_NO_OLD_BADGE', 'Nenhum badge usa mais const oc=opColOf(operationalCol
       // detail-hierarchy-v2: dependências phase-aware de hasPendingItemRevision
       fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       oneLine('hasPendingItemRevision'),
-      fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('clientStatusView'),
+      fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), oneLine('flowSentToClientSignal'), fnDecl('operationalCol'), fnDecl('clientStatusView'),
       'return {clientStatusView,operationalCol,opColOf};'
     ];
     mod=new Function(pieces.join('\n'))();
@@ -925,7 +925,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
       // detail-hierarchy-v2: dependências phase-aware de hasPendingItemRevision
       fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
       oneLine('hasPendingItemRevision'),
-      fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), fnDecl('operationalCol'), fnDecl('nextActionText'),
+      fnDecl('isFullyComplete'), fnDecl('isTaskCompleted'), fnDecl('clientCol'), oneLine('flowSentToClientSignal'), fnDecl('operationalCol'), fnDecl('nextActionText'),
       fnDecl('clientStatusView'), fnDecl('_tlEventAt'),
       (DH.match(/const TL_EVENT_LABELS=\{[\s\S]*?\n\};/)||[''])[0], fnDecl('_tlHumanLabel'),
       fnDecl('taskTimeline'),
@@ -1039,7 +1039,7 @@ check('TL2_CRON_GUARD', 'progresso do card V2 só p/ cronograma (prog=null fora;
       fnDecl('hasDesigner'),fnDecl('designerOf'),fnDecl('designerCol'),fnDecl('designerDelivered'),
       fnDecl('pendingLegend'),fnDecl('pendingFeed'),fnDecl('pendingStory'),fnDecl('pendingProduction'),
       fnDecl('clientApprovalPhaseOf'),fnDecl('pendingClientItems'),fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
-      fnDecl('hasPendingItemRevision'),fnDecl('isFullyComplete'),fnDecl('isTaskCompleted'),fnDecl('clientCol'),
+      fnDecl('hasPendingItemRevision'),fnDecl('isFullyComplete'),fnDecl('isTaskCompleted'),fnDecl('clientCol'),fnDecl('flowSentToClientSignal'),
       fnDecl('clientApproved'),fnDecl('isSentToDesigner'),fnDecl('canSendToClient'),
       fnDecl('fmtDateTimeBR'),
       fnDecl('detailState'),fnDecl('detailActionsHtml'),

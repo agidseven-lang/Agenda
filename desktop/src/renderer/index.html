@@ -4317,7 +4317,15 @@ function renderPersonBoard(){
   const isMe=state.user&&state.user.id===pid;
   let list=state.tasks.filter(t=>t.assigneeId===pid||t.by===pid);
   if(boardQuery)list=list.filter(t=>((t.title||'')+(t.client||'')).toLowerCase().includes(boardQuery.toLowerCase()));
-  const byStatus=SOCIAL_COLS4.map(st=>list.filter(t=>personBoardCol(t,pid)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
+  // F3.3.17-R5.1 — board do DESIGNER (dono é o designer em TODAS as suas tarefas de cronograma): usa o
+  // EIXO do designer (DESIGNER_COLS4, que tem a coluna "Entregue") para a ENTREGA não ficar presa em
+  // "Em andamento". Boards de Social/Admin seguem o eixo social (personBoardCol) — intacto.
+  const cronList=list.filter(t=>secOf(t.sector).key==='cronograma');
+  const asDesigner=cronList.filter(t=>hasDesigner(t)&&designerOf(t)===pid);
+  const designerBoardView=asDesigner.length>0&&asDesigner.length===cronList.length;
+  const COLS=designerBoardView?DESIGNER_COLS4:SOCIAL_COLS4;
+  const colOf=designerBoardView?(t=>designerColView(t)):(t=>personBoardCol(t,pid));
+  const byStatus=COLS.map(st=>list.filter(t=>colOf(t)===st.key).sort((a,b)=>{const da=dtMs(a.dueDate||a.due,a.dueTime||'23:59')||9e15;const dbb=dtMs(b.dueDate||b.due,b.dueTime||'23:59')||9e15;return da-dbb;}));
   const backTo=isMe?'hub':(roleCat(state.user)==='ADMIN'?'roleboards':'hub');
   let h=
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="'+backTo+'">'+svg('back')+'</button>'+
@@ -4326,7 +4334,7 @@ function renderPersonBoard(){
     '<div class="scr" style="padding-top:0">'+boardToolbar()+
     // role-aware: no "Meu quadro" de um DESIGNER, a tarefa atribuída a ele aparece na
     // perspectiva do designer; tarefas onde ele NÃO é o designer seguem operacional.
-    kbv2BoardHtml(SOCIAL_COLS4.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})),
+    kbv2BoardHtml(COLS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})),
       t=>(hasDesigner(t)&&designerOf(t)===pid)?kbv2Card(t,'designer'):kbv2Card(t));
   return h+'</div>';
 }
@@ -4576,10 +4584,15 @@ function operationalCol(t){
   // no portal (botão "Aprovar temas") — para a Social isso é "Aguardando aprovação dos temas".
   if(cf==='revisao'&&!hasPendingItemRevision(t)&&allPhaseItemsApproved(t))return 'producao';
   if(cf==='revisao'||hasPendingItemRevision(t))return 'aguardando_revisao'; // cliente pediu ajuste
-  if(cf==='reenviado')return 'aguardando_final';
+  // F3.3.17-R5.1 — "reenviado" só é "aguardando aprovação final" quando a versão final foi REALMENTE
+  // enviada ao cliente (flowSentToClientSignal). A entrega do designer grava clientFlowStatus='reenviado'
+  // mas isso NÃO é envio ao cliente — cai no eixo do designer abaixo (Social precisa legendar e enviar).
+  if(cf==='reenviado'&&flowSentToClientSignal(t))return 'aguardando_final';
   if(hasDesigner(t)){
     const dc=designerCol(t);
-    if(dc==='concluido')return pendingProduction(t)?'aguardando_legenda':'aguardando_final'; // entregou: falta legenda/post ou pronto p/ reenvio
+    // F3.3.17-R5.1 — designer ENTREGOU: o responsável vira a SOCIAL (legendas/posts) até o ENVIO real
+    // da versão final (flowSentToClientSignal). Só então é "aguardando aprovação final".
+    if(dc==='concluido')return flowSentToClientSignal(t)?'aguardando_final':'aguardando_legenda'; // entregou → Social legenda/envia; enviado → aguarda cliente
     // FLUXO CORRETO (task-flow-fix + role-aware passo 2): "Designer em produção" SÓ quando o
     // designer iniciou (andamento); "Designer em revisão" quando está corrigindo um ajuste
     // (revisao); recém-enviado (afazer/vazio) → "Aguardando designer iniciar".
@@ -5132,7 +5145,9 @@ function kbv2SlaLocal(t,nowMs){
      nunca mostra "Início atrasado" enquanto o PRAZO FINAL está em dia; o fluxo/início vive no
      chip de etapa (separado do SLA). Aqui só mapeamos o estado canônico p/ os rótulos do card. */
   const d=resolveTaskDisplayState(t,nowMs||Date.now(),(typeof dtMs==='function'?dtMs:null));
-  if(d.state==='completed')return {state:'completed',sev:'verde',label:'Concluído'};
+  // F3.3.17-R5.1 — no CRONOGRAMA, a ENTREGA do designer (SLA cumprido) NÃO é conclusão final: o chip
+  // do card NUNCA diz "Concluído" antes da aprovação final real do cliente (isTaskCompleted) → "Entregue".
+  if(d.state==='completed')return {state:'completed',sev:'verde',label:(secOf(t.sector).key==='cronograma'&&!isTaskCompleted(t))?'Entregue':'Concluído'};
   if(d.state==='none')return {state:'invalid_or_missing',sev:'neutro',label:''};
   if(d.state==='overdue')return {state:'overdue_finish',sev:'vermelho',label:'Prazo encerrado'};
   if(d.state==='warning')return {state:'warning_finish',sev:'laranja',label:'Prazo próximo'};
@@ -5595,7 +5610,11 @@ function detailState(t){
     sub:'A correção foi feita e o cliente vai revisar no mesmo link.',
     next:'Aguardar o cliente revisar o conteúdo corrigido. Nenhuma ação necessária agora.',
     owner:'cliente',actions:['clientview']};
-  if(cc==='reenviado')return {key:'aguardando_final',color:'#5B9BFF',
+  // F3.3.17-R5.1 — "Aguardando aprovação final" SÓ quando a versão final foi REALMENTE enviada ao
+  // cliente (flowSentToClientSignal: cronStatus ready_for_final_client_review/reenviado_cliente ou fase
+  // final). A entrega do designer (clientFlowStatus='reenviado') NÃO basta — primeiro a Social precisa
+  // preencher legenda/posts e enviar (cai no estado "Designer entregou" abaixo, com a ação Legendas).
+  if(flowSentToClientSignal(t))return {key:'aguardando_final',color:'#5B9BFF',
     label:'Aguardando aprovação final',
     sub:'Legendas e posts foram enviados. O cliente foi avisado.',
     next:'Aguardar o cliente aprovar a versão final no portal.',
@@ -5682,7 +5701,9 @@ function detailSla(t){
   if(d.state==='none') return null;
   var now=Date.now(), pd=d.finishMs;
   var o={planStartAt:Number(ds.planStartAt)||0,planDueAt:pd,state:d.state};
-  if(d.state==='completed'){o.label='Concluída';o.color='#37D196';o.rem='Entrega concluída';return o;}
+  // F3.3.17-R5.1 — entrega do designer ≠ conclusão final: no CRONOGRAMA o rótulo do SLA é "Entregue" até a
+  // aprovação final real do cliente (isTaskCompleted); só então "Concluída".
+  if(d.state==='completed'){var _fin=(secOf(t.sector).key!=='cronograma')||isTaskCompleted(t);o.label=_fin?'Concluída':'Entregue';o.color='#37D196';o.rem=_fin?'Entrega concluída':'Entregue — aguardando envio/aprovação final';return o;}
   if(d.state==='overdue'){o.label='Prazo encerrado';o.color='#FF6B61';
     o.rem='Atrasada há '+slaibFmtDur(now-pd)+' · '+(d.critical?'Atraso crítico — sinalize imediatamente':'Restam '+d.graceRemainingMin+' min para concluir ou sinalizar atraso');return o;}
   if(d.state==='warning'){o.label='Prazo próximo';o.color='#F2A93B';o.rem='Faltam '+slaibFmtDur(pd-now);return o;}

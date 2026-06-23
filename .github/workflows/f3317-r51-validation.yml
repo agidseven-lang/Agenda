@@ -1,0 +1,111 @@
+# =====================================================================
+# [manual] F3.3.17-R5.1 — VALIDAÇÃO READ-ONLY da correção da ENTREGA DO DESIGNER
+# (3 ressalvas do teste físico): (A) card preso em "Em andamento" após a entrega →
+# board do Designer mostra "Entregue"; (B) chip "Concluído" prematuro → SLA do card/detalhe
+# vira "Entregue" até a aprovação final real (isTaskCompleted); (C) Legendas/Posts/Artes some
+# para a Social → detailState/operationalCol voltam a oferecer 'prod'/'sendclient' e o
+# responsável correto. Conclusão SÓ na aprovação final real do cliente (Worker).
+#
+# Roda em CI (ubuntu): a prova da entrega (f33P), o fluxo R5 (f33O), apresentação/colunas
+# (f33I/f33J), regressões F3.3.13 (f33G)/F3.3.15 (f33H), R1-R4 (f33K/f33L/f33N), suítes de
+# notificação (Chromium real p/ f33C/f33D), e2e, tsc, syntax check, DIFF-ZERO nos protegidos
+# e as provas dedicadas de Worker e Android intocados.
+# SOMENTE validação: NÃO faz build/deploy/release/merge, NÃO altera produto/protegidos.
+# =====================================================================
+name: "[manual] F3.3.17-R5.1 Designer-Delivery Validation (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3317-r51-validation.yml'
+      - 'desktop/scripts/f33P-designer-delivery.test.mjs'
+      - 'desktop/scripts/e2e-flow-test.js'
+      - 'desktop/src/renderer/index.html'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3317-r51-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # diff-zero usa baseline pré-R (ac66826); f33N lê o renderer antigo
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Chromium real (testes DOM f33C/f33D no renderer real)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          echo "CHROME_BIN=$(node -e "console.log(require('playwright').chromium.executablePath())")" >> "$GITHUB_ENV"
+
+      - name: tsc (main + preload) — nenhum TS alterado na R5.1
+        run: |
+          cd desktop
+          npm ci
+          npx tsc -p tsconfig.json --noEmit
+          echo "tsc OK"
+
+      - name: Syntax check (node --check em todos os scripts .mjs/.js)
+        run: |
+          set -e
+          for f in desktop/scripts/*.mjs desktop/scripts/*.js; do node --check "$f"; done
+          echo "syntax OK"
+
+      - name: R5.1 (entrega do designer) + fluxo R5 + apresentação/colunas
+        run: |
+          set -e
+          for t in f33P-designer-delivery f33O-flow-audit f33I-flow-presentation f33J-flow-columns; do
+            echo "==================== $t ===================="; node "desktop/scripts/$t.test.mjs"
+          done
+
+      - name: Regressões F3.3.13 / F3.3.15 / R1-R2-R3-R4 + suítes de notificação
+        run: |
+          set -e
+          for t in f33G-editprazo-write f33H-hotfix-ui f33K-notif-actor f33L-account-anchor f33N-assign-baseline-fix \
+                   f333-notif f33A-notif-central f33C-assignment-toast f33D-background-notif f33E-main-notifier f33F-bg-notify; do
+            echo "==================== $t ===================="; node "desktop/scripts/$t.test.mjs"
+          done
+
+      - name: Prova DIFF-ZERO nos arquivos protegidos (ac66826 -> HEAD)
+        run: |
+          set -e
+          BASE=ac66826
+          PROT="desktop/src/main/ desktop/src/preload/ desktop/src/renderer/bgnotify.html sw.js firebase-messaging-sw.js cloudflare-worker.js android"
+          if git diff --stat "$BASE" HEAD -- $PROT | grep .; then
+            echo "::error:: arquivos protegidos ALTERADOS desde $BASE"
+            git diff --stat "$BASE" HEAD -- $PROT
+            exit 1
+          fi
+          echo "OK: protegidos com diff-zero ($BASE -> HEAD) — notifier/main/bgNotify/bgnotify.html/preloads/sw/firebase-sw/Worker/Android intocados."
+          echo "Delta de produto da R5.1 = apenas desktop/src/renderer/index.html (renderPersonBoard + operationalCol + kbv2SlaLocal + detailState + detailSla)."
+
+      - name: Prova dedicada — Worker (cloudflare-worker.js) INTOCADO (ac66826 -> HEAD)
+        run: |
+          set -e
+          if git diff --stat ac66826 HEAD -- cloudflare-worker.js | grep .; then
+            echo "::error:: cloudflare-worker.js ALTERADO"; git diff ac66826 HEAD -- cloudflare-worker.js; exit 1
+          fi
+          echo "OK: cloudflare-worker.js intocado — conclusão final permanece EXCLUSIVA do Worker (sem caminho paralelo)."
+
+      - name: Prova dedicada — Android INTOCADO (ac66826 -> HEAD)
+        run: |
+          set -e
+          if git diff --stat ac66826 HEAD -- android | grep .; then
+            echo "::error:: android/ ALTERADO"; git diff --stat ac66826 HEAD -- android; exit 1
+          fi
+          echo "OK: android/ intocado."
+
+      - name: E2E (fluxo lógico + estrutural; cross-branch ausente = SKIP tolerante)
+        run: node desktop/scripts/e2e-flow-test.js
