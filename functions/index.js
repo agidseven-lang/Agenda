@@ -911,3 +911,94 @@ exports.updateNotifPrefs = onRequest({ region: "us-central1", maxInstances: 10 }
 exports._notifVerifyToken = notifVerifyToken;
 exports._notifValidatePrefs = notifValidatePrefs;
 exports._handleNotifPrefsUpdate = handleNotifPrefsUpdate;
+
+/* ============================================================================
+   F3.3.20-B1.3-B — EMISSOR server-side de TOKEN HMAC p/ notifPrefs (dormente).
+   ----------------------------------------------------------------------------
+   - Em Functions (NAO no Worker => Worker/Cloudflare permanece diff-zero).
+   - HTTPS onRequest (NAO onCall) => NAO depende de request.auth.uid.
+   - Prova de identidade = a SENHA REAL do usuario interno (mesmo modelo do login):
+     "s2:" + SHA-256(salt|senha) atual + djb2 legado; comparacao em tempo constante.
+   - ACESSO (corrigido): qualquer usuario INTERNO VALIDO emite token p/ SI MESMO —
+     Social, Designer e Admin. NAO ha gate de role (nao bloqueia Designer). Cliente
+     externo/link publico NAO entra (nao possui users/{uid} com senha). Usuario
+     inativo (status pendente/removido/excluido) e rejeitado.
+   - Token: payloadB64url.sigB64url (HMAC-SHA256 sobre o payloadB64url) — formato
+     IDENTICO ao verificado pela B1.2. Claims: {uid, admin, scope, iat, exp}.
+   - admin:true SOMENTE se o registro do proprio usuario marca admin===true.
+   - DORMENTE: sem NOTIF_PREFS_SECRET => 503. So LE o registro do usuario; NAO escreve
+     no Firestore. NUNCA persiste/loga a senha; NUNCA loga o token completo nem o segredo.
+   ============================================================================ */
+const NOTIF_TOKEN_TTL_MS = 15 * 60 * 1000;   // 15 min (TTL curto; acao interativa)
+function notifMaskUid(v) { const s = String(v || ""); return s ? (s.slice(0, 3) + "…") : "(vazio)"; }
+function notifDjb2(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return "h" + (h >>> 0); }
+// Comparacao em tempo constante: digere ambos os lados (=> mesmo tamanho, sem early-exit).
+function notifTimingSafeEq(a, b) {
+  const da = crypto.createHash("sha256").update(String(a)).digest();
+  const db = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(da, db);
+}
+// Espelha o verifyPw do app: "s2:"+SHA-256(salt|senha) atual; djb2 legado. Nunca loga a senha.
+function notifVerifyPassword(pass, salt, pw) {
+  if (!pass) return false;
+  if (salt && String(pass).startsWith("s2:")) {
+    const h = "s2:" + crypto.createHash("sha256").update(String(salt) + "|" + String(pw)).digest("hex");
+    return notifTimingSafeEq(pass, h);
+  }
+  return notifTimingSafeEq(pass, notifDjb2(String(pw)));   // credenciais legadas (djb2)
+}
+// Assina o token no MESMO formato que a B1.2 (notifVerifyToken) verifica.
+function notifSignToken(claims, secret) {
+  const p = Buffer.from(JSON.stringify(claims)).toString("base64url");
+  const s = crypto.createHmac("sha256", secret).update(p).digest().toString("base64url");
+  return p + "." + s;
+}
+// Orquestra a emissao. ctx = {method, body, now}. So LE users/{uid} (sem escrita).
+async function handleIssueNotifPrefsToken(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  if (ctx.method && String(ctx.method).toUpperCase() !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  if (!notifPrefsSecret()) return { status: 503, json: { ok: false, error: "endpoint_disabled" } };
+  const body = ctx.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { status: 400, json: { ok: false, error: "body_not_object" } };
+  const uid = (typeof body.uid === "string") ? body.uid.trim() : "";
+  const password = (typeof body.password === "string") ? body.password : "";
+  if (!uid) return { status: 400, json: { ok: false, error: "missing_uid" } };
+  if (!password) return { status: 400, json: { ok: false, error: "missing_password" } };
+  let snap;
+  try { snap = await notifDb().collection("users").doc(uid).get(); }
+  catch (e) {
+    try { logger.error("[issueNotifPrefsToken] leitura falhou", { uid: notifMaskUid(uid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "lookup_failed" } };
+  }
+  // uid desconhecido OU senha errada => MESMO 401 generico (nao revela existencia do uid).
+  if (!snap || !snap.exists) return { status: 401, json: { ok: false, error: "invalid_credentials" } };
+  const u = snap.data() || {};
+  if (!notifVerifyPassword(u.pass, u.salt, password)) return { status: 401, json: { ok: false, error: "invalid_credentials" } };
+  // Inativo => 403 (checado SO apos a senha correta, p/ nao vazar estado a quem nao a tem).
+  const st = String(u.status || "");
+  if (st === "pendente" || st === "removido" || st === "excluido") return { status: 403, json: { ok: false, error: "user_inactive" } };
+  // Token p/ o PROPRIO uid provado (nunca aceita uid alvo). admin:true so se o registro marcar.
+  const isAdmin = (u.admin === true);
+  const claims = { uid: uid, admin: isAdmin, scope: "notifPrefs:write", iat: now, exp: now + NOTIF_TOKEN_TTL_MS };
+  const token = notifSignToken(claims, notifPrefsSecret());
+  try { logger.info("[issueNotifPrefsToken] emitido", { uid: notifMaskUid(uid), admin: isAdmin, exp: claims.exp }); } catch (_) {}
+  return { status: 200, json: { ok: true, token: token, uid: uid, admin: isAdmin, scope: claims.scope, exp: claims.exp } };
+}
+
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem NOTIF_PREFS_SECRET
+// => 503. NAO deployado nesta fase; NAO integrado ao Desktop/UI.
+exports.issueNotifPrefsToken = onRequest({ region: "us-central1", maxInstances: 10 }, async (req, res) => {
+  try {
+    const out = await handleIssueNotifPrefsToken({ method: req.method, body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[issueNotifPrefsToken] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; emissor dormente/sem deploy).
+exports._notifVerifyPassword = notifVerifyPassword;
+exports._notifSignToken = notifSignToken;
+exports._handleIssueNotifPrefsToken = handleIssueNotifPrefsToken;
