@@ -35,11 +35,14 @@ function grab(n) {
 }
 
 const NAMES = ["notifPrefsSecret", "notifDb", "notifMaskUid", "notifDjb2", "notifTimingSafeEq",
-  "notifVerifyPassword", "notifSignToken", "handleIssueNotifPrefsToken", "notifVerifyToken"];
+  "notifVerifyPassword", "notifSignToken", "notifRlBlocked", "notifRlFail", "notifRlClear",
+  "handleIssueNotifPrefsToken", "notifVerifyToken"];
 let BODY = ""; for (const n of NAMES) BODY += grab(n) + "\n";
 
 const PRELUDE = `
   var NOTIF_TOKEN_TTL_MS = 15 * 60 * 1000;
+  var NOTIF_RL_MAX = 5, NOTIF_RL_WINDOW_MS = 5 * 60 * 1000, NOTIF_RL_BLOCK_MS = 15 * 60 * 1000;
+  var __notifRlState = new Map();
   var __users = {}; var __writes = []; var __logs = [];
   function _col(c) { return {
     doc: function (id) { return {

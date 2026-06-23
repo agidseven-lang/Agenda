@@ -41,6 +41,7 @@ let BODY = ""; for (const n of NAMES) BODY += grab(n) + "\n";
 
 const PRELUDE = `
   var TTL_MS = 600000;
+  var NOTIF_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000;
   var __store = {}; var __sends = []; var __writes = []; var __log = [];
   var __failPrefs = false, __failLog = false;
   function _docRef(p) { return {
