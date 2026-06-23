@@ -93,9 +93,14 @@ const ok = (n, c) => { if (c) pass++; else { fail++; flog.push("FAIL: " + n); } 
   ok("[src#12] helpers NAO tocam clientPushSubs", !/clientPushSubs/.test(BLOCK));
   ok("[src] dedupeTokensByDevice (deviceId) permanece intacto no arquivo",
     /function dedupeTokensByDevice/.test(SRC) && /m\.deviceId/.test(SRC));
-  ok("[src] DORMENCIA: notifyResponsible (trigger) NAO chama os helpers", (() => {
+  // Pós-B1.4-B: notifyResponsible pode usar shouldNotifyByPrefs/writeNotifLog, MAS
+  // sempre atrás do gate ENABLE_NOTIF_PREFS/ENABLE_NOTIF_LOG (flag OFF => dormente/idêntico).
+  ok("[src] notifyResponsible só usa prefs/log atrás do gate de flag (OFF => dormente)", (() => {
     const f = grab("notifyResponsible");
-    return !/getNotifPrefs|shouldNotifyByPrefs|writeNotifLog/.test(f);
+    if (!/shouldNotifyByPrefs|writeNotifLog/.test(f)) return true;     // ainda dormente
+    const gate = f.indexOf('notifFlag("ENABLE_NOTIF_PREFS")');
+    const call = f.indexOf("shouldNotifyByPrefs");
+    return gate >= 0 && call > gate;                                   // gate antes da chamada
   })());
   ok("[src] writeNotifLog grava em colecao notifLog (server-side)", /collection\("notifLog"\)\.add\(/.test(BLOCK));
   ok("[src] getNotifPrefs le notifPrefs/{uid}", /collection\("notifPrefs"\)\.doc\(String\(uid\)\)/.test(BLOCK));

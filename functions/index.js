@@ -109,6 +109,23 @@ async function notifyResponsible(type, coll, id, doc) {
     return;
   }
 
+  // F3.3.20-B1.4-B — gating OPCIONAL por preferencias. SO roda com ENABLE_NOTIF_PREFS=true
+  // (flag OFF => este bloco e ignorado e o comportamento e identico ao atual). Evento
+  // opcional (task_assigned/event_assigned). Erro ao ler prefs => envia (fail-safe).
+  // Eventos criticos NAO passam por aqui (nao sao emitidos por este trigger).
+  const eventType = (type === "task") ? "task_assigned" : "event_assigned";
+  if (notifFlag("ENABLE_NOTIF_PREFS")) {
+    let allow = true;
+    try { allow = await shouldNotifyByPrefs(responsibleId, eventType, "android"); } catch (_) { allow = true; }
+    if (!allow) {
+      logger.info(`[TRIGGER] ${type}/${id} -> ${responsibleId}: suprimido por prefs`);
+      // preserva o dedup (immediateNotifiedAt) p/ o fallback/CRON NAO reenviar.
+      await ref.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: "suprimido por prefs" }, { merge: true });
+      if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: (type === "task" ? id : ""), eventType: eventType, to: responsibleId, channel: "fcm", sent: 0, total: tokens.length, reason: "suppressed_by_prefs" }); } catch (_) {} }
+      return;
+    }
+  }
+
   const { data } = buildMessageData(type, id, doc);
   let sent = 0, reason = "";
   try {
@@ -125,6 +142,7 @@ async function notifyResponsible(type, coll, id, doc) {
   }
   logger.info(`[TRIGGER] ${type}/${id} -> ${responsibleId}: ${reason}`);
   await ref.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: reason }, { merge: true });
+  if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: (type === "task" ? id : ""), eventType: eventType, to: responsibleId, channel: "fcm", sent: sent, total: tokens.length, reason: reason }); } catch (_) {} }
 }
 
 exports.onEventCreated = onDocumentCreated("events/{eventId}", async (event) => {
@@ -229,6 +247,17 @@ async function notifyChatMessage(chatId, messageId, msg) {
         results.push(`${rid}: sem token`);
         continue;
       }
+      // F3.3.20-B1.4-B — gating OPCIONAL por DESTINATARIO (so com ENABLE_NOTIF_PREFS=true;
+      // flag OFF => ignorado). Suprime apenas ESTE destinatario; os demais seguem normais.
+      if (notifFlag("ENABLE_NOTIF_PREFS")) {
+        let allowRid = true;
+        try { allowRid = await shouldNotifyByPrefs(rid, "chat_message", "android"); } catch (_) { allowRid = true; }
+        if (!allowRid) {
+          results.push(`${rid}: suprimido por prefs`);
+          if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: "", eventType: "chat_message", to: rid, channel: "fcm", sent: 0, total: tokens.length, reason: "suppressed_by_prefs" }); } catch (_) {} }
+          continue;
+        }
+      }
       const data = buildChatData(senderName, msg, chatId, messageId, senderId);
       const resp = await admin.messaging().sendEachForMulticast({
         tokens: tokens,
@@ -237,6 +266,7 @@ async function notifyChatMessage(chatId, messageId, msg) {
       });
       logger.info(`[TRIGGER] chat/${messageId} -> ${rid}: sent ${resp.successCount}/${tokens.length}`);
       results.push(`${rid}: sent ${resp.successCount}/${tokens.length}`);
+      if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: "", eventType: "chat_message", to: rid, channel: "fcm", sent: resp.successCount, total: tokens.length, reason: "sent " + resp.successCount + "/" + tokens.length }); } catch (_) {} }
     } catch (e) {
       const m = "erro FCM: " + (e && e.message ? e.message : String(e));
       logger.error(`[TRIGGER] chat/${messageId} -> ${rid}: ${m}`);
