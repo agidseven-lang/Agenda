@@ -1,0 +1,126 @@
+# =====================================================================
+# [manual] F3.3.20-B1.5-B — VALIDAÇÃO READ-ONLY do hardening do trilho notifPrefs/notifLog
+# (functions/index.js). Prova (f33V, handlers REAIS): NOTIF_PREFS_SECRET via defineSecret +
+# binding nos 2 endpoints; 503 sem segredo (dormente); flags default false; notifLog com
+# expireAt (at+30d) e SÓ IDs+contadores (sem senha/token/segredo/texto de chat); rate-limit
+# in-memory uid+IP (5 inválidas => 429; SEM Firestore; válido não é bloqueado). Regressões:
+# f33U/f33T/f33S/f33R, notificações (f333/f33A/f33C/f33D Chromium real/f33E/f33F/f33K), e2e,
+# tsc, syntax. CONFINAMENTO: track de notificações server-side; DIFF-ZERO renderer/main/
+# preload/bgnotify/sw/firebase-sw/Worker/Android. SOMENTE validação: NÃO build/deploy/release/
+# merge; sem segredo real, sem ativar flags.
+# =====================================================================
+name: "[manual] F3.3.20-B1.5-B notif hardening (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3320-b15-validation.yml'
+      - 'scripts/worker-ops/f33V-notif-hardening.test.mjs'
+      - 'functions/index.js'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3320-b15-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # precisa de 26b3a3b (INC01-A) e ac66826 (baseline)
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Chromium real (testes DOM f33C/f33D no renderer real)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          echo "CHROME_BIN=$(node -e "console.log(require('playwright').chromium.executablePath())")" >> "$GITHUB_ENV"
+
+      - name: Syntax check (node --check em functions + scripts)
+        run: |
+          set -e
+          node --check functions/index.js
+          for f in scripts/worker-ops/*.mjs desktop/scripts/*.mjs desktop/scripts/*.js; do node --check "$f"; done
+          echo "syntax OK"
+
+      - name: tsc (main + preload) — nenhum TS alterado na B1.5-B
+        run: |
+          cd desktop
+          npm ci
+          npx tsc -p tsconfig.json --noEmit
+          echo "tsc OK"
+
+      - name: B1.5-B — hardening (f33V) + integração (f33U) + emissor (f33T) + endpoint (f33S) + base (f33R)
+        run: |
+          set -e
+          node scripts/worker-ops/f33V-notif-hardening.test.mjs
+          node scripts/worker-ops/f33U-notif-send-prefs-integration.test.mjs
+          node scripts/worker-ops/f33T-notif-prefs-token-issuer.test.mjs
+          node scripts/worker-ops/f33S-notif-prefs-endpoint.test.mjs
+          node scripts/worker-ops/f33R-notif-prefs-log.test.mjs
+
+      - name: Suítes de notificação existentes (regressão) + e2e
+        run: |
+          set -e
+          for t in f333-notif f33A-notif-central f33C-assignment-toast f33D-background-notif f33E-main-notifier f33F-bg-notify f33K-notif-actor; do
+            echo "==================== $t ===================="; node "desktop/scripts/$t.test.mjs"
+          done
+          echo "==================== e2e ===================="; node desktop/scripts/e2e-flow-test.js
+
+      - name: CONFINAMENTO — track de notificações server-side, sem tocar produto (26b3a3b -> HEAD)
+        run: |
+          set -e
+          BASE=26b3a3b
+          DELTA="$(git diff --name-only "$BASE" HEAD -- . ':(exclude)docs/sla-f332')"
+          echo "Arquivos alterados desde $BASE (excl. docs/sla-f332):"; echo "$DELTA"
+          UNEXPECTED="$(echo "$DELTA" | grep -vE '^(functions/index\.js|scripts/worker-ops/f33[A-Z]-[a-z0-9-]+\.test\.mjs|\.github/workflows/f3320-[a-z0-9-]+\.yml)$' || true)"
+          if [ -n "$UNEXPECTED" ]; then
+            echo "::error:: arquivos fora do track de notificações server-side alterados:"; echo "$UNEXPECTED"; exit 1
+          fi
+          echo "OK: delta confinado ao track de notificações (functions/index.js + f33[A-Z]-*.test.mjs + f3320-*.yml)."
+
+      - name: DIFF-ZERO — Desktop renderer/main/preload/bgnotify + SW + Worker + Android (26b3a3b -> HEAD)
+        run: |
+          set -e
+          BASE=26b3a3b
+          PROT="desktop/src/renderer/index.html desktop/src/main/ desktop/src/preload/ desktop/src/renderer/bgnotify.html sw.js firebase-messaging-sw.js cloudflare-worker.js android"
+          if git diff --stat "$BASE" HEAD -- $PROT | grep .; then
+            echo "::error:: arquivos protegidos ALTERADOS desde $BASE"
+            git diff --stat "$BASE" HEAD -- $PROT
+            exit 1
+          fi
+          echo "OK: renderer/main/preload/bgnotify/sw/firebase-sw/Worker/Android com diff-zero (B1.5-B não os tocou)."
+
+      - name: Prova dedicada — Worker (cloudflare-worker.js + wrangler.toml) INTOCADO desde ac66826
+        run: |
+          set -e
+          if git diff --stat ac66826 HEAD -- cloudflare-worker.js wrangler.toml | grep .; then
+            echo "::error:: Worker ALTERADO"; exit 1
+          fi
+          echo "OK: cloudflare-worker.js + wrangler.toml intocados (hardening foi p/ Functions, não p/ Worker)."
+
+      - name: Prova dedicada — Android e service workers INTOCADOS desde ac66826
+        run: |
+          set -e
+          if git diff --stat ac66826 HEAD -- android sw.js firebase-messaging-sw.js | grep .; then
+            echo "::error:: Android/SW ALTERADOS"; exit 1
+          fi
+          echo "OK: Android/ + sw.js + firebase-messaging-sw.js intocados."
+
+      - name: Prova — Firestore Rules NÃO versionadas no repo (geridas manualmente)
+        run: |
+          set -e
+          if [ -f firestore.rules ] || grep -q '"firestore"' firebase.json 2>/dev/null; then
+            echo "::error:: rules apareceram no repo — revisar (B1.5-B não altera Rules)"; exit 1
+          fi
+          echo "OK: sem firestore.rules no repo e firebase.json sem secção firestore — Rules Opção B geridas manualmente, intocadas."

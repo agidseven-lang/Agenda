@@ -109,6 +109,23 @@ async function notifyResponsible(type, coll, id, doc) {
     return;
   }
 
+  // F3.3.20-B1.4-B — gating OPCIONAL por preferencias. SO roda com ENABLE_NOTIF_PREFS=true
+  // (flag OFF => este bloco e ignorado e o comportamento e identico ao atual). Evento
+  // opcional (task_assigned/event_assigned). Erro ao ler prefs => envia (fail-safe).
+  // Eventos criticos NAO passam por aqui (nao sao emitidos por este trigger).
+  const eventType = (type === "task") ? "task_assigned" : "event_assigned";
+  if (notifFlag("ENABLE_NOTIF_PREFS")) {
+    let allow = true;
+    try { allow = await shouldNotifyByPrefs(responsibleId, eventType, "android"); } catch (_) { allow = true; }
+    if (!allow) {
+      logger.info(`[TRIGGER] ${type}/${id} -> ${responsibleId}: suprimido por prefs`);
+      // preserva o dedup (immediateNotifiedAt) p/ o fallback/CRON NAO reenviar.
+      await ref.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: "suprimido por prefs" }, { merge: true });
+      if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: (type === "task" ? id : ""), eventType: eventType, to: responsibleId, channel: "fcm", sent: 0, total: tokens.length, reason: "suppressed_by_prefs" }); } catch (_) {} }
+      return;
+    }
+  }
+
   const { data } = buildMessageData(type, id, doc);
   let sent = 0, reason = "";
   try {
@@ -125,6 +142,7 @@ async function notifyResponsible(type, coll, id, doc) {
   }
   logger.info(`[TRIGGER] ${type}/${id} -> ${responsibleId}: ${reason}`);
   await ref.set({ immediateNotifiedAt: Date.now(), immediateNotifyResult: reason }, { merge: true });
+  if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: (type === "task" ? id : ""), eventType: eventType, to: responsibleId, channel: "fcm", sent: sent, total: tokens.length, reason: reason }); } catch (_) {} }
 }
 
 exports.onEventCreated = onDocumentCreated("events/{eventId}", async (event) => {
@@ -229,6 +247,17 @@ async function notifyChatMessage(chatId, messageId, msg) {
         results.push(`${rid}: sem token`);
         continue;
       }
+      // F3.3.20-B1.4-B — gating OPCIONAL por DESTINATARIO (so com ENABLE_NOTIF_PREFS=true;
+      // flag OFF => ignorado). Suprime apenas ESTE destinatario; os demais seguem normais.
+      if (notifFlag("ENABLE_NOTIF_PREFS")) {
+        let allowRid = true;
+        try { allowRid = await shouldNotifyByPrefs(rid, "chat_message", "android"); } catch (_) { allowRid = true; }
+        if (!allowRid) {
+          results.push(`${rid}: suprimido por prefs`);
+          if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: "", eventType: "chat_message", to: rid, channel: "fcm", sent: 0, total: tokens.length, reason: "suppressed_by_prefs" }); } catch (_) {} }
+          continue;
+        }
+      }
       const data = buildChatData(senderName, msg, chatId, messageId, senderId);
       const resp = await admin.messaging().sendEachForMulticast({
         tokens: tokens,
@@ -237,6 +266,7 @@ async function notifyChatMessage(chatId, messageId, msg) {
       });
       logger.info(`[TRIGGER] chat/${messageId} -> ${rid}: sent ${resp.successCount}/${tokens.length}`);
       results.push(`${rid}: sent ${resp.successCount}/${tokens.length}`);
+      if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: "", eventType: "chat_message", to: rid, channel: "fcm", sent: resp.successCount, total: tokens.length, reason: "sent " + resp.successCount + "/" + tokens.length }); } catch (_) {} }
     } catch (e) {
       const m = "erro FCM: " + (e && e.message ? e.message : String(e));
       logger.error(`[TRIGGER] chat/${messageId} -> ${rid}: ${m}`);
@@ -704,3 +734,339 @@ exports.cleanupPasswordResetCodes = onSchedule(
 
 // Exporta logica pura para o smoke test local (nao afeta o runtime das Functions).
 exports._shouldDeleteResetCode = shouldDeleteResetCode;
+
+/* ============================================================================
+   F3.3.20-B1.1-A — BASE SERVER-SIDE DORMENTE p/ notifPrefs / notifLog.
+   ----------------------------------------------------------------------------
+   Objetivo: estabelecer helpers server-side (service account / admin SDK) para,
+   no FUTURO, respeitar preferencias de notificacao (notifPrefs/{uid}) e gravar
+   auditoria de envio (notifLog/{autoId}) — SEM mudar o comportamento atual.
+
+   SEGURANCA / DORMENCIA:
+   - Flags OFF por padrao: ENABLE_NOTIF_PREFS / ENABLE_NOTIF_LOG. Qualquer valor
+     diferente de "true" (case-insensitive) = OFF.
+   - Com as flags OFF: getNotifPrefs => null, shouldNotifyByPrefs => true,
+     writeNotifLog => no-op. Ou seja, comportamento atual 100% identico.
+   - Estes helpers NAO sao chamados por nenhum trigger/relay nesta fase (base
+     dormente). A integracao real fica para uma fase futura (autorizada).
+   - Best-effort: nunca lancam; nunca bloqueiam envio nem fluxo de negocio.
+   - Nao usam request.auth.uid (rodam por service account / admin SDK).
+   - Nao tocam fcmTokens / fcmTokenMeta / clientPushSubs nem o dedup por deviceId
+     (dedupeTokensByDevice). So LEEM notifPrefs e GRAVAM notifLog server-side.
+   - Escrita client-side continua barrada pelas Firestore Rules Opcao B; estes
+     helpers rodam server-side (admin SDK ignora rules).
+   ============================================================================ */
+function notifFlag(name) {
+  // Defensivo: somente "true" (case-insensitive) liga a flag; qualquer outra coisa = OFF.
+  return String((typeof process !== "undefined" && process.env && process.env[name]) || "").toLowerCase() === "true";
+}
+// Indirecao p/ o Firestore (testabilidade). Em producao = admin.firestore().
+function notifDb() { return admin.firestore(); }
+
+// (1) Le notifPrefs/{uid}. Dormente: flag OFF => null. Sem doc => null.
+//     Erro de leitura => null (fallback seguro). null SEMPRE significa
+//     "comportamento atual preservado" para quem consome.
+async function getNotifPrefs(uid) {
+  if (!notifFlag("ENABLE_NOTIF_PREFS")) return null;
+  if (!uid) return null;
+  try {
+    const snap = await notifDb().collection("notifPrefs").doc(String(uid)).get();
+    if (!snap || !snap.exists) return null;
+    return snap.data() || null;
+  } catch (e) {
+    try { logger.warn("[notifPrefs] leitura falhou (fallback seguro)", { uid: String(uid), err: e && e.message }); } catch (_) {}
+    return null;
+  }
+}
+
+// (2) Decide se deve notificar conforme as prefs. Defaults SEGUROS:
+//     - flag OFF          => true (nunca suprime; comportamento atual)
+//     - sem doc           => true (comportamento atual preservado)
+//     - erro              => true (nunca bloqueia)
+//     - enabled === false => false (opt-out explicito; SO com a flag ON)
+//     - mutedEvents[eventType] === true => false (granular opcional)
+//     - platforms[platform] === false   => false (granular opcional)
+async function shouldNotifyByPrefs(uid, eventType, platform) {
+  if (!notifFlag("ENABLE_NOTIF_PREFS")) return true;
+  let prefs = null;
+  try { prefs = await getNotifPrefs(uid); } catch (_) { return true; }
+  if (!prefs) return true;
+  if (prefs.enabled === false) return false;
+  if (eventType && prefs.mutedEvents && prefs.mutedEvents[eventType] === true) return false;
+  if (platform && prefs.platforms && prefs.platforms[platform] === false) return false;
+  return true;
+}
+
+// (3) Grava notifLog/{autoId} best-effort. Dormente: flag OFF => no-op.
+//     NUNCA lanca; NUNCA bloqueia envio/fluxo. Retorna {written, skipped?}.
+//     Payload normalizado: so IDs tecnicos + contadores (sem PII sensivel).
+async function writeNotifLog(entry) {
+  if (!notifFlag("ENABLE_NOTIF_LOG")) return { written: false, skipped: "flag_off" };
+  try {
+    const e = entry || {};
+    const atMs = (e.at != null ? e.at : Date.now());
+    const doc = {
+      taskId:    String(e.taskId    != null ? e.taskId    : ""),
+      eventType: String(e.eventType != null ? e.eventType : ""),
+      to:        String(e.to        != null ? e.to        : ""),
+      channel:   String(e.channel   != null ? e.channel   : ""),
+      sent:      Number.isFinite(+e.sent)  ? +e.sent  : 0,
+      total:     Number.isFinite(+e.total) ? +e.total : 0,
+      reason:    String(e.reason     != null ? e.reason   : ""),
+      at:        atMs,
+      expireAt:  atMs + NOTIF_LOG_TTL_MS,   // B1.5-B: retencao 30 dias (server-side; TTL nativo do Firestore)
+    };
+    await notifDb().collection("notifLog").add(doc);
+    return { written: true };
+  } catch (e) {
+    try { logger.warn("[notifLog] gravacao falhou (best-effort, ignorada)", { err: e && e.message }); } catch (_) {}
+    return { written: false, skipped: "error" };
+  }
+}
+
+// Exporta logica pura para o harness local (NAO afeta o runtime; helpers ficam
+// dormentes — nenhum trigger os chama nesta fase).
+exports._notifFlag = notifFlag;
+exports._getNotifPrefs = getNotifPrefs;
+exports._shouldNotifyByPrefs = shouldNotifyByPrefs;
+exports._writeNotifLog = writeNotifLog;
+
+/* ============================================================================
+   F3.3.20-B1.5-B — HARDENING (ainda DORMENTE; prepara deploy seguro).
+   ----------------------------------------------------------------------------
+   - NOTIF_PREFS_SECRET via Secret Manager (defineSecret), bound SOMENTE em
+     updateNotifPrefs/issueNotifPrefsToken. Sem o segredo => process.env vazio
+     => 503 (dormente). notifPrefsSecret()/notifFlag() continuam lendo process.env
+     (v2 injeta o segredo bound em process.env; harness seta process.env).
+   - Flags continuam via process.env: DEFAULT OFF garantido (ausente/≠"true" => false).
+     NUNCA "true" no codigo; ativacao so via env de runtime no deploy controlado.
+   - notifLog ganha expireAt (retencao 30 dias, server-side) p/ TTL nativo do Firestore.
+   - Rate-limit IN-MEMORY (best-effort, por instancia; SEM Firestore; sem PII) do
+     emissor: por uid+IP, NOTIF_RL_MAX falhas invalidas / janela => bloqueio temporario.
+   ============================================================================ */
+const NOTIF_PREFS_SECRET = defineSecret("NOTIF_PREFS_SECRET");
+const NOTIF_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 dias
+const NOTIF_RL_MAX = 5;                               // tentativas invalidas
+const NOTIF_RL_WINDOW_MS = 5 * 60 * 1000;            // janela de contagem
+const NOTIF_RL_BLOCK_MS = 15 * 60 * 1000;           // bloqueio/backoff
+const __notifRlState = new Map();                    // key -> {fails, first, until} (volatil; sem PII)
+function notifRlBlocked(key, now) { const s = __notifRlState.get(key); return !!(s && s.until && now < s.until); }
+function notifRlFail(key, now) {
+  let s = __notifRlState.get(key);
+  if (!s || (now - s.first) >= NOTIF_RL_WINDOW_MS) s = { fails: 0, first: now };
+  s.fails += 1;
+  if (s.fails >= NOTIF_RL_MAX) s.until = now + NOTIF_RL_BLOCK_MS;
+  __notifRlState.set(key, s);
+}
+function notifRlClear(key) { __notifRlState.delete(key); }
+
+/* ============================================================================
+   F3.3.20-B1.2 — ENDPOINT server-side AUTENTICADO p/ notifPrefs/{uid}.
+   ----------------------------------------------------------------------------
+   - Autenticacao por TOKEN ASSINADO (HMAC-SHA256). Usa onRequest (NAO onCall) =>
+     NAO depende de request.auth.uid; o uid vem do token verificado, nao do corpo.
+   - Gate de dormencia: sem NOTIF_PREFS_SECRET no ambiente => 503 (inerte). Em
+     producao o segredo NAO esta setado e a funcao NAO esta deployada nesta fase.
+   - Escreve SOMENTE em notifPrefs/{uid} (merge). NUNCA toca users/{uid},
+     fcmTokens, fcmTokenMeta, clientPushSubs nem o dedup por deviceId.
+   - notifPrefs continua SEM efeito em producao enquanto ENABLE_NOTIF_PREFS=OFF
+     (shouldNotifyByPrefs da B1.1-A retorna true). Gravar pref e inocuo ate ligar.
+   - Cliente NAO grava direto (Rules Opcao B barram). Usuario nao altera prefs de
+     outro uid (token.uid != alvo => 403), salvo token com admin:true (server).
+   - NAO integrado ao Desktop; SEM UI. So a base do endpoint + validacao/normalizacao.
+   ============================================================================ */
+function notifPrefsSecret() {
+  return String((typeof process !== "undefined" && process.env && process.env.NOTIF_PREFS_SECRET) || "");
+}
+// Verifica "payloadB64url.sigB64url" (HMAC-SHA256 sobre o payloadB64url).
+// Retorna {ok:true, uid, admin} ou {ok:false, code, error}. NAO usa request.auth.uid.
+function notifVerifyToken(authHeader, secret, nowMs) {
+  if (!secret) return { ok: false, code: 503, error: "endpoint_disabled" };
+  const m = /^Bearer\s+(.+)$/.exec(String(authHeader || "").trim());
+  if (!m) return { ok: false, code: 401, error: "missing_token" };
+  const parts = m[1].split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return { ok: false, code: 401, error: "malformed_token" };
+  let expected, got;
+  try {
+    expected = crypto.createHmac("sha256", secret).update(parts[0]).digest();
+    got = Buffer.from(parts[1], "base64url");
+  } catch (_) { return { ok: false, code: 401, error: "bad_sig" }; }
+  if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return { ok: false, code: 401, error: "bad_sig" };
+  let claims;
+  try { claims = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8")); } catch (_) { return { ok: false, code: 401, error: "bad_claims" }; }
+  if (!claims || typeof claims.uid !== "string" || !claims.uid) return { ok: false, code: 401, error: "no_uid" };
+  if (typeof claims.exp === "number" && nowMs > claims.exp) return { ok: false, code: 401, error: "expired" };
+  return { ok: true, uid: claims.uid, admin: claims.admin === true };
+}
+// Valida + normaliza o corpo. Campos aceitos: enabled(bool), byEvent(map bool),
+// byPlatform(map bool), quietHours({start,end} "HH:MM" | null). updatedAt e SEMPRE
+// server-side (ignora o do cliente). Retorna {ok:true, value} ou {ok:false, error}.
+function notifValidatePrefs(input, nowMs) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { ok: false, error: "body_not_object" };
+  const ALLOWED = ["enabled", "byEvent", "byPlatform", "quietHours"];
+  const keys = Object.keys(input).filter((k) => k !== "uid");
+  const unknown = keys.filter((k) => ALLOWED.indexOf(k) < 0);
+  if (unknown.length) return { ok: false, error: "unknown_fields:" + unknown.join(",") };
+  if (!keys.length) return { ok: false, error: "empty_update" };
+  const isBoolMap = (o) => o && typeof o === "object" && !Array.isArray(o) && Object.keys(o).every((k) => typeof o[k] === "boolean");
+  const out = {};
+  if ("enabled" in input) {
+    if (typeof input.enabled !== "boolean") return { ok: false, error: "enabled_not_boolean" };
+    out.enabled = input.enabled;
+  }
+  if ("byEvent" in input) { if (!isBoolMap(input.byEvent)) return { ok: false, error: "byEvent_invalid" }; out.byEvent = Object.assign({}, input.byEvent); }
+  if ("byPlatform" in input) { if (!isBoolMap(input.byPlatform)) return { ok: false, error: "byPlatform_invalid" }; out.byPlatform = Object.assign({}, input.byPlatform); }
+  if ("quietHours" in input) {
+    const q = input.quietHours;
+    if (q === null) { out.quietHours = null; }
+    else {
+      const hhmm = (s) => typeof s === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+      if (!q || typeof q !== "object" || Array.isArray(q) || !hhmm(q.start) || !hhmm(q.end)) return { ok: false, error: "quietHours_invalid" };
+      out.quietHours = { start: q.start, end: q.end };
+    }
+  }
+  out.updatedAt = (typeof nowMs === "number" ? nowMs : Date.now());
+  return { ok: true, value: out };
+}
+// Orquestra a atualizacao. ctx = {method, authHeader, body, now}. Escreve SO em
+// notifPrefs/{uid}. Retorna {status, json}. Erros sempre controlados (sem throw).
+async function handleNotifPrefsUpdate(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  if (ctx.method && String(ctx.method).toUpperCase() !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const auth = notifVerifyToken(ctx.authHeader, notifPrefsSecret(), now);
+  if (!auth.ok) return { status: auth.code, json: { ok: false, error: auth.error } };
+  const body = ctx.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { status: 400, json: { ok: false, error: "body_not_object" } };
+  const targetUid = (typeof body.uid === "string" && body.uid) ? body.uid : auth.uid;
+  if (targetUid !== auth.uid && !auth.admin) return { status: 403, json: { ok: false, error: "forbidden_uid" } };
+  const val = notifValidatePrefs(body, now);
+  if (!val.ok) return { status: 400, json: { ok: false, error: val.error } };
+  try {
+    await notifDb().collection("notifPrefs").doc(String(targetUid)).set(val.value, { merge: true });
+  } catch (e) {
+    try { logger.error("[updateNotifPrefs] gravacao falhou", { uid: String(targetUid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "write_failed" } };
+  }
+  return { status: 200, json: { ok: true, uid: targetUid, prefs: val.value } };
+}
+
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem
+// NOTIF_PREFS_SECRET => 503. NAO deployado nesta fase; NAO integrado ao Desktop/UI.
+exports.updateNotifPrefs = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10 }, async (req, res) => {
+  try {
+    const out = await handleNotifPrefsUpdate({
+      method: req.method,
+      authHeader: (req.get && req.get("authorization")) || "",
+      body: req.body,
+      now: Date.now(),
+    });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[updateNotifPrefs] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
+exports._notifVerifyToken = notifVerifyToken;
+exports._notifValidatePrefs = notifValidatePrefs;
+exports._handleNotifPrefsUpdate = handleNotifPrefsUpdate;
+
+/* ============================================================================
+   F3.3.20-B1.3-B — EMISSOR server-side de TOKEN HMAC p/ notifPrefs (dormente).
+   ----------------------------------------------------------------------------
+   - Em Functions (NAO no Worker => Worker/Cloudflare permanece diff-zero).
+   - HTTPS onRequest (NAO onCall) => NAO depende de request.auth.uid.
+   - Prova de identidade = a SENHA REAL do usuario interno (mesmo modelo do login):
+     "s2:" + SHA-256(salt|senha) atual + djb2 legado; comparacao em tempo constante.
+   - ACESSO (corrigido): qualquer usuario INTERNO VALIDO emite token p/ SI MESMO —
+     Social, Designer e Admin. NAO ha gate de role (nao bloqueia Designer). Cliente
+     externo/link publico NAO entra (nao possui users/{uid} com senha). Usuario
+     inativo (status pendente/removido/excluido) e rejeitado.
+   - Token: payloadB64url.sigB64url (HMAC-SHA256 sobre o payloadB64url) — formato
+     IDENTICO ao verificado pela B1.2. Claims: {uid, admin, scope, iat, exp}.
+   - admin:true SOMENTE se o registro do proprio usuario marca admin===true.
+   - DORMENTE: sem NOTIF_PREFS_SECRET => 503. So LE o registro do usuario; NAO escreve
+     no Firestore. NUNCA persiste/loga a senha; NUNCA loga o token completo nem o segredo.
+   ============================================================================ */
+const NOTIF_TOKEN_TTL_MS = 15 * 60 * 1000;   // 15 min (TTL curto; acao interativa)
+function notifMaskUid(v) { const s = String(v || ""); return s ? (s.slice(0, 3) + "…") : "(vazio)"; }
+function notifDjb2(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return "h" + (h >>> 0); }
+// Comparacao em tempo constante: digere ambos os lados (=> mesmo tamanho, sem early-exit).
+function notifTimingSafeEq(a, b) {
+  const da = crypto.createHash("sha256").update(String(a)).digest();
+  const db = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(da, db);
+}
+// Espelha o verifyPw do app: "s2:"+SHA-256(salt|senha) atual; djb2 legado. Nunca loga a senha.
+function notifVerifyPassword(pass, salt, pw) {
+  if (!pass) return false;
+  if (salt && String(pass).startsWith("s2:")) {
+    const h = "s2:" + crypto.createHash("sha256").update(String(salt) + "|" + String(pw)).digest("hex");
+    return notifTimingSafeEq(pass, h);
+  }
+  return notifTimingSafeEq(pass, notifDjb2(String(pw)));   // credenciais legadas (djb2)
+}
+// Assina o token no MESMO formato que a B1.2 (notifVerifyToken) verifica.
+function notifSignToken(claims, secret) {
+  const p = Buffer.from(JSON.stringify(claims)).toString("base64url");
+  const s = crypto.createHmac("sha256", secret).update(p).digest().toString("base64url");
+  return p + "." + s;
+}
+// Orquestra a emissao. ctx = {method, body, now}. So LE users/{uid} (sem escrita).
+async function handleIssueNotifPrefsToken(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  if (ctx.method && String(ctx.method).toUpperCase() !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  if (!notifPrefsSecret()) return { status: 503, json: { ok: false, error: "endpoint_disabled" } };
+  const body = ctx.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { status: 400, json: { ok: false, error: "body_not_object" } };
+  const uid = (typeof body.uid === "string") ? body.uid.trim() : "";
+  const password = (typeof body.password === "string") ? body.password : "";
+  if (!uid) return { status: 400, json: { ok: false, error: "missing_uid" } };
+  if (!password) return { status: 400, json: { ok: false, error: "missing_password" } };
+  // B1.5-B — rate-limit IN-MEMORY (best-effort; SEM Firestore) por uid + IP.
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["u:" + uid].concat(ip ? ["i:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  let snap;
+  try { snap = await notifDb().collection("users").doc(uid).get(); }
+  catch (e) {
+    try { logger.error("[issueNotifPrefsToken] leitura falhou", { uid: notifMaskUid(uid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "lookup_failed" } };
+  }
+  // uid desconhecido OU senha errada => MESMO 401 generico (nao revela existencia do uid).
+  if (!snap || !snap.exists) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
+  const u = snap.data() || {};
+  if (!notifVerifyPassword(u.pass, u.salt, password)) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
+  // Inativo => 403 (checado SO apos a senha correta, p/ nao vazar estado a quem nao a tem).
+  const st = String(u.status || "");
+  if (st === "pendente" || st === "removido" || st === "excluido") return { status: 403, json: { ok: false, error: "user_inactive" } };
+  rlKeys.forEach((k) => notifRlClear(k));   // sucesso de credenciais: zera o rate-limit do uid/IP
+  // Token p/ o PROPRIO uid provado (nunca aceita uid alvo). admin:true so se o registro marcar.
+  const isAdmin = (u.admin === true);
+  const claims = { uid: uid, admin: isAdmin, scope: "notifPrefs:write", iat: now, exp: now + NOTIF_TOKEN_TTL_MS };
+  const token = notifSignToken(claims, notifPrefsSecret());
+  try { logger.info("[issueNotifPrefsToken] emitido", { uid: notifMaskUid(uid), admin: isAdmin, exp: claims.exp }); } catch (_) {}
+  return { status: 200, json: { ok: true, token: token, uid: uid, admin: isAdmin, scope: claims.scope, exp: claims.exp } };
+}
+
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem NOTIF_PREFS_SECRET
+// => 503. NAO deployado nesta fase; NAO integrado ao Desktop/UI.
+exports.issueNotifPrefsToken = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10 }, async (req, res) => {
+  try {
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleIssueNotifPrefsToken({ method: req.method, body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[issueNotifPrefsToken] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; emissor dormente/sem deploy).
+exports._notifVerifyPassword = notifVerifyPassword;
+exports._notifSignToken = notifSignToken;
+exports._handleIssueNotifPrefsToken = handleIssueNotifPrefsToken;
