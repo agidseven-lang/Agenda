@@ -87,8 +87,12 @@ const ok = (n, c) => { if (c) pass++; else { fail++; flog.push("FAIL: " + n); } 
 
 (async () => {
   /* ===== 0) PROVAS DE FONTE (no-touch / onRequest / dormencia) ===== */
-  const B2 = SRC.slice(SRC.indexOf("F3.3.20-B1.2 — ENDPOINT"));
-  const CODE2 = SRC.slice(SRC.indexOf("function notifPrefsSecret"));
+  // Limita as fatias à secção da B1.2 (de notifPrefsSecret até o marcador da B1.3-B),
+  // p/ não capturar o emissor B1.3-B (que LÊ users/{uid}) nem fases futuras.
+  const _b13 = SRC.indexOf("F3.3.20-B1.3-B — EMISSOR");
+  const _end = _b13 > 0 ? _b13 : undefined;
+  const B2 = SRC.slice(SRC.indexOf("F3.3.20-B1.2 — ENDPOINT"), _end);
+  const CODE2 = SRC.slice(SRC.indexOf("function notifPrefsSecret"), _end);
   ok("[src] endpoint usa onRequest + token assinado (sem req.auth/context.auth no codigo)",
     /onRequest\(/.test(B2) && /notifVerifyToken\(/.test(CODE2) && !/\breq\.auth\b/.test(CODE2) && !/context\.auth/.test(CODE2));
   ok("[src] gate de dormencia: NOTIF_PREFS_SECRET ausente => 503", /code: 503, error: "endpoint_disabled"/.test(CODE2) && /notifPrefsSecret\(\)/.test(CODE2));
