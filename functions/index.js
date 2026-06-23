@@ -798,3 +798,116 @@ exports._notifFlag = notifFlag;
 exports._getNotifPrefs = getNotifPrefs;
 exports._shouldNotifyByPrefs = shouldNotifyByPrefs;
 exports._writeNotifLog = writeNotifLog;
+
+/* ============================================================================
+   F3.3.20-B1.2 — ENDPOINT server-side AUTENTICADO p/ notifPrefs/{uid}.
+   ----------------------------------------------------------------------------
+   - Autenticacao por TOKEN ASSINADO (HMAC-SHA256). Usa onRequest (NAO onCall) =>
+     NAO depende de request.auth.uid; o uid vem do token verificado, nao do corpo.
+   - Gate de dormencia: sem NOTIF_PREFS_SECRET no ambiente => 503 (inerte). Em
+     producao o segredo NAO esta setado e a funcao NAO esta deployada nesta fase.
+   - Escreve SOMENTE em notifPrefs/{uid} (merge). NUNCA toca users/{uid},
+     fcmTokens, fcmTokenMeta, clientPushSubs nem o dedup por deviceId.
+   - notifPrefs continua SEM efeito em producao enquanto ENABLE_NOTIF_PREFS=OFF
+     (shouldNotifyByPrefs da B1.1-A retorna true). Gravar pref e inocuo ate ligar.
+   - Cliente NAO grava direto (Rules Opcao B barram). Usuario nao altera prefs de
+     outro uid (token.uid != alvo => 403), salvo token com admin:true (server).
+   - NAO integrado ao Desktop; SEM UI. So a base do endpoint + validacao/normalizacao.
+   ============================================================================ */
+function notifPrefsSecret() {
+  return String((typeof process !== "undefined" && process.env && process.env.NOTIF_PREFS_SECRET) || "");
+}
+// Verifica "payloadB64url.sigB64url" (HMAC-SHA256 sobre o payloadB64url).
+// Retorna {ok:true, uid, admin} ou {ok:false, code, error}. NAO usa request.auth.uid.
+function notifVerifyToken(authHeader, secret, nowMs) {
+  if (!secret) return { ok: false, code: 503, error: "endpoint_disabled" };
+  const m = /^Bearer\s+(.+)$/.exec(String(authHeader || "").trim());
+  if (!m) return { ok: false, code: 401, error: "missing_token" };
+  const parts = m[1].split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return { ok: false, code: 401, error: "malformed_token" };
+  let expected, got;
+  try {
+    expected = crypto.createHmac("sha256", secret).update(parts[0]).digest();
+    got = Buffer.from(parts[1], "base64url");
+  } catch (_) { return { ok: false, code: 401, error: "bad_sig" }; }
+  if (got.length !== expected.length || !crypto.timingSafeEqual(got, expected)) return { ok: false, code: 401, error: "bad_sig" };
+  let claims;
+  try { claims = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8")); } catch (_) { return { ok: false, code: 401, error: "bad_claims" }; }
+  if (!claims || typeof claims.uid !== "string" || !claims.uid) return { ok: false, code: 401, error: "no_uid" };
+  if (typeof claims.exp === "number" && nowMs > claims.exp) return { ok: false, code: 401, error: "expired" };
+  return { ok: true, uid: claims.uid, admin: claims.admin === true };
+}
+// Valida + normaliza o corpo. Campos aceitos: enabled(bool), byEvent(map bool),
+// byPlatform(map bool), quietHours({start,end} "HH:MM" | null). updatedAt e SEMPRE
+// server-side (ignora o do cliente). Retorna {ok:true, value} ou {ok:false, error}.
+function notifValidatePrefs(input, nowMs) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { ok: false, error: "body_not_object" };
+  const ALLOWED = ["enabled", "byEvent", "byPlatform", "quietHours"];
+  const keys = Object.keys(input).filter((k) => k !== "uid");
+  const unknown = keys.filter((k) => ALLOWED.indexOf(k) < 0);
+  if (unknown.length) return { ok: false, error: "unknown_fields:" + unknown.join(",") };
+  if (!keys.length) return { ok: false, error: "empty_update" };
+  const isBoolMap = (o) => o && typeof o === "object" && !Array.isArray(o) && Object.keys(o).every((k) => typeof o[k] === "boolean");
+  const out = {};
+  if ("enabled" in input) {
+    if (typeof input.enabled !== "boolean") return { ok: false, error: "enabled_not_boolean" };
+    out.enabled = input.enabled;
+  }
+  if ("byEvent" in input) { if (!isBoolMap(input.byEvent)) return { ok: false, error: "byEvent_invalid" }; out.byEvent = Object.assign({}, input.byEvent); }
+  if ("byPlatform" in input) { if (!isBoolMap(input.byPlatform)) return { ok: false, error: "byPlatform_invalid" }; out.byPlatform = Object.assign({}, input.byPlatform); }
+  if ("quietHours" in input) {
+    const q = input.quietHours;
+    if (q === null) { out.quietHours = null; }
+    else {
+      const hhmm = (s) => typeof s === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+      if (!q || typeof q !== "object" || Array.isArray(q) || !hhmm(q.start) || !hhmm(q.end)) return { ok: false, error: "quietHours_invalid" };
+      out.quietHours = { start: q.start, end: q.end };
+    }
+  }
+  out.updatedAt = (typeof nowMs === "number" ? nowMs : Date.now());
+  return { ok: true, value: out };
+}
+// Orquestra a atualizacao. ctx = {method, authHeader, body, now}. Escreve SO em
+// notifPrefs/{uid}. Retorna {status, json}. Erros sempre controlados (sem throw).
+async function handleNotifPrefsUpdate(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  if (ctx.method && String(ctx.method).toUpperCase() !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const auth = notifVerifyToken(ctx.authHeader, notifPrefsSecret(), now);
+  if (!auth.ok) return { status: auth.code, json: { ok: false, error: auth.error } };
+  const body = ctx.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { status: 400, json: { ok: false, error: "body_not_object" } };
+  const targetUid = (typeof body.uid === "string" && body.uid) ? body.uid : auth.uid;
+  if (targetUid !== auth.uid && !auth.admin) return { status: 403, json: { ok: false, error: "forbidden_uid" } };
+  const val = notifValidatePrefs(body, now);
+  if (!val.ok) return { status: 400, json: { ok: false, error: val.error } };
+  try {
+    await notifDb().collection("notifPrefs").doc(String(targetUid)).set(val.value, { merge: true });
+  } catch (e) {
+    try { logger.error("[updateNotifPrefs] gravacao falhou", { uid: String(targetUid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "write_failed" } };
+  }
+  return { status: 200, json: { ok: true, uid: targetUid, prefs: val.value } };
+}
+
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem
+// NOTIF_PREFS_SECRET => 503. NAO deployado nesta fase; NAO integrado ao Desktop/UI.
+exports.updateNotifPrefs = onRequest({ region: "us-central1", maxInstances: 10 }, async (req, res) => {
+  try {
+    const out = await handleNotifPrefsUpdate({
+      method: req.method,
+      authHeader: (req.get && req.get("authorization")) || "",
+      body: req.body,
+      now: Date.now(),
+    });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[updateNotifPrefs] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
+exports._notifVerifyToken = notifVerifyToken;
+exports._notifValidatePrefs = notifValidatePrefs;
+exports._handleNotifPrefsUpdate = handleNotifPrefsUpdate;
