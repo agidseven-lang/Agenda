@@ -2591,6 +2591,7 @@ function slaibFmtDur(ms){ms=Math.max(0,ms);var m=Math.round(ms/60000);if(m<60)re
 /* F3.3.2-PANEL-CORE BEGIN */
 var SLA_PANEL_WARN_MS=30*60000;   // janela LARANJA (prazo próximo): finish-30min <= now < finish
 var SLA_PANEL_GRACE_MS=10*60000;  // tolerância VERMELHA: 10 min após o finish p/ concluir/sinalizar
+var SLA_ASSIGNMENT_GRACE_MS=2*60000;  // F3.3.19-G-INC01-A: grace pós-atribuição — NÃO sobrepor o laranja "prazo próximo" à notificação azul de atribuição (só o ramo warning; vermelho/atraso intacto)
 function slaPanelFinishMs(t,dtMsFn){
   var ds=(t&&t.designerSla)||{};
   var pf=Number(ds.plannedFinishAt); if(pf>0) return pf;          // 1) plannedFinishAt (engine)
@@ -3633,10 +3634,18 @@ function notifScanSla(){
         targetUserId:state.user.id, notificationType:'sla_personal', etapa:'SLA', status:d.state,
         subtitle:tl, anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
       if(d.state==='warning'){
-        // LARANJA — texto canônico + prazo final/contador no contexto.
-        notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
-          title:(fn?fn+', ':'')+'prazo próximo', body:'Você tem 30 minutos para concluir esta tarefa.',
-          context:'Prazo final: '+pf+' · Vence em '+slaCount(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
+        // F3.3.19-G-INC01-A — GRACE pós-atribuição: suprime SOMENTE o laranja "prazo próximo" nos
+        // primeiros SLA_ASSIGNMENT_GRACE_MS após a atribuição, p/ não sair junto com a notificação azul
+        // de atribuição. Após o grace (ou tarefa antiga sem assignedAt recente) dispara normal.
+        // NÃO afeta vermelho/atraso (ramo abaixo), dedup, baseline R4 nem a notificação de atribuição.
+        var _aAt=Number(t&&t.designerAssignment&&t.designerAssignment.assignedAt)||0;
+        var _inGrace=_aAt>0 && (now-_aAt)<SLA_ASSIGNMENT_GRACE_MS;
+        if(!_inGrace){
+          // LARANJA — texto canônico + prazo final/contador no contexto.
+          notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
+            title:(fn?fn+', ':'')+'prazo próximo', body:'Você tem 30 minutos para concluir esta tarefa.',
+            context:'Prazo final: '+pf+' · Vence em '+slaCount(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
+        }
       } else if(d.state==='overdue'){
         if(d.critical){
           // CRÍTICO — esgotada a tolerância de 10 min.
