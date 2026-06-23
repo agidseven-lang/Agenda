@@ -43,6 +43,7 @@ let BODY = ""; for (const n of NAMES) BODY += grab(n) + "\n";
 
 // Mock de admin.firestore(): store p/ notifPrefs + captura de notifLog + modos de erro.
 const PRELUDE = `
+  var NOTIF_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000;
   var __store = { notifPrefs: {} };
   var __failGet = false, __failAdd = false, __log = [];
   var admin = { firestore: function () { return {

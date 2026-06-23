@@ -804,6 +804,7 @@ async function writeNotifLog(entry) {
   if (!notifFlag("ENABLE_NOTIF_LOG")) return { written: false, skipped: "flag_off" };
   try {
     const e = entry || {};
+    const atMs = (e.at != null ? e.at : Date.now());
     const doc = {
       taskId:    String(e.taskId    != null ? e.taskId    : ""),
       eventType: String(e.eventType != null ? e.eventType : ""),
@@ -812,7 +813,8 @@ async function writeNotifLog(entry) {
       sent:      Number.isFinite(+e.sent)  ? +e.sent  : 0,
       total:     Number.isFinite(+e.total) ? +e.total : 0,
       reason:    String(e.reason     != null ? e.reason   : ""),
-      at:        (e.at != null ? e.at : Date.now()),
+      at:        atMs,
+      expireAt:  atMs + NOTIF_LOG_TTL_MS,   // B1.5-B: retencao 30 dias (server-side; TTL nativo do Firestore)
     };
     await notifDb().collection("notifLog").add(doc);
     return { written: true };
@@ -828,6 +830,35 @@ exports._notifFlag = notifFlag;
 exports._getNotifPrefs = getNotifPrefs;
 exports._shouldNotifyByPrefs = shouldNotifyByPrefs;
 exports._writeNotifLog = writeNotifLog;
+
+/* ============================================================================
+   F3.3.20-B1.5-B — HARDENING (ainda DORMENTE; prepara deploy seguro).
+   ----------------------------------------------------------------------------
+   - NOTIF_PREFS_SECRET via Secret Manager (defineSecret), bound SOMENTE em
+     updateNotifPrefs/issueNotifPrefsToken. Sem o segredo => process.env vazio
+     => 503 (dormente). notifPrefsSecret()/notifFlag() continuam lendo process.env
+     (v2 injeta o segredo bound em process.env; harness seta process.env).
+   - Flags continuam via process.env: DEFAULT OFF garantido (ausente/≠"true" => false).
+     NUNCA "true" no codigo; ativacao so via env de runtime no deploy controlado.
+   - notifLog ganha expireAt (retencao 30 dias, server-side) p/ TTL nativo do Firestore.
+   - Rate-limit IN-MEMORY (best-effort, por instancia; SEM Firestore; sem PII) do
+     emissor: por uid+IP, NOTIF_RL_MAX falhas invalidas / janela => bloqueio temporario.
+   ============================================================================ */
+const NOTIF_PREFS_SECRET = defineSecret("NOTIF_PREFS_SECRET");
+const NOTIF_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 dias
+const NOTIF_RL_MAX = 5;                               // tentativas invalidas
+const NOTIF_RL_WINDOW_MS = 5 * 60 * 1000;            // janela de contagem
+const NOTIF_RL_BLOCK_MS = 15 * 60 * 1000;           // bloqueio/backoff
+const __notifRlState = new Map();                    // key -> {fails, first, until} (volatil; sem PII)
+function notifRlBlocked(key, now) { const s = __notifRlState.get(key); return !!(s && s.until && now < s.until); }
+function notifRlFail(key, now) {
+  let s = __notifRlState.get(key);
+  if (!s || (now - s.first) >= NOTIF_RL_WINDOW_MS) s = { fails: 0, first: now };
+  s.fails += 1;
+  if (s.fails >= NOTIF_RL_MAX) s.until = now + NOTIF_RL_BLOCK_MS;
+  __notifRlState.set(key, s);
+}
+function notifRlClear(key) { __notifRlState.delete(key); }
 
 /* ============================================================================
    F3.3.20-B1.2 — ENDPOINT server-side AUTENTICADO p/ notifPrefs/{uid}.
@@ -922,7 +953,7 @@ async function handleNotifPrefsUpdate(ctx) {
 
 // Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem
 // NOTIF_PREFS_SECRET => 503. NAO deployado nesta fase; NAO integrado ao Desktop/UI.
-exports.updateNotifPrefs = onRequest({ region: "us-central1", maxInstances: 10 }, async (req, res) => {
+exports.updateNotifPrefs = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10 }, async (req, res) => {
   try {
     const out = await handleNotifPrefsUpdate({
       method: req.method,
@@ -995,6 +1026,10 @@ async function handleIssueNotifPrefsToken(ctx) {
   const password = (typeof body.password === "string") ? body.password : "";
   if (!uid) return { status: 400, json: { ok: false, error: "missing_uid" } };
   if (!password) return { status: 400, json: { ok: false, error: "missing_password" } };
+  // B1.5-B — rate-limit IN-MEMORY (best-effort; SEM Firestore) por uid + IP.
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["u:" + uid].concat(ip ? ["i:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
   let snap;
   try { snap = await notifDb().collection("users").doc(uid).get(); }
   catch (e) {
@@ -1002,12 +1037,13 @@ async function handleIssueNotifPrefsToken(ctx) {
     return { status: 500, json: { ok: false, error: "lookup_failed" } };
   }
   // uid desconhecido OU senha errada => MESMO 401 generico (nao revela existencia do uid).
-  if (!snap || !snap.exists) return { status: 401, json: { ok: false, error: "invalid_credentials" } };
+  if (!snap || !snap.exists) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
   const u = snap.data() || {};
-  if (!notifVerifyPassword(u.pass, u.salt, password)) return { status: 401, json: { ok: false, error: "invalid_credentials" } };
+  if (!notifVerifyPassword(u.pass, u.salt, password)) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
   // Inativo => 403 (checado SO apos a senha correta, p/ nao vazar estado a quem nao a tem).
   const st = String(u.status || "");
   if (st === "pendente" || st === "removido" || st === "excluido") return { status: 403, json: { ok: false, error: "user_inactive" } };
+  rlKeys.forEach((k) => notifRlClear(k));   // sucesso de credenciais: zera o rate-limit do uid/IP
   // Token p/ o PROPRIO uid provado (nunca aceita uid alvo). admin:true so se o registro marcar.
   const isAdmin = (u.admin === true);
   const claims = { uid: uid, admin: isAdmin, scope: "notifPrefs:write", iat: now, exp: now + NOTIF_TOKEN_TTL_MS };
@@ -1018,9 +1054,11 @@ async function handleIssueNotifPrefsToken(ctx) {
 
 // Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem NOTIF_PREFS_SECRET
 // => 503. NAO deployado nesta fase; NAO integrado ao Desktop/UI.
-exports.issueNotifPrefsToken = onRequest({ region: "us-central1", maxInstances: 10 }, async (req, res) => {
+exports.issueNotifPrefsToken = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10 }, async (req, res) => {
   try {
-    const out = await handleIssueNotifPrefsToken({ method: req.method, body: req.body, now: Date.now() });
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleIssueNotifPrefsToken({ method: req.method, body: req.body, ip: clientIp, now: Date.now() });
     res.status(out.status).json(out.json);
   } catch (e) {
     try { logger.error("[issueNotifPrefsToken] erro", { err: e && e.message }); } catch (_) {}
