@@ -1,0 +1,122 @@
+# =====================================================================
+# [manual] F3.3.20-B1.1-A — VALIDAÇÃO READ-ONLY da base server-side DORMENTE
+# de notifPrefs/notifLog (functions/index.js). Prova (f33R, helpers REAIS):
+# flags OFF => comportamento atual idêntico; ausência/erro => fallback seguro;
+# enabled=false (flag ON) => suprime só no helper; notifLog best-effort com os
+# campos exigidos; e que dedup por deviceId / fcmTokens / fcmTokenMeta /
+# clientPushSubs NÃO são tocados. Regressões: notificações (f333/f33A/f33C/f33D
+# Chromium real/f33E/f33F), e2e, tsc (main+preload), syntax. CONFINAMENTO: o
+# delta da B1.1-A (vs 26b3a3b) é SÓ functions/index.js + f33R + este workflow;
+# DIFF-ZERO em renderer/main/preload/bgnotify/sw/firebase-sw/Worker/Android.
+# SOMENTE validação: NÃO faz build/deploy/release/merge; NÃO altera produto.
+# =====================================================================
+name: "[manual] F3.3.20-B1.1-A notifPrefs/notifLog base (read-only)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop/local-detail-hierarchy-v2]
+    paths:
+      - '.github/workflows/f3320-b11a-validation.yml'
+      - 'scripts/worker-ops/f33R-notif-prefs-log.test.mjs'
+      - 'functions/index.js'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3320-b11a-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # precisa de 26b3a3b (baseline INC01-A) e ac66826 p/ provas
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Chromium real (testes DOM f33C/f33D no renderer real)
+        run: |
+          npm init -y >/dev/null 2>&1 || true
+          npm i playwright@1.47.2 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          echo "CHROME_BIN=$(node -e "console.log(require('playwright').chromium.executablePath())")" >> "$GITHUB_ENV"
+
+      - name: Syntax check (node --check em functions + scripts)
+        run: |
+          set -e
+          node --check functions/index.js
+          for f in scripts/worker-ops/*.mjs desktop/scripts/*.mjs desktop/scripts/*.js; do node --check "$f"; done
+          echo "syntax OK"
+
+      - name: tsc (main + preload) — nenhum TS alterado na B1.1-A
+        run: |
+          cd desktop
+          npm ci
+          npx tsc -p tsconfig.json --noEmit
+          echo "tsc OK"
+
+      - name: B1.1-A — base notifPrefs/notifLog (f33R, helpers reais)
+        run: node scripts/worker-ops/f33R-notif-prefs-log.test.mjs
+
+      - name: Suítes de notificação existentes (regressão) + e2e
+        run: |
+          set -e
+          for t in f333-notif f33A-notif-central f33C-assignment-toast f33D-background-notif f33E-main-notifier f33F-bg-notify f33K-notif-actor; do
+            echo "==================== $t ===================="; node "desktop/scripts/$t.test.mjs"
+          done
+          echo "==================== e2e ===================="; node desktop/scripts/e2e-flow-test.js
+
+      - name: CONFINAMENTO — delta da B1.1-A só em functions/index.js + f33R + workflow (26b3a3b -> HEAD)
+        run: |
+          set -e
+          BASE=26b3a3b
+          # Ignora docs/sla-f332 (PNGs de QA gerados pelo bot, [skip ci]) — ruido fora do escopo.
+          DELTA="$(git diff --name-only "$BASE" HEAD -- . ':(exclude)docs/sla-f332')"
+          echo "Arquivos alterados desde $BASE (excl. docs/sla-f332):"; echo "$DELTA"
+          UNEXPECTED="$(echo "$DELTA" | grep -vE '^(functions/index\.js|scripts/worker-ops/f33R-notif-prefs-log\.test\.mjs|\.github/workflows/f3320-b11a-validation\.yml)$' || true)"
+          if [ -n "$UNEXPECTED" ]; then
+            echo "::error:: arquivos fora do escopo da B1.1-A alterados:"; echo "$UNEXPECTED"; exit 1
+          fi
+          echo "OK: delta confinado a functions/index.js + f33R + workflow."
+
+      - name: DIFF-ZERO — Desktop renderer/main/preload/bgnotify + SW + Worker + Android (26b3a3b -> HEAD)
+        run: |
+          set -e
+          BASE=26b3a3b
+          PROT="desktop/src/renderer/index.html desktop/src/main/ desktop/src/preload/ desktop/src/renderer/bgnotify.html sw.js firebase-messaging-sw.js cloudflare-worker.js android"
+          if git diff --stat "$BASE" HEAD -- $PROT | grep .; then
+            echo "::error:: arquivos protegidos ALTERADOS desde $BASE"
+            git diff --stat "$BASE" HEAD -- $PROT
+            exit 1
+          fi
+          echo "OK: renderer/main/preload/bgnotify/sw/firebase-sw/Worker/Android com diff-zero (B1.1-A não os tocou)."
+
+      - name: Prova dedicada — Worker (cloudflare-worker.js) INTOCADO desde ac66826
+        run: |
+          set -e
+          if git diff --stat ac66826 HEAD -- cloudflare-worker.js | grep .; then
+            echo "::error:: cloudflare-worker.js ALTERADO"; exit 1
+          fi
+          echo "OK: cloudflare-worker.js intocado (Worker fora do escopo da B1.1-A)."
+
+      - name: Prova dedicada — Android e service workers INTOCADOS desde ac66826
+        run: |
+          set -e
+          if git diff --stat ac66826 HEAD -- android sw.js firebase-messaging-sw.js | grep .; then
+            echo "::error:: Android/SW ALTERADOS"; exit 1
+          fi
+          echo "OK: Android/ + sw.js + firebase-messaging-sw.js intocados."
+
+      - name: Prova — Firestore Rules NÃO versionadas no repo (geridas manualmente)
+        run: |
+          set -e
+          if [ -f firestore.rules ] || grep -q '"firestore"' firebase.json 2>/dev/null; then
+            echo "::error:: rules apareceram no repo — revisar (B1.1-A não altera Rules)"; exit 1
+          fi
+          echo "OK: sem firestore.rules no repo e firebase.json sem secção firestore — Rules Opção B geridas manualmente, intocadas."
