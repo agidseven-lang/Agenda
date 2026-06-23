@@ -704,3 +704,97 @@ exports.cleanupPasswordResetCodes = onSchedule(
 
 // Exporta logica pura para o smoke test local (nao afeta o runtime das Functions).
 exports._shouldDeleteResetCode = shouldDeleteResetCode;
+
+/* ============================================================================
+   F3.3.20-B1.1-A — BASE SERVER-SIDE DORMENTE p/ notifPrefs / notifLog.
+   ----------------------------------------------------------------------------
+   Objetivo: estabelecer helpers server-side (service account / admin SDK) para,
+   no FUTURO, respeitar preferencias de notificacao (notifPrefs/{uid}) e gravar
+   auditoria de envio (notifLog/{autoId}) — SEM mudar o comportamento atual.
+
+   SEGURANCA / DORMENCIA:
+   - Flags OFF por padrao: ENABLE_NOTIF_PREFS / ENABLE_NOTIF_LOG. Qualquer valor
+     diferente de "true" (case-insensitive) = OFF.
+   - Com as flags OFF: getNotifPrefs => null, shouldNotifyByPrefs => true,
+     writeNotifLog => no-op. Ou seja, comportamento atual 100% identico.
+   - Estes helpers NAO sao chamados por nenhum trigger/relay nesta fase (base
+     dormente). A integracao real fica para uma fase futura (autorizada).
+   - Best-effort: nunca lancam; nunca bloqueiam envio nem fluxo de negocio.
+   - Nao usam request.auth.uid (rodam por service account / admin SDK).
+   - Nao tocam fcmTokens / fcmTokenMeta / clientPushSubs nem o dedup por deviceId
+     (dedupeTokensByDevice). So LEEM notifPrefs e GRAVAM notifLog server-side.
+   - Escrita client-side continua barrada pelas Firestore Rules Opcao B; estes
+     helpers rodam server-side (admin SDK ignora rules).
+   ============================================================================ */
+function notifFlag(name) {
+  // Defensivo: somente "true" (case-insensitive) liga a flag; qualquer outra coisa = OFF.
+  return String((typeof process !== "undefined" && process.env && process.env[name]) || "").toLowerCase() === "true";
+}
+// Indirecao p/ o Firestore (testabilidade). Em producao = admin.firestore().
+function notifDb() { return admin.firestore(); }
+
+// (1) Le notifPrefs/{uid}. Dormente: flag OFF => null. Sem doc => null.
+//     Erro de leitura => null (fallback seguro). null SEMPRE significa
+//     "comportamento atual preservado" para quem consome.
+async function getNotifPrefs(uid) {
+  if (!notifFlag("ENABLE_NOTIF_PREFS")) return null;
+  if (!uid) return null;
+  try {
+    const snap = await notifDb().collection("notifPrefs").doc(String(uid)).get();
+    if (!snap || !snap.exists) return null;
+    return snap.data() || null;
+  } catch (e) {
+    try { logger.warn("[notifPrefs] leitura falhou (fallback seguro)", { uid: String(uid), err: e && e.message }); } catch (_) {}
+    return null;
+  }
+}
+
+// (2) Decide se deve notificar conforme as prefs. Defaults SEGUROS:
+//     - flag OFF          => true (nunca suprime; comportamento atual)
+//     - sem doc           => true (comportamento atual preservado)
+//     - erro              => true (nunca bloqueia)
+//     - enabled === false => false (opt-out explicito; SO com a flag ON)
+//     - mutedEvents[eventType] === true => false (granular opcional)
+//     - platforms[platform] === false   => false (granular opcional)
+async function shouldNotifyByPrefs(uid, eventType, platform) {
+  if (!notifFlag("ENABLE_NOTIF_PREFS")) return true;
+  let prefs = null;
+  try { prefs = await getNotifPrefs(uid); } catch (_) { return true; }
+  if (!prefs) return true;
+  if (prefs.enabled === false) return false;
+  if (eventType && prefs.mutedEvents && prefs.mutedEvents[eventType] === true) return false;
+  if (platform && prefs.platforms && prefs.platforms[platform] === false) return false;
+  return true;
+}
+
+// (3) Grava notifLog/{autoId} best-effort. Dormente: flag OFF => no-op.
+//     NUNCA lanca; NUNCA bloqueia envio/fluxo. Retorna {written, skipped?}.
+//     Payload normalizado: so IDs tecnicos + contadores (sem PII sensivel).
+async function writeNotifLog(entry) {
+  if (!notifFlag("ENABLE_NOTIF_LOG")) return { written: false, skipped: "flag_off" };
+  try {
+    const e = entry || {};
+    const doc = {
+      taskId:    String(e.taskId    != null ? e.taskId    : ""),
+      eventType: String(e.eventType != null ? e.eventType : ""),
+      to:        String(e.to        != null ? e.to        : ""),
+      channel:   String(e.channel   != null ? e.channel   : ""),
+      sent:      Number.isFinite(+e.sent)  ? +e.sent  : 0,
+      total:     Number.isFinite(+e.total) ? +e.total : 0,
+      reason:    String(e.reason     != null ? e.reason   : ""),
+      at:        (e.at != null ? e.at : Date.now()),
+    };
+    await notifDb().collection("notifLog").add(doc);
+    return { written: true };
+  } catch (e) {
+    try { logger.warn("[notifLog] gravacao falhou (best-effort, ignorada)", { err: e && e.message }); } catch (_) {}
+    return { written: false, skipped: "error" };
+  }
+}
+
+// Exporta logica pura para o harness local (NAO afeta o runtime; helpers ficam
+// dormentes — nenhum trigger os chama nesta fase).
+exports._notifFlag = notifFlag;
+exports._getNotifPrefs = getNotifPrefs;
+exports._shouldNotifyByPrefs = shouldNotifyByPrefs;
+exports._writeNotifLog = writeNotifLog;
