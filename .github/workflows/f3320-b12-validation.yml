@@ -1,31 +1,31 @@
 # =====================================================================
-# [manual] F3.3.20-B1.1-A — VALIDAÇÃO READ-ONLY da base server-side DORMENTE
-# de notifPrefs/notifLog (functions/index.js). Prova (f33R, helpers REAIS):
-# flags OFF => comportamento atual idêntico; ausência/erro => fallback seguro;
-# enabled=false (flag ON) => suprime só no helper; notifLog best-effort com os
-# campos exigidos; e que dedup por deviceId / fcmTokens / fcmTokenMeta /
-# clientPushSubs NÃO são tocados. Regressões: notificações (f333/f33A/f33C/f33D
-# Chromium real/f33E/f33F), e2e, tsc (main+preload), syntax. CONFINAMENTO: o
-# delta da B1.1-A (vs 26b3a3b) é SÓ functions/index.js + f33R + este workflow;
-# DIFF-ZERO em renderer/main/preload/bgnotify/sw/firebase-sw/Worker/Android.
-# SOMENTE validação: NÃO faz build/deploy/release/merge; NÃO altera produto.
+# [manual] F3.3.20-B1.2 — VALIDAÇÃO READ-ONLY do ENDPOINT server-side autenticado
+# de notifPrefs/{uid} (functions/index.js). Prova (f33S, handler REAL):
+# 401 sem auth / 503 sem segredo / 400 payload inválido / 200 válido; grava SOMENTE
+# notifPrefs/{uid} (merge), nunca users/fcmTokens/fcmTokenMeta/clientPushSubs; impede
+# outro uid (403, admin pode); erro de gravação => 500 controlado; flag OFF mantém
+# comportamento atual (pref não afeta envio). Regressões: f33R (B1.1-A), notificações
+# (f333/f33A/f33C/f33D Chromium real/f33E/f33F/f33K), e2e, tsc, syntax. CONFINAMENTO:
+# delta da B1.2 (vs 2c0eab1) é só functions/index.js + f33S + este workflow; DIFF-ZERO
+# em renderer/main/preload/bgnotify/sw/firebase-sw/Worker/Android. SOMENTE validação:
+# NÃO faz build/deploy/release/merge; NÃO altera produto/Rules; endpoint NÃO deployado.
 # =====================================================================
-name: "[manual] F3.3.20-B1.1-A notifPrefs/notifLog base (read-only)"
+name: "[manual] F3.3.20-B1.2 notifPrefs endpoint (read-only)"
 
 on:
   workflow_dispatch:
   push:
     branches: [desktop/local-detail-hierarchy-v2]
     paths:
-      - '.github/workflows/f3320-b11a-validation.yml'
-      - 'scripts/worker-ops/f33R-notif-prefs-log.test.mjs'
+      - '.github/workflows/f3320-b12-validation.yml'
+      - 'scripts/worker-ops/f33S-notif-prefs-endpoint.test.mjs'
       - 'functions/index.js'
 
 permissions:
   contents: read
 
 concurrency:
-  group: f3320-b11a-validation
+  group: f3320-b12-validation
   cancel-in-progress: true
 
 jobs:
@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # precisa de 26b3a3b (baseline INC01-A) e ac66826 p/ provas
+          fetch-depth: 0   # precisa de 2c0eab1 (B1.1-A), 26b3a3b (INC01-A) e ac66826
 
       - uses: actions/setup-node@v4
         with:
@@ -54,15 +54,18 @@ jobs:
           for f in scripts/worker-ops/*.mjs desktop/scripts/*.mjs desktop/scripts/*.js; do node --check "$f"; done
           echo "syntax OK"
 
-      - name: tsc (main + preload) — nenhum TS alterado na B1.1-A
+      - name: tsc (main + preload) — nenhum TS alterado na B1.2
         run: |
           cd desktop
           npm ci
           npx tsc -p tsconfig.json --noEmit
           echo "tsc OK"
 
-      - name: B1.1-A — base notifPrefs/notifLog (f33R, helpers reais)
-        run: node scripts/worker-ops/f33R-notif-prefs-log.test.mjs
+      - name: B1.2 — endpoint notifPrefs (f33S, handler real) + base B1.1-A (f33R)
+        run: |
+          set -e
+          node scripts/worker-ops/f33S-notif-prefs-endpoint.test.mjs
+          node scripts/worker-ops/f33R-notif-prefs-log.test.mjs
 
       - name: Suítes de notificação existentes (regressão) + e2e
         run: |
@@ -97,7 +100,7 @@ jobs:
             git diff --stat "$BASE" HEAD -- $PROT
             exit 1
           fi
-          echo "OK: renderer/main/preload/bgnotify/sw/firebase-sw/Worker/Android com diff-zero (B1.1-A não os tocou)."
+          echo "OK: renderer/main/preload/bgnotify/sw/firebase-sw/Worker/Android com diff-zero (B1.2 não os tocou)."
 
       - name: Prova dedicada — Worker (cloudflare-worker.js) INTOCADO desde ac66826
         run: |
@@ -105,7 +108,7 @@ jobs:
           if git diff --stat ac66826 HEAD -- cloudflare-worker.js | grep .; then
             echo "::error:: cloudflare-worker.js ALTERADO"; exit 1
           fi
-          echo "OK: cloudflare-worker.js intocado (Worker fora do escopo da B1.1-A)."
+          echo "OK: cloudflare-worker.js intocado (Worker fora do escopo da B1.2)."
 
       - name: Prova dedicada — Android e service workers INTOCADOS desde ac66826
         run: |
@@ -119,6 +122,6 @@ jobs:
         run: |
           set -e
           if [ -f firestore.rules ] || grep -q '"firestore"' firebase.json 2>/dev/null; then
-            echo "::error:: rules apareceram no repo — revisar (B1.1-A não altera Rules)"; exit 1
+            echo "::error:: rules apareceram no repo — revisar (B1.2 não altera Rules)"; exit 1
           fi
           echo "OK: sem firestore.rules no repo e firebase.json sem secção firestore — Rules Opção B geridas manualmente, intocadas."

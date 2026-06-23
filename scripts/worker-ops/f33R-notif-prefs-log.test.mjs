@@ -80,9 +80,11 @@ const ok = (n, c) => { if (c) pass++; else { fail++; flog.push("FAIL: " + n); } 
 
 (async () => {
   /* ===== 0) PROVAS DE FONTE (confinamento / no-touch / dormencia) ===== */
-  // BLOCK = somente o CODIGO dos helpers (a partir de notifFlag), excluindo o
-  // comentario-cabecalho (que cita deviceId/fcmTokens/clientPushSubs nas notas).
-  const BLOCK = SRC.slice(SRC.indexOf("function notifFlag"));
+  // BLOCK = somente o CODIGO dos helpers da B1.1-A (de notifFlag ate o inicio da
+  // B1.2), excluindo cabecalhos/comentarios que citam deviceId/fcmTokens/clientPushSubs.
+  const _b1aStart = SRC.indexOf("function notifFlag");
+  const _b12Start = SRC.indexOf("F3.3.20-B1.2 — ENDPOINT");
+  const BLOCK = SRC.slice(_b1aStart, _b12Start > _b1aStart ? _b12Start : undefined);
   ok("[src] flags ENABLE_NOTIF_PREFS/ENABLE_NOTIF_LOG definidas (default OFF; so 'true' liga)",
     /notifFlag\("ENABLE_NOTIF_PREFS"\)/.test(BLOCK) && /notifFlag\("ENABLE_NOTIF_LOG"\)/.test(BLOCK)
     && /=== "true"/.test(BLOCK));
