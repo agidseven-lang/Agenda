@@ -8,8 +8,11 @@
 #   - rejeita 'functions' (total), updateNotifPrefs, issueNotifPrefsToken, vazio e token fora da lista;
 #   - pin do blob functions/index.js == ced2518394d73b41512ac3da72b8b8de935b295c;
 #   - pre-checks: node --check + f33R..f33V + flags OFF;
-#   - NAO cria/usa NOTIF_PREFS_SECRET; NAO escreve ENABLE_NOTIF_* no .env;
-#   - pos-deploy (so dry_run=false): endpoints novos ausentes + segredo ausente.
+#   - NOTIF_PREFS_SECRET: garante PLACEHOLDER (so dry_run=false) p/ a analise do firebase passar
+#     (firebase analisa o codebase INTEIRO e exige valor; os endpoints ficam FORA do --only =>
+#     placeholder INERTE, nao publicado). Nunca valor real; NAO escreve ENABLE_NOTIF_* no .env;
+#   - pos-deploy (so dry_run=false) valida DORMENCIA REAL: endpoints novos ausentes + flags OFF
+#     (placeholder de segredo NAO quebra dormencia: nenhuma funcao publicada o consome).
 # Inputs sao mapeados para env (evita injecao de expressao no shell).
 # =====================================================================
 name: "[manual] Firebase Functions Deploy — DORMANT-1 (parcial, 3 triggers)"
@@ -130,6 +133,22 @@ jobs:
           gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
           gcloud config set project "$GCP_PROJECT" >/dev/null
 
+      - name: Placeholder NOTIF_PREFS_SECRET (so dry_run=false; sem valor real; inerte)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -e
+          # O firebase analisa o codebase INTEIRO e exige VALOR p/ NOTIF_PREFS_SECRET (bound em
+          # updateNotifPrefs/issueNotifPrefsToken), mesmo deployando so os 3 triggers (--only).
+          # Garante um PLACEHOLDER (nunca valor real; nunca imprime valor). Os endpoints continuam
+          # FORA do --only => NAO publicados => placeholder INERTE (mesmo padrao do RESEND_API_KEY).
+          if gcloud secrets describe NOTIF_PREFS_SECRET --project "$GCP_PROJECT" >/dev/null 2>&1; then
+            echo "NOTIF_PREFS_SECRET ja existe — nao altero valor."
+          else
+            gcloud secrets create NOTIF_PREFS_SECRET --replication-policy=automatic --project "$GCP_PROJECT" >/dev/null || true
+            printf 'PLACEHOLDER_NOT_CONFIGURED_DORMANT1' | gcloud secrets versions add NOTIF_PREFS_SECRET --data-file=- --project "$GCP_PROJECT" >/dev/null 2>&1 || true
+            echo "NOTIF_PREFS_SECRET placeholder criado (inerte; endpoints nao publicados)."
+          fi
+
       - name: functions/.env SEM flags (somente RESET_EMAIL_*)
         env:
           RESET_EMAIL_FROM: ${{ secrets.RESET_EMAIL_FROM }}
@@ -171,21 +190,28 @@ jobs:
             echo "DRY-RUN=true — nenhum deploy executado. Alvo planejado: $TARGET"
           fi
 
-      - name: Validacao POS-deploy (somente se dry_run=false)
+      - name: Validacao POS-deploy — DORMENCIA REAL (somente se dry_run=false)
         if: ${{ github.event.inputs.dry_run == 'false' }}
         run: |
           set -e
+          # Dormencia real = endpoints novos AUSENTES + flags OFF. Um PLACEHOLDER de
+          # NOTIF_PREFS_SECRET NAO quebra a dormencia: nenhuma funcao publicada o consome
+          # (os endpoints que o usam ficam fora do --only). Por isso NAO exigimos segredo ausente.
           firebase functions:list --project "$GCP_PROJECT" | tee after.txt
           if grep -qE '(^|[^A-Za-z])updateNotifPrefs([^A-Za-z]|$)' after.txt; then
-            echo "::error:: updateNotifPrefs presente (DORMANT-1 violado)"; exit 1
+            echo "::error:: updateNotifPrefs publicado (DORMANT-1 violado)"; exit 1
           fi
           if grep -qE '(^|[^A-Za-z])issueNotifPrefsToken([^A-Za-z]|$)' after.txt; then
-            echo "::error:: issueNotifPrefsToken presente (DORMANT-1 violado)"; exit 1
+            echo "::error:: issueNotifPrefsToken publicado (DORMANT-1 violado)"; exit 1
           fi
-          if gcloud secrets describe NOTIF_PREFS_SECRET --project "$GCP_PROJECT" >/dev/null 2>&1; then
-            echo "::error:: NOTIF_PREFS_SECRET existe (nao deveria no DORMANT-1)"; exit 1
-          fi
-          echo "POS-deploy OK: endpoints novos ausentes; segredo ausente."
+          # flags devem continuar OFF/ausentes no env das 3 funcoes publicadas
+          for FN in onTaskCreated onEventCreated onChatMessageCreated; do
+            EV="$(gcloud functions describe "$FN" --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.environmentVariables)' 2>/dev/null || true)"
+            if echo "$EV" | grep -qE 'ENABLE_NOTIF_(PREFS|LOG)=true'; then
+              echo "::error:: flag ativada em $FN (DORMANT-1 violado)"; exit 1
+            fi
+          done
+          echo "POS-deploy OK: endpoints novos ausentes; flags OFF; placeholder de segredo inerte tolerado."
 
       - name: Limpeza (.env, SA, artefatos)
         if: always()
