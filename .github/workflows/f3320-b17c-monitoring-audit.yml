@@ -1,0 +1,186 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-C-MONITORING-WORKFLOW-AUDIT — AUDITORIA READ-ONLY de Cloud
+# Monitoring/Logging do emissor publico issueNotifPrefsToken (us-central1). Esta fase
+# NAO cria alertas, NAO cria notification channels, NAO altera policies. Apenas DESCOBRE
+# (read-only): canais de notificacao existentes, alert policies existentes, descritores de
+# metrica do Cloud Run, metadados da function (gen2) + servico Cloud Run de apoio, e logs
+# recentes filtrados ao proprio servico. workflow_dispatch only; mode == audit_only.
+# NAO clona o repositorio (dispensa o codigo do repo). NAO publica funcoes. NAO altera
+# variaveis de ambiente. NAO le nem grava versoes do segredo do trilho. NAO ativa flags.
+# NAO concede nem edita IAM. NAO toca Worker, Desktop nem Android (so leitura de Monitoring).
+# NAO cria/edita/remove qualquer recurso de Monitoring. Mesmo padrao de auth GCP dos demais
+# workflows. Filtros restritos a issueNotifPrefsToken / us-central1. Cada comando e tolerante
+# a falha (set +e) para que a auditoria reporte lacunas de permissao/superficie sem abortar.
+# =====================================================================
+name: "[manual] F3.3.20-B1.7-C Monitoring AUDIT (read-only) issueNotifPrefsToken"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Digite audit_only para confirmar (qualquer outro valor aborta). NAO cria alertas."
+        required: true
+        default: "audit_only"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ff-monitoring-audit
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  REGION: "us-central1"
+  FN: "issueNotifPrefsToken"
+
+jobs:
+  monitoring-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard mode (== audit_only; nao cria alertas)
+        env:
+          MODE: ${{ github.event.inputs.mode }}
+        run: |
+          set -eu
+          if [ "$MODE" != "audit_only" ]; then
+            echo "::error:: mode != audit_only — abortando antes de tudo (esta fase so audita)."
+            exit 1
+          fi
+          echo "mode OK: audit_only (somente leitura; nenhum alerta/canal/policy sera criado)."
+
+      - name: Auth gcloud (service account via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          echo "Auth OK — projeto: $GCP_PROJECT (somente leitura nesta auditoria)."
+
+      - name: AUDIT 1/7 — contexto do projeto (read-only)
+        run: |
+          set +e
+          echo "========== CONTEXTO =========="
+          echo "PROJECT=$GCP_PROJECT  REGION=$REGION  FN=$FN"
+          echo "--- gcloud version (superficie disponivel) ---"
+          gcloud version 2>&1 | sed -n '1,6p'
+          echo "==============================================="
+
+      - name: AUDIT 2/7 — function gen2 (metadados; nunca le valor de segredo)
+        run: |
+          set +e
+          echo "========== FUNCTION (gen2) =========="
+          gcloud functions describe "$FN" --gen2 --region "$REGION" --project "$GCP_PROJECT" \
+            --format='value(name,state,environment,updateTime,serviceConfig.uri,serviceConfig.service,serviceConfig.maxInstanceCount,serviceConfig.serviceAccountEmail)' \
+            2>&1 | tee fn.txt
+          rc=$?
+          if [ $rc -ne 0 ]; then echo "[rc=$rc] functions describe indisponivel/sem permissao"; fi
+          echo "===================================="
+
+      - name: AUDIT 3/7 — Cloud Run service de apoio (nome p/ filtros de metrica)
+        run: |
+          set +e
+          echo "========== CLOUD RUN SERVICE =========="
+          gcloud run services describe "$FN" --region "$REGION" --project "$GCP_PROJECT" \
+            --format='value(metadata.name,status.url,status.latestReadyRevisionName)' \
+            2>&1 | tee run.txt
+          rc=$?
+          if [ $rc -ne 0 ]; then echo "[rc=$rc] run services describe indisponivel/sem permissao"; fi
+          echo "Nome do servico (resource.labels.service_name p/ alertas futuros): $FN"
+          echo "======================================="
+
+      - name: AUDIT 4/7 — notification channels existentes (NAO cria)
+        run: |
+          set +e
+          echo "========== NOTIFICATION CHANNELS (list) =========="
+          gcloud monitoring channels list --project "$GCP_PROJECT" \
+            --format='value(name,type,displayName,enabled)' 2>&1 | tee channels.txt
+          rc=$?
+          if [ $rc -ne 0 ]; then echo "[rc=$rc] channels list indisponivel/sem permissao"; fi
+          N=$(grep -c . channels.txt 2>/dev/null || echo 0)
+          echo "CHANNELS_COUNT=$N"
+          echo "================================================="
+
+      - name: AUDIT 5/7 — alert policies existentes (list/describe; NAO cria/edita)
+        run: |
+          set +e
+          echo "========== ALERT POLICIES (list) =========="
+          gcloud monitoring policies list --project "$GCP_PROJECT" \
+            --format='value(name,displayName,enabled)' 2>&1 | tee policies.txt
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "[rc=$rc] 'gcloud monitoring policies list' (GA) indisponivel; tentando alpha"
+            gcloud alpha monitoring policies list --project "$GCP_PROJECT" \
+              --format='value(name,displayName,enabled)' --quiet 2>&1 | tee policies.txt
+            rc=$?
+            [ $rc -ne 0 ] && echo "[rc=$rc] alpha policies list tambem indisponivel/sem permissao"
+          fi
+          P=$(grep -c . policies.txt 2>/dev/null || echo 0)
+          echo "POLICIES_COUNT=$P"
+          echo "--- policies que mencionam $FN (se houver) ---"
+          grep -i "$FN" policies.txt 2>/dev/null || echo "(nenhuma policy menciona $FN — nao ha alerta dedicado ainda)"
+          echo "==========================================="
+
+      - name: AUDIT 6/7 — descritores de metrica do Cloud Run (p/ desenhar alertas)
+        run: |
+          set +e
+          echo "========== METRIC DESCRIPTORS (run.googleapis.com) =========="
+          gcloud monitoring metric-descriptors list --project "$GCP_PROJECT" \
+            --filter='metric.type:run.googleapis.com' --format='value(type)' 2>&1 | tee metrics.txt
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "[rc=$rc] metric-descriptors list indisponivel nesta superficie/sem permissao"
+            echo "Fallback documental — metricas padrao do Cloud Run para alertas futuros:"
+            echo "  run.googleapis.com/request_count        (labels: response_code, response_code_class)"
+            echo "  run.googleapis.com/request_latencies    (distribuicao; p95/p99)"
+            echo "  run.googleapis.com/container/instance_count"
+          else
+            echo "--- metricas-chave detectadas (count/latency) ---"
+            grep -E 'request_count|request_latencies|instance_count' metrics.txt 2>/dev/null || echo "(filtrar manualmente em metrics.txt)"
+          fi
+          echo "============================================================="
+
+      - name: AUDIT 7/7 — logs recentes do servico (filtrado; sem payload sensivel)
+        run: |
+          set +e
+          FILTER='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$FN"'" AND resource.labels.location="'"$REGION"'"'
+          echo "========== LOGS — ultimas requisicoes (status/metodo; 7d) =========="
+          gcloud logging read "$FILTER" --project "$GCP_PROJECT" --limit=30 --freshness=7d --order=desc \
+            --format='value(timestamp,severity,httpRequest.requestMethod,httpRequest.status)' 2>&1 | tee logs_req.txt
+          rc=$?
+          [ $rc -ne 0 ] && echo "[rc=$rc] logging read (requisicoes) indisponivel/sem permissao"
+          echo "========== LOGS — severidade >= WARNING (7d) =========="
+          gcloud logging read "$FILTER AND severity>=WARNING" --project "$GCP_PROJECT" --limit=20 --freshness=7d --order=desc \
+            --format='value(timestamp,severity)' 2>&1 | tee logs_warn.txt
+          rc=$?
+          [ $rc -ne 0 ] && echo "[rc=$rc] logging read (warnings) indisponivel/sem permissao"
+          W=$(grep -c . logs_warn.txt 2>/dev/null || echo 0)
+          echo "WARN_PLUS_COUNT=$W"
+          echo "=================================================================="
+
+      - name: RELATORIO (resumo parse-friendly da auditoria)
+        run: |
+          set +e
+          echo "========== RELATORIO B1.7-C-MONITORING-WORKFLOW-AUDIT =========="
+          echo "MODE=audit_only"
+          echo "PROJECT=$GCP_PROJECT"
+          echo "REGION=$REGION"
+          echo "FN=$FN"
+          echo "CHANNELS_COUNT=$(grep -c . channels.txt 2>/dev/null || echo 0)"
+          echo "POLICIES_COUNT=$(grep -c . policies.txt 2>/dev/null || echo 0)"
+          echo "POLICIES_MATCHING_FN=$(grep -ic "$FN" policies.txt 2>/dev/null || echo 0)"
+          echo "METRICS_LINES=$(grep -c . metrics.txt 2>/dev/null || echo 0)"
+          echo "REQ_LOG_LINES=$(grep -c . logs_req.txt 2>/dev/null || echo 0)"
+          echo "WARN_PLUS_COUNT=$(grep -c . logs_warn.txt 2>/dev/null || echo 0)"
+          echo "ALERTAS_CRIADOS=0 (esta fase NAO cria alertas)"
+          echo "CANAIS_CRIADOS=0 (esta fase NAO cria notification channels)"
+          echo "POLICIES_ALTERADAS=0 (somente leitura)"
+          echo "==============================================================="
+
+      - name: Limpeza (service account temporario)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" fn.txt run.txt channels.txt policies.txt metrics.txt logs_req.txt logs_warn.txt 2>/dev/null || true
