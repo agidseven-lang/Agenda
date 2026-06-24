@@ -59,6 +59,7 @@ const PRELUDE = `
       }
     }; }
   }; } };
+  admin.firestore.Timestamp = { fromMillis: function (ms) { return { _millis: ms, toMillis: function () { return ms; } }; } };
   var logger = { warn: function () {}, info: function () {}, error: function () {} };
 `;
 
