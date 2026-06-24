@@ -11,8 +11,10 @@
 #   - NOTIF_PREFS_SECRET: garante PLACEHOLDER (so dry_run=false) p/ a analise do firebase passar
 #     (firebase analisa o codebase INTEIRO e exige valor; os endpoints ficam FORA do --only =>
 #     placeholder INERTE, nao publicado). Nunca valor real; NAO escreve ENABLE_NOTIF_* no .env;
-#   - pos-deploy (so dry_run=false) valida DORMENCIA REAL: endpoints novos ausentes + flags OFF
-#     (placeholder de segredo NAO quebra dormencia: nenhuma funcao publicada o consome).
+#   - pos-deploy (so dry_run=false) valida: os 3 triggers ACTIVE + flags OFF por trigger; os
+#     endpoints issueNotifPrefsToken/updateNotifPrefs sao ESPERADOS (publicados em fases
+#     anteriores), ficam FORA do --only e NAO sao republicados (presenca != violacao);
+#     read-only, sem acessar valor de segredo.
 # Inputs sao mapeados para env (evita injecao de expressao no shell).
 # =====================================================================
 name: "[manual] Firebase Functions Deploy — DORMANT-1 (parcial, 3 triggers)"
@@ -73,19 +75,23 @@ jobs:
             *",updateNotifPrefs,"*)     echo "::error:: endpoint proibido: updateNotifPrefs"; exit 1 ;;
             *",issueNotifPrefsToken,"*) echo "::error:: endpoint proibido: issueNotifPrefsToken"; exit 1 ;;
           esac
-          # cada token precisa estar na allowlist FIXA
+          # cada token precisa estar na allowlist FIXA; o alvo final QUALIFICA cada funcao com
+          # o prefixo "functions:" (o firebase --only exige cada alvo qualificado; sem isso,
+          # apenas o primeiro token e deployado — causa do deploy parcial no run 6).
           IFS=','
+          TARGET=""
           for fn in $RAW; do
             case " $ALLOW " in
               *" $fn "*) : ;;
               *) echo "::error:: token fora da allowlist: $fn"; exit 1 ;;
             esac
+            TARGET="${TARGET:+$TARGET,}functions:$fn"
           done
           unset IFS
-          TARGET="functions:$RAW"
-          if [ "$TARGET" = "functions" ] || [ "$TARGET" = "functions:" ]; then
-            echo "::error:: alvo invalido (total)"; exit 1
-          fi
+          # trava: alvo nunca pode ser vazio nem total
+          case "$TARGET" in
+            ""|functions|functions:) echo "::error:: alvo invalido (vazio/total)"; exit 1 ;;
+          esac
           echo "TARGET=$TARGET" >> "$GITHUB_ENV"
           echo "Allowlist OK — alvo: $TARGET"
 
@@ -190,28 +196,38 @@ jobs:
             echo "DRY-RUN=true — nenhum deploy executado. Alvo planejado: $TARGET"
           fi
 
-      - name: Validacao POS-deploy — DORMENCIA REAL (somente se dry_run=false)
+      - name: Validacao POS-deploy — triggers ACTIVE + flags OFF (somente se dry_run=false)
         if: ${{ github.event.inputs.dry_run == 'false' }}
         run: |
           set -e
-          # Dormencia real = endpoints novos AUSENTES + flags OFF. Um PLACEHOLDER de
-          # NOTIF_PREFS_SECRET NAO quebra a dormencia: nenhuma funcao publicada o consome
-          # (os endpoints que o usam ficam fora do --only). Por isso NAO exigimos segredo ausente.
+          # Valida o que ESTE deploy (DORMANT-1) garante: os 3 triggers ACTIVE e com flags OFF.
+          # Os endpoints issueNotifPrefsToken/updateNotifPrefs sao ESPERADOS (publicados em fases
+          # anteriores), ficam FORA do --only e NAO sao republicados aqui — a presenca deles NAO e
+          # violacao. Read-only por metadados; nunca le valor de segredo.
           firebase functions:list --project "$GCP_PROJECT" | tee after.txt
-          if grep -qE '(^|[^A-Za-z])updateNotifPrefs([^A-Za-z]|$)' after.txt; then
-            echo "::error:: updateNotifPrefs publicado (DORMANT-1 violado)"; exit 1
-          fi
-          if grep -qE '(^|[^A-Za-z])issueNotifPrefsToken([^A-Za-z]|$)' after.txt; then
-            echo "::error:: issueNotifPrefsToken publicado (DORMANT-1 violado)"; exit 1
-          fi
-          # flags devem continuar OFF/ausentes no env das 3 funcoes publicadas
+          # 1) os 3 triggers do DORMANT-1 devem existir/ACTIVE e ter flags OFF
           for FN in onTaskCreated onEventCreated onChatMessageCreated; do
+            ST="$(gcloud functions describe "$FN" --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(state)' 2>/dev/null || true)"
+            if [ "$ST" != "ACTIVE" ]; then echo "::error:: $FN nao esta ACTIVE (estado: ${ST:-desconhecido})"; exit 1; fi
             EV="$(gcloud functions describe "$FN" --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.environmentVariables)' 2>/dev/null || true)"
             if echo "$EV" | grep -qE 'ENABLE_NOTIF_(PREFS|LOG)=true'; then
               echo "::error:: flag ativada em $FN (DORMANT-1 violado)"; exit 1
             fi
+            UT="$(gcloud functions describe "$FN" --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(updateTime)' 2>/dev/null || true)"
+            echo "  trigger OK: $FN state=$ST updateTime=${UT:-?} flags=OFF"
           done
-          echo "POS-deploy OK: endpoints novos ausentes; flags OFF; placeholder de segredo inerte tolerado."
+          # 2) defesa em profundidade: endpoints NUNCA podem estar no TARGET deste deploy
+          case "$TARGET" in
+            *updateNotifPrefs*|*issueNotifPrefsToken*)
+              echo "::error:: endpoint indevidamente no TARGET ($TARGET)"; exit 1 ;;
+          esac
+          # 3) endpoints ESPERADOS/preservados (publicados antes; fora do DORMANT-1): apenas loga
+          for EP in issueNotifPrefsToken updateNotifPrefs; do
+            if grep -qE "(^|[^A-Za-z])${EP}([^A-Za-z]|$)" after.txt; then
+              echo "  endpoint preservado (esperado, fora do DORMANT-1): $EP"
+            fi
+          done
+          echo "POS-deploy OK: 3 triggers ACTIVE; flags OFF; endpoints preservados (esperados); sem acesso a segredo."
 
       - name: Limpeza (.env, SA, artefatos)
         if: always()
