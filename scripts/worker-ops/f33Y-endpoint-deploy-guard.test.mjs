@@ -153,6 +153,21 @@ ok("29 POS valida flags OFF + alvo presente",
 ok("30 cleanup SA + .env",
   /rm -f[^\n]*gcp-sa\.json/.test(YML) && /functions\/\.env\./.test(YML) && /if:\s*always\(\)/.test(YML));
 
+/* ===== F3.3.20-B1.7-C-FIX: passo functions/.env com RESET_EMAIL_* (sem flags/segredo) ===== */
+const ENVSTEP = stepBody("functions/.env SEM flags (somente RESET_EMAIL_*)");
+/* 31) cria functions/.env.${GCP_PROJECT} antes do deploy */
+ok("31 cria functions/.env.${GCP_PROJECT}",
+  ENVSTEP.length > 0 && /> "functions\/\.env\.\$\{GCP_PROJECT\}"/.test(ENVSTEP));
+/* 32) grava RESET_EMAIL_FROM / _FROM_NAME / _PROVIDER (do secrets) */
+ok("32 .env grava RESET_EMAIL_*",
+  /RESET_EMAIL_FROM=%s/.test(ENVSTEP) && /RESET_EMAIL_FROM_NAME=%s/.test(ENVSTEP) && /RESET_EMAIL_PROVIDER=%s/.test(ENVSTEP) &&
+  /secrets\.RESET_EMAIL_FROM/.test(YML) && /secrets\.RESET_EMAIL_FROM_NAME/.test(YML) && /secrets\.RESET_EMAIL_PROVIDER/.test(YML));
+/* 33) .env NAO escreve flags (somente abort-guard); ENABLE_NOTIF nunca via printf */
+ok("33 .env sem flags (abort-guard presente)",
+  !/printf[^\n]*ENABLE_NOTIF/.test(ENVSTEP) && /grep -q 'ENABLE_NOTIF_'/.test(ENVSTEP) && /\.env contem ENABLE_NOTIF/.test(ENVSTEP));
+/* 34) .env NAO contem o segredo */
+ok("34 .env sem NOTIF_PREFS_SECRET", !/NOTIF_PREFS_SECRET/.test(ENVSTEP));
+
 console.log("\n===== F3.3.20-B1.7-C — guard ENDPOINT-ONLY (firebase-functions-deploy-endpoint.yml) =====");
 console.log("  workflow_dispatch only · confirm DEPLOY_ENDPOINT · dry_run default true");
 console.log("  allowlist {issueNotifPrefsToken, updateNotifPrefs} · 1 por vez · sem total/triggers/lista/curinga");

@@ -120,6 +120,29 @@ jobs:
           npm install -g firebase-tools >/dev/null 2>&1
           firebase functions:list --project "$GCP_PROJECT" | tee before.txt || true
 
+      - name: functions/.env SEM flags (somente RESET_EMAIL_*)
+        env:
+          RESET_EMAIL_FROM: ${{ secrets.RESET_EMAIL_FROM }}
+          RESET_EMAIL_FROM_NAME: ${{ secrets.RESET_EMAIL_FROM_NAME }}
+          RESET_EMAIL_PROVIDER: ${{ secrets.RESET_EMAIL_PROVIDER }}
+        run: |
+          set -eu
+          # O firebase analisa o codebase INTEIRO: as funcoes de password-reset declaram
+          # defineString(RESET_EMAIL_*), exigidas em --non-interactive mesmo com --only de 1 endpoint
+          # (mesma classe da falha B1.6-K). Grava SOMENTE RESET_EMAIL_* (defaults seguros).
+          # NUNCA flags ENABLE_NOTIF_*; NUNCA o segredo do trilho; sem imprimir valores sensiveis.
+          FROM="${RESET_EMAIL_FROM:-no-reply@agendaidseven.com.br}"
+          {
+            printf 'RESET_EMAIL_FROM=%s\n' "$FROM"
+            printf 'RESET_EMAIL_FROM_NAME=%s\n' "${RESET_EMAIL_FROM_NAME:-ID Seven Agenda}"
+            printf 'RESET_EMAIL_PROVIDER=%s\n' "${RESET_EMAIL_PROVIDER:-resend}"
+          } > "functions/.env.${GCP_PROJECT}"
+          # trava: NUNCA escrever flags no .env (aborta se aparecer)
+          if grep -q 'ENABLE_NOTIF_' "functions/.env.${GCP_PROJECT}"; then
+            echo "::error:: .env contem ENABLE_NOTIF_*"; exit 1
+          fi
+          echo ".env gravado sem flags."
+
       - name: Deploy ENDPOINT (somente se dry_run=false)
         env:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
