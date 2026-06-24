@@ -83,7 +83,7 @@ jobs:
           BASE=26b3a3b
           DELTA="$(git diff --name-only "$BASE" HEAD -- . ':(exclude)docs/sla-f332')"
           echo "Arquivos alterados desde $BASE (excl. docs/sla-f332):"; echo "$DELTA"
-          UNEXPECTED="$(echo "$DELTA" | grep -vE '^(functions/index\.js|scripts/worker-ops/f33[A-Z]-[a-z0-9-]+\.test\.mjs|\.github/workflows/f3320-[a-z0-9-]+\.yml|\.github/workflows/firebase-functions-deploy-[a-z0-9-]+\.yml)$' || true)"
+          UNEXPECTED="$(echo "$DELTA" | grep -vE '^(functions/index\.js|scripts/worker-ops/f33[A-Z]-[a-z0-9-]+\.test\.mjs|\.github/workflows/f3320-[a-z0-9-]+\.yml|\.github/workflows/firebase-functions-deploy-[a-z0-9-]+\.yml|\.github/workflows/notif-prefs-secret-set\.yml)$' || true)"
           if [ -n "$UNEXPECTED" ]; then
             echo "::error:: arquivos fora do track de notificações server-side alterados:"; echo "$UNEXPECTED"; exit 1
           fi
