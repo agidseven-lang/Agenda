@@ -1,0 +1,251 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — Deploy LOG-ONLY (parcial) dos 3 triggers de notificacao,
+# ATIVANDO somente ENABLE_NOTIF_LOG=true (observabilidade best-effort). ENABLE_NOTIF_PREFS
+# permanece SEMPRE OFF/ausente (sem consumo de preferencias; producao segue dormente nesse
+# aspecto). SEPARADO do DORMANT-1 (sem flags), do ENDPOINT-ONLY e do deploy TOTAL —
+# este NUNCA faz deploy total e NUNCA toca endpoints.
+# Execucao manual (workflow_dispatch); dry_run=true por padrao (so plano/list, sem deploy).
+# Guards rigidos:
+#   - confirm_deploy == DEPLOY (senao aborta antes de tudo);
+#   - allowlist FIXA {onTaskCreated,onEventCreated,onChatMessageCreated};
+#   - rejeita 'functions' (total), updateNotifPrefs, issueNotifPrefsToken, vazio e token fora da lista;
+#   - target TOTALMENTE QUALIFICADO: functions:onTaskCreated,functions:onEventCreated,functions:onChatMessageCreated;
+#   - pin do blob functions/index.js == 3c2ea4fc2f01770a04740d17214f449cad34e5ac;
+#   - pre-checks: node --check + f33R..f33V + flag NUNCA hardcoded no codigo;
+#   - .env (so dry_run=false): RESET_EMAIL_* + ENABLE_NOTIF_LOG=true; ABORTA se ENABLE_NOTIF_PREFS aparecer;
+#   - NOTIF_PREFS_SECRET: garante PLACEHOLDER (so dry_run=false; ja existe => nao altera valor);
+#     nunca le valor; nunca usa 'secrets versions access';
+#   - pos-deploy (so dry_run=false) valida: 3 triggers ACTIVE + ENABLE_NOTIF_LOG=true +
+#     ENABLE_NOTIF_PREFS != true; endpoints ESPERADOS/preservados (fora do --only); read-only.
+# ROLLBACK do LOG-only: rodar o workflow DORMANT-1 (sem flags) com dry_run=false nos 3 triggers
+#   => remove ENABLE_NOTIF_LOG da env, mantem ENABLE_NOTIF_PREFS OFF e Web Push OFF (baseline dormente).
+# Inputs sao mapeados para env (evita injecao de expressao no shell). Web Push: NAO tocado.
+# =====================================================================
+name: "[manual] Firebase Functions Deploy — LOG-ONLY (3 triggers, ENABLE_NOTIF_LOG)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Digite DEPLOY para confirmar (qualquer outro valor aborta)"
+        required: true
+        default: ""
+      dry_run:
+        description: "true = apenas plano/list (NAO faz deploy); false = deploy real"
+        required: true
+        default: "true"
+      functions_csv:
+        description: "Lista (allowlist fixa dos 3 triggers LOG-only)"
+        required: true
+        default: "onTaskCreated,onEventCreated,onChatMessageCreated"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ff-deploy-log-only
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  GCP_PROJECT_NUMBER: "391529908613"
+  PINNED_FUNCTIONS_BLOB: "3c2ea4fc2f01770a04740d17214f449cad34e5ac"
+
+jobs:
+  deploy-log-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard confirm_deploy (== DEPLOY)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_deploy }}
+        run: |
+          if [ "$CONFIRM" != "DEPLOY" ]; then
+            echo "::error:: confirm_deploy != DEPLOY — abortando antes de tudo."
+            exit 1
+          fi
+          echo "confirm_deploy OK."
+
+      - name: Guard allowlist (rejeita total/endpoints/vazio/desconhecido; alvo qualificado)
+        env:
+          FUNCTIONS_CSV: ${{ github.event.inputs.functions_csv }}
+        run: |
+          set -e
+          ALLOW="onTaskCreated onEventCreated onChatMessageCreated"
+          RAW="${FUNCTIONS_CSV// /}"          # remove espacos
+          if [ -z "$RAW" ]; then echo "::error:: lista vazia"; exit 1; fi
+          # rejeicao explicita de alvos proibidos
+          case ",$RAW," in
+            *",functions,"*)            echo "::error:: deploy TOTAL proibido (functions)"; exit 1 ;;
+            *",updateNotifPrefs,"*)     echo "::error:: endpoint proibido: updateNotifPrefs"; exit 1 ;;
+            *",issueNotifPrefsToken,"*) echo "::error:: endpoint proibido: issueNotifPrefsToken"; exit 1 ;;
+          esac
+          # cada token precisa estar na allowlist FIXA; o alvo final QUALIFICA cada funcao com
+          # o prefixo "functions:" (o firebase --only exige cada alvo qualificado).
+          IFS=','
+          TARGET=""
+          for fn in $RAW; do
+            case " $ALLOW " in
+              *" $fn "*) : ;;
+              *) echo "::error:: token fora da allowlist: $fn"; exit 1 ;;
+            esac
+            TARGET="${TARGET:+$TARGET,}functions:$fn"
+          done
+          unset IFS
+          # trava: alvo nunca pode ser vazio nem total
+          case "$TARGET" in
+            ""|functions|functions:) echo "::error:: alvo invalido (vazio/total)"; exit 1 ;;
+          esac
+          echo "TARGET=$TARGET" >> "$GITHUB_ENV"
+          echo "Allowlist OK — alvo: $TARGET"
+
+      - name: Checkout (ref FIXO app/main)
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          fetch-depth: 0
+
+      - name: Pin do blob functions/index.js (== 3c2ea4f)
+        run: |
+          set -e
+          B="$(git rev-parse HEAD:functions/index.js)"
+          if [ "$B" != "$PINNED_FUNCTIONS_BLOB" ]; then
+            echo "::error:: functions/index.js ($B) != pin ($PINNED_FUNCTIONS_BLOB)"
+            exit 1
+          fi
+          echo "Pin OK: $B"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Pre-checks (syntax + harnesses f33R..f33V + flag NAO hardcoded)
+        run: |
+          set -e
+          node --check functions/index.js
+          for t in f33R-notif-prefs-log f33S-notif-prefs-endpoint f33T-notif-prefs-token-issuer f33U-notif-send-prefs-integration f33V-notif-hardening; do
+            echo "==== $t ===="; node "scripts/worker-ops/$t.test.mjs"
+          done
+          # as flags NUNCA podem estar hardcoded ="true" no codigo (vem da env). Apenas detecta.
+          if grep -nE 'ENABLE_NOTIF_(PREFS|LOG)[[:space:]]*=[[:space:]]*"true"' functions/index.js; then
+            echo "::error:: flag hardcoded no codigo"; exit 1
+          fi
+          echo "Pre-checks OK."
+
+      - name: Auth gcloud (SA via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: GOOGLE_APPLICATION_CREDENTIALS_JSON ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+
+      - name: Placeholder NOTIF_PREFS_SECRET (so dry_run=false; sem valor real; inerte)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -e
+          # O firebase analisa o codebase INTEIRO e exige VALOR p/ NOTIF_PREFS_SECRET (bound em
+          # updateNotifPrefs/issueNotifPrefsToken), mesmo deployando so os 3 triggers (--only).
+          # Garante um PLACEHOLDER (nunca valor real; nunca imprime/le valor; sem 'versions access').
+          # Os endpoints continuam FORA do --only => NAO publicados => placeholder INERTE.
+          if gcloud secrets describe NOTIF_PREFS_SECRET --project "$GCP_PROJECT" >/dev/null 2>&1; then
+            echo "NOTIF_PREFS_SECRET ja existe — nao altero valor."
+          else
+            gcloud secrets create NOTIF_PREFS_SECRET --replication-policy=automatic --project "$GCP_PROJECT" >/dev/null || true
+            printf 'PLACEHOLDER_NOT_CONFIGURED_LOGONLY' | gcloud secrets versions add NOTIF_PREFS_SECRET --data-file=- --project "$GCP_PROJECT" >/dev/null 2>&1 || true
+            echo "NOTIF_PREFS_SECRET placeholder criado (inerte; endpoints nao publicados)."
+          fi
+
+      - name: functions/.env com ENABLE_NOTIF_LOG=true (LOG-only; NUNCA ENABLE_NOTIF_PREFS)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          RESET_EMAIL_FROM: ${{ secrets.RESET_EMAIL_FROM }}
+          RESET_EMAIL_FROM_NAME: ${{ secrets.RESET_EMAIL_FROM_NAME }}
+          RESET_EMAIL_PROVIDER: ${{ secrets.RESET_EMAIL_PROVIDER }}
+        run: |
+          set -e
+          # firebase analisa o codebase INTEIRO (password-reset declara defineString(RESET_EMAIL_*)).
+          # Grava RESET_EMAIL_* + a UNICA flag permitida: ENABLE_NOTIF_LOG=true. NUNCA ENABLE_NOTIF_PREFS.
+          FROM="${RESET_EMAIL_FROM:-no-reply@agendaidseven.com.br}"
+          ENVF="functions/.env.${GCP_PROJECT}"
+          {
+            printf 'RESET_EMAIL_FROM=%s\n' "$FROM"
+            printf 'RESET_EMAIL_FROM_NAME=%s\n' "${RESET_EMAIL_FROM_NAME:-ID Seven Agenda}"
+            printf 'RESET_EMAIL_PROVIDER=%s\n' "${RESET_EMAIL_PROVIDER:-resend}"
+            printf 'ENABLE_NOTIF_LOG=true\n'
+          } > "$ENVF"
+          # trava CRITICA: ENABLE_NOTIF_PREFS NUNCA pode entrar no .env (LOG-only proibe)
+          if grep -qiE '^[[:space:]]*ENABLE_NOTIF_PREFS[[:space:]]*=' "$ENVF"; then
+            echo "::error:: .env contem ENABLE_NOTIF_PREFS (LOG-only proibe)"; exit 1
+          fi
+          # a UNICA flag ENABLE_NOTIF_* permitida e exatamente ENABLE_NOTIF_LOG=true
+          if [ "$(grep -cE '^[[:space:]]*ENABLE_NOTIF_' "$ENVF")" != "1" ] || ! grep -qxE 'ENABLE_NOTIF_LOG=true' "$ENVF"; then
+            echo "::error:: .env deve conter exatamente ENABLE_NOTIF_LOG=true e nenhuma outra flag ENABLE_NOTIF_*"; exit 1
+          fi
+          echo ".env gravado: RESET_EMAIL_* + ENABLE_NOTIF_LOG=true (sem ENABLE_NOTIF_PREFS)."
+
+      - name: Estado ANTES (functions:list)
+        run: |
+          npm install -g firebase-tools >/dev/null 2>&1
+          firebase functions:list --project "$GCP_PROJECT" | tee before.txt || true
+
+      - name: Deploy LOG-ONLY (somente se dry_run=false)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -e
+          ( cd functions && if [ -f package-lock.json ]; then npm ci; else npm install; fi )
+          # trava FINAL: TARGET nunca pode ser deploy total
+          case "$TARGET" in
+            functions|functions:) echo "::error:: alvo total bloqueado"; exit 1 ;;
+          esac
+          if [ "$DRY_RUN" = "false" ]; then
+            echo "DEPLOY real LOG-ONLY — alvo: $TARGET"
+            firebase deploy --only "$TARGET" --project "$GCP_PROJECT" --non-interactive --force
+          else
+            echo "DRY-RUN=true — nenhum deploy executado. Alvo planejado: $TARGET"
+            echo "DRY-RUN=true — .env planejado: RESET_EMAIL_* + ENABLE_NOTIF_LOG=true (sem ENABLE_NOTIF_PREFS)"
+          fi
+
+      - name: Validacao POS-deploy — LOG=true + PREFS!=true + ACTIVE (somente se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -e
+          # Valida o que ESTE deploy (LOG-only) garante: os 3 triggers ACTIVE, com
+          # ENABLE_NOTIF_LOG=true e ENABLE_NOTIF_PREFS != true. Os endpoints
+          # issueNotifPrefsToken/updateNotifPrefs sao ESPERADOS (publicados em fases anteriores),
+          # ficam FORA do --only e NAO sao republicados. Read-only; nunca le valor de segredo.
+          firebase functions:list --project "$GCP_PROJECT" | tee after.txt
+          for FN in onTaskCreated onEventCreated onChatMessageCreated; do
+            ST="$(gcloud functions describe "$FN" --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(state)' 2>/dev/null || true)"
+            if [ "$ST" != "ACTIVE" ]; then echo "::error:: $FN nao esta ACTIVE (estado: ${ST:-desconhecido})"; exit 1; fi
+            EV="$(gcloud functions describe "$FN" --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.environmentVariables)' 2>/dev/null || true)"
+            # LOG-only: ENABLE_NOTIF_LOG deve estar true
+            if ! echo "$EV" | grep -qE 'ENABLE_NOTIF_LOG=true'; then
+              echo "::error:: $FN sem ENABLE_NOTIF_LOG=true (LOG-only nao aplicado)"; exit 1
+            fi
+            # ENABLE_NOTIF_PREFS NUNCA pode estar true
+            if echo "$EV" | grep -qE 'ENABLE_NOTIF_PREFS=true'; then
+              echo "::error:: $FN com ENABLE_NOTIF_PREFS=true (PROIBIDO em LOG-only)"; exit 1
+            fi
+            UT="$(gcloud functions describe "$FN" --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(updateTime)' 2>/dev/null || true)"
+            echo "  trigger OK: $FN state=$ST ENABLE_NOTIF_LOG=true ENABLE_NOTIF_PREFS!=true updateTime=${UT:-?}"
+          done
+          # defesa em profundidade: endpoints NUNCA podem estar no TARGET deste deploy
+          case "$TARGET" in
+            *updateNotifPrefs*|*issueNotifPrefsToken*)
+              echo "::error:: endpoint indevidamente no TARGET ($TARGET)"; exit 1 ;;
+          esac
+          # endpoints ESPERADOS/preservados (publicados antes; fora do LOG-only): apenas loga
+          for EP in issueNotifPrefsToken updateNotifPrefs; do
+            if grep -qE "(^|[^A-Za-z])${EP}([^A-Za-z]|$)" after.txt; then
+              echo "  endpoint preservado (esperado, fora do LOG-only): $EP"
+            fi
+          done
+          echo "POS-deploy OK: 3 triggers ACTIVE; ENABLE_NOTIF_LOG=true; ENABLE_NOTIF_PREFS OFF; endpoints preservados; sem acesso a segredo."
+
+      - name: Limpeza (.env, SA, artefatos)
+        if: always()
+        run: rm -f functions/.env.* "$RUNNER_TEMP/gcp-sa.json" before.txt after.txt 2>/dev/null || true
