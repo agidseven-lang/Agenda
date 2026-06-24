@@ -784,14 +784,25 @@ async function getNotifPrefs(uid) {
 //     - sem doc           => true (comportamento atual preservado)
 //     - erro              => true (nunca bloqueia)
 //     - enabled === false => false (opt-out explicito; SO com a flag ON)
-//     - mutedEvents[eventType] === true => false (granular opcional)
-//     - platforms[platform] === false   => false (granular opcional)
+//   Schema canonico do writer (notifValidatePrefs/updateNotifPrefs):
+//     - byEvent[eventType]   === false => false (suprime aquele evento)
+//     - byPlatform[platform] === false => false (suprime aquela plataforma)
+//   Fallback legacy defensivo (docs antigos; nao dominante):
+//     - mutedEvents[eventType] === true  => false
+//     - platforms[platform]    === false => false
+//   Campo/chave ausente => permissivo (nao suprime). quietHours NAO e aplicado
+//   nesta fase (exige timezone; fase futura B1.7-E-QUIETHOURS) — ignorado de
+//   forma permissiva/segura.
 async function shouldNotifyByPrefs(uid, eventType, platform) {
   if (!notifFlag("ENABLE_NOTIF_PREFS")) return true;
   let prefs = null;
   try { prefs = await getNotifPrefs(uid); } catch (_) { return true; }
   if (!prefs) return true;
   if (prefs.enabled === false) return false;
+  // schema canonico (writer)
+  if (eventType && prefs.byEvent && prefs.byEvent[eventType] === false) return false;
+  if (platform && prefs.byPlatform && prefs.byPlatform[platform] === false) return false;
+  // fallback legacy (docs antigos)
   if (eventType && prefs.mutedEvents && prefs.mutedEvents[eventType] === true) return false;
   if (platform && prefs.platforms && prefs.platforms[platform] === false) return false;
   return true;
