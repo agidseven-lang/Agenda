@@ -67,6 +67,7 @@ const PRELUDE = `
     firestore: function () { return { collection: function (c) { return _colRef(c); } }; },
     messaging: function () { return { sendEachForMulticast: async function (m) { __sends.push(m); return { successCount: (m.tokens || []).length }; } }; }
   };
+  admin.firestore.Timestamp = { fromMillis: function (ms) { return { _millis: ms, toMillis: function () { return ms; } }; } };
   var logger = { info: function () {}, warn: function () {}, error: function () {} };
 `;
 

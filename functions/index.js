@@ -825,7 +825,7 @@ async function writeNotifLog(entry) {
       total:     Number.isFinite(+e.total) ? +e.total : 0,
       reason:    String(e.reason     != null ? e.reason   : ""),
       at:        atMs,
-      expireAt:  atMs + NOTIF_LOG_TTL_MS,   // B1.5-B: retencao 30 dias (server-side; TTL nativo do Firestore)
+      expireAt:  admin.firestore.Timestamp.fromMillis(atMs + NOTIF_LOG_TTL_MS),   // B1.7-E: Timestamp (TTL nativo do Firestore exige Timestamp); retencao 30 dias
     };
     await notifDb().collection("notifLog").add(doc);
     return { written: true };

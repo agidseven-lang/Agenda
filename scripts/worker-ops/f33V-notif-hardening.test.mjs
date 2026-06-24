@@ -46,6 +46,7 @@ const PRELUDE = `
     add: async function (o) { __writes.push({ coll: c, op: "add" }); if (c === "notifLog") __log.push(o); return { id: "x" }; }
   }; }
   var admin = { firestore: function () { return { collection: _col }; } };
+  admin.firestore.Timestamp = { fromMillis: function (ms) { return { _millis: ms, toMillis: function () { return ms; } }; } };
   var logger = { info: function () {}, warn: function () {}, error: function () {} };
 `;
 
@@ -103,8 +104,8 @@ const ok = (n, c) => { if (c) pass++; else { fail++; flog.push("FAIL: " + n); } 
   setFlags(false, true); api.resetLog();
   await api.writeNotifLog({ taskId: "T8", eventType: "task_assigned", to: "uDes", channel: "fcm", sent: 1, total: 1, reason: "ok", at: NOW });
   const d8 = api.log()[0];
-  ok("8 LOG ON: grava 1 doc com expireAt", api.log().length === 1 && typeof d8.expireAt === "number");
-  ok("9 expireAt === at + 30 dias", d8.expireAt === NOW + D30 && d8.at === NOW);
+  ok("8 LOG ON: grava 1 doc com expireAt Timestamp", api.log().length === 1 && d8.expireAt && typeof d8.expireAt.toMillis === "function");
+  ok("9 expireAt.toMillis() === at + 30 dias; at permanece number", d8.expireAt.toMillis() === NOW + D30 && d8.at === NOW && typeof d8.at === "number");
 
   /* ===== 10-13) sem PII no log ===== */
   api.resetLog();
