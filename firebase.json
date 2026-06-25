@@ -9,5 +9,19 @@
         "*.log"
       ]
     }
-  ]
+  ],
+  "hosting": {
+    "public": ".staging-public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      { "source": "**", "destination": "/index.html" }
+    ],
+    "appAssociation": "NONE",
+    "cleanUrls": false,
+    "trailingSlash": false
+  }
 }
