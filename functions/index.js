@@ -856,6 +856,10 @@ exports._writeNotifLog = writeNotifLog;
      emissor: por uid+IP, NOTIF_RL_MAX falhas invalidas / janela => bloqueio temporario.
    ============================================================================ */
 const NOTIF_PREFS_SECRET = defineSecret("NOTIF_PREFS_SECRET");
+// B1.7-E — CORS allowlist (origins reais do app; SEM wildcard). Browser/PWA precisa de
+// preflight; Electron/native nao (CORS so e imposto pelo browser). Aplicado SOMENTE aos
+// 2 endpoints notifPrefs; nao toca triggers, flags, secret binding nem Web Push.
+const NOTIF_CORS_ORIGINS = ["https://agendaidseven.com.br", "https://agenda-id-seven.web.app", "https://agenda-id-seven.firebaseapp.com"];
 const NOTIF_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 dias
 const NOTIF_RL_MAX = 5;                               // tentativas invalidas
 const NOTIF_RL_WINDOW_MS = 5 * 60 * 1000;            // janela de contagem
@@ -964,7 +968,8 @@ async function handleNotifPrefsUpdate(ctx) {
 
 // Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem
 // NOTIF_PREFS_SECRET => 503. NAO deployado nesta fase; NAO integrado ao Desktop/UI.
-exports.updateNotifPrefs = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10 }, async (req, res) => {
+exports.updateNotifPrefs = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // B1.7-E preflight: sem auth, sem segredo, sem Firestore
   try {
     const out = await handleNotifPrefsUpdate({
       method: req.method,
@@ -1065,7 +1070,8 @@ async function handleIssueNotifPrefsToken(ctx) {
 
 // Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem NOTIF_PREFS_SECRET
 // => 503. NAO deployado nesta fase; NAO integrado ao Desktop/UI.
-exports.issueNotifPrefsToken = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10 }, async (req, res) => {
+exports.issueNotifPrefsToken = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // B1.7-E preflight: sem auth, sem segredo, sem Firestore
   try {
     const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
     const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");

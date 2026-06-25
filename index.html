@@ -4675,6 +4675,142 @@ const IMAGEKIT_URL_ENDPOINT  = "https://ik.imagekit.io/agidseven";
 const IMAGEKIT_AUTH_URL      = PUSH_WORKER_URL + "/imagekit-auth";
 /* =================================================================== */
 
+/* ===================================================================
+   F3.3.20-B1.7-E — Preferências de notificação por push (conta).
+   Cliente + UI da seção em Settings → Notificações. Token SÓ em memória;
+   senha só no modal e descartada; SEM localStorage p/ token; SEM uid no update;
+   quietHours oculto. Endpoints onRequest (CORS allowlist) já preparados.
+=================================================================== */
+/* __NPC_START__  (bloco testado por f33W; lógica pura + fetch injetável) */
+const NOTIF_ISSUE_URL  = "https://issuenotifprefstoken-de36pi7vza-uc.a.run.app";
+const NOTIF_UPDATE_URL = "https://updatenotifprefs-de36pi7vza-uc.a.run.app";
+const NOTIF_ALLOWED_EVENTS = ["task_assigned", "event_assigned", "chat_message"];
+const NOTIF_ALLOWED_PLATFORMS = ["android"];
+function buildNotifPrefsPayload(state){
+  if(!state || typeof state !== "object") throw new Error("state_invalid");
+  var out = {};
+  if(typeof state.enabled === "boolean") out.enabled = state.enabled;
+  var be = {}; NOTIF_ALLOWED_EVENTS.forEach(function(k){ if(typeof state[k] === "boolean") be[k] = state[k]; });
+  if(Object.keys(be).length) out.byEvent = be;
+  var bp = {}; NOTIF_ALLOWED_PLATFORMS.forEach(function(k){ if(typeof state[k] === "boolean") bp[k] = state[k]; });
+  if(Object.keys(bp).length) out.byPlatform = bp;
+  return out; // NUNCA inclui uid/quietHours/campos extras
+}
+function permissiveDefaultNotifPrefsPayload(){
+  return { enabled:true, byEvent:{ task_assigned:true, event_assigned:true, chat_message:true }, byPlatform:{ android:true } };
+}
+function sanitizeNotifPrefsError(status, error){
+  switch(status){
+    case 400: return "Não foi possível salvar: dados inválidos.";
+    case 401: return "Senha incorreta ou sessão expirada. Confirme sua senha e tente novamente.";
+    case 403: return "Você não tem permissão para alterar estas preferências.";
+    case 429: return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+    case 503: return "Serviço temporariamente indisponível. Tente mais tarde.";
+    default:  return "Não foi possível salvar suas preferências agora.";
+  }
+}
+async function issueNotifPrefsTokenClient(opts){
+  opts = opts || {}; var f = opts.fetchImpl || (typeof fetch !== "undefined" ? fetch : null);
+  if(!f) throw new Error("no_fetch");
+  if(!opts.uid || !opts.password) throw new Error("missing_credentials");
+  var r = await f(opts.url || NOTIF_ISSUE_URL, { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ uid: opts.uid, password: opts.password }) });
+  var j = null; try { j = await r.json(); } catch(_){}
+  if(r.status === 200 && j && typeof j.token === "string") return { ok:true, token:j.token, exp:j.exp, scope:j.scope };
+  return { ok:false, status:r.status, error:(j && j.error) || "issue_failed" }; // NUNCA inclui o token
+}
+async function updateNotifPrefsClient(opts){
+  opts = opts || {}; var f = opts.fetchImpl || (typeof fetch !== "undefined" ? fetch : null);
+  if(!f) throw new Error("no_fetch");
+  if(!opts.token) throw new Error("missing_token");
+  var payload = opts.payload || {};
+  if("uid" in payload) throw new Error("uid_must_not_be_sent"); // cross-uid guard (msg clara) ANTES da allowlist
+  var allowed = { enabled:1, byEvent:1, byPlatform:1 };
+  for(var k in payload){ if(Object.prototype.hasOwnProperty.call(payload,k) && !allowed[k]) throw new Error("payload_field_not_allowed:" + k); }
+  var r = await f(opts.url || NOTIF_UPDATE_URL, { method:"POST", headers:{ "content-type":"application/json", "authorization":"Bearer " + opts.token }, body: JSON.stringify(payload) });
+  var j = null; try { j = await r.json(); } catch(_){}
+  if(r.status === 200 && j && j.ok) return { ok:true, uid:j.uid, prefs:j.prefs };
+  return { ok:false, status:r.status, error:(j && j.error) || "update_failed" };
+}
+function clearNotifPrefsSensitiveRefs(refs){ if(refs && typeof refs === "object"){ refs.token = null; refs.password = null; } return refs; }
+/* __NPC_END__ */
+
+/* ---- UI (DOM; validada por sintaxe + preview; modal de senha autocontido) ---- */
+function renderNotifPrefsPushSection(cur){
+  function chk(v){ return v !== false; } // ausência/true => ligado (permissivo)
+  function row(id,label,checked){ return '<label class="set-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:8px 4px">'
+    + '<span class="set-row-l">' + label + '</span>'
+    + '<input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--c-trafego,#4f8cff)"></label>'; }
+  var be = (cur && cur.byEvent) || {}, bp = (cur && cur.byPlatform) || {};
+  return ''
+   + '<div class="set-section" id="notifPrefsAcctCard">'
+     + '<div class="set-section-h">Notificações por push (conta)</div>'
+     + '<div style="font-size:12px;color:var(--ink-faint);line-height:1.55;padding:0 4px 6px">Essas preferências ficam salvas na sua conta e controlam quais notificações do app você recebe. As notificações Web Push continuam fora desta etapa.</div>'
+     + row("np_enabled","Ativar notificações push da conta", chk(cur && cur.enabled))
+     + '<div style="font-size:11px;color:var(--ink-faint);margin:6px 4px 0;opacity:.85">Por tipo</div>'
+     + row("np_task_assigned","Tarefas atribuídas", chk(be.task_assigned))
+     + row("np_event_assigned","Eventos atribuídos", chk(be.event_assigned))
+     + row("np_chat_message","Mensagens / chat", chk(be.chat_message))
+     + '<div style="font-size:11px;color:var(--ink-faint);margin:6px 4px 0;opacity:.85">Por plataforma</div>'
+     + row("np_android","Android", chk(bp.android))
+     + '<div style="display:flex;gap:10px;margin-top:12px">'
+       + '<button class="set-btn-ghost" id="np_save">Salvar preferências</button>'
+       + '<button class="set-btn-ghost" id="np_restore">Restaurar padrão</button>'
+     + '</div>'
+     + '<div id="np_status" role="status" aria-live="polite" style="font-size:12px;color:var(--ink-faint);margin-top:8px;min-height:16px"></div>'
+   + '</div>';
+}
+function openNotifPrefsPasswordModal(){
+  return new Promise(function(resolve){
+    var ov = document.createElement("div");
+    ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99999";
+    var card = document.createElement("div");
+    card.style.cssText = "background:var(--card,#171c22);color:var(--ink,#e7edf3);border-radius:14px;padding:18px;max-width:340px;width:90%;box-shadow:0 8px 30px #0008";
+    card.innerHTML = '<div style="font-weight:600;margin-bottom:8px">Confirme sua senha</div>'
+      + '<div style="font-size:12px;color:var(--ink-faint);margin-bottom:10px">Para salvar as preferências de notificação na sua conta.</div>'
+      + '<input type="password" id="np_pw" autocomplete="current-password" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--line,#262d36);background:transparent;color:inherit;margin-bottom:12px">'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end"><button id="np_pw_cancel" class="set-btn-ghost">Cancelar</button><button id="np_pw_ok" class="set-btn-ghost">Confirmar</button></div>';
+    ov.appendChild(card); document.body.appendChild(ov);
+    var input = card.querySelector("#np_pw"); try { input.focus(); } catch(_){}
+    function done(val){ try { input.value = ""; } catch(_){} try { document.body.removeChild(ov); } catch(_){} resolve(val || null); }
+    card.querySelector("#np_pw_cancel").onclick = function(){ done(null); };
+    card.querySelector("#np_pw_ok").onclick = function(){ done(input.value || null); };
+    ov.onclick = function(e){ if(e.target === ov) done(null); };
+    input.onkeydown = function(e){ if(e.key === "Enter") done(input.value || null); if(e.key === "Escape") done(null); };
+  });
+}
+function bindNotifPrefsPushSection(){
+  function $(id){ return document.getElementById(id); }
+  if(!$("np_save")) return; // seção não presente
+  var statusEl = $("np_status");
+  function setStatus(msg,kind){ if(statusEl){ statusEl.textContent = msg || ""; statusEl.dataset.kind = kind || ""; } }
+  function readState(){ return {
+    enabled: $("np_enabled").checked,
+    task_assigned: $("np_task_assigned").checked,
+    event_assigned: $("np_event_assigned").checked,
+    chat_message: $("np_chat_message").checked,
+    android: $("np_android").checked
+  }; }
+  async function saveWithPassword(payload){
+    if(typeof me === "undefined" || !me || !me.id){ setStatus("Faça login para salvar.","error"); return; }
+    var password = await openNotifPrefsPasswordModal();
+    if(!password) return; // cancelado
+    var ref = { token:null, password:password };
+    try {
+      setStatus("Salvando…","loading");
+      var iss = await issueNotifPrefsTokenClient({ uid: me.id, password: ref.password });
+      ref.password = null; // descarta a senha imediatamente
+      if(!iss.ok){ setStatus(sanitizeNotifPrefsError(iss.status, iss.error),"error"); return; }
+      ref.token = iss.token; // token só em memória
+      var upd = await updateNotifPrefsClient({ token: ref.token, payload: payload });
+      if(!upd.ok){ setStatus(sanitizeNotifPrefsError(upd.status, upd.error),"error"); return; }
+      setStatus("Preferências salvas.","success");
+    } catch(_){ setStatus("Falha de rede. Verifique a conexão e tente novamente.","error"); }
+    finally { clearNotifPrefsSensitiveRefs(ref); ref = null; } // nunca persistir token/senha
+  }
+  $("np_save").onclick = function(){ saveWithPassword(buildNotifPrefsPayload(readState())); };
+  $("np_restore").onclick = function(){ saveWithPassword(permissiveDefaultNotifPrefsPayload()); };
+}
+
 const SESSION_KEY="idseven_session";
 const PREFS_KEY="idseven_prefs";
 
@@ -9223,12 +9359,15 @@ function renderSettingsNotifications(){
       '</button>'+
       '<div id="setTestPushResult" style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;line-height:1.5;padding:0 4px"></div>'+
     '</div>'+
+    /* B1.7-E — preferências de notificação por push salvas na conta (write-only; Rules self-read em fase futura) */
+    renderNotifPrefsPushSection()+
   '</div>';
 }
 
 function bindSettingsNotifications(){
   var bk = document.getElementById("setBack");
   if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
+  try { bindNotifPrefsPushSection(); } catch(_){}   // B1.7-E — preferências push (conta)
   ["soundOn","vibrationOn","notifyNewTasks","notifyComments","notifyApproval","notifyLate","notifyNative","notifyReminder","notifyClientViewing"].forEach(function(key){
     bindToggleRow(key, function(on){
       setPref(key, on);
