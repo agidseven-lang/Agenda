@@ -110,8 +110,10 @@ jobs:
           rec("login canario OK", await pg.evaluate(() => !document.getElementById("doLogin") || !!document.querySelector("nav.nav")));
           rec("Web Push: permission != granted", await pg.evaluate(() => typeof Notification !== "undefined" ? Notification.permission !== "granted" : true));
           await pg.evaluate(() => { try { switchTab("settings"); } catch (e) {} });
-          let found = false; try { await pg.waitForSelector("#notifPrefsAcctCard", { timeout: 9000 }); found = true; } catch (e) {}
-          if (!found) { await pg.evaluate(() => { const el = [...document.querySelectorAll("button,a,div,span")].find(e => /Notifica[cç]/i.test(e.textContent || "") && e.offsetParent); el && el.click && el.click(); }); try { await pg.waitForSelector("#notifPrefsAcctCard", { timeout: 9000 }); found = true; } catch (e) {} }
+          await pg.waitForTimeout(400);
+          await pg.evaluate(() => { try { settingsView = "notifications"; render(); } catch (e) {} });
+          let found = false; try { await pg.waitForSelector("#notifPrefsAcctCard", { timeout: 12000 }); found = true; } catch (e) {}
+          if (!found) { await pg.evaluate(() => { const el = document.querySelector('[data-setgo="notifications"]'); el && el.click && el.click(); }); try { await pg.waitForSelector("#notifPrefsAcctCard", { timeout: 9000 }); found = true; } catch (e) {} }
           rec("#notifPrefsAcctCard visivel", found);
           if (!found) { fs.writeFileSync("retest-summary.txt", "NO-GO: nao cheguei a #notifPrefsAcctCard\n"); await br.close(); process.exit(1); }
           const before = await pg.evaluate(() => document.getElementById("np_task_assigned").checked);
