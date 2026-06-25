@@ -11,7 +11,7 @@
 #   - allowlist FIXA {onTaskCreated,onEventCreated,onChatMessageCreated};
 #   - rejeita 'functions' (total), updateNotifPrefs, issueNotifPrefsToken, vazio e token fora da lista;
 #   - target TOTALMENTE QUALIFICADO: functions:onTaskCreated,functions:onEventCreated,functions:onChatMessageCreated;
-#   - pin do blob functions/index.js == f5901e23de5bc846e965c9d928586f545b0df1d4;
+#   - pin do blob functions/index.js == 781fdd335ab0bcbbdb0c1a8c9a3bfae369099db1;
 #   - pre-checks: node --check + f33R..f33V + flag NUNCA hardcoded no codigo;
 #   - .env (so dry_run=false): RESET_EMAIL_* + ENABLE_NOTIF_LOG=true + ENABLE_NOTIF_PREFS=true;
 #     4 travas: exatamente essas 2 flags NOTIF, nenhuma outra ENABLE_*, sem Web Push, chaves na allowlist;
@@ -53,7 +53,7 @@ concurrency:
 env:
   GCP_PROJECT: "agenda-id-seven"
   GCP_PROJECT_NUMBER: "391529908613"
-  PINNED_FUNCTIONS_BLOB: "f5901e23de5bc846e965c9d928586f545b0df1d4"
+  PINNED_FUNCTIONS_BLOB: "781fdd335ab0bcbbdb0c1a8c9a3bfae369099db1"
 
 jobs:
   deploy-prefs-on:
