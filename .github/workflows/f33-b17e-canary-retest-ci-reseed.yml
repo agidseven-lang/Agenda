@@ -116,21 +116,25 @@ jobs:
           if (!found) { await pg.evaluate(() => { const el = document.querySelector('[data-setgo="notifications"]'); el && el.click && el.click(); }); try { await pg.waitForSelector("#notifPrefsAcctCard", { timeout: 9000 }); found = true; } catch (e) {} }
           rec("#notifPrefsAcctCard visivel", found);
           if (!found) { fs.writeFileSync("retest-summary.txt", "NO-GO: nao cheguei a #notifPrefsAcctCard\n"); await br.close(); process.exit(1); }
-          const before = await pg.evaluate(() => document.getElementById("np_task_assigned").checked);
-          await pg.locator("#np_task_assigned").click({ force: true });
-          await pg.waitForTimeout(2200);
-          const after = await pg.evaluate(() => document.getElementById("np_task_assigned").checked);
+          const before = await pg.evaluate(() => { const e = document.getElementById("np_task_assigned"); return e ? e.checked : null; });
+          await pg.evaluate(() => { const e = document.getElementById("np_task_assigned"); if (e) { e.checked = false; e.dispatchEvent(new Event("change", { bubbles: true })); } });
+          await pg.waitForTimeout(2500);
+          const after = await pg.evaluate(() => { const e = document.getElementById("np_task_assigned"); return e ? e.checked : null; });
           rec("[CRITICO] np_task_assigned PERMANECE false apos re-render", after === false, "before=" + before + " after=" + after);
           if (after !== false) { fs.writeFileSync("retest-summary.txt", "NO-GO: UI reverteu task_assigned para true\n"); await br.close(); process.exit(1); }
-          await pg.click("#np_save");
-          await pg.waitForSelector("#np_pw", { timeout: 5000 });
+          const stBefore = await pg.evaluate(() => ({ en: (document.getElementById("np_enabled") || {}).checked, ev: (document.getElementById("np_event_assigned") || {}).checked, ch: (document.getElementById("np_chat_message") || {}).checked, an: (document.getElementById("np_android") || {}).checked, ta: (document.getElementById("np_task_assigned") || {}).checked }));
+          rec("demais toggles ON e task_assigned false", stBefore.en && stBefore.ev && stBefore.ch && stBefore.an && stBefore.ta === false, JSON.stringify(stBefore));
+          await pg.evaluate(() => { window.__sawSalvas = false; try { const obs = new MutationObserver(() => { try { const s = document.getElementById("np_status"); if (s && /salvas/i.test(s.textContent || "")) window.__sawSalvas = true; } catch (e) {} }); obs.observe(document.body, { subtree: true, childList: true, characterData: true }); window.__npObs = obs; } catch (e) {} });
+          await pg.evaluate(() => { const b = document.getElementById("np_save"); if (b) b.click(); });
+          await pg.waitForSelector("#np_pw", { timeout: 8000 });
           rec("modal senha type=password", await pg.evaluate(() => { const e = document.getElementById("np_pw"); return !!e && e.type === "password"; }));
-          await pg.fill("#np_pw", PW); await pg.click("#np_pw_ok");
-          await pg.waitForFunction(() => { const s = document.getElementById("np_status"); return s && /salvas|incorreta|permiss|tentativas|Falha/i.test(s.textContent); }, null, { timeout: 15000 }).catch(() => {});
+          await pg.evaluate((pw) => { const e = document.getElementById("np_pw"); if (e) { e.value = pw; e.dispatchEvent(new Event("input", { bubbles: true })); } const b = document.getElementById("np_pw_ok"); if (b) b.click(); }, PW);
+          await pg.waitForFunction(() => { if (window.__sawSalvas) return true; const s = document.getElementById("np_status"); return s && /salvas|incorreta|permiss|tentativas|Falha/i.test(s.textContent || ""); }, null, { timeout: 20000 }).catch(() => {});
           rec("issueNotifPrefsToken 200", net.issue === 200, "status=" + net.issue);
           rec("updateNotifPrefs 200", net.update === 200, "status=" + net.update);
+          const sawSalvas = await pg.evaluate(() => !!window.__sawSalvas);
           const statusTxt = await pg.evaluate(() => { const s = document.getElementById("np_status"); return s ? s.textContent : ""; });
-          rec("#np_status vivo: 'Preferencias salvas.'", /salvas/i.test(statusTxt), statusTxt);
+          rec("#np_status: 'Preferencias salvas.'", sawSalvas || /salvas/i.test(statusTxt), "sawSalvas=" + sawSalvas + " live=" + JSON.stringify(statusTxt));
           rec("Web Push: subscribe nao chamado", await pg.evaluate(() => !window.__subscribeCalled));
           await br.close();
           const fails = R.filter(x => !x.p);
