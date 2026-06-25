@@ -35,7 +35,7 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  PINNED_FUNCTIONS_BLOB: "f5901e23de5bc846e965c9d928586f545b0df1d4"
+  PINNED_FUNCTIONS_BLOB: "781fdd335ab0bcbbdb0c1a8c9a3bfae369099db1"
 
 jobs:
   deploy-endpoint:
