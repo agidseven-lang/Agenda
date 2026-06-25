@@ -4735,6 +4735,9 @@ function clearNotifPrefsSensitiveRefs(refs){ if(refs && typeof refs === "object"
 /* __NPC_END__ */
 
 /* ---- UI (DOM; validada por sintaxe + preview; modal de senha autocontido) ---- */
+/* B1.7-E-FIX — estado draft persistente da seção: sobrevive a re-renders (render/onSnapshot/heartbeat/timers)
+   enquanto a tela de Configurações→Notificações estiver aberta; resetado no logout/troca de usuário. */
+var notifPrefsDraftState = null;
 function renderNotifPrefsPushSection(cur){
   function chk(v){ return v !== false; } // ausência/true => ligado (permissivo)
   function row(id,label,checked){ return '<label class="set-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:8px 4px">'
@@ -4781,8 +4784,8 @@ function openNotifPrefsPasswordModal(){
 function bindNotifPrefsPushSection(){
   function $(id){ return document.getElementById(id); }
   if(!$("np_save")) return; // seção não presente
-  var statusEl = $("np_status");
-  function setStatus(msg,kind){ if(statusEl){ statusEl.textContent = msg || ""; statusEl.dataset.kind = kind || ""; } }
+  /* B1.7-E-FIX — escreve no nó VIVO por id (evita referência capturada que fica detachada após re-render) */
+  function setStatus(msg,kind){ var el=document.getElementById("np_status"); if(el){ el.textContent = msg || ""; el.dataset.kind = kind || ""; } }
   function readState(){ return {
     enabled: $("np_enabled").checked,
     task_assigned: $("np_task_assigned").checked,
@@ -4807,8 +4810,13 @@ function bindNotifPrefsPushSection(){
     } catch(_){ setStatus("Falha de rede. Verifique a conexão e tente novamente.","error"); }
     finally { clearNotifPrefsSensitiveRefs(ref); ref = null; } // nunca persistir token/senha
   }
-  $("np_save").onclick = function(){ saveWithPassword(buildNotifPrefsPayload(readState())); };
-  $("np_restore").onclick = function(){ saveWithPassword(permissiveDefaultNotifPrefsPayload()); };
+  $("np_save").onclick = function(){ notifPrefsDraftState = buildNotifPrefsPayload(readState()); saveWithPassword(notifPrefsDraftState); };
+  $("np_restore").onclick = function(){ notifPrefsDraftState = permissiveDefaultNotifPrefsPayload(); saveWithPassword(notifPrefsDraftState); };
+  /* B1.7-E-FIX — toda mudança de toggle sincroniza o draft; assim re-renders preservam o estado do usuário
+     (inclusive task_assigned=false) em vez de voltar ao default permissivo (ON). */
+  ["np_enabled","np_task_assigned","np_event_assigned","np_chat_message","np_android"].forEach(function(id){
+    var el = $(id); if(el) el.addEventListener("change", function(){ try{ notifPrefsDraftState = buildNotifPrefsPayload(readState()); }catch(_){} });
+  });
 }
 
 const SESSION_KEY="idseven_session";
@@ -5814,6 +5822,8 @@ $("doLogin").onclick=async()=>{
 $("pendReload").onclick=()=>{const f=users.find(u=>u.id===(me&&me.id));if(f)me=f;route();};
 $("pendLogout").onclick=logout;
 function logout(){
+  /* B1.7-E-FIX — limpa o draft de preferências de notificação p/ não vazar estado entre usuários */
+  try{ notifPrefsDraftState = null; }catch(_){}
   /* [V62.9 — I3] Cancela timers ao deslogar (evita memory leak em SPA) */
   if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null;alarmSeeded=false;}
   if(boardTimer){clearInterval(boardTimer);boardTimer=null;}
@@ -9360,7 +9370,8 @@ function renderSettingsNotifications(){
       '<div id="setTestPushResult" style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;line-height:1.5;padding:0 4px"></div>'+
     '</div>'+
     /* B1.7-E — preferências de notificação por push salvas na conta (write-only; Rules self-read em fase futura) */
-    renderNotifPrefsPushSection()+
+    /* B1.7-E-FIX — renderiza a partir do draft persistente (preserva edições entre re-renders) */
+    renderNotifPrefsPushSection(notifPrefsDraftState)+
   '</div>';
 }
 
