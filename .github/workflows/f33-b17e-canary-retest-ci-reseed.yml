@@ -1,0 +1,184 @@
+name: "[manual] F3.3.20-B1.7-E Canary Retest (UI notifPrefs) — reseed + Playwright"
+# TEMPORARIO. workflow_dispatch only. SEM deploy. NAO toca app code/functions/Hosting/Rules.
+# Re-seed restrito ao doc do usuario canario (pass/salt). Web Push bloqueado. Sem segredo impresso.
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  canary-retest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout app/main
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          fetch-depth: 0
+      - name: Confirmar SHA app/main (== a81173c6)
+        run: |
+          set -eu
+          echo "HEAD=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "a81173c6fb72ccddbdd17c64bb8285aab6739c74" || { echo "::error:: app/main != a81173c6"; exit 1; }
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps (playwright + firebase-admin) + chromium
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/canary" && cd "$RUNNER_TEMP/canary"
+          npm init -y >/dev/null 2>&1
+          npm i playwright firebase-admin >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          echo "deps OK"
+      - name: Auth GCP (service account secret -> arquivo temp)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente"; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+      - name: Re-seed canary password (efemero; mascarado; so users/canary)
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP/canary"
+          cat > reseed.mjs <<'EOF'
+          import crypto from "node:crypto";
+          import fs from "node:fs";
+          const { initializeApp } = await import("firebase-admin/app");
+          const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
+          const UID = "canary-pwa-staging-notifprefs", DOC = "users/" + UID;
+          const pw = crypto.randomBytes(24).toString("base64url");
+          console.log("::add-mask::" + pw);
+          const salt = crypto.randomBytes(16).toString("hex");
+          const pass = "s2:" + crypto.createHash("sha256").update(salt + "|" + pw).digest("hex");
+          console.log("::add-mask::" + salt); console.log("::add-mask::" + pass);
+          initializeApp({ projectId: "agenda-id-seven" });
+          const db = getFirestore();
+          const ref = db.doc(DOC);
+          const snap = await ref.get();
+          if (!snap.exists) { console.error("ABORT: canary user ausente"); process.exit(3); }
+          if ((snap.data() || {}).canary !== true) { console.error("ABORT: doc nao e canary"); process.exit(4); }
+          await ref.set({ pass, salt, updatedAt: FieldValue.serverTimestamp(), reseedFor: "F3.3.20-B1.7-E-CANARY-RETEST", reseedRunId: String(process.env.GITHUB_RUN_ID || "") }, { merge: true });
+          const a = (await ref.get()).data() || {};
+          const ok = a.status === "ativo" && a.admin === false && a.role === "tester" && a.canary === true && !("fcmTokens" in a) && !("phone" in a) && /^s2:[0-9a-f]{64}$/.test(a.pass || "") && !!a.salt;
+          console.log("reseed invariantes:", ok);
+          if (!ok) { console.error("ABORT: pos-reseed invariantes falharam"); process.exit(5); }
+          fs.appendFileSync(process.env.GITHUB_ENV, "CANARY_PW=" + pw + "\n");
+          console.log("reseed OK (senha em env, mascarada; nunca impressa)");
+          EOF
+          node reseed.mjs
+      - name: Pre-check site (HTTP 200 + patch publicado)
+        run: |
+          set -eu
+          code=$(curl -sS -o /dev/null -w "%{http_code}" https://agenda-id-seven.web.app)
+          echo "HTTP=$code"; test "$code" = "200" || { echo "::error:: web.app HTTP $code"; exit 1; }
+          body=$(curl -sS https://agenda-id-seven.web.app)
+          echo "$body" | grep -q "notifPrefsDraftState" || { echo "::error:: notifPrefsDraftState ausente"; exit 1; }
+          echo "$body" | grep -q "renderNotifPrefsPushSection(notifPrefsDraftState)" || { echo "::error:: render(cur) ausente"; exit 1; }
+          echo "$body" | grep -q 'getElementById("np_status")' || { echo "::error:: statusById ausente"; exit 1; }
+          echo "pre-check OK"
+      - name: Playwright retest (Web Push bloqueado; canario)
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP/canary"
+          cat > retest.mjs <<'EOF'
+          import { chromium } from "playwright";
+          import fs from "node:fs";
+          const URL = "https://agenda-id-seven.web.app";
+          const EMAIL = "canary-pwa-staging-notifprefs@idseven.test";
+          const PW = process.env.CANARY_PW;
+          if (!PW) { console.error("ABORT: CANARY_PW ausente no env"); process.exit(2); }
+          const R = []; const rec = (n, p, d) => { R.push({ n, p: !!p }); console.log((p ? "PASS" : "FAIL") + " — " + n + (d ? ("  :: " + d) : "")); };
+          const GUARD = "window.__subscribeCalled=false;try{if(window.Notification){Notification.requestPermission=function(){return Promise.resolve('denied');};try{Object.defineProperty(Notification,'permission',{get:()=>'denied',configurable:true});}catch(e){}}}catch(e){}try{if(window.PushManager&&PushManager.prototype){PushManager.prototype.subscribe=function(){window.__subscribeCalled=true;return Promise.reject(new Error('blocked'));};}}catch(e){}";
+          const net = { issue: null, update: null };
+          const br = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+          const ctx = await br.newContext({ viewport: { width: 1280, height: 900 }, permissions: [] });
+          await ctx.addInitScript(GUARD);
+          const pg = await ctx.newPage();
+          pg.on("response", r => { const u = r.url(), m = r.request().method();
+            if (m === "POST" && u.includes("issuenotifprefstoken")) net.issue = r.status();
+            if (m === "POST" && u.includes("updatenotifprefs")) net.update = r.status(); });
+          let resp = await pg.goto(URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+          rec("HTTP 200", resp && resp.status() === 200, "http=" + (resp && resp.status()));
+          await pg.evaluate(() => { try { localStorage.removeItem("idseven_session"); localStorage.removeItem("idseven_user"); sessionStorage.clear(); } catch (e) {} });
+          await pg.reload({ waitUntil: "domcontentloaded" });
+          await pg.waitForSelector("#lUser", { timeout: 30000 });
+          await pg.fill("#lUser", EMAIL); await pg.fill("#lPass", PW); await pg.click("#doLogin");
+          await pg.waitForSelector("nav.nav, #content", { timeout: 30000 }); await pg.waitForTimeout(1500);
+          rec("login canario OK", await pg.evaluate(() => !document.getElementById("doLogin") || !!document.querySelector("nav.nav")));
+          rec("Web Push: permission != granted", await pg.evaluate(() => typeof Notification !== "undefined" ? Notification.permission !== "granted" : true));
+          await pg.evaluate(() => { try { switchTab("settings"); } catch (e) {} });
+          let found = false; try { await pg.waitForSelector("#notifPrefsAcctCard", { timeout: 9000 }); found = true; } catch (e) {}
+          if (!found) { await pg.evaluate(() => { const el = [...document.querySelectorAll("button,a,div,span")].find(e => /Notifica[cç]/i.test(e.textContent || "") && e.offsetParent); el && el.click && el.click(); }); try { await pg.waitForSelector("#notifPrefsAcctCard", { timeout: 9000 }); found = true; } catch (e) {} }
+          rec("#notifPrefsAcctCard visivel", found);
+          if (!found) { fs.writeFileSync("retest-summary.txt", "NO-GO: nao cheguei a #notifPrefsAcctCard\n"); await br.close(); process.exit(1); }
+          const before = await pg.evaluate(() => document.getElementById("np_task_assigned").checked);
+          await pg.locator("#np_task_assigned").click({ force: true });
+          await pg.waitForTimeout(2200);
+          const after = await pg.evaluate(() => document.getElementById("np_task_assigned").checked);
+          rec("[CRITICO] np_task_assigned PERMANECE false apos re-render", after === false, "before=" + before + " after=" + after);
+          if (after !== false) { fs.writeFileSync("retest-summary.txt", "NO-GO: UI reverteu task_assigned para true\n"); await br.close(); process.exit(1); }
+          await pg.click("#np_save");
+          await pg.waitForSelector("#np_pw", { timeout: 5000 });
+          rec("modal senha type=password", await pg.evaluate(() => { const e = document.getElementById("np_pw"); return !!e && e.type === "password"; }));
+          await pg.fill("#np_pw", PW); await pg.click("#np_pw_ok");
+          await pg.waitForFunction(() => { const s = document.getElementById("np_status"); return s && /salvas|incorreta|permiss|tentativas|Falha/i.test(s.textContent); }, null, { timeout: 15000 }).catch(() => {});
+          rec("issueNotifPrefsToken 200", net.issue === 200, "status=" + net.issue);
+          rec("updateNotifPrefs 200", net.update === 200, "status=" + net.update);
+          const statusTxt = await pg.evaluate(() => { const s = document.getElementById("np_status"); return s ? s.textContent : ""; });
+          rec("#np_status vivo: 'Preferencias salvas.'", /salvas/i.test(statusTxt), statusTxt);
+          rec("Web Push: subscribe nao chamado", await pg.evaluate(() => !window.__subscribeCalled));
+          await br.close();
+          const fails = R.filter(x => !x.p);
+          const summary = "==== " + (R.length - fails.length) + "/" + R.length + " PASS ====\nnetwork: issue=" + net.issue + " update=" + net.update + " (Bearer ***MASKED***)\n" + (fails.length ? ("NO-GO: " + fails.map(f => f.n).join("; ")) : "GO: UI retest passou") + "\n";
+          fs.writeFileSync("retest-summary.txt", summary);
+          console.log(summary);
+          process.exit(fails.length ? 1 : 0);
+          EOF
+          node retest.mjs
+      - name: Firestore validate (read-only)
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP/canary"
+          cat > validate.mjs <<'EOF'
+          const { initializeApp } = await import("firebase-admin/app");
+          const { getFirestore } = await import("firebase-admin/firestore");
+          import fs from "node:fs";
+          initializeApp({ projectId: "agenda-id-seven" });
+          const db = getFirestore();
+          const p = (await db.doc("notifPrefs/canary-pwa-staging-notifprefs").get());
+          const d = p.data() || {};
+          const u = (await db.doc("users/canary-pwa-staging-notifprefs").get()).data() || {};
+          const out = {
+            prefs_exists: p.exists,
+            enabled: d.enabled,
+            task_assigned: d.byEvent && d.byEvent.task_assigned,
+            event_assigned: d.byEvent && d.byEvent.event_assigned,
+            chat_message: d.byEvent && d.byEvent.chat_message,
+            android: d.byPlatform && d.byPlatform.android,
+            updatedAt: !!d.updatedAt,
+            has_uid: ("uid" in d),
+            user_fcmTokens_absent: !("fcmTokens" in u),
+            user_phone_absent: !("phone" in u)
+          };
+          console.log(JSON.stringify(out, null, 2));
+          fs.writeFileSync("firestore-validate.txt", JSON.stringify(out, null, 2) + "\n");
+          const ok = out.prefs_exists===true && out.enabled===true && out.task_assigned===false && out.event_assigned===true && out.chat_message===true && out.android===true && out.updatedAt===true && out.has_uid===false && out.user_fcmTokens_absent===true && out.user_phone_absent===true;
+          console.log(ok ? "GO: Firestore byEvent.task_assigned=false confirmado" : "NO-GO: Firestore nao bate criterios");
+          process.exit(ok ? 0 : 1);
+          EOF
+          node validate.mjs
+      - name: Upload artifact (seguro, sem segredos)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-retest-report
+          path: |
+            ${{ runner.temp }}/canary/retest-summary.txt
+            ${{ runner.temp }}/canary/firestore-validate.txt
+          if-no-files-found: warn
+      - name: Cleanup credencial temporaria
+        if: ${{ always() }}
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" || true
