@@ -4684,6 +4684,7 @@ const IMAGEKIT_AUTH_URL      = PUSH_WORKER_URL + "/imagekit-auth";
 /* __NPC_START__  (bloco testado por f33W; lógica pura + fetch injetável) */
 const NOTIF_ISSUE_URL  = "https://issuenotifprefstoken-de36pi7vza-uc.a.run.app";
 const NOTIF_UPDATE_URL = "https://updatenotifprefs-de36pi7vza-uc.a.run.app";
+const NOTIF_GET_URL    = "https://getnotifprefs-de36pi7vza-uc.a.run.app";
 const NOTIF_ALLOWED_EVENTS = ["task_assigned", "event_assigned", "chat_message"];
 const NOTIF_ALLOWED_PLATFORMS = ["android"];
 function buildNotifPrefsPayload(state){
@@ -4731,6 +4732,15 @@ async function updateNotifPrefsClient(opts){
   if(r.status === 200 && j && j.ok) return { ok:true, uid:j.uid, prefs:j.prefs };
   return { ok:false, status:r.status, error:(j && j.error) || "update_failed" };
 }
+async function getNotifPrefsClient(opts){
+  opts = opts || {}; var f = opts.fetchImpl || (typeof fetch !== "undefined" ? fetch : null);
+  if(!f) throw new Error("no_fetch");
+  if(!opts.token) throw new Error("missing_token");
+  var r = await f(opts.url || NOTIF_GET_URL, { method:"GET", headers:{ "authorization":"Bearer " + opts.token } });
+  var j = null; try { j = await r.json(); } catch(_){}
+  if(r.status === 200 && j && j.ok) return { ok:true, exists: !!j.exists, prefs: (j.prefs && typeof j.prefs === "object") ? j.prefs : {} };
+  return { ok:false, status:r.status, error:(j && j.error) || "get_failed" }; // NUNCA inclui token
+}
 function clearNotifPrefsSensitiveRefs(refs){ if(refs && typeof refs === "object"){ refs.token = null; refs.password = null; } return refs; }
 /* __NPC_END__ */
 
@@ -4738,7 +4748,12 @@ function clearNotifPrefsSensitiveRefs(refs){ if(refs && typeof refs === "object"
 /* B1.7-E-FIX — estado draft persistente da seção: sobrevive a re-renders (render/onSnapshot/heartbeat/timers)
    enquanto a tela de Configurações→Notificações estiver aberta; resetado no logout/troca de usuário. */
 var notifPrefsDraftState = null;
-function renderNotifPrefsPushSection(cur){
+/* B1.7-E-SELFREAD — token p/ self-read SOMENTE em memoria (nunca storage); limpo no logout.
+   loadState alimenta a nota da seção; hydrateTried evita refetch a cada re-render. */
+var notifPrefsTokenCache = null;     // {token, exp}
+var notifPrefsLoadState = "idle";    // idle|loading|loaded|defaults|need_password|error
+var notifPrefsHydrateTried = false;
+function renderNotifPrefsPushSection(cur, note){
   function chk(v){ return v !== false; } // ausência/true => ligado (permissivo)
   function row(id,label,checked){ return '<label class="set-row" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:8px 4px">'
     + '<span class="set-row-l">' + label + '</span>'
@@ -4748,6 +4763,7 @@ function renderNotifPrefsPushSection(cur){
    + '<div class="set-section" id="notifPrefsAcctCard">'
      + '<div class="set-section-h">Notificações por push (conta)</div>'
      + '<div style="font-size:12px;color:var(--ink-faint);line-height:1.55;padding:0 4px 6px">Essas preferências ficam salvas na sua conta e controlam quais notificações do app você recebe. As notificações Web Push continuam fora desta etapa.</div>'
+     + (note ? ('<div id="np_loadnote" style="font-size:11.5px;color:var(--c-aviso,#d9a441);line-height:1.5;padding:0 4px 8px">' + note + ((notifPrefsLoadState === "need_password" || notifPrefsLoadState === "error") ? ' <button class="set-btn-ghost" id="np_load" style="padding:2px 8px;font-size:11.5px">Carregar</button>' : '') + '</div>') : '')
      + row("np_enabled","Ativar notificações push da conta", chk(cur && cur.enabled))
      + '<div style="font-size:11px;color:var(--ink-faint);margin:6px 4px 0;opacity:.85">Por tipo</div>'
      + row("np_task_assigned","Tarefas atribuídas", chk(be.task_assigned))
@@ -4804,8 +4820,12 @@ function bindNotifPrefsPushSection(){
       ref.password = null; // descarta a senha imediatamente
       if(!iss.ok){ setStatus(sanitizeNotifPrefsError(iss.status, iss.error),"error"); return; }
       ref.token = iss.token; // token só em memória
+      notifPrefsTokenCache = { token: iss.token, exp: iss.exp }; // cache p/ self-read (memória; expira no exp)
       var upd = await updateNotifPrefsClient({ token: ref.token, payload: payload });
       if(!upd.ok){ setStatus(sanitizeNotifPrefsError(upd.status, upd.error),"error"); return; }
+      /* B1.7-E-SELFREAD — usa o echo allowlisted do update p/ refletir o estado salvo no draft */
+      if(upd.prefs && typeof upd.prefs === "object"){ var d={}; if(typeof upd.prefs.enabled==="boolean") d.enabled=upd.prefs.enabled; if(upd.prefs.byEvent) d.byEvent=upd.prefs.byEvent; if(upd.prefs.byPlatform) d.byPlatform=upd.prefs.byPlatform; notifPrefsDraftState=d; }
+      notifPrefsLoadState = "loaded";
       setStatus("Preferências salvas.","success");
     } catch(_){ setStatus("Falha de rede. Verifique a conexão e tente novamente.","error"); }
     finally { clearNotifPrefsSensitiveRefs(ref); ref = null; } // nunca persistir token/senha
@@ -4817,6 +4837,65 @@ function bindNotifPrefsPushSection(){
   ["np_enabled","np_task_assigned","np_event_assigned","np_chat_message","np_android"].forEach(function(id){
     var el = $(id); if(el) el.addEventListener("change", function(){ try{ notifPrefsDraftState = buildNotifPrefsPayload(readState()); }catch(_){} });
   });
+  /* B1.7-E-SELFREAD — botão "Carregar" (quando precisa de senha/erro) e hidratação 1x por entrada na seção */
+  var lb = $("np_load"); if(lb) lb.onclick = function(){ loadNotifPrefsWithPassword(); };
+  if(!notifPrefsHydrateTried){ setTimeout(function(){ try{ maybeHydrateNotifPrefs(); }catch(_){} }, 0); }
+}
+
+/* B1.7-E-SELFREAD — hidrata o draft a partir do servidor (getNotifPrefs). Token só em memória,
+   válido até exp; nunca em storage; limpo no logout. Independe de ENABLE_NOTIF_PREFS. Não falseia
+   consentimento: enquanto não carregar, exibe nota; defaults explícitos só quando exists=false. */
+function notifPrefsLoadNote(){
+  switch(notifPrefsLoadState){
+    case "loading": return "Carregando suas preferências salvas…";
+    case "need_password": return "Exibindo padrões. Confirme sua senha para ver/editar o que está salvo.";
+    case "error": return "Não foi possível carregar suas preferências salvas. Exibindo padrões temporários.";
+    case "defaults": return "Você ainda não salvou preferências; exibindo padrões.";
+    default: return ""; // "loaded"/"idle" => sem nota
+  }
+}
+function notifPrefsValidCachedToken(){
+  try{
+    if(notifPrefsTokenCache && notifPrefsTokenCache.token && typeof notifPrefsTokenCache.exp === "number"
+       && Date.now() < (notifPrefsTokenCache.exp - 5000)) return notifPrefsTokenCache.token;
+  }catch(_){}
+  return null;
+}
+function applyNotifPrefsFromServer(res){
+  if(res && res.exists){
+    var p = res.prefs || {}, draft = {};
+    if(typeof p.enabled === "boolean") draft.enabled = p.enabled;
+    if(p.byEvent && typeof p.byEvent === "object") draft.byEvent = p.byEvent;
+    if(p.byPlatform && typeof p.byPlatform === "object") draft.byPlatform = p.byPlatform;
+    notifPrefsDraftState = draft; notifPrefsLoadState = "loaded";
+  } else {
+    notifPrefsDraftState = permissiveDefaultNotifPrefsPayload(); notifPrefsLoadState = "defaults";
+  }
+}
+async function loadNotifPrefsWithPassword(){
+  if(typeof me === "undefined" || !me || !me.id){ notifPrefsLoadState = "error"; if(typeof render === "function") render(); return; }
+  var password = await openNotifPrefsPasswordModal();
+  if(!password) return; // cancelado: mantém estado atual
+  notifPrefsLoadState = "loading"; if(typeof render === "function") render();
+  var iss = null;
+  try { iss = await issueNotifPrefsTokenClient({ uid: me.id, password: password }); }
+  catch(_){ password=null; notifPrefsLoadState="error"; if(typeof render === "function") render(); return; }
+  password = null;
+  if(!iss || !iss.ok){ notifPrefsLoadState = "error"; if(typeof render === "function") render(); return; }
+  notifPrefsTokenCache = { token: iss.token, exp: iss.exp };
+  try { var res = await getNotifPrefsClient({ token: iss.token }); if(res && res.ok) applyNotifPrefsFromServer(res); else notifPrefsLoadState = "error"; }
+  catch(_){ notifPrefsLoadState = "error"; }
+  if(typeof render === "function") render();
+}
+function maybeHydrateNotifPrefs(){
+  if(notifPrefsHydrateTried) return;
+  notifPrefsHydrateTried = true;
+  var tok = notifPrefsValidCachedToken();
+  if(!tok){ if(notifPrefsLoadState === "idle") notifPrefsLoadState = "need_password"; if(typeof render === "function") render(); return; }
+  notifPrefsLoadState = "loading"; if(typeof render === "function") render();
+  getNotifPrefsClient({ token: tok }).then(function(res){
+    if(res && res.ok) applyNotifPrefsFromServer(res); else notifPrefsLoadState = "error";
+  }).catch(function(){ notifPrefsLoadState = "error"; }).then(function(){ if(typeof render === "function") render(); });
 }
 
 const SESSION_KEY="idseven_session";
@@ -5823,7 +5902,7 @@ $("pendReload").onclick=()=>{const f=users.find(u=>u.id===(me&&me.id));if(f)me=f
 $("pendLogout").onclick=logout;
 function logout(){
   /* B1.7-E-FIX — limpa o draft de preferências de notificação p/ não vazar estado entre usuários */
-  try{ notifPrefsDraftState = null; }catch(_){}
+  try{ notifPrefsDraftState = null; notifPrefsTokenCache = null; notifPrefsHydrateTried = false; notifPrefsLoadState = "idle"; }catch(_){}
   /* [V62.9 — I3] Cancela timers ao deslogar (evita memory leak em SPA) */
   if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null;alarmSeeded=false;}
   if(boardTimer){clearInterval(boardTimer);boardTimer=null;}
@@ -9020,6 +9099,8 @@ function bindSettingsMain(){
   if(bk) bk.onclick = function(){ switchTab("profile"); };
   document.querySelectorAll("[data-setgo]").forEach(b=>b.onclick=()=>{
     settingsView = b.dataset.setgo;
+    /* B1.7-E-SELFREAD — ao entrar em Notificações, re-tenta hidratar do servidor (1x por entrada) */
+    if(b.dataset.setgo === "notifications"){ notifPrefsHydrateTried = false; notifPrefsLoadState = "idle"; }
     render();
   });
   var sv = document.getElementById("setVer");
@@ -9371,7 +9452,7 @@ function renderSettingsNotifications(){
     '</div>'+
     /* B1.7-E — preferências de notificação por push salvas na conta (write-only; Rules self-read em fase futura) */
     /* B1.7-E-FIX — renderiza a partir do draft persistente (preserva edições entre re-renders) */
-    renderNotifPrefsPushSection(notifPrefsDraftState)+
+    renderNotifPrefsPushSection(notifPrefsDraftState, notifPrefsLoadNote())+
   '</div>';
 }
 

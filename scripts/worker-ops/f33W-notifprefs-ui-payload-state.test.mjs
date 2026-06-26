@@ -34,7 +34,7 @@ rec("buildNotifPrefsPayload preserva byEvent.task_assigned=false", !!(p.byEvent 
 rec("buildNotifPrefsPayload mantém event_assigned=true/android=true", p.byEvent.event_assigned === true && p.byPlatform.android === true);
 
 // 4) regressão no SOURCE — falham no código antigo, passam no patched
-rec("caller renderiza com cur (renderNotifPrefsPushSection(notifPrefsDraftState))", html.includes("renderNotifPrefsPushSection(notifPrefsDraftState)"));
+rec("caller renderiza com cur (renderNotifPrefsPushSection(notifPrefsDraftState, ...))", /renderNotifPrefsPushSection\(notifPrefsDraftState\b/.test(html));
 rec("setStatus escreve no nó vivo (getElementById np_status)", html.includes('function setStatus(msg,kind){ var el=document.getElementById("np_status")'));
 rec("change-listeners sincronizam o draft", /addEventListener\("change"[\s\S]{0,140}notifPrefsDraftState = buildNotifPrefsPayload\(readState\(\)\)/.test(html));
 rec("logout reseta notifPrefsDraftState", /function logout\(\)\{[\s\S]{0,200}notifPrefsDraftState = null/.test(html));
