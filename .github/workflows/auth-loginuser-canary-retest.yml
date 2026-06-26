@@ -1,0 +1,117 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — QA gated: reteste CANARIO de loginUser (server-side login).
+# Executa o runner endpoint-only scripts/worker-ops/f33AB-auth-loginuser-canary.e2e.mjs
+# (de app/main) contra a Function HTTPS loginUser JA PUBLICADA. Prova: metadata +
+# binding AUTH_SESSION_SECRET (so metadados; NUNCA o valor) -> probes seguros
+# (OPTIONS 204/GET 405/POST invalido 400/inexistente 401) -> re-seed EFEMERO so do
+# canario -> login canario 200 + token scope=session -> projecao segura -> negativos 401.
+# workflow_dispatch only; gate confirm_retest==RUN_LOGINUSER_CANARY_RETEST. NAO faz deploy
+# (Functions/Hosting/Rules/Firestore/Storage). Unico write Firestore direto = re-seed da
+# SENHA do canario (no runner). SEM Playwright/UI. Web Push bloqueado. Segredo (SA) nunca
+# impresso; artifacts sem token bruto/senha. NAO executa gcloud secrets versions access.
+# =====================================================================
+name: "[manual] F3.3.20-B1.7-E loginUser Canary Retest"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_retest:
+        description: "Type RUN_LOGINUSER_CANARY_RETEST to run the loginUser canary retest"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-loginuser-canary-retest
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  RETEST_OUT: "loginuser-canary-artifacts"
+
+jobs:
+  loginuser-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_retest (== RUN_LOGINUSER_CANARY_RETEST)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_retest }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_LOGINUSER_CANARY_RETEST" ]; then
+            echo "::error:: confirm_retest != RUN_LOGINUSER_CANARY_RETEST — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_retest OK."
+
+      - name: Checkout (ref FIXO app/main)
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          fetch-depth: 0
+
+      - name: Confirmar app/main + presenca do runner f33AB
+        run: |
+          set -eu
+          echo "app/main HEAD = $(git rev-parse HEAD)"
+          test -f scripts/worker-ops/f33AB-auth-loginuser-canary.e2e.mjs || { echo "::error:: runner f33AB ausente"; exit 1; }
+          node --check scripts/worker-ops/f33AB-auth-loginuser-canary.e2e.mjs
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar firebase-admin (SEM Playwright)
+        run: |
+          set -eu
+          npm install --no-save --no-audit --no-fund firebase-admin
+
+      - name: Auth gcloud SA (secret -> arquivo temporario; nunca impresso)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          echo "SA ativada (valor nao impresso)."
+
+      - name: Metadata loginUser (describe; URI + binding AUTH_SESSION_SECRET; sem valor)
+        run: |
+          set -eu
+          mkdir -p "$RETEST_OUT"
+          URI="$(gcloud functions describe loginUser --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)"
+          if [ -z "$URI" ]; then echo "::error:: loginUser sem URI (nao publicada/inacessivel) — NO-GO"; exit 1; fi
+          case "$URI" in https://*) : ;; *) echo "::error:: URI nao https: $URI"; exit 1 ;; esac
+          SECRETS="$(gcloud functions describe loginUser --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.secretEnvironmentVariables.secret)' 2>/dev/null || true)"
+          if echo "$SECRETS" | grep -q 'AUTH_SESSION_SECRET'; then BIND=true; else BIND=false; fi
+          if [ "$BIND" != "true" ]; then echo "::error:: binding AUTH_SESSION_SECRET ausente em loginUser — NO-GO"; exit 1; fi
+          echo "loginUser URI OK (https) e binding AUTH_SESSION_SECRET presente (valor nunca acessado)."
+          printf '{"name":"loginUser","uri":"%s","region":"us-central1","trigger":"https","secret_binding_auth_session_secret":%s}\n' "$URI" "$BIND" > "$RETEST_OUT/metadata.json"
+          echo "LOGINUSER_URL=$URI" >> "$GITHUB_ENV"
+
+      - name: Rodar reteste canario loginUser (endpoint-only; Web Push bloqueado)
+        env:
+          LOGINUSER_URL: ${{ env.LOGINUSER_URL }}
+        run: |
+          set -eu
+          node scripts/worker-ops/f33AB-auth-loginuser-canary.e2e.mjs
+
+      - name: Upload artifacts seguros (report/metadata/probes/response-safe)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loginuser-canary-retest
+          path: loginuser-canary-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Limpeza (service account)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
