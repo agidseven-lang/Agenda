@@ -1,0 +1,146 @@
+rules_version = '2';
+
+// ============================================================
+//  REGRAS DE SEGURANCA - Agenda ID Seven
+//  Onde colar: Firebase Console > Build > Firestore Database
+//  > aba "Rules" (Regras) > apague tudo que estiver la
+//  > cole este conteudo.
+//
+//  V63.29: ADICIONADAS regras pro chat interno (DMs entre usuarios)
+//  F3.3.20-B1.0.1: ADICIONADAS colecoes server-side
+//  notifLog e notifPrefs para notificacoes 100% / onboarding.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helpers administrativos para leitura futura de auditoria ----
+    // Observacao:
+    // O app usa auth propria em parte dos fluxos.
+    // Por isso, notifPrefs e notifLog NAO permitem escrita direta do cliente.
+    // Worker/Functions via service account gravarao futuramente ignorando rules.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.admin == true;
+    }
+
+    // ---- Equipe: ler/criar/atualizar SIM, apagar NAO ----
+    match /users/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.size() < 60;
+      allow update: if request.resource.data.size() < 60;
+      allow delete: if false;
+    }
+
+    // ---- Agenda (compromissos) ----
+    match /events/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.size() < 50;
+      allow update: if request.resource.data.size() < 50;
+      allow delete: if true;
+    }
+
+    // ---- Quadro (tarefas) ----
+    match /tasks/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.size() < 80;
+      allow update: if request.resource.data.size() < 80;
+      allow delete: if true;
+    }
+
+    // ---- Chat interno (V63.29) ----
+    // Cada documento em /chats/{chatId} representa uma conversa (DM).
+    // As mensagens ficam em /chats/{chatId}/messages/{mid}.
+    // Sem Firebase Auth, qualquer cliente do app pode ler/escrever — o
+    // controle de quem participa fica no campo `participants`. Limite
+    // defensivo de campos pra evitar lixo.
+    match /chats/{chatId} {
+      allow read: if true;
+      allow create: if request.resource.data.size() < 20;
+      allow update: if request.resource.data.size() < 20;
+      allow delete: if true;
+
+      // Mensagens da conversa
+      match /messages/{mid} {
+        allow read: if true;
+        allow create: if request.resource.data.size() < 15;
+        allow update: if request.resource.data.size() < 15;
+        allow delete: if true;
+      }
+    }
+
+    // -------- INICIO injetado por scripts/patch-firestore-password-reset-rules.mjs --------
+    // passwordResetRequests — reset por administrador (app nativo 1.0.37+).
+    // App nao usa Firebase Auth (sem request.auth confiavel), entao a
+    // regra valida o SCHEMA do documento criado.
+    match /passwordResetRequests/{reqId} {
+      allow get, list: if false;
+      allow update, delete: if false;
+
+      allow create: if
+        request.resource.data.keys().hasOnly([
+          'identifier','kind','phoneDigits','createdAt',
+          'status','source','handledBy','handledAt'
+        ]) &&
+        request.resource.data.keys().hasAll([
+          'identifier','kind','phoneDigits','createdAt',
+          'status','source','handledBy','handledAt'
+        ]) &&
+        request.resource.data.identifier is string &&
+        request.resource.data.identifier.size() >= 3 &&
+        request.resource.data.identifier.size() <= 120 &&
+        request.resource.data.kind is string &&
+        (
+          request.resource.data.kind == 'email' ||
+          request.resource.data.kind == 'phone'
+        ) &&
+        request.resource.data.phoneDigits is string &&
+        request.resource.data.phoneDigits.size() <= 20 &&
+        (
+          request.resource.data.kind != 'phone' ||
+          request.resource.data.phoneDigits.size() >= 8
+        ) &&
+        request.resource.data.createdAt is number &&
+        request.resource.data.createdAt > 0 &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.source == 'nativebeta' &&
+        request.resource.data.handledBy == null &&
+        request.resource.data.handledAt == null;
+    }
+    // -------- FIM injetado --------
+
+    // -------- INICIO injetado: passwordResetCodes (self-service 1.0.39+) --------
+    // Codigos de redefinicao gerenciados APENAS pelas Cloud Functions
+    // (requestPasswordReset / confirmPasswordReset) via Admin SDK, que
+    // bypassa estas rules. Cliente NAO tem acesso direto.
+    match /passwordResetCodes/{codeId} {
+      allow read, list, write: if false;
+    }
+    // -------- FIM injetado: passwordResetCodes --------
+
+    // -------- INICIO F3.3.20-B1.0.1: notificacoes server-side --------
+    // notifLog — trilha de auditoria futura de envio de notificacoes.
+    // Cliente comum NAO grava. Worker/Functions via service account gravarao futuramente.
+    match /notifLog/{logId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    // notifPrefs — preferencias futuras por usuario.
+    // Cliente comum NAO grava direto. Worker/Functions via service account gravarao futuramente.
+    match /notifPrefs/{uid} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    // -------- FIM F3.3.20-B1.0.1 --------
+
+    // ---- Qualquer outra colecao: BLOQUEADA ----
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "projectId": "agenda-id-seven",
+  "release": "cloud.firestore",
+  "rulesetName": "projects/agenda-id-seven/rulesets/2ebfb400-c5d1-4d13-b0de-b24b00710799",
+  "updateTime": "2026-06-23T17:59:34.130417Z",
+  "createTime": "2026-06-23T17:59:31.716831Z",
+  "sha256": "0f621e2f50f19e4f2bd4279735d450033c720939bbef3d1a4542d3d56f26bdf6",
+  "lineCount": 147,
+  "byteCount": 5592,
+  "source": "Firebase Rules API GET",
+  "capturedAt": "2026-06-26T15:53:32.876Z",
+  "capturedByWorkflow": "firestore-rules-baseline-capture.yml",
+  "captureRunId": "28249260055",
+  "auditRunId": "28247709664",
+  "auditArtifactId": "7909407768",
+  "mainSha": "8782f9deb172a7d2505d55b755ccabed14bcb02d",
+  "appMainSha": "54e8bc10ccd75e37f77b38b353b29e827bc4a90e",
+  "verdict": "NO-GO",
+  "counts": {
+    "HIGH": 1,
+    "INFO": 20,
+    "MEDIUM": 8
+  },
+  "knownRisk": "users HIGH / leitura direta de PII / pass/salt/fcmTokens/phone/email",
+  "note": "BASELINE ONLY - NOT a deploy source; firebase.json does not point to this file."
+}
