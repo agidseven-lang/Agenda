@@ -1169,3 +1169,124 @@ exports.getNotifPrefs = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-c
 // Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
 exports._handleNotifPrefsRead = handleNotifPrefsRead;
 exports._notifProjectPrefsOut = notifProjectPrefsOut;
+
+/* ============================================================================
+   F3.3.20-B1.7-E — LOGIN server-side (Slice 1): exports.loginUser.
+   ----------------------------------------------------------------------------
+   - Migra a VERIFICACAO DE SENHA do cliente para o servidor (mesmo modelo do
+     emissor B1.3-B): prova = a senha real do usuario ("s2:"+SHA-256(salt|senha)
+     atual + djb2 legado), comparacao em tempo constante (notifVerifyPassword).
+     onRequest (NAO onCall) => NAO depende de request.auth.uid.
+   - Lookup ESPELHA o cliente: e-mail (lowercase) OU telefone (somente digitos),
+     normalizando AMBOS os lados em memoria (Firestore where nao replica
+     toLowerCase()/replace(\D)). Le a colecao users (igual ao onSnapshot do app).
+   - Anti-enumeracao: identifier inexistente / multiplos matches (colisao) / senha
+     errada => MESMO 401 generico ("invalid_credentials"). Status inativo
+     (pendente/removido/excluido) => 403 SO apos a senha correta (nao vaza estado
+     a quem nao tem a senha).
+   - Rate-limit IN-MEMORY (best-effort, por instancia; SEM Firestore; sem PII) por
+     identifier + IP (chaves namespaced; isoladas das chaves dos endpoints notif).
+   - Token de SESSAO assinado HMAC-SHA256 (MESMO formato/notifSignToken). Claims
+     {uid, admin, role, scope:"session", iat, exp}; TTL 24h em MS (mesma unidade da
+     B1.3-B; notifVerifyToken compara ms). NAO altera notifVerifyToken nesta fase.
+   - Projecao SEGURA (allowlist EXPLICITA campo a campo): SO {id,name,role,admin,
+     status,photo,color}. NUNCA retorna pass/salt/fcmTokens/phone/email/token
+     interno/doc cru/campos desconhecidos via spread. So LE users; NUNCA escreve
+     no Firestore. NUNCA loga senha/token/segredo/identifier.
+   - DORMENTE: sem AUTH_SESSION_SECRET no ambiente => 503 (inerte). Em producao o
+     segredo NAO esta setado e a funcao NAO esta deployada nesta fase. Secret
+     SEPARADO do NOTIF_PREFS_SECRET (isolamento de escopo). Slice 1 = SO o backend
+     + testes: NAO integra a UI, NAO fecha users, NAO cria usersPublic, NAO mexe Rules.
+   ============================================================================ */
+const AUTH_SESSION_SECRET = defineSecret("AUTH_SESSION_SECRET");
+const AUTH_SESSION_TTL_MS = 24 * 60 * 60 * 1000;   // 24h (sessao)
+function authSessionSecret() {
+  return String((typeof process !== "undefined" && process.env && process.env.AUTH_SESSION_SECRET) || "");
+}
+// Projecao SEGURA do usuario (allowlist EXPLICITA; nunca espalha o doc cru).
+function authUserPublicOut(id, d) {
+  const src = (d && typeof d === "object" && !Array.isArray(d)) ? d : {};
+  const str = (v) => (typeof v === "string" ? v : "");
+  return {
+    id: String(id),
+    name: str(src.name),
+    role: str(src.role),
+    admin: src.admin === true,
+    status: str(src.status),
+    photo: str(src.photo),
+    color: str(src.color),
+  };
+}
+// Orquestra o login. ctx = {method, body, ip, now}. So LE users (sem escrita).
+// Retorna {status, json}. Erros sempre controlados (sem throw).
+async function handleLoginUser(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  if (ctx.method && String(ctx.method).toUpperCase() !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  if (!authSessionSecret()) return { status: 503, json: { ok: false, error: "endpoint_disabled" } };
+  const body = ctx.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { status: 400, json: { ok: false, error: "body_not_object" } };
+  const identifier = (typeof body.identifier === "string") ? body.identifier.trim() : "";
+  const password = (typeof body.password === "string") ? body.password : "";
+  if (!identifier) return { status: 400, json: { ok: false, error: "missing_identifier" } };
+  if (!password) return { status: 400, json: { ok: false, error: "missing_password" } };
+  if (identifier.length > 320 || password.length > 1024) return { status: 400, json: { ok: false, error: "oversized_input" } };
+  // rate-limit IN-MEMORY por identifier + IP (chaves namespaced; isoladas dos endpoints notif).
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const idLower = identifier.toLowerCase();
+  const idDigits = identifier.replace(/\D/g, "");
+  const rlKeys = ["lu:" + idLower].concat(ip ? ["li:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  let snap;
+  try { snap = await notifDb().collection("users").get(); }
+  catch (e) {
+    try { logger.error("[loginUser] leitura falhou", { err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "lookup_failed" } };
+  }
+  // Match ESPELHA o cliente: email (lowercase) OU phone (digitos). Normaliza ambos os lados.
+  const matches = [];
+  try {
+    snap.forEach((doc) => {
+      const d = (doc && typeof doc.data === "function") ? (doc.data() || {}) : {};
+      const email = (typeof d.email === "string" ? d.email : "").toLowerCase();
+      const phone = (typeof d.phone === "string" ? d.phone : "").replace(/\D/g, "");
+      if ((email && email === idLower) || (idDigits && phone && phone === idDigits)) {
+        matches.push({ id: doc.id, d: d });
+      }
+    });
+  } catch (_) { /* snapshot defensivo */ }
+  // inexistente OU multiplos matches (colisao) => MESMO 401 generico (nao revela existencia/colisao).
+  if (matches.length !== 1) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
+  const u = matches[0];
+  // senha errada => MESMO 401 generico (indistinguivel de inexistente).
+  if (!notifVerifyPassword(u.d.pass, u.d.salt, password)) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
+  // inativo => 403 (checado SO apos a senha correta, p/ nao vazar estado a quem nao a tem).
+  const st = String(u.d.status || "");
+  if (st === "pendente" || st === "removido" || st === "excluido") return { status: 403, json: { ok: false, error: "user_inactive" } };
+  rlKeys.forEach((k) => notifRlClear(k));   // sucesso de credenciais: zera o rate-limit do identifier/IP
+  const isAdmin = (u.d.admin === true);
+  const role = (typeof u.d.role === "string") ? u.d.role : "";
+  const claims = { uid: u.id, admin: isAdmin, role: role, scope: "session", iat: now, exp: now + AUTH_SESSION_TTL_MS };
+  const token = notifSignToken(claims, authSessionSecret());
+  try { logger.info("[loginUser] sessao emitida", { uid: notifMaskUid(u.id), admin: isAdmin, role: role, exp: claims.exp }); } catch (_) {}
+  return { status: 200, json: { ok: true, session: { token: token, expiresAt: claims.exp }, user: authUserPublicOut(u.id, u.d) } };
+}
+
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem AUTH_SESSION_SECRET
+// => 503. NAO deployado nesta fase; NAO integrado a UI (Slice 1 = so o backend + testes).
+exports.loginUser = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleLoginUser({ method: req.method, body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[loginUser] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
+exports._handleLoginUser = handleLoginUser;
+exports._authUserPublicOut = authUserPublicOut;
