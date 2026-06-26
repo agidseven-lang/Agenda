@@ -1,0 +1,159 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — Firebase HOSTING STAGING Deploy (Hosting-only).
+# Publica SOMENTE Firebase Hosting (agenda-id-seven.web.app) a partir do pacote
+# .staging-public (allowlist FIXA de 6 arquivos) de app/main. PERMANENTE, oficial,
+# gated, auditavel e reversivel (rollback por hosting:versions). workflow_dispatch;
+# dry_run=true por padrao. Guards: confirm_deploy==DEPLOY_HOSTING; checkout fixo
+# app/main; pin do commit (PINNED_APPMAIN_COMMIT) e do index.html (PINNED_INDEX_SHA256);
+# firebase.json hosting-only (sem firestore/rules/predeploy); allowlist de 6 + SHA-256;
+# markers da UI self-read; deploy UNICO `firebase deploy --only hosting`. NAO toca
+# Functions/Rules/Firestore/Storage; NAO usa hosting:channel; NAO ativa Web Push;
+# sem usuario real; segredo (SA) nunca impresso. Bump os PINNED_* a cada release.
+# =====================================================================
+name: "[manual] F3.3.20-B1.7-E Firebase Hosting Staging Deploy"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Type DEPLOY_HOSTING to allow real deploy"
+        required: true
+        default: ""
+      dry_run:
+        description: "true = validate only; false = deploy hosting"
+        required: true
+        default: "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fb-hosting-staging-deploy
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  PINNED_APPMAIN_COMMIT: "d53ad23d9553ba32ca427874c23a453cece9d093"
+  PINNED_INDEX_SHA256: "4d0b4fb13eeac50381da386e421e059be4a25d2778449ee7e4da790d24c7adcb"
+
+jobs:
+  hosting-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard confirm_deploy (== DEPLOY_HOSTING)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_deploy }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "DEPLOY_HOSTING" ]; then
+            echo "::error:: confirm_deploy != DEPLOY_HOSTING — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_deploy OK."
+
+      - name: Guard dry_run (true|false)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -eu
+          case "$DRY_RUN" in
+            true|false) echo "dry_run=$DRY_RUN OK." ;;
+            *) echo "::error:: dry_run deve ser 'true' ou 'false' (recebido: $DRY_RUN)"; exit 1 ;;
+          esac
+
+      - name: Checkout (ref FIXO app/main)
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          fetch-depth: 0
+
+      - name: Pin commit app/main + SHA-256 do index.html
+        run: |
+          set -eu
+          H="$(git rev-parse HEAD)"
+          if [ "$H" != "$PINNED_APPMAIN_COMMIT" ]; then
+            echo "::error:: app/main HEAD ($H) != pin ($PINNED_APPMAIN_COMMIT)"; exit 1
+          fi
+          ACT="$(sha256sum index.html | awk '{print $1}')"
+          if [ "$ACT" != "$PINNED_INDEX_SHA256" ]; then
+            echo "::error:: index.html sha256 ($ACT) != pin ($PINNED_INDEX_SHA256)"; exit 1
+          fi
+          echo "Pins OK: commit=$H index.html=$ACT"
+
+      - name: Gate firebase.json (hosting-only; sem firestore/rules/predeploy)
+        run: |
+          set -eu
+          node -e "const d=require('./firebase.json'); if(d.hosting.public!=='.staging-public') throw 'hosting.public'; if(d.firestore||d.rules) throw 'firestore/rules presente'; if(d.hosting.predeploy) throw 'hosting.predeploy presente'; console.log('firebase.json hosting-only OK')"
+
+      - name: Markers da UI self-read + zero segredo no index.html
+        run: |
+          set -eu
+          for m in 'getNotifPrefsClient' 'NOTIF_GET_URL' 'notifPrefsTokenCache' 'renderNotifPrefsPushSection' 'task_assigned'; do
+            if ! grep -q "$m" index.html; then echo "::error:: marker ausente: $m"; exit 1; fi
+          done
+          if grep -qE '"s2:[0-9a-f]{64}"|NOTIF_PREFS_SECRET[[:space:]]*=[[:space:]]*"|Bearer [A-Za-z0-9._-]{20,}' index.html; then
+            echo "::error:: possivel segredo/token embutido no index.html"; exit 1
+          fi
+          echo "Markers OK; sem segredo embutido."
+
+      - name: Montar .staging-public (allowlist FIXA de 6) + SHA-256
+        run: |
+          set -eu
+          rm -rf .staging-public && mkdir -p .staging-public
+          for f in index.html manifest.json sw.js firebase-messaging-sw.js icon-192.png icon-512.png; do
+            [ -f "$f" ] || { echo "::error:: arquivo ausente: $f"; exit 1; }
+            cp "$f" ".staging-public/$f"
+          done
+          N="$(find .staging-public -type f | wc -l)"
+          [ "$N" -eq 6 ] || { echo "::error:: .staging-public tem $N arquivos (esperado 6)"; exit 1; }
+          if ls .staging-public | grep -qE 'functions|scripts|\.github|firebase\.json|\.firebaserc|package\.json|package-lock\.json|node_modules|\.env|\.md$|wrangler|cloudflare'; then
+            echo "::error:: arquivo interno detectado em .staging-public"; exit 1
+          fi
+          check() { got="$(sha256sum "$1" | awk '{print $1}')"; if [ "$got" != "$2" ]; then echo "::error:: $1 sha256 $got != $2"; exit 1; fi; }
+          ( cd .staging-public
+            check index.html                4d0b4fb13eeac50381da386e421e059be4a25d2778449ee7e4da790d24c7adcb
+            check manifest.json             5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
+            check sw.js                     a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
+            check firebase-messaging-sw.js  64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
+            check icon-192.png              15dd146c151bf406d590a1f07a1950a7c82d7ceb6277a5b9ed5c0b8257fe6ba5
+            check icon-512.png              a29c86455b1ba2a6727309edb48c70a88909db772a01811a09a960c1fb3854bc )
+          echo "Pacote .staging-public OK (6 arquivos; SHA-256 conferido)."
+
+      - name: Auth gcloud (service account via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+
+      - name: Deploy HOSTING (somente se dry_run=false)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -eu
+          if [ "$DRY_RUN" = "false" ]; then
+            npm install -g firebase-tools >/dev/null 2>&1
+            echo "DEPLOY real — alvo: hosting"
+            firebase deploy --only hosting --project "$GCP_PROJECT" --non-interactive
+          else
+            echo "DRY-RUN=true — nenhum deploy executado. Alvo planejado: hosting."
+          fi
+
+      - name: Pos-deploy (read-only; somente se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          code="$(curl -sS -o /dev/null -w '%{http_code}' https://agenda-id-seven.web.app)"
+          echo "HTTP=$code"; [ "$code" = "200" ] || { echo "::error:: web.app HTTP $code"; exit 1; }
+          body="$(curl -sS https://agenda-id-seven.web.app)"
+          for m in 'getNotifPrefsClient' 'NOTIF_GET_URL' 'notifPrefsTokenCache' 'task_assigned'; do
+            echo "$body" | grep -q "$m" || { echo "::error:: marker ausente no site: $m"; exit 1; }
+          done
+          echo "POS-deploy OK: HTTP 200; UI self-read publicada."
+
+      - name: Limpeza (service account)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
