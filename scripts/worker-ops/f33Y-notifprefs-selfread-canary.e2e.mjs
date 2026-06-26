@@ -106,8 +106,13 @@ try {
   async function login(page){
     await page.goto(SITE, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#lUser", { timeout: 45000 });
-    // espera a lista de usuarios carregar (login depende de window.users)
-    await page.waitForFunction((email) => Array.isArray(window.users) && window.users.some((x) => ((x.email || "").toLowerCase() === email)), CANARY_EMAIL, { timeout: 60000 });
+    // espera a lista de usuarios carregar. 'users' e um top-level `let` no app (index.html),
+    // que NAO vira propriedade de window; por isso referenciamos o binding global direto
+    // (com try/catch para tolerar ReferenceError ate o boot popular a lista).
+    await page.waitForFunction((email) => {
+      try { return Array.isArray(users) && users.some((x) => ((x.email || "").toLowerCase() === email)); }
+      catch (e) { return false; }
+    }, CANARY_EMAIL, { timeout: 60000 });
     await page.fill("#lUser", CANARY_EMAIL);
     await page.fill("#lPass", pw);
     await page.click("#doLogin");
