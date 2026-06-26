@@ -1322,3 +1322,74 @@ function authVerifySessionToken(authHeader, secret, nowMs) {
 
 // Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
 exports._authVerifySessionToken = authVerifySessionToken;
+
+/* ============================================================================
+   F3.3.20-B1.7-E — SLICE 2: getUserContact (leitura AUTENTICADA de contato).
+   ----------------------------------------------------------------------------
+   - Primeiro CONSUMIDOR de authVerifySessionToken: substitui a exposicao direta de
+     phone/email por endpoint autenticado. onRequest (NAO onCall) => uid do requester
+     vem SO do token de sessao verificado; NUNCA de Firebase Auth/request.auth.
+   - Autorizacao MINIMA: self (session.uid === uid) OU admin (session.admin === true).
+     Nao-self e nao-admin => 403 ANTES de revelar existencia (anti-enumeracao).
+   - Projecao SEGURA: retorna SOMENTE { phone, email } em `contact`. NUNCA pass/salt/
+     fcmTokens/fcmTokenMeta/admin/role/status/photo/color/doc cru/campos extras.
+   - So LE users/{uid} (um doc; nunca a colecao inteira); NUNCA escreve no Firestore.
+   - Rate-limit IN-MEMORY por session.uid + IP. Logs sem token/Authorization/PII
+     (so uids mascarados). Dormente sem AUTH_SESSION_SECRET => sessao invalida (401).
+   - ADITIVO/INERTE: ainda NAO consumido pela UI; sem deploy nesta fase.
+   ============================================================================ */
+async function handleGetUserContact(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "GET" && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  // Autenticacao de SESSAO estrita (assinatura + exp + scope=session via AUTH_SESSION_SECRET).
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "invalid_session" } };
+  // Rate-limit por requester (uid da sessao) + IP.
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["c:" + auth.uid].concat(ip ? ["ci:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  // Alvo.
+  const targetUid = (typeof ctx.uid === "string") ? ctx.uid.trim() : "";
+  if (!targetUid) return { status: 400, json: { ok: false, error: "missing_uid" } };
+  if (targetUid.length > 200) return { status: 400, json: { ok: false, error: "bad_uid" } };
+  // Autorizacao: self OU admin. 403 ANTES de ler o doc (nao revela existencia a quem nao pode).
+  const isSelf = (targetUid === auth.uid);
+  const isAdmin = (auth.admin === true);
+  if (!isSelf && !isAdmin) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 403, json: { ok: false, error: "forbidden" } }; }
+  let snap;
+  try { snap = await notifDb().collection("users").doc(targetUid).get(); }
+  catch (e) {
+    try { logger.error("[getUserContact] leitura falhou", { uid: notifMaskUid(targetUid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "lookup_failed" } };
+  }
+  if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
+  const d = snap.data() || {};
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[getUserContact] ok", { requester: notifMaskUid(auth.uid), target: notifMaskUid(targetUid), self: isSelf, admin: isAdmin }); } catch (_) {}
+  // Projecao SEGURA: SOMENTE phone/email.
+  return { status: 200, json: { ok: true, uid: targetUid, contact: { phone: (typeof d.phone === "string" ? d.phone : ""), email: (typeof d.email === "string" ? d.email : "") } } };
+}
+
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem AUTH_SESSION_SECRET
+// => sessao invalida (401 via authVerifySessionToken). NAO deployado nesta fase; sem UI.
+exports.getUserContact = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const uid = (String(req.method).toUpperCase() === "POST")
+      ? ((req.body && typeof req.body === "object" && typeof req.body.uid === "string") ? req.body.uid : "")
+      : ((req.query && typeof req.query.uid === "string") ? req.query.uid : "");
+    const out = await handleGetUserContact({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", uid: uid, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[getUserContact] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
+exports._handleGetUserContact = handleGetUserContact;
