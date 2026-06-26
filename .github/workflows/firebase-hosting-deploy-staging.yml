@@ -158,23 +158,44 @@ jobs:
           if [ "$DRY_RUN" = "false" ]; then
             npm install -g firebase-tools >/dev/null 2>&1
             echo "DEPLOY real — alvo: hosting"
-            firebase deploy --only hosting --project "$GCP_PROJECT" --non-interactive
+            LOG="$RUNNER_TEMP/hosting_deploy.log"
+            # Captura saida+rc sem que 'set -e' aborte; o output de --only hosting NAO contem segredo.
+            set +e
+            firebase deploy --only hosting --project "$GCP_PROJECT" --non-interactive >"$LOG" 2>&1
+            rc=$?
+            set -e
+            cat "$LOG"
+            if [ "$rc" = "0" ]; then
+              echo "HOSTING_DEPLOY_RESULT=success" >> "$GITHUB_ENV"
+              echo "Deploy HOSTING: nova versao publicada (success)."
+            elif grep -qF "HTTP Error: 400" "$LOG" \
+                 && grep -qF "is the current active version" "$LOG" \
+                 && grep -qF "channels/live" "$LOG"; then
+              # No-op idempotente: a versao do pacote ja e a ativa no canal live (estado desejado ja presente).
+              echo "HOSTING_DEPLOY_RESULT=idempotent_noop" >> "$GITHUB_ENV"
+              echo "Deploy HOSTING: no-op idempotente — a versao do pacote ja e a ativa no canal live."
+            else
+              # Fail-closed: qualquer outro erro (outro 400, IAM, rede, quota, etc.) aborta.
+              echo "::error:: firebase deploy falhou (rc=$rc) por erro real (nao idempotente)."
+              exit "$rc"
+            fi
           else
             echo "DRY-RUN=true — nenhum deploy executado. Alvo planejado: hosting."
           fi
 
-      - name: Pos-deploy (read-only; somente se dry_run=false)
-        if: ${{ github.event.inputs.dry_run == 'false' }}
+      - name: Pos-deploy (read-only; success ou idempotent_noop)
+        if: ${{ github.event.inputs.dry_run == 'false' && (env.HOSTING_DEPLOY_RESULT == 'success' || env.HOSTING_DEPLOY_RESULT == 'idempotent_noop') }}
         run: |
           set -eu
+          echo "Resultado do deploy: $HOSTING_DEPLOY_RESULT"
           code="$(curl -sS -o /dev/null -w '%{http_code}' https://agenda-id-seven.web.app)"
           echo "HTTP=$code"; [ "$code" = "200" ] || { echo "::error:: web.app HTTP $code"; exit 1; }
           body="$(curl -sS https://agenda-id-seven.web.app)"
-          for m in 'getNotifPrefsClient' 'NOTIF_GET_URL' 'notifPrefsTokenCache' 'task_assigned'; do
+          for m in 'getNotifPrefsClient' 'NOTIF_GET_URL' 'notifPrefsTokenCache' 'task_assigned' 'getnotifprefs-de36pi7vza-uc.a.run.app'; do
             echo "$body" | grep -q "$m" || { echo "::error:: marker ausente no site: $m"; exit 1; }
           done
-          echo "POS-deploy OK: HTTP 200; UI self-read publicada."
+          echo "POS-deploy OK: HTTP 200; UI self-read publicada ($HOSTING_DEPLOY_RESULT)."
 
-      - name: Limpeza (service account)
+      - name: Limpeza (service account + log temporario)
         if: always()
-        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" "$RUNNER_TEMP/hosting_deploy.log" 2>/dev/null || true
