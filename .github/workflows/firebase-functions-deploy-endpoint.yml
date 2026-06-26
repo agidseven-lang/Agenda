@@ -1,10 +1,10 @@
 # =====================================================================
 # [manual] F3.3.20-B1.7-C — Deploy ENDPOINT-ONLY (parcial) de UM endpoint do trilho
-# notifPrefs/auth: issueNotifPrefsToken, updateNotifPrefs, getNotifPrefs OU loginUser (um por vez). SEPARADO do deploy
+# notifPrefs/auth: issueNotifPrefsToken, updateNotifPrefs, getNotifPrefs, loginUser OU getUserContact (um por vez). SEPARADO do deploy
 # total (firebase-functions-deploy.yml) e do DORMANT-1 (3 triggers). workflow_dispatch;
 # dry_run=true por padrao. Guards: confirm_deploy == DEPLOY_ENDPOINT; allowlist FIXA
-# {issueNotifPrefsToken, updateNotifPrefs, getNotifPrefs, loginUser}; rejeita total/triggers/vazio/lista/virgula/
-# espaco/curinga/desconhecido; pin do blob 6930ce54; prechecks f33R..f33V + f33X + f33AA; checkout fixo
+# {issueNotifPrefsToken, updateNotifPrefs, getNotifPrefs, loginUser, getUserContact}; rejeita total/triggers/vazio/lista/virgula/
+# espaco/curinga/desconhecido; pin do blob 3ee9cb00; prechecks f33R..f33V + f33X + f33AA + f33AC + f33AD; checkout fixo
 # app/main. NAO ativa flags; NAO toca produto; pos-deploy apenas por metadados. O segredo
 # NOTIF_PREFS_SECRET e AUTH_SESSION_SECRET ja possuem versao real — nenhuma operacao de segredo ocorre aqui.
 # =====================================================================
@@ -22,7 +22,7 @@ on:
         required: true
         default: "true"
       function_name:
-        description: "Endpoint alvo (allowlist fixa: issueNotifPrefsToken | updateNotifPrefs | getNotifPrefs | loginUser)"
+        description: "Endpoint alvo (allowlist fixa: issueNotifPrefsToken | updateNotifPrefs | getNotifPrefs | loginUser | getUserContact)"
         required: true
         default: "issueNotifPrefsToken"
 
@@ -35,7 +35,7 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  PINNED_FUNCTIONS_BLOB: "6930ce54334947d9544aa6b9ae6f29f28bd1acb8"
+  PINNED_FUNCTIONS_BLOB: "3ee9cb00673e1aaf8e6e6a100ab45d8cc19b838d"
 
 jobs:
   deploy-endpoint:
@@ -57,7 +57,7 @@ jobs:
           FUNCTION_NAME: ${{ github.event.inputs.function_name }}
         run: |
           set -eu
-          ALLOW="issueNotifPrefsToken updateNotifPrefs getNotifPrefs loginUser"
+          ALLOW="issueNotifPrefsToken updateNotifPrefs getNotifPrefs loginUser getUserContact"
           FN="$FUNCTION_NAME"
           if [ -z "$FN" ]; then echo "::error:: function_name vazio"; exit 1; fi
           case "$FN" in
@@ -99,7 +99,7 @@ jobs:
         run: |
           set -eu
           node --check functions/index.js
-          for t in f33R-notif-prefs-log f33S-notif-prefs-endpoint f33T-notif-prefs-token-issuer f33U-notif-send-prefs-integration f33V-notif-hardening f33X-notifprefs-selfread-endpoint f33AA-auth-login-user; do
+          for t in f33R-notif-prefs-log f33S-notif-prefs-endpoint f33T-notif-prefs-token-issuer f33U-notif-send-prefs-integration f33V-notif-hardening f33X-notifprefs-selfread-endpoint f33AA-auth-login-user f33AC-auth-session-scope f33AD-auth-get-user-contact; do
             echo "==== $t ===="; node "scripts/worker-ops/$t.test.mjs"
           done
           echo "Pre-checks OK."
