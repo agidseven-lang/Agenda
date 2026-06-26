@@ -1,0 +1,184 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — Captura BASELINE byte-exato das Firestore Rules live.
+# READ-ONLY das Rules (Firebase Rules API, SOMENTE GET). Grava 3 arquivos baseline
+# em ops/firestore-rules-baseline/ (NAO-deployavel), empurra uma branch e NAO abre PR
+# (o PR/merge fica na rota MCP da sessao). NAO publica Rules, NAO faz firebase deploy,
+# NAO toca documentos Firestore, NAO toca usuario real, NAO altera firebase.json, NAO
+# cria root firestore.rules. Confirma release before==after. Token mascarado; SA
+# removida no fim. workflow_dispatch only; gate confirm_capture==CAPTURE_RULES_BASELINE.
+# =====================================================================
+name: "[manual] F3.3.20-B1.7-E Firestore Rules Baseline Capture (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_capture:
+        description: "Type CAPTURE_RULES_BASELINE to capture the live Rules baseline"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: firestore-rules-baseline-capture
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  BASELINE_DIR: "ops/firestore-rules-baseline"
+
+jobs:
+  baseline-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_capture (== CAPTURE_RULES_BASELINE)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_capture }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "CAPTURE_RULES_BASELINE" ]; then
+            echo "::error:: confirm_capture != CAPTURE_RULES_BASELINE — abortando."; exit 1
+          fi
+          echo "confirm_capture OK."
+
+      - name: Checkout main (workspace)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Checkout app/main (subpasta app-main/, p/ analisador)
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          path: app-main
+          fetch-depth: 0
+
+      - name: Confirmar SHAs + ausencia de root firestore.rules
+        run: |
+          set -eu
+          MAIN_SHA="$(git rev-parse HEAD)"
+          APPMAIN_SHA="$(git -C app-main rev-parse HEAD)"
+          echo "MAIN_SHA=$MAIN_SHA" >> "$GITHUB_ENV"
+          echo "APPMAIN_SHA=$APPMAIN_SHA" >> "$GITHUB_ENV"
+          echo "main=$MAIN_SHA app/main=$APPMAIN_SHA"
+          [ ! -e firestore.rules ] || { echo "::error:: root firestore.rules existe (inesperado)"; exit 1; }
+          node --check app-main/scripts/worker-ops/f33Z-firestore-rules-live-audit.mjs
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Auth gcloud (SA via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: SA ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          echo "SA ativada."
+
+      - name: GET release-before + ruleset + escrever rules byte-exato
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" -o release-before.json || { echo "::error:: GET release falhou (403? NO-GO de capacidade)"; exit 1; }
+          RULESET="$(jq -r '.rulesetName' release-before.json)"
+          [ -n "$RULESET" ] && [ "$RULESET" != "null" ] || { echo "::error:: rulesetName ausente"; exit 1; }
+          echo "rulesetName=$RULESET"
+          curl -fsS -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/${RULESET}" -o ruleset.json
+          node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("ruleset.json","utf8"));const f=(r.source&&r.source.files)||[];if(f.length!==1){console.error("::error:: source.files.length="+f.length+" (esperado 1) — NO-GO de capacidade");process.exit(2)}fs.mkdirSync(process.env.BASELINE_DIR,{recursive:true});fs.writeFileSync(process.env.BASELINE_DIR+"/live-firestore.rules",f[0].content);console.log("rules byte-exato escrito: "+Buffer.byteLength(f[0].content,"utf8")+" bytes")'
+
+      - name: Rodar analisador f33Z (de app-main) no baseline
+        run: |
+          set -eu
+          node app-main/scripts/worker-ops/f33Z-firestore-rules-live-audit.mjs "${BASELINE_DIR}/live-firestore.rules"
+
+      - name: GET release-after + gerar metadata + summary + validar before==after
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" -o release-after.json
+          cat > "$RUNNER_TEMP/build-baseline.mjs" <<'NODE'
+          import fs from "node:fs"; import crypto from "node:crypto";
+          const DIR = process.env.BASELINE_DIR;
+          const ruleset = JSON.parse(fs.readFileSync("ruleset.json", "utf8"));
+          const relB = JSON.parse(fs.readFileSync("release-before.json", "utf8"));
+          const relA = JSON.parse(fs.readFileSync("release-after.json", "utf8"));
+          if (relB.rulesetName !== relA.rulesetName || relB.updateTime !== relA.updateTime) {
+            console.error("::error:: release mudou (before != after) — abortando"); process.exit(3);
+          }
+          const content = fs.readFileSync(DIR + "/live-firestore.rules", "utf8");
+          const buf = Buffer.from(content, "utf8");
+          const sha = crypto.createHash("sha256").update(buf).digest("hex");
+          const byteCount = buf.length;
+          const lineCount = content.split("\n").length;
+          let verdict = "unknown", counts = {};
+          try { const rep = JSON.parse(fs.readFileSync("rules-audit-report.json", "utf8")); verdict = rep.verdict; counts = rep.counts; } catch (_) {}
+          function extractMatch(text, needle) { const idx = text.indexOf(needle); if (idx < 0) return null; let i = text.indexOf("{", idx); if (i < 0) return null; let d = 0, end = -1; for (let j = i; j < text.length; j++) { const c = text[j]; if (c === "{") d++; else if (c === "}") { d--; if (d === 0) { end = j; break; } } } return end > i ? text.slice(idx, end + 1) : null; }
+          const usersBlock = extractMatch(content, "match /users") || "(bloco match /users nao localizado; ver arquivo completo)";
+          const meta = { projectId: "agenda-id-seven", release: "cloud.firestore", rulesetName: relB.rulesetName, updateTime: relB.updateTime, createTime: ruleset.createTime || null, sha256: sha, lineCount, byteCount, source: "Firebase Rules API GET", capturedAt: new Date().toISOString(), capturedByWorkflow: "firestore-rules-baseline-capture.yml", captureRunId: process.env.GITHUB_RUN_ID || null, auditRunId: "28247709664", auditArtifactId: "7909407768", mainSha: process.env.MAIN_SHA || null, appMainSha: process.env.APPMAIN_SHA || null, verdict, counts, knownRisk: "users HIGH / leitura direta de PII / pass/salt/fcmTokens/phone/email", note: "BASELINE ONLY - NOT a deploy source; firebase.json does not point to this file." };
+          fs.writeFileSync(DIR + "/live-firestore-rules.metadata.json", JSON.stringify(meta, null, 2) + "\n");
+          let md = "# Firestore Rules - BASELINE (somente documento)\n\n";
+          md += "> AVISO: este arquivo NAO e source-of-truth de deploy. firebase.json NAO aponta para este baseline. Nenhuma Rule e publicada por este baseline.\n\n";
+          md += "- Finalidade: baseline auditavel byte-exato das Rules live para hardening futuro (diff/rollback).\n";
+          md += "- rulesetName: " + meta.rulesetName + "\n- release: " + meta.release + "\n- SHA-256: " + sha + "\n- linhas: " + lineCount + " / bytes: " + byteCount + "\n- capturedAt: " + meta.capturedAt + " / captureRunId: " + meta.captureRunId + "\n- verdict (audit): " + verdict + " / counts: " + JSON.stringify(counts) + "\n\n";
+          md += "## Achado HIGH - users\nLeitura direta aberta de users expoe PII/credenciais: pass, salt, fcmTokens, phone, email.\n\n";
+          md += "### Bloco match /users (verbatim do baseline)\n```\n" + usersBlock + "\n```\n\n";
+          md += "## Risco\nFechar users nas Rules sem migrar a verificacao de senha para server-side QUEBRA o login (o cliente le users+pass+salt).\n\n";
+          md += "## Proxima fase\nDesign de auth server-side / projecao publica (usersPublic) / hardening.\n\n";
+          md += "## Rollback\nO ruleset anterior segue LIVE; este baseline e somente documento (nada publicado).\n";
+          fs.writeFileSync(DIR + "/live-firestore-rules-audit-summary.md", md);
+          console.log("[baseline] sha256=" + sha + " lines=" + lineCount + " bytes=" + byteCount + " verdict=" + verdict);
+          NODE
+          node "$RUNNER_TEMP/build-baseline.mjs"
+
+      - name: Validar baseline (3 arquivos; firebase.json intocado; sem root rules)
+        run: |
+          set -eu
+          test -f "${BASELINE_DIR}/live-firestore.rules"
+          test -f "${BASELINE_DIR}/live-firestore-rules.metadata.json"
+          test -f "${BASELINE_DIR}/live-firestore-rules-audit-summary.md"
+          N="$(find "${BASELINE_DIR}" -type f | wc -l)"
+          [ "$N" -eq 3 ] || { echo "::error:: baseline tem $N arquivos (esperado 3)"; exit 1; }
+          [ ! -e firestore.rules ] || { echo "::error:: root firestore.rules criado (proibido)"; exit 1; }
+          git diff --quiet -- firebase.json || { echo "::error:: firebase.json alterado (proibido)"; exit 1; }
+          echo "Baseline OK (3 arquivos; firebase.json intocado; sem root rules)."
+
+      - name: Criar branch baseline + commit (3 arquivos) + push (sem PR)
+        run: |
+          set -eu
+          git config core.autocrlf false
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BR="ops/f33-b17e-rules-baseline-capture-${GITHUB_RUN_ID}"
+          git checkout -b "$BR"
+          git add "${BASELINE_DIR}/live-firestore.rules" "${BASELINE_DIR}/live-firestore-rules.metadata.json" "${BASELINE_DIR}/live-firestore-rules-audit-summary.md"
+          EXTRA="$(git diff --cached --name-only | grep -v "^${BASELINE_DIR}/" || true)"
+          [ -z "$EXTRA" ] || { echo "::error:: arquivos fora do baseline staged: $EXTRA"; exit 1; }
+          git commit -m "ops(rules): baseline byte-exato das Firestore Rules live (NAO-deployavel) [skip ci]"
+          git push -u origin "$BR"
+          echo "Branch baseline empurrada: $BR (sem PR)."
+
+      - name: Upload artifact seguro
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firestore-rules-baseline
+          path: |
+            ops/firestore-rules-baseline/live-firestore.rules
+            ops/firestore-rules-baseline/live-firestore-rules.metadata.json
+            ops/firestore-rules-baseline/live-firestore-rules-audit-summary.md
+            release-before.json
+            release-after.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Limpeza (service account)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
