@@ -1,0 +1,99 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — QA oficial: reteste canário SELF-READ de notifPrefs.
+# Executa o runner E2E (Playwright Chromium headless) scripts/worker-ops/
+# f33Y-notifprefs-selfread-canary.e2e.mjs de app/main contra o Hosting PUBLICADO
+# (agenda-id-seven.web.app). Prova: save task_assigned=false via UI/endpoints ->
+# reentrada incognita -> getNotifPrefs=200 exists=true task_assigned=false ->
+# checkbox OFF -> validacao Firestore read-only. workflow_dispatch only; gated por
+# confirm_retest==RUN_CANARY_RETEST. NAO faz deploy (Functions/Hosting/Rules/Firestore/
+# Storage). Unico write Firestore direto = re-seed efemero da SENHA do canario (no runner).
+# Web Push bloqueado. Segredo (SA) nunca impresso; artifacts sem token/senha.
+# =====================================================================
+name: "[manual] F3.3.20-B1.7-E NotifPrefs Self-Read Canary Retest"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_retest:
+        description: "Type RUN_CANARY_RETEST to run the canary self-read retest"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notifprefs-selfread-canary-retest
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  RETEST_OUT: "retest-artifacts"
+
+jobs:
+  canary-retest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Guard confirm_retest (== RUN_CANARY_RETEST)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_retest }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_CANARY_RETEST" ]; then
+            echo "::error:: confirm_retest != RUN_CANARY_RETEST — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_retest OK."
+
+      - name: Checkout (ref FIXO app/main)
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          fetch-depth: 0
+
+      - name: Confirmar app/main + presenca do runner
+        run: |
+          set -eu
+          echo "app/main HEAD = $(git rev-parse HEAD)"
+          test -f scripts/worker-ops/f33Y-notifprefs-selfread-canary.e2e.mjs || { echo "::error:: runner E2E ausente"; exit 1; }
+          node --check scripts/worker-ops/f33Y-notifprefs-selfread-canary.e2e.mjs
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar Playwright + firebase-admin + Chromium
+        run: |
+          set -eu
+          npm install --no-save --no-audit --no-fund playwright firebase-admin
+          npx playwright install --with-deps chromium
+
+      - name: Auth gcloud SA (secret -> arquivo temporario; nunca impresso)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          echo "SA gravada em arquivo temporario (valor nao impresso)."
+
+      - name: Rodar reteste canario self-read (E2E real, Web Push bloqueado)
+        run: |
+          set -eu
+          node scripts/worker-ops/f33Y-notifprefs-selfread-canary.e2e.mjs
+
+      - name: Upload artifacts seguros (report/screenshot/response)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notifprefs-selfread-canary-retest
+          path: retest-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Limpeza (service account)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
