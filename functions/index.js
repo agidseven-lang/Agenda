@@ -1290,3 +1290,35 @@ exports.loginUser = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-cent
 // Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
 exports._handleLoginUser = handleLoginUser;
 exports._authUserPublicOut = authUserPublicOut;
+
+/* ============================================================================
+   F3.3.20-B1.7-E — Verificador ESTRITO de token de SESSAO (authVerifySessionToken).
+   ----------------------------------------------------------------------------
+   - Hardening de escopo: REUTILIZA notifVerifyToken (Bearer/HMAC/uid/exp-se-presente/
+     503) e impoe camada ESTRITA propria: exp OBRIGATORIO (numero), scope==="session",
+     uid string nao-vazia; retorna tambem role e scope. notifVerifyToken NAO e alterado
+     (fluxos notifPrefs antigos preservados; ele segue scope-agnostic p/ a B1.2).
+   - O secret e PARAMETRO (caller passa authSessionSecret() = AUTH_SESSION_SECRET).
+     NUNCA chama .value() aqui; NUNCA toca Firestore; NUNCA loga token/payload/segredo.
+   - Erro UNIFORME { ok:false, error:"invalid_session" } (sem enumerar a causa).
+   - ADITIVO/INERTE: ainda NAO consumido por nenhuma Function publicada; sem deploy.
+     Sera usado por slices futuros (getUserContact/userMutate/registerUser) antes da UI.
+   ============================================================================ */
+function authVerifySessionToken(authHeader, secret, nowMs) {
+  // 1) Reuso: assinatura HMAC + uid basico + exp-se-presente + dormencia (sem secret => 503).
+  const base = notifVerifyToken(authHeader, secret, nowMs);
+  if (!base.ok) return { ok: false, error: "invalid_session" };
+  // 2) Camada ESTRITA: re-decodifica o payload (assinatura JA verificada acima) e impoe escopo/exp.
+  let claims;
+  try {
+    const m = /^Bearer\s+(.+)$/.exec(String(authHeader || "").trim());
+    claims = JSON.parse(Buffer.from(m[1].split(".")[0], "base64url").toString("utf8"));
+  } catch (_) { return { ok: false, error: "invalid_session" }; }
+  if (typeof claims.exp !== "number") return { ok: false, error: "invalid_session" };   // exp OBRIGATORIO (fecha o gap)
+  if (claims.scope !== "session") return { ok: false, error: "invalid_session" };        // scope ESTRITO
+  if (typeof claims.uid !== "string" || !claims.uid) return { ok: false, error: "invalid_session" };
+  return { ok: true, uid: claims.uid, admin: claims.admin === true, role: (typeof claims.role === "string" ? claims.role : ""), scope: "session" };
+}
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
+exports._authVerifySessionToken = authVerifySessionToken;
