@@ -1,0 +1,133 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — Auditoria READ-ONLY das Firestore Rules live.
+# Baixa as Rules de PRODUCAO via Firebase Rules REST API usando SOMENTE GET
+# (releases/cloud.firestore -> rulesetName -> ruleset content), roda o analisador
+# estatico scripts/worker-ops/f33Z-firestore-rules-live-audit.mjs (de app/main) e
+# sobe artifacts seguros. NAO publica Rules, NAO faz firebase deploy, NAO toca
+# documentos Firestore, NAO toca usuario real, NAO habilita API. Confirma que o
+# release (rulesetName/updateTime) fica INALTERADO (before == after). Token de acesso
+# mascarado; SA via secret em arquivo temporario, removida no fim. workflow_dispatch
+# only; gate confirm_audit==AUDIT_RULES.
+# =====================================================================
+name: "[manual] F3.3.20-B1.7-E Firestore Rules Live Audit (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_audit:
+        description: "Type AUDIT_RULES to run the read-only Rules audit"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-rules-live-audit
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+
+jobs:
+  rules-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_audit (== AUDIT_RULES)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_audit }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "AUDIT_RULES" ]; then
+            echo "::error:: confirm_audit != AUDIT_RULES — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_audit OK."
+
+      - name: Checkout (ref FIXO app/main)
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          fetch-depth: 0
+
+      - name: Confirmar app/main + presenca do analisador
+        run: |
+          set -eu
+          echo "app/main HEAD = $(git rev-parse HEAD)"
+          test -f scripts/worker-ops/f33Z-firestore-rules-live-audit.mjs || { echo "::error:: analisador ausente"; exit 1; }
+          node --check scripts/worker-ops/f33Z-firestore-rules-live-audit.mjs
+          echo "Analisador presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Auth gcloud (service account via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          echo "SA ativada (valor nao impresso)."
+
+      - name: Baixar Rules live (GET read-only) + release-before
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          # release atual (cloud.firestore). -f => falha em HTTP>=400 (ex.: 403 => NO-GO de capacidade)
+          if ! curl -fsS -H "Authorization: Bearer $TOKEN" \
+               "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" \
+               -o release-before.json; then
+            echo "::error:: GET release falhou (possivel 403/sem capacidade). NO-GO de capacidade — sem fallback, sem enable."; exit 1
+          fi
+          RULESET="$(jq -r '.rulesetName' release-before.json)"
+          [ -n "$RULESET" ] && [ "$RULESET" != "null" ] || { echo "::error:: rulesetName ausente."; exit 1; }
+          echo "rulesetName=$RULESET"
+          if ! curl -fsS -H "Authorization: Bearer $TOKEN" \
+               "https://firebaserules.googleapis.com/v1/${RULESET}" -o ruleset.json; then
+            echo "::error:: GET ruleset falhou."; exit 1
+          fi
+          jq -r '.source.files[].content' ruleset.json > rules.live.txt
+          [ -s rules.live.txt ] || { echo "::error:: rules.live.txt vazio."; exit 1; }
+          echo "rules.live.txt: $(wc -l < rules.live.txt) linhas, $(wc -c < rules.live.txt) bytes."
+
+      - name: Rodar analisador estatico (sem rede, sem Firestore)
+        run: |
+          set -eu
+          node scripts/worker-ops/f33Z-firestore-rules-live-audit.mjs rules.live.txt
+
+      - name: Confirmar release INALTERADO (before == after)
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" \
+            -o release-after.json
+          B_RS="$(jq -r '.rulesetName' release-before.json)"; A_RS="$(jq -r '.rulesetName' release-after.json)"
+          B_UT="$(jq -r '.updateTime'  release-before.json)"; A_UT="$(jq -r '.updateTime'  release-after.json)"
+          echo "before: $B_RS @ $B_UT"; echo "after : $A_RS @ $A_UT"
+          [ "$B_RS" = "$A_RS" ] || { echo "::error:: rulesetName mudou ($B_RS -> $A_RS) — auditoria NAO deveria publicar!"; exit 1; }
+          [ "$B_UT" = "$A_UT" ] || { echo "::error:: updateTime mudou — release alterado inesperadamente!"; exit 1; }
+          echo "Release inalterado: nenhuma publicacao ocorreu."
+
+      - name: Upload artifacts seguros (rules + analise + releases)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firestore-rules-live-audit
+          path: |
+            rules.live.txt
+            rules-audit-report.json
+            rules-audit-summary.md
+            release-before.json
+            release-after.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Limpeza (service account)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
