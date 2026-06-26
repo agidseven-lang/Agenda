@@ -125,16 +125,27 @@ try {
   }
   async function fillPwModal(page){
     await page.waitForSelector("#np_pw", { timeout: 20000 });
-    const t = await page.getAttribute("#np_pw", "type");
-    if (t !== "password") fail("modal de senha nao e type=password (type=" + t + ")");
-    await page.fill("#np_pw", pw);
-    await page.click("#np_pw_ok");
+    const r = await page.evaluate((p) => {
+      const i = document.getElementById("np_pw"); if (!i) return "nomodal";
+      if (i.type !== "password") return "nottype";
+      i.value = p; const b = document.getElementById("np_pw_ok"); if (!b) return "nobtn"; b.click(); return "ok";
+    }, pw);
+    if (r === "nottype") fail("modal de senha nao e type=password");
+    if (r !== "ok") fail("modal de senha ausente/incompleto (" + r + ")");
   }
-  async function isChecked(page, id){ return await page.evaluate((i) => { const el = document.getElementById(i); return !!(el && el.checked); }, id); }
-  async function setChecked(page, id, want){
-    const cur = await isChecked(page, id);
-    if (cur !== want) await page.click("#" + id);
+  // O #content re-renderiza continuamente (listeners do app); acionamos elementos internos
+  // via evaluate ATOMICO (getElementById + click no mesmo tick) com retry, e confirmamos por
+  // REDE — robusto ao "element detached from the DOM". O modal (#np_pw) fica em document.body.
+  async function openModalVia(page, doClick){
+    for (let i = 0; i < 12; i++){
+      await page.evaluate(doClick).catch(() => {});
+      const m = await page.waitForSelector("#np_pw", { timeout: 2500 }).catch(() => null);
+      if (m) return true;
+      await page.waitForTimeout(400);
+    }
+    return false;
   }
+  async function waitNet(page, store, key, tries){ for (let i = 0; i < tries && store[key] === undefined; i++) { await page.waitForTimeout(500); } }
 
   // ---------------------------------------------------------------------------
   // FASE 1 — SAVE: task_assigned=false via UI/endpoints (contexto 1)
@@ -146,20 +157,22 @@ try {
     attachNet(page, net);
     await login(page);
     await gotoNotif(page);
-    // estado desejado: enabled ON, event/chat/android ON, task_assigned OFF
-    await setChecked(page, "np_enabled", true);
-    await setChecked(page, "np_event_assigned", true);
-    await setChecked(page, "np_chat_message", true);
-    await setChecked(page, "np_android", true);
-    await setChecked(page, "np_task_assigned", false);
-    await page.click("#np_save");
+    // estado desejado (enabled/event/chat/android ON, task_assigned OFF) + SALVAR em UM
+    // evaluate atomico (resiliente ao re-render do #content); modal abre em document.body.
+    const savedOpened = await openModalVia(page, () => {
+      const set = (id, v) => { const el = document.getElementById(id); if (el) { el.checked = v; el.dispatchEvent(new Event("change", { bubbles: true })); } };
+      set("np_enabled", true); set("np_event_assigned", true); set("np_chat_message", true); set("np_android", true); set("np_task_assigned", false);
+      const s = document.getElementById("np_save"); if (s) s.click();
+    });
+    if (!savedOpened) fail("modal de senha do SAVE nao abriu");
     await fillPwModal(page);
-    // espera issue+update 200 e status "Preferências salvas."
-    await page.waitForFunction(() => { const s = document.getElementById("np_status"); return s && /salvas/i.test(s.textContent || ""); }, null, { timeout: 45000 });
-    report.steps.save = { issue: net.issue || null, update: net.update || null, status_ok: true, wpAttempt: await page.evaluate(() => !!window.__wpAttempt) };
+    // confirma por REDE (robusto ao re-render do #np_status)
+    await waitNet(page, net, "issue", 90);
+    await waitNet(page, net, "update", 90);
+    report.steps.save = { issue: net.issue || null, update: net.update || null, wpAttempt: await page.evaluate(() => !!window.__wpAttempt) };
     if (net.issue !== 200) fail("issueNotifPrefsToken != 200 (got " + net.issue + ")");
     if (net.update !== 200) fail("updateNotifPrefs != 200 (got " + net.update + ")");
-    log("SAVE OK: issue=200 update=200; #np_status=Preferências salvas.");
+    log("SAVE OK: issue=200 update=200 (task_assigned=false gravado via UI/endpoints)");
     await ctx.close();
   }
 
@@ -173,37 +186,40 @@ try {
     attachNet(page, net);
     await login(page);
     await gotoNotif(page);
-    // fresh entry => need_password => botao "Carregar"
-    await page.waitForSelector("#np_load", { timeout: 20000 });
-    await page.click("#np_load");
+    // fresh entry => need_password => "Carregar" abre o modal (clique atomico, com retry)
+    await page.waitForFunction(() => !!document.getElementById("np_load"), null, { timeout: 20000 }).catch(() => {});
+    const loadOpened = await openModalVia(page, () => { const b = document.getElementById("np_load"); if (b) b.click(); });
+    if (!loadOpened) fail("botao Carregar / modal do SELF-READ nao abriu");
     await fillPwModal(page);
-    // aguarda a resposta do getNotifPrefs ser capturada (ate ~30s)
-    for (let i = 0; i < 60 && net.get === undefined; i++) { await page.waitForTimeout(500); }
-    // aguarda a UI assentar (loaded ou error) apos aplicar a resposta
-    await page.waitForFunction(() => {
-      return typeof notifPrefsLoadState !== "undefined" && notifPrefsLoadState !== "loading";
-    }, null, { timeout: 30000 }).catch(() => {});
+    // aguarda a resposta do getNotifPrefs (rede) e a UI sair de loading/idle/need_password
+    await waitNet(page, net, "get", 90);
+    await page.waitForFunction(() => typeof notifPrefsLoadState !== "undefined" && ["loaded", "defaults", "error"].indexOf(notifPrefsLoadState) >= 0, null, { timeout: 30000 }).catch(() => {});
 
     const body = net.getBody || {};
-    const uiTask  = await isChecked(page, "np_task_assigned");
-    const uiEvent = await isChecked(page, "np_event_assigned");
-    const uiChat  = await isChecked(page, "np_chat_message");
-    const uiAndro = await isChecked(page, "np_android");
-    const loadState = await page.evaluate(() => (typeof notifPrefsLoadState !== "undefined" ? notifPrefsLoadState : null));
-    const wpAttempt = await page.evaluate(() => !!window.__wpAttempt);
-    const permGranted = await page.evaluate(() => { try { return Notification.permission === "granted"; } catch (e) { return false; } });
+    // leitura em UM snapshot (evita flakiness do re-render): draft e a fonte de verdade do render
+    const snap = await page.evaluate(() => ({
+      loadState: (typeof notifPrefsLoadState !== "undefined") ? notifPrefsLoadState : null,
+      draftTask: (typeof notifPrefsDraftState !== "undefined" && notifPrefsDraftState && notifPrefsDraftState.byEvent) ? notifPrefsDraftState.byEvent.task_assigned : null,
+      uiTask: (() => { const e = document.getElementById("np_task_assigned"); return e ? e.checked : null; })(),
+      uiEvent: (() => { const e = document.getElementById("np_event_assigned"); return e ? e.checked : null; })(),
+      uiChat: (() => { const e = document.getElementById("np_chat_message"); return e ? e.checked : null; })(),
+      uiAndroid: (() => { const e = document.getElementById("np_android"); return e ? e.checked : null; })(),
+      wpAttempt: !!window.__wpAttempt,
+      permGranted: (() => { try { return Notification.permission === "granted"; } catch (e) { return false; } })(),
+    }));
 
     report.steps.selfread = {
       getNotifPrefs_status: net.get || null,
       response_exists: body && body.exists === true,
       response_task_assigned: body && body.prefs && body.prefs.byEvent ? body.prefs.byEvent.task_assigned : null,
-      ui_task_assigned_checked: uiTask,
-      ui_event_assigned_checked: uiEvent,
-      ui_chat_message_checked: uiChat,
-      ui_android_checked: uiAndro,
-      ui_loadState: loadState,           // "loaded" => veio do servidor (nao defaults)
-      webpush_attempt: wpAttempt,
-      notification_permission_granted: permGranted,
+      draft_task_assigned: snap.draftTask,
+      ui_task_assigned_checked: snap.uiTask,
+      ui_event_assigned_checked: snap.uiEvent,
+      ui_chat_message_checked: snap.uiChat,
+      ui_android_checked: snap.uiAndroid,
+      ui_loadState: snap.loadState,        // "loaded" => veio do servidor (nao defaults)
+      webpush_attempt: snap.wpAttempt,
+      notification_permission_granted: snap.permGranted,
     };
     // resposta de getNotifPrefs SEM headers/sem token (corpo allowlisted: ok/exists/prefs)
     try { fs.writeFileSync(path.join(OUT, "getnotifprefs-response.json"), JSON.stringify(body, null, 2)); } catch (_) {}
@@ -212,9 +228,10 @@ try {
     if (net.get !== 200) fail("getNotifPrefs != 200 (got " + net.get + ")");
     if (!(body && body.exists === true)) fail("getNotifPrefs response exists != true");
     if (!(body.prefs && body.prefs.byEvent && body.prefs.byEvent.task_assigned === false)) fail("getNotifPrefs prefs.byEvent.task_assigned != false");
-    if (uiTask !== false) fail("UI np_task_assigned NAO esta OFF apos self-read");
-    if (loadState !== "loaded") fail("UI loadState != loaded (pode ter mostrado defaults silenciosos): " + loadState);
-    if (permGranted) fail("Notification.permission === granted (Web Push nao deveria ativar)");
+    if (snap.loadState !== "loaded") fail("UI loadState != loaded (pode ter mostrado defaults silenciosos): " + snap.loadState);
+    if (snap.draftTask !== false) fail("draft (fonte do render) task_assigned != false: " + snap.draftTask);
+    if (snap.uiTask !== false) fail("UI np_task_assigned NAO esta OFF apos self-read");
+    if (snap.permGranted) fail("Notification.permission === granted (Web Push nao deveria ativar)");
     log("SELF-READ OK: getNotifPrefs=200 exists=true task_assigned=false; UI checkbox OFF; loadState=loaded");
     await ctx.close();
   }
