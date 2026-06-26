@@ -129,6 +129,27 @@ jobs:
           gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
           gcloud config set project "$GCP_PROJECT" >/dev/null
 
+      - name: "Gate 0 — confirmar URI real de getNotifPrefs (== NOTIF_GET_URL)"
+        run: |
+          set -eu
+          # Confirma, ANTES de QUALQUER deploy, que a Function Gen2 getNotifPrefs ja publicada
+          # responde na MESMA URL run.app embutida em NOTIF_GET_URL no index.html. Roda em
+          # dry_run=true E dry_run=false (sem guarda 'if'). NAO acessa nem imprime segredo —
+          # apenas o metadado publico serviceConfig.uri. URI vazia ou divergente => NO-GO (aborta
+          # antes do deploy). Pre-requisito do pacote .staging-public: a UI chama exatamente EXP.
+          EXP="https://getnotifprefs-de36pi7vza-uc.a.run.app"
+          URI="$(gcloud functions describe getNotifPrefs --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)"
+          echo "Function: getNotifPrefs"
+          echo "EXP=$EXP"
+          echo "URI=$URI"
+          if [ -z "$URI" ]; then
+            echo "::error:: getNotifPrefs sem URI (nao publicada/inacessivel) — NO-GO"; exit 1
+          fi
+          if [ "$URI" != "$EXP" ]; then
+            echo "::error:: getNotifPrefs URI mismatch: real=$URI expected=$EXP"; exit 1
+          fi
+          echo "Gate 0 OK: getNotifPrefs URI == NOTIF_GET_URL ($EXP)."
+
       - name: Deploy HOSTING (somente se dry_run=false)
         env:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
