@@ -1087,3 +1087,85 @@ exports.issueNotifPrefsToken = onRequest({ secrets: [NOTIF_PREFS_SECRET], region
 exports._notifVerifyPassword = notifVerifyPassword;
 exports._notifSignToken = notifSignToken;
 exports._handleIssueNotifPrefsToken = handleIssueNotifPrefsToken;
+
+/* ============================================================================
+   F3.3.20-B1.7-E — SELF-READ allowlisted de notifPrefs/{uid} (getNotifPrefs).
+   ----------------------------------------------------------------------------
+   - onRequest (NAO onCall) => uid vem SO do token HMAC verificado (mesmo token de
+     updateNotifPrefs; notifVerifyToken nao exige scope). NUNCA do body/query.
+   - Le SOMENTE notifPrefs/{token.uid}. NUNCA le users/{uid}; NUNCA retorna campos
+     sensiveis do usuario (tokens de push, telefone, hash de senha, e-mail, papel)
+     nem o uid. Saida = allowlist EXPLICITA (campo a campo; nunca espalha o doc cru).
+   - INDEPENDENTE de ENABLE_NOTIF_PREFS (a flag governa SUPRESSAO de envio, nao a
+     visualizacao). Por isso NAO reusa getNotifPrefs(uid) interno (flag-gated).
+   - Dormente sem NOTIF_PREFS_SECRET => 503. Cache-Control: no-store. Log sem PII.
+   ============================================================================ */
+function notifProjectPrefsOut(d) {
+  const src = (d && typeof d === "object" && !Array.isArray(d)) ? d : {};
+  const out = {};
+  if (typeof src.enabled === "boolean") out.enabled = src.enabled;
+  const pickBoolMap = (o) => {
+    if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+    const m = {}; for (const k of Object.keys(o)) { if (typeof o[k] === "boolean") m[k] = o[k]; } return m;
+  };
+  const be = pickBoolMap(src.byEvent); if (be) out.byEvent = be;
+  const bp = pickBoolMap(src.byPlatform); if (bp) out.byPlatform = bp;
+  if (src.quietHours === null) out.quietHours = null;
+  else if (src.quietHours && typeof src.quietHours === "object" && !Array.isArray(src.quietHours)
+           && typeof src.quietHours.start === "string" && typeof src.quietHours.end === "string") {
+    out.quietHours = { start: src.quietHours.start, end: src.quietHours.end };
+  }
+  if (typeof src.updatedAt === "number") out.updatedAt = src.updatedAt;
+  else if (src.updatedAt && typeof src.updatedAt.toMillis === "function") { try { out.updatedAt = src.updatedAt.toMillis(); } catch (_) {} }
+  return out;
+}
+// Orquestra a LEITURA self-read. ctx = {method, authHeader, uid?(defensivo), ip?, now}.
+// Le SO notifPrefs/{token.uid}. Erros sempre controlados (sem throw).
+async function handleNotifPrefsRead(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  if (ctx.method && String(ctx.method).toUpperCase() !== "GET") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const ipKey = (typeof ctx.ip === "string" && ctx.ip) ? ("r:" + ctx.ip) : null;
+  if (ipKey && notifRlBlocked(ipKey, now)) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const auth = notifVerifyToken(ctx.authHeader, notifPrefsSecret(), now);
+  if (!auth.ok) { if (ipKey) notifRlFail(ipKey, now); return { status: auth.code, json: { ok: false, error: auth.error } }; }
+  if (ipKey) notifRlClear(ipKey);
+  // Cross-read impossivel por contrato: alvo = token.uid. Parametro defensivo opcional:
+  const askedUid = (typeof ctx.uid === "string" && ctx.uid) ? ctx.uid : null;
+  if (askedUid && askedUid !== auth.uid) return { status: 403, json: { ok: false, error: "forbidden_uid" } };
+  let snap;
+  try { snap = await notifDb().collection("notifPrefs").doc(String(auth.uid)).get(); }
+  catch (e) {
+    try { logger.error("[getNotifPrefs] leitura falhou", { err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "read_failed" } };
+  }
+  if (!snap || !snap.exists) return { status: 200, json: { ok: true, exists: false, prefs: {} } };
+  return { status: 200, json: { ok: true, exists: true, prefs: notifProjectPrefsOut(snap.data() || {}) } };
+}
+// Wrapper HTTPS (onRequest). DORMENTE: sem NOTIF_PREFS_SECRET => 503 (via notifVerifyToken).
+// Self-read allowlisted; NAO toca users/{uid}; Cache-Control: no-store; NAO loga token/segredo/PII.
+exports.getNotifPrefs = onRequest({ secrets: [NOTIF_PREFS_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  const t0 = Date.now();
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleNotifPrefsRead({
+      method: req.method,
+      authHeader: (req.get && req.get("authorization")) || "",
+      uid: (req.query && typeof req.query.uid === "string") ? req.query.uid : null,
+      ip: clientIp,
+      now: Date.now(),
+    });
+    try { logger.info("[getNotifPrefs]", { status: out.status, exists: !!(out.json && out.json.exists), durationMs: Date.now() - t0, error: (out.json && out.json.ok === false) ? out.json.error : "" }); } catch (_) {}
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[getNotifPrefs] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
+exports._handleNotifPrefsRead = handleNotifPrefsRead;
+exports._notifProjectPrefsOut = notifProjectPrefsOut;
