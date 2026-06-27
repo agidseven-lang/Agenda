@@ -1,0 +1,115 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — Canary Password Reset (Admin SDK; SOMENTE canário).
+# Sincroniza a senha do usuario CANARIO users/<CANARY_UID> com o secret
+# CANARY_PASSWORD: atualiza SOMENTE {pass,salt} no formato do login do app
+# (pass="s2:"+sha256hex(salt+"|"+senha)). Roda scripts/worker-ops/f33-canary-pwreset.e2e.mjs.
+# workflow_dispatch ONLY. dry_run=true (default): valida doc/canary, ZERO escrita.
+# dry_run=false: exige confirm_reset==RUN_CANARY_PWRESET e CANARY_PASSWORD; escreve so pass/salt.
+# Guards: id precisa parecer canario E doc.canary===true (runner). NAO faz deploy; NAO toca
+# Functions/Rules/Hosting/Web Push; NAO acessa segredo de servidor; nunca imprime senha/hash/salt.
+# Credencial Admin via GOOGLE_APPLICATION_CREDENTIALS_JSON -> arquivo temporario (nunca impresso).
+# =====================================================================
+name: "[manual] F3.3.20-B1.7-E Canary Password Reset"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_reset:
+        description: "Digite RUN_CANARY_PWRESET para sincronizar a senha do canario"
+        required: true
+        type: string
+      dry_run:
+        description: "true = valida doc/canary sem escrever; false = atualiza pass/salt"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-userspublic-canary-pwreset
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  CANARY_UID: "canary-pwa-staging-notifprefs"
+  RUNNER_SCRIPT: "scripts/worker-ops/f33-canary-pwreset.e2e.mjs"
+
+jobs:
+  pwreset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard confirm_reset (+ CANARY_PASSWORD se dry_run=false)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_reset }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CPW: ${{ secrets.CANARY_PASSWORD }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_CANARY_PWRESET" ]; then
+            echo "::error:: confirm_reset != RUN_CANARY_PWRESET — abortando antes de tudo."; exit 1
+          fi
+          if [ "$DRY_RUN" = "false" ]; then
+            if [ -z "$CPW" ]; then echo "::error:: CANARY_PASSWORD ausente (secret) — necessario no APPLY."; exit 1; fi
+            echo "APPLY confirmado (CANARY_PASSWORD presente; valor NUNCA impresso)."
+          else
+            echo "DRY-RUN (default) — valida doc/canary; ZERO escrita."
+          fi
+
+      - name: Checkout (main; traz o runner)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Confirma runner presente
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: node --check do runner
+        run: node --check "$RUNNER_SCRIPT"
+
+      - name: Instalar firebase-admin (somente)
+        run: npm install --no-save --no-package-lock firebase-admin
+
+      - name: Auth SA -> credencial temporaria (nunca impressa)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+
+      - name: Executar reset (dry-run valida / apply sincroniza pass+salt)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CONFIRM_PWRESET: ${{ github.event.inputs.confirm_reset }}
+          CANARY_UID: ${{ env.CANARY_UID }}
+          CANARY_PASSWORD: ${{ secrets.CANARY_PASSWORD }}
+          ARTIFACT_DIR: ${{ runner.temp }}/pwreset-artifacts
+        run: |
+          set -eu
+          mkdir -p "$ARTIFACT_DIR"
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifacts (sanitizados; sem senha/hash/salt)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-pwreset-${{ github.run_id }}
+          path: ${{ runner.temp }}/pwreset-artifacts/*.json
+          if-no-files-found: warn
+
+      - name: Limpeza (credencial temporaria)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
