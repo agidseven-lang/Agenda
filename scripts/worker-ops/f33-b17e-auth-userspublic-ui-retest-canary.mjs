@@ -32,7 +32,7 @@ const MARKERS = [
 ];
 const SEL = {
   loginId: "#lUser", loginPw: "#lPass", loginBtn: "#doLogin",
-  settingsBtn: "#hSettings",
+  settingsBtn: "#hSettings", settingsNotifCard: '[data-setgo="notifications"]',
   npCheckbox: "#np_task_assigned", npSave: "#np_save", npStatus: "#np_status",
   npPw: "#np_pw", npPwOk: "#np_pw_ok",
 };
@@ -129,12 +129,15 @@ async function runApply() {
     await page.waitForTimeout(4000);
     summary.loginCanaryOk = !(await page.locator(SEL.loginBtn).isVisible().catch(() => false));
 
-    // abrir preferências: navegação real do usuário — o botão #hSettings faz settingsView="main"; switchTab("settings"),
-    // que renderiza/liga renderNotifPrefsPushSection/bindNotifPrefsPushSection. Fallback: switchTab direto. Espera por #np_save.
+    // abrir preferências em DOIS passos: (1) #hSettings abre o menu de Configurações (renderSettingsMain);
+    // (2) o card [data-setgo="notifications"] entra em settingsView="notifications" (renderSettingsNotifications),
+    // que renderiza/liga renderNotifPrefsPushSection/bindNotifPrefsPushSection com #np_save. Fallback: switchTab direto.
     await page.click(SEL.settingsBtn, { timeout: OP_TIMEOUT }).catch(() => {});
-    await page.waitForSelector(SEL.npSave, { timeout: 8000 }).catch(() => {});
+    await page.waitForSelector(SEL.settingsNotifCard, { timeout: 15000 }).catch(() => {});
+    await page.click(SEL.settingsNotifCard, { timeout: OP_TIMEOUT }).catch(() => {});
+    await page.waitForSelector(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
     if (!(await page.locator(SEL.npSave).isVisible().catch(() => false))) {
-      await page.evaluate(() => { try { if (typeof window.switchTab === "function") { window.settingsView = "main"; window.switchTab("settings"); } } catch (e) {} }).catch(() => {});
+      await page.evaluate(() => { try { if (typeof window.switchTab === "function") { window.settingsView = "notifications"; window.switchTab("settings"); } } catch (e) {} }).catch(() => {});
       await page.waitForSelector(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
     }
     summary.notifScreenOk = await page.locator(SEL.npSave).isVisible().catch(() => false);
