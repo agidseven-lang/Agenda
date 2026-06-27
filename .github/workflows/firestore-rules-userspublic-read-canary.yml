@@ -1,0 +1,100 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — Canario de Firestore Rules — usersPublic read (GATED).
+# Roda o runner CLIENTE scripts/worker-ops/f33AJ-userspublic-rules-read-canary.e2e.mjs
+# (em app/main) usando o SDK Firebase NAO-AUTENTICADO (o app nao tem Firebase Auth =>
+# request.auth==null, identico ao PWA) contra as Rules LIVE de PRODUCAO para provar:
+# cliente LE/lista usersPublic; NAO cria/atualiza/deleta usersPublic; ainda LE users
+# (temporario); notifPrefs negado (read+write); catch-all deny; usersPublic com EXATAMENTE
+# 7 chaves allowlisted e PII-free; nenhum write persiste. workflow_dispatch only.
+# confirm_canary == RUN_USERSPUBLIC_RULES_READ_CANARY (aborta antes de tudo se nao bater).
+# Checkout FIXO app/main. Instala SOMENTE o SDK CLIENTE `firebase` (sem Admin SDK).
+# NAO faz deploy; NAO altera Rules/UI/firebase.json/functions; NAO usa Secret Manager/SA;
+# NAO usa credencial ADC nem token (canario 100% nao-privilegiado); sem Web Push.
+# firebaseConfig (chave web PUBLICA) lido do index.html no checkout; nunca impresso.
+# Writes tentados sao ESPERADOS permission-denied (nenhum persiste). Artifacts SANITIZADOS.
+# =====================================================================
+name: "[manual] Firestore Rules Canary — usersPublic read"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_canary:
+        description: "Digite RUN_USERSPUBLIC_RULES_READ_CANARY para executar"
+        required: true
+        default: ""
+      page_size:
+        description: "Limite de docs lidos por colecao (canario)"
+        required: false
+        default: "50"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-rules-userspublic-canary
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+
+jobs:
+  rules-canary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard (confirm_canary)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_canary }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_USERSPUBLIC_RULES_READ_CANARY" ]; then
+            echo "::error:: requer confirm_canary=RUN_USERSPUBLIC_RULES_READ_CANARY"; exit 1
+          fi
+          echo "Canary confirmado."
+
+      - name: Checkout (ref FIXO app/main)
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          fetch-depth: 0
+
+      - name: Confirma runner + index.html presentes
+        run: |
+          set -eu
+          test -f scripts/worker-ops/f33AJ-userspublic-rules-read-canary.e2e.mjs \
+            || { echo "::error:: runner f33AJ ausente no checkout app/main"; exit 1; }
+          test -f index.html || { echo "::error:: index.html ausente (firebaseConfig)"; exit 1; }
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: node --check do runner
+        run: node --check scripts/worker-ops/f33AJ-userspublic-rules-read-canary.e2e.mjs
+
+      - name: Instalar SDK CLIENTE firebase (sem Admin SDK)
+        run: npm install --no-save --no-package-lock firebase
+
+      - name: Executar canario (SDK cliente; sem credencial; sem segredo)
+        env:
+          CONFIRM_CANARY: ${{ github.event.inputs.confirm_canary }}
+          PAGE_SIZE: ${{ github.event.inputs.page_size }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          ARTIFACT_DIR: ${{ runner.temp }}/artifacts-canary
+          INDEX_HTML: index.html
+        run: |
+          set -eu
+          mkdir -p "$ARTIFACT_DIR"
+          node scripts/worker-ops/f33AJ-userspublic-rules-read-canary.e2e.mjs
+
+      - name: Upload artifacts (sanitizados; so JSON de contagens/booleans/hashes)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userspublic-rules-canary-${{ github.run_id }}
+          path: ${{ runner.temp }}/artifacts-canary/*.json
+          if-no-files-found: warn
+
+      - name: Limpeza
+        if: always()
+        run: rm -rf node_modules 2>/dev/null || true
