@@ -1,0 +1,107 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — Canary Status Activate (Admin SDK; SOMENTE canário).
+# Atualiza SOMENTE users/<CANARY_UID>.status = "ativo" para o canário sair de
+# pendingScreen. Roda scripts/worker-ops/f33-canary-status-activate.e2e.mjs.
+# workflow_dispatch ONLY. dry_run=true (default): valida doc/canary + reporta status, ZERO escrita.
+# dry_run=false: exige confirm_status==ACTIVATE_CANARY_STATUS; escreve so status.
+# Guards: id parece canario E doc.canary===true (runner). NAO faz deploy; NAO toca
+# Functions/Rules/Hosting/Web Push; NAO acessa segredo de servidor; nunca imprime segredo.
+# NAO altera pass/salt/fcmTokens/notifPrefs/email/name/role/admin.
+# Credencial Admin via GOOGLE_APPLICATION_CREDENTIALS_JSON -> arquivo temporario (nunca impresso).
+# =====================================================================
+name: "[manual] F3.3.20-B1.7-E Canary Status Activate"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_status:
+        description: "Digite ACTIVATE_CANARY_STATUS para ativar o canario"
+        required: true
+        type: string
+      dry_run:
+        description: "true = valida doc/canary sem escrever; false = atualiza status"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-userspublic-canary-status-activate
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  CANARY_UID: "canary-pwa-staging-notifprefs"
+  RUNNER_SCRIPT: "scripts/worker-ops/f33-canary-status-activate.e2e.mjs"
+
+jobs:
+  status-activate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard confirm_status
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_status }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "ACTIVATE_CANARY_STATUS" ]; then
+            echo "::error:: confirm_status != ACTIVATE_CANARY_STATUS — abortando antes de tudo."; exit 1
+          fi
+          echo "guard OK (dry_run=${{ github.event.inputs.dry_run }})"
+
+      - name: Checkout (main; traz o runner)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Confirma runner presente
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: node --check do runner
+        run: node --check "$RUNNER_SCRIPT"
+
+      - name: Instalar firebase-admin (somente)
+        run: npm install --no-save --no-package-lock firebase-admin
+
+      - name: Auth SA -> credencial temporaria (nunca impressa)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+
+      - name: Executar ativacao (dry-run valida / apply escreve status)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CONFIRM_STATUS: ${{ github.event.inputs.confirm_status }}
+          CANARY_UID: ${{ env.CANARY_UID }}
+          ARTIFACT_DIR: ${{ runner.temp }}/status-activate-artifacts
+        run: |
+          set -eu
+          mkdir -p "$ARTIFACT_DIR"
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifacts (sanitizados; sem segredo)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-status-activate-${{ github.run_id }}
+          path: ${{ runner.temp }}/status-activate-artifacts/*.json
+          if-no-files-found: warn
+
+      - name: Limpeza (credencial temporaria)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
