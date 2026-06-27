@@ -41,6 +41,56 @@ const isCanary = (uid, ident) =>
   /canary|canario|teste|test|qa/i.test(String(uid || "")) || /canary|canario|teste|test|qa/i.test(String(ident || ""));
 const mask = (s) => (s ? (String(s).slice(0, 2) + "***" + String(s).length) : "<unset>");
 
+// ---- Telemetria (somente observabilidade; NUNCA segredo/valor sensível) ----
+let T0 = 0;
+let lastStep = "start";
+const consoleErrors = [];
+const pageErrors = [];
+const uiSteps = [];
+const SECRET_RE = /\b(pass|salt|hash|authorization|bearer|access[_-]?token|id[_-]?token|refresh[_-]?token|fcm[_-]?token|token|senha)\b\s*[:=]?\s*\S+/gi;
+function sanitizeText(s) {
+  if (s == null) return "";
+  let t = String(s);
+  t = t.replace(SECRET_RE, "$1=***");
+  t = t.replace(/eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g, "<jwt>");
+  t = t.replace(/s2:[0-9a-f]{8,}/gi, "<hash>");
+  t = t.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>");
+  return t.slice(0, 240);
+}
+function setStep(s) { lastStep = s; }
+async function snapshotUi(page, label) {
+  let d = {};
+  try {
+    d = await page.evaluate(() => {
+      const info = (sel) => { const el = document.querySelector(sel); if (!el) return { exists: false, visible: false }; const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); const visible = !!(r.width || r.height) && cs.visibility !== "hidden" && cs.display !== "none" && cs.opacity !== "0"; return { exists: true, visible, box: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }, disabled: !!el.disabled }; };
+      const ae = document.activeElement || {};
+      let topCenter = "";
+      try { const t = document.elementFromPoint(Math.floor(innerWidth / 2), Math.floor(innerHeight / 2)); if (t) topCenter = (t.id ? "#" + t.id : t.tagName.toLowerCase()) + (typeof t.className === "string" && t.className ? "." + t.className.trim().split(/\s+/).slice(0, 2).join(".") : ""); } catch (e) {}
+      const cards = Array.from(document.querySelectorAll("[data-setgo]"));
+      return {
+        url: location.href, title: document.title, bodyClass: (document.body && document.body.className) || "", viewport: { w: innerWidth, h: innerHeight },
+        authScreen: info("#authScreen"), pendingScreen: info("#pendingScreen"), mainApp: info("#mainApp"), setupScreen: info("#setupScreen"),
+        hSettings: info("#hSettings"), notifCard: info('[data-setgo="notifications"]'), npSave: info("#np_save"), notifSheet: info("#notifSheet"),
+        settingsCardsCount: cards.length, settingsCardKeys: cards.map((b) => b.getAttribute("data-setgo")).slice(0, 20),
+        activeElementTag: (ae.tagName || "").toLowerCase(), activeElementId: ae.id || "", activeElementText: (ae.textContent || "").slice(0, 60),
+        topAtCenter: topCenter, toastText: (document.querySelector("#toast") ? (document.querySelector("#toast").textContent || "") : "").slice(0, 120),
+      };
+    });
+  } catch (e) { d = { evalError: (e && (e.message || "")).slice(0, 120) }; }
+  d.title = sanitizeText(d.title); d.activeElementText = sanitizeText(d.activeElementText); d.toastText = sanitizeText(d.toastText);
+  const vis = (o) => !!(o && o.visible);
+  const visibleScreen = vis(d.setupScreen) ? "setup" : vis(d.authScreen) ? "auth" : vis(d.pendingScreen) ? "pending" : vis(d.mainApp) ? "main" : "unknown";
+  const snap = {
+    label, tRel: (T0 ? Date.now() - T0 : 0), lastStep,
+    currentUrl: d.url, visibleScreen,
+    authScreenVisible: vis(d.authScreen), pendingScreenVisible: vis(d.pendingScreen), mainAppVisible: vis(d.mainApp),
+    hSettingsVisible: vis(d.hSettings), notificationsCardVisible: vis(d.notifCard), npSaveVisible: vis(d.npSave),
+    consoleErrorsCount: consoleErrors.length, pageErrorsCount: pageErrors.length,
+  };
+  uiSteps.push({ ...snap, detail: d });
+  return snap;
+}
+
 function pushNeutralizationInitScript() {
   return "(() => {" +
     "try{Object.defineProperty(Notification,'permission',{get:()=>'denied'});}catch(e){}" +
@@ -115,39 +165,62 @@ async function runApply() {
     if (u.includes("updatenotifprefs")) netStatus.update = r.status();
   });
   const consoleLines = [];
-  page.on("console", (msg) => { const t = msg.text(); if (t.indexOf("[roster]") >= 0) consoleLines.push(t); });
+  page.on("console", (msg) => { const t = msg.text(); if (t.indexOf("[roster]") >= 0) consoleLines.push(t); if (msg.type() === "error") consoleErrors.push(sanitizeText(t)); });
+  page.on("pageerror", (err) => { pageErrors.push(sanitizeText(err && err.message)); });
 
   try {
+    T0 = Date.now();
+    setStep("page_goto");
     await page.goto(STAGING_URL, { waitUntil: "domcontentloaded", timeout: OP_TIMEOUT });
     await page.waitForTimeout(3000);
+    setStep("login_form_seen");
+    await snapshotUi(page, "afterGoto");
     summary.usersPublicSource = consoleLines.some((l) => /fonte=usersPublic/.test(l)) || summary.usersPublicSource;
 
     // login canário
     await page.fill(SEL.loginId, CANARY_IDENTIFIER, { timeout: OP_TIMEOUT });
     await page.fill(SEL.loginPw, process.env.CANARY_PASSWORD, { timeout: OP_TIMEOUT });
+    setStep("login_submitted");
+    await snapshotUi(page, "afterLoginSubmit");
     await page.click(SEL.loginBtn, { timeout: OP_TIMEOUT });
     await page.waitForTimeout(4000);
     summary.loginCanaryOk = !(await page.locator(SEL.loginBtn).isVisible().catch(() => false));
+    setStep("login_result_checked");
+    await snapshotUi(page, "afterLoginWait");
 
     // abrir preferências em DOIS passos: (1) #hSettings abre o menu de Configurações (renderSettingsMain);
     // (2) o card [data-setgo="notifications"] entra em settingsView="notifications" (renderSettingsNotifications),
     // que renderiza/liga renderNotifPrefsPushSection/bindNotifPrefsPushSection com #np_save. Fallback: switchTab direto.
+    setStep("before_open_settings");
+    await snapshotUi(page, "beforeClickHSettings");
     await page.click(SEL.settingsBtn, { timeout: OP_TIMEOUT }).catch(() => {});
+    setStep("after_open_settings");
+    await snapshotUi(page, "afterClickHSettings");
     await page.waitForSelector(SEL.settingsNotifCard, { timeout: 15000 }).catch(() => {});
+    setStep("before_open_notifications_subview");
+    await snapshotUi(page, "beforeClickNotificationsCard");
     await page.click(SEL.settingsNotifCard, { timeout: OP_TIMEOUT }).catch(() => {});
+    setStep("after_open_notifications_subview");
+    await snapshotUi(page, "afterClickNotificationsCard");
+    setStep("before_wait_np_save");
     await page.waitForSelector(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
     if (!(await page.locator(SEL.npSave).isVisible().catch(() => false))) {
       await page.evaluate(() => { try { if (typeof window.switchTab === "function") { window.settingsView = "notifications"; window.switchTab("settings"); } } catch (e) {} }).catch(() => {});
       await page.waitForSelector(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
     }
     summary.notifScreenOk = await page.locator(SEL.npSave).isVisible().catch(() => false);
+    setStep("after_wait_np_save");
+    await snapshotUi(page, "afterWaitNpSave");
 
     if (summary.notifScreenOk) {
+      setStep("before_toggle_task_assigned");
       const cb = page.locator(SEL.npCheckbox);
       if (await cb.isChecked().catch(() => false)) await cb.uncheck({ timeout: OP_TIMEOUT }).catch(() => {});
       await page.waitForTimeout(1500); // re-render
       summary.taskAssignedStayedFalse = (await cb.isChecked().catch(() => true)) === false;
+      setStep("after_toggle_task_assigned");
 
+      setStep("before_save");
       await page.click(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
       // reauth modal se aparecer
       if (await page.locator(SEL.npPw).isVisible({ timeout: 4000 }).catch(() => false)) {
@@ -159,15 +232,57 @@ async function runApply() {
       summary.updateStatus = netStatus.update || 0;
       const st = (await page.locator(SEL.npStatus).innerText().catch(() => "")) || "";
       summary.savedStatusOk = /salv|sucesso|salvas/i.test(st);
+      setStep("after_save");
     }
 
     summary.notificationDenied = await page.evaluate(() => { try { return Notification.permission === "denied"; } catch (e) { return false; } }).catch(() => false);
     try { mkdirSync(ARTIFACT_DIR, { recursive: true }); await page.screenshot({ path: ARTIFACT_DIR + "/ui-retest-screenshot.png" }); } catch (_) {}
+    setStep(summary.notifScreenOk ? "done" : "failed");
   } catch (e) {
-    console.error("::error:: apply falhou: " + (e && (e.message || "").slice(0, 120)));
+    setStep("failed");
+    console.error("::error:: apply falhou: " + sanitizeText(e && (e.message || "")).slice(0, 120));
   } finally {
     try { await browser.close(); } catch (_) {}
   }
+
+  // ---- Telemetria final no summary (sanitizada; sem segredo/valor sensível) ----
+  const last = uiSteps.length ? uiSteps[uiSteps.length - 1] : null;
+  const ld = (last && last.detail) || {};
+  summary.lastStep = lastStep;
+  summary.currentUrl = ld.url || "";
+  summary.documentTitle = ld.title || "";
+  summary.bodyClass = ld.bodyClass || "";
+  summary.visibleScreen = last ? last.visibleScreen : "unknown";
+  summary.viewport = ld.viewport || null;
+  summary.consoleErrorsCount = consoleErrors.length;
+  summary.consoleErrorsSanitized = consoleErrors.slice(0, 10);
+  summary.pageErrorsCount = pageErrors.length;
+  summary.pageErrorsSanitized = pageErrors.slice(0, 10);
+  summary.authScreenVisible = !!(ld.authScreen && ld.authScreen.visible);
+  summary.pendingScreenVisible = !!(ld.pendingScreen && ld.pendingScreen.visible);
+  summary.mainAppVisible = !!(ld.mainApp && ld.mainApp.visible);
+  summary.setupScreenVisible = !!(ld.setupScreen && ld.setupScreen.visible);
+  summary.hSettingsExists = !!(ld.hSettings && ld.hSettings.exists);
+  summary.hSettingsVisible = !!(ld.hSettings && ld.hSettings.visible);
+  summary.hSettingsBox = (ld.hSettings && ld.hSettings.box) || null;
+  summary.hSettingsDisabled = !!(ld.hSettings && ld.hSettings.disabled);
+  summary.settingsMenuVisible = (ld.settingsCardsCount || 0) > 0;
+  summary.settingsCardsCount = ld.settingsCardsCount || 0;
+  summary.settingsCardKeys = ld.settingsCardKeys || [];
+  summary.notificationsCardExists = !!(ld.notifCard && ld.notifCard.exists);
+  summary.notificationsCardVisible = !!(ld.notifCard && ld.notifCard.visible);
+  summary.notificationsCardBox = (ld.notifCard && ld.notifCard.box) || null;
+  summary.npSaveExists = !!(ld.npSave && ld.npSave.exists);
+  summary.npSaveVisible = !!(ld.npSave && ld.npSave.visible);
+  summary.npSaveBox = (ld.npSave && ld.npSave.box) || null;
+  summary.notifSheetExists = !!(ld.notifSheet && ld.notifSheet.exists);
+  summary.notifSheetVisible = !!(ld.notifSheet && ld.notifSheet.visible);
+  summary.activeElementTag = ld.activeElementTag || "";
+  summary.activeElementId = ld.activeElementId || "";
+  summary.activeElementTextSanitized = ld.activeElementText || "";
+  summary.topAtCenter = ld.topAtCenter || "";
+  summary.toastTextSanitized = ld.toastText || "";
+  summary.steps = uiSteps.map((s) => ({ label: s.label, tRel: s.tRel, lastStep: s.lastStep, visibleScreen: s.visibleScreen, currentUrl: s.currentUrl, authScreenVisible: s.authScreenVisible, pendingScreenVisible: s.pendingScreenVisible, mainAppVisible: s.mainAppVisible, hSettingsVisible: s.hSettingsVisible, notificationsCardVisible: s.notificationsCardVisible, npSaveVisible: s.npSaveVisible, consoleErrorsCount: s.consoleErrorsCount, pageErrorsCount: s.pageErrorsCount }));
 
   writeSummary(summary);
   const go = summary.markersHtml && summary.loginCanaryOk && summary.notifScreenOk && summary.taskAssignedStayedFalse &&
