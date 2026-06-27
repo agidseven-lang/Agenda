@@ -1,0 +1,174 @@
+# =====================================================================
+# [manual] F3.3.20-B1.7-E — Firestore Rules Deploy — usersPublic read (GATED).
+# Injeta a Rule MINIMA de leitura de usersPublic nas Rules LIVE de PRODUCAO
+# (download-prod -> patch idempotente -> deploy), SEM deployar baseline wholesale.
+# workflow_dispatch only. dry_run=true por padrao => so download/patch/diff/compile-check
+# (ZERO deploy). APPLY (dry_run=false) exige confirm_deploy=DEPLOY_RULES_USERSPUBLIC_READ
+# (aborta antes de qualquer deploy se nao bater). Checkout FIXO app/main (onde vive o patcher).
+# Deploy SOMENTE firestore:rules via firebase.ci.json efemero. NAO faz Hosting/Functions/
+# indexes; NAO toca Firestore docs; NAO altera UI; NAO acessa valor de Secret Manager; sem Web Push.
+# Patcher: scripts/worker-ops/patch-firestore-userspublic-read-rules.mjs (idempotente, additive-only,
+# preserva users/notifPrefs/password-reset/catch-all). Backup do ruleset live em artifact (rollback).
+# NESTA FASE o workflow NAO e disparado.
+# =====================================================================
+name: "[manual] Firestore Rules Deploy — usersPublic read"
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true = download/patch/diff/compile-check (ZERO deploy); false = deploy real das Rules"
+        type: boolean
+        default: true
+      confirm_deploy:
+        description: "Digite DEPLOY_RULES_USERSPUBLIC_READ para APPLY (ignorado em dry-run)"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-rules-userspublic-read
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+
+jobs:
+  rules-userspublic-read:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard APPLY (confirm_deploy se dry_run=false)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CONFIRM: ${{ github.event.inputs.confirm_deploy }}
+        run: |
+          set -eu
+          if [ "$DRY_RUN" = "false" ]; then
+            if [ "$CONFIRM" != "DEPLOY_RULES_USERSPUBLIC_READ" ]; then
+              echo "::error:: APPLY (dry_run=false) exige confirm_deploy=DEPLOY_RULES_USERSPUBLIC_READ"; exit 1
+            fi
+            echo "APPLY confirmado."
+          else
+            echo "DRY-RUN (default) — download/patch/diff/compile-check; ZERO deploy."
+          fi
+
+      - name: Checkout (ref FIXO app/main)
+        uses: actions/checkout@v4
+        with:
+          ref: app/main
+          fetch-depth: 0
+
+      - name: Confirma patcher + teste presentes
+        run: |
+          set -eu
+          test -f scripts/worker-ops/patch-firestore-userspublic-read-rules.mjs \
+            || { echo "::error:: patcher ausente no checkout app/main"; exit 1; }
+          test -f scripts/worker-ops/f33AI-firestore-userspublic-read-rules-patch.test.mjs \
+            || { echo "::error:: teste f33AI ausente no checkout app/main"; exit 1; }
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Prechecks (node --check + f33AI)
+        run: |
+          set -eu
+          node --check scripts/worker-ops/patch-firestore-userspublic-read-rules.mjs
+          node --check scripts/worker-ops/f33AI-firestore-userspublic-read-rules-patch.test.mjs
+          node scripts/worker-ops/f33AI-firestore-userspublic-read-rules-patch.test.mjs
+
+      - name: Auth gcloud (SA via secret -> arquivo temporario; nunca impresso)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          gcloud services enable firebaserules.googleapis.com --project "$GCP_PROJECT" >/dev/null 2>&1 || true
+
+      - name: Baixar Rules LIVE de PROD + backup (fonte da verdade)
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"
+          REL=$(curl -fsSL -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore")
+          RULESET=$(echo "$REL" | jq -r '.rulesetName')
+          [ -n "$RULESET" ] && [ "$RULESET" != "null" ] || { echo "::error:: rulesetName nao encontrado."; exit 1; }
+          echo "RULESET_BEFORE=$RULESET" >> "$GITHUB_ENV"
+          curl -fsSL -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/${RULESET}" | jq -r '.source.files[0].content' > firestore.rules.live
+          cp firestore.rules.live "firestore.rules.backup-pre-${GITHUB_SHA}"
+          echo "Backup: firestore.rules.backup-pre-${GITHUB_SHA} ($(wc -l < firestore.rules.live) linhas)"
+
+      - name: Patch idempotente (injeta usersPublic read)
+        run: |
+          set -eu
+          node scripts/worker-ops/patch-firestore-userspublic-read-rules.mjs \
+            firestore.rules.live firestore.rules.generated userspublic-patch-report.json
+          echo "===== diff (so adicoes esperadas) ====="; diff -u firestore.rules.live firestore.rules.generated || true
+          [ -s firestore.rules.generated ] || { echo "::error:: generated vazio."; exit 1; }
+          # defesa: exatamente 1 bloco usersPublic; users/notifPrefs/catch-all preservados
+          test "$(grep -c 'match /usersPublic/{uid}' firestore.rules.generated)" = "1" || { echo "::error:: usersPublic != 1x"; exit 1; }
+          grep -q 'match /users/{id}' firestore.rules.generated || { echo "::error:: users sumiu"; exit 1; }
+          grep -q 'match /notifPrefs/{uid}' firestore.rules.generated || { echo "::error:: notifPrefs sumiu"; exit 1; }
+          grep -q 'match /{document=\*\*}' firestore.rules.generated || { echo "::error:: catch-all sumiu"; exit 1; }
+
+      - name: Compile-check (cria ruleset SEM release; nao afeta o live)
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"
+          jq -n --rawfile c firestore.rules.generated \
+            '{source:{files:[{name:"firestore.rules", content:$c}]}}' > ruleset-body.json
+          HTTP=$(curl -sS -o ruleset-create-resp.json -w '%{http_code}' \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            -X POST "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/rulesets" \
+            -d @ruleset-body.json || true)
+          echo "compile-check HTTP=$HTTP"
+          if [ "$HTTP" != "200" ]; then echo "::error:: compile-check falhou (HTTP $HTTP) — ruleset invalido"; jq -r '.error.message? // empty' ruleset-create-resp.json || true; exit 1; fi
+          jq -r '.name? // empty' ruleset-create-resp.json | grep -q . || { echo "::error:: compile-check sem ruleset name"; exit 1; }
+          echo "Compile-check OK (ruleset compilou; NAO foi liberado)."
+
+      - name: Deploy Rules (SOMENTE se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          npm install -g firebase-tools >/dev/null 2>&1
+          printf '%s\n' '{"firestore":{"rules":"firestore.rules.generated"}}' > firebase.ci.json
+          echo "DEPLOY real — somente firestore:rules"
+          firebase deploy --only firestore:rules --project "$GCP_PROJECT" --config firebase.ci.json --non-interactive
+
+      - name: Postcheck (SOMENTE se dry_run=false; metadados read-only)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"
+          REL=$(curl -fsSL -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore")
+          RULESET_AFTER=$(echo "$REL" | jq -r '.rulesetName')
+          UPDATED=$(echo "$REL" | jq -r '.updateTime')
+          echo "rulesetBefore=$RULESET_BEFORE rulesetAfter=$RULESET_AFTER updateTime=$UPDATED"
+          curl -fsSL -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/${RULESET_AFTER}" | jq -r '.source.files[0].content' > firestore.rules.active
+          grep -q 'match /usersPublic/{uid}' firestore.rules.active || { echo "::error:: usersPublic ausente no ruleset ativo"; exit 1; }
+          grep -q 'match /users/{id}' firestore.rules.active || { echo "::error:: users alterado/ausente"; exit 1; }
+          grep -q 'match /notifPrefs/{uid}' firestore.rules.active || { echo "::error:: notifPrefs alterado/ausente"; exit 1; }
+          grep -q 'match /{document=\*\*}' firestore.rules.active || { echo "::error:: catch-all alterado/ausente"; exit 1; }
+          echo "{\"rulesetBefore\":\"$RULESET_BEFORE\",\"rulesetAfter\":\"$RULESET_AFTER\",\"updateTime\":\"$UPDATED\"}" > ruleset-metadata.json
+          echo "POSTCHECK OK: usersPublic presente; users/notifPrefs/catch-all preservados."
+
+      - name: Upload artifacts (backup/generated/diff/report; sem secrets)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: userspublic-rules-read-${{ github.run_id }}
+          path: |
+            firestore.rules.backup-pre-*
+            firestore.rules.generated
+            userspublic-patch-report.json
+            ruleset-metadata.json
+          if-no-files-found: warn
+
+      - name: Limpeza (SA + ci.json + temporarios)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" firebase.ci.json firestore.rules.live ruleset-body.json ruleset-create-resp.json firestore.rules.active 2>/dev/null || true
