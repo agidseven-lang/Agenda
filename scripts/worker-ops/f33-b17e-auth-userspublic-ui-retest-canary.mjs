@@ -107,6 +107,49 @@ async function clickDomSelector(page, selector, label) {
   return result;
 }
 
+// B1.7-E-FIX4 — checkbox via DOM (checked + eventos input/change/click); imune a re-render do page.uncheck
+async function setCheckboxDom(page, selector, checked, label) {
+  const result = await page.evaluate(({ selector, checked }) => {
+    const el = document.querySelector(selector) || document.getElementById(selector.replace(/^#/, ""));
+    if (!el) return { ok: false, reason: "not_found" };
+    const rect = el.getBoundingClientRect();
+    const visible = !!(rect.width && rect.height);
+    if (!visible) return { ok: false, reason: "not_visible", checked: !!el.checked, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
+    try { el.scrollIntoView({ block: "center", inline: "center" }); } catch (e) {}
+    const before = !!el.checked;
+    if (before !== checked) {
+      el.checked = checked;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window }));
+      if (!!el.checked !== checked) {
+        el.checked = checked;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+    return { ok: !!el.checked === checked, before, after: !!el.checked, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
+  }, { selector, checked });
+  if (!result.ok) throw new Error(label + " DOM checkbox failed: " + (result.reason || "checked_mismatch"));
+  return result;
+}
+
+// B1.7-E-FIX4 — input via DOM (value + eventos); NUNCA loga/retorna o value (senha)
+async function setInputDom(page, selector, value, label) {
+  const result = await page.evaluate(({ selector, value }) => {
+    const el = document.querySelector(selector) || document.getElementById(selector.replace(/^#/, ""));
+    if (!el) return { ok: false, reason: "not_found" };
+    try { el.scrollIntoView({ block: "center", inline: "center" }); } catch (e) {}
+    try { el.focus(); } catch (e) {}
+    el.value = value;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    return { ok: el.value === value, hasValue: !!el.value };
+  }, { selector, value });
+  if (!result.ok) throw new Error(label + " DOM input failed: " + (result.reason || "value_not_set"));
+  return { ok: true, hasValue: true };
+}
+
 function pushNeutralizationInitScript() {
   return "(() => {" +
     "try{Object.defineProperty(Notification,'permission',{get:()=>'denied'});}catch(e){}" +
@@ -163,6 +206,9 @@ async function runApply() {
     taskAssignedStayedFalse: false, issueStatus: 0, updateStatus: 0, savedStatusOk: false,
     notificationDenied: false, pushSubscribeBlocked: true, noRealUser: true, noSecretPrinted: true, noDeploy: true,
     notificationsCardDomClickOk: false, notificationsCardDomClickReason: "", notificationsCardDomClickRect: null,
+    taskAssignedDomSetOk: false, taskAssignedBefore: null, taskAssignedAfter: null, taskAssignedAfterRerender: null, taskAssignedDomSetReason: "", taskAssignedDomSetRect: null,
+    npSaveDomClickOk: false, npSaveDomClickReason: "", npSaveDomClickRect: null,
+    reauthModalVisible: false, npPwInputOk: false, npPwOkDomClickOk: false,
     canary: mask(CANARY_UID),
   };
 
@@ -242,25 +288,53 @@ async function runApply() {
 
     if (summary.notifScreenOk) {
       setStep("before_toggle_task_assigned");
-      const cb = page.locator(SEL.npCheckbox);
-      if (await cb.isChecked().catch(() => false)) await cb.uncheck({ timeout: OP_TIMEOUT }).catch(() => {});
-      await page.waitForTimeout(1500); // re-render
-      summary.taskAssignedStayedFalse = (await cb.isChecked().catch(() => true)) === false;
+      await snapshotUi(page, "beforeToggleTaskAssigned");
+      // B1.7-E-FIX4: toggle task_assigned -> false via DOM (page.uncheck nao surtia efeito na secao re-renderizada)
+      try {
+        const tr = await setCheckboxDom(page, SEL.npCheckbox, false, "taskAssigned");
+        summary.taskAssignedDomSetOk = !!(tr && tr.ok);
+        summary.taskAssignedBefore = tr ? tr.before : null;
+        summary.taskAssignedAfter = tr ? tr.after : null;
+        summary.taskAssignedDomSetReason = (tr && tr.reason) || "ok";
+        summary.taskAssignedDomSetRect = (tr && tr.rect) || null;
+      } catch (e) {
+        summary.taskAssignedDomSetOk = false;
+        summary.taskAssignedDomSetReason = sanitizeText(e && e.message).slice(0, 120);
+      }
       setStep("after_toggle_task_assigned");
+      await snapshotUi(page, "afterToggleTaskAssigned");
+      await page.waitForTimeout(1500); // re-render
+      summary.taskAssignedAfterRerender = await page.evaluate((sel) => { const el = document.querySelector(sel); return el ? !!el.checked : null; }, SEL.npCheckbox).catch(() => null);
+      summary.taskAssignedStayedFalse = summary.taskAssignedAfterRerender === false;
+      await snapshotUi(page, "afterRerenderSnapshot");
 
       setStep("before_save");
-      await page.click(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
-      // reauth modal se aparecer
-      if (await page.locator(SEL.npPw).isVisible({ timeout: 4000 }).catch(() => false)) {
-        await page.fill(SEL.npPw, process.env.CANARY_PASSWORD).catch(() => {});
-        await page.click(SEL.npPwOk).catch(() => {});
+      await snapshotUi(page, "beforeSaveSnapshot");
+      // B1.7-E-FIX4: salvar via DOM click (page.click expirava por actionability/re-render)
+      try {
+        const sr = await clickDomSelector(page, SEL.npSave, "npSave");
+        summary.npSaveDomClickOk = !!(sr && sr.ok);
+        summary.npSaveDomClickReason = (sr && sr.reason) || "ok";
+        summary.npSaveDomClickRect = (sr && sr.rect) || null;
+      } catch (e) {
+        summary.npSaveDomClickOk = false;
+        summary.npSaveDomClickReason = sanitizeText(e && e.message).slice(0, 120);
       }
+      await snapshotUi(page, "afterSaveClickSnapshot");
+      // reauth modal se aparecer: senha via DOM (valor NUNCA logado) + confirmar via DOM click
+      summary.reauthModalVisible = await page.locator(SEL.npPw).isVisible({ timeout: 4000 }).catch(() => false);
+      if (summary.reauthModalVisible) {
+        try { await setInputDom(page, SEL.npPw, process.env.CANARY_PASSWORD || "", "npPw"); summary.npPwInputOk = true; } catch (e) { summary.npPwInputOk = false; }
+        try { const pr = await clickDomSelector(page, SEL.npPwOk, "npPwOk"); summary.npPwOkDomClickOk = !!(pr && pr.ok); } catch (e) { summary.npPwOkDomClickOk = false; }
+      }
+      await snapshotUi(page, "afterReauthSnapshot");
       await page.waitForTimeout(5000);
       summary.issueStatus = netStatus.issue || 0;
       summary.updateStatus = netStatus.update || 0;
       const st = (await page.locator(SEL.npStatus).innerText().catch(() => "")) || "";
       summary.savedStatusOk = /salv|sucesso|salvas/i.test(st);
       setStep("after_save");
+      await snapshotUi(page, "afterEndpointSnapshot");
     }
 
     summary.notificationDenied = await page.evaluate(() => { try { return Notification.permission === "denied"; } catch (e) { return false; } }).catch(() => false);
