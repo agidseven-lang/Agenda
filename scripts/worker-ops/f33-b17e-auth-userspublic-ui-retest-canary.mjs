@@ -150,6 +150,37 @@ async function setInputDom(page, selector, value, label) {
   return { ok: true, hasValue: true };
 }
 
+// B1.7-E-FIX5 — espera EXPLICITA pela resposta de um endpoint observado no fluxo UI (sem fixar timeout curto)
+async function waitForEndpointResponse(page, label, urlPart, timeoutMs) {
+  const startedAt = Date.now();
+  try {
+    const response = await page.waitForResponse((r) => String(r.url() || "").toLowerCase().includes(String(urlPart).toLowerCase()), { timeout: timeoutMs });
+    return { ok: true, label, status: response.status(), elapsedMs: Date.now() - startedAt };
+  } catch (err) {
+    return { ok: false, label, status: 0, reason: sanitizeText(err && err.message ? err.message : String(err)).slice(0, 160), elapsedMs: Date.now() - startedAt };
+  }
+}
+
+// B1.7-E-FIX5 — espera EXPLICITA do status de sucesso na UI; regex precisa (#np_status amplo; corpo so a frase, nao casa o botao "Salvar")
+async function waitForSavedStatus(page, timeoutMs) {
+  const startedAt = Date.now();
+  const read = () => page.evaluate(() => { const s = document.getElementById("np_status"); return (s && s.textContent) || (document.body ? document.body.innerText : "") || ""; });
+  try {
+    await page.waitForFunction(() => {
+      const reStatus = /(prefer[eê]ncias\s+salvas|salvas com sucesso|configura[cç][aã]o\s+salva|sucesso|atualizad[oa])/i;
+      const rePhrase = /(prefer[eê]ncias\s+salvas|salvas com sucesso|configura[cç][aã]o\s+salva)/i;
+      const s = document.getElementById("np_status");
+      const st = s ? (s.textContent || "") : "";
+      const body = document.body ? (document.body.innerText || "") : "";
+      return reStatus.test(st) || rePhrase.test(body);
+    }, { timeout: timeoutMs });
+    return { ok: true, elapsedMs: Date.now() - startedAt, text: sanitizeText(await read()).slice(0, 500) };
+  } catch (err) {
+    const text = await read().catch(() => "");
+    return { ok: false, elapsedMs: Date.now() - startedAt, reason: sanitizeText(err && err.message ? err.message : String(err)).slice(0, 160), text: sanitizeText(text).slice(0, 500) };
+  }
+}
+
 function pushNeutralizationInitScript() {
   return "(() => {" +
     "try{Object.defineProperty(Notification,'permission',{get:()=>'denied'});}catch(e){}" +
@@ -209,6 +240,8 @@ async function runApply() {
     taskAssignedDomSetOk: false, taskAssignedBefore: null, taskAssignedAfter: null, taskAssignedAfterRerender: null, taskAssignedDomSetReason: "", taskAssignedDomSetRect: null,
     npSaveDomClickOk: false, npSaveDomClickReason: "", npSaveDomClickRect: null,
     reauthModalVisible: false, npPwInputOk: false, npPwOkDomClickOk: false,
+    updateWaitStarted: false, updateWaitOk: false, updateWaitStatus: 0, updateWaitElapsedMs: 0, updateWaitReasonSanitized: "",
+    savedStatusWaitOk: false, savedStatusElapsedMs: 0, savedStatusTextSanitized: "", savedStatusWaitReasonSanitized: "",
     canary: mask(CANARY_UID),
   };
 
@@ -310,6 +343,9 @@ async function runApply() {
 
       setStep("before_save");
       await snapshotUi(page, "beforeSaveSnapshot");
+      // B1.7-E-FIX5: inicia a espera da resposta de updateNotifPrefs ANTES do clique em salvar (cold-start pode passar de 5s)
+      summary.updateWaitStarted = true;
+      const updateWait = waitForEndpointResponse(page, "updateNotifPrefs", "updatenotifprefs", 45000);
       // B1.7-E-FIX4: salvar via DOM click (page.click expirava por actionability/re-render)
       try {
         const sr = await clickDomSelector(page, SEL.npSave, "npSave");
@@ -328,11 +364,24 @@ async function runApply() {
         try { const pr = await clickDomSelector(page, SEL.npPwOk, "npPwOk"); summary.npPwOkDomClickOk = !!(pr && pr.ok); } catch (e) { summary.npPwOkDomClickOk = false; }
       }
       await snapshotUi(page, "afterReauthSnapshot");
-      await page.waitForTimeout(5000);
+      // B1.7-E-FIX5: espera EXPLICITA da resposta de updateNotifPrefs (substitui a espera fixa pos-save)
+      const updateWaitResult = await updateWait;
+      summary.updateWaitOk = !!updateWaitResult.ok;
+      summary.updateWaitStatus = updateWaitResult.status || 0;
+      summary.updateWaitElapsedMs = updateWaitResult.elapsedMs || 0;
+      summary.updateWaitReasonSanitized = updateWaitResult.reason ? sanitizeText(updateWaitResult.reason).slice(0, 120) : "";
+      await snapshotUi(page, "afterUpdateWaitSnapshot");
+      // B1.7-E-FIX5: espera EXPLICITA do status de salvamento na UI
+      const savedWaitResult = await waitForSavedStatus(page, 45000);
+      summary.savedStatusWaitOk = !!savedWaitResult.ok;
+      summary.savedStatusElapsedMs = savedWaitResult.elapsedMs || 0;
+      summary.savedStatusTextSanitized = (savedWaitResult.text || "").slice(0, 200);
+      summary.savedStatusWaitReasonSanitized = savedWaitResult.reason ? sanitizeText(savedWaitResult.reason).slice(0, 120) : "";
+      await snapshotUi(page, "afterSavedStatusWaitSnapshot");
       summary.issueStatus = netStatus.issue || 0;
-      summary.updateStatus = netStatus.update || 0;
+      summary.updateStatus = summary.updateWaitStatus || netStatus.update || 0;
       const st = (await page.locator(SEL.npStatus).innerText().catch(() => "")) || "";
-      summary.savedStatusOk = /salv|sucesso|salvas/i.test(st);
+      summary.savedStatusOk = savedWaitResult.ok || /salv|sucesso|salvas/i.test(st);
       setStep("after_save");
       await snapshotUi(page, "afterEndpointSnapshot");
     }
