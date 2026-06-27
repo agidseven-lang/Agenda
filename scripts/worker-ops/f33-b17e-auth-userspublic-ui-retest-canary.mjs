@@ -32,6 +32,7 @@ const MARKERS = [
 ];
 const SEL = {
   loginId: "#lUser", loginPw: "#lPass", loginBtn: "#doLogin",
+  settingsBtn: "#hSettings",
   npCheckbox: "#np_task_assigned", npSave: "#np_save", npStatus: "#np_status",
   npPw: "#np_pw", npPwOk: "#np_pw_ok",
 };
@@ -128,9 +129,14 @@ async function runApply() {
     await page.waitForTimeout(4000);
     summary.loginCanaryOk = !(await page.locator(SEL.loginBtn).isVisible().catch(() => false));
 
-    // abrir preferências (aba settings) — caminho exato finalizado no apply real; espera robusta por #np_save
-    await page.evaluate(() => { try { if (typeof window.setTab === "function") window.setTab("settings"); } catch (e) {} }).catch(() => {});
-    await page.waitForSelector(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
+    // abrir preferências: navegação real do usuário — o botão #hSettings faz settingsView="main"; switchTab("settings"),
+    // que renderiza/liga renderNotifPrefsPushSection/bindNotifPrefsPushSection. Fallback: switchTab direto. Espera por #np_save.
+    await page.click(SEL.settingsBtn, { timeout: OP_TIMEOUT }).catch(() => {});
+    await page.waitForSelector(SEL.npSave, { timeout: 8000 }).catch(() => {});
+    if (!(await page.locator(SEL.npSave).isVisible().catch(() => false))) {
+      await page.evaluate(() => { try { if (typeof window.switchTab === "function") { window.settingsView = "main"; window.switchTab("settings"); } } catch (e) {} }).catch(() => {});
+      await page.waitForSelector(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
+    }
     summary.notifScreenOk = await page.locator(SEL.npSave).isVisible().catch(() => false);
 
     if (summary.notifScreenOk) {
