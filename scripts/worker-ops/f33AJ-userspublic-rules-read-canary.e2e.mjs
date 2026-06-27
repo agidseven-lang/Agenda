@@ -50,6 +50,12 @@ if (CONFIRM !== REQUIRED) {
   process.exit(1);
 }
 
+// IDs de teste NAO-reservados. O Firestore rejeita ids no padrao /^__.*__$/ com
+// INVALID_ARGUMENT *antes* das Rules; usar tais ids mascararia o permission-denied.
+const CANARY_WRITE_ID = "canary-write-test";
+const CATCHALL_COLL = "canaryCatchallZ9";
+const CATCHALL_DOC = "noDoc";
+
 const sha256 = (s) => createHash("sha256").update(String(s)).digest("hex").slice(0, 16);
 const isDenied = (e) =>
   !!e && (e.code === "permission-denied" ||
@@ -117,18 +123,18 @@ async function main() {
   rec("usersPublic_schema_exactly7", eachExactly7 && upCount > 0, "keysUnion=" + [...keysUnion].sort().join(","));
   rec("usersPublic_pii_free", forbiddenFound.size === 0, forbiddenFound.size ? ("forbidden:" + [...forbiddenFound].join(",")) : "none");
 
-  const tgt = sampleId || "__canary_write_test__";
+  const tgt = sampleId || CANARY_WRITE_ID;
 
   // ---- 2) CREATE usersPublic => deny ----
   try {
-    await withTimeout(setDoc(doc(db, "usersPublic", "__canary_write_test__"),
-      { id: "__canary_write_test__", name: "", role: "", admin: false, status: "", photo: "", color: "" }), "create usersPublic");
+    await withTimeout(setDoc(doc(db, "usersPublic", CANARY_WRITE_ID),
+      { id: CANARY_WRITE_ID, name: "", role: "", admin: false, status: "", photo: "", color: "" }), "create usersPublic");
     rec("usersPublic_create_denied", false, "WRITE PERSISTIU (NO-GO)");
   } catch (e) { rec("usersPublic_create_denied", isDenied(e), codeOf(e)); }
 
   // ---- 3) UPDATE usersPublic => deny (alvo existente; rule if false nega antes de mutar) ----
   try {
-    await withTimeout(updateDoc(doc(db, "usersPublic", tgt), { name: "__canary__" }), "update usersPublic");
+    await withTimeout(updateDoc(doc(db, "usersPublic", tgt), { name: "canary" }), "update usersPublic");
     rec("usersPublic_update_denied", false, "WRITE PERSISTIU (NO-GO)");
   } catch (e) { rec("usersPublic_update_denied", isDenied(e), codeOf(e)); }
 
@@ -154,13 +160,13 @@ async function main() {
 
   // ---- 7) WRITE notifPrefs => deny ----
   try {
-    await withTimeout(setDoc(doc(db, "notifPrefs", "__canary_write_test__"), { x: 1 }), "write notifPrefs");
+    await withTimeout(setDoc(doc(db, "notifPrefs", CANARY_WRITE_ID), { x: 1 }), "write notifPrefs");
     rec("notifPrefs_write_denied", false, "WRITE PERSISTIU (NO-GO)");
   } catch (e) { rec("notifPrefs_write_denied", isDenied(e), codeOf(e)); }
 
   // ---- 8) catch-all (colecao aleatoria) => deny ----
   try {
-    await withTimeout(getDoc(doc(db, "__canary_catchall__", "__no_doc__")), "read catchall");
+    await withTimeout(getDoc(doc(db, CATCHALL_COLL, CATCHALL_DOC)), "read catchall");
     rec("catchall_denied", false, "LEITURA PERMITIDA (NO-GO)");
   } catch (e) { rec("catchall_denied", isDenied(e), codeOf(e)); }
 
@@ -171,8 +177,8 @@ async function main() {
     const snap2 = await withTimeout(getDocs(query(collection(db, "usersPublic"), limit(PAGE_SIZE))), "reread usersPublic");
     if (snap2.size !== upCount) { persistOk = false; persistDetail.push("count " + upCount + "->" + snap2.size); }
     let canaryExists = false;
-    snap2.forEach((d) => { if (d.id === "__canary_write_test__") canaryExists = true; });
-    if (canaryExists) { persistOk = false; persistDetail.push("__canary_write_test__ existe"); }
+    snap2.forEach((d) => { if (d.id === CANARY_WRITE_ID) canaryExists = true; });
+    if (canaryExists) { persistOk = false; persistDetail.push(CANARY_WRITE_ID + " existe"); }
   } catch (e) { persistOk = false; persistDetail.push("reread:" + codeOf(e)); }
   rec("no_write_persisted", persistOk, persistDetail.join(";") || "count igual; canary ausente");
 
