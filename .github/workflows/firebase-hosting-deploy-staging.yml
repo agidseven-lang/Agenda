@@ -33,8 +33,8 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  PINNED_APPMAIN_COMMIT: "d53ad23d9553ba32ca427874c23a453cece9d093"
-  PINNED_INDEX_SHA256: "4d0b4fb13eeac50381da386e421e059be4a25d2778449ee7e4da790d24c7adcb"
+  PINNED_APPMAIN_COMMIT: "4ba284067640fee86abc47b1056ba92fadc2f9f5"
+  PINNED_INDEX_SHA256: "7ead0504a122a48eb4a00e99c7378d7e89364e5366331fb742daa7021c357eb2"
 
 jobs:
   hosting-deploy:
@@ -110,7 +110,7 @@ jobs:
           fi
           check() { got="$(sha256sum "$1" | awk '{print $1}')"; if [ "$got" != "$2" ]; then echo "::error:: $1 sha256 $got != $2"; exit 1; fi; }
           ( cd .staging-public
-            check index.html                4d0b4fb13eeac50381da386e421e059be4a25d2778449ee7e4da790d24c7adcb
+            check index.html                7ead0504a122a48eb4a00e99c7378d7e89364e5366331fb742daa7021c357eb2
             check manifest.json             5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
             check sw.js                     a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
             check firebase-messaging-sw.js  64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
