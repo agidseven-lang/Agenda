@@ -91,6 +91,22 @@ async function snapshotUi(page, label) {
   return snap;
 }
 
+// B1.7-E-FIX3 — clique DOM no nó vivo (dispara o onclick real; imune a actionability/re-render do page.click)
+async function clickDomSelector(page, selector, label) {
+  const result = await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return { ok: false, reason: "not_found" };
+    const rect = el.getBoundingClientRect();
+    const visible = !!(rect.width && rect.height);
+    if (!visible) return { ok: false, reason: "not_visible", rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
+    try { el.scrollIntoView({ block: "center", inline: "center" }); } catch (e) {}
+    el.click();
+    return { ok: true, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
+  }, selector);
+  if (!result.ok) throw new Error(label + " DOM click failed: " + result.reason);
+  return result;
+}
+
 function pushNeutralizationInitScript() {
   return "(() => {" +
     "try{Object.defineProperty(Notification,'permission',{get:()=>'denied'});}catch(e){}" +
@@ -146,6 +162,7 @@ async function runApply() {
     executed: true, markersHtml: false, usersPublicSource: false, loginCanaryOk: false, notifScreenOk: false,
     taskAssignedStayedFalse: false, issueStatus: 0, updateStatus: 0, savedStatusOk: false,
     notificationDenied: false, pushSubscribeBlocked: true, noRealUser: true, noSecretPrinted: true, noDeploy: true,
+    notificationsCardDomClickOk: false, notificationsCardDomClickReason: "", notificationsCardDomClickRect: null,
     canary: mask(CANARY_UID),
   };
 
@@ -199,13 +216,24 @@ async function runApply() {
     await page.waitForSelector(SEL.settingsNotifCard, { timeout: 15000 }).catch(() => {});
     setStep("before_open_notifications_subview");
     await snapshotUi(page, "beforeClickNotificationsCard");
-    await page.click(SEL.settingsNotifCard, { timeout: OP_TIMEOUT }).catch(() => {});
+    // B1.7-E-FIX3: aciona o card via clique DOM no nó vivo (page.click expirava por actionability/re-render).
+    try {
+      const r = await clickDomSelector(page, SEL.settingsNotifCard, "notificationsCard");
+      summary.notificationsCardDomClickOk = !!(r && r.ok);
+      summary.notificationsCardDomClickReason = (r && r.reason) || "ok";
+      summary.notificationsCardDomClickRect = (r && r.rect) || null;
+    } catch (e) {
+      summary.notificationsCardDomClickOk = false;
+      summary.notificationsCardDomClickReason = sanitizeText(e && e.message).slice(0, 120);
+      summary.notificationsCardDomClickRect = null;
+    }
     setStep("after_open_notifications_subview");
     await snapshotUi(page, "afterClickNotificationsCard");
     setStep("before_wait_np_save");
     await page.waitForSelector(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
     if (!(await page.locator(SEL.npSave).isVisible().catch(() => false))) {
-      await page.evaluate(() => { try { if (typeof window.switchTab === "function") { window.settingsView = "notifications"; window.switchTab("settings"); } } catch (e) {} }).catch(() => {});
+      // fallback: força a sub-tela notifications direto no app (render()/switchTab)
+      await page.evaluate(() => { try { window.settingsView = "notifications"; if (typeof window.render === "function") { window.render(); } else if (typeof window.switchTab === "function") { window.switchTab("settings"); } } catch (e) {} }).catch(() => {});
       await page.waitForSelector(SEL.npSave, { timeout: OP_TIMEOUT }).catch(() => {});
     }
     summary.notifScreenOk = await page.locator(SEL.npSave).isVisible().catch(() => false);
