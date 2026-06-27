@@ -5176,6 +5176,31 @@ async function verifyPw(u,pw){
   }
   return false;
 }
+
+/* ============================================================================
+   F3.3.21-B2 — LOGIN SERVER-SIDE (dual-path canário; TEMPORÁRIO até users-read hardening).
+   Consome exports.loginUser (HMAC sessão 24h) do backend já existente. OFF por padrão:
+   só roda quando o canário liga lsSet("auth_ss_login","on"). Mantém o login client-side
+   atual como fallback temporário. NUNCA loga senha/token/pass/salt. NÃO fecha users read aqui.
+   ============================================================================ */
+const AUTH_LOGIN_URL_DEFAULT = "https://loginuser-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; ATIVO só após deploy (fase futura) */
+const AUTH_SESSION_KEY = "idseven_auth_session_v1";
+function authLoginUrl(){ try{ const o=lsGet("auth_login_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_LOGIN_URL_DEFAULT; }
+function authServerSideLoginEnabled(){ try{ return lsGet("auth_ss_login")==="on"; }catch(_){ return false; } }
+/* Guarda a sessão server-side (token HMAC + expiresAt). NUNCA loga o token. */
+function authStoreSession(session){ try{ if(session && typeof session.token==="string"){ lsSet(AUTH_SESSION_KEY, JSON.stringify({ token: session.token, expiresAt: (session.expiresAt||0) })); } }catch(_){ } }
+function authGetSession(){ try{ const raw=lsGet(AUTH_SESSION_KEY); if(!raw) return null; const o=JSON.parse(raw); if(o && typeof o.token==="string" && (!o.expiresAt || o.expiresAt>Date.now())) return o; }catch(_){ } return null; }
+function authClearSession(){ try{ lsDel(AUTH_SESSION_KEY); }catch(_){ } }
+/* POST p/ loginUser. Retorna {ok,user,session} (sucesso) ou {ok:false,status,error}. NUNCA loga senha/token. */
+async function loginUserServerSide(identifier, password){
+  try{
+    const res=await fetch(authLoginUrl(), { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ identifier: String(identifier||""), password: String(password||"") }) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true){ return { ok:false, status: (res.status||0), error: (data && data.error) ? String(data.error) : "login_failed" }; }
+    return { ok:true, user: (data.user||null), session: (data.session||null) };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; sem PII/segredo */
+}
+
 function fbAvatar(n){const i=(n||"?").trim().charAt(0).toUpperCase()||"?";
   return `<div style="width:100%;height:100%;background:var(--surface-2);display:grid;place-items:center;font-weight:800;color:var(--ink-soft);font-size:15px">${i}</div>`;}
 function safePhoto(p){
@@ -5951,10 +5976,24 @@ $("doLogin").onclick=async()=>{
   if(busy)return;
   const id=val("lUser").toLowerCase(), pw=val("lPass");
   if(!id||!pw)return showErr("Preencha e-mail/WhatsApp e senha.");
-  const u=users.find(x=>(x.email||"").toLowerCase()===id||(x.phone||"").replace(/\D/g,"")===id.replace(/\D/g,""));
-  if(!u)return showErr("E-mail/WhatsApp ou senha incorretos.");
   busy=true; const b=$("doLogin"); const ot=b.textContent; b.disabled=true; b.textContent="Entrando…";
   try{
+    /* F3.3.21-B2 — DUAL-PATH (canário/flag): tenta login server-side via loginUser.
+       TEMPORÁRIO até o hardening de users-read. OFF por padrão. NUNCA loga senha/token/pass/salt. */
+    if(authServerSideLoginEnabled()){
+      const sr=await loginUserServerSide(id,pw);
+      if(sr.ok && sr.user && sr.user.id){
+        authStoreSession(sr.session);
+        me=sr.user; sessionId=sr.user.id; lsSet(SESSION_KEY,sr.user.id); route();
+        return;
+      }
+      if(sr.status===401){ showErr("E-mail/WhatsApp ou senha incorretos."); return; }
+      if(sr.status===403){ showErr("Sua conta ainda não está ativa. Aguarde a aprovação."); return; }
+      /* transitório (status 0/500/503): cai no fallback client-side temporário abaixo */
+    }
+    /* Fallback client-side TEMPORÁRIO (esquema atual; será removido na fase de users-read hardening). */
+    const u=users.find(x=>(x.email||"").toLowerCase()===id||(x.phone||"").replace(/\D/g,"")===id.replace(/\D/g,""));
+    if(!u){ showErr("E-mail/WhatsApp ou senha incorretos."); return; }
     const ok=await verifyPw(u,pw);
     if(!ok){ showErr("E-mail/WhatsApp ou senha incorretos."); return; }
     me=u; sessionId=u.id; lsSet(SESSION_KEY,u.id); route();
@@ -5966,6 +6005,8 @@ $("pendLogout").onclick=logout;
 function logout(){
   /* B1.7-E-FIX — limpa o draft de preferências de notificação p/ não vazar estado entre usuários */
   try{ notifPrefsDraftState = null; notifPrefsTokenCache = null; notifPrefsHydrateTried = false; notifPrefsLoadState = "idle"; }catch(_){}
+  /* F3.3.21-B2 — limpa a sessão server-side (token HMAC) p/ não vazar entre usuários */
+  try{ authClearSession(); }catch(_){}
   /* [V62.9 — I3] Cancela timers ao deslogar (evita memory leak em SPA) */
   if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null;alarmSeeded=false;}
   if(boardTimer){clearInterval(boardTimer);boardTimer=null;}
