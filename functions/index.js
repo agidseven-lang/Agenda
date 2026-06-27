@@ -14,7 +14,7 @@
    Credenciais: usa as credenciais padrão do runtime de Functions (admin SDK).
    NENHUM segredo no código. Requer plano Blaze para deploy.
    ============================================================================ */
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
@@ -1423,3 +1423,45 @@ function projectUserPublicOut(id, d) {
 
 // Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
 exports._projectUserPublicOut = projectUserPublicOut;
+
+/* ============================================================================
+   F3.3.20-B1.7-E — SLICE 2: trigger syncUsersPublic (sincroniza usersPublic).
+   ----------------------------------------------------------------------------
+   - onDocumentWritten("users/{uid}") gen2. CREATE/UPDATE => SET COMPLETO da projecao
+     allowlist (projectUserPublicOut) em usersPublic/{uid} (sem merge => sem chaves
+     remanescentes). DELETE (after ausente/!exists) => DELETE usersPublic/{uid}.
+   - So toca usersPublic/{uid}: NUNCA escreve em users/{uid}, notifPrefs, fcmTokens,
+     nem outro doc. NUNCA copia PII (phone/email) nem credenciais (pass/salt/fcmTokens):
+     a projecao e allowlist. Logs mascaram uid; nunca logam doc/PII.
+   - Erro em set/delete: loga generico (uid mascarado) e RELANCA (retry da Function);
+     nunca engole erro.
+   - Handler PURO testavel via deps {db, logger, maskUid}; testes com mocks (sem
+     Firestore real). ADITIVO; NAO deployado nesta fase (sem backfill, sem UI, sem Rules).
+   ============================================================================ */
+async function handleSyncUsersPublic(event, deps) {
+  deps = deps || {};
+  const db = deps.db || notifDb();
+  const log = deps.logger || logger;
+  const mask = deps.maskUid || notifMaskUid;
+  const uid = String((event && event.params && event.params.uid) || "");
+  const after = event && event.data && event.data.after;
+  const exists = !!(after && after.exists === true);
+  const target = db.collection("usersPublic").doc(uid);
+  try {
+    if (!exists) { await target.delete(); return { op: "delete", uid: uid }; }
+    const data = (typeof after.data === "function" ? (after.data() || {}) : {});
+    await target.set(projectUserPublicOut(uid, data));   // SET COMPLETO: substitui o doc (1 arg, sem opcoes)
+    return { op: "set", uid: uid };
+  } catch (e) {
+    try { log.error("[syncUsersPublic] erro", { uid: mask(uid), op: exists ? "set" : "delete", err: e && e.message }); } catch (_) {}
+    throw e;   // relanca p/ retry (nunca engole)
+  }
+}
+
+// Trigger Firestore (onDocumentWritten => NAO usa request.auth). NAO deployada nesta fase.
+exports.syncUsersPublic = onDocumentWritten({ document: "users/{uid}", region: "us-central1", maxInstances: 10 }, async (event) => {
+  return handleSyncUsersPublic(event);
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; testavel com mocks; sem deploy).
+exports._handleSyncUsersPublic = handleSyncUsersPublic;

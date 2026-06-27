@@ -9,7 +9,7 @@
  *     fcmTokenMeta/tokens/reset/secrets/extras => saida NAO os contem;
  *   - shape-equality com authUserPublicOut (mesmas chaves e valores);
  *   - provas de fonte: authUserPublicOut/loginUser/getUserContact preservados;
- *     syncUsersPublic/onDocumentWritten ausentes; helper sem Firestore/secret/spread.
+ *     syncUsersPublic/onDocumentWritten presentes (trigger); helper sem Firestore/secret/spread.
  * Puro/offline: NAO require() o modulo; NAO toca producao; NAO deploya.
  * Rodar: node scripts/worker-ops/f33AF-auth-userspublic-projection.test.mjs
  * ===================================================================== */
@@ -50,7 +50,7 @@ ok("[src] NAO e CloudFunction (sem onRequest/onCall/onDocument no helper)", !/on
 ok("[src#18] authUserPublicOut preservado", /function authUserPublicOut\(/.test(SRC));
 ok("[src#19] loginUser preservado", /exports\.loginUser = onRequest/.test(SRC));
 ok("[src#20] getUserContact preservado", /exports\.getUserContact = onRequest/.test(SRC));
-ok("[src#21] syncUsersPublic ausente (sem export/trigger)", !/exports\.syncUsersPublic/.test(SRC) && !/onDocumentWritten/.test(SRC));
+ok("[src#21] syncUsersPublic presente (trigger onDocumentWritten users/{uid})", /exports\.syncUsersPublic = onDocumentWritten\(/.test(SRC) && /onDocumentWritten\(\{ document: "users\/\{uid\}"/.test(SRC));
 
 /* ===== 1) 7 chaves exatas ===== */
 const r1 = proj("u1", { name: "Alice", role: "designer", admin: false, status: "ativo", photo: "p", color: "#f00" });
@@ -107,7 +107,7 @@ ok("17b shape-equality (mesmos valores) com authUserPublicOut", JSON.stringify(a
 console.log("\n========= F3.3.20-B1.7-E — usersPublic projection helper =========");
 console.log("  allowlist {id,name,role,admin,status,photo,color}; sem PII/credenciais/extras/spread");
 console.log("  negativos pass/salt/phone/email/fcmTokens; shape-equality com authUserPublicOut");
-console.log("  syncUsersPublic/onDocumentWritten ausentes; loginUser/getUserContact preservados");
+console.log("  syncUsersPublic/onDocumentWritten presentes (trigger); loginUser/getUserContact preservados");
 console.log("==================================================================");
 console.log("F3.3.20-B1.7-E auth-userspublic-projection: " + pass + " OK, " + fail + " FAIL");
 if (fail) { console.log(flog.join("\n")); process.exit(1); }
