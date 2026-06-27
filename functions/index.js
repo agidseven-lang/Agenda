@@ -1393,3 +1393,33 @@ exports.getUserContact = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us
 
 // Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
 exports._handleGetUserContact = handleGetUserContact;
+
+/* ============================================================================
+   F3.3.20-B1.7-E — SLICE 2: projecao publica segura (projectUserPublicOut).
+   ----------------------------------------------------------------------------
+   - Helper PURO de projeccao para a futura colecao usersPublic: allowlist EXPLICITA
+     {id,name,role,admin,status,photo,color} — campos de EXIBICAO. NUNCA copia PII
+     (phone/email) nem credenciais (pass/salt/fcmTokens/fcmTokenMeta) nem doc cru
+     nem campos desconhecidos (sem spread). phone/email continuam via getUserContact.
+   - Consistente com authUserPublicOut (mesmo shape/normalizacao); helper SEPARADO
+     (NAO altera authUserPublicOut, ja deployado em loginUser). Um teste prova a
+     shape-equality entre os dois.
+   - ADITIVO/INERTE nesta fase: SEM trigger (syncUsersPublic), SEM backfill, SEM
+     deploy, SEM Firestore, SEM UI. So o helper + testes.
+   ============================================================================ */
+function projectUserPublicOut(id, d) {
+  const src = (d && typeof d === "object" && !Array.isArray(d)) ? d : {};
+  const str = (v) => (typeof v === "string" ? v : "");
+  return {
+    id: String(id),
+    name: str(src.name),
+    role: str(src.role),
+    admin: src.admin === true,
+    status: str(src.status),
+    photo: str(src.photo),
+    color: str(src.color),
+  };
+}
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
+exports._projectUserPublicOut = projectUserPublicOut;
