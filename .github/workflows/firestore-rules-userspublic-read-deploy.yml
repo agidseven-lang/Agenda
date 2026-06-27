@@ -86,6 +86,9 @@ jobs:
         run: |
           set -eu
           [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          # ADC para o Firebase CLI (firebase deploy usa GOOGLE_APPLICATION_CREDENTIALS); padrao dos
+          # workflows endpoint/dormant/backfill. Sem isto, firebase deploy falha com "Failed to authenticate".
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
           printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
           gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
           gcloud config set project "$GCP_PROJECT" >/dev/null
