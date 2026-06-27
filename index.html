@@ -5191,6 +5191,67 @@ const USER_COLORS=["var(--c-rev-strong)","#60a5fa","#34d399","#a78bfa","#f59e0b"
 function userColor(u){ if(!u||!u.id)return"#8a8a96"; if(u.color&&USER_COLORS.includes(u.color))return u.color; let h=0; const s=String(u.id); for(let i=0;i<s.length;i++)h=((h<<5)-h+s.charCodeAt(i))|0; return USER_COLORS[Math.abs(h)%USER_COLORS.length]; }
 function userByName(n){ n=(n||"").trim().toLowerCase(); return n?users.find(u=>(u.name||"").trim().toLowerCase()===n):null; }
 
+/* ===================================================================
+   F3.3.20-B1.7-E - UI dual-path roster (usersPublic primario; fallback users).
+   Camada SEGURA de EXIBICAO: SOMENTE {id,name,role,admin,status,photo,color}.
+   NUNCA usada para login/PII/contato/cadastro/mutacoes/presenca - esses seguem
+   em `users` (raw/legado). usersPublic nao tem lastSeen, entao listas com
+   presenca (equipe/chat picker) permanecem em `users` neste slice.
+   =================================================================== */
+let usersRoster = [];
+let usersRosterSource = "init";
+let usersRosterLoaded = false;
+let unsubUsersPublicRoster = null;
+function normalizeRosterUser(id, data){
+  const src = (data && typeof data === "object" && !Array.isArray(data)) ? data : {};
+  const str = (v) => (typeof v === "string" ? v : "");
+  return {
+    id: String(id || ""),
+    name: str(src.name),
+    role: str(src.role),
+    admin: src.admin === true,
+    status: str(src.status),
+    photo: str(src.photo),
+    color: str(src.color)
+  };
+}
+function rosterById(id){ return usersRoster.find(function(u){ return u.id === id; }) || null; }
+function rosterByName(n){ n=(n||"").trim().toLowerCase(); return n ? (usersRoster.find(function(u){ return (u.name||"").trim().toLowerCase() === n; }) || null) : null; }
+function rebuildRosterFromUsers(){
+  /* So reconstroi do array `users` enquanto usersPublic ainda nao e a fonte. */
+  if(usersRosterSource === "usersPublic") return;
+  try{ usersRoster = (Array.isArray(users) ? users : []).map(function(u){ return normalizeRosterUser(u.id, u); }); }
+  catch(_){ usersRoster = []; }
+  usersRosterLoaded = true;
+}
+function _usersRosterFallback(reason){
+  usersRosterSource = "users-fallback:" + (reason || "users");
+  try{ usersRoster = (Array.isArray(users) ? users : []).map(function(u){ return normalizeRosterUser(u.id, u); }); }
+  catch(_){ usersRoster = []; }
+  usersRosterLoaded = true;
+  try{ console.log("[roster] fonte=" + usersRosterSource + " n=" + usersRoster.length); }catch(_){}
+  try{ if(!$("mainApp").classList.contains("hidden")) render(); }catch(_){}
+}
+function startUsersRosterSync(){
+  if(unsubUsersPublicRoster) return;            /* evita subscribe duplicado */
+  if(!db){ _usersRosterFallback("no-db"); return; }
+  try{
+    unsubUsersPublicRoster = db.collection("usersPublic").onSnapshot(function(snap){
+      try{
+        if(snap.empty){ _usersRosterFallback("empty"); return; }
+        usersRoster = snap.docs.map(function(d){ return normalizeRosterUser(d.id, d.data()); });
+        usersRosterSource = "usersPublic";
+        usersRosterLoaded = true;
+        try{ console.log("[roster] fonte=usersPublic n=" + usersRoster.length); }catch(_){}
+        try{ if(!$("mainApp").classList.contains("hidden")) render(); }catch(_){}
+      }catch(e){ _usersRosterFallback("map-error"); }
+    }, function(err){
+      _usersRosterFallback((err && err.code === "permission-denied") ? "denied" : "error");
+    });
+  }catch(e){ _usersRosterFallback("subscribe-error"); }
+}
+
+
 /* image downscale for small avatars — robusto p/ HEIC/fotos grandes */
 function compress(file,ok,fail){
   const r=new FileReader();
@@ -5401,6 +5462,7 @@ var __clientOpenedMark = false;
     _prevUsersForCompare = newUsers;
     users = newUsers;
     usersLoaded=true;
+    try{ rebuildRosterFromUsers(); }catch(_){}
     if(!me && sessionId){ const u=users.find(x=>x.id===sessionId); if(u) me=u; }
     if(me){const fresh=users.find(u=>u.id===me.id);if(fresh)me=fresh;}
     /* [V64.3] Sincroniza reminderMinutes Firestore↔local uma vez por sessão (pro Worker ler) */
@@ -5453,6 +5515,7 @@ var __clientOpenedMark = false;
       }
     }catch(_){}
   },err=>{$("syncBadge").classList.add("off");$("syncBadge").querySelector("span").textContent="sem conexão";});
+  try{ startUsersRosterSync(); }catch(_){}
   db.collection("events").onSnapshot(snap=>{
     events=snap.docs.map(d=>({id:d.id,...d.data()}));
     $("syncBadge").classList.remove("off");$("syncBadge").querySelector("span").textContent="sincronizado";
@@ -10604,7 +10667,7 @@ function ccard(x){
     csFb = '<div class="cli-fb-box"><div class="cli-fb-lab">✏ PEDIDO DO CLIENTE · LEGENDA</div><div class="cli-fb-txt">"'+esc(o.lgFeedback)+'"</div></div>';
   }
   /* [V58] Quem demandou esta tarefa (criador). Não mostra se for tarefa antiga sem t.by */
-  var creator = t.by ? users.find(function(u){return u.id===t.by;}) : null;
+  var creator = t.by ? usersRoster.find(function(u){return u.id===t.by;}) : null;
   var launchedTxt2 = t.createdAt ? ('lançada '+fmtShort(t.createdAt)) : '';
   var fromHtml = creator
     ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="nm">'+esc(creator.name)+'</span>'+(launchedTxt2?'<span class="at">· '+esc(launchedTxt2)+'</span>':'')+'</div>'
@@ -10649,13 +10712,13 @@ function tcard(t){
   const nameLine='<div class="tc-who">'+esc(t.assignee||"Sem responsável")+'</div>';
   let doneLine='';
   if(t.status==="concluido"&&t.doneBy){
-    const du=users.find(x=>x.id===t.doneBy);
+    const du=usersRoster.find(x=>x.id===t.doneBy);
     const nm=esc(((du&&du.name)||"Alguém").split(" ")[0]);
     doneLine='<div class="tdone"><span class="av">'+avatarHTML(du)+'</span>concluiu: '+nm+
       (t.doneAt?' · '+esc(fmtDT(t.doneAt)):'')+'</div>';
   }
   /* [V58] Quem demandou esta tarefa (criador). Não mostra se for tarefa antiga sem t.by */
-  var creator = t.by ? users.find(function(u){return u.id===t.by;}) : null;
+  var creator = t.by ? usersRoster.find(function(u){return u.id===t.by;}) : null;
   var launchedTxt = t.createdAt ? ('lançada '+fmtShort(t.createdAt)) : '';
   var fromHtml = creator
     ? '<div class="tc-from" style="--user-color:'+userColor(creator)+'"><span class="lab">POR</span><span class="av">'+avatarHTML(creator)+'</span><span class="nm">'+esc(creator.name)+'</span>'+(launchedTxt?'<span class="at">· '+esc(launchedTxt)+'</span>':'')+'</div>'
@@ -10995,7 +11058,7 @@ function tlIcon(k){
 }
 function tlText(e, sector, scope){
   var who="";
-  if(e.byId){ var pu=users.find(function(x){return x.id===e.byId;}); who=(pu&&pu.name)||e.name||"alguém"; }
+  if(e.byId){ var pu=usersRoster.find(function(x){return x.id===e.byId;}); who=(pu&&pu.name)||e.name||"alguém"; }
   else if(e.name){ who=e.name; }
   var W=who?'<b>'+esc(who)+'</b> ':'';
   var noun = (scope==="content")?"este conteúdo":"esta tarefa";
@@ -11233,7 +11296,7 @@ function openContentDetail(tid, idx){
     cmtHtml+='<div class="cmt-empty">Nenhum comentário ainda. Use <b>@</b> para mencionar alguém.</div>';
   } else {
     cmtHtml+='<div class="cmt-list">'+cms.slice(-60).map(function(c){
-      var cu=users.find(function(x){return x.id===c.by;});
+      var cu=usersRoster.find(function(x){return x.id===c.by;});
       return '<div class="cmt"><span class="av">'+avatarHTML(cu)+'</span><div class="cmt-b"><div class="cmt-h">'+esc((cu&&cu.name)||c.name||"Alguém")+' · <span>'+esc(fmtDT(c.at))+'</span></div><div class="cmt-x">'+renderCmtText(c)+'</div></div></div>';
     }).join("")+'</div>';
   }
@@ -14283,7 +14346,7 @@ function openTaskDetail(id){
   $("taskDetailEdit").style.display=_cm?"":"none";
   $("taskDetailDel").style.display=_cm?"":"none";
   const sec=SECTORS[t.sector]||{label:"—",color:"var(--c-outro)"};
-  const u=users.find(x=>x.id===t.by);
+  const u=usersRoster.find(x=>x.id===t.by);
   const late=taskLate(t);
   const sMsD=taskStartMs(t), dMsD=taskDueMs(t), ri=remainInfo(t);
   const ck=Array.isArray(t.checklist)?t.checklist:[];
@@ -14301,7 +14364,7 @@ function openTaskDetail(id){
     ck.forEach((it,i)=>{chkHtml+='<div class="chk-it'+(it.d?" done":"")+'"><div class="bx" data-tk="'+i+'"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="tx">'+esc(it.t)+'</div></div>';});
     chkHtml+='</div>';
   }
-  const du=users.find(x=>x.id===t.doneBy);
+  const du=usersRoster.find(x=>x.id===t.doneBy);
   /* TIMELINE: histórico unificado derivado dos campos existentes + array history */
   var events=[];
   if(t.createdAt) events.push({kind:"created", at:t.createdAt, byId:t.by});
@@ -14326,7 +14389,7 @@ function openTaskDetail(id){
   }
   function tlText(e){
     var who="";
-    if(e.byId){ var pu=users.find(x=>x.id===e.byId); who=(pu&&pu.name)||e.name||"alguém"; }
+    if(e.byId){ var pu=usersRoster.find(x=>x.id===e.byId); who=(pu&&pu.name)||e.name||"alguém"; }
     else if(e.name){ who=e.name; }
     var W=who?'<b>'+esc(who)+'</b> ':'';
     if(e.kind==="created") return W+'criou esta tarefa';
@@ -14445,7 +14508,7 @@ function openTaskDetail(id){
   let copyHtml="";
   if(t.sector==="copy"){
     var cs=copyStateOf(t), ci=copyStateInfo(cs), appr=isCopyApprover(me);
-    var cby=users.find(x=>x.id===t.copyBy);
+    var cby=usersRoster.find(x=>x.id===t.copyBy);
     copyHtml='<div class="copy-view"><div class="tt">Aprovação do conteúdo (Copywriter)</div>'+
       '<div class="copy-badge" style="background:'+secBg(ci.color)+';color:'+ci.color+'"><span class="cdot2" style="background:'+ci.color+'"></span>'+ci.label+'</div>';
     if(cs==="aprovado"){
@@ -14666,7 +14729,7 @@ function openTaskDetail(id){
     }
     var ch='<div class="cmt-sec"><div class="tt">Comentários · '+cms.length+'</div>';
     if(!cms.length) ch+='<div class="cmt-empty">Nenhum comentário ainda. Use <b>@</b> para mencionar alguém.</div>';
-    else ch+='<div class="cmt-list">'+cms.slice(-60).map(function(c){ var cu=users.find(function(x){return x.id===c.by;}); return '<div class="cmt"><span class="av">'+avatarHTML(cu)+'</span><div class="cmt-b"><div class="cmt-h">'+esc((cu&&cu.name)||c.name||"Alguém")+' · <span>'+esc(fmtDT(c.at))+'</span></div><div class="cmt-x">'+renderCmtText(c)+'</div></div></div>'; }).join("")+'</div>';
+    else ch+='<div class="cmt-list">'+cms.slice(-60).map(function(c){ var cu=usersRoster.find(function(x){return x.id===c.by;}); return '<div class="cmt"><span class="av">'+avatarHTML(cu)+'</span><div class="cmt-b"><div class="cmt-h">'+esc((cu&&cu.name)||c.name||"Alguém")+' · <span>'+esc(fmtDT(c.at))+'</span></div><div class="cmt-x">'+renderCmtText(c)+'</div></div></div>'; }).join("")+'</div>';
     ch+='<div class="cmt-add"><div class="cmt-ac" id="cmtAc"></div><input id="cmtInput" placeholder="Escrever um comentário… use @ pra mencionar" maxlength="1200" autocomplete="off"><button type="button" id="cmtSend"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l7 6-7 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></div>';
     $("taskDetailBody").insertAdjacentHTML("beforeend", ch);
     var cs=$("cmtSend"), ci=$("cmtInput"), ac=$("cmtAc");
@@ -15148,14 +15211,14 @@ function openNotifs(){
       }
       else if(x.kind==="assigned"){ ic='<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'; col="var(--c-design)"; h="Te atribuíram uma tarefa nova"; body=ct; }
       else if(x.kind==="comment"){
-        var cu=users.find(function(u){return u.id===(x.cmt&&x.cmt.by);});
+        var cu=usersRoster.find(function(u){return u.id===(x.cmt&&x.cmt.by);});
         var who=(cu&&cu.name)||(x.cmt&&x.cmt.name)||"Alguém";
         var tx=(x.cmt&&x.cmt.text)||""; var trim=tx.slice(0,90)+(tx.length>90?"…":"");
         ic='<path d="M5 5h14v11H9l-4 4V5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>';
         col="var(--c-copy)"; h=esc(who)+" comentou"; body=ct+' · "'+esc(trim)+'"';
       }
       else if(x.kind==="mention"){
-        var cuM=users.find(function(u){return u.id===(x.cmt&&x.cmt.by);});
+        var cuM=usersRoster.find(function(u){return u.id===(x.cmt&&x.cmt.by);});
         var whoM=(cuM&&cuM.name)||(x.cmt&&x.cmt.name)||"Alguém";
         var txM=(x.cmt&&x.cmt.text)||""; var trimM=txM.slice(0,90)+(txM.length>90?"…":"");
         ic='<circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M16 8v6a3 3 0 0 0 6 0v-2a10 10 0 1 0-4 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
@@ -15563,7 +15626,7 @@ $("delBtn").onclick=async()=>{
 };
 function openDetail(id){
   const e=events.find(x=>x.id===id);if(!e)return;detailId=id;
-  const t=TYPES[e.type]||TYPES.outro,u=users.find(x=>x.id===e.by);
+  const t=TYPES[e.type]||TYPES.outro,u=usersRoster.find(x=>x.id===e.by);
   const own=evOwner(e), oc=own?userColor(own):t.color, si=evStatus(e);
   const di=(svg,l,v)=>v?'<div class="dti"><div class="ic2"><svg viewBox="0 0 24 24" fill="none">'+svg+'</svg></div><div class="tx"><div class="l">'+l+'</div><div class="v">'+esc(v)+'</div></div></div>':"";
   const diH=(svg,l,v)=>v?'<div class="dti"><div class="ic2"><svg viewBox="0 0 24 24" fill="none">'+svg+'</svg></div><div class="tx"><div class="l">'+l+'</div><div class="v">'+v+'</div></div></div>':"";
@@ -15574,7 +15637,7 @@ function openDetail(id){
     ? '<span style="display:flex;align-items:center;gap:9px"><span style="width:30px;height:30px;border-radius:50%;overflow:hidden;border:2px solid '+oc+';flex-shrink:0;display:inline-block">'+avatarHTML(own)+'</span><b>'+esc(own.name)+'</b><span style="width:11px;height:11px;border-radius:50%;background:'+oc+';display:inline-block"></span></span>'
     : (e.owner?esc(e.owner):"");
   const siColor = si?(si.late?"var(--c-rev)":(si.kind==="run"?"var(--c-foto)":"var(--c-trafego)")):"";
-  const dByU = e.doneBy?users.find(x=>x.id===e.doneBy):null;
+  const dByU = e.doneBy?usersRoster.find(x=>x.id===e.doneBy):null;
   $("detailBody").innerHTML='<span class="dt-type" style="background:'+RGBA[t.color]+';color:'+t.color+'"><span style="width:7px;height:7px;border-radius:50%;background:'+t.color+';display:inline-block"></span>'+t.label+'</span><h2 class="dtt">'+(esc(e.title)||esc(e.client)||"Sem título")+'</h2><div class="dt-list">'+
     di('<circle cx="12" cy="8" r="3.5" stroke="currentColor" stroke-width="2"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',"Cliente / Empresa",e.client)+
     diH('<rect x="8" y="2" width="8" height="5" rx="1.5" stroke="currentColor" stroke-width="2"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke="currentColor" stroke-width="2"/>',"Responsável",ownHtml)+
