@@ -149,8 +149,9 @@ jobs:
           set -eu
           npm install -g firebase-tools >/dev/null 2>&1
           firebase functions:list --project "$GCP_PROJECT" | tee before.txt || true
-          # baseline preciso (gen2) p/ o delta do pos-deploy; read-only; nunca le valor de segredo
-          gcloud functions list --gen2 --project "$GCP_PROJECT" --format='value(name)' 2>/dev/null | sed 's#.*/##' | sort -u > names-before.txt || true
+          # baseline preciso p/ o delta do pos-deploy; read-only; nunca le valor de segredo.
+          # (gcloud functions list NAO aceita --gen2; usa --regions p/ filtrar a regiao.)
+          gcloud functions list --regions=us-central1 --project "$GCP_PROJECT" --format='value(name)' 2>/dev/null | sed 's#.*/##' | sort -u > names-before.txt || true
           echo "syncUsersPublic ANTES: $(grep -qx syncUsersPublic names-before.txt && echo presente || echo ausente)"
 
       - name: functions/.env SEM flags (somente RESET_EMAIL_*; trigger nao usa secret)
@@ -198,33 +199,24 @@ jobs:
             echo "DRY-RUN=true — nenhum deploy executado. Alvo planejado: $TARGET"
           fi
 
-      - name: Validacao POS-deploy (trigger/Eventarc; somente se dry_run=false)
-        if: ${{ github.event.inputs.dry_run == 'false' }}
+      - name: Postcheck/Verify (trigger/Eventarc; describe INDEPENDENTE do baseline)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
           set -eu
           # Read-only por metadados; nunca le valor de segredo; nunca escreve docs.
-          firebase functions:list --project "$GCP_PROJECT" | tee after.txt
-          gcloud functions list --gen2 --project "$GCP_PROJECT" --format='value(name)' 2>/dev/null | sed 's#.*/##' | sort -u > names-after.txt
+          # Roda em AMBOS os modos:
+          #   dry_run=false => postcheck pos-deploy (exige presenca + delta == so syncUsersPublic);
+          #   dry_run=true  => verificacao READ-ONLY da trigger ja publicada (describe), SEM deploy.
+          # (gcloud functions list NAO aceita --gen2; usa --regions. O describe roda INDEPENDENTE
+          #  do baseline/delta — era ali que o bug do --gen2 impedia a validacao do eventTrigger.)
+          firebase functions:list --project "$GCP_PROJECT" | tee after.txt || true
+          gcloud functions list --regions=us-central1 --project "$GCP_PROJECT" --format='value(name)' 2>/dev/null | sed 's#.*/##' | sort -u > names-after.txt || true
 
-          # baseline obrigatorio p/ delta confiavel (fail-closed)
-          if [ ! -s names-before.txt ]; then
-            echo "::error:: baseline names-before vazio — nao da p/ validar delta com seguranca"; exit 1
-          fi
+          PRESENT=0; grep -qx syncUsersPublic names-after.txt && PRESENT=1
+          echo "syncUsersPublic presente=$PRESENT (DRY_RUN=$DRY_RUN)"
 
-          # 1) syncUsersPublic presente apos o deploy
-          if ! grep -qx syncUsersPublic names-after.txt; then
-            echo "::error:: syncUsersPublic ausente apos deploy"; exit 1
-          fi
-
-          # 2) delta de Function NOVA == somente syncUsersPublic
-          NEW="$(comm -13 names-before.txt names-after.txt || true)"
-          EXTRA="$(printf '%s\n' "$NEW" | sed '/^$/d' | grep -vx 'syncUsersPublic' || true)"
-          if [ -n "$EXTRA" ]; then
-            echo "::error:: deploy publicou Function(s) nova(s) inesperada(s): $EXTRA"; exit 1
-          fi
-          echo "Delta novo OK: [$(printf '%s' "$NEW" | tr '\n' ' ')]"
-
-          # 3) helpers _-prefix NUNCA podem aparecer como CloudFunctions
+          # helpers _-prefix NUNCA podem aparecer como CloudFunctions (sempre)
           for H in _handleSyncUsersPublic _projectUserPublicOut _handleGetUserContact _authVerifySessionToken; do
             if grep -qx "$H" names-after.txt; then
               echo "::error:: helper publicado indevidamente como Function: $H"; exit 1
@@ -232,23 +224,45 @@ jobs:
           done
           echo "Helpers _-prefix ausentes (OK)."
 
-          # 4) describe: gen2 + ACTIVE + eventTrigger Firestore document users/{uid}; sem secrets; nao HTTP
-          gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" > desc.txt 2>/dev/null \
-            || { echo "::error:: gcloud describe falhou"; exit 1; }
-          ENVN="$(gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(environment)' 2>/dev/null || true)"
-          ST="$(gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(state)' 2>/dev/null || true)"
-          ET="$(gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(eventTrigger.eventType)' 2>/dev/null || true)"
-          SEC="$(gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.secretEnvironmentVariables)' 2>/dev/null || true)"
-          echo "environment=$ENVN state=$ST eventType=$ET"
-          [ "$ENVN" = "GEN_2" ] || { echo "::error:: nao e gen2 (environment=$ENVN)"; exit 1; }
-          [ "$ST" = "ACTIVE" ] || { echo "::error:: state != ACTIVE ($ST)"; exit 1; }
-          [ -n "$ET" ] || { echo "::error:: eventTrigger ausente (parece HTTP function)"; exit 1; }
-          [ "$ET" = "google.cloud.firestore.document.v1.written" ] || { echo "::error:: eventType inesperado ($ET)"; exit 1; }
-          grep -q 'users/{uid}' desc.txt || { echo "::error:: document filter != users/{uid}"; exit 1; }
-          grep -q '(default)' desc.txt || echo "::warning:: database (default) nao confirmado no describe"
-          if [ -n "$SEC" ]; then echo "::error:: syncUsersPublic tem secrets vinculados ($SEC) — esperado nenhum"; exit 1; fi
+          # delta before/after: SO apos deploy real (fail-closed se baseline vazio)
+          if [ "$DRY_RUN" = "false" ]; then
+            if ! grep -qx syncUsersPublic names-after.txt; then
+              echo "::error:: syncUsersPublic ausente apos deploy"; exit 1
+            fi
+            if [ ! -s names-before.txt ]; then
+              echo "::error:: baseline names-before vazio — nao da p/ validar delta com seguranca"; exit 1
+            fi
+            NEW="$(comm -13 names-before.txt names-after.txt || true)"
+            EXTRA="$(printf '%s\n' "$NEW" | sed '/^$/d' | grep -vx 'syncUsersPublic' || true)"
+            if [ -n "$EXTRA" ]; then
+              echo "::error:: deploy publicou Function(s) nova(s) inesperada(s): $EXTRA"; exit 1
+            fi
+            echo "Delta novo OK: [$(printf '%s' "$NEW" | tr '\n' ' ')]"
+          fi
 
-          echo "POS-deploy OK: gen2 ACTIVE; eventTrigger Firestore document users/{uid} (written); sem secrets; nao e HTTP function; delta=so syncUsersPublic; sem Hosting/Rules/Firestore deploy; sem backfill (deploy publica a Function e NAO escreve docs; usersPublic so sera populado por write FUTURO em users/{uid})."
+          # DESCRIBE: roda SEMPRE que a Function existe — INDEPENDENTE do baseline/delta.
+          if [ "$PRESENT" = "1" ]; then
+            gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" > desc.txt 2>/dev/null \
+              || { echo "::error:: gcloud describe falhou"; exit 1; }
+            ENVN="$(gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(environment)' 2>/dev/null || true)"
+            ST="$(gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(state)' 2>/dev/null || true)"
+            ET="$(gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(eventTrigger.eventType)' 2>/dev/null || true)"
+            SEC="$(gcloud functions describe syncUsersPublic --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.secretEnvironmentVariables)' 2>/dev/null || true)"
+            echo "environment=$ENVN state=$ST eventType=$ET"
+            [ "$ENVN" = "GEN_2" ] || { echo "::error:: nao e gen2 (environment=$ENVN)"; exit 1; }
+            [ "$ST" = "ACTIVE" ] || { echo "::error:: state != ACTIVE ($ST)"; exit 1; }
+            [ -n "$ET" ] || { echo "::error:: eventTrigger ausente (parece HTTP function)"; exit 1; }
+            [ "$ET" = "google.cloud.firestore.document.v1.written" ] || { echo "::error:: eventType inesperado ($ET)"; exit 1; }
+            grep -q 'users/{uid}' desc.txt || { echo "::error:: document filter != users/{uid}"; exit 1; }
+            grep -q '(default)' desc.txt || echo "::warning:: database (default) nao confirmado no describe"
+            if grep -qiE 'httpsTrigger' desc.txt; then echo "::error:: httpsTrigger presente (Function HTTP)"; exit 1; fi
+            if [ -n "$SEC" ]; then echo "::error:: syncUsersPublic tem secrets vinculados ($SEC) — esperado nenhum"; exit 1; fi
+            echo "VERIFY OK: gen2 ACTIVE; eventTrigger Firestore document users/{uid} (written); database (default); nao e HTTP function (sem httpsTrigger); sem secrets vinculados; helpers nao publicados."
+          elif [ "$DRY_RUN" = "false" ]; then
+            echo "::error:: syncUsersPublic ausente apos deploy — describe nao pode validar"; exit 1
+          else
+            echo "DRY-RUN verify: syncUsersPublic ainda nao publicada — describe pulado (pre-deploy)."
+          fi
 
       - name: Limpeza (service account + .env temporario + artefatos)
         if: always()
