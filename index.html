@@ -5201,6 +5201,39 @@ async function loginUserServerSide(identifier, password){
   }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; sem PII/segredo */
 }
 
+/* ============================================================================
+   F3.3.21-B3.1 — MIGRAÇÃO users-read (DORMENTE; flag OFF por padrão; canário-first).
+   Helpers para ler dados próprios/contato via Functions (getUserSelf/getUserContact)
+   em vez do doc cru de users. NÃO removem onSnapshot("users")/verifyPw/fallback nesta
+   fase — só ficam disponíveis para a migração futura. NUNCA logam token/senha; usam a
+   sessão server-side já armazenada. Endpoints ativos só após deploy futuro.
+   ============================================================================ */
+const AUTH_SELF_URL_DEFAULT = "https://getuserself-de36pi7vza-uc.a.run.app";       /* gen2 us-central1; ATIVO só após deploy (fase futura) */
+const AUTH_CONTACT_URL_DEFAULT = "https://getusercontact-de36pi7vza-uc.a.run.app"; /* já deployado (Slice 2) */
+function usersReadHardeningEnabled(){ try{ return lsGet("users_read_hardening")==="on"; }catch(_){ return false; } }
+function authSelfUrl(){ try{ const o=lsGet("auth_self_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_SELF_URL_DEFAULT; }
+function authContactUrl(){ try{ const o=lsGet("auth_contact_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_CONTACT_URL_DEFAULT; }
+/* GET getUserSelf (perfil próprio seguro). Usa a sessão server-side; NUNCA loga o token. */
+async function getUserSelfClient(){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"no_session" };
+    const res=await fetch(authSelfUrl(), { method:"GET", headers:{ "Authorization":"Bearer "+s.token } });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"self_failed" };
+    return { ok:true, self:(data.self||null) };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; sem PII/segredo */
+}
+/* GET getUserContact (phone/email seguro; self-ou-admin). Usa a sessão; NUNCA loga o token. */
+async function getUserContactClient(uid){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"no_session" };
+    const res=await fetch(authContactUrl()+"?uid="+encodeURIComponent(String(uid||"")), { method:"GET", headers:{ "Authorization":"Bearer "+s.token } });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"contact_failed" };
+    return { ok:true, contact:(data.contact||null) };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; sem PII/segredo */
+}
+
 function fbAvatar(n){const i=(n||"?").trim().charAt(0).toUpperCase()||"?";
   return `<div style="width:100%;height:100%;background:var(--surface-2);display:grid;place-items:center;font-weight:800;color:var(--ink-soft);font-size:15px">${i}</div>`;}
 function safePhoto(p){

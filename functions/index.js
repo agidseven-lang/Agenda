@@ -1395,6 +1395,72 @@ exports.getUserContact = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us
 exports._handleGetUserContact = handleGetUserContact;
 
 /* ============================================================================
+   F3.3.21-B3.1 — getUserSelf (leitura AUTENTICADA do PROPRIO usuario).
+   ----------------------------------------------------------------------------
+   - Session-gated (authVerifySessionToken). Le SOMENTE users/<session.uid> (nunca a
+     colecao; nunca outro uid). NUNCA retorna pass/salt/hash/fcmTokens/fcmTokenMeta/
+     phone/email (contato segue via getUserContact). Retorna campos de exibicao +
+     preferencia + CONTADORES seguros (hasFcmToken/fcmTokensCount) — nunca o token.
+   - onRequest (NAO usa request.auth.uid; uid vem SO do token de sessao verificado).
+     Rate-limit IN-MEMORY por session.uid + IP. Logs sem token/PII (uid mascarado).
+   - DORMENTE sem AUTH_SESSION_SECRET => 401 (via authVerifySessionToken). ADITIVO/
+     INERTE: ainda NAO consumido pela UI como fonte unica; sem deploy nesta fase.
+   ============================================================================ */
+async function handleGetUserSelf(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "GET" && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  // Autenticacao de SESSAO estrita (assinatura + exp + scope=session via AUTH_SESSION_SECRET).
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "invalid_session" } };
+  // Rate-limit por requester (uid da sessao) + IP. Chaves namespaced (isoladas dos outros endpoints).
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["s:" + auth.uid].concat(ip ? ["si:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  // Le SOMENTE o proprio doc (auth.uid); nunca a colecao, nunca outro uid.
+  let snap;
+  try { snap = await notifDb().collection("users").doc(auth.uid).get(); }
+  catch (e) {
+    try { logger.error("[getUserSelf] leitura falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "lookup_failed" } };
+  }
+  if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
+  const d = snap.data() || {};
+  rlKeys.forEach((k) => notifRlClear(k));
+  const str = (v) => (typeof v === "string" ? v : "");
+  const fcm = Array.isArray(d.fcmTokens) ? d.fcmTokens.filter(Boolean) : [];
+  try { logger.info("[getUserSelf] ok", { uid: notifMaskUid(auth.uid), admin: auth.admin === true }); } catch (_) {}
+  // Projecao SEGURA do PROPRIO usuario: exibicao + preferencia + contadores. NUNCA pass/salt/fcmTokens/phone/email.
+  return { status: 200, json: { ok: true, uid: auth.uid, self: {
+    id: String(auth.uid),
+    name: str(d.name), role: str(d.role), admin: d.admin === true, status: str(d.status),
+    photo: str(d.photo), color: str(d.color),
+    reminderMinutes: (typeof d.reminderMinutes === "number" ? d.reminderMinutes : null),
+    hasFcmToken: fcm.length > 0, fcmTokensCount: fcm.length,
+  } } };
+}
+
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE: sem AUTH_SESSION_SECRET
+// => sessao invalida (401 via authVerifySessionToken). NAO deployado nesta fase; sem UI.
+exports.getUserSelf = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleGetUserSelf({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[getUserSelf] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
+exports._handleGetUserSelf = handleGetUserSelf;
+
+/* ============================================================================
    F3.3.20-B1.7-E — SLICE 2: projecao publica segura (projectUserPublicOut).
    ----------------------------------------------------------------------------
    - Helper PURO de projeccao para a futura colecao usersPublic: allowlist EXPLICITA
