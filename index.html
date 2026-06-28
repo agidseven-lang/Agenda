@@ -5234,6 +5234,56 @@ async function getUserContactClient(uid){
   }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; sem PII/segredo */
 }
 
+/* ============================================================================
+   F3.3.21-B3.8 — Integração client-side FLAG-GATED de getUserSelf (DORMENTE).
+   Quando users_read_hardening==="on" E houver sessão server-side, hidrata o
+   PRÓPRIO usuário (me) via getUserSelfClient, normalizado por ALLOWLIST PII-free.
+   Com a flag OFF (padrão) é NO-OP: nenhuma chamada; comportamento atual intacto
+   (onSnapshot("users")/verifyPw/fallback seguem como fonte). Erros caem em
+   fallback sem quebrar a UI. NUNCA loga token/senha/pass/salt/hash/fcmTokens/
+   phone/email. Não remove dependências antigas nesta fase.
+   ============================================================================ */
+let serverSelfCache = null; /* overlay seguro (PII-free) do próprio usuário; só popula com a flag ON */
+/* Normaliza a resposta de getUserSelf para uma ALLOWLIST de exibição PII-free.
+   Inclui SÓ campos seguros presentes; pass/salt/hash/fcmTokens/fcmTokenMeta/
+   phone/email/token/session/password ficam de fora por construção (allowlist). */
+function normalizeServerSelfUser(self){
+  if(!self || typeof self!=="object") return null;
+  const out={};
+  if(typeof self.id==="string" && self.id) out.id=self.id;
+  if(typeof self.name==="string") out.name=self.name;
+  if(typeof self.role==="string") out.role=self.role;
+  if(typeof self.status==="string") out.status=self.status;
+  if(typeof self.photo==="string") out.photo=self.photo;
+  if(typeof self.color==="string") out.color=self.color;
+  if(typeof self.admin==="boolean") out.admin=self.admin;
+  if(typeof self.reminderMinutes==="number") out.reminderMinutes=self.reminderMinutes;
+  if(typeof self.hasFcmToken==="boolean") out.hasFcmToken=self.hasFcmToken;
+  if(typeof self.fcmTokensCount==="number") out.fcmTokensCount=self.fcmTokensCount;
+  return out.id ? out : null; /* sem id seguro => descarta */
+}
+/* Hidratação FLAG-GATED do próprio usuário via getUserSelf. NO-OP com a flag OFF.
+   Só chama o endpoint se: flag ON + sessão server-side presente (ex.: não em logout).
+   Em sucesso, mescla SÓ a allowlist em me/users (mesmo id) e atualiza o overlay.
+   Qualquer erro => silencioso (mantém o fallback atual). Nunca loga token/PII. */
+async function hydrateSelfFromServerIfEnabled(){
+  try{
+    if(!usersReadHardeningEnabled()) return false;             /* flag OFF (padrão) => nenhuma chamada */
+    const s=authGetSession(); if(!s || !s.token) return false; /* sem sessão => não chama */
+    const r=await getUserSelfClient();
+    if(!r || r.ok!==true || !r.self) return false;             /* erro/sem self => mantém fallback */
+    const norm=normalizeServerSelfUser(r.self);
+    if(!norm) return false;
+    serverSelfCache=norm;                                      /* cache/overlay PII-free */
+    if(me && me.id && norm.id===me.id){                        /* overlay só no próprio usuário */
+      me=Object.assign({}, me, norm);
+      try{ const i=users.findIndex(u=>u && u.id===norm.id); if(i>=0) users[i]=Object.assign({}, users[i], norm); }catch(_){ }
+      try{ if(typeof route==="function") route(); }catch(_){ } /* reflete o overlay (canário) */
+    }
+    return true;
+  }catch(_){ return false; } /* nunca quebra a UI; sem log de token/PII */
+}
+
 function fbAvatar(n){const i=(n||"?").trim().charAt(0).toUpperCase()||"?";
   return `<div style="width:100%;height:100%;background:var(--surface-2);display:grid;place-items:center;font-weight:800;color:var(--ink-soft);font-size:15px">${i}</div>`;}
 function safePhoto(p){
@@ -6018,6 +6068,7 @@ $("doLogin").onclick=async()=>{
       if(sr.ok && sr.user && sr.user.id){
         authStoreSession(sr.session);
         me=sr.user; sessionId=sr.user.id; lsSet(SESSION_KEY,sr.user.id); route();
+        hydrateSelfFromServerIfEnabled(); /* F3.3.21-B3.8: overlay próprio via getUserSelf; NO-OP com users_read_hardening OFF */
         return;
       }
       if(sr.status===401){ showErr("E-mail/WhatsApp ou senha incorretos."); return; }
