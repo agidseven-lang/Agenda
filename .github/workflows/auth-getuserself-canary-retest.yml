@@ -1,0 +1,136 @@
+# =====================================================================
+# [manual] F3.3.21-B3.5A — QA gated: reteste CANARIO de getUserSelf.
+# Executa o runner endpoint-only scripts/worker-ops/f3321-b35a-auth-getuserself-canary.e2e.mjs
+# (de main) contra a Function HTTPS getUserSelf JA PUBLICADA. DOIS modos:
+#   dry_run=true (padrao): valida plano/inputs/guards/canario SEM nenhuma chamada externa
+#     (NAO chama loginUser, NAO chama getUserSelf, NAO toca Firestore, NAO faz login);
+#   dry_run=false (APPLY): emite token de sessao CANARIO via loginUser e chama getUserSelf
+#     com Bearer; exige 200 + projecao segura {id,name,role,admin,status,photo,color,
+#     reminderMinutes,hasFcmToken,fcmTokensCount}; proibe pass/salt/hash/fcmTokens/
+#     fcmTokenMeta/phone/email.
+# workflow_dispatch only; gate confirm_retest == RUN_GETUSERSELF_CANARY_RETEST.
+# NAO faz deploy (Functions/Hosting/Rules/Firestore/Worker). NAO toca usuario real.
+# Web Push inexistente (node). Segredos canarios (CANARY_*) nunca impressos; token
+# mascarado; artifacts/summary sanitizados. NAO executa gcloud secrets versions access.
+# =====================================================================
+name: "[manual] F3.3.21-B3.5A getUserSelf Canary Retest"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_retest:
+        description: "Type RUN_GETUSERSELF_CANARY_RETEST to run the getUserSelf canary retest"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = valida plano/inputs/guards SEM chamadas (read-only); false = reteste real (loginUser + getUserSelf canario)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      endpoint_url:
+        description: "URL HTTPS do getUserSelf"
+        required: true
+        default: "https://us-central1-agenda-id-seven.cloudfunctions.net/getUserSelf"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-getuserself-canary-retest
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  RETEST_OUT: "getuserself-canary-artifacts"
+
+jobs:
+  getuserself-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_retest (== RUN_GETUSERSELF_CANARY_RETEST)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_retest }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_GETUSERSELF_CANARY_RETEST" ]; then
+            echo "::error:: confirm_retest != RUN_GETUSERSELF_CANARY_RETEST — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_retest OK."
+
+      - name: Checkout (runner em main)
+        uses: actions/checkout@v4
+
+      - name: Confirmar presenca do runner + node --check
+        run: |
+          set -eu
+          R="scripts/worker-ops/f3321-b35a-auth-getuserself-canary.e2e.mjs"
+          test -f "$R" || { echo "::error:: runner f3321-b35a ausente"; exit 1; }
+          node --check "$R"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Metadata getUserSelf (describe read-only; SOMENTE no APPLY; best-effort; sem valor)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          # Metadata read-only OPCIONAL: confirma URI/HTTPS/regiao + binding AUTH_SESSION_SECRET
+          # (apenas o NOME do binding; NUNCA o valor). NAO usa gcloud secrets versions access.
+          # Se a SA nao estiver configurada, pula sem falhar (runner usa endpoint_url/default).
+          if [ -z "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ]; then
+            echo "SA ausente — metadata describe pulada (best-effort)."
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          S_URI="$(gcloud functions describe getUserSelf --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)"
+          L_URI="$(gcloud functions describe loginUser  --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)"
+          [ -n "$S_URI" ] || { echo "::error:: getUserSelf sem URI — NO-GO"; exit 1; }
+          case "$S_URI" in https://*) : ;; *) echo "::error:: getUserSelf URI nao https: $S_URI"; exit 1 ;; esac
+          SECRETS="$(gcloud functions describe getUserSelf --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.secretEnvironmentVariables.secret)' 2>/dev/null || true)"
+          if echo "$SECRETS" | grep -q 'AUTH_SESSION_SECRET'; then BIND=true; else BIND=false; fi
+          [ "$BIND" = "true" ] || { echo "::error:: binding AUTH_SESSION_SECRET ausente em getUserSelf — NO-GO"; exit 1; }
+          mkdir -p "$RETEST_OUT"
+          printf '{"getUserSelf":{"uri":"%s","secret_binding_auth_session_secret":%s},"loginUser":{"uri":"%s"},"region":"us-central1","trigger":"https"}\n' "$S_URI" "$BIND" "$L_URI" > "$RETEST_OUT/metadata.json"
+          echo "GETUSERSELF_URL=$S_URI" >> "$GITHUB_ENV"
+          [ -n "$L_URI" ] && echo "LOGINUSER_URL=$L_URI" >> "$GITHUB_ENV" || true
+          echo "Metadata OK (https; binding AUTH_SESSION_SECRET presente; valor nunca acessado)."
+
+      - name: Rodar reteste canario getUserSelf (dry-run seguro por padrao; Web Push inexistente)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          ENDPOINT_URL: ${{ github.event.inputs.endpoint_url }}
+          GETUSERSELF_URL: ${{ env.GETUSERSELF_URL }}
+          LOGINUSER_URL: ${{ env.LOGINUSER_URL }}
+          CANARY_UID: ${{ secrets.CANARY_UID }}
+          CANARY_IDENTIFIER: ${{ secrets.CANARY_IDENTIFIER }}
+          CANARY_PASSWORD: ${{ secrets.CANARY_PASSWORD }}
+        run: |
+          set -eu
+          node scripts/worker-ops/f3321-b35a-auth-getuserself-canary.e2e.mjs
+
+      - name: Upload artifacts seguros (summary sanitizado)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: getuserself-canary-retest
+          path: getuserself-canary-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Limpeza (service account temporario, se houver)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
