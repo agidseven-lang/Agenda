@@ -1,0 +1,153 @@
+# =====================================================================
+# [manual] F3.3.21-B3.16A — users-read MIGRATION UI Retest Canary.
+# Roda scripts/worker-ops/f3321-b316a-users-read-hardening-ui-canary-retest.mjs (em main)
+# contra https://agenda-id-seven.web.app. workflow_dispatch ONLY (sem push/PR/agendamento).
+# dry_run=true (default): SO fetch read-only do HTML + grep markers (login server-side +
+# app + integracao getUserSelf) + plano (sem login/endpoint/Firestore/navegador/Web Push).
+# dry_run=false: reteste REAL com Playwright, SOMENTE usuario CANARIO via secrets; Web Push
+# neutralizado E localStorage.auth_ss_login="on" + users_read_hardening="on" ANTES de
+# carregar; loginUser E getUserSelf exercitados SO pelo fluxo da UI (doLogin -> hydrate),
+# nunca por chamada direta. Guards: confirm_retest==RUN_USERS_READ_HARDENING_UI_RETEST;
+# staging_url fixo; CANARY_* exigidos no APPLY; CANARY_UID precisa parecer canario.
+# NAO faz deploy; NAO toca Functions/Rules/Firestore manual; NAO usa CLI de deploy de
+# nuvem; NAO acessa Secret Manager; NAO usa segredo de servidor; nunca imprime senha/token;
+# Web Push OFF. Secrets (CANARY_IDENTIFIER/CANARY_UID/CANARY_PASSWORD) so referenciados p/
+# execucao futura.
+# =====================================================================
+name: "AUTH users-read-hardening UI Retest Canary"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_retest:
+        description: "Digite RUN_USERS_READ_HARDENING_UI_RETEST para executar o reteste canario"
+        required: true
+        type: string
+      dry_run:
+        description: "true = valida sem login (read-only); false = reteste real canario"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      staging_url:
+        description: "URL do Hosting staging"
+        required: true
+        default: "https://agenda-id-seven.web.app"
+        type: string
+      auth_ss_login:
+        description: "Ligar a flag de login server-side no canario (true) ou nao (false)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      users_read_hardening:
+        description: "Ligar a flag users_read_hardening no canario (true) ou nao (false)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-users-read-hardening-ui-retest-canary
+  cancel-in-progress: false
+
+env:
+  EXPECTED_URL: "https://agenda-id-seven.web.app"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3321-b316a-users-read-hardening-ui-canary-retest.mjs"
+
+jobs:
+  ui-retest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard confirm_retest + staging_url
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_retest }}
+          SURL: ${{ github.event.inputs.staging_url }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_USERS_READ_HARDENING_UI_RETEST" ]; then
+            echo "::error:: confirm_retest != RUN_USERS_READ_HARDENING_UI_RETEST — abortando antes de tudo."; exit 1
+          fi
+          if [ "$SURL" != "$EXPECTED_URL" ]; then
+            echo "::error:: staging_url ($SURL) != $EXPECTED_URL"; exit 1
+          fi
+          echo "guards OK (dry_run=${{ github.event.inputs.dry_run }}; auth_ss_login=${{ github.event.inputs.auth_ss_login }}; users_read_hardening=${{ github.event.inputs.users_read_hardening }})"
+
+      - name: Guard APPLY (secrets canarios; SOMENTE se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          CID: ${{ secrets.CANARY_IDENTIFIER }}
+          CUID: ${{ secrets.CANARY_UID }}
+          CPW: ${{ secrets.CANARY_PASSWORD }}
+        run: |
+          set -eu
+          if [ -z "$CID" ] || [ -z "$CUID" ] || [ -z "$CPW" ]; then
+            echo "::error:: CANARY_IDENTIFIER/CANARY_UID/CANARY_PASSWORD ausentes (secrets)."; exit 1
+          fi
+          case "$CUID" in
+            *canary*|*canario*|*teste*|*test*|*qa*) echo "CANARY_UID parece canario — OK." ;;
+            *) echo "::error:: CANARY_UID nao parece canario — abortando (protecao usuario real)."; exit 1 ;;
+          esac
+          echo "secrets canarios presentes (valores NUNCA impressos)."
+
+      - name: Checkout (main; traz o runner)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Confirma runner presente
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: node --check do runner
+        run: node --check "$RUNNER_SCRIPT"
+
+      - name: Instalar Playwright + Chromium (SOMENTE se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          npm install --no-save --no-package-lock playwright >/dev/null 2>&1
+          npx --yes playwright install chromium >/dev/null 2>&1
+
+      - name: Executar reteste (dry-run read-only / apply canario)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          STAGING_URL: ${{ github.event.inputs.staging_url }}
+          CONFIRM_UI_RETEST: ${{ github.event.inputs.confirm_retest }}
+          AUTH_SS_LOGIN: ${{ github.event.inputs.auth_ss_login }}
+          USERS_READ_HARDENING: ${{ github.event.inputs.users_read_hardening }}
+          CANARY_IDENTIFIER: ${{ secrets.CANARY_IDENTIFIER }}
+          CANARY_UID: ${{ secrets.CANARY_UID }}
+          CANARY_PASSWORD: ${{ secrets.CANARY_PASSWORD }}
+          ARTIFACT_DIR: ${{ runner.temp }}/users-read-hardening-ui-retest-artifacts
+        run: |
+          set -eu
+          mkdir -p "$ARTIFACT_DIR"
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifacts (sanitizados)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: users-read-hardening-ui-retest-${{ github.run_id }}
+          path: ${{ runner.temp }}/users-read-hardening-ui-retest-artifacts/*
+          if-no-files-found: warn
+
+      - name: Limpeza
+        if: always()
+        run: rm -rf node_modules 2>/dev/null || true
