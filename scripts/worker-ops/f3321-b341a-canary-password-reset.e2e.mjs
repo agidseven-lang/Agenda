@@ -33,13 +33,17 @@ const ALLOW_APPLY      = lc("ALLOW_APPLY_RESET", "false") === "true";
 const MUST_CHANGE      = lc("MUST_CHANGE_PASSWORD", "true") === "true";
 const HOSTING_PUBLISH  = lc("HOSTING_PUBLISH", "false") === "true";
 const FCM_TOKEN_SERVER = lc("FCM_TOKEN_SERVER", "false") === "true";
+// Modo DIAGNOSTICO read-only (separado do APPLY): bloqueado por padrao; SO leitura.
+const DIAGNOSTIC_READ  = lc("DIAGNOSTIC_READ", "false") === "true";
+const ALLOW_DIAG_READ  = lc("ALLOW_DIAGNOSTIC_READ", "false") === "true";
+const CONFIRM_DIAG     = sv("CONFIRM_DIAGNOSTIC", "");
 // Secrets — fornecidos SO na fase APPLY autorizada; consumidos SO no caminho gated;
 // NUNCA impressos. Em DRY-RUN sao ignorados (apenas presenca booleana e reportada).
 const CANARY_NEW_PASSWORD  = sv("CANARY_NEW_PASSWORD", "");   // nunca impresso
 const SERVICE_ACCOUNT_JSON = sv("FIREBASE_SERVICE_ACCOUNT", ""); // segredo; nunca impresso
 const OUT = sv("RETEST_OUT", "canary-password-reset-artifacts");
 
-const EXPECTED = { email: "teste.webpush@idseven.com.br", confirm: "RESET_CANARY_PASSWORD" };
+const EXPECTED = { email: "teste.webpush@idseven.com.br", confirm: "RESET_CANARY_PASSWORD", confirmDiag: "DIAG_FIRESTORE_READ_ONLY", project: "agenda-id-seven" };
 const MIN_PW_LEN = 6; // mesma politica do app (confirmPasswordReset)
 
 const fails = [];
@@ -67,6 +71,16 @@ function matchUsersByEmailCI(users, targetLower) {
   }
   return out;
 }
+// Conclusao sanitizada do diagnostico (codigo; sem PII). Pura e testavel.
+function diagnosticConclusionCode({ readAttempted, readOk, saProjectMatchesExpected, usersCount, canaryCICount }) {
+  if (!readAttempted) return "DIAG_BLOCKED";
+  if (!readOk) return "FIRESTORE_READ_FAILED";
+  if (!saProjectMatchesExpected) return "SA_PROJECT_MISMATCH";
+  if (usersCount === 0) return "USERS_COLLECTION_EMPTY";
+  if (canaryCICount === 0) return "CANARY_NOT_FOUND_IN_USERS";
+  if (canaryCICount > 1) return "CANARY_DUPLICATE_MATCHES";
+  return "CANARY_FOUND_EXACTLY_ONE";
+}
 
 const summary = {
   phase: "F3.3.21-B3.41-CANARY-PASSWORD-RESET",
@@ -92,6 +106,16 @@ const summary = {
   // seguranca (por construcao; nada sensivel e impresso)
   noPasswordPrinted: true, noHashPrinted: true, noSaltPrinted: true, noSecretPrinted: true,
   otherUsersUntouched: true, noWebPush: true, noNotification: true, noDeploy: true, noHostingPublish: true,
+  // diagnostico read-only (sanitizado; sem PII/segredo): booleanos, contagens e codigo
+  diagnostic: false,
+  serviceAccountProjectPresent: false,
+  serviceAccountProjectMatchesExpected: false,
+  firestoreUsersReadAttempted: false,
+  firestoreUsersReadOk: false,
+  usersCollectionCount: null,
+  canaryCaseInsensitiveMatchCount: null,
+  canaryExactLowerMatchCount: null,
+  diagnosticConclusion: null,
 };
 
 function finish(go) {
@@ -105,6 +129,13 @@ function finish(go) {
   console.log("  target=" + summary.targetEmailMasked + " · targetIsCanary=" + summary.targetIsCanary + " · maxUsers=" + MAX_USERS);
   console.log("  newPasswordProvided=" + summary.newPasswordProvided + " · serviceAccountProvided=" + summary.serviceAccountProvided +
               " · noPasswordPrinted=true noHashPrinted=true noSaltPrinted=true noSecretPrinted=true noDeploy=true");
+  if (summary.diagnostic) {
+    console.log("  [diag] saProjectPresent=" + summary.serviceAccountProjectPresent +
+                " saProjectMatchesExpected=" + summary.serviceAccountProjectMatchesExpected +
+                " usersReadOk=" + summary.firestoreUsersReadOk + " usersCount=" + summary.usersCollectionCount +
+                " canaryCI=" + summary.canaryCaseInsensitiveMatchCount + " canaryExactLower=" + summary.canaryExactLowerMatchCount +
+                " conclusion=" + summary.diagnosticConclusion);
+  }
   console.log("============================================================");
   console.log("f3321-b341 canary password reset: " + summary.result);
   process.exit(go ? 0 : 1);
@@ -174,6 +205,55 @@ async function applyReset() {
   return true;
 }
 
+// ---- DIAGNOSTICO read-only: SOMENTE leitura. NUNCA escreve, NUNCA usa CANARY_NEW_PASSWORD,
+// NUNCA imprime segredo/PII (sem project_id real, client_email, private_key, doc id ou e-mail).
+// Reporta apenas booleanos, contagens e um codigo sanitizado. ----
+async function runDiagnostic() {
+  summary.mode = "DIAGNOSTIC";
+  summary.diagnostic = true;
+  if (CONFIRM_DIAG !== EXPECTED.confirmDiag) {
+    fail("confirm_diagnostic invalido — abortado");
+    summary.diagnosticConclusion = "DIAG_BLOCKED";
+    summary.result = "DIAG_BLOCKED";
+    return finish(false);
+  }
+  // project_id da service account: SO presenca + match booleano (valor real NUNCA impresso).
+  let saProjectId = "";
+  try { const c = JSON.parse(SERVICE_ACCOUNT_JSON || "{}"); saProjectId = (c && typeof c.project_id === "string") ? c.project_id : ""; }
+  catch (_) { saProjectId = ""; }
+  summary.serviceAccountProjectPresent = saProjectId.length > 0;
+  summary.serviceAccountProjectMatchesExpected = (saProjectId === EXPECTED.project);
+
+  // Leitura read-only da colecao users. firebase-admin importado tardiamente.
+  summary.firestoreUsersReadAttempted = true;
+  const readFail = () => { summary.firestoreUsersReadOk = false; summary.diagnosticConclusion = "FIRESTORE_READ_FAILED"; summary.result = "FIRESTORE_READ_FAILED"; return finish(false); };
+  let admin;
+  try { admin = (await import("firebase-admin")).default; } catch (_) { return readFail(); }
+  let cred;
+  try { cred = JSON.parse(SERVICE_ACCOUNT_JSON); } catch (_) { return readFail(); }
+  try { if (!admin.apps.length) admin.initializeApp({ credential: admin.credential.cert(cred) }); } catch (_) { return readFail(); }
+  let snap;
+  try { snap = await admin.firestore().collection("users").get(); } catch (_) { return readFail(); } // SO leitura
+  summary.firestoreUsersReadOk = true;
+
+  // SO o campo email em memoria; nunca impresso; sem id/nome/PII.
+  const users = [];
+  snap.forEach((doc) => { const d = (doc && typeof doc.data === "function") ? (doc.data() || {}) : {}; users.push({ email: d.email }); });
+  summary.usersCollectionCount = users.length;
+  summary.canaryCaseInsensitiveMatchCount = matchUsersByEmailCI(users, EXPECTED.email).length;
+  summary.canaryExactLowerMatchCount = users.filter((u) => String(u.email || "") === EXPECTED.email).length;
+
+  const code = diagnosticConclusionCode({
+    readAttempted: true, readOk: true,
+    saProjectMatchesExpected: summary.serviceAccountProjectMatchesExpected,
+    usersCount: summary.usersCollectionCount,
+    canaryCICount: summary.canaryCaseInsensitiveMatchCount,
+  });
+  summary.diagnosticConclusion = code;
+  summary.result = code;
+  return finish(code === "CANARY_FOUND_EXACTLY_ONE");
+}
+
 function runPrep() {
   summary.mode = "PREP";
   scopeGuards();
@@ -183,25 +263,30 @@ function runPrep() {
 }
 
 async function main() {
-  log("canary password reset (dry_run=" + DRY_RUN + "). APPLY NAO autorizado nesta fase.");
+  log("canary password reset (dry_run=" + DRY_RUN + ", diagnostic=" + DIAGNOSTIC_READ + ").");
   const applyRequested = (!DRY_RUN) && ALLOW_APPLY && (CONFIRM_RESET === EXPECTED.confirm);
-  if (!applyRequested) {
-    // DRY-RUN / PREP: nenhuma conexao, nenhuma escrita. (Inclui allow_apply_reset=true sem dry_run=false.)
-    return runPrep();
+  const diagRequested  = DIAGNOSTIC_READ && ALLOW_DIAG_READ; // confirm validado dentro de runDiagnostic
+  if (applyRequested) {
+    // ---- APPLY real: protegido por gate. ----
+    summary.mode = "APPLY";
+    scopeGuards();
+    if (fails.length > 0) { summary.result = "APPLY_BLOCKED"; return finish(false); }
+    summary.applyAuthorizedThisPhase = true;
+    const done = await applyReset();
+    if (!done) { summary.result = "APPLY_BLOCKED"; return finish(false); }
+    summary.result = "APPLY_DONE";
+    return finish(true);
   }
-  // ---- Abaixo: somente fase posterior autorizada. Mantido protegido por gate. ----
-  summary.mode = "APPLY";
-  scopeGuards();
-  if (fails.length > 0) { summary.result = "APPLY_BLOCKED"; return finish(false); }
-  summary.applyAuthorizedThisPhase = true;
-  const done = await applyReset();
-  if (!done) { summary.result = "APPLY_BLOCKED"; return finish(false); }
-  summary.result = "APPLY_DONE";
-  return finish(true);
+  if (diagRequested) {
+    // ---- DIAGNOSTICO read-only: SOMENTE leitura; nunca escreve. ----
+    return runDiagnostic();
+  }
+  // DRY-RUN / PREP: nenhuma conexao, nenhuma escrita.
+  return runPrep();
 }
 
 // Exporta o matcher para teste local (case-insensitive). Espelha o login do app.
-export { matchUsersByEmailCI };
+export { matchUsersByEmailCI, diagnosticConclusionCode };
 
 // Executa main() SOMENTE quando rodado diretamente (node runner.mjs). Quando importado
 // por um teste, main() NAO roda — permite testar matchUsersByEmailCI sem firebase-admin.
