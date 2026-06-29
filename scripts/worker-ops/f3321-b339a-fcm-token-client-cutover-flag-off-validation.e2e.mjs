@@ -64,7 +64,7 @@ const summary = {
   executed: false,
   fcmTokenServerExpectedOff: true,
   // segurança (por construção deste runner; nada real é chamado)
-  noEndpoint: true, noLogin: true, noFcmTokenCreated: true, noFirestoreWrite: true,
+  noEndpoint: true, noLogin: true, noFcmTokenCreated: true, noFirestoreReal: true, noFirestoreWrite: true,
   noRealUser: true, noSecretPrinted: true, noWebPush: true, noDeploy: true, noHostingPublish: true,
   endpointCallsBlocked: ENDPOINT_BLOCK, webPushNeutralized: WEBPUSH_NEUTRAL,
   firestoreBlocked: FIRESTORE_BLOCK, hostingPublish: HOSTING_PUBLISH,
@@ -200,7 +200,9 @@ async function runValidation() {
   catch (e) { fail("playwright indisponivel (fail-safe; nenhuma chamada real): " + (e && e.message)); return finish(); }
 
   const observed = {
-    registerEndpoint: false, removeEndpoint: false, firestoreReal: false,
+    registerEndpoint: false, removeEndpoint: false,
+    firestoreBlockedAttempt: false, firestoreRequestAborted: false,
+    firestoreRealEscaped: false, firestoreWriteEscaped: false,
     loginReal: false, fcmTokenReal: false, otherExternalBlocked: 0,
     notificationReq: false, swRegisterAttempt: false, getToken: false,
     serviceWorkerRealRegistered: false, notificationRealGranted: false,
@@ -215,7 +217,7 @@ async function runValidation() {
       let url = ""; try { url = route.request().url(); } catch (_) { url = ""; }
       if (/^(data:|blob:|about:)/i.test(url)) return route.continue();
       if (isDangerousHost(url)) {
-        if (/firestore\.googleapis\.com/i.test(url)) observed.firestoreReal = true;
+        if (/firestore\.googleapis\.com/i.test(url)) { observed.firestoreBlockedAttempt = true; observed.firestoreRequestAborted = true; }
         else if (/registerfcmtoken/i.test(url)) observed.registerEndpoint = true;
         else if (/removemyfcmtoken/i.test(url)) observed.removeEndpoint = true;
         else if (/loginuser|getuserself|identitytoolkit|securetoken/i.test(url)) observed.loginReal = true;
@@ -243,6 +245,15 @@ async function runValidation() {
 
     const page = await context.newPage();
     page.on("pageerror", () => {});
+    // Detector de ESCAPE real: uma request Firestore so produz 'response' se NAO foi abortada.
+    // Tentativa abortada por route.abort() nunca dispara 'response' => firestoreRealEscaped continua false.
+    page.on("response", (resp2) => {
+      let u = ""; try { u = resp2.url(); } catch (_) { u = ""; }
+      if (/firestore\.googleapis\.com/i.test(u)) {
+        observed.firestoreRealEscaped = true;                       // resposta real recebida = escapou do abort
+        if (/commit|write/i.test(u)) observed.firestoreWriteEscaped = true; // mutacao real escapada
+      }
+    });
     const resp = await page.goto(TARGET_URL, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => null);
     http = resp ? resp.status() : 0;
 
@@ -301,7 +312,13 @@ async function runValidation() {
     summary.noEndpointReal = observed.registerEndpoint === false && observed.removeEndpoint === false;
     summary.noLoginReal = observed.loginReal === false;
     summary.noFcmTokenCreated = observed.getToken === false && observed.fcmTokenReal === false;
-    summary.noFirestoreWrite = observed.firestoreReal === false;
+    // Firestore: distinguir TENTATIVA bloqueada/abortada (esperada, segura) de ESCAPE real/write real.
+    summary.firestoreBlockedAttempt = observed.firestoreBlockedAttempt;
+    summary.firestoreRequestAborted = observed.firestoreRequestAborted;
+    summary.firestoreRealEscaped = observed.firestoreRealEscaped;
+    summary.firestoreWriteEscaped = observed.firestoreWriteEscaped;
+    summary.noFirestoreReal = observed.firestoreRealEscaped === false;
+    summary.noFirestoreWrite = observed.firestoreRealEscaped === false && observed.firestoreWriteEscaped === false;
     summary.noWebPushReal = observed.serviceWorkerRealRegistered === false && observed.notificationRealGranted === false;
 
     ok("validacao: HTTP 200 no app live", http === 200);
@@ -310,7 +327,10 @@ async function runValidation() {
     ok("validacao: localStorage NAO forca fcm_token_server=on", res.lsVal !== "on");
     ok("validacao: registerFcmTokenClient em OFF retorna 'disabled' sem endpoint real", res.regErr === "disabled" && observed.registerEndpoint === false);
     ok("validacao: removeFcmTokenClient em OFF retorna 'disabled' sem endpoint real", res.remErr === "disabled" && observed.removeEndpoint === false);
-    ok("validacao: NENHUM Firestore real", observed.firestoreReal === false);
+    // Tentativa Firestore bloqueada/abortada e ESPERADA (protecao funcionando) e NAO reprova.
+    // Reprova somente se uma request Firestore ESCAPAR (resposta real) ou houver write real escapado.
+    ok("validacao: NENHUM Firestore real escapou (tentativa abortada e segura)", observed.firestoreRealEscaped === false);
+    ok("validacao: NENHUM Firestore write escapou", observed.firestoreWriteEscaped === false);
     ok("validacao: NENHUM login/identity real", observed.loginReal === false);
     ok("validacao: NENHUM token FCM real (getToken/registrations)", observed.getToken === false && observed.fcmTokenReal === false);
     ok("validacao: NENHUM service worker real", observed.serviceWorkerRealRegistered === false);
