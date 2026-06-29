@@ -1,0 +1,124 @@
+# =====================================================================
+# [manual] F3.3.21-B3.28A — QA gated: reteste CANARIO dos endpoints FCM.
+# Executa o runner endpoint-only scripts/worker-ops/f3321-b328a-auth-fcm-token-endpoint-canary.e2e.mjs
+# (de main) contra as Functions HTTPS registerFcmToken/removeMyFcmToken JA PUBLICADAS. DOIS modos:
+#   dry_run=true (padrao): valida plano/inputs/guards/canario/URLs SEM nenhuma chamada externa
+#     (NAO chama loginUser, NAO chama registerFcmToken, NAO chama removeMyFcmToken, NAO cria
+#      token FCM sintetico, NAO toca Firestore, NAO faz login);
+#   dry_run=false (APPLY): emite sessao CANARIA via loginUser, cria token FCM SINTETICO controlado
+#     (prefixo canario; mascarado; NUNCA real), chama registerFcmToken e depois removeMyFcmToken
+#     com Bearer; exige 200 em ambos + respostas SEGURAS (sem fcmTokens/fcmTokenMeta; sem token
+#     ecoado). O token sintetico e removido no MESMO APPLY (cleanupIncomplete se remove falhar).
+# workflow_dispatch only; gate confirm_retest == RUN_FCM_TOKEN_ENDPOINT_CANARY_RETEST.
+# NAO faz deploy (Functions/Hosting/Rules/Firestore/Worker). NAO toca usuario real. Web Push
+# inexistente (node). Secrets canarios (CANARY_*) nunca impressos; session token e token FCM
+# mascarados; artifacts/summary sanitizados. NAO executa gcloud secrets versions access.
+# =====================================================================
+name: "[manual] F3.3.21-B3.28A FCM Token Endpoint Canary Retest"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_retest:
+        description: "Type RUN_FCM_TOKEN_ENDPOINT_CANARY_RETEST to run the FCM token endpoint canary retest"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = valida plano/inputs/guards SEM chamadas (read-only); false = reteste real (loginUser + registerFcmToken + removeMyFcmToken canario)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      register_endpoint_url:
+        description: "URL HTTPS do registerFcmToken"
+        required: true
+        default: "https://us-central1-agenda-id-seven.cloudfunctions.net/registerFcmToken"
+        type: string
+      remove_endpoint_url:
+        description: "URL HTTPS do removeMyFcmToken"
+        required: true
+        default: "https://us-central1-agenda-id-seven.cloudfunctions.net/removeMyFcmToken"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-fcm-token-endpoint-canary-retest
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  RETEST_OUT: "fcm-token-endpoint-canary-artifacts"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3321-b328a-auth-fcm-token-endpoint-canary.e2e.mjs"
+
+jobs:
+  fcm-token-endpoint-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_retest (== RUN_FCM_TOKEN_ENDPOINT_CANARY_RETEST)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_retest }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_FCM_TOKEN_ENDPOINT_CANARY_RETEST" ]; then
+            echo "::error:: confirm_retest != RUN_FCM_TOKEN_ENDPOINT_CANARY_RETEST — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_retest OK (dry_run=${{ github.event.inputs.dry_run }})."
+
+      - name: Guard APPLY (secrets canarios; SOMENTE se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          CID: ${{ secrets.CANARY_IDENTIFIER }}
+          CUID: ${{ secrets.CANARY_UID }}
+          CPW: ${{ secrets.CANARY_PASSWORD }}
+        run: |
+          set -eu
+          if [ -z "$CID" ] || [ -z "$CUID" ] || [ -z "$CPW" ]; then
+            echo "::error:: CANARY_IDENTIFIER/CANARY_UID/CANARY_PASSWORD ausentes (secrets)."; exit 1
+          fi
+          case "$CUID" in
+            *canary*|*canario*|*teste*|*test*|*qa*) echo "CANARY_UID parece canario — OK." ;;
+            *) echo "::error:: CANARY_UID nao parece canario — abortando (protecao usuario real)."; exit 1 ;;
+          esac
+          echo "secrets canarios presentes (valores NUNCA impressos)."
+
+      - name: Checkout (runner em main)
+        uses: actions/checkout@v4
+
+      - name: Confirmar presenca do runner + node --check
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+          node --check "$RUNNER_SCRIPT"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Rodar reteste canario FCM (dry-run seguro por padrao; Web Push inexistente)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          REGISTER_ENDPOINT_URL: ${{ github.event.inputs.register_endpoint_url }}
+          REMOVE_ENDPOINT_URL: ${{ github.event.inputs.remove_endpoint_url }}
+          CANARY_UID: ${{ secrets.CANARY_UID }}
+          CANARY_IDENTIFIER: ${{ secrets.CANARY_IDENTIFIER }}
+          CANARY_PASSWORD: ${{ secrets.CANARY_PASSWORD }}
+        run: |
+          set -eu
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifacts seguros (summary sanitizado)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcm-token-endpoint-canary-retest
+          path: fcm-token-endpoint-canary-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
