@@ -19,6 +19,8 @@
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const lc = (v, d) => String(process.env[v] || d || "").toLowerCase();
 const sv = (v, d) => String(process.env[v] || d || "");
@@ -52,6 +54,19 @@ const present = (s) => (String(s || "").length > 0);
 function sha256Hex(s) { return crypto.createHash("sha256").update(s, "utf8").digest("hex"); }
 function hashPw(pw, salt) { return "s2:" + sha256Hex(`${salt}|${pw}`); }
 function randSalt() { return crypto.randomBytes(16).toString("hex"); }
+// Lookup case-insensitive ESPELHANDO o login do app (handleLoginUser): compara o campo
+// `email` de cada doc, normalizado para minusculas, com o alvo (ja minusculo). A query
+// exata where("email","==",...) do Firestore e case-sensitive e pode retornar 0 mesmo
+// com o usuario existente (capitalizacao diferente) — por isso casamos em memoria.
+// `users`: array de { id, email, ref? }. Retorna os objetos que casam (preserva ref).
+function matchUsersByEmailCI(users, targetLower) {
+  const out = [];
+  for (const u of (Array.isArray(users) ? users : [])) {
+    const email = (u && typeof u.email === "string" ? u.email : "").toLowerCase();
+    if (email !== "" && email === targetLower) out.push(u);
+  }
+  return out;
+}
 
 const summary = {
   phase: "F3.3.21-B3.41-CANARY-PASSWORD-RESET",
@@ -128,14 +143,23 @@ async function applyReset() {
   catch (e) { fail("init admin falhou (sem vazar valores): " + (e && e.name)); return false; }
 
   const db = admin.firestore();
-  // EXATAMENTE 1 doc com esse e-mail. limit(2) para detectar duplicidade => aborta se !=1.
+  // Le a colecao `users` e casa o e-mail em memoria (case-insensitive), IGUAL ao login
+  // (handleLoginUser). Robusto a capitalizacao do campo `email` no doc. EXATAMENTE 1
+  // match obrigatorio: aborta se 0 ou >1. Nenhum e-mail real e impresso (so contagem).
   let snap;
-  try { snap = await db.collection("users").where("email", "==", EXPECTED.email).limit(2).get(); }
+  try { snap = await db.collection("users").get(); }
   catch (e) { fail("consulta users falhou (sem vazar valores): " + (e && e.name)); return false; }
-  if (snap.size === 0) { fail("0 usuarios com o e-mail canario — abortado"); return false; }
-  if (snap.size > 1) { fail(">1 usuario com o e-mail canario — abortado (ambiguo)"); return false; }
+  const users = [];
+  snap.forEach((doc) => {
+    const d = (doc && typeof doc.data === "function") ? (doc.data() || {}) : {};
+    users.push({ id: doc.id, email: d.email, ref: doc.ref });
+  });
+  const matches = matchUsersByEmailCI(users, EXPECTED.email); // EXPECTED.email ja e minusculo
+  summary.canaryMatchCount = matches.length; // contagem sanitizada (numero; sem e-mails)
+  if (matches.length === 0) { fail("0 usuarios (case-insensitive) com o e-mail canario — abortado"); return false; }
+  if (matches.length > 1) { fail(">1 usuario (case-insensitive) com o e-mail canario — abortado (ambiguo)"); return false; }
 
-  const userRef = snap.docs[0].ref;
+  const userRef = matches[0].ref;
   // pass/salt no MESMO formato do app. Valores NUNCA impressos.
   const salt = randSalt();
   const pass = hashPw(CANARY_NEW_PASSWORD, salt);
@@ -176,4 +200,12 @@ async function main() {
   return finish(true);
 }
 
-main();
+// Exporta o matcher para teste local (case-insensitive). Espelha o login do app.
+export { matchUsersByEmailCI };
+
+// Executa main() SOMENTE quando rodado diretamente (node runner.mjs). Quando importado
+// por um teste, main() NAO roda — permite testar matchUsersByEmailCI sem firebase-admin.
+const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : "";
+if (invokedPath && invokedPath === fileURLToPath(import.meta.url)) {
+  main();
+}
