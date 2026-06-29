@@ -8,7 +8,7 @@
 ## 1. Por que a B3.40M foi NO-GO
 Os workflows webpush existentes eram apenas **scaffold/gate/prep** (validação
 estrutural/readiness). **Nenhum** fazia getToken real, login, envio FCM real ou
-cleanup. Além disso, a parte física depende do **operador no Samsung Galaxy A54**.
+cleanup. Além disso, a parte física depende do **operador no Samsung Galaxy Note 20 Ultra**.
 Este PR resolve a lacuna do mecanismo automatizável (envio único seguro) e
 documenta a parte humana.
 
@@ -16,10 +16,10 @@ documenta a parte humana.
 - `main`: `4111d45021ac7ae0702bb130ec7007c16d171c4f`
 - `app/main`: `92b71f21178f254258b12bb41e4d530af10cf82f`
 - `fcm_token_server`: **OFF** (não ativado) · `users` read: **ABERTO** (não fechado)
-- B3.40L: GO (8/8, Android 14, `REAL_RUN_PREP_READY`)
+- B3.40L: GO (8/8, `REAL_RUN_PREP_READY`) — **obtido para o dispositivo anterior (A54/Android 14); INVALIDADO pela troca de dispositivo (B3.40R). Readiness deve ser re-validada para o Galaxy Note 20 Ultra com a versão Android informada.**
 
 ## 3. Escopo travado (1 / 1)
-Usuário `teste.webpush@idseven.com.br` · dispositivo Samsung Galaxy A54 · Android 14 ·
+Usuário `teste.webpush@idseven.com.br` · dispositivo Samsung Galaxy Note 20 Ultra · Android (a informar; gate bloqueia em branco/placeholder) ·
 Chrome Android · mensagem `Teste técnico de notificação ID Seven.` · janela
 2026-06-29T16:00:00-03:00 (America/Fortaleza) · responsável Miercohévisk.
 

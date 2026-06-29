@@ -43,14 +43,14 @@ on:
         default: "teste.webpush@idseven.com.br"
         type: string
       canary_device:
-        description: "Dispositivo canario (fixo)"
+        description: "Dispositivo canario (fixo: Samsung Galaxy Note 20 Ultra)"
         required: true
-        default: "Samsung Galaxy A54"
+        default: "Samsung Galaxy Note 20 Ultra"
         type: string
       android_version:
-        description: "Versao do Android (fixo: Android 14)"
+        description: "Versao do Android (OBRIGATORIO; vazio/placeholder/sem digito => bloqueado)"
         required: true
-        default: "Android 14"
+        default: ""
         type: string
       canary_browser:
         description: "Navegador canario (fixo)"
@@ -148,8 +148,7 @@ env:
   EXPECTED_SOURCE_REF: "app/main"
   EXPECTED_TARGET_URL: "https://agenda-id-seven.web.app"
   EXPECTED_CANARY_USER: "teste.webpush@idseven.com.br"
-  EXPECTED_CANARY_DEVICE: "Samsung Galaxy A54"
-  EXPECTED_ANDROID: "Android 14"
+  EXPECTED_CANARY_DEVICE: "Samsung Galaxy Note 20 Ultra"
   RUNNER_SCRIPT: "scripts/worker-ops/f3321-b340m-webpush-real-send-once.e2e.mjs"
   RETEST_OUT: "webpush-real-send-once-artifacts"
 
@@ -189,8 +188,8 @@ jobs:
           if [ "$SRC" != "$EXPECTED_SOURCE_REF" ]; then echo "::error:: source_ref invalido"; exit 1; fi
           if [ "$URL" != "$EXPECTED_TARGET_URL" ]; then echo "::error:: target_url invalido"; exit 1; fi
           if [ "$USER_C" != "$EXPECTED_CANARY_USER" ]; then echo "::error:: canary_user diferente do canario"; exit 1; fi
-          if [ "$DEVICE_C" != "$EXPECTED_CANARY_DEVICE" ]; then echo "::error:: canary_device diferente"; exit 1; fi
-          if [ "$ANDROID_C" != "$EXPECTED_ANDROID" ]; then echo "::error:: android_version != Android 14"; exit 1; fi
+          if [ "$DEVICE_C" != "$EXPECTED_CANARY_DEVICE" ]; then echo "::error:: canary_device diferente (esperado Samsung Galaxy Note 20 Ultra)"; exit 1; fi
+          if [ -z "$ANDROID_C" ] || printf '%s' "$ANDROID_C" | grep -q '_' || ! printf '%s' "$ANDROID_C" | grep -qE '[0-9]'; then echo "::error:: android_version vazio/placeholder/sem digito — informe a versao real."; exit 1; fi
           if [ "$MAXT" != "1" ]; then echo "::error:: max_targets != 1 (base-wide proibido)"; exit 1; fi
           if [ "$MAXD" != "1" ]; then echo "::error:: max_devices != 1"; exit 1; fi
           # Execucao real futura exige o secret presente. Sem segredo => so PREP/dry-run.

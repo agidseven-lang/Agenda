@@ -50,8 +50,7 @@ const EXPECTED = {
   ref: "app/main",
   url: "https://agenda-id-seven.web.app",
   user: "teste.webpush@idseven.com.br",
-  device: "Samsung Galaxy A54",
-  android: "Android 14",
+  device: "Samsung Galaxy Note 20 Ultra",
   browser: "Chrome Android",
   confirm: "RUN_WEBPUSH_REAL_SEND_ONCE",
 };
@@ -63,6 +62,8 @@ const log  = (m) => console.log("[f3321-b340m] " + m);
 const maskEmail = (e) => { const s = String(e || ""); const i = s.indexOf("@"); return i > 0 ? ("***@" + s.slice(i + 1)) : (s ? "***" : ""); };
 // Tokens/segredos NUNCA sao impressos: reportamos apenas presenca booleana.
 const present = (s) => (String(s || "").length > 0);
+// android_version valida: nao vazia, com digito e sem placeholder "_".
+const androidVersionValid = (v) => { const s = String(v || "").trim(); return s.length > 0 && /\d/.test(s) && !/_/.test(s); };
 
 const summary = {
   phase: "F3.3.21-B3.40M-WEBPUSH-REAL-SEND-ONCE",
@@ -122,8 +123,8 @@ function scopeGuards() {
   ok("source_ref == app/main", SOURCE_REF === EXPECTED.ref);
   ok("target_url == web.app", TARGET_URL === EXPECTED.url);
   ok("canary_user == canario esperado", CANARY_USER === EXPECTED.user);
-  ok("canary_device == Samsung Galaxy A54", CANARY_DEVICE === EXPECTED.device);
-  ok("android_version == Android 14", ANDROID_VERSION === EXPECTED.android);
+  ok("canary_device == Samsung Galaxy Note 20 Ultra", CANARY_DEVICE === EXPECTED.device);
+  ok("android_version preenchida (nao vazia/placeholder)", androidVersionValid(ANDROID_VERSION));
   ok("canary_browser == Chrome Android", CANARY_BROWSER === EXPECTED.browser);
   ok("max_targets == 1", MAX_TARGETS === "1");
   ok("max_devices == 1", MAX_DEVICES === "1");
