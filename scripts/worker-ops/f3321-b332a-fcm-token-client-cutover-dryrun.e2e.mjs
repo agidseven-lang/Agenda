@@ -77,6 +77,22 @@ function extractIfElse(src, startIdx) {
   }
   return { trueBlock, elseBlock, hasElse };
 }
+// Brace-match: extrai a declaracao COMPLETA de `function <name>(...){...}`. Usa o mesmo
+// balanceamento de chaves de extractIfElse, suportando try/catch aninhado. NAO usar regex
+// nao-greedy (/function ...\{[\s\S]*?\}/), que pararia no 1o `}` (fechamento do try) e
+// truncaria o helper antes do catch -> "Missing catch or finally after try" no node:vm.
+function extractNamedFunction(src, name) {
+  const re = new RegExp("function\\s+" + name + "\\s*\\(");
+  const m = re.exec(src); if (!m) return null;
+  const open = src.indexOf("{", m.index); if (open < 0) return null;
+  let depth = 0;
+  for (let i = open; i < src.length; i++) {
+    const c = src[i];
+    if (c === "{") depth++;
+    else if (c === "}") { depth--; if (depth === 0) return src.slice(m.index, i + 1); }
+  }
+  return null;
+}
 
 function finish() {
   summary.go = fails.length === 0;
@@ -181,8 +197,8 @@ function main() {
   summary.dynamicSimulationAttempted = true;
   let microOn = null, microOff = null, sandboxTouchedNetwork = false;
   try {
-    const fnMatch = /function fcmTokenServerEnabled\(\)\{[\s\S]*?\}/.exec(html);
-    if (!fnMatch) throw new Error("helper nao extraido");
+    const fnSrc = extractNamedFunction(html, "fcmTokenServerEnabled");
+    if (!fnSrc) throw new Error("helper nao extraido");
     const guard = () => { sandboxTouchedNetwork = true; throw new Error("BLOQUEADO: chamada real proibida no dry-run"); };
     const evalHelper = (flagVal) => {
       const sandbox = {
@@ -194,7 +210,7 @@ function main() {
         console: { log() {}, warn() {}, error() {} },
       };
       vm.createContext(sandbox);
-      vm.runInContext(fnMatch[0] + "\n; globalThis.__r = fcmTokenServerEnabled();", sandbox, { timeout: 1000 });
+      vm.runInContext(fnSrc + "\n; globalThis.__r = fcmTokenServerEnabled();", sandbox, { timeout: 1000 });
       return sandbox.__r === true;
     };
     microOn = evalHelper("on");      // esperado: true
