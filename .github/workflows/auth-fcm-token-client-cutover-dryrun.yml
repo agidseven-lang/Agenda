@@ -1,0 +1,151 @@
+# =====================================================================
+# [manual] F3.3.21-B3.32A — DRY-RUN do client cutover FCM (fcm_token_server).
+# Roda scripts/worker-ops/f3321-b332a-fcm-token-client-cutover-dryrun.e2e.mjs (de main)
+# para validar o cutover ja mergeado em app/main:index.html SEM publicar Hosting, SEM
+# endpoint real, SEM Web Push real, SEM Firestore real, SEM login, SEM token FCM real.
+# Le o index.html de app/main via `git show origin/app/main:index.html` (read-only) e faz:
+#   CAMADA 1 (estatica): sintaxe + estrutura do if(fcmTokenServerEnabled()) nos call sites
+#     de registro/remocao (server ON usa os helpers; legacy tx.get/tx.set/arrayRemove no
+#     else; sem getUserSelf/loginUser/Firestore client no ramo ON; sem fallback silencioso;
+#     flag OFF por padrao; sem logs de token);
+#   CAMADA 2 (micro-sim segura via node:vm): avalia SO fcmTokenServerEnabled() com lsGet
+#     stub + fetch/Notification/PushManager/serviceWorker que LANCAM se usados.
+# workflow_dispatch ONLY; dry-run ONLY (dry_run!=true => recusa). SEM secrets, SEM gcloud,
+# SEM firebase deploy, SEM Hosting, SEM Firestore. Summary/artifact sanitizados.
+# =====================================================================
+name: "[manual] F3.3.21-B3.32A FCM Client Cutover Dry-Run"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_dryrun:
+        description: "Digite RUN_FCM_TOKEN_CLIENT_CUTOVER_DRYRUN para validar o cutover (dry-run)"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = valida (read-only/estatico + micro-sim). Esta fase e dry-run ONLY."
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      source_ref:
+        description: "Ref com o index.html do cutover (fixo: app/main)"
+        required: true
+        default: "app/main"
+        type: string
+      fcm_token_server:
+        description: "Valor simulado da flag fcm_token_server (true = caminho server ON)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      endpoint_calls_blocked:
+        description: "Bloquear chamadas de endpoint na simulacao (sempre true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      web_push_neutralized:
+        description: "Neutralizar Web Push na simulacao (sempre true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-fcm-token-client-cutover-dryrun
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_REF: "app/main"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3321-b332a-fcm-token-client-cutover-dryrun.e2e.mjs"
+  RETEST_OUT: "fcm-client-cutover-dryrun-artifacts"
+
+jobs:
+  fcm-client-cutover-dryrun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Guard confirm_dryrun (== RUN_FCM_TOKEN_CLIENT_CUTOVER_DRYRUN)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_dryrun }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_FCM_TOKEN_CLIENT_CUTOVER_DRYRUN" ]; then
+            echo "::error:: confirm_dryrun != RUN_FCM_TOKEN_CLIENT_CUTOVER_DRYRUN — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_dryrun OK."
+
+      - name: Guard dry-run ONLY (recusa dry_run=false) + source_ref fixo
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SRC: ${{ github.event.inputs.source_ref }}
+        run: |
+          set -eu
+          if [ "$DRY_RUN" != "true" ]; then
+            echo "::error:: esta fase e dry-run ONLY (dry_run deve ser true)."; exit 1
+          fi
+          if [ "$SRC" != "$EXPECTED_SOURCE_REF" ]; then
+            echo "::error:: source_ref ($SRC) != $EXPECTED_SOURCE_REF"; exit 1
+          fi
+          echo "dry-run ONLY OK; source_ref=$SRC"
+
+      - name: Checkout (main; traz o runner)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Confirma runner + node --check
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+          node --check "$RUNNER_SCRIPT"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Preparar index.html de app/main (read-only; SEM publicar Hosting)
+        env:
+          SRC: ${{ github.event.inputs.source_ref }}
+        run: |
+          set -eu
+          # Apenas LEITURA do blob de app/main (sem checkout do app, sem Hosting, sem deploy).
+          git fetch --no-tags --depth=1 origin "$SRC"
+          git show "origin/$SRC:index.html" > "$RUNNER_TEMP/source-index.html"
+          echo "index.html de $SRC preparado ($(wc -c < "$RUNNER_TEMP/source-index.html") bytes)."
+
+      - name: Rodar dry-run do cutover (estatico + micro-sim segura; sem navegador/rede/endpoint)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SOURCE_REF: ${{ github.event.inputs.source_ref }}
+          SOURCE_INDEX_PATH: ${{ runner.temp }}/source-index.html
+          FCM_TOKEN_SERVER: ${{ github.event.inputs.fcm_token_server }}
+          ENDPOINT_CALLS_BLOCKED: ${{ github.event.inputs.endpoint_calls_blocked }}
+          WEB_PUSH_NEUTRALIZED: ${{ github.event.inputs.web_push_neutralized }}
+        run: |
+          set -eu
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifact sanitizado (summary)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcm-client-cutover-dryrun
+          path: fcm-client-cutover-dryrun-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
