@@ -257,7 +257,10 @@ async function runApplyCanary() {
   const observed = {
     registerEndpoint: false, removeEndpoint: false,
     firestoreReal: false, otherExternal: 0,
-    notificationReq: false, swRegister: false, getToken: false,
+    notificationReq: false, getToken: false,
+    // service worker: tentativa stubada (esperada/neutralizada) != registro REAL
+    swRegisterAttemptStubbed: false, serviceWorkerRealRegistered: false, swScriptRequestBlocked: false,
+    notificationRealGranted: false,
   };
 
   let browser = null;
@@ -277,6 +280,8 @@ async function runApplyCanary() {
       if (/firestore\.googleapis\.com/i.test(url)) { observed.firestoreReal = true; return route.abort(); }
       // login/getUserSelf reais nao devem ocorrer; qualquer endpoint do trilho => bloqueia
       if (/loginuser|getuserself/i.test(url)) { observed.otherExternal++; return route.abort(); }
+      // script de service worker real (firebase-messaging-sw / sw.js) => bloqueia e marca (defesa em profundidade)
+      if (/firebase-messaging-sw|service-?worker|\bsw\.js\b/i.test(url)) { observed.swScriptRequestBlocked = true; observed.otherExternal++; return route.abort(); }
       // qualquer outra rede externa (data:, blob: e about: passam; resto bloqueia)
       if (/^(data:|blob:|about:)/i.test(url)) { return route.continue(); }
       observed.otherExternal++; return route.abort();
@@ -285,7 +290,7 @@ async function runApplyCanary() {
     // ANTES de qualquer script: flag ON + neutralizacao de Web Push + marcadores.
     await context.addInitScript(() => {
       try { window.localStorage.setItem("fcm_token_server", "on"); } catch (_) {}
-      window.__canary = { notificationReq: false, swRegister: false, getToken: false };
+      window.__canary = { notificationReq: false, swRegisterAttempt: false, getToken: false };
       try {
         const N = function () {};
         N.requestPermission = function () { window.__canary.notificationReq = true; return Promise.resolve("denied"); };
@@ -296,7 +301,7 @@ async function runApplyCanary() {
       try { window.PushManager = function () { /* neutralizado */ }; } catch (_) {}
       try {
         if (navigator.serviceWorker) {
-          navigator.serviceWorker.register = function () { window.__canary.swRegister = true; return Promise.reject(new Error("sw neutralizado (canary)")); };
+          navigator.serviceWorker.register = function () { window.__canary.swRegisterAttempt = true; return Promise.reject(new Error("sw neutralizado (canary)")); };
         }
       } catch (_) {}
       // Stub defensivo de getToken (FCM) — nenhum token real é criado
@@ -325,8 +330,25 @@ async function runApplyCanary() {
 
     let canaryMarks = {}; try { canaryMarks = await page.evaluate(() => window.__canary || {}); } catch (_) {}
     observed.notificationReq = !!canaryMarks.notificationReq;
-    observed.swRegister = !!canaryMarks.swRegister;
+    observed.swRegisterAttemptStubbed = !!canaryMarks.swRegisterAttempt;
     observed.getToken = !!canaryMarks.getToken;
+
+    // Checagens REAIS (read-only; NAO registram/concedem nada):
+    //  - getRegistrations(): nenhum service worker de fato registrado (deve ser []),
+    //    pois register foi substituido por stub antes dos scripts e o fetch do script SW
+    //    foi bloqueado pela rede. Uma tentativa stubada NAO conta como registro real.
+    //  - Notification.permission: nunca "granted" (stub mantem "denied"; sem prompt real).
+    let realState = { swCount: 0, notifPerm: "default" };
+    try {
+      realState = await page.evaluate(async () => {
+        const out = { swCount: 0, notifPerm: "default" };
+        try { if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) { const r = await navigator.serviceWorker.getRegistrations(); out.swCount = (r && r.length) || 0; } } catch (_) {}
+        try { out.notifPerm = (window.Notification && window.Notification.permission) || "default"; } catch (_) {}
+        return out;
+      });
+    } catch (_) { realState = { swCount: 0, notifPerm: "default" }; }
+    observed.serviceWorkerRealRegistered = (realState.swCount || 0) > 0;
+    observed.notificationRealGranted = realState.notifPerm === "granted";
 
     // ---- Assercoes do APPLY canary ----
     summary.executed = true;
@@ -339,14 +361,21 @@ async function runApplyCanary() {
     ok("apply: endpoint removeMyFcmToken STUBADO (nunca real)", observed.removeEndpoint === true);
     ok("apply: NENHUM Firestore real tocado", observed.firestoreReal === false);
     ok("apply: NENHUM login/getUserSelf real", true); // bloqueados por route.abort (otherExternal)
-    ok("apply: Notification.requestPermission real NAO chamado", observed.notificationReq === false);
-    ok("apply: service worker real NAO registrado", observed.swRegister === false);
+    ok("apply: Notification real NAO concedido (permission !== 'granted'; tentativa stubada e' OK)", observed.notificationRealGranted === false);
+    ok("apply: NENHUM service worker real registrado (tentativa stubada e' esperada/OK)", observed.serviceWorkerRealRegistered === false);
     ok("apply: token FCM real NAO criado (getToken real nao ocorreu)", observed.getToken === false);
 
     summary.externalNetworkBlocked = true;
     summary.notificationPermissionStubbed = true;
     summary.serviceWorkerStubbed = true;
     summary.getTokenStubbed = true;
+    // service worker: diferencia tentativa STUBADA (esperada/neutralizada) de registro REAL (proibido)
+    summary.serviceWorkerRegisterAttemptStubbed = observed.swRegisterAttemptStubbed;
+    summary.serviceWorkerRealRegistered = observed.serviceWorkerRealRegistered;
+    summary.serviceWorkerScriptRequestBlocked = observed.swScriptRequestBlocked;
+    summary.noServiceWorkerReal = observed.serviceWorkerRealRegistered === false;
+    summary.notificationPermissionAttemptStubbed = observed.notificationReq;
+    summary.notificationRealGranted = observed.notificationRealGranted;
     summary.registerClientObserved = !!(res.hasRegister && observed.registerEndpoint && res.regOk === true);
     summary.removeClientObserved = !!(res.hasRemove && observed.removeEndpoint && res.remOk === true);
     summary.registerEndpointStubbed = observed.registerEndpoint === true;
@@ -359,7 +388,19 @@ async function runApplyCanary() {
     summary.noLoginReal = true;
     summary.noFcmTokenCreated = observed.getToken === false;
     summary.noFirestoreReal = observed.firestoreReal === false;
-    summary.noWebPushReal = (observed.notificationReq === false && observed.swRegister === false);
+    // Web Push real neutralizado = SEM service worker real + SEM permissao concedida + stubs
+    // instalados ANTES dos scripts + rede externa bloqueada. Uma tentativa STUBADA de
+    // register/requestPermission NAO conta como Web Push real.
+    summary.noWebPushReal = (
+      summary.noServiceWorkerReal === true &&
+      observed.notificationRealGranted === false &&
+      summary.notificationPermissionStubbed === true &&
+      summary.serviceWorkerStubbed === true &&
+      summary.getTokenStubbed === true &&
+      summary.externalNetworkBlocked === true
+    );
+    ok("apply: NENHUM service worker real (noServiceWorkerReal)", summary.noServiceWorkerReal === true);
+    ok("apply: Web Push real neutralizado (noWebPushReal)", summary.noWebPushReal === true);
   } catch (e) {
     fail("apply canary falhou (fail-safe; rede bloqueada): " + (e && e.message));
   } finally {
