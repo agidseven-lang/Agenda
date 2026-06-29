@@ -33,8 +33,8 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  PINNED_APPMAIN_COMMIT: "9042fbdc22f026bec7f3f59e40527a45a4b37c92"
-  PINNED_INDEX_SHA256: "a8950208dd7fc1e4446fddbc2932247073c0b409d33868c8f971c63416786bad"
+  PINNED_APPMAIN_COMMIT: "92b71f21178f254258b12bb41e4d530af10cf82f"
+  PINNED_INDEX_SHA256: "6a1e1b08921654914693c44bd08aa8f0efb8d836e7942c2e48dc715ba9f72585"
 
 jobs:
   hosting-deploy:
@@ -95,6 +95,20 @@ jobs:
           fi
           echo "Markers OK; sem segredo embutido."
 
+      - name: Gate fcm_token_server OFF por padrao (fail-closed)
+        run: |
+          set -eu
+          # O caminho server do cutover FCM (registerFcmTokenClient/removeFcmTokenClient) so e
+          # usado quando fcm_token_server==="on". Confirma, ANTES de montar o pacote, que a flag
+          # e OFF por padrao (helper com catch=>false) e que o index NAO forca a flag ON embutida.
+          # Fail-closed: qualquer divergencia aborta antes de qualquer deploy.
+          grep -Fq 'function fcmTokenServerEnabled(){ try{ return lsGet("fcm_token_server")==="on"; }catch(_){ return false; } }' index.html \
+            || { echo "::error:: helper fcmTokenServerEnabled OFF-por-padrao ausente/divergente"; exit 1; }
+          if grep -Eq 'fcm_token_server"[[:space:]]*,[[:space:]]*"on"' index.html; then
+            echo "::error:: index.html define fcm_token_server=ON embutido (default ON proibido)"; exit 1
+          fi
+          echo "Gate fcm_token_server OFF por padrao OK (flag dormente; sem forcar ON)."
+
       - name: Montar .staging-public (allowlist FIXA de 6) + SHA-256
         run: |
           set -eu
@@ -110,7 +124,7 @@ jobs:
           fi
           check() { got="$(sha256sum "$1" | awk '{print $1}')"; if [ "$got" != "$2" ]; then echo "::error:: $1 sha256 $got != $2"; exit 1; fi; }
           ( cd .staging-public
-            check index.html                a8950208dd7fc1e4446fddbc2932247073c0b409d33868c8f971c63416786bad
+            check index.html                6a1e1b08921654914693c44bd08aa8f0efb8d836e7942c2e48dc715ba9f72585
             check manifest.json             5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
             check sw.js                     a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
             check firebase-messaging-sw.js  64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
