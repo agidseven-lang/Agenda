@@ -13,8 +13,8 @@
 - Nenhum token/segredo deve ser colado em chat/log/print. Trate o token FCM como sensível.
 
 ## Passos
-1. Pegar o **Samsung Galaxy A54** (dispositivo canário único).
-2. Confirmar **Android 14** em Configurações › Sobre o telefone.
+1. Pegar o **Samsung Galaxy Note 20 Ultra** (dispositivo canário único).
+2. Confirmar e **informar a versão do Android** (valor real, não placeholder) em Configurações › Sobre o telefone.
 3. Abrir o **Chrome Android**.
 4. Acessar **https://agenda-id-seven.web.app**.
 5. Fazer login **somente** com **teste.webpush@idseven.com.br** (usuário canário).
