@@ -1461,6 +1461,163 @@ exports.getUserSelf = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-ce
 exports._handleGetUserSelf = handleGetUserSelf;
 
 /* ============================================================================
+   F3.3.21-B3.20 — registerFcmToken / removeMyFcmToken (FCM token do PROPRIO usuario).
+   ----------------------------------------------------------------------------
+   - Base server-side para MIGRAR a gestao de fcmTokens/fcmTokenMeta que hoje o
+     cliente faz lendo/escrevendo users/<uid> direto (tx.get + tx.set + doc.get).
+     Session-gated (authVerifySessionToken): opera SOMENTE no proprio usuario
+     (session.uid); NUNCA outro uid. onRequest (NAO usa request.auth.uid).
+   - Admin SDK (notifDb) em TRANSACAO: le users/<uid>, faz dedup por deviceId
+     (espelha a logica atual do cliente) e grava fcmTokens + fcmTokenMeta. NUNCA
+     retorna fcmTokens/fcmTokenMeta; SO contadores seguros (saved/hasToken/count).
+   - NUNCA loga o FCM token nem o session token (token mascarado; uid mascarado).
+     NUNCA retorna/loga pass/salt/hash/phone/email.
+   - DORMENTE sem AUTH_SESSION_SECRET => 401 (via authVerifySessionToken). ADITIVO/
+     INERTE: NAO deployado, NAO integrado a UI como fonte; sem deploy nesta fase.
+   - Handlers PUROS testaveis: ctx.db injetavel (mock); sem Firestore real nos testes.
+   ============================================================================ */
+const FCM_TOKEN_MAX_LEN = 4096;
+const FCM_DEVICE_MAX_LEN = 200;
+const FCM_PLATFORM_MAX_LEN = 64;
+// Mascara para LOGS (nunca o token inteiro). Token FCM e longo (>100 chars).
+function authMaskFcmToken(t) {
+  const s = String(t || "");
+  if (!s) return "(vazio)";
+  return s.length >= 16 ? (s.slice(0, 6) + "…" + s.slice(-4)) : "***";
+}
+// Normaliza lista/meta atuais do doc (defensivo) — espelha o shape do cliente.
+function authFcmReadState(d) {
+  const src = (d && typeof d === "object" && !Array.isArray(d)) ? d : {};
+  const tokens = Array.isArray(src.fcmTokens) ? src.fcmTokens.filter((t) => typeof t === "string" && t) : [];
+  const meta = (src.fcmTokenMeta && typeof src.fcmTokenMeta === "object" && !Array.isArray(src.fcmTokenMeta)) ? src.fcmTokenMeta : {};
+  return { tokens: tokens, meta: meta };
+}
+// REGISTRA/atualiza o token FCM do PROPRIO usuario (dedup por deviceId). So escreve users/<uid>.
+async function handleRegisterFcmToken(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "invalid_session" } };
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["fcm:" + auth.uid].concat(ip ? ["fcmi:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const body = ctx.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { status: 400, json: { ok: false, error: "body_not_object" } };
+  const token = (typeof body.token === "string") ? body.token.trim() : "";
+  if (!token) return { status: 400, json: { ok: false, error: "missing_token" } };
+  if (token.length > FCM_TOKEN_MAX_LEN) return { status: 400, json: { ok: false, error: "oversized_token" } };
+  const deviceId = (typeof body.deviceId === "string") ? body.deviceId.slice(0, FCM_DEVICE_MAX_LEN) : "";
+  const platform = (typeof body.platform === "string") ? body.platform.slice(0, FCM_PLATFORM_MAX_LEN) : "";
+  const db = (ctx && ctx.db) || notifDb();
+  let count = 0;
+  try {
+    const ref = db.collection("users").doc(auth.uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap || snap.exists === false) { const e = new Error("not_found"); e.__code = 404; throw e; }
+      const st = authFcmReadState(typeof snap.data === "function" ? snap.data() : {});
+      const meta = Object.assign({}, st.meta);
+      // Dedup por deviceId: remove tokens antigos do MESMO aparelho (token != atual). Espelha o cliente.
+      let tokens = st.tokens.slice();
+      if (deviceId) {
+        tokens = tokens.filter((t) => !(meta[t] && meta[t].deviceId === deviceId && t !== token));
+        Object.keys(meta).forEach((t) => { if (meta[t] && meta[t].deviceId === deviceId && t !== token) delete meta[t]; });
+      }
+      if (tokens.indexOf(token) < 0) tokens.push(token);
+      const prevCreated = (meta[token] && typeof meta[token].createdAt === "number") ? meta[token].createdAt : now;
+      meta[token] = { token: token, deviceId: deviceId, platform: platform, createdAt: prevCreated, lastSeenAt: now };
+      tokens = tokens.filter(Boolean);
+      count = tokens.length;
+      tx.set(ref, { fcmTokens: tokens, fcmTokenMeta: meta }, { merge: true });
+    });
+  } catch (e) {
+    if (e && e.__code === 404) return { status: 404, json: { ok: false, error: "not_found" } };
+    try { logger.error("[registerFcmToken] gravacao falhou", { uid: notifMaskUid(auth.uid), token: authMaskFcmToken(token), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "save_failed" } };
+  }
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[registerFcmToken] ok", { uid: notifMaskUid(auth.uid), token: authMaskFcmToken(token), count: count }); } catch (_) {}
+  // Resposta SEGURA: NUNCA fcmTokens/fcmTokenMeta. So contadores.
+  return { status: 200, json: { ok: true, saved: true, tokenMasked: true, hasToken: count > 0, count: count } };
+}
+// REMOVE um token FCM do PROPRIO usuario. So escreve users/<uid>.
+async function handleRemoveFcmToken(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "invalid_session" } };
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["fcmr:" + auth.uid].concat(ip ? ["fcmri:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const body = ctx.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { status: 400, json: { ok: false, error: "body_not_object" } };
+  const token = (typeof body.token === "string") ? body.token.trim() : "";
+  if (!token) return { status: 400, json: { ok: false, error: "missing_token" } };
+  if (token.length > FCM_TOKEN_MAX_LEN) return { status: 400, json: { ok: false, error: "oversized_token" } };
+  const db = (ctx && ctx.db) || notifDb();
+  let count = 0, removed = false;
+  try {
+    const ref = db.collection("users").doc(auth.uid);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap || snap.exists === false) { const e = new Error("not_found"); e.__code = 404; throw e; }
+      const st = authFcmReadState(typeof snap.data === "function" ? snap.data() : {});
+      const meta = Object.assign({}, st.meta);
+      const before = st.tokens.length;
+      const tokens = st.tokens.filter((t) => t !== token);
+      if (meta[token]) delete meta[token];
+      removed = tokens.length !== before;
+      count = tokens.length;
+      tx.set(ref, { fcmTokens: tokens, fcmTokenMeta: meta }, { merge: true });
+    });
+  } catch (e) {
+    if (e && e.__code === 404) return { status: 404, json: { ok: false, error: "not_found" } };
+    try { logger.error("[removeMyFcmToken] gravacao falhou", { uid: notifMaskUid(auth.uid), token: authMaskFcmToken(token), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "save_failed" } };
+  }
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[removeMyFcmToken] ok", { uid: notifMaskUid(auth.uid), token: authMaskFcmToken(token), removed: removed, count: count }); } catch (_) {}
+  return { status: 200, json: { ok: true, saved: true, removed: removed, tokenMasked: true, hasToken: count > 0, count: count } };
+}
+// Wrappers HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE sem AUTH_SESSION_SECRET
+// => 401. NAO deployado nesta fase; NAO integrado a UI como fonte.
+exports.registerFcmToken = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleRegisterFcmToken({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[registerFcmToken] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+exports.removeMyFcmToken = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleRemoveFcmToken({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[removeMyFcmToken] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+// Exporta logica pura p/ o harness (NAO afeta runtime; endpoints dormentes/sem deploy).
+exports._handleRegisterFcmToken = handleRegisterFcmToken;
+exports._handleRemoveFcmToken = handleRemoveFcmToken;
+exports._authMaskFcmToken = authMaskFcmToken;
+exports._authFcmReadState = authFcmReadState;
+
+/* ============================================================================
    F3.3.20-B1.7-E — SLICE 2: projecao publica segura (projectUserPublicOut).
    ----------------------------------------------------------------------------
    - Helper PURO de projeccao para a futura colecao usersPublic: allowlist EXPLICITA

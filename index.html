@@ -5235,6 +5235,48 @@ async function getUserContactClient(uid){
 }
 
 /* ============================================================================
+   F3.3.21-B3.20 — FCM token server-side (DORMENTE; flag fcm_token_server OFF por padrão).
+   Helpers para REGISTRAR/REMOVER o token FCM do PRÓPRIO usuário via Functions
+   (registerFcmToken/removeMyFcmToken) em vez de tx.get/doc.get/update direto em
+   users. Flag SEPARADA de users_read_hardening (a migração de FCM tem canário e
+   rollback próprios). NÃO são chamados no fluxo vivo nesta fase: a gestão atual de
+   fcmTokens (transação client-side + Web Push) segue intacta. NUNCA logam o token
+   FCM nem o token de sessão. Endpoints ativos só após deploy futuro (B3.22/B3.23). */
+const AUTH_FCM_REGISTER_URL_DEFAULT = "https://registerfcmtoken-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; placeholder ATIVO só após deploy (fase futura) */
+const AUTH_FCM_REMOVE_URL_DEFAULT   = "https://removemyfcmtoken-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; placeholder ATIVO só após deploy (fase futura) */
+function fcmTokenServerEnabled(){ try{ return lsGet("fcm_token_server")==="on"; }catch(_){ return false; } }
+function authFcmRegisterUrl(){ try{ const o=lsGet("auth_fcm_register_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_FCM_REGISTER_URL_DEFAULT; }
+function authFcmRemoveUrl(){ try{ const o=lsGet("auth_fcm_remove_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_FCM_REMOVE_URL_DEFAULT; }
+/* POST registerFcmToken (token do próprio usuário; dedup por deviceId no servidor).
+   DORMENTE: só age com a flag ON E sessão server-side presente. NUNCA loga o token FCM
+   nem o de sessão. Resposta segura (sem fcmTokens/fcmTokenMeta): {ok,saved,count,hasToken}. */
+async function registerFcmTokenClient(token, deviceId, platform){
+  try{
+    if(!fcmTokenServerEnabled()) return { ok:false, error:"disabled" };   /* flag OFF (padrão) => nenhuma chamada */
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"no_session" };
+    const tok=String(token||""); if(!tok) return { ok:false, error:"missing_token" };
+    const res=await fetch(authFcmRegisterUrl(), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token },
+      body: JSON.stringify({ token: tok, deviceId: String(deviceId||""), platform: String(platform||"") }) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"register_failed" };
+    return { ok:true, saved:(data.saved===true), count:(typeof data.count==="number"?data.count:null), hasToken:(data.hasToken===true) };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; nunca loga token/sessão */
+}
+/* POST removeMyFcmToken (remove um token do próprio usuário). DORMENTE: flag ON + sessão. */
+async function removeFcmTokenClient(token){
+  try{
+    if(!fcmTokenServerEnabled()) return { ok:false, error:"disabled" };
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"no_session" };
+    const tok=String(token||""); if(!tok) return { ok:false, error:"missing_token" };
+    const res=await fetch(authFcmRemoveUrl(), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token },
+      body: JSON.stringify({ token: tok }) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"remove_failed" };
+    return { ok:true, saved:(data.saved===true), removed:(data.removed===true), count:(typeof data.count==="number"?data.count:null) };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; nunca loga token/sessão */
+}
+
+/* ============================================================================
    F3.3.21-B3.8 — Integração client-side FLAG-GATED de getUserSelf (DORMENTE).
    Quando users_read_hardening==="on" E houver sessão server-side, hidrata o
    PRÓPRIO usuário (me) via getUserSelfClient, normalizado por ALLOWLIST PII-free.
