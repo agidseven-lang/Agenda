@@ -1,0 +1,226 @@
+# =====================================================================
+# [manual] F3.3.21-B3.40A — GATE de preparacao da validacao Web Push REAL E2E.
+# Roda scripts/worker-ops/f3321-b340a-webpush-real-validation-gate.e2e.mjs (de main)
+# em modo GATE/PLANEJAMENTO: valida ESTATICAMENTE a prontidao de Web Push/FCM do app
+# (app/main: firebase-messaging-sw.js, sw.js, manifest.json, index.html,
+# functions/index.js — lidos via `git show`, READ-ONLY) e DOCUMENTA os pre-requisitos
+# da futura validacao real. NAO executa Web Push real, NAO abre browser, NAO carrega o
+# app live, NAO chama endpoint, NAO cria token FCM, NAO faz login, NAO toca Firestore,
+# NAO publica Hosting.
+# EXECUCAO REAL BLOQUEADA: o workflow RECUSA webpush_real=true / fcm_token_server=true /
+# allow_endpoint_real=true / allow_get_token_real=true / allow_push_send_real=true /
+# allow_firestore_write=true / hosting_publish=true / source_ref!=app/main /
+# target_url!=https://agenda-id-seven.web.app.
+# workflow_dispatch ONLY. SEM secrets, SEM gcloud, SEM firebase deploy, SEM Hosting,
+# SEM Firestore. Summary/artifact sanitizados.
+# =====================================================================
+name: "[manual] F3.3.21-B3.40A Web Push Real Validation Gate (prep/dry-run)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_gate:
+        description: "Digite RUN_WEBPUSH_REAL_VALIDATION_GATE para confirmar"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = planejamento estatico (sem browser/rede). Execucao real e bloqueada nesta fase."
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      source_ref:
+        description: "Ref dos arquivos PWA/FCM para validacao estatica (fixo: app/main)"
+        required: true
+        default: "app/main"
+        type: string
+      target_url:
+        description: "URL do app live (fixo: https://agenda-id-seven.web.app)"
+        required: true
+        default: "https://agenda-id-seven.web.app"
+        type: string
+      webpush_real:
+        description: "Ativar Web Push REAL (sempre false; true e recusado nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      fcm_token_server:
+        description: "Estado da flag (sempre false; true e recusado nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      require_manual_device:
+        description: "Validacao real exige dispositivo manual (informativo; default true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      require_canary_user:
+        description: "Validacao real exige usuario canario (informativo; default true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      allow_endpoint_real:
+        description: "Permitir endpoint real (sempre false; true e recusado nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_get_token_real:
+        description: "Permitir getToken real (sempre false; true e recusado nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_push_send_real:
+        description: "Permitir push send real (sempre false; true e recusado nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_firestore_write:
+        description: "Permitir Firestore write (sempre false; true e recusado nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      hosting_publish:
+        description: "Publicar Hosting (sempre false; true e recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-webpush-real-validation-gate
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_REF: "app/main"
+  EXPECTED_TARGET_URL: "https://agenda-id-seven.web.app"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3321-b340a-webpush-real-validation-gate.e2e.mjs"
+  RETEST_OUT: "webpush-real-validation-gate-artifacts"
+
+jobs:
+  webpush-real-validation-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_gate (== RUN_WEBPUSH_REAL_VALIDATION_GATE)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_gate }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_WEBPUSH_REAL_VALIDATION_GATE" ]; then
+            echo "::error:: confirm_gate invalido — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_gate OK."
+
+      - name: Guard seguranca (bloqueia execucao real; refs fixas)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SRC: ${{ github.event.inputs.source_ref }}
+          URL: ${{ github.event.inputs.target_url }}
+          WEBPUSH_REAL: ${{ github.event.inputs.webpush_real }}
+          FCM: ${{ github.event.inputs.fcm_token_server }}
+          ALLOW_ENDPOINT: ${{ github.event.inputs.allow_endpoint_real }}
+          ALLOW_GETTOKEN: ${{ github.event.inputs.allow_get_token_real }}
+          ALLOW_PUSH: ${{ github.event.inputs.allow_push_send_real }}
+          ALLOW_FS: ${{ github.event.inputs.allow_firestore_write }}
+          HOSTING: ${{ github.event.inputs.hosting_publish }}
+        run: |
+          set -eu
+          if [ "$HOSTING" = "true" ]; then echo "::error:: hosting_publish=true e proibido."; exit 1; fi
+          if [ "$WEBPUSH_REAL" = "true" ]; then echo "::error:: webpush_real=true e proibido nesta fase (gate prep)."; exit 1; fi
+          if [ "$FCM" = "true" ]; then echo "::error:: fcm_token_server=true e proibido nesta fase."; exit 1; fi
+          if [ "$ALLOW_ENDPOINT" = "true" ]; then echo "::error:: allow_endpoint_real=true e proibido nesta fase."; exit 1; fi
+          if [ "$ALLOW_GETTOKEN" = "true" ]; then echo "::error:: allow_get_token_real=true e proibido nesta fase."; exit 1; fi
+          if [ "$ALLOW_PUSH" = "true" ]; then echo "::error:: allow_push_send_real=true e proibido nesta fase."; exit 1; fi
+          if [ "$ALLOW_FS" = "true" ]; then echo "::error:: allow_firestore_write=true e proibido nesta fase."; exit 1; fi
+          if [ "$SRC" != "$EXPECTED_SOURCE_REF" ]; then echo "::error:: source_ref ($SRC) != $EXPECTED_SOURCE_REF"; exit 1; fi
+          if [ "$URL" != "$EXPECTED_TARGET_URL" ]; then echo "::error:: target_url ($URL) != $EXPECTED_TARGET_URL"; exit 1; fi
+          echo "guards de seguranca OK (gate prep; execucao real bloqueada; dry_run=$DRY_RUN)."
+
+      - name: Checkout (main; traz o runner)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Confirma runner + node --check
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+          node --check "$RUNNER_SCRIPT"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Preparar arquivos PWA/FCM de app/main (read-only; git show; SEM publicar Hosting)
+        env:
+          SRC: ${{ github.event.inputs.source_ref }}
+        run: |
+          set -eu
+          git fetch --no-tags --depth=1 origin "$SRC"
+          for f in index.html firebase-messaging-sw.js sw.js manifest.json functions/index.js; do
+            mkdir -p "$RUNNER_TEMP/app/$(dirname "$f")"
+            git show "origin/$SRC:$f" > "$RUNNER_TEMP/app/$f"
+          done
+          echo "Arquivos PWA/FCM de $SRC preparados (read-only)."
+
+      - name: Rodar gate (planejamento estatico; sem browser/endpoint/push/Firestore reais)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SOURCE_REF: ${{ github.event.inputs.source_ref }}
+          TARGET_URL: ${{ github.event.inputs.target_url }}
+          APP_DIR: ${{ runner.temp }}/app
+          WEBPUSH_REAL: ${{ github.event.inputs.webpush_real }}
+          FCM_TOKEN_SERVER: ${{ github.event.inputs.fcm_token_server }}
+          REQUIRE_MANUAL_DEVICE: ${{ github.event.inputs.require_manual_device }}
+          REQUIRE_CANARY_USER: ${{ github.event.inputs.require_canary_user }}
+          ALLOW_ENDPOINT_REAL: ${{ github.event.inputs.allow_endpoint_real }}
+          ALLOW_GET_TOKEN_REAL: ${{ github.event.inputs.allow_get_token_real }}
+          ALLOW_PUSH_SEND_REAL: ${{ github.event.inputs.allow_push_send_real }}
+          ALLOW_FIRESTORE_WRITE: ${{ github.event.inputs.allow_firestore_write }}
+          HOSTING_PUBLISH: ${{ github.event.inputs.hosting_publish }}
+        run: |
+          set -eu
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifact sanitizado (summary)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webpush-real-validation-gate
+          path: webpush-real-validation-gate-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
