@@ -1,0 +1,191 @@
+# =====================================================================
+# [manual] F3.3.21-B3.39A — VALIDACAO POS-HOSTING com fcm_token_server OFF.
+# Roda scripts/worker-ops/f3321-b339a-fcm-token-client-cutover-flag-off-validation.e2e.mjs
+# (de main) para confirmar que o app LIVE (agenda-id-seven.web.app, cutover client-side FCM)
+# permanece legacy/OFF: flag fcm_token_server OFF por padrao, caminho server FCM DORMENTE,
+# registerFcmTokenClient/removeFcmTokenClient NAO disparam endpoint no caminho OFF.
+#   DRY-RUN (padrao): validacao estatica de app/main:index.html (sem browser/rede/endpoint).
+#   VALIDACAO (dry_run=false): carrega TARGET_URL em Playwright controlado, GARANTE flag OFF
+#     (remove fcm_token_server do localStorage; nunca seta "on"), neutraliza Web Push e
+#     BLOQUEIA firestore.googleapis.com / cloudfunctions.net / *.run.app / fcmregistrations /
+#     firebaseinstallations / identitytoolkit (qualquer hit real => NO-GO).
+# workflow_dispatch ONLY. Recusa hosting_publish=true / endpoint_calls_blocked=false /
+# web_push_neutralized=false / firestore_blocked=false / fcm_token_server=true / target_url!=
+# web.app / source_ref!=app/main. SEM secrets, SEM gcloud, SEM firebase deploy, SEM Hosting,
+# SEM Firestore. Summary/artifact sanitizados.
+# =====================================================================
+name: "[manual] F3.3.21-B3.39A FCM Flag-OFF Post-Hosting Validation"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_validation:
+        description: "Digite RUN_FCM_TOKEN_CLIENT_CUTOVER_FLAG_OFF_VALIDATION para confirmar"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = valida estatico (sem browser); false = valida o app live (Playwright, flag OFF)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      source_ref:
+        description: "Ref do index.html para comparacao estatica (fixo: app/main)"
+        required: true
+        default: "app/main"
+        type: string
+      target_url:
+        description: "URL do app live (fixo: https://agenda-id-seven.web.app)"
+        required: true
+        default: "https://agenda-id-seven.web.app"
+        type: string
+      fcm_token_server:
+        description: "Estado esperado da flag (sempre false nesta validacao)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      endpoint_calls_blocked:
+        description: "Bloquear chamadas de endpoint (sempre true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      web_push_neutralized:
+        description: "Neutralizar Web Push (sempre true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      firestore_blocked:
+        description: "Bloquear Firestore real (sempre true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      hosting_publish:
+        description: "Publicar Hosting (sempre false; true e recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-fcm-token-client-cutover-flag-off-validation
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_REF: "app/main"
+  EXPECTED_TARGET_URL: "https://agenda-id-seven.web.app"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3321-b339a-fcm-token-client-cutover-flag-off-validation.e2e.mjs"
+  RETEST_OUT: "fcm-flag-off-validation-artifacts"
+
+jobs:
+  fcm-flag-off-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_validation (== RUN_FCM_TOKEN_CLIENT_CUTOVER_FLAG_OFF_VALIDATION)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_validation }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_FCM_TOKEN_CLIENT_CUTOVER_FLAG_OFF_VALIDATION" ]; then
+            echo "::error:: confirm_validation invalido — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_validation OK."
+
+      - name: Guard seguranca (flag OFF; hosting_publish=false; endpoint/webpush/firestore bloqueados; refs fixas)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SRC: ${{ github.event.inputs.source_ref }}
+          URL: ${{ github.event.inputs.target_url }}
+          FCM: ${{ github.event.inputs.fcm_token_server }}
+          ENDPOINT_BLOCK: ${{ github.event.inputs.endpoint_calls_blocked }}
+          WEBPUSH: ${{ github.event.inputs.web_push_neutralized }}
+          FIRESTORE_BLOCK: ${{ github.event.inputs.firestore_blocked }}
+          HOSTING: ${{ github.event.inputs.hosting_publish }}
+        run: |
+          set -eu
+          if [ "$HOSTING" = "true" ]; then echo "::error:: hosting_publish=true e proibido."; exit 1; fi
+          if [ "$FCM" = "true" ]; then echo "::error:: fcm_token_server=true e proibido nesta validacao (flag OFF)."; exit 1; fi
+          if [ "$ENDPOINT_BLOCK" != "true" ]; then echo "::error:: endpoint_calls_blocked deve ser true."; exit 1; fi
+          if [ "$WEBPUSH" != "true" ]; then echo "::error:: web_push_neutralized deve ser true."; exit 1; fi
+          if [ "$FIRESTORE_BLOCK" != "true" ]; then echo "::error:: firestore_blocked deve ser true."; exit 1; fi
+          if [ "$SRC" != "$EXPECTED_SOURCE_REF" ]; then echo "::error:: source_ref ($SRC) != $EXPECTED_SOURCE_REF"; exit 1; fi
+          if [ "$URL" != "$EXPECTED_TARGET_URL" ]; then echo "::error:: target_url ($URL) != $EXPECTED_TARGET_URL"; exit 1; fi
+          echo "guards de seguranca OK (dry_run=$DRY_RUN; flag OFF; target_url=$URL)."
+
+      - name: Checkout (main; traz o runner)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Confirma runner + node --check
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+          node --check "$RUNNER_SCRIPT"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Preparar index.html de app/main (read-only; comparacao estatica; SEM publicar Hosting)
+        env:
+          SRC: ${{ github.event.inputs.source_ref }}
+        run: |
+          set -eu
+          git fetch --no-tags --depth=1 origin "$SRC"
+          git show "origin/$SRC:index.html" > "$RUNNER_TEMP/source-index.html"
+          echo "index.html de $SRC preparado ($(wc -c < "$RUNNER_TEMP/source-index.html") bytes)."
+
+      - name: Instalar Playwright + Chromium (SOMENTE se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          npm install --no-save --no-package-lock playwright >/dev/null 2>&1
+          npx --yes playwright install chromium >/dev/null 2>&1
+          echo "Playwright + Chromium instalados (validacao flag-off)."
+
+      - name: Rodar validacao flag-OFF (estatico OU live controlado; sem Hosting/endpoint/Firestore reais)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SOURCE_REF: ${{ github.event.inputs.source_ref }}
+          SOURCE_INDEX_PATH: ${{ runner.temp }}/source-index.html
+          TARGET_URL: ${{ github.event.inputs.target_url }}
+          FCM_TOKEN_SERVER: ${{ github.event.inputs.fcm_token_server }}
+          ENDPOINT_CALLS_BLOCKED: ${{ github.event.inputs.endpoint_calls_blocked }}
+          WEB_PUSH_NEUTRALIZED: ${{ github.event.inputs.web_push_neutralized }}
+          FIRESTORE_BLOCKED: ${{ github.event.inputs.firestore_blocked }}
+          HOSTING_PUBLISH: ${{ github.event.inputs.hosting_publish }}
+        run: |
+          set -eu
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifact sanitizado (summary)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcm-flag-off-validation
+          path: fcm-flag-off-validation-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
