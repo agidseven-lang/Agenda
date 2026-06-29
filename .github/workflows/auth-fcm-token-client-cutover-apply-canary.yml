@@ -1,0 +1,181 @@
+# =====================================================================
+# [manual] F3.3.21-B3.33A — APPLY CANARY (UI/client) do cutover FCM (fcm_token_server).
+# Roda scripts/worker-ops/f3321-b333a-fcm-token-client-cutover-apply-canary.e2e.mjs (de main)
+# para validar o cutover ja mergeado em app/main:index.html operando com fcm_token_server=on,
+# SEM publicar Hosting, SEM endpoint real, SEM login real, SEM token FCM real, SEM Web Push
+# real, SEM Firestore real, SEM usuario real, SEM segredo e SEM deploy.
+# Le o index.html de app/main via `git show origin/app/main:index.html` (read-only).
+#   DRY-RUN (padrao): SO validacao estatica + micro-sim (sem browser/rede/endpoint).
+#   APPLY (dry_run=false): carrega app/main LOCALMENTE via Playwright (route fulfill; sem
+#     servidor/rede), liga fcm_token_server=on e neutraliza Web Push ANTES de qualquer script,
+#     intercepta/stuba registerFcmToken/removeMyFcmToken (nunca real) e FALHA se Firestore real
+#     for tocado; observa que o caminho server ON escolhe registerFcmTokenClient/removeFcmTokenClient.
+# workflow_dispatch ONLY. Guards: confirm_apply, hosting_publish=false, endpoint_calls_blocked=true,
+# web_push_neutralized=true, firestore_blocked=true, source_ref=app/main. SEM secrets, SEM gcloud,
+# SEM firebase deploy, SEM Hosting, SEM Firestore. Summary/artifact sanitizados.
+# =====================================================================
+name: "[manual] F3.3.21-B3.33A FCM Client Cutover APPLY Canary"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_apply:
+        description: "Digite RUN_FCM_TOKEN_CLIENT_CUTOVER_APPLY_CANARY para confirmar"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = valida (estatico/micro-sim, sem browser); false = APPLY canario (Playwright local)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      source_ref:
+        description: "Ref com o index.html do cutover (fixo: app/main)"
+        required: true
+        default: "app/main"
+        type: string
+      fcm_token_server:
+        description: "Valor da flag fcm_token_server aplicada no canario (true = caminho server ON)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      endpoint_calls_blocked:
+        description: "Bloquear/stubar chamadas de endpoint (sempre true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      web_push_neutralized:
+        description: "Neutralizar Web Push antes de qualquer script (sempre true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      firestore_blocked:
+        description: "Bloquear Firestore real (sempre true)"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      hosting_publish:
+        description: "Publicar Hosting (sempre false; true e recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-fcm-token-client-cutover-apply-canary
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_REF: "app/main"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3321-b333a-fcm-token-client-cutover-apply-canary.e2e.mjs"
+  RETEST_OUT: "fcm-client-cutover-apply-canary-artifacts"
+
+jobs:
+  fcm-client-cutover-apply-canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_apply (== RUN_FCM_TOKEN_CLIENT_CUTOVER_APPLY_CANARY)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_apply }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_FCM_TOKEN_CLIENT_CUTOVER_APPLY_CANARY" ]; then
+            echo "::error:: confirm_apply != RUN_FCM_TOKEN_CLIENT_CUTOVER_APPLY_CANARY — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_apply OK."
+
+      - name: Guard seguranca (hosting_publish=false; endpoint/webpush/firestore bloqueados; source_ref fixo)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SRC: ${{ github.event.inputs.source_ref }}
+          ENDPOINT_BLOCK: ${{ github.event.inputs.endpoint_calls_blocked }}
+          WEBPUSH: ${{ github.event.inputs.web_push_neutralized }}
+          FIRESTORE_BLOCK: ${{ github.event.inputs.firestore_blocked }}
+          HOSTING: ${{ github.event.inputs.hosting_publish }}
+        run: |
+          set -eu
+          if [ "$HOSTING" = "true" ]; then echo "::error:: hosting_publish=true e proibido (sem Hosting publish)."; exit 1; fi
+          if [ "$ENDPOINT_BLOCK" != "true" ]; then echo "::error:: endpoint_calls_blocked deve ser true."; exit 1; fi
+          if [ "$WEBPUSH" != "true" ]; then echo "::error:: web_push_neutralized deve ser true."; exit 1; fi
+          if [ "$FIRESTORE_BLOCK" != "true" ]; then echo "::error:: firestore_blocked deve ser true."; exit 1; fi
+          if [ "$SRC" != "$EXPECTED_SOURCE_REF" ]; then echo "::error:: source_ref ($SRC) != $EXPECTED_SOURCE_REF"; exit 1; fi
+          echo "guards de seguranca OK (dry_run=$DRY_RUN; source_ref=$SRC; hosting_publish=$HOSTING)."
+
+      - name: Checkout (main; traz o runner)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Confirma runner + node --check
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+          node --check "$RUNNER_SCRIPT"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Preparar index.html de app/main (read-only; SEM publicar Hosting)
+        env:
+          SRC: ${{ github.event.inputs.source_ref }}
+        run: |
+          set -eu
+          # Apenas LEITURA do blob de app/main (sem checkout do app, sem Hosting, sem deploy).
+          git fetch --no-tags --depth=1 origin "$SRC"
+          git show "origin/$SRC:index.html" > "$RUNNER_TEMP/source-index.html"
+          echo "index.html de $SRC preparado ($(wc -c < "$RUNNER_TEMP/source-index.html") bytes)."
+
+      - name: Instalar Playwright + Chromium (SOMENTE se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          npm install --no-save --no-package-lock playwright >/dev/null 2>&1
+          npx --yes playwright install chromium >/dev/null 2>&1
+          echo "Playwright + Chromium instalados (apply canary)."
+
+      - name: Rodar APPLY canary (dry-run estatico OU apply local; sem Hosting/endpoint/Firestore reais)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SOURCE_REF: ${{ github.event.inputs.source_ref }}
+          SOURCE_INDEX_PATH: ${{ runner.temp }}/source-index.html
+          FCM_TOKEN_SERVER: ${{ github.event.inputs.fcm_token_server }}
+          ENDPOINT_CALLS_BLOCKED: ${{ github.event.inputs.endpoint_calls_blocked }}
+          WEB_PUSH_NEUTRALIZED: ${{ github.event.inputs.web_push_neutralized }}
+          FIRESTORE_BLOCKED: ${{ github.event.inputs.firestore_blocked }}
+          HOSTING_PUBLISH: ${{ github.event.inputs.hosting_publish }}
+        run: |
+          set -eu
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifact sanitizado (summary)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fcm-client-cutover-apply-canary
+          path: fcm-client-cutover-apply-canary-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
