@@ -1,0 +1,227 @@
+# =====================================================================
+# [manual] F3.3.21-B3.40F — PLAN-PREP da validacao Web Push REAL canaria.
+# Roda scripts/worker-ops/f3321-b340f-webpush-real-validation-plan.e2e.mjs (de main)
+# em modo PLAN-PREP: captura os dados operacionais do canario, confirma as travas de
+# seguranca e documenta os pre-requisitos/itens pendentes. NAO executa Web Push real,
+# NAO abre browser, NAO chama endpoint, NAO cria token FCM, NAO faz login, NAO toca
+# Firestore, NAO publica Hosting, NAO usa segredo.
+# EXECUCAO REAL BLOQUEADA: o workflow RECUSA webpush_real=true / fcm_token_server=true /
+# allow_get_token_real=true / allow_endpoint_real=true / allow_push_send_real=true /
+# allow_firestore_write=true / hosting_publish=true / source_ref!=app/main /
+# target_url!=https://agenda-id-seven.web.app / canary_user!=canario esperado.
+# workflow_dispatch ONLY. SEM secrets, SEM gcloud, SEM firebase deploy, SEM Hosting.
+# Emite PLAN_READY ou PLAN_BLOCKED; nunca executa validacao real.
+# =====================================================================
+name: "[manual] F3.3.21-B3.40F Web Push Real Validation PLAN (prep)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_plan:
+        description: "Digite PREPARE_ONLY para confirmar (apenas preparacao)"
+        required: true
+        default: "PREPARE_ONLY"
+        type: string
+      dry_run:
+        description: "true = preparacao estatica (sem execucao real). Execucao real e bloqueada nesta fase."
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      source_ref:
+        description: "Ref base (fixo: app/main)"
+        required: true
+        default: "app/main"
+        type: string
+      target_url:
+        description: "URL do app live (fixo: https://agenda-id-seven.web.app)"
+        required: true
+        default: "https://agenda-id-seven.web.app"
+        type: string
+      canary_user:
+        description: "Usuario canario dedicado (fixo)"
+        required: true
+        default: "teste.webpush@idseven.com.br"
+        type: string
+      canary_device:
+        description: "Dispositivo Android canario"
+        required: true
+        default: "Samsung Galaxy A54"
+        type: string
+      canary_browser:
+        description: "Navegador canario"
+        required: true
+        default: "Chrome Android"
+        type: string
+      test_window:
+        description: "Janela de teste (ISO 8601, America/Fortaleza)"
+        required: true
+        default: "2026-06-29T16:00:00-03:00"
+        type: string
+      test_message:
+        description: "Mensagem de teste aprovada"
+        required: true
+        default: "Teste tecnico de notificacao ID Seven."
+        type: string
+      webpush_real:
+        description: "Ativar Web Push REAL (sempre false; true e recusado nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      fcm_token_server:
+        description: "Estado da flag (sempre false; true e recusado nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_get_token_real:
+        description: "Permitir getToken real (sempre false; true e recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_endpoint_real:
+        description: "Permitir endpoint real (sempre false; true e recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_push_send_real:
+        description: "Permitir push send real (sempre false; true e recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_firestore_write:
+        description: "Permitir Firestore write (sempre false; true e recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      hosting_publish:
+        description: "Publicar Hosting (sempre false; true e recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-webpush-real-validation-plan
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_REF: "app/main"
+  EXPECTED_TARGET_URL: "https://agenda-id-seven.web.app"
+  EXPECTED_CANARY_USER: "teste.webpush@idseven.com.br"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3321-b340f-webpush-real-validation-plan.e2e.mjs"
+  RETEST_OUT: "webpush-real-validation-plan-artifacts"
+
+jobs:
+  webpush-real-validation-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_plan (== PREPARE_ONLY)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_plan }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "PREPARE_ONLY" ]; then
+            echo "::error:: confirm_plan invalido — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_plan OK."
+
+      - name: Guard seguranca (bloqueia execucao real; refs/canario fixos)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SRC: ${{ github.event.inputs.source_ref }}
+          URL: ${{ github.event.inputs.target_url }}
+          USER_C: ${{ github.event.inputs.canary_user }}
+          WEBPUSH_REAL: ${{ github.event.inputs.webpush_real }}
+          FCM: ${{ github.event.inputs.fcm_token_server }}
+          ALLOW_GETTOKEN: ${{ github.event.inputs.allow_get_token_real }}
+          ALLOW_ENDPOINT: ${{ github.event.inputs.allow_endpoint_real }}
+          ALLOW_PUSH: ${{ github.event.inputs.allow_push_send_real }}
+          ALLOW_FS: ${{ github.event.inputs.allow_firestore_write }}
+          HOSTING: ${{ github.event.inputs.hosting_publish }}
+        run: |
+          set -eu
+          if [ "$HOSTING" = "true" ]; then echo "::error:: hosting_publish=true e proibido."; exit 1; fi
+          if [ "$WEBPUSH_REAL" = "true" ]; then echo "::error:: webpush_real=true e proibido nesta fase (plan prep)."; exit 1; fi
+          if [ "$FCM" = "true" ]; then echo "::error:: fcm_token_server=true e proibido nesta fase."; exit 1; fi
+          if [ "$ALLOW_GETTOKEN" = "true" ]; then echo "::error:: allow_get_token_real=true e proibido nesta fase."; exit 1; fi
+          if [ "$ALLOW_ENDPOINT" = "true" ]; then echo "::error:: allow_endpoint_real=true e proibido nesta fase."; exit 1; fi
+          if [ "$ALLOW_PUSH" = "true" ]; then echo "::error:: allow_push_send_real=true e proibido nesta fase."; exit 1; fi
+          if [ "$ALLOW_FS" = "true" ]; then echo "::error:: allow_firestore_write=true e proibido nesta fase."; exit 1; fi
+          if [ "$SRC" != "$EXPECTED_SOURCE_REF" ]; then echo "::error:: source_ref ($SRC) != $EXPECTED_SOURCE_REF"; exit 1; fi
+          if [ "$URL" != "$EXPECTED_TARGET_URL" ]; then echo "::error:: target_url ($URL) != $EXPECTED_TARGET_URL"; exit 1; fi
+          if [ "$USER_C" != "$EXPECTED_CANARY_USER" ]; then echo "::error:: canary_user diferente do canario esperado"; exit 1; fi
+          echo "guards de seguranca OK (plan prep; execucao real bloqueada; dry_run=$DRY_RUN)."
+
+      - name: Checkout (main; traz o runner e o plano)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Confirma runner + node --check
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+          node --check "$RUNNER_SCRIPT"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Rodar PLAN-PREP (sem execucao real; sem browser/endpoint/push/Firestore)
+        env:
+          CONFIRM_PLAN: ${{ github.event.inputs.confirm_plan }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SOURCE_REF: ${{ github.event.inputs.source_ref }}
+          TARGET_URL: ${{ github.event.inputs.target_url }}
+          CANARY_USER: ${{ github.event.inputs.canary_user }}
+          CANARY_DEVICE: ${{ github.event.inputs.canary_device }}
+          CANARY_BROWSER: ${{ github.event.inputs.canary_browser }}
+          TEST_WINDOW: ${{ github.event.inputs.test_window }}
+          TEST_MESSAGE: ${{ github.event.inputs.test_message }}
+          WEBPUSH_REAL: ${{ github.event.inputs.webpush_real }}
+          FCM_TOKEN_SERVER: ${{ github.event.inputs.fcm_token_server }}
+          ALLOW_GET_TOKEN_REAL: ${{ github.event.inputs.allow_get_token_real }}
+          ALLOW_ENDPOINT_REAL: ${{ github.event.inputs.allow_endpoint_real }}
+          ALLOW_PUSH_SEND_REAL: ${{ github.event.inputs.allow_push_send_real }}
+          ALLOW_FIRESTORE_WRITE: ${{ github.event.inputs.allow_firestore_write }}
+          HOSTING_PUBLISH: ${{ github.event.inputs.hosting_publish }}
+        run: |
+          set -eu
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifact sanitizado (summary)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webpush-real-validation-plan
+          path: webpush-real-validation-plan-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
