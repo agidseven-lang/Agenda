@@ -8168,6 +8168,20 @@ async function _setupPushNotificationsInternal(){
     var platform = detectPlatform();
     var nowTs = Date.now();
     var _dedupCount = 0, _finalCount = 0;
+    if(fcmTokenServerEnabled()){
+      /* F3.3.21-B3.30: cutover FCM server-side (flag fcm_token_server ON). Registra via
+         registerFcmToken (o servidor grava users/<uid> por Admin SDK com dedup por device);
+         SEM tx.get/tx.set client. SEM fallback silencioso p/ legado quando a flag esta ON. */
+      var _reg = await registerFcmTokenClient(token, devId, platform);
+      if(!_reg || _reg.ok !== true){
+        try{ _pushDbg("12-server-register-falhou", "registerFcmToken status=" + (_reg && _reg.status!=null ? _reg.status : "?") + " err=" + (_reg && _reg.error ? _reg.error : "?")); }catch(_){}
+        _pushErr("server-register", new Error("registerFcmToken falhou (flag fcm_token_server ON; sem fallback legado)."));
+        fcmInitInProgress = false;
+        return false;
+      }
+      _finalCount = (typeof _reg.count === "number") ? _reg.count : _finalCount;
+      _pushDbg("12b-server-register", "device=" + devId + " (" + platform + "); registerFcmToken OK; total agora=" + _finalCount);
+    } else {
     await savedDb.runTransaction(async function(tx){
       var doc = await tx.get(userRef);
       var d = (doc.exists ? doc.data() : {}) || {};
@@ -8197,6 +8211,7 @@ async function _setupPushNotificationsInternal(){
       tx.set(userRef, { fcmTokens: nextTokens, fcmTokenMeta: meta }, { merge: true });
     });
     _pushDbg("12b-dedup-device", "device=" + devId + " (" + platform + "); removeu " + _dedupCount + " token(s) antigo(s) do mesmo aparelho; total agora=" + _finalCount);
+    }
     fcmTokenSaved = token;
     fcmInitSucceeded = true;        /* [V63.94] marcador de sucesso definitivo */
     fcmInitInProgress = false;       /* [V63.94] libera */
@@ -8283,13 +8298,23 @@ async function _setupPushNotificationsInternal(){
       (que tava logado). Agora reseta tudo. */
 async function teardownPushNotifications(){
   if(me && db && fcmTokenSaved){
-    try{
-      var userRef = db.collection("users").doc(me.id);
-      /* arrayRemove atômico — não sobrescreve concorrência */
-      await userRef.update({
-        fcmTokens: firebase.firestore.FieldValue.arrayRemove(fcmTokenSaved)
-      });
-    }catch(_){ /* permissão negada ou outro erro — ignora */ }
+    if(fcmTokenServerEnabled()){
+      /* F3.3.21-B3.30: cutover FCM server-side (flag ON). Remove via removeMyFcmToken
+         (o servidor remove de users/<uid> por Admin SDK); SEM update client.
+         SEM fallback silencioso p/ legado quando a flag esta ON. */
+      try{
+        var _rem = await removeFcmTokenClient(fcmTokenSaved);
+        if(!_rem || _rem.ok !== true){ try{ _pushDbg("teardown-server-remove-falhou", "removeMyFcmToken status=" + (_rem && _rem.status!=null ? _rem.status : "?") + " err=" + (_rem && _rem.error ? _rem.error : "?")); }catch(_){} }
+      }catch(_){ try{ _pushDbg("teardown-server-remove-erro", "excecao generica"); }catch(_){} }
+    } else {
+      try{
+        var userRef = db.collection("users").doc(me.id);
+        /* arrayRemove atômico — não sobrescreve concorrência */
+        await userRef.update({
+          fcmTokens: firebase.firestore.FieldValue.arrayRemove(fcmTokenSaved)
+        });
+      }catch(_){ /* permissão negada ou outro erro — ignora */ }
+    }
   }
   /* Reseta TODO o estado do FCM no app — próximo login vai re-registrar */
   fcmTokenSaved = null;
