@@ -1,0 +1,255 @@
+# =====================================================================
+# [manual] F3.3.21-B3.40M — Web Push REAL send-once (canario). PREP + gate.
+# Roda scripts/worker-ops/f3321-b340m-webpush-real-send-once.e2e.mjs (de main).
+#   PREP / dry-run (PADRAO): valida plano/inputs/escopo 1/1; NAO envia push, NAO chama
+#     endpoint, NAO le segredo, NAO toca Firestore, NAO cria token, NAO faz login.
+#   FUTURE_REAL_SEND (fase posterior, autorizada): envia EXATAMENTE 1 push para 1 token
+#     canario. NAO e executado nesta fase (defaults seguros mantem PREP).
+# EXECUCAO REAL bloqueada por padrao. RECUSA confirm errado / refs|canario|android|
+# escopo divergentes / hosting_publish=true / fcm_token_server=true. permissions minimos.
+# O segredo FCM_SEND_BEARER e consumido SOMENTE no caminho real gated e NUNCA impresso.
+# =====================================================================
+name: "[manual] F3.3.21-B3.40M Web Push Real Send-Once (canary)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_real_send:
+        description: "Digite RUN_WEBPUSH_REAL_SEND_ONCE para confirmar"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = PREP/readiness (sem envio). Execucao real e bloqueada nesta fase."
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      source_ref:
+        description: "Ref base (fixo: app/main)"
+        required: true
+        default: "app/main"
+        type: string
+      target_url:
+        description: "URL do app live (fixo: https://agenda-id-seven.web.app)"
+        required: true
+        default: "https://agenda-id-seven.web.app"
+        type: string
+      canary_user:
+        description: "Usuario canario (fixo)"
+        required: true
+        default: "teste.webpush@idseven.com.br"
+        type: string
+      canary_device:
+        description: "Dispositivo canario (fixo)"
+        required: true
+        default: "Samsung Galaxy A54"
+        type: string
+      android_version:
+        description: "Versao do Android (fixo: Android 14)"
+        required: true
+        default: "Android 14"
+        type: string
+      canary_browser:
+        description: "Navegador canario (fixo)"
+        required: true
+        default: "Chrome Android"
+        type: string
+      test_message:
+        description: "Mensagem aprovada"
+        required: true
+        default: "Teste tecnico de notificacao ID Seven."
+        type: string
+      max_targets:
+        description: "Maximo de usuarios alvo (fixo: 1)"
+        required: true
+        default: "1"
+        type: string
+      max_devices:
+        description: "Maximo de dispositivos alvo (fixo: 1)"
+        required: true
+        default: "1"
+        type: string
+      webpush_real:
+        description: "Web Push real (sempre false nesta fase; true recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_get_token_real:
+        description: "Permitir getToken real (sempre false nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_endpoint_real:
+        description: "Permitir endpoint real (sempre false nesta fase)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_push_send_real:
+        description: "Permitir push send real (sempre false nesta fase; futuro: com confirm+secret)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_firestore_write:
+        description: "Permitir Firestore write (sempre false)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      allow_cleanup:
+        description: "Planejar cleanup do token (futuro). Default false nesta fase"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      hosting_publish:
+        description: "Publicar Hosting (sempre false; true recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      fcm_token_server:
+        description: "Estado da flag (sempre false; true recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-webpush-real-send-once
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_REF: "app/main"
+  EXPECTED_TARGET_URL: "https://agenda-id-seven.web.app"
+  EXPECTED_CANARY_USER: "teste.webpush@idseven.com.br"
+  EXPECTED_CANARY_DEVICE: "Samsung Galaxy A54"
+  EXPECTED_ANDROID: "Android 14"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3321-b340m-webpush-real-send-once.e2e.mjs"
+  RETEST_OUT: "webpush-real-send-once-artifacts"
+
+jobs:
+  webpush-real-send-once:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_real_send (== RUN_WEBPUSH_REAL_SEND_ONCE)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_real_send }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "RUN_WEBPUSH_REAL_SEND_ONCE" ]; then
+            echo "::error:: confirm_real_send invalido — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_real_send OK."
+
+      - name: Guard escopo/seguranca (1/1; canario fixo; sem base-wide; flags travadas)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SRC: ${{ github.event.inputs.source_ref }}
+          URL: ${{ github.event.inputs.target_url }}
+          USER_C: ${{ github.event.inputs.canary_user }}
+          DEVICE_C: ${{ github.event.inputs.canary_device }}
+          ANDROID_C: ${{ github.event.inputs.android_version }}
+          MAXT: ${{ github.event.inputs.max_targets }}
+          MAXD: ${{ github.event.inputs.max_devices }}
+          HOSTING: ${{ github.event.inputs.hosting_publish }}
+          FCM: ${{ github.event.inputs.fcm_token_server }}
+          ALLOW_PUSH: ${{ github.event.inputs.allow_push_send_real }}
+          HAS_SECRET: ${{ secrets.FCM_SEND_BEARER != '' }}
+        run: |
+          set -eu
+          if [ "$HOSTING" = "true" ]; then echo "::error:: hosting_publish=true e proibido."; exit 1; fi
+          if [ "$FCM" = "true" ]; then echo "::error:: fcm_token_server=true e proibido."; exit 1; fi
+          if [ "$SRC" != "$EXPECTED_SOURCE_REF" ]; then echo "::error:: source_ref invalido"; exit 1; fi
+          if [ "$URL" != "$EXPECTED_TARGET_URL" ]; then echo "::error:: target_url invalido"; exit 1; fi
+          if [ "$USER_C" != "$EXPECTED_CANARY_USER" ]; then echo "::error:: canary_user diferente do canario"; exit 1; fi
+          if [ "$DEVICE_C" != "$EXPECTED_CANARY_DEVICE" ]; then echo "::error:: canary_device diferente"; exit 1; fi
+          if [ "$ANDROID_C" != "$EXPECTED_ANDROID" ]; then echo "::error:: android_version != Android 14"; exit 1; fi
+          if [ "$MAXT" != "1" ]; then echo "::error:: max_targets != 1 (base-wide proibido)"; exit 1; fi
+          if [ "$MAXD" != "1" ]; then echo "::error:: max_devices != 1"; exit 1; fi
+          # Execucao real futura exige o secret presente. Sem segredo => so PREP/dry-run.
+          if [ "$ALLOW_PUSH" = "true" ] && [ "$DRY_RUN" = "false" ] && [ "$HAS_SECRET" != "true" ]; then
+            echo "::error:: secret/credencial de envio ausente para execucao real — abortando."; exit 1
+          fi
+          echo "guards de escopo/seguranca OK (dry_run=$DRY_RUN; 1/1; canario fixo)."
+
+      - name: Checkout (main; traz o runner e os docs)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Confirma runner + node --check
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+          node --check "$RUNNER_SCRIPT"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Rodar send-once (PREP/dry-run por padrao; real so em fase posterior gated)
+        env:
+          CONFIRM_REAL_SEND: ${{ github.event.inputs.confirm_real_send }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          SOURCE_REF: ${{ github.event.inputs.source_ref }}
+          TARGET_URL: ${{ github.event.inputs.target_url }}
+          CANARY_USER: ${{ github.event.inputs.canary_user }}
+          CANARY_DEVICE: ${{ github.event.inputs.canary_device }}
+          ANDROID_VERSION: ${{ github.event.inputs.android_version }}
+          CANARY_BROWSER: ${{ github.event.inputs.canary_browser }}
+          TEST_MESSAGE: ${{ github.event.inputs.test_message }}
+          MAX_TARGETS: ${{ github.event.inputs.max_targets }}
+          MAX_DEVICES: ${{ github.event.inputs.max_devices }}
+          WEBPUSH_REAL: ${{ github.event.inputs.webpush_real }}
+          ALLOW_GET_TOKEN_REAL: ${{ github.event.inputs.allow_get_token_real }}
+          ALLOW_ENDPOINT_REAL: ${{ github.event.inputs.allow_endpoint_real }}
+          ALLOW_PUSH_SEND_REAL: ${{ github.event.inputs.allow_push_send_real }}
+          ALLOW_FIRESTORE_WRITE: ${{ github.event.inputs.allow_firestore_write }}
+          ALLOW_CLEANUP: ${{ github.event.inputs.allow_cleanup }}
+          HOSTING_PUBLISH: ${{ github.event.inputs.hosting_publish }}
+          FCM_TOKEN_SERVER: ${{ github.event.inputs.fcm_token_server }}
+          # Consumidos SOMENTE no caminho real gated (fase posterior); nunca impressos.
+          # Em PREP/dry-run o runner ignora estes valores.
+          CANARY_FCM_TOKEN: ${{ secrets.CANARY_FCM_TOKEN }}
+          FCM_SEND_BEARER: ${{ secrets.FCM_SEND_BEARER }}
+        run: |
+          set -eu
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifact sanitizado (summary)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webpush-real-send-once
+          path: webpush-real-send-once-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
