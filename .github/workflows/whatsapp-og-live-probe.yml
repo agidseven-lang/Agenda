@@ -1,0 +1,202 @@
+# [manual] WhatsApp OG Live Probe — diagnostico LIVE read-only.
+#
+# Executa SOMENTE GET/HEAD publicos contra /share/cronograma/<token> e a imagem OG
+# (/og/wa-card-v64-39.jpg) no dominio custom (aprovar.agendaidseven.com.br) e em
+# workers.dev, com User-Agents (default, navegador, facebookexternalhit, WhatsApp),
+# e gera artefato com headers, bodies sanitizados (so /share, truncado), hashes e
+# matriz comparativa + summary.json com recomendacao A-F.
+#
+# NAO faz deploy. NAO usa secrets. NAO usa wrangler/firebase/firestore/WhatsApp Cloud API.
+# NAO envia mensagem. SOMENTE GET/HEAD (zero POST/PUT/PATCH/DELETE). NAO toca Desktop.
+# Acionamento SOMENTE manual (workflow_dispatch). Nao altera nenhum produto.
+name: "[manual] WhatsApp OG Live Probe"
+
+on:
+  workflow_dispatch:
+    inputs:
+      token:
+        description: "Token de teste (dummy; nao usar token real de cliente)"
+        required: true
+        default: "audittoken0006"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: whatsapp-og-live-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: live probe (read-only GET/HEAD)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe /share + imagem OG (GET/HEAD publicos) e sintetizar matriz
+        env:
+          TOKEN: ${{ github.event.inputs.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/headers out/bodies out/images
+          CUSTOM="https://aprovar.agendaidseven.com.br"
+          WORKERS="https://idseven-push.agidseven.workers.dev"
+          IMG_PATH="/og/wa-card-v64-39.jpg"
+          CUSTOM_SHARE="$CUSTOM/share/cronograma/$TOKEN"
+          WORKERS_SHARE="$WORKERS/share/cronograma/$TOKEN"
+          CUSTOM_IMAGE="$CUSTOM$IMG_PATH"
+          WORKERS_IMAGE="$WORKERS$IMG_PATH"
+
+          TAB=$(printf '\t')
+          : > out/raw.tsv
+          printf 'kind%sorigin%sua%surl%sstatus%sfinal_url%scontent_type%scache_control%scf_cache%slocation%sx_robots%scsp%sog_title%sog_desc%sog_image%stwitter_card%sog_locale%sscript%slocreplace%srefresh%snostore%ssize%ssha256%sextra\n' \
+            "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" "$TAB" >> out/raw.tsv
+
+          hval() { grep -i "^$2:" "$1" 2>/dev/null | tail -1 | tr -d '\r' | sed "s/^[^:]*: *//" || true; }
+          bflag() { if grep -qi "$2" "$1" 2>/dev/null; then echo yes; else echo no; fi; }
+
+          ua_arg() {
+            case "$1" in
+              default) UAARG=();;
+              browser) UAARG=(-A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");;
+              fb) UAARG=(-A "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)");;
+              wa) UAARG=(-A "WhatsApp/2.0");;
+            esac
+          }
+
+          probe_share() {
+            origin="$1"; url="$2"
+            for label in default browser fb wa; do
+              ua_arg "$label"
+              hdr="out/headers/share_${origin}_${label}.txt"
+              bodyfull="out/bodies/share_${origin}_${label}.full"
+              body="out/bodies/share_${origin}_${label}.html"
+              code=$(curl -sS -m 25 "${UAARG[@]}" -D "$hdr" -o "$bodyfull" -w '%{http_code}' "$url" 2>"$hdr.err" || echo 000)
+              furl=$(curl -sS -m 25 "${UAARG[@]}" -L -o /dev/null -w '%{url_effective}' "$url" 2>/dev/null || echo "-")
+              head -c 8000 "$bodyfull" > "$body" 2>/dev/null || true
+              size=$(wc -c < "$bodyfull" 2>/dev/null | tr -d ' ' || echo 0)
+              sha=$(sha256sum "$bodyfull" 2>/dev/null | cut -d' ' -f1 || echo "-")
+              rm -f "$bodyfull" || true
+              ct=$(hval "$hdr" content-type); cc=$(hval "$hdr" cache-control)
+              cf=$(hval "$hdr" cf-cache-status); loc=$(hval "$hdr" location)
+              xr=$(hval "$hdr" x-robots-tag); csp=$(hval "$hdr" content-security-policy)
+              ogt=$(bflag "$body" 'property="og:title"'); ogd=$(bflag "$body" 'property="og:description"')
+              ogi=$(bflag "$body" 'property="og:image"'); twc=$(bflag "$body" 'twitter:card')
+              ogl=$(bflag "$body" 'og:locale'); scr=$(bflag "$body" '<script')
+              lr=$(bflag "$body" 'location.replace'); mr=$(bflag "$body" 'http-equiv="refresh"')
+              if echo "$cc" | grep -qi 'no-store'; then ns=yes; else ns=no; fi
+              printf '%s\n' "share${TAB}${origin}${TAB}${label}${TAB}${url}${TAB}${code}${TAB}${furl}${TAB}${ct}${TAB}${cc}${TAB}${cf}${TAB}${loc}${TAB}${xr}${TAB}${csp}${TAB}${ogt}${TAB}${ogd}${TAB}${ogi}${TAB}${twc}${TAB}${ogl}${TAB}${scr}${TAB}${lr}${TAB}${mr}${TAB}${ns}${TAB}${size}${TAB}${sha}${TAB}-" >> out/raw.tsv
+            done
+          }
+
+          probe_image() {
+            origin="$1"; url="$2"
+            for label in default browser fb wa; do
+              ua_arg "$label"
+              hdr="out/images/img_${origin}_${label}.headers.txt"
+              code=$(curl -sS -m 25 -I "${UAARG[@]}" -D "$hdr" -o /dev/null -w '%{http_code}' "$url" 2>"$hdr.err" || echo 000)
+              curl -sS -m 25 -r 0-15 "${UAARG[@]}" -o out/.tmpimg "$url" 2>/dev/null || true
+              hex=$(xxd -p out/.tmpimg 2>/dev/null | head -1 | tr -d '\n' || echo "")
+              sha=$(sha256sum out/.tmpimg 2>/dev/null | cut -d' ' -f1 || echo "-")
+              echo "$sha" > "out/images/img_${origin}_${label}.sha256.txt"
+              rm -f out/.tmpimg || true
+              case "$hex" in ffd8*) isjpeg=yes;; *) isjpeg=no;; esac
+              ct=$(hval "$hdr" content-type); cl=$(hval "$hdr" content-length)
+              cc=$(hval "$hdr" cache-control); cf=$(hval "$hdr" cf-cache-status)
+              printf '%s\n' "image${TAB}${origin}${TAB}${label}${TAB}${url}${TAB}${code}${TAB}-${TAB}${ct}${TAB}${cc}${TAB}${cf}${TAB}-${TAB}-${TAB}-${TAB}-${TAB}-${TAB}-${TAB}-${TAB}-${TAB}-${TAB}-${TAB}-${TAB}-${TAB}${cl}${TAB}${sha}${TAB}hex=${hex};jpeg=${isjpeg}" >> out/raw.tsv
+            done
+          }
+
+          probe_share custom "$CUSTOM_SHARE" || true
+          probe_share workers "$WORKERS_SHARE" || true
+          probe_image custom "$CUSTOM_IMAGE" || true
+          probe_image workers "$WORKERS_IMAGE" || true
+
+          echo "===== raw.tsv ====="
+          cat out/raw.tsv
+
+          python3 - <<'PY'
+          import csv, json
+          rows=[]
+          with open('out/raw.tsv', newline='') as f:
+              for x in csv.DictReader(f, delimiter='\t'):
+                  rows.append(x)
+          def find(kind, origin, ua):
+              for x in rows:
+                  if x['kind']==kind and x['origin']==origin and x['ua']==ua:
+                      return x
+              return {}
+          share_keys=['origin','ua','status','content_type','cache_control','cf_cache',
+                      'location','x_robots','csp','og_title','og_image','twitter_card',
+                      'og_locale','script','locreplace','refresh','nostore','size','sha256']
+          # Build human matrix
+          lines=['# WhatsApp OG Live Probe — matriz', '', '## /share', '']
+          hdr='| origin | ua | status | og:image | script | no-store | cache-control | cf-cache | sha256(12) |'
+          lines.append(hdr); lines.append('|'+'---|'*9)
+          for o in ['custom','workers']:
+              for u in ['default','browser','fb','wa']:
+                  r=find('share',o,u)
+                  if not r: continue
+                  lines.append('| %s | %s | %s | %s | %s | %s | %s | %s | %s |' % (
+                      o,u,r.get('status','?'),r.get('og_image','?'),r.get('script','?'),
+                      r.get('nostore','?'),(r.get('cache_control','') or '-')[:24],
+                      r.get('cf_cache','') or '-',(r.get('sha256','') or '-')[:12]))
+          lines += ['', '## imagem OG', '', '| origin | ua | status | content_type | content_length | jpeg | cf-cache |', '|'+'---|'*7]
+          for o in ['custom','workers']:
+              for u in ['default','browser','fb','wa']:
+                  r=find('image',o,u)
+                  if not r: continue
+                  extra=r.get('extra','') or ''
+                  jpeg='?'
+                  for part in extra.split(';'):
+                      if part.startswith('jpeg='): jpeg=part.split('=',1)[1]
+                  lines.append('| %s | %s | %s | %s | %s | %s | %s |' % (
+                      o,u,r.get('status','?'),r.get('content_type','?'),
+                      r.get('size','?'),jpeg,r.get('cf_cache','') or '-'))
+          open('out/matrix.md','w').write('\n'.join(lines)+'\n')
+
+          # Auto recommendation A-F (best-effort, read-only)
+          cs_wa=find('share','custom','wa'); cs_br=find('share','custom','browser')
+          ws_wa=find('share','workers','wa'); ci_wa=find('image','custom','wa')
+          findings=[]; suspects=[]; rec=[]
+          def ok(r): return r.get('status')=='200'
+          if not cs_wa or not ok(cs_wa) or cs_wa.get('og_image')!='yes':
+              rec.append('F'); findings.append('custom /share (WhatsApp UA) status=%s og:image=%s' % (cs_wa.get('status'),cs_wa.get('og_image')))
+          if cs_wa and ws_wa and cs_wa.get('sha256') and ws_wa.get('sha256') and cs_wa['sha256']!=ws_wa['sha256']:
+              rec.append('B'); suspects.append('custom /share difere de workers.dev /share (sha256 distinto) — possivel cache/route Cloudflare')
+          if cs_wa and cs_br and cs_wa.get('sha256') and cs_br.get('sha256') and cs_wa['sha256']!=cs_br['sha256']:
+              rec.append('C'); suspects.append('WhatsApp UA recebe /share diferente do navegador (sha256 distinto)')
+          if cs_wa.get('script')=='yes' or cs_wa.get('locreplace')=='yes' or cs_wa.get('refresh')=='yes' or cs_wa.get('nostore')=='yes':
+              rec.append('F'); findings.append('custom /share live ainda tem script/redirect/no-store (esperado: ausentes)')
+          if cs_wa.get('x_robots') or cs_wa.get('csp'):
+              rec.append('E'); suspects.append('headers suspeitos no /share live (x-robots-tag/csp) — provavel Cloudflare')
+          if not ci_wa or not ok(ci_wa):
+              rec.append('D'); findings.append('imagem OG (WhatsApp UA) status=%s' % ci_wa.get('status'))
+          if not rec:
+              rec.append('A'); suspects.append('servidor live OK p/ WhatsApp UA; suspeitar app/config/cache do WhatsApp Business')
+          # dedupe preserving order
+          seen=set(); rec=[x for x in rec if not (x in seen or seen.add(x))]
+          summary={
+              'token_note':'dummy token; /share e token-independent',
+              'recommendation_codes':rec,
+              'recommendation_legend':{
+                  'A':'server OK, suspeitar app WhatsApp',
+                  'B':'custom domain diverge de workers.dev',
+                  'C':'WhatsApp UA recebe resposta diferente',
+                  'D':'imagem falha para WhatsApp UA',
+                  'E':'headers/cache suspeitos',
+                  'F':'HTML live nao corresponde ao esperado'},
+              'findings':findings,'suspects':suspects,
+              'share':{ '%s/%s'%(x['origin'],x['ua']):{k:x.get(k) for k in share_keys} for x in rows if x['kind']=='share'},
+              'image':{ '%s/%s'%(x['origin'],x['ua']):{'status':x.get('status'),'content_type':x.get('content_type'),'content_length':x.get('size'),'cf_cache':x.get('cf_cache'),'extra':x.get('extra')} for x in rows if x['kind']=='image'},
+          }
+          open('out/summary.json','w').write(json.dumps(summary, ensure_ascii=False, indent=2))
+          print('===== summary.json ====='); print(json.dumps(summary, ensure_ascii=False, indent=2))
+          print('===== matrix.md ====='); print(open('out/matrix.md').read())
+          PY
+
+      - name: Upload artefato whatsapp-og-live-probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whatsapp-og-live-probe
+          path: out/
+          retention-days: 30
