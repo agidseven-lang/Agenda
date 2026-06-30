@@ -15,7 +15,9 @@ const server = http.createServer((req, res) => { let f = (req.url || '/').split(
   fs.readFile(path.join(RENDER_DIR, f), (e, b) => { if (e) { res.writeHead(404); res.end('x'); return; } res.writeHead(200, { 'content-type': f.endsWith('.html') ? 'text/html' : 'application/octet-stream' }); res.end(b); }); });
 await new Promise(r => server.listen(0, r));
 const base = `http://127.0.0.1:${server.address().port}/index.html`;
-const browser = await chromium.launch();
+// F3.3.22-GAP-FIX (harness-only): usa um Chromium já instalado via CHROMIUM_BIN (ex.:
+// /opt/pw-browsers/chromium-*/chrome-linux/chrome) sem download automático. Vazio = padrão Playwright.
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_BIN || undefined });
 const LONG_NAME = 'Miercohévisk Niheb Ferreira Nascimento Carlôto';
 const VPS = [{ w: 1366, h: 768 }, { w: 1350, h: 689 }, { w: 1920, h: 1080 }];
 const report = { viewports: [], errors: [] };
