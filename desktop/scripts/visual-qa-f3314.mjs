@@ -61,7 +61,9 @@ const PROBE = () => {
 };
 
 const VIEWPORTS = [{ w: 1366, h: 768 }, { w: 1350, h: 689 }, { w: 1920, h: 1080 }];
-const browser = await chromium.launch();
+// F3.3.22-GAP-FIX (harness-only): usa um Chromium já instalado via CHROMIUM_BIN (ex.:
+// /opt/pw-browsers/chromium-*/chrome-linux/chrome) sem download automático. Vazio = padrão Playwright.
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_BIN || undefined });
 const report = { generatedAt: new Date().toISOString(), viewports: [], dashboardClean: true, headerAligned: true, maxCenterDeltaPx: 0, errors: [] };
 
 for (const vp of VIEWPORTS) {

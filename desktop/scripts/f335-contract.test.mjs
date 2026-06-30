@@ -35,6 +35,10 @@ try {
     fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
     oneLine('hasPendingItemRevision'),
     oneLine('flowCompletedSignal'), oneLine('flowSentToClientSignal'), oneLine('flowClientChangesSignal'),
+    // F3.3.22-GAP-FIX (test-only): deriveCanonicalTaskState chama estes dois helpers de sinal
+    // (Temas aprovados / Temas enviados). Faltavam na extração do sandbox -> ReferenceError em runtime.
+    // Ambos são one-liners e dependem só de hasDesigner (já extraído). Sem alterar produto.
+    oneLine('flowThemesApprovedSignal'), oneLine('flowThemesSentSignal'),
     fnDecl('isTaskCompleted'), fnDecl('isFullyComplete'), fnDecl('clientCol'), fnDecl('socialCol'),
     fnDecl('deriveCanonicalTaskState'),
     'return { deriveCanonicalTaskState, clientCol, socialCol, designerCol, TASK_PHASE };',

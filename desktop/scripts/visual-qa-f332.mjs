@@ -32,7 +32,9 @@ const server = http.createServer((req, res) => {
 });
 await new Promise(r => server.listen(0, r));
 const base = `http://127.0.0.1:${server.address().port}/index.html`;
-const browser = await chromium.launch();
+// F3.3.22-GAP-FIX (harness-only): usa um Chromium já instalado via CHROMIUM_BIN (ex.:
+// /opt/pw-browsers/chromium-*/chrome-linux/chrome) sem download automático. Vazio = padrão Playwright.
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_BIN || undefined });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 2 });
 const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
