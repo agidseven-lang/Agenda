@@ -113,7 +113,6 @@ function shareCardHtml(origin, token) {
     '<title>' + escapeHtml(title) + '</title>\n' +
     '<meta name="description" content="' + escapeHtml(desc) + '"/>\n' +
     '<meta name="theme-color" content="#5B6CFF"/>\n' +
-    '<meta name="robots" content="noindex,nofollow"/>\n' +
     '</head><body style="margin:0;background:#070810;color:#e9edef;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif">\n' +
     '<div style="max-width:520px;margin:0 auto;padding:52px 22px;text-align:center">\n' +
     '<h1 style="font-size:20px;margin:0 0 8px;font-weight:800">' + escapeHtml(title) + '</h1>\n' +
