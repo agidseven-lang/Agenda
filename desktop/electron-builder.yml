@@ -12,6 +12,12 @@ files:
   - package.json
   - "!**/*.map"
   - "!node_modules/firebase/**/{*.md,*.ts,LICENSE,*.flow,docs/**}"
+# F3.3.22-TRAY-FIX — empacota o icone do tray como recurso REAL em disco (resources/icon.png),
+# resolvendo process.resourcesPath/icon.png usado por src/main/tray.ts (candidato #2). Sem isto,
+# build/icon.png nao entra no pacote e o Tray cai em nativeImage.createEmpty() -> icone invisivel.
+extraResources:
+  - from: build/icon.png
+    to: icon.png
 win:
   target:
     - target: nsis
