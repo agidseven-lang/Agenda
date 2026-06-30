@@ -99,37 +99,14 @@ function crawlerCardHtml(origin, clientName, token) {
     '<p><a href="' + escapeHtml(link) + '">Abrir área de aprovação</a></p>\n' +
     '</body></html>';
 }
-function waCardHtml(origin, token) {
-  // V64.60 — rota WhatsApp-specific: HTML ULTRA-SIMPLES, OG-only, SEM script de redirect, SEM
-  // beacon, SEM no-store. So OG no topo do <head> + link MANUAL no body p/ humanos (sem auto
-  // redirect). Token-independent (HTTP 200 p/ qualquer token). NAO substitui /share (intacta).
-  const base = ogClientBase(origin);
-  const title = "Aprovar cronograma";
-  const desc = "Seu cronograma está pronto para avaliação.";
-  const portal = base + "/cliente/cronograma/" + token;
-  return '<!doctype html>\n<html lang="pt-BR"><head>\n<meta charset="utf-8"/>\n' +
-    ogClientMeta(origin, title, desc, "/wa/cronograma/" + token) +
-    '<meta name="viewport" content="width=device-width, initial-scale=1"/>\n' +
-    '<title>' + escapeHtml(title) + '</title>\n' +
-    '<meta name="description" content="' + escapeHtml(desc) + '"/>\n' +
-    '</head><body style="margin:0;background:#070810;color:#e9edef;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif">\n' +
-    '<div style="max-width:520px;margin:0 auto;padding:52px 22px;text-align:center">\n' +
-    '<h1 style="font-size:20px;margin:0 0 8px;font-weight:800">' + escapeHtml(title) + '</h1>\n' +
-    '<p style="color:#9aa3ad;line-height:1.5;margin:0 0 20px">' + escapeHtml(desc) + '</p>\n' +
-    '<p><a href="' + escapeHtml(portal) + '" style="display:inline-block;background:linear-gradient(135deg,#5B6CFF,#22D3EE 60%,#10B981);color:#fff;text-decoration:none;font-weight:800;padding:13px 22px;border-radius:12px">Abrir area de aprovacao →</a></p>\n' +
-    '</div>\n' +
-    '</body></html>';
-}
-
 function shareCardHtml(origin, token) {
   // V64.39 — pagina LEVE so para preview OG (WhatsApp/Facebook/Twitter/Telegram/LinkedIn).
   // OG/Twitter PRIMEIRO no <head>, ANTES de qualquer script. og:image absoluto HTTPS 1200x630
-  // (image/jpeg). Humanos sao redirecionados (JS) ao portal; crawlers leem o card e param.
+  // (image/jpeg). SEM script/redirect: humano abre por LINK MANUAL; crawler le o card e para.
   const base = ogClientBase(origin);
   const title = "Aprovar cronograma";
   const desc = "Seu cronograma está pronto para avaliação.";
   const portal = base + "/cliente/cronograma/" + token;
-  const tj = JSON.stringify(token);
   return '<!doctype html>\n<html lang="pt-BR"><head>\n<meta charset="utf-8"/>\n' +
     ogClientMeta(origin, title, desc, "/share/cronograma/" + token) +
     '<meta name="viewport" content="width=device-width, initial-scale=1"/>\n' +
@@ -142,7 +119,6 @@ function shareCardHtml(origin, token) {
     '<p style="color:#9aa3ad;line-height:1.5;margin:0 0 20px">' + escapeHtml(desc) + '</p>\n' +
     '<p><a id="go" href="' + escapeHtml(portal) + '" style="display:inline-block;background:linear-gradient(135deg,#5B6CFF,#22D3EE 60%,#10B981);color:#fff;text-decoration:none;font-weight:800;padding:13px 22px;border-radius:12px">Abrir area de aprovacao \u2192</a></p>\n' +
     '</div>\n' +
-    '<script>try{location.replace("/cliente/cronograma/"+' + tj + ');}catch(e){}</script>\n' +
     '</body></html>';
 }
 
@@ -306,16 +282,7 @@ export default {
     {
       const shareMatch = url.pathname.match(/^\/share\/cronograma\/([A-Za-z0-9_-]{4,128})\/?$/);
       if (shareMatch && request.method === "GET") {
-        return htmlResponse(shareCardHtml(url.origin, shareMatch[1]), 200);
-      }
-    }
-
-    // V64.60 — rota WhatsApp-specific (preview WhatsApp Business): HTML ultra-simples OG-only,
-    // SEM redirect JS, resposta CACHEAVEL (sem no-store). NAO quebra /share (mantida acima).
-    {
-      const waMatch = url.pathname.match(/^\/wa\/cronograma\/([A-Za-z0-9_-]{4,128})\/?$/);
-      if (waMatch && request.method === "GET") {
-        return htmlResponseCacheable(waCardHtml(url.origin, waMatch[1]), 200);
+        return htmlResponseCacheable(shareCardHtml(url.origin, shareMatch[1]), 200);
       }
     }
 
@@ -2471,7 +2438,7 @@ async function writeClientLastAction(env, accessToken, taskId, action) {
 
 function htmlResponseCacheable(html, status) {
   // V64.60 — resposta HTML CACHEAVEL p/ crawlers de preview (WhatsApp Business): SEM no-store.
-  // Content-Type explicito. Usada pela rota WhatsApp-specific /wa/cronograma (nao afeta /share).
+  // Content-Type explicito. Usada pela rota canonica /share/cronograma (preview WhatsApp Business).
   return new Response(html, {
     status: status || 200,
     headers: {
