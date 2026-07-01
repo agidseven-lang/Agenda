@@ -5606,6 +5606,11 @@ var __clientOpenedMark = false;
     }
     return false;
   }
+  /* F3.3.28 users-read-hardening (DORMENTE; flag OFF por padrao): a assinatura crua de
+     `users` fica ATRAS do gate. OFF => comportamento legado 100% identico. ON => nao inicia
+     a leitura crua de `users` (roster via usersPublic em startUsersRosterSync; "eu" via
+     login server-side/getUserSelf). NAO fecha Rules, NAO muda o default. */
+  if(!usersReadHardeningEnabled()){
   db.collection("users").onSnapshot(snap=>{
     var newUsers = snap.docs.map(d=>({id:d.id,...d.data()}));
     var changedBeyondPresence = _usersDifferIgnoringPresence(_prevUsersForCompare, newUsers);
@@ -5665,6 +5670,7 @@ var __clientOpenedMark = false;
       }
     }catch(_){}
   },err=>{$("syncBadge").classList.add("off");$("syncBadge").querySelector("span").textContent="sem conexão";});
+  } /* F3.3.28: fim do gate users-read-hardening (assinatura crua `users`) */
   try{ startUsersRosterSync(); }catch(_){}
   db.collection("events").onSnapshot(snap=>{
     events=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -6063,7 +6069,8 @@ $("doReg").onclick=async()=>{
   try{
     // garante lista de usuários atualizada (evita criar admin duplicado / cadastro repetido)
     let list=users;
-    if(!usersLoaded){
+    /* F3.3.28 users-read-hardening: com a flag ON, NAO faz leitura crua de `users` no cadastro. */
+    if(!usersLoaded && !usersReadHardeningEnabled()){
       try{ const s=await withTimeout(db.collection("users").get(),12000);
             list=s.docs.map(d=>({id:d.id,...d.data()})); }catch(_){}
     }
@@ -8466,7 +8473,7 @@ async function sendPushToUsers(userIds, payload){
     var uid = ids[i];
     var freshTokens = null;
     try{
-      if(db){
+      if(db && !usersReadHardeningEnabled()){ /* F3.3.28: com a flag ON, nao le `users` cru p/ tokens (cai no cache em memoria) */
         var snap = await db.collection("users").doc(uid).get();
         if(snap.exists){
           var data = snap.data() || {};
