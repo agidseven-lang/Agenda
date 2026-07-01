@@ -157,6 +157,10 @@ jobs:
       - name: Publicar SOMENTE canal preview (apenas se dry_run=false)
         env:
           DR: ${{ github.event.inputs.dry_run }}
+          # F3.3.33-A2G: define CH neste step (mesmo padrao dos steps de guards/comando).
+          # Sem isto, o echo do branch de sucesso (rollback) usava $CH indefinido e, sob
+          # set -u, abortava o step APOS um deploy bem-sucedido (bug pos-deploy cosmetico).
+          CH: ${{ github.event.inputs.preview_channel }}
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
           set -eu
