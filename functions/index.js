@@ -1622,6 +1622,96 @@ exports._authMaskFcmToken = authMaskFcmToken;
 exports._authFcmReadState = authFcmReadState;
 
 /* ============================================================================
+   F3.3.48 — checkUserExists (duplicate-check de CADASTRO, server-side).
+   ----------------------------------------------------------------------------
+   - Move o duplicate-check de email/phone que hoje o cliente faz lendo `users`
+     cru (db.collection("users").get()) para o servidor. O Admin SDK (notifDb)
+     ignora Rules, entao continua funcionando quando users read for fechado.
+   - NAO-autenticado por natureza (o cadastro e PRE-login/PRE-sessao). Rate-limit
+     IN-MEMORY por IP (anti-abuso/enumeracao). CORS restrito (NOTIF_CORS_ORIGINS),
+     sem wildcard. NAO expoe informacao nova: o app legado ja revela "ja existe"
+     no proprio formulario de cadastro; aqui a resposta e um booleano minimo.
+   - Resposta MINIMA: SOMENTE { ok, exists, field? }. field ∈ {"email","phone"}
+     apenas quando exists=true. NUNCA retorna pass/salt/fcmTokens/fcmTokenMeta/
+     token/doc cru/phone/email de ninguem/qualquer PII.
+   - So LE users (server-side); NUNCA escreve. Normaliza email (trim+lowercase) e
+     phone (so digitos), espelhando exatamente o duplicate-check legado do cliente.
+   - Handler PURO testavel: ctx.db injetavel (mock); helper puro dupCheckAgainstUsers
+     testado sem Firestore real. DORMENTE: NAO deployado; sem UI ligada com flag OFF.
+   ============================================================================ */
+const DUPCHECK_EMAIL_MAX_LEN = 254;   // RFC 5321 addr-spec
+const DUPCHECK_PHONE_MAX_DIGITS = 32;
+// PURO: dado email/phone JA normalizados e a lista de docs {email,phone}, decide
+// duplicidade. email tem prioridade (espelha a ordem das mensagens do cliente).
+function dupCheckAgainstUsers(email, phone, docs) {
+  const e = String(email || "").trim().toLowerCase();
+  const p = String(phone || "").replace(/\D/g, "");
+  const list = Array.isArray(docs) ? docs : [];
+  if (e) {
+    for (let i = 0; i < list.length; i++) {
+      const u = list[i] || {};
+      if (String(u.email || "").trim().toLowerCase() === e) return { exists: true, field: "email" };
+    }
+  }
+  if (p) {
+    for (let i = 0; i < list.length; i++) {
+      const u = list[i] || {};
+      if (String(u.phone || "").replace(/\D/g, "") === p) return { exists: true, field: "phone" };
+    }
+  }
+  return { exists: false, field: "unknown" };
+}
+async function handleCheckUserExists(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : {};
+  const email = (typeof body.email === "string") ? body.email.trim().toLowerCase() : "";
+  const phone = (typeof body.phone === "string") ? body.phone.replace(/\D/g, "") : "";
+  if (!email && !phone) return { status: 400, json: { ok: false, error: "missing_fields" } };
+  if (email.length > DUPCHECK_EMAIL_MAX_LEN || phone.length > DUPCHECK_PHONE_MAX_DIGITS) return { status: 400, json: { ok: false, error: "bad_input" } };
+  // Rate-limit por IP (endpoint nao-autenticado). Chave namespaced ("d:") isolada.
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ip ? ["d:" + ip] : [];
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const db = (ctx && ctx.db) || notifDb();
+  let docs;
+  try {
+    const snap = await db.collection("users").get();
+    docs = (snap && Array.isArray(snap.docs)) ? snap.docs.map((d) => (typeof d.data === "function" ? (d.data() || {}) : {})) : [];
+  } catch (e) {
+    try { logger.error("[checkUserExists] leitura falhou", { err: e && e.message }); } catch (_) {}
+    rlKeys.forEach((k) => notifRlFail(k, now));
+    return { status: 500, json: { ok: false, error: "lookup_failed" } };
+  }
+  const r = dupCheckAgainstUsers(email, phone, docs);
+  rlKeys.forEach((k) => notifRlClear(k));
+  // Log sem PII: so o resultado agregado (existe? qual campo?), nunca o email/phone consultado.
+  try { logger.info("[checkUserExists] ok", { exists: r.exists, field: (r.exists ? r.field : "none") }); } catch (_) {}
+  // Resposta MINIMA: SOMENTE {ok,exists,field?}. NUNCA doc/PII/credencial.
+  return { status: 200, json: (r.exists ? { ok: true, exists: true, field: r.field } : { ok: true, exists: false }) };
+}
+// Wrapper HTTPS (onRequest). SEM secret (nao-autenticado; pre-cadastro). DORMENTE: NAO
+// deployado nesta fase; a UI so chama com users_read_hardening=ON (flag OFF por padrao).
+exports.checkUserExists = onRequest({ region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleCheckUserExists({ method: req.method, body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[checkUserExists] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+// Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
+exports._handleCheckUserExists = handleCheckUserExists;
+exports._dupCheckAgainstUsers = dupCheckAgainstUsers;
+
+/* ============================================================================
    F3.3.20-B1.7-E — SLICE 2: projecao publica segura (projectUserPublicOut).
    ----------------------------------------------------------------------------
    - Helper PURO de projeccao para a futura colecao usersPublic: allowlist EXPLICITA

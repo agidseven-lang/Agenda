@@ -5233,6 +5233,19 @@ async function getUserContactClient(uid){
     return { ok:true, contact:(data.contact||null) };
   }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; sem PII/segredo */
 }
+/* F3.3.48 — POST checkUserExists (duplicate-check de CADASTRO, server-side). SEM sessão
+   (o cadastro é pré-login). Retorna {ok,exists,field}. Resposta mínima; o servidor NUNCA
+   devolve PII/doc/credencial. Endpoint ATIVO só após deploy futuro; consumido só com a flag ON. */
+const AUTH_DUPCHECK_URL_DEFAULT = "https://checkuserexists-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; ATIVO só após deploy (fase futura) */
+function authDupCheckUrl(){ try{ const o=lsGet("auth_dupcheck_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_DUPCHECK_URL_DEFAULT; }
+async function checkUserExistsClient(email, phone){
+  try{
+    const res=await fetch(authDupCheckUrl(), { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ email:String(email||""), phone:String(phone||"") }) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"dupcheck_failed" };
+    return { ok:true, exists:(data.exists===true), field:(typeof data.field==="string"?data.field:"unknown") };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; sem PII/segredo */
+}
 
 /* ============================================================================
    F3.3.21-B3.20 — FCM token server-side (DORMENTE; flag fcm_token_server OFF por padrão).
@@ -6166,19 +6179,36 @@ $("doReg").onclick=async()=>{
   try{
     // garante lista de usuários atualizada (evita criar admin duplicado / cadastro repetido)
     let list=users;
-    /* F3.3.28 users-read-hardening: com a flag ON, NAO faz leitura crua de `users` no cadastro. */
-    if(!usersLoaded && !usersReadHardeningEnabled()){
-      try{ const s=await withTimeout(db.collection("users").get(),12000);
-            list=s.docs.map(d=>({id:d.id,...d.data()})); }catch(_){}
-    }
-    if(list.some(u=>(u.email||"").toLowerCase()===email)){
-      showErr("Já existe um cadastro com este e-mail. Use a opção \"Entrar\".");
-      btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
-    }
     const pd=phone.replace(/\D/g,"");
-    if(list.some(u=>(u.phone||"").replace(/\D/g,"")===pd)){
-      showErr("Já existe um cadastro com este WhatsApp. Use a opção \"Entrar\".");
-      btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
+    /* F3.3.28/F3.3.48 users-read-hardening: com a flag ON, o duplicate-check NÃO lê `users` cru
+       (usersPublic é PII-free, não serve p/ checar email/phone) — usa o endpoint server-side
+       checkUserExists. OFF (padrão): caminho legado 100% intacto (fetch de users + checagem em memória). */
+    if(usersReadHardeningEnabled()){
+      let dc=null;
+      try{ dc=await withTimeout(checkUserExistsClient(email,phone),12000); }catch(_){ dc=null; }
+      if(!dc || dc.ok!==true){
+        showErr("Não foi possível verificar seu cadastro agora. Verifique a internet e tente de novo.");
+        btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
+      }
+      if(dc.exists){
+        showErr(dc.field==="phone"
+          ? "Já existe um cadastro com este WhatsApp. Use a opção \"Entrar\"."
+          : "Já existe um cadastro com este e-mail. Use a opção \"Entrar\".");
+        btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
+      }
+    }else{
+      if(!usersLoaded){
+        try{ const s=await withTimeout(db.collection("users").get(),12000);
+              list=s.docs.map(d=>({id:d.id,...d.data()})); }catch(_){}
+      }
+      if(list.some(u=>(u.email||"").toLowerCase()===email)){
+        showErr("Já existe um cadastro com este e-mail. Use a opção \"Entrar\".");
+        btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
+      }
+      if(list.some(u=>(u.phone||"").replace(/\D/g,"")===pd)){
+        showErr("Já existe um cadastro com este WhatsApp. Use a opção \"Entrar\".");
+        btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
+      }
     }
     const first=list.length===0;
     const _salt=randSalt(); const _ph=await hashPw(pass,_salt);
