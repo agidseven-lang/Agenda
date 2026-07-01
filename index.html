@@ -8188,6 +8188,11 @@ async function _setupPushNotificationsInternal(){
       }
       _finalCount = (typeof _reg.count === "number") ? _reg.count : _finalCount;
       _pushDbg("12b-server-register", "device=" + devId + " (" + platform + "); registerFcmToken OK; total agora=" + _finalCount);
+    } else if(usersReadHardeningEnabled()){
+      /* F3.3.30 users-read-hardening: com a flag ON e fcm_token_server OFF, NAO roda o save
+         legado por transacao (evitaria tx.get em `users`). Token nao e salvo pelo caminho
+         legado (degradado controlado); no cutover pareado (fcm_token_server ON) usa o servidor. */
+      try{ _pushDbg("12-legacy-skip-hardening-on", "users_read_hardening ON sem fcm_token_server: save legado pulado (sem leitura crua de users)"); }catch(_){}
     } else {
     await savedDb.runTransaction(async function(tx){
       var doc = await tx.get(userRef);
