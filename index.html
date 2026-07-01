@@ -5326,6 +5326,82 @@ async function hydrateSelfFromServerIfEnabled(){
   }catch(_){ return false; } /* nunca quebra a UI; sem log de token/PII */
 }
 
+/* ============================================================================
+   F3.3.46 — Integração client-side FLAG-GATED de getUserContact (DORMENTE).
+   Quando users_read_hardening==="on" E houver sessão server-side, busca phone/email
+   do PRÓPRIO usuário SOB DEMANDA (perfil/conta) via getUserContactClient e cacheia
+   SOMENTE em memória (nunca localStorage/Firestore), por uid, invalidando ao trocar
+   usuário/sessão (logout). Com a flag OFF (padrão) é NO-OP total: nenhuma chamada; o
+   contato vem de me.phone/me.email (legado) exatamente como hoje. NÃO busca contato de
+   terceiros no roster (equipe fica role-only quando ON — usersPublic é PII-free). Não
+   persiste PII em lugar nenhum. NUNCA loga token/phone/email.
+   ============================================================================ */
+let serverContactCache = {};                 /* { uid: {phone,email} } — SOMENTE em memória; PII sob demanda */
+let _contactHydrateInFlight = false;         /* evita fetch duplicado/loop de re-render */
+function serverContactGet(uid){ try{ const c=serverContactCache[String(uid||"")]; return (c && typeof c==="object") ? c : null; }catch(_){ return null; } }
+function serverContactClear(){ serverContactCache = {}; _contactHydrateInFlight = false; } /* invalida ao trocar usuário/sessão */
+/* Hidratação FLAG-GATED do contato (phone/email) de um uid via getUserContact. NO-OP com a
+   flag OFF. Só chama se: flag ON + sessão presente. Em sucesso, cacheia {phone,email} em RAM
+   (allowlist explícita — só strings). Erro/403/404 => retorna null e NÃO cacheia (mantém o
+   fallback e nunca grava lixo). NUNCA loga token/PII. */
+async function hydrateContactFromServerIfEnabled(uid){
+  try{
+    if(!usersReadHardeningEnabled()) return null;              /* flag OFF (padrão) => nenhuma chamada */
+    const s=authGetSession(); if(!s || !s.token) return null;  /* sem sessão => não chama */
+    const id=String(uid||""); if(!id) return null;
+    const r=await getUserContactClient(id);
+    if(!r || r.ok!==true || !r.contact) return null;           /* erro/negado => mantém fallback */
+    const c=r.contact;
+    const norm={ phone:(typeof c.phone==="string"?c.phone:""), email:(typeof c.email==="string"?c.email:"") };
+    serverContactCache[id]=norm;                               /* cache SOMENTE em memória, por uid */
+    return norm;
+  }catch(_){ return null; } /* nunca quebra a UI; sem log de token/PII */
+}
+/* Valor de contato do PRÓPRIO usuário p/ exibir/editar no perfil, honrando a flag.
+   OFF (padrão): me[field] (legado idêntico). ON: usa o cache em memória de getUserContact;
+   se ainda não hidratado, retorna "" (me[field] já é vazio com a flag ON) — a hidratação
+   assíncrona re-renderiza quando chega. NUNCA vaza PII em log. */
+function meContactField(field){
+  try{
+    if(usersReadHardeningEnabled()){
+      const c = (me && me.id) ? serverContactGet(me.id) : null;
+      return (c && typeof c[field]==="string") ? c[field] : "";
+    }
+    return (me && typeof me[field]==="string") ? me[field] : "";
+  }catch(_){ return ""; }
+}
+/* true quando é seguro gravar phone/email do próprio usuário. OFF => sempre true (legado).
+   ON => só true se o contato já foi hidratado do servidor (evita salvar em branco). */
+function meContactHydrated(){ try{ if(!usersReadHardeningEnabled()) return true; return !!(me && me.id && serverContactGet(me.id)); }catch(_){ return false; } }
+/* Dispara (idempotente) a hidratação sob demanda do contato próprio quando ON. Sem loop:
+   só busca se ON + sessão + me.id + cache vazio + nenhum fetch em voo. Ao chegar: se a tela
+   de Conta está aberta, preenche os inputs SÓ se ainda vazios (não sobrescreve o que o
+   usuário digitou); caso contrário, re-renderiza (perfil é somente-leitura). NO-OP com OFF. */
+function ensureOwnContactHydrated(){
+  try{
+    if(!usersReadHardeningEnabled()) return;   /* flag OFF (padrão) => NO-OP */
+    if(!me || !me.id) return;
+    if(serverContactGet(me.id)) return;        /* já em cache */
+    if(_contactHydrateInFlight) return;        /* já buscando */
+    const s=authGetSession(); if(!s || !s.token) return;
+    _contactHydrateInFlight = true;
+    hydrateContactFromServerIfEnabled(me.id).then(function(c){
+      _contactHydrateInFlight = false;
+      if(!c) return;
+      var pe=null, ee=null;
+      try{ pe=document.getElementById("setPhone"); ee=document.getElementById("setEmail"); }catch(_){}
+      if(pe || ee){
+        /* Form de Conta aberto: preenche só se ainda vazio (evita clobber do que foi digitado) */
+        try{ if(pe && !pe.value) pe.value = c.phone||""; }catch(_){}
+        try{ if(ee && !ee.value) ee.value = c.email||""; }catch(_){}
+      }else{
+        /* Perfil (somente leitura) ou outra tela: re-render seguro reflete o contato */
+        try{ if(typeof render==="function") render(); }catch(_){}
+      }
+    }).catch(function(){ _contactHydrateInFlight = false; });
+  }catch(_){ _contactHydrateInFlight = false; }
+}
+
 function fbAvatar(n){const i=(n||"?").trim().charAt(0).toUpperCase()||"?";
   return `<div style="width:100%;height:100%;background:var(--surface-2);display:grid;place-items:center;font-weight:800;color:var(--ink-soft);font-size:15px">${i}</div>`;}
 function safePhoto(p){
@@ -6152,6 +6228,8 @@ function logout(){
   try{ notifPrefsDraftState = null; notifPrefsTokenCache = null; notifPrefsHydrateTried = false; notifPrefsLoadState = "idle"; }catch(_){}
   /* F3.3.21-B2 — limpa a sessão server-side (token HMAC) p/ não vazar entre usuários */
   try{ authClearSession(); }catch(_){}
+  /* F3.3.46 — invalida o cache de contato (phone/email) em memória p/ não vazar entre usuários/sessões */
+  try{ serverContactClear(); }catch(_){}
   /* [V62.9 — I3] Cancela timers ao deslogar (evita memory leak em SPA) */
   if(alarmTimer){clearInterval(alarmTimer);alarmTimer=null;alarmSeeded=false;}
   if(boardTimer){clearInterval(boardTimer);boardTimer=null;}
@@ -7269,6 +7347,7 @@ function render(){
   else if(tab==="calendar"){c.innerHTML=renderContentCalendar();bindContentCalendar();}
   else if(tab==="settings"){c.innerHTML=renderSettings();bindSettings();}
   else{c.innerHTML=renderProfile();$("logoutBtn").onclick=logout;
+    ensureOwnContactHydrated(); /* F3.3.46: sob users_read_hardening ON, hidrata phone/email próprios via getUserContact; NO-OP com OFF */
     document.querySelectorAll(".cp-dot").forEach(b=>b.onclick=()=>setMyColor(b.dataset.color));
     var bb=$("backupBtn"); if(bb){ bb.onclick=exportBackup;
       var last=lsGet("idseven_lastbackup"); if(last&&$("bkTip")) $("bkTip").textContent="Último backup: "+last+" · faça um por semana e guarde em local seguro."; }
@@ -7368,7 +7447,7 @@ function personRow(u,p){
   const online = !p && isUserOnline(u);
   const presenceTxt = p ? '' : '<div class="last-seen"><span class="dot"></span>'+esc(presenceLabel(u))+'</div>';
   const rowClass = online ? 'person online' : 'person';
-  return '<div class="'+rowClass+'"><div class="pa" style="--user-color:'+userColor(u)+'">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+tag+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+' · '+esc(u.phone)+'</div>'+presenceTxt+'</div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':admBtn||'<span class="pst ok">Ativo</span>')+'</div>';
+  return '<div class="'+rowClass+'"><div class="pa" style="--user-color:'+userColor(u)+'">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+tag+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+(usersReadHardeningEnabled()?'':(' · '+esc(u.phone)))+'</div>'+presenceTxt+'</div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':admBtn||'<span class="pst ok">Ativo</span>')+'</div>';
 }
 function bindTeam(){
   document.querySelectorAll("[data-ap]").forEach(b=>b.onclick=async()=>{
@@ -7399,8 +7478,8 @@ function bindTeam(){
 function renderProfile(){
   const row=(svg,l,v)=>'<div class="pl"><div class="pic"><svg viewBox="0 0 24 24" fill="none">'+svg+'</svg></div><div class="px"><div class="l">'+l+'</div><div class="v">'+esc(v||"—")+'</div></div></div>';
   return '<div class="prof"><div class="pa" style="box-shadow:0 0 0 3px '+userColor(me)+'">'+avatarHTML(me)+'</div><h2>'+esc(me.name)+'</h2><div class="role">'+esc(me.role)+(me.admin?' · admin':'')+'</div><div class="prof-card">'+
-    row('<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2"/>',"WhatsApp",me.phone)+
-    row('<rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="2"/>',"E-mail",me.email)+
+    row('<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2"/>',"WhatsApp",meContactField("phone"))+
+    row('<rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="2"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="2"/>',"E-mail",meContactField("email"))+
     '<div class="color-pick"><div class="cp-h"><div class="l">Sua cor no Quadro</div><span class="cp-now" style="background:'+userColor(me)+'"></span></div><div class="cp-grid">'+
       USER_COLORS.map(c=>{
         const taker=users.find(x=>isUserActive(x)&&x.id!==me.id&&userColor(x)===c);
@@ -9416,8 +9495,8 @@ function renderSettingsAccount(){
       '<div class="set-section-h">Dados pessoais</div>'+
       field("setName", "Nome completo", me.name, "text", "Seu nome")+
       field("setRole", "Função na agência", me.role, "text", "Ex: Social Media, Videomaker")+
-      field("setPhone", "WhatsApp", me.phone, "tel", "Ex: 88 9 9999-9999")+
-      field("setEmail", "E-mail", me.email, "email", "voce@agencia.com")+
+      field("setPhone", "WhatsApp", meContactField("phone"), "tel", "Ex: 88 9 9999-9999")+
+      field("setEmail", "E-mail", meContactField("email"), "email", "voce@agencia.com")+
       '<button class="set-btn-primary" id="setSaveAcc">Salvar alterações</button>'+
     '</div>'+
     /* Senha */
@@ -9432,6 +9511,7 @@ function renderSettingsAccount(){
 }
 
 function bindSettingsAccount(){
+  ensureOwnContactHydrated(); /* F3.3.46: hidrata phone/email próprios via getUserContact sob users_read_hardening ON; NO-OP com OFF */
   var bk = document.getElementById("setBack");
   if(bk) bk.onclick = ()=>{ settingsView="main"; render(); };
   /* Foto */
@@ -9481,8 +9561,14 @@ function bindSettingsAccount(){
     saveBtn.disabled=true; saveBtn.textContent="Salvando…";
     try{
       var updates = {name:name, role:role, phone:phone, email:email};
+      /* F3.3.46: com users_read_hardening ON, phone/email vêm de getUserContact (cache em
+         memória). Se o contato NÃO foi hidratado (fetch falhou/pendente), NÃO grava phone/email
+         em branco — evita perda de dado. OFF: comportamento legado 100% intacto. */
+      if(usersReadHardeningEnabled() && !meContactHydrated()){ delete updates.phone; delete updates.email; }
       await db.collection("users").doc(me.id).update(updates);
       Object.assign(me, updates);
+      /* mantém o cache de contato em memória coerente com o que acabou de ser salvo (só ON) */
+      if(usersReadHardeningEnabled() && me && me.id && ("phone" in updates)){ serverContactCache[me.id] = { phone:phone, email:email }; }
       toast("Dados atualizados ✓");
     }catch(e){ toast("Erro ao salvar"); console.error(e); }
     finally{ busy=false; saveBtn.disabled=false; saveBtn.textContent="Salvar alterações"; }
@@ -9530,7 +9616,7 @@ function renderSettingsSecurity(){
     '<div class="set-section">'+
       '<div class="set-section-h">Sessão atual</div>'+
       '<div class="set-info-card">'+
-        '<div class="set-info-row"><span>Conectado como</span><b>'+esc(me.email||me.name)+'</b></div>'+
+        '<div class="set-info-row"><span>Conectado como</span><b>'+esc(meContactField("email")||me.name)+'</b></div>'+
         '<div class="set-info-row"><span>Status</span><b style="color:var(--c-trafego)">Ativo</b></div>'+
         '<div class="set-info-row"><span>Sincronização</span><b style="color:var(--c-trafego)">Tempo real</b></div>'+
       '</div>'+
