@@ -1712,6 +1712,92 @@ exports._handleCheckUserExists = handleCheckUserExists;
 exports._dupCheckAgainstUsers = dupCheckAgainstUsers;
 
 /* ============================================================================
+   F3.3.49 — changePassword (troca de senha do PROPRIO usuario, server-side).
+   ----------------------------------------------------------------------------
+   - Move a troca de senha que hoje o cliente faz lendo me.pass/me.salt, validando
+     a senha antiga (verifyPw) e gerando hash/salt no client, para o servidor.
+   - Session-gated (authVerifySessionToken): opera SOMENTE no proprio usuario
+     (session.uid); NUNCA outro uid (nao ha uid no body — o alvo e sempre auth.uid).
+   - Valida a senha ATUAL no servidor (notifVerifyPassword, timing-safe, s2:+legado),
+     gera novo salt/hash no MESMO esquema (hashPw/randSalt) e atualiza SOMENTE pass/salt
+     via .update() (NUNCA admin/role/status/email/phone/fcmTokens). So escreve users/<uid>.
+   - Rate-limit IN-MEMORY por session.uid + IP (falha conta; sucesso limpa). NUNCA loga
+     oldPassword/newPassword/hash/salt/token (so uid mascarado). Nao emite sessao nova nem
+     invalida as existentes (sem politica de revogacao definida).
+   - Request: { oldPassword, newPassword }. Response: { ok:true } | { ok:false, error }.
+     error ∈ {invalid_current_password, weak_password, unauthorized, bad_request, rate_limited}.
+     NUNCA retorna pass/salt/hash/token/doc/PII.
+   - Handler PURO testavel: ctx.db injetavel (mock). DORMENTE sem AUTH_SESSION_SECRET => 401.
+     NAO deployado; a UI so chama com users_read_hardening=ON (flag OFF por padrao).
+   ============================================================================ */
+const CHPW_MIN_LEN = 6;               // espelha o minimo do app (setSavePass: "Minimo 6 caracteres")
+const CHPW_MAX_LEN = 512;             // teto defensivo (anti-DoS de hashing)
+async function handleChangePassword(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  // Autenticacao de SESSAO estrita (assinatura + exp + scope=session via AUTH_SESSION_SECRET).
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "unauthorized" } };
+  // Rate-limit por requester (uid da sessao) + IP. Chaves namespaced ("pw:"/"pwi:") isoladas.
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["pw:" + auth.uid].concat(ip ? ["pwi:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  // Body.
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : {};
+  const oldPw = (typeof body.oldPassword === "string") ? body.oldPassword : "";
+  const newPw = (typeof body.newPassword === "string") ? body.newPassword : "";
+  if (!oldPw || !newPw) return { status: 400, json: { ok: false, error: "bad_request" } };
+  if (oldPw.length > CHPW_MAX_LEN || newPw.length > CHPW_MAX_LEN) return { status: 400, json: { ok: false, error: "bad_request" } };
+  if (newPw.length < CHPW_MIN_LEN) return { status: 400, json: { ok: false, error: "weak_password" } };
+  const db = (ctx && ctx.db) || notifDb();
+  // Le SOMENTE o proprio doc (auth.uid) p/ validar a senha atual no servidor.
+  let snap;
+  try { snap = await db.collection("users").doc(auth.uid).get(); }
+  catch (e) {
+    try { logger.error("[changePassword] leitura falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "internal" } };
+  }
+  if (!snap || !snap.exists) return { status: 401, json: { ok: false, error: "unauthorized" } };
+  const d = (typeof snap.data === "function" ? snap.data() : null) || {};
+  // Valida a senha ATUAL no servidor (timing-safe). Falha => conta no rate-limit.
+  if (!notifVerifyPassword(d.pass, d.salt, oldPw)) {
+    rlKeys.forEach((k) => notifRlFail(k, now));
+    return { status: 401, json: { ok: false, error: "invalid_current_password" } };
+  }
+  // Gera novo salt/hash no MESMO esquema (server-side). NUNCA logados.
+  const newSalt = randSalt();
+  const newHash = hashPw(newPw, newSalt);
+  // Atualiza SOMENTE pass/salt do proprio usuario (merge parcial; nao toca outros campos).
+  try { await db.collection("users").doc(auth.uid).update({ pass: newHash, salt: newSalt }); }
+  catch (e) {
+    try { logger.error("[changePassword] update falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "internal" } };
+  }
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[changePassword] ok", { uid: notifMaskUid(auth.uid) }); } catch (_) {}   // NUNCA senha/hash/salt/token
+  return { status: 200, json: { ok: true } };
+}
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). Session-gated: precisa de
+// AUTH_SESSION_SECRET p/ verificar o token. DORMENTE sem o secret => 401. NAO deployado.
+exports.changePassword = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleChangePassword({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[changePassword] erro", { err: e && e.message }); } catch (_) {}   // NUNCA body/senha
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+// Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
+exports._handleChangePassword = handleChangePassword;
+
+/* ============================================================================
    F3.3.20-B1.7-E — SLICE 2: projecao publica segura (projectUserPublicOut).
    ----------------------------------------------------------------------------
    - Helper PURO de projeccao para a futura colecao usersPublic: allowlist EXPLICITA
