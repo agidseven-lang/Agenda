@@ -857,9 +857,13 @@ exports._writeNotifLog = writeNotifLog;
    ============================================================================ */
 const NOTIF_PREFS_SECRET = defineSecret("NOTIF_PREFS_SECRET");
 // B1.7-E — CORS allowlist (origins reais do app; SEM wildcard). Browser/PWA precisa de
-// preflight; Electron/native nao (CORS so e imposto pelo browser). Aplicado SOMENTE aos
-// 2 endpoints notifPrefs; nao toca triggers, flags, secret binding nem Web Push.
-const NOTIF_CORS_ORIGINS = ["https://agendaidseven.com.br", "https://agenda-id-seven.web.app", "https://agenda-id-seven.firebaseapp.com"];
+// preflight; Electron/native nao (CORS so e imposto pelo browser). Usado pelos endpoints
+// notifPrefs e auth/fcm (onRequest cors:); nao toca triggers, flags, secret binding nem Web Push.
+// F3.3.34 — inclui canais de PREVIEW do Firebase Hosting via RegExp ANCORADA (^...$), casando
+// SOMENTE https://agenda-id-seven--<channel>.web.app (channel = [a-z0-9-]+). Sem wildcard: nao
+// casa dominios parecidos (ex.: ...web.app.evil.com), http://, subdominios extras nem outros
+// hosts. O framework (onRequest cors) reflete SO o origin casado e aplica a TODAS as respostas.
+const NOTIF_CORS_ORIGINS = ["https://agendaidseven.com.br", "https://agenda-id-seven.web.app", "https://agenda-id-seven.firebaseapp.com", /^https:\/\/agenda-id-seven--[a-z0-9-]+\.web\.app$/];
 const NOTIF_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 dias
 const NOTIF_RL_MAX = 5;                               // tentativas invalidas
 const NOTIF_RL_WINDOW_MS = 5 * 60 * 1000;            // janela de contagem
