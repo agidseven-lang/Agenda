@@ -5246,6 +5246,22 @@ async function checkUserExistsClient(email, phone){
     return { ok:true, exists:(data.exists===true), field:(typeof data.field==="string"?data.field:"unknown") };
   }catch(e){ return { ok:false, status:0, error:"network" }; } /* erro genérico; sem PII/segredo */
 }
+/* F3.3.49 — POST changePassword (troca de senha do PRÓPRIO usuário, server-side). Session-gated:
+   usa a sessão server-side (Bearer). Envia {oldPassword,newPassword}; o servidor valida a senha
+   atual, gera novo salt/hash e atualiza só pass/salt. Resposta mínima {ok:true} | {ok:false,error}.
+   NUNCA loga senha/token; o client NÃO lê me.pass/me.salt nem gera hash. ATIVO só após deploy futuro. */
+const AUTH_CHANGEPW_URL_DEFAULT = "https://changepassword-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; ATIVO só após deploy (fase futura) */
+function authChangePwUrl(){ try{ const o=lsGet("auth_changepw_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_CHANGEPW_URL_DEFAULT; }
+async function changePasswordClient(oldPassword, newPassword){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"unauthorized" };
+    const res=await fetch(authChangePwUrl(), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token },
+      body: JSON.stringify({ oldPassword:String(oldPassword||""), newPassword:String(newPassword||"") }) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"change_failed" };
+    return { ok:true };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga senha/token */
+}
 
 /* ============================================================================
    F3.3.21-B3.20 — FCM token server-side (DORMENTE; flag fcm_token_server OFF por padrão).
@@ -9622,18 +9638,39 @@ function bindSettingsAccount(){
     if(!oldP || !newP || !confP){ toast("Preencha todos os campos"); return; }
     if(newP.length < 6){ toast("Senha nova precisa ter pelo menos 6 caracteres"); return; }
     if(newP !== confP){ toast("As senhas não conferem"); return; }
-    /* Valida senha atual usando o mesmo método de hash do login (compatível s2:) */
+    /* F3.3.49 users-read-hardening: com a flag ON, a troca de senha NÃO lê me.pass/me.salt nem
+       valida/gera hash no client — chama o endpoint server-side changePassword (valida a senha
+       atual, gera salt/hash e grava só pass/salt no servidor). OFF (padrão): caminho legado intacto
+       (verifyPw + hashPw + update client-side, mesmo esquema s2:). */
     try{
-      var valid = await verifyPw(me, oldP);
-      if(!valid){ toast("Senha atual incorreta"); return; }
-      var newSalt = randSalt();
-      var newHash = await hashPw(newP, newSalt);
-      await db.collection("users").doc(me.id).update({pass:newHash, salt:newSalt});
-      me.pass = newHash; me.salt = newSalt;
-      document.getElementById("setPassOld").value = "";
-      document.getElementById("setPassNew").value = "";
-      document.getElementById("setPassConf").value = "";
-      toast("Senha alterada com sucesso ✓");
+      if(usersReadHardeningEnabled()){
+        var r = await changePasswordClient(oldP, newP);
+        if(!r || r.ok!==true){
+          var er = (r && r.error) ? r.error : "change_failed";
+          if(er==="invalid_current_password") toast("Senha atual incorreta");
+          else if(er==="weak_password") toast("Senha nova precisa ter pelo menos 6 caracteres");
+          else if(er==="unauthorized") toast("Sua sessão expirou. Entre novamente.");
+          else if(er==="rate_limited") toast("Muitas tentativas. Aguarde um pouco e tente de novo.");
+          else toast("Erro ao alterar senha");
+          return;
+        }
+        /* sucesso: o client NÃO conhece o novo hash/salt (correto). Só limpa os campos. */
+        document.getElementById("setPassOld").value = "";
+        document.getElementById("setPassNew").value = "";
+        document.getElementById("setPassConf").value = "";
+        toast("Senha alterada com sucesso ✓");
+      }else{
+        var valid = await verifyPw(me, oldP);
+        if(!valid){ toast("Senha atual incorreta"); return; }
+        var newSalt = randSalt();
+        var newHash = await hashPw(newP, newSalt);
+        await db.collection("users").doc(me.id).update({pass:newHash, salt:newSalt});
+        me.pass = newHash; me.salt = newSalt;
+        document.getElementById("setPassOld").value = "";
+        document.getElementById("setPassNew").value = "";
+        document.getElementById("setPassConf").value = "";
+        toast("Senha alterada com sucesso ✓");
+      }
     }catch(e){ toast("Erro ao alterar senha"); console.error(e); }
   };
 }
