@@ -178,10 +178,48 @@ jobs:
           eval "$PREVIEW_CMD" > "$RUNNER_TEMP/preview.log" 2>&1
           rc=$?
           set -e
-          grep -iE 'Channel URL|channel:|expire|version' "$RUNNER_TEMP/preview.log" || true
-          [ "$rc" = "0" ] || { echo "::error:: hosting:channel:deploy falhou (rc=$rc)"; exit "$rc"; }
-          echo "Canal preview publicado (efemero; --expires 1d). Rollback: firebase hosting:channel:delete $CH --project $GCP_PROJECT"
+          # F3.3.33-A1C observabilidade: expoe a saida do firebase de forma SANITIZADA
+          # (mascara tokens/JWT/credenciais/chaves) no log do job e em artifact (em falha).
+          # Fail-closed: se a sanitizacao falhar, o log bruto e OMITIDO (nunca exposto).
+          SAN="$GITHUB_WORKSPACE/preview-failure-log.txt"
+          sed -E \
+            -e 's#ya29\.[A-Za-z0-9._-]+#***TOKEN_REDACTED***#g' \
+            -e 's#ey[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+#***JWT_REDACTED***#g' \
+            -e 's#(access_token|id_token|refresh_token|private_key_id|private_key|client_email|client_id|api_key|apikey|authorization|bearer)([":= ]+)[^,}" ]+#\1\2***REDACTED***#gI' \
+            -e 's#-----BEGIN[A-Z ]*PRIVATE KEY-----#***PRIVATE_KEY_REDACTED***#g' \
+            "$RUNNER_TEMP/preview.log" > "$SAN" 2>/dev/null || echo "(sanitizacao indisponivel; log bruto omitido por seguranca)" > "$SAN"
+          if [ "$rc" = "0" ]; then
+            grep -iE 'Channel URL|channel:|expire|version' "$SAN" || true
+            echo "Canal preview publicado (efemero; --expires 1d). Rollback: firebase hosting:channel:delete $CH --project $GCP_PROJECT"
+          else
+            echo "::group::firebase hosting:channel:deploy — saida SANITIZADA (rc=$rc)"
+            cat "$SAN" || true
+            echo "::endgroup::"
+            {
+              echo "# Preview channel deploy — FALHA (sanitizado)"
+              echo ""
+              echo "- rc: $rc"
+              echo "- canal: $CH (nao criado)"
+              echo "- producao/live: intocada (channel:deploy nunca toca o canal live)"
+              echo ""
+              echo "## Saida sanitizada do firebase"
+              cat "$SAN" 2>/dev/null || echo "(sem log)"
+            } > "$GITHUB_WORKSPACE/workflow-summary.md" 2>/dev/null || true
+            echo "::error:: hosting:channel:deploy falhou (rc=$rc) — ver log sanitizado (job log + artifact preview-failure-log)."
+            exit "$rc"
+          fi
 
-      - name: Limpeza (service account)
+      - name: Upload log de falha (sanitizado; somente em falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-failure-log
+          path: |
+            preview-failure-log.txt
+            workflow-summary.md
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Limpeza (service account + logs temporarios)
         if: always()
-        run: rm -f "$RUNNER_TEMP/gcp-sa.json" "$RUNNER_TEMP/preview.log" 2>/dev/null || true
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" "$RUNNER_TEMP/preview.log" "$GITHUB_WORKSPACE/preview-failure-log.txt" "$GITHUB_WORKSPACE/workflow-summary.md" 2>/dev/null || true
