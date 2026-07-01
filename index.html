@@ -5392,6 +5392,18 @@ function startUsersRosterSync(){
         usersRoster = snap.docs.map(function(d){ return normalizeRosterUser(d.id, d.data()); });
         usersRosterSource = "usersPublic";
         usersRosterLoaded = true;
+        /* F3.3.31 users-read-hardening: com a flag ON, alimenta `users` a partir de usersPublic
+           (SO campos seguros via normalizeRosterUser: id,name,role,admin,status,photo,color; sem
+           pass/salt/fcmTokens/phone/email) pra a UI de equipe operar sem leitura crua de users.
+           OFF => bloco ignorado (legado intacto: `users` vem do onSnapshot cru). */
+        if(usersReadHardeningEnabled()){
+          try{
+            users = usersRoster.slice();
+            usersLoaded = true;
+            if(!me && sessionId){ var _mu = users.find(function(x){ return x.id === sessionId; }); if(_mu) me = _mu; }
+            try{ route(); }catch(_){}
+          }catch(_){}
+        }
         try{ console.log("[roster] fonte=usersPublic n=" + usersRoster.length); }catch(_){}
         try{ if(!$("mainApp").classList.contains("hidden")) render(); }catch(_){}
       }catch(e){ _usersRosterFallback("map-error"); }
