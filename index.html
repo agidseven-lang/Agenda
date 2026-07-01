@@ -5392,6 +5392,18 @@ function startUsersRosterSync(){
         usersRoster = snap.docs.map(function(d){ return normalizeRosterUser(d.id, d.data()); });
         usersRosterSource = "usersPublic";
         usersRosterLoaded = true;
+        /* F3.3.31 users-read-hardening: com a flag ON, alimenta `users` a partir de usersPublic
+           (SO campos seguros via normalizeRosterUser: id,name,role,admin,status,photo,color; sem
+           pass/salt/fcmTokens/phone/email) pra a UI de equipe operar sem leitura crua de users.
+           OFF => bloco ignorado (legado intacto: `users` vem do onSnapshot cru). */
+        if(usersReadHardeningEnabled()){
+          try{
+            users = usersRoster.slice();
+            usersLoaded = true;
+            if(!me && sessionId){ var _mu = users.find(function(x){ return x.id === sessionId; }); if(_mu) me = _mu; }
+            try{ route(); }catch(_){}
+          }catch(_){}
+        }
         try{ console.log("[roster] fonte=usersPublic n=" + usersRoster.length); }catch(_){}
         try{ if(!$("mainApp").classList.contains("hidden")) render(); }catch(_){}
       }catch(e){ _usersRosterFallback("map-error"); }
@@ -5606,6 +5618,11 @@ var __clientOpenedMark = false;
     }
     return false;
   }
+  /* F3.3.28 users-read-hardening (DORMENTE; flag OFF por padrao): a assinatura crua de
+     `users` fica ATRAS do gate. OFF => comportamento legado 100% identico. ON => nao inicia
+     a leitura crua de `users` (roster via usersPublic em startUsersRosterSync; "eu" via
+     login server-side/getUserSelf). NAO fecha Rules, NAO muda o default. */
+  if(!usersReadHardeningEnabled()){
   db.collection("users").onSnapshot(snap=>{
     var newUsers = snap.docs.map(d=>({id:d.id,...d.data()}));
     var changedBeyondPresence = _usersDifferIgnoringPresence(_prevUsersForCompare, newUsers);
@@ -5665,6 +5682,7 @@ var __clientOpenedMark = false;
       }
     }catch(_){}
   },err=>{$("syncBadge").classList.add("off");$("syncBadge").querySelector("span").textContent="sem conexão";});
+  } /* F3.3.28: fim do gate users-read-hardening (assinatura crua `users`) */
   try{ startUsersRosterSync(); }catch(_){}
   db.collection("events").onSnapshot(snap=>{
     events=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -6063,7 +6081,8 @@ $("doReg").onclick=async()=>{
   try{
     // garante lista de usuários atualizada (evita criar admin duplicado / cadastro repetido)
     let list=users;
-    if(!usersLoaded){
+    /* F3.3.28 users-read-hardening: com a flag ON, NAO faz leitura crua de `users` no cadastro. */
+    if(!usersLoaded && !usersReadHardeningEnabled()){
       try{ const s=await withTimeout(db.collection("users").get(),12000);
             list=s.docs.map(d=>({id:d.id,...d.data()})); }catch(_){}
     }
@@ -8181,6 +8200,11 @@ async function _setupPushNotificationsInternal(){
       }
       _finalCount = (typeof _reg.count === "number") ? _reg.count : _finalCount;
       _pushDbg("12b-server-register", "device=" + devId + " (" + platform + "); registerFcmToken OK; total agora=" + _finalCount);
+    } else if(usersReadHardeningEnabled()){
+      /* F3.3.30 users-read-hardening: com a flag ON e fcm_token_server OFF, NAO roda o save
+         legado por transacao (evitaria tx.get em `users`). Token nao e salvo pelo caminho
+         legado (degradado controlado); no cutover pareado (fcm_token_server ON) usa o servidor. */
+      try{ _pushDbg("12-legacy-skip-hardening-on", "users_read_hardening ON sem fcm_token_server: save legado pulado (sem leitura crua de users)"); }catch(_){}
     } else {
     await savedDb.runTransaction(async function(tx){
       var doc = await tx.get(userRef);
@@ -8466,7 +8490,7 @@ async function sendPushToUsers(userIds, payload){
     var uid = ids[i];
     var freshTokens = null;
     try{
-      if(db){
+      if(db && !usersReadHardeningEnabled()){ /* F3.3.28: com a flag ON, nao le `users` cru p/ tokens (cai no cache em memoria) */
         var snap = await db.collection("users").doc(uid).get();
         if(snap.exists){
           var data = snap.data() || {};
