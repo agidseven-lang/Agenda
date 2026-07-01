@@ -4,7 +4,7 @@
 # total (firebase-functions-deploy.yml) e do DORMANT-1 (3 triggers). workflow_dispatch;
 # dry_run=true por padrao. Guards: confirm_deploy == DEPLOY_ENDPOINT; allowlist FIXA
 # {issueNotifPrefsToken, updateNotifPrefs, getNotifPrefs, loginUser, getUserContact, getUserSelf, registerFcmToken, removeMyFcmToken}; rejeita total/triggers/vazio/lista/virgula/
-# espaco/curinga/desconhecido; pin do blob 4f3b60d; prechecks f33R..f33V + f33X + f33AA + f33AC + f33AD; checkout fixo
+# espaco/curinga/desconhecido; pin do blob de79a21 (F3.3.36: CORS preview; ex-4f3b60d); prechecks f33R..f33V + f33X + f33AA + f33AC + f33AD; checkout fixo
 # app/main. NAO ativa flags; NAO toca produto; pos-deploy apenas por metadados. O segredo
 # NOTIF_PREFS_SECRET e AUTH_SESSION_SECRET ja possuem versao real — nenhuma operacao de segredo ocorre aqui.
 # =====================================================================
@@ -35,7 +35,7 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  PINNED_FUNCTIONS_BLOB: "4f3b60d7cd72c36220b0201aabbaa8765741f640"
+  PINNED_FUNCTIONS_BLOB: "de79a2109d4299bb635f89e7b06a72c231fc6cd1"
 
 jobs:
   deploy-endpoint:
@@ -80,7 +80,7 @@ jobs:
           ref: app/main
           fetch-depth: 0
 
-      - name: Pin do blob functions/index.js (== 4f3b60d)
+      - name: Pin do blob functions/index.js (== de79a21)
         run: |
           set -eu
           B="$(git rev-parse HEAD:functions/index.js)"
