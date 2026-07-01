@@ -167,6 +167,12 @@ jobs:
           [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ] || { echo "::error:: service account ausente (secret)"; exit 1; }
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
           printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          # F3.3.33-A2C: exporta a credencial no SHELL ATUAL. O $GITHUB_ENV acima so
+          # disponibiliza a variavel para steps SEGUINTES; sem este export, o firebase
+          # roda no mesmo step SEM ADC e falha ("Failed to authenticate"). Nao imprime
+          # caminho/JSON/client_email/private_key.
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/gcp-sa.json"
+          test -s "$GOOGLE_APPLICATION_CREDENTIALS" || { echo "::error:: credencial da service account ausente/vazia"; exit 1; }
           npm install -g firebase-tools >/dev/null 2>&1
           # Guard final: recusa se por qualquer motivo o comando nao for channel:deploy.
           case "$PREVIEW_CMD" in
