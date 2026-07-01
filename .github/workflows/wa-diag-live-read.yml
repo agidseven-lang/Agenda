@@ -1,0 +1,75 @@
+# [manual] WA-Diag Live Read — leitura read-only do endpoint /wa-diag.
+#
+# Executa SOMENTE 1 GET publico em https://aprovar.agendaidseven.com.br/wa-diag
+# (JSON dos ultimos hits de crawler/preview gravados pelo Worker). NAO toca /share
+# nem /og (evita contaminar o diagnostico). NAO usa secrets, NAO faz deploy, NAO
+# escreve nada. Acionamento SOMENTE manual. Nao altera nenhum produto.
+name: "[manual] WA-Diag Live Read"
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wa-diag-live-read
+  cancel-in-progress: false
+
+jobs:
+  read:
+    name: read /wa-diag (read-only GET)
+    runs-on: ubuntu-latest
+    steps:
+      - name: GET /wa-diag (somente leitura; sem tocar /share ou /og)
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          URL="https://aprovar.agendaidseven.com.br/wa-diag"
+          echo "GET $URL"
+          code=$(curl -sS -m 30 -A "Mozilla/5.0 (wa-diag-reader)" -D out/headers.txt -o out/wadiag.json -w '%{http_code}' "$URL" 2>out/curl.err || echo 000)
+          echo "HTTP=$code" | tee out/summary.md
+          echo "== headers ==" ; cat out/headers.txt 2>/dev/null || true
+          echo "== body (wadiag.json) ==" ; cat out/wadiag.json 2>/dev/null || true
+          echo
+          python3 - <<'PY'
+          import json
+          try:
+              d = json.load(open('out/wadiag.json'))
+          except Exception as e:
+              open('out/summary.md','a').write("\nPARSE_ERROR: %s\n" % e)
+              print("PARSE_ERROR:", e); raise SystemExit(0)
+          hits = d.get('hits', []) if isinstance(d, dict) else []
+          META_PREFIXES = ('31.13.', '157.240.', '173.252.', '69.63.', '66.220.', '129.134.', '204.15.20.', '179.60.')
+          out = []
+          out.append("")
+          out.append("ok=%s count=%s total_hits=%d" % (d.get('ok'), d.get('count'), len(hits)))
+          tgt = [h for h in hits if h.get('path') == '/og/wa-card-v64-39.jpg']
+          out.append("hits_og_v64-39=%d" % len(tgt))
+          def is_meta(ip): return any((ip or '').startswith(p) for p in META_PREFIXES)
+          out.append("")
+          out.append("## hits em /og/wa-card-v64-39.jpg")
+          for h in tgt:
+              ua = (h.get('ua') or '')
+              flags = []
+              if 'facebookexternalhit' in ua.lower(): flags.append('FB')
+              if 'whatsapp' in ua.lower(): flags.append('WA')
+              if is_meta(h.get('ip')): flags.append('META_IP')
+              out.append("- ts=%s ip=%s country=%s isBot=%s flags=%s ua=%s" % (
+                  h.get('ts'), h.get('ip'), h.get('country'), h.get('isBot'), ','.join(flags) or '-', ua[:90]))
+          out.append("")
+          out.append("## todos os hits (ate 60)")
+          for h in hits[:60]:
+              out.append("- ts=%s path=%s ip=%s ua=%s" % (h.get('ts'), h.get('path'), h.get('ip'), (h.get('ua') or '')[:60]))
+          txt = "\n".join(out) + "\n"
+          open('out/summary.md','a').write(txt)
+          print(txt)
+          PY
+
+      - name: Upload artefato wa-diag-live-read
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wa-diag-live-read
+          path: out/
+          retention-days: 30
