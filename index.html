@@ -5991,14 +5991,23 @@ document.addEventListener("visibilitychange", function(){
   }
 });
 
+/* F3.3.47 — Presença/lastSeen deriva de users.lastSeen (users cru). Com users_read_hardening
+   ON, o roster vem de usersPublic (SEM lastSeen) e a leitura crua de `users` fica desligada:
+   NÃO há fonte segura de presença, então a presença fica NEUTRA/indisponível (sem afirmar
+   "online"/"offline"/"nunca entrou" e sem ler users cru). OFF (padrão): comportamento legado
+   100% intacto. Client-only, gated, sem Rules/Functions/deploy. */
+function presenceAvailable(){ return !usersReadHardeningEnabled(); }
+
 /* Helper: usuário está online agora? */
 function isUserOnline(u){
+  if(!presenceAvailable()) return false;   /* F3.3.47: ON => presença indisponível (não lê users cru) */
   if(!u || !u.lastSeen) return false;
   return (Date.now() - u.lastSeen) < PRESENCE_ONLINE_WINDOW_MS;
 }
 
 /* Helper: rótulo amigável de quando foi visto */
 function presenceLabel(u){
+  if(!presenceAvailable()) return "";      /* F3.3.47: ON => rótulo neutro (a UI oculta/substitui) */
   if(!u || !u.lastSeen) return "nunca entrou";
   if(isUserOnline(u)) return "Online agora";
   var diff = Date.now() - u.lastSeen;
@@ -7260,7 +7269,7 @@ function openChatPicker(){
       var role = u.role || "";
       var subLine = online
         ? '<div class="st-line is-online"><span class="st-mini-dot"></span><span>online</span>'+(role?' <span class="rl-divider">·</span> <span style="color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;font-size:10.5px;font-weight:600">'+esc(role)+'</span>':'')+'</div>'
-        : '<div class="st-line is-offline">'+esc(statusText)+(role?' <span class="rl-divider">·</span> <span style="text-transform:uppercase;letter-spacing:.04em;font-size:10.5px;font-weight:600">'+esc(role)+'</span>':'')+'</div>';
+        : '<div class="st-line is-offline">'+esc(statusText)+(role?((statusText?' <span class="rl-divider">·</span> ':'')+'<span style="text-transform:uppercase;letter-spacing:.04em;font-size:10.5px;font-weight:600">'+esc(role)+'</span>'):'')+'</div>'; /* F3.3.47: sem "·" à esquerda quando statusText vazio (ON) */
       return '<div class="chat-picker-it" data-uid="'+esc(u.id)+'">'+
         '<div class="chat-li-av'+(online?" is-online":"")+'">'+chatAvatarHTML(u)+'</div>'+
         '<div style="flex:1;min-width:0">'+
@@ -7445,7 +7454,8 @@ function personRow(u,p){
   const tag = isAdm?'<span class="adm-tag">ADMIN</span>':'';
   /* [V63.15] Estado de presença — bolinha verde + label sob o nome */
   const online = !p && isUserOnline(u);
-  const presenceTxt = p ? '' : '<div class="last-seen"><span class="dot"></span>'+esc(presenceLabel(u))+'</div>';
+  const _pLabel = p ? '' : presenceLabel(u); /* F3.3.47: ON => "" (oculta a linha de presença) */
+  const presenceTxt = _pLabel ? '<div class="last-seen"><span class="dot"></span>'+esc(_pLabel)+'</div>' : '';
   const rowClass = online ? 'person online' : 'person';
   return '<div class="'+rowClass+'"><div class="pa" style="--user-color:'+userColor(u)+'">'+avatarHTML(u)+'</div><div class="pi"><div class="pn">'+esc(u.name)+tag+((me&&u.id===me.id)?' <span style="color:var(--ink-faint);font-weight:600">(você)</span>':'')+'</div><div class="pr">'+esc(u.role)+(usersReadHardeningEnabled()?'':(' · '+esc(u.phone)))+'</div>'+presenceTxt+'</div>'+(p?'<button class="approve" data-ap="'+u.id+'">Liberar</button>':admBtn||'<span class="pst ok">Ativo</span>')+'</div>';
 }
