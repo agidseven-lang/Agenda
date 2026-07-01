@@ -1798,6 +1798,137 @@ exports.changePassword = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us
 exports._handleChangePassword = handleChangePassword;
 
 /* ============================================================================
+   F3.3.50-B — sendPush (push MULTIUSUARIO server-side; Functions-only).
+   ----------------------------------------------------------------------------
+   - Remove o blocker: hoje o client (sendPushToUsers) le users/<uid>.get() p/ obter
+     fcmTokens de TERCEIROS. Com users read fechado isso quebra. Aqui o lookup de tokens
+     + envio FCM + limpeza de dead tokens ficam no servidor.
+   - Session-gated (authVerifySessionToken): so um usuario autenticado dispara. Recebe
+     { targetUids:[], payload:{...} }. Busca fcmTokens server-side (Admin SDK; dedupe por
+     device), envia via admin.messaging().sendEachForMulticast e remove dead tokens
+     (arrayRemove). NAO usa o Worker (cloudflare-worker.js intocado); NAO toca Card/Desktop.
+   - PRESERVA o comportamento do sendPushToUsers do client (envio direto, SEM gating de
+     prefs): as prefs seguem aplicadas pelas TRIGGERS server-side (notifyResponsible) p/
+     eventos de criacao. Assim ON == OFF na entrega (diferenca documentada).
+   - Formato da mensagem espelha o que o SW (firebase-messaging-sw.js) renderiza:
+     notification:{title,body} + data:{tag,url,icon,...}. android priority high, ttl=TTL_MS.
+   - Resposta MINIMA { ok, sent, failed, total }. NUNCA retorna fcmTokens/token/doc/PII.
+     NUNCA loga token FCM/session token/payload sensivel (so uid mascarado + contadores).
+   - Handler PURO testavel: ctx.db e ctx.messaging injetaveis (mock). DORMENTE sem
+     AUTH_SESSION_SECRET => 401. NAO deployado; a UI so chama com users_read_hardening=ON.
+   ============================================================================ */
+const SENDPUSH_MAX_TARGETS = 100;         // teto de destinatarios por request
+const SENDPUSH_FCM_BATCH = 500;           // limite do sendEachForMulticast
+const SENDPUSH_PAYLOAD_KEYS = ["tag", "url", "icon", "type", "eventType", "source", "taskId", "eventId", "chatId"];
+// PURO: monta o `data` (strings) a partir do payload, so com chaves da allowlist. Sem PII.
+function sendPushBuildData(payload) {
+  const p = (payload && typeof payload === "object" && !Array.isArray(payload)) ? payload : {};
+  const data = {};
+  for (const k of SENDPUSH_PAYLOAD_KEYS) { if (typeof p[k] === "string" && p[k]) data[k] = String(p[k]); }
+  return data;
+}
+async function handleSendPush(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "unauthorized" } };
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["sp:" + auth.uid].concat(ip ? ["spi:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : {};
+  if (!Array.isArray(body.targetUids)) return { status: 400, json: { ok: false, error: "bad_request" } };
+  let uids = body.targetUids.filter((u) => typeof u === "string" && u);
+  uids = Array.from(new Set(uids));                       // dedup server-side
+  if (!uids.length) return { status: 400, json: { ok: false, error: "no_targets" } };
+  if (uids.length > SENDPUSH_MAX_TARGETS) uids = uids.slice(0, SENDPUSH_MAX_TARGETS);   // cap
+  const payload = (body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)) ? body.payload : {};
+  const title = (typeof payload.title === "string" && payload.title) ? payload.title : "ID Seven";
+  const bodyText = (typeof payload.body === "string") ? payload.body : "";
+  const data = sendPushBuildData(payload);
+  const db = (ctx && ctx.db) || notifDb();
+  // Lookup de tokens SERVER-SIDE (Admin SDK). Mapeia token -> uid p/ cleanup direcionado.
+  const tokenToUid = {};
+  const tokens = [];
+  for (let i = 0; i < uids.length; i++) {
+    const uid = uids[i];
+    let snap;
+    try { snap = await db.collection("users").doc(uid).get(); }
+    catch (e) { try { logger.warn("[sendPush] lookup falhou", { uid: notifMaskUid(uid) }); } catch (_) {} continue; }
+    if (!snap || !snap.exists) continue;
+    const d = (typeof snap.data === "function" ? snap.data() : null) || {};
+    const toks = dedupeTokensByDevice(Array.isArray(d.fcmTokens) ? d.fcmTokens.filter(Boolean) : [], d.fcmTokenMeta);
+    for (let j = 0; j < toks.length; j++) { const t = toks[j]; if (t && !(t in tokenToUid)) { tokenToUid[t] = uid; tokens.push(t); } }
+  }
+  const total = tokens.length;
+  if (!total) {
+    try { logger.info("[sendPush] sem tokens", { requester: notifMaskUid(auth.uid), targets: uids.length }); } catch (_) {}
+    rlKeys.forEach((k) => notifRlClear(k));
+    return { status: 200, json: { ok: true, sent: 0, failed: 0, total: 0 } };
+  }
+  const messaging = (ctx && ctx.messaging) || admin.messaging();
+  let sent = 0, failed = 0;
+  const dead = [];    // { token, uid } — tokens invalidos p/ cleanup
+  try {
+    for (let b = 0; b < tokens.length; b += SENDPUSH_FCM_BATCH) {
+      const batch = tokens.slice(b, b + SENDPUSH_FCM_BATCH);
+      const resp = await messaging.sendEachForMulticast({
+        tokens: batch,
+        notification: { title: title, body: bodyText },
+        data: data,
+        android: { priority: "high", ttl: TTL_MS },
+      });
+      sent += (typeof resp.successCount === "number" ? resp.successCount : 0);
+      failed += (typeof resp.failureCount === "number" ? resp.failureCount : 0);
+      const responses = Array.isArray(resp.responses) ? resp.responses : [];
+      for (let r = 0; r < responses.length; r++) {
+        const rr = responses[r] || {};
+        if (rr.success) continue;
+        const code = String((rr.error && (rr.error.code || (rr.error.errorInfo && rr.error.errorInfo.code))) || "");
+        if (/registration-token-not-registered|invalid-registration-token|invalid-argument/i.test(code)) {
+          const tk = batch[r]; if (tk && tokenToUid[tk]) dead.push({ token: tk, uid: tokenToUid[tk] });
+        }
+      }
+    }
+  } catch (e) {
+    try { logger.error("[sendPush] envio falhou", { requester: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {}
+    rlKeys.forEach((k) => notifRlFail(k, now));
+    return { status: 500, json: { ok: false, error: "send_failed" } };
+  }
+  // Cleanup de dead tokens SERVER-SIDE (arrayRemove por uid; best-effort, nao falha o request).
+  if (dead.length) {
+    const byUid = {};
+    for (const x of dead) { (byUid[x.uid] = byUid[x.uid] || []).push(x.token); }
+    for (const uid of Object.keys(byUid)) {
+      try { await db.collection("users").doc(uid).update({ fcmTokens: admin.firestore.FieldValue.arrayRemove.apply(null, byUid[uid]) }); }
+      catch (_) { /* best-effort; permissao/erro ignorado */ }
+    }
+  }
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[sendPush] ok", { requester: notifMaskUid(auth.uid), targets: uids.length, sent: sent, failed: failed, total: total, cleaned: dead.length }); } catch (_) {}
+  return { status: 200, json: { ok: true, sent: sent, failed: failed, total: total } };
+}
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). Session-gated: precisa de
+// AUTH_SESSION_SECRET. DORMENTE sem o secret => 401. NAO deployado nesta fase.
+exports.sendPush = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleSendPush({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[sendPush] erro", { err: e && e.message }); } catch (_) {}   // NUNCA body/tokens
+    res.status(500).json({ ok: false, error: "send_failed" });
+  }
+});
+// Exporta logica pura p/ o harness (NAO afeta runtime; endpoint dormente/sem deploy).
+exports._handleSendPush = handleSendPush;
+exports._sendPushBuildData = sendPushBuildData;
+
+/* ============================================================================
    F3.3.20-B1.7-E — SLICE 2: projecao publica segura (projectUserPublicOut).
    ----------------------------------------------------------------------------
    - Helper PURO de projeccao para a futura colecao usersPublic: allowlist EXPLICITA

@@ -5262,6 +5262,22 @@ async function changePasswordClient(oldPassword, newPassword){
     return { ok:true };
   }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga senha/token */
 }
+/* F3.3.50-B — POST sendPush (push MULTIUSUÁRIO server-side). Session-gated (Bearer). Envia
+   {targetUids,payload}; o servidor busca fcmTokens, envia FCM e limpa dead tokens. O client
+   NÃO recebe tokens (só resumo {sent,failed,total}). NUNCA loga token. ATIVO só após deploy futuro. */
+const AUTH_SENDPUSH_URL_DEFAULT = "https://sendpush-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; ATIVO só após deploy (fase futura) */
+function authSendPushUrl(){ try{ const o=lsGet("auth_sendpush_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_SENDPUSH_URL_DEFAULT; }
+async function sendPushServerClient(targetUids, payload){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"unauthorized" };
+    const ids=(Array.isArray(targetUids)?targetUids:[targetUids]).filter(Boolean);
+    const res=await fetch(authSendPushUrl(), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token },
+      body: JSON.stringify({ targetUids: ids, payload: (payload||{}) }) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"send_failed" };
+    return { ok:true, sent:(typeof data.sent==="number"?data.sent:0), failed:(typeof data.failed==="number"?data.failed:0), total:(typeof data.total==="number"?data.total:0) };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token/sessão */
+}
 
 /* ============================================================================
    F3.3.21-B3.20 — FCM token server-side (DORMENTE; flag fcm_token_server OFF por padrão).
@@ -8600,6 +8616,28 @@ async function sendPushToUsers(userIds, payload){
   function _sendDbg(msg){ try{ console.log("[PUSH-SEND] " + msg); }catch(_){} }
   function _sendFail(reason, info){
     try{ console.error("[PUSH-SEND falha] " + reason, info || ""); }catch(_){}
+  }
+
+  /* F3.3.50-B users-read-hardening: com a flag ON, NÃO lê users cru p/ tokens nem usa o Worker
+     relay — delega ao endpoint server-side sendPush (lookup de tokens + envio FCM + limpeza de
+     dead tokens no servidor). O client não recebe/manuseia tokens de terceiros. OFF (padrão): o
+     caminho legado abaixo fica 100% intacto. */
+  if(usersReadHardeningEnabled()){
+    if(!payload || !payload.title){ _sendFail("Payload sem título"); return; }
+    var _spIds = (Array.isArray(userIds) ? userIds : [userIds]).filter(function(v, i, a){ return v && a.indexOf(v) === i; });
+    if(!_spIds.length){ _sendFail("Nenhum ID de usuário recebido"); return; }
+    try{
+      var _p = payload || {}, _d = _p.data || {};
+      var _r = await sendPushServerClient(_spIds, {
+        title: _p.title, body: _p.body || "",
+        tag: _p.tag || _d.tag, url: _p.url || _d.url, icon: _d.icon,
+        type: _d.type, eventType: _d.eventType, source: _d.source,
+        taskId: _d.taskId, eventId: _d.eventId, chatId: _d.chatId
+      });
+      if(_r && _r.ok){ _sendDbg("sendPush server-side: sent=" + _r.sent + " failed=" + _r.failed + " total=" + _r.total); }
+      else { _sendFail("sendPush server-side", (_r && _r.error) || "erro"); }
+    }catch(e){ _sendFail("sendPush server-side exception", e && (e.message || e)); }
+    return;
   }
 
   if(!PUSH_WORKER_URL){ _sendFail("Worker URL não configurado"); return; }
