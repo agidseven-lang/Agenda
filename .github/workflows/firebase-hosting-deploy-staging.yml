@@ -124,7 +124,7 @@ jobs:
           fi
           check() { got="$(sha256sum "$1" | awk '{print $1}')"; if [ "$got" != "$2" ]; then echo "::error:: $1 sha256 $got != $2"; exit 1; fi; }
           ( cd .staging-public
-            check index.html                6a1e1b08921654914693c44bd08aa8f0efb8d836e7942c2e48dc715ba9f72585
+            check index.html                503ce425a0a48b4a92edda07e51bf709c81cfbef8905b17b25d263ee573b0899
             check manifest.json             5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
             check sw.js                     a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
             check firebase-messaging-sw.js  64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
