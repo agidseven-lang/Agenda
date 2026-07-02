@@ -5473,6 +5473,7 @@ let usersRoster = [];
 let usersRosterSource = "init";
 let usersRosterLoaded = false;
 let unsubUsersPublicRoster = null;
+let usersRosterSig = null;              /* F3.3.53-B1 (F1): assinatura p/ detectar eco de snapshot de usersPublic */
 function normalizeRosterUser(id, data){
   const src = (data && typeof data === "object" && !Array.isArray(data)) ? data : {};
   const str = (v) => (typeof v === "string" ? v : "");
@@ -5513,11 +5514,25 @@ function startUsersRosterSync(){
         usersRoster = snap.docs.map(function(d){ return normalizeRosterUser(d.id, d.data()); });
         usersRosterSource = "usersPublic";
         usersRosterLoaded = true;
+        /* F3.3.53-B1 (F1): assinatura estavel do roster projetado p/ detectar ECO.
+           O trigger syncUsersPublic faz SET incondicional a cada write em users/<uid>
+           (ex.: ping de presenca/lastSeen), re-disparando este onSnapshot SEM mudanca real
+           nos campos publicos (a projecao exclui lastSeen). Sem o guard, com a flag ON o
+           route() abaixo re-pinga presenca e fecha o loop route->markPresence->
+           syncUsersPublic->onSnapshot->route (causa do abort da F3.3.53-B). SO atua com a
+           flag ON: OFF preserva o comportamento legado identico. */
+        var __rosterEcho = false;
+        try{
+          var __rosterSig = JSON.stringify(usersRoster.slice().sort(function(a,b){ return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0); }));
+          __rosterEcho = (usersRosterSig !== null && __rosterSig === usersRosterSig);
+          usersRosterSig = __rosterSig;
+        }catch(_){ __rosterEcho = false; }
         /* F3.3.31 users-read-hardening: com a flag ON, alimenta `users` a partir de usersPublic
            (SO campos seguros via normalizeRosterUser: id,name,role,admin,status,photo,color; sem
            pass/salt/fcmTokens/phone/email) pra a UI de equipe operar sem leitura crua de users.
            OFF => bloco ignorado (legado intacto: `users` vem do onSnapshot cru). */
         if(usersReadHardeningEnabled()){
+          if(__rosterEcho){ return; }   /* F1: eco identico => sem route/render/log (quebra o ciclo) */
           try{
             users = usersRoster.slice();
             usersLoaded = true;
@@ -8101,6 +8116,7 @@ var fcmTokenSaved = null;  /* token desta sessão, pra não salvar duplicado */
 var fcmInitInProgress = false;
 var fcmInitSucceeded = false;
 var fcmInitTryCount = 0;
+var fcmPermAbortLogged = null;   /* F3.3.53-B1 (F2): dedupe por sessao do abort de permission!=granted */
 var FCM_INIT_MAX_TRIES = 8;
 /* [V64.0] FIX CAUSA RAIZ — race condition + chamadas abandonadas.
    ANTES: chamadas paralelas chegavam, viam fcmInitInProgress=true, e DESISTIAM
@@ -8194,6 +8210,11 @@ async function setupPushNotifications(){
    e a gente não sabia onde estava parando. */
 async function _setupPushNotificationsInternal(){
   fcmInitInProgress = true;
+  /* F3.3.53-B1 (F2): abort de permissao JA logado nesta sessao p/ este estado =>
+     retorno SILENCIOSO (sem log, sem getToken, sem SW, sem salvar token). Evita spam
+     quando algo re-chama o setup com notificacoes bloqueadas. Granted nunca cai aqui. */
+  var __permNow = (typeof Notification !== "undefined" ? Notification.permission : "undefined");
+  if(__permNow !== "granted" && fcmPermAbortLogged === __permNow){ fcmInitInProgress = false; return false; }
   _pushDbgCapture("0-entrada-internal", "iniciando setup");
   /* Sem config ainda? sai silencioso */
   if(!PUSH_VAPID_KEY || !PUSH_WORKER_URL){
@@ -8222,6 +8243,7 @@ async function _setupPushNotificationsInternal(){
   }
   /* Permissão não concedida ainda? não força aqui */
   if(typeof Notification === "undefined" || Notification.permission !== "granted"){
+    fcmPermAbortLogged = __permNow;   /* F2: proximo abort deste mesmo estado fica silencioso */
     _pushDbgCapture("0-abort", "permission != granted (atual: " + (typeof Notification !== "undefined" ? Notification.permission : "undefined") + ")");
     fcmInitInProgress = false; return false;
   }
