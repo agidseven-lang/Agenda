@@ -7414,6 +7414,15 @@ function openChatPicker(){
 function render(){
   if($("mainApp").classList.contains("hidden"))return;
   const c=$("content");c.className="";void c.offsetWidth;c.className="fade";
+  /* F3.3.53-B4-D3-C1: FADE-GUARD — garante que o conteudo termine VISIVEL. Com
+     .fade{animation:fadeUp .35s both}, se a animacao for criada mas nao avancar
+     (SO/navegador suprimindo animacoes: economia de bateria/acessibilidade), o
+     #content fica preso no estado from (opacity:0/translateY(10px)) com o conteudo
+     ja renderizado por baixo — causa real das "abas vazias" (probes da D3-C).
+     Remover a classe apos a janela da animacao mata animacao+fill em QUALQUER modo
+     de falha; se a animacao completou, e no-op visual (estado final == base). */
+  clearTimeout(window.__contentFadeGuard);
+  window.__contentFadeGuard=setTimeout(function(){ try{ c.classList.remove("fade"); }catch(_){} },450);
   if(tab==="hoje"){c.innerHTML=renderHoje();bindHoje();}
   else if(tab==="agenda"){
     $("monthTitle").innerHTML=MO[cursor.getMonth()].replace(/^./,x=>x.toUpperCase())+" <span>"+cursor.getFullYear()+"</span>";
