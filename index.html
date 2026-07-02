@@ -7413,43 +7413,73 @@ function openChatPicker(){
 
 function render(){
   if($("mainApp").classList.contains("hidden"))return;
-  const c=$("content");c.className="";void c.offsetWidth;c.className="fade";
-  /* F3.3.53-B4-D3-C1: FADE-GUARD — garante que o conteudo termine VISIVEL. Com
-     .fade{animation:fadeUp .35s both}, se a animacao for criada mas nao avancar
-     (SO/navegador suprimindo animacoes: economia de bateria/acessibilidade), o
-     #content fica preso no estado from (opacity:0/translateY(10px)) com o conteudo
-     ja renderizado por baixo — causa real das "abas vazias" (probes da D3-C).
-     Remover a classe apos a janela da animacao mata animacao+fill em QUALQUER modo
-     de falha; se a animacao completou, e no-op visual (estado final == base). */
-  clearTimeout(window.__contentFadeGuard);
-  window.__contentFadeGuard=setTimeout(function(){ try{ c.classList.remove("fade"); }catch(_){} },450);
-  if(tab==="hoje"){c.innerHTML=renderHoje();bindHoje();}
+  const c=$("content");
+  /* ===== F3.3.53-B4-D3-C9: RENDER IDEMPOTENTE + COALESCIDO + FADE SO EM TROCA DE ABA =====
+     Causa raiz do NO-GO da C8 ("tremendo"/#content invisivel com conteudo por baixo):
+     render() era chamado por CADA snapshot (presenca dos 8 usuarios via dual-path
+     usersPublic, tasks/events/chats/briefs, e mudancas de `users` alem-presenca que
+     tambem disparam route()) e SEMPRE reconstruia o innerHTML e reiniciava a animacao
+     .fade — sob trafego real de producao isso vira RENDER STORM: o fade e reaplicado
+     continuamente e o guard de 450ms (C1) e re-armado antes de disparar (starvation),
+     deixando o #content preso no estado from (opacity:0/translateY(10px)) e piscando.
+     Correcao de RAIZ (nao cosmetica):
+       1) IDEMPOTENTE: se a aba nao mudou e o HTML gerado e IDENTICO ao ultimo aplicado,
+          NAO reatribui innerHTML, NAO re-binda, NAO reaplica fade — no-op total.
+       2) COALESCIDO: rajadas (<150ms) na MESMA aba viram 1 unico render no trailing —
+          sem reentrancia, sem storm de DOM.
+       3) FADE SO EM MUDANCA REAL DE ABA: a animacao aprovada roda exatamente onde foi
+          desenhada (troca de tela); dados novos na MESMA aba atualizam o conteudo sem
+          reiniciar animacao (sem piscar).
+       4) FADE-GUARD (C1) mantido como fallback pos-troca-de-aba: sem reaplicacao
+          continua, o guard nunca mais sofre starvation e garante fim VISIVEL mesmo com
+          animacoes suprimidas pelo SO/navegador. */
+  var __now=Date.now();
+  if(tab===window.__renderLastTab && (__now-(window.__renderLastAt||0))<150){
+    clearTimeout(window.__renderCoalesceT);
+    window.__renderCoalesceT=setTimeout(function(){ try{ render(); }catch(_){} },160);
+    return;
+  }
+  window.__renderLastAt=__now;
+  var html="", bind=null;
+  if(tab==="hoje"){html=renderHoje();bind=bindHoje;}
   else if(tab==="agenda"){
     $("monthTitle").innerHTML=MO[cursor.getMonth()].replace(/^./,x=>x.toUpperCase())+" <span>"+cursor.getFullYear()+"</span>";
     $("vMonth").classList.toggle("on",view==="month");$("vAgenda").classList.toggle("on",view==="agenda");
-    c.innerHTML=renderFilters()+(view==="month"?renderMonth():renderAgenda());bindAgenda();
-  }else if(tab==="board"){c.innerHTML=renderBoard();bindBoard();}
-  else if(tab==="team"){c.innerHTML=renderTeam();bindTeam();}
-  else if(tab==="chat"){c.innerHTML=renderChat();bindChat();}
-  else if(tab==="painel"){c.innerHTML=renderDashboard();
-    var bp=$("backToProfile"); if(bp)bp.onclick=()=>switchTab("profile");}
-  else if(tab==="posts"){c.innerHTML=renderPostsLog();
-    var pb=$("postsBack"); if(pb)pb.onclick=()=>switchTab("board");
-    document.querySelectorAll(".plog[data-tid]").forEach(el=>el.onclick=()=>openTaskDetail(el.dataset.tid));}
-  else if(tab==="clientes"){c.innerHTML=renderClients();
-    var cb=$("cliBack"); if(cb)cb.onclick=()=>switchTab("board");
-    document.querySelectorAll("[data-cli]").forEach(el=>el.onclick=()=>{boardFilter="cli:"+el.dataset.cli;boardFilterUserSet=true;switchTab("board");});}
-  else if(tab==="calendar"){c.innerHTML=renderContentCalendar();bindContentCalendar();}
-  else if(tab==="settings"){c.innerHTML=renderSettings();bindSettings();}
-  else{c.innerHTML=renderProfile();$("logoutBtn").onclick=logout;
-    ensureOwnContactHydrated(); /* F3.3.46: sob users_read_hardening ON, hidrata phone/email próprios via getUserContact; NO-OP com OFF */
-    document.querySelectorAll(".cp-dot").forEach(b=>b.onclick=()=>setMyColor(b.dataset.color));
-    var bb=$("backupBtn"); if(bb){ bb.onclick=exportBackup;
-      var last=lsGet("idseven_lastbackup"); if(last&&$("bkTip")) $("bkTip").textContent="Último backup: "+last+" · faça um por semana e guarde em local seguro."; }
-    var gp=$("goPainel"); if(gp)gp.onclick=()=>switchTab("painel");
-    /* [V63] Botão Configurações */
-    var gs=$("goSettings"); if(gs)gs.onclick=()=>{ settingsView="main"; switchTab("settings"); };
+    html=renderFilters()+(view==="month"?renderMonth():renderAgenda());bind=bindAgenda;
+  }else if(tab==="board"){html=renderBoard();bind=bindBoard;}
+  else if(tab==="team"){html=renderTeam();bind=bindTeam;}
+  else if(tab==="chat"){html=renderChat();bind=bindChat;}
+  else if(tab==="painel"){html=renderDashboard();
+    bind=function(){ var bp=$("backToProfile"); if(bp)bp.onclick=()=>switchTab("profile"); };}
+  else if(tab==="posts"){html=renderPostsLog();
+    bind=function(){ var pb=$("postsBack"); if(pb)pb.onclick=()=>switchTab("board");
+      document.querySelectorAll(".plog[data-tid]").forEach(el=>el.onclick=()=>openTaskDetail(el.dataset.tid)); };}
+  else if(tab==="clientes"){html=renderClients();
+    bind=function(){ var cb=$("cliBack"); if(cb)cb.onclick=()=>switchTab("board");
+      document.querySelectorAll("[data-cli]").forEach(el=>el.onclick=()=>{boardFilter="cli:"+el.dataset.cli;boardFilterUserSet=true;switchTab("board");}); };}
+  else if(tab==="calendar"){html=renderContentCalendar();bind=bindContentCalendar;}
+  else if(tab==="settings"){html=renderSettings();bind=bindSettings;}
+  else{html=renderProfile();
+    bind=function(){ $("logoutBtn").onclick=logout;
+      ensureOwnContactHydrated(); /* F3.3.46: sob users_read_hardening ON, hidrata phone/email próprios via getUserContact; NO-OP com OFF */
+      document.querySelectorAll(".cp-dot").forEach(b=>b.onclick=()=>setMyColor(b.dataset.color));
+      var bb=$("backupBtn"); if(bb){ bb.onclick=exportBackup;
+        var last=lsGet("idseven_lastbackup"); if(last&&$("bkTip")) $("bkTip").textContent="Último backup: "+last+" · faça um por semana e guarde em local seguro."; }
+      var gp=$("goPainel"); if(gp)gp.onclick=()=>switchTab("painel");
+      /* [V63] Botão Configurações */
+      var gs=$("goSettings"); if(gs)gs.onclick=()=>{ settingsView="main"; switchTab("settings"); }; };}
+  var __tabChanged=(window.__renderLastTab!==tab);
+  var __htmlChanged=(window.__renderLastHtml!==html)||!c.firstChild;
+  window.__renderLastTab=tab;
+  if(!__htmlChanged){ return; }   /* C9(1): conteudo identico ja aplicado => no-op total */
+  window.__renderLastHtml=html;
+  if(__tabChanged){
+    c.className="";void c.offsetWidth;c.className="fade";
+    clearTimeout(window.__contentFadeGuard);
+    window.__contentFadeGuard=setTimeout(function(){ try{ c.classList.remove("fade"); }catch(_){} },450);
   }
+  c.innerHTML=html;
+  if(bind){ try{ bind(); }catch(_){} }
 }
 function exportBackup(){
   try{
@@ -8179,7 +8209,12 @@ async function setupPushNotifications(){
      - Se já tentou MAX_TRIES vezes, desiste (proteção contra loop infinito)
      - Caso contrário, INICIA uma nova promise e armazena em fcmSetupPromise */
 
-  if(fcmInitSucceeded){ _pushDbgCapture("init", "já registrado nesta sessão, pulando"); return true; }
+  if(fcmInitSucceeded){
+    /* F3.3.53-B4-D3-C9: loga 1x por sessao (route() re-chama o setup a cada mudanca de
+       `users` alem-presenca — funcionalmente inofensivo; o log repetido poluia o console). */
+    if(!window.__pushInitDupLogged){ window.__pushInitDupLogged=true; _pushDbgCapture("init", "já registrado nesta sessão, pulando"); }
+    return true;
+  }
 
   /* [V64.0] WATCHDOG: se a promise existente ficou travada > 30s, reseta. */
   if(fcmSetupPromise && fcmSetupStartedAt > 0){
