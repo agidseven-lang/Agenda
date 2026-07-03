@@ -119,6 +119,21 @@ check("logout-clears", core._testHasToken() === false && !fs.existsSync(path.joi
 const r12 = await core.self();
 check("self-no-session", r12.ok === false && r12.error === "no_session");
 
+// 13) F3.3.56-G5a — "reabrir o app" APÓS logout NÃO pode relogar sozinho:
+//     nova instância do core sobre o MESMO storeDir (simula novo boot) tem
+//     que ficar SEM sessão e authSelf tem que devolver no_session.
+const coreReopen = createAuthCore({ storeDir, urls: { login: base + "/login", self: base + "/self", changePassword: base + "/chpw" } });
+const r13 = await coreReopen.self();
+check("reopen-after-logout-no-relogin", coreReopen._testHasToken() === false && r13.ok === false && r13.error === "no_session" && !leakScan(r13));
+
+// 14) CONTRAPROVA — sem logout, "reabrir o app" RESTAURA a sessão (comportamento
+//     desejado: fechar/Sair da bandeja != Sair da conta).
+await core.login(CANARY, PW); mode = "ok";
+const coreReopen2 = createAuthCore({ storeDir, urls: { login: base + "/login", self: base + "/self", changePassword: base + "/chpw" } });
+const r14 = await coreReopen2.self();
+check("reopen-without-logout-restores", coreReopen2._testHasToken() === true && r14.ok === true && r14.self && r14.self.id === "canaryUid12345" && !leakScan(r14));
+coreReopen2.logout(); // higiene do ambiente de teste
+
 server.close();
 try { fs.rmSync(storeDir, { recursive: true, force: true }); } catch {}
 
