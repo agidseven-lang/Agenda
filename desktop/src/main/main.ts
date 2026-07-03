@@ -15,6 +15,7 @@ import { startNotifier } from "./notifier";
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
 import { startReminder } from "./reminder";
 import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
+import { registerAuthIpc } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main)
 
 let mainWin: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -275,6 +276,7 @@ app.whenReady().then(() => {
   });
 
   // IPC do renderer
+  registerAuthIpc(); // F3.3.56-G2 — auth-login/auth-self/auth-change-password/auth-logout/auth-session-status
   ipcMain.handle("notif-test", () => {
     new Notification({ title: "Agenda ID Seven", body: "Notificacao de teste OK." }).show();
     diag("notif-test.shown");
