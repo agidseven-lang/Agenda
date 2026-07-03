@@ -2447,7 +2447,12 @@ async function doRegister(){
 function saveSession(u){localStorage.setItem('wp_uid',u.id);localStorage.setItem('wp_name',u.name||'');}
 function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');localStorage.removeItem('wp_team_jwt');}
 function startApp(u){state.user=u;saveSession(u);document.body.classList.add("authed");document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
-function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}
+async function logout(){
+  /* F3.3.56-G5a — FIX: "Sair da conta" também limpa a SESSÃO SERVER-SIDE no
+     processo main (userData/session.json). Sem isto, o boot re-logava sozinho
+     via authSelf ao reabrir o app após o logout. */
+  try{if(window.desktopAPI&&window.desktopAPI.authLogout){await window.desktopAPI.authLogout();}}catch(_){}
+  try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}
 function subscribeData(){
   /* F3.3.56-G2 — roster via usersPublic (projeção allowlist {id,name,role,admin,
      status,photo,color} mantida pelo trigger syncUsersPublic). O renderer deixa
