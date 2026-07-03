@@ -2227,12 +2227,10 @@ const APP_VER={ desktop:'1.0.146', tag:'Fluxo', apk:'1.0.146-beta-board-rebuild'
   }catch(e){}
 })();
 
-/* ---- Crypto (Crypto.kt / PWA) ---- */
-async function sha256Hex(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');}
-async function hashPw(pw,salt){return 's2:'+await sha256Hex(salt+'|'+pw);}
-function djb2(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return 'h'+(h>>>0);}
-async function verifyPw(pass,salt,pw){if(!pass)return false;if(salt&&pass.startsWith('s2:'))return pass===await hashPw(pw,salt);return pass===djb2(pw);}
-function randSalt(){const a=new Uint8Array(16);crypto.getRandomValues(a);return [...a].map(x=>x.toString(16).padStart(2,'0')).join('');}
+/* ---- Crypto ----
+   F3.3.56-G2: hash/verificação de senha REMOVIDOS do renderer. A senha só
+   transita para o processo main (desktopAPI.authLogin/authChangePassword),
+   que fala com os endpoints server-side. O renderer nunca vê pass/salt. */
 
 /* ---- Domínio (Types.kt) ---- */
 const SECTORS=[
@@ -2365,18 +2363,26 @@ let unsub={users:null,events:null,tasks:null};
 /* ---- AUTH ---- */
 function digits(s){return (s||'').replace(/\D/g,'');}
 async function doLogin(idOrPhone,password){
-  const id=idOrPhone.trim().toLowerCase();const d=digits(idOrPhone);
-  const snap=await db.collection('users').get();let m=null;
-  snap.forEach(doc=>{if(m)return;const u=doc.data();const em=(u.email||'').toLowerCase();if(em===id||(d&&digits(u.phone)===d))m=Object.assign({id:doc.id},u);});
-  if(!m)throw 'E-mail/WhatsApp ou senha incorretos.';
-  const st=m.status||'';if(st==='pendente')throw 'Cadastro aguardando aprovação.';if(st==='removido'||st==='excluido')throw 'Conta inativa.';
-  if(!await verifyPw(m.pass,m.salt,password))throw 'E-mail/WhatsApp ou senha incorretos.';
+  /* F3.3.56-G2 — login SERVER-SIDE via processo main (endpoint loginUser).
+     O renderer NÃO lê a coleção users, NÃO vê pass/salt e NÃO verifica senha.
+     O servidor faz match por e-mail OU telefone, valida a senha, barra
+     pendente/removido/excluido (user_inactive) e aplica rate-limit. */
+  const api=window.desktopAPI;
+  if(!api||typeof api.authLogin!=='function')throw 'Login indisponível nesta build (auth do Desktop ausente).';
+  const r=await api.authLogin((idOrPhone||'').trim(),password);
+  if(!r||!r.ok){
+    const e=(r&&r.error)||'network';
+    if(e==='invalid_credentials')throw 'E-mail/WhatsApp ou senha incorretos.';
+    if(e==='user_inactive')throw 'Conta inativa ou aguardando aprovação.';
+    if(e==='rate_limited')throw 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
+    if(e==='bad_request')throw 'Preencha e-mail/WhatsApp e senha.';
+    throw 'Sem conexão com o servidor de login. Verifique a internet e tente de novo.';
+  }
   // detail-hierarchy-v2: adquire o teamSessionJwt do Worker (autenticação FORTE p/ ações
   // de workflow). Fire-and-forget: falha NÃO bloqueia o login (a ação avisa na hora).
   // A senha é usada SÓ nesta chamada HTTPS — nunca persistida no app.
-  acquireTeamSession(m.id,password);
-  if(m.mustChangePassword){state.pending={user:m};return null;}
-  return m;
+  acquireTeamSession(r.user.id,password);
+  return r.user;
 }
 /* Sessão de EQUIPE (Worker V64.45): POST /team/session {uid, password} → JWT HS256
    ({sub, aud:'idseven-team', scope:'workflow:team_adjusted_item', exp:+12h}) assinado
@@ -2432,17 +2438,21 @@ function ensureTeamSession(){
     const inp=document.getElementById('tsPw');if(inp)inp.focus();
   });
 }
-async function doRegister(name,role,phone,email,password){
-  if(!name.trim()||!email.trim()||!password)throw 'Preencha nome, e-mail e senha.';
-  const salt=randSalt();const pass=await hashPw(password,salt);
-  await db.collection('users').add({name:name.trim(),role:role.trim(),phone:phone.trim(),email:email.trim().toLowerCase(),pass,salt,status:'pendente',admin:false,createdAt:Date.now()});
+async function doRegister(){
+  /* F3.3.56-G2 — AUTO-CADASTRO DESATIVADO (Opção A, ratificada pelo owner).
+     Sistema interno com onboarding admin-driven: o Desktop não cria usuário
+     e não grava credencial no cliente. */
+  throw 'Cadastro interno desativado. Solicite acesso ao administrador.';
 }
 function saveSession(u){localStorage.setItem('wp_uid',u.id);localStorage.setItem('wp_name',u.name||'');}
 function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');localStorage.removeItem('wp_team_jwt');}
 function startApp(u){state.user=u;saveSession(u);document.body.classList.add("authed");document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
 function logout(){try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}
 function subscribeData(){
-  unsub.users=db.collection('users').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}renderFromSnapshot();});
+  /* F3.3.56-G2 — roster via usersPublic (projeção allowlist {id,name,role,admin,
+     status,photo,color} mantida pelo trigger syncUsersPublic). O renderer deixa
+     de ler a coleção users; nenhum pass/salt/PII chega à memória do app. */
+  unsub.users=db.collection('usersPublic').onSnapshot(s=>{state.users=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(state.user){const me=state.users.find(x=>x.id===state.user.id);if(me)state.user=me;}renderFromSnapshot();});
   unsub.events=db.collection('events').onSnapshot(s=>{state.events=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderFromSnapshot();});
   unsub.tasks=db.collection('tasks').onSnapshot(s=>{state.tasks=dedupById(s.docs.map(d=>Object.assign({id:d.id},d.data())).filter(t=>!isTestTask(t)));renderFromSnapshot();});
 }
@@ -2472,10 +2482,11 @@ function dedupById(arr){
 /* ---- LOGIN UI ---- */
 let loginMode='login',forgotStep=1,forgotEmail='';
 function renderLogin(){
-  const titles={login:'Entrar',register:'Criar conta',forgot:forgotStep===2?'Confirmar código':'Redefinir senha',pending:'Criar nova senha'};
-  const subs={login:'Acesse sua agenda e tarefas da equipe',register:'Cadastre-se para a equipe da ID Seven',
-    forgot:forgotStep===2?('Informe o código de 6 dígitos enviado para '+forgotEmail+' e crie uma nova senha.'):'Informe o e-mail cadastrado e enviaremos um código de 6 dígitos para você criar uma nova senha.',
-    pending:'Defina uma nova senha para continuar — você entrou com uma senha temporária.'};
+  /* F3.3.56-G2: modos 'register' e 'pending' removidos — cadastro interno é
+     admin-driven e a troca de senha é server-side (perfil → Trocar senha). */
+  const titles={login:'Entrar',forgot:forgotStep===2?'Confirmar código':'Redefinir senha'};
+  const subs={login:'Acesse sua agenda e tarefas da equipe',
+    forgot:forgotStep===2?('Informe o código de 6 dígitos enviado para '+forgotEmail+' e crie uma nova senha.'):'Informe o e-mail cadastrado e enviaremos um código de 6 dígitos para você criar uma nova senha.'};
   document.getElementById('loginTitle').textContent=titles[loginMode];
   document.getElementById('loginSub').textContent=subs[loginMode];
   const f=document.getElementById('loginForm');let h='';
@@ -2484,14 +2495,7 @@ function renderLogin(){
     h+='<div class="fld"><label>E-mail ou WhatsApp</label><input class="inp" id="liId" placeholder="E-mail ou WhatsApp" inputmode="email"></div>'+pw('liPw')+
       '<div style="height:10px"></div><button class="btn" id="btnLogin">Entrar</button>'+
       '<button class="txtbtn accent" data-mode="forgot">Esqueci minha senha</button>'+
-      '<button class="txtbtn soft" data-mode="register">Não tem conta? Criar conta</button>';
-  }else if(loginMode==='register'){
-    h+='<div class="fld"><label>Nome completo</label><input class="inp" id="rName" placeholder="Nome completo"></div>'+
-      '<div class="fld"><label>Função (ex.: Social Media)</label><input class="inp" id="rRole" placeholder="Função (ex.: Social Media)"></div>'+
-      '<div class="fld"><label>WhatsApp</label><input class="inp" id="rPhone" placeholder="WhatsApp" inputmode="tel"></div>'+
-      '<div class="fld"><label>E-mail</label><input class="inp" id="rEmail" placeholder="E-mail" inputmode="email"></div>'+pw('rPw')+
-      '<div style="height:10px"></div><button class="btn" id="btnReg">Criar conta</button>'+
-      '<button class="txtbtn soft" data-mode="login">Já tenho conta? Entrar</button>';
+      '<div style="margin-top:10px;font-size:12.5px;color:var(--soft);text-align:center">Cadastro interno desativado. Solicite acesso ao administrador.</div>';
   }else if(loginMode==='forgot'&&forgotStep===1){
     h+='<div class="fld"><label>E-mail cadastrado</label><input class="inp" id="fEmail" placeholder="E-mail cadastrado" inputmode="email"></div>'+
       '<div style="height:10px"></div><button class="btn" id="btnFreq">Enviar código</button>'+
@@ -2502,10 +2506,6 @@ function renderLogin(){
       '<div style="height:10px"></div><button class="btn" id="btnFconf">Criar nova senha</button>'+
       '<button class="txtbtn accent" id="btnResend">Reenviar código</button>'+
       '<button class="txtbtn soft" data-mode="login">Voltar ao login</button>';
-  }else if(loginMode==='pending'){
-    h+=pw('pPw','Nova senha')+pw('pPw2','Confirmar nova senha')+
-      '<div style="height:10px"></div><button class="btn" id="btnPend">Salvar nova senha</button>'+
-      '<button class="txtbtn soft" data-mode="login">Cancelar e voltar ao login</button>';
   }
   f.innerHTML=h;
 }
@@ -2517,22 +2517,47 @@ document.getElementById('login').addEventListener('click',async e=>{
   const tg=e.target.closest('[data-toggle]');if(tg){const inp=document.getElementById(tg.dataset.toggle);const sh=inp.type==='password';inp.type=sh?'text':'password';tg.textContent=sh?'Ocultar':'Mostrar';return;}
   const btn=e.target.closest('button');if(!btn||!btn.id||btn.dataset.toggle)return;btn.dataset.t=btn.textContent;
   try{
-    if(btn.id==='btnLogin'){banner('');loading(btn,true);const u=await doLogin(val('liId'),val('liPw'));if(u)startApp(u);else{loginMode='pending';renderLogin();banner('Senha temporária — defina uma nova senha.',true);}}
-    else if(btn.id==='btnReg'){banner('');loading(btn,true);await doRegister(val('rName'),val('rRole'),val('rPhone'),val('rEmail'),val('rPw'));loginMode='login';renderLogin();banner('Cadastro enviado! Aguarde aprovação do administrador.',true);}
+    if(btn.id==='btnLogin'){banner('');loading(btn,true);const u=await doLogin(val('liId'),val('liPw'));startApp(u);}
     else if(btn.id==='btnFreq'){forgotEmail=val('fEmail');if(!/.+@.+\..+/.test(forgotEmail)){banner('Informe um e-mail válido.');return;}forgotStep=2;renderLogin();banner('Se o e-mail existir, enviamos um código. (O backend de reset roda nas Cloud Functions de produção — não alterado nesta prévia.)',true);}
     else if(btn.id==='btnResend'){banner('Código reenviado (se o e-mail existir).',true);}
     else if(btn.id==='btnFconf'){banner('A redefinição usa as Cloud Functions de produção, que não são tocadas nesta homologação. Use sua senha atual para entrar.',true);}
-    else if(btn.id==='btnPend'){await pendingChange(val('pPw'),val('pPw2'),btn);}
   }catch(err){banner(typeof err==='string'?err:('Não foi possível agora. '+(err&&err.message||err)));}
   finally{loading(btn,false);}
 });
-async function pendingChange(p1,p2,btn){
-  if((p1||'').length<6){banner('A nova senha precisa ter pelo menos 6 caracteres.');return;}
-  if(p1!==p2){banner('As senhas não coincidem.');return;}
-  if(!state.pending){banner('Sessão expirada, refaça o login.');return;}
-  loading(btn,true);const salt=randSalt();const pass=await hashPw(p1,salt);
-  await db.collection('users').doc(state.pending.user.id).update({pass,salt,mustChangePassword:false,passwordChangedAt:Date.now()});
-  const u=Object.assign({},state.pending.user,{pass,salt,mustChangePassword:false});state.pending=null;startApp(u);
+/* F3.3.56-G2 — TROCA DE SENHA SERVER-SIDE (perfil → "Trocar senha").
+   Substitui o antigo fluxo 'pending' (que gravava pass/salt no cliente): a senha
+   atual é validada NO SERVIDOR (endpoint changePassword, sessão obrigatória) e o
+   próprio servidor limpa mustChangePassword. Nada de hash/credencial no renderer. */
+function openChangePasswordModal(){
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg-keep="1"><div class="sheet" style="max-width:420px">'+
+    '<div class="grab"></div><div style="font-size:17px;font-weight:800;margin-bottom:6px">Trocar senha</div>'+
+    '<div style="font-size:13px;color:var(--soft);line-height:1.5;margin-bottom:12px">A senha atual é confirmada no servidor. A nova senha vale para o Desktop e para o app.</div>'+
+    '<input class="inp" id="cpOld" type="password" autocomplete="current-password" placeholder="Senha atual">'+
+    '<div style="height:8px"></div><input class="inp" id="cpNew" type="password" autocomplete="new-password" placeholder="Nova senha (mín. 6)">'+
+    '<div style="height:8px"></div><input class="inp" id="cpNew2" type="password" autocomplete="new-password" placeholder="Confirmar nova senha">'+
+    '<div id="cpErr" style="font-size:12.5px;color:var(--red);min-height:18px;margin-top:6px"></div>'+
+    '<div class="row" style="gap:10px;margin-top:8px">'+
+      '<button class="btn ghost" id="cpCancel" style="flex:1">Cancelar</button>'+
+      '<button class="btn" id="cpGo" style="flex:1.4">Salvar nova senha</button>'+
+    '</div></div></div>';
+  document.getElementById('cpCancel').addEventListener('click',()=>closeModal());
+  document.getElementById('cpGo').addEventListener('click',async()=>{
+    const err=document.getElementById('cpErr');
+    const o=(document.getElementById('cpOld')||{}).value||'';
+    const n1=(document.getElementById('cpNew')||{}).value||'';
+    const n2=(document.getElementById('cpNew2')||{}).value||'';
+    if(!o){if(err)err.textContent='Digite a senha atual.';return;}
+    if((n1||'').length<6){if(err)err.textContent='A nova senha precisa ter pelo menos 6 caracteres.';return;}
+    if(n1!==n2){if(err)err.textContent='As senhas não coincidem.';return;}
+    if(err)err.textContent='';
+    const api=window.desktopAPI;
+    if(!api||typeof api.authChangePassword!=='function'){if(err)err.textContent='Indisponível nesta build.';return;}
+    const r=await api.authChangePassword(o,n1);
+    if(r&&r.ok){closeModal();flashToast('Senha alterada com sucesso.');return;}
+    const e=(r&&r.error)||'network';
+    if(err)err.textContent=(e==='invalid_current_password'||e==='invalid_credentials')?'Senha atual incorreta.':(e==='weak_password')?'Nova senha muito curta.':(e==='rate_limited')?'Muitas tentativas. Aguarde alguns minutos.':(e==='expired'||e==='no_session')?'Sessão expirada — saia e entre de novo.':'Falha de conexão. Tente novamente.';
+  });
+  const inp=document.getElementById('cpOld');if(inp)inp.focus();
 }
 
 /* ---- APP RENDER ---- */
@@ -7038,11 +7063,11 @@ function settRow(ic,l,s,sheet){return '<button class="settrow" data-sheet="'+she
 function openSheet(which){
   const u=state.user;let rows,title;
   if(which==='conta'){title='Conta';rows=[['Nome',u.name],['Função',u.role||'Não informado'],['E-mail',u.email||'Não informado'],['WhatsApp',u.phone||'Não informado'],['Status','Ativa'],['Permissão',u.admin?'Administrador':'Membro da equipe'],['ID do usuário',u.id]];}
-  else if(which==='seguranca'){title='Segurança';rows=[['Sessão','Ativa neste navegador'],['Login','Custom (hash s2 / SHA-256)'],['UID',u.id],['Sessão salva','Local (localStorage)']];}
+  else if(which==='seguranca'){title='Segurança';rows=[['Sessão','Ativa (servidor)'],['Login','Server-side (endpoint seguro)'],['UID',u.id],['Sessão salva','Somente no app (protegida)']];}
   else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Espelha APK','1.0.108-beta-whatsapp-aurora-premium-card'],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800;margin-bottom:10px">'+title+'</div>'+
     rows.map(r=>'<div class="infoline"><div class="il">'+esc(r[0])+'</div><div class="iv">'+esc(r[1])+'</div></div>').join('')+
-    (which==='seguranca'?'<div style="height:14px"></div><button class="btn" data-logout="1" style="background:'+withAlpha('#F87171',.14)+';color:var(--red)">Sair da conta</button>':'')+'</div></div>';
+    (which==='seguranca'?'<div style="height:14px"></div><button class="btn" data-chpw="1" style="margin-bottom:10px">Trocar senha</button><button class="btn" data-logout="1" style="background:'+withAlpha('#F87171',.14)+';color:var(--red)">Sair da conta</button>':'')+'</div></div>';
 }
 
 /* ---- TASK FORM (wizard) ---- */
@@ -7386,6 +7411,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
   if(el=g('[data-cfgnotiftest]')){try{window.desktopAPI&&window.desktopAPI.notifTest&&window.desktopAPI.notifTest();}catch(_){}flashToast('Notificação de teste disparada.');return;}
   if(el=g('[data-logout]')){closeModal();logout();return;}
+  if(el=g('[data-chpw]')){closeModal();openChangePasswordModal();return;}
   if(el=g('[data-pickasg]')){if(state.form){const id=el.dataset.pickasg||null;state.form.assigneeId=id;const u=id?state.users.find(x=>x.id===id):null;state.form.assignee=u?(u.name||''):'';}closeModal();render();return;}
   if(el=g('[data-form]')){const a=el.dataset.form;if(a==='close'){state.form=null;render();}else if(a==='back'){state.form.step=Math.max(0,state.form.step-1);render();}else if(a==='next')stepNext();else if(a==='save')await saveTask();return;}
   if(el=g('[data-fsector]')){state.form.sector=el.dataset.fsector;state.form.subtype=null;state.form.contents=[];state.form.checklist=[];render();return;}
@@ -7413,8 +7439,17 @@ try{window.desktopAPI&&window.desktopAPI.onNotifOpen(function(t){if(!state.user)
 function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta.focus();}}
 (async function boot(){
   renderLogin();
-  const uid=localStorage.getItem('wp_uid');
-  if(uid){try{const doc=await db.collection('users').doc(uid).get();if(doc.exists){startApp(Object.assign({id:doc.id},doc.data()));return;}}catch(_){}clearSession();}
+  /* F3.3.56-G2 — restauração de sessão SERVER-SIDE: o token vive no processo
+     main; getUserSelf valida e devolve o perfil próprio. O renderer não lê
+     users. Sessão expirada/inexistente => permanece na tela de login. */
+  try{
+    const api=window.desktopAPI;
+    if(api&&typeof api.authSelf==='function'){
+      const r=await api.authSelf();
+      if(r&&r.ok&&r.self&&r.self.id){startApp(Object.assign({},r.self));return;}
+      if(r&&(r.error==='expired'||r.error==='no_session'))clearSession();
+    }
+  }catch(_){}
 })();
 
 /* ════════ SINGLE-CARD-DOM-LOCK ═══════════════════════════════════════════════════

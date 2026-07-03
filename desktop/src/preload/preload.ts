@@ -41,6 +41,13 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   copyCardImage: (bytes: ArrayBuffer | Uint8Array): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke("copy-card-image", bytes),
   showInFolder: (p: string): Promise<boolean> => ipcRenderer.invoke("show-in-folder", p),
+  // F3.3.56-G2 — AUTH SERVER-SIDE. O token de sessão vive SOMENTE no main;
+  // estes métodos retornam apenas {ok, user/self/active/expiresAt/error} — nunca o token.
+  authLogin: (identifier: string, password: string): Promise<any> => ipcRenderer.invoke("auth-login", identifier, password),
+  authSelf: (): Promise<any> => ipcRenderer.invoke("auth-self"),
+  authChangePassword: (oldPassword: string, newPassword: string): Promise<any> => ipcRenderer.invoke("auth-change-password", oldPassword, newPassword),
+  authLogout: (): Promise<any> => ipcRenderer.invoke("auth-logout"),
+  authSessionStatus: (): Promise<any> => ipcRenderer.invoke("auth-session-status"),
   isDesktop: true,
   version: "1.0.137-beta-portal-fix-v64-51-test",
 });
