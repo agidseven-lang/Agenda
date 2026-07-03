@@ -494,7 +494,7 @@
     "warningText": "Você tem 30 minutos para concluir esta tarefa.",
     "overdueText": "Você tem 10 minutos para concluir esta tarefa.",
     "criticalText": "Sinalize atraso imediatamente ou conclua a tarefa.",
-    "warningCtx": "Prazo final: 12:21 · Vence em 18:00",
+    "warningCtx": "Prazo final: 20:34 · Vence em 18:00",
     "overdueCtx": "Restam 7:00 · atrasada há 3:00",
     "overdueSev": "critical",
     "criticalSev": "critical",
