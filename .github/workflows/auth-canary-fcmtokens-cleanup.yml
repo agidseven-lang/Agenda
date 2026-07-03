@@ -1,0 +1,163 @@
+# =====================================================================
+# [manual] F3.3.55-D4 — LIMPEZA CONTROLADA dos fcmTokens do usuario CANARIO. PREP + gate.
+# Roda scripts/worker-ops/f3355-d4-canary-fcmtokens-cleanup.e2e.mjs (de main).
+#   DRY-RUN / PREP (PADRAO): valida alvo==canario + escopo 1 usuario; NAO conecta no
+#     Firestore, NAO escreve, NAO usa credencial, NAO imprime token/segredo.
+#   APPLY (fase posterior, autorizada): limpa SOMENTE fcmTokens ([]) e fcmTokenMeta ({})
+#     do doc do canario, reportando contadores antes/depois (nunca valores). NAO toca
+#     pass/salt/status/perfil/notifPrefs nem qualquer outro doc. NAO e executado nesta
+#     fase (defaults seguros mantem DRY-RUN).
+# EXECUCAO/APPLY bloqueado por padrao. RECUSA confirm errado / target != canario /
+# max_users != 1 / hosting_publish=true / fcm_token_server=true / (APPLY sem service
+# account). NAO chama sendPush; NAO envia FCM/Web Push; NAO faz deploy. permissions
+# minimos. O secret FIREBASE_SERVICE_ACCOUNT e consumido SOMENTE no caminho APPLY
+# gated e NUNCA impresso.
+# =====================================================================
+name: "[manual] F3.3.55-D4 Canary FCM Tokens Cleanup (controlled)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_cleanup:
+        description: "Digite CLEAR_CANARY_FCM_TOKENS para confirmar"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = PREP/validacao (sem escrita). APPLY exige false + allow."
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      target_email:
+        description: "E-mail alvo (fixo: somente o canario)"
+        required: true
+        default: "teste.webpush@idseven.com.br"
+        type: string
+      max_users:
+        description: "Maximo de usuarios alvo (fixo: 1)"
+        required: true
+        default: "1"
+        type: string
+      allow_apply_cleanup:
+        description: "Permitir APPLY real (default false; exigido junto de dry_run=false)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      hosting_publish:
+        description: "Publicar Hosting (sempre false; true recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      fcm_token_server:
+        description: "Estado da flag (sempre false; true recusado)"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-canary-fcmtokens-cleanup
+  cancel-in-progress: false
+
+env:
+  EXPECTED_TARGET_EMAIL: "teste.webpush@idseven.com.br"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3355-d4-canary-fcmtokens-cleanup.e2e.mjs"
+  RETEST_OUT: "canary-fcmtokens-cleanup-artifacts"
+
+jobs:
+  canary-fcmtokens-cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_cleanup (== CLEAR_CANARY_FCM_TOKENS)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_cleanup }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "CLEAR_CANARY_FCM_TOKENS" ]; then
+            echo "::error:: confirm_cleanup invalido — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_cleanup OK."
+
+      - name: Guard escopo/seguranca (somente canario; 1 usuario; flags travadas)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          EMAIL: ${{ github.event.inputs.target_email }}
+          MAXU: ${{ github.event.inputs.max_users }}
+          ALLOW_APPLY: ${{ github.event.inputs.allow_apply_cleanup }}
+          HOSTING: ${{ github.event.inputs.hosting_publish }}
+          FCM: ${{ github.event.inputs.fcm_token_server }}
+          HAS_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+        run: |
+          set -eu
+          if [ "$HOSTING" = "true" ]; then echo "::error:: hosting_publish=true e proibido."; exit 1; fi
+          if [ "$FCM" = "true" ]; then echo "::error:: fcm_token_server=true e proibido."; exit 1; fi
+          if [ "$EMAIL" != "$EXPECTED_TARGET_EMAIL" ]; then echo "::error:: target_email diferente do canario — recusado."; exit 1; fi
+          if [ "$MAXU" != "1" ]; then echo "::error:: max_users != 1 — recusado."; exit 1; fi
+          # APPLY real exige o service account presente. Sem ele => so DRY-RUN/PREP.
+          if [ "$ALLOW_APPLY" = "true" ] && [ "$DRY_RUN" = "false" ]; then
+            if [ "$HAS_SA" != "true" ]; then echo "::error:: FIREBASE_SERVICE_ACCOUNT ausente para APPLY — abortando."; exit 1; fi
+          fi
+          echo "guards de escopo/seguranca OK (dry_run=$DRY_RUN; somente canario; 1 usuario)."
+
+      - name: Checkout (main; traz o runner)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Confirma runner + node --check
+        run: |
+          set -eu
+          test -f "$RUNNER_SCRIPT" || { echo "::error:: runner ausente: $RUNNER_SCRIPT"; exit 1; }
+          node --check "$RUNNER_SCRIPT"
+          echo "Runner presente e com sintaxe OK."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instala firebase-admin (somente APPLY gated)
+        if: ${{ github.event.inputs.dry_run == 'false' && github.event.inputs.allow_apply_cleanup == 'true' }}
+        run: |
+          set -eu
+          npm i --no-save firebase-admin@12 >/dev/null 2>&1
+          echo "firebase-admin instalado (APPLY)."
+
+      - name: Rodar cleanup (DRY-RUN/PREP por padrao; APPLY so gated)
+        env:
+          CONFIRM_CLEANUP: ${{ github.event.inputs.confirm_cleanup }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          TARGET_EMAIL: ${{ github.event.inputs.target_email }}
+          MAX_USERS: ${{ github.event.inputs.max_users }}
+          ALLOW_APPLY_CLEANUP: ${{ github.event.inputs.allow_apply_cleanup }}
+          HOSTING_PUBLISH: ${{ github.event.inputs.hosting_publish }}
+          FCM_TOKEN_SERVER: ${{ github.event.inputs.fcm_token_server }}
+          # Consumido SOMENTE no APPLY gated; NUNCA impresso. Em DRY-RUN e ignorado.
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -eu
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifact sanitizado (summary)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-fcmtokens-cleanup
+          path: canary-fcmtokens-cleanup-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
