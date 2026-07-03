@@ -44,7 +44,7 @@ const server = http.createServer((req, res) => {
     }
     if (p === "/chpw") {
       if (auth !== "Bearer " + TOKEN) return send(401, { ok: false, error: "unauthorized" });
-      if (chpwMode === "wrong") return send(401, { ok: false, error: "invalid_credentials" });
+      if (chpwMode === "wrong") return send(401, { ok: false, error: "invalid_current_password" });
       if (chpwMode === "weak") return send(400, { ok: false, error: "weak_password" });
       return send(200, { ok: true });
     }
@@ -102,7 +102,7 @@ check("chpw-ok", r8.ok === true && !leakScan(r8));
 // 9) troca de senha com senha atual errada
 chpwMode = "wrong";
 const r9 = await core.changePassword("errada", "nova-senha-123");
-check("chpw-wrong", r9.ok === false && r9.error === "invalid_credentials");
+check("chpw-wrong", r9.ok === false && r9.error === "invalid_current_password" && core._testHasToken() === true);
 
 // 10) self expirado => limpa sessão + reporta expired
 mode = "expired";

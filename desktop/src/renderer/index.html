@@ -2555,7 +2555,7 @@ function openChangePasswordModal(){
     const r=await api.authChangePassword(o,n1);
     if(r&&r.ok){closeModal();flashToast('Senha alterada com sucesso.');return;}
     const e=(r&&r.error)||'network';
-    if(err)err.textContent=(e==='invalid_credentials')?'Senha atual incorreta.':(e==='weak_password')?'Nova senha muito curta.':(e==='rate_limited')?'Muitas tentativas. Aguarde alguns minutos.':(e==='expired'||e==='no_session')?'Sessão expirada — saia e entre de novo.':'Falha de conexão. Tente novamente.';
+    if(err)err.textContent=(e==='invalid_current_password'||e==='invalid_credentials')?'Senha atual incorreta.':(e==='weak_password')?'Nova senha muito curta.':(e==='rate_limited')?'Muitas tentativas. Aguarde alguns minutos.':(e==='expired'||e==='no_session')?'Sessão expirada — saia e entre de novo.':'Falha de conexão. Tente novamente.';
   });
   const inp=document.getElementById('cpOld');if(inp)inp.focus();
 }
