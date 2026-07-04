@@ -5186,7 +5186,13 @@ async function verifyPw(u,pw){
 const AUTH_LOGIN_URL_DEFAULT = "https://loginuser-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; ATIVO só após deploy (fase futura) */
 const AUTH_SESSION_KEY = "idseven_auth_session_v1";
 function authLoginUrl(){ try{ const o=lsGet("auth_login_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_LOGIN_URL_DEFAULT; }
-function authServerSideLoginEnabled(){ try{ return lsGet("auth_ss_login")==="on"; }catch(_){ return false; } }
+/* F3.3.57-W1 — cutover Web hardened: default ON, TERCEIRO flag do trio acoplado
+   (auth_ss_login + users_read_hardening + fcm_token_server). Sem login server-side,
+   com users_read_hardening ON o array `users` fica vazio e o fallback client-side
+   do login não acha o usuário — por isso os três defaults viram ON juntos. Endpoint
+   loginUser já ATIVO em produção (mesmo usado pelo Desktop server-side). Override
+   manual: "off" respeita OFF; qualquer outro valor OU ausência => ON. */
+function authServerSideLoginEnabled(){ try{ return lsGet("auth_ss_login")!=="off"; }catch(_){ return true; } }
 /* Guarda a sessão server-side (token HMAC + expiresAt). NUNCA loga o token. */
 function authStoreSession(session){ try{ if(session && typeof session.token==="string"){ lsSet(AUTH_SESSION_KEY, JSON.stringify({ token: session.token, expiresAt: (session.expiresAt||0) })); } }catch(_){ } }
 function authGetSession(){ try{ const raw=lsGet(AUTH_SESSION_KEY); if(!raw) return null; const o=JSON.parse(raw); if(o && typeof o.token==="string" && (!o.expiresAt || o.expiresAt>Date.now())) return o; }catch(_){ } return null; }
@@ -5210,7 +5216,10 @@ async function loginUserServerSide(identifier, password){
    ============================================================================ */
 const AUTH_SELF_URL_DEFAULT = "https://getuserself-de36pi7vza-uc.a.run.app";       /* gen2 us-central1; ATIVO só após deploy (fase futura) */
 const AUTH_CONTACT_URL_DEFAULT = "https://getusercontact-de36pi7vza-uc.a.run.app"; /* já deployado (Slice 2) */
-function usersReadHardeningEnabled(){ try{ return lsGet("users_read_hardening")==="on"; }catch(_){ return false; } }
+/* F3.3.57-W1 — cutover Web hardened: default ON. Override manual por localStorage
+   preservado p/ rollback local: valor explícito "off" respeita OFF; qualquer outro
+   valor OU ausência => ON. Fecha a dependência de leitura crua de `users`. */
+function usersReadHardeningEnabled(){ try{ return lsGet("users_read_hardening")!=="off"; }catch(_){ return true; } }
 function authSelfUrl(){ try{ const o=lsGet("auth_self_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_SELF_URL_DEFAULT; }
 function authContactUrl(){ try{ const o=lsGet("auth_contact_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_CONTACT_URL_DEFAULT; }
 /* GET getUserSelf (perfil próprio seguro). Usa a sessão server-side; NUNCA loga o token. */
@@ -5289,7 +5298,10 @@ async function sendPushServerClient(targetUids, payload){
    FCM nem o token de sessão. Endpoints ativos só após deploy futuro (B3.22/B3.23). */
 const AUTH_FCM_REGISTER_URL_DEFAULT = "https://registerfcmtoken-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; placeholder ATIVO só após deploy (fase futura) */
 const AUTH_FCM_REMOVE_URL_DEFAULT   = "https://removemyfcmtoken-de36pi7vza-uc.a.run.app"; /* gen2 us-central1; placeholder ATIVO só após deploy (fase futura) */
-function fcmTokenServerEnabled(){ try{ return lsGet("fcm_token_server")==="on"; }catch(_){ return false; } }
+/* F3.3.57-W1 — cutover Web hardened: default ON, PAREADO com users_read_hardening
+   (evita o modo degradado em que hardening ON pula o save legado de token FCM).
+   Override manual: "off" respeita OFF; qualquer outro valor OU ausência => ON. */
+function fcmTokenServerEnabled(){ try{ return lsGet("fcm_token_server")!=="off"; }catch(_){ return true; } }
 function authFcmRegisterUrl(){ try{ const o=lsGet("auth_fcm_register_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_FCM_REGISTER_URL_DEFAULT; }
 function authFcmRemoveUrl(){ try{ const o=lsGet("auth_fcm_remove_url"); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return AUTH_FCM_REMOVE_URL_DEFAULT; }
 /* POST registerFcmToken (token do próprio usuário; dedup por deviceId no servidor).
@@ -6214,69 +6226,13 @@ function withTimeout(promise,ms){
 }
 
 $("doReg").onclick=async()=>{
-  const btn=$("doReg");
-  const name=val("rName"),role=val("rRole"),phone=val("rPhone"),email=val("rEmail").toLowerCase(),pass=val("rPass");
-  if(!photoReady||!pendingPhoto) return showErr("Envie sua foto para continuar (toque no círculo e escolha/tire a foto). Se a foto não aparecer no círculo, ela não foi aceita — tente outra.");
-  if(!name||!role||!phone||!email||!pass) return showErr("Preencha todos os campos do cadastro.");
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showErr("E-mail inválido. Confira o endereço (ex.: nome@empresa.com) e tente de novo.");
-  if(phone.replace(/\D/g,"").length<10) return showErr("WhatsApp inválido. Use DDD + número (ex.: 88 9 9999-9999).");
-  if(pass.length<4) return showErr("A senha deve ter pelo menos 4 caracteres.");
-  if(!db) return showErr("Sem conexão com o servidor. Verifique a internet e tente de novo.");
-  btn.disabled=true; btn.textContent="Enviando…";
-  try{
-    // garante lista de usuários atualizada (evita criar admin duplicado / cadastro repetido)
-    let list=users;
-    const pd=phone.replace(/\D/g,"");
-    /* F3.3.28/F3.3.48 users-read-hardening: com a flag ON, o duplicate-check NÃO lê `users` cru
-       (usersPublic é PII-free, não serve p/ checar email/phone) — usa o endpoint server-side
-       checkUserExists. OFF (padrão): caminho legado 100% intacto (fetch de users + checagem em memória). */
-    if(usersReadHardeningEnabled()){
-      let dc=null;
-      try{ dc=await withTimeout(checkUserExistsClient(email,phone),12000); }catch(_){ dc=null; }
-      if(!dc || dc.ok!==true){
-        showErr("Não foi possível verificar seu cadastro agora. Verifique a internet e tente de novo.");
-        btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
-      }
-      if(dc.exists){
-        showErr(dc.field==="phone"
-          ? "Já existe um cadastro com este WhatsApp. Use a opção \"Entrar\"."
-          : "Já existe um cadastro com este e-mail. Use a opção \"Entrar\".");
-        btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
-      }
-    }else{
-      if(!usersLoaded){
-        try{ const s=await withTimeout(db.collection("users").get(),12000);
-              list=s.docs.map(d=>({id:d.id,...d.data()})); }catch(_){}
-      }
-      if(list.some(u=>(u.email||"").toLowerCase()===email)){
-        showErr("Já existe um cadastro com este e-mail. Use a opção \"Entrar\".");
-        btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
-      }
-      if(list.some(u=>(u.phone||"").replace(/\D/g,"")===pd)){
-        showErr("Já existe um cadastro com este WhatsApp. Use a opção \"Entrar\".");
-        btn.disabled=false; btn.textContent="Enviar cadastro para aprovação"; return;
-      }
-    }
-    const first=list.length===0;
-    const _salt=randSalt(); const _ph=await hashPw(pass,_salt);
-    const ref=await withTimeout(db.collection("users").add({
-      name,role,phone,email,pass:_ph,salt:_salt,photo:pendingPhoto,
-      status:first?"ativo":"pendente",admin:first,createdAt:Date.now()
-    }),15000);
-    /* [V63.99] sincroniza sessionId em memória junto com localStorage (consistência) */
-    sessionId=ref.id;
-    lsSet(SESSION_KEY,ref.id);
-    me={id:ref.id,name,role,phone,email,status:first?"ativo":"pendente",admin:first,photo:pendingPhoto};
-    toast(first?"Cadastro criado — você é o administrador":"Cadastro enviado com sucesso!");
-    route();
-  }catch(e){
-    const msg=(e&&e.message)?e.message:"falha desconhecida";
-    if(/tempo esgotado/.test(msg))
-      showErr("O servidor demorou a responder. Verifique a internet e toque em enviar de novo.");
-    else
-      showErr("Não foi possível concluir o cadastro: "+msg+". Tente novamente; se persistir, me avise com essa mensagem.");
-  }
-  btn.disabled=false; btn.textContent="Enviar cadastro para aprovação";
+  /* F3.3.57-W1 — AUTO-CADASTRO WEB DESATIVADO (Opção B, alinhado com o Desktop).
+     Antes do fechamento de `users read`, o cadastro interno pelo cliente foi removido:
+     não lê `users` (users.get), não escreve (users.add), não gera hash/salt no cliente
+     (hashPw/randSalt) e não cria usuário. Provisionamento passa a ser do administrador.
+     A tela/botão permanecem (sem quebrar layout); a AÇÃO é bloqueada com mensagem clara. */
+  try{ showErr("Cadastro interno desativado. Solicite acesso ao administrador."); }catch(_){ }
+  return;
 };
 $("doLogin").onclick=async()=>{
   if(busy)return;
