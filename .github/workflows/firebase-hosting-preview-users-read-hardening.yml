@@ -1,7 +1,9 @@
 # =====================================================================
-# [manual] Firebase Hosting PREVIEW CHANNEL — users-read-hardening (branch do PR #120).
-# Publica a branch app/f3328-users-read-hardening-onsnapshot-gate SOMENTE num CANAL
-# PREVIEW efemero (nunca o canal live/producao), para validar users_read_hardening=ON
+# [manual] Firebase Hosting PREVIEW CHANNEL — users-read-hardening (patch W1 do cutover).
+# F3.3.57-W3b-a2: REAPONTADO do patch antigo/superado (PR #120, app/f3328@3e3b07b, flags
+# default OFF) para o patch W1 vigente: branch web-hardening-w1-prep @ bda7ec9 (3 flags
+# default ON + auto-cadastro bloqueado; W2 73/73; W3 pacote validado). Publica essa branch
+# SOMENTE num CANAL PREVIEW efemero (nunca o canal live/producao), para validar o cutover
 # com backend real sem afetar a populacao geral.
 #
 # FAIL-CLOSED e DORMENTE: dry_run=true por padrao (nao publica nada). Mesmo com
@@ -9,28 +11,28 @@
 # hosting-only dedicada; NUNCA `firebase deploy` / `--only hosting` (live) / functions /
 # firestore / rules. NAO toca Card Premium / cloudflare-worker.js / Worker /send / Desktop.
 #
-# ESTA FASE (F3.3.33-A1) APENAS ADICIONA O WORKFLOW — NAO DEVE SER EXECUTADO AQUI.
+# ESTA FASE (F3.3.57-W3b-a2) APENAS REAPONTA O WORKFLOW — NAO DEVE SER EXECUTADO AQUI.
 # A execucao real (dry_run=false) e uma fase propria, gated, idealmente conduzida/observada
 # pelo owner (que controla a service account de producao). Rollback: expira sozinho (--expires)
 # ou `firebase hosting:channel:delete <preview_channel> --project agenda-id-seven`.
 # =====================================================================
-name: "[manual] Firebase Hosting PREVIEW (users-read-hardening PR #120)"
+name: "[manual] Firebase Hosting PREVIEW (users-read-hardening W1 · web-hardening-w1-prep)"
 
 on:
   workflow_dispatch:
     inputs:
       target_branch:
-        description: "Branch do PR #120 (fixa)"
+        description: "Branch do patch W1 do cutover (fixa)"
         required: true
-        default: "app/f3328-users-read-hardening-onsnapshot-gate"
+        default: "web-hardening-w1-prep"
       expected_head:
         description: "HEAD esperado da branch (curto ou completo)"
         required: true
-        default: "3e3b07b"
+        default: "bda7ec9"
       preview_channel:
         description: "Nome do canal preview (nunca live/prod/main)"
         required: true
-        default: "f3328-users-hardening-canary"
+        default: "web-hardening-w3"
       confirm_preview_only:
         description: "Digite DEPLOY_PREVIEW_ONLY para confirmar canal preview"
         required: true
@@ -49,7 +51,7 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  ALLOWED_BRANCH: "app/f3328-users-read-hardening-onsnapshot-gate"
+  ALLOWED_BRANCH: "web-hardening-w1-prep"
 
 jobs:
   preview:
@@ -118,7 +120,15 @@ jobs:
           A="$(sha256sum index.html | awk '{print $1}')"
           B="$(sha256sum .staging-public/index.html | awk '{print $1}')"
           [ "$A" = "$B" ] || { echo "::error:: index.html do pacote ($B) != da branch alvo ($A)"; exit 1; }
-          echo ".staging-public OK (6 arquivos; index.html == branch; sha256=$A)."
+          # F3.3.57-W3b-a2: PIN dos hashes oficiais W3 (aborta se qualquer um divergir).
+          pin(){ H="$(sha256sum ".staging-public/$1" | awk '{print $1}')"; [ "$H" = "$2" ] || { echo "::error:: hash W3 divergente em $1 ($H != $2)"; exit 1; }; }
+          pin index.html               29ac9a9ad97b250db3c6646411129d40151512cc76b282615e32fab1f63931e3
+          pin manifest.json            5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
+          pin sw.js                    a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
+          pin firebase-messaging-sw.js 64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
+          pin icon-192.png             15dd146c151bf406d590a1f07a1950a7c82d7ceb6277a5b9ed5c0b8257fe6ba5
+          pin icon-512.png             a29c86455b1ba2a6727309edb48c70a88909db772a01811a09a960c1fb3854bc
+          echo ".staging-public OK (6 arquivos; index.html == branch; hashes W3 pinados 6/6; sha256=$A)."
 
       - name: Config hosting-only dedicada (sem functions/firestore/rules/predeploy)
         run: |
