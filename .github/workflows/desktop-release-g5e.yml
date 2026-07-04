@@ -1,0 +1,221 @@
+# =====================================================================
+# [manual] F3.3.56-G5e-R2 — Publicacao do PRE-RELEASE Desktop RC (#197)
+# ---------------------------------------------------------------------
+# Publica o pre-release controlado do build #197 (auth server-side +
+# logout fix). TUDO PINADO: run id, SHA alvo, tag, titulo e hashes
+# oficiais SHA-256 do EXE/MSI (G5c/G5d). O job:
+#   1) exige confirmacao literal via input;
+#   2) valida run #197 = completed/success no SHA pinado;
+#   3) aborta se a tag ou a release ja existirem;
+#   4) baixa os artifacts do run #197 e confere os hashes byte a byte
+#      (divergiu => aborta SEM publicar);
+#   5) cria a release prerelease=true, latest=false, tag no SHA exato;
+#   6) anexa SOMENTE EXE e MSI; verifica flags/assets pos-publicacao.
+# NAO builda, NAO deploya, NAO toca Firebase/Firestore/Rules/flags,
+# NAO altera codigo, NAO mexe em releases/tags antigas (inc01b intacta).
+# Sem secrets alem do GITHUB_TOKEN padrao. Permissions minimas.
+# Execucao SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] Desktop Release G5e — pre-release RC auth+logout (#197)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-PRERELEASE-G5E para autorizar a publicacao"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "28682872813"
+      TARGET_SHA: "eab4058789b63dcded227ef087a32eeecd64a9e4"
+      TAG: "desktop/rc-1.0.146-auth-serverside-logoutfix"
+      TITLE: "Agenda ID Seven Desktop — 1.0.146 RC · auth server-side + logout fix"
+      ART: "agenda-id-seven-desktop-1.0.146-beta-board-rebuild-installer"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.146-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.146-x64.msi"
+      EXP_EXE: "e5064810b0c7a99a7c5402ff39d32b3c9c2ff532afbcd6048cba10884f4b4dde"
+      EXP_MSI: "cccc4d67b8496051f83e7c85622b5098c88f71cfe3e020e5deefb668f306e673"
+    steps:
+      - name: "Gate 1 — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "PUBLICAR-PRERELEASE-G5E" ]; then
+            echo "::error::confirmacao invalida — nada foi publicado"
+            exit 1
+          fi
+          echo "OK: confirmacao literal valida"
+
+      - name: "Gate 2 — run #197 completed/success no SHA pinado"
+        run: |
+          set -euo pipefail
+          ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion + "|" + .head_sha')"
+          echo "run #197: $ST"
+          if [ "$ST" != "completed|success|$TARGET_SHA" ]; then
+            echo "::error::run #197 invalido para publicacao"
+            exit 1
+          fi
+
+      - name: "Gate 3 — tag e release nao podem existir"
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::a tag $TAG ja existe — abortando"
+            exit 1
+          fi
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            echo "::error::a release $TAG ja existe — abortando"
+            exit 1
+          fi
+          echo "OK: tag e release livres"
+
+      - name: "Baixar artifacts do run #197"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART" -D pacote
+          ls -lh pacote
+          test -f "pacote/$EXE_NAME" || { echo "::error::EXE ausente no artifact"; exit 1; }
+          test -f "pacote/$MSI_NAME" || { echo "::error::MSI ausente no artifact"; exit 1; }
+
+      - name: "Gate 4 — SHA-256 oficiais (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          H_EXE="$(sha256sum "pacote/$EXE_NAME" | awk '{print $1}')"
+          H_MSI="$(sha256sum "pacote/$MSI_NAME" | awk '{print $1}')"
+          echo "SHA-256 exe : $H_EXE"
+          echo "SHA-256 msi : $H_MSI"
+          [ "$H_EXE" = "$EXP_EXE" ] || { echo "::error::hash EXE divergente — NAO publicado"; exit 1; }
+          [ "$H_MSI" = "$EXP_MSI" ] || { echo "::error::hash MSI divergente — NAO publicado"; exit 1; }
+          echo "OK: hashes conferem com os oficiais (G5c/G5d)"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.146 — RC · auth server-side + logout fix
+
+          Pré-release controlado — Desktop Windows.
+          Uso interno.
+          NÃO é latest/final.
+
+          Commit:
+          eab4058789b63dcded227ef087a32eeecd64a9e4
+
+          Run:
+          #197 — id 28682872813 — success
+
+          MUDANÇAS
+
+          - Login server-side (loginUser; e-mail OU telefone).
+          - Restore de sessão via getUserSelf.
+          - Troca de senha via changePassword (senha atual validada no servidor).
+          - Roster/equipe via usersPublic (sem PII; e-mail/WhatsApp próprios podem aparecer como "Não informado" — esperado).
+          - Token de sessão não exposto ao renderer (confinado ao processo main; userData/session.json restrito).
+          - pass/salt/verifyPw removidos do renderer.
+          - Auto-cadastro interno desativado (acesso somente via administrador).
+          - LOGOUT FIX: "Sair da conta" limpa a sessão server-side no processo main.
+          - Reabrir o app após logout PEDE LOGIN (não reloga automaticamente).
+          - Tray-fix preservado (ícone visível; X esconde; Sair pela bandeja encerra).
+
+          QA FÍSICO — APROVADO
+
+          - Windows 11.
+          - Hash conferido.
+          - Instalação OK.
+          - SmartScreen apareceu (esperado, app sem assinatura).
+          - Tray/bandeja OK.
+          - Login com senha errada falhou corretamente.
+          - Login canário correto OK.
+          - Painel sem tela branca.
+          - Restore sem logout OK.
+          - Sair da conta voltou para login.
+          - Reabrir após logout pediu login.
+          - Não relogou automaticamente.
+          - Roster usersPublic OK.
+          - Troca de senha com senha atual errada mostrou erro correto.
+          - Smoke das telas principais OK.
+          - Sem regressão crítica.
+          - Rollback não necessário.
+
+          HASHES OFICIAIS
+
+          EXE:
+          Agenda-ID-Seven-Desktop-1.0.146-x64.exe
+          SHA-256:
+          e5064810b0c7a99a7c5402ff39d32b3c9c2ff532afbcd6048cba10884f4b4dde
+
+          MSI:
+          Agenda-ID-Seven-Desktop-1.0.146-x64.msi
+          SHA-256:
+          cccc4d67b8496051f83e7c85622b5098c88f71cfe3e020e5deefb668f306e673
+
+          ATENÇÃO: nomes de arquivo iguais aos da inc01b (mesma versão 1.0.146). Confira SEMPRE o SHA-256 após baixar.
+
+          INSTALAÇÃO / ATUALIZAÇÃO
+
+          1. Na versão antiga: botão direito no ícone da bandeja → Sair.
+          2. Baixar o EXE desta release.
+          3. Conferir o SHA-256 (certutil -hashfile <arquivo> SHA256).
+          4. Rodar o instalador.
+          5. Se aparecer SmartScreen: Mais informações → Executar assim mesmo.
+          6. Abrir o app e fazer login (primeira abertura pede login).
+
+          FALLBACK / ROLLBACK
+
+          inc01b permanece publicada como baseline/fallback:
+          desktop/rc-1.0.146-board-rebuild-inc01b
+          commit b1409ea
+
+          1. Bandeja → Sair.
+          2. Desinstalar esta versão.
+          3. Reinstalar a RC inc01b.
+          4. Fazer login.
+
+          Dados preservados no Firebase.
+
+          RISCOS CONHECIDOS
+
+          - SmartScreen por app não assinado.
+          - Notificações desktop exigem app aberto/minimizado/bandeja.
+          - users read ainda aberto até F3.3.57/58.
+          - PWA/Chrome arquivado.
+          - Android Kotlin fora desta release.
+          NOTAS
+          echo "notas.md gerado:"
+          wc -l notas.md
+
+      - name: "Publicar pre-release (prerelease=true, latest=false)"
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$TARGET_SHA" \
+            --prerelease \
+            --latest=false \
+            --title "$TITLE" \
+            --notes-file notas.md \
+            "pacote/$EXE_NAME" \
+            "pacote/$MSI_NAME"
+          echo "publicado: $TAG"
+
+      - name: "Verificacao pos-publicacao (resumo sanitizado)"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" \
+            --json tagName,targetCommitish,isPrerelease,isLatest,isDraft,assets \
+            --jq '{tag:.tagName, target:.targetCommitish, prerelease:.isPrerelease, latest:.isLatest, draft:.isDraft, assets:[.assets[]|{name,size}]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft,isLatest --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)+"|"+(.isLatest|tostring)')"
+          [ "$FLAGS" = "true|false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "2" ] || { echo "::error::esperado 2 assets, encontrados $N"; exit 1; }
+          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
+          [ "$TGT" = "$TARGET_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          echo "===== GO: PRE-RELEASE PUBLICADO E VALIDADO ====="
