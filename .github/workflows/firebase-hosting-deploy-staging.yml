@@ -33,8 +33,9 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  PINNED_APPMAIN_COMMIT: "d1815370f231d92c723a68acae07ae1f19cbe25d"
-  PINNED_INDEX_SHA256: "5e9a0326d639e0eb3d14fb4fbec57f848b235333fb025ad68b75685d11fa80a5"
+  # F3.3.57-W6b: pins bumpados p/ o app/main hardened (cutover Web) — PR #145 mergeado.
+  PINNED_APPMAIN_COMMIT: "04c8dff5b773b2ed2e7df9a6703f3b1f682ee3a9"
+  PINNED_INDEX_SHA256: "29ac9a9ad97b250db3c6646411129d40151512cc76b282615e32fab1f63931e3"
 
 jobs:
   hosting-deploy:
@@ -95,19 +96,21 @@ jobs:
           fi
           echo "Markers OK; sem segredo embutido."
 
-      - name: Gate fcm_token_server OFF por padrao (fail-closed)
+      - name: Gate fcm_token_server default ON (fail-closed)
         run: |
           set -eu
-          # O caminho server do cutover FCM (registerFcmTokenClient/removeFcmTokenClient) so e
-          # usado quando fcm_token_server==="on". Confirma, ANTES de montar o pacote, que a flag
-          # e OFF por padrao (helper com catch=>false) e que o index NAO forca a flag ON embutida.
-          # Fail-closed: qualquer divergencia aborta antes de qualquer deploy.
-          grep -Fq 'function fcmTokenServerEnabled(){ try{ return lsGet("fcm_token_server")==="on"; }catch(_){ return false; } }' index.html \
-            || { echo "::error:: helper fcmTokenServerEnabled OFF-por-padrao ausente/divergente"; exit 1; }
+          # F3.3.57-W6b: cutover Web hardening — fcm_token_server agora e DEFAULT ON (helper com
+          # catch=>true; localStorage "off" so p/ rollback local). O caminho server do FCM
+          # (registerFcmTokenClient/removeFcmTokenClient) passa a ser o padrao. Fail-closed: se o
+          # helper default-ON sumir/divergir, aborta ANTES de qualquer deploy.
+          grep -Fq 'function fcmTokenServerEnabled(){ try{ return lsGet("fcm_token_server")!=="off"; }catch(_){ return true; } }' index.html \
+            || { echo "::error:: helper fcmTokenServerEnabled default-ON ausente/divergente"; exit 1; }
+          # Guard preservado: o default vem do HELPER; o flag NAO deve ser tambem forcado via
+          # escrita embutida "fcm_token_server","on" (quebraria o override OFF de rollback local).
           if grep -Eq 'fcm_token_server"[[:space:]]*,[[:space:]]*"on"' index.html; then
-            echo "::error:: index.html define fcm_token_server=ON embutido (default ON proibido)"; exit 1
+            echo "::error:: index.html forca fcm_token_server=ON embutido (proibido; o default vem do helper)"; exit 1
           fi
-          echo "Gate fcm_token_server OFF por padrao OK (flag dormente; sem forcar ON)."
+          echo "Gate fcm_token_server default ON OK (helper default-ON; sem forcar embutido)."
 
       - name: Montar .staging-public (allowlist FIXA de 6) + SHA-256
         run: |
@@ -124,7 +127,7 @@ jobs:
           fi
           check() { got="$(sha256sum "$1" | awk '{print $1}')"; if [ "$got" != "$2" ]; then echo "::error:: $1 sha256 $got != $2"; exit 1; fi; }
           ( cd .staging-public
-            check index.html                5e9a0326d639e0eb3d14fb4fbec57f848b235333fb025ad68b75685d11fa80a5
+            check index.html                29ac9a9ad97b250db3c6646411129d40151512cc76b282615e32fab1f63931e3
             check manifest.json             5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
             check sw.js                     a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
             check firebase-messaging-sw.js  64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
