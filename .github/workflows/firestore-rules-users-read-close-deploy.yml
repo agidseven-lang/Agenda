@@ -168,6 +168,14 @@ jobs:
           [ "$OB" = "$CB" ] || { echo "::error:: chaves desbalanceadas ($OB vs $CB)"; exit 1; }
           echo "Validacao estrutural OK (so /users read fechou; usersPublic/demais intactos)."
 
+      - name: "Setup Java 21 (Temurin) para o Firestore Emulator"
+        # F3.3.58-E-FIX: firebase-tools deprecou runtimes Java < 21; o emulator Firestore
+        # exige JDK 21+. Provisiona Temurin 21 ANTES do step de validacao emulator.
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: "Validacao emulator (matriz local; NAO cria ruleset de producao)"
         run: |
           set -eu
