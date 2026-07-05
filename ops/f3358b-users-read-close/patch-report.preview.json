@@ -1,0 +1,10 @@
+{
+  "status": "patched",
+  "changedLines": 1,
+  "usersBlockLine": 32,
+  "usersReadLine": 33,
+  "matchCount": 12,
+  "shaIn": "720c2e1b34ba02442a968c0253b5343d4586d1bd4df57b682d4782fce5aee01a",
+  "shaOut": "e201d6f0e0a610b416e3850c30202a3327901b6408bb0f2c432f4aef76b82119",
+  "note": "surgical: fecha SOMENTE /users allow read (true->false); usersPublic e demais blocos intactos"
+}
