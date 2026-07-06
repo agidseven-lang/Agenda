@@ -1812,7 +1812,7 @@ exports._handleChangePassword = handleChangePassword;
      ADITIVO/INERTE: sem deploy, sem cutover do cliente, sem tocar Rules nesta fase.
    - syncUsersPublic (trigger) propaga qualquer write server-side de users -> usersPublic.
    ============================================================================ */
-const USER_SELF_UPDATE_KEYS = ["color", "photo", "reminderMinutes"];
+const USER_SELF_UPDATE_KEYS = ["color", "photo", "reminderMinutes", "name", "phone", "email"];
 const USER_ADMIN_UPDATE_KEYS = ["name", "role", "email", "phone", "color", "photo", "reminderMinutes"];
 const USER_STATUS_VALUES = ["ativo", "inativo", "pendente"];
 function uwValidColor(v) { return typeof v === "string" && (v === "" || /^#[0-9a-fA-F]{6}$/.test(v)); }
@@ -1862,6 +1862,10 @@ async function handleUpdateUserSelf(ctx) {
   if ("color" in body) { if (!uwValidColor(body.color)) return { status: 400, json: { ok: false, error: "bad_color" } }; patch.color = body.color; }
   if ("photo" in body) { if (!uwValidPhoto(body.photo)) return { status: 400, json: { ok: false, error: "bad_photo" } }; patch.photo = body.photo; }
   if ("reminderMinutes" in body) { if (!uwValidReminder(body.reminderMinutes)) return { status: 400, json: { ok: false, error: "bad_reminder" } }; patch.reminderMinutes = body.reminderMinutes; }
+  // Identidade self-editavel (F3.3.61-J): name/phone/email. role NAO entra aqui (preferencia segura RBAC).
+  if ("name" in body) { const nm = (typeof body.name === "string") ? body.name.trim() : ""; if (!uwValidStr(nm, 200) || !nm) return { status: 400, json: { ok: false, error: "bad_name" } }; patch.name = nm; }
+  if ("phone" in body) { if (!uwValidStr(body.phone, 40)) return { status: 400, json: { ok: false, error: "bad_phone" } }; patch.phone = body.phone; }
+  if ("email" in body) { const em = normEmail(body.email); if (em && !isValidEmail(em)) return { status: 400, json: { ok: false, error: "bad_email" } }; patch.email = em; }
   if (!Object.keys(patch).length) return { status: 400, json: { ok: false, error: "empty_patch" } };
   const db = (ctx && ctx.db) || notifDb();
   try { await db.collection("users").doc(auth.uid).update(patch); }
@@ -2116,6 +2120,33 @@ exports.disableUser = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-ce
   } catch (e) { try { logger.error("[disableUser] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
 });
 exports._handleDisableUser = handleDisableUser;
+
+// deleteMyAccount (F3.3.61-J) — autoexclusao do PROPRIO usuario. NAO deleta o doc: marca
+// status="excluido", deletedAt, e limpa email/phone/photo (mesmo comportamento do cliente legado).
+// Session-gated (NAO admin); atua SO em users/{selfUid} (uid vem do token, nunca do corpo);
+// nunca targetId arbitrario; nunca grava admin/status arbitrario; nunca retorna PII.
+async function handleDeleteMyAccount(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "unauthorized" } };
+  const db = (ctx && ctx.db) || notifDb();
+  try { await db.collection("users").doc(auth.uid).update({ status: "excluido", deletedAt: now, email: "", phone: "", photo: "" }); }
+  catch (e) { try { logger.error("[deleteMyAccount] update falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  try { logger.info("[deleteMyAccount] ok", { uid: notifMaskUid(auth.uid) }); } catch (_) {}
+  return { status: 200, json: { ok: true } };
+}
+exports.deleteMyAccount = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const out = await handleDeleteMyAccount({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) { try { logger.error("[deleteMyAccount] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleDeleteMyAccount = handleDeleteMyAccount;
 // FIM F3.3.61-C
 
 /* ============================================================================
