@@ -1,0 +1,200 @@
+# =====================================================================
+# [manual] F3.3.61-E — Deploy das 7 Functions de USERS-WRITE (Admin SDK).
+# Publica SOMENTE os endpoints de migracao de writes em /users:
+#   updateUserSelf, touchUserLastSeen, adminCreateUser, adminUpdateUser,
+#   adminSetUserStatus, adminSetUserAdmin, disableUser.
+# SEPARADO do deploy total (firebase-functions-deploy.yml) e do endpoint-only
+# do trilho notifPrefs (firebase-functions-deploy-endpoint.yml).
+#
+# SEGURANCA:
+#   - workflow_dispatch ONLY (NAO roda em push/PR/schedule).
+#   - dry_run=true por PADRAO: valida + planeja + functions:list, mas NAO faz deploy.
+#   - Deploy real EXIGE dry_run=false E confirm_deploy == DEPLOY_USERS_WRITE_ENDPOINTS.
+#   - Alvo FIXO = as 7 functions (--only functions:<nome> x7). Trava final rejeita
+#     qualquer alvo total ("functions") ou curinga. NUNCA toca Rules/Hosting/Firestore data.
+#   - Checkout PINADO em app/main@a6ee9a3; blob de functions/index.js conferido (b8d380ec).
+#   - Pre-checks: node --check + harness hermetico f3361C (41/41) + presenca dos 7 exports.
+#   - O segredo AUTH_SESSION_SECRET JA possui versao real no Secret Manager (set por
+#     auth-session-secret-set.yml). Este fluxo NAO cria/le/imprime segredo algum; validacao
+#     pos-deploy so por metadados. Sem flags de runtime; sem client cutover.
+# =====================================================================
+name: "[manual] Firebase Functions Deploy — USERS-WRITE (7 endpoints Admin SDK)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_deploy:
+        description: "Digite DEPLOY_USERS_WRITE_ENDPOINTS para confirmar (qualquer outro valor aborta o deploy real)"
+        required: true
+        default: ""
+      dry_run:
+        description: "true = valida/planeja/list (NAO faz deploy); false = deploy real das 7 functions"
+        required: true
+        default: "true"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ff-deploy-users-write-endpoints
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  PINNED_COMMIT: "a6ee9a380c4b67213823c21243335ca78411b9d3"
+  PINNED_FUNCTIONS_BLOB: "b8d380ec6aab91cecc86e687fdf251fea9dbe64f"
+  # Alvo FIXO — as 7 functions de users-write, uma a uma em --only (nunca alvo total).
+  DEPLOY_TARGET: "functions:updateUserSelf,functions:touchUserLastSeen,functions:adminCreateUser,functions:adminUpdateUser,functions:adminSetUserStatus,functions:adminSetUserAdmin,functions:disableUser"
+
+jobs:
+  deploy-users-write:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard dry_run (default true; so 'false' habilita deploy real)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -eu
+          case "$DRY_RUN" in
+            true|false) echo "dry_run=$DRY_RUN" ;;
+            *) echo "::error:: dry_run deve ser 'true' ou 'false' (recebido: '$DRY_RUN')"; exit 1 ;;
+          esac
+
+      - name: Guard confirm_deploy (deploy real exige == DEPLOY_USERS_WRITE_ENDPOINTS)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_deploy }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -eu
+          if [ "$DRY_RUN" = "false" ] && [ "$CONFIRM" != "DEPLOY_USERS_WRITE_ENDPOINTS" ]; then
+            echo "::error:: deploy real pedido (dry_run=false) mas confirm_deploy != DEPLOY_USERS_WRITE_ENDPOINTS — abortando."
+            exit 1
+          fi
+          echo "confirm/dry_run coerentes."
+
+      - name: Guard DEPLOY_TARGET (7 alvos fixos; rejeita alvo total/curinga)
+        run: |
+          set -eu
+          T="$DEPLOY_TARGET"
+          EXPECTED="functions:updateUserSelf,functions:touchUserLastSeen,functions:adminCreateUser,functions:adminUpdateUser,functions:adminSetUserStatus,functions:adminSetUserAdmin,functions:disableUser"
+          [ "$T" = "$EXPECTED" ] || { echo "::error:: DEPLOY_TARGET adulterado"; exit 1; }
+          case "$T" in
+            *"*"*) echo "::error:: curinga proibido no alvo"; exit 1 ;;
+          esac
+          # nenhum token pode ser o alvo total 'functions'
+          IFS=','; for tok in $T; do
+            case "$tok" in
+              functions|functions:) echo "::error:: alvo total bloqueado ($tok)"; exit 1 ;;
+              functions:*) : ;;
+              *) echo "::error:: token de alvo invalido: $tok"; exit 1 ;;
+            esac
+          done
+          echo "Alvo OK (7 functions): $T"
+
+      - name: Checkout (PIN app/main@a6ee9a3)
+        uses: actions/checkout@v4
+        with:
+          ref: a6ee9a380c4b67213823c21243335ca78411b9d3
+          fetch-depth: 0
+
+      - name: Confirmar commit e blob pinados
+        run: |
+          set -eu
+          HEAD_SHA="$(git rev-parse HEAD)"
+          [ "$HEAD_SHA" = "$PINNED_COMMIT" ] || { echo "::error:: HEAD ($HEAD_SHA) != PINNED_COMMIT ($PINNED_COMMIT)"; exit 1; }
+          B="$(git rev-parse HEAD:functions/index.js)"
+          [ "$B" = "$PINNED_FUNCTIONS_BLOB" ] || { echo "::error:: functions/index.js ($B) != pin ($PINNED_FUNCTIONS_BLOB)"; exit 1; }
+          echo "Pin OK — commit $HEAD_SHA; functions/index.js blob $B"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Pre-checks (syntax + harness f3361C 41/41 + presenca dos 7 exports)
+        run: |
+          set -eu
+          node --check functions/index.js
+          node scripts/worker-ops/f3361C-users-write-endpoints.test.mjs
+          for FN in updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser; do
+            grep -qE "exports\.${FN} = onRequest" functions/index.js || { echo "::error:: export ausente: $FN"; exit 1; }
+          done
+          echo "Pre-checks OK (node --check; testes 41/41; 7 exports presentes)."
+
+      - name: Auth gcloud (service account via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+
+      - name: Preflight — AUTH_SESSION_SECRET existe (metadados; NUNCA le valor)
+        run: |
+          set -eu
+          npm install -g firebase-tools >/dev/null 2>&1
+          if gcloud secrets describe AUTH_SESSION_SECRET --project "$GCP_PROJECT" >/dev/null 2>&1; then
+            echo "AUTH_SESSION_SECRET presente no Secret Manager (metadados)."
+          else
+            echo "::warning:: AUTH_SESSION_SECRET ausente — rode auth-session-secret-set.yml ANTES do deploy real (dry_run=false)."
+          fi
+
+      - name: Estado ANTES (functions:list — leitura)
+        run: firebase functions:list --project "$GCP_PROJECT" | tee before.txt || true
+
+      - name: functions/.env SEM flags (somente RESET_EMAIL_*; codebase-wide defineString)
+        env:
+          RESET_EMAIL_FROM: ${{ secrets.RESET_EMAIL_FROM }}
+          RESET_EMAIL_FROM_NAME: ${{ secrets.RESET_EMAIL_FROM_NAME }}
+          RESET_EMAIL_PROVIDER: ${{ secrets.RESET_EMAIL_PROVIDER }}
+        run: |
+          set -eu
+          # O firebase analisa o codebase INTEIRO; as funcoes de password-reset declaram
+          # defineString(RESET_EMAIL_*), exigidas em --non-interactive mesmo com --only.
+          # Grava SOMENTE RESET_EMAIL_* (defaults seguros). NUNCA flags; NUNCA segredo; sem valores sensiveis.
+          FROM="${RESET_EMAIL_FROM:-no-reply@agendaidseven.com.br}"
+          {
+            printf 'RESET_EMAIL_FROM=%s\n' "$FROM"
+            printf 'RESET_EMAIL_FROM_NAME=%s\n' "${RESET_EMAIL_FROM_NAME:-ID Seven Agenda}"
+            printf 'RESET_EMAIL_PROVIDER=%s\n' "${RESET_EMAIL_PROVIDER:-resend}"
+          } > "functions/.env.${GCP_PROJECT}"
+          if grep -qE 'ENABLE_|SECRET|TOKEN|PASS' "functions/.env.${GCP_PROJECT}"; then
+            echo "::error:: .env contem chave proibida"; exit 1
+          fi
+          echo ".env gravado sem flags/segredos."
+
+      - name: Deploy das 7 Functions (SOMENTE se dry_run=false)
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -eu
+          ( cd functions && if [ -f package-lock.json ]; then npm ci; else npm install; fi )
+          # trava FINAL: alvo nunca pode ser total
+          case "$DEPLOY_TARGET" in
+            functions|functions:) echo "::error:: alvo total bloqueado"; exit 1 ;;
+          esac
+          if [ "$DRY_RUN" = "false" ]; then
+            echo "DEPLOY real — alvo: $DEPLOY_TARGET"
+            firebase deploy --only "$DEPLOY_TARGET" --project "$GCP_PROJECT" --non-interactive --force
+          else
+            echo "DRY-RUN=true — nenhum deploy executado. Alvo planejado: $DEPLOY_TARGET"
+          fi
+
+      - name: Validacao POS-deploy (metadados; SOMENTE se dry_run=false)
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          firebase functions:list --project "$GCP_PROJECT" | tee after.txt
+          for FN in updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser; do
+            if ! grep -qE "(^|[^A-Za-z])${FN}([^A-Za-z]|$)" after.txt; then
+              echo "::error:: alvo $FN ausente apos deploy"; exit 1
+            fi
+          done
+          echo "POS-deploy OK: as 7 functions presentes; deploy --only limitado (sem Rules/Hosting/extras)."
+
+      - name: Limpeza (service account + .env temporario)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" functions/.env.* before.txt after.txt 2>/dev/null || true
