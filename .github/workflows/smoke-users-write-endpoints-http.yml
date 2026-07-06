@@ -1,0 +1,63 @@
+# =====================================================================
+# [manual] F3.3.61-H — Smoke HTTP READ-ONLY das 7 Functions users-write.
+# Prova o comportamento SEM AUTENTICACAO das URLs publicas ja deployadas:
+#   OPTIONS            -> 2xx (CORS seguro);
+#   GET  (sem auth)    -> 405 (method-gate);
+#   POST (sem auth,{}) -> 401 (dormente/fail-closed).
+# Alem disso: zero 5xx e zero vazamento de pass/salt/fcmTokens nos corpos.
+#
+# READ-ONLY / SEGURO: NAO faz deploy, NAO usa secrets, NAO usa token/usuario real,
+# NAO escreve nada, NAO chama endpoints com payload real, NAO toca
+# Rules/Hosting/Functions/Firestore/cliente. So curl (leitura) + assercoes.
+# workflow_dispatch only. Relatorio de status HTTP; para apos o relatorio.
+# =====================================================================
+name: "[manual] Smoke HTTP — USERS-WRITE endpoints (read-only, no auth)"
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-users-write-http
+  cancel-in-progress: false
+
+env:
+  BASE: "https://us-central1-agenda-id-seven.cloudfunctions.net"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Smoke HTTP read-only (OPTIONS / GET / POST-{} sem auth) x7
+        run: |
+          set -u
+          FUNCS="updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser"
+          FAIL=0
+          printf '%-20s | %-7s | %-4s | %-6s | %s\n' "function" "OPTIONS" "GET" "POST{}" "verdict"
+          echo "--------------------------------------------------------------------"
+          for FN in $FUNCS; do
+            U="$BASE/$FN"
+            # OPTIONS (preflight, sem auth) — nao envia corpo, nao muta nada
+            OPT=$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS --max-time 30 "$U" || echo 000)
+            # GET (sem auth) — captura corpo + status
+            GALL=$(curl -s -o - -w '\n%{http_code}' -X GET --max-time 30 "$U" || printf '\n000')
+            GCODE=$(printf '%s' "$GALL" | tail -n1); GTXT=$(printf '%s' "$GALL" | sed '$d')
+            # POST (sem auth, corpo {}) — session-gated => 401 ANTES de qualquer escrita
+            PALL=$(curl -s -o - -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' --max-time 30 "$U" || printf '\n000')
+            PCODE=$(printf '%s' "$PALL" | tail -n1); PTXT=$(printf '%s' "$PALL" | sed '$d')
+            VERD="OK"
+            case "$OPT" in 2*) : ;; *) VERD="FAIL(OPTIONS=$OPT)"; FAIL=1 ;; esac
+            [ "$GCODE" = "405" ] || { VERD="FAIL(GET=$GCODE)"; FAIL=1; }
+            [ "$PCODE" = "401" ] || { VERD="FAIL(POST=$PCODE)"; FAIL=1; }
+            case "$OPT $GCODE $PCODE" in *5[0-9][0-9]*) VERD="FAIL(5xx)"; FAIL=1 ;; esac
+            if printf '%s %s' "$GTXT" "$PTXT" | grep -qiE 'pass|salt|fcmtoken'; then VERD="FAIL(leak)"; FAIL=1; fi
+            printf '%-20s | %-7s | %-4s | %-6s | %s\n' "$FN" "$OPT" "$GCODE" "$PCODE" "$VERD"
+          done
+          echo "--------------------------------------------------------------------"
+          if [ "$FAIL" = "0" ]; then
+            echo "SMOKE OK: 7/7 — OPTIONS 2xx, GET 405, POST(sem sessao) 401, zero 5xx, zero pass/salt/fcmTokens."
+          else
+            echo "::error:: SMOKE FALHOU — ver tabela acima."; exit 1
+          fi
