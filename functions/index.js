@@ -1798,6 +1798,327 @@ exports.changePassword = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us
 exports._handleChangePassword = handleChangePassword;
 
 /* ============================================================================
+   F3.3.61-C — Endpoints Admin SDK p/ MIGRAR os writes client-side de /users
+   (rumo a Opcao C: /users create/update/delete = false no cliente).
+   ----------------------------------------------------------------------------
+   - TODOS session-gated (authVerifySessionToken; scope=session; sem Firebase Auth).
+     Os endpoints ADMIN usam authRequireAdminSession: RE-CARREGA users/{callerUid}
+     e exige admin===true (NUNCA confia no claim do token nem no cliente).
+   - Admin SDK (bypassa Rules). Allowlist ESTRITA de campos: qualquer chave fora da
+     allowlist => 400 (NUNCA grava admin/status/pass/salt/fcmTokens por endpoint self).
+   - NUNCA retorna pass/salt/fcmTokens (respostas via authUserPublicOut / {ok:true}).
+     NUNCA loga senha/hash/salt/token (so uid mascarado + nomes de campos).
+   - Handlers PUROS testaveis: ctx.db injetavel. DORMENTE sem AUTH_SESSION_SECRET => 401.
+     ADITIVO/INERTE: sem deploy, sem cutover do cliente, sem tocar Rules nesta fase.
+   - syncUsersPublic (trigger) propaga qualquer write server-side de users -> usersPublic.
+   ============================================================================ */
+const USER_SELF_UPDATE_KEYS = ["color", "photo", "reminderMinutes"];
+const USER_ADMIN_UPDATE_KEYS = ["name", "role", "email", "phone", "color", "photo", "reminderMinutes"];
+const USER_STATUS_VALUES = ["ativo", "inativo", "pendente"];
+function uwValidColor(v) { return typeof v === "string" && (v === "" || /^#[0-9a-fA-F]{6}$/.test(v)); }
+function uwValidPhoto(v) { return typeof v === "string" && v.length <= 4096; }
+function uwValidReminder(v) { return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 1440; }
+function uwValidStr(v, max) { return typeof v === "string" && v.length <= (max || 200); }
+function uwTargetId(v) { const s = (typeof v === "string") ? v.trim() : ""; return (s && s.length <= 200) ? s : ""; }
+
+// RBAC: valida sessao E exige admin (re-carrega o doc do caller; nao confia no token).
+// Retorna {ok:true, uid, data, db} OU {ok:false, status, json}. 401 sessao; 403 nao-admin/inativo.
+async function authRequireAdminSession(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { ok: false, status: 401, json: { ok: false, error: "unauthorized" } };
+  const db = (ctx && ctx.db) || notifDb();
+  let snap;
+  try { snap = await db.collection("users").doc(auth.uid).get(); }
+  catch (e) { try { logger.error("[authRequireAdmin] leitura falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {} return { ok: false, status: 500, json: { ok: false, error: "internal" } }; }
+  if (!snap || !snap.exists) return { ok: false, status: 403, json: { ok: false, error: "forbidden" } };
+  const d = (typeof snap.data === "function" ? snap.data() : null) || {};
+  const st = String(d.status || "");
+  if (st === "pendente" || st === "removido" || st === "excluido" || d.disabled === true) return { ok: false, status: 403, json: { ok: false, error: "forbidden" } };
+  if (d.admin !== true) return { ok: false, status: 403, json: { ok: false, error: "forbidden" } };
+  return { ok: true, uid: auth.uid, data: d, db: db };
+}
+exports._authRequireAdminSession = authRequireAdminSession;
+
+// updateUserSelf — substitui os writes client-side do PROPRIO perfil (color/photo/reminderMinutes).
+// STRICT: qualquer campo fora da allowlist => 400 (NUNCA admin/status/pass/salt/fcmTokens/etc.).
+async function handleUpdateUserSelf(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "unauthorized" } };
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["us:" + auth.uid].concat(ip ? ["usi:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : null;
+  if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
+  const keys = Object.keys(body);
+  if (!keys.length) return { status: 400, json: { ok: false, error: "empty_patch" } };
+  for (const k of keys) { if (USER_SELF_UPDATE_KEYS.indexOf(k) < 0) return { status: 400, json: { ok: false, error: "forbidden_field" } }; }
+  const patch = {};
+  if ("color" in body) { if (!uwValidColor(body.color)) return { status: 400, json: { ok: false, error: "bad_color" } }; patch.color = body.color; }
+  if ("photo" in body) { if (!uwValidPhoto(body.photo)) return { status: 400, json: { ok: false, error: "bad_photo" } }; patch.photo = body.photo; }
+  if ("reminderMinutes" in body) { if (!uwValidReminder(body.reminderMinutes)) return { status: 400, json: { ok: false, error: "bad_reminder" } }; patch.reminderMinutes = body.reminderMinutes; }
+  if (!Object.keys(patch).length) return { status: 400, json: { ok: false, error: "empty_patch" } };
+  const db = (ctx && ctx.db) || notifDb();
+  try { await db.collection("users").doc(auth.uid).update(patch); }
+  catch (e) { try { logger.error("[updateUserSelf] update falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[updateUserSelf] ok", { uid: notifMaskUid(auth.uid), fields: Object.keys(patch) }); } catch (_) {}
+  return { status: 200, json: { ok: true } };
+}
+exports.updateUserSelf = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleUpdateUserSelf({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) { try { logger.error("[updateUserSelf] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleUpdateUserSelf = handleUpdateUserSelf;
+
+// touchUserLastSeen — presenca do PROPRIO usuario (grava SO lastSeen). Body deve ser vazio.
+// Sem rate-limit (presenca e frequente; self-scoped e baixo risco). Substitui o write client-side de lastSeen.
+async function handleTouchUserLastSeen(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "unauthorized" } };
+  const body = ctx.body;
+  if (body && typeof body === "object" && !Array.isArray(body) && Object.keys(body).length) return { status: 400, json: { ok: false, error: "no_fields_allowed" } };
+  const db = (ctx && ctx.db) || notifDb();
+  try { await db.collection("users").doc(auth.uid).update({ lastSeen: now }); }
+  catch (e) { try { logger.error("[touchUserLastSeen] update falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  return { status: 200, json: { ok: true } };
+}
+exports.touchUserLastSeen = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const out = await handleTouchUserLastSeen({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) { try { logger.error("[touchUserLastSeen] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleTouchUserLastSeen = handleTouchUserLastSeen;
+
+// adminCreateUser — criacao controlada via Admin SDK (gera salt/hash server-side). NUNCA retorna pass/salt.
+async function handleAdminCreateUser(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const adm = await authRequireAdminSession(ctx);
+  if (!adm.ok) return { status: adm.status, json: adm.json };
+  const db = adm.db;
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : null;
+  if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
+  const name = (typeof body.name === "string") ? body.name.trim() : "";
+  const role = (typeof body.role === "string") ? body.role.trim() : "";
+  const email = (typeof body.email === "string") ? normEmail(body.email) : "";
+  const phone = (typeof body.phone === "string") ? body.phone.trim() : "";
+  const status = (typeof body.status === "string" && body.status.trim()) ? body.status.trim() : "ativo";
+  const initialPassword = (typeof body.senhaInicial === "string") ? body.senhaInicial : ((typeof body.initialPassword === "string") ? body.initialPassword : "");
+  if (!uwValidStr(name, 200) || !name) return { status: 400, json: { ok: false, error: "bad_name" } };
+  if (!uwValidStr(role, 80)) return { status: 400, json: { ok: false, error: "bad_role" } };
+  if (email && !isValidEmail(email)) return { status: 400, json: { ok: false, error: "bad_email" } };
+  if (!uwValidStr(phone, 40)) return { status: 400, json: { ok: false, error: "bad_phone" } };
+  if (USER_STATUS_VALUES.indexOf(status) < 0) return { status: 400, json: { ok: false, error: "bad_status" } };
+  if (initialPassword.length < CHPW_MIN_LEN || initialPassword.length > CHPW_MAX_LEN) return { status: 400, json: { ok: false, error: "weak_password" } };
+  const salt = randSalt();
+  const pass = hashPw(initialPassword, salt);
+  const doc = { name: name, role: role, email: email, phone: phone, status: status, admin: false, pass: pass, salt: salt, mustChangePassword: true, createdAt: now, createdBy: adm.uid };
+  let ref;
+  try { ref = await db.collection("users").add(doc); }
+  catch (e) { try { logger.error("[adminCreateUser] add falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  const newId = (ref && ref.id) || "";
+  try { logger.info("[adminCreateUser] ok", { by: notifMaskUid(adm.uid), created: notifMaskUid(newId), role: role, status: status }); } catch (_) {}
+  return { status: 200, json: { ok: true, id: newId, user: authUserPublicOut(newId, doc) } };   // NUNCA pass/salt
+}
+exports.adminCreateUser = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const out = await handleAdminCreateUser({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) { try { logger.error("[adminCreateUser] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleAdminCreateUser = handleAdminCreateUser;
+
+// adminUpdateUser — edicao administrativa de campos NAO sensiveis (allowlist). Proibe pass/salt/fcmTokens/admin/status.
+async function handleAdminUpdateUser(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const adm = await authRequireAdminSession(ctx);
+  if (!adm.ok) return { status: adm.status, json: adm.json };
+  const db = adm.db;
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : null;
+  if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
+  const targetId = uwTargetId(body.targetId);
+  if (!targetId) return { status: 400, json: { ok: false, error: "bad_target" } };
+  const p = (body.patch && typeof body.patch === "object" && !Array.isArray(body.patch)) ? body.patch : null;
+  if (!p) return { status: 400, json: { ok: false, error: "bad_request" } };
+  const pkeys = Object.keys(p);
+  if (!pkeys.length) return { status: 400, json: { ok: false, error: "empty_patch" } };
+  for (const k of pkeys) { if (USER_ADMIN_UPDATE_KEYS.indexOf(k) < 0) return { status: 400, json: { ok: false, error: "forbidden_field" } }; }
+  const patch = {};
+  if ("name" in p) { if (!uwValidStr(p.name, 200)) return { status: 400, json: { ok: false, error: "bad_name" } }; patch.name = p.name; }
+  if ("role" in p) { if (!uwValidStr(p.role, 80)) return { status: 400, json: { ok: false, error: "bad_role" } }; patch.role = p.role; }
+  if ("email" in p) { const em = normEmail(p.email); if (em && !isValidEmail(em)) return { status: 400, json: { ok: false, error: "bad_email" } }; patch.email = em; }
+  if ("phone" in p) { if (!uwValidStr(p.phone, 40)) return { status: 400, json: { ok: false, error: "bad_phone" } }; patch.phone = p.phone; }
+  if ("color" in p) { if (!uwValidColor(p.color)) return { status: 400, json: { ok: false, error: "bad_color" } }; patch.color = p.color; }
+  if ("photo" in p) { if (!uwValidPhoto(p.photo)) return { status: 400, json: { ok: false, error: "bad_photo" } }; patch.photo = p.photo; }
+  if ("reminderMinutes" in p) { if (!uwValidReminder(p.reminderMinutes)) return { status: 400, json: { ok: false, error: "bad_reminder" } }; patch.reminderMinutes = p.reminderMinutes; }
+  if (!Object.keys(patch).length) return { status: 400, json: { ok: false, error: "empty_patch" } };
+  let snap;
+  try { snap = await db.collection("users").doc(targetId).get(); }
+  catch (e) { try { logger.error("[adminUpdateUser] leitura falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
+  try { await db.collection("users").doc(targetId).update(patch); }
+  catch (e) { try { logger.error("[adminUpdateUser] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  try { logger.info("[adminUpdateUser] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId), fields: Object.keys(patch) }); } catch (_) {}
+  return { status: 200, json: { ok: true } };
+}
+exports.adminUpdateUser = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const out = await handleAdminUpdateUser({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) { try { logger.error("[adminUpdateUser] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleAdminUpdateUser = handleAdminUpdateUser;
+
+// adminSetUserStatus — substitui o write client-side de status (ativo/inativo/pendente).
+async function handleAdminSetUserStatus(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const adm = await authRequireAdminSession(ctx);
+  if (!adm.ok) return { status: adm.status, json: adm.json };
+  const db = adm.db;
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : null;
+  if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
+  const targetId = uwTargetId(body.targetId);
+  if (!targetId) return { status: 400, json: { ok: false, error: "bad_target" } };
+  const status = (typeof body.status === "string") ? body.status.trim() : "";
+  if (USER_STATUS_VALUES.indexOf(status) < 0) return { status: 400, json: { ok: false, error: "bad_status" } };
+  let snap;
+  try { snap = await db.collection("users").doc(targetId).get(); }
+  catch (e) { try { logger.error("[adminSetUserStatus] leitura falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
+  try { await db.collection("users").doc(targetId).update({ status: status }); }
+  catch (e) { try { logger.error("[adminSetUserStatus] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  try { logger.info("[adminSetUserStatus] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId), status: status }); } catch (_) {}
+  return { status: 200, json: { ok: true } };
+}
+exports.adminSetUserStatus = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const out = await handleAdminSetUserStatus({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) { try { logger.error("[adminSetUserStatus] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleAdminSetUserStatus = handleAdminSetUserStatus;
+
+// adminSetUserAdmin — substitui o toggle de admin. GUARD: nao remover o ULTIMO admin (409).
+async function handleAdminSetUserAdmin(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const adm = await authRequireAdminSession(ctx);
+  if (!adm.ok) return { status: adm.status, json: adm.json };
+  const db = adm.db;
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : null;
+  if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
+  const targetId = uwTargetId(body.targetId);
+  if (!targetId) return { status: 400, json: { ok: false, error: "bad_target" } };
+  if (typeof body.admin !== "boolean") return { status: 400, json: { ok: false, error: "bad_admin" } };
+  const makeAdmin = body.admin;
+  let snap;
+  try { snap = await db.collection("users").doc(targetId).get(); }
+  catch (e) { try { logger.error("[adminSetUserAdmin] leitura falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
+  if (makeAdmin === false) {
+    // GUARD ultimo-admin: se o alvo e admin e e o UNICO, rebaixar deixaria o sistema sem admin.
+    let adminIds = [];
+    try {
+      const adminsSnap = await db.collection("users").where("admin", "==", true).get();
+      adminsSnap.forEach((doc) => { adminIds.push(doc.id); });
+    } catch (e) { try { logger.error("[adminSetUserAdmin] contagem falhou", { err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+    if (adminIds.length <= 1 && adminIds.indexOf(targetId) >= 0) return { status: 409, json: { ok: false, error: "last_admin" } };
+  }
+  try { await db.collection("users").doc(targetId).update({ admin: makeAdmin }); }
+  catch (e) { try { logger.error("[adminSetUserAdmin] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  try { logger.info("[adminSetUserAdmin] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId), admin: makeAdmin }); } catch (_) {}
+  return { status: 200, json: { ok: true } };
+}
+exports.adminSetUserAdmin = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const out = await handleAdminSetUserAdmin({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) { try { logger.error("[adminSetUserAdmin] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleAdminSetUserAdmin = handleAdminSetUserAdmin;
+
+// disableUser — desativa SEM delete (status=inativo, disabled=true; preserva dados). Guards: nao-self; nao ultimo-admin.
+async function handleDisableUser(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const adm = await authRequireAdminSession(ctx);
+  if (!adm.ok) return { status: adm.status, json: adm.json };
+  const db = adm.db;
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : null;
+  if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
+  const targetId = uwTargetId(body.targetId);
+  if (!targetId) return { status: 400, json: { ok: false, error: "bad_target" } };
+  if (targetId === adm.uid) return { status: 409, json: { ok: false, error: "cannot_disable_self" } };
+  let snap;
+  try { snap = await db.collection("users").doc(targetId).get(); }
+  catch (e) { try { logger.error("[disableUser] leitura falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
+  const td = (typeof snap.data === "function" ? snap.data() : null) || {};
+  if (td.admin === true) {
+    // GUARD: desativar o ULTIMO admin deixaria o sistema sem admin ativo.
+    let adminIds = [];
+    try {
+      const adminsSnap = await db.collection("users").where("admin", "==", true).get();
+      adminsSnap.forEach((doc) => { adminIds.push(doc.id); });
+    } catch (e) { try { logger.error("[disableUser] contagem falhou", { err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+    if (adminIds.length <= 1 && adminIds.indexOf(targetId) >= 0) return { status: 409, json: { ok: false, error: "last_admin" } };
+  }
+  try { await db.collection("users").doc(targetId).update({ status: "inativo", disabled: true, disabledAt: now, disabledBy: adm.uid }); }
+  catch (e) { try { logger.error("[disableUser] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  try { logger.info("[disableUser] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId) }); } catch (_) {}
+  return { status: 200, json: { ok: true } };
+}
+exports.disableUser = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const out = await handleDisableUser({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) { try { logger.error("[disableUser] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleDisableUser = handleDisableUser;
+// FIM F3.3.61-C
+
+/* ============================================================================
    F3.3.50-B — sendPush (push MULTIUSUARIO server-side; Functions-only).
    ----------------------------------------------------------------------------
    - Remove o blocker: hoje o client (sendPushToUsers) le users/<uid>.get() p/ obter
