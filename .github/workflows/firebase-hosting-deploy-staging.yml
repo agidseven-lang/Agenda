@@ -33,10 +33,13 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  # F3.3.61-Q1: pins bumpados p/ o bundle users-write cutover (app/main@eb9ba11); a flag
-  # users_write_endpoints permanece default OFF (publicacao inerte ate ativacao controlada).
-  PINNED_APPMAIN_COMMIT: "eb9ba1112d226d2caa344a3af3317f4f4f04d36e"
-  PINNED_INDEX_SHA256: "3e2aaf7d15cf1fb9201d813c938fb1e40659347888b72b481bcc6bf7e7cdbe81"
+  # F3.3.61-R10A: pins bumpados p/ o bundle Web FCM cutoff (app/main@1433344). O force-reregister
+  # passa a rotear via endpoint self-only resetMyFcmTokens com fcm_token_server DEFAULT ON (write
+  # direto em /users so no fallback fcm_token_server OFF); users_write_endpoints permanece DEFAULT
+  # OFF (publicacao inerte). Somente index.html mudou (9a2baa34); os outros 5 estaticos sao
+  # byte-identicos ao bundle anterior — seus SHA-256 in-package permanecem inalterados.
+  PINNED_APPMAIN_COMMIT: "1433344ff2e7f614063cbb4a7bc7ada3e31e7f0a"
+  PINNED_INDEX_SHA256: "9a2baa346f91a282f7db9d69427457884f300103437b1b678dead015401ad7c2"
 
 jobs:
   hosting-deploy:
@@ -128,7 +131,7 @@ jobs:
           fi
           check() { got="$(sha256sum "$1" | awk '{print $1}')"; if [ "$got" != "$2" ]; then echo "::error:: $1 sha256 $got != $2"; exit 1; fi; }
           ( cd .staging-public
-            check index.html                3e2aaf7d15cf1fb9201d813c938fb1e40659347888b72b481bcc6bf7e7cdbe81
+            check index.html                9a2baa346f91a282f7db9d69427457884f300103437b1b678dead015401ad7c2
             check manifest.json             5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
             check sw.js                     a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
             check firebase-messaging-sw.js  64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
