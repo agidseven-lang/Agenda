@@ -1,24 +1,28 @@
 # =====================================================================
-# [manual] F3.3.61-E — Deploy das 7 Functions de USERS-WRITE (Admin SDK).
+# [manual] F3.3.61-E/K — Deploy das 8 Functions de USERS-WRITE (Admin SDK).
 # Publica SOMENTE os endpoints de migracao de writes em /users:
 #   updateUserSelf, touchUserLastSeen, adminCreateUser, adminUpdateUser,
-#   adminSetUserStatus, adminSetUserAdmin, disableUser.
+#   adminSetUserStatus, adminSetUserAdmin, disableUser, deleteMyAccount.
 # SEPARADO do deploy total (firebase-functions-deploy.yml) e do endpoint-only
 # do trilho notifPrefs (firebase-functions-deploy-endpoint.yml).
+#
+# F3.3.61-K: re-pin apos o merge do cutover Web (PR #153). updateUserSelf foi
+# estendido (name/phone/email) e deleteMyAccount e NOVA — por isso o pacote sobe
+# junto (Opcao B) a partir do novo blob, evitando divergencia de versao.
 #
 # SEGURANCA:
 #   - workflow_dispatch ONLY (NAO roda em push/PR/schedule).
 #   - dry_run=true por PADRAO: valida + planeja + functions:list, mas NAO faz deploy.
 #   - Deploy real EXIGE dry_run=false E confirm_deploy == DEPLOY_USERS_WRITE_ENDPOINTS.
-#   - Alvo FIXO = as 7 functions (--only functions:<nome> x7). Trava final rejeita
+#   - Alvo FIXO = as 8 functions (--only functions:<nome> x8). Trava final rejeita
 #     qualquer alvo total ("functions") ou curinga. NUNCA toca Rules/Hosting/Firestore data.
-#   - Checkout PINADO em app/main@a6ee9a3; blob de functions/index.js conferido (b8d380ec).
-#   - Pre-checks: node --check + harness hermetico f3361C (41/41) + presenca dos 7 exports.
+#   - Checkout PINADO em app/main@eb9ba11; blob de functions/index.js conferido (baa6cb33).
+#   - Pre-checks: node --check + harness f3361C (41/41) + f3361J (39/39) + presenca dos 8 exports.
 #   - O segredo AUTH_SESSION_SECRET JA possui versao real no Secret Manager (set por
 #     auth-session-secret-set.yml). Este fluxo NAO cria/le/imprime segredo algum; validacao
 #     pos-deploy so por metadados. Sem flags de runtime; sem client cutover.
 # =====================================================================
-name: "[manual] Firebase Functions Deploy — USERS-WRITE (7 endpoints Admin SDK)"
+name: "[manual] Firebase Functions Deploy — USERS-WRITE (8 endpoints Admin SDK)"
 
 on:
   workflow_dispatch:
@@ -28,7 +32,7 @@ on:
         required: true
         default: ""
       dry_run:
-        description: "true = valida/planeja/list (NAO faz deploy); false = deploy real das 7 functions"
+        description: "true = valida/planeja/list (NAO faz deploy); false = deploy real das 8 functions"
         required: true
         default: "true"
 
@@ -41,10 +45,10 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  PINNED_COMMIT: "a6ee9a380c4b67213823c21243335ca78411b9d3"
-  PINNED_FUNCTIONS_BLOB: "b8d380ec6aab91cecc86e687fdf251fea9dbe64f"
-  # Alvo FIXO — as 7 functions de users-write, uma a uma em --only (nunca alvo total).
-  DEPLOY_TARGET: "functions:updateUserSelf,functions:touchUserLastSeen,functions:adminCreateUser,functions:adminUpdateUser,functions:adminSetUserStatus,functions:adminSetUserAdmin,functions:disableUser"
+  PINNED_COMMIT: "eb9ba1112d226d2caa344a3af3317f4f4f04d36e"
+  PINNED_FUNCTIONS_BLOB: "baa6cb337d6fa623f4d35270b1fadafd062c0490"
+  # Alvo FIXO — as 8 functions de users-write, uma a uma em --only (nunca alvo total).
+  DEPLOY_TARGET: "functions:updateUserSelf,functions:touchUserLastSeen,functions:adminCreateUser,functions:adminUpdateUser,functions:adminSetUserStatus,functions:adminSetUserAdmin,functions:disableUser,functions:deleteMyAccount"
 
 jobs:
   deploy-users-write:
@@ -72,11 +76,11 @@ jobs:
           fi
           echo "confirm/dry_run coerentes."
 
-      - name: Guard DEPLOY_TARGET (7 alvos fixos; rejeita alvo total/curinga)
+      - name: Guard DEPLOY_TARGET (8 alvos fixos; rejeita alvo total/curinga)
         run: |
           set -eu
           T="$DEPLOY_TARGET"
-          EXPECTED="functions:updateUserSelf,functions:touchUserLastSeen,functions:adminCreateUser,functions:adminUpdateUser,functions:adminSetUserStatus,functions:adminSetUserAdmin,functions:disableUser"
+          EXPECTED="functions:updateUserSelf,functions:touchUserLastSeen,functions:adminCreateUser,functions:adminUpdateUser,functions:adminSetUserStatus,functions:adminSetUserAdmin,functions:disableUser,functions:deleteMyAccount"
           [ "$T" = "$EXPECTED" ] || { echo "::error:: DEPLOY_TARGET adulterado"; exit 1; }
           case "$T" in
             *"*"*) echo "::error:: curinga proibido no alvo"; exit 1 ;;
@@ -89,12 +93,12 @@ jobs:
               *) echo "::error:: token de alvo invalido: $tok"; exit 1 ;;
             esac
           done
-          echo "Alvo OK (7 functions): $T"
+          echo "Alvo OK (8 functions): $T"
 
-      - name: Checkout (PIN app/main@a6ee9a3)
+      - name: Checkout (PIN app/main@eb9ba11)
         uses: actions/checkout@v4
         with:
-          ref: a6ee9a380c4b67213823c21243335ca78411b9d3
+          ref: eb9ba1112d226d2caa344a3af3317f4f4f04d36e
           fetch-depth: 0
 
       - name: Confirmar commit e blob pinados
@@ -111,15 +115,16 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Pre-checks (syntax + harness f3361C 41/41 + presenca dos 7 exports)
+      - name: Pre-checks (syntax + harness f3361C 41/41 + f3361J 39/39 + presenca dos 8 exports)
         run: |
           set -eu
           node --check functions/index.js
           node scripts/worker-ops/f3361C-users-write-endpoints.test.mjs
-          for FN in updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser; do
+          node scripts/worker-ops/f3361J-web-users-write-client-cutover.test.mjs
+          for FN in updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser deleteMyAccount; do
             grep -qE "exports\.${FN} = onRequest" functions/index.js || { echo "::error:: export ausente: $FN"; exit 1; }
           done
-          echo "Pre-checks OK (node --check; testes 41/41; 7 exports presentes)."
+          echo "Pre-checks OK (node --check; testes 41/41 + 39/39; 8 exports presentes)."
 
       - name: Auth gcloud (service account via secret -> arquivo temporario)
         env:
@@ -166,7 +171,7 @@ jobs:
           fi
           echo ".env gravado sem flags/segredos."
 
-      - name: Deploy das 7 Functions (SOMENTE se dry_run=false)
+      - name: Deploy das 8 Functions (SOMENTE se dry_run=false)
         env:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
@@ -188,12 +193,12 @@ jobs:
         run: |
           set -eu
           firebase functions:list --project "$GCP_PROJECT" | tee after.txt
-          for FN in updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser; do
+          for FN in updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser deleteMyAccount; do
             if ! grep -qE "(^|[^A-Za-z])${FN}([^A-Za-z]|$)" after.txt; then
               echo "::error:: alvo $FN ausente apos deploy"; exit 1
             fi
           done
-          echo "POS-deploy OK: as 7 functions presentes; deploy --only limitado (sem Rules/Hosting/extras)."
+          echo "POS-deploy OK: as 8 functions presentes; deploy --only limitado (sem Rules/Hosting/extras)."
 
       - name: Limpeza (service account + .env temporario)
         if: always()
