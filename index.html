@@ -9673,10 +9673,14 @@ function bindSettingsMain(){
 
 /* === SUB-PÁGINA: CONTA E PERFIL === */
 function renderSettingsAccount(){
-  function field(id, label, value, type, placeholder){
+  function field(id, label, value, type, placeholder, readonly){
     type = type || "text";
-    return '<div class="set-field"><label>'+esc(label)+'</label>'+
-      '<input id="'+id+'" type="'+type+'" value="'+esc(value||"")+'" placeholder="'+esc(placeholder||"")+'" maxlength="120">'+
+    /* F3.3.61-S1: readonly => campo somente-leitura (role é admin-controlled; nunca self-save). */
+    var roAttr = readonly ? ' readonly aria-readonly="true"' : '';
+    var roNote = readonly ? '<div class="set-field-note" style="font-size:11px;color:var(--ink-faint);margin-top:4px">Definida pelo administrador</div>' : '';
+    return '<div class="set-field'+(readonly?' set-field-ro':'')+'"><label>'+esc(label)+'</label>'+
+      '<input id="'+id+'" type="'+type+'" value="'+esc(value||"")+'" placeholder="'+esc(placeholder||"")+'" maxlength="120"'+roAttr+'>'+
+      roNote+
     '</div>';
   }
   return '<div class="settings">'+
@@ -9697,7 +9701,7 @@ function renderSettingsAccount(){
     '<div class="set-section">'+
       '<div class="set-section-h">Dados pessoais</div>'+
       field("setName", "Nome completo", me.name, "text", "Seu nome")+
-      field("setRole", "Função na agência", me.role, "text", "Ex: Social Media, Videomaker")+
+      field("setRole", "Função na agência", me.role, "text", "Definida pelo administrador", true)+
       field("setPhone", "WhatsApp", meContactField("phone"), "tel", "Ex: 88 9 9999-9999")+
       field("setEmail", "E-mail", meContactField("email"), "email", "voce@agencia.com")+
       '<button class="set-btn-primary" id="setSaveAcc">Salvar alterações</button>'+
@@ -9756,27 +9760,29 @@ function bindSettingsAccount(){
   var saveBtn = document.getElementById("setSaveAcc");
   if(saveBtn) saveBtn.onclick = async function(){
     var name  = (document.getElementById("setName").value||"").trim();
-    var role  = (document.getElementById("setRole").value||"").trim();
     var phone = (document.getElementById("setPhone").value||"").trim();
     var email = (document.getElementById("setEmail").value||"").trim().toLowerCase();
     if(!name){ toast("Nome não pode ficar vazio"); return; }
-    if(!role){ toast("Função não pode ficar vazia"); return; }
     if(email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast("E-mail inválido"); return; }
     if(busy) return; busy=true;
     saveBtn.disabled=true; saveBtn.textContent="Salvando…";
     try{
-      var updates = {name:name, role:role, phone:phone, email:email};
+      /* F3.3.61-S1: role é admin-controlled/read-only — NUNCA entra em self-save (nem via
+         updateUserSelf, nem no fallback direto em /users). admin/status idem. Constrói payload
+         ALLOWLISTED (name/phone/email); a defesa explícita abaixo reforça a allowlist mesmo que
+         algum campo escape por refactor futuro. role só muda via adminUpdateUser (admin session). */
+      var updates = {name:name, phone:phone, email:email};
+      delete updates.role; delete updates.admin; delete updates.status;
       /* F3.3.46: com users_read_hardening ON, phone/email vêm de getUserContact (cache em
          memória). Se o contato NÃO foi hidratado (fetch falhou/pendente), NÃO grava phone/email
          em branco — evita perda de dado. OFF: comportamento legado 100% intacto. */
       if(usersReadHardeningEnabled() && !meContactHydrated()){ delete updates.phone; delete updates.email; }
       if(usersWriteEndpointsEnabled()){
-        /* F3.3.61-J: role fica FORA de updateUserSelf (preferência segura RBAC); envia só name/phone/email. */
+        /* self-patch allowlisted: só name/phone/email; role/admin/status jamais enviados. */
         const _selfPatch={}; if("name" in updates)_selfPatch.name=updates.name; if("phone" in updates)_selfPatch.phone=updates.phone; if("email" in updates)_selfPatch.email=updates.email;
         const _r=await updateUserSelfClient(_selfPatch); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed");
-        /* role não é migrado via endpoint nesta fase — mantém valor atual (não sobrescreve me.role) */
-        delete updates.role;
       }else{
+        /* fallback direto (flag OFF): updates já é allowlisted (name/phone/email), sem role. */
         await db.collection("users").doc(me.id).update(updates);
       }
       Object.assign(me, updates);
