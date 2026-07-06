@@ -5352,6 +5352,18 @@ async function deleteMyAccountClient(){
     return { ok:true };
   }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token */
 }
+/* POST resetMyFcmTokens — limpa TODOS os tokens FCM do PRÓPRIO usuário (self-only, server-side).
+   F3.3.61-R1: substitui o antigo write DIRETO do force-reregister em /users. Sessão obrigatória;
+   corpo vazio; NUNCA envia/recebe token nem targetId; contrato {ok:true} só se res.ok && data.ok===true. */
+async function resetMyFcmTokensClient(){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"unauthorized" };
+    const res=await fetch(uwUrl("resetMyFcmTokens","uw_reset_fcm_url"), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token }, body: "{}" });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"reset_failed" };
+    return { ok:true };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token */
+}
 
 /* ============================================================================
    F3.3.21-B3.20 — FCM token server-side (DORMENTE; flag fcm_token_server OFF por padrão).
@@ -10249,7 +10261,15 @@ function bindSettingsNotifications(){
       try{
         /* Apaga tokens do Firestore (e os metadados por device da V64.3) */
         if(me && db){
-          await db.collection("users").doc(me.id).update({ fcmTokens: [], fcmTokenMeta: {} });
+          /* F3.3.61-R1: com fcm_token_server ON (padrão) limpa via endpoint self-only
+             resetMyFcmTokens — SEM write direto em /users. Fallback direto SOMENTE com a
+             flag OFF, enquanto /users create/update ainda estão abertos nas Rules. */
+          if(fcmTokenServerEnabled()){
+            const rr2 = await resetMyFcmTokensClient();
+            if(!rr2 || rr2.ok!==true) throw new Error("reset_fcm_failed");
+          } else {
+            await db.collection("users").doc(me.id).update({ fcmTokens: [], fcmTokenMeta: {} });
+          }
         }
         /* [V63.97] Desregistra o SW do FCM pra forçar um fresh start.
            Antes, o setupPushNotifications fazia isso automaticamente. Agora setupPush
