@@ -1620,6 +1620,40 @@ exports._handleRegisterFcmToken = handleRegisterFcmToken;
 exports._handleRemoveFcmToken = handleRemoveFcmToken;
 exports._authMaskFcmToken = authMaskFcmToken;
 exports._authFcmReadState = authFcmReadState;
+// ---------------------------------------------------------------------------
+// F3.3.61-R1 — resetMyFcmTokens: LIMPA todos os tokens FCM do PROPRIO usuario
+// (fcmTokens=[], fcmTokenMeta={}). Move server-side o antigo write DIRETO do
+// force-reregister do cliente (index.html ~10252). Self-only: escreve SEMPRE em
+// users/<auth.uid> (uid da SESSAO); IGNORA qualquer targetId/uid/userId do body.
+// Sessao obrigatoria; POST-only; NUNCA retorna/loga token/fcmTokens/fcmTokenMeta.
+// Resposta minima { ok:true }. Dormente ate deploy (fase futura R3).
+async function handleResetMyFcmTokens(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "invalid_session" } };
+  // Alvo SEMPRE = a sessao. O body e ignorado (nunca le targetId/uid/userId).
+  const db = (ctx && ctx.db) || notifDb();
+  try { await db.collection("users").doc(auth.uid).update({ fcmTokens: [], fcmTokenMeta: {} }); }
+  catch (e) { try { logger.error("[resetMyFcmTokens] limpeza falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "save_failed" } }; }
+  try { logger.info("[resetMyFcmTokens] ok", { uid: notifMaskUid(auth.uid) }); } catch (_) {}
+  // Resposta SEGURA: NUNCA fcmTokens/fcmTokenMeta/token. So { ok:true }.
+  return { status: 200, json: { ok: true } };
+}
+exports.resetMyFcmTokens = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    res.set("Cache-Control", "no-store");
+    const out = await handleResetMyFcmTokens({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[resetMyFcmTokens] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+exports._handleResetMyFcmTokens = handleResetMyFcmTokens;
 
 /* ============================================================================
    F3.3.48 — checkUserExists (duplicate-check de CADASTRO, server-side).
