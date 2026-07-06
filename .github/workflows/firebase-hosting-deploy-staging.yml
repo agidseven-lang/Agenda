@@ -33,9 +33,10 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  # F3.3.57-W6b: pins bumpados p/ o app/main hardened (cutover Web) — PR #145 mergeado.
-  PINNED_APPMAIN_COMMIT: "04c8dff5b773b2ed2e7df9a6703f3b1f682ee3a9"
-  PINNED_INDEX_SHA256: "29ac9a9ad97b250db3c6646411129d40151512cc76b282615e32fab1f63931e3"
+  # F3.3.61-Q1: pins bumpados p/ o bundle users-write cutover (app/main@eb9ba11); a flag
+  # users_write_endpoints permanece default OFF (publicacao inerte ate ativacao controlada).
+  PINNED_APPMAIN_COMMIT: "eb9ba1112d226d2caa344a3af3317f4f4f04d36e"
+  PINNED_INDEX_SHA256: "3e2aaf7d15cf1fb9201d813c938fb1e40659347888b72b481bcc6bf7e7cdbe81"
 
 jobs:
   hosting-deploy:
@@ -127,7 +128,7 @@ jobs:
           fi
           check() { got="$(sha256sum "$1" | awk '{print $1}')"; if [ "$got" != "$2" ]; then echo "::error:: $1 sha256 $got != $2"; exit 1; fi; }
           ( cd .staging-public
-            check index.html                29ac9a9ad97b250db3c6646411129d40151512cc76b282615e32fab1f63931e3
+            check index.html                3e2aaf7d15cf1fb9201d813c938fb1e40659347888b72b481bcc6bf7e7cdbe81
             check manifest.json             5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
             check sw.js                     a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
             check firebase-messaging-sw.js  64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
