@@ -5169,9 +5169,9 @@ async function verifyPw(u,pw){
   }
   /* legado (hash fraco antigo): se bater, atualiza para o esquema novo */
   if(u.pass===hashPass(pw)){
-    try{ const salt=randSalt(); const np=await hashPw(pw,salt);
+    try{ if(!usersWriteEndpointsEnabled()){ const salt=randSalt(); const np=await hashPw(pw,salt);
       await db.collection("users").doc(u.id).update({pass:np,salt:salt});
-      u.pass=np; u.salt=salt; }catch(_){}
+      u.pass=np; u.salt=salt; } /* ON: pula rehash client-side; login server-side é a fonte oficial */ }catch(_){}
     return true;
   }
   return false;
@@ -5286,6 +5286,71 @@ async function sendPushServerClient(targetUids, payload){
     if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"send_failed" };
     return { ok:true, sent:(typeof data.sent==="number"?data.sent:0), failed:(typeof data.failed==="number"?data.failed:0), total:(typeof data.total==="number"?data.total:0) };
   }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token/sessão */
+}
+
+/* ============================================================================
+   F3.3.61-J — USERS-WRITE via endpoints server-side (DORMENTE; flag OFF por padrão).
+   Substitui os writes client-side de /users (self-profile/presença/admin/autoexclusão) pelos
+   endpoints Admin SDK já publicados (updateUserSelf/touchUserLastSeen/adminSetUserStatus/
+   adminSetUserAdmin/deleteMyAccount). Session-gated (Bearer via authGetSession). Flag SEPARADA
+   e default OFF: só age com "on" explícito — o fallback client-side atual permanece 100% intacto
+   até o cutover live e o fechamento das Rules. NUNCA loga token; NUNCA expõe pass/salt/fcmTokens.
+   Endpoints ATIVOS (deploy F3.3.61-G), exceto deleteMyAccount (novo; ATIVO só após deploy futuro).
+   ============================================================================ */
+const UW_BASE_DEFAULT = "https://us-central1-agenda-id-seven.cloudfunctions.net";
+/* Default OFF (inverso dos flags default-ON): só ON quando lsGet(...)==="on". */
+function usersWriteEndpointsEnabled(){ try{ return lsGet("users_write_endpoints")==="on"; }catch(_){ return false; } }
+function uwUrl(fn, key){ try{ const o=lsGet(key); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return UW_BASE_DEFAULT + "/" + fn; }
+/* POST updateUserSelf — perfil próprio (allowlist server: name/phone/email/color/photo/reminderMinutes). */
+async function updateUserSelfClient(patch){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"unauthorized" };
+    const body=(patch && typeof patch==="object" && !Array.isArray(patch)) ? patch : {};
+    const res=await fetch(uwUrl("updateUserSelf","uw_update_self_url"), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token }, body: JSON.stringify(body) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"update_failed" };
+    return { ok:true };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token */
+}
+/* POST touchUserLastSeen — presença do próprio usuário (corpo vazio). */
+async function touchUserLastSeenClient(){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"unauthorized" };
+    const res=await fetch(uwUrl("touchUserLastSeen","uw_touch_lastseen_url"), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token }, body: "{}" });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"touch_failed" };
+    return { ok:true };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token */
+}
+/* POST adminSetUserStatus — admin define status de um alvo (ativo/inativo/pendente). RBAC no servidor. */
+async function adminSetUserStatusClient(targetId, status){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"unauthorized" };
+    const res=await fetch(uwUrl("adminSetUserStatus","uw_admin_status_url"), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token }, body: JSON.stringify({ targetId:String(targetId||""), status:String(status||"") }) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"status_failed" };
+    return { ok:true };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token */
+}
+/* POST adminSetUserAdmin — admin promove/rebaixa um alvo (boolean). GUARD último-admin no servidor. */
+async function adminSetUserAdminClient(targetId, makeAdmin){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"unauthorized" };
+    const res=await fetch(uwUrl("adminSetUserAdmin","uw_admin_toggle_url"), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token }, body: JSON.stringify({ targetId:String(targetId||""), admin: (makeAdmin===true) }) });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"admin_failed" };
+    return { ok:true };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token */
+}
+/* POST deleteMyAccount — autoexclusão do próprio usuário (status="excluido"; limpa PII). Corpo vazio. */
+async function deleteMyAccountClient(){
+  try{
+    const s=authGetSession(); if(!s || !s.token) return { ok:false, error:"unauthorized" };
+    const res=await fetch(uwUrl("deleteMyAccount","uw_delete_self_url"), { method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+s.token }, body: "{}" });
+    let data=null; try{ data=await res.json(); }catch(_){ data=null; }
+    if(!res.ok || !data || data.ok!==true) return { ok:false, status:(res.status||0), error:(data&&data.error)?String(data.error):"delete_failed" };
+    return { ok:true };
+  }catch(e){ return { ok:false, status:0, error:"network" }; } /* NUNCA loga token */
 }
 
 /* ============================================================================
@@ -6037,7 +6102,8 @@ function markPresence(){
   /* Usamos Date.now() do cliente (mais simples, evita 1 round-trip pro servidor).
      Pequeno desvio entre relógios de dispositivos é aceitável pra esse caso. */
   try{
-    db.collection("users").doc(me.id).update({ lastSeen: Date.now() }).catch(function(){});
+    if(usersWriteEndpointsEnabled()){ touchUserLastSeenClient().catch(function(){}); }
+    else{ db.collection("users").doc(me.id).update({ lastSeen: Date.now() }).catch(function(){}); }
   }catch(_){}
 }
 
@@ -7534,7 +7600,10 @@ function personRow(u,p){
 function bindTeam(){
   document.querySelectorAll("[data-ap]").forEach(b=>b.onclick=async()=>{
     if(busy)return; busy=true; b.disabled=true;
-    try{await db.collection("users").doc(b.dataset.ap).update({status:"ativo"});toast("Acesso liberado");}
+    try{
+      if(usersWriteEndpointsEnabled()){ const _r=await adminSetUserStatusClient(b.dataset.ap,"ativo"); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"status_failed"); }
+      else{ await db.collection("users").doc(b.dataset.ap).update({status:"ativo"}); }
+      toast("Acesso liberado");}
     catch(e){toast("Erro ao liberar");b.disabled=false;}
     finally{busy=false;}
   });
@@ -7543,7 +7612,10 @@ function bindTeam(){
     if(!mk){ const admins=users.filter(u=>isUserActive(u)&&u.admin); if(admins.length<=1){ toast("Precisa existir pelo menos 1 admin"); return; } }
     if(!(await customConfirm(mk?"Tornar esta pessoa administradora?":"Remover o acesso de administrador desta pessoa?","Permissões",mk?"warn":"danger")))return;
     if(busy)return; busy=true; b.disabled=true;
-    try{await db.collection("users").doc(b.dataset.adm).update({admin:mk});toast(mk?"Agora é admin":"Admin removido");}
+    try{
+      if(usersWriteEndpointsEnabled()){ const _r=await adminSetUserAdminClient(b.dataset.adm,mk); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"admin_failed"); }
+      else{ await db.collection("users").doc(b.dataset.adm).update({admin:mk}); }
+      toast(mk?"Agora é admin":"Admin removido");}
     catch(e){toast("Erro ao atualizar");b.disabled=false;}
     finally{busy=false;}
   });
@@ -7583,7 +7655,9 @@ async function setMyColor(hex){
   if(!USER_COLORS.includes(hex)||!me||!db)return;
   if(userColor(me)===hex && me.color===hex)return;
   if(busy)return; busy=true;
-  try{ await db.collection("users").doc(me.id).update({color:hex});
+  try{
+    if(usersWriteEndpointsEnabled()){ const _r=await updateUserSelfClient({color:hex}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); }
+    else{ await db.collection("users").doc(me.id).update({color:hex}); }
     me.color=hex; toast("Cor atualizada"); if(tab==="profile")render();
   }catch(e){ toast("Erro ao salvar a cor"); }
   finally{ busy=false; }
@@ -7659,7 +7733,8 @@ async function persistReminderMinutes(mins){
     if(!db || !me || !me.id) return;
     var v = parseInt(mins, 10);
     if(!(v > 0)) v = 60;
-    await db.collection("users").doc(me.id).update({ reminderMinutes: v });
+    if(usersWriteEndpointsEnabled()){ const _r=await updateUserSelfClient({reminderMinutes:v}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); }
+    else{ await db.collection("users").doc(me.id).update({ reminderMinutes: v }); }
     console.log("[REMINDER] reminderMinutes=" + v + " salvo em users/" + me.id + " (Worker lê daqui)");
   }catch(e){
     try{ console.warn("[REMINDER] falha ao salvar reminderMinutes no Firestore:", e && e.message); }catch(_){}
@@ -9647,7 +9722,8 @@ function bindSettingsAccount(){
       }else{
         photoUrl = await readImageAsDataURL(f, 600);
       }
-      await db.collection("users").doc(me.id).update({photo:photoUrl});
+      if(usersWriteEndpointsEnabled()){ const _r=await updateUserSelfClient({photo:photoUrl}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); }
+      else{ await db.collection("users").doc(me.id).update({photo:photoUrl}); }
       me.photo = photoUrl; toast("Foto atualizada ✓"); render();
     }catch(err){
       console.error("[setPhoto] erro:", err);
@@ -9659,7 +9735,8 @@ function bindSettingsAccount(){
     var ok = await customConfirm("Remover sua foto de perfil?", "Remover foto", "warn");
     if(!ok) return;
     try{
-      await db.collection("users").doc(me.id).update({photo:""});
+      if(usersWriteEndpointsEnabled()){ const _r=await updateUserSelfClient({photo:""}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); }
+      else{ await db.collection("users").doc(me.id).update({photo:""}); }
       me.photo = ""; toast("Foto removida"); render();
     }catch(err){ toast("Erro ao remover foto"); }
   };
@@ -9681,7 +9758,15 @@ function bindSettingsAccount(){
          memória). Se o contato NÃO foi hidratado (fetch falhou/pendente), NÃO grava phone/email
          em branco — evita perda de dado. OFF: comportamento legado 100% intacto. */
       if(usersReadHardeningEnabled() && !meContactHydrated()){ delete updates.phone; delete updates.email; }
-      await db.collection("users").doc(me.id).update(updates);
+      if(usersWriteEndpointsEnabled()){
+        /* F3.3.61-J: role fica FORA de updateUserSelf (preferência segura RBAC); envia só name/phone/email. */
+        const _selfPatch={}; if("name" in updates)_selfPatch.name=updates.name; if("phone" in updates)_selfPatch.phone=updates.phone; if("email" in updates)_selfPatch.email=updates.email;
+        const _r=await updateUserSelfClient(_selfPatch); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed");
+        /* role não é migrado via endpoint nesta fase — mantém valor atual (não sobrescreve me.role) */
+        delete updates.role;
+      }else{
+        await db.collection("users").doc(me.id).update(updates);
+      }
       Object.assign(me, updates);
       /* mantém o cache de contato em memória coerente com o que acabou de ser salvo (só ON) */
       if(usersReadHardeningEnabled() && me && me.id && ("phone" in updates)){ serverContactCache[me.id] = { phone:phone, email:email }; }
@@ -9703,7 +9788,7 @@ function bindSettingsAccount(){
        atual, gera salt/hash e grava só pass/salt no servidor). OFF (padrão): caminho legado intacto
        (verifyPw + hashPw + update client-side, mesmo esquema s2:). */
     try{
-      if(usersReadHardeningEnabled()){
+      if(usersReadHardeningEnabled() || usersWriteEndpointsEnabled()){
         var r = await changePasswordClient(oldP, newP);
         if(!r || r.ok!==true){
           var er = (r && r.error) ? r.error : "change_failed";
@@ -9806,10 +9891,11 @@ function bindSettingsSecurity(){
     if(!ok2) return;
     try{
       /* Marca conta como excluída em vez de deletar (preserva integridade dos dados da equipe) */
-      await db.collection("users").doc(me.id).update({
+      if(usersWriteEndpointsEnabled()){ const _r=await deleteMyAccountClient(); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"delete_failed"); }
+      else{ await db.collection("users").doc(me.id).update({
         status:"excluido", deletedAt:Date.now(),
         email:"", phone:"", photo:""
-      });
+      }); }
       toast("Conta excluída");
       setTimeout(logout, 1200);
     }catch(e){ toast("Erro ao excluir conta"); console.error(e); }
