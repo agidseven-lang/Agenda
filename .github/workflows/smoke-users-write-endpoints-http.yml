@@ -1,5 +1,5 @@
 # =====================================================================
-# [manual] F3.3.61-H — Smoke HTTP READ-ONLY das 7 Functions users-write.
+# [manual] F3.3.61-H/N — Smoke HTTP READ-ONLY das 8 Functions users-write.
 # Prova o comportamento SEM AUTENTICACAO das URLs publicas ja deployadas:
 #   OPTIONS            -> 2xx (CORS seguro);
 #   GET  (sem auth)    -> 405 (method-gate);
@@ -30,10 +30,10 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Smoke HTTP read-only (OPTIONS / GET / POST-{} sem auth) x7
+      - name: Smoke HTTP read-only (OPTIONS / GET / POST-{} sem auth) x8
         run: |
           set -u
-          FUNCS="updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser"
+          FUNCS="updateUserSelf touchUserLastSeen adminCreateUser adminUpdateUser adminSetUserStatus adminSetUserAdmin disableUser deleteMyAccount"
           FAIL=0
           printf '%-20s | %-7s | %-4s | %-6s | %s\n' "function" "OPTIONS" "GET" "POST{}" "verdict"
           echo "--------------------------------------------------------------------"
@@ -57,7 +57,7 @@ jobs:
           done
           echo "--------------------------------------------------------------------"
           if [ "$FAIL" = "0" ]; then
-            echo "SMOKE OK: 7/7 — OPTIONS 2xx, GET 405, POST(sem sessao) 401, zero 5xx, zero pass/salt/fcmTokens."
+            echo "SMOKE OK: 8/8 — OPTIONS 2xx, GET 405, POST(sem sessao) 401, zero 5xx, zero pass/salt/fcmTokens."
           else
             echo "::error:: SMOKE FALHOU — ver tabela acima."; exit 1
           fi
