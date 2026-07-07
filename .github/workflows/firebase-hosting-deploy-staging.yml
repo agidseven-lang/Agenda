@@ -33,15 +33,16 @@ concurrency:
 
 env:
   GCP_PROJECT: "agenda-id-seven"
-  # F3.3.61-S6A: pins bumpados p/ o bundle Web Role hardening (app/main@35acfe8). O campo `role`
-  # do perfil passa a ser read-only/admin-controlled: setRole renderizado read-only e o self-save
-  # constroi payload ALLOWLISTED (name/phone/email) + defesa delete role/admin/status, sem enviar
-  # role em nenhum caminho (users_write_endpoints ON ou OFF). users_write_endpoints permanece
-  # DEFAULT OFF e fcm_token_server DEFAULT ON; resetMyFcmTokensClient + FCM cutoff preservados.
-  # Somente index.html mudou (novo hash ae63b99d); os outros 5 estaticos sao byte-identicos ao
-  # bundle anterior — seus SHA-256 in-package permanecem inalterados.
-  PINNED_APPMAIN_COMMIT: "35acfe8bb59be5929dc151f15198a216386c7e97"
-  PINNED_INDEX_SHA256: "ae63b99db4f69d1d15d40b3a9da541a13bedd06e8f554271cb2ccaa1e3996c75"
+  # F3.3.61-U5A: pins bumpados p/ o bundle consolidado Users fallback cutoff (app/main@9ae664e).
+  # U1: users_write_endpoints DEFAULT ON + 11 fallbacks diretos em /users removidos (endpoint-only);
+  # U2: fcm_token_server DEFAULT ON + fallbacks FCM OFF removidos (register/remove/reset endpoint-only);
+  # U3: cleanupDeadTokens removido + push-send client legado removido => envio de push ENDPOINT-ONLY
+  # server-side (sendPush). ZERO direct writes em /users no client; role hardening preservado
+  # (setRole read-only; self-save sem role/admin/status). Somente index.html mudou (novo hash
+  # 35eb24c1); os outros 5 estaticos sao byte-identicos (SHA-256 in-package inalterados). Gate 0b
+  # (sendPush URI) adicionado: o deploy aborta se o endpoint server-side nao estiver publicado.
+  PINNED_APPMAIN_COMMIT: "9ae664e0428fc5f265f462719536194c0084b7f5"
+  PINNED_INDEX_SHA256: "35eb24c1085a86b603b224640aacfe076bde214019e7fb22fd2494887b4f459c"
 
 jobs:
   hosting-deploy:
@@ -133,7 +134,7 @@ jobs:
           fi
           check() { got="$(sha256sum "$1" | awk '{print $1}')"; if [ "$got" != "$2" ]; then echo "::error:: $1 sha256 $got != $2"; exit 1; fi; }
           ( cd .staging-public
-            check index.html                ae63b99db4f69d1d15d40b3a9da541a13bedd06e8f554271cb2ccaa1e3996c75
+            check index.html                35eb24c1085a86b603b224640aacfe076bde214019e7fb22fd2494887b4f459c
             check manifest.json             5143364eb9640fb55dc308d3ce15326452ea8b27058d2ec2898c92a9f5bd0820
             check sw.js                     a042671afa3e9891ca6ee96449763fd4877d142fb7ea98076936916795aab003
             check firebase-messaging-sw.js  64bb254d4dd8204a421cc4744f0f49c05c729435e0e1b26452646794229210aa
@@ -172,6 +173,31 @@ jobs:
             echo "::error:: getNotifPrefs URI mismatch: real=$URI expected=$EXP"; exit 1
           fi
           echo "Gate 0 OK: getNotifPrefs URI == NOTIF_GET_URL ($EXP)."
+
+      - name: "Gate 0b — confirmar URI real de sendPush (== AUTH_SENDPUSH_URL)"
+        run: |
+          set -eu
+          # F3.3.61-U5A: confirma, ANTES de QUALQUER deploy, que a Function Gen2 sendPush ja
+          # publicada responde na MESMA URL run.app embutida no client (AUTH_SENDPUSH_URL_DEFAULT).
+          # A serie U torna o envio de push ENDPOINT-ONLY server-side (sendPush); este gate garante
+          # que o endpoint existe ANTES de publicar o bundle U. Roda em dry_run=true E false. NAO
+          # envia push / NAO chama o endpoint com payload — apenas metadado publico serviceConfig.uri.
+          # URI vazia/divergente => NO-GO (aborta antes do deploy).
+          EXP="https://sendpush-de36pi7vza-uc.a.run.app"
+          URI="$(gcloud functions describe sendPush --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)"
+          if [ -z "$URI" ]; then
+            URI="$(gcloud functions describe sendpush --gen2 --region us-central1 --project "$GCP_PROJECT" --format='value(serviceConfig.uri)' 2>/dev/null || true)"
+          fi
+          echo "Function: sendPush"
+          echo "EXP=$EXP"
+          echo "URI=$URI"
+          if [ -z "$URI" ]; then
+            echo "::error:: sendPush sem URI (nao publicada/inacessivel) — NO-GO (a serie U depende do endpoint server-side)"; exit 1
+          fi
+          if [ "$URI" != "$EXP" ]; then
+            echo "::error:: sendPush URI mismatch: real=$URI expected=$EXP"; exit 1
+          fi
+          echo "Gate 0b OK: sendPush URI == AUTH_SENDPUSH_URL ($EXP)."
 
       - name: Deploy HOSTING (somente se dry_run=false)
         env:
