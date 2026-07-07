@@ -5169,9 +5169,8 @@ async function verifyPw(u,pw){
   }
   /* legado (hash fraco antigo): se bater, atualiza para o esquema novo */
   if(u.pass===hashPass(pw)){
-    try{ if(!usersWriteEndpointsEnabled()){ const salt=randSalt(); const np=await hashPw(pw,salt);
-      await db.collection("users").doc(u.id).update({pass:np,salt:salt});
-      u.pass=np; u.salt=salt; } /* ON: pula rehash client-side; login server-side é a fonte oficial */ }catch(_){}
+    /* F3.3.61-U1: sem rehash client-side (sem write direto em /users). O login oficial é
+       server-side (loginUser); notifVerifyPassword aceita credenciais legadas (djb2). */
     return true;
   }
   return false;
@@ -5299,7 +5298,7 @@ async function sendPushServerClient(targetUids, payload){
    ============================================================================ */
 const UW_BASE_DEFAULT = "https://us-central1-agenda-id-seven.cloudfunctions.net";
 /* Default OFF (inverso dos flags default-ON): só ON quando lsGet(...)==="on". */
-function usersWriteEndpointsEnabled(){ try{ return lsGet("users_write_endpoints")==="on"; }catch(_){ return false; } }
+function usersWriteEndpointsEnabled(){ try{ return lsGet("users_write_endpoints")!=="off"; }catch(_){ return true; } }
 function uwUrl(fn, key){ try{ const o=lsGet(key); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return UW_BASE_DEFAULT + "/" + fn; }
 /* POST updateUserSelf — perfil próprio (allowlist server: name/phone/email/color/photo/reminderMinutes). */
 async function updateUserSelfClient(patch){
@@ -6114,8 +6113,7 @@ function markPresence(){
   /* Usamos Date.now() do cliente (mais simples, evita 1 round-trip pro servidor).
      Pequeno desvio entre relógios de dispositivos é aceitável pra esse caso. */
   try{
-    if(usersWriteEndpointsEnabled()){ touchUserLastSeenClient().catch(function(){}); }
-    else{ db.collection("users").doc(me.id).update({ lastSeen: Date.now() }).catch(function(){}); }
+    touchUserLastSeenClient().catch(function(){}); /* F3.3.61-U1: endpoint-only (sem write direto em /users) */
   }catch(_){}
 }
 
@@ -7613,8 +7611,7 @@ function bindTeam(){
   document.querySelectorAll("[data-ap]").forEach(b=>b.onclick=async()=>{
     if(busy)return; busy=true; b.disabled=true;
     try{
-      if(usersWriteEndpointsEnabled()){ const _r=await adminSetUserStatusClient(b.dataset.ap,"ativo"); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"status_failed"); }
-      else{ await db.collection("users").doc(b.dataset.ap).update({status:"ativo"}); }
+      const _r=await adminSetUserStatusClient(b.dataset.ap,"ativo"); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"status_failed"); /* F3.3.61-U1: endpoint-only */
       toast("Acesso liberado");}
     catch(e){toast("Erro ao liberar");b.disabled=false;}
     finally{busy=false;}
@@ -7625,8 +7622,7 @@ function bindTeam(){
     if(!(await customConfirm(mk?"Tornar esta pessoa administradora?":"Remover o acesso de administrador desta pessoa?","Permissões",mk?"warn":"danger")))return;
     if(busy)return; busy=true; b.disabled=true;
     try{
-      if(usersWriteEndpointsEnabled()){ const _r=await adminSetUserAdminClient(b.dataset.adm,mk); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"admin_failed"); }
-      else{ await db.collection("users").doc(b.dataset.adm).update({admin:mk}); }
+      const _r=await adminSetUserAdminClient(b.dataset.adm,mk); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"admin_failed"); /* F3.3.61-U1: endpoint-only */
       toast(mk?"Agora é admin":"Admin removido");}
     catch(e){toast("Erro ao atualizar");b.disabled=false;}
     finally{busy=false;}
@@ -7668,8 +7664,7 @@ async function setMyColor(hex){
   if(userColor(me)===hex && me.color===hex)return;
   if(busy)return; busy=true;
   try{
-    if(usersWriteEndpointsEnabled()){ const _r=await updateUserSelfClient({color:hex}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); }
-    else{ await db.collection("users").doc(me.id).update({color:hex}); }
+    const _r=await updateUserSelfClient({color:hex}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); /* F3.3.61-U1: endpoint-only */
     me.color=hex; toast("Cor atualizada"); if(tab==="profile")render();
   }catch(e){ toast("Erro ao salvar a cor"); }
   finally{ busy=false; }
@@ -7745,8 +7740,7 @@ async function persistReminderMinutes(mins){
     if(!db || !me || !me.id) return;
     var v = parseInt(mins, 10);
     if(!(v > 0)) v = 60;
-    if(usersWriteEndpointsEnabled()){ const _r=await updateUserSelfClient({reminderMinutes:v}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); }
-    else{ await db.collection("users").doc(me.id).update({ reminderMinutes: v }); }
+    const _r=await updateUserSelfClient({reminderMinutes:v}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); /* F3.3.61-U1: endpoint-only */
     console.log("[REMINDER] reminderMinutes=" + v + " salvo em users/" + me.id + " (Worker lê daqui)");
   }catch(e){
     try{ console.warn("[REMINDER] falha ao salvar reminderMinutes no Firestore:", e && e.message); }catch(_){}
@@ -9738,8 +9732,7 @@ function bindSettingsAccount(){
       }else{
         photoUrl = await readImageAsDataURL(f, 600);
       }
-      if(usersWriteEndpointsEnabled()){ const _r=await updateUserSelfClient({photo:photoUrl}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); }
-      else{ await db.collection("users").doc(me.id).update({photo:photoUrl}); }
+      const _r=await updateUserSelfClient({photo:photoUrl}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); /* F3.3.61-U1: endpoint-only */
       me.photo = photoUrl; toast("Foto atualizada ✓"); render();
     }catch(err){
       console.error("[setPhoto] erro:", err);
@@ -9751,8 +9744,7 @@ function bindSettingsAccount(){
     var ok = await customConfirm("Remover sua foto de perfil?", "Remover foto", "warn");
     if(!ok) return;
     try{
-      if(usersWriteEndpointsEnabled()){ const _r=await updateUserSelfClient({photo:""}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); }
-      else{ await db.collection("users").doc(me.id).update({photo:""}); }
+      const _r=await updateUserSelfClient({photo:""}); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed"); /* F3.3.61-U1: endpoint-only */
       me.photo = ""; toast("Foto removida"); render();
     }catch(err){ toast("Erro ao remover foto"); }
   };
@@ -9777,14 +9769,9 @@ function bindSettingsAccount(){
          memória). Se o contato NÃO foi hidratado (fetch falhou/pendente), NÃO grava phone/email
          em branco — evita perda de dado. OFF: comportamento legado 100% intacto. */
       if(usersReadHardeningEnabled() && !meContactHydrated()){ delete updates.phone; delete updates.email; }
-      if(usersWriteEndpointsEnabled()){
-        /* self-patch allowlisted: só name/phone/email; role/admin/status jamais enviados. */
-        const _selfPatch={}; if("name" in updates)_selfPatch.name=updates.name; if("phone" in updates)_selfPatch.phone=updates.phone; if("email" in updates)_selfPatch.email=updates.email;
-        const _r=await updateUserSelfClient(_selfPatch); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed");
-      }else{
-        /* fallback direto (flag OFF): updates já é allowlisted (name/phone/email), sem role. */
-        await db.collection("users").doc(me.id).update(updates);
-      }
+      /* F3.3.61-U1: endpoint-only. self-patch allowlisted: só name/phone/email; role/admin/status jamais enviados. */
+      const _selfPatch={}; if("name" in updates)_selfPatch.name=updates.name; if("phone" in updates)_selfPatch.phone=updates.phone; if("email" in updates)_selfPatch.email=updates.email;
+      const _r=await updateUserSelfClient(_selfPatch); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"update_failed");
       Object.assign(me, updates);
       /* mantém o cache de contato em memória coerente com o que acabou de ser salvo (só ON) */
       if(usersReadHardeningEnabled() && me && me.id && ("phone" in updates)){ serverContactCache[me.id] = { phone:phone, email:email }; }
@@ -9806,34 +9793,22 @@ function bindSettingsAccount(){
        atual, gera salt/hash e grava só pass/salt no servidor). OFF (padrão): caminho legado intacto
        (verifyPw + hashPw + update client-side, mesmo esquema s2:). */
     try{
-      if(usersReadHardeningEnabled() || usersWriteEndpointsEnabled()){
-        var r = await changePasswordClient(oldP, newP);
-        if(!r || r.ok!==true){
-          var er = (r && r.error) ? r.error : "change_failed";
-          if(er==="invalid_current_password") toast("Senha atual incorreta");
-          else if(er==="weak_password") toast("Senha nova precisa ter pelo menos 6 caracteres");
-          else if(er==="unauthorized") toast("Sua sessão expirou. Entre novamente.");
-          else if(er==="rate_limited") toast("Muitas tentativas. Aguarde um pouco e tente de novo.");
-          else toast("Erro ao alterar senha");
-          return;
-        }
-        /* sucesso: o client NÃO conhece o novo hash/salt (correto). Só limpa os campos. */
-        document.getElementById("setPassOld").value = "";
-        document.getElementById("setPassNew").value = "";
-        document.getElementById("setPassConf").value = "";
-        toast("Senha alterada com sucesso ✓");
-      }else{
-        var valid = await verifyPw(me, oldP);
-        if(!valid){ toast("Senha atual incorreta"); return; }
-        var newSalt = randSalt();
-        var newHash = await hashPw(newP, newSalt);
-        await db.collection("users").doc(me.id).update({pass:newHash, salt:newSalt});
-        me.pass = newHash; me.salt = newSalt;
-        document.getElementById("setPassOld").value = "";
-        document.getElementById("setPassNew").value = "";
-        document.getElementById("setPassConf").value = "";
-        toast("Senha alterada com sucesso ✓");
+      /* F3.3.61-U1: endpoint-only changePassword (sem verifyPw/hash/write direto em /users). */
+      var r = await changePasswordClient(oldP, newP);
+      if(!r || r.ok!==true){
+        var er = (r && r.error) ? r.error : "change_failed";
+        if(er==="invalid_current_password") toast("Senha atual incorreta");
+        else if(er==="weak_password") toast("Senha nova precisa ter pelo menos 6 caracteres");
+        else if(er==="unauthorized") toast("Sua sessão expirou. Entre novamente.");
+        else if(er==="rate_limited") toast("Muitas tentativas. Aguarde um pouco e tente de novo.");
+        else toast("Erro ao alterar senha");
+        return;
       }
+      /* sucesso: o client NÃO conhece o novo hash/salt (correto). Só limpa os campos. */
+      document.getElementById("setPassOld").value = "";
+      document.getElementById("setPassNew").value = "";
+      document.getElementById("setPassConf").value = "";
+      toast("Senha alterada com sucesso ✓");
     }catch(e){ toast("Erro ao alterar senha"); console.error(e); }
   };
 }
@@ -9909,11 +9884,7 @@ function bindSettingsSecurity(){
     if(!ok2) return;
     try{
       /* Marca conta como excluída em vez de deletar (preserva integridade dos dados da equipe) */
-      if(usersWriteEndpointsEnabled()){ const _r=await deleteMyAccountClient(); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"delete_failed"); }
-      else{ await db.collection("users").doc(me.id).update({
-        status:"excluido", deletedAt:Date.now(),
-        email:"", phone:"", photo:""
-      }); }
+      const _r=await deleteMyAccountClient(); if(!_r||_r.ok!==true) throw new Error((_r&&_r.error)||"delete_failed"); /* F3.3.61-U1: endpoint-only */
       toast("Conta excluída");
       setTimeout(logout, 1200);
     }catch(e){ toast("Erro ao excluir conta"); console.error(e); }

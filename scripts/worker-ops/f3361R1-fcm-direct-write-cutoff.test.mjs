@@ -134,7 +134,7 @@ const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL " +
   const dwCount = (HSRC.match(/update\(\{ fcmTokens: \[\], fcmTokenMeta: \{\} \}\)/g) || []).length;
   ok("24 nenhum write direto INCONDICIONAL (unico e gated)", dwCount === 1 && /if\(fcmTokenServerEnabled\(\)\)\{[\s\S]*?\} else \{[\s\S]*?update\(\{ fcmTokens: \[\], fcmTokenMeta: \{\} \}\)/.test(cut));
   ok("25 fcm_token_server default ON preservado", /function fcmTokenServerEnabled\(\)\{ try\{ return lsGet\("fcm_token_server"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
-  ok("26 users_write_endpoints intacto (default OFF)", /function usersWriteEndpointsEnabled\(\)\{ try\{ return lsGet\("users_write_endpoints"\)==="on"; \}catch\(_\)\{ return false; \} \}/.test(HSRC));
+  ok("26 users_write_endpoints default ON (U1)", /function usersWriteEndpointsEnabled\(\)\{ try\{ return lsGet\("users_write_endpoints"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
   ok("27 deleteMyAccount intacto", grabH("deleteMyAccountClient").length > 0 && /async function handleDeleteMyAccount\(/.test(FSRC));
   ok("28 registerFcmToken intacto", /async function handleRegisterFcmToken\(/.test(FSRC) && /exports\.registerFcmToken = onRequest/.test(FSRC));
   ok("29 removeFcmToken intacto", /async function handleRemoveFcmToken\(/.test(FSRC) && /exports\.removeMyFcmToken = onRequest/.test(FSRC));
@@ -150,7 +150,16 @@ const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL " +
   let st = "__gitfail__";
   try { st = execSync("git -C " + JSON.stringify(ROOT) + " status --porcelain", { encoding: "utf8" }); } catch (_) { st = "__gitfail__"; }
   const changed = st === "__gitfail__" ? [] : st.split("\n").map((l) => l.slice(3).trim()).filter(Boolean);
-  const allowed = new Set(["functions/index.js", "index.html", "scripts/worker-ops/f3361R1-fcm-direct-write-cutoff.test.mjs"]);
+  /* F3.3.61-U1B: allowlist reconhece os testes irmaos da linha users-write/role/U1 para o
+     diff-scope nao falso-positivar no path "worker-ops" quando eles mudam juntos. NAO afrouxa
+     gate de producao: Rules/workflows/Desktop/Android/Card-Worker seguem barrados abaixo. */
+  const allowed = new Set([
+    "functions/index.js", "index.html",
+    "scripts/worker-ops/f3361R1-fcm-direct-write-cutoff.test.mjs",
+    "scripts/worker-ops/f3361U1-users-write-endpoints-default-on-cutoff.test.mjs",
+    "scripts/worker-ops/f3361J-web-users-write-client-cutover.test.mjs",
+    "scripts/worker-ops/f3361S1-role-self-edit-hardening.test.mjs",
+  ]);
   const disallowed = changed.filter((f) => !allowed.has(f));
   ok("32 sem Rules change", !disallowed.some((f) => /rules|firestore\.rules/i.test(f)));
   ok("33 sem Hosting workflow change", !disallowed.some((f) => /\.github\/workflows/.test(f)));
