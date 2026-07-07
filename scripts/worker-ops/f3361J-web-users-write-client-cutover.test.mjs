@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /* =====================================================================
  * F3.3.61-J — Testes do cutover Web para os endpoints users-write.
- * PARTE A (estática, index.html): flag users_write_endpoints (default OFF),
- *   5 clients, cada write migrado com ON->client / OFF->fallback direto,
- *   nenhum token logado, autoexclusão via deleteMyAccountClient, admin via
- *   adminSetUser*Client, self-profile via updateUserSelfClient, lastSeen via
- *   touchUserLastSeenClient.
+ * ATUALIZADO em F3.3.61-U1B para o comportamento U1: users_write_endpoints agora
+ * DEFAULT ON e os 11 fallbacks diretos em /users foram removidos (endpoint-only).
+ * PARTE A (estática, index.html): flag users_write_endpoints DEFAULT ON; 5 clients;
+ *   cada write agora ENDPOINT-ONLY (sem else-branch de write direto; localStorage
+ *   "off" nao reativa write direto); nenhum token logado; autoexclusão via
+ *   deleteMyAccountClient; admin via adminSetUser*Client; self-profile via
+ *   updateUserSelfClient (role/admin/status fora); lastSeen via touchUserLastSeenClient.
  * PARTE B (hermética, functions/index.js): updateUserSelf agora aceita
  *   name/phone/email e REJEITA role/admin/status/pass/salt; deleteMyAccount
  *   (self) sem sessão->401, com sessão marca status="excluido"+limpa PII e
@@ -25,34 +27,35 @@ const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL " +
 const hasHtml = (re) => re.test(HTML);
 
 /* ---------------- PARTE A — estática (index.html) ---------------- */
-// flag default OFF (só "on" liga)
-ok("A1 flag usersWriteEndpointsEnabled default OFF", /function usersWriteEndpointsEnabled\(\)\s*\{[^}]*lsGet\("users_write_endpoints"\)\s*===\s*"on"/.test(HTML));
-ok("A2 flag NAO usa padrão default-ON (!==off)", !/usersWriteEndpointsEnabled\(\)\s*\{[^}]*!==\s*"off"/.test(HTML));
-// 5 clients definidos
+// F3.3.61-U1: flag agora DEFAULT ON; fluxos users_write sao ENDPOINT-ONLY (sem
+// else-branch de write direto em /users; localStorage "off" NAO reativa write direto).
+ok("A1 flag usersWriteEndpointsEnabled default ON (U1)", /function usersWriteEndpointsEnabled\(\)\{ try\{ return lsGet\("users_write_endpoints"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HTML));
+ok("A2 flag usa idioma default-ON (!==off), nao default-OFF (===on)", /usersWriteEndpointsEnabled\(\)\{[^}]*!==\s*"off"/.test(HTML) && !/usersWriteEndpointsEnabled\(\)\{[^}]*===\s*"on"/.test(HTML));
+// 5 clients definidos (endpoint-only preservados)
 for (const c of ["updateUserSelfClient", "touchUserLastSeenClient", "adminSetUserStatusClient", "adminSetUserAdminClient", "deleteMyAccountClient"]) {
   ok("A3 client " + c + " definido", new RegExp("async function " + c + "\\(").test(HTML));
 }
 // clients usam authGetSession + Bearer
 ok("A4 clients usam authGetSession + Bearer", (HTML.match(/authGetSession\(\); if\(!s \|\| !s\.token\) return \{ ok:false, error:"unauthorized" \}/g) || []).length >= 5);
-// cada write migrado: ON -> client
-ok("A5 color ON->updateUserSelfClient", hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ const _r=await updateUserSelfClient\(\{color:hex\}\)/));
-ok("A6 reminderMinutes ON->updateUserSelfClient", hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ const _r=await updateUserSelfClient\(\{reminderMinutes:v\}\)/));
-ok("A7 photo ON->updateUserSelfClient", hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ const _r=await updateUserSelfClient\(\{photo:photoUrl\}\)/));
-ok("A8 photo-remove ON->updateUserSelfClient", hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ const _r=await updateUserSelfClient\(\{photo:""\}\)/));
-ok("A9 basic-data ON->updateUserSelfClient (name/phone/email; role fora)", hasHtml(/_selfPatch\.name=updates\.name/) && hasHtml(/delete updates\.role/));
-ok("A10 lastSeen ON->touchUserLastSeenClient", hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ touchUserLastSeenClient\(\)\.catch/));
-ok("A11 status ON->adminSetUserStatusClient", hasHtml(/adminSetUserStatusClient\(b\.dataset\.ap,"ativo"\)/));
-ok("A12 admin ON->adminSetUserAdminClient", hasHtml(/adminSetUserAdminClient\(b\.dataset\.adm,mk\)/));
-ok("A13 autoexclusão ON->deleteMyAccountClient", hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ const _r=await deleteMyAccountClient\(\)/));
-// cada write migrado: OFF -> fallback direto preservado
-ok("A14 fallback OFF color", hasHtml(/else\{ await db\.collection\("users"\)\.doc\(me\.id\)\.update\(\{color:hex\}\)/));
-ok("A15 fallback OFF status", hasHtml(/else\{ await db\.collection\("users"\)\.doc\(b\.dataset\.ap\)\.update\(\{status:"ativo"\}\)/));
-ok("A16 fallback OFF admin", hasHtml(/else\{ await db\.collection\("users"\)\.doc\(b\.dataset\.adm\)\.update\(\{admin:mk\}\)/));
-ok("A17 fallback OFF autoexclusão", hasHtml(/else\{ await db\.collection\("users"\)\.doc\(me\.id\)\.update\(\{\s*status:"excluido"/));
-// pass/salt: rehash legado pulado no modo ON
-ok("A18 rehash legado pulado no ON", hasHtml(/try\{ if\(!usersWriteEndpointsEnabled\(\)\)\{ const salt=randSalt\(\);/));
-// password: gate honra a nova flag
-ok("A19 changePassword honra nova flag", hasHtml(/if\(usersReadHardeningEnabled\(\) \|\| usersWriteEndpointsEnabled\(\)\)\{/));
+// cada write agora ENDPOINT-ONLY (sem guard if(usersWriteEndpointsEnabled()))
+ok("A5 color endpoint-only updateUserSelfClient", hasHtml(/const _r=await updateUserSelfClient\(\{color:hex\}\)/) && !hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ const _r=await updateUserSelfClient\(\{color:hex\}\)/));
+ok("A6 reminderMinutes endpoint-only", hasHtml(/const _r=await updateUserSelfClient\(\{reminderMinutes:v\}\)/));
+ok("A7 photo endpoint-only", hasHtml(/const _r=await updateUserSelfClient\(\{photo:photoUrl\}\)/));
+ok("A8 photo-remove endpoint-only", hasHtml(/const _r=await updateUserSelfClient\(\{photo:""\}\)/));
+ok("A9 basic-data endpoint-only updateUserSelfClient (name/phone/email; role fora)", hasHtml(/_selfPatch\.name=updates\.name/) && hasHtml(/delete updates\.role/));
+ok("A10 lastSeen endpoint-only touchUserLastSeenClient", hasHtml(/touchUserLastSeenClient\(\)\.catch\(function\(\)\{\}\);/) && !hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ touchUserLastSeenClient/));
+ok("A11 status endpoint-only adminSetUserStatusClient", hasHtml(/adminSetUserStatusClient\(b\.dataset\.ap,"ativo"\)/));
+ok("A12 admin endpoint-only adminSetUserAdminClient", hasHtml(/adminSetUserAdminClient\(b\.dataset\.adm,mk\)/));
+ok("A13 autoexclusão endpoint-only deleteMyAccountClient", hasHtml(/const _r=await deleteMyAccountClient\(\);/) && !hasHtml(/if\(usersWriteEndpointsEnabled\(\)\)\{ const _r=await deleteMyAccountClient/));
+// fallbacks OFF diretos em /users REMOVIDOS (U1) — devem estar AUSENTES
+ok("A14 sem fallback OFF color (removido U1)", !hasHtml(/update\(\{color:hex\}\)/));
+ok("A15 sem fallback OFF status (removido U1)", !hasHtml(/update\(\{status:"ativo"\}\)/));
+ok("A16 sem fallback OFF admin (removido U1)", !hasHtml(/update\(\{admin:mk\}\)/));
+ok("A17 sem fallback OFF autoexclusão (removido U1)", !hasHtml(/status:"excluido"/));
+// rehash legado client-side REMOVIDO (U1): login oficial server-side (loginUser) + notifVerifyPassword(djb2)
+ok("A18 rehash legado client-side removido (U1)", !hasHtml(/if\(!usersWriteEndpointsEnabled\(\)\)\{ const salt=randSalt\(\);/) && !hasHtml(/update\(\{pass:np,salt:salt\}\)/));
+// changePassword agora endpoint-only (changePasswordClient; sem flag/gate/fallback direto)
+ok("A19 changePassword endpoint-only", hasHtml(/var r = await changePasswordClient\(oldP, newP\);/) && !hasHtml(/if\(usersReadHardeningEnabled\(\) \|\| usersWriteEndpointsEnabled\(\)\)\{/) && !hasHtml(/update\(\{pass:newHash, salt:newSalt\}\)/));
 // nenhum token logado DENTRO dos corpos dos 5 clients novos (escopo restrito — não o arquivo todo)
 function clientBody(name){ const a=HTML.indexOf("async function "+name+"("); if(a<0) return ""; let d=0; for(let j=HTML.indexOf("{",a); j<HTML.length; j++){ const c=HTML[j]; if(c==="{")d++; else if(c==="}"){ d--; if(!d) return HTML.slice(a,j+1); } } return ""; }
 const _clientBodies=["updateUserSelfClient","touchUserLastSeenClient","adminSetUserStatusClient","adminSetUserAdminClient","deleteMyAccountClient"].map(clientBody).join("\n");

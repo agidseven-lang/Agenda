@@ -92,12 +92,12 @@ const H_ADMREQ = grab(FSRC, "authRequireAdminSession");
      /_selfPatch=\{\}/.test(SAVE) && /_selfPatch\.name=/.test(SAVE) && /_selfPatch\.phone=/.test(SAVE) && /_selfPatch\.email=/.test(SAVE)
      && !/_selfPatch\.role/.test(SAVE) && !/_selfPatch\.admin/.test(SAVE) && !/_selfPatch\.status/.test(SAVE));
   ok("8 ON: chama updateUserSelfClient(_selfPatch)", /updateUserSelfClient\(_selfPatch\)/.test(SAVE));
-  ok("9 OFF: write direto usa update(updates) allowlisted", /db\.collection\("users"\)\.doc\(me\.id\)\.update\(updates\)/.test(SAVE));
+  ok("9 self-save endpoint-only (U1: sem write direto update(updates))", !/db\.collection\("users"\)\.doc\(me\.id\)\.update\(updates\)/.test(SAVE) && /updateUserSelfClient\(_selfPatch\)/.test(SAVE));
   ok("10 nenhum update inline com role no self-save", !/\.update\(\{[^}]*role/.test(SAVE));
 
   // ---------- CLIENT: display + comportamentos preservados (11-18) ----------
   ok("11 role ainda projetado p/ EXIBICAO (normalizeRosterUser)", /role: str\(src\.role\)/.test(HSRC));
-  ok("12 users_write_endpoints default OFF preservado", /function usersWriteEndpointsEnabled\(\)\{ try\{ return lsGet\("users_write_endpoints"\)==="on"; \}catch\(_\)\{ return false; \} \}/.test(HSRC));
+  ok("12 users_write_endpoints default ON (U1)", /function usersWriteEndpointsEnabled\(\)\{ try\{ return lsGet\("users_write_endpoints"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
   ok("13 fcm_token_server default ON preservado", /function fcmTokenServerEnabled\(\)\{ try\{ return lsGet\("fcm_token_server"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
   ok("14 resetMyFcmTokensClient preservado", /async function resetMyFcmTokensClient\(/.test(HSRC));
   ok("15 cutover force-rereg preservado", /const rr2 = await resetMyFcmTokensClient\(\)/.test(HSRC));
