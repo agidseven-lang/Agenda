@@ -17,10 +17,10 @@
  *   - FCM cutoff preservado (resetMyFcmTokensClient; fcm_token_server default ON);
  *   - users_read_hardening default ON preservado;
  *   - RESIDUAIS: em U1 os fallbacks FCM OFF (force-rereg {fcmTokens:[],fcmTokenMeta:{}} e
- *       teardown arrayRemove(fcmTokenSaved)) ainda existiam; a U2 os CORTOU -> assercoes 27/28
- *       ATUALIZADAS em U2B p/ exigir a AUSENCIA + fluxo endpoint-only (reset/remove). Resta so
- *       o residual U3 (users_read_hardening OFF / push legado): cleanupDeadTokens
- *           arrayRemove.apply(null, deadTokens) [cross-user];
+ *       teardown arrayRemove(fcmTokenSaved)) ainda existiam; a U2 os CORTOU (27/28). O residual
+ *       U3 (cleanupDeadTokens cross-user / arrayRemove.apply(null, deadTokens)) tambem ja foi
+ *       CORTADO pela U3 -> assercao 29 ATUALIZADA em U3B p/ exigir a AUSENCIA + push-send
+ *       server-side (sendPushServerClient) como caminho unico;
  *   - inline JS valido (node --check do bloco <script> extraido).
  *
  * Prova (server, functions/index.js — inalterado): USER_SELF_UPDATE_KEYS sem
@@ -87,12 +87,12 @@ const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL " +
   ok("25 fcm_token_server default ON preservado", /function fcmTokenServerEnabled\(\)\{ try\{ return lsGet\("fcm_token_server"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
   ok("26 users_read_hardening default ON preservado", /function usersReadHardeningEnabled\(\)\{ try\{ return lsGet\("users_read_hardening"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
 
-  // ---------- CLIENT: fallbacks FCM OFF CORTADOS por U2 (endpoint-only); residual U3 preservado (27-29) ----------
+  // ---------- CLIENT: fallbacks FCM OFF (U2) + residual push (U3) CORTADOS; endpoint-only / server-side (27-29) ----------
   // F3.3.61-U2B: U2 removeu os 2 fallbacks diretos FCM OFF em /users. Antes 27/28 exigiam a
   // PRESENCA (residual U2); agora exigem a AUSENCIA do write direto + o caminho endpoint-only.
   ok("27 fallback FCM OFF force-rereg CORTADO por U2 (reset endpoint-only)", !HSRC.includes("update({ fcmTokens: [], fcmTokenMeta: {} })") && HSRC.includes("const rr2 = await resetMyFcmTokensClient();"));
   ok("28 fallback FCM OFF teardown arrayRemove CORTADO por U2 (remove endpoint-only)", !HSRC.includes("firebase.firestore.FieldValue.arrayRemove(fcmTokenSaved)") && HSRC.includes("await removeFcmTokenClient(fcmTokenSaved)"));
-  ok("29 residual U3 cleanupDeadTokens (read-hardening OFF / push legado) preservado", HSRC.includes("fcmTokens: firebase.firestore.FieldValue.arrayRemove.apply(null, deadTokens)"));
+  ok("29 push-send legado / cleanupDeadTokens cross-user CORTADO por U3 (sendPush server-side único)", !HSRC.includes("fcmTokens: firebase.firestore.FieldValue.arrayRemove.apply(null, deadTokens)") && !/async function cleanupDeadTokens\(/.test(HSRC) && /async function sendPushServerClient\(/.test(HSRC));
 
   // ---------- CLIENT: nenhum write direto single-line /users no client (U1+U2) (30) ----------
   // Apos U2 nao sobra NENHUM write single-line em /users no client (o force-rereg era o ultimo).
