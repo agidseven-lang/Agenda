@@ -5297,7 +5297,10 @@ async function sendPushServerClient(targetUids, payload){
    Endpoints ATIVOS (deploy F3.3.61-G), exceto deleteMyAccount (novo; ATIVO só após deploy futuro).
    ============================================================================ */
 const UW_BASE_DEFAULT = "https://us-central1-agenda-id-seven.cloudfunctions.net";
-/* Default OFF (inverso dos flags default-ON): só ON quando lsGet(...)==="on". */
+/* F3.3.61-U1: users_write_endpoints é DEFAULT ON (como fcm_token_server / users_read_hardening).
+   OFF ("off") é só um kill-switch local de diagnóstico/rollback visual e NÃO reativa fallback
+   direto em /users — as else-branches de escrita direta foram removidas na U1: os fluxos
+   users_write são endpoint-only. Semântica: null/ausente => true; "off" => false; catch => true. */
 function usersWriteEndpointsEnabled(){ try{ return lsGet("users_write_endpoints")!=="off"; }catch(_){ return true; } }
 function uwUrl(fn, key){ try{ const o=lsGet(key); if(o && /^https:\/\//.test(o)) return o; }catch(_){ } return UW_BASE_DEFAULT + "/" + fn; }
 /* POST updateUserSelf — perfil próprio (allowlist server: name/phone/email/color/photo/reminderMinutes). */
@@ -8440,7 +8443,7 @@ async function _setupPushNotificationsInternal(){
     var devId = getDeviceId();
     var platform = detectPlatform();
     var nowTs = Date.now();
-    var _dedupCount = 0, _finalCount = 0;
+    var _finalCount = 0;
     if(fcmTokenServerEnabled()){
       /* F3.3.21-B3.30: cutover FCM server-side (flag fcm_token_server ON). Registra via
          registerFcmToken (o servidor grava users/<uid> por Admin SDK com dedup por device);
@@ -8459,37 +8462,12 @@ async function _setupPushNotificationsInternal(){
          legado por transacao (evitaria tx.get em `users`). Token nao e salvo pelo caminho
          legado (degradado controlado); no cutover pareado (fcm_token_server ON) usa o servidor. */
       try{ _pushDbg("12-legacy-skip-hardening-on", "users_read_hardening ON sem fcm_token_server: save legado pulado (sem leitura crua de users)"); }catch(_){}
-    } else {
-    await savedDb.runTransaction(async function(tx){
-      var doc = await tx.get(userRef);
-      var d = (doc.exists ? doc.data() : {}) || {};
-      var existing = Array.isArray(d.fcmTokens) ? d.fcmTokens.filter(Boolean) : [];
-      var meta = (d.fcmTokenMeta && typeof d.fcmTokenMeta === "object") ? Object.assign({}, d.fcmTokenMeta) : {};
-
-      /* Tokens ANTIGOS deste mesmo device (exceto o atual) → serão removidos */
-      var sameDeviceOld = [];
-      Object.keys(meta).forEach(function(t){
-        if(meta[t] && meta[t].deviceId === devId && t !== token) sameDeviceOld.push(t);
-      });
-      _dedupCount = sameDeviceOld.length;
-
-      /* Nova lista de tokens: remove os do mesmo device + dedup com Set + garante o atual */
-      var nextTokens = existing.filter(function(t){ return sameDeviceOld.indexOf(t) < 0; });
-      if(nextTokens.indexOf(token) < 0) nextTokens.push(token);
-      nextTokens = Array.from(new Set(nextTokens.filter(Boolean)));
-      if(nextTokens.length > 5) nextTokens = nextTokens.slice(-5); /* limite de 5 devices */
-
-      /* Sincroniza meta: descarta entradas de tokens que saíram, atualiza/cria o atual */
-      sameDeviceOld.forEach(function(t){ delete meta[t]; });
-      Object.keys(meta).forEach(function(t){ if(nextTokens.indexOf(t) < 0) delete meta[t]; });
-      var prevCreated = (meta[token] && meta[token].createdAt) || nowTs;
-      meta[token] = { token: token, deviceId: devId, platform: platform, createdAt: prevCreated, lastSeenAt: nowTs };
-
-      _finalCount = nextTokens.length;
-      tx.set(userRef, { fcmTokens: nextTokens, fcmTokenMeta: meta }, { merge: true });
-    });
-    _pushDbg("12b-dedup-device", "device=" + devId + " (" + platform + "); removeu " + _dedupCount + " token(s) antigo(s) do mesmo aparelho; total agora=" + _finalCount);
     }
+    /* F3.3.61-U2: registro FCM legado via savedDb.runTransaction (tx.set de fcmTokens/fcmTokenMeta
+       em /users) REMOVIDO. O único caminho de escrita de token é o endpoint registerFcmToken
+       (fcm_token_server ON, padrão). Sem write direto/tx em /users no client; nem a flag OFF
+       reativa write direto (não há else). Com a flag OFF o token não é salvo por este caminho
+       (degradado controlado) — o cutover oficial é server-side. */
     fcmTokenSaved = token;
     fcmInitSucceeded = true;        /* [V63.94] marcador de sucesso definitivo */
     fcmInitInProgress = false;       /* [V63.94] libera */
@@ -8584,15 +8562,10 @@ async function teardownPushNotifications(){
         var _rem = await removeFcmTokenClient(fcmTokenSaved);
         if(!_rem || _rem.ok !== true){ try{ _pushDbg("teardown-server-remove-falhou", "removeMyFcmToken status=" + (_rem && _rem.status!=null ? _rem.status : "?") + " err=" + (_rem && _rem.error ? _rem.error : "?")); }catch(_){} }
       }catch(_){ try{ _pushDbg("teardown-server-remove-erro", "excecao generica"); }catch(_){} }
-    } else {
-      try{
-        var userRef = db.collection("users").doc(me.id);
-        /* arrayRemove atômico — não sobrescreve concorrência */
-        await userRef.update({
-          fcmTokens: firebase.firestore.FieldValue.arrayRemove(fcmTokenSaved)
-        });
-      }catch(_){ /* permissão negada ou outro erro — ignora */ }
     }
+    /* F3.3.61-U2: fallback direto (arrayRemove de fcmTokens em /users) REMOVIDO — a remoção do
+       token deste device é endpoint-only (removeMyFcmToken). Nem a flag OFF reativa write direto
+       (não há else). Com fcm_token_server OFF nada é removido por aqui (degradado controlado). */
   }
   /* Reseta TODO o estado do FCM no app — próximo login vai re-registrar */
   fcmTokenSaved = null;
@@ -10238,14 +10211,13 @@ function bindSettingsNotifications(){
       try{
         /* Apaga tokens do Firestore (e os metadados por device da V64.3) */
         if(me && db){
-          /* F3.3.61-R1: com fcm_token_server ON (padrão) limpa via endpoint self-only
-             resetMyFcmTokens — SEM write direto em /users. Fallback direto SOMENTE com a
-             flag OFF, enquanto /users create/update ainda estão abertos nas Rules. */
+          /* F3.3.61-U2: limpar tokens é endpoint-only (resetMyFcmTokens self-only). O fallback
+             direto update({fcmTokens:[],fcmTokenMeta:{}}) em /users foi REMOVIDO — nem a flag OFF
+             reativa write direto (não há else). Fail-closed: erro no endpoint lança e a UI mostra
+             o erro. Com fcm_token_server OFF não há reset via client; o re-registro abaixo ocorre. */
           if(fcmTokenServerEnabled()){
             const rr2 = await resetMyFcmTokensClient();
             if(!rr2 || rr2.ok!==true) throw new Error("reset_fcm_failed");
-          } else {
-            await db.collection("users").doc(me.id).update({ fcmTokens: [], fcmTokenMeta: {} });
           }
         }
         /* [V63.97] Desregistra o SW do FCM pra forçar um fresh start.
