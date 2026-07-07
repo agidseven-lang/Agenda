@@ -16,10 +16,10 @@
  *   - role hardening preservado (setRole read-only; self-save sem role/admin/status);
  *   - FCM cutoff preservado (resetMyFcmTokensClient; fcm_token_server default ON);
  *   - users_read_hardening default ON preservado;
- *   - RESIDUAIS fora do escopo de U1 preservados p/ U2/U3:
- *       U2 (fcm_token_server OFF): force-rereg {fcmTokens:[],fcmTokenMeta:{}} e
- *           teardown arrayRemove(fcmTokenSaved);
- *       U3 (users_read_hardening OFF / push legado): cleanupDeadTokens
+ *   - RESIDUAIS: em U1 os fallbacks FCM OFF (force-rereg {fcmTokens:[],fcmTokenMeta:{}} e
+ *       teardown arrayRemove(fcmTokenSaved)) ainda existiam; a U2 os CORTOU -> assercoes 27/28
+ *       ATUALIZADAS em U2B p/ exigir a AUSENCIA + fluxo endpoint-only (reset/remove). Resta so
+ *       o residual U3 (users_read_hardening OFF / push legado): cleanupDeadTokens
  *           arrayRemove.apply(null, deadTokens) [cross-user];
  *   - inline JS valido (node --check do bloco <script> extraido).
  *
@@ -87,15 +87,18 @@ const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL " +
   ok("25 fcm_token_server default ON preservado", /function fcmTokenServerEnabled\(\)\{ try\{ return lsGet\("fcm_token_server"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
   ok("26 users_read_hardening default ON preservado", /function usersReadHardeningEnabled\(\)\{ try\{ return lsGet\("users_read_hardening"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
 
-  // ---------- CLIENT: RESIDUAIS U2/U3 preservados (nao regressao) (27-29) ----------
-  ok("27 residual U2 force-rereg (fcm OFF) preservado", HSRC.includes("update({ fcmTokens: [], fcmTokenMeta: {} })"));
-  ok("28 residual U2 teardown arrayRemove (fcm OFF) preservado", HSRC.includes("fcmTokens: firebase.firestore.FieldValue.arrayRemove(fcmTokenSaved)"));
-  ok("29 residual U3 cleanupDeadTokens (read-hardening OFF) preservado", HSRC.includes("fcmTokens: firebase.firestore.FieldValue.arrayRemove.apply(null, deadTokens)"));
+  // ---------- CLIENT: fallbacks FCM OFF CORTADOS por U2 (endpoint-only); residual U3 preservado (27-29) ----------
+  // F3.3.61-U2B: U2 removeu os 2 fallbacks diretos FCM OFF em /users. Antes 27/28 exigiam a
+  // PRESENCA (residual U2); agora exigem a AUSENCIA do write direto + o caminho endpoint-only.
+  ok("27 fallback FCM OFF force-rereg CORTADO por U2 (reset endpoint-only)", !HSRC.includes("update({ fcmTokens: [], fcmTokenMeta: {} })") && HSRC.includes("const rr2 = await resetMyFcmTokensClient();"));
+  ok("28 fallback FCM OFF teardown arrayRemove CORTADO por U2 (remove endpoint-only)", !HSRC.includes("firebase.firestore.FieldValue.arrayRemove(fcmTokenSaved)") && HSRC.includes("await removeFcmTokenClient(fcmTokenSaved)"));
+  ok("29 residual U3 cleanupDeadTokens (read-hardening OFF / push legado) preservado", HSRC.includes("fcmTokens: firebase.firestore.FieldValue.arrayRemove.apply(null, deadTokens)"));
 
-  // ---------- CLIENT: nenhum write direto /users da familia users_write remanescente (30) ----------
-  // Sobra apenas 1 write single-line: o residual force-rereg (U2). Os arrayRemove (U2/U3) usam var refs.
+  // ---------- CLIENT: nenhum write direto single-line /users no client (U1+U2) (30) ----------
+  // Apos U2 nao sobra NENHUM write single-line em /users no client (o force-rereg era o ultimo).
+  // Os arrayRemove residuais (U3) usam var refs / .apply e nao casam o regex single-line.
   const singleLine = (HSRC.match(/collection\("users"\)\.doc\([^)]*\)\.(update|set|delete)\(/g) || []).length;
-  ok("30 writes diretos single-line /users == 1 (apenas residual force-rereg U2)", singleLine === 1);
+  ok("30 writes diretos single-line /users no client == 0 (U2 cortou o ultimo)", singleLine === 0);
 
   // ---------- SERVER: invariantes RBAC intactas + login legado (31-34) ----------
   const SELF = grabConst(FSRC, "USER_SELF_UPDATE_KEYS");
