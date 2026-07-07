@@ -130,9 +130,11 @@ const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL " +
   const ci = HSRC.indexOf("Apaga tokens do Firestore");
   const cut = ci >= 0 ? HSRC.slice(ci, ci + 800) : "";
   ok("22 force-rereg chama resetMyFcmTokensClient com fcm_token_server ON", /if\(fcmTokenServerEnabled\(\)\)\{[\s\S]*?const rr2 = await resetMyFcmTokensClient\(\)/.test(cut));
-  ok("23 write direto so no fallback OFF (else)", /\} else \{[\s\S]*?db\.collection\("users"\)\.doc\(me\.id\)\.update\(\{ fcmTokens: \[\], fcmTokenMeta: \{\} \}\)/.test(cut));
+  /* F3.3.61-U2B: U2 removeu o fallback direto force-rereg. 23/24 antes exigiam a PRESENCA do
+     write direto no ramo OFF (else); agora exigem a AUSENCIA + o fluxo endpoint-only/fail-closed. */
+  ok("23 force-rereg SEM fallback direto em /users (U2 cortou o else)", !/\} else \{[\s\S]*?update\(\{ fcmTokens: \[\], fcmTokenMeta: \{\} \}\)/.test(cut));
   const dwCount = (HSRC.match(/update\(\{ fcmTokens: \[\], fcmTokenMeta: \{\} \}\)/g) || []).length;
-  ok("24 nenhum write direto INCONDICIONAL (unico e gated)", dwCount === 1 && /if\(fcmTokenServerEnabled\(\)\)\{[\s\S]*?\} else \{[\s\S]*?update\(\{ fcmTokens: \[\], fcmTokenMeta: \{\} \}\)/.test(cut));
+  ok("24 force-rereg endpoint-only/fail-closed; ZERO write direto em /users (U2)", dwCount === 0 && /if\(fcmTokenServerEnabled\(\)\)\{[\s\S]*?const rr2 = await resetMyFcmTokensClient\(\);[\s\S]*?if\(!rr2 \|\| rr2\.ok!==true\) throw new Error\("reset_fcm_failed"\)/.test(cut));
   ok("25 fcm_token_server default ON preservado", /function fcmTokenServerEnabled\(\)\{ try\{ return lsGet\("fcm_token_server"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
   ok("26 users_write_endpoints default ON (U1)", /function usersWriteEndpointsEnabled\(\)\{ try\{ return lsGet\("users_write_endpoints"\)!=="off"; \}catch\(_\)\{ return true; \} \}/.test(HSRC));
   ok("27 deleteMyAccount intacto", grabH("deleteMyAccountClient").length > 0 && /async function handleDeleteMyAccount\(/.test(FSRC));
