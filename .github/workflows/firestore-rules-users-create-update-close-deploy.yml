@@ -1,0 +1,270 @@
+# =====================================================================
+# [manual] F3.3.61-T — Firestore Rules Deploy — FECHAR users create/update (GATED).
+# Fecha o client CREATE e UPDATE de /users (size()<60 -> if false) nas Rules LIVE de
+# PRODUCAO, usando o PADRAO SEGURO comprovado do users-read-close: download-live (GET)
+# -> patcher idempotente CIRURGICO (patch-firestore-users-create-update-close-rules.mjs)
+# -> validacao estrutural + matriz emulator local -> deploy SOMENTE firestore:rules via
+# firebase.ci.json efemero. workflow_dispatch only. dry_run=true por padrao =>
+# download/patch/validate/emulator, ZERO deploy, ZERO ruleset criado, ZERO release.
+# APPLY (dry_run=false) exige confirm_deploy == DEPLOY_RULES_USERS_CREATE_UPDATE_CLOSE
+# (aborta antes de tudo se nao bater). Checkout FIXO main (onde vive o patcher).
+# Pin do ruleset live esperado (prefixo owner-provided 0507d75f — ver nota) e do
+# patcher (sha256). Backup do ruleset live em artifact (rollback). NAO toca Hosting/
+# Functions/Storage/Database/indexes; NAO usa predeploy; NAO toca Firestore docs; NAO
+# usa usuario real; NAO usa gcloud secrets versions access; segredo (SA) nunca impresso.
+# Estrategia Opcao A (T-PLAN): preserva read=false, delete=false, usersPublic read=true/
+# write=false, catch-all deny. APPLY REAL somente em T3, apos dry-run/emulator GO e
+# janela anti-stale/autorizacao explicita. NESTA FASE (T1) o workflow e apenas CRIADO
+# — NAO e disparado.
+# =====================================================================
+name: "[manual] F3.3.61-T Firestore Rules — close users create/update"
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true = download/patch/validate/emulator (ZERO deploy/ruleset/release); false = deploy real das Rules"
+        required: true
+        type: boolean
+        default: true
+      confirm_deploy:
+        description: "Digite DEPLOY_RULES_USERS_CREATE_UPDATE_CLOSE para APPLY (ignorado em dry-run)"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firestore-rules-users-create-update-close
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  # Pin do ruleset LIVE esperado (PREFIXO). Valor owner-provided (T-PLAN: "0507d75f").
+  # CAMINHO A: NAO confirmavel do sandbox (sem acesso a Rules API); o T2-DRYRUN imprime
+  # o rulesetName real no step de download-live — RECONFIRMAR/atualizar este pin com
+  # auditoria fresca ANTES do T3-APPLY se divergir. Fail-closed: se a producao nao casar
+  # com o prefixo, ABORTA (sem patch as cegas).
+  PINNED_LIVE_RULESET: "0507d75f"
+  # Pin do patcher validado (T1: node --check + teste 17/17 + patch real sobre o snapshot
+  # live users-read-closed.preview.rules => diff cirurgico de 2 linhas). Aborta se divergir.
+  PINNED_PATCHER_SHA256: "bac1d09f26b18b6220a7466b4f1dfa8602705f5ae4fd4778dc98d8ad5e6f53fb"
+  PATCHER: "scripts/worker-ops/patch-firestore-users-create-update-close-rules.mjs"
+  PATCHER_TEST: "scripts/worker-ops/f3361t1-firestore-users-create-update-close-rules-patch.test.mjs"
+  EMU_MATRIX: "ops/f3361t1-users-create-update-close/emulator-matrix.mjs"
+
+jobs:
+  rules-users-create-update-close:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: "Guard APPLY (confirm_deploy se dry_run=false)"
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CONFIRM: ${{ github.event.inputs.confirm_deploy }}
+        run: |
+          set -eu
+          if [ "$DRY_RUN" = "false" ]; then
+            if [ "$CONFIRM" != "DEPLOY_RULES_USERS_CREATE_UPDATE_CLOSE" ]; then
+              echo "::error:: APPLY (dry_run=false) exige confirm_deploy=DEPLOY_RULES_USERS_CREATE_UPDATE_CLOSE"; exit 1
+            fi
+            echo "APPLY confirmado."
+          else
+            echo "DRY-RUN (default) — download/patch/validate/emulator; ZERO deploy/ruleset/release."
+          fi
+
+      - name: "Checkout (ref FIXO main)"
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: "Confirmar patcher + teste + matriz + PIN do patcher (sha256)"
+        run: |
+          set -eu
+          test -f "$PATCHER" || { echo "::error:: patcher ausente: $PATCHER"; exit 1; }
+          test -f "$PATCHER_TEST" || { echo "::error:: teste ausente: $PATCHER_TEST"; exit 1; }
+          test -f "$EMU_MATRIX" || { echo "::error:: matriz emulator ausente: $EMU_MATRIX"; exit 1; }
+          GOT="$(sha256sum "$PATCHER" | awk '{print $1}')"
+          if [ "$GOT" != "$PINNED_PATCHER_SHA256" ]; then
+            echo "::error:: patcher sha256 divergente ($GOT != $PINNED_PATCHER_SHA256) — patcher nao-validado; abortando"; exit 1
+          fi
+          echo "Patcher pin OK ($GOT)."
+
+      - name: "Setup Node 20"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "Prechecks (node --check + teste unitario/estrutural)"
+        run: |
+          set -eu
+          node --check "$PATCHER"
+          node --check "$PATCHER_TEST"
+          node "$PATCHER_TEST"
+          echo "Prechecks OK (patcher + teste 17/17)."
+
+      - name: "Auth gcloud (SA via secret -> arquivo temporario; nunca impresso)"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          echo "SA ativada (valor nao impresso)."
+
+      - name: "Baixar Rules LIVE (GET read-only) + backup + PIN do ruleset + sanidade pre-patch"
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" -o release-before.json \
+            || { echo "::error:: GET release falhou (403/sem capacidade) — NO-GO"; exit 1; }
+          RULESET="$(jq -r '.rulesetName' release-before.json)"
+          UPDATED="$(jq -r '.updateTime' release-before.json)"
+          [ -n "$RULESET" ] && [ "$RULESET" != "null" ] || { echo "::error:: rulesetName ausente."; exit 1; }
+          echo "RULESET_BEFORE=$RULESET" >> "$GITHUB_ENV"
+          echo "rulesetBefore=$RULESET updateTime=$UPDATED"
+          # PIN (prefixo): aborta se o ruleset live nao contiver o prefixo esperado — sem patch as cegas.
+          case "$RULESET" in
+            *"/rulesets/$PINNED_LIVE_RULESET"*) echo "Pin (prefixo) do ruleset live OK." ;;
+            *) echo "::error:: ruleset live ($RULESET) != pin prefixo ($PINNED_LIVE_RULESET) — reconfirmar auditoria fresca (T2) antes do APPLY; abortando"; exit 1 ;;
+          esac
+          curl -fsS -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/${RULESET}" -o ruleset.json \
+            || { echo "::error:: GET ruleset falhou."; exit 1; }
+          jq -r '.source.files[].content' ruleset.json > firestore.rules.live
+          [ -s firestore.rules.live ] || { echo "::error:: firestore.rules.live vazio."; exit 1; }
+          cp firestore.rules.live "firestore.rules.backup-pre-${GITHUB_SHA}"
+          LIVE_SHA="$(sha256sum firestore.rules.live | awk '{print $1}')"
+          echo "live: $(wc -l < firestore.rules.live) linhas, $(wc -c < firestore.rules.live) bytes, sha256 ${LIVE_SHA}"
+          # Sanidade pre-patch: usersPublic e catch-all presentes; existe exatamente 1 bloco /users.
+          grep -q 'match /usersPublic/{uid}' firestore.rules.live || { echo "::error:: usersPublic ausente no live — abortando"; exit 1; }
+          grep -q 'match /{document=\*\*}' firestore.rules.live || { echo "::error:: catch-all ausente no live — abortando"; exit 1; }
+          test "$(grep -c 'match /users/{id}' firestore.rules.live)" = "1" || { echo "::error:: esperado 1 bloco /users no live — abortando"; exit 1; }
+
+      - name: "Patch (patcher cirurgico sobre o live-download) + validacao estrutural"
+        run: |
+          set -eu
+          node "$PATCHER" firestore.rules.live firestore.rules.generated patch-report.json
+          STATUS="$(jq -r '.status' patch-report.json)"
+          echo "patcher status=$STATUS changedLines=$(jq -r '.changedLines' patch-report.json)"
+          # Fresh-close esperado: status=patched (troca create/update size()<60 -> false).
+          # already_closed => /users create/update ja fechado inesperadamente => NO-GO (rever T-PLAN/pin).
+          [ "$STATUS" = "patched" ] || { echo "::error:: patcher status=$STATUS (esperado 'patched'; /users create/update ja fechado?) — abortando"; exit 1; }
+          # Diff estrutural: exatamente 2 linhas logicas diferentes (create+update de /users) => 4 marcadores.
+          DIFF="$(diff firestore.rules.live firestore.rules.generated | grep -cE '^[<>]' || true)"
+          [ "$DIFF" = "4" ] || { echo "::error:: diff != 2 linhas logicas (encontrado $DIFF marcadores) — abortando"; exit 1; }
+          echo "===== diff (esperado: SO /users create+update size()<60 -> false) ====="; diff -u firestore.rules.live firestore.rules.generated || true
+          # /users: create/update fechados; read/delete preservados if false
+          U="$(awk '/match \/users\/\{id\}/{f=1} f{print} /^    \}/{if(f)exit}' firestore.rules.generated)"
+          echo "$U" | grep -q 'allow create: if false;' || { echo "::error:: /users create nao ficou if false"; exit 1; }
+          echo "$U" | grep -q 'allow update: if false;' || { echo "::error:: /users update nao ficou if false"; exit 1; }
+          echo "$U" | grep -qE 'allow (create|update): if request.resource.data.size\(\) < 60;' && { echo "::error:: /users ainda tem create/update size()<60"; exit 1; } || true
+          echo "$U" | grep -q 'allow read: if false;' || { echo "::error:: /users read deixou de ser if false"; exit 1; }
+          echo "$U" | grep -q 'allow delete: if false;' || { echo "::error:: /users delete deixou de ser if false"; exit 1; }
+          # usersPublic + notifPrefs + catch-all preservados
+          grep -q 'match /usersPublic/{uid}' firestore.rules.generated || { echo "::error:: usersPublic sumiu"; exit 1; }
+          grep -q 'match /notifPrefs/{uid}' firestore.rules.generated || { echo "::error:: notifPrefs sumiu"; exit 1; }
+          grep -q 'match /{document=\*\*}' firestore.rules.generated || { echo "::error:: catch-all sumiu"; exit 1; }
+          # contagem de blocos match e chaves preservadas
+          MI="$(grep -cE '^\s*match\s+/' firestore.rules.live)"; MO="$(grep -cE '^\s*match\s+/' firestore.rules.generated)"
+          [ "$MI" = "$MO" ] || { echo "::error:: contagem de match mudou ($MI -> $MO)"; exit 1; }
+          OB="$(grep -o '{' firestore.rules.generated | wc -l)"; CB="$(grep -o '}' firestore.rules.generated | wc -l)"
+          [ "$OB" = "$CB" ] || { echo "::error:: chaves desbalanceadas ($OB vs $CB)"; exit 1; }
+          echo "Validacao estrutural OK (so /users create+update fecharam; read/delete/usersPublic/demais intactos)."
+
+      - name: "Setup Java 21 (Temurin) para o Firestore Emulator"
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: "Validacao emulator (matriz local; NAO cria ruleset de producao)"
+        run: |
+          set -eu
+          WORK="$RUNNER_TEMP/emu"; mkdir -p "$WORK"
+          cp firestore.rules.live "$WORK/pre.rules"
+          cp firestore.rules.generated "$WORK/post.rules"
+          cp "$EMU_MATRIX" "$WORK/matrix.mjs"
+          cd "$WORK"
+          printf '%s' '{"name":"emu","private":true,"type":"module","version":"1.0.0"}' > package.json
+          printf '%s' '{"firestore":{"rules":"post.rules"},"emulators":{"firestore":{"port":8080},"ui":{"enabled":false},"singleProjectMode":false}}' > firebase.json
+          printf '%s' '{"projects":{"default":"demo-users-create-update-close"}}' > .firebaserc
+          npm install --no-audit --no-fund firebase-tools@latest @firebase/rules-unit-testing@latest firebase@latest >/dev/null 2>&1
+          PRE_RULES="$WORK/pre.rules" POST_RULES="$WORK/post.rules" \
+            npx firebase emulators:exec --only firestore --project demo-users-create-update-close "node matrix.mjs"
+          echo "Matriz emulator OK (contra o live-download patchado)."
+
+      - name: "Notas de rollback"
+        run: |
+          set -eu
+          cat > rollback-notes.md <<NOTES
+          # Rollback — fechamento de users create/update (F3.3.61-T)
+          - Ruleset ANTERIOR (rollback source): ${RULESET_BEFORE}
+          - Rollback imediato (sem recompilar): re-liberar o ruleset anterior por nome via
+            Firebase Rules API (releases/cloud.firestore -> ${RULESET_BEFORE}).
+          - Rollback alternativo: redeploy do backup 'firestore.rules.backup-pre-${GITHUB_SHA}'
+            (artifact) via 'firebase deploy --only firestore:rules'.
+          - ATENCAO acoplamento Hosting<->Rules: um rollback do Hosting para S6D com estas
+            Rules fechadas pode quebrar fluxos de bundles antigos com fallback direto em /users
+            => reabrir Rules de forma COORDENADA se o Hosting for revertido.
+          - Validar Web live (login canario/usersPublic/updateUserSelf) apos rollback.
+          - NAO tocar Hosting/Functions durante rollback.
+          NOTES
+          echo "rollback-notes.md gerado."
+
+      - name: "Deploy Rules (SOMENTE se dry_run=false; APENAS firestore:rules)"
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          # Config efemera hosting/functions/storage/database/indexes/predeploy-FREE.
+          printf '%s\n' '{"firestore":{"rules":"firestore.rules.generated"}}' > firebase.ci.json
+          # Self-audit da config efemera: SOMENTE firestore.rules.
+          node -e "const d=require('./firebase.ci.json'); const k=Object.keys(d); if(k.length!==1||k[0]!=='firestore') throw 'ci.json fora de firestore'; const fk=Object.keys(d.firestore); if(fk.length!==1||fk[0]!=='rules') throw 'firestore fora de rules'; if(d.hosting||d.functions||d.storage||d.database||d.firestore.indexes||d.firestore.predeploy) throw 'escopo proibido na ci.json'; console.log('ci.json firestore:rules-only OK')"
+          npm install -g firebase-tools >/dev/null 2>&1
+          echo "DEPLOY real — SOMENTE firestore:rules"
+          firebase deploy --only firestore:rules --project "$GCP_PROJECT" --config firebase.ci.json --non-interactive
+
+      - name: "Postcheck (SOMENTE se dry_run=false; metadados read-only)"
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" -o release-after.json
+          RULESET_AFTER="$(jq -r '.rulesetName' release-after.json)"; UPDATED="$(jq -r '.updateTime' release-after.json)"
+          echo "rulesetBefore=$RULESET_BEFORE rulesetAfter=$RULESET_AFTER updateTime=$UPDATED"
+          curl -fsS -H "Authorization: Bearer $TOKEN" "https://firebaserules.googleapis.com/v1/${RULESET_AFTER}" | jq -r '.source.files[].content' > firestore.rules.active
+          U="$(awk '/match \/users\/\{id\}/{f=1} f{print} /^    \}/{if(f)exit}' firestore.rules.active)"
+          echo "$U" | grep -q 'allow create: if false;' || { echo "::error:: pos-deploy: /users create nao ficou if false"; exit 1; }
+          echo "$U" | grep -q 'allow update: if false;' || { echo "::error:: pos-deploy: /users update nao ficou if false"; exit 1; }
+          echo "$U" | grep -q 'allow read: if false;' || { echo "::error:: pos-deploy: /users read deixou de ser if false"; exit 1; }
+          echo "$U" | grep -q 'allow delete: if false;' || { echo "::error:: pos-deploy: /users delete deixou de ser if false"; exit 1; }
+          grep -q 'match /usersPublic/{uid}' firestore.rules.active || { echo "::error:: pos-deploy: usersPublic ausente"; exit 1; }
+          grep -q 'match /notifPrefs/{uid}' firestore.rules.active || { echo "::error:: pos-deploy: notifPrefs ausente"; exit 1; }
+          grep -q 'match /{document=\*\*}' firestore.rules.active || { echo "::error:: pos-deploy: catch-all ausente"; exit 1; }
+          echo "POSTCHECK OK: /users create+update FECHADOS; read/delete/usersPublic/notifPrefs/catch-all preservados."
+
+      - name: "Upload artifacts (backup/live/patched/report/rollback; sem secrets)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: users-create-update-close-rules-${{ github.run_id }}
+          path: |
+            release-before.json
+            firestore.rules.backup-pre-*
+            firestore.rules.live
+            firestore.rules.generated
+            patch-report.json
+            rollback-notes.md
+            release-after.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: "Limpeza (SA + ci.json + temporarios)"
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" firebase.ci.json firestore.rules.active 2>/dev/null || true
