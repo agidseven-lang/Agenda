@@ -8694,10 +8694,11 @@ async function sendPushToUsers(userIds, payload){
     try{ console.error("[PUSH-SEND falha] " + reason, info || ""); }catch(_){}
   }
 
-  /* F3.3.50-B users-read-hardening: com a flag ON, NÃO lê users cru p/ tokens nem usa o Worker
-     relay — delega ao endpoint server-side sendPush (lookup de tokens + envio FCM + limpeza de
-     dead tokens no servidor). O client não recebe/manuseia tokens de terceiros. OFF (padrão): o
-     caminho legado abaixo fica 100% intacto. */
+  /* F3.3.61-U3: envio de push é ENDPOINT-ONLY server-side (sendPush). O client delega ao endpoint
+     (lookup de tokens + envio FCM + limpeza de dead tokens no servidor); NÃO lê tokens em /users,
+     NÃO usa o Worker relay legado e NÃO limpa dead tokens. O caminho legado client-side foi
+     REMOVIDO — nem users_read_hardening OFF o reativa. Fail-closed: erro no endpoint só loga
+     (best-effort), sem fallback client-side / write direto em /users. */
   if(usersReadHardeningEnabled()){
     if(!payload || !payload.title){ _sendFail("Payload sem título"); return; }
     var _spIds = (Array.isArray(userIds) ? userIds : [userIds]).filter(function(v, i, a){ return v && a.indexOf(v) === i; });
@@ -8714,137 +8715,6 @@ async function sendPushToUsers(userIds, payload){
       else { _sendFail("sendPush server-side", (_r && _r.error) || "erro"); }
     }catch(e){ _sendFail("sendPush server-side exception", e && (e.message || e)); }
     return;
-  }
-
-  if(!PUSH_WORKER_URL){ _sendFail("Worker URL não configurado"); return; }
-  if(!payload || !payload.title){ _sendFail("Payload sem título"); return; }
-  var ids = Array.isArray(userIds) ? userIds : [userIds];
-  /* Dedup IDs */
-  ids = ids.filter(function(v, i, a){ return v && a.indexOf(v) === i; });
-  if(!ids.length){ _sendFail("Nenhum ID de usuário recebido"); return; }
-
-  _sendDbg("Iniciando para " + ids.length + " usuário(s)");
-
-  /* [V64.1] FRESH TOKEN FETCH: busca o doc de cada user DIRETAMENTE do Firestore.
-     Antes (V63.x): pegava de `users` em memória, que pode estar atrasado.
-     Agora: fetch direto da fonte da verdade. Custa N reads (1 por destinatário),
-     mas garante que estamos enviando pros tokens REAIS, não pros cacheados.
-     Se a leitura do Firestore falhar pra um user específico, cai no fallback
-     do cache em memória pra esse user específico. */
-  var tokens = [];
-  var tokenToUserId = {};  /* mapeia token → uid pra cleanup direcionado depois */
-  var usersWithoutToken = [];  /* pra log explícito */
-
-  for(var i = 0; i < ids.length; i++){
-    var uid = ids[i];
-    var freshTokens = null;
-    try{
-      if(db && !usersReadHardeningEnabled()){ /* F3.3.28: com a flag ON, nao le `users` cru p/ tokens (cai no cache em memoria) */
-        var snap = await db.collection("users").doc(uid).get();
-        if(snap.exists){
-          var data = snap.data() || {};
-          if(Array.isArray(data.fcmTokens)) freshTokens = data.fcmTokens.filter(Boolean);
-        }
-      }
-    }catch(eFetch){
-      _sendDbg("Falha ao ler doc fresco de " + uid + " (fallback pro cache): " + (eFetch && eFetch.message || eFetch));
-    }
-    /* Fallback: se não conseguiu ler do Firestore, usa cache em memória */
-    if(!freshTokens){
-      var u = users.find(function(x){ return x.id === uid; });
-      freshTokens = (u && Array.isArray(u.fcmTokens)) ? u.fcmTokens.filter(Boolean) : [];
-    }
-    if(!freshTokens.length){
-      var uName = (users.find(function(x){ return x.id === uid; }) || {}).name || uid;
-      usersWithoutToken.push(uName + " (" + uid + ")");
-      continue;
-    }
-    freshTokens.forEach(function(t){
-      if(!t || tokens.indexOf(t) >= 0) return;
-      tokens.push(t);
-      tokenToUserId[t] = uid;
-    });
-  }
-
-  /* [V64.1] Log explícito: quem está sem token (item #3 do briefing) */
-  if(usersWithoutToken.length > 0){
-    _sendDbg("⚠ Sem token registrado: " + usersWithoutToken.join(", "));
-  }
-
-  if(!tokens.length){
-    _sendDbg("Nenhum token nos destinatários — push pulado");
-    return;
-  }
-
-  _sendDbg("Chamando Worker com " + tokens.length + " token(s) (fresh do Firestore)");
-  /* [V63.73] Normaliza payload: aceita tag/url tanto no nível de cima quanto dentro de data.
-     Antes, chamadas como sendPushToUsers([id], {tag:"...", url:"..."}) tinham tag/url
-     ignorados — só era lido payload.data. Resultado: push chegava mas sem deep link. */
-  var normalizedData = Object.assign({}, payload.data || {});
-  if(payload.tag && !normalizedData.tag) normalizedData.tag = payload.tag;
-  if(payload.url && !normalizedData.url) normalizedData.url = payload.url;
-  try{
-    var res = await fetch(PUSH_WORKER_URL, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        tokens: tokens,
-        title: payload.title,
-        body: payload.body || "",
-        data: normalizedData
-      })
-    });
-    var txt = "";
-    try{ txt = await res.text(); }catch(_){}
-    _sendDbg("Worker respondeu status=" + res.status);
-    /* [V63.96] FIX CRÍTICO: NÃO retornar prematuro se status ≥ 400.
-       Antes: erro de Worker → return → tokens mortos nunca eram limpos do Firestore.
-       Agora: registra o fail mas SEGUE pro bloco de cleanup. Worker V63.96 retorna 200 sempre,
-       mas mantemos esse fallback caso Worker antigo retorne 502 (todos tokens UNREGISTERED). */
-    if(res.status >= 400){
-      _sendFail("Worker HTTP " + res.status, txt.substring(0,300));
-      /* NÃO returns aqui — segue pro auto-cleanup abaixo */
-    }
-
-    /* [V63.13] AUTO-LIMPEZA: o Worker retorna detalhes por token; se algum
-       falhou com NotRegistered/InvalidArgument, removemos do Firestore
-       automaticamente (best-effort — pode falhar por permissões).
-       [V64.1] AGORA usa tokenToUserId pra fazer cleanup DIRECIONADO — remove o token
-       morto SÓ do user que tinha esse token, não de todos os destinatários.
-       Antes: arrayRemove em TODOS os ids — desnecessário e poluído. */
-    try{
-      var parsed = JSON.parse(txt);
-      if(parsed && Array.isArray(parsed.results)){
-        var deadByUser = {};  /* uid → [tokens mortos desse user] */
-        parsed.results.forEach(function(r, idx){
-          if(!r || r.ok) return;
-          var resp = String(r.response || "");
-          var isDead = resp.indexOf("NotRegistered") >= 0
-                    || resp.indexOf("UNREGISTERED") >= 0
-                    || resp.indexOf("InvalidArgument") >= 0
-                    || resp.indexOf("INVALID_ARGUMENT") >= 0
-                    || (r.status === 404);
-          if(isDead && tokens[idx]){
-            var deadToken = tokens[idx];
-            var deadUid = tokenToUserId[deadToken];
-            if(deadUid){
-              if(!deadByUser[deadUid]) deadByUser[deadUid] = [];
-              deadByUser[deadUid].push(deadToken);
-            }
-          }
-        });
-        var totalDead = 0;
-        Object.keys(deadByUser).forEach(function(uid){
-          totalDead += deadByUser[uid].length;
-          cleanupDeadTokens([uid], deadByUser[uid]);
-        });
-        if(totalDead > 0){
-          _sendDbg("Removendo " + totalDead + " token(s) morto(s) (direcionado por user)");
-        }
-      }
-    }catch(_){ /* parse falhou — sem cleanup, sem problema */ }
-  }catch(e){
-    _sendFail("Erro de rede ao chamar Worker", e && e.message);
   }
 }
 
@@ -8896,27 +8766,10 @@ async function triggerPush(eventType, recipients, payload){
   }
 }
 
-/* [V63.13] Remove tokens mortos do Firestore dos usuários afetados.
-   Best-effort — falha silenciosa se permissões não permitirem (ex: usuário
-   tentando alterar doc de outro usuário sem ser admin).
-   [V63.96] FIX RACE CONDITION: usa arrayRemove atômico em vez de read-modify-write.
-   Antes: se outro device salvasse token novo ENQUANTO esse cleanup rodava, podia
-   sobrescrever a lista e perder o token novo. arrayRemove é atômico server-side. */
-async function cleanupDeadTokens(userIds, deadTokens){
-  if(!db || !Array.isArray(userIds) || !Array.isArray(deadTokens) || !deadTokens.length) return;
-  for(var i = 0; i < userIds.length; i++){
-    var uid = userIds[i];
-    if(!uid) continue;
-    try{
-      var ref = db.collection("users").doc(uid);
-      /* arrayRemove aceita N argumentos — remove todos os tokens mortos atomicamente */
-      await ref.update({
-        fcmTokens: firebase.firestore.FieldValue.arrayRemove.apply(null, deadTokens)
-      });
-      try{ console.log("[PUSH-SEND] Removeu " + deadTokens.length + " token(s) morto(s) de " + uid + " (arrayRemove atômico)"); }catch(_){}
-    }catch(_){ /* permissão negada ou outro erro — ignora */ }
-  }
-}
+/* F3.3.61-U3: cleanupDeadTokens(userIds, deadTokens) REMOVIDO — era o último write cross-user
+   DIRETO em /users no client (arrayRemove de fcmTokens no doc de outro uid). A limpeza de dead
+   tokens agora é 100% server-side (o endpoint sendPush faz lookup + envio + limpeza). O client
+   nunca escreve /users de terceiros. */
 
 /* === Helper: descobre IDs dos administradores/gestores (recipient quando cliente aprova) ===
    [V63.96] FIX: agora filtra por isUserActive — antes incluía admins com status pendente/removido */
