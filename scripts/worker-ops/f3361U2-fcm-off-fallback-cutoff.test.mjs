@@ -22,8 +22,9 @@
  *   - role hardening preservado (setRole read-only; self-save sem role/admin/status);
  *   - resetMyFcmTokensClient + cutover (const rr2) preservados;
  *   - users_read_hardening default ON preservado;
- *   - RESIDUAL U3 preservado e classificado (NAO regressao U2): push-send legado +
- *     cleanupDeadTokens cross-user (arrayRemove.apply(null, deadTokens)) intactos.
+ *   - RESIDUAL U3 (push-send legado + cleanupDeadTokens cross-user / arrayRemove.apply): em U2
+ *     ficava preservado; a U3 o CORTOU -> assercoes 6/22/23 ATUALIZADAS em U3B p/ exigir a
+ *     AUSENCIA; push-send passa a ser endpoint-only server-side (sendPushServerClient).
  *
  * Prova (server, functions/index.js — inalterado): endpoints registerFcmToken /
  *   removeMyFcmToken / resetMyFcmTokens existem.
@@ -60,15 +61,15 @@ const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL " +
   const singleLine = (HSRC.match(/collection\("users"\)\.doc\([^)]*\)\.(update|set|delete)\(/g) || []).length;
   ok("5 writes diretos single-line /users no client == 0 (nada da familia users_write/FCM sobra)", singleLine === 0);
 
-  // ---------- CLIENT: unico write /users com fcmTokens e a forma U3 apply (6) ----------
-  // Qualquer linha de codigo (nao-comentario) que escreve fcmTokens em /users deve ser
-  // exclusivamente o cleanupDeadTokens (U3, cross-user, arrayRemove.apply).
+  // ---------- CLIENT: ZERO write /users com fcmTokens no client (U3 cortou o residual) (6) ----------
+  // Apos U3 nenhuma linha de codigo (nao-comentario) escreve fcmTokens em /users: os fallbacks
+  // FCM OFF (U2) e o cleanupDeadTokens cross-user (U3, arrayRemove.apply) foram todos removidos.
   const fcmWriteLines = HSRC.split("\n").filter((l) => {
     const t = l.trim();
     if (t.startsWith("/*") || t.startsWith("*") || t.startsWith("//")) return false; // ignora comentario
     return /firebase\.firestore\.FieldValue\.arrayRemove/.test(l) || /\.(update|set)\(\{[^}]*fcmToken/.test(l) || /tx\.set\([^)]*fcmToken/.test(l);
   });
-  ok("6 unico write /users c/ fcmTokens no client e o residual U3 (arrayRemove.apply)", fcmWriteLines.length === 1 && /arrayRemove\.apply\(null, deadTokens\)/.test(fcmWriteLines[0]));
+  ok("6 ZERO write /users c/ fcmTokens no client (U3 cortou cleanupDeadTokens/arrayRemove.apply)", fcmWriteLines.length === 0);
 
   // ---------- CLIENT: fluxos FCM endpoint-only / fail-closed (7-11) ----------
   ok("7 teardown endpoint-only: removeFcmTokenClient chamado", HSRC.includes("await removeFcmTokenClient(fcmTokenSaved)"));
@@ -102,10 +103,12 @@ const ok = (n, c) => { if (c) { pass++; } else { fail++; console.error("FAIL " +
   ok("20 role hardening: setRole read-only", HSRC.includes('field("setRole", "Função na agência", me.role, "text", "Definida pelo administrador", true)'));
   ok("21 role hardening: self-save delete role/admin/status", HSRC.includes("delete updates.role; delete updates.admin; delete updates.status;"));
 
-  // ---------- CLIENT: RESIDUAL U3 preservado e classificado (22-24) ----------
-  ok("22 residual U3: cleanupDeadTokens (cross-user) definido", /async function cleanupDeadTokens\(userIds, deadTokens\)/.test(HSRC));
-  ok("23 residual U3: arrayRemove.apply(null, deadTokens) preservado", HSRC.includes("fcmTokens: firebase.firestore.FieldValue.arrayRemove.apply(null, deadTokens)"));
-  ok("24 residual U3: push-send legado (marcadores) preservado", HSRC.includes("[PUSH-SEND]") && /function _sendDbg\(/.test(HSRC));
+  // ---------- CLIENT: residual U3 CORTADO por U3 (push-send server-side único) (22-24) ----------
+  // F3.3.61-U3B: a U3 removeu cleanupDeadTokens + arrayRemove.apply; 22/23 antes exigiam a
+  // PRESENCA; agora exigem a AUSENCIA + push-send endpoint-only (sendPushServerClient).
+  ok("22 cleanupDeadTokens (cross-user) REMOVIDO por U3 + sendPush server-side preservado", !/async function cleanupDeadTokens\(/.test(HSRC) && /async function sendPushServerClient\(/.test(HSRC));
+  ok("23 arrayRemove.apply(null, deadTokens) REMOVIDO por U3 (sem write cross-user em /users)", !HSRC.includes("fcmTokens: firebase.firestore.FieldValue.arrayRemove.apply(null, deadTokens)"));
+  ok("24 marcadores _sendDbg/[PUSH-SEND] preservados no fluxo server-side (não é legado)", HSRC.includes("[PUSH-SEND]") && /function _sendDbg\(/.test(HSRC));
 
   // ---------- SERVER: endpoints FCM intactos (25) ----------
   for (const fn of ["registerFcmToken", "removeMyFcmToken", "resetMyFcmTokens"]) {
