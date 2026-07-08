@@ -168,6 +168,14 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(hRas.includes('kbv2-themes-ph') && hRas.includes('Tema 1 — a definir') && hRas.includes('Tema 3 — a definir'), 'F1a: rascunho interno tem Temas estruturados "a definir"');
   ok(hRas.includes('kbv2-hint') && hRas.includes('liberar o <b>envio ao cliente</b>'), 'F1b: rascunho interno tem hint do Card Premium');
   ok(hRas.includes('data-card-renderer="canonical-board-card"') && hRas.includes('kbv2-card-rail') && hRas.includes('Etapa atual'), 'F1c: rascunho segue 100% canônico');
+  const nuncaTocado = { id: 'CN', title: 'Cronograma semanal — QA', client: 'Cliente QA', sector: 'cronograma', status: 'afazer', by: 'u1', createdAt: 1751970000000, checklist: [] };
+  const hNt = M.kbv2Card(nuncaTocado);
+  ok(hNt.includes('kbv2-themes-ph') && hNt.includes('Tema 1 — a definir') && hNt.includes('Tema 3 — a definir'), 'F1d: cronograma NUNCA-TOCADO (sem cronContents) tem Temas estruturados "a definir"');
+  ok(hNt.includes('kbv2-hint') && hNt.includes('data-card-renderer="canonical-board-card"') && hNt.includes('kbv2-card-rail'), 'F1e: nunca-tocado tem hint premium e segue canônico');
+  const hNtCli = M.kbv2Card(nuncaTocado, 'client');
+  ok(!hNtCli.includes('a definir') && !hNtCli.includes('kbv2-hint'), 'F1f: nunca-tocado na visão do CLIENTE sem placeholder/hint');
+  const aNt = M.detailActionsHtml(nuncaTocado, { actions: ['edit', 'sendclient'] });
+  ok(aNt.includes('det-hero-locked') && aNt.includes('disabled'), 'F1g: nunca-tocado → botão premium BLOQUEADO com explicação');
   const hCli = M.kbv2Card(rascunho, 'client');
   ok(!hCli.includes('a definir') && !hCli.includes('kbv2-hint') && !hCli.includes('kbv2-themes-ph'), 'F2: visão do CLIENTE sem placeholder e sem hint (nunca vaza)');
   const hOk = M.kbv2Card(pronto);

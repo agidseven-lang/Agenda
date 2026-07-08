@@ -5498,10 +5498,13 @@ function kbv2Card(t, persp){
        '</div>'+
      '</div>';
   }
-  else if(!clientView&&cron&&!cron.list.length){
+  else if(!clientView&&isCron&&(!cron||!cron.list.length)){
     /* F3.3.70D3R10I — rascunho SEM temas: estrutura premium NUNCA some (mockup aprovado).
-       Placeholders "a definir" SOMENTE na visao interna (nunca persp 'client'/Card Premium). */
-    const phN=Math.max(1,Math.min(cron.count||3,3));
+       Placeholders "a definir" SOMENTE na visao interna (nunca persp 'client'/Card Premium).
+       F3.3.70D3R10I-B — cobre TAMBEM o cronograma 'nunca-tocado' (sem cronContents gravado):
+       o formulario inicia contents:[] e saveTask so grava se houver entrada; sem o campo,
+       cronOf() e null — ainda assim o card interno mostra a caixa Temas (3 placeholders). */
+    const phN=cron?Math.max(1,Math.min(cron.count||3,3)):3;
     h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">Temas</div>'+
        '<div class="kbv2-themes-list kbv2-themes-ph">'+
        Array.from({length:phN},(_,i)=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(i+1)+'</span><span class="kbv2-theme-t">Tema '+(i+1)+' — a definir</span></div>').join('')+
