@@ -1,0 +1,90 @@
+# =====================================================================
+# [manual] F3.3.70D3R8 — Desambiguacao MINIMA de e-mail em /users (controlled).
+# Roda scripts/worker-ops/f3370d3r8-users-email-disambiguation.e2e.mjs (de main).
+#   DRY-RUN (PADRAO): gate completo read-only + plano; ZERO escrita.
+#   APPLY (dry_run=false + confirm exato): update de CAMPO UNICO
+#     users/{...x3QHw3}.email -> idseven+dup-QHw3@idseven.com.br  + postcheck.
+#   ROLLBACK (mode=rollback): restaura idseven@idseven.com.br no mesmo doc.
+# NAO toca senha/pass/salt/role/admin/status/phone/usersPublic/tasks/
+# passwordResetCodes. NAO faz deploy. NAO imprime segredo. permissions minimos.
+# =====================================================================
+name: "[manual] F3.3.70D3R8 Users Email Disambiguation (controlled)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "APPLY_USERS_EMAIL_DISAMBIGUATION_X3QHW3 (apply) | ROLLBACK_USERS_EMAIL_DISAMBIGUATION_X3QHW3 (rollback)"
+        required: true
+        default: ""
+        type: string
+      dry_run:
+        description: "true = gate+plano sem escrita (PADRAO). false = APPLY real."
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      mode:
+        description: "apply = arquivar email do obsoleto; rollback = restaurar original"
+        required: true
+        default: "apply"
+        type: choice
+        options:
+          - "apply"
+          - "rollback"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3370d3r8-users-email-disambiguation
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  RUNNER_SCRIPT: "scripts/worker-ops/f3370d3r8-users-email-disambiguation.e2e.mjs"
+  PINNED_SHA256: "47c9cceb8a052b25b8b6c7efc70bb3602a9906c97b0ebe35146ce9cd1d06d99a"
+
+jobs:
+  disambiguate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (main)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Pin do runner (sha256)
+        run: |
+          GOT=$(sha256sum "$RUNNER_SCRIPT" | awk '{print $1}')
+          if [ "$GOT" != "$PINNED_SHA256" ]; then echo "::error:: runner divergente do pin ($GOT)"; exit 1; fi
+          echo "pin OK"
+
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: firebase-admin isolado (sem tocar package.json)
+        run: npm i --no-save --no-audit --no-fund firebase-admin@^12
+
+      - name: Credencial (nunca em log)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: secret GOOGLE_APPLICATION_CREDENTIALS_JSON ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+
+      - name: Gate + dry-run/apply/rollback + postcheck
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          MODE: ${{ github.event.inputs.mode }}
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: node "$RUNNER_SCRIPT"
+
+      - name: Limpeza SA
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
