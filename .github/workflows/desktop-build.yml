@@ -30,12 +30,20 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.77-desktop-cronograma-client-flow-phase1"
+      # F3.3.70D3R10I — rotulo derivado do package.json (passo "Derivar versao"); nada hardcoded.
+      DIST_BASENAME: ""
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
+
+      - name: Derivar versao (package.json e a fonte unica)
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-$APP_VERSION" >> "$GITHUB_ENV"
+          echo "versao=$APP_VERSION"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -53,6 +61,17 @@ jobs:
       - name: electron-builder (NSIS + MSI)
         working-directory: ${{ env.APP_DIR }}
         run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado (F3.3.22/F3.3.70D3R10I)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          if [ -f "dist-installer/win-unpacked/resources/icon.png" ]; then
+            echo "resources/icon.png OK (tray tera icone)"
+          else
+            echo "::error:: resources/icon.png AUSENTE no pacote — tray ficaria invisivel (nativeImage.createEmpty)."
+            ls -la dist-installer/win-unpacked/resources/ 2>/dev/null || true
+            exit 1
+          fi
 
       - name: Empacotar bundle (instalador + relatorios)
         working-directory: ${{ env.APP_DIR }}
@@ -73,7 +92,7 @@ jobs:
           # VERSAO-DESKTOP.txt — prova do que esta dentro
           {
             echo "productName : Agenda ID Seven Desktop"
-            echo "versionName : 1.0.77-desktop-cronograma-client-flow-phase1"
+            echo "versionName : $APP_VERSION"
             echo "appId       : br.com.idseven.agenda.desktop"
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
@@ -157,7 +176,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.77-installer
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-installer
           path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
           if-no-files-found: error
           retention-days: 30
@@ -166,7 +185,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-1.0.77-bundle
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-bundle
           path: dist-pkg/
           if-no-files-found: error
           retention-days: 30
