@@ -1922,6 +1922,18 @@
   body.desktop .kempty-ic{color:rgba(160,178,220,.38)}
   body.desktop .kempty{border-color:rgba(150,170,255,.10)}
 </style>
+<style id="d3r10i-148-styles">
+/* F3.3.70D3R10I (1.0.148) — Temas placeholder (visao interna), hint premium, empty-state inequivoco */
+body.desktop .kbv2-themes-ph{border:1px dashed rgba(255,255,255,.14);border-radius:10px;padding:4px 6px}
+body.desktop .kbv2-themes-ph .kbv2-theme-t{color:#7c8496;font-style:italic}
+body.desktop .kbv2-themes-ph .kbv2-theme-n{opacity:.55}
+body.desktop .kbv2-hint{display:flex;align-items:center;gap:8px;font-size:12px;color:#c9b46a;background:rgba(242,169,59,.10);border:1px solid rgba(242,169,59,.28);border-radius:10px;padding:8px 11px;line-height:1.35}
+body.desktop .kbv2-hint b{color:#e8cf8a}
+body.desktop .kbv2-empty2{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;margin:10px 12px;padding:26px 14px;border:1.5px dashed rgba(255,255,255,.16);border-radius:14px;background:transparent}
+body.desktop .kbv2-empty2 .t{font-size:13.5px;font-weight:800;color:#9aa3b5;letter-spacing:.02em;text-transform:uppercase}
+body.desktop .kbv2-empty2 .s{font-size:12.5px;color:#788296;max-width:210px;line-height:1.5}
+body.desktop .det-hero-locked{opacity:.55;pointer-events:none;filter:grayscale(.3)}
+</style>
 <style id="kbv2-styles">
 /* ════════ KANBANBOARDV2 — tema BLACK PREMIUM (skin dark) ════════
    SOMENTE cores. Estrutura/proporções/paddings/gaps/tamanhos INALTERADOS.
@@ -5202,9 +5214,10 @@ function kbv2Empty(kind){
    check:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="16"/><path d="M17 24.5l5 5 9-10"/></svg>',
    list:'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="6" width="28" height="36" rx="3"/><path d="M17 16h14M17 24h14M17 32h9"/></svg>'};
   const ic=/afazer/.test(k)?IC.plus:(/revis|ajuste/.test(k)?IC.search:(/aprovado|concluido|entregue/.test(k)?IC.check:IC.list));
-  return '<div class="kbv2-empty"><div class="kbv2-empty-ic">'+ic+'</div>'+
-    '<div class="kbv2-empty-t">Nenhuma tarefa aqui</div>'+
-    '<div class="kbv2-empty-s">Tarefas adicionadas ficarão visíveis nesta coluna.</div></div>';
+  void ic; /* F3.3.70D3R10I — empty-state inequivoco (mockup aprovado): tracejado + rotulo, jamais parecido com card */
+  return '<div class="kbv2-empty2" data-empty-state="1">'+
+    '<div class="t">— Coluna vazia —</div>'+
+    '<div class="s">Nenhuma tarefa neste estágio. Isto não é um card: tarefas reais aparecem como cartões completos.</div></div>';
 }
 // F1 — Designer SLA: derivação LOCAL (read-only). Não liga motor/Worker; só colore o card.
 const KBV2_SLA={warnStartMin:30,warnFinishMin:30,criticalAfterMin:60};
@@ -5485,6 +5498,16 @@ function kbv2Card(t, persp){
        '</div>'+
      '</div>';
   }
+  else if(!clientView&&cron&&!cron.list.length){
+    /* F3.3.70D3R10I — rascunho SEM temas: estrutura premium NUNCA some (mockup aprovado).
+       Placeholders "a definir" SOMENTE na visao interna (nunca persp 'client'/Card Premium). */
+    const phN=Math.max(1,Math.min(cron.count||3,3));
+    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">Temas</div>'+
+       '<div class="kbv2-themes-list kbv2-themes-ph">'+
+       Array.from({length:phN},(_,i)=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(i+1)+'</span><span class="kbv2-theme-t">Tema '+(i+1)+' — a definir</span></div>').join('')+
+       '</div></div>';
+    h+='<div class="kbv2-hint">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium).</span></div>';
+  }
   if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;h+='<div class="kbv2-card-chk">'+done+' de '+t.checklist.length+' no checklist</div>';}
   // 10) data
   if(t.dueDate||t.due)h+='<div class="kbv2-card-date">'+svg('calendar')+'<span>'+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span></div>';
@@ -5753,7 +5776,7 @@ function detailActionsHtml(t,ds){
     redesigner:'<button class="btn ghost" data-senddesigner="'+t.id+'">'+svg('swap')+'Trocar designer</button>',
     dboard:(hasDesigner(t)?'<button class="btn det-goboard" data-goboard="'+designerOf(t)+'">'+svg('grid')+'Ver quadro do designer</button>':''),
     prod:'<button class="btn dz-go" data-prodopen="'+t.id+'">'+svg('movie')+'Legendas e artes</button>',
-    sendclient:(canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':''),
+    sendclient:(canSendToClient({sector:t.sector,client:t.client,contents:t.cronContents||[]})?'<button class="btn send-go" data-sendclient-task="'+t.id+'">'+svg('send')+'Enviar ao cliente</button>':'<button class="btn send-go det-hero-locked" disabled title="Preencha ao menos 1 tema para liberar o envio ao cliente">'+svg('send')+'Enviar ao cliente 🔒</button>'),
     edit:'<button class="btn ce-edit" data-ceopen="'+t.id+'">'+svg('editnote')+'Editar conteúdos</button>',
   };
   return ds.actions.map(k=>B[k]||'').join('');
@@ -5762,6 +5785,7 @@ function detailActionsHtml(t,ds){
 function detailHeroBlock(t){
   if(secOf(t.sector).key!=='cronograma')return '';
   const ds=detailState(t);const ow=detailOwner(t,ds);
+  const _filled=(t.cronContents||[]).filter(c=>c&&(c.tema||c.legenda)).length;
   return '<div class="det-hero">'+
     '<div class="det-hero-status" style="background:'+withAlpha(ds.color,.12)+';border-color:'+withAlpha(ds.color,.38)+'">'+
       '<span class="det-hero-dot" style="background:'+ds.color+'"></span>'+
@@ -5770,6 +5794,7 @@ function detailHeroBlock(t){
     '<div class="det-hero-next"><span class="det-hero-nk">Próxima ação</span><div class="det-hero-nt">'+esc(ds.next)+'</div></div>'+
     '<div class="det-hero-owner"><span class="det-hero-ava '+ow.cls+'">'+esc(ow.ini)+'</span>'+
       '<div><div class="det-hero-ok">Responsável agora</div><div class="det-hero-on">'+esc(ow.name)+' <span class="det-hero-or">· '+esc(ow.role.split('—')[1]||ow.role)+'</span></div></div></div>'+
+    (_filled<1?'<div class="kbv2-hint" style="margin:0 0 10px">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium do WhatsApp).</span></div>':'')+
     '<div class="det-hero-actions">'+detailActionsHtml(t,ds)+'</div>'+
   '</div>';
 }
@@ -7094,7 +7119,7 @@ function renderConfig(){
   h+='<div style="height:14px"></div><div class="lbl">Privacidade e Segurança</div><div class="card">'+
       settRow('gear','Segurança da sessão','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+soon('Autenticação em duas etapas (2FA)')+'<div class="divline"></div>'+soon('Sessões e dispositivos')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
   h+='<div style="height:14px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
-      act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+soon('Notificações de tarefas')+'<div class="divline"></div>'+soon('Notificações de chat')+'</div>';
+      act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+soon('Notificações de tarefas')+'<div class="divline"></div>'+soon('Notificações de chat')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
   h+='<div style="height:14px"></div><div class="lbl">Acessibilidade e Aparência</div><div class="card">'+
       info('Tema','Escuro (premium)')+'<div class="divline"></div>'+soon('Tema claro')+'<div class="divline"></div>'+soon('Tamanho da fonte')+'<div class="divline"></div>'+soon('Alto contraste')+'</div>';
   h+='<div style="height:14px"></div><div class="lbl">Desempenho e Dados</div><div class="card">'+

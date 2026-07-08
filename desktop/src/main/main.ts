@@ -285,6 +285,8 @@ app.whenReady().then(() => {
   // F3.3.10-DIAG — renderer envia eventos p/ o MESMO arquivo de log local (scan/Central/visibility).
   ipcMain.on("diag-log", (_e, tag: string, data?: unknown) => { try { diag("renderer." + String(tag), data); } catch { /* */ } });
   ipcMain.handle("diag-path", () => diagPath());
+  // F3.3.70D3R10I — fonte unica da versao p/ o renderer (Config mostra a versao real do build)
+  ipcMain.on("app-version", (e) => { try { e.returnValue = app.getVersion(); } catch { e.returnValue = "dev"; } });
   // F3.3.3 — renderer pede notificação (fluxo/SLA/bloqueio detectados no renderer).
   // O HUB decide o canal (toast in-app x nativa) e faz dedup. Sem provider externo.
   ipcMain.handle("notify", (_e, payload: NotifPayload) => deliverNotification(payload));

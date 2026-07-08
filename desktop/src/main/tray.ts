@@ -1,5 +1,6 @@
 import { app, Tray, Menu, BrowserWindow, nativeImage } from "electron";
 import path from "path";
+import { diag } from "./diag";
 
 export function createTray(getWin: () => BrowserWindow | null, opts: {
   isAutoStart: () => boolean;
@@ -14,13 +15,16 @@ export function createTray(getWin: () => BrowserWindow | null, opts: {
     iconPath,
   ];
   let img = nativeImage.createEmpty();
+  let usedPath = "";
   for (const p of tryPaths) {
     try {
       const i = nativeImage.createFromPath(p);
-      if (!i.isEmpty()) { img = i.resize({ width: 16, height: 16 }); break; }
+      if (!i.isEmpty()) { img = i.resize({ width: 16, height: 16 }); usedPath = p; break; }
     } catch {}
   }
   const tray = new Tray(img);
+  // F3.3.70D3R10I — diagnostico runtime do tray (prova icone empacotado/na bandeja)
+  try { diag("tray.created", { iconEmpty: img.isEmpty(), iconPath: usedPath || "(none)" }); } catch { /* */ }
   tray.setToolTip("Agenda ID Seven Desktop");
 
   const rebuild = () => {

@@ -131,5 +131,61 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(!/data-card-renderer="legacy"/.test(HTML), 'E3: fonte inteira sem marcador legacy');
 }
 
+/* ───────────────── F: 1.0.148 — mockups aprovados (D3R10H) ───────────────── */
+{
+  const NAMES = ['SECTORS', 'SECTOR_ALIAS', 'secOf', 'STATUS', 'stOf', 'dtMs', 'humanDur', 'todayStr', 'taskDeadline', 'esc', 'withAlpha', 'fmtDateTimeBR', 'cronOf', 'kbv2NextForStatus', 'opOwnerLabel', 'deriveOperationalCardPresentation', 'kbv2DeriveStatus', 'kbv2Card', 'kbv2Empty', 'canSendToClient', 'detailActionsHtml'];
+  let SRC = ''; for (const n of NAMES) SRC += grab(n) + '\n';
+  const PRELUDE =
+    'var state={user:{id:"u1",role:"social media",admin:false},users:[]};\n' +
+    'function respOf(t){return {id:"u2",name:"Fulana Teste",role:"Editora"};}\n' +
+    'function avatar(u,s){return \'<span class="av"></span>\';}\n' +
+    'function svg(k){return "";}\n' +
+    'function fmtDateBR(d){return String(d||"");}\n' +
+    'function hasDesigner(t){return false;}\n' +
+    'function designerOf(t){return "";}\n' +
+    'function designerStatusView(t){return {label:"x",color:"#000"};}\n' +
+    'function clientStatusView(t){return {label:"Rascunho",color:"#A78BFA"};}\n' +
+    'function clientFacingStatusView(t){return clientStatusView(t);}\n' +
+    'function taskTimeline(t){return {milestones:[{key:"a",state:"current"},{key:"b",state:""},{key:"c",state:""}],owner:{role:"Social",id:null}};}\n' +
+    'function nextActionShort(t){return "Preencher os temas";}\n' +
+    'function clientFacingNextShort(t){return "";}\n' +
+    'function designerColView(t){return "afazer";}\n' +
+    'function designerNextShort(t){return "";}\n' +
+    'var TASK_PHASE={COMPLETED:"c",AWAITING_DESIGNER:"ad",AWAITING_CLIENT_APPROVAL:"acp",DESIGNER_PRODUCING:"dp",DESIGNER_REVISING:"dr",DESIGNER_DELIVERED:"dd"};\n' +
+    'function deriveCanonicalTaskState(t){return {phase:"producing",owner:"social"};}\n' +
+    'function deriveCanonicalPerspective(t,p){return {key:"afazer",label:"Rascunho",color:"#A78BFA",next:"Preencher os temas"};}\n' +
+    'function isTaskCompleted(t){return false;}\n' +
+    'function kbv2SlaLocal(t){return {sev:"neutro",label:""};}\n' +
+    'function canDelTask(t){return false;}\n' +
+    'var MANAGER_KW=["social","gestor","gerente","diretor","coordena","supervisor","admin","dono","owner","ceo","head"];\n' +
+    'function norm(x){return (x||"").toLowerCase();}\n' +
+    'function roleCat(u){if(!u)return "UNKNOWN";if(u.admin)return "ADMIN";const r=norm(u.role);return MANAGER_KW.some(k=>r.includes(k))?"MANAGER":"OPERATIONAL";}\n' +
+    'function canSeeAll(u){const c=roleCat(u);return c==="ADMIN"||c==="MANAGER";}\n';
+  const M = new Function(PRELUDE + SRC + '\nreturn {kbv2Card,kbv2Empty,canSendToClient,detailActionsHtml};')();
+  const rascunho = { id: 'CR', title: 'Cronograma semanal — QA', client: 'Cliente QA', sector: 'cronograma', status: 'afazer', cronContents: [{}, {}, {}], by: 'u1', createdAt: 1751970000000, checklist: [] };
+  const pronto = { id: 'CP', title: 'Cronograma semanal — QA', client: 'Cliente QA', sector: 'cronograma', status: 'andamento', cronContents: [{ tema: 'Tema real 1' }, { tema: 'Tema real 2' }], by: 'u1', createdAt: 1751970000000, checklist: [] };
+  const hRas = M.kbv2Card(rascunho);
+  ok(hRas.includes('kbv2-themes-ph') && hRas.includes('Tema 1 — a definir') && hRas.includes('Tema 3 — a definir'), 'F1a: rascunho interno tem Temas estruturados "a definir"');
+  ok(hRas.includes('kbv2-hint') && hRas.includes('liberar o <b>envio ao cliente</b>'), 'F1b: rascunho interno tem hint do Card Premium');
+  ok(hRas.includes('data-card-renderer="canonical-board-card"') && hRas.includes('kbv2-card-rail') && hRas.includes('Etapa atual'), 'F1c: rascunho segue 100% canônico');
+  const hCli = M.kbv2Card(rascunho, 'client');
+  ok(!hCli.includes('a definir') && !hCli.includes('kbv2-hint') && !hCli.includes('kbv2-themes-ph'), 'F2: visão do CLIENTE sem placeholder e sem hint (nunca vaza)');
+  const hOk = M.kbv2Card(pronto);
+  ok(!hOk.includes('a definir') && !hOk.includes('kbv2-hint') && hOk.includes('Tema real 1'), 'F3: cron com temas não mostra placeholder/hint');
+  const he = M.kbv2Empty('afazer');
+  ok(he.includes('data-empty-state="1"') && he.includes('Coluna vazia') && !he.includes('kbv2-card'), 'F4: empty-state marcado, rotulado e sem classes de card');
+  ok(M.canSendToClient({ sector: 'cronograma', client: 'Cliente QA', contents: pronto.cronContents }) === true, 'F5a: canSendToClient elegível com tema real');
+  const dsR = { actions: ['edit', 'sendclient'] };
+  const aR = M.detailActionsHtml(rascunho, dsR), aP = M.detailActionsHtml(pronto, dsR);
+  ok(aR.includes('det-hero-locked') && aR.includes('disabled') && aR.includes('Enviar ao cliente'), 'F5b: sem tema → botão premium BLOQUEADO visível (nunca some)');
+  ok(aP.includes('data-sendclient-task="CP"') && !aP.includes('det-hero-locked'), 'F5c: com tema → botão premium ATIVO');
+  ok(/_filled<1\?'<div class="kbv2-hint"/.test(HTML), 'F6: hero do detalhe injeta hint quando sem tema (fonte)');
+  const PRELOAD = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
+  ok(!PRELOAD.includes('1.0.137-beta-portal-fix') && PRELOAD.includes('app-version'), 'F7: preload sem versão stale; versão real via IPC');
+  ok(/info\('Versão do aplicativo'/.test(HTML), 'F8: tela Config exibe a versão do aplicativo');
+  const TRAY = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'tray.ts'), 'utf8');
+  ok(TRAY.includes('tray.created') && TRAY.includes('iconEmpty'), 'F9: tray com diagnóstico runtime (tray.created)');
+}
+
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
 process.exit(fail ? 1 : 0);

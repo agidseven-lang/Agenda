@@ -49,5 +49,6 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   authLogout: (): Promise<any> => ipcRenderer.invoke("auth-logout"),
   authSessionStatus: (): Promise<any> => ipcRenderer.invoke("auth-session-status"),
   isDesktop: true,
-  version: "1.0.137-beta-portal-fix-v64-51-test",
+  // F3.3.70D3R10I — versao REAL do app (app.getVersion() via IPC sincrono; nunca mais string manual)
+  version: (() => { try { return String(ipcRenderer.sendSync("app-version") || "dev"); } catch { return "dev"; } })(),
 });
