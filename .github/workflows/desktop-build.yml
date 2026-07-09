@@ -73,16 +73,22 @@ jobs:
             exit 1
           fi
 
-      - name: Gate prova-de-versao (nenhum rotulo stale 1.0.146 no renderer empacotado)
+      - name: Gate prova-de-versao (sem versao stale/hardcoded no renderer empacotado)
         working-directory: ${{ env.APP_DIR }}
         run: |
-          FOUND=$(grep -rl "1.0.146" dist-installer/win-unpacked/resources/app*/src/renderer/ 2>/dev/null || true)
+          # F3.3.70D3R10U — NO-GO absoluto: 1.0.146-149 em qualquer lugar do renderer
+          # empacotado, e qualquer rotulo literal "Desktop 1\.0\.<n>" / "Versao 1.0.<n>"
+          # (a versao real deriva de app.getVersion em runtime; literal = regressao).
+          RDIR=$(ls -d dist-installer/win-unpacked/resources/app*/src/renderer 2>/dev/null | head -1)
+          if [ -z "$RDIR" ]; then echo "::error:: renderer empacotado nao encontrado"; exit 1; fi
+          PAT='1\.0\.14[6-9]|Desktop 1\.0\.[0-9]+|Vers..?o 1\.0\.[0-9]+'
+          FOUND=$(grep -rlE "$PAT" "$RDIR" 2>/dev/null || true)
           if [ -n "$FOUND" ]; then
-            echo "::error:: rotulo stale '1.0.146' encontrado no renderer empacotado: $FOUND"
-            grep -rn "1.0.146" $FOUND | head -8
+            echo "::error:: rotulo de versao stale/hardcoded no renderer empacotado: $FOUND"
+            grep -rnE "$PAT" $FOUND | head -8
             exit 1
           fi
-          echo "renderer empacotado sem string '1.0.146' — prova de versao consistente (deriva de app.getVersion)."
+          echo "renderer sem 1.0.146-149 e sem 'Desktop/Versao 1.0.<n>' literal — versao deriva de app.getVersion."
 
       - name: Empacotar bundle (instalador + relatorios)
         working-directory: ${{ env.APP_DIR }}
