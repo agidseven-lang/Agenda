@@ -195,5 +195,29 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(TRAY.includes('tray.created') && TRAY.includes('iconEmpty'), 'F9: tray com diagnóstico runtime (tray.created)');
 }
 
+/* ───────────────── G: 1.0.150 — proveniencia de versao (D3R10Q) ───────────────── */
+{
+  // G1: nenhuma string stale 1.0.146 no renderer (gate anti-mismatch)
+  const occ = (HTML.match(/1\.0\.146/g) || []).length;
+  ok(occ === 0, 'G1: renderer sem NENHUMA string "1.0.146" (encontradas: ' + occ + ')');
+  ok(!HTML.includes('1.0.146-beta-board-rebuild'), 'G2: rótulo "1.0.146-beta-board-rebuild" eliminado');
+  // G3: versao vem de app.getVersion (preload), nao hardcoded
+  ok(/const DESK_VER=\(function\(\)\{try\{return \(window\.desktopAPI&&window\.desktopAPI\.version\)/.test(HTML), 'G3: DESK_VER deriva de window.desktopAPI.version');
+  ok(/const APP_VER=\{ desktop:DESK_VER/.test(HTML), 'G4: APP_VER.desktop = DESK_VER (não hardcoded)');
+  ok(/const BUILD=DESK_VER;/.test(HTML), 'G5: BUILD = DESK_VER (não hardcoded)');
+  // G6: <title> estatico neutro (sem numero de versao)
+  ok(/<title>ID Seven · Desktop<\/title>/.test(HTML), 'G6: <title> estático neutro (runtime preenche)');
+  // G7: sidebar footer deriva de APP_VER
+  ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
+  // G8: package.json e lock em 1.0.150
+  const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
+  ok(pj.version === '1.0.150', 'G8: package.json version = 1.0.150 (é: ' + pj.version + ')');
+  const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
+  ok(pl.version === '1.0.150', 'G9: package-lock version = 1.0.150 (é: ' + pl.version + ')');
+  // G10: preload sem versao stale, expondo app.getVersion
+  const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
+  ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
+}
+
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
 process.exit(fail ? 1 : 0);
