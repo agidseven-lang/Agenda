@@ -5,11 +5,11 @@
  * - Autostart Windows opcional (sobe oculto na tray no login)
  * - Notifier + Reminder rodam aqui (sobrevivem a janela escondida)
  */
-import { app, BrowserWindow, Tray, ipcMain, Notification, shell, clipboard, nativeImage, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImage, dialog } from "electron";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import { createTray } from "./tray";
+import { ensureTray, recreateTray, getTrayState } from "./tray";
 import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
@@ -18,10 +18,13 @@ import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.1
 import { registerAuthIpc } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main)
 
 let mainWin: BrowserWindow | null = null;
-let tray: Tray | null = null;
 let stopNotifier: (() => void) | null = null;
 let stopReminder: (() => void) | null = null;
 let quitting = false;
+// F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
+// heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
+const trayWin = () => mainWin;
+const trayOpts = { isAutoStart, setAutoStart, quit: realQuit };
 
 // AUMID p/ toasts no Windows respeitarem o app
 if (process.platform === "win32") app.setAppUserModelId("br.com.idseven.agenda.desktop");
@@ -263,10 +266,8 @@ function realQuit() {
 app.whenReady().then(() => {
   diag("app.ready", { diagPath: diagPath() }); // F3.3.10-DIAG: caminho do log impresso no próprio log
   createWindow();
-  tray = createTray(
-    () => mainWin,
-    { isAutoStart, setAutoStart, quit: realQuit }
-  );
+  // F3.3.70D3R10U — tray via ensureTray (cria no startup; recriavel depois sem duplicar)
+  ensureTray(trayWin, trayOpts);
 
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
@@ -336,6 +337,27 @@ app.whenReady().then(() => {
       return { ok: true, path: r.filePath };
     } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
   });
+  // F3.3.70D3R10U — "Abrir imagem": grava o card em Downloads e abre no visualizador
+  // padrao do SO (shell.openPath). Auto-contido: NAO abre caminho arbitrario do renderer.
+  ipcMain.handle("open-card-image", async (_e, payload: { bytes: ArrayBuffer | Uint8Array; filename: string }) => {
+    try {
+      const dir = app.getPath("downloads") || os.tmpdir();
+      const safe = String(payload?.filename || "agenda-id-seven-card.jpg").replace(/[^A-Za-z0-9._-]/g, "_");
+      const dest = path.join(dir, safe);
+      fs.writeFileSync(dest, Buffer.from(payload.bytes as any));
+      const err = await shell.openPath(dest);
+      if (err) return { ok: false, path: dest, error: String(err) };
+      return { ok: true, path: dest };
+    } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
+  });
+
+  // F3.3.70D3R10U — TRAY: status p/ Configuracoes (sincrono, payload minusculo) e
+  // recriacao forcada pelo botao "Recriar icone da bandeja".
+  ipcMain.on("tray-status", (e) => { try { e.returnValue = getTrayState(); } catch { e.returnValue = null; } });
+  ipcMain.handle("tray-recreate", () => {
+    const r = recreateTray(trayWin, trayOpts);
+    return { ...r, state: getTrayState() };
+  });
 
   // Deep link no cold start (app aberto pelo proprio idseven://...).
   const coldTarget = deepLinkTarget(process.argv);
@@ -348,6 +370,8 @@ app.whenReady().then(() => {
   // Renderer avisa o uid logado -> ligamos os listeners de notificacao
   ipcMain.on("session-login", (_e, uid: string) => {
     diag("session-login", { uid }); // F3.3.10-DIAG
+    // F3.3.70D3R10U — garante o tray apos login (recria se sumiu; no-op se ok)
+    try { ensureTray(trayWin, trayOpts); } catch { /* */ }
     if (stopNotifier) stopNotifier();
     if (stopReminder) stopReminder();
     if (uid) {
@@ -370,10 +394,14 @@ app.whenReady().then(() => {
   setInterval(() => {
     try {
       const w = mainWin;
+      // F3.3.70D3R10U — watchdog do tray: se sumiu (ex.: Explorer reiniciou), recria.
+      const ts = getTrayState();
+      if (!ts.created) { try { ensureTray(trayWin, trayOpts); } catch { /* */ } }
       diag("main.alive", {
         notifier: !!stopNotifier, reminder: !!stopReminder,
         visible: !!(w && !w.isDestroyed() && w.isVisible()),
         minimized: !!(w && !w.isDestroyed() && w.isMinimized()),
+        tray: ts.created, trayIconEmpty: ts.iconEmpty,
       });
     } catch { /* heartbeat de diagnóstico nunca pode quebrar o app */ }
   }, 30000);

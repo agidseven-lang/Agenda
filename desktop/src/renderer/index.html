@@ -1923,7 +1923,7 @@
   body.desktop .kempty{border-color:rgba(150,170,255,.10)}
 </style>
 <style id="d3r10i-148-styles">
-/* F3.3.70D3R10I (1.0.148) — Temas placeholder (visao interna), hint premium, empty-state inequivoco */
+/* F3.3.70D3R10I — Temas placeholder (visao interna), hint premium, empty-state inequivoco */
 body.desktop .kbv2-themes-ph{border:1px dashed rgba(255,255,255,.14);border-radius:10px;padding:4px 6px}
 body.desktop .kbv2-themes-ph .kbv2-theme-t{color:#7c8496;font-style:italic}
 body.desktop .kbv2-themes-ph .kbv2-theme-n{opacity:.55}
@@ -1933,6 +1933,15 @@ body.desktop .kbv2-empty2{flex:1 1 auto;display:flex;flex-direction:column;align
 body.desktop .kbv2-empty2 .t{font-size:13.5px;font-weight:800;color:#9aa3b5;letter-spacing:.02em;text-transform:uppercase}
 body.desktop .kbv2-empty2 .s{font-size:12.5px;color:#788296;max-width:210px;line-height:1.5}
 body.desktop .det-hero-locked{opacity:.55;pointer-events:none;filter:grayscale(.3)}
+</style>
+<style id="d3r10u-151-styles">
+/* F3.3.70D3R10U — modal Card Premium IMAGEM-PRIMEIRO + Configuracoes > Bandeja do sistema */
+body.desktop .gcs-stepnum{display:inline-flex;width:18px;height:18px;border-radius:50%;background:#5B6CFF;color:#fff;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;flex:none}
+body.desktop .gcs-pin{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;font-weight:600;color:#e8cf8a;background:rgba(242,169,59,.10);border:1px solid rgba(242,169,59,.30);border-radius:11px;padding:10px 12px;line-height:1.45;margin:13px 0 15px}
+body.desktop .gcs-pin b{color:#f0dca0}
+body.desktop .gcs-go[disabled]{opacity:.45;filter:grayscale(.5);cursor:default;box-shadow:none;pointer-events:none}
+body.desktop .cfg-traypill{margin-left:auto;flex:none;display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;border-radius:999px;padding:4px 10px;letter-spacing:.02em}
+body.desktop .cfg-traypill .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
 </style>
 <style id="kbv2-styles">
 /* ════════ KANBANBOARDV2 — tema BLACK PREMIUM (skin dark) ════════
@@ -5800,7 +5809,7 @@ function detailHeroBlock(t){
     '<div class="det-hero-next"><span class="det-hero-nk">Próxima ação</span><div class="det-hero-nt">'+esc(ds.next)+'</div></div>'+
     '<div class="det-hero-owner"><span class="det-hero-ava '+ow.cls+'">'+esc(ow.ini)+'</span>'+
       '<div><div class="det-hero-ok">Responsável agora</div><div class="det-hero-on">'+esc(ow.name)+' <span class="det-hero-or">· '+esc(ow.role.split('—')[1]||ow.role)+'</span></div></div></div>'+
-    (_filled<1?'<div class="kbv2-hint" style="margin:0 0 10px">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium do WhatsApp).</span></div>':'')+
+    (_filled<1?'<div class="kbv2-hint" style="margin:0 0 10px">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium).</span></div>':'')+
     '<div class="det-hero-actions">'+detailActionsHtml(t,ds)+'</div>'+
   '</div>';
 }
@@ -6389,7 +6398,7 @@ function buildPublicClientUrl(token){
   if(!t){throw new Error('buildPublicClientUrl: link do cliente NUNCA pode sair sem token');}
   return CLIENT_LINK_BASE+'/cliente/cronograma/'+t;
 }
-// 1.0.124 — LINK DE COMPARTILHAMENTO (preview premium garantido no WhatsApp). Página leve
+// 1.0.124 — LINK DE COMPARTILHAMENTO (OG premium; a prévia depende do WhatsApp raspar). Página leve
 // /share/cronograma/<token> só com OG no <head> (card OG absoluto 1200×630, image/jpeg) que
 // redireciona ao portal. É ESTE link que vai na mensagem colada no grupo — assim o WhatsApp
 // renderiza a prévia premium do card. NUNCA sai sem token.
@@ -6485,62 +6494,61 @@ async function openSendClientModal(taskOrForm){
   // de "Abrir WhatsApp" e usadas apenas em shell.openExternal.
   const shortTok=String(ctx.token||'').slice(0,8);
   const cardFile='agenda-id-seven-card-'+String(ctx.client||'cliente').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')+'-'+shortTok+'.jpg';
-  // 1.0.122-whatsapp-group-assisted — FLUXO PRINCIPAL: publicar no GRUPO do cliente (assistido).
-  // O sistema prepara o CARD premium + a LEGENDA + o LINK e abre o WhatsApp Business para o
-  // operador colar no grupo onde o cliente já está. HONESTO: não existe botão clicável nativo
-  // dentro do grupo (o WhatsApp não permite) — o botão "Revisar e aprovar" aparece no PORTAL,
-  // depois que o cliente abre o link. O envio individual com botão oficial (Cloud API) fica
-  // recolhido como "Opção avançada". Ícones SEMPRE pequenos (.gcs-sheet svg = 18px).
+  // F3.3.70D3R10U — FLUXO IMAGEM-PRIMEIRO (mockups aprovados na D3R10T): o operador envia a
+  // IMAGEM real do card (passo 1) + cola a MENSAGEM com o link (passo 2) no grupo do WhatsApp
+  // Business (passo 3). O visual premium NAO depende mais do unfurl/preview automatico do
+  // WhatsApp (que o teste fisico D3R10R provou nao ser confiavel). HONESTO: nao existe botao
+  // clicavel nativo dentro do grupo — o botao "Revisar e aprovar" aparece no PORTAL, depois
+  // que o cliente abre o link. O envio individual (Cloud API) fica recolhido como opcao
+  // avancada, DESABILITADO ate as credenciais da Meta existirem no servidor.
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet gcs-sheet" style="max-width:640px">'+
     '<button class="iconbtn gcs-x" data-modalclose="1">'+svg('close')+'</button>'+
     '<div class="gcs-head">'+
       '<div class="gcs-headic brand" role="img" aria-label="ID Seven"></div>'+
-      '<div style="min-width:0"><div class="gcs-title">Enviar no grupo do cliente</div>'+
-        '<div class="gcs-sub">Abra o WhatsApp Business e envie a mensagem no grupo onde o cliente está.</div></div>'+
+      '<div style="min-width:0"><div class="gcs-title">Enviar ao cliente — Card Premium</div>'+
+        '<div class="gcs-sub">Imagem + mensagem: o visual premium aparece em qualquer WhatsApp, sem depender da prévia automática.</div></div>'+
     '</div>'+
-    /* ===== FLUXO PRINCIPAL — ABRIR WHATSAPP BUSINESS (copia a mensagem + abre o app) ===== */
+    /* ===== F3.3.70D3R10U — FLUXO IMAGEM-PRIMEIRO (mockups A-D aprovados na D3R10T) ===== */
+    '<div class="gcs-pin">📌 <span>Envie a <b>imagem</b> + cole a <b>mensagem com o link</b> para garantir o Card Premium.</span></div>'+
+    /* ===== PASSO 1 — IMAGEM DO CARD (principal) ===== */
     '<div class="gcs-auto" id="groupBlock">'+
-      '<div class="gcs-steplabel">Publicar no grupo do WhatsApp Business do cliente</div>'+
-      '<pre class="gcs-legend" id="groupLegendBox">'+esc(msg)+'</pre>'+
-      /* Prévia de como o WhatsApp renderiza o LINK (card premium vem do OG público, não de arquivo) */
-      '<div class="gcs-lp" id="groupLinkPreview">'+
-        '<div class="gcs-lp-img"><img id="groupCardPreview" alt="Prévia do link — card premium Agenda ID Seven"/></div>'+
-        '<div class="gcs-lp-meta">'+
-          '<div class="gcs-lp-title">Aprovar cronograma</div>'+
-          '<div class="gcs-lp-desc">Seu cronograma está pronto para avaliação.</div>'+
-          '<div class="gcs-lp-dom">aprovar.agendaidseven.com.br</div>'+
-        '</div>'+
+      '<div class="gcs-steplabel"><span class="gcs-stepnum">1</span> IMAGEM DO CARD</div>'+
+      '<div class="gcs-card"><img id="groupCardPreview" alt="Card premium Aurora Glass — Agenda ID Seven" style="width:100%;display:block"/></div>'+
+      '<div class="gcs-status" style="margin-top:7px">Ilustração do card que você pode enviar como imagem.</div>'+
+      '<button class="gcs-go" id="btnCopyImg" style="margin-top:11px">'+svg('send')+'Copiar card (imagem)</button>'+
+      '<div class="gcs-secondary" style="margin-top:10px;padding-top:0;border-top:none">'+
+        '<button class="btn ghost" id="btnSaveImgAs">Baixar imagem…</button>'+
+        '<button class="btn ghost" id="btnOpenImg">Abrir imagem</button>'+
       '</div>'+
-      '<button class="gcs-go" id="btnOpenWaMain">'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
-      '<div class="gcs-status" id="groupStatus">A mensagem será copiada automaticamente. No WhatsApp Business, escolha o grupo do cliente e cole.</div>'+
-      '<div class="gcs-note">A prévia do card vem do <b>link público</b> (não de arquivo salvo). O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link.</div>'+
-      '<div class="gcs-secondary">'+
+    /* ===== PASSO 2 — MENSAGEM COM O LINK ===== */
+      '<div class="gcs-steplabel" style="margin-top:18px"><span class="gcs-stepnum">2</span> MENSAGEM COM O LINK</div>'+
+      '<pre class="gcs-legend" id="groupLegendBox">'+esc(msg)+'</pre>'+
+      '<div class="gcs-secondary" style="margin-top:0;padding-top:0;border-top:none">'+
         '<button class="btn ghost" id="btnCopyGroupMsg">Copiar mensagem</button>'+
         '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
       '</div>'+
+    /* ===== PASSO 3 — WHATSAPP BUSINESS ===== */
+      '<div class="gcs-steplabel" style="margin-top:18px"><span class="gcs-stepnum">3</span> WHATSAPP BUSINESS</div>'+
+      '<button class="gcs-go" id="btnOpenWaMain">'+svg('send')+'Abrir WhatsApp Business</button>'+
+      '<div class="gcs-status" id="groupStatus"><span>No WhatsApp Business: envie a <b>imagem</b> e cole a <b>mensagem com o link</b>. (Copie um de cada vez — a área de transferência guarda um item por vez.)</span></div>'+
+      '<div class="gcs-note">O WhatsApp <b>nem sempre</b> gera a prévia do link sozinho. Com a imagem anexada, o visual premium aparece <b>sempre</b> — e, se a prévia do link também carregar, o cliente verá os dois. Nenhuma mensagem é enviada automaticamente. O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link.</div>'+
     '</div>'+
     /* ===== Ação primária discreta ===== */
     '<div class="gcs-prim-actions">'+
       '<button class="btn ghost" data-modalclose="1">Fechar</button>'+
     '</div>'+
-    /* ===== OPÇÕES AVANÇADAS — card como arquivo (fallback, recolhido) ===== */
-    '<details class="gcs-adv"><summary>Opções avançadas: anexar o card como imagem (fallback)</summary>'+
+    /* ===== OPÇÕES AVANÇADAS — arquivo e envio automático (recolhido) ===== */
+    '<details class="gcs-adv"><summary>Opções avançadas: arquivo e envio automático</summary>'+
       '<div class="gcs-advbody">'+
-        '<div class="gcs-stepmsg" style="margin-top:0">Normalmente <b>não é preciso</b>: a prévia do card aparece sozinha ao colar o link. Use só se quiser anexar a imagem manualmente.</div>'+
+        '<div class="gcs-stepmsg" style="margin-top:0">Prefere trabalhar com o arquivo? Salve o card em Downloads e abra a pasta.</div>'+
         '<div class="gcs-secondary" style="margin-top:4px;border-top:none;padding-top:0">'+
-          '<button class="btn ghost" id="btnCopyImg">Copiar card (imagem)</button>'+
           '<button class="btn ghost" id="btnOpenFolder">Salvar e abrir pasta</button>'+
         '</div>'+
-      '</div>'+
-    '</details>'+
-    /* ===== OPÇÃO AVANÇADA — número individual com botão oficial (Cloud API, recolhido) ===== */
-    '<details class="gcs-adv"><summary>Opção avançada: enviar para número individual com botão oficial</summary>'+
-      '<div class="gcs-advbody">'+
-        '<div class="gcs-stepmsg" style="margin-top:0">Envia direto ao <b>WhatsApp individual</b> do responsável pela WhatsApp Cloud API, com o <b>botão oficial</b> “Revisar e aprovar”. Não publica no grupo.</div>'+
-        '<div class="gcs-card"><img id="autoCardPreview" alt="Card premium Aurora Glass — Agenda ID Seven"/></div>'+
-        '<input id="waPhone" class="gcs-input" type="tel" autocomplete="off" placeholder="WhatsApp do responsável — ex.: 55 11 99999-9999" value="'+esc(ctx.phone||'')+'"/>'+
-        '<button class="gcs-go" id="btnSendAuto">'+svg('send')+'Enviar para número individual</button>'+
-        '<div class="gcs-status" id="autoStatus">Vai pela WhatsApp Cloud API: imagem + texto + botão “Revisar e aprovar”. Confirmação com ID real da Meta.</div>'+
+        '<div style="height:1px;background:var(--line-soft);margin:14px 0"></div>'+
+        '<div class="gcs-stepmsg" style="margin-top:0"><b>Envio automático para número individual</b> (WhatsApp Cloud API oficial, com botão “Revisar e aprovar”). Depende de configuração futura das credenciais da Meta no servidor. <b>Nenhuma mensagem é enviada sem sua ação.</b></div>'+
+        '<input id="waPhone" class="gcs-input" type="tel" autocomplete="off" disabled placeholder="WhatsApp do responsável — ex.: 55 11 99999-9999" value="'+esc(ctx.phone||'')+'"/>'+
+        '<button class="gcs-go" id="btnSendAuto" disabled style="margin-top:11px">'+svg('send')+'Enviar para número individual — indisponível</button>'+
+        '<div class="gcs-status" id="autoStatus" style="color:#c9b46a">Integração oficial ainda não configurada. Quando for configurada, o envio continuará exigindo um clique seu.</div>'+
       '</div>'+
     '</details>'+
   '</div></div>';
@@ -6621,12 +6629,11 @@ function openWhatsAppWebOnly(){
   else { try{window.open(WEB,'_blank');}catch(_){} }
   return WEB;
 }
-// 1.0.123-whatsapp-group-copy — FLUXO PRINCIPAL "Enviar no grupo do cliente" (1 CLIQUE).
-// "Copiar mensagem para o grupo" copia a MENSAGEM COMPLETA (texto + link público) p/ a área de
-// transferência. O operador cola no grupo do WhatsApp Business do cliente e o WhatsApp renderiza
-// a PRÉVIA PREMIUM do link (card OG do Worker, "Toque no link abaixo →"). NÃO salva arquivo, NÃO
-// abre pasta, NÃO copia imagem como ação principal. O botão "Revisar e aprovar" vive no PORTAL.
-// "Copiar card (imagem)"/"Salvar e abrir pasta" existem só como fallback recolhido (opções avançadas).
+// F3.3.70D3R10U — wiring do fluxo IMAGEM-PRIMEIRO: passo 1 copia/baixa/abre a IMAGEM real do
+// card (garante o visual premium em qualquer WhatsApp); passo 2 copia a MENSAGEM COMPLETA
+// (texto + link público /share); passo 3 abre o WhatsApp Business SEM tocar no clipboard
+// (para nao apagar a imagem copiada). O botão "Revisar e aprovar" vive no PORTAL.
+// "Salvar e abrir pasta" permanece nas opções avançadas.
 async function _wireGroupSend(ctx, msg, cardFile){
   const api=(window.desktopAPI||{});
   let bytes=null, savedPath=null;
@@ -6641,7 +6648,7 @@ async function _wireGroupSend(ctx, msg, cardFile){
   }catch(e){
     try{ const r=await fetch(CARD_IMG_URL,{cache:'no-store'}); if(r.ok){ bytes=await r.arrayBuffer(); if(img) img.src=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'})); } }catch(_){ if(img) img.src=CARD_IMG_URL; }
   }
-  // Fallbacks (opções avançadas) — só sob demanda; nunca na ação principal.
+  // Helpers de imagem — usados pelo PASSO 1 (copiar/baixar/abrir) e pelas opções avançadas.
   async function ensureSaved(){
     if(savedPath) return savedPath;
     if(!bytes) return null;
@@ -6660,36 +6667,71 @@ async function _wireGroupSend(ctx, msg, cardFile){
     copyToClipboard(msg);                                          // copia a MENSAGEM COMPLETA (texto + link /share)
     return true;
   }
-  /* ===== PRINCIPAL — ABRIR WHATSAPP BUSINESS (copia a mensagem AUTOMATICAMENTE + abre o app) =====
-     É o fluxo que funcionou no teste real: 1 clique copia a mensagem e abre o WhatsApp Business.
-     Sem pasta, sem salvar arquivo, sem etapas. O link /share gera a prévia premium ao colar. */
-  on('btnOpenWaMain', function(){
-    if(!copyMsgClean()) return;                                    // 1) copia a mensagem automaticamente
-    openWhatsAppWebOnly();                                         // 2) abre o WhatsApp Business (só web.whatsapp.com/)
-    const b=$('btnOpenWaMain'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'WhatsApp aberto · mensagem copiada'; }
-    setStatus(svg('check')+'<span>Mensagem copiada e WhatsApp Business aberto. Escolha o grupo do cliente e cole (Ctrl+V) — a prévia premium aparece pelo link.</span>','ok',true);
-    flashToast('Mensagem copiada e WhatsApp Business aberto. Escolha o grupo do cliente e cole.');
-    // Reprovação 1.0.138 (causa-raiz da notificação inicial): este é o botão REAL usado
-    // pela Social e ele NÃO registrava o envio — sem persistClientSend não há contentSent
-    // e o Notification Engine nunca recebe themes_sent_to_client. O registro roda em
-    // segundo plano (não trava o WhatsApp); o dedup de 60s do engine cobre o duplo clique.
-    if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
+  /* ===== F3.3.70D3R10U · PASSO 1 — IMAGEM DO CARD (acao PRINCIPAL do fluxo) =====
+     "Copiar card (imagem)" e o passo 1 do envio garantido: o operador cola a imagem
+     no grupo do WhatsApp Business. Se o clipboard de imagem falhar, salva o arquivo. */
+  on('btnCopyImg', async function(){
+    if(!bytes){ flashToast('A imagem ainda não carregou.'); return; }
+    const cp=await copyCard();
+    if(cp.ok){
+      const b=$('btnCopyImg'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'Imagem copiada'; }
+      setStatus(svg('check')+'<span>Imagem copiada. No WhatsApp Business, cole (Ctrl+V) na conversa do grupo e envie. Depois use “Copiar mensagem” (passo 2).</span>','ok',true);
+      flashToast('Card copiado — cole (Ctrl+V) como imagem no grupo.');
+    } else {
+      const p=await ensureSaved();
+      flashToast(p?('Clipboard indisponível — card salvo: '+p):'Não foi possível preparar o card.');
+    }
   });
-  /* ===== Secundários discretos ===== */
-  on('btnCopyGroupMsg', function(){                                // copia só a mensagem (se útil), sem abrir o WhatsApp
+  on('btnSaveImgAs', async function(){                             // "Baixar imagem…" (dialogo Salvar como)
+    if(!bytes){ flashToast('A imagem ainda não carregou.'); return; }
+    if(api.saveCardImageAs){
+      const r=await api.saveCardImageAs(new Uint8Array(bytes),cardFile);
+      if(r&&r.ok){ savedPath=r.path||savedPath; flashToast('Card salvo: '+(r.path||'')); }
+      else if(r&&r.canceled){ /* usuario cancelou o dialogo — sem toast de erro */ }
+      else { flashToast('Não foi possível salvar o card.'); }
+    } else {
+      const p=await ensureSaved(); flashToast(p?('Card salvo: '+p):'Não foi possível salvar o card.');
+    }
+  });
+  on('btnOpenImg', async function(){                               // "Abrir imagem" (visualizador padrao do SO)
+    if(!bytes){ flashToast('A imagem ainda não carregou.'); return; }
+    if(api.openCardImage){
+      const r=await api.openCardImage(new Uint8Array(bytes),cardFile);
+      if(r&&r.ok){ savedPath=r.path||savedPath; flashToast('Imagem aberta no visualizador (salva em Downloads).'); return; }
+    }
+    const p=await ensureSaved();
+    if(p&&api.showInFolder){ api.showInFolder(p); flashToast('Card salvo e pasta aberta: '+p); }
+    else { flashToast(p?('Card salvo: '+p):'Não foi possível abrir a imagem.'); }
+  });
+  /* ===== PASSO 2 — MENSAGEM COM O LINK ===== */
+  on('btnCopyGroupMsg', function(){                                // copia a mensagem completa (texto + link /share)
     if(!copyMsgClean()) return;
     const b=$('btnCopyGroupMsg'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'Mensagem copiada'; }
     flashToast('Mensagem copiada. Cole no grupo do WhatsApp Business do cliente.');
-    // Copiar a mensagem É o passo de envio manual no grupo — registra igual.
+    // Copiar a mensagem É o passo de envio manual no grupo — registra igual (Notification Engine).
     if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
   });
-  on('btnTestLink', function(){                                    // abre o LINK DE COMPARTILHAMENTO p/ conferir a prévia premium + portal
+  on('btnTestLink', function(){                                    // abre o LINK DE COMPARTILHAMENTO p/ conferir portal
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ flashToast('Link inválido — gere o cronograma novamente.'); return; }
     const ext=api.openExternal; if(ext){ try{ ext(url); }catch(_){ try{window.open(url,'_blank');}catch(__){} } } else { try{window.open(url,'_blank');}catch(_){} }
-    flashToast('Abrindo o link de compartilhamento (prévia premium + portal) para teste.');
+    flashToast('Abrindo o link de compartilhamento (portal do cliente) para teste.');
   });
-  /* ===== Fallback (opções avançadas) — card como arquivo; NUNCA na ação principal ===== */
-  on('btnCopyImg', async function(){ if(!bytes){flashToast('A imagem ainda não carregou.');return;} const cp=await copyCard(); if(cp.ok){ flashToast('Card copiado — cole (Ctrl+V) como imagem no grupo.'); } else { const p=await ensureSaved(); flashToast(p?('Card salvo: '+p):'Não foi possível preparar o card.'); } });
+  /* ===== PASSO 3 — ABRIR WHATSAPP BUSINESS =====
+     F3.3.70D3R10U: NAO copia mais a mensagem automaticamente — copiar aqui APAGARIA a
+     imagem do clipboard (passo 1) e o operador colaria texto achando que era o card.
+     Os botoes de copia sao explicitos (passos 1 e 2); este apenas valida o link e abre. */
+  on('btnOpenWaMain', function(){
+    const lk=_gateValidLink(ctx,msg);                              // valida link público /share + token
+    if(!lk.ok){ setStatus('Link inválido — gere o cronograma novamente.','err'); flashToast('Link inválido — gere o cronograma novamente.'); return; }
+    openWhatsAppWebOnly();                                         // abre o WhatsApp Business (só web.whatsapp.com/)
+    const b=$('btnOpenWaMain'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'WhatsApp Business aberto'; }
+    setStatus(svg('check')+'<span>WhatsApp Business aberto. Envie a <b>imagem</b> (passo 1) e cole a <b>mensagem</b> (passo 2) no grupo do cliente.</span>','ok',true);
+    flashToast('WhatsApp Business aberto. Envie a imagem + a mensagem no grupo.');
+    // Reprovação 1.0.138: este é o botão REAL usado pela Social — sem persistClientSend não há
+    // contentSent e o Notification Engine nunca recebe themes_sent_to_client. Mantido.
+    if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
+  });
+  /* ===== Opções avançadas — arquivo (recolhido) ===== */
   on('btnOpenFolder', async function(){ const p=await ensureSaved(); if(p&&api.showInFolder){ api.showInFolder(p); flashToast('Card salvo e pasta aberta: '+p); } else if(p){ flashToast('Card salvo: '+p); } else { flashToast('Não foi possível salvar o card.'); } });
 }
 /* ===== VISÃO DO CLIENTE — tela real (rota dedicada) =====
@@ -7111,7 +7153,35 @@ function renderPerfil(){
       settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
-    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop 1.0.119 · Domínio premium</div></div>';
+    '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop '+APP_VER.desktop+' · produção</div></div>';
+}
+// F3.3.70D3R10U — linha de status da Bandeja do sistema (Configuracoes).
+// Le o estado REAL via IPC sincrono (desktopAPI.trayStatus) e mapeia os 4 estados
+// aprovados no mockup D: Criada · icone OK (verde) / Nao encontrada (vermelho) /
+// Recriada agora (azul) / Erro ao criar (ambar). Mostra iconEmpty true/false e a origem.
+function cfgTrayRowHtml(){
+  let st=null;
+  try{ st=(window.desktopAPI&&window.desktopAPI.trayStatus)?window.desktopAPI.trayStatus():null; }catch(_){ st=null; }
+  let label,color,ss;
+  if(!st){
+    label='Indisponível'; color='#9BA0AB';
+    ss='Status do tray não disponível nesta versão do app.';
+  } else if(st.lastEvent==='error'){
+    label='Erro ao criar'; color='#F2A93B';
+    ss='Falha real na criação — reinicie o app; detalhe no log local (idseven-notif-diag.log).';
+  } else if(!st.created){
+    label='Não encontrada'; color='#F87171';
+    ss='Tray ausente (ex.: Explorer reiniciou). O app tenta recriar sozinho; o botão abaixo força na hora.';
+  } else if(st.lastEvent==='recreated'){
+    label='Recriada agora ✓'; color='#60A5FA';
+    ss='Ícone '+(st.iconEmpty?'VAZIO':'OK')+' (iconEmpty: '+String(!!st.iconEmpty)+') · origem: '+(st.iconPath||'—');
+  } else {
+    label='Criada · ícone '+(st.iconEmpty?'VAZIO':'OK'); color=st.iconEmpty?'#F2A93B':'#34D399';
+    ss='iconEmpty: '+String(!!st.iconEmpty)+' · origem: '+(st.iconPath||'—');
+  }
+  return '<div class="settrow" style="cursor:default"><div class="icb">'+svg('bell')+'</div>'+
+    '<div class="sm"><div class="sl">Bandeja do sistema</div><div class="ss">'+esc(ss)+'</div></div>'+
+    '<span class="cfg-traypill" style="background:'+withAlpha(color,.16)+';color:'+color+'"><span class="dot" style="background:'+color+'"></span>'+esc(label)+'</span></div>';
 }
 function renderConfig(){
   const u=state.user;
@@ -7126,6 +7196,13 @@ function renderConfig(){
       settRow('gear','Segurança da sessão','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+soon('Autenticação em duas etapas (2FA)')+'<div class="divline"></div>'+soon('Sessões e dispositivos')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
   h+='<div style="height:14px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
       act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+soon('Notificações de tarefas')+'<div class="divline"></div>'+soon('Notificações de chat')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
+  // F3.3.70D3R10U — Bandeja do sistema (tray): status real via IPC tray-status +
+  // botao "Recriar icone da bandeja" (IPC tray-recreate) + orientacao da seta ^.
+  h+='<div style="height:14px"></div><div class="lbl">Bandeja do sistema (tray)</div><div class="card">'+
+      cfgTrayRowHtml()+'<div class="divline"></div>'+
+      act('send','Recriar ícone da bandeja','Use se o ícone sumir da área perto do relógio','data-cfgtrayrecreate="1"')+'<div class="divline"></div>'+
+      info('Onde encontro o ícone?','Ele pode ficar escondido na seta ^ perto do relógio do Windows.')+'<div class="divline"></div>'+
+      info('Fechar (X) × Sair','X envia o app para a bandeja (continua rodando). “Sair”, no menu da bandeja, encerra de verdade.')+'</div>';
   h+='<div style="height:14px"></div><div class="lbl">Acessibilidade e Aparência</div><div class="card">'+
       info('Tema','Escuro (premium)')+'<div class="divline"></div>'+soon('Tema claro')+'<div class="divline"></div>'+soon('Tamanho da fonte')+'<div class="divline"></div>'+soon('Alto contraste')+'</div>';
   h+='<div style="height:14px"></div><div class="lbl">Desempenho e Dados</div><div class="card">'+
@@ -7490,6 +7567,18 @@ document.addEventListener('click',async e=>{
   }
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
   if(el=g('[data-cfgnotiftest]')){try{window.desktopAPI&&window.desktopAPI.notifTest&&window.desktopAPI.notifTest();}catch(_){}flashToast('Notificação de teste disparada.');return;}
+  // F3.3.70D3R10U — "Recriar ícone da bandeja": IPC tray-recreate + re-render p/ o status novo
+  if(el=g('[data-cfgtrayrecreate]')){
+    (async function(){
+      let r=null;
+      try{ r=(window.desktopAPI&&window.desktopAPI.trayRecreate)?await window.desktopAPI.trayRecreate():null; }catch(_){ r=null; }
+      if(r&&r.ok){ flashToast('Ícone da bandeja recriado. Procure perto do relógio ou na seta ^.'); }
+      else if(r){ flashToast('Não foi possível recriar o ícone — veja o log de diagnóstico.'); }
+      else { flashToast('Recriação indisponível nesta versão do app.'); }
+      render();                                            // atualiza a linha "Bandeja do sistema"
+    })();
+    return;
+  }
   if(el=g('[data-logout]')){closeModal();logout();return;}
   if(el=g('[data-chpw]')){closeModal();openChangePasswordModal();return;}
   if(el=g('[data-pickasg]')){if(state.form){const id=el.dataset.pickasg||null;state.form.assigneeId=id;const u=id?state.users.find(x=>x.id===id):null;state.form.assignee=u?(u.name||''):'';}closeModal();render();return;}

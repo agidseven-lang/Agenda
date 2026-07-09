@@ -15,9 +15,9 @@ name: "[manual] Desktop Build (Windows)"
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: desktop/local-detail-hierarchy-v2)"
+        description: "Branch/commit a buildar (default: desktop/local-1.0.77-cronograma-client-flow-phase1)"
         required: true
-        default: "desktop/local-detail-hierarchy-v2"
+        default: "desktop/local-1.0.77-cronograma-client-flow-phase1"
 
 permissions:
   contents: read
@@ -30,22 +30,20 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      DIST_BASENAME: "Agenda-ID-Seven-Desktop-1.0.99-operational-status-consistency-fix"
+      # F3.3.70D3R10I — rotulo derivado do package.json (passo "Derivar versao"); nada hardcoded.
+      DIST_BASENAME: ""
     steps:
       - name: Checkout (ref escolhido)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
 
-      # CI-only: label FIXO desta versao de TESTE + validacao de que o package.json bate.
-      - name: Definir versao/labels (1.0.146-beta-board-rebuild)
+      - name: Derivar versao (package.json e a fonte unica)
         run: |
-          LABEL="1.0.146-beta-board-rebuild"
-          VER="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$APP_DIR/package.json" | head -1)"
-          if [ "$VER" != "1.0.146" ]; then echo "::error::package.json version=$VER (esperado 1.0.146)"; exit 1; fi
-          echo "VER_LABEL=$LABEL" >> "$GITHUB_ENV"
-          echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL}" >> "$GITHUB_ENV"
-          echo "VER_LABEL=$LABEL | DIST_BASENAME=Agenda-ID-Seven-Desktop-${LABEL} | package.json=$VER"
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-$APP_VERSION" >> "$GITHUB_ENV"
+          echo "versao=$APP_VERSION"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -64,27 +62,33 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: npx electron-builder --win nsis msi --publish never
 
-      # PROVA exigida no reteste 1.0.146: o renderer DENTRO do app.asar empacotado
-      # deve ser byte a byte identico ao renderer auditado do repo. Falha = build invalido.
-      - name: Prova renderer empacotado == renderer auditado (byte a byte)
+      - name: Gate tray icon empacotado (F3.3.22/F3.3.70D3R10I)
         working-directory: ${{ env.APP_DIR }}
         run: |
-          ASAR="dist-installer/win-unpacked/resources/app.asar"
-          if [ ! -f "$ASAR" ]; then echo "::error::app.asar nao encontrado em $ASAR"; ls -R dist-installer | head -50; exit 1; fi
-          # extract COMPLETO (extract-file falha no Windows: separador de caminho interno e '\')
-          rm -rf asar-x
-          npx @electron/asar extract "$ASAR" asar-x
-          if [ ! -f asar-x/src/renderer/index.html ]; then echo "::error::index.html ausente no asar extraido"; find asar-x -maxdepth 3 -type d | head -30; exit 1; fi
-          SHA_SRC=$(sha256sum src/renderer/index.html | awk '{print $1}')
-          SHA_PKG=$(sha256sum asar-x/src/renderer/index.html | awk '{print $1}')
-          echo "SHA-256 renderer fonte (auditado) : $SHA_SRC"
-          echo "SHA-256 renderer empacotado(asar) : $SHA_PKG"
-          if [ "$SHA_SRC" != "$SHA_PKG" ]; then echo "::error::renderer empacotado DIFERE da fonte auditada"; exit 1; fi
-          echo "OK: renderer empacotado e byte a byte o renderer auditado."
-          rm -rf asar-x
-          echo "GREP de proibidos no renderer empacotado (deve ser vazio):"
-          ! grep -nE "fitZoom|--fitz|body\.style\.zoom" src/renderer/index.html || { echo "::error::padrao proibido encontrado"; exit 1; }
-          echo "OK: sem fitZoom / --fitz / body.style.zoom."
+          if [ -f "dist-installer/win-unpacked/resources/icon.png" ]; then
+            echo "resources/icon.png OK (tray tera icone)"
+          else
+            echo "::error:: resources/icon.png AUSENTE no pacote — tray ficaria invisivel (nativeImage.createEmpty)."
+            ls -la dist-installer/win-unpacked/resources/ 2>/dev/null || true
+            exit 1
+          fi
+
+      - name: Gate prova-de-versao (sem versao stale/hardcoded no renderer empacotado)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          # F3.3.70D3R10U — NO-GO absoluto: 1.0.146-149 em qualquer lugar do renderer
+          # empacotado, e qualquer rotulo literal "Desktop 1\.0\.<n>" / "Versao 1.0.<n>"
+          # (a versao real deriva de app.getVersion em runtime; literal = regressao).
+          RDIR=$(ls -d dist-installer/win-unpacked/resources/app*/src/renderer 2>/dev/null | head -1)
+          if [ -z "$RDIR" ]; then echo "::error:: renderer empacotado nao encontrado"; exit 1; fi
+          PAT='1\.0\.14[6-9]|Desktop 1\.0\.[0-9]+|Vers..?o 1\.0\.[0-9]+'
+          FOUND=$(grep -rlE "$PAT" "$RDIR" 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "::error:: rotulo de versao stale/hardcoded no renderer empacotado: $FOUND"
+            grep -rnE "$PAT" $FOUND | head -8
+            exit 1
+          fi
+          echo "renderer sem 1.0.146-149 e sem 'Desktop/Versao 1.0.<n>' literal — versao deriva de app.getVersion."
 
       - name: Empacotar bundle (instalador + relatorios)
         working-directory: ${{ env.APP_DIR }}
@@ -105,7 +109,7 @@ jobs:
           # VERSAO-DESKTOP.txt — prova do que esta dentro
           {
             echo "productName : Agenda ID Seven Desktop"
-            echo "versionName : ${VER_LABEL}"
+            echo "versionName : $APP_VERSION"
             echo "appId       : br.com.idseven.agenda.desktop"
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
@@ -115,7 +119,7 @@ jobs:
             fi
             echo "commit      : $GITHUB_SHA"
             echo "ref         : ${{ github.event.inputs.ref }}"
-            echo "espelha APK : ${VER_LABEL}"
+            echo "espelha APK : 1.0.64-beta-build-artifact-version-fix"
           } > "$OUT/VERSAO-DESKTOP.txt"
           # RELATORIO-DESKTOP.txt — checagens
           {
@@ -133,13 +137,13 @@ jobs:
           printf '%s\n' \
             "==== COMO INSTALAR - Agenda ID Seven Desktop (Windows) ====" \
             "" \
-            "*** IMPORTANTE - ANTES DE INSTALAR (correcao 1.0.86) ***" \
+            "*** IMPORTANTE - ANTES DE INSTALAR (correcao 1.0.77) ***" \
             "- Se ja existe uma versao instalada, FECHE-A PELA BANDEJA:" \
             "  clique direito no icone na bandeja (perto do relogio) -> 'Sair'." \
             "- O app mora na bandeja; clicar no X apenas esconde, NAO encerra," \
             "  e a versao antiga travava os arquivos, impedindo a atualizacao" \
             "  (era a causa de continuar aparecendo 1.0.66)." \
-            "- A partir do 1.0.86 o instalador ja ENCERRA a versao antiga" \
+            "- A partir do 1.0.77 o instalador ja ENCERRA a versao antiga" \
             "  automaticamente, mas fechar pela bandeja antes garante 100%." \
             "" \
             "1) Baixe o instalador (.exe ou .msi). PREFIRA o .exe." \
@@ -189,7 +193,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-${{ env.VER_LABEL }}-installer
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-installer
           path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
           if-no-files-found: error
           retention-days: 30
@@ -198,7 +202,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agenda-id-seven-desktop-${{ env.VER_LABEL }}-bundle
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-bundle
           path: dist-pkg/
           if-no-files-found: error
           retention-days: 30

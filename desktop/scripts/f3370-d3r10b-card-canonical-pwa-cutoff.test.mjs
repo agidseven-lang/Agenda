@@ -192,7 +192,8 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(!PRELOAD.includes('1.0.137-beta-portal-fix') && PRELOAD.includes('app-version'), 'F7: preload sem versão stale; versão real via IPC');
   ok(/info\('Versão do aplicativo'/.test(HTML), 'F8: tela Config exibe a versão do aplicativo');
   const TRAY = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'tray.ts'), 'utf8');
-  ok(TRAY.includes('tray.created') && TRAY.includes('iconEmpty'), 'F9: tray com diagnóstico runtime (tray.created)');
+  // F3.3.70D3R10U: o diag virou template ("tray." + event) e cobre created/recreated/error
+  ok(TRAY.includes('diag("tray." + event') && TRAY.includes('iconEmpty'), 'F9: tray com diagnóstico runtime (tray.created/recreated via template)');
 }
 
 /* ───────────────── G: 1.0.150 — proveniencia de versao (D3R10Q) ───────────────── */
@@ -209,14 +210,96 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<title>ID Seven · Desktop<\/title>/.test(HTML), 'G6: <title> estático neutro (runtime preenche)');
   // G7: sidebar footer deriva de APP_VER
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
-  // G8: package.json e lock em 1.0.150
+  // G8: package.json e lock em 1.0.151
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.150', 'G8: package.json version = 1.0.150 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.151', 'G8: package.json version = 1.0.151 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.150', 'G9: package-lock version = 1.0.150 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.151', 'G9: package-lock version = 1.0.151 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
+}
+
+
+/* ───────────── H: 1.0.151 — Card Premium IMAGEM-PRIMEIRO + tray diag (D3R10U) ───────────── */
+{
+  const MAIN = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'main.ts'), 'utf8');
+  const TRAY = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'tray.ts'), 'utf8');
+  const PRE  = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
+  const WF   = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'desktop-build.yml'), 'utf8');
+
+  // H1 — botoes de imagem no FLUXO PRINCIPAL (antes do 1º <details> de opções avançadas)
+  const modalStart = HTML.indexOf("gcs-title\">Enviar ao cliente — Card Premium");
+  const advStart = HTML.indexOf("<details class=\"gcs-adv\"", modalStart);
+  ok(modalStart > 0 && advStart > modalStart, 'H1a: modal imagem-primeiro presente com opções avançadas depois');
+  const mainFlow = HTML.slice(modalStart, advStart);
+  ok(mainFlow.includes('id="btnCopyImg"') && mainFlow.includes('Copiar card (imagem)'), 'H1b: "Copiar card (imagem)" é passo PRINCIPAL (fora de opções avançadas)');
+  ok(mainFlow.includes('id="btnSaveImgAs"') && mainFlow.includes('Baixar imagem'), 'H1c: "Baixar imagem…" no fluxo principal');
+  ok(mainFlow.includes('id="btnOpenImg"') && mainFlow.includes('Abrir imagem'), 'H1d: "Abrir imagem" no fluxo principal');
+  ok(/gcs-stepnum">1<\/span> IMAGEM DO CARD/.test(mainFlow) && /gcs-stepnum">2<\/span> MENSAGEM COM O LINK/.test(mainFlow) && /gcs-stepnum">3<\/span> WHATSAPP BUSINESS/.test(mainFlow), 'H1e: passos 1-2-3 na ordem imagem → mensagem → WhatsApp');
+  ok(mainFlow.includes('Envie a <b>imagem</b> + cole a <b>mensagem com o link</b> para garantir o Card Premium'), 'H1f: texto obrigatório do callout presente');
+  ok(mainFlow.includes('Ilustração do card que você pode enviar como imagem'), 'H1g: legenda honesta da imagem presente');
+  ok(mainFlow.includes('id="btnCopyGroupMsg"') && mainFlow.includes('id="btnTestLink"') && mainFlow.includes('id="btnOpenWaMain"'), 'H1h: Copiar mensagem / Testar link / Abrir WhatsApp Business presentes');
+
+  // H2 — textos enganosos REMOVIDOS (UI)
+  ok(!HTML.includes('Normalmente <b>não é preciso</b>') && !HTML.includes('Normalmente não é preciso'), 'H2a: "Normalmente não é preciso" removido');
+  ok(!HTML.includes('aparece sozinha ao colar o link') && !HTML.includes('prévia premium aparece pelo link'), 'H2b: promessas de unfurl automático removidas');
+  ok(!HTML.includes('A mensagem será copiada automaticamente'), 'H2c: promessa de cópia automática (que apagaria a imagem do clipboard) removida');
+  ok(HTML.includes('nem sempre</b> gera a prévia do link sozinho'), 'H2d: nota honesta sobre unfurl presente');
+
+  // H3 — mensagem/link intocados (funções reais)
+  const SRC3 = ['CLIENT_LINK_BASE', 'withWhatsAppPreviewBust', 'buildShareClientUrl', 'buildClientMessage'].map(grab).join('\n');
+  const M3 = new Function('Date', SRC3 + '\nreturn {buildShareClientUrl,buildClientMessage,withWhatsAppPreviewBust};')(Date);
+  const tok = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718';
+  const msg3 = M3.buildClientMessage({ client: 'Cliente QA', token: tok });
+  ok(msg3.includes('https://aprovar.agendaidseven.com.br/share/cronograma/' + tok + '?v='), 'H3a: mensagem contém /share/cronograma/<token>?v= (cache-bust automático)');
+  ok(msg3.indexOf('Olá, Cliente QA.') === 0 && msg3.includes('Equipe ID Seven'), 'H3b: modelo da mensagem preservado');
+  let threw = false; try { M3.buildShareClientUrl(''); } catch (_) { threw = true; }
+  ok(threw, 'H3c: link NUNCA sai sem token (guard lança)');
+
+  // H4 — Cloud API permanece avançado, sem envio automático
+  const advFlow = HTML.slice(advStart);
+  ok(advFlow.includes('id="btnSendAuto"') && advFlow.includes('disabled'), 'H4a: envio Cloud API recolhido em opções avançadas e DESABILITADO até config da Meta');
+  ok(advFlow.includes('configuração futura das credenciais da Meta') && advFlow.includes('Nenhuma mensagem é enviada sem sua ação'), 'H4b: aviso honesto de dependência futura');
+  ok(HTML.includes("const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE+'/client/send-premium-whatsapp'"), 'H4c: rota segura do Worker inalterada');
+  ok(advFlow.includes('id="btnOpenFolder"') && advFlow.includes('Salvar e abrir pasta'), 'H4d: "Salvar e abrir pasta" permanece nas opções avançadas');
+
+  // H5 — tray NUNCA com ícone vazio (fallback embutido)
+  ok(TRAY.includes('TRAY_FALLBACK_B64'), 'H5a: fallback de ícone EMBUTIDO (base64) presente no tray.ts');
+  ok(/if \(img\.isEmpty\(\)\) \{[\s\S]*?createFromDataURL\("data:image\/png;base64," \+ TRAY_FALLBACK_B64\)/.test(TRAY), 'H5b: ramo isEmpty → usa o embutido (ícone invisível impossível)');
+  ok(TRAY.includes('function ensureTray') && TRAY.includes('function recreateTray') && TRAY.includes('function getTrayState'), 'H5c: ensureTray/recreateTray/getTrayState exportados');
+  ok(TRAY.includes('tray.error') && TRAY.includes('"recreated"'), 'H5d: diag tray.recreated/tray.error presentes');
+
+  // H6 — main.ts: IPCs + recriação no login + heartbeat
+  ok(MAIN.includes('ipcMain.on("tray-status"') && MAIN.includes('ipcMain.handle("tray-recreate"'), 'H6a: IPCs tray-status/tray-recreate registrados');
+  ok(/session-login[\s\S]{0,220}ensureTray\(trayWin, trayOpts\)/.test(MAIN), 'H6b: session-login garante o tray (recria após login)');
+  ok(/getTrayState\(\);[\s\S]{0,120}if \(!ts\.created\)[\s\S]{0,80}ensureTray/.test(MAIN), 'H6c: heartbeat verifica e recria o tray');
+  ok(MAIN.includes('tray: ts.created, trayIconEmpty: ts.iconEmpty'), 'H6d: main.alive loga estado do tray');
+  ok(MAIN.includes('ipcMain.handle("open-card-image"'), 'H6e: IPC open-card-image (Abrir imagem) registrado');
+
+  // H7 — preload expõe as pontes
+  ok(PRE.includes('trayStatus:') && PRE.includes('tray-status') && PRE.includes('trayRecreate:') && PRE.includes('tray-recreate'), 'H7a: preload expõe trayStatus/trayRecreate');
+  ok(PRE.includes('openCardImage:') && PRE.includes('open-card-image'), 'H7b: preload expõe openCardImage');
+
+  // H8 — Configurações: Bandeja do sistema + botão recriar + seta ^
+  ok(HTML.includes('Bandeja do sistema (tray)') && HTML.includes('function cfgTrayRowHtml'), 'H8a: seção "Bandeja do sistema" em Configurações');
+  ok(HTML.includes('data-cfgtrayrecreate="1"') && HTML.includes('Recriar ícone da bandeja'), 'H8b: botão "Recriar ícone da bandeja" presente');
+  ok(HTML.includes('escondido na seta ^ perto do relógio do Windows'), 'H8c: orientação da seta ^ presente');
+  ok(HTML.includes("'Não encontrada'") && HTML.includes("'Recriada agora ✓'") && HTML.includes("'Erro ao criar'") && HTML.includes('iconEmpty: '), 'H8d: 4 estados + iconEmpty true/false exibidos');
+  ok(HTML.includes('X envia o app para a bandeja') && HTML.includes('encerra de verdade'), 'H8e: regra X→bandeja / Sair→encerra escrita na tela');
+
+  // H10 — anti-leak: fixtures sem dados reais
+  ok(!/55\s?\d{2}\s?9?\d{4}-?\d{4}/.test(msg3), 'H10a: mensagem de teste sem telefone real');
+  ok(tok.length === 48 && !HTML.includes(tok), 'H10b: token de teste sintético (não existe no renderer)');
+
+  // H11 — ZERO versão hardcoded renderizada remanescente
+  ok((HTML.match(/1\.0\.14[6-9]/g) || []).length === 0, 'H11a: renderer sem 1.0.146/147/148/149 (nem em comentários)');
+  ok(!/Desktop 1\.0\.[0-9]/.test(HTML) && !/Versão 1\.0\.[0-9]/.test(HTML), 'H11b: nenhum "Desktop 1.0.<n>"/"Versão 1.0.<n>" literal (Perfil 1.0.119 corrigido)');
+  ok(HTML.includes("ID Seven · Desktop '+APP_VER.desktop+' · produção"), 'H11c: rodapé do Perfil deriva de APP_VER');
+
+  // H12 — gate de CI estendido (ícone + prova de versão anti-hardcode)
+  ok(WF.includes('Gate tray icon') || WF.includes('icon.png'), 'H12a: gate do ícone do tray presente no workflow');
+  ok(/1\\\.0\\\.14\[6-9\]/.test(WF) && WF.includes('Desktop 1\\.0\\.'), 'H12b: gate de prova-de-versão estendido (146-149 + Desktop/Versão 1.0.<n> literais)');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));

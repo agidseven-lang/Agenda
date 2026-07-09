@@ -40,7 +40,13 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.invoke("save-card-image-as", { bytes, filename }),
   copyCardImage: (bytes: ArrayBuffer | Uint8Array): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke("copy-card-image", bytes),
+  // F3.3.70D3R10U — "Abrir imagem" do card (salva em Downloads + abre no visualizador do SO)
+  openCardImage: (bytes: ArrayBuffer | Uint8Array, filename: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
+    ipcRenderer.invoke("open-card-image", { bytes, filename }),
   showInFolder: (p: string): Promise<boolean> => ipcRenderer.invoke("show-in-folder", p),
+  // F3.3.70D3R10U — TRAY: status p/ Configuracoes (sincrono, payload minusculo) + recriacao
+  trayStatus: (): any => { try { return ipcRenderer.sendSync("tray-status"); } catch { return null; } },
+  trayRecreate: (): Promise<any> => ipcRenderer.invoke("tray-recreate"),
   // F3.3.56-G2 — AUTH SERVER-SIDE. O token de sessão vive SOMENTE no main;
   // estes métodos retornam apenas {ok, user/self/active/expiresAt/error} — nunca o token.
   authLogin: (identifier: string, password: string): Promise<any> => ipcRenderer.invoke("auth-login", identifier, password),
