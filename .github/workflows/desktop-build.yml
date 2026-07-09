@@ -79,13 +79,34 @@ jobs:
           # F3.3.70D3R10U — NO-GO absoluto: 1.0.146-149 em qualquer lugar do renderer
           # empacotado, e qualquer rotulo literal "Desktop 1\.0\.<n>" / "Versao 1.0.<n>"
           # (a versao real deriva de app.getVersion em runtime; literal = regressao).
-          RDIR=$(ls -d dist-installer/win-unpacked/resources/app*/src/renderer 2>/dev/null | head -1)
-          if [ -z "$RDIR" ]; then echo "::error:: renderer empacotado nao encontrado"; exit 1; fi
+          # HONESTIDADE DO GATE: o renderer real vive DENTRO de app.asar — a versao
+          # anterior deste gate grepava app*/src/renderer (que nao existe com asar) e
+          # PASSAVA EM BRANCO. Agora extrai o asar e FALHA se o renderer nao for achado.
+          set +e
+          RDIR=""
+          ASAR="dist-installer/win-unpacked/resources/app.asar"
+          if [ -f "$ASAR" ]; then
+            EXDIR="$RUNNER_TEMP/asar-extract"
+            rm -rf "$EXDIR"; mkdir -p "$EXDIR"
+            npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+            if [ $? -ne 0 ]; then echo "::error:: falha ao extrair app.asar para o gate"; exit 1; fi
+            RDIR="$EXDIR/src/renderer"
+          else
+            for d in dist-installer/win-unpacked/resources/app*/src/renderer; do
+              if [ -d "$d" ]; then RDIR="$d"; break; fi
+            done
+          fi
+          if [ ! -d "$RDIR" ] || [ ! -f "$RDIR/index.html" ]; then
+            echo "::error:: renderer empacotado NAO encontrado (asar/app) — gate nao pode passar em branco."
+            ls -la dist-installer/win-unpacked/resources/ 2>/dev/null
+            exit 1
+          fi
+          echo "renderer real localizado: $RDIR"
           PAT='1\.0\.14[6-9]|Desktop 1\.0\.[0-9]+|Vers..?o 1\.0\.[0-9]+'
-          FOUND=$(grep -rlE "$PAT" "$RDIR" 2>/dev/null || true)
+          FOUND=$(grep -rlE "$PAT" "$RDIR" 2>/dev/null)
           if [ -n "$FOUND" ]; then
             echo "::error:: rotulo de versao stale/hardcoded no renderer empacotado: $FOUND"
-            grep -rnE "$PAT" $FOUND | head -8
+            grep -rnE "$PAT" $FOUND 2>/dev/null | head -8
             exit 1
           fi
           echo "renderer sem 1.0.146-149 e sem 'Desktop/Versao 1.0.<n>' literal — versao deriva de app.getVersion."
