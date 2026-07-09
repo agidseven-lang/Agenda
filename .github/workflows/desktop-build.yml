@@ -73,6 +73,17 @@ jobs:
             exit 1
           fi
 
+      - name: Gate prova-de-versao (nenhum rotulo stale 1.0.146 no renderer empacotado)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          FOUND=$(grep -rl "1.0.146" dist-installer/win-unpacked/resources/app*/src/renderer/ 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "::error:: rotulo stale '1.0.146' encontrado no renderer empacotado: $FOUND"
+            grep -rn "1.0.146" $FOUND | head -8
+            exit 1
+          fi
+          echo "renderer empacotado sem string '1.0.146' — prova de versao consistente (deriva de app.getVersion)."
+
       - name: Empacotar bundle (instalador + relatorios)
         working-directory: ${{ env.APP_DIR }}
         run: |
