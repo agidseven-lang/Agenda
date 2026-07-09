@@ -300,6 +300,9 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   // H12 — gate de CI estendido (ícone + prova de versão anti-hardcode)
   ok(WF.includes('Gate tray icon') || WF.includes('icon.png'), 'H12a: gate do ícone do tray presente no workflow');
   ok(/1\\\.0\\\.14\[6-9\]/.test(WF) && WF.includes('Desktop 1\\.0\\.'), 'H12b: gate de prova-de-versão estendido (146-149 + Desktop/Versão 1.0.<n> literais)');
+  // F3.3.70D3R10U: o gate anterior grepava app*/src/renderer (inexistente com asar) e
+  // passava EM BRANCO — agora extrai o app.asar e falha se o renderer não for achado.
+  ok(WF.includes('@electron/asar extract') && WF.includes('gate nao pode passar em branco'), 'H12c: gate extrai o asar e é anti-vácuo (nunca passa sem escanear o renderer real)');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
