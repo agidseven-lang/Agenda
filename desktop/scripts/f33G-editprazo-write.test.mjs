@@ -147,7 +147,8 @@ ok('S2 patch só monta designerSla.plan* (sem editedAt/editedBy/history/extra)',
 ok('S3 nenhuma escrita de plannedFinishAt fora do espelhamento guardado', (DH.match(/plannedFinishAt'\]=/g) || []).length === 1);
 ok('S4 read-back presente (get + slaPanelFinishMs + gate AND)', /await db\.collection\('tasks'\)\.doc\(taskId\)\.get\(\)/.test(DH) && /okCanon=fresh\?\(Number\(slaPanelFinishMs\(fresh,f\)\)===dueMs\):false;/.test(DH) && /if\(fresh&&okStart&&okDue&&okPF&&okCanon\)\{/.test(DH));
 ok('S5 handler do "Salvar prazo" chama slaEditPrazoCommit (não é mais no-op)', /if\(e\.target\.id==='slaedit-save'\)\{ slaEditPrazoCommit\(taskId, ov\); return; \}/.test(DH));
-ok('S6 cache-bust WhatsApp INTOCADO (withWhatsAppPreviewBust no buildClientMessage)', /const url=withWhatsAppPreviewBust\(buildShareClientUrl\(ctx&&ctx\.token\)\)/.test(DH));
+// F3.3.70D3R10AA: contrato atualizado por ordem do owner — mensagem SEM cache-bust (regime 19/06).
+ok('S6 mensagem WhatsApp no regime restaurado (link estavel, sem ?v= — D3R10AA)', /const url=buildShareClientUrl\(ctx&&ctx\.token\);/.test(DH));
 ok('S7 notificações background INTOCADAS (showBgNotify primário, canal bg-window)', /const bgOk = showBgNotify\(p\);/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
 ok('S8 Worker/OG INTOCADO (OG_IMG_PATH + dimensões 1200x630)', /const OG_IMG_PATH = "\/og\/wa-card-v64-38\.jpg"/.test(WK) && /og:image:width" content="1200"/.test(WK));
 ok('S9 SLA Monitor lê pelo MESMO canônico (slaPanelFinishMs em slaMonNextBoundary)', /var fin=slaPanelFinishMs\(t,f\); if\(!fin\) continue;/.test(DH));
