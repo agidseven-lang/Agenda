@@ -210,11 +210,11 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<title>ID Seven · Desktop<\/title>/.test(HTML), 'G6: <title> estático neutro (runtime preenche)');
   // G7: sidebar footer deriva de APP_VER
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
-  // G8: package.json e lock em 1.0.151
+  // G8: package.json e lock em 1.0.152
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.151', 'G8: package.json version = 1.0.151 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.152', 'G8: package.json version = 1.0.152 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.151', 'G9: package-lock version = 1.0.151 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.152', 'G9: package-lock version = 1.0.152 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
@@ -228,24 +228,25 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   const PRE  = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   const WF   = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'desktop-build.yml'), 'utf8');
 
-  // H1 — botoes de imagem no FLUXO PRINCIPAL (antes do 1º <details> de opções avançadas)
+  // H1 — F3.3.70D3R10Z: ENVIO OFICIAL (Cloud API) e o CAMINHO PRINCIPAL do modal
   const modalStart = HTML.indexOf("gcs-title\">Enviar ao cliente — Card Premium");
   const advStart = HTML.indexOf("<details class=\"gcs-adv\"", modalStart);
-  ok(modalStart > 0 && advStart > modalStart, 'H1a: modal imagem-primeiro presente com opções avançadas depois');
+  ok(modalStart > 0 && advStart > modalStart, 'H1a: modal presente com opções avançadas depois do fluxo principal');
   const mainFlow = HTML.slice(modalStart, advStart);
-  ok(mainFlow.includes('id="btnCopyImg"') && mainFlow.includes('Copiar card (imagem)'), 'H1b: "Copiar card (imagem)" é passo PRINCIPAL (fora de opções avançadas)');
-  ok(mainFlow.includes('id="btnSaveImgAs"') && mainFlow.includes('Baixar imagem'), 'H1c: "Baixar imagem…" no fluxo principal');
-  ok(mainFlow.includes('id="btnOpenImg"') && mainFlow.includes('Abrir imagem'), 'H1d: "Abrir imagem" no fluxo principal');
-  ok(/gcs-stepnum">1<\/span> IMAGEM DO CARD/.test(mainFlow) && /gcs-stepnum">2<\/span> MENSAGEM COM O LINK/.test(mainFlow) && /gcs-stepnum">3<\/span> WHATSAPP BUSINESS/.test(mainFlow), 'H1e: passos 1-2-3 na ordem imagem → mensagem → WhatsApp');
-  ok(mainFlow.includes('Envie a <b>imagem</b> + cole a <b>mensagem com o link</b> para garantir o Card Premium'), 'H1f: texto obrigatório do callout presente');
-  ok(mainFlow.includes('Ilustração do card que você pode enviar como imagem'), 'H1g: legenda honesta da imagem presente');
-  ok(mainFlow.includes('id="btnCopyGroupMsg"') && mainFlow.includes('id="btnTestLink"') && mainFlow.includes('id="btnOpenWaMain"'), 'H1h: Copiar mensagem / Testar link / Abrir WhatsApp Business presentes');
-
+  ok(mainFlow.includes('id="btnSendAuto"') && !/id="btnSendAuto"[^>]*disabled/.test(mainFlow), 'H1b: "Enviar Card Premium agora (oficial)" é PRIMÁRIO e HABILITADO');
+  ok(mainFlow.includes('id="waPhone"') && !/id="waPhone"[^>]*disabled/.test(mainFlow), 'H1c: campo de WhatsApp do cliente habilitado no fluxo principal');
+  ok(mainFlow.includes('ENVIO OFICIAL — CARD PREMIUM DIRETO NO WHATSAPP'), 'H1d: passo 1 = envio oficial direto no WhatsApp');
+  ok(mainFlow.includes('id="btnCopyGroupMsg"') && mainFlow.includes('id="btnTestLink"') && mainFlow.includes('id="btnOpenWaMain"'), 'H1e: alternativa manual (mensagem + WhatsApp) VISÍVEL — funcionalidade aprovada preservada');
+  ok(mainFlow.includes('<b>Envio oficial</b> (WhatsApp Business Cloud API)'), 'H1f: callout do envio oficial presente');
+  ok(mainFlow.includes('Imagem premium que o cliente vai receber'), 'H1g: legenda honesta da imagem presente');
+  const advFlowH = HTML.slice(advStart, advStart + 1600);
+  ok(advFlowH.includes('id="btnCopyImg"') && advFlowH.includes('id="btnSaveImgAs"') && advFlowH.includes('id="btnOpenImg"') && advFlowH.includes('id="btnOpenFolder"'), 'H1h: ferramentas de imagem manual recolhidas em opções avançadas');
+  ok(!mainFlow.includes('Ctrl+V') && !mainFlow.toLowerCase().includes('anexar') && !mainFlow.toLowerCase().includes('anexada'), 'H1i: fluxo principal SEM instrução de anexo/colagem manual');
   // H2 — textos enganosos REMOVIDOS (UI)
   ok(!HTML.includes('Normalmente <b>não é preciso</b>') && !HTML.includes('Normalmente não é preciso'), 'H2a: "Normalmente não é preciso" removido');
   ok(!HTML.includes('aparece sozinha ao colar o link') && !HTML.includes('prévia premium aparece pelo link'), 'H2b: promessas de unfurl automático removidas');
   ok(!HTML.includes('A mensagem será copiada automaticamente'), 'H2c: promessa de cópia automática (que apagaria a imagem do clipboard) removida');
-  ok(HTML.includes('nem sempre</b> gera a prévia do link sozinho'), 'H2d: nota honesta sobre unfurl presente');
+  ok(HTML.includes('A prévia do link pode ou não aparecer'), 'H2d: nota honesta sobre prévia do link presente (sem promessa de unfurl)');
 
   // H3 — mensagem/link intocados (funções reais)
   const SRC3 = ['CLIENT_LINK_BASE', 'withWhatsAppPreviewBust', 'buildShareClientUrl', 'buildClientMessage'].map(grab).join('\n');
@@ -257,13 +258,14 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   let threw = false; try { M3.buildShareClientUrl(''); } catch (_) { threw = true; }
   ok(threw, 'H3c: link NUNCA sai sem token (guard lança)');
 
-  // H4 — Cloud API permanece avançado, sem envio automático
-  const advFlow = HTML.slice(advStart);
-  ok(advFlow.includes('id="btnSendAuto"') && advFlow.includes('disabled'), 'H4a: envio Cloud API recolhido em opções avançadas e DESABILITADO até config da Meta');
-  ok(advFlow.includes('configuração futura das credenciais da Meta') && advFlow.includes('Nenhuma mensagem é enviada sem sua ação'), 'H4b: aviso honesto de dependência futura');
-  ok(HTML.includes("const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE+'/client/send-premium-whatsapp'"), 'H4c: rota segura do Worker inalterada');
-  ok(advFlow.includes('id="btnOpenFolder"') && advFlow.includes('Salvar e abrir pasta'), 'H4d: "Salvar e abrir pasta" permanece nas opções avançadas');
-
+  // H4 — contrato do ENVIO OFICIAL (Cloud API): rota, sucesso real, 503 honesto
+  ok(HTML.includes("const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE+'/client/send-premium-whatsapp'"), 'H4a: rota segura do Worker inalterada');
+  ok(/r&&r\.ok&&data&&data\.ok&&data\.message_id/.test(HTML), 'H4b: sucesso SÓ com message_id real da Meta');
+  ok(HTML.includes("WHATSAPP_CLOUD_API_NOT_CONFIGURED") && HTML.includes('não configurado</b>'), 'H4c: 503 vira estado honesto no modal (sem fingir envio)');
+  const autoWire = HTML.slice(HTML.indexOf('function _wireAutoSend'), HTML.indexOf('function _wireAutoSend') + 4200);
+  ok(!autoWire.includes('openWhatsAppWebOnly'), 'H4d: falha do oficial NUNCA cai para WhatsApp Web sozinho');
+  ok(/message_id[\s\S]{0,400}persistClientSend\(ctx\.id\)/.test(autoWire), 'H4e: sucesso do oficial registra o envio (Notification Engine)');
+  ok(HTML.includes('a Meta não permite envio automático para grupos'), 'H4f: limitação de grupos declarada honestamente');
   // H5 — tray NUNCA com ícone vazio (fallback embutido)
   ok(TRAY.includes('TRAY_FALLBACK_B64'), 'H5a: fallback de ícone EMBUTIDO (base64) presente no tray.ts');
   ok(/if \(img\.isEmpty\(\)\) \{[\s\S]*?createFromDataURL\("data:image\/png;base64," \+ TRAY_FALLBACK_B64\)/.test(TRAY), 'H5b: ramo isEmpty → usa o embutido (ícone invisível impossível)');
@@ -303,6 +305,17 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   // F3.3.70D3R10U: o gate anterior grepava app*/src/renderer (inexistente com asar) e
   // passava EM BRANCO — agora extrai o app.asar e falha se o renderer não for achado.
   ok(WF.includes('@electron/asar extract') && WF.includes('gate nao pode passar em branco'), 'H12c: gate extrai o asar e é anti-vácuo (nunca passa sem escanear o renderer real)');
+}
+
+
+/* ───────────── J: 1.0.152 — read-back do clipboard + probe versionado (D3R10Z) ───────────── */
+{
+  const MAINJ = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'main.ts'), 'utf8');
+  ok(/clipboard\.writeImage\(img\);[\s\S]{0,200}clipboard\.readImage\(\)[\s\S]{0,120}isEmpty\(\)/.test(MAINJ), 'J1: copy-card-image confere o clipboard de verdade (read-back pós-write)');
+  ok(MAINJ.includes('clipboard nao reteve a imagem'), 'J2: falha de retenção vira erro honesto (nunca "ok" falso)');
+  let wfProbe = '';
+  try { wfProbe = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'wa-cloudapi-config-probe.yml'), 'utf8'); } catch (_) {}
+  ok(wfProbe.includes('/client/send-premium-whatsapp') && wfProbe.includes('WHATSAPP_CLOUD_API_NOT_CONFIGURED'), 'J3: probe read-only da rota Cloud API versionado (dispatch-only)');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));

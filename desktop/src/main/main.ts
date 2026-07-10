@@ -314,12 +314,16 @@ app.whenReady().then(() => {
       return { ok: true, path: dest };
     } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
   });
-  // Copia a IMAGEM do card para a área de transferência (usuário cola direto no WhatsApp).
+  // Copia a IMAGEM do card para a área de transferência (ferramenta opcional).
+  // F3.3.70D3R10Z — READ-BACK: após o write, confere se o clipboard REALMENTE retém a
+  // imagem; sem isso o SO pode recusar silenciosamente e o app mentiria "ok".
   ipcMain.handle("copy-card-image", (_e, bytes: ArrayBuffer | Uint8Array) => {
     try {
       const img = nativeImage.createFromBuffer(Buffer.from(bytes as any));
       if (img.isEmpty()) return { ok: false, error: "imagem vazia" };
       clipboard.writeImage(img);
+      const back = clipboard.readImage();
+      if (!back || back.isEmpty()) return { ok: false, error: "clipboard nao reteve a imagem" };
       return { ok: true };
     } catch (e: any) { return { ok: false, error: String(e?.message || e) }; }
   });

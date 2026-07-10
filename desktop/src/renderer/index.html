@@ -6506,71 +6506,66 @@ async function openSendClientModal(taskOrForm){
     '<div class="gcs-head">'+
       '<div class="gcs-headic brand" role="img" aria-label="ID Seven"></div>'+
       '<div style="min-width:0"><div class="gcs-title">Enviar ao cliente — Card Premium</div>'+
-        '<div class="gcs-sub">Imagem + mensagem: o visual premium aparece em qualquer WhatsApp, sem depender da prévia automática.</div></div>'+
+        '<div class="gcs-sub">Envio oficial: o sistema entrega a imagem premium + o link direto no WhatsApp do cliente.</div></div>'+
     '</div>'+
-    /* ===== F3.3.70D3R10U — FLUXO IMAGEM-PRIMEIRO (mockups A-D aprovados na D3R10T) ===== */
-    '<div class="gcs-pin">📌 <span>Envie a <b>imagem</b> + cole a <b>mensagem com o link</b> para garantir o Card Premium.</span></div>'+
-    /* ===== PASSO 1 — IMAGEM DO CARD (principal) ===== */
+    /* ===== F3.3.70D3R10Z — ENVIO OFICIAL (Cloud API) como CAMINHO PRINCIPAL. O sistema envia
+       a IMAGEM real do card + legenda + link server-side (Meta), sem unfurl e sem passos
+       manuais do operador. Sucesso SO com message_id real. Manual segue como alternativa. ===== */
+    '<div class="gcs-pin">📌 <span><b>Envio oficial</b> (WhatsApp Business Cloud API): o cliente recebe o <b>card premium + link</b>, sem passos manuais e sem depender de prévia.</span></div>'+
     '<div class="gcs-auto" id="groupBlock">'+
-      '<div class="gcs-steplabel"><span class="gcs-stepnum">1</span> IMAGEM DO CARD</div>'+
+      '<div class="gcs-steplabel"><span class="gcs-stepnum">1</span> ENVIO OFICIAL — CARD PREMIUM DIRETO NO WHATSAPP</div>'+
       '<div class="gcs-card"><img id="groupCardPreview" alt="Card premium Aurora Glass — Agenda ID Seven" style="width:100%;display:block"/></div>'+
-      '<div class="gcs-status" style="margin-top:7px">Ilustração do card que você pode enviar como imagem.</div>'+
-      '<button class="gcs-go" id="btnCopyImg" style="margin-top:11px">'+svg('send')+'Copiar card (imagem)</button>'+
-      '<div class="gcs-secondary" style="margin-top:10px;padding-top:0;border-top:none">'+
-        '<button class="btn ghost" id="btnSaveImgAs">Baixar imagem…</button>'+
-        '<button class="btn ghost" id="btnOpenImg">Abrir imagem</button>'+
-      '</div>'+
-    /* ===== PASSO 2 — MENSAGEM COM O LINK ===== */
-      '<div class="gcs-steplabel" style="margin-top:18px"><span class="gcs-stepnum">2</span> MENSAGEM COM O LINK</div>'+
+      '<div class="gcs-status" style="margin-top:7px">Imagem premium que o cliente vai receber — enviada pelo sistema, junto com o link de aprovação.</div>'+
+      '<input id="waPhone" class="gcs-input" type="tel" autocomplete="off" placeholder="WhatsApp do cliente — ex.: 55 11 99999-9999" value="'+esc(ctx.phone||'')+'"/>'+
+      '<button class="gcs-go" id="btnSendAuto" style="margin-top:11px">'+svg('send')+'Enviar Card Premium agora (oficial)</button>'+
+      '<div class="gcs-status" id="autoStatus"><span>Envio server-side pela Meta. Sucesso só com confirmação real (message_id). Nenhuma mensagem sai sem o seu clique.</span></div>'+
+    /* ===== ALTERNATIVA MANUAL (visivel; funcionalidade aprovada preservada) ===== */
+      '<div class="gcs-steplabel" style="margin-top:18px"><span class="gcs-stepnum">2</span> ALTERNATIVA MANUAL (MENSAGEM + WHATSAPP)</div>'+
       '<pre class="gcs-legend" id="groupLegendBox">'+esc(msg)+'</pre>'+
       '<div class="gcs-secondary" style="margin-top:0;padding-top:0;border-top:none">'+
         '<button class="btn ghost" id="btnCopyGroupMsg">Copiar mensagem</button>'+
         '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
+        '<button class="btn ghost" id="btnOpenWaMain">Abrir WhatsApp Business</button>'+
       '</div>'+
-    /* ===== PASSO 3 — WHATSAPP BUSINESS ===== */
-      '<div class="gcs-steplabel" style="margin-top:18px"><span class="gcs-stepnum">3</span> WHATSAPP BUSINESS</div>'+
-      '<button class="gcs-go" id="btnOpenWaMain">'+svg('send')+'Abrir WhatsApp Business</button>'+
-      '<div class="gcs-status" id="groupStatus"><span>No WhatsApp Business: envie a <b>imagem</b> e cole a <b>mensagem com o link</b>. (Copie um de cada vez — a área de transferência guarda um item por vez.)</span></div>'+
-      '<div class="gcs-note">O WhatsApp <b>nem sempre</b> gera a prévia do link sozinho. Com a imagem anexada, o visual premium aparece <b>sempre</b> — e, se a prévia do link também carregar, o cliente verá os dois. Nenhuma mensagem é enviada automaticamente. O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link.</div>'+
+      '<div class="gcs-status" id="groupStatus"><span>Use se preferir mandar você mesmo (e para grupos): cole a mensagem na conversa. A prévia do link pode ou não aparecer — por isso o caminho garantido é o envio oficial acima.</span></div>'+
+      '<div class="gcs-note">O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link. O envio oficial atende <b>número individual</b> (a Meta não permite envio automático para grupos).</div>'+
     '</div>'+
     /* ===== Ação primária discreta ===== */
     '<div class="gcs-prim-actions">'+
       '<button class="btn ghost" data-modalclose="1">Fechar</button>'+
     '</div>'+
-    /* ===== OPÇÕES AVANÇADAS — arquivo e envio automático (recolhido) ===== */
-    '<details class="gcs-adv"><summary>Opções avançadas: arquivo e envio automático</summary>'+
+    /* ===== OPÇÕES AVANÇADAS — imagem manual como arquivo (recolhido) ===== */
+    '<details class="gcs-adv"><summary>Opções avançadas: imagem manual (arquivo)</summary>'+
       '<div class="gcs-advbody">'+
-        '<div class="gcs-stepmsg" style="margin-top:0">Prefere trabalhar com o arquivo? Salve o card em Downloads e abra a pasta.</div>'+
+        '<div class="gcs-stepmsg" style="margin-top:0">Ferramentas de arquivo da imagem do card (uso opcional; não são o caminho principal).</div>'+
         '<div class="gcs-secondary" style="margin-top:4px;border-top:none;padding-top:0">'+
+          '<button class="btn ghost" id="btnCopyImg">Copiar card (imagem)</button>'+
+          '<button class="btn ghost" id="btnSaveImgAs">Baixar imagem…</button>'+
+          '<button class="btn ghost" id="btnOpenImg">Abrir imagem</button>'+
           '<button class="btn ghost" id="btnOpenFolder">Salvar e abrir pasta</button>'+
         '</div>'+
-        '<div style="height:1px;background:var(--line-soft);margin:14px 0"></div>'+
-        '<div class="gcs-stepmsg" style="margin-top:0"><b>Envio automático para número individual</b> (WhatsApp Cloud API oficial, com botão “Revisar e aprovar”). Depende de configuração futura das credenciais da Meta no servidor. <b>Nenhuma mensagem é enviada sem sua ação.</b></div>'+
-        '<input id="waPhone" class="gcs-input" type="tel" autocomplete="off" disabled placeholder="WhatsApp do responsável — ex.: 55 11 99999-9999" value="'+esc(ctx.phone||'')+'"/>'+
-        '<button class="gcs-go" id="btnSendAuto" disabled style="margin-top:11px">'+svg('send')+'Enviar para número individual — indisponível</button>'+
-        '<div class="gcs-status" id="autoStatus" style="color:#c9b46a">Integração oficial ainda não configurada. Quando for configurada, o envio continuará exigindo um clique seu.</div>'+
       '</div>'+
     '</details>'+
   '</div></div>';
   _wireGroupSend(ctx, msg, cardFile);
   _wireAutoSend(ctx);
 }
-// 1.0.121-whatsapp-cloud-api-send — ENVIO AUTOMÁTICO OFICIAL (à prova de erro de verdade).
-// O botão "Enviar card premium agora" chama a rota SEGURA do Worker (POST /client/send-premium-whatsapp),
-// que envia a imagem real do card + legenda + link via WhatsApp Business Cloud API (server-side).
-// O token da Meta NUNCA fica no client. Sucesso SÓ é exibido com message_id real devolvido pela Meta.
-// Sem credenciais (503 WHATSAPP_CLOUD_API_NOT_CONFIGURED) → mensagem clara, sem cair para WhatsApp Web.
+// F3.3.70D3R10Z — ENVIO OFICIAL como CAMINHO PRINCIPAL (rota versionada do Worker,
+// branch worker/v64-59-canonical: POST /client/send-premium-whatsapp). O servidor envia a
+// IMAGEM real do card + legenda + link via WhatsApp Business Cloud API. O token da Meta
+// NUNCA fica no client. Sucesso SÓ com message_id real. Sem credenciais (503
+// WHATSAPP_CLOUD_API_NOT_CONFIGURED) → estado honesto no modal, sem cair p/ WhatsApp Web.
 function _wireAutoSend(ctx){
   const $=id=>document.getElementById(id);
   const img=$('autoCardPreview');
   // Card oficial Aurora Glass embutido (mesma fonte do envio manual).
   try{ if(img) img.src='data:image/jpeg;base64,'+CARD_IMG_B64; }catch(_){ if(img) img.src=CARD_IMG_URL; }
   const btn=$('btnSendAuto'), status=$('autoStatus'), phoneEl=$('waPhone');
-  function setStatus(txt,cls){ if(!status)return; status.className='gcs-status'+(cls?(' '+cls):''); status.textContent=txt; }
+  function setStatus(txt,cls,html){ if(!status)return; status.className='gcs-status'+(cls?(' '+cls):''); if(html)status.innerHTML=txt; else status.textContent=txt; }
   if(!btn) return;
   btn.addEventListener('click', async function(){
     const phone=(phoneEl&&phoneEl.value||'').replace(/[^\d]/g,'');
-    if(phone.length<10){ setStatus('Informe o WhatsApp do responsável com DDD (ex.: 55 11 99999-9999).','err'); if(phoneEl)phoneEl.focus(); return; }
+    if(phone.length<10){ setStatus('Informe o WhatsApp do cliente com DDI+DDD (ex.: 55 11 99999-9999).','err'); if(phoneEl)phoneEl.focus(); return; }
     if(!ctx.token){ setStatus('Link do cliente sem token — gere o cronograma novamente.','err'); return; }
     btn.disabled=true; const old=btn.innerHTML; btn.innerHTML=svg('send')+'Enviando…';
     setStatus('Enviando o card premium pela WhatsApp Cloud API…');
@@ -6584,22 +6579,25 @@ function _wireAutoSend(ctx){
       btn.disabled=false; btn.innerHTML=old;
       setStatus('Sem conexão com o servidor de envio. Verifique a internet e tente de novo.','err'); return;
     }
-    // Cloud API ainda não configurada (sem secrets) — mensagem clara, sem fallback para WhatsApp Web.
+    // Cloud API ainda não configurada (sem secrets) — estado honesto; manual continua abaixo.
     if((r&&r.status===503)||(data&&data.error==='WHATSAPP_CLOUD_API_NOT_CONFIGURED')){
       btn.disabled=false; btn.innerHTML=old;
-      setStatus('A integração WhatsApp Cloud API ainda não está configurada. Configure as credenciais da Meta para habilitar o envio automático do card premium.','blocked');
+      const miss=(data&&data.missing&&data.missing.length)?(' Faltam no servidor: '+data.missing.join(', ')+'.'):'';
+      setStatus('<span>Envio oficial ainda <b>não configurado</b> — credenciais da Meta pendentes no servidor.'+esc(miss)+' Nenhuma mensagem foi enviada. Enquanto isso, use a alternativa manual abaixo.</span>','blocked',true);
       return;
     }
     // Sucesso REAL: só com message_id devolvido pela Meta.
     if(r&&r.ok&&data&&data.ok&&data.message_id){
-      btn.innerHTML=svg('check')+'Enviado'; btn.classList.add('is-done');
-      setStatus('Card premium enviado ao responsável ✓ (id: '+esc(String(data.message_id))+').','ok');
-      flashToast('Card premium enviado ao responsável (Cloud API).');
+      btn.innerHTML=svg('check')+'Card Premium enviado'; btn.classList.add('is-done');
+      setStatus('Card premium entregue no WhatsApp ✓ (id Meta: '+esc(String(data.message_id))+').','ok');
+      flashToast('Card premium enviado ao cliente (envio oficial).');
+      // Registro do envio (Notification Engine) — mesmo evento do caminho manual.
+      try{ if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id); }catch(_){ }
       return;
     }
     // Falha controlada — mostra o código retornado pelo Worker/Meta.
     btn.disabled=false; btn.innerHTML=old;
-    const code=(data&&(data.error||data.status))||(r&&r.status)||'desconhecido';
+    const code=(data&&(data.error||data.code||data.status))||(r&&r.status)||'desconhecido';
     setStatus('Não foi possível enviar agora. Código: '+esc(String(code))+'. Nenhuma mensagem foi enviada.','err');
   });
 }
@@ -6675,7 +6673,7 @@ async function _wireGroupSend(ctx, msg, cardFile){
     const cp=await copyCard();
     if(cp.ok){
       const b=$('btnCopyImg'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'Imagem copiada'; }
-      setStatus(svg('check')+'<span>Imagem copiada. No WhatsApp Business, cole (Ctrl+V) na conversa do grupo e envie. Depois use “Copiar mensagem” (passo 2).</span>','ok',true);
+      setStatus(svg('check')+'<span>Imagem copiada para a área de transferência (ferramenta opcional — o caminho principal é o envio oficial acima).</span>','ok',true);
       flashToast('Card copiado — cole (Ctrl+V) como imagem no grupo.');
     } else {
       const p=await ensureSaved();
@@ -6716,17 +6714,15 @@ async function _wireGroupSend(ctx, msg, cardFile){
     const ext=api.openExternal; if(ext){ try{ ext(url); }catch(_){ try{window.open(url,'_blank');}catch(__){} } } else { try{window.open(url,'_blank');}catch(_){} }
     flashToast('Abrindo o link de compartilhamento (portal do cliente) para teste.');
   });
-  /* ===== PASSO 3 — ABRIR WHATSAPP BUSINESS =====
-     F3.3.70D3R10U: NAO copia mais a mensagem automaticamente — copiar aqui APAGARIA a
-     imagem do clipboard (passo 1) e o operador colaria texto achando que era o card.
-     Os botoes de copia sao explicitos (passos 1 e 2); este apenas valida o link e abre. */
+  /* ===== ALTERNATIVA MANUAL — ABRIR WHATSAPP BUSINESS =====
+     Nao copia a mensagem automaticamente (cópias são explícitas); valida o link e abre. */
   on('btnOpenWaMain', function(){
     const lk=_gateValidLink(ctx,msg);                              // valida link público /share + token
     if(!lk.ok){ setStatus('Link inválido — gere o cronograma novamente.','err'); flashToast('Link inválido — gere o cronograma novamente.'); return; }
     openWhatsAppWebOnly();                                         // abre o WhatsApp Business (só web.whatsapp.com/)
     const b=$('btnOpenWaMain'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'WhatsApp Business aberto'; }
-    setStatus(svg('check')+'<span>WhatsApp Business aberto. Envie a <b>imagem</b> (passo 1) e cole a <b>mensagem</b> (passo 2) no grupo do cliente.</span>','ok',true);
-    flashToast('WhatsApp Business aberto. Envie a imagem + a mensagem no grupo.');
+    setStatus(svg('check')+'<span>WhatsApp Business aberto. Cole a <b>mensagem</b> na conversa/grupo do cliente.</span>','ok',true);
+    flashToast('WhatsApp Business aberto. Cole a mensagem na conversa do cliente.');
     // Reprovação 1.0.138: este é o botão REAL usado pela Social — sem persistClientSend não há
     // contentSent e o Notification Engine nunca recebe themes_sent_to_client. Mantido.
     if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
