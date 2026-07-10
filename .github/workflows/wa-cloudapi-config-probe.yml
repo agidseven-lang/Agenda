@@ -1,0 +1,30 @@
+# F3.3.70D3R10Z — probe READ-ONLY da rota Cloud API no worker IMPLANTADO.
+# POST com token/telefone dummy: nenhum ramo envia mensagem (503 sem secrets;
+# com secrets, token dummy -> CRONOGRAMA_NAO_ENCONTRADO antes de qualquer Meta call).
+name: "[manual] WA CloudAPI Config Probe (read-only)"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe /client/send-premium-whatsapp (impossivel enviar)
+        run: |
+          set +e
+          for BASE in "https://idseven-push.agidseven.workers.dev" "https://aprovar.agendaidseven.com.br"; do
+            echo "== POST $BASE/client/send-premium-whatsapp"
+            HTTP=$(curl -s -o /tmp/r.txt -w '%{http_code}' -m 25 -X POST "$BASE/client/send-premium-whatsapp" \
+              -H 'Content-Type: application/json' \
+              --data '{"token":"probe-dummy-0000","phone":"5500000000000"}')
+            echo "HTTP=$HTTP"
+            echo "corpo (400 bytes):"; head -c 400 /tmp/r.txt; echo; echo "---"
+          done
+          echo "INTERPRETACAO:"
+          echo " - 503 + WHATSAPP_CLOUD_API_NOT_CONFIGURED => rota LIVE, secrets ausentes (nada enviado)"
+          echo " - 404 + CRONOGRAMA_NAO_ENCONTRADO         => rota LIVE, CONFIGURADA (token dummy inexistente; nada enviado)"
+          echo " - 404 HTML/erro Cloudflare                => rota AUSENTE no worker implantado"
