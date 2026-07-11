@@ -31,3 +31,22 @@
 !macro customUnInit
   !insertmacro killRunningApp
 !macroend
+
+; ============================================================================
+; F3.3.71C3 — NITIDEZ DO INSTALADOR EM TELAS HiDPI (100/125/150%).
+; ----------------------------------------------------------------------------
+; CAUSA DO "instalador embacado": o executavel do NSIS assistido nao declarava
+; DPI-awareness (o template do electron-builder deixa ManifestDPIAware no
+; default = notset). Em telas com escala > 100% o Windows aplica bitmap-stretch
+; na janela inteira do instalador -> texto e icone borrados. Os assets ja sao
+; alta resolucao (icon.ico 16..256, icon.png 1024) — o problema NUNCA foi o
+; asset, e sim a ausencia da flag de DPI.
+;
+; SOLUCAO: declarar o instalador DPI-aware via customHeader (escopo global do
+; script, antes de .onInit). O Windows para de esticar bitmap e passa a renderizar
+; o texto/icone de forma nitida. NAO altera nada do app empacotado (asar/exe/
+; funcionalidade) — afeta somente o manifest do proprio instalador.
+; ============================================================================
+!macro customHeader
+  ManifestDPIAware true
+!macroend

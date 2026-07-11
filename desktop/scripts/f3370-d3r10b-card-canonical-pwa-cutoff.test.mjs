@@ -212,9 +212,9 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
   // G8: package.json e lock em 1.0.154 (D9R2)
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.156', 'G8: package.json version = 1.0.156 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.157', 'G8: package.json version = 1.0.157 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.156', 'G9: package-lock version = 1.0.156 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.157', 'G9: package-lock version = 1.0.157 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
@@ -371,6 +371,18 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(HTML.includes('body.desktop .form-wrap{max-width:980px;margin-inline:auto}'), 'M4: breakpoint largo com margin-inline:auto (fim da coluna à esquerda)');
   ok(HTML.includes('body.desktop .form-wrap .scr,body.desktop .form-wrap .scr-head{max-width:none}'), 'M5: internos preenchem o shell (header/X integrados à moldura)');
   ok(HTML.includes('<div class="form-wrap">') && HTML.includes('data-form="next"'), 'M6: HTML/JS do wizard intocado (correção só CSS)');
+}
+
+
+/* ───────────── N: 1.0.157 — F3.3.71C3 instalador DPI-aware (nitidez) ───────────── */
+{
+  const NSH = fs.readFileSync(path.resolve(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
+  ok(/!macro customHeader[\s\S]*ManifestDPIAware true[\s\S]*!macroend/.test(NSH), 'N1: installer.nsh declara ManifestDPIAware true via customHeader');
+  ok((NSH.match(/^!macro /gm) || []).length === (NSH.match(/^!macroend/gm) || []).length, 'N2: macros NSIS balanceadas');
+  ok(NSH.includes('killRunningApp') && NSH.includes('customInit') && NSH.includes('customUnInit'), 'N3: hooks anti-lock do asar preservados (1.0.68)');
+  const YML = fs.readFileSync(path.resolve(__dirname, '..', 'electron-builder.yml'), 'utf8');
+  ok(YML.includes('icon: build/icon.ico') && YML.includes('include: build/installer.nsh'), 'N4: build aponta icon.ico + installer.nsh (config intocada além do fix)');
+  ok(YML.includes('from: build/icon.png') && YML.includes('to: icon.png'), 'N5: extraResources do tray preservado');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
