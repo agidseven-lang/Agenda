@@ -1942,6 +1942,20 @@ body.desktop .gcs-pin b{color:#f0dca0}
 body.desktop .gcs-go[disabled]{opacity:.45;filter:grayscale(.5);cursor:default;box-shadow:none;pointer-events:none}
 body.desktop .cfg-traypill{margin-left:auto;flex:none;display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;border-radius:999px;padding:4px 10px;letter-spacing:.02em}
 body.desktop .cfg-traypill .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+/* F3.3.70D9R2 — Configuracoes: estrutura uniforme premium. TODA linha ganha coluna
+   de icone (.icb; linhas informativas/em-breve usam .icb-mut sutil) => coluna de texto
+   unica alinhada ao .divline (65px), altura de linha constante, pill sempre a direita,
+   e o conteudo centralizado com largura maxima (fim dos cards esticados no desktop). */
+body.desktop .cfg-head,body.desktop .cfg-wrap{max-width:840px;margin-inline:auto;width:100%}
+/* box-sizing explicito: a regra global *{border-box} esta caida em producao (chave } sobrando
+   na linha ~38 do bloco 0 — registrado para fase futura de housekeeping). Sem isto, as linhas
+   DIV (info/em-breve/bandeja) somam padding ao width:100% e estouram 28px para fora do card. */
+body.desktop .cfg-wrap .settrow{box-sizing:border-box;min-height:62px;padding:12px 14px}
+body.desktop .cfg-wrap .icb-mut{background:transparent;border:1px solid var(--line);color:var(--faint)}
+body.desktop .cfg-wrap .settrow .ss{line-height:1.4;margin-top:2px}
+body.desktop .cfg-wrap .settrow .pill{flex:none;margin-left:auto;white-space:nowrap}
+body.desktop .cfg-wrap .cfg-traypill{max-width:46%}
+body.desktop .cfg-wrap .card{overflow:hidden}
 </style>
 <style id="kbv2-styles">
 /* ════════ KANBANBOARDV2 — tema BLACK PREMIUM (skin dark) ════════
@@ -7155,31 +7169,33 @@ function cfgTrayRowHtml(){
 }
 function renderConfig(){
   const u=state.user;
-  const soon=l=>'<div class="settrow" style="cursor:default"><div class="sm"><div class="sl" style="color:var(--soft);font-weight:600">'+esc(l)+'</div></div><span class="pill" style="background:var(--surface2);color:var(--faint);border:1px solid var(--line)">Em breve</span></div>';
-  const info=(l,v)=>'<div class="settrow" style="cursor:default"><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(v)+'</div></div></div>';
+  /* F3.3.70D9R2 — toda linha tem coluna de icone: em-breve usa relogio sutil (.icb-mut),
+     informativa usa "i" sutil; texto alinha com as linhas de acao e com o .divline (65px). */
+  const soon=l=>'<div class="settrow" style="cursor:default"><div class="icb icb-mut">'+svg('clock')+'</div><div class="sm"><div class="sl" style="color:var(--soft);font-weight:600">'+esc(l)+'</div></div><span class="pill" style="background:var(--surface2);color:var(--faint);border:1px solid var(--line)">Em breve</span></div>';
+  const info=(l,v)=>'<div class="settrow" style="cursor:default"><div class="icb icb-mut">'+svg('info')+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(v)+'</div></div></div>';
   const act=(ic,l,s,attr,color)=>'<button class="settrow" '+attr+'><div class="icb"'+(color?' style="color:'+color+'"':'')+'>'+svg(ic)+'</div><div class="sm"><div class="sl"'+(color?' style="color:'+color+'"':'')+'>'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';
-  let h='<div class="scr-head"><div class="row" style="align-items:center;gap:12px"><div class="cfg-ic">'+svg('gear')+'</div><div><div class="h-title">Configurações</div><div class="h-sub">Conta, privacidade, notificações, dados e idioma</div></div></div></div>'+
-    '<div class="scr" style="padding-top:8px">';
+  let h='<div class="scr-head cfg-head"><div class="row" style="align-items:center;gap:12px"><div class="cfg-ic">'+svg('gear')+'</div><div><div class="h-title">Configurações</div><div class="h-sub">Conta, privacidade, notificações, dados e idioma</div></div></div></div>'+
+    '<div class="scr cfg-wrap" style="padding-top:8px">';
   h+='<div class="lbl">Gerenciamento de Conta</div><div class="card">'+
       settRow('person','Conta','Seus dados','conta')+'<div class="divline"></div>'+soon('Atualizar dados pessoais')+'<div class="divline"></div>'+soon('Assinatura / plano')+'</div>';
-  h+='<div style="height:14px"></div><div class="lbl">Privacidade e Segurança</div><div class="card">'+
+  h+='<div style="height:18px"></div><div class="lbl">Privacidade e Segurança</div><div class="card">'+
       settRow('gear','Segurança da sessão','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+soon('Autenticação em duas etapas (2FA)')+'<div class="divline"></div>'+soon('Sessões e dispositivos')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
-  h+='<div style="height:14px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
+  h+='<div style="height:18px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
       act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+soon('Notificações de tarefas')+'<div class="divline"></div>'+soon('Notificações de chat')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
   // F3.3.70D3R10U — Bandeja do sistema (tray): status real via IPC tray-status +
   // botao "Recriar icone da bandeja" (IPC tray-recreate) + orientacao da seta ^.
-  h+='<div style="height:14px"></div><div class="lbl">Bandeja do sistema (tray)</div><div class="card">'+
+  h+='<div style="height:18px"></div><div class="lbl">Bandeja do sistema (tray)</div><div class="card">'+
       cfgTrayRowHtml()+'<div class="divline"></div>'+
       act('send','Recriar ícone da bandeja','Use se o ícone sumir da área perto do relógio','data-cfgtrayrecreate="1"')+'<div class="divline"></div>'+
       info('Onde encontro o ícone?','Ele pode ficar escondido na seta ^ perto do relógio do Windows.')+'<div class="divline"></div>'+
       info('Fechar (X) × Sair','X envia o app para a bandeja (continua rodando). “Sair”, no menu da bandeja, encerra de verdade.')+'</div>';
-  h+='<div style="height:14px"></div><div class="lbl">Acessibilidade e Aparência</div><div class="card">'+
+  h+='<div style="height:18px"></div><div class="lbl">Acessibilidade e Aparência</div><div class="card">'+
       info('Tema','Escuro (premium)')+'<div class="divline"></div>'+soon('Tema claro')+'<div class="divline"></div>'+soon('Tamanho da fonte')+'<div class="divline"></div>'+soon('Alto contraste')+'</div>';
-  h+='<div style="height:14px"></div><div class="lbl">Desempenho e Dados</div><div class="card">'+
+  h+='<div style="height:18px"></div><div class="lbl">Desempenho e Dados</div><div class="card">'+
       info('Sincronização','Tempo real (Firestore) · bandeja + autostart')+'<div class="divline"></div>'+soon('Limpar cache')+'<div class="divline"></div>'+soon('Otimizar uso de dados')+'</div>';
-  h+='<div style="height:14px"></div><div class="lbl">Idioma e Região</div><div class="card">'+
+  h+='<div style="height:18px"></div><div class="lbl">Idioma e Região</div><div class="card">'+
       info('Idioma','Português (Brasil)')+'<div class="divline"></div>'+info('Formato de data','dd/MM/aaaa')+'<div class="divline"></div>'+info('Formato de hora','24h')+'<div class="divline"></div>'+soon('Outros idiomas e moeda')+'</div>';
-  h+='<div style="height:14px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
+  h+='<div style="height:18px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div>'+
       '<div class="divline"></div>'+settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:18px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+

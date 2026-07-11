@@ -210,11 +210,11 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<title>ID Seven · Desktop<\/title>/.test(HTML), 'G6: <title> estático neutro (runtime preenche)');
   // G7: sidebar footer deriva de APP_VER
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
-  // G8: package.json e lock em 1.0.153
+  // G8: package.json e lock em 1.0.154 (D9R2)
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.153', 'G8: package.json version = 1.0.153 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.154', 'G8: package.json version = 1.0.154 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.153', 'G9: package-lock version = 1.0.153 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.154', 'G9: package-lock version = 1.0.154 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
@@ -316,6 +316,29 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   let wfProbe = '';
   try { wfProbe = fs.readFileSync(path.resolve(__dirname, '..', '..', '.github', 'workflows', 'wa-cloudapi-config-probe.yml'), 'utf8'); } catch (_) {}
   ok(wfProbe.includes('/client/send-premium-whatsapp') && wfProbe.includes('WHATSAPP_CLOUD_API_NOT_CONFIGURED'), 'J3: probe read-only da rota Cloud API versionado (dispatch-only)');
+}
+
+
+/* ───────────── K: 1.0.154 — D9R2 Configuracoes uniformes + contratos intocados ───────────── */
+{
+  // K1/K2: linhas em-breve e informativas ganharam coluna de icone sutil (.icb-mut)
+  ok(/const soon=l=>'<div class="settrow" style="cursor:default"><div class="icb icb-mut">'\+svg\('clock'\)/.test(HTML), 'K1: soon() tem coluna de ícone sutil (clock)');
+  ok(/const info=\(l,v\)=>'<div class="settrow" style="cursor:default"><div class="icb icb-mut">'\+svg\('info'\)/.test(HTML), 'K2: info() tem coluna de ícone sutil (info)');
+  // K3: wrapper centralizado com largura maxima
+  ok(HTML.includes('<div class="scr-head cfg-head">') && HTML.includes('<div class="scr cfg-wrap"'), 'K3: renderConfig usa cfg-head + cfg-wrap');
+  ok(/body\.desktop \.cfg-head,body\.desktop \.cfg-wrap\{max-width:840px;margin-inline:auto/.test(HTML), 'K4: CSS D9R2 centraliza com max-width 840');
+  // K5: box-sizing explicito nas linhas (regra global * caida em producao — chave } sobrando)
+  ok(/body\.desktop \.cfg-wrap \.settrow\{box-sizing:border-box;min-height:62px/.test(HTML), 'K5: settrow do config com border-box explícito + altura mínima');
+  ok((HTML.match(/\*\{box-sizing:border-box/g) || []).length === 1, 'K6: nenhuma mudança global de box-sizing nesta fase (housekeeping futuro)');
+  // K7/K8: contratos de Equipe/Chat INTOCADOS (correção de usuários é de DADO, não código)
+  ok(HTML.includes("const us=state.users.filter(u=>!['removido','excluido'].includes(u.status||'')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));"), 'K7: renderEquipe byte-idêntico (filtra removido/excluido)');
+  ok(HTML.includes("const us=state.users.filter(u=>u.id!==state.user.id&&!['removido','excluido','pendente'].includes(u.status||''))"), 'K8: renderChat byte-idêntico');
+  // K9: formulario de tarefa NAO tocado (spacer 14px do Cliente/Empresa permanece)
+  ok(HTML.includes('<div style="height:14px"></div><div class="lbl">Cliente / Empresa'), 'K9: task form intocado (spacer original)');
+  // K10: divline permanece 65px (agora correta para TODAS as linhas, que têm ícone)
+  ok(/\.divline\{height:1px;background:#222633;margin-left:65px\}/.test(HTML), 'K10: divline 65px preservada');
+  // K11: secoes do config com respiro 18px (7 secoes)
+  ok((HTML.match(/<div style="height:18px"><\/div><div class="lbl">/g) || []).length === 7, 'K11: 7 espaçadores de seção do config em 18px');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
