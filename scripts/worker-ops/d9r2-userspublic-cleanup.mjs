@@ -22,7 +22,10 @@
    NUNCA imprime segredo. Credencial via GOOGLE_APPLICATION_CREDENTIALS (ADC).
    ===================================================================== */
 import { writeFileSync, mkdirSync } from "node:fs";
-import admin from "firebase-admin";
+// API modular do firebase-admin (compat com Node 24 + admin >=12; o namespace
+// via default-import quebrou no runner: "admin.firestore is not a function")
+import { initializeApp, applicationDefault } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 const DRY_RUN = (process.env.DRY_RUN ?? "true") !== "false";
 const CONFIRM = process.env.CONFIRM_CLEANUP || "";
@@ -56,8 +59,8 @@ async function main() {
   // G1 — estatico
   for (const t of TARGETS) if (PROTECTED.includes(t.id)) die("TARGET na lista PROTECTED: " + t.id);
 
-  admin.initializeApp(); // ADC via GOOGLE_APPLICATION_CREDENTIALS
-  const db = admin.firestore();
+  initializeApp({ credential: applicationDefault() }); // ADC via GOOGLE_APPLICATION_CREDENTIALS
+  const db = getFirestore();
   const col = db.collection("usersPublic");
 
   // G3 — protected primeiro (owner real incluido) — tudo ANTES de qualquer escrita
