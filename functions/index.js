@@ -2385,3 +2385,128 @@ exports.syncUsersPublic = onDocumentWritten({ document: "users/{uid}", region: "
 
 // Exporta logica pura p/ o harness (NAO afeta runtime; testavel com mocks; sem deploy).
 exports._handleSyncUsersPublic = handleSyncUsersPublic;
+
+/* ============================================================================
+   F3.3.71A — TROCA SEGURA DE E-MAIL DE LOGIN (self + admin). Server-side.
+   ----------------------------------------------------------------------------
+   - changeLoginEmail (self): sessao valida + SENHA ATUAL re-verificada no
+     servidor (notifVerifyPassword) + novo e-mail normalizado/valido + UNICIDADE
+     contra TODOS os users (mesma semantica do loginUser: email lowercase) +
+     auditoria em usersAudit. NUNCA permite e-mail vazio (e-mail e identidade).
+   - adminChangeUserEmail (admin): authRequireAdminSession (re-carrega caller;
+     admin===true) + confirmacao literal "ALTERAR EMAIL" re-checada NO SERVIDOR +
+     alvo existe, canary!==true e status==="ativo" (nunca canario/removido/
+     pendente por engano) + unicidade excluindo o alvo + auditoria com quem/
+     alvo/e-mail antigo/novo/motivo/data.
+   - usersAudit: colecao SERVER-ONLY (Admin SDK; sem regra client). NUNCA loga
+     senha/hash/salt/token; logs so uid mascarado. Handlers PUROS (ctx.db).
+   ============================================================================ */
+const EMAILCHG_CONFIRM = "ALTERAR EMAIL";
+const EMAILCHG_MAX = 254;
+async function emailInUseByOther(db, emailNorm, exceptUid) {
+  const snap = await db.collection("users").get();
+  const docs = (snap && Array.isArray(snap.docs)) ? snap.docs : [];
+  for (let i = 0; i < docs.length; i++) {
+    const doc = docs[i];
+    const id = (doc && doc.id) ? String(doc.id) : "";
+    if (id && id === exceptUid) continue;
+    const d = (typeof doc.data === "function" ? (doc.data() || {}) : {});
+    if (normEmail(d.email) === emailNorm) return true;
+  }
+  return false;
+}
+async function emailAuditWrite(db, entry) {
+  try { await db.collection("usersAudit").add(entry); return true; }
+  catch (e) { try { logger.error("[emailAudit] write falhou", { err: e && e.message }); } catch (_) {} return false; }
+}
+// SELF: troca o proprio e-mail de login. Body: { currentPassword, newEmail }.
+async function handleChangeLoginEmail(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "unauthorized" } };
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["ce:" + auth.uid].concat(ip ? ["cei:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : null;
+  if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
+  const pw = (typeof body.currentPassword === "string") ? body.currentPassword : "";
+  const em = normEmail(body.newEmail);
+  if (!pw) return { status: 400, json: { ok: false, error: "missing_password" } };
+  if (!em || em.length > EMAILCHG_MAX || !isValidEmail(em)) return { status: 400, json: { ok: false, error: "bad_email" } };
+  const db = (ctx && ctx.db) || notifDb();
+  let snap;
+  try { snap = await db.collection("users").doc(auth.uid).get(); }
+  catch (e) { try { logger.error("[changeLoginEmail] leitura falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  if (!snap || !snap.exists) return { status: 401, json: { ok: false, error: "unauthorized" } };
+  const d = snap.data() || {};
+  if (!notifVerifyPassword(d.pass, d.salt, pw)) {
+    rlKeys.forEach((k) => notifRlFail(k, now));
+    return { status: 401, json: { ok: false, error: "invalid_current_password" } };
+  }
+  const emailOld = normEmail(d.email);
+  if (em === emailOld) return { status: 400, json: { ok: false, error: "same_email" } };
+  let dup;
+  try { dup = await emailInUseByOther(db, em, auth.uid); }
+  catch (e) { try { logger.error("[changeLoginEmail] dupcheck falhou", { err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  if (dup) return { status: 409, json: { ok: false, error: "email_in_use" } };
+  try { await db.collection("users").doc(auth.uid).update({ email: em }); }
+  catch (e) { try { logger.error("[changeLoginEmail] update falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  await emailAuditWrite(db, { type: "email_change_self", by: auth.uid, target: auth.uid, emailOld: emailOld, emailNew: em, reason: "", at: now, phase: "F3.3.71A" });
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[changeLoginEmail] ok", { uid: notifMaskUid(auth.uid) }); } catch (_) {}
+  return { status: 200, json: { ok: true } };
+}
+// ADMIN: troca o e-mail de OUTRO usuario. Body: { targetId, newEmail, confirm, reason? }.
+async function handleAdminChangeUserEmail(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "bad_request" } };
+  const adm = await authRequireAdminSession(ctx);
+  if (!adm.ok) return { status: adm.status, json: adm.json };
+  const db = adm.db;
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : null;
+  if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
+  if (String(body.confirm || "") !== EMAILCHG_CONFIRM) return { status: 400, json: { ok: false, error: "missing_confirm" } };
+  const targetId = uwTargetId(body.targetId);
+  if (!targetId) return { status: 400, json: { ok: false, error: "bad_target" } };
+  const em = normEmail(body.newEmail);
+  if (!em || em.length > EMAILCHG_MAX || !isValidEmail(em)) return { status: 400, json: { ok: false, error: "bad_email" } };
+  const reason = (typeof body.reason === "string") ? body.reason.trim().slice(0, 300) : "";
+  let snap;
+  try { snap = await db.collection("users").doc(targetId).get(); }
+  catch (e) { try { logger.error("[adminChangeUserEmail] leitura falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
+  const d = snap.data() || {};
+  if (d.canary === true) return { status: 400, json: { ok: false, error: "target_is_canary" } };
+  if (String(d.status || "") !== "ativo") return { status: 400, json: { ok: false, error: "target_not_active" } };
+  const emailOld = normEmail(d.email);
+  if (em === emailOld) return { status: 400, json: { ok: false, error: "same_email" } };
+  let dup;
+  try { dup = await emailInUseByOther(db, em, targetId); }
+  catch (e) { try { logger.error("[adminChangeUserEmail] dupcheck falhou", { err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  if (dup) return { status: 409, json: { ok: false, error: "email_in_use" } };
+  try { await db.collection("users").doc(targetId).update({ email: em }); }
+  catch (e) { try { logger.error("[adminChangeUserEmail] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
+  await emailAuditWrite(db, { type: "email_change_admin", by: adm.uid, target: targetId, emailOld: emailOld, emailNew: em, reason: reason, at: now, phase: "F3.3.71A" });
+  try { logger.info("[adminChangeUserEmail] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId) }); } catch (_) {}
+  return { status: 200, json: { ok: true } };
+}
+exports.changeLoginEmail = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  try {
+    const r = await handleChangeLoginEmail({ method: req.method, authHeader: req.headers && req.headers.authorization, body: req.body, ip: req.ip, now: Date.now() });
+    res.status(r.status).json(r.json);
+  } catch (e) { try { logger.error("[changeLoginEmail] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports.adminChangeUserEmail = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  try {
+    const r = await handleAdminChangeUserEmail({ method: req.method, authHeader: req.headers && req.headers.authorization, body: req.body, ip: req.ip, now: Date.now() });
+    res.status(r.status).json(r.json);
+  } catch (e) { try { logger.error("[adminChangeUserEmail] erro", { err: e && e.message }); } catch (_) {} res.status(500).json({ ok: false, error: "internal" }); }
+});
+exports._handleChangeLoginEmail = handleChangeLoginEmail;
+exports._handleAdminChangeUserEmail = handleAdminChangeUserEmail;
+exports._emailInUseByOther = emailInUseByOther;
