@@ -21,12 +21,15 @@ export type AuthResult = {
   active?: boolean; expiresAt?: number;
 };
 type Session = { token: string; expiresAt: number; uid: string };
-type Urls = { login: string; self: string; changePassword: string };
+type Urls = { login: string; self: string; changePassword: string; changeEmail: string; adminChangeEmail: string };
 
 const DEFAULT_URLS: Urls = {
   login: "https://loginuser-de36pi7vza-uc.a.run.app",
   self: "https://getuserself-de36pi7vza-uc.a.run.app",
   changePassword: "https://changepassword-de36pi7vza-uc.a.run.app",
+  // F3.3.71A — troca segura de e-mail (self/admin); v2 run.app segue o padrao dos demais
+  changeEmail: "https://changeloginemail-de36pi7vza-uc.a.run.app",
+  adminChangeEmail: "https://adminchangeuseremail-de36pi7vza-uc.a.run.app",
 };
 const HTTP_TIMEOUT_MS = 15000;
 const EXP_SAFETY_MS = 30000;          // folga p/ não expirar "em voo"
@@ -125,6 +128,34 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls> })
       try {
         r = await post(urls.changePassword,
           { oldPassword: String(oldPassword || ""), newPassword: String(newPassword || "") },
+          (mem as Session).token);
+      } catch { return { ok: false, error: "network" }; }
+      const j = r.json || {};
+      if (r.status === 200 && j.ok === true) return { ok: true };
+      if (r.status === 401 && (j && j.error) === "unauthorized") { wipe(); return { ok: false, error: "expired" }; }
+      return { ok: false, error: (j && j.error) || ("http_" + r.status) };
+    },
+    /** F3.3.71A — troca do PROPRIO e-mail de login (senha atual re-verificada no servidor). */
+    async changeEmail(currentPassword: string, newEmail: string): Promise<AuthResult> {
+      if (!valid()) return { ok: false, error: "no_session" };
+      let r;
+      try {
+        r = await post(urls.changeEmail,
+          { currentPassword: String(currentPassword || ""), newEmail: String(newEmail || "") },
+          (mem as Session).token);
+      } catch { return { ok: false, error: "network" }; }
+      const j = r.json || {};
+      if (r.status === 200 && j.ok === true) return { ok: true };
+      if (r.status === 401 && (j && j.error) === "unauthorized") { wipe(); return { ok: false, error: "expired" }; }
+      return { ok: false, error: (j && j.error) || ("http_" + r.status) };
+    },
+    /** F3.3.71A — troca ADMIN do e-mail de OUTRO usuario (confirm literal re-checado no servidor). */
+    async adminChangeUserEmail(targetId: string, newEmail: string, confirm: string, reason: string): Promise<AuthResult> {
+      if (!valid()) return { ok: false, error: "no_session" };
+      let r;
+      try {
+        r = await post(urls.adminChangeEmail,
+          { targetId: String(targetId || ""), newEmail: String(newEmail || ""), confirm: String(confirm || ""), reason: String(reason || "") },
           (mem as Session).token);
       } catch { return { ok: false, error: "network" }; }
       const j = r.json || {};

@@ -2633,6 +2633,98 @@ function openChangePasswordModal(){
   const inp=document.getElementById('cpOld');if(inp)inp.focus();
 }
 
+
+/* F3.3.71A — TROCA SEGURA DE E-MAIL DE LOGIN (self + admin). Validacao REAL no
+   servidor (senha atual, unicidade, auditoria); aqui so UX + mensagens. */
+function _ceMsg(e){
+  if(e==='invalid_current_password'||e==='invalid_credentials')return 'Senha atual incorreta.';
+  if(e==='email_in_use')return 'Este e-mail já está em uso por outro usuário.';
+  if(e==='bad_email')return 'E-mail inválido.';
+  if(e==='same_email')return 'O novo e-mail é igual ao atual.';
+  if(e==='missing_password')return 'Digite a senha atual.';
+  if(e==='rate_limited')return 'Muitas tentativas. Aguarde alguns minutos.';
+  if(e==='expired'||e==='no_session')return 'Sessão expirada — saia e entre de novo.';
+  if(e==='forbidden')return 'Apenas administradores podem executar esta ação.';
+  if(e==='target_is_canary'||e==='target_not_active')return 'Este usuário não pode ter o e-mail alterado.';
+  if(e==='not_found')return 'Usuário não encontrado.';
+  if(e==='missing_confirm')return 'Digite exatamente: ALTERAR EMAIL';
+  return 'Falha de conexão. Tente novamente.';
+}
+function openChangeEmailModal(){
+  const u=state.user||{};
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg-keep="1"><div class="sheet" style="max-width:440px">'+
+    '<div class="grab"></div><div style="font-size:17px;font-weight:800;margin-bottom:6px">Alterar e-mail de login</div>'+
+    '<div style="font-size:13px;color:var(--soft);line-height:1.5;margin-bottom:12px">E-mail atual: <b>'+esc(u.email||'não informado')+'</b><br>A senha atual é confirmada no servidor e o novo e-mail não pode estar em uso por outro usuário.</div>'+
+    '<input class="inp" id="ceNew" type="email" autocomplete="email" placeholder="Novo e-mail">'+
+    '<div style="height:8px"></div><input class="inp" id="ceNew2" type="email" placeholder="Confirmar novo e-mail">'+
+    '<div style="height:8px"></div><input class="inp" id="cePw" type="password" autocomplete="current-password" placeholder="Senha atual">'+
+    '<div id="ceErr" style="font-size:12.5px;color:var(--red);min-height:18px;margin-top:6px"></div>'+
+    '<div class="row" style="gap:10px;margin-top:8px">'+
+      '<button class="btn ghost" id="ceCancel" style="flex:1">Cancelar</button>'+
+      '<button class="btn" id="ceGo" style="flex:1.4">Solicitar alteração</button>'+
+    '</div></div></div>';
+  document.getElementById('ceCancel').addEventListener('click',()=>closeModal());
+  document.getElementById('ceGo').addEventListener('click',async()=>{
+    const err=document.getElementById('ceErr');
+    const n1=((document.getElementById('ceNew')||{}).value||'').trim().toLowerCase();
+    const n2=((document.getElementById('ceNew2')||{}).value||'').trim().toLowerCase();
+    const pw=(document.getElementById('cePw')||{}).value||'';
+    if(!n1){if(err)err.textContent='Digite o novo e-mail.';return;}
+    if(n1!==n2){if(err)err.textContent='Os e-mails não coincidem.';return;}
+    if(!pw){if(err)err.textContent='Digite a senha atual.';return;}
+    if(err)err.textContent='';
+    const api=window.desktopAPI;
+    if(!api||typeof api.authChangeEmail!=='function'){if(err)err.textContent='Indisponível nesta build.';return;}
+    const r=await api.authChangeEmail(pw,n1);
+    if(r&&r.ok){try{state.user.email=n1;}catch(_){ }closeModal();flashToast('E-mail de login atualizado com sucesso. Use o novo e-mail no próximo acesso.');return;}
+    if(err)err.textContent=_ceMsg((r&&r.error)||'network');
+  });
+  const inp=document.getElementById('ceNew');if(inp)inp.focus();
+}
+function openAdminEmailModal(){
+  const us=(state.users||[]).filter(x=>(x.status||'')==='ativo').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const opts=['<option value="">Selecione o usuário…</option>'].concat(us.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name||'')+' — '+esc(x.role||'Equipe')+'</option>')).join('');
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg-keep="1"><div class="sheet" style="max-width:460px">'+
+    '<div class="grab"></div><div style="font-size:17px;font-weight:800;margin-bottom:6px">Alterar e-mail de usuário</div>'+
+    '<div style="font-size:13px;color:var(--soft);line-height:1.5;margin-bottom:12px">Ação administrativa com auditoria (quem alterou, e-mail antigo e novo, data e motivo). O servidor bloqueia duplicidade e usuários de teste/removidos.</div>'+
+    '<select class="inp" id="aeUser" style="width:100%">'+opts+'</select>'+
+    '<div id="aeInfo" style="font-size:12.5px;color:var(--soft);min-height:18px;margin-top:6px"></div>'+
+    '<div style="height:8px"></div><input class="inp" id="aeNew" type="email" placeholder="Novo e-mail">'+
+    '<div style="height:8px"></div><input class="inp" id="aeNew2" type="email" placeholder="Confirmar novo e-mail">'+
+    '<div style="height:8px"></div><input class="inp" id="aeReason" type="text" maxlength="300" placeholder="Motivo (opcional)">'+
+    '<div style="height:8px"></div><input class="inp" id="aeConfirm" type="text" autocomplete="off" placeholder="Digite: ALTERAR EMAIL">'+
+    '<div id="aeErr" style="font-size:12.5px;color:var(--red);min-height:18px;margin-top:6px"></div>'+
+    '<div class="row" style="gap:10px;margin-top:8px">'+
+      '<button class="btn ghost" id="aeCancel" style="flex:1">Cancelar</button>'+
+      '<button class="btn" id="aeGo" style="flex:1.4">Alterar e-mail</button>'+
+    '</div></div></div>';
+  const sel=document.getElementById('aeUser');
+  sel.addEventListener('change',()=>{
+    const x=us.find(w=>w.id===sel.value);const el=document.getElementById('aeInfo');
+    if(el)el.innerHTML=x?('Selecionado: <b>'+esc(x.name||'')+'</b> · '+esc(x.role||'Equipe')+' · '+esc(x.status||'')):'';
+  });
+  document.getElementById('aeCancel').addEventListener('click',()=>closeModal());
+  document.getElementById('aeGo').addEventListener('click',async()=>{
+    const err=document.getElementById('aeErr');
+    const id=sel.value||'';
+    const x=us.find(w=>w.id===id);
+    const n1=((document.getElementById('aeNew')||{}).value||'').trim().toLowerCase();
+    const n2=((document.getElementById('aeNew2')||{}).value||'').trim().toLowerCase();
+    const rz=((document.getElementById('aeReason')||{}).value||'').trim();
+    const cf=((document.getElementById('aeConfirm')||{}).value||'').trim();
+    if(!id){if(err)err.textContent='Selecione o usuário.';return;}
+    if(!n1){if(err)err.textContent='Digite o novo e-mail.';return;}
+    if(n1!==n2){if(err)err.textContent='Os e-mails não coincidem.';return;}
+    if(cf!=='ALTERAR EMAIL'){if(err)err.textContent='Digite exatamente: ALTERAR EMAIL';return;}
+    if(err)err.textContent='';
+    const api=window.desktopAPI;
+    if(!api||typeof api.authAdminChangeUserEmail!=='function'){if(err)err.textContent='Indisponível nesta build.';return;}
+    const r=await api.authAdminChangeUserEmail(id,n1,cf,rz);
+    if(r&&r.ok){closeModal();flashToast('E-mail de '+((x&&x.name)||'usuário')+' atualizado com sucesso.');return;}
+    if(err)err.textContent=_ceMsg((r&&r.error)||'network');
+  });
+}
+
 /* ---- APP RENDER ---- */
 const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'relatorios',l:'Relatórios',i:'bars'},{k:'notificacoes',l:'Notificações',i:'bell'}];
 // 1.0.119-form-unlock-hotfix — CAUSA RAIZ do "nada responde": um snapshot do Firestore
@@ -7195,6 +7287,8 @@ function renderConfig(){
       info('Sincronização','Tempo real (Firestore) · bandeja + autostart')+'<div class="divline"></div>'+soon('Limpar cache')+'<div class="divline"></div>'+soon('Otimizar uso de dados')+'</div>';
   h+='<div style="height:18px"></div><div class="lbl">Idioma e Região</div><div class="card">'+
       info('Idioma','Português (Brasil)')+'<div class="divline"></div>'+info('Formato de data','dd/MM/aaaa')+'<div class="divline"></div>'+info('Formato de hora','24h')+'<div class="divline"></div>'+soon('Outros idiomas e moeda')+'</div>';
+  if(u.admin){h+='<div style="height:18px"></div><div class="lbl">Administração</div><div class="card">'+
+      act('person','Alterar e-mail de usuário','Troca administrativa com confirmação e auditoria','data-cfgadminemail="1"')+'</div>';}
   h+='<div style="height:18px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div>'+
       '<div class="divline"></div>'+settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
@@ -7210,7 +7304,7 @@ function openSheet(which){
   else{title='Sobre o aplicativo';rows=[['App','ID Seven · Desktop'],['Build',BUILD],['Versão real (app.getVersion)',DESK_VER],['Ambiente','Desktop (Tray + Autostart)'],['Tecnologia','Electron + Firestore']];}
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div><div style="font-size:18px;font-weight:800;margin-bottom:10px">'+title+'</div>'+
     rows.map(r=>'<div class="infoline"><div class="il">'+esc(r[0])+'</div><div class="iv">'+esc(r[1])+'</div></div>').join('')+
-    (which==='seguranca'?'<div style="height:14px"></div><button class="btn" data-chpw="1" style="margin-bottom:10px">Trocar senha</button><button class="btn" data-logout="1" style="background:'+withAlpha('#F87171',.14)+';color:var(--red)">Sair da conta</button>':'')+'</div></div>';
+    (which==='conta'?'<div style="height:14px"></div><button class="btn" data-chemail="1">Alterar e-mail de login</button>':'')+(which==='seguranca'?'<div style="height:14px"></div><button class="btn" data-chpw="1" style="margin-bottom:10px">Trocar senha</button><button class="btn" data-logout="1" style="background:'+withAlpha('#F87171',.14)+';color:var(--red)">Sair da conta</button>':'')+'</div></div>';
 }
 
 /* ---- TASK FORM (wizard) ---- */
@@ -7567,6 +7661,8 @@ document.addEventListener('click',async e=>{
   }
   if(el=g('[data-logout]')){closeModal();logout();return;}
   if(el=g('[data-chpw]')){closeModal();openChangePasswordModal();return;}
+  if(el=g('[data-chemail]')){closeModal();openChangeEmailModal();return;}
+  if(el=g('[data-cfgadminemail]')){closeModal();openAdminEmailModal();return;}
   if(el=g('[data-pickasg]')){if(state.form){const id=el.dataset.pickasg||null;state.form.assigneeId=id;const u=id?state.users.find(x=>x.id===id):null;state.form.assignee=u?(u.name||''):'';}closeModal();render();return;}
   if(el=g('[data-form]')){const a=el.dataset.form;if(a==='close'){state.form=null;render();}else if(a==='back'){state.form.step=Math.max(0,state.form.step-1);render();}else if(a==='next')stepNext();else if(a==='save')await saveTask();return;}
   if(el=g('[data-fsector]')){state.form.sector=el.dataset.fsector;state.form.subtype=null;state.form.contents=[];state.form.checklist=[];render();return;}

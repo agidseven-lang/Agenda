@@ -212,9 +212,9 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
   // G8: package.json e lock em 1.0.154 (D9R2)
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.154', 'G8: package.json version = 1.0.154 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.155', 'G8: package.json version = 1.0.155 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.154', 'G9: package-lock version = 1.0.154 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.155', 'G9: package-lock version = 1.0.155 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
@@ -338,7 +338,28 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   // K10: divline permanece 65px (agora correta para TODAS as linhas, que têm ícone)
   ok(/\.divline\{height:1px;background:#222633;margin-left:65px\}/.test(HTML), 'K10: divline 65px preservada');
   // K11: secoes do config com respiro 18px (7 secoes)
-  ok((HTML.match(/<div style="height:18px"><\/div><div class="lbl">/g) || []).length === 7, 'K11: 7 espaçadores de seção do config em 18px');
+  // F3.3.71A: +1 seção (Administração, admin-only) => 8 espaçadores
+  ok((HTML.match(/<div style="height:18px"><\/div><div class="lbl">/g) || []).length === 8, 'K11: 8 espaçadores de seção do config em 18px (7 D9R2 + Administração F3.3.71A)');
+}
+
+
+/* ───────────── L: 1.0.155 — F3.3.71A troca segura de e-mail (wiring) ───────────── */
+{
+  const AC = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'auth-core.ts'), 'utf8');
+  const AU = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'auth.ts'), 'utf8');
+  const PR = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
+  ok(AC.includes('changeloginemail-de36pi7vza-uc.a.run.app') && AC.includes('adminchangeuseremail-de36pi7vza-uc.a.run.app'), 'L1: auth-core aponta os 2 endpoints novos');
+  ok(/async changeEmail\(currentPassword: string, newEmail: string\)/.test(AC) && /async adminChangeUserEmail\(targetId: string/.test(AC), 'L2: auth-core expõe changeEmail/adminChangeUserEmail (token confinado)');
+  ok(AU.includes('"auth-change-email"') && AU.includes('"auth-admin-change-user-email"'), 'L3: IPCs registrados no main');
+  ok(PR.includes('authChangeEmail:') && PR.includes('authAdminChangeUserEmail:'), 'L4: preload expõe os 2 métodos (nunca o token)');
+  ok(HTML.includes('data-chemail="1"') && HTML.includes('Alterar e-mail de login'), 'L5: sheet Conta tem "Alterar e-mail de login"');
+  ok(/function openChangeEmailModal\(\)/.test(HTML) && HTML.includes('id="ceNew"') && HTML.includes('id="ceNew2"') && HTML.includes('id="cePw"'), 'L6: modal self com novo e-mail + confirmar + senha atual');
+  ok(HTML.includes("E-mail de login atualizado com sucesso. Use o novo e-mail no próximo acesso."), 'L7: mensagem de sucesso exata do spec');
+  ok(/if\(u\.admin\)\{h\+='<div style="height:18px"><\/div><div class="lbl">Administração<\/div>/.test(HTML), 'L8: seção Administração só para admin');
+  ok(HTML.includes('id="aeConfirm"') && HTML.includes('Digite: ALTERAR EMAIL') && HTML.includes("cf!=='ALTERAR EMAIL'"), 'L9: confirmação textual literal ALTERAR EMAIL no fluxo admin');
+  ok(HTML.includes('id="aeUser"') && HTML.includes('id="aeReason"'), 'L10: admin seleciona usuário e pode informar motivo');
+  ok(HTML.includes("email_in_use") && HTML.includes('já está em uso por outro usuário'), 'L11: erro de duplicidade mapeado na UI');
+  ok(!/authChangeEmail[\s\S]{0,200}token/.test(PR), 'L12: preload não expõe token no fluxo de e-mail');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));

@@ -20,6 +20,9 @@ export function registerAuthIpc(): void {
   ipcMain.handle("auth-login", (_e, identifier: string, password: string) => core.login(identifier, password));
   ipcMain.handle("auth-self", () => core.self());
   ipcMain.handle("auth-change-password", (_e, oldPw: string, newPw: string) => core.changePassword(oldPw, newPw));
+  // F3.3.71A — troca segura de e-mail de login (self + admin)
+  ipcMain.handle("auth-change-email", (_e, currentPassword: string, newEmail: string) => core.changeEmail(currentPassword, newEmail));
+  ipcMain.handle("auth-admin-change-user-email", (_e, targetId: string, newEmail: string, confirm: string, reason: string) => core.adminChangeUserEmail(targetId, newEmail, confirm, reason));
   ipcMain.handle("auth-logout", () => core.logout());
   ipcMain.handle("auth-session-status", () => core.status());
 }

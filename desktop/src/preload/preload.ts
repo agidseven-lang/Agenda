@@ -53,6 +53,9 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   authSelf: (): Promise<any> => ipcRenderer.invoke("auth-self"),
   authChangePassword: (oldPassword: string, newPassword: string): Promise<any> => ipcRenderer.invoke("auth-change-password", oldPassword, newPassword),
   authLogout: (): Promise<any> => ipcRenderer.invoke("auth-logout"),
+  // F3.3.71A — troca segura de e-mail de login (self/admin); nunca expoe token
+  authChangeEmail: (currentPassword: string, newEmail: string): Promise<any> => ipcRenderer.invoke("auth-change-email", currentPassword, newEmail),
+  authAdminChangeUserEmail: (targetId: string, newEmail: string, confirm: string, reason: string): Promise<any> => ipcRenderer.invoke("auth-admin-change-user-email", targetId, newEmail, confirm, reason),
   authSessionStatus: (): Promise<any> => ipcRenderer.invoke("auth-session-status"),
   isDesktop: true,
   // F3.3.70D3R10I — versao REAL do app (app.getVersion() via IPC sincrono; nunca mais string manual)
