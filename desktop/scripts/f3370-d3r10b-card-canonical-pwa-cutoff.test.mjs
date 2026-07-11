@@ -212,9 +212,9 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
   // G8: package.json e lock em 1.0.154 (D9R2)
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.155', 'G8: package.json version = 1.0.155 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.156', 'G8: package.json version = 1.0.156 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.155', 'G9: package-lock version = 1.0.155 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.156', 'G9: package-lock version = 1.0.156 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
@@ -360,6 +360,17 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(HTML.includes('id="aeUser"') && HTML.includes('id="aeReason"'), 'L10: admin seleciona usuário e pode informar motivo');
   ok(HTML.includes("email_in_use") && HTML.includes('já está em uso por outro usuário'), 'L11: erro de duplicidade mapeado na UI');
   ok(!/authChangeEmail[\s\S]{0,200}token/.test(PR), 'L12: preload não expõe token no fluxo de e-mail');
+}
+
+
+/* ───────────── M: 1.0.156 — F3.3.71C1 shell do wizard Nova tarefa ───────────── */
+{
+  ok(HTML.includes('body.desktop #app > .content > .form-wrap{max-width:980px;margin:18px auto 28px;padding:6px 28px 0;background:var(--surface);border:1px solid var(--line-soft);border-radius:18px}'), 'M1: form-wrap é um shell emoldurado 980px centrado');
+  ok(/body\.desktop \.footer-nav\{position:sticky;bottom:0;margin:18px -28px 0/.test(HTML), 'M2: footer Voltar/Próximo sticky DENTRO do shell (não mais fixed na tela)');
+  ok((HTML.match(/body\.desktop \.stepper\{max-width:980px/g) || []).length === 2, 'M3: stepper alinhado à coluna 980 nos 2 breakpoints');
+  ok(HTML.includes('body.desktop .form-wrap{max-width:980px;margin-inline:auto}'), 'M4: breakpoint largo com margin-inline:auto (fim da coluna à esquerda)');
+  ok(HTML.includes('body.desktop .form-wrap .scr,body.desktop .form-wrap .scr-head{max-width:none}'), 'M5: internos preenchem o shell (header/X integrados à moldura)');
+  ok(HTML.includes('<div class="form-wrap">') && HTML.includes('data-form="next"'), 'M6: HTML/JS do wizard intocado (correção só CSS)');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));

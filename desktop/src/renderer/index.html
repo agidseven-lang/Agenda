@@ -1066,12 +1066,12 @@
   body.desktop .d-perfil .pcard{margin-top:0;padding:32px;border-radius:22px}
 
   /* FORM desktop — wizard isolado num wrapper estreito e centrado */
-  body.desktop #app > .content > .form-wrap{max-width:760px;margin:0 auto;padding-bottom:140px}
+  body.desktop #app > .content > .form-wrap{max-width:980px;margin:18px auto 28px;padding:6px 28px 0;background:var(--surface);border:1px solid var(--line-soft);border-radius:18px}
   body.desktop .form-wrap .scr,body.desktop .form-wrap .scr-head{max-width:none}
-  body.desktop .footer-nav{position:fixed;bottom:0;left:var(--d-side);right:0;background:rgba(13,14,20,.96);backdrop-filter:blur(10px);border-top:1px solid var(--line-soft);padding:14px 32px;display:flex;justify-content:flex-end;gap:12px;z-index:30}
+  body.desktop .footer-nav{position:sticky;bottom:0;margin:18px -28px 0;background:rgba(13,14,20,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line-soft);border-radius:0 0 18px 18px;padding:14px 28px;display:flex;justify-content:flex-end;gap:12px;z-index:30}
   body.desktop .footer-nav .btn{width:auto;min-width:160px;height:46px;border-radius:12px;padding:0 22px}
   body.desktop .footer-nav .btn.ghost{min-width:120px}
-  body.desktop .stepper{max-width:760px;margin:0 auto}
+  body.desktop .stepper{max-width:980px;margin:0 auto}
 
   /* MODAL polish — centrado, premium */
   body.desktop .modal-back{align-items:center;justify-content:center;background:rgba(6,7,11,.62);backdrop-filter:blur(3px)}
@@ -1141,7 +1141,7 @@
   body.desktop textarea.inp{min-height:84px}
 
   /* FORM: grupos visuais (estilo Linear/Notion) */
-  body.desktop .form-wrap{max-width:680px}
+  body.desktop .form-wrap{max-width:980px;margin-inline:auto}
   body.desktop .fgroup{background:var(--surface2);border:1px solid var(--line-soft);border-radius:16px;padding:18px 18px 20px;margin-bottom:16px;box-shadow:0 1px 0 rgba(255,255,255,.02) inset}
   body.desktop .fgroup .fgroup-h{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--soft);margin-bottom:15px}
   body.desktop .fgroup .fgroup-h::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--accent)}
@@ -1166,7 +1166,7 @@
   body.desktop .sw.on{box-shadow:0 0 0 3px rgba(91,108,255,.18)}
 
   /* STEPPER premium */
-  body.desktop .stepper{max-width:680px;margin:0 auto;padding:20px 0 24px;gap:0}
+  body.desktop .stepper{max-width:980px;margin:0 auto;padding:20px 0 24px;gap:0}
   body.desktop .stepper .sc{width:28px;height:28px;font-size:12.5px;font-weight:800;transition:box-shadow .15s,background .15s}
   body.desktop .stepper .sc.on{box-shadow:0 0 0 4px rgba(91,108,255,.2)}
   body.desktop .stepper .sc.done{background:var(--accent);border-color:transparent}
