@@ -1,0 +1,218 @@
+# =====================================================================
+# [manual] F3.3.70D4R2 — Publicacao do PRE-RELEASE Desktop 1.0.153 (#205)
+# ---------------------------------------------------------------------
+# Publica a release CONTROLADA do Desktop 1.0.153 (RC validado no QA
+# fisico D3R10AB; congelado na D4R; prep aprovado na D4R1). TUDO
+# PINADO: run id, SHA do workflow do run, SHA alvo da tag (fonte do
+# build), tag, titulo e hashes oficiais SHA-256 do EXE/MSI. O job:
+#   1) exige confirmacao literal via input;
+#   2) valida run #205 = completed/success no SHA pinado e que a
+#      branch fonte segue exatamente no SHA alvo (tip == 1547b09);
+#   3) aborta se a tag ou a release ja existirem;
+#   4) baixa o artifact BUNDLE do run #205, exige EXE/MSI/VERSAO-
+#      DESKTOP.txt, confere provenance (versionName/ref/commit e os
+#      hashes registrados) e os hashes REAIS byte a byte
+#      (qualquer divergencia => aborta SEM publicar);
+#   5) cria a release prerelease=true, latest=false, tag no SHA exato;
+#   6) anexa EXE, MSI, SHA256SUMS.txt e VERSAO-DESKTOP.txt; re-baixa
+#      os assets publicados e re-confere flags e hashes.
+# NAO builda, NAO deploya, NAO toca Firebase/Firestore/Rules/Worker,
+# NAO altera codigo de produto, NAO mexe em releases/tags antigas.
+# Sem secrets alem do GITHUB_TOKEN padrao. Permissions minimas.
+# Execucao SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] Desktop Release D4R2 — pre-release 1.0.153 producao controlada (#205)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-PRERELEASE-D4R2-1.0.153 para autorizar a publicacao"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "29100147229"
+      RUN_WF_SHA: "dbed4e86341e6287d551e89585691f77578171a9"
+      TARGET_SHA: "1547b09e1a84a1653c84c6533938253343536f41"
+      SRC_REF: "desktop/f3370-d3r10b-card-canonical-pwa-cutoff"
+      TAG: "desktop/v1.0.153-production-rc"
+      TITLE: "Agenda ID Seven Desktop 1.0.153 — Produção Controlada"
+      ART: "agenda-id-seven-desktop-1.0.153-bundle"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.153-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.153-x64.msi"
+      EXP_EXE: "407d19506aa92d830797be165ccc2c78c7dece287467f430b1c93b3a98791c1a"
+      EXP_MSI: "4b655c18ccf1ba8ca5968502dc8d7b23bfad5e4dc8c720bfa84720f9928fa54e"
+    steps:
+      - name: "Gate 1 — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "PUBLICAR-PRERELEASE-D4R2-1.0.153" ]; then
+            echo "::error::confirmacao invalida — nada foi publicado"
+            exit 1
+          fi
+          echo "OK: confirmacao literal valida"
+
+      - name: "Gate 2 — run #205 success + branch fonte no SHA alvo"
+        run: |
+          set -euo pipefail
+          ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion + "|" + .head_sha')"
+          echo "run #205: $ST"
+          if [ "$ST" != "completed|success|$RUN_WF_SHA" ]; then
+            echo "::error::run #205 invalido para publicacao"
+            exit 1
+          fi
+          TIP="$(gh api "repos/$REPO/git/ref/heads/$SRC_REF" --jq '.object.sha')"
+          echo "tip $SRC_REF: $TIP"
+          if [ "$TIP" != "$TARGET_SHA" ]; then
+            echo "::error::branch fonte nao esta mais no SHA alvo — investigar antes de publicar"
+            exit 1
+          fi
+          echo "OK: run e branch fonte conferem"
+
+      - name: "Gate 3 — tag e release nao podem existir"
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::a tag $TAG ja existe — abortando"
+            exit 1
+          fi
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            echo "::error::a release $TAG ja existe — abortando"
+            exit 1
+          fi
+          echo "OK: tag e release livres"
+
+      - name: "Baixar artifact bundle do run #205"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART" -D pacote
+          echo "----- conteudo do artifact -----"
+          find pacote -type f -exec ls -lh {} \;
+          EXE="$(find pacote -type f -name "$EXE_NAME" | head -1)"
+          MSI="$(find pacote -type f -name "$MSI_NAME" | head -1)"
+          VTX="$(find pacote -type f -name "VERSAO-DESKTOP.txt" | head -1)"
+          [ -n "$EXE" ] || { echo "::error::EXE ausente no artifact"; exit 1; }
+          [ -n "$MSI" ] || { echo "::error::MSI ausente no artifact"; exit 1; }
+          [ -n "$VTX" ] || { echo "::error::VERSAO-DESKTOP.txt ausente no artifact"; exit 1; }
+          { echo "EXE=$EXE"; echo "MSI=$MSI"; echo "VTX=$VTX"; } >> "$GITHUB_ENV"
+
+      - name: "Gate 4 — provenance + SHA-256 oficiais (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          echo "----- VERSAO-DESKTOP.txt -----"
+          cat "$VTX"
+          tr -d '\r' < "$VTX" > versao.lf
+          grep -Eq '^versionName[[:space:]]*:[[:space:]]*1\.0\.153$' versao.lf || { echo "::error::versionName != 1.0.153"; exit 1; }
+          grep -Eq "^ref[[:space:]]*:[[:space:]]*$SRC_REF\$" versao.lf || { echo "::error::ref do build nao e a branch fonte pinada"; exit 1; }
+          grep -Eq "^commit[[:space:]]*:[[:space:]]*$RUN_WF_SHA\$" versao.lf || { echo "::error::commit do run divergente"; exit 1; }
+          grep -qi "$EXP_EXE" versao.lf || { echo "::error::hash EXE nao consta no VERSAO-DESKTOP.txt"; exit 1; }
+          grep -qi "$EXP_MSI" versao.lf || { echo "::error::hash MSI nao consta no VERSAO-DESKTOP.txt"; exit 1; }
+          H_EXE="$(sha256sum "$EXE" | awk '{print $1}')"
+          H_MSI="$(sha256sum "$MSI" | awk '{print $1}')"
+          echo "SHA-256 exe : $H_EXE"
+          echo "SHA-256 msi : $H_MSI"
+          [ "$H_EXE" = "$EXP_EXE" ] || { echo "::error::hash EXE divergente — NAO publicado"; exit 1; }
+          [ "$H_MSI" = "$EXP_MSI" ] || { echo "::error::hash MSI divergente — NAO publicado"; exit 1; }
+          echo "OK: provenance e hashes conferem com os oficiais (D4R/D4R1)"
+
+      - name: "SHA256SUMS.txt"
+        run: |
+          set -euo pipefail
+          { echo "$EXP_EXE *$EXE_NAME"; echo "$EXP_MSI *$MSI_NAME"; } > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: "Release notes (aprovadas na D4R1)"
+        run: |
+          cat > notas.md <<'NOTAS'
+          **RC de produção validado** — QA físico completo aprovado em 10/07/2026 (GO completo, sem bloqueadores).
+          **Release controlada:** instalar somente em máquinas autorizadas, após conferência de hash. Sem rollout amplo nesta etapa.
+
+          ## O que há nesta versão
+          - **Card Premium WhatsApp Business restaurado e aprovado**: fluxo de um clique — "Abrir WhatsApp Business para enviar no grupo" copia a mensagem completa automaticamente e abre o WhatsApp Web; ao colar, a estrutura chega pronta com o Card Premium e o link estável `/share/cronograma/<token>` (sem cache-bust — regime validado em produção). O link abre o portal do cliente.
+          - **Board/Kanban canônico** aprovado (card canônico).
+          - **Tarefas antigas do PWA fora do fluxo principal** (corte PWA no Desktop).
+          - **Tray/bandeja do sistema validada**: ícone nunca-invisível (fallback embutido), recriação automática (startup/login/heartbeat), seção "Bandeja do sistema" em Configurações com status em tempo real e botão "Recriar ícone da bandeja".
+          - **Agenda, Chat e Testar notificação aprovados** no QA físico.
+          - **Prova de versão**: todos os rótulos derivam do executável real (`app.getVersion()`); Sobre e Perfil exibem **1.0.153**.
+
+          ## Escopo desta release
+          - **Sem Android** (pausado).
+          - **PWA fora do produto principal.**
+          - **Nenhuma alteração de servidor**: Worker/Card em produção, Firestore, Rules e Functions intocados.
+
+          ## Artefatos e hashes oficiais (SHA-256)
+          | Arquivo | SHA-256 |
+          |---|---|
+          | `Agenda-ID-Seven-Desktop-1.0.153-x64.exe` | `407d19506aa92d830797be165ccc2c78c7dece287467f430b1c93b3a98791c1a` |
+          | `Agenda-ID-Seven-Desktop-1.0.153-x64.msi` | `4b655c18ccf1ba8ca5968502dc8d7b23bfad5e4dc8c720bfa84720f9928fa54e` |
+
+          ## Instalação (somente máquinas autorizadas)
+          1. Baixe o `.exe` (ou o `.msi`) desta release.
+          2. Confira o hash no Prompt/PowerShell:
+             `certutil -hashfile "Agenda-ID-Seven-Desktop-1.0.153-x64.exe" SHA256`
+             O valor deve ser **exatamente** o da tabela acima. Se divergir, **não instale** e reporte.
+          3. Execute o instalador. Se o SmartScreen avisar: **"Mais informações" → "Executar assim mesmo"**.
+          4. Após instalar, abra o app e confirme **1.0.153** em Configurações → Sobre e no Perfil.
+
+          ## ⚠️ Aviso — Smart App Control / assinatura digital
+          O instalador **ainda não é assinado digitalmente**. Em máquinas com **Smart App Control ativo** (Windows 11), o Windows **pode bloquear a instalação sem opção de prosseguir**. Instale somente em máquinas autorizadas e compatíveis, e sempre após conferência de hash.
+
+          ## Rollback
+          - Rebaixar **apenas em caso de falha crítica**, **reportando antes**.
+          - **As versões 1.0.147–1.0.152 estão fora de uso.** **1.0.153 é o único RC aprovado.**
+          - Reinstalação íntegra: baixe novamente os artefatos **desta** release e confira o hash antes de instalar.
+
+          ## Procedência do build
+          - Workflow desktop-build, run **#205** (id `29100147229`), concluído com sucesso; gates de tray e de prova-de-versão (asar-aware) aprovados.
+          - Fonte: branch `desktop/f3370-d3r10b-card-canonical-pwa-cutoff` @ commit `1547b09`.
+          NOTAS
+          echo "notas.md gerado:"
+          wc -l notas.md
+
+      - name: "Publicar pre-release (prerelease=true, latest=false)"
+        run: |
+          set -euo pipefail
+          cp "$EXE" "$MSI" "$VTX" .
+          gh release create "$TAG" -R "$REPO" \
+            --target "$TARGET_SHA" \
+            --prerelease \
+            --latest=false \
+            --title "$TITLE" \
+            --notes-file notas.md \
+            "$EXE_NAME" \
+            "$MSI_NAME" \
+            "SHA256SUMS.txt" \
+            "VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG"
+
+      - name: "Verificacao pos-publicacao (flags, assets, re-download, hashes)"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" \
+            --json tagName,targetCommitish,isPrerelease,isLatest,isDraft,assets \
+            --jq '{tag:.tagName, target:.targetCommitish, prerelease:.isPrerelease, latest:.isLatest, draft:.isDraft, assets:[.assets[]|{name,size}]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft,isLatest --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)+"|"+(.isLatest|tostring)')"
+          [ "$FLAGS" = "true|false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "4" ] || { echo "::error::esperado 4 assets, encontrados $N"; exit 1; }
+          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
+          [ "$TGT" = "$TARGET_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          mkdir volta
+          gh release download "$TAG" -R "$REPO" -D volta
+          (cd volta && sha256sum -c SHA256SUMS.txt)
+          H2E="$(sha256sum "volta/$EXE_NAME" | awk '{print $1}')"
+          H2M="$(sha256sum "volta/$MSI_NAME" | awk '{print $1}')"
+          [ "$H2E" = "$EXP_EXE" ] || { echo "::error::re-download EXE divergente"; exit 1; }
+          [ "$H2M" = "$EXP_MSI" ] || { echo "::error::re-download MSI divergente"; exit 1; }
+          echo "===== GO: PRE-RELEASE 1.0.153 PUBLICADO E VALIDADO ====="
