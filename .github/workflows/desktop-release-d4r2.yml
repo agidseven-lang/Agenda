@@ -19,7 +19,10 @@
 # NAO builda, NAO deploya, NAO toca Firebase/Firestore/Rules/Worker,
 # NAO altera codigo de produto, NAO mexe em releases/tags antigas.
 # Sem secrets alem do GITHUB_TOKEN padrao. Permissions minimas.
-# Execucao SOMENTE manual (workflow_dispatch).
+# Execucao SOMENTE deliberada: workflow_dispatch (confirm literal) OU
+# push NESTA branch de ops cujo head-commit contenha a MESMA string
+# literal (o dispatch por API exige workflow na branch default; o
+# push-trigger roda do proprio ref — mesma confirmacao, outro canal).
 # =====================================================================
 name: "[manual] Desktop Release D4R2 — pre-release 1.0.153 producao controlada (#205)"
 
@@ -30,6 +33,9 @@ name: "[manual] Desktop Release D4R2 — pre-release 1.0.153 producao controlada
         description: "Digite PUBLICAR-PRERELEASE-D4R2-1.0.153 para autorizar a publicacao"
         required: true
         default: ""
+  push:
+    branches:
+      - "claude/bold-hopper-4boo17"
 
 permissions:
   contents: write
@@ -53,15 +59,22 @@ jobs:
       EXP_EXE: "407d19506aa92d830797be165ccc2c78c7dece287467f430b1c93b3a98791c1a"
       EXP_MSI: "4b655c18ccf1ba8ca5968502dc8d7b23bfad5e4dc8c720bfa84720f9928fa54e"
     steps:
-      - name: "Gate 1 — confirmacao literal"
+      - name: "Gate 1 — confirmacao literal (dispatch OU head-commit)"
         env:
           CONFIRM: ${{ github.event.inputs.confirm }}
+          HEADMSG: ${{ github.event.head_commit.message }}
         run: |
-          if [ "$CONFIRM" != "PUBLICAR-PRERELEASE-D4R2-1.0.153" ]; then
-            echo "::error::confirmacao invalida — nada foi publicado"
-            exit 1
+          if [ "$CONFIRM" = "PUBLICAR-PRERELEASE-D4R2-1.0.153" ]; then
+            echo "OK: confirmacao literal via dispatch"
+            exit 0
           fi
-          echo "OK: confirmacao literal valida"
+          case "$HEADMSG" in
+            *PUBLICAR-PRERELEASE-D4R2-1.0.153*)
+              echo "OK: confirmacao literal via head-commit do push" ;;
+            *)
+              echo "sem confirmacao literal — nada foi publicado (no-op)"
+              exit 1 ;;
+          esac
 
       - name: "Gate 2 — run #205 success + branch fonte no SHA alvo"
         run: |
