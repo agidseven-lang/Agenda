@@ -33,9 +33,9 @@ name: "[manual] Desktop Release D4R2 — pre-release 1.0.153 producao controlada
         description: "Digite PUBLICAR-PRERELEASE-D4R2-1.0.153 para autorizar a publicacao"
         required: true
         default: ""
-  push:
-    branches:
-      - "claude/bold-hopper-4boo17"
+  # push-trigger REMOVIDO apos a publicacao (11/07/2026, run 29152720721):
+  # a release desktop/v1.0.153-production-rc ja existe; o gate 3 bloquearia
+  # re-publicacao, e sem o trigger nao ha runs no-op em pushes futuros.
 
 permissions:
   contents: write
