@@ -19,9 +19,8 @@ name: "[manual] Desktop Release D4R2 — verificacao pos-publicacao 1.0.153"
         description: "Digite VERIFICAR-PRERELEASE-D4R2-1.0.153 para rodar a verificacao"
         required: true
         default: ""
-  push:
-    branches:
-      - "claude/bold-hopper-4boo17"
+  # push-trigger REMOVIDO apos a verificacao verde (run 29152865470, 11/07/2026):
+  # evita runs no-op em pushes futuros desta branch de ops.
 
 permissions:
   contents: read
