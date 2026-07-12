@@ -210,11 +210,11 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<title>ID Seven · Desktop<\/title>/.test(HTML), 'G6: <title> estático neutro (runtime preenche)');
   // G7: sidebar footer deriva de APP_VER
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
-  // G8: package.json e lock em 1.0.154 (D9R2)
+  // G8/G9: versão corrente (1.0.158 = F3.3.71C5 wizard coluna real + instalador 1º clique)
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.157', 'G8: package.json version = 1.0.157 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.158', 'G8: package.json version = 1.0.158 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.157', 'G9: package-lock version = 1.0.157 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.158', 'G9: package-lock version = 1.0.158 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
@@ -363,10 +363,15 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
 }
 
 
-/* ───────────── M: 1.0.156 — F3.3.71C1 shell do wizard Nova tarefa ───────────── */
+/* ───────────── M: 1.0.156 — F3.3.71C1 shell do wizard Nova tarefa
+   [M1/M2 ATUALIZADAS em 1.0.158 / F3.3.71C5] O NO-GO físico do owner provou que o
+   footer sticky da 71C1 era OVERLAY (537px de conteúdo por baixo dele na etapa
+   Dados @1366×768) e que focar/digitar rolava o .content (card fora do
+   enquadramento; 0→442px medidos). O shell agora é COLUNA REAL: corpo .scr é o
+   único scroller e o footer é ESTÁTICO dentro da moldura. ───────────── */
 {
-  ok(HTML.includes('body.desktop #app > .content > .form-wrap{max-width:980px;margin:18px auto 28px;padding:6px 28px 0;background:var(--surface);border:1px solid var(--line-soft);border-radius:18px}'), 'M1: form-wrap é um shell emoldurado 980px centrado');
-  ok(/body\.desktop \.footer-nav\{position:sticky;bottom:0;margin:18px -28px 0/.test(HTML), 'M2: footer Voltar/Próximo sticky DENTRO do shell (não mais fixed na tela)');
+  ok(HTML.includes('body.desktop #app > .content > .form-wrap{max-width:980px;margin:18px auto 28px;padding:6px 28px 0;background:var(--surface);border:1px solid var(--line-soft);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;max-height:calc(100vh - var(--d-topbar) - 110px)}'), 'M1: form-wrap é shell 980px em COLUNA com teto no scrollport (71C5)');
+  ok(/body\.desktop \.footer-nav\{position:static;flex:none;margin:0 -28px/.test(HTML), 'M2: footer Voltar/Próximo ESTÁTICO dentro do shell (fim do overlay sticky — 71C5)');
   ok((HTML.match(/body\.desktop \.stepper\{max-width:980px/g) || []).length === 2, 'M3: stepper alinhado à coluna 980 nos 2 breakpoints');
   ok(HTML.includes('body.desktop .form-wrap{max-width:980px;margin-inline:auto}'), 'M4: breakpoint largo com margin-inline:auto (fim da coluna à esquerda)');
   ok(HTML.includes('body.desktop .form-wrap .scr,body.desktop .form-wrap .scr-head{max-width:none}'), 'M5: internos preenchem o shell (header/X integrados à moldura)');
@@ -383,6 +388,21 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   const YML = fs.readFileSync(path.resolve(__dirname, '..', 'electron-builder.yml'), 'utf8');
   ok(YML.includes('icon: build/icon.ico') && YML.includes('include: build/installer.nsh'), 'N4: build aponta icon.ico + installer.nsh (config intocada além do fix)');
   ok(YML.includes('from: build/icon.png') && YML.includes('to: icon.png'), 'N5: extraResources do tray preservado');
+}
+
+
+/* ───────────── O: 1.0.158 — F3.3.71C5 wizard coluna real + instalador 1º clique ───────────── */
+{
+  ok(HTML.includes('body.desktop .form-wrap .scr{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px 20px 26px 0;margin-right:-20px;scrollbar-gutter:stable}'), 'O1: corpo .scr é o ÚNICO scroller do wizard (gutter estável, sem pulo entre etapas)');
+  ok(HTML.includes('body.desktop .form-wrap input,body.desktop .form-wrap textarea,body.desktop .form-wrap select{box-sizing:border-box}'), 'O2: campos do wizard em border-box (fim do estouro de ~30px além da coluna)');
+  ok(HTML.includes('body.desktop .form-wrap .scr-head,body.desktop .form-wrap .stepper{flex:none}') && HTML.includes('body.desktop .form-wrap .stepper{width:100%}'), 'O3: header/stepper fixos na moldura; stepper largura cheia no flex-column');
+  ok(/\.footer-nav\{position:sticky;bottom:0;background:var\(--surface\)/.test(HTML), 'O4: base mobile/PWA do footer preservada (sticky segue fora do desktop)');
+  ok(HTML.includes('body.desktop .footer-nav{padding:14px 28px;gap:12px;background:rgba(11,12,17,.92)}'), 'O5: footer premium alinhado à coluna do conteúdo (28px, era 32px)');
+  ok(!/body\.desktop \.footer-nav\{[^}]*backdrop-filter/.test(HTML), 'O6: footer desktop sem backdrop-filter (nada passa por baixo dele agora)');
+  const NSH = fs.readFileSync(path.resolve(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
+  ok(/!macro customInit[\s\S]*Banner::show "Preparando o instalador\.\.\."[\s\S]*!insertmacro killRunningApp[\s\S]*Banner::destroy[\s\S]*!macroend/.test(NSH), 'O7: customInit dá feedback imediato (Banner) antes do taskkill/Sleep e destrói ao fim');
+  ok(/IfSilent instPrepSemBanner[\s\S]*IfSilent instPrepFim/.test(NSH), 'O8: instalação silenciosa /S preservada (banner só no modo interativo)');
+  ok(/Mark-of-the-Web[\s\S]*Desbloquear/.test(NSH), 'O9: causa operacional do 1º clique (MOTW/verificação) documentada no próprio hook');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));

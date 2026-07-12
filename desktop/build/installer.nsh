@@ -23,8 +23,27 @@
 !macroend
 
 ; Roda no .onInit do INSTALADOR (antes de qualquer secao de copia de arquivos).
+; ----------------------------------------------------------------------------
+; F3.3.71C5 — "primeiro duplo clique nao abre; o segundo instala" (2 camadas):
+;  (1) FORA do nosso codigo (nao corrigivel por NSIS): com Mark-of-the-Web,
+;      SmartScreen/Defender VERIFICAM o EXE inteiro ANTES de criar o processo —
+;      nessa janela nenhum codigo nosso roda e nenhum feedback e possivel. O
+;      template do electron-builder ainda tem mutex de instancia unica: um novo
+;      clique durante a verificacao vira a instancia "vencedora" e a primeira,
+;      atrasada, se encerra sozinha (Abort silencioso) — dai "o segundo instala".
+;      MITIGACAO OPERACIONAL: apos conferir o SHA-256, aguardar ~10-30s no 1o
+;      clique OU desbloquear o arquivo (Propriedades -> Desbloquear) antes de rodar.
+;  (2) NOSSA janela (corrigida AQUI): customInit roda taskkill + Sleep 1200 antes
+;      da GUI -> 1,2s+ de silencio proprio. Banner nativo da feedback imediato.
+;      IfSilent preserva instalacao silenciosa /S sem UI.
 !macro customInit
+  IfSilent instPrepSemBanner
+    Banner::show "Preparando o instalador..."
+  instPrepSemBanner:
   !insertmacro killRunningApp
+  IfSilent instPrepFim
+    Banner::destroy
+  instPrepFim:
 !macroend
 
 ; Roda no .onInit do DESINSTALADOR (libera arquivos antes de remover).

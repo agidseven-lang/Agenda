@@ -1065,10 +1065,23 @@
   body.desktop .d-perfil{display:grid;grid-template-columns:380px 1fr;gap:24px;align-items:start}
   body.desktop .d-perfil .pcard{margin-top:0;padding:32px;border-radius:22px}
 
-  /* FORM desktop — wizard isolado num wrapper estreito e centrado */
-  body.desktop #app > .content > .form-wrap{max-width:980px;margin:18px auto 28px;padding:6px 28px 0;background:var(--surface);border:1px solid var(--line-soft);border-radius:18px}
+  /* FORM desktop — F3.3.71C5: shell REAL em coluna. O footer sticky da 71C1 era
+     um OVERLAY: na etapa Dados @1366×768 537px de conteúdo passavam POR BAIXO
+     dele e focar/digitar rolava o .content inteiro (card saía do enquadramento;
+     contentScrollTop 0→442px medido no harness). Agora header/stepper ficam
+     fixos na moldura, o corpo .scr é o ÚNICO scroller e o footer é ESTÁTICO
+     dentro do shell — nunca cobre campo e o card nunca se move ao focar. */
+  body.desktop #app > .content > .form-wrap{max-width:980px;margin:18px auto 28px;padding:6px 28px 0;background:var(--surface);border:1px solid var(--line-soft);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;max-height:calc(100vh - var(--d-topbar) - 110px)}
   body.desktop .form-wrap .scr,body.desktop .form-wrap .scr-head{max-width:none}
-  body.desktop .footer-nav{position:sticky;bottom:0;margin:18px -28px 0;background:rgba(13,14,20,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line-soft);border-radius:0 0 18px 18px;padding:14px 28px;display:flex;justify-content:flex-end;gap:12px;z-index:30}
+  body.desktop .form-wrap .scr-head,body.desktop .form-wrap .stepper{flex:none}
+  /* flex-item de coluna com margin:0 auto encolheria para fit-content: força largura cheia */
+  body.desktop .form-wrap .stepper{width:100%}
+  body.desktop .form-wrap .scr{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px 20px 26px 0;margin-right:-20px;scrollbar-gutter:stable}
+  /* campos do wizard em border-box: .inp é width:100% + padding 13/14 e ficava
+     ~30px mais largo que a coluna (o reset global de box-sizing está morto pela
+     chave solta histórica — ver D9R2); escopo EXCLUSIVO do wizard, nada global */
+  body.desktop .form-wrap input,body.desktop .form-wrap textarea,body.desktop .form-wrap select{box-sizing:border-box}
+  body.desktop .footer-nav{position:static;flex:none;margin:0 -28px;background:rgba(13,14,20,.94);border-top:1px solid var(--line-soft);padding:14px 28px;display:flex;justify-content:flex-end;gap:12px}
   body.desktop .footer-nav .btn{width:auto;min-width:160px;height:46px;border-radius:12px;padding:0 22px}
   body.desktop .footer-nav .btn.ghost{min-width:120px}
   body.desktop .stepper{max-width:980px;margin:0 auto}
@@ -1173,8 +1186,9 @@
   body.desktop .stepper .slab{font-size:12.5px;margin-left:2px}
   body.desktop .stepper .ln{margin:0 10px;height:2px;border-radius:2px}
 
-  /* FOOTER nav premium */
-  body.desktop .footer-nav{padding:14px 32px;gap:12px;background:rgba(11,12,17,.92)}
+  /* FOOTER nav premium — 71C5: padding 28px alinha os botões à coluna do conteúdo
+     (o wrap tem padding lateral 28px; 32px deixava Voltar/Próximo 4px fora do eixo) */
+  body.desktop .footer-nav{padding:14px 28px;gap:12px;background:rgba(11,12,17,.92)}
   body.desktop .footer-nav .btn{height:44px;border-radius:11px;font-size:14px;font-weight:700;min-width:150px}
   body.desktop .footer-nav .btn:not(.ghost){background:linear-gradient(135deg,#5B6CFF 0%,#6E5BFF 100%);box-shadow:0 6px 16px -6px rgba(91,108,255,.5)}
   body.desktop .footer-nav .btn.ghost{min-width:118px;background:transparent;border:1px solid var(--line);color:var(--soft)}
