@@ -11,8 +11,8 @@ name: "[manual] F3.3.72C — deploy email-cut legados (2 functions; dry-run/appl
   workflow_dispatch:
     inputs:
       confirm: { description: "Digite DEPLOY-ADMINUPDATEUSER-EMAIL-CUT-72C (apply) ou DRYRUN (dry-run)", required: true, default: "DRYRUN" }
-  push:
-    branches: ["claude/bold-hopper-4boo17"]
+  # push-trigger REMOVIDO apos o deploy (13/07/2026, run 29259974529):
+  # o corte ja esta em producao; re-execucoes futuras via dispatch em fase propria.
 permissions: { contents: read }
 concurrency: { group: f3372c-deploy, cancel-in-progress: false }
 env:
