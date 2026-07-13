@@ -15,9 +15,9 @@ name: "[manual] F3.3.72A usersAudit verify (read-only)"
         description: "Digite VERIFICAR-USERSAUDIT-72A para autorizar a leitura"
         required: true
         default: ""
-  push:
-    branches:
-      - "claude/bold-hopper-4boo17"
+  # push-trigger REMOVIDO apos a leitura (13/07/2026, run 29258029157):
+  # re-leituras futuras via workflow_dispatch quando este arquivo estiver na main,
+  # ou re-armando o push-trigger em fase propria.
 
 permissions:
   contents: read
