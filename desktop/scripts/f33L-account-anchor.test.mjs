@@ -18,7 +18,7 @@ const m = HTML.indexOf('nav.innerHTML=');
 const elseIdx = HTML.indexOf('}else{', m);
 const block = HTML.slice(m, elseIdx);   // "nav.innerHTML= ...';"
 ok('nav: bloco isDesktop localizado', m>0 && elseIdx>m);
-const build = new Function('TABS','sbItem','svg','avatar','esc','notifNavBadge','state',
+const build = new Function('TABS','sbItem','svg','avatar','esc','notifNavBadge','state','APP_VER',
   'var nav={};'+block+'return nav.innerHTML;');
 const html = build(
   [],                                        // TABS (vazio p/ isolar o sb-user)
@@ -27,7 +27,8 @@ const html = build(
   (u,s)=>'«AV:'+((u&&u.name)||'')+':'+s+'»',  // avatar (marca foto+tamanho)
   (s)=> (s==null?'':String(s)),               // esc (identidade p/ teste)
   ()=> '',                                    // notifNavBadge
-  { user:{ name:'Arydyjany Carlôto', role:'Social Media', admin:false, photo:'sm.png' } }
+  { user:{ name:'Arydyjany Carlôto', role:'Social Media', admin:false, photo:'sm.png' } },
+  { desktop:'0.0.0-teste', tag:'teste' }      // APP_VER stub (F3.3.72E: rodapé usa APP_VER desde G7)
 );
 ok('sb-user: classe presente', /class="sb-user"/.test(html));
 ok('sb-user: abre Perfil (data-tab=perfil)', /class="sb-user"[^>]*data-tab="perfil"/.test(html));
@@ -59,7 +60,10 @@ ok('logout: remove overlays operacionais (cornerAvatar/monitor/sino)', /cornerAv
 ok('clearSession remove wp_uid', /function clearSession\([^)]*\)\{[^}]*wp_uid/.test(HTML.replace(/\n/g,' ')) || /removeItem\('wp_uid'\)/.test(HTML));
 
 /* ===== 4) Boot/login gate intacto (sem sessão → Login; persistida → entra) ===== */
-ok('boot: lê wp_uid (sessão persistida)', /localStorage\.getItem\('wp_uid'\)/.test(HTML));
+/* [ATUALIZADA F3.3.72E] O contrato antigo (boot lê wp_uid do localStorage) morreu na
+   F3.3.56-G2: a sessão é restaurada SERVER-SIDE (token confinado ao main; boot chama
+   desktopAPI.authSelf). O renderer NUNCA mais lê wp_uid — é isso que se trava agora. */
+ok('boot: sessão restaurada server-side via desktopAPI.authSelf; renderer NÃO lê wp_uid', !/localStorage\.getItem\('wp_uid'\)/.test(HTML) && /api\.authSelf\(\)/.test(HTML));
 ok('boot: renderLogin() no arranque', /async function boot\(\)\{\s*renderLogin\(\)/.test(HTML));
 ok('render: barra app sem usuário (if(!state.user)return)', /function render\(\)\{[\s\S]{0,80}if\(!state\.user\)return/.test(HTML));
 
