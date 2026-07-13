@@ -67,8 +67,8 @@ ok("C2 initialSector descontinuado NÃO pré-seleciona a criação (guarda 71C7)
   /takeIf \{ !it\.descontinuado \}/.test(FORM));
 ok("C3 edição de tarefa histórica NÃO força troca de setor (editId preserva t.sector)",
   /sector = Sectors\.of\(t\.sector\)\.key/.test(FORM));
-ok("C4 hub Quadros mostra TODOS os setores (histórico visível, igual Desktop)",
-  /items\(Sectors\.ALL, key = \{ it\.key \}\)/.test(HUB) && !/filter \{ !it\.descontinuado \}/.test(HUB));
+ok("C4 hub Quadros mostra SÓ setores ativos (decisão do owner na 73I1; histórico intacto)",
+  /items\(Sectors\.ALL\.filter \{ !it\.descontinuado \}, key = \{ it\.key \}\)/.test(HUB));
 ok("C5 template de copywriting preservado (edição histórica)",
   /"copywriting" to SectorTpl\(/.test(TPLS));
 ok("C6 board não filtra tarefas por setor descontinuado (histórico aparece)",

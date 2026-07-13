@@ -52,6 +52,10 @@ fun BoardsHubScreen(
     tasksState.errorMessage()?.let { ErrorState("Quadros — $it"); return }
     if (tasksState.isLoading) { SkeletonList(); return }
     val all = TaskVisibility.visibleTasks(currentUser, tasksState.itemsOrEmpty())
+    // F3.3.73I1 — decisão do owner: setor DESCONTINUADO sai do fluxo visual do hub
+    // (cards E contagem da pílula). NADA é apagado/migrado: as tarefas históricas
+    // seguem no banco e Sectors.of()/alias continuam resolvendo-as em detalhe/edição.
+    val shown = all.filter { !Sectors.of(it.sector).descontinuado }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -60,12 +64,12 @@ fun BoardsHubScreen(
                 Text("Gestão por setor da agência", color = Tokens.Faint, fontSize = 12.5.sp, fontWeight = FontWeight.Medium)
             }
             Box(Modifier.clip(RoundedCornerShape(999.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(999.dp)).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                Text("${all.size} tarefas", color = Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("${shown.size} tarefas", color = Tokens.Soft, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
         LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp)) {
-            items(Sectors.ALL, key = { it.key }) { s ->
-                val list = all.filter { Sectors.of(it.sector).key == s.key }
+            items(Sectors.ALL.filter { !it.descontinuado }, key = { it.key }) { s ->
+                val list = shown.filter { Sectors.of(it.sector).key == s.key }
                 val total = list.size
                 val late = list.count { TaskDeadline.of(it)?.late == true }
                 BoardCard(
