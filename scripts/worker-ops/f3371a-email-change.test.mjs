@@ -39,10 +39,12 @@ const FN_NAMES = [
   "authSessionSecret", "authVerifySessionToken",
   "notifRlBlocked", "notifRlFail", "notifRlClear", "notifDb",
   "uwValidStr", "uwTargetId", "authRequireAdminSession",
+  "uwValidColor", "uwValidPhoto", "uwValidReminder",
   "emailInUseByOther", "emailAuditWrite",
   "handleChangeLoginEmail", "handleAdminChangeUserEmail",
+  "handleUpdateUserSelf", "handleAdminUpdateUser",
 ];
-const CONST_NAMES = ["AUTH_SESSION_TTL_MS", "EMAILCHG_CONFIRM", "EMAILCHG_MAX"];
+const CONST_NAMES = ["AUTH_SESSION_TTL_MS", "EMAILCHG_CONFIRM", "EMAILCHG_MAX", "USER_SELF_UPDATE_KEYS", "USER_ADMIN_UPDATE_KEYS"];
 
 let BODY = "";
 for (const n of CONST_NAMES) BODY += grabConst(n) + "\n";
@@ -74,6 +76,8 @@ const make = new Function("crypto", PRELUDE + BODY + `
     reset: function (u) { for (var k in __users) delete __users[k]; if (u) for (var kk in u) __users[kk] = u[kk]; __writes.length = 0; __logs.length = 0; __notifRlState.clear(); },
     writes: function () { return __writes; }, users: function () { return __users; },
     changeLoginEmail: handleChangeLoginEmail, adminChangeUserEmail: handleAdminChangeUserEmail,
+    updateUserSelf: handleUpdateUserSelf, adminUpdateUser: handleAdminUpdateUser,
+    emailAuditWrite: emailAuditWrite, selfKeys: USER_SELF_UPDATE_KEYS, adminKeys: USER_ADMIN_UPDATE_KEYS,
   };
 `);
 const H = make(crypto);
@@ -146,6 +150,36 @@ function seed() {
   ok("A8c email do alvo atualizado", H.users().userC.email === "novo-c@x.com");
   ok("A8d resposta sem PII/segredo", noSecret(a8.json));
   ok("A9 permanece: alvo troca nao mexe em pass/salt/status/admin", H.users().userC.pass && H.users().userC.salt === "s2" && H.users().userC.status === "ativo" && H.users().userC.admin === false);
+
+  // ---- U: F3.3.72C — corte de e-mail nos endpoints LEGADOS + retry da auditoria ----
+  seed();
+  const u1 = await call("updateUserSelf", { authHeader: sess("ownerU"), body: { email: "hack@x.com" } });
+  ok("U1 self com email -> 400 email_change_dedicated_flow", u1.status === 400 && u1.json.error === "email_change_dedicated_flow");
+  const u2 = await call("updateUserSelf", { authHeader: sess("ownerU"), body: { email: "" } });
+  ok("U2 self com email VAZIO -> 400 (nunca limpa e-mail)", u2.status === 400 && u2.json.error === "email_change_dedicated_flow");
+  seed();
+  const u3 = await call("updateUserSelf", { authHeader: sess("ownerU"), body: { name: "Owner Novo", color: "#112233" } });
+  const wu3 = H.writes().find(w => w.coll === "users" && w.op === "update" && w.id === "ownerU");
+  ok("U3 self demais campos seguem OK (name/color) sem email", u3.status === 200 && !!wu3 && wu3.patch.name === "Owner Novo" && wu3.patch.color === "#112233" && !("email" in wu3.patch));
+  ok("U4 self sem sessao -> 401", (await call("updateUserSelf", { authHeader: "", body: { name: "x" } })).status === 401);
+  seed();
+  const u5 = await call("adminUpdateUser", { authHeader: sess("ownerU"), body: { targetId: "userB", patch: { email: "hack@x.com" } } });
+  ok("U5 admin patch com email -> 400 email_change_dedicated_flow", u5.status === 400 && u5.json.error === "email_change_dedicated_flow");
+  const u6 = await call("adminUpdateUser", { authHeader: sess("ownerU"), body: { targetId: "userB", patch: { email: "" } } });
+  ok("U6 admin patch com email VAZIO -> 400 (nunca limpa e-mail)", u6.status === 400 && u6.json.error === "email_change_dedicated_flow");
+  seed();
+  const u7 = await call("adminUpdateUser", { authHeader: sess("ownerU"), body: { targetId: "userB", patch: { name: "B2", role: "Editor2" } } });
+  const wu7 = H.writes().find(w => w.coll === "users" && w.op === "update" && w.id === "userB");
+  ok("U7 admin demais campos seguem OK (name/role) sem email", u7.status === 200 && !!wu7 && wu7.patch.name === "B2" && wu7.patch.role === "Editor2" && !("email" in wu7.patch));
+  ok("U8 admin nao-admin segue bloqueado -> 403", (await call("adminUpdateUser", { authHeader: sess("userB"), body: { targetId: "userC", patch: { name: "x" } } })).status === 403);
+  ok("U9 allowlists sem email (self e admin)", H.selfKeys.indexOf("email") < 0 && H.adminKeys.indexOf("email") < 0);
+  ok("U10 email do alvo INTACTO apos tentativas", H.users().userB.email === "b@x.com" && H.users().ownerU.email === "owner@x.com");
+  // retry do audit-write: falha 1x -> sucesso na 2a (true); falha 2x -> false, sem lancar
+  let fails = 1;
+  const dbFlaky = { collection: () => ({ add: async () => { if (fails-- > 0) throw new Error("indisponivel"); return { id: "a1" }; } }) };
+  ok("U11 emailAuditWrite: 1 falha + retry -> true", (await H.emailAuditWrite(dbFlaky, { type: "t", by: "u", target: "u" })) === true);
+  const dbDead = { collection: () => ({ add: async () => { throw new Error("indisponivel"); } }) };
+  ok("U12 emailAuditWrite: 2 falhas -> false (best-effort, sem lancar)", (await H.emailAuditWrite(dbDead, { type: "t", by: "u", target: "u" })) === false);
 
   console.log("\nRESULTADO: " + pass + "/" + (pass + fail) + " PASS" + (fail ? " — HÁ FALHAS" : " — SUITE OK"));
   process.exit(fail ? 1 : 0);

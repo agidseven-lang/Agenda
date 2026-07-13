@@ -1846,8 +1846,13 @@ exports._handleChangePassword = handleChangePassword;
      ADITIVO/INERTE: sem deploy, sem cutover do cliente, sem tocar Rules nesta fase.
    - syncUsersPublic (trigger) propaga qualquer write server-side de users -> usersPublic.
    ============================================================================ */
-const USER_SELF_UPDATE_KEYS = ["color", "photo", "reminderMinutes", "name", "phone", "email"];
-const USER_ADMIN_UPDATE_KEYS = ["name", "role", "email", "phone", "color", "photo", "reminderMinutes"];
+/* F3.3.72C — "email" REMOVIDO das duas allowlists: troca de e-mail passou a ser
+   EXCLUSIVA dos fluxos dedicados (changeLoginEmail / adminChangeUserEmail), que
+   re-verificam senha/confirm literal, garantem UNICIDADE e gravam usersAudit.
+   Os handlers abaixo tambem rejeitam explicitamente qualquer patch com "email"
+   (erro claro email_change_dedicated_flow), inclusive e-mail vazio. */
+const USER_SELF_UPDATE_KEYS = ["color", "photo", "reminderMinutes", "name", "phone"];
+const USER_ADMIN_UPDATE_KEYS = ["name", "role", "phone", "color", "photo", "reminderMinutes"];
 const USER_STATUS_VALUES = ["ativo", "inativo", "pendente"];
 function uwValidColor(v) { return typeof v === "string" && (v === "" || /^#[0-9a-fA-F]{6}$/.test(v)); }
 function uwValidPhoto(v) { return typeof v === "string" && v.length <= 4096; }
@@ -1891,15 +1896,17 @@ async function handleUpdateUserSelf(ctx) {
   if (!body) return { status: 400, json: { ok: false, error: "bad_request" } };
   const keys = Object.keys(body);
   if (!keys.length) return { status: 400, json: { ok: false, error: "empty_patch" } };
+  // F3.3.72C: e-mail NUNCA por aqui (nem vazio) — fluxo dedicado com senha+unicidade+auditoria.
+  if (keys.indexOf("email") >= 0) return { status: 400, json: { ok: false, error: "email_change_dedicated_flow", msg: "Alteração de e-mail deve usar o fluxo seguro dedicado (changeLoginEmail)." } };
   for (const k of keys) { if (USER_SELF_UPDATE_KEYS.indexOf(k) < 0) return { status: 400, json: { ok: false, error: "forbidden_field" } }; }
   const patch = {};
   if ("color" in body) { if (!uwValidColor(body.color)) return { status: 400, json: { ok: false, error: "bad_color" } }; patch.color = body.color; }
   if ("photo" in body) { if (!uwValidPhoto(body.photo)) return { status: 400, json: { ok: false, error: "bad_photo" } }; patch.photo = body.photo; }
   if ("reminderMinutes" in body) { if (!uwValidReminder(body.reminderMinutes)) return { status: 400, json: { ok: false, error: "bad_reminder" } }; patch.reminderMinutes = body.reminderMinutes; }
-  // Identidade self-editavel (F3.3.61-J): name/phone/email. role NAO entra aqui (preferencia segura RBAC).
+  // Identidade self-editavel (F3.3.61-J): name/phone. role NAO entra aqui (preferencia segura RBAC).
+  // email saiu na F3.3.72C: exclusivo do changeLoginEmail (senha + unicidade + auditoria).
   if ("name" in body) { const nm = (typeof body.name === "string") ? body.name.trim() : ""; if (!uwValidStr(nm, 200) || !nm) return { status: 400, json: { ok: false, error: "bad_name" } }; patch.name = nm; }
   if ("phone" in body) { if (!uwValidStr(body.phone, 40)) return { status: 400, json: { ok: false, error: "bad_phone" } }; patch.phone = body.phone; }
-  if ("email" in body) { const em = normEmail(body.email); if (em && !isValidEmail(em)) return { status: 400, json: { ok: false, error: "bad_email" } }; patch.email = em; }
   if (!Object.keys(patch).length) return { status: 400, json: { ok: false, error: "empty_patch" } };
   const db = (ctx && ctx.db) || notifDb();
   try { await db.collection("users").doc(auth.uid).update(patch); }
@@ -1990,6 +1997,7 @@ exports.adminCreateUser = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "u
 exports._handleAdminCreateUser = handleAdminCreateUser;
 
 // adminUpdateUser — edicao administrativa de campos NAO sensiveis (allowlist). Proibe pass/salt/fcmTokens/admin/status.
+// F3.3.72C: e-mail tambem PROIBIDO aqui — exclusivo do adminChangeUserEmail (confirm literal + unicidade + auditoria).
 async function handleAdminUpdateUser(ctx) {
   ctx = ctx || {};
   const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
@@ -2006,11 +2014,12 @@ async function handleAdminUpdateUser(ctx) {
   if (!p) return { status: 400, json: { ok: false, error: "bad_request" } };
   const pkeys = Object.keys(p);
   if (!pkeys.length) return { status: 400, json: { ok: false, error: "empty_patch" } };
+  // F3.3.72C: e-mail NUNCA por aqui (nem vazio) — fluxo dedicado com confirm literal+unicidade+auditoria.
+  if (pkeys.indexOf("email") >= 0) return { status: 400, json: { ok: false, error: "email_change_dedicated_flow", msg: "Alteração de e-mail deve usar o fluxo seguro dedicado (adminChangeUserEmail)." } };
   for (const k of pkeys) { if (USER_ADMIN_UPDATE_KEYS.indexOf(k) < 0) return { status: 400, json: { ok: false, error: "forbidden_field" } }; }
   const patch = {};
   if ("name" in p) { if (!uwValidStr(p.name, 200)) return { status: 400, json: { ok: false, error: "bad_name" } }; patch.name = p.name; }
   if ("role" in p) { if (!uwValidStr(p.role, 80)) return { status: 400, json: { ok: false, error: "bad_role" } }; patch.role = p.role; }
-  if ("email" in p) { const em = normEmail(p.email); if (em && !isValidEmail(em)) return { status: 400, json: { ok: false, error: "bad_email" } }; patch.email = em; }
   if ("phone" in p) { if (!uwValidStr(p.phone, 40)) return { status: 400, json: { ok: false, error: "bad_phone" } }; patch.phone = p.phone; }
   if ("color" in p) { if (!uwValidColor(p.color)) return { status: 400, json: { ok: false, error: "bad_color" } }; patch.color = p.color; }
   if ("photo" in p) { if (!uwValidPhoto(p.photo)) return { status: 400, json: { ok: false, error: "bad_photo" } }; patch.photo = p.photo; }
@@ -2416,8 +2425,21 @@ async function emailInUseByOther(db, emailNorm, exceptUid) {
   return false;
 }
 async function emailAuditWrite(db, entry) {
-  try { await db.collection("usersAudit").add(entry); return true; }
-  catch (e) { try { logger.error("[emailAudit] write falhou", { err: e && e.message }); } catch (_) {} return false; }
+  // F3.3.72C (piggyback): 1 retry + log ESTRUTURADO mascarado se a auditoria falhar.
+  // Continua best-effort (nunca bloqueia a troca ja validada); zero PII no log.
+  for (let tent = 1; tent <= 2; tent++) {
+    try { await db.collection("usersAudit").add(entry); return true; }
+    catch (e) {
+      try {
+        logger.error("[emailAudit] write falhou", {
+          tentativa: tent, type: entry && entry.type,
+          by: notifMaskUid(entry && entry.by), target: notifMaskUid(entry && entry.target),
+          err: e && e.message,
+        });
+      } catch (_) { }
+    }
+  }
+  return false;
 }
 // SELF: troca o proprio e-mail de login. Body: { currentPassword, newEmail }.
 async function handleChangeLoginEmail(ctx) {
