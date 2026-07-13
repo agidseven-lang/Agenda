@@ -1,0 +1,113 @@
+# =====================================================================
+# [manual] F3.3.70D9R2 — usersPublic CLEANUP (3 docs PINADOS; dry-run/apply)
+# ---------------------------------------------------------------------
+# Marca status:"removido" (soft-delete reversivel) SOMENTE nos 3 docs de
+# teste/canario/duplicado provados no gate read-only da fase D9R2:
+#   canary-pwa-staging-notifprefs / SDQzpOTP2aQ4vhEKZtAX / pursmoRfjL05WNx3QHw3
+# Runner: scripts/worker-ops/d9r2-userspublic-cleanup.mjs (guards G1-G5:
+# snapshot exato dos alvos, 5 usuarios reais PROTECTED intactos — incluindo
+# o doc REAL do owner —, backup logico antes, read-back e roster final = 5).
+# NAO builda, NAO deploya, NAO toca Functions/Rules/Hosting/Worker/users.
+# Sem segredo em log. Credencial via GOOGLE_APPLICATION_CREDENTIALS_JSON.
+# Disparo deliberado: dispatch (confirm literal) OU push nesta branch de
+# ops com literal no head-commit: D9R2-DRYRUN-USERSPUBLIC (dry-run) /
+# D9R2-APPLY-USERSPUBLIC (apply). Sem literal => no-op.
+# =====================================================================
+name: "[manual] F3.3.70D9R2 — usersPublic cleanup (pinado; dry-run/apply)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite LIMPAR-USERSPUBLIC-D9R2 para autorizar"
+        required: true
+        default: ""
+      dry_run:
+        description: "true = valida e faz backup sem escrever; false = aplica"
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+  push:
+    branches:
+      - "claude/bold-hopper-4boo17"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d9r2-userspublic-cleanup
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  RUNNER_SCRIPT: "scripts/worker-ops/d9r2-userspublic-cleanup.mjs"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate — modo e confirmacao literal (dispatch OU head-commit)"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+          DRYIN: ${{ github.event.inputs.dry_run }}
+          HEADMSG: ${{ github.event.head_commit.message }}
+        run: |
+          MODE=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "$CONFIRM" != "LIMPAR-USERSPUBLIC-D9R2" ]; then
+              echo "::error::confirmacao invalida — nada foi executado"; exit 1
+            fi
+            MODE="$DRYIN"
+          else
+            case "$HEADMSG" in
+              *D9R2-APPLY-USERSPUBLIC*) MODE="false" ;;
+              *D9R2-DRYRUN-USERSPUBLIC*) MODE="true" ;;
+              *) echo "push sem literal D9R2 — no-op (nada executado)"; exit 1 ;;
+            esac
+          fi
+          echo "DRY_RUN=$MODE" >> "$GITHUB_ENV"
+          echo "modo: DRY_RUN=$MODE"
+
+      - name: Checkout (ref do disparo; traz o runner pinado)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: node --check do runner
+        run: node --check "$RUNNER_SCRIPT"
+
+      - name: Instalar firebase-admin (somente)
+        run: npm install --no-save --no-package-lock firebase-admin
+
+      - name: Auth SA -> credencial temporaria (nunca impressa)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+
+      - name: Executar limpeza pinada (dry-run valida / apply escreve)
+        env:
+          CONFIRM_CLEANUP: "LIMPAR-USERSPUBLIC-D9R2"
+          ARTIFACT_DIR: ${{ runner.temp }}/d9r2-cleanup-artifacts
+        run: |
+          set -eu
+          mkdir -p "$ARTIFACT_DIR"
+          node "$RUNNER_SCRIPT"
+
+      - name: Upload artifacts (backup logico + resultado; sem segredo)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: d9r2-userspublic-cleanup-${{ github.run_id }}
+          path: ${{ runner.temp }}/d9r2-cleanup-artifacts/*.json
+          if-no-files-found: warn
+
+      - name: Limpeza (credencial temporaria)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true

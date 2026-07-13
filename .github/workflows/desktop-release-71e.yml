@@ -1,0 +1,236 @@
+# =====================================================================
+# [manual] F3.3.71E — Publicacao da RELEASE Desktop 1.0.159 (#211)
+# ---------------------------------------------------------------------
+# Publica a release CONTROLADA do Desktop 1.0.159 (validada fisicamente
+# pelo owner na 71C8; prep aprovado na 71D). PRODUCAO OFICIAL CONTROLADA:
+# sem --prerelease e SEMPRE --latest=false (decisao pinada pelo owner).
+# TUDO PINADO: run id, SHA do workflow do run, SHA alvo da tag (fonte do
+# build), tag, titulo e hashes oficiais SHA-256 do EXE/MSI. O job:
+#   1) exige confirmacao literal (dispatch input OU head-commit do push);
+#   2) valida run #211 = completed/success no SHA pinado e que a branch
+#      fonte segue exatamente no SHA alvo (tip == ef90fa2);
+#   3) aborta se a tag ou a release ja existirem; confere 1.0.153 intacta;
+#   4) baixa o artifact BUNDLE do run #211, exige EXE/MSI/VERSAO-
+#      DESKTOP.txt, confere provenance (versionName/ref/commit e os
+#      hashes registrados) e os hashes REAIS byte a byte
+#      (qualquer divergencia => aborta SEM publicar);
+#   5) cria a release SEM prerelease, latest=false, tag no SHA exato;
+#   6) anexa EXE, MSI, SHA256SUMS.txt e VERSAO-DESKTOP.txt; re-baixa os
+#      assets publicados, re-confere hashes, confirma releases/latest
+#      NAO aponta para a 159 (via API — o campo isLatest do gh do runner
+#      nao existe; licao da D4R2) e que a release 1.0.153 (id 352510246)
+#      permanece intacta como rollback.
+# NAO builda, NAO deploya, NAO toca Firebase/Firestore/Rules/Worker,
+# NAO altera codigo de produto, NAO mexe em releases/tags antigas.
+# Sem secrets alem do GITHUB_TOKEN padrao. Permissions minimas.
+# Rollback de publicacao: apagar SOMENTE release/tag criadas AQUI.
+# =====================================================================
+name: "[manual] Desktop Release 71E — release 1.0.159 producao controlada (#211)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-RELEASE-159-71E para autorizar a publicacao"
+        required: true
+        default: ""
+  # push-trigger REMOVIDO apos a publicacao (13/07/2026, run 29254681677):
+  # a release desktop/v1.0.159-production ja existe (id 353178394); o gate 3
+  # bloquearia re-publicacao, e sem o trigger nao ha runs no-op em pushes futuros.
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency: desktop-release-71e
+
+jobs:
+  publish:
+    # push sem o literal => job SKIPPED (neutro, sem run vermelho no historico)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, 'PUBLICAR-RELEASE-159-71E')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "29251549150"
+      RUN_WF_SHA: "dbed4e86341e6287d551e89585691f77578171a9"
+      TARGET_SHA: "ef90fa27f441b5fdb402f883ed4212327e12e30f"
+      SRC_REF: "desktop/f3371c7-scope-cut"
+      TAG: "desktop/v1.0.159-production"
+      TITLE: "Agenda ID Seven Desktop 1.0.159 — Produção Controlada"
+      ART: "agenda-id-seven-desktop-1.0.159-bundle"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.159-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.159-x64.msi"
+      EXP_EXE: "f772de61c8f11e444a5089a9dbdefb9370ecb03f9cf242c54f5dea1bcf9312f1"
+      EXP_MSI: "a5aa9b5a9f75b914cd2ae7c361a951aa895d8b53ae7e31cfad721b3ed3a7c2f7"
+      REL153_ID: "352510246"
+      REL153_TAG: "desktop/v1.0.153-production-rc"
+    steps:
+      - name: "Gate 1 — confirmacao literal (dispatch OU head-commit)"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+          HEADMSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [ "$CONFIRM" = "PUBLICAR-RELEASE-159-71E" ]; then
+            echo "OK: confirmacao literal via dispatch"
+            exit 0
+          fi
+          case "$HEADMSG" in
+            *PUBLICAR-RELEASE-159-71E*)
+              echo "OK: confirmacao literal via head-commit do push" ;;
+            *)
+              echo "::error::sem confirmacao literal — nada foi publicado"
+              exit 1 ;;
+          esac
+
+      - name: "Checkout (notes da 71D versionadas nesta branch de ops)"
+        uses: actions/checkout@v5
+
+      - name: "Gate 2 — run #211 success no SHA pinado + branch fonte no SHA alvo"
+        run: |
+          set -euo pipefail
+          ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion + "|" + .head_sha')"
+          echo "run #211: $ST"
+          if [ "$ST" != "completed|success|$RUN_WF_SHA" ]; then
+            echo "::error::run #211 invalido para publicacao"
+            exit 1
+          fi
+          TIP="$(gh api "repos/$REPO/git/ref/heads/$SRC_REF" --jq '.object.sha')"
+          echo "tip $SRC_REF: $TIP"
+          if [ "$TIP" != "$TARGET_SHA" ]; then
+            echo "::error::branch fonte nao esta mais no SHA alvo — investigar antes de publicar"
+            exit 1
+          fi
+          echo "OK: run e branch fonte conferem"
+
+      - name: "Gate 3 — tag/release 159 nao podem existir + 1.0.153 intacta"
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::a tag $TAG ja existe — abortando"
+            exit 1
+          fi
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            echo "::error::a release $TAG ja existe — abortando"
+            exit 1
+          fi
+          R153="$(gh api "repos/$REPO/releases/$REL153_ID" --jq '.tag_name + "|" + (.assets|length|tostring) + "|" + (.prerelease|tostring)')"
+          echo "release 1.0.153: $R153"
+          if [ "$R153" != "$REL153_TAG|4|true" ]; then
+            echo "::error::release 1.0.153 nao esta no estado esperado — abortando"
+            exit 1
+          fi
+          echo "OK: tag/release 159 livres e 1.0.153 intacta"
+
+      - name: "Baixar artifact bundle do run #211"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART" -D pacote
+          echo "----- conteudo do artifact -----"
+          find pacote -type f -exec ls -lh {} \;
+          EXE="$(find pacote -type f -name "$EXE_NAME" | head -1)"
+          MSI="$(find pacote -type f -name "$MSI_NAME" | head -1)"
+          VTX="$(find pacote -type f -name "VERSAO-DESKTOP.txt" | head -1)"
+          [ -n "$EXE" ] || { echo "::error::EXE ausente no artifact"; exit 1; }
+          [ -n "$MSI" ] || { echo "::error::MSI ausente no artifact"; exit 1; }
+          [ -n "$VTX" ] || { echo "::error::VERSAO-DESKTOP.txt ausente no artifact"; exit 1; }
+          { echo "EXE=$EXE"; echo "MSI=$MSI"; echo "VTX=$VTX"; } >> "$GITHUB_ENV"
+
+      - name: "Gate 4 — provenance + SHA-256 oficiais byte a byte (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          echo "----- VERSAO-DESKTOP.txt -----"
+          cat "$VTX"
+          tr -d '\r' < "$VTX" > versao.lf
+          grep -Eq '^versionName[[:space:]]*:[[:space:]]*1\.0\.159$' versao.lf || { echo "::error::versionName != 1.0.159"; exit 1; }
+          grep -Eq "^ref[[:space:]]*:[[:space:]]*$SRC_REF\$" versao.lf || { echo "::error::ref do build nao e a branch fonte pinada"; exit 1; }
+          grep -Eq "^commit[[:space:]]*:[[:space:]]*$RUN_WF_SHA\$" versao.lf || { echo "::error::commit do run divergente"; exit 1; }
+          grep -qi "$EXP_EXE" versao.lf || { echo "::error::hash EXE nao consta no VERSAO-DESKTOP.txt"; exit 1; }
+          grep -qi "$EXP_MSI" versao.lf || { echo "::error::hash MSI nao consta no VERSAO-DESKTOP.txt"; exit 1; }
+          H_EXE="$(sha256sum "$EXE" | awk '{print $1}')"
+          H_MSI="$(sha256sum "$MSI" | awk '{print $1}')"
+          echo "SHA-256 exe : $H_EXE"
+          echo "SHA-256 msi : $H_MSI"
+          [ "$H_EXE" = "$EXP_EXE" ] || { echo "::error::hash EXE divergente — NAO publicado"; exit 1; }
+          [ "$H_MSI" = "$EXP_MSI" ] || { echo "::error::hash MSI divergente — NAO publicado"; exit 1; }
+          echo "OK: provenance e hashes conferem com os oficiais (71C8/71D)"
+
+      - name: "SHA256SUMS.txt (formato canonico p/ sha256sum -c)"
+        run: |
+          set -euo pipefail
+          { echo "$EXP_EXE *$EXE_NAME"; echo "$EXP_MSI *$MSI_NAME"; } > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: "Gate 5 — release notes da 71D presentes"
+        run: |
+          set -euo pipefail
+          test -s .github/relnotes/release-notes-1.0.159.md
+          wc -l .github/relnotes/release-notes-1.0.159.md
+
+      - name: "Publicar release (SEM prerelease, latest=false)"
+        run: |
+          set -euo pipefail
+          cp "$EXE" "$MSI" "$VTX" .
+          gh release create "$TAG" -R "$REPO" \
+            --target "$TARGET_SHA" \
+            --latest=false \
+            --title "$TITLE" \
+            --notes-file .github/relnotes/release-notes-1.0.159.md \
+            "$EXE_NAME" \
+            "$MSI_NAME" \
+            "SHA256SUMS.txt" \
+            "VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG"
+
+      - name: "Verificacao pos-publicacao (flags via API, assets, re-download, hashes, latest, 153)"
+        run: |
+          set -euo pipefail
+          RJ="$(gh api "repos/$REPO/releases/tags/$TAG")"
+          RID="$(echo "$RJ" | jq -r '.id')"
+          URL="$(echo "$RJ" | jq -r '.html_url')"
+          PRE="$(echo "$RJ" | jq -r '.prerelease')"
+          DRAFT="$(echo "$RJ" | jq -r '.draft')"
+          TGT="$(echo "$RJ" | jq -r '.target_commitish')"
+          N="$(echo "$RJ" | jq -r '.assets|length')"
+          echo "release id=$RID url=$URL prerelease=$PRE draft=$DRAFT target=$TGT assets=$N"
+          [ "$PRE" = "false" ]  || { echo "::error::prerelease deveria ser false"; exit 1; }
+          [ "$DRAFT" = "false" ] || { echo "::error::draft deveria ser false"; exit 1; }
+          [ "$TGT" = "$TARGET_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          [ "$N" = "4" ] || { echo "::error::esperado 4 assets, encontrados $N"; exit 1; }
+          echo "$RJ" | jq -r '.assets[] | .name + " | " + .state + " | " + (.digest // "sem-digest")'
+          for A in "$EXE_NAME" "$MSI_NAME" "SHA256SUMS.txt" "VERSAO-DESKTOP.txt"; do
+            echo "$RJ" | jq -e --arg a "$A" '.assets[] | select(.name==$a and .state=="uploaded")' >/dev/null \
+              || { echo "::error::asset ausente/nao-uploaded: $A"; exit 1; }
+          done
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          echo "tag_sha=$TAGSHA"
+          [ "$TAGSHA" = "$TARGET_SHA" ] || { echo "::error::tag nao aponta para o SHA alvo"; exit 1; }
+          LAT="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null || echo '404-sem-latest')"
+          echo "releases/latest => $LAT"
+          [ "$LAT" != "$TAG" ] || { echo "::error::a 159 aparece como latest — proibido nesta fase"; exit 1; }
+          mkdir volta
+          gh release download "$TAG" -R "$REPO" -D volta
+          (cd volta && sha256sum -c SHA256SUMS.txt)
+          H2E="$(sha256sum "volta/$EXE_NAME" | awk '{print $1}')"
+          H2M="$(sha256sum "volta/$MSI_NAME" | awk '{print $1}')"
+          [ "$H2E" = "$EXP_EXE" ] || { echo "::error::re-download EXE divergente"; exit 1; }
+          [ "$H2M" = "$EXP_MSI" ] || { echo "::error::re-download MSI divergente"; exit 1; }
+          R153B="$(gh api "repos/$REPO/releases/$REL153_ID" --jq '.tag_name + "|" + (.assets|length|tostring) + "|" + (.prerelease|tostring)')"
+          [ "$R153B" = "$REL153_TAG|4|true" ] || { echo "::error::release 1.0.153 mudou de estado"; exit 1; }
+          echo "== RELEASE-71E =="
+          echo "release_id : $RID"
+          echo "url        : $URL"
+          echo "tag        : $TAG"
+          echo "tag_sha    : $TAGSHA"
+          echo "target     : $TGT"
+          echo "prerelease : $PRE"
+          echo "draft      : $DRAFT"
+          echo "latest     : $LAT"
+          echo "assets     : $N (EXE/MSI/SHA256SUMS/VERSAO-DESKTOP uploaded)"
+          echo "dl_exe_sha : $H2E"
+          echo "dl_msi_sha : $H2M"
+          echo "rel153     : $R153B (intacta)"
+          echo "== FIM RELEASE-71E =="
+          echo "===== GO: RELEASE 1.0.159 PUBLICADA E VALIDADA ====="

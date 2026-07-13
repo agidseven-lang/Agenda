@@ -1,0 +1,104 @@
+# =====================================================================
+# [manual] F3.3.70D4R2 — VERIFICACAO pos-publicacao da release 1.0.153
+# ---------------------------------------------------------------------
+# 100% LEITURA (permissions: contents read). Confere a release publicada
+# desktop/v1.0.153-production-rc: flags (prerelease=true, draft=false),
+# NAO-latest (repos/releases/latest deve ser 404 ou outra tag), 4 assets,
+# target no SHA exato, tag apontando ao SHA exato, DOWNLOAD real dos
+# assets publicados e re-conferencia dos SHA-256 contra os oficiais.
+# Nao publica, nao altera, nao deleta nada.
+# Disparo deliberado: dispatch (confirm literal) OU push nesta branch de
+# ops cujo head-commit contenha a MESMA string literal de verificacao.
+# =====================================================================
+name: "[manual] Desktop Release D4R2 — verificacao pos-publicacao 1.0.153"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite VERIFICAR-PRERELEASE-D4R2-1.0.153 para rodar a verificacao"
+        required: true
+        default: ""
+  # push-trigger REMOVIDO apos a verificacao verde (run 29152865470, 11/07/2026):
+  # evita runs no-op em pushes futuros desta branch de ops.
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      TARGET_SHA: "1547b09e1a84a1653c84c6533938253343536f41"
+      TAG: "desktop/v1.0.153-production-rc"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.153-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.153-x64.msi"
+      EXP_EXE: "407d19506aa92d830797be165ccc2c78c7dece287467f430b1c93b3a98791c1a"
+      EXP_MSI: "4b655c18ccf1ba8ca5968502dc8d7b23bfad5e4dc8c720bfa84720f9928fa54e"
+    steps:
+      - name: "Gate — confirmacao literal (dispatch OU head-commit)"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+          HEADMSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [ "$CONFIRM" = "VERIFICAR-PRERELEASE-D4R2-1.0.153" ]; then
+            echo "OK: confirmacao literal via dispatch"
+            exit 0
+          fi
+          case "$HEADMSG" in
+            *VERIFICAR-PRERELEASE-D4R2-1.0.153*)
+              echo "OK: confirmacao literal via head-commit do push" ;;
+            *)
+              echo "sem confirmacao literal — verificacao nao solicitada (no-op)"
+              exit 1 ;;
+          esac
+
+      - name: "Flags, assets, target e tag"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" \
+            --json tagName,targetCommitish,isPrerelease,isDraft,publishedAt,assets \
+            --jq '{tag:.tagName, target:.targetCommitish, prerelease:.isPrerelease, draft:.isDraft, publishedAt:.publishedAt, assets:[.assets[]|{name,size}]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "true|false" ] || { echo "::error::flags incorretas (prerelease|draft): $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "4" ] || { echo "::error::esperado 4 assets, encontrados $N"; exit 1; }
+          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
+          [ "$TGT" = "$TARGET_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          echo "tag -> $TAGSHA"
+          [ "$TAGSHA" = "$TARGET_SHA" ] || { echo "::error::tag nao aponta ao SHA alvo: $TAGSHA"; exit 1; }
+          echo "OK: prerelease=true, draft=false, 4 assets, target e tag no SHA alvo"
+
+      - name: "NAO-latest (releases/latest deve ser 404 ou outra tag)"
+        run: |
+          set +e
+          LT="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null)"
+          RC=$?
+          set -e
+          if [ $RC -ne 0 ]; then
+            echo "OK: repo sem release latest (404) — nao-latest confirmado"
+          elif [ "$LT" != "$TAG" ]; then
+            echo "OK: latest e outra release ($LT) — nao-latest confirmado"
+          else
+            echo "::error::a release esta marcada como latest"
+            exit 1
+          fi
+
+      - name: "Download real dos assets publicados + SHA-256"
+        run: |
+          set -euo pipefail
+          mkdir volta
+          gh release download "$TAG" -R "$REPO" -D volta
+          ls -lh volta
+          (cd volta && sha256sum -c SHA256SUMS.txt)
+          H2E="$(sha256sum "volta/$EXE_NAME" | awk '{print $1}')"
+          H2M="$(sha256sum "volta/$MSI_NAME" | awk '{print $1}')"
+          echo "SHA-256 exe (release): $H2E"
+          echo "SHA-256 msi (release): $H2M"
+          [ "$H2E" = "$EXP_EXE" ] || { echo "::error::EXE publicado divergente"; exit 1; }
+          [ "$H2M" = "$EXP_MSI" ] || { echo "::error::MSI publicado divergente"; exit 1; }
+          tr -d '\r' < volta/VERSAO-DESKTOP.txt | grep -Eq '^versionName[[:space:]]*:[[:space:]]*1\.0\.153$' || { echo "::error::VERSAO-DESKTOP.txt publicado sem versionName 1.0.153"; exit 1; }
+          echo "===== GO: DOWNLOAD OK + HASHES DA RELEASE CONFEREM COM OS OFICIAIS ====="

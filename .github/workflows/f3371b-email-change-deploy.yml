@@ -1,0 +1,92 @@
+# [manual] F3.3.71B — deploy PINADO das 2 functions de e-mail (dry-run/apply).
+# Fonte: app/f3371a-email-change @ a2087eb (SHA verificado). Alvo FIXO --only
+# changeLoginEmail,adminChangeUserEmail. NUNCA hosting/rules/firestore/alvo total.
+# Canarios pos-deploy sem dados reais (401/400 esperados). Rollback: as 2 sao
+# aditivas — remover/despublicar as 2 ou redeployar escopo anterior.
+name: "[manual] F3.3.71B — deploy email-change (2 functions; dry-run/apply)"
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm: { description: "Digite DEPLOY-EMAIL-CHANGE-71B (apply) ou DRYRUN (dry-run)", required: true, default: "DRYRUN" }
+  push:
+    branches: ["claude/bold-hopper-4boo17"]
+permissions: { contents: read }
+concurrency: { group: f3371b-deploy, cancel-in-progress: false }
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  SRC_REF: "app/f3371a-email-change"
+  SRC_SHA: "a2087eb"
+  DEPLOY_TARGET: "functions:changeLoginEmail,functions:adminChangeUserEmail"
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate — modo (literal via dispatch OU head-commit)
+        env: { CONFIRM: "${{ github.event.inputs.confirm }}", HEADMSG: "${{ github.event.head_commit.message }}" }
+        run: |
+          MODE=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            case "$CONFIRM" in DEPLOY-EMAIL-CHANGE-71B) MODE=false;; DRYRUN) MODE=true;; *) echo "::error::confirm invalido"; exit 1;; esac
+          else
+            case "$HEADMSG" in *DEPLOY-EMAIL-CHANGE-71B*) MODE=false;; *71B-DRYRUN-EMAIL-CHANGE*) MODE=true;; *) echo "push sem literal 71B — no-op"; exit 1;; esac
+          fi
+          echo "DRY_RUN=$MODE" >> "$GITHUB_ENV"; echo "modo DRY_RUN=$MODE"
+      - name: Checkout fonte pinada
+        uses: actions/checkout@v5
+        with: { ref: "app/f3371a-email-change", fetch-depth: 1 }
+      - name: Guard SHA + pre-checks (harness 25/25; exports novos E antigos presentes)
+        run: |
+          set -eu
+          HEADSHA=$(git rev-parse --short=7 HEAD); [ "$HEADSHA" = "$SRC_SHA" ] || { echo "::error::SHA divergente: $HEADSHA"; exit 1; }
+          node --check functions/index.js
+          node scripts/worker-ops/f3371a-email-change.test.mjs
+          for FN in changeLoginEmail adminChangeUserEmail loginUser getUserSelf changePassword updateUserSelf adminUpdateUser adminCreateUser; do
+            grep -qE "exports\.${FN} = onRequest" functions/index.js || { echo "::error::export ausente: $FN"; exit 1; }
+          done
+          case "$DEPLOY_TARGET" in functions|functions:) echo "::error::alvo total bloqueado"; exit 1;; esac
+          case "$DEPLOY_TARGET" in *hosting*|*firestore*|*rules*) echo "::error::alvo proibido"; exit 1;; esac
+          echo "pre-checks OK"
+      - name: Auth gcloud (SA via secret; nunca impresso)
+        env: { GOOGLE_APPLICATION_CREDENTIALS_JSON: "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" }
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error::SA ausente"; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          npm install -g firebase-tools >/dev/null 2>&1
+      - name: Estado ANTES (functions:list)
+        run: firebase functions:list --project "$GCP_PROJECT" | tee before.txt || true
+      - name: functions/.env (somente RESET_EMAIL_* defaults; sem segredo)
+        run: |
+          set -eu
+          { printf 'RESET_EMAIL_FROM=%s\n' "no-reply@agendaidseven.com.br"; printf 'RESET_EMAIL_FROM_NAME=%s\n' "ID Seven Agenda"; printf 'RESET_EMAIL_PROVIDER=%s\n' "resend"; } > "functions/.env.${GCP_PROJECT}"
+      - name: Deploy (SOMENTE apply)
+        run: |
+          set -eu
+          ( cd functions && if [ -f package-lock.json ]; then npm ci; else npm install; fi )
+          if [ "$DRY_RUN" = "false" ]; then
+            firebase deploy --only "$DEPLOY_TARGET" --project "$GCP_PROJECT" --non-interactive --force
+          else
+            echo "DRY-RUN — nenhum deploy. Alvo planejado: $DEPLOY_TARGET"
+          fi
+      - name: Pos-deploy + canarios seguros (somente apply)
+        run: |
+          set -eu
+          [ "$DRY_RUN" = "false" ] || { echo "dry-run: sem canarios"; exit 0; }
+          firebase functions:list --project "$GCP_PROJECT" | tee after.txt
+          for FN in changeLoginEmail adminChangeUserEmail loginUser getUserSelf changePassword updateUserSelf adminUpdateUser; do
+            grep -qi "$FN" after.txt || { echo "::error::function ausente pos-deploy: $FN"; exit 1; }
+          done
+          C1=$(curl -s -o r1.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://changeloginemail-de36pi7vza-uc.a.run.app); cat r1.json; echo
+          [ "$C1" = "401" ] || { echo "::error::changeLoginEmail sem-sessao esperava 401, veio $C1"; exit 1; }
+          C2=$(curl -s -o r2.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' https://adminchangeuseremail-de36pi7vza-uc.a.run.app); cat r2.json; echo
+          [ "$C2" = "401" ] || { echo "::error::adminChangeUserEmail sem-sessao esperava 401, veio $C2"; exit 1; }
+          C3=$(curl -s -o r3.json -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"identifier":"canario-inexistente-71b@x.com","password":"x"}' https://loginuser-de36pi7vza-uc.a.run.app); cat r3.json; echo
+          [ "$C3" = "401" ] || { echo "::error::loginUser canario esperava 401, veio $C3"; exit 1; }
+          grep -qiE 'pass|salt|token"' r1.json r2.json r3.json && { echo "::error::PII em resposta"; exit 1; } || true
+          echo "===== GO: DEPLOY + CANARIOS OK ====="
+      - name: Limpeza credencial
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" || true
