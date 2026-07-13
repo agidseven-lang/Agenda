@@ -34,9 +34,9 @@ name: "[manual] Desktop Release 71E — release 1.0.159 producao controlada (#21
         description: "Digite PUBLICAR-RELEASE-159-71E para autorizar a publicacao"
         required: true
         default: ""
-  push:
-    branches:
-      - "claude/bold-hopper-4boo17"
+  # push-trigger REMOVIDO apos a publicacao (13/07/2026, run 29254681677):
+  # a release desktop/v1.0.159-production ja existe (id 353178394); o gate 3
+  # bloquearia re-publicacao, e sem o trigger nao ha runs no-op em pushes futuros.
 
 permissions:
   contents: write
