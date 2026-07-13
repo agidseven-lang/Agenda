@@ -24,9 +24,14 @@ const ok = (n, c) => { if (c) { pass++; console.log('  PASS — ' + n); } else {
 
 console.log('F3.3.73I3 — Agenda compartilhada: criar compromisso (Desktop 1.0.160)');
 
-/* ── A: CTA "Novo compromisso" na Agenda ── */
+/* ── A: CTA "Novo compromisso" na Agenda (layout corrigido na 73I4A) ── */
 ok('A1 botão "Novo compromisso" no render da Agenda (data-ag="new")',
-  /data-ag="new"[^>]*>'\+svg\('plus'\)\+'Novo compromisso<\/button>/.test(HTML));
+  /data-ag="new"[\s\S]{0,260}svg\('plus','ag-newic'\)\+'Novo compromisso<\/button>/.test(HTML));
+ok('A1a 73I4A: ícone do CTA dimensionado por regra CSS escopada (.ag-newic 16px) — sem elemento gigante',
+  /\.ag-newic\{width:16px;height:16px;flex:none\}/.test(HTML) && /svg\('plus','ag-newic'\)/.test(HTML));
+ok('A1b 73I4A: CTA compacto (inline-flex, height 40px), SEM width:100% (não bloqueia calendário)',
+  /data-ag="new" style="display:inline-flex;[^"]*height:40px[^"]*"/.test(HTML) &&
+  !/data-ag="new"[^>]*width:100%/.test(HTML));
 ok('A2 handler data-ag trata "new" abrindo openEventForm',
   /if\(a==='new'\)\{openEventForm\(\);return;\}/.test(HTML));
 ok('A3 CTA aparece antes da busca da Agenda (topo, descobrível)',
