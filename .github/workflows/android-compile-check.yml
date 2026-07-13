@@ -8,7 +8,7 @@ name: "[manual] Android compile-check (beta, sem APK)"
 on:
   workflow_dispatch:
   push:
-    branches: [desktop/local-detail-hierarchy-v2, android/f3373c-login-serverside, android/f3373d-session-profile-userspublic, android/f3373e-board-kanban-canonical]
+    branches: [desktop/local-detail-hierarchy-v2, android/f3373c-login-serverside, android/f3373d-session-profile-userspublic, android/f3373e-board-kanban-canonical, android/f3373f-agenda]
     paths:
       - 'android-native-beta/**'
       - '.github/workflows/android-compile-check.yml'
