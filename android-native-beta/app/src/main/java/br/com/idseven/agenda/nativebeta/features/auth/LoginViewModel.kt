@@ -59,7 +59,8 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
                         _pendingChange.value = PendingPasswordChange(r.uid, r.name, password)
                         _ui.value = AuthUi.Info("Sua senha é temporária. Defina uma nova senha para continuar.")
                     } else {
-                        sessionStore.save(r.uid, r.name) // dispara navegação reativa
+                        // F3.3.73C — grava uid/name + token de sessão server-side (cifrado).
+                        sessionStore.save(r.uid, r.name, r.token) // dispara navegação reativa
                         _ui.value = AuthUi.Idle // evita spinner travado ao voltar do logout (VM é da Activity)
                     }
                 }

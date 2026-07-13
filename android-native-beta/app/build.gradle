@@ -24,6 +24,14 @@ android {
         def _resetCnf = project.findProperty('PASSWORD_RESET_CONFIRM_URL') ?: ''
         buildConfigField "String", "PASSWORD_RESET_REQUEST_URL", "\"${_resetReq}\""
         buildConfigField "String", "PASSWORD_RESET_CONFIRM_URL", "\"${_resetCnf}\""
+        // F3.3.73C — login/perfil SERVER-SIDE. URLs PUBLICAS dos endpoints Gen2 (as
+        // MESMAS ja embarcadas no Desktop 1.0.159 — nao sao segredo). Default embutido
+        // para o app funcionar out-of-the-box; o CI pode sobrepor via -PLOGIN_USER_URL /
+        // -PGET_USER_SELF_URL (resolvidas por `gcloud functions describe`, como as de reset).
+        def _loginUrl = project.findProperty('LOGIN_USER_URL') ?: 'https://loginuser-de36pi7vza-uc.a.run.app'
+        def _selfUrl  = project.findProperty('GET_USER_SELF_URL') ?: 'https://getuserself-de36pi7vza-uc.a.run.app'
+        buildConfigField "String", "LOGIN_USER_URL", "\"${_loginUrl}\""
+        buildConfigField "String", "GET_USER_SELF_URL", "\"${_selfUrl}\""
     }
 
     signingConfigs {
@@ -69,8 +77,9 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7"
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7"
 
-    // Sessão local (DataStore Preferences)
+    // Sessão local (DataStore Preferences) + token de sessão cifrado (F3.3.73C).
     implementation "androidx.datastore:datastore-preferences:1.1.1"
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
 
     // Firebase Android NATIVO (Firestore). BoM controla as versões. NÃO usa Firebase Auth.
     implementation platform("com.google.firebase:firebase-bom:33.7.0")

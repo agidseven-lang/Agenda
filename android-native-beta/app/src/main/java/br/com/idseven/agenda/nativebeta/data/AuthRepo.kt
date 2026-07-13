@@ -27,7 +27,9 @@ object AuthRepo {
     sealed class Result {
         // mustChangePassword: usuário entrou com senha temporária; precisa trocar antes
         // de receber sessão. O caller (VM) NÃO grava sessão até a troca concluir.
-        data class Ok(val uid: String, val name: String?, val mustChangePassword: Boolean = false) : Result()
+        // token (F3.3.73C): token de sessão server-side; o VM grava em storage
+        // seguro (EncryptedSharedPreferences) e NUNCA loga. Null nos fluxos legados.
+        data class Ok(val uid: String, val name: String?, val mustChangePassword: Boolean = false, val token: String? = null) : Result()
         data class Err(val message: String) : Result()
     }
 
@@ -39,6 +41,10 @@ object AuthRepo {
     // e injetadas via buildConfigField. Nao ha URL presumida no codigo.
     private val FN_REQUEST_URL: String = BuildConfig.PASSWORD_RESET_REQUEST_URL
     private val FN_CONFIRM_URL: String = BuildConfig.PASSWORD_RESET_CONFIRM_URL
+    // F3.3.73C — login/perfil SERVER-SIDE (mesmo contrato provado no Desktop 1.0.159).
+    // URLs publicas dos endpoints Gen2 (nao sao segredo; ja embarcadas no Desktop).
+    private val FN_LOGIN_URL: String = BuildConfig.LOGIN_USER_URL
+    private val FN_SELF_URL: String = BuildConfig.GET_USER_SELF_URL
     private const val TAG = "AuthRepo"
 
     private fun classifyError(e: Throwable): String = when (e) {
@@ -52,9 +58,9 @@ object AuthRepo {
     // POST JSON via HttpURLConnection (sem lib externa). Retorna Triple(httpCode,
     // bodyString, exceptionOrNull). Em erro de rede/SSL/timeout, exception
     // preenchido; em resposta HTTP, code+body preenchidos. Roda em Dispatchers.IO.
-    private suspend fun postJson(url: String, payload: JSONObject): Triple<Int, String, Throwable?> =
+    private suspend fun postJson(url: String, payload: JSONObject, bearer: String? = null): Triple<Int, String, Throwable?> =
         withContext(Dispatchers.IO) {
-            if (url.isBlank()) return@withContext Triple(0, "", IllegalStateException("URL vazia (build sem -PPASSWORD_RESET_*_URL)"))
+            if (url.isBlank()) return@withContext Triple(0, "", IllegalStateException("URL vazia (build sem -P...URL)"))
             var conn: HttpURLConnection? = null
             try {
                 conn = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -64,6 +70,8 @@ object AuthRepo {
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json; charset=utf-8")
                     setRequestProperty("Accept", "application/json")
+                    // F3.3.73C — sessão server-side: token vai no header, nunca no corpo/log.
+                    if (!bearer.isNullOrBlank()) setRequestProperty("Authorization", "Bearer $bearer")
                 }
                 conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
                 val code = conn.responseCode
@@ -77,35 +85,60 @@ object AuthRepo {
             }
         }
 
-    suspend fun login(idOrPhone: String, password: String): Result = suspendCancellableCoroutine { cont ->
-        val id = idOrPhone.trim().lowercase()
-        if (id.isEmpty() || password.isEmpty()) {
-            cont.resume(Result.Err("Preencha e-mail/WhatsApp e senha.")); return@suspendCancellableCoroutine
+    // F3.3.73C — LOGIN SERVER-SIDE. Fala com o endpoint `loginUser` (mesmo contrato
+    // do Desktop 1.0.159): { identifier, password } -> { ok, session:{token,expiresAt},
+    // user:{id,name,...} }. NUNCA lê a coleção `users`, NUNCA valida hash local, NUNCA
+    // loga corpo/token/senha. O token retornado é validado imediatamente por getUserSelf
+    // (prova o round-trip) e devolvido ao VM para gravação em storage seguro.
+    suspend fun login(idOrPhone: String, password: String): Result {
+        val id = idOrPhone.trim()
+        if (id.isEmpty() || password.isEmpty()) return Result.Err("Preencha e-mail/WhatsApp e senha.")
+        val (http, body, exc) = postJson(FN_LOGIN_URL, JSONObject().put("identifier", id).put("password", password))
+        if (exc != null) {
+            Log.w(TAG, "login kind=${classifyError(exc)} http=$http") // sem corpo/senha
+            return Result.Err("Não foi possível entrar agora. Verifique a internet e tente de novo.")
         }
-        val idDigits = digits(id)
-        db.collection("users").get()
-            .addOnSuccessListener { snap ->
-                val doc = snap.documents.firstOrNull { d ->
-                    val email = (d.getString("email") ?: "").lowercase()
-                    val phone = digits(d.getString("phone") ?: "")
-                    email == id || (idDigits.isNotEmpty() && phone == idDigits)
-                }
-                if (doc == null) { cont.resume(Result.Err("E-mail/WhatsApp ou senha incorretos.")); return@addOnSuccessListener }
-                when (doc.getString("status")) {
-                    "pendente" -> { cont.resume(Result.Err("Cadastro aguardando aprovação.")); return@addOnSuccessListener }
-                    "removido", "excluido" -> { cont.resume(Result.Err("Conta inativa.")); return@addOnSuccessListener }
-                }
-                if (!Crypto.verify(doc.getString("pass"), doc.getString("salt"), password)) {
-                    cont.resume(Result.Err("E-mail/WhatsApp ou senha incorretos.")); return@addOnSuccessListener
-                }
-                val mustChange = doc.getBoolean("mustChangePassword") == true
-                cont.resume(Result.Ok(doc.id, doc.getString("name"), mustChange))
+        Log.i(TAG, "login http=$http") // sem corpo (contém token)
+        val json = runCatching { JSONObject(body) }.getOrNull()
+        if (http == 200 && json?.optBoolean("ok", false) == true) {
+            val session = json.optJSONObject("session")
+            val user = json.optJSONObject("user")
+            val token = session?.optString("token", "").orEmpty()
+            val uid = user?.optString("id", "").orEmpty()
+            if (token.isBlank() || uid.isBlank()) return Result.Err("Não foi possível entrar agora. Tente novamente.")
+            val mustChange = user.optBoolean("mustChangePassword", json.optBoolean("mustChangePassword", false))
+            // Valida o token no servidor e busca o perfil canônico (self).
+            val name = when (val self = getUserSelf(token)) {
+                is Result.Ok -> self.name ?: user.optString("name", "")
+                is Result.Err -> user.optString("name", "")
             }
-            .addOnFailureListener { ex ->
-                cont.resume(Result.Err("Não foi possível entrar agora. Verifique a internet. (${ex.message})"))
-            }
+            return Result.Ok(uid, name, mustChange, token)
+        }
+        // Erro genérico e seguro (não revela se foi e-mail inexistente ou senha errada).
+        return Result.Err("E-mail/WhatsApp ou senha incorretos.")
     }
 
+    // F3.3.73C — perfil autenticado via `getUserSelf` (token no header Bearer). 401 =>
+    // sessão expirada/inválida. Sem PII/token em log.
+    suspend fun getUserSelf(token: String): Result {
+        if (token.isBlank()) return Result.Err("no_session")
+        val (http, body, exc) = postJson(FN_SELF_URL, JSONObject(), bearer = token)
+        if (exc != null) { Log.w(TAG, "self kind=${classifyError(exc)} http=$http"); return Result.Err("network") }
+        val json = runCatching { JSONObject(body) }.getOrNull()
+        if (http == 200 && json?.optBoolean("ok", false) == true) {
+            val self = json.optJSONObject("self")
+            val uid = self?.optString("id", "").orEmpty()
+            if (uid.isBlank()) return Result.Err("bad_self")
+            return Result.Ok(uid, self.optString("name", ""))
+        }
+        if (http == 401) return Result.Err("expired")
+        return Result.Err("http_$http")
+    }
+
+    // NOTA F3.3.73C: register (auto-cadastro) e a troca de senha temporária abaixo
+    // NÃO são o fluxo de LOGIN e permanecem no modelo legado (Firestore-direto) — a
+    // migração deles tem fase própria (não há endpoint de auto-signup hoje; a troca
+    // temporária depende de decisão de contrato). O LOGIN já é 100% server-side acima.
     suspend fun register(name: String, role: String, phone: String, email: String, password: String): Result =
         suspendCancellableCoroutine { cont ->
             val n = name.trim(); val em = email.trim().lowercase()
