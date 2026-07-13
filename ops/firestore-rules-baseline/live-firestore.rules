@@ -30,9 +30,9 @@ service cloud.firestore {
 
     // ---- Equipe: ler/criar/atualizar SIM, apagar NAO ----
     match /users/{id} {
-      allow read: if true;
-      allow create: if request.resource.data.size() < 60;
-      allow update: if request.resource.data.size() < 60;
+      allow read: if false;
+      allow create: if false;
+      allow update: if false;
       allow delete: if false;
     }
 
@@ -139,8 +139,22 @@ service cloud.firestore {
     // -------- FIM F3.3.20-B1.0.1 --------
 
     // ---- Qualquer outra colecao: BLOQUEADA ----
+
+    // -------- INICIO injetado: usersPublic read (F3.3.20-B1.7-E) --------
+    // Projecao publica PII-free {id,name,role,admin,status,photo,color}, mantida pela
+    // trigger syncUsersPublic / backfill (Admin SDK, que bypassa estas rules).
+    // Cliente: leitura liberada (sem PII); ESCRITA fechada (so Admin SDK escreve).
+    // app sem Firebase Auth => leitura aberta (read: if true), coerente com users/events/tasks.
+    match /usersPublic/{uid} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+    // -------- FIM injetado: usersPublic read --------
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+
+
+
