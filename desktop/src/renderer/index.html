@@ -4418,7 +4418,7 @@ function urgentRow(t,d){const s=secOf(t.sector);const asg=state.users.find(u=>u.
 }
 function eventCard(e){
   const ty=typeOf(e.type);const owner=state.users.find(u=>u.id===e.ownerId)||{name:e.owner,id:e.ownerId};const col=userColor(owner.id);const late=eventLate(e);
-  return '<div class="evc"><div class="bar" style="background:'+(late?'#F87171':col)+'"></div><div class="main">'+
+  return '<div class="evc" data-evdetail="'+e.id+'" style="cursor:pointer"><div class="bar" style="background:'+(late?'#F87171':col)+'"></div><div class="main">'+
     '<div class="toprow">'+avatar(owner,40)+'<div class="ti">'+esc(e.title||'Sem título')+'<div style="font-size:12.5px;font-weight:700;color:'+col+';margin-top:2px">'+esc(owner.name||'')+'</div></div>'+
     '<div class="time"><div class="s">'+esc(e.start||'')+'</div><div class="e">'+esc(e.end||'')+'</div></div></div>'+
     '<div style="margin-top:11px"><span class="pill" style="background:'+withAlpha(ty.color,.16)+';color:'+ty.color+'">'+esc(ty.label)+'</span></div>'+
@@ -4428,6 +4428,57 @@ function eventCard(e){
   '</div></div>';
 }
 function eventLate(e){if(e.done)return false;const ms=dtMs(e.date,e.end||e.start||'23:59');return ms&&Date.now()>ms;}
+/* F3.3.73I3 — Agenda compartilhada em tempo real: criação de compromisso. Grava em
+   `events` (mesmo contrato do Android/EventContract); o onSnapshot da linha 2516 já
+   propaga em tempo real para TODOS os usuários (sem filtro de src). NÃO dispara push
+   pelo cliente: o trigger server-side onEventCreated cobre a notificação — porém hoje
+   com gate src==='nativebeta'; a notificação server-side de eventos criados no Desktop
+   é encaminhada a fase própria de Functions (relaxar o allowlist + deploy). src honesto
+   'webpreview' (mesmo dos itens criados no Desktop); NUNCA falsear src p/ forçar push. */
+function openEventForm(){
+  const us=state.users.filter(u=>!['removido','excluido','pendente'].includes(u.status||'')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const typeOpts=TYPES.map(t=>'<option value="'+t.key+'"'+(t.key==='reuniao'?' selected':'')+'>'+esc(t.label)+'</option>').join('');
+  const userOpts='<option value="">Ninguém</option>'+us.map(u=>'<option value="'+u.id+'">'+esc(u.name||'')+'</option>').join('');
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div>'+
+    '<div style="font-size:18px;font-weight:800;margin-bottom:14px">Novo compromisso</div>'+
+    '<div class="lbl">Título</div><input class="inp" id="evTitle" placeholder="Ex.: Reunião de alinhamento" style="margin-bottom:12px">'+
+    '<div class="lbl">Cliente / pessoa / empresa</div><input class="inp" id="evClient" placeholder="Ex.: Hospital Visão" style="margin-bottom:12px">'+
+    '<div class="lbl">Tipo</div><select class="inp" id="evType" style="margin-bottom:12px">'+typeOpts+'</select>'+
+    '<div class="lbl">Data</div><input class="inp" id="evDate" type="date" style="margin-bottom:12px">'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Início</div><input class="inp" id="evStart" type="time" style="margin-bottom:12px"></div><div style="flex:1"><div class="lbl">Término</div><input class="inp" id="evEnd" type="time" style="margin-bottom:12px"></div></div>'+
+    '<div class="lbl">Local</div><input class="inp" id="evLoc" placeholder="Opcional" style="margin-bottom:12px">'+
+    '<div class="lbl">Responsável</div><select class="inp" id="evOwner" style="margin-bottom:12px">'+userOpts+'</select>'+
+    '<div class="lbl">Observações</div><textarea class="inp" id="evNotes" rows="3" placeholder="Opcional" style="margin-bottom:14px"></textarea>'+
+    '<div id="evErr" style="color:#F87171;font-size:13px;margin-bottom:10px;display:none"></div>'+
+    '<div class="del-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button><button class="btn" data-evsave="1">Salvar compromisso</button></div>'+
+  '</div></div>';
+  const d=document.getElementById('evDate');if(d&&!d.value)d.value=(agSel||todayStr());
+}
+async function saveEvent(){
+  const q=id=>document.getElementById(id);
+  const err=q('evErr');const fail=m=>{if(err){err.textContent=m;err.style.display='block';}};
+  const title=(q('evTitle').value||'').trim();const date=(q('evDate').value||'').trim();
+  if(!title){fail('Informe o título do compromisso.');return;}
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){fail('Escolha a data do compromisso.');return;}
+  const btn=document.querySelector('[data-evsave]');if(btn){if(btn.dataset.busy)return;btn.dataset.busy='1';btn.textContent='Salvando…';}
+  const ownerId=(q('evOwner').value||'')||null;
+  const owner=ownerId?((state.users.find(u=>u.id===ownerId)||{}).name||''):'';
+  const payload={type:(q('evType').value||'reuniao'),client:(q('evClient').value||'').trim(),title:title,location:(q('evLoc').value||'').trim(),date:date,start:(q('evStart').value||''),end:(q('evEnd').value||''),owner:owner,ownerId:ownerId,notes:(q('evNotes').value||'').trim(),by:state.user.id,done:false,createdAt:Date.now(),src:'webpreview'};
+  try{await db.collection('events').add(payload);}
+  catch(e){console.warn('saveEvent add',e);fail('Não foi possível salvar. Verifique a conexão e tente de novo.');if(btn){delete btn.dataset.busy;btn.textContent='Salvar compromisso';}return;}
+  closeModal();render();
+}
+function openEventDetail(id){
+  const e=state.events.find(x=>x.id===id);if(!e)return;
+  const ty=typeOf(e.type);const owner=state.users.find(u=>u.id===e.ownerId)||{name:e.owner,id:e.ownerId};const creator=state.users.find(u=>u.id===e.by);
+  const row=(lbl,val)=>val?'<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-soft)"><div style="width:110px;color:var(--faint);font-size:13px">'+lbl+'</div><div style="flex:1;font-size:13.5px;color:var(--ink)">'+esc(val)+'</div></div>':'';
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="pill" style="background:'+withAlpha(ty.color,.16)+';color:'+ty.color+'">'+esc(ty.label)+'</span></div>'+
+    '<div style="font-size:19px;font-weight:800;margin-bottom:12px">'+esc(e.title||'Sem título')+'</div>'+
+    row('Cliente',e.client)+row('Data',e.date)+row('Início',e.start)+row('Término',e.end)+row('Local',e.location)+row('Responsável',owner&&owner.name)+row('Criado por',creator&&creator.name)+row('Observações',e.notes)+
+    '<div class="del-actions" style="margin-top:14px"><button class="btn ghost" data-modalclose="1">Fechar</button></div>'+
+  '</div></div>';
+}
 function emptyState(ic,t,s){return '<div class="empty"><div class="ebox">'+svg(ic)+'</div><div class="et">'+esc(t)+'</div><div class="es">'+esc(s)+'</div></div>';}
 
 /* ---- AGENDA ---- */
@@ -4445,7 +4496,9 @@ function renderAgenda(){
     '<div class="chips" style="margin-bottom:10px">'+
       '<button class="chip" data-ag="vmonth" style="'+(agView==='month'?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Mês</button>'+
       '<button class="chip" data-ag="vlist" style="'+(agView==='list'?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Agenda</button>'+
-    '</div><input class="inp" id="agSearch" placeholder="Buscar compromisso…" value="'+esc(agQuery)+'" style="margin-bottom:10px">'+
+    '</div>'+
+    '<button class="btn" data-ag="new" style="width:100%;height:44px;border-radius:12px;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">'+svg('plus')+'Novo compromisso</button>'+
+    '<input class="inp" id="agSearch" placeholder="Buscar compromisso…" value="'+esc(agQuery)+'" style="margin-bottom:10px">'+
     '<div class="chips" style="margin-bottom:12px"><button class="chip" data-agf="all" style="'+(agFilter==='all'?'background:var(--accent);border-color:transparent;color:#fff':'')+'">Todos</button>'+
       TYPES.map(t=>'<button class="chip" data-agf="'+t.key+'" style="'+(agFilter===t.key?'background:'+withAlpha(t.color,.18)+';color:'+t.color+';border-color:'+t.color:'')+'">'+esc(t.label)+'</button>').join('')+'</div>';
   if(agView==='month'){
@@ -7574,7 +7627,9 @@ document.addEventListener('click',async e=>{
     render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
   if(el=g('[data-bmine]')){boardMine=!boardMine;render();return;}
-  if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
+  if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='new'){openEventForm();return;}if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
+  if(el=g('[data-evdetail]')){openEventDetail(el.dataset.evdetail);return;}
+  if(el=g('[data-evsave]')){saveEvent();return;}
   if(el=g('[data-agf]')){agFilter=el.dataset.agf;render();return;}
   if(el=g('[data-day]')){agSel=el.dataset.day;render();return;}
   // menu '⋯' do card V4: popover FIXED via PORTAL no <body>, ancorado ao botão. PROD1.1:

@@ -210,11 +210,11 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<title>ID Seven · Desktop<\/title>/.test(HTML), 'G6: <title> estático neutro (runtime preenche)');
   // G7: sidebar footer deriva de APP_VER
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
-  // G8/G9: versão corrente (1.0.159 = F3.3.71C7 corte de escopo Chat + Copywriting)
+  // G8/G9: versão corrente (1.0.160 = F3.3.73I3 Agenda compartilhada — criar compromisso)
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.159', 'G8: package.json version = 1.0.159 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.160', 'G8: package.json version = 1.0.160 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.159', 'G9: package-lock version = 1.0.159 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.160', 'G9: package-lock version = 1.0.160 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
