@@ -2,6 +2,7 @@ package br.com.idseven.agenda.nativebeta.data
 
 import android.util.Log
 import br.com.idseven.agenda.nativebeta.BuildConfig
+import br.com.idseven.agenda.nativebeta.domain.SelfInfo
 import com.google.firebase.firestore.FirebaseFirestore
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -133,6 +134,32 @@ object AuthRepo {
         }
         if (http == 401) return Result.Err("expired")
         return Result.Err("http_$http")
+    }
+
+    // F3.3.73D — perfil CANÔNICO do próprio usuário (para a tela Perfil). Diferente
+    // do getUserSelf acima (que só valida o round-trip e devolve o nome), este
+    // extrai os campos exibíveis do doc `self` autenticado — inclusive e-mail/
+    // telefone, que são do PRÓPRIO usuário (permitido) e NUNCA vêm de usersPublic.
+    // Token no header Bearer; nada de token/PII em log. Retorna null se sem sessão/erro.
+    suspend fun selfProfile(token: String?): SelfInfo? {
+        if (token.isNullOrBlank()) return null
+        val (http, body, exc) = postJson(FN_SELF_URL, JSONObject(), bearer = token)
+        if (exc != null) { Log.w(TAG, "selfProfile kind=${classifyError(exc)} http=$http"); return null }
+        val json = runCatching { JSONObject(body) }.getOrNull() ?: return null
+        if (http != 200 || !json.optBoolean("ok", false)) return null
+        val self = json.optJSONObject("self") ?: return null
+        val id = self.optString("id", "")
+        if (id.isBlank()) return null
+        fun s(k: String): String? = self.optString(k, "").takeIf { it.isNotBlank() }
+        val fcm: List<String> = self.optJSONArray("fcmTokens")?.let { arr ->
+            (0 until arr.length()).mapNotNull { arr.optString(it, "").takeIf { t -> t.isNotBlank() } }
+        } ?: emptyList()
+        return SelfInfo(
+            id = id, name = s("name"), role = s("role"), color = s("color"),
+            photo = s("photo") ?: s("photoUrl") ?: s("avatar"),
+            admin = self.optBoolean("admin", false),
+            email = s("email"), phone = s("phone"), fcmTokens = fcm,
+        )
     }
 
     // NOTA F3.3.73C: register (auto-cadastro) e a troca de senha temporária abaixo

@@ -118,6 +118,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
 
     val users = usersState.itemsOrEmpty()
     val currentUser = users.firstOrNull { it.id == session.uid }
+    val self by vm.self.collectAsState()   // F3.3.73D — perfil canônico (getUserSelf) p/ e-mail/telefone
     val canManage = currentUser?.admin == true
 
     // Notificações: canais, permissão (Android 13+) e registro do token FCM.
@@ -294,7 +295,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     onBack = { nav.popBackStack() },
                 )
             }
-            composable("perfil") { ProfileScreen(currentUser, session, onLogout) }
+            composable("perfil") { ProfileScreen(currentUser, self, session, onLogout) }
             composable("event/{id}") { entry ->
                 EventDetailScreen(
                     id = entry.arguments?.getString("id") ?: "",

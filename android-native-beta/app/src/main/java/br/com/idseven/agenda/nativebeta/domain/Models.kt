@@ -22,6 +22,20 @@ data class EventItem(
     val doneBy: String?,
 )
 
+// F3.3.73D — perfil canônico do próprio usuário (getUserSelf). Carrega e-mail/
+// telefone do PRÓPRIO usuário (permitido); NUNCA vem de usersPublic.
+data class SelfInfo(
+    val id: String,
+    val name: String? = null,
+    val role: String? = null,
+    val color: String? = null,
+    val photo: String? = null,
+    val admin: Boolean = false,
+    val email: String? = null,
+    val phone: String? = null,
+    val fcmTokens: List<String> = emptyList(),
+)
+
 data class UserLite(
     val id: String,
     val name: String?,

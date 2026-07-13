@@ -3,15 +3,19 @@ package br.com.idseven.agenda.nativebeta.core
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import br.com.idseven.agenda.nativebeta.data.AuthRepo
 import br.com.idseven.agenda.nativebeta.data.EventRepo
+import br.com.idseven.agenda.nativebeta.data.SessionStore
 import br.com.idseven.agenda.nativebeta.data.TaskRepo
 import br.com.idseven.agenda.nativebeta.data.UsersRepo
 import br.com.idseven.agenda.nativebeta.domain.EventItem
+import br.com.idseven.agenda.nativebeta.domain.SelfInfo
 import br.com.idseven.agenda.nativebeta.domain.TaskItem
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
@@ -38,6 +42,14 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
         TaskRepo.tasks().map { UiList.Data(it) as UiList<TaskItem> }
             .catch { emit(UiList.Error(it.message ?: "Falha ao carregar as tarefas")) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiList.Loading)
+
+    // F3.3.73D — perfil canônico do próprio usuário via getUserSelf (token seguro
+    // da 73C). Fonte ÚNICA de e-mail/telefone na tela Perfil; a equipe (usersPublic)
+    // não carrega esses campos. Best-effort: null se sem sessão/rede.
+    val self: StateFlow<SelfInfo?> =
+        flow { emit(AuthRepo.selfProfile(SessionStore(getApplication()).token())) }
+            .catch { emit(null) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 }
 
 fun <T> UiList<T>.itemsOrEmpty(): List<T> = when (this) {

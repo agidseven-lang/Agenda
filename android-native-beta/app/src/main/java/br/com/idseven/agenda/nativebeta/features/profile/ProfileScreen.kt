@@ -60,6 +60,7 @@ import br.com.idseven.agenda.nativebeta.data.UserSession
 import br.com.idseven.agenda.nativebeta.designsystem.components.Avatar
 import br.com.idseven.agenda.nativebeta.designsystem.components.Pill
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
+import br.com.idseven.agenda.nativebeta.domain.SelfInfo
 import br.com.idseven.agenda.nativebeta.domain.UserColor
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
@@ -69,7 +70,7 @@ private val BUILD = br.com.idseven.agenda.nativebeta.BuildConfig.VERSION_NAME
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> Unit) {
+fun ProfileScreen(currentUser: UserLite?, self: SelfInfo?, session: UserSession, onLogout: () -> Unit) {
     val name = (currentUser?.name ?: session.name).ifBlank { "Usuário" }
     val color = UserColor.of(currentUser?.id ?: session.uid, currentUser?.color)
     val context = LocalContext.current
@@ -143,9 +144,11 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                     "conta" -> {
                         SheetTitle("Conta")
                         InfoLine("Nome", name)
-                        InfoLine("Função", currentUser?.role?.takeIf { it.isNotBlank() } ?: "Não informado")
-                        InfoLine("E-mail", currentUser?.email?.takeIf { it.isNotBlank() } ?: "Não informado")
-                        InfoLine("WhatsApp", currentUser?.phone?.takeIf { it.isNotBlank() } ?: "Não informado")
+                        // F3.3.73D — e-mail/telefone vêm do getUserSelf (self), NUNCA da
+                        // equipe (usersPublic não carrega PII). Função também prioriza o self.
+                        InfoLine("Função", (self?.role ?: currentUser?.role)?.takeIf { it.isNotBlank() } ?: "Não informado")
+                        InfoLine("E-mail", self?.email?.takeIf { it.isNotBlank() } ?: "Não informado")
+                        InfoLine("WhatsApp", self?.phone?.takeIf { it.isNotBlank() } ?: "Não informado")
                         InfoLine("Status", "Ativa")
                         InfoLine("Permissão", if (currentUser?.admin == true) "Administrador" else "Membro da equipe")
                         InfoLine("ID do usuário", session.uid)
@@ -170,9 +173,12 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                             context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null)
                         }
                         val hasToken = localToken != null
-                        // Este aparelho está registrado na conta do usuário logado? (token local ∈ users/{uid}.fcmTokens)
-                        val deviceRegistered = remember(permRefresh, currentUser) {
-                            !localToken.isNullOrBlank() && (currentUser?.fcmTokens?.contains(localToken) == true)
+                        // F3.3.73D — este aparelho está registrado na conta? Confere o token
+                        // local contra os fcmTokens do PRÓPRIO usuário (self/getUserSelf);
+                        // usersPublic não carrega fcmTokens. (Depende de getUserSelf expor
+                        // fcmTokens — confirmado no QA físico da 73J; degrada para "não" se ausente.)
+                        val deviceRegistered = remember(permRefresh, self) {
+                            !localToken.isNullOrBlank() && (self?.fcmTokens?.contains(localToken) == true)
                         }
                         val firedPersist = remember(permRefresh) {
                             context.getSharedPreferences("notifydiag", android.content.Context.MODE_PRIVATE).getString("last_fired", null)
