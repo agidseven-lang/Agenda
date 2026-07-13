@@ -55,12 +55,13 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
 
       - name: "firebase-admin (API modular)"
+        # instalado na RAIZ do workspace: resolucao ESM de .mjs sobe diretorios a
+        # partir do script e IGNORA NODE_PATH (causa da falha do run #1)
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/fa" && cd "$RUNNER_TEMP/fa"
-          npm init -y >/dev/null 2>&1
-          npm i firebase-admin >/dev/null 2>&1
-          echo "NODE_PATH=$RUNNER_TEMP/fa/node_modules" >> "$GITHUB_ENV"
+          [ -f package.json ] || npm init -y >/dev/null 2>&1
+          npm i firebase-admin --no-save --no-audit --no-fund >/dev/null 2>&1
+          node -e "import('firebase-admin/app').then(()=>console.log('firebase-admin OK'))"
 
       - name: "Leitura read-only do usersAudit (saida sanitizada)"
         run: node scripts/worker-ops/f3372a-usersaudit-verify.mjs
