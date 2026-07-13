@@ -28,11 +28,14 @@ object Types {
 // Mantém alias de chaves legadas (design/copy/postagem) para não quebrar dados antigos:
 // o campo `sector` continua sendo uma String no Firestore (sem mudança de schema).
 object Sectors {
-    data class Sec(val key: String, val label: String, val color: Color, val icon: ImageVector, val desc: String)
+    data class Sec(val key: String, val label: String, val color: Color, val icon: ImageVector, val desc: String, val descontinuado: Boolean = false)
     val ALL = listOf(
         Sec("edicao_midia", "Edição de mídia", Color(0xFF60A5FA), Icons.Outlined.Movie, "Cortes, legendas e exportação"),
         Sec("cronograma", "Cronograma", Color(0xFF34D399), Icons.Outlined.CalendarMonth, "Planejamento de publicações"),
-        Sec("copywriting", "Copywriting", Color(0xFF22D3EE), Icons.Outlined.EditNote, "Textos, legendas e anúncios"),
+        /* F3.3.73E — paridade com o Desktop 1.0.159 (71C7): setor DESCONTINUADO para
+           NOVAS tarefas. A definição permanece para tarefas HISTÓRICAS: of()/alias/
+           labels/cores/hub/Board continuam resolvendo 'copywriting' e 'copy'. */
+        Sec("copywriting", "Copywriting", Color(0xFF22D3EE), Icons.Outlined.EditNote, "Textos, legendas e anúncios", descontinuado = true),
         Sec("roteiro", "Roteiro", Color(0xFFF59E0B), Icons.Outlined.Description, "Gancho, desenvolvimento e CTA"),
         Sec("programacao_posts", "Programação de posts", Color(0xFFA78BFA), Icons.Outlined.GridView, "Agendamento e publicação"),
     )

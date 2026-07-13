@@ -130,7 +130,10 @@ fun TaskFormScreen(
                 checklist.clear(); checklist.addAll(t.checklist)
             }
         } else {
-            val s = initialSector?.let { Sectors.of(it).key } ?: sector
+            // F3.3.73E — paridade 71C7 (openTaskForm do Desktop): quadro DESCONTINUADO
+            // não pré-seleciona a criação; cai no setor ativo padrão. Histórico intacto.
+            val resolved = initialSector?.let { Sectors.of(it) }
+            val s = resolved?.takeIf { !it.descontinuado }?.key ?: sector
             sector = s
             applySectorDefaults(s)
         }
@@ -223,7 +226,9 @@ fun TaskFormScreen(
             when (step) {
                 0 -> {
                     Label("Escolha o setor")
-                    Sectors.ALL.forEach { s ->
+                    // F3.3.73E — paridade 71C7: oferece SOMENTE setores ativos
+                    // (descontinuado sai da criação, não do histórico/Board).
+                    Sectors.ALL.filter { !it.descontinuado }.forEach { s ->
                         SectorCardCompact(s.label, s.desc, s.icon, s.color, selected = sector == s.key) {
                             if (sector != s.key) { sector = s.key; applySectorDefaults(s.key) }
                         }

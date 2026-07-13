@@ -22,7 +22,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Person
@@ -57,8 +56,6 @@ import br.com.idseven.agenda.nativebeta.domain.TaskPhase
 import br.com.idseven.agenda.nativebeta.designsystem.components.AppTopbar
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.features.agenda.AgendaScreen
-import br.com.idseven.agenda.nativebeta.features.chat.ChatListScreen
-import br.com.idseven.agenda.nativebeta.features.chat.ChatThreadScreen
 import br.com.idseven.agenda.nativebeta.features.dashboard.DashboardScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventDetailScreen
 import br.com.idseven.agenda.nativebeta.features.events.EventFormScreen
@@ -161,18 +158,21 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
         val route = when {
             dl.startsWith("task:") -> "task/${dl.removePrefix("task:")}"
             dl.startsWith("event:") -> "event/${dl.removePrefix("event:")}"
-            dl.startsWith("chat:") -> "chatThread/${dl.removePrefix("chat:")}"
+            // F3.3.73E — paridade 71C7 (Desktop 1.0.159): Chat fora do fluxo principal.
+            // Deep-link legado de chat é ignorado (rotas removidas); FCM/push intocados.
+            dl.startsWith("chat:") -> return@LaunchedEffect
             else -> "event/$dl"
         }
         runCatching { nav.navigate(route) }
     }
 
+    // F3.3.73E — paridade 71C7 (Desktop 1.0.159): aba Chat REMOVIDA do fluxo principal.
+    // As telas de chat permanecem no código (features/chat) como dead code, sem rota.
     val tabs = listOf(
         Tab("hoje", "Hoje", Icons.Outlined.Today),
         Tab("agenda", "Agenda", Icons.Outlined.CalendarMonth),
         Tab("tarefas", "Tarefas", Icons.Outlined.Checklist),
         Tab("equipe", "Equipe", Icons.Outlined.Group),
-        Tab("chat", "Chat", Icons.Outlined.ChatBubbleOutline),
         Tab("perfil", "Perfil", Icons.Outlined.Person),
     )
     val backStack by nav.currentBackStackEntryAsState()
@@ -286,15 +286,8 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                 )
             }
             composable("equipe") { TeamScreen(usersState) }
-            composable("chat") { ChatListScreen(session, users, onOpenChat = { nav.navigate("chatThread/$it") }) }
-            composable("chatThread/{otherId}") { entry ->
-                ChatThreadScreen(
-                    session = session,
-                    otherId = entry.arguments?.getString("otherId") ?: "",
-                    users = users,
-                    onBack = { nav.popBackStack() },
-                )
-            }
+            // F3.3.73E — rotas "chat"/"chatThread" removidas (paridade 71C7). Navegação a
+            // rota inexistente via deep-link antigo é engolida pelo runCatching acima.
             composable("perfil") { ProfileScreen(currentUser, self, session, onLogout) }
             composable("event/{id}") { entry ->
                 EventDetailScreen(
