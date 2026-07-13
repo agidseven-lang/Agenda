@@ -34,7 +34,7 @@ jobs:
       DIST_BASENAME: ""
     steps:
       - name: Checkout (ref escolhido)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.ref }}
 
@@ -46,7 +46,7 @@ jobs:
           echo "versao=$APP_VERSION"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
 
@@ -212,7 +212,7 @@ jobs:
 
       - name: Upload installer (artifact)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-installer
           path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
@@ -221,7 +221,7 @@ jobs:
 
       - name: Upload bundle (ZIP com instaladores + relatorios)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-bundle
           path: dist-pkg/

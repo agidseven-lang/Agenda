@@ -32,7 +32,7 @@ jobs:
           fi
           echo "DRY_RUN=$MODE" >> "$GITHUB_ENV"; echo "modo DRY_RUN=$MODE"
       - name: Checkout fonte pinada
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with: { ref: "app/f3371a-email-change", fetch-depth: 1 }
       - name: Guard SHA + pre-checks (harness 25/25; exports novos E antigos presentes)
         run: |

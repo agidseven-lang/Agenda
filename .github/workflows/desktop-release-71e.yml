@@ -86,7 +86,7 @@ jobs:
           esac
 
       - name: "Checkout (notes da 71D versionadas nesta branch de ops)"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: "Gate 2 — run #211 success no SHA pinado + branch fonte no SHA alvo"
         run: |
