@@ -1,0 +1,66 @@
+# =====================================================================
+# [manual] F3.3.72A — Verificacao READ-ONLY da auditoria usersAudit
+# (troca de e-mail). NAO escreve NADA no Firestore: o script nao contem
+# add/set/update/delete; e-mails saem MASCARADOS; nenhum segredo em log
+# (SA via arquivo temporario, nunca impresso). Dispara SOMENTE com o
+# literal VERIFICAR-USERSAUDIT-72A (dispatch input OU head-commit do
+# push nesta branch de ops — dispatch por API fora da main e 404).
+# =====================================================================
+name: "[manual] F3.3.72A usersAudit verify (read-only)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite VERIFICAR-USERSAUDIT-72A para autorizar a leitura"
+        required: true
+        default: ""
+  push:
+    branches:
+      - "claude/bold-hopper-4boo17"
+
+permissions:
+  contents: read
+
+concurrency: f3372a-usersaudit-verify
+
+jobs:
+  verify:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, 'VERIFICAR-USERSAUDIT-72A')
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+          HEADMSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [ "$CONFIRM" = "VERIFICAR-USERSAUDIT-72A" ]; then echo "OK (dispatch)"; exit 0; fi
+          case "$HEADMSG" in
+            *VERIFICAR-USERSAUDIT-72A*) echo "OK (push literal)";;
+            *) echo "::error::sem confirmacao literal"; exit 1;;
+          esac
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Credencial ADC (nunca impressa)"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error::service account ausente"; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+
+      - name: "firebase-admin (API modular)"
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/fa" && cd "$RUNNER_TEMP/fa"
+          npm init -y >/dev/null 2>&1
+          npm i firebase-admin >/dev/null 2>&1
+          echo "NODE_PATH=$RUNNER_TEMP/fa/node_modules" >> "$GITHUB_ENV"
+
+      - name: "Leitura read-only do usersAudit (saida sanitizada)"
+        run: node scripts/worker-ops/f3372a-usersaudit-verify.mjs
