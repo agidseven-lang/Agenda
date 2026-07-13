@@ -1,0 +1,94 @@
+# =====================================================================
+# [manual] F3.3.73E — Readout READ-ONLY das Firestore Rules live (tasks).
+# Motivo: o artifact do audit (blob storage) e inacessivel pela politica de
+# rede do ambiente ops; este job IMPRIME o conteudo das Rules no LOG do job
+# (Rules sao configuracao client-side, sem segredo/PII). SOMENTE GET:
+# releases/cloud.firestore -> rulesetName -> ruleset content. NAO publica
+# Rules, NAO faz firebase deploy, NAO toca documentos Firestore. Confirma
+# release INALTERADO (before == after). Token mascarado; SA via secret em
+# arquivo temporario, removida no fim. workflow_dispatch only; gate
+# confirm_readout==READOUT_RULES.
+# =====================================================================
+name: "[manual] F3.3.73E Firestore Rules readout no log (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_readout:
+        description: "Type READOUT_RULES to print live Rules in the job log"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3373e-rules-tasks-readout
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+
+jobs:
+  readout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Guard confirm_readout (== READOUT_RULES)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_readout }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "READOUT_RULES" ]; then
+            echo "::error:: confirm_readout != READOUT_RULES — abortando antes de tudo."; exit 1
+          fi
+          echo "confirm_readout OK."
+
+      - name: Auth gcloud (service account via secret -> arquivo temporario)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error:: service account ausente."; exit 1; }
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          echo "SA ativada (valor nao impresso)."
+
+      - name: Baixar Rules live (GET read-only) e IMPRIMIR no log
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" \
+            -o release-before.json
+          RULESET="$(jq -r '.rulesetName' release-before.json)"
+          [ -n "$RULESET" ] && [ "$RULESET" != "null" ] || { echo "::error:: rulesetName ausente."; exit 1; }
+          echo "rulesetName=$RULESET"
+          echo "updateTime=$(jq -r '.updateTime' release-before.json)"
+          curl -fsS -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/${RULESET}" -o ruleset.json
+          jq -r '.source.files[].content' ruleset.json > rules.live.txt
+          [ -s rules.live.txt ] || { echo "::error:: rules.live.txt vazio."; exit 1; }
+          echo "sha256=$(sha256sum rules.live.txt | cut -d' ' -f1)"
+          echo "== RULES-LIVE-BEGIN =="
+          nl -ba rules.live.txt
+          echo "== RULES-LIVE-END =="
+
+      - name: Confirmar release INALTERADO (before == after)
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" \
+            -o release-after.json
+          B_RS="$(jq -r '.rulesetName' release-before.json)"; A_RS="$(jq -r '.rulesetName' release-after.json)"
+          B_UT="$(jq -r '.updateTime'  release-before.json)"; A_UT="$(jq -r '.updateTime'  release-after.json)"
+          echo "before: $B_RS @ $B_UT"; echo "after : $A_RS @ $A_UT"
+          [ "$B_RS" = "$A_RS" ] || { echo "::error:: rulesetName mudou — readout NAO deveria publicar!"; exit 1; }
+          [ "$B_UT" = "$A_UT" ] || { echo "::error:: updateTime mudou — release alterado inesperadamente!"; exit 1; }
+          echo "Release inalterado: nenhuma publicacao ocorreu."
+
+      - name: Limpeza (service account)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
