@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +23,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -65,7 +67,7 @@ private const val ANCHOR = 1200
 private fun monthsBetween(a: YearMonth, b: YearMonth) = (b.year - a.year) * 12 + (b.monthValue - a.monthValue)
 
 @Composable
-fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventClick: (String) -> Unit) {
+fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventClick: (String) -> Unit, onNewEvent: () -> Unit) {
     eventsState.errorMessage()?.let { ErrorState("Agenda — $it"); return }
     if (eventsState.isLoading) { SkeletonList(); return }
     val all = eventsState.itemsOrEmpty()
@@ -111,6 +113,19 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
         Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp).clip(RoundedCornerShape(14.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(14.dp)).padding(4.dp)) {
             Seg("Mês", !listMode, Modifier.weight(1f)) { listMode = false }
             Seg("Agenda", listMode, Modifier.weight(1f)) { listMode = true }
+        }
+        // F3.3.73I2 — CTA explícito de agendamento. O "+" central da bottom bar já abria
+        // este mesmo fluxo (rota eventForm), mas sem opção visível na Agenda o owner não
+        // encontrava como agendar. Botão claro aqui; nada muda no contrato de events.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 2.dp)
+                .clip(RoundedCornerShape(14.dp)).background(Tokens.Accent)
+                .clickable { onNewEvent() }.padding(vertical = 13.dp),
+            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Novo compromisso", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
         SearchField(query, { query = it }, "Buscar compromisso…")
         TypeFilters(typeFilter) { typeFilter = it }

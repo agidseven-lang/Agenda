@@ -267,7 +267,7 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
                     },
                 )
             }
-            composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }) }
+            composable("agenda") { AgendaScreen(eventsState, users, onEventClick = { nav.navigate("event/$it") }, onNewEvent = { nav.navigate("eventForm") }) }
             composable("tarefas") {
                 BoardsHubScreen(tasksState, currentUser = currentUser, onOpenSector = { nav.navigate("board/$it") })
             }
