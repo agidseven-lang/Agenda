@@ -1,26 +1,30 @@
 package br.com.idseven.agenda.nativebeta.core
 
 import android.content.Context
-import android.provider.Settings
-import com.google.firebase.firestore.FieldPath
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import br.com.idseven.agenda.nativebeta.data.FcmApi
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
-// Registra o token FCM no doc do usuário (users.fcmTokens) — mesmo campo do PWA/Worker.
-// Guarda o uid em prefs para que o serviço de mensagens consiga atualizar o token
-// no Firestore quando ele rotacionar (onNewToken), mesmo sem novo login.
+// Registra o token FCM do usuário — F3.3.73G: SERVER-SIDE via registerFcmToken.
+// A escrita direta em users/{uid} (fcmTokens/fcmTokenMeta) foi REMOVIDA: as Rules
+// fecharam write em users, e quem grava agora é a Function (dedup por deviceId no
+// servidor), sempre no usuário da SESSÃO (bearer da 73C).
 //
-// PÓS-REINSTALAÇÃO o token FCM ROTACIONA. Além de adicionar o novo em `fcmTokens`,
-// gravamos `fcmTokenMeta[token] = { deviceId, lastSeenAt }` usando um deviceId estável
-// do aparelho. O Worker/Functions deduplicam por deviceId pegando o token de maior
-// lastSeenAt -> o token ANTIGO deste mesmo aparelho deixa de ser usado (substituído),
-// sem precisar removê-lo manualmente. Logs claros para diagnóstico.
+// Guarda uid/token em prefs para: (a) o serviço de mensagens re-registrar o token
+// quando ele ROTACIONAR (onNewToken), mesmo sem novo login; (b) o Perfil indicar
+// "este aparelho na conta"; (c) o logout remover o token DESTE aparelho.
+// Best-effort: nenhuma falha aqui quebra login/UI.
 object Fcm {
+    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     fun register(ctx: Context, uid: String?) {
         if (uid.isNullOrBlank()) return
         try {
-            val prefs = ctx.getSharedPreferences("fcm", Context.MODE_PRIVATE)
+            val app = ctx.applicationContext
+            val prefs = app.getSharedPreferences("fcm", Context.MODE_PRIVATE)
             prefs.edit().putString("uid", uid).apply()
             FirebaseMessaging.getInstance().token
                 .addOnSuccessListener { token ->
@@ -29,33 +33,12 @@ object Fcm {
                         return@addOnSuccessListener
                     }
                     prefs.edit().putString("token", token).apply()
-                    val deviceId = stableDeviceId(ctx)
-                    val meta = mapOf(
-                        "deviceId" to deviceId,
-                        "lastSeenAt" to System.currentTimeMillis(),
-                        "platform" to "android-native",
-                    )
-                    FirebaseFirestore.getInstance().collection("users").document(uid)
-                        .update(
-                            "fcmTokens", FieldValue.arrayUnion(token),
-                            FieldPath.of("fcmTokenMeta", token), meta,
-                        )
-                        .addOnSuccessListener {
-                            android.util.Log.i("Fcm", "[FCM_TOKEN_SYNCED] uid=$uid device=$deviceId token=${token.take(12)}…")
-                        }
-                        .addOnFailureListener { e ->
-                            android.util.Log.w("Fcm", "[FCM_TOKEN_SYNC_FAILED] uid=$uid err=${e.message}")
-                        }
+                    // F3.3.73G — endpoint server-side no lugar do Firestore direto.
+                    io.launch { FcmApi.register(app, token) }
                 }
                 .addOnFailureListener { e ->
                     android.util.Log.w("Fcm", "[FCM_TOKEN_FETCH_FAILED] uid=$uid err=${e.message}")
                 }
         } catch (_: Throwable) { }
     }
-
-    // Identificador estável por aparelho (não muda na reinstalação) para agrupar tokens
-    // do mesmo device e descartar o antigo. Não é PII sensível e fica só no doc do usuário.
-    private fun stableDeviceId(ctx: Context): String = try {
-        Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ANDROID_ID)?.takeIf { it.isNotBlank() } ?: "unknown"
-    } catch (_: Throwable) { "unknown" }
 }

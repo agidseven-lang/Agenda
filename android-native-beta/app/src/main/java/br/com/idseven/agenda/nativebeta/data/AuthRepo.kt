@@ -59,7 +59,8 @@ object AuthRepo {
     // POST JSON via HttpURLConnection (sem lib externa). Retorna Triple(httpCode,
     // bodyString, exceptionOrNull). Em erro de rede/SSL/timeout, exception
     // preenchido; em resposta HTTP, code+body preenchidos. Roda em Dispatchers.IO.
-    private suspend fun postJson(url: String, payload: JSONObject, bearer: String? = null): Triple<Int, String, Throwable?> =
+    // F3.3.73G — visibilidade internal: FcmApi reusa o MESMO transporte/sessão.
+    internal suspend fun postJson(url: String, payload: JSONObject, bearer: String? = null): Triple<Int, String, Throwable?> =
         withContext(Dispatchers.IO) {
             if (url.isBlank()) return@withContext Triple(0, "", IllegalStateException("URL vazia (build sem -P...URL)"))
             var conn: HttpURLConnection? = null

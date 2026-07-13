@@ -32,6 +32,14 @@ android {
         def _selfUrl  = project.findProperty('GET_USER_SELF_URL') ?: 'https://getuserself-de36pi7vza-uc.a.run.app'
         buildConfigField "String", "LOGIN_USER_URL", "\"${_loginUrl}\""
         buildConfigField "String", "GET_USER_SELF_URL", "\"${_selfUrl}\""
+        // F3.3.73G — FCM token SERVER-SIDE (registerFcmToken/removeMyFcmToken/
+        // resetMyFcmTokens). URLs publicas Gen2 (nao sao segredo), override -P via CI.
+        def _fcmReg = project.findProperty('REGISTER_FCM_TOKEN_URL') ?: 'https://registerfcmtoken-de36pi7vza-uc.a.run.app'
+        def _fcmDel = project.findProperty('REMOVE_MY_FCM_TOKEN_URL') ?: 'https://removemyfcmtoken-de36pi7vza-uc.a.run.app'
+        def _fcmRst = project.findProperty('RESET_MY_FCM_TOKENS_URL') ?: 'https://resetmyfcmtokens-de36pi7vza-uc.a.run.app'
+        buildConfigField "String", "REGISTER_FCM_TOKEN_URL", "\"${_fcmReg}\""
+        buildConfigField "String", "REMOVE_MY_FCM_TOKEN_URL", "\"${_fcmDel}\""
+        buildConfigField "String", "RESET_MY_FCM_TOKENS_URL", "\"${_fcmRst}\""
     }
 
     signingConfigs {

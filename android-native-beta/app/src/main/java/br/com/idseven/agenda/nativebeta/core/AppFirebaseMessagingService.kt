@@ -1,25 +1,31 @@
 package br.com.idseven.agenda.nativebeta.core
 
 import android.content.Context
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import br.com.idseven.agenda.nativebeta.data.FcmApi
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
-// Notificações remotas (FCM). Quando o token rotaciona, atualiza users.fcmTokens no
-// Firestore (lendo o uid salvo no login) — assim o Worker de push sempre alcança este
-// aparelho, inclusive para o usuário RESPONSÁVEL pelo compromisso. Mensagens viram
-// notificação local do sistema (funciona com o app fechado).
+// Notificações remotas (FCM). Quando o token rotaciona, re-registra SERVER-SIDE via
+// registerFcmToken (F3.3.73G — sem Firestore direto; as Rules fecharam users) — assim
+// o Worker de push sempre alcança este aparelho, inclusive para o usuário RESPONSÁVEL
+// pelo compromisso. Mensagens viram notificação local do sistema (app fechado incluso).
 class AppFirebaseMessagingService : FirebaseMessagingService() {
+
+    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onNewToken(token: String) {
         try {
             val prefs = getSharedPreferences("fcm", Context.MODE_PRIVATE)
             prefs.edit().putString("token", token).apply()
             val uid = prefs.getString("uid", null)
+            // F3.3.73G — rotação server-side (bearer da sessão 73C). Sem uid salvo
+            // (nunca logou), o registro acontece no próximo login/resume.
             if (!uid.isNullOrBlank()) {
-                FirebaseFirestore.getInstance().collection("users").document(uid)
-                    .update("fcmTokens", FieldValue.arrayUnion(token))
+                io.launch { FcmApi.register(applicationContext, token) }
             }
         } catch (_: Throwable) { }
     }

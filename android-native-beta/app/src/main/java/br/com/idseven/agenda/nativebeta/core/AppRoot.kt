@@ -13,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import br.com.idseven.agenda.nativebeta.data.FcmApi
 import br.com.idseven.agenda.nativebeta.data.SessionStore
 import br.com.idseven.agenda.nativebeta.data.UserSession
 import br.com.idseven.agenda.nativebeta.features.auth.LoginScreen
@@ -43,7 +44,9 @@ fun AppRoot() {
         is SessionState.LoggedOut -> LoginScreen()
         is SessionState.LoggedIn -> MainScaffold(
             session = s.session,
-            onLogout = { scope.launch { sessionStore.clear() } },
+            // F3.3.73G — logout remove o token FCM DESTE aparelho via removeMyFcmToken
+            // (best-effort, exige a sessão ainda viva) e SÓ ENTÃO limpa a sessão local.
+            onLogout = { scope.launch { runCatching { FcmApi.removeCurrentToken(context) }; sessionStore.clear() } },
         )
     }
 }
