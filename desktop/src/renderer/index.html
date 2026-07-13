@@ -2288,7 +2288,10 @@ const APP_VER={ desktop:DESK_VER, tag:'Fluxo', apk:DESK_VER };
 const SECTORS=[
   {key:'edicao_midia',label:'Edição de mídia',color:'#60A5FA',desc:'Cortes, legendas e exportação',icon:'movie'},
   {key:'cronograma',label:'Cronograma',color:'#34D399',desc:'Planejamento de publicações',icon:'calendar'},
-  {key:'copywriting',label:'Copywriting',color:'#22D3EE',desc:'Textos, legendas e anúncios',icon:'editnote'},
+  /* F3.3.71C7 — setor DESCONTINUADO para NOVAS tarefas (corte de escopo do owner).
+     A definição permanece para tarefas HISTÓRICAS: secOf/alias/labels/cores/Board
+     continuam resolvendo 'copywriting' e 'copy' normalmente. */
+  {key:'copywriting',label:'Copywriting',color:'#22D3EE',desc:'Textos, legendas e anúncios',icon:'editnote',descontinuado:true},
   {key:'roteiro',label:'Roteiro',color:'#F59E0B',desc:'Gancho, desenvolvimento e CTA',icon:'description'},
   {key:'programacao_posts',label:'Programação de posts',color:'#A78BFA',desc:'Agendamento e publicação',icon:'grid'}];
 const SECTOR_ALIAS={design:'edicao_midia',copy:'copywriting',postagem:'programacao_posts'};
@@ -2740,7 +2743,7 @@ function openAdminEmailModal(){
 }
 
 /* ---- APP RENDER ---- */
-const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'chat',l:'Chat',i:'chat'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'relatorios',l:'Relatórios',i:'bars'},{k:'notificacoes',l:'Notificações',i:'bell'}];
+const TABS=[{k:'hoje',l:'Hoje',i:'today'},{k:'agenda',l:'Agenda',i:'calendar'},{k:'tarefas',l:'Tarefas',i:'checklist'},{k:'equipe',l:'Equipe',i:'group'},{k:'perfil',l:'Perfil',i:'person'},{k:'exec',l:'Executivo',i:'gauge'},{k:'relatorios',l:'Relatórios',i:'bars'},{k:'notificacoes',l:'Notificações',i:'bell'}];
 // 1.0.119-form-unlock-hotfix — CAUSA RAIZ do "nada responde": um snapshot do Firestore
 // (users/events/tasks) chegava enquanto o WIZARD de criação estava aberto e RECONSTRUÍA o
 // #content por baixo do usuário — destruindo o campo/clique/foco a cada atualização de dados
@@ -3959,6 +3962,10 @@ try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPa
 
 function render(){
   if(!state.user)return;
+  // F3.3.71C7 — Chat fora do fluxo principal do Desktop: qualquer navegação
+  // residual (estado antigo/setter futuro) cai em Hoje. Dados de chat NÃO são
+  // tocados (o app nem lê coleção de chat; renderChat vira código inativo).
+  if(state.tab==='chat')state.tab='hoje';
   // 1.0.102 — NUNCA re-renderizar por baixo de uma edição aberta. Se há um modal aberto com
   // campo de edição (ou qualquer input/textarea em foco), adia o render (snapshot do Firestore)
   // até o usuário fechar/salvar. Corrige o modal de correção sumindo em tempo real.
@@ -4011,7 +4018,6 @@ function render(){
     afterBoard();
   }
   else if(state.tab==='equipe')c.innerHTML=renderEquipe();
-  else if(state.tab==='chat')c.innerHTML=renderChat();
   else if(state.tab==='perfil')c.innerHTML=renderPerfil();
   else if(state.tab==='config')c.innerHTML=renderConfig();
   else if(state.tab==='exec'){c.innerHTML=renderExecPanel();afterExecPanel();}
@@ -7223,6 +7229,9 @@ function renderEquipe(){
   h+=isDesktop()?('<div class="d-team">'+items+'</div>'):items;
   return h+'</div>';
 }
+/* F3.3.71C7 — CÓDIGO INATIVO: Chat saiu do fluxo principal (sem item no menu,
+   sem rota). Mantido byte-idêntico por contrato (K8) e para eventual retorno;
+   nunca leu/escreveu coleção de chat — lista apenas a equipe em memória. */
 function renderChat(){
   const us=state.users.filter(u=>u.id!==state.user.id&&!['removido','excluido','pendente'].includes(u.status||'')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   let h='<div class="scr-head"><div class="h-title">Chat</div><div class="h-sub">Equipe ID Seven</div></div><div class="scr" style="padding-top:8px">'+
@@ -7287,7 +7296,7 @@ function renderConfig(){
   h+='<div style="height:18px"></div><div class="lbl">Privacidade e Segurança</div><div class="card">'+
       settRow('gear','Segurança da sessão','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+soon('Autenticação em duas etapas (2FA)')+'<div class="divline"></div>'+soon('Sessões e dispositivos')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
   h+='<div style="height:18px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
-      act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+soon('Notificações de tarefas')+'<div class="divline"></div>'+soon('Notificações de chat')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
+      act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+soon('Notificações de tarefas')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
   // F3.3.70D3R10U — Bandeja do sistema (tray): status real via IPC tray-status +
   // botao "Recriar icone da bandeja" (IPC tray-recreate) + orientacao da seta ^.
   h+='<div style="height:18px"></div><div class="lbl">Bandeja do sistema (tray)</div><div class="card">'+
@@ -7323,7 +7332,7 @@ function openSheet(which){
 
 /* ---- TASK FORM (wizard) ---- */
 function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],checklist:[],link:'',obs:'',_openContent:null};}
-function openTaskForm(sector){closeModal();state.form=newForm(sector);if(sector)state.form.step=1;render();}
+function openTaskForm(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
 function tpl(){return state.form.sector?TEMPLATES[secOf(state.form.sector).key]:null;}
 function curSub(){const t=tpl();return (t&&t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;}
 function renderForm(){
@@ -7337,7 +7346,8 @@ function renderForm(){
   return '<div class="form-wrap">'+h+'</div>';
 }
 function stepSector(){const f=state.form;let h='<div class="lbl">Escolha o setor</div>';
-  SECTORS.forEach(s=>{const sel=f.sector===s.key;h+='<button class="sector-card '+(sel?'sel':'')+'" data-fsector="'+s.key+'" style="'+(sel?'background:'+withAlpha(s.color,.12)+';border-color:'+s.color:'')+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div><div class="sm"><div class="sl">'+esc(s.label)+'</div><div class="sd">'+esc(s.desc)+'</div></div>'+(sel?'<div style="color:'+s.color+'">✓</div>':'')+'</button>';});
+  // 71C7: oferece SOMENTE setores ativos (descontinuado sai da criação, não do histórico)
+  SECTORS.filter(s=>!s.descontinuado).forEach(s=>{const sel=f.sector===s.key;h+='<button class="sector-card '+(sel?'sel':'')+'" data-fsector="'+s.key+'" style="'+(sel?'background:'+withAlpha(s.color,.12)+';border-color:'+s.color:'')+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div><div class="sm"><div class="sl">'+esc(s.label)+'</div><div class="sd">'+esc(s.desc)+'</div></div>'+(sel?'<div style="color:'+s.color+'">✓</div>':'')+'</button>';});
   return h;
 }
 function stepDados(){const f=state.form;const t=tpl();

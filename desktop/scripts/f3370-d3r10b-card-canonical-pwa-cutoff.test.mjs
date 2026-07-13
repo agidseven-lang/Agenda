@@ -210,11 +210,11 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/<title>ID Seven · Desktop<\/title>/.test(HTML), 'G6: <title> estático neutro (runtime preenche)');
   // G7: sidebar footer deriva de APP_VER
   ok(/<span class="ver">Desktop '\+APP_VER\.desktop\+' · '\+APP_VER\.tag\+'<\/span>/.test(HTML), 'G7: sidebar footer deriva de APP_VER');
-  // G8/G9: versão corrente (1.0.158 = F3.3.71C5 wizard coluna real + instalador 1º clique)
+  // G8/G9: versão corrente (1.0.159 = F3.3.71C7 corte de escopo Chat + Copywriting)
   const pj = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok(pj.version === '1.0.158', 'G8: package.json version = 1.0.158 (é: ' + pj.version + ')');
+  ok(pj.version === '1.0.159', 'G8: package.json version = 1.0.159 (é: ' + pj.version + ')');
   const pl = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package-lock.json'), 'utf8'));
-  ok(pl.version === '1.0.158', 'G9: package-lock version = 1.0.158 (é: ' + pl.version + ')');
+  ok(pl.version === '1.0.159', 'G9: package-lock version = 1.0.159 (é: ' + pl.version + ')');
   // G10: preload sem versao stale, expondo app.getVersion
   const PRE = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'preload', 'preload.ts'), 'utf8');
   ok(!/1\.0\.13\d|1\.0\.14\d/.test(PRE) && PRE.includes('app-version'), 'G10: preload sem versão hardcoded; usa IPC app-version');
@@ -403,6 +403,23 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(/!macro customInit[\s\S]*Banner::show "Preparando o instalador\.\.\."[\s\S]*!insertmacro killRunningApp[\s\S]*Banner::destroy[\s\S]*!macroend/.test(NSH), 'O7: customInit dá feedback imediato (Banner) antes do taskkill/Sleep e destrói ao fim');
   ok(/IfSilent instPrepSemBanner[\s\S]*IfSilent instPrepFim/.test(NSH), 'O8: instalação silenciosa /S preservada (banner só no modo interativo)');
   ok(/Mark-of-the-Web[\s\S]*Desbloquear/.test(NSH), 'O9: causa operacional do 1º clique (MOTW/verificação) documentada no próprio hook');
+}
+
+
+/* ───────────── P: 1.0.159 — F3.3.71C7 corte de escopo: Chat fora do fluxo + Copywriting fora da criação ───────────── */
+{
+  ok(!/\{k:'chat'/.test(HTML), 'P1: TABS sem item Chat (menu lateral desktop e nav mobile-legada)');
+  ok(HTML.includes("if(state.tab==='chat')state.tab='hoje'"), 'P2: navegação residual para Chat cai em Hoje (guard no topo do render)');
+  ok(!/else if\(state\.tab==='chat'\)/.test(HTML), 'P3: rota do Chat removida do switch de telas');
+  ok(HTML.includes("const us=state.users.filter(u=>u.id!==state.user.id&&!['removido','excluido','pendente'].includes(u.status||''))"), 'P4: renderChat preservado como código inativo (contrato K8) — zero dado apagado');
+  ok(!/soon\('Notificações de chat'\)/.test(HTML), 'P5: pill "Notificações de chat" removida das Configurações');
+  ok(/\{key:'copywriting',label:'Copywriting'[^}]*descontinuado:true\}/.test(HTML), 'P6: setor copywriting marcado descontinuado SEM remover a definição');
+  ok(HTML.includes("SECTOR_ALIAS={design:'edicao_midia',copy:'copywriting',postagem:'programacao_posts'}"), 'P7: alias legado copy→copywriting preservado (históricas resolvem)');
+  ok(HTML.includes('SECTORS.filter(s=>!s.descontinuado).forEach'), 'P8: etapa Setor oferece SOMENTE setores ativos');
+  ['edicao_midia','cronograma','roteiro','programacao_posts'].forEach(k=>ok(new RegExp("\\{key:'"+k+"'").test(HTML) && !new RegExp("\\{key:'"+k+"'[^}]*descontinuado").test(HTML), 'P9: setor ativo preservado na criação: '+k));
+  ok(/copywriting:\{titleLabel:'Título da copy'/.test(HTML), 'P10: TEMPLATES.copywriting preservado (edição/briefing de tarefa histórica)');
+  ok(HTML.includes('if(sector&&secOf(sector).descontinuado)sector=null'), 'P11: FAB dentro de board histórico não pré-seleciona setor descontinuado');
+  ok(/function notifNavBadge\(k\)\{ if\(k!=='notificacoes'\) return ''/.test(HTML), 'P12: único badge de navegação é o de Notificações (nunca houve badge de Chat)');
 }
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
