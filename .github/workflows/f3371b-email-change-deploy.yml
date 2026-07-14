@@ -8,8 +8,9 @@ name: "[manual] F3.3.71B — deploy email-change (2 functions; dry-run/apply)"
   workflow_dispatch:
     inputs:
       confirm: { description: "Digite DEPLOY-EMAIL-CHANGE-71B (apply) ou DRYRUN (dry-run)", required: true, default: "DRYRUN" }
-  push:
-    branches: ["claude/bold-hopper-4boo17"]
+  # F3.3.73I6C7 — push-trigger REMOVIDO (workflow antigo 71B, fase concluida; as 2 functions
+  # de e-mail ja estao deployadas): so workflow_dispatch (com DEPLOY-EMAIL-CHANGE-71B) reativa.
+  # Elimina os runs no-op vermelhos que o gate literal gerava a cada push na ops-branch.
 permissions: { contents: read }
 concurrency: { group: f3371b-deploy, cancel-in-progress: false }
 env:

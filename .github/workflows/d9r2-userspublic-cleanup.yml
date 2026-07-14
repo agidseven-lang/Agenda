@@ -30,9 +30,9 @@ name: "[manual] F3.3.70D9R2 — usersPublic cleanup (pinado; dry-run/apply)"
         options:
           - "true"
           - "false"
-  push:
-    branches:
-      - "claude/bold-hopper-4boo17"
+  # F3.3.73I6C7 — push-trigger REMOVIDO (workflow antigo D9R2, fase concluida): so
+  # workflow_dispatch (com o literal LIMPAR-USERSPUBLIC-D9R2) reativa. Elimina os runs
+  # no-op vermelhos que o gate literal gerava a cada push na ops-branch. Nada mais muda.
 
 permissions:
   contents: read
