@@ -10,12 +10,13 @@
 # app/f3373i5-event-notify-webpreview @ a3604fb (onEventCreated pré-fan-out;
 # onEventUpdated inexistente lá — para remover, deletar a função no console/CLI).
 name: "[manual] F3.3.73I6C1 — deploy lifecycle+fanout (2 functions; dry-run/apply)"
+# pos-apply (73I6C1 concluida, run 29339843883): push-trigger DESARMADO —
+# workflow agora e dispatch-only (paridade pos-deploy 72C/73I5). Redeploy futuro
+# so por acionamento manual.
 "on":
   workflow_dispatch:
     inputs:
       confirm: { description: "Digite DEPLOY-LIFECYCLE-FANOUT-73I6C1 (apply) ou DRYRUN (dry-run)", required: true, default: "DRYRUN" }
-  push:
-    branches: [claude/bold-hopper-4boo17]
 permissions: { contents: read }
 concurrency: { group: f3373i6c1-deploy, cancel-in-progress: false }
 env:
@@ -25,22 +26,14 @@ env:
   DEPLOY_TARGET: "functions:onEventCreated,functions:onEventUpdated"
 jobs:
   deploy:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, '73I6C1-DRYRUN-FANOUT') ||
-      contains(github.event.head_commit.message, 'DEPLOY-LIFECYCLE-FANOUT-73I6C1')
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Gate — modo (literal via dispatch OU head-commit)
-        env: { CONFIRM: "${{ github.event.inputs.confirm }}", HEADMSG: "${{ github.event.head_commit.message }}" }
+      - name: Gate — modo (literal via dispatch)
+        env: { CONFIRM: "${{ github.event.inputs.confirm }}" }
         run: |
           set -eu
-          MODE=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            case "$CONFIRM" in DEPLOY-LIFECYCLE-FANOUT-73I6C1) MODE=false;; DRYRUN) MODE=true;; *) echo "::error::confirm invalido"; exit 1;; esac
-          else
-            case "$HEADMSG" in *DEPLOY-LIFECYCLE-FANOUT-73I6C1*) MODE=false;; *73I6C1-DRYRUN-FANOUT*) MODE=true;; *) echo "push sem literal 73I6C1 — no-op"; exit 1;; esac
-          fi
+          case "$CONFIRM" in DEPLOY-LIFECYCLE-FANOUT-73I6C1) MODE=false;; DRYRUN) MODE=true;; *) echo "::error::confirm invalido"; exit 1;; esac
           echo "DRY_RUN=$MODE" >> "$GITHUB_ENV"; echo "modo DRY_RUN=$MODE"
       - name: Checkout fonte pinada
         uses: actions/checkout@v5
