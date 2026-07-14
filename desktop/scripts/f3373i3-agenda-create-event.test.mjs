@@ -40,6 +40,17 @@ ok('A3 CTA aparece antes da busca da Agenda (topo, descobrível)',
 /* ── B: modal/form de compromisso ── */
 ok('B1 openEventForm existe e injeta modal no modalRoot',
   /function openEventForm\(\)\{/.test(HTML) && /modalRoot'\)\.innerHTML='<div class="modal-back"[\s\S]{0,400}Novo compromisso/.test(HTML));
+ok('B1a 73I4B: modal de criação usa classe escopada .ev-sheet (não afeta outros modais)',
+  /<div class="modal-back" data-modalbg="1"><div class="sheet ev-sheet"><div class="grab"><\/div>'\+[\s\S]{0,120}Novo compromisso/.test(HTML));
+ok('B1b 73I4B: CSS do modal corrige box-sizing (reset global morto) nos controles + sem overflow-x',
+  /\.sheet\.ev-sheet\{box-sizing:border-box;[^}]*overflow-x:hidden;overflow-y:auto\}/.test(HTML) &&
+  /\.sheet\.ev-sheet \.inp\{width:100%;box-sizing:border-box\}/.test(HTML) &&
+  /\.sheet\.ev-sheet \.row>div\{min-width:0\}/.test(HTML));
+ok('B1c 73I4B: largura confortável e controlada (min(720px, viewport-48))',
+  /body\.desktop \.sheet\.ev-sheet\{width:min\(720px,calc\(100vw - 48px\)\);max-width:min\(720px,calc\(100vw - 48px\)\)\}/.test(HTML));
+ok('B1d 73I4B: correção escopada — NÃO alterou o box-sizing global (só .ev-sheet)',
+  (HTML.match(/\*\{box-sizing:border-box/g) || []).length === 1 &&
+  /openEventDetail[\s\S]{0,600}<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab">/.test(HTML));
 ok('B2 form tem os campos mínimos (título/cliente/tipo/data/início/término/local/resp/obs)',
   ['evTitle','evClient','evType','evDate','evStart','evEnd','evLoc','evOwner','evNotes'].every(id => HTML.includes('id="' + id + '"')));
 ok('B3 responsável populado só com usuários ativos (sem removido/excluído/pendente)',

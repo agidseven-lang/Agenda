@@ -1094,6 +1094,16 @@
   body.desktop .modal-back{align-items:center;justify-content:center;background:rgba(6,7,11,.62);backdrop-filter:blur(3px)}
   body.desktop .sheet{max-width:480px;width:100%;border-radius:18px;border:1px solid var(--line);box-shadow:0 24px 70px -20px rgba(0,0,0,.75);animation:dpop .14s ease-out}
   body.desktop .sheet .grab{display:none}
+  /* F3.3.73I4B — modal "Novo compromisso" (Agenda). O reset global *{box-sizing:
+     border-box} está MORTO em produção (chave } sobrando), então .inp{width:100%}
+     + padding estourava o .sheet e cortava à direita. Escopado em .ev-sheet:
+     box-sizing correto, largura confortável e sem overflow-x. NÃO afeta os demais
+     modais (que usam .sheet puro). */
+  .sheet.ev-sheet{box-sizing:border-box;max-height:calc(100vh - 48px);overflow-x:hidden;overflow-y:auto}
+  .sheet.ev-sheet .inp{width:100%;box-sizing:border-box}
+  .sheet.ev-sheet .row{gap:12px}
+  .sheet.ev-sheet .row>div{min-width:0}
+  body.desktop .sheet.ev-sheet{width:min(720px,calc(100vw - 48px));max-width:min(720px,calc(100vw - 48px))}
   @keyframes dpop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
   body.desktop .sheet .settrow,body.desktop .sheet .moveopt{transition:background .12s,transform .08s}
   body.desktop .sheet .settrow:hover,body.desktop .sheet .moveopt:hover{background:rgba(255,255,255,.05)}
@@ -4443,7 +4453,7 @@ function openEventForm(){
   const us=state.users.filter(u=>!['removido','excluido','pendente'].includes(u.status||'')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   const typeOpts=TYPES.map(t=>'<option value="'+t.key+'"'+(t.key==='reuniao'?' selected':'')+'>'+esc(t.label)+'</option>').join('');
   const userOpts='<option value="">Ninguém</option>'+us.map(u=>'<option value="'+u.id+'">'+esc(u.name||'')+'</option>').join('');
-  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div>'+
+  document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet ev-sheet"><div class="grab"></div>'+
     '<div style="font-size:18px;font-weight:800;margin-bottom:14px">Novo compromisso</div>'+
     '<div class="lbl">Título</div><input class="inp" id="evTitle" placeholder="Ex.: Reunião de alinhamento" style="margin-bottom:12px">'+
     '<div class="lbl">Cliente / pessoa / empresa</div><input class="inp" id="evClient" placeholder="Ex.: Hospital Visão" style="margin-bottom:12px">'+
