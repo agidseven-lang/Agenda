@@ -52,7 +52,7 @@ ok("D1 onEventCreated segue onDocumentCreated (só create; sem reprocessar antig
 ok("D2 chat mantém gate próprio 'nativebeta'-only (intocado)",
   /if \(msg\.src !== "nativebeta"\) return;/.test(SRC));
 ok("D3 onEventCreated continua delegando a notifyResponsible('event',...)",
-  /notifyResponsible\("event", "events", event\.params\.eventId, snap\.data\(\)\)/.test(SRC));
+  /notifyResponsible\("event", "events", event\.params\.eventId, (?:doc|snap\.data\(\))\)/.test(SRC));
 
 /* ── E: segurança — a mudança desta fase não adicionou logging/token/secret ── */
 const added = SRC.match(/const NOTIFY_SRC_ALLOW = \{[\s\S]*?if \(!allow \|\| !allow\.has\(doc\.src\)\) return;/);

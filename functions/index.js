@@ -14,7 +14,7 @@
    Credenciais: usa as credenciais padrão do runtime de Functions (admin SDK).
    NENHUM segredo no código. Requer plano Blaze para deploy.
    ============================================================================ */
-const { onDocumentCreated, onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
@@ -158,13 +158,218 @@ async function notifyResponsible(type, coll, id, doc) {
   if (notifFlag("ENABLE_NOTIF_LOG")) { try { await writeNotifLog({ taskId: (type === "task" ? id : ""), eventType: eventType, to: responsibleId, channel: "fcm", sent: sent, total: tokens.length, reason: reason }); } catch (_) {} }
 }
 
+/* ============================================================================
+   F3.3.73I6C1 — LIFECYCLE + FAN-OUT server-side da Agenda compartilhada.
+   ----------------------------------------------------------------------------
+   Além do push ao RESPONSÁVEL (notifyResponsible, acima — INTOCADO), a Agenda
+   passa a NOTIFICAR EM TEMPO REAL TODOS OS USUÁRIOS AUTORIZADOS a cada etapa:
+   criado / editado / iniciado / finalizado / cancelado. Regras:
+     • fonte: só events com src em NOTIFY_SRC_ALLOW.event (nativebeta|webpreview);
+     • destinatários: usersPublic ATIVOS (exclui removido/inativo/pendente/
+       canário/teste) e SEM o AUTOR da ação; no "created" também exclui o
+       responsável (já coberto por notifyResponsible/Worker via immediateNotifiedAt,
+       cujo gate confirmado no Worker: /notify-assignee só dispara 1x no create);
+     • dedup POR TRANSIÇÃO reivindicado em TRANSAÇÃO (evita fan-out duplicado à
+       equipe inteira em entrega at-least-once). Edição usa hash de conteúdo
+       (repetível: nova edição re-notifica; a MESMA edição reentregue não repete);
+     • payload com ator (nome/foto), ação, detalhe e deepLink event:<id>. SEM
+       scheduledDate/scheduledAt → NÃO reagenda lembrete no app atual (o lembrete
+       do responsável segue no fluxo notifyResponsible). NÃO toca tarefas nem chat.
+   Idempotência de re-disparo: as gravações de dedup (só campos *NotifiedAt) não
+   mudam conteúdo/estado, então detectEventTransition() retorna null e o
+   onEventUpdated re-disparado é no-op (sem loop).
+   ============================================================================ */
+
+// Campos de CONTEÚDO (o que caracteriza uma EDIÇÃO). Bookkeeping (done/startedAt/
+// doneAt/status/*NotifiedAt/…) fica de fora de propósito.
+const EVENT_CONTENT_FIELDS = ["type", "client", "title", "location", "date", "start", "end", "owner", "ownerId", "notes"];
+
+// status derivado (contrato: scheduled|in_progress|completed|cancelled). Deriva do
+// que os clientes JÁ gravam (done/startedAt) e é forward-compat com um futuro
+// campo status/cancelledAt (73I6C2/C3) sem exigir migração de dados.
+function eventStatus(doc) {
+  if (!doc) return "scheduled";
+  if (doc.status === "cancelled" || doc.cancelledAt) return "cancelled";
+  if (doc.done === true) return "completed";
+  if (Number(doc.startedAt) > 0) return "in_progress";
+  return "scheduled";
+}
+
+// Hash estável do CONTEÚDO (dedup de edição repetível).
+function eventContentHash(doc) {
+  const parts = EVENT_CONTENT_FIELDS.map((k) => String((doc && doc[k] != null) ? doc[k] : ""));
+  return crypto.createHash("sha1").update(parts.join("")).digest("hex");
+}
+
+// Detecta a transição por DELTA (before→after). Prioridade: cancelled > finished
+// > started > edited. Retorna null se não houver transição relevante (gravação de
+// dedup, reabertura done:true→false, ou update sem mudança de conteúdo).
+function detectEventTransition(before, after) {
+  if (!after) return null;
+  if (eventStatus(after) === "cancelled" && eventStatus(before) !== "cancelled") return "cancelled";
+  if (after.done === true && !(before && before.done === true)) return "finished";
+  if (Number(after.startedAt) > 0 && !(Number(before && before.startedAt) > 0)) return "started";
+  if (before) {
+    for (const k of EVENT_CONTENT_FIELDS) {
+      if (String(before[k] == null ? "" : before[k]) !== String(after[k] == null ? "" : after[k])) return "edited";
+    }
+  }
+  return null;
+}
+
+const LIFECYCLE_DEDUP_FIELD = { created: "createdNotifiedAt", started: "startedNotifiedAt", finished: "finishedNotifiedAt", cancelled: "cancelledNotifiedAt", edited: "updatedNotifiedAt" };
+const LIFECYCLE_VERB = { created: "criou", edited: "editou", started: "iniciou", finished: "finalizou", cancelled: "cancelou" };
+
+// AUTOR da ação por transição (usa o *By que o cliente grava; degrada p/ "" —
+// nunca misatribui ao criador — se ausente, exceto no created onde by = criador).
+function eventActorId(action, doc) {
+  if (!doc) return "";
+  if (action === "created") return String(doc.by || "");
+  if (action === "started") return String(doc.startedBy || "");
+  if (action === "finished") return String(doc.doneBy || "");
+  if (action === "cancelled") return String(doc.cancelledBy || doc.deletedBy || doc.updatedBy || "");
+  if (action === "edited") return String(doc.updatedBy || "");
+  return "";
+}
+
+// status vetados no fan-out (não notificar removido/inativo/pendente/teste/canário).
+const RECIPIENT_STATUS_DENY = new Set(["removido", "excluido", "inativo", "pendente", "desativado", "suspenso", "canario", "canary", "teste", "test", "demo"]);
+function isActiveRecipient(u) {
+  if (!u) return false;
+  if (u.canary === true || u.test === true || u.isTest === true) return false;
+  return !RECIPIENT_STATUS_DENY.has(String(u.status || "").trim().toLowerCase());
+}
+
+// usersPublic ATIVOS (id/name/photo/status) — projeção pública, sem PII/tokens.
+async function listActiveUsersPublic(db) {
+  const snap = await db.collection("usersPublic").get();
+  const out = [];
+  snap.forEach((d) => {
+    const u = d.data() || {};
+    if (!isActiveRecipient(u)) return;
+    out.push({ id: d.id, name: String(u.name || ""), photo: String(u.photo || ""), status: String(u.status || "") });
+  });
+  return out;
+}
+
+// Junta tokens FCM server-side (users/{id}.fcmTokens); usuário sem token é
+// ignorado com segurança. Dedup por device (igual ao Worker).
+async function gatherFcmTokens(db, userIds) {
+  if (!userIds.length) return [];
+  const refs = userIds.map((id) => db.collection("users").doc(id));
+  const snaps = await db.getAll(...refs);
+  let tokens = [];
+  for (const s of snaps) {
+    const u = s.exists ? s.data() : null;
+    if (!u) continue;
+    const t = dedupeTokensByDevice(Array.isArray(u.fcmTokens) ? u.fcmTokens.filter(Boolean) : [], u.fcmTokenMeta);
+    if (t.length) tokens = tokens.concat(t);
+  }
+  return Array.from(new Set(tokens.filter(Boolean)));
+}
+
+// Payload (strings) do fan-out de lifecycle: ator (nome/foto), ação, detalhe,
+// deepLink. SEM scheduledDate/scheduledAt (não reagenda lembrete).
+function buildLifecycleData(action, eventId, doc, actor) {
+  const title = String(doc.title || doc.client || "Compromisso");
+  const client = String(doc.client || "");
+  const date = String(doc.date || "");
+  const start = String(doc.start || "");
+  const actorName = String((actor && actor.name) || "Alguém");
+  const when = [date, start].filter(Boolean).join(" ");
+  const detail = [title, client].filter(Boolean).join(" — ") + (when ? (", " + when) : "");
+  const data = {
+    type: "event",
+    eventId: String(eventId),
+    deepLink: "event:" + String(eventId),
+    action: action,
+    title: title,
+    body: actorName + " " + (LIFECYCLE_VERB[action] || "atualizou") + " o compromisso: " + detail,
+    actorId: String((actor && actor.id) || ""),
+    actorName: actorName,
+    actorPhoto: String((actor && actor.photo) || ""),
+    client: client,
+    date: date,
+    start: start,
+    status: eventStatus(doc),
+    src: String(doc.src || ""),
+  };
+  for (const k of Object.keys(data)) data[k] = String(data[k] == null ? "" : data[k]);
+  return data;
+}
+
+async function sendFanout(tokens, data) {
+  let sent = 0;
+  for (let i = 0; i < tokens.length; i += 500) {
+    const chunk = tokens.slice(i, i + 500);
+    const resp = await admin.messaging().sendEachForMulticast({ tokens: chunk, data: data, android: { priority: "high", ttl: TTL_MS } });
+    sent += resp.successCount;
+  }
+  return sent;
+}
+
+/* Fan-out de UMA transição para todos os autorizados (menos o autor e excludeIds).
+   Reivindica o dedup em TRANSAÇÃO antes de enviar (evita fan-out duplicado à
+   equipe em entrega at-least-once). NÃO lança em falha de envio. */
+async function broadcastEventLifecycle(action, eventId, doc, excludeIds) {
+  const allow = NOTIFY_SRC_ALLOW.event;
+  if (!allow || !allow.has(doc && doc.src)) return;             // só fontes permitidas (nativebeta|webpreview)
+  const field = LIFECYCLE_DEDUP_FIELD[action];
+  if (!field) return;
+  const db = admin.firestore();
+  const ref = db.collection("events").doc(String(eventId));
+  const hash = (action === "edited") ? eventContentHash(doc) : null;
+
+  let claimed = false;
+  try {
+    claimed = await db.runTransaction(async (tx) => {
+      const s = await tx.get(ref);
+      if (!s.exists) return false;
+      const d = s.data() || {};
+      if (action === "edited") {
+        if (d.updatedNotifiedHash === hash) return false;       // mesma edição já notificada
+        tx.set(ref, { updatedNotifiedAt: Date.now(), updatedNotifiedHash: hash }, { merge: true });
+        return true;
+      }
+      if (d[field]) return false;                               // transição já notificada
+      tx.set(ref, { [field]: Date.now() }, { merge: true });
+      return true;
+    });
+  } catch (e) {
+    logger.error(`[FANOUT] event/${eventId} ${action}: erro no claim: ${e && e.message}`);
+    return;
+  }
+  if (!claimed) return;
+
+  const actorId = eventActorId(action, doc);
+  const exclude = new Set([actorId, ...(excludeIds || [])].filter(Boolean));
+  const users = await listActiveUsersPublic(db);
+  const actor = users.find((u) => u.id === actorId) || { id: actorId, name: "", photo: "" };
+  const audience = users.filter((u) => !exclude.has(u.id));
+  const tokens = await gatherFcmTokens(db, audience.map((u) => u.id));
+  if (!tokens.length) { logger.info(`[FANOUT] event/${eventId} ${action}: 0 destinatarios elegiveis (audiencia ${audience.length})`); return; }
+  const data = buildLifecycleData(action, eventId, doc, actor);
+  let sent = 0;
+  try { sent = await sendFanout(tokens, data); }
+  catch (e) { logger.error(`[FANOUT] event/${eventId} ${action}: erro FCM: ${e && e.message}`); }
+  logger.info(`[FANOUT] event/${eventId} ${action}: ${sent}/${tokens.length} enviados (audiencia ${audience.length})`);
+}
+
 exports.onEventCreated = onDocumentCreated("events/{eventId}", async (event) => {
   const snap = event.data;
   if (!snap) return;
+  const doc = snap.data();
   try {
-    await notifyResponsible("event", "events", event.params.eventId, snap.data());
+    await notifyResponsible("event", "events", event.params.eventId, doc);      // responsável (INTOCADO)
   } catch (e) {
     logger.error("[TRIGGER] onEventCreated falhou:", e && e.message);
+  }
+  try {
+    // fan-out "criou" aos DEMAIS autorizados (exclui autor e responsável — este já
+    // coberto por notifyResponsible/Worker via immediateNotifiedAt).
+    await broadcastEventLifecycle("created", event.params.eventId, doc, [String((doc && doc.ownerId) || "")]);
+  } catch (e) {
+    logger.error("[FANOUT] onEventCreated fan-out falhou:", e && e.message);
   }
 });
 
@@ -175,6 +380,22 @@ exports.onTaskCreated = onDocumentCreated("tasks/{taskId}", async (event) => {
     await notifyResponsible("task", "tasks", event.params.taskId, snap.data());
   } catch (e) {
     logger.error("[TRIGGER] onTaskCreated falhou:", e && e.message);
+  }
+});
+
+// F3.3.73I6C1 — lifecycle de events: edição/início/finalização/cancelamento →
+// fan-out a todos os autorizados (menos o autor). Gravações de dedup e reabertura
+// não são transição relevante (detectEventTransition → null → no-op, sem loop).
+exports.onEventUpdated = onDocumentUpdated("events/{eventId}", async (event) => {
+  const before = (event.data && event.data.before) ? event.data.before.data() : null;
+  const after = (event.data && event.data.after) ? event.data.after.data() : null;
+  if (!after) return;
+  const action = detectEventTransition(before, after);
+  if (!action) return;
+  try {
+    await broadcastEventLifecycle(action, event.params.eventId, after, []);
+  } catch (e) {
+    logger.error(`[FANOUT] onEventUpdated (${action}) falhou:`, e && e.message);
   }
 });
 
