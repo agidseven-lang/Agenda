@@ -8,11 +8,13 @@
 # (firebase functions:delete onEventDeleted) — o restante segue do 73I6C1.
 name: "[manual] F3.3.73I6C3A — deploy onEventDeleted (1 function; dry-run/apply)"
 "on":
+  # F3.3.73I6C3A — DESARMADO pos-apply. Deploy de onEventDeleted concluido (run 29354374188:
+  # onEventDeleted presente com trigger firestore.document.v1.deleted + siblings intactos).
+  # Auto-trigger por PUSH REMOVIDO: so workflow_dispatch manual reativa. Impede redeploy
+  # acidental por qualquer commit futuro que contenha o literal na mensagem.
   workflow_dispatch:
     inputs:
       confirm: { description: "Digite DEPLOY-ONEVENTDELETED-73I6C3A (apply) ou DRYRUN (dry-run)", required: true, default: "DRYRUN" }
-  push:
-    branches: [claude/bold-hopper-4boo17]
 permissions: { contents: read }
 concurrency: { group: f3373i6c3a-deploy, cancel-in-progress: false }
 env:
@@ -22,10 +24,7 @@ env:
   DEPLOY_TARGET: "functions:onEventDeleted"
 jobs:
   deploy:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, '73I6C3A-DRYRUN-DELETE') ||
-      contains(github.event.head_commit.message, 'DEPLOY-ONEVENTDELETED-73I6C3A')
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Gate — modo (literal via dispatch OU head-commit)
