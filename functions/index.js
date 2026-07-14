@@ -14,7 +14,7 @@
    Credenciais: usa as credenciais padrão do runtime de Functions (admin SDK).
    NENHUM segredo no código. Requer plano Blaze para deploy.
    ============================================================================ */
-const { onDocumentCreated, onDocumentUpdated, onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted, onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
@@ -396,6 +396,60 @@ exports.onEventUpdated = onDocumentUpdated("events/{eventId}", async (event) => 
     await broadcastEventLifecycle(action, event.params.eventId, after, []);
   } catch (e) {
     logger.error(`[FANOUT] onEventUpdated (${action}) falhou:`, e && e.message);
+  }
+});
+
+/* F3.3.73I6C3A — EXCLUSÃO DEFINITIVA (hard delete) de compromisso. Fan-out "excluiu
+   definitivamente" a todos os autorizados (menos o autor). O ator vem de
+   before.deletedBy (o cliente grava deletedBy ANTES do delete físico — onDocumentDeleted
+   não carrega identidade de quem apagou). Payload SEM eventId/deepLink (o doc não existe
+   mais → o app abre a Agenda, nunca um event:<id> quebrado). Sem dedup transacional
+   (não há doc p/ marcar); a função não lança → entrega efetivamente-única. */
+async function broadcastEventDeleted(eventId, doc) {
+  const allow = NOTIFY_SRC_ALLOW.event;
+  if (!allow || !allow.has(doc && doc.src)) return;             // só fontes permitidas (nativebeta|webpreview)
+  const db = admin.firestore();
+  const actorId = String((doc && doc.deletedBy) || "");
+  const users = await listActiveUsersPublic(db);
+  const actor = users.find((u) => u.id === actorId) || { id: actorId, name: "", photo: "" };
+  const audience = users.filter((u) => u.id && u.id !== actorId);
+  const tokens = await gatherFcmTokens(db, audience.map((u) => u.id));
+  if (!tokens.length) { logger.info(`[FANOUT] event/${eventId} deleted: 0 destinatarios elegiveis (audiencia ${audience.length})`); return; }
+  const title = String((doc && (doc.title || doc.client)) || "Compromisso");
+  const client = String((doc && doc.client) || "");
+  const date = String((doc && doc.date) || "");
+  const start = String((doc && doc.start) || "");
+  const actorName = String(actor.name || "Alguém");
+  const when = [date, start].filter(Boolean).join(" ");
+  const detail = [title, client].filter(Boolean).join(" — ") + (when ? (", " + when) : "");
+  const data = {
+    type: "event",
+    action: "deleted",
+    eventId: "",                                                // SEM eventId/deepLink (doc removido)
+    title: title,
+    body: actorName + " excluiu definitivamente o compromisso: " + detail,
+    actorId: actorId,
+    actorName: actorName,
+    actorPhoto: String(actor.photo || ""),
+    client: client,
+    date: date,
+    start: start,
+    status: "deleted",
+  };
+  for (const k of Object.keys(data)) data[k] = String(data[k] == null ? "" : data[k]);
+  let sent = 0;
+  try { sent = await sendFanout(tokens, data); }
+  catch (e) { logger.error(`[FANOUT] event/${eventId} deleted: erro FCM: ${e && e.message}`); }
+  logger.info(`[FANOUT] event/${eventId} deleted: ${sent}/${tokens.length} enviados (audiencia ${audience.length})`);
+}
+
+exports.onEventDeleted = onDocumentDeleted("events/{eventId}", async (event) => {
+  const before = event.data ? event.data.data() : null;        // snapshot ANTES do delete
+  if (!before) return;
+  try {
+    await broadcastEventDeleted(event.params.eventId, before);
+  } catch (e) {
+    logger.error("[FANOUT] onEventDeleted falhou:", e && e.message);
   }
 });
 
