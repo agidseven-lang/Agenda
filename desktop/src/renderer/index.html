@@ -4402,11 +4402,11 @@ try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function')
 /* ---- HOJE ---- */
 function renderHoje(){
   const td=todayStr();const u=state.user;
-  const todays=state.events.filter(e=>e.date===td&&!e.done).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
+  const todays=state.events.filter(e=>e.date===td&&!e.done&&!isEvCancelled(e)).sort((a,b)=>(a.start||'').localeCompare(b.start||''));
   const vis=visibleTasks(u,state.tasks);const openTasks=vis.filter(t=>t.status!=='concluido');
   const activeUsers=state.users.filter(x=>!['pendente','removido','excluido'].includes(x.status||''));
   const urgent=openTasks.map(t=>({t,d:taskDeadline(t)})).filter(o=>o.d).sort((a,b)=>{const da=dtMs(a.t.dueDate||a.t.due,a.t.dueTime||'23:59')||9e15;const dbb=dtMs(b.t.dueDate||b.t.due,b.t.dueTime||'23:59')||9e15;return da-dbb;}).slice(0,4);
-  const future=state.events.filter(e=>e.date>td&&!e.done).sort((a,b)=>((a.date||'')+(a.start||'')).localeCompare((b.date||'')+(b.start||''))).slice(0,5);
+  const future=state.events.filter(e=>e.date>td&&!e.done&&!isEvCancelled(e)).sort((a,b)=>((a.date||'')+(a.start||'')).localeCompare((b.date||'')+(b.start||''))).slice(0,5);
   let h='<div class="scr"><div class="h-title">Olá, '+esc(first(u.name))+' 👋</div>'+
     '<div style="font-size:13px;color:var(--soft);margin:2px 0 18px">Resumo de hoje · '+dayShort(td)+'</div>'+
     '<div class="stats">'+
@@ -4435,7 +4435,7 @@ function eventCard(e){
   return '<div class="evc" data-evdetail="'+e.id+'" style="cursor:pointer"><div class="bar" style="background:'+(late?'#F87171':col)+'"></div><div class="main">'+
     '<div class="toprow">'+avatar(owner,40)+'<div class="ti">'+esc(e.title||'Sem título')+'<div style="font-size:12.5px;font-weight:700;color:'+col+';margin-top:2px">'+esc(owner.name||'')+'</div></div>'+
     '<div class="time"><div class="s">'+esc(e.start||'')+'</div><div class="e">'+esc(e.end||'')+'</div></div></div>'+
-    '<div style="margin-top:11px"><span class="pill" style="background:'+withAlpha(ty.color,.16)+';color:'+ty.color+'">'+esc(ty.label)+'</span></div>'+
+    '<div style="margin-top:11px"><span class="pill" style="background:'+withAlpha(ty.color,.16)+';color:'+ty.color+'">'+esc(ty.label)+'</span>'+(function(){var st=evStatus(e);if(st==='in_progress'||st==='completed'){var sm=evStatusMeta(st);return ' <span class="pill" style="background:'+withAlpha(sm.color,.16)+';color:'+sm.color+'">'+sm.label+'</span>';}return '';})()+'</div>'+
     (e.client?'<div class="meta">'+svg('person')+esc(e.client)+'</div>':'')+
     (e.location?'<div class="meta">'+svg('place')+esc(e.location)+'</div>':'')+
     (e.notes?'<div class="meta">'+svg('notes')+esc(e.notes)+'</div>':'')+
@@ -4449,22 +4449,37 @@ function eventLate(e){if(e.done)return false;const ms=dtMs(e.date,e.end||e.start
    com gate src==='nativebeta'; a notificação server-side de eventos criados no Desktop
    é encaminhada a fase própria de Functions (relaxar o allowlist + deploy). src honesto
    'webpreview' (mesmo dos itens criados no Desktop); NUNCA falsear src p/ forçar push. */
-function openEventForm(){
+/* F3.3.73I6C2 — CRUD+lifecycle no contrato server-side 73I6C1. status derivado de
+   done/startedAt (cancelled explícito por status/cancelledAt) — espelha functions
+   eventStatus(). Editar grava updatedAt/updatedBy (preserva by/createdAt/src/done);
+   iniciar/finalizar/cancelar gravam *At/*By e disparam onEventUpdated (fan-out). */
+var evEditId=null,_evBusy=false;
+function evStatus(e){if(!e)return 'scheduled';if(e.status==='cancelled'||e.cancelledAt)return 'cancelled';if(e.done===true)return 'completed';if(+e.startedAt>0)return 'in_progress';return 'scheduled';}
+function evStatusMeta(st){return st==='cancelled'?{label:'Cancelado',color:'#F87171'}:st==='completed'?{label:'Finalizado',color:'#34D399'}:st==='in_progress'?{label:'Em andamento',color:'#F59E0B'}:{label:'Agendado',color:'#60A5FA'};}
+function isEvCancelled(e){return evStatus(e)==='cancelled';}
+function evActorName(uid){if(!uid)return '';const u=state.users.find(x=>x.id===uid);return (u&&u.name)?u.name:'';}
+function evWhen(ms){if(!ms)return '';try{return new Date(+ms).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(_){return '';}}
+function openEventForm(editId){
+  evEditId=editId||null;
+  const ex=evEditId?(state.events.find(x=>x.id===evEditId)||null):null;
+  const AV=v=>esc(String(v==null?'':v)).replace(/"/g,'&quot;');
   const us=state.users.filter(u=>!['removido','excluido','pendente'].includes(u.status||'')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const typeOpts=TYPES.map(t=>'<option value="'+t.key+'"'+(t.key==='reuniao'?' selected':'')+'>'+esc(t.label)+'</option>').join('');
-  const userOpts='<option value="">Ninguém</option>'+us.map(u=>'<option value="'+u.id+'">'+esc(u.name||'')+'</option>').join('');
+  const curType=ex?(ex.type||'reuniao'):'reuniao';
+  const typeOpts=TYPES.map(t=>'<option value="'+t.key+'"'+(t.key===curType?' selected':'')+'>'+esc(t.label)+'</option>').join('');
+  const curOwner=ex?(ex.ownerId||''):'';
+  const userOpts='<option value="">Ninguém</option>'+us.map(u=>'<option value="'+u.id+'"'+(u.id===curOwner?' selected':'')+'>'+esc(u.name||'')+'</option>').join('');
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet ev-sheet"><div class="grab"></div>'+
-    '<div style="font-size:18px;font-weight:800;margin-bottom:14px">Novo compromisso</div>'+
-    '<div class="lbl">Título</div><input class="inp" id="evTitle" placeholder="Ex.: Reunião de alinhamento" style="margin-bottom:12px">'+
-    '<div class="lbl">Cliente / pessoa / empresa</div><input class="inp" id="evClient" placeholder="Ex.: Hospital Visão" style="margin-bottom:12px">'+
+    '<div style="font-size:18px;font-weight:800;margin-bottom:14px">'+(ex?'Editar compromisso':'Novo compromisso')+'</div>'+
+    '<div class="lbl">Título</div><input class="inp" id="evTitle" placeholder="Ex.: Reunião de alinhamento" value="'+AV(ex&&ex.title)+'" style="margin-bottom:12px">'+
+    '<div class="lbl">Cliente / pessoa / empresa</div><input class="inp" id="evClient" placeholder="Ex.: Hospital Visão" value="'+AV(ex&&ex.client)+'" style="margin-bottom:12px">'+
     '<div class="lbl">Tipo</div><select class="inp" id="evType" style="margin-bottom:12px">'+typeOpts+'</select>'+
-    '<div class="lbl">Data</div><input class="inp" id="evDate" type="date" style="margin-bottom:12px">'+
-    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Início</div><input class="inp" id="evStart" type="time" style="margin-bottom:12px"></div><div style="flex:1"><div class="lbl">Término</div><input class="inp" id="evEnd" type="time" style="margin-bottom:12px"></div></div>'+
-    '<div class="lbl">Local</div><input class="inp" id="evLoc" placeholder="Opcional" style="margin-bottom:12px">'+
+    '<div class="lbl">Data</div><input class="inp" id="evDate" type="date" value="'+AV(ex&&ex.date)+'" style="margin-bottom:12px">'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Início</div><input class="inp" id="evStart" type="time" value="'+AV(ex&&ex.start)+'" style="margin-bottom:12px"></div><div style="flex:1"><div class="lbl">Término</div><input class="inp" id="evEnd" type="time" value="'+AV(ex&&ex.end)+'" style="margin-bottom:12px"></div></div>'+
+    '<div class="lbl">Local</div><input class="inp" id="evLoc" placeholder="Opcional" value="'+AV(ex&&ex.location)+'" style="margin-bottom:12px">'+
     '<div class="lbl">Responsável</div><select class="inp" id="evOwner" style="margin-bottom:12px">'+userOpts+'</select>'+
-    '<div class="lbl">Observações</div><textarea class="inp" id="evNotes" rows="3" placeholder="Opcional" style="margin-bottom:14px"></textarea>'+
+    '<div class="lbl">Observações</div><textarea class="inp" id="evNotes" rows="3" placeholder="Opcional" style="margin-bottom:14px">'+esc((ex&&ex.notes)||'')+'</textarea>'+
     '<div id="evErr" style="color:#F87171;font-size:13px;margin-bottom:10px;display:none"></div>'+
-    '<div class="del-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button><button class="btn" data-evsave="1">Salvar compromisso</button></div>'+
+    '<div class="del-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button><button class="btn" data-evsave="1">'+(ex?'Salvar alterações':'Salvar compromisso')+'</button></div>'+
   '</div></div>';
   const d=document.getElementById('evDate');if(d&&!d.value)d.value=(agSel||todayStr());
 }
@@ -4474,23 +4489,57 @@ async function saveEvent(){
   const title=(q('evTitle').value||'').trim();const date=(q('evDate').value||'').trim();
   if(!title){fail('Informe o título do compromisso.');return;}
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){fail('Escolha a data do compromisso.');return;}
+  const editing=!!evEditId;
   const btn=document.querySelector('[data-evsave]');if(btn){if(btn.dataset.busy)return;btn.dataset.busy='1';btn.textContent='Salvando…';}
   const ownerId=(q('evOwner').value||'')||null;
   const owner=ownerId?((state.users.find(u=>u.id===ownerId)||{}).name||''):'';
-  const payload={type:(q('evType').value||'reuniao'),client:(q('evClient').value||'').trim(),title:title,location:(q('evLoc').value||'').trim(),date:date,start:(q('evStart').value||''),end:(q('evEnd').value||''),owner:owner,ownerId:ownerId,notes:(q('evNotes').value||'').trim(),by:state.user.id,done:false,createdAt:Date.now(),src:'webpreview'};
-  try{await db.collection('events').add(payload);}
-  catch(e){console.warn('saveEvent add',e);fail('Não foi possível salvar. Verifique a conexão e tente de novo.');if(btn){delete btn.dataset.busy;btn.textContent='Salvar compromisso';}return;}
-  closeModal();render();
+  const content={type:(q('evType').value||'reuniao'),client:(q('evClient').value||'').trim(),title:title,location:(q('evLoc').value||'').trim(),date:date,start:(q('evStart').value||''),end:(q('evEnd').value||''),owner:owner,ownerId:ownerId,notes:(q('evNotes').value||'').trim()};
+  try{
+    if(editing){
+      await db.collection('events').doc(evEditId).update(Object.assign({},content,{updatedAt:Date.now(),updatedBy:state.user.id}));
+    }else{
+      await db.collection('events').add(Object.assign({},content,{by:state.user.id,done:false,createdAt:Date.now(),src:'webpreview'}));
+    }
+  }
+  catch(e){console.warn('saveEvent',e);fail('Não foi possível salvar. Verifique a conexão e tente de novo.');if(btn){delete btn.dataset.busy;btn.textContent=(editing?'Salvar alterações':'Salvar compromisso');}return;}
+  evEditId=null;closeModal();render();
 }
-function openEventDetail(id){
+async function evLifecycle(id,patch){
+  if(_evBusy)return;_evBusy=true;
+  try{await db.collection('events').doc(id).update(patch);evEditId=null;closeModal();render();}
+  catch(e){console.warn('evLifecycle',e);try{openEventDetail(id);}catch(_){}}
+  finally{_evBusy=false;}
+}
+function evStart(id){evLifecycle(id,{startedAt:Date.now(),startedBy:state.user.id});}
+function evFinish(id){evLifecycle(id,{done:true,doneAt:Date.now(),doneBy:state.user.id});}
+function evCancel(id){evLifecycle(id,{status:'cancelled',cancelledAt:Date.now(),cancelledBy:state.user.id});}
+function openEventDetail(id,confirmCancel){
   const e=state.events.find(x=>x.id===id);if(!e)return;
   const ty=typeOf(e.type);const owner=state.users.find(u=>u.id===e.ownerId)||{name:e.owner,id:e.ownerId};const creator=state.users.find(u=>u.id===e.by);
+  const st=evStatus(e);const sm=evStatusMeta(st);
   const row=(lbl,val)=>val?'<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-soft)"><div style="width:110px;color:var(--faint);font-size:13px">'+lbl+'</div><div style="flex:1;font-size:13.5px;color:var(--ink)">'+esc(val)+'</div></div>':'';
+  let actions;
+  if(confirmCancel){
+    actions='<div style="margin-top:12px;font-size:13.5px;color:var(--ink)">Cancelar este compromisso para toda a equipe? Ele sai da agenda ativa (não é apagado).</div>'+
+      '<div class="del-actions" style="margin-top:12px"><button class="btn ghost" data-evdetail="'+e.id+'">Voltar</button><button class="btn btn-danger" data-evcancelyes="'+e.id+'">Sim, cancelar</button></div>';
+  }else{
+    var b=[];
+    if(st!=='cancelled')b.push('<button class="btn ghost" data-evedit="'+e.id+'">Editar</button>');
+    if(st==='scheduled')b.push('<button class="btn" data-evstart="'+e.id+'">Iniciar</button>');
+    if(st==='scheduled'||st==='in_progress')b.push('<button class="btn" data-evfinish="'+e.id+'">Finalizar</button>');
+    if(st==='scheduled'||st==='in_progress')b.push('<button class="btn btn-danger" data-evcancel="'+e.id+'">Cancelar</button>');
+    b.push('<button class="btn ghost" data-modalclose="1">Fechar</button>');
+    actions='<div class="del-actions" style="margin-top:14px;flex-wrap:wrap;gap:8px">'+b.join('')+'</div>';
+  }
   document.getElementById('modalRoot').innerHTML='<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab"></div>'+
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span class="pill" style="background:'+withAlpha(ty.color,.16)+';color:'+ty.color+'">'+esc(ty.label)+'</span></div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap"><span class="pill" style="background:'+withAlpha(ty.color,.16)+';color:'+ty.color+'">'+esc(ty.label)+'</span><span class="pill" style="background:'+withAlpha(sm.color,.16)+';color:'+sm.color+'">'+sm.label+'</span></div>'+
     '<div style="font-size:19px;font-weight:800;margin-bottom:12px">'+esc(e.title||'Sem título')+'</div>'+
-    row('Cliente',e.client)+row('Data',e.date)+row('Início',e.start)+row('Término',e.end)+row('Local',e.location)+row('Responsável',owner&&owner.name)+row('Criado por',creator&&creator.name)+row('Observações',e.notes)+
-    '<div class="del-actions" style="margin-top:14px"><button class="btn ghost" data-modalclose="1">Fechar</button></div>'+
+    row('Cliente',e.client)+row('Data',e.date)+row('Início',e.start)+row('Término',e.end)+row('Local',e.location)+row('Responsável',owner&&owner.name)+row('Criado por',creator&&creator.name)+
+    (e.startedAt?row('Iniciado',evWhen(e.startedAt)+(evActorName(e.startedBy)?' · '+evActorName(e.startedBy):'')):'')+
+    ((e.done&&e.doneAt)?row('Finalizado',evWhen(e.doneAt)+(evActorName(e.doneBy)?' · '+evActorName(e.doneBy):'')):'')+
+    ((st==='cancelled'&&e.cancelledAt)?row('Cancelado',evWhen(e.cancelledAt)+(evActorName(e.cancelledBy)?' · '+evActorName(e.cancelledBy):'')):'')+
+    row('Observações',e.notes)+
+    actions+
   '</div></div>';
 }
 function emptyState(ic,t,s){return '<div class="empty"><div class="ebox">'+svg(ic)+'</div><div class="et">'+esc(t)+'</div><div class="es">'+esc(s)+'</div></div>';}
@@ -4499,7 +4548,7 @@ function emptyState(ic,t,s){return '<div class="empty"><div class="ebox">'+svg(i
 let agView='month',agCursor=new Date(),agSel=todayStr(),agFilter='all',agQuery='';
 function renderAgenda(){
   const y=agCursor.getFullYear(),m=agCursor.getMonth();
-  let evs=state.events.slice();
+  let evs=state.events.filter(e=>!isEvCancelled(e));
   if(agFilter!=='all')evs=evs.filter(e=>e.type===agFilter);
   if(agQuery)evs=evs.filter(e=>((e.title||'')+(e.client||'')).toLowerCase().includes(agQuery.toLowerCase()));
   let h='<div class="scr-head"><div class="row" style="gap:8px">';
@@ -7644,6 +7693,11 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-ag]')){const a=el.dataset.ag;if(a==='new'){openEventForm();return;}if(a==='today'){agCursor=new Date();agSel=todayStr();}else if(a==='prev')agCursor.setMonth(agCursor.getMonth()-1);else if(a==='next')agCursor.setMonth(agCursor.getMonth()+1);else if(a==='vmonth')agView='month';else if(a==='vlist')agView='list';render();return;}
   if(el=g('[data-evdetail]')){openEventDetail(el.dataset.evdetail);return;}
   if(el=g('[data-evsave]')){saveEvent();return;}
+  if(el=g('[data-evedit]')){openEventForm(el.dataset.evedit);return;}
+  if(el=g('[data-evstart]')){evStart(el.dataset.evstart);return;}
+  if(el=g('[data-evfinish]')){evFinish(el.dataset.evfinish);return;}
+  if(el=g('[data-evcancel]')){openEventDetail(el.dataset.evcancel,true);return;}
+  if(el=g('[data-evcancelyes]')){evCancel(el.dataset.evcancelyes);return;}
   if(el=g('[data-agf]')){agFilter=el.dataset.agf;render();return;}
   if(el=g('[data-day]')){agSel=el.dataset.day;render();return;}
   // menu '⋯' do card V4: popover FIXED via PORTAL no <body>, ancorado ao botão. PROD1.1:

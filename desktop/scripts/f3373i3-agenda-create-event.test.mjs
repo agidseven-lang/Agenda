@@ -38,8 +38,8 @@ ok('A3 CTA aparece antes da busca da Agenda (topo, descobrível)',
   HTML.indexOf('data-ag="new"') < HTML.indexOf('id="agSearch"'));
 
 /* ── B: modal/form de compromisso ── */
-ok('B1 openEventForm existe e injeta modal no modalRoot',
-  /function openEventForm\(\)\{/.test(HTML) && /modalRoot'\)\.innerHTML='<div class="modal-back"[\s\S]{0,400}Novo compromisso/.test(HTML));
+ok('B1 openEventForm existe e injeta modal no modalRoot (73I6C2: assinatura editId)',
+  /function openEventForm\(editId\)\{/.test(HTML) && /modalRoot'\)\.innerHTML='<div class="modal-back"[\s\S]{0,600}Novo compromisso/.test(HTML));
 ok('B1a 73I4B: modal de criação usa classe escopada .ev-sheet (não afeta outros modais)',
   /<div class="modal-back" data-modalbg="1"><div class="sheet ev-sheet"><div class="grab"><\/div>'\+[\s\S]{0,120}Novo compromisso/.test(HTML));
 ok('B1b 73I4B: CSS do modal corrige box-sizing (reset global morto) nos controles + sem overflow-x',
@@ -50,7 +50,7 @@ ok('B1c 73I4B: largura confortável e controlada (min(720px, viewport-48))',
   /body\.desktop \.sheet\.ev-sheet\{width:min\(720px,calc\(100vw - 48px\)\);max-width:min\(720px,calc\(100vw - 48px\)\)\}/.test(HTML));
 ok('B1d 73I4B: correção escopada — NÃO alterou o box-sizing global (só .ev-sheet)',
   (HTML.match(/\*\{box-sizing:border-box/g) || []).length === 1 &&
-  /openEventDetail[\s\S]{0,600}<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab">/.test(HTML));
+  /function openEventDetail\(id,confirmCancel\)\{[\s\S]{0,1800}<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab">/.test(HTML));
 ok('B2 form tem os campos mínimos (título/cliente/tipo/data/início/término/local/resp/obs)',
   ['evTitle','evClient','evType','evDate','evStart','evEnd','evLoc','evOwner','evNotes'].every(id => HTML.includes('id="' + id + '"')));
 ok('B3 responsável populado só com usuários ativos (sem removido/excluído/pendente)',
@@ -68,10 +68,12 @@ ok('C3 trava anti-duplo-envio (dataset.busy)',
 
 /* ── D: grava em events com o contrato compatível + src honesto ── */
 ok('D1 grava via db.collection(\'events\').add (mesma coleção compartilhada)',
-  /await db\.collection\('events'\)\.add\(payload\)/.test(HTML));
-ok('D2 payload tem os 14 campos do contrato (compatível com Android)',
-  ['type:','client:','title:title','location:','date:date','start:','end:','owner:owner','ownerId:ownerId','notes:','by:state.user.id','done:false','createdAt:Date.now()',"src:'webpreview'"]
-    .every(f => new RegExp('payload=\\{[\\s\\S]{0,400}' + f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(HTML)));
+  /await db\.collection\('events'\)\.add\(/.test(HTML));
+ok('D2 contrato de 14 campos (73I6C2: 10 em content + by/done/createdAt/src no add)',
+  ['type:','client:','title:title','location:','date:date','start:','end:','owner:owner','ownerId:ownerId','notes:']
+    .every(f => new RegExp('const content=\\{[\\s\\S]{0,400}' + f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(HTML)) &&
+  ['by:state.user.id','done:false','createdAt:Date.now()',"src:'webpreview'"]
+    .every(f => new RegExp('\\.add\\(Object\\.assign\\(\\{\\},content,\\{[\\s\\S]{0,140}' + f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(HTML)));
 ok('D3 src é HONESTO "webpreview" — NUNCA falseia "nativebeta" p/ forçar push',
   /src:'webpreview'/.test(HTML) && !/events'\)\.add\([\s\S]{0,300}nativebeta/.test(HTML));
 ok('D4 nenhuma gambiarra client-side de push no fluxo de evento (só write; trigger cobre)',
@@ -84,15 +86,15 @@ ok('E2 eventCard virou clicável para o detalhe (data-evdetail + cursor)',
   /<div class="evc" data-evdetail="'\+e\.id\+'" style="cursor:pointer">/.test(HTML));
 ok('E3 handler data-evdetail abre openEventDetail',
   /if\(el=g\('\[data-evdetail\]'\)\)\{openEventDetail\(el\.dataset\.evdetail\);return;\}/.test(HTML));
-ok('E4 openEventDetail existe e mostra campos do compromisso',
-  /function openEventDetail\(id\)\{/.test(HTML) &&
+ok('E4 openEventDetail existe e mostra campos do compromisso (73I6C2: +confirmCancel)',
+  /function openEventDetail\(id,confirmCancel\)\{/.test(HTML) &&
   /row\('Cliente',e\.client\)\+row\('Data',e\.date\)/.test(HTML) &&
   /row\('Responsável',owner&&owner\.name\)/.test(HTML));
 ok('E5 handler data-evsave chama saveEvent',
   /if\(el=g\('\[data-evsave\]'\)\)\{saveEvent\(\);return;\}/.test(HTML));
 
 /* ── F: regressões preservadas ── */
-ok('F1 versão 1.0.160 no package.json', PJ.version === '1.0.160');
+ok('F1 versão 1.0.160+ no package.json (bump 1.0.161 na 73I6C2)', ['1.0.160', '1.0.161'].includes(PJ.version));
 ok('F2 STATUS/Kanban canônico intacto (afazer/andamento/revisao/concluido)',
   /const STATUS=\[[\s\S]{0,400}key:'afazer'[\s\S]{0,400}key:'andamento'[\s\S]{0,400}key:'revisao'[\s\S]{0,400}key:'concluido'/.test(HTML));
 ok('F3 Copywriting segue descontinuado na criação (71C7)',
