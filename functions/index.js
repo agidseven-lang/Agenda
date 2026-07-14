@@ -76,10 +76,23 @@ function buildMessageData(type, id, doc) {
   return { title, body, data };
 }
 
+// F3.3.73I5 — fontes (src) que disparam notificação server-side, POR TIPO.
+// event: app nativo Android ("nativebeta") + Desktop 1.0.160 ("webpreview").
+// task : mantido só "nativebeta" (fora do escopo desta fase — inalterado).
+// Chat tem gate próprio e NÃO passa por aqui. src desconhecido/ausente => sem push.
+const NOTIFY_SRC_ALLOW = {
+  event: new Set(["nativebeta", "webpreview"]),
+  task: new Set(["nativebeta"]),
+};
+
 /* Núcleo: notifica o responsável de um item recém-criado (idempotente). */
 async function notifyResponsible(type, coll, id, doc) {
   if (!doc) return;
-  if (doc.src !== "nativebeta") return;                 // só itens do app nativo (evita double com PWA)
+  // F3.3.73I5 — allowlist de src por tipo (antes: só "nativebeta" p/ ambos). Habilita
+  // eventos criados no Desktop (src:"webpreview") sem falsear src no cliente e sem
+  // afetar tarefas/chat. Dedup por immediateNotifiedAt logo abaixo permanece intacto.
+  const allow = NOTIFY_SRC_ALLOW[type];
+  if (!allow || !allow.has(doc.src)) return;            // só fontes permitidas p/ o tipo (evita double com PWA)
   if (doc.immediateNotifiedAt) return;                  // dedupe (já notificado por outra camada)
   if (type === "event" && doc.done) return;
   if (type === "task" && doc.status === "concluido") return;
