@@ -1,0 +1,101 @@
+# [manual] F3.3.73I5 — deploy PINADO de onEventCreated (allowlist de src: events
+# passam a aceitar "webpreview" do Desktop 1.0.160 além de "nativebeta"). Fonte:
+# app/f3373i5-event-notify-webpreview @ a3604fb (SHA verificado). Alvo FIXO --only
+# functions:onEventCreated. NUNCA hosting/rules/firestore/alvo total. É um TRIGGER
+# (onDocumentCreated), então o pós-deploy NÃO faz canário HTTP nem Firestore write:
+# valida presença em functions:list + ausência de colateral. Validação funcional
+# (evento criado no Desktop -> push ao responsável) fica no owner-run 73I6.
+# Rollback: redeploy da mesma função a partir de app/main (gate único anterior).
+name: "[manual] F3.3.73I5 — deploy onEventCreated webpreview (1 function; dry-run/apply)"
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm: { description: "Digite DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5 (apply) ou DRYRUN (dry-run)", required: true, default: "DRYRUN" }
+  push:
+    branches: [claude/bold-hopper-4boo17]
+permissions: { contents: read }
+concurrency: { group: f3373i5-deploy, cancel-in-progress: false }
+env:
+  GCP_PROJECT: "agenda-id-seven"
+  SRC_REF: "app/f3373i5-event-notify-webpreview"
+  SRC_SHA: "a3604fb"
+  DEPLOY_TARGET: "functions:onEventCreated"
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '73I5-DRYRUN-EVENTNOTIFY') ||
+      contains(github.event.head_commit.message, 'DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate — modo (literal via dispatch OU head-commit)
+        env: { CONFIRM: "${{ github.event.inputs.confirm }}", HEADMSG: "${{ github.event.head_commit.message }}" }
+        run: |
+          set -eu
+          MODE=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            case "$CONFIRM" in DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5) MODE=false;; DRYRUN) MODE=true;; *) echo "::error::confirm invalido"; exit 1;; esac
+          else
+            case "$HEADMSG" in *DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5*) MODE=false;; *73I5-DRYRUN-EVENTNOTIFY*) MODE=true;; *) echo "push sem literal 73I5 — no-op"; exit 1;; esac
+          fi
+          echo "DRY_RUN=$MODE" >> "$GITHUB_ENV"; echo "modo DRY_RUN=$MODE"
+      - name: Checkout fonte pinada
+        uses: actions/checkout@v5
+        with: { ref: "app/f3373i5-event-notify-webpreview", fetch-depth: 1 }
+      - name: Guard SHA + pre-checks (harness 16/16; allowlist PROVADO no fonte)
+        run: |
+          set -eu
+          HEADSHA=$(git rev-parse --short=7 HEAD); [ "$HEADSHA" = "$SRC_SHA" ] || { echo "::error::SHA divergente: $HEADSHA (esperado $SRC_SHA)"; exit 1; }
+          node --check functions/index.js
+          node scripts/worker-ops/f3373i5-event-src-allowlist.test.mjs
+          grep -qE 'exports\.onEventCreated = onDocumentCreated\("events/\{eventId\}"' functions/index.js || { echo "::error::onEventCreated ausente/alterado"; exit 1; }
+          grep -qE 'event: new Set\(\["nativebeta", "webpreview"\]\)' functions/index.js || { echo "::error::allowlist de event sem webpreview"; exit 1; }
+          grep -qE 'task: new Set\(\["nativebeta"\]\)' functions/index.js || { echo "::error::task deixou de ser nativebeta-only"; exit 1; }
+          grep -qE 'if \(msg.src !== "nativebeta"\) return;' functions/index.js || { echo "::error::gate do chat foi alterado (deveria ser intocado)"; exit 1; }
+          case "$DEPLOY_TARGET" in functions|functions:) echo "::error::alvo total bloqueado"; exit 1;; esac
+          case "$DEPLOY_TARGET" in *hosting*|*firestore*|*rules*) echo "::error::alvo proibido"; exit 1;; esac
+          echo "pre-checks OK"
+      - name: Auth gcloud (SA via secret; nunca impresso)
+        env: { GOOGLE_APPLICATION_CREDENTIALS_JSON: "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" }
+        run: |
+          set -eu
+          [ -n "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ] || { echo "::error::SA ausente"; exit 1; }
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/gcp-sa.json" >> "$GITHUB_ENV"
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null
+          gcloud config set project "$GCP_PROJECT" >/dev/null
+          npm install -g firebase-tools >/dev/null 2>&1
+      - name: Estado ANTES (functions:list)
+        run: firebase functions:list --project "$GCP_PROJECT" | tee before.txt || true
+      - name: functions/.env (defaults RESET_EMAIL_*; sem segredo — paridade c/ deploy 72C)
+        run: |
+          set -eu
+          { printf 'RESET_EMAIL_FROM=%s\n' "no-reply@agendaidseven.com.br"; printf 'RESET_EMAIL_FROM_NAME=%s\n' "ID Seven Agenda"; printf 'RESET_EMAIL_PROVIDER=%s\n' "resend"; } > "functions/.env.${GCP_PROJECT}"
+      - name: Deploy (SOMENTE apply; alvo fixo 1 function)
+        run: |
+          set -eu
+          ( cd functions && if [ -f package-lock.json ]; then npm ci; else npm install; fi )
+          if [ "$DRY_RUN" = "false" ]; then
+            firebase deploy --only "$DEPLOY_TARGET" --project "$GCP_PROJECT" --non-interactive --force
+          else
+            echo "DRY-RUN — nenhum deploy. Alvo planejado: $DEPLOY_TARGET"
+          fi
+      - name: Pos-deploy (somente apply; TRIGGER — sem canário HTTP, sem Firestore write)
+        run: |
+          set -eu
+          [ "$DRY_RUN" = "false" ] || { echo "dry-run: sem pos-deploy"; exit 0; }
+          firebase functions:list --project "$GCP_PROJECT" | tee after.txt
+          grep -qi "onEventCreated" after.txt || { echo "::error::onEventCreated ausente pos-deploy"; exit 1; }
+          for FN in onTaskCreated onChatMessageCreated loginUser getUserSelf registerFcmToken; do
+            grep -qi "$FN" after.txt || { echo "::error::colateral: $FN sumiu pos-deploy"; exit 1; }
+          done
+          echo "== EVENTNOTIFY-73I5 =="
+          echo "deploy_target : $DEPLOY_TARGET"
+          echo "src           : $SRC_REF @ $SRC_SHA"
+          echo "onEventCreated: presente pos-deploy; siblings (onTaskCreated/onChatMessageCreated/loginUser/getUserSelf/registerFcmToken) intactos"
+          echo "validacao funcional (evento Desktop -> push) => owner-run 73I6"
+          echo "== FIM EVENTNOTIFY-73I5 =="
+          echo "===== GO: DEPLOY onEventCreated (webpreview) OK ====="
+      - name: Limpeza credencial
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" || true
