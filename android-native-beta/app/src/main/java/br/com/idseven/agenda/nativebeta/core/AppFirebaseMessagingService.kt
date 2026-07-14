@@ -70,7 +70,9 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
             // NÃO reagendam o lembrete de 1h (o payload de lifecycle nem traz scheduledDate). Só a
             // criação/atribuição agenda. Evita, p.ex., reagendar lembrete de um evento cancelado.
             val action = data["action"]
-            val isLifecycle = action == "started" || action == "finished" || action == "cancelled" || action == "updated"
+            // F3.3.73I6C3A — "deleted" (exclusão definitiva) também é lifecycle: NÃO reagenda
+            // lembrete e o eventId vem vazio (doc removido), então não há deep-link p/ o evento.
+            val isLifecycle = action == "started" || action == "finished" || action == "cancelled" || action == "updated" || action == "deleted"
             if ((type == "event" || type == "task") && !isLifecycle) {
                 val rawId = (if (type == "task") data["taskId"] else data["eventId"])?.takeIf { it.isNotBlank() }
                     ?: data["deepLink"]?.substringAfter(":", "")?.takeIf { it.isNotBlank() }

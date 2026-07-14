@@ -47,10 +47,13 @@ ok('A6 startPatch/finishPatch/reopenPatch preservados',
 /* ── B: exclusão LÓGICA (sem delete físico) ── */
 ok('B1 EventRepo.cancel via update (cancelPatch)',
   /suspend fun cancel\(id: String, uid: String\?\) = update\(id, EventContract\.cancelPatch\(uid, System\.currentTimeMillis\(\)\)\)/.test(REPO));
-ok('B2 SEM delete físico de events (nenhum .document(id).delete())',
-  !/\.document\(id\)\.delete\(\)/.test(REPO) && !/fun delete\(/.test(REPO));
-ok('B3 EventDetailScreen cancela (confirmCancel → EventRepo.cancel), sem EventRepo.delete',
-  /EventRepo\.cancel\(id, currentUid\)\.onSuccess \{ onBack\(\) \}/.test(DETAIL) && !/EventRepo\.delete/.test(DETAIL));
+ok('B2 delete físico de events SÓ no EventRepo.remove (73I6C3A; cancelar continua lógico via update)',
+  (REPO.match(/\.document\(id\)\.delete\(\)/g) || []).length === 1 &&
+  /suspend fun remove\(id: String, uid: String\?\): Result<Unit> \{[\s\S]{0,260}EventContract\.deletePatch\(uid[\s\S]{0,200}\.document\(id\)\.delete\(\)/.test(REPO) &&
+  /suspend fun cancel\(id: String, uid: String\?\) = update\(id, EventContract\.cancelPatch/.test(REPO));
+ok('B3 EventDetailScreen: cancelar via EventRepo.cancel (lógico); excluir via EventRepo.remove (hard, 73I6C3A)',
+  /EventRepo\.cancel\(id, currentUid\)\.onSuccess \{ onBack\(\) \}/.test(DETAIL) &&
+  /EventRepo\.remove\(id, currentUid\)\.onSuccess \{ onBack\(\) \}/.test(DETAIL));
 ok('B4 diálogo de cancelamento é lógico (sai da agenda, não apaga)',
   /Cancelar compromisso/.test(DETAIL) && /não é apagado/.test(DETAIL) && /Sim, cancelar/.test(DETAIL));
 

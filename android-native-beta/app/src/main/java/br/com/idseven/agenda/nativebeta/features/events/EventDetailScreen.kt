@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.Person
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -77,6 +79,9 @@ fun EventDetailScreen(
     val event by flow.collectAsState(initial = null)
     var busy by remember { mutableStateOf(false) }
     var confirmCancel by remember { mutableStateOf(false) }
+    // F3.3.73I6C3A — exclusão DEFINITIVA (admin) com confirmação FORTE: digitar "EXCLUIR".
+    var confirmDelete by remember { mutableStateOf(false) }
+    var delText by remember { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
         // Cabeçalho
@@ -173,6 +178,15 @@ fun EventDetailScreen(
                     }
                 }
             }
+            // F3.3.73I6C3A — EXCLUIR DEFINITIVAMENTE (hard delete): só admin (canManage), em
+            // QUALQUER estado (agendado/andamento/finalizado/cancelado). Fica FORA do bloco de
+            // lifecycle acima (que se esconde quando cancelado), pois excluir vale para cancelados.
+            if (canManage) {
+                Spacer(Modifier.height(if (EventStatus.isCancelled(ev)) 16.dp else 11.dp))
+                BigButton("Excluir definitivamente", Icons.Outlined.DeleteForever, Tokens.Red, Tokens.Red.copy(alpha = 0.10f), enabled = !busy) {
+                    delText = ""; confirmDelete = true
+                }
+            }
             Spacer(Modifier.height(28.dp))
             }
         }
@@ -190,6 +204,35 @@ fun EventDetailScreen(
                 }) { Text("Sim, cancelar", color = Tokens.Red) }
             },
             dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("Voltar") } },
+        )
+    }
+
+    // F3.3.73I6C3A — confirmação FORTE de EXCLUSÃO DEFINITIVA: aviso de irreversibilidade +
+    // exigir digitar "EXCLUIR". Só então EventRepo.remove (grava deletedBy/deletedAt e apaga).
+    if (confirmDelete) {
+        val armed = delText.trim() == "EXCLUIR"
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Excluir definitivamente") },
+            text = {
+                Column {
+                    Text("Esta ação é permanente e não poderá ser desfeita. O compromisso será removido de events para toda a equipe.")
+                    Spacer(Modifier.height(12.dp))
+                    Text("Para confirmar, digite EXCLUIR", color = Tokens.Faint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(value = delText, onValueChange = { delText = it }, singleLine = true, placeholder = { Text("EXCLUIR") })
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = armed && !busy,
+                    onClick = {
+                        confirmDelete = false; busy = true
+                        scope.launch { EventRepo.remove(id, currentUid).onSuccess { onBack() }; busy = false }
+                    },
+                ) { Text("Excluir definitivamente", color = Tokens.Red) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Voltar") } },
         )
     }
 }

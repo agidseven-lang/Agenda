@@ -48,6 +48,12 @@ object EventContract {
     fun cancelPatch(uid: String?, nowMs: Long): Map<String, Any?> =
         mapOf("status" to "cancelled", "cancelledAt" to nowMs, "cancelledBy" to uid)
 
+    // F3.3.73I6C3A — EXCLUSÃO DEFINITIVA: grava deletedBy/deletedAt ANTES do delete físico
+    // (EventRepo.remove) para o gatilho onEventDeleted (73I6C3A) atribuir o ator na notificação.
+    // Distinto de cancelPatch: aqui o documento será REMOVIDO de events logo em seguida.
+    fun deletePatch(uid: String?, nowMs: Long): Map<String, Any?> =
+        mapOf("deletedBy" to uid, "deletedAt" to nowMs)
+
     fun startPatch(uid: String?, nowMs: Long): Map<String, Any?> =
         mapOf("startedAt" to nowMs, "startedBy" to uid)
 

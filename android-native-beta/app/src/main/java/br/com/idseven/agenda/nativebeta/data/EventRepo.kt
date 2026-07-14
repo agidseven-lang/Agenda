@@ -75,4 +75,17 @@ object EventRepo {
     suspend fun start(id: String, uid: String?) = update(id, EventContract.startPatch(uid, System.currentTimeMillis()))
     suspend fun finish(id: String, uid: String?) = update(id, EventContract.finishPatch(uid, System.currentTimeMillis()))
     suspend fun reopen(id: String) = update(id, EventContract.reopenPatch())
+
+    // F3.3.73I6C3A — EXCLUSÃO DEFINITIVA (hard delete), distinta do cancelamento lógico:
+    // 1) grava deletedBy/deletedAt (deletePatch) ANTES do delete físico, para o onEventDeleted
+    //    (73I6C3A) atribuir o ATOR na notificação de exclusão; 2) REMOVE o documento de events.
+    // Só é chamado após confirmação FORTE na UI (admin + digitar "EXCLUIR"). Cancelar NÃO usa isto.
+    suspend fun remove(id: String, uid: String?): Result<Unit> {
+        update(id, EventContract.deletePatch(uid, System.currentTimeMillis()))
+        return suspendCancellableCoroutine { cont ->
+            db.collection("events").document(id).delete()
+                .addOnSuccessListener { cont.resume(Result.success(Unit)) }
+                .addOnFailureListener { cont.resume(Result.failure(it)) }
+        }
+    }
 }

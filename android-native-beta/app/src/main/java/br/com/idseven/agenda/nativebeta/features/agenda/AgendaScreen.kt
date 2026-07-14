@@ -71,9 +71,13 @@ private fun monthsBetween(a: YearMonth, b: YearMonth) = (b.year - a.year) * 12 +
 fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventClick: (String) -> Unit, onNewEvent: () -> Unit) {
     eventsState.errorMessage()?.let { ErrorState("Agenda — $it"); return }
     if (eventsState.isLoading) { SkeletonList(); return }
-    // F3.3.73I6C3 — Agenda ATIVA não lista cancelados (exclusão lógica; histórico segue no banco).
-    val all = eventsState.itemsOrEmpty().filter { !EventStatus.isCancelled(it) }
     val scope = rememberCoroutineScope()
+    // F3.3.73I6C3 / F3.3.73I6C3A — Agenda ATIVA oculta cancelados por padrão (exclusão lógica;
+    // histórico segue no banco). "Mostrar cancelados" (showCancelled) exibe-os (com Situação
+    // "Cancelado") para permitir abrir o detalhe e Excluir definitivamente. Nada apaga aqui.
+    var showCancelled by remember { mutableStateOf(false) }
+    val all = if (showCancelled) eventsState.itemsOrEmpty()
+              else eventsState.itemsOrEmpty().filter { !EventStatus.isCancelled(it) }
 
     val base = remember { YearMonth.now() }
     val pager = rememberPagerState(initialPage = ANCHOR, pageCount = { ANCHOR * 2 })
@@ -115,6 +119,16 @@ fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventC
         Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp).clip(RoundedCornerShape(14.dp)).background(Tokens.Surface).border(1.dp, Tokens.Line, RoundedCornerShape(14.dp)).padding(4.dp)) {
             Seg("Mês", !listMode, Modifier.weight(1f)) { listMode = false }
             Seg("Agenda", listMode, Modifier.weight(1f)) { listMode = true }
+        }
+        // F3.3.73I6C3A — alternador "Mostrar/Ocultar cancelados": alcança compromissos
+        // cancelados (logicamente ocultos) para abrir o detalhe e Excluir definitivamente.
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.weight(1f))
+            FilterChip(
+                selected = showCancelled,
+                onClick = { showCancelled = !showCancelled },
+                label = { Text(if (showCancelled) "Ocultar cancelados" else "Mostrar cancelados") },
+            )
         }
         // F3.3.73I2 — CTA explícito de agendamento. O "+" central da bottom bar já abria
         // este mesmo fluxo (rota eventForm), mas sem opção visível na Agenda o owner não
