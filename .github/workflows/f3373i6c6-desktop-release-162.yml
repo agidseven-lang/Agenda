@@ -23,14 +23,15 @@
 name: "[manual] F3.3.73I6C6 — Desktop Release 1.0.162 producao controlada"
 
 "on":
+  # push-trigger REMOVIDO apos a publicacao (F3.3.73I6C6, run 29370494738): a release
+  # desktop/v1.0.162-production ja existe (id 354094216); o Gate 3 bloquearia re-publicacao,
+  # e sem o trigger nao ha runs no-op/vermelhos em pushes futuros. So workflow_dispatch reativa.
   workflow_dispatch:
     inputs:
       confirm:
         description: "Digite PUBLICAR-RELEASE-162-C6 para autorizar a publicacao"
         required: true
         default: ""
-  push:
-    branches: [claude/bold-hopper-4boo17]
 
 permissions:
   contents: write
@@ -40,10 +41,8 @@ concurrency: f3373i6c6-desktop-release-162
 
 jobs:
   publish:
-    # push sem o literal => job SKIPPED (neutro, sem run vermelho no historico)
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, 'PUBLICAR-RELEASE-162-C6')
+    # DESARMADO pos-publicacao: so workflow_dispatch manual reativa (nunca por push/literal).
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
