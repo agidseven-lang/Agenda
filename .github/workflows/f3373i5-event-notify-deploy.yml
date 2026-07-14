@@ -7,12 +7,12 @@
 # (evento criado no Desktop -> push ao responsável) fica no owner-run 73I6.
 # Rollback: redeploy da mesma função a partir de app/main (gate único anterior).
 name: "[manual] F3.3.73I5 — deploy onEventCreated webpreview (1 function; dry-run/apply)"
+# pos-apply (73I5 concluida): push-trigger DESARMADO — workflow agora e dispatch-only
+# (paridade com o padrao pos-deploy 72C). Redeploy futuro so por acionamento manual.
 "on":
   workflow_dispatch:
     inputs:
       confirm: { description: "Digite DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5 (apply) ou DRYRUN (dry-run)", required: true, default: "DRYRUN" }
-  push:
-    branches: [claude/bold-hopper-4boo17]
 permissions: { contents: read }
 concurrency: { group: f3373i5-deploy, cancel-in-progress: false }
 env:
@@ -22,22 +22,14 @@ env:
   DEPLOY_TARGET: "functions:onEventCreated"
 jobs:
   deploy:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, '73I5-DRYRUN-EVENTNOTIFY') ||
-      contains(github.event.head_commit.message, 'DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5')
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Gate — modo (literal via dispatch OU head-commit)
-        env: { CONFIRM: "${{ github.event.inputs.confirm }}", HEADMSG: "${{ github.event.head_commit.message }}" }
+      - name: Gate — modo (literal via dispatch)
+        env: { CONFIRM: "${{ github.event.inputs.confirm }}" }
         run: |
           set -eu
-          MODE=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            case "$CONFIRM" in DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5) MODE=false;; DRYRUN) MODE=true;; *) echo "::error::confirm invalido"; exit 1;; esac
-          else
-            case "$HEADMSG" in *DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5*) MODE=false;; *73I5-DRYRUN-EVENTNOTIFY*) MODE=true;; *) echo "push sem literal 73I5 — no-op"; exit 1;; esac
-          fi
+          case "$CONFIRM" in DEPLOY-ONEVENTCREATED-WEBPREVIEW-73I5) MODE=false;; DRYRUN) MODE=true;; *) echo "::error::confirm invalido"; exit 1;; esac
           echo "DRY_RUN=$MODE" >> "$GITHUB_ENV"; echo "modo DRY_RUN=$MODE"
       - name: Checkout fonte pinada
         uses: actions/checkout@v5
