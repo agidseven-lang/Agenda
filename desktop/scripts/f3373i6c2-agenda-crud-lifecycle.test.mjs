@@ -22,7 +22,7 @@ const ok = (n, c) => { if (c) { pass++; console.log('  PASS — ' + n); } else {
 console.log('F3.3.73I6C2 — Agenda CRUD+lifecycle (Desktop 1.0.161)');
 
 /* ── A: versão + helpers de status (espelho do contrato server-side) ── */
-ok('A1 versão 1.0.161', PJ.version === '1.0.161');
+ok('A1 versão 1.0.161+ (73I6C3A bump 1.0.162)', PJ.version.startsWith('1.0.') && parseInt(PJ.version.split('.')[2], 10) >= 161);
 ok('A2 evStatus deriva de status/cancelledAt→cancelled, done→completed, startedAt→in_progress',
   /function evStatus\(e\)\{[\s\S]{0,240}status==='cancelled'\|\|e\.cancelledAt\)return 'cancelled';[\s\S]{0,80}e\.done===true\)return 'completed';[\s\S]{0,80}\+e\.startedAt>0\)return 'in_progress';return 'scheduled'/.test(HTML));
 ok('A3 evStatusMeta com os 4 rótulos (Agendado/Em andamento/Finalizado/Cancelado)',
@@ -47,23 +47,26 @@ ok('C1 evStart grava startedAt/startedBy', /function evStart\(id\)\{evLifecycle\
 ok('C2 evFinish grava done/doneAt/doneBy', /function evFinish\(id\)\{evLifecycle\(id,\{done:true,doneAt:Date\.now\(\),doneBy:state\.user\.id\}\)/.test(HTML));
 ok('C3 evCancel grava status:cancelled + cancelledAt/By (LÓGICO)', /function evCancel\(id\)\{evLifecycle\(id,\{status:'cancelled',cancelledAt:Date\.now\(\),cancelledBy:state\.user\.id\}\)/.test(HTML));
 ok('C4 evLifecycle usa UPDATE (nunca delete)', /async function evLifecycle\(id,patch\)\{[\s\S]{0,160}collection\('events'\)\.doc\(id\)\.update\(patch\)/.test(HTML));
-ok('C5 NÃO há delete físico de events em lugar nenhum', !/collection\('events'\)[\s\S]{0,60}\.delete\(/.test(HTML));
+ok('C5 delete físico de events SÓ no evDeletePermanent (73I6C3A; cancelar continua lógico)',
+  (HTML.match(/collection\('events'\)\.doc\(id\)\.delete\(\)/g) || []).length === 1 &&
+  !/function evLifecycle[\s\S]{0,260}\.delete\(\)/.test(HTML));
 ok('C6 anti-duplo-envio no lifecycle (_evBusy)', /if\(_evBusy\)return;_evBusy=true;/.test(HTML));
 
 /* ── D: detalhe — status visual + ações condicionais + confirm de cancelamento ── */
-ok('D1 openEventDetail(id,confirmCancel) com status pill',
-  /function openEventDetail\(id,confirmCancel\)\{[\s\S]{0,340}const st=evStatus\(e\);const sm=evStatusMeta\(st\)/.test(HTML) &&
+ok('D1 openEventDetail(id,confirm) com status pill',
+  /function openEventDetail\(id,confirm\)\{[\s\S]{0,340}const st=evStatus\(e\);const sm=evStatusMeta\(st\)/.test(HTML) &&
   /\+sm\.label\+'<\/span>/.test(HTML));
 ok('D2 Editar aparece exceto cancelado', /if\(st!=='cancelled'\)b\.push\('<button[^']*data-evedit="'\+e\.id/.test(HTML));
 ok('D3 Iniciar só em scheduled', /if\(st==='scheduled'\)b\.push\('<button[^']*data-evstart="'\+e\.id/.test(HTML));
 ok('D4 Finalizar em scheduled|in_progress (não completado/cancelado)', /if\(st==='scheduled'\|\|st==='in_progress'\)b\.push\('<button[^']*data-evfinish="'\+e\.id/.test(HTML));
 ok('D5 Cancelar em scheduled|in_progress', /if\(st==='scheduled'\|\|st==='in_progress'\)b\.push\('<button[^']*data-evcancel="'\+e\.id/.test(HTML));
 ok('D6 confirm de cancelamento (data-evcancelyes) — passo explícito',
-  /if\(confirmCancel\)\{[\s\S]{0,420}data-evcancelyes="'\+e\.id/.test(HTML));
+  /if\(confirm==='cancel'\)\{[\s\S]{0,420}data-evcancelyes="'\+e\.id/.test(HTML));
 ok('D7 detalhe mostra Iniciado/Finalizado/Cancelado com ator', /row\('Iniciado',evWhen\(e\.startedAt\)/.test(HTML) && /row\('Finalizado',evWhen\(e\.doneAt\)/.test(HTML) && /row\('Cancelado',evWhen\(e\.cancelledAt\)/.test(HTML));
 
 /* ── E: Agenda filtra cancelados + card com status ── */
-ok('E1 renderAgenda exclui cancelados', /let evs=state\.events\.filter\(e=>!isEvCancelled\(e\)\)/.test(HTML));
+ok('E1 renderAgenda exclui cancelados por padrão (73I6C3A: toggle Mostrar cancelados)',
+  /let evs=agShowCancelled\?state\.events\.slice\(\):state\.events\.filter\(e=>!isEvCancelled\(e\)\)/.test(HTML));
 ok('E2 Hoje/Próximos excluem cancelados', /e\.date===td&&!e\.done&&!isEvCancelled\(e\)/.test(HTML) && /e\.date>td&&!e\.done&&!isEvCancelled\(e\)/.test(HTML));
 ok('E3 eventCard mostra pill de status (in_progress/completed)', /var st=evStatus\(e\);if\(st==='in_progress'\|\|st==='completed'\)\{var sm=evStatusMeta\(st\)/.test(HTML));
 
@@ -71,8 +74,8 @@ ok('E3 eventCard mostra pill de status (in_progress/completed)', /var st=evStatu
 ok('F1 handler data-evedit → openEventForm(id)', /if\(el=g\('\[data-evedit\]'\)\)\{openEventForm\(el\.dataset\.evedit\);return;\}/.test(HTML));
 ok('F2 handler data-evstart → evStart', /if\(el=g\('\[data-evstart\]'\)\)\{evStart\(el\.dataset\.evstart\);return;\}/.test(HTML));
 ok('F3 handler data-evfinish → evFinish', /if\(el=g\('\[data-evfinish\]'\)\)\{evFinish\(el\.dataset\.evfinish\);return;\}/.test(HTML));
-ok('F4 handler data-evcancel → confirm; data-evcancelyes → evCancel',
-  /if\(el=g\('\[data-evcancel\]'\)\)\{openEventDetail\(el\.dataset\.evcancel,true\);return;\}/.test(HTML) &&
+ok('F4 handler data-evcancel → confirm "cancel"; data-evcancelyes → evCancel',
+  /if\(el=g\('\[data-evcancel\]'\)\)\{openEventDetail\(el\.dataset\.evcancel,'cancel'\);return;\}/.test(HTML) &&
   /if\(el=g\('\[data-evcancelyes\]'\)\)\{evCancel\(el\.dataset\.evcancelyes\);return;\}/.test(HTML));
 
 /* ── G: regressões preservadas ── */

@@ -50,7 +50,7 @@ ok('B1c 73I4B: largura confortável e controlada (min(720px, viewport-48))',
   /body\.desktop \.sheet\.ev-sheet\{width:min\(720px,calc\(100vw - 48px\)\);max-width:min\(720px,calc\(100vw - 48px\)\)\}/.test(HTML));
 ok('B1d 73I4B: correção escopada — NÃO alterou o box-sizing global (só .ev-sheet)',
   (HTML.match(/\*\{box-sizing:border-box/g) || []).length === 1 &&
-  /function openEventDetail\(id,confirmCancel\)\{[\s\S]{0,1800}<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab">/.test(HTML));
+  /function openEventDetail\(id,confirm\)\{[\s\S]{0,2900}<div class="modal-back" data-modalbg="1"><div class="sheet"><div class="grab">/.test(HTML));
 ok('B2 form tem os campos mínimos (título/cliente/tipo/data/início/término/local/resp/obs)',
   ['evTitle','evClient','evType','evDate','evStart','evEnd','evLoc','evOwner','evNotes'].every(id => HTML.includes('id="' + id + '"')));
 ok('B3 responsável populado só com usuários ativos (sem removido/excluído/pendente)',
@@ -86,15 +86,15 @@ ok('E2 eventCard virou clicável para o detalhe (data-evdetail + cursor)',
   /<div class="evc" data-evdetail="'\+e\.id\+'" style="cursor:pointer">/.test(HTML));
 ok('E3 handler data-evdetail abre openEventDetail',
   /if\(el=g\('\[data-evdetail\]'\)\)\{openEventDetail\(el\.dataset\.evdetail\);return;\}/.test(HTML));
-ok('E4 openEventDetail existe e mostra campos do compromisso (73I6C2: +confirmCancel)',
-  /function openEventDetail\(id,confirmCancel\)\{/.test(HTML) &&
+ok('E4 openEventDetail existe e mostra campos do compromisso (73I6C3A: assinatura confirm)',
+  /function openEventDetail\(id,confirm\)\{/.test(HTML) &&
   /row\('Cliente',e\.client\)\+row\('Data',e\.date\)/.test(HTML) &&
   /row\('Responsável',owner&&owner\.name\)/.test(HTML));
 ok('E5 handler data-evsave chama saveEvent',
   /if\(el=g\('\[data-evsave\]'\)\)\{saveEvent\(\);return;\}/.test(HTML));
 
 /* ── F: regressões preservadas ── */
-ok('F1 versão 1.0.160+ no package.json (bump 1.0.161 na 73I6C2)', ['1.0.160', '1.0.161'].includes(PJ.version));
+ok('F1 versão 1.0.160+ no package.json (Agenda compartilhada; bumps 1.0.161/162+)', PJ.version.startsWith('1.0.') && parseInt(PJ.version.split('.')[2], 10) >= 160);
 ok('F2 STATUS/Kanban canônico intacto (afazer/andamento/revisao/concluido)',
   /const STATUS=\[[\s\S]{0,400}key:'afazer'[\s\S]{0,400}key:'andamento'[\s\S]{0,400}key:'revisao'[\s\S]{0,400}key:'concluido'/.test(HTML));
 ok('F3 Copywriting segue descontinuado na criação (71C7)',
