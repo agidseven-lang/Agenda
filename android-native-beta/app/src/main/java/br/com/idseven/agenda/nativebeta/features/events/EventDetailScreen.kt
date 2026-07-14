@@ -26,8 +26,8 @@ import androidx.compose.material.icons.outlined.AssignmentInd
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.Person
@@ -76,7 +76,7 @@ fun EventDetailScreen(
     val flow = remember(id) { EventRepo.event(id) }
     val event by flow.collectAsState(initial = null)
     var busy by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
+    var confirmCancel by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(Tokens.Bg)) {
         // Cabeçalho
@@ -85,11 +85,16 @@ fun EventDetailScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Detalhes", color = Tokens.Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            if (canManage) {
-                IconBtn(Icons.Outlined.Edit, Tokens.Soft) { event?.let { onEdit(it.id) } }
+            // F3.3.73I6C3 — Editar/Cancelar condicionais ao estado: cancelado não mostra ações;
+            // Cancelar (lógico) só em Agendado/Em andamento (não finalizado).
+            val evc = event
+            if (canManage && evc != null && !EventStatus.isCancelled(evc)) {
+                IconBtn(Icons.Outlined.Edit, Tokens.Soft) { onEdit(evc.id) }
                 Spacer(Modifier.width(6.dp))
-                IconBtn(Icons.Outlined.Delete, Tokens.Red) { confirmDelete = true }
-                Spacer(Modifier.width(6.dp))
+                if (!evc.done) {
+                    IconBtn(Icons.Outlined.Cancel, Tokens.Red) { confirmCancel = true }
+                    Spacer(Modifier.width(6.dp))
+                }
             }
             IconBtn(Icons.Outlined.Close, Tokens.Soft) { onBack() }
         }
@@ -131,32 +136,41 @@ fun EventDetailScreen(
                 EventStatus.startMs(ev)?.let { ms -> DetailRow(Icons.Outlined.AddCircle, "Início previsto") { ValueText(DateUtil.fmtMs(ms)) } }
                 EventStatus.dueMs(ev)?.let { ms -> DetailRow(Icons.Outlined.CalendarMonth, "Término previsto") { ValueText(DateUtil.fmtMs(ms)) } }
                 EventStatus.status(ev)?.let { si ->
-                    val col = if (si.late) Tokens.Red else if (si.kind == "run") Tokens.Amber else Tokens.Green
+                    val col = if (si.kind == "cancelled" || si.late) Tokens.Red else if (si.kind == "run") Tokens.Amber else Tokens.Green
                     DetailRow(Icons.Outlined.Schedule, "Situação") { Text(si.text, color = col, fontSize = 14.5.sp, fontWeight = FontWeight.Bold) }
                 }
                 if (ev.startedAt != null && ev.startedAt > 0) DetailRow(Icons.Outlined.Schedule, "Iniciada em") { ValueText(DateUtil.fmtMs(ev.startedAt)) }
                 if (ev.done && ev.doneAt != null) DetailRow(Icons.Outlined.CheckCircle, "Finalizada em") {
                     ValueText(DateUtil.fmtMs(ev.doneAt) + (doneByUser?.name?.let { " · $it" } ?: ""))
                 }
+                if (EventStatus.isCancelled(ev) && ev.cancelledAt != null) {
+                    val cancelledByUser = ev.cancelledBy?.let { b -> users.firstOrNull { it.id == b } }
+                    DetailRow(Icons.Outlined.Cancel, "Cancelada em") {
+                        ValueText(DateUtil.fmtMs(ev.cancelledAt) + (cancelledByUser?.name?.let { " · $it" } ?: ""))
+                    }
+                }
                 if (!ev.location.isNullOrBlank()) DetailRow(Icons.Outlined.Place, "Local") { ValueText(ev.location) }
                 if (!ev.notes.isNullOrBlank()) DetailRow(Icons.Outlined.Notes, "Observações") { ValueText(ev.notes) }
                 DetailRow(Icons.Outlined.Person, "Criado por", last = true) { ValueText(creator?.name ?: "—") }
             }
 
-            Spacer(Modifier.height(16.dp))
-            if (!ev.done && (ev.startedAt == null || ev.startedAt <= 0)) {
-                BigButton("Iniciar agora", Icons.Filled.PlayArrow, Tokens.Amber, Tokens.Amber.copy(alpha = 0.12f), enabled = !busy) {
-                    busy = true; scope.launch { EventRepo.start(ev.id, currentUid); busy = false }
+            // F3.3.73I6C3 — ações de lifecycle só quando NÃO cancelado (cancelado é terminal na agenda ativa).
+            if (!EventStatus.isCancelled(ev)) {
+                Spacer(Modifier.height(16.dp))
+                if (!ev.done && (ev.startedAt == null || ev.startedAt <= 0)) {
+                    BigButton("Iniciar agora", Icons.Filled.PlayArrow, Tokens.Amber, Tokens.Amber.copy(alpha = 0.12f), enabled = !busy) {
+                        busy = true; scope.launch { EventRepo.start(ev.id, currentUid); busy = false }
+                    }
+                    Spacer(Modifier.height(11.dp))
                 }
-                Spacer(Modifier.height(11.dp))
-            }
-            if (!ev.done) {
-                BigButton("Finalizar agora", Icons.Outlined.Check, Tokens.Ink, Tokens.Surface, enabled = !busy) {
-                    busy = true; scope.launch { EventRepo.finish(ev.id, currentUid); busy = false }
-                }
-            } else {
-                BigButton("Serviço finalizado ✓ (tocar para reabrir)", Icons.Outlined.Check, Tokens.Green, Tokens.Green.copy(alpha = 0.1f), enabled = !busy) {
-                    busy = true; scope.launch { EventRepo.reopen(ev.id); busy = false }
+                if (!ev.done) {
+                    BigButton("Finalizar agora", Icons.Outlined.Check, Tokens.Ink, Tokens.Surface, enabled = !busy) {
+                        busy = true; scope.launch { EventRepo.finish(ev.id, currentUid); busy = false }
+                    }
+                } else {
+                    BigButton("Serviço finalizado ✓ (tocar para reabrir)", Icons.Outlined.Check, Tokens.Green, Tokens.Green.copy(alpha = 0.1f), enabled = !busy) {
+                        busy = true; scope.launch { EventRepo.reopen(ev.id); busy = false }
+                    }
                 }
             }
             Spacer(Modifier.height(28.dp))
@@ -164,18 +178,18 @@ fun EventDetailScreen(
         }
     }
 
-    if (confirmDelete) {
+    if (confirmCancel) {
         AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Excluir compromisso") },
-            text = { Text("Excluir este compromisso para toda a equipe?") },
+            onDismissRequest = { confirmCancel = false },
+            title = { Text("Cancelar compromisso") },
+            text = { Text("Cancelar este compromisso para toda a equipe? Ele sai da agenda ativa (não é apagado).") },
             confirmButton = {
                 TextButton(onClick = {
-                    confirmDelete = false
-                    scope.launch { EventRepo.delete(id).onSuccess { onBack() } }
-                }) { Text("Excluir", color = Tokens.Red) }
+                    confirmCancel = false
+                    scope.launch { EventRepo.cancel(id, currentUid).onSuccess { onBack() } }
+                }) { Text("Sim, cancelar", color = Tokens.Red) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
+            dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("Voltar") } },
         )
     }
 }

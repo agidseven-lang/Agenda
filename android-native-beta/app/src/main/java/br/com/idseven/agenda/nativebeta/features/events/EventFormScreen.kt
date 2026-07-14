@@ -128,7 +128,7 @@ fun EventFormScreen(
         )
         busy = true
         scope.launch {
-            val res: Result<Any?> = if (editId != null) EventRepo.update(editId, EventContract.base(input))
+            val res: Result<Any?> = if (editId != null) EventRepo.update(editId, EventContract.editPatch(input, currentUid, System.currentTimeMillis()))
             else EventRepo.create(EventContract.create(input, currentUid, System.currentTimeMillis()))
             if (res.isSuccess) {
                 val savedId = (res.getOrNull() as? String) ?: editId

@@ -42,9 +42,9 @@ console.log("F3.3.73F — Agenda Android (hermético por texto)");
 ok("A1 EventRepo lê a coleção events (stream + doc)",
   /collection\("events"\)\.addSnapshotListener/.test(REPO) &&
   /collection\("events"\)\.document\(id\)\.addSnapshotListener/.test(REPO));
-ok("A2 escritas centralizadas no EventRepo (create/update/delete + patches)",
+ok("A2 escritas centralizadas no EventRepo (create/update/cancel-lógico + patches; 73I6C3)",
   /suspend fun create\(/.test(REPO) && /suspend fun update\(/.test(REPO) &&
-  /suspend fun delete\(/.test(REPO) && /startPatch/.test(REPO) && /finishPatch/.test(REPO) && /reopenPatch/.test(REPO));
+  /suspend fun cancel\(/.test(REPO) && !/suspend fun delete\(/.test(REPO) && /startPatch/.test(REPO) && /finishPatch/.test(REPO) && /reopenPatch/.test(REPO));
 ok("A3 contrato base canônico (type/client/title/location/date/start/end/owner/ownerId/notes)",
   ["type", "client", "title", "location", "date", "start", "end", "owner", "ownerId", "notes"]
     .every(f => new RegExp(`"${f}" to i\\.`).test(CONTRACT)));
@@ -53,7 +53,8 @@ ok("A4 create adiciona by/done/createdAt/src (rastreio PWA)",
   /put\("createdAt", nowMs\)/.test(CONTRACT) && /put\("src", "nativebeta"\)/.test(CONTRACT));
 (() => {
   const baseFields = (CONTRACT.match(/"\w+" to i\./g) || []).length;
-  const createExtra = (CONTRACT.match(/put\("/g) || []).length;
+  const createBlock = CONTRACT.slice(CONTRACT.indexOf('fun create('), CONTRACT.indexOf('fun editPatch'));
+  const createExtra = (createBlock.match(/put\("/g) || []).length;
   ok(`A5 payload de create ≤ 14 campos (${baseFields}+${createExtra}) — dentro do size<50 das Rules`,
     baseFields === 10 && createExtra === 4);
 })();
@@ -69,11 +70,11 @@ ok("B2 calendário mensal preservado (pager + CalendarCard + dia selecionado)",
   /HorizontalPager/.test(AGENDA) && /CalendarCard\(/.test(AGENDA) && /selected = LocalDate\.now\(\)/.test(AGENDA.replace(/\n/g, " ")) || (/CalendarCard\(/.test(AGENDA) && /LocalDate/.test(AGENDA)));
 ok("B3 CalendarCard é UI pura (sem Firestore, sem repo)",
   !/collection\(/.test(CAL) && !/EventRepo/.test(CAL) && !/Firebase/.test(CAL));
-ok("B4 detalhe preservado (stream por id + iniciar/finalizar/reabrir/excluir via repo)",
+ok("B4 detalhe preservado (stream por id + iniciar/finalizar/reabrir/cancelar-lógico via repo; 73I6C3)",
   /EventRepo\.event\(id\)/.test(DETAIL) && /EventRepo\.start\(/.test(DETAIL) &&
-  /EventRepo\.finish\(/.test(DETAIL) && /EventRepo\.reopen\(/.test(DETAIL) && /EventRepo\.delete\(/.test(DETAIL));
-ok("B5 criação/edição preservadas pelo contrato (EventContract.create/base)",
-  /EventRepo\.update\(editId, EventContract\.base\(input\)\)/.test(FORM) &&
+  /EventRepo\.finish\(/.test(DETAIL) && /EventRepo\.reopen\(/.test(DETAIL) && /EventRepo\.cancel\(/.test(DETAIL) && !/EventRepo\.delete\(/.test(DETAIL));
+ok("B5 criação/edição preservadas pelo contrato (create + editPatch com updatedAt/By; 73I6C3)",
+  /EventRepo\.update\(editId, EventContract\.editPatch\(input, currentUid/.test(FORM) &&
   /EventRepo\.create\(EventContract\.create\(input, currentUid/.test(FORM));
 ok("B6 form valida cliente e data antes de gravar",
   /Informe o cliente/.test(FORM) && /Escolha a data/.test(FORM));

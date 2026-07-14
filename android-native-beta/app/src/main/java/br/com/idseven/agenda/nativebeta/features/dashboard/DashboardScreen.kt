@@ -71,7 +71,8 @@ fun DashboardScreen(
     if (eventsState.isLoading) { SkeletonList(); return }
 
     val today = DateUtil.todayIso()
-    val events = eventsState.itemsOrEmpty()
+    // F3.3.73I6C3 — "Hoje"/"Próximos" não listam compromissos cancelados (exclusão lógica).
+    val events = eventsState.itemsOrEmpty().filter { !EventStatus.isCancelled(it) }
     val tasks = tasksState.itemsOrEmpty()
     val todayEvents = events.filter { it.date == today }.sortedBy { it.start ?: "" }
     val todayDate = LocalDate.now()

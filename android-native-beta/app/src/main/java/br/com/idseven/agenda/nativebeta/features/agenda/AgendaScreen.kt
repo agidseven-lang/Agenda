@@ -56,6 +56,7 @@ import br.com.idseven.agenda.nativebeta.designsystem.components.SearchField
 import br.com.idseven.agenda.nativebeta.designsystem.components.SkeletonList
 import br.com.idseven.agenda.nativebeta.designsystem.theme.Tokens
 import br.com.idseven.agenda.nativebeta.domain.EventItem
+import br.com.idseven.agenda.nativebeta.domain.EventStatus
 import br.com.idseven.agenda.nativebeta.domain.Types
 import br.com.idseven.agenda.nativebeta.domain.UserLite
 import br.com.idseven.agenda.nativebeta.shared.DateUtil
@@ -70,7 +71,8 @@ private fun monthsBetween(a: YearMonth, b: YearMonth) = (b.year - a.year) * 12 +
 fun AgendaScreen(eventsState: UiList<EventItem>, users: List<UserLite>, onEventClick: (String) -> Unit, onNewEvent: () -> Unit) {
     eventsState.errorMessage()?.let { ErrorState("Agenda — $it"); return }
     if (eventsState.isLoading) { SkeletonList(); return }
-    val all = eventsState.itemsOrEmpty()
+    // F3.3.73I6C3 — Agenda ATIVA não lista cancelados (exclusão lógica; histórico segue no banco).
+    val all = eventsState.itemsOrEmpty().filter { !EventStatus.isCancelled(it) }
     val scope = rememberCoroutineScope()
 
     val base = remember { YearMonth.now() }

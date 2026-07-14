@@ -31,6 +31,9 @@ object EventRepo {
         startedBy = d.getString("startedBy"),
         doneAt = d.getLong("doneAt"),
         doneBy = d.getString("doneBy"),
+        status = d.getString("status"),
+        cancelledAt = d.getLong("cancelledAt"),
+        cancelledBy = d.getString("cancelledBy"),
     )
 
     fun events(): Flow<List<EventItem>> = callbackFlow {
@@ -65,12 +68,10 @@ object EventRepo {
             .addOnFailureListener { cont.resume(Result.failure(it)) }
     }
 
-    suspend fun delete(id: String): Result<Unit> = suspendCancellableCoroutine { cont ->
-        db.collection("events").document(id).delete()
-            .addOnSuccessListener { cont.resume(Result.success(Unit)) }
-            .addOnFailureListener { cont.resume(Result.failure(it)) }
-    }
-
+    // F3.3.73I6C3 — exclusão LÓGICA (cancelamento). NUNCA apaga o documento (sem .delete()):
+    // grava status:"cancelled" + cancelledAt/cancelledBy; o onEventUpdated (73I6C1) dispara o
+    // fan-out "cancelou" e a Agenda ativa filtra cancelados. Histórico preservado no Firestore.
+    suspend fun cancel(id: String, uid: String?) = update(id, EventContract.cancelPatch(uid, System.currentTimeMillis()))
     suspend fun start(id: String, uid: String?) = update(id, EventContract.startPatch(uid, System.currentTimeMillis()))
     suspend fun finish(id: String, uid: String?) = update(id, EventContract.finishPatch(uid, System.currentTimeMillis()))
     suspend fun reopen(id: String) = update(id, EventContract.reopenPatch())

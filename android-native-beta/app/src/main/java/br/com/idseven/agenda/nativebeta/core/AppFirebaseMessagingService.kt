@@ -66,7 +66,12 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
             // Agenda o lembrete premium de 1h aqui, cobrindo o caso de B não abrir o app
             // antes do lembrete. Idempotente com o sync (mesmo id). Não afeta o push imediato.
             val type = data["type"]
-            if (type == "event" || type == "task") {
+            // F3.3.73I6C3 — pushes de LIFECYCLE (iniciar/finalizar/cancelar/editar do fan-out 73I6C1)
+            // NÃO reagendam o lembrete de 1h (o payload de lifecycle nem traz scheduledDate). Só a
+            // criação/atribuição agenda. Evita, p.ex., reagendar lembrete de um evento cancelado.
+            val action = data["action"]
+            val isLifecycle = action == "started" || action == "finished" || action == "cancelled" || action == "updated"
+            if ((type == "event" || type == "task") && !isLifecycle) {
                 val rawId = (if (type == "task") data["taskId"] else data["eventId"])?.takeIf { it.isNotBlank() }
                     ?: data["deepLink"]?.substringAfter(":", "")?.takeIf { it.isNotBlank() }
                 val date = data["scheduledDate"]?.takeIf { it.isNotBlank() } ?: data["scheduledAt"]

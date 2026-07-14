@@ -54,7 +54,8 @@ ok("B2 form valida cliente e data antes de gravar (evita dado inválido)",
   /Informe o cliente/.test(EVFORM) && /Escolha a data/.test(EVFORM));
 ok("B3 grava via EventContract.create (contrato events; 14 campos ≤ size<50 das Rules)",
   /EventRepo\.create\(EventContract\.create\(input, currentUid/.test(EVFORM) &&
-  (CONTRACT.match(/"\w+" to i\./g) || []).length === 10 && (CONTRACT.match(/put\("/g) || []).length === 4);
+  (CONTRACT.match(/"\w+" to i\./g) || []).length === 10 &&
+  (CONTRACT.slice(CONTRACT.indexOf('fun create('), CONTRACT.indexOf('fun editPatch')).match(/put\("/g) || []).length === 4);
 ok("B4 responsável escolhido entre usuários ATIVOS (usersPublic)",
   /users\.filter \{ it\.isActive\(\) \}/.test(EVFORM));
 

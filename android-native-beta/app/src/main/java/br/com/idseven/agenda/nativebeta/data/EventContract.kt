@@ -39,6 +39,15 @@ object EventContract {
             put("src", "nativebeta")
         }
 
+    // F3.3.73I6C3 — edição: grava conteúdo + updatedAt/updatedBy (paridade contrato 73I6C1).
+    // NÃO toca by/createdAt/src/done/startedAt (preservados). Dispara onEventUpdated ("editou").
+    fun editPatch(i: Input, uid: String?, nowMs: Long): LinkedHashMap<String, Any?> =
+        base(i).apply { put("updatedAt", nowMs); put("updatedBy", uid) }
+
+    // F3.3.73I6C3 — cancelamento LÓGICO (status:"cancelled"). Sai da agenda ativa; sem delete físico.
+    fun cancelPatch(uid: String?, nowMs: Long): Map<String, Any?> =
+        mapOf("status" to "cancelled", "cancelledAt" to nowMs, "cancelledBy" to uid)
+
     fun startPatch(uid: String?, nowMs: Long): Map<String, Any?> =
         mapOf("startedAt" to nowMs, "startedBy" to uid)
 

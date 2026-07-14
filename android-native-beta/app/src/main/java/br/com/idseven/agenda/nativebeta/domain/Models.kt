@@ -20,6 +20,10 @@ data class EventItem(
     val startedBy: String?,
     val doneAt: Long?,
     val doneBy: String?,
+    // F3.3.73I6C3 — lifecycle: cancelamento LÓGICO (paridade contrato 73I6C1 / Desktop 1.0.161).
+    val status: String? = null,
+    val cancelledAt: Long? = null,
+    val cancelledBy: String? = null,
 )
 
 // F3.3.73D — perfil canônico do próprio usuário (getUserSelf). Carrega e-mail/

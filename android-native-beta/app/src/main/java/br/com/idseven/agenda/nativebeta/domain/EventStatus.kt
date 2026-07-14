@@ -34,7 +34,11 @@ object EventStatus {
     fun startMs(e: EventItem): Long? = dtMs(e.date, e.start ?: "00:00")
     fun dueMs(e: EventItem): Long? = dtMs(e.date, e.end ?: e.start ?: "23:59")
 
+    // F3.3.73I6C3 — cancelamento lógico (paridade contrato 73I6C1 / Desktop 1.0.161).
+    fun isCancelled(e: EventItem): Boolean = e.status == "cancelled" || (e.cancelledAt != null && e.cancelledAt > 0)
+
     fun status(e: EventItem): S? {
+        if (isCancelled(e)) return S("cancelled", "Cancelado", false)
         val t = Types.of(e.type)
         if (e.done) return S("done", t.done, false)
         val now = System.currentTimeMillis()
