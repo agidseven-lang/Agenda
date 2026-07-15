@@ -235,7 +235,7 @@ jobs:
           fail=0
           hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
           check_token() { # label token titulo img_path
-            local L="$1" T="$2" TITLE="$3" IMG="$4" url fresh i task xsc2
+            local L="$1" T="$2" TITLE="$3" IMG="$4" url fresh i task xsc2 f0="$fail"
             url="$B/share/cronograma/$T"
             # entradas antigas do cache (TTL 600s) não têm X-Share-Task — esperar corpo FRESCO
             fresh=0
@@ -253,7 +253,7 @@ jobs:
             curl -sS --max-time 30 -D h2.txt -o /dev/null "$url" || true
             xsc2="$(hv x-share-cache h2.txt)"
             case "$xsc2" in *hit*) : ;; *) echo "FALHA[$L]: GET#2 X-Share-Cache='$xsc2' (esperado hit)"; fail=1;; esac
-            echo "OK[$L]: X-Share-Task=resolved + og:title '$TITLE' + arte $IMG + MISS→HIT"
+            [ "$fail" = "$f0" ] && echo "OK[$L]: X-Share-Task=resolved + og:title '$TITLE' + arte $IMG + MISS→HIT" || echo "RESUMO[$L]: houve falhas (linhas FALHA acima)"
           }
           check_token cron "$CT" "Aprovar cronograma" "/og/wa-card-v64-39.jpg"
           check_token rot  "$RT" "Aprovar roteiro"    "/og/wa-card-roteiro-v64-60.jpg"
