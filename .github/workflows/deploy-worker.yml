@@ -256,15 +256,17 @@ jobs:
             echo "OK[$L]: X-Share-Task=resolved + og:title '$TITLE' + arte $IMG + MISS→HIT"
           }
           check_token cron "$CT" "Aprovar cronograma" "/og/wa-card-v64-39.jpg"
-          check_token rot  "$RT" "Aprovar roteiro"    "/og/wa-card-roteiro-v64-59.jpg"
+          check_token rot  "$RT" "Aprovar roteiro"    "/og/wa-card-roteiro-v64-60.jpg"
           echo "== artes por tipo (integridade + distinção) =="
           s1=$(curl -sS --max-time 30 "$B/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
-          s2=$(curl -sS --max-time 30 "$B/og/wa-card-roteiro-v64-59.jpg" | sha256sum | cut -d' ' -f1)
+          s2=$(curl -sS --max-time 30 "$B/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          s2a=$(curl -sS --max-time 30 "$B/og/wa-card-roteiro-v64-59.jpg" | sha256sum | cut -d' ' -f1)
           echo "cron: $s1"; echo "rot : $s2"
           [ "$s1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || { echo "FALHA: arte do Cronograma divergente"; fail=1; }
-          [ "$s2" = "6a484364053cf7acdbc6a28517097a1f243feab9875e736fc6626d24e956271a" ] || { echo "FALHA: arte do Roteiro divergente"; fail=1; }
+          [ "$s2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || { echo "FALHA: arte do Roteiro divergente"; fail=1; }
+          [ "$s2a" = "$s2" ] || { echo "FALHA: alias v64-59 difere da arte v64-60"; fail=1; }
           [ "$s1" != "$s2" ] || { echo "FALHA: artes iguais"; fail=1; }
-          hc=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -I "$B/og/wa-card-roteiro-v64-59.jpg")
+          hc=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -I "$B/og/wa-card-roteiro-v64-60.jpg")
           [ "$hc" = "200" ] || { echo "FALHA: HEAD da arte do Roteiro=$hc"; fail=1; }
           rm -f b1.html h1.txt h2.txt
           [ "$fail" = 0 ] || { echo "ABORTAR: validação real-token C18E falhou — rollback automático a seguir"; exit 1; }

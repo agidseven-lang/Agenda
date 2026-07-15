@@ -32,9 +32,9 @@ console.log('F3.3.73I6C18E — imagem OG exclusiva do Roteiro (hermético)');
 
 /* ── A: versão e constantes de path ── */
 ok('A1 versão da fase (prefixo V64.59 preservado p/ gates do deploy)',
-  /version: "V64\.59-c18e-roteiro-og-image"/.test(SRC) && /version: *"V64\.59/.test(SRC));
+  /version: "V64\.59-c18g-roteiro-og-logo-idseven"/.test(SRC) && /version: *"V64\.59/.test(SRC));
 ok('A2 OG_IMG_PATH do cronograma INTACTO', /const OG_IMG_PATH = "\/og\/wa-card-v64-39\.jpg";/.test(SRC));
-ok('A3 OG_IMG_PATH_ROTEIRO novo e versionado', /const OG_IMG_PATH_ROTEIRO = "\/og\/wa-card-roteiro-v64-59\.jpg";/.test(SRC));
+ok('A3 OG_IMG_PATH_ROTEIRO novo e versionado (C18G: v64-60, logo oficial)', /const OG_IMG_PATH_ROTEIRO = "\/og\/wa-card-roteiro-v64-60\.jpg";/.test(SRC));
 
 /* ── B: micro-exec do vocabulário/HTML por tipo ── */
 const CORE = constLine('OG_IMG_PATH') + '\n' + constLine('OG_IMG_PATH_ROTEIRO') + '\n' + constObj('PREMIUM_TYPES') + '\n' +
@@ -44,11 +44,11 @@ const API = new Function(CORE + 'return {PREMIUM_TYPES, premiumTypeOf, ogClientM
 const O = 'https://aprovar.agendaidseven.com.br';
 const T = 'tokentesteC18E';
 const CRON_IMG = O + '/og/wa-card-v64-39.jpg';
-const ROT_IMG = O + '/og/wa-card-roteiro-v64-59.jpg';
+const ROT_IMG = O + '/og/wa-card-roteiro-v64-60.jpg';
 
 ok('B1 PREMIUM_TYPES.imgPath por tipo (cron=v64-39; rot=roteiro-v64-59)',
   API.PREMIUM_TYPES.cronograma.imgPath === '/og/wa-card-v64-39.jpg' &&
-  API.PREMIUM_TYPES.roteiro.imgPath === '/og/wa-card-roteiro-v64-59.jpg');
+  API.PREMIUM_TYPES.roteiro.imgPath === '/og/wa-card-roteiro-v64-60.jpg');
 
 const shCron = API.shareCardHtml(O, T, API.PREMIUM_TYPES.cronograma);
 const shRot = API.shareCardHtml(O, T, API.PREMIUM_TYPES.roteiro);
@@ -113,8 +113,8 @@ function jpegDims(buf) {
 }
 ok('C1 arte CRONOGRAMA intocada (sha256 byte-exato do deploy c18b)',
   sha(jCron) === 'c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea' && jCron.length === 144941);
-ok('C2 arte ROTEIRO = o JPEG revisado visualmente na fase (sha256 pinado)',
-  sha(jRot) === '6a484364053cf7acdbc6a28517097a1f243feab9875e736fc6626d24e956271a' && jRot.length === 75956);
+ok('C2 arte ROTEIRO = o JPEG revisado visualmente na fase (C18G: logo OFICIAL; sha256 pinado)',
+  sha(jRot) === 'f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3' && jRot.length === 75415);
 ok('C3 artes DISTINTAS (URLs e bytes)', sha(jCron) !== sha(jRot));
 ok('C4 ambas JPEG válidos (magic ffd8) 1200×630', (() => {
   const dc = jpegDims(jCron), dr = jpegDims(jRot);
@@ -138,8 +138,8 @@ ok('D2 HEAD → mesmos headers, corpo vazio (GET×HEAD consistentes)', await (as
   return r.status === 200 && r.headers.get('content-type') === 'image/jpeg' &&
     r.headers.get('content-length') === String(jRot.length) && buf.length === 0;
 })());
-ok('D3 rota registrada no bloco GET||HEAD',
-  /if \(url\.pathname === "\/og\/wa-card-roteiro-v64-59\.jpg"\) return jpgRoteiroBannerResponse\(M\);/.test(SRC));
+ok('D3 rota registrada no bloco GET||HEAD (v64-60 + alias v64-59 p/ HTML cacheado)',
+  /if \(url\.pathname === "\/og\/wa-card-roteiro-v64-60\.jpg" \|\| url\.pathname === "\/og\/wa-card-roteiro-v64-59\.jpg"\) return jpgRoteiroBannerResponse\(M\);/.test(SRC));
 ok('D4 rota v64-39 do cronograma INTACTA (mesma lista de canários)',
   /url\.pathname === "\/og\/wa-card-v64-39\.jpg"\) return jpgBannerResponse\(M\);/.test(SRC));
 

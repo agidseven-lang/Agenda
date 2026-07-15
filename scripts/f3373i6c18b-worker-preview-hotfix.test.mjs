@@ -28,7 +28,7 @@ const constLine = (name) => { const m = SRC.match(new RegExp('const ' + name + '
 console.log('F3.3.73I6C18B — /share preview hotfix (HEAD + Cache API + single-flight)');
 
 /* ── A: versão e compat com gates do deploy pinado ── */
-ok('A1 versão V64.59-* (linha canônica; sufixo da fase atual = c18e)', /version: "V64\.59-c18e-roteiro-og-image"/.test(SRC));
+ok('A1 versão V64.59-* (linha canônica; sufixo da fase atual = c18g)', /version: "V64\.59-c18g-roteiro-og-logo-idseven"/.test(SRC));
 ok('A2 prefixo V64.59 preservado (gate pré/pós-deploy)', /version: *"V64\.59/.test(SRC));
 
 /* ── B: micro-exec do handleShareCard REAL (Cache/Firestore/OAuth stubados) ── */
