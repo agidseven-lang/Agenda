@@ -112,7 +112,7 @@ jobs:
             local st ct ttfb tt
             st=$(printf '%s' "$W" | cut -f1); ct=$(printf '%s' "$W" | cut -f2)
             ttfb=$(printf '%s' "$W" | cut -f3); tt=$(printf '%s' "$W" | cut -f4)
-            hv() { grep -i "^$1:" "$hdr" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//'; }
+            hv() { grep -i "^$1:" "$hdr" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
             local cl xsc cc loc
             cl=$(hv content-length); xsc=$(hv x-share-cache); cc=$(hv cache-control)
             if [ -n "$(hv location)" ]; then loc=yes; else loc=no; fi
@@ -132,7 +132,10 @@ jobs:
 
           # ---- sequência idêntica por token (share custom: GET#1, GET#2, wa, fb, HEADs; workers; portal)
           share_seq() { # <label> <token>
-            local L="$1" T="$2" p="/share/cronograma/$T" pp="/cliente/cronograma/$T"
+            # NOTA: argumentos do builtin `local` são expandidos ANTES das atribuições —
+            # $T em p/pp precisa vir em linha separada (set -u).
+            local L="$1" T="$2"
+            local p="/share/cronograma/$T" pp="/cliente/cronograma/$T"
             req "$L" custom "$CUSTOM" share "$p" browser GET 1; cp out/b.red "out/red/share_${L}_custom_browser_get1.html"
             req "$L" custom "$CUSTOM" share "$p" browser GET 2; cp out/b.red "out/red/share_${L}_custom_browser_get2.html"
             req "$L" custom "$CUSTOM" share "$p" wa GET 3
