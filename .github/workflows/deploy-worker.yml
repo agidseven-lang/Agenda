@@ -173,6 +173,19 @@ jobs:
           set -euo pipefail
           mkdir -p worker-ops-logs
           TOKEN="c18bpost0001"
+          # Estabilização da PROPAGAÇÃO GRADUAL do deploy (run 73: medir cedo demais capturou
+          # a versão ANTIGA em alguns colos → falso-negativo → rollback). Exige 5 HEADs
+          # consecutivos text/html no domínio custom (máx. 120 s) antes de medir/assertar.
+          echo "== aguardando propagação estabilizar (HEAD /share text/html x5 consecutivos) =="
+          CONSEC=0; DEADLINE=$(( $(date +%s) + 120 ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            CT=$(curl -sSI --max-time 15 -A "propagation-check" "https://aprovar.agendaidseven.com.br/share/cronograma/$TOKEN" 2>/dev/null | grep -i '^content-type:' | tr -d '\r' | sed 's/^[^:]*: *//' || true)
+            case "$CT" in text/html*) CONSEC=$((CONSEC+1));; *) CONSEC=0;; esac
+            [ "$CONSEC" -ge 5 ] && break
+            sleep 3
+          done
+          [ "$CONSEC" -ge 5 ] || { echo "ABORTAR: propagação não estabilizou em 120s (HEAD ainda fora do handler novo)"; exit 1; }
+          echo "OK: propagação estável ($CONSEC HEADs text/html consecutivos)"
           TSV=worker-ops-logs/ttfb.tsv
           printf 'origin\tua\tmethod\titer\thttp\tcontent_type\tttfb_s\ttotal_s\tx_share_cache\tserver_timing\n' > "$TSV"
           for ORPAIR in "custom|https://aprovar.agendaidseven.com.br" "workers|$WORKER_URL"; do
