@@ -28,7 +28,7 @@ const ok = (n, c) => { if (c) { pass++; console.log('  PASS — ' + n); } else {
 console.log('F3.3.73I6C11 — Desktop 1.0.163 diagnóstico auth/logout + tray fix (hermético)');
 
 /* ── A: versão ── */
-ok('A1 versão 1.0.163', PJ.version === '1.0.163');
+ok('A1 versão 1.0.163+ (73I6C14 bump 1.0.164)', PJ.version.startsWith('1.0.') && parseInt(PJ.version.split('.')[2], 10) >= 163);
 
 /* ── B: fix confirmado do tray no QUIT ── */
 ok('B1 tray.ts exporta destroyTray() que destrói o tray atual',

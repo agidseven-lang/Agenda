@@ -36,6 +36,14 @@
     --kanban-col-min:279px;
   }
   }
+  /* F3.3.73I6C14 — APARÊNCIA CLIENT-SIDE (Configurações). Overrides ESCOPADOS em body.light /
+     body.hc: só re-declaram tokens; o tema escuro padrão (:root) fica intacto (fallback seguro).
+     Nada aqui toca Agenda/Board/Card Premium além das cores de tema já derivadas de var(). */
+  body.light{color-scheme:light;
+    --bg:#F3F5FA; --surface:#FFFFFF; --surface2:#EDF0F7; --line:#D6DBE6; --line-soft:#E3E7F0;
+    --ink:#171A22; --soft:#4C5261; --faint:#7A8194;}
+  body.hc{--ink:#FFFFFF; --soft:#DDE1EA; --faint:#B7BDCB; --line:#4A5164; --line-soft:#39404F;}
+  body.light.hc{--ink:#000000; --soft:#232936; --faint:#3E4657; --line:#8890A2; --line-soft:#A8AFC0;}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html{color-scheme:dark}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
@@ -7394,7 +7402,7 @@ function renderPerfil(){
     '<div style="margin-top:12px"><span class="pill" style="background:'+(u.admin?withAlpha('#5B6CFF',.16):withAlpha('#34D399',.16))+';color:'+(u.admin?'#5B6CFF':'#34D399')+'">'+(u.admin?'Administrador':'Membro da equipe')+'</span></div></div>'+
     '<div style="height:16px"></div><div class="lbl">Configurações</div><div class="card">'+
       settRow('person','Conta','Seus dados','conta')+'<div class="divline"></div>'+
-      settRow('person','Segurança','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+
+      settRow('person','Segurança','Sessão protegida por autenticação server-side','seguranca')+'<div class="divline"></div>'+
       settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
     '<div style="height:20px"></div><button class="btn ghost" data-logout="1" style="color:var(--red);border-color:'+withAlpha('#F87171',.4)+'">Sair da conta</button>'+
     '<div style="text-align:center;color:var(--faint);font-size:11px;margin-top:14px">ID Seven · Desktop '+APP_VER.desktop+' · produção</div></div>';
@@ -7427,6 +7435,17 @@ function cfgTrayRowHtml(){
     '<div class="sm"><div class="sl">Bandeja do sistema</div><div class="ss">'+esc(ss)+'</div></div>'+
     '<span class="cfg-traypill" style="background:'+withAlpha(color,.16)+';color:'+color+'"><span class="dot" style="background:'+color+'"></span>'+esc(label)+'</span></div>';
 }
+/* F3.3.73I6C14 — Aparência CLIENT-SIDE (tema claro / tamanho da fonte / alto contraste).
+   SOMENTE localStorage (chave idseven.desktop.appearance) — sem Firestore, sem Functions,
+   sem rede, sem dados reais. Fallback seguro: qualquer erro/valor inválido => escuro/100%/
+   desligado. applyAppearance roda no boot (sobrevive a fechar/reabrir) e a cada mudança. */
+const APPEAR_KEY='idseven.desktop.appearance';
+const APPEAR_FONTS={std:'',lg:'1.1',xl:'1.25'};
+function appearLoad(){try{const a=JSON.parse(localStorage.getItem(APPEAR_KEY)||'{}')||{};return{theme:a.theme==='light'?'light':'dark',font:(APPEAR_FONTS[a.font]!==undefined)?a.font:'std',hc:a.hc===true};}catch(_){return{theme:'dark',font:'std',hc:false};}}
+function appearSave(a){try{localStorage.setItem(APPEAR_KEY,JSON.stringify({theme:a.theme,font:a.font,hc:a.hc}));}catch(_){}}
+function applyAppearance(){try{const a=appearLoad();document.body.classList.toggle('light',a.theme==='light');document.body.classList.toggle('hc',a.hc===true);document.body.style.zoom=APPEAR_FONTS[a.font]||'';}catch(_){}}
+function appearSet(patch){const a=Object.assign(appearLoad(),patch||{});appearSave(a);applyAppearance();try{render();}catch(_){}}
+try{applyAppearance();}catch(_){}
 function renderConfig(){
   const u=state.user;
   /* F3.3.70D9R2 — toda linha tem coluna de icone: em-breve usa relogio sutil (.icb-mut),
@@ -7436,12 +7455,16 @@ function renderConfig(){
   const act=(ic,l,s,attr,color)=>'<button class="settrow" '+attr+'><div class="icb"'+(color?' style="color:'+color+'"':'')+'>'+svg(ic)+'</div><div class="sm"><div class="sl"'+(color?' style="color:'+color+'"':'')+'>'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div class="arr">'+svg('arr')+'</div></button>';
   let h='<div class="scr-head cfg-head"><div class="row" style="align-items:center;gap:12px"><div class="cfg-ic">'+svg('gear')+'</div><div><div class="h-title">Configurações</div><div class="h-sub">Conta, privacidade, notificações, dados e idioma</div></div></div></div>'+
     '<div class="scr cfg-wrap" style="padding-top:8px">';
+  /* F3.3.73I6C14 — os placeholders "Em breve" não prontos SAÍRAM da UI (decisão do owner):
+     Atualizar dados pessoais, Assinatura/plano, 2FA, Sessões e dispositivos, Notificações de
+     tarefas, Limpar cache, Otimizar uso de dados, Outros idiomas/moeda. O helper soon() segue
+     definido (padrão visual K1/d3r10b) para reuso quando uma funcionalidade futura for real. */
   h+='<div class="lbl">Gerenciamento de Conta</div><div class="card">'+
-      settRow('person','Conta','Seus dados','conta')+'<div class="divline"></div>'+soon('Atualizar dados pessoais')+'<div class="divline"></div>'+soon('Assinatura / plano')+'</div>';
+      settRow('person','Conta','Seus dados','conta')+'</div>';
   h+='<div style="height:18px"></div><div class="lbl">Privacidade e Segurança</div><div class="card">'+
-      settRow('gear','Segurança da sessão','Login custom (s2 / SHA-256)','seguranca')+'<div class="divline"></div>'+soon('Autenticação em duas etapas (2FA)')+'<div class="divline"></div>'+soon('Sessões e dispositivos')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
+      settRow('gear','Segurança da sessão','Sessão protegida por autenticação server-side','seguranca')+'<div class="divline"></div>'+info('Dados coletados','Apenas dados de uso da equipe (tarefas/agenda)')+'</div>';
   h+='<div style="height:18px"></div><div class="lbl">Preferências de Notificação</div><div class="card">'+
-      act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+soon('Notificações de tarefas')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
+      act('send','Testar notificação','Dispara um toast nativo agora','data-cfgnotiftest="1"')+'<div class="divline"></div>'+info('Lembretes','Aviso 1h antes do compromisso (bandeja)')+'<div class="divline"></div>'+info('Versão do aplicativo',(window.desktopAPI&&window.desktopAPI.version)||'—')+'</div>';
   // F3.3.70D3R10U — Bandeja do sistema (tray): status real via IPC tray-status +
   // botao "Recriar icone da bandeja" (IPC tray-recreate) + orientacao da seta ^.
   h+='<div style="height:18px"></div><div class="lbl">Bandeja do sistema (tray)</div><div class="card">'+
@@ -7449,12 +7472,19 @@ function renderConfig(){
       act('send','Recriar ícone da bandeja','Use se o ícone sumir da área perto do relógio','data-cfgtrayrecreate="1"')+'<div class="divline"></div>'+
       info('Onde encontro o ícone?','Ele pode ficar escondido na seta ^ perto do relógio do Windows.')+'<div class="divline"></div>'+
       info('Fechar (X) × Sair','X envia o app para a bandeja (continua rodando). “Sair”, no menu da bandeja, encerra de verdade.')+'</div>';
+  /* F3.3.73I6C14 — Aparência REAL client-side: chips aplicam na hora (appearSet) e ficam
+     salvos neste computador (localStorage). Sem backend; padrão = Escuro/100%/desligado. */
+  const ap=appearLoad();
+  const seg=(attr,val,cur,lbl)=>'<button class="chip" '+attr+'="'+val+'" style="'+(cur===val?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+esc(lbl)+'</button>';
+  const aprow=(ic,l,s,chips)=>'<div class="settrow" style="cursor:default"><div class="icb">'+svg(ic)+'</div><div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(s)+'</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+chips+'</div></div>';
   h+='<div style="height:18px"></div><div class="lbl">Acessibilidade e Aparência</div><div class="card">'+
-      info('Tema','Escuro (premium)')+'<div class="divline"></div>'+soon('Tema claro')+'<div class="divline"></div>'+soon('Tamanho da fonte')+'<div class="divline"></div>'+soon('Alto contraste')+'</div>';
+      aprow('eye','Tema','Aplicado na hora · salvo neste computador',seg('data-cfgtheme','dark',ap.theme,'Escuro')+seg('data-cfgtheme','light',ap.theme,'Claro'))+'<div class="divline"></div>'+
+      aprow('info','Tamanho da fonte','Padrão 100% · Grande 110% · Extra 125%',seg('data-cfgfont','std',ap.font,'Padrão')+seg('data-cfgfont','lg',ap.font,'Grande')+seg('data-cfgfont','xl',ap.font,'Extra'))+'<div class="divline"></div>'+
+      aprow('gear','Alto contraste','Reforça texto e bordas para leitura',seg('data-cfghc','off',(ap.hc?'on':'off'),'Desligado')+seg('data-cfghc','on',(ap.hc?'on':'off'),'Ligado'))+'</div>';
   h+='<div style="height:18px"></div><div class="lbl">Desempenho e Dados</div><div class="card">'+
-      info('Sincronização','Tempo real (Firestore) · bandeja + autostart')+'<div class="divline"></div>'+soon('Limpar cache')+'<div class="divline"></div>'+soon('Otimizar uso de dados')+'</div>';
+      info('Sincronização','Tempo real (Firestore) · bandeja + autostart')+'</div>';
   h+='<div style="height:18px"></div><div class="lbl">Idioma e Região</div><div class="card">'+
-      info('Idioma','Português (Brasil)')+'<div class="divline"></div>'+info('Formato de data','dd/MM/aaaa')+'<div class="divline"></div>'+info('Formato de hora','24h')+'<div class="divline"></div>'+soon('Outros idiomas e moeda')+'</div>';
+      info('Idioma','Português (Brasil)')+'<div class="divline"></div>'+info('Formato de data','dd/MM/aaaa')+'<div class="divline"></div>'+info('Formato de hora','24h')+'</div>';
   if(u.admin){h+='<div style="height:18px"></div><div class="lbl">Administração</div><div class="card">'+
       act('person','Alterar e-mail de usuário','Troca administrativa com confirmação e auditoria','data-cfgadminemail="1"')+'</div>';}
   h+='<div style="height:18px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
@@ -7841,6 +7871,10 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-chpw]')){closeModal();openChangePasswordModal();return;}
   if(el=g('[data-chemail]')){closeModal();openChangeEmailModal();return;}
   if(el=g('[data-cfgadminemail]')){closeModal();openAdminEmailModal();return;}
+  // F3.3.73I6C14 — Aparência client-side (aplica + persiste local; re-render p/ chip ativo)
+  if(el=g('[data-cfgtheme]')){appearSet({theme:el.dataset.cfgtheme==='light'?'light':'dark'});return;}
+  if(el=g('[data-cfgfont]')){appearSet({font:(el.dataset.cfgfont==='lg'||el.dataset.cfgfont==='xl')?el.dataset.cfgfont:'std'});return;}
+  if(el=g('[data-cfghc]')){appearSet({hc:el.dataset.cfghc==='on'});return;}
   if(el=g('[data-pickasg]')){if(state.form){const id=el.dataset.pickasg||null;state.form.assigneeId=id;const u=id?state.users.find(x=>x.id===id):null;state.form.assignee=u?(u.name||''):'';}closeModal();render();return;}
   if(el=g('[data-form]')){const a=el.dataset.form;if(a==='close'){state.form=null;render();}else if(a==='back'){state.form.step=Math.max(0,state.form.step-1);render();}else if(a==='next')stepNext();else if(a==='save')await saveTask();return;}
   if(el=g('[data-fsector]')){state.form.sector=el.dataset.fsector;state.form.subtype=null;state.form.contents=[];state.form.checklist=[];render();return;}
