@@ -61,6 +61,22 @@ jobs:
           # ---- gate dos secrets (falha clara e sanitizada se ausentes)
           [ -n "${CRON_TOKEN:-}" ] || { echo "::error::secret C18E_CRONOGRAMA_TOKEN ausente — criar em Settings > Secrets and variables > Actions (temporário da fase C18E)."; exit 1; }
           [ -n "${ROT_TOKEN:-}" ]  || { echo "::error::secret C18E_ROTEIRO_TOKEN ausente — criar em Settings > Secrets and variables > Actions (temporário da fase C18E)."; exit 1; }
+          # normalização TOLERANTE (nada é impresso): remove CR/LF/espaços; se vier a URL
+          # ou o path inteiro (/share/cronograma/<token>), extrai o último segmento; corta
+          # querystring/fragment e barra final. A validação de charset roda DEPOIS disso.
+          norm_token() {
+            local v="$1"
+            v="${v//$'\r'/}"; v="${v//$'\n'/}"; v="${v//$'\t'/}"; v="${v// /}"
+            v="${v%%\?*}"; v="${v%%#*}"; v="${v%/}"
+            case "$v" in */*) v="${v##*/}";; esac
+            printf '%s' "$v"
+          }
+          CRON_TOKEN="$(norm_token "$CRON_TOKEN")"
+          ROT_TOKEN="$(norm_token "$ROT_TOKEN")"
+          # máscara extra: se o secret foi salvo como URL, o token extraído (substring)
+          # NÃO seria mascarado automaticamente pelo Actions — registrar explicitamente.
+          echo "::add-mask::$CRON_TOKEN"
+          echo "::add-mask::$ROT_TOKEN"
           case "$CRON_TOKEN" in (*[!A-Za-z0-9_-]*) echo "::error::C18E_CRONOGRAMA_TOKEN com caractere fora de [A-Za-z0-9_-]"; exit 1;; esac
           case "$ROT_TOKEN"  in (*[!A-Za-z0-9_-]*) echo "::error::C18E_ROTEIRO_TOKEN com caractere fora de [A-Za-z0-9_-]"; exit 1;; esac
           [ ${#CRON_TOKEN} -ge 4 ] && [ ${#CRON_TOKEN} -le 128 ] || { echo "::error::C18E_CRONOGRAMA_TOKEN com tamanho fora de 4..128"; exit 1; }
