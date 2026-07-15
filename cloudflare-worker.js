@@ -53,13 +53,84 @@ const DATASTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
 // (/og/aprovar-v64-23.png). Alguns previews (WhatsApp) ignoram/cacheiam mal querystrings —
 // uma URL limpa e versionada no path é a forma mais robusta de cache-busting.
 const OG_IMG_PATH = "/og/wa-card-v64-39.jpg";
+/* ───── F3.3.73I6C17 — TIPO do Card Premium (Cronograma × Roteiro) ─────
+   O Desktop 1.0.165 estendeu o fluxo-cliente ao ROTEIRO em paridade com o
+   Cronograma, usando as MESMAS rotas (/share/cronograma/<token> e
+   /cliente/cronograma/<token> — o formato do link NÃO mudou). O tipo é
+   resolvido pelos DADOS REAIS da tarefa (task.sector, gravado pelo Desktop
+   em todo save) — NUNCA por heurística de texto. Sem task (erro/404/token
+   inválido) → cronograma (fallback byte-idêntico ao comportamento atual).
+   Cronograma preservado: todo texto do tipo cronograma permanece EXATO. */
+const PREMIUM_TYPES = {
+  cronograma: {
+    key: "cronograma",
+    aprLabel: "Aprovar cronograma",
+    shareDesc: "Seu cronograma está pronto para avaliação.",
+    crawlerDesc: "Sua área de aprovação está pronta. Toque para revisar os temas, aprovar o que estiver correto e solicitar ajustes.",
+    portalOgDesc: "Sua área de aprovação está pronta. Toque para revisar os temas, aprovar o que estiver correto e solicitar ajustes. Link seguro · Agenda ID Seven.",
+    ackOgDesc: "Acompanhe a aprovação do seu cronograma. Link seguro · Agenda ID Seven.",
+    successOgDesc: "Cronograma aprovado. Link seguro · Agenda ID Seven.",
+    successDocTitle: "Cronograma aprovado",
+    successH1: "Cronograma aprovado com sucesso!",
+    ackH2Themes: "Temas aprovados!",
+    ackMsgThemes: "A equipe seguirá para a etapa de produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final.",
+    ackNextThemes: "Aguardando produção · legendas e artes",
+    docSuffix: "Aprovação de cronograma",
+    imgAlt: "Agenda ID Seven — Aprovar cronograma",
+    titleFallback: "Cronograma",
+    freqPill: "Frequência",
+    itensWord: "temas",
+    itemSing: "conteúdo aprovado", itemPlur: "conteúdos aprovados",
+    itemName: "Conteúdo",
+    histApprove: "Aprovou o cronograma", histComment: "Comentou no cronograma",
+    actApproveLabel: "Cliente aprovou os temas/cronograma", actCommentLabel: "Cliente comentou no cronograma",
+    jsO: "o cronograma", jsEm: "no cronograma", jsDo: "do cronograma", jsSeu: "seu cronograma", jsDeste: "deste cronograma",
+    notif: null,
+  },
+  roteiro: {
+    key: "roteiro",
+    aprLabel: "Aprovar roteiro",
+    shareDesc: "Seu Roteiro de gravação de vídeos está pronto para avaliação.",
+    crawlerDesc: "Seu Roteiro de gravação de vídeos está pronto. Toque para revisar os roteiros, aprovar o que estiver correto e solicitar ajustes.",
+    portalOgDesc: "Seu Roteiro de gravação de vídeos está pronto. Toque para revisar os roteiros, aprovar o que estiver correto e solicitar ajustes. Link seguro · Agenda ID Seven.",
+    ackOgDesc: "Acompanhe a aprovação do seu Roteiro de gravação de vídeos. Link seguro · Agenda ID Seven.",
+    successOgDesc: "Roteiro aprovado. Link seguro · Agenda ID Seven.",
+    successDocTitle: "Roteiro aprovado",
+    successH1: "Roteiro de gravação de vídeos aprovado com sucesso!",
+    ackH2Themes: "Roteiros aprovados!",
+    ackMsgThemes: "A equipe foi notificada da sua aprovação e seguirá com a gravação dos vídeos. Qualquer novidade chega neste mesmo link.",
+    ackNextThemes: "Aguardando produção dos vídeos",
+    docSuffix: "Aprovação de roteiro",
+    imgAlt: "Agenda ID Seven — Aprovar roteiro",
+    titleFallback: "Roteiro de gravação de vídeos",
+    freqPill: "Quantidade",
+    itensWord: "roteiros",
+    itemSing: "roteiro aprovado", itemPlur: "roteiros aprovados",
+    itemName: "Roteiro",
+    histApprove: "Aprovou o roteiro", histComment: "Comentou no roteiro",
+    actApproveLabel: "Cliente aprovou os roteiros", actCommentLabel: "Cliente comentou no roteiro",
+    jsO: "o roteiro", jsEm: "no roteiro", jsDo: "do roteiro", jsSeu: "seu roteiro", jsDeste: "deste roteiro",
+    notif: {
+      themes_sent_to_client:     { title: "Roteiro de gravação de vídeos para análise", body: "Os roteiros estão prontos para a sua revisão." },
+      theme_adjusted_by_team:    { title: "Roteiro corrigido", body: "O roteiro ajustado foi reenviado. Toque para revisar." },
+      themes_approved_by_client: { title: "Roteiros aprovados", body: "A etapa de roteiros foi aprovada com sucesso." },
+      final_approved_by_client:  { title: "Roteiro finalizado", body: "Seu Roteiro de gravação de vídeos foi aprovado com sucesso." },
+    },
+  },
+};
+function premiumTypeOf(task) {
+  const sec = (task && typeof task.sector === "string") ? task.sector.trim().toLowerCase() : "";
+  return sec === "roteiro" ? PREMIUM_TYPES.roteiro : PREMIUM_TYPES.cronograma;
+}
 function ogClientBase(origin) {
   return (typeof origin === "string" && /^https:\/\//.test(origin)) ? origin : "https://aprovar.agendaidseven.com.br";
 }
-function ogClientMeta(origin, titleRaw, descRaw, pathRel) {
+function ogClientMeta(origin, titleRaw, descRaw, pathRel, altRaw) {
   const base = ogClientBase(origin);
   const title = escapeHtml(titleRaw);
   const desc = escapeHtml(descRaw);
+  // F3.3.73I6C17 — alt dinâmico por tipo; default preserva o texto atual (cronograma).
+  const alt = escapeHtml(altRaw || "Agenda ID Seven — Aprovar cronograma");
   const img = base + OG_IMG_PATH;
   const url = base + (pathRel || "/");
   return '<meta property="og:type" content="website"/>\n' +
@@ -74,7 +145,7 @@ function ogClientMeta(origin, titleRaw, descRaw, pathRel) {
     '<meta property="og:image:type" content="image/jpeg"/>\n' +
     '<meta property="og:image:width" content="1200"/>\n' +
     '<meta property="og:image:height" content="630"/>\n' +
-    '<meta property="og:image:alt" content="Agenda ID Seven — Aprovar cronograma"/>\n' +
+    '<meta property="og:image:alt" content="' + alt + '"/>\n' +
     '<meta name="twitter:card" content="summary_large_image"/>\n' +
     '<meta name="twitter:title" content="' + title + '"/>\n' +
     '<meta name="twitter:description" content="' + desc + '"/>\n' +
@@ -83,14 +154,15 @@ function ogClientMeta(origin, titleRaw, descRaw, pathRel) {
 // HTML MÍNIMO p/ crawlers (WhatsApp/Facebook/Twitter/Telegram/LinkedIn): só OG no topo do
 // <head> + corpo simples. NÃO depende do CSS/JS do portal — elimina qualquer chance de o
 // preview falhar por tamanho/ordem do HTML. O usuário/navegador normal recebe o portal completo.
-function crawlerCardHtml(origin, clientName, token) {
+function crawlerCardHtml(origin, clientName, token, ptype) {
+  const pt = ptype || PREMIUM_TYPES.cronograma;   // F3.3.73I6C17 — tipo dinâmico; default = cronograma (texto EXATO de antes)
   const cli = clientName || "Cliente";
-  const title = "Aprovar cronograma — " + cli;
-  const desc = "Sua área de aprovação está pronta. Toque para revisar os temas, aprovar o que estiver correto e solicitar ajustes.";
+  const title = pt.aprLabel + " — " + cli;
+  const desc = pt.crawlerDesc;
   const base = ogClientBase(origin);
   const link = base + "/cliente/cronograma/" + token;
   return '<!doctype html>\n<html lang="pt-BR"><head>\n<meta charset="utf-8"/>\n' +
-    ogClientMeta(origin, title, desc, "/cliente/cronograma/" + token) +
+    ogClientMeta(origin, title, desc, "/cliente/cronograma/" + token, pt.imgAlt) +
     '<meta name="viewport" content="width=device-width, initial-scale=1"/>\n' +
     '<title>' + escapeHtml(title) + '</title>\n' +
     '<meta name="description" content="' + escapeHtml(desc) + '"/>\n' +
@@ -99,16 +171,18 @@ function crawlerCardHtml(origin, clientName, token) {
     '<p><a href="' + escapeHtml(link) + '">Abrir área de aprovação</a></p>\n' +
     '</body></html>';
 }
-function shareCardHtml(origin, token) {
+function shareCardHtml(origin, token, ptype) {
   // V64.39 — pagina LEVE so para preview OG (WhatsApp/Facebook/Twitter/Telegram/LinkedIn).
   // OG/Twitter PRIMEIRO no <head>, ANTES de qualquer script. og:image absoluto HTTPS 1200x630
   // (image/jpeg). SEM script/redirect: humano abre por LINK MANUAL; crawler le o card e para.
+  // F3.3.73I6C17 — tipo dinâmico (cronograma×roteiro); default = cronograma (texto EXATO de antes).
+  const pt = ptype || PREMIUM_TYPES.cronograma;
   const base = ogClientBase(origin);
-  const title = "Aprovar cronograma";
-  const desc = "Seu cronograma está pronto para avaliação.";
+  const title = pt.aprLabel;
+  const desc = pt.shareDesc;
   const portal = base + "/cliente/cronograma/" + token;
   return '<!doctype html>\n<html lang="pt-BR"><head>\n<meta charset="utf-8"/>\n' +
-    ogClientMeta(origin, title, desc, "/share/cronograma/" + token) +
+    ogClientMeta(origin, title, desc, "/share/cronograma/" + token, pt.imgAlt) +
     '<meta name="viewport" content="width=device-width, initial-scale=1"/>\n' +
     '<title>' + escapeHtml(title) + '</title>\n' +
     '<meta name="description" content="' + escapeHtml(desc) + '"/>\n' +
@@ -282,7 +356,17 @@ export default {
     {
       const shareMatch = url.pathname.match(/^\/share\/cronograma\/([A-Za-z0-9_-]{4,128})\/?$/);
       if (shareMatch && request.method === "GET") {
-        return htmlResponseCacheable(shareCardHtml(url.origin, shareMatch[1]), 200);
+        // F3.3.73I6C17 — resolve o TIPO (cronograma×roteiro) pelos dados REAIS da task
+        // (task.sector). QUALQUER falha (auth/query/token não encontrado) → card de
+        // cronograma como sempre foi (byte-idêntico) — a rota NUNCA quebra o preview
+        // nem passa a responder 5xx por causa da dependência nova. Cache inalterado.
+        let ptype = PREMIUM_TYPES.cronograma;
+        try {
+          const at = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+          const task = await queryTaskByToken(env, at, shareMatch[1]);
+          if (task) ptype = premiumTypeOf(task);
+        } catch (_) { /* fallback cronograma (comportamento atual) */ }
+        return htmlResponseCacheable(shareCardHtml(url.origin, shareMatch[1], ptype), 200);
       }
     }
 
@@ -303,7 +387,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-legacy-risk" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c17-roteiro-title-parity" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1316,12 +1400,14 @@ async function hmacSha1Hex(key, msg) {
 // para o crawler — assim o preview nunca cai em "cru/pobre").
 async function handleClientCronogramaCrawler(token, env, origin) {
   let client = "Cliente";
+  let ptype = PREMIUM_TYPES.cronograma;   // F3.3.73I6C17 — default = cronograma (texto EXATO de antes)
   try {
     const accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
     const task = await queryTaskByToken(env, accessToken, token);
     if (task && task.client) client = task.client;
+    if (task) ptype = premiumTypeOf(task);
   } catch (_) { /* mantém card premium genérico */ }
-  return new Response(crawlerCardHtml(origin, client, token), {
+  return new Response(crawlerCardHtml(origin, client, token, ptype), {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
@@ -1829,7 +1915,7 @@ async function handleClientPushTest(token, request, env) {
     return json({ ok: true, sent: 0, total: 0, reason: "sem_subscription" }, 200, env);
   }
   const out = await broadcastWebPush(env, subs,
-    { title: "Teste de avisos — Agenda ID Seven", body: "Os avisos deste cronograma estão funcionando. 💜",
+    { title: "Teste de avisos — Agenda ID Seven", body: "Os avisos " + (premiumTypeOf(task).jsDeste) + " estão funcionando. 💜",
       openUrl: "/cliente/cronograma/" + token, tag: "idseven-push-test",
       icon: "/og/idseven-logo.png", badge: "/og/idseven-badge.png",
       eventType: "push_test", taskId: task.id, phase: "test" },
@@ -2083,8 +2169,12 @@ const NOTIFY_EVENTS = {
 };
 
 async function notifyWorkflowEvent(env, task, eventType, payload) {
-  const ev = NOTIFY_EVENTS[eventType];
+  let ev = NOTIFY_EVENTS[eventType];
   if (!ev) return { ok: false, error: "evento desconhecido: " + eventType };
+  // F3.3.73I6C17 — copy por TIPO: roteiro sobrepõe título/corpo dos eventos de CLIENTE;
+  // cronograma usa a tabela canônica EXATA (override nulo). Fase/destino inalterados.
+  const _ovr = premiumTypeOf(task).notif;
+  if (_ovr && _ovr[eventType]) ev = Object.assign({}, ev, _ovr[eventType]);
   const token = (task && (task.clientReviewToken || task.shareToken)) || (payload && payload.token) || "";
   const openUrl = token ? ("/cliente/cronograma/" + token) : "/";
   // anti-duplicidade: 1 disparo por (task|evento|item) numa janela de 60s
@@ -2153,7 +2243,7 @@ async function handleClientCronogramaState(token, env) {
     const out = items.map((raw, i) => {
       const c = (raw && typeof raw === "object") ? raw : {};
       const ov = ci["i" + i] || {};
-      const tema = (typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || ("Conteúdo " + (i + 1)));
+      const tema = (typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || (premiumTypeOf(task).itemName + " " + (i + 1)));
       const legRaw = (typeof ov.legenda === "string") ? ov.legenda : (typeof c.legenda === "string" ? c.legenda : (typeof c.caption === "string" ? c.caption : (typeof c.lg === "string" ? c.lg : (typeof c.l === "string" ? c.l : ""))));
       return { i, cs: ov.cs || c.cs || "", tema, legenda: (legRaw || "").toString(),
         feed: firstUrl(c.feed) || (c.feedImageUrl || ""), story: firstUrl(c.story || c.stories) || (c.storyImageUrl || "") };
@@ -2236,9 +2326,11 @@ async function writeClientGranular(env, accessToken, task, e) {
   // DO CLIENTE (`clientFlowStatus`/`clientWorkflowStage`). A tarefa NÃO sai do fluxo do
   // cliente quando vai ao designer; só sai de cena na aprovação FINAL (clientFlowStatus=concluido).
   //   client: 'aprovado' (temas aprovados) | 'revisao' (pediu ajuste) | 'concluido' (aprovação final)
+  // F3.3.73I6C17 — labels de histórico por TIPO (cronograma preserva o texto EXATO).
+  const _pt = premiumTypeOf(task);
   const approveG = isFinalPhase
     ? { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou_final", label: "Cliente aprovou a entrega final", col: "concluido", stage: "concluido", client: "concluido" }
-    : { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou",       label: "Cliente aprovou os temas/cronograma", col: "andamento", stage: "producao", client: "aprovado" };
+    : { cs: "aprovado_cliente", rev: "aprovado", htype: "cliente_aprovou",       label: _pt.actApproveLabel, col: "andamento", stage: "producao", client: "aprovado" };
   const STAT = {
     approve:      approveG,
     approveAll:   approveG,
@@ -2248,7 +2340,7 @@ async function writeClientGranular(env, accessToken, task, e) {
     editTheme:    { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente editou o tema de um conteúdo",    col: "revisao", stage: "revisao", client: "revisao" },
     editLegenda:  { cs: "editado_cliente",    rev: "editado", htype: "cliente_editou",        label: "Cliente editou a legenda de um conteúdo", col: "revisao", stage: "revisao", client: "revisao" },
     noteItem:     { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente deixou uma observação", col: null, stage: null, client: null },
-    comment:      { cs: null, rev: null, htype: "cliente_comentou", label: "Cliente comentou no cronograma", col: null, stage: null, client: null },
+    comment:      { cs: null, rev: null, htype: "cliente_comentou", label: _pt.actCommentLabel, col: null, stage: null, client: null },
   };
   let g = STAT[e.type] || { cs: null, rev: null, htype: "cliente_acao", label: "Ação do cliente", col: null, stage: null, client: null };
 
@@ -2467,7 +2559,14 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-function frequencyLabel(t) {
+function frequencyLabel(t, ptype) {
+  // F3.3.73I6C17 — roteiro: quantidade (q4/q6/q8/q12 gravado pelo Desktop em cronSub);
+  // fallback "Roteiro". Cronograma: comportamento EXATO de antes.
+  if (ptype && ptype.key === "roteiro") {
+    const q = (t.cronSub || t.subtype || "").toString().toLowerCase();
+    const qmap = { q4: "4 roteiros", q6: "6 roteiros", q8: "8 roteiros", q12: "12 roteiros" };
+    return qmap[q] || "Roteiro";
+  }
   const f = (t.freq || t.frequencia || t.cronFrequency || "").toString().toLowerCase();
   const map = { semanal: "Semanal", quinzenal: "Quinzenal", mensal: "Mensal", unico: "Único" };
   return map[f] || (f ? f.charAt(0).toUpperCase() + f.slice(1) : "Cronograma");
@@ -2493,8 +2592,16 @@ function clientPhase(task) {
   }
   return "themes";
 }
-function phaseCopy(phase) {
-  if (phase === "final") return {
+function phaseCopy(phase, ptype) {
+  // F3.3.73I6C17 — copy por TIPO: cronograma preserva o texto EXATO; roteiro identifica
+  // "Roteiro de gravação de vídeos" (designer não participa do fluxo do roteiro).
+  const rot = !!(ptype && ptype.key === "roteiro");
+  if (phase === "final") return rot ? {
+    kicker: "Aprovação final do roteiro",
+    title: "Aprovação final do Roteiro de gravação de vídeos",
+    sub: "Confira os roteiros finais. Ao aprovar aqui, o processo é encerrado.",
+    cta: "Aprovar versão final",
+  } : {
     kicker: "Aprovação final do cronograma",
     title: "Aprovação final do cronograma",
     sub: "Confira legendas, Feed e Story. Ao aprovar aqui, o processo é encerrado.",
@@ -2506,7 +2613,12 @@ function phaseCopy(phase) {
     sub: "Confira as legendas e as artes. Ainda haverá uma etapa final.",
     cta: "Aprovar legendas e artes",
   };
-  return {
+  return rot ? {
+    kicker: "Aprovação de roteiros",
+    title: "Roteiro de gravação de vídeos",
+    sub: "Você está aprovando os roteiros de gravação de vídeos. A equipe seguirá com a produção dos vídeos.",
+    cta: "Aprovar roteiros",
+  } : {
     kicker: "Aprovação de temas",
     title: "Aprovação de temas",
     sub: "Você está aprovando apenas os temas. A equipe seguirá com a produção (designer + legendas + posts).",
@@ -2533,15 +2645,16 @@ function clientAckedPhase(task) {
 function renderClientPhaseAckHtml(task, token, phase, origin) {
   const cliente = escapeHtml(task.client || "Cliente");
   const titulo = escapeHtml(task.title || "Cronograma");
+  const pt = premiumTypeOf(task);   // F3.3.73I6C17 — cronograma preserva o texto EXATO
   const isThemes = phase === "themes";
-  const h2 = isThemes ? "Temas aprovados!" : "Legendas e artes aprovadas!";
+  const h2 = isThemes ? pt.ackH2Themes : "Legendas e artes aprovadas!";
   const msg = isThemes
-    ? "A equipe seguirá para a etapa de produção (designer, legendas e posts). Em breve você receberá a versão final neste mesmo link para a aprovação final."
+    ? pt.ackMsgThemes
     : "A equipe enviará a versão final completa para a sua aprovação. Em breve você receberá o aviso neste mesmo link.";
-  const next = isThemes ? "Aguardando produção · legendas e artes" : "Aguardando aprovação final";
+  const next = isThemes ? pt.ackNextThemes : "Aguardando aprovação final";
   return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
 '<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>\n' +
-ogClientMeta(origin, "Aprovar cronograma — " + (task.client || "Cliente"), "Acompanhe a aprovação do seu cronograma. Link seguro · Agenda ID Seven.", "/cliente/cronograma/" + token) +
+ogClientMeta(origin, pt.aprLabel + " — " + (task.client || "Cliente"), pt.ackOgDesc, "/cliente/cronograma/" + token, pt.imgAlt) +
 '<title>' + cliente + ' · ' + titulo + ' · Visão do Cliente</title>\n<meta name="theme-color" content="#070810"/>\n' +
 '<meta name="robots" content="noindex,nofollow"/>\n' +
 '<style>' + CV_CSS + '</style></head><body>\n' +
@@ -2772,6 +2885,8 @@ a{color:#b9a4ff;text-decoration:none}
 `;
 
 const CV_JS = `
+/* F3.3.73I6C17 — vocabulário do TIPO (injetado antes deste bloco); default seguro = cronograma. */
+var PT=(typeof PT==='object'&&PT&&PT.o)?PT:{o:'o cronograma',em:'no cronograma',de:'do cronograma',seu:'seu cronograma',deste:'deste cronograma',itens:'temas'};
 var CIC={check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',revise:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/></svg>',edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/></svg>'};
 var URLX='/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/action';
 var scrim=document.getElementById('scrim'),sheet=document.getElementById('sheet'),toastEl=document.getElementById('toast'),pending=null,tt;
@@ -2784,7 +2899,7 @@ function setBadge(i,cs){var c=card(i);if(!c)return;var b=c.querySelector('[data-
 /* V64.48 — RODAPÉ DINÂMICO (bug 1.0.133): o botão principal segue o estado REAL dos badges
    NESTA sessão. Com QUALQUER ajuste/edição pendente → "Enviar feedback" (nunca "Aprovar
    temas e liberar produção"); só com tudo sem pendência → CTA de aprovação da fase. */
-function footerCta(){return PHASE==='final'?'Aprovar versão final':(PHASE==='production'?'Aprovar legendas e artes':'Aprovar temas');}
+function footerCta(){return PHASE==='final'?'Aprovar versão final':(PHASE==='production'?'Aprovar legendas e artes':'Aprovar '+PT.itens);}
 function badgeStats(){var total=0,apr=0,rev=0;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){total++;var t=(b.textContent||'');
   if(t.indexOf('Aprovado')>=0)apr++;else if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)rev++;});return {total:total,apr:apr,rev:rev};}
 function anyRevBadge(){return badgeStats().rev>0;}
@@ -2867,7 +2982,7 @@ document.addEventListener('click',function(e){
   else if(act==='editTheme'){openInput('Editar tema — Conteúdo '+(i+1),'Sugira um novo tema para este conteúdo.','ok',getText(i,'tema'),false,function(v){if(!v.trim())return;post({action:'editTheme',contentIndex:i,value:v},null,function(){setTheme(i,v);setBadge(i,'editado');addHist('edit','Editou o tema de Conteúdo '+(i+1));toast('Tema atualizado','ok');syncFooter();});});}
   else if(act==='editLegenda'){openInput('Editar legenda — Conteúdo '+(i+1),'Ajuste a legenda deste conteúdo do jeito que preferir.','ok',getText(i,'legenda'),true,function(v){post({action:'editLegenda',contentIndex:i,value:v},null,function(){setLegenda(i,v);setBadge(i,'editado');addHist('edit','Editou a legenda de Conteúdo '+(i+1));toast('Legenda atualizada','ok');syncFooter();});});}
   else if(act==='noteItem'){openInput('Observação — Conteúdo '+(i+1),'Deixe uma observação específica para este conteúdo.','ok','',true,function(v){if(!v.trim())return;post({action:'noteItem',contentIndex:i,note:v},null,function(){setItemNote(i,v);addHist('note','Comentou em Conteúdo '+(i+1));toast('Observação registrada','ok');});});}
-  else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar no cronograma como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
+  else if(act==='revision'){openInput('Pedir revisão geral','Conte o que precisa mudar '+PT.em+' como um todo.','rev','',true,function(v){if(!v.trim())return;post({action:'revision',note:v},null,function(){addHist('rev','Pediu revisão geral');toast('Revisão enviada','ok');});});}
   else if(act==='ackFeedback'){
     // V64.47 — "Enviar feedback" agora é CANÔNICO: se TODOS os conteúdos estão aprovados,
     // envia approveAll de verdade (fecha a fase no servidor) e mostra "Temas aprovados e
@@ -2892,7 +3007,7 @@ document.addEventListener('click',function(e){
     // V64.16 — GATE client-side: se algum conteúdo está com ajuste/edição pedido, NÃO aprova tudo.
     var anyRev=false;document.querySelectorAll('#contents [data-card] [data-badge]').forEach(function(b){var t=(b.textContent||'');if(t.indexOf('Ajuste')>=0||t.indexOf('Editado')>=0)anyRev=true;});
     if(anyRev){toast('Há ajuste pendente — enviando como feedback.','ok');post({action:'approveAll'},a,function(){addHist('rev','Enviou feedback (ajustes pendentes)');clientFeedbackSent();});return;}
-    var msg=ph==='final'?'Confirmar APROVAÇÃO FINAL do cronograma? Esta é a etapa que encerra o processo.'
+    var msg=ph==='final'?'Confirmar APROVAÇÃO FINAL '+PT.de+'? Esta é a etapa que encerra o processo.'
       :ph==='production'?'Confirmar aprovação das legendas e artes? A equipe ainda enviará a versão final para você.'
       :'Confirmar aprovação dos TEMAS? A equipe seguirá com a produção e enviará a versão final depois.';
     if(!confirm(msg))return;
@@ -2905,10 +3020,10 @@ document.addEventListener('click',function(e){
       // Intermediário: temas aprovados (fase themes) ou produção aprovada (production).
       if(j&&j.phase==='themes'){addHist('ok','Aprovou os temas');clientThemesApproved();return;}
       if(j&&j.phase==='production'){addHist('ok','Aprovou legendas e artes');clientProductionApproved();return;}
-      addHist('ok','Aprovou o cronograma');toast('Aprovação registrada','ok');
+      addHist('ok','Aprovou '+PT.o);toast('Aprovação registrada','ok');
     });}
   else if(act==='closePage'){try{window.close();}catch(_){ }}
-  else if(act==='sendGenObs'){var ta=document.getElementById('genObs');var v=ta?ta.value.trim():'';if(!v){toast('Escreva uma observação primeiro.','err');return;}post({action:'comment',note:v},a,function(){if(ta)ta.value='';addHist('note','Comentou no cronograma');toast('Observação enviada','ok');});}
+  else if(act==='sendGenObs'){var ta=document.getElementById('genObs');var v=ta?ta.value.trim():'';if(!v){toast('Escreva uma observação primeiro.','err');return;}post({action:'comment',note:v},a,function(){if(ta)ta.value='';addHist('note','Comentou '+PT.em);toast('Observação enviada','ok');});}
 });
 /* V64.16/18 — TEMPO REAL: polling leve do MESMO link (sem reabrir, sem gerar link novo). */
 var LAST_SIG=null, FEEDBACK_MODE=false, FEEDBACK_BASE=null, LIVE_EL=null, SUCCESS_MODE=false;
@@ -2927,7 +3042,7 @@ function liveTick(ok){
 function teamUpdated(){
   var box=document.getElementById('teamupd');
   if(box){box.style.display='block';
-    box.innerHTML='<div style="border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.12);border-radius:14px;padding:14px;text-align:center"><div style="font-weight:800;color:#34D399;margin-bottom:4px">A equipe atualizou seu cronograma ✦</div><div style="color:var(--mut);font-size:13px;margin-bottom:10px">As correções estão prontas. Vamos abrir a versão atualizada para você revisar novamente.</div><button class="btn primary" onclick="location.reload()" style="width:auto;padding:10px 18px">Revisar agora</button></div>';}
+    box.innerHTML='<div style="border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.12);border-radius:14px;padding:14px;text-align:center"><div style="font-weight:800;color:#34D399;margin-bottom:4px">A equipe atualizou '+PT.seu+' ✦</div><div style="color:var(--mut);font-size:13px;margin-bottom:10px">As correções estão prontas. Vamos abrir a versão atualizada para você revisar novamente.</div><button class="btn primary" onclick="location.reload()" style="width:auto;padding:10px 18px">Revisar agora</button></div>';}
   toast('A equipe atualizou — abrindo a versão revisada…','ok');
   setTimeout(function(){location.reload();},2200);   // mesmo link, sem reabrir o WhatsApp
 }
@@ -3005,7 +3120,7 @@ function subscribeClientPush(cb){
     if(!sub)return;
     diagSet('endpoint',(sub.endpoint||'').slice(-12));
     return sendSubToWorker(sub).then(function(resp){
-      if(resp&&resp.ok===true){pushCtaState('Avisos ativados ✓ Você será notificado a cada atualização deste cronograma.','pc-ok',null);done(true);}
+      if(resp&&resp.ok===true){pushCtaState('Avisos ativados ✓ Você será notificado a cada atualização '+PT.deste+'.','pc-ok',null);done(true);}
       else{pushCtaState('Sua permissão foi dada, mas NÃO conseguimos salvar a inscrição no servidor ('+((resp&&resp.error)||('HTTP '+(resp&&resp._http)))+'). Vamos manter o WhatsApp como canal de aviso.','pc-warn','Tentar novamente');done(false);}
     });
   }).catch(function(e){diagSet('lastSubscribeStatus','EXCEPTION '+(e&&e.message));pushCtaState('Não foi possível ativar os avisos agora. Vamos manter o WhatsApp como canal de aviso.','pc-warn','Tentar novamente');done(false);});
@@ -3022,8 +3137,8 @@ function pushGateShow(){
   // overlay transparente bloqueando os toques nos cards).
   d.style.cssText='position:fixed;inset:0;z-index:90;background:rgba(5,6,12,.82);display:flex;align-items:center;justify-content:center;padding:20px';
   d.innerHTML='<div class="pg-card"><div class="pg-ic">'+CIC.check+'</div>'+
-    '<h3>Receba avisos deste cronograma em tempo real</h3>'+
-    '<p>Para receber avisos quando a equipe enviar ajustes, legendas, posts ou finalizar o cronograma, ative as notificações deste cronograma.</p>'+
+    '<h3>Receba avisos '+PT.deste+' em tempo real</h3>'+
+    '<p>Para receber avisos quando a equipe enviar ajustes, legendas, posts ou finalizar '+PT.o+', ative as notificações '+PT.deste+'.</p>'+
     '<button class="btn primary" id="pgOn">Ativar avisos em tempo real</button>'+
     '<button class="btn ghost" id="pgSkip">Continuar sem avisos</button>'+
     '<div class="pg-foot">Sem a ativação, os avisos continuam chegando pelo WhatsApp.</div></div>';
@@ -3062,7 +3177,7 @@ function setupClientWebPush(){
           if(!skip2)pushGateShow();}
       }).catch(function(){pushCtaState('Avisos ativados no navegador (servidor não respondeu agora — verificaremos no próximo acesso).','pc-ok',null);});
       return;}
-    pushCtaState('Quer ser avisado na hora a cada atualização deste cronograma?','', 'Receber avisos deste cronograma');
+    pushCtaState('Quer ser avisado na hora a cada atualização '+PT.deste+'?','', 'Receber avisos '+PT.deste);
     var skip=false;try{skip=localStorage.getItem('wp_gate_skip_'+TOKEN)==='1';}catch(_){}
     if(!skip)pushGateShow();   // PRIMEIRO acesso sem inscrição: ativação assistida
   }).catch(function(){pushCtaState('Você receberá os avisos pelo WhatsApp.','pc-warn',null);});
@@ -3118,9 +3233,10 @@ try{pushDebugPanel();}catch(_){}
 `;
 
 function renderClientHtml(task, token, env, origin) {
+  const pt = premiumTypeOf(task);   // F3.3.73I6C17 — cronograma×roteiro pelos dados reais
   const cliente = escapeHtml(task.client || "Cliente");
-  const titulo = escapeHtml(task.title || "Cronograma");
-  const freq = escapeHtml(frequencyLabel(task));
+  const titulo = escapeHtml(task.title || pt.titleFallback);
+  const freq = escapeHtml(frequencyLabel(task, pt));
   const status = escapeHtml(statusLabel(task));
   const items = Array.isArray(task.cronWeeks) ? task.cronWeeks
     : (Array.isArray(task.cronContents) ? task.cronContents : []);
@@ -3130,7 +3246,7 @@ function renderClientHtml(task, token, env, origin) {
   // ('themes' = só temas; 'production' = legendas/posts; 'final' = aprovação final).
   // Tela de sucesso só aparece quando a fase é 'final' (gating do clientSuccess).
   const phase = clientPhase(task);
-  const phaseUi = phaseCopy(phase);
+  const phaseUi = phaseCopy(phase, pt);
   // V64.15/V64.47 — aprovação PARCIAL POR FASE: só pendência da fase ATUAL esconde o CTA
   // "Aprovar todos". Se TODOS os conteúdos da fase estão aprovados, o portal volta ao CTA
   // normal mesmo com clientReview.status='revisao' herdado (ciclo ajuste→correção→aprovação).
@@ -3223,14 +3339,14 @@ function renderClientHtml(task, token, env, origin) {
   if (acts.length) {
     histHtml = acts.map(function (a) {
       const map = {
-        approve: ["hb-ok", ICN.check, "Aprovou o cronograma"], approveAll: ["hb-ok", ICN.check, "Aprovou o cronograma"],
+        approve: ["hb-ok", ICN.check, pt.histApprove], approveAll: ["hb-ok", ICN.check, pt.histApprove],
         approveItem: ["hb-ok", ICN.check, "Aprovou"], reviseItem: ["hb-rev", ICN.revise, "Pediu ajuste em"],
         revision: ["hb-rev", ICN.revise, "Pediu revisão geral"], edit_request: ["hb-edit", ICN.edit, "Pediu edição"],
         editTheme: ["hb-edit", ICN.edit, "Editou o tema de"], editLegenda: ["hb-edit", ICN.edit, "Editou a legenda de"], noteItem: ["hb-note", ICN.note, "Comentou em"],
-        comment: ["hb-note", ICN.note, "Comentou no cronograma"],
+        comment: ["hb-note", ICN.note, pt.histComment],
       };
       const m = map[a.type] || ["hb-note", ICN.note, "Ação em"];
-      const tgt = (a.contentIndex != null && a.contentIndex !== "") ? (" Conteúdo " + (Number(a.contentIndex) + 1)) : "";
+      const tgt = (a.contentIndex != null && a.contentIndex !== "") ? (" " + pt.itemName + " " + (Number(a.contentIndex) + 1)) : "";
       let extra = "";
       if (a.newValue) extra = '<div class="hdiff"><span class="new">' + escapeHtml(String(a.newValue).slice(0, 160)) + '</span></div>';
       else if (a.note) extra = '<div class="hdiff">' + escapeHtml(String(a.note).slice(0, 200)) + '</div>';
@@ -3241,8 +3357,8 @@ function renderClientHtml(task, token, env, origin) {
   const pct = total ? Math.round(doneCount / total * 100) : 0;
   // V64.22 — card premium do link: og:title de AÇÃO + descrição + banner 1200×630.
   // Meta OG geradas pelo helper compartilhado (mesmo card em TODAS as páginas do cliente).
-  const ogTitleRaw = "Aprovar cronograma — " + (task.client || "Cliente");
-  const ogDescRaw = "Sua área de aprovação está pronta. Toque para revisar os temas, aprovar o que estiver correto e solicitar ajustes. Link seguro · Agenda ID Seven.";
+  const ogTitleRaw = pt.aprLabel + " — " + (task.client || "Cliente");
+  const ogDescRaw = pt.portalOgDesc;
   const ogTitle = escapeHtml(ogTitleRaw);
   const ogDesc = escapeHtml(ogDescRaw);
 
@@ -3250,8 +3366,8 @@ function renderClientHtml(task, token, env, origin) {
 '<meta charset="utf-8"/>\n' +
 '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>\n' +
 // OG/Twitter PRIMEIRO (antes de <title>/<style>/scripts) p/ o crawler ler o card cedo.
-ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
-'<title>' + ogTitle + ' · Aprovação de cronograma</title>\n' +
+ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token, pt.imgAlt) +
+'<title>' + ogTitle + ' · ' + pt.docSuffix + '</title>\n' +
 '<meta name="description" content="' + ogDesc + '"/>\n' +
 '<meta name="theme-color" content="#5B6CFF"/>\n' +
 '<meta name="robots" content="noindex,nofollow"/>\n' +
@@ -3263,7 +3379,7 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
     '<h1>' + titulo + '</h1><div class="cli">Preparado para <b>' + cliente + '</b></div>' +
     '<div class="phase-banner phase-' + phase + '"><span class="phase-dot"></span><b>' + escapeHtml(phaseUi.title) + '</b><span class="phase-sub">' + escapeHtml(phaseUi.sub) + '</span></div>' +
     '<div class="hero-meta">' +
-      '<span class="mpill">' + ICN.cal + '<span class="mv">Frequência</span> ' + freq + '</span>' +
+      '<span class="mpill">' + ICN.cal + '<span class="mv">' + pt.freqPill + '</span> ' + freq + '</span>' +
       '<span class="mpill">' + ICN.layers + '<span class="mv">Conteúdos</span> ' + total + '</span>' +
       '<span class="mpill status"><span class="dot"></span>' + status + '</span>' +
     '</div>' +
@@ -3274,12 +3390,12 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
   '<div class="guide" id="guide">' + ICN.note + (pendingRevision
     ? '<span>Há <b>ajustes solicitados</b> em um ou mais conteúdos. A equipe foi notificada e fará as correções — você não precisa aprovar tudo agora.</span>'
     : (_allApprovedR
-    ? '<span>Todos os temas foram aprovados. Confirme em <b>' + escapeHtml(phaseUi.cta) + '</b> para a equipe seguir com a produção.</span>'
+    ? '<span>Todos os ' + pt.itensWord + ' foram aprovados. Confirme em <b>' + escapeHtml(phaseUi.cta) + '</b> para a equipe seguir com a produção.</span>'
     : '<span>Toque em <b>cada conteúdo</b> abaixo para revisar e aprovar. O botão final aparece quando todos estiverem aprovados.</span>')) + '</div>' +
   '<div class="sec"><h2>Conteúdos</h2><div class="legend"><span><i style="background:var(--ok)"></i>Aprovado</span><span><i style="background:var(--rev)"></i>Ajuste</span><span><i style="background:var(--faint)"></i>Pendente</span></div></div>' +
   '<div id="contents">' + contentsHtml + '</div>' +
   '<div class="sec"><h2>Observações gerais</h2></div>' +
-  '<div class="card pad"><textarea id="genObs" placeholder="Quer deixar um recado para a equipe sobre o cronograma como um todo? (opcional)"></textarea>' +
+  '<div class="card pad"><textarea id="genObs" placeholder="Quer deixar um recado para a equipe sobre ' + pt.jsO + ' como um todo? (opcional)"></textarea>' +
     '<div style="text-align:right;margin-top:10px"><button class="ibtn" data-act="sendGenObs">' + ICN.note + 'Enviar observação geral</button></div></div>' +
   '<div class="sec' + (acts.length ? '' : ' hide') + '" data-histsec><h2>Histórico de feedback</h2></div>' +
   '<div class="hist" id="hist">' + histHtml + '</div>' +
@@ -3298,6 +3414,8 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token) +
 '<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>' +
 '<div class="toast" id="toast"></div>' +
 '<script>\nvar TOKEN=' + JSON.stringify(token) + ';var TOTAL=' + total + ';var PHASE=' + JSON.stringify(phase) + ';\n' +
+// F3.3.73I6C17 — vocabulário do TIPO p/ o JS do portal (cronograma×roteiro); CV_JS tem default seguro.
+'var PT=' + JSON.stringify({ o: pt.jsO, em: pt.jsEm, de: pt.jsDo, seu: pt.jsSeu, deste: pt.jsDeste, itens: pt.itensWord }) + ';\n' +
 // V64.42 — feature flag de PWA Web Push: o portal so mostra opt-in/subscribe quando ENABLE_PUSH=true.
 // VAPID_PUBLIC_KEY e injetada para uso em pushManager.subscribe (aplicationServerKey).
 'var ENABLE_PUSH=' + JSON.stringify(env && env.ENABLE_CLIENT_WEB_PUSH === "true") + ';' +
@@ -3325,25 +3443,26 @@ ogClientMeta(origin, "Aprovar cronograma — Agenda ID Seven", "Sua área de apr
 /* P2: tela final PREMIUM de sucesso — exibida quando o cronograma já foi aprovado em definitivo
    (status/workflowStage = concluido). Sem botões de ação: o fluxo está encerrado. */
 function renderClientSuccessHtml(task, token, origin) {
+  const pt = premiumTypeOf(task);   // F3.3.73I6C17 — cronograma preserva o texto EXATO
   const cliente = escapeHtml(task.client || "Cliente");
-  const titulo = escapeHtml(task.title || "Cronograma");
+  const titulo = escapeHtml(task.title || pt.titleFallback);
   const items = Array.isArray(task.cronWeeks) ? task.cronWeeks : (Array.isArray(task.cronContents) ? task.cronContents : []);
   const total = items.length;
   return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
 '<meta charset="utf-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>\n' +
-ogClientMeta(origin, "Aprovar cronograma — " + (task.client || "Cliente"), "Cronograma aprovado. Link seguro · Agenda ID Seven.", "/cliente/cronograma/" + token) +
-'<title>Cronograma aprovado · ' + cliente + '</title>\n<meta name="theme-color" content="#070810"/>\n<meta name="robots" content="noindex,nofollow"/>\n' +
+ogClientMeta(origin, pt.aprLabel + " — " + (task.client || "Cliente"), pt.successOgDesc, "/cliente/cronograma/" + token, pt.imgAlt) +
+'<title>' + pt.successDocTitle + ' · ' + cliente + '</title>\n<meta name="theme-color" content="#070810"/>\n<meta name="robots" content="noindex,nofollow"/>\n' +
 '<style>' + CV_CSS + '</style></head><body>\n' +
 '<div class="wrap"><div class="topbar"><div class="brand">' + CV_LOGO + '<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div>' +
   '<div class="secure">' + ICN.shield + '<span class="lbl">Link seguro</span></div></div>' +
   '<div class="succwrap"><div class="succcard">' +
     '<div class="succ-badge">' + ICN.check + '</div>' +
-    '<h1>Cronograma aprovado com sucesso!</h1>' +
+    '<h1>' + pt.successH1 + '</h1>' +
     '<p>Sua aprovação foi registrada. A equipe já foi notificada e seguirá com a finalização.</p>' +
     '<div class="succ-meta">' +
       '<span class="pill">' + cliente + '</span>' +
       '<span class="pill">' + titulo + '</span>' +
-      '<span class="pill ok"><span class="bd" style="background:var(--ok)"></span>' + (total ? (total + ' ' + (total === 1 ? "conteúdo aprovado" : "conteúdos aprovados")) : "Aprovado") + '</span>' +
+      '<span class="pill ok"><span class="bd" style="background:var(--ok)"></span>' + (total ? (total + ' ' + (total === 1 ? pt.itemSing : pt.itemPlur)) : "Aprovado") + '</span>' +
     '</div>' +
     '<div class="succ-foot">Você já pode fechar esta página. 💜</div>' +
   '</div></div>' +
@@ -3387,10 +3506,14 @@ function maskPhone(d) {
   return s.slice(0, 2) + "*".repeat(Math.max(0, s.length - 4)) + s.slice(-2);
 }
 // Legenda OFICIAL, limpa, premium — idêntica à do Desktop. SEM URL técnica do WhatsApp.
-function buildPremiumCaption(clientName, tipo, link) {
+function buildPremiumCaption(clientName, tipo, link, ptype) {
   const nome = (clientName && String(clientName).trim()) || "cliente";
   const t = String(tipo || "").toLowerCase().trim();
-  const tdc = !t ? "cronograma" : (t.indexOf("cronograma") >= 0 ? t : ("cronograma " + t));
+  // F3.3.73I6C17 — roteiro identifica-se como "Roteiro de gravação de vídeos";
+  // cronograma mantém a montagem EXATA de antes.
+  const tdc = (ptype && ptype.key === "roteiro")
+    ? "Roteiro de gravação de vídeos"
+    : (!t ? "cronograma" : (t.indexOf("cronograma") >= 0 ? t : ("cronograma " + t)));
   return "Olá, " + nome + ". 👋\n\n" +
     "Seu *" + tdc + "* já está disponível para avaliação.\n\n" +
     "Toque no link abaixo para revisar e aprovar:\n\n" +
@@ -3427,7 +3550,7 @@ async function handleSendPremiumWhatsApp(request, env, origin) {
   const cardUrl = base + OG_IMG_PATH;                       // /og/wa-card-v64-26.jpg (Aurora Glass, 1200×630)
   const clientName = (typeof body.clientName === "string" && body.clientName.trim()) ? body.clientName.trim() : (task.client || "cliente");
   const tipo = (typeof body.cronogramaTipo === "string" && body.cronogramaTipo.trim()) ? body.cronogramaTipo.trim() : "";
-  const caption = buildPremiumCaption(clientName, tipo, link);
+  const caption = buildPremiumCaption(clientName, tipo, link, premiumTypeOf(task));
 
   // 5) Monta o payload da Cloud API. Em PRODUÇÃO (fora da janela de 24h) a Meta EXIGE template
   //    aprovado com header de IMAGEM. Se WHATSAPP_TEMPLATE_NAME existir, usa template; senão,

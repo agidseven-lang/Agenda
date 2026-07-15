@@ -232,7 +232,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_52', 'Healthcheck retorna V64.53-premium-portal', /version: "V64\.53-premium-portal"/.test(SRC));
+check('C_HEALTH_V64_52', 'Healthcheck retorna V64.59 (linha canônica; sufixo da fase atual)', /version: "V64\.59-c17-roteiro-title-parity"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -367,7 +367,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + estados (ativado/negado/incompatível/disponível)', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados ✓/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.53-premium-portal', /version: "V64\.53-premium-portal"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.59 (linha canônica; sufixo da fase atual)', /version: "V64\.59-c17-roteiro-title-parity"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -484,8 +484,9 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     (()=>{const f=(SRC.match(/function syncFooter\(\)\{[\s\S]*?\n\}/)||[''])[0];if(!f)return false;const fb=f.indexOf('ackFeedback');const ap=f.indexOf('approveAll');const rv=f.indexOf('reviewNext');return fb>=0&&ap>fb&&rv>ap&&/st\.apr>=st\.total/.test(f)&&f.indexOf('Enviar feedback')>=0;})());
   check('I9_FOOTER_CALLS','syncFooter chamado em approveItem/reviseItem/editTheme/editLegenda + applyState (poller tempo real)',
     (()=>{const n=(SRC.match(/syncFooter\(\);/g)||[]).length;return n>=5 && /toast\('Ajuste solicitado','ok'\);syncFooter\(\);/.test(SRC) && /syncFooter\(\);\s*\/\/ V64\.48/.test(SRC);})());
-  check('I10_FOOTER_CTA_PHASE','footerCta segue a fase (final/production/themes) — paridade com phaseCopy do server-render',
-    /PHASE==='final'\?'Aprovar versão final':\(PHASE==='production'\?'Aprovar legendas e artes':'Aprovar temas'\)/.test(SRC));
+  check('I10_FOOTER_CTA_PHASE','footerCta segue a fase (final/production/themes) — paridade com phaseCopy do server-render (C17: itens por TIPO; default cronograma = temas)',
+    /PHASE==='final'\?'Aprovar versão final':\(PHASE==='production'\?'Aprovar legendas e artes':'Aprovar '\+PT\.itens\)/.test(SRC) &&
+    /var PT=\(typeof PT==='object'&&PT&&PT\.o\)\?PT:\{o:'o cronograma',em:'no cronograma',de:'do cronograma',seu:'seu cronograma',deste:'deste cronograma',itens:'temas'\};/.test(SRC));
   check('I11_FOOTER_SERVER_PARITY','rodapé server-rendered (load) continua decidindo por pendingRevision (sem regressão; V64.53: barra só-botões + guia no fluxo)',
     /pendingRevision\s*\n?\s*\?\s*'<button class="btn ghost" data-act="revision">/.test(SRC) &&
     /<div class="guide" id="guide">[\s\S]{0,400}ajustes solicitados/.test(SRC));
@@ -494,8 +495,9 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   console.log(`${C.b}\n[J] V64.49 — ativação assistida de avisos + copy exata + fechamento explícito${C.x}`);
   check('J1_GATE_FN','pushGateShow/pushGateClose existem (bloco destacado no 1º acesso)',
     /function pushGateShow\(\)/.test(SRC) && /function pushGateClose\(\)/.test(SRC));
-  check('J2_GATE_COPY','Gate tem título/texto/botões EXATOS da especificação',
-    /Receba avisos deste cronograma em tempo real/.test(SRC) && /ative as notificações deste cronograma\./.test(SRC) && /Ativar avisos em tempo real/.test(SRC) && /Continuar sem avisos/.test(SRC));
+  check('J2_GATE_COPY','Gate tem título/texto/botões EXATOS da especificação (C17: "deste cronograma"/"deste roteiro" via PT; default cronograma preservado)',
+    /Receba avisos '\+PT\.deste\+' em tempo real/.test(SRC) && /ative as notificações '\+PT\.deste\+'\./.test(SRC) && /Ativar avisos em tempo real/.test(SRC) && /Continuar sem avisos/.test(SRC) &&
+    /deste:'deste cronograma'/.test(SRC));
   check('J3_GATE_NO_AUTOPROMPT','Gate NÃO pede permissão sem clique (requestPermission só dentro de subscribeClientPush)',
     (()=>{const g=(SRC.match(/function pushGateShow\(\)\{[\s\S]*?\n\}/)||[''])[0];return g.length>0&&g.indexOf('requestPermission')===-1&&/subscribeClientPush\(function\(ok\)/.test(g);})());
   check('J4_GATE_SKIP','"Continuar sem avisos" registra a escolha (localStorage por TOKEN) e mostra fallback WhatsApp',
@@ -523,8 +525,8 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     /if \(!out\.sent\) \{ result\.fallback = "whatsapp_premium"; result\.reason = "send_failed"; result\.error = "push_send_failed"; \}/.test(SRC) && /reason: subs\.length \? "VAPID_NOT_CONFIGURED" : "sem_subscription"/.test(SRC));
   check('J12_ITEM_NO_AUTOFINISH','CV_JS: aprovar item NÃO mostra tela final automaticamente (sem clientThemesApproved no callback de approveItem)',
     (()=>{const m=SRC.match(/if\(act==='approveItem'\)\{post\([\s\S]*?\}\);\}/);if(!m)return false;return m[0].indexOf('clientThemesApproved')===-1&&m[0].indexOf('clientProductionApproved')===-1&&/syncFooter\(\)/.test(m[0]);})());
-  check('J13_CTA_APROVAR_TEMAS','CTA da fase de temas = "Aprovar temas" (server phaseCopy + footerCta)',
-    /cta: "Aprovar temas",/.test(SRC) && /:'Aprovar temas'\)/.test(SRC.match(/function footerCta[\s\S]{0,200}/)[0]));
+  check('J13_CTA_APROVAR_TEMAS','CTA da fase de temas = "Aprovar temas" no cronograma (server phaseCopy) + footerCta por TIPO (C17)',
+    /cta: "Aprovar temas",/.test(SRC) && /:'Aprovar '\+PT\.itens\)/.test(SRC.match(/function footerCta[\s\S]{0,200}/)[0]));
 
   /* ═══════════ PARTE K — V64.50 (prova pós-ativação: interop real + verdade + diagnóstico) ═══════════ */
   console.log(`${C.b}\n[K] V64.50 — push pós-ativação: interop RFC 8291/8292 + verdade na inscrição + diagnóstico${C.x}`);
@@ -667,7 +669,9 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
       maskEndpoint:(e)=>'masked('+String(e||'').slice(-8)+')',
       pruneClientPushSubs:async()=>{},
     };
-    const OM=new Function(...Object.keys(scopeO),cx('NOTIFY_EVENTS')+'\n'+fx('notifyWorkflowEvent')+'\nreturn {NOTIFY_EVENTS,notifyWorkflowEvent};')(...Object.values(scopeO));
+    // F3.3.73I6C17 — o engine real agora resolve o TIPO (cronograma×roteiro) via premiumTypeOf;
+    // extrai também PREMIUM_TYPES/premiumTypeOf (tasks do teste sem sector → cronograma, copy EXATA).
+    const OM=new Function(...Object.keys(scopeO),cx('PREMIUM_TYPES')+'\n'+fx('premiumTypeOf')+'\n'+cx('NOTIFY_EVENTS')+'\n'+fx('notifyWorkflowEvent')+'\nreturn {NOTIFY_EVENTS,notifyWorkflowEvent};')(...Object.values(scopeO));
     const env={VAPID_PRIVATE_KEY:'k',VAPID_PUBLIC_KEY:'K',VAPID_SUBJECT:'mailto:x@x'};
     const SIX=[
       ['themes_sent_to_client','themes'],
