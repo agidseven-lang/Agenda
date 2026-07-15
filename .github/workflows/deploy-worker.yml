@@ -166,6 +166,43 @@ jobs:
           curl -sS --max-time 25 -X POST "$WORKER_URL/notify-designer" \
             -H "Content-Type: application/json" -d '{"id":"__dryrun_ci__","dryRun":true}'; echo
 
+      # F3.3.73I6C18B — medição READ-ONLY dos gates de latência (não altera nada;
+      # token DUMMY; GET/HEAD × UAs × 3 iterações: 1ª fria/MISS, demais quentes/HIT).
+      - name: Pós-deploy — TTFB /share (GET/HEAD × UA; X-Share-Cache MISS→HIT)
+        run: |
+          set -euo pipefail
+          mkdir -p worker-ops-logs
+          TOKEN="c18bpost0001"
+          TSV=worker-ops-logs/ttfb.tsv
+          printf 'origin\tua\tmethod\titer\thttp\tcontent_type\tttfb_s\ttotal_s\tx_share_cache\tserver_timing\n' > "$TSV"
+          for ORPAIR in "custom|https://aprovar.agendaidseven.com.br" "workers|$WORKER_URL"; do
+            ORIGIN="${ORPAIR%%|*}"; BASE="${ORPAIR#*|}"
+            for UA in "browser|Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "fb|facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" "wa|WhatsApp/2.23.20.0"; do
+              UAN="${UA%%|*}"; UAV="${UA#*|}"
+              for M in GET HEAD; do
+                for i in 1 2 3; do
+                  HDR=worker-ops-logs/h.txt
+                  args=(-sS --max-time 30 -D "$HDR" -o /dev/null -w "%{http_code}\t%{content_type}\t%{time_starttransfer}\t%{time_total}" -A "$UAV")
+                  [ "$M" = "HEAD" ] && args+=(-I)
+                  W=$(curl "${args[@]}" "$BASE/share/cronograma/$TOKEN" || printf '000\t\t0\t0')
+                  XSC=$(grep -i '^x-share-cache:' "$HDR" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true)
+                  ST=$(grep -i '^server-timing:' "$HDR" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true)
+                  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$ORIGIN" "$UAN" "$M" "$i" "$W" "${XSC:--}" "${ST:--}" >> "$TSV"
+                done
+              done
+            done
+          done
+          echo "===== TTFB matrix (token dummy $TOKEN) ====="
+          column -t -s "$(printf '\t')" "$TSV"
+          # Asserts do hotfix (com token DUMMY): HEAD text/html (nunca JSON) + handler novo
+          # ativo (X-Share-Cache presente). HIT ao vivo NÃO é assertável com dummy: task
+          # inexistente NUNCA é cacheada (regra no-poison) — prova de HIT: suíte hermética
+          # B4-B7 + validação com link real do owner (miss→hit no 2º acesso).
+          if grep -P '\tHEAD\t' "$TSV" | grep -q 'application/json'; then echo "ABORTAR: HEAD /share ainda responde JSON"; exit 1; fi
+          MISSES=$(grep -cP '\tmiss\t' "$TSV" || true)
+          [ "$MISSES" -ge 1 ] || { echo "ABORTAR: X-Share-Cache ausente — handler novo não está ativo"; exit 1; }
+          echo "OK: HEAD=text/html em todas as iterações e handler C18B ativo (X-Share-Cache presente em $MISSES respostas)"
+
       - name: Rollback AUTOMÁTICO se a validação pós-deploy falhou (validado)
         if: ${{ failure() && steps.deploy.outputs.deployed == 'true' }}
         env:
