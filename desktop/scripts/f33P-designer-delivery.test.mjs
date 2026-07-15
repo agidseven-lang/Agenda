@@ -52,7 +52,7 @@ const NAMES = [
 let SRC = ''; const missing = [];
 for (const n of NAMES) { try { SRC += grab(n) + '\n'; } catch (e) { missing.push(n); } }
 const PRELUDE =
-  'function secOf(s){return {key:(s==="cronograma"?"cronograma":"outro")};}var SECTORS=[{key:"cronograma"}];\n' +
+  'function secOf(s){return {key:(s==="cronograma"?"cronograma":"outro")};}function isClientSector(k){return k==="cronograma"||k==="roteiro";}var SECTORS=[{key:"cronograma"}];\n' +
   'function stOf(s){return {key:s,label:String(s),color:"#888"};}\n' +
   'function fmtDateTimeBR(x){return String(x);}\n' +
   'function slaPanelFinishMs(){return 0;}var SLA_PANEL_GRACE_MS=600000,SLA_PANEL_WARN_MS=1800000;\n' +
@@ -140,8 +140,8 @@ ok('FINAL: cliente ainda NÃO vê aprovado/concluído antes da aprovação', per
 
 /* ============ PROBLEMA B — chip "Concluído" NÃO pode aparecer antes da aprovação final ============ */
 const slaLabel = (t) => R.kbv2SlaLocal(t, Date.now()).label;
-ok("[src] B/kbv2SlaLocal: SLA do card relabela 'Entregue' no cronograma sem aprovação final",
-  /label:\(secOf\(t\.sector\)\.key==='cronograma'&&!isTaskCompleted\(t\)\)\?'Entregue':'Concluído'/.test(grab('kbv2SlaLocal')));
+ok("[src] B/kbv2SlaLocal: SLA do card relabela 'Entregue' no fluxo-cliente sem aprovação final",
+  /label:\(isClientSector\(secOf\(t\.sector\)\.key\)&&!isTaskCompleted\(t\)\)\?'Entregue':'Concluído'/.test(grab('kbv2SlaLocal')));
 ok("[src] B/detailSla: SLA do detalhe não diz 'Concluída' antes da aprovação final (gate isTaskCompleted)",
   /isTaskCompleted\(t\)/.test(grab('detailSla')) && grab('detailSla').includes("?'Concluída':'Entregue'"));
 ok('B: chip SLA na ENTREGA (s/legenda) = "Entregue" (NUNCA "Concluído")', slaLabel(S.entregaSemLegenda) === 'Entregue');

@@ -40,7 +40,7 @@ const NAMES = [
 ];
 let SRC = ''; const missing = [];
 for (const n of NAMES) { try { SRC += grab(n) + '\n'; } catch (e) { missing.push(n); } }
-const PRELUDE = 'function secOf(s){return {key:(s==="cronograma"?"cronograma":"outro")};}var SECTORS=[{key:"cronograma"}];\n';
+const PRELUDE = 'function secOf(s){return {key:(s==="cronograma"?"cronograma":"outro")};}function isClientSector(k){return k==="cronograma"||k==="roteiro";}var SECTORS=[{key:"cronograma"}];\n';
 const R = new Function(PRELUDE + SRC + '\n; return {' + NAMES.filter(n => !missing.includes(n)).join(',') + '};')();
 
 let pass = 0, fail = 0; const flog = [];

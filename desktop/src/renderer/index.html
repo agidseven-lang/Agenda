@@ -2314,10 +2314,15 @@ const SECTORS=[
      A definição permanece para tarefas HISTÓRICAS: secOf/alias/labels/cores/Board
      continuam resolvendo 'copywriting' e 'copy' normalmente. */
   {key:'copywriting',label:'Copywriting',color:'#22D3EE',desc:'Textos, legendas e anúncios',icon:'editnote',descontinuado:true},
-  {key:'roteiro',label:'Roteiro',color:'#F59E0B',desc:'Gancho, desenvolvimento e CTA',icon:'description'},
+  {key:'roteiro',label:'Roteiro',color:'#F59E0B',desc:'Roteiros de gravação de vídeos',icon:'description'},
   {key:'programacao_posts',label:'Programação de posts',color:'#A78BFA',desc:'Agendamento e publicação',icon:'grid'}];
 const SECTOR_ALIAS={design:'edicao_midia',copy:'copywriting',postagem:'programacao_posts'};
 function secOf(k){const kk=SECTOR_ALIAS[k]||k;return SECTORS.find(s=>s.key===kk)||SECTORS[0];}
+/* F3.3.73I6C16 — Roteiro passa a usar o MESMO fluxo-cliente do Cronograma (Card Premium):
+   cliente obrigatório, blocos de conteúdo (tema+legenda), link premium e aprovação do
+   cliente. Setores com fluxo-cliente = cronograma + roteiro. O designer NÃO participa do
+   roteiro (board do designer segue exclusivo do cronograma). */
+function isClientSector(k){return k==='cronograma'||k==='roteiro';}
 const STATUS=[
   {key:'afazer',label:'A Fazer',color:'#9BA0AB',desc:'Aguardando início',ab:'A Fazer'},
   {key:'andamento',label:'Em andamento',color:'#F59E0B',desc:'Em execução agora',ab:'Andam.'},
@@ -2345,7 +2350,15 @@ const TEMPLATES={
     semanal:{label:'Semanal',formTitle:'Copywriting — semanal',fields:[{k:'semana_ref',l:'Semana de referência',kind:'text',ph:'Ex.: 03/06 a 09/06'},{k:'qtd',l:'Quantidade',kind:'text',ph:'Ex.: 3'},{k:'tipo_conteudo',l:'Tipo de conteúdo',kind:'choice',opts:['Legenda','Anúncio','Roteiro curto','Chamada','Carrossel']},{k:'objetivo',l:'Objetivo',kind:'choice',opts:['Engajamento','Conversão','Autoridade','Captação']},{k:'tom',l:'Tom de voz',kind:'text',ph:'Ex.: Próximo, leve'},{k:'cta',l:'CTA',kind:'text',ph:'Chamada para ação'}],checklist:['Escrever copies da semana','Revisar','Aprovar','Entregar']},
     quinzenal:{label:'Quinzenal',formTitle:'Copywriting — quinzenal',fields:[{k:'periodo',l:'Período',kind:'text',ph:'Ex.: 1ª e 2ª semana'},{k:'qtd',l:'Quantidade',kind:'text',ph:'Ex.: 6'},{k:'objetivo',l:'Objetivo',kind:'choice',opts:['Engajamento','Conversão','Autoridade','Captação']},{k:'tom',l:'Tom de voz',kind:'text',ph:''},{k:'ctas',l:'CTAs',kind:'text',ph:''}],checklist:['Escrever copies da quinzena','Revisar','Aprovar','Entregar']},
     mensal:{label:'Mensal',formTitle:'Copywriting — mensal',fields:[{k:'mes_ref',l:'Mês de referência',kind:'text',ph:'Ex.: Junho/2026'},{k:'qtd',l:'Quantidade',kind:'text',ph:'Ex.: 12'},{k:'campanhas',l:'Campanhas',kind:'text',ph:''},{k:'tom',l:'Tom de voz',kind:'text',ph:''},{k:'ctas',l:'CTAs',kind:'text',ph:''}],checklist:['Escrever copies do mês','Revisar','Aprovar','Entregar']}}},
-  roteiro:{titleLabel:'Título do roteiro',titlePh:'Ex.: Roteiro Reels — bastidores',fields:[{k:'tipo_roteiro',l:'Tipo de roteiro',kind:'choice',opts:['Reels','YouTube','Story','Institucional','Captação']},{k:'gancho',l:'Gancho',kind:'text',ph:'Primeiros 3 segundos'},{k:'desenvolvimento',l:'Desenvolvimento',kind:'text',ph:'Estrutura do conteúdo'},{k:'cta',l:'CTA',kind:'text',ph:'Chamada para ação'},{k:'obs_gravacao',l:'Obs. de gravação',kind:'text',ph:'Locação, enquadramento…'}],checklist:['Criar gancho','Estruturar roteiro','Revisar','Aprovar','Enviar para gravação']},
+  /* F3.3.73I6C16 — Roteiro passa ao fluxo-cliente (Card Premium), paridade com o Cronograma:
+     Social escolhe a QUANTIDADE de roteiros (4/6/8/12); cliente é OBRIGATÓRIO; cada roteiro é
+     um bloco de conteúdo (tema/título + legenda/descrição) — o MESMO editor do cronograma
+     (dirigido por contentCount). Sem responsável/designer, sem etapa, sem período. */
+  roteiro:{titleLabel:'Título do roteiro',titlePh:'Ex.: Roteiros de gravação — Junho',subLabel:'Quantidade de roteiros',clientRequired:true,subtypes:{
+    q4:{label:'4 roteiros',formTitle:'Roteiro de gravação de vídeos — 4 roteiros',contentCount:4,fields:[],checklist:['Escrever roteiros','Revisar','Aprovar com o cliente','Enviar para gravação']},
+    q6:{label:'6 roteiros',formTitle:'Roteiro de gravação de vídeos — 6 roteiros',contentCount:6,fields:[],checklist:['Escrever roteiros','Revisar','Aprovar com o cliente','Enviar para gravação']},
+    q8:{label:'8 roteiros',formTitle:'Roteiro de gravação de vídeos — 8 roteiros',contentCount:8,fields:[],checklist:['Escrever roteiros','Revisar','Aprovar com o cliente','Enviar para gravação']},
+    q12:{label:'12 roteiros',formTitle:'Roteiro de gravação de vídeos — 12 roteiros',contentCount:12,fields:[],checklist:['Escrever roteiros','Revisar','Aprovar com o cliente','Enviar para gravação']}}},
   programacao_posts:{titleLabel:'Título da programação',titlePh:'Ex.: Post lançamento — feed',fields:[{k:'canal',l:'Canal',kind:'choice',opts:['Instagram','Facebook','YouTube','WhatsApp']},{k:'tipo_conteudo',l:'Tipo de conteúdo',kind:'choice',opts:['Feed','Reels','Stories','Carrossel']},{k:'legenda_aprovada',l:'Legenda aprovada',kind:'bool'},{k:'arte_aprovada',l:'Arte aprovada',kind:'bool'}],checklist:['Revisar arte','Revisar legenda','Agendar','Publicar','Confirmar publicação']}};
 
 /* ---- Visibilidade (TaskVisibility.kt) ---- */
@@ -4692,7 +4705,8 @@ function renderPersonBoard(){
   // F3.3.17-R5.1 — board do DESIGNER (dono é o designer em TODAS as suas tarefas de cronograma): usa o
   // EIXO do designer (DESIGNER_COLS4, que tem a coluna "Entregue") para a ENTREGA não ficar presa em
   // "Em andamento". Boards de Social/Admin seguem o eixo social (personBoardCol) — intacto.
-  const cronList=list.filter(t=>secOf(t.sector).key==='cronograma');
+  /* F3.3.73I6C16 — board do DESIGNER é EXCLUSIVO do cronograma (roteiro não vai a designer). */
+  const cronList=list.filter(t=>{const _sk=secOf(t.sector).key;return _sk==='cronograma';});
   const asDesigner=cronList.filter(t=>hasDesigner(t)&&designerOf(t)===pid);
   const designerBoardView=asDesigner.length>0&&asDesigner.length===cronList.length;
   const COLS=designerBoardView?DESIGNER_COLS4:SOCIAL_COLS4;
@@ -4719,7 +4733,7 @@ function isDesignerFlow(t){return hasDesigner(t);}
 function designerOf(t){return (t&&t.designerAssignment&&t.designerAssignment.designerId)||(t&&t.assigneeId)||null;}
 // Client flow: TODO cronograma vive no fluxo do cliente — INDEPENDENTE do designer.
 // A tarefa só "conclui" o fluxo do cliente na aprovação final (clientFlowStatus='concluido').
-function isClientFlow(t){return !!t&&secOf(t.sector).key==='cronograma';}
+function isClientFlow(t){return !!t&&isClientSector(secOf(t.sector).key);}
 // Colunas do FLUXO DO CLIENTE (eixo próprio, separado do designer).
 const CLIENT_COLS=[
   {key:'afazer',    label:'A Fazer',                     color:'#6E7480'},
@@ -4867,7 +4881,7 @@ function socialCol(t){
   // Fase Produção 1 — D2: conclusão final canônica reflete imediatamente na coluna da Social.
   // F3.3.4 item A: FONTE ÚNICA isTaskCompleted (regra idêntica; antes era inline aqui).
   if(isTaskCompleted(t))return 'concluido';
-  if(secOf(t.sector).key==='cronograma'){const c=clientCol(t);
+  if(isClientSector(secOf(t.sector).key)){const c=clientCol(t);
     if(c==='concluido')return 'concluido';if(c==='revisao')return 'revisao';if(c==='afazer')return 'afazer';
     return 'andamento';}                 // enviado/aprovado/producao/reenviado = em andamento (produzindo/acompanhando)
   // F1.1 (fluxo coerente): se há designer atribuído, derivar do eixo do designer
@@ -4937,7 +4951,7 @@ function allPhaseItemsApproved(t){
    "Concluído" exige aprovação FINAL do cliente E zero pendências operacionais.
    O status BRUTO do kanban (t.status) NUNCA, sozinho, conclui um cronograma. */
 function isFullyComplete(t){
-  if(secOf(t.sector).key!=='cronograma')return (t&&t.status)==='concluido';
+  if(!isClientSector(secOf(t.sector).key))return (t&&t.status)==='concluido';
   // Guardas duras: qualquer pendência aberta => NUNCA concluído.
   if(hasDesigner(t)&&!designerDelivered(t))return false;                 // designer ainda produzindo
   if(pendingProduction(t))return false;                                  // legenda/Feed pendente
@@ -4949,7 +4963,7 @@ function isFullyComplete(t){
 // Status operacional REAL — DERIVADO dos eixos + pendências (sempre dinâmico).
 // 'concluido' tem caminho ÚNICO: isFullyComplete (aprovação final real + sem pendências).
 function operationalCol(t){
-  if(secOf(t.sector).key!=='cronograma')return t.status||'afazer';
+  if(!isClientSector(secOf(t.sector).key))return t.status||'afazer';
   if(isFullyComplete(t))return 'concluido';                              // ÚNICO caminho para concluído
   const cf=clientCol(t);
   // V64.49: todos os itens aprovados com 'revisao' herdado = aguardando o cliente CONFIRMAR
@@ -5023,7 +5037,7 @@ function opColOf(k){return OPERATIONAL_COLS.find(c=>c.key===k)||OPERATIONAL_COLS
 // já mostra hoje via opColOf(operationalCol(t)) — mesmo resultado, agora em um lugar só.
 function clientStatusView(t){
   if(!t)return {key:'afazer',label:'A Fazer',color:'#9BA0AB',axis:'status'};
-  if(secOf(t.sector).key!=='cronograma'){const s=stOf(t.status);return {key:(t.status||'afazer'),label:s.label,color:s.color,axis:'status'};}
+  if(!isClientSector(secOf(t.sector).key)){const s=stOf(t.status);return {key:(t.status||'afazer'),label:s.label,color:s.color,axis:'status'};}
   const k=operationalCol(t);const c=opColOf(k);
   return {key:k,label:c.label,color:c.color,axis:'operational'};
 }
@@ -5142,7 +5156,7 @@ function taskTimeline(t){
 // "Meu quadro". Para CRONOGRAMA, deriva do eixo OPERACIONAL — assim o status BRUTO nunca
 // coloca um cronograma em "Concluído" antes da aprovação final real (paridade com o card).
 function boardCol4(t){
-  if(secOf(t.sector).key!=='cronograma')return t.status||'afazer';
+  if(!isClientSector(secOf(t.sector).key))return t.status||'afazer';
   const oc=operationalCol(t);
   if(oc==='concluido')return 'concluido';            // só quando isFullyComplete
   if(oc==='aguardando_revisao')return 'revisao';
@@ -5233,7 +5247,7 @@ function clientFacingNextShort(t){switch(clientFacingStatusView(t).key){
 // atribuído à tarefa, usa o eixo de trabalho do designer (assim um cronograma recém-enviado
 // cai em "A Fazer" do designer — paridade com o Android). Senão, usa o eixo operacional.
 function boardCol4For(t,uid){
-  if(secOf(t.sector).key!=='cronograma')return t.status||'afazer';
+  if(!isClientSector(secOf(t.sector).key))return t.status||'afazer';
   if(uid&&hasDesigner(t)&&designerOf(t)===uid){
     const dc=designerCol(t);
     return dc==='concluido'?'concluido':dc==='revisao'?'revisao':dc==='andamento'?'andamento':'afazer';
@@ -5377,12 +5391,12 @@ function taskCard(t, persp){
      SUA ETAPA/PRÓXIMA → TEMAS com círculos de estado → data → Detalhes/Mover/⋯.
      Fontes únicas preservadas (designerStatusView × clientFacing × clientStatusView ×
      taskTimeline). Sem checklist no cronograma (regra vigente da Parte 5). */
-  const designerView = persp==='designer' && secOf(t.sector).key==='cronograma' && hasDesigner(t);
-  const clientView = persp==='client' && secOf(t.sector).key==='cronograma';
+  const designerView = persp==='designer' && isClientSector(secOf(t.sector).key) && hasDesigner(t);
+  const clientView = persp==='client' && isClientSector(secOf(t.sector).key);
   const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
   const asg=respOf(t);const asgName=asg?(asg.name||''):'';
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'';
-  const cron=cronOf(t);const isCron=s.key==='cronograma';
+  const cron=cronOf(t);const isCron=isClientSector(s.key);
   const stage=isCron?(designerView?designerStatusView(t):(clientView?clientFacingStatusView(t):clientStatusView(t))):null;
   const topSt=designerView?designerStatusView(t):st;           // pill superior (como no modelo)
   const acc=(stage&&stage.color)||topSt.color;
@@ -5520,7 +5534,7 @@ function kbv2SlaLocal(t,nowMs){
   const d=resolveTaskDisplayState(t,nowMs||Date.now(),(typeof dtMs==='function'?dtMs:null));
   // F3.3.17-R5.1 — no CRONOGRAMA, a ENTREGA do designer (SLA cumprido) NÃO é conclusão final: o chip
   // do card NUNCA diz "Concluído" antes da aprovação final real do cliente (isTaskCompleted) → "Entregue".
-  if(d.state==='completed')return {state:'completed',sev:'verde',label:(secOf(t.sector).key==='cronograma'&&!isTaskCompleted(t))?'Entregue':'Concluído'};
+  if(d.state==='completed')return {state:'completed',sev:'verde',label:(isClientSector(secOf(t.sector).key)&&!isTaskCompleted(t))?'Entregue':'Concluído'};
   if(d.state==='none')return {state:'invalid_or_missing',sev:'neutro',label:''};
   if(d.state==='overdue')return {state:'overdue_finish',sev:'vermelho',label:'Prazo encerrado'};
   if(d.state==='warning')return {state:'warning_finish',sev:'laranja',label:'Prazo próximo'};
@@ -5558,7 +5572,7 @@ function flowThemesSentSignal(t){if(hasDesigner(t))return false;const cf=(t&&t.c
 // FONTE ÚNICA — fase canônica da tarefa. Determinística e ORDENADA (terminal → designer).
 function deriveCanonicalTaskState(t){
   if(!t)return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:false};
-  const isCron=secOf(t.sector).key==='cronograma';
+  const isCron=isClientSector(secOf(t.sector).key);
   if(!isCron){
     const s=(t.status||'afazer');
     const phase=s==='concluido'?TASK_PHASE.COMPLETED:(s==='revisao'?TASK_PHASE.DESIGNER_REVISING:(s==='andamento'?TASK_PHASE.DESIGNER_PRODUCING:TASK_PHASE.AWAITING_DESIGNER));
@@ -5607,7 +5621,7 @@ function deriveBoardColumn(t,persp){return deriveCanonicalPerspective(t,persp).c
 /* F3.3.17 — COLUNA do quadro = MESMA fonte do chip (Flow Engine canônico) no CRONOGRAMA → coluna≡chip
    por papel. Fora do cronograma mantém eixo legado (idêntico ao chip não-cron). SÓ leitura. */
 function flowBoardCol(t, role){
-  if(secOf(t.sector).key!=='cronograma'){
+  if(!isClientSector(secOf(t.sector).key)){
     if(role==='designer') return designerColView(t);
     if(role==='client') return clientCol4(t);
     return (t&&t.status)||'afazer';
@@ -5619,7 +5633,7 @@ function flowBoardCol(t, role){
    não-iniciou→A Fazer; em produção/ajuste→respectivo; ENTREGUE(não-final)→Em andamento (NUNCA
    Finalizado). Social-dono: canônico social (col≡chip). Não-cron: status legado. */
 function personBoardCol(t, pid){
-  if(secOf(t.sector).key!=='cronograma') return (t&&t.status)||'afazer';
+  if(!isClientSector(secOf(t.sector).key)) return (t&&t.status)||'afazer';
   if(isTaskCompleted(t)) return 'concluido';
   if(hasDesigner(t)&&designerOf(t)===pid){
     var dc=designerCol(t);
@@ -5637,7 +5651,7 @@ function deriveTaskLabels(t,persp){
 // Fase Produção 1 — kbv2DeriveStatus agora DELEGA ao Flow Engine no cronograma. Mantém o
 // comportamento legado (F1.2) só para setores NÃO-cronograma.
 function kbv2DeriveStatus(t, persp){
-  const isCron = secOf(t.sector).key==='cronograma';
+  const isCron = isClientSector(secOf(t.sector).key);
   if(isCron){ const p=deriveCanonicalPerspective(t, persp); return {key:p.key,label:p.label,color:p.color}; }
   // default: Social/Hub/Setor — se há designer atribuído, deriva do eixo do designer.
   if(hasDesigner(t) && typeof designerStatusView==='function')
@@ -5663,7 +5677,7 @@ function opOwnerLabel(cs, persp, isFinal){
   return owner==='social'?'Responsável: Você':(owner==='designer'?'Responsável: Designer':'Responsável: Cliente');
 }
 function deriveOperationalCardPresentation(t, persp){
-  var isCron=secOf(t.sector).key==='cronograma';
+  var isCron=isClientSector(secOf(t.sector).key);
   if(!isCron){
     var base=(hasDesigner(t)&&typeof designerStatusView==='function')?designerStatusView(t):stOf(t.status);
     var r=respOf(t); var rn=(r&&r.name)?r.name.split(' ')[0]:'';
@@ -5684,12 +5698,12 @@ function deriveOperationalCardPresentation(t, persp){
           ownerLabel:opOwnerLabel(cs,persp,isFinal)};
 }
 function kbv2Card(t, persp){
-  const designerView = persp==='designer' && secOf(t.sector).key==='cronograma' && hasDesigner(t);
-  const clientView = persp==='client' && secOf(t.sector).key==='cronograma';
+  const designerView = persp==='designer' && isClientSector(secOf(t.sector).key) && hasDesigner(t);
+  const clientView = persp==='client' && isClientSector(secOf(t.sector).key);
   const s=secOf(t.sector);const st=stOf(t.status);const d=taskDeadline(t);
   const asg=respOf(t);const asgName=asg?(asg.name||''):'';
   const req=t.by?state.users.find(u=>u.id===t.by):null;const reqName=req?req.name:'';
-  const cron=cronOf(t);const isCron=s.key==='cronograma';
+  const cron=cronOf(t);const isCron=isClientSector(s.key);
   const stage=isCron?(designerView?designerStatusView(t):(clientView?clientFacingStatusView(t):clientStatusView(t))):null;
   // F1.2 — fonte única do status no topo (resolve "Social vê A Fazer enquanto designer já moveu").
   const topSt=kbv2DeriveStatus(t, persp);
@@ -5864,7 +5878,7 @@ async function moveStatus(taskId,newStatus){
     if(newStatus==='concluido'||newStatus==='entregue')patch['designerSla.finishedAt']=now;
     // F1.1 (fluxo coerente) — propagar para os eixos visíveis ao Social e ao Cliente,
     // SEM criar campo novo. Cronograma usa clientFlowStatus; demais usam o status genérico.
-    const isCron=secOf(t.sector).key==='cronograma';
+    const isCron=isClientSector(secOf(t.sector).key);
     if(isCron){
       if(newStatus==='andamento')patch.clientFlowStatus='producao';
       else if(newStatus==='revisao')patch.clientFlowStatus='producao';   // designer ajustando ainda é produção p/ o cliente
@@ -5919,7 +5933,7 @@ function openDetails(taskId){
     '<div class="det-chips">'+((function(){
         // detail-hierarchy-v2: UM único chip de estado no topo (sem status concorrentes).
         // Cronograma usa a MESMA máquina de estados do hero (detailState) — nunca contradiz.
-        if(secOf(t.sector).key==='cronograma'){const dsc=detailState(t);
+        if(isClientSector(secOf(t.sector).key)){const dsc=detailState(t);
           return '<span class="rev-chip" style="background:'+withAlpha(dsc.color,.16)+';color:'+dsc.color+'"><span class="dotc" style="background:'+dsc.color+'"></span>'+esc(dsc.label)+'</span>';}
         return '<span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>';
       })())+
@@ -5946,11 +5960,11 @@ function openDetails(taskId){
     '</div>';
   // cronograma
   if(cron){
-    h+='<div class="det-sec">Conteúdos do cronograma <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span></div>';
+    h+='<div class="det-sec">'+(secOf(t.sector).key==='roteiro'?'Roteiros':'Conteúdos do cronograma')+' <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span></div>';
     h+=cron.list.length?('<div class="det-contents">'+cron.list.map(c=>'<div class="det-content"><div class="det-content-n">'+(c._i+1)+'</div><div class="det-content-m"><div class="det-content-t">'+esc(c.tema||'(sem tema)')+'</div>'+(c.legenda?'<div class="det-content-l">'+esc(c.legenda)+'</div>':'')+'</div></div>').join('')+'</div>'):'<div class="emptyline">Nenhum conteúdo preenchido.</div>';
   }else if(t.desc){h+='<div class="det-sec">Briefing</div><div class="det-desc">'+esc(t.desc)+'</div>';}
   // checklist (leitura) — oculto p/ cronograma (sem função no fluxo atual)
-  if(secOf(t.sector).key!=='cronograma'&&Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;
+  if(!isClientSector(secOf(t.sector).key)&&Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;
     h+='<div class="det-sec">Checklist <span class="det-sec-c">'+done+' / '+t.checklist.length+'</span></div><div class="det-check">'+
       t.checklist.map(c=>'<div class="det-check-i"><span class="det-check-b '+(c.d?'on':'')+'">'+(c.d?'✓':'')+'</span><span class="'+(c.d?'det-check-done':'')+'">'+esc(c.t||'')+'</span></div>').join('')+'</div>';}
   if(t.link)h+='<div class="det-sec">Link / anexo</div><div class="det-link">'+esc(t.link)+'</div>';
@@ -5986,7 +6000,7 @@ function openDetails(taskId){
    Hierarquia: 1 Status principal · 2 Próxima ação · 3 Responsável · 4 Ações · 5 Detalhes colapsados.
    Linguagem humana; 1 status no topo; botões apenas da fase. */
 function detailState(t){
-  if(secOf(t.sector).key!=='cronograma'){const st=stOf(t.status);
+  if(!isClientSector(secOf(t.sector).key)){const st=stOf(t.status);
     return {key:'task_'+(t.status||'afazer'),color:st.color,label:st.label,sub:'',next:'',owner:'assignee',actions:[]};}
   const cc=clientCol(t);const pend=pendingClientItems(t);
   if(isFullyComplete(t))return {key:'concluido',color:'#34D399',label:'Concluído ✓',
@@ -6077,7 +6091,7 @@ function detailActionsHtml(t,ds){
 }
 /* Bloco HERO do detalhe: status principal + próxima ação + responsável + ações. */
 function detailHeroBlock(t){
-  if(secOf(t.sector).key!=='cronograma')return '';
+  if(!isClientSector(secOf(t.sector).key))return '';
   const ds=detailState(t);const ow=detailOwner(t,ds);
   const _filled=(t.cronContents||[]).filter(c=>c&&(c.tema||c.legenda)).length;
   return '<div class="det-hero">'+
@@ -6105,7 +6119,7 @@ function detailSla(t){
   var o={planStartAt:Number(ds.planStartAt)||0,planDueAt:pd,state:d.state};
   // F3.3.17-R5.1 — entrega do designer ≠ conclusão final: no CRONOGRAMA o rótulo do SLA é "Entregue" até a
   // aprovação final real do cliente (isTaskCompleted); só então "Concluída".
-  if(d.state==='completed'){var _fin=(secOf(t.sector).key!=='cronograma')||isTaskCompleted(t);o.label=_fin?'Concluída':'Entregue';o.color='#37D196';o.rem=_fin?'Entrega concluída':'Entregue — aguardando envio/aprovação final';return o;}
+  if(d.state==='completed'){var _fin=(!isClientSector(secOf(t.sector).key))||isTaskCompleted(t);o.label=_fin?'Concluída':'Entregue';o.color='#37D196';o.rem=_fin?'Entrega concluída':'Entregue — aguardando envio/aprovação final';return o;}
   if(d.state==='overdue'){o.label='Prazo encerrado';o.color='#FF6B61';
     o.rem='Atrasada há '+slaibFmtDur(now-pd)+' · '+(d.critical?'Atraso crítico — sinalize imediatamente':'Restam '+d.graceRemainingMin+' min para concluir ou sinalizar atraso');return o;}
   if(d.state==='warning'){o.label='Prazo próximo';o.color='#F2A93B';o.rem='Faltam '+slaibFmtDur(pd-now);return o;}
@@ -6134,7 +6148,7 @@ function detailSlaBlock(t){
 /* "Detalhes do fluxo" — bloco COLAPSADO (nativo <details>): os chips técnicos
    (flowSummaryBlock) e a timeline operacional (opPanelBlock) moram aqui dentro. */
 function flowDetailsBlock(t){
-  if(secOf(t.sector).key!=='cronograma')return '';
+  if(!isClientSector(secOf(t.sector).key))return '';
   return '<details class="det-flowdet"><summary>Detalhes do fluxo</summary>'+
     '<div class="det-flowdet-body">'+flowSummaryBlock(t)+opPanelBlock(t)+'</div></details>';
 }
@@ -6183,7 +6197,7 @@ async function markItemsAdjusted(taskId){
 /* P1 — bloco de correções por conteúdo (quando o cliente pediu revisão/edição de itens). */
 // Resumo dos DOIS eixos no Detalhes: status do cliente + status do designer + prazos.
 function flowSummaryBlock(t){
-  if(secOf(t.sector).key!=='cronograma')return '';
+  if(!isClientSector(secOf(t.sector).key))return '';
   const cc=CLIENT_COLS.find(c=>c.key===clientCol(t))||CLIENT_COLS[0];
   let h='<div class="det-flow"><div class="det-flow-col"><div class="det-flow-lbl">Fluxo do cliente</div>'+
     '<span class="det-flow-pill" style="background:'+withAlpha(cc.color,.16)+';color:'+cc.color+'"><span class="dotc" style="background:'+cc.color+'"></span>'+esc(cc.label)+'</span></div>';
@@ -6219,7 +6233,7 @@ function clientApprovalPhaseOf(t){
 }
 /* Painel "Próxima ação" + "Linha do tempo operacional" (10 etapas) no Detalhes. */
 function opPanelBlock(t){
-  if(secOf(t.sector).key!=='cronograma')return '';
+  if(!isClientSector(secOf(t.sector).key))return '';
   // FASE 2 (passo 3): a timeline COMPLETA do detalhe lê a FONTE ÚNICA taskTimeline(t) — mesmos
   // 10 marcos canônicos e os MESMOS estados (done/current/pending/attention) de hoje; acrescenta
   // data + tempo relativo + autor (humanizado). Sem schema, sem dados, sem rótulos crus.
@@ -6624,7 +6638,7 @@ function cronStatusLabel(k){return (CRON_STATES[k]||{label:k}).label;}
 function cronStatusColor(k){return (CRON_STATES[k]||{color:'#9BA0AB'}).color;}
 // Deriva o tipo do cronograma (Semanal/Quinzenal/Mensal) de um form ou tarefa salva
 function cronTypeLabel(o){
-  const map={semanal:'Semanal',quinzenal:'Quinzenal',mensal:'Mensal'};
+  const map={semanal:'Semanal',quinzenal:'Quinzenal',mensal:'Mensal',q4:'4 roteiros',q6:'6 roteiros',q8:'8 roteiros',q12:'12 roteiros'};
   if(o.subtype&&map[o.subtype])return map[o.subtype];
   if(o.cronSub&&map[o.cronSub])return map[o.cronSub];
   const n=(o.contents||o.cronContents||[]).length;
@@ -6635,6 +6649,7 @@ function cronCtx(o){
   const isForm=!o.id;
   return {
     id:o.id||null, isForm,
+    sector:(o.sector?secOf(o.sector).key:'cronograma'),
     client:(o.client||'').trim(),
     title:(o.title||'').trim()||'Cronograma',
     type:cronTypeLabel(o),
@@ -6714,6 +6729,14 @@ function buildClientMessage(ctx){
   // (commit 6d46bce, decisao registrada do owner: "sem cache-bust agora"). URL estavel por
   // cliente = preview raspado uma vez fica cacheado e o card aparece de forma consistente.
   const url=buildShareClientUrl(ctx&&ctx.token);
+  // F3.3.73I6C16 — Roteiro identifica-se corretamente como "Roteiro de gravação de vídeos".
+  if(ctx&&ctx.sector==='roteiro'){
+    return 'Olá, '+nome+'.\n'+
+      'Seu Roteiro de gravação de vídeos já está pronto para avaliação.\n\n'+
+      'Acesse o link abaixo para revisar os roteiros, aprovar ou solicitar ajustes:\n\n'+
+      url+'\n\n'+
+      'Equipe ID Seven';
+  }
   return 'Olá, '+nome+'.\n'+
     'Seu cronograma já está pronto para avaliação.\n\n'+
     'Acesse o link abaixo para revisar os temas, aprovar ou solicitar ajustes:\n\n'+
@@ -6797,11 +6820,15 @@ async function openSendClientModal(taskOrForm){
       '<div class="gcs-lp" id="groupLinkPreview">'+
         '<div class="gcs-lp-img"><img id="groupCardPreview" alt="Prévia do link — card premium Agenda ID Seven"/></div>'+
         '<div class="gcs-lp-meta">'+
-          '<div class="gcs-lp-title">Aprovar cronograma</div>'+
-          '<div class="gcs-lp-desc">Seu cronograma está pronto para avaliação.</div>'+
+          '<div class="gcs-lp-title">'+(ctx.sector==='roteiro'?'Aprovar roteiro':'Aprovar cronograma')+'</div>'+
+          '<div class="gcs-lp-desc">'+(ctx.sector==='roteiro'?'Seu Roteiro de gravação de vídeos está pronto para avaliação.':'Seu cronograma está pronto para avaliação.')+'</div>'+
           '<div class="gcs-lp-dom">aprovar.agendaidseven.com.br</div>'+
         '</div>'+
       '</div>'+
+      /* F3.3.73I6C16 — HONESTIDADE: a ARTE do card OG é gerada pelo servidor de preview (Worker),
+         que ainda renderiza o layout "cronograma". A mensagem e a tarefa já dizem "Roteiro de
+         gravação de vídeos"; o título do card do Worker é atualizado numa etapa própria de servidor. */
+      (ctx.sector==='roteiro'?'<div class="gcs-note" style="margin-top:2px">Transparência: a arte do card de compartilhamento ainda usa o layout de “cronograma” (gerada pelo servidor de preview). A mensagem e a tarefa já identificam “Roteiro de gravação de vídeos”; o título do card será atualizado na etapa do servidor.</div>':'')+
       '<button class="gcs-go" id="btnOpenWaMain">'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
       '<div class="gcs-status" id="groupStatus">A mensagem será copiada automaticamente. No WhatsApp Business, escolha o grupo do cliente e cole.</div>'+
       '<div class="gcs-note">A prévia do card vem do <b>link público</b> (não de arquivo salvo). O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link.</div>'+
@@ -7000,7 +7027,7 @@ function openClientView(taskId){
   render();
 }
 function fallbackTaskFromCtx(ctx){
-  return {id:ctx.id,title:ctx.title,client:ctx.client,sector:'cronograma',cronStatus:ctx.status,
+  return {id:ctx.id,title:ctx.title,client:ctx.client,sector:(ctx.sector||'cronograma'),cronStatus:ctx.status,
     cronContents:ctx.contents,assignee:ctx.assignee,assigneeId:null,clientSentBy:(state.user&&state.user.id)||null,
     createdAt:ctx._createdAt||Date.now(),checklist:[],desc:'',clientReview:ctx._review||null};
 }
@@ -7526,13 +7553,17 @@ function stepSector(){const f=state.form;let h='<div class="lbl">Escolha o setor
   return h;
 }
 function stepDados(){const f=state.form;const t=tpl();
-  const isCron=(typeof secOf==='function')&&secOf(f.sector).key==='cronograma';
+  const isCron=(typeof secOf==='function')&&isClientSector(secOf(f.sector).key);
+  /* F3.3.73I6C16 — Roteiro: SEM Responsável/Etapa (grupo Atribuição) e SEM Período (owner).
+     Mantém Identificação (Título + Cliente obrigatório) e Prazo/Prioridade. */
+  const isRoteiro=(typeof secOf==='function')&&secOf(f.sector).key==='roteiro';
   const dt=(ic,id,type,val)=>'<div class="dt-field">'+svg(ic)+'<input class="inp dt" id="'+id+'" type="'+type+'" value="'+esc(val)+'"></div>';
   return ''+
   '<div class="fgroup"><div class="fgroup-h">Identificação</div>'+
     '<div class="lbl">'+esc(t?t.titleLabel:'Título')+'</div><input class="inp" id="fTitle" placeholder="'+esc(t?t.titlePh:'Dê um nome claro à tarefa')+'" value="'+esc(f.title)+'">'+
     '<div style="height:14px"></div><div class="lbl">Cliente / Empresa'+((t&&t.clientRequired)?' <span class="req">obrigatório</span>':'')+'</div><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
   '</div>'+
+  (isRoteiro?'':(
   '<div class="fgroup"><div class="fgroup-h">Atribuição</div>'+
     '<div class="lbl">Responsável'+(isCron?' <span style="font-weight:600;color:var(--faint);font-size:11px">(opcional)</span>':'')+'</div>'+assigneeField()+
     /* F3.3.2 (reteste): na criação do cronograma a Social NÃO precisa atribuir designer.
@@ -7544,7 +7575,7 @@ function stepDados(){const f=state.form;const t=tpl();
     '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de início</div>'+dt('calendar','fStart','date',f.startDate)+'</div><div style="flex:1"><div class="lbl">Hora de início</div>'+dt('clock','fStartT','time',f.startTime)+'</div></div>'+
     '<div style="height:12px"></div>'+
     '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de término</div>'+dt('calendar','fEnd','date',f.endDate)+'</div><div style="flex:1"><div class="lbl">Hora de término</div>'+dt('clock','fEndT','time',f.endTime)+'</div></div>'+
-  '</div>'+
+  '</div>'))+
   '<div class="fgroup"><div class="fgroup-h">Prazo final &amp; prioridade</div>'+
     '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data limite</div>'+dt('calendar','fDue','date',f.dueDate)+'</div><div style="flex:1"><div class="lbl">Hora limite</div>'+dt('clock','fDueT','time',f.dueTime)+'</div></div>'+
     '<div style="height:16px"></div><div class="switchrow"><div><div style="font-size:14px;font-weight:600">Prioridade alta</div><div style="font-size:12px;color:var(--faint);margin-top:1px">Destaca a tarefa nos quadros</div></div><button class="sw '+(f.priority?'on':'')+'" data-ftoggle="priority"></button></div>'+
@@ -7565,18 +7596,18 @@ function stepBriefing(){const f=state.form;const t=tpl();const s=secOf(f.sector)
     const sub=curSub();
     if(sub){
       h+='<div style="background:'+withAlpha('#5B6CFF',.12)+';color:var(--accent);font-size:13px;font-weight:700;padding:8px 12px;border-radius:10px;margin-bottom:12px">'+esc(sub.formTitle)+'</div>'+fieldsHtml(sub.fields);
-      if(sub.contentCount){h+='<div class="lbl" style="margin-top:6px">Conteúdos do cronograma ('+sub.contentCount+')</div>';
+      if(sub.contentCount){h+='<div class="lbl" style="margin-top:6px">'+(secOf(f.sector).key==='roteiro'?'Roteiros':'Conteúdos do cronograma')+' ('+sub.contentCount+')</div>';
         for(let i=0;i<sub.contentCount;i++){const c=f.contents[i]||{tema:'',legenda:''};const filled=(c.tema||c.legenda);const open=f._openContent===i;
-          h+='<div class="content-card '+(open?'open':'')+'"><button class="ch" data-content="'+i+'"><span class="cd '+(filled?'fill':'')+'"></span><span class="ct">Conteúdo '+(i+1)+'</span><span style="color:var(--soft)">'+(open?'▲':'▼')+'</span></button><div class="cb"><div class="lbl">Tema</div><input class="inp" data-ctema="'+i+'" placeholder="Tema do conteúdo '+(i+1)+'" value="'+esc(c.tema||'')+'"><div style="height:8px"></div><div class="lbl">Legenda</div><textarea class="inp" data-cleg="'+i+'" placeholder="Legenda do conteúdo '+(i+1)+'">'+esc(c.legenda||'')+'</textarea></div></div>';}}
+          h+='<div class="content-card '+(open?'open':'')+'"><button class="ch" data-content="'+i+'"><span class="cd '+(filled?'fill':'')+'"></span><span class="ct">'+(secOf(f.sector).key==='roteiro'?'Roteiro ':'Conteúdo ')+(i+1)+'</span><span style="color:var(--soft)">'+(open?'▲':'▼')+'</span></button><div class="cb"><div class="lbl">Tema</div><input class="inp" data-ctema="'+i+'" placeholder="Tema do conteúdo '+(i+1)+'" value="'+esc(c.tema||'')+'"><div style="height:8px"></div><div class="lbl">Legenda</div><textarea class="inp" data-cleg="'+i+'" placeholder="Legenda do conteúdo '+(i+1)+'">'+esc(c.legenda||'')+'</textarea></div></div>';}}
       if(sub.items){h+='<div class="lbl" style="margin-top:6px">Itens do pacote</div>';
         for(let i=0;i<sub.items;i++)h+='<div class="row" style="gap:10px;margin-bottom:8px"><div style="width:80px;font-size:11.5px;font-weight:700;color:var(--faint)">'+esc(sub.itemLabel||'Item')+' '+(i+1)+'</div><input class="inp" data-item="'+i+'" placeholder="Descrição" value="'+esc(f.items[i]||'')+'"></div>';}
       // Reprovação 1.0.137: CRONOGRAMA não usa checklist — o fluxo real é temas→designer→
       // legendas→aprovação final. Demais setores mantêm o checklist do briefing.
-      if(f.sector!=='cronograma')h+=checklistHtml(sub.checklist);
+      if(!isClientSector(f.sector))h+=checklistHtml(sub.checklist);
     }
   }else if(t){h+='<div class="lbl">Briefing · '+esc(s.label)+'</div>'+fieldsHtml(t.fields)+checklistHtml(t.checklist);}
   // CRONOGRAMA: sem Link/anexo e sem Observações livres (sem função no fluxo atual).
-  if(f.sector!=='cronograma'){
+  if(!isClientSector(f.sector)){
     h+='<div style="height:6px"></div><div class="lbl">Link / anexo</div><input class="inp" id="fLink" placeholder="URL (Drive, Figma, etc.)" value="'+esc(f.link)+'"><div style="height:12px"></div><div class="lbl">Observações livres</div><textarea class="inp" id="fObs" placeholder="Notas adicionais…">'+esc(f.obs)+'</textarea>';
   }
   return h;
@@ -7626,7 +7657,7 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
   // Cronograma — conteudos premium
   if(sub&&sub.contentCount){
     const filled=f.contents.map((c,i)=>({c,i})).filter(o=>o.c&&(o.c.tema||o.c.legenda));
-    h+='<div class="rev-sec-h"><span>Conteúdos do cronograma</span><span class="rev-count">'+filled.length+' / '+sub.contentCount+'</span></div>';
+    h+='<div class="rev-sec-h"><span>'+(secOf(f.sector).key==='roteiro'?'Roteiros':'Conteúdos do cronograma')+'</span><span class="rev-count">'+filled.length+' / '+sub.contentCount+'</span></div>';
     if(filled.length)h+='<div class="rev-contents">'+filled.map(o=>'<div class="rev-content"><div class="rev-content-n">'+(o.i+1)+'</div><div class="rev-content-m"><div class="rev-content-t">'+esc(o.c.tema||'(sem tema)')+'</div>'+(o.c.legenda?'<div class="rev-content-l">'+esc(o.c.legenda)+'</div>':'')+'</div></div>').join('')+'</div>';
     else h+='<div class="emptyline">Nenhum conteúdo preenchido ainda.</div>';
   }
@@ -7642,7 +7673,7 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
 }
 function canSendToClient(f){
   if(!f||!f.sector)return false;
-  if(secOf(f.sector).key!=='cronograma')return false;
+  if(!isClientSector(secOf(f.sector).key))return false;
   if(!f.client||!String(f.client).trim())return false;
   const filled=(f.contents||[]).filter(c=>c&&(c.tema||c.legenda)).length;
   if(filled<1)return false;
@@ -7670,7 +7701,7 @@ function composedDesc(){const f=state.form;const sub=curSub();const t=tpl();let 
   if(sub)lines.push(sub.formTitle);
   const fields=(sub?sub.fields:(t?t.fields:[]))||[];
   fields.forEach(fl=>{const v=f.fields[fl.k];if(v!==undefined&&v!==''&&v!==false)lines.push(fl.l+': '+(v===true?'Sim':v));});
-  if(sub&&sub.contentCount){for(let i=0;i<sub.contentCount;i++){const c=f.contents[i];if(c&&(c.tema||c.legenda)){lines.push('Conteúdo '+(i+1)+':');if(c.tema)lines.push('  Tema: '+c.tema);if(c.legenda)lines.push('  Legenda: '+c.legenda);}}}
+  if(sub&&sub.contentCount){for(let i=0;i<sub.contentCount;i++){const c=f.contents[i];if(c&&(c.tema||c.legenda)){lines.push((secOf(f.sector).key==='roteiro'?'Roteiro ':'Conteúdo ')+(i+1)+':');if(c.tema)lines.push('  Tema: '+c.tema);if(c.legenda)lines.push('  Legenda: '+c.legenda);}}}
   if(sub&&sub.items){for(let i=0;i<sub.items;i++){if(f.items[i])lines.push((sub.itemLabel||'Item')+' '+(i+1)+': '+f.items[i]);}}
   if(f.obs)lines.push('',f.obs);
   return lines.join('\n').trim();
@@ -7682,7 +7713,7 @@ async function saveTask(){const f=state.form;
   if(f._saving)return; f._saving=true;
   if(!f.sector){f._saving=false;alert('Selecione o setor.');f.step=0;render();return;}
   const t=tpl();
-  if(t&&t.clientRequired&&!f.client.trim()){f._saving=false;alert('Para Cronograma o cliente é obrigatório.');f.step=1;render();return;}
+  if(t&&t.clientRequired&&!f.client.trim()){f._saving=false;alert('Para '+secOf(state.form.sector).label+' o cliente é obrigatório.');f.step=1;render();return;}
   if(!f.title.trim()){f._saving=false;alert('Informe o título.');f.step=1;render();return;}
   const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
@@ -7692,7 +7723,7 @@ async function saveTask(){const f=state.form;
   const socialOwner=(u&&isSocialUser(u))?u:(isSocialUser(state.user)?state.user:null);
   if(socialOwner){data.socialOwnerId=socialOwner.id;data.socialOwnerName=socialOwner.name||'';data.socialFlowStatus='afazer';data.socialWorkflowStage='afazer';}
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
-  if(secOf(f.sector).key==='cronograma'){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
+  if(isClientSector(secOf(f.sector).key)){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
     data.clientFlowStatus=f._sendAfterSave?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
   const sendAfter=!!f._sendAfterSave;
   let ref;
@@ -7702,7 +7733,7 @@ async function saveTask(){const f=state.form;
   if(sendAfter&&ref&&ref.id){
     // mantemos o board aberto e abrimos o modal de envio com a tarefa recem-criada
     state.tab='tarefas';state.boardSector=sector;boardCol=0;render();
-    openSendClientModal({id:ref.id,client:data.client,title:data.title,cronContents:data.cronContents||[],cronSub:data.cronSub,cronStatus:data.cronStatus});
+    openSendClientModal({id:ref.id,client:data.client,title:data.title,sector:data.sector,cronContents:data.cronContents||[],cronSub:data.cronSub,cronStatus:data.cronStatus});
   }else{
     state.tab='tarefas';state.boardSector=sector;boardCol=0;render();
   }
@@ -7893,7 +7924,7 @@ document.getElementById('modalRoot').addEventListener('click',e=>{if(e.target.cl
 document.addEventListener('focusout',function(){if(_deferRender)setTimeout(function(){if(!_editingNow()){_deferRender=false;render();}},80);});
 function stepNext(){const f=state.form;
   if(f.step===0&&!f.sector){alert('Escolha o setor.');return;}
-  if(f.step===1){const t=tpl();if(t&&t.clientRequired&&!f.client.trim()){alert('Para Cronograma o cliente é obrigatório.');return;}if(!f.title.trim()){alert('Informe o título.');return;}}
+  if(f.step===1){const t=tpl();if(t&&t.clientRequired&&!f.client.trim()){alert('Para '+secOf(state.form.sector).label+' o cliente é obrigatório.');return;}if(!f.title.trim()){alert('Informe o título.');return;}}
   f.step=Math.min(3,f.step+1);render();
 }
 

@@ -19,6 +19,7 @@ function constObj(name){ const a=html.indexOf('const '+name+'='); if(a<0) throw 
   let i=html.indexOf('{',a), d=0; for(let j=i;j<html.length;j++){ const c=html[j]; if(c==='{')d++; else if(c==='}'){d--; if(d===0) return html.slice(a,j+1)+';';} } throw new Error('sem fecho: '+name); }
 
 const code = [
+  fnSrc('isClientSector'),
   constObj('TASK_PHASE'),
   constObj('FLOW_LABELS'),
   fnSrc('flowRole'),

@@ -13,7 +13,7 @@ const DH = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'renderer', 'ind
 function fnSrc(n){ const a=DH.indexOf('function '+n+'('); if(a<0)throw new Error('fn '+n); let d=0; for(let j=DH.indexOf('{',a);j<DH.length;j++){const c=DH[j]; if(c==='{')d++; else if(c==='}'){d--; if(!d)return DH.slice(a,j+1);}} }
 function constObj(n){ const a=DH.indexOf('const '+n+'='); if(a<0)throw new Error('const '+n); let d=0; for(let j=DH.indexOf('{',a);j<DH.length;j++){const c=DH[j]; if(c==='{')d++; else if(c==='}'){d--; if(!d)return DH.slice(a,j+1)+';';}} }
 
-const code=[constObj('TASK_PHASE'),constObj('FLOW_LABELS'),fnSrc('flowRole'),fnSrc('opOwnerLabel'),
+const code=[fnSrc('isClientSector'),constObj('TASK_PHASE'),constObj('FLOW_LABELS'),fnSrc('flowRole'),fnSrc('opOwnerLabel'),
   fnSrc('deriveCanonicalPerspective'),fnSrc('deriveBoardColumn'),fnSrc('deriveOperationalCardPresentation'),
   fnSrc('flowBoardCol'),fnSrc('personBoardCol')].join('\n');
 

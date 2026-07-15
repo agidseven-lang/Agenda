@@ -30,7 +30,7 @@ try {
   const pieces = [
     constArr('SECTORS'), 'const SECTOR_ALIAS=' + ((DH.match(/const SECTOR_ALIAS=\{[\s\S]*?\};/) || ['const SECTOR_ALIAS={};'])[0].replace(/^const SECTOR_ALIAS=/, '')),
     constArr('CLIENT_COLS'), constObj('TASK_PHASE'),
-    oneLine('secOf'), oneLine('hasDesigner'), oneLine('designerOf'), oneLine('designerCol'),
+    oneLine('secOf'), oneLine('isClientSector'), oneLine('hasDesigner'), oneLine('designerOf'), oneLine('designerCol'),
     oneLine('pendingLegend'), oneLine('pendingFeed'), oneLine('pendingStory'), oneLine('pendingProduction'), oneLine('designerDelivered'),
     fnDecl('clientApprovalPhaseOf'), fnDecl('pendingClientItems'), fnDecl('hasTeamAdjustedAwaiting'), fnDecl('allPhaseItemsApproved'),
     oneLine('hasPendingItemRevision'),

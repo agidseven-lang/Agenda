@@ -59,7 +59,7 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
 
 /* ───────────────────────── C+D: CARD CANÔNICO ───────────────────────── */
 {
-  const NAMES = ['SECTORS', 'SECTOR_ALIAS', 'secOf', 'STATUS', 'stOf', 'dtMs', 'humanDur', 'todayStr', 'taskDeadline', 'esc', 'withAlpha', 'fmtDateTimeBR', 'cronOf', 'kbv2NextForStatus', 'opOwnerLabel', 'deriveOperationalCardPresentation', 'kbv2DeriveStatus', 'kbv2Card', 'kbv2Empty', 'kbv2BoardHtml'];
+  const NAMES = ['SECTORS', 'SECTOR_ALIAS', 'secOf', 'isClientSector', 'STATUS', 'stOf', 'dtMs', 'humanDur', 'todayStr', 'taskDeadline', 'esc', 'withAlpha', 'fmtDateTimeBR', 'cronOf', 'kbv2NextForStatus', 'opOwnerLabel', 'deriveOperationalCardPresentation', 'kbv2DeriveStatus', 'kbv2Card', 'kbv2Empty', 'kbv2BoardHtml'];
   let SRC = ''; for (const n of NAMES) SRC += grab(n) + '\n';
   const PRELUDE =
     'var state={user:{id:"u1"},users:[]};\n' +
@@ -133,7 +133,7 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
 
 /* ───────────────── F: 1.0.148 — mockups aprovados (D3R10H) ───────────────── */
 {
-  const NAMES = ['SECTORS', 'SECTOR_ALIAS', 'secOf', 'STATUS', 'stOf', 'dtMs', 'humanDur', 'todayStr', 'taskDeadline', 'esc', 'withAlpha', 'fmtDateTimeBR', 'cronOf', 'kbv2NextForStatus', 'opOwnerLabel', 'deriveOperationalCardPresentation', 'kbv2DeriveStatus', 'kbv2Card', 'kbv2Empty', 'canSendToClient', 'detailActionsHtml'];
+  const NAMES = ['SECTORS', 'SECTOR_ALIAS', 'secOf', 'isClientSector', 'STATUS', 'stOf', 'dtMs', 'humanDur', 'todayStr', 'taskDeadline', 'esc', 'withAlpha', 'fmtDateTimeBR', 'cronOf', 'kbv2NextForStatus', 'opOwnerLabel', 'deriveOperationalCardPresentation', 'kbv2DeriveStatus', 'kbv2Card', 'kbv2Empty', 'canSendToClient', 'detailActionsHtml'];
   let SRC = ''; for (const n of NAMES) SRC += grab(n) + '\n';
   const PRELUDE =
     'var state={user:{id:"u1",role:"social media",admin:false},users:[]};\n' +

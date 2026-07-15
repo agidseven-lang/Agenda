@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.164",
-  "description": "Agenda ID Seven Desktop — premium client domain link fix (Electron)",
+  "version": "1.0.165",
+  "description": "Agenda ID Seven Desktop — Roteiro no fluxo Card Premium (paridade Cronograma) (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
