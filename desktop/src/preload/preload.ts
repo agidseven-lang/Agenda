@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   diagPath: (): Promise<string> => ipcRenderer.invoke("diag-path"),
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
+  // F3.3.73I6C18C — prepara/valida o Card Premium ANTES do WhatsApp (GET read-only no main,
+  // RESTRITO a https://aprovar.agendaidseven.com.br/share/cronograma/<token>; token nunca logado)
+  cardPrewarm: (url: string, expectedType: string): Promise<{ ok: boolean; reason?: string; cache?: string; get1Ms?: number; get2Ms?: number }> =>
+    ipcRenderer.invoke("card-prewarm", url, expectedType),
   // 1.0.114 — ENVIO PREMIUM: imagem real do card p/ anexar no WhatsApp.
   saveCardImage: (bytes: ArrayBuffer | Uint8Array, filename: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
     ipcRenderer.invoke("save-card-image", { bytes, filename }),

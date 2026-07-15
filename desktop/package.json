@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.165",
-  "description": "Agenda ID Seven Desktop — Roteiro no fluxo Card Premium (paridade Cronograma) (Electron)",
+  "version": "1.0.166",
+  "description": "Agenda ID Seven Desktop — prewarm determinístico do Card Premium antes do WhatsApp (Electron)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

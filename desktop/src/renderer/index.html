@@ -6829,10 +6829,13 @@ async function openSendClientModal(taskOrForm){
          que ainda renderiza o layout "cronograma". A mensagem e a tarefa já dizem "Roteiro de
          gravação de vídeos"; o título do card do Worker é atualizado numa etapa própria de servidor. */
       (ctx.sector==='roteiro'?'<div class="gcs-note" style="margin-top:2px">Transparência: a arte do card de compartilhamento ainda usa o layout de “cronograma” (gerada pelo servidor de preview). A mensagem e a tarefa já identificam “Roteiro de gravação de vídeos”; o título do card será atualizado na etapa do servidor.</div>':'')+
-      '<button class="gcs-go" id="btnOpenWaMain">'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
-      '<div class="gcs-status" id="groupStatus">A mensagem será copiada automaticamente. No WhatsApp Business, escolha o grupo do cliente e cole.</div>'+
+      /* F3.3.73I6C18C — o botão NASCE desabilitado: só libera após "Card Premium preparado."
+         (prova técnica real via IPC card-prewarm: GET validado + OG do TIPO certo + cache). */
+      '<button class="gcs-go" id="btnOpenWaMain" disabled>'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
+      '<div class="gcs-status" id="groupStatus">Preparando Card Premium… A mensagem será copiada automaticamente ao abrir o WhatsApp Business.</div>'+
       '<div class="gcs-note">A prévia do card vem do <b>link público</b> (não de arquivo salvo). O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link.</div>'+
       '<div class="gcs-secondary">'+
+        '<button class="btn ghost" id="btnPrewarmRetry" style="display:none">Tentar novamente</button>'+
         '<button class="btn ghost" id="btnCopyGroupMsg">Copiar mensagem</button>'+
         '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
       '</div>'+
@@ -6952,6 +6955,11 @@ async function _wireGroupSend(ctx, msg, cardFile){
   const on=(id,fn)=>{const b=$(id); if(b) b.addEventListener('click',fn);};
   const img=$('groupCardPreview'), status=$('groupStatus');
   function setStatus(txt,cls,html){ if(!status)return; status.className='gcs-status'+(cls?(' '+cls):''); if(html) status.innerHTML=txt; else status.textContent=txt; }
+  /* F3.3.73I6C18C — estado da preparação determinística do Card Premium.
+     prepReady só vira true com PROVA técnica (IPC card-prewarm: GET 200 text/html +
+     OG completo + og:url exato + TIPO esperado + cache confirmado). prepBusy impede
+     preparações simultâneas (cliques duplicados). Token nunca é logado. */
+  let prepReady=false, prepBusy=false;
   // Imagem do card só ILUSTRA a prévia do link (embutida, sem rede). Não é anexada por padrão.
   try{
     const bin=atob(CARD_IMG_B64); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); bytes=u.buffer;
@@ -6982,7 +6990,10 @@ async function _wireGroupSend(ctx, msg, cardFile){
      É o fluxo que funcionou no teste real: 1 clique copia a mensagem e abre o WhatsApp Business.
      Sem pasta, sem salvar arquivo, sem etapas. O link /share gera a prévia premium ao colar. */
   on('btnOpenWaMain', function(){
+    // F3.3.73I6C18C — REGRA CENTRAL: WhatsApp SÓ abre após "Card Premium preparado."
+    if(!prepReady){ flashToast('Aguarde: o Card Premium ainda está sendo preparado.'); return; }
     if(!copyMsgClean()) return;                                    // 1) copia a mensagem automaticamente
+    const b0=$('btnOpenWaMain'); if(b0){ b0.innerHTML=svg('send')+'Abrindo WhatsApp Business…'; }
     openWhatsAppWebOnly();                                         // 2) abre o WhatsApp Business (só web.whatsapp.com/)
     const b=$('btnOpenWaMain'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+'WhatsApp aberto · mensagem copiada'; }
     setStatus(svg('check')+'<span>Mensagem copiada e WhatsApp Business aberto. Escolha o grupo do cliente e cole (Ctrl+V) — a prévia premium aparece pelo link.</span>','ok',true);
@@ -7006,6 +7017,38 @@ async function _wireGroupSend(ctx, msg, cardFile){
     const ext=api.openExternal; if(ext){ try{ ext(url); }catch(_){ try{window.open(url,'_blank');}catch(__){} } } else { try{window.open(url,'_blank');}catch(_){} }
     flashToast('Abrindo o link de compartilhamento (prévia premium + portal) para teste.');
   });
+  /* ===== F3.3.73I6C18C — PREPARAÇÃO DETERMINÍSTICA DO CARD PREMIUM =====
+     Fluxo obrigatório: Gerar link → Preparar Card Premium → Validar OG →
+     Confirmar cache → só então liberar o WhatsApp. O GET real acontece no
+     processo MAIN via IPC restrito (sem CORS, sem bridge genérica); o retry
+     progressivo (máx. 3: 0/800/1500 ms) vive no main. Falha NUNCA abre o
+     WhatsApp: mostra erro + "Tentar novamente" (e "Copiar mensagem" segue
+     disponível como opção manual). */
+  async function runPrewarm(){
+    if(prepBusy) return; prepBusy=true;
+    prepReady=false;
+    const b=$('btnOpenWaMain'); if(b){ b.disabled=true; }
+    const rt=$('btnPrewarmRetry'); if(rt){ rt.style.display='none'; }
+    setStatus('Preparando Card Premium…');
+    let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ url=''; }
+    let pw=null;
+    try{
+      pw=(api.cardPrewarm&&url)?await api.cardPrewarm(url,(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma'):{ok:false,reason:'indisponivel'};
+    }catch(_){ pw={ok:false,reason:'ipc_falhou'}; }
+    prepBusy=false;
+    if(pw&&pw.ok){
+      prepReady=true;
+      if(b){ b.disabled=false; }
+      setStatus(svg('check')+'<span>Card Premium preparado. A mensagem será copiada automaticamente ao abrir o WhatsApp Business — escolha o grupo do cliente e cole (Ctrl+V).</span>','ok',true);
+    }else{
+      prepReady=false;
+      if(b){ b.disabled=true; }
+      if(rt){ rt.style.display=''; }
+      setStatus('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.','err');
+    }
+  }
+  on('btnPrewarmRetry', function(){ runPrewarm(); });
+  runPrewarm();
   /* ===== Fallback (opções avançadas) — card como arquivo; NUNCA na ação principal ===== */
   on('btnCopyImg', async function(){ if(!bytes){flashToast('A imagem ainda não carregou.');return;} const cp=await copyCard(); if(cp.ok){ flashToast('Card copiado — cole (Ctrl+V) como imagem no grupo.'); } else { const p=await ensureSaved(); flashToast(p?('Card salvo: '+p):'Não foi possível preparar o card.'); } });
   on('btnOpenFolder', async function(){ const p=await ensureSaved(); if(p&&api.showInFolder){ api.showInFolder(p); flashToast('Card salvo e pasta aberta: '+p); } else if(p){ flashToast('Card salvo: '+p); } else { flashToast('Não foi possível salvar o card.'); } });
@@ -7874,6 +7917,18 @@ document.addEventListener('click',async e=>{
       }
       if(!ctx.token){ flashToast('Link do cliente indisponível. Tente novamente.'); return; }
     }
+    // F3.3.73I6C18C — REGRA CENTRAL também neste caminho: o WhatsApp SÓ abre com o
+    // Card Premium PREPARADO (mesma prova técnica via IPC card-prewarm; falha = não abre).
+    if(state._openwaBusy){ return; }
+    state._openwaBusy=true;
+    try{
+      flashToast('Preparando Card Premium…');
+      let _pwUrl=''; try{ _pwUrl=buildShareClientUrl(ctx&&ctx.token); }catch(_){ _pwUrl=''; }
+      const _pw=(window.desktopAPI&&window.desktopAPI.cardPrewarm&&_pwUrl)
+        ?await window.desktopAPI.cardPrewarm(_pwUrl,(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma')
+        :{ok:false};
+      if(!_pw||!_pw.ok){ flashToast('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.'); return; }
+    }finally{ state._openwaBusy=false; }
     // 1.0.119 — COPIA só a mensagem limpa e abre o WhatsApp SEM texto na URL.
     // NUNCA envia send?text= ao cliente. O usuário cola a mensagem no chat.
     const msg=buildClientMessage(ctx);
@@ -7881,7 +7936,7 @@ document.addEventListener('click',async e=>{
     if(id&&id!=='__form__')await persistClientSend(id);
     closeModal();
     openWhatsAppPlain();
-    flashToast('Mensagem copiada. Cole no WhatsApp (e anexe a imagem do card).');
+    flashToast('Card Premium preparado. Mensagem copiada — cole no WhatsApp.');
     return;
   }
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}

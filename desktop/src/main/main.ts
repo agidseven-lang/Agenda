@@ -16,6 +16,7 @@ import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build in
 import { startReminder } from "./reminder";
 import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
 import { registerAuthIpc } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main)
+import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
 
 let mainWin: BrowserWindow | null = null;
 let stopNotifier: (() => void) | null = null;
@@ -281,6 +282,7 @@ app.whenReady().then(() => {
 
   // IPC do renderer
   registerAuthIpc(); // F3.3.56-G2 — auth-login/auth-self/auth-change-password/auth-logout/auth-session-status
+  registerPrewarmIpc(); // F3.3.73I6C18C — card-prewarm (GET read-only restrito ao /share; token redigido nos logs)
   ipcMain.handle("notif-test", () => {
     new Notification({ title: "Agenda ID Seven", body: "Notificacao de teste OK." }).show();
     diag("notif-test.shown");
