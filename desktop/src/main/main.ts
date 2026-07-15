@@ -9,7 +9,7 @@ import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImag
 import path from "path";
 import fs from "fs";
 import os from "os";
-import { ensureTray, recreateTray, getTrayState } from "./tray";
+import { ensureTray, recreateTray, getTrayState, destroyTray } from "./tray";
 import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
@@ -260,6 +260,9 @@ function realQuit() {
   if (stopNotifier) stopNotifier();
   if (stopReminder) stopReminder();
   try { stopBgNotify(); } catch { /* */ }
+  // F3.3.73I6C11 — "Sair do aplicativo" remove o icone da bandeja (evita tray-fantasma no Windows).
+  try { destroyTray(); } catch { /* */ }
+  diag("app.realQuit→destroyTray"); // F3.3.10-DIAG
   app.quit();
 }
 
@@ -399,8 +402,9 @@ app.whenReady().then(() => {
     try {
       const w = mainWin;
       // F3.3.70D3R10U — watchdog do tray: se sumiu (ex.: Explorer reiniciou), recria.
+      // F3.3.73I6C11 — NAO recria durante o quit (senao o destroyTray do realQuit seria desfeito).
       const ts = getTrayState();
-      if (!ts.created) { try { ensureTray(trayWin, trayOpts); } catch { /* */ } }
+      if (!quitting && !ts.created) { try { ensureTray(trayWin, trayOpts); } catch { /* */ } }
       diag("main.alive", {
         notifier: !!stopNotifier, reminder: !!stopReminder,
         visible: !!(w && !w.isDestroyed() && w.isVisible()),

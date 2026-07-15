@@ -2520,7 +2520,9 @@ async function logout(){
   /* F3.3.56-G5a — FIX: "Sair da conta" também limpa a SESSÃO SERVER-SIDE no
      processo main (userData/session.json). Sem isto, o boot re-logava sozinho
      via authSelf ao reabrir o app após o logout. */
+  try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.begin')}catch(_){}
   try{if(window.desktopAPI&&window.desktopAPI.authLogout){await window.desktopAPI.authLogout();}}catch(_){}
+  try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.afterAuthLogout')}catch(_){}
   try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}
 function subscribeData(){
   /* F3.3.56-G2 — roster via usersPublic (projeção allowlist {id,name,role,admin,
@@ -7873,6 +7875,7 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
     const api=window.desktopAPI;
     if(api&&typeof api.authSelf==='function'){
       const r=await api.authSelf();
+      try{api.diagLog&&api.diagLog('boot.authSelf',{ok:!!(r&&r.ok),error:r&&r.error,hasSelf:!!(r&&r.self)})}catch(_){}
       if(r&&r.ok&&r.self&&r.self.id){startApp(Object.assign({},r.self));return;}
       if(r&&(r.error==='expired'||r.error==='no_session'))clearSession();
     }

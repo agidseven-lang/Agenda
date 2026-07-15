@@ -275,7 +275,7 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   // H6 — main.ts: IPCs + recriação no login + heartbeat
   ok(MAIN.includes('ipcMain.on("tray-status"') && MAIN.includes('ipcMain.handle("tray-recreate"'), 'H6a: IPCs tray-status/tray-recreate registrados');
   ok(/session-login[\s\S]{0,220}ensureTray\(trayWin, trayOpts\)/.test(MAIN), 'H6b: session-login garante o tray (recria após login)');
-  ok(/getTrayState\(\);[\s\S]{0,120}if \(!ts\.created\)[\s\S]{0,80}ensureTray/.test(MAIN), 'H6c: heartbeat verifica e recria o tray');
+  ok(/getTrayState\(\);[\s\S]{0,200}if \(!quitting && !ts\.created\)[\s\S]{0,80}ensureTray/.test(MAIN), 'H6c: heartbeat verifica e recria o tray (73I6C11: guardado por !quitting no quit)');
   ok(MAIN.includes('tray: ts.created, trayIconEmpty: ts.iconEmpty'), 'H6d: main.alive loga estado do tray');
   ok(MAIN.includes('ipcMain.handle("open-card-image"'), 'H6e: IPC open-card-image (Abrir imagem) registrado');
 

@@ -35,7 +35,7 @@ const HTTP_TIMEOUT_MS = 15000;
 const EXP_SAFETY_MS = 30000;          // folga p/ não expirar "em voo"
 const FALLBACK_TTL_MS = 6 * 3600 * 1000; // se o endpoint não mandar expiresAt
 
-export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls> }) {
+export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls>; log?: (tag: string, data?: unknown) => void }) {
   const urls: Urls = { ...DEFAULT_URLS };
   if (opts.urls) {
     for (const k of Object.keys(DEFAULT_URLS) as (keyof Urls)[]) {
@@ -45,6 +45,9 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls> })
   }
   const storeFile = path.join(opts.storeDir, "session.json");
   let mem: Session | null = null;
+  // F3.3.73I6C11 — logger de diagnostico OPCIONAL (behavior-preserving; default no-op).
+  // NUNCA loga token/segredo — apenas booleans/uid/expiresAt p/ localizar o auto-login pos-logout.
+  const log = opts.log || ((_t: string, _d?: unknown) => { /* no-op */ });
 
   function persist(): void {
     try {
@@ -53,8 +56,13 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls> })
     } catch { /* best-effort: sessão só em memória se o disco falhar */ }
   }
   function wipe(): void {
+    let existed = false;
+    try { existed = fs.existsSync(storeFile); } catch { /* */ }
     mem = null;
     try { fs.rmSync(storeFile, { force: true }); } catch { /* */ }
+    let removed = false;
+    try { removed = !fs.existsSync(storeFile); } catch { /* */ }
+    log("wipe", { existed, removed }); // F3.3.73I6C11-DIAG: prova que o logout apaga session.json
   }
   function load(): void {
     try {
@@ -63,6 +71,7 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls> })
         mem = { token: j.token, expiresAt: j.expiresAt, uid: String(j.uid || "") };
       }
     } catch { /* sem sessão salva */ }
+    log("load", { hasMem: !!mem, uid: mem ? mem.uid : "", expiresAt: mem ? mem.expiresAt : 0 }); // F3.3.73I6C11-DIAG
   }
   // exp JWT vem em SEGUNDOS; normaliza para ms.
   function normExp(e: unknown): number {
@@ -112,6 +121,7 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls> })
     },
     /** Restore/perfil via getUserSelf. 401 => sessão expirada (limpa). Rede fora NÃO derruba a sessão. */
     async self(): Promise<AuthResult> {
+      log("self.enter", { valid: valid(), hasMem: !!mem }); // F3.3.73I6C11-DIAG: estado da sessao no boot
       if (!valid()) { if (mem) wipe(); return { ok: false, error: "no_session" }; }
       let r;
       try { r = await post(urls.self, {}, (mem as Session).token); }

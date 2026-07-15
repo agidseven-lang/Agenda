@@ -110,6 +110,15 @@ export function ensureTray(getWin: () => BrowserWindow | null, opts: TrayOpts): 
   }
 }
 
+// F3.3.73I6C11 — destruir o tray no QUIT real ("Sair do aplicativo"). Sem isto, o icone
+// pode "fantasmar" na bandeja do Windows apos app.quit() ate o mouse passar por cima.
+// So deve ser chamado no encerramento (realQuit): fechar janela/minimizar NAO destroem.
+export function destroyTray(): void {
+  try { if (currentTray && !currentTray.isDestroyed()) currentTray.destroy(); } catch { /* */ }
+  currentTray = null;
+  trayState.created = false;
+}
+
 // F3.3.70D3R10U — recriacao FORCADA (botao "Recriar icone da bandeja" em Configuracoes).
 export function recreateTray(getWin: () => BrowserWindow | null, opts: TrayOpts): { ok: boolean } {
   try {

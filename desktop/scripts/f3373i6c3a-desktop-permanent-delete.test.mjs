@@ -20,7 +20,7 @@ const ok = (n, c) => { if (c) { pass++; console.log('  PASS — ' + n); } else {
 console.log('F3.3.73I6C3A — Desktop exclusão definitiva (1.0.162)');
 
 /* ── A: versão + delete físico separado ── */
-ok('A1 versão 1.0.162', PJ.version === '1.0.162');
+ok('A1 versão 1.0.162+ (73I6C11 bump 1.0.163)', PJ.version.startsWith('1.0.') && parseInt(PJ.version.split('.')[2], 10) >= 162);
 ok('A2 evDeletePermanent grava deletedBy ANTES do delete físico',
   /async function evDeletePermanent\(id\)\{[\s\S]{0,260}collection\('events'\)\.doc\(id\)\.update\(\{deletedBy:state\.user\.id,deletedAt:Date\.now\(\)\}\);[\s\S]{0,120}collection\('events'\)\.doc\(id\)\.delete\(\)/.test(HTML));
 ok('A3 evDelete exige digitar EXCLUIR (confirmação forte)',
