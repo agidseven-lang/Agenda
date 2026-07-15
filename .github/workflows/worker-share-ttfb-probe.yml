@@ -1,0 +1,82 @@
+# [manual] Worker /share TTFB Probe — medição READ-ONLY de latência (F3.3.73I6C18B).
+#
+# Mede TTFB (time_starttransfer) e tempo total do /share/cronograma/<token dummy> em
+# GET e HEAD, com user-agents navegador/facebookexternalhit/WhatsApp, N iterações
+# (1ª = frio/MISS esperado; seguintes = quente/HIT pós-hotfix), nos dois domínios.
+# Captura http_code, content_type, X-Share-Cache e Server-Timing.
+#
+# NAO faz deploy. NAO usa secrets. SOMENTE GET/HEAD públicos com token DUMMY
+# (nunca token real de cliente). NAO escreve em nada. workflow_dispatch apenas.
+name: "[manual] Worker /share TTFB Probe (read-only)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      token:
+        description: "Token DUMMY (nunca usar token real de cliente)"
+        required: true
+        default: "c18bttfb0001"
+      iterations:
+        description: "Iterações por combinação (1ª fria, demais quentes)"
+        required: false
+        default: "3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker-share-ttfb-probe
+  cancel-in-progress: false
+
+jobs:
+  ttfb:
+    name: medir TTFB /share (GET/HEAD x UAs)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Medir e sintetizar matriz de latência
+        env:
+          TOKEN: ${{ github.event.inputs.token }}
+          N: ${{ github.event.inputs.iterations }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          N="${N:-3}"
+          CUSTOM="https://aprovar.agendaidseven.com.br"
+          WORKERS="https://idseven-push.agidseven.workers.dev"
+          TSV=out/ttfb.tsv
+          printf 'origin\tua\tmethod\titer\thttp\tcontent_type\tttfb_s\ttotal_s\tx_share_cache\tserver_timing\n' > "$TSV"
+          probe_one() {
+            local base="$1" origin="$2" ua_name="$3" ua_val="$4" method="$5" iter="$6"
+            local url="$base/share/cronograma/$TOKEN"
+            local HDR=out/h.txt
+            local args=(-sS --max-time 30 -D "$HDR" -o /dev/null -w '%{http_code}\t%{content_type}\t%{time_starttransfer}\t%{time_total}')
+            [ -n "$ua_val" ] && args+=(-A "$ua_val")
+            [ "$method" = "HEAD" ] && args+=(-I)
+            local W; W=$(curl "${args[@]}" "$url" || echo "000		0	0")
+            local XSC ST
+            XSC=$(grep -i '^x-share-cache:' "$HDR" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true)
+            ST=$(grep -i '^server-timing:' "$HDR" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true)
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$origin" "$ua_name" "$method" "$iter" "$W" "${XSC:-\-}" "${ST:-\-}" >> "$TSV"
+          }
+          for ORPAIR in "custom|$CUSTOM" "workers|$WORKERS"; do
+            ORIGIN="${ORPAIR%%|*}"; BASE="${ORPAIR#*|}"
+            for UA in "browser|Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "fb|facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" "wa|WhatsApp/2.23.20.0" ; do
+              UAN="${UA%%|*}"; UAV="${UA#*|}"
+              for M in GET HEAD; do
+                i=1
+                while [ "$i" -le "$N" ]; do
+                  probe_one "$BASE" "$ORIGIN" "$UAN" "$UAV" "$M" "$i"
+                  i=$((i+1))
+                done
+              done
+            done
+          done
+          echo "===== ttfb.tsv ====="
+          column -t -s "$(printf '\t')" "$TSV"
+      - name: Upload artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-share-ttfb-probe
+          path: out/
+          retention-days: 30

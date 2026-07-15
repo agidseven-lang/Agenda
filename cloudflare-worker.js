@@ -196,6 +196,57 @@ function shareCardHtml(origin, token, ptype) {
     '</body></html>';
 }
 
+/* ───── F3.3.73I6C18B — /share: HEAD + Cache API + single-flight (preview do WhatsApp) ─────
+   Diagnóstico C18A: OG/imagem/headers PERFEITOS em GET p/ todos os UAs, mas (a) o 1º byte
+   pagava OAuth+runQuery (~2,3 s pior caso) sem NENHUM cache de borda (cf-cache vazio) e
+   (b) HEAD /share respondia o fallback JSON. Hipótese principal (por eliminação): o
+   compositor do WhatsApp desiste antes da resposta e a mensagem sai sem card.
+   Este handler:
+   - responde HEAD com os MESMOS headers text/html (corpo vazio);
+   - Cache API (caches.default) com chave = origem+path (o token isola a chave; tipos
+     NUNCA se misturam porque a chave contém o token). TTL = Cache-Control público atual
+     (600 s, preservado). HIT: zero OAuth/Firestore.
+   - MISS: resolve o TIPO REAL (task.sector). REGRA CRÍTICA C18B: NÃO existe deadline
+     que devolva "cronograma" p/ roteiro — a resposta espera a verdade. 1 retry rápido
+     em erro transitório; erro persistente/tarefa não encontrada → card padrão SEM
+     cachear (erro/404 NUNCA envenena o cache; próximo scrape tenta de novo).
+   - single-flight por token no isolate: scrapes simultâneos compartilham UMA consulta.
+   - X-Share-Cache (hit|miss) + Server-Timing share_lookup — métricas públicas p/ os
+     probes read-only (sem token/segredo/dado de cliente). */
+const _shareInflight = new Map();
+async function handleShareCard(request, env, ctx, url, token) {
+  const cacheKey = new Request(url.origin + "/share/cronograma/" + token, { method: "GET" });
+  let cached = null;
+  try { cached = await caches.default.match(cacheKey); } catch (_) { /* Cache API indisponível → segue MISS */ }
+  if (cached) {
+    const h = new Headers(cached.headers); h.set("X-Share-Cache", "hit");
+    return new Response(request.method === "HEAD" ? null : cached.body, { status: cached.status, headers: h });
+  }
+  const t0 = Date.now();
+  let ptype = PREMIUM_TYPES.cronograma, resolved = false;
+  try {
+    let p = _shareInflight.get(token);
+    if (!p) {
+      p = (async () => {
+        const at = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
+        try { return await queryTaskByToken(env, at, token); }
+        catch (_e1) { return await queryTaskByToken(env, at, token); }   // 1 retry rápido (erro transitório)
+      })();
+      _shareInflight.set(token, p);
+      p.then(() => _shareInflight.delete(token), () => _shareInflight.delete(token));
+    }
+    const task = await p;
+    if (task) { ptype = premiumTypeOf(task); resolved = true; }
+  } catch (_) { /* erro persistente: serve card padrão SEM cachear (nunca envenena) */ }
+  const res = htmlResponseCacheable(shareCardHtml(url.origin, token, ptype), 200);
+  res.headers.set("X-Share-Cache", "miss");
+  res.headers.set("Server-Timing", "share_lookup;dur=" + (Date.now() - t0));
+  // Só SUCESSO com tarefa ENCONTRADA aquece o cache (tipo comprovado; 404/erro ficam fora).
+  if (resolved && ctx) { try { ctx.waitUntil(caches.default.put(cacheKey, res.clone())); } catch (_) { /* best-effort */ } }
+  if (request.method === "HEAD") return new Response(null, { status: 200, headers: res.headers });
+  return res;
+}
+
 function isCrawlerUA(ua) {
   return /facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|pinterest|googlebot|bingbot|embedly|redditbot|skypeuripreview|vkshare|whatsapp\/|ia_archiver/i.test(ua || "");
 }
@@ -355,18 +406,12 @@ export default {
     // e redireciona humanos (JS) ao portal. Nao depende de sniff de User-Agent nem do HTML pesado.
     {
       const shareMatch = url.pathname.match(/^\/share\/cronograma\/([A-Za-z0-9_-]{4,128})\/?$/);
-      if (shareMatch && request.method === "GET") {
-        // F3.3.73I6C17 — resolve o TIPO (cronograma×roteiro) pelos dados REAIS da task
-        // (task.sector). QUALQUER falha (auth/query/token não encontrado) → card de
-        // cronograma como sempre foi (byte-idêntico) — a rota NUNCA quebra o preview
-        // nem passa a responder 5xx por causa da dependência nova. Cache inalterado.
-        let ptype = PREMIUM_TYPES.cronograma;
-        try {
-          const at = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
-          const task = await queryTaskByToken(env, at, shareMatch[1]);
-          if (task) ptype = premiumTypeOf(task);
-        } catch (_) { /* fallback cronograma (comportamento atual) */ }
-        return htmlResponseCacheable(shareCardHtml(url.origin, shareMatch[1], ptype), 200);
+      if (shareMatch && (request.method === "GET" || request.method === "HEAD")) {
+        // F3.3.73I6C18B — /share rápido e confiável p/ o scraper do WhatsApp:
+        // GET e HEAD na MESMA rota (antes, HEAD caía no fallback JSON do worker —
+        // content-type errado p/ fetchers HEAD-first) + Cache API de borda.
+        // O TIPO continua vindo dos DADOS REAIS (C17); ver handleShareCard.
+        return handleShareCard(request, env, ctx, url, shareMatch[1]);
       }
     }
 
@@ -387,7 +432,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-c17-roteiro-title-parity" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c18b-preview-hotfix" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {

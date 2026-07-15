@@ -33,7 +33,7 @@ const constLine = (name) => { const m = SRC.match(new RegExp('const ' + name + '
 console.log('F3.3.73I6C17 — Worker Roteiro ↔ Card Premium TITLE parity (hermético)');
 
 /* ── A: versão compatível com os gates do deploy pinado ── */
-ok('A1 versão V64.59-c17-roteiro-title-parity no GET /', /version: "V64\.59-c17-roteiro-title-parity"/.test(SRC));
+ok('A1 versão V64.59-* no GET / (linha canônica; sufixo da fase atual = c18b)', /version: "V64\.59-c18b-preview-hotfix"/.test(SRC));
 ok('A2 compatível com gate pré-deploy (grep version: "V64.59)', /version: *"V64\.59/.test(SRC));
 
 /* ── B: resolução de tipo pelos DADOS REAIS (micro-exec) ── */
@@ -61,8 +61,9 @@ ok('C4 roteiro: og:title "Aprovar roteiro"', shareRot.includes('<meta property="
 ok('C5 roteiro: desc "Seu Roteiro de gravação de vídeos está pronto para avaliação."',
   shareRot.includes('<meta property="og:description" content="Seu Roteiro de gravação de vídeos está pronto para avaliação."/>'));
 ok('C6 roteiro: og:image:alt "Agenda ID Seven — Aprovar roteiro"', shareRot.includes('og:image:alt" content="Agenda ID Seven — Aprovar roteiro"'));
-ok('C7 /share carrega a task (queryTaskByToken) com try/catch e fallback cronograma',
-  /shareMatch && request\.method === "GET"[\s\S]{0,900}let ptype = PREMIUM_TYPES\.cronograma;[\s\S]{0,600}queryTaskByToken\(env, at, shareMatch\[1\]\)[\s\S]{0,200}catch \(_\)[\s\S]{0,200}htmlResponseCacheable\(shareCardHtml\(url\.origin, shareMatch\[1\], ptype\), 200\)/.test(SRC));
+ok('C7 /share carrega a task (queryTaskByToken) com try/catch e fallback cronograma (C18B: via handleShareCard, mesma garantia)',
+  /shareMatch && \(request\.method === "GET" \|\| request\.method === "HEAD"\)[\s\S]{0,400}handleShareCard\(request, env, ctx, url, shareMatch\[1\]\)/.test(SRC) &&
+  /async function handleShareCard\(request, env, ctx, url, token\)[\s\S]{0,1600}let ptype = PREMIUM_TYPES\.cronograma[\s\S]{0,900}queryTaskByToken\(env, at, token\)[\s\S]{0,700}htmlResponseCacheable\(shareCardHtml\(url\.origin, token, ptype\), 200\)/.test(SRC));
 ok('C8 rota /share/cronograma INALTERADA (mesmo regex; nenhuma rota nova de share)',
   /\/\^\\\/share\\\/cronograma\\\/\(\[A-Za-z0-9_-\]\{4,128\}\)\\\/\?\$\//.test(SRC) && !/share\\\/roteiro/.test(SRC));
 ok('C9 cache do /share INALTERADO (public, max-age=600 no htmlResponseCacheable)',
