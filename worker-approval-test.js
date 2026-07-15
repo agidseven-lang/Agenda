@@ -232,7 +232,7 @@ check('W_APPROVEITEM_NOT_CONCLUDE', 'approveItem NÃO está no caminho de g.clie
 
 /* ===================== PARTE C — V64.42 (asserções estruturais novas) ===================== */
 console.log(`${C.b}\n[C] V64.42 — team-action + idempotencia + logo + UX + push esqueleto${C.x}`);
-check('C_HEALTH_V64_52', 'Healthcheck retorna V64.59 (linha canônica; sufixo da fase atual)', /version: "V64\.59-c18b-preview-hotfix"/.test(SRC));
+check('C_HEALTH_V64_52', 'Healthcheck retorna V64.59 (linha canônica; sufixo da fase atual)', /version: "V64\.59-c18e-roteiro-og-image"/.test(SRC));
 check('C_LOGO_B64', 'IDSEVEN_LOGO_B64 declarado (base64 do icon oficial)', /const IDSEVEN_LOGO_B64 = "[A-Za-z0-9+/=]{1000,}"/.test(SRC));
 check('C_LOGO_FN', 'Funcao idsevenLogoResponse() existe e usa Content-Type image/png', /function idsevenLogoResponse\(\)/.test(SRC) && /idsevenLogoResponse[\s\S]{0,400}image\/png/.test(SRC));
 check('C_LOGO_ROUTE', 'Rota GET /og/idseven-logo.png registrada', /\/og\/idseven-logo\.png[\s\S]{0,80}idsevenLogoResponse\(\)/.test(SRC));
@@ -367,7 +367,7 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
   check('F_HOOK_WA','envio do card WhatsApp dispara themes_sent_to_client/final_content_sent_to_client', /final_content_sent_to_client" : "themes_sent_to_client/.test(SRC));
   check('F_CTA','Portal tem CTA explícito "Receber avisos deste cronograma" + estados (ativado/negado/incompatível/disponível)', /Receber avisos deste cronograma/.test(SRC)&&/Notificações não permitidas\. Vamos manter o WhatsApp como canal de aviso\./.test(SRC)&&/não suporta avisos em tempo real/.test(SRC)&&/Avisos ativados ✓/.test(SRC));
   check('F_CTA_NO_AUTOPROMPT','CTA NUNCA pede permissão sem clique (requestPermission só dentro de subscribeClientPush)', (()=>{const auto=SRC.match(/function setupClientWebPush\(\)\{[\s\S]*?\n\}/);return auto&&auto[0].indexOf('requestPermission')===-1;})());
-  check('F_VERSION','Healthcheck = V64.59 (linha canônica; sufixo da fase atual)', /version: "V64\.59-c18b-preview-hotfix"/.test(SRC));
+  check('F_VERSION','Healthcheck = V64.59 (linha canônica; sufixo da fase atual)', /version: "V64\.59-c18e-roteiro-og-image"/.test(SRC));
   check('F_INFO_NULLBYTE','Strings HKDF info terminam com \\u0000 (RFC 8291) e SEM null byte cru no source', /WebPush: info\\u0000/.test(SRC)&&/aes128gcm\\u0000/.test(SRC)&&/nonce\\u0000/.test(SRC)&&SRC.indexOf(String.fromCharCode(0))===-1);
 
   /* ===================== PARTE G — TEAM SESSION JWT (round-trip funcional REAL) =====================
@@ -671,7 +671,9 @@ const W=new Function(...Object.keys(evalScope),CRYPTO_FNS+'\nreturn {b64uToBytes
     };
     // F3.3.73I6C17 — o engine real agora resolve o TIPO (cronograma×roteiro) via premiumTypeOf;
     // extrai também PREMIUM_TYPES/premiumTypeOf (tasks do teste sem sector → cronograma, copy EXATA).
-    const OM=new Function(...Object.keys(scopeO),cx('PREMIUM_TYPES')+'\n'+fx('premiumTypeOf')+'\n'+cx('NOTIFY_EVENTS')+'\n'+fx('notifyWorkflowEvent')+'\nreturn {NOTIFY_EVENTS,notifyWorkflowEvent};')(...Object.values(scopeO));
+    const cl=(name)=>{const m=SRC.match(new RegExp('const '+name+' = "[^"]*";'));if(!m)throw new Error('const '+name);return m[0];};
+    // F3.3.73I6C18E — PREMIUM_TYPES agora referencia os paths de imagem por tipo
+    const OM=new Function(...Object.keys(scopeO),cl('OG_IMG_PATH')+'\n'+cl('OG_IMG_PATH_ROTEIRO')+'\n'+cx('PREMIUM_TYPES')+'\n'+fx('premiumTypeOf')+'\n'+cx('NOTIFY_EVENTS')+'\n'+fx('notifyWorkflowEvent')+'\nreturn {NOTIFY_EVENTS,notifyWorkflowEvent};')(...Object.values(scopeO));
     const env={VAPID_PRIVATE_KEY:'k',VAPID_PUBLIC_KEY:'K',VAPID_SUBJECT:'mailto:x@x'};
     const SIX=[
       ['themes_sent_to_client','themes'],

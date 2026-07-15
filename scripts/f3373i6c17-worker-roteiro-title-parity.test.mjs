@@ -33,11 +33,11 @@ const constLine = (name) => { const m = SRC.match(new RegExp('const ' + name + '
 console.log('F3.3.73I6C17 — Worker Roteiro ↔ Card Premium TITLE parity (hermético)');
 
 /* ── A: versão compatível com os gates do deploy pinado ── */
-ok('A1 versão V64.59-* no GET / (linha canônica; sufixo da fase atual = c18b)', /version: "V64\.59-c18b-preview-hotfix"/.test(SRC));
+ok('A1 versão V64.59-* no GET / (linha canônica; sufixo da fase atual = c18e)', /version: "V64\.59-c18e-roteiro-og-image"/.test(SRC));
 ok('A2 compatível com gate pré-deploy (grep version: "V64.59)', /version: *"V64\.59/.test(SRC));
 
 /* ── B: resolução de tipo pelos DADOS REAIS (micro-exec) ── */
-const CORE = constLine('OG_IMG_PATH') + '\n' + constObj('PREMIUM_TYPES') + '\n' + fnSrc('premiumTypeOf') + '\n' +
+const CORE = constLine('OG_IMG_PATH') + '\n' + constLine('OG_IMG_PATH_ROTEIRO') + '\n' + constObj('PREMIUM_TYPES') + '\n' + fnSrc('premiumTypeOf') + '\n' +
   fnSrc('escapeHtml') + '\n' + fnSrc('ogClientBase') + '\n' + fnSrc('ogClientMeta') + '\n' +
   fnSrc('shareCardHtml') + '\n' + fnSrc('crawlerCardHtml') + '\n' + fnSrc('phaseCopy') + '\n' + fnSrc('frequencyLabel') + '\n';
 const API = new Function(CORE + 'return {premiumTypeOf,PREMIUM_TYPES,shareCardHtml,crawlerCardHtml,phaseCopy,frequencyLabel,ogClientMeta};')();
