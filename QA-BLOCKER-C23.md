@@ -61,3 +61,50 @@ congelada como "publicada, porém não aprovada fisicamente").
 
 É PROIBIDO declarar o Card Premium corrigido, publicar 1.0.169 ou fazer
 deploy de produção antes da prova física real.
+
+---
+
+# ADENDO F3.3.73I6C24 — RUNBOOK DE DESBLOQUEIO (equipe operacional)
+
+## Desbloqueio 1 em 3 passos (Cloudflare — ~5 minutos, painel)
+
+1. **Criar token técnico dedicado de QA** (dash.cloudflare.com → My Profile →
+   API Tokens → Create Token → Custom): permissões MÍNIMAS
+   - Account → **Workers KV Storage → Edit**
+   - Account → **Workers Scripts → Edit**
+   - (opcional) Account → Account Settings → Read
+   - Zone: NENHUMA (QA usa somente workers.dev)
+   - Account Resources: somente a conta do idseven-push.
+   Não reutilizar credencial pessoal; não alterar o token de produção.
+2. **Gravar como secret do GitHub Actions** com o nome exato
+   `CLOUDFLARE_QA_API_TOKEN` (Settings → Secrets and variables → Actions).
+   O workflow de QA já prefere esse secret automaticamente (fallback ao
+   atual apenas se ausente); o valor nunca aparece em logs.
+3. **Re-executar** `deploy-worker-qa.yml` (confirm=`PROVISIONAR-QA-C23`,
+   ref=`worker/f3373i6c23-share-snapshot`). O run verde comprova, ao vivo:
+   namespace `SHARE_SNAPSHOTS_QA` criado/reutilizado (idempotente), binding
+   KV, serviço `idseven-push-qa` publicado, contrato C23 completo
+   (ready/not_found/imagens/HIT/HEAD/401/400) e **produção intocada**
+   (gate final). Diagnóstico auxiliar: `ops-cf-token-diagnose.yml`
+   (confirm=`DIAGNOSTICAR-CF-C24`) — read-only, mostra o que a credencial
+   pode fazer sem criar nada.
+
+## Desbloqueio 2 — WhatsApp Business QA (registro obrigatório)
+
+Provisionar e REGISTRAR neste arquivo (via PR/commit da equipe):
+- responsável operacional: ______
+- número/SIM ou eSIM de teste corporativo (NUNCA conta pessoal do owner): ______
+- dispositivo controlado + WhatsApp Web autenticado (perfil de navegador QA): ______
+- conversa individual e grupo de teste: ______
+- data do provisionamento: ______
+- retenção das evidências (vídeo/screenshots, tokens SEMPRE redigidos): ______
+- política de privacidade aplicada; PROIBIDO usar dados reais de clientes.
+
+## Sequência pós-desbloqueio (C24 objetivos 3→5)
+
+1. QA verde (workflow acima) → 2. Desktop **1.0.169-QA** (bump + build
+   apontando EXCLUSIVAMENTE para o Worker QA, identificado visualmente como
+   QA, sem release/tag) → 3. prova física da ETAPA 5 (Cronograma, Roteiro
+   4/6/8/12, wizard nos 4 quadros) com evidências → só então abrir
+   **F3.3.73I6C25-PRODUCTION-CUTOVER-DESKTOP-1.0.169** (única fase
+   autorizada a criar KV de produção, implantar o Worker C23 e publicar).
