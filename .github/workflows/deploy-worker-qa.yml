@@ -84,10 +84,22 @@ jobs:
         run: |
           set -euo pipefail
           API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
-          NSID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API?per_page=100" | jq -r --arg t "$NS_TITLE" '.result[] | select(.title==$t) | .id' | head -1)
+          LISTA=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API?per_page=100")
+          if [ "$(echo "$LISTA" | jq -r '.success')" != "true" ]; then
+            echo "::error::API KV recusou a LISTAGEM — token sem permissao 'Workers KV Storage'? (bloqueio de credencial, nao de codigo)"
+            echo "$LISTA" | jq '{success, errors}'
+            exit 1
+          fi
+          NSID=$(echo "$LISTA" | jq -r --arg t "$NS_TITLE" '(.result // [])[] | select(.title==$t) | .id' | head -1)
           if [ -z "$NSID" ]; then
             echo "criando namespace $NS_TITLE"
-            NSID=$(curl -sS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "{\"title\":\"$NS_TITLE\"}" "$API" | jq -r '.result.id')
+            CRIA=$(curl -sS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "{\"title\":\"$NS_TITLE\"}" "$API")
+            if [ "$(echo "$CRIA" | jq -r '.success')" != "true" ]; then
+              echo "::error::API KV recusou a CRIACAO do namespace QA (permissao do token)"
+              echo "$CRIA" | jq '{success, errors}'
+              exit 1
+            fi
+            NSID=$(echo "$CRIA" | jq -r '.result.id')
           else
             echo "reutilizando namespace existente"
           fi
