@@ -174,16 +174,40 @@ jobs:
           # que reprovava o proprio host de QA -> "Link invalido". Este gate le o renderer REAL de
           # dentro do app.asar (mesmo $RDIR acima) e reprova o build QA se o legado voltar.
           if grep -rIlF "AMBIENTE QA" "$RDIR" >/dev/null 2>&1; then
-            echo "build QA detectado — validando o gate de URL EMPACOTADO (C24D)"
-            if grep -rnF '!/workers\.dev/.test' "$RDIR" 2>/dev/null | grep -q .; then
-              echo "::error:: validador legado (rejeicao workers.dev) EMPACOTADO no build QA"; grep -rnF '!/workers\.dev/.test' "$RDIR" | head -3; exit 1; fi
-            if grep -rF "indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/')===0" "$RDIR" 2>/dev/null | grep -q .; then
-              echo "::error:: host de producao HARDCODED no validador do build QA empacotado"; exit 1; fi
-            grep -rqF "function validateShareUrl" "$RDIR" || { echo "::error:: validateShareUrl AUSENTE no build QA empacotado (allowlist por ambiente nao empacotada)"; exit 1; }
-            grep -rqF "SHARE_ALLOWED_HOST = QA_BUILD ? 'idseven-push-qa.agidseven.workers.dev'" "$RDIR" || { echo "::error:: SHARE_ALLOWED_HOST nao aponta ao host QA no build QA empacotado"; exit 1; }
-            grep -rqF "idseven-push-qa.agidseven.workers.dev" "$RDIR" || { echo "::error:: host QA AUSENTE no build QA empacotado"; exit 1; }
-            grep -rqF "gere o roteiro novamente" "$RDIR" || { echo "::error:: texto por setor de Roteiro AUSENTE no build QA empacotado"; exit 1; }
-            echo "F3.3.73I6C24D: gate de URL EMPACOTADO (build QA) OK — allowlist exata do host QA; legado ausente; textos por setor presentes."
+            if grep -rqF "F3.3.74D — CONTRATO RESTAURADO" "$RDIR"; then
+              # ===== F3.3.74E — GATE DO RUNTIME EMPACOTADO (contrato RESTAURADO da baseline
+              # fisicamente aprovada 1.0.153; falha se o comportamento C18C reaparecer). =====
+              echo "build QA RESTAURADO detectado — validando o contrato 74E EMPACOTADO"
+              IDX="$RDIR/index.html"
+              if grep -qF 'id="btnOpenWaMain" disabled' "$IDX"; then echo "::error:: (74E-1) botao NASCE disabled — regressao C18C EMPACOTADA"; exit 1; fi
+              if grep -qF 'if(!prepReady){ flashToast' "$IDX"; then echo "::error:: (74E-2) gate prepReady no clique — regressao C18C EMPACOTADA"; exit 1; fi
+              if grep -qF "\$('btnOpenWaMain'); if(b){ b.disabled=true; }" "$IDX"; then echo "::error:: (74E-3) prewarm desabilita o botao — nao e bonus"; exit 1; fi
+              if grep -qF 'if(!_pw||!_pw.ok){ flashToast' "$IDX"; then echo "::error:: (74E-4) falha de prewarm aborta o envio (data-openwa)"; exit 1; fi
+              grep -qF 'Acesse o link abaixo para revisar os temas, aprovar ou solicitar ajustes:' "$IDX" || { echo "::error:: (74E-5) mensagem aprovada AUSENTE"; exit 1; }
+              grep -qF 'https://aprovar.agendaidseven.com.br' "$IDX" || { echo "::error:: (74E-6) dominio oficial AUSENTE"; exit 1; }
+              grep -qF '/share/cronograma/' "$IDX" || { echo "::error:: (74E-7) rota oficial AUSENTE"; exit 1; }
+              grep -qF "return CLIENT_LINK_BASE+'/share/cronograma/'+t;" "$IDX" || { echo "::error:: (74E-8) token fora do pathname (builder alterado)"; exit 1; }
+              if grep -qF 'withWhatsAppPreviewBust(buildShareClientUrl' "$IDX" || grep -qF 'url=withWhatsAppPreviewBust(' "$IDX"; then echo "::error:: (74E-9) cache-bust EM USO no envio (contrato aprovado e SEM ?v=)"; exit 1; fi
+              if grep -qF 'nativeShare' "$IDX"; then echo "::error:: (74E-10) native-share no caminho principal"; exit 1; fi
+              if grep -qF 'buildNativeShareRequest' "$IDX"; then echo "::error:: (74E-11) Windows Share UI no caminho principal"; exit 1; fi
+              if grep -qF 'buildPremiumCardImage' "$IDX" || grep -qF 'CARD_ART_B64_BY_TYPE' "$IDX"; then echo "::error:: (74E-12) Canvas/PNG nativo no caminho principal"; exit 1; fi
+              case "$APP_VERSION" in *-QA) : ;; *) echo "::error:: (74E-13) versao sem sufixo -QA ($APP_VERSION) com banner QA"; exit 1 ;; esac
+              grep -qF 'AMBIENTE QA — NÃO USAR COM CLIENTES' "$IDX" || { echo "::error:: (74E-14) banner QA AUSENTE"; exit 1; }
+              echo "F3.3.74E: gate do CONTRATO RESTAURADO EMPACOTADO OK — 14/14 (sem C18C, sem 74B/74C, mensagem/dominio/rota/token intactos, sem cache-bust, banner presente, versao $APP_VERSION)."
+            elif grep -rqF "function validateShareUrl" "$RDIR"; then
+              echo "build QA (linha C24D) detectado — validando o gate de URL EMPACOTADO (C24D)"
+              if grep -rnF '!/workers\.dev/.test' "$RDIR" 2>/dev/null | grep -q .; then
+                echo "::error:: validador legado (rejeicao workers.dev) EMPACOTADO no build QA"; grep -rnF '!/workers\.dev/.test' "$RDIR" | head -3; exit 1; fi
+              if grep -rF "indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/')===0" "$RDIR" 2>/dev/null | grep -q .; then
+                echo "::error:: host de producao HARDCODED no validador do build QA empacotado"; exit 1; fi
+              grep -rqF "SHARE_ALLOWED_HOST = QA_BUILD ? 'idseven-push-qa.agidseven.workers.dev'" "$RDIR" || { echo "::error:: SHARE_ALLOWED_HOST nao aponta ao host QA no build QA empacotado"; exit 1; }
+              grep -rqF "idseven-push-qa.agidseven.workers.dev" "$RDIR" || { echo "::error:: host QA AUSENTE no build QA empacotado"; exit 1; }
+              grep -rqF "gere o roteiro novamente" "$RDIR" || { echo "::error:: texto por setor de Roteiro AUSENTE no build QA empacotado"; exit 1; }
+              echo "F3.3.73I6C24D: gate de URL EMPACOTADO (build QA) OK — allowlist exata do host QA; legado ausente; textos por setor presentes."
+            else
+              echo "::error:: build QA sem regime de validacao conhecido (nem contrato RESTAURADO 74E, nem validateShareUrl C24D) — fail-closed."
+              exit 1
+            fi
           fi
 
       - name: Gate helper nativo EMPACOTADO (F3.3.74C)
