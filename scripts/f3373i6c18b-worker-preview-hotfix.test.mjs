@@ -43,6 +43,7 @@ const CORE =
   fnSrc('ogClientMeta') + '\n' + fnSrc('shareCardHtml') + '\n' + fnSrc('htmlResponseCacheable') + '\n' +
   fnSrc('shareUnavailableHtml') + '\n' + fnSrc('shareSnapshotContentHashInput') + '\n' +
   fnSrc('sha256HexW') + '\n' + fnSrc('maskUid') + '\n' + fnSrc('timingSafeEqualStr') + '\n' +
+  fnSrc('qaTraceId') + '\n' + fnSrc('qaTraceLog') + '\n' +
   fnSrc('handleShareCard') + '\n' + fnSrc('handleShareSnapshotCreate') + '\n';
 
 function mkEnv() {

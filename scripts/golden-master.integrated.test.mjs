@@ -181,6 +181,17 @@ const st = await snapCreate(ID_SEMTOK, 'roteiro');
 gate('G24c', 'tarefa sem token estável: 409 token_missing (endpoint NUNCA rotaciona/gera)', st.s === 409 && /token_missing/.test((st.j && st.j.error) || ''));
 const na = await req('/share-snapshot', { method: 'POST', ua: 'br', body: { taskId: ID_CRON, expectedType: 'cronograma' } });
 gate('G24d', 'endpoint sem credencial: 401 (criação sempre autenticada)', na.s === 401);
+
+/* ═══ F3.3.73I6C24C — resposta ESTRUTURADA p/ o Desktop (código + OG do tipo; readback-before-ready) ═══ */
+const c24 = await snapCreate(ID_CRON, 'cronograma');
+gate('G24e', '[C24C] POST ready traz code=snapshot_ready + og.imagePath=v64-39 + og.title (preview usa a arte certa)',
+  c24.j && c24.j.code === 'snapshot_ready' && c24.j.og && c24.j.og.imagePath === '/og/wa-card-v64-39.jpg' && c24.j.og.title === 'Aprovar cronograma', true);
+const r24 = await snapCreate(ID_ROT, 'roteiro');
+gate('G24f', '[C24C] Roteiro: og.imagePath=v64-60 (NUNCA cronograma) — corrige a preview interna do Roteiro',
+  r24.j && r24.j.og && r24.j.og.imagePath === '/og/wa-card-roteiro-v64-60.jpg', true);
+const nf24 = await snapCreate('gmtasknaoexiste000000000', 'cronograma');
+gate('G24g', '[C24C] taskId inexistente: 404 code=task_not_found (código estruturado preservado, não some)', nf24.s === 404 && nf24.j && nf24.j.code === 'task_not_found', true);
+gate('G24h', '[C24C] tipo divergente: 409 code=type_mismatch (código estruturado)', mm.j && mm.j.code === 'type_mismatch', true);
 /* HIT + HEAD + logs */
 const g1b = await share(T_CRON, { ua: 'br' });
 gate('G25a', 'HIT preserva OG + headers do contrato (resolved/tipo/ready)', /hit/i.test(g1b.xc || '') && hasCronCard(g1b.html) && g1b.task === 'resolved' && g1b.snap === 'ready');

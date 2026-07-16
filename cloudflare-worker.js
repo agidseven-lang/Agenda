@@ -225,6 +225,26 @@ function shareCardHtml(origin, token, ptype) {
    wrangler.toml ANTES do deploy (sem o binding, /share responde 503 explícito). */
 const SHARE_SNAP_KEY = (token) => "snap:" + token;
 const SHARE_TOKEN_RE = /^[A-Za-z0-9_-]{4,128}$/;
+/* F3.3.73I6C24C — TRACE de QA (correlação ponta a ponta SANITIZADA).
+   Só ativa quando env.QA_TRACE === "1" (var definida APENAS no wrangler de QA —
+   produção não define e nada é logado). O traceId é um UUID OPACO gerado pelo
+   Desktop: nunca contém taskId/token/cliente/e-mail/conteúdo, e NENHUMA dessas
+   informações entra aqui — somente etapa, status/código sanitizado e duração. */
+function qaTraceId(request) {
+  const h = request && request.headers;
+  const v = (h && typeof h.get === "function" && h.get("X-QA-Trace-Id")) || "";
+  return /^[A-Za-z0-9-]{8,64}$/.test(v) ? v : "";
+}
+function qaTraceLog(env, traceId, stage, extra) {
+  if (!env || env.QA_TRACE !== "1" || !traceId) return;
+  const safe = [];
+  for (const k of Object.keys(extra || {})) {
+    const val = extra[k];
+    if (val === undefined || val === null) continue;
+    safe.push(k + "=" + String(val).slice(0, 60));
+  }
+  console.log(`[QA-TRACE] traceId=${traceId} stage=${stage}${safe.length ? " " + safe.join(" ") : ""}`);
+}
 function shareSnapshotContentHashInput(typeKey) {
   // Conteúdo VISÍVEL do card = tipo + arte versionada (title/desc/imagem derivam do tipo).
   const pt = PREMIUM_TYPES[typeKey];
@@ -266,11 +286,13 @@ async function handleShareCard(request, env, ctx, url, token) {
                    (KV indisponível, binding ausente ou snapshot corrompido —
                    erro NUNCA vira Cronograma). */
   const t0 = Date.now();
+  const qtid = qaTraceId(request);
   const cacheKey = new Request(url.origin + "/share/cronograma/" + token, { method: "GET" });
   let cached = null;
   try { cached = await caches.default.match(cacheKey); } catch (_) { /* Cache API indisponível → segue p/ KV */ }
   if (cached) {
     const h = new Headers(cached.headers); h.set("X-Share-Cache", "hit");
+    qaTraceLog(env, qtid, "worker.share.get", { status: cached.status, cache: "hit", durMs: Date.now() - t0 });
     return new Response(request.method === "HEAD" ? null : cached.body, { status: cached.status, headers: h });
   }
   const fail = (state, status, snapHdr) => {
@@ -303,6 +325,7 @@ async function handleShareCard(request, env, ctx, url, token) {
   res.headers.set("X-Share-Type", ptype.key);
   res.headers.set("X-Share-Snapshot", "ready");
   res.headers.set("Server-Timing", "snapshot_read;dur=" + (Date.now() - t0));
+  qaTraceLog(env, qtid, "worker.share.get", { status: 200, cache: "miss", durMs: Date.now() - t0 });
   // Só snapshot READY aquece a Cache API (not_found/error NUNCA são cacheados).
   if (ctx) { try { ctx.waitUntil(caches.default.put(cacheKey, res.clone())); } catch (_) { /* best-effort */ } }
   if (request.method === "HEAD") return new Response(null, { status: 200, headers: res.headers });
@@ -318,95 +341,141 @@ async function handleShareCard(request, env, ctx, url, token) {
    (o clientReviewToken existente — nada rotaciona), shareUrl, portalUrl,
    snapshotStatus ready|error, type, imageUrl, createdAt, contentHash, reused. */
 async function handleShareSnapshotCreate(request, env, ctx, url) {
-  if (!env.SHARE_SNAPSHOTS) return json({ ok: false, error: "SHARE_SNAPSHOTS_NOT_CONFIGURED", snapshotStatus: "error" }, 503, env);
+  const traceId = qaTraceId(request);
+  const tStart = Date.now();
+  if (!env.SHARE_SNAPSHOTS) return json({ ok: false, error: "SHARE_SNAPSHOTS_NOT_CONFIGURED", code: "kv_binding_missing", snapshotStatus: "error" }, 503, env);
   let p = {};
   try { p = await request.json(); } catch (_) { /* body inválido tratado abaixo */ }
   const taskId = (p && typeof p.taskId === "string") ? p.taskId.trim() : "";
   const expectedType = (p && typeof p.expectedType === "string") ? p.expectedType.trim().toLowerCase() : "";
-  if (!taskId || !/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) return json({ ok: false, error: "taskId inválido" }, 400, env);
-  if (expectedType !== "cronograma" && expectedType !== "roteiro") return json({ ok: false, error: "expectedType deve ser cronograma|roteiro" }, 400, env);
+  if (!taskId || !/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) return json({ ok: false, error: "taskId inválido", code: "content_invalid" }, 400, env);
+  if (expectedType !== "cronograma" && expectedType !== "roteiro") return json({ ok: false, error: "expectedType deve ser cronograma|roteiro", code: "content_invalid" }, 400, env);
   // ── AUTENTICAÇÃO FORTE PRIMEIRO (nenhum recurso é adquirido antes de autenticar) ──
   const suppliedKey = request.headers.get("X-Team-Key") || "";
+  qaTraceLog(env, traceId, "worker.auth.start", {});
   const keyOk = !!(env.TEAM_API_KEY && await timingSafeEqualStr(suppliedKey, env.TEAM_API_KEY));
   let jwtUid = "";
   if (!keyOk) {
     const m = (request.headers.get("Authorization") || "").match(/^Bearer\s+(.+)$/i);
     if (!m) {
       console.warn("[SHARE-SNAPSHOT] negado: sem Bearer/X-Team-Key");
-      return json({ ok: false, error: "unauthorized: Authorization Bearer <teamSessionJwt> obrigatório (obtido em /team/session) ou X-Team-Key server-to-server" }, 401, env);
+      qaTraceLog(env, traceId, "worker.auth.fail", { code: "auth_missing" });
+      return json({ ok: false, error: "unauthorized: Authorization Bearer <teamSessionJwt> obrigatório (obtido em /team/session) ou X-Team-Key server-to-server", code: "auth_missing" }, 401, env);
     }
     const v = await verifyTeamJwt(env, m[1]);
     if (!v.ok) {
       console.warn("[SHARE-SNAPSHOT] negado: jwt " + v.error);
-      return json({ ok: false, error: "unauthorized: " + v.error, expired: !!v.expired }, 401, env);
+      qaTraceLog(env, traceId, "worker.auth.fail", { code: "auth_invalid" });
+      return json({ ok: false, error: "unauthorized: " + v.error, expired: !!v.expired, code: "auth_invalid" }, 401, env);
     }
     jwtUid = v.uid;
   }
   let accessToken;
   try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
-  catch (_) { return json({ ok: false, error: "auth indisponível no momento" }, 502, env); }
+  catch (_) { qaTraceLog(env, traceId, "worker.auth.fail", { code: "firestore_error", etapa: "oauth" }); return json({ ok: false, error: "auth indisponível no momento", code: "firestore_error" }, 502, env); }
   let byUid = "server";
   if (!keyOk) {
     // reconsulta de role/status no Firestore ANTES de executar (revogação imediata).
     const teamUser = await lookupTeamUser(env, accessToken, jwtUid);
     if (!teamUser) {
       console.warn(`[SHARE-SNAPSHOT] negado: uid=${maskUid(jwtUid)} não é mais Social/Admin ativo`);
-      return json({ ok: false, error: "forbidden: usuário não é mais Social/Admin ativo" }, 403, env);
+      qaTraceLog(env, traceId, "worker.auth.fail", { code: "role_denied" });
+      return json({ ok: false, error: "forbidden: usuário não é mais Social/Admin ativo", code: "role_denied" }, 403, env);
     }
     byUid = teamUser.uid;
   }
+  qaTraceLog(env, traceId, "worker.auth.ok", { modo: keyOk ? "key" : "jwt" });
   // Resolve a tarefa UMA vez, server-side autenticado — NUNCA no GET público.
   let doc = null;
+  qaTraceLog(env, traceId, "worker.task.lookup.start", {});
   try {
     const r = await fetch(`${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${encodeURIComponent(taskId)}`, {
       headers: { "Authorization": "Bearer " + accessToken },
     });
-    if (r.status === 404) return json({ ok: false, error: "task_not_found" }, 404, env);
-    if (!r.ok) return json({ ok: false, error: "firestore " + r.status }, 502, env);
+    if (r.status === 404) { qaTraceLog(env, traceId, "worker.task.lookup.not_found", {}); return json({ ok: false, error: "task_not_found", code: "task_not_found" }, 404, env); }
+    if (!r.ok) { qaTraceLog(env, traceId, "worker.task.lookup.error", { status: r.status }); return json({ ok: false, error: "firestore " + r.status, code: "firestore_error" }, 502, env); }
     doc = await r.json();
-  } catch (_) { return json({ ok: false, error: "firestore indisponível" }, 502, env); }
+  } catch (_) { qaTraceLog(env, traceId, "worker.task.lookup.error", { etapa: "rede" }); return json({ ok: false, error: "firestore indisponível", code: "firestore_error" }, 502, env); }
+  qaTraceLog(env, traceId, "worker.task.lookup.found", {});
   const f = (doc && doc.fields) || {};
   const sector = (f.sector && f.sector.stringValue) || "";
   const typeKey = premiumTypeOf({ sector: sector }).key;
   // Tipo divergente NUNCA vira fallback: erro explícito (o Desktop bloqueia o WhatsApp).
-  if (typeKey !== expectedType) return json({ ok: false, error: "type_mismatch", expected: expectedType, actual: typeKey }, 409, env);
+  if (typeKey !== expectedType) return json({ ok: false, error: "type_mismatch", code: "type_mismatch", expected: expectedType, actual: typeKey }, 409, env);
   const token = (f.clientReviewToken && f.clientReviewToken.stringValue) || (f.shareToken && f.shareToken.stringValue) || "";
-  if (!SHARE_TOKEN_RE.test(token)) return json({ ok: false, error: "token_missing: gere o link estável da tarefa antes (C18H)" }, 409, env);
+  if (!SHARE_TOKEN_RE.test(token)) return json({ ok: false, error: "token_missing: gere o link estável da tarefa antes (C18H)", code: "token_missing" }, 409, env);
   const contentHash = await sha256HexW(shareSnapshotContentHashInput(typeKey));
+  qaTraceLog(env, traceId, "worker.snapshot.hash", { durMs: Date.now() - tStart });
   const snapId = "snap_" + (await sha256HexW("id|" + token + "|" + contentHash)).slice(0, 16);
   let existing = null;
   try {
     const raw = await env.SHARE_SNAPSHOTS.get(SHARE_SNAP_KEY(token));
-    existing = raw ? JSON.parse(raw) : null;
-  } catch (_) { return json({ ok: false, error: "snapshot_store_read", snapshotStatus: "error" }, 503, env); }
+    if (raw) { try { existing = JSON.parse(raw); } catch (_) { existing = null; qaTraceLog(env, traceId, "worker.kv.read.pending", { nota: "corrompido_pre_write" }); } }
+  } catch (_) { qaTraceLog(env, traceId, "worker.kv.read.fail", { code: "kv_not_visible", etapa: "pre" }); return json({ ok: false, error: "snapshot_store_read", code: "kv_not_visible", snapshotStatus: "error" }, 503, env); }
   // REUSO: conteúdo inalterado ⇒ mesmo snapshot (nenhum write; publicado nunca muda em silêncio).
   const reused = !!(existing && existing.type === typeKey && existing.contentHash === contentHash);
   let snap = existing;
   if (!reused) {
     snap = { v: 1, type: typeKey, contentHash: contentHash, createdAt: new Date().toISOString(), by: maskUid(byUid) };
+    qaTraceLog(env, traceId, "worker.kv.put.start", {});
     try { await env.SHARE_SNAPSHOTS.put(SHARE_SNAP_KEY(token), JSON.stringify(snap)); }
-    catch (_) { return json({ ok: false, error: "snapshot_store_write", snapshotStatus: "error" }, 503, env); }
+    catch (_) { qaTraceLog(env, traceId, "worker.kv.put.fail", { code: "kv_write_failed" }); return json({ ok: false, error: "snapshot_store_write", code: "kv_write_failed", snapshotStatus: "error" }, 503, env); }
+    qaTraceLog(env, traceId, "worker.kv.put.ok", {});
+    /* F3.3.73I6C24C — READY SÓ COM LEITURA CONFIRMADA. A consistência eventual do KV é
+       FATO MEDIDO neste projeto (run 3 do QA: GET público 404 ~0,3s após o put do seed;
+       run 4/5: propagação por versão). O POST agora RELÊ o snapshot e confere type +
+       contentHash ANTES de responder ready. Poll LIMITADO com backoff progressivo
+       (0/150/250/400/600/900/1300/1800ms ≈ 5,9s de teto, sem loop infinito); em timeout
+       responde 503 kv_not_visible — NUNCA ready antecipado. (Reuso não precisa reler:
+       o valor acabou de ser LIDO do próprio KV nesta mesma requisição.) */
+    const RB_DELAYS = [0, 150, 250, 400, 600, 900, 1300, 1800];
+    let visible = false;
+    qaTraceLog(env, traceId, "worker.kv.read.start", {});
+    for (let i = 0; i < RB_DELAYS.length; i++) {
+      if (RB_DELAYS[i] > 0) await new Promise((r) => setTimeout(r, RB_DELAYS[i]));
+      let back = null;
+      try { const rb = await env.SHARE_SNAPSHOTS.get(SHARE_SNAP_KEY(token)); back = rb ? JSON.parse(rb) : null; } catch (_) { back = null; }
+      if (back && back.type === typeKey && back.contentHash === contentHash) { visible = true; break; }
+      qaTraceLog(env, traceId, "worker.kv.read.pending", { tentativa: i + 1 });
+    }
+    if (!visible) {
+      qaTraceLog(env, traceId, "worker.kv.read.fail", { code: "kv_not_visible" });
+      return json({ ok: false, error: "kv_not_visible: snapshot gravado mas ainda não legível — tente novamente", code: "kv_not_visible", snapshotStatus: "error" }, 503, env);
+    }
+    qaTraceLog(env, traceId, "worker.kv.read.ready", {});
   }
   // PRÉ-RENDERIZA o OG: aquece a Cache API da URL pública CANÔNICA (o link do cliente
   // usa sempre o domínio custom — independe da origem desta chamada autenticada).
   const base = ogClientBase("");
+  /* F3.3.73I6C24C — aquece a Cache API na base CANÔNICA do cliente E TAMBÉM na origem
+     desta chamada: em QA o Desktop consulta o próprio workers.dev de QA, e aquecer só o
+     domínio canônico de produção era um NO-OP para o GET#1 do Desktop-QA (chave de cache
+     é por URL). Em produção origem==canônico na prática e nada muda. */
+  const origin = (url && typeof url.origin === "string" && /^https:\/\//.test(url.origin)) ? url.origin : base;
   const shareUrl = base + "/share/cronograma/" + token;
   const pt = PREMIUM_TYPES[typeKey];
-  try {
-    const warm = htmlResponseCacheable(shareCardHtml(base, token, pt), 200);
-    warm.headers.set("X-Share-Cache", "miss");
-    warm.headers.set("X-Share-Task", "resolved");
-    warm.headers.set("X-Share-Type", typeKey);
-    warm.headers.set("X-Share-Snapshot", "ready");
-    const warmKey = new Request(shareUrl, { method: "GET" });
-    if (ctx) ctx.waitUntil(caches.default.put(warmKey, warm));
-  } catch (_) { /* best-effort: o GET público lê do KV de qualquer forma */ }
+  const warmBases = (origin === base) ? [base] : [base, origin];
+  for (const wb of warmBases) {
+    try {
+      const warm = htmlResponseCacheable(shareCardHtml(wb, token, pt), 200);
+      warm.headers.set("X-Share-Cache", "miss");
+      warm.headers.set("X-Share-Task", "resolved");
+      warm.headers.set("X-Share-Type", typeKey);
+      warm.headers.set("X-Share-Snapshot", "ready");
+      const warmKey = new Request(wb + "/share/cronograma/" + token, { method: "GET" });
+      if (ctx) ctx.waitUntil(caches.default.put(warmKey, warm));
+    } catch (_) { /* best-effort: o GET público lê do KV de qualquer forma */ }
+  }
   console.log(`[SHARE-SNAPSHOT] ${reused ? "reuso" : "publicado"} id=${snapId} tipo=${typeKey} por=${maskUid(byUid)}`);
+  qaTraceLog(env, traceId, "worker.snapshot.response", { status: 200, code: "snapshot_ready", reused: reused, durMs: Date.now() - tStart });
   return json({
     ok: true, snapshotId: snapId, token: token, shareUrl: shareUrl,
     portalUrl: base + "/cliente/cronograma/" + token, snapshotStatus: "ready",
     type: typeKey, imageUrl: base + pt.imgPath, createdAt: snap.createdAt,
-    contentHash: contentHash, reused: reused,
+    contentHash: contentHash, reused: reused, code: "snapshot_ready",
+    /* F3.3.73I6C24C — metadados OG do snapshot p/ a PRÉVIA INTERNA do Desktop:
+       a UI não adivinha mais arte/título — usa exatamente o que o snapshot serve. */
+    og: { title: pt.aprLabel, description: pt.shareDesc, imagePath: pt.imgPath },
   }, 200, env);
 }
 

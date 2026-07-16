@@ -21,6 +21,9 @@ workers_dev = true
 
 [vars]
 FCM_PROJECT_ID = "qa-sem-firestore"
+# F3.3.73I6C24C — trace de correlação SANITIZADO (somente QA; produção não define
+# esta var e nenhuma linha [QA-TRACE] é emitida lá). Nunca registra token/taskId.
+QA_TRACE = "1"
 ALLOWED_ORIGIN = "https://agendaidseven.com.br"
 REMINDER_BEFORE_MINUTES = "60"
 REMINDER_WINDOW_SECONDS = "300"
