@@ -58,6 +58,64 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: npm run build
 
+      # ===== F3.3.74C — HELPER NATIVO do Windows Share (compila ANTES do electron-builder,
+      # que o empacota via extraResources native-share/publish). Condicional ao ref buildado
+      # conter o helper (refs antigos 1.0.168–1.0.172 seguem buildando sem estes passos). =====
+      - name: Compilar helper nativo Share (F3.3.74C)
+        if: ${{ hashFiles('desktop/native-share/AgendaIdSevenNativeShare.cpp') != '' }}
+        working-directory: desktop/native-share
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSPATH=%%i"
+          if not defined VSPATH (echo ::error:: MSVC nao encontrado no runner & exit /b 1)
+          call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+          if not exist publish mkdir publish
+          cl /nologo /std:c++20 /EHsc /permissive- /O2 /W3 /DUNICODE /D_UNICODE AgendaIdSevenNativeShare.cpp /Fe:publish\AgendaIdSeven.NativeShare.exe /link WindowsApp.lib user32.lib ole32.lib shell32.lib || exit /b 1
+          dir publish
+
+      - name: Gate F3.3.74C FASE 12 — QA Share Target (selftest RELÊ o DataPackage combinado)
+        if: ${{ hashFiles('desktop/native-share/AgendaIdSevenNativeShare.cpp') != '' }}
+        working-directory: desktop/native-share
+        run: |
+          # PROVA DE PACOTE (sem WhatsApp): o helper monta o DataPackage e o RELÊ via
+          # GetView() — exatamente o DataPackageView que um Share Target recebe — e
+          # registra os formatos presentes. O gate exige TODOS simultaneamente:
+          # StorageItems (1 PNG) + Text (legenda) + WebLink + Title + Description.
+          # HONESTIDADE: isto prova a COMPOSIÇÃO do pacote; o que o WhatsApp faz com
+          # ele é prova FÍSICA (fase de ops) — este gate NÃO autoriza GO E2E.
+          cat > gen-selftest-png.ps1 <<'PSEOF'
+          Add-Type -AssemblyName System.Drawing
+          $bmp = New-Object System.Drawing.Bitmap 1200, 630
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $rect = New-Object System.Drawing.Rectangle 0, 0, 1200, 630
+          $c1 = [System.Drawing.Color]::FromArgb(255, 15, 23, 42)
+          $c2 = [System.Drawing.Color]::FromArgb(255, 59, 130, 246)
+          $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush($rect, $c1, $c2, 45.0)
+          $g.FillRectangle($brush, $rect)
+          $font = New-Object System.Drawing.Font('Segoe UI', 42, [System.Drawing.FontStyle]::Bold)
+          $g.DrawString('QA SELFTEST 74C', $font, [System.Drawing.Brushes]::White, 40, 40)
+          $g.Dispose()
+          $out = Join-Path (Get-Location).Path 'selftest-card.png'
+          $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
+          $bmp.Dispose()
+          Write-Host "png sintetico: $out ($((Get-Item $out).Length) bytes)"
+          PSEOF
+          powershell -NoProfile -ExecutionPolicy Bypass -File gen-selftest-png.ps1 || { echo "::error:: falha ao gerar PNG sintetico"; exit 1; }
+          SIZE=$(wc -c < selftest-card.png)
+          if [ "$SIZE" -lt 1024 ]; then echo "::error:: PNG sintetico < 1024 bytes ($SIZE) — abaixo do minimo do validador"; exit 1; fi
+          PNGWIN=$(cygpath -w "$PWD/selftest-card.png")
+          set +e
+          ./publish/AgendaIdSeven.NativeShare.exe --selftest "$PNGWIN" > selftest-74c.log 2>&1
+          RC=$?
+          set -e
+          echo "== eventos do selftest (sanitizados) =="; cat selftest-74c.log
+          if [ $RC -ne 0 ]; then echo "::error:: selftest do helper falhou (exit=$RC)"; exit 1; fi
+          grep -qF '"evt":"selftest_ok"' selftest-74c.log || { echo "::error:: selftest_ok AUSENTE"; exit 1; }
+          for K in '"storageItems":true' '"text":true' '"webLink":true' '"titlePresent":true' '"descPresent":true' '"itemCount":1'; do
+            grep -qF "$K" selftest-74c.log || { echo "::error:: formato AUSENTE no DataPackage: $K"; exit 1; }
+          done
+          echo "GATE 74C OK: o DataPackage contem SIMULTANEAMENTE StorageItems(1 PNG) + Text + WebLink + Title + Description."
+
       - name: electron-builder (NSIS + MSI)
         working-directory: ${{ env.APP_DIR }}
         run: npx electron-builder --win nsis msi --publish never
@@ -127,6 +185,22 @@ jobs:
             grep -rqF "gere o roteiro novamente" "$RDIR" || { echo "::error:: texto por setor de Roteiro AUSENTE no build QA empacotado"; exit 1; }
             echo "F3.3.73I6C24D: gate de URL EMPACOTADO (build QA) OK — allowlist exata do host QA; legado ausente; textos por setor presentes."
           fi
+
+      - name: Gate helper nativo EMPACOTADO (F3.3.74C)
+        if: ${{ hashFiles('desktop/native-share/AgendaIdSevenNativeShare.cpp') != '' }}
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          # O instalador PRECISA carregar o helper (resources/native-share) — sem ele o
+          # fluxo principal degrada para o modo alternativo. Fail-closed no build.
+          EXE="dist-installer/win-unpacked/resources/native-share/AgendaIdSeven.NativeShare.exe"
+          if [ ! -f "$EXE" ]; then
+            echo "::error:: helper nativo NAO empacotado ($EXE ausente) — extraResources falhou."
+            ls -la dist-installer/win-unpacked/resources/ 2>/dev/null || true
+            exit 1
+          fi
+          SIZE=$(wc -c < "$EXE")
+          if [ "$SIZE" -lt 65536 ]; then echo "::error:: helper empacotado suspeito de truncado ($SIZE bytes)"; exit 1; fi
+          echo "helper nativo empacotado OK ($SIZE bytes): resources/native-share/AgendaIdSeven.NativeShare.exe"
 
       - name: Empacotar bundle (instalador + relatorios)
         working-directory: ${{ env.APP_DIR }}
