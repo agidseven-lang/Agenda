@@ -136,3 +136,47 @@ Provisionar e REGISTRAR neste arquivo (via PR/commit da equipe):
   fim-a-fim não fecha.
 - **Bloqueio 2 (WhatsApp Business QA)**: permanece com a equipe
   operacional (dispositivo/número/conta/sessão) — registro acima.
+
+## ATUALIZAÇÃO C24A — SECRETS DO WORKER QA: RESOLVIDO PELO PIPELINE
+
+- **Sub-blocker "secrets próprios do Worker QA": RESOLVIDO sem ação
+  operacional**, pelo workflow `ops-qa-secrets-c24a.yml`
+  (run 2 = `29521583522`, VERDE):
+  1. **Análise explícita da credencial** (exigida pelo mandato antes de
+     qualquer cópia): a SA `GOOGLE_APPLICATION_CREDENTIALS_JSON` — a mesma
+     já confiada ao pipeline p/ Secret Manager — provou LEITURA de
+     Firestore no projeto `agenda-id-seven` (GET de doc inexistente →
+     HTTP 404; sem permissão seria 403). Nenhum secret do serviço de
+     produção foi lido/copiado; o serviço de produção não foi tocado.
+  2. **Provisão (somente `idseven-push-qa`)**: secrets `FCM_CLIENT_EMAIL`
+     + `FCM_PRIVATE_KEY` (da SA), `TEAM_SESSION_SECRET` (CSPRNG novo,
+     exclusivo de QA) e `TEAM_API_KEY` (CSPRNG renovado). `FCM_PROJECT_ID`
+     permanece **VAR** (id público, não-segredo): secret homônimo colide
+     com a var implantada (API 10053, run 1); o deploy aplicou
+     `FCM_PROJECT_ID="agenda-id-seven"` com o MESMO código do run 5.
+  3. **Validação ao vivo da cadeia completa** (sem tarefa física e sem
+     escrever em produção): POST `/share-snapshot` autenticado com taskId
+     sintético inexistente → **404 `task_not_found`** (prova
+     chave→OAuth Google→consulta REAL ao Firestore, somente leitura);
+     `/team/session` com credencial inválida → **401 genérico**
+     ("credenciais inválidas"); seeds sintéticos continuam **READY**;
+     gate final: **produção intacta** (`V64.59-c20-golden-contract`).
+- **Endurecimento recomendado (opcional, equipe operacional/IAM)**: criar
+  SA GCP DEDICADA somente-leitura (`roles/datastore.viewer`) p/ o Worker
+  QA e regravar `FCM_CLIENT_EMAIL`/`FCM_PRIVATE_KEY`. O pipeline NÃO faz
+  isso por design: conceder papel exige alterar a IAM policy do projeto
+  de PRODUÇÃO (`setIamPolicy`), o que é vedado ao pipeline nesta fase.
+- **Workflow `deploy-worker-qa.yml` atualizado (C24A)**: preserva a var
+  `FCM_PROJECT_ID` real no deploy (não regride p/ `qa-sem-firestore`),
+  gate C3 passa a exigir **404 `task_not_found`** quando a credencial GCP
+  existe (502 explícito segue valendo no mundo sem credencial) e ganhou
+  gate de **portal acessível** (`/cliente/cronograma/<token sintético>` →
+  404 HTML amigável "Cronograma não encontrado" via consulta real).
+- **ÚNICO bloqueio restante = Bloqueio 2 (físico)**: dispositivo/número/
+  conta WhatsApp Business de QA + instalação do Desktop **1.0.169-QA**
+  (run 224: EXE sha256 `82886cd2…7a14a49`, MSI `c9897657…aeeb46`) +
+  execução das ETAPAS 2–7 da C24A (wizard nos 4 quadros; E2E Cronograma
+  3/6/12 e Roteiro 4/6/8/12 com tarefa de CLIENTE SINTÉTICO criada no
+  próprio Desktop-QA; evidências com tokens redigidos). Nada disso pode
+  ser executado deste ambiente (sem dispositivo/SIM/sessão WhatsApp) e
+  NADA é transferido ao owner.
