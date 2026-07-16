@@ -325,13 +325,10 @@ async function handleShareSnapshotCreate(request, env, ctx, url) {
   const expectedType = (p && typeof p.expectedType === "string") ? p.expectedType.trim().toLowerCase() : "";
   if (!taskId || !/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) return json({ ok: false, error: "taskId inválido" }, 400, env);
   if (expectedType !== "cronograma" && expectedType !== "roteiro") return json({ ok: false, error: "expectedType deve ser cronograma|roteiro" }, 400, env);
-  let accessToken;
-  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
-  catch (_) { return json({ ok: false, error: "auth indisponível no momento" }, 502, env); }
-  // ── AUTENTICAÇÃO FORTE (antes de QUALQUER efeito) ──
+  // ── AUTENTICAÇÃO FORTE PRIMEIRO (nenhum recurso é adquirido antes de autenticar) ──
   const suppliedKey = request.headers.get("X-Team-Key") || "";
   const keyOk = !!(env.TEAM_API_KEY && await timingSafeEqualStr(suppliedKey, env.TEAM_API_KEY));
-  let byUid = "server";
+  let jwtUid = "";
   if (!keyOk) {
     const m = (request.headers.get("Authorization") || "").match(/^Bearer\s+(.+)$/i);
     if (!m) {
@@ -343,9 +340,17 @@ async function handleShareSnapshotCreate(request, env, ctx, url) {
       console.warn("[SHARE-SNAPSHOT] negado: jwt " + v.error);
       return json({ ok: false, error: "unauthorized: " + v.error, expired: !!v.expired }, 401, env);
     }
-    const teamUser = await lookupTeamUser(env, accessToken, v.uid);
+    jwtUid = v.uid;
+  }
+  let accessToken;
+  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+  catch (_) { return json({ ok: false, error: "auth indisponível no momento" }, 502, env); }
+  let byUid = "server";
+  if (!keyOk) {
+    // reconsulta de role/status no Firestore ANTES de executar (revogação imediata).
+    const teamUser = await lookupTeamUser(env, accessToken, jwtUid);
     if (!teamUser) {
-      console.warn(`[SHARE-SNAPSHOT] negado: uid=${maskUid(v.uid)} não é mais Social/Admin ativo`);
+      console.warn(`[SHARE-SNAPSHOT] negado: uid=${maskUid(jwtUid)} não é mais Social/Admin ativo`);
       return json({ ok: false, error: "forbidden: usuário não é mais Social/Admin ativo" }, 403, env);
     }
     byUid = teamUser.uid;
