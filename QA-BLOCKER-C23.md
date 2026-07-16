@@ -108,3 +108,31 @@ Provisionar e REGISTRAR neste arquivo (via PR/commit da equipe):
    4/6/8/12, wizard nos 4 quadros) com evidências → só então abrir
    **F3.3.73I6C25-PRODUCTION-CUTOVER-DESKTOP-1.0.169** (única fase
    autorizada a criar KV de produção, implantar o Worker C23 e publicar).
+
+## ATUALIZAÇÃO C24 — QA DESBLOQUEADO PARCIALMENTE (runs 3→5)
+
+- **Bloqueio 1 (token Cloudflare): RESOLVIDO pela equipe operacional.**
+  Run #5 (`29518981844`) VERDE: namespace `SHARE_SNAPSHOTS_QA`
+  (`699bc76fcdec46889863bd07439c3972`), serviço `idseven-push-qa`
+  implantado, contrato READY/NOT_FOUND/imagens/HIT/HEAD/401/400/502
+  validados ao vivo, produção intocada (gate final).
+  Aprendizados de consistência eventual registrados nos commits
+  `c3ac27f` (KV write→read: run 3) e `aa5f237` (secret put → nova
+  versão do worker: run 4) — relevantes para o cutover C25.
+- **Desktop 1.0.169-QA**: branch `desktop/f3373i6c24-qa-1.0.169-qa`
+  (sabor de QA; nunca mergear) — aponta só para o Worker QA, banner
+  permanente de QA, allowlist do prewarm no host QA.
+- **SUB-BLOCKER NOVO (equipe operacional) — secrets próprios do Worker QA**
+  para o fluxo Card end-to-end do Desktop-QA (ETAPA 5):
+  1. criar service account GCP de QA com leitura de
+     `tasks` (Firestore) — console GCP (IAM) do projeto;
+  2. `wrangler secret put` no serviço `idseven-push-qa` (token QA já
+     habilitado): `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY`,
+     `FCM_PROJECT_ID` (=agenda-id-seven), `TEAM_SESSION_SECRET`
+     (CSPRNG novo, exclusivo de QA).
+  Sem esses secrets, o POST /share-snapshot em QA responde 502 explícito
+  (comprovado e esperado) e o /team/session responde 503 — o Desktop-QA
+  bloqueia o WhatsApp corretamente (fail-closed), mas a prova física
+  fim-a-fim não fecha.
+- **Bloqueio 2 (WhatsApp Business QA)**: permanece com a equipe
+  operacional (dispositivo/número/conta/sessão) — registro acima.
