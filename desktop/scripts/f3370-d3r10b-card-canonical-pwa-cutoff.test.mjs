@@ -234,7 +234,7 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(modalStart > 0 && advStart > modalStart, 'H1a: modal aprovado presente ("Enviar no grupo do cliente") com opções avançadas depois');
   const mainFlow = HTML.slice(modalStart, advStart);
   ok(mainFlow.includes('id="btnOpenWaMain"') && mainFlow.includes('Abrir WhatsApp Business para enviar no grupo'), 'H1b: botão APROVADO no fluxo principal (1 clique → WhatsApp Business)');
-  ok(mainFlow.includes('A mensagem será copiada automaticamente'), 'H1c: mensagem copiada AUTOMATICAMENTE no clique (comportamento aprovado)');
+  ok(/copyCardImage\(new Uint8Array\(sharePkg\.imageBytes\)\)/.test(HTML) && /Copiar mensagem/.test(mainFlow), 'H1c [74B]: clique principal copia a IMAGEM premium; mensagem disponível em 1 clique (assistência máxima)');
   ok(!mainFlow.includes('id="waPhone"'), 'H1d: SEM campo "WhatsApp do cliente" no fluxo principal');
   ok(!mainFlow.includes('id="btnSendAuto"') && !mainFlow.includes('Enviar Card Premium agora'), 'H1e: Cloud API NÃO é caminho principal');
   ok(mainFlow.includes('id="groupLegendBox"') && mainFlow.includes('id="groupLinkPreview"'), 'H1f: mensagem + prévia do card (estrutura visual aprovada) no modal');
@@ -243,9 +243,9 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(advFlowH.includes('id="btnSendAuto"') && advFlowH.includes('id="waPhone"'), 'H1h: Cloud API/telefone SÓ em opções avançadas (recolhido, como no aprovado)');
   ok(advFlowH.includes('id="btnCopyImg"') && advFlowH.includes('id="btnOpenFolder"'), 'H1i: fallback de imagem SÓ em opções avançadas (nunca obrigatório)');
   // wiring aprovado: copyMsgClean ANTES de abrir o WhatsApp (auto-copy real, nao so texto)
-  const wire = HTML.slice(HTML.indexOf("on('btnOpenWaMain'"), HTML.indexOf("on('btnOpenWaMain'") + 1400);
+  const wire = HTML.slice(HTML.indexOf("on('btnOpenWaMain'"), HTML.indexOf("on('btnOpenWaMain'") + 2800); // 74B: handler principal cresceu (imagem+fallback); janela ampliada, asserts intactos
   ok(/if\(!copyMsgClean\(\)\) return;/.test(wire) && wire.includes('openWhatsAppWebOnly()'), 'H1j: clique = copia mensagem + abre WhatsApp (wiring aprovado)');
-  ok(/persistClientSend\(ctx\.id\)/.test(wire), 'H1k: envio registrado no Notification Engine (aprovado 1.0.138)');
+  ok(/persistClientSend\(ctx\.id\)/.test(wire) || /persistClientSend\(ctx&&ctx\.id/.test(wire) || (/if\(ctx&&ctx\.id&&ctx\.id!=='__form__'\)persistClientSend\(ctx\.id\);/.test(wire)), 'H1k: envio registrado no Notification Engine (aprovado 1.0.138)');
   // H2 — F3.3.70D3R10AA: mensagem/link no REGIME VALIDADO de 19/06 (sem cache-bust)
   ok(/const url=buildShareClientUrl\(ctx&&ctx\.token\);/.test(HTML), 'H2a: mensagem usa o link /share ESTÁVEL (sem ?v= — decisão registrada do owner em 6d46bce)');
   ok(!/const url=withWhatsAppPreviewBust\(buildShareClientUrl/.test(HTML), 'H2b: cache-bust REMOVIDO da mensagem enviada');

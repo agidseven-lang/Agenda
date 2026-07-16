@@ -48,7 +48,7 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão da candidata QA (1.0.171-QA — C24D)', PJ.version === '1.0.171-QA' && (S('package-lock.json').includes('"version": "1.0.171-QA"')));
+ok('A1 versão da candidata QA (1.0.172-QA — 74B)', PJ.version === '1.0.172-QA' && (S('package-lock.json').includes('"version": "1.0.172-QA"')));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
 const MODC = 'const SHARE_PATH = "/share/cronograma/";\nconst HOST = "aprovar.agendaidseven.com.br";\n';
@@ -174,28 +174,28 @@ ok('H2 preload expõe cardPrewarm(url, expectedType) via invoke("card-prewarm")'
   /cardPrewarm: \(url: string, expectedType: string, traceId\?: string\)/.test(PRE) && /ipcRenderer\.invoke\("card-prewarm", url, expectedType, traceId\)/.test(PRE));
 
 /* ── I: renderer — fluxo obrigatório e UX (gates 16-17-19 + estados) ── */
-ok('I1 [C24D] botão do WhatsApp NASCE desabilitado + estado inicial por setor "Preparando o link do…"',
-  /id="btnOpenWaMain" disabled>/.test(HTML) && /id="groupStatus">Preparando o link do /.test(HTML));
-ok('I2 WhatsApp SÓ abre com prepReady (gate 16/17: sucesso libera; falha bloqueia)',
-  /if\(!prepReady\)\{ flashToast\('Aguarde: o Card Premium ainda está sendo preparado\.'\); return; \}/.test(HTML) &&
+ok('I1 [74B] botão do WhatsApp NASCE desabilitado + estado inicial "Preparando o card premium do…"',
+  /id="btnOpenWaMain" disabled>/.test(HTML) && /id="groupStatus">Preparando o card premium do /.test(HTML));
+ok('I2 [74B] WhatsApp SÓ abre com o PACOTE pronto (prepReady + sharePkg.ok; falha bloqueia)',
+  /if\(!prepReady\|\|!sharePkg\|\|!sharePkg\.ok\)\{ flashToast\('Aguarde: o card premium ainda está sendo preparado\.'\); return; \}/.test(HTML) &&
   /let prepReady=false, prepBusy=false;/.test(HTML));
-ok('I3 runPrewarm [C23]: snapshot server-side ANTES + prova técnica via IPC (cardPrewarm) com TIPO por setor',
-  /const tipo=\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma';/.test(HTML) &&
-  /snap=await ensureShareSnapshot\(ctx&&ctx\.id,tipo,traceId\);/.test(HTML) &&
-  /pw=snap\.ok\?\(\(api\.cardPrewarm&&url\)\?await api\.cardPrewarm\(url,tipo,traceId\):\{ok:false,reason:'indisponivel',stage:'ipc'\}\):snap;/.test(HTML));
-ok('I4 [C24D] sucesso → "Link do <tipo> pronto para envio." + botão liberado; falha → erro + botão bloqueado + Tentar novamente',
-  /Link do '\+_tipoModal\+' pronto para envio\. A mensagem será copiada automaticamente ao abrir o WhatsApp Business/.test(HTML) &&
-  /Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\./.test(HTML) &&
-  /id="btnPrewarmRetry"/.test(HTML) && /on\('btnPrewarmRetry', function\(\)\{ runPrewarm\(\); \}\);/.test(HTML));
+ok('I3 [74B] runPreparePackage: pacote NATIVO como gate; snapshot/prewarm como BÔNUS (nunca gate)',
+  /P=await buildSharePackage\(ctx\);/.test(HTML) &&
+  /bonusPreviewWarm\(ctx&&ctx\.id,_tipoModal,P\.approvalUrl\);/.test(HTML) &&
+  /if\(snp&&snp\.ok&&window\.desktopAPI&&window\.desktopAPI\.cardPrewarm&&url\)\{pw=await window\.desktopAPI\.cardPrewarm\(url,tipo,tr\);\}/.test(HTML));
+ok('I4 [74B] sucesso → "Card premium … pronto para envio" + botão liberado; falha → erro + botão bloqueado + Regenerar card',
+  /Card premium do '\+_tipoModal\+' pronto para envio — imagem, mensagem e link gerados/.test(HTML) &&
+  /Não foi possível gerar o card premium agora\. Toque em “Regenerar card”/.test(HTML) &&
+  /id="btnPrewarmRetry"/.test(HTML) && /on\('btnPrewarmRetry', function\(\)\{ runPreparePackage\(\); \}\);/.test(HTML));
 ok('I5 estado "Abrindo WhatsApp Business…" antes de abrir', /Abrindo WhatsApp Business…/.test(HTML));
 ok('I6 cliques duplicados bloqueados (prepBusy no modal + _openwaBusy no caminho data-openwa)',
   /if\(prepBusy\) return; prepBusy=true;/.test(HTML) && /if\(state\._openwaBusy\)\{ return; \}/.test(HTML));
-ok('I7 caminho [data-openwa] TAMBÉM gated [C23] (snapshot + prewarm; falha nunca abre openWhatsAppPlain)',
+ok('I7 [74B] caminho [data-openwa] TAMBÉM gated pelo PACOTE (falha nunca abre openWhatsAppPlain)',
   /REGRA CENTRAL também neste caminho/.test(HTML) &&
-  /const _snap=await ensureShareSnapshot\(\(id&&id!=='__form__'\)\?id:\(ctx&&ctx\.id\),_tipo,_trace\);/.test(HTML) &&
-  /await window\.desktopAPI\.cardPrewarm\(_pwUrl,_tipo,_trace\)/.test(HTML) &&
-  /if\(!_pw\|\|!_pw\.ok\)\{ flashToast\('Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\.'\); return; \}/.test(HTML));
-ok('I8 prewarm inicia automaticamente ao abrir o modal (runPrewarm())', /on\('btnPrewarmRetry', function\(\)\{ runPrewarm\(\); \}\);\s*\n\s*runPrewarm\(\);/.test(HTML));
+  /_P=await buildSharePackage\(ctx\);/.test(HTML) &&
+  /if\(!_P\|\|!_P\.ok\)\{/.test(HTML) &&
+  /bonusPreviewWarm\(\(id&&id!=='__form__'\)\?id:\(ctx&&ctx\.id\),_P\.type,_P\.approvalUrl\);/.test(HTML));
+ok('I8 [74B] pacote inicia automaticamente ao abrir o modal (runPreparePackage())', /on\('btnPrewarmRetry', function\(\)\{ runPreparePackage\(\); \}\);\s*\n\s*runPreparePackage\(\);/.test(HTML));
 ok('I9 erro NÃO expõe token/detalhe técnico (mensagem amigável; sem token na UI)',
   !/token[^\n]{0,40}flashToast/.test(HTML.slice(HTML.indexOf('runPrewarm'))) || true);
 
