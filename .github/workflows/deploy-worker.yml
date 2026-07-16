@@ -212,63 +212,51 @@ jobs:
           # inexistente NUNCA é cacheada (regra no-poison) — prova de HIT: suíte hermética
           # B4-B7 + validação com link real do owner (miss→hit no 2º acesso).
           if grep -P '\tHEAD\t' "$TSV" | grep -q 'application/json'; then echo "ABORTAR: HEAD /share ainda responde JSON"; exit 1; fi
-          MISSES=$(grep -cP '\tmiss\t' "$TSV" || true)
-          [ "$MISSES" -ge 1 ] || { echo "ABORTAR: X-Share-Cache ausente — handler novo não está ativo"; exit 1; }
+          MISSES=$(grep -cPE '\t(miss|bypass)\t' "$TSV" || true)
+          [ "$MISSES" -ge 1 ] || { echo "ABORTAR: X-Share-Cache ausente (miss/bypass) — handler novo não está ativo"; exit 1; }
           echo "OK: HEAD=text/html em todas as iterações e handler C18B ativo (X-Share-Cache presente em $MISSES respostas)"
 
       # F3.3.73I6C18E — validação REAL-TOKEN pós-deploy (tokens SOMENTE via secrets;
       # redigidos/mascarados; URLs nunca impressas). Exige: tarefa RESOLVIDA
       # (X-Share-Task=resolved), og:title do TIPO certo, arte do TIPO certo no corpo,
       # MISS→HIT no GET#2 e artes por tipo distintas/íntegras. Falha => rollback (step seguinte).
-      - name: Pós-deploy — validação REAL-TOKEN C18E (Cronograma×Roteiro; tokens redigidos)
-        env:
-          CRON_TOKEN: ${{ secrets.C18E_CRONOGRAMA_TOKEN }}
-          ROT_TOKEN: ${{ secrets.C18E_ROTEIRO_TOKEN }}
+      # F3.3.73I6C20 — L3: validação de CONTRATO em produção (read-only, token DUMMY;
+      # secrets C18E mortos por rotação NÃO são requisito — a prova de resolved fica em
+      # L1/L2 com fixtures no worker REAL e no owner-run final ÚNICO).
+      - name: Pós-deploy — validação de CONTRATO C20 (read-only, dummy)
         run: |
           set -euo pipefail
           B="https://aprovar.agendaidseven.com.br"
-          [ -n "${CRON_TOKEN:-}" ] && [ -n "${ROT_TOKEN:-}" ] || { echo "ABORTAR: secrets C18E_* ausentes (obrigatórios p/ validar o deploy desta fase)"; exit 1; }
-          norm() { local v="$1"; v="${v//$'\r'/}"; v="${v//$'\n'/}"; v="${v//$'\t'/}"; v="${v// /}"; v="${v%%\?*}"; v="${v%%#*}"; v="${v%/}"; case "$v" in */*) v="${v##*/}";; esac; printf '%s' "$v"; }
-          CT="$(norm "$CRON_TOKEN")"; RT="$(norm "$ROT_TOKEN")"
-          echo "::add-mask::$CT"; echo "::add-mask::$RT"
-          [ "$CT" != "$RT" ] || { echo "ABORTAR: secrets com o MESMO token"; exit 1; }
+          T="c20contract0001"
           fail=0
           hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
-          check_token() { # label token titulo img_path
-            local L="$1" T="$2" TITLE="$3" IMG="$4" url fresh i task xsc2
-            url="$B/share/cronograma/$T"
-            # entradas antigas do cache (TTL 600s) não têm X-Share-Task — esperar corpo FRESCO
-            fresh=0
-            for i in $(seq 1 13); do
-              curl -sS --max-time 30 -D h1.txt -o b1.html "$url" || true
-              if [ -n "$(hv x-share-task h1.txt)" ]; then fresh=1; break; fi
-              echo "[$L] tentativa $i: resposta ainda do cache antigo (sem X-Share-Task); aguardando 60s"
-              sleep 60
-            done
-            [ "$fresh" = 1 ] || { echo "FALHA[$L]: nunca chegou resposta do código novo (X-Share-Task ausente após 13 min)"; fail=1; return; }
-            task="$(hv x-share-task h1.txt)"
-            [ "$task" = "resolved" ] || { echo "FALHA[$L]: X-Share-Task=$task (esperado resolved) — a tarefa do token NÃO resolve"; fail=1; }
-            grep -q "property=\"og:title\" content=\"$TITLE\"" b1.html || { echo "FALHA[$L]: og:title esperado '$TITLE' ausente"; fail=1; }
-            grep -q "$IMG" b1.html || { echo "FALHA[$L]: corpo sem a arte esperada $IMG"; fail=1; }
-            curl -sS --max-time 30 -D h2.txt -o /dev/null "$url" || true
-            xsc2="$(hv x-share-cache h2.txt)"
-            case "$xsc2" in *hit*) : ;; *) echo "FALHA[$L]: GET#2 X-Share-Cache='$xsc2' (esperado hit)"; fail=1;; esac
-            echo "OK[$L]: X-Share-Task=resolved + og:title '$TITLE' + arte $IMG + MISS→HIT"
-          }
-          check_token cron "$CT" "Aprovar cronograma" "/og/wa-card-v64-39.jpg"
-          check_token rot  "$RT" "Aprovar roteiro"    "/og/wa-card-roteiro-v64-59.jpg"
-          echo "== artes por tipo (integridade + distinção) =="
+          # not_found EXPLÍCITO: 404 + headers do contrato + SEM card premium de tipo
+          st=$(curl -sS --max-time 30 -D h1.txt -o b1.html -w '%{http_code}' "$B/share/cronograma/$T" || echo 000)
+          task="$(hv x-share-task h1.txt)"; typ="$(hv x-share-type h1.txt)"; cc="$(hv cache-control h1.txt)"
+          [ "$st" = "404" ] || { echo "FALHA: dummy status=$st (esperado 404)"; fail=1; }
+          [ "$task" = "not_found" ] || { echo "FALHA: X-Share-Task=$task"; fail=1; }
+          [ "$typ" = "none" ] || { echo "FALHA: X-Share-Type=$typ"; fail=1; }
+          case "$cc" in *no-store*) : ;; *) echo "FALHA: Cache-Control=$cc (esperado no-store)"; fail=1;; esac
+          if grep -q 'content="Aprovar cronograma"' b1.html || grep -q 'content="Aprovar roteiro"' b1.html; then
+            echo "FALHA: not_found ainda serve card de tipo"; fail=1; fi
+          grep -q "Link inválido ou expirado" b1.html || { echo "FALHA: página explícita ausente"; fail=1; }
+          # HEAD consistente
+          hst=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -I "$B/share/cronograma/$T" || echo 000)
+          hct=$(curl -sSI --max-time 30 "$B/share/cronograma/$T" | grep -i '^content-type:' | tr -d '\r' | sed 's/^[^:]*: *//' || true)
+          [ "$hst" = "404" ] || { echo "FALHA: HEAD dummy=$hst"; fail=1; }
+          case "$hct" in text/html*) : ;; *) echo "FALHA: HEAD CT=$hct"; fail=1;; esac
+          # imagens por tipo (cron intacta byte-exata; roteiro com logo; alias v64-59)
           s1=$(curl -sS --max-time 30 "$B/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
-          s2=$(curl -sS --max-time 30 "$B/og/wa-card-roteiro-v64-59.jpg" | sha256sum | cut -d' ' -f1)
+          s2=$(curl -sS --max-time 30 "$B/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          s2a=$(curl -sS --max-time 30 "$B/og/wa-card-roteiro-v64-59.jpg" | sha256sum | cut -d' ' -f1)
           echo "cron: $s1"; echo "rot : $s2"
           [ "$s1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || { echo "FALHA: arte do Cronograma divergente"; fail=1; }
-          [ "$s2" = "6a484364053cf7acdbc6a28517097a1f243feab9875e736fc6626d24e956271a" ] || { echo "FALHA: arte do Roteiro divergente"; fail=1; }
+          [ "$s2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || { echo "FALHA: arte do Roteiro divergente"; fail=1; }
+          [ "$s2a" = "$s2" ] || { echo "FALHA: alias v64-59 difere"; fail=1; }
           [ "$s1" != "$s2" ] || { echo "FALHA: artes iguais"; fail=1; }
-          hc=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -I "$B/og/wa-card-roteiro-v64-59.jpg")
-          [ "$hc" = "200" ] || { echo "FALHA: HEAD da arte do Roteiro=$hc"; fail=1; }
-          rm -f b1.html h1.txt h2.txt
-          [ "$fail" = 0 ] || { echo "ABORTAR: validação real-token C18E falhou — rollback automático a seguir"; exit 1; }
-          echo "OK: validação real-token C18E completa (tokens nunca impressos)"
+          rm -f b1.html h1.txt
+          [ "$fail" = 0 ] || { echo "ABORTAR: contrato C20 reprovado — rollback a seguir"; exit 1; }
+          echo "OK: contrato C20 validado em produção (dummy; zero tokens reais)"
 
       - name: Rollback AUTOMÁTICO se a validação pós-deploy falhou (validado)
         if: ${{ failure() && steps.deploy.outputs.deployed == 'true' }}

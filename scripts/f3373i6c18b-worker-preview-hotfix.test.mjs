@@ -28,7 +28,7 @@ const constLine = (name) => { const m = SRC.match(new RegExp('const ' + name + '
 console.log('F3.3.73I6C18B — /share preview hotfix (HEAD + Cache API + single-flight)');
 
 /* ── A: versão e compat com gates do deploy pinado ── */
-ok('A1 versão V64.59-* (linha canônica; sufixo da fase atual = c18e)', /version: "V64\.59-c18e-roteiro-og-image"/.test(SRC));
+ok('A1 versão V64.59-* (linha canônica; sufixo da fase atual = c20)', /version: "V64\.59-c20-golden-contract"/.test(SRC));
 ok('A2 prefixo V64.59 preservado (gate pré/pós-deploy)', /version: *"V64\.59/.test(SRC));
 
 /* ── B: micro-exec do handleShareCard REAL (Cache/Firestore/OAuth stubados) ── */
@@ -36,6 +36,7 @@ const CORE =
   constLine('OG_IMG_PATH') + '\n' + constLine('OG_IMG_PATH_ROTEIRO') + '\n' + constObj('PREMIUM_TYPES') + '\n' +
   fnSrc('premiumTypeOf') + '\n' + fnSrc('escapeHtml') + '\n' + fnSrc('ogClientBase') + '\n' +
   fnSrc('ogClientMeta') + '\n' + fnSrc('shareCardHtml') + '\n' + fnSrc('htmlResponseCacheable') + '\n' +
+  fnSrc('shareUnavailableHtml') + '\n' +
   'const _shareInflight = new Map();\n' + fnSrc('handleShareCard') + '\n';
 
 function mkEnv() {
@@ -117,9 +118,10 @@ await (async () => {
   const q0 = stats.puts;
   const nf = await api.handleShareCard(req('GET'), {}, ctxStub, URLC, 'unknowntok01'); await flush();
   const nf2 = await api.handleShareCard(req('GET'), {}, ctxStub, URLC, 'unknowntok01'); await flush();
-  ok('B8 não-encontrado: 200 card padrão, ZERO put no cache, 2ª chamada volta a consultar (MISS de novo)',
-    nf.status === 200 && nf.headers.get('x-share-cache') === 'miss' && stats.puts === q0 &&
-    nf2.headers.get('x-share-cache') === 'miss');
+  ok('B8 [C20] não-encontrado: 404 EXPLÍCITO sem card de tipo, no-store, ZERO put, 2ª chamada volta a consultar',
+    nf.status === 404 && nf.headers.get('x-share-task') === 'not_found' && nf.headers.get('x-share-type') === 'none' &&
+    /no-store/.test(nf.headers.get('cache-control') || '') && stats.puts === q0 &&
+    nf2.status === 404 && nf2.headers.get('x-share-task') === 'not_found');
 
   // B9 — erro persistente: retry 1x, fallback SEM cache; recuperação posterior serve tipo CERTO
   let fails = 0;
@@ -129,9 +131,10 @@ await (async () => {
   const afterQ = stats.queries;
   scope.__lookup = (t) => ({ sector: 'roteiro' });
   const rec = await api.handleShareCard(req('GET'), {}, ctxStub, URLC, 'rotok000003'); await flush();
-  ok('B9 erro transitório: 1 retry (2 consultas), resposta 200 sem cache; recuperado → tipo ROTEIRO correto (sem envenenamento)',
-    er.status === 200 && (afterQ - before) === 2 && er.headers.get('x-share-cache') === 'miss' &&
-    (await rec.text()).includes('Aprovar roteiro') && rec.headers.get('x-share-cache') === 'miss');
+  ok('B9 [C20] erro persistente: 1 retry (2 consultas) → 503 X-Share-Task=error no-store SEM card de tipo; recuperado → 200 ROTEIRO correto',
+    er.status === 503 && (afterQ - before) === 2 && er.headers.get('x-share-task') === 'error' &&
+    er.headers.get('x-share-type') === 'none' && /no-store/.test(er.headers.get('cache-control') || '') &&
+    rec.status === 200 && (await rec.text()).includes('Aprovar roteiro') && rec.headers.get('x-share-task') === 'resolved');
 
   // B10 — single-flight: 2 GETs simultâneos do MESMO token = 1 consulta
   const { scope: s2, stats: st2 } = mkEnv();
@@ -164,8 +167,9 @@ ok('C1 rota /share casa GET e HEAD (mesma rota; sem rota nova)',
   /\/\^\\\/share\\\/cronograma\\\/\(\[A-Za-z0-9_-\]\{4,128\}\)\\\/\?\$\//.test(SRC) && !/share\\\/roteiro/.test(SRC));
 ok('C2 SEM deadline/timeout que troque tipo (nenhum Promise.race/AbortController no handler)',
   (() => { const h = fnSrc('handleShareCard'); return !/Promise\.race|AbortController|setTimeout/.test(h); })());
-ok('C3 cache só em SUCESSO com task encontrada (resolved) + waitUntil + clone',
-  /if \(resolved && ctx\) \{ try \{ ctx\.waitUntil\(caches\.default\.put\(cacheKey, res\.clone\(\)\)\); \}/.test(SRC));
+ok('C3 [C20] cache só em resolved (não-resolvido retorna ANTES do put) + waitUntil + clone',
+  /if \(!resolved\) \{/.test(SRC) && /if \(ctx\) \{ try \{ ctx\.waitUntil\(caches\.default\.put\(cacheKey, res\.clone\(\)\)\); \}/.test(SRC) &&
+  SRC.indexOf('if (!resolved) {') < SRC.indexOf('caches.default.put(cacheKey'));
 ok('C4 Cache-Control PRESERVADO (public, max-age=600 no htmlResponseCacheable, TTL do cache)',
   /"Cache-Control": "public, max-age=600"/.test(SRC));
 ok('C5 headers de métrica públicos (X-Share-Cache hit|miss + Server-Timing) sem token/segredo',
