@@ -48,7 +48,7 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão da candidata QA (1.0.170-QA — C24C)', PJ.version === '1.0.170-QA' && (S('package-lock.json').includes('"version": "1.0.170-QA"')));
+ok('A1 versão da candidata QA (1.0.171-QA — C24D)', PJ.version === '1.0.171-QA' && (S('package-lock.json').includes('"version": "1.0.171-QA"')));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
 const MODC = 'const SHARE_PATH = "/share/cronograma/";\nconst HOST = "aprovar.agendaidseven.com.br";\n';
@@ -174,8 +174,8 @@ ok('H2 preload expõe cardPrewarm(url, expectedType) via invoke("card-prewarm")'
   /cardPrewarm: \(url: string, expectedType: string, traceId\?: string\)/.test(PRE) && /ipcRenderer\.invoke\("card-prewarm", url, expectedType, traceId\)/.test(PRE));
 
 /* ── I: renderer — fluxo obrigatório e UX (gates 16-17-19 + estados) ── */
-ok('I1 botão do WhatsApp NASCE desabilitado + estado inicial "Preparando Card Premium…"',
-  /id="btnOpenWaMain" disabled>/.test(HTML) && /id="groupStatus">Preparando Card Premium…/.test(HTML));
+ok('I1 [C24D] botão do WhatsApp NASCE desabilitado + estado inicial por setor "Preparando o link do…"',
+  /id="btnOpenWaMain" disabled>/.test(HTML) && /id="groupStatus">Preparando o link do /.test(HTML));
 ok('I2 WhatsApp SÓ abre com prepReady (gate 16/17: sucesso libera; falha bloqueia)',
   /if\(!prepReady\)\{ flashToast\('Aguarde: o Card Premium ainda está sendo preparado\.'\); return; \}/.test(HTML) &&
   /let prepReady=false, prepBusy=false;/.test(HTML));
@@ -183,8 +183,8 @@ ok('I3 runPrewarm [C23]: snapshot server-side ANTES + prova técnica via IPC (ca
   /const tipo=\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma';/.test(HTML) &&
   /snap=await ensureShareSnapshot\(ctx&&ctx\.id,tipo,traceId\);/.test(HTML) &&
   /pw=snap\.ok\?\(\(api\.cardPrewarm&&url\)\?await api\.cardPrewarm\(url,tipo,traceId\):\{ok:false,reason:'indisponivel',stage:'ipc'\}\):snap;/.test(HTML));
-ok('I4 sucesso → "Card Premium preparado." + botão liberado; falha → erro + botão bloqueado + Tentar novamente',
-  /Card Premium preparado\. A mensagem será copiada automaticamente ao abrir o WhatsApp Business/.test(HTML) &&
+ok('I4 [C24D] sucesso → "Link do <tipo> pronto para envio." + botão liberado; falha → erro + botão bloqueado + Tentar novamente',
+  /Link do '\+_tipoModal\+' pronto para envio\. A mensagem será copiada automaticamente ao abrir o WhatsApp Business/.test(HTML) &&
   /Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\./.test(HTML) &&
   /id="btnPrewarmRetry"/.test(HTML) && /on\('btnPrewarmRetry', function\(\)\{ runPrewarm\(\); \}\);/.test(HTML));
 ok('I5 estado "Abrindo WhatsApp Business…" antes de abrir', /Abrindo WhatsApp Business…/.test(HTML));
@@ -208,7 +208,7 @@ ok('J2 Roteiro preservado (subtypes q4/q6/q8/q12 + "Roteiro de gravação de ví
   /q4:\{label:'4 roteiros'[^}]*contentCount:4/.test(HTML) && /q12:\{label:'12 roteiros'[^}]*contentCount:12/.test(HTML) &&
   /Seu Roteiro de gravação de vídeos já está pronto para avaliação\./.test(HTML));
 ok('J3 mensagem/link inalterados (buildShareClientUrl /share/cronograma/ + buildClientMessage)',
-  /https:\/\/aprovar\.agendaidseven\.com\.br\/share\/cronograma\//.test(HTML) && /function buildClientMessage\(ctx\)/.test(HTML));
+  /CLIENT_LINK_BASE\+'\/share\/cronograma\/'/.test(HTML) && /function buildClientMessage\(ctx\)/.test(HTML));
 ok('J4 aprovação intocada (clientReviewAction/portal intactos; nenhum write novo no prewarm)',
   /function clientReviewAction\(/.test(HTML) &&
   (() => { const i = HTML.indexOf('PREPARAÇÃO DETERMINÍSTICA DO CARD PREMIUM'); const blk = HTML.slice(i, i + 2600);

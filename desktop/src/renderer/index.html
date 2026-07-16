@@ -6684,6 +6684,44 @@ const CLIENT_LINK_BASE='https://idseven-push-qa.agidseven.workers.dev'; // F3.3.
 // F3.3.73I6C24C — arte OG correta POR TIPO (previa e fallback usam a arte do tipo; NUNCA cronograma fixo p/ roteiro).
 const OG_IMG_BY_TYPE={cronograma:'/og/wa-card-v64-39.jpg',roteiro:'/og/wa-card-roteiro-v64-60.jpg'};
 function ogImageUrlForType(tipo){return CLIENT_LINK_BASE+(OG_IMG_BY_TYPE[tipo]||OG_IMG_BY_TYPE.cronograma);}
+/* ===== F3.3.73I6C24D — GATE DE URL do compartilhamento: allowlist EXPLÍCITA por ambiente =====
+   INCIDENTE 1.0.170-QA: o validador legado `_gateValidLink` fixava o host de PRODUÇÃO e rejeitava
+   `workers.dev`, reprovando o próprio host de QA do build. CORREÇÃO fail-closed, por ambiente,
+   SEM enfraquecer segurança: aceita EXATAMENTE o host permitido do ambiente (===), https, rota
+   oficial, token no formato oficial, tipo válido. NUNCA correspondencia por substring do dominio
+   de edge, NUNCA wildcard, NUNCA startsWith de host, NUNCA host arbitrário. Config QA e produção separadas, explícitas,
+   pinadas e testáveis. */
+const SHARE_ENV = QA_BUILD ? 'qa' : 'prod';
+const SHARE_ALLOWED_HOST = QA_BUILD ? 'idseven-push-qa.agidseven.workers.dev' : 'aprovar.agendaidseven.com.br';
+const SHARE_PATH_PREFIX = '/share/cronograma/';
+const SHARE_TOKEN_RE_DESK = /^[A-Za-z0-9_-]{4,128}$/;
+/* invariante de build: o host efetivo do link (CLIENT_LINK_BASE) DEVE ser exatamente o host
+   permitido do ambiente — protege contra host de produção vazar no build QA (e vice-versa). */
+(function(){ try{ if(new URL(CLIENT_LINK_BASE).host!==SHARE_ALLOWED_HOST){ console.error('F3.3.73I6C24D CONFIG: CLIENT_LINK_BASE host != SHARE_ALLOWED_HOST'); } }catch(_){ /* URL API sempre presente no renderer */ } })();
+/* validador ÚNICO, fail-closed, por new URL() (nunca startsWith/includes). Resultado ESTRUTURADO:
+   é a FONTE ÚNICA do estado dos 3 botões. normalizedUrl NÃO é logada por completo (só metadados). */
+function validateShareUrl(rawUrl, expectedType){
+  const R={ok:false,normalizedUrl:'',environment:SHARE_ENV,expectedType:(expectedType||''),returnedType:'',
+    protocolOk:false,hostnameOk:false,pathOk:false,tokenOk:false,typeOk:false,reason:''};
+  let s=(rawUrl==null?'':String(rawUrl));
+  if(!s){R.reason='url_ausente';return R;}
+  if(s!==s.trim()){R.reason='url_espacos';return R;}                                   // espaços antes/depois
+  if(/[\s\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029\ufeff]/.test(s)){R.reason='url_caracteres_invalidos';return R;} // invisiveis/controle/espacos
+  let x; try{ x=new URL(s); }catch(_){ R.reason='url_malformada'; return R; }
+  R.normalizedUrl=x.href;
+  if(x.protocol!=='https:'){R.reason='protocolo_invalido';return R;} R.protocolOk=true;
+  if(x.username||x.password||x.port){R.reason='host_nao_permitido';return R;}          // credencial/porta embutida
+  if(x.hostname!==SHARE_ALLOWED_HOST){R.reason='host_nao_permitido';return R;} R.hostnameOk=true; // EXATO
+  if(x.search||x.hash){R.reason='query_desconhecida';return R;}                        // rota estável (sem ?v=)
+  if(x.pathname.indexOf(SHARE_PATH_PREFIX)!==0){R.reason='rota_desconhecida';return R;} R.pathOk=true;
+  const tok=x.pathname.slice(SHARE_PATH_PREFIX.length).replace(/\/+$/,'');
+  if(!SHARE_TOKEN_RE_DESK.test(tok)){R.reason='token_invalido';return R;} R.tokenOk=true;
+  R.returnedType=(expectedType||'');
+  if(expectedType!=='cronograma'&&expectedType!=='roteiro'){R.reason='tipo_invalido';return R;} R.typeOk=true;
+  R.ok=true; R.reason='ok'; return R;
+}
+/* texto de erro POR SETOR (FASE 8): nada de "cronograma" no fluxo de Roteiro. */
+function shareInvalidMsg(tipo){ return 'Link inválido — '+(tipo==='roteiro'?'gere o roteiro novamente':'gere o cronograma novamente')+'.'; }
 // 1.0.119-whatsapp-media-card — imagem REAL do card premium (mesmo domínio), enviada como
 // mídia no WhatsApp. Rota servida pelo Worker (image/jpeg 1200×630, sem query).
 const CARD_IMG_URL='https://aprovar.agendaidseven.com.br/og/wa-card-v64-38.jpg';
@@ -6886,12 +6924,12 @@ async function openSendClientModal(taskOrForm){
       /* F3.3.73I6C18C — o botão NASCE desabilitado: só libera após "Card Premium preparado."
          (prova técnica real via IPC card-prewarm: GET validado + OG do TIPO certo + cache). */
       '<button class="gcs-go" id="btnOpenWaMain" disabled>'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
-      '<div class="gcs-status" id="groupStatus">Preparando Card Premium… A mensagem será copiada automaticamente ao abrir o WhatsApp Business.</div>'+
+      '<div class="gcs-status" id="groupStatus">Preparando o link do '+(ctx.sector==='roteiro'?'roteiro':'cronograma')+'… A mensagem será copiada automaticamente ao abrir o WhatsApp Business.</div>'+
       '<div class="gcs-note">A prévia do card vem do <b>link público</b> (não de arquivo salvo). O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link.</div>'+
       '<div class="gcs-secondary">'+
         '<button class="btn ghost" id="btnPrewarmRetry" style="display:none">Tentar novamente</button>'+
-        '<button class="btn ghost" id="btnCopyGroupMsg">Copiar mensagem</button>'+
-        '<button class="btn ghost" id="btnTestLink">Testar link</button>'+
+        '<button class="btn ghost" id="btnCopyGroupMsg" disabled>Copiar mensagem</button>'+
+        '<button class="btn ghost" id="btnTestLink" disabled>Testar link</button>'+
       '</div>'+
     '</div>'+
     /* ===== Ação primária discreta ===== */
@@ -6977,16 +7015,15 @@ function _wireAutoSend(ctx){
 // ETAPA 3: abre SOMENTE https://web.whatsapp.com/ (sem send?text=). Liberada só após 1 e 2
 //          (imagem salva + legenda copiada + link validado). NUNCA antes.
 function _gateValidLink(ctx,msg){
-  // 1.0.124 — a mensagem deve conter o LINK DE COMPARTILHAMENTO (/share/...), que gera o preview
-  // premium no WhatsApp. Valida domínio premium + token presente; rejeita workers.dev e link sem token.
+  // F3.3.73I6C24D — validacao por ALLOWLIST EXATA do ambiente (validateShareUrl), NUNCA host
+  // hardcoded nem rejeicao de workers.dev. A mensagem deve conter EXATAMENTE a shareUrl validada.
+  const tipo=(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma';
   let url='';
-  try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ return {ok:false,url:''}; }
-  const ok = !!url
-    && url.indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/')===0
-    && !/\/share\/cronograma\/?$/.test(url)
-    && !/workers\.dev/.test(url)
-    && String(msg).indexOf(url)>-1;
-  return {ok:ok,url:url};
+  try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ return {ok:false,url:'',reason:'token_ausente'}; }
+  const st=validateShareUrl(url,tipo);
+  if(!st.ok) return {ok:false,url:url,reason:st.reason};
+  if(String(msg).indexOf(url)<0) return {ok:false,url:url,reason:'link_ausente_na_mensagem'};
+  return {ok:true,url:url,reason:'ok'};
 }
 function openWhatsAppWebOnly(){
   // ABRE SOMENTE https://web.whatsapp.com/ — nunca send?text=, nunca whatsapp://send.
@@ -7014,6 +7051,12 @@ async function _wireGroupSend(ctx, msg, cardFile){
      OG completo + og:url exato + TIPO esperado + cache confirmado). prepBusy impede
      preparações simultâneas (cliques duplicados). Token nunca é logado. */
   let prepReady=false, prepBusy=false;
+  // F3.3.73I6C24D — URL CANONICA UNICA + estado dos 3 botoes (fonte unica). previewUrl===copiedUrl===
+  // testedUrl===whatsappUrl. Os 3 botoes observam a MESMA variavel; nascem desabilitados (fail-closed).
+  const _tipoModal=(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma';
+  const _modalTrace=(typeof qaTraceId==='function'?qaTraceId():'');
+  let canonicalShareUrl=''; try{ canonicalShareUrl=buildShareClientUrl(ctx&&ctx.token); }catch(_){ canonicalShareUrl=''; }
+  function setShareButtonsEnabled(on){ for(var _i=0,_a=['btnOpenWaMain','btnCopyGroupMsg','btnTestLink'];_i<_a.length;_i++){ var _b=$(_a[_i]); if(_b) _b.disabled=!on; } }
   // F3.3.73I6C24C/FASE 8 — a PRÉVIA NÃO mostra arte fixa: fica em skeleton ("Preparando prévia…")
   // até o snapshot ready, quando runPrewarm define a arte do TIPO correto. O `bytes` (fallback
   // "copiar imagem", opção avançada) é carregado da arte do TIPO correto — nunca cronograma p/ roteiro.
@@ -7041,8 +7084,8 @@ async function _wireGroupSend(ctx, msg, cardFile){
   }
   // Copia a MENSAGEM COMPLETA (texto + link /share) — valida o link antes. Sem pasta/arquivo.
   function copyMsgClean(){
-    const lk=_gateValidLink(ctx,msg);                              // valida link público /share + token
-    if(!lk.ok){ setStatus('Link inválido — gere o cronograma novamente.','err'); flashToast('Link inválido — gere o cronograma novamente.'); return false; }
+    const lk=_gateValidLink(ctx,msg);                              // valida link público /share via allowlist exata
+    if(!lk.ok){ const em=shareInvalidMsg(_tipoModal); qaDiag('qa.desktop.url.validation.result',{ok:false,reason:lk.reason,env:SHARE_ENV,trace:_modalTrace}); setStatus(em,'err'); flashToast(em); return false; }
     copyToClipboard(msg);                                          // copia a MENSAGEM COMPLETA (texto + link /share)
     return true;
   }
@@ -7072,9 +7115,10 @@ async function _wireGroupSend(ctx, msg, cardFile){
     // Copiar a mensagem É o passo de envio manual no grupo — registra igual.
     if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
   });
-  on('btnTestLink', function(){                                    // abre o LINK DE COMPARTILHAMENTO p/ conferir a prévia premium + portal
-    let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ flashToast('Link inválido — gere o cronograma novamente.'); return; }
-    const ext=api.openExternal; if(ext){ try{ ext(url); }catch(_){ try{window.open(url,'_blank');}catch(__){} } } else { try{window.open(url,'_blank');}catch(_){} }
+  on('btnTestLink', function(){                                    // abre a MESMA shareUrl canonica (previa premium + portal)
+    const st=validateShareUrl(canonicalShareUrl,_tipoModal);
+    if(!st.ok){ flashToast(shareInvalidMsg(_tipoModal)); return; }
+    const ext=api.openExternal; if(ext){ try{ ext(canonicalShareUrl); }catch(_){ try{window.open(canonicalShareUrl,'_blank');}catch(__){} } } else { try{window.open(canonicalShareUrl,'_blank');}catch(_){} }
     flashToast('Abrindo o link de compartilhamento (prévia premium + portal) para teste.');
   });
   /* ===== F3.3.73I6C18C — PREPARAÇÃO DETERMINÍSTICA DO CARD PREMIUM =====
@@ -7114,8 +7158,9 @@ async function _wireGroupSend(ctx, msg, cardFile){
     prepReady=false;
     const b=$('btnOpenWaMain'); if(b){ b.disabled=true; }
     const rt=$('btnPrewarmRetry'); if(rt){ rt.style.display='none'; }
-    setStatus('Preparando Card Premium…');
-    const traceId=qaTraceId();
+    setShareButtonsEnabled(false);
+    setStatus('Preparando o link do '+_tipoModal+'…');
+    const traceId=_modalTrace||qaTraceId();
     qaDiag('qa.desktop.token.start',{trace:traceId});
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ url=''; }
     qaDiag(url?'qa.desktop.token.ready':'qa.desktop.token.fail',{trace:traceId});
@@ -7129,19 +7174,26 @@ async function _wireGroupSend(ctx, msg, cardFile){
       pw=snap.ok?((api.cardPrewarm&&url)?await api.cardPrewarm(url,tipo,traceId):{ok:false,reason:'indisponivel',stage:'ipc'}):snap;
     }catch(_){ pw={ok:false,reason:'ipc_falhou',stage:'ipc'}; }
     prepBusy=false;
-    if(pw&&pw.ok){
+    // F3.3.73I6C24D — GATE DE URL na preparacao: o botao SO habilita se a shareUrl for VALIDA
+    // pela allowlist EXATA do ambiente (alem do snapshot/prewarm). Reproduz a decisao do clique.
+    let urlSt=null;
+    if(pw&&pw.ok){ urlSt=validateShareUrl(canonicalShareUrl,_tipoModal);
+      qaDiag('qa.desktop.url.validation.result',{ok:urlSt.ok,reason:urlSt.reason,host:urlSt.hostnameOk,path:urlSt.pathOk,token:urlSt.tokenOk,type:urlSt.typeOk,env:SHARE_ENV,trace:traceId}); }
+    if(pw&&pw.ok&&urlSt&&urlSt.ok){
       prepReady=true;
-      if(b){ b.disabled=false; }
+      setShareButtonsEnabled(true);
       // FASE 8: a prévia usa a arte do SNAPSHOT (tipo correto), nunca cronograma fixo para roteiro.
-      try{ applyPreviewFromSnapshot((ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma', snap&&snap.og); }catch(_){}
-      setStatus(svg('check')+'<span>Card Premium preparado. A mensagem será copiada automaticamente ao abrir o WhatsApp Business — escolha o grupo do cliente e cole (Ctrl+V).</span>','ok',true);
+      try{ applyPreviewFromSnapshot(_tipoModal, snap&&snap.og); }catch(_){}
+      setStatus(svg('check')+'<span>Link do '+_tipoModal+' pronto para envio. A mensagem será copiada automaticamente ao abrir o WhatsApp Business — escolha o grupo do cliente e cole (Ctrl+V).</span>','ok',true);
     }else{
       prepReady=false;
-      if(b){ b.disabled=true; }
+      setShareButtonsEnabled(false);
       if(rt){ rt.style.display=''; }
       // FASE 3: mensagem simples na UI; o CÓDIGO exato fica no diagnóstico QA (nunca some).
-      qaDiag('qa.desktop.prewarm.result',{ok:false,stage:(pw&&pw.stage)||'',reason:(pw&&(pw.reason||pw.code))||'',trace:traceId});
-      setStatus('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.','err');
+      const _reason=(urlSt&&!urlSt.ok)?('url:'+urlSt.reason):((pw&&(pw.reason||pw.code))||'');
+      qaDiag('qa.desktop.prewarm.result',{ok:false,stage:(urlSt&&!urlSt.ok)?'url':((pw&&pw.stage)||''),reason:_reason,trace:traceId});
+      if(urlSt&&!urlSt.ok){ setStatus(shareInvalidMsg(_tipoModal),'err'); }
+      else { setStatus('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.','err'); }
     }
   }
   on('btnPrewarmRetry', function(){ runPrewarm(); });
