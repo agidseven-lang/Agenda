@@ -243,7 +243,7 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   ok(advFlowH.includes('id="btnSendAuto"') && advFlowH.includes('id="waPhone"'), 'H1h: Cloud API/telefone SÓ em opções avançadas (recolhido, como no aprovado)');
   ok(advFlowH.includes('id="btnCopyImg"') && advFlowH.includes('id="btnOpenFolder"'), 'H1i: fallback de imagem SÓ em opções avançadas (nunca obrigatório)');
   // wiring aprovado: copyMsgClean ANTES de abrir o WhatsApp (auto-copy real, nao so texto)
-  const wire = HTML.slice(HTML.indexOf("on('btnOpenWaMain'"), HTML.indexOf("on('btnOpenWaMain'") + 1400);
+  const wire = HTML.slice(HTML.indexOf("on('btnOpenWaMain'"), HTML.indexOf("on('btnOpenWaMain'") + 1900); // 74D: comentário de restauração no handler; asserts intactos
   ok(/if\(!copyMsgClean\(\)\) return;/.test(wire) && wire.includes('openWhatsAppWebOnly()'), 'H1j: clique = copia mensagem + abre WhatsApp (wiring aprovado)');
   ok(/persistClientSend\(ctx\.id\)/.test(wire), 'H1k: envio registrado no Notification Engine (aprovado 1.0.138)');
   // H2 — F3.3.70D3R10AA: mensagem/link no REGIME VALIDADO de 19/06 (sem cache-bust)

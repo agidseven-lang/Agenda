@@ -45,7 +45,7 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão da baseline atual (1.0.168 — C20)', PJ.version === '1.0.168' && (S('package-lock.json').includes('"version": "1.0.168"')));
+ok('A1 versão da candidata QA (1.0.174-QA — 74E restore)', PJ.version === '1.0.174-QA' && (S('package-lock.json').includes('"version": "1.0.174-QA"')));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
 const MODC = 'const SHARE_PATH = "/share/cronograma/";\nconst HOST = "aprovar.agendaidseven.com.br";\n';
@@ -164,24 +164,28 @@ ok('H2 preload expõe cardPrewarm(url, expectedType) via invoke("card-prewarm")'
   /cardPrewarm: \(url: string, expectedType: string\)/.test(PRE) && /ipcRenderer\.invoke\("card-prewarm", url, expectedType\)/.test(PRE));
 
 /* ── I: renderer — fluxo obrigatório e UX (gates 16-17-19 + estados) ── */
-ok('I1 botão do WhatsApp NASCE desabilitado + estado inicial "Preparando Card Premium…"',
-  /id="btnOpenWaMain" disabled>/.test(HTML) && /id="groupStatus">Preparando Card Premium…/.test(HTML));
-ok('I2 WhatsApp SÓ abre com prepReady (gate 16/17: sucesso libera; falha bloqueia)',
-  /if\(!prepReady\)\{ flashToast\('Aguarde: o Card Premium ainda está sendo preparado\.'\); return; \}/.test(HTML) &&
-  /let prepReady=false, prepBusy=false;/.test(HTML));
+ok('I1 [74D] botão do WhatsApp NASCE HABILITADO (contrato físico 1.0.153); status inicial = bônus informativo',
+  !/id="btnOpenWaMain" disabled>/.test(HTML) && /id="btnOpenWaMain">/.test(HTML) &&
+  /id="groupStatus">Pré-aquecendo a prévia premium em segundo plano \(bônus\)/.test(HTML));
+ok('I2 [74D] clique NUNCA bloqueado por prepReady (gate C18C removido — primeira regressão, 2bcad42); prepReady segue só como estado do bônus',
+  !/if\(!prepReady\)\{ flashToast/.test(HTML) &&
+  /let prepReady=false, prepBusy=false;/.test(HTML) &&
+  /if\(!copyMsgClean\(\)\) return;/.test(HTML));
 ok('I3 runPrewarm: prova técnica via IPC (cardPrewarm) com TIPO por setor (roteiro×cronograma)',
   /api\.cardPrewarm&&url\)\?await api\.cardPrewarm\(url,\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma'\)/.test(HTML));
-ok('I4 sucesso → "Card Premium preparado." + botão liberado; falha → erro + botão bloqueado + Tentar novamente',
-  /Card Premium preparado\. A mensagem será copiada automaticamente ao abrir o WhatsApp Business/.test(HTML) &&
-  /Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\./.test(HTML) &&
+ok('I4 [74D] sucesso → "Prévia premium pré-aquecida."; falha → informativo SEM bloqueio; Tentar novamente preservado',
+  /Prévia premium pré-aquecida\. A mensagem será copiada automaticamente ao abrir o WhatsApp Business/.test(HTML) &&
+  /Prévia não pré-aquecida agora \(bônus\) — o envio pelo WhatsApp segue liberado/.test(HTML) &&
+  !/Tente novamente antes de enviar pelo WhatsApp/.test(HTML) &&
   /id="btnPrewarmRetry"/.test(HTML) && /on\('btnPrewarmRetry', function\(\)\{ runPrewarm\(\); \}\);/.test(HTML));
 ok('I5 estado "Abrindo WhatsApp Business…" antes de abrir', /Abrindo WhatsApp Business…/.test(HTML));
 ok('I6 cliques duplicados bloqueados (prepBusy no modal + _openwaBusy no caminho data-openwa)',
   /if\(prepBusy\) return; prepBusy=true;/.test(HTML) && /if\(state\._openwaBusy\)\{ return; \}/.test(HTML));
-ok('I7 caminho [data-openwa] TAMBÉM gated (falha nunca abre openWhatsAppPlain)',
-  /REGRA CENTRAL também neste caminho/.test(HTML) &&
-  /await window\.desktopAPI\.cardPrewarm\(_pwUrl,\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma'\)/.test(HTML) &&
-  /if\(!_pw\|\|!_pw\.ok\)\{ flashToast\('Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\.'\); return; \}/.test(HTML));
+ok('I7 [74D] caminho [data-openwa] com prewarm MELHOR-ESFORÇO (falha NUNCA aborta; mensagem + WhatsApp sempre)',
+  /CONTRATO RESTAURADO também neste caminho/.test(HTML) &&
+  /await window\.desktopAPI\.cardPrewarm\(_pwUrl,\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma'\); \}catch\(_\)\{/.test(HTML) &&
+  !/if\(!_pw\|\|!_pw\.ok\)\{ flashToast[^}]*return; \}/.test(HTML) &&
+  /copyToClipboard\(msg\);/.test(HTML));
 ok('I8 prewarm inicia automaticamente ao abrir o modal (runPrewarm())', /on\('btnPrewarmRetry', function\(\)\{ runPrewarm\(\); \}\);\s*\n\s*runPrewarm\(\);/.test(HTML));
 ok('I9 erro NÃO expõe token/detalhe técnico (mensagem amigável; sem token na UI)',
   !/token[^\n]{0,40}flashToast/.test(HTML.slice(HTML.indexOf('runPrewarm'))) || true);

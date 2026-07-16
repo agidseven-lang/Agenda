@@ -6882,8 +6882,8 @@ async function openSendClientModal(taskOrForm){
       (ctx.sector==='roteiro'?'<div class="gcs-note" style="margin-top:2px">Transparência: a arte do card de compartilhamento ainda usa o layout de “cronograma” (gerada pelo servidor de preview). A mensagem e a tarefa já identificam “Roteiro de gravação de vídeos”; o título do card será atualizado na etapa do servidor.</div>':'')+
       /* F3.3.73I6C18C — o botão NASCE desabilitado: só libera após "Card Premium preparado."
          (prova técnica real via IPC card-prewarm: GET validado + OG do TIPO certo + cache). */
-      '<button class="gcs-go" id="btnOpenWaMain" disabled>'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
-      '<div class="gcs-status" id="groupStatus">Preparando Card Premium… A mensagem será copiada automaticamente ao abrir o WhatsApp Business.</div>'+
+      '<button class="gcs-go" id="btnOpenWaMain">'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
+      '<div class="gcs-status" id="groupStatus">Pré-aquecendo a prévia premium em segundo plano (bônus) — o envio já está liberado. A mensagem será copiada automaticamente ao abrir o WhatsApp Business.</div>'+
       '<div class="gcs-note">A prévia do card vem do <b>link público</b> (não de arquivo salvo). O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link.</div>'+
       '<div class="gcs-secondary">'+
         '<button class="btn ghost" id="btnPrewarmRetry" style="display:none">Tentar novamente</button>'+
@@ -7041,8 +7041,9 @@ async function _wireGroupSend(ctx, msg, cardFile){
      É o fluxo que funcionou no teste real: 1 clique copia a mensagem e abre o WhatsApp Business.
      Sem pasta, sem salvar arquivo, sem etapas. O link /share gera a prévia premium ao colar. */
   on('btnOpenWaMain', function(){
-    // F3.3.73I6C18C — REGRA CENTRAL: WhatsApp SÓ abre após "Card Premium preparado."
-    if(!prepReady){ flashToast('Aguarde: o Card Premium ainda está sendo preparado.'); return; }
+    // F3.3.74D — CONTRATO RESTAURADO (baseline física 1.0.153, tag desktop/v1.0.153-production-rc):
+    // 1 clique SEMPRE copia a mensagem completa e abre o WhatsApp Business. O pré-aquecimento
+    // da prévia é BÔNUS em segundo plano (nunca gate) — a regressão C18C (2bcad42) invertia isso.
     if(!copyMsgClean()) return;                                    // 1) copia a mensagem automaticamente
     const b0=$('btnOpenWaMain'); if(b0){ b0.innerHTML=svg('send')+'Abrindo WhatsApp Business…'; }
     openWhatsAppWebOnly();                                         // 2) abre o WhatsApp Business (só web.whatsapp.com/)
@@ -7076,11 +7077,12 @@ async function _wireGroupSend(ctx, msg, cardFile){
      WhatsApp: mostra erro + "Tentar novamente" (e "Copiar mensagem" segue
      disponível como opção manual). */
   async function runPrewarm(){
+    // F3.3.74D — BÔNUS (nunca gate): pré-aquece a prévia em segundo plano; o botão do
+    // WhatsApp permanece SEMPRE habilitado (contrato 1.0.153). Falha aqui NUNCA bloqueia.
     if(prepBusy) return; prepBusy=true;
     prepReady=false;
-    const b=$('btnOpenWaMain'); if(b){ b.disabled=true; }
     const rt=$('btnPrewarmRetry'); if(rt){ rt.style.display='none'; }
-    setStatus('Preparando Card Premium…');
+    setStatus('Pré-aquecendo a prévia premium em segundo plano (bônus) — o envio já está liberado.');
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ url=''; }
     let pw=null;
     try{
@@ -7089,13 +7091,11 @@ async function _wireGroupSend(ctx, msg, cardFile){
     prepBusy=false;
     if(pw&&pw.ok){
       prepReady=true;
-      if(b){ b.disabled=false; }
-      setStatus(svg('check')+'<span>Card Premium preparado. A mensagem será copiada automaticamente ao abrir o WhatsApp Business — escolha o grupo do cliente e cole (Ctrl+V).</span>','ok',true);
+      setStatus(svg('check')+'<span>Prévia premium pré-aquecida. A mensagem será copiada automaticamente ao abrir o WhatsApp Business — escolha o grupo do cliente e cole (Ctrl+V).</span>','ok',true);
     }else{
       prepReady=false;
-      if(b){ b.disabled=true; }
       if(rt){ rt.style.display=''; }
-      setStatus('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.','err');
+      setStatus('Prévia não pré-aquecida agora (bônus) — o envio pelo WhatsApp segue liberado; a prévia é gerada pelo próprio WhatsApp ao colar o link.','',true);
     }
   }
   on('btnPrewarmRetry', function(){ runPrewarm(); });
@@ -7968,17 +7968,15 @@ document.addEventListener('click',async e=>{
       }
       if(!ctx.token){ flashToast('Link do cliente indisponível. Tente novamente.'); return; }
     }
-    // F3.3.73I6C18C — REGRA CENTRAL também neste caminho: o WhatsApp SÓ abre com o
-    // Card Premium PREPARADO (mesma prova técnica via IPC card-prewarm; falha = não abre).
+    // F3.3.74D — CONTRATO RESTAURADO também neste caminho: o envio NUNCA depende do
+    // pré-aquecimento (bônus, melhor-esforço); a prévia é do WhatsApp (OG do link estável).
     if(state._openwaBusy){ return; }
     state._openwaBusy=true;
     try{
-      flashToast('Preparando Card Premium…');
       let _pwUrl=''; try{ _pwUrl=buildShareClientUrl(ctx&&ctx.token); }catch(_){ _pwUrl=''; }
-      const _pw=(window.desktopAPI&&window.desktopAPI.cardPrewarm&&_pwUrl)
-        ?await window.desktopAPI.cardPrewarm(_pwUrl,(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma')
-        :{ok:false};
-      if(!_pw||!_pw.ok){ flashToast('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.'); return; }
+      if(window.desktopAPI&&window.desktopAPI.cardPrewarm&&_pwUrl){
+        try{ await window.desktopAPI.cardPrewarm(_pwUrl,(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma'); }catch(_){ /* bônus: nunca bloqueia */ }
+      }
     }finally{ state._openwaBusy=false; }
     // 1.0.119 — COPIA só a mensagem limpa e abre o WhatsApp SEM texto na URL.
     // NUNCA envia send?text= ao cliente. O usuário cola a mensagem no chat.
@@ -7987,7 +7985,7 @@ document.addEventListener('click',async e=>{
     if(id&&id!=='__form__')await persistClientSend(id);
     closeModal();
     openWhatsAppPlain();
-    flashToast('Card Premium preparado. Mensagem copiada — cole no WhatsApp.');
+    flashToast('Mensagem copiada — cole no WhatsApp. A prévia premium aparece pelo link.');
     return;
   }
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}
@@ -8250,5 +8248,6 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
 })();
 /* ════════ FIM IN-APP-DIAGNOSTIC-V1 ════════ */
 </script>
+<script>/* F3.3.74E — banner permanente de QA (build de teste do contrato RESTAURADO; identificacao visual; sem literais de versao) */try{var _qb=document.createElement('div');_qb.textContent='AMBIENTE QA — NÃO USAR COM CLIENTES';_qb.setAttribute('style','position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#7a1020;color:#fff;font:600 12px/1.6 system-ui,Segoe UI,Roboto,sans-serif;text-align:center;letter-spacing:.04em;padding:3px 8px;pointer-events:none;opacity:.96');document.body.appendChild(_qb);}catch(_){}</script>
 </body>
 </html>
