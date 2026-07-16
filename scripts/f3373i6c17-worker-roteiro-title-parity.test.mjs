@@ -33,7 +33,7 @@ const constLine = (name) => { const m = SRC.match(new RegExp('const ' + name + '
 console.log('F3.3.73I6C17 — Worker Roteiro ↔ Card Premium TITLE parity (hermético)');
 
 /* ── A: versão compatível com os gates do deploy pinado ── */
-ok('A1 versão V64.59-* no GET / (linha canônica; sufixo da fase atual = c20)', /version: "V64\.59-c20-golden-contract"/.test(SRC));
+ok('A1 versão V64.59-* no GET / (linha canônica; sufixo da fase atual = c23)', /version: "V64\.59-c23-share-snapshot"/.test(SRC));
 ok('A2 compatível com gate pré-deploy (grep version: "V64.59)', /version: *"V64\.59/.test(SRC));
 
 /* ── B: resolução de tipo pelos DADOS REAIS (micro-exec) ── */
@@ -61,9 +61,9 @@ ok('C4 roteiro: og:title "Aprovar roteiro"', shareRot.includes('<meta property="
 ok('C5 roteiro: desc "Seu Roteiro de gravação de vídeos está pronto para avaliação."',
   shareRot.includes('<meta property="og:description" content="Seu Roteiro de gravação de vídeos está pronto para avaliação."/>'));
 ok('C6 roteiro: og:image:alt "Agenda ID Seven — Aprovar roteiro"', shareRot.includes('og:image:alt" content="Agenda ID Seven — Aprovar roteiro"'));
-ok('C7 /share via handleShareCard com CONTRATO C20 (resolved→card do tipo; not_found/error→página explícita, sem fallback de tipo)',
+ok('C7 /share via handleShareCard com CONTRATO C23 (READY→card do tipo pelo SNAPSHOT; not_found/error→página explícita, sem fallback e sem lookup dinâmico)',
   /shareMatch && \(request\.method === "GET" \|\| request\.method === "HEAD"\)[\s\S]{0,400}handleShareCard\(request, env, ctx, url, shareMatch\[1\]\)/.test(SRC) &&
-  /async function handleShareCard\(request, env, ctx, url, token\)[\s\S]{0,2400}queryTaskByToken\(env, at, token\)[\s\S]{0,2200}if \(!resolved\) \{[\s\S]{0,900}shareUnavailableHtml\(url\.origin, state\)/.test(SRC) &&
+  /async function handleShareCard\(request, env, ctx, url, token\)[\s\S]{0,3600}env\.SHARE_SNAPSHOTS\.get\(SHARE_SNAP_KEY\(token\)\)[\s\S]{0,600}if \(!snap\) return fail\("not_found", 404, "none"\);/.test(SRC) &&
   /htmlResponseCacheable\(shareCardHtml\(url\.origin, token, ptype\), 200\)/.test(SRC));
 ok('C8 rota /share/cronograma INALTERADA (mesmo regex; nenhuma rota nova de share)',
   /\/\^\\\/share\\\/cronograma\\\/\(\[A-Za-z0-9_-\]\{4,128\}\)\\\/\?\$\//.test(SRC) && !/share\\\/roteiro/.test(SRC));

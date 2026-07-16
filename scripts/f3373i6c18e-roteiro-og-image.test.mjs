@@ -32,7 +32,7 @@ console.log('F3.3.73I6C18E — imagem OG exclusiva do Roteiro (hermético)');
 
 /* ── A: versão e constantes de path ── */
 ok('A1 versão da fase (prefixo V64.59 preservado p/ gates do deploy)',
-  /version: "V64\.59-c20-golden-contract"/.test(SRC) && /version: *"V64\.59/.test(SRC));
+  /version: "V64\.59-c23-share-snapshot"/.test(SRC) && /version: *"V64\.59/.test(SRC));
 ok('A2 OG_IMG_PATH do cronograma INTACTO', /const OG_IMG_PATH = "\/og\/wa-card-v64-39\.jpg";/.test(SRC));
 ok('A3 OG_IMG_PATH_ROTEIRO novo e versionado (C18G: v64-60, logo oficial)', /const OG_IMG_PATH_ROTEIRO = "\/og\/wa-card-roteiro-v64-60\.jpg";/.test(SRC));
 
@@ -147,20 +147,23 @@ ok('D4 rota v64-39 do cronograma INTACTA (mesma lista de canários)',
 const hs = fnSrc('handleShareCard');
 ok('E1 cache key contém o TOKEN (tipos nunca se misturam por chave)',
   hs.includes('url.origin + "/share/cronograma/" + token'));
-ok('E2 só tarefa RESOLVIDA aquece o cache (contrato C20: não-resolvido retorna ANTES do put)',
-  hs.includes('if (!resolved) {') && hs.indexOf('if (!resolved) {') < hs.indexOf('caches.default.put(cacheKey'));
+ok('E2 só snapshot READY aquece o cache (contrato C23: não-publicado retorna ANTES do put)',
+  hs.includes('if (!snap) return fail("not_found", 404, "none");') &&
+  hs.indexOf('if (!snap) return fail') < hs.indexOf('caches.default.put(cacheKey'));
 ok('E3 sem branch por UA no /share (mesma resposta p/ WhatsApp/FB/navegador)',
   !hs.includes('isCrawlerUA'));
 ok('E4 rota/formato do link INTACTOS (regex do /share inalterada)',
   SRC.includes('/^\\/share\\/cronograma\\/([A-Za-z0-9_-]{4,128})\\/?$/'));
 ok('E5 X-Share-Cache preservado (hit e miss)',
   hs.includes('"X-Share-Cache", "hit"') && hs.includes('"X-Share-Cache", "miss"'));
-ok('E6 sem deadline que troque tipo (espera a verdade; retry único preservado)',
-  !/deadline|race\(/.test(hs) && hs.includes('return await queryTaskByToken(env, at, token)'));
-ok('E7 contrato C20: estados explícitos + X-Share-Type + no-store nos não-resolvidos',
+ok('E6 sem deadline que troque tipo E sem lookup dinâmico no GET público (C23: snapshot é a fonte única)',
+  !/deadline|race\(/.test(hs) && !/queryTaskByToken|getAccessToken/.test(hs) &&
+  hs.includes('env.SHARE_SNAPSHOTS.get(SHARE_SNAP_KEY(token))'));
+ok('E7 contrato C23: estados explícitos + X-Share-Type + X-Share-Snapshot + no-store nos não-publicados',
   hs.includes('res.headers.set("X-Share-Task", "resolved");') && hs.includes('res.headers.set("X-Share-Type", ptype.key);') &&
+  hs.includes('res.headers.set("X-Share-Snapshot", "ready");') &&
   hs.includes('"X-Share-Task": state') && hs.includes('"X-Share-Type": "none"') && hs.includes('"Cache-Control": "no-store"') &&
-  hs.includes('lookupFailed = false') && hs.includes('catch (_) { lookupFailed = true;'));
+  hs.includes('return fail("error", 503,'));
 ok('E8 X-Share-Task definido ANTES do cache.put (entrada cacheada carrega "resolved")', (() => {
   const iSet = hs.indexOf('X-Share-Task'); const iPut = hs.indexOf('caches.default.put(cacheKey');
   return iSet >= 0 && iPut >= 0 && iSet < iPut;

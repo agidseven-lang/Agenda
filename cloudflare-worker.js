@@ -192,6 +192,7 @@ function shareCardHtml(origin, token, ptype) {
   const portal = base + "/cliente/cronograma/" + token;
   return '<!doctype html>\n<html lang="pt-BR"><head>\n<meta charset="utf-8"/>\n' +
     ogClientMeta(origin, title, desc, "/share/cronograma/" + token, pt.imgAlt, pt.imgPath) +
+    '<link rel="canonical" href="' + escapeHtml(base + "/share/cronograma/" + token) + '"/>\n' +
     '<meta name="viewport" content="width=device-width, initial-scale=1"/>\n' +
     '<title>' + escapeHtml(title) + '</title>\n' +
     '<meta name="description" content="' + escapeHtml(desc) + '"/>\n' +
@@ -205,31 +206,41 @@ function shareCardHtml(origin, token, ptype) {
     '</body></html>';
 }
 
-/* ───── F3.3.73I6C18B — /share: HEAD + Cache API + single-flight (preview do WhatsApp) ─────
-   Diagnóstico C18A: OG/imagem/headers PERFEITOS em GET p/ todos os UAs, mas (a) o 1º byte
-   pagava OAuth+runQuery (~2,3 s pior caso) sem NENHUM cache de borda (cf-cache vazio) e
-   (b) HEAD /share respondia o fallback JSON. Hipótese principal (por eliminação): o
-   compositor do WhatsApp desiste antes da resposta e a mensagem sai sem card.
-   Este handler:
-   - responde HEAD com os MESMOS headers text/html (corpo vazio);
-   - Cache API (caches.default) com chave = origem+path (o token isola a chave; tipos
-     NUNCA se misturam porque a chave contém o token). TTL = Cache-Control público atual
-     (600 s, preservado). HIT: zero OAuth/Firestore.
-   - MISS: resolve o TIPO REAL (task.sector). REGRA CRÍTICA C18B: NÃO existe deadline
-     que devolva "cronograma" p/ roteiro — a resposta espera a verdade. 1 retry rápido
-     em erro transitório; erro persistente/tarefa não encontrada → card padrão SEM
-     cachear (erro/404 NUNCA envenena o cache; próximo scrape tenta de novo).
-   - single-flight por token no isolate: scrapes simultâneos compartilham UMA consulta.
-   - X-Share-Cache (hit|miss) + Server-Timing share_lookup — métricas públicas p/ os
-     probes read-only (sem token/segredo/dado de cliente). */
-/* F3.3.73I6C20 — página EXPLÍCITA para /share sem tarefa resolvida. SEM og:title de
-   Cronograma/Roteiro (o crawler não deve montar card de tipo algum); noindex; texto
-   humano claro; link para solicitar um novo envio fica com a equipe (sem dados). */
-function shareUnavailableHtml(origin, state) {
+/* ═══════════════ F3.3.73I6C23 — SHARE SNAPSHOT IMUTÁVEL ═══════════════
+   DECISÃO DE ARQUITETURA (ordem executiva): o preview do WhatsApp NÃO PODE depender de
+   OAuth Google, consulta Firestore, estado transitório da tarefa nem cache aquecido "no
+   momento certo" durante a requisição do crawler. O fluxo definitivo é:
+     Desktop → POST /share-snapshot (autenticado) → Worker resolve a tarefa UMA vez
+     (server-side), PERSISTE o snapshot {type, contentHash, v, createdAt} em KV
+     (binding env.SHARE_SNAPSHOTS, chave snap:<token>) e PRÉ-RENDERIZA o OG na Cache
+     API → o GET público /share/cronograma/<token> passa a LER SOMENTE o snapshot —
+     resposta estática, tipada e determinística. ZERO OAuth/Firestore no GET público.
+   REGRAS C23: conteúdo inalterado ⇒ MESMO snapshot (reuso, sem write); reenvio NUNCA
+   rotaciona token; nova versão SÓ quando o conteúdo do card muda (tipo/arte versionada);
+   snapshot publicado nunca muda silenciosamente; revogação futura = delete explícito;
+   token NUNCA logado (ids derivados por SHA-256). Links pré-C23 (sem snapshot) mantêm o
+   acesso HUMANO ao portal pelo botão manual da página not_found; o card deles passa a
+   existir na primeira re-preparação pelo Desktop (mesmo token — nada rotaciona).
+   ATIVAÇÃO EM PRODUÇÃO: exige criar o namespace KV e o binding SHARE_SNAPSHOTS no
+   wrangler.toml ANTES do deploy (sem o binding, /share responde 503 explícito). */
+const SHARE_SNAP_KEY = (token) => "snap:" + token;
+const SHARE_TOKEN_RE = /^[A-Za-z0-9_-]{4,128}$/;
+function shareSnapshotContentHashInput(typeKey) {
+  // Conteúdo VISÍVEL do card = tipo + arte versionada (title/desc/imagem derivam do tipo).
+  const pt = PREMIUM_TYPES[typeKey];
+  return "card|v1|" + typeKey + "|" + (pt ? pt.imgPath : "");
+}
+/* F3.3.73I6C20/C23 — página EXPLÍCITA para /share sem snapshot publicado. SEM og:title de
+   Cronograma/Roteiro (o crawler não monta card de tipo algum); noindex; texto humano claro.
+   C23: em not_found (token bem-formado) a página ganha o BOTÃO MANUAL para o portal — links
+   antigos (pré-snapshot) continuam levando o cliente à área de aprovação. */
+function shareUnavailableHtml(origin, state, token) {
   const titulo = state === "error" ? "Não foi possível carregar o link agora" : "Link inválido ou expirado";
   const msg = state === "error"
     ? "Tivemos uma instabilidade temporária ao validar este link. Tente novamente em instantes."
-    : "Este link de aprovação não está mais ativo. Peça à equipe ID Seven um novo link de aprovação.";
+    : "Este link não tem uma pré-visualização publicada ou não está mais ativo. Se você o recebeu da equipe ID Seven, toque abaixo para abrir sua área de aprovação.";
+  const portal = (state !== "error" && token && SHARE_TOKEN_RE.test(token))
+    ? (ogClientBase(origin) + "/cliente/cronograma/" + token) : "";
   return '<!doctype html>\n<html lang="pt-BR"><head>\n<meta charset="utf-8"/>\n' +
     '<meta name="robots" content="noindex, nofollow"/>\n' +
     '<meta name="viewport" content="width=device-width, initial-scale=1"/>\n' +
@@ -238,67 +249,160 @@ function shareUnavailableHtml(origin, state) {
     '<div style="max-width:520px;margin:0 auto;padding:52px 22px;text-align:center">\n' +
     '<h1 style="font-size:20px;margin:0 0 8px;font-weight:800">' + titulo + '</h1>\n' +
     '<p style="color:#9aa3ad;line-height:1.5;margin:0">' + msg + '</p>\n' +
-    '</div>\n</body></html>';
+    (portal ? '<p style="margin-top:20px"><a href="' + escapeHtml(portal) + '" style="display:inline-block;background:linear-gradient(135deg,#5B6CFF,#22D3EE 60%,#10B981);color:#fff;text-decoration:none;font-weight:800;padding:13px 22px;border-radius:12px">Abrir area de aprovacao →</a></p>' : '') +
+    '\n</div>\n</body></html>';
 }
-const _shareInflight = new Map();
 async function handleShareCard(request, env, ctx, url, token) {
+  /* FONTE ÚNICA = SHARE SNAPSHOT (KV) + Cache API. PROIBIDO neste handler: OAuth,
+     Firestore, single-flight de lookup, fallback de tipo, correção retroativa.
+     CONTRATO:
+       READY     → 200 text/html + X-Share-Task=resolved + X-Share-Type=<tipo> +
+                   X-Share-Snapshot=ready + OG completo + Cache-Control público
+                   (HIT posterior preserva os MESMOS headers/HTML);
+       NOT_FOUND → 404 página explícita SEM OG de tipo + botão manual p/ o portal +
+                   X-Share-Task=not_found + X-Share-Type=none + X-Share-Snapshot=none
+                   + no-store (nunca envenena cache);
+       ERROR     → 503 + X-Share-Task=error + X-Share-Type=none + no-store
+                   (KV indisponível, binding ausente ou snapshot corrompido —
+                   erro NUNCA vira Cronograma). */
+  const t0 = Date.now();
   const cacheKey = new Request(url.origin + "/share/cronograma/" + token, { method: "GET" });
   let cached = null;
-  try { cached = await caches.default.match(cacheKey); } catch (_) { /* Cache API indisponível → segue MISS */ }
+  try { cached = await caches.default.match(cacheKey); } catch (_) { /* Cache API indisponível → segue p/ KV */ }
   if (cached) {
     const h = new Headers(cached.headers); h.set("X-Share-Cache", "hit");
     return new Response(request.method === "HEAD" ? null : cached.body, { status: cached.status, headers: h });
   }
-  const t0 = Date.now();
-  let ptype = PREMIUM_TYPES.cronograma, resolved = false, lookupFailed = false;
-  try {
-    let p = _shareInflight.get(token);
-    if (!p) {
-      p = (async () => {
-        const at = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE);
-        try { return await queryTaskByToken(env, at, token); }
-        catch (_e1) { return await queryTaskByToken(env, at, token); }   // 1 retry rápido (erro transitório)
-      })();
-      _shareInflight.set(token, p);
-      p.then(() => _shareInflight.delete(token), () => _shareInflight.delete(token));
-    }
-    const task = await p;
-    if (task) { ptype = premiumTypeOf(task); resolved = true; }
-  } catch (_) { lookupFailed = true; /* erro persistente: serve card padrão SEM cachear (nunca envenena) */ }
-  /* F3.3.73I6C20 — CONTRATO DEFINITIVO (fim do fallback silencioso de Cronograma):
-     RESOLVED  → 200 + card do TIPO real + X-Share-Task=resolved + X-Share-Type=<tipo>
-                 + cache por token (HIT posterior carrega os MESMOS headers).
-     NOT_FOUND → 404 + página EXPLÍCITA de link inválido/expirado (SEM OG de tipo),
-                 X-Share-Task=not_found, X-Share-Type=none, Cache-Control no-store.
-     ERROR     → 503 + página neutra de indisponibilidade, X-Share-Task=error,
-                 X-Share-Type=none, no-store. NUNCA cachear not_found/error; NUNCA
-                 corrigir tipo depois de responder (sem waitUntil retroativo). */
-  const lookupMs = Date.now() - t0;
-  if (!resolved) {
-    const state = lookupFailed ? "error" : "not_found";
-    const h = shareUnavailableHtml(url.origin, state);
-    const res = new Response(request.method === "HEAD" ? null : h, {
-      status: lookupFailed ? 503 : 404,
+  const fail = (state, status, snapHdr) => {
+    const html = shareUnavailableHtml(url.origin, state, state === "not_found" ? token : "");
+    return new Response(request.method === "HEAD" ? null : html, {
+      status,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
         "X-Share-Cache": "bypass",
         "X-Share-Task": state,
         "X-Share-Type": "none",
-        "Server-Timing": "share_lookup;dur=" + lookupMs,
+        "X-Share-Snapshot": snapHdr,
+        "Server-Timing": "snapshot_read;dur=" + (Date.now() - t0),
       },
     });
-    return res;
-  }
+  };
+  if (!env.SHARE_SNAPSHOTS) return fail("error", 503, "unconfigured");
+  let snap = null;
+  try {
+    const raw = await env.SHARE_SNAPSHOTS.get(SHARE_SNAP_KEY(token));
+    snap = raw ? JSON.parse(raw) : null;
+  } catch (_) { return fail("error", 503, "error"); }
+  if (!snap) return fail("not_found", 404, "none");
+  const ptype = PREMIUM_TYPES[snap.type];
+  if (!ptype) return fail("error", 503, "corrupt");
   const res = htmlResponseCacheable(shareCardHtml(url.origin, token, ptype), 200);
   res.headers.set("X-Share-Cache", "miss");
   res.headers.set("X-Share-Task", "resolved");
   res.headers.set("X-Share-Type", ptype.key);
-  res.headers.set("Server-Timing", "share_lookup;dur=" + lookupMs);
-  // Só tarefa RESOLVIDA aquece o cache (tipo comprovado; not_found/error ficam fora).
+  res.headers.set("X-Share-Snapshot", "ready");
+  res.headers.set("Server-Timing", "snapshot_read;dur=" + (Date.now() - t0));
+  // Só snapshot READY aquece a Cache API (not_found/error NUNCA são cacheados).
   if (ctx) { try { ctx.waitUntil(caches.default.put(cacheKey, res.clone())); } catch (_) { /* best-effort */ } }
   if (request.method === "HEAD") return new Response(null, { status: 200, headers: res.headers });
   return res;
+}
+/* POST /share-snapshot — cria OU reutiliza o snapshot público do Card Premium.
+   AUTENTICAÇÃO FORTE (idêntica à team-action): X-Team-Key server-to-server OU
+   Authorization Bearer <teamSessionJwt> + reconsulta de role/status no Firestore.
+   O Desktop NUNCA escreve snapshot diretamente (KV é acessível só pelo Worker).
+   Body: { taskId, expectedType: "cronograma"|"roteiro", contentHash? (opcional —
+   o Worker calcula o canônico), client?/quantity? (aceitos e IGNORADOS na persistência:
+   o card não expõe dado de cliente) }. Resposta: snapshotId, token público ESTÁVEL
+   (o clientReviewToken existente — nada rotaciona), shareUrl, portalUrl,
+   snapshotStatus ready|error, type, imageUrl, createdAt, contentHash, reused. */
+async function handleShareSnapshotCreate(request, env, ctx, url) {
+  if (!env.SHARE_SNAPSHOTS) return json({ ok: false, error: "SHARE_SNAPSHOTS_NOT_CONFIGURED", snapshotStatus: "error" }, 503, env);
+  let p = {};
+  try { p = await request.json(); } catch (_) { /* body inválido tratado abaixo */ }
+  const taskId = (p && typeof p.taskId === "string") ? p.taskId.trim() : "";
+  const expectedType = (p && typeof p.expectedType === "string") ? p.expectedType.trim().toLowerCase() : "";
+  if (!taskId || !/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) return json({ ok: false, error: "taskId inválido" }, 400, env);
+  if (expectedType !== "cronograma" && expectedType !== "roteiro") return json({ ok: false, error: "expectedType deve ser cronograma|roteiro" }, 400, env);
+  let accessToken;
+  try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+  catch (_) { return json({ ok: false, error: "auth indisponível no momento" }, 502, env); }
+  // ── AUTENTICAÇÃO FORTE (antes de QUALQUER efeito) ──
+  const suppliedKey = request.headers.get("X-Team-Key") || "";
+  const keyOk = !!(env.TEAM_API_KEY && await timingSafeEqualStr(suppliedKey, env.TEAM_API_KEY));
+  let byUid = "server";
+  if (!keyOk) {
+    const m = (request.headers.get("Authorization") || "").match(/^Bearer\s+(.+)$/i);
+    if (!m) {
+      console.warn("[SHARE-SNAPSHOT] negado: sem Bearer/X-Team-Key");
+      return json({ ok: false, error: "unauthorized: Authorization Bearer <teamSessionJwt> obrigatório (obtido em /team/session) ou X-Team-Key server-to-server" }, 401, env);
+    }
+    const v = await verifyTeamJwt(env, m[1]);
+    if (!v.ok) {
+      console.warn("[SHARE-SNAPSHOT] negado: jwt " + v.error);
+      return json({ ok: false, error: "unauthorized: " + v.error, expired: !!v.expired }, 401, env);
+    }
+    const teamUser = await lookupTeamUser(env, accessToken, v.uid);
+    if (!teamUser) {
+      console.warn(`[SHARE-SNAPSHOT] negado: uid=${maskUid(v.uid)} não é mais Social/Admin ativo`);
+      return json({ ok: false, error: "forbidden: usuário não é mais Social/Admin ativo" }, 403, env);
+    }
+    byUid = teamUser.uid;
+  }
+  // Resolve a tarefa UMA vez, server-side autenticado — NUNCA no GET público.
+  let doc = null;
+  try {
+    const r = await fetch(`${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${encodeURIComponent(taskId)}`, {
+      headers: { "Authorization": "Bearer " + accessToken },
+    });
+    if (r.status === 404) return json({ ok: false, error: "task_not_found" }, 404, env);
+    if (!r.ok) return json({ ok: false, error: "firestore " + r.status }, 502, env);
+    doc = await r.json();
+  } catch (_) { return json({ ok: false, error: "firestore indisponível" }, 502, env); }
+  const f = (doc && doc.fields) || {};
+  const sector = (f.sector && f.sector.stringValue) || "";
+  const typeKey = premiumTypeOf({ sector: sector }).key;
+  // Tipo divergente NUNCA vira fallback: erro explícito (o Desktop bloqueia o WhatsApp).
+  if (typeKey !== expectedType) return json({ ok: false, error: "type_mismatch", expected: expectedType, actual: typeKey }, 409, env);
+  const token = (f.clientReviewToken && f.clientReviewToken.stringValue) || (f.shareToken && f.shareToken.stringValue) || "";
+  if (!SHARE_TOKEN_RE.test(token)) return json({ ok: false, error: "token_missing: gere o link estável da tarefa antes (C18H)" }, 409, env);
+  const contentHash = await sha256HexW(shareSnapshotContentHashInput(typeKey));
+  const snapId = "snap_" + (await sha256HexW("id|" + token + "|" + contentHash)).slice(0, 16);
+  let existing = null;
+  try {
+    const raw = await env.SHARE_SNAPSHOTS.get(SHARE_SNAP_KEY(token));
+    existing = raw ? JSON.parse(raw) : null;
+  } catch (_) { return json({ ok: false, error: "snapshot_store_read", snapshotStatus: "error" }, 503, env); }
+  // REUSO: conteúdo inalterado ⇒ mesmo snapshot (nenhum write; publicado nunca muda em silêncio).
+  const reused = !!(existing && existing.type === typeKey && existing.contentHash === contentHash);
+  let snap = existing;
+  if (!reused) {
+    snap = { v: 1, type: typeKey, contentHash: contentHash, createdAt: new Date().toISOString(), by: maskUid(byUid) };
+    try { await env.SHARE_SNAPSHOTS.put(SHARE_SNAP_KEY(token), JSON.stringify(snap)); }
+    catch (_) { return json({ ok: false, error: "snapshot_store_write", snapshotStatus: "error" }, 503, env); }
+  }
+  // PRÉ-RENDERIZA o OG: aquece a Cache API da URL pública CANÔNICA (o link do cliente
+  // usa sempre o domínio custom — independe da origem desta chamada autenticada).
+  const base = ogClientBase("");
+  const shareUrl = base + "/share/cronograma/" + token;
+  const pt = PREMIUM_TYPES[typeKey];
+  try {
+    const warm = htmlResponseCacheable(shareCardHtml(base, token, pt), 200);
+    warm.headers.set("X-Share-Cache", "miss");
+    warm.headers.set("X-Share-Task", "resolved");
+    warm.headers.set("X-Share-Type", typeKey);
+    warm.headers.set("X-Share-Snapshot", "ready");
+    const warmKey = new Request(shareUrl, { method: "GET" });
+    if (ctx) ctx.waitUntil(caches.default.put(warmKey, warm));
+  } catch (_) { /* best-effort: o GET público lê do KV de qualquer forma */ }
+  console.log(`[SHARE-SNAPSHOT] ${reused ? "reuso" : "publicado"} id=${snapId} tipo=${typeKey} por=${maskUid(byUid)}`);
+  return json({
+    ok: true, snapshotId: snapId, token: token, shareUrl: shareUrl,
+    portalUrl: base + "/cliente/cronograma/" + token, snapshotStatus: "ready",
+    type: typeKey, imageUrl: base + pt.imgPath, createdAt: snap.createdAt,
+    contentHash: contentHash, reused: reused,
+  }, 200, env);
 }
 
 function isCrawlerUA(ua) {
@@ -495,6 +599,12 @@ export default {
       return handleSendPremiumWhatsApp(request, env, url.origin);
     }
 
+    // F3.3.73I6C23 — cria/reutiliza o SHARE SNAPSHOT do Card Premium (autenticação forte;
+    // o GET público /share passa a ler SOMENTE o snapshot — nunca OAuth/Firestore).
+    if (url.pathname === "/share-snapshot" && request.method === "POST") {
+      return handleShareSnapshotCreate(request, env, ctx, url);
+    }
+
     // V64.45 — sessão de EQUIPE: emite teamSessionJwt (HS256) após verificar a SENHA real
     // server-side + role Social/Admin ativo. Gated por env.TEAM_SESSION_SECRET (503 sem ele).
     if (url.pathname === "/team/session" && request.method === "POST") {
@@ -505,7 +615,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-golden-contract" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c23-share-snapshot" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
