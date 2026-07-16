@@ -6671,13 +6671,13 @@ function cronCtx(o){
       (shell.openExternal). NUNCA copiar/compartilhar/exibir essas URLs. */
 
 // API INTERNA do Worker (token/imagekit/notify) — SEMPRE workers.dev (sempre no ar; não depende de DNS).
-const CLIENT_REVIEW_BASE='https://idseven-push.agidseven.workers.dev';
+const CLIENT_REVIEW_BASE='https://idseven-push-qa.agidseven.workers.dev'; // F3.3.73I6C24 — BUILD QA: nunca producao
 // 1.0.121 — ENVIO PREMIUM AUTOMÁTICO (oficial): rota segura do Worker que envia a imagem real do
 // card + legenda + link via WhatsApp Business Cloud API (server-side; token da Meta NUNCA no client).
 const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE+'/client/send-premium-whatsapp';
 // 1.0.112 — LINK PÚBLICO PREMIUM do cliente (domínio da marca). O mesmo Worker atende este
 // subdomínio (rota Cloudflare aprovar.agendaidseven.com.br/*). Requer o DNS+Route aplicados.
-const CLIENT_LINK_BASE='https://aprovar.agendaidseven.com.br';
+const CLIENT_LINK_BASE='https://idseven-push-qa.agidseven.workers.dev'/* F3.3.73I6C24 — BUILD QA: Worker QA exclusivo */;
 // 1.0.119-whatsapp-media-card — imagem REAL do card premium (mesmo domínio), enviada como
 // mídia no WhatsApp. Rota servida pelo Worker (image/jpeg 1200×630, sem query).
 const CARD_IMG_URL='https://aprovar.agendaidseven.com.br/og/wa-card-v64-38.jpg';
@@ -8249,6 +8249,9 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   setTimeout(_hashCheck,800);
 })();
 /* ════════ FIM IN-APP-DIAGNOSTIC-V1 ════════ */
+</script>
+<script>/* F3.3.73I6C24 — BUILD QA: identificacao visual permanente; este build aponta para o Worker QA (idseven-push-qa) e NUNCA deve ser usado com clientes reais. */
+(function(){try{var b=document.createElement('div');b.textContent='AMBIENTE QA \u00b7 Worker QA (idseven-push-qa) \u00b7 build de teste \u2014 N\u00c3O usar com clientes';b.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:2147483647;background:#B45309;color:#fff;font:700 12px system-ui,Segoe UI,Roboto,Arial,sans-serif;text-align:center;padding:4px 8px;letter-spacing:.4px;pointer-events:none;opacity:.95';document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(b);});if(document.body)document.body.appendChild(b);}catch(_){}})();
 </script>
 </body>
 </html>

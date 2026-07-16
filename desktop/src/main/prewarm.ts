@@ -18,7 +18,7 @@ import { ipcMain } from "electron";
 import { diag } from "./diag";
 
 const SHARE_PATH = "/share/cronograma/";
-const HOST = "aprovar.agendaidseven.com.br";
+const HOST = "idseven-push-qa.agidseven.workers.dev"; // F3.3.73I6C24 — BUILD QA
 const TIMEOUT_MS = 12000;
 
 export function redactShareUrl(u: unknown): string {
