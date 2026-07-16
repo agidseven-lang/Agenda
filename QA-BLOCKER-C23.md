@@ -376,3 +376,55 @@ C24B (Cronograma/Roteiro/Nova tarefa). Expectativa técnica: os 3 botões
 habilitam com o host QA, "Link do &lt;tipo&gt; pronto para envio.", e o card
 aparece no WhatsApp Business QA. Só então **GO E2E QA** e
 **F3.3.73I6C25-PRODUCTION-CUTOVER-DESKTOP-1.0.171**.
+
+---
+
+# ADENDO F3.3.74B — SHARE NATIVO: Card Premium como IMAGEM REAL (candidata 1.0.172-QA)
+
+## Mudança de conceito (decisão funcional do owner)
+
+O envio **não depende mais do preview automático do link** no WhatsApp
+(Open Graph/prewarm/cache-HIT viraram **bônus**, nunca gate). O app gera
+nativamente o pacote de envio: **imagem premium real** (arte aprovada por
+tipo, byte-exata: v64-39 cron / v64-60 roteiro + faixa "Cliente ·
+quantidade"), **mensagem por tipo** com o link de aprovação (allowlist
+C24D) e **abertura assistida** do WhatsApp Business.
+
+## Novo fluxo físico (o que a equipe vai ver na 1.0.172-QA)
+
+1. Abrir a tarefa → "Enviar no grupo do cliente": o modal mostra
+   "Preparando o card premium do &lt;tipo&gt;…" e então a **prévia da imagem
+   REAL gerada** + "Card premium pronto para envio".
+2. Clicar **"Abrir WhatsApp Business"**: a IMAGEM vai ao clipboard
+   (read-back confirmado) e o WhatsApp abre. No grupo: **colar (Ctrl+V) a
+   imagem e enviar**; depois **"Copiar mensagem"** e colar/enviar (é a
+   mensagem que leva o link de aprovação). Botões extras: Copiar link /
+   Testar link / Regenerar card.
+3. Critério de sucesso FÍSICO: **imagem premium real enviada no grupo** +
+   mensagem com link funcional (portal abre; aprovação flui). O preview
+   automático do link, se aparecer, é bônus — NÃO é critério.
+4. Limite honesto da plataforma: o WhatsApp não permite envio 100%
+   automático em grupo; o clipboard segura UM item por vez (imagem OU
+   texto) — por isso o fluxo é assistido em 2 colagens.
+
+## Candidata FÍSICA a instalar (substitui 1.0.171-QA) — build run 227 (`29535973035`)
+
+| Item | Valor |
+|---|---|
+| Versão | **1.0.172-QA** |
+| Branch/commit | `desktop/f3374b-qa-1.0.172-qa` @ `fb3b546` |
+| EXE | `Agenda-ID-Seven-Desktop-1.0.172-QA-x64.exe` |
+| SHA-256 EXE | `aac6be0069bef548bb0e6c38e083c75fa3159eb1c4dcc4f7431d4c9a53ff82c0` |
+| MSI | `Agenda-ID-Seven-Desktop-1.0.172-QA-x64.msi` |
+| SHA-256 MSI | `56fec965ac7c25bb13053bc03e7c7dd367150a207a131351f58ab3a9057e513e` |
+| Artifact installer | `8390594819` |
+| Artifact bundle | `8390598240` |
+| Banner permanente | "AMBIENTE QA — NÃO USAR COM CLIENTES" |
+| Gate empacotado (app.asar) | verde no run 227 (validateShareUrl/allowlist QA/textos por setor) |
+
+Provas técnicas: suíte 74B `f3374b-share-package.test.mjs` **36/36** (artes
+embutidas byte-exatas sha256 `c038636d…`/`f64f6f3e…`; tipos fortes; matriz de
+negativos; fiação do modal); sweep integral **verde**; tsc limpo; **cards REAIS
+gerados pelo código do renderer em Chromium headless** (1200×630 PNG, cron +
+roteiro) entregues como evidência visual. Produção intocada (Desktop 1.0.168;
+Worker `V64.59-c20-golden-contract`).
