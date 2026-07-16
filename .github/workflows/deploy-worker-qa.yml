@@ -8,8 +8,10 @@
 #   ready + OG exato + canonical + imagens por SHA-256 + HIT no 2o GET +
 #   HEAD text/html; NOT_FOUND → 404 explicito no-store sem card de tipo;
 #   endpoint /share-snapshot: 401 sem credencial, 400 body invalido com
-#   a chave QA, 502 explicito no caminho Firestore (QA NAO tem credencial
-#   FCM por design — o caminho Firestore-dependente e provado no Golden
+#   a chave QA; no caminho Firestore, DOIS mundos objetivos (C24A):
+#   com credencial GCP no repo => leitura REAL de Firestore e taskId
+#   sintetico inexistente responde 404 task_not_found (cadeia completa);
+#   sem credencial => 502 explicito (mundo pre-C24A, coberto no Golden
 #   Master hermetico); /sla-* 403; PRODUCAO INTOCADA (gate final confere
 #   que idseven-push segue exatamente na versao atual de producao).
 # NUNCA toca o servico de producao, seus secrets, rotas ou variaveis.
@@ -111,10 +113,31 @@ jobs:
           echo "namespace QA id: $NSID"
 
       - name: "Deploy QA — wrangler deploy (servico proprio; producao intocada)"
+        env:
+          GCP_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
           set -euo pipefail
           mkdir -p qa-ops
-          sed "s/__QA_NAMESPACE_ID__/$NSID/" wrangler.qa.toml > wrangler.qa.final.toml
+          # C24A: com credencial GCP no repo, a var FCM_PROJECT_ID aponta o projeto
+          # REAL (leitura de Firestore em QA; secrets FCM_* ja gravados pelo workflow
+          # ops-qa-secrets-c24a persistem no deploy). Sem credencial, mantem o valor
+          # do template (mundo pre-C24A: caminho Firestore responde 502 explicito).
+          QA_FS=off
+          PROJ=""
+          if [ -n "$GCP_JSON" ]; then
+            PROJ=$(printf '%s' "$GCP_JSON" | jq -r '.project_id' | tr -d '\n')
+            echo "$PROJ" | grep -Eq '^[a-z][a-z0-9-]{4,28}[a-z0-9]$' || { echo "::error::project_id da SA em formato inesperado"; exit 1; }
+            QA_FS=on
+          fi
+          if [ "$QA_FS" = "on" ]; then
+            sed -e "s/__QA_NAMESPACE_ID__/$NSID/" \
+                -e "s/^FCM_PROJECT_ID = .*/FCM_PROJECT_ID = \"$PROJ\"/" wrangler.qa.toml > wrangler.qa.final.toml
+            grep -q "^FCM_PROJECT_ID = \"$PROJ\"\$" wrangler.qa.final.toml || { echo "::error::var FCM_PROJECT_ID nao ajustada"; exit 1; }
+          else
+            sed "s/__QA_NAMESPACE_ID__/$NSID/" wrangler.qa.toml > wrangler.qa.final.toml
+          fi
+          echo "QA_FS=$QA_FS" >> "$GITHUB_ENV"
+          echo "modo Firestore em QA: $QA_FS"
           grep -q "id = \"$NSID\"" wrangler.qa.final.toml
           npx --yes wrangler@4 deploy --config wrangler.qa.final.toml 2>&1 | tee qa-ops/deploy-qa.txt
           grep -q "idseven-push-qa" qa-ops/deploy-qa.txt || { echo "::error::deploy QA nao confirmou o nome"; exit 1; }
@@ -234,7 +257,7 @@ jobs:
           [ "$ST2" = "404" ] && case "$(hv x-share-cache qa-ops/h-nf2.txt)" in *bypass*) : ;; *) echo "::error::not_found cacheou"; exit 1;; esac
           echo "OK: NOT_FOUND explicito, com portal manual, nunca cacheado"
 
-      - name: "L3-QA — endpoint /share-snapshot (auth real; Firestore fora do escopo QA)"
+      - name: "L3-QA — endpoint /share-snapshot (auth real; caminho Firestore conforme o mundo)"
         run: |
           set -euo pipefail
           C1=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -d '{"taskId":"qa1","expectedType":"cronograma"}' -o qa-ops/e1.json -w '%{http_code}' "$QA_URL/share-snapshot")
@@ -242,21 +265,58 @@ jobs:
           C2=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: $(cat "$RUNNER_TEMP/qa_key")" -d '{"taskId":"","expectedType":"x"}' -o qa-ops/e2.json -w '%{http_code}' "$QA_URL/share-snapshot")
           [ "$C2" = "400" ] || { echo "::error::body invalido com chave QA deveria ser 400 (foi $C2)"; exit 1; }
           # C3 com tolerancia de PROPAGACAO: 'wrangler secret put' cria NOVA versao do
-          # worker (run 4 provou: colo ainda na versao anterior respondia 401 com a chave
-          # nova). Poll ate a chave valer: 502 = chave aceita + caminho Firestore explicito
-          # (sucesso); 401 transitorio = versao antiga (aguardar); outro codigo = falha real.
+          # worker (run 4 provou: colo na versao anterior respondia 401 com a chave nova)
+          # e o deploy tambem propaga por versao. Mundos objetivos (decididos no deploy):
+          #   QA_FS=on  => leitura REAL de Firestore: taskId sintetico INEXISTENTE responde
+          #               404 task_not_found (prova a cadeia key->OAuth->Firestore; nada e
+          #               escrito). 401/502 sao transitorios de propagacao.
+          #   QA_FS=off => sem credencial GCP: 502 explicito (auth indisponivel);
+          #               401 transitorio de propagacao.
+          if [ "$QA_FS" = "on" ]; then EXP=404; else EXP=502; fi
           C3=""
-          DEADLINE3=$(( $(date +%s) + 90 ))
+          DEADLINE3=$(( $(date +%s) + 120 ))
           while :; do
             C3=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: $(cat "$RUNNER_TEMP/qa_key")" -d '{"taskId":"qa-task-sintetica","expectedType":"cronograma"}' -o qa-ops/e3.json -w '%{http_code}' "$QA_URL/share-snapshot")
-            [ "$C3" = "502" ] && break
-            if [ "$C3" = "401" ] && [ "$(date +%s)" -lt "$DEADLINE3" ]; then sleep 3; continue; fi
-            echo "::error::caminho Firestore em QA deveria ser 502 explicito (foi $C3)"; exit 1
+            [ "$C3" = "$EXP" ] && break
+            if { [ "$C3" = "401" ] || [ "$C3" = "502" ]; } && [ "$(date +%s)" -lt "$DEADLINE3" ]; then sleep 3; continue; fi
+            echo "::error::caminho Firestore em QA deveria ser $EXP (foi $C3)"; jq -c '{ok,error}' qa-ops/e3.json || true; exit 1
           done
-          grep -q "auth indisponível" qa-ops/e3.json || { echo "::error::502 sem mensagem explicita"; exit 1; }
+          if [ "$EXP" = "404" ]; then
+            grep -q 'task_not_found' qa-ops/e3.json || { echo "::error::404 sem task_not_found"; exit 1; }
+            MSG="404 task_not_found com Firestore REAL (somente leitura; se falhar com 502 persistente, rodar ops-qa-secrets-c24a.yml)"
+          else
+            grep -q "auth indisponível" qa-ops/e3.json || { echo "::error::502 sem mensagem explicita"; exit 1; }
+            MSG="502 explicito no caminho Firestore (QA sem credencial GCP — coberto no Golden Master hermetico)"
+          fi
           C4=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: chave-errada" -d '{"taskId":"qa1","expectedType":"cronograma"}' -o /dev/null -w '%{http_code}' "$QA_URL/share-snapshot")
           [ "$C4" = "401" ] || { echo "::error::chave errada deveria ser 401 (foi $C4)"; exit 1; }
-          echo "OK: 401 sem credencial/chave errada; 400 body invalido; 502 explicito no caminho Firestore (QA sem FCM por design — coberto no Golden Master hermetico)"
+          echo "OK: 401 sem credencial/chave errada; 400 body invalido; $MSG"
+
+      - name: "L3-QA — portal do cliente acessivel (rota /cliente/ executa no worker QA)"
+        run: |
+          set -euo pipefail
+          # QA_FS=on: token sintetico INEXISTENTE => 404 HTML amigavel "Cronograma não
+          # encontrado" — prova que o PORTAL consultou o Firestore REAL (somente leitura)
+          # e respondeu a pagina do worker (nunca tela branca/JSON). 200 aqui seria
+          # gravissimo (token sintetico casando com tarefa real) => falha imediata.
+          # QA_FS=off: sem credencial GCP => 503 amigavel ("Não foi possível carregar").
+          if [ "$QA_FS" = "on" ]; then PEXP=404; else PEXP=503; fi
+          P=""
+          DEADLINEP=$(( $(date +%s) + 90 ))
+          while :; do
+            P=$(curl -sS --max-time 30 -D qa-ops/h-portal.txt -o qa-ops/b-portal.html -w '%{http_code}' "$QA_URL/cliente/cronograma/$T_NF")
+            [ "$P" = "$PEXP" ] && break
+            if [ "$P" = "503" ] && [ "$(date +%s)" -lt "$DEADLINEP" ]; then sleep 3; continue; fi
+            echo "::error::portal QA deveria responder $PEXP para token sintetico (foi $P)"; exit 1
+          done
+          grep -qi '^content-type: text/html' qa-ops/h-portal.txt || { echo "::error::portal sem text/html"; exit 1; }
+          if [ "$PEXP" = "404" ]; then
+            grep -q "Cronograma não encontrado" qa-ops/b-portal.html || { echo "::error::404 do portal sem pagina amigavel"; exit 1; }
+            echo "OK: portal acessivel no worker QA — consulta REAL ao Firestore (leitura) e 404 amigavel p/ token sintetico"
+          else
+            grep -q "Não foi possível carregar" qa-ops/b-portal.html || { echo "::error::503 do portal sem pagina amigavel"; exit 1; }
+            echo "OK: portal acessivel no worker QA — 503 amigavel sem credencial GCP (mundo pre-C24A)"
+          fi
 
       - name: "L3-QA — /sla-* 403 (paridade de seguranca)"
         run: |
