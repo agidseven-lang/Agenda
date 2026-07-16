@@ -241,8 +241,18 @@ jobs:
           [ "$C1" = "401" ] || { echo "::error::sem credencial deveria ser 401 (foi $C1)"; exit 1; }
           C2=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: $(cat "$RUNNER_TEMP/qa_key")" -d '{"taskId":"","expectedType":"x"}' -o qa-ops/e2.json -w '%{http_code}' "$QA_URL/share-snapshot")
           [ "$C2" = "400" ] || { echo "::error::body invalido com chave QA deveria ser 400 (foi $C2)"; exit 1; }
-          C3=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: $(cat "$RUNNER_TEMP/qa_key")" -d '{"taskId":"qa-task-sintetica","expectedType":"cronograma"}' -o qa-ops/e3.json -w '%{http_code}' "$QA_URL/share-snapshot")
-          [ "$C3" = "502" ] || { echo "::error::caminho Firestore em QA deveria ser 502 explicito (foi $C3)"; exit 1; }
+          # C3 com tolerancia de PROPAGACAO: 'wrangler secret put' cria NOVA versao do
+          # worker (run 4 provou: colo ainda na versao anterior respondia 401 com a chave
+          # nova). Poll ate a chave valer: 502 = chave aceita + caminho Firestore explicito
+          # (sucesso); 401 transitorio = versao antiga (aguardar); outro codigo = falha real.
+          C3=""
+          DEADLINE3=$(( $(date +%s) + 90 ))
+          while :; do
+            C3=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: $(cat "$RUNNER_TEMP/qa_key")" -d '{"taskId":"qa-task-sintetica","expectedType":"cronograma"}' -o qa-ops/e3.json -w '%{http_code}' "$QA_URL/share-snapshot")
+            [ "$C3" = "502" ] && break
+            if [ "$C3" = "401" ] && [ "$(date +%s)" -lt "$DEADLINE3" ]; then sleep 3; continue; fi
+            echo "::error::caminho Firestore em QA deveria ser 502 explicito (foi $C3)"; exit 1
+          done
           grep -q "auth indisponível" qa-ops/e3.json || { echo "::error::502 sem mensagem explicita"; exit 1; }
           C4=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: chave-errada" -d '{"taskId":"qa1","expectedType":"cronograma"}' -o /dev/null -w '%{http_code}' "$QA_URL/share-snapshot")
           [ "$C4" = "401" ] || { echo "::error::chave errada deveria ser 401 (foi $C4)"; exit 1; }
