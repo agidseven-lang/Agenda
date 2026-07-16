@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.167",
-  "description": "Agenda ID Seven Desktop — link de aprovação ESTÁVEL por tarefa (token nunca rotaciona em reenvio)",
+  "version": "1.0.168",
+  "description": "Agenda ID Seven Desktop — Golden Master integrado: link estável + Card Premium só com resolved/type/HIT comprovados",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

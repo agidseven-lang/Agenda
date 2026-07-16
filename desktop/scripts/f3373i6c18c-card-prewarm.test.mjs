@@ -35,6 +35,9 @@ function fnTs(name) {
   rest = rest.replace(/\(u: unknown\): string/, '(u)').replace(/\(u: unknown\): boolean/, '(u)');
   rest = rest.replace(/\(html: unknown, url: unknown, expectedType: unknown\): \{ ok: boolean; reason\?: string \}/, '(html, url, expectedType)');
   rest = rest.replace(/\(url: string, expectedType: string\): Promise<Record<string, unknown>>/, '(url, expectedType)');
+  rest = rest.replace(/\(g: ShareFetch, url: string, expectedType: string\): \{ ok: boolean; reason\?: string \}/, '(g, url, expectedType)');
+  rest = rest.replace(/\(html: unknown\): string/, '(html)');
+  rest = rest.replace(/\(imgUrl: string, timeoutMs: number\): Promise<boolean>/, '(imgUrl, timeoutMs)');
   rest = rest.replace(/let x: URL;/, 'let x;');
   let d = 0; const i = rest.indexOf('{');
   for (let j = i; j < rest.length; j++) { const c = rest[j]; if (c === '{') d++; else if (c === '}') { d--; if (!d) return rest.slice(0, j + 1); } }
@@ -42,10 +45,10 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão da baseline atual (1.0.167 — C18H)', PJ.version === '1.0.167' && (S('package-lock.json').includes('"version": "1.0.167"')));
+ok('A1 versão da baseline atual (1.0.168 — C20)', PJ.version === '1.0.168' && (S('package-lock.json').includes('"version": "1.0.168"')));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
-const MODC = 'const SHARE_PATH = "/share/cronograma/";\n';
+const MODC = 'const SHARE_PATH = "/share/cronograma/";\nconst HOST = "aprovar.agendaidseven.com.br";\n';
 const vURL = new Function(MODC + fnTs('isAllowedShareUrl') + '\nreturn isAllowedShareUrl;')();
 const GOOD = 'https://aprovar.agendaidseven.com.br/share/cronograma/abcDEF1234_-';
 ok('B1 URL válida aceita', vURL(GOOD) === true);
@@ -87,48 +90,53 @@ ok('D4 OG incompleto rejeitado (gate 10: sem og:image)',
 ok('D5 og:url divergente rejeitado', vOG(mkHtml('Aprovar cronograma').replace(GOOD, GOOD + 'X'), GOOD, 'cronograma').ok === false);
 ok('D6 cronograma sem título esperado rejeitado', vOG(mkHtml('Pagina qualquer'), GOOD, 'cronograma').ok === false);
 
-/* ── E: prepareCardOnce com fetch STUBADO (gates 7/8/14/15, micro-exec) ── */
+/* ── E: prepareCardOnce com fetch STUBADO (CONTRATO C20, micro-exec) ── */
 const prepSrc = fnTs('prepareCardOnce');
-const mkPrep = (script) => {
-  // script: array de respostas na ordem dos GETs
-  let call = 0;
+const legSrc = fnTs('checkLeg');
+const exImgSrc = fnTs('extractOgImage');
+const mkPrep = (script, imgOk = true) => {
+  let call = 0; let imgCalls = 0;
   const fetchShare = async () => { const r = script[Math.min(call, script.length - 1)]; call++; return r; };
-  const validateOgHtml = vOG;
-  const api = new Function('fetchShare', 'validateOgHtml', 'const TIMEOUT_MS=12000;\n' + prepSrc + '\nreturn prepareCardOnce;')(fetchShare, validateOgHtml);
-  return { api, calls: () => call };
+  const fetchOgImageOk = async () => { imgCalls++; return imgOk; };
+  const api = new Function('fetchShare', 'validateOgHtml', 'fetchOgImageOk', 'const TIMEOUT_MS=12000;\n' + exImgSrc + '\n' + legSrc + '\n' + prepSrc + '\nreturn prepareCardOnce;')(fetchShare, vOG, fetchOgImageOk);
+  return { api, calls: () => call, imgCalls: () => imgCalls };
 };
 const okHtmlCron = mkHtml('Aprovar cronograma');
 const okHtmlRot = mkHtml('Aprovar roteiro');
+const R = (over) => Object.assign({ ok: true, status: 200, contentType: 'text/html; charset=utf-8', xShareCache: 'miss', xShareTask: 'resolved', xShareType: 'roteiro', elapsedMs: 900, html: okHtmlRot }, over);
 await (async () => {
-  // E1 — fluxo feliz: GET#1 miss válido prepara; GET#2 HIT confirma (gates 14+15)
-  const p1 = mkPrep([
-    { ok: true, status: 200, contentType: 'text/html; charset=utf-8', xShareCache: 'miss', elapsedMs: 900, html: okHtmlRot },
-    { ok: true, status: 200, contentType: 'text/html; charset=utf-8', xShareCache: 'hit', elapsedMs: 120, html: okHtmlRot },
-  ]);
+  // E1 — fluxo feliz C20: GET#1 resolved+type + imagem ok + GET#2 resolved+type+HIT
+  const p1 = mkPrep([R({}), R({ xShareCache: 'hit', elapsedMs: 120 })]);
   const r1 = await p1.api(GOOD, 'roteiro');
-  ok('E1 GET#1 prepara + GET#2 com X-Share-Cache=hit confirma (roteiro OK; 2 GETs)', r1.ok === true && r1.cache === 'hit' && p1.calls() === 2);
-  // E2 — alternativa DOCUMENTADA: sem header, 2ª resposta válida + latência aquecida
-  const p2 = mkPrep([
-    { ok: true, status: 200, contentType: 'text/html', xShareCache: '', elapsedMs: 1000, html: okHtmlCron },
-    { ok: true, status: 200, contentType: 'text/html', xShareCache: '', elapsedMs: 300, html: okHtmlCron },
-  ]);
+  ok('E1 contrato pleno: resolved+type+OG+imagem+HIT → sucesso (2 GETs + 1 imagem)', r1.ok === true && r1.cache === 'hit' && p1.calls() === 2 && p1.imgCalls() === 1);
+  // E2 — atalho sem header REMOVIDO: resposta sem X-Share-Task NUNCA é sucesso
+  const p2 = mkPrep([R({ xShareTask: '', xShareType: '', html: okHtmlCron }), R({ xShareTask: '', xShareType: '', html: okHtmlCron, elapsedMs: 300 })]);
   const r2 = await p2.api(GOOD, 'cronograma');
-  ok('E2 alternativa sem header: 2ª resposta válida+aquecida → aquecido_sem_header', r2.ok === true && r2.cache === 'aquecido_sem_header');
-  // E3 — sem header e SEM aquecimento → cache_nao_confirmado (timeout nunca vira sucesso)
-  const p3 = mkPrep([
-    { ok: true, status: 200, contentType: 'text/html', xShareCache: '', elapsedMs: 900, html: okHtmlCron },
-    { ok: true, status: 200, contentType: 'text/html', xShareCache: '', elapsedMs: 1900, html: okHtmlCron },
-  ]);
-  const r3 = await p3.api(GOOD, 'cronograma');
+  ok('E2 [C20] sem X-Share-Task → task_nao_resolvida (fim do aquecido_sem_header)', r2.ok === false && r2.reason === 'task_nao_resolvida');
+  // E3 — resolved mas SEM hit no GET#2 → cache_nao_confirmado
+  const p3 = mkPrep([R({}), R({ xShareCache: '' })]);
+  const r3 = await p3.api(GOOD, 'roteiro');
   ok('E3 cache não confirmado → FALHA (não libera WhatsApp)', r3.ok === false && r3.reason === 'cache_nao_confirmado');
-  // E4 — JSON rejeitado (gate 8) / rede-timeout rejeitado
+  // E4 — JSON rejeitado no GET#1
   const p4 = mkPrep([{ ok: false, reason: 'resposta_json', elapsedMs: 40 }]);
   const r4 = await p4.api(GOOD, 'cronograma');
   ok('E4 resposta JSON rejeitada no GET#1', r4.ok === false && r4.reason === 'resposta_json' && r4.step === 'get1');
-  // E5 — roteiro recebendo OG de cronograma no GET#1 → falha imediata
-  const p5 = mkPrep([{ ok: true, status: 200, contentType: 'text/html', xShareCache: 'miss', elapsedMs: 500, html: okHtmlCron }]);
+  // E5 — headers de roteiro mas HTML de cronograma → detecção textual preservada
+  const p5 = mkPrep([R({ html: okHtmlCron })]);
   const r5 = await p5.api(GOOD, 'roteiro');
-  ok('E5 tipo trocado detectado no OG do GET#1 (roteiro nunca sai como cronograma)', r5.ok === false && r5.reason === 'roteiro_recebeu_og_de_cronograma');
+  ok('E5 roteiro nunca sai como cronograma (OG textual)', r5.ok === false && r5.reason === 'roteiro_recebeu_og_de_cronograma');
+  // E6 — X-Share-Type divergente do esperado → falha por header
+  const p6 = mkPrep([R({ xShareType: 'cronograma', html: okHtmlCron })]);
+  const r6 = await p6.api(GOOD, 'roteiro');
+  ok('E6 [C20] X-Share-Type divergente → tipo_header_divergente', r6.ok === false && r6.reason === 'tipo_header_divergente');
+  // E7 — not_found do contrato nunca vira sucesso (e é definitivo)
+  const p7 = mkPrep([{ ok: false, reason: 'task_not_found', status: 404, xShareTask: 'not_found', elapsedMs: 200 }]);
+  const r7 = await p7.api(GOOD, 'roteiro');
+  ok('E7 [C20] task_not_found → falha explícita', r7.ok === false && r7.reason === 'task_not_found');
+  // E8 — imagem OG inacessível bloqueia
+  const p8 = mkPrep([R({}), R({ xShareCache: 'hit' })], false);
+  const r8 = await p8.api(GOOD, 'roteiro');
+  ok('E8 [C20] imagem inacessível → imagem_inacessivel (WhatsApp fechado)', r8.ok === false && r8.reason === 'imagem_inacessivel' && r8.step === 'img');
 })();
 
 /* ── F: fetch real do main — pins de fonte (gates 7/8/9 + timeout) ── */

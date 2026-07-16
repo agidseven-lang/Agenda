@@ -1,23 +1,24 @@
 /* =====================================================================
-   F3.3.73I6C18C — PREWARM do Card Premium (processo MAIN; IPC restrito).
-   Prepara e VALIDA o link /share ANTES de o renderer abrir o WhatsApp:
-     GET#1 (status/Content-Type/OG completo/og:url exato/TIPO esperado)
-     → GET#2 (confirma cache: X-Share-Cache=hit preferencial; alternativa
-       DOCUMENTADA somente se o header não vier).
-   SEGURANÇA:
-     - operação LIMITADA a https://aprovar.agendaidseven.com.br/share/cronograma/<token>
-       (sem bridge genérica de rede; qualquer outra URL é rejeitada);
-     - token NUNCA é logado — logs usam /share/cronograma/<token-redacted>;
-     - somente GET read-only; sem Firestore; sem escrita; sem aprovação;
-     - redirect (3xx) é REJEITADO (redirect:"manual");
-     - timeout por tentativa NUNCA vira sucesso;
-     - PROIBIDO fallback que classifique Roteiro como Cronograma: se uma
-       tarefa de Roteiro receber OG de Cronograma, a preparação FALHA.
+   F3.3.73I6C18C + F3.3.73I6C20 — PREWARM do Card Premium (processo MAIN).
+   Prepara e VALIDA o link /share ANTES de o renderer abrir o WhatsApp.
+   CONTRATO C20 (cumulativo — QUALQUER divergência = falha, WhatsApp fechado):
+     GET#1: 200 + text/html + X-Share-Task=resolved + X-Share-Type=<tipo
+            esperado> + OG completo (title/description/image/url) + og:url
+            EXATO + confirmação textual do tipo;
+     IMAGEM: og:image acessível (200 + image/jpeg) no MESMO domínio;
+     GET#2: mesmas exigências + X-Share-Cache=hit (o WhatsApp NUNCA deve
+            raspar antes de existir HIT tipado) + mesmo X-Share-Type.
+   not_found/error NUNCA viram sucesso (nem por velocidade); NÃO existe
+   sucesso alternativo sem prova de cache (o antigo atalho sem header foi REMOVIDO).
+   SEGURANÇA: só https://aprovar.agendaidseven.com.br/share/cronograma/<token>
+   (sem bridge genérica); token NUNCA logado (<token-redacted>); GET read-only;
+   redirect 3xx rejeitado; timeout NUNCA é sucesso.
    ===================================================================== */
 import { ipcMain } from "electron";
 import { diag } from "./diag";
 
 const SHARE_PATH = "/share/cronograma/";
+const HOST = "aprovar.agendaidseven.com.br";
 const TIMEOUT_MS = 12000;
 
 export function redactShareUrl(u: unknown): string {
@@ -28,12 +29,19 @@ export function redactShareUrl(u: unknown): string {
 export function isAllowedShareUrl(u: unknown): boolean {
   let x: URL; try { x = new URL(String(u)); } catch { return false; }
   if (x.protocol !== "https:") return false;
-  if (x.hostname !== "aprovar.agendaidseven.com.br") return false;
+  if (x.hostname !== HOST) return false;
   if (x.port && x.port !== "443") return false;
   if (x.username || x.password || x.search || x.hash) return false;
   if (!x.pathname.startsWith(SHARE_PATH)) return false;
   const token = x.pathname.slice(SHARE_PATH.length).replace(/\/$/, "");
   return /^[A-Za-z0-9_-]{4,128}$/.test(token);
+}
+
+/* imagem OG: mesmo host, https, path /og/*.jpg — nada além disso é buscável */
+export function isAllowedOgImageUrl(u: unknown): boolean {
+  let x: URL; try { x = new URL(String(u)); } catch { return false; }
+  return x.protocol === "https:" && x.hostname === HOST && !x.search && !x.hash &&
+    /^\/og\/[A-Za-z0-9._-]+\.jpg$/.test(x.pathname);
 }
 
 export function validateOgHtml(html: unknown, url: unknown, expectedType: unknown): { ok: boolean; reason?: string } {
@@ -54,7 +62,12 @@ export function validateOgHtml(html: unknown, url: unknown, expectedType: unknow
   return { ok: false, reason: "tipo_nao_confirmado" };
 }
 
-type ShareFetch = { ok: boolean; reason?: string; status?: number; contentType?: string; xShareCache?: string; elapsedMs: number; html?: string };
+export function extractOgImage(html: unknown): string {
+  const m = String(html || "").match(/property="og:image" content="([^"]+)"/);
+  return m ? m[1] : "";
+}
+
+type ShareFetch = { ok: boolean; reason?: string; status?: number; contentType?: string; xShareCache?: string; xShareTask?: string; xShareType?: string; elapsedMs: number; html?: string };
 
 async function fetchShare(url: string, timeoutMs: number): Promise<ShareFetch> {
   const ac = new AbortController();
@@ -66,36 +79,59 @@ async function fetchShare(url: string, timeoutMs: number): Promise<ShareFetch> {
     const status = res.status;
     const contentType = String(res.headers.get("content-type") || "");
     const xShareCache = String(res.headers.get("x-share-cache") || "");
+    const xShareTask = String(res.headers.get("x-share-task") || "");
+    const xShareType = String(res.headers.get("x-share-type") || "");
     if (status >= 300 && status < 400) return { ok: false, reason: "redirect_bloqueado", status, elapsedMs };
+    // contrato C20: not_found/error são estados EXPLÍCITOS — nunca sucesso.
+    if (xShareTask === "not_found") return { ok: false, reason: "task_not_found", status, xShareTask, elapsedMs };
+    if (xShareTask === "error") return { ok: false, reason: "task_error", status, xShareTask, elapsedMs };
     if (status !== 200) return { ok: false, reason: "http_" + status, status, elapsedMs };
     if (contentType.indexOf("text/html") < 0) {
       return { ok: false, reason: contentType.indexOf("application/json") >= 0 ? "resposta_json" : "content_type_invalido", status, contentType, elapsedMs };
     }
     const html = await res.text();
-    return { ok: true, status, contentType, xShareCache, elapsedMs, html };
+    return { ok: true, status, contentType, xShareCache, xShareTask, xShareType, elapsedMs, html };
   } catch {
     // rede caiu OU o timeout abortou — timeout NUNCA é tratado como sucesso
     return { ok: false, reason: "rede_ou_timeout", elapsedMs: Date.now() - t0 };
   } finally { clearTimeout(timer); }
 }
 
+async function fetchOgImageOk(imgUrl: string, timeoutMs: number): Promise<boolean> {
+  if (!isAllowedOgImageUrl(imgUrl)) return false;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(imgUrl, { method: "GET", redirect: "manual", signal: ac.signal });
+    const ct = String(res.headers.get("content-type") || "");
+    return res.status === 200 && ct.indexOf("image/jpeg") >= 0;
+  } catch { return false; } finally { clearTimeout(timer); }
+}
+
+function checkLeg(g: ShareFetch, url: string, expectedType: string): { ok: boolean; reason?: string } {
+  if (!g.ok) return { ok: false, reason: g.reason };
+  if (g.xShareTask !== "resolved") return { ok: false, reason: "task_nao_resolvida" };
+  if (g.xShareType !== expectedType) return { ok: false, reason: "tipo_header_divergente" };
+  const v = validateOgHtml(g.html, url, expectedType);
+  if (!v.ok) return { ok: false, reason: v.reason };
+  return { ok: true };
+}
+
 async function prepareCardOnce(url: string, expectedType: string): Promise<Record<string, unknown>> {
   const g1 = await fetchShare(url, TIMEOUT_MS);
-  if (!g1.ok) return { ok: false, step: "get1", reason: g1.reason };
-  const v1 = validateOgHtml(g1.html, url, expectedType);
-  if (!v1.ok) return { ok: false, step: "og1", reason: v1.reason };
+  const c1 = checkLeg(g1, url, expectedType);
+  if (!c1.ok) return { ok: false, step: "get1", reason: c1.reason };
+  const img = extractOgImage(g1.html);
+  const imgOk = await fetchOgImageOk(img, TIMEOUT_MS);
+  if (!imgOk) return { ok: false, step: "img", reason: "imagem_inacessivel" };
   const g2 = await fetchShare(url, TIMEOUT_MS);
-  if (!g2.ok) return { ok: false, step: "get2", reason: g2.reason };
-  const v2 = validateOgHtml(g2.html, url, expectedType);
-  if (!v2.ok) return { ok: false, step: "og2", reason: v2.reason };
+  const c2 = checkLeg(g2, url, expectedType);
+  if (!c2.ok) return { ok: false, step: "get2", reason: c2.reason };
+  if (g2.xShareType !== g1.xShareType) return { ok: false, step: "get2", reason: "tipo_divergente_entre_gets" };
+  // prova de cache OBRIGATÓRIA: o WhatsApp só pode raspar depois de existir HIT tipado.
   const hit = /hit/i.test(String(g2.xShareCache || ""));
-  // PREFERENCIAL: header X-Share-Cache=hit (C18B) prova o cache de borda preparado.
-  // ALTERNATIVA DOCUMENTADA (somente se o header NÃO estiver disponível — ex.: proxy
-  // corporativo removendo headers): 2ª resposta VÁLIDA, MESMO OG esperado, latência
-  // compatível com resposta aquecida (≤ GET#1 e < 1200 ms) e nenhuma nova falha.
-  const aquecidoSemHeader = !g2.xShareCache && g2.elapsedMs < 1200 && g2.elapsedMs <= g1.elapsedMs;
-  if (!hit && !aquecidoSemHeader) return { ok: false, step: "cache", reason: "cache_nao_confirmado" };
-  return { ok: true, cache: hit ? "hit" : "aquecido_sem_header", get1Ms: g1.elapsedMs, get2Ms: g2.elapsedMs };
+  if (!hit) return { ok: false, step: "cache", reason: "cache_nao_confirmado" };
+  return { ok: true, cache: "hit", get1Ms: g1.elapsedMs, get2Ms: g2.elapsedMs };
 }
 
 /* single-flight por URL: cliques/chamadas duplicadas reaproveitam a MESMA preparação */
@@ -118,6 +154,8 @@ export function registerPrewarmIpc(): void {
         last = await prepareCardOnce(url, tipo);
         diag("prewarm.tentativa", { n: i + 1, ok: last.ok, step: last.step, reason: last.reason, cache: last.cache, get1Ms: last.get1Ms, get2Ms: last.get2Ms, tipo, url: redactShareUrl(url) });
         if (last.ok) break;
+        // not_found é DEFINITIVO para esta URL (tarefa não existe): retry não muda o fato.
+        if (last.reason === "task_not_found") break;
       }
       return last;
     })();
