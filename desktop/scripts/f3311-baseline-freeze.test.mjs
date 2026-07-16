@@ -29,7 +29,7 @@ ok('A1 helper withWhatsAppPreviewBust existe (?/& + v=Date.now())', /function wi
 // (commit 6d46bce — owner: "sem cache-bust agora"). Link ESTAVEL por cliente na mensagem.
 ok('A2 buildClientMessage usa o link /share ESTAVEL (sem cache-bust — D3R10AA/6d46bce)', /const url=buildShareClientUrl\(ctx&&ctx\.token\);/.test(DH));
 ok('A3 buildShareClientUrl = /share/cronograma/<token> (rota/dominio congelados)', /function buildShareClientUrl\(token\)\{[\s\S]*?CLIENT_LINK_BASE\+'\/share\/cronograma\/'\+t/.test(DH));
-ok('A4 dominio premium congelado', /const CLIENT_LINK_BASE='https:\/\/aprovar\.agendaidseven\.com\.br'/.test(DH));
+ok('A4 [QA] dominio congelado re-baseline p/ host QA (flavor 1.0.170-QA; link publico = Worker QA)', /const CLIENT_LINK_BASE='https:\/\/idseven-push-qa\.agidseven\.workers\.dev'/.test(DH));
 // cache-bust SOMENTE no link da mensagem: exatamente 1 call-site (em buildClientMessage)
 ok('A5 cache-bust FORA da mensagem (0 call-sites em buildClientMessage — D3R10AA)', (DH.match(/withWhatsAppPreviewBust\(buildShareClientUrl/g)||[]).length === 0);
 // o link SALVO no Firestore (clientReviewUrl) NAO leva cache-bust (usa buildPublicClientUrl puro)

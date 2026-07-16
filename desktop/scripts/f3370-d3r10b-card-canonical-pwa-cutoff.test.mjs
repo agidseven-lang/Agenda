@@ -255,7 +255,7 @@ function ok(cond, msg) { if (cond) { pass++; console.log('  PASS — ' + msg); }
   const M3 = new Function('Date', SRC3 + '\nreturn {buildShareClientUrl,buildClientMessage,withWhatsAppPreviewBust};')(Date);
   const tok = 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718';
   const msg3 = M3.buildClientMessage({ client: 'Cliente QA', token: tok });
-  ok(msg3.includes('https://aprovar.agendaidseven.com.br/share/cronograma/' + tok) && !msg3.includes('?v='), 'H3a: mensagem contém /share/cronograma/<token> ESTÁVEL (sem ?v=, regime 19/06)');
+  ok(msg3.includes('https://idseven-push-qa.agidseven.workers.dev/share/cronograma/' + tok) && !msg3.includes('?v='), 'H3a: [QA] mensagem contém /share/cronograma/<token> ESTÁVEL no host QA (sem ?v=, regime 19/06)');
   ok(msg3.indexOf('Olá, Cliente QA.') === 0 && msg3.includes('Equipe ID Seven'), 'H3b: modelo da mensagem preservado');
   let threw = false; try { M3.buildShareClientUrl(''); } catch (_) { threw = true; }
   ok(threw, 'H3c: link NUNCA sai sem token (guard lança)');

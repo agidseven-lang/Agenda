@@ -33,10 +33,11 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   diagPath: (): Promise<string> => ipcRenderer.invoke("diag-path"),
   // abrir URL externa (WhatsApp app/web, browser) via shell.openExternal
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke("open-external", url),
-  // F3.3.73I6C18C — prepara/valida o Card Premium ANTES do WhatsApp (GET read-only no main,
-  // RESTRITO a https://aprovar.agendaidseven.com.br/share/cronograma/<token>; token nunca logado)
-  cardPrewarm: (url: string, expectedType: string): Promise<{ ok: boolean; reason?: string; cache?: string; get1Ms?: number; get2Ms?: number }> =>
-    ipcRenderer.invoke("card-prewarm", url, expectedType),
+  // F3.3.73I6C18C/C24C — prepara/valida o Card Premium ANTES do WhatsApp (GET read-only no main,
+  // RESTRITO a https://idseven-push-qa.agidseven.workers.dev/share/cronograma/<token>; token nunca logado).
+  // C24C: aceita um traceId opaco (X-QA-Trace-Id, correlação sanitizada) e devolve objeto ESTRUTURADO.
+  cardPrewarm: (url: string, expectedType: string, traceId?: string): Promise<{ ok: boolean; stage?: string; reason?: string; status?: number | null; taskState?: string; shareType?: string; snapshotState?: string; cacheState?: string; imageState?: string; timings?: { get1Ms: number | null; imgMs: number | null; get2Ms: number | null } }> =>
+    ipcRenderer.invoke("card-prewarm", url, expectedType, traceId),
   // 1.0.114 — ENVIO PREMIUM: imagem real do card p/ anexar no WhatsApp.
   saveCardImage: (bytes: ArrayBuffer | Uint8Array, filename: string): Promise<{ ok: boolean; path?: string; error?: string }> =>
     ipcRenderer.invoke("save-card-image", { bytes, filename }),

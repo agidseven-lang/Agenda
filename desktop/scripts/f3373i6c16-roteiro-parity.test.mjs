@@ -103,9 +103,10 @@ ok('G4 openSendClientModal (pós-save) passa sector:data.sector', /openSendClien
 ok('H1 preview do card é sector-aware (Aprovar roteiro / Roteiro de gravação de vídeos)',
   /\(ctx\.sector==='roteiro'\?'Aprovar roteiro':'Aprovar cronograma'\)/.test(HTML) &&
   /\(ctx\.sector==='roteiro'\?'Seu Roteiro de gravação de vídeos está pronto para avaliação\.':'Seu cronograma está pronto para avaliação\.'\)/.test(HTML));
-ok('H2 caveat HONESTO no roteiro (arte do card ainda usa layout "cronograma"; título atualizado na etapa do servidor)',
-  /Transparência: a arte do card de compartilhamento ainda usa o layout de “cronograma”/.test(HTML) &&
-  /A mensagem e a tarefa já identificam “Roteiro de gravação de vídeos”/.test(HTML));
+ok('H2 [C24C] resíduo REMOVIDO (FASE 8): sem "layout de cronograma"; Roteiro usa arte v64-60 + "Roteiro de gravação de vídeos"',
+  !/ainda usa o layout de/.test(HTML) && !/a arte do card de compartilhamento/.test(HTML) &&
+  /roteiro:'\/og\/wa-card-roteiro-v64-60\.jpg'/.test(HTML) &&
+  /Seu Roteiro de gravação de vídeos está pronto para avaliação\./.test(HTML));
 
 /* ── I: Cronograma PRESERVADO + Worker INTOCADO + sem regressões ── */
 ok('I1 Cronograma intacto (clientRequired + subtypes semanal/quinzenal/mensal 3/6/12)',

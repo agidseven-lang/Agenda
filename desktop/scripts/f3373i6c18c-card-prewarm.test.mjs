@@ -38,6 +38,9 @@ function fnTs(name) {
   rest = rest.replace(/\(g: ShareFetch, url: string, expectedType: string\): \{ ok: boolean; reason\?: string \}/, '(g, url, expectedType)');
   rest = rest.replace(/\(html: unknown\): string/, '(html)');
   rest = rest.replace(/\(imgUrl: string, timeoutMs: number\): Promise<boolean>/, '(imgUrl, timeoutMs)');
+  rest = rest.replace(/\(imgUrl: string, timeoutMs: number\): Promise<ImgResult>/, '(imgUrl, timeoutMs)');
+  rest = rest.replace(/\(url: string, expectedType: string, traceId: string\): Promise<PrewarmResult>/, '(url, expectedType, traceId)');
+  rest = rest.replace(/\(\): PrewarmResult/, '()');
   rest = rest.replace(/let x: URL;/, 'let x;');
   let d = 0; const i = rest.indexOf('{');
   for (let j = i; j < rest.length; j++) { const c = rest[j]; if (c === '{') d++; else if (c === '}') { d--; if (!d) return rest.slice(0, j + 1); } }
@@ -45,7 +48,7 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão da baseline atual (1.0.168 — C20)', PJ.version === '1.0.168' && (S('package-lock.json').includes('"version": "1.0.168"')));
+ok('A1 versão da candidata QA (1.0.170-QA — C24C)', PJ.version === '1.0.170-QA' && (S('package-lock.json').includes('"version": "1.0.170-QA"')));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
 const MODC = 'const SHARE_PATH = "/share/cronograma/";\nconst HOST = "aprovar.agendaidseven.com.br";\n';
@@ -80,7 +83,9 @@ const mkHtml = (title, extra) => '<html><head>' +
   '<meta property="og:title" content="' + title + '"/>' +
   '<meta property="og:description" content="desc"/>' +
   '<meta property="og:image" content="https://aprovar.agendaidseven.com.br/og/wa-card-v64-39.jpg"/>' +
-  '<meta property="og:url" content="' + GOOD + '"/>' + (extra || '') + '</head><body>' + title + '</body></html>';
+  '<meta property="og:url" content="' + GOOD + '"/>' +
+  '<meta property="og:image:width" content="1200"/>' +
+  '<meta property="og:image:height" content="630"/>' + (extra || '') + '</head><body>' + title + '</body></html>';
 ok('D1 OG completo de CRONOGRAMA aceito p/ tarefa cronograma (gate 13)', vOG(mkHtml('Aprovar cronograma'), GOOD, 'cronograma').ok === true);
 ok('D2 OG completo de ROTEIRO aceito p/ tarefa roteiro (gate 11)', vOG(mkHtml('Aprovar roteiro'), GOOD, 'roteiro').ok === true);
 ok('D3 ROTEIRO recebendo OG de CRONOGRAMA → REJEITADO (gate 12; motivo explícito)',
@@ -92,13 +97,14 @@ ok('D6 cronograma sem título esperado rejeitado', vOG(mkHtml('Pagina qualquer')
 
 /* ── E: prepareCardOnce com fetch STUBADO (CONTRATO C20, micro-exec) ── */
 const prepSrc = fnTs('prepareCardOnce');
-const legSrc = fnTs('checkLeg');
+const legSrc = fnTs('legReason');
+const baseSrc = fnTs('baseResult');
 const exImgSrc = fnTs('extractOgImage');
 const mkPrep = (script, imgOk = true) => {
   let call = 0; let imgCalls = 0;
   const fetchShare = async () => { const r = script[Math.min(call, script.length - 1)]; call++; return r; };
-  const fetchOgImageOk = async () => { imgCalls++; return imgOk; };
-  const api = new Function('fetchShare', 'validateOgHtml', 'fetchOgImageOk', 'const TIMEOUT_MS=12000;\n' + exImgSrc + '\n' + legSrc + '\n' + prepSrc + '\nreturn prepareCardOnce;')(fetchShare, vOG, fetchOgImageOk);
+  const fetchOgImage = async () => { imgCalls++; return { ok: imgOk }; };
+  const api = new Function('fetchShare', 'validateOgHtml', 'fetchOgImage', 'diag', 'redactShareUrl', 'const TIMEOUT_MS=12000;\n' + baseSrc + '\n' + exImgSrc + '\n' + legSrc + '\n' + prepSrc + '\nreturn prepareCardOnce;')(fetchShare, vOG, fetchOgImage, () => {}, (u) => '<red>');
   return { api, calls: () => call, imgCalls: () => imgCalls };
 };
 const okHtmlCron = mkHtml('Aprovar cronograma');
@@ -108,7 +114,7 @@ await (async () => {
   // E1 — fluxo feliz C20: GET#1 resolved+type + imagem ok + GET#2 resolved+type+HIT
   const p1 = mkPrep([R({}), R({ xShareCache: 'hit', elapsedMs: 120 })]);
   const r1 = await p1.api(GOOD, 'roteiro');
-  ok('E1 contrato pleno: resolved+type+OG+imagem+HIT → sucesso (2 GETs + 1 imagem)', r1.ok === true && r1.cache === 'hit' && p1.calls() === 2 && p1.imgCalls() === 1);
+  ok('E1 contrato pleno: resolved+type+OG+imagem+HIT → sucesso (2 GETs + 1 imagem)', r1.ok === true && r1.cacheState === 'hit' && p1.calls() === 2 && p1.imgCalls() === 1);
   // E2 — atalho sem header REMOVIDO: resposta sem X-Share-Task NUNCA é sucesso
   const p2 = mkPrep([R({ xShareTask: '', xShareType: '', html: okHtmlCron }), R({ xShareTask: '', xShareType: '', html: okHtmlCron, elapsedMs: 300 })]);
   const r2 = await p2.api(GOOD, 'cronograma');
@@ -120,7 +126,7 @@ await (async () => {
   // E4 — JSON rejeitado no GET#1
   const p4 = mkPrep([{ ok: false, reason: 'resposta_json', elapsedMs: 40 }]);
   const r4 = await p4.api(GOOD, 'cronograma');
-  ok('E4 resposta JSON rejeitada no GET#1', r4.ok === false && r4.reason === 'resposta_json' && r4.step === 'get1');
+  ok('E4 resposta JSON rejeitada no GET#1', r4.ok === false && r4.reason === 'resposta_json' && r4.stage === 'get1');
   // E5 — headers de roteiro mas HTML de cronograma → detecção textual preservada
   const p5 = mkPrep([R({ html: okHtmlCron })]);
   const r5 = await p5.api(GOOD, 'roteiro');
@@ -136,7 +142,7 @@ await (async () => {
   // E8 — imagem OG inacessível bloqueia
   const p8 = mkPrep([R({}), R({ xShareCache: 'hit' })], false);
   const r8 = await p8.api(GOOD, 'roteiro');
-  ok('E8 [C20] imagem inacessível → imagem_inacessivel (WhatsApp fechado)', r8.ok === false && r8.reason === 'imagem_inacessivel' && r8.step === 'img');
+  ok('E8 [C20] imagem inacessível → imagem_inacessivel (WhatsApp fechado)', r8.ok === false && r8.reason === 'imagem_inacessivel' && r8.stage === 'img');
   // E9 — [C23] resposta sem X-Share-Snapshot=ready NUNCA é sucesso (resolução dinâmica não vale)
   const p9 = mkPrep([R({ xShareSnapshot: '' })]);
   const r9 = await p9.api(GOOD, 'roteiro');
@@ -156,16 +162,16 @@ ok('F3 timeout por tentativa (AbortController 12s) e timeout NUNCA é sucesso',
 ok('G1 retry MÁX 3 com backoff progressivo 0/800/1500 ms (sem loop infinito)',
   /const BACKOFF = \[0, 800, 1500\];/.test(PW) && /for \(let i = 0; i < 3; i\+\+\)/.test(PW) && /if \(last\.ok\) break;/.test(PW));
 ok('G2 single-flight por URL no main (Map inflight; chamada duplicada reaproveita)',
-  /const inflight = new Map<string, Promise<Record<string, unknown>>>\(\);/.test(PW) &&
+  /const inflight = new Map<string, Promise<PrewarmResult>>\(\);/.test(PW) &&
   /const existing = inflight\.get\(url\);\s*\n\s*if \(existing\) return existing;/.test(PW) && /finally \{ inflight\.delete\(url\); \}/.test(PW));
 ok('G3 IPC rejeita URL não permitida ANTES de qualquer rede',
-  /if \(!isAllowedShareUrl\(url\)\) \{\s*\n\s*diag\("prewarm\.url_rejeitada"/.test(PW) && /url_nao_permitida/.test(PW));
+  /if \(!isAllowedShareUrl\(url\)\) \{\s*\n\s*diag\("qa\.desktop\.prewarm\.fail"/.test(PW) && /url_nao_permitida/.test(PW));
 
 /* ── H: wiring (main/preload/renderer) ── */
 ok('H1 main registra registerPrewarmIpc junto do registerAuthIpc',
   /import \{ registerPrewarmIpc \} from "\.\/prewarm";/.test(MAIN) && /registerAuthIpc\(\);[\s\S]{0,220}registerPrewarmIpc\(\);/.test(MAIN));
 ok('H2 preload expõe cardPrewarm(url, expectedType) via invoke("card-prewarm")',
-  /cardPrewarm: \(url: string, expectedType: string\)/.test(PRE) && /ipcRenderer\.invoke\("card-prewarm", url, expectedType\)/.test(PRE));
+  /cardPrewarm: \(url: string, expectedType: string, traceId\?: string\)/.test(PRE) && /ipcRenderer\.invoke\("card-prewarm", url, expectedType, traceId\)/.test(PRE));
 
 /* ── I: renderer — fluxo obrigatório e UX (gates 16-17-19 + estados) ── */
 ok('I1 botão do WhatsApp NASCE desabilitado + estado inicial "Preparando Card Premium…"',
@@ -175,8 +181,8 @@ ok('I2 WhatsApp SÓ abre com prepReady (gate 16/17: sucesso libera; falha bloque
   /let prepReady=false, prepBusy=false;/.test(HTML));
 ok('I3 runPrewarm [C23]: snapshot server-side ANTES + prova técnica via IPC (cardPrewarm) com TIPO por setor',
   /const tipo=\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma';/.test(HTML) &&
-  /const snap=await ensureShareSnapshot\(ctx&&ctx\.id,tipo\);/.test(HTML) &&
-  /pw=snap\.ok\?\(\(api\.cardPrewarm&&url\)\?await api\.cardPrewarm\(url,tipo\):\{ok:false,reason:'indisponivel'\}\):snap;/.test(HTML));
+  /snap=await ensureShareSnapshot\(ctx&&ctx\.id,tipo,traceId\);/.test(HTML) &&
+  /pw=snap\.ok\?\(\(api\.cardPrewarm&&url\)\?await api\.cardPrewarm\(url,tipo,traceId\):\{ok:false,reason:'indisponivel',stage:'ipc'\}\):snap;/.test(HTML));
 ok('I4 sucesso → "Card Premium preparado." + botão liberado; falha → erro + botão bloqueado + Tentar novamente',
   /Card Premium preparado\. A mensagem será copiada automaticamente ao abrir o WhatsApp Business/.test(HTML) &&
   /Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\./.test(HTML) &&
@@ -186,8 +192,8 @@ ok('I6 cliques duplicados bloqueados (prepBusy no modal + _openwaBusy no caminho
   /if\(prepBusy\) return; prepBusy=true;/.test(HTML) && /if\(state\._openwaBusy\)\{ return; \}/.test(HTML));
 ok('I7 caminho [data-openwa] TAMBÉM gated [C23] (snapshot + prewarm; falha nunca abre openWhatsAppPlain)',
   /REGRA CENTRAL também neste caminho/.test(HTML) &&
-  /const _snap=await ensureShareSnapshot\(\(id&&id!=='__form__'\)\?id:\(ctx&&ctx\.id\),_tipo\);/.test(HTML) &&
-  /await window\.desktopAPI\.cardPrewarm\(_pwUrl,_tipo\)/.test(HTML) &&
+  /const _snap=await ensureShareSnapshot\(\(id&&id!=='__form__'\)\?id:\(ctx&&ctx\.id\),_tipo,_trace\);/.test(HTML) &&
+  /await window\.desktopAPI\.cardPrewarm\(_pwUrl,_tipo,_trace\)/.test(HTML) &&
   /if\(!_pw\|\|!_pw\.ok\)\{ flashToast\('Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\.'\); return; \}/.test(HTML));
 ok('I8 prewarm inicia automaticamente ao abrir o modal (runPrewarm())', /on\('btnPrewarmRetry', function\(\)\{ runPrewarm\(\); \}\);\s*\n\s*runPrewarm\(\);/.test(HTML));
 ok('I9 erro NÃO expõe token/detalhe técnico (mensagem amigável; sem token na UI)',

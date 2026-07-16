@@ -6671,13 +6671,19 @@ function cronCtx(o){
       (shell.openExternal). NUNCA copiar/compartilhar/exibir essas URLs. */
 
 // API INTERNA do Worker (token/imagekit/notify) — SEMPRE workers.dev (sempre no ar; não depende de DNS).
-const CLIENT_REVIEW_BASE='https://idseven-push.agidseven.workers.dev';
+const CLIENT_REVIEW_BASE='https://idseven-push-qa.agidseven.workers.dev'; // F3.3.73I6C24C — BUILD QA: Worker QA exclusivo (nunca producao)
+const QA_BUILD=true; // F3.3.73I6C24C — build de QA: habilita trace X-QA-Trace-Id e o banner permanente
+// F3.3.73I6C24C — traceId OPACO p/ correlacao sanitizada; NUNCA contem token/taskId/cliente/email/conteudo.
+function qaTraceId(){try{if(!QA_BUILD)return '';if(typeof crypto!=='undefined'&&crypto.getRandomValues){const b=crypto.getRandomValues(new Uint8Array(16));return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('');}}catch(_){}return 'qa'+Date.now().toString(36);}
 // 1.0.121 — ENVIO PREMIUM AUTOMÁTICO (oficial): rota segura do Worker que envia a imagem real do
 // card + legenda + link via WhatsApp Business Cloud API (server-side; token da Meta NUNCA no client).
 const PREMIUM_SEND_URL=CLIENT_REVIEW_BASE+'/client/send-premium-whatsapp';
 // 1.0.112 — LINK PÚBLICO PREMIUM do cliente (domínio da marca). O mesmo Worker atende este
 // subdomínio (rota Cloudflare aprovar.agendaidseven.com.br/*). Requer o DNS+Route aplicados.
-const CLIENT_LINK_BASE='https://aprovar.agendaidseven.com.br';
+const CLIENT_LINK_BASE='https://idseven-push-qa.agidseven.workers.dev'; // F3.3.73I6C24C — BUILD QA: link publico aponta ao Worker QA
+// F3.3.73I6C24C — arte OG correta POR TIPO (previa e fallback usam a arte do tipo; NUNCA cronograma fixo p/ roteiro).
+const OG_IMG_BY_TYPE={cronograma:'/og/wa-card-v64-39.jpg',roteiro:'/og/wa-card-roteiro-v64-60.jpg'};
+function ogImageUrlForType(tipo){return CLIENT_LINK_BASE+(OG_IMG_BY_TYPE[tipo]||OG_IMG_BY_TYPE.cronograma);}
 // 1.0.119-whatsapp-media-card — imagem REAL do card premium (mesmo domínio), enviada como
 // mídia no WhatsApp. Rota servida pelo Worker (image/jpeg 1200×630, sem query).
 const CARD_IMG_URL='https://aprovar.agendaidseven.com.br/og/wa-card-v64-38.jpg';
@@ -6869,17 +6875,14 @@ async function openSendClientModal(taskOrForm){
       '<pre class="gcs-legend" id="groupLegendBox">'+esc(msg)+'</pre>'+
       /* Prévia de como o WhatsApp renderiza o LINK (card premium vem do OG público, não de arquivo) */
       '<div class="gcs-lp" id="groupLinkPreview">'+
-        '<div class="gcs-lp-img"><img id="groupCardPreview" alt="Prévia do link — card premium Agenda ID Seven"/></div>'+
+        '<div class="gcs-lp-img" style="position:relative"><img id="groupCardPreview" alt="Prévia do card premium Agenda ID Seven" style="visibility:hidden"/><span id="groupCardSkel" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--faint)">Preparando prévia…</span></div>'+
         '<div class="gcs-lp-meta">'+
           '<div class="gcs-lp-title">'+(ctx.sector==='roteiro'?'Aprovar roteiro':'Aprovar cronograma')+'</div>'+
           '<div class="gcs-lp-desc">'+(ctx.sector==='roteiro'?'Seu Roteiro de gravação de vídeos está pronto para avaliação.':'Seu cronograma está pronto para avaliação.')+'</div>'+
-          '<div class="gcs-lp-dom">aprovar.agendaidseven.com.br</div>'+
+          '<div class="gcs-lp-dom">'+(function(){try{return new URL(CLIENT_LINK_BASE).host}catch(_){return 'aprovar.agendaidseven.com.br'}})()+'</div>'+
         '</div>'+
       '</div>'+
-      /* F3.3.73I6C16 — HONESTIDADE: a ARTE do card OG é gerada pelo servidor de preview (Worker),
-         que ainda renderiza o layout "cronograma". A mensagem e a tarefa já dizem "Roteiro de
-         gravação de vídeos"; o título do card do Worker é atualizado numa etapa própria de servidor. */
-      (ctx.sector==='roteiro'?'<div class="gcs-note" style="margin-top:2px">Transparência: a arte do card de compartilhamento ainda usa o layout de “cronograma” (gerada pelo servidor de preview). A mensagem e a tarefa já identificam “Roteiro de gravação de vídeos”; o título do card será atualizado na etapa do servidor.</div>':'')+
+            /* F3.3.73I6C24C — resíduo removido: a arte do card vem do SNAPSHOT do TIPO correto (v64-39 cronograma / v64-60 roteiro). Nao ha mais "layout de cronograma" para Roteiro. */
       /* F3.3.73I6C18C — o botão NASCE desabilitado: só libera após "Card Premium preparado."
          (prova técnica real via IPC card-prewarm: GET validado + OG do TIPO certo + cache). */
       '<button class="gcs-go" id="btnOpenWaMain" disabled>'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
@@ -7011,12 +7014,18 @@ async function _wireGroupSend(ctx, msg, cardFile){
      OG completo + og:url exato + TIPO esperado + cache confirmado). prepBusy impede
      preparações simultâneas (cliques duplicados). Token nunca é logado. */
   let prepReady=false, prepBusy=false;
-  // Imagem do card só ILUSTRA a prévia do link (embutida, sem rede). Não é anexada por padrão.
-  try{
-    const bin=atob(CARD_IMG_B64); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); bytes=u.buffer;
-    if(img) img.src='data:image/jpeg;base64,'+CARD_IMG_B64;
-  }catch(e){
-    try{ const r=await fetch(CARD_IMG_URL,{cache:'no-store'}); if(r.ok){ bytes=await r.arrayBuffer(); if(img) img.src=URL.createObjectURL(new Blob([bytes],{type:'image/jpeg'})); } }catch(_){ if(img) img.src=CARD_IMG_URL; }
+  // F3.3.73I6C24C/FASE 8 — a PRÉVIA NÃO mostra arte fixa: fica em skeleton ("Preparando prévia…")
+  // até o snapshot ready, quando runPrewarm define a arte do TIPO correto. O `bytes` (fallback
+  // "copiar imagem", opção avançada) é carregado da arte do TIPO correto — nunca cronograma p/ roteiro.
+  try{ const _t=(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma';
+    const r=await fetch(ogImageUrlForType(_t),{cache:'no-store'}); if(r.ok){ bytes=await r.arrayBuffer(); }
+  }catch(_){ /* fallback opcional; a prova real é o link público validado pelo prewarm */ }
+  // aplica a arte correta na prévia se o snapshot já tiver sido preparado antes (reabertura)
+  function applyPreviewFromSnapshot(tipo,og){
+    const im=$('groupCardPreview'), sk=$('groupCardSkel');
+    if(!im)return;
+    im.onload=function(){ im.style.visibility='visible'; if(sk)sk.style.display='none'; };
+    im.src=(og&&og.imagePath)?(CLIENT_LINK_BASE+og.imagePath):ogImageUrlForType(tipo);
   }
   // Fallbacks (opções avançadas) — só sob demanda; nunca na ação principal.
   async function ensureSaved(){
@@ -7081,44 +7090,57 @@ async function _wireGroupSend(ctx, msg, cardFile){
      equipe) para publicar/reutilizar o snapshot imutável do Card Premium. Regras:
      reenvio NUNCA rotaciona token; conteúdo igual ⇒ mesmo snapshot (reused=true);
      tipo divergente/erro ⇒ falha explícita (o WhatsApp NÃO abre). Token nunca logado. */
-  async function ensureShareSnapshot(taskId,tipo){
-    if(!taskId||taskId==='__form__')return{ok:false,reason:'task_sem_id'};
+  async function ensureShareSnapshot(taskId,tipo,traceId){
+    if(!taskId||taskId==='__form__')return{ok:false,reason:'task_sem_id',code:'content_invalid'};
     try{await ensureTeamSession();}catch(_){/* renovação falhou → jwt vazio abaixo */}
     const jwt=localStorage.getItem('wp_team_jwt')||'';
-    if(!jwt)return{ok:false,reason:'sessao_equipe_indisponivel'};
+    if(!jwt)return{ok:false,reason:'sessao_equipe_indisponivel',code:'auth_missing'};
     try{
+      const _h={'Content-Type':'application/json','Authorization':'Bearer '+jwt};
+      if(QA_BUILD&&traceId)_h['X-QA-Trace-Id']=traceId; // FASE 2: correlacao sanitizada (QA)
       const r=await fetch(CLIENT_REVIEW_BASE+'/share-snapshot',{method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+        headers:_h,
         body:JSON.stringify({taskId:String(taskId),expectedType:tipo})});
       let j=null;try{j=await r.json();}catch(_){j=null;}
-      if(r.status===401){localStorage.removeItem('wp_team_jwt');return{ok:false,reason:'sessao_expirada'};}
-      if(r.ok&&j&&j.ok===true&&j.snapshotStatus==='ready'&&j.type===tipo)return{ok:true,reused:!!j.reused};
-      return{ok:false,reason:(j&&j.error)?String(j.error).slice(0,80):('snapshot_http_'+r.status)};
-    }catch(_){return{ok:false,reason:'rede_snapshot'};}
+      if(r.status===401){localStorage.removeItem('wp_team_jwt');return{ok:false,reason:'sessao_expirada',code:(j&&j.code)||'auth_invalid'};}
+      // FASE 3: preserva o CÓDIGO real do worker (nao vira mensagem generica no diagnostico)
+      if(r.ok&&j&&j.ok===true&&j.snapshotStatus==='ready'&&j.type===tipo)return{ok:true,reused:!!j.reused,code:j.code||'snapshot_ready',og:(j&&j.og)||null,type:j.type};
+      return{ok:false,code:(j&&j.code)||('snapshot_http_'+r.status),reason:(j&&(j.code||j.error))?String(j.code||j.error).slice(0,80):('snapshot_http_'+r.status)};
+    }catch(_){return{ok:false,reason:'rede_snapshot',code:'rede_snapshot'};}
   }
+  function qaDiag(stage,data){ try{ if(QA_BUILD&&window.desktopAPI&&window.desktopAPI.diagLog) window.desktopAPI.diagLog(stage,data); }catch(_){} }
   async function runPrewarm(){
     if(prepBusy) return; prepBusy=true;
     prepReady=false;
     const b=$('btnOpenWaMain'); if(b){ b.disabled=true; }
     const rt=$('btnPrewarmRetry'); if(rt){ rt.style.display='none'; }
     setStatus('Preparando Card Premium…');
+    const traceId=qaTraceId();
+    qaDiag('qa.desktop.token.start',{trace:traceId});
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ url=''; }
-    let pw=null;
+    qaDiag(url?'qa.desktop.token.ready':'qa.desktop.token.fail',{trace:traceId});
+    let pw=null, snap=null;
     try{
       const tipo=(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma';
+      qaDiag('qa.desktop.snapshot.post.start',{trace:traceId});
       // C23: 1º publica/reutiliza o snapshot no servidor; SÓ então valida a URL pública.
-      const snap=await ensureShareSnapshot(ctx&&ctx.id,tipo);
-      pw=snap.ok?((api.cardPrewarm&&url)?await api.cardPrewarm(url,tipo):{ok:false,reason:'indisponivel'}):snap;
-    }catch(_){ pw={ok:false,reason:'ipc_falhou'}; }
+      snap=await ensureShareSnapshot(ctx&&ctx.id,tipo,traceId);
+      qaDiag('qa.desktop.snapshot.post.result',{ok:!!(snap&&snap.ok),code:(snap&&snap.code)||'',trace:traceId});
+      pw=snap.ok?((api.cardPrewarm&&url)?await api.cardPrewarm(url,tipo,traceId):{ok:false,reason:'indisponivel',stage:'ipc'}):snap;
+    }catch(_){ pw={ok:false,reason:'ipc_falhou',stage:'ipc'}; }
     prepBusy=false;
     if(pw&&pw.ok){
       prepReady=true;
       if(b){ b.disabled=false; }
+      // FASE 8: a prévia usa a arte do SNAPSHOT (tipo correto), nunca cronograma fixo para roteiro.
+      try{ applyPreviewFromSnapshot((ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma', snap&&snap.og); }catch(_){}
       setStatus(svg('check')+'<span>Card Premium preparado. A mensagem será copiada automaticamente ao abrir o WhatsApp Business — escolha o grupo do cliente e cole (Ctrl+V).</span>','ok',true);
     }else{
       prepReady=false;
       if(b){ b.disabled=true; }
       if(rt){ rt.style.display=''; }
+      // FASE 3: mensagem simples na UI; o CÓDIGO exato fica no diagnóstico QA (nunca some).
+      qaDiag('qa.desktop.prewarm.result',{ok:false,stage:(pw&&pw.stage)||'',reason:(pw&&(pw.reason||pw.code))||'',trace:traceId});
       setStatus('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.','err');
     }
   }
@@ -8011,10 +8033,11 @@ document.addEventListener('click',async e=>{
       let _pwUrl=''; try{ _pwUrl=buildShareClientUrl(ctx&&ctx.token); }catch(_){ _pwUrl=''; }
       const _tipo=(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma';
       // C23: snapshot publicado no servidor ANTES da prova técnica da URL pública.
-      const _snap=await ensureShareSnapshot((id&&id!=='__form__')?id:(ctx&&ctx.id),_tipo);
+      const _trace=qaTraceId();
+      const _snap=await ensureShareSnapshot((id&&id!=='__form__')?id:(ctx&&ctx.id),_tipo,_trace);
       const _pw=_snap.ok
         ?((window.desktopAPI&&window.desktopAPI.cardPrewarm&&_pwUrl)
-          ?await window.desktopAPI.cardPrewarm(_pwUrl,_tipo)
+          ?await window.desktopAPI.cardPrewarm(_pwUrl,_tipo,_trace)
           :{ok:false})
         :_snap;
       if(!_pw||!_pw.ok){ flashToast('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.'); return; }
@@ -8289,5 +8312,6 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
 })();
 /* ════════ FIM IN-APP-DIAGNOSTIC-V1 ════════ */
 </script>
+<script>/* F3.3.73I6C24C — banner permanente de QA (identificacao visual; build de teste; sem literais de versao) */try{var _qb=document.createElement('div');_qb.textContent='AMBIENTE QA — NÃO USAR COM CLIENTES';_qb.setAttribute('style','position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#7a1020;color:#fff;font:600 12px/1.6 system-ui,Segoe UI,Roboto,sans-serif;text-align:center;letter-spacing:.04em;padding:3px 8px;pointer-events:none;opacity:.96');document.body.appendChild(_qb);}catch(_){}</script>
 </body>
 </html>
