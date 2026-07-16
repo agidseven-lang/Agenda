@@ -103,7 +103,7 @@ const mkPrep = (script, imgOk = true) => {
 };
 const okHtmlCron = mkHtml('Aprovar cronograma');
 const okHtmlRot = mkHtml('Aprovar roteiro');
-const R = (over) => Object.assign({ ok: true, status: 200, contentType: 'text/html; charset=utf-8', xShareCache: 'miss', xShareTask: 'resolved', xShareType: 'roteiro', elapsedMs: 900, html: okHtmlRot }, over);
+const R = (over) => Object.assign({ ok: true, status: 200, contentType: 'text/html; charset=utf-8', xShareCache: 'miss', xShareTask: 'resolved', xShareType: 'roteiro', xShareSnapshot: 'ready', elapsedMs: 900, html: okHtmlRot }, over);
 await (async () => {
   // E1 — fluxo feliz C20: GET#1 resolved+type + imagem ok + GET#2 resolved+type+HIT
   const p1 = mkPrep([R({}), R({ xShareCache: 'hit', elapsedMs: 120 })]);
@@ -137,6 +137,10 @@ await (async () => {
   const p8 = mkPrep([R({}), R({ xShareCache: 'hit' })], false);
   const r8 = await p8.api(GOOD, 'roteiro');
   ok('E8 [C20] imagem inacessível → imagem_inacessivel (WhatsApp fechado)', r8.ok === false && r8.reason === 'imagem_inacessivel' && r8.step === 'img');
+  // E9 — [C23] resposta sem X-Share-Snapshot=ready NUNCA é sucesso (resolução dinâmica não vale)
+  const p9 = mkPrep([R({ xShareSnapshot: '' })]);
+  const r9 = await p9.api(GOOD, 'roteiro');
+  ok('E9 [C23] sem X-Share-Snapshot=ready → snapshot_nao_confirmado (WhatsApp fechado)', r9.ok === false && r9.reason === 'snapshot_nao_confirmado');
 })();
 
 /* ── F: fetch real do main — pins de fonte (gates 7/8/9 + timeout) ── */
@@ -169,8 +173,10 @@ ok('I1 botão do WhatsApp NASCE desabilitado + estado inicial "Preparando Card P
 ok('I2 WhatsApp SÓ abre com prepReady (gate 16/17: sucesso libera; falha bloqueia)',
   /if\(!prepReady\)\{ flashToast\('Aguarde: o Card Premium ainda está sendo preparado\.'\); return; \}/.test(HTML) &&
   /let prepReady=false, prepBusy=false;/.test(HTML));
-ok('I3 runPrewarm: prova técnica via IPC (cardPrewarm) com TIPO por setor (roteiro×cronograma)',
-  /api\.cardPrewarm&&url\)\?await api\.cardPrewarm\(url,\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma'\)/.test(HTML));
+ok('I3 runPrewarm [C23]: snapshot server-side ANTES + prova técnica via IPC (cardPrewarm) com TIPO por setor',
+  /const tipo=\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma';/.test(HTML) &&
+  /const snap=await ensureShareSnapshot\(ctx&&ctx\.id,tipo\);/.test(HTML) &&
+  /pw=snap\.ok\?\(\(api\.cardPrewarm&&url\)\?await api\.cardPrewarm\(url,tipo\):\{ok:false,reason:'indisponivel'\}\):snap;/.test(HTML));
 ok('I4 sucesso → "Card Premium preparado." + botão liberado; falha → erro + botão bloqueado + Tentar novamente',
   /Card Premium preparado\. A mensagem será copiada automaticamente ao abrir o WhatsApp Business/.test(HTML) &&
   /Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\./.test(HTML) &&
@@ -178,9 +184,10 @@ ok('I4 sucesso → "Card Premium preparado." + botão liberado; falha → erro +
 ok('I5 estado "Abrindo WhatsApp Business…" antes de abrir', /Abrindo WhatsApp Business…/.test(HTML));
 ok('I6 cliques duplicados bloqueados (prepBusy no modal + _openwaBusy no caminho data-openwa)',
   /if\(prepBusy\) return; prepBusy=true;/.test(HTML) && /if\(state\._openwaBusy\)\{ return; \}/.test(HTML));
-ok('I7 caminho [data-openwa] TAMBÉM gated (falha nunca abre openWhatsAppPlain)',
+ok('I7 caminho [data-openwa] TAMBÉM gated [C23] (snapshot + prewarm; falha nunca abre openWhatsAppPlain)',
   /REGRA CENTRAL também neste caminho/.test(HTML) &&
-  /await window\.desktopAPI\.cardPrewarm\(_pwUrl,\(ctx&&ctx\.sector\)==='roteiro'\?'roteiro':'cronograma'\)/.test(HTML) &&
+  /const _snap=await ensureShareSnapshot\(\(id&&id!=='__form__'\)\?id:\(ctx&&ctx\.id\),_tipo\);/.test(HTML) &&
+  /await window\.desktopAPI\.cardPrewarm\(_pwUrl,_tipo\)/.test(HTML) &&
   /if\(!_pw\|\|!_pw\.ok\)\{ flashToast\('Não foi possível preparar o Card Premium agora\. Tente novamente antes de enviar pelo WhatsApp\.'\); return; \}/.test(HTML));
 ok('I8 prewarm inicia automaticamente ao abrir o modal (runPrewarm())', /on\('btnPrewarmRetry', function\(\)\{ runPrewarm\(\); \}\);\s*\n\s*runPrewarm\(\);/.test(HTML));
 ok('I9 erro NÃO expõe token/detalhe técnico (mensagem amigável; sem token na UI)',

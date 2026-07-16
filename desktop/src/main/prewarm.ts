@@ -1,10 +1,13 @@
 /* =====================================================================
-   F3.3.73I6C18C + F3.3.73I6C20 — PREWARM do Card Premium (processo MAIN).
+   F3.3.73I6C18C + C20 + C23 — PREWARM do Card Premium (processo MAIN).
    Prepara e VALIDA o link /share ANTES de o renderer abrir o WhatsApp.
-   CONTRATO C20 (cumulativo — QUALQUER divergência = falha, WhatsApp fechado):
+   C23: a URL pública é servida por SHARE SNAPSHOT imutável (o renderer publica o
+   snapshot via POST /share-snapshot autenticado ANTES deste prewarm); aqui exige-se
+   também X-Share-Snapshot=ready nos DOIS GETs — sem snapshot publicado não há sucesso.
+   CONTRATO (cumulativo — QUALQUER divergência = falha, WhatsApp fechado):
      GET#1: 200 + text/html + X-Share-Task=resolved + X-Share-Type=<tipo
-            esperado> + OG completo (title/description/image/url) + og:url
-            EXATO + confirmação textual do tipo;
+            esperado> + X-Share-Snapshot=ready + OG completo (title/description/
+            image/url) + og:url EXATO + confirmação textual do tipo;
      IMAGEM: og:image acessível (200 + image/jpeg) no MESMO domínio;
      GET#2: mesmas exigências + X-Share-Cache=hit (o WhatsApp NUNCA deve
             raspar antes de existir HIT tipado) + mesmo X-Share-Type.
@@ -67,7 +70,7 @@ export function extractOgImage(html: unknown): string {
   return m ? m[1] : "";
 }
 
-type ShareFetch = { ok: boolean; reason?: string; status?: number; contentType?: string; xShareCache?: string; xShareTask?: string; xShareType?: string; elapsedMs: number; html?: string };
+type ShareFetch = { ok: boolean; reason?: string; status?: number; contentType?: string; xShareCache?: string; xShareTask?: string; xShareType?: string; xShareSnapshot?: string; elapsedMs: number; html?: string };
 
 async function fetchShare(url: string, timeoutMs: number): Promise<ShareFetch> {
   const ac = new AbortController();
@@ -81,6 +84,7 @@ async function fetchShare(url: string, timeoutMs: number): Promise<ShareFetch> {
     const xShareCache = String(res.headers.get("x-share-cache") || "");
     const xShareTask = String(res.headers.get("x-share-task") || "");
     const xShareType = String(res.headers.get("x-share-type") || "");
+    const xShareSnapshot = String(res.headers.get("x-share-snapshot") || "");
     if (status >= 300 && status < 400) return { ok: false, reason: "redirect_bloqueado", status, elapsedMs };
     // contrato C20: not_found/error são estados EXPLÍCITOS — nunca sucesso.
     if (xShareTask === "not_found") return { ok: false, reason: "task_not_found", status, xShareTask, elapsedMs };
@@ -90,7 +94,7 @@ async function fetchShare(url: string, timeoutMs: number): Promise<ShareFetch> {
       return { ok: false, reason: contentType.indexOf("application/json") >= 0 ? "resposta_json" : "content_type_invalido", status, contentType, elapsedMs };
     }
     const html = await res.text();
-    return { ok: true, status, contentType, xShareCache, xShareTask, xShareType, elapsedMs, html };
+    return { ok: true, status, contentType, xShareCache, xShareTask, xShareType, xShareSnapshot, elapsedMs, html };
   } catch {
     // rede caiu OU o timeout abortou — timeout NUNCA é tratado como sucesso
     return { ok: false, reason: "rede_ou_timeout", elapsedMs: Date.now() - t0 };
@@ -112,6 +116,8 @@ function checkLeg(g: ShareFetch, url: string, expectedType: string): { ok: boole
   if (!g.ok) return { ok: false, reason: g.reason };
   if (g.xShareTask !== "resolved") return { ok: false, reason: "task_nao_resolvida" };
   if (g.xShareType !== expectedType) return { ok: false, reason: "tipo_header_divergente" };
+  // C23: o card SÓ é confiável se veio de snapshot PUBLICADO (nunca de resolução dinâmica).
+  if (g.xShareSnapshot !== "ready") return { ok: false, reason: "snapshot_nao_confirmado" };
   const v = validateOgHtml(g.html, url, expectedType);
   if (!v.ok) return { ok: false, reason: v.reason };
   return { ok: true };

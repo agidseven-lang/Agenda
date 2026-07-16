@@ -5840,7 +5840,7 @@ function kbv2BoardHtml(cols, cardFn){
     h+='<section class="kbv2-column'+live+'" style="--kc:'+c.color+'">'+
          '<div class="kbv2-column-header"><span class="kbv2-cdot" style="background:'+c.color+'"></span><span class="kbv2-ctitle">'+esc(c.label)+'</span><span class="kbv2-ccount">'+c.tasks.length+'</span></div>'+
          '<div class="kbv2-column-body">'+(c.tasks.length?c.tasks.map(fn).join(''):kbv2Empty(c.key))+'</div>'+
-         '<button class="kbv2-column-add" data-fab="1">'+svg('plus')+'<span>Adicionar tarefa</span></button>'+
+         '<button class="kbv2-column-add" data-fabctx="1">'+svg('plus')+'<span>Adicionar tarefa</span></button>'+
        '</section>';
   });
   return h+'</div></div>';
@@ -7075,6 +7075,27 @@ async function _wireGroupSend(ctx, msg, cardFile){
      progressivo (máx. 3: 0/800/1500 ms) vive no main. Falha NUNCA abre o
      WhatsApp: mostra erro + "Tentar novamente" (e "Copiar mensagem" segue
      disponível como opção manual). */
+  /* ===== F3.3.73I6C23 — SHARE SNAPSHOT (servidor publica o card ANTES do WhatsApp) =====
+     O preview NÃO depende mais de lookup dinâmico no scrape: o Desktop pede ao Worker
+     (POST /share-snapshot, Bearer teamSessionJwt — MESMA autenticação das ações de
+     equipe) para publicar/reutilizar o snapshot imutável do Card Premium. Regras:
+     reenvio NUNCA rotaciona token; conteúdo igual ⇒ mesmo snapshot (reused=true);
+     tipo divergente/erro ⇒ falha explícita (o WhatsApp NÃO abre). Token nunca logado. */
+  async function ensureShareSnapshot(taskId,tipo){
+    if(!taskId||taskId==='__form__')return{ok:false,reason:'task_sem_id'};
+    try{await ensureTeamSession();}catch(_){/* renovação falhou → jwt vazio abaixo */}
+    const jwt=localStorage.getItem('wp_team_jwt')||'';
+    if(!jwt)return{ok:false,reason:'sessao_equipe_indisponivel'};
+    try{
+      const r=await fetch(CLIENT_REVIEW_BASE+'/share-snapshot',{method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+        body:JSON.stringify({taskId:String(taskId),expectedType:tipo})});
+      let j=null;try{j=await r.json();}catch(_){j=null;}
+      if(r.status===401){localStorage.removeItem('wp_team_jwt');return{ok:false,reason:'sessao_expirada'};}
+      if(r.ok&&j&&j.ok===true&&j.snapshotStatus==='ready'&&j.type===tipo)return{ok:true,reused:!!j.reused};
+      return{ok:false,reason:(j&&j.error)?String(j.error).slice(0,80):('snapshot_http_'+r.status)};
+    }catch(_){return{ok:false,reason:'rede_snapshot'};}
+  }
   async function runPrewarm(){
     if(prepBusy) return; prepBusy=true;
     prepReady=false;
@@ -7084,7 +7105,10 @@ async function _wireGroupSend(ctx, msg, cardFile){
     let url=''; try{ url=buildShareClientUrl(ctx&&ctx.token); }catch(_){ url=''; }
     let pw=null;
     try{
-      pw=(api.cardPrewarm&&url)?await api.cardPrewarm(url,(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma'):{ok:false,reason:'indisponivel'};
+      const tipo=(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma';
+      // C23: 1º publica/reutiliza o snapshot no servidor; SÓ então valida a URL pública.
+      const snap=await ensureShareSnapshot(ctx&&ctx.id,tipo);
+      pw=snap.ok?((api.cardPrewarm&&url)?await api.cardPrewarm(url,tipo):{ok:false,reason:'indisponivel'}):snap;
     }catch(_){ pw={ok:false,reason:'ipc_falhou'}; }
     prepBusy=false;
     if(pw&&pw.ok){
@@ -7628,7 +7652,16 @@ function openSheet(which){
 
 /* ---- TASK FORM (wizard) ---- */
 function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],checklist:[],link:'',obs:'',_openContent:null};}
-function openTaskForm(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
+/* F3.3.73I6C23 — RESET DETERMINÍSTICO do wizard "Nova tarefa".
+   GLOBAL (botão "Nova tarefa" da nav e FAB): SEMPRE etapa 1 — Setor (Edição de mídia /
+   Cronograma / Roteiro / Programação de posts), formulário 100% NOVO (newForm(null) zera
+   id/step/sector/subtype/título/cliente/responsável/status/datas/prioridade/fields/
+   contents/items/checklist/link/obs) e o contexto residual de envio (_sendCtx) é
+   descartado. NUNCA herda o setor do board, a etapa nem o formulário anterior.
+   CONTEXTUAL ("Adicionar tarefa" da coluna / "+ Novo" do board): comportamento aprovado
+   preservado — pré-seleciona o setor do board e abre em Dados. Handlers SEPARADOS. */
+function openGlobalNewTask(){closeModal();state._sendCtx=null;state.form=newForm(null);render();}
+function openContextualNewTask(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
 function tpl(){return state.form.sector?TEMPLATES[secOf(state.form.sector).key]:null;}
 function curSub(){const t=tpl();return (t&&t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;}
 function renderForm(){
@@ -7854,7 +7887,8 @@ document.addEventListener('click',async e=>{
   if(!(e.target&&e.target.closest))return;
   const g=sel=>e.target.closest(sel);let el;
   if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.tab=el.dataset.tab;closeModal();render();return;}
-  if(el=g('[data-fab]')){closeModal();if(state.tab==='tarefas')openTaskForm(state.boardSector);else{state.tab='tarefas';openTaskForm(null);}return;}
+  if(el=g('[data-fabctx]')){openContextualNewTask(state.boardSector);return;}
+  if(el=g('[data-fab]')){if(state.tab!=='tarefas'){state.tab='tarefas';}openGlobalNewTask();return;}
   if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}
   if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
@@ -7870,7 +7904,7 @@ document.addEventListener('click',async e=>{
     else if(a==='roleboards'){state.personBoard=null;state.roleBoards=true;}
     else if(a==='flowdesigners'){state.designerBoard=null;state.socialBoard=null;state.flowView='designers';}
     else if(a==='flowsocials'){state.socialBoard=null;state.designerBoard=null;state.flowView='socials';}
-    else if(a==='new'){openTaskForm(state.boardSector);return;}
+    else if(a==='new'){openContextualNewTask(state.boardSector);return;}
     render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
   if(el=g('[data-bmine]')){boardMine=!boardMine;render();return;}
@@ -7975,9 +8009,14 @@ document.addEventListener('click',async e=>{
     try{
       flashToast('Preparando Card Premium…');
       let _pwUrl=''; try{ _pwUrl=buildShareClientUrl(ctx&&ctx.token); }catch(_){ _pwUrl=''; }
-      const _pw=(window.desktopAPI&&window.desktopAPI.cardPrewarm&&_pwUrl)
-        ?await window.desktopAPI.cardPrewarm(_pwUrl,(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma')
-        :{ok:false};
+      const _tipo=(ctx&&ctx.sector)==='roteiro'?'roteiro':'cronograma';
+      // C23: snapshot publicado no servidor ANTES da prova técnica da URL pública.
+      const _snap=await ensureShareSnapshot((id&&id!=='__form__')?id:(ctx&&ctx.id),_tipo);
+      const _pw=_snap.ok
+        ?((window.desktopAPI&&window.desktopAPI.cardPrewarm&&_pwUrl)
+          ?await window.desktopAPI.cardPrewarm(_pwUrl,_tipo)
+          :{ok:false})
+        :_snap;
       if(!_pw||!_pw.ok){ flashToast('Não foi possível preparar o Card Premium agora. Tente novamente antes de enviar pelo WhatsApp.'); return; }
     }finally{ state._openwaBusy=false; }
     // 1.0.119 — COPIA só a mensagem limpa e abre o WhatsApp SEM texto na URL.

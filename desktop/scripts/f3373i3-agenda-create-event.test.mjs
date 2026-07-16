@@ -101,8 +101,9 @@ ok('F3 Copywriting segue descontinuado na criação (71C7)',
   /key:'copywriting'[\s\S]{0,120}descontinuado:true/.test(HTML) && /SECTORS\.filter\(s=>!s\.descontinuado\)/.test(HTML));
 ok('F4 Chat segue fora do fluxo principal (aba de chat não reintroduzida no TABS)',
   /const TABS=\[/.test(HTML) && !/TABS=\[[^\]]*\{k:'chat'/.test(HTML));
-ok('F5 FAB global segue criando TAREFA (não sequestrado pelo evento)',
-  /if\(el=g\('\[data-fab\]'\)\)\{closeModal\(\);if\(state\.tab==='tarefas'\)openTaskForm/.test(HTML));
+ok('F5 FAB global segue criando TAREFA (não sequestrado pelo evento; C23: reset global determinístico)',
+  /if\(el=g\('\[data-fab\]'\)\)\{if\(state\.tab!=='tarefas'\)\{state\.tab='tarefas';\}openGlobalNewTask\(\);return;\}/.test(HTML) &&
+  /function openGlobalNewTask\(\)\{closeModal\(\);state\._sendCtx=null;state\.form=newForm\(null\);render\(\);\}/.test(HTML));
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
 process.exit(fail ? 1 : 0);

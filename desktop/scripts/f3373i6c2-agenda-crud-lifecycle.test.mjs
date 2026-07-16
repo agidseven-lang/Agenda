@@ -84,7 +84,7 @@ ok('G2 CTA "Novo compromisso" intacto (data-ag="new")', /data-ag="new"[\s\S]{0,2
 ok('G3 Board/Kanban canônico intacto', /const STATUS=\[[\s\S]{0,400}key:'afazer'[\s\S]{0,400}key:'concluido'/.test(HTML));
 ok('G4 Copywriting descontinuado na criação', /key:'copywriting'[\s\S]{0,120}descontinuado:true/.test(HTML) && /SECTORS\.filter\(s=>!s\.descontinuado\)/.test(HTML));
 ok('G5 Chat fora do fluxo principal (TABS sem chat)', /const TABS=\[/.test(HTML) && !/TABS=\[[^\]]*\{k:'chat'/.test(HTML));
-ok('G6 FAB global segue criando TAREFA (não sequestrado)', /if\(el=g\('\[data-fab\]'\)\)\{closeModal\(\);if\(state\.tab==='tarefas'\)openTaskForm/.test(HTML));
+ok('G6 FAB global segue criando TAREFA (não sequestrado; C23: reset global)', /if\(el=g\('\[data-fab\]'\)\)\{if\(state\.tab!=='tarefas'\)\{state\.tab='tarefas';\}openGlobalNewTask\(\);return;\}/.test(HTML));
 ok('G7 K6 box-sizing global preservado (só .ev-sheet, 73I4B)', (HTML.match(/\*\{box-sizing:border-box/g) || []).length === 1);
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
