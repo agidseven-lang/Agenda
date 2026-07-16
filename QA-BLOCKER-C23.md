@@ -180,3 +180,77 @@ Provisionar e REGISTRAR neste arquivo (via PR/commit da equipe):
   próprio Desktop-QA; evidências com tokens redigidos). Nada disso pode
   ser executado deste ambiente (sem dispositivo/SIM/sessão WhatsApp) e
   NADA é transferido ao owner.
+
+---
+
+# ADENDO F3.3.73I6C24B — PROVA FÍSICA WHATSAPP QA: ROTEIRO EXECUTÁVEL (equipe operacional)
+
+## Ponto exato do NO-GO (registro exigido pelo mandato C24B)
+
+- **Falha na etapa 0 (provisão do ambiente físico), não em código**: o
+  executor da fase é um container Linux de nuvem SEM dispositivo, SIM,
+  telefone, conta WhatsApp Business ou sessão WhatsApp Web autenticada.
+- **Evidência objetiva (2026-07-16T18:06Z, nesta sessão)**:
+  1. enumeração de conectores instalados → somente `Cloudflare Developer
+     Platform`, `meta ads`, `Windsor.ai` (nenhum é cliente WhatsApp; os
+     três sem OAuth possível em sessão não-interativa);
+  2. busca de ferramentas por `whatsapp/message/send/phone/sms/device` →
+     nenhuma ferramenta de WhatsApp/SMS/dispositivo disponível;
+  3. egress direto do sandbox a `*.workers.dev` bloqueado pelo proxy
+     (CONNECT 403) — até WhatsApp Web seria inalcançável daqui, e
+     autenticá-lo exigiria QR de aparelho com conta ativa (inexistente).
+- Consequência: é PROIBIDO declarar GO (nenhum Card foi visto no
+  WhatsApp Business QA) e é PROIBIDO simular/usar dummy como prova.
+  Produção intocada; nenhum código alterado; nenhum build/release novo.
+
+## Estado do ambiente (pronto AGORA para a prova — nada a reconstruir)
+
+| Item | Valor | Prova |
+|---|---|---|
+| Worker QA | `idseven-push-qa` / `V64.59-c23-share-snapshot` | run 6 `29521890042` (17:57Z): `QA ativo` |
+| Version ID QA | `8e249449-9aae-4900-80e1-fd228377ab8f` | log do deploy (run 6) |
+| KV QA | `SHARE_SNAPSHOTS_QA` = `699bc76fcdec46889863bd07439c3972` | run 6 (reuso idempotente) |
+| Secrets QA | FCM_CLIENT_EMAIL/FCM_PRIVATE_KEY/TEAM_SESSION_SECRET/TEAM_API_KEY | run `29521583522` verde |
+| Cadeia Firestore | POST `/share-snapshot` → 404 `task_not_found`; portal → 404 amigável | runs `29521583522`/`29521890042` |
+| Desktop QA | **1.0.169-QA** (run 224 `29519468683`, commit `2a06de0`) | EXE `82886cd2a7f92047ffcc83895bfa9179aa220ea3e5792d7078a17551f7a14a49`; MSI `c989765718edea195ecba5e8413cd9ed48523b3f1df8e51ba78a567831aeeb46` |
+| Produção | `V64.59-c20-golden-contract` (intacta) | gate final dos 2 runs |
+
+## Roteiro VERBATIM da prova (executar e anexar evidências via PR/commit)
+
+Ambiente obrigatório: número/SIM de QA; conta WhatsApp Business exclusiva
+de QA; telefone controlado pela equipe; WhatsApp Web autenticado; Windows
+de QA; Desktop 1.0.169-QA instalado (verificar SHA-256 acima e o banner
+"AMBIENTE QA"); NENHUM dado real de cliente.
+
+TESTE CRONOGRAMA: 1) criar tarefa sintética pela UI; 2) confirmar cliente
+e conteúdos; 3) gerar share snapshot; 4) confirmar "Card Premium
+preparado"; 5) abrir WhatsApp Business; 6) confirmar Card Premium
+visível; 7) confirmar "Aprovar cronograma" + imagem correta + link
+correto; 8) abrir portal; 9) aprovar; 10) confirmar retorno ao Desktop;
+11) reenviar e confirmar URL estável.
+
+TESTE ROTEIRO: 1) criar tarefa sintética pela UI; 2) confirmar ausência
+de designer/responsável; 3) confirmar 4/6/8/12; 4) gerar share snapshot;
+5) confirmar "Card Premium preparado"; 6) abrir WhatsApp Business;
+7) confirmar Card Premium visível; 8) confirmar "Aprovar roteiro" +
+"Roteiro de gravação de vídeos" + logo oficial Id Seven + arte correta;
+9) abrir portal; 10) aprovar; 11) confirmar retorno ao Desktop;
+12) reenviar e confirmar URL estável.
+
+TESTE NOVA TAREFA: 1) abrir Quadro de Cronograma; 2) clicar no botão
+global "Nova tarefa"; 3) confirmar etapa Setor; 4) repetir em Roteiro,
+Edição de mídia e Programação de posts; 5) confirmar que nenhum setor ou
+formulário anterior é herdado.
+
+EVIDÊNCIAS OBRIGATÓRIAS: vídeo ou screenshots; data e hora; versão
+Desktop (1.0.169-QA); versão Worker (V64.59-c23-share-snapshot); Card
+Cronograma; Card Roteiro; portal; aprovação; retorno ao Desktop; Nova
+tarefa abrindo Setor; tokens SEMPRE redigidos.
+
+PROIBIÇÕES: não pedir teste ao owner; não usar conta pessoal do owner;
+não tocar produção; não alterar código; não gerar novo build; não criar
+release/tag; não usar dummy como prova física; não declarar GO sem Card
+visível no WhatsApp Business QA.
+
+RESULTADO: GO E2E QA somente com TODAS as provas físicas. Só após o GO:
+**F3.3.73I6C25-PRODUCTION-CUTOVER-DESKTOP-1.0.169**.
