@@ -212,7 +212,7 @@ jobs:
           # inexistente NUNCA é cacheada (regra no-poison) — prova de HIT: suíte hermética
           # B4-B7 + validação com link real do owner (miss→hit no 2º acesso).
           if grep -P '\tHEAD\t' "$TSV" | grep -q 'application/json'; then echo "ABORTAR: HEAD /share ainda responde JSON"; exit 1; fi
-          MISSES=$(grep -cPE '\t(miss|bypass)\t' "$TSV" || true)
+          MISSES=$(grep -cP '\t(miss|bypass)\t' "$TSV" || true)
           [ "$MISSES" -ge 1 ] || { echo "ABORTAR: X-Share-Cache ausente (miss/bypass) — handler novo não está ativo"; exit 1; }
           echo "OK: HEAD=text/html em todas as iterações e handler C18B ativo (X-Share-Cache presente em $MISSES respostas)"
 
