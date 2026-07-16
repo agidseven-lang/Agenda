@@ -145,6 +145,26 @@ jobs:
           done
           echo "::error::QA nao respondeu a versao C23 em 120s"; exit 1
 
+      - name: "Aguardar propagacao do KV (seeds legiveis; run 3 provou consistencia eventual)"
+        run: |
+          set -euo pipefail
+          # Run #3 (29518280536): cron leu na 1a tentativa; roteiro 404 no GET#1 e 200 no
+          # HEAD ~0,3s depois — consistencia eventual write->read do KV. Os asserts
+          # estritos so podem rodar APOS ambos os seeds estarem LEGIVEIS (mesma semantica
+          # do Desktop, que aguarda snapshotStatus=ready antes de validar). Cloudflare
+          # documenta ate ~60s de propagacao; deadline 120s. no-store garante que os
+          # 404s de sondagem NUNCA envenenam cache (provado no proprio run 3).
+          DEADLINE=$(( $(date +%s) + 120 ))
+          for TOK in "$T_CRON" "$T_ROT"; do
+            while :; do
+              TASK=$(curl -sSI --max-time 15 -A "kv-propagation-check" "$QA_URL/share/cronograma/$TOK" 2>/dev/null | grep -i '^x-share-task:' | tr -d '\r' | sed 's/^[^:]*: *//' || true)
+              [ "$TASK" = "resolved" ] && { echo "seed legivel ($TASK)"; break; }
+              [ "$(date +%s)" -lt "$DEADLINE" ] || { echo "::error::seed nao ficou legivel em 120s (KV)"; exit 1; }
+              sleep 3
+            done
+          done
+          echo "OK: ambos os snapshots sinteticos legiveis no edge"
+
       - name: "L3-QA — contrato READY (Cronograma + Roteiro) ao vivo"
         run: |
           set -euo pipefail
@@ -152,6 +172,7 @@ jobs:
           hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
           check_ready() {
             local TOK="$1" TIPO="$2" TITLE="$3" DESC="$4" IMG="$5"
+            local f0="$fail"
             local H="qa-ops/h-$TIPO.txt" B="qa-ops/b-$TIPO.html"
             local ST
             ST=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D "$H" -o "$B" -w '%{http_code}' "$QA_URL/share/cronograma/$TOK")
@@ -176,7 +197,7 @@ jobs:
             HS=$(curl -sS --max-time 30 -I -A "WhatsApp/2.23.20.0" -D "$HH" -o /dev/null -w '%{http_code}' "$QA_URL/share/cronograma/$TOK")
             [ "$HS" = "200" ] || { echo "FALHA[$TIPO]: HEAD status $HS"; fail=1; }
             case "$(hv content-type "$HH")" in text/html*) : ;; *) echo "FALHA[$TIPO]: HEAD content-type"; fail=1;; esac
-            echo "OK[$TIPO]: READY completo (200/resolved/$TIPO/ready + OG + canonical + HIT + HEAD)"
+            if [ "$fail" = "$f0" ]; then echo "OK[$TIPO]: READY completo (200/resolved/$TIPO/ready + OG + canonical + HIT + HEAD)"; else echo "REPROVADO[$TIPO]: ver FALHAs acima"; fi
           }
           check_ready "$T_CRON" "cronograma" "Aprovar cronograma" "Seu cronograma está pronto para avaliação." "/og/wa-card-v64-39.jpg"
           check_ready "$T_ROT" "roteiro" "Aprovar roteiro" "Seu Roteiro de gravação de vídeos está pronto para avaliação." "/og/wa-card-roteiro-v64-60.jpg"
