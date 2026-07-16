@@ -33,7 +33,10 @@ ok('A4 dominio premium congelado', /const CLIENT_LINK_BASE='https:\/\/aprovar\.a
 // cache-bust SOMENTE no link da mensagem: exatamente 1 call-site (em buildClientMessage)
 ok('A5 cache-bust FORA da mensagem (0 call-sites em buildClientMessage — D3R10AA)', (DH.match(/withWhatsAppPreviewBust\(buildShareClientUrl/g)||[]).length === 0);
 // o link SALVO no Firestore (clientReviewUrl) NAO leva cache-bust (usa buildPublicClientUrl puro)
-const ensureFn = (DH.match(/async function ensureReviewToken\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];
+// F3.3.73I6C18H — ensureReviewToken virou alias; o corpo real (que monta o link salvo)
+// é ensureStableClientReviewToken. A regra congelada continua a MESMA: link salvo via
+// buildPublicClientUrl, SEM cache-bust.
+const ensureFn = (DH.match(/async function ensureStableClientReviewToken\(taskId\)\{[\s\S]*?\n\}/)||[''])[0];
 ok('A6 link salvo (ensureReviewToken) usa buildPublicClientUrl SEM cache-bust', /const url=buildPublicClientUrl\(token\)/.test(ensureFn) && !/withWhatsAppPreviewBust/.test(ensureFn));
 ok('A7 preview usa /share (NAO /cliente) — buildClientMessage', /function buildClientMessage\(ctx\)\{[\s\S]*?buildShareClientUrl[\s\S]*?\n\}/.test(DH) && !/buildClientMessage[\s\S]*?\/cliente\/cronograma/.test((DH.match(/function buildClientMessage\(ctx\)\{[\s\S]*?\n\}/)||[''])[0]));
 

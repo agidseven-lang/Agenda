@@ -1,7 +1,7 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.166",
-  "description": "Agenda ID Seven Desktop — prewarm determinístico do Card Premium antes do WhatsApp (Electron)",
+  "version": "1.0.167",
+  "description": "Agenda ID Seven Desktop — link de aprovação ESTÁVEL por tarefa (token nunca rotaciona em reenvio)",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {

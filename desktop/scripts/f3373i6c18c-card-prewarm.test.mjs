@@ -42,7 +42,7 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão 1.0.166', PJ.version === '1.0.166' && (S('package-lock.json').includes('"version": "1.0.166"')));
+ok('A1 versão da baseline atual (1.0.167 — C18H)', PJ.version === '1.0.167' && (S('package-lock.json').includes('"version": "1.0.167"')));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
 const MODC = 'const SHARE_PATH = "/share/cronograma/";\n';

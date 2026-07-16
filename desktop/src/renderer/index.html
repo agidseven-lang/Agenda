@@ -6760,21 +6760,72 @@ function buildClientMessage(ctx){
 //   2) NAO engole o erro: confirma a escrita com um get() de leitura (read-back).
 //   3) se a gravacao/confirmacao falhar, LANCA -> o chamador aborta o envio em vez de
 //      mandar um link orfao. So persiste a versao otimista em memoria APOS confirmar.
-async function ensureReviewToken(taskId){
+/* F3.3.73I6C18H — TOKEN ESTÁVEL por tarefa (anti-rotação). O ensure antigo decidia
+   SÓ pelo cache local (state.tasks): se a tarefa não estivesse no cache no instante da
+   chamada (pós-login antes do 1º snapshot, corrida logo após o add(), exclusões do
+   pwaCutoffFilter/isTestTask), gerava token NOVO e SOBRESCREVIA o existente no
+   Firestore — matando o link antigo (portal 404 / fallback no Worker). Agora:
+     1) single-flight por tarefa (dois cliques => UMA geração);
+     2) cache local com token VÁLIDO => reusa (caminho quente, zero rede);
+     3) senão consulta a FONTE (get no doc): clientReviewToken válido => reusa;
+        só shareToken legado (Web/PWA) válido => reusa SEM escrever (o Worker
+        resolve pelos dois campos; precedência de leitura: clientReviewToken
+        primeiro — mesma ordem do Worker);
+     4) só gera token novo se NÃO existir nenhum válido; persiste UMA vez
+        (set merge aditivo) + read-back; se o read-back devolver OUTRO token
+        válido (outra máquina gravou primeiro), ADOTA o vencedor — nunca
+        sobrescreve nem falha à toa;
+     5) formato validado = o MESMO aceito pela rota do Worker; vazio/null/
+        undefined/curto => inválido. Token NUNCA é logado (nem URL completa).
+   Rotação futura só por ação administrativa explícita (fora desta fase). */
+function isValidReviewToken(v){return typeof v==='string'&&/^[A-Za-z0-9_-]{4,128}$/.test(v);}
+const _tokenFlight=new Map();
+async function ensureStableClientReviewToken(taskId){
   if(!taskId)return null;
-  const t=state.tasks.find(x=>x.id===taskId);
-  if(t&&t.clientReviewToken)return t.clientReviewToken;
-  const token=genReviewToken();const url=buildPublicClientUrl(token);
-  // set merge: cria/mescla mesmo se o doc acabou de ser criado (sem depender de update).
-  await db.collection('tasks').doc(taskId).set({clientReviewToken:token,clientReviewUrl:url},{merge:true});
-  // Read-back: confirma que o token REALMENTE esta no servidor antes de liberar o envio.
-  const snap=await db.collection('tasks').doc(taskId).get();
-  const saved=snap&&snap.exists?snap.get('clientReviewToken'):null;
-  if(saved!==token){throw new Error('clientReviewToken nao confirmado no Firestore');}
-  // So agora atualiza o cache em memoria (estado consistente com o servidor).
-  if(t){t.clientReviewToken=token;t.clientReviewUrl=url;}
-  return token;
+  const inflight=_tokenFlight.get(taskId);
+  if(inflight)return inflight;
+  const run=(async()=>{
+    const t=state.tasks.find(x=>x.id===taskId);
+    if(t&&isValidReviewToken(t.clientReviewToken))return t.clientReviewToken;
+    const ref=db.collection('tasks').doc(taskId);
+    // FONTE antes de gerar: nunca rotacionar um token que já existe no servidor.
+    const snap=await ref.get();
+    const remote=snap&&snap.exists?snap.get('clientReviewToken'):null;
+    if(isValidReviewToken(remote)){
+      const rurl=(snap.get('clientReviewUrl'))||buildPublicClientUrl(remote);
+      if(t){t.clientReviewToken=remote;t.clientReviewUrl=rurl;}
+      return remote;
+    }
+    const legacyShare=snap&&snap.exists?snap.get('shareToken'):null;
+    if(isValidReviewToken(legacyShare)){
+      // compat: tarefa legada (Web/PWA) — reusa SEM escrever nada (link continua vivo).
+      if(t&&!t.clientReviewToken)t.shareToken=legacyShare;
+      return legacyShare;
+    }
+    const token=genReviewToken();const url=buildPublicClientUrl(token);
+    // set merge: cria/mescla mesmo se o doc acabou de ser criado (sem depender de update).
+    await ref.set({clientReviewToken:token,clientReviewUrl:url},{merge:true});
+    // Read-back: confirma que o token REALMENTE esta no servidor antes de liberar o envio.
+    const chk=await ref.get();
+    const saved=chk&&chk.exists?chk.get('clientReviewToken'):null;
+    if(saved!==token){
+      // corrida multi-máquina: outro cliente persistiu primeiro — ADOTA o vencedor.
+      if(isValidReviewToken(saved)){
+        const surl=(chk.get('clientReviewUrl'))||buildPublicClientUrl(saved);
+        if(t){t.clientReviewToken=saved;t.clientReviewUrl=surl;}
+        return saved;
+      }
+      throw new Error('clientReviewToken nao confirmado no Firestore');
+    }
+    // So agora atualiza o cache em memoria (estado consistente com o servidor).
+    if(t){t.clientReviewToken=token;t.clientReviewUrl=url;}
+    return token;
+  })().finally(()=>{_tokenFlight.delete(taskId);});
+  _tokenFlight.set(taskId,run);
+  return run;
 }
+// Nome histórico preservado: TODOS os call sites (modal/openwa/resend) continuam válidos.
+async function ensureReviewToken(taskId){return ensureStableClientReviewToken(taskId);}
 
 // Aliases legados.
 function clientPreviewLink(ctx){return buildInternalClientLink(ctx);}
