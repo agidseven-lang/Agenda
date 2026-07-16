@@ -1,0 +1,85 @@
+# =====================================================================
+# [manual] F3.3.73I6C24 — DIAGNOSTICO da credencial Cloudflare (read-only)
+# ---------------------------------------------------------------------
+# Prova, com evidencia sanitizada, o que a credencial disponivel PODE e
+# NAO PODE fazer: (1) validade do token; (2) acesso a Workers KV Storage;
+# (3) capacidade de GERENCIAR/EMITIR tokens (user e conta). Nao cria nem
+# altera NADA — somente GETs + /verify. Nunca imprime valores de token;
+# ids sao mascarados. Serve de base objetiva para o item "responsavel
+# pelo bloqueio" do relatorio C24.
+# =====================================================================
+name: "[manual] C24 — diagnostico credencial Cloudflare (read-only)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite DIAGNOSTICAR-CF-C24 para autorizar"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  CF_TOKEN: ${{ secrets.CLOUDFLARE_QA_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+  CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  USANDO_QA_DEDICADO: ${{ secrets.CLOUDFLARE_QA_API_TOKEN != '' }}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "DIAGNOSTICAR-CF-C24" ] || { echo "::error::confirmacao invalida"; exit 1; }
+
+      - name: "D1 — token valido? (GET /user/tokens/verify)"
+        run: |
+          set -euo pipefail
+          R=$(curl -sS -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/user/tokens/verify")
+          echo "usando secret dedicado de QA: $USANDO_QA_DEDICADO"
+          echo "$R" | jq '{success, status: (.result.status // null), errors}'
+          [ "$(echo "$R" | jq -r '.success')" = "true" ] || { echo "::error::token INVALIDO"; exit 1; }
+
+      - name: "D2 — Workers KV Storage acessivel? (lista namespaces)"
+        run: |
+          set -euo pipefail
+          R=$(curl -sS -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/storage/kv/namespaces?per_page=5")
+          OK=$(echo "$R" | jq -r '.success')
+          echo "KV listagem success=$OK"
+          echo "$R" | jq '{success, errors, quantos: ((.result // []) | length)}'
+          if [ "$OK" = "true" ]; then echo "KV_OK=true" >> "$GITHUB_ENV"; else echo "KV_OK=false" >> "$GITHUB_ENV"; fi
+
+      - name: "D3 — pode GERENCIAR tokens? (GETs read-only; nada e criado)"
+        run: |
+          set -euo pipefail
+          U=$(curl -sS -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/user/tokens?per_page=1")
+          echo "user tokens: $(echo "$U" | jq -c '{success, errors: (.errors // [] | map(.code))}')"
+          A=$(curl -sS -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/tokens?per_page=1")
+          echo "account tokens: $(echo "$A" | jq -c '{success, errors: (.errors // [] | map(.code))}')"
+          if [ "$(echo "$U" | jq -r '.success')" = "true" ] || [ "$(echo "$A" | jq -r '.success')" = "true" ]; then
+            echo "GESTAO_TOKENS=true" >> "$GITHUB_ENV"
+            echo "::warning::credencial PODE gerenciar tokens — auto-emissao de token QA e tecnicamente possivel (nenhuma criacao foi feita nesta run)"
+          else
+            echo "GESTAO_TOKENS=false" >> "$GITHUB_ENV"
+            echo "credencial NAO pode listar/gerenciar tokens (auto-emissao IMPOSSIVEL para o executor)"
+          fi
+
+      - name: "D4 — veredito consolidado"
+        run: |
+          set -euo pipefail
+          echo "== VEREDITO C24 =="
+          echo "token valido............: sim"
+          echo "usa secret QA dedicado..: $USANDO_QA_DEDICADO"
+          echo "Workers KV Storage......: $KV_OK"
+          echo "gestao/emissao de tokens: $GESTAO_TOKENS"
+          if [ "$KV_OK" = "true" ]; then
+            echo "DESBLOQUEADO: reexecutar deploy-worker-qa.yml (PROVISIONAR-QA-C23)"
+          elif [ "$GESTAO_TOKENS" = "true" ]; then
+            echo "PARCIAL: sem KV, mas com gestao de tokens — avaliar auto-emissao controlada"
+          else
+            echo "BLOQUEIO CONFIRMADO: somente o administrador Cloudflare pode emitir o token QA (Workers KV Storage: Edit) e grava-lo como secret CLOUDFLARE_QA_API_TOKEN no GitHub"
+          fi

@@ -45,7 +45,10 @@ env:
   T_CRON: qacronsynthetic0000000000000000000000000001
   T_ROT: qarotsynthetic00000000000000000000000000002
   T_NF: qadummysynthetic000000000000000000000000003
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  # C24: preferir o token TECNICO DEDICADO de QA quando existir (permissoes
+  # minimas: Workers KV Storage Edit + Workers Scripts Edit); fallback ao token
+  # atual de deploy. Nenhum valor jamais e impresso.
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_QA_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
 jobs:
