@@ -315,3 +315,64 @@ e o card aparece no WhatsApp Business QA com a arte do tipo correto (v64-39
 cronograma / v64-60 roteiro). Só então **GO E2E QA** e abertura da
 **F3.3.73I6C25-PRODUCTION-CUTOVER-DESKTOP-1.0.170** (produção segue intocada:
 Worker `V64.59-c20-golden-contract`, Desktop 1.0.168).
+
+---
+
+# ADENDO F3.3.73I6C24D — GATE DE URL corrigido + candidata 1.0.171-QA (substitui a 1.0.170-QA)
+
+## Por que a 1.0.170-QA falhou fisicamente (HARD NO-GO) — causa PROVADA (linha exata)
+
+A prévia carregava, mas ao clicar aparecia **"Link inválido — gere o cronograma
+novamente."** e os 3 botões travavam. Causa-raiz no renderer, função
+`_gateValidLink` (segundo validador, separado do prewarm): fixava o host de
+**produção** (`indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/')
+===0`) e **rejeitava `workers.dev`** (`!/workers\.dev/.test`) — reprovando o
+próprio host de QA do build. O prewarm (`isAllowedShareUrl`) já fora corrigido
+na C24C, mas este segundo validador ficou com a allowlist de produção.
+Reproduzido no código real (RED): `RED_CRONOGRAMA/ROTEIRO_LINK_INVALID_CONFIRMED`.
+**A 1.0.170-QA está DESCARTADA.**
+
+## O que foi corrigido na RAIZ (C24D) — fail-closed, sem enfraquecer segurança
+
+- **allowlist EXPLÍCITA por ambiente**: `SHARE_ENV`/`SHARE_ALLOWED_HOST`
+  (QA=host QA; prod=host oficial) + invariante de build (host do
+  `CLIENT_LINK_BASE` === allowlist).
+- **`validateShareUrl()`**: validação ÚNICA por `new URL()` — host **EXATO**
+  (`===`, nunca includes/startsWith/wildcard), https, rota oficial, token no
+  formato, tipo válido; rejeita espaços/invisíveis/credencial/porta/query.
+- **URL canônica única**: os 3 botões (WhatsApp/Copiar/Testar) observam a MESMA
+  `canonicalShareUrl` e o MESMO estado (nascem `disabled`; só habilitam com
+  prewarm ok **E** URL válida; qualquer falha → os 3 bloqueados, reason exato).
+- **texto por setor**: "gere o roteiro novamente"/"Preparando o link do
+  roteiro…"/"Link do roteiro pronto para envio." (sem contaminação de cronograma).
+- **gate EMPACOTADO** (app.asar) no `desktop-build.yml`: reprova build QA que
+  reintroduza o validador legado (provado: detecta a 1.0.170-QA, aprova a
+  1.0.171-QA). O **Worker QA não mudou** — a causa é 100% renderer.
+
+## Candidata FÍSICA a instalar (substitui 1.0.170-QA) — build run 226 (`29531146350`)
+
+| Item | Valor |
+|---|---|
+| Versão | **1.0.171-QA** |
+| Branch/commit | `desktop/f3373i6c24d-qa-1.0.171-qa` @ `77f84f0` |
+| EXE | `Agenda-ID-Seven-Desktop-1.0.171-QA-x64.exe` |
+| SHA-256 EXE | `3d29eebea4f553a968d5be5c6eb470052dad1a854d4ed5778c57a4f2aeae8f5f` |
+| MSI | `Agenda-ID-Seven-Desktop-1.0.171-QA-x64.msi` |
+| SHA-256 MSI | `e844f87bc08dca6d0bb0ace8a2e4dffd0c55dc41a8bd5e47de3df032d999b289` |
+| Artifact installer | `8388728455` |
+| Artifact bundle | `8388733727` |
+| Banner permanente | "AMBIENTE QA — NÃO USAR COM CLIENTES" |
+| Aponta para | Worker QA `idseven-push-qa` (exclusivo; host QA aceito pela allowlist) |
+
+## Provas
+Suite do gate de URL `f3373i6c24d-share-url-gate.test.mjs` **35/35** (RED→GREEN;
+matriz host/proto/path/token/tipo/re-render/reenvio/URL-canônica/texto/
+fail-closed); regressão desktop integral **verde**; tsc limpo; gate empacotado
+provado. Worker QA C24C permanece vivo (run `29528374193`); produção intocada.
+
+## O que a equipe operacional executa AGORA
+Instalar a **1.0.171-QA** (conferir SHA-256 acima e o banner) e rodar o roteiro
+C24B (Cronograma/Roteiro/Nova tarefa). Expectativa técnica: os 3 botões
+habilitam com o host QA, "Link do &lt;tipo&gt; pronto para envio.", e o card
+aparece no WhatsApp Business QA. Só então **GO E2E QA** e
+**F3.3.73I6C25-PRODUCTION-CUTOVER-DESKTOP-1.0.171**.
