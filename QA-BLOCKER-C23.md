@@ -254,3 +254,64 @@ visível no WhatsApp Business QA.
 
 RESULTADO: GO E2E QA somente com TODAS as provas físicas. Só após o GO:
 **F3.3.73I6C25-PRODUCTION-CUTOVER-DESKTOP-1.0.169**.
+
+---
+
+# ADENDO F3.3.73I6C24C — CAUSA-RAIZ CORRIGIDA + CANDIDATA 1.0.170-QA (substitui a 1.0.169-QA)
+
+## Por que a 1.0.169-QA falhou fisicamente (HARD NO-GO) — causa PROVADA
+
+`git diff 4fb0a7f→2a06de0`: a **1.0.169-QA foi cortada da base C20 (1.0.168)**,
+que NÃO tem a etapa de publicação do snapshot (`ensureShareSnapshot` / POST
+`/share-snapshot`). Contra o Worker C23 (GET público serve **só** o snapshot do
+KV), o card nunca era publicado → GET `/share` respondia **404 not_found** → o
+prewarm falhava em `get1` → botão desabilitado → "Não foi possível preparar o
+Card Premium" — **antes** do WhatsApp. A "arte de cronograma" no Roteiro era
+resíduo legado da mesma base C20. **A 1.0.169-QA está DESCARTADA.**
+
+## O que foi corrigido na RAIZ (C24C)
+
+- **Worker** `worker/f3373i6c23-share-snapshot` @ `30d64ba`: READY só após
+  **readback** do KV (poll com backoff; timeout → 503 `kv_not_visible`, nunca
+  ready antecipado); **códigos estruturados** de falha; **trace** `X-QA-Trace-Id`
+  (só quando `QA_TRACE=1`); warm da Cache API também na ORIGEM; `og{title,
+  description,imagePath}` na resposta. Deploy QA vivo verde: run
+  `29528374193` (endpoint 404 `task_not_found` real, portal 404 amigável,
+  produção intocada).
+- **Desktop 1.0.170-QA** `desktop/f3373i6c24c-qa-1.0.170-qa` @ `301a26c`:
+  reconstruída sobre a **base C23** (`4b15fc7` — tem o fluxo snapshot-antes-do-
+  WhatsApp + reset do wizard) + sabor QA + melhorias C24C (prewarm estruturado;
+  preview por OG do tipo com skeleton; **resíduo removido**; trace).
+
+## Candidata FÍSICA a instalar (substitui 1.0.169-QA) — build run 225 (`29528415451`)
+
+| Item | Valor |
+|---|---|
+| Versão | **1.0.170-QA** |
+| EXE | `Agenda-ID-Seven-Desktop-1.0.170-QA-x64.exe` |
+| SHA-256 EXE | `c051f3cbe9e86482fd7034dbafc829a439d0c07581339df145a5da005d6aef35` |
+| MSI | `Agenda-ID-Seven-Desktop-1.0.170-QA-x64.msi` |
+| SHA-256 MSI | `c939b64a25b6c64603da17656adac9cc9ae29da535be29540e8a93aceab52d68` |
+| Artifact installer | `8387697287` |
+| Artifact bundle | `8387701665` |
+| Banner permanente | "AMBIENTE QA — NÃO USAR COM CLIENTES" |
+| Aponta para | Worker QA `idseven-push-qa` (exclusivo) |
+
+## Prova hermética ponta a ponta (worker REAL + prewarm REAL) — antes da física
+
+`scripts/f3373i6c24c-integrated-prewarm.e2e.test.mjs` (branch do worker) **26/26**:
+reproduz a falha da 1.0.169-QA (sem POST → get1 not_found), prova o fix
+Cronograma+Roteiro (botão liberado, arte do tipo, URL estável) e a matriz de
+falhas (auth/task/type/kv/imagem/cache → botão desabilitado, razão exata, sem
+WhatsApp). Golden Master 56/56; regressão desktop integral verde.
+
+## O que a equipe operacional executa AGORA (idêntico ao roteiro C24B acima)
+
+Instalar a **1.0.170-QA** (conferir SHA-256 acima e o banner) no Windows de QA e
+rodar os TESTES CRONOGRAMA / ROTEIRO / NOVA TAREFA do adendo C24B, coletando
+evidências (tokens redigidos). Expectativa técnica agora: o modal mostra
+"Preparando prévia…" → "Card Premium preparado", o botão do WhatsApp **habilita**,
+e o card aparece no WhatsApp Business QA com a arte do tipo correto (v64-39
+cronograma / v64-60 roteiro). Só então **GO E2E QA** e abertura da
+**F3.3.73I6C25-PRODUCTION-CUTOVER-DESKTOP-1.0.170** (produção segue intocada:
+Worker `V64.59-c20-golden-contract`, Desktop 1.0.168).
