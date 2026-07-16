@@ -145,8 +145,8 @@ const ctxRot = { id: 't-rot', sector: 'roteiro', client: 'Cliente Sintético', t
 /* ── fiação do modal: pacote real como gate; prewarm = BÔNUS ── */
 ok('W1 modal usa runPreparePackage (pacote) e NÃO gate de prewarm', /async function runPreparePackage\(\)/.test(HTML) && /on\('btnPrewarmRetry', function\(\)\{ runPreparePackage\(\); \}\);/.test(HTML) && !/async function runPrewarm\(\)/.test(HTML));
 ok('W2 prewarm/snapshot viraram BÔNUS em segundo plano (bonusPreviewWarm; nunca altera UI)', /function bonusPreviewWarm\(taskId,tipo,url\)/.test(HTML) && /bonusPreviewWarm\(ctx&&ctx\.id,_tipoModal,P\.approvalUrl\);/.test(HTML));
-ok('W3 botão principal copia a IMAGEM premium (copyCardImage) e abre o WhatsApp (openWhatsAppWebOnly)',
-  /const r=await api\.copyCardImage\(new Uint8Array\(sharePkg\.imageBytes\)\)/.test(HTML) && /openWhatsAppWebOnly\(\);/.test(HTML));
+ok('W3 [74C] botão principal usa o Share NATIVO (pacote único imagem+legenda+link); fallback honesto ainda copia a IMAGEM (copyCardImage) e abre o WhatsApp (openWhatsAppWebOnly)',
+  /await api\.nativeShare\(buildNativeShareRequest\(sharePkg,_modalTrace\)\)/.test(HTML) && /const r2=await api\.copyCardImage\(new Uint8Array\(sharePkg\.imageBytes\)\)/.test(HTML) && /openWhatsAppWebOnly\(\);/.test(HTML));
 ok('W4 fallback assistido: sem clipboard de imagem → salva arquivo + copia mensagem (nunca trava)',
   /const pth=await ensureSaved\(\); if\(pth\)/.test(HTML) && /if\(!copyMsgClean\(\)\) return;/.test(HTML));
 ok('W5 4 botões fail-closed nascem disabled e habilitam JUNTOS pelo pacote',

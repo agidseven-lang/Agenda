@@ -6813,6 +6813,22 @@ async function buildSharePackage(ctx){
   }catch(_){P.contentHash='';}
   P.ok=true;P.reason='ok';return P;
 }
+/* F3.3.74C — request do compartilhamento NATIVO (Windows Share): UM DataPackage com
+   imagem + legenda (com o link) + WebLink + titulo/descricao. Nunca inclui JWT/secret/
+   dados administrativos — só o que o cliente final verá. */
+function buildNativeShareRequest(P,traceId){
+  return {
+    type:(P.type==='roteiro'?'VIDEO_SCRIPT':'SCHEDULE'),
+    imageBytes:P.imageBytes,
+    captionText:P.messageText,
+    approvalUrl:P.approvalUrl,
+    title:P.title,
+    description:P.description,
+    clientName:P.clientName,
+    contentHash:P.contentHash,
+    traceId:traceId||''
+  };
+}
 /* BONUS (nunca gate): aquece snapshot/preview do link em segundo plano — se o WhatsApp
    renderizar o preview, otimo; se nao, o envio segue 100% funcional pela IMAGEM nativa. */
 function bonusPreviewWarm(taskId,tipo,url){
@@ -7030,7 +7046,7 @@ async function openSendClientModal(taskOrForm){
             /* F3.3.73I6C24C — resíduo removido: a arte do card vem do SNAPSHOT do TIPO correto (v64-39 cronograma / v64-60 roteiro). Nao ha mais "layout de cronograma" para Roteiro. */
       /* F3.3.73I6C18C — o botão NASCE desabilitado: só libera após "Card Premium preparado."
          (prova técnica real via IPC card-prewarm: GET validado + OG do TIPO certo + cache). */
-      '<button class="gcs-go" id="btnOpenWaMain" disabled>'+svg('send')+'Abrir WhatsApp Business para enviar no grupo</button>'+
+      '<button class="gcs-go" id="btnOpenWaMain" disabled>'+svg('send')+'Compartilhar Card Premium no WhatsApp</button>'+
       '<div class="gcs-status" id="groupStatus">Preparando o card premium do '+(ctx.sector==='roteiro'?'roteiro':'cronograma')+'…</div>'+
       '<div class="gcs-note">A prévia acima é a <b>imagem premium real</b> gerada pelo app — é ela que você envia no grupo. O botão “Revisar e aprovar” aparece no <b>portal</b>, quando o cliente abre o link da mensagem.</div>'+
       '<div class="gcs-secondary">'+
@@ -7200,28 +7216,51 @@ async function _wireGroupSend(ctx, msg, cardFile){
      É o fluxo que funcionou no teste real: 1 clique copia a mensagem e abre o WhatsApp Business.
      Sem pasta, sem salvar arquivo, sem etapas. O link /share gera a prévia premium ao colar. */
   on('btnOpenWaMain', async function(){
-    // F3.3.74B — REGRA CENTRAL: WhatsApp SÓ abre com o PACOTE pronto (imagem real + mensagem +
-    // link validado). O preview automático do link NÃO é requisito (bônus em segundo plano).
+    // F3.3.74C — FLUXO PRINCIPAL: Windows Share NATIVO — UM ÚNICO pacote de mídia com a
+    // IMAGEM premium + LEGENDA (com o link) + WebLink. Sem duas colagens. O usuário só
+    // escolhe o WhatsApp Business e o grupo, confere a prévia e confirma o envio.
     if(!prepReady||!sharePkg||!sharePkg.ok){ flashToast('Aguarde: o card premium ainda está sendo preparado.'); return; }
-    const b0=$('btnOpenWaMain'); if(b0){ b0.innerHTML=svg('send')+'Abrindo WhatsApp Business…'; }
-    // 1) coloca a IMAGEM premium no clipboard (read-back no main confirma retenção);
-    //    fallback: salva o arquivo e copia a mensagem (assistência máxima possível).
-    let imgCopied=false;
-    try{ if(api.copyCardImage&&sharePkg.imageBytes){ const r=await api.copyCardImage(new Uint8Array(sharePkg.imageBytes)); imgCopied=!!(r&&r.ok); } }catch(_){ imgCopied=false; }
-    let savedInfo='';
-    if(!imgCopied){ bytes=sharePkg.imageBytes; const pth=await ensureSaved(); if(pth){ savedInfo=' A imagem foi salva em: '+pth+'.'; } if(!copyMsgClean()) return; }
-    // 2) abre o WhatsApp Business (só web.whatsapp.com/ — nunca send?text=)
-    openWhatsAppWebOnly();
-    const b=$('btnOpenWaMain'); if(b){ b.classList.add('is-done'); b.innerHTML=svg('check')+(imgCopied?'WhatsApp aberto · imagem copiada':'WhatsApp aberto'); }
-    if(imgCopied){
-      setStatus(svg('check')+'<span><b>Imagem premium copiada</b> e WhatsApp Business aberto. 1) No grupo do cliente, cole (Ctrl+V) a imagem e envie. 2) Toque em “Copiar mensagem” e cole/envie na sequência (é ela que leva o link de aprovação).</span>','ok',true);
-      flashToast('Imagem premium copiada. Cole (Ctrl+V) no grupo e envie; depois use “Copiar mensagem”.');
-    }else{
-      setStatus(svg('check')+'<span>Mensagem copiada e WhatsApp Business aberto. Cole (Ctrl+V) no grupo.'+savedInfo+' Use “Copiar card (imagem)” nas opções para anexar a imagem premium.</span>','ok',true);
-      flashToast('Mensagem copiada e WhatsApp Business aberto.');
+    if(prepBusy) return; prepBusy=true;
+    const b0=$('btnOpenWaMain'); if(b0){ b0.disabled=true; b0.innerHTML=svg('send')+'Abrindo o compartilhamento…'; }
+    let nativeOk=false, nativeTried=false;
+    try{
+      const avail=(api.nativeShareAvailable?await api.nativeShareAvailable():{available:false});
+      if(avail&&avail.available&&api.nativeShare){
+        nativeTried=true;
+        setStatus('Escolha o <b>WhatsApp Business</b> na janela de compartilhamento do Windows e selecione o grupo do cliente. A imagem premium e a mensagem com o link seguem JUNTAS na mesma mídia.','',true);
+        qaDiag('qa.desktop.nativeshare.start',{trace:_modalTrace,tipo:_tipoModal});
+        const r=await api.nativeShare(buildNativeShareRequest(sharePkg,_modalTrace));
+        qaDiag('qa.desktop.nativeshare.result',{ok:!!(r&&r.ok),stage:(r&&r.stage)||'',canceled:!!(r&&r.canceled),target:(r&&r.target)?'sim':'',trace:_modalTrace});
+        if(r&&r.ok){
+          nativeOk=true;
+          if(b0){ b0.classList.add('is-done'); b0.innerHTML=svg('check')+'Compartilhado no WhatsApp'; b0.disabled=false; }
+          setStatus(svg('check')+'<span>Pacote enviado ao WhatsApp Business'+(r.target?' ('+esc(r.target)+')':'')+': imagem premium + legenda + link em uma única mensagem de mídia. Confira o grupo e confirme o envio, se ainda não confirmou.</span>','ok',true);
+          if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
+        }else if(r&&r.canceled){
+          if(b0){ b0.disabled=false; b0.innerHTML=svg('send')+'Compartilhar Card Premium no WhatsApp'; }
+          setStatus('Compartilhamento cancelado. Nada foi enviado — toque novamente quando quiser compartilhar.','err');
+        }else if(r&&r.timeout){
+          if(b0){ b0.disabled=false; b0.innerHTML=svg('send')+'Compartilhar Card Premium no WhatsApp'; }
+          setStatus('A janela de compartilhamento foi fechada sem confirmação. Nada foi registrado — tente novamente.','err');
+        }else{
+          nativeTried=false; // falha real do helper → cai no modo alternativo abaixo
+          qaDiag('qa.desktop.nativeshare.fallback',{reason:(r&&r.reason)||'sem_resultado',trace:_modalTrace});
+        }
+      }
+    }catch(_){ nativeTried=false; }
+    if(!nativeOk&&!nativeTried){
+      // MODO ALTERNATIVO (fallback honesto — NÃO é a solução definitiva): imagem no
+      // clipboard + WhatsApp aberto; a mensagem fica em “Copiar mensagem”.
+      let imgCopied=false;
+      try{ if(api.copyCardImage&&sharePkg.imageBytes){ const r2=await api.copyCardImage(new Uint8Array(sharePkg.imageBytes)); imgCopied=!!(r2&&r2.ok); } }catch(_){ imgCopied=false; }
+      let savedInfo='';
+      if(!imgCopied){ bytes=sharePkg.imageBytes; const pth=await ensureSaved(); if(pth){ savedInfo=' A imagem foi salva em: '+pth+'.'; } if(!copyMsgClean()){ prepBusy=false; if(b0){ b0.disabled=false; b0.innerHTML=svg('send')+'Compartilhar Card Premium no WhatsApp'; } return; } }
+      openWhatsAppWebOnly();
+      if(b0){ b0.disabled=false; b0.innerHTML=svg('send')+'Compartilhar Card Premium no WhatsApp'; }
+      setStatus('<b>Modo alternativo</b> (o compartilhamento nativo do Windows não está disponível): '+(imgCopied?'a imagem premium foi copiada — cole (Ctrl+V) no grupo e envie; depois toque em “Copiar mensagem” e cole/envie o texto com o link.':'a mensagem foi copiada — cole no grupo.'+savedInfo),'err',true);
+      if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
     }
-    // Registro do envio (Notification Engine) — segue idêntico ao aprovado.
-    if(ctx&&ctx.id&&ctx.id!=='__form__')persistClientSend(ctx.id);
+    prepBusy=false;
   });
   /* ===== Secundários discretos ===== */
   on('btnCopyGroupMsg', function(){                                // copia só a mensagem (se útil), sem abrir o WhatsApp
@@ -7294,7 +7333,7 @@ async function _wireGroupSend(ctx, msg, cardFile){
       prepReady=true;
       setShareButtonsEnabled(true);
       try{ applyPreviewFromPackage(P); }catch(_){}
-      setStatus(svg('check')+'<span>Card premium do '+_tipoModal+' pronto para envio — imagem, mensagem e link gerados. Toque em “Abrir WhatsApp Business” para enviar no grupo.</span>','ok',true);
+      setStatus(svg('check')+'<span>Card premium do '+_tipoModal+' pronto para envio — imagem, mensagem e link gerados. Toque em “Compartilhar Card Premium no WhatsApp” para enviar tudo em uma única mensagem de mídia.</span>','ok',true);
       // BÔNUS (nunca gate): aquece o preview do link em segundo plano.
       bonusPreviewWarm(ctx&&ctx.id,_tipoModal,P.approvalUrl);
     }else{
@@ -8203,15 +8242,25 @@ document.addEventListener('click',async e=>{
       }
       bonusPreviewWarm((id&&id!=='__form__')?id:(ctx&&ctx.id),_P.type,_P.approvalUrl);
     }finally{ state._openwaBusy=false; }
-    // 1.0.119 — COPIA só a mensagem limpa e abre o WhatsApp SEM texto na URL.
-    // NUNCA envia send?text= ao cliente. O usuário cola a mensagem no chat.
-    // (A IMAGEM premium é enviada pelo modal principal "Enviar no grupo do cliente",
-    //  que coloca a imagem no clipboard — este atalho copia a MENSAGEM do pacote.)
-    copyToClipboard(_P.messageText);
-    if(id&&id!=='__form__')await persistClientSend(id);
-    closeModal();
-    openWhatsAppPlain();
-    flashToast('Card premium pronto. Mensagem copiada — cole no WhatsApp. Para a IMAGEM, use “Enviar no grupo do cliente”.');
+    // F3.3.74C — atalho também usa o Share NATIVO (um pacote único). Fallback honesto:
+    // mensagem no clipboard + WhatsApp aberto (sem prometer mídia+texto juntos).
+    let _nsOk=false;
+    try{
+      const _av=(window.desktopAPI&&window.desktopAPI.nativeShareAvailable)?await window.desktopAPI.nativeShareAvailable():{available:false};
+      if(_av&&_av.available&&window.desktopAPI.nativeShare){
+        flashToast('Escolha o WhatsApp Business na janela de compartilhamento…');
+        const _r=await window.desktopAPI.nativeShare(buildNativeShareRequest(_P,qaTraceId()));
+        if(_r&&_r.ok){ _nsOk=true; if(id&&id!=='__form__')await persistClientSend(id); closeModal(); flashToast('Compartilhado: imagem + legenda + link em uma única mensagem.'); return; }
+        if(_r&&(_r.canceled||_r.timeout)){ flashToast('Compartilhamento não concluído — nada foi enviado.'); return; }
+      }
+    }catch(_){/* cai no fallback */}
+    if(!_nsOk){
+      copyToClipboard(_P.messageText);
+      if(id&&id!=='__form__')await persistClientSend(id);
+      closeModal();
+      openWhatsAppPlain();
+      flashToast('Modo alternativo: mensagem copiada — cole no WhatsApp. Para a mídia única, use “Enviar no grupo do cliente”.');
+    }
     return;
   }
   if(el=g('[data-sheet]')){openSheet(el.dataset.sheet);return;}

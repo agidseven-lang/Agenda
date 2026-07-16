@@ -18,6 +18,10 @@ files:
 extraResources:
   - from: build/icon.png
     to: icon.png
+  # F3.3.74C — helper nativo do Windows Share (compilado no CI antes do electron-builder;
+  # instalado junto, sem atalho proprio, chamado só pelo processo main via IPC native-share)
+  - from: native-share/publish
+    to: native-share
 win:
   target:
     - target: nsis

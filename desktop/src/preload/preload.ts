@@ -43,6 +43,10 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.invoke("save-card-image", { bytes, filename }),
   saveCardImageAs: (bytes: ArrayBuffer | Uint8Array, filename: string): Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }> =>
     ipcRenderer.invoke("save-card-image-as", { bytes, filename }),
+  // F3.3.74C — compartilhamento NATIVO (Windows Share): UM pacote com imagem+legenda+link.
+  nativeShare: (req: { type: string; imageBytes: ArrayBuffer | Uint8Array; captionText: string; approvalUrl: string; title: string; description: string; clientName?: string; contentHash?: string; traceId?: string }): Promise<{ ok: boolean; stage: string; canceled: boolean; timeout: boolean; target: string; reason: string; helperExit: number | null }> =>
+    ipcRenderer.invoke("native-share", req),
+  nativeShareAvailable: (): Promise<{ available: boolean }> => ipcRenderer.invoke("native-share-available"),
   copyCardImage: (bytes: ArrayBuffer | Uint8Array): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke("copy-card-image", bytes),
   // F3.3.70D3R10U — "Abrir imagem" do card (salva em Downloads + abre no visualizador do SO)

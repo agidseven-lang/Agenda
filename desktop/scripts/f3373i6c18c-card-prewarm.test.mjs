@@ -48,7 +48,7 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão da candidata QA (1.0.172-QA — 74B)', PJ.version === '1.0.172-QA' && (S('package-lock.json').includes('"version": "1.0.172-QA"')));
+ok('A1 versão da candidata QA (1.0.173-QA — 74C)', PJ.version === '1.0.173-QA' && (S('package-lock.json').includes('"version": "1.0.173-QA"')));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
 const MODC = 'const SHARE_PATH = "/share/cronograma/";\nconst HOST = "aprovar.agendaidseven.com.br";\n';
@@ -187,7 +187,7 @@ ok('I4 [74B] sucesso → "Card premium … pronto para envio" + botão liberado;
   /Card premium do '\+_tipoModal\+' pronto para envio — imagem, mensagem e link gerados/.test(HTML) &&
   /Não foi possível gerar o card premium agora\. Toque em “Regenerar card”/.test(HTML) &&
   /id="btnPrewarmRetry"/.test(HTML) && /on\('btnPrewarmRetry', function\(\)\{ runPreparePackage\(\); \}\);/.test(HTML));
-ok('I5 estado "Abrindo WhatsApp Business…" antes de abrir', /Abrindo WhatsApp Business…/.test(HTML));
+ok('I5 [74C] estado "Abrindo o compartilhamento…" antes do Share nativo', /Abrindo o compartilhamento…/.test(HTML));
 ok('I6 cliques duplicados bloqueados (prepBusy no modal + _openwaBusy no caminho data-openwa)',
   /if\(prepBusy\) return; prepBusy=true;/.test(HTML) && /if\(state\._openwaBusy\)\{ return; \}/.test(HTML));
 ok('I7 [74B] caminho [data-openwa] TAMBÉM gated pelo PACOTE (falha nunca abre openWhatsAppPlain)',
