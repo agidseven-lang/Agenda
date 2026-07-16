@@ -428,3 +428,92 @@ negativos; fiação do modal); sweep integral **verde**; tsc limpo; **cards REAI
 gerados pelo código do renderer em Chromium headless** (1200×630 PNG, cron +
 roteiro) entregues como evidência visual. Produção intocada (Desktop 1.0.168;
 Worker `V64.59-c20-golden-contract`).
+
+---
+
+# ADENDO F3.3.74C — PACOTE ÚNICO: imagem+legenda+link em UMA mensagem de mídia (candidata 1.0.173-QA)
+
+## Por que a 1.0.172-QA reprovou fisicamente (HARD NO-GO do owner)
+
+Na 1.0.172-QA a imagem premium chegou ao grupo, mas **sem legenda e sem link
+clicável**: o clipboard do Windows carrega UM item por vez, então o fluxo
+exigia **duas colagens** (imagem; depois texto). O owner rejeitou o mecanismo
+— cliente final não pode depender de segunda colagem. Requisito DEFINITIVO:
+o WhatsApp Business deve receber **UMA ÚNICA mensagem de mídia** com (1) a
+imagem premium real, (2) a legenda correta e (3) o link de aprovação clicável
+dentro da legenda.
+
+## O que mudou na 1.0.173-QA (troca de mecanismo, não cosmética)
+
+- Novo helper nativo **`AgendaIdSeven.NativeShare.exe`** (C++/WinRT, Win32),
+  embutido no instalador (`resources/native-share`), chamado pelo processo
+  main por IPC restrito. Ele monta **UM DataPackage** com **StorageItems
+  (PNG real do card) + Text (legenda completa com o link) + WebLink +
+  Title/Description + Thumbnail** e abre o **Windows Share UI** ancorado em
+  janela própria (`IDataTransferManagerInterop::ShowShareUIForWindow` —
+  padrão Win32 que NÃO exige package identity/MSIX).
+- O botão principal do modal virou **"Compartilhar Card Premium no
+  WhatsApp"**: abre o Share do Windows; a equipe escolhe **WhatsApp
+  (Business)** → grupo do cliente; imagem+legenda+link seguem **JUNTOS na
+  mesma mídia**. **Sem segunda colagem.**
+- Cancelar/fechar sem confirmar → estado honesto ("Nada foi enviado").
+  Helper indisponível/falha real → **MODO ALTERNATIVO** rotulado (o fluxo
+  assistido da 74B, nunca apresentado como solução definitiva).
+- Telemetria sanitizada (nunca legenda/URL completa/token; só flags, host,
+  tamanhos, alvo e duração) com trace QA.
+
+## Prova de pacote em CI (FASE 12 — "QA Share Target") — run 228 (`29539245049`)
+
+O gate compila o helper (MSVC `/std:c++20`) e roda `--selftest`: monta o
+DataPackage real e o **RELÊ** pelo `DataPackageView` — o MESMO objeto que um
+Share Target recebe — exigindo TODOS os formatos simultaneamente:
+`storageItems:true` (`itemCount:1`), `text:true`, `webLink:true`,
+`titlePresent:true`, `descPresent:true`. Resultado do run 228: `selftest_ok` em 47 ms — `storageItems:true, text:true, webLink:true, titlePresent:true, descPresent:true, itemCount:1, textLen:180, linkHost:idseven-push-qa.agidseven.workers.dev` (valores relidos do próprio pacote).
+Gate pós-build confirma o helper DENTRO do instalador
+(`resources/native-share/AgendaIdSeven.NativeShare.exe`, 394.240 bytes).
+
+**HONESTIDADE:** isso prova a **COMPOSIÇÃO** do pacote entregue ao Windows.
+NÃO prova o comportamento do WhatsApp Business ao recebê-lo — essa prova é
+FÍSICA (roteiro abaixo). **PROIBIDO GO só pelo selftest.**
+
+## Candidata FÍSICA a instalar (substitui 1.0.172-QA) — build run 228 (`29539245049`)
+
+| Item | Valor |
+|---|---|
+| Versão | **1.0.173-QA** |
+| Branch/commit | `desktop/f3374c-qa-1.0.173-qa` @ `f34c872` |
+| EXE | `Agenda-ID-Seven-Desktop-1.0.173-QA-x64.exe` |
+| SHA-256 EXE | `cc6cfae0d28799d1844567fcfba8bb2134a62b851b11c3f4ea635cfcbab5a334` |
+| MSI | `Agenda-ID-Seven-Desktop-1.0.173-QA-x64.msi` |
+| SHA-256 MSI | `bf975a9626a0917df6d6d145550d75b768dc688e9a51e326501bd093a09e4a1f` |
+| Artifact installer | `8391826153` |
+| Artifact bundle | `8391830106` |
+| Banner permanente | "AMBIENTE QA — NÃO USAR COM CLIENTES" |
+| Gates do run 228 | compilação helper + selftest FASE 12 + tray + prova-de-versão + URL C24D + helper empacotado: todos VERDES (15/15 passos) |
+
+## O que a equipe operacional executa AGORA (prova física 74C — Cronograma E Roteiro)
+
+1. Instalar a **1.0.173-QA** (conferir SHA-256 acima; banner QA visível).
+2. Tarefa de **Cronograma** → "Enviar no grupo do cliente" → aguardar
+   "Card premium do cronograma pronto para envio" (prévia = imagem REAL).
+3. Clicar **"Compartilhar Card Premium no WhatsApp"** → na janela de
+   compartilhamento do Windows escolher **WhatsApp (Business)** → escolher o
+   **grupo QA** → conferir a prévia da mensagem → **confirmar o envio**.
+4. **Verificar no grupo (no celular e no desktop):** deve haver **UMA única
+   mensagem de mídia** com a imagem premium + legenda completa + **link
+   clicável** que abre o portal QA (testar o toque no link no celular).
+5. Repetir os passos 2–4 com uma tarefa de **Roteiro** (arte de roteiro,
+   texto de roteiro, título "Aprovar roteiro" — sem nenhum texto de
+   cronograma).
+6. Evidências obrigatórias: print do grupo mostrando imagem+legenda+link em
+   UMA mensagem (cron E roteiro); print do portal aberto a partir do link;
+   diagnóstico QA `qa.desktop.nativeshare.result` com `ok:true` +
+   `target:sim`.
+
+**Critério de GO:** somente se, para **os dois tipos**, a mensagem única de
+mídia chegou com imagem + legenda + link clicável, **sem segunda colagem** e
+sem contaminação de tipo. **Se o WhatsApp Business descartar o Text/WebLink
+do DataPackage** (limitação do alvo, fora do nosso controle): registrar
+**NO-GO objetivo** com o print + o evento `target_selected`, e a fase
+seguinte decide o caminho (ex.: Share Target dedicado/outro canal). O MODO
+ALTERNATIVO (74B) permanece embutido como contingência — rotulado como tal.
