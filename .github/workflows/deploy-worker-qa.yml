@@ -1,0 +1,238 @@
+# =====================================================================
+# [manual] F3.3.73I6C23 — Worker QA ISOLADO: provisionar + validar share snapshot
+# ---------------------------------------------------------------------
+# Provisiona o servico de QA `idseven-push-qa` (workers.dev apenas, sem
+# rotas/dominio custom, sem cron) com KV EXCLUSIVO de QA
+# (titulo SHARE_SNAPSHOTS_QA) e valida AO VIVO o contrato C23 do /share:
+#   READY (snapshot sintetico semeado no KV de QA) → 200 resolved/tipo/
+#   ready + OG exato + canonical + imagens por SHA-256 + HIT no 2o GET +
+#   HEAD text/html; NOT_FOUND → 404 explicito no-store sem card de tipo;
+#   endpoint /share-snapshot: 401 sem credencial, 400 body invalido com
+#   a chave QA, 502 explicito no caminho Firestore (QA NAO tem credencial
+#   FCM por design — o caminho Firestore-dependente e provado no Golden
+#   Master hermetico); /sla-* 403; PRODUCAO INTOCADA (gate final confere
+#   que idseven-push segue exatamente na versao atual de producao).
+# NUNCA toca o servico de producao, seus secrets, rotas ou variaveis.
+# Tokens usados sao SINTETICOS (qa*synthetic*) — nunca reais.
+# Execucao SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] Worker QA C23 — provisionar + validar (isolado)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PROVISIONAR-QA-C23 para autorizar"
+        required: true
+        default: ""
+      ref:
+        description: "Branch/commit do Worker C23 a publicar em QA"
+        required: true
+        default: "worker/f3373i6c23-share-snapshot"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-worker-qa-c23
+  cancel-in-progress: false
+
+env:
+  QA_NAME: idseven-push-qa
+  QA_URL: https://idseven-push-qa.agidseven.workers.dev
+  PROD_URL: https://idseven-push.agidseven.workers.dev
+  NS_TITLE: SHARE_SNAPSHOTS_QA
+  T_CRON: qacronsynthetic0000000000000000000000000001
+  T_ROT: qarotsynthetic00000000000000000000000000002
+  T_NF: qadummysynthetic000000000000000000000000003
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate 1 — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "PROVISIONAR-QA-C23" ] || { echo "::error::confirmacao invalida"; exit 1; }
+          echo "OK"
+
+      - name: Checkout (ref C23)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: "Gate 2 — fonte C23 + template QA integro (isolamento por construcao)"
+        run: |
+          set -euo pipefail
+          grep -q 'version: "V64.59-c23-share-snapshot"' cloudflare-worker.js || { echo "::error::fonte nao e a C23"; exit 1; }
+          grep -q 'name = "idseven-push-qa"' wrangler.qa.toml || { echo "::error::template QA sem nome de QA"; exit 1; }
+          grep -q '__QA_NAMESPACE_ID__' wrangler.qa.toml || { echo "::error::template QA sem placeholder de namespace"; exit 1; }
+          if grep -qE '^\s*route|^\s*routes|custom_domain|\[triggers\]|crons' wrangler.qa.toml; then
+            echo "::error::template QA contem rota/cron — quebraria o isolamento"; exit 1; fi
+          grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml de producao alterado?"; exit 1; }
+          echo "OK: template isolado e fonte C23 confirmados"
+
+      - name: "KV QA — criar ou reutilizar namespace SHARE_SNAPSHOTS_QA"
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          NSID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API?per_page=100" | jq -r --arg t "$NS_TITLE" '.result[] | select(.title==$t) | .id' | head -1)
+          if [ -z "$NSID" ]; then
+            echo "criando namespace $NS_TITLE"
+            NSID=$(curl -sS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "{\"title\":\"$NS_TITLE\"}" "$API" | jq -r '.result.id')
+          else
+            echo "reutilizando namespace existente"
+          fi
+          [ -n "$NSID" ] && [ "$NSID" != "null" ] || { echo "::error::falha ao obter namespace QA"; exit 1; }
+          echo "NSID=$NSID" >> "$GITHUB_ENV"
+          echo "namespace QA id: $NSID"
+
+      - name: "Deploy QA — wrangler deploy (servico proprio; producao intocada)"
+        run: |
+          set -euo pipefail
+          mkdir -p qa-ops
+          sed "s/__QA_NAMESPACE_ID__/$NSID/" wrangler.qa.toml > wrangler.qa.final.toml
+          grep -q "id = \"$NSID\"" wrangler.qa.final.toml
+          npx --yes wrangler@4 deploy --config wrangler.qa.final.toml 2>&1 | tee qa-ops/deploy-qa.txt
+          grep -q "idseven-push-qa" qa-ops/deploy-qa.txt || { echo "::error::deploy QA nao confirmou o nome"; exit 1; }
+
+      - name: "Secret QA — TEAM_API_KEY exclusivo (CSPRNG; nunca impresso)"
+        run: |
+          set -euo pipefail
+          node -e 'process.stdout.write(require("crypto").randomBytes(32).toString("base64url"))' > "$RUNNER_TEMP/qa_key"
+          npx --yes wrangler@4 secret put TEAM_API_KEY --config wrangler.qa.final.toml < "$RUNNER_TEMP/qa_key" >/dev/null
+          echo "OK: TEAM_API_KEY de QA definido (somente no servico QA; valor nunca exibido)"
+
+      - name: "Seed KV QA — snapshots SINTETICOS (cron + roteiro)"
+        run: |
+          set -euo pipefail
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          npx --yes wrangler@4 kv key put "snap:$T_CRON" "{\"v\":1,\"type\":\"cronograma\",\"contentHash\":\"qa-cron\",\"createdAt\":\"$NOW\"}" --namespace-id "$NSID" --remote
+          npx --yes wrangler@4 kv key put "snap:$T_ROT" "{\"v\":1,\"type\":\"roteiro\",\"contentHash\":\"qa-rot\",\"createdAt\":\"$NOW\"}" --namespace-id "$NSID" --remote
+          echo "OK: 2 snapshots sinteticos publicados no KV de QA"
+
+      - name: "Aguardar propagacao do QA (GET / == c23)"
+        run: |
+          set -euo pipefail
+          DEADLINE=$(( $(date +%s) + 120 ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            V=$(curl -sS --max-time 15 "$QA_URL/" | jq -r '.version' 2>/dev/null || true)
+            [ "$V" = "V64.59-c23-share-snapshot" ] && { echo "QA ativo: $V"; exit 0; }
+            sleep 3
+          done
+          echo "::error::QA nao respondeu a versao C23 em 120s"; exit 1
+
+      - name: "L3-QA — contrato READY (Cronograma + Roteiro) ao vivo"
+        run: |
+          set -euo pipefail
+          fail=0
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
+          check_ready() {
+            local TOK="$1" TIPO="$2" TITLE="$3" DESC="$4" IMG="$5"
+            local H="qa-ops/h-$TIPO.txt" B="qa-ops/b-$TIPO.html"
+            local ST
+            ST=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D "$H" -o "$B" -w '%{http_code}' "$QA_URL/share/cronograma/$TOK")
+            [ "$ST" = "200" ] || { echo "FALHA[$TIPO]: status $ST"; fail=1; }
+            [ "$(hv x-share-task "$H")" = "resolved" ] || { echo "FALHA[$TIPO]: X-Share-Task"; fail=1; }
+            [ "$(hv x-share-type "$H")" = "$TIPO" ] || { echo "FALHA[$TIPO]: X-Share-Type"; fail=1; }
+            [ "$(hv x-share-snapshot "$H")" = "ready" ] || { echo "FALHA[$TIPO]: X-Share-Snapshot"; fail=1; }
+            case "$(hv cache-control "$H")" in *public*) : ;; *) echo "FALHA[$TIPO]: Cache-Control nao publico"; fail=1;; esac
+            grep -q "content=\"$TITLE\"" "$B" || { echo "FALHA[$TIPO]: og:title"; fail=1; }
+            grep -q "content=\"$DESC\"" "$B" || { echo "FALHA[$TIPO]: og:description"; fail=1; }
+            grep -q "$IMG" "$B" || { echo "FALHA[$TIPO]: og:image"; fail=1; }
+            grep -q "<link rel=\"canonical\" href=\"$QA_URL/share/cronograma/$TOK\"/>" "$B" || { echo "FALHA[$TIPO]: canonical"; fail=1; }
+            grep -q 'og:image:secure_url' "$B" && grep -q 'og:image:width" content="1200"' "$B" && grep -q 'og:image:height" content="630"' "$B" || { echo "FALHA[$TIPO]: og:image metas"; fail=1; }
+            # 2o GET — HIT obrigatorio com MESMOS headers
+            local H2="qa-ops/h2-$TIPO.txt"
+            curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D "$H2" -o /dev/null "$QA_URL/share/cronograma/$TOK"
+            case "$(hv x-share-cache "$H2")" in *hit*) : ;; *) echo "FALHA[$TIPO]: 2o GET sem HIT"; fail=1;; esac
+            [ "$(hv x-share-type "$H2")" = "$TIPO" ] || { echo "FALHA[$TIPO]: HIT trocou o tipo"; fail=1; }
+            # HEAD — text/html, nunca JSON
+            local HH="qa-ops/hh-$TIPO.txt"
+            local HS
+            HS=$(curl -sS --max-time 30 -I -A "WhatsApp/2.23.20.0" -D "$HH" -o /dev/null -w '%{http_code}' "$QA_URL/share/cronograma/$TOK")
+            [ "$HS" = "200" ] || { echo "FALHA[$TIPO]: HEAD status $HS"; fail=1; }
+            case "$(hv content-type "$HH")" in text/html*) : ;; *) echo "FALHA[$TIPO]: HEAD content-type"; fail=1;; esac
+            echo "OK[$TIPO]: READY completo (200/resolved/$TIPO/ready + OG + canonical + HIT + HEAD)"
+          }
+          check_ready "$T_CRON" "cronograma" "Aprovar cronograma" "Seu cronograma está pronto para avaliação." "/og/wa-card-v64-39.jpg"
+          check_ready "$T_ROT" "roteiro" "Aprovar roteiro" "Seu Roteiro de gravação de vídeos está pronto para avaliação." "/og/wa-card-roteiro-v64-60.jpg"
+          grep -q 'content="Aprovar cronograma"' qa-ops/b-roteiro.html && { echo "FALHA: roteiro serviu OG de cronograma"; fail=1; }
+          [ "$fail" = 0 ] || { echo "::error::contrato READY reprovado em QA"; exit 1; }
+
+      - name: "L3-QA — imagens por SHA-256 (byte-exatas na borda)"
+        run: |
+          set -euo pipefail
+          s1=$(curl -sS --max-time 30 "$QA_URL/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
+          s2=$(curl -sS --max-time 30 "$QA_URL/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          s2a=$(curl -sS --max-time 30 "$QA_URL/og/wa-card-roteiro-v64-59.jpg" | sha256sum | cut -d' ' -f1)
+          echo "cron: $s1"; echo "rot : $s2"
+          [ "$s1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || { echo "::error::arte cron divergente"; exit 1; }
+          [ "$s2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || { echo "::error::arte roteiro divergente"; exit 1; }
+          [ "$s2a" = "$s2" ] || { echo "::error::alias v64-59 difere"; exit 1; }
+          [ "$s1" != "$s2" ] || { echo "::error::artes iguais"; exit 1; }
+          echo "OK: artes byte-exatas em QA"
+
+      - name: "L3-QA — NOT_FOUND explicito (sem snapshot) + nunca cacheia"
+        run: |
+          set -euo pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
+          ST=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D qa-ops/h-nf.txt -o qa-ops/b-nf.html -w '%{http_code}' "$QA_URL/share/cronograma/$T_NF")
+          [ "$ST" = "404" ] || { echo "::error::not_found status $ST"; exit 1; }
+          [ "$(hv x-share-task qa-ops/h-nf.txt)" = "not_found" ] || { echo "::error::X-Share-Task"; exit 1; }
+          [ "$(hv x-share-type qa-ops/h-nf.txt)" = "none" ] || { echo "::error::X-Share-Type"; exit 1; }
+          [ "$(hv x-share-snapshot qa-ops/h-nf.txt)" = "none" ] || { echo "::error::X-Share-Snapshot"; exit 1; }
+          case "$(hv cache-control qa-ops/h-nf.txt)" in *no-store*) : ;; *) echo "::error::sem no-store"; exit 1;; esac
+          if grep -qE 'content="Aprovar (cronograma|roteiro)"' qa-ops/b-nf.html; then echo "::error::404 serviu card de tipo"; exit 1; fi
+          grep -q "Link inválido ou expirado" qa-ops/b-nf.html || { echo "::error::pagina explicita ausente"; exit 1; }
+          grep -q "/cliente/cronograma/$T_NF" qa-ops/b-nf.html || { echo "::error::botao manual do portal ausente"; exit 1; }
+          ST2=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D qa-ops/h-nf2.txt -o /dev/null -w '%{http_code}' "$QA_URL/share/cronograma/$T_NF")
+          [ "$ST2" = "404" ] && case "$(hv x-share-cache qa-ops/h-nf2.txt)" in *bypass*) : ;; *) echo "::error::not_found cacheou"; exit 1;; esac
+          echo "OK: NOT_FOUND explicito, com portal manual, nunca cacheado"
+
+      - name: "L3-QA — endpoint /share-snapshot (auth real; Firestore fora do escopo QA)"
+        run: |
+          set -euo pipefail
+          C1=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -d '{"taskId":"qa1","expectedType":"cronograma"}' -o qa-ops/e1.json -w '%{http_code}' "$QA_URL/share-snapshot")
+          [ "$C1" = "401" ] || { echo "::error::sem credencial deveria ser 401 (foi $C1)"; exit 1; }
+          C2=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: $(cat "$RUNNER_TEMP/qa_key")" -d '{"taskId":"","expectedType":"x"}' -o qa-ops/e2.json -w '%{http_code}' "$QA_URL/share-snapshot")
+          [ "$C2" = "400" ] || { echo "::error::body invalido com chave QA deveria ser 400 (foi $C2)"; exit 1; }
+          C3=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: $(cat "$RUNNER_TEMP/qa_key")" -d '{"taskId":"qa-task-sintetica","expectedType":"cronograma"}' -o qa-ops/e3.json -w '%{http_code}' "$QA_URL/share-snapshot")
+          [ "$C3" = "502" ] || { echo "::error::caminho Firestore em QA deveria ser 502 explicito (foi $C3)"; exit 1; }
+          grep -q "auth indisponível" qa-ops/e3.json || { echo "::error::502 sem mensagem explicita"; exit 1; }
+          C4=$(curl -sS --max-time 30 -X POST -H "Content-Type: application/json" -H "X-Team-Key: chave-errada" -d '{"taskId":"qa1","expectedType":"cronograma"}' -o /dev/null -w '%{http_code}' "$QA_URL/share-snapshot")
+          [ "$C4" = "401" ] || { echo "::error::chave errada deveria ser 401 (foi $C4)"; exit 1; }
+          echo "OK: 401 sem credencial/chave errada; 400 body invalido; 502 explicito no caminho Firestore (QA sem FCM por design — coberto no Golden Master hermetico)"
+
+      - name: "L3-QA — /sla-* 403 (paridade de seguranca)"
+        run: |
+          set -euo pipefail
+          for r in sla-dryrun sla-reschedule-plan sla-discover; do
+            c=$(curl -sS --max-time 25 -o /dev/null -w "%{http_code}" -X POST "$QA_URL/$r" -H "Content-Type: application/json" -d '{}')
+            [ "$c" = "403" ] || { echo "::error::/$r em QA retornou $c"; exit 1; }
+          done
+          echo "OK: SLA desligado tambem em QA"
+
+      - name: "Gate FINAL — PRODUCAO INTOCADA (idseven-push permanece na versao atual)"
+        run: |
+          set -euo pipefail
+          V=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version')
+          echo "producao: $V"
+          [ "$V" = "V64.59-c20-golden-contract" ] || { echo "::error::PRODUCAO MUDOU durante o QA ($V) — investigar imediatamente"; exit 1; }
+          echo "OK: producao exatamente como antes (c20 do run 78)"
+
+      - name: Upload evidencias QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worker-qa-c23-evidence
+          path: qa-ops/
+          retention-days: 30
