@@ -110,6 +110,23 @@ jobs:
             exit 1
           fi
           echo "renderer sem 1.0.146-149 e sem 'Desktop/Versao 1.0.<n>' literal — versao deriva de app.getVersion."
+          # ===== F3.3.73I6C24D — GATE DE URL EMPACOTADO (somente builds QA; fail-closed) =====
+          # O incidente 1.0.170-QA passou nos testes de FONTE mas falhou instalado: o renderer
+          # EMPACOTADO trazia o validador legado (host de producao hardcoded + rejeicao workers.dev),
+          # que reprovava o proprio host de QA -> "Link invalido". Este gate le o renderer REAL de
+          # dentro do app.asar (mesmo $RDIR acima) e reprova o build QA se o legado voltar.
+          if grep -rIlF "AMBIENTE QA" "$RDIR" >/dev/null 2>&1; then
+            echo "build QA detectado — validando o gate de URL EMPACOTADO (C24D)"
+            if grep -rnF '!/workers\.dev/.test' "$RDIR" 2>/dev/null | grep -q .; then
+              echo "::error:: validador legado (rejeicao workers.dev) EMPACOTADO no build QA"; grep -rnF '!/workers\.dev/.test' "$RDIR" | head -3; exit 1; fi
+            if grep -rF "indexOf('https://aprovar.agendaidseven.com.br/share/cronograma/')===0" "$RDIR" 2>/dev/null | grep -q .; then
+              echo "::error:: host de producao HARDCODED no validador do build QA empacotado"; exit 1; fi
+            grep -rqF "function validateShareUrl" "$RDIR" || { echo "::error:: validateShareUrl AUSENTE no build QA empacotado (allowlist por ambiente nao empacotada)"; exit 1; }
+            grep -rqF "SHARE_ALLOWED_HOST = QA_BUILD ? 'idseven-push-qa.agidseven.workers.dev'" "$RDIR" || { echo "::error:: SHARE_ALLOWED_HOST nao aponta ao host QA no build QA empacotado"; exit 1; }
+            grep -rqF "idseven-push-qa.agidseven.workers.dev" "$RDIR" || { echo "::error:: host QA AUSENTE no build QA empacotado"; exit 1; }
+            grep -rqF "gere o roteiro novamente" "$RDIR" || { echo "::error:: texto por setor de Roteiro AUSENTE no build QA empacotado"; exit 1; }
+            echo "F3.3.73I6C24D: gate de URL EMPACOTADO (build QA) OK — allowlist exata do host QA; legado ausente; textos por setor presentes."
+          fi
 
       - name: Empacotar bundle (instalador + relatorios)
         working-directory: ${{ env.APP_DIR }}
