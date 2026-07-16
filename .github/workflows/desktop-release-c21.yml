@@ -1,0 +1,303 @@
+# =====================================================================
+# [manual] F3.3.73I6C21 — Publicacao da PRODUCAO CONTROLADA Desktop 1.0.168
+# ---------------------------------------------------------------------
+# Publica a release de producao controlada da Desktop 1.0.168 usando
+# EXCLUSIVAMENTE os artifacts do run 29497633530 (build unico aprovado
+# na F3.3.73I6C20). TUDO PINADO: run id, SHA alvo, artifact ids/digests,
+# tag, titulo e hashes SHA-256 oficiais do EXE/MSI. O job:
+#   1) exige confirmacao literal via input;
+#   2) valida run 223 = completed/success no SHA pinado (desktop-build.yml);
+#   3) valida que os branches aprovados NAO se moveram (desktop+worker);
+#   4) valida o Worker de producao (versao ao vivo == c20; ultimo deploy
+#      == run 78) — read-only, nenhum deploy;
+#   5) valida ids + digests dos DOIS artifacts do run;
+#   6) aborta se a tag ou a release ja existirem;
+#   7) baixa os DOIS artifacts e confere os hashes byte a byte + o
+#      conteudo de VERSAO-DESKTOP.txt (divergiu => aborta SEM publicar);
+#   8) registra presenca/ausencia dos secrets temporarios C18E_* (SO
+#      presenca; valores nunca lidos/impressos; passo informativo);
+#   9) gera SHA256SUMS e cria a release prerelease=false, latest=false,
+#      tag no SHA exato; anexa EXE + MSI + SHA256SUMS + VERSAO-DESKTOP.txt;
+#  10) verifica flags/assets/target pos-publicacao e imprime release id/URL.
+# NAO builda, NAO deploya, NAO toca Android/Functions/Firestore Rules/
+# Hosting, NAO altera codigo de produto, NAO cria 1.0.169, NAO marca latest.
+# Sem secrets alem do GITHUB_TOKEN padrao (C18E_* apenas presenca).
+# Execucao SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] Desktop Release C21 — producao controlada 1.0.168"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-PRODUCAO-1.0.168 para autorizar a publicacao"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: desktop-release-c21
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "29497633530"
+      TARGET_SHA: "4fb0a7f0a573aad5d4c2bd2e5eda8af19875b2aa"
+      DESK_BRANCH: "desktop/f3373i6c20-golden-1.0.168"
+      WORKER_BRANCH: "worker/f3373i6c20-golden-contract"
+      WORKER_SHA: "928669eb2408c50e4b2fdd93a930ae443a8568d4"
+      WORKER_RUN: "29497207159"
+      WORKER_VERSION: "V64.59-c20-golden-contract"
+      WORKER_URL: "https://idseven-push.agidseven.workers.dev"
+      TAG: "desktop/v1.0.168-production"
+      TITLE: "Agenda ID Seven Desktop 1.0.168 — Produção Controlada"
+      ART_INST: "agenda-id-seven-desktop-1.0.168-installer"
+      ART_INST_ID: "8375143666"
+      ART_INST_DIGEST: "sha256:bf9baa8080fb33c89280823d827032127e55847074d816712f471ce7eb5c2d4f"
+      ART_BUNDLE: "agenda-id-seven-desktop-1.0.168-bundle"
+      ART_BUNDLE_ID: "8375148470"
+      ART_BUNDLE_DIGEST: "sha256:373e74c8b73d829e153625fd6bf3e6b790b460c1834bbc1895eba0b7c919d959"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.168-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.168-x64.msi"
+      EXP_EXE: "299162a0686ed683c0749833e833034c997f5040be66d21b2bd333630ae6e1da"
+      EXP_MSI: "a761317408286acba86b9a01d8e6231cbf43967c3f0b880d3581c4f5e7b25b99"
+    steps:
+      - name: "Gate 1 — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "PUBLICAR-PRODUCAO-1.0.168" ]; then
+            echo "::error::confirmacao invalida — nada foi publicado"
+            exit 1
+          fi
+          echo "OK: confirmacao literal valida"
+
+      - name: "Gate 2 — run 223 completed/success no SHA pinado (desktop-build.yml)"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion + "|" + .head_sha')"
+          WP="$(echo "$J" | jq -r '.path')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run: $ST | $WP | $BR"
+          [ "$ST" = "completed|success|$TARGET_SHA" ] || { echo "::error::run invalido para publicacao"; exit 1; }
+          [ "$WP" = ".github/workflows/desktop-build.yml" ] || { echo "::error::run nao e do desktop-build"; exit 1; }
+          [ "$BR" = "$DESK_BRANCH" ] || { echo "::error::run nao veio do branch aprovado"; exit 1; }
+          echo "OK: run 223 valido"
+
+      - name: "Gate 3 — branches aprovados nao se moveram (desktop + worker)"
+        run: |
+          set -euo pipefail
+          D="$(gh api "repos/$REPO/git/ref/heads/$DESK_BRANCH" --jq '.object.sha')"
+          W="$(gh api "repos/$REPO/git/ref/heads/$WORKER_BRANCH" --jq '.object.sha')"
+          echo "desktop: $D"
+          echo "worker : $W"
+          [ "$D" = "$TARGET_SHA" ] || { echo "::error::branch desktop moveu apos aprovacao — NO-GO"; exit 1; }
+          [ "$W" = "$WORKER_SHA" ] || { echo "::error::branch worker moveu apos aprovacao — NO-GO"; exit 1; }
+          echo "OK: nenhuma alteracao apos os commits aprovados"
+
+      - name: "Gate 4 — Worker de producao integro (read-only; sem deploy)"
+        run: |
+          set -euo pipefail
+          V="$(curl -sS --max-time 25 "$WORKER_URL/" | jq -r '.version')"
+          echo "worker ao vivo: $V"
+          [ "$V" = "$WORKER_VERSION" ] || { echo "::error::Worker de producao divergente ($V) — NO-GO"; exit 1; }
+          L="$(gh api "repos/$REPO/actions/workflows/deploy-worker.yml/runs?per_page=1" --jq '.workflow_runs[0] | (.id|tostring) + "|" + .status + "|" + (.conclusion // "")')"
+          echo "ultimo deploy-worker: $L"
+          [ "$L" = "$WORKER_RUN|completed|success" ] || { echo "::error::existe deploy do Worker posterior/divergente do run 78 — NO-GO"; exit 1; }
+          echo "OK: producao no c20 do run 78 (nenhum deploy posterior)"
+
+      - name: "Gate 5 — artifacts do run: ids + digests exatos"
+        run: |
+          set -euo pipefail
+          A="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts")"
+          I="$(echo "$A" | jq -r --arg n "$ART_INST" '.artifacts[] | select(.name==$n) | (.id|tostring) + "|" + .digest + "|" + (.expired|tostring)')"
+          B="$(echo "$A" | jq -r --arg n "$ART_BUNDLE" '.artifacts[] | select(.name==$n) | (.id|tostring) + "|" + .digest + "|" + (.expired|tostring)')"
+          echo "installer: $I"
+          echo "bundle   : $B"
+          [ "$I" = "$ART_INST_ID|$ART_INST_DIGEST|false" ] || { echo "::error::artifact installer divergente — NO-GO"; exit 1; }
+          [ "$B" = "$ART_BUNDLE_ID|$ART_BUNDLE_DIGEST|false" ] || { echo "::error::artifact bundle divergente — NO-GO"; exit 1; }
+          echo "OK: artifacts exatamente os aprovados (8375143666 / 8375148470)"
+
+      - name: "Gate 6 — tag e release nao podem existir"
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::a tag $TAG ja existe — abortando"
+            exit 1
+          fi
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            echo "::error::a release $TAG ja existe — abortando"
+            exit 1
+          fi
+          echo "OK: tag e release livres"
+
+      - name: "Baixar os DOIS artifacts do run 223"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D inst
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_BUNDLE" -D bund
+          ls -lh inst bund
+          test -f "inst/$EXE_NAME" || { echo "::error::EXE ausente no installer"; exit 1; }
+          test -f "inst/$MSI_NAME" || { echo "::error::MSI ausente no installer"; exit 1; }
+          test -f "bund/$EXE_NAME" || { echo "::error::EXE ausente no bundle"; exit 1; }
+          test -f "bund/$MSI_NAME" || { echo "::error::MSI ausente no bundle"; exit 1; }
+          test -f "bund/VERSAO-DESKTOP.txt" || { echo "::error::VERSAO-DESKTOP.txt ausente"; exit 1; }
+
+      - name: "Gate 7 — SHA-256 oficiais + VERSAO-DESKTOP.txt (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          HIE="$(sha256sum "inst/$EXE_NAME" | awk '{print $1}')"
+          HIM="$(sha256sum "inst/$MSI_NAME" | awk '{print $1}')"
+          HBE="$(sha256sum "bund/$EXE_NAME" | awk '{print $1}')"
+          HBM="$(sha256sum "bund/$MSI_NAME" | awk '{print $1}')"
+          echo "installer exe: $HIE"
+          echo "installer msi: $HIM"
+          echo "bundle    exe: $HBE"
+          echo "bundle    msi: $HBM"
+          [ "$HIE" = "$EXP_EXE" ] || { echo "::error::hash EXE (installer) divergente — NAO publicado"; exit 1; }
+          [ "$HIM" = "$EXP_MSI" ] || { echo "::error::hash MSI (installer) divergente — NAO publicado"; exit 1; }
+          [ "$HBE" = "$EXP_EXE" ] || { echo "::error::hash EXE (bundle) divergente — NAO publicado"; exit 1; }
+          [ "$HBM" = "$EXP_MSI" ] || { echo "::error::hash MSI (bundle) divergente — NAO publicado"; exit 1; }
+          V="$(tr -d '\r' < bund/VERSAO-DESKTOP.txt)"
+          echo "$V"
+          echo "$V" | grep -q '^versionName : 1\.0\.168$' || { echo "::error::VERSAO-DESKTOP: versionName errado"; exit 1; }
+          echo "$V" | grep -q "^commit      : $TARGET_SHA\$" || { echo "::error::VERSAO-DESKTOP: commit errado"; exit 1; }
+          VE="$(echo "$V" | grep '^SHA-256 exe' | grep -oE '[0-9a-f]{64}')"
+          VM="$(echo "$V" | grep '^SHA-256 msi' | grep -oE '[0-9a-f]{64}')"
+          [ "$VE" = "$EXP_EXE" ] || { echo "::error::VERSAO-DESKTOP: hash EXE interno divergente"; exit 1; }
+          [ "$VM" = "$EXP_MSI" ] || { echo "::error::VERSAO-DESKTOP: hash MSI interno divergente"; exit 1; }
+          echo "OK: hashes byte a byte e VERSAO-DESKTOP.txt conferem com os oficiais da C20"
+
+      - name: "Secrets temporarios C18E — registro de presenca (SO presenca; informativo)"
+        env:
+          S1: ${{ secrets.C18E_CRONOGRAMA_TOKEN }}
+          S2: ${{ secrets.C18E_ROTEIRO_TOKEN }}
+        run: |
+          p1="AUSENTE (ja removido)"; p2="AUSENTE (ja removido)"
+          [ -n "$S1" ] && p1="PRESENTE — remocao manual pendente"
+          [ -n "$S2" ] && p2="PRESENTE — remocao manual pendente"
+          echo "C18E_CRONOGRAMA_TOKEN: $p1"
+          echo "C18E_ROTEIRO_TOKEN  : $p2"
+          echo "(valores nunca lidos alem do teste de vazio e nunca impressos; os valores estao MORTOS por rotacao desde a C18G)"
+          echo "(remocao exige administrador do repositorio: Settings -> Secrets and variables -> Actions -> deletar os dois; o GITHUB_TOKEN de workflow nao possui escopo de secrets)"
+
+      - name: "SHA256SUMS"
+        run: |
+          set -euo pipefail
+          mkdir -p pacote
+          cp "inst/$EXE_NAME" "inst/$MSI_NAME" pacote/
+          cp bund/VERSAO-DESKTOP.txt pacote/
+          (cd pacote && sha256sum "$EXE_NAME" "$MSI_NAME" VERSAO-DESKTOP.txt > SHA256SUMS)
+          cat pacote/SHA256SUMS
+          (cd pacote && sha256sum -c SHA256SUMS)
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          **Produção controlada** — validação **automatizada integral** (F3.3.73I6C20: Golden Master L1/L2/L3, RED→GREEN, contrato validado em produção). **Substitui a produção controlada 1.0.162** como versão oficial do Desktop.
+          **Release controlada:** instalar somente em máquinas autorizadas, após conferência de hash. Sem rollout amplo e **sem marcar como *latest***.
+
+          ## Escopo da validação (transparência)
+          - Toda a validação desta versão foi **automatizada**: Golden Master integrado 31/31 (worker REAL em Node + fixtures; modo RED reproduziu 8 regressões antes da correção), suítes herméticas (c17 43/43, c18b 24/24, c18e 34/34, prewarm c18c 45/45, token estável c18h 30/30, baseline-freeze), contrato C20 validado em produção (deploy run 78) e gates de build (tray, prova-de-versão asar-aware).
+          - A **renderização visual do card dentro do aplicativo WhatsApp NÃO foi testada fisicamente** nesta fase (única evidência não automatizável). O contrato é fail-closed: sem prova completa, o WhatsApp **não abre**.
+          - Esta release **não** é marcada como estável definitiva além do escopo automatizado; a primeira validação física ocorre no próprio uso controlado.
+
+          ## O que há nesta versão (Card Premium — contrato definitivo C20)
+          - **Fim do fallback silencioso**: link inexistente/expirado retorna página explícita "Link inválido ou expirado" (404, `X-Share-Task: not_found`) — NUNCA um card de Cronograma indevido; erro de backend responde 503 explícito. Nada não-resolvido é cacheado.
+          - **Prewarm com prova cumulativa** (qualquer divergência = WhatsApp bloqueado com "Tentar novamente / Copiar link / Cancelar"): 200 + text/html + `X-Share-Task: resolved` + `X-Share-Type` do tipo esperado + OG completo com `og:url` exato + confirmação textual do tipo + **imagem OG acessível** (200 image/jpeg no mesmo domínio) + 2º GET com as mesmas exigências e `X-Share-Cache: hit` + mesmo tipo nos dois GETs.
+          - **not_found é definitivo** (corta o retry) e timeout/redirect/JSON nunca são sucesso; o antigo atalho de sucesso sem prova de cache foi **removido**.
+          - **Token estável por tarefa (C18H)**: reenvios usam sempre o MESMO link do portal (fim da rotação que invalidava links já enviados).
+          - **Card do Roteiro com logo oficial ID Seven** (arte própria 1200×630, "Roteiro de gravação de vídeos", rota versionada); **card do Cronograma byte-exato preservado**.
+
+          ## Worker em produção (referência desta release)
+          - Versão: `V64.59-c20-golden-contract` — deploy run 78 (id `29497207159`), Cloudflare Version ID `8af6c3ab-4f5e-4fb9-9644-fc5cd60bd5ef`, commits `50e04cf` + `928669e` (branch `worker/f3373i6c20-golden-contract`).
+          - Contrato conferido ao vivo com token dummy: 404 + `not_found` + `none` + `no-store` + página explícita; artes por tipo com SHA-256 conferidos (cron `c038636d…843eea`, roteiro `f64f6f3e…389cf3`, alias íntegro).
+          - Esta publicação **não** executa deploy: o Worker permanece exatamente o do run 78 (verificado read-only no gate desta release).
+
+          ## Preservado (regressões protegidas)
+          - Chat e Copywriting continuam fora do produto; Agenda/Board/Kanban, Configurações, Equipe, login/logout, tray/bandeja, notificações (toast/bg-window/Central/SLA), portal do cliente e fluxo de aprovação — intactos (sweep 34 PASS + baseline-freeze verdes no commit da release).
+
+          ## Artefatos e hashes oficiais (SHA-256)
+          | Arquivo | SHA-256 |
+          |---|---|
+          | `Agenda-ID-Seven-Desktop-1.0.168-x64.exe` | `299162a0686ed683c0749833e833034c997f5040be66d21b2bd333630ae6e1da` |
+          | `Agenda-ID-Seven-Desktop-1.0.168-x64.msi` | `a761317408286acba86b9a01d8e6231cbf43967c3f0b880d3581c4f5e7b25b99` |
+
+          Anexos de conferência: `SHA256SUMS` (confira com `sha256sum -c SHA256SUMS`) e `VERSAO-DESKTOP.txt` (prova do conteúdo: versão, commit e hashes).
+
+          ## Instalação (somente máquinas autorizadas)
+          1. Baixe o `.exe` (ou o `.msi`) desta release.
+          2. Confira o hash: `certutil -hashfile "Agenda-ID-Seven-Desktop-1.0.168-x64.exe" SHA256` — deve ser **exatamente** o da tabela. Se divergir, **não instale** e reporte.
+          3. Feche o app atual (bandeja → botão direito → **Sair**) e execute o instalador. Se o SmartScreen avisar: **"Mais informações" → "Executar assim mesmo"**.
+          4. Após instalar, abra o app e confirme **1.0.168** em Configurações → Sobre e no Perfil.
+
+          ## ⚠️ Aviso — Smart App Control / assinatura digital
+          O instalador **ainda não é assinado digitalmente** (code signing permanece fora do escopo desta fase). Em máquinas com **Smart App Control ativo** (Windows 11), o Windows pode bloquear a instalação sem opção de prosseguir. Instale somente em máquinas autorizadas, sempre após conferência de hash.
+
+          ## Rollback Desktop (oficial: 1.0.162)
+          - Rebaixar **apenas em caso de falha crítica**, **reportando antes**.
+          - Release preservada: `desktop/v1.0.162-production` (commit `f1101df`, build run `29353487838`).
+            - EXE `5bbd937afedb412faca874faac4b9df5df2f8bd6aa30106cc5ddad1e28fb4069`
+            - MSI `d123b15c24049b5c6bfba701450c67ce186e9723f9752a2e741a677057721f1a`
+          - Procedimento: bandeja → **Sair** → desinstalar a 1.0.168 → baixar a 1.0.162 na release preservada → conferir o hash → reinstalar → login. Dados preservados no Firebase.
+          - Nota: a 1.0.162 **não** possui o contrato C20 do prewarm nem o token estável C18H — o rollback reintroduz o comportamento anterior do Card Premium (limitação conhecida e aceita para contingência).
+
+          ## Rollback Worker (backup do run 78)
+          - Backup **byte-exato** do script anterior (c18e) no artifact `deploy-worker-evidence` do run 78 (artifact id `8374910291`, retenção 30 dias): `backup-producao.js`, SHA-256 `bfb2969fd1e9f5ebb9fb5bb4c084c34ef43011cad2312bc79e11531df7fa14dd`.
+          - Caminho recomendado: re-dispatch do `deploy-worker.yml` com input `ref` apontando para o código c18e canônico (branch/commit da F3.3.73I6C18E, `7c91f36`) — o próprio workflow faz backup, valida e reverte automaticamente se algo falhar.
+          - Caminho manual: baixar o artifact, conferir o SHA-256 acima e publicar o script via API Cloudflare (mesmo mecanismo do step de rollback do deploy-worker). Restaura `V64.59-c18e-roteiro-og-image`.
+          - Atenção: rollback do Worker **reintroduz o fallback silencioso pré-C20** (regressão conhecida) — usar somente em falha crítica do contrato C20.
+
+          ## Secrets temporários C18E (higiene)
+          - `C18E_CRONOGRAMA_TOKEN` e `C18E_ROTEIRO_TOKEN` estão **mortos** (tokens rotacionados desde a C18G) e devem ser removidos pelo administrador em **Settings → Secrets and variables → Actions** (o GITHUB_TOKEN de workflows não possui escopo de secrets; a remoção não é automatizável). O status de presença no momento desta publicação está registrado no log do run desta release — apenas presença, nunca valores.
+
+          ## Android
+          - **Fora desta release** (inalterado; Android, Functions, Firestore Rules e Hosting não foram tocados).
+
+          ## Procedência do build
+          - Workflow **desktop-build (Windows)**, run **223** (id `29497633530`), success; gates de tray e de prova-de-versão (asar-aware) aprovados.
+          - Artifacts EXATOS do run: `agenda-id-seven-desktop-1.0.168-installer` (id `8375143666`) e `agenda-id-seven-desktop-1.0.168-bundle` (id `8375148470`) — ids e digests conferidos nesta publicação.
+          - Fonte: branch `desktop/f3373i6c20-golden-1.0.168` @ commit `4fb0a7f0a573aad5d4c2bd2e5eda8af19875b2aa`.
+          - Esta publicação não gerou novo build, não alterou código e não executou deploy.
+          NOTAS
+          echo "notas.md gerado:"
+          wc -l notas.md
+
+      - name: "Publicar producao controlada (prerelease=false, latest=false)"
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$TARGET_SHA" \
+            --latest=false \
+            --title "$TITLE" \
+            --notes-file notas.md \
+            "pacote/$EXE_NAME" \
+            "pacote/$MSI_NAME" \
+            "pacote/SHA256SUMS" \
+            "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG"
+
+      - name: "Verificacao pos-publicacao"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" \
+            --json databaseId,tagName,targetCommitish,isPrerelease,isLatest,isDraft,url,assets \
+            --jq '{id:.databaseId, tag:.tagName, target:.targetCommitish, prerelease:.isPrerelease, latest:.isLatest, draft:.isDraft, url:.url, assets:[.assets[]|{id,name,size}]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft,isLatest --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)+"|"+(.isLatest|tostring)')"
+          [ "$FLAGS" = "false|false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "4" ] || { echo "::error::esperado 4 assets, encontrados $N"; exit 1; }
+          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
+          [ "$TGT" = "$TARGET_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          for A in "$EXE_NAME" "$MSI_NAME" "SHA256SUMS" "VERSAO-DESKTOP.txt"; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$A" || { echo "::error::asset ausente: $A"; exit 1; }
+          done
+          echo "===== GO: PRODUCAO CONTROLADA 1.0.168 PUBLICADA E VALIDADA ====="
