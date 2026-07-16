@@ -1,0 +1,31 @@
+# ============================================================================
+# F3.3.73I6C23 — Worker de QA ISOLADO (`idseven-push-qa`) — NUNCA é produção.
+# ============================================================================
+# ISOLAMENTO GARANTIDO POR CONSTRUÇÃO:
+#   - nome de serviço PRÓPRIO (idseven-push-qa) — o serviço de produção
+#     (idseven-push) não é lido, escrito nem re-deployado por este arquivo;
+#   - namespace KV EXCLUSIVO de QA (título SHARE_SNAPSHOTS_QA; id injetado
+#     pelo workflow de provisionamento no lugar do placeholder abaixo);
+#   - SOMENTE workers.dev (nenhuma rota/domínio custom — zero tráfego real);
+#   - SEM cron (nenhum scheduled/lembrete roda em QA);
+#   - secrets PRÓPRIOS de QA (TEAM_API_KEY gerado por CSPRNG no runner;
+#     NENHUM secret de produção é copiado — sem FCM/WhatsApp/VAPID, os
+#     caminhos Firestore-dependentes respondem erro explícito, e é isso
+#     que o QA espera: eles são provados hermeticamente no Golden Master).
+# ============================================================================
+
+name = "idseven-push-qa"
+main = "cloudflare-worker.js"
+compatibility_date = "2026-05-24"
+workers_dev = true
+
+[vars]
+FCM_PROJECT_ID = "qa-sem-firestore"
+ALLOWED_ORIGIN = "https://agendaidseven.com.br"
+REMINDER_BEFORE_MINUTES = "60"
+REMINDER_WINDOW_SECONDS = "300"
+APP_TZ_OFFSET_MINUTES = "-180"
+
+[[kv_namespaces]]
+binding = "SHARE_SNAPSHOTS"
+id = "__QA_NAMESPACE_ID__"
