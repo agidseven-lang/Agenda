@@ -56,7 +56,8 @@ jobs:
           [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] || { echo "::error::secret CLOUDFLARE_ACCOUNT_ID ausente"; exit 1; }
           mkdir -p out
           echo "===== robots.txt do domínio custom (conteúdo público; fecha thread FASE 4) ====="
-          curl -sS --max-time 20 "https://aprovar.agendaidseven.com.br/robots.txt" | tee out/robots-custom.txt | head -60
+          curl -sS --max-time 20 "https://aprovar.agendaidseven.com.br/robots.txt" | tee out/robots-custom.txt
+          echo "— bytes: $(wc -c < out/robots-custom.txt)" 
           echo; echo "— linhas Disallow/User-agent:"; grep -cE '^(User-agent|Disallow|Allow)' out/robots-custom.txt || true
           grep -iE '^(User-agent|Disallow|Allow)' out/robots-custom.txt | head -30 || true
           echo; echo "===== página not_found (token dummy): metas robots/OG ====="
@@ -98,7 +99,10 @@ jobs:
               if not line: continue
               try: ev = json.loads(line)
               except Exception: continue
-              req = (ev.get('event') or {}).get('request') or {}
+              evd = ev.get('event')
+              if not isinstance(evd, dict): continue
+              req = evd.get('request') or {}
+              if not isinstance(req, dict): continue
               url = red(str(req.get('url') or ''))
               if '/share/' not in url and '/og/' not in url and '/cliente/' not in url:
                   continue
@@ -106,7 +110,7 @@ jobs:
               ua = ''
               for k, v in (hdrs.items() if isinstance(hdrs, dict) else []):
                   if k.lower() == 'user-agent': ua = str(v)[:90]
-              resp = (ev.get('event') or {}).get('response') or {}
+              resp = evd.get('response') if isinstance(evd.get('response'), dict) else {}
               ts = ev.get('eventTimestamp')
               tss = datetime.datetime.utcfromtimestamp(ts/1000).isoformat() + 'Z' if isinstance(ts, (int, float)) else '?'
               logs = []
