@@ -590,3 +590,37 @@ prova física, antes de qualquer produção.
 Provas: runs `29544534906` (edge audit), `29545126269`/`29026657304`/`27920037629`
 (meta-probe hoje/09-07/21-06), `29457363181` (C18E #6 15/07), `29544795520`+`29545099725`
 (capturas baseline; robots integral no artifact). Produção intocada (somente leituras).
+
+## ADENDO 74F-B — ESPELHO DE PRODUÇÃO EM QA COM O FIX ESTÁ NO AR (prova viva pós-fix verde)
+
+O serviço `idseven-push-qa` agora roda o **espelho de produção com a correção 74F**
+(`V64.59-c20-failopen-74f`, branch `worker/f3374f-share-og-failopen-candidate` @ `d134193`,
+deploy run `29572278371`, 17/07 10:06 UTC). **Atenção:** isto SUBSTITUIU o worker
+C23-snapshot do serviço QA (linha 1.0.169–1.0.173, revogada pelo owner). Produção
+(`idseven-push`) confirmada intocada no gate final do mesmo run.
+
+**Prova viva pós-fix (gates do run, todos verdes):** token dummy em
+`/share/cronograma/…` no host QA respondeu **200 + X-Share-Task=not_found +
+X-Share-Type=generic + no-store + OG completo (≥9 metas, título "Aprovar cronograma",
+arte v64-39) + bypass no 2º GET + HEAD 200 text/html** — exatamente o contrato
+fisicamente aprovado, onde produção hoje responde 404 sem NENHUMA meta. Artes
+byte-exatas no espelho (cron `c038636d…`, roteiro `f64f6f3e…`).
+
+### Roteiro físico ANTES/DEPOIS (equipe; ~15 min, no mesmo WhatsApp Business QA)
+
+1. **Janela de captura no espelho:** Actions → "[manual] F3.3.74F Crawler Capture" →
+   Run workflow com `service=idseven-push-qa`, `window_minutes=12`,
+   `note=fisico-espelho-74f`. Aguardar "JANELA ATIVA" no log.
+2. **DEPOIS (fix):** colar no grupo QA a URL do espelho com QUALQUER token 48-hex, ex.:
+   `https://idseven-push-qa.agidseven.workers.dev/share/cronograma/f3374fmirror0000000000000000000000000000000000001`
+   → aguardar até 60 s → o Card Premium DEVE aparecer (página com OG sempre presente).
+3. **ANTES (produção, controle):** na mesma janela (ou numa segunda com
+   `service=idseven-push`), colar a URL de uma tarefa sintética criada na 1.0.174
+   (domínio `aprovar.agendaidseven.com.br`) → registrar SIM/NÃO do card.
+4. O log do run mostra, sanitizado, cada requisição do WhatsApp (método, UA, status,
+   busca da imagem) — anexar prints do grupo + link do run.
+
+**Leitura dos resultados:** espelho SIM + produção NÃO ⇒ causa 74F confirmada de ponta
+a ponta → promover o fail-open à produção em fase autorizada. Espelho NÃO ⇒ examinar a
+captura (se o WhatsApp nem requisitou → causa no lado do cliente/dispositivo; se
+requisitou 200+OG e não renderizou → política/cache Meta — investigar com a captura em mãos).
