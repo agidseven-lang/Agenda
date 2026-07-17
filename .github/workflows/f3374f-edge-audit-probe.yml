@@ -1,0 +1,127 @@
+# =====================================================================
+# [manual] F3.3.74F — AUDITORIA VIVA DA BORDA (DNS/TLS/Cloudflare/WAF).
+#
+# Camadas que o probe C18E NÃO cobria: resolução DNS, cadeia TLS/SNI,
+# versão HTTP, headers de borda (cf-ray, cf-mitigated, cf-cache-status,
+# server, age, etag, vary, x-robots-tag, csp), detecção de challenge/
+# Bot Fight (403/503 + marcador __cf_chl / "Just a moment"), robots.txt,
+# e o comportamento do crawler Meta SIMULADO (facebookexternalhit /
+# WhatsApp UA) contra AMBAS as origens (domínio custom e workers.dev).
+#
+# READ-ONLY absoluto: só DNS queries, handshake TLS e GET/HEAD públicos
+# com token DUMMY (nunca token real; nenhum dado de cliente). SEM deploy,
+# SEM wrangler, SEM Firestore, SEM secrets. Não altera nenhum produto.
+# =====================================================================
+name: "[manual] F3.3.74F Edge Audit Probe"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      dummy_token:
+        description: "Token DUMMY 48-hex (NUNCA um token real)"
+        required: false
+        default: "f3374fedgeaudit000000000000000000000000000000001"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374f-edge-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: edge audit (read-only; dummy token)
+    runs-on: ubuntu-latest
+    env:
+      DUMMY_IN: ${{ github.event.inputs.dummy_token }}
+    steps:
+      - name: Auditoria DNS + TLS + HTTP/edge (sanitizada)
+        run: |
+          set -uo pipefail
+          CUSTOM_HOST="aprovar.agendaidseven.com.br"
+          WORKERS_HOST="idseven-push.agidseven.workers.dev"
+          DUMMY="${DUMMY_IN:-f3374fedgeaudit000000000000000000000000000000001}"
+          case "$DUMMY" in (*[!A-Za-z0-9_-]*) echo "::error::dummy inválido"; exit 1;; esac
+          mkdir -p out
+
+          echo "===== FASE 4.1 — DNS ====="
+          for H in "$CUSTOM_HOST" "$WORKERS_HOST"; do
+            echo "--- $H"
+            echo "A:";     dig +short A "$H"     | sed 's/^/  /' || true
+            echo "AAAA:";  dig +short AAAA "$H"  | sed 's/^/  /' || true
+            echo "CNAME:"; dig +short CNAME "$H" | sed 's/^/  /' || true
+            echo "NS (zona):"; dig +short NS "$(echo "$H" | awk -F. '{n=NF; print $(n-2)"."$(n-1)"."$n}')" 2>/dev/null | sed 's/^/  /' || true
+          done
+
+          echo; echo "===== FASE 4.2 — TLS (cadeia, SAN, emissor, expiração, ALPN) ====="
+          for H in "$CUSTOM_HOST" "$WORKERS_HOST"; do
+            echo "--- $H"
+            echo | openssl s_client -connect "$H:443" -servername "$H" -alpn 'h2,http/1.1' 2>/dev/null \
+              | openssl x509 -noout -subject -issuer -dates -ext subjectAltName 2>/dev/null | sed 's/^/  /' || echo "  TLS FALHOU"
+            echo "  ALPN negociado:"; echo | openssl s_client -connect "$H:443" -servername "$H" -alpn 'h2,http/1.1' 2>/dev/null | grep -i "ALPN" | sed 's/^/    /' || true
+          done
+
+          echo; echo "===== FASE 4.3/5 — HTTP: status/headers/challenge por UA (GET+HEAD; share dummy, imagem, raiz, robots) ====="
+          UA_BROWSER="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"
+          UA_FB="facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+          UA_WA="WhatsApp/2.23.20.0"
+          TSV=out/edge-matrix.tsv
+          printf 'host\tpath_kind\tua\tmethod\thttp_ver\tstatus\tct\tclen\tcf_ray\tcf_cache\tcf_mitigated\tserver\tage\tetag\tvary\txrobots\tcsp\tlocation\tttfb_s\tchallenge_marker\n' > "$TSV"
+          probe() { # host path kind ua_name ua method
+            local host="$1" path="$2" kind="$3" uan="$4" ua="$5" m="$6"
+            local hdr=out/h.txt body=out/b.bin args
+            args=(-sS --max-time 30 -D "$hdr" -o "$body" -w '%{http_version}\t%{http_code}\t%{content_type}\t%{time_starttransfer}' -A "$ua")
+            [ "$m" = "HEAD" ] && args=("${args[@]}" -I)
+            : > "$body"; : > "$hdr"
+            local W; W=$(curl "${args[@]}" "https://$host$path" 2>/dev/null) || W="$(printf -- '-\t000\t-\t0')"
+            local hv; hv() { grep -i "^$1:" "$hdr" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-70; }
+            local chl="no"
+            if grep -qiE '__cf_chl|Just a moment|challenge-platform|cf_chl_opt' "$body" 2>/dev/null; then chl="YES"; fi
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+              "$host" "$kind" "$uan" "$m" \
+              "$(printf '%s' "$W" | cut -f1)" "$(printf '%s' "$W" | cut -f2)" "$(printf '%s' "$W" | cut -f3 | cut -c1-40)" \
+              "$(hv content-length)" "$( [ -n "$(hv cf-ray)" ] && echo present || echo - )" "$(hv cf-cache-status)" "$(hv cf-mitigated)" "$(hv server)" \
+              "$(hv age)" "$( [ -n "$(hv etag)" ] && echo present || echo - )" "$(hv vary)" "$(hv x-robots-tag)" \
+              "$( [ -n "$(hv content-security-policy)" ] && echo present || echo - )" "$( [ -n "$(hv location)" ] && echo yes || echo no )" \
+              "$(printf '%s' "$W" | cut -f4)" "$chl" >> "$TSV"
+          }
+          SHARE="/share/cronograma/$DUMMY"
+          IMG="/og/wa-card-v64-39.jpg"
+          for HOSTN in "$CUSTOM_HOST" "$WORKERS_HOST"; do
+            for UAN in browser fb wa; do
+              case "$UAN" in browser) UA="$UA_BROWSER";; fb) UA="$UA_FB";; wa) UA="$UA_WA";; esac
+              probe "$HOSTN" "$SHARE" share "$UAN" "$UA" GET
+              probe "$HOSTN" "$SHARE" share "$UAN" "$UA" HEAD
+              probe "$HOSTN" "$IMG" image "$UAN" "$UA" GET
+            done
+            probe "$HOSTN" "/" root fb "$UA_FB" GET
+            probe "$HOSTN" "/robots.txt" robots fb "$UA_FB" GET
+          done
+          column -t -s "$(printf '\t')" "$TSV"
+
+          echo; echo "===== FASE 7 — imagem OG ao vivo: bytes + sha256 + dimensões ====="
+          for HOSTN in "$CUSTOM_HOST" "$WORKERS_HOST"; do
+            curl -sS --max-time 30 -A "$UA_FB" -o out/img.bin "https://$HOSTN$IMG" 2>/dev/null || true
+            SZ=$(wc -c < out/img.bin | tr -d ' ')
+            SHA=$(sha256sum out/img.bin | cut -d' ' -f1)
+            SIG=$(head -c3 out/img.bin | od -An -tx1 | tr -d ' \n')
+            echo "$HOSTN$IMG -> bytes=$SZ sha256=$SHA jpeg_sig=$SIG (esperado c038636d…, 144941 bytes, ffd8ff)"
+          done
+
+          echo; echo "===== Desafio/Bot: veredito ====="
+          if awk -F'\t' 'NR>1 && ($11!="" && $11!="-") || $20=="YES" {found=1} END{exit !found}' "$TSV"; then
+            echo "::warning:: CHALLENGE/BOT MITIGATION DETECTADO em pelo menos uma resposta (ver matriz: colunas cf_mitigated / challenge_marker)."
+          else
+            echo "nenhum challenge/Bot Fight detectado nas respostas acima (cf_mitigated vazio; sem marcador de challenge)."
+          fi
+          rm -f out/b.bin out/h.txt out/img.bin
+          echo "OK: auditoria de borda concluída."
+
+      - name: Upload artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374f-edge-audit
+          path: out/
+          retention-days: 14
