@@ -31,10 +31,16 @@ name: "[manual] F3.3.74F Crawler Capture (tail janela)"
         description: "Etiqueta da tentativa (ex.: colagem-1.0.174-cron-grupoQA)"
         required: false
         default: "janela-sem-etiqueta"
+      # F3.3.74H1: CHOICE fechado — runs #7/#8 falharam com resíduo de edição do
+      # campo textual pré-preenchido ("ididseven-push-qa"/"iidseven-push-qa").
       service:
-        description: "Worker a observar: idseven-push (produção) ou idseven-push-qa (espelho 74F)"
-        required: false
-        default: "idseven-push"
+        description: "Worker a observar"
+        required: true
+        type: choice
+        options:
+          - idseven-push-qa
+          - idseven-push
+        default: idseven-push-qa
 
 permissions:
   contents: read
@@ -52,7 +58,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       WIN_IN: ${{ github.event.inputs.window_minutes }}
       NOTE_IN: ${{ github.event.inputs.note }}
-      SVC_IN: ${{ github.event.inputs.service }}
+      SVC_IN: ${{ inputs.service }}
     steps:
       - name: Pré-checagens + robots.txt + not_found OG (público, sanitizado)
         run: |
@@ -78,8 +84,23 @@ jobs:
           case "$MIN" in (*[!0-9]*) MIN=12;; esac
           [ "$MIN" -ge 3 ] 2>/dev/null || MIN=3
           [ "$MIN" -le 55 ] 2>/dev/null || MIN=55
-          SVC="${SVC_IN:-idseven-push}"
-          case "$SVC" in idseven-push|idseven-push-qa) : ;; *) echo "::error::service inválido"; exit 1;; esac
+          # 74H1: diagnóstico ANTES do guard (service não é segredo) + normalização
+          # restrita a whitespace externo/CR-LF; guard continua fail-closed.
+          python3 - <<'PY'
+          import os
+          s = os.environ.get("SVC_IN", "")
+          print(f"service recebido repr={s!r} len={len(s)} hex={s.encode('utf-8').hex()}")
+          PY
+          SVC="$(python3 - <<'PY'
+          import os
+          print(os.environ.get("SVC_IN", "").strip(), end="")
+          PY
+          )"
+          case "$SVC" in
+            idseven-push|idseven-push-qa) : ;;
+            *) echo "::error::service inválido após normalização"; exit 1 ;;
+          esac
+          echo "service validado: $SVC"
           # aquecer wrangler ANTES de abrir a janela (o npx frio custa ~60s e criaria
           # ponto cego no início da captura — foi exatamente o que engoliu as sondas
           # do self-test 74H run 4)
