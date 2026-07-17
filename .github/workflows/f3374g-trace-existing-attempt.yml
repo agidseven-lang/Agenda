@@ -1,0 +1,116 @@
+# =====================================================================
+# [manual] F3.3.74G — RASTREIO READ-ONLY da tentativa física JÁ realizada.
+#
+# O owner colou (~07:28 local = 10:28 UTC de 17/07) no WhatsApp Business
+# o link /share/cronograma/<token sintético 74f…> do host QA e NENHUM
+# preview apareceu. Este workflow NÃO pede novo teste: ele consulta a
+# GraphQL Analytics da Cloudflare (invocações por minuto do script QA,
+# que é ISOLADO — sem tráfego ambiente) na janela da colagem, com a
+# prova viva do deploy (10:05–10:06 UTC) como CONTROLE POSITIVO interno,
+# e sonda o estado do link exato + robots/X-Robots-Tag do host QA.
+#
+# READ-ONLY absoluto: GraphQL (leitura) + GET/HEAD públicos. SEM deploy,
+# SEM tail, SEM secret novo, SEM mutação. O token da colagem é SINTÉTICO
+# e INEXISTENTE no Firestore (sem capacidade); ainda assim os RELATÓRIOS
+# usam a forma sanitizada <tok:3d9cb673>.
+# =====================================================================
+name: "[manual] F3.3.74G Trace Existing Attempt"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      start_utc:
+        description: "Início da janela (UTC, ISO)"
+        required: false
+        default: "2026-07-17T10:00:00Z"
+      end_utc:
+        description: "Fim da janela (UTC, ISO)"
+        required: false
+        default: "2026-07-17T11:00:00Z"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374g-trace
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_QA_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  QA_URL: https://idseven-push-qa.agidseven.workers.dev
+  # token SINTÉTICO da colagem 74G (público no mandato; inexistente no Firestore; sem capacidade)
+  T_PASTE: 74f74f74f74f74f74f74f74f74f74f74f74f74f74f74f74f
+  START_IN: ${{ github.event.inputs.start_utc }}
+  END_IN: ${{ github.event.inputs.end_utc }}
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "1) GraphQL Analytics — invocações por minuto (QA e produção) na janela"
+        run: |
+          set -uo pipefail
+          mkdir -p out
+          Q='query($acct: String!, $start: Time!, $end: Time!) { viewer { accounts(filter: {accountTag: $acct}) { workersInvocationsAdaptive(limit: 2000, filter: {datetime_geq: $start, datetime_leq: $end}) { sum { requests errors subrequests } dimensions { scriptName status datetimeMinute } } } } }'
+          BODY=$(jq -n --arg q "$Q" --arg acct "$CLOUDFLARE_ACCOUNT_ID" --arg s "${START_IN:-2026-07-17T10:00:00Z}" --arg e "${END_IN:-2026-07-17T11:00:00Z}" '{query:$q, variables:{acct:$acct, start:$s, end:$e}}')
+          RESP=$(curl -sS --max-time 60 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "$BODY" https://api.cloudflare.com/client/v4/graphql)
+          echo "$RESP" > out/graphql-raw.json
+          ERRS=$(echo "$RESP" | jq -r '.errors // empty | length' 2>/dev/null || echo "")
+          if [ -n "$ERRS" ] && [ "$ERRS" != "0" ]; then
+            echo "::warning::GraphQL retornou erros (escopo do token?) — registrando honestamente:"
+            echo "$RESP" | jq '.errors' || echo "$RESP" | head -c 800
+          fi
+          echo "===== invocações por minuto (todos os scripts da conta na janela) ====="
+          echo "$RESP" | jq -r '.data.viewer.accounts[0].workersInvocationsAdaptive[]? | [.dimensions.datetimeMinute, .dimensions.scriptName, .dimensions.status, (.sum.requests|tostring), (.sum.errors|tostring)] | @tsv' | sort | column -t || true
+          echo; echo "===== somente idseven-push-qa ====="
+          echo "$RESP" | jq -r '.data.viewer.accounts[0].workersInvocationsAdaptive[]? | select(.dimensions.scriptName=="idseven-push-qa") | [.dimensions.datetimeMinute, .dimensions.status, (.sum.requests|tostring)] | @tsv' | sort | column -t || echo "(sem linhas para o script QA)"
+          TOT_QA=$(echo "$RESP" | jq '[.data.viewer.accounts[0].workersInvocationsAdaptive[]? | select(.dimensions.scriptName=="idseven-push-qa") | .sum.requests] | add // 0')
+          echo; echo "TOTAL de requests ao script QA na janela: $TOT_QA"
+          echo "$TOT_QA" > out/total-qa.txt
+
+      - name: "2) Sub-janela da COLAGEM (10:20–10:40 UTC) — isolar do controle do deploy (10:05–10:06)"
+        run: |
+          set -uo pipefail
+          RESP=$(cat out/graphql-raw.json)
+          echo "===== idseven-push-qa entre 10:20 e 10:40 UTC (janela da colagem; deploy-proofs 10:05–10:06 EXCLUÍDAS) ====="
+          echo "$RESP" | jq -r '.data.viewer.accounts[0].workersInvocationsAdaptive[]? | select(.dimensions.scriptName=="idseven-push-qa") | select(.dimensions.datetimeMinute >= "2026-07-17T10:20" and .dimensions.datetimeMinute <= "2026-07-17T10:40") | [.dimensions.datetimeMinute, .dimensions.status, (.sum.requests|tostring)] | @tsv' | sort | column -t > out/paste-window.txt || true
+          if [ -s out/paste-window.txt ]; then cat out/paste-window.txt; else echo "(ZERO invocações do script QA na sub-janela da colagem)"; fi
+          N=$(awk -F'\t' '{s+=$3} END{print s+0}' out/paste-window.txt 2>/dev/null || echo 0)
+          echo "REQUESTS na sub-janela da colagem: ${N:-0}"
+
+      - name: "3) Sonda do LINK EXATO da colagem (estado atual do espelho; 3 UAs; GET+HEAD)"
+        run: |
+          set -uo pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-70; }
+          for UA in "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" "WhatsApp/2.23.20.0"; do
+            ST=$(curl -sS --max-time 30 -A "$UA" -D out/h.txt -o out/b.html -w '%{http_code}' "$QA_URL/share/cronograma/$T_PASTE")
+            OGN=$(grep -c 'property="og:' out/b.html || true)
+            HS=$(curl -sS --max-time 30 -I -A "$UA" -o /dev/null -w '%{http_code}' "$QA_URL/share/cronograma/$T_PASTE")
+            echo "UA=$(echo "$UA" | cut -c1-30)… GET=$ST HEAD=$HS og_metas=$OGN task=$(hv x-share-task out/h.txt) type=$(hv x-share-type out/h.txt) cc=$(hv cache-control out/h.txt) xrobots=$(hv x-robots-tag out/h.txt)"
+          done
+          sed -e "s/$T_PASTE/<tok:3d9cb673>/g" out/b.html > out/paste-link-page-sanitized.html
+          rm -f out/b.html
+          echo "— metas OG da página do link colado (sanitizadas):"
+          grep -oE '<meta (property|name)="(og:[a-z:_]+|twitter:card)" content="[^"]*"/?>' out/paste-link-page-sanitized.html | sed "s/$T_PASTE/<tok:3d9cb673>/g" | head -20 || true
+
+      - name: "4) robots + X-Robots-Tag + imagem no host QA (workers.dev)"
+        run: |
+          set -uo pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-70; }
+          echo "— robots.txt do host QA (workers.dev):"
+          RST=$(curl -sS --max-time 20 -D out/hr.txt -o out/robots-qa.txt -w '%{http_code}' "$QA_URL/robots.txt")
+          echo "status=$RST content-type=$(hv content-type out/hr.txt) bytes=$(wc -c < out/robots-qa.txt)"
+          head -5 out/robots-qa.txt || true
+          echo; echo "— imagem OG no host QA (UA facebookexternalhit):"
+          IST=$(curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D out/hi.txt -o out/img.bin -w '%{http_code}' "$QA_URL/og/wa-card-v64-39.jpg")
+          echo "status=$IST ct=$(hv content-type out/hi.txt) len=$(hv content-length out/hi.txt) sha256=$(sha256sum out/img.bin | cut -d' ' -f1)"
+          rm -f out/img.bin
+
+      - name: Upload evidências (sanitizadas)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374g-trace-evidence
+          path: out/
+          retention-days: 30
