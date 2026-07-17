@@ -275,16 +275,23 @@ async function handleShareCard(request, env, ctx, url, token) {
                  corrigir tipo depois de responder (sem waitUntil retroativo). */
   const lookupMs = Date.now() - t0;
   if (!resolved) {
+    // F3.3.74F — FAIL-OPEN DO OG (restauração do contrato fisicamente aprovado):
+    // token não-resolvido/erro de lookup NUNCA entrega página sem OG (o C20 fail-closed
+    // matou o preview p/ qualquer não-resolvido — primeiro ponto real de divergência,
+    // comprovado ao vivo: 15/07 C18E dummy=200+OG; 17/07 c20 dummy=404 sem OG).
+    // Volta o card GENÉRICO de cronograma (comportamento C18E/legacy) com 200 + OG
+    // completo; continua no-store e NUNCA aquece o cache (tipo só com prova — C18E:
+    // roteiro resolvido segue tipado; nada de contaminação retroativa).
     const state = lookupFailed ? "error" : "not_found";
-    const h = shareUnavailableHtml(url.origin, state);
+    const h = shareCardHtml(url.origin, token, PREMIUM_TYPES.cronograma);
     const res = new Response(request.method === "HEAD" ? null : h, {
-      status: lookupFailed ? 503 : 404,
+      status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
         "X-Share-Cache": "bypass",
         "X-Share-Task": state,
-        "X-Share-Type": "none",
+        "X-Share-Type": "generic",
         "Server-Timing": "share_lookup;dur=" + lookupMs,
       },
     });
