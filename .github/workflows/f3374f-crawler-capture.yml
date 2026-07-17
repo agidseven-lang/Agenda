@@ -87,7 +87,8 @@ jobs:
           ( timeout "$((MIN*60))" npx --yes wrangler@3 tail "$SVC" --format json > out/raw.jsonl 2> out/tail-err.txt; echo "tail exit=$?" ) &
           TAILPID=$!
           DEADLINE=$(( $(date +%s) + 90 ))
-          until grep -qiE 'connected' out/tail-err.txt 2>/dev/null; do
+          # wrangler@3 anuncia "Successfully created tail" no stdout (não "Connected"/stderr)
+          until grep -qiE 'connected|successfully created tail' out/raw.jsonl out/tail-err.txt 2>/dev/null; do
             [ "$(date +%s)" -lt "$DEADLINE" ] || { echo "::warning::tail não confirmou attach em 90s — janela segue mesmo assim"; break; }
             sleep 2
           done
@@ -112,11 +113,21 @@ jobs:
               raw = open('out/raw.jsonl', encoding='utf-8', errors='replace').read()
           except FileNotFoundError:
               raw = ''
-          for line in raw.splitlines():
-              line = line.strip()
-              if not line: continue
-              try: ev = json.loads(line)
-              except Exception: continue
+          # wrangler@3 --format json emite eventos PRETTY-PRINTED (multi-linha) misturados
+          # a banner/ruído no stdout — decodificar como STREAM, não como JSONL.
+          dec = json.JSONDecoder()
+          events = []
+          i = 0
+          while True:
+              j = raw.find('{', i)
+              if j < 0: break
+              try:
+                  obj, k = dec.raw_decode(raw, j)
+                  events.append(obj); i = k
+              except Exception:
+                  i = j + 1
+          print(f'== objetos JSON no stream: {len(events)} ==')
+          for ev in events:
               if not isinstance(ev, dict): continue
               evd = ev.get('event')
               if not isinstance(evd, dict): continue
