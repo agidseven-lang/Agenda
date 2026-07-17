@@ -76,7 +76,8 @@ jobs:
           echo "===== idseven-push-qa entre 10:20 e 10:40 UTC (janela da colagem; deploy-proofs 10:05–10:06 EXCLUÍDAS) ====="
           echo "$RESP" | jq -r '.data.viewer.accounts[0].workersInvocationsAdaptive[]? | select(.dimensions.scriptName=="idseven-push-qa") | select(.dimensions.datetimeMinute >= "2026-07-17T10:20" and .dimensions.datetimeMinute <= "2026-07-17T10:40") | [.dimensions.datetimeMinute, .dimensions.status, (.sum.requests|tostring)] | @tsv' | sort | column -t > out/paste-window.txt || true
           if [ -s out/paste-window.txt ]; then cat out/paste-window.txt; else echo "(ZERO invocações do script QA na sub-janela da colagem)"; fi
-          N=$(awk -F'\t' '{s+=$3} END{print s+0}' out/paste-window.txt 2>/dev/null || echo 0)
+          # soma direto do JSON (column -t troca TAB por espaços; awk -F'\t' somaria 0 com linhas presentes)
+          N=$(echo "$RESP" | jq '[.data.viewer.accounts[0].workersInvocationsAdaptive[]? | select(.dimensions.scriptName=="idseven-push-qa") | select(.dimensions.datetimeMinute >= "2026-07-17T10:20" and .dimensions.datetimeMinute <= "2026-07-17T10:40") | .sum.requests] | add // 0')
           echo "REQUESTS na sub-janela da colagem: ${N:-0}"
 
       - name: "3) Sonda do LINK EXATO da colagem (estado atual do espelho; 3 UAs; GET+HEAD)"
