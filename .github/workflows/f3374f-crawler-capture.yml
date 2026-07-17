@@ -99,6 +99,7 @@ jobs:
               if not line: continue
               try: ev = json.loads(line)
               except Exception: continue
+              if not isinstance(ev, dict): continue
               evd = ev.get('event')
               if not isinstance(evd, dict): continue
               req = evd.get('request') or {}
