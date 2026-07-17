@@ -1,0 +1,135 @@
+# =====================================================================
+# [manual] F3.3.74F — CAPTURA AO VIVO DO CRAWLER (FASE 3 do mandato).
+#
+# Abre uma janela de observação (wrangler tail, READ-ONLY) no Worker de
+# PRODUÇÃO `idseven-push` enquanto a equipe cola o link no WhatsApp
+# Business QA. Responde com PROVA: o WhatsApp/Meta requisitou a URL?
+# quando? GET ou HEAD? com que user-agent? que status recebeu? em quanto
+# tempo? pediu a imagem depois?
+#
+# SANITIZAÇÃO OBRIGATÓRIA: tokens NUNCA aparecem — todo token no path é
+# substituído por <tok:sha8> (hash não reversível, só para distinguir
+# URLs). Console logs do worker passam pela mesma redação. Nenhum dado
+# de cliente sai no log/artifact (o /share não contém dado de cliente;
+# eventos do portal têm o corpo ignorado — só método/status/UA).
+#
+# READ-ONLY absoluto: tail de observação; nenhum deploy, nenhuma config,
+# nenhum secret novo, nenhuma escrita em KV/Firestore.
+# Extra (fecha thread da FASE 4): despeja o CONTEÚDO do robots.txt do
+# domínio custom (público) e a contagem de metas OG da página not_found.
+# =====================================================================
+name: "[manual] F3.3.74F Crawler Capture (tail janela)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      window_minutes:
+        description: "Duração da janela de captura (minutos, 3..20)"
+        required: false
+        default: "12"
+      note:
+        description: "Etiqueta da tentativa (ex.: colagem-1.0.174-cron-grupoQA)"
+        required: false
+        default: "janela-sem-etiqueta"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374f-crawler-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    name: tail sanitizado do idseven-push
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WIN_IN: ${{ github.event.inputs.window_minutes }}
+      NOTE_IN: ${{ github.event.inputs.note }}
+    steps:
+      - name: Pré-checagens + robots.txt + not_found OG (público, sanitizado)
+        run: |
+          set -uo pipefail
+          [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || { echo "::error::secret CLOUDFLARE_API_TOKEN ausente"; exit 1; }
+          [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] || { echo "::error::secret CLOUDFLARE_ACCOUNT_ID ausente"; exit 1; }
+          mkdir -p out
+          echo "===== robots.txt do domínio custom (conteúdo público; fecha thread FASE 4) ====="
+          curl -sS --max-time 20 "https://aprovar.agendaidseven.com.br/robots.txt" | tee out/robots-custom.txt | head -60
+          echo; echo "— linhas Disallow/User-agent:"; grep -cE '^(User-agent|Disallow|Allow)' out/robots-custom.txt || true
+          grep -iE '^(User-agent|Disallow|Allow)' out/robots-custom.txt | head -30 || true
+          echo; echo "===== página not_found (token dummy): metas robots/OG ====="
+          DUMMY="f3374fcapture000000000000000000000000000000000001"
+          curl -sS --max-time 30 -A "facebookexternalhit/1.1" -o out/nf.html "https://aprovar.agendaidseven.com.br/share/cronograma/$DUMMY" || true
+          echo "metas og: $(grep -c 'property="og:' out/nf.html || true) | meta robots: $(grep -o '<meta name="robots"[^>]*>' out/nf.html | head -1)"
+          rm -f out/nf.html
+
+      - name: Janela de captura (wrangler tail sanitizado)
+        run: |
+          set -uo pipefail
+          MIN="${WIN_IN:-12}"
+          case "$MIN" in (*[!0-9]*) MIN=12;; esac
+          [ "$MIN" -ge 3 ] 2>/dev/null || MIN=3
+          [ "$MIN" -le 20 ] 2>/dev/null || MIN=20
+          echo "== JANELA ATIVA por ${MIN} minutos — etiqueta: ${NOTE_IN:-} =="
+          echo "== A equipe deve COLAR o link/mensagem no WhatsApp Business QA AGORA =="
+          ( timeout "$((MIN*60))" npx --yes wrangler@3 tail idseven-push --format json > out/raw.jsonl 2> out/tail-err.txt; echo "tail exit=$?" ) || true
+          tail -3 out/tail-err.txt || true
+          wc -l out/raw.jsonl || true
+
+      - name: Sanitizar + resumir captura
+        run: |
+          python3 - <<'PYEOF'
+          import json, re, hashlib, sys, datetime
+          tokre = re.compile(r'/(share|cliente)/(cronograma|roteiro)/([A-Za-z0-9_-]{4,128})')
+          def red(s):
+              def rep(m):
+                  h = hashlib.sha256(m.group(3).encode()).hexdigest()[:8]
+                  return f'/{m.group(1)}/{m.group(2)}/<tok:{h}>'
+              return tokre.sub(rep, s)
+          rows = []
+          try:
+              raw = open('out/raw.jsonl', encoding='utf-8', errors='replace').read()
+          except FileNotFoundError:
+              raw = ''
+          for line in raw.splitlines():
+              line = line.strip()
+              if not line: continue
+              try: ev = json.loads(line)
+              except Exception: continue
+              req = (ev.get('event') or {}).get('request') or {}
+              url = red(str(req.get('url') or ''))
+              if '/share/' not in url and '/og/' not in url and '/cliente/' not in url:
+                  continue
+              hdrs = req.get('headers') or {}
+              ua = ''
+              for k, v in (hdrs.items() if isinstance(hdrs, dict) else []):
+                  if k.lower() == 'user-agent': ua = str(v)[:90]
+              resp = (ev.get('event') or {}).get('response') or {}
+              ts = ev.get('eventTimestamp')
+              tss = datetime.datetime.utcfromtimestamp(ts/1000).isoformat() + 'Z' if isinstance(ts, (int, float)) else '?'
+              logs = []
+              for lg in (ev.get('logs') or []):
+                  msg = ' '.join(str(m) for m in (lg.get('message') or []))
+                  logs.append(red(msg)[:220])
+              rows.append({'ts': tss, 'method': req.get('method'), 'url': url,
+                           'ua': ua, 'status': resp.get('status'), 'outcome': ev.get('outcome'), 'logs': logs})
+          with open('out/capture-sanitized.jsonl', 'w', encoding='utf-8') as f:
+              for r in rows: f.write(json.dumps(r, ensure_ascii=False) + '\n')
+          print(f'== eventos /share|/og|/cliente capturados: {len(rows)} ==')
+          for r in rows[:80]:
+              print(f"  {r['ts']} {r['method']} {r['status'] or '-'} {r['outcome'] or ''} {r['url'][:90]} UA={r['ua'][:60]}")
+              for lg in r['logs'][:2]: print(f"      log: {lg}")
+          if not rows:
+              print('  (nenhum evento nas rotas de share/imagem/portal durante a janela)')
+          PYEOF
+          rm -f out/raw.jsonl
+
+      - name: Upload artefato (somente sanitizado)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374f-crawler-capture-${{ github.run_number }}
+          path: out/
+          retention-days: 14
