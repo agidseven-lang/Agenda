@@ -1,0 +1,157 @@
+# =====================================================================
+# [manual] F3.3.74H — FASE 1: CAPABILITY GATE DA ZONA (READ-ONLY absoluto).
+#
+# Antes de QUALQUER mutação: prova que aprovar-qa.agendaidseven.com.br
+# NÃO existe (DNS público autoritativo + inventário API quando o escopo
+# do token permitir), inventaria as rotas/custom-domains atuais (como a
+# produção aprovar.* está vinculada), confirma que nenhum wildcard
+# captura o host QA e que o serviço idseven-push-qa está no ar com a
+# candidata fail-open. NÃO cria nada. NÃO altera nada. Endpoints sem
+# escopo são registrados como DENIED (honestidade > cobertura).
+#
+# CONFLITO ENCONTRADO (host já existe em DNS/rota/custom-domain) ⇒
+# exit 1 = NO-GO com inventário. Escopo ausente ⇒ warning registrado
+# (a FASE 2 é quem descobre capacidade de escrita, tentando).
+# =====================================================================
+name: "[manual] F3.3.74H Zone Capability Gate"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374h-zone-gate
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_QA_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  ZONE_NAME: agendaidseven.com.br
+  QA_HOST: aprovar-qa.agendaidseven.com.br
+  PROD_HOST: aprovar.agendaidseven.com.br
+  QA_WORKERS_DEV: https://idseven-push-qa.agidseven.workers.dev
+  PROD_WORKERS_DEV: https://idseven-push.agidseven.workers.dev
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "1) DNS público autoritativo — o host QA NÃO deve existir"
+        run: |
+          set -uo pipefail
+          mkdir -p out
+          echo "===== NS da zona ====="
+          dig +short NS "$ZONE_NAME" | tee out/ns.txt
+          echo; echo "===== $QA_HOST (esperado: vazio/NXDOMAIN em A/AAAA/CNAME) ====="
+          CONFLICT=0
+          for RT in A AAAA CNAME; do
+            R=$(dig +short "$RT" "$QA_HOST" @1.1.1.1 | tr '\n' ' ')
+            echo "  $RT: ${R:-<vazio>}"
+            [ -n "$R" ] && CONFLICT=1
+          done
+          RC=$(dig +noall +comments "$QA_HOST" @1.1.1.1 | grep -oE 'status: [A-Z]+' | head -1)
+          echo "  rcode: ${RC:-?}"
+          echo; echo "===== $PROD_HOST (produção; deve continuar existindo) ====="
+          NA=$(dig +short A "$PROD_HOST" @1.1.1.1 | wc -l); NAA=$(dig +short AAAA "$PROD_HOST" @1.1.1.1 | wc -l)
+          echo "  A: $NA registro(s) | AAAA: $NAA registro(s) (valores não impressos)"
+          [ "$NA" -ge 1 ] || [ "$NAA" -ge 1 ] || { echo "::error::produção não resolve?!"; exit 1; }
+          if [ "$CONFLICT" = "1" ]; then echo "::error::CONFLITO: $QA_HOST JÁ EXISTE no DNS — NO-GO (não escolher outro hostname silenciosamente)"; exit 1; fi
+          echo "OK: host QA livre no DNS público"
+
+      - name: "2) Inventário API (read-only; DENIED registrado honestamente)"
+        run: |
+          set -uo pipefail
+          api() { curl -sS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4$1"; }
+          echo "===== zona ====="
+          ZJ=$(api "/zones?name=$ZONE_NAME")
+          if [ "$(echo "$ZJ" | jq -r '.success')" != "true" ]; then
+            echo "  zones list: DENIED/erro: $(echo "$ZJ" | jq -c '.errors' 2>/dev/null | head -c 200)"
+            echo "::warning::sem escopo de leitura de zona — FASE 2 descobrirá capacidade tentando (PUT custom domain não exige zones list se zone_id vier de outra fonte; aqui NÃO temos outra fonte)"
+            echo "" > out/zid.txt
+          else
+            ZID=$(echo "$ZJ" | jq -r '.result[0].id // empty')
+            ST=$(echo "$ZJ" | jq -r '.result[0].status // "?"')
+            echo "  zona encontrada: id=$(echo "$ZID" | cut -c1-8)… status=$ST (controle da zona confirmado)"
+            echo "$ZID" > out/zid.txt
+          fi
+          ZID=$(cat out/zid.txt)
+          echo; echo "===== dns_records do host QA (esperado: nenhum) ====="
+          if [ -n "$ZID" ]; then
+            DR=$(api "/zones/$ZID/dns_records?name=$QA_HOST")
+            if [ "$(echo "$DR" | jq -r '.success')" = "true" ]; then
+              N=$(echo "$DR" | jq '.result | length')
+              echo "  registros com nome exato $QA_HOST: $N"
+              [ "$N" = "0" ] || { echo "::error::CONFLITO: existem registros DNS para o host QA"; echo "$DR" | jq -r '.result[] | "  - \(.type) proxied=\(.proxied)"'; exit 1; }
+              PR=$(api "/zones/$ZID/dns_records?name=$PROD_HOST")
+              echo "  produção $PROD_HOST: $(echo "$PR" | jq -r '[.result[] | "\(.type)(proxied=\(.proxied))"] | join(", ") // "?"')"
+            else
+              echo "  dns_records: DENIED: $(echo "$DR" | jq -c '.errors' | head -c 200)"
+            fi
+          else
+            echo "  (sem zone id — pulado; ausência já provada pelo DNS público autoritativo)"
+          fi
+          echo; echo "===== workers routes da zona ====="
+          if [ -n "$ZID" ]; then
+            RT=$(api "/zones/$ZID/workers/routes")
+            if [ "$(echo "$RT" | jq -r '.success')" = "true" ]; then
+              echo "$RT" | jq -r '.result[] | "  - pattern=\(.pattern) script=\(.script // "-")"' | tee out/routes.txt
+              grep -q "aprovar-qa" out/routes.txt && { echo "::error::CONFLITO: rota existente menciona aprovar-qa"; exit 1; }
+              if grep -qE 'pattern=\*\.' out/routes.txt; then echo "::warning::há rota wildcard na zona — verificar se captura o host QA (inventário acima)"; else echo "  (nenhuma rota wildcard *. na zona)"; fi
+            else
+              echo "  routes: DENIED: $(echo "$RT" | jq -c '.errors' | head -c 200)"
+            fi
+          fi
+          echo; echo "===== custom domains de Workers (conta) ====="
+          WD=$(api "/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains")
+          if [ "$(echo "$WD" | jq -r '.success')" = "true" ]; then
+            echo "$WD" | jq -r '.result[] | "  - hostname=\(.hostname) service=\(.service) env=\(.environment)"' | tee out/wdomains.txt
+            grep -q "hostname=$QA_HOST" out/wdomains.txt && { echo "::error::CONFLITO: custom domain do host QA já existe"; exit 1; }
+            grep -q "hostname=$PROD_HOST" out/wdomains.txt && echo "  (produção está vinculada como WORKER CUSTOM DOMAIN)" || echo "  (produção NÃO aparece como custom domain — vínculo é por rota de zona)"
+          else
+            echo "  workers/domains: DENIED: $(echo "$WD" | jq -c '.errors' | head -c 200)"
+          fi
+          echo; echo "===== pages projects (conta; conflito de hostname) ====="
+          PG=$(api "/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects")
+          if [ "$(echo "$PG" | jq -r '.success')" = "true" ]; then
+            HITS=$(echo "$PG" | jq -r '[.result[]?.domains[]?] | join("\n")' | grep -c "aprovar-qa" || true)
+            echo "  domínios de Pages contendo aprovar-qa: ${HITS:-0}"
+            [ "${HITS:-0}" = "0" ] || { echo "::error::CONFLITO: Pages project usa o hostname"; exit 1; }
+          else
+            echo "  pages/projects: DENIED (aceitável): $(echo "$PG" | jq -c '.errors' | head -c 160)"
+          fi
+          echo; echo "===== rulesets da zona (redirects que citem o host QA) ====="
+          if [ -n "$ZID" ]; then
+            RS=$(api "/zones/$ZID/rulesets")
+            if [ "$(echo "$RS" | jq -r '.success')" = "true" ]; then
+              HITS=$(echo "$RS" | jq -r '.result[]?.name // empty' | wc -l)
+              MC=$(echo "$RS" | grep -c "aprovar-qa" || true)
+              echo "  rulesets listados: $HITS | menções a aprovar-qa: ${MC:-0}"
+              [ "${MC:-0}" = "0" ] || { echo "::error::CONFLITO: ruleset menciona o host QA"; exit 1; }
+            else
+              echo "  rulesets: DENIED (aceitável): $(echo "$RS" | jq -c '.errors' | head -c 160)"
+            fi
+          fi
+
+      - name: "3) Serviços vivos — QA candidata no ar; produção intocada"
+        run: |
+          set -euo pipefail
+          VQ=$(curl -sS --max-time 25 "$QA_WORKERS_DEV/" | jq -r '.version')
+          VP=$(curl -sS --max-time 25 "$PROD_WORKERS_DEV/" | jq -r '.version')
+          VC=$(curl -sS --max-time 25 "https://$PROD_HOST/" | jq -r '.version')
+          echo "idseven-push-qa (workers.dev): $VQ"
+          echo "idseven-push (workers.dev):    $VP"
+          echo "produção via $PROD_HOST:       $VC"
+          [ "$VQ" = "V64.59-c20-failopen-74f" ] || { echo "::error::serviço QA não está com a candidata 74F"; exit 1; }
+          [ "$VP" = "V64.59-c20-golden-contract" ] || { echo "::error::produção workers.dev divergente"; exit 1; }
+          [ "$VC" = "V64.59-c20-golden-contract" ] || { echo "::error::produção domínio custom divergente"; exit 1; }
+          echo "OK: candidata no serviço QA; produção exatamente como congelada"
+
+      - name: Upload inventário
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374h-zone-gate
+          path: out/
+          retention-days: 30

@@ -1,0 +1,160 @@
+# =====================================================================
+# [manual] F3.3.74H — FASE 6/9: OBSERVABILIDADE PÓS-FATO DO HOST CUSTOM QA.
+#
+# O 74G não tinha UA/ASN porque workers.dev fica FORA da zona. O host
+# custom QA fica DENTRO de agendaidseven.com.br ⇒ o dataset de zona
+# httpRequestsAdaptiveGroups entrega, POR REQUEST-GROUP e sem coordenação
+# prévia: minuto, método, status, user-agent, ASN, path. Este workflow:
+#   • (probe=true) dispara sondas com UA marcado "74H-OBS-PROBE" no host
+#     custom, espera a ingestão e EXIGE vê-las no dataset (controle
+#     positivo — gate 17 do mandato);
+#   • consulta a janela dada: zona (host custom QA + /share do host de
+#     produção, para contraste) e conta (invocações do script QA).
+#
+# SANITIZAÇÃO: tokens no path são reduzidos a <tok:sha8> antes de
+# qualquer print/artifact. Nenhum dado de cliente (o /share não tem).
+# READ-ONLY: só GETs públicos de sonda + GraphQL de leitura.
+# =====================================================================
+name: "[manual] F3.3.74H Crawler Trace (custom QA)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      start_utc:
+        description: "Início da janela (UTC, ISO)"
+        required: false
+        default: "2026-07-17T10:50:00Z"
+      end_utc:
+        description: "Fim da janela (UTC, ISO)"
+        required: false
+        default: "2026-07-17T13:00:00Z"
+      probe:
+        description: "true = disparar sondas 74H-OBS-PROBE e validar que aparecem (controle positivo)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374h-trace-custom
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_QA_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  ZONE_NAME: agendaidseven.com.br
+  QA_HOST: aprovar-qa.agendaidseven.com.br
+  PROD_HOST: aprovar.agendaidseven.com.br
+  T74H: f3374a00000000000000000000000000000000000074a001
+  START_IN: ${{ github.event.inputs.start_utc }}
+  END_IN: ${{ github.event.inputs.end_utc }}
+  PROBE_IN: ${{ github.event.inputs.probe }}
+
+jobs:
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "0) (opcional) Sondas de controle positivo no host custom"
+        run: |
+          set -uo pipefail
+          mkdir -p out
+          if [ "${PROBE_IN:-false}" != "true" ]; then echo "(probe=false — pulado)"; exit 0; fi
+          date -u +"probe_fired_at=%Y-%m-%dT%H:%M:%SZ" | tee out/probe-ts.txt
+          for i in 1 2 3; do
+            curl -sS --max-time 25 -A "74H-OBS-PROBE/1.$i (+controle-positivo)" -o /dev/null -w "GET share -> %{http_code}\n" "https://$QA_HOST/share/cronograma/$T74H"
+          done
+          curl -sS --max-time 25 -A "74H-OBS-PROBE/2.0 (+controle-positivo)" -o /dev/null -w "GET image -> %{http_code}\n" "https://$QA_HOST/og/wa-card-v64-39.jpg"
+          echo "aguardando ingestão do dataset adaptativo (300 s)…"
+          sleep 300
+
+      - name: "1) Zona — httpRequestsAdaptiveGroups do HOST CUSTOM QA (UA/ASN/método/status/path)"
+        run: |
+          set -uo pipefail
+          S="${START_IN:-2026-07-17T10:50:00Z}"; E="${END_IN:-2026-07-17T13:00:00Z}"
+          api() { curl -sS --max-time 60 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "$1" https://api.cloudflare.com/client/v4/graphql; }
+          ZJ=$(curl -sS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=$ZONE_NAME")
+          ZID=$(echo "$ZJ" | jq -r '.result[0].id // empty')
+          [ -n "$ZID" ] || { echo "::error::sem zone id (escopo?)"; echo "$ZJ" | jq -c '.errors' | head -c 300; exit 1; }
+          echo "$ZID" > out/zid.txt
+          Q='query($z: String!, $s: Time!, $e: Time!, $h: String!) { viewer { zones(filter: {zoneTag: $z}) { httpRequestsAdaptiveGroups(limit: 1000, filter: {datetime_geq: $s, datetime_leq: $e, clientRequestHTTPHost: $h}) { count dimensions { datetimeMinute clientRequestHTTPMethodName edgeResponseStatus userAgent clientAsn clientRequestPath } } } } }'
+          BODY=$(jq -n --arg q "$Q" --arg z "$ZID" --arg s "$S" --arg e "$E" --arg h "$QA_HOST" '{query:$q, variables:{z:$z, s:$s, e:$e, h:$h}}')
+          RESP=$(api "$BODY"); echo "$RESP" > out/zone-qa-raw.json
+          if [ "$(echo "$RESP" | jq -r '.errors // empty | length' 2>/dev/null || echo 0)" != "0" ] && [ -n "$(echo "$RESP" | jq -r '.errors // empty' 2>/dev/null)" ]; then
+            echo "::warning::GraphQL de zona retornou erros (escopo Analytics de zona?):"; echo "$RESP" | jq -c '.errors' | head -c 400
+          fi
+          echo "===== requests no host $QA_HOST ($S → $E) — path SANITIZADO ====="
+          echo "$RESP" | jq -r '.data.viewer.zones[0].httpRequestsAdaptiveGroups[]? | [.dimensions.datetimeMinute, .dimensions.clientRequestHTTPMethodName, (.dimensions.edgeResponseStatus|tostring), ("ASN"+(.dimensions.clientAsn|tostring)), (.count|tostring), .dimensions.clientRequestPath, .dimensions.userAgent] | @tsv' \
+          | python3 -c '
+          import sys, re, hashlib
+          tok = re.compile(r"/(share|cliente)/(cronograma|roteiro)/([A-Za-z0-9_-]{4,128})")
+          def red(p):
+              return tok.sub(lambda m: f"/{m.group(1)}/{m.group(2)}/<tok:{hashlib.sha256(m.group(3).encode()).hexdigest()[:8]}>", p)
+          n = 0
+          for line in sys.stdin:
+              f = line.rstrip("\n").split("\t")
+              if len(f) < 7: continue
+              n += 1
+              print(f"  {f[0]} {f[1]:4} {f[2]:3} {f[3]:>9} n={f[4]:>2} {red(f[5])[:60]:60} UA={f[6][:70]}")
+          print(f"  == grupos: {n} ==" if n else "  (ZERO requests no host custom QA na janela)")
+          ' | tee out/zone-qa-rows.txt
+          TOT=$(echo "$RESP" | jq '[.data.viewer.zones[0].httpRequestsAdaptiveGroups[]?.count] | add // 0')
+          echo "TOTAL (count) no host custom QA: $TOT"; echo "$TOT" > out/zone-qa-total.txt
+
+      - name: "2) Zona — /share/* do host de PRODUÇÃO na mesma janela (contraste; sanitizado)"
+        run: |
+          set -uo pipefail
+          S="${START_IN:-2026-07-17T10:50:00Z}"; E="${END_IN:-2026-07-17T13:00:00Z}"
+          ZID=$(cat out/zid.txt)
+          Q='query($z: String!, $s: Time!, $e: Time!, $h: String!) { viewer { zones(filter: {zoneTag: $z}) { httpRequestsAdaptiveGroups(limit: 1000, filter: {datetime_geq: $s, datetime_leq: $e, clientRequestHTTPHost: $h, clientRequestPath_like: "/share/%"}) { count dimensions { datetimeMinute clientRequestHTTPMethodName edgeResponseStatus userAgent clientAsn clientRequestPath } } } } }'
+          BODY=$(jq -n --arg q "$Q" --arg z "$ZID" --arg s "$S" --arg e "$E" --arg h "$PROD_HOST" '{query:$q, variables:{z:$z, s:$s, e:$e, h:$h}}')
+          RESP=$(curl -sS --max-time 60 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "$BODY" https://api.cloudflare.com/client/v4/graphql)
+          echo "$RESP" > out/zone-prod-share-raw.json
+          echo "===== /share/* em $PROD_HOST ($S → $E) — sanitizado ====="
+          echo "$RESP" | jq -r '.data.viewer.zones[0].httpRequestsAdaptiveGroups[]? | [.dimensions.datetimeMinute, .dimensions.clientRequestHTTPMethodName, (.dimensions.edgeResponseStatus|tostring), ("ASN"+(.dimensions.clientAsn|tostring)), (.count|tostring), .dimensions.clientRequestPath, .dimensions.userAgent] | @tsv' \
+          | python3 -c '
+          import sys, re, hashlib
+          tok = re.compile(r"/(share|cliente)/(cronograma|roteiro)/([A-Za-z0-9_-]{4,128})")
+          def red(p):
+              return tok.sub(lambda m: f"/{m.group(1)}/{m.group(2)}/<tok:{hashlib.sha256(m.group(3).encode()).hexdigest()[:8]}>", p)
+          n = 0
+          for line in sys.stdin:
+              f = line.rstrip("\n").split("\t")
+              if len(f) < 7: continue
+              n += 1
+              print(f"  {f[0]} {f[1]:4} {f[2]:3} {f[3]:>9} n={f[4]:>2} {red(f[5])[:60]:60} UA={f[6][:70]}")
+          print(f"  == grupos: {n} ==" if n else "  (zero /share/* no host de produção na janela)")
+          ' | tee out/zone-prod-rows.txt
+
+      - name: "3) Conta — invocações do script idseven-push-qa por minuto (mesma janela)"
+        run: |
+          set -uo pipefail
+          S="${START_IN:-2026-07-17T10:50:00Z}"; E="${END_IN:-2026-07-17T13:00:00Z}"
+          Q='query($acct: String!, $start: Time!, $end: Time!) { viewer { accounts(filter: {accountTag: $acct}) { workersInvocationsAdaptive(limit: 2000, filter: {datetime_geq: $start, datetime_leq: $end}) { sum { requests errors } dimensions { scriptName status datetimeMinute } } } } }'
+          BODY=$(jq -n --arg q "$Q" --arg acct "$CLOUDFLARE_ACCOUNT_ID" --arg s "$S" --arg e "$E" '{query:$q, variables:{acct:$acct, start:$s, end:$e}}')
+          RESP=$(curl -sS --max-time 60 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "$BODY" https://api.cloudflare.com/client/v4/graphql)
+          echo "$RESP" > out/invocations-raw.json
+          echo "===== idseven-push-qa por minuto ====="
+          echo "$RESP" | jq -r '.data.viewer.accounts[0].workersInvocationsAdaptive[]? | select(.dimensions.scriptName=="idseven-push-qa") | [.dimensions.datetimeMinute, .dimensions.status, (.sum.requests|tostring)] | @tsv' | sort | column -t | tee out/invocations-qa.txt
+          [ -s out/invocations-qa.txt ] || echo "(zero invocações do script QA na janela)"
+          TOT=$(echo "$RESP" | jq '[.data.viewer.accounts[0].workersInvocationsAdaptive[]? | select(.dimensions.scriptName=="idseven-push-qa") | .sum.requests] | add // 0')
+          echo "TOTAL script QA: $TOT"
+
+      - name: "4) (probe=true) Controle positivo — as sondas DEVEM estar visíveis"
+        run: |
+          set -uo pipefail
+          if [ "${PROBE_IN:-false}" != "true" ]; then echo "(probe=false — pulado)"; exit 0; fi
+          if grep -q "74H-OBS-PROBE" out/zone-qa-rows.txt; then
+            echo "OK: sondas 74H-OBS-PROBE visíveis no dataset de zona (UA/ASN/método/status/path capturados)"
+            echo "OBSERVABILIDADE VALIDADA — gate 16/17 verdes"
+          else
+            echo "::error::sondas NÃO apareceram no dataset de zona após a espera — observabilidade NÃO validada (verificar escopo Analytics/lag)"; exit 1
+          fi
+
+      - name: Upload evidências (sanitizadas)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374h-trace-custom-${{ github.run_number }}
+          path: out/
+          retention-days: 30

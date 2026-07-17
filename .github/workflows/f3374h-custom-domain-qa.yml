@@ -1,0 +1,265 @@
+# =====================================================================
+# [manual] F3.3.74H — FASES 2/3/5/7: CUSTOM DOMAIN QA ISOLADO + PROVAS.
+#
+# Cria EXCLUSIVAMENTE o vínculo aprovar-qa.agendaidseven.com.br →
+# serviço idseven-push-qa (candidata fail-open d134193 JÁ NO AR — este
+# workflow NÃO faz deploy de código). Mecanismo preferencial: Worker
+# Custom Domain via API (PUT /workers/domains — cria DNS+cert
+# gerenciados). Fallback: DNS AAAA 100:: proxied + rota EXATA
+# aprovar-qa.agendaidseven.com.br/* → idseven-push-qa. NUNCA wildcard,
+# NUNCA toca aprovar.* nem o worker/rotas/DNS/WAF de produção, NUNCA
+# copia secret. Rollback: ids gravados em out/rollback.txt.
+#
+# Depois valida ao vivo: DNS, TLS/SAN, h2, rota→script (versão), FASE 5
+# (GET/HEAD 3 UAs + OG completo + imagem canônica) e FASE 7 (contraste
+# workers.dev × custom com o MESMO token e MESMO código — HTML
+# normalizado por hostname deve ser byte-idêntico).
+# Token 74H: SINTÉTICO 48-hex, inexistente no Firestore, sem capacidade.
+# =====================================================================
+name: "[manual] F3.3.74H Custom Domain QA (criar + provar)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite CRIAR-DOMINIO-QA-74H para autorizar"
+        required: true
+        default: ""
+      ref:
+        description: "Branch/commit da candidata"
+        required: true
+        default: "worker/f3374f-share-og-failopen-candidate"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374h-custom-domain
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_QA_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  ZONE_NAME: agendaidseven.com.br
+  QA_HOST: aprovar-qa.agendaidseven.com.br
+  PROD_HOST: aprovar.agendaidseven.com.br
+  QA_WORKERS_DEV: idseven-push-qa.agidseven.workers.dev
+  PROD_WORKERS_DEV: idseven-push.agidseven.workers.dev
+  # token SINTÉTICO 48-hex da fase 74H (sem relação com Firestore; sem capacidade)
+  T74H: f3374a00000000000000000000000000000000000074a001
+
+jobs:
+  create-and-prove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "CRIAR-DOMINIO-QA-74H" ] || { echo "::error::confirmação inválida"; exit 1; }
+          case "$T74H" in (*[!0-9a-f]*) echo "::error::token 74H não é hex"; exit 1;; esac
+          [ "${#T74H}" = "48" ] || { echo "::error::token 74H não tem 48 chars"; exit 1; }
+          echo "OK (token sintético: <tok:$(printf %s "$T74H" | sha256sum | cut -c1-8)>)"
+
+      - name: Checkout (candidata)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: "Gate — fonte é EXATAMENTE a candidata d134193 (sem redeploy nesta fase)"
+        run: |
+          set -euo pipefail
+          HEAD=$(git rev-parse HEAD)
+          echo "HEAD=$HEAD"
+          case "$HEAD" in d134193*) : ;; *) echo "::error::ref não é a candidata d134193"; exit 1;; esac
+          grep -q 'version: "V64.59-c20-failopen-74f"' cloudflare-worker.js || { echo "::error::versão candidata ausente"; exit 1; }
+          grep -q 'F3.3.74F — FAIL-OPEN DO OG' cloudflare-worker.js || { echo "::error::fix fail-open ausente"; exit 1; }
+          grep -q 'name = "idseven-push-qa"' wrangler.qa.toml || { echo "::error::template QA divergente"; exit 1; }
+          if grep -qE '^\s*route|^\s*routes|custom_domain|\[triggers\]|crons' wrangler.qa.toml; then
+            echo "::error::wrangler.qa.toml ganhou rota/cron — isolamento por construção quebrado"; exit 1; fi
+          grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml de produção alterado?"; exit 1; }
+          echo "OK: candidata íntegra; nenhum deploy será feito (script já está no ar)"
+
+      - name: "Gate — serviço QA vivo com a candidata; host ainda livre"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          VQ=$(curl -sS --max-time 25 "https://$QA_WORKERS_DEV/" | jq -r '.version')
+          [ "$VQ" = "V64.59-c20-failopen-74f" ] || { echo "::error::serviço QA não roda a candidata ($VQ)"; exit 1; }
+          R=$(dig +short "$QA_HOST" @1.1.1.1 | tr '\n' ' ')
+          [ -z "$R" ] || { echo "::error::host QA já resolve ($R) — rodar o capability gate e investigar"; exit 1; }
+          echo "OK: QA=$VQ; $QA_HOST livre"
+
+      - name: "FASE 2 — criar o vínculo (custom domain; fallback DNS+rota exata)"
+        run: |
+          set -uo pipefail
+          api() { M="$1"; P="$2"; shift 2; curl -sS --max-time 40 -X "$M" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4$P" "$@"; }
+          ZJ=$(api GET "/zones?name=$ZONE_NAME")
+          [ "$(echo "$ZJ" | jq -r '.success')" = "true" ] || { echo "::error::sem escopo para ler a zona (necessário p/ zone_id): $(echo "$ZJ" | jq -c '.errors' | head -c 300)"; exit 1; }
+          ZID=$(echo "$ZJ" | jq -r '.result[0].id')
+          echo "zone_id=$(echo "$ZID" | cut -c1-8)…"
+          echo "== Tentativa 1: Worker Custom Domain (PUT /accounts/…/workers/domains) =="
+          BODY=$(jq -n --arg z "$ZID" --arg h "$QA_HOST" '{zone_id:$z, hostname:$h, service:"idseven-push-qa", environment:"production"}')
+          WD=$(api PUT "/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains" -d "$BODY")
+          if [ "$(echo "$WD" | jq -r '.success')" = "true" ]; then
+            DID=$(echo "$WD" | jq -r '.result.id')
+            echo "OK: custom domain criado (mecanismo=WORKER_CUSTOM_DOMAIN)"
+            echo "mechanism=WORKER_CUSTOM_DOMAIN" > out/rollback.txt
+            echo "rollback: DELETE /accounts/<acct>/workers/domains/$DID" >> out/rollback.txt
+            echo "domain_id=$DID" >> out/rollback.txt
+          else
+            echo "Tentativa 1 falhou: $(echo "$WD" | jq -c '.errors' | head -c 300)"
+            echo "== Fallback: DNS AAAA 100:: proxied + rota EXATA =="
+            DRB=$(jq -n --arg n "$QA_HOST" '{type:"AAAA", name:$n, content:"100::", proxied:true, ttl:1, comment:"F3.3.74H QA isolado (rollback: apagar junto com a rota)"}')
+            DR=$(api POST "/zones/$ZID/dns_records" -d "$DRB")
+            [ "$(echo "$DR" | jq -r '.success')" = "true" ] || { echo "::error::sem capacidade de criar DNS (NO-GO honesto — permissão faltante no token): $(echo "$DR" | jq -c '.errors' | head -c 300)"; exit 1; }
+            RID=$(echo "$DR" | jq -r '.result.id')
+            RTB=$(jq -n --arg p "$QA_HOST/*" '{pattern:$p, script:"idseven-push-qa"}')
+            RT=$(api POST "/zones/$ZID/workers/routes" -d "$RTB")
+            if [ "$(echo "$RT" | jq -r '.success')" != "true" ]; then
+              echo "::error::rota falhou — desfazendo o DNS recém-criado: $(echo "$RT" | jq -c '.errors' | head -c 300)"
+              api DELETE "/zones/$ZID/dns_records/$RID" >/dev/null || true
+              exit 1
+            fi
+            RTID=$(echo "$RT" | jq -r '.result.id')
+            echo "OK: DNS AAAA(100::, proxied) + rota $QA_HOST/* → idseven-push-qa (mecanismo=DNS_PLUS_ROUTE)"
+            { echo "mechanism=DNS_PLUS_ROUTE"
+              echo "rollback: DELETE /zones/<zid>/workers/routes/$RTID ; DELETE /zones/<zid>/dns_records/$RID"
+              echo "dns_record_id=$RID"; echo "route_id=$RTID"; } > out/rollback.txt
+          fi
+          echo "$ZID" > out/zid.txt
+          cat out/rollback.txt
+
+      - name: "FASE 3 — DNS/TLS/h2/rota ao vivo (com espera de propagação/cert)"
+        run: |
+          set -uo pipefail
+          echo "== DNS =="
+          DEADLINE=$(( $(date +%s) + 180 ))
+          until [ -n "$(dig +short "$QA_HOST" @1.1.1.1 | head -1)" ]; do
+            [ "$(date +%s)" -lt "$DEADLINE" ] || { echo "::error::DNS não propagou em 180s"; exit 1; }
+            sleep 5
+          done
+          echo "  resolve: SIM ($(dig +short "$QA_HOST" @1.1.1.1 | wc -l) registro(s); valores de borda CF)"
+          echo "== TLS (poll até cert cobrir o host) =="
+          DEADLINE=$(( $(date +%s) + 480 ))
+          OKTLS=0
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            SAN=$(echo | openssl s_client -connect "$QA_HOST:443" -servername "$QA_HOST" -alpn 'h2,http/1.1' 2>/dev/null | openssl x509 -noout -ext subjectAltName 2>/dev/null || true)
+            if echo "$SAN" | grep -qE "(\*\.$ZONE_NAME|$QA_HOST)"; then OKTLS=1; break; fi
+            sleep 10
+          done
+          [ "$OKTLS" = "1" ] || { echo "::error::certificado não cobre o host em 480s (pode concluir depois; NÃO removido — reexecutar FASE 3)"; exit 1; }
+          echo | openssl s_client -connect "$QA_HOST:443" -servername "$QA_HOST" -alpn 'h2,http/1.1' 2>/dev/null \
+            | openssl x509 -noout -subject -issuer -dates -ext subjectAltName | sed 's/^/  /'
+          echo "  ALPN: $(echo | openssl s_client -connect "$QA_HOST:443" -servername "$QA_HOST" -alpn 'h2,http/1.1' 2>/dev/null | grep -i '^ALPN' | head -1)"
+          echo "== rota → script (identidade pela versão) =="
+          DEADLINE=$(( $(date +%s) + 180 ))
+          V=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            V=$(curl -sS --max-time 15 "https://$QA_HOST/" | jq -r '.version' 2>/dev/null || true)
+            [ "$V" = "V64.59-c20-failopen-74f" ] && break
+            sleep 5
+          done
+          [ "$V" = "V64.59-c20-failopen-74f" ] || { echo "::error::host QA não responde a candidata (obtido: ${V:-nada})"; exit 1; }
+          echo "  https://$QA_HOST/ → $V (script de destino comprovado)"
+          HV=$(curl -sS --max-time 20 -o /dev/null -w '%{http_version}' "https://$QA_HOST/")
+          echo "  http_version=$HV"
+          RAY=$(curl -sS --max-time 20 -D - -o /dev/null "https://$QA_HOST/" | grep -i '^cf-ray:' | tr -d '\r' | cut -d' ' -f2)
+          echo "  cf-ray: ${RAY:-ausente} (borda Cloudflare ativa)"
+          HR=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "http://$QA_HOST/" || echo "err")
+          HL=$(curl -sS --max-time 20 -D - -o /dev/null "http://$QA_HOST/" 2>/dev/null | grep -i '^location:' | tr -d '\r' | head -1 || true)
+          echo "  http:// → status=$HR ${HL:+| $HL}"
+
+      - name: "Gate — PRODUÇÃO INTOCADA (versões + DNS de produção)"
+        run: |
+          set -euo pipefail
+          VP=$(curl -sS --max-time 25 "https://$PROD_WORKERS_DEV/" | jq -r '.version')
+          VC=$(curl -sS --max-time 25 "https://$PROD_HOST/" | jq -r '.version')
+          echo "produção workers.dev: $VP | produção $PROD_HOST: $VC"
+          [ "$VP" = "V64.59-c20-golden-contract" ] || { echo "::error::PRODUÇÃO MUDOU"; exit 1; }
+          [ "$VC" = "V64.59-c20-golden-contract" ] || { echo "::error::PRODUÇÃO (domínio custom) MUDOU"; exit 1; }
+          NA=$(dig +short A "$PROD_HOST" @1.1.1.1 | wc -l); NAA=$(dig +short AAAA "$PROD_HOST" @1.1.1.1 | wc -l)
+          [ "$NA" -ge 1 ] || [ "$NAA" -ge 1 ] || { echo "::error::DNS de produção sumiu?!"; exit 1; }
+          echo "OK: produção exatamente como congelada"
+
+      - name: "FASE 5 — validação HTTP pré-física no host custom (3 UAs, GET+HEAD, OG, imagem)"
+        run: |
+          set -uo pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-80; }
+          URL="https://$QA_HOST/share/cronograma/$T74H"
+          FAIL=0
+          for UA in "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" "WhatsApp/2.23.20.0"; do
+            ST=$(curl -sS --max-time 30 -A "$UA" -D out/h5.txt -o out/b5.html -w '%{http_code}' "$URL")
+            HS=$(curl -sS --max-time 30 -I -A "$UA" -o /dev/null -w '%{http_code}' "$URL")
+            OGN=$(grep -c 'property="og:' out/b5.html || true)
+            CT=$(hv content-type out/h5.txt); TK=$(hv x-share-task out/h5.txt); TY=$(hv x-share-type out/h5.txt); CC=$(hv cache-control out/h5.txt); XC=$(hv x-share-cache out/h5.txt); XR=$(hv x-robots-tag out/h5.txt)
+            echo "UA=$(echo "$UA" | cut -c1-28)… GET=$ST HEAD=$HS ct=$CT og=$OGN task=$TK type=$TY cc=$CC xcache=$XC xrobots=${XR:-<vazio>}"
+            [ "$ST" = "200" ] && [ "$HS" = "200" ] || FAIL=1
+            case "$CT" in text/html*) : ;; *) FAIL=1;; esac
+            [ "$TK" = "not_found" ] && [ "$TY" = "generic" ] || FAIL=1
+            case "$CC" in *no-store*) : ;; *) FAIL=1;; esac
+            [ "$OGN" -ge 13 ] || FAIL=1
+          done
+          echo "— metas obrigatórias:"
+          for M in 'og:type' 'og:site_name' 'og:locale' 'og:title' 'og:description' 'og:url' 'og:image' 'og:image:url' 'og:image:secure_url' 'og:image:type' 'og:image:width' 'og:image:height'; do
+            grep -q "property=\"$M\"" out/b5.html && echo "  $M: OK" || { echo "  $M: AUSENTE"; FAIL=1; }
+          done
+          grep -q 'name="twitter:card" content="summary_large_image"' out/b5.html && echo "  twitter:card: OK" || { echo "  twitter:card: AUSENTE"; FAIL=1; }
+          if grep -q 'rel="canonical"' out/b5.html; then echo "  canonical: presente"; else echo "  canonical: AUSENTE no HTML comprovado (inalterado por mandato — FASE 4 proíbe mudar HTML)"; fi
+          grep -q "https://$QA_HOST/og/wa-card-v64-39.jpg" out/b5.html && echo "  og:image absoluto no host custom: OK" || { echo "  og:image não aponta para o host custom"; FAIL=1; }
+          ST2=$(curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D out/h5b.txt -o /dev/null -w '%{http_code}' "$URL")
+          case "$(hv x-share-cache out/h5b.txt)" in *bypass*) echo "  2º GET: bypass (nunca aquece cache) OK";; *) echo "  2º GET aqueceu cache!"; FAIL=1;; esac
+          echo "— imagem no host custom:"
+          IST=$(curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D out/hi5.txt -o out/img5.bin -w '%{http_code} %{num_redirects}' "https://$QA_HOST/og/wa-card-v64-39.jpg")
+          SHA=$(sha256sum out/img5.bin | cut -d' ' -f1); SZ=$(wc -c < out/img5.bin | tr -d ' ')
+          echo "  status/redirects=$IST ct=$(hv content-type out/hi5.txt) bytes=$SZ sha256=$SHA"
+          [ "$IST" = "200 0" ] || FAIL=1
+          [ "$SZ" = "144941" ] || FAIL=1
+          [ "$SHA" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || FAIL=1
+          sed -e "s/$T74H/<tok:$(printf %s "$T74H" | sha256sum | cut -c1-8)>/g" out/b5.html > out/custom-share-page-sanitized.html
+          rm -f out/b5.html out/img5.bin
+          [ "$FAIL" = "0" ] || { echo "::error::FASE 5 reprovou (ver linhas acima)"; exit 1; }
+          echo "OK FASE 5: host custom serve o contrato fail-open completo"
+
+      - name: "FASE 7 — contraste workers.dev × custom (mesmo token, mesmo código)"
+        run: |
+          set -uo pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-60; }
+          probe() { # $1=host  $2=prefix
+            curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D "out/$2-h.txt" -o "out/$2-b.html" -w '%{http_code}' "https://$1/share/cronograma/$T74H" > "out/$2-get.txt"
+            curl -sS --max-time 30 -I -A "facebookexternalhit/1.1" -o /dev/null -w '%{http_code}' "https://$1/share/cronograma/$T74H" > "out/$2-head.txt"
+            curl -sS --max-time 30 "https://$1/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1 > "out/$2-img.txt"
+            curl -sS --max-time 20 "https://$1/" > "out/$2-root.json"
+            sed -e "s/$1/__HOST__/g" "out/$2-b.html" | sha256sum | cut -d' ' -f1 > "out/$2-norm.txt"
+            sha256sum "out/$2-b.html" | cut -d' ' -f1 > "out/$2-raw.txt"
+          }
+          probe "$QA_WORKERS_DEV" wd
+          probe "$QA_HOST" cq
+          row() { printf '%-22s | %-34s | %-34s | %s\n' "$1" "$2" "$3" "$([ "$2" = "$3" ] && echo IGUAL || echo DIFERENTE)"; }
+          echo "ITEM                   | WORKERS.DEV                        | CUSTOM QA                          | VEREDITO"
+          echo "-----------------------+------------------------------------+------------------------------------+---------"
+          row "GET status"   "$(cat out/wd-get.txt)"  "$(cat out/cq-get.txt)"
+          row "HEAD status"  "$(cat out/wd-head.txt)" "$(cat out/cq-head.txt)"
+          row "content-type" "$(hv content-type out/wd-h.txt)" "$(hv content-type out/cq-h.txt)"
+          row "cache-control" "$(hv cache-control out/wd-h.txt)" "$(hv cache-control out/cq-h.txt)"
+          row "x-share-task" "$(hv x-share-task out/wd-h.txt)" "$(hv x-share-task out/cq-h.txt)"
+          row "x-share-type" "$(hv x-share-type out/wd-h.txt)" "$(hv x-share-type out/cq-h.txt)"
+          row "x-share-cache" "$(hv x-share-cache out/wd-h.txt)" "$(hv x-share-cache out/cq-h.txt)"
+          row "og metas (n)"  "$(grep -c 'property="og:' out/wd-b.html)" "$(grep -c 'property="og:' out/cq-b.html)"
+          row "HTML sha (bruto)" "$(cut -c1-12 out/wd-raw.txt)…" "$(cut -c1-12 out/cq-raw.txt)…"
+          row "HTML sha (norm.)"  "$(cat out/wd-norm.txt)" "$(cat out/cq-norm.txt)"
+          row "imagem sha"    "$(cat out/wd-img.txt)" "$(cat out/cq-img.txt)"
+          row "worker version" "$(jq -r '.version' out/wd-root.json)" "$(jq -r '.version' out/cq-root.json)"
+          [ "$(cat out/wd-norm.txt)" = "$(cat out/cq-norm.txt)" ] || { echo "::error::HTML normalizado divergiu entre hosts"; exit 1; }
+          [ "$(cat out/wd-img.txt)" = "$(cat out/cq-img.txt)" ] || { echo "::error::imagem divergiu entre hosts"; exit 1; }
+          [ "$(jq -r '.version' out/wd-root.json)" = "$(jq -r '.version' out/cq-root.json)" ] || { echo "::error::versões divergem"; exit 1; }
+          for f in out/wd-b.html out/cq-b.html; do sed -i "s/$T74H/<tok:$(printf %s "$T74H" | sha256sum | cut -c1-8)>/g" "$f"; done
+          echo "OK FASE 7: semanticamente idênticos — única diferença é o hostname (e URLs absolutas derivadas)"
+
+      - name: Upload evidências (sanitizadas) + rollback ids
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374h-custom-domain-evidence
+          path: out/
+          retention-days: 30
