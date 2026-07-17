@@ -101,25 +101,98 @@ jobs:
             *) echo "::error::service inválido após normalização"; exit 1 ;;
           esac
           echo "service validado: $SVC"
-          # aquecer wrangler ANTES de abrir a janela (o npx frio custa ~60s e criaria
-          # ponto cego no início da captura — foi exatamente o que engoliu as sondas
-          # do self-test 74H run 4)
+          # ============== F3.3.74H2 — FAIL-CLOSED POR SELF-PROBE ==============
+          # A janela SÓ é declarada depois que um request de controle nosso
+          # aparece DENTRO do stream capturado (banner do wrangler é mera dica,
+          # nunca prova). QA (fail-open) espera 200; produção (fail-closed c20)
+          # espera 404 determinístico para token sintético.
+          if [ "$SVC" = "idseven-push-qa" ]; then
+            PHOST="aprovar-qa.agendaidseven.com.br"; PEXP=200
+          else
+            PHOST="aprovar.agendaidseven.com.br"; PEXP=404
+          fi
           npx --yes wrangler@3 --version >/dev/null 2>&1 || true
-          ( timeout "$((MIN*60))" npx --yes wrangler@3 tail "$SVC" --format json > out/raw.jsonl 2> out/tail-err.txt; echo "tail exit=$?" ) &
+          ( npx --yes wrangler@3 tail "$SVC" --format json > out/raw.jsonl 2> out/tail-err.txt ) &
           TAILPID=$!
-          DEADLINE=$(( $(date +%s) + 90 ))
-          # wrangler@3 anuncia "Successfully created tail" no stdout (não "Connected"/stderr)
+          redact() { sed -E 's#/(share|cliente)/(cronograma|roteiro)/[A-Za-z0-9_-]{4,128}#/\1/\2/<tok>#g' "$1" 2>/dev/null | tail -5 || true; }
+          cleanup() { kill "$TAILPID" 2>/dev/null || true; wait "$TAILPID" 2>/dev/null || true; }
+          trap cleanup EXIT
+          sleep 3
+          kill -0 "$TAILPID" 2>/dev/null || { echo "::error::processo tail morreu ao iniciar"; redact out/tail-err.txt; exit 1; }
+          # dica de attach (NÃO é o gate): banner em até 90s; sem alegações
+          HD=$(( $(date +%s) + 90 ))
           until grep -qiE 'connected|successfully created tail' out/raw.jsonl out/tail-err.txt 2>/dev/null; do
-            [ "$(date +%s)" -lt "$DEADLINE" ] || { echo "::warning::tail não confirmou attach em 90s — janela segue mesmo assim"; break; }
+            [ "$(date +%s)" -lt "$HD" ] || break
             sleep 2
           done
+          sleep 3
+          # SELF-PROBE ÚNICO: token sintético 48-hex derivado do run (sem Firestore,
+          # sem tarefa/cliente/token real); UA exclusivo e rastreável
+          PROBE_ID="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PTOK=$(printf %s "F3374H2-${PROBE_ID}" | sha256sum | cut -c1-48)
+          PUA="F3374H2-TailProbe/${PROBE_ID}"
+          PST=$(curl -sS --max-time 25 -A "$PUA" -o /dev/null -w '%{http_code}' "https://$PHOST/share/cronograma/$PTOK" || echo err)
+          echo "resposta da sonda HTTP $PST (esperado $PEXP; token <tok:$(printf %s "$PTOK" | sha256sum | cut -c1-8)>; UA=$PUA)"
+          [ "$PST" = "$PEXP" ] || { echo "::error::self-probe não obteve HTTP $PEXP na borda — abortando (sem janela)"; exit 1; }
+          # GATE: o evento da sonda tem de estar no STREAM (parser JSONDecoder;
+          # wrangler emite pretty-printed) — até 90s
+          export PTOK PUA PHOST PEXP
+          FOUND=0
+          GD=$(( $(date +%s) + 90 ))
+          while [ "$(date +%s)" -lt "$GD" ]; do
+            if python3 - <<'PY'
+          import json, os, sys
+          try:
+              raw = open('out/raw.jsonl', encoding='utf-8', errors='replace').read()
+          except FileNotFoundError:
+              sys.exit(1)
+          dec = json.JSONDecoder(); i = 0
+          tok = os.environ['PTOK']; ua = os.environ['PUA']
+          want = f"https://{os.environ['PHOST']}/share/cronograma/{tok}"
+          exp = int(os.environ['PEXP'])
+          while True:
+              j = raw.find('{', i)
+              if j < 0: break
+              try:
+                  obj, i = dec.raw_decode(raw, j)
+              except Exception:
+                  i = j + 1; continue
+              if not isinstance(obj, dict): continue
+              ev = obj.get('event') if isinstance(obj.get('event'), dict) else {}
+              req = ev.get('request') if isinstance(ev.get('request'), dict) else {}
+              hdrs = req.get('headers') if isinstance(req.get('headers'), dict) else {}
+              rua = next((str(v) for k, v in hdrs.items() if k.lower() == 'user-agent'), '')
+              resp = ev.get('response') if isinstance(ev.get('response'), dict) else {}
+              if (str(req.get('url') or '') == want and rua == ua
+                      and str(req.get('method')) == 'GET'
+                      and resp.get('status') == exp and obj.get('outcome') == 'ok'):
+                  sys.exit(0)
+          sys.exit(1)
+          PY
+            then FOUND=1; break; fi
+            sleep 3
+          done
+          if [ "$FOUND" != "1" ]; then
+            echo "::error::tail não comprovou captura por self-probe — execução abortada"
+            redact out/tail-err.txt
+            exit 1
+          fi
+          echo "evento da sonda encontrado no Tail (host=$PHOST rota=/share/cronograma/<tok:$(printf %s "$PTOK" | sha256sum | cut -c1-8)> método=GET status=$PEXP outcome=ok UA=$PUA)"
+          echo "TAIL_ATTACH_PROVADO"
+          echo "SELF_PROBE_CAPTURED=1"
+          echo "service validado: $SVC"
           echo "== JANELA ATIVA por ${MIN} minutos — serviço: $SVC — etiqueta: ${NOTE_IN:-} =="
           echo "== A equipe deve COLAR o link/mensagem no WhatsApp Business QA AGORA =="
-          wait "$TAILPID" || true
-          tail -3 out/tail-err.txt || true
+          sleep $(( MIN * 60 ))
+          cleanup
+          trap - EXIT
+          echo "janela encerrada de forma controlada"
           echo "linhas no raw: $(wc -l < out/raw.jsonl 2>/dev/null || echo 0) | linhas-evento (com outcome): $(grep -c '"outcome"' out/raw.jsonl 2>/dev/null || echo 0)"
 
       - name: Sanitizar + resumir captura
+        # 74H2: SEMPRE roda (mesmo com o gate abortando) — o raw NUNCA pode
+        # chegar ao artifact sem sanitização (este passo termina removendo-o).
+        if: always()
         run: |
           python3 - <<'PYEOF'
           import json, re, hashlib, sys, datetime
@@ -170,17 +243,20 @@ jobs:
               for lg in (ev.get('logs') or []):
                   msg = ' '.join(str(m) for m in (lg.get('message') or []))
                   logs.append(red(msg)[:220])
-              rows.append({'ts': tss, 'method': req.get('method'), 'url': url,
+              # 74H2: a sonda prova o observador, NUNCA conta como WhatsApp/crawler
+              src = 'self_probe' if ua.startswith('F3374H2-TailProbe/') else 'external'
+              rows.append({'ts': tss, 'source': src, 'method': req.get('method'), 'url': url,
                            'ua': ua, 'asn': asn, 'country': country,
                            'status': resp.get('status'), 'outcome': ev.get('outcome'), 'logs': logs})
           with open('out/capture-sanitized.jsonl', 'w', encoding='utf-8') as f:
               for r in rows: f.write(json.dumps(r, ensure_ascii=False) + '\n')
-          print(f'== eventos /share|/og|/cliente capturados: {len(rows)} ==')
+          ext = [r for r in rows if r['source'] == 'external']
+          print(f'== eventos /share|/og|/cliente capturados: {len(rows)} (externos={len(ext)}; self_probe={len(rows)-len(ext)} — excluídos de qualquer contagem de WhatsApp/crawler) ==')
           for r in rows[:80]:
-              print(f"  {r['ts']} {r['method']} {r['status'] or '-'} {r['outcome'] or ''} ASN{r['asn'] or '?'}/{r['country'] or '?'} {r['url'][:90]} UA={r['ua'][:60]}")
+              print(f"  [{r['source']}] {r['ts']} {r['method']} {r['status'] or '-'} {r['outcome'] or ''} ASN{r['asn'] or '?'}/{r['country'] or '?'} {r['url'][:90]} UA={r['ua'][:60]}")
               for lg in r['logs'][:2]: print(f"      log: {lg}")
-          if not rows:
-              print('  (nenhum evento nas rotas de share/imagem/portal durante a janela)')
+          if not ext:
+              print('  (nenhum evento EXTERNO nas rotas de share/imagem/portal durante a janela)')
           PYEOF
           rm -f out/raw.jsonl
 
