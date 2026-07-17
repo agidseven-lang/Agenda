@@ -1,0 +1,141 @@
+# =====================================================================
+# [manual] F3.3.74F — ESPELHO DE PRODUÇÃO EM QA com o fix fail-open (FASE 13).
+#
+# Publica no serviço de QA `idseven-push-qa` (workers.dev; sem rota custom;
+# sem cron) a réplica do worker de PRODUÇÃO (c20) com a correção cirúrgica
+# comprovada da 74F (não-resolvido/erro → 200 + OG completo genérico,
+# no-store, nunca cacheia; resolvido intacto: tipado + cacheável) e PROVA
+# AO VIVO o pós-fix na borda:
+#   • GET /            → V64.59-c20-failopen-74f
+#   • dummy /share     → 200 + X-Share-Task=not_found + X-Share-Type=generic
+#                        + no-store + OG completo (era 404 sem NENHUMA meta)
+#   • 2º GET dummy     → continua bypass (nunca aquece cache)
+#   • HEAD             → 200 text/html
+#   • imagens          → byte-exatas (cron c038636d…, roteiro f64f6f3e…)
+#   • PRODUÇÃO INTOCADA (idseven-push segue V64.59-c20-golden-contract)
+#
+# SUBSTITUI o worker C23-snapshot do serviço QA (linha 1.0.169–1.0.173,
+# revogada pelo owner) pelo ESPELHO de produção — exatamente o que a
+# FASE 13 do mandato exige ("ambiente QA que replique exatamente").
+# NUNCA toca o serviço de produção, seus secrets, rotas ou variáveis.
+# =====================================================================
+name: "[manual] F3.3.74F Deploy QA Mirror (fail-open fix)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite ESPELHAR-QA-74F para autorizar"
+        required: true
+        default: ""
+      ref:
+        description: "Branch/commit da candidata 74F"
+        required: true
+        default: "worker/f3374f-share-og-failopen-candidate"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374f-deploy-qa-mirror
+  cancel-in-progress: false
+
+env:
+  QA_URL: https://idseven-push-qa.agidseven.workers.dev
+  PROD_URL: https://idseven-push.agidseven.workers.dev
+  T_NF: f3374fmirror0000000000000000000000000000000000001
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_QA_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate 1 — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "ESPELHAR-QA-74F" ] || { echo "::error::confirmação inválida"; exit 1; }
+          echo "OK"
+
+      - name: Checkout (candidata 74F)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: "Gate 2 — fonte é a candidata 74F e o template QA é isolado"
+        run: |
+          set -euo pipefail
+          grep -q 'version: "V64.59-c20-failopen-74f"' cloudflare-worker.js || { echo "::error::fonte não é a candidata 74F"; exit 1; }
+          grep -q 'F3.3.74F — FAIL-OPEN DO OG' cloudflare-worker.js || { echo "::error::fix fail-open ausente da fonte"; exit 1; }
+          grep -q 'name = "idseven-push-qa"' wrangler.qa.toml || { echo "::error::template QA sem nome de QA"; exit 1; }
+          if grep -qE '^\s*route|^\s*routes|custom_domain|\[triggers\]|crons' wrangler.qa.toml; then
+            echo "::error::template QA contém rota/cron — quebraria o isolamento"; exit 1; fi
+          grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml de produção alterado?"; exit 1; }
+          echo "OK: candidata 74F + template QA isolado"
+
+      - name: "Deploy QA (serviço próprio; produção intocada)"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          npx --yes wrangler@4 deploy --config wrangler.qa.toml 2>&1 | tee out/deploy-qa.txt
+          grep -q "idseven-push-qa" out/deploy-qa.txt || { echo "::error::deploy QA não confirmou o nome"; exit 1; }
+
+      - name: "Propagação — GET / responde a candidata"
+        run: |
+          set -euo pipefail
+          DEADLINE=$(( $(date +%s) + 120 ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            V=$(curl -sS --max-time 15 "$QA_URL/" | jq -r '.version' 2>/dev/null || true)
+            [ "$V" = "V64.59-c20-failopen-74f" ] && { echo "QA ativo: $V"; exit 0; }
+            sleep 3
+          done
+          echo "::error::QA não respondeu a candidata em 120s"; exit 1
+
+      - name: "PÓS-FIX VIVO — dummy /share = 200 + OG completo (era 404 sem meta)"
+        run: |
+          set -euo pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
+          ST=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D out/h1.txt -o out/b1.html -w '%{http_code}' "$QA_URL/share/cronograma/$T_NF")
+          OGN=$(grep -c 'property="og:' out/b1.html || true)
+          echo "status=$ST task=$(hv x-share-task out/h1.txt) type=$(hv x-share-type out/h1.txt) cc=$(hv cache-control out/h1.txt) og_metas=$OGN"
+          [ "$ST" = "200" ] || { echo "::error::(pós-fix) status $ST"; exit 1; }
+          [ "$(hv x-share-task out/h1.txt)" = "not_found" ] || { echo "::error::X-Share-Task"; exit 1; }
+          [ "$(hv x-share-type out/h1.txt)" = "generic" ] || { echo "::error::X-Share-Type"; exit 1; }
+          case "$(hv cache-control out/h1.txt)" in *no-store*) : ;; *) echo "::error::sem no-store"; exit 1;; esac
+          [ "$OGN" -ge 9 ] || { echo "::error::OG incompleto ($OGN metas)"; exit 1; }
+          grep -q 'content="Aprovar cronograma"' out/b1.html || { echo "::error::og:title genérico ausente"; exit 1; }
+          grep -q '/og/wa-card-v64-39.jpg' out/b1.html || { echo "::error::og:image ausente"; exit 1; }
+          grep -q 'summary_large_image' out/b1.html || { echo "::error::twitter:card ausente"; exit 1; }
+          ST2=$(curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D out/h2.txt -o /dev/null -w '%{http_code}' "$QA_URL/share/cronograma/$T_NF")
+          case "$(hv x-share-cache out/h2.txt)" in *bypass*) : ;; *) echo "::error::não-resolvido aqueceu cache"; exit 1;; esac
+          HS=$(curl -sS --max-time 30 -I -A "WhatsApp/2.23.20.0" -D out/h3.txt -o /dev/null -w '%{http_code}' "$QA_URL/share/cronograma/$T_NF")
+          [ "$HS" = "200" ] || { echo "::error::HEAD $HS"; exit 1; }
+          case "$(hv content-type out/h3.txt)" in text/html*) : ;; *) echo "::error::HEAD content-type"; exit 1;; esac
+          echo "OK PÓS-FIX: 200/not_found/generic/no-store + OG completo + bypass + HEAD text/html"
+
+      - name: "Imagens byte-exatas na borda QA"
+        run: |
+          set -euo pipefail
+          s1=$(curl -sS --max-time 30 "$QA_URL/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
+          s2=$(curl -sS --max-time 30 "$QA_URL/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          echo "cron: $s1"; echo "rot : $s2"
+          [ "$s1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || { echo "::error::arte cron divergente"; exit 1; }
+          [ "$s2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || { echo "::error::arte roteiro divergente"; exit 1; }
+          echo "OK: artes byte-exatas no espelho QA"
+
+      - name: "Gate FINAL — PRODUÇÃO INTOCADA"
+        run: |
+          set -euo pipefail
+          V=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version')
+          echo "produção: $V"
+          [ "$V" = "V64.59-c20-golden-contract" ] || { echo "::error::PRODUÇÃO MUDOU ($V) — investigar imediatamente"; exit 1; }
+          echo "OK: produção exatamente como antes"
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374f-qa-mirror-evidence
+          path: out/
+          retention-days: 30
