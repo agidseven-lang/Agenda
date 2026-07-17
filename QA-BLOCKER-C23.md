@@ -517,3 +517,76 @@ do DataPackage** (limitação do alvo, fora do nosso controle): registrar
 **NO-GO objetivo** com o print + o evento `target_selected`, e a fase
 seguinte decide o caminho (ex.: Share Target dedicado/outro canal). O MODO
 ALTERNATIVO (74B) permanece embutido como contingência — rotulado como tal.
+
+---
+
+# ADENDO F3.3.74F — AUDITORIA FULL-STACK: primeiro ponto real de divergência COMPROVADO ao vivo
+
+## O que a auditoria DESCARTOU com prova (nada disso é a causa)
+
+- **Mensagem/clipboard-fonte:** byte-idêntica na 1.0.153 × 1.0.168 × 1.0.174 (mesmo sha256,
+  265 chars, 8 linhas, zero caracteres invisíveis, link sozinho em linha própria).
+- **HTML/OG do Worker para token RESOLVIDO:** byte-idêntico entre o Worker bom
+  (V64.59-legacy-risk) e o de produção (c20) — só headers de diagnóstico a mais.
+- **DNS/TLS:** saudáveis nos dois hosts (Cloudflare anycast; certificados válidos; ALPN h2).
+- **WAF/Bot Fight/challenge:** ZERO mitigação para browser/facebookexternalhit/WhatsApp,
+  GET e HEAD, nos dois hosts (matriz viva de 22 requisições, run `29544534906`).
+- **Imagem OG ao vivo:** 200 image/jpeg, byte-exata (`c038636d…`, 144.941 bytes) nos dois
+  hosts, TTFB ~40 ms.
+
+## O PRIMEIRO PONTO REAL DE DIVERGÊNCIA (com data, requests e bytes)
+
+O MESMO token real (default público do workflow `wa-share-meta-probe`), na MESMA URL:
+
+| Quando | Worker vigente | Resposta viva |
+|---|---|---|
+| 21/06 e 09/07 (era do GO físico) | V64.59-legacy (estático) | **200 + OG 9/9** (2.324 bytes) |
+| 15/07 23:03 (probe C18E #6) | C18E (com lookup) | tokens reais: **200 miss→hit + OG tipado**; dummy: **200 + OG genérico (fail-open)** |
+| 16/07 12:11 | **deploy #78 → c20-golden-contract** | — |
+| 16/07 (mesmo dia) | c20 | **C22: primeiro NO-GO físico registrado** |
+| 17/07 00:33 (hoje) | c20 | **404 + OG 0/9** (714 bytes, página not_found SEM NENHUMA meta OG, no-store) |
+
+**Divergência:** o c20 transformou o `/share` de **fail-open com OG sempre** (contrato da
+época fisicamente aprovada, vigente até 15/07 23:03) em **fail-closed sem OG** para qualquer
+token não-resolvido — e o token que resolvia ao vivo em 15/07 hoje NÃO resolve. Qualquer
+colagem cujo lookup não resolva recebe uma página sem NENHUM OG → o WhatsApp não tem o que
+renderizar → sem Card Premium, em QUALQUER versão do Desktop (por isso a 1.0.174 falhou
+mesmo com o clique restaurado). Fatores secundários registrados: TTFB do /share subiu de
+~40 ms (estático) para 1,0–2,3 s (OAuth+Firestore por requisição não cacheada); robots.txt
+GERENCIADO na zona (fora do git; o worker não tem handler) bloqueando `GPTBot` e
+`meta-externalagent` com `Disallow: /`.
+
+## O discriminador que falta (UMA sessão correlacionada com a equipe)
+
+Para separar os 3 ramos possíveis para TAREFAS NOVAS — (i) o WhatsApp nem busca a URL;
+(ii) busca e recebe 404 (lookup vivo falhando também para tarefas novas); (iii) busca,
+recebe 200+OG e não renderiza (lado Meta/dispositivo) — executar:
+
+1. Actions → **"[manual] F3.3.74F Crawler Capture (tail janela)"** → Run workflow
+   (window_minutes=12; note=colagem-<data>). Aguardar no log "JANELA ATIVA".
+2. Na 1.0.174-QA: criar tarefa sintética NOVA de Cronograma → "Abrir WhatsApp Business
+   para enviar no grupo" → colar no grupo QA → aguardar até 60 s → enviar mesmo sem prévia.
+3. Repetir com Roteiro dentro da MESMA janela.
+4. O run imprime (sanitizado, token nunca aparece): se houve requisição, quando, GET/HEAD,
+   user-agent, status devolvido e se a imagem foi buscada. Anexar o print do grupo.
+
+## Pendências para a equipe
+
+- Secrets `C18E_CRONOGRAMA_TOKEN` / `C18E_ROTEIRO_TOKEN`: existem mas com caractere
+  inválido (rotacionados/alterados pós-fase) — re-gravar com tokens válidos de tarefas QA
+  reais reabilita o probe diferencial completo (`c18e-share-differential-probe`).
+- robots.txt gerenciado da zona: revisar no painel Cloudflare (Bot Management / AI bots)
+  quando foi habilitado; o conteúdo integral está no artifact `f3374f-crawler-capture-*`.
+
+## Correção cirúrgica candidata (camada COMPROVADA; não aplicada — produção congelada)
+
+No Worker (`handleShareCard`): restaurar **fail-open do OG** — token não-resolvido volta a
+receber a página de card genérica (200 + OG completo, `no-store`, sem aquecer cache; sem
+contaminação: resolvido continua tipado; erro de lookup idem fail-open). É a restauração
+exata do comportamento vigente até 15/07 (C18E) e equivalente ao da baseline física de
+10/07. Validar primeiro no serviço QA (`idseven-push-qa`) com captura correlacionada e
+prova física, antes de qualquer produção.
+
+Provas: runs `29544534906` (edge audit), `29545126269`/`29026657304`/`27920037629`
+(meta-probe hoje/09-07/21-06), `29457363181` (C18E #6 15/07), `29544795520`+`29545099725`
+(capturas baseline; robots integral no artifact). Produção intocada (somente leituras).
