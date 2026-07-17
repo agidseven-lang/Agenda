@@ -60,6 +60,10 @@ jobs:
           set -uo pipefail
           mkdir -p out
           if [ "${PROBE_IN:-false}" != "true" ]; then echo "(probe=false — pulado)"; exit 0; fi
+          echo "— robots.txt do HOST CUSTOM QA (fecha a questão do robots gerenciado da zona no host novo):"
+          RST=$(curl -sS --max-time 20 -o out/robots-customqa.txt -w '%{http_code}' "https://$QA_HOST/robots.txt" || echo err)
+          echo "status=$RST bytes=$(wc -c < out/robots-customqa.txt 2>/dev/null || echo 0)"
+          grep -iE '^(User-agent|Disallow|Allow)' out/robots-customqa.txt 2>/dev/null | head -20 || head -3 out/robots-customqa.txt 2>/dev/null || true
           date -u +"probe_fired_at=%Y-%m-%dT%H:%M:%SZ" | tee out/probe-ts.txt
           for i in 1 2 3; do
             curl -sS --max-time 25 -A "74H-OBS-PROBE/1.$i (+controle-positivo)" -o /dev/null -w "GET share -> %{http_code}\n" "https://$QA_HOST/share/cronograma/$T74H"

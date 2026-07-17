@@ -80,11 +80,22 @@ jobs:
           [ "$MIN" -le 55 ] 2>/dev/null || MIN=55
           SVC="${SVC_IN:-idseven-push}"
           case "$SVC" in idseven-push|idseven-push-qa) : ;; *) echo "::error::service inválido"; exit 1;; esac
+          # aquecer wrangler ANTES de abrir a janela (o npx frio custa ~60s e criaria
+          # ponto cego no início da captura — foi exatamente o que engoliu as sondas
+          # do self-test 74H run 4)
+          npx --yes wrangler@3 --version >/dev/null 2>&1 || true
+          ( timeout "$((MIN*60))" npx --yes wrangler@3 tail "$SVC" --format json > out/raw.jsonl 2> out/tail-err.txt; echo "tail exit=$?" ) &
+          TAILPID=$!
+          DEADLINE=$(( $(date +%s) + 90 ))
+          until grep -qiE 'connected' out/tail-err.txt 2>/dev/null; do
+            [ "$(date +%s)" -lt "$DEADLINE" ] || { echo "::warning::tail não confirmou attach em 90s — janela segue mesmo assim"; break; }
+            sleep 2
+          done
           echo "== JANELA ATIVA por ${MIN} minutos — serviço: $SVC — etiqueta: ${NOTE_IN:-} =="
           echo "== A equipe deve COLAR o link/mensagem no WhatsApp Business QA AGORA =="
-          ( timeout "$((MIN*60))" npx --yes wrangler@3 tail "$SVC" --format json > out/raw.jsonl 2> out/tail-err.txt; echo "tail exit=$?" ) || true
+          wait "$TAILPID" || true
           tail -3 out/tail-err.txt || true
-          wc -l out/raw.jsonl || true
+          echo "linhas no raw: $(wc -l < out/raw.jsonl 2>/dev/null || echo 0) | linhas-evento (com outcome): $(grep -c '"outcome"' out/raw.jsonl 2>/dev/null || echo 0)"
 
       - name: Sanitizar + resumir captura
         run: |
