@@ -80,17 +80,16 @@ jobs:
           grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml de produção alterado?"; exit 1; }
           echo "OK: candidata íntegra; nenhum deploy será feito (script já está no ar)"
 
-      - name: "Gate — serviço QA vivo com a candidata; host ainda livre"
+      - name: "Gate — serviço QA vivo com a candidata"
         run: |
           set -euo pipefail
           mkdir -p out
           VQ=$(curl -sS --max-time 25 "https://$QA_WORKERS_DEV/" | jq -r '.version')
           [ "$VQ" = "V64.59-c20-failopen-74f" ] || { echo "::error::serviço QA não roda a candidata ($VQ)"; exit 1; }
-          R=$(dig +short "$QA_HOST" @1.1.1.1 | tr '\n' ' ')
-          [ -z "$R" ] || { echo "::error::host QA já resolve ($R) — rodar o capability gate e investigar"; exit 1; }
-          echo "OK: QA=$VQ; $QA_HOST livre"
+          R=$(dig +short "$QA_HOST" @1.1.1.1 | tr '\n' ' ' || true)
+          echo "OK: QA=$VQ; DNS atual de $QA_HOST: ${R:-<vazio>} (idempotência tratada na FASE 2)"
 
-      - name: "FASE 2 — criar o vínculo (custom domain; fallback DNS+rota exata)"
+      - name: "FASE 2 — criar o vínculo (custom domain; idempotente; fallback DNS+rota exata)"
         run: |
           set -uo pipefail
           api() { M="$1"; P="$2"; shift 2; curl -sS --max-time 40 -X "$M" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" "https://api.cloudflare.com/client/v4$P" "$@"; }
@@ -98,6 +97,17 @@ jobs:
           [ "$(echo "$ZJ" | jq -r '.success')" = "true" ] || { echo "::error::sem escopo para ler a zona (necessário p/ zone_id): $(echo "$ZJ" | jq -c '.errors' | head -c 300)"; exit 1; }
           ZID=$(echo "$ZJ" | jq -r '.result[0].id')
           echo "zone_id=$(echo "$ZID" | cut -c1-8)…"
+          EX=$(api GET "/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains")
+          EXSVC=$(echo "$EX" | jq -r --arg h "$QA_HOST" '.result[]? | select(.hostname==$h) | .service' | head -1)
+          if [ -n "$EXSVC" ]; then
+            [ "$EXSVC" = "idseven-push-qa" ] || { echo "::error::CONFLITO: $QA_HOST já vinculado a OUTRO serviço ($EXSVC)"; exit 1; }
+            DID=$(echo "$EX" | jq -r --arg h "$QA_HOST" '.result[]? | select(.hostname==$h) | .id' | head -1)
+            echo "IDEMPOTENTE: custom domain já existe para idseven-push-qa (criado em run anterior) — prosseguindo só com as provas"
+            { echo "mechanism=WORKER_CUSTOM_DOMAIN"
+              echo "rollback: DELETE /accounts/<acct>/workers/domains/$DID"
+              echo "domain_id=$DID"; } > out/rollback.txt
+            echo "$ZID" > out/zid.txt; cat out/rollback.txt; exit 0
+          fi
           echo "== Tentativa 1: Worker Custom Domain (PUT /accounts/…/workers/domains) =="
           BODY=$(jq -n --arg z "$ZID" --arg h "$QA_HOST" '{zone_id:$z, hostname:$h, service:"idseven-push-qa", environment:"production"}')
           WD=$(api PUT "/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains" -d "$BODY")
@@ -164,7 +174,7 @@ jobs:
           echo "  https://$QA_HOST/ → $V (script de destino comprovado)"
           HV=$(curl -sS --max-time 20 -o /dev/null -w '%{http_version}' "https://$QA_HOST/")
           echo "  http_version=$HV"
-          RAY=$(curl -sS --max-time 20 -D - -o /dev/null "https://$QA_HOST/" | grep -i '^cf-ray:' | tr -d '\r' | cut -d' ' -f2)
+          RAY=$(curl -sS --max-time 20 -D - -o /dev/null "https://$QA_HOST/" | grep -i '^cf-ray:' | tr -d '\r' | cut -d' ' -f2 || true)
           echo "  cf-ray: ${RAY:-ausente} (borda Cloudflare ativa)"
           HR=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "http://$QA_HOST/" || echo "err")
           HL=$(curl -sS --max-time 20 -D - -o /dev/null "http://$QA_HOST/" 2>/dev/null | grep -i '^location:' | tr -d '\r' | head -1 || true)
@@ -185,7 +195,8 @@ jobs:
       - name: "FASE 5 — validação HTTP pré-física no host custom (3 UAs, GET+HEAD, OG, imagem)"
         run: |
           set -uo pipefail
-          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-80; }
+          # || true: header ausente (ex.: x-robots-tag) NÃO pode matar o step via -e+pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-80 || true; }
           URL="https://$QA_HOST/share/cronograma/$T74H"
           FAIL=0
           for UA in "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" "WhatsApp/2.23.20.0"; do
@@ -224,7 +235,7 @@ jobs:
       - name: "FASE 7 — contraste workers.dev × custom (mesmo token, mesmo código)"
         run: |
           set -uo pipefail
-          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-60; }
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-60 || true; }
           probe() { # $1=host  $2=prefix
             curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D "out/$2-h.txt" -o "out/$2-b.html" -w '%{http_code}' "https://$1/share/cronograma/$T74H" > "out/$2-get.txt"
             curl -sS --max-time 30 -I -A "facebookexternalhit/1.1" -o /dev/null -w '%{http_code}' "https://$1/share/cronograma/$T74H" > "out/$2-head.txt"
