@@ -148,7 +148,11 @@ jobs:
               sys.exit(1)
           dec = json.JSONDecoder(); i = 0
           tok = os.environ['PTOK']; ua = os.environ['PUA']
-          want = f"https://{os.environ['PHOST']}/share/cronograma/{tok}"
+          # O runtime do tail REDIGE o segmento do token na URL (placeholder literal
+          # "REDACTED" — sha8 b83c7778, comprovado no run #12). A identidade da sonda
+          # vem da ROTA (prefixo) + UA exclusivo do run; aceita-se token exato OU
+          # placeholder da plataforma.
+          prefix = f"https://{os.environ['PHOST']}/share/cronograma/"
           exp = int(os.environ['PEXP'])
           while True:
               j = raw.find('{', i)
@@ -163,7 +167,9 @@ jobs:
               hdrs = req.get('headers') if isinstance(req.get('headers'), dict) else {}
               rua = next((str(v) for k, v in hdrs.items() if k.lower() == 'user-agent'), '')
               resp = ev.get('response') if isinstance(ev.get('response'), dict) else {}
-              if (str(req.get('url') or '') == want and rua == ua
+              url = str(req.get('url') or '')
+              seg = url[len(prefix):] if url.startswith(prefix) else None
+              if (seg in (tok, 'REDACTED') and rua == ua
                       and str(req.get('method')) == 'GET'
                       and resp.get('status') == exp and obj.get('outcome') == 'ok'):
                   sys.exit(0)
