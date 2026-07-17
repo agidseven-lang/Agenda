@@ -667,3 +667,87 @@ fix (o crawler nunca vem). Próxima fase deve expor o candidato fail-open sob o 
 custom (rota/subdomínio QA na zona, ou promoção autorizada à produção — congelada até
 lá). Corrigido no `main` (commit `630742b`) o contador da sub-janela do workflow
 (soma agora sai do JSON; as linhas por minuto sempre foram corretas).
+
+## ADENDO 74H — HOST CUSTOM QA NO AR: aprovar-qa.agendaidseven.com.br → idseven-push-qa (fail-open)
+
+A 74G provou que o WhatsApp NÃO busca links `*.workers.dev` (zero requests na colagem) e
+BUSCA links do domínio custom (picos reais na produção no teste noturno). A 74H atacou
+exatamente esse diferencial: o MESMO worker QA fail-open (candidata `d134193a5f65…`,
+`V64.59-c20-failopen-74f`, SEM redeploy) agora atende também por um subdomínio próprio
+e isolado da zona, criado como **Worker Custom Domain** (mesmo mecanismo do vínculo de
+produção `aprovar.` → `idseven-push`):
+
+- **Host QA:** `aprovar-qa.agendaidseven.com.br` (custom domain; DNS/cert gerenciados
+  pela Cloudflare; cert dedicado GTS WE1 com SAN `aprovar-qa.` + `*.aprovar-qa.`,
+  válido até 15/10/2026; ALPN h2; cf-ray ativo).
+- **Rollback registrado:** `DELETE /accounts/<acct>/workers/domains/`
+  `4bc9b2d4d35a301a7d8787ed97429201bee75cc4` (artifact `f3374h-custom-domain-evidence`,
+  out/rollback.txt). Nada além desse objeto foi criado (zero mudança em `aprovar.`,
+  rotas, WAF, cache, secrets).
+- **Produção intocada** (gate no mesmo run): `aprovar.` e workers.dev de produção
+  respondendo `V64.59-c20-golden-contract`; DNS de produção íntegro.
+- **Runs:** capability gate `29575831445` (host livre; produção vinculada como custom
+  domain; escopos de zona DENIED honestamente); criar+provar `29575882272` (criou o
+  domínio; FASE 5 caiu por bug de shell no probe — `hv` + `-e`/pipefail — SEM efeito de
+  borda) e `29576112006` (VERDE integral, caminho idempotente).
+
+**Provas vivas no host custom (run `29576112006`):** 3 UAs (browser, facebookexternalhit,
+WhatsApp) × GET+HEAD no `/share/cronograma/<tok:156df4c2>` → `200/200`, `text/html`,
+**13 metas OG**, `X-Share-Task=not_found`, `X-Share-Type=generic`, `no-store`,
+`X-Share-Cache=bypass` (2º GET continua bypass), `X-Robots-Tag` vazio; imagem
+`/og/wa-card-v64-39.jpg` → `200`, 0 redirects, `image/jpeg`, 144941 B,
+`c038636d…` byte-exata. `canonical`: ausente por design comprovado (HTML inalterado).
+
+**Contraste workers.dev × custom QA (mesmo token, mesmo código):** GET/HEAD/headers/
+metas/imagem/versão IGUAIS; HTML bruto difere APENAS pelo hostname — **normalizado por
+hostname, sha256 idêntico** (`cbe4ea260443…`) nos dois hosts. Ou seja: a página é a
+mesma; o que muda é SÓ o host — exatamente a variável que a 74G isolou.
+
+**Observabilidade estrutural nova:** por estar NA ZONA, o host QA aparece no dataset
+`httpRequestsAdaptiveGroups` (minuto, método, status, user-agent, ASN, path) — o que o
+workers.dev nunca teve. Workflow `f3374h-crawler-trace-custom.yml` consulta a janela
+dada (host QA + `/share/*` da produção para contraste, paths sanitizados) e, com
+`probe=true`, valida o pipeline com sondas `74H-OBS-PROBE`:
+- **Tail ao vivo (nível UA) VALIDADO** — run `29577789573`: as 4 sondas apareceram na
+  janela com timestamp/método/status/outcome/ASN/país e URL sanitizada
+  (correlação sub-segundo com `probe_fired_at`). O self-test achou e corrigiu 3
+  defeitos reais ANTES de entregar o link ao owner: ponto cego de attach do
+  `npx wrangler` frio, marcador de attach errado e parser JSONL que descartava
+  eventos pretty-printed (agora decodifica STREAM). Commits no main:
+  `630742b`, `d64bb6d`, `aa1f2ca`, `2a1f71d`, `2b13e33`.
+- **Presença pós-fato (invocações) VALIDADA** — runs `29576790981`/`29577916070`:
+  minuto exato das sondas com contagem esperada (4 e 5).
+- **Dataset de zona (UA/ASN pós-fato) INDISPONÍVEL por escopo** — erro literal:
+  `does not have permission 'com.cloudflare.api.account.zone.analytics.read'`.
+  PENDÊNCIA equipe: adicionar "Zone Analytics: Read" (zona agendaidseven.com.br)
+  ao token CF do CI — destrava auditoria pós-fato com UA/ASN sem coordenação.
+- **robots do host custom QA:** gerenciado da zona (1908 B): `*` → `Allow: /`;
+  `Disallow: /` SÓ para bots de IA (incl. `meta-externalagent`, que é o crawler
+  de IA da Meta — NÃO o de preview). `facebookexternalhit`/WhatsApp: livres.
+- **Ruído real no host novo:** ondas de scanners (56/78/83/100 req/min) começaram
+  minutos após o cert entrar no CT log — identificação do crawler na prova física
+  é POR UA na janela de tail, nunca por contagem de invocações.
+- Nota menor: a etiqueta `<tok:sha8>` impressa pela captura divergiu do sha8
+  local do token sintético (cosmético; sanitização OK; atribuição é por UA;
+  investigar fora de fase).
+
+### PROVA FÍSICA 74H — UM único link (Cronograma; token sintético SEM capacidade)
+
+1. Actions → "[manual] F3.3.74F Crawler Capture (tail janela)" → Run workflow com
+   `service=idseven-push-qa`, `window_minutes=30`, `note=fisico-74h-cronograma`.
+   Aguardar "JANELA ATIVA" no log do run.
+2. Colar SOZINHO no WhatsApp Business (grupo QA), aguardar até 30 s observando
+   ANTES de enviar, e registrar captura de tela:
+   `https://aprovar-qa.agendaidseven.com.br/share/cronograma/f3374a00000000000000000000000000000000000074a001`
+3. O log do run mostra, sanitizado, cada requisição (UA, método, status, busca da
+   imagem, ASN). Depois, rodar "[manual] F3.3.74H Crawler Trace (custom QA)" com a
+   janela UTC correspondente (registro pós-fato de presença).
+4. Leitura (FASE 9): request+card ⇒ **B** (host workers.dev era o diferencial → preparar
+   `F3.3.74I-PRODUCTION-FAILOPEN-PROMOTION-PLAN`; nada é promovido automaticamente);
+   request 200+OG sem card ⇒ **C** (registrar comportamento Meta; comparar com
+   `aprovar.`); sem request ⇒ **A** (bloqueio antes da borda; comparar o mesmo
+   aparelho com `aprovar.`); request com erro ⇒ **D** (primeiro divergente; fix só QA).
+
+Rollback integral do host QA (se ordenado): `DELETE /accounts/<acct>/workers/domains/`
+`4bc9b2d4d35a301a7d8787ed97429201bee75cc4` — remove DNS+cert+vínculo de uma vez;
+nada mais foi criado nesta fase.
