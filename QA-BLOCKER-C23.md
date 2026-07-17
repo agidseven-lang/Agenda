@@ -624,3 +624,46 @@ byte-exatas no espelho (cron `c038636d…`, roteiro `f64f6f3e…`).
 a ponta → promover o fail-open à produção em fase autorizada. Espelho NÃO ⇒ examinar a
 captura (se o WhatsApp nem requisitou → causa no lado do cliente/dispositivo; se
 requisitou 200+OG e não renderizou → política/cache Meta — investigar com a captura em mãos).
+
+## ADENDO 74G — A COLAGEM FÍSICA NO ESPELHO (workers.dev) NUNCA CHEGOU AO WORKER (classificação A)
+
+A colagem já realizada (~07:28 local = ~10:28 UTC de 17/07; link
+`https://idseven-push-qa.agidseven.workers.dev/share/cronograma/<tok:3d9cb673>`, token
+sintético inexistente no Firestore) foi rastreada READ-ONLY por GraphQL Analytics
+(`workersInvocationsAdaptive`, por minuto) no workflow
+`f3374g-trace-existing-attempt.yml` — runs `29573896114` (+6 min da colagem),
+`29574067563` (janela 06:00–10:20), `29574082583` (janela do teste noturno 16/07) e
+`29574564886` (+18 min da colagem).
+
+**Resultado:** o script `idseven-push-qa` registrou APENAS as provas do deploy
+(10:05 = 1, 10:06 = 21) e as sondas dos próprios runs (10:34 = 7, 10:37 = 16).
+Na sub-janela da colagem (10:20–10:40 UTC), **ZERO invocações externas** — em
+particular, no minuto 10:28 só existe o heartbeat de cron da produção. Controles
+internos que blindam a leitura: (a) mesmíssimo pipeline mostrou as sondas feitas às
+10:34/10:37 quando consultado às 10:46 (lag de ingestão vencido); (b) a produção
+aparece com `sum.requests=1` em ~cada minuto por 4h+ (amostragem captura eventos de
+1 request); (c) o fail-open estava no ar 22 min ANTES da colagem e a sonda do link
+exato respondia `200 + 13 metas OG + not_found/generic/no-store`, X-Robots-Tag vazio,
+imagem `200 image/jpeg 144941 B c038636d…` para os 3 UAs (browser/facebookexternalhit/
+WhatsApp), GET e HEAD.
+
+**Classificação (A–E do mandato): A — o WhatsApp/Meta NÃO requisitou a URL colada.**
+O Worker QA (fail-open) **não participou da falha**: não houve request para divergir.
+(Nota honesta: um bloqueio edge-side ao crawler específico do domínio compartilhado
+workers.dev seria indistinguível de A do nosso ponto de observação — e tem a mesma
+consequência operacional.)
+
+**Contraste que orienta a próxima fase (workers.dev × domínio custom):** na janela do
+teste físico noturno da 1.0.174 (16/07 23:30–17/07 00:30 UTC), a PRODUÇÃO (servida pelo
+domínio custom `aprovar.agendaidseven.com.br`) mostra picos reais acima do baseline de
+cron exatamente nos minutos do teste — 23:56 (5), 00:21 (24), 00:26 (3) — ou seja, o
+WhatsApp BUSCA links do domínio custom (e o card falhou naquela noite pelo 404-sem-OG
+fail-closed, causa 74F), mas NÃO busca links `*.workers.dev` (zero eventos na colagem).
+DNS/TLS/WAF idênticos e limpos nos dois hosts (edge audit `29544534906`); robots.txt =
+fallback JSON 200 em ambos (sem Disallow). O diferencial é o HOST, não a página.
+
+**Consequência:** teste físico de card via `*.workers.dev` é INCAPAZ de exercitar o
+fix (o crawler nunca vem). Próxima fase deve expor o candidato fail-open sob o domínio
+custom (rota/subdomínio QA na zona, ou promoção autorizada à produção — congelada até
+lá). Corrigido no `main` (commit `630742b`) o contador da sub-janela do workflow
+(soma agora sai do JSON; as linhas por minuto sempre foram corretas).
