@@ -118,6 +118,8 @@ jobs:
               ua = ''
               for k, v in (hdrs.items() if isinstance(hdrs, dict) else []):
                   if k.lower() == 'user-agent': ua = str(v)[:90]
+              cf = req.get('cf') if isinstance(req.get('cf'), dict) else {}
+              asn = cf.get('asn'); country = cf.get('country')
               resp = evd.get('response') if isinstance(evd.get('response'), dict) else {}
               ts = ev.get('eventTimestamp')
               tss = datetime.datetime.utcfromtimestamp(ts/1000).isoformat() + 'Z' if isinstance(ts, (int, float)) else '?'
@@ -126,12 +128,13 @@ jobs:
                   msg = ' '.join(str(m) for m in (lg.get('message') or []))
                   logs.append(red(msg)[:220])
               rows.append({'ts': tss, 'method': req.get('method'), 'url': url,
-                           'ua': ua, 'status': resp.get('status'), 'outcome': ev.get('outcome'), 'logs': logs})
+                           'ua': ua, 'asn': asn, 'country': country,
+                           'status': resp.get('status'), 'outcome': ev.get('outcome'), 'logs': logs})
           with open('out/capture-sanitized.jsonl', 'w', encoding='utf-8') as f:
               for r in rows: f.write(json.dumps(r, ensure_ascii=False) + '\n')
           print(f'== eventos /share|/og|/cliente capturados: {len(rows)} ==')
           for r in rows[:80]:
-              print(f"  {r['ts']} {r['method']} {r['status'] or '-'} {r['outcome'] or ''} {r['url'][:90]} UA={r['ua'][:60]}")
+              print(f"  {r['ts']} {r['method']} {r['status'] or '-'} {r['outcome'] or ''} ASN{r['asn'] or '?'}/{r['country'] or '?'} {r['url'][:90]} UA={r['ua'][:60]}")
               for lg in r['logs'][:2]: print(f"      log: {lg}")
           if not rows:
               print('  (nenhum evento nas rotas de share/imagem/portal durante a janela)')
