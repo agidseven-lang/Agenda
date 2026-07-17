@@ -512,7 +512,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-golden-contract" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-74f" }, 200, env);
   },
 
   async scheduled(event, env, ctx) {

@@ -1,0 +1,27 @@
+# ============================================================================
+# F3.3.74F — ESPELHO DE PRODUÇÃO em QA (`idseven-push-qa`) com o fix fail-open
+# ----------------------------------------------------------------------------
+# Réplica do worker de produção (c20) + correção cirúrgica 74F, publicada
+# SOMENTE no serviço de QA (workers.dev; SEM rota/domínio custom; SEM cron —
+# isolamento por construção). Secrets FCM_* do serviço QA persistem (C24A).
+# NENHUM secret neste arquivo. Produção (`idseven-push`) permanece intocada.
+# ============================================================================
+
+name = "idseven-push-qa"
+main = "cloudflare-worker.js"
+compatibility_date = "2026-05-24"
+workers_dev = true
+
+[vars]
+FCM_PROJECT_ID = "agenda-id-seven"
+ALLOWED_ORIGIN = "https://agendaidseven.com.br"
+REMINDER_BEFORE_MINUTES = "60"
+REMINDER_WINDOW_SECONDS = "300"
+APP_TZ_OFFSET_MINUTES = "-180"
+WHATSAPP_PHONE_NUMBER_ID = "1149841268214085"
+WHATSAPP_BUSINESS_ACCOUNT_ID = "874634135665971"
+WHATSAPP_TEMPLATE_NAME = "cronograma_aprovacao"
+WHATSAPP_TEMPLATE_LANG = "pt_BR"
+WHATSAPP_GRAPH_VERSION = "v25.0"
+VAPID_SUBJECT = "mailto:contato@agendaidseven.com.br"
+ENABLE_CLIENT_WEB_PUSH = "true"
