@@ -1164,3 +1164,46 @@ Sem alteração de Desktop. Promoção controlada do Desktop 1.0.174 permanece f
 b82e5b03); **`media-gate do Roteiro PRESENTE no script vivo`**; rotas nenhuma; Custom Domains
 corretos; 12 vars + 8 secrets por nome; rollback c20 íntegro (sha aa07171e…) + botão
 ROLLBACK-C20-74J2 no main. Deploy run 29655678585, commit 85787d0.
+
+---
+
+## F3.3.74K — Desktop 1.0.174 Produção Controlada (candidata) (2026-07-18)
+
+Promove a Desktop de PRODUÇÃO 1.0.174 a partir da fonte funcional fisicamente aprovada
+**1.0.174-QA** (`670cef2`), removendo SÓ empacotamento (versão + banner QA). Worker de
+produção CONGELADO em `V64.59-c20-failopen-j4-roteiro-portal` (cace97b6); nada de backend.
+
+### FASE 1 — capability gate: GO
+- Sem tag/release `desktop/v1.0.174-production` (404 + list_tags só até 1.0.168).
+- 1.0.168 produção intacta (release 355084579 immutable; EXE `299162a0…`; MSI `a761317…`;
+  commit `4fb0a7f`) — rollback oficial preservado.
+- QA `670cef2` "F3.3.74E restore" · package.json 1.0.174-QA.
+- Worker live j4 confirmado.
+
+### FASE 2-6 — candidata limpa (branch `desktop/f3374k-1.0.174-production`, commit `b6b800c`)
+Diff = **só empacotamento** (7 arquivos; nenhum `.ts` tocado → tsc idêntico ao QA):
+- `package.json`/`package-lock.json`: 1.0.174-QA → **1.0.174**;
+- `index.html`: removida a ÚNICA linha do banner "AMBIENTE QA — NÃO USAR COM CLIENTES";
+- testes de versão/banner: R16 (banner AUSENTE), R17/A1/H3 (versão 1.0.174);
+- gate novo `f3374k-production-invariance.test.mjs` **30/30**: renderer da candidata ==
+  QA menos a linha do banner; `buildClientMessage`/`buildShareClientUrl`/`ensureReviewToken`/
+  `copyMsgClean`/`openWhatsAppWebOnly`/`persistClientSend`/`runPrewarm`/`main.ts`/`preload.ts`/
+  `electron-builder.yml` BYTE-IDÊNTICOS ao QA; regressões C18C/native-share/Windows Share/
+  Canvas ausentes.
+Suítes herméticas: **36/38 verde**; as 2 restantes (`auth-core`, `main-notifier`) exigem
+node_modules/tsc e falham IDÊNTICAS no QA baseline (ambiente, não regressão).
+
+### FASE 7 — build oficial (desktop-build.yml, run 29656441708, branch 74K @ b6b800c)
+Windows; version derivada do package.json → artefatos `Agenda-ID-Seven-Desktop-1.0.174-x64.exe/.msi`
+(sem "QA" no nome). O bloco de gate QA do build (condicional a "AMBIENTE QA") é PULADO por
+construção (sem banner) — os gates funcionais são reproduzidos na FASE 8/9 (app.asar).
+
+### FASE 8-9 — gate do app.asar (workflow `f3374k-desktop-asar-verify.yml`)
+Extrai o app.asar do EXE de produção e do EXE 1.0.174-QA (run 29542929297) e prova no runtime
+empacotado: produção 1.0.174 sem banner, contrato restaurado intacto, regressões ausentes; e
+comparação QA×prod: renderer idêntico a menos do banner, package.json só versão, main/preload
+compilados byte-idênticos, inventário do app idêntico (única divergência = index.html + package.json).
+
+### STOP GATE PRÉ-RELEASE
+Após build + gates + entrega ao owner: **PARAR**. Release só com QA físico do owner (35 checagens)
+e o literal **PUBLICAR-DESKTOP-1.0.174-74K**. Rollback oficial = 1.0.168 (release preservada).
