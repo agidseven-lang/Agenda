@@ -1,0 +1,51 @@
+# =====================================================================
+# [manual] F3.3.75B — Prova autoritativa do selo "Latest" (GraphQL isLatest).
+#
+# Read-only. Lê o campo isLatest (fonte de verdade do GitHub p/ o selo
+# "Latest") de cada release e imprime qual tag está marcada como latest.
+# Usado p/ confirmar que a 1.0.175 NÃO é a release "latest" (mandato 75B).
+# Nenhuma escrita, nenhuma release, nenhum deploy.
+# =====================================================================
+name: "[manual] F3.3.75B latest-probe (isLatest via GraphQL; read-only)"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3375b-latest-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: "isLatest de cada release (GraphQL — fonte autoritativa)"
+        run: |
+          set -euo pipefail
+          echo "TAG	isLatest	tipo	estado"
+          gh api graphql -f query='
+            query {
+              repository(owner: "agidseven-lang", name: "Agenda") {
+                releases(first: 20, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes { tagName isLatest isPrerelease isDraft }
+                }
+              }
+            }' --jq '.data.repository.releases.nodes[] | [.tagName, (if .isLatest then "LATEST" else "-" end), (if .isPrerelease then "pre" else "full" end), (if .isDraft then "draft" else "pub" end)] | @tsv'
+          echo "----"
+          MARKED="$(gh api graphql -f query='
+            query {
+              repository(owner: "agidseven-lang", name: "Agenda") {
+                releases(first: 100) { nodes { tagName isLatest } }
+              }
+            }' --jq '[.data.repository.releases.nodes[] | select(.isLatest) | .tagName] | join(",")')"
+          echo "Release(s) marcada(s) isLatest=true: ${MARKED:-<nenhuma>}"
+          if [ "$MARKED" = "desktop/v1.0.175-production" ]; then
+            echo "RESULTADO: 1.0.175 ESTÁ marcada como Latest (viola o mandato — precisa correção)."
+          else
+            echo "RESULTADO: 1.0.175 NÃO está marcada como Latest (conforme mandato)."
+          fi
