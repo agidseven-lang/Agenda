@@ -1,0 +1,113 @@
+# =====================================================================
+# [manual] F3.3.74J2 — AUDITORIA READ-ONLY do estado de produção.
+#
+# Pós-GO físico do Card sintético: reconfirma AO VIVO, sem alterar nada,
+# que a produção segue exatamente no estado promovido pela 74J:
+#   versão viva (2 caminhos) + Version ID do deployment ativo + rotas da
+#   zona (nenhuma rota canário) + Custom Domains (aprovar → idseven-push;
+#   aprovar-qa → idseven-push-qa) + DNS público + bindings (só nome/tipo)
+#   + secrets (SÓ nomes; valores jamais) + fonte de rollback c20 íntegra.
+# Somente GETs; nenhum deploy, nenhuma escrita, nenhum secret impresso.
+# =====================================================================
+name: "[manual] F3.3.74J2 Prod State Audit (read-only)"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374j2-state-audit
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  PROD_URL: https://aprovar.agendaidseven.com.br
+  PROD_WDEV: https://idseven-push.agidseven.workers.dev
+  EXPECT_VERSION: V64.59-c20-failopen-74f
+  EXPECT_VID: b82e5b03-b779-4b04-9a8e-29ddc522416c
+  ROLLBACK_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
+  ROLLBACK_WORKER_SHA256: aa07171e144400d9aabfbc7cb8e85ca60409036f9fe98826055de029765741d0
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidata (só para conferir a fonte de rollback)
+        uses: actions/checkout@v4
+        with:
+          ref: worker/f3374f-share-og-failopen-candidate
+          fetch-depth: 0
+
+      - name: "Auditoria viva (somente leitura; sanitizada)"
+        run: |
+          set -uo pipefail
+          fail=0
+          API="https://api.cloudflare.com/client/v4"
+          AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          ACC="$CLOUDFLARE_ACCOUNT_ID"
+
+          echo "===== 1) Versão viva nos 2 caminhos ====="
+          V1=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version' 2>/dev/null || true)
+          V2=$(curl -sS --max-time 25 "$PROD_WDEV/" | jq -r '.version' 2>/dev/null || true)
+          echo "aprovar.    : $V1"
+          echo "workers.dev : $V2"
+          [ "$V1" = "$EXPECT_VERSION" ] || { echo "::error::versão em aprovar. divergente"; fail=1; }
+          [ "$V2" = "$EXPECT_VERSION" ] || { echo "::error::versão em workers.dev divergente"; fail=1; }
+
+          echo; echo "===== 2) Deployment ativo (Version ID) ====="
+          DEP=$(curl -sS --max-time 25 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
+          echo "$DEP" | jq -r '.result.deployments[0] | "latest: id=\(.id) created=\(.created_on) strategy=\(.strategy)"' 2>/dev/null || echo "(shape inesperado)"
+          echo "$DEP" | jq -r '.result.deployments[0].versions[] | "  version_id=\(.version_id) pct=\(.percentage)"' 2>/dev/null || true
+          LVID=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].version_id' 2>/dev/null || true)
+          LPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage' 2>/dev/null || true)
+          { [ "$LVID" = "$EXPECT_VID" ] && [ "$LPCT" = "100" ]; } || { echo "::error::deployment ativo não é $EXPECT_VID @100%"; fail=1; }
+
+          echo; echo "===== 3) Conteúdo vivo do script (versão + ausência de golden) ====="
+          curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push" -o live-script.bin || true
+          SZ=$(wc -c < live-script.bin | tr -d ' '); SHA=$(sha256sum live-script.bin | cut -d' ' -f1)
+          echo "bytes=$SZ sha256=$SHA (informativo; upload pode conter wrapper do wrangler)"
+          grep -q "$EXPECT_VERSION" live-script.bin || { echo "::error::script vivo NÃO contém $EXPECT_VERSION"; fail=1; }
+          if grep -q 'version: "V64.59-c20-golden-contract"' live-script.bin; then echo "::error::script vivo ainda contém identidade golden"; fail=1; fi
+
+          echo; echo "===== 4) Rotas da zona (nenhuma rota canário) ====="
+          ZID=$(curl -sS --max-time 25 -H "$AUTH" "$API/zones?name=agendaidseven.com.br" | jq -r '.result[0].id')
+          RT=$(curl -sS --max-time 25 -H "$AUTH" "$API/zones/$ZID/workers/routes")
+          echo "$RT" | jq -c '.result'
+          if echo "$RT" | jq -r '.result[]?.pattern' | grep -q "share/cronograma"; then echo "::error::ROTA CANÁRIO PRESENTE"; fail=1; else echo "nenhuma rota /share/cronograma (canário 74I segue removido)"; fi
+
+          echo; echo "===== 5) Custom Domains do Worker (zona agendaidseven.com.br) ====="
+          CD=$(curl -sS --max-time 25 -H "$AUTH" "$API/accounts/$ACC/workers/domains")
+          echo "$CD" | jq -r '.result[] | select(.zone_name=="agendaidseven.com.br") | "\(.hostname) -> \(.service) (env=\(.environment))"'
+          echo "$CD" | jq -r '.result[] | select(.zone_name=="agendaidseven.com.br") | "\(.hostname)|\(.service)"' | sort > cd.txt
+          grep -q "^aprovar.agendaidseven.com.br|idseven-push$" cd.txt || { echo "::error::aprovar. não está ligado a idseven-push"; fail=1; }
+          grep -q "^aprovar-qa.agendaidseven.com.br|idseven-push-qa$" cd.txt || { echo "::error::aprovar-qa. não está ligado a idseven-push-qa"; fail=1; }
+
+          echo; echo "===== 6) DNS público (dig) ====="
+          for H in aprovar.agendaidseven.com.br aprovar-qa.agendaidseven.com.br; do
+            echo "--- $H"; echo "A:"; dig +short A "$H" | sed 's/^/  /'; echo "AAAA:"; dig +short AAAA "$H" | sed 's/^/  /'
+          done
+
+          echo; echo "===== 7) Bindings (SÓ nome/tipo — nunca valores) ====="
+          curl -sS --max-time 25 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/settings" \
+            | jq -r '.result.bindings[] | "\(.type)\t\(.name)"' | sort || echo "(settings indisponível)"
+
+          echo; echo "===== 8) Secrets (SÓ nomes) ====="
+          curl -sS --max-time 25 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/secrets" \
+            | jq -r '.result[] | .name' | sort || echo "(lista indisponível)"
+
+          echo; echo "===== 9) Fonte de rollback c20 íntegra + botão armado ====="
+          git cat-file -e ${ROLLBACK_SHA}^{commit} && echo "commit ${ROLLBACK_SHA:0:9} existe" || { echo "::error::commit de rollback ausente"; fail=1; }
+          git show ${ROLLBACK_SHA}:cloudflare-worker.js > rb.js
+          RSHA=$(sha256sum rb.js | cut -d' ' -f1); echo "sha256(rollback worker)=$RSHA"
+          [ "$RSHA" = "$ROLLBACK_WORKER_SHA256" ] || { echo "::error::fonte de rollback divergente do canônico"; fail=1; }
+          grep -q 'version: "V64.59-c20-golden-contract"' rb.js && echo "identidade golden confirmada na fonte de rollback" || { echo "::error::identidade golden ausente"; fail=1; }
+          git fetch -q origin main
+          git show origin/main:.github/workflows/f3374j2-rollback-c20.yml | grep -q "ROLLBACK-C20-74J2" \
+            && echo "workflow de rollback 1-clique presente no main (confirm literal ROLLBACK-C20-74J2)" \
+            || { echo "::error::workflow de rollback ausente no main"; fail=1; }
+          rm -f live-script.bin rb.js cd.txt
+
+          echo; [ "$fail" = "0" ] && echo "AUDITORIA: PRODUÇÃO ÍNTEGRA NO ESTADO PROMOVIDO (74J) — tudo confirmado" || { echo "::error::AUDITORIA ENCONTROU DIVERGÊNCIA(S)"; exit 1; }
