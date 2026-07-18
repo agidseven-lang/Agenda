@@ -1207,3 +1207,32 @@ compilados byte-idênticos, inventário do app idêntico (única divergência = 
 ### STOP GATE PRÉ-RELEASE
 Após build + gates + entrega ao owner: **PARAR**. Release só com QA físico do owner (35 checagens)
 e o literal **PUBLICAR-DESKTOP-1.0.174-74K**. Rollback oficial = 1.0.168 (release preservada).
+
+### FASE 7-9 — build de produção + gates app.asar: VERDE
+- Build oficial **run 29656441708** (desktop-build, branch 74K @ b6b800c) SUCCESS (~4 min).
+  Artefatos: `Agenda-ID-Seven-Desktop-1.0.174-x64.exe` (79 MB) SHA-256
+  `4940f8a6374ee26a90cfb6d2e67b1bdf01b0663b01474b48aacd43d148aff276`;
+  `…-1.0.174-x64.msi` (88 MB) SHA-256
+  `160a1d315206d86e1e1fc36701d3f2513ef8e077d45732f9c75eb45a5b81a947`.
+  Installer artifact id **8433040597** (digest sha256 b6b2a61f…); bundle id **8433042465**.
+- **app.asar verify run 29656718630** (FASES 8+9) SUCCESS: versão empacotada 1.0.174, SEM
+  banner, contrato restaurado intacto, regressões ausentes; renderer produção == QA menos
+  a linha do banner (todos handlers byte-idênticos); package.json só versão; main.js/preload.js
+  byte-idênticos; inventário do app idêntico. app.asar prod `f51ae131…` / QA `842a629c…`.
+
+### FASE 12-13 — release gated ARMADO (não publicado)
+Workflow `f3374k-desktop-release-production.yml` no main (literal **PUBLICAR-DESKTOP-1.0.174-74K**):
+pinado a run 29656441708 / commit b6b800c / EXE 4940f8a6… / MSI 160a1d31…; cria tag
+`desktop/v1.0.174-production` (draft=false, prerelease=false, latest=false), assets EXE+MSI+
+SHA256SUMS+VERSAO+RELATORIO; gate do Worker j4 read-only; smoke pós-publicação; **não toca a
+1.0.168**. NÃO roda sem o literal.
+
+### FASE 10-11 — entrega ao owner (candidata) + QA físico 35 checagens
+Instalador: run 29656441708 → artifact `agenda-id-seven-desktop-1.0.174-installer`.
+`certutil -hashfile "Agenda-ID-Seven-Desktop-1.0.174-x64.exe" SHA256` = 4940F8A6…276.
+QA físico obrigatório antes da release (35 checagens do mandato; dados sintéticos).
+
+### ESTADO após 74K (candidata)
+Desktop produção OFICIAL segue **1.0.168** (rollback preservado) até o literal de publicação.
+Worker produção `V64.59-c20-failopen-j4-roteiro-portal` (cace97b6) congelado. Candidata 1.0.174
+buildada e verificada; aguardando QA físico + PUBLICAR-DESKTOP-1.0.174-74K.
