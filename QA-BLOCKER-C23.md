@@ -960,3 +960,32 @@ do worker seguem; espelho QA `aprovar-qa` intacto; Desktop produção 1.0.168 se
 Mesmo com GO total (Worker + Cronograma + Roteiro): **NÃO publicar** Desktop 1.0.174 — sem
 release, sem tag, sem troca do instalador de produção. Preparar apenas a autorização de
 **F3.3.74K-DESKTOP-1.0.174-CONTROLLED-PRODUCTION-PROMOTION**.
+
+### ✅ GO FÍSICO DO WORKER FAIL-OPEN EM PRODUÇÃO — REGISTRADO (2026-07-18, 12:52 UTC)
+- **Prova física (owner)**: Card Premium de Cronograma apareceu no WhatsApp Business às
+  ~09:52 locais (12:52 UTC) a partir do link sintético `…/share/cronograma/74f74f…74f` em
+  `aprovar.agendaidseven.com.br` — imagem Premium, título "Aprovar cronograma", descrição,
+  domínio e link clicável corretos. **Rollback NÃO executado (não necessário).**
+- **Prova instrumental (run #15 = `29644819510`)**: observador PROVADO por self-probe capturada
+  no MESMO stream (12:44:43 probe HTTP **200**; 12:44:46 `evento da sonda encontrado no Tail …
+  método=GET status=200 outcome=ok`; `TAIL_ATTACH_PROVADO`; `SELF_PROBE_CAPTURED=1`;
+  `JANELA ATIVA por 30 minutos — serviço: idseven-push — etiqueta: fisico-74j2-producao-sintetico`).
+  Na janela: **3 eventos EXTERNOS** (self_probe excluída), todos `UA=WhatsApp/2.23.20.0
+  ASN28126/BR GET 200 ok` em `aprovar.`:
+  1. `12:51:59.797Z` GET `/share/cronograma/<tok>` (página, 1ª busca)
+  2. `12:52:00.582Z` GET `/share/cronograma/<tok>` (página, retry +785 ms)
+  3. `12:52:00.794Z` GET `/og/wa-card-v64-39.jpg` (imagem; `isBot=true` no WA-DIAG)
+  = unfurl **client-side** (mesmo padrão do GO do canário 74I); nenhum fetch de datacenter Meta;
+  correlação exata com o horário físico. Artefato: `f3374f-crawler-capture-15` (id 8429988763).
+- **Estado de produção reconfirmado ao vivo 12:56–58 UTC** (run `29645237524`, read-only, tudo
+  fail-closed): versão `V64.59-c20-failopen-74f` nos 2 caminhos; deployment ativo
+  `b82e5b03-b779-4b04-9a8e-29ddc522416c` @100% (criado 12:25:42Z); script vivo com identidade
+  failopen e SEM a golden; rotas da zona: **nenhuma** (canário segue removido); Custom Domains
+  `aprovar.→idseven-push` e `aprovar-qa.→idseven-push-qa`; DNS ok; **12 vars + 8 secrets POR
+  NOME** idênticos ao inventário 74J; fonte de rollback sha256 `aa07171e…` canônica; botão
+  `ROLLBACK-C20-74J2` presente no main.
+- Nota técnica: o robots.txt servido em `aprovar.` = bloco gerenciado da zona + corpo do origin
+  (o JSON da raiz do worker) anexado — por isso 1911 B (golden) → **1908 B** (failopen, versão
+  3 bytes mais curta). Política de crawlers inalterada (`*` Allow: /; Meta/WhatsApp livres).
+- **Próximo**: FASES 4–7 (Desktop 1.0.174-QA E2E Cronograma/Roteiro + regressão) → somente
+  depois, com tudo verde, a 74K (promoção controlada da Desktop). Worker fail-open PERMANECE.
