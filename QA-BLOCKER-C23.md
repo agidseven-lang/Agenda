@@ -894,3 +894,69 @@ Após GO físico de Cronograma E Roteiro: **PARAR**. NÃO publicar Desktop 1.0.1
 para a fase separada **F3.3.74K-DESKTOP-1.0.174-CONTROLLED-PRODUCTION-PROMOTION**
 (auditar build existente, hashes, regressão, release controlada, rollback 1.0.168).
 Desktop de produção permanece **1.0.168**.
+
+---
+
+## F3.3.74J2 — Validação FÍSICA em produção + E2E Desktop (2026-07-18)
+
+Produção Worker: **V64.59-c20-failopen-74f** (Version ID `b82e5b03-b779-4b04-9a8e-29ddc522416c`,
+promovido no run `29644274208`). Desktop produção segue **1.0.168**.
+
+### FASE 1 — gate vivo (PASSOU, 12:41 UTC)
+- Edge-audit `29644781093`: `/share/cronograma/<dummy>` → **GET 200 + HEAD 200** nos 3 UAs
+  (browser/facebookexternalhit/WhatsApp) em `aprovar.` **e** `workers.dev` (sob c20 era 404 —
+  assinatura comportamental do fail-open vivo nos DOIS caminhos).
+- Imagem `wa-card-v64-39.jpg`: 144941 bytes, sha256 `c038636d…` byte-exata nos 2 hosts.
+- `cf_mitigated` vazio + zero marcador de challenge; TLS (GTS WE1, SAN aprovar.) e DNS ok.
+- Rotas idênticas ao snapshot (gate final do promote `29644274208`); nenhuma rota canário.
+- **Rollback em 1 clique ARMADO**: workflow `f3374j2-rollback-c20.yml` no main (commit `80c18bf`);
+  confirmação literal `ROLLBACK-C20-74J2` → redeploya `928669eb2` (golden) e valida ao vivo.
+
+### FASE 2 — janela autovalidada em produção
+Run do `f3374f-crawler-capture.yml`: `service=idseven-push`, `window_minutes=30`,
+`note=fisico-74j2-producao-sintetico`. Gates exigidos ANTES do link: `service validado`,
+self-probe status, evento no tail, `TAIL_ATTACH_PROVADO`, `SELF_PROBE_CAPTURED=1`, `JANELA ATIVA`.
+
+### FASE 3 — prova física do card sintético EM PRODUÇÃO (owner)
+Colar SOZINHO no WhatsApp Business, aguardar até 30 s, CAPTURAR a pré-visualização, enviar UMA vez:
+`https://aprovar.agendaidseven.com.br/share/cronograma/74f74f74f74f74f74f74f74f74f74f74f74f74f74f74f74f`
+(token sintético 74J2; supersede o token `f3374jprova…` do runbook 74J acima).
+- Card Premium de Cronograma DEVE aparecer (imagem + título + descrição + domínio + link).
+- **Se NÃO aparecer** → Actions → "[manual] F3.3.74J2 Rollback c20" → digitar `ROLLBACK-C20-74J2`
+  → produção volta ao golden-contract → **HARD NO-GO**, NÃO seguir ao Desktop.
+- Se aparecer → registrar **GO FÍSICO DO WORKER EM PRODUÇÃO** (log da janela mostra o request
+  `[external]` real: horário/UA/ASN-país/método/status/outcome).
+- Janela expirou antes de colar? Reabrir com os MESMOS inputs da FASE 2 e colar de novo.
+
+### FASE 4 — reinstalar Desktop 1.0.174-QA EXISTENTE (owner; NENHUMA build nova)
+Artefato oficial do run `29542929297`: `Agenda-ID-Seven-Desktop-1.0.174-QA-x64.exe`,
+SHA-256 `fe6051e76f790e7fc6cf9ac8df9ee163b133c659a5d90d642833c10b4f4c9fa9`
+(conferir com `certutil -hashfile <exe> SHA256`). Banner QA visível; nenhum cliente real.
+
+### FASE 5 — E2E Cronograma na 1.0.174-QA (15 checagens)
+1 hash do EXE confere; 2 instala como 1.0.174-QA; 3 banner QA visível; 4 ambiente/tarefa
+sintética (cliente QA, nunca real); 5 criar tarefa de Cronograma; 6 botão 1-clique COPIA o link
+e ABRE o WhatsApp (regressão C18C corrigida — clique não morre); 7 link tem a forma
+`aprovar.agendaidseven.com.br/share/cronograma/<token>`; 8 colar e aguardar ≤30 s; 9 card TIPADO
+de Cronograma (arte `wa-card-v64-39.jpg`); 10 título/descrição de Cronograma + domínio corretos;
+11 enviar → card renderiza no destinatário; 12 tocar o link → portal abre a tarefa correta;
+13 aprovar no portal → status atualiza; 14 retorno/notificação no Desktop; 15 zero contaminação
+Roteiro×Cronograma no card.
+
+### FASE 6 — E2E Roteiro TIPADO na 1.0.174-QA (12 checagens)
+1 criar tarefa sintética de Roteiro; 2 opções de quantidade **4/6/8/12** presentes; 3 fluxo SEM
+Designer; 4 1-clique copia+abre WhatsApp; 5 colar e aguardar ≤30 s; 6 card **"Aprovar roteiro"**
+tipado (**NUNCA** o card genérico); 7 arte `wa-card-roteiro-v64-60.jpg`; 8 descrição própria de
+Roteiro, ZERO texto de Cronograma; 9 enviar UMA vez → renderiza; 10 portal abre a tarefa de
+Roteiro; 11 aprovar → status atualiza → retorno ao Desktop; 12 captura/headers comprovam página
+tipada (`X-Share-Type: roteiro` no GET do share).
+
+### FASE 7 — regressão física mínima (owner, pós-GO)
+raiz `/` JSON 200 nos 2 hosts; imagens OG ambas byte-exatas; robots.txt da zona intacto; portal
+de aprovação de link RESOLVIDO segue funcionando (cache público C20 preservado); push FCM/cron
+do worker seguem; espelho QA `aprovar-qa` intacto; Desktop produção 1.0.168 segue operando.
+
+### STOP GATE 74J2
+Mesmo com GO total (Worker + Cronograma + Roteiro): **NÃO publicar** Desktop 1.0.174 — sem
+release, sem tag, sem troca do instalador de produção. Preparar apenas a autorização de
+**F3.3.74K-DESKTOP-1.0.174-CONTROLLED-PRODUCTION-PROMOTION**.
