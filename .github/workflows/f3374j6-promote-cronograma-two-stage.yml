@@ -1,0 +1,199 @@
+# =====================================================================
+# [manual] F3.3.74J6 — PROMOÇÃO do ciclo de DUAS ETAPAS do Cronograma à PRODUÇÃO.
+#
+# Incidente confirmado no HOST DE PRODUÇÃO (aprovar.agendaidseven.com.br): na
+# ETAPA 1 (APROVAÇÃO DE TEMAS) o portal do Cronograma exibia indevidamente
+# Legenda/Peças/Feed/Story/placeholders. A correção 74J5 estava só no Worker QA
+# (idseven-push-qa), então produção seguia servindo o portal antigo. Este
+# workflow promove ao serviço de PRODUÇÃO `idseven-push` a candidata LIMPA J6
+# (= fix 74J5 byte-idêntico: predicado themesOnly + gate de Legenda/Peças/Editar-
+# legenda por FASE) com nova identidade V64.59-c20-failopen-j6-cronograma-two-stage.
+#
+# Blindagem: snapshot → RED(produção j4: ETAPA 1 mostra Legenda/Peças) / GREEN
+# (candidata 43/43 + roteiro 35/35) + contrato 74J no runner → deploy → validação
+# viva (versão+build novos + IDENTIDADE no HOST via X-ID7-Worker-Build +
+# not_found/HEAD/imagens/rotas/domains/bindings idênticos) → ROLLBACK AUTOMÁTICO
+# para V64.59-c20-failopen-j4-roteiro-portal (worker 85787d0) em qualquer falha.
+# Card Premium/OG/fail-open/Roteiro/DNS/rotas/Custom Domains/bindings/secrets/
+# Desktop: INTOCADOS.
+# =====================================================================
+name: "[manual] F3.3.74J6 Promote Cronograma Two-Stage (produção; gated)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PROMOVER-CRONOGRAMA-2-ETAPAS-74J6 para autorizar o deploy de produção"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374j6-promote
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  PROD_URL: https://aprovar.agendaidseven.com.br
+  PROD_WDEV: https://idseven-push.agidseven.workers.dev
+  CANDIDATE_REF: worker/f3374j6-cronograma-two-stage-production
+  CANDIDATE_SHA: db325d9
+  NEW_VERSION: V64.59-c20-failopen-j6-cronograma-two-stage
+  NEW_BUILD: j6-cronograma-two-stage
+  ROLLBACK_SHA: 85787d0de0fcf0c18d18762cc43fa45ac628d030
+  PREV_VERSION: V64.59-c20-failopen-j4-roteiro-portal
+  PREV_VID: cace97b6-1eb0-44c8-9493-853d0fd675e5
+  BASE_SHA: f9b54ce320f345e50f9893415d7eeef87ef9ecbc
+  C20_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
+  T_NF: f3374j6promote00000000000000000000000000000000001
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate 1 — confirmação literal do owner"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "PROMOVER-CRONOGRAMA-2-ETAPAS-74J6" ] || { echo "::error::confirmação inválida — deploy de produção NEGADO"; exit 1; }
+          echo "OK"
+
+      - name: Checkout candidata J6
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_REF }}
+          fetch-depth: 0
+
+      - name: "Gate 2 — snapshot pré (versão viva, rotas, domains, bindings, hashes, fonte de rollback)"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          HEAD=$(git rev-parse HEAD); echo "HEAD=$HEAD" | tee out/pre.txt
+          case "$HEAD" in ${CANDIDATE_SHA}*) : ;; *) echo "::error::ref não está na candidata ${CANDIDATE_SHA}"; exit 1;; esac
+          node --check cloudflare-worker.js
+          # identidade da candidata J6
+          grep -q "version: \"$NEW_VERSION\"" cloudflare-worker.js || { echo "::error::fonte não tem a nova identidade de versão j6"; exit 1; }
+          grep -Fq 'const WORKER_BUILD = "j6-cronograma-two-stage";' cloudflare-worker.js || { echo "::error::build J6 ausente"; exit 1; }
+          # fix 74J5 (corte por FASE) presente
+          grep -Fq 'const themesOnly = pt.key !== "roteiro" && phase === "themes";' cloudflare-worker.js || { echo "::error::predicado themesOnly ausente"; exit 1; }
+          grep -Fq '(pt.key === "roteiro" || themesOnly) ? ""' cloudflare-worker.js || { echo "::error::gate Peças por fase ausente"; exit 1; }
+          # guard J3 (roteiro Tema+Legenda) preservado
+          grep -Fq 'if (premiumTypeOf(task).key === "roteiro") return "themes";' cloudflare-worker.js || { echo "::error::guard clientPhase (roteiro) ausente"; exit 1; }
+          grep -q 'F3.3.74F — FAIL-OPEN DO OG' cloudflare-worker.js || { echo "::error::fail-open ausente"; exit 1; }
+          grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml de produção divergente"; exit 1; }
+          sha256sum cloudflare-worker.js | tee -a out/pre.txt
+          V=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); B=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.build')
+          echo "produção ANTES: version=$V build=$B" | tee -a out/pre.txt
+          case "$V" in
+            "$PREV_VERSION") echo "pré-estado: j4-roteiro-portal (promoção nova)";;
+            "$NEW_VERSION")  echo "pré-estado: J6 já ativa (re-run idempotente)";;
+            *) echo "::error::produção em estado inesperado ($V)"; exit 1;;
+          esac
+          ZID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=agendaidseven.com.br" | jq -r '.result[0].id')
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZID/workers/routes" | jq -c '.result' | tee out/routes-pre.json
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains" | jq -r '.result[] | select(.zone_name=="agendaidseven.com.br") | "\(.hostname)|\(.service)"' | sort | tee out/domains-pre.txt
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/idseven-push/settings" | jq -r '.result.bindings[] | "\(.type)\t\(.name)"' | sort | tee out/bindings-pre.txt
+          for IMG in wa-card-v64-39.jpg wa-card-roteiro-v64-60.jpg; do
+            echo "$IMG $(curl -sS --max-time 30 "$PROD_URL/og/$IMG" | sha256sum | cut -d' ' -f1)" | tee -a out/pre.txt
+          done
+          git show ${ROLLBACK_SHA}:cloudflare-worker.js > out/rollback-worker.js
+          sha256sum out/rollback-worker.js | tee -a out/pre.txt
+          grep -q "version: \"$PREV_VERSION\"" out/rollback-worker.js || { echo "::error::fonte de rollback não é a j4-roteiro-portal"; exit 1; }
+
+      - name: "Gate 3 — RED (produção j4: ETAPA 1 mostra Legenda/Peças) + GREEN (43/43 + roteiro 35/35) + contrato 74J"
+        run: |
+          set -euo pipefail
+          git show ${ROLLBACK_SHA}:cloudflare-worker.js > out/prod-j4.js
+          git show ${BASE_SHA}:cloudflare-worker.js > out/base-f9b54ce.js
+          git show ${C20_SHA}:cloudflare-worker.js > out/c20.js
+          echo "— RED: produção j4 (85787d0) exibe Legenda/Peças na ETAPA 1 do Cronograma —"
+          WORKER_SRC=out/prod-j4.js EXPECT=red node scripts/f3374j5-cronograma-themes.test.mjs
+          echo "— GREEN: candidata J6 (ETAPA 1 só Tema; ETAPA 2/roteiro/handlers byte-idênticos vs j4) —"
+          BASELINE_SRC=out/prod-j4.js node scripts/f3374j5-cronograma-themes.test.mjs
+          echo "— regressão: roteiro Tema+Legenda 35/35 (baseline f9b54ce) —"
+          BASELINE_SRC=out/base-f9b54ce.js node scripts/f3374j3-roteiro-portal.test.mjs
+          echo "— contrato fail-open 74J: RED c20 + GREEN failopen —"
+          WORKER_SRC=out/c20.js EXPECT=c20 node scripts/f3374j-failopen-contract.test.mjs
+          EXPECT=failopen RED_PROVED=1 DIFF_SCOPE_OK=1 node scripts/f3374j-failopen-contract.test.mjs
+          echo "GATE 3 OK"
+
+      - name: "DEPLOY produção (wrangler; mesmo serviço/rotas/bindings)"
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy 2>&1 | tee out/deploy.txt
+          grep -q "idseven-push" out/deploy.txt || { echo "::error::deploy não confirmou o serviço"; exit 1; }
+          UPVID=$(grep -oiE 'Current Version ID: [0-9a-f-]+' out/deploy.txt | awk '{print $NF}' | tail -1)
+          echo "NEW_VID=$UPVID" | tee out/new-vid.txt
+
+      - name: "Validação viva pós-deploy (identidade no HOST; rollback automático em falha)"
+        run: |
+          set -uo pipefail
+          fail=0
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-70 || true; }
+          # 1) versão+build NOVOS vivos nos 2 caminhos (identidade no host — fecha o ponto cego)
+          DEADLINE=$(( $(date +%s) + 120 )); V=""; B=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            R=$(curl -sS --max-time 15 "$PROD_URL/" 2>/dev/null || true)
+            V=$(printf '%s' "$R" | jq -r '.version' 2>/dev/null || true)
+            B=$(printf '%s' "$R" | jq -r '.build' 2>/dev/null || true)
+            [ "$V" = "$NEW_VERSION" ] && [ "$B" = "$NEW_BUILD" ] && break; sleep 4
+          done
+          echo "aprovar. version=$V build=$B"; { [ "$V" = "$NEW_VERSION" ] && [ "$B" = "$NEW_BUILD" ]; } || fail=1
+          # 2) identidade do worker no HOST via header X-ID7-Worker-Build (prova que aprovar. roda J6)
+          HB=$(curl -sS --max-time 25 -A "WhatsApp/2.23.20.0" -D - -o /dev/null "$PROD_URL/share/cronograma/$T_NF" 2>/dev/null | grep -i '^x-id7-worker-build:' | tr -d '\r' | awk '{print $2}' | tail -1)
+          echo "X-ID7-Worker-Build (host aprovar.): $HB"; [ "$HB" = "$NEW_BUILD" ] || fail=1
+          # 3) contrato not_found (fail-open) intacto
+          ST=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D out/h1.txt -o out/b1.html -w '%{http_code}' "$PROD_URL/share/cronograma/$T_NF")
+          OGN=$(grep -c 'property="og:' out/b1.html || true)
+          echo "not_found: GET=$ST og=$OGN task=$(hv x-share-task out/h1.txt) type=$(hv x-share-type out/h1.txt) cc=$(hv cache-control out/h1.txt)"
+          { [ "$ST" = "200" ] && [ "$OGN" -ge 9 ] && [ "$(hv x-share-task out/h1.txt)" = "not_found" ] && [ "$(hv x-share-type out/h1.txt)" = "generic" ]; } || fail=1
+          case "$(hv cache-control out/h1.txt)" in *no-store*) : ;; *) fail=1;; esac
+          HS=$(curl -sS --max-time 30 -I -A "facebookexternalhit/1.1" -o /dev/null -w '%{http_code}' "$PROD_URL/share/cronograma/$T_NF")
+          echo "HEAD not_found: $HS"; [ "$HS" = "200" ] || fail=1
+          ST2=$(curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D out/h2.txt -o /dev/null -w '%{http_code}' "$PROD_URL/share/cronograma/$T_NF")
+          case "$(hv x-share-cache out/h2.txt)" in *bypass*) : ;; *) echo "not_found aqueceu cache!"; fail=1;; esac
+          # 4) imagens byte-exatas (Card Premium Cronograma + Roteiro intocados)
+          I1=$(curl -sS --max-time 30 "$PROD_URL/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
+          I2=$(curl -sS --max-time 30 "$PROD_URL/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          echo "img cron=$I1 rot=$I2"
+          [ "$I1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || fail=1
+          [ "$I2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || fail=1
+          # 5) workers.dev propaga a nova versão
+          WD=$(( $(date +%s) + 120 )); W=""
+          while [ "$(date +%s)" -lt "$WD" ]; do
+            W=$(curl -sS --max-time 15 "$PROD_WDEV/" | jq -r '.version' 2>/dev/null || true)
+            [ "$W" = "$NEW_VERSION" ] && break; sleep 4
+          done
+          echo "workers.dev: $W"; [ "$W" = "$NEW_VERSION" ] || fail=1
+          if [ "$fail" != "0" ]; then
+            echo "::error::VALIDAÇÃO PÓS-DEPLOY FALHOU — ROLLBACK IMEDIATO para $PREV_VERSION"
+            git checkout -q ${ROLLBACK_SHA} -- cloudflare-worker.js
+            npx --yes wrangler@4 deploy 2>&1 | tee out/rollback-deploy.txt
+            RV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); echo "versão após rollback: $RV" | tee -a out/rollback-deploy.txt
+            { [ "$RV" = "$PREV_VERSION" ] && echo "ROLLBACK OK ($PREV_VERSION)"; } || echo "::error::ROLLBACK NÃO CONFIRMOU — intervenção manual"
+            exit 1
+          fi
+          echo "OK: produção J6 validada ao vivo (ciclo 2 etapas promovido; host roda build $NEW_BUILD)"
+
+      - name: "Gate final — rotas + Custom Domains + bindings idênticos ao snapshot"
+        if: always()
+        run: |
+          set -uo pipefail
+          ZID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=agendaidseven.com.br" | jq -r '.result[0].id')
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZID/workers/routes" | jq -c '.result' | tee out/routes-post.json
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains" | jq -r '.result[] | select(.zone_name=="agendaidseven.com.br") | "\(.hostname)|\(.service)"' | sort | tee out/domains-post.txt
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/idseven-push/settings" | jq -r '.result.bindings[] | "\(.type)\t\(.name)"' | sort | tee out/bindings-post.txt
+          cmp -s out/routes-pre.json out/routes-post.json && echo "rotas: IDÊNTICAS" || { echo "::error::rotas divergiram"; exit 1; }
+          cmp -s out/domains-pre.txt out/domains-post.txt && echo "Custom Domains: IDÊNTICOS" || { echo "::error::domains divergiram"; exit 1; }
+          cmp -s out/bindings-pre.txt out/bindings-post.txt && echo "bindings: IDÊNTICOS" || { echo "::error::bindings divergiram"; exit 1; }
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374j6-promotion-evidence
+          path: out/
+          retention-days: 90
