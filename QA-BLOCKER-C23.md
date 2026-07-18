@@ -804,3 +804,46 @@ canário seguiu 404 (produção), produção intacta, artifact ok.
 
 Candidato único (FASE 14): **já existe** — Desktop 1.0.174-QA (74E) + Worker QA
 fail-open d134193. Nenhum build novo será gerado sem causa adicional comprovada.
+
+## ADENDO 74J — GO FÍSICO DO CRONOGRAMA (canário no host histórico) + PROMOÇÃO PREPARADA
+
+**GO FÍSICO registrado pelo owner (~08:51 local):** o Card Premium completo (imagem,
+título "Aprovar cronograma", descrição, domínio, link clicável) apareceu no WhatsApp
+Business com a URL canário no host histórico.
+
+**Request real capturado (run `29642737121`, tail autovalidado):**
+`[external] 2026-07-18T11:51:27.878Z GET 200 ok ASN28126/BR UA=WhatsApp/2.23.20.0`
+`[external] 2026-07-18T11:51:28.608Z GET 200 ok ASN28126/BR UA=WhatsApp/2.23.20.0`
+(= 08:51 local; DOIS fetches da página em ~0,7 s; unfurl CLIENTE-side — ASN brasileiro,
+não datacenter Meta). self-probe 11:34:34 classificada à parte; os 6 eventos
+ASN8075/US 11:37:41-49 são o edge-audit `29642885792` (minha prova comportamental),
+honestamente atribuídos. Imagem: buscada na PRODUÇÃO (rota canário cobria só o path
+do share) — 200 byte-exata `c038636d…` provada ao vivo no mesmo minuto.
+
+**Rollback comprovado:** `DELETE rota: success=true` → canário de volta a 404 →
+produção `V64.59-c20-golden-contract` (aprovar. e workers.dev). Zero resíduo.
+
+**CAUSA-RAIZ FINAL (fechada de ponta a ponta):** (A) Desktop C18C `2bcad42` matou o
+clique (corrigido: 1.0.174-QA); (B) Worker C20 fail-closed matou o OG no host que o
+WhatsApp consulta — a MESMA URL, com fail-open, gerou o card físico. Confirmado.
+
+**Promoção preparada (SEM deploy):**
+- Patch mínimo = candidata `f9b54ce` (V64.59-c20-failopen-74f; só handleShareCard+versão).
+- Testes: `scripts/f3374j-failopen-contract.test.mjs` — RED 5/5 no c20 `928669eb2`
+  (404/503 sem OG micro-executados) e GREEN 19/19 na candidata (resolved cron/rot
+  tipados+cacheáveis; not_found/error 200+OG no-store bypass; HEAD/GET; token não
+  exposto; zero Firestore write; zero contaminação; portal intacto por escopo de diff).
+- Workflow gated: `f3374j-promote-failopen.yml` (main `af28207`) — confirmação literal
+  `PROMOVER-FAILOPEN-74J`; snapshot versão/rotas/hash; RED/GREEN no runner; deploy;
+  validação viva (GET/HEAD/not_found/error/imagens/versão); **rollback automático
+  para o c20 `928669eb2`** se qualquer gate pós-deploy falhar; cmp rotas pré/pós.
+  NÃO EXECUTAR sem autorização expressa do owner.
+
+**Roteiro (prova tipada preparada):** o canário agora aceita input `token` — runbook:
+(1) criar tarefa SINTÉTICA de Roteiro na 1.0.174-QA (wizard; opções 4/6/8/12; sem
+Designer); (2) copiar o token do link gerado; (3) rodar o canário com
+`confirm=CANARIO-74I`, `token=<token-da-tarefa>`, `window_minutes=30` (rota exata só
+desse token → worker QA resolve e serve card TIPADO "Aprovar roteiro" + arte
+`wa-card-roteiro-v64-60.jpg`); (4) colar o link `aprovar.…/share/cronograma/<token>`
+na JANELA ATIVA; (5) card de Roteiro deve aparecer SEM nada de Cronograma; reversão
+automática. Proibido aprovar Roteiro com card genérico.
