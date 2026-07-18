@@ -1,0 +1,224 @@
+# =====================================================================
+# [manual] F3.3.74K — Publicação da PRODUÇÃO CONTROLADA Desktop 1.0.174.
+#
+# PREPARADO (armado) na 74K; NÃO publica sem o literal do owner. Publica a
+# release de produção 1.0.174 usando EXCLUSIVAMENTE os artifacts do build
+# aprovado (run 29656441708, branch desktop/f3374k-1.0.174-production @
+# b6b800c). TUDO PINADO: run id, SHA alvo, artifact ids/digests, tag, título
+# e hashes SHA-256 oficiais do EXE/MSI. Sequência: literal → run success no
+# SHA → branch não moveu → Worker de produção íntegro (j4, read-only) →
+# artifacts ids/digests exatos → tag/release livres → baixa artifacts +
+# confere hashes byte a byte + VERSAO-DESKTOP → cria tag+release (draft=false,
+# prerelease=false, latest=false) com EXE+MSI+SHA256SUMS+VERSAO+RELATORIO →
+# verifica flags/assets/target → SMOKE: re-baixa da release e reconfere hashes
+# → confirma 1.0.168 intacta. NÃO builda, NÃO deploya, NÃO toca 1.0.168.
+# =====================================================================
+name: "[manual] F3.3.74K Desktop Release — produção controlada 1.0.174 (gated)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-DESKTOP-1.0.174-74K para autorizar a publicação"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: f3374k-desktop-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "29656441708"
+      TARGET_SHA: "b6b800c889d82f71ac27f18a31ae6502f96f155d"
+      DESK_BRANCH: "desktop/f3374k-1.0.174-production"
+      WORKER_URL: "https://idseven-push.agidseven.workers.dev"
+      WORKER_VERSION: "V64.59-c20-failopen-j4-roteiro-portal"
+      TAG: "desktop/v1.0.174-production"
+      TITLE: "Agenda ID Seven Desktop 1.0.174 — Produção Controlada"
+      OLD_TAG: "desktop/v1.0.168-production"
+      ART_INST: "agenda-id-seven-desktop-1.0.174-installer"
+      ART_INST_ID: "8433040597"
+      ART_INST_DIGEST: "sha256:b6b2a61ffca20aae2a9aa4921d40438090b952898af2824b6bbd79c4ea47dfb4"
+      ART_BUNDLE: "agenda-id-seven-desktop-1.0.174-bundle"
+      ART_BUNDLE_ID: "8433042465"
+      ART_BUNDLE_DIGEST: "sha256:220ae9ded3028ea144ec54b8d759bea675645acf9c8d80269b7f985c72757472"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.174-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.174-x64.msi"
+      EXP_EXE: "4940f8a6374ee26a90cfb6d2e67b1bdf01b0663b01474b48aacd43d148aff276"
+      EXP_MSI: "160a1d315206d86e1e1fc36701d3f2513ef8e077d45732f9c75eb45a5b81a947"
+    steps:
+      - name: "Gate 1 — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "PUBLICAR-DESKTOP-1.0.174-74K" ] || { echo "::error::confirmação inválida — nada publicado"; exit 1; }
+          echo "OK"
+
+      - name: "Gate 2 — run success no SHA pinado (desktop-build.yml)"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion + "|" + .head_sha')"
+          WP="$(echo "$J" | jq -r '.path')"; BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run: $ST | $WP | $BR"
+          [ "$ST" = "completed|success|$TARGET_SHA" ] || { echo "::error::run inválido"; exit 1; }
+          [ "$WP" = ".github/workflows/desktop-build.yml" ] || { echo "::error::run não é do desktop-build"; exit 1; }
+          [ "$BR" = "$DESK_BRANCH" ] || { echo "::error::run não veio da branch 74K"; exit 1; }
+
+      - name: "Gate 3 — branch 74K não se moveu"
+        run: |
+          set -euo pipefail
+          D="$(gh api "repos/$REPO/git/ref/heads/$DESK_BRANCH" --jq '.object.sha')"
+          echo "desktop: $D"
+          [ "$D" = "$TARGET_SHA" ] || { echo "::error::branch 74K moveu após aprovação — NO-GO"; exit 1; }
+
+      - name: "Gate 4 — Worker de produção íntegro (j4; read-only; sem deploy)"
+        run: |
+          set -euo pipefail
+          V="$(curl -sS --max-time 25 "$WORKER_URL/" | jq -r '.version')"
+          echo "worker ao vivo: $V"
+          [ "$V" = "$WORKER_VERSION" ] || { echo "::error::Worker de produção divergente ($V) — NO-GO"; exit 1; }
+
+      - name: "Gate 5 — artifacts do run: ids + digests exatos"
+        run: |
+          set -euo pipefail
+          A="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts")"
+          I="$(echo "$A" | jq -r --arg n "$ART_INST" '.artifacts[] | select(.name==$n) | (.id|tostring) + "|" + .digest + "|" + (.expired|tostring)')"
+          B="$(echo "$A" | jq -r --arg n "$ART_BUNDLE" '.artifacts[] | select(.name==$n) | (.id|tostring) + "|" + .digest + "|" + (.expired|tostring)')"
+          echo "installer: $I"; echo "bundle   : $B"
+          [ "$I" = "$ART_INST_ID|$ART_INST_DIGEST|false" ] || { echo "::error::artifact installer divergente — NO-GO"; exit 1; }
+          [ "$B" = "$ART_BUNDLE_ID|$ART_BUNDLE_DIGEST|false" ] || { echo "::error::artifact bundle divergente — NO-GO"; exit 1; }
+
+      - name: "Gate 6 — tag/release novas livres; 1.0.168 intacta"
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then echo "::error::tag $TAG já existe"; exit 1; fi
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG já existe"; exit 1; fi
+          gh release view "$OLD_TAG" -R "$REPO" --json tagName >/dev/null 2>&1 || { echo "::error::release 1.0.168 sumiu — abortar"; exit 1; }
+          echo "OK: 1.0.174 livre; 1.0.168 presente"
+
+      - name: "Baixar os DOIS artifacts do run"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D inst
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_BUNDLE" -D bund
+          ls -lh inst bund
+          for f in "inst/$EXE_NAME" "inst/$MSI_NAME" "bund/$EXE_NAME" "bund/$MSI_NAME" "bund/VERSAO-DESKTOP.txt" "bund/RELATORIO-DESKTOP.txt"; do
+            test -f "$f" || { echo "::error::ausente: $f"; exit 1; }
+          done
+
+      - name: "Gate 7 — SHA-256 oficiais + VERSAO-DESKTOP (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          HIE="$(sha256sum "inst/$EXE_NAME" | awk '{print $1}')"; HIM="$(sha256sum "inst/$MSI_NAME" | awk '{print $1}')"
+          HBE="$(sha256sum "bund/$EXE_NAME" | awk '{print $1}')"; HBM="$(sha256sum "bund/$MSI_NAME" | awk '{print $1}')"
+          echo "inst exe=$HIE msi=$HIM"; echo "bund exe=$HBE msi=$HBM"
+          for h in "$HIE" "$HBE"; do [ "$h" = "$EXP_EXE" ] || { echo "::error::hash EXE divergente"; exit 1; }; done
+          for h in "$HIM" "$HBM"; do [ "$h" = "$EXP_MSI" ] || { echo "::error::hash MSI divergente"; exit 1; }; done
+          V="$(tr -d '\r' < bund/VERSAO-DESKTOP.txt)"; echo "$V"
+          echo "$V" | grep -q '^versionName : 1\.0\.174$' || { echo "::error::versionName != 1.0.174"; exit 1; }
+          echo "$V" | grep -q "^commit      : $TARGET_SHA\$" || { echo "::error::commit errado"; exit 1; }
+          VE="$(echo "$V" | grep '^SHA-256 exe' | grep -oE '[0-9a-f]{64}')"; VM="$(echo "$V" | grep '^SHA-256 msi' | grep -oE '[0-9a-f]{64}')"
+          [ "$VE" = "$EXP_EXE" ] && [ "$VM" = "$EXP_MSI" ] || { echo "::error::hashes internos do VERSAO-DESKTOP divergem"; exit 1; }
+          echo "OK: hashes byte a byte conferem"
+
+      - name: "SHA256SUMS"
+        run: |
+          set -euo pipefail
+          mkdir -p pacote
+          cp "inst/$EXE_NAME" "inst/$MSI_NAME" bund/VERSAO-DESKTOP.txt bund/RELATORIO-DESKTOP.txt pacote/
+          (cd pacote && sha256sum "$EXE_NAME" "$MSI_NAME" VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt > SHA256SUMS && sha256sum -c SHA256SUMS)
+          cat pacote/SHA256SUMS
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          **Produção controlada** — Desktop **1.0.174** derivada da fonte funcional **fisicamente aprovada** 1.0.174-QA (F3.3.74E/74K), removendo exclusivamente versão/banner de QA. **Substitui a 1.0.168** como versão oficial do Desktop. Instalar somente em máquinas autorizadas, após conferência de hash; **sem marcar como *latest***.
+
+          ## O que há nesta versão
+          - **Card Premium de Cronograma restaurado** (contrato conhecido-como-bom) e **Card Premium de Roteiro** com arte própria "Roteiro de gravação de vídeos".
+          - **Prewarm é bônus, nunca gate**: o botão de enviar ao WhatsApp nasce habilitado e o clique abre o WhatsApp imediatamente (fim da regressão C18C).
+          - **Portal de aprovação de Roteiro com apenas Tema e Legenda** (Worker j4): sem PEÇAS/Feed/Story; Cronograma preserva sua estrutura de peças.
+          - Mensagem/domínio/rota/token do link intactos; nenhuma dependência de native-share/Windows Share/Canvas no caminho principal.
+
+          ## Compatibilidade com o Worker em produção
+          - Worker: `V64.59-c20-failopen-j4-roteiro-portal` (fail-open + portal de Roteiro Tema+Legenda). Esta publicação **não** executa deploy de Worker (verificado read-only no gate desta release).
+
+          ## Preservado (regressões protegidas)
+          - Login/logout, tray/bandeja, Kanban/Board, Agenda, notificações, Equipe, Configurações, criação de tarefas por Setor, portal do cliente e aprovação — intactos (gate de invariância app.asar QA×produção: único delta funcional = versão + banner).
+
+          ## Artefatos e hashes oficiais (SHA-256)
+          | Arquivo | SHA-256 |
+          |---|---|
+          | `Agenda-ID-Seven-Desktop-1.0.174-x64.exe` | `4940f8a6374ee26a90cfb6d2e67b1bdf01b0663b01474b48aacd43d148aff276` |
+          | `Agenda-ID-Seven-Desktop-1.0.174-x64.msi` | `160a1d315206d86e1e1fc36701d3f2513ef8e077d45732f9c75eb45a5b81a947` |
+
+          Anexos de conferência: `SHA256SUMS` (`sha256sum -c SHA256SUMS`), `VERSAO-DESKTOP.txt`, `RELATORIO-DESKTOP.txt`.
+
+          ## Instalação (somente máquinas autorizadas)
+          1. Baixe o `.exe` (ou `.msi`).
+          2. Confira o hash: `certutil -hashfile "Agenda-ID-Seven-Desktop-1.0.174-x64.exe" SHA256` — deve ser **exatamente** o da tabela. Se divergir, **não instale**.
+          3. Feche o app atual (bandeja → **Sair**) e execute o instalador. SmartScreen: **"Mais informações" → "Executar assim mesmo"**.
+          4. Após instalar, confirme **1.0.174** em Configurações → Sobre.
+
+          ## ⚠️ Smart App Control / assinatura
+          Instalador **não assinado** nesta fase — em Windows 11 com Smart App Control ativo pode ser bloqueado. Instale só em máquinas autorizadas, após conferência de hash.
+
+          ## Rollback (oficial: 1.0.168)
+          - Release preservada: `desktop/v1.0.168-production` (commit `4fb0a7f`).
+            - EXE `299162a0686ed683c0749833e833034c997f5040be66d21b2bd333630ae6e1da`
+            - MSI `a761317408286acba86b9a01d8e6231cbf43967c3f0b880d3581c4f5e7b25b99`
+          - Procedimento: bandeja → **Sair** → desinstalar a 1.0.174 → instalar a 1.0.168 pela release preservada → conferir hash → login. Dados preservados no Firebase.
+
+          ## Fora desta release
+          - PWA fora do produto; Android pausado; nenhuma alteração de backend (Worker/DNS/Functions/Rules/Hosting) nesta release.
+
+          ## Procedência
+          - Build: **desktop-build (Windows)** run `29656441708`, success; fonte `desktop/f3374k-1.0.174-production` @ `b6b800c`.
+          - Gate app.asar QA×produção (run `29656718630`): renderer idêntico ao 1.0.174-QA a menos do banner; main/preload compilados byte-idênticos.
+          NOTAS
+          wc -l notas.md
+
+      - name: "Publicar produção controlada (draft=false, prerelease=false, latest=false)"
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$TARGET_SHA" --latest=false \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt" "pacote/RELATORIO-DESKTOP.txt"
+          echo "publicado: $TAG"
+
+      - name: "Verificação pós-publicação"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" --json databaseId,tagName,targetCommitish,isPrerelease,isLatest,isDraft,url,assets \
+            --jq '{id:.databaseId,tag:.tagName,target:.targetCommitish,prerelease:.isPrerelease,latest:.isLatest,draft:.isDraft,url:.url,assets:[.assets[]|{name,size}]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft,isLatest --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)+"|"+(.isLatest|tostring)')"
+          [ "$FLAGS" = "false|false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "5" ] || { echo "::error::esperado 5 assets, achei $N"; exit 1; }
+          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
+          [ "$TGT" = "$TARGET_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+
+      - name: "FASE 14 — download smoke (re-baixa da release e reconfere) + 1.0.168 intacta"
+        run: |
+          set -euo pipefail
+          mkdir -p smoke
+          gh release download "$TAG" -R "$REPO" -p "$EXE_NAME" -p "$MSI_NAME" -D smoke
+          SE="$(sha256sum "smoke/$EXE_NAME" | awk '{print $1}')"; SM="$(sha256sum "smoke/$MSI_NAME" | awk '{print $1}')"
+          echo "smoke exe=$SE msi=$SM"
+          [ "$SE" = "$EXP_EXE" ] && [ "$SM" = "$EXP_MSI" ] || { echo "::error::SMOKE: hash da release divergiu — remover release/tag 1.0.174 e investigar"; exit 1; }
+          # 1.0.168 preservada e imutável
+          O="$(gh release view "$OLD_TAG" -R "$REPO" --json tagName,isDraft,assets --jq '.tagName+"|"+(.isDraft|tostring)+"|"+(.assets|length|tostring)')"
+          echo "1.0.168: $O"
+          case "$O" in "$OLD_TAG"|false|*) : ;; *) echo "::error::1.0.168 alterada"; exit 1;; esac
+          echo "===== GO: PRODUÇÃO CONTROLADA 1.0.174 PUBLICADA E VALIDADA (1.0.168 preservada) ====="
