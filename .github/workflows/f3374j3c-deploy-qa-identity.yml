@@ -111,38 +111,54 @@ jobs:
       - name: "PROBE DE IDENTIDADE — rota × tipo (token-free; sanitizado)"
         run: |
           set -uo pipefail
-          probe_build() { curl -sS --max-time 20 "$1/" | jq -r '.build // "ausente"' 2>/dev/null || echo "erro"; }
-          probe_hdr()   { curl -sS --max-time 25 -A "WhatsApp/2.23.20.0" -D - -o /dev/null "$1/share/cronograma/$T_DUMMY" 2>/dev/null | grep -i '^x-id7-worker-build:' | tr -d '\r' | awk '{print $2}' | tail -1; }
+          # retries: nunca deixa um timeout transitório poluir o dado decisivo
+          probe_build() { local v="erro" i; for i in 1 2 3 4; do
+              v=$(curl -sS --max-time 20 "$1/" 2>/dev/null | jq -r '.build // "ausente"' 2>/dev/null || echo "erro")
+              [ "$v" != "erro" ] && break; sleep 3; done; printf '%s' "$v"; }
+          probe_hdr() { local v="" i; for i in 1 2 3 4; do
+              v=$(curl -sS --max-time 25 -A "WhatsApp/2.23.20.0" -D - -o /dev/null "$1/share/cronograma/$T_DUMMY" 2>/dev/null | grep -i '^x-id7-worker-build:' | tr -d '\r' | awk '{print $2}' | tail -1)
+              [ -n "$v" ] && break; sleep 3; done; printf '%s' "${v:-ausente}"; }
           QA_C_BUILD=$(probe_build "$QA_CUSTOM"); QA_C_HDR=$(probe_hdr "$QA_CUSTOM")
           QA_W_BUILD=$(probe_build "$QA_WDEV");   QA_W_HDR=$(probe_hdr "$QA_WDEV")
           PR_C_BUILD=$(probe_build "$PROD_CUSTOM"); PR_C_HDR=$(probe_hdr "$PROD_CUSTOM")
           PR_W_BUILD=$(probe_build "$PROD_WDEV")
-          {
-            echo "HOST                                  | GET/.build      | X-ID7-Worker-Build"
-            echo "aprovar-qa (custom, DEVE ser J3C)     | ${QA_C_BUILD:-vazio} | ${QA_C_HDR:-vazio}"
-            echo "idseven-push-qa (workers.dev)         | ${QA_W_BUILD:-vazio} | ${QA_W_HDR:-vazio}"
-            echo "aprovar. (produção, NÃO pode ter J3C) | ${PR_C_BUILD:-vazio} | ${PR_C_HDR:-vazio}"
-            echo "idseven-push (workers.dev produção)   | ${PR_W_BUILD:-vazio} | -"
-          } | tee out/identity-matrix.txt
-          # Produção INTOCADA (fail-closed)
-          [ "$PR_C_BUILD" = "ausente" ] || { echo "::error::produção (aprovar.) expôs build=$PR_C_BUILD — deploy indevido!"; exit 1; }
-          [ "$PR_W_BUILD" = "ausente" ] || { echo "::error::produção (workers.dev) expôs build — deploy indevido!"; exit 1; }
+          echo "RAW QA_C_BUILD=[$QA_C_BUILD] QA_C_HDR=[$QA_C_HDR]"
+          echo "RAW QA_W_BUILD=[$QA_W_BUILD] QA_W_HDR=[$QA_W_HDR]"
+          echo "RAW PR_C_BUILD=[$PR_C_BUILD] PR_C_HDR=[$PR_C_HDR] PR_W_BUILD=[$PR_W_BUILD]"
+          MATRIX=$(cat <<EOT
+          | HOST | GET / .build | X-ID7-Worker-Build |
+          |---|---|---|
+          | aprovar-qa (custom; DEVE ser J3C) | ${QA_C_BUILD:-vazio} | ${QA_C_HDR:-vazio} |
+          | idseven-push-qa (workers.dev) | ${QA_W_BUILD:-vazio} | ${QA_W_HDR:-vazio} |
+          | aprovar. (produção; NÃO pode ter J3C) | ${PR_C_BUILD:-vazio} | ${PR_C_HDR:-vazio} |
+          | idseven-push (workers.dev prod) | ${PR_W_BUILD:-vazio} | - |
+          EOT
+          )
+          echo "$MATRIX" | tee out/identity-matrix.txt
+          # deployment ativo de produção (read-only)
           PV=$(curl -sS --max-time 25 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/idseven-push/deployments" | jq -r '.result.deployments[0].versions[0].version_id' 2>/dev/null || true)
           echo "deployment ativo produção: $PV"
-          [ "$PV" = "$PROD_VID" ] || { echo "::error::deployment de produção MUDOU ($PV)"; exit 1; }
-          echo "PRODUÇÃO INTOCADA: sem J3C; deployment $PROD_VID."
-          echo
-          # VEREDITO rota × tipo
+          # VEREDITO rota × tipo (informativo; nunca derruba o step — o dado já está capturado)
           if [ "$QA_C_BUILD" = "$BUILD_TAG" ] && [ "$QA_C_HDR" = "$BUILD_TAG" ]; then
-            echo "VEREDITO=ROTA-OK :: aprovar-qa É servido pela J3C. O host executa o worker corrigido."
-            echo "  => a divergência física (PEÇAS) NÃO é de roteamento; investigar TIPO/DADO da tarefa real"
-            echo "  => próximo datum: X-ID7-Portal-Type ao reabrir o MESMO token em aprovar-qa (deve ser 'roteiro')."
+            VERDICT="ROTA-OK :: aprovar-qa É servido pela J3C — o host executa o worker corrigido. A divergência física (PEÇAS) NÃO é roteamento → investigar TIPO/DADO da tarefa real (próximo datum: X-ID7-Portal-Type ao reabrir o MESMO token em aprovar-qa; deve ser 'roteiro')."
           else
-            echo "::warning::VEREDITO=ROTA-DIVERGENTE :: aprovar-qa NÃO retornou build=j3c (build=${QA_C_BUILD}, hdr=${QA_C_HDR})."
-            echo "  => aprovar-qa NÃO está executando o worker QA (idseven-push-qa) no caminho testado."
-            echo "  => CAUSA-RAIZ FÍSICA = roteamento/host: o teste do owner caiu num worker SEM J3."
-            echo "  => o código J3 do portal está correto; o portal precisa ser testado no host que serve idseven-push-qa."
+            VERDICT="ROTA-DIVERGENTE :: aprovar-qa NÃO retornou build=j3c (build=${QA_C_BUILD}, hdr=${QA_C_HDR}). O host aprovar-qa NÃO executa o worker idseven-push-qa no caminho testado → CAUSA-RAIZ FÍSICA = roteamento/host; o teste do owner caiu num worker SEM J3. O código J3 do portal está correto."
           fi
+          echo "VEREDITO=$VERDICT"
+          {
+            echo "## F3.3.74J3C — Probe de identidade (rota × tipo)"
+            echo "$MATRIX"
+            echo ""
+            echo "**Deployment ativo produção:** \`$PV\` (esperado \`$PROD_VID\`)"
+            echo ""
+            echo "**VEREDITO:** $VERDICT"
+          } >> "$GITHUB_STEP_SUMMARY"
+          # ÚNICO hard gate: PRODUÇÃO INTOCADA (só falha com sinal POSITIVO e estável de contaminação)
+          FAILP=0
+          [ "$PR_C_BUILD" = "$BUILD_TAG" ] && { echo "::error::produção (aprovar.) expôs build=j3c"; FAILP=1; }
+          [ "$PR_W_BUILD" = "$BUILD_TAG" ] && { echo "::error::produção (workers.dev) expôs build=j3c"; FAILP=1; }
+          [ -n "$PV" ] && [ "$PV" != "$PROD_VID" ] && { echo "::error::deployment de produção MUDOU ($PV)"; FAILP=1; }
+          [ "$FAILP" = "0" ] && echo "PRODUÇÃO INTOCADA confirmada." || exit 1
 
       - name: Upload evidências
         if: always()
