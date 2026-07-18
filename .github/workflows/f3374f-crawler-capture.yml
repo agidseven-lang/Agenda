@@ -107,9 +107,11 @@ jobs:
           # nunca prova). QA (fail-open) espera 200; produção (fail-closed c20)
           # espera 404 determinístico para token sintético.
           if [ "$SVC" = "idseven-push-qa" ]; then
-            PHOST="aprovar-qa.agendaidseven.com.br"; PEXP=200
+            PHOST="aprovar-qa.agendaidseven.com.br"; PEXPS="200"
           else
-            PHOST="aprovar.agendaidseven.com.br"; PEXP=404
+            # produção: 200 pós-74J (fail-open) ou 404 se rollback c20 — ambos
+            # determinísticos; o gate exige que o MESMO status apareça no tail
+            PHOST="aprovar.agendaidseven.com.br"; PEXPS="200 404"
           fi
           npx --yes wrangler@3 --version >/dev/null 2>&1 || true
           ( npx --yes wrangler@3 tail "$SVC" --format json > out/raw.jsonl 2> out/tail-err.txt ) &
@@ -132,8 +134,9 @@ jobs:
           PTOK=$(printf %s "F3374H2-${PROBE_ID}" | sha256sum | cut -c1-48)
           PUA="F3374H2-TailProbe/${PROBE_ID}"
           PST=$(curl -sS --max-time 25 -A "$PUA" -o /dev/null -w '%{http_code}' "https://$PHOST/share/cronograma/$PTOK" || echo err)
-          echo "resposta da sonda HTTP $PST (esperado $PEXP; token <tok:$(printf %s "$PTOK" | sha256sum | cut -c1-8)>; UA=$PUA)"
-          [ "$PST" = "$PEXP" ] || { echo "::error::self-probe não obteve HTTP $PEXP na borda — abortando (sem janela)"; exit 1; }
+          echo "resposta da sonda HTTP $PST (aceitos: $PEXPS; token <tok:$(printf %s "$PTOK" | sha256sum | cut -c1-8)>; UA=$PUA)"
+          case " $PEXPS " in *" $PST "*) : ;; *) echo "::error::self-probe não obteve status aceito ($PEXPS) na borda — abortando (sem janela)"; exit 1;; esac
+          PEXP="$PST"
           # GATE: o evento da sonda tem de estar no STREAM (parser JSONDecoder;
           # wrangler emite pretty-printed) — até 90s
           export PTOK PUA PHOST PEXP
