@@ -751,3 +751,56 @@ dada (host QA + `/share/*` da produção para contraste, paths sanitizados) e, c
 Rollback integral do host QA (se ordenado): `DELETE /accounts/<acct>/workers/domains/`
 `4bc9b2d4d35a301a7d8787ed97429201bee75cc4` — remove DNS+cert+vínculo de uma vez;
 nada mais foi criado nesta fase.
+
+## ADENDO 74I — CAUSA-RAIZ CONSOLIDADA + CANÁRIO DE ROTA EXATA PRONTO (bloqueado por 1 permissão)
+
+**Fato físico novo (mandato 74I):** run #14 (`29584936565`) — colagem no host custom QA
+com observador PROVADO (TAIL_ATTACH_PROVADO + SELF_PROBE_CAPTURED=1) terminou com
+`externos=0`. Com a 74G (zero em workers.dev × bursts reais em `aprovar.` no teste
+noturno), fica demonstrado por contraste: **o WhatsApp busca o host histórico e não
+busca hosts novos** — a validação física do fail-open TEM de acontecer em `aprovar.`.
+
+**Causa-raiz consolidada (cadeia sob nosso controle, evidência primária):**
+1. Desktop C18C `2bcad42` — gate de prewarm matou o clique (corrigido: 1.0.174-QA, 37/37).
+2. Worker c20 (deploy #78) — `handleShareCard` não-resolvido passou de fail-open
+   (200+OG, provado até 15/07 no C18E run 6) para fail-closed (404, ZERO OG) — no
+   ÚNICO host que o crawler busca. Correção cirúrgica pronta e provada na borda QA:
+   `worker/f3374f-share-og-failopen-candidate @ d134193` (V64.59-c20-failopen-74f).
+
+**Canário FASE 7/8 (workflow `f3374i-canary-exact-route.yml`, main `7e27626`):** cria
+rota EXATA `aprovar.agendaidseven.com.br/share/cronograma/<tok:1b96d7a8>` →
+`idseven-push-qa`, prova isolamento comportamental em 5 checagens (token irmão segue
+404 produção; raiz/portal/imagem intactos), tail autovalidado por self-probe (74H2),
+captura classificada (`self_probe` × `external`) e REMOVE a rota em `always()` com
+prova de reversão. Token canário público/sintético/sem capacidade:
+`dedec9f4f5aafc33a9bcc56f49e6cf7092d4cba8bfc1d7f0`.
+
+**Run de validação #1 (`29641775269`):** o POST da rota respondeu
+`[{"code":10000,"message":"Authentication error"}]` — o token CF do CI **não tem
+"Zone → Workers Routes → Edit"**. Fail-safe comprovado no mesmo run: nada criado,
+canário seguiu 404 (produção), produção intacta, artifact ok.
+
+### PENDÊNCIAS EXATAS PARA A EQUIPE (destravam a prova final)
+1. **Adicionar ao token CF do CI:** `Zone → Workers Routes → Edit` (zona
+   agendaidseven.com.br) — destrava o canário (FASE 7-9 do 74I).
+2. (Da 74H, opcional mas recomendado) `Zone → Analytics → Read` — auditoria pós-fato
+   com UA/ASN sem coordenação de janela.
+
+### RUNBOOK DA ÚNICA PROVA FÍSICA (após a permissão 1)
+1. Actions → "[manual] F3.3.74I Canário rota exata (host histórico)" → Run com
+   `confirm=CANARIO-74I`, `window_minutes=30`.
+2. Aguardar no log: isolamento provado → `TAIL_ATTACH_PROVADO` →
+   `SELF_PROBE_CAPTURED=1` → `JANELA ATIVA`.
+3. Colar SOZINHO no WhatsApp Business (grupo QA), aguardando até 30 s antes de enviar:
+   `https://aprovar.agendaidseven.com.br/share/cronograma/dedec9f4f5aafc33a9bcc56f49e6cf7092d4cba8bfc1d7f0`
+4. Registrar captura de tela. O log classifica requests `[external]` (UA/ASN/status/
+   imagem); a rota é removida automaticamente ao fim (mesmo com erro/cancelamento).
+5. Leitura: card aparece ⇒ causa fechada de ponta a ponta (fail-closed era o único
+   bloqueio no host real) → preparar promoção mínima (fail-open produção + Desktop
+   1.0.174) com canário/rollback — só com autorização expressa. Card não aparece mas
+   request 200+OG+imagem capturado ⇒ classe C com evidência primária completa para a
+   FASE 10 (comparação com baseline). Zero request até em `aprovar.` ⇒ refuta a tese
+   de host e aponta o cliente WhatsApp — decidir com a captura em mãos.
+
+Candidato único (FASE 14): **já existe** — Desktop 1.0.174-QA (74E) + Worker QA
+fail-open d134193. Nenhum build novo será gerado sem causa adicional comprovada.
