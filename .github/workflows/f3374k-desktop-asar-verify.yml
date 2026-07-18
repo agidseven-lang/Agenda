@@ -1,0 +1,170 @@
+# =====================================================================
+# [manual] F3.3.74K — GATE DO APP.ASAR (runtime empacotado) + COMPARAÇÃO QA×PROD.
+#
+# FASE 8 (runtime empacotado) + FASE 9 (comparação QA×produção). Extrai o
+# app.asar de DENTRO do EXE de PRODUÇÃO 1.0.174 (build 74K) e do EXE da
+# 1.0.174-QA fisicamente aprovada (run 29542929297), e prova no runtime REAL:
+#   • produção: versão 1.0.174, SEM banner QA, contrato restaurado intacto
+#     (mensagem/domínio/rota/token), sem C18C, sem native-share/Windows Share/
+#     Canvas no caminho principal;
+#   • comparação: o renderer (onde vivem TODOS os handlers WhatsApp/token/
+#     mensagens/Kanban/login/tray/notif/Cronograma/Roteiro) da produção é
+#     IDÊNTICO ao da QA a MENOS da linha do banner; package.json difere só na
+#     versão; main/preload compilados byte-idênticos.
+# Somente leitura de artifacts; nenhuma release, nenhum deploy.
+# =====================================================================
+name: "[manual] F3.3.74K Desktop app.asar verify (runtime + QA×prod)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      prod_run_id:
+        description: "Run ID do build de PRODUÇÃO 1.0.174 (desktop-build na branch 74K)"
+        required: true
+      qa_run_id:
+        description: "Run ID do build 1.0.174-QA aprovado"
+        required: true
+        default: "29542929297"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: f3374k-asar-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ferramentas (7zip)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full >/dev/null
+
+      - name: Baixar instalador de PRODUÇÃO (1.0.174)
+        uses: actions/download-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.174-installer
+          path: prod-dl
+          run-id: ${{ github.event.inputs.prod_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Baixar instalador 1.0.174-QA (aprovado)
+        uses: actions/download-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.174-QA-installer
+          path: qa-dl
+          run-id: ${{ github.event.inputs.qa_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Extrair app.asar dos dois EXE e o renderer real"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          extract_asar() { # $1=exe  $2=destdir
+            local exe="$1" dest="$2" t1 t2 asar
+            rm -rf "$dest"; mkdir -p "$dest/l1" "$dest/l2" "$dest/asarx"
+            7z x -y "$exe" -o"$dest/l1" >/dev/null 2>&1 || true
+            local inner
+            inner=$(find "$dest/l1" -iname 'app-64.7z' -o -iname 'app.7z' | head -1)
+            if [ -n "$inner" ]; then 7z x -y "$inner" -o"$dest/l2" >/dev/null 2>&1 || true; fi
+            asar=$(find "$dest/l1" "$dest/l2" -iname 'app.asar' 2>/dev/null | head -1)
+            [ -n "$asar" ] || { echo "::error::app.asar não encontrado em $exe"; exit 1; }
+            echo "app.asar de $(basename "$exe"): $asar ($(wc -c < "$asar") bytes)"
+            npx --yes @electron/asar extract "$asar" "$dest/asarx"
+            cp "$asar" "$dest/app.asar"
+          }
+          PEXE=$(ls prod-dl/Agenda-ID-Seven-Desktop-*.exe | head -1)
+          QEXE=$(ls qa-dl/Agenda-ID-Seven-Desktop-*.exe | head -1)
+          echo "PROD EXE: $PEXE"; echo "QA EXE: $QEXE"
+          sha256sum "$PEXE" "$QEXE" | tee out/exe-hashes.txt
+          extract_asar "$PEXE" out/prod
+          extract_asar "$QEXE" out/qa
+          sha256sum out/prod/app.asar out/qa/app.asar | tee out/asar-hashes.txt
+
+      - name: "FASE 8 — gate do runtime EMPACOTADO (produção 1.0.174)"
+        run: |
+          set -euo pipefail
+          R="out/prod/asarx"
+          IDX="$R/src/renderer/index.html"
+          PKG="$R/package.json"
+          [ -f "$IDX" ] && [ -f "$PKG" ] || { echo "::error::renderer/package.json ausentes no app.asar de produção"; exit 1; }
+          V=$(node -p "require('./$PKG').version")
+          echo "versão empacotada (produção): $V"
+          [ "$V" = "1.0.174" ] || { echo "::error::versão empacotada != 1.0.174"; exit 1; }
+          # 1-3 identidade de produção
+          ! grep -qF 'AMBIENTE QA' "$IDX" || { echo "::error:: banner QA presente no pacote de produção"; exit 1; }
+          ! grep -qF 'NÃO USAR COM CLIENTES' "$IDX" || { echo "::error:: texto QA presente"; exit 1; }
+          ! grep -qF '1.0.174-QA' "$R" -r || { echo "::error:: sufixo -QA presente no pacote"; exit 1; }
+          # contrato restaurado intacto
+          grep -qF 'Acesse o link abaixo para revisar os temas, aprovar ou solicitar ajustes:' "$IDX" || { echo "::error:: mensagem aprovada AUSENTE"; exit 1; }
+          grep -qF 'https://aprovar.agendaidseven.com.br' "$IDX" || { echo "::error:: domínio oficial AUSENTE"; exit 1; }
+          grep -qF '/share/cronograma/' "$IDX" || { echo "::error:: rota oficial AUSENTE"; exit 1; }
+          grep -qF "return CLIENT_LINK_BASE+'/share/cronograma/'+t;" "$IDX" || { echo "::error:: token fora do pathname"; exit 1; }
+          # regressões proibidas (74E-1..12)
+          ! grep -qF 'id="btnOpenWaMain" disabled' "$IDX" || { echo "::error:: botão nasce disabled (C18C)"; exit 1; }
+          ! grep -qF 'if(!prepReady){ flashToast' "$IDX" || { echo "::error:: gate prepReady no clique (C18C)"; exit 1; }
+          ! grep -qF 'if(!_pw||!_pw.ok){ flashToast' "$IDX" || { echo "::error:: falha de prewarm aborta envio"; exit 1; }
+          ! grep -qF 'withWhatsAppPreviewBust(buildShareClientUrl' "$IDX" || { echo "::error:: cache-bust em uso"; exit 1; }
+          ! grep -qF 'nativeShare' "$IDX" || { echo "::error:: native-share no caminho principal"; exit 1; }
+          ! grep -qF 'buildNativeShareRequest' "$IDX" || { echo "::error:: Windows Share UI no caminho principal"; exit 1; }
+          { ! grep -qF 'buildPremiumCardImage' "$IDX" && ! grep -qF 'CARD_ART_B64_BY_TYPE' "$IDX"; } || { echo "::error:: Canvas/PNG nativo no caminho principal"; exit 1; }
+          echo "FASE 8 OK: runtime empacotado 1.0.174 sem QA, contrato restaurado intacto, regressões ausentes."
+
+      - name: "FASE 9 — comparação app.asar QA × PRODUÇÃO (só banner+versão)"
+        run: |
+          set -euo pipefail
+          PR="out/prod/asarx"; QR="out/qa/asarx"
+          # 1) RENDERER: onde vivem TODOS os handlers. Produção == QA menos a linha do banner.
+          python3 - <<'PY'
+          import sys
+          qa=open('out/qa/asarx/src/renderer/index.html',encoding='utf-8').read().split('\n')
+          pr=open('out/prod/asarx/src/renderer/index.html',encoding='utf-8').read().split('\n')
+          bidx=[i for i,l in enumerate(qa) if 'banner permanente de QA' in l and 'AMBIENTE QA' in l]
+          assert len(bidx)==1, f'banner no QA: {len(bidx)}'
+          qa_minus=[l for i,l in enumerate(qa) if i!=bidx[0]]
+          if qa_minus==pr:
+              print('RENDERER: produção == QA menos a linha do banner (todos os handlers byte-idênticos)')
+          else:
+              # diagnóstico das primeiras divergências
+              import difflib
+              d=list(difflib.unified_diff(qa_minus,pr,lineterm='',n=0))[:40]
+              print('::error:: renderer diverge além do banner:')
+              print('\n'.join(d)); sys.exit(1)
+          PY
+          # 2) package.json: só a versão difere
+          python3 - <<'PY'
+          import json,sys
+          qa=json.load(open('out/qa/asarx/package.json')); pr=json.load(open('out/prod/asarx/package.json'))
+          assert qa['version']=='1.0.174-QA' and pr['version']=='1.0.174', (qa['version'],pr['version'])
+          qa['version']=pr['version']=None
+          assert json.dumps(qa,sort_keys=True)==json.dumps(pr,sort_keys=True), 'package.json diverge além da versão'
+          print('package.json: idêntico exceto version (1.0.174-QA -> 1.0.174)')
+          PY
+          # 3) main/preload COMPILADOS byte-idênticos (mesma fonte .ts)
+          for f in dist/main/main.js dist/preload/preload.js; do
+            if [ -f "$QR/$f" ] && [ -f "$PR/$f" ]; then
+              if cmp -s "$QR/$f" "$PR/$f"; then echo "$f: byte-idêntico QA×prod"; else echo "::error:: $f diverge (compilado)"; exit 1; fi
+            fi
+          done
+          # 4) inventário de arquivos: mesmo conjunto (fora node_modules, que segue o lock idêntico)
+          ( cd "$QR" && find . -type f -not -path './node_modules/*' | sort ) > out/qa-files.txt
+          ( cd "$PR" && find . -type f -not -path './node_modules/*' | sort ) > out/prod-files.txt
+          if cmp -s out/qa-files.txt out/prod-files.txt; then echo "inventário de arquivos (app, sem node_modules): IDÊNTICO"; else echo "::error:: conjunto de arquivos do app divergiu:"; diff out/qa-files.txt out/prod-files.txt | head; exit 1; fi
+          # 5) hash de cada arquivo do app (sem node_modules) — diferenças permitidas SÓ em index.html e package.json
+          ( cd "$QR" && find . -type f -not -path './node_modules/*' -exec sha256sum {} \; | sort -k2 ) > out/qa-hashes.txt
+          ( cd "$PR" && find . -type f -not -path './node_modules/*' -exec sha256sum {} \; | sort -k2 ) > out/prod-hashes.txt
+          DIFFS=$(diff <(cut -c1-64,67- out/qa-hashes.txt) <(cut -c1-64,67- out/prod-hashes.txt) | grep -E '^[<>]' | awk '{print $3}' | sort -u || true)
+          echo "arquivos do app com hash divergente:"; echo "$DIFFS"
+          UNEXPECTED=$(echo "$DIFFS" | grep -vE './src/renderer/index.html$|./package.json$' | grep -v '^$' || true)
+          [ -z "$UNEXPECTED" ] || { echo "::error:: divergência funcional NÃO autorizada:"; echo "$UNEXPECTED"; exit 1; }
+          echo "FASE 9 OK: a ÚNICA divergência funcional é index.html (banner) + package.json (versão)."
+
+      - name: Upload evidências (hashes/inventários; sem binários)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374k-asar-verify-evidence
+          path: |
+            out/*.txt
+          retention-days: 90
