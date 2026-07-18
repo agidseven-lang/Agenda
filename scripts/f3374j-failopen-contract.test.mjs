@@ -25,7 +25,11 @@ function constObj(name) { const st = SRC.indexOf('const ' + name + ' = {'); if (
 const constLine = (name) => { const m = SRC.match(new RegExp('const ' + name + ' = "[^"]*";')); if (!m) throw new Error('const ' + name); return m[0]; };
 
 const hasUnavailable = /function shareUnavailableHtml/.test(SRC);
+// F3.3.74J3C — const de identidade (build). handleShareCard passou a emitir o header
+// X-ID7-Worker-Build; incluí-la no CORE para o micro-exec não quebrar (não existe na c20).
+const hasBuild = /const WORKER_BUILD = /.test(SRC);
 const CORE =
+  (hasBuild ? constLine('WORKER_BUILD') + '\n' : 'const WORKER_BUILD = "";\n') +
   constLine('OG_IMG_PATH') + '\n' + constLine('OG_IMG_PATH_ROTEIRO') + '\n' +
   constObj('PREMIUM_TYPES') + '\n' +
   fnSrc('premiumTypeOf') + '\n' + fnSrc('escapeHtml') + '\n' +

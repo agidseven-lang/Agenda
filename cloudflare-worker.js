@@ -126,6 +126,11 @@ const PREMIUM_TYPES = {
     },
   },
 };
+// F3.3.74J3C — marcador de BUILD do worker, exposto em headers/JSON de identidade
+// (nunca token/dado de cliente). Distingue inequivocamente ESTE worker no host que o
+// serviu — a string de VERSÃO é idêntica entre QA e produção, então versão sozinha não
+// prova qual runtime respondeu. Presença de build=j3c => é a candidata J3C.
+const WORKER_BUILD = "j3c-portal-fix";
 function premiumTypeOf(task) {
   const sec = (task && typeof task.sector === "string") ? task.sector.trim().toLowerCase() : "";
   return sec === "roteiro" ? PREMIUM_TYPES.roteiro : PREMIUM_TYPES.cronograma;
@@ -292,12 +297,14 @@ async function handleShareCard(request, env, ctx, url, token) {
         "X-Share-Cache": "bypass",
         "X-Share-Task": state,
         "X-Share-Type": "generic",
+        "X-ID7-Worker-Build": WORKER_BUILD,   // F3.3.74J3C — identidade do runtime (token-free)
         "Server-Timing": "share_lookup;dur=" + lookupMs,
       },
     });
     return res;
   }
   const res = htmlResponseCacheable(shareCardHtml(url.origin, token, ptype), 200);
+  res.headers.set("X-ID7-Worker-Build", WORKER_BUILD);   // F3.3.74J3C — identidade do runtime
   res.headers.set("X-Share-Cache", "miss");
   res.headers.set("X-Share-Task", "resolved");
   res.headers.set("X-Share-Type", ptype.key);
@@ -512,7 +519,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-74f" }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-74f", build: WORKER_BUILD }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1538,6 +1545,8 @@ async function handleClientCronogramaCrawler(token, env, origin) {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "public, max-age=300",
       "X-Content-Type-Options": "nosniff",
+      "X-ID7-Worker-Build": WORKER_BUILD,       // F3.3.74J3C — identidade do runtime
+      "X-ID7-Portal-Type": ptype.key,           // tipo canônico visto pelo card do portal
     },
   });
 }
@@ -1555,23 +1564,27 @@ async function handleClientCronogramaView(token, env, origin) {
     const task = await queryTaskByToken(env, accessToken, token);
     if (!task) {
       console.log(`[CLIENT-VIEW] token nao encontrado: ${token.slice(0, 6)}…`);
-      return htmlResponse(renderClientErrorHtml("Cronograma não encontrado",
-        "Este link pode ter sido invalidado ou ainda não foi compartilhado. Fale com sua equipe ID Seven.", origin), 404);
+      return htmlResponseId7(renderClientErrorHtml("Cronograma não encontrado",
+        "Este link pode ter sido invalidado ou ainda não foi compartilhado. Fale com sua equipe ID Seven.", origin), 404, null, "notfound");
     }
-    console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""}`);
+    // F3.3.74J3C — TIPO CANÔNICO resolvido UMA vez no handler; exposto em X-ID7-Portal-Type.
+    // É o MESMO premiumTypeOf(task) que o renderer usa internamente (mesma tarefa → mesmo
+    // resultado); serve de prova viva de qual tipo o portal enxergou para a tarefa REAL.
+    const pt = premiumTypeOf(task);
+    console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""} portalType=${pt.key}`);
     // P2: a tela de SUCESSO só aparece na aprovação FINAL REAL.
     // V64.14 (status-consistency): o gate usa SÓ os sinais deliberados de encerramento final
     // (finalApprovalCompleted / clientFlowStatus='concluido'). O status BRUTO do kanban
     // (task.status / workflowStage = 'concluido'), que pode vir de mover o card manualmente,
     // NÃO encerra mais a Visão do Cliente — evita tela final prematura.
     if (task.finalApprovalCompleted === true || task.clientFlowStatus === "concluido") {
-      return htmlResponse(renderClientSuccessHtml(task, token, origin), 200);
+      return htmlResponseId7(renderClientSuccessHtml(task, token, origin), 200, pt.key, "success");
     }
     // V64.14: já aprovou a fase atual (temas/produção) e ainda NÃO é final? Mostra a
     // confirmação INTERMEDIÁRIA (não a página de ações aberta como se nada tivesse ocorrido).
     const acked = clientAckedPhase(task);
-    if (acked) return htmlResponse(renderClientPhaseAckHtml(task, token, acked, origin), 200);
-    return htmlResponse(renderClientHtml(task, token, env, origin), 200);
+    if (acked) return htmlResponseId7(renderClientPhaseAckHtml(task, token, acked, origin), 200, pt.key, "ack");
+    return htmlResponseId7(renderClientHtml(task, token, env, origin), 200, pt.key, "full");
   } catch (e) {
     // Blindagem: qualquer erro inesperado de render/query → HTML amigável (NUNCA tela branca/JSON/corpo vazio).
     console.error("[CLIENT-VIEW] erro inesperado:", e && (e.stack || e.message));
@@ -2676,6 +2689,17 @@ function htmlResponse(html, status) {
       "Referrer-Policy": "no-referrer",
     },
   });
+}
+// F3.3.74J3C — envelopa htmlResponse com headers de IDENTIDADE do runtime/portal
+// (build do worker, tipo canônico resolvido, renderer usado). Diagnóstico puro: sem
+// token, sem dado de cliente, sem alterar corpo/cache. Permite provar no HTML VIVO qual
+// worker respondeu e qual TIPO o portal resolveu para a tarefa real (rota vs tipo).
+function htmlResponseId7(html, status, portalType, renderer) {
+  const res = htmlResponse(html, status);
+  res.headers.set("X-ID7-Worker-Build", WORKER_BUILD);
+  if (portalType) res.headers.set("X-ID7-Portal-Type", portalType);
+  if (renderer) res.headers.set("X-ID7-Portal-Renderer", renderer);
+  return res;
 }
 
 function escapeHtml(s) {

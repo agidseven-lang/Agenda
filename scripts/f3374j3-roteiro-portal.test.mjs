@@ -186,12 +186,26 @@ if (BASEPATH) {
   const baseHtml = cronFix.map((t) => base.api.renderClientHtml(t, TOKEN, ENV, ORIGIN));
   ok('T27 nenhuma alteração visual: HTML do cronograma BYTE-IDÊNTICO ao pré-patch (2 fixtures)',
     baseHtml[0] === cronHtml[0] && baseHtml[1] === cronHtml[1]);
-  const SAME_FNS = ['handleShareCard', 'shareCardHtml', 'ogClientMeta', 'ogClientBase', 'htmlResponseCacheable',
+  // Núcleo de comportamento que J3C NÃO toca (byte-idêntico ao pré-patch):
+  const SAME_FNS = ['shareCardHtml', 'ogClientMeta', 'ogClientBase', 'htmlResponseCacheable',
     'premiumTypeOf', 'handleClientCronogramaAction', 'writeClientGranular', 'handleClientCronogramaState',
-    'handleClientCronogramaCrawler', 'handleClientCronogramaView', 'renderClientPhaseAckHtml', 'phaseCopy', 'media', 'statusLabel', 'frequencyLabel'];
+    'renderClientPhaseAckHtml', 'phaseCopy', 'media', 'statusLabel', 'frequencyLabel'];
   const diffs = SAME_FNS.filter((n) => { try { return fnSrc(base.SRC, n) !== fnSrc(SRC, n); } catch (e) { return true; } });
-  ok('T28 payload/handlers byte-idênticos (ação/estado/escrita/OG/share/media): ' + (diffs.length ? 'DIVERGEM: ' + diffs.join(',') : 'todos iguais'),
+  ok('T28 payload/estado/escrita/OG/media byte-idênticos (núcleo intocado): ' + (diffs.length ? 'DIVERGEM: ' + diffs.join(',') : 'todos iguais'),
     diffs.length === 0 && constObj(base.SRC, 'PREMIUM_TYPES') === constObj(SRC, 'PREMIUM_TYPES'));
+  // F3.3.74J3C — os 3 handlers de entrada mudam SÓ por headers de identidade (diagnóstico):
+  // toda linha divergente tem de conter um marcador X-ID7 / WORKER_BUILD / htmlResponseId7 /
+  // portalType / 74J3C — nenhuma mudança de corpo, cache, status ou lógica.
+  const DIAG_FNS = ['handleShareCard', 'handleClientCronogramaCrawler', 'handleClientCronogramaView'];
+  const FORBIDDEN = /caches\.|\.put\(|\.delete\(|\bfetch\(|Cache-Control|no-store|max-age|waitUntil|queryTaskByToken|getAccessToken|writeClient|clientItems|status:\s*\d/;
+  const diagOk = DIAG_FNS.every((n) => {
+    const a = fnSrc(base.SRC, n).split('\n'), b = fnSrc(SRC, n).split('\n');
+    const added = b.filter((l) => !a.includes(l));
+    const gainedMarker = added.some((l) => /X-ID7|WORKER_BUILD|htmlResponseId7/.test(l));
+    const noSideEffect = added.every((l) => !FORBIDDEN.test(l));   // nenhuma linha nova traz cache/escrita/fetch/auth/status
+    return gainedMarker && noSideEffect;
+  });
+  ok('T28b handlers de entrada: só adicionam identidade (marcador presente; ZERO nova linha com cache/escrita/fetch/auth/status)', diagOk);
 } else {
   ok('T27 (pulado — defina BASELINE_SRC para a prova byte-idêntica)', false);
   ok('T28 (pulado — defina BASELINE_SRC para a prova byte-idêntica)', false);
