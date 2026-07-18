@@ -168,7 +168,11 @@ ok('T23 nenhum write/rede na renderização (fetch=0) e fase legada IGNORADA (th
 
 console.log('— CRONOGRAMA (preservação) —');
 const cronFix = [
-  mkTask('Cronograma', 4, { clientItems: { i0: { cs: 'aprovado', phase: 'themes' } } }),
+  // F3.3.74J5 — a estrutura "com Peças/Feed/Story" do cronograma é exclusiva da ETAPA 2.
+  // Fixture[0] em fase 'production' EXPLÍCITA (sem URLs) prova os placeholders da ETAPA 2;
+  // a ETAPA 1 (themes) agora mostra só o Tema (coberto pela suíte f3374j5). Isto mantém a
+  // prova byte-idêntica válida: o que J5 NÃO toca (production/final) continua idêntico.
+  mkTask('Cronograma', 4, { clientItems: { i0: { cs: 'aprovado', phase: 'production' } }, extra: { clientApprovalPhase: 'production' } }),
   // cronograma com mídia completa deriva fase 'production' → itens aprovados NESSA fase
   mkTask('Cronograma', 6, { legacy: true, clientItems: approvedItems(6, 'production') }),
 ];
@@ -221,7 +225,7 @@ ok('T30 OG Roteiro intacto no portal (og: metas + arte roteiro)',
 ok('T31 referência da arte Cronograma preservada (path canônico)', SRC.includes('/og/wa-card-v64-39.jpg'));
 ok('T32 referência da arte Roteiro preservada (path canônico)', SRC.includes('/og/wa-card-roteiro-v64-60.jpg'));
 ok('T33 fail-open intacto na fonte (bloco 74F presente; identidade failopen)',
-  SRC.includes('F3.3.74F — FAIL-OPEN DO OG') && /version: "V64\.59-c20-failopen(-74f|-j4-roteiro-portal)"/.test(SRC));
+  SRC.includes('F3.3.74F — FAIL-OPEN DO OG') && /version: "V64\.59-c20-failopen(-74f|-j4-roteiro-portal|-j5-cronograma-themes)"/.test(SRC));
 ok('T34 resolved/not_found/error intactos (suite f3374j-failopen-contract 19/19 roda na sequência)',
   fs.existsSync(path.resolve(__dirname, 'f3374j-failopen-contract.test.mjs')));
 

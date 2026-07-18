@@ -130,7 +130,7 @@ const PREMIUM_TYPES = {
 // (nunca token/dado de cliente). Distingue inequivocamente ESTE worker no host que o
 // serviu — a string de VERSÃO é idêntica entre QA e produção, então versão sozinha não
 // prova qual runtime respondeu. Presença de build=j3c => é a candidata J3C.
-const WORKER_BUILD = "j4-roteiro-portal";
+const WORKER_BUILD = "j5-cronograma-themes";
 function premiumTypeOf(task) {
   const sec = (task && typeof task.sector === "string") ? task.sector.trim().toLowerCase() : "";
   return sec === "roteiro" ? PREMIUM_TYPES.roteiro : PREMIUM_TYPES.cronograma;
@@ -519,7 +519,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-j4-roteiro-portal", build: WORKER_BUILD }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-j5-cronograma-themes", build: WORKER_BUILD }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -3400,6 +3400,14 @@ function renderClientHtml(task, token, env, origin) {
   // Tela de sucesso só aparece quando a fase é 'final' (gating do clientSuccess).
   const phase = clientPhase(task);
   const phaseUi = phaseCopy(phase, pt);
+  // F3.3.74J5 — Cronograma tem DUAS aprovações do cliente. Na ETAPA 1 (fase 'themes') o
+  // cliente aprova SOMENTE os temas; Legenda/Peças/Feed/Story ainda não existem e NÃO
+  // devem aparecer (nem placeholder). Só na ETAPA 2 (fase 'production'/'final', após a
+  // produção e o reenvio com o MESMO link → cronStatus='ready_for_final_client_review') o
+  // portal revela Legenda + Feed + Story. O corte é por FASE, não por presença do dado:
+  // registros com legenda/feed LEGADOS em 'themes' continuam mostrando só o Tema (o dado
+  // nunca é apagado). Roteiro (fase sempre 'themes') mantém Tema+Legenda pelo fix 74J3.
+  const themesOnly = pt.key !== "roteiro" && phase === "themes";
   // V64.15/V64.47 — aprovação PARCIAL POR FASE: só pendência da fase ATUAL esconde o CTA
   // "Aprovar todos". Se TODOS os conteúdos da fase estão aprovados, o portal volta ao CTA
   // normal mesmo com clientReview.status='revisao' herdado (ciclo ajuste→correção→aprovação).
@@ -3464,15 +3472,22 @@ function renderClientHtml(task, token, env, origin) {
         '</div>' +
         '<div class="cbody">' +
           '<div class="field"><div class="flabel"><span class="fl">' + ICN.type + 'Tema</span></div><div class="fval theme" data-field="tema">' + tema + '</div></div>' +
+          // F3.3.74J5 — ETAPA 1 (themes) do Cronograma mostra SÓ o Tema: a Legenda só passa a
+          // ser GERADA na ETAPA 2 (production/final). Nada de placeholder "Legenda pendente" na
+          // aprovação de temas — nem por CSS: o campo simplesmente não é emitido. Roteiro
+          // (themesOnly=false) e Cronograma pós-produção mantêm a Legenda EXATAMENTE como antes.
+          (themesOnly ? "" :
           '<div class="field"><div class="flabel"><span class="fl">' + ICN.text + 'Legenda</span>' + (leg ? '<span class="cnt">' + leg.length + ' caracteres</span>' : '') + '</div>' +
             (leg ? '<div class="fval" data-field="legenda">' + escapeHtml(leg) + '</div>'
                  : '<div class="pend" data-field="legenda"><div class="pi">' + ICN.text + '</div><div><div class="pt">Legenda pendente</div><div class="ps">Nossa equipe ainda está finalizando a legenda deste conteúdo.</div></div></div>') +
-          '</div>' +
+          '</div>') +
           // F3.3.74J3 — Roteiro de gravação de vídeos só tem Tema e Legenda: o bloco de
           // peças (Peças/Feed/Story/placeholders) deixa de ser GERADO para roteiro — nada
           // de esconder por CSS. Campos legados de Feed/Story em registros antigos são
           // ignorados na renderização (e jamais apagados). Cronograma: string EXATA de antes.
-          (pt.key === "roteiro" ? "" :
+          // F3.3.74J5 — e também não é GERADO na ETAPA 1 (themes) do Cronograma: peças só
+          // aparecem a partir da ETAPA 2 (production/final). Cronograma pós-produção: igual.
+          ((pt.key === "roteiro" || themesOnly) ? "" :
           '<div class="field"><div class="flabel"><span class="fl">' + ICN.img + 'Peças</span></div><div class="media-row">' + media("feed", feedUrl) + media("story", storyUrl) + '</div></div>') +
           (itemNote ? '<div class="field"><div class="flabel"><span class="fl">' + ICN.note + 'Sua observação</span></div><div class="fval note" data-itemnote>' + escapeHtml(itemNote) + '</div></div>'
                     : '<div class="field" data-noteslot style="display:none"><div class="flabel"><span class="fl">' + ICN.note + 'Sua observação</span></div><div class="fval note" data-itemnote></div></div>') +
@@ -3480,7 +3495,9 @@ function renderClientHtml(task, token, env, origin) {
             '<button class="ibtn ok" data-act="approveItem" data-i="' + i + '">' + ICN.check + 'Aprovar conteúdo</button>' +
             '<button class="ibtn rev" data-act="reviseItem" data-i="' + i + '">' + ICN.revise + 'Pedir ajuste</button>' +
             '<button class="ibtn" data-act="editTheme" data-i="' + i + '">' + ICN.type + 'Editar tema</button>' +
-            '<button class="ibtn" data-act="editLegenda" data-i="' + i + '">' + ICN.pen + 'Editar legenda</button>' +
+            // F3.3.74J5 — "Editar legenda" não faz sentido na ETAPA 1 (não há legenda ainda);
+            // some junto com o campo. Volta a aparecer na ETAPA 2 (production/final) e no roteiro.
+            (themesOnly ? "" : '<button class="ibtn" data-act="editLegenda" data-i="' + i + '">' + ICN.pen + 'Editar legenda</button>') +
             '<button class="ibtn" data-act="noteItem" data-i="' + i + '">' + ICN.note + 'Observação</button>' +
           '</div>' +
         '</div>' +
