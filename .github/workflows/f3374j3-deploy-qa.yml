@@ -129,14 +129,37 @@ jobs:
         run: |
           set -uo pipefail
           API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
-          curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push-qa" -o qa-live.js || true
-          curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push" -o prod-live.js || true
-          grep -Fq 'pt.key === "roteiro" ? ""' qa-live.js || { echo "::error::script VIVO do QA não contém o marcador J3"; exit 1; }
-          grep -Fq 'if (premiumTypeOf(task).key === "roteiro") return "themes";' qa-live.js || { echo "::error::script VIVO do QA sem o guard J3"; exit 1; }
-          echo "QA vivo: marcadores J3 PRESENTES"
-          if grep -Fq 'pt.key === "roteiro" ? ""' prod-live.js; then echo "::error::PRODUÇÃO CONTÉM J3 — deploy indevido!"; exit 1; fi
-          grep -q 'V64.59-c20-failopen-74f' prod-live.js || { echo "::error::produção não é mais a fail-open 74J?"; exit 1; }
-          echo "produção viva: SEM J3 (como deve ser nesta fase)"
+          # PRIMÁRIO (fail-closed): cadeia de identidade — o Version ID impresso pelo
+          # wrangler no UPLOAD desta run TEM de ser o deployment ATIVO do serviço QA.
+          # (checkout J3 → sha256 em out/pre.txt → upload → Version ID → deployment vivo)
+          UPVID=$(grep -oiE 'Current Version ID: [0-9a-f-]+' out/deploy-qa.txt | awk '{print $NF}' | tail -1)
+          echo "Version ID do upload QA: ${UPVID:-<ausente>}"
+          [ -n "$UPVID" ] || { echo "::error::deploy-qa.txt sem Version ID"; exit 1; }
+          QDEP=$(curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push-qa/deployments")
+          QVID=$(echo "$QDEP" | jq -r '.result.deployments[0].versions[0].version_id' 2>/dev/null || true)
+          QPCT=$(echo "$QDEP" | jq -r '.result.deployments[0].versions[0].percentage' 2>/dev/null || true)
+          echo "deployment ativo QA: $QVID @$QPCT%"
+          { [ "$QVID" = "$UPVID" ] && [ "$QPCT" = "100" ]; } || { echo "::error::deployment ativo do QA não é o upload J3 desta run"; exit 1; }
+          echo "IDENTIDADE PROVADA: QA vivo == candidata J3 recém-enviada ($UPVID @100%)"
+          # BÔNUS (retries; o download do conteúdo do script sofreu timeout transiente no run 1):
+          # se o corpo baixar, o grep é fail-closed; se a API não responder, o primário acima já provou.
+          dl() { # $1=script $2=arquivo
+            for EP in "workers/scripts/$1" "workers/scripts/$1/content"; do
+              for i in 1 2; do
+                curl -sS --max-time 60 -H "$AUTH" "$API/accounts/$ACC/$EP" -o "$2" 2>/dev/null && [ -s "$2" ] && return 0
+                sleep 3
+              done
+            done
+            return 1
+          }
+          if dl idseven-push-qa qa-live.js; then
+            grep -Fq 'pt.key === "roteiro" ? ""' qa-live.js || { echo "::error::script VIVO do QA não contém o marcador J3"; exit 1; }
+            grep -Fq 'if (premiumTypeOf(task).key === "roteiro") return "themes";' qa-live.js || { echo "::error::script VIVO do QA sem o guard J3"; exit 1; }
+            echo "script vivo QA: marcadores J3 PRESENTES (bônus confirmado)"
+          else
+            echo "::warning::API de conteúdo do script QA indisponível — identidade já provada pelo Version ID"
+          fi
+          # PRODUÇÃO INTOCADA (fail-closed): versão viva + deployment ativo inalterado
           PV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); echo "produção /: $PV"
           [ "$PV" = "$EXPECT_VERSION" ] || { echo "::error::versão de produção divergente"; exit 1; }
           DEP=$(curl -sS --max-time 25 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
@@ -144,6 +167,13 @@ jobs:
           LPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage' 2>/dev/null || true)
           echo "deployment ativo produção: $LVID @$LPCT%"
           { [ "$LVID" = "$PROD_VID" ] && [ "$LPCT" = "100" ]; } || { echo "::error::deployment de produção MUDOU"; exit 1; }
+          if dl idseven-push prod-live.js; then
+            if grep -Fq 'pt.key === "roteiro" ? ""' prod-live.js; then echo "::error::PRODUÇÃO CONTÉM J3 — deploy indevido!"; exit 1; fi
+            grep -q 'V64.59-c20-failopen-74f' prod-live.js || { echo "::error::produção não é mais a fail-open 74J?"; exit 1; }
+            echo "script vivo produção: SEM J3 (bônus confirmado)"
+          else
+            echo "::warning::API de conteúdo do script de produção indisponível — deployment intacto já provado"
+          fi
           rm -f qa-live.js prod-live.js
           echo "PRODUÇÃO INTOCADA: deployment b82e5b03 @100% confirmado"
 
