@@ -1,0 +1,97 @@
+# =====================================================================
+# [manual] F3.3.74K — VERIFICAÇÃO PÓS-PUBLICAÇÃO + reforço not-latest.
+#
+# Completa o que o run de publicação (29659586505) pulou por um bug de versão
+# do gh (campo --json isLatest inexistente): (1) reforça make_latest=false na
+# release 1.0.174 (idempotente, via gh api PATCH); (2) SMOKE — re-baixa EXE/MSI
+# da release publicada e reconfere SHA-256 byte a byte; (3) confirma flags/target/
+# assets/digests da 1.0.174; (4) confirma a 1.0.168 intacta. Read-only fora do
+# PATCH de make_latest; NÃO republica, NÃO builda, NÃO deploya, NÃO toca assets.
+# =====================================================================
+name: "[manual] F3.3.74K Desktop Release verify (+ enforce not-latest)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite VERIFICAR-DESKTOP-1.0.174-74K"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: f3374k-desktop-release-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      TAG: "desktop/v1.0.174-production"
+      OLD_TAG: "desktop/v1.0.168-production"
+      TARGET_SHA: "b6b800c889d82f71ac27f18a31ae6502f96f155d"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.174-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.174-x64.msi"
+      EXP_EXE: "4940f8a6374ee26a90cfb6d2e67b1bdf01b0663b01474b48aacd43d148aff276"
+      EXP_MSI: "160a1d315206d86e1e1fc36701d3f2513ef8e077d45732f9c75eb45a5b81a947"
+      OLD_EXE: "299162a0686ed683c0749833e833034c997f5040be66d21b2bd333630ae6e1da"
+    steps:
+      - name: "Gate — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "VERIFICAR-DESKTOP-1.0.174-74K" ] || { echo "::error::confirmação inválida"; exit 1; }
+
+      - name: "Reforçar make_latest=false (idempotente) + flags/target/assets/digests"
+        run: |
+          set -euo pipefail
+          RID="$(gh release view "$TAG" -R "$REPO" --json databaseId --jq '.databaseId')"
+          echo "release id: $RID"
+          gh api -X PATCH "repos/$REPO/releases/$RID" -f make_latest=false >/dev/null && echo "make_latest=false OK (reforçado)"
+          J="$(gh api "repos/$REPO/releases/tags/$TAG")"
+          DR="$(echo "$J" | jq -r '.draft')"; PR="$(echo "$J" | jq -r '.prerelease')"; TG="$(echo "$J" | jq -r '.target_commitish')"
+          N="$(echo "$J" | jq -r '.assets|length')"
+          DE="$(echo "$J" | jq -r --arg n "$EXE_NAME" '.assets[]|select(.name==$n)|.digest')"
+          DM="$(echo "$J" | jq -r --arg n "$MSI_NAME" '.assets[]|select(.name==$n)|.digest')"
+          echo "draft=$DR prerelease=$PR target=$TG assets=$N"
+          echo "exe digest=$DE"; echo "msi digest=$DM"
+          [ "$DR" = "false" ] && [ "$PR" = "false" ] || { echo "::error::flags"; exit 1; }
+          [ "$TG" = "$TARGET_SHA" ] || { echo "::error::target"; exit 1; }
+          [ "$N" = "5" ] || { echo "::error::esperado 5 assets, achei $N"; exit 1; }
+          [ "$DE" = "sha256:$EXP_EXE" ] || { echo "::error::digest EXE divergente"; exit 1; }
+          [ "$DM" = "sha256:$EXP_MSI" ] || { echo "::error::digest MSI divergente"; exit 1; }
+          echo "OK: digests server-side conferem (EXE/MSI byte-exatos)"
+
+      - name: "SMOKE — re-baixa da release e reconfere SHA-256 byte a byte"
+        run: |
+          set -euo pipefail
+          mkdir -p smoke
+          gh release download "$TAG" -R "$REPO" -p "$EXE_NAME" -p "$MSI_NAME" -D smoke
+          SE="$(sha256sum "smoke/$EXE_NAME" | awk '{print $1}')"; SM="$(sha256sum "smoke/$MSI_NAME" | awk '{print $1}')"
+          echo "smoke exe=$SE"; echo "smoke msi=$SM"
+          [ "$SE" = "$EXP_EXE" ] || { echo "::error::SMOKE EXE divergiu"; exit 1; }
+          [ "$SM" = "$EXP_MSI" ] || { echo "::error::SMOKE MSI divergiu"; exit 1; }
+          echo "SMOKE OK: bytes da release == hashes oficiais"
+
+      - name: "1.0.168 preservada e imutável"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/releases/tags/$OLD_TAG")"
+          DR="$(echo "$J" | jq -r '.draft')"; N="$(echo "$J" | jq -r '.assets|length')"
+          DE="$(echo "$J" | jq -r '.assets[]|select(.name|endswith("-x64.exe"))|.digest')"
+          echo "1.0.168: draft=$DR assets=$N exe=$DE"
+          [ "$DR" = "false" ] || { echo "::error::1.0.168 draft mudou"; exit 1; }
+          [ "$N" -ge 2 ] || { echo "::error::1.0.168 sem assets"; exit 1; }
+          [ "$DE" = "sha256:$OLD_EXE" ] || { echo "::error::1.0.168 EXE digest divergente"; exit 1; }
+          echo "OK: 1.0.168 intacta"
+
+      - name: "Informativo — /releases/latest (endpoint é date-based)"
+        run: |
+          set -uo pipefail
+          L="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null || echo '<n/a>')"
+          echo "/releases/latest (por data de commit) = $L  — NOTA: independe da badge make_latest, que foi setada false na 1.0.174."
+          echo "===== GO: 1.0.174 publicada, byte-exata, not-latest reforçado; 1.0.168 intacta ====="
