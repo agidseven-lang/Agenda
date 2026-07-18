@@ -4728,7 +4728,10 @@ function renderPersonBoard(){
 /* ===== P3/P4 — Fluxo do Cliente x Fluxo dos Designers ===== */
 // ===== EIXOS SEPARADOS (visibility-fix) =====
 // Designer flow: a tarefa foi atribuída a um designer (designerAssignment.designerId).
-function hasDesigner(t){return !!(t&&t.designerAssignment&&t.designerAssignment.designerId);}
+// F3.3.75A — ROTEIRO não tem Designer em NENHUMA etapa (fluxo Social→Cliente→Concluído).
+// designerAssignment LEGADO em tarefas antigas de roteiro é IGNORADO (nunca apagado): o roteiro
+// jamais entra no fluxo/boards do designer nem é bloqueado por "designer produzindo".
+function hasDesigner(t){return !!(t&&t.designerAssignment&&t.designerAssignment.designerId)&&secOf(t.sector).key!=='roteiro';}
 function isDesignerFlow(t){return hasDesigner(t);}
 function designerOf(t){return (t&&t.designerAssignment&&t.designerAssignment.designerId)||(t&&t.assigneeId)||null;}
 // Client flow: TODO cronograma vive no fluxo do cliente — INDEPENDENTE do designer.
@@ -4970,6 +4973,13 @@ function operationalCol(t){
   // no portal (botão "Aprovar temas") — para a Social isso é "Aguardando aprovação dos temas".
   if(cf==='revisao'&&!hasPendingItemRevision(t)&&allPhaseItemsApproved(t))return 'producao';
   if(cf==='revisao'||hasPendingItemRevision(t))return 'aguardando_revisao'; // cliente pediu ajuste
+  // F3.3.75A — ROTEIRO não tem Designer nem ETAPA 2: a aprovação do cliente CONCLUI a tarefa
+  // (Social→Cliente→Concluído). Nunca 'aguardando_envio' nem qualquer estágio de designer.
+  if(secOf(t.sector).key==='roteiro'){
+    if(cf==='aprovado'||cf==='reenviado')return 'concluido';   // cliente aprovou → concluído
+    if(cf==='afazer')return 'afazer';
+    return 'producao';                                          // enviado ao cliente, aguardando feedback
+  }
   // F3.3.17-R5.1 — "reenviado" só é "aguardando aprovação final" quando a versão final foi REALMENTE
   // enviada ao cliente (flowSentToClientSignal). A entrega do designer grava clientFlowStatus='reenviado'
   // mas isso NÃO é envio ao cliente — cai no eixo do designer abaixo (Social precisa legendar e enviar).
@@ -5588,6 +5598,9 @@ function deriveCanonicalTaskState(t){
     if(dc==='andamento')return {phase:TASK_PHASE.DESIGNER_PRODUCING,owner:'designer',isCron:true};
     return {phase:TASK_PHASE.AWAITING_DESIGNER,owner:'designer',isCron:true};
   }
+  // F3.3.75A — ROTEIRO: a aprovação do cliente É a conclusão (não há ETAPA 2 nem designer).
+  // "Temas aprovados" no roteiro = CONCLUÍDO (nunca THEMES_APPROVED, que pediria "enviar ao designer").
+  if(secOf(t.sector).key==='roteiro'&&flowThemesApprovedSignal(t))return {phase:TASK_PHASE.COMPLETED,owner:'social',isCron:true};
   // F3.3.17-R5/C1 — SEM designer: distinguir a sub-jornada de TEMAS do planejamento puro
   // (aprovação de TEMAS NUNCA é conclusão — terminal só via flowCompletedSignal acima).
   if(flowThemesApprovedSignal(t))return {phase:TASK_PHASE.THEMES_APPROVED,owner:'social',isCron:true};
@@ -6002,6 +6015,25 @@ function openDetails(taskId){
 function detailState(t){
   if(!isClientSector(secOf(t.sector).key)){const st=stOf(t.status);
     return {key:'task_'+(t.status||'afazer'),color:st.color,label:st.label,sub:'',next:'',owner:'assignee',actions:[]};}
+  // F3.3.75A — ROTEIRO: máquina de estados do detalhe SEM designer (Social→Cliente→Concluído).
+  // A aprovação do cliente CONCLUI (não há ETAPA 2). designerAssignment/designerFlowStatus/
+  // designerSla LEGADO é IGNORADO aqui (nunca apagado) — o roteiro jamais mostra ação de designer.
+  if(secOf(t.sector).key==='roteiro'){
+    const rc=clientCol(t);const rp=pendingClientItems(t);
+    if(isFullyComplete(t)||clientApproved(t))return {key:'concluido',color:'#34D399',label:'Concluído ✓',
+      sub:'O cliente aprovou os roteiros. Tarefa encerrada.',
+      next:'Nada a fazer — aprovação registrada.',owner:'none',actions:['clientview']};
+    if(rp.length||rc==='revisao')return {key:'cliente_ajuste',color:'#FB7185',label:'Cliente pediu ajuste',
+      sub:'O cliente pediu ajuste nos roteiros — volta para a Social Media (o designer não participa).',
+      next:'Corrigir os roteiros e marcar como corrigido — o cliente será avisado pelo mesmo link.',
+      owner:'social',actions:['fix','teamfix','clientview']};
+    if(rc==='enviado')return {key:'aguardando_temas',color:'#22D3EE',label:'Aguardando aprovação',
+      sub:'Os roteiros foram enviados ao cliente. O cliente foi avisado.',
+      next:'Aguardar o cliente analisar os roteiros no portal.',owner:'cliente',actions:['clientview','edit']};
+    return {key:'preparacao',color:'#6E7480',label:'Em preparação',
+      sub:'Os roteiros ainda não foram enviados ao cliente.',
+      next:'Preencher os roteiros e enviar ao cliente para aprovação.',owner:'social',actions:['edit','sendclient']};
+  }
   const cc=clientCol(t);const pend=pendingClientItems(t);
   if(isFullyComplete(t))return {key:'concluido',color:'#34D399',label:'Concluído ✓',
     sub:'O cliente aprovou a versão final. Cronograma encerrado.',
@@ -6110,6 +6142,7 @@ function detailHeroBlock(t){
  * do status de FLUXO (que vive no HERO). Mostra status SLA por PRAZO FINAL, datas
  * planejadas e tempo restante/atraso. NÃO grava nada; só lê designerSla. */
 function detailSla(t){
+  if(secOf(t.sector).key==='roteiro')return null;   // F3.3.75A — roteiro não tem SLA de designer (designerSla legado ignorado)
   var ds=t&&t.designerSla; if(!ds) return null;
   /* F3.3.2 — detalhe deriva da FONTE ÚNICA (resolveTaskDisplayState): mesmo prazo final/estado
      do chip do card, do widget e do sino. Sem reimplementar limiares aqui. */
@@ -7629,6 +7662,18 @@ function openSheet(which){
 /* ---- TASK FORM (wizard) ---- */
 function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],checklist:[],link:'',obs:'',_openContent:null};}
 function openTaskForm(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
+// F3.3.75A — função CANÔNICA de "Nova tarefa": TODO entry point de CRIAÇÃO recomeça na ETAPA 1
+// (Setor), sem reaproveitar etapa/setor/título/cliente/responsável/briefing/conteúdos/anexos/
+// erros/estado do wizard anterior. Força o re-render mesmo com um wizard já aberto: a guarda
+// _editingNow() (que protege campos em foco de re-render por snapshot do Firestore) NÃO pode
+// abortar este reset explícito do usuário — por isso soltamos o foco e zeramos o defer antes.
+function openNewTaskWizard(){
+  try{const a=document.activeElement;if(a&&a.blur)a.blur();}catch(_){}
+  closeModal();
+  state.form=newForm(null);            // id:null, step:0 (Setor), sector:null, tudo limpo
+  _deferRender=false;_deferRenderAt=0; // nenhuma edição anterior pode adiar este reset
+  render();
+}
 function tpl(){return state.form.sector?TEMPLATES[secOf(state.form.sector).key]:null;}
 function curSub(){const t=tpl();return (t&&t.subtypes&&state.form.subtype)?t.subtypes[state.form.subtype]:null;}
 function renderForm(){
@@ -7854,7 +7899,7 @@ document.addEventListener('click',async e=>{
   if(!(e.target&&e.target.closest))return;
   const g=sel=>e.target.closest(sel);let el;
   if(el=g('[data-tab]')){state.form=null;state.boardSector=null;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.tab=el.dataset.tab;closeModal();render();return;}
-  if(el=g('[data-fab]')){closeModal();if(state.tab==='tarefas')openTaskForm(state.boardSector);else{state.tab='tarefas';openTaskForm(null);}return;}
+  if(el=g('[data-fab]')){state.tab='tarefas';openNewTaskWizard();return;}   // F3.3.75A — sempre ETAPA 1 (Setor), sem reaproveitar estado
   if(el=g('[data-sector]')){state.boardSector=el.dataset.sector;state.personBoard=null;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;boardCol=0;boardMine=false;boardQuery='';render();return;}
   if(el=g('[data-myboard]')){state.personBoard=state.user&&state.user.id;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
@@ -7870,7 +7915,7 @@ document.addEventListener('click',async e=>{
     else if(a==='roleboards'){state.personBoard=null;state.roleBoards=true;}
     else if(a==='flowdesigners'){state.designerBoard=null;state.socialBoard=null;state.flowView='designers';}
     else if(a==='flowsocials'){state.socialBoard=null;state.designerBoard=null;state.flowView='socials';}
-    else if(a==='new'){openTaskForm(state.boardSector);return;}
+    else if(a==='new'){openNewTaskWizard();return;}   // F3.3.75A — entry point de criação usa a função canônica (ETAPA 1)
     render();return;}
   if(el=g('[data-bcol]')){boardCol=+el.dataset.bcol;render();return;}
   if(el=g('[data-bmine]')){boardMine=!boardMine;render();return;}
@@ -8248,5 +8293,6 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
 })();
 /* ════════ FIM IN-APP-DIAGNOSTIC-V1 ════════ */
 </script>
+<script>/* F3.3.75A — banner permanente de QA (build de teste 1.0.175-QA; NUNCA usar com clientes). */try{var _qb=document.createElement('div');_qb.textContent='AMBIENTE QA — NÃO USAR COM CLIENTES';_qb.setAttribute('style','position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#7a1020;color:#fff;font:700 12px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;text-align:center;padding:6px 10px;letter-spacing:.4px;pointer-events:none;box-shadow:0 -2px 12px rgba(0,0,0,.35)');document.body.appendChild(_qb);}catch(_){}</script>
 </body>
 </html>

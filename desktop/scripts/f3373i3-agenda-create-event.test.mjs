@@ -101,8 +101,10 @@ ok('F3 Copywriting segue descontinuado na criação (71C7)',
   /key:'copywriting'[\s\S]{0,120}descontinuado:true/.test(HTML) && /SECTORS\.filter\(s=>!s\.descontinuado\)/.test(HTML));
 ok('F4 Chat segue fora do fluxo principal (aba de chat não reintroduzida no TABS)',
   /const TABS=\[/.test(HTML) && !/TABS=\[[^\]]*\{k:'chat'/.test(HTML));
+// F3.3.75A — o FAB passou a usar a função CANÔNICA openNewTaskWizard (recomeça na ETAPA 1/Setor).
+// Continua criando TAREFA (tab=tarefas) e NÃO é sequestrado pelo fluxo de evento/agenda.
 ok('F5 FAB global segue criando TAREFA (não sequestrado pelo evento)',
-  /if\(el=g\('\[data-fab\]'\)\)\{closeModal\(\);if\(state\.tab==='tarefas'\)openTaskForm/.test(HTML));
+  /if\(el=g\('\[data-fab\]'\)\)\{state\.tab='tarefas';openNewTaskWizard\(\)/.test(HTML));
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
 process.exit(fail ? 1 : 0);
