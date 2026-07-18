@@ -68,7 +68,11 @@ jobs:
           grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml divergente"; exit 1; }
           sha256sum cloudflare-worker.js | tee -a out/pre.txt
           V=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); echo "produção ANTES: $V" | tee -a out/pre.txt
-          [ "$V" = "V64.59-c20-golden-contract" ] || { echo "::error::produção não está no c20 congelado ($V)"; exit 1; }
+          case "$V" in
+            V64.59-c20-golden-contract) echo "pré-estado: c20 (promoção nova)";;
+            V64.59-c20-failopen-74f) echo "pré-estado: candidata já ativa (re-run idempotente após rollback/corrida)";;
+            *) echo "::error::produção em estado inesperado ($V)"; exit 1;;
+          esac
           ZID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=agendaidseven.com.br" | jq -r '.result[0].id')
           curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZID/workers/routes" | jq -c '.result' | tee out/routes-pre.json
           git show ${ROLLBACK_SHA}:cloudflare-worker.js > out/rollback-c20-worker.js
@@ -113,10 +117,16 @@ jobs:
           I2=$(curl -sS --max-time 30 "$PROD_URL/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
           [ "$I1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || fail=1
           [ "$I2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || fail=1
-          W=$(curl -sS --max-time 25 "$PROD_WDEV/" | jq -r '.version'); echo "workers.dev: $W"; [ "$W" = "V64.59-c20-failopen-74f" ] || fail=1
+          # workers.dev propaga alguns segundos depois do custom domain — poll com prazo
+          WD=$(( $(date +%s) + 120 )); W=""
+          while [ "$(date +%s)" -lt "$WD" ]; do
+            W=$(curl -sS --max-time 15 "$PROD_WDEV/" | jq -r '.version' 2>/dev/null || true)
+            [ "$W" = "V64.59-c20-failopen-74f" ] && break; sleep 4
+          done
+          echo "workers.dev: $W"; [ "$W" = "V64.59-c20-failopen-74f" ] || fail=1
           if [ "$fail" != "0" ]; then
             echo "::error::VALIDAÇÃO PÓS-DEPLOY FALHOU — executando ROLLBACK IMEDIATO para o c20"
-            git stash -u >/dev/null 2>&1 || true
+            # NUNCA `git stash -u` aqui: engoliria out/ (untracked) — bug do run 1
             git checkout -q ${ROLLBACK_SHA} -- cloudflare-worker.js
             npx --yes wrangler@4 deploy 2>&1 | tee out/rollback-deploy.txt
             RV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); echo "versão após rollback: $RV" | tee -a out/rollback-deploy.txt
