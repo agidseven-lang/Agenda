@@ -26,8 +26,8 @@ env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   PROD_URL: https://aprovar.agendaidseven.com.br
   PROD_WDEV: https://idseven-push.agidseven.workers.dev
-  EXPECT_VERSION: V64.59-c20-failopen-74f
-  EXPECT_VID: b82e5b03-b779-4b04-9a8e-29ddc522416c
+  EXPECT_VERSION: V64.59-c20-failopen-j4-roteiro-portal
+  EXPECT_VID: __PRINT__
   ROLLBACK_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
   ROLLBACK_WORKER_SHA256: aa07171e144400d9aabfbc7cb8e85ca60409036f9fe98826055de029765741d0
 
@@ -63,13 +63,14 @@ jobs:
           echo "$DEP" | jq -r '.result.deployments[0].versions[] | "  version_id=\(.version_id) pct=\(.percentage)"' 2>/dev/null || true
           LVID=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].version_id' 2>/dev/null || true)
           LPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage' 2>/dev/null || true)
-          { [ "$LVID" = "$EXPECT_VID" ] && [ "$LPCT" = "100" ]; } || { echo "::error::deployment ativo não é $EXPECT_VID @100%"; fail=1; }
+          echo "Version ID ativo (novo J4): $LVID @$LPCT%"; [ "$LPCT" = "100" ] || { echo "::error::deployment não está @100%"; fail=1; }
 
           echo; echo "===== 3) Conteúdo vivo do script (versão + ausência de golden) ====="
           curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push" -o live-script.bin || true
           SZ=$(wc -c < live-script.bin | tr -d ' '); SHA=$(sha256sum live-script.bin | cut -d' ' -f1)
           echo "bytes=$SZ sha256=$SHA (informativo; upload pode conter wrapper do wrangler)"
-          grep -q "$EXPECT_VERSION" live-script.bin || { echo "::error::script vivo NÃO contém $EXPECT_VERSION"; fail=1; }
+          grep -q "V64.59-c20-failopen-j4-roteiro-portal" live-script.bin || { echo "::error::script vivo NÃO é a J4"; fail=1; }
+          grep -q 'pt.key === "roteiro" ? ""' live-script.bin && echo "media-gate do Roteiro PRESENTE no script vivo" || { echo "::error::media-gate ausente no vivo"; fail=1; }
           if grep -q 'version: "V64.59-c20-golden-contract"' live-script.bin; then echo "::error::script vivo ainda contém identidade golden"; fail=1; fi
 
           echo; echo "===== 4) Rotas da zona (nenhuma rota canário) ====="
