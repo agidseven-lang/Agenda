@@ -1387,3 +1387,44 @@ Dois bugs Desktop-only sobre 1.0.174 (b6b800c). **QA isolado; nada em produção
 ### STOP / próximo
 Sem release/tag/produção. Produção Desktop 1.0.174 e Worker j6 intactos. Prova física do owner pendente
 (instalar 1.0.175-QA em máquina autorizada + TESTE 1/2/3). GO físico → F3.3.75B (promoção 1.0.175 produção).
+
+---
+
+## F3.3.75B — Desktop 1.0.175: promoção controlada QA→produção (build limpa; app.asar gate; release ARMADA)
+
+Promoção da fonte funcional **fisicamente aprovada** 1.0.175-QA (75A) → produção **1.0.175**, removendo
+EXCLUSIVAMENTE versão/banner de QA. **Sem alterar Worker/portal/backend.** Zero mudança funcional
+(delta = versão + banner). Release **armada e gated**; nada publicado até o literal do owner.
+
+### Transform QA→prod (branch desktop/f3375b-1.0.175-production, commit d1351389; 100% Desktop-only)
+- Renderer: removida SOMENTE a linha do banner permanente de QA (única diferença de handler vs 8ea10fb/75A).
+- package.json / package-lock.json: `1.0.175-QA` → `1.0.175` (só a versão).
+- Pins de estado de produção atualizados p/ 1.0.175 (card-prewarm A1, stable-token H3, restore-contract R17).
+- `scripts/f3375a-…test.mjs` self-adapting: **GREEN 25/25** em produção; **RED 5/5** no baseline b6b800c.
+
+### Build limpa (run 29662554660 SUCCESS; procedência unívoca)
+- Disparado com ref=branch → head_sha == target == commit do VERSAO = **d1351389** (sem mismatch main).
+- versão empacotada **1.0.175**, SEM banner; gate prova-de-versão (app.asar) + 74E OK.
+- EXE `30116107977552d6623534a4a06613b465a8a17a1db49b1aa0493acbd1cd06b7`
+- MSI `359483c346de47b06e2e15c6693e169ba3ffdf068e94cb44a7c7ac019eebce99`
+- artifacts: installer **8434789419** (digest `f85f5089…`), bundle **8434790828** (digest `92515c92…`).
+
+### Gate app.asar QA×produção (workflow f3375b-desktop-asar-verify, run 29662782129 SUCCESS)
+- **FASE 8** (runtime EMPACOTADO): 1.0.175 sem QA; `openNewTaskWizard`/FAB-canônico/`hasDesigner`-exclui-roteiro/
+  ramo-roteiro + domínio `aprovar.agendaidseven.com.br` + rota `/share/cronograma/` intactos.
+- **FASE 9** (comparação): renderer produção == 1.0.175-QA **menos a linha do banner** (todos os handlers
+  byte-idênticos); package.json só difere na versão; main/preload compilados byte-idênticos; inventário idêntico;
+  **zero** divergência funcional não-autorizada. EXE prod `30116107…`, EXE QA `ab2be2d5…`.
+
+### Release ARMADA (workflow f3375b-desktop-release-production, id 315913224, active; NÃO disparada)
+- Gated no literal `PUBLICAR-DESKTOP-1.0.175-75B`. Tudo pinado (run/SHA/artifact ids+digests/tag/hashes EXE+MSI).
+- Sequência: literal → run-success-no-SHA → branch-não-moveu → Worker j6 (read-only, sem deploy) → artifacts
+  exatos → tag/release livres & 1.0.174 presente → hashes byte-a-byte + VERSAO-DESKTOP → create (draft=false,
+  prerelease=false, **make_latest=false**, imutável) EXE+MSI+SHA256SUMS+VERSAO+RELATORIO → verify flags/assets/
+  target + reforço make_latest=false (sem query isLatest; fix 74K carregado) → download-smoke → confirma 1.0.174 intacta.
+- Tag alvo `desktop/v1.0.175-production`; **não** marca latest; **não** toca `desktop/v1.0.174-production` (b6b800c).
+
+### STOP / próximo
+Nada publicado. Produção Desktop **1.0.174** e Worker **j6** (`9fbdf417…`) intactos. Aguardando: (1) prova física
+do owner (instalar candidata 1.0.175 em máquina autorizada, SEM banner, reconferir TESTE 1/2) e (2) literal
+`PUBLICAR-DESKTOP-1.0.175-75B` p/ disparar a release. Rollback oficial: 1.0.174 (EXE `4940f8a6…`, MSI `160a1d31…`).
