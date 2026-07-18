@@ -1,0 +1,153 @@
+# =====================================================================
+# [manual] F3.3.74J3C — DEPLOY QA + PROBE DE IDENTIDADE (rota × tipo).
+#
+# O HARD NO-GO físico (portal QA de Roteiro exibiu PEÇAS) tinha um PONTO
+# CEGO: QA (idseven-push-qa) e produção (idseven-push) reportam a MESMA
+# string de versão "V64.59-c20-failopen-74f" — então nenhum check por HOST
+# distinguia qual runtime respondeu. A candidata J3C expõe identidade
+# observável (build + headers X-ID7-*), SEM token/dado de cliente.
+#
+# Este workflow (QA-only) deploya a J3C em idseven-push-qa e então prova,
+# TOKEN-FREE, se o host aprovar-qa realmente executa a J3C:
+#   • aprovar-qa/  e  aprovar-qa/share/<dummy>  →  build=j3c-portal-fix ?
+#   • workers.dev QA  →  build=j3c (sanity do serviço)
+#   • produção (aprovar. + workers.dev prod)  →  SEM build (intocada)
+#   • deployment ativo de produção segue b82e5b03 @100%
+# VEREDITO automático: ROTA (aprovar-qa não serve J3C) vs TIPO (serve J3C →
+# a divergência está no dado/tipo da tarefa real). Produção nunca é tocada.
+# =====================================================================
+name: "[manual] F3.3.74J3C Deploy QA + Identity Probe (rota×tipo)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite IDENTIDADE-QA-74J3C para autorizar"
+        required: true
+        default: ""
+      ref:
+        description: "Branch/commit da candidata J3C"
+        required: true
+        default: "worker/f3374j3c-roteiro-portal-physical-fix"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374j3c-identity
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  QA_WDEV: https://idseven-push-qa.agidseven.workers.dev
+  QA_CUSTOM: https://aprovar-qa.agendaidseven.com.br
+  PROD_CUSTOM: https://aprovar.agendaidseven.com.br
+  PROD_WDEV: https://idseven-push.agidseven.workers.dev
+  BUILD_TAG: j3c-portal-fix
+  PROD_VID: b82e5b03-b779-4b04-9a8e-29ddc522416c
+  BASE_SHA: f9b54ce320f345e50f9893415d7eeef87ef9ecbc
+  C20_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
+  T_DUMMY: f3374j3cidentity00000000000000000000000000000001
+
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate 1 — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "IDENTIDADE-QA-74J3C" ] || { echo "::error::confirmação inválida"; exit 1; }
+          echo "OK"
+
+      - name: Checkout candidata J3C
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: "Gate 2 — identidade da fonte + testes herméticos"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          echo "HEAD=$(git rev-parse HEAD)" | tee out/pre.txt
+          sha256sum cloudflare-worker.js | tee -a out/pre.txt
+          node --check cloudflare-worker.js
+          grep -q 'version: "V64.59-c20-failopen-74f"' cloudflare-worker.js || { echo "::error::não é a linha fail-open"; exit 1; }
+          grep -Fq 'const WORKER_BUILD = "j3c-portal-fix";' cloudflare-worker.js || { echo "::error::marcador de build J3C ausente"; exit 1; }
+          grep -Fq 'pt.key === "roteiro" ? ""' cloudflare-worker.js || { echo "::error::media-gate J3 ausente"; exit 1; }
+          grep -q 'name = "idseven-push-qa"' wrangler.qa.toml || { echo "::error::template QA inválido"; exit 1; }
+          if grep -qE '^\s*route|^\s*routes|custom_domain|\[triggers\]|crons' wrangler.qa.toml; then echo "::error::template QA com rota/cron"; exit 1; fi
+          grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml de produção alterado?"; exit 1; }
+          git show ${BASE_SHA}:cloudflare-worker.js > /tmp/base.js
+          git show ${C20_SHA}:cloudflare-worker.js > /tmp/c20.js
+          BASELINE_SRC=/tmp/base.js node scripts/f3374j3-roteiro-portal.test.mjs
+          WORKER_SRC=/tmp/base.js EXPECT=red node scripts/f3374j3-roteiro-portal.test.mjs
+          WORKER_SRC=/tmp/c20.js EXPECT=c20 node scripts/f3374j-failopen-contract.test.mjs
+          EXPECT=failopen RED_PROVED=1 DIFF_SCOPE_OK=1 node scripts/f3374j-failopen-contract.test.mjs
+          echo "GATE 2 OK"
+
+      - name: "Deploy QA (idseven-push-qa; produção intocada)"
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --config wrangler.qa.toml > out/deploy-qa.txt 2>&1 || true
+          tail -6 out/deploy-qa.txt
+          grep -q "idseven-push-qa" out/deploy-qa.txt || { echo "::error::deploy QA não confirmou o serviço"; exit 1; }
+          UPVID=$(grep -oiE 'Current Version ID: [0-9a-f-]+' out/deploy-qa.txt | awk '{print $NF}' | tail -1)
+          echo "QA_UPVID=$UPVID" | tee out/qa-vid.txt
+
+      - name: "Propagação QA (workers.dev serve build j3c)"
+        run: |
+          set -uo pipefail
+          DEADLINE=$(( $(date +%s) + 120 )); B=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            B=$(curl -sS --max-time 15 "$QA_WDEV/" | jq -r '.build' 2>/dev/null || true)
+            [ "$B" = "$BUILD_TAG" ] && break; sleep 3
+          done
+          echo "workers.dev QA build: $B"
+          [ "$B" = "$BUILD_TAG" ] || { echo "::error::serviço QA não propagou a J3C"; exit 1; }
+
+      - name: "PROBE DE IDENTIDADE — rota × tipo (token-free; sanitizado)"
+        run: |
+          set -uo pipefail
+          probe_build() { curl -sS --max-time 20 "$1/" | jq -r '.build // "ausente"' 2>/dev/null || echo "erro"; }
+          probe_hdr()   { curl -sS --max-time 25 -A "WhatsApp/2.23.20.0" -D - -o /dev/null "$1/share/cronograma/$T_DUMMY" 2>/dev/null | grep -i '^x-id7-worker-build:' | tr -d '\r' | awk '{print $2}' | tail -1; }
+          QA_C_BUILD=$(probe_build "$QA_CUSTOM"); QA_C_HDR=$(probe_hdr "$QA_CUSTOM")
+          QA_W_BUILD=$(probe_build "$QA_WDEV");   QA_W_HDR=$(probe_hdr "$QA_WDEV")
+          PR_C_BUILD=$(probe_build "$PROD_CUSTOM"); PR_C_HDR=$(probe_hdr "$PROD_CUSTOM")
+          PR_W_BUILD=$(probe_build "$PROD_WDEV")
+          {
+            echo "HOST                                  | GET/.build      | X-ID7-Worker-Build"
+            echo "aprovar-qa (custom, DEVE ser J3C)     | ${QA_C_BUILD:-vazio} | ${QA_C_HDR:-vazio}"
+            echo "idseven-push-qa (workers.dev)         | ${QA_W_BUILD:-vazio} | ${QA_W_HDR:-vazio}"
+            echo "aprovar. (produção, NÃO pode ter J3C) | ${PR_C_BUILD:-vazio} | ${PR_C_HDR:-vazio}"
+            echo "idseven-push (workers.dev produção)   | ${PR_W_BUILD:-vazio} | -"
+          } | tee out/identity-matrix.txt
+          # Produção INTOCADA (fail-closed)
+          [ "$PR_C_BUILD" = "ausente" ] || { echo "::error::produção (aprovar.) expôs build=$PR_C_BUILD — deploy indevido!"; exit 1; }
+          [ "$PR_W_BUILD" = "ausente" ] || { echo "::error::produção (workers.dev) expôs build — deploy indevido!"; exit 1; }
+          PV=$(curl -sS --max-time 25 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/idseven-push/deployments" | jq -r '.result.deployments[0].versions[0].version_id' 2>/dev/null || true)
+          echo "deployment ativo produção: $PV"
+          [ "$PV" = "$PROD_VID" ] || { echo "::error::deployment de produção MUDOU ($PV)"; exit 1; }
+          echo "PRODUÇÃO INTOCADA: sem J3C; deployment $PROD_VID."
+          echo
+          # VEREDITO rota × tipo
+          if [ "$QA_C_BUILD" = "$BUILD_TAG" ] && [ "$QA_C_HDR" = "$BUILD_TAG" ]; then
+            echo "VEREDITO=ROTA-OK :: aprovar-qa É servido pela J3C. O host executa o worker corrigido."
+            echo "  => a divergência física (PEÇAS) NÃO é de roteamento; investigar TIPO/DADO da tarefa real"
+            echo "  => próximo datum: X-ID7-Portal-Type ao reabrir o MESMO token em aprovar-qa (deve ser 'roteiro')."
+          else
+            echo "::warning::VEREDITO=ROTA-DIVERGENTE :: aprovar-qa NÃO retornou build=j3c (build=${QA_C_BUILD}, hdr=${QA_C_HDR})."
+            echo "  => aprovar-qa NÃO está executando o worker QA (idseven-push-qa) no caminho testado."
+            echo "  => CAUSA-RAIZ FÍSICA = roteamento/host: o teste do owner caiu num worker SEM J3."
+            echo "  => o código J3 do portal está correto; o portal precisa ser testado no host que serve idseven-push-qa."
+          fi
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374j3c-identity-evidence
+          path: out/
+          retention-days: 30
