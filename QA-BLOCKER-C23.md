@@ -1350,3 +1350,40 @@ conferência de hash. Instalação física em máquinas autorizadas fica a cargo
 
 **Estado final:** Worker produção **j6** (`9fbdf417…`); Desktop produção controlada **1.0.174** publicada
 (1.0.168 preservada como rollback). Ciclo F3.3.74 encerrado.
+
+---
+
+## F3.3.75A — Desktop QA: reset do wizard "Nova tarefa" + Roteiro sem Designer (1.0.175-QA)
+
+Dois bugs Desktop-only sobre 1.0.174 (b6b800c). **QA isolado; nada em produção.**
+
+### Causa-raiz
+- **BUG1 (wizard não reinicia):** FAB global e `data-board="new"` chamavam `openTaskForm(state.boardSector)`;
+  o `render()` era abortado pela guarda `_editingNow()` (protege campos em foco de re-render por snapshot
+  Firestore) quando já havia wizard aberto (`state.form` setado) → estado resetava mas o DOM mantinha a Etapa 2.
+- **BUG2 (Roteiro→Designer):** `operationalCol`, `deriveCanonicalTaskState` e `detailState` só gateavam por
+  `isClientSector` (true p/ cronograma E roteiro) → roteiro entrava nos estágios de designer.
+
+### Correção (branch desktop/f3375a-new-task-reset-roteiro-no-designer, commit 8ea10fb; +50 linhas; 100% Desktop-only)
+- **BUG1:** nova função canônica `openNewTaskWizard()` → `newForm(null)` (step 0/Setor, tudo limpo) + render
+  FORÇADO (blur do foco + zera `_deferRender`); FAB e `data-board="new"` roteados para ela. Edição (`data-edit`) intacta.
+- **BUG2:** `hasDesigner()` exclui roteiro (ignora designerAssignment legado, pula boards/bloco designer);
+  ramos roteiro em `operationalCol`/`deriveCanonicalTaskState`/`detailState` (aprovação do cliente CONCLUI,
+  nunca "enviar ao designer"); `detailSla` ignora roteiro. Dados legados ignorados, nunca apagados.
+- **Cronograma preservado** (designer intacto: hasDesigner só muda roteiro; C1–C5 verdes). Worker/portal/Card/
+  Cronograma-two-stage: intocados.
+
+### Provas
+- `scripts/f3375a-wizard-reset-roteiro-no-designer.test.mjs`: **RED 5/5** (b6b800c) + **GREEN 25/25**.
+- Regressão: flow-audit/roteiro-parity/baseline-freeze verdes; agenda F5/G6 atualizados p/ a função canônica.
+  Falhas restantes = SÓ pins de estado de produção 74K (versão 1.0.174 / sem-banner) que um build QA tripa por design.
+
+### Build QA (run 29661482161 SUCCESS)
+- versão **1.0.175-QA** + banner "AMBIENTE QA — NÃO USAR COM CLIENTES"; gate prova-de-versão (app.asar) + 74E OK.
+- EXE `ab2be2d562cd5cb6295af4c754246390ed6d0cd9b712f5ecbd73f67b04f05445`
+- MSI `f735010c551d50a21df44f89ccfe8900168a3484a3c33d927bab7ec515a5fb08`
+- artifacts: installer **8434480582**, bundle **8434482517**.
+
+### STOP / próximo
+Sem release/tag/produção. Produção Desktop 1.0.174 e Worker j6 intactos. Prova física do owner pendente
+(instalar 1.0.175-QA em máquina autorizada + TESTE 1/2/3). GO físico → F3.3.75B (promoção 1.0.175 produção).
