@@ -1107,3 +1107,53 @@ cronSub q4/q6/q8/q12 além de sector) — NÃO aplicado ainda (sem prova do valo
 ### STOP GATE 74J3C
 Produção intocada; nenhuma promoção. 74J4 permanece PROIBIDA até GO físico do owner no portal
 QA (J3C). Se GO: promover J3C (não J3) — inclui as duas correções (media-gate + identidade).
+
+---
+
+## F3.3.74J4 — Portal de Roteiro (Tema+Legenda) PROMOVIDO À PRODUÇÃO (2026-07-18, 18:21 UTC)
+
+**Evidência que fechou a causa:** a captura física do owner (74J3C) era em
+`aprovar.agendaidseven.com.br` = **PRODUÇÃO** (barra de endereço). A correção J3/J3C estava
+só no Worker QA (`idseven-push-qa`); produção seguia servindo o portal antigo → Roteiro com
+PEÇAS. Causa operacional: **correção QA não promovida**; causa de código: bloco de peças
+compartilhado sem exclusão do tipo roteiro (já corrigido no J3).
+
+**Candidata J4** (branch `worker/f3374j4-roteiro-portal-production`, commit `85787d0`): base =
+produção `f9b54ce` + media-gate do Roteiro + `clientPhase` sem mídia + identidade estática.
+Nova identidade de versão **V64.59-c20-failopen-j4-roteiro-portal** (build `j4-roteiro-portal`)
+— distingue o worker promovido do anterior (fecha o ponto cego de versão em produção).
+
+**Promoção gated** (workflow `f3374j4-promote-roteiro-portal.yml`, confirm
+`PROMOVER-PORTAL-ROTEIRO-74J4`, run **29655678585**, SUCCESS 57s):
+- Gate 2 snapshot pré (versão viva failopen-74f; rotas; domains; bindings; imagens; fonte de rollback f9b54ce).
+- Gate 3 **RED contra produção 5/5** (Roteiro exibe PEÇAS/Feed/Story) + **GREEN candidata 35/35**
+  (Roteiro só Tema/Legenda; Cronograma byte-idêntico) + contrato 74J **RED c20 5/5 + failopen 19/19**.
+- Deploy `idseven-push` (wrangler@4).
+- **Validação viva na PRODUÇÃO**: `aprovar.` versão=`…-j4-roteiro-portal` build=`j4-roteiro-portal`;
+  **X-ID7-Worker-Build no HOST = j4-roteiro-portal** (prova que aprovar. roda J4 — o check que
+  faltava antes); not_found GET=200 og=13 not_found/generic/no-store + HEAD 200; imagens
+  byte-exatas (c038636d…, f64f6f3e…); workers.dev = mesma versão.
+- Gate final: **rotas / Custom Domains / bindings IDÊNTICOS** ao snapshot (aprovar.→idseven-push,
+  aprovar-qa→idseven-push-qa; 12 vars + 8 secrets por nome).
+- **Rollback automático armado** no próprio workflow: qualquer falha → redeploy `f9b54ce`
+  (V64.59-c20-failopen-74f). Não disparou (tudo verde). Artifact `f3374j4-promotion-evidence` (90d).
+
+**Escopo/preservação:** diff vs produção só em `renderClientHtml` (peças não geradas p/ roteiro;
+cronograma byte-idêntico), `clientPhase` (roteiro sem dep. de mídia), headers de identidade
+estáticos, versão. **Intocados**: Card Premium/OG/fail-open/resolved/not_found/error/imagens/
+Cronograma/DNS/rotas/Custom Domains/bindings/secrets/Desktop. Dados legados de Feed/Story:
+ignorados na renderização, **jamais apagados**.
+
+**Estado de produção pós-J4:** Worker `idseven-push` = **V64.59-c20-failopen-j4-roteiro-portal**
+(build j4-roteiro-portal); Desktop produção **1.0.168** (intocado).
+
+### PROVA FÍSICA DO OWNER (FASE 8) — mesma página já aberta
+NÃO gerar link novo, NÃO reinstalar Desktop. Na MESMA página de Roteiro em produção
+(`aprovar.agendaidseven.com.br/cliente/cronograma/<mesmo_token>`): **Ctrl+F5** (ou fechar a aba
+e reabrir o mesmo link) → expandir Conteúdo 1. Esperado: Tema + Legenda + controles; **SEM**
+PEÇAS/Feed/Story/placeholder/área de imagem. Se PEÇAS persistir → disparar rollback
+(o workflow reverte automaticamente em falha de gate; manual: redeploy f9b54ce) + HARD NO-GO.
+
+### STOP GATE
+Sem alteração de Desktop. Promoção controlada do Desktop 1.0.174 permanece fase à parte
+(F3.3.74K), somente com autorização literal futura.
