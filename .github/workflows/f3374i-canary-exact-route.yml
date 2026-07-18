@@ -1,0 +1,305 @@
+# =====================================================================
+# [manual] F3.3.74I — CANÁRIO DE ROTA EXATA NO HOST HISTÓRICO (autorreversível).
+#
+# Cria, por UMA janela limitada, uma Worker Route EXATA:
+#   aprovar.agendaidseven.com.br/share/cronograma/<token-canário 48-hex fixo>
+#   → script idseven-push-qa (fail-open V64.59-c20-failopen-74f, JÁ no ar)
+# e prova, no host que o WhatsApp comprovadamente busca (74G: bursts reais
+# na produção durante o teste físico noturno), se o card renderiza quando
+# a resposta é 200+OG. Rotas têm precedência sobre o Custom Domain SÓ na
+# URL exata; TODO o resto de aprovar.* segue na produção intocada.
+#
+# FAIL-CLOSED (74H2): a janela só é declarada após a self-probe aparecer
+# DENTRO do stream do tail. A rota é REMOVIDA em steps `always()` (erro,
+# cancelamento, timeout, falha de tail — qualquer caminho) com prova
+# comportamental de reversão (canário volta a 404 de produção).
+#
+# PROIBIDO por construção: wildcard, /share/*, alteração de Custom Domain,
+# deploy de worker, DNS, WAF, secrets. Token canário: SINTÉTICO, público,
+# inexistente no Firestore, sem capacidade. Sanitização <tok:sha8> mantida
+# (a plataforma já redige o token no stream como "REDACTED").
+# =====================================================================
+name: "[manual] F3.3.74I Canário rota exata (host histórico)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite CANARIO-74I para autorizar"
+        required: true
+        default: ""
+      window_minutes:
+        description: "Duração da janela física (minutos, 3..55)"
+        required: false
+        default: "4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374i-canary
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_QA_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  ZONE_NAME: agendaidseven.com.br
+  PROD_HOST: aprovar.agendaidseven.com.br
+  QA_SCRIPT: idseven-push-qa
+  # token canário FIXO da fase 74I (sha256("F3374I-CANARY-AGENDAIDSEVEN")[:48])
+  TCAN: dedec9f4f5aafc33a9bcc56f49e6cf7092d4cba8bfc1d7f0
+  WIN_IN: ${{ github.event.inputs.window_minutes }}
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate — confirmação literal + pré-estado do host histórico"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          set -uo pipefail
+          [ "$CONFIRM" = "CANARIO-74I" ] || { echo "::error::confirmação inválida"; exit 1; }
+          mkdir -p out
+          V=$(curl -sS --max-time 25 "https://$PROD_HOST/" | jq -r '.version' || true)
+          echo "produção (raiz): $V"
+          [ "$V" = "V64.59-c20-golden-contract" ] || { echo "::error::produção não está no estado congelado"; exit 1; }
+          PC=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "https://$PROD_HOST/share/cronograma/$TCAN")
+          echo "pré-estado da URL canário (produção fail-closed esperada 404): $PC" | tee out/pre-state.txt
+          [ "$PC" = "404" ] || { echo "::error::pré-estado inesperado ($PC) — investigar antes de criar rota"; exit 1; }
+          echo "token canário: <tok:$(printf %s "$TCAN" | sha256sum | cut -c1-8)> (sintético, sem capacidade)"
+
+      - name: "FASE 7/8.1 — fotografar rotas (leitura; DENIED tolerado) "
+        run: |
+          set -uo pipefail
+          ZJ=$(curl -sS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=$ZONE_NAME")
+          ZID=$(echo "$ZJ" | jq -r '.result[0].id // empty')
+          [ -n "$ZID" ] || { echo "::error::sem zone id"; exit 1; }
+          echo "$ZID" > out/zid.txt
+          RT=$(curl -sS --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZID/workers/routes")
+          if [ "$(echo "$RT" | jq -r '.success')" = "true" ]; then
+            echo "$RT" | jq -r '.result[] | "  - id=\(.id | .[0:8])… pattern=\(.pattern) script=\(.script // "-")"' | tee out/routes-before.txt
+          else
+            echo "leitura de rotas: DENIED ($(echo "$RT" | jq -c '.errors' | head -c 160)) — fotografia degrade para prova comportamental (pré/pós)" | tee out/routes-before.txt
+          fi
+
+      - name: "FASE 7/8.2 — CRIAR rota EXATA (momento de capacidade)"
+        id: mkroute
+        run: |
+          set -uo pipefail
+          ZID=$(cat out/zid.txt)
+          PAT="$PROD_HOST/share/cronograma/$TCAN"
+          BODY=$(jq -n --arg p "$PAT" --arg s "$QA_SCRIPT" '{pattern:$p, script:$s}')
+          R=$(curl -sS --max-time 40 -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" -d "$BODY" "https://api.cloudflare.com/client/v4/zones/$ZID/workers/routes")
+          if [ "$(echo "$R" | jq -r '.success')" != "true" ]; then
+            echo "::error::criação da rota exata NEGADA/FALHOU — permissão faltante no token? $(echo "$R" | jq -c '.errors' | head -c 400)"
+            exit 1
+          fi
+          RID=$(echo "$R" | jq -r '.result.id')
+          echo "$RID" > out/route-id.txt
+          echo "route_id=$RID" >> "$GITHUB_OUTPUT"
+          echo "OK: rota exata criada (id=$(echo "$RID" | cut -c1-8)…) — padrão SÓ o pathname literal do token canário"
+
+      - name: "FASE 7.3 — provar ISOLAMENTO (comportamental, 5 checagens)"
+        run: |
+          set -uo pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-70 || true; }
+          URLC="https://$PROD_HOST/share/cronograma/$TCAN"
+          DEADLINE=$(( $(date +%s) + 120 ))
+          ST=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            ST=$(curl -sS --max-time 20 -A "isolation-check" -D out/h1.txt -o out/b1.html -w '%{http_code}' "$URLC" || echo err)
+            [ "$ST" = "200" ] && break
+            sleep 5
+          done
+          OGN=$(grep -c 'property="og:' out/b1.html || true)
+          echo "1) URL canário: GET=$ST og=$OGN task=$(hv x-share-task out/h1.txt) type=$(hv x-share-type out/h1.txt) cc=$(hv cache-control out/h1.txt)"
+          [ "$ST" = "200" ] && [ "$OGN" -ge 13 ] && [ "$(hv x-share-task out/h1.txt)" = "not_found" ] && [ "$(hv x-share-type out/h1.txt)" = "generic" ] || { echo "::error::canário NÃO respondeu pelo worker QA fail-open"; exit 1; }
+          HS=$(curl -sS --max-time 20 -I -o /dev/null -w '%{http_code}' "$URLC")
+          echo "   HEAD canário: $HS"; [ "$HS" = "200" ] || { echo "::error::HEAD do canário"; exit 1; }
+          SIB=$(printf %s "F3374I-SIBLING-$GITHUB_RUN_ID" | sha256sum | cut -c1-48)
+          S2=$(curl -sS --max-time 20 -o out/b2.html -w '%{http_code}' "https://$PROD_HOST/share/cronograma/$SIB")
+          OG2=$(grep -c 'property="og:' out/b2.html || true)
+          echo "2) token irmão (produção): GET=$S2 og=$OG2 (esperado 404 + 0 — fail-closed c20 INTACTO)"
+          [ "$S2" = "404" ] && [ "$OG2" = "0" ] || { echo "::error::outra URL de share saiu da produção!"; exit 1; }
+          V=$(curl -sS --max-time 20 "https://$PROD_HOST/" | jq -r '.version')
+          echo "3) raiz: $V"; [ "$V" = "V64.59-c20-golden-contract" ] || { echo "::error::raiz mudou"; exit 1; }
+          I=$(curl -sS --max-time 25 "https://$PROD_HOST/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
+          echo "4) imagem produção: sha=$I"; [ "$I" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || { echo "::error::imagem divergente"; exit 1; }
+          P=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "https://$PROD_HOST/cliente/cronograma/$SIB")
+          echo "5) portal (token irmão): $P (qualquer status de PRODUÇÃO serve; só não pode ser o QA generic)"
+          rm -f out/b1.html out/b2.html
+          echo "ISOLAMENTO PROVADO: só o pathname literal do canário vai ao QA"
+
+      - name: "FASE 8/9 — tail autovalidado (self-probe) + JANELA física + captura"
+        run: |
+          set -uo pipefail
+          MIN="${WIN_IN:-4}"
+          case "$MIN" in (*[!0-9]*) MIN=4;; esac
+          [ "$MIN" -ge 3 ] 2>/dev/null || MIN=3
+          [ "$MIN" -le 55 ] 2>/dev/null || MIN=55
+          npx --yes wrangler@3 --version >/dev/null 2>&1 || true
+          ( npx --yes wrangler@3 tail "$QA_SCRIPT" --format json > out/raw.jsonl 2> out/tail-err.txt ) &
+          TAILPID=$!
+          redact() { sed -E 's#/(share|cliente)/(cronograma|roteiro)/[A-Za-z0-9_-]{4,128}#/\1/\2/<tok>#g' "$1" 2>/dev/null | tail -5 || true; }
+          cleanup() { kill "$TAILPID" 2>/dev/null || true; wait "$TAILPID" 2>/dev/null || true; }
+          trap cleanup EXIT
+          sleep 3
+          kill -0 "$TAILPID" 2>/dev/null || { echo "::error::tail morreu ao iniciar"; redact out/tail-err.txt; exit 1; }
+          HD=$(( $(date +%s) + 90 ))
+          until grep -qiE 'connected|successfully created tail' out/raw.jsonl out/tail-err.txt 2>/dev/null; do
+            [ "$(date +%s)" -lt "$HD" ] || break
+            sleep 2
+          done
+          sleep 3
+          PUA="F3374I-TailProbe/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PST=$(curl -sS --max-time 25 -A "$PUA" -o /dev/null -w '%{http_code}' "https://$PROD_HOST/share/cronograma/$TCAN" || echo err)
+          echo "resposta da sonda HTTP $PST (esperado 200 via ROTA CANÁRIO; token <tok:$(printf %s "$TCAN" | sha256sum | cut -c1-8)>; UA=$PUA)"
+          [ "$PST" = "200" ] || { echo "::error::self-probe pela rota canário não obteve 200 — abortando"; exit 1; }
+          export TCAN PUA PROD_HOST
+          FOUND=0
+          GD=$(( $(date +%s) + 90 ))
+          while [ "$(date +%s)" -lt "$GD" ]; do
+            if python3 - <<'PY'
+          import json, os, sys
+          try:
+              raw = open('out/raw.jsonl', encoding='utf-8', errors='replace').read()
+          except FileNotFoundError:
+              sys.exit(1)
+          dec = json.JSONDecoder(); i = 0
+          tok = os.environ['TCAN']; ua = os.environ['PUA']
+          prefix = f"https://{os.environ['PROD_HOST']}/share/cronograma/"
+          while True:
+              j = raw.find('{', i)
+              if j < 0: break
+              try:
+                  obj, i = dec.raw_decode(raw, j)
+              except Exception:
+                  i = j + 1; continue
+              if not isinstance(obj, dict): continue
+              ev = obj.get('event') if isinstance(obj.get('event'), dict) else {}
+              req = ev.get('request') if isinstance(ev.get('request'), dict) else {}
+              hdrs = req.get('headers') if isinstance(req.get('headers'), dict) else {}
+              rua = next((str(v) for k, v in hdrs.items() if k.lower() == 'user-agent'), '')
+              resp = ev.get('response') if isinstance(ev.get('response'), dict) else {}
+              url = str(req.get('url') or '')
+              seg = url[len(prefix):] if url.startswith(prefix) else None
+              if (seg in (tok, 'REDACTED') and rua == ua
+                      and str(req.get('method')) == 'GET'
+                      and resp.get('status') == 200 and obj.get('outcome') == 'ok'):
+                  sys.exit(0)
+          sys.exit(1)
+          PY
+            then FOUND=1; break; fi
+            sleep 3
+          done
+          if [ "$FOUND" != "1" ]; then
+            echo "::error::tail não comprovou captura por self-probe — execução abortada (rota será removida no always)"
+            redact out/tail-err.txt
+            exit 1
+          fi
+          echo "evento da sonda encontrado no Tail (host=$PROD_HOST via rota canário; método=GET status=200 outcome=ok UA=$PUA)"
+          echo "TAIL_ATTACH_PROVADO"
+          echo "SELF_PROBE_CAPTURED=1"
+          echo "== JANELA ATIVA por ${MIN} minutos — CANÁRIO no host histórico $PROD_HOST =="
+          echo "== A equipe deve COLAR o link canário no WhatsApp Business QA AGORA =="
+          echo "==   https://$PROD_HOST/share/cronograma/<token-canário-da-fase>  (registro operacional) =="
+          sleep $(( MIN * 60 ))
+          cleanup
+          trap - EXIT
+          echo "janela encerrada de forma controlada"
+
+      - name: "Sanitizar + classificar captura (self_probe × external)"
+        if: always()
+        run: |
+          python3 - <<'PYEOF'
+          import json, re, hashlib, datetime
+          tokre = re.compile(r'/(share|cliente)/(cronograma|roteiro)/([A-Za-z0-9_-]{4,128})')
+          def red(s):
+              def rep(m):
+                  h = hashlib.sha256(m.group(3).encode()).hexdigest()[:8]
+                  return f'/{m.group(1)}/{m.group(2)}/<tok:{h}>'
+              return tokre.sub(rep, s)
+          try:
+              raw = open('out/raw.jsonl', encoding='utf-8', errors='replace').read()
+          except FileNotFoundError:
+              raw = ''
+          dec = json.JSONDecoder(); events = []; i = 0
+          while True:
+              j = raw.find('{', i)
+              if j < 0: break
+              try:
+                  obj, k = dec.raw_decode(raw, j); events.append(obj); i = k
+              except Exception:
+                  i = j + 1
+          rows = []
+          for ev in events:
+              if not isinstance(ev, dict): continue
+              evd = ev.get('event')
+              if not isinstance(evd, dict): continue
+              req = evd.get('request') or {}
+              if not isinstance(req, dict): continue
+              url = red(str(req.get('url') or ''))
+              if '/share/' not in url and '/og/' not in url and '/cliente/' not in url: continue
+              hdrs = req.get('headers') or {}
+              ua = next((str(v)[:90] for k, v in (hdrs.items() if isinstance(hdrs, dict) else []) if k.lower() == 'user-agent'), '')
+              cf = req.get('cf') if isinstance(req.get('cf'), dict) else {}
+              resp = evd.get('response') if isinstance(evd.get('response'), dict) else {}
+              ts = ev.get('eventTimestamp')
+              tss = datetime.datetime.utcfromtimestamp(ts/1000).isoformat() + 'Z' if isinstance(ts, (int, float)) else '?'
+              src = 'self_probe' if ua.startswith(('F3374I-TailProbe/', 'F3374H2-TailProbe/')) else 'external'
+              rows.append({'ts': tss, 'source': src, 'method': req.get('method'), 'url': url, 'ua': ua,
+                           'asn': cf.get('asn'), 'country': cf.get('country'),
+                           'status': resp.get('status'), 'outcome': ev.get('outcome')})
+          with open('out/capture-sanitized.jsonl', 'w', encoding='utf-8') as f:
+              for r in rows: f.write(json.dumps(r, ensure_ascii=False) + '\n')
+          ext = [r for r in rows if r['source'] == 'external']
+          print(f'== eventos capturados: {len(rows)} (externos={len(ext)}; self_probe={len(rows)-len(ext)} — sonda NUNCA conta como WhatsApp) ==')
+          for r in rows[:80]:
+              print(f"  [{r['source']}] {r['ts']} {r['method']} {r['status'] or '-'} {r['outcome'] or ''} ASN{r['asn'] or '?'}/{r['country'] or '?'} {r['url'][:90]} UA={r['ua'][:60]}")
+          if not ext:
+              print('  (nenhum request EXTERNO no canário durante a janela)')
+          PYEOF
+          rm -f out/raw.jsonl
+
+      - name: "REVERSÃO — remover rota canário + prova comportamental (SEMPRE)"
+        if: always()
+        run: |
+          set -uo pipefail
+          if [ ! -s out/route-id.txt ]; then
+            echo "nenhuma rota foi criada neste run — verificando que o canário segue na produção"
+          else
+            ZID=$(cat out/zid.txt)
+            RID=$(cat out/route-id.txt)
+            D=$(curl -sS --max-time 40 -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZID/workers/routes/$RID")
+            echo "DELETE rota: success=$(echo "$D" | jq -r '.success') ($(echo "$D" | jq -c '.errors' | head -c 160))"
+            [ "$(echo "$D" | jq -r '.success')" = "true" ] || { echo "::error::FALHA AO REMOVER A ROTA CANÁRIO — remover manualmente id=$RID"; exit 1; }
+          fi
+          DEADLINE=$(( $(date +%s) + 90 ))
+          PC=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            PC=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "https://$PROD_HOST/share/cronograma/$TCAN" || echo err)
+            [ "$PC" = "404" ] && break
+            sleep 5
+          done
+          echo "pós-estado da URL canário: $PC (esperado 404 = produção de volta)"
+          [ "$PC" = "404" ] || { echo "::error::canário NÃO voltou à produção"; exit 1; }
+          echo "ROTA REMOVIDA E REVERTIDA — host histórico 100% produção de novo"
+
+      - name: "PRODUÇÃO INTACTA (final, SEMPRE)"
+        if: always()
+        run: |
+          set -euo pipefail
+          V=$(curl -sS --max-time 25 "https://$PROD_HOST/" | jq -r '.version')
+          W=$(curl -sS --max-time 25 "https://idseven-push.agidseven.workers.dev/" | jq -r '.version')
+          echo "produção: $V | workers.dev: $W"
+          [ "$V" = "V64.59-c20-golden-contract" ] && [ "$W" = "V64.59-c20-golden-contract" ] || { echo "::error::PRODUÇÃO DIVERGIU"; exit 1; }
+          echo "OK: produção exatamente como congelada"
+
+      - name: Upload evidências (sanitizadas)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374i-canary-${{ github.run_number }}
+          path: out/
+          retention-days: 30
