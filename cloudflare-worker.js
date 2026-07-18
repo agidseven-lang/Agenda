@@ -2706,6 +2706,10 @@ function clientPhase(task) {
   if (task.finalApprovalCompleted === true) return "final";
   if (task.cronStatus === "ready_for_final_client_review"
       || task.workflowStage === "entrega" || task.workflowStage === "revisao_final") return "final";
+  // F3.3.74J3 — roteiro NÃO deriva fase por peças: só tem Tema/Legenda, e feedImageUrl
+  // legado em registros antigos é IGNORADO na validação (a fase 'production' de
+  // legendas/artes é exclusiva do cronograma; o fluxo do roteiro é themes → final).
+  if (premiumTypeOf(task).key === "roteiro") return "themes";
   // Deriva pela completude do conteúdo: todas com legenda E todas com Feed -> produção/final-prox.
   const arr = Array.isArray(task.cronWeeks) ? task.cronWeeks
     : (Array.isArray(task.cronContents) ? task.cronContents : []);
@@ -3440,7 +3444,12 @@ function renderClientHtml(task, token, env, origin) {
             (leg ? '<div class="fval" data-field="legenda">' + escapeHtml(leg) + '</div>'
                  : '<div class="pend" data-field="legenda"><div class="pi">' + ICN.text + '</div><div><div class="pt">Legenda pendente</div><div class="ps">Nossa equipe ainda está finalizando a legenda deste conteúdo.</div></div></div>') +
           '</div>' +
-          '<div class="field"><div class="flabel"><span class="fl">' + ICN.img + 'Peças</span></div><div class="media-row">' + media("feed", feedUrl) + media("story", storyUrl) + '</div></div>' +
+          // F3.3.74J3 — Roteiro de gravação de vídeos só tem Tema e Legenda: o bloco de
+          // peças (Peças/Feed/Story/placeholders) deixa de ser GERADO para roteiro — nada
+          // de esconder por CSS. Campos legados de Feed/Story em registros antigos são
+          // ignorados na renderização (e jamais apagados). Cronograma: string EXATA de antes.
+          (pt.key === "roteiro" ? "" :
+          '<div class="field"><div class="flabel"><span class="fl">' + ICN.img + 'Peças</span></div><div class="media-row">' + media("feed", feedUrl) + media("story", storyUrl) + '</div></div>') +
           (itemNote ? '<div class="field"><div class="flabel"><span class="fl">' + ICN.note + 'Sua observação</span></div><div class="fval note" data-itemnote>' + escapeHtml(itemNote) + '</div></div>'
                     : '<div class="field" data-noteslot style="display:none"><div class="flabel"><span class="fl">' + ICN.note + 'Sua observação</span></div><div class="fval note" data-itemnote></div></div>') +
           '<div class="iacts">' +
