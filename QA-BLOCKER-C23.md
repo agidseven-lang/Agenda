@@ -1157,3 +1157,10 @@ PEÇAS/Feed/Story/placeholder/área de imagem. Se PEÇAS persistir → disparar 
 ### STOP GATE
 Sem alteração de Desktop. Promoção controlada do Desktop 1.0.174 permanece fase à parte
 (F3.3.74K), somente com autorização literal futura.
+
+**Confirmação independente pós-deploy (auditoria read-only run 29655819351):** versão viva
+`V64.59-c20-failopen-j4-roteiro-portal` nos 2 caminhos; **Version ID ativo
+`cace97b6-1eb0-44c8-9493-853d0fd675e5` @100%** (deployment 574779cb, 18:21:28Z; anterior
+b82e5b03); **`media-gate do Roteiro PRESENTE no script vivo`**; rotas nenhuma; Custom Domains
+corretos; 12 vars + 8 secrets por nome; rollback c20 íntegro (sha aa07171e…) + botão
+ROLLBACK-C20-74J2 no main. Deploy run 29655678585, commit 85787d0.
