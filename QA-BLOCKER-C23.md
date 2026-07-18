@@ -1284,3 +1284,36 @@ runner, deploy só em `idseven-push-qa`, prova QA=build j5 e produção segue j4
 Mudança **só no worker** → Desktop 1.0.174 (candidata b6b800c) permanece **byte-idêntica** e
 **HARD-BLOCKED**: NÃO publicar `desktop/v1.0.174-production` nem aceitar PUBLICAR-DESKTOP-1.0.174-74K
 até o GO físico do 74J5. Produção do worker congelada em j4 até F3.3.74J6 (promoção gated).
+
+---
+
+## F3.3.74J6 — Cronograma 2-etapas PROMOVIDO à PRODUÇÃO (GO)
+
+Literal **PROMOVER-CRONOGRAMA-2-ETAPAS-74J6**. Candidata **worker/f3374j6-cronograma-two-stage-production**
+`db325d9` = fix 74J5 byte-idêntico (predicado `themesOnly` + gate Legenda/Peças/Editar-legenda por FASE)
++ identidade nova. Diff J4→J6 = SÓ os hunks autorizados (themesOnly + 3 gates + versão/build + testes).
+
+**Deploy gated** (workflow `f3374j6-promote-cronograma-two-stage.yml`, run **29659163418 SUCCESS**, 9/9 steps):
+snapshot → RED(j4: ETAPA 1 mostra Legenda/Peças) 7/7 → GREEN 43/43 + roteiro 35/35 + contrato 74J →
+deploy só em `idseven-push` → validação viva → gate infra → **sem rollback**.
+
+**Produção AGORA:**
+- service **idseven-push**
+- versão **V64.59-c20-failopen-j6-cronograma-two-stage**
+- build **j6-cronograma-two-stage**
+- **Version ID `9fbdf417-0348-4c46-b815-0393d6f837e7`** (anterior j4 `cace97b6-…` substituído)
+- rollback armado: j4 `85787d0` → V64.59-c20-failopen-j4-roteiro-portal.
+
+**Gates vivos no host aprovar.agendaidseven.com.br:** version+build=j6; **X-ID7-Worker-Build=j6-cronograma-two-stage**;
+not_found GET=200 og=13 task=not_found type=generic cc=no-store; HEAD 200; artes byte-exatas
+(cron c038636d…eea, roteiro f64f6f3e…cf3); workers.dev=j6. **rotas/Custom Domains/bindings IDÊNTICOS**
+ao snapshot (aprovar-qa→idseven-push-qa, aprovar.→idseven-push; 12 vars + 8 secrets só por NOME; cron `* * * * *`
+preservado). Evidência: artifact **8433792636** (16 arquivos). Nenhum secret impresso.
+
+**Comportamento provado (identidade viva ∧ RED/GREEN herméticos):** ETAPA 1 (themes) = só Tema; ETAPA 2
+(production/final) = Tema+Legenda+Feed+Story; Roteiro = Tema+Legenda. Render de portal resolvido ao vivo
+é validado fisicamente pelo owner (PASSO A/B/C/D) — não se cunha token de cliente.
+
+**Desktop 1.0.174 (b6b800c) permanece HARD-BLOCKED** — 74J6 é worker-only. Publicação só após GO físico
+integral das duas etapas + reauditoria da candidata Desktop + reliberação de PUBLICAR-DESKTOP-1.0.174-74K.
+QA `idseven-push-qa` segue j5 (`c4660441`).
