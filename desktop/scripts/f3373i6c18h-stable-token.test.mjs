@@ -211,7 +211,7 @@ ok('G2 [gate17] call sites de warn existentes não recebem token (apenas o Error
 ok('H1 alias ensureReviewToken delega para o helper estável (call sites intactos)',
   /async function ensureReviewToken\(taskId\)\{return ensureStableClientReviewToken\(taskId\);\}/.test(HTML));
 ok('H2 single-flight declarado (Map por tarefa)', /const _tokenFlight=new Map\(\);/.test(HTML));
-ok('H3 [gate20] versão da candidata QA (1.0.174-QA — 74E restore)', PKG.version === '1.0.174-QA');
+ok('H3 [gate20] versão da candidata de produção (1.0.174 — 74K)', PKG.version === '1.0.174');
 ok('H4 fonte consultada ANTES de gerar (get antecede genReviewToken no fluxo frio)', (() => {
   const iGet = SRC_ENSURE.indexOf('await ref.get()');
   const iGen = SRC_ENSURE.indexOf('genReviewToken()');

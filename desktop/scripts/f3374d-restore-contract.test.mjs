@@ -120,15 +120,15 @@ ok('R14 Roteiro usa o MESMO envelope (mensagem por setor; sem rota nova; sem Des
     /Seu cronograma já está pronto para avaliação/.test(seg));
 }
 
-/* R16 [74E] — banner QA permanente presente (identificação visual da candidata) */
-ok('R16 [74E] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" presente e permanente',
-  h.includes("AMBIENTE QA — NÃO USAR COM CLIENTES") && h.includes('z-index:2147483647'));
+/* R16 [74K] — build de PRODUÇÃO: banner QA AUSENTE (nenhuma identificação de QA no renderer) */
+ok('R16 [74K] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" AUSENTE (produção)',
+  !h.includes("AMBIENTE QA") && !h.includes("NÃO USAR COM CLIENTES") && !h.includes('banner permanente de QA'));
 
-/* R17 [74E] — versão da candidata QA (sem literal de versão no renderer) */
+/* R17 [74K] — versão de PRODUÇÃO 1.0.174 (sem sufixo -QA; sem literal de versão no renderer) */
 {
   const PKG = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok('R17 [74E] versão 1.0.174-QA (package.json) e NENHUM literal de versão no renderer',
-    PKG.version === '1.0.174-QA' && !h.includes('1.0.174'));
+  ok('R17 [74K] versão 1.0.174 (package.json, sem -QA) e NENHUM literal de versão no renderer',
+    PKG.version === '1.0.174' && !h.includes('1.0.174-QA') && !h.includes('1.0.174'));
 }
 
 console.log('');
