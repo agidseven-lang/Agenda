@@ -1236,3 +1236,51 @@ QA físico obrigatório antes da release (35 checagens do mandato; dados sintét
 Desktop produção OFICIAL segue **1.0.168** (rollback preservado) até o literal de publicação.
 Worker produção `V64.59-c20-failopen-j4-roteiro-portal` (cace97b6) congelado. Candidata 1.0.174
 buildada e verificada; aguardando QA físico + PUBLICAR-DESKTOP-1.0.174-74K.
+
+---
+
+## F3.3.74J5 — Cronograma: aprovação do cliente em DUAS etapas (ETAPA 1 = só Tema)
+
+**Incidente físico (owner):** portal do Cronograma na ETAPA 1 (APROVAÇÃO DE TEMAS, cabeçalho
+"Você está aprovando apenas os temas…") exibia indevidamente no Conteúdo 1: LEGENDA, "Legenda
+pendente", PEÇAS, FEED, STORY, "Feed pendente", "Story pendente", placeholders e áreas grandes de
+imagem. HARD NO-GO. Regra correta: ETAPA 1 mostra SÓ o Tema (+ nº, estado, observação, controles
+aprovar/ajuste/editar-tema). Legenda/Feed/Story só na ETAPA 2 (após produção + reenvio no MESMO
+link → cronStatus='ready_for_final_client_review').
+
+### Causa-raiz (auditoria forense read-only)
+- Portal renderiza no **worker** (`renderClientHtml`, cloudflare-worker.js) — não no Desktop.
+- Linha do tempo (git): Desktop 1.0.85 (52e65d0, 2026-06-04) desenhou o fluxo em 2 etapas
+  (`cvw`: legenda só `if(c.legenda)`, arte só `if(feed||story)` — **corte por PRESENÇA**). O portal
+  HTML do worker nasceu no dia seguinte (V64.6 fe2cd1e) e já em V64.7 (bfc9790) gerava Legenda +
+  Peças **incondicionalmente** para o cronograma. `clientPhase` (V64.13 3df257c) separou fases mas
+  só mexeu em cabeçalho/CTA — **o corpo nunca foi gated por fase**. Desde 74J3 o único gate era por
+  TIPO (`pt.key==='roteiro'`), nunca por FASE.
+- **Objetivo:** o corpo por conteúdo emitia o campo Legenda e o bloco Peças (Feed/Story) para o
+  cronograma em TODA fase → na fase 'themes' aparecia "Legenda/Feed/Story pendente".
+
+### Correção (worker-only, cirúrgica; branch worker/f3374j5-cronograma-themes-only, e8f7b3a)
+`renderClientHtml`: `const themesOnly = pt.key !== "roteiro" && phase === "themes";` e gate de
+(1) campo Legenda, (2) bloco Peças, (3) botão "Editar legenda" por `themesOnly` — **não gerados no
+DOM** na ETAPA 1 (nada de esconder por CSS). ETAPA 2 (production/final) e Roteiro (74J3): idênticos.
+Corte por **FASE**, não por presença — registros com legenda/feed LEGADO em 'themes' mostram só o
+Tema e **jamais** são apagados. Identidade: version `V64.59-c20-failopen-j5-cronograma-themes`,
+build `j5-cronograma-themes`.
+
+### Provas
+- Testes `scripts/f3374j5-cronograma-themes.test.mjs`: **RED 7/7** reproduz o print sobre a fonte
+  de PRODUÇÃO viva (85787d0/j4); **GREEN 43/43** na candidata (inclui byte-idêntico de ETAPA 2 +
+  roteiro + TODOS os handlers vs j4). Regressão: 74J3 **35/35** (roteiro preservado; cronograma-
+  production byte-idêntico), contrato 74J 17/17 real (T17/T18 são gated de runner, idênticos em j4).
+- **Físico (Playwright, DOM real após expandir os cards):** etapa1-themes = 0 Legenda / 0 Peças /
+  0 media-row / 0 editLegenda + 3 Tema + 3 Aprovar; etapa2-production = 3/3/3/3; roteiro = 4 Legenda
+  / 0 Peças / 4 editLegenda / 4 Tema. Screenshots em scratchpad/j5-proof/.
+
+### Deploy QA (isolado; produção INTOCADA)
+Workflow `f3374j5-deploy-qa.yml` (gate literal **ESPELHAR-QA-74J5**): roda RED/GREEN/regressão no
+runner, deploy só em `idseven-push-qa`, prova QA=build j5 e produção segue j4 (cace97b6 @100%).
+
+### ESCOPO / BLOQUEIO
+Mudança **só no worker** → Desktop 1.0.174 (candidata b6b800c) permanece **byte-idêntica** e
+**HARD-BLOCKED**: NÃO publicar `desktop/v1.0.174-production` nem aceitar PUBLICAR-DESKTOP-1.0.174-74K
+até o GO físico do 74J5. Produção do worker congelada em j4 até F3.3.74J6 (promoção gated).
