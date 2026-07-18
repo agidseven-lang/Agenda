@@ -130,7 +130,7 @@ const PREMIUM_TYPES = {
 // (nunca token/dado de cliente). Distingue inequivocamente ESTE worker no host que o
 // serviu — a string de VERSÃO é idêntica entre QA e produção, então versão sozinha não
 // prova qual runtime respondeu. Presença de build=j3c => é a candidata J3C.
-const WORKER_BUILD = "j5-cronograma-themes";
+const WORKER_BUILD = "j6-cronograma-two-stage";
 function premiumTypeOf(task) {
   const sec = (task && typeof task.sector === "string") ? task.sector.trim().toLowerCase() : "";
   return sec === "roteiro" ? PREMIUM_TYPES.roteiro : PREMIUM_TYPES.cronograma;
@@ -519,7 +519,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-j5-cronograma-themes", build: WORKER_BUILD }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-j6-cronograma-two-stage", build: WORKER_BUILD }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
