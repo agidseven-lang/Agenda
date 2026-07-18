@@ -1,0 +1,80 @@
+# =====================================================================
+# [manual] F3.3.74J2 — ROLLBACK ON-DEMAND para o c20 golden-contract.
+#
+# Botão de emergência da FASE 3: se o Card sintético NÃO aparecer,
+# qualquer pessoa autorizada dispara este workflow e a produção volta
+# IMEDIATAMENTE ao estado congelado V64.59-c20-golden-contract
+# (fonte 928669eb2 — o exato worker de produção pré-74J).
+# Não altera rotas/DNS/bindings/secrets; valida ao vivo após o deploy
+# (versão + not_found volta a 404 fail-closed, o comportamento c20).
+# =====================================================================
+name: "[manual] F3.3.74J2 Rollback c20 (produção; gated)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite ROLLBACK-C20-74J2 para reverter a produção ao c20"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374j2-rollback
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  PROD_URL: https://aprovar.agendaidseven.com.br
+  ROLLBACK_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
+  T_NF: f3374j2rollbackcheck0000000000000000000000000001
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "ROLLBACK-C20-74J2" ] || { echo "::error::confirmação inválida"; exit 1; }
+          echo "OK"
+
+      - name: Checkout (fonte de rollback)
+        uses: actions/checkout@v4
+        with:
+          ref: worker/f3374f-share-og-failopen-candidate
+          fetch-depth: 0
+
+      - name: "Rollback — deploy do worker c20 928669eb2 + validação viva"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          git checkout -q ${ROLLBACK_SHA} -- cloudflare-worker.js
+          sha256sum cloudflare-worker.js | tee out/rollback-hash.txt
+          grep -q 'version: "V64.59-c20-golden-contract"' cloudflare-worker.js || { echo "::error::fonte de rollback não é o c20"; exit 1; }
+          npx --yes wrangler@4 deploy > out/rollback-deploy.txt 2>&1 || true
+          tail -8 out/rollback-deploy.txt
+          grep -q "idseven-push" out/rollback-deploy.txt || { echo "::error::deploy de rollback não confirmou o serviço"; exit 1; }
+          DEADLINE=$(( $(date +%s) + 120 )); V=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            V=$(curl -sS --max-time 15 "$PROD_URL/" | jq -r '.version' 2>/dev/null || true)
+            [ "$V" = "V64.59-c20-golden-contract" ] && break; sleep 4
+          done
+          echo "versão pós-rollback: $V"
+          [ "$V" = "V64.59-c20-golden-contract" ] || { echo "::error::ROLLBACK NÃO CONFIRMOU"; exit 1; }
+          ST=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' "$PROD_URL/share/cronograma/$T_NF")
+          echo "not_found pós-rollback: $ST (esperado 404 = contrato c20 fail-closed)"
+          [ "$ST" = "404" ] || { echo "::error::comportamento pós-rollback inesperado"; exit 1; }
+          echo "ROLLBACK OK — produção de volta ao V64.59-c20-golden-contract"
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374j2-rollback-evidence
+          path: out/
+          retention-days: 90
