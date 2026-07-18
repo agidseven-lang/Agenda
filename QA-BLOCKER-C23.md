@@ -1416,15 +1416,25 @@ EXCLUSIVAMENTE versão/banner de QA. **Sem alterar Worker/portal/backend.** Zero
   byte-idênticos); package.json só difere na versão; main/preload compilados byte-idênticos; inventário idêntico;
   **zero** divergência funcional não-autorizada. EXE prod `30116107…`, EXE QA `ab2be2d5…`.
 
-### Release ARMADA (workflow f3375b-desktop-release-production, id 315913224, active; NÃO disparada)
-- Gated no literal `PUBLICAR-DESKTOP-1.0.175-75B`. Tudo pinado (run/SHA/artifact ids+digests/tag/hashes EXE+MSI).
-- Sequência: literal → run-success-no-SHA → branch-não-moveu → Worker j6 (read-only, sem deploy) → artifacts
-  exatos → tag/release livres & 1.0.174 presente → hashes byte-a-byte + VERSAO-DESKTOP → create (draft=false,
-  prerelease=false, **make_latest=false**, imutável) EXE+MSI+SHA256SUMS+VERSAO+RELATORIO → verify flags/assets/
-  target + reforço make_latest=false (sem query isLatest; fix 74K carregado) → download-smoke → confirma 1.0.174 intacta.
-- Tag alvo `desktop/v1.0.175-production`; **não** marca latest; **não** toca `desktop/v1.0.174-production` (b6b800c).
+### Release PUBLICADA (workflow f3375b-desktop-release-production, run 29663247092 SUCCESS; pós-literal PUBLICAR-DESKTOP-1.0.175-75B)
+- 7 gates (literal → run-success-no-SHA → branch-não-moveu → Worker j6 read-only → artifacts exatos → tag/release
+  livres & 1.0.174 presente → hashes byte-a-byte + VERSAO) + publish + pós-verify + FASE 13 smoke: TODOS verdes.
+- Release `desktop/v1.0.175-production` (id **356205849**, target `d1351389`, draft=false, prerelease=false,
+  **imutável**), **5 assets** (EXE+MSI+SHA256SUMS+VERSAO+RELATORIO).
+- SMOKE: re-baixou da release publicada e reconferiu byte-a-byte — EXE `30116107…`, MSI `359483c3…`. 1.0.174
+  preservada (tag intacta, não-draft). Worker j6 verificado read-only (nenhum deploy).
 
-### STOP / próximo
-Nada publicado. Produção Desktop **1.0.174** e Worker **j6** (`9fbdf417…`) intactos. Aguardando: (1) prova física
-do owner (instalar candidata 1.0.175 em máquina autorizada, SEM banner, reconferir TESTE 1/2) e (2) literal
-`PUBLICAR-DESKTOP-1.0.175-75B` p/ disparar a release. Rollback oficial: 1.0.174 (EXE `4940f8a6…`, MSI `160a1d31…`).
+### Selo "Latest" — DECISÃO DO OWNER: aceitar 1.0.175 como Latest
+- Fato (prova autoritativa GraphQL `isLatest`, run 29663498085): a 1.0.175 ficou **isLatest=true** mesmo com
+  `--latest=false` no create + PATCH `make_latest=false` (ACEITO pelo GitHub, 2xx). Motivo: com TODAS as releases
+  full em make_latest=false, o GitHub designa a full **mais nova** como Latest por fallback; só sai da 1.0.175
+  marcando uma release mais antiga como Latest. Imutabilidade NÃO bloqueou (o PATCH foi aceito) — é o fallback.
+- Conflito com "não tocar a 1.0.174". **Owner DECIDIU ACEITAR a 1.0.175 como Latest** (é a nova versão oficial que
+  substitui a 1.0.174). Nenhuma release foi tocada; **1.0.174 intacta**.
+- Nota: o corpo da release 1.0.175 contém a frase "sem marcar como latest" (agora divergente do estado aceito);
+  NÃO editado (decisão "nada tocado"). Título/notas de release imutável seguem editáveis se o owner quiser depois.
+
+### ESTADO FINAL
+Produção Desktop **1.0.175** publicada (release imutável; **Latest por decisão do owner**). Rollback oficial
+**1.0.174** preservado (`desktop/v1.0.174-production`, `b6b800c`; EXE `4940f8a6…`, MSI `160a1d31…`). Worker **j6**
+(`9fbdf417…`) intacto (nenhum deploy). Backend/portal/Android congelados. **F3.3.75B encerrado.**
