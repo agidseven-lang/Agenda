@@ -847,3 +847,50 @@ desse token → worker QA resolve e serve card TIPADO "Aprovar roteiro" + arte
 `wa-card-roteiro-v64-60.jpg`); (4) colar o link `aprovar.…/share/cronograma/<token>`
 na JANELA ATIVA; (5) card de Roteiro deve aparecer SEM nada de Cronograma; reversão
 automática. Proibido aprovar Roteiro com card genérico.
+
+## ADENDO 74J-PROMOÇÃO — FAIL-OPEN NO AR EM PRODUÇÃO (validado ao vivo; rollback armado)
+
+**PROMOÇÃO EXECUTADA** (owner autorizou `PROMOVER-FAILOPEN-74J`). Workflow gated
+`f3374j-promote-failopen.yml`, run **`29644274208`** (main `5cfdba7`), 9/9 steps verdes:
+- Gate 1 literal OK; Gate 2 identidade da fonte (`f9b54ce` = c20 golden + fail-open,
+  worker byte-idêntico a `d134193`); Gate 3 herméticos no runner RED **5/5** (c20
+  `928669eb2`) + GREEN **19/19** (candidata).
+- **DEPLOY produção `idseven-push`** — Cloudflare Version ID
+  **`b82e5b03-b779-4b04-9a8e-29ddc522416c`**; mesmos bindings (12 vars inalteradas),
+  mesmo cron, mesmas rotas; secrets só por nome.
+- **Validação viva:** `aprovar.` = `V64.59-c20-failopen-74f`; not_found sintético
+  `GET=200 og=13 task=not_found type=generic cc=no-store xc=bypass`; HEAD 200; 2º GET
+  bypass; imagens `c038636d…`/`f64f6f3e…` byte-exatas; workers.dev = failopen.
+- **Gate final:** rotas pós **IDÊNTICAS** ao snapshot; DNS/Custom Domain/bindings
+  intocados. **Rollback armado** no próprio workflow (redeploy `928669eb2` →
+  golden-contract) e disponível a qualquer momento.
+
+**Nota do run 1 (`29643969870`, falso NO-GO):** o fail-open subiu e funcionou no
+domínio custom, mas o check do workers.dev era single-shot e leu golden-contract antes
+da propagação → rollback falso disparou (e re-deployou c20). Corrigido no run 2 com
+poll de propagação; remoção do `git stash -u` que engolia `out/`. Sem impacto de dados.
+
+### FASE 6 — prova física do card sintético EM PRODUÇÃO (owner; janela autovalidada)
+1. Actions → "[manual] F3.3.74F Crawler Capture" → `service=idseven-push`,
+   `window_minutes=30`, `note=fisico-74j-prod-cronograma`. Aguardar
+   `TAIL_ATTACH_PROVADO` / `SELF_PROBE_CAPTURED=1` / `JANELA ATIVA` (a self-probe em
+   produção agora aceita 200 = fail-open).
+2. Colar SOZINHO no WhatsApp Business, aguardar até 30 s antes de enviar:
+   `https://aprovar.agendaidseven.com.br/share/cronograma/f3374jprova000000000000000000000000000000000001`
+   (token sintético, sem capacidade). Card Premium de Cronograma DEVE aparecer.
+3. Registrar captura; o log mostra o request real `[external]` (UA/ASN/status/imagem).
+
+### FASE 7 — E2E com a Desktop 1.0.174-QA EXISTENTE (owner; sem build nova)
+- CRONOGRAMA: criar tarefa sintética → 1-clique copia+abre WhatsApp → colar → card
+  tipado → enviar → portal → aprovar → retorno ao Desktop.
+- ROTEIRO (prova TIPADA, sem card genérico): criar tarefa sintética de Roteiro
+  (opções 4/6/8/12, sem Designer) → card "Aprovar roteiro" + arte
+  `wa-card-roteiro-v64-60.jpg` + descrição própria, ZERO texto de Cronograma → portal
+  → aprovar → retorno. (Alternativa de canário tipado disponível no
+  `f3374i-canary-exact-route.yml` via input `token`, se preferir isolar por rota.)
+
+### STOP GATE
+Após GO físico de Cronograma E Roteiro: **PARAR**. NÃO publicar Desktop 1.0.174 — fica
+para a fase separada **F3.3.74K-DESKTOP-1.0.174-CONTROLLED-PRODUCTION-PROMOTION**
+(auditar build existente, hashes, regressão, release controlada, rollback 1.0.168).
+Desktop de produção permanece **1.0.168**.
