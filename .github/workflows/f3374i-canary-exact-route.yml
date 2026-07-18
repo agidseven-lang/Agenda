@@ -32,6 +32,10 @@ name: "[manual] F3.3.74I Canário rota exata (host histórico)"
         description: "Duração da janela física (minutos, 3..55)"
         required: false
         default: "4"
+      token:
+        description: "Token da rota exata (default = canário sintético 74I; para a prova TIPADA de Roteiro, usar o token QA resolvido da tarefa sintética)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -46,8 +50,10 @@ env:
   ZONE_NAME: agendaidseven.com.br
   PROD_HOST: aprovar.agendaidseven.com.br
   QA_SCRIPT: idseven-push-qa
-  # token canário FIXO da fase 74I (sha256("F3374I-CANARY-AGENDAIDSEVEN")[:48])
-  TCAN: dedec9f4f5aafc33a9bcc56f49e6cf7092d4cba8bfc1d7f0
+  # token canário FIXO da fase 74I (sha256("F3374I-CANARY-AGENDAIDSEVEN")[:48]);
+  # o input `token` pode substituí-lo (ex.: prova tipada de Roteiro com token QA)
+  TCAN_DEFAULT: dedec9f4f5aafc33a9bcc56f49e6cf7092d4cba8bfc1d7f0
+  TOK_IN: ${{ inputs.token }}
   WIN_IN: ${{ github.event.inputs.window_minutes }}
 
 jobs:
@@ -61,6 +67,11 @@ jobs:
           set -uo pipefail
           [ "$CONFIRM" = "CANARIO-74I" ] || { echo "::error::confirmação inválida"; exit 1; }
           mkdir -p out
+          TCAN="${TOK_IN:-$TCAN_DEFAULT}"; [ -n "$TCAN" ] || TCAN="$TCAN_DEFAULT"
+          case "$TCAN" in (*[!A-Za-z0-9_-]*) echo "::error::token inválido (charset)"; exit 1;; esac
+          L=${#TCAN}; { [ "$L" -ge 4 ] && [ "$L" -le 128 ]; } || { echo "::error::token inválido (tamanho $L)"; exit 1; }
+          printf %s "$TCAN" > out/tcan.txt
+          echo "TCAN=$TCAN" >> "$GITHUB_ENV"
           V=$(curl -sS --max-time 25 "https://$PROD_HOST/" | jq -r '.version' || true)
           echo "produção (raiz): $V"
           [ "$V" = "V64.59-c20-golden-contract" ] || { echo "::error::produção não está no estado congelado"; exit 1; }

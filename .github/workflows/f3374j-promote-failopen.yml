@@ -1,0 +1,142 @@
+# =====================================================================
+# [manual] F3.3.74J — PROMOÇÃO MÍNIMA DO FAIL-OPEN À PRODUÇÃO (gated).
+#
+# PREPARADO na 74J-PREP; NÃO roda sem a confirmação literal do owner.
+# Promove ao serviço de PRODUÇÃO `idseven-push` a candidata cirúrgica
+# f9b54ce (V64.59-c20-failopen-74f = c20 GOLDEN + fail-open no /share),
+# cuja causa foi fisicamente comprovada no canário 74I (Card Premium
+# apareceu no host histórico com a MESMA resposta fail-open).
+#
+# Sequência blindada: fotografa versão/rotas + hash do worker → testes
+# herméticos RED(c20)/GREEN(candidata) no runner → deploy → validação
+# viva GET/HEAD/resolved-headers/not_found/error/imagens/Cronograma-
+# Roteiro → ROLLBACK IMEDIATO automático para o c20 se qualquer gate
+# pós-deploy falhar (redeploy do commit 928669eb2). Desktop/DNS/secrets/
+# rotas/Custom Domain intocados.
+# =====================================================================
+name: "[manual] F3.3.74J Promote fail-open (produção; gated)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PROMOVER-FAILOPEN-74J para autorizar o deploy de produção"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374j-promote
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  PROD_URL: https://aprovar.agendaidseven.com.br
+  PROD_WDEV: https://idseven-push.agidseven.workers.dev
+  CANDIDATE_REF: worker/f3374f-share-og-failopen-candidate
+  CANDIDATE_SHA: f9b54ce
+  ROLLBACK_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
+  T_NF: f3374jpromote000000000000000000000000000000000001
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate 1 — confirmação literal do owner"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "PROMOVER-FAILOPEN-74J" ] || { echo "::error::confirmação inválida — deploy de produção NEGADO"; exit 1; }
+          echo "OK"
+
+      - name: Checkout candidata
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_REF }}
+          fetch-depth: 0
+
+      - name: "Gate 2 — snapshot pré (versão viva, rotas, hash do worker, identidade da fonte)"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          HEAD=$(git rev-parse HEAD); echo "HEAD=$HEAD" | tee out/pre.txt
+          case "$HEAD" in ${CANDIDATE_SHA}*) : ;; *) echo "::error::ref não está na candidata ${CANDIDATE_SHA}"; exit 1;; esac
+          grep -q 'version: "V64.59-c20-failopen-74f"' cloudflare-worker.js || { echo "::error::fonte não é a candidata"; exit 1; }
+          grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml divergente"; exit 1; }
+          sha256sum cloudflare-worker.js | tee -a out/pre.txt
+          V=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); echo "produção ANTES: $V" | tee -a out/pre.txt
+          [ "$V" = "V64.59-c20-golden-contract" ] || { echo "::error::produção não está no c20 congelado ($V)"; exit 1; }
+          ZID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=agendaidseven.com.br" | jq -r '.result[0].id')
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZID/workers/routes" | jq -c '.result' | tee out/routes-pre.json
+          git show ${ROLLBACK_SHA}:cloudflare-worker.js > out/rollback-c20-worker.js
+          sha256sum out/rollback-c20-worker.js | tee -a out/pre.txt
+
+      - name: "Gate 3 — testes herméticos no runner (RED c20 5/5 + GREEN candidata 19/19)"
+        run: |
+          set -euo pipefail
+          WORKER_SRC=out/rollback-c20-worker.js EXPECT=c20 node scripts/f3374j-failopen-contract.test.mjs
+          EXPECT=failopen RED_PROVED=1 DIFF_SCOPE_OK=1 node scripts/f3374j-failopen-contract.test.mjs
+
+      - name: "DEPLOY produção (wrangler; mesmo serviço, mesmas rotas/bindings)"
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy 2>&1 | tee out/deploy.txt
+          grep -q "idseven-push" out/deploy.txt || { echo "::error::deploy não confirmou o serviço"; exit 1; }
+
+      - name: "Validação viva pós-deploy (com rollback automático em falha)"
+        run: |
+          set -uo pipefail
+          fail=0
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' | cut -c1-70 || true; }
+          DEADLINE=$(( $(date +%s) + 120 )); V=""
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            V=$(curl -sS --max-time 15 "$PROD_URL/" | jq -r '.version' 2>/dev/null || true)
+            [ "$V" = "V64.59-c20-failopen-74f" ] && break; sleep 4
+          done
+          echo "versão viva: $V"; [ "$V" = "V64.59-c20-failopen-74f" ] || fail=1
+          ST=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D out/h1.txt -o out/b1.html -w '%{http_code}' "$PROD_URL/share/cronograma/$T_NF")
+          OGN=$(grep -c 'property="og:' out/b1.html || true)
+          echo "not_found: GET=$ST og=$OGN task=$(hv x-share-task out/h1.txt) type=$(hv x-share-type out/h1.txt) cc=$(hv cache-control out/h1.txt) xc=$(hv x-share-cache out/h1.txt)"
+          { [ "$ST" = "200" ] && [ "$OGN" -ge 13 ] && [ "$(hv x-share-task out/h1.txt)" = "not_found" ] && [ "$(hv x-share-type out/h1.txt)" = "generic" ]; } || fail=1
+          case "$(hv cache-control out/h1.txt)" in *no-store*) : ;; *) fail=1;; esac
+          HS=$(curl -sS --max-time 30 -I -A "facebookexternalhit/1.1" -o /dev/null -w '%{http_code}' "$PROD_URL/share/cronograma/$T_NF")
+          echo "HEAD not_found: $HS"; [ "$HS" = "200" ] || fail=1
+          ST2=$(curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D out/h2.txt -o /dev/null -w '%{http_code}' "$PROD_URL/share/cronograma/$T_NF")
+          case "$(hv x-share-cache out/h2.txt)" in *bypass*) : ;; *) echo "not_found aqueceu cache!"; fail=1;; esac
+          for IMG in wa-card-v64-39.jpg wa-card-roteiro-v64-60.jpg; do
+            SHA=$(curl -sS --max-time 30 "$PROD_URL/og/$IMG" | sha256sum | cut -d' ' -f1); echo "img $IMG: $SHA"
+          done
+          I1=$(curl -sS --max-time 30 "$PROD_URL/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
+          I2=$(curl -sS --max-time 30 "$PROD_URL/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          [ "$I1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || fail=1
+          [ "$I2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || fail=1
+          W=$(curl -sS --max-time 25 "$PROD_WDEV/" | jq -r '.version'); echo "workers.dev: $W"; [ "$W" = "V64.59-c20-failopen-74f" ] || fail=1
+          if [ "$fail" != "0" ]; then
+            echo "::error::VALIDAÇÃO PÓS-DEPLOY FALHOU — executando ROLLBACK IMEDIATO para o c20"
+            git stash -u >/dev/null 2>&1 || true
+            git checkout -q ${ROLLBACK_SHA} -- cloudflare-worker.js
+            npx --yes wrangler@4 deploy 2>&1 | tee out/rollback-deploy.txt
+            RV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); echo "versão após rollback: $RV" | tee -a out/rollback-deploy.txt
+            [ "$RV" = "V64.59-c20-golden-contract" ] && echo "ROLLBACK OK" || echo "::error::ROLLBACK NÃO CONFIRMOU — intervenção manual"
+            exit 1
+          fi
+          echo "OK: produção fail-open validada ao vivo"
+
+      - name: "Gate final — rotas idênticas ao snapshot + secrets/bindings intocados"
+        if: always()
+        run: |
+          set -uo pipefail
+          ZID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones?name=agendaidseven.com.br" | jq -r '.result[0].id')
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/zones/$ZID/workers/routes" | jq -c '.result' | tee out/routes-post.json
+          if cmp -s out/routes-pre.json out/routes-post.json; then echo "rotas: IDÊNTICAS ao snapshot"; else echo "::error::rotas divergiram do snapshot"; exit 1; fi
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374j-promotion-evidence
+          path: out/
+          retention-days: 90
