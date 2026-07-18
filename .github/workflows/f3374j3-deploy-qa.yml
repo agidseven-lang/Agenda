@@ -1,0 +1,156 @@
+# =====================================================================
+# [manual] F3.3.74J3 — DEPLOY QA da candidata "portal Roteiro = Tema+Legenda".
+#
+# Publica SOMENTE no serviço de QA `idseven-push-qa` (aprovar-qa.…/workers.dev;
+# sem rota custom de produção; sem cron) a candidata 74J3 (fail-open 74J +
+# remoção do bloco de Peças/Feed/Story do portal de ROTEIRO). Produção
+# (`idseven-push`) permanece INTOCADA — e este workflow PROVA isso ao vivo:
+#   • roda a suíte 74J3 (RED repro + GREEN 34/34) e o contrato 74J (RED c20
+#     5/5 + GREEN 19/19) NO RUNNER antes do deploy;
+#   • deploy QA → GET / = V64.59-c20-failopen-74f; contrato /share e artes
+#     byte-exatas no domínio custom QA;
+#   • PROVA DE CÓDIGO VIVO: o script do serviço QA CONTÉM o marcador J3 e o
+#     script de PRODUÇÃO NÃO contém; deployment ativo de produção segue
+#     b82e5b03 @100%. NENHUM secret impresso; token dummy apenas.
+# =====================================================================
+name: "[manual] F3.3.74J3 Deploy QA (portal roteiro tema+legenda)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite ESPELHAR-QA-74J3 para autorizar o deploy de QA"
+        required: true
+        default: ""
+      ref:
+        description: "Branch/commit da candidata 74J3"
+        required: true
+        default: "worker/f3374j3-roteiro-portal-tema-legenda-only"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f3374j3-deploy-qa
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  QA_WDEV: https://idseven-push-qa.agidseven.workers.dev
+  QA_CUSTOM: https://aprovar-qa.agendaidseven.com.br
+  PROD_URL: https://aprovar.agendaidseven.com.br
+  EXPECT_VERSION: V64.59-c20-failopen-74f
+  PROD_VID: b82e5b03-b779-4b04-9a8e-29ddc522416c
+  BASE_SHA: f9b54ce320f345e50f9893415d7eeef87ef9ecbc
+  C20_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
+  T_NF: f3374j3qadeploy000000000000000000000000000000001
+
+jobs:
+  deploy-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate 1 — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "ESPELHAR-QA-74J3" ] || { echo "::error::confirmação inválida — deploy QA negado"; exit 1; }
+          echo "OK"
+
+      - name: Checkout candidata 74J3
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: "Gate 2 — identidade da fonte + testes herméticos no runner"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          echo "HEAD=$(git rev-parse HEAD)" | tee out/pre.txt
+          sha256sum cloudflare-worker.js | tee -a out/pre.txt
+          node --check cloudflare-worker.js
+          grep -q 'version: "V64.59-c20-failopen-74f"' cloudflare-worker.js || { echo "::error::fonte não é fail-open 74J"; exit 1; }
+          grep -q 'F3.3.74F — FAIL-OPEN DO OG' cloudflare-worker.js || { echo "::error::bloco fail-open ausente"; exit 1; }
+          grep -Fq 'pt.key === "roteiro" ? ""' cloudflare-worker.js || { echo "::error::marcador J3 (Peças) ausente"; exit 1; }
+          grep -Fq 'if (premiumTypeOf(task).key === "roteiro") return "themes";' cloudflare-worker.js || { echo "::error::guard J3 (clientPhase) ausente"; exit 1; }
+          grep -q 'name = "idseven-push-qa"' wrangler.qa.toml || { echo "::error::template QA inválido"; exit 1; }
+          if grep -qE '^\s*route|^\s*routes|custom_domain|\[triggers\]|crons' wrangler.qa.toml; then
+            echo "::error::template QA contém rota/cron — quebraria o isolamento"; exit 1; fi
+          grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml de produção alterado?"; exit 1; }
+          git show ${BASE_SHA}:cloudflare-worker.js > /tmp/base-f9b54ce.js
+          git show ${C20_SHA}:cloudflare-worker.js > /tmp/rollback-c20.js
+          echo "— suíte 74J3 RED (repro no pré-patch) —"
+          WORKER_SRC=/tmp/base-f9b54ce.js EXPECT=red node scripts/f3374j3-roteiro-portal.test.mjs
+          echo "— suíte 74J3 GREEN (34/34 na candidata) —"
+          BASELINE_SRC=/tmp/base-f9b54ce.js node scripts/f3374j3-roteiro-portal.test.mjs
+          echo "— contrato 74J RED (c20) + GREEN (failopen) —"
+          WORKER_SRC=/tmp/rollback-c20.js EXPECT=c20 node scripts/f3374j-failopen-contract.test.mjs
+          EXPECT=failopen RED_PROVED=1 DIFF_SCOPE_OK=1 node scripts/f3374j-failopen-contract.test.mjs
+          echo "GATE 2 OK: fonte J3 íntegra + RED/GREEN completos no runner"
+
+      - name: "Deploy QA (serviço próprio; produção intocada)"
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --config wrangler.qa.toml > out/deploy-qa.txt 2>&1 || true
+          tail -8 out/deploy-qa.txt
+          grep -q "idseven-push-qa" out/deploy-qa.txt || { echo "::error::deploy QA não confirmou o serviço"; exit 1; }
+
+      - name: "Propagação + contrato /share no QA (workers.dev e domínio custom)"
+        run: |
+          set -uo pipefail
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
+          for U in "$QA_WDEV" "$QA_CUSTOM"; do
+            DEADLINE=$(( $(date +%s) + 120 )); V=""
+            while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+              V=$(curl -sS --max-time 15 "$U/" | jq -r '.version' 2>/dev/null || true)
+              [ "$V" = "$EXPECT_VERSION" ] && break; sleep 3
+            done
+            echo "$U -> $V"
+            [ "$V" = "$EXPECT_VERSION" ] || { echo "::error::QA não propagou em $U"; exit 1; }
+          done
+          ST=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D out/h1.txt -o out/b1.html -w '%{http_code}' "$QA_CUSTOM/share/cronograma/$T_NF")
+          OGN=$(grep -c 'property="og:' out/b1.html || true)
+          echo "not_found QA: GET=$ST og=$OGN task=$(hv x-share-task out/h1.txt) type=$(hv x-share-type out/h1.txt) cc=$(hv cache-control out/h1.txt)"
+          { [ "$ST" = "200" ] && [ "$OGN" -ge 9 ] && [ "$(hv x-share-task out/h1.txt)" = "not_found" ] && [ "$(hv x-share-type out/h1.txt)" = "generic" ]; } || { echo "::error::contrato not_found QA divergente"; exit 1; }
+          case "$(hv cache-control out/h1.txt)" in *no-store*) : ;; *) echo "::error::sem no-store"; exit 1;; esac
+          ST2=$(curl -sS --max-time 30 -A "facebookexternalhit/1.1" -D out/h2.txt -o /dev/null -w '%{http_code}' "$QA_CUSTOM/share/cronograma/$T_NF")
+          case "$(hv x-share-cache out/h2.txt)" in *bypass*) : ;; *) echo "::error::não-resolvido aqueceu cache"; exit 1;; esac
+          HS=$(curl -sS --max-time 30 -I -o /dev/null -w '%{http_code}' -A "WhatsApp/2.23.20.0" "$QA_CUSTOM/share/cronograma/$T_NF")
+          [ "$HS" = "200" ] || { echo "::error::HEAD $HS"; exit 1; }
+          s1=$(curl -sS --max-time 30 "$QA_CUSTOM/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
+          s2=$(curl -sS --max-time 30 "$QA_CUSTOM/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          echo "arte cron: $s1"; echo "arte rot : $s2"
+          [ "$s1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || { echo "::error::arte cron divergente"; exit 1; }
+          [ "$s2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || { echo "::error::arte roteiro divergente"; exit 1; }
+          echo "OK: QA vivo com contrato de share + artes byte-exatas"
+
+      - name: "PROVA DE CÓDIGO VIVO — QA contém J3; PRODUÇÃO NÃO (intocada)"
+        run: |
+          set -uo pipefail
+          API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
+          curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push-qa" -o qa-live.js || true
+          curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push" -o prod-live.js || true
+          grep -Fq 'pt.key === "roteiro" ? ""' qa-live.js || { echo "::error::script VIVO do QA não contém o marcador J3"; exit 1; }
+          grep -Fq 'if (premiumTypeOf(task).key === "roteiro") return "themes";' qa-live.js || { echo "::error::script VIVO do QA sem o guard J3"; exit 1; }
+          echo "QA vivo: marcadores J3 PRESENTES"
+          if grep -Fq 'pt.key === "roteiro" ? ""' prod-live.js; then echo "::error::PRODUÇÃO CONTÉM J3 — deploy indevido!"; exit 1; fi
+          grep -q 'V64.59-c20-failopen-74f' prod-live.js || { echo "::error::produção não é mais a fail-open 74J?"; exit 1; }
+          echo "produção viva: SEM J3 (como deve ser nesta fase)"
+          PV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); echo "produção /: $PV"
+          [ "$PV" = "$EXPECT_VERSION" ] || { echo "::error::versão de produção divergente"; exit 1; }
+          DEP=$(curl -sS --max-time 25 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
+          LVID=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].version_id' 2>/dev/null || true)
+          LPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage' 2>/dev/null || true)
+          echo "deployment ativo produção: $LVID @$LPCT%"
+          { [ "$LVID" = "$PROD_VID" ] && [ "$LPCT" = "100" ]; } || { echo "::error::deployment de produção MUDOU"; exit 1; }
+          rm -f qa-live.js prod-live.js
+          echo "PRODUÇÃO INTOCADA: deployment b82e5b03 @100% confirmado"
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3374j3-qa-deploy-evidence
+          path: out/
+          retention-days: 30
