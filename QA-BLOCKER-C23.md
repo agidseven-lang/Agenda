@@ -989,3 +989,60 @@ release, sem tag, sem troca do instalador de produção. Preparar apenas a autor
   3 bytes mais curta). Política de crawlers inalterada (`*` Allow: /; Meta/WhatsApp livres).
 - **Próximo**: FASES 4–7 (Desktop 1.0.174-QA E2E Cronograma/Roteiro + regressão) → somente
   depois, com tudo verde, a 74K (promoção controlada da Desktop). Worker fail-open PERMANECE.
+
+---
+
+## F3.3.74J3 — Portal de Roteiro: SOMENTE Tema + Legenda (QA; 2026-07-18)
+
+**Bug físico (owner)**: no portal de aprovação de ROTEIRO, expandir um conteúdo mostrava
+"PEÇAS" + blocos FEED/STORY + placeholders "Feed pendente"/"Story pendente". Regra de
+negócio: Roteiro de gravação de vídeos tem SÓ Tema e Legenda.
+
+**Causa-raiz (exata, com repro RED)**: `cloudflare-worker.js` → `renderClientHtml`
+(template por-conteúdo, L3443 pré-patch) gerava SEM condição de tipo:
+`'<div class="field">…' + ICN.img + 'Peças…' + media("feed", feedUrl) + media("story", storyUrl)`.
+`media()` sem URL emite `<span class="pl">Feed pendente</span>` (labels CONCATENADOS —
+por isso a busca literal falhava) e "Peças" vira "PEÇAS" por `text-transform:uppercase`
+(CSS `.flabel .fl`). Classificação: **G = A+B** (componente compartilhado + ausência de
+`type==='roteiro'`), mais latente **E/D**: `clientPhase` derivava fase `production` se
+todos os itens tivessem `feedImageUrl` (legado) — mesmo em roteiro.
+
+**Patch cirúrgico (branch `worker/f3374j3-roteiro-portal-tema-legenda-only`, commit
+`2919f5c`; diff +10/−1 em 2 pontos)**:
+1. bloco de Peças embrulhado em `(pt.key === "roteiro" ? "" : '…string EXATA…')` —
+   para roteiro o DOM **não é gerado** (nada de display:none);
+2. `clientPhase`: `if (premiumTypeOf(task).key === "roteiro") return "themes";` antes da
+   derivação por peças (explícito/final continuam respeitados; cronograma inalterado).
+Campos legados: lidos, **ignorados** na renderização/validação, **nunca enviados** no
+payload (`/action` = {action, contentIndex, value, note}; `clientItems` = {cs, theme,
+legenda, note, at}), **jamais apagados**.
+
+**Provas**:
+- Suíte nova `scripts/f3374j3-roteiro-portal.test.mjs`: RED 5/5 (repro pré-patch,
+  incl. fase legada 'production') + GREEN **34/34** (Tema/Legenda presentes; PEÇAS/FEED/
+  STORY/placeholders/upload/anexos AUSENTES em 4/6/8/12; aprovação/ajuste/progresso/final
+  ok; legado ignorado e intacto; **cronograma HTML BYTE-IDÊNTICO** pré×pós em fixtures
+  com e sem mídia; handlers/payload/OG/share/media byte-idênticos).
+- Contrato 74J na candidata: RED c20 5/5 + GREEN failopen **19/19**.
+- Suítes existentes: conjunto de falhas **IDÊNTICO** ao pré-patch (só pins c20 da 74J;
+  41/43, 21/24, 32/2) — zero regressão nova.
+- **Deploy QA** run `29651523278` (workflow `f3374j3-deploy-qa.yml`, confirm
+  `ESPELHAR-QA-74J3`): testes re-executados no runner; QA vivo nos 2 endereços com
+  `V64.59-c20-failopen-74f`; contrato share GET=200 og=13 not_found/generic/no-store/
+  bypass/HEAD; artes byte-exatas; **IDENTIDADE PROVADA** upload==deployment ativo QA
+  (`bc9d600f-1978-4444-b661-0c7ad5f3a807` @100%) + marcadores J3 no script vivo QA;
+  **PRODUÇÃO INTOCADA** (`b82e5b03…` @100%; script vivo SEM J3). Evidências: artifact
+  `f3374j3-qa-deploy-evidence` (8431607088).
+
+### Checklist FÍSICO do owner no portal QA (FASE 11)
+No link do Roteiro sintético do E2E, trocar o host `aprovar.` por `aprovar-qa.` e abrir
+no navegador do celular (mesmo token; NÃO criar cliente real):
+1 cabeçalho "Roteiro de gravação de vídeos"/"Aprovação de roteiros"; 2 pílula "4 roteiros";
+3 conteúdos corretos; 4 ao expandir: Tema ✓, Legenda ✓, PEÇAS ✗, Feed ✗, Story ✗, nenhum
+espaço vazio; 5 aprovar conteúdo; 6 pedir ajuste; 7 progresso 0/N…N/N; 8 aprovação final;
+9 retorno ao Desktop. (6/8/12: cobertos por teste automatizado.) 📸 de cada etapa.
+
+### STOP GATE 74J3
+**NENHUM deploy de produção.** Produção segue `V64.59-c20-failopen-74f`/`b82e5b03` com o
+portal atual. Só após aprovação física do owner no QA: autorizar
+**F3.3.74J4-ROTEIRO-PORTAL-TEMA-LEGENDA-ONLY-PRODUCTION-PROMOTION**.
