@@ -92,10 +92,19 @@ ok('C4 openDesignerModal / fluxo do designer preservado (cronograma)', /function
 ok('C5 Cronograma em duas etapas (Worker) não é tocado por este patch — sem cloudflare-worker no diff (Desktop-only)',
   !/cloudflare-worker/.test(H));
 
-console.log('— IDENTIDADE QA —');
-ok('Q1 QA banner "AMBIENTE QA — NÃO USAR COM CLIENTES" presente', /AMBIENTE QA — NÃO USAR COM CLIENTES/.test(H));
-ok('Q2 versão será 1.0.175-QA (package.json)',
-  /"version": "1\.0\.175-QA"/.test(fs.readFileSync(path.resolve(path.dirname(SRCPATH), '..', '..', 'package.json'), 'utf8')));
+console.log('— IDENTIDADE (auto-adaptável QA×produção) —');
+const PKG = fs.readFileSync(path.resolve(path.dirname(SRCPATH), '..', '..', 'package.json'), 'utf8');
+const isQA = /"version": "1\.0\.175-QA"/.test(PKG);
+const hasBanner = /AMBIENTE QA — NÃO USAR COM CLIENTES/.test(H);
+if (isQA) {
+  ok('Q1 (QA) banner "AMBIENTE QA — NÃO USAR COM CLIENTES" presente', hasBanner);
+  ok('Q2 (QA) versão 1.0.175-QA no package.json', /"version": "1\.0\.175-QA"/.test(PKG));
+} else {
+  // F3.3.75B — candidata de PRODUÇÃO: banner QA AUSENTE, versão 1.0.175 (sem -QA em lugar nenhum).
+  ok('Q1 (produção) banner "AMBIENTE QA" AUSENTE do renderer', !hasBanner);
+  ok('Q2 (produção) versão 1.0.175 (package.json) e NENHUM "1.0.175-QA" no renderer',
+    /"version": "1\.0\.175"/.test(PKG) && !/1\.0\.175-QA/.test(H));
+}
 
 console.log(`\n${EXPECT}: PASS=${pass} FAIL=${fail}`);
 process.exit(fail ? 1 : 0);
