@@ -1317,3 +1317,36 @@ preservado). Evidência: artifact **8433792636** (16 arquivos). Nenhum secret im
 **Desktop 1.0.174 (b6b800c) permanece HARD-BLOCKED** — 74J6 é worker-only. Publicação só após GO físico
 integral das duas etapas + reauditoria da candidata Desktop + reliberação de PUBLICAR-DESKTOP-1.0.174-74K.
 QA `idseven-push-qa` segue j5 (`c4660441`).
+
+---
+
+## F3.3.74K — Desktop 1.0.174 PUBLICADA (release de produção controlada)
+
+Literal **PUBLICAR-DESKTOP-1.0.174-74K** (após GO do 74J6; bloqueio resolvido — produção worker em j6).
+Candidata **b6b800c** (byte-idêntica; worker-independente). Antes do deploy, o sanity-gate do worker da
+release foi realinhado j4→j6 (a promoção 74J6 moveu produção); **pinos de integridade EXE/MSI/run
+inalterados**.
+
+**Release publicada:** `desktop/v1.0.174-production` (id 356186412), run **29659586505**.
+- target **b6b800c**, draft=false, prerelease=false, immutable=true, **5 assets**.
+- EXE `Agenda-ID-Seven-Desktop-1.0.174-x64.exe` (82,064,503 B) SHA-256 **4940f8a6…276**.
+- MSI `Agenda-ID-Seven-Desktop-1.0.174-x64.msi` (92,020,736 B) SHA-256 **160a1d31…947**.
+- + SHA256SUMS, VERSAO-DESKTOP.txt, RELATORIO-DESKTOP.txt.
+- Gate 4 confirmou worker vivo = j6 (read-only, sem deploy).
+
+**Nota de execução:** o step de pós-verificação da release falhou por incompat. do `gh` do runner
+(campo `--json isLatest` inexistente) — DEPOIS do publish (step 12 OK). Corrigido: workflow
+`f3374k-desktop-release-verify.yml` (literal VERIFICAR-DESKTOP-1.0.174-74K, run **29659847633 SUCCESS**):
+- `make_latest=false` **reforçado** (gh api PATCH, aceito mesmo em release imutável);
+- **SMOKE**: re-baixou EXE/MSI da release e reconferiu SHA-256 == oficiais;
+- digests server-side == oficiais; flags/target/5 assets conferidos;
+- **1.0.168 intacta** (`desktop/v1.0.168-production`, draft=false, 4 assets, EXE `299162a0…e1da`).
+- `/releases/latest` retorna 1.0.174 por ser a mais recente por DATA (endpoint date-based) — independe da
+  badge make_latest, que está false.
+
+**Rollback oficial:** 1.0.168 (`4fb0a7f`), EXE `299162a0…e1da` / MSI `a7613174…5b99`. Dados no Firebase.
+Instalador **não assinado** (Smart App Control pode bloquear) — instalar só em máquinas autorizadas após
+conferência de hash. Instalação física em máquinas autorizadas fica a cargo do owner (não automatizável).
+
+**Estado final:** Worker produção **j6** (`9fbdf417…`); Desktop produção controlada **1.0.174** publicada
+(1.0.168 preservada como rollback). Ciclo F3.3.74 encerrado.
