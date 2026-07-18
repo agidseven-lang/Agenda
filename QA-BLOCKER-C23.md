@@ -1046,3 +1046,64 @@ espaço vazio; 5 aprovar conteúdo; 6 pedir ajuste; 7 progresso 0/N…N/N; 8 apr
 **NENHUM deploy de produção.** Produção segue `V64.59-c20-failopen-74f`/`b82e5b03` com o
 portal atual. Só após aprovação física do owner no QA: autorizar
 **F3.3.74J4-ROTEIRO-PORTAL-TEMA-LEGENDA-ONLY-PRODUCTION-PROMOTION**.
+
+---
+
+## F3.3.74J3C — Causa-raiz FÍSICA do PEÇAS no portal QA (2026-07-18)
+
+**HARD NO-GO físico**: portal QA de Roteiro (owner, aprovar-qa) exibiu PEÇAS/Feed/Story.
+
+### O que a fonte PROVA (token-free)
+- Resolução de tipo **simétrica**: Card (`handleShareCard`/crawler) e portal
+  (`handleClientCronogramaView`→`renderClientHtml`) usam o **mesmo** `premiumTypeOf(task)`
+  = `task.sector.trim().toLowerCase()==='roteiro'`. Não há "duas regras" (refuta hip. F).
+- `media()` (PEÇAS/Feed/Story) é gerado **só** no template por-conteúdo (L3452), agora
+  roteiro-gated; **não há** builder client-side nem 2º bloco (refuta G/H).
+- Portal = `htmlResponse` **no-store** → nunca cacheado no edge (refuta C p/ o portal).
+- Desktop grava setor pela KEY (`roteiro`); `decodeFields` mapeia `sector` stringValue.
+
+### PONTO CEGO corrigido
+QA (`idseven-push-qa`) e produção (`idseven-push`) reportavam a **MESMA** string de versão
+`V64.59-c20-failopen-74f`. Nenhum check por host distinguia os runtimes; o "marcador J3" da
+74J3 foi lido pela **API do serviço**, nunca pelo host `aprovar-qa`, e o gate 74J3 **jamais
+renderizou um portal roteiro no host**. Além disso, `aprovar-qa` serviu o **74F mirror
+(fail-open SEM J3)** até o deploy 74J3 (16:13 UTC).
+
+### Instrumento J3C (branch worker/f3374j3c-roteiro-portal-physical-fix, commit 6d5360b)
+Headers/JSON de identidade (sem token/cliente, sem mudar corpo/cache/status):
+`const WORKER_BUILD="j3c-portal-fix"` em `GET /` (campo build) e header **X-ID7-Worker-Build**
+(share/crawler/portal); **X-ID7-Portal-Type** = tipo canônico resolvido 1x no handler (prova
+viva do tipo que o portal vê p/ a tarefa REAL); **X-ID7-Portal-Renderer** = full/ack/success/
+notfound. Testes: RED 5/5, portal GREEN 35/35 (T27 cronograma byte-idêntico; T28 núcleo
+byte-idêntico; T28b handlers só ganham identidade), contrato 74J RED c20 5/5 + failopen 19/19.
+
+### PROBE DE IDENTIDADE (run 29654776264, SUCCESS) — VEREDITO=ROTA-OK
+| host | GET /.build | X-ID7-Worker-Build |
+|---|---|---|
+| aprovar-qa (custom) | **j3c-portal-fix** | **j3c-portal-fix** |
+| idseven-push-qa (workers.dev) | j3c-portal-fix | j3c-portal-fix |
+| aprovar. (produção) | ausente | ausente |
+| idseven-push (workers.dev prod) | ausente | - |
+Deployment produção `b82e5b03…` @100% — **PRODUÇÃO INTOCADA**.
+
+**Conclusão**: `aprovar-qa` **executa o worker corrigido**; a divergência física **não é
+roteamento**. Causa mais provável = **timing/observabilidade**: o teste do owner caiu num
+worker de QA **SEM** J3 (74F mirror pré-16:13, ou propagação do custom domain). Para a tarefa
+roteiro, worker sem J3 → `premiumTypeOf=roteiro` (Card OK) **mas** media-block ungated → PEÇAS.
+Nenhuma contradição com o Card; **o código J3/J3C do portal está correto**.
+
+### PROVA FÍSICA DECISIVA (owner; mesmo token privado; sem divulgá-lo)
+Reabrir a MESMA tarefa de Roteiro em `https://aprovar-qa.agendaidseven.com.br/cliente/cronograma/<mesmo_token>`
+AGORA (aprovar-qa serve J3C). Esperado: **SEM** PEÇAS/Feed/Story; só Tema+Legenda+controles.
+Confirmar o header **X-ID7-Portal-Type** (deve ser `roteiro`) por qualquer um:
+- Chrome Android: `chrome://net-export` OU compartilhar → "Ver código-fonte" não mostra header;
+  mais simples: abrir DevTools remoto — porém, no celular, o caminho prático é o **visual**:
+  se não aparecer PEÇAS, é GO. (O X-ID7-Portal-Type fica no artifact/print se aberto via
+  desktop com F12 → Network → resposta do documento.)
+Se PEÇAS **persistir** com X-ID7-Portal-Type=`cronograma` → é dado/tipo real (a tarefa não
+tem sector='roteiro'); aí o fix canônico é robustecer `premiumTypeOf` (reconhecer roteiro por
+cronSub q4/q6/q8/q12 além de sector) — NÃO aplicado ainda (sem prova do valor real).
+
+### STOP GATE 74J3C
+Produção intocada; nenhuma promoção. 74J4 permanece PROIBIDA até GO físico do owner no portal
+QA (J3C). Se GO: promover J3C (não J3) — inclui as duas correções (media-gate + identidade).
