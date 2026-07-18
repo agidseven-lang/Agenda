@@ -6,7 +6,7 @@
 # aprovado (run 29656441708, branch desktop/f3374k-1.0.174-production @
 # b6b800c). TUDO PINADO: run id, SHA alvo, artifact ids/digests, tag, título
 # e hashes SHA-256 oficiais do EXE/MSI. Sequência: literal → run success no
-# SHA → branch não moveu → Worker de produção íntegro (j4, read-only) →
+# SHA → branch não moveu → Worker de produção íntegro (j6, read-only) →
 # artifacts ids/digests exatos → tag/release livres → baixa artifacts +
 # confere hashes byte a byte + VERSAO-DESKTOP → cria tag+release (draft=false,
 # prerelease=false, latest=false) com EXE+MSI+SHA256SUMS+VERSAO+RELATORIO →
@@ -41,7 +41,7 @@ jobs:
       TARGET_SHA: "b6b800c889d82f71ac27f18a31ae6502f96f155d"
       DESK_BRANCH: "desktop/f3374k-1.0.174-production"
       WORKER_URL: "https://idseven-push.agidseven.workers.dev"
-      WORKER_VERSION: "V64.59-c20-failopen-j4-roteiro-portal"
+      WORKER_VERSION: "V64.59-c20-failopen-j6-cronograma-two-stage"
       TAG: "desktop/v1.0.174-production"
       TITLE: "Agenda ID Seven Desktop 1.0.174 — Produção Controlada"
       OLD_TAG: "desktop/v1.0.168-production"
@@ -81,7 +81,7 @@ jobs:
           echo "desktop: $D"
           [ "$D" = "$TARGET_SHA" ] || { echo "::error::branch 74K moveu após aprovação — NO-GO"; exit 1; }
 
-      - name: "Gate 4 — Worker de produção íntegro (j4; read-only; sem deploy)"
+      - name: "Gate 4 — Worker de produção íntegro (j6; read-only; sem deploy)"
         run: |
           set -euo pipefail
           V="$(curl -sS --max-time 25 "$WORKER_URL/" | jq -r '.version')"
@@ -147,11 +147,12 @@ jobs:
           ## O que há nesta versão
           - **Card Premium de Cronograma restaurado** (contrato conhecido-como-bom) e **Card Premium de Roteiro** com arte própria "Roteiro de gravação de vídeos".
           - **Prewarm é bônus, nunca gate**: o botão de enviar ao WhatsApp nasce habilitado e o clique abre o WhatsApp imediatamente (fim da regressão C18C).
-          - **Portal de aprovação de Roteiro com apenas Tema e Legenda** (Worker j4): sem PEÇAS/Feed/Story; Cronograma preserva sua estrutura de peças.
+          - **Portal de aprovação de Roteiro com apenas Tema e Legenda** (Worker): sem PEÇAS/Feed/Story.
+          - **Cronograma em duas etapas** no portal do cliente (Worker): a ETAPA 1 (aprovação de temas) mostra somente o Tema; Legenda/Feed/Story aparecem apenas na ETAPA 2 (aprovação final), pelo mesmo link.
           - Mensagem/domínio/rota/token do link intactos; nenhuma dependência de native-share/Windows Share/Canvas no caminho principal.
 
           ## Compatibilidade com o Worker em produção
-          - Worker: `V64.59-c20-failopen-j4-roteiro-portal` (fail-open + portal de Roteiro Tema+Legenda). Esta publicação **não** executa deploy de Worker (verificado read-only no gate desta release).
+          - Worker: `V64.59-c20-failopen-j6-cronograma-two-stage` (fail-open + portal de Roteiro Tema+Legenda + Cronograma em duas etapas). Esta publicação **não** executa deploy de Worker (verificado read-only no gate desta release).
 
           ## Preservado (regressões protegidas)
           - Login/logout, tray/bandeja, Kanban/Board, Agenda, notificações, Equipe, Configurações, criação de tarefas por Setor, portal do cliente e aprovação — intactos (gate de invariância app.asar QA×produção: único delta funcional = versão + banner).
