@@ -120,15 +120,21 @@ ok('R14 Roteiro usa o MESMO envelope (mensagem por setor; sem rota nova; sem Des
     /Seu cronograma já está pronto para avaliação/.test(seg));
 }
 
-/* R16 [74K] — build de PRODUÇÃO: banner QA AUSENTE (nenhuma identificação de QA no renderer) */
-ok('R16 [74K] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" AUSENTE (produção)',
-  !h.includes("AMBIENTE QA") && !h.includes("NÃO USAR COM CLIENTES") && !h.includes('banner permanente de QA'));
-
-/* R17 [75B] — versão de PRODUÇÃO 1.0.175 (sem sufixo -QA; sem literal de versão no renderer) */
+/* R16/R17 [77A] — IDENTIDADE auto-adaptável (QA×produção). Build QA = banner AMBIENTE QA PRESENTE +
+   versão 1.0.177-QA. Build de PRODUÇÃO = banner AUSENTE + versão 1.0.177 (sem -QA; sem literal no renderer). */
 {
   const PKG = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok('R17 [75B] versão 1.0.175 (package.json, sem -QA) e NENHUM literal de versão no renderer',
-    PKG.version === '1.0.175' && !h.includes('1.0.175-QA') && !h.includes('1.0.175'));
+  const IS_QA = /-QA/.test(PKG.version);
+  if (IS_QA) {
+    ok('R16 [77A/QA] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" PRESENTE (build QA)',
+      h.includes("AMBIENTE QA") && h.includes("NÃO USAR COM CLIENTES"));
+    ok('R17 [77A/QA] versão 1.0.177-QA (package.json com sufixo -QA)', PKG.version === '1.0.177-QA');
+  } else {
+    ok('R16 [77A] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" AUSENTE (produção)',
+      !h.includes("AMBIENTE QA") && !h.includes("NÃO USAR COM CLIENTES") && !h.includes('banner permanente de QA'));
+    ok('R17 [77A] versão 1.0.177 (package.json, sem -QA) e NENHUM literal de versão no renderer',
+      PKG.version === '1.0.177' && !h.includes('1.0.177-QA') && !h.includes('1.0.177'));
+  }
 }
 
 console.log('');

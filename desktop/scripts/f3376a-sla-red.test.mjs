@@ -106,7 +106,7 @@ if (HAS_OP) {
   ok('SRC1: SEM designerOpSla (âncora voltou ao PRAZO PLANEJADO)', !HAS_OP);
   ok('SRC2: notifScanSla usa resolveTaskDisplayState + exclui roteiro', (() => { const s = grab('notifScanSla'); return /resolveTaskDisplayState\(t,now,f\)/.test(s) && /secOf\(t\.sector\)\|\|\{\}\)\.key==='roteiro'/.test(s); })());
   ok('SRC3: SEM grace de atribuição no amarelo (SLA_ASSIGNMENT_GRACE_MS não gateia notifScanSla)', !/SLA_ASSIGNMENT_GRACE_MS/.test(grab('notifScanSla')));
-  ok('SRC4: dedup por finishMs (planDueAt), não por assignedAt', /dedupKey:'sla_warning:'\+t\.id\+':'\+d\.finishMs/.test(grab('notifScanSla')));
+  ok('SRC4: dedup por finishMs (planDueAt), não por assignedAt (F3.3.77A: via slaDk config-driven)', /slaDk=function\(tag\)\{ return \(cfg&&cfg\.dedupByDesigner\)/.test(grab('notifScanSla')) && /':'\+d\.finishMs/.test(grab('notifScanSla')) && !/assignedAt/.test(grab('notifScanSla')));
   console.log('\n(CORRIGIDA / GREEN)');
 }
 

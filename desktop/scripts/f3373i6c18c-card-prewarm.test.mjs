@@ -45,7 +45,7 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão da candidata de produção (1.0.175 — 75B)', PJ.version === '1.0.175' && (S('package-lock.json').includes('"version": "1.0.175"')));
+ok('A1 versão da candidata (1.0.177 — 77A; aceita sufixo -QA no build QA)', (PJ.version === '1.0.177' || PJ.version === '1.0.177-QA') && (S('package-lock.json').includes('"version": "1.0.177"') || S('package-lock.json').includes('"version": "1.0.177-QA"')));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
 const MODC = 'const SHARE_PATH = "/share/cronograma/";\nconst HOST = "aprovar.agendaidseven.com.br";\n';

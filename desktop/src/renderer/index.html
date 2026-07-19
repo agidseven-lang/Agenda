@@ -2339,9 +2339,9 @@ function userColor(id){let h=0;const s=id||'';for(let i=0;i<s.length;i++)h=(h*31
 /* ---- Templates (TaskTemplates.kt) ---- */
 const TEMPLATES={
   edicao_midia:{titleLabel:'Título da edição',titlePh:'Ex.: Reels institucional — corte 30s',subLabel:'Pacote',subtypes:{
-    p4:{label:'4 vídeos/roteiros',formTitle:'Edição — pacote 4 vídeos/roteiros',items:4,itemLabel:'Vídeo',fields:[{k:'orientacoes',l:'Orientações',kind:'text',ph:'Cortes, ritmo, trilha, identidade…'}],checklist:['Receber materiais','Editar 4 vídeos','Revisar','Aprovar','Entregar']},
-    p6:{label:'6 vídeos/roteiros',formTitle:'Edição — pacote 6 vídeos/roteiros',items:6,itemLabel:'Vídeo',fields:[{k:'orientacoes',l:'Orientações',kind:'text',ph:'Cortes, ritmo, trilha, identidade…'}],checklist:['Receber materiais','Editar 6 vídeos','Revisar','Aprovar','Entregar']},
-    p12:{label:'12 vídeos/roteiros',formTitle:'Edição — pacote 12 vídeos/roteiros',items:12,itemLabel:'Vídeo',fields:[{k:'orientacoes',l:'Orientações',kind:'text',ph:'Cortes, ritmo, trilha, identidade…'}],checklist:['Receber materiais','Editar 12 vídeos','Revisar','Aprovar','Entregar']}}},
+    p4:{label:'4 vídeos/roteiros',formTitle:'Edição — pacote 4 vídeos/roteiros',items:4,itemLabel:'Vídeo',videoTema:true,fields:[{k:'orientacoes',l:'Orientações',kind:'text',ph:'Cortes, ritmo, trilha, identidade…'}],checklist:['Receber materiais','Editar 4 vídeos','Revisar','Aprovar','Entregar']},
+    p6:{label:'6 vídeos/roteiros',formTitle:'Edição — pacote 6 vídeos/roteiros',items:6,itemLabel:'Vídeo',videoTema:true,fields:[{k:'orientacoes',l:'Orientações',kind:'text',ph:'Cortes, ritmo, trilha, identidade…'}],checklist:['Receber materiais','Editar 6 vídeos','Revisar','Aprovar','Entregar']},
+    p12:{label:'12 vídeos/roteiros',formTitle:'Edição — pacote 12 vídeos/roteiros',items:12,itemLabel:'Vídeo',videoTema:true,fields:[{k:'orientacoes',l:'Orientações',kind:'text',ph:'Cortes, ritmo, trilha, identidade…'}],checklist:['Receber materiais','Editar 12 vídeos','Revisar','Aprovar','Entregar']}}},
   cronograma:{titleLabel:'Nome do cronograma',titlePh:'Ex.: Cronograma de junho',subLabel:'Periodicidade',clientRequired:true,subtypes:{
     semanal:{label:'Semanal',formTitle:'Cronograma semanal — 3 conteúdos',contentCount:3,fields:[{k:'semana_ref',l:'Semana de referência',kind:'text',ph:'Ex.: 03/06 a 09/06'},{k:'canais',l:'Canais',kind:'choice',opts:['Instagram','Facebook','YouTube','WhatsApp']}],checklist:['Definir temas da semana','Organizar datas','Revisar cronograma','Aprovar cronograma semanal','Enviar para produção']},
     quinzenal:{label:'Quinzenal',formTitle:'Cronograma quinzenal — 6 conteúdos',contentCount:6,fields:[{k:'periodo',l:'Período',kind:'text',ph:'Ex.: 1ª e 2ª semana de junho'},{k:'canais',l:'Canais',kind:'choice',opts:['Instagram','Facebook','YouTube','WhatsApp']}],checklist:['Definir temas da quinzena','Distribuir conteúdos por semana','Revisar cronograma','Aprovar cronograma quinzenal','Enviar para produção']},
@@ -2882,6 +2882,10 @@ function resolveTaskDisplayState(t,now,dtMsFn){
   now=now||Date.now();
   var hasSla=!!(t&&t.designerSla);
   var finishMs=slaPanelFinishMs(t,dtMsFn)||0;
+  // F3.3.77A — janela LARANJA / tolerância VERMELHA por SETOR (default 30/10). Defensivo: quando o
+  // PANEL-CORE é extraído isolado (teste), slaCfgOf não existe → mantém as constantes 30/10.
+  var _WARN=SLA_PANEL_WARN_MS, _GRACE=SLA_PANEL_GRACE_MS;
+  try{ if(typeof slaCfgOf==='function'){ var _c=slaCfgOf(t); if(_c){ _WARN=(_c.warningMinutes||30)*60000; _GRACE=(_c.overdueGraceMinutes||10)*60000; } } }catch(_e){}
   if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,label:'Concluído',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(!hasSla||!finishMs)   return {sev:'neutro',state:'none',finishMs:finishMs,label:'',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(now>=finishMs){ var over=Math.max(1,Math.round((now-finishMs)/60000));
@@ -2889,10 +2893,10 @@ function resolveTaskDisplayState(t,now,dtMsFn){
     // 10 min p/ concluir ou sinalizar atraso; passados os 10 min ⇒ atraso crítico (read-only,
     // sem escalonamento/push real nesta fase).
     // F3.3.3 (precisão): além dos minutos arredondados, exponho os ms BRUTOS p/ contador mm:ss.
-    var graceLeft=Math.max(0,Math.round((finishMs+SLA_PANEL_GRACE_MS-now)/60000));
-    var critical=(now>=finishMs+SLA_PANEL_GRACE_MS);
-    return {sev:'vermelho',state:'overdue',finishMs:finishMs,label:'Prazo encerrado',remainingMin:0,overdueMin:over,graceRemainingMin:graceLeft,remainingMs:0,overdueMs:(now-finishMs),graceRemainingMs:Math.max(0,finishMs+SLA_PANEL_GRACE_MS-now),critical:critical,hasSla:true,inPanel:true}; }
-  if(now>=finishMs-SLA_PANEL_WARN_MS){ var left=Math.max(1,Math.round((finishMs-now)/60000));
+    var graceLeft=Math.max(0,Math.round((finishMs+_GRACE-now)/60000));
+    var critical=(now>=finishMs+_GRACE);
+    return {sev:'vermelho',state:'overdue',finishMs:finishMs,label:'Prazo encerrado',remainingMin:0,overdueMin:over,graceRemainingMin:graceLeft,remainingMs:0,overdueMs:(now-finishMs),graceRemainingMs:Math.max(0,finishMs+_GRACE-now),critical:critical,hasSla:true,inPanel:true}; }
+  if(now>=finishMs-_WARN){ var left=Math.max(1,Math.round((finishMs-now)/60000));
     return {sev:'laranja',state:'warning',finishMs:finishMs,label:'Prazo próximo',remainingMin:left,overdueMin:0,graceRemainingMin:0,remainingMs:Math.max(0,finishMs-now),overdueMs:0,graceRemainingMs:0,critical:false,hasSla:true,inPanel:true}; }
   var rem=Math.max(1,Math.round((finishMs-now)/60000));
   return {sev:'azul',state:'running',finishMs:finishMs,label:'Em prazo',remainingMin:rem,overdueMin:0,graceRemainingMin:0,remainingMs:Math.max(0,finishMs-now),overdueMs:0,graceRemainingMs:0,critical:false,hasSla:true,inPanel:false};
@@ -2920,6 +2924,24 @@ function slaPanelDerive(tasks,now,dtMsFn){
            warning:rows.filter(function(x){return x.sev==='laranja';}), rows:rows, total:rows.length };
 }
 /* F3.3.2-PANEL-CORE END */
+/* ═══ F3.3.77A — SLA DO DESIGNER POR SETOR (fonte ÚNICA; sem condicionais espalhadas) ═══
+ * Cada setor define warningMinutes/overdueGraceMinutes + textos + tags de dedup. O DEFAULT
+ * (setor ausente da tabela) é 30/10 com os textos canônicos — assim Cronograma e QUALQUER setor
+ * não-listado permanecem BYTE-idênticos ao comportamento aprovado. Edição de mídia = 40/20
+ * (amarelo em planDueAt−40 · vermelho em planDueAt informando 20min · SEM crítico adicional).
+ * Roteiro = designerSla:false (jamais SLA de designer). Definido FORA do PANEL-CORE de propósito:
+ * resolveTaskDisplayState (dentro do core, testado isolado) consulta slaCfgOf de forma DEFENSIVA
+ * (typeof slaCfgOf==='function'), caindo em 30/10 quando o core é extraído sem esta tabela. */
+var SECTOR_SLA={
+  cronograma:  {designerSla:true,  warningMinutes:30, overdueGraceMinutes:10, critical:true,  dedupByDesigner:false, warnText:'Você tem 30 minutos para concluir esta tarefa.', overdueText:'Você tem 10 minutos para concluir esta tarefa.', warnTag:'sla_warning',      overdueTag:'sla_overdue'},
+  edicao_midia:{designerSla:true,  warningMinutes:40, overdueGraceMinutes:20, critical:false, dedupByDesigner:true,  warnText:'Você tem 40 minutos para concluir esta tarefa.', overdueText:'Você tem 20 minutos para concluir esta tarefa.', warnTag:'media_warning_40', overdueTag:'media_overdue_20'},
+  roteiro:     {designerSla:false, warningMinutes:30, overdueGraceMinutes:10, critical:false, dedupByDesigner:false, warnText:'',                                              overdueText:'',                                              warnTag:'sla_warning',      overdueTag:'sla_overdue'}
+};
+function slaCfgDefault(){return {designerSla:true, warningMinutes:30, overdueGraceMinutes:10, critical:true, dedupByDesigner:false, warnText:'Você tem 30 minutos para concluir esta tarefa.', overdueText:'Você tem 10 minutos para concluir esta tarefa.', warnTag:'sla_warning', overdueTag:'sla_overdue'};}
+function slaCfgOf(t){
+  var k=''; try{ k=(typeof secOf==='function'?((secOf(t&&t.sector)||{}).key||''):((t&&t.sector)||'')); }catch(_){ k=(t&&t.sector)||''; }
+  return SECTOR_SLA[k]||slaCfgDefault();
+}
 /* Alerta SLA por PRAZO FINAL p/ o SINO (read-only). Deriva do PANEL-CORE (sino↔painel 1:1,
  * ambos exigem designerSla = SLA iniciado no envio ao designer). Textos aprovados. */
 function slaibFinishAlert(t,now){
@@ -3436,7 +3458,9 @@ function slaMonNextBoundary(now){
   for(var i=0;i<vis.length;i++){ var t=vis[i]; if(!t||!t.designerSla) continue;
     if(slaPanelDelivered(t)) continue;
     var fin=slaPanelFinishMs(t,f); if(!fin) continue;
-    var bs=[fin-SLA_PANEL_WARN_MS, fin, fin+SLA_PANEL_GRACE_MS];
+    // F3.3.77A — limites por SETOR (Edição de mídia acorda em fin−40 / fin+20; default 30/10).
+    var _bc=(typeof slaCfgOf==='function')?slaCfgOf(t):null, _bw=_bc?_bc.warningMinutes*60000:SLA_PANEL_WARN_MS, _bg=_bc?_bc.overdueGraceMinutes*60000:SLA_PANEL_GRACE_MS;
+    var bs=[fin-_bw, fin, fin+_bg];
     for(var k=0;k<bs.length;k++){ if(bs[k]>now && (!best||bs[k]<best)) best=bs[k]; }
   }
   return best;
@@ -3869,37 +3893,51 @@ function notifScanSla(){
       if(!tg.shouldNotifyCurrentUser) continue;
       // F3.3.76A — Roteiro NÃO tem SLA de designer (jamais amarelo/vermelho).
       if(typeof secOf==='function' && ((secOf(t.sector)||{}).key==='roteiro')) continue;
-      // F3.3.76A — ÂNCORA = PRAZO FINAL da Social (designerSla.planDueAt, via resolveTaskDisplayState):
-      // AMARELO em planDueAt-30min · VERMELHO em planDueAt · CRÍTICO em planDueAt+10min. NÃO ancorar na
-      // atribuição — a notificação AZUL de atribuição é SEPARADA e PERMANECE (notifScanAssign). Sem grace
-      // de atribuição. Card Premium / chip de SLA / painel / monitor / modal de prazo: INTOCADOS.
+      // F3.3.77A — CONFIG DE SLA POR SETOR (fonte única slaCfgOf; default 30/10). Setor com
+      // designerSla:false não emite. Cronograma = 30/10 + dedup sla_warning/sla_overdue:taskId:finishMs
+      // (BYTE-idêntico). Edição de mídia = 40/20, textos/tags próprios (media_warning_40/media_overdue_20),
+      // dedup inclui designerId (reatribuição segura) e SEM crítico adicional (vermelha uma única vez).
+      var cfg=(typeof slaCfgOf==='function')?slaCfgOf(t):null;
+      if(cfg && !cfg.designerSla) continue;
+      var warnText=(cfg&&cfg.warnText)||'Você tem 30 minutos para concluir esta tarefa.';
+      var overdueText=(cfg&&cfg.overdueText)||'Você tem 10 minutos para concluir esta tarefa.';
+      var warnTag=(cfg&&cfg.warnTag)||'sla_warning';
+      var overdueTag=(cfg&&cfg.overdueTag)||'sla_overdue';
+      var critEnabled=cfg?(cfg.critical!==false):true;
+      // F3.3.76A/77A — ÂNCORA = PRAZO FINAL da Social (designerSla.planDueAt, via resolveTaskDisplayState):
+      // AMARELO em planDueAt−warningMinutes · VERMELHO em planDueAt · CRÍTICO (só onde o setor permite)
+      // em planDueAt+overdueGraceMinutes. A notificação AZUL de atribuição é SEPARADA (notifScanAssign).
       var d=resolveTaskDisplayState(t,now,f); if(!d||!d.inPanel) continue;
       var resp=notifResponsible(t);
       var fn=first(resp.name||''), tl=(t.title||'Tarefa')+(t.client?(' — '+t.client):''), pf=slaibFmtHM(d.finishMs);
+      // dedup por prazo (finishMs=planDueAt) → mudança de prazo recalcula; setores com dedupByDesigner
+      // (Edição de mídia) incluem o designerId → reatribuição gera chave nova p/ o novo designer.
+      var slaDk=function(tag){ return (cfg&&cfg.dedupByDesigner) ? (tag+':'+t.id+':'+resp.id+':'+d.finishMs) : (tag+':'+t.id+':'+d.finishMs); };
       var base={ taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
         actorId:resp.id, actorName:resp.name, actorAvatar:resp.avatar,
         responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
         targetUserId:state.user.id, notificationType:'sla_personal', etapa:'SLA', status:d.state,
         subtitle:tl, anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
       if(d.state==='warning'){
-        // AMARELO — restam 30 min p/ o prazo final (planDueAt-30). Uma vez por prazo (dedup por finishMs;
+        // AMARELO — restam warningMinutes p/ o prazo final. Uma vez por prazo (dedup por finishMs;
         // mudança de prazo → novo finishMs → novo dedup → recalcula). NÃO suprime nem duplica a azul de atribuição.
-        try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.match',{taskId:t.id,kind:'yellow_30',finishMs:d.finishMs}); }catch(_){}
+        try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.match',{taskId:t.id,kind:'yellow_'+((cfg&&cfg.warningMinutes)||30),finishMs:d.finishMs}); }catch(_){}
         notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
-          title:(fn?fn+', ':'')+'prazo próximo', body:'Você tem 30 minutos para concluir esta tarefa.',
-          context:'Prazo final: '+pf+' · Vence em '+slaCount(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
+          title:(fn?fn+', ':'')+'prazo próximo', body:warnText,
+          context:'Prazo final: '+pf+' · Vence em '+slaCount(d.remainingMs), dedupKey:slaDk(warnTag) })));
       } else if(d.state==='overdue'){
         if(d.critical){
-          // CRÍTICO — esgotada a tolerância de 10 min após o prazo final.
-          notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_critical', severity:'critical', sound:true,
+          // CRÍTICO — só para setores que o permitem (Cronograma). Edição de mídia NÃO emite adicional
+          // (mandato: vermelha uma única vez, sem outra notificação sem autorização).
+          if(critEnabled) notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_critical', severity:'critical', sound:true,
             title:(fn?fn+', ':'')+'atraso crítico', body:'Sinalize atraso imediatamente ou conclua a tarefa.',
-            context:'Atrasada há '+slaElapsed(d.overdueMs), dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
+            context:'Atrasada há '+slaElapsed(d.overdueMs), dedupKey:slaDk('sla_critical') })));
         } else {
           // VERMELHO — prazo final atingido/ultrapassado (planDueAt) e tarefa AINDA aberta. Uma vez por prazo.
-          try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.match',{taskId:t.id,kind:'red_10',finishMs:d.finishMs}); }catch(_){}
+          try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.match',{taskId:t.id,kind:'red_'+((cfg&&cfg.overdueGraceMinutes)||10),finishMs:d.finishMs}); }catch(_){}
           notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_overdue', severity:'critical', sound:true,
-            title:(fn?fn+', ':'')+'prazo encerrado', body:'Você tem 10 minutos para concluir esta tarefa.',
-            context:'Restam '+slaCount(d.graceRemainingMs)+' · atrasada há '+slaElapsed(d.overdueMs), dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
+            title:(fn?fn+', ':'')+'prazo encerrado', body:overdueText,
+            context:'Restam '+slaCount(d.graceRemainingMs)+' · atrasada há '+slaElapsed(d.overdueMs), dedupKey:slaDk(overdueTag) })));
         }
       }
     }
@@ -4848,7 +4886,7 @@ function renderDesignersHub(){
         '<div class="bp"><span class="pill" style="background:'+withAlpha('#5B6CFF',.16)+';color:#5B6CFF">'+open+' aberta'+(open===1?'':'s')+'</span>'+
         (late>0?'<span class="pill" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">'+late+' em atraso</span>':'')+'</div></div>'+
       '<div class="arr">'+svg('arr')+'</div></button>';}).join('')
-    :'<div class="emptyline" style="text-align:center;padding:26px 6px">Nenhuma tarefa enviada a designers ainda. Envie um cronograma aprovado para um designer.</div>';
+    :'<div class="emptyline" style="text-align:center;padding:26px 6px">Nenhuma tarefa enviada a designers ainda. Envie uma tarefa (Cronograma aprovado ou Edição de mídia) a um designer.</div>';
   h+=isDesktop()?('<div class="d-hub">'+cards+'</div>'):cards;
   return h+'</div>';
 }
@@ -5362,6 +5400,13 @@ function fmtDateTimeBR(v){
   return p(dt.getDate())+'/'+p(dt.getMonth()+1)+'/'+dt.getFullYear()+' às '+p(dt.getHours())+':'+p(dt.getMinutes());
 }
 function cronOf(t){
+  // F3.3.77A — Edição de mídia: fonte de temas = t.videos (array próprio [{id,n,tema}]). Mostra TODOS os N
+  // (sem filtrar vazios) para card/detalhe exibirem a quantidade EXATA; label vazio → o chip de periodicidade
+  // (Semanal/Quinzenal/Mensal) fica suprimido (não é cronograma). Cron/roteiro continuam por cronContents.
+  if(Array.isArray(t.videos)&&t.videos.length){
+    const list=t.videos.map((v,i)=>({tema:(v&&v.tema)||'',legenda:'',_i:i}));
+    return {list,count:t.videos.length,label:'',videos:true};
+  }
   const arr=Array.isArray(t.cronContents)?t.cronContents:(Array.isArray(t.contents)?t.contents:null);
   if(!arr||!arr.length)return null;
   const list=arr.map((c,i)=>({tema:c&&c.tema,legenda:c&&c.legenda,_i:i})).filter(c=>c.tema||c.legenda);
@@ -5950,7 +5995,7 @@ function openDetails(taskId){
         return '<span class="rev-chip" style="background:'+withAlpha(st.color,.16)+';color:'+st.color+'"><span class="dotc" style="background:'+st.color+'"></span>'+esc(st.label)+'</span>';
       })())+
       (t.priority?'<span class="rev-chip" style="background:'+withAlpha('#F87171',.16)+';color:#F87171">⚑ Prioridade alta</span>':'')+
-      (cron?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+'</div>'+
+      (cron&&cron.label?'<span class="rev-chip rev-chip-soft">'+esc(cron.label)+'</span>':'')+'</div>'+
     '<div class="det-body">'+
     // pessoas
     '<div class="det-people">'+
@@ -5972,7 +6017,7 @@ function openDetails(taskId){
     '</div>';
   // cronograma
   if(cron){
-    h+='<div class="det-sec">'+(secOf(t.sector).key==='roteiro'?'Roteiros':'Conteúdos do cronograma')+' <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span></div>';
+    h+='<div class="det-sec">'+(secOf(t.sector).key==='roteiro'?'Roteiros':(secOf(t.sector).key==='edicao_midia'?'Vídeos':'Conteúdos do cronograma'))+' <span class="det-sec-c">'+cron.list.length+' / '+cron.count+'</span></div>';
     h+=cron.list.length?('<div class="det-contents">'+cron.list.map(c=>'<div class="det-content"><div class="det-content-n">'+(c._i+1)+'</div><div class="det-content-m"><div class="det-content-t">'+esc(c.tema||'(sem tema)')+'</div>'+(c.legenda?'<div class="det-content-l">'+esc(c.legenda)+'</div>':'')+'</div></div>').join('')+'</div>'):'<div class="emptyline">Nenhum conteúdo preenchido.</div>';
   }else if(t.desc){h+='<div class="det-sec">Briefing</div><div class="det-desc">'+esc(t.desc)+'</div>';}
   // checklist (leitura) — oculto p/ cronograma (sem função no fluxo atual)
@@ -6012,6 +6057,23 @@ function openDetails(taskId){
    Hierarquia: 1 Status principal · 2 Próxima ação · 3 Responsável · 4 Ações · 5 Detalhes colapsados.
    Linguagem humana; 1 status no topo; botões apenas da fase. */
 function detailState(t){
+  // F3.3.77A — EDIÇÃO DE MÍDIA: máquina de estados PRÓPRIA (Social→Designer→Finalizado), SEM cliente,
+  // SEM aprovação/portal. Antes da atribuição = "Aguardando atribuição" (ação: enviar ao designer).
+  // Depois = deriva do eixo do designer (A Fazer → Em andamento → Finalizado). Reusa senddesigner/dboard.
+  if(secOf(t.sector).key==='edicao_midia'){
+    if(hasDesigner(t)){ const dc=designerCol(t);
+      if(designerDelivered(t)) return {key:'edm_finalizado',color:'#22D3B8',label:'Designer finalizou ✓',
+        sub:'O designer finalizou os vídeos.',next:'Nada a fazer — tarefa finalizada.',owner:'none',actions:['dboard']};
+      if(dc==='afazer') return {key:'edm_aguardando_iniciar',color:'#B9A4FF',label:'Aguardando designer iniciar',
+        sub:'A tarefa está no quadro do designer, em “A Fazer”.',next:'Aguardar o designer iniciar. Ele já foi notificado.',owner:'designer',actions:['dboard','redesigner']};
+      if(dc==='revisao') return {key:'edm_revisao',color:'#60A5FA',label:'Designer em revisão',
+        sub:'O designer está ajustando os vídeos.',next:'Aguardar o designer finalizar.',owner:'designer',actions:['dboard']};
+      return {key:'edm_producao',color:'#F5A524',label:'Designer em produção',
+        sub:'O designer está produzindo os vídeos.',next:'Aguardar a entrega dos vídeos.',owner:'designer',actions:['dboard','redesigner']};
+    }
+    return {key:'edm_aguardando_atrib',color:'#34D399',label:'Pronto para enviar ao designer',
+      sub:'Escolha o designer responsável e defina o prazo.',next:'Selecionar o designer e o prazo, e enviar ao quadro dele.',owner:'social',actions:['senddesigner']};
+  }
   if(!isClientSector(secOf(t.sector).key)){const st=stOf(t.status);
     return {key:'task_'+(t.status||'afazer'),color:st.color,label:st.label,sub:'',next:'',owner:'assignee',actions:[]};}
   // F3.3.75A — ROTEIRO: máquina de estados do detalhe SEM designer (Social→Cliente→Concluído).
@@ -6122,9 +6184,12 @@ function detailActionsHtml(t,ds){
 }
 /* Bloco HERO do detalhe: status principal + próxima ação + responsável + ações. */
 function detailHeroBlock(t){
-  if(!isClientSector(secOf(t.sector).key))return '';
+  const _k=secOf(t.sector).key;
+  if(!isClientSector(_k)&&_k!=='edicao_midia')return '';   // F3.3.77A — hero também para Edição de mídia (atribuição)
   const ds=detailState(t);const ow=detailOwner(t,ds);
-  const _filled=(t.cronContents||[]).filter(c=>c&&(c.tema||c.legenda)).length;
+  // F3.3.77A — a dica "🔒 preencha 1 tema p/ liberar envio ao cliente" é EXCLUSIVA do fluxo-cliente
+  // (Cronograma); Edição de mídia não tem cliente → nunca mostra a dica (_filled forçado a 1).
+  const _filled=isClientSector(_k)?(t.cronContents||[]).filter(c=>c&&(c.tema||c.legenda)).length:1;
   return '<div class="det-hero">'+
     '<div class="det-hero-status" style="background:'+withAlpha(ds.color,.12)+';border-color:'+withAlpha(ds.color,.38)+'">'+
       '<span class="det-hero-dot" style="background:'+ds.color+'"></span>'+
@@ -6387,9 +6452,9 @@ function openDesignerModal(taskId){
     '<button class="iconbtn sp-x" data-modalclose="1">'+svg('close')+'</button>'+
     '<div class="dz-ic">'+svg('group')+'</div>'+
     '<div class="sp-title">Enviar para designer</div>'+
-    '<div class="sp-sub">O cronograma aprovado vai para o quadro do designer escolhido — só ele verá esta tarefa. Ele recebe uma notificação imediata.</div>'+
+    '<div class="sp-sub">'+(isClientSector(secOf(t.sector).key)?'O cronograma aprovado vai':'A tarefa vai')+' para o quadro do designer escolhido — só ele verá esta tarefa. Ele recebe uma notificação imediata.</div>'+
     '<div class="dz-card"><div class="dz-card-h"><div class="dz-card-av">'+svg('calendar')+'</div>'+
-      '<div><div class="dz-card-t">'+esc(t.title||'Cronograma')+'</div><div class="dz-card-s">'+esc(t.client||'')+(cron?' · '+esc(cron.label):'')+'</div></div></div></div>'+
+      '<div><div class="dz-card-t">'+esc(t.title||'Tarefa')+'</div><div class="dz-card-s">'+esc(t.client||'')+(cron&&cron.label?' · '+esc(cron.label):'')+'</div></div></div></div>'+
     '<div class="sp-lbl">Escolha o designer</div>'+
     '<div class="dz-list">'+list+'</div>'+
     '<div class="sp-actions"><button class="btn ghost" data-modalclose="1">Cancelar</button></div>'+
@@ -6441,6 +6506,17 @@ async function sendToDesigner(taskId,designerId,dl){
       startDate:dl.startDate||'',startTime:dl.startTime||'',endDate:dl.endDate||'',endTime:dl.endTime||'',note:dl.obs||''
     })
   };
+  // F3.3.77A — EDIÇÃO DE MÍDIA = fluxo interno Social→Designer→Finalizado, SEM cliente. Remove os campos
+  // do eixo-cliente / revisão-social / aprovação-final para NÃO injetar etapa de cliente e manter
+  // isTaskCompleted coerente (a conclusão do designer via moveStatus grava status='concluido'+doneAt+
+  // designerSla.finishedAt → slaPanelDelivered cancela o SLA). O eixo do designer + designerSla governam.
+  // Cronograma permanece BYTE-idêntico (o bloco só roda para edicao_midia).
+  if(secOf(t.sector).key==='edicao_midia'){
+    delete patch.cronStatus; delete patch.clientFlowStatus; delete patch.clientWorkflowStage;
+    delete patch.operationalStatus; delete patch.socialFlowStatus; delete patch.socialWorkflowStage;
+    delete patch.pendingDesignerDelivery; delete patch.pendingSocialReview;
+    delete patch.finalApprovalRequired; delete patch.finalApprovalCompleted;
+  }
   if(dl.obs&&String(dl.obs).trim())patch.desc=String(dl.obs).trim();
   // otimista
   // F3.3.17-R5/C4 — estado OTIMISTA = MESMOS campos do patch persistido (menos history), para a UI ler
@@ -6465,7 +6541,7 @@ function openDesignerDeadline(taskId,designerId){
     '<div class="sp-title">Prazo para o designer</div>'+
     '<div class="sp-sub">Defina <b>início</b> e <b>término</b> (data e hora). O designer recebe a tarefa com o prazo e é avisado se atrasar.</div>'+
     '<div class="dz-card"><div class="dz-card-h">'+avatar(d,40)+
-      '<div><div class="dz-card-t">'+esc(d.name||'Designer')+'</div><div class="dz-card-s">'+esc(d.role||'Designer')+' · '+esc(t.title||'Cronograma')+'</div></div></div></div>'+
+      '<div><div class="dz-card-t">'+esc(d.name||'Designer')+'</div><div class="dz-card-s">'+esc(d.role||'Designer')+' · '+esc(t.title||'Tarefa')+'</div></div></div></div>'+
     '<div class="dz-dl">'+
       '<div class="dz-dl-row"><div class="dz-dl-f"><label>Data de início</label><input type="date" id="dlSd" value="'+t0+'"></div>'+
         '<div class="dz-dl-f"><label>Hora de início</label><input type="time" id="dlSt" value="09:00"></div></div>'+
@@ -7659,7 +7735,7 @@ function openSheet(which){
 }
 
 /* ---- TASK FORM (wizard) ---- */
-function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],checklist:[],link:'',obs:'',_openContent:null};}
+function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null};}
 function openTaskForm(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
 // F3.3.75A — função CANÔNICA de "Nova tarefa": TODO entry point de CRIAÇÃO recomeça na ETAPA 1
 // (Setor), sem reaproveitar etapa/setor/título/cliente/responsável/briefing/conteúdos/anexos/
@@ -7737,8 +7813,18 @@ function stepBriefing(){const f=state.form;const t=tpl();const s=secOf(f.sector)
       if(sub.contentCount){h+='<div class="lbl" style="margin-top:6px">'+(secOf(f.sector).key==='roteiro'?'Roteiros':'Conteúdos do cronograma')+' ('+sub.contentCount+')</div>';
         for(let i=0;i<sub.contentCount;i++){const c=f.contents[i]||{tema:'',legenda:''};const filled=(c.tema||c.legenda);const open=f._openContent===i;
           h+='<div class="content-card '+(open?'open':'')+'"><button class="ch" data-content="'+i+'"><span class="cd '+(filled?'fill':'')+'"></span><span class="ct">'+(secOf(f.sector).key==='roteiro'?'Roteiro ':'Conteúdo ')+(i+1)+'</span><span style="color:var(--soft)">'+(open?'▲':'▼')+'</span></button><div class="cb"><div class="lbl">Tema</div><input class="inp" data-ctema="'+i+'" placeholder="Tema do conteúdo '+(i+1)+'" value="'+esc(c.tema||'')+'"><div style="height:8px"></div><div class="lbl">Legenda</div><textarea class="inp" data-cleg="'+i+'" placeholder="Legenda do conteúdo '+(i+1)+'">'+esc(c.legenda||'')+'</textarea></div></div>';}}
-      if(sub.items){h+='<div class="lbl" style="margin-top:6px">Itens do pacote</div>';
-        for(let i=0;i<sub.items;i++)h+='<div class="row" style="gap:10px;margin-bottom:8px"><div style="width:80px;font-size:11.5px;font-weight:700;color:var(--faint)">'+esc(sub.itemLabel||'Item')+' '+(i+1)+'</div><input class="inp" data-item="'+i+'" placeholder="Descrição" value="'+esc(f.items[i]||'')+'"></div>';}
+      if(sub.items){
+        if(sub.videoTema){
+          // F3.3.77A — Edição de mídia: N vídeos, cada um com seu TEMA (fonte própria f.videos → data.videos;
+          // NÃO usa contentCount/cronContents). Todos os N campos visíveis (Social informa os N temas).
+          h+='<div class="lbl" style="margin-top:6px">Temas dos vídeos ('+sub.items+')</div>';
+          for(let i=0;i<sub.items;i++){const v=f.videos[i]||{};
+            h+='<div class="row" style="gap:10px;margin-bottom:8px"><div style="width:80px;font-size:11.5px;font-weight:700;color:var(--faint)">'+esc(sub.itemLabel||'Vídeo')+' '+(i+1)+'</div><input class="inp" data-vtema="'+i+'" placeholder="Tema do '+esc((sub.itemLabel||'vídeo').toLowerCase())+' '+(i+1)+'" value="'+esc((v&&v.tema)||'')+'"></div>';}
+        }else{
+          h+='<div class="lbl" style="margin-top:6px">Itens do pacote</div>';
+          for(let i=0;i<sub.items;i++)h+='<div class="row" style="gap:10px;margin-bottom:8px"><div style="width:80px;font-size:11.5px;font-weight:700;color:var(--faint)">'+esc(sub.itemLabel||'Item')+' '+(i+1)+'</div><input class="inp" data-item="'+i+'" placeholder="Descrição" value="'+esc(f.items[i]||'')+'"></div>';
+        }
+      }
       // Reprovação 1.0.137: CRONOGRAMA não usa checklist — o fluxo real é temas→designer→
       // legendas→aprovação final. Demais setores mantêm o checklist do briefing.
       if(!isClientSector(f.sector))h+=checklistHtml(sub.checklist);
@@ -7799,6 +7885,13 @@ function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSu
     if(filled.length)h+='<div class="rev-contents">'+filled.map(o=>'<div class="rev-content"><div class="rev-content-n">'+(o.i+1)+'</div><div class="rev-content-m"><div class="rev-content-t">'+esc(o.c.tema||'(sem tema)')+'</div>'+(o.c.legenda?'<div class="rev-content-l">'+esc(o.c.legenda)+'</div>':'')+'</div></div>').join('')+'</div>';
     else h+='<div class="emptyline">Nenhum conteúdo preenchido ainda.</div>';
   }
+  // F3.3.77A — Edição de mídia: prévia dos TEMAS dos vídeos na revisão (todos os N)
+  if(sub&&sub.videoTema){
+    const nV=sub.items||0;const filled=[];for(let i=0;i<nV;i++){const v=(f.videos&&f.videos[i])||{};if(v&&v.tema&&String(v.tema).trim())filled.push({tema:v.tema,i});}
+    h+='<div class="rev-sec-h"><span>Temas dos vídeos</span><span class="rev-count">'+filled.length+' / '+nV+'</span></div>';
+    if(filled.length)h+='<div class="rev-contents">'+filled.map(o=>'<div class="rev-content"><div class="rev-content-n">'+(o.i+1)+'</div><div class="rev-content-m"><div class="rev-content-t">'+esc(o.tema)+'</div></div></div>').join('')+'</div>';
+    else h+='<div class="emptyline">Nenhum tema preenchido ainda.</div>';
+  }
   // Edicao rapida
   h+='<div class="rev-quick"><button class="rev-edit2" data-formgoto="1">'+svg('editnote')+'Editar dados</button>'+
      (sub||TEMPLATES[s.key]?'<button class="rev-edit2" data-formgoto="2">'+svg('description')+'Editar briefing</button>':'')+'</div>';
@@ -7830,6 +7923,7 @@ function afterForm(){
   bind('[data-ctema]',e=>{const i=+e.dataset.ctema;state.form.contents[i]=state.form.contents[i]||{};state.form.contents[i].tema=e.value;});
   bind('[data-cleg]',e=>{const i=+e.dataset.cleg;state.form.contents[i]=state.form.contents[i]||{};state.form.contents[i].legenda=e.value;});
   bind('[data-item]',e=>state.form.items[+e.dataset.item]=e.value);
+  bind('[data-vtema]',e=>{const i=+e.dataset.vtema;state.form.videos[i]=state.form.videos[i]||{};state.form.videos[i].tema=e.value;});
   bind('[data-chk]',e=>state.form.checklist[+e.dataset.chk].t=e.value);
   // date/time: indicador nativo oculto -> clicar no campo abre o seletor via showPicker()
   c.querySelectorAll('.dt-field').forEach(w=>{const inp=w.querySelector('input');if(!inp)return;
@@ -7840,7 +7934,8 @@ function composedDesc(){const f=state.form;const sub=curSub();const t=tpl();let 
   const fields=(sub?sub.fields:(t?t.fields:[]))||[];
   fields.forEach(fl=>{const v=f.fields[fl.k];if(v!==undefined&&v!==''&&v!==false)lines.push(fl.l+': '+(v===true?'Sim':v));});
   if(sub&&sub.contentCount){for(let i=0;i<sub.contentCount;i++){const c=f.contents[i];if(c&&(c.tema||c.legenda)){lines.push((secOf(f.sector).key==='roteiro'?'Roteiro ':'Conteúdo ')+(i+1)+':');if(c.tema)lines.push('  Tema: '+c.tema);if(c.legenda)lines.push('  Legenda: '+c.legenda);}}}
-  if(sub&&sub.items){for(let i=0;i<sub.items;i++){if(f.items[i])lines.push((sub.itemLabel||'Item')+' '+(i+1)+': '+f.items[i]);}}
+  if(sub&&sub.videoTema){for(let i=0;i<sub.items;i++){const v=(f.videos&&f.videos[i])||{};if(v&&v.tema)lines.push((sub.itemLabel||'Vídeo')+' '+(i+1)+': '+v.tema);}}
+  else if(sub&&sub.items){for(let i=0;i<sub.items;i++){if(f.items[i])lines.push((sub.itemLabel||'Item')+' '+(i+1)+': '+f.items[i]);}}
   if(f.obs)lines.push('',f.obs);
   return lines.join('\n').trim();
 }
@@ -7856,6 +7951,9 @@ async function saveTask(){const f=state.form;
   const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
   if(f.contents.length)data.cronContents=f.contents;
+  // F3.3.77A — Edição de mídia: persiste os N vídeos como ARRAY ESTRUTURADO (data.videos = [{id,n,tema}]),
+  // NUNCA como texto único e NUNCA em cronContents (evita entrelaçar com os helpers do fluxo-cliente/legenda).
+  {const _sub=curSub(); if(_sub&&_sub.videoTema){const _nV=_sub.items||0,_vids=[];for(let i=0;i<_nV;i++){const v=(f.videos&&f.videos[i])||{};_vids.push({id:(v&&v.id)||('v'+(i+1)),n:i+1,tema:((v&&v.tema)||'').trim()});}if(_vids.length)data.videos=_vids;}}
   // EIXO SOCIAL (aditivo): dono social = responsável social, senão o criador se for social.
   // Persistido p/ a tarefa NÃO sair do quadro da Social Media ao ser enviada a um designer.
   const socialOwner=(u&&isSocialUser(u))?u:(isSocialUser(state.user)?state.user:null);

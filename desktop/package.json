@@ -1,6 +1,6 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.176-QA.2",
+  "version": "1.0.177-QA",
   "description": "Agenda ID Seven Desktop — Golden Master integrado: link estável + Card Premium só com resolved/type/HIT comprovados",
   "main": "dist/main/main.js",
   "private": true,

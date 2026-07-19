@@ -185,7 +185,7 @@ ok('card: zero text-overflow:ellipsis em campos essenciais (ti/ds/ctx/resp)', !/
 ok('compacto: contrato tem subtitle', /subtitle:o\.subtitle/.test(html));
 ok('compacto: toast usa p.subtitle (linha enxuta)', /p\.subtitle!=null/.test(html) && /\(sub\?'<div class="ntf-ti">/.test(html));
 ok('compacto: corpo do toast é condicional (sem div vazio)', /p\.body\?'<div class="ntf-ds">/.test(html));
-ok('compacto: SLA laranja corpo = só a mensagem (tarefa vai no subtítulo)', /body:'Você tem 30 minutos para concluir esta tarefa\.',/.test(html) && /subtitle:tl/.test(html));
+ok('compacto: SLA laranja corpo = só a mensagem (config por setor: cronograma 30min; tarefa no subtítulo)', /warnText:'Você tem 30 minutos para concluir esta tarefa\.'/.test(html) && /body:warnText/.test(html) && /subtitle:tl/.test(html));
 ok('compacto: fluxo sem "Responsável" duplicado no contexto (vai no respRow)', /subtitle:\(actor\.name\|\|''\)/.test(html) && /context:'', anchor:cur/.test(html));
 ok('compacto: atribuição etapa no contexto + subtítulo tarefa·cliente', /p\.subtitle=\(p\.clientName\?/.test(html) && /p\.context='Etapa: '/.test(html));
 // FASE 3 — notifier do main entrega IDs p/ o renderer resolver foto/nome reais

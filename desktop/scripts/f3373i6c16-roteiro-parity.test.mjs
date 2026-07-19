@@ -122,7 +122,7 @@ ok('I4 roteiro segue setor ATIVO (não descontinuado)',
 /* ── J: rótulos de conteúdo sector-aware (Roteiros vs Conteúdos do cronograma) ── */
 ok('J1 briefing: rótulo "Roteiros (N)" p/ roteiro', /\(secOf\(f\.sector\)\.key==='roteiro'\?'Roteiros':'Conteúdos do cronograma'\)\+' \('\+sub\.contentCount\+'\)/.test(HTML));
 ok('J2 revisão: rótulo sector-aware', /<span>'\+\(secOf\(f\.sector\)\.key==='roteiro'\?'Roteiros':'Conteúdos do cronograma'\)\+'<\/span>/.test(HTML));
-ok('J3 detalhe: rótulo sector-aware', /<div class="det-sec">'\+\(secOf\(t\.sector\)\.key==='roteiro'\?'Roteiros':'Conteúdos do cronograma'\)\+' <span/.test(HTML));
+ok('J3 detalhe: rótulo sector-aware', /<div class="det-sec">'\+\(secOf\(t\.sector\)\.key==='roteiro'\?'Roteiros':\(secOf\(t\.sector\)\.key==='edicao_midia'\?'Vídeos':'Conteúdos do cronograma'\)\)\+' <span/.test(HTML));
 
 console.log('\nRESULTADO: ' + pass + '/' + (pass + fail) + ' PASS' + (fail ? ' — HÁ FALHAS' : ' — SUITE OK'));
 process.exit(fail ? 1 : 0);
