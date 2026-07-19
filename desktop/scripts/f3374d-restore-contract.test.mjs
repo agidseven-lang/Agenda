@@ -124,11 +124,11 @@ ok('R14 Roteiro usa o MESMO envelope (mensagem por setor; sem rota nova; sem Des
 ok('R16 [74K] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" AUSENTE (produção)',
   !h.includes("AMBIENTE QA") && !h.includes("NÃO USAR COM CLIENTES") && !h.includes('banner permanente de QA'));
 
-/* R17 [75B] — versão de PRODUÇÃO 1.0.175 (sem sufixo -QA; sem literal de versão no renderer) */
+/* R17 [76B] — versão de PRODUÇÃO 1.0.176 (sem sufixo -QA; sem literal de versão no renderer) */
 {
   const PKG = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf8'));
-  ok('R17 [75B] versão 1.0.175 (package.json, sem -QA) e NENHUM literal de versão no renderer',
-    PKG.version === '1.0.175' && !h.includes('1.0.175-QA') && !h.includes('1.0.175'));
+  ok('R17 [76B] versão 1.0.176 (package.json, sem -QA) e NENHUM literal de versão no renderer',
+    PKG.version === '1.0.176' && !h.includes('1.0.176-QA') && !h.includes('1.0.176'));
 }
 
 console.log('');
