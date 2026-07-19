@@ -1438,3 +1438,49 @@ EXCLUSIVAMENTE versão/banner de QA. **Sem alterar Worker/portal/backend.** Zero
 Produção Desktop **1.0.175** publicada (release imutável; **Latest por decisão do owner**). Rollback oficial
 **1.0.174** preservado (`desktop/v1.0.174-production`, `b6b800c`; EXE `4940f8a6…`, MSI `160a1d31…`). Worker **j6**
 (`9fbdf417…`) intacto (nenhum deploy). Backend/portal/Android congelados. **F3.3.75B encerrado.**
+
+---
+
+## F3.3.76A — Desktop QA 1.0.176-QA: restaurar SLA do Designer em tempo real (30/10 a partir da atribuição)
+
+Incidente funcional: as duas notificações de SLA do Designer (laranja "Você tem 30 minutos…" / vermelha
+"Você tem 10 minutos…") pararam de aparecer na atribuição. **QA isolado; nada em produção.**
+
+### Causa-raiz (auditada; SEM regressão de código desde a baseline aprovada 26b3a3b)
+O SLA operacional laranja/vermelho estava ancorado no **PRAZO PLANEJADO** (`designerSla.planDueAt` = término
+do modal "Prazo para o designer", default **+3 dias**), NÃO na atribuição. Tarefa recém-atribuída ficava em
+`resolveTaskDisplayState`→`running` (`inPanel:false`) por dias, e `notifScanSla` não emitia nada perto da
+atribuição. Scanner (30s + snapshot) e o HUB de entrega nativa **intactos** — os alertas nunca eram gerados.
+3 auditorias independentes convergiram; RED provou (prazo default → nada; prazo curto injetado → dispara).
+
+### Correção (branch desktop/f3376a-designer-sla-realtime-notifications, commit d1351389→**920e270**; Desktop-only, cirúrgica)
+- **Decisão de escopo do owner: SLA fixo 30/10 SÓ nas NOTIFICAÇÕES** — Card Premium / modal de prazo / chip de
+  SLA / painel / monitor **intocados** (seguem por `resolveTaskDisplayState`/prazo planejado).
+- Nova `designerOpSla(t)`: reconstrói do dado persistido `designerAssignment.assignedAt` →
+  `designerDeadlineAt = assignedAt+30min`, `overdueGraceUntil = +10min`. `notifScanSla` re-ancorado: **laranja
+  IMEDIATO na atribuição**, **vermelho em +30**, e escalonamento **crítico** em +40 (contrato aprovado preservado).
+- Pessoal ao designer responsável; **só setores com designer** (Cronograma/Edição de mídia), **NUNCA roteiro**;
+  suprime concluída/cancelada; reatribuição inicia SLA novo. Dedup novos (deadline_30/overdue_10/critical_10).
+  Logs `notifSla.deadline.match/skip`. Grace de 2min (F3.3.19) **removido** (owner exige "imediatamente").
+- `main.ts` **inalterado** (nativa na lock screen = mudança ao contrato congelado de entrega; **adiada** — flag ao owner).
+
+### Provas
+- `scripts/f3376a-sla-red.test.mjs` (self-adapting RED×GREEN + matriz FASE-10 de emissão): **GREEN 30/30** na
+  fonte corrigida; **RED 4/4** na baseline 1.0.175. `f333-notif` var do contexto laranja atualizado (d→op).
+  `f3375a` detecção QA agnóstica de versão. `f33Q` (grace de 2min) aposentado.
+- Regressão: **36/39** verdes; 3 falhas pré-existentes/ambientais (auth-core/main-notifier compilam .ts;
+  production-invariance é pin do 74K). Na árvore QA (1.0.176-QA+banner): +3 pins de PRODUÇÃO (1.0.175) que
+  uma build QA tripa por design. Todos os 3 blocos `<script>` do renderer parseiam limpos.
+
+### Build QA (run 29666612688 SUCCESS; procedência unívoca head_sha==commit 920e270)
+- versão **1.0.176-QA** + banner "AMBIENTE QA — NÃO USAR COM CLIENTES"; gates prova-de-versão + tray-icon OK.
+- EXE `d56dbae98bd0a26d1bc07ef2153b2f79f831337a974ae3f58a5953c8b82f32b1`
+- MSI `a5870b2484a49fd17c801a5a8339d5c75aaff916022b9d59da79dd07050c4842`
+- artifacts: installer **8435929876** (digest `2b984bbc…`), bundle **8435931460** (digest `dff2b4db…`).
+
+### STOP / próximo
+Sem release/tag/produção. Produção Desktop **1.0.175** e Worker **j6** intactos; Roteiro sem designer/SLA.
+Aguardando: (1) prova física do owner (2 usuários QA — Social + Designer: laranja imediato, vermelho em +30,
+só o designer, clique abre a tarefa, janela/tray/lock, cancelamento, reatribuição, Roteiro sem SLA) e
+(2) GO físico → **F3.3.76B** (promoção 1.0.176 produção). Ponto aberto p/ decisão: (a) toast azul "Nova tarefa
+atribuída" fica junto do laranja? (b) nativa na lock screen (mexe no contrato congelado de entrega)?
