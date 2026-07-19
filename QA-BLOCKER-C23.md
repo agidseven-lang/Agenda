@@ -1539,3 +1539,64 @@ STOP GATE PRÉ-RELEASE ativo: **nenhuma** tag/release/asset/latest criado; **1.0
 (9fbdf417 · V64.59-c20-failopen-j6-cronograma-two-stage) intactos. Rollback oficial = **1.0.175**
 (EXE `30116107…`, MSI `359483c3…`, commit d1351389). Aguardando o literal **PUBLICAR-DESKTOP-1.0.176-76B**
 → dispara a release ARMADA → download smoke → GO final.
+
+## F3.3.77A — Edição de mídia: vídeos/temas + atribuição de designer + aba Designers + SLA 40/20 (QA 1.0.177-QA) (2026-07-19)
+
+### Incidente físico (owner, na 1.0.176)
+Setor **Edição de mídia** (fluxo INTERNO Social→Designer→Finalizado; SEM cliente/portal/Card Premium/WhatsApp/token):
+(1) card com área de conteúdos VAZIA (temas dos vídeos não aparecem); (2) sem atribuição completa de Designer+prazo;
+(3) aba Tarefas→Designers permanece "Nenhuma tarefa enviada a designers ainda".
+
+### Causa-raiz (auditoria FASE 1, read-only, 6 facetas + cross-check)
+- **P1 (temas vazios):** subtipos edicao_midia usavam `items:N` (não `contentCount`) → form gerava inputs "Descrição"
+  em `f.items[]` (strings), gravados SÓ no texto `desc` (composedDesc); `saveTask` só persiste `cronContents` se
+  `f.contents.length` (vazio) → nenhum array estruturado. Card/detalhe/board leem `cronOf`→`cronContents`→null.
+- **P2 (sem atribuição):** a única entrada p/ atribuir (botão `data-senddesigner`) só é emitida no ramo cliente do
+  `detailState` (cronograma, estado `temas_aprovados` gated por `clientApproved`); p/ setor não-cliente `detailState`
+  retorna `actions:[]` e `detailHeroBlock` retorna ''. A cadeia openDesignerModal→openDesignerDeadline→sendToDesigner
+  já é sector-agnóstica; faltava só a ENTRADA.
+- **P3 (aba vazia):** consequência de P2. `designerBoardsList`/`renderDesignerBoard` filtram só por `isDesignerFlow`
+  (=`hasDesigner`, exclui só roteiro) — edicao_midia entra assim que houver `designerAssignment.designerId`.
+- **Notif:** limiares 30/10 eram constantes globais (`SLA_PANEL_WARN_MS`/`GRACE_MS`) lidas por resolveTaskDisplayState
+  + notifScanSla (textos hardcoded). A AZUL (notifScanAssign) já é sector-agnóstica.
+
+### Correção cirúrgica (branch desktop/f3377a-media-editing-designer-flow @ aae266f; renderer-only)
+main.ts/preload.ts/notifier.ts/bgNotify.ts BYTE-idênticos; Worker/DNS/Functions/Rules/Hosting intocados.
+- **P1:** subtipos ganham `videoTema:true`; form renderiza N campos de TEMA (`data-vtema`) → `f.videos`; `saveTask`
+  persiste `data.videos=[{id,n,tema}]` (array estruturado, nunca texto único, nunca em cronContents); `cronOf` lê
+  `t.videos` e mostra TODOS os N no card e nos detalhes (rótulo "Vídeos"); stepReview mostra a prévia. Placeholder de
+  cronograma permanece exclusivo do fluxo-cliente (isCron).
+- **P2:** `detailState` ganha máquina própria de edicao_midia (Aguardando atribuição → A Fazer → Em andamento →
+  Finalizado) com ação `senddesigner`; `detailHeroBlock` aberto p/ edicao_midia (dica de tema-lock suprimida).
+  Reusa openDesignerModal/openDesignerDeadline/sendToDesigner (prazo REAL da Social, sem prazo automático).
+  `sendToDesigner` branch edicao_midia: remove campos do eixo-cliente/aprovação-final (clientFlowStatus,
+  finalApprovalRequired, etc.) → isTaskCompleted coerente; Cronograma permanece byte-idêntico.
+- **P3:** sem mudança funcional (apenas cópia do empty-state genérica) — acende sozinho ao atribuir.
+- **Notif por SETOR (tabela ÚNICA SECTOR_SLA + slaCfgOf; default 30/10, defensivo p/ o PANEL-CORE testado):**
+  Edição de mídia = AZUL imediata (reuso) · AMARELA em planDueAt−40 ("Você tem 40 minutos…") · VERMELHA em planDueAt
+  ("Você tem 20 minutos…"), UMA vez, SEM crítico adicional; dedup `media_warning_40`/`media_overdue_20` inclui
+  designerId (reatribuição segura). Cronograma 30/10 intacto; Roteiro `designerSla:false`.
+
+### Provas (RED×GREEN + regressão + TypeScript + sintaxe)
+- Novo `scripts/f3377a-media-editing.test.mjs`: **52/52** (conteúdos 1–10 · atribuição 11–20 · aba designers 21–29 ·
+  notificações 30–44 incl. 40/20+dedup+cancelamento+sem-crítico · preservações 45–50). Static + extração-e-execução
+  do notifScanSla/resolveTaskDisplayState/slaCfgOf REAIS.
+- RED baseline: todos os marcadores do fix AUSENTES na 1.0.176 (videoTema/data.videos/cronOf-videos/detailState-
+  edicao_midia/SECTOR_SLA/40min/20min = 0) e PRESENTES na 1.0.177-QA.
+- Regressão: **37/40 verde**. 3 red = NÃO-regressões: f3356-auth-core (exige `npm run build`/dist), f33E-main-notifier
+  (exige compilar notifier.ts), f3374k-production-invariance (oráculo do 74K fixado no baseline 1.0.174-QA + banner).
+  f333/f3376a/f3373i6c16 atualizados p/ a nova estrutura (contrato preservado); pins de versão → 1.0.177 auto-adaptáveis.
+- TypeScript build (main+preload) OK no CI; `node --check` no <script> do renderer OK.
+
+### Build QA (run 29684731797 SUCCESS; head_sha==commit 9374a9a… não, aae266f; empacotador aceitou 1.0.177-QA)
+- versão **1.0.177-QA** + banner "AMBIENTE QA — NÃO USAR COM CLIENTES"; gates prova-de-versão + tray-icon OK.
+- EXE `98538d69f061cbc8dedee4feea59ff387cc191e2d867cec7d2bd19184a5f3661`
+- MSI `ea52ca2fdb7c6f5194626b2599d37543dd0278f3d191f03c8ddd2c70fded4542`
+- artifacts: installer **8441736500** (digest `63341018…`), bundle **8441738098** (digest `e4c18b0e…`).
+
+### STOP / próximo
+Sem release/tag/produção. Produção Desktop **1.0.176** (Latest) e Worker **j6** (9fbdf417) intactos. Aguardando:
+(1) prova física do owner (2 usuários QA — Social + Designer; criar Edição de mídia com 4/6/12 temas → confirmar no
+card/detalhe; atribuir Designer+prazo → azul imediata; abrir aba Designers → quadro individual; fake-clock: amarela em
+planDueAt−40 "40 minutos" / vermelha em planDueAt "20 minutos"; conclusão cancela; preservações Cronograma 30/10 /
+Roteiro sem SLA / Card Premium / portal / wizard) e (2) GO físico → **F3.3.77B** (promoção 1.0.177).
