@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 /* =====================================================================
-   F3.3.74K — GATE DE INVARIÂNCIA FUNCIONAL (candidata de produção 1.0.174).
-   Prova que a candidata difere da fonte funcional APROVADA (1.0.174-QA,
-   commit 670cef2) SOMENTE em empacotamento: versão e remoção do banner QA.
+   F3.3.74K — GATE DE INVARIÂNCIA FUNCIONAL (candidata de produção; F3.3.77B: 1.0.177).
+   Prova que a candidata difere da fonte funcional fisicamente APROVADA (F3.3.77B:
+   1.0.177-QA.4, commit 960d8ed) SOMENTE em empacotamento: versão e remoção do banner QA.
    NENHUMA função funcional aprovada pode divergir. Fail-closed.
+   (Rebase de baseline por fase via QA_BASELINE_SHA; default = fonte QA aprovada da fase corrente.)
 
-   Baseline lido via `git show 670cef2:<arquivo>` (funciona local e no CI
+   Baseline lido via `git show 960d8ed:<arquivo>` (funciona local e no CI
    com fetch-depth 0). Sem rede, sem build, sem escrita.
    ===================================================================== */
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');            // desktop/
-const QA_SHA = process.env.QA_BASELINE_SHA || '670cef2';
+const QA_SHA = process.env.QA_BASELINE_SHA || '960d8ed';   // F3.3.77B: fonte QA fisicamente aprovada (1.0.177-QA.4)
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; console.log('  PASS — ' + n); } else { fail++; console.error('  FAIL — ' + n); } };
@@ -31,7 +32,7 @@ function fnSrc(SRC, name) {
   return null;
 }
 
-console.log(`F3.3.74K — invariância funcional (candidata 1.0.174 vs QA ${QA_SHA})`);
+console.log(`F3.3.74K — invariância funcional (candidata 1.0.177 vs QA ${QA_SHA})`);
 
 const qaHtml = baseline('src/renderer/index.html');
 const cuHtml = current('src/renderer/index.html');
@@ -73,15 +74,17 @@ ok('K-reg native-share fora do caminho principal', !cuHtml.includes('nativeShare
 ok('K-reg Windows Share UI fora', !cuHtml.includes('buildNativeShareRequest'));
 ok('K-reg Canvas/PNG nativo fora', !cuHtml.includes('buildPremiumCardImage') && !cuHtml.includes('CARD_ART_B64_BY_TYPE'));
 
-// 5) main.ts / preload.ts byte-idênticos ao QA (nenhuma mudança de processo).
-for (const rel of ['src/main/main.ts', 'src/preload/preload.ts']) {
+// 5) Processo principal byte-idêntico ao QA (nenhuma mudança de processo). F3.3.77B: inclui os
+//    módulos do relógio canônico (clockSync) e o produtor único (notifier), além de bgNotify/firebase/auth-core.
+for (const rel of ['src/main/main.ts', 'src/preload/preload.ts', 'src/main/clockSync.ts',
+  'src/main/notifier.ts', 'src/main/bgNotify.ts', 'src/main/firebase.ts', 'src/main/auth-core.ts']) {
   ok(`K-proc ${rel} byte-idêntico ao QA`, baseline(rel) === current(rel));
 }
 
 // 6) package.json difere SOMENTE na versão; electron-builder.yml intacto.
 {
   const qa = JSON.parse(baseline('package.json')), cu = JSON.parse(current('package.json'));
-  ok('K-pkg versão QA=1.0.174-QA → candidata=1.0.174', qa.version === '1.0.174-QA' && cu.version === '1.0.174');
+  ok('K-pkg versão QA=1.0.177-QA.4 → candidata=1.0.177', qa.version === '1.0.177-QA.4' && cu.version === '1.0.177');
   const qb = { ...qa, version: null }, cb = { ...cu, version: null };
   ok('K-pkg package.json idêntico exceto version', JSON.stringify(qb) === JSON.stringify(cb));
   ok('K-builder electron-builder.yml byte-idêntico ao QA', baseline('electron-builder.yml') === current('electron-builder.yml'));
