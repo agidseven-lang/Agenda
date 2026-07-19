@@ -1600,3 +1600,46 @@ Sem release/tag/produção. Produção Desktop **1.0.176** (Latest) e Worker **j
 card/detalhe; atribuir Designer+prazo → azul imediata; abrir aba Designers → quadro individual; fake-clock: amarela em
 planDueAt−40 "40 minutos" / vermelha em planDueAt "20 minutos"; conclusão cancela; preservações Cronograma 30/10 /
 Roteiro sem SLA / Card Premium / portal / wizard) e (2) GO físico → **F3.3.77B** (promoção 1.0.177).
+
+## F3.3.77A-R2 — bloqueadores da prova física: horário global + criação atômica + azul (QA 1.0.177-QA.2) (2026-07-19)
+
+### Prova física (owner) da 1.0.177-QA
+APROVADO: temas dos vídeos aparecem no card (quantidade+ordem corretas) — **NÃO alterar**.
+3 BLOQUEADORES → 1.0.177-QA = NO-GO:
+- **B1** campos de HORÁRIO travando (digitação/mouse/rolagem/seleção; re-render durante a edição) em TODO o Desktop.
+- **B2** Edição de mídia pedia Designer+prazo DEPOIS de criar (2ª operação "Enviar para designer").
+- **B3** notificação AZUL com identidade errada (Designer como autor; sem foto da Social; sem Designer abaixo).
+
+### Causa-raiz + correção (branch desktop/f3377a-… @ a1c0461; renderer-only; main/preload/notifier/bgNotify byte-idênticos)
+- **B1:** `_editingNow` só adiava o render p/ modal-com-input OU input focado no wizard (#content+state.form).
+  Campos de data/hora fora disso (Agenda, filtros) ou com foco momentaneamente fora durante o SELETOR NATIVO
+  ficavam desprotegidos → snapshot Firestore (render) reconstruía o campo no meio da edição (amplificado pelo
+  slaTick de 1s). FIX GLOBAL: `_editingNow` passa a SEMPRE adiar enquanto QUALQUER `input[type=time|date|
+  datetime-local]` estiver em foco (independe de container/setor) + janela de graça `_fieldEditUntil` (renovada
+  por listener de captura em pointerdown/keydown/input/change/focusin/wheel). NÃO afeta a busca da toolbar.
+- **B2:** wizard de Edição de mídia agora exige Designer + prazo (término); `saveTask` monta
+  `designerAssignment`+`designerSla.planDueAt`+`designerFlowStatus:'afazer'`+`assigneeId` no MESMO `add()` →
+  nasce atribuída, cai no quadro do Designer, dispara a azul; sem 2ª operação; sem cliente/token/portal/CardPremium.
+  `detailState` só mostra "Pronto para enviar ao designer" p/ LEGADO sem designer (recuperação documentada).
+- **B3:** `saveTask` persiste QUEM ENVIOU=Social (assignedBy/assignedById/assignedByName + foto via `photoOf`,
+  robusto a photo/photoUrl/avatar/foto) e QUEM RECEBEU=Designer (designerName+foto). `notifScanAssign` já usa
+  actor=assignedBy / responsible=designerId; o toast mostra a Social no topo ("<Social> atribuiu uma tarefa") e o
+  Designer em linha própria ("Responsável"). Clique agora abre a TAREFA (deep `detail/<taskId>`). Só o Designer recebe.
+
+### Provas
+- `scripts/f3377a-media-editing.test.mjs`: **79/79** (52 R1 + 27 R2). B1.1-8 via extração-e-execução do `_editingNow`
+  (campo time/date focado → adia; graça; busca da toolbar NÃO adia; global). B2.1-9 criação atômica. B3.1-7 identidade
+  da azul. Regressão **37/40 verde**; 3 red = não-regressões (f3356/f33E exigem npm build; f3374k = oráculo do 74K).
+- RED baseline: marcadores do fix AUSENTES na 1.0.177-QA @aae266f, PRESENTES na 1.0.177-QA.2. `node --check` OK. TS OK.
+
+### Build QA (run 29686391572 SUCCESS; head_sha==commit a1c0461; empacotador aceitou 1.0.177-QA.2)
+- versão **1.0.177-QA.2** + banner "AMBIENTE QA"; gates prova-de-versão + tray-icon OK.
+- EXE `bc5fb890a3265e5fe5f283655fc0e33db891ea6ddb09cc946e6e6875b942ceb8`
+- MSI `6179ea26fb45ca19ac5fff1dc271a778cbd17991ed4d76a94f4a96d1719fbea0`
+- artifacts: installer **8442221139** (`d0a9e45d…`), bundle **8442222858** (`ae122b0e…`).
+- (1.0.177-QA @aae266f = NO-GO/OBSOLETA — não promover.)
+
+### STOP / próximo
+Sem release/tag/produção. Produção **1.0.176** (Latest) e Worker **j6** (9fbdf417) intactos. Aguardando prova física
+do owner (horários sem travar em todos os setores/Agenda/modais; criação de Edição de mídia já atribuída; azul com
+Social no topo + Designer como responsável; SLA 40/20 + Cronograma 30/10 + Roteiro sem SLA) → GO físico → **F3.3.77B**.
