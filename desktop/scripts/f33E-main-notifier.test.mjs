@@ -111,7 +111,7 @@ ok('A — app aberto: atribuição → canal TOAST', byTask('tA') && byTask('tA'
 ok('B — minimizado: atribuição → JANELA PREMIUM propria (bg-window)', byTask('tB') && byTask('tB').channel === 'bg-window');
 ok('C — X/bandeja (hide): atribuição → JANELA PREMIUM propria (bg-window)', byTask('tC') && byTask('tC').channel === 'bg-window');
 ok('payload completo: tarefa+cliente+responsável+deep', byTask('tA') && byTask('tA').taskTitle === 'Cronograma semanal' && byTask('tA').clientName === 'Hospital Visão' && byTask('tA').responsibleName === 'Marina Dias' && /^detail\/|^board\//.test(byTask('tA').deep || ''));
-ok('dedupKey = designer_assigned:<id>:<assignedAt>', byTask('tA') && byTask('tA').key === 'designer_assigned:tA:' + (NOW + 1000));
+ok('dedupKey = designer_assigned:<id>:<designerId>:<assignedAt> (F3.3.77A-R3 canônico)', byTask('tA') && byTask('tA').key === 'designer_assigned:tA:designer1:' + (NOW + 1000));
 ok('dedup: reenvio do mesmo docChange NÃO duplica', delivered.filter((d) => d.taskId === 'tB').length === 1);
 ok('usuário errado (outro designer) NÃO recebe', !byTask('tX'));
 ok('feita por mim mesmo NÃO dispara', !byTask('tMine'));

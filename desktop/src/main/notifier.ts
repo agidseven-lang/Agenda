@@ -42,6 +42,17 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
       if (created && created < state.sinceMs) return;          // historico
       if (!t.assigneeId || t.assigneeId !== state.uid) return; // nao e p/ mim
       if (t.by && t.by === state.uid) return;                  // eu mesmo criei
+      // F3.3.77A-R3 (Bloqueador 1) — PRODUTOR ÚNICO: se a tarefa já carrega um designerAssignment
+      // PARA MIM, a atribuição é notificada UMA ÚNICA vez pelo ramo RICO designer_assigned (u1b).
+      // NÃO emitir também o task_assigned genérico: seu dedupKey (task_assigned:<id>) DIFERE do da
+      // azul rica (designer_assigned:<id>:<designerId>:<at>) e ESCAPARIA o dedup do HUB → 2 azuis
+      // (a genérica "superior" com identidade pobre + a rica "inferior"). Esta é a causa física da
+      // duplicidade: a criação atômica de Edição de mídia grava assigneeId=Designer E designerAssignment.
+      const _daT = (t as any).designerAssignment;
+      if (_daT && _daT.designerId === state.uid) {
+        diag("assignment.duplicate.blocked", { taskId: t.id, producer: "notifier.u1.task_assigned", canonical: "designer_assigned(u1b)" });
+        return;
+      }
       deliver({
         eventType: "task_assigned", source: "notifier", providerCalled: false,
         taskId: t.id, taskTitle: t.title || "Sem titulo", clientName: t.client || "",
@@ -54,7 +65,8 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
         body: (t.title || "Sem titulo") + (t.client ? ` - ${t.client}` : ""),
         context: t.client ? `Tarefa - ${t.client}` : "Tarefa",
         severity: "info", sound: true,
-        action: { type: "board", deep: `board/${t.sector || ""}` },
+        // F3.3.77A-R3 (FASE 4) — deep-link canônico para a TAREFA (paridade com o renderer e a azul rica).
+        action: { type: "detail", deep: `detail/${t.id}` },
         dedupKey: `task_assigned:${t.id}`,
       });
     });
@@ -71,7 +83,10 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
       if (da.assignedBy && da.assignedBy === state.uid) { diag("notifier.assign.skip", { taskId: t.id, reason: "self" }); return; }
       const at = Number(da.assignedAt) || 0;
       if (at && at < state.sinceMs) { diag("notifier.assign.skip", { taskId: t.id, reason: "before-login", at, sinceMs: state.sinceMs }); return; } // atribuicao anterior ao login
-      diag("notifier.assign.match", { taskId: t.id, type: ch.type, designerId: da.designerId, assignedBy: da.assignedBy, at, dedupKey: `designer_assigned:${t.id}:${at}` }); // F3.3.10-DIAG (só log)
+      // F3.3.77A-R3 (FASE 3) — eventId/dedupKey CANÔNICO determinístico: designer_assigned:<taskId>:<designerId>:<assignedAtMs>.
+      // IDÊNTICO ao do renderer (notifScanAssign/notifAssignKeyOf) → o HUB colapsa os dois produtores; robusto a reatribuição (designerId novo → chave nova).
+      const _canonKey = `designer_assigned:${t.id}:${da.designerId || ""}:${at}`;
+      diag("assignment.producer", { taskId: t.id, type: ch.type, designerId: da.designerId, assignedBy: da.assignedBy, at, producer: "notifier.u1b", dedupKey: _canonKey }); // F3.3.10-DIAG (só log)
       const linha = `${t.title || "Cronograma"}${t.client ? " — " + t.client : ""}`;
       const byName = da.assignedByName || "";
       deliver({
@@ -87,8 +102,9 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
         body: `${linha}${da.designerName ? `\nResponsável: ${da.designerName}` : ""}\nEtapa: Aguardando produção`,
         context: t.client ? `Cronograma - ${t.client}` : "Cronograma",
         severity: "info", sound: true,
-        action: { type: "board", deep: `board/${t.sector || ""}` },
-        dedupKey: `designer_assigned:${t.id}:${at}`,
+        // F3.3.77A-R3 (FASE 4) — deep-link canônico p/ a TAREFA (abre o detalhe; paridade com o renderer).
+        action: { type: "detail", deep: `detail/${t.id}` },
+        dedupKey: _canonKey,
       });
     });
   });

@@ -40,6 +40,8 @@ const PRELUDE =
   'function first(s){return (s||"").split(" ")[0];}\n' +
   'function dtMs(){return 0;}\n' +
   'function ncDiag(){}\n' +
+  'function canonicalNowMs(){return Date.now();}\n' +                                                        /* F3.3.77A-R3 — relógio canônico (stub: offset 0) */
+  'function _slaScheduleRevOf(t){return Number(t&&t.designerSla&&t.designerSla.scheduleRevision)||0;}\n' +   /* F3.3.77A-R3 — revisão de prazo (stub) */
   'function secOf(s){return {key:(s&&s.sector!==undefined)?s.sector:s};}\n';
 const R = new Function(PRELUDE + SLA_SRC +
   '\n; return { notifScanSla, cap:function(){return CAP;}, setTasks:function(a){__TASKS=a;}, setUser:function(u){state.user=u;}, slaCfgOf:slaCfgOf, rtds:resolveTaskDisplayState };')();
@@ -107,10 +109,10 @@ ok('34 texto EXATO do amarelo (40 minutos)', (run(withPd(NOW + 30 * MIN), 'dz1')
 ok('35 VERMELHA em planDueAt (prazo no passado + aberta → sla_overdue)', evs(withPd(NOW - 1 * MIN), 'dz1').includes('sla_overdue'));
 ok('36 texto EXATO do vermelho (20 minutos)', (run(withPd(NOW - 1 * MIN), 'dz1').find(p => p.eventType === 'sla_overdue') || {}).body === 'Você tem 20 minutos para concluir esta tarefa.');
 ok('37 conclusão CANCELA o vermelho (designerFlowStatus=concluido + prazo passado → sem alerta)', !evs(withPd(NOW - 1 * MIN, { designerFlowStatus: 'concluido' }), 'dz1').length);
-ok('38 alteração de prazo RECALCULA (novo finishMs → novo dedupKey media_warning_40)', (run(withPd(NOW + 18 * MIN), 'dz1').find(p => p.eventType === 'sla_warning') || {}).dedupKey === 'media_warning_40:m1:dz1:' + (NOW + 18 * MIN));
-ok('39 reatribuição RECALCULA (novo designer dz2 recebe; dedup inclui designerId)', (run(withPd(NOW + 20 * MIN, { designerAssignment: { designerId: 'dz2', assignedAt: NOW } }), 'dz2').find(p => p.eventType === 'sla_warning') || {}).dedupKey === 'media_warning_40:m1:dz2:' + (NOW + 20 * MIN));
+ok('38 alteração de prazo RECALCULA (novo finishMs → novo dedupKey media_warning_40; :r0 = scheduleRevision F3.3.77A-R3)', (run(withPd(NOW + 18 * MIN), 'dz1').find(p => p.eventType === 'sla_warning') || {}).dedupKey === 'media_warning_40:m1:dz1:' + (NOW + 18 * MIN) + ':r0');
+ok('39 reatribuição RECALCULA (novo designer dz2 recebe; dedup inclui designerId + scheduleRevision)', (run(withPd(NOW + 20 * MIN, { designerAssignment: { designerId: 'dz2', assignedAt: NOW } }), 'dz2').find(p => p.eventType === 'sla_warning') || {}).dedupKey === 'media_warning_40:m1:dz2:' + (NOW + 20 * MIN) + ':r0');
 ok('40 dedup impede repetição (mesmo snapshot → mesmo dedupKey estável)', (run(withPd(NOW + 20 * MIN), 'dz1').find(p => p.eventType === 'sla_warning') || {}).dedupKey === (run(withPd(NOW + 20 * MIN), 'dz1').find(p => p.eventType === 'sla_warning') || {}).dedupKey);
-ok('40b dedup vermelho = media_overdue_20:taskId:designerId:planDueAt', (run(withPd(NOW - 1 * MIN), 'dz1').find(p => p.eventType === 'sla_overdue') || {}).dedupKey === 'media_overdue_20:m1:dz1:' + (NOW - 1 * MIN));
+ok('40b dedup vermelho = media_overdue_20:taskId:designerId:planDueAt:rN', (run(withPd(NOW - 1 * MIN), 'dz1').find(p => p.eventType === 'sla_overdue') || {}).dedupKey === 'media_overdue_20:m1:dz1:' + (NOW - 1 * MIN) + ':r0');
 ok('41 clique abre a tarefa (action detail/<taskId>)', (run(withPd(NOW - 1 * MIN), 'dz1').find(p => p.eventType === 'sla_overdue') || {}).action.deep === 'detail/m1');
 ok('42 SEM crítico adicional p/ Edição de mídia (prazo −25min, após grace de 20 → NENHUMA notificação)', evs(withPd(NOW - 25 * MIN), 'dz1').length === 0);
 ok('43 só o DESIGNER responsável recebe (dz2 não recebe o vermelho de dz1)', !evs(withPd(NOW - 1 * MIN), 'dz2').includes('sla_overdue'));
@@ -163,7 +165,7 @@ ok('B3.2 persiste QUEM RECEBEU = Designer (designerName + foto via photoOf)', /d
 ok('B3.3 notifScanAssign: actor=assignedBy (Social), responsible=designerId (Designer)', /actorId:da\.assignedBy\|\|'', actorName:da\.assignedByName[\s\S]{0,140}responsibleId:da\.designerId\|\|'', responsibleName:da\.designerName/.test(H));
 ok('B3.4 título = "<Social> atribuiu uma tarefa" (autor é a Social, não o Designer)', /title:\(da\.assignedByName\?da\.assignedByName\+' atribuiu uma tarefa'/.test(H) && /if\(actor\.name\) p\.title=actor\.name\+' atribuiu uma tarefa';/.test(H));
 ok('B3.5 toast: avatar/nome PRINCIPAL = ATOR (Social) no fluxo/atribuição; responsável em linha própria', /var primName = isSla \? \(p\.responsibleName\|\|p\.actorName\|\|''\) : \(p\.actorName\|\|p\.responsibleName\|\|''\);/.test(H) && /respRow='<div class="ntf-resp">'\+rav\+'<span>Responsável: '/.test(H));
-ok('B3.6 clique ABRE A TAREFA (deep detail/<taskId>, não o quadro)', /dedupKey:'designer_assigned:'\+t\.id\+':'\+at, action:\{type:'detail',deep:'detail\/'\+t\.id\}/.test(H));
+ok('B3.6 clique ABRE A TAREFA (deep detail/<taskId>, não o quadro; eventId canônico F3.3.77A-R3)', /dedupKey:'designer_assigned:'\+t\.id\+':'\+\(da\.designerId\|\|''\)\+':'\+at, action:\{type:'detail',deep:'detail\/'\+t\.id\}/.test(H));
 ok('B3.7 entregue SOMENTE ao Designer atribuído (da.designerId===me && da.assignedBy!==me)', /if\(da && da\.designerId===me && da\.assignedBy!==me\)\{/.test(H));
 
 /* ---- PRESERVAÇÕES adicionais (R2) ---- */

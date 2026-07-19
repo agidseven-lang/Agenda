@@ -160,7 +160,7 @@ let liveSkewPayload = null;
   ok('[8] payload responsibleAvatar = Designer', p.responsibleAvatar === DESIGNER.photo);
   ok('[8] payload responsibleId = Designer', p.responsibleId === DESIGNER.id);
   ok('[8] payload targetUserId = Designer', p.targetUserId === DESIGNER.id);
-  ok('[8] payload dedupKey designer_assigned:t1:' + AT_SKEW, p.dedupKey === 'designer_assigned:t1:' + AT_SKEW);
+  ok('[8] payload dedupKey designer_assigned:t1:<designerId>:' + AT_SKEW + ' (F3.3.77A-R3 eventId canônico)', p.dedupKey === 'designer_assigned:t1:' + DESIGNER.id + ':' + AT_SKEW);
   ok('[8] payload título "Arydyjany ... atribuiu uma tarefa"', /atribuiu uma tarefa/.test(p.title || '') && (p.title || '').indexOf(SOCIAL.name) === 0);
 }
 

@@ -40,6 +40,8 @@ const PRELUDE =
   'function slaCriticalFor(u){return null;}\n' +
   'function first(s){return (s||"").split(" ")[0];}\n' +
   'function dtMs(){return 0;}\n' +
+  'function canonicalNowMs(){return Date.now();}\n' +                                                        /* F3.3.77A-R3 — relógio canônico (stub: offset 0) */
+  'function _slaScheduleRevOf(t){return Number(t&&t.designerSla&&t.designerSla.scheduleRevision)||0;}\n' +   /* F3.3.77A-R3 — revisão de prazo (stub) */
   'function secOf(s){return {key:(s==="cronograma"?"cronograma":(s==="roteiro"?"roteiro":(s==="edicao"?"edicao":"outro")))};}\n';
 const R = new Function(PRELUDE + SRC +
   '\n; return { notifScanSla, cap:function(){return CAP;}, setTasks:function(a){__TASKS=a;}, setUser:function(u){state.user=u;} };')();

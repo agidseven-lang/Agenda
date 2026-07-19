@@ -39,7 +39,7 @@ const ok = (n, c) => { if (c) pass++; else { fail++; console.log('FAIL:', n); } 
 // ── estáticas ──
 ok('notifScanAssign existe', /function notifScanAssign\(\)/.test(html0));
 ok('notifScan chama notifScanAssign', /function notifScan\(\)\{ notifScanFlow\(\); notifScanSla\(\); notifScanAssign\(\); \}/.test(html0));
-ok('dedupKey designer_assigned idêntico ao main (<id>:<assignedAt>)', /dedupKey:'designer_assigned:'\+t\.id\+':'\+at/.test(html0));
+ok('dedupKey designer_assigned idêntico ao main (<id>:<designerId>:<assignedAt> — F3.3.77A-R3 canônico)', /dedupKey:'designer_assigned:'\+t\.id\+':'\+\(da\.designerId\|\|''\)\+':'\+at/.test(html0));
 ok('dedupKey task_assigned idêntico ao main (<id>)', /dedupKey:'task_assigned:'\+t\.id/.test(html0));
 // F3.3.17-R4 — baseline robusto a clock-skew: SEMENTE do histórico no 1º snapshot + dedup persistente,
 // SEM comparar assignedAt (relógio de quem grava) com o relógio de quem lê (removido o gate at<_notifAssignSince).
@@ -110,7 +110,7 @@ if (Rj.ERROR) { console.error('::error:: erro no driver DOM:', Rj.ERROR); proces
 
 const N = Rj.notified || [];
 const has = (type, key) => N.some(x => x.type === type && x.key === key);
-ok('DOM: emite designer_assigned para atribuição NOVA (dedupKey com assignedAt)', N.some(x => x.type==='designer_assigned' && /^designer_assigned:tNew:\d+$/.test(x.key) && x.target==='designer1'));
+ok('DOM: emite designer_assigned para atribuição NOVA (dedupKey canônico <id>:<designerId>:<assignedAt>)', N.some(x => x.type==='designer_assigned' && /^designer_assigned:tNew:designer1:\d+$/.test(x.key) && x.target==='designer1'));
 ok('DOM: emite task_assigned para tarefa nova atribuída a mim', has('task_assigned','task_assigned:tTask'));
 ok('DOM: NÃO emite atribuição anterior ao login (tOld)', !N.some(x => x.task==='tOld'));
 ok('DOM: NÃO emite atribuição feita por mim (tMine)', !N.some(x => x.task==='tMine'));

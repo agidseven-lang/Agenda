@@ -2942,10 +2942,37 @@ function slaCfgOf(t){
   var k=''; try{ k=(typeof secOf==='function'?((secOf(t&&t.sector)||{}).key||''):((t&&t.sector)||'')); }catch(_){ k=(t&&t.sector)||''; }
   return SECTOR_SLA[k]||slaCfgDefault();
 }
+/* ═══════════ F3.3.77A-R3 — RELÓGIO E LINHA DO TEMPO CANÔNICOS (fonte ÚNICA) ═══════════
+ * canonicalNowMs(): ÚNICO ponto de leitura de "agora" para TODO o SLA — cronômetro do card, chip,
+ * Monitor de prazos, painel, boundary timer e as notificações amarela/vermelha. Hoje = relógio LOCAL
+ * (offset 0) ⇒ comportamento BYTE-idêntico ao aprovado. É o ÚNICO lugar onde uma FONTE DE TEMPO DE
+ * SERVIDOR (se AUTORIZADA — vide STOP GATE / FASE 8) plugaria o offset, fazendo TODAS as superfícies
+ * deslizarem JUNTAS e eliminando o clock-skew ENTRE máquinas. Sem essa fonte, o Desktop NÃO tem como
+ * saber que o relógio local está errado (limitação técnica registrada no relatório).
+ * resolveCanonicalSlaTimeline(t): deriva os INSTANTES canônicos (dueAtMs/warningAtMs/overdueAtMs/
+ * criticalAtMs) da MESMA fonte de prazo (slaPanelFinishMs) + MESMA config por setor (slaCfgOf) — assim
+ * boundary timer, cronômetro e notificação usam EXATAMENTE os mesmos marcos. Puro/read-only. */
+var _slaClockOffsetMs=0;   // 0 = relógio local. NÃO alterar sem fonte de tempo de servidor AUTORIZADA (FASE 8).
+function canonicalNowMs(){ return Date.now()+_slaClockOffsetMs; }
+function _slaScheduleRevOf(t){ try{ return Number(t&&t.designerSla&&t.designerSla.scheduleRevision)||0; }catch(_){ return 0; } }
+function resolveCanonicalSlaTimeline(t,dtMsFn){
+  var f=dtMsFn||(typeof dtMs==='function'?dtMs:null);
+  var cfg=(typeof slaCfgOf==='function')?slaCfgOf(t):slaCfgDefault();
+  var dueAtMs=(typeof slaPanelFinishMs==='function')?(slaPanelFinishMs(t,f)||0):0;
+  var warnMin=(cfg&&cfg.warningMinutes)||30, graceMin=(cfg&&cfg.overdueGraceMinutes)||10;
+  var tz=''; try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone||''; }catch(_){}
+  return { dueAtMs:dueAtMs,
+    warningAtMs:dueAtMs?(dueAtMs-warnMin*60000):0,   // AMARELO: prazo final − warningMinutes
+    overdueAtMs:dueAtMs,                              // VERMELHO: no PRAZO FINAL (planDueAt)
+    criticalAtMs:dueAtMs?(dueAtMs+graceMin*60000):0, // fim da tolerância (setores com critical)
+    warningMinutes:warnMin, overdueGraceMinutes:graceMin,
+    designerSla:!!(cfg&&cfg.designerSla), timeZone:tz, scheduleRevision:_slaScheduleRevOf(t) };
+}
+try{ window.canonicalNowMs=canonicalNowMs; window.resolveCanonicalSlaTimeline=resolveCanonicalSlaTimeline; }catch(_){}
 /* Alerta SLA por PRAZO FINAL p/ o SINO (read-only). Deriva do PANEL-CORE (sino↔painel 1:1,
  * ambos exigem designerSla = SLA iniciado no envio ao designer). Textos aprovados. */
 function slaibFinishAlert(t,now){
-  var r=slaPanelRow(t,now||Date.now(),(typeof dtMs==='function'?dtMs:null)); if(!r) return null;
+  var r=slaPanelRow(t,now||canonicalNowMs(),(typeof dtMs==='function'?dtMs:null)); if(!r) return null;   /* F3.3.77A-R3 — relógio canônico */
   if(r.sev==='vermelho'){
     // mesma regra de tolerância de 10 min do monitor/card/detalhe (fonte única)
     var grace=r.critical
@@ -2960,7 +2987,7 @@ function slaibFinishAlert(t,now){
 function slaibCompute(){
   var u=state.user; if(!u) return [];
   var vis=slaibVisible(u);
-  var now=Date.now(), out=[];
+  var now=canonicalNowMs(), out=[];   /* F3.3.77A-R3 — relógio canônico (sino/lista) */
   for(var i=0;i<vis.length;i++){
     var t=vis[i]; if(!t) continue;
     var a=slaibFinishAlert(t,now); if(!a) continue;   // só PRAZO FINAL (laranja/vermelho)
@@ -3200,7 +3227,7 @@ function slaOpName(id){ if(!id) return '—'; var u=(state.users||[]).find(funct
 var slaMonOpen=false;  // estado do dropdown do widget (persiste entre refreshes do ticker)
 function slaOpRowTime(x){ return (x.sev==='vermelho')?('Atrasada há '+slaElapsed(_slaMs(x.overdueMs,x.overdueMin))):('Faltam '+slaCount(_slaMs(x.remainingMs,x.remainingMin))); }
 function slaOpRowGrace(x){ return 'Restam '+slaCount(_slaMs(x.graceRemainingMs,x.graceRemainingMin))+' para concluir ou sinalizar atraso.'; }
-function slaOpRowPct(x){ if(x.sev==='vermelho') return 100; var p=(x.startMs>0&&x.finishMs>x.startMs)?Math.round((Date.now()-x.startMs)/(x.finishMs-x.startMs)*100):82; return Math.max(5,Math.min(99,p)); }
+function slaOpRowPct(x){ if(x.sev==='vermelho') return 100; var p=(x.startMs>0&&x.finishMs>x.startMs)?Math.round((canonicalNowMs()-x.startMs)/(x.finishMs-x.startMs)*100):82; return Math.max(5,Math.min(99,p)); }   /* F3.3.77A-R3 — relógio canônico (barra de progresso) */
 function slaOpRowHtml(x){
   var cls=(x.sev==='vermelho')?'red':'amber';
   var meta=(x.client?slaibEsc(x.client)+' · ':'')+'resp. '+slaOpName(x.designerId)+' · prazo '+slaibFmtHM(x.finishMs);
@@ -3235,7 +3262,7 @@ function slaOpGrpHtml(kind,rows){
 function slaMonData(){
   var u=state.user; if(!u) return {overdue:[],warning:[],rows:[],total:0,nextMs:0,horizonMin:0};
   var vis=(typeof slaibVisible==='function')?slaibVisible(u):(state.tasks||[]);
-  var now=Date.now(), f=(typeof dtMs==='function'?dtMs:null);
+  var now=canonicalNowMs(), f=(typeof dtMs==='function'?dtMs:null);   /* F3.3.77A-R3 — relógio canônico (Monitor de prazos) */
   var d=slaPanelDerive(vis,now,f);
   // PRÓXIMO prazo (tempo real): menor término futuro entre tarefas ainda EM PRAZO (running).
   var nextMs=0;
@@ -3405,6 +3432,7 @@ async function slaEditPrazoCommit(taskId, ov){
   var hadPF=Number(t.designerSla&&t.designerSla.plannedFinishAt)>0;
   var patch={}; patch['designerSla.planStartAt']=startMs; patch['designerSla.planDueAt']=dueMs;
   if(hadPF) patch['designerSla.plannedFinishAt']=dueMs;
+  patch['designerSla.scheduleRevision']=_slaScheduleRevOf(t)+1;   // F3.3.77A-R3 (FASE 10) — nova revisão: cancela/rearma timers e invalida os dedupes amarelo/vermelho do prazo anterior
   var btn=document.getElementById('slaedit-save'); if(btn)btn.disabled=true;
   try{
     await db.collection('tasks').doc(taskId).update(patch);
@@ -3457,10 +3485,10 @@ function slaMonNextBoundary(now){
   var f=(typeof dtMs==='function'?dtMs:null), best=0;
   for(var i=0;i<vis.length;i++){ var t=vis[i]; if(!t||!t.designerSla) continue;
     if(slaPanelDelivered(t)) continue;
-    var fin=slaPanelFinishMs(t,f); if(!fin) continue;
-    // F3.3.77A — limites por SETOR (Edição de mídia acorda em fin−40 / fin+20; default 30/10).
-    var _bc=(typeof slaCfgOf==='function')?slaCfgOf(t):null, _bw=_bc?_bc.warningMinutes*60000:SLA_PANEL_WARN_MS, _bg=_bc?_bc.overdueGraceMinutes*60000:SLA_PANEL_GRACE_MS;
-    var bs=[fin-_bw, fin, fin+_bg];
+    // F3.3.77A-R3 — marcos por SETOR vindos da LINHA DO TEMPO CANÔNICA (mesmos instantes do cronômetro
+    // e da notificação): Edição de mídia acorda em due−40 / due / due+20; default 30/10.
+    var tl=resolveCanonicalSlaTimeline(t,f); if(!tl.dueAtMs) continue;
+    var bs=[tl.warningAtMs, tl.overdueAtMs, tl.criticalAtMs];
     for(var k=0;k<bs.length;k++){ if(bs[k]>now && (!best||bs[k]<best)) best=bs[k]; }
   }
   return best;
@@ -3468,11 +3496,15 @@ function slaMonNextBoundary(now){
 function slaMonScheduleBoundary(){
   try{
     if(_slaBoundaryTimer){ clearTimeout(_slaBoundaryTimer); _slaBoundaryTimer=null; }
-    var now=Date.now(), b=slaMonNextBoundary(now); if(!b) return;
+    var now=canonicalNowMs(), b=slaMonNextBoundary(now); if(!b) return;   /* F3.3.77A-R3 — relógio canônico */
     var delay=Math.max(80, Math.min(b-now+120, 30*60000));   // dispara no limite exato (cap 30min)
+    try{ if(typeof ncDiag==='function') ncDiag('sla.timer.arm',{boundaryMs:b,delayMs:delay,canonicalNowMs:now,systemNowMs:Date.now(),clockOffsetMs:_slaClockOffsetMs}); }catch(_){}
     // No limite EXATO: atualiza monitor/sino/card (slaibRefresh) E dispara a NOTIFICAÇÃO (toast) —
     // sem o notifScanSla aqui, o toast laranja só sairia no poll de 30s (até 30s atrasado).
-    _slaBoundaryTimer=setTimeout(function(){ try{ slaibRefresh(); }catch(_){} try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){} }, delay);
+    _slaBoundaryTimer=setTimeout(function(){
+      try{ if(typeof ncDiag==='function') ncDiag('sla.timer.fire',{boundaryMs:b,canonicalNowMs:canonicalNowMs(),systemNowMs:Date.now(),actualDriftMs:canonicalNowMs()-b}); }catch(_){}
+      try{ slaibRefresh(); }catch(_){} try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){}
+    }, delay);
   }catch(_){}
 }
 /* F3.3.2 (FASE 5 — BLOQUEIO OPERACIONAL, escopo aprovado pelo owner: DESIGNER responsável;
@@ -3482,7 +3514,7 @@ function slaMonScheduleBoundary(){
 function slaCriticalFor(u){
   u=u||state.user; if(!u) return null;
   if(typeof canSeeAll==='function' && canSeeAll(u)) return null;     // Admin/Social supervisionam (não bloqueia)
-  var now=Date.now(), f=(typeof dtMs==='function'?dtMs:null);
+  var now=canonicalNowMs(), f=(typeof dtMs==='function'?dtMs:null);   /* F3.3.77A-R3 — relógio canônico (bloqueio operacional) */
   var vis=(typeof slaibVisible==='function')?slaibVisible(u):(state.tasks||[]);
   for(var i=0;i<vis.length;i++){ var t=vis[i]; if(!t||!t.designerSla) continue;
     var resp=(t.designerAssignment&&t.designerAssignment.designerId)||t.assigneeId||null;
@@ -3881,7 +3913,7 @@ function notifScanFlow(){
 function notifScanSla(){
   try{
     if(!state.user) return;
-    var now=Date.now(), f=(typeof dtMs==='function'?dtMs:null), vis=[];
+    var now=canonicalNowMs(), f=(typeof dtMs==='function'?dtMs:null), vis=[];   /* F3.3.77A-R3 — relógio canônico (notificação amarela/vermelha em lockstep com o cronômetro) */
     try{ vis=slaibVisible(state.user)||[]; }catch(_){ vis=[]; }
     for(var i=0;i<vis.length;i++){
       var t=vis[i]; if(!t) continue;
@@ -3912,7 +3944,9 @@ function notifScanSla(){
       var fn=first(resp.name||''), tl=(t.title||'Tarefa')+(t.client?(' — '+t.client):''), pf=slaibFmtHM(d.finishMs);
       // dedup por prazo (finishMs=planDueAt) → mudança de prazo recalcula; setores com dedupByDesigner
       // (Edição de mídia) incluem o designerId → reatribuição gera chave nova p/ o novo designer.
-      var slaDk=function(tag){ return (cfg&&cfg.dedupByDesigner) ? (tag+':'+t.id+':'+resp.id+':'+d.finishMs) : (tag+':'+t.id+':'+d.finishMs); };
+      // F3.3.77A-R3 (FASE 10) — Edição de mídia (dedupByDesigner) inclui scheduleRevision: mudança de prazo
+      // gera chave NOVA → não repete o alerta do prazo antigo. Cronograma (sem dedupByDesigner) permanece BYTE-idêntico.
+      var slaDk=function(tag){ return (cfg&&cfg.dedupByDesigner) ? (tag+':'+t.id+':'+resp.id+':'+d.finishMs+':r'+_slaScheduleRevOf(t)) : (tag+':'+t.id+':'+d.finishMs); };
       var base={ taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
         actorId:resp.id, actorName:resp.name, actorAvatar:resp.avatar,
         responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
@@ -3971,7 +4005,7 @@ var _notifAssignUid=null;
 function notifAssignKeyOf(t,me){
   if(!t||!t.id) return '';
   var da=t.designerAssignment;
-  if(da && da.designerId===me && da.assignedBy!==me){ var at=Number(da.assignedAt)||0; return at?('designer_assigned:'+t.id+':'+at):''; }
+  if(da && da.designerId===me && da.assignedBy!==me){ var at=Number(da.assignedAt)||0; return at?('designer_assigned:'+t.id+':'+(da.designerId||'')+':'+at):''; }   /* F3.3.77A-R3 (FASE 3) — eventId canônico: :taskId:designerId:assignedAtMs (idêntico ao notifier.u1b) */
   if(t.assigneeId===me && t.by!==me && !da){ var ct=Number(t.createdAt)||0; return ct?('task_assigned:'+t.id):''; }
   return '';
 }
@@ -4002,7 +4036,8 @@ function notifScanAssign(){
           targetUserId:me, etapa:'Aguardando produção', severity:'info', sound:true, anchor:at,
           title:(da.assignedByName?da.assignedByName+' atribuiu uma tarefa':'Nova tarefa atribuída a você'),
           body:linha+(da.designerName?('\nResponsável: '+da.designerName):'')+'\nEtapa: Aguardando produção',
-          dedupKey:'designer_assigned:'+t.id+':'+at, action:{type:'detail',deep:'detail/'+t.id} }));
+          /* F3.3.77A-R3 (FASE 3) — eventId canônico IDÊNTICO ao notifier.u1b: o HUB do main colapsa os dois produtores em UMA azul. */
+          dedupKey:'designer_assigned:'+t.id+':'+(da.designerId||'')+':'+at, action:{type:'detail',deep:'detail/'+t.id} }));
       } else if(t.assigneeId===me && t.by!==me && !da){
         var ct=Number(t.createdAt)||0; if(!ct) continue;
         notifEmit(notifBuildPayload({ eventType:'task_assigned', taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
@@ -4019,6 +4054,20 @@ function notifScanAssign(){
 if(typeof renderFromSnapshot==='function'){ var _notif_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_notif_rfs.apply(this,arguments); try{ notifScan(); }catch(_){} return r; }; }
 if(typeof slaTick==='function'){ var _notif_tk=slaTick; slaTick=function(){ var r=_notif_tk.apply(this,arguments); try{ notifScanSla(); }catch(_){} return r; }; }
 try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} try{ notifScanAssign(); }catch(_){} },30000); }catch(_){}
+/* F3.3.77A-R3 (FASE 9) — RETOMADA (resume/unlock): o Windows pode SUSPENDER o processo, congelando o
+   setTimeout do boundary. Ao voltar o foco/visibilidade, reavalia IMEDIATAMENTE a linha do tempo canônica:
+   reemite (deduped) o amarelo/vermelho que venceu durante a suspensão e RE-ARMA o boundary timer — alvo ≤3s
+   após a retomada, sem depender do poll de 30s. Só leitura; nunca grava. */
+try{
+  var _slaResume=function(){
+    try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){}
+    try{ if(typeof slaMonScheduleBoundary==='function') slaMonScheduleBoundary(); }catch(_){}
+    try{ if(typeof slaibRefresh==='function') slaibRefresh(); }catch(_){}
+    try{ if(typeof ncDiag==='function') ncDiag('sla.resume.recover',{vis:(typeof document!=='undefined'?document.visibilityState:'?'),canonicalNowMs:(typeof canonicalNowMs==='function'?canonicalNowMs():Date.now()),systemNowMs:Date.now()}); }catch(_){}
+  };
+  document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') _slaResume(); });
+  window.addEventListener('focus',_slaResume);
+}catch(_){}
 /* F3.3.10-DIAG — HEARTBEAT do RENDERER (intervalo próprio, não altera a varredura aprovada): prova se o
    timer do renderer SOBREVIVE minimizado/bandeja (Chromium pode congelar a janela oculta). Se houver
    scan.tick com vis:'hidden', a varredura de SLA roda em background; se sumir ao ocultar, o SLA depende
@@ -5585,7 +5634,7 @@ function kbv2SlaLocal(t,nowMs){
      (resolveTaskDisplayState, PANEL-CORE), por PRAZO FINAL — NUNCA por início. Assim o card
      nunca mostra "Início atrasado" enquanto o PRAZO FINAL está em dia; o fluxo/início vive no
      chip de etapa (separado do SLA). Aqui só mapeamos o estado canônico p/ os rótulos do card. */
-  const d=resolveTaskDisplayState(t,nowMs||Date.now(),(typeof dtMs==='function'?dtMs:null));
+  const d=resolveTaskDisplayState(t,nowMs||canonicalNowMs(),(typeof dtMs==='function'?dtMs:null));   /* F3.3.77A-R3 — relógio canônico (chip do card) */
   // F3.3.17-R5.1 — no CRONOGRAMA, a ENTREGA do designer (SLA cumprido) NÃO é conclusão final: o chip
   // do card NUNCA diz "Concluído" antes da aprovação final real do cliente (isTaskCompleted) → "Entregue".
   if(d.state==='completed')return {state:'completed',sev:'verde',label:(isClientSector(secOf(t.sector).key)&&!isTaskCompleted(t))?'Entregue':'Concluído'};
@@ -6210,9 +6259,9 @@ function detailSla(t){
   var ds=t&&t.designerSla; if(!ds) return null;
   /* F3.3.2 — detalhe deriva da FONTE ÚNICA (resolveTaskDisplayState): mesmo prazo final/estado
      do chip do card, do widget e do sino. Sem reimplementar limiares aqui. */
-  var d=resolveTaskDisplayState(t,Date.now(),(typeof dtMs==='function'?dtMs:null));
+  var d=resolveTaskDisplayState(t,canonicalNowMs(),(typeof dtMs==='function'?dtMs:null));   /* F3.3.77A-R3 — relógio canônico (detalhe) */
   if(d.state==='none') return null;
-  var now=Date.now(), pd=d.finishMs;
+  var now=canonicalNowMs(), pd=d.finishMs;
   var o={planStartAt:Number(ds.planStartAt)||0,planDueAt:pd,state:d.state};
   // F3.3.17-R5.1 — entrega do designer ≠ conclusão final: no CRONOGRAMA o rótulo do SLA é "Entregue" até a
   // aprovação final real do cliente (isTaskCompleted); só então "Concluída".
@@ -7991,7 +8040,7 @@ async function saveTask(){const f=state.form;
     data.designerAssignment={ designerId:f.assigneeId, designerName:_des.name||'', designerAvatar:photoOf(_des)||'', designerPhoto:photoOf(_des)||'',
       assignedAt:_now, assignedBy:_soc.id||null, assignedById:_soc.id||null, assignedByName:_soc.name||'', assignedByAvatar:photoOf(_soc)||'', assignedByPhoto:photoOf(_soc)||'', status:'sent',
       startDate:f.startDate||'', startTime:f.startTime||'', endDate:f.endDate||'', endTime:f.endTime||'', obs:f.obs||'' };
-    data.designerSla={ planStartAt:(f.startDate?dtMs(f.startDate,f.startTime||'00:00'):null), planDueAt:(f.endDate?dtMs(f.endDate,f.endTime||'23:59'):null), seedAt:_now, seedBy:_soc.id||null };
+    data.designerSla={ planStartAt:(f.startDate?dtMs(f.startDate,f.startTime||'00:00'):null), planDueAt:(f.endDate?dtMs(f.endDate,f.endTime||'23:59'):null), seedAt:_now, seedBy:_soc.id||null, scheduleRevision:1 };   /* F3.3.77A-R3 (FASE 10) — revisão de prazo (semente): mudança de prazo incrementa → invalida dedupes antigos */
     data.designerFlowStatus='afazer'; data.designerWorkflowStage='afazer';
     data.designerResponsibleId=f.assigneeId; data.designerResponsibleName=_des.name||'';
     data.status='afazer'; data.dueDate=f.endDate||''; data.dueTime=f.endTime||''; data.due=f.endDate||'';

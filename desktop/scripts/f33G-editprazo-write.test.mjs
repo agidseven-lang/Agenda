@@ -39,9 +39,11 @@ const dtMs = (date, time) => { if (!date) return null; const [y, m, d] = date.sp
 
 // fábrica do sandbox: injeta dependências e devolve as duas funções reais
 function buildFns(deps) {
-  const factory = new Function('db', 'document', 'dtMs', 'state', 'flashToast', 'render', 'console',
+  // F3.3.77A-R3 (FASE 10) — slaEditPrazoCommit agora incrementa designerSla.scheduleRevision no patch.
+  const _slaScheduleRevOf = (t) => Number(t && t.designerSla && t.designerSla.scheduleRevision) || 0;
+  const factory = new Function('db', 'document', 'dtMs', 'state', 'flashToast', 'render', 'console', '_slaScheduleRevOf',
     finishSrc + '\n' + commitSrc + '\n; return { slaEditPrazoCommit, slaPanelFinishMs };');
-  return factory(deps.db, deps.document, dtMs, deps.state, deps.flashToast, deps.render, console);
+  return factory(deps.db, deps.document, dtMs, deps.state, deps.flashToast, deps.render, console, _slaScheduleRevOf);
 }
 
 // ───────────────────────── mocks ─────────────────────────
@@ -78,12 +80,13 @@ const baseTask = () => ({
   await fns.slaEditPrazoCommit('task1', ov);
   const patch = db._updated();
   const wantStart = dtMs('2026-07-01', '09:00'), wantDue = dtMs('2026-07-10', '18:00');
-  ok('C1.1 patch tem SÓ planStartAt + planDueAt (sem plannedFinishAt)', JSON.stringify(Object.keys(patch).sort()) === JSON.stringify(['designerSla.planDueAt', 'designerSla.planStartAt']));
+  ok('C1.1 patch tem planStartAt + planDueAt + scheduleRevision (sem plannedFinishAt) — F3.3.77A-R3', JSON.stringify(Object.keys(patch).sort()) === JSON.stringify(['designerSla.planDueAt', 'designerSla.planStartAt', 'designerSla.scheduleRevision']));
+  ok('C1.1b scheduleRevision incrementado (0 → 1) na mudança de prazo', patch['designerSla.scheduleRevision'] === 1);
   ok('C1.2 patch grava os ms corretos (start/due)', patch['designerSla.planStartAt'] === wantStart && patch['designerSla.planDueAt'] === wantDue);
   ok('C1.3 NÃO cria plannedFinishAt no patch', !('designerSla.plannedFinishAt' in patch));
   ok('C1.4 servidor NÃO passa a ter plannedFinishAt', stored.designerSla.plannedFinishAt === undefined);
   ok('C1.5 preserva seedAt/seedBy (subcampos de designerSla)', stored.designerSla.seedAt === 111 && stored.designerSla.seedBy === 'u1');
-  ok('C1.6 patch SÓ toca designerSla.plan* (nada de status/responsável/cliente/etapa)', Object.keys(patch).every((k) => /^designerSla\.plan(Start|Due)At$/.test(k)));
+  ok('C1.6 patch SÓ toca designerSla.plan*/scheduleRevision (nada de status/responsável/cliente/etapa)', Object.keys(patch).every((k) => /^designerSla\.(plan(Start|Due)At|scheduleRevision)$/.test(k)));
   ok('C1.7 status/responsável/cliente/etapa/prioridade INALTERADOS', t.status === before.status && t.assigneeId === before.assigneeId && t.assignee === before.assignee && t.client === before.client && t.sector === before.sector && t.priority === before.priority && t.designerFlowStatus === before.designerFlowStatus);
   ok('C1.8 designerAssignment INALTERADO', JSON.stringify(t.designerAssignment) === JSON.stringify(before.designerAssignment));
   ok('C1.9 read-back confirmou -> toast de sucesso', toasts.some((m) => /confirmad/i.test(m)));
@@ -100,7 +103,7 @@ const baseTask = () => ({
   await fns.slaEditPrazoCommit('task1', ov);
   const patch = db._updated();
   const wantStart = dtMs('2026-08-02', '10:30'), wantDue = dtMs('2026-08-12', '19:00');
-  ok('C2.1 patch tem os 3 campos (espelhamento)', JSON.stringify(Object.keys(patch).sort()) === JSON.stringify(['designerSla.planDueAt', 'designerSla.planStartAt', 'designerSla.plannedFinishAt']));
+  ok('C2.1 patch tem os 4 campos (espelhamento + scheduleRevision) — F3.3.77A-R3', JSON.stringify(Object.keys(patch).sort()) === JSON.stringify(['designerSla.planDueAt', 'designerSla.planStartAt', 'designerSla.plannedFinishAt', 'designerSla.scheduleRevision']));
   ok('C2.2 plannedFinishAt ESPELHADO p/ o novo prazo (==due)', patch['designerSla.plannedFinishAt'] === wantDue);
   ok('C2.3 planStartAt/planDueAt corretos', patch['designerSla.planStartAt'] === wantStart && patch['designerSla.planDueAt'] === wantDue);
   ok('C2.4 servidor: plannedFinishAt agora == novo prazo', stored.designerSla.plannedFinishAt === wantDue);
@@ -151,7 +154,7 @@ ok('S5 handler do "Salvar prazo" chama slaEditPrazoCommit (não é mais no-op)',
 ok('S6 mensagem WhatsApp no regime restaurado (link estavel, sem ?v= — D3R10AA)', /const url=buildShareClientUrl\(ctx&&ctx\.token\);/.test(DH));
 ok('S7 notificações background INTOCADAS (showBgNotify primário, canal bg-window)', /const bgOk = showBgNotify\(p\);/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
 ok('S8 Worker/OG INTOCADO (OG_IMG_PATH + dimensões 1200x630)', /const OG_IMG_PATH = "\/og\/wa-card-v64-38\.jpg"/.test(WK) && /og:image:width" content="1200"/.test(WK));
-ok('S9 SLA Monitor lê pelo MESMO canônico (slaPanelFinishMs em slaMonNextBoundary)', /var fin=slaPanelFinishMs\(t,f\); if\(!fin\) continue;/.test(DH));
+ok('S9 SLA Monitor lê pelo MESMO canônico (resolveCanonicalSlaTimeline→slaPanelFinishMs em slaMonNextBoundary) — F3.3.77A-R3', /var tl=resolveCanonicalSlaTimeline\(t,f\); if\(!tl\.dueAtMs\) continue;/.test(DH) && /function resolveCanonicalSlaTimeline\(t,dtMsFn\)\{[\s\S]{0,400}slaPanelFinishMs\(t,f\)/.test(DH));
 
 console.log('\nF3.3.13 EDITAR-PRAZO WRITE: ' + pass + ' PASS / ' + fail + ' FAIL');
 if (fail) { console.error('::error:: write-path do "Editar prazo" divergiu do contrato autorizado (Opção A)'); process.exit(1); }
