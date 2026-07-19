@@ -1441,46 +1441,47 @@ Produção Desktop **1.0.175** publicada (release imutável; **Latest por decis�
 
 ---
 
-## F3.3.76A — Desktop QA 1.0.176-QA: restaurar SLA do Designer em tempo real (30/10 a partir da atribuição)
+## F3.3.76A — Desktop QA 1.0.176-QA.2: SLA do Designer ancorado no PRAZO FINAL (planDueAt)
 
-Incidente funcional: as duas notificações de SLA do Designer (laranja "Você tem 30 minutos…" / vermelha
-"Você tem 10 minutos…") pararam de aparecer na atribuição. **QA isolado; nada em produção.**
+Incidente: as duas notificações SLA do Designer (laranja "Você tem 30 minutos…" / vermelha "Você tem 10
+minutos…") não apareciam corretamente. **QA isolado; nada em produção.**
 
-### Causa-raiz (auditada; SEM regressão de código desde a baseline aprovada 26b3a3b)
-O SLA operacional laranja/vermelho estava ancorado no **PRAZO PLANEJADO** (`designerSla.planDueAt` = término
-do modal "Prazo para o designer", default **+3 dias**), NÃO na atribuição. Tarefa recém-atribuída ficava em
-`resolveTaskDisplayState`→`running` (`inPanel:false`) por dias, e `notifScanSla` não emitia nada perto da
-atribuição. Scanner (30s + snapshot) e o HUB de entrega nativa **intactos** — os alertas nunca eram gerados.
-3 auditorias independentes convergiram; RED provou (prazo default → nada; prazo curto injetado → dispara).
+### Regra CORRETA (após correção de escopo do owner)
+Âncora = **designerSla.planDueAt** (prazo final que a Social define no modal). A notificação AZUL de
+atribuição permanece imediata e intacta. **NÃO** existe SLA fixo de 30min a partir da atribuição.
+- **AMARELO**: `yellowAt = planDueAt − 30min` (restam 30min p/ o prazo). "Você tem 30 minutos…"
+- **VERMELHO**: `redAt = planDueAt` (prazo atingido e tarefa aberta). "Você tem 10 minutos…"
+- **CRÍTICO**: `planDueAt + 10min` (escalonamento aprovado preservado).
+- Independe da duração (1h / 3h / 1–3 dias): o amarelo só sai quando faltam 30min.
 
-### Correção (branch desktop/f3376a-designer-sla-realtime-notifications, commit d1351389→**920e270**; Desktop-only, cirúrgica)
-- **Decisão de escopo do owner: SLA fixo 30/10 SÓ nas NOTIFICAÇÕES** — Card Premium / modal de prazo / chip de
-  SLA / painel / monitor **intocados** (seguem por `resolveTaskDisplayState`/prazo planejado).
-- Nova `designerOpSla(t)`: reconstrói do dado persistido `designerAssignment.assignedAt` →
-  `designerDeadlineAt = assignedAt+30min`, `overdueGraceUntil = +10min`. `notifScanSla` re-ancorado: **laranja
-  IMEDIATO na atribuição**, **vermelho em +30**, e escalonamento **crítico** em +40 (contrato aprovado preservado).
-- Pessoal ao designer responsável; **só setores com designer** (Cronograma/Edição de mídia), **NUNCA roteiro**;
-  suprime concluída/cancelada; reatribuição inicia SLA novo. Dedup novos (deadline_30/overdue_10/critical_10).
-  Logs `notifSla.deadline.match/skip`. Grace de 2min (F3.3.19) **removido** (owner exige "imediatamente").
-- `main.ts` **inalterado** (nativa na lock screen = mudança ao contrato congelado de entrega; **adiada** — flag ao owner).
+### Interpretação ERRADA (candidata 1.0.176-QA, commit 920e270 — OBSOLETA / NO-GO / NÃO PROMOVER)
+A 1ª tentativa ancorou em `assignedAt+30` (`designerOpSla`) e disparava o amarelo IMEDIATAMENTE na atribuição.
+Owner corrigiu; revertido. RED prova: 920e270 emite amarelo na atribuição mesmo com prazo 31min à frente.
+
+### Correção (branch desktop/f3376a-…, commit 920e270→**9374a9a**; cirúrgica, só `notifScanSla`)
+- Removida a `designerOpSla`; âncora de volta a `resolveTaskDisplayState` (**planDueAt**) — idêntica ao
+  original aprovado 1.0.175.
+- Removido o grace de 2min pós-atribuição (F3.3.19) → o amarelo cai exatamente em planDueAt−30.
+- Adicionada exclusão explícita de **Roteiro** (jamais SLA). Logs `notifSla.deadline.match` (yellow_30/red_10).
+- Dedup por **finishMs (planDueAt)** → mudança de prazo recalcula; a **azul de atribuição (notifScanAssign)
+  NÃO é suprimida nem duplicada**.
+- **INTOCADOS**: modal/prazo planejado, Card Premium, chip de SLA, painel, monitor, `assignedAt`, azul,
+  Roteiro sem designer, Cronograma, portal, Worker, backend, `main.ts`.
 
 ### Provas
-- `scripts/f3376a-sla-red.test.mjs` (self-adapting RED×GREEN + matriz FASE-10 de emissão): **GREEN 30/30** na
-  fonte corrigida; **RED 4/4** na baseline 1.0.175. `f333-notif` var do contexto laranja atualizado (d→op).
-  `f3375a` detecção QA agnóstica de versão. `f33Q` (grace de 2min) aposentado.
-- Regressão: **36/39** verdes; 3 falhas pré-existentes/ambientais (auth-core/main-notifier compilam .ts;
-  production-invariance é pin do 74K). Na árvore QA (1.0.176-QA+banner): +3 pins de PRODUÇÃO (1.0.175) que
-  uma build QA tripa por design. Todos os 3 blocos `<script>` do renderer parseiam limpos.
+- `scripts/f3376a-sla-red.test.mjs` self-adapting: **GREEN 30/30** na fonte corrigida (owner tests 1–10:
+  3 dias / 2 horas / exato 30min / <30min / mudança de prazo / conclusão / reatribuição / snapshots / restart /
+  Roteiro sem SLA); **RED 1/1** na candidata errada 920e270 (amarelo antecipado). Regressão **33/39**
+  (3 pré-existentes ambientais + 3 pins de PRODUÇÃO 1.0.175 que build QA tripa por design). Scripts parseiam.
 
-### Build QA (run 29666612688 SUCCESS; procedência unívoca head_sha==commit 920e270)
-- versão **1.0.176-QA** + banner "AMBIENTE QA — NÃO USAR COM CLIENTES"; gates prova-de-versão + tray-icon OK.
-- EXE `d56dbae98bd0a26d1bc07ef2153b2f79f831337a974ae3f58a5953c8b82f32b1`
-- MSI `a5870b2484a49fd17c801a5a8339d5c75aaff916022b9d59da79dd07050c4842`
-- artifacts: installer **8435929876** (digest `2b984bbc…`), bundle **8435931460** (digest `dff2b4db…`).
+### Build QA (run 29667559700 SUCCESS; head_sha==commit 9374a9a; empacotador ACEITOU 1.0.176-QA.2)
+- versão **1.0.176-QA.2** + banner "AMBIENTE QA — NÃO USAR COM CLIENTES"; gates prova-de-versão + tray-icon OK.
+- EXE `67087a66b2b816a044c8dddb539b5252676f1f7be26dddf9aa7e94f72c25c628`
+- MSI `1c7ad94eefe21a8243e4968d8edbd2629452cf972e578f896b1a6b664ea68a8f`
+- artifacts: installer **8436237223** (digest `b80e7a19…`), bundle **8436239018** (digest `f6eb14fd…`).
 
 ### STOP / próximo
-Sem release/tag/produção. Produção Desktop **1.0.175** e Worker **j6** intactos; Roteiro sem designer/SLA.
-Aguardando: (1) prova física do owner (2 usuários QA — Social + Designer: laranja imediato, vermelho em +30,
-só o designer, clique abre a tarefa, janela/tray/lock, cancelamento, reatribuição, Roteiro sem SLA) e
-(2) GO físico → **F3.3.76B** (promoção 1.0.176 produção). Ponto aberto p/ decisão: (a) toast azul "Nova tarefa
-atribuída" fica junto do laranja? (b) nativa na lock screen (mexe no contrato congelado de entrega)?
+Sem release/tag/produção. Produção Desktop **1.0.175** e Worker **j6** intactos; Roteiro sem designer/SLA;
+azul de atribuição intacta. Aguardando: (1) prova física do owner (2 usuários QA — Social + Designer;
+cenário: prazo 22:02 → 21:31 só azul · 21:32 amarelo · 22:02 vermelho; + 3 dias / 2h / exato-30 / <30 /
+mudança de prazo / conclusão / reatribuição / Roteiro sem SLA) e (2) GO físico → **F3.3.76B** (promoção 1.0.176).
