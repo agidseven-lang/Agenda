@@ -79,7 +79,7 @@ ok('D5 save grava cronStatus/clientFlowStatus para o fluxo-cliente (cronograma+r
 ok('E1 isRoteiro derivado no stepDados', /const isRoteiro=\(typeof secOf==='function'\)&&secOf\(f\.sector\)\.key==='roteiro';/.test(HTML));
 ok('E2 Atribuição (Responsável+Etapa) + Período OCULTOS p/ roteiro (wrap por isRoteiro)',
   /'<\/div>'\+\s*\(isRoteiro\?'':\(\s*'<div class="fgroup"><div class="fgroup-h">Atribuição<\/div>'\+/.test(HTML) &&
-  /'<\/div>'\)\)\+\s*'<div class="fgroup"><div class="fgroup-h">Prazo final &amp; prioridade<\/div>'\+/.test(HTML));
+  /'<\/div>'\)\)\+[\s\S]{0,320}'<div class="fgroup"><div class="fgroup-h">'\+\(isMedia\?'Prioridade':'Prazo final &amp; prioridade'\)\+'<\/div>'\+/.test(HTML));
 ok('E3 Identificação e Cliente OBRIGATÓRIO permanecem (clientRequired marca "obrigatório")',
   /Cliente \/ Empresa'\+\(\(t&&t\.clientRequired\)\?' <span class="req">obrigatório<\/span>':''\)/.test(HTML));
 

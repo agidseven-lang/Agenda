@@ -128,7 +128,7 @@ ok('R14 Roteiro usa o MESMO envelope (mensagem por setor; sem rota nova; sem Des
   if (IS_QA) {
     ok('R16 [77A/QA] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" PRESENTE (build QA)',
       h.includes("AMBIENTE QA") && h.includes("NÃO USAR COM CLIENTES"));
-    ok('R17 [77A/QA] versão 1.0.177-QA (package.json com sufixo -QA)', PKG.version === '1.0.177-QA');
+    ok('R17 [77A/QA] versão 1.0.177-QA/-QA.n (package.json com sufixo -QA)', /^1\.0\.177-QA(\.\d+)?$/.test(PKG.version));
   } else {
     ok('R16 [77A] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" AUSENTE (produção)',
       !h.includes("AMBIENTE QA") && !h.includes("NÃO USAR COM CLIENTES") && !h.includes('banner permanente de QA'));

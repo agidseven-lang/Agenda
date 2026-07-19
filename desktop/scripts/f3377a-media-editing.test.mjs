@@ -126,6 +126,51 @@ ok('48 isClientSector inalterado (só cronograma||roteiro; edicao_midia NÃO é 
 ok('49 wizard "Nova tarefa" intacto (openNewTaskWizard reinicia na etapa 0/Setor)', /function openNewTaskWizard\(\)\{[\s\S]*?state\.form=newForm\(null\);/.test(H));
 ok('50 login/tray/Kanban intactos (âncoras preservadas)', /data-logout="1"/.test(H) && /function isDesignerAxisMove/.test(H) && /kbv2-card-footer/.test(H));
 
+/* ═══════════════════ F3.3.77A-R2 — BLOQUEADORES DA PROVA FÍSICA ═══════════════════ */
+console.log('\n== F3.3.77A-R2 — horários (B1) · criação atômica (B2) · identidade da azul (B3) ==');
+
+/* ---- B1: HORÁRIOS — _editingNow protege QUALQUER campo de data/hora GLOBALMENTE ---- */
+const _EN = (active, formSet, until) => new Function('document', 'state', '_fieldEditUntil',
+  grab('_isTimeDateEl') + '\n' + grab('_editingNow') + '\n; return _editingNow();')(
+    { getElementById: (id) => id === 'modalRoot' ? { firstChild: null, querySelector: () => null } : null, activeElement: active },
+    { form: formSet ? {} : null }, until || 0);
+const timeEl = { tagName: 'INPUT', getAttribute: (k) => k === 'type' ? 'time' : null, type: 'time', closest: () => null };
+const dateEl = { tagName: 'INPUT', getAttribute: (k) => k === 'type' ? 'date' : null, type: 'date', closest: () => null };
+const searchEl = { tagName: 'INPUT', getAttribute: (k) => k === 'type' ? 'text' : null, type: 'text', isContentEditable: false, closest: (s) => /tbar|bsearch|d-board-tools/.test(s) ? {} : null };
+ok('B1.1 campo type=time em foco → adia render (mesmo SEM state.form/#content)', _EN(timeEl, false, 0) === true);
+ok('B1.2 campo type=date em foco → adia render (global)', _EN(dateEl, false, 0) === true);
+ok('B1.3 janela de graça ativa (seletor nativo aberto, foco fora) → adia render', _EN(null, false, Date.now() + 1000) === true);
+ok('B1.4 busca da toolbar (type=text em .tbar) NÃO adia (preserva correção 1.0.104)', _EN(searchEl, false, 0) === false);
+ok('B1.5 sem foco e sem graça → NÃO adia (render normal)', _EN(null, false, 0) === false);
+ok('B1.6 listener de captura renova a graça em interação com data/hora', /_isTimeDateEl\(e&&e\.target\)\) _fieldEditUntil=Date\.now\(\)\+1500/.test(H) && /'pointerdown','keydown','input','change','focusin','wheel'/.test(H));
+ok('B1.7 proteção é GLOBAL (checa data/hora ANTES de qualquer escopo de container/setor)', /if\(_isTimeDateEl\(a\)\)return true;[\s\S]{0,260}if\(Date\.now\(\)<_fieldEditUntil\)return true;/.test(H));
+ok('B1.8 campos de data/hora abrem seletor nativo (showPicker) — comportamento único', /inp\.showPicker&&inp\.showPicker\(\)/.test(H));
+
+/* ---- B2: CRIAÇÃO ATÔMICA — Designer + prazo no formulário inicial ---- */
+ok('B2.1 wizard: Designer responsável OBRIGATÓRIO (isMedia)', /isMedia\?'Designer responsável <span class="req">obrigatório<\/span>'/.test(H));
+ok('B2.2 wizard: prazo (término) OBRIGATÓRIO p/ edicao_midia', /Data de término'\+\(isMedia\?' <span class="req">obrigatório<\/span>'/.test(H));
+ok('B2.3 saveTask valida Designer + término antes de criar (edicao_midia)', /if\(secOf\(f\.sector\)\.key==='edicao_midia'\)\{[\s\S]{0,260}if\(!f\.assigneeId\)\{[\s\S]{0,200}if\(!f\.endDate\)\{/.test(H));
+ok('B2.4 criação ATÔMICA: data.designerAssignment montado ANTES do add() (mesma operação)', /data\.designerAssignment=\{ designerId:f\.assigneeId/.test(H) && /data\.designerFlowStatus='afazer'/.test(H) && /data\.status='afazer'/.test(H));
+ok('B2.5 designerSla.planDueAt = término (dtMs de f.endDate); sem prazo automático fixo', /data\.designerSla=\{ planStartAt:\(f\.startDate\?dtMs\(f\.startDate[\s\S]{0,80}planDueAt:\(f\.endDate\?dtMs\(f\.endDate/.test(H));
+ok('B2.6 UMA única gravação (add) — o bloco de atribuição está DENTRO de saveTask, antes de db...add(data)', H.indexOf("data.designerAssignment={ designerId:f.assigneeId") < H.indexOf("ref=await db.collection('tasks').add(data)"));
+ok('B2.7 edicao_midia na criação NÃO seta clientFlowStatus/cronStatus (só isClientSector)', /if\(isClientSector\(secOf\(f\.sector\)\.key\)\)\{data\.cronStatus=/.test(H));
+ok('B2.8 detailState edicao_midia COM designer → NÃO "Pronto para enviar" (Aguardando/produção)', /if\(secOf\(t\.sector\)\.key==='edicao_midia'\)\{\s*if\(hasDesigner\(t\)\)\{[\s\S]{0,400}edm_aguardando_iniciar/.test(H));
+ok('B2.9 recuperação de legado preservada: edicao_midia SEM designer ainda oferece senddesigner', /key:'edm_aguardando_atrib'[\s\S]{0,340}actions:\['senddesigner'\]/.test(H));
+
+/* ---- B3: IDENTIDADE DA NOTIFICAÇÃO AZUL ---- */
+ok('B3.1 persiste QUEM ENVIOU = Social (assignedBy/assignedById/assignedByName + foto via photoOf)', /assignedBy:_soc\.id\|\|null, assignedById:_soc\.id\|\|null, assignedByName:_soc\.name\|\|'', assignedByAvatar:photoOf\(_soc\)/.test(H));
+ok('B3.2 persiste QUEM RECEBEU = Designer (designerName + foto via photoOf)', /designerId:f\.assigneeId, designerName:_des\.name\|\|'', designerAvatar:photoOf\(_des\)/.test(H));
+ok('B3.3 notifScanAssign: actor=assignedBy (Social), responsible=designerId (Designer)', /actorId:da\.assignedBy\|\|'', actorName:da\.assignedByName[\s\S]{0,140}responsibleId:da\.designerId\|\|'', responsibleName:da\.designerName/.test(H));
+ok('B3.4 título = "<Social> atribuiu uma tarefa" (autor é a Social, não o Designer)', /title:\(da\.assignedByName\?da\.assignedByName\+' atribuiu uma tarefa'/.test(H) && /if\(actor\.name\) p\.title=actor\.name\+' atribuiu uma tarefa';/.test(H));
+ok('B3.5 toast: avatar/nome PRINCIPAL = ATOR (Social) no fluxo/atribuição; responsável em linha própria', /var primName = isSla \? \(p\.responsibleName\|\|p\.actorName\|\|''\) : \(p\.actorName\|\|p\.responsibleName\|\|''\);/.test(H) && /respRow='<div class="ntf-resp">'\+rav\+'<span>Responsável: '/.test(H));
+ok('B3.6 clique ABRE A TAREFA (deep detail/<taskId>, não o quadro)', /dedupKey:'designer_assigned:'\+t\.id\+':'\+at, action:\{type:'detail',deep:'detail\/'\+t\.id\}/.test(H));
+ok('B3.7 entregue SOMENTE ao Designer atribuído (da.designerId===me && da.assignedBy!==me)', /if\(da && da\.designerId===me && da\.assignedBy!==me\)\{/.test(H));
+
+/* ---- PRESERVAÇÕES adicionais (R2) ---- */
+ok('R2.P1 correção dos TEMAS preservada (data.videos + cronOf t.videos intactos)', /data\.videos=_vids/.test(H) && /if\(Array\.isArray\(t\.videos\)&&t\.videos\.length\)\{/.test(H));
+ok('R2.P2 SLA 40/20 preservado (Edição de mídia) + Cronograma 30/10 + Roteiro sem SLA', (() => { const m = R.slaCfgOf({ sector: 'edicao_midia' }), c = R.slaCfgOf({ sector: 'cronograma' }), r = R.slaCfgOf({ sector: 'roteiro' }); return m.warningMinutes === 40 && m.overdueGraceMinutes === 20 && c.warningMinutes === 30 && c.overdueGraceMinutes === 10 && r.designerSla === false; })());
+ok('R2.P3 wizard reset (openNewTaskWizard) e login/tray intactos', /function openNewTaskWizard\(\)\{[\s\S]*?state\.form=newForm\(null\);/.test(H) && /data-logout="1"/.test(H));
+
 console.log('');
 console.log('RESULTADO F3.3.77A: ' + pass + ' PASS, ' + fail + ' FAIL  (SRC=' + SRC_PATH + ')');
 if (fail) { console.log(flog.join('\n')); process.exit(1); }

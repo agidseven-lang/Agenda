@@ -4002,14 +4002,14 @@ function notifScanAssign(){
           targetUserId:me, etapa:'Aguardando produção', severity:'info', sound:true, anchor:at,
           title:(da.assignedByName?da.assignedByName+' atribuiu uma tarefa':'Nova tarefa atribuída a você'),
           body:linha+(da.designerName?('\nResponsável: '+da.designerName):'')+'\nEtapa: Aguardando produção',
-          dedupKey:'designer_assigned:'+t.id+':'+at, action:{type:'board',deep:'board/'+(t.sector||'')} }));
+          dedupKey:'designer_assigned:'+t.id+':'+at, action:{type:'detail',deep:'detail/'+t.id} }));
       } else if(t.assigneeId===me && t.by!==me && !da){
         var ct=Number(t.createdAt)||0; if(!ct) continue;
         notifEmit(notifBuildPayload({ eventType:'task_assigned', taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
           actorId:t.by||'', responsibleId:t.assigneeId||'', responsibleName:t.assignee||t.assigneeName||'',
           targetUserId:me, severity:'info', sound:true, anchor:ct,
           title:'Nova tarefa atribuída a você', body:(t.title||'Tarefa')+(t.client?(' — '+t.client):''),
-          dedupKey:'task_assigned:'+t.id, action:{type:'board',deep:'board/'+(t.sector||'')} }));
+          dedupKey:'task_assigned:'+t.id, action:{type:'detail',deep:'detail/'+t.id} }));
       }
     }
   }catch(_){}
@@ -7575,6 +7575,11 @@ function closeModal(){document.getElementById('modalRoot').innerHTML='';if(_defe
 // toolbar "Meu quadro / Cliente / Designer / Social Media / Setores" de aparecer sem dar
 // um passo de navegação extra (Problema 2). A toolbar e os cards re-renderizam na hora.
 let _deferRender=false;
+// F3.3.77A-R2 (B1) — CAMPO DE DATA/HORA: janela de graça de edição (renovada a cada interação com
+// o seletor nativo). Enquanto ativa, o render é adiado — o input/seletor nativo NUNCA é reconstruído
+// no meio da digitação/rolagem/seleção. Correção GLOBAL (Agenda, filtros, wizard, modais, edição).
+let _fieldEditUntil=0;
+function _isTimeDateEl(el){ if(!el||el.tagName!=='INPUT')return false; var ty=((el.getAttribute&&el.getAttribute('type'))||el.type||'').toLowerCase(); return ty==='time'||ty==='date'||ty==='datetime-local'; }
 // F1.1 — watchdog do defer: se ficou pendente >1500ms e não há edição real, descongela.
 let _deferRenderAt=0, _deferWatchdogTimer=null;
 function _armDeferWatchdog(){
@@ -7590,6 +7595,14 @@ function _editingNow(){
   const mr=document.getElementById('modalRoot');
   if(mr&&mr.firstChild&&mr.querySelector('input,textarea,select'))return true;
   const a=document.activeElement;
+  // F3.3.77A-R2 (B1) — QUALQUER campo de DATA/HORA em foco SEMPRE adia o render, em TODO o Desktop
+  // (independe de container/state.form): corrige o campo de horário travando/re-renderizando durante
+  // a edição em Edição de mídia, Cronograma, Roteiro, Programação de Posts, Agenda, prazos do Designer,
+  // filtros, modais, edição e criação de tarefa.
+  if(_isTimeDateEl(a))return true;
+  // Grace pós-interação: ao usar o SELETOR NATIVO o foco pode sair do input por instantes — mantém o
+  // defer por uma janela curta (renovada a cada interação) p/ o seletor não morrer no meio da seleção.
+  if(Date.now()<_fieldEditUntil)return true;
   if(!a)return false;
   const isField=(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.isContentEditable);
   if(!isField)return false;
@@ -7771,6 +7784,8 @@ function stepDados(){const f=state.form;const t=tpl();
   /* F3.3.73I6C16 — Roteiro: SEM Responsável/Etapa (grupo Atribuição) e SEM Período (owner).
      Mantém Identificação (Título + Cliente obrigatório) e Prazo/Prioridade. */
   const isRoteiro=(typeof secOf==='function')&&secOf(f.sector).key==='roteiro';
+  // F3.3.77A-R2 (B2) — Edição de mídia: Designer + PRAZO no formulário INICIAL (nasce atribuída).
+  const isMedia=(typeof secOf==='function')&&secOf(f.sector).key==='edicao_midia';
   const dt=(ic,id,type,val)=>'<div class="dt-field">'+svg(ic)+'<input class="inp dt" id="'+id+'" type="'+type+'" value="'+esc(val)+'"></div>';
   return ''+
   '<div class="fgroup"><div class="fgroup-h">Identificação</div>'+
@@ -7779,20 +7794,23 @@ function stepDados(){const f=state.form;const t=tpl();
   '</div>'+
   (isRoteiro?'':(
   '<div class="fgroup"><div class="fgroup-h">Atribuição</div>'+
-    '<div class="lbl">Responsável'+(isCron?' <span style="font-weight:600;color:var(--faint);font-size:11px">(opcional)</span>':'')+'</div>'+assigneeField()+
+    '<div class="lbl">'+(isMedia?'Designer responsável <span class="req">obrigatório</span>':('Responsável'+(isCron?' <span style="font-weight:600;color:var(--faint);font-size:11px">(opcional)</span>':'')))+'</div>'+assigneeField()+
+    (isMedia?'<div style="font-size:11.5px;color:var(--faint);margin-top:7px;line-height:1.45">A tarefa <b style="color:var(--soft)">nasce já atribuída</b> ao Designer escolhido e entra no <b style="color:var(--soft)">quadro dele</b>; ele recebe a notificação na hora. O <b style="color:var(--soft)">SLA do designer</b> começa pelo prazo abaixo.</div>':'')+
     /* F3.3.2 (reteste): na criação do cronograma a Social NÃO precisa atribuir designer.
        O designer final (e o SLA) só nascem em "Enviar ao designer", após o cliente aprovar os temas. */
     (isCron?'<div style="font-size:11.5px;color:var(--faint);margin-top:7px;line-height:1.45">Opcional nesta etapa. O <b style="color:var(--soft)">designer final</b> é definido depois, em “Enviar ao designer” — é aí que começa o <b style="color:var(--soft)">SLA do designer</b>.</div>':'')+
     '<div style="height:14px"></div><div class="lbl">Etapa</div><div class="chips" style="margin-bottom:0">'+STATUS.map(st=>'<button class="chip" data-fstatus="'+st.key+'" style="'+(f.status===st.key?'background:'+withAlpha(st.color,.18)+';color:'+st.color+';border-color:'+st.color:'')+'">'+st.label+'</button>').join('')+'</div>'+
   '</div>'+
-  '<div class="fgroup"><div class="fgroup-h">Período do cronograma</div>'+
+  '<div class="fgroup"><div class="fgroup-h">'+(isMedia?'Prazo do Designer':'Período do cronograma')+'</div>'+
     '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de início</div>'+dt('calendar','fStart','date',f.startDate)+'</div><div style="flex:1"><div class="lbl">Hora de início</div>'+dt('clock','fStartT','time',f.startTime)+'</div></div>'+
     '<div style="height:12px"></div>'+
-    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de término</div>'+dt('calendar','fEnd','date',f.endDate)+'</div><div style="flex:1"><div class="lbl">Hora de término</div>'+dt('clock','fEndT','time',f.endTime)+'</div></div>'+
+    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data de término'+(isMedia?' <span class="req">obrigatório</span>':'')+'</div>'+dt('calendar','fEnd','date',f.endDate)+'</div><div style="flex:1"><div class="lbl">Hora de término'+(isMedia?' <span class="req">obrigatório</span>':'')+'</div>'+dt('clock','fEndT','time',f.endTime)+'</div></div>'+
   '</div>'))+
-  '<div class="fgroup"><div class="fgroup-h">Prazo final &amp; prioridade</div>'+
-    '<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data limite</div>'+dt('calendar','fDue','date',f.dueDate)+'</div><div style="flex:1"><div class="lbl">Hora limite</div>'+dt('clock','fDueT','time',f.dueTime)+'</div></div>'+
-    '<div style="height:16px"></div><div class="switchrow"><div><div style="font-size:14px;font-weight:600">Prioridade alta</div><div style="font-size:12px;color:var(--faint);margin-top:1px">Destaca a tarefa nos quadros</div></div><button class="sw '+(f.priority?'on':'')+'" data-ftoggle="priority"></button></div>'+
+  // F3.3.77A-R2 (B2) — Edição de mídia: o PRAZO do Designer é o término acima (planDueAt). Oculta o
+  // "Prazo final" redundante (fDue) p/ não confundir; mantém só a Prioridade.
+  '<div class="fgroup"><div class="fgroup-h">'+(isMedia?'Prioridade':'Prazo final &amp; prioridade')+'</div>'+
+    (isMedia?'':'<div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data limite</div>'+dt('calendar','fDue','date',f.dueDate)+'</div><div style="flex:1"><div class="lbl">Hora limite</div>'+dt('clock','fDueT','time',f.dueTime)+'</div></div><div style="height:16px"></div>')+
+    '<div class="switchrow"><div><div style="font-size:14px;font-weight:600">Prioridade alta</div><div style="font-size:12px;color:var(--faint);margin-top:1px">Destaca a tarefa nos quadros</div></div><button class="sw '+(f.priority?'on':'')+'" data-ftoggle="priority"></button></div>'+
   '</div>';
 }
 function assigneeField(){const f=state.form;const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
@@ -7948,6 +7966,11 @@ async function saveTask(){const f=state.form;
   const t=tpl();
   if(t&&t.clientRequired&&!f.client.trim()){f._saving=false;alert('Para '+secOf(state.form.sector).label+' o cliente é obrigatório.');f.step=1;render();return;}
   if(!f.title.trim()){f._saving=false;alert('Informe o título.');f.step=1;render();return;}
+  // F3.3.77A-R2 (B2) — Edição de mídia NASCE atribuída: Designer + prazo final (término) obrigatórios.
+  if(secOf(f.sector).key==='edicao_midia'){
+    if(!f.assigneeId){f._saving=false;alert('Para Edição de mídia, escolha o Designer responsável.');f.step=1;render();return;}
+    if(!f.endDate){f._saving=false;alert('Para Edição de mídia, defina o prazo final do Designer (data e hora de término).');f.step=1;render();return;}
+  }
   const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
   const data={title:f.title.trim(),client:f.client.trim(),sector:f.sector,desc:composedDesc(),status:f.status,assignee:u?u.name:'',assigneeId:f.assigneeId||null,link:f.link.trim(),priority:!!f.priority,startDate:f.startDate||'',startTime:f.startTime||'',endDate:f.endDate||'',endTime:f.endTime||'',dueDate:f.dueDate||'',dueTime:f.dueTime||'',due:f.dueDate||'',checklist:f.checklist.filter(c=>c.t.trim()),by:state.user.id,createdAt:Date.now(),src:'webpreview'};
   if(f.contents.length)data.cronContents=f.contents;
@@ -7958,6 +7981,22 @@ async function saveTask(){const f=state.form;
   // Persistido p/ a tarefa NÃO sair do quadro da Social Media ao ser enviada a um designer.
   const socialOwner=(u&&isSocialUser(u))?u:(isSocialUser(state.user)?state.user:null);
   if(socialOwner){data.socialOwnerId=socialOwner.id;data.socialOwnerName=socialOwner.name||'';data.socialFlowStatus='afazer';data.socialWorkflowStage='afazer';}
+  // F3.3.77A-R2 (B2/B3) — Edição de mídia: CRIAÇÃO ATÔMICA já atribuída ao Designer (mesmo add(), SEM
+  // segunda operação "Enviar ao designer"). Persiste designerAssignment (com QUEM ENVIOU = Social
+  // autenticada: assignedBy*/foto/nome; e QUEM RECEBEU = Designer: designerName/foto) + designerSla
+  // (planDueAt = término) + designerFlowStatus:'afazer' + assigneeId. A AZUL (notifScanAssign) dispara ao
+  // snapshot chegar ao Designer, com a identidade correta. SEM cliente/portal/token/Card Premium.
+  if(secOf(f.sector).key==='edicao_midia' && f.assigneeId){
+    const _des=state.users.find(x=>x.id===f.assigneeId)||{}; const _now=Date.now(); const _soc=state.user||{};
+    data.designerAssignment={ designerId:f.assigneeId, designerName:_des.name||'', designerAvatar:photoOf(_des)||'', designerPhoto:photoOf(_des)||'',
+      assignedAt:_now, assignedBy:_soc.id||null, assignedById:_soc.id||null, assignedByName:_soc.name||'', assignedByAvatar:photoOf(_soc)||'', assignedByPhoto:photoOf(_soc)||'', status:'sent',
+      startDate:f.startDate||'', startTime:f.startTime||'', endDate:f.endDate||'', endTime:f.endTime||'', obs:f.obs||'' };
+    data.designerSla={ planStartAt:(f.startDate?dtMs(f.startDate,f.startTime||'00:00'):null), planDueAt:(f.endDate?dtMs(f.endDate,f.endTime||'23:59'):null), seedAt:_now, seedBy:_soc.id||null };
+    data.designerFlowStatus='afazer'; data.designerWorkflowStage='afazer';
+    data.designerResponsibleId=f.assigneeId; data.designerResponsibleName=_des.name||'';
+    data.status='afazer'; data.dueDate=f.endDate||''; data.dueTime=f.endTime||''; data.due=f.endDate||'';
+    if(!data.socialOwnerId){ data.socialOwnerId=_soc.id||null; data.socialOwnerName=_soc.name||''; }
+  }
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
   if(isClientSector(secOf(f.sector).key)){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
     data.clientFlowStatus=f._sendAfterSave?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
@@ -8168,6 +8207,13 @@ document.addEventListener('click',async e=>{
 document.getElementById('modalRoot').addEventListener('click',e=>{if(e.target.classList&&e.target.classList.contains('modal-back'))closeModal();});
 // 1.0.102 — ao sair de um campo, se houve render adiado durante a edição, aplica agora.
 document.addEventListener('focusout',function(){if(_deferRender)setTimeout(function(){if(!_editingNow()){_deferRender=false;render();}},80);});
+// F3.3.77A-R2 (B1) — renova a janela de graça em QUALQUER interação com um campo de DATA/HORA
+// (captura, cobre digitação, setas, Tab, clique, e ROLAGEM do seletor nativo). Com isso o render é
+// adiado durante toda a interação com o seletor, em qualquer setor/modal/tela. NÃO afeta a busca
+// da toolbar (type=text) nem chips (não são data/hora), preservando a correção do 1.0.104.
+['pointerdown','keydown','input','change','focusin','wheel'].forEach(function(_ev){
+  try{ document.addEventListener(_ev,function(e){ if(_isTimeDateEl(e&&e.target)) _fieldEditUntil=Date.now()+1500; },true); }catch(_e){}
+});
 function stepNext(){const f=state.form;
   if(f.step===0&&!f.sector){alert('Escolha o setor.');return;}
   if(f.step===1){const t=tpl();if(t&&t.clientRequired&&!f.client.trim()){alert('Para '+secOf(state.form.sector).label+' o cliente é obrigatório.');return;}if(!f.title.trim()){alert('Informe o título.');return;}}
