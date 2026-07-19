@@ -1485,3 +1485,57 @@ Sem release/tag/produção. Produção Desktop **1.0.175** e Worker **j6** intac
 azul de atribuição intacta. Aguardando: (1) prova física do owner (2 usuários QA — Social + Designer;
 cenário: prazo 22:02 → 21:31 só azul · 21:32 amarelo · 22:02 vermelho; + 3 dias / 2h / exato-30 / <30 /
 mudança de prazo / conclusão / reatribuição / Roteiro sem SLA) e (2) GO físico → **F3.3.76B** (promoção 1.0.176).
+
+## F3.3.76B — Desktop 1.0.176: promoção controlada QA→produção (candidata; app.asar gate GREEN; release ARMADA; Latest ACEITO) (2026-07-19)
+
+### GO físico integral (1.0.176-QA.2)
+Owner aprovou fisicamente a QA.2 (12 confirmações): azul imediata na atribuição · amarela em `planDueAt−30` ·
+vermelha em `planDueAt` · janela aberta/minimizada/tray · Windows bloqueado · Roteiro sem SLA · Cronograma com
+Designer · Card Premium intacto. Diferença de política vs 75B: **Latest ACEITO** para a nova versão oficial
+("Latest aceito para a nova versão oficial").
+
+### Fonte e transform (só versão/banner/metadados/testes; nenhuma lógica funcional)
+- Branch **desktop/f3376b-1.0.176-production** @ **5278b93** derivada da QA aprovada **9374a9a** (run 29667559700).
+- Transform: `1.0.176-QA.2 → 1.0.176`; remoção da linha do banner QA; nomes dos instaladores; metadados de
+  empacotamento; testes de versão/banner. **notifScanSla / resolveTaskDisplayState / azul / dedupe / deep-link /
+  Card Premium / chip / painel / monitor / main.ts / preload.ts** — intocados.
+
+### Testes pré-build (árvore de produção 5278b93): 36/39 limpos; 0 regressão
+- **Phase-critical GREEN**: `f3376a-sla-red` **30/30** (planDueAt; owner tests 1–10) · `f3375a` **25/0** (wizard
+  reset + Roteiro sem Designer + identidade de produção Q1/Q2) · `f3374d` **17/0** (R17 fixado em 1.0.176) ·
+  `f333-notif` **146/0** · `f332-panel` **71/0** · `f334b-equiv` **72/0** · demais suites limpas.
+- **3 não-passam, nenhuma é regressão**: `f3356-auth-core` (rc2 — exige `dist/main/auth-core.js`, artefato de
+  build) · `f33E-main-notifier` (rc1 — exige compilar `notifier.ts`, toolchain TS) · `f3374k-production-invariance`
+  (rc1 — oráculo do 74K, fixado no baseline **1.0.174-QA** 670cef2 e versão 1.0.174: 28 PASS / 2 pins obsoletos).
+  A cobertura de invariância real (main/preload byte-idênticos; runtime) é dada VIVA pelo gate app.asar abaixo.
+
+### Build de produção (run 29669057692 SUCCESS; procedência unívoca)
+- head_sha == target == commit do VERSAO == **5278b93a14341a5e2ab36b670ced19269eea71be**; versionName **1.0.176**.
+- EXE `Agenda-ID-Seven-Desktop-1.0.176-x64.exe` = `c3cc5f25c1ebd5ab6a8ad9ecfafe514130f6191794e8bf145cbe549100b5ebde`
+- MSI `Agenda-ID-Seven-Desktop-1.0.176-x64.msi` = `4d3784b5ffdb8bba361c915f25d3c3977495a007f1753969d1957f2c07f56691`
+- artifacts: installer **8436728552** (digest `d9f0c122…`), bundle **8436730364** (digest `67654b1f…`).
+- gates de prova-de-versão + tray-icon OK. (build machine NÃO roda a suíte .mjs — só npm build + gates.)
+
+### Gate app.asar QA×PRODUÇÃO (run 29669233670 SUCCESS — runtime REAL empacotado)
+- **FASE 8** (runtime empacotado 1.0.176): versão 1.0.176; SEM `AMBIENTE QA`/`NÃO USAR COM CLIENTES`/sufixo `-QA`;
+  `designerOpSla` AUSENTE; `var d=resolveTaskDisplayState(t,now,f)…` presente (âncora planDueAt); exclusão de
+  Roteiro presente; textos amarelo/vermelho (30/10 min) presentes; `dedupKey:'sla_warning…'+d.finishMs`; azul
+  `designer_assigned` + "Nova tarefa atribuída a você" intactas; domínio/rota oficiais presentes.
+- EXE de produção computado DENTRO do gate = `c3cc5f25…b5ebde` (== hash do build) e QA.2 = `67087a66…c25c628`
+  (== EXE fisicamente aprovado) — amarra o runtime aos bits aprovados.
+- **FASE 9** (QA×prod): `RENDERER: produção == QA menos a linha do banner (todos os handlers byte-idênticos)`;
+  `package.json idêntico exceto version (1.0.176-QA.2 → 1.0.176)`; `dist/main/main.js` e `dist/preload/preload.js`
+  **byte-idênticos QA×prod**; inventário idêntico; ÚNICA divergência de hash = `index.html` (banner) + `package.json`
+  (versão). Zero divergência funcional → gate PASSA.
+
+### Release ARMADA (não publica sem literal)
+- `.github/workflows/f3376b-desktop-release-production.yml` (commit **576b6dd** na main) — gated pelo literal
+  **PUBLICAR-DESKTOP-1.0.176-76B**. draft=false, prerelease=false, **latest=true (ACEITO)**, target 5278b93,
+  tag `desktop/v1.0.176-production`, 5 assets (EXE/MSI/SHA256SUMS/VERSAO-DESKTOP.txt/RELATORIO-DESKTOP.txt).
+  Reforça make_latest=true + confirma isLatest via GraphQL; smoke re-baixa e reconfere; verifica 1.0.175 preservada.
+
+### STOP / próximo
+STOP GATE PRÉ-RELEASE ativo: **nenhuma** tag/release/asset/latest criado; **1.0.175** e Worker **j6**
+(9fbdf417 · V64.59-c20-failopen-j6-cronograma-two-stage) intactos. Rollback oficial = **1.0.175**
+(EXE `30116107…`, MSI `359483c3…`, commit d1351389). Aguardando o literal **PUBLICAR-DESKTOP-1.0.176-76B**
+→ dispara a release ARMADA → download smoke → GO final.
