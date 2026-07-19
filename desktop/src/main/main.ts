@@ -5,7 +5,7 @@
  * - Autostart Windows opcional (sobe oculto na tray no login)
  * - Notifier + Reminder rodam aqui (sobrevivem a janela escondida)
  */
-import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImage, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, Notification, shell, clipboard, nativeImage, dialog, powerMonitor } from "electron";
 import path from "path";
 import fs from "fs";
 import os from "os";
@@ -17,10 +17,12 @@ import { startReminder } from "./reminder";
 import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
 import { registerAuthIpc } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main)
 import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
+import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio canônico via cabeçalho HTTP Date (Cloud Run read-only)
 
 let mainWin: BrowserWindow | null = null;
 let stopNotifier: (() => void) | null = null;
 let stopReminder: (() => void) | null = null;
+let clockSync: ReturnType<typeof createClockSync> | null = null; // F3.3.77A-R4B — relógio canônico (main)
 let quitting = false;
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
@@ -260,6 +262,7 @@ function realQuit() {
   quitting = true;
   if (stopNotifier) stopNotifier();
   if (stopReminder) stopReminder();
+  if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
   try { stopBgNotify(); } catch { /* */ }
   // F3.3.73I6C11 — "Sair do aplicativo" remove o icone da bandeja (evita tray-fantasma no Windows).
   try { destroyTray(); } catch { /* */ }
@@ -272,6 +275,13 @@ app.whenReady().then(() => {
   createWindow();
   // F3.3.70D3R10U — tray via ensureTray (cria no startup; recriavel depois sem duplicar)
   ensureTray(trayWin, trayOpts);
+
+  // F3.3.77A-R4B — RETOMADA/DESBLOQUEIO: ao voltar do sleep ou desbloquear a tela, ressincroniza o
+  // relógio canônico (offset antigo pode estar defasado) e o renderer rearma as timelines de SLA.
+  try {
+    powerMonitor.on("resume", () => { diag("power.resume"); if (clockSync) void clockSync.requestSync("resume"); });
+    powerMonitor.on("unlock-screen", () => { diag("power.unlock"); if (clockSync) void clockSync.requestSync("unlock"); });
+  } catch { /* powerMonitor pode não existir em todas as plataformas */ }
 
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
@@ -388,13 +398,26 @@ app.whenReady().then(() => {
       // mantêm a nativa quando minimizado/tray). Mesmos eventos/dedup de antes.
       stopNotifier = startNotifier(() => mainWin, uid, deliverNotification);
       stopReminder = startReminder(() => mainWin, uid, deliverNotification);
+      // F3.3.77A-R4B — RELÓGIO CANÔNICO: liga a sincronização (main) via cabeçalho HTTP Date do
+      // getUserSelf (Cloud Run, read-only, SEM auth ⇒ zero mutação). Empurra o offset ao renderer,
+      // que o aplica em canonicalNowMs()/_slaClockOffsetMs e rearma as timelines de SLA.
+      if (clockSync) { try { clockSync.stop(); } catch { /* */ } }
+      clockSync = createClockSync({
+        emit: (s) => { try { const w = mainWin; if (w && !w.isDestroyed()) w.webContents.send("clock-state", s); } catch { /* */ } },
+        onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+      });
+      clockSync.start();
     }
   });
   ipcMain.on("session-logout", () => {
     diag("session-logout"); // F3.3.10-DIAG
     if (stopNotifier) { stopNotifier(); stopNotifier = null; }
     if (stopReminder) { stopReminder(); stopReminder = null; }
+    if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
   });
+  // F3.3.77A-R4B — o renderer consulta/força a sincronização do relógio (sem expor token/URL/headers).
+  ipcMain.handle("clock-get-state", () => (clockSync ? clockSync.getState() : null));
+  ipcMain.handle("clock-request-sync", () => (clockSync ? clockSync.requestSync("renderer") : null));
 
   // F3.3.10-DIAG — HEARTBEAT do MAIN: prova que o processo principal (e o notifier) seguem VIVOS
   // com a janela minimizada/oculta/bandeja. Se após uma atribuição em background não houver

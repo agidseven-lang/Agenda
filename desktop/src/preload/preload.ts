@@ -28,6 +28,14 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   onNotifHistory: (cb: (payload: any) => void) => {
     ipcRenderer.on("notif-history", (_e, p: any) => cb(p));
   },
+  // F3.3.77A-R4B — RELÓGIO CANÔNICO: offset derivado do cabeçalho HTTP Date (Cloud Run read-only) no
+  // MAIN. O renderer recebe SOMENTE {offsetMs, quality, syncedAt*, uncertaintyMs, source, ...} — nunca
+  // token, URL privada, headers de auth ou corpo da resposta.
+  clockGetState: (): Promise<any> => ipcRenderer.invoke("clock-get-state"),
+  clockRequestSync: (): Promise<any> => ipcRenderer.invoke("clock-request-sync"),
+  onClockState: (cb: (state: any) => void) => {
+    ipcRenderer.on("clock-state", (_e, s: any) => cb(s));
+  },
   // F3.3.10-DIAG — renderer escreve eventos no log local do main (sem rede/Firestore). Build instrumentada.
   diagLog: (tag: string, data?: any) => { try { ipcRenderer.send("diag-log", tag, data); } catch { /* */ } },
   diagPath: (): Promise<string> => ipcRenderer.invoke("diag-path"),

@@ -4060,6 +4060,9 @@ try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} try{ notifScanAssi
    após a retomada, sem depender do poll de 30s. Só leitura; nunca grava. */
 try{
   var _slaResume=function(){
+    // F3.3.77A-R4B — pede ressync do relógio canônico ao MAIN (offset pode ter defasado no sleep/lock);
+    // o novo estado chega por onClockState e rearma as timelines. Melhor-esforço; nunca bloqueia.
+    try{ if(window.desktopAPI&&typeof window.desktopAPI.clockRequestSync==='function') window.desktopAPI.clockRequestSync(); }catch(_){}
     try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){}
     try{ if(typeof slaMonScheduleBoundary==='function') slaMonScheduleBoundary(); }catch(_){}
     try{ if(typeof slaibRefresh==='function') slaibRefresh(); }catch(_){}
@@ -4068,6 +4071,33 @@ try{
   document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='visible') _slaResume(); });
   window.addEventListener('focus',_slaResume);
 }catch(_){}
+/* F3.3.77A-R4B — RELÓGIO CANÔNICO (Opção B): recebe do MAIN o offset derivado do cabeçalho HTTP Date
+   de um endpoint Cloud Run read-only (getUserSelf, sondado SEM auth ⇒ zero mutação). Alimenta
+   canonicalNowMs()/_slaClockOffsetMs → cronômetro, chip, Monitor, painel, boundary timer e
+   notificações amarela/vermelha passam a usar a MESMA referência canônica em TODAS as máquinas.
+   FASE 12: ao mudar o offset, cancela/rearma os timers e re-resolve as timelines — sem repetir
+   dedupes, sem tocar planDueAt/scheduleRevision. quality=local_fallback ⇒ relógio local (offset 0). */
+function _slaApplyClockState(s){
+  try{
+    if(!s||typeof s.offsetMs!=='number') return;
+    var q=s.quality||'error';
+    var useOffset=(q==='synced'||q==='degraded'||q==='stale');
+    var newOffset=useOffset?Math.round(s.offsetMs):0;   // synced/degraded/stale usam o offset; local_fallback/error = relógio local
+    try{ window.__slaClock=s; }catch(_){}
+    if(newOffset===_slaClockOffsetMs) return;           // metadados mudaram mas o instante canônico não → sem rearme
+    _slaClockOffsetMs=newOffset;
+    try{ if(typeof ncDiag==='function') ncDiag('clock.offset.apply',{offsetMs:newOffset,quality:q,uncertaintyMs:s.uncertaintyMs,source:s.source,syncedAtSystemMs:s.syncedAtSystemMs}); }catch(_){}
+    // FASE 12 — rearma tudo com o novo relógio: cancela o boundary antigo e re-resolve/re-arma.
+    try{ if(_slaBoundaryTimer){ clearTimeout(_slaBoundaryTimer); _slaBoundaryTimer=null; } }catch(_){}
+    try{ if(typeof slaMonScheduleBoundary==='function') slaMonScheduleBoundary(); }catch(_){}
+    try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){}
+    try{ if(typeof slaibRefresh==='function') slaibRefresh(); }catch(_){}
+    try{ if(typeof ncDiag==='function') ncDiag('sla.timer.rearm',{reason:'clock.offset.changed',offsetMs:newOffset}); }catch(_){}
+  }catch(_){}
+}
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onClockState==='function'){ window.desktopAPI.onClockState(_slaApplyClockState); } }catch(_){}
+try{ if(window.desktopAPI&&typeof window.desktopAPI.clockGetState==='function'){ window.desktopAPI.clockGetState().then(function(s){ _slaApplyClockState(s); }).catch(function(){}); } }catch(_){}
+try{ window._slaApplyClockState=_slaApplyClockState; }catch(_){}
 /* F3.3.10-DIAG — HEARTBEAT do RENDERER (intervalo próprio, não altera a varredura aprovada): prova se o
    timer do renderer SOBREVIVE minimizado/bandeja (Chromium pode congelar a janela oculta). Se houver
    scan.tick com vis:'hidden', a varredura de SLA roda em background; se sumir ao ocultar, o SLA depende

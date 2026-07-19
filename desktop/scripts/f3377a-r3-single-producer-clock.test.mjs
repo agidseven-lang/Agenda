@@ -117,7 +117,7 @@ ok('B2.5 slaMonNextBoundary deriva os marcos da LINHA DO TEMPO canônica (mesmos
 ok('B2.6 retomada (visibilitychange/focus) reavalia notifScanSla + rearma o boundary',
   /document\.addEventListener\('visibilitychange',function\(\)\{ if\(document\.visibilityState==='visible'\) _slaResume\(\); \}\);/.test(H) &&
   /window\.addEventListener\('focus',_slaResume\);/.test(H) &&
-  /_slaResume=function\(\)\{[\s\S]{0,260}notifScanSla\(\)[\s\S]{0,160}slaMonScheduleBoundary\(\)/.test(H));
+  /_slaResume=function\(\)\{[\s\S]{0,460}notifScanSla\(\)[\s\S]{0,160}slaMonScheduleBoundary\(\)/.test(H));
 
 /* logs canônicos (FASE 12) */
 ok('B2.7 logs de tempo (sla.timer.arm/fire com canonicalNowMs/systemNowMs/drift)',
