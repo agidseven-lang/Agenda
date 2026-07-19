@@ -95,11 +95,11 @@ ok('C5 Cronograma em duas etapas (Worker) não é tocado por este patch — sem 
 console.log('— IDENTIDADE (auto-adaptável QA×produção) —');
 const PKG = fs.readFileSync(path.resolve(path.dirname(SRCPATH), '..', '..', 'package.json'), 'utf8');
 // auto-adaptável a QUALQUER versão QA (x.y.z-QA) × produção (x.y.z), p/ não repinar a cada fase.
-const isQA = /"version": "\d+\.\d+\.\d+-QA"/.test(PKG);
+const isQA = /"version": "\d+\.\d+\.\d+-QA(\.\d+)?"/.test(PKG);
 const hasBanner = /AMBIENTE QA — NÃO USAR COM CLIENTES/.test(H);
 if (isQA) {
   ok('Q1 (QA) banner "AMBIENTE QA — NÃO USAR COM CLIENTES" presente', hasBanner);
-  ok('Q2 (QA) versão x.y.z-QA no package.json', /"version": "\d+\.\d+\.\d+-QA"/.test(PKG));
+  ok('Q2 (QA) versão x.y.z-QA[.n] no package.json', /"version": "\d+\.\d+\.\d+-QA(\.\d+)?"/.test(PKG));
 } else {
   // candidata de PRODUÇÃO: banner QA AUSENTE, versão sem sufixo -QA (em lugar nenhum).
   ok('Q1 (produção) banner "AMBIENTE QA" AUSENTE do renderer', !hasBanner);

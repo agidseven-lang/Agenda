@@ -1,33 +1,29 @@
 #!/usr/bin/env node
 /* =====================================================================
- * F3.3.76A — SLA do Designer em tempo real (laranja 30 / vermelho 10),
- * ancorado na ATRIBUIÇÃO (assignedAt+30 / +10). SELF-ADAPTING (RED×GREEN)
- * + matriz de contrato (FASE 10, itens de EMISSÃO — os testáveis por extração;
- * UI/nativa/clique 26-33 são prova FÍSICA, FASE 13).
+ * F3.3.76A — SLA do Designer ancorado no PRAZO FINAL da Social (designerSla.planDueAt).
+ *   AMARELO em planDueAt-30min · VERMELHO em planDueAt · (CRÍTICO em planDueAt+10min).
+ *   A notificação AZUL de atribuição é SEPARADA e permanece (notifScanAssign).
  *
- * Executa o notifScanSla REAL (com designerOpSla/resolveTaskDisplayState/
- * slaPanelFinishMs/slaPanelDelivered/resolveNotificationTargets reais) e
- * captura os notifEmit.
- *   • fonte SEM designerOpSla  → BASELINE (1.0.175) → prova o BUG (RED).
- *   • fonte COM designerOpSla  → CORRIGIDA → prova o contrato (GREEN).
+ * SELF-ADAPTING (RED×GREEN) sobre o notifScanSla REAL (com resolveTaskDisplayState/
+ * slaPanelFinishMs/slaPanelDelivered/resolveNotificationTargets reais) + captura de notifEmit:
+ *   • fonte COM designerOpSla → candidata ERRADA (amarelo antecipado na atribuição) → RED.
+ *   • fonte SEM designerOpSla → CORRIGIDA (âncora = planDueAt) → GREEN + matriz FASE-10.
  *
- * Rodar: /opt/node22/bin/node desktop/scripts/f3376a-sla-red.test.mjs
- *   SRC=<outro index.html> força outra fonte (ex.: baseline p/ RED).
+ * Rodar: /opt/node22/bin/node desktop/scripts/f3376a-sla-red.test.mjs   (SRC=<index.html> força fonte)
  * ===================================================================== */
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SRC_PATH = process.env.SRC || path.resolve(__dirname, '..', 'src', 'renderer', 'index.html');
 const HTML = fs.readFileSync(SRC_PATH, 'utf8');
-const HAS_FIX = /function designerOpSla\(/.test(HTML);
+const HAS_OP = /function designerOpSla\(/.test(HTML);   // presente = candidata ERRADA (assignedAt+30)
 
 function grab(n) {
-  let a = HTML.indexOf('function ' + n + '(');
-  if (a < 0) throw new Error('não encontrei: ' + n);
+  let a = HTML.indexOf('function ' + n + '('); if (a < 0) throw new Error('não encontrei: ' + n);
   let d = 0; for (let j = HTML.indexOf('{', a); j < HTML.length; j++) { const c = HTML[j]; if (c === '{') d++; else if (c === '}') { d--; if (!d) return HTML.slice(a, j + 1); } }
   throw new Error('sem fim: ' + n);
 }
-const BASE_NAMES = ['notifScanSla', 'resolveTaskDisplayState', 'slaPanelFinishMs', 'slaPanelDelivered', 'resolveNotificationTargets'];
-const NAMES = HAS_FIX ? ['designerOpSla', ...BASE_NAMES] : BASE_NAMES;
+const NAMES = ['notifScanSla', 'resolveTaskDisplayState', 'slaPanelFinishMs', 'slaPanelDelivered', 'resolveNotificationTargets'];
+if (HAS_OP) NAMES.unshift('designerOpSla');
 let SRC = ''; for (const n of NAMES) SRC += grab(n) + '\n';
 
 const PRELUDE =
@@ -38,9 +34,9 @@ const PRELUDE =
   'function notifResponsible(t){var da=(t&&t.designerAssignment)||{};return {id:da.designerId||"dz1",name:"Designer Teste",avatar:""};}\n' +
   'function notifBuildPayload(p){return p;}\n' +
   'function notifEmit(p){CAP.push(p);}\n' +
-  'function slaibFmtHM(ms){return "16:15";}\n' +
-  'function slaCount(ms){return "27:16";}\n' +
-  'function slaElapsed(ms){return "5:00";}\n' +
+  'function slaibFmtHM(ms){return "22:02";}\n' +
+  'function slaCount(ms){return "29:58";}\n' +
+  'function slaElapsed(ms){return "0:30";}\n' +
   'function slaCriticalFor(u){return null;}\n' +
   'function first(s){return (s||"").split(" ")[0];}\n' +
   'function dtMs(){return 0;}\n' +
@@ -48,83 +44,73 @@ const PRELUDE =
 const R = new Function(PRELUDE + SRC +
   '\n; return { notifScanSla, cap:function(){return CAP;}, setTasks:function(a){__TASKS=a;}, setUser:function(u){state.user=u;} };')();
 
-const NOW = Date.now(), MIN = 60000, DAY = 86400000;
+const NOW = Date.now(), MIN = 60000, DAY = 86400000, HOUR = 3600000;
 const task = (o) => Object.assign({
   id: 't1', title: 'Cronograma semanal', client: 'Hospital Visão', sector: 'cronograma',
-  designerAssignment: { designerId: 'dz1', assignedAt: NOW, assignedBy: 'soc1' },
-  designerFlowStatus: 'afazer', designerSla: { planDueAt: NOW + 3 * DAY },
+  designerAssignment: { designerId: 'dz1', assignedAt: NOW, assignedBy: 'soc1' }, designerFlowStatus: 'afazer',
+  designerSla: { planDueAt: NOW + 3 * DAY },
 }, o || {});
-// roda notifScanSla p/ 1 tarefa vista pelo usuário `uid`; devolve os payloads capturados.
+const withSla = (pd, extra) => task(Object.assign({ designerSla: { planDueAt: pd } }, extra || {}));
 const run = (t, uid) => { R.cap().length = 0; R.setUser({ id: uid || 'dz1' }); R.setTasks([t]); R.notifScanSla(); return R.cap().slice(); };
 const evs = (t, uid) => run(t, uid).map(p => p.eventType);
 
 let pass = 0, fail = 0; const flog = [];
 const ok = (n, c) => { if (c) { pass++; } else { fail++; flog.push('FAIL: ' + n); } };
 
-/* patch de designerAssignment mantendo o resto */
-const withDa = (o, extra) => task(Object.assign({}, o, { designerAssignment: Object.assign({ designerId: 'dz1', assignedAt: NOW, assignedBy: 'soc1' }, (o && o.designerAssignment) || {}, extra || {}) }));
-
-if (!HAS_FIX) {
-  /* ===================== BASELINE — RED (bug reproduzido) ===================== */
-  const A = evs(task({ designerAssignment: { designerId: 'dz1', assignedAt: NOW, assignedBy: 'soc1' } }), 'dz1');
-  const B = evs(task({ designerAssignment: { designerId: 'dz1', assignedAt: NOW - 31 * MIN, assignedBy: 'soc1' } }), 'dz1');
-  const C = evs(task({ designerAssignment: { designerId: 'dz1', assignedAt: NOW - 3 * MIN, assignedBy: 'soc1' }, designerSla: { planDueAt: NOW + 27 * MIN } }), 'dz1');
-  ok('RED-A: atribuição agora + término default (+3d) → NÃO emite laranja (BUG)', !A.includes('sla_warning'));
-  ok('RED-A2: idem → NÃO emite vermelho', !A.includes('sla_overdue'));
-  ok('RED-B: 31min após atribuição + término +3d → NÃO emite vermelho (ancorado no prazo planejado)', !B.includes('sla_overdue') && !B.includes('sla_warning'));
-  ok('CTRL-C: com término curto (27min) a cadeia emite laranja → quebra é a ÂNCORA, não o disparo/entrega', C.includes('sla_warning'));
-  console.log('\n(BASELINE / RED) A=' + JSON.stringify(A) + ' B=' + JSON.stringify(B) + ' C=' + JSON.stringify(C));
+if (HAS_OP) {
+  /* RED — candidata ERRADA: atribuição AGORA + prazo 31min à frente → amarelo ANTECIPADO na atribuição. */
+  const A = evs(withSla(NOW + 31 * MIN, { designerAssignment: { designerId: 'dz1', assignedAt: NOW, assignedBy: 'soc1' } }), 'dz1');
+  ok('RED: atribuição agora + prazo 31min à frente → amarelo ANTECIPADO (bug: âncora na atribuição, não em planDueAt-30)', A.includes('sla_warning'));
+  console.log('\n(CANDIDATA ERRADA / RED) A=' + JSON.stringify(A));
 } else {
-  /* ===================== CORRIGIDA — GREEN (contrato FASE 3-6) ===================== */
-  // --- LARANJA (SLA inicial) ---
-  const y1 = run(task(), 'dz1');
-  ok('Y1: atribuição AGORA → laranja imediato (independe do término planejado)', y1.map(p => p.eventType).includes('sla_warning'));
-  ok('Y2: só o DESIGNER correto recebe (dz2 não recebe)', !evs(task(), 'dz2').includes('sla_warning'));
-  ok('Y3: Social/autor (soc1) NÃO recebe', !evs(task(), 'soc1').includes('sla_warning'));
-  const yWarn = y1.find(p => p.eventType === 'sla_warning') || {};
-  ok('Y4: texto canônico exato (30 min)', yWarn.body === 'Você tem 30 minutos para concluir esta tarefa.');
-  ok('Y5: cor/severidade = warning (laranja)', yWarn.severity === 'warning');
-  ok('Y6: dedupKey estável = taskId+designerId+assignedAt+deadline_30', yWarn.dedupKey === 'sla_warning:t1:dz1:' + NOW + ':deadline_30');
-  const yReassign = run(withDa({}, { designerId: 'dz1', assignedAt: NOW + 5 * MIN }), 'dz1').find(p => p.eventType === 'sla_warning') || {};
-  ok('Y7: reatribuição (novo assignedAt) → dedupKey NOVO', yReassign.dedupKey === 'sla_warning:t1:dz1:' + (NOW + 5 * MIN) + ':deadline_30');
-  ok('Y8: ROTEIRO NÃO gera laranja', !evs(task({ sector: 'roteiro' }), 'dz1').includes('sla_warning'));
-  ok('Y9: CRONOGRAMA gera laranja', evs(task({ sector: 'cronograma' }), 'dz1').includes('sla_warning'));
-  ok('Y10: EDIÇÃO DE MÍDIA gera laranja', evs(task({ sector: 'edicao' }), 'dz1').includes('sla_warning'));
-  ok('Y11: sem designer (sem designerId) → nada', evs(task({ designerAssignment: { assignedAt: NOW } }), 'dz1').length === 0);
-
-  // --- VERMELHO (prazo ultrapassado) ---
-  const before = evs(task({ designerAssignment: { designerId: 'dz1', assignedAt: NOW, assignedBy: 'soc1' } }), 'dz1');
-  ok('R12: antes do prazo (atribuição agora) → NÃO emite vermelho', !before.includes('sla_overdue'));
-  const rOver = run(task({ designerAssignment: { designerId: 'dz1', assignedAt: NOW - 31 * MIN, assignedBy: 'soc1' } }), 'dz1');
-  ok('R13: 31min após atribuição (assignedAt+30 ultrapassado) → emite vermelho', rOver.map(p => p.eventType).includes('sla_overdue'));
-  const rBody = rOver.find(p => p.eventType === 'sla_overdue') || {};
-  ok('R14: texto canônico exato (10 min)', rBody.body === 'Você tem 10 minutos para concluir esta tarefa.');
-  ok('R15: cor/severidade = critical (vermelho)', rBody.severity === 'critical');
-  ok('R16: só o DESIGNER correto recebe o vermelho', !evs(task({ designerAssignment: { designerId: 'dz1', assignedAt: NOW - 31 * MIN } }), 'dz2').includes('sla_overdue'));
-  ok('R17: dedupKey vermelho = taskId+designerId+deadlineAt+overdue_10', rBody.dedupKey === 'sla_overdue:t1:dz1:' + (NOW - 31 * MIN + SLA_OP_DEADLINE()) + ':overdue_10');
-  ok('R18: tarefa CONCLUÍDA (designerFlowStatus=concluido) → não gera', evs(task({ designerFlowStatus: 'concluido', designerAssignment: { designerId: 'dz1', assignedAt: NOW - 31 * MIN } }), 'dz1').length === 0);
-  ok('R19: tarefa CANCELADA (status=cancelado) → não gera', evs(task({ status: 'cancelado', designerAssignment: { designerId: 'dz1', assignedAt: NOW - 31 * MIN } }), 'dz1').length === 0);
-  ok('R20: designer SUBSTITUÍDO (agora dz2) → dz1 não recebe', !evs(task({ designerAssignment: { designerId: 'dz2', assignedAt: NOW } }), 'dz1').includes('sla_warning'));
-
-  // --- PERSISTÊNCIA / reconstrução ---
-  ok('P21: reconstrói SÓ do assignedAt persistido (sem campo de prazo) → laranja', run(task({ designerSla: undefined }), 'dz1').map(p => p.eventType).includes('sla_warning'));
-  ok('P23: suspensão/retomada — assignedAt há 35min (dentro da tolerância) → detecta atraso (vermelho)', evs(task({ designerAssignment: { designerId: 'dz1', assignedAt: NOW - 35 * MIN } }), 'dz1').includes('sla_overdue'));
-  ok('P23b: assignedAt há 45min (esgotada a tolerância de 10min) → escalona p/ crítico', evs(task({ designerAssignment: { designerId: 'dz1', assignedAt: NOW - 45 * MIN } }), 'dz1').includes('sla_critical'));
-  ok('P24: alteração irrelevante NÃO muda o dedupKey (mesmo assignedAt)', (run(task({ title: 'X' }), 'dz1').find(p => p.eventType === 'sla_warning') || {}).dedupKey === 'sla_warning:t1:dz1:' + NOW + ':deadline_30');
-
-  // --- PRESERVAÇÕES (card/painel intocados) ---
-  ok('PR34: Roteiro sem SLA (designerOpSla exclui roteiro)', !evs(task({ sector: 'roteiro', designerAssignment: { designerId: 'dz1', assignedAt: NOW - 31 * MIN } }), 'dz1').length);
-  ok('PR-src1: resolveTaskDisplayState (card) NÃO referencia designerOpSla/SLA_OP (card intocado)', (() => { const s = grab('resolveTaskDisplayState'); return !/designerOpSla|SLA_OP_/.test(s); })());
-  ok('PR-src2: slaPanelFinishMs (prazo do card) segue por planDueAt (intocado)', /planDueAt/.test(grab('slaPanelFinishMs')) && !/SLA_OP_/.test(grab('slaPanelFinishMs')));
-  ok('PR-src3: designerOpSla exclui roteiro e ancora em assignedAt+SLA_OP_DEADLINE_MS', (() => { const s = grab('designerOpSla'); return /key==='roteiro'\)\s*return null/.test(s) && /assignedAt\+SLA_OP_DEADLINE_MS/.test(s); })());
-  ok('PR-src4: textos canônicos presentes na fonte', /Você tem 30 minutos para concluir esta tarefa\./.test(HTML) && /Você tem 10 minutos para concluir esta tarefa\./.test(HTML));
-  ok('PR-src5: dedupKeys novos presentes (deadline_30 / overdue_10)', /:deadline_30'/.test(HTML) && /:overdue_10'/.test(HTML));
-
-  function SLA_OP_DEADLINE() { return 30 * 60000; }
+  /* GREEN — corrigida: âncora = designerSla.planDueAt. */
+  // Cronologia (cenário do owner: prazo 22:02; 21:31 só azul; 21:32 amarelo; 22:02 vermelho).
+  ok('Y1: prazo 31min à frente → SEM amarelo (só a azul de atribuição, separada)', !evs(withSla(NOW + 31 * MIN), 'dz1').includes('sla_warning'));
+  ok('Y2: prazo 30min à frente (restam 30) → AMARELO', evs(withSla(NOW + 30 * MIN), 'dz1').includes('sla_warning'));
+  const y = run(withSla(NOW + 25 * MIN), 'dz1').find(p => p.eventType === 'sla_warning') || {};
+  ok('Y3: texto canônico do amarelo', y.body === 'Você tem 30 minutos para concluir esta tarefa.');
+  ok('Y4: severidade warning (laranja)', y.severity === 'warning');
+  ok('Y5: dedupKey = sla_warning:taskId:finishMs (planDueAt)', y.dedupKey === 'sla_warning:t1:' + (NOW + 25 * MIN));
+  ok('Y6: só o DESIGNER (dz2 não recebe)', !evs(withSla(NOW + 25 * MIN), 'dz2').includes('sla_warning'));
+  ok('Y7: Social/autor (soc1) não recebe', !evs(withSla(NOW + 25 * MIN), 'soc1').includes('sla_warning'));
+  // Durações (owner tests 1-4): amarelo só quando faltam 30, independente da duração.
+  ok('T1: prazo 3 DIAS → SEM amarelo agora', !evs(withSla(NOW + 3 * DAY), 'dz1').includes('sla_warning'));
+  ok('T2: prazo 2 HORAS → SEM amarelo agora', !evs(withSla(NOW + 2 * HOUR), 'dz1').includes('sla_warning'));
+  ok('T3: prazo EXATO 30min → AMARELO', evs(withSla(NOW + 30 * MIN), 'dz1').includes('sla_warning'));
+  ok('T4: prazo < 30min (20min) → AMARELO (já dentro da janela)', evs(withSla(NOW + 20 * MIN), 'dz1').includes('sla_warning'));
+  // VERMELHO
+  const r = run(withSla(NOW - 1 * MIN), 'dz1').find(p => p.eventType === 'sla_overdue') || {};
+  ok('R1: prazo final atingido (planDueAt no passado) + aberta → VERMELHO', !!r.eventType);
+  ok('R2: texto canônico do vermelho', r.body === 'Você tem 10 minutos para concluir esta tarefa.');
+  ok('R3: antes do prazo (25min à frente) → SEM vermelho', !evs(withSla(NOW + 25 * MIN), 'dz1').includes('sla_overdue'));
+  ok('R4: dedupKey vermelho = sla_overdue:taskId:finishMs', r.dedupKey === 'sla_overdue:t1:' + (NOW - 1 * MIN));
+  // Conclusão / cancelamento (owner test 6)
+  ok('C1: CONCLUÍDA (designerFlowStatus=concluido) + prazo passado → SEM vermelho', !evs(withSla(NOW - 1 * MIN, { designerFlowStatus: 'concluido' }), 'dz1').length);
+  ok('C2: CANCELADA (status=cancelado) → SEM alerta', !evs(withSla(NOW - 1 * MIN, { status: 'cancelado' }), 'dz1').length);
+  // Alteração de prazo (owner test 5) → recalcula (novo finishMs → novo dedup)
+  ok('D1: mudança de prazo → novo dedupKey (finishMs novo)', (run(withSla(NOW + 18 * MIN), 'dz1').find(p => p.eventType === 'sla_warning') || {}).dedupKey === 'sla_warning:t1:' + (NOW + 18 * MIN));
+  // Reatribuição (owner test 7): baseada no prazo; o novo designer recebe, o anterior não.
+  ok('RE1: reatribuído a dz2 (prazo na janela) → dz2 recebe amarelo', evs(withSla(NOW + 25 * MIN, { designerAssignment: { designerId: 'dz2', assignedAt: NOW } }), 'dz2').includes('sla_warning'));
+  ok('RE2: reatribuído a dz2 → dz1 NÃO recebe', !evs(withSla(NOW + 25 * MIN, { designerAssignment: { designerId: 'dz2', assignedAt: NOW } }), 'dz1').includes('sla_warning'));
+  // Snapshots repetidos (owner test 8) → mesmo dedupKey estável
+  ok('SN1: snapshot repetido → mesmo dedupKey', (run(withSla(NOW + 25 * MIN), 'dz1').find(p => p.eventType === 'sla_warning') || {}).dedupKey === (run(withSla(NOW + 25 * MIN), 'dz1').find(p => p.eventType === 'sla_warning') || {}).dedupKey);
+  // Restart (owner test 9): reconstrói do planDueAt persistido (sem estado local) → dispara
+  ok('RS1: restart — reconstrói do planDueAt persistido → amarelo', evs(withSla(NOW + 25 * MIN), 'dz1').includes('sla_warning'));
+  // Roteiro sem SLA (owner test 10)
+  ok('RO1: ROTEIRO (prazo na janela) → SEM amarelo', !evs(withSla(NOW + 25 * MIN, { sector: 'roteiro' }), 'dz1').includes('sla_warning'));
+  ok('RO2: ROTEIRO (prazo passado) → SEM vermelho', !evs(withSla(NOW - 1 * MIN, { sector: 'roteiro' }), 'dz1').includes('sla_overdue'));
+  // Setores com designer
+  ok('SE1: Cronograma → amarelo', evs(withSla(NOW + 25 * MIN, { sector: 'cronograma' }), 'dz1').includes('sla_warning'));
+  ok('SE2: Edição de mídia → amarelo', evs(withSla(NOW + 25 * MIN, { sector: 'edicao' }), 'dz1').includes('sla_warning'));
+  // Fonte
+  ok('SRC1: SEM designerOpSla (âncora voltou ao PRAZO PLANEJADO)', !HAS_OP);
+  ok('SRC2: notifScanSla usa resolveTaskDisplayState + exclui roteiro', (() => { const s = grab('notifScanSla'); return /resolveTaskDisplayState\(t,now,f\)/.test(s) && /secOf\(t\.sector\)\|\|\{\}\)\.key==='roteiro'/.test(s); })());
+  ok('SRC3: SEM grace de atribuição no amarelo (SLA_ASSIGNMENT_GRACE_MS não gateia notifScanSla)', !/SLA_ASSIGNMENT_GRACE_MS/.test(grab('notifScanSla')));
+  ok('SRC4: dedup por finishMs (planDueAt), não por assignedAt', /dedupKey:'sla_warning:'\+t\.id\+':'\+d\.finishMs/.test(grab('notifScanSla')));
   console.log('\n(CORRIGIDA / GREEN)');
 }
 
-console.log('\n========= F3.3.76A — SLA designer (' + (HAS_FIX ? 'GREEN/corrigida' : 'RED/baseline') + ') =========');
+console.log('========= F3.3.76A — SLA planDueAt (' + (HAS_OP ? 'RED/errada' : 'GREEN/corrigida') + ') =========');
 console.log('SRC=' + SRC_PATH);
 console.log('F3.3.76A-SLA: ' + pass + ' OK, ' + fail + ' FAIL');
 if (fail) { console.log(flog.join('\n')); process.exit(1); }

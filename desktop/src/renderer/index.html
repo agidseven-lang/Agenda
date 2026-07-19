@@ -3853,31 +3853,6 @@ function notifScanFlow(){
     _notifBaseline=true;
   }catch(_){}
 }
-/* F3.3.76A — SLA OPERACIONAL do designer p/ as NOTIFICAÇÕES (laranja 30 / vermelho 10),
-   ancorado na ATRIBUIÇÃO (designerDeadlineAt = assignedAt + 30min; overdueGraceUntil = +10min),
-   RECONSTRUÍDO do dado persistido (designerAssignment.assignedAt) — sobrevive a restart/reconexão/
-   suspensão. Escopo: SOMENTE setores COM designer; NUNCA roteiro. NÃO usa o prazo planejado e NÃO
-   toca card/painel/monitor (que seguem por resolveTaskDisplayState/PRAZO PLANEJADO, intocados). */
-var SLA_OP_DEADLINE_MS=30*60000;   // 30 min a partir da atribuição (laranja → vermelho)
-var SLA_OP_GRACE_MS=10*60000;      // +10 min de tolerância (janela do vermelho)
-function designerOpSla(t,now){
-  now=now||Date.now();
-  if(!t) return null;
-  var key=(typeof secOf==='function'?((secOf(t.sector)||{}).key||''):'');
-  if(key==='roteiro') return null;                        // Roteiro NÃO tem designer/SLA
-  var da=t.designerAssignment;
-  var designerId=(da&&da.designerId)||null;
-  if(!designerId) return null;                            // sem designer responsável → sem SLA
-  var assignedAt=Number(da&&da.assignedAt)||0;
-  if(!assignedAt) return null;                            // sem âncora persistida → não reconstrói
-  if(typeof slaPanelDelivered==='function' && slaPanelDelivered(t)) return null; // concluída/entregue/cancelada/removida → encerra (FASE 6)
-  var deadlineAt=assignedAt+SLA_OP_DEADLINE_MS;
-  var graceUntil=deadlineAt+SLA_OP_GRACE_MS;
-  return { designerId:designerId, assignedAt:assignedAt, deadlineAt:deadlineAt, graceUntil:graceUntil,
-    state:(now>=deadlineAt?'overdue':'warning'),
-    remainingMs:Math.max(0,deadlineAt-now), overdueMs:Math.max(0,now-deadlineAt),
-    graceRemainingMs:Math.max(0,graceUntil-now), critical:(now>=graceUntil) };
-}
 /* DETECÇÃO: SLA (laranja/vermelho/crítico) + bloqueio operacional — escopo do usuário logado. */
 function notifScanSla(){
   try{
@@ -3892,39 +3867,40 @@ function notifScanSla(){
       // o mesmo critério de destinatário, então basta classificar uma vez.
       var tg=resolveNotificationTargets({ eventType:'sla_warning', task:t, currentUser:state.user });
       if(!tg.shouldNotifyCurrentUser) continue;
-      // F3.3.76A — SLA OPERACIONAL ancorado na ATRIBUIÇÃO (assignedAt+30 / +10 grace), reconstruído do
-      // dado persistido. Substitui a âncora de PRAZO PLANEJADO SÓ nas notificações; card/painel/monitor
-      // seguem por resolveTaskDisplayState (intocado). Roteiro/entregue/sem-designer → designerOpSla=null.
-      var op=designerOpSla(t,now); if(!op) continue;
+      // F3.3.76A — Roteiro NÃO tem SLA de designer (jamais amarelo/vermelho).
+      if(typeof secOf==='function' && ((secOf(t.sector)||{}).key==='roteiro')) continue;
+      // F3.3.76A — ÂNCORA = PRAZO FINAL da Social (designerSla.planDueAt, via resolveTaskDisplayState):
+      // AMARELO em planDueAt-30min · VERMELHO em planDueAt · CRÍTICO em planDueAt+10min. NÃO ancorar na
+      // atribuição — a notificação AZUL de atribuição é SEPARADA e PERMANECE (notifScanAssign). Sem grace
+      // de atribuição. Card Premium / chip de SLA / painel / monitor / modal de prazo: INTOCADOS.
+      var d=resolveTaskDisplayState(t,now,f); if(!d||!d.inPanel) continue;
       var resp=notifResponsible(t);
-      var fn=first(resp.name||''), tl=(t.title||'Tarefa')+(t.client?(' — '+t.client):'');
+      var fn=first(resp.name||''), tl=(t.title||'Tarefa')+(t.client?(' — '+t.client):''), pf=slaibFmtHM(d.finishMs);
       var base={ taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
         actorId:resp.id, actorName:resp.name, actorAvatar:resp.avatar,
         responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
-        targetUserId:state.user.id, notificationType:'sla_personal', etapa:'SLA', status:op.state,
-        subtitle:tl, anchor:op.deadlineAt, action:{type:'detail',deep:'detail/'+t.id} };
-      if(op.state==='warning'){
-        // LARANJA — SLA INICIAL: dispara IMEDIATAMENTE na atribuição, uma vez por atribuição
-        // (dedup por taskId+designerId+assignedAt+deadline_30).
-        try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.match',{taskId:t.id,kind:'deadline_30',designerId:op.designerId,assignedAt:op.assignedAt}); }catch(_){}
+        targetUserId:state.user.id, notificationType:'sla_personal', etapa:'SLA', status:d.state,
+        subtitle:tl, anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
+      if(d.state==='warning'){
+        // AMARELO — restam 30 min p/ o prazo final (planDueAt-30). Uma vez por prazo (dedup por finishMs;
+        // mudança de prazo → novo finishMs → novo dedup → recalcula). NÃO suprime nem duplica a azul de atribuição.
+        try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.match',{taskId:t.id,kind:'yellow_30',finishMs:d.finishMs}); }catch(_){}
         notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_warning', severity:'warning', sound:true,
           title:(fn?fn+', ':'')+'prazo próximo', body:'Você tem 30 minutos para concluir esta tarefa.',
-          context:'Prazo final: '+slaibFmtHM(op.deadlineAt)+' · Vence em '+slaCount(op.remainingMs),
-          dedupKey:'sla_warning:'+t.id+':'+op.designerId+':'+op.assignedAt+':deadline_30' })));
-      } else if(op.critical){
-        // CRÍTICO — esgotados os 10 min de tolerância (assignedAt+40): escalonamento (contrato aprovado preservado).
-        try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.skip',{taskId:t.id,kind:'critical',designerId:op.designerId,deadlineAt:op.deadlineAt}); }catch(_){}
-        notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_critical', severity:'critical', sound:true,
-          title:(fn?fn+', ':'')+'atraso crítico', body:'Sinalize atraso imediatamente ou conclua a tarefa.',
-          context:'Atrasada há '+slaElapsed(op.overdueMs), dedupKey:'sla_critical:'+t.id+':'+op.designerId+':'+op.deadlineAt+':critical_10' })));
-      } else {
-        // VERMELHO — PRAZO ULTRAPASSADO: 30 min excedidos (janela de 10 min), uma vez por prazo
-        // (dedup por taskId+designerId+deadlineAt+overdue_10).
-        try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.match',{taskId:t.id,kind:'overdue_10',designerId:op.designerId,deadlineAt:op.deadlineAt}); }catch(_){}
-        notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_overdue', severity:'critical', sound:true,
-          title:(fn?fn+', ':'')+'prazo encerrado', body:'Você tem 10 minutos para concluir esta tarefa.',
-          context:'Restam '+slaCount(op.graceRemainingMs)+' · atrasada há '+slaElapsed(op.overdueMs),
-          dedupKey:'sla_overdue:'+t.id+':'+op.designerId+':'+op.deadlineAt+':overdue_10' })));
+          context:'Prazo final: '+pf+' · Vence em '+slaCount(d.remainingMs), dedupKey:'sla_warning:'+t.id+':'+d.finishMs })));
+      } else if(d.state==='overdue'){
+        if(d.critical){
+          // CRÍTICO — esgotada a tolerância de 10 min após o prazo final.
+          notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_critical', severity:'critical', sound:true,
+            title:(fn?fn+', ':'')+'atraso crítico', body:'Sinalize atraso imediatamente ou conclua a tarefa.',
+            context:'Atrasada há '+slaElapsed(d.overdueMs), dedupKey:'sla_critical:'+t.id+':'+d.finishMs })));
+        } else {
+          // VERMELHO — prazo final atingido/ultrapassado (planDueAt) e tarefa AINDA aberta. Uma vez por prazo.
+          try{ if(typeof ncDiag==='function') ncDiag('notifSla.deadline.match',{taskId:t.id,kind:'red_10',finishMs:d.finishMs}); }catch(_){}
+          notifEmit(notifBuildPayload(Object.assign({},base,{ eventType:'sla_overdue', severity:'critical', sound:true,
+            title:(fn?fn+', ':'')+'prazo encerrado', body:'Você tem 10 minutos para concluir esta tarefa.',
+            context:'Restam '+slaCount(d.graceRemainingMs)+' · atrasada há '+slaElapsed(d.overdueMs), dedupKey:'sla_overdue:'+t.id+':'+d.finishMs })));
+        }
       }
     }
     // Bloqueio operacional — já é PESSOAL do designer (slaCriticalFor retorna null p/ quem vê tudo).
@@ -8316,6 +8292,6 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
 })();
 /* ════════ FIM IN-APP-DIAGNOSTIC-V1 ════════ */
 </script>
-<script>/* F3.3.76A — banner permanente de QA (build de teste 1.0.176-QA; NUNCA usar com clientes). */try{var _qb=document.createElement('div');_qb.textContent='AMBIENTE QA — NÃO USAR COM CLIENTES';_qb.setAttribute('style','position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#7a1020;color:#fff;font:700 12px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;text-align:center;padding:6px 10px;letter-spacing:.4px;pointer-events:none;box-shadow:0 -2px 12px rgba(0,0,0,.35)');document.body.appendChild(_qb);}catch(_){}</script>
+<script>/* F3.3.76A — banner permanente de QA (build de teste 1.0.176-QA.2; NUNCA usar com clientes). */try{var _qb=document.createElement('div');_qb.textContent='AMBIENTE QA — NÃO USAR COM CLIENTES';_qb.setAttribute('style','position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#7a1020;color:#fff;font:700 12px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;text-align:center;padding:6px 10px;letter-spacing:.4px;pointer-events:none;box-shadow:0 -2px 12px rgba(0,0,0,.35)');document.body.appendChild(_qb);}catch(_){}</script>
 </body>
 </html>
