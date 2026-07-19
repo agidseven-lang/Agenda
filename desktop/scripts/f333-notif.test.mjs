@@ -151,7 +151,7 @@ ok('renderer: contador ao vivo no Monitor usa mm:ss', /sla(Count|Elapsed|MMSS)\(
 ok('precisão: resolveCanonicalDeadline (fonte única + metadados)', /function resolveCanonicalDeadline\(/.test(html) && /plannedFinishAtMs/.test(html) && /sourceField/.test(html));
 ok('precisão: contagem regressiva ARREDONDA P/ CIMA (slaCount=ceil)', /function slaCount\(ms\)\{ return slaMMSSfmt\(ms,'up'\); \}/.test(html));
 ok('precisão: tempo decorrido ARREDONDA P/ BAIXO (slaElapsed=floor)', /function slaElapsed\(ms\)\{ return slaMMSSfmt\(ms,'down'\); \}/.test(html));
-ok('precisão: toast laranja "Vence em" usa slaCount (ceil)', /Vence em '\+slaCount\(d\.remainingMs\)/.test(html));
+ok('precisão: toast laranja "Vence em" usa slaCount (ceil)', /Vence em '\+slaCount\(op\.remainingMs\)/.test(html));
 ok('precisão: boundary timer DISPARA notifScanSla no limite exato', /_slaBoundaryTimer=setTimeout\(function\(\)\{[\s\S]*?notifScanSla\(\)/.test(html));
 // REGRESSÃO (canal): app ABERTO/VISÍVEL usa toast premium (nativo só minimizado/bandeja)
 ok('canal: app visível-sem-foco usa toast in-app (não exige isFocused)', /janela ABERTA e VISÍVEL/.test(mainTs) && /return !!\(w && !w\.isDestroyed\(\) && w\.isVisible\(\) && !w\.isMinimized\(\)\);/.test(mainTs));

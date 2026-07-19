@@ -94,16 +94,17 @@ ok('C5 Cronograma em duas etapas (Worker) não é tocado por este patch — sem 
 
 console.log('— IDENTIDADE (auto-adaptável QA×produção) —');
 const PKG = fs.readFileSync(path.resolve(path.dirname(SRCPATH), '..', '..', 'package.json'), 'utf8');
-const isQA = /"version": "1\.0\.175-QA"/.test(PKG);
+// auto-adaptável a QUALQUER versão QA (x.y.z-QA) × produção (x.y.z), p/ não repinar a cada fase.
+const isQA = /"version": "\d+\.\d+\.\d+-QA"/.test(PKG);
 const hasBanner = /AMBIENTE QA — NÃO USAR COM CLIENTES/.test(H);
 if (isQA) {
   ok('Q1 (QA) banner "AMBIENTE QA — NÃO USAR COM CLIENTES" presente', hasBanner);
-  ok('Q2 (QA) versão 1.0.175-QA no package.json', /"version": "1\.0\.175-QA"/.test(PKG));
+  ok('Q2 (QA) versão x.y.z-QA no package.json', /"version": "\d+\.\d+\.\d+-QA"/.test(PKG));
 } else {
-  // F3.3.75B — candidata de PRODUÇÃO: banner QA AUSENTE, versão 1.0.175 (sem -QA em lugar nenhum).
+  // candidata de PRODUÇÃO: banner QA AUSENTE, versão sem sufixo -QA (em lugar nenhum).
   ok('Q1 (produção) banner "AMBIENTE QA" AUSENTE do renderer', !hasBanner);
-  ok('Q2 (produção) versão 1.0.175 (package.json) e NENHUM "1.0.175-QA" no renderer',
-    /"version": "1\.0\.175"/.test(PKG) && !/1\.0\.175-QA/.test(H));
+  ok('Q2 (produção) versão sem -QA (package.json) e NENHUM sufixo -QA no renderer',
+    /"version": "\d+\.\d+\.\d+"/.test(PKG) && !/\d+\.\d+\.\d+-QA/.test(H));
 }
 
 console.log(`\n${EXPECT}: PASS=${pass} FAIL=${fail}`);
