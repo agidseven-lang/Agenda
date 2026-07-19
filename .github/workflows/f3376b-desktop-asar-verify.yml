@@ -1,0 +1,165 @@
+# =====================================================================
+# [manual] F3.3.76B — GATE DO APP.ASAR (runtime empacotado) + COMPARAÇÃO QA×PROD.
+#
+# FASE 8 (runtime empacotado) + FASE 9 (comparação QA×produção). Extrai o
+# app.asar de DENTRO do EXE de PRODUÇÃO 1.0.176 (build 76B) e do EXE da
+# 1.0.176-QA.2 fisicamente aprovada (run 29667559700), e prova no runtime REAL:
+#   • produção: versão 1.0.176, SEM banner QA, SLA do designer ancorado no PRAZO
+#     FINAL (resolveTaskDisplayState/planDueAt), amarelo/vermelho canônicos,
+#     Roteiro sem SLA, designerOpSla AUSENTE, notificação AZUL de atribuição intacta;
+#   • comparação: o renderer (onde vivem TODOS os handlers) da produção é IDÊNTICO
+#     ao da QA a MENOS da linha do banner; package.json difere só na versão;
+#     main/preload compilados byte-idênticos.
+# Somente leitura de artifacts; nenhuma release, nenhum deploy.
+# =====================================================================
+name: "[manual] F3.3.76B Desktop app.asar verify (runtime + QA×prod)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      prod_run_id:
+        description: "Run ID do build de PRODUÇÃO 1.0.176 (desktop-build na branch 76B)"
+        required: true
+      qa_run_id:
+        description: "Run ID do build 1.0.176-QA.2 aprovado"
+        required: true
+        default: "29667559700"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: f3376b-asar-verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ferramentas (7zip)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq p7zip-full >/dev/null
+
+      - name: Baixar instalador de PRODUÇÃO (1.0.176)
+        uses: actions/download-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.176-installer
+          path: prod-dl
+          run-id: ${{ github.event.inputs.prod_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Baixar instalador 1.0.176-QA.2 (aprovado)
+        uses: actions/download-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.176-QA.2-installer
+          path: qa-dl
+          run-id: ${{ github.event.inputs.qa_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Extrair app.asar dos dois EXE e o renderer real"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          extract_asar() { # $1=exe  $2=destdir
+            local exe="$1" dest="$2" asar inner
+            rm -rf "$dest"; mkdir -p "$dest/l1" "$dest/l2" "$dest/asarx"
+            7z x -y "$exe" -o"$dest/l1" >/dev/null 2>&1 || true
+            inner=$(find "$dest/l1" -iname 'app-64.7z' -o -iname 'app.7z' | head -1)
+            if [ -n "$inner" ]; then 7z x -y "$inner" -o"$dest/l2" >/dev/null 2>&1 || true; fi
+            asar=$(find "$dest/l1" "$dest/l2" -iname 'app.asar' 2>/dev/null | head -1)
+            [ -n "$asar" ] || { echo "::error::app.asar não encontrado em $exe"; exit 1; }
+            echo "app.asar de $(basename "$exe"): $asar ($(wc -c < "$asar") bytes)"
+            npx --yes @electron/asar extract "$asar" "$dest/asarx"
+            cp "$asar" "$dest/app.asar"
+          }
+          PEXE=$(ls prod-dl/Agenda-ID-Seven-Desktop-*.exe | head -1)
+          QEXE=$(ls qa-dl/Agenda-ID-Seven-Desktop-*.exe | head -1)
+          echo "PROD EXE: $PEXE"; echo "QA EXE: $QEXE"
+          sha256sum "$PEXE" "$QEXE" | tee out/exe-hashes.txt
+          extract_asar "$PEXE" out/prod
+          extract_asar "$QEXE" out/qa
+          sha256sum out/prod/app.asar out/qa/app.asar | tee out/asar-hashes.txt
+
+      - name: "FASE 8 — gate do runtime EMPACOTADO (produção 1.0.176)"
+        run: |
+          set -euo pipefail
+          R="out/prod/asarx"
+          IDX="$R/src/renderer/index.html"
+          PKG="$R/package.json"
+          [ -f "$IDX" ] && [ -f "$PKG" ] || { echo "::error::renderer/package.json ausentes no app.asar de produção"; exit 1; }
+          V=$(node -p "require('./$PKG').version")
+          echo "versão empacotada (produção): $V"
+          [ "$V" = "1.0.176" ] || { echo "::error::versão empacotada != 1.0.176"; exit 1; }
+          # identidade de produção (sem QA)
+          ! grep -qF 'AMBIENTE QA' "$IDX" || { echo "::error:: banner QA presente no pacote de produção"; exit 1; }
+          ! grep -qF 'NÃO USAR COM CLIENTES' "$IDX" || { echo "::error:: texto QA presente"; exit 1; }
+          ! grep -qF '1.0.176-QA' "$R" -r || { echo "::error:: sufixo -QA presente no pacote"; exit 1; }
+          # SLA do designer ancorado no PRAZO FINAL (planDueAt via resolveTaskDisplayState); designerOpSla AUSENTE
+          ! grep -qF 'function designerOpSla(' "$IDX" || { echo "::error:: designerOpSla presente (âncora ERRADA em assignedAt)"; exit 1; }
+          grep -qF 'var d=resolveTaskDisplayState(t,now,f); if(!d||!d.inPanel) continue;' "$IDX" || { echo "::error:: notifScanSla não ancora em resolveTaskDisplayState (planDueAt)"; exit 1; }
+          grep -qF "(secOf(t.sector)||{}).key==='roteiro')) continue;" "$IDX" || { echo "::error:: exclusão de Roteiro ausente no notifScanSla"; exit 1; }
+          grep -qF 'Você tem 30 minutos para concluir esta tarefa.' "$IDX" || { echo "::error:: texto do amarelo (30min) ausente"; exit 1; }
+          grep -qF 'Você tem 10 minutos para concluir esta tarefa.' "$IDX" || { echo "::error:: texto do vermelho (10min) ausente"; exit 1; }
+          grep -qF "dedupKey:'sla_warning:'+t.id+':'+d.finishMs" "$IDX" || { echo "::error:: dedup do amarelo não usa finishMs (planDueAt)"; exit 1; }
+          # notificação AZUL de atribuição intacta (notifScanAssign) — NÃO suprimida
+          grep -qF "eventType:'designer_assigned'" "$IDX" || { echo "::error:: notificação AZUL (designer_assigned) ausente"; exit 1; }
+          grep -qF 'Nova tarefa atribuída a você' "$IDX" || { echo "::error:: texto da AZUL de atribuição ausente"; exit 1; }
+          # contrato conhecido-como-bom preservado (domínio/rota)
+          grep -qF 'https://aprovar.agendaidseven.com.br' "$IDX" || { echo "::error:: domínio oficial AUSENTE"; exit 1; }
+          grep -qF '/share/cronograma/' "$IDX" || { echo "::error:: rota oficial AUSENTE"; exit 1; }
+          echo "FASE 8 OK: runtime 1.0.176 sem QA; SLA por planDueAt (amarelo -30 / vermelho no prazo), Roteiro sem SLA, azul intacta, contrato preservado."
+
+      - name: "FASE 9 — comparação app.asar QA × PRODUÇÃO (só banner+versão)"
+        run: |
+          set -euo pipefail
+          # 1) RENDERER: produção == QA menos a linha do banner (todos os handlers byte-idênticos)
+          python3 - <<'PY'
+          import sys
+          qa=open('out/qa/asarx/src/renderer/index.html',encoding='utf-8').read().split('\n')
+          pr=open('out/prod/asarx/src/renderer/index.html',encoding='utf-8').read().split('\n')
+          bidx=[i for i,l in enumerate(qa) if 'banner permanente de QA' in l and 'AMBIENTE QA' in l]
+          assert len(bidx)==1, f'banner no QA: {len(bidx)}'
+          qa_minus=[l for i,l in enumerate(qa) if i!=bidx[0]]
+          if qa_minus==pr:
+              print('RENDERER: produção == QA menos a linha do banner (todos os handlers byte-idênticos)')
+          else:
+              import difflib
+              d=list(difflib.unified_diff(qa_minus,pr,lineterm='',n=0))[:40]
+              print('::error:: renderer diverge além do banner:'); print('\n'.join(d)); sys.exit(1)
+          PY
+          # 2) package.json: só a versão difere
+          python3 - <<'PY'
+          import json
+          qa=json.load(open('out/qa/asarx/package.json')); pr=json.load(open('out/prod/asarx/package.json'))
+          assert qa['version']=='1.0.176-QA.2' and pr['version']=='1.0.176', (qa['version'],pr['version'])
+          qa['version']=pr['version']=None
+          assert json.dumps(qa,sort_keys=True)==json.dumps(pr,sort_keys=True), 'package.json diverge além da versão'
+          print('package.json: idêntico exceto version (1.0.176-QA.2 -> 1.0.176)')
+          PY
+          # 3) main/preload COMPILADOS byte-idênticos (mesma fonte .ts)
+          for f in dist/main/main.js dist/preload/preload.js; do
+            if [ -f "out/qa/asarx/$f" ] && [ -f "out/prod/asarx/$f" ]; then
+              if cmp -s "out/qa/asarx/$f" "out/prod/asarx/$f"; then echo "$f: byte-idêntico QA×prod"; else echo "::error:: $f diverge (compilado)"; exit 1; fi
+            fi
+          done
+          # 4) inventário de arquivos idêntico (fora node_modules)
+          ( cd out/qa/asarx && find . -type f -not -path './node_modules/*' | sort ) > out/qa-files.txt
+          ( cd out/prod/asarx && find . -type f -not -path './node_modules/*' | sort ) > out/prod-files.txt
+          cmp -s out/qa-files.txt out/prod-files.txt && echo "inventário (app, sem node_modules): IDÊNTICO" || { echo "::error:: conjunto de arquivos divergiu:"; diff out/qa-files.txt out/prod-files.txt | head; exit 1; }
+          # 5) hash de cada arquivo do app — diferenças permitidas SÓ em index.html e package.json
+          ( cd out/qa/asarx && find . -type f -not -path './node_modules/*' -exec sha256sum {} \; | sort -k2 ) > out/qa-hashes.txt
+          ( cd out/prod/asarx && find . -type f -not -path './node_modules/*' -exec sha256sum {} \; | sort -k2 ) > out/prod-hashes.txt
+          DIFFS=$(diff <(cut -c1-64,67- out/qa-hashes.txt) <(cut -c1-64,67- out/prod-hashes.txt) | grep -E '^[<>]' | awk '{print $3}' | sort -u || true)
+          echo "arquivos do app com hash divergente:"; echo "$DIFFS"
+          UNEXPECTED=$(echo "$DIFFS" | grep -vE './src/renderer/index.html$|./package.json$' | grep -v '^$' || true)
+          [ -z "$UNEXPECTED" ] || { echo "::error:: divergência funcional NÃO autorizada:"; echo "$UNEXPECTED"; exit 1; }
+          echo "FASE 9 OK: a ÚNICA divergência funcional é index.html (banner) + package.json (versão)."
+
+      - name: Upload evidências (hashes/inventários; sem binários)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f3376b-asar-verify-evidence
+          path: |
+            out/*.txt
+          retention-days: 90
