@@ -110,6 +110,7 @@ for (const rel of [
   ok('N updaterService.ts presente e substancial na candidata', svc.length > 2000 && /createUpdaterService/.test(svc));
   ok('N updaterService: autoDownload/allowDowngrade/autoInstallOnAppQuit=false', /autoDownload\s*=\s*false/.test(svc) && /allowDowngrade\s*=\s*false/.test(svc) && /autoInstallOnAppQuit\s*=\s*false/.test(svc));
   ok('N updaterService: forceDevUpdateConfig=false (sem dev-app-update)', /forceDevUpdateConfig\s*=\s*false/.test(svc));
+  ok('N updaterService: allowPrerelease=true (canário) setado ANTES de allowDowngrade=false', /allowPrerelease\s*=\s*true/.test(svc) && svc.indexOf('allowPrerelease = true') >= 0 && svc.indexOf('allowPrerelease = true') < svc.indexOf('allowDowngrade = false'));
 }
 
 // ---------- 5) package.json: só version + dependência electron-updater ----------

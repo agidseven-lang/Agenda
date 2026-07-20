@@ -89,22 +89,24 @@ async function toAvailable(svc, auto, ver) {
   // ---- Configuração obrigatória (mandato) ----
   {
     const { svc, auto } = makeService({ version: '1.0.178-canary.1' });
+    ok('CFG allowPrerelease=true (canário; setado ANTES de allowDowngrade)', auto.allowPrerelease === true);
+    ok('CFG allowDowngrade=false (nunca rebaixa)', auto.allowDowngrade === false);
     ok('CFG autoDownload=false', auto.autoDownload === false);
     ok('CFG autoInstallOnAppQuit=false', auto.autoInstallOnAppQuit === false);
-    ok('CFG allowDowngrade=false (item 10: sem downgrade)', auto.allowDowngrade === false);
+    ok('CFG forceDevUpdateConfig=false (sem dev-app-update.yml)', auto.forceDevUpdateConfig === false);
     ok('CFG fullChangelog=false', auto.fullChangelog === false);
-    ok('CFG forceDevUpdateConfig=false', auto.forceDevUpdateConfig === false);
     ok('CFG logger sanitizado (funções info/warn/error)', auto.logger && typeof auto.logger.info === 'function');
     ok('INIT estado inicial idle', svc.getState().status === 'idle');
-    ok('INIT canal=prerelease p/ versão -canary', svc.getState().channel === 'prerelease');
+    ok('INIT canal=prerelease (allowPrerelease=true)', svc.getState().channel === 'prerelease');
   }
 
-  // 11) prerelease rejeitada em produção: allowPrerelease derivado da versão
+  // 11) FLAGS reais no runtime empacotado — as 5 exigidas pelo mandato (canário)
   {
-    const a = makeService({ version: '1.0.178-canary.1' });
-    ok('11a allowPrerelease=true SÓ no canário', a.auto.allowPrerelease === true && a.svc.getState().allowPrerelease === true);
-    const b = makeService({ version: '1.0.178' });
-    ok('11b allowPrerelease=false no estável (prerelease barrada em produção)', b.auto.allowPrerelease === false && b.svc.getState().channel === 'stable');
+    const { svc, auto } = makeService({ version: '1.0.178-canary.1' });
+    const flagsOk = auto.allowPrerelease === true && auto.allowDowngrade === false && auto.autoDownload === false && auto.autoInstallOnAppQuit === false && auto.forceDevUpdateConfig === false;
+    ok('11 as 5 flags reais no runtime (allowPrerelease=true; allowDowngrade/autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false)', flagsOk);
+    ok('11 estado reflete canal prerelease + allowPrerelease=true', svc.getState().channel === 'prerelease' && svc.getState().allowPrerelease === true);
+    // No bootstrap ESTÁVEL (FASE 16) a linha allowPrerelease vira false — diferença canário→estável.
   }
 
   // 1) idle -> checking
