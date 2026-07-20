@@ -2,13 +2,13 @@
  * Agenda ID Seven Desktop — Atualizador nativo (F3.4.1A)
  * ---------------------------------------------------------------------------
  * Serviço ISOLADO no processo MAIN sobre electron-updater (NSIS/Windows).
- * Regras inegociáveis (mandato F3.4.1A):
- *   - FLAGS (ordem exigida): allowPrerelease(false) -> channel(latest) -> allowDowngrade(false),
+ * Regras inegociáveis (mandato F3.4.1A / F3.4.2A):
+ *   - FLAGS (ordem exigida): allowPrerelease(true) -> channel(canary) -> allowDowngrade(false),
  *     depois autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig/fullChangelog (false).
  *     A ordem importa: allowPrerelease E channel podem ativar allowDowngrade no
- *     electron-updater, logo allowDowngrade=false vem POR ÚLTIMO. ESTÁVEL (FASE 16) consulta
- *     SOMENTE o canal latest (latest.yml) e NUNCA vê prereleases/canary (allowPrerelease=false);
- *     o canário (allowPrerelease=true + channel canary) é a linha irmã, isolada por canal.
+ *     electron-updater, logo allowDowngrade=false vem POR ÚLTIMO. CANÁRIO consulta o canal
+ *     canary (canary.yml); ESTÁVEL (FASE 16) usa allowPrerelease=false + channel latest e
+ *     NUNCA vê prereleases (isolamento real de canal — a máquina estável ignora o canário).
  *   - Download só após ação do usuário. Instalação só após ação do usuário e
  *     com o renderer confirmando que não há trabalho não salvo. NUNCA silencioso
  *     sem confirmação.
@@ -17,7 +17,7 @@
  * Integridade: o electron-updater valida o sha512 do latest.yml no download; a
  * integridade de RELEASE (sha256, target commit, não-draft, não-substituída) é
  * garantida no publish (workflow gated). Downgrade/prerelease-em-produção são
- * barrados por allowDowngrade=false; canal ISOLADO por channel latest (o canário usa canary).
+ * barrados por allowDowngrade=false; canal ISOLADO por channel canary (o estável usa latest).
  */
 import { app, BrowserWindow } from "electron";
 import { autoUpdater } from "electron-updater";
@@ -63,6 +63,10 @@ export type UpdaterDeps = {
   beforeInstall: () => void; // teardown antes do quitAndInstall (quitting=true + parar subsistemas + destroyTray)
   now?: () => number; // injetável p/ teste
   getVersion?: () => string; // injetável p/ teste
+  // F3.4.2A (Escopo A) — gancho OPCIONAL para o HUB de notificação do main disparar a
+  // notificação IMEDIATA de atualização (produtor ÚNICO no main). Recebe só o kind + o
+  // ESTADO PÚBLICO já sanitizado (sem token/URL/headers). Ausência ⇒ comportamento 1.0.178.
+  onNotify?: (kind: "available" | "downloaded", state: UpdaterState) => void;
 };
 
 // 6h entre verificações automáticas (impede tempestade de chamadas).
@@ -85,13 +89,13 @@ export function createUpdaterService(deps: UpdaterDeps) {
   const getVersion = deps.getVersion || (() => { try { return app.getVersion(); } catch { return "dev"; } });
   const installed = getVersion();
 
-  // ---- FLAGS OBRIGATÓRIAS (mandato F3.4.1B — bootstrap ESTÁVEL, FASE 16) — ORDEM EXIGIDA:
+  // ---- FLAGS OBRIGATÓRIAS (mandato F3.4.2A — linha CANÁRIO, prerelease 1.0.179-canary.1) — ORDEM EXIGIDA:
   // allowPrerelease -> channel -> allowDowngrade. Motivo: allowPrerelease E channel podem
   // ativar allowDowngrade no electron-updater, então allowDowngrade=false vem POR ÚLTIMO.
-  // ESTÁVEL consulta SOMENTE o canal latest (latest.yml) e NUNCA vê prereleases/canary
-  // (allowPrerelease=false). Isolamento real de canal: a máquina estável ignora o canário.
-  autoUpdater.allowPrerelease = false;
-  autoUpdater.channel = "latest";
+  // CANÁRIO consulta SOMENTE o canal canary (canary.yml) e vê os prereleases da própria linha;
+  // o bootstrap ESTÁVEL (FASE 16) usa allowPrerelease=false + channel latest (nunca vê canary).
+  autoUpdater.allowPrerelease = true;
+  autoUpdater.channel = "canary";
   autoUpdater.allowDowngrade = false;
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
@@ -180,6 +184,9 @@ export function createUpdaterService(deps: UpdaterDeps) {
       error: null,
     });
     deps.onLog("updater.available", { version: ver });
+    // F3.4.2A — produtor ÚNICO da notificação imediata: o main monta o NotifPayload e roteia
+    // pelo HUB (deliverNotification). Nunca pode quebrar a máquina de estados do updater.
+    try { if (deps.onNotify) deps.onNotify("available", publicState()); } catch { /* notificar nunca derruba o updater */ }
   });
   autoUpdater.on("update-not-available", (info: any) => {
     set({ status: "up_to_date", availableVersion: null, progress: null, error: null });
@@ -203,6 +210,7 @@ export function createUpdaterService(deps: UpdaterDeps) {
       availableVersion: String((info && info.version) || state.availableVersion || "") || null,
     });
     deps.onLog("updater.downloaded", { version: String((info && info.version) || "") });
+    try { if (deps.onNotify) deps.onNotify("downloaded", publicState()); } catch { /* notificar nunca derruba o updater */ }
   });
   autoUpdater.on("error", (err: any) => {
     inFlightCheck = false;

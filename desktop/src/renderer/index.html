@@ -3749,6 +3749,9 @@ function notifEnsureStack(){
 function notifRoute(deep){
   try{
     if(!deep||!state.user) return;
+    /* UPDATER:BEGIN (F3.4.2A — deep-link da notificação de atualização → Configurações→Atualizações) */
+    if(deep==='config/updates'||deep==='config'){ try{ state.tab='config'; state.boardSector=null; render(); setTimeout(function(){ try{ var r=document.getElementById('upd-root'); if(r&&r.scrollIntoView) r.scrollIntoView({behavior:'smooth',block:'start'}); }catch(_){} },140); }catch(_){} return; }
+    /* UPDATER:END */
     if(deep.indexOf('detail/')===0){ var id=deep.slice(7); if(typeof openDetails==='function'){ try{ openDetails(id); return; }catch(_){} } deep='board/'; }
     if(deep.indexOf('client/')===0){ if(typeof openClientView==='function') openClientView(deep.slice(7)); return; }
     if(deep.indexOf('board/')===0){ state.tab='tarefas'; state.boardSector=deep.slice(6)||null; render(); return; }
@@ -7811,6 +7814,9 @@ function renderConfig(){
   /* UPDATER:BEGIN (F3.4.1A — seção Configurações → Atualizações; injeção aditiva) */
   h+=(typeof updConfigSectionHtml==='function'?updConfigSectionHtml():'');
   /* UPDATER:END */
+  /* PRESENCE:BEGIN (F3.4.2A — seção CANÁRIO Configurações → Presença (teste de /auth); injeção aditiva, só em prerelease) */
+  h+=(typeof presenceConfigSectionHtml==='function'?presenceConfigSectionHtml():'');
+  /* PRESENCE:END */
   h+='<div style="height:18px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div>'+
       '<div class="divline"></div>'+settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
@@ -8558,15 +8564,11 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   }
   window.updConfigSectionHtml=function(){ return '<div style="height:18px"></div><div class="lbl">Atualizações</div><div class="card" id="upd-root">'+updSectionInner()+'</div>'; };
   function updRefresh(){ try{ var r=document.getElementById('upd-root'); if(r) r.innerHTML=updSectionInner(); }catch(_){} }
-  function updMaybeToast(s){
-    try{
-      if(s&&s.status==='update_available'&&s.availableVersion&&_updToastedFor!==s.availableVersion){
-        _updToastedFor=s.availableVersion;
-        if(typeof notifShowToast==='function') notifShowToast({severity:'info',eventType:'app_update',title:'Atualização disponível',body:'Versão '+s.availableVersion+' disponível. Abra Configurações → Atualizações para baixar.',sound:false});
-      }
-      if(s&&(s.status==='up_to_date'||s.status==='idle')) _updToastedFor=null;
-    }catch(_){}
-  }
+  // F3.4.2A — PRODUTOR ÚNICO: a notificação de atualização passa a ser emitida SOMENTE pelo HUB do
+  // main (deliverNotification, via updater.onNotify) — toast in-app quando a janela está visível,
+  // nativa/premium quando na bandeja. Este produtor do renderer foi NEUTRALIZADO para NÃO duplicar
+  // o aviso. Mantido como no-op para preservar a assinatura de onStateChanged (zero regressão).
+  function updMaybeToast(_s){ /* neutralizado — HUB do main é o único produtor da notificação de update */ }
   // Guarda de instalação consultada pelo MAIN (trabalho não salvo => bloqueia a instalação).
   window.__updaterInstallGuard=function(){
     try{
@@ -8620,6 +8622,54 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   }catch(_){}
 })();
 /* UPDATER:END */
+/* PRESENCE:BEGIN (F3.4.2A — seção CANÁRIO "Presença — teste de autenticação": sonda de /auth do Worker
+   canário. Só aparece em builds prerelease (versão com '-'). NÃO ativa WebSocket, heartbeat, presença
+   on-line/off-line, nem a tela Equipe. Nunca exibe token/ticket/UID/e-mail — só booleans/status/duração. */
+(function(){
+  if(typeof window==='undefined') return;
+  var __presState=null, __presBusy=false;
+  function presIcb(ic){ return '<div class="icb icb-mut">'+(typeof svg==='function'?svg(ic):'')+'</div>'; }
+  function presRow(l,v){ return '<div class="settrow" style="cursor:default">'+presIcb('info')+'<div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(v)+'</div></div></div>'; }
+  function presWhen(ms){ if(!ms)return '—'; try{return new Date(ms).toLocaleString('pt-BR');}catch(_){return '—';} }
+  function presChips(f){ f=f||{}; var ks=['id','name','role','admin','status','photo','color'];
+    return ks.map(function(k){ var on=!!f[k]; return '<span style="display:inline-block;padding:2px 8px;margin:2px;border-radius:10px;font:600 11px system-ui,Segoe UI,sans-serif;background:'+(on?'rgba(52,199,89,.15)':'var(--surface2)')+';color:'+(on?'#34C759':'var(--soft)')+'">'+esc(k)+(on?' ✓':' —')+'</span>'; }).join(''); }
+  function presInner(){
+    var s=__presState;
+    var statusTxt = !s ? 'Nunca testado' : (s.errorCode ? ('Erro: '+s.errorCode) : (s.validated ? 'Autenticado' : 'Não autenticado'));
+    var idOk = s ? (s.validated?'Sim':'Não') : '—';
+    var h=presRow('Serviço',(s&&s.service)||'idseven-presence-canary')
+      +'<div class="divline"></div>'+presRow('Status',statusTxt)
+      +'<div class="divline"></div>'+presRow('Identidade validada',idOk)
+      +'<div class="divline"></div>'+presRow('WebSocket',(s&&s.wsEnabled)?'Ativo':'Desligado (stage 1)');
+    if(s){
+      h+='<div class="divline"></div>'+presRow('Latência',(s.durationMs!=null?(s.durationMs+' ms'):'—'))
+       +'<div class="divline"></div>'+presRow('HTTP',String(s.httpStatus||'—'))
+       +'<div class="divline"></div>'+presRow('Última prova',presWhen(s.testedAt))
+       +'<div class="divline"></div><div class="settrow" style="cursor:default;align-items:flex-start">'+presIcb('info')+'<div class="sm"><div class="sl">Campos da identidade</div><div class="ss" style="margin-top:4px">'+presChips(s.requiredFieldsPresent)+'</div></div></div>';
+    }
+    h+='<div class="divline"></div><div class="settrow" style="cursor:default"><div class="icb">'+(typeof svg==='function'?svg('gear'):'')+'</div><div class="sm" style="flex:1"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-presprobe="1" style="'+(__presBusy?'opacity:.5;pointer-events:none':'background:var(--accent);color:#fff;border-color:transparent')+'">'+(__presBusy?'Testando…':'Testar autenticação de presença')+'</button></div><div class="ss" style="margin-top:8px">Prova a sessão real no Worker canário (só /auth). Sem WebSocket, sem presença on-line, sem tela Equipe.</div></div></div>';
+    return h;
+  }
+  window.presenceConfigSectionHtml=function(){
+    try{ var ver=(window.desktopAPI&&window.desktopAPI.version)||''; if(!/-/.test(String(ver))) return ''; }catch(_){ return ''; }
+    return '<div style="height:18px"></div><div class="lbl">Presença — teste de autenticação (canário)</div><div class="card" id="pres-root">'+presInner()+'</div>';
+  };
+  function presRefresh(){ try{ var r=document.getElementById('pres-root'); if(r) r.innerHTML=presInner(); }catch(_){} }
+  document.addEventListener('click',function(ev){
+    try{
+      var b=(ev.target&&ev.target.closest)?ev.target.closest('[data-presprobe]'):null;
+      if(!b) return;
+      var api=(window.desktopAPI&&window.desktopAPI.presence)?window.desktopAPI.presence:null;
+      if(!api||typeof api.authProbe!=='function'){ if(typeof flashToast==='function')flashToast('Sonda de presença indisponível',2500); return; }
+      if(__presBusy) return;
+      __presBusy=true; presRefresh();
+      api.authProbe().then(function(r){ __presState=r||null; __presBusy=false; presRefresh();
+        if(typeof flashToast==='function'){ flashToast((r&&r.validated)?'Autenticação de presença validada ✓':('Falha: '+((r&&r.errorCode)||'desconhecida')),3000); } })
+        .catch(function(){ __presBusy=false; presRefresh(); if(typeof flashToast==='function')flashToast('Erro ao testar autenticação de presença',2800); });
+    }catch(_){ __presBusy=false; }
+  });
+})();
+/* PRESENCE:END */
 </script>
 </body>
 </html>

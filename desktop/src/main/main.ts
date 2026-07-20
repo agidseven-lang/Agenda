@@ -21,6 +21,9 @@ import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio can�
 // UPDATER:BEGIN (F3.4.1A — atualizador nativo, processo main)
 import { createUpdaterService } from "./updaterService";
 // UPDATER:END
+// PRESENCE:BEGIN (F3.4.2A — sonda MÍNIMA de /auth do Worker canário; SEM WS/heartbeat/DO/presença)
+import { createPresenceProbe } from "./presenceAuthProbe";
+// PRESENCE:END
 
 let mainWin: BrowserWindow | null = null;
 let stopNotifier: (() => void) | null = null;
@@ -31,6 +34,9 @@ let quitting = false;
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
 const trayOpts = { isAutoStart, setAutoStart, quit: realQuit };
+// PRESENCE:BEGIN (F3.4.2A — instância da sonda de /auth; criada no ready com userData real)
+let presenceProbe: ReturnType<typeof createPresenceProbe> | null = null;
+// PRESENCE:END
 // UPDATER:BEGIN (F3.4.1A — instância do atualizador + teardown seguro para quitAndInstall)
 let updater: ReturnType<typeof createUpdaterService> | null = null;
 function updaterTeardownForInstall() {
@@ -432,6 +438,13 @@ app.whenReady().then(() => {
       // UPDATER:BEGIN (F3.4.1A — política de verificação item 2: após restauração da sessão)
       if (updater) updater.checkAuto("session-restore");
       // UPDATER:END
+      // PRESENCE:BEGIN (F3.4.2A — 1 sonda SILENCIOSA pós-login/restauração; diagnóstico do /auth, SEM token no log)
+      if (presenceProbe) {
+        presenceProbe.probe()
+          .then((r) => { try { diag("presence.login.probe", { validated: r.validated, httpStatus: r.httpStatus, durationMs: r.durationMs, wsEnabled: r.wsEnabled, errorCode: r.errorCode }); } catch { /* */ } })
+          .catch(() => { /* diagnóstico best-effort; nunca afeta o login */ });
+      }
+      // PRESENCE:END
     }
   });
   ipcMain.on("session-logout", () => {
@@ -448,6 +461,41 @@ app.whenReady().then(() => {
     getWindow: () => mainWin,
     onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
     beforeInstall: () => updaterTeardownForInstall(),
+    // F3.4.2A (Escopo A) — NOTIFICAÇÃO IMEDIATA de atualização, PRODUTOR ÚNICO: o updater
+    // avisa, o main monta o payload e roteia pelo MESMO HUB (deliverNotification) de todas as
+    // notificações — toast in-app quando a janela está visível, nativa/premium quando na bandeja.
+    // O renderer NÃO emite mais toast próprio de update (updMaybeToast neutralizado). dedupKey
+    // canônico impede repetição da MESMA versão. Sem download/instalação automáticos.
+    onNotify: (kind, st) => {
+      try {
+        const installed = String(st.installedVersion || (function () { try { return app.getVersion(); } catch { return ""; } })());
+        const avail = String(st.availableVersion || "");
+        const channel = String(st.channel || "latest");
+        if (kind === "available") {
+          deliverNotification({
+            eventId: `desktop_update_available:${installed}:${avail}:${channel}`,
+            eventType: "desktop_update_available",
+            title: "NOVA ATUALIZAÇÃO DISPONÍVEL",
+            body: `Agenda ID Seven Desktop ${avail} está disponível.`,
+            severity: "info", sound: false,
+            action: { type: "deep", deep: "config/updates" },
+            dedupKey: `desktop_update_available:${installed}:${avail}:${channel}`,
+            source: "updater",
+          });
+        } else if (kind === "downloaded") {
+          deliverNotification({
+            eventId: `desktop_update_downloaded:${avail}:${channel}`,
+            eventType: "desktop_update_downloaded",
+            title: "ATUALIZAÇÃO PRONTA",
+            body: `A versão ${avail} foi baixada e está pronta para instalação.`,
+            severity: "success", sound: false,
+            action: { type: "deep", deep: "config/updates" },
+            dedupKey: `desktop_update_downloaded:${avail}:${channel}`,
+            source: "updater",
+          });
+        }
+      } catch { /* notificação nunca pode quebrar o updater */ }
+    },
   });
   updater.start();
   ipcMain.handle("updater-get-state", () => (updater ? updater.getState() : null));
@@ -458,6 +506,16 @@ app.whenReady().then(() => {
   // Política de verificação (item 1): após app.ready. (Respeita intervalo de 6h + guarda de in-flight.)
   updater.checkAuto("app-ready");
   // UPDATER:END
+  // PRESENCE:BEGIN (F3.4.2A — sonda de autenticação de presença: instância + IPC restrito, sanitizado)
+  presenceProbe = createPresenceProbe({
+    userDataDir: app.getPath("userData"),
+    onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } }, // logger sanitizado (NUNCA recebe token)
+  });
+  // Retorna SOMENTE o resultado SANITIZADO (booleans/status/duração). NUNCA token/ticket/headers/UID/e-mail.
+  ipcMain.handle("presence-auth-probe", async () => (presenceProbe
+    ? presenceProbe.probe()
+    : { validated: false, httpStatus: 0, durationMs: 0, requiredFieldsPresent: { id: false, name: false, role: false, admin: false, status: false, photo: false, color: false }, testedAt: Date.now(), errorCode: "no_probe", service: "idseven-presence-canary", wsEnabled: false }));
+  // PRESENCE:END
 
   // F3.3.10-DIAG — HEARTBEAT do MAIN: prova que o processo principal (e o notifier) seguem VIVOS
   // com a janela minimizada/oculta/bandeja. Se após uma atribuição em background não houver

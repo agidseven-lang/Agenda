@@ -79,6 +79,11 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     onStateChanged: (cb: (state: any) => void) => { ipcRenderer.on("updater-state", (_e, s: any) => cb(s)); },
   },
   // UPDATER:END
+  // PRESENCE:BEGIN (F3.4.2A — sonda de /auth do Worker canário; retorna SÓ o resultado SANITIZADO, nunca token/URL/headers)
+  presence: {
+    authProbe: (): Promise<any> => ipcRenderer.invoke("presence-auth-probe"),
+  },
+  // PRESENCE:END
   isDesktop: true,
   // F3.3.70D3R10I — versao REAL do app (app.getVersion() via IPC sincrono; nunca mais string manual)
   version: (() => { try { return String(ipcRenderer.sendSync("app-version") || "dev"); } catch { return "dev"; } })(),
