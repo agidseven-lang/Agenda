@@ -8622,9 +8622,10 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   }catch(_){}
 })();
 /* UPDATER:END */
-/* PRESENCE:BEGIN (F3.4.2A — seção CANÁRIO "Presença — teste de autenticação": sonda de /auth do Worker
-   canário. Só aparece em builds prerelease (versão com '-'). NÃO ativa WebSocket, heartbeat, presença
-   on-line/off-line, nem a tela Equipe. Nunca exibe token/ticket/UID/e-mail — só booleans/status/duração. */
+/* PRESENCE:BEGIN (F3.4.2A — seção CANÁRIO "Presença — teste de autenticação") */
+/* Sonda de /auth do Worker canário. Só aparece em builds prerelease (versão com '-'). NÃO ativa
+   WebSocket/heartbeat/presença on-line-off-line, nem a tela Equipe. Nunca exibe credenciais nem
+   identificadores sensíveis — só booleans/status/duração. */
 (function(){
   if(typeof window==='undefined') return;
   var __presState=null, __presBusy=false;
