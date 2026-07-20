@@ -133,6 +133,25 @@ jobs:
           '
           echo "GATE prova-de-versao + app.asar OK."
 
+      - name: Gate FLAGS do updater no app.asar (allowPrerelease=true ANTES de allowDowngrade=false)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          US="$RUNNER_TEMP/asarx/dist/main/updaterService.js"
+          test -f "$US" || { echo "::error:: updaterService.js ausente no app.asar extraido"; exit 1; }
+          # Ancorado no prefixo autoUpdater. -> casa APENAS o código (electron_updater_1.autoUpdater.<flag>), nunca comentários/prosa.
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*true' "$US" || { echo "::error:: allowPrerelease != true no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowDowngrade != false no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.autoDownload[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: autoDownload != false no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.autoInstallOnAppQuit[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: autoInstallOnAppQuit != false no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.forceDevUpdateConfig[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: forceDevUpdateConfig != false no app.asar"; exit 1; }
+          LP=$(grep -nE 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*true' "$US" | head -1 | cut -d: -f1)
+          LD=$(grep -nE 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" | head -1 | cut -d: -f1)
+          { [ -n "$LP" ] && [ -n "$LD" ] && [ "$LP" -lt "$LD" ]; } || { echo "::error:: ordem incorreta: allowPrerelease deve vir ANTES de allowDowngrade (LP=$LP LD=$LD)"; exit 1; }
+          echo "===== flags no updaterService.js EMPACOTADO ====="
+          grep -nE 'allow(Prerelease|Downgrade)|autoDownload|autoInstallOnAppQuit|forceDevUpdateConfig' "$US" | head -20
+          echo "GATE flags no app.asar OK: allowPrerelease=true (linha $LP, ANTES) + allowDowngrade=false (linha $LD) + autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false."
+
       - name: Empacotar bundle (instalador + metadata + relatorios + hashes)
         working-directory: ${{ env.APP_DIR }}
         run: |
@@ -144,12 +163,12 @@ jobs:
           cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"
           cp dist-installer/latest.yml "$OUT/"
           cp "$BM" "$OUT/"
-          cp dist-installer/win-unpacked/resources/app-update.yml "$OUT/app-update.yml"
+          # app-update.yml permanece SOMENTE dentro do pacote (win-unpacked/resources/app.asar sibling) — NAO e asset publico (mandato item 6).
           EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo "")
           BM_NAME=$(basename "$BM")
           EXE_SHA=$(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')
           MSI_SHA=$([ -n "$MSI" ] && sha256sum "$OUT/$MSI_NAME" | awk '{print $1}' || echo "")
-          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" app-update.yml > SHA256SUMS )
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" > SHA256SUMS )
           {
             echo "productName : Agenda ID Seven Desktop"
             echo "versionName : $APP_VERSION"
@@ -158,7 +177,7 @@ jobs:
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
             [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $MSI_SHA"
-            echo "metadata    : latest.yml + $BM_NAME + app-update.yml (MESMO build)"
+            echo "metadata    : latest.yml + $BM_NAME (MESMO build); app-update.yml SOMENTE dentro do pacote"
             echo "commit      : $GITHUB_SHA"
             echo "ref         : ${{ github.event.inputs.ref }}"
             echo "baseline    : produção 1.0.177 @ $BASE_SHA (invariância region-scoped verificada)"
@@ -171,7 +190,7 @@ jobs:
             echo "----- Arquivos no package -----"; ls -lh "$OUT"
             echo ""; echo "----- VERSAO-DESKTOP -----"; cat "$OUT/VERSAO-DESKTOP.txt"
             echo ""; echo "----- latest.yml -----"; cat "$OUT/latest.yml"
-            echo ""; echo "----- app-update.yml -----"; cat "$OUT/app-update.yml"
+            echo ""; echo "----- app-update.yml (dentro do pacote) -----"; cat dist-installer/win-unpacked/resources/app-update.yml
           } > "$OUT/RELATORIO-DESKTOP.txt"
           echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
 
@@ -194,7 +213,6 @@ jobs:
           path: |
             dist-pkg/latest.yml
             dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
-            dist-pkg/app-update.yml
             dist-pkg/SHA256SUMS
             dist-pkg/VERSAO-DESKTOP.txt
             dist-pkg/RELATORIO-DESKTOP.txt
