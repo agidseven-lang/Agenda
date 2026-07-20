@@ -1,0 +1,210 @@
+# =====================================================================
+# [manual] F3.4.1A — Desktop Updater Build (canário 1.0.178-canary.1)
+# ---------------------------------------------------------------------
+# Builda o Desktop COM o atualizador nativo (electron-updater + NSIS) a
+# partir do `ref` informado e GERA, do MESMO build, a metadata de update:
+#   latest.yml + <exe>.blockmap + app-update.yml
+# `--publish never`: o CI NUNCA publica (o release gated é o único
+# publicador). Gates fail-closed: testes do updater; invariância
+# region-scoped (fonte vs produção 1.0.177 @2963927); tray-icon; metadata
+# obrigatória e coerente + SEM segredo; renderer EMPACOTADO byte-idêntico
+# à 1.0.177 fora das regiões UPDATER.
+# NÃO publica release; NÃO toca Worker/Firebase/Firestore/Rules/Cloudflare.
+# Execução SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] F3.4.1A Desktop Updater Build (canary)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit a buildar (ex.: desktop/f341a-native-auto-updater-canary)"
+        required: true
+        default: "desktop/f341a-native-auto-updater-canary"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: "desktop"
+      BASE_SHA: "2963927232e02caa3a80dcdc58b94f19d61d11f3" # produção 1.0.177 (F3.3.77B)
+    steps:
+      - name: Checkout (ref escolhido; history completo p/ baseline)
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Derivar versao (package.json e a fonte unica)
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-$APP_VERSION" >> "$GITHUB_ENV"
+          echo "versao=$APP_VERSION"
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: npm install
+        working-directory: ${{ env.APP_DIR }}
+        run: npm install --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + updaterService)
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run build
+
+      - name: Testes do updater (máquina de estados; sem identidades)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f341a-updater-state-machine.test.mjs
+
+      - name: Gate invariância region-scoped (fonte vs produção 1.0.177)
+        working-directory: ${{ env.APP_DIR }}
+        env:
+          QA_BASELINE_SHA: ${{ env.BASE_SHA }}
+        run: node scripts/f341a-region-invariance.test.mjs
+
+      - name: electron-builder (NSIS + MSI + metadata do MESMO build)
+        working-directory: ${{ env.APP_DIR }}
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          if [ -f "dist-installer/win-unpacked/resources/icon.png" ]; then
+            echo "resources/icon.png OK (tray tera icone)"
+          else
+            echo "::error:: resources/icon.png AUSENTE no pacote"; exit 1
+          fi
+
+      - name: Gate metadata de update (latest.yml + blockmap + app-update.yml do MESMO build)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          LY="dist-installer/latest.yml"
+          test -f "$LY" || { echo "::error:: latest.yml NAO gerado (publish provider ausente?)"; ls -la dist-installer || true; exit 1; }
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap 2>/dev/null | head -1)
+          test -n "$BM" || { echo "::error:: <exe>.blockmap NAO gerado"; exit 1; }
+          AU="dist-installer/win-unpacked/resources/app-update.yml"
+          test -f "$AU" || { echo "::error:: app-update.yml NAO empacotado"; exit 1; }
+          echo "===== latest.yml ====="; cat "$LY"
+          echo "===== app-update.yml ====="; cat "$AU"
+          EXE_NAME=$(basename "$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)")
+          grep -q "version: $APP_VERSION" "$LY" || { echo "::error:: latest.yml version != $APP_VERSION"; exit 1; }
+          grep -q "sha512:" "$LY" || { echo "::error:: latest.yml sem sha512"; exit 1; }
+          grep -qF "$EXE_NAME" "$LY" || { echo "::error:: latest.yml nao referencia o EXE $EXE_NAME"; exit 1; }
+          grep -q "provider: github" "$AU" || { echo "::error:: app-update.yml provider != github"; exit 1; }
+          grep -q "owner: agidseven-lang" "$AU" || { echo "::error:: app-update.yml owner errado"; exit 1; }
+          grep -q "repo: Agenda" "$AU" || { echo "::error:: app-update.yml repo errado"; exit 1; }
+          if grep -qiE '(token|secret|password|gh_token|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml contem possivel segredo"; exit 1; fi
+          echo "GATE metadata OK: latest.yml + blockmap + app-update.yml coerentes e sem segredo (mesmo build)."
+
+      - name: Gate prova-de-versao + renderer EMPACOTADO byte-identico a 1.0.177
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"
+          test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"
+          npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          EXIDX="$EXDIR/src/renderer/index.html"
+          test -f "$EXIDX" || { echo "::error:: renderer nao encontrado no asar"; exit 1; }
+          PAT='1\.0\.14[6-9]|Desktop 1\.0\.[0-9]+|Vers..?o 1\.0\.[0-9]+'
+          if grep -rlE "$PAT" "$EXDIR/src/renderer" 2>/dev/null | grep -q .; then echo "::error:: versao hardcoded/stale no renderer empacotado"; grep -rnE "$PAT" "$EXIDX" | head; exit 1; fi
+          test -f "$EXDIR/dist/main/updaterService.js" || { echo "::error:: updaterService.js ausente no asar"; exit 1; }
+          grep -q "createUpdaterService" "$EXDIR/dist/main/main.js" || { echo "::error:: wiring do updater ausente no main.js empacotado"; exit 1; }
+          BASEIDX="$RUNNER_TEMP/base-index.html"
+          git show ${BASE_SHA}:desktop/src/renderer/index.html > "$BASEIDX"
+          EXIDX="$EXIDX" BASEIDX="$BASEIDX" node -e '
+            const fs=require("fs");
+            const cur=fs.readFileSync(process.env.EXIDX,"utf8");
+            const base=fs.readFileSync(process.env.BASEIDX,"utf8");
+            const strip=s=>{const o=[];let sk=false;for(const l of s.split("\n")){if(!sk&&/UPDATER:BEGIN/.test(l)){sk=true;continue;}if(sk){if(/UPDATER:END/.test(l))sk=false;continue;}o.push(l);}return o.join("\n");};
+            if(strip(cur)!==base){console.error("renderer empacotado (sem UPDATER) != producao 1.0.177");process.exit(1);}
+            console.log("renderer EMPACOTADO: negocio byte-identico a 1.0.177 (so regioes UPDATER diferem).");
+          '
+          echo "GATE prova-de-versao + app.asar OK."
+
+      - name: Empacotar bundle (instalador + metadata + relatorios + hashes)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"
+          cp dist-installer/latest.yml "$OUT/"
+          cp "$BM" "$OUT/"
+          cp dist-installer/win-unpacked/resources/app-update.yml "$OUT/app-update.yml"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo "")
+          BM_NAME=$(basename "$BM")
+          EXE_SHA=$(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')
+          MSI_SHA=$([ -n "$MSI" ] && sha256sum "$OUT/$MSI_NAME" | awk '{print $1}' || echo "")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" app-update.yml > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "channel     : canary (prerelease) — allowPrerelease derivado da versao"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $EXE_SHA"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $MSI_SHA"
+            echo "metadata    : latest.yml + $BM_NAME + app-update.yml (MESMO build)"
+            echo "commit      : $GITHUB_SHA"
+            echo "ref         : ${{ github.event.inputs.ref }}"
+            echo "baseline    : produção 1.0.177 @ $BASE_SHA (invariância region-scoped verificada)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          {
+            echo "===== RELATORIO DESKTOP (F3.4.1A canário) ====="
+            echo "Gerado (UTC) : $(date -u)"
+            echo "Ref / commit : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
+            echo ""
+            echo "----- Arquivos no package -----"; ls -lh "$OUT"
+            echo ""; echo "----- VERSAO-DESKTOP -----"; cat "$OUT/VERSAO-DESKTOP.txt"
+            echo ""; echo "----- latest.yml -----"; cat "$OUT/latest.yml"
+            echo ""; echo "----- app-update.yml -----"; cat "$OUT/app-update.yml"
+          } > "$OUT/RELATORIO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload installer (artifact)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload update-metadata (latest.yml + blockmap + app-update.yml + SHA256SUMS)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/app-update.yml
+            dist-pkg/SHA256SUMS
+            dist-pkg/VERSAO-DESKTOP.txt
+            dist-pkg/RELATORIO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload bundle (tudo)
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-bundle
+          path: dist-pkg/
+          if-no-files-found: error
+          retention-days: 30
