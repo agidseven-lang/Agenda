@@ -31,9 +31,14 @@ const BASE_SHA = process.env.QA_BASELINE_SHA || '2963927'; // produção 1.0.177
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; console.log('  PASS — ' + n); } else { fail++; console.error('  FAIL — ' + n); } };
-const baseline = (rel) => execSync(`git show ${BASE_SHA}:desktop/${rel}`, { cwd: ROOT, maxBuffer: 96 * 1024 * 1024 }).toString('utf8');
+// Normaliza EOL: no runner Windows o checkout aplica autocrlf (working tree CRLF) enquanto
+// `git show <sha>` retorna o blob LF. É artefato de checkout, NÃO mudança de conteúdo — e ambos
+// os builds (1.0.177 e canário) rodam no MESMO windows-latest com a MESMA conversão, então os
+// arquivos EMPACOTADOS ficam byte-idênticos. Aqui comparamos o CONTEÚDO, normalizado a LF.
+const norm = (s) => String(s).replace(/\r\n/g, '\n');
+const baseline = (rel) => norm(execSync(`git show ${BASE_SHA}:desktop/${rel}`, { cwd: ROOT, maxBuffer: 96 * 1024 * 1024 }).toString('utf8'));
 const baselineMissing = (rel) => { try { execSync(`git show ${BASE_SHA}:desktop/${rel}`, { cwd: ROOT, stdio: ['ignore', 'ignore', 'ignore'] }); return false; } catch { return true; } };
-const current = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const current = (rel) => norm(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
 
 // Remove blocos UPDATER:BEGIN … UPDATER:END (linhas inteiras, inclusive as sentinelas).
 function stripUpdater(src) {
