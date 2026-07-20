@@ -1,0 +1,140 @@
+# =====================================================================
+# [manual] idseven-presence-canary — DEPLOY STAGE 2 (DO + WebSocket) via GitHub Actions
+# ---------------------------------------------------------------------
+# Implanta o Worker isolado idseven-presence-canary no STAGE 2: Durable Object
+# PresenceHubCanary (SQLite, migration new_sqlite_classes) + binding PRESENCE_HUB
+# + WebSocket Hibernation LIGADO (PRESENCE_WS_ENABLED=true). BROADCAST DESLIGADO
+# (PRESENCE_BROADCAST_ENABLED=false) — mantem estado + baseline, sem transicoes.
+# PINADO ao commit 6209918. Usa a config presence-service/wrangler.stage2.toml.
+# Secrets do repo (owner): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, PRESENCE_TICKET_SECRET.
+# O valor do secret NUNCA e impresso. NAO toca Worker J6 (idseven-push) / Cloud Run /
+# Firestore / Rules / producao Desktop 1.0.178. Execucao SOMENTE manual.
+# =====================================================================
+name: "[manual] Presence Canary Deploy — STAGE 2 (DO + WebSocket)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite DEPLOY-PRESENCE-CANARY-STAGE2 para autorizar"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PINNED_SHA: "6209918028fac73ace8e9d60ada9d509bef3c832"
+    steps:
+      - name: "Gate — confirmacao literal"
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DEPLOY-PRESENCE-CANARY-STAGE2" ]; then
+            echo "::error::confirmacao invalida — nada foi feito"; exit 1
+          fi
+
+      - name: "Gate — secrets do repo presentes (sem imprimir valores)"
+        env:
+          T: ${{ secrets.PRESENCE_TICKET_SECRET }}
+        run: |
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::falta CLOUDFLARE_API_TOKEN"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::falta CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          [ -n "$T" ] || { echo "::error::falta PRESENCE_TICKET_SECRET"; exit 1; }
+          echo "OK: 3 secrets presentes (valores não exibidos)"
+
+      - name: "Checkout PINADO ao 6209918 (fonte autorizada)"
+        uses: actions/checkout@v5
+        with:
+          ref: 6209918028fac73ace8e9d60ada9d509bef3c832
+
+      - name: "Guard — HEAD == commit pinado"
+        run: |
+          H="$(git rev-parse HEAD)"
+          echo "HEAD=$H (esperado $PINNED_SHA)"
+          [ "$H" = "$PINNED_SHA" ] || { echo "::error::checkout divergiu do commit pinado"; exit 1; }
+
+      - name: "Guard — Stage 2 (DO+WS presentes) + isolamento do J6"
+        working-directory: presence-service
+        run: |
+          set -e
+          TOML=wrangler.stage2.toml
+          grep -qE '^main *= *"src/index\.ts"' "$TOML" || { echo "::error::stage2 nao usa src/index.ts"; exit 1; }
+          # Stage 2 EXIGE DO + binding + migration (oposto do stage 1).
+          grep -vE '^\s*#' "$TOML" | grep -qE 'class_name *= *"PresenceHubCanary"' || { echo "::error::binding PresenceHubCanary ausente"; exit 1; }
+          grep -vE '^\s*#' "$TOML" | grep -qE 'name *= *"PRESENCE_HUB"' || { echo "::error::binding PRESENCE_HUB ausente"; exit 1; }
+          grep -vE '^\s*#' "$TOML" | grep -qE 'new_sqlite_classes *= *\[ *"PresenceHubCanary" *\]' || { echo "::error::migration new_sqlite_classes ausente"; exit 1; }
+          grep -q 'PRESENCE_WS_ENABLED = "true"' "$TOML" || { echo "::error::WS != true (stage 2 exige WS ligado)"; exit 1; }
+          grep -q 'PRESENCE_BROADCAST_ENABLED = "false"' "$TOML" || { echo "::error::BROADCAST != false (broadcast so no stage 2B)"; exit 1; }
+          grep -q 'PRESENCE_AUTH_ENABLED = "true"' "$TOML" || { echo "::error::AUTH != true"; exit 1; }
+          grep -q 'name = "idseven-presence-canary"' "$TOML" || { echo "::error::name != idseven-presence-canary"; exit 1; }
+          # so linhas NAO-comentario (o comentario de isolamento cita 'idseven-push' de proposito)
+          grep -vE '^\s*#' "$TOML" | grep -q 'idseven-push' && { echo "::error::referencia o Worker J6"; exit 1; } || true
+          echo "OK: stage-2 DO+WS presentes; broadcast off; J6 nao referenciado"
+
+      - name: "Setup Node"
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: "Instalar deps (wrangler)"
+        working-directory: presence-service
+        run: npm install --no-audit --no-fund
+
+      - name: "Testes de proteção (ticket 9/9 + presença 23/23)"
+        working-directory: presence-service
+        run: npm test
+
+      - name: "Typecheck (tsc --noEmit)"
+        working-directory: presence-service
+        run: |
+          npm install --no-save --no-audit --no-fund typescript@5 @cloudflare/workers-types
+          npx tsc --noEmit
+
+      - name: "Deploy — wrangler deploy -c wrangler.stage2.toml (DO+WS) + captura da URL"
+        working-directory: presence-service
+        run: |
+          set -e
+          npx wrangler deploy -c wrangler.stage2.toml 2>&1 | tee deploy.log
+          URL="$(grep -oE 'https://idseven-presence-canary[a-zA-Z0-9.-]*\.workers\.dev' deploy.log | head -1)"
+          [ -n "$URL" ] || URL="https://idseven-presence-canary.agidseven.workers.dev"
+          echo "PRESENCE_URL=$URL" >> "$GITHUB_ENV"
+          echo "URL do Worker: $URL"
+          # Confirma que a migration do DO SQLite foi aplicada (log do wrangler).
+          grep -qiE 'PresenceHubCanary|migration|new sqlite|durable' deploy.log && echo "OK: wrangler processou o Durable Object" || echo "aviso: nao localizei mencao ao DO no log (segue verificacao por /health)"
+
+      - name: "Configurar secret PRESENCE_TICKET_SECRET no Worker (valor NUNCA impresso)"
+        working-directory: presence-service
+        env:
+          PRESENCE_TICKET_SECRET: ${{ secrets.PRESENCE_TICKET_SECRET }}
+        run: |
+          set -e
+          printf '%s' "$PRESENCE_TICKET_SECRET" | npx wrangler secret put PRESENCE_TICKET_SECRET -c wrangler.stage2.toml
+          echo "OK: PRESENCE_TICKET_SECRET configurado no Worker (valor não exibido)"
+
+      - name: "Verificacao /health (ws:true, broadcast:false) + /auth + /ws vivos (sanitizada)"
+        run: |
+          set -e
+          echo "== GET /health =="
+          H="$(curl -sS -m 20 "$PRESENCE_URL/health")"
+          echo "$H"
+          echo "$H" | grep -q '"ok":true' || { echo "::error::/health sem ok:true"; exit 1; }
+          echo "$H" | grep -q '"auth":true' || { echo "::error::flag auth != true"; exit 1; }
+          echo "$H" | grep -q '"ws":true' || { echo "::error::flag ws != true (stage 2 exige WS ligado)"; exit 1; }
+          echo "$H" | grep -q '"broadcast":false' || { echo "::error::flag broadcast != false (broadcast so no stage 2B)"; exit 1; }
+          echo "== POST /auth sem Bearer (espera 401 missing_bearer — rota viva) =="
+          A="$(curl -sS -m 20 -X POST -H 'content-type: application/json' --data '{}' "$PRESENCE_URL/auth")"
+          echo "$A" | grep -q 'missing_bearer' || { echo "::error::/auth não respondeu missing_bearer"; exit 1; }
+          echo "== GET /ws sem Upgrade (espera 426 expected_websocket — rota WS VIVA e ligada, nao 503) =="
+          WSC="$(curl -sS -m 20 -o /tmp/ws.out -w '%{http_code}' "$PRESENCE_URL/ws")"
+          echo "http=$WSC"; cat /tmp/ws.out; echo
+          [ "$WSC" = "426" ] || { echo "::error::/ws esperado 426 (WS ligado, sem upgrade); got $WSC"; exit 1; }
+          grep -q 'expected_websocket' /tmp/ws.out || { echo "::error::/ws nao respondeu expected_websocket"; exit 1; }
+          echo "== GET /ws com Upgrade + ticket invalido (espera 401 bad_ticket — validacao de ticket VIVA) =="
+          WB="$(curl -sS -m 20 -o /tmp/wsb.out -w '%{http_code}' -H 'Connection: Upgrade' -H 'Upgrade: websocket' "$PRESENCE_URL/ws?ticket=nao-e-um-ticket")"
+          echo "http=$WB"; cat /tmp/wsb.out; echo
+          grep -q 'bad_ticket' /tmp/wsb.out || { echo "::error::/ws com ticket invalido nao respondeu bad_ticket"; exit 1; }
+          echo "===== GO: idseven-presence-canary STAGE 2 no ar — DO + WebSocket LIGADOS; broadcast DESLIGADO. ====="
