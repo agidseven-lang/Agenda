@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
    F3.4.1A — GATE DE PRESERVAÇÃO REGION-SCOPED (FASE 13).
-   Prova que a candidata bootstrap canário (1.0.178-canary.1) difere da
+   Prova que a candidata bootstrap canário (1.0.178-canary.2) difere da
    PRODUÇÃO FÍSICA APROVADA 1.0.177 (commit 2963927) SOMENTE nas regiões
    `UPDATER:BEGIN … UPDATER:END` e nos arquivos whitelisted. Fora disso,
    BYTE-IDENTIDADE (HARD NO-GO em qualquer diferença fora da whitelist).
@@ -68,7 +68,7 @@ function fnSrc(SRC, name) {
   return null;
 }
 
-console.log(`F3.4.1A — region-scoped invariance (candidata 1.0.178-canary.1 vs produção ${BASE_SHA})`);
+console.log(`F3.4.1A — region-scoped invariance (candidata 1.0.178-canary.2 vs produção ${BASE_SHA})`);
 
 // ---------- 1) RENDERER: fora das regiões UPDATER, byte-idêntico ----------
 {
@@ -120,7 +120,7 @@ for (const rel of [
 {
   const b = JSON.parse(baseline('package.json'));
   const c = JSON.parse(current('package.json'));
-  ok('P version 1.0.177 → 1.0.178-canary.1', b.version === '1.0.177' && c.version === '1.0.178-canary.1');
+  ok('P version 1.0.177 → 1.0.178-canary.2', b.version === '1.0.177' && c.version === '1.0.178-canary.2');
   ok('P electron-updater ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['electron-updater']) && c.dependencies && c.dependencies['electron-updater'] === '6.8.9');
   // zera version + remove electron-updater dos deps → o resto deve ser idêntico
   const nb = { ...b, version: null }; const nc = { ...c, version: null, dependencies: { ...c.dependencies } };
@@ -144,7 +144,7 @@ for (const rel of [
   const c = current('package-lock.json');
   ok('L produção sem electron-updater no lock', !/"node_modules\/electron-updater"/.test(b));
   ok('L candidata com electron-updater no lock', /"node_modules\/electron-updater"/.test(c));
-  ok('L lock version 1.0.177 → 1.0.178-canary.1', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.178-canary\.1"/.test(c));
+  ok('L lock version 1.0.177 → 1.0.178-canary.2', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.178-canary\.2"/.test(c));
 }
 
 // ---------- 8) FUNÇÕES CRÍTICAS DE NEGÓCIO: byte-idênticas (mandato FASE 13) ----------
