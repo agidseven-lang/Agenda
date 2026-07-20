@@ -124,8 +124,9 @@ jobs:
           git show ${BASE_SHA}:desktop/src/renderer/index.html > "$BASEIDX"
           EXIDX="$EXIDX" BASEIDX="$BASEIDX" node -e '
             const fs=require("fs");
-            const cur=fs.readFileSync(process.env.EXIDX,"utf8");
-            const base=fs.readFileSync(process.env.BASEIDX,"utf8");
+            const nrm=s=>String(s).replace(/\r\n/g,"\n");
+            const cur=nrm(fs.readFileSync(process.env.EXIDX,"utf8"));
+            const base=nrm(fs.readFileSync(process.env.BASEIDX,"utf8"));
             const strip=s=>{const o=[];let sk=false;for(const l of s.split("\n")){if(!sk&&/UPDATER:BEGIN/.test(l)){sk=true;continue;}if(sk){if(/UPDATER:END/.test(l))sk=false;continue;}o.push(l);}return o.join("\n");};
             if(strip(cur)!==base){console.error("renderer empacotado (sem UPDATER) != producao 1.0.177");process.exit(1);}
             console.log("renderer EMPACOTADO: negocio byte-identico a 1.0.177 (so regioes UPDATER diferem).");
