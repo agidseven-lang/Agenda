@@ -200,10 +200,10 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "$TAG" -R "$REPO" \
-            --json tagName,targetCommitish,isPrerelease,isLatest,isDraft,assets \
-            --jq '{tag:.tagName,target:.targetCommitish,prerelease:.isPrerelease,latest:.isLatest,draft:.isDraft,assets:[.assets[].name]}'
-          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft,isLatest --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)+"|"+(.isLatest|tostring)')"
-          [ "$FLAGS" = "true|false|false" ] || { echo "::error::flags incorretas: $FLAGS (esperado true|false|false)"; exit 1; }
+            --json tagName,targetCommitish,isPrerelease,isDraft,assets \
+            --jq '{tag:.tagName,target:.targetCommitish,prerelease:.isPrerelease,draft:.isDraft,assets:[.assets[].name]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "true|false" ] || { echo "::error::flags incorretas: $FLAGS (esperado true|false)"; exit 1; }
           N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
           [ "$N" = "7" ] || { echo "::error::esperado 7 assets, encontrados $N"; exit 1; }
           for a in "$EXE_NAME" "$MSI_NAME" "$CY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
@@ -212,10 +212,12 @@ jobs:
           if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
           TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
           [ "$TGT" = "$CANARY_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
-          # A 1.0.177-production PRECISA continuar Latest (canario nunca vira latest)
-          PL="$(gh release view "$PROD_TAG" -R "$REPO" --json isLatest,isPrerelease --jq '(.isLatest|tostring)+"|"+(.isPrerelease|tostring)')"
-          echo "1.0.177-production: isLatest|isPrerelease = $PL"
-          [ "$PL" = "true|false" ] || { echo "::error::1.0.177-production deixou de ser Latest!"; exit 1; }
+          # A 1.0.177-production PRECISA continuar sendo o Latest do repo (canario NUNCA vira latest).
+          # (isLatest nao existe em `gh release view --json`; usar a API de releases/latest.)
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          echo "Latest do repo: $LATEST_TAG"
+          [ "$LATEST_TAG" = "$PROD_TAG" ] || { echo "::error::Latest do repo mudou: $LATEST_TAG (esperado $PROD_TAG)"; exit 1; }
+          [ "$LATEST_TAG" != "$TAG" ] || { echo "::error::canario virou Latest!"; exit 1; }
           echo "===== GO: PRERELEASE CANARIO PUBLICADA; 1.0.177 segue Latest ====="
 
       - name: "Smoke — re-baixar EXE + canary.yml da release e reconferir hashes"
