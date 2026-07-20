@@ -77,6 +77,16 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: node scripts/f342a-presence-client.test.mjs
 
+      - name: "Testes de ciclo de vida da presença (Stage-2A-X — fechar-no-X mantém WS/heartbeat; logout/Sair/quit encerram)"
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -eo pipefail
+          if [ -f scripts/f342a-presence-lifecycle.test.mjs ]; then
+            node scripts/f342a-presence-lifecycle.test.mjs
+          else
+            echo "ciclo de vida (Stage-2A-X) ausente neste ref — pulando (candidata anterior à correção X)"
+          fi
+
       - name: Gate invariância region-scoped (fonte vs produção 1.0.177; strip UPDATER+PRESENCE)
         working-directory: ${{ env.APP_DIR }}
         env:
