@@ -110,7 +110,10 @@ for (const rel of [
   ok('N updaterService.ts presente e substancial na candidata', svc.length > 2000 && /createUpdaterService/.test(svc));
   ok('N updaterService: autoDownload/allowDowngrade/autoInstallOnAppQuit=false', /autoDownload\s*=\s*false/.test(svc) && /allowDowngrade\s*=\s*false/.test(svc) && /autoInstallOnAppQuit\s*=\s*false/.test(svc));
   ok('N updaterService: forceDevUpdateConfig=false (sem dev-app-update)', /forceDevUpdateConfig\s*=\s*false/.test(svc));
-  ok('N updaterService: allowPrerelease=true (canário) setado ANTES de allowDowngrade=false', /allowPrerelease\s*=\s*true/.test(svc) && svc.indexOf('allowPrerelease = true') >= 0 && svc.indexOf('allowPrerelease = true') < svc.indexOf('allowDowngrade = false'));
+  ok('N updaterService: ordem allowPrerelease=true -> channel="canary" -> allowDowngrade=false', (function () {
+    const lp = svc.indexOf('allowPrerelease = true'), lc = svc.indexOf('channel = "canary"'), ld = svc.indexOf('allowDowngrade = false');
+    return lp >= 0 && lc >= 0 && ld >= 0 && lp < lc && lc < ld;
+  })());
 }
 
 // ---------- 5) package.json: só version + dependência electron-updater ----------
@@ -131,7 +134,7 @@ for (const rel of [
   const c = current('electron-builder.yml');
   ok('EB produção é prefixo exato da candidata (nada acima do publish mudou)', c.startsWith(b));
   const suffix = c.slice(b.length);
-  ok('EB sufixo adicionado contém SOMENTE o provider github público (owner/repo), sem segredo embutido', /provider:\s*github/.test(suffix) && /owner:\s*agidseven-lang/.test(suffix) && /repo:\s*Agenda/.test(suffix) && !/\b(token|secret|password|gh_token|pat)\b\s*[:=]/i.test(suffix));
+  ok('EB sufixo = provider github público (owner/repo) + channel canary, sem segredo', /provider:\s*github/.test(suffix) && /owner:\s*agidseven-lang/.test(suffix) && /repo:\s*Agenda/.test(suffix) && /channel:\s*canary/.test(suffix) && !/\b(token|secret|password|gh_token|pat)\b\s*[:=]/i.test(suffix));
   ok('EB identidade NSIS/appId/productName/artifactName intacta no prefixo', /appId:\s*br\.com\.idseven\.agenda\.desktop/.test(b) && /productName:\s*Agenda ID Seven Desktop/.test(b) && !/appId/.test(suffix) && !/productName/.test(suffix) && !/artifactName/.test(suffix));
 }
 

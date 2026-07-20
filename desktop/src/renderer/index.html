@@ -8531,7 +8531,7 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   function updSectionInner(){
     var s=__updState||{};
     var installed=s.installedVersion||((window.desktopAPI&&window.desktopAPI.version)||'—');
-    var canal=(s.channel==='prerelease')?'Canário (pré-lançamento)':'Estável';
+    var canal=(s.channel==='canary'||s.channel==='prerelease')?'Canário (pré-lançamento)':'Estável';
     var h=updRow('Versão instalada',installed)+updRow('Canal',canal)
       +'<div class="divline"></div>'+updRow('Status',updStatusPt(s.status))
       +'<div class="divline"></div>'+updRow('Última verificação',updWhen(s.lastCheckAt));

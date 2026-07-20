@@ -26,7 +26,7 @@ class FakeAuto {
   constructor() {
     this._h = {};
     this.autoDownload = null; this.autoInstallOnAppQuit = null; this.allowDowngrade = null;
-    this.allowPrerelease = null; this.fullChangelog = null; this.forceDevUpdateConfig = null; this.logger = null;
+    this.allowPrerelease = null; this.channel = null; this.fullChangelog = null; this.forceDevUpdateConfig = null; this.logger = null;
     this.checkCalls = 0; this.downloadCalls = 0; this.quitInstall = null;
   }
   on(e, h) { (this._h[e] = this._h[e] || []).push(h); return this; }
@@ -89,24 +89,25 @@ async function toAvailable(svc, auto, ver) {
   // ---- Configuração obrigatória (mandato) ----
   {
     const { svc, auto } = makeService({ version: '1.0.178-canary.1' });
-    ok('CFG allowPrerelease=true (canário; setado ANTES de allowDowngrade)', auto.allowPrerelease === true);
-    ok('CFG allowDowngrade=false (nunca rebaixa)', auto.allowDowngrade === false);
+    ok('CFG allowPrerelease=true (setado 1º)', auto.allowPrerelease === true);
+    ok('CFG channel="canary" (setado 2º, após allowPrerelease)', auto.channel === 'canary');
+    ok('CFG allowDowngrade=false (setado por último — nunca rebaixa)', auto.allowDowngrade === false);
     ok('CFG autoDownload=false', auto.autoDownload === false);
     ok('CFG autoInstallOnAppQuit=false', auto.autoInstallOnAppQuit === false);
     ok('CFG forceDevUpdateConfig=false (sem dev-app-update.yml)', auto.forceDevUpdateConfig === false);
     ok('CFG fullChangelog=false', auto.fullChangelog === false);
     ok('CFG logger sanitizado (funções info/warn/error)', auto.logger && typeof auto.logger.info === 'function');
     ok('INIT estado inicial idle', svc.getState().status === 'idle');
-    ok('INIT canal=prerelease (allowPrerelease=true)', svc.getState().channel === 'prerelease');
+    ok('INIT canal=canary (channel="canary")', svc.getState().channel === 'canary');
   }
 
-  // 11) FLAGS reais no runtime empacotado — as 5 exigidas pelo mandato (canário)
+  // 11) FLAGS reais no runtime empacotado — canal canary isolado (canário)
   {
     const { svc, auto } = makeService({ version: '1.0.178-canary.1' });
-    const flagsOk = auto.allowPrerelease === true && auto.allowDowngrade === false && auto.autoDownload === false && auto.autoInstallOnAppQuit === false && auto.forceDevUpdateConfig === false;
-    ok('11 as 5 flags reais no runtime (allowPrerelease=true; allowDowngrade/autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false)', flagsOk);
-    ok('11 estado reflete canal prerelease + allowPrerelease=true', svc.getState().channel === 'prerelease' && svc.getState().allowPrerelease === true);
-    // No bootstrap ESTÁVEL (FASE 16) a linha allowPrerelease vira false — diferença canário→estável.
+    const flagsOk = auto.allowPrerelease === true && auto.channel === 'canary' && auto.allowDowngrade === false && auto.autoDownload === false && auto.autoInstallOnAppQuit === false && auto.forceDevUpdateConfig === false;
+    ok('11 flags reais no runtime (allowPrerelease=true; channel="canary"; allowDowngrade/autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false)', flagsOk);
+    ok('11 estado reflete channel=canary + allowPrerelease=true', svc.getState().channel === 'canary' && svc.getState().allowPrerelease === true);
+    // No bootstrap ESTÁVEL (FASE 16): allowPrerelease=false + channel="latest" — nunca consulta canary.
   }
 
   // 1) idle -> checking

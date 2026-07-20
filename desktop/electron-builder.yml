@@ -50,3 +50,4 @@ publish:
   - provider: github
     owner: agidseven-lang
     repo: Agenda
+    channel: canary
