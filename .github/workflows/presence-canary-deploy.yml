@@ -1,0 +1,127 @@
+# =====================================================================
+# [manual] idseven-presence-canary — DEPLOY AUTH-ONLY (Stage 1) via GitHub Actions
+# ---------------------------------------------------------------------
+# Implanta SOMENTE o Worker isolado idseven-presence-canary com /health e /auth
+# (PRESENCE_WS_ENABLED=false, PRESENCE_BROADCAST_ENABLED=false; SEM Durable
+# Object / binding / migration / WebSocket). PINADO ao commit d32dc30. Os runners
+# do GitHub alcançam a Cloudflare; usa secrets do repositório (owner):
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, PRESENCE_TICKET_SECRET
+# O valor do secret NUNCA é impresso. NÃO toca Worker J6 / Cloud Run / Firestore /
+# Rules. Execução SOMENTE manual.
+# =====================================================================
+name: "[manual] Presence Canary Deploy — AUTH-ONLY (stage 1)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite DEPLOY-PRESENCE-CANARY para autorizar"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PINNED_SHA: "d32dc30e54eb2522309b8665419b7c5ffd8658d9"
+    steps:
+      - name: "Gate — confirmacao literal"
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DEPLOY-PRESENCE-CANARY" ]; then
+            echo "::error::confirmacao invalida — nada foi feito"; exit 1
+          fi
+
+      - name: "Gate — secrets do repo presentes (sem imprimir valores)"
+        env:
+          T: ${{ secrets.PRESENCE_TICKET_SECRET }}
+        run: |
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || { echo "::error::falta CLOUDFLARE_API_TOKEN"; exit 1; }
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || { echo "::error::falta CLOUDFLARE_ACCOUNT_ID"; exit 1; }
+          [ -n "$T" ] || { echo "::error::falta PRESENCE_TICKET_SECRET"; exit 1; }
+          echo "OK: 3 secrets presentes (valores não exibidos)"
+
+      - name: "Checkout PINADO ao d32dc30 (fonte autorizada)"
+        uses: actions/checkout@v5
+        with:
+          ref: d32dc30e54eb2522309b8665419b7c5ffd8658d9
+
+      - name: "Guard — HEAD == commit pinado"
+        run: |
+          H="$(git rev-parse HEAD)"
+          echo "HEAD=$H (esperado $PINNED_SHA)"
+          [ "$H" = "$PINNED_SHA" ] || { echo "::error::checkout divergiu do commit pinado"; exit 1; }
+
+      - name: "Guard — Stage 1 AUTH-ONLY + isolamento do J6"
+        working-directory: presence-service
+        run: |
+          set -e
+          grep -qE '^main *= *"src/auth-only\.ts"' wrangler.toml || { echo "::error::wrangler.toml não é o stage-1 (auth-only)"; exit 1; }
+          if grep -vE '^\s*#' wrangler.toml | grep -qiE 'durable_objects|\[\[migrations\]\]|new_sqlite_classes|PRESENCE_HUB'; then
+            echo "::error::config stage-1 contém DO/migration/binding (proibido)"; exit 1; fi
+          grep -q 'PRESENCE_WS_ENABLED = "false"' wrangler.toml || { echo "::error::WS não está false"; exit 1; }
+          grep -q 'PRESENCE_BROADCAST_ENABLED = "false"' wrangler.toml || { echo "::error::BROADCAST não está false"; exit 1; }
+          grep -q 'name = "idseven-presence-canary"' wrangler.toml || { echo "::error::name != idseven-presence-canary"; exit 1; }
+          grep -q 'idseven-push' wrangler.toml && { echo "::error::referencia o Worker J6"; exit 1; } || true
+          echo "OK: stage-1 auth-only; sem DO/WS; J6 não referenciado"
+
+      - name: "Setup Node"
+        uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: "Instalar deps (wrangler)"
+        working-directory: presence-service
+        run: npm install --no-audit --no-fund
+
+      - name: "Testes de proteção (ticket 9/9 + presença 23/23)"
+        working-directory: presence-service
+        run: npm test
+
+      - name: "Typecheck (tsc --noEmit)"
+        working-directory: presence-service
+        run: |
+          npm install --no-save --no-audit --no-fund typescript@5 @cloudflare/workers-types
+          npx tsc --noEmit
+
+      - name: "Deploy — wrangler deploy (auth-only) + captura da URL"
+        working-directory: presence-service
+        run: |
+          set -e
+          npx wrangler deploy 2>&1 | tee deploy.log
+          URL="$(grep -oE 'https://idseven-presence-canary[a-zA-Z0-9.-]*\.workers\.dev' deploy.log | head -1)"
+          [ -n "$URL" ] || URL="https://idseven-presence-canary.agidseven.workers.dev"
+          echo "PRESENCE_URL=$URL" >> "$GITHUB_ENV"
+          echo "URL do Worker: $URL"
+
+      - name: "Configurar secret PRESENCE_TICKET_SECRET no Worker (valor NUNCA impresso)"
+        working-directory: presence-service
+        env:
+          PRESENCE_TICKET_SECRET: ${{ secrets.PRESENCE_TICKET_SECRET }}
+        run: |
+          set -e
+          printf '%s' "$PRESENCE_TICKET_SECRET" | npx wrangler secret put PRESENCE_TICKET_SECRET
+          echo "OK: PRESENCE_TICKET_SECRET configurado no Worker (valor não exibido)"
+
+      - name: "Verificacao /health + /ws off + /auth up (sanitizada)"
+        run: |
+          set -e
+          echo "== GET /health =="
+          H="$(curl -sS -m 20 "$PRESENCE_URL/health")"
+          echo "$H"
+          echo "$H" | grep -q '"ok":true' || { echo "::error::/health sem ok:true"; exit 1; }
+          echo "$H" | grep -q '"stage":1' || { echo "::error::/health stage != 1"; exit 1; }
+          echo "$H" | grep -q '"auth":true' || { echo "::error::flag auth != true"; exit 1; }
+          echo "$H" | grep -q '"ws":false' || { echo "::error::flag ws != false"; exit 1; }
+          echo "$H" | grep -q '"broadcast":false' || { echo "::error::flag broadcast != false"; exit 1; }
+          echo "== GET /ws (espera 503 ws_disabled — WebSocket desligado) =="
+          WS="$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "$PRESENCE_URL/ws")"
+          echo "http=$WS"; [ "$WS" = "503" ] || [ "$WS" = "426" ] || { echo "::error::/ws deveria estar indisponível"; exit 1; }
+          echo "== POST /auth sem Bearer (espera 401 missing_bearer — rota viva, valida token) =="
+          A="$(curl -sS -m 20 -X POST -H 'content-type: application/json' --data '{}' "$PRESENCE_URL/auth")"
+          echo "$A" | grep -q 'missing_bearer' || { echo "::error::/auth não respondeu missing_bearer"; exit 1; }
+          echo "===== GO: idseven-presence-canary AUTH-ONLY no ar (/health + /auth); WS/DO/broadcast desligados. ====="
