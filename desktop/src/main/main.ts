@@ -38,6 +38,26 @@ const trayOpts = { isAutoStart, setAutoStart, quit: realQuit };
 // PRESENCE:BEGIN (F3.4.2A — instância da sonda de /auth + cliente WS; criadas no ready com userData real)
 let presenceProbe: ReturnType<typeof createPresenceProbe> | null = null;
 let presenceClient: ReturnType<typeof createPresenceClient> | null = null;
+// F3.4.2A Stage-2A-X — KEEP-ALIVE da presença: enquanto a INTENÇÃO for "conectado" (login→logout/Sair/
+// quit/update), seguramos powerSaveBlocker('prevent-app-suspension') para o processo (WebSocket+heartbeat
+// no main) NÃO ser suspenso pelo SO quando a janela é fechada no X (bandeja). Assim o Durable Object, que
+// remove o usuário no fechamento do socket, mantém o usuário on-line. Idempotente; require lazy (não muda
+// o import de topo). Liberado só na transição de intenção true->false (onIdle).
+let presencePsbId = -1;
+function presenceKeepAliveOn(): void {
+  try {
+    const psb = require("electron").powerSaveBlocker;
+    if (presencePsbId < 0 || !psb.isStarted(presencePsbId)) { presencePsbId = psb.start("prevent-app-suspension"); diag("presence.keepalive.on", { id: presencePsbId }); }
+  } catch { /* keep-alive é best-effort; nunca quebra a presença */ }
+}
+function presenceKeepAliveOff(): void {
+  try {
+    const psb = require("electron").powerSaveBlocker;
+    if (presencePsbId >= 0 && psb.isStarted(presencePsbId)) psb.stop(presencePsbId);
+    diag("presence.keepalive.off", { id: presencePsbId });
+  } catch { /* */ }
+  presencePsbId = -1;
+}
 // PRESENCE:END
 // UPDATER:BEGIN (F3.4.1A — instância do atualizador + teardown seguro para quitAndInstall)
 let updater: ReturnType<typeof createUpdaterService> | null = null;
@@ -281,6 +301,11 @@ function createWindow() {
   mainWin.on("restore", () => diag("window.restore"));
   mainWin.on("show", () => diag("window.show"));
   mainWin.on("hide", () => diag("window.hide(tray)"));
+  // PRESENCE:BEGIN (F3.4.2A Stage-2A-X — reabrir da bandeja reconecta a presença SE tiver caído.
+  // Idempotente: connect() é no-op se já conectado/conectando (reutiliza a MESMA conexão; sem 2ª sessão,
+  // sem nova transição 0->1). Fechar no X só ESCONDE (acima); NUNCA chama disconnect.)
+  mainWin.on("show", () => { if (presenceClient) { try { presenceClient.connect(); } catch { /* presença nunca quebra a UI */ } } });
+  // PRESENCE:END
 }
 
 function realQuit() {
@@ -546,6 +571,9 @@ app.whenReady().then(() => {
       WebSocketCtor: PresenceWS,
       onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } }, // sanitizado (NUNCA recebe token/ticket)
       onState: (s) => { try { const w = mainWin; if (w && !w.isDestroyed()) w.webContents.send("presence-realtime-state", s); } catch { /* */ } },
+      // Stage-2A-X: mantém o processo vivo na bandeja enquanto a presença deve estar conectada.
+      onActive: () => presenceKeepAliveOn(),
+      onIdle: () => presenceKeepAliveOff(),
     });
   } else {
     diag("presence.ws.unavailable", {}); // pacote ws ausente — presença WS inativa nesta build

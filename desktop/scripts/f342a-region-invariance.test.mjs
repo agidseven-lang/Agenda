@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
-   F3.4.2A (Stage-1B) — GATE DE PRESERVAÇÃO REGION-SCOPED (canário 1.0.179-canary.2).
-   Prova que a candidata CANÁRIO 1.0.179-canary.2 difere da PRODUÇÃO FÍSICA
+   F3.4.2A (Stage-1B) — GATE DE PRESERVAÇÃO REGION-SCOPED (canário 1.0.179-canary.3).
+   Prova que a candidata CANÁRIO 1.0.179-canary.3 difere da PRODUÇÃO FÍSICA
    APROVADA 1.0.177 (commit 2963927) SOMENTE nas regiões sentinela
    `UPDATER:BEGIN…UPDATER:END` + `PRESENCE:BEGIN…PRESENCE:END` e em arquivos
    whitelisted (NOVOS). Fora disso, BYTE-IDENTIDADE (HARD NO-GO).
@@ -64,7 +64,7 @@ function fnSrc(SRC, name) {
   return null;
 }
 
-console.log(`F3.4.2A — region-scoped invariance (candidata CANÁRIO 1.0.179-canary.2 vs produção ${BASE_SHA})`);
+console.log(`F3.4.2A — region-scoped invariance (candidata CANÁRIO 1.0.179-canary.3 vs produção ${BASE_SHA})`);
 
 // ---------- 1) RENDERER: fora das regiões sentinela, byte-idêntico ----------
 {
@@ -150,6 +150,8 @@ function stripComments(src) {
   ok('PC WSS /ws com ticket na URL + reconexão backoff + heartbeat', /wsEndpoint/.test(code) && /ticket/.test(code) && /scheduleReconnect/.test(code) && /heartbeat/i.test(code));
   ok('PC nenhuma chamada de log passa token/ticket', !/\blog\([^)]*\b(token|ticket)\b/i.test(code));
   ok('PC estado público sanitizado — nenhum literal token:/ticket: no código', !/\btoken\s*:/.test(code) && !/\bticket\s*:/.test(code));
+  // Stage-2A-X: intenção de conexão exposta ao main via onActive/onIdle (para o keep-alive).
+  ok('PC onActive/onIdle disparam na transição de intenção (para o keep-alive do main)', /onActive\?\:/.test(code) && /onIdle\?\:/.test(code) && /deps\.onActive/.test(code) && /deps\.onIdle/.test(code));
 }
 
 // ---------- 6) main.ts: fiação Escopo A (onNotify->HUB) + PRESENCE (probe + WS) IPC (só em regiões) ----------
@@ -160,6 +162,10 @@ function stripComments(src) {
   ok('W3 IPC presence-auth-probe + createPresenceProbe + createPresenceClient + presence-realtime-state', /ipcMain\.handle\("presence-auth-probe"/.test(m) && /createPresenceProbe\(/.test(m) && /createPresenceClient\(/.test(m) && /ipcMain\.handle\("presence-realtime-state"/.test(m));
   ok('W4 sonda pós-login diagnóstico sem token (só status/duração/campos)', /presence\.login\.probe/.test(m) && !/presence\.login\.probe[^\n]*token/i.test(m));
   ok('W4b WS liga no login (connect) e desliga no logout/quit (disconnect)', /presenceClient\.connect\(\)/.test(m) && /presenceClient\.disconnect\(\)/.test(m));
+  // Stage-2A-X: keep-alive (powerSaveBlocker) + reabrir-da-bandeja reconecta — só dentro de regiões PRESENCE.
+  ok('W6 keep-alive: powerSaveBlocker prevent-app-suspension + onActive/onIdle fiados', /powerSaveBlocker/.test(m) && /prevent-app-suspension/.test(m) && /presenceKeepAliveOn\(\)/.test(m) && /presenceKeepAliveOff\(\)/.test(m) && /onActive:\s*\(\)\s*=>\s*presenceKeepAliveOn/.test(m) && /onIdle:\s*\(\)\s*=>\s*presenceKeepAliveOff/.test(m));
+  ok('W7 reabrir-da-bandeja reconecta (show -> connect idempotente)', /mainWin\.on\("show",\s*\(\)\s*=>\s*\{\s*if \(presenceClient\)/.test(m));
+  ok('W8 keep-alive/show-connect vivem SÓ em regiões sentinela (strip remove tudo)', !/powerSaveBlocker/.test(stripSentinels(m)) && !/presenceKeepAliveOn/.test(stripSentinels(m)));
   ok('W5 fiação nova SÓ dentro de regiões sentinela (strip == 1.0.177)', stripSentinels(m) === baseline('src/main/main.ts'));
 }
 
@@ -189,7 +195,7 @@ function stripComments(src) {
 {
   const b = JSON.parse(baseline('package.json'));
   const c = JSON.parse(current('package.json'));
-  ok('P version 1.0.177 → 1.0.179-canary.2', b.version === '1.0.177' && c.version === '1.0.179-canary.2');
+  ok('P version 1.0.177 → 1.0.179-canary.3', b.version === '1.0.177' && c.version === '1.0.179-canary.3');
   ok('P electron-updater ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['electron-updater']) && c.dependencies && c.dependencies['electron-updater'] === '6.8.9');
   ok('P ws (cliente WebSocket de presença) ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['ws']) && c.dependencies && typeof c.dependencies['ws'] === 'string' && /^\^?8\./.test(c.dependencies['ws']));
   // zera version + remove electron-updater E ws dos deps → o restante deve ser idêntico à 1.0.177
@@ -217,7 +223,7 @@ function stripComments(src) {
   ok('L candidata com electron-updater no lock', /"node_modules\/electron-updater"/.test(c));
   ok('L produção sem ws no lock', !/"node_modules\/ws"/.test(b));
   ok('L candidata com ws no lock', /"node_modules\/ws"/.test(c));
-  ok('L lock version 1.0.177 → 1.0.179-canary.2', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.179-canary\.2"/.test(c));
+  ok('L lock version 1.0.177 → 1.0.179-canary.3', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.179-canary\.3"/.test(c));
 }
 
 // ---------- 12) FUNÇÕES CRÍTICAS DE NEGÓCIO: byte-idênticas (mandato) ----------

@@ -57,6 +57,12 @@ export type PresenceClientDeps = {
   now?: () => number;
   onLog?: (tag: string, data?: unknown) => void; // logger sanitizado (NUNCA recebe token)
   onState?: (state: PresenceClientState) => void; // empurra estado sanitizado ao renderer
+  // F3.4.2A Stage-2A-X — transições de INTENÇÃO de conexão (não de socket). onActive dispara quando
+  // wantConnected passa false->true (login/reabrir); onIdle quando true->false (logout/Sair/quit/update).
+  // O main usa isto para segurar/soltar o powerSaveBlocker('prevent-app-suspension'), mantendo o
+  // processo (WebSocket+heartbeat) vivo na bandeja. Reconexões transitórias NÃO disparam onIdle.
+  onActive?: () => void;
+  onIdle?: () => void;
   heartbeatMs?: number;
   timeoutMs?: number;
   setTimer?: (fn: () => void, ms: number) => any; // injetável p/ teste (default setTimeout)
@@ -252,14 +258,21 @@ export function createPresenceClient(deps: PresenceClientDeps) {
   }
 
   function connect(): void {
+    const was = wantConnected;
     wantConnected = true;
+    // Só na transição false->true: liga o keep-alive (o main segura o powerSaveBlocker). Idempotente:
+    // chamar connect() já conectado é no-op e NÃO refaz onActive (evita start duplo do blocker).
+    if (!was) { try { if (deps.onActive) deps.onActive(); } catch { /* keep-alive nunca quebra o cliente */ } }
     if (st.phase === "connecting" || st.phase === "connected" || st.phase === "authenticating") return; // guarda
     if (reconnectTimer) { try { clearTimer(reconnectTimer); } catch { /* */ } reconnectTimer = null; }
     attempts = 0;
     void openOnce();
   }
   function disconnect(): void {
+    const was = wantConnected;
     wantConnected = false;
+    // Só na transição true->false: solta o keep-alive (o main libera o powerSaveBlocker).
+    if (was) { try { if (deps.onIdle) deps.onIdle(); } catch { /* */ } }
     generation++; // invalida callbacks pendentes
     if (reconnectTimer) { try { clearTimer(reconnectTimer); } catch { /* */ } reconnectTimer = null; }
     stopHeartbeat();
