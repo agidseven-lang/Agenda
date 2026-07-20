@@ -21,8 +21,9 @@ import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio can�
 // UPDATER:BEGIN (F3.4.1A — atualizador nativo, processo main)
 import { createUpdaterService } from "./updaterService";
 // UPDATER:END
-// PRESENCE:BEGIN (F3.4.2A — sonda MÍNIMA de /auth do Worker canário; SEM WS/heartbeat/DO/presença)
+// PRESENCE:BEGIN (F3.4.2A — sonda MÍNIMA de /auth + cliente WebSocket de presença do Worker canário)
 import { createPresenceProbe } from "./presenceAuthProbe";
+import { createPresenceClient } from "./presenceClient";
 // PRESENCE:END
 
 let mainWin: BrowserWindow | null = null;
@@ -34,8 +35,9 @@ let quitting = false;
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
 const trayOpts = { isAutoStart, setAutoStart, quit: realQuit };
-// PRESENCE:BEGIN (F3.4.2A — instância da sonda de /auth; criada no ready com userData real)
+// PRESENCE:BEGIN (F3.4.2A — instância da sonda de /auth + cliente WS; criadas no ready com userData real)
 let presenceProbe: ReturnType<typeof createPresenceProbe> | null = null;
+let presenceClient: ReturnType<typeof createPresenceClient> | null = null;
 // PRESENCE:END
 // UPDATER:BEGIN (F3.4.1A — instância do atualizador + teardown seguro para quitAndInstall)
 let updater: ReturnType<typeof createUpdaterService> | null = null;
@@ -46,6 +48,7 @@ function updaterTeardownForInstall() {
   try { if (stopReminder) stopReminder(); } catch { /* */ }
   try { if (clockSync) { clockSync.stop(); clockSync = null; } } catch { /* */ }
   try { stopBgNotify(); } catch { /* */ }
+  try { if (presenceClient) presenceClient.disconnect(); } catch { /* Stage-2A: encerra WS de presença antes de instalar */ }
   try { destroyTray(); } catch { /* */ }
   diag("updater.teardownForInstall");
 }
@@ -286,6 +289,9 @@ function realQuit() {
   if (stopReminder) stopReminder();
   if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
   try { stopBgNotify(); } catch { /* */ }
+  // PRESENCE:BEGIN (F3.4.2A Stage-2A — "Sair" (tray) encerra a conexão WebSocket de presença)
+  try { if (presenceClient) presenceClient.disconnect(); } catch { /* */ }
+  // PRESENCE:END
   // F3.3.73I6C11 — "Sair do aplicativo" remove o icone da bandeja (evita tray-fantasma no Windows).
   try { destroyTray(); } catch { /* */ }
   diag("app.realQuit→destroyTray"); // F3.3.10-DIAG
@@ -310,6 +316,13 @@ app.whenReady().then(() => {
     powerMonitor.on("unlock-screen", () => { if (updater) updater.maybeCheckOnResume(); });
   } catch { /* */ }
   // UPDATER:END
+  // PRESENCE:BEGIN (F3.4.2A Stage-2A — ao retomar/desbloquear, reconecta o WebSocket de presença se caiu;
+  // connect() é idempotente: no-op se já conectado. Sem tempestade — backoff próprio do cliente.)
+  try {
+    powerMonitor.on("resume", () => { if (presenceClient) { try { presenceClient.connect(); } catch { /* */ } } });
+    powerMonitor.on("unlock-screen", () => { if (presenceClient) { try { presenceClient.connect(); } catch { /* */ } } });
+  } catch { /* */ }
+  // PRESENCE:END
 
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
@@ -444,6 +457,9 @@ app.whenReady().then(() => {
           .then((r) => { try { diag("presence.login.probe", { validated: r.validated, httpStatus: r.httpStatus, durationMs: r.durationMs, wsEnabled: r.wsEnabled, errorCode: r.errorCode }); } catch { /* */ } })
           .catch(() => { /* diagnóstico best-effort; nunca afeta o login */ });
       }
+      // F3.4.2A Stage-2A — liga o cliente WebSocket de presença (token→/auth→ticket→WSS /ws→heartbeat).
+      // Idempotente: se já conectado/conectando, no-op. NÃO afeta login/notificações/relógio.
+      if (presenceClient) { try { presenceClient.connect(); } catch { /* presença nunca quebra o login */ } }
       // PRESENCE:END
     }
   });
@@ -452,6 +468,9 @@ app.whenReady().then(() => {
     if (stopNotifier) { stopNotifier(); stopNotifier = null; }
     if (stopReminder) { stopReminder(); stopReminder = null; }
     if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
+    // PRESENCE:BEGIN (F3.4.2A Stage-2A — logout encerra a conexão WebSocket de presença)
+    if (presenceClient) { try { presenceClient.disconnect(); } catch { /* */ } }
+    // PRESENCE:END
   });
   // F3.3.77A-R4B — o renderer consulta/força a sincronização do relógio (sem expor token/URL/headers).
   ipcMain.handle("clock-get-state", () => (clockSync ? clockSync.getState() : null));
@@ -515,6 +534,26 @@ app.whenReady().then(() => {
   ipcMain.handle("presence-auth-probe", async () => (presenceProbe
     ? presenceProbe.probe()
     : { validated: false, httpStatus: 0, durationMs: 0, requiredFieldsPresent: { id: false, name: false, role: false, admin: false, status: false, photo: false, color: false }, testedAt: Date.now(), errorCode: "no_probe", service: "idseven-presence-canary", wsEnabled: false }));
+  // F3.4.2A Stage-2A — CLIENTE WEBSOCKET de presença (tempo real). O ctor do WebSocket vem do pacote
+  // `ws` (Node/main); se indisponível, a presença WS fica inativa (sem storm). Token/ticket FICAM no
+  // main; o renderer recebe SOMENTE o estado sanitizado via 'presence-realtime-state'. Broadcast do
+  // Worker está DESLIGADO (Stage 2A): recebemos baseline + estado, NUNCA notificações entrou/saiu.
+  let PresenceWS: any = null;
+  try { PresenceWS = require("ws"); } catch { PresenceWS = null; }
+  if (PresenceWS) {
+    presenceClient = createPresenceClient({
+      userDataDir: app.getPath("userData"),
+      WebSocketCtor: PresenceWS,
+      onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } }, // sanitizado (NUNCA recebe token/ticket)
+      onState: (s) => { try { const w = mainWin; if (w && !w.isDestroyed()) w.webContents.send("presence-realtime-state", s); } catch { /* */ } },
+    });
+  } else {
+    diag("presence.ws.unavailable", {}); // pacote ws ausente — presença WS inativa nesta build
+  }
+  const presenceIdleState = { phase: "idle", wsConnected: false, authValidated: false, service: "idseven-presence-canary", lastConnectAt: null, lastMessageAt: null, heartbeatActive: false, baselineReceived: false, onlineCount: 0, wsEnabled: false, errorCode: null };
+  ipcMain.handle("presence-realtime-state", () => (presenceClient ? presenceClient.getState() : presenceIdleState));
+  ipcMain.handle("presence-realtime-connect", () => { try { if (presenceClient) presenceClient.connect(); } catch { /* */ } return { ok: !!presenceClient }; });
+  ipcMain.handle("presence-realtime-disconnect", () => { try { if (presenceClient) presenceClient.disconnect(); } catch { /* */ } return { ok: !!presenceClient }; });
   // PRESENCE:END
 
   // F3.3.10-DIAG — HEARTBEAT do MAIN: prova que o processo principal (e o notifier) seguem VIVOS

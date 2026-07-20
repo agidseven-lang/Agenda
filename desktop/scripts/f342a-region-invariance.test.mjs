@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
-   F3.4.2A (Stage-1B) — GATE DE PRESERVAÇÃO REGION-SCOPED (canário 1.0.179-canary.1).
-   Prova que a candidata CANÁRIO 1.0.179-canary.1 difere da PRODUÇÃO FÍSICA
+   F3.4.2A (Stage-1B) — GATE DE PRESERVAÇÃO REGION-SCOPED (canário 1.0.179-canary.2).
+   Prova que a candidata CANÁRIO 1.0.179-canary.2 difere da PRODUÇÃO FÍSICA
    APROVADA 1.0.177 (commit 2963927) SOMENTE nas regiões sentinela
    `UPDATER:BEGIN…UPDATER:END` + `PRESENCE:BEGIN…PRESENCE:END` e em arquivos
    whitelisted (NOVOS). Fora disso, BYTE-IDENTIDADE (HARD NO-GO).
@@ -9,11 +9,12 @@
    Whitelist de mudança permitida (mandato):
      - NOVO desktop/src/main/updaterService.ts (atualizador nativo — canário)
      - NOVO desktop/src/main/presenceAuthProbe.ts (sonda /auth mínima — canário)
+     - NOVO desktop/src/main/presenceClient.ts (cliente WebSocket de presença — canário)
      - fiação IPC no main (main.ts, só em UPDATER:* e PRESENCE:*)
      - API mínima no preload (preload.ts, só em UPDATER:* e PRESENCE:*)
      - seções Atualizações + Presença no renderer (index.html, só em UPDATER:* e PRESENCE:*)
      - deep-link config/updates em notifRoute (só dentro de UPDATER:*)
-     - dependência electron-updater (package.json / package-lock.json)
+     - dependências electron-updater + ws (package.json / package-lock.json)
      - publish config (electron-builder.yml, só o bloco publish anexado; channel canary)
      - versão + banner canário + UI canário (versão em package*.json; JS nas regiões sentinela)
      - workflows/testes exclusivos do updater/presence (fora do app.asar)
@@ -63,7 +64,7 @@ function fnSrc(SRC, name) {
   return null;
 }
 
-console.log(`F3.4.2A — region-scoped invariance (candidata CANÁRIO 1.0.179-canary.1 vs produção ${BASE_SHA})`);
+console.log(`F3.4.2A — region-scoped invariance (candidata CANÁRIO 1.0.179-canary.2 vs produção ${BASE_SHA})`);
 
 // ---------- 1) RENDERER: fora das regiões sentinela, byte-idêntico ----------
 {
@@ -135,21 +136,40 @@ function stripComments(src) {
   ok('PA timeout via AbortController', /AbortController/.test(code) && /timeout/.test(code));
 }
 
-// ---------- 6) main.ts: fiação Escopo A (onNotify->HUB) + PRESENCE IPC (só em regiões) ----------
+// ---------- 5b) presenceClient.ts: NOVO + contrato de segurança (cliente WebSocket, Stage-2A) ----------
+// Cross-check ESTÁTICO leve (a prova AUTORITATIVA é f342a-presence-client.test.mjs, runtime).
+{
+  ok('PC presenceClient.ts AUSENTE na produção 1.0.177', baselineMissing('src/main/presenceClient.ts'));
+  const p = current('src/main/presenceClient.ts');
+  const code = stripComments(p);
+  ok('PC presente e substancial (createPresenceClient)', p.length > 2000 && /createPresenceClient/.test(code));
+  ok('PC lê o token do MESMO session.json (0600); token só no main', /session\.json/.test(code) && /readToken/.test(code));
+  ok('PC /auth usa Authorization: Bearer <token>', /Bearer\s*["']\s*\+\s*token/.test(code));
+  ok('PC body do /auth = { deviceId } (sem userId/token)', /body:\s*JSON\.stringify\(\{ deviceId \}\)/.test(code) && !/userId/.test(code));
+  ok('PC deviceId = randomUUID persistido; sem hostname/MAC/IP/serial', /randomUUID\(\)/.test(code) && /presence-device\.json/.test(code) && !/hostname|networkInterfaces|macAddress|\bserial\b/i.test(code));
+  ok('PC WSS /ws com ticket na URL + reconexão backoff + heartbeat', /wsEndpoint/.test(code) && /ticket/.test(code) && /scheduleReconnect/.test(code) && /heartbeat/i.test(code));
+  ok('PC nenhuma chamada de log passa token/ticket', !/\blog\([^)]*\b(token|ticket)\b/i.test(code));
+  ok('PC estado público sanitizado — nenhum literal token:/ticket: no código', !/\btoken\s*:/.test(code) && !/\bticket\s*:/.test(code));
+}
+
+// ---------- 6) main.ts: fiação Escopo A (onNotify->HUB) + PRESENCE (probe + WS) IPC (só em regiões) ----------
 {
   const m = current('src/main/main.ts');
   ok('W1 onNotify monta NotifPayload e chama deliverNotification (produtor único no HUB)', /onNotify:\s*\(kind, st\)/.test(m) && /desktop_update_available/.test(m) && /deliverNotification\(/.test(m));
   ok('W2 dedupKey canônico de update (available/downloaded)', /dedupKey:\s*`desktop_update_available:/.test(m) && /dedupKey:\s*`desktop_update_downloaded:/.test(m));
-  ok('W3 IPC presence-auth-probe registrado + createPresenceProbe instanciado', /ipcMain\.handle\("presence-auth-probe"/.test(m) && /createPresenceProbe\(/.test(m));
+  ok('W3 IPC presence-auth-probe + createPresenceProbe + createPresenceClient + presence-realtime-state', /ipcMain\.handle\("presence-auth-probe"/.test(m) && /createPresenceProbe\(/.test(m) && /createPresenceClient\(/.test(m) && /ipcMain\.handle\("presence-realtime-state"/.test(m));
   ok('W4 sonda pós-login diagnóstico sem token (só status/duração/campos)', /presence\.login\.probe/.test(m) && !/presence\.login\.probe[^\n]*token/i.test(m));
+  ok('W4b WS liga no login (connect) e desliga no logout/quit (disconnect)', /presenceClient\.connect\(\)/.test(m) && /presenceClient\.disconnect\(\)/.test(m));
   ok('W5 fiação nova SÓ dentro de regiões sentinela (strip == 1.0.177)', stripSentinels(m) === baseline('src/main/main.ts'));
 }
 
-// ---------- 7) preload.ts: expõe SÓ a sonda sanitizada (nunca token) ----------
+// ---------- 7) preload.ts: expõe SÓ estado/resultado sanitizado (nunca token/ticket) ----------
 {
   const pl = current('src/preload/preload.ts');
-  ok('PL preload expõe presence.authProbe (sanitizado, via IPC)', /presence:\s*\{[\s\S]*authProbe[\s\S]*ipcRenderer\.invoke\("presence-auth-probe"\)/.test(pl));
-  ok('PL preload NÃO expõe token/ticket/deviceId ao renderer', !/authProbe[^\n]*token/i.test(pl) && !/ticket/i.test(pl.split('PRESENCE:BEGIN')[1] ? pl.split('PRESENCE:BEGIN')[1].split('PRESENCE:END')[0] : ''));
+  ok('PL preload expõe presence.authProbe + realtimeState (sanitizado, via IPC)', /presence:\s*\{[\s\S]*authProbe[\s\S]*ipcRenderer\.invoke\("presence-auth-probe"\)/.test(pl) && /presence-realtime-state/.test(pl));
+  const segRaw = pl.split('PRESENCE:BEGIN')[1] ? pl.split('PRESENCE:BEGIN')[1].split('PRESENCE:END')[0] : '';
+  const seg = stripComments(segRaw); // comentários citam "nunca token/ticket" de propósito — checamos o CÓDIGO
+  ok('PL CÓDIGO da região PRESENCE do preload NÃO manipula token/ticket/Bearer', !/token/i.test(seg) && !/ticket/i.test(seg) && !/bearer/i.test(seg));
 }
 
 // ---------- 8) renderer: produtor único (updMaybeToast neutralizado) + deep-link config/updates ----------
@@ -165,15 +185,18 @@ function stripComments(src) {
   ok('T3 notifRoute (negócio) byte-idêntico após strip (deep-link só em UPDATER:*)', a !== null && b !== null && a === b);
 }
 
-// ---------- 9) package.json: só version + dependência electron-updater ----------
+// ---------- 9) package.json: só version + deps electron-updater + ws (WebSocket client) ----------
 {
   const b = JSON.parse(baseline('package.json'));
   const c = JSON.parse(current('package.json'));
-  ok('P version 1.0.177 → 1.0.179-canary.1', b.version === '1.0.177' && c.version === '1.0.179-canary.1');
+  ok('P version 1.0.177 → 1.0.179-canary.2', b.version === '1.0.177' && c.version === '1.0.179-canary.2');
   ok('P electron-updater ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['electron-updater']) && c.dependencies && c.dependencies['electron-updater'] === '6.8.9');
+  ok('P ws (cliente WebSocket de presença) ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['ws']) && c.dependencies && typeof c.dependencies['ws'] === 'string' && /^\^?8\./.test(c.dependencies['ws']));
+  // zera version + remove electron-updater E ws dos deps → o restante deve ser idêntico à 1.0.177
   const nb = { ...b, version: null }; const nc = { ...c, version: null, dependencies: { ...c.dependencies } };
   delete nc.dependencies['electron-updater'];
-  ok('P package.json idêntico exceto version + electron-updater', JSON.stringify(nb) === JSON.stringify(nc));
+  delete nc.dependencies['ws'];
+  ok('P package.json idêntico exceto version + electron-updater + ws', JSON.stringify(nb) === JSON.stringify(nc));
 }
 
 // ---------- 10) electron-builder.yml: produção é PREFIXO; sufixo = publish canary sem segredo ----------
@@ -186,13 +209,15 @@ function stripComments(src) {
   ok('EB identidade NSIS/appId/productName/artifactName intacta no prefixo', /appId:\s*br\.com\.idseven\.agenda\.desktop/.test(b) && /productName:\s*Agenda ID Seven Desktop/.test(b) && !/appId/.test(suffix) && !/productName/.test(suffix) && !/artifactName/.test(suffix));
 }
 
-// ---------- 11) package-lock.json: version bump + electron-updater no fecho ----------
+// ---------- 11) package-lock.json: version bump + electron-updater + ws no fecho ----------
 {
   const b = baseline('package-lock.json');
   const c = current('package-lock.json');
   ok('L produção sem electron-updater no lock', !/"node_modules\/electron-updater"/.test(b));
   ok('L candidata com electron-updater no lock', /"node_modules\/electron-updater"/.test(c));
-  ok('L lock version 1.0.177 → 1.0.179-canary.1', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.179-canary\.1"/.test(c));
+  ok('L produção sem ws no lock', !/"node_modules\/ws"/.test(b));
+  ok('L candidata com ws no lock', /"node_modules\/ws"/.test(c));
+  ok('L lock version 1.0.177 → 1.0.179-canary.2', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.179-canary\.2"/.test(c));
 }
 
 // ---------- 12) FUNÇÕES CRÍTICAS DE NEGÓCIO: byte-idênticas (mandato) ----------

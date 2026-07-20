@@ -79,9 +79,14 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     onStateChanged: (cb: (state: any) => void) => { ipcRenderer.on("updater-state", (_e, s: any) => cb(s)); },
   },
   // UPDATER:END
-  // PRESENCE:BEGIN (F3.4.2A — sonda de /auth do Worker canário; retorna SÓ o resultado SANITIZADO, nunca token/URL/headers)
+  // PRESENCE:BEGIN (F3.4.2A — sonda de /auth + cliente WebSocket de presença; SÓ resultado/estado SANITIZADO)
   presence: {
     authProbe: (): Promise<any> => ipcRenderer.invoke("presence-auth-probe"),
+    // Stage-2A — estado do WebSocket de presença (SANITIZADO: fases/flags/contagem/erros; nunca token/ticket/deviceId).
+    realtimeState: (): Promise<any> => ipcRenderer.invoke("presence-realtime-state"),
+    onRealtimeState: (cb: (state: any) => void) => { ipcRenderer.on("presence-realtime-state", (_e, s: any) => cb(s)); },
+    realtimeConnect: (): Promise<any> => ipcRenderer.invoke("presence-realtime-connect"),
+    realtimeDisconnect: (): Promise<any> => ipcRenderer.invoke("presence-realtime-disconnect"),
   },
   // PRESENCE:END
   isDesktop: true,

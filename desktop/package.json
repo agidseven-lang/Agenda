@@ -1,6 +1,6 @@
 {
   "name": "agenda-id-seven-desktop",
-  "version": "1.0.179-canary.1",
+  "version": "1.0.179-canary.2",
   "description": "Agenda ID Seven Desktop — Golden Master integrado: link estável + Card Premium só com resolved/type/HIT comprovados",
   "main": "dist/main/main.js",
   "private": true,
@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "electron-updater": "6.8.9",
-    "firebase": "10.12.2"
+    "firebase": "10.12.2",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "electron": "31.3.1",
