@@ -66,7 +66,8 @@ jobs:
           grep -q 'PRESENCE_WS_ENABLED = "false"' wrangler.toml || { echo "::error::WS não está false"; exit 1; }
           grep -q 'PRESENCE_BROADCAST_ENABLED = "false"' wrangler.toml || { echo "::error::BROADCAST não está false"; exit 1; }
           grep -q 'name = "idseven-presence-canary"' wrangler.toml || { echo "::error::name != idseven-presence-canary"; exit 1; }
-          grep -q 'idseven-push' wrangler.toml && { echo "::error::referencia o Worker J6"; exit 1; } || true
+          # só linhas NÃO-comentário (o comentário de isolamento cita 'idseven-push' de propósito)
+          grep -vE '^\s*#' wrangler.toml | grep -q 'idseven-push' && { echo "::error::referencia o Worker J6"; exit 1; } || true
           echo "OK: stage-1 auth-only; sem DO/WS; J6 não referenciado"
 
       - name: "Setup Node"
