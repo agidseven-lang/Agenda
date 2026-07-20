@@ -97,7 +97,7 @@ jobs:
       - name: "Deploy — wrangler deploy -c wrangler.stage2.toml (DO+WS) + captura da URL"
         working-directory: presence-service
         run: |
-          set -e
+          set -eo pipefail   # pipefail: uma falha do wrangler NAO pode ser mascarada pelo `tee`
           npx wrangler deploy -c wrangler.stage2.toml 2>&1 | tee deploy.log
           URL="$(grep -oE 'https://idseven-presence-canary[a-zA-Z0-9.-]*\.workers\.dev' deploy.log | head -1)"
           [ -n "$URL" ] || URL="https://idseven-presence-canary.agidseven.workers.dev"
@@ -118,12 +118,17 @@ jobs:
       - name: "Verificacao /health (ws:true, broadcast:false) + /auth + /ws vivos (sanitizada)"
         run: |
           set -e
-          echo "== GET /health =="
-          H="$(curl -sS -m 20 "$PRESENCE_URL/health")"
-          echo "$H"
+          echo "== GET /health (poll ate ws:true; propagacao da Cloudflare pode levar alguns segundos) =="
+          H=""
+          for i in $(seq 1 15); do
+            H="$(curl -sS -m 20 "$PRESENCE_URL/health" || true)"
+            echo "tentativa $i: $H"
+            echo "$H" | grep -q '"ws":true' && { echo "propagado (ws:true) na tentativa $i"; break; }
+            sleep 4
+          done
           echo "$H" | grep -q '"ok":true' || { echo "::error::/health sem ok:true"; exit 1; }
           echo "$H" | grep -q '"auth":true' || { echo "::error::flag auth != true"; exit 1; }
-          echo "$H" | grep -q '"ws":true' || { echo "::error::flag ws != true (stage 2 exige WS ligado)"; exit 1; }
+          echo "$H" | grep -q '"ws":true' || { echo "::error::flag ws != true apos propagacao (stage 2 exige WS ligado)"; exit 1; }
           echo "$H" | grep -q '"broadcast":false' || { echo "::error::flag broadcast != false (broadcast so no stage 2B)"; exit 1; }
           echo "== POST /auth sem Bearer (espera 401 missing_bearer — rota viva) =="
           A="$(curl -sS -m 20 -X POST -H 'content-type: application/json' --data '{}' "$PRESENCE_URL/auth")"
