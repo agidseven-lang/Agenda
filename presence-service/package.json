@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "node test/ticket.test.mjs && node test/presence.test.mjs",
+    "typecheck": "tsc --noEmit",
     "deploy": "wrangler deploy",
+    "deploy:stage2": "wrangler deploy -c wrangler.stage2.toml",
     "secret:ticket": "wrangler secret put PRESENCE_TICKET_SECRET"
   },
   "devDependencies": {

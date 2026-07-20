@@ -1,41 +1,30 @@
 # ============================================================================
-# idseven-presence-canary — Worker CANÁRIO de presença (TOTALMENTE ISOLADO)
+# idseven-presence-canary — STAGE 1 (AUTH-ONLY) — config do PRIMEIRO DEPLOY.
 # ----------------------------------------------------------------------------
-# NÃO tem relação com o Worker J6 (idseven-push): outro name, outro DO, outros
-# secrets, outra rota, outro deploy, outro rollback. NÃO importa nem edita
-# cloudflare-worker.js. Sem Firestore, sem Firebase Auth, sem Rules.
+# Correção de sequência (owner): o primeiro deploy NÃO cria Durable Object,
+# NÃO tem binding PRESENCE_HUB, NÃO tem migration, NÃO tem WebSocket. Só prova
+# o contrato Desktop -> /auth -> getUserSelf. O DO fica em src/presenceHub.ts +
+# wrangler.stage2.toml (no branch), mas NÃO é implantado/vinculado ainda.
 #
-# SECRET (NUNCA neste arquivo — só via `wrangler secret put`):
-#   - PRESENCE_TICKET_SECRET   (assina o ticket efêmero de presença; próprio,
-#                               separado de qualquer secret do J6)
+# TOTALMENTE ISOLADO do Worker J6 (idseven-push): outro name/secret/deploy.
+# SECRET (só via `wrangler secret put`, NUNCA aqui/código/chat):
+#   - PRESENCE_TICKET_SECRET
 #
-# DEPLOY: cd presence-service && wrangler deploy   (exige conta Cloudflare do owner)
+# DEPLOY (owner): cd presence-service && wrangler deploy   (usa este arquivo)
+# STAGE 2 (depois, autorização literal): wrangler deploy -c wrangler.stage2.toml
 # ============================================================================
 
 name = "idseven-presence-canary"
-main = "src/index.ts"
+main = "src/auth-only.ts"
 compatibility_date = "2026-05-24"
 workers_dev = true
 
-# Durable Object com armazenamento SQLite (correção 1 da auditoria).
-[[durable_objects.bindings]]
-name = "PRESENCE_HUB"
-class_name = "PresenceHubCanary"
+# SEM durable_objects, SEM [[migrations]] — stage 1 é AUTH-ONLY (correção de sequência).
 
-# SQLite-backed DO (elegível ao plano Free quando disponível na conta).
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["PresenceHubCanary"]
-
-# Feature flags server-side (strings). PRIMEIRO DEPLOY: só /health e /auth.
 [vars]
 PRESENCE_AUTH_ENABLED = "true"
 PRESENCE_WS_ENABLED = "false"
 PRESENCE_BROADCAST_ENABLED = "false"
-# Identidade validada pelo getUserSelf EXISTENTE (não alteramos o Cloud Run).
 GETUSERSELF_URL = "https://getuserself-de36pi7vza-uc.a.run.app"
-# TTL/heartbeat CANÁRIO (calibráveis por env; valores iniciais autorizados p/ canário).
-PRESENCE_TTL_MS = "90000"
-PRESENCE_HEARTBEAT_MS = "30000"
 PRESENCE_TICKET_TTL_MS = "60000"
-SERVICE_VERSION = "canary-0"
+SERVICE_VERSION = "canary-stage1"

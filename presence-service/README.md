@@ -27,16 +27,19 @@ npm test      # node test/ticket.test.mjs && node test/presence.test.mjs
 ```
 Cobrem: ticket (assina/verifica/expira/adultera/aud/reuso) e agregação (0↔1, multi-device, heartbeat sem notificar, alarm idempotente, crash de 1-de-2, nextExpiry, baseline sanitizado, seed/reconexão sem entrada falsa).
 
-## Deploy (ação do OWNER — exige conta Cloudflare)
+## Deploy em 2 estágios (ação do OWNER — exige conta Cloudflare)
 > STOP GATE: criar secrets e fazer deploy são passos do owner. Este repositório entrega o código; o deploy usa a conta Cloudflare do owner.
 
-1. **Auditar plano/limites** e confirmar **Durable Objects SQLite** disponível na conta (não contratar/alterar plano em silêncio).
-2. Definir o secret próprio: `wrangler secret put PRESENCE_TICKET_SECRET` (aleatório forte, ≥32 bytes).
-3. **Primeiro deploy** (flags AUTH=true, WS=false, BROADCAST=false): `cd presence-service && wrangler deploy`.
+**STAGE 1 — AUTH-ONLY (só `/health` e `/auth`; SEM Durable Object/WS).** Config: `wrangler.toml` (default). Entry: `src/auth-only.ts`. NÃO cria DO/binding/migration.
+1. **Auditar plano/Workers/workers.dev** na conta (não contratar/alterar plano em silêncio).
+2. Secret próprio: `wrangler secret put PRESENCE_TICKET_SECRET` (aleatório forte, ≥32 bytes; separado do J6).
+3. **Primeiro deploy**: `cd presence-service && wrangler deploy` (usa `wrangler.toml` = stage 1).
 4. Conferir `GET https://idseven-presence-canary.<subdominio>.workers.dev/health`.
-5. **PARAR** (STOP #1) e fazer a **prova real do `getUserSelf`** com a conta real do owner pelo Desktop (FASE 3) antes de ligar `PRESENCE_WS_ENABLED`.
+5. **PARAR** e fazer a **prova real do `/auth`** com a conta real do owner pelo Desktop 1.0.179-canary.1.
 
-Alternativa: workflow `.github/workflows/presence-canary-deploy.yml` (requer `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` como secrets do repositório — ação do owner).
+**STAGE 2 — DURABLE OBJECT + WebSocket (só após autorização literal).** Config: `wrangler.stage2.toml` (traz DO `PresenceHubCanary` + migration SQLite + WS). Deploy: `npm run deploy:stage2`. NÃO fazer antes do STAGE-2 autorizado.
+
+Alternativa de deploy: workflow `.github/workflows/presence-canary-deploy.yml` (stage 1; requer `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` como secrets do repositório — ação do owner).
 
 ## Segurança
 Ver `THREAT-MODEL.md`. Identidade só do `getUserSelf`; `userId` do body ignorado; eventos sanitizados (sem token/IP/hostname/deviceId/localização).
