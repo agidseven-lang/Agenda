@@ -1,0 +1,41 @@
+# ============================================================================
+# idseven-presence-canary — Worker CANÁRIO de presença (TOTALMENTE ISOLADO)
+# ----------------------------------------------------------------------------
+# NÃO tem relação com o Worker J6 (idseven-push): outro name, outro DO, outros
+# secrets, outra rota, outro deploy, outro rollback. NÃO importa nem edita
+# cloudflare-worker.js. Sem Firestore, sem Firebase Auth, sem Rules.
+#
+# SECRET (NUNCA neste arquivo — só via `wrangler secret put`):
+#   - PRESENCE_TICKET_SECRET   (assina o ticket efêmero de presença; próprio,
+#                               separado de qualquer secret do J6)
+#
+# DEPLOY: cd presence-service && wrangler deploy   (exige conta Cloudflare do owner)
+# ============================================================================
+
+name = "idseven-presence-canary"
+main = "src/index.ts"
+compatibility_date = "2026-05-24"
+workers_dev = true
+
+# Durable Object com armazenamento SQLite (correção 1 da auditoria).
+[[durable_objects.bindings]]
+name = "PRESENCE_HUB"
+class_name = "PresenceHubCanary"
+
+# SQLite-backed DO (elegível ao plano Free quando disponível na conta).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PresenceHubCanary"]
+
+# Feature flags server-side (strings). PRIMEIRO DEPLOY: só /health e /auth.
+[vars]
+PRESENCE_AUTH_ENABLED = "true"
+PRESENCE_WS_ENABLED = "false"
+PRESENCE_BROADCAST_ENABLED = "false"
+# Identidade validada pelo getUserSelf EXISTENTE (não alteramos o Cloud Run).
+GETUSERSELF_URL = "https://getuserself-de36pi7vza-uc.a.run.app"
+# TTL/heartbeat CANÁRIO (calibráveis por env; valores iniciais autorizados p/ canário).
+PRESENCE_TTL_MS = "90000"
+PRESENCE_HEARTBEAT_MS = "30000"
+PRESENCE_TICKET_TTL_MS = "60000"
+SERVICE_VERSION = "canary-0"

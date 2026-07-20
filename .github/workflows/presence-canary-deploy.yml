@@ -1,0 +1,80 @@
+# =====================================================================
+# [manual] idseven-presence-canary — deploy do serviço de presença CANÁRIO
+# ---------------------------------------------------------------------
+# TOTALMENTE ISOLADO do Worker J6: só toca presence-service/. Requer secrets
+# do repositório (ação do OWNER — STOP gate "criar secrets"):
+#   - CLOUDFLARE_API_TOKEN   (token com permissão de Workers na conta do owner)
+#   - CLOUDFLARE_ACCOUNT_ID  (id da conta)
+# O secret do ticket (PRESENCE_TICKET_SECRET) é definido À PARTE, uma vez, via
+#   wrangler secret put PRESENCE_TICKET_SECRET
+# Primeiro deploy: wrangler.toml traz AUTH=true / WS=false / BROADCAST=false
+# -> só /health e /auth. NÃO ativa WebSocket. NÃO altera J6/Cloud Run/Firestore.
+# Execução SOMENTE manual.
+# =====================================================================
+name: "[manual] Presence Canary Deploy (idseven-presence-canary)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite DEPLOY-PRESENCE-CANARY para autorizar"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: presence-service
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: "Gate — confirmacao literal"
+        working-directory: .
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DEPLOY-PRESENCE-CANARY" ]; then
+            echo "::error::confirmacao invalida — nada foi feito"; exit 1
+          fi
+
+      - name: "Gate — secrets Cloudflare presentes (owner)"
+        working-directory: .
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::defina CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID (secrets do repo) antes do deploy"; exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: "Instalar deps (wrangler)"
+        run: npm install --no-audit --no-fund
+
+      - name: "Testes de proteção (ticket + presença)"
+        run: npm test
+
+      - name: "Guard — NÃO tocar o Worker J6"
+        working-directory: .
+        run: |
+          # Este workflow só pode mexer em presence-service/. Falha se algo referenciar o J6.
+          if grep -RniE 'idseven-push|cloudflare-worker\.js' presence-service/wrangler.toml; then
+            echo "::error::presence-service referencia o J6 — isolamento violado"; exit 1
+          fi
+          echo "OK: isolamento do J6 preservado"
+
+      - name: "wrangler deploy (idseven-presence-canary)"
+        run: npx wrangler deploy
+
+      - name: "Smoke /health"
+        run: |
+          set -e
+          SUB="$(npx wrangler whoami >/dev/null 2>&1; echo idseven-presence-canary)"
+          echo "Verifique manualmente: https://idseven-presence-canary.<subdominio>.workers.dev/health"
+          echo "Deploy concluido. Flags esperadas: auth=true ws=false broadcast=false (só /health e /auth)."
