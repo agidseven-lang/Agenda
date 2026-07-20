@@ -119,9 +119,9 @@ jobs:
           echo "$H" | grep -q '"auth":true' || { echo "::error::flag auth != true"; exit 1; }
           echo "$H" | grep -q '"ws":false' || { echo "::error::flag ws != false"; exit 1; }
           echo "$H" | grep -q '"broadcast":false' || { echo "::error::flag broadcast != false"; exit 1; }
-          echo "== GET /ws (espera 503 ws_disabled — WebSocket desligado) =="
+          echo "== GET /ws (stage-1 auth-only: a rota /ws NEM EXISTE -> 404; ou 503/426 se desligada) =="
           WS="$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "$PRESENCE_URL/ws")"
-          echo "http=$WS"; [ "$WS" = "503" ] || [ "$WS" = "426" ] || { echo "::error::/ws deveria estar indisponível"; exit 1; }
+          echo "http=$WS"; case "$WS" in 404|503|426) echo "OK: /ws indisponível ($WS)";; *) echo "::error::/ws deveria estar indisponível (404/503/426); got $WS"; exit 1;; esac
           echo "== POST /auth sem Bearer (espera 401 missing_bearer — rota viva, valida token) =="
           A="$(curl -sS -m 20 -X POST -H 'content-type: application/json' --data '{}' "$PRESENCE_URL/auth")"
           echo "$A" | grep -q 'missing_bearer' || { echo "::error::/auth não respondeu missing_bearer"; exit 1; }
