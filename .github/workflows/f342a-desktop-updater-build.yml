@@ -191,8 +191,16 @@ jobs:
           grep -q 'presence-auth-probe' "$PL" || { echo "::error:: preload nao expoe a sonda presence-auth-probe"; exit 1; }
           # (4) o corpo enviado ao /auth é SÓ { deviceId } (sem userId/token) — prova no bundle do main
           grep -q 'JSON.stringify({ deviceId })' "$PP" || { echo "::error:: body do /auth nao é exatamente { deviceId } no bundle"; exit 1; }
-          # (5) WS/heartbeat/DO NAO existem no cliente (Escopo D mínimo)
-          if grep -qiE 'new WebSocket|/ws\?ticket|heartbeat|PresenceHub' "$PP"; then echo "::error:: sonda contem WS/heartbeat/DO (proibido no stage-1B)"; exit 1; fi
+          # (5) WS/heartbeat-loop/DO NAO existem no CODIGO do cliente (Escopo D mínimo). Checa o CODIGO
+          # (comentarios removidos): o JSDoc do arquivo cita "WebSocket/heartbeat/Durable Object" ao
+          # documentar o que NAO faz. Heartbeat = laco periodico (setInterval); o unico setTimeout da
+          # sonda é o ABORT do timeout da requisicao (legitimo, nao é heartbeat).
+          PP="$PP" node -e '
+            const fs=require("fs");
+            const code=fs.readFileSync(process.env.PP,"utf8").replace(/\/\*[\s\S]*?\*\//g,"").replace(/(^|[^:])\/\/[^\n]*/g,"$1");
+            if(/new WebSocket|WebSocketPair|\/ws\?|PresenceHub|setInterval/i.test(code)){console.error("CODIGO da sonda contem WS/heartbeat-loop/DO (proibido no stage-1B)");process.exit(1);}
+            console.log("CODIGO da sonda: sem new WebSocket/WebSocketPair/ws-route/PresenceHub/setInterval");
+          '
           # (6) as REGIOES PRESENCE do renderer empacotado NAO referenciam token/Bearer/authorization/session.json.
           # (o renderer tem 'Bearer' PRE-EXISTENTE do teamSessionJwt/portais — 1.0.177; a presença nunca toca token.)
           IDX="$IDX" node -e '
