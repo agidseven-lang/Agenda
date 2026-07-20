@@ -27,10 +27,13 @@ class_name = "PresenceHubCanary"
 tag = "v1"
 new_sqlite_classes = ["PresenceHubCanary"]
 
-# Feature flags server-side (strings). PRIMEIRO DEPLOY: só /health e /auth.
+# Feature flags server-side (strings). STAGE 2A: DO + WebSocket LIGADOS; broadcast DESLIGADO.
+# Nesta fase o serviço aceita conexões WSS /ws, mantém o estado agregado e envia o baseline
+# ao conectar — mas NÃO emite transições entrou/saiu (broadcast=false). O broadcast só liga no
+# STAGE 2B (autorização literal F3.4.2A-STAGE-2B-ENABLE-PRESENCE-BROADCAST).
 [vars]
 PRESENCE_AUTH_ENABLED = "true"
-PRESENCE_WS_ENABLED = "false"
+PRESENCE_WS_ENABLED = "true"
 PRESENCE_BROADCAST_ENABLED = "false"
 # Identidade validada pelo getUserSelf EXISTENTE (não alteramos o Cloud Run).
 GETUSERSELF_URL = "https://getuserself-de36pi7vza-uc.a.run.app"
