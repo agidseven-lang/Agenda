@@ -1,0 +1,249 @@
+# =====================================================================
+# [manual] F3.4.2A Stage-1B — Publicacao da PRERELEASE canario Desktop 1.0.179-canary.1
+# ---------------------------------------------------------------------
+# Publica a prerelease CANARIO 1.0.179-canary.1 (Escopo A: notificacao imediata
+# de update pelo HUB; Escopo D minimo: sonda /auth presenceAuthProbe) do run
+# 29780112009. TUDO PINADO: run id, SHA do codigo canario (alvo da tag),
+# ids+digests dos artifacts, hashes SHA-256 (EXE/MSI/canary.yml/blockmap), tag e titulo.
+# O job:
+#   1) exige confirmacao literal (input);
+#   2) valida run 29780112009 = completed/success;
+#   3) confirma o head do branch canario == SHA pinado (alvo da tag);
+#   4) aborta se a tag/release v1.0.179-canary.1 ja existir;
+#   5) baixa os 2 artifacts (installer + updatemeta), confere ids+digests e
+#      os hashes byte a byte (divergiu => aborta SEM publicar);
+#   6) cria a release prerelease=true, latest=false, tag no SHA canario;
+#   7) anexa 7 assets: EXE, MSI, canary.yml, blockmap, SHA256SUMS,
+#      VERSAO-DESKTOP.txt, RELATORIO-DESKTOP.txt (app-update.yml NAO e asset);
+#   8) pos-verifica flags/assets/target + confirma que a 1.0.178 SEGUE Latest
+#      (canario NUNCA vira latest) e as tags historicas intactas;
+#   9) smoke: re-baixa EXE + canary.yml da release e reconfere os hashes.
+# NAO builda, NAO deploya, NAO toca Firebase/Worker/Cloud Run/Rules/flags, NAO mexe
+# na producao estavel 1.0.178 nem em releases/tags antigas. So GITHUB_TOKEN padrao.
+# Execucao SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] F3.4.2A Stage-1B Desktop Canary Release — 1.0.179-canary.1"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-DESKTOP-1.0.179-CANARY.1 para autorizar"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "29780112009"
+      CANARY_SHA: "d7f873c2a3bdf3bd6131d97984d9e2624f587218"
+      DESK_BRANCH: "desktop/f342a-update-notification-presence-auth-probe"
+      TAG: "v1.0.179-canary.1"
+      TITLE: "Agenda ID Seven Desktop 1.0.179-canary.1 — Update Notification + Presence Auth Probe (CANARIO)"
+      ART_INST: "agenda-id-seven-desktop-1.0.179-canary.1-installer"
+      ART_INST_DIGEST: "sha256:6bb102018f52f05bd61eb0ab5400ccfb555cc9ba46ef967f41dc99ec1124ab05"
+      ART_META: "agenda-id-seven-desktop-1.0.179-canary.1-updatemeta"
+      ART_META_DIGEST: "sha256:1e098d3c7cae16be25c0ad56bdc701153f652cd0a773a2c1b27d25a706711140"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.179-canary.1-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.179-canary.1-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.179-canary.1-x64.exe.blockmap"
+      CY_NAME: "canary.yml"
+      EXP_EXE: "cb3aa329c585128297bcc7835cce397e2308f8dd01141679a4a3633ec723c71f"
+      EXP_MSI: "d6d625cb004e5b8c55200d468de1776ab3050f7ebc76dedc496647a67cb91bbe"
+      EXP_CY: "00db1e76056a297be194521d1e298e0abed55ddcad00483c80a13643239121e6"
+      EXP_BM: "8baf7cfe4d4f196d7e123b9c848d2f8c1ce045a21d5b68bf5cb167acac5741a4"
+      LATEST_TAG_EXP: "v1.0.178"
+    steps:
+      - name: "Gate 1 — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "PUBLICAR-DESKTOP-1.0.179-CANARY.1" ]; then
+            echo "::error::confirmacao invalida — nada foi publicado"; exit 1
+          fi
+          echo "OK: confirmacao literal valida"
+
+      - name: "Gate 2 — run completed/success"
+        run: |
+          set -euo pipefail
+          ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion')"
+          echo "run $RUN_ID: $ST"
+          [ "$ST" = "completed|success" ] || { echo "::error::run invalido para publicacao"; exit 1; }
+
+      - name: "Gate 3 — head do branch canario == SHA pinado (alvo da tag)"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$DESK_BRANCH" --jq '.object.sha')"
+          echo "head $DESK_BRANCH: $H (esperado $CANARY_SHA)"
+          [ "$H" = "$CANARY_SHA" ] || { echo "::error::branch canario moveu; alvo da tag divergiu"; exit 1; }
+
+      - name: "Gate 4 — tag e release nao podem existir"
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then echo "::error::tag $TAG ja existe"; exit 1; fi
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          echo "OK: tag e release livres"
+
+      - name: "Gate 5 — artifacts: ids+digests conferem"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          check() {
+            local name="$1" digest="$2"
+            local d
+            d="$(echo "$json" | jq -r --arg n "$name" '.artifacts[] | select(.name==$n) | .digest')"
+            echo "artifact $name: $d"
+            [ "$d" = "$digest" ] || { echo "::error::digest do artifact $name divergente ($d != $digest)"; exit 1; }
+            local exp
+            exp="$(echo "$json" | jq -r --arg n "$name" '.artifacts[] | select(.name==$n) | .expired')"
+            [ "$exp" = "false" ] || { echo "::error::artifact $name expirado"; exit 1; }
+          }
+          check "$ART_INST" "$ART_INST_DIGEST"
+          check "$ART_META" "$ART_META_DIGEST"
+          echo "OK: artifacts intactos"
+
+      - name: "Baixar artifacts (installer + updatemeta)"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          ls -lh pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$CY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::asset ausente no artifact: $f"; exit 1; }
+          done
+          test -f pacote/app-update.yml && { echo "::error::app-update.yml NAO deve ser asset publico"; exit 1; } || true
+
+      - name: "Gate 6 — hashes SHA-256 conferem (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          H_EXE="$(sha256sum "pacote/$EXE_NAME" | awk '{print $1}')"
+          H_MSI="$(sha256sum "pacote/$MSI_NAME" | awk '{print $1}')"
+          H_CY="$(sha256sum "pacote/$CY_NAME" | awk '{print $1}')"
+          H_BM="$(sha256sum "pacote/$BM_NAME" | awk '{print $1}')"
+          echo "exe=$H_EXE"; echo "msi=$H_MSI"; echo "canary.yml=$H_CY"; echo "blockmap=$H_BM"
+          [ "$H_EXE" = "$EXP_EXE" ] || { echo "::error::hash EXE divergente"; exit 1; }
+          [ "$H_MSI" = "$EXP_MSI" ] || { echo "::error::hash MSI divergente"; exit 1; }
+          [ "$H_CY" = "$EXP_CY" ] || { echo "::error::hash canary.yml divergente"; exit 1; }
+          [ "$H_BM" = "$EXP_BM" ] || { echo "::error::hash blockmap divergente"; exit 1; }
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.179-canary.1" "pacote/$CY_NAME" || { echo "::error::canary.yml version incorreta"; exit 1; }
+          grep -qF "$EXE_NAME" "pacote/$CY_NAME" || { echo "::error::canary.yml nao referencia o EXE"; exit 1; }
+          echo "OK: hashes conferem + canary.yml coerente"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.179-canary.1 — Update Notification + Presence Auth Probe (CANARIO)
+
+          PRERELEASE de teste (canal `canary`). NAO e latest, NAO e para distribuicao geral.
+          Instalar SOMENTE em maquina real autorizada (owner / 2o computador).
+
+          O QUE E
+          - Escopo A — NOTIFICACAO IMEDIATA de atualizacao, PRODUTOR UNICO: quando o updater detecta
+            uma nova versao (ou conclui o download), o processo main monta a notificacao e a roteia
+            pelo MESMO HUB de todas as notificacoes (toast in-app quando a janela esta visivel; nativa/
+            premium quando na bandeja). O toast proprio do renderer foi NEUTRALIZADO (fim da duplicacao);
+            clique abre Configuracoes -> Atualizacoes. Sem download/instalacao automaticos.
+          - Escopo D minimo — SONDA DE /auth (presenceAuthProbe): valida a sessao REAL contra o Worker
+            canario isolado idseven-presence-canary (rota /auth), que confirma a identidade pelo
+            getUserSelf existente. O token de sessao vive SO no main; o corpo enviado leva SO { deviceId }
+            (UUID persistido). O resultado ao renderer e SANITIZADO (validado sim/nao, campos presentes,
+            latencia) — nunca token/ticket/UID/e-mail. SEM WebSocket, SEM heartbeat, SEM Durable Object,
+            SEM presenca on-line/off-line, SEM tela Equipe. UI "Presenca - teste de autenticacao" so
+            aparece em builds prerelease.
+          - Runtime do updater CANARIO: allowPrerelease=true, channel="canary", allowDowngrade=false,
+            autoDownload=false, autoInstallOnAppQuit=false, forceDevUpdateConfig=false.
+          - Metadata do MESMO build: canary.yml + <exe>.blockmap; app-update.yml fica SO dentro do pacote
+            (provider github publico agidseven-lang/Agenda, sem token no cliente). Canal ISOLADO: maquinas
+            estaveis (channel latest) NUNCA veem este canario.
+
+          PRESERVACAO (zero regressao, congelado da 1.0.177)
+          - Todas as funcoes de negocio byte-identicas a 1.0.177 (gate region-scoped removendo UPDATER+
+            PRESENCE, verificado tambem DENTRO do app.asar empacotado). auth-core/clock/notifier/tray
+            intocados. Nenhum segredo (PRESENCE_TICKET_SECRET) empacotado.
+          - 1.0.178 SEGUE Latest (producao estavel); rollback = reinstalar 1.0.178. Canario NUNCA vira latest.
+          - Prereleases/tags historicas preservadas: v1.0.177-production, v1.0.178, v1.0.178-canary.1, v1.0.178-canary.2.
+
+          HASHES OFICIAIS (SHA-256)
+          - EXE: cb3aa329c585128297bcc7835cce397e2308f8dd01141679a4a3633ec723c71f
+          - MSI: d6d625cb004e5b8c55200d468de1776ab3050f7ebc76dedc496647a67cb91bbe
+          - canary.yml: 00db1e76056a297be194521d1e298e0abed55ddcad00483c80a13643239121e6
+          - blockmap: 8baf7cfe4d4f196d7e123b9c848d2f8c1ce045a21d5b68bf5cb167acac5741a4
+          Confira com SHA256SUMS anexado (sha256sum -c SHA256SUMS) ou certutil -hashfile <arquivo> SHA256.
+
+          PROVA FISICA (parte do owner)
+          1. Instale 1.0.179-canary.1 em maquina real autorizada; faca login; confirme 1.0.179-canary.1 em Sobre.
+          2. Config -> Presenca -> "Testar autenticacao de presenca": confirme identidade validada = Sim,
+             campos presentes (id/name/role/admin/status/photo/color), latencia e WebSocket = Desligado.
+             (Prova o contrato Desktop -> /auth -> getUserSelf com a sessao real, sem expor token.)
+          3. Notificacao de update: a cadeia canario continua — uma maquina canario detecta/baixa/instala a
+             proxima canary. A NOVA notificacao imediata (produtor unico) sera observada quando existir uma
+             1.0.179-canary.2 alvo (esta 1.0.179-canary.1 ja traz o codigo emissor).
+
+          RISCOS CONHECIDOS
+          - Instalador nao assinado (SmartScreen/MOTW). Integridade por SHA-512 (canary.yml) + SHA-256 (release).
+          - MSI e contingencia manual; o auto-update usa SOMENTE o EXE NSIS (canal canary).
+          - WebSocket/presenca em tempo real permanecem DESLIGADOS (stage 1); serao um estagio futuro autorizado.
+
+          Procedencia: run 29780112009 (success); fonte desktop/f342a-update-notification-presence-auth-probe @ d7f873c.
+          NOTAS
+          wc -l notas.md
+
+      - name: "Publicar prerelease (prerelease=true, latest=false) — 7 assets"
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$CANARY_SHA" \
+            --prerelease \
+            --latest=false \
+            --title "$TITLE" \
+            --notes-file notas.md \
+            "pacote/$EXE_NAME" \
+            "pacote/$MSI_NAME" \
+            "pacote/$CY_NAME" \
+            "pacote/$BM_NAME" \
+            "pacote/SHA256SUMS" \
+            "pacote/VERSAO-DESKTOP.txt" \
+            "pacote/RELATORIO-DESKTOP.txt"
+          echo "publicado: $TAG"
+
+      - name: "Pos-verificacao (flags/assets/target + 1.0.178 segue Latest)"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" \
+            --json tagName,targetCommitish,isPrerelease,isDraft,assets \
+            --jq '{tag:.tagName,target:.targetCommitish,prerelease:.isPrerelease,draft:.isDraft,assets:[.assets[].name]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "true|false" ] || { echo "::error::flags incorretas: $FLAGS (esperado true|false)"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "7" ] || { echo "::error::esperado 7 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$CY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset ausente na release: $a"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
+          [ "$TGT" = "$CANARY_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          # A 1.0.178 PRECISA continuar sendo o Latest do repo (canario NUNCA vira latest).
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          echo "Latest do repo: $LATEST_TAG"
+          [ "$LATEST_TAG" = "$LATEST_TAG_EXP" ] || { echo "::error::Latest do repo mudou: $LATEST_TAG (esperado $LATEST_TAG_EXP)"; exit 1; }
+          [ "$LATEST_TAG" != "$TAG" ] || { echo "::error::canario virou Latest!"; exit 1; }
+          echo "===== GO: PRERELEASE CANARIO 1.0.179-canary.1 PUBLICADA; 1.0.178 segue Latest ====="
+
+      - name: "Smoke — re-baixar EXE + canary.yml da release e reconferir hashes"
+        run: |
+          set -euo pipefail
+          rm -rf smoke; mkdir -p smoke
+          gh release download "$TAG" -R "$REPO" -p "$EXE_NAME" -p "$CY_NAME" -D smoke
+          S_EXE="$(sha256sum "smoke/$EXE_NAME" | awk '{print $1}')"
+          S_CY="$(sha256sum "smoke/$CY_NAME" | awk '{print $1}')"
+          [ "$S_EXE" = "$EXP_EXE" ] || { echo "::error::smoke EXE hash divergente"; exit 1; }
+          [ "$S_CY" = "$EXP_CY" ] || { echo "::error::smoke canary.yml hash divergente"; exit 1; }
+          echo "SMOKE OK: EXE e canary.yml publicados conferem byte a byte."
