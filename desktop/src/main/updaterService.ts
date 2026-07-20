@@ -3,12 +3,12 @@
  * ---------------------------------------------------------------------------
  * Serviço ISOLADO no processo MAIN sobre electron-updater (NSIS/Windows).
  * Regras inegociáveis (mandato F3.4.1A):
- *   - FLAGS (ordem exigida): allowPrerelease(true) -> channel(canary) -> allowDowngrade(false),
+ *   - FLAGS (ordem exigida): allowPrerelease(false) -> channel(latest) -> allowDowngrade(false),
  *     depois autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig/fullChangelog (false).
  *     A ordem importa: allowPrerelease E channel podem ativar allowDowngrade no
- *     electron-updater, logo allowDowngrade=false vem POR ÚLTIMO. CANÁRIO consulta o canal
- *     canary (canary.yml); ESTÁVEL (FASE 16) usa allowPrerelease=false + channel latest e
- *     NUNCA vê prereleases (isolamento real de canal).
+ *     electron-updater, logo allowDowngrade=false vem POR ÚLTIMO. ESTÁVEL (FASE 16) consulta
+ *     SOMENTE o canal latest (latest.yml) e NUNCA vê prereleases/canary (allowPrerelease=false);
+ *     o canário (allowPrerelease=true + channel canary) é a linha irmã, isolada por canal.
  *   - Download só após ação do usuário. Instalação só após ação do usuário e
  *     com o renderer confirmando que não há trabalho não salvo. NUNCA silencioso
  *     sem confirmação.
@@ -17,7 +17,7 @@
  * Integridade: o electron-updater valida o sha512 do latest.yml no download; a
  * integridade de RELEASE (sha256, target commit, não-draft, não-substituída) é
  * garantida no publish (workflow gated). Downgrade/prerelease-em-produção são
- * barrados por allowDowngrade=false; canal ISOLADO por channel canary (estável usa latest).
+ * barrados por allowDowngrade=false; canal ISOLADO por channel latest (o canário usa canary).
  */
 import { app, BrowserWindow } from "electron";
 import { autoUpdater } from "electron-updater";
@@ -43,7 +43,7 @@ export type UpdaterProgress = {
 export type UpdaterState = {
   status: UpdaterStatus;
   installedVersion: string;
-  channel: string; // "stable" | "prerelease" (derivado da versão)
+  channel: string; // canal literal do updater: "latest" (estável) | "canary" (canário)
   allowPrerelease: boolean;
   availableVersion: string | null;
   releaseName: string | null;
@@ -85,20 +85,20 @@ export function createUpdaterService(deps: UpdaterDeps) {
   const getVersion = deps.getVersion || (() => { try { return app.getVersion(); } catch { return "dev"; } });
   const installed = getVersion();
 
-  // ---- FLAGS OBRIGATÓRIAS (mandato F3.4.1A) — ORDEM EXIGIDA pelo owner:
+  // ---- FLAGS OBRIGATÓRIAS (mandato F3.4.1B — bootstrap ESTÁVEL, FASE 16) — ORDEM EXIGIDA:
   // allowPrerelease -> channel -> allowDowngrade. Motivo: allowPrerelease E channel podem
   // ativar allowDowngrade no electron-updater, então allowDowngrade=false vem POR ÚLTIMO.
-  // CANÁRIO consulta SOMENTE o canal canary (canary.yml); no bootstrap ESTÁVEL (FASE 16):
-  // allowPrerelease vira false + channel vira latest (a máquina estável nunca vê canary).
-  autoUpdater.allowPrerelease = true;
-  autoUpdater.channel = "canary";
+  // ESTÁVEL consulta SOMENTE o canal latest (latest.yml) e NUNCA vê prereleases/canary
+  // (allowPrerelease=false). Isolamento real de canal: a máquina estável ignora o canário.
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.channel = "latest";
   autoUpdater.allowDowngrade = false;
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.forceDevUpdateConfig = false;
   autoUpdater.fullChangelog = false;
-  const allowPre = autoUpdater.allowPrerelease === true;
-  const chan = String(autoUpdater.channel || "latest");
+  const allowPre = (autoUpdater.allowPrerelease as boolean) === true;
+  const chan = String((autoUpdater.channel as string | null | undefined) || "latest");
   autoUpdater.logger = {
     info: (m: unknown) => deps.onLog("updater.lib.info", { m: redact(m) }),
     warn: (m: unknown) => deps.onLog("updater.lib.warn", { m: redact(m) }),

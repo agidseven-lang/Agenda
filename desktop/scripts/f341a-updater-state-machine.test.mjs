@@ -38,7 +38,7 @@ class FakeAuto {
 }
 
 let FAKE_AUTO = null;
-let FAKE_VERSION = '1.0.178-canary.1';
+let FAKE_VERSION = '1.0.178';
 const guardBox = { result: { safe: true } };
 const winBox = { sent: [] };
 const fakeWin = {
@@ -58,7 +58,7 @@ Module._load = function (req) {
 
 function makeService(opts) {
   opts = opts || {};
-  FAKE_VERSION = opts.version || '1.0.178-canary.1';
+  FAKE_VERSION = opts.version || '1.0.178';
   FAKE_AUTO = new FakeAuto();
   winBox.sent = [];
   guardBox.result = { safe: true };
@@ -80,7 +80,7 @@ function makeService(opts) {
 async function toAvailable(svc, auto, ver) {
   svc.check();               // status -> checking
   await flush();
-  auto.emit('update-available', { version: ver || '1.0.178-canary.2', files: [{ size: 1000 }], releaseName: 'RC', releaseNotes: 'notas', releaseDate: '2026-07-20' });
+  auto.emit('update-available', { version: ver || '1.0.179', files: [{ size: 1000 }], releaseName: 'RC', releaseNotes: 'notas', releaseDate: '2026-07-20' });
 }
 
 (async () => {
@@ -88,9 +88,9 @@ async function toAvailable(svc, auto, ver) {
 
   // ---- Configuração obrigatória (mandato) ----
   {
-    const { svc, auto } = makeService({ version: '1.0.178-canary.1' });
-    ok('CFG allowPrerelease=true (setado 1º)', auto.allowPrerelease === true);
-    ok('CFG channel="canary" (setado 2º, após allowPrerelease)', auto.channel === 'canary');
+    const { svc, auto } = makeService({ version: '1.0.178' });
+    ok('CFG allowPrerelease=false (setado 1º)', auto.allowPrerelease === false);
+    ok('CFG channel="latest" (setado 2º, após allowPrerelease)', auto.channel === 'latest');
     ok('CFG allowDowngrade=false (setado por último — nunca rebaixa)', auto.allowDowngrade === false);
     ok('CFG autoDownload=false', auto.autoDownload === false);
     ok('CFG autoInstallOnAppQuit=false', auto.autoInstallOnAppQuit === false);
@@ -98,16 +98,16 @@ async function toAvailable(svc, auto, ver) {
     ok('CFG fullChangelog=false', auto.fullChangelog === false);
     ok('CFG logger sanitizado (funções info/warn/error)', auto.logger && typeof auto.logger.info === 'function');
     ok('INIT estado inicial idle', svc.getState().status === 'idle');
-    ok('INIT canal=canary (channel="canary")', svc.getState().channel === 'canary');
+    ok('INIT canal=latest (channel="latest")', svc.getState().channel === 'latest');
   }
 
   // 11) FLAGS reais no runtime empacotado — canal canary isolado (canário)
   {
-    const { svc, auto } = makeService({ version: '1.0.178-canary.1' });
-    const flagsOk = auto.allowPrerelease === true && auto.channel === 'canary' && auto.allowDowngrade === false && auto.autoDownload === false && auto.autoInstallOnAppQuit === false && auto.forceDevUpdateConfig === false;
-    ok('11 flags reais no runtime (allowPrerelease=true; channel="canary"; allowDowngrade/autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false)', flagsOk);
-    ok('11 estado reflete channel=canary + allowPrerelease=true', svc.getState().channel === 'canary' && svc.getState().allowPrerelease === true);
-    // No bootstrap ESTÁVEL (FASE 16): allowPrerelease=false + channel="latest" — nunca consulta canary.
+    const { svc, auto } = makeService({ version: '1.0.178' });
+    const flagsOk = auto.allowPrerelease === false && auto.channel === 'latest' && auto.allowDowngrade === false && auto.autoDownload === false && auto.autoInstallOnAppQuit === false && auto.forceDevUpdateConfig === false;
+    ok('11 flags reais no runtime (allowPrerelease=false; channel="latest"; allowDowngrade/autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false)', flagsOk);
+    ok('11 estado reflete channel=latest + allowPrerelease=false', svc.getState().channel === 'latest' && svc.getState().allowPrerelease === false);
+    // No CANÁRIO (F3.4.1A): allowPrerelease=true + channel="canary". Aqui (ESTÁVEL) nunca vê prerelease/canary.
   }
 
   // 1) idle -> checking
@@ -120,10 +120,10 @@ async function toAvailable(svc, auto, ver) {
   // 2) checking -> update_available (+ metadados)
   {
     const { svc, auto } = makeService();
-    await toAvailable(svc, auto, '1.0.178-canary.2');
+    await toAvailable(svc, auto, '1.0.179');
     const s = svc.getState();
     ok('2 checking→update_available', s.status === 'update_available');
-    ok('2 availableVersion capturada', s.availableVersion === '1.0.178-canary.2');
+    ok('2 availableVersion capturada', s.availableVersion === '1.0.179');
     ok('2 sizeBytes somado dos files', s.sizeBytes === 1000);
     ok('2 releaseNotes/date capturados', s.releaseNotes === 'notas' && s.releaseDate === '2026-07-20');
   }
@@ -132,7 +132,7 @@ async function toAvailable(svc, auto, ver) {
   {
     const { svc, auto } = makeService();
     svc.check(); await flush();
-    auto.emit('update-not-available', { version: '1.0.178-canary.1' });
+    auto.emit('update-not-available', { version: '1.0.178' });
     ok('3 checking→up_to_date', svc.getState().status === 'up_to_date');
   }
 
@@ -159,7 +159,7 @@ async function toAvailable(svc, auto, ver) {
   {
     const { svc, auto } = makeService();
     await toAvailable(svc, auto); await svc.download();
-    auto.emit('update-downloaded', { version: '1.0.178-canary.2' });
+    auto.emit('update-downloaded', { version: '1.0.179' });
     const s = svc.getState();
     ok('6 downloaded + flag downloaded=true', s.status === 'downloaded' && s.downloaded === true);
   }
@@ -190,7 +190,7 @@ async function toAvailable(svc, auto, ver) {
     await toAvailable(svc, auto);
     const r = svc.defer();
     ok('9 defer→deferred', r.ok === true && svc.getState().status === 'deferred');
-    ok('9 defer preserva availableVersion (retomável)', svc.getState().availableVersion === '1.0.178-canary.2');
+    ok('9 defer preserva availableVersion (retomável)', svc.getState().availableVersion === '1.0.179');
   }
 
   // 10) versão inferior rejeitada — garantida por allowDowngrade=false (config)
@@ -233,7 +233,7 @@ async function toAvailable(svc, auto, ver) {
   {
     const { svc, auto } = makeService();
     await toAvailable(svc, auto); await svc.download();
-    auto.emit('update-downloaded', { version: '1.0.178-canary.2' });
+    auto.emit('update-downloaded', { version: '1.0.179' });
     const r1 = await svc.installAndRestart();
     const r2 = await svc.installAndRestart();
     ok('17 primeira instalação ok + quitAndInstall 1x', r1.ok === true && auto.quitInstall && auto.quitInstall.isSilent === false && auto.quitInstall.forceRun === true);
@@ -244,7 +244,7 @@ async function toAvailable(svc, auto, ver) {
   {
     const { svc, auto } = makeService();
     await toAvailable(svc, auto); await svc.download();
-    auto.emit('update-downloaded', { version: '1.0.178-canary.2' });
+    auto.emit('update-downloaded', { version: '1.0.179' });
     guardBox.result = { safe: false, reason: 'Há uma tarefa em edição' };
     const r = await svc.installAndRestart();
     ok('18/19 instalação bloqueada quando renderer reporta trabalho não salvo', r.ok === false && r.reason === 'busy');
@@ -257,7 +257,7 @@ async function toAvailable(svc, auto, ver) {
   {
     const { svc, auto } = makeService();
     await toAvailable(svc, auto); await svc.download();
-    auto.emit('update-downloaded', { version: '1.0.178-canary.2' });
+    auto.emit('update-downloaded', { version: '1.0.179' });
     guardBox.result = { safe: true };
     const r = await svc.installAndRestart();
     ok('20 install ok + status installing', r.ok === true && svc.getState().status === 'installing');

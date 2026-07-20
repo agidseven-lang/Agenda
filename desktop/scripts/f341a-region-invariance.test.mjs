@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
    F3.4.1A — GATE DE PRESERVAÇÃO REGION-SCOPED (FASE 13).
-   Prova que a candidata bootstrap canário (1.0.178-canary.2) difere da
+   Prova que a candidata bootstrap ESTÁVEL (1.0.178) difere da
    PRODUÇÃO FÍSICA APROVADA 1.0.177 (commit 2963927) SOMENTE nas regiões
    `UPDATER:BEGIN … UPDATER:END` e nos arquivos whitelisted. Fora disso,
    BYTE-IDENTIDADE (HARD NO-GO em qualquer diferença fora da whitelist).
@@ -68,7 +68,7 @@ function fnSrc(SRC, name) {
   return null;
 }
 
-console.log(`F3.4.1A — region-scoped invariance (candidata 1.0.178-canary.2 vs produção ${BASE_SHA})`);
+console.log(`F3.4.1B — region-scoped invariance (candidata ESTÁVEL 1.0.178 vs produção ${BASE_SHA})`);
 
 // ---------- 1) RENDERER: fora das regiões UPDATER, byte-idêntico ----------
 {
@@ -110,8 +110,8 @@ for (const rel of [
   ok('N updaterService.ts presente e substancial na candidata', svc.length > 2000 && /createUpdaterService/.test(svc));
   ok('N updaterService: autoDownload/allowDowngrade/autoInstallOnAppQuit=false', /autoDownload\s*=\s*false/.test(svc) && /allowDowngrade\s*=\s*false/.test(svc) && /autoInstallOnAppQuit\s*=\s*false/.test(svc));
   ok('N updaterService: forceDevUpdateConfig=false (sem dev-app-update)', /forceDevUpdateConfig\s*=\s*false/.test(svc));
-  ok('N updaterService: ordem allowPrerelease=true -> channel="canary" -> allowDowngrade=false', (function () {
-    const lp = svc.indexOf('allowPrerelease = true'), lc = svc.indexOf('channel = "canary"'), ld = svc.indexOf('allowDowngrade = false');
+  ok('N updaterService: ordem allowPrerelease=false -> channel="latest" -> allowDowngrade=false', (function () {
+    const lp = svc.indexOf('allowPrerelease = false'), lc = svc.indexOf('channel = "latest"'), ld = svc.indexOf('allowDowngrade = false');
     return lp >= 0 && lc >= 0 && ld >= 0 && lp < lc && lc < ld;
   })());
 }
@@ -120,7 +120,7 @@ for (const rel of [
 {
   const b = JSON.parse(baseline('package.json'));
   const c = JSON.parse(current('package.json'));
-  ok('P version 1.0.177 → 1.0.178-canary.2', b.version === '1.0.177' && c.version === '1.0.178-canary.2');
+  ok('P version 1.0.177 → 1.0.178', b.version === '1.0.177' && c.version === '1.0.178');
   ok('P electron-updater ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['electron-updater']) && c.dependencies && c.dependencies['electron-updater'] === '6.8.9');
   // zera version + remove electron-updater dos deps → o resto deve ser idêntico
   const nb = { ...b, version: null }; const nc = { ...c, version: null, dependencies: { ...c.dependencies } };
@@ -134,7 +134,7 @@ for (const rel of [
   const c = current('electron-builder.yml');
   ok('EB produção é prefixo exato da candidata (nada acima do publish mudou)', c.startsWith(b));
   const suffix = c.slice(b.length);
-  ok('EB sufixo = provider github público (owner/repo) + channel canary, sem segredo', /provider:\s*github/.test(suffix) && /owner:\s*agidseven-lang/.test(suffix) && /repo:\s*Agenda/.test(suffix) && /channel:\s*canary/.test(suffix) && !/\b(token|secret|password|gh_token|pat)\b\s*[:=]/i.test(suffix));
+  ok('EB sufixo = provider github público (owner/repo) + channel latest, sem segredo', /provider:\s*github/.test(suffix) && /owner:\s*agidseven-lang/.test(suffix) && /repo:\s*Agenda/.test(suffix) && /channel:\s*latest/.test(suffix) && !/\b(token|secret|password|gh_token|pat)\b\s*[:=]/i.test(suffix));
   ok('EB identidade NSIS/appId/productName/artifactName intacta no prefixo', /appId:\s*br\.com\.idseven\.agenda\.desktop/.test(b) && /productName:\s*Agenda ID Seven Desktop/.test(b) && !/appId/.test(suffix) && !/productName/.test(suffix) && !/artifactName/.test(suffix));
 }
 
@@ -144,7 +144,7 @@ for (const rel of [
   const c = current('package-lock.json');
   ok('L produção sem electron-updater no lock', !/"node_modules\/electron-updater"/.test(b));
   ok('L candidata com electron-updater no lock', /"node_modules\/electron-updater"/.test(c));
-  ok('L lock version 1.0.177 → 1.0.178-canary.2', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.178-canary\.2"/.test(c));
+  ok('L lock version 1.0.177 → 1.0.178', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.178"/.test(c));
 }
 
 // ---------- 8) FUNÇÕES CRÍTICAS DE NEGÓCIO: byte-idênticas (mandato FASE 13) ----------
