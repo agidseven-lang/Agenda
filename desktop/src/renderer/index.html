@@ -7808,6 +7808,9 @@ function renderConfig(){
       info('Idioma','Português (Brasil)')+'<div class="divline"></div>'+info('Formato de data','dd/MM/aaaa')+'<div class="divline"></div>'+info('Formato de hora','24h')+'</div>';
   if(u.admin){h+='<div style="height:18px"></div><div class="lbl">Administração</div><div class="card">'+
       act('person','Alterar e-mail de usuário','Troca administrativa com confirmação e auditoria','data-cfgadminemail="1"')+'</div>';}
+  /* UPDATER:BEGIN (F3.4.1A — seção Configurações → Atualizações; injeção aditiva) */
+  h+=(typeof updConfigSectionHtml==='function'?updConfigSectionHtml():'');
+  /* UPDATER:END */
   h+='<div style="height:18px"></div><div class="lbl">Sessão</div><div class="card" style="padding:6px">'+
       '<div class="row" style="align-items:center;gap:12px;padding:8px">'+avatar(u,40)+'<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(u.name||'')+'</div><div style="font-size:12px;color:var(--soft)">'+esc(u.role||'Equipe')+(u.admin?' · admin':'')+'</div></div></div>'+
       '<div class="divline"></div>'+settRow('info','Sobre o aplicativo','Versão '+BUILD,'sobre')+'</div>'+
@@ -8514,6 +8517,109 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   setTimeout(_hashCheck,800);
 })();
 /* ════════ FIM IN-APP-DIAGNOSTIC-V1 ════════ */
+/* UPDATER:BEGIN (F3.4.1A — atualizador nativo: seção Configurações→Atualizações, guarda de instalação, toast, banner canário) */
+(function(){
+  if(typeof window==='undefined') return;
+  var updApi=(window.desktopAPI&&window.desktopAPI.updater)?window.desktopAPI.updater:null;
+  var __updState=null, _updToastedFor=null;
+  function updBytes(n){ n=Number(n)||0; if(n<1024)return n+' B'; if(n<1048576)return (n/1024).toFixed(0)+' KB'; if(n<1073741824)return (n/1048576).toFixed(1)+' MB'; return (n/1073741824).toFixed(2)+' GB'; }
+  function updWhen(ms){ if(!ms)return '—'; try{return new Date(ms).toLocaleString('pt-BR');}catch(_){return '—';} }
+  function updStatusPt(st){ var m={idle:'Ocioso',checking:'Verificando…',update_available:'Atualização disponível',up_to_date:'Você está na versão mais recente',downloading:'Baixando…',downloaded:'Pronto para instalar',installing:'Instalando…',deferred:'Adiada',error:'Erro'}; return m[st]||st||'—'; }
+  function updIcb(ic){ return '<div class="icb icb-mut">'+(typeof svg==='function'?svg(ic):'')+'</div>'; }
+  function updRow(l,v){ return '<div class="settrow" style="cursor:default">'+updIcb('info')+'<div class="sm"><div class="sl">'+esc(l)+'</div><div class="ss">'+esc(v)+'</div></div></div>'; }
+  function updBtn(a,label,style){ return '<button class="btn" data-upd="'+a+'" style="'+(style||'')+'">'+esc(label)+'</button>'; }
+  function updSectionInner(){
+    var s=__updState||{};
+    var installed=s.installedVersion||((window.desktopAPI&&window.desktopAPI.version)||'—');
+    var canal=(s.channel==='prerelease')?'Canário (pré-lançamento)':'Estável';
+    var h=updRow('Versão instalada',installed)+updRow('Canal',canal)
+      +'<div class="divline"></div>'+updRow('Status',updStatusPt(s.status))
+      +'<div class="divline"></div>'+updRow('Última verificação',updWhen(s.lastCheckAt));
+    var hasAvail=s.availableVersion&&(s.status==='update_available'||s.status==='downloading'||s.status==='downloaded'||s.status==='installing'||s.status==='deferred');
+    if(hasAvail){
+      h+='<div class="divline"></div>'+updRow('Versão disponível',s.availableVersion);
+      if(s.sizeBytes) h+='<div class="divline"></div>'+updRow('Tamanho',updBytes(s.sizeBytes));
+      if(s.releaseNotes){ var notes=String(s.releaseNotes); if(notes.length>600)notes=notes.slice(0,600)+'…'; h+='<div class="divline"></div><div class="settrow" style="cursor:default;align-items:flex-start">'+updIcb('info')+'<div class="sm"><div class="sl">Novidades</div><div class="ss" style="white-space:pre-wrap">'+esc(notes)+'</div></div></div>'; }
+    }
+    if(s.status==='downloading'&&s.progress){
+      var pct=Math.round(Number(s.progress.percent)||0);
+      h+='<div class="divline"></div><div class="settrow" style="cursor:default;align-items:flex-start">'+updIcb('clock')+'<div class="sm" style="flex:1"><div class="sl">Baixando '+pct+'%</div><div style="height:8px;border-radius:6px;background:var(--surface2);overflow:hidden;margin:6px 0"><div style="height:100%;width:'+pct+'%;background:var(--accent)"></div></div><div class="ss">'+updBytes(s.progress.transferred)+' de '+updBytes(s.progress.total)+' · '+updBytes(s.progress.bytesPerSecond)+'/s</div></div></div>';
+    }
+    if(s.status==='error'&&s.error){ h+='<div class="divline"></div>'+updRow('Erro',String(s.error.message||'falha')); }
+    var busy=(s.status==='checking'||s.status==='downloading'||s.status==='installing');
+    var acts=updBtn('check','Verificar atualizações',busy?'opacity:.5;pointer-events:none':'');
+    if((s.status==='update_available'||s.status==='deferred')&&s.availableVersion) acts+=updBtn('download','Baixar atualização','background:var(--accent);color:#fff;border-color:transparent');
+    if(s.status==='downloaded'){ acts+=updBtn('install','Instalar e reiniciar','background:var(--accent);color:#fff;border-color:transparent'); }
+    if(s.status==='update_available'||s.status==='downloaded'||s.status==='downloading') acts+=updBtn('defer','Lembrar mais tarde','');
+    acts+=updBtn('release','Abrir página da release','');
+    acts+=updBtn('copydiag','Copiar diagnóstico','');
+    h+='<div class="divline"></div><div class="settrow" style="cursor:default">'+updIcb('gear')+'<div class="sm" style="flex:1"><div style="display:flex;gap:8px;flex-wrap:wrap">'+acts+'</div></div></div>';
+    return h;
+  }
+  window.updConfigSectionHtml=function(){ return '<div style="height:18px"></div><div class="lbl">Atualizações</div><div class="card" id="upd-root">'+updSectionInner()+'</div>'; };
+  function updRefresh(){ try{ var r=document.getElementById('upd-root'); if(r) r.innerHTML=updSectionInner(); }catch(_){} }
+  function updMaybeToast(s){
+    try{
+      if(s&&s.status==='update_available'&&s.availableVersion&&_updToastedFor!==s.availableVersion){
+        _updToastedFor=s.availableVersion;
+        if(typeof notifShowToast==='function') notifShowToast({severity:'info',eventType:'app_update',title:'Atualização disponível',body:'Versão '+s.availableVersion+' disponível. Abra Configurações → Atualizações para baixar.',sound:false});
+      }
+      if(s&&(s.status==='up_to_date'||s.status==='idle')) _updToastedFor=null;
+    }catch(_){}
+  }
+  // Guarda de instalação consultada pelo MAIN (trabalho não salvo => bloqueia a instalação).
+  window.__updaterInstallGuard=function(){
+    try{
+      var reasons=[];
+      try{ if(typeof state!=='undefined'&&state&&state.form) reasons.push('Há uma tarefa em edição — feche ou salve o formulário antes de atualizar.'); }catch(_){}
+      try{ if(typeof ncCaptureBusy==='function'&&ncCaptureBusy()) reasons.push('Há um campo em edição.'); }catch(_){}
+      try{ var mr=document.getElementById('modalRoot'); if(mr&&mr.innerHTML&&mr.innerHTML.trim()!=='') reasons.push('Feche a janela/modal aberta antes de atualizar.'); }catch(_){}
+      return reasons.length?{safe:false,reason:reasons[0]}:{safe:true};
+    }catch(_){ return {safe:true}; }
+  };
+  // Ações dos botões (listener PRÓPRIO e aditivo; não toca a delegação existente).
+  document.addEventListener('click',function(ev){
+    try{
+      var b=(ev.target&&ev.target.closest)?ev.target.closest('[data-upd]'):null;
+      if(!b||!updApi) return;
+      var a=b.getAttribute('data-upd');
+      if(a==='check') updApi.check();
+      else if(a==='download') updApi.download();
+      else if(a==='defer') updApi.defer();
+      else if(a==='release'){ try{ window.desktopAPI.openExternal('https://github.com/agidseven-lang/Agenda/releases'); }catch(_){} }
+      else if(a==='copydiag'){
+        var s=__updState||{}; var d={version:s.installedVersion,channel:s.channel,status:s.status,available:s.availableVersion,size:s.sizeBytes,lastCheckAt:s.lastCheckAt,lastCheckReason:s.lastCheckReason,error:s.error};
+        var txt='Agenda ID Seven — diagnostico do atualizador\n'+JSON.stringify(d,null,2);
+        try{ navigator.clipboard.writeText(txt); if(typeof flashToast==='function')flashToast('Diagnóstico copiado',2200); }catch(_){ if(typeof flashToast==='function')flashToast('Não foi possível copiar',2200); }
+      }
+      else if(a==='install'){
+        var g=window.__updaterInstallGuard?window.__updaterInstallGuard():{safe:true};
+        if(g&&g.safe===false){ if(typeof flashToast==='function')flashToast('Não é possível instalar agora: '+g.reason,4500); return; }
+        updApi.installAndRestart().then(function(r){ if(r&&r.ok===false&&r.reason==='busy'&&typeof flashToast==='function') flashToast('Instalação bloqueada: '+(r.detail||'trabalho não salvo'),4500); });
+      }
+    }catch(_){}
+  });
+  // Assinatura do estado (main -> renderer) + primeira leitura.
+  try{
+    if(updApi&&typeof updApi.onStateChanged==='function') updApi.onStateChanged(function(s){ __updState=s; updRefresh(); updMaybeToast(s); });
+    if(updApi&&typeof updApi.getState==='function') updApi.getState().then(function(s){ if(s){ __updState=s; updRefresh(); } });
+  }catch(_){}
+  // Banner CANÁRIO: só quando a versão empacotada é pré-lançamento (contém '-'), ex.: 1.0.178-canary.1.
+  try{
+    var ver=(window.desktopAPI&&window.desktopAPI.version)||'';
+    if(/-/.test(String(ver))){
+      var mk=function(){
+        if(document.getElementById('upd-canary-banner')) return;
+        var el=document.createElement('div'); el.id='upd-canary-banner';
+        el.textContent='CANÁRIO '+ver+' · build de teste — NÃO DISTRIBUIR';
+        el.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:2147483000;background:#7A3E00;color:#FFE9C7;font:600 11px/1.6 system-ui,Segoe UI,sans-serif;text-align:center;padding:2px 8px;letter-spacing:.3px;pointer-events:none;border-top:1px solid #B26A17';
+        (document.body||document.documentElement).appendChild(el);
+      };
+      if(document.body) mk(); else document.addEventListener('DOMContentLoaded',mk);
+    }
+  }catch(_){}
+})();
+/* UPDATER:END */
 </script>
 </body>
 </html>

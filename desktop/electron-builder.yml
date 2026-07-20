@@ -40,3 +40,13 @@ nsis:
 msi:
   oneClick: false
   perMachine: false
+# F3.4.1A — feed de atualização (electron-updater). Provider GitHub OFICIAL no repositório
+# PÚBLICO agidseven-lang/Agenda: SEM token no cliente, SEM segredo no app-update.yml.
+# `--publish never` continua valendo no CI (o CI NUNCA publica; o release gated é o único
+# publicador). A presença deste bloco faz o electron-builder GERAR, do MESMO build:
+# latest.yml + <exe>.blockmap + app-update.yml. Canal padrão (latest.yml); o isolamento
+# canário↔estável é por allowPrerelease (derivado da versão) + flag prerelease do GitHub Release.
+publish:
+  - provider: github
+    owner: agidseven-lang
+    repo: Agenda

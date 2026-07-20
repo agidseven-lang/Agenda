@@ -18,6 +18,9 @@ import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.1
 import { registerAuthIpc } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main)
 import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
 import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio canônico via cabeçalho HTTP Date (Cloud Run read-only)
+// UPDATER:BEGIN (F3.4.1A — atualizador nativo, processo main)
+import { createUpdaterService } from "./updaterService";
+// UPDATER:END
 
 let mainWin: BrowserWindow | null = null;
 let stopNotifier: (() => void) | null = null;
@@ -28,6 +31,19 @@ let quitting = false;
 // heartbeat e IPC tray-recreate; a recriacao usa SEMPRE o mesmo menu/quit).
 const trayWin = () => mainWin;
 const trayOpts = { isAutoStart, setAutoStart, quit: realQuit };
+// UPDATER:BEGIN (F3.4.1A — instância do atualizador + teardown seguro para quitAndInstall)
+let updater: ReturnType<typeof createUpdaterService> | null = null;
+function updaterTeardownForInstall() {
+  // Mesmo teardown do realQuit, porém SEM app.quit() (o quitAndInstall encerra e reabre).
+  quitting = true;
+  try { if (stopNotifier) stopNotifier(); } catch { /* */ }
+  try { if (stopReminder) stopReminder(); } catch { /* */ }
+  try { if (clockSync) { clockSync.stop(); clockSync = null; } } catch { /* */ }
+  try { stopBgNotify(); } catch { /* */ }
+  try { destroyTray(); } catch { /* */ }
+  diag("updater.teardownForInstall");
+}
+// UPDATER:END
 
 // AUMID p/ toasts no Windows respeitarem o app
 if (process.platform === "win32") app.setAppUserModelId("br.com.idseven.agenda.desktop");
@@ -282,6 +298,12 @@ app.whenReady().then(() => {
     powerMonitor.on("resume", () => { diag("power.resume"); if (clockSync) void clockSync.requestSync("resume"); });
     powerMonitor.on("unlock-screen", () => { diag("power.unlock"); if (clockSync) void clockSync.requestSync("unlock"); });
   } catch { /* powerMonitor pode não existir em todas as plataformas */ }
+  // UPDATER:BEGIN (F3.4.1A — ao retomar/desbloquear, reverifica atualização SE a verificação venceu)
+  try {
+    powerMonitor.on("resume", () => { if (updater) updater.maybeCheckOnResume(); });
+    powerMonitor.on("unlock-screen", () => { if (updater) updater.maybeCheckOnResume(); });
+  } catch { /* */ }
+  // UPDATER:END
 
   // F3.3.10-BG — registra a janela premium de background + callback de "Abrir tarefa"
   // (reabre a mainWindow minimizada/oculta e navega via deep link). NÃO rouba foco do SO.
@@ -407,6 +429,9 @@ app.whenReady().then(() => {
         onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
       });
       clockSync.start();
+      // UPDATER:BEGIN (F3.4.1A — política de verificação item 2: após restauração da sessão)
+      if (updater) updater.checkAuto("session-restore");
+      // UPDATER:END
     }
   });
   ipcMain.on("session-logout", () => {
@@ -418,6 +443,21 @@ app.whenReady().then(() => {
   // F3.3.77A-R4B — o renderer consulta/força a sincronização do relógio (sem expor token/URL/headers).
   ipcMain.handle("clock-get-state", () => (clockSync ? clockSync.getState() : null));
   ipcMain.handle("clock-request-sync", () => (clockSync ? clockSync.requestSync("renderer") : null));
+  // UPDATER:BEGIN (F3.4.1A — atualizador nativo: instância + IPC restrito + verificação pós-ready)
+  updater = createUpdaterService({
+    getWindow: () => mainWin,
+    onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
+    beforeInstall: () => updaterTeardownForInstall(),
+  });
+  updater.start();
+  ipcMain.handle("updater-get-state", () => (updater ? updater.getState() : null));
+  ipcMain.handle("updater-check", () => (updater ? updater.check("manual") : { ok: false, reason: "no_updater" }));
+  ipcMain.handle("updater-download", () => (updater ? updater.download() : { ok: false, reason: "no_updater" }));
+  ipcMain.handle("updater-install", () => (updater ? updater.installAndRestart() : { ok: false, reason: "no_updater" }));
+  ipcMain.handle("updater-defer", () => (updater ? updater.defer() : { ok: false }));
+  // Política de verificação (item 1): após app.ready. (Respeita intervalo de 6h + guarda de in-flight.)
+  updater.checkAuto("app-ready");
+  // UPDATER:END
 
   // F3.3.10-DIAG — HEARTBEAT do MAIN: prova que o processo principal (e o notifier) seguem VIVOS
   // com a janela minimizada/oculta/bandeja. Se após uma atribuição em background não houver

@@ -69,6 +69,16 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   authChangeEmail: (currentPassword: string, newEmail: string): Promise<any> => ipcRenderer.invoke("auth-change-email", currentPassword, newEmail),
   authAdminChangeUserEmail: (targetId: string, newEmail: string, confirm: string, reason: string): Promise<any> => ipcRenderer.invoke("auth-admin-change-user-email", targetId, newEmail, confirm, reason),
   authSessionStatus: (): Promise<any> => ipcRenderer.invoke("auth-session-status"),
+  // UPDATER:BEGIN (F3.4.1A — API mínima do atualizador; nunca token/URL/headers/fs/objetos Electron)
+  updater: {
+    getState: (): Promise<any> => ipcRenderer.invoke("updater-get-state"),
+    check: (): Promise<any> => ipcRenderer.invoke("updater-check"),
+    download: (): Promise<any> => ipcRenderer.invoke("updater-download"),
+    installAndRestart: (): Promise<any> => ipcRenderer.invoke("updater-install"),
+    defer: (): Promise<any> => ipcRenderer.invoke("updater-defer"),
+    onStateChanged: (cb: (state: any) => void) => { ipcRenderer.on("updater-state", (_e, s: any) => cb(s)); },
+  },
+  // UPDATER:END
   isDesktop: true,
   // F3.3.70D3R10I — versao REAL do app (app.getVersion() via IPC sincrono; nunca mais string manual)
   version: (() => { try { return String(ipcRenderer.sendSync("app-version") || "dev"); } catch { return "dev"; } })(),

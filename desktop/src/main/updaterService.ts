@@ -1,0 +1,318 @@
+/**
+ * Agenda ID Seven Desktop — Atualizador nativo (F3.4.1A)
+ * ---------------------------------------------------------------------------
+ * Serviço ISOLADO no processo MAIN sobre electron-updater (NSIS/Windows).
+ * Regras inegociáveis (mandato F3.4.1A):
+ *   - autoDownload=false, autoInstallOnAppQuit=false, allowDowngrade=false,
+ *     fullChangelog=false, forceDevUpdateConfig=false.
+ *   - allowPrerelease é DERIVADO da versão empacotada: true SÓ quando a versão
+ *     tem componente de pré-lançamento (ex.: 1.0.178-canary.1); false no estável
+ *     (ex.: 1.0.178). Assim canário→estável difere SÓ na versão (sem tocar código).
+ *   - Download só após ação do usuário. Instalação só após ação do usuário e
+ *     com o renderer confirmando que não há trabalho não salvo. NUNCA silencioso
+ *     sem confirmação.
+ *   - Nada de token/URL/headers/caminho interno é exposto ao renderer nem aos
+ *     logs (logger sanitizado; estado público sanitizado).
+ * Integridade: o electron-updater valida o sha512 do latest.yml no download; a
+ * integridade de RELEASE (sha256, target commit, não-draft, não-substituída) é
+ * garantida no publish (workflow gated). Downgrade/prerelease-em-produção são
+ * barrados por allowDowngrade=false e allowPrerelease derivado da versão.
+ */
+import { app, BrowserWindow } from "electron";
+import { autoUpdater } from "electron-updater";
+
+export type UpdaterStatus =
+  | "idle"
+  | "checking"
+  | "update_available"
+  | "up_to_date"
+  | "downloading"
+  | "downloaded"
+  | "installing"
+  | "deferred"
+  | "error";
+
+export type UpdaterProgress = {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+};
+
+export type UpdaterState = {
+  status: UpdaterStatus;
+  installedVersion: string;
+  channel: string; // "stable" | "prerelease" (derivado da versão)
+  allowPrerelease: boolean;
+  availableVersion: string | null;
+  releaseName: string | null;
+  releaseNotes: string | null;
+  releaseDate: string | null;
+  sizeBytes: number | null;
+  progress: UpdaterProgress | null;
+  downloaded: boolean;
+  lastCheckAt: number | null;
+  lastCheckReason: string | null;
+  error: { message: string; code: string | null } | null;
+};
+
+export type UpdaterDeps = {
+  getWindow: () => BrowserWindow | null;
+  onLog: (tag: string, data?: unknown) => void;
+  beforeInstall: () => void; // teardown antes do quitAndInstall (quitting=true + parar subsistemas + destroyTray)
+  now?: () => number; // injetável p/ teste
+  getVersion?: () => string; // injetável p/ teste
+};
+
+// 6h entre verificações automáticas (impede tempestade de chamadas).
+export const CHECK_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+// Redige qualquer URL/segredo antes de logar (nunca token/URL nos logs).
+export function redact(s: unknown): string {
+  return String(s == null ? "" : s)
+    .replace(/https?:\/\/[^\s"']+/gi, "<url>")
+    .replace(/\b(token|bearer|authorization|apikey|api_key)\b\s*[=:]\s*[^\s"']+/gi, "$1=<redacted>");
+}
+
+// Estados a partir dos quais uma nova verificação/donwload não pode começar.
+export function isBusyStatus(s: UpdaterStatus): boolean {
+  return s === "checking" || s === "downloading" || s === "installing";
+}
+
+export function createUpdaterService(deps: UpdaterDeps) {
+  const now = deps.now || (() => Date.now());
+  const getVersion = deps.getVersion || (() => { try { return app.getVersion(); } catch { return "dev"; } });
+  const installed = getVersion();
+  const isPrerelease = /-/.test(installed); // 1.0.178-canary.1 => prerelease; 1.0.178 => stable
+
+  // ---- Configuração obrigatória (não altera nada aprovado; só governa o updater) ----
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowDowngrade = false;
+  autoUpdater.fullChangelog = false;
+  autoUpdater.forceDevUpdateConfig = false;
+  autoUpdater.allowPrerelease = isPrerelease; // canário=true (versão -canary.N); estável=false
+  autoUpdater.logger = {
+    info: (m: unknown) => deps.onLog("updater.lib.info", { m: redact(m) }),
+    warn: (m: unknown) => deps.onLog("updater.lib.warn", { m: redact(m) }),
+    error: (m: unknown) => deps.onLog("updater.lib.error", { m: redact(m) }),
+    debug: (_m: unknown) => { /* silencioso: evita vazar URL/feed em logs verbosos */ },
+  } as unknown as typeof autoUpdater.logger;
+
+  const state: UpdaterState = {
+    status: "idle",
+    installedVersion: installed,
+    channel: isPrerelease ? "prerelease" : "stable",
+    allowPrerelease: isPrerelease,
+    availableVersion: null,
+    releaseName: null,
+    releaseNotes: null,
+    releaseDate: null,
+    sizeBytes: null,
+    progress: null,
+    downloaded: false,
+    lastCheckAt: null,
+    lastCheckReason: null,
+    error: null,
+  };
+
+  let inFlightCheck = false;
+  let periodic: ReturnType<typeof setInterval> | null = null;
+
+  function publicState(): UpdaterState {
+    // cópia sanitizada — NUNCA token/URL/headers/caminho de arquivo interno.
+    return {
+      ...state,
+      progress: state.progress ? { ...state.progress } : null,
+      error: state.error ? { ...state.error } : null,
+    };
+  }
+  function emit() {
+    try {
+      const w = deps.getWindow();
+      if (w && !w.isDestroyed()) w.webContents.send("updater-state", publicState());
+    } catch { /* emitir estado nunca pode quebrar o app */ }
+  }
+  function set(patch: Partial<UpdaterState>) { Object.assign(state, patch); emit(); }
+
+  function sizeOf(info: unknown): number | null {
+    try {
+      const files = (info as any) && (info as any).files;
+      if (Array.isArray(files) && files.length) {
+        const s = files.reduce((a: number, f: any) => a + (Number(f && f.size) || 0), 0);
+        return s > 0 ? s : null;
+      }
+    } catch { /* */ }
+    return null;
+  }
+  function notesOf(info: unknown): string | null {
+    try {
+      const n = (info as any) && (info as any).releaseNotes;
+      if (typeof n === "string") return n;
+      if (Array.isArray(n)) return n.map((x: any) => (x && x.note) || "").filter(Boolean).join("\n\n") || null;
+    } catch { /* */ }
+    return null;
+  }
+  const codeOf = (e: any): string | null => (e && (e.code || e.name)) ? String(e.code || e.name) : null;
+
+  // ---- eventos electron-updater (fonte da verdade da máquina de estados) ----
+  const EVENTS = ["checking-for-update", "update-available", "update-not-available", "download-progress", "update-downloaded", "error"];
+  EVENTS.forEach((e) => { try { autoUpdater.removeAllListeners(e as any); } catch { /* */ } });
+
+  autoUpdater.on("checking-for-update", () => { set({ status: "checking", error: null }); deps.onLog("updater.checking", {}); });
+  autoUpdater.on("update-available", (info: any) => {
+    const ver = String((info && info.version) || "");
+    set({
+      status: "update_available",
+      availableVersion: ver || null,
+      releaseName: (info && info.releaseName) || null,
+      releaseNotes: notesOf(info),
+      releaseDate: (info && info.releaseDate) || null,
+      sizeBytes: sizeOf(info),
+      progress: null,
+      error: null,
+    });
+    deps.onLog("updater.available", { version: ver });
+  });
+  autoUpdater.on("update-not-available", (info: any) => {
+    set({ status: "up_to_date", availableVersion: null, progress: null, error: null });
+    deps.onLog("updater.up_to_date", { version: String((info && info.version) || "") });
+  });
+  autoUpdater.on("download-progress", (p: any) => {
+    set({
+      status: "downloading",
+      progress: {
+        percent: Math.max(0, Math.min(100, Number(p && p.percent) || 0)),
+        transferred: Number(p && p.transferred) || 0,
+        total: Number(p && p.total) || 0,
+        bytesPerSecond: Number(p && p.bytesPerSecond) || 0,
+      },
+    });
+  });
+  autoUpdater.on("update-downloaded", (info: any) => {
+    set({
+      status: "downloaded",
+      downloaded: true,
+      availableVersion: String((info && info.version) || state.availableVersion || "") || null,
+    });
+    deps.onLog("updater.downloaded", { version: String((info && info.version) || "") });
+  });
+  autoUpdater.on("error", (err: any) => {
+    inFlightCheck = false;
+    set({ status: "error", error: { message: redact((err && err.message) || err || "erro desconhecido"), code: codeOf(err) } });
+    deps.onLog("updater.error", { code: codeOf(err), message: redact((err && err.message) || err) });
+  });
+
+  // ---- API pública (chamada via IPC restrito) ----
+  async function check(reason: string, manual: boolean): Promise<{ ok: boolean; reason?: string }> {
+    // Bloqueia verificações concorrentes (inFlightCheck) e verificações durante download/instalação.
+    // NÃO bloqueia por status "checking" residual (o inFlightCheck é a verdade do que está em curso).
+    if (inFlightCheck || state.status === "downloading" || state.status === "installing") { deps.onLog("updater.check.skip", { reason, why: "busy" }); return { ok: false, reason: "busy" }; }
+    if (!manual && state.lastCheckAt != null && (now() - state.lastCheckAt) < CHECK_MIN_INTERVAL_MS) {
+      deps.onLog("updater.check.skip", { reason, why: "interval" });
+      return { ok: false, reason: "interval" };
+    }
+    inFlightCheck = true;
+    set({ status: "checking", lastCheckAt: now(), lastCheckReason: reason, error: null });
+    try {
+      await autoUpdater.checkForUpdates();
+      return { ok: true };
+    } catch (e: any) {
+      // normalmente o evento 'error' já ajustou o estado; garante consistência.
+      set({ status: "error", error: { message: redact((e && e.message) || e), code: codeOf(e) } });
+      return { ok: false, reason: "error" };
+    } finally {
+      inFlightCheck = false;
+    }
+  }
+
+  async function download(): Promise<{ ok: boolean; reason?: string }> {
+    if (state.status === "downloading") return { ok: false, reason: "already_downloading" };
+    if (state.status === "installing") return { ok: false, reason: "installing" };
+    if (state.status === "downloaded") return { ok: true, reason: "already_downloaded" };
+    if ((state.status !== "update_available" && state.status !== "deferred") || !state.availableVersion) {
+      return { ok: false, reason: "no_update" };
+    }
+    set({ status: "downloading", progress: null, error: null });
+    try {
+      await autoUpdater.downloadUpdate();
+      return { ok: true };
+    } catch (e: any) {
+      set({ status: "error", error: { message: redact((e && e.message) || e), code: codeOf(e) } });
+      return { ok: false, reason: "error" };
+    }
+  }
+
+  async function installAndRestart(): Promise<{ ok: boolean; reason?: string; detail?: string }> {
+    if (state.status === "installing") return { ok: false, reason: "already_installing" };
+    if (!state.downloaded || state.status !== "downloaded") return { ok: false, reason: "no_update_downloaded" };
+    // O MAIN consulta o renderer sobre trabalho não salvo (wizard/formulário/modal/gravação).
+    let guard: any = { safe: true };
+    try {
+      const w = deps.getWindow();
+      if (w && !w.isDestroyed()) {
+        guard = await w.webContents.executeJavaScript(
+          "(function(){try{return (window.__updaterInstallGuard&&window.__updaterInstallGuard())||{safe:true};}catch(e){return {safe:true};}})()"
+        );
+      }
+    } catch { guard = { safe: true }; }
+    if (guard && guard.safe === false) {
+      deps.onLog("updater.install.blocked", { reason: String((guard && guard.reason) || "busy") });
+      emit(); // permanece 'downloaded'; a UI mostra instrução clara
+      return { ok: false, reason: "busy", detail: String((guard && guard.reason) || "busy") };
+    }
+    set({ status: "installing" });
+    deps.onLog("updater.install.begin", { version: state.availableVersion });
+    try {
+      deps.beforeInstall(); // quitting=true + parar notifier/reminder/clockSync/bgNotify + destroyTray
+    } catch (e: any) {
+      deps.onLog("updater.install.teardown.error", { message: redact((e && e.message) || e) });
+    }
+    try {
+      // isSilent=false → instalador assistido VISÍVEL (nunca silencioso sem confirmação);
+      // isForceRunAfter=true → reabre o app após instalar.
+      autoUpdater.quitAndInstall(false, true);
+      return { ok: true };
+    } catch (e: any) {
+      set({ status: "error", error: { message: redact((e && e.message) || e), code: codeOf(e) } });
+      return { ok: false, reason: "error", detail: redact((e && e.message) || e) };
+    }
+  }
+
+  function defer(): { ok: boolean } {
+    if (state.status === "update_available" || state.status === "downloaded" || state.status === "downloading" || state.status === "error") {
+      set({ status: "deferred" });
+    }
+    deps.onLog("updater.deferred", {});
+    return { ok: true };
+  }
+
+  function getState(): UpdaterState { return publicState(); }
+
+  function start() {
+    if (periodic) return;
+    periodic = setInterval(() => { void check("periodic", false); }, CHECK_MIN_INTERVAL_MS);
+    deps.onLog("updater.start", { installed, channel: state.channel, allowPrerelease: state.allowPrerelease });
+  }
+  function stop() {
+    if (periodic) { clearInterval(periodic); periodic = null; }
+    EVENTS.forEach((e) => { try { autoUpdater.removeAllListeners(e as any); } catch { /* */ } });
+    deps.onLog("updater.stop", {});
+  }
+  function checkAuto(reason: string) { void check(reason, false); }
+  function maybeCheckOnResume() {
+    if (state.lastCheckAt == null || (now() - state.lastCheckAt) >= CHECK_MIN_INTERVAL_MS) void check("resume", false);
+  }
+
+  return {
+    start,
+    stop,
+    getState,
+    check: (reason = "manual") => check(reason, true),
+    checkAuto,
+    maybeCheckOnResume,
+    download,
+    installAndRestart,
+    defer,
+  };
+}
