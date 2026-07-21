@@ -5,7 +5,7 @@
 # PresenceHubCanary (SQLite, migration new_sqlite_classes) + binding PRESENCE_HUB
 # + WebSocket Hibernation LIGADO (PRESENCE_WS_ENABLED=true). BROADCAST DESLIGADO
 # (PRESENCE_BROADCAST_ENABLED=false) — mantem estado + baseline, sem transicoes.
-# PINADO ao commit 6209918. Usa a config presence-service/wrangler.stage2.toml.
+# PINADO ao commit a562923 (Stage-2B). Usa a config presence-service/wrangler.stage2.toml.
 # Secrets do repo (owner): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, PRESENCE_TICKET_SECRET.
 # O valor do secret NUNCA e impresso. NAO toca Worker J6 (idseven-push) / Cloud Run /
 # Firestore / Rules / producao Desktop 1.0.178. Execucao SOMENTE manual.
@@ -29,7 +29,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PINNED_SHA: "6209918028fac73ace8e9d60ada9d509bef3c832"
+      PINNED_SHA: "a56292350068e172906572b27dc1e4a1a793eb73"
     steps:
       - name: "Gate — confirmacao literal"
         run: |
@@ -46,10 +46,10 @@ jobs:
           [ -n "$T" ] || { echo "::error::falta PRESENCE_TICKET_SECRET"; exit 1; }
           echo "OK: 3 secrets presentes (valores não exibidos)"
 
-      - name: "Checkout PINADO ao 6209918 (fonte autorizada)"
+      - name: "Checkout PINADO ao a562923 (fonte autorizada)"
         uses: actions/checkout@v5
         with:
-          ref: 6209918028fac73ace8e9d60ada9d509bef3c832
+          ref: a56292350068e172906572b27dc1e4a1a793eb73
 
       - name: "Guard — HEAD == commit pinado"
         run: |
@@ -84,7 +84,7 @@ jobs:
         working-directory: presence-service
         run: npm install --no-audit --no-fund
 
-      - name: "Testes de proteção (ticket 9/9 + presença 23/23)"
+      - name: "Testes de proteção (ticket + aggregator pending/TTL + contrato do DO)"
         working-directory: presence-service
         run: npm test
 
