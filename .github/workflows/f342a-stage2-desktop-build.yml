@@ -23,7 +23,7 @@ name: "[manual] F3.4.2A Stage-2A Desktop Build (canary 1.0.179-canary.2)"
       ref:
         description: "Branch/commit a buildar"
         required: true
-        default: "desktop/f342a-realtime-presence-websocket-canary"
+        default: "desktop/f342a-x-tray-presence-persistence-canary"
 
 permissions:
   contents: read
@@ -76,6 +76,16 @@ jobs:
       - name: "Testes do cliente WebSocket de presença (segurança + fluxo: ticket/heartbeat/reconexão/baseline)"
         working-directory: ${{ env.APP_DIR }}
         run: node scripts/f342a-presence-client.test.mjs
+
+      - name: "Testes de NOTIFICAÇÕES de presença (Stage-2C — baseline no-notify/0->1/1->0/self/dedupe/reconnect)"
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -eo pipefail
+          if [ -f scripts/f342a-presence-notifications.test.mjs ]; then
+            node scripts/f342a-presence-notifications.test.mjs
+          else
+            echo "notificações (Stage-2C) ausentes neste ref — pulando (candidata anterior à ativação do broadcast)"
+          fi
 
       - name: "Testes de ciclo de vida da presença (Stage-2A-X — fechar-no-X mantém WS/heartbeat; logout/Sair/quit encerram)"
         working-directory: ${{ env.APP_DIR }}

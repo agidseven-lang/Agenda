@@ -1,11 +1,12 @@
 # =====================================================================
 # [manual] idseven-presence-canary — DEPLOY STAGE 2 (DO + WebSocket) via GitHub Actions
 # ---------------------------------------------------------------------
-# Implanta o Worker isolado idseven-presence-canary no STAGE 2: Durable Object
+# Implanta o Worker isolado idseven-presence-canary no STAGE 2C: Durable Object
 # PresenceHubCanary (SQLite, migration new_sqlite_classes) + binding PRESENCE_HUB
-# + WebSocket Hibernation LIGADO (PRESENCE_WS_ENABLED=true). BROADCAST DESLIGADO
-# (PRESENCE_BROADCAST_ENABLED=false) — mantem estado + baseline, sem transicoes.
-# PINADO ao commit a562923 (Stage-2B). Usa a config presence-service/wrangler.stage2.toml.
+# + WebSocket Hibernation LIGADO (PRESENCE_WS_ENABLED=true). BROADCAST LIGADO
+# (PRESENCE_BROADCAST_ENABLED=true) — transmite SOMENTE as transicoes canonicas
+# 0<->1 (entrou/saiu), com auto-exclusao do proprio usuario na fonte.
+# PINADO ao commit eed520e (Stage-2C). Usa a config presence-service/wrangler.stage2.toml.
 # Secrets do repo (owner): CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, PRESENCE_TICKET_SECRET.
 # O valor do secret NUNCA e impresso. NAO toca Worker J6 (idseven-push) / Cloud Run /
 # Firestore / Rules / producao Desktop 1.0.178. Execucao SOMENTE manual.
@@ -29,7 +30,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      PINNED_SHA: "a56292350068e172906572b27dc1e4a1a793eb73"
+      PINNED_SHA: "eed520e1a81da52bceb7a0962e637604e0e14020"
     steps:
       - name: "Gate — confirmacao literal"
         run: |
@@ -46,10 +47,10 @@ jobs:
           [ -n "$T" ] || { echo "::error::falta PRESENCE_TICKET_SECRET"; exit 1; }
           echo "OK: 3 secrets presentes (valores não exibidos)"
 
-      - name: "Checkout PINADO ao a562923 (fonte autorizada)"
+      - name: "Checkout PINADO ao eed520e (fonte autorizada Stage-2C)"
         uses: actions/checkout@v5
         with:
-          ref: a56292350068e172906572b27dc1e4a1a793eb73
+          ref: eed520e1a81da52bceb7a0962e637604e0e14020
 
       - name: "Guard — HEAD == commit pinado"
         run: |
@@ -68,12 +69,12 @@ jobs:
           grep -vE '^\s*#' "$TOML" | grep -qE 'name *= *"PRESENCE_HUB"' || { echo "::error::binding PRESENCE_HUB ausente"; exit 1; }
           grep -vE '^\s*#' "$TOML" | grep -qE 'new_sqlite_classes *= *\[ *"PresenceHubCanary" *\]' || { echo "::error::migration new_sqlite_classes ausente"; exit 1; }
           grep -q 'PRESENCE_WS_ENABLED = "true"' "$TOML" || { echo "::error::WS != true (stage 2 exige WS ligado)"; exit 1; }
-          grep -q 'PRESENCE_BROADCAST_ENABLED = "false"' "$TOML" || { echo "::error::BROADCAST != false (broadcast so no stage 2B)"; exit 1; }
+          grep -q 'PRESENCE_BROADCAST_ENABLED = "true"' "$TOML" || { echo "::error::BROADCAST != true (Stage-2C LIGA o broadcast)"; exit 1; }
           grep -q 'PRESENCE_AUTH_ENABLED = "true"' "$TOML" || { echo "::error::AUTH != true"; exit 1; }
           grep -q 'name = "idseven-presence-canary"' "$TOML" || { echo "::error::name != idseven-presence-canary"; exit 1; }
           # so linhas NAO-comentario (o comentario de isolamento cita 'idseven-push' de proposito)
           grep -vE '^\s*#' "$TOML" | grep -q 'idseven-push' && { echo "::error::referencia o Worker J6"; exit 1; } || true
-          echo "OK: stage-2 DO+WS presentes; broadcast off; J6 nao referenciado"
+          echo "OK: stage-2C DO+WS presentes; broadcast ON; J6 nao referenciado"
 
       - name: "Setup Node"
         uses: actions/setup-node@v5
@@ -115,7 +116,7 @@ jobs:
           printf '%s' "$PRESENCE_TICKET_SECRET" | npx wrangler secret put PRESENCE_TICKET_SECRET -c wrangler.stage2.toml
           echo "OK: PRESENCE_TICKET_SECRET configurado no Worker (valor não exibido)"
 
-      - name: "Verificacao /health (ws:true, broadcast:false) + /auth + /ws vivos (sanitizada)"
+      - name: "Verificacao /health (ws:true, broadcast:true) + /auth + /ws vivos (sanitizada)"
         run: |
           set -e
           echo "== GET /health (poll ate ws:true; propagacao da Cloudflare pode levar alguns segundos) =="
@@ -129,7 +130,7 @@ jobs:
           echo "$H" | grep -q '"ok":true' || { echo "::error::/health sem ok:true"; exit 1; }
           echo "$H" | grep -q '"auth":true' || { echo "::error::flag auth != true"; exit 1; }
           echo "$H" | grep -q '"ws":true' || { echo "::error::flag ws != true apos propagacao (stage 2 exige WS ligado)"; exit 1; }
-          echo "$H" | grep -q '"broadcast":false' || { echo "::error::flag broadcast != false (broadcast so no stage 2B)"; exit 1; }
+          echo "$H" | grep -q '"broadcast":true' || { echo "::error::flag broadcast != true (Stage-2C exige broadcast ligado)"; exit 1; }
           echo "== POST /auth sem Bearer (espera 401 missing_bearer — rota viva) =="
           A="$(curl -sS -m 20 -X POST -H 'content-type: application/json' --data '{}' "$PRESENCE_URL/auth")"
           echo "$A" | grep -q 'missing_bearer' || { echo "::error::/auth não respondeu missing_bearer"; exit 1; }
@@ -142,4 +143,4 @@ jobs:
           # WebSocket COMPLETO (Sec-WebSocket-Key/Version) para repassar o Upgrade ao Worker; um curl com
           # apenas o header Upgrade recebe 426 na borda, sem chegar ao verifyTicket. O verifyTicket esta
           # coberto por ticket.test.mjs (9/9: assina/verifica/expira/adultera/aud/reuso) + prova fisica real.
-          echo "===== GO: idseven-presence-canary STAGE 2 no ar — DO + WebSocket LIGADOS (/health ws:true; /ws 426 sem upgrade); broadcast DESLIGADO. ====="
+          echo "===== GO: idseven-presence-canary STAGE 2 no ar — DO + WebSocket LIGADOS (/health ws:true; /ws 426 sem upgrade); broadcast LIGADO. ====="
