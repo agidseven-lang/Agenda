@@ -7840,7 +7840,7 @@ function openSheet(which){
 }
 
 /* ---- TASK FORM (wizard) ---- */
-function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null};}
+function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false};}
 function openTaskForm(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
 // F3.3.75A — função CANÔNICA de "Nova tarefa": TODO entry point de CRIAÇÃO recomeça na ETAPA 1
 // (Setor), sem reaproveitar etapa/setor/título/cliente/responsável/briefing/conteúdos/anexos/
@@ -8054,6 +8054,11 @@ async function saveTask(){const f=state.form;
   // 1.0.104 — trava anti-duplo-envio: dois cliques rápidos em "Confirmar/Enviar" criavam
   // DOIS docs de tarefa (duas telas/cards). Um único add por submissão.
   if(f._saving)return; f._saving=true;
+  // F3.4.3E — CONSUMO SEGURO de _sendAfterSave: captura o valor e LIMPA o estado IMEDIATAMENTE.
+  // Uma tentativa interrompida por validação/erro NÃO pode deixar ação pendente para outro clique,
+  // tarefa ou setor — o modal de envio ao cliente só reabre com um NOVO clique explícito. Nunca
+  // persistida (localStorage/sessionStorage). A abertura do modal usa a cópia local `sendAfter`.
+  const sendAfter=f._sendAfterSave===true; f._sendAfterSave=false;
   if(!f.sector){f._saving=false;alert('Selecione o setor.');f.step=0;render();return;}
   const t=tpl();
   if(t&&t.clientRequired&&!f.client.trim()){f._saving=false;alert('Para '+secOf(state.form.sector).label+' o cliente é obrigatório.');f.step=1;render();return;}
@@ -8090,14 +8095,16 @@ async function saveTask(){const f=state.form;
     if(!data.socialOwnerId){ data.socialOwnerId=_soc.id||null; data.socialOwnerName=_soc.name||''; }
   }
   // Aditivo: cronograma inicia em 'rascunho_social' (ou 'pronto_cliente' se chamada do botao Enviar)
-  if(isClientSector(secOf(f.sector).key)){data.cronStatus=f._sendAfterSave?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
-    data.clientFlowStatus=f._sendAfterSave?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
-  const sendAfter=!!f._sendAfterSave;
+  if(isClientSector(secOf(f.sector).key)){data.cronStatus=sendAfter?'pronto_cliente':'rascunho_social';if(f.subtype)data.cronSub=f.subtype;
+    data.clientFlowStatus=sendAfter?'enviado':'afazer';data.clientWorkflowStage=data.clientFlowStatus;}
   let ref;
   try{ref=await db.collection('tasks').add(data);}
   catch(e){f._saving=false;console.warn('saveTask add',e);alert('Não foi possível salvar a tarefa. Verifique a conexão e tente novamente.');render();return;}
   const sector=f.sector;state.form=null;
-  if(sendAfter&&ref&&ref.id){
+  // F3.4.3E — TRAVA POR SETOR: o modal de envio ao cliente só abre quando o setor SALVO é
+  // comprovadamente de cliente (isClientSector). Para edicao_midia/Social/Designer/Roteiro e
+  // qualquer setor interno, o envio ao cliente é IMPOSSÍVEL mesmo com estado residual da flag.
+  if(sendAfter&&isClientSector(secOf(sector).key)&&ref&&ref.id){
     // mantemos o board aberto e abrimos o modal de envio com a tarefa recem-criada
     state.tab='tarefas';state.boardSector=sector;boardCol=0;render();
     openSendClientModal({id:ref.id,client:data.client,title:data.title,sector:data.sector,cronContents:data.cronContents||[],cronSub:data.cronSub,cronStatus:data.cronStatus});
@@ -8285,7 +8292,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-cfghc]')){appearSet({hc:el.dataset.cfghc==='on'});return;}
   if(el=g('[data-pickasg]')){if(state.form){const id=el.dataset.pickasg||null;state.form.assigneeId=id;const u=id?state.users.find(x=>x.id===id):null;state.form.assignee=u?(u.name||''):'';}closeModal();render();return;}
   if(el=g('[data-form]')){const a=el.dataset.form;if(a==='close'){state.form=null;render();}else if(a==='back'){state.form.step=Math.max(0,state.form.step-1);render();}else if(a==='next')stepNext();else if(a==='save')await saveTask();return;}
-  if(el=g('[data-fsector]')){state.form.sector=el.dataset.fsector;state.form.subtype=null;state.form.contents=[];state.form.checklist=[];render();return;}
+  if(el=g('[data-fsector]')){state.form.sector=el.dataset.fsector;state.form.subtype=null;state.form.contents=[];state.form.checklist=[];state.form._sendAfterSave=false;render();return;}
   if(el=g('[data-fstatus]')){state.form.status=el.dataset.fstatus;render();return;}
   if(el=g('[data-ftoggle]')){state.form[el.dataset.ftoggle]=!state.form[el.dataset.ftoggle];render();return;}
   if(el=g('[data-fsub]')){state.form.subtype=el.dataset.fsub;state.form.checklist=[];state.form.contents=[];state.form._openContent=0;render();return;}

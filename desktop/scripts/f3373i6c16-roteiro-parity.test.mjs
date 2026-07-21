@@ -72,8 +72,11 @@ ok('D3 isClientFlow usa isClientSector',
   /function isClientFlow\(t\)\{return !!t&&isClientSector\(secOf\(t\.sector\)\.key\);\}/.test(HTML));
 ok('D4 canSendToClient libera roteiro via isClientSector (cliente + >=1 tema + papel)',
   /if\(!isClientSector\(secOf\(f\.sector\)\.key\)\)return false;/.test(HTML));
+// F3.4.3E — o valor gravado é IDÊNTICO; a leitura da flag foi hasteada para a cópia local `sendAfter`
+// (const sendAfter=f._sendAfterSave===true, capturada e LIMPA no topo de saveTask — consumo seguro).
+// `f._sendAfterSave?` ≡ `sendAfter?` para todos os valores reais da flag (só true/false/undefined).
 ok('D5 save grava cronStatus/clientFlowStatus para o fluxo-cliente (cronograma+roteiro)',
-  /if\(isClientSector\(secOf\(f\.sector\)\.key\)\)\{data\.cronStatus=f\._sendAfterSave\?'pronto_cliente':'rascunho_social';if\(f\.subtype\)data\.cronSub=f\.subtype;/.test(HTML));
+  /if\(isClientSector\(secOf\(f\.sector\)\.key\)\)\{data\.cronStatus=sendAfter\?'pronto_cliente':'rascunho_social';if\(f\.subtype\)data\.cronSub=f\.subtype;/.test(HTML));
 
 /* ── E: stepDados — Roteiro sem Responsável/Etapa/Período ── */
 ok('E1 isRoteiro derivado no stepDados', /const isRoteiro=\(typeof secOf==='function'\)&&secOf\(f\.sector\)\.key==='roteiro';/.test(HTML));

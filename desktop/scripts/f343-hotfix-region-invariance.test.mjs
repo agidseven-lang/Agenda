@@ -38,19 +38,23 @@ const AUTH_EXACT = new Set([
   'desktop/scripts/f3377a-r3-single-producer-clock.test.mjs', 'desktop/scripts/f3377a-r4b-http-date-clock.test.mjs',
   'desktop/scripts/f33D-background-notif.test.mjs', 'desktop/scripts/f33E-main-notifier.test.mjs',
   'desktop/scripts/f33N-assign-baseline-fix.test.mjs',
+  // F3.4.3E — acoplamento BEHAVIOR-PRESERVING: o valor gravado por cronStatus/clientFlowStatus é
+  // idêntico; a leitura da flag foi hasteada de `f._sendAfterSave?` para a cópia local `sendAfter?`
+  // (consumo seguro em saveTask). A asserção D5 acompanha o literal equivalente — não afrouxa a prova.
+  'desktop/scripts/f3373i6c16-roteiro-parity.test.mjs',
 ]);
 function authorized(rel) {
   if (AUTH_EXACT.has(rel)) return true;
-  if (/^desktop\/scripts\/f343-[^/]*\.test\.mjs$/.test(rel)) return true;   // novos testes do hotfix
+  if (/^desktop\/scripts\/f343[a-z0-9]*-[^/]*\.test\.mjs$/.test(rel)) return true;   // novos testes do hotfix (f343-, f343d-, …)
   if (/^desktop\/scripts\/fixtures\/f343\//.test(rel)) return true;         // fixtures do hotfix
   if (rel === 'desktop/scripts/F343-TEST-STATUS.md') return true;           // registro de status do hotfix
   return false;
 }
 
-/* ── 1) versão: PERMITE somente a rc exata 1.0.180-rc.1 ── */
+/* ── 1) versão: PERMITE somente a rc exata 1.0.180-rc.2 (F3.4.3E — nova QA privada) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.180-rc.1 (rc exata permitida)', pj.version === '1.0.180-rc.1');
+  ok('1 package.json version === 1.0.180-rc.2 (rc exata permitida)', pj.version === '1.0.180-rc.2');
 }
 
 /* ── 2) git diff --name-only 9444e7f -- desktop: TODA mudança rastreada deve ser AUTORIZADA ── */
