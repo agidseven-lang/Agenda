@@ -33,26 +33,40 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
   const state: NotifierState = { uid, sinceMs: Date.now() };
   diag("notifier.start", { uid, sinceMs: state.sinceMs }); // F3.3.10-DIAG (só log)
 
-  // tasks: nova tarefa atribuida a mim
+  // F3.4.3 — DETECÇÃO POR TRANSIÇÃO (substitui o gate por horário `assignedAt < sinceMs`, que
+  // HARD-DROPPAVA atribuições AO VIVO sob clock-skew entre máquinas). O produtor do MAIN passa a ser
+  // AUTORITATIVO das 3 janelas (visível/minimizado/oculto). Baseline SEMEADO no 1º snapshot
+  // (Firestore entrega o estado inicial como `added`): marca as atribuições EXISTENTES como vistas
+  // SEM emitir; depois emite só TRANSIÇÕES novas/alteradas (mudança de designer OU novo assignedAt),
+  // como o seed do renderer (notifScanAssign). NÃO hard-dropa por assignedAt ausente/incoerente.
+  const lastDesignerId = new Map<string, string | null>(); // taskId -> designerId (para transição de designer)
+  const lastAssignedAt = new Map<string, number>();        // taskId -> assignedAt (para re-envio ao MESMO designer)
+  const lastAssigneeId = new Map<string, string | null>(); // taskId -> assigneeId (u1: task_assigned direto)
+  let seededDa = false;
+  let seededAsg = false;
+
+  // tasks: TAREFA DIRETA atribuida a mim (assigneeId), sem designerAssignment p/ mim (u1b cobre esse).
   const u1 = listen<Task>("tasks", (snap) => {
+    const firstRun = !seededAsg;
     snap.docChanges().forEach((ch) => {
-      if (ch.type !== "added") return;
+      if (ch.type !== "added" && ch.type !== "modified" && ch.type !== "removed") return;
+      if (ch.type === "removed") { lastAssigneeId.delete(ch.doc.id); return; }
       const t = { id: ch.doc.id, ...(ch.doc.data() as any) } as Task;
-      const created = Number(t.createdAt) || 0;
-      if (created && created < state.sinceMs) return;          // historico
-      if (!t.assigneeId || t.assigneeId !== state.uid) return; // nao e p/ mim
+      const cur = (t.assigneeId != null ? String(t.assigneeId) : null);
+      const prev = lastAssigneeId.has(t.id) ? lastAssigneeId.get(t.id) : undefined;
+      lastAssigneeId.set(t.id, cur);
+      if (firstRun) return;                                    // BASELINE SEED: marca sem emitir
+      if (!cur || cur !== state.uid) return;                   // nao e p/ mim
       if (t.by && t.by === state.uid) return;                  // eu mesmo criei
       // F3.3.77A-R3 (Bloqueador 1) — PRODUTOR ÚNICO: se a tarefa já carrega um designerAssignment
       // PARA MIM, a atribuição é notificada UMA ÚNICA vez pelo ramo RICO designer_assigned (u1b).
-      // NÃO emitir também o task_assigned genérico: seu dedupKey (task_assigned:<id>) DIFERE do da
-      // azul rica (designer_assigned:<id>:<designerId>:<at>) e ESCAPARIA o dedup do HUB → 2 azuis
-      // (a genérica "superior" com identidade pobre + a rica "inferior"). Esta é a causa física da
-      // duplicidade: a criação atômica de Edição de mídia grava assigneeId=Designer E designerAssignment.
       const _daT = (t as any).designerAssignment;
       if (_daT && _daT.designerId === state.uid) {
         diag("assignment.duplicate.blocked", { taskId: t.id, producer: "notifier.u1.task_assigned", canonical: "designer_assigned(u1b)" });
         return;
       }
+      if (prev === cur) return;                                // sem transição (mesmo assignee) → não duplica
+      const created = Number(t.createdAt) || 0;
       deliver({
         eventType: "task_assigned", source: "notifier", providerCalled: false,
         taskId: t.id, taskTitle: t.title || "Sem titulo", clientName: t.client || "",
@@ -70,22 +84,35 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
         dedupKey: `task_assigned:${t.id}`,
       });
     });
+    if (firstRun) seededAsg = true;
   });
 
   // tasks (added/modified): cronograma ENVIADO AO DESIGNER (atribuicao) — notifica o designer.
-  // Dedup por assignedAt (1 toast por atribuicao; cobre added na carga e modified ao vivo).
+  // TRANSIÇÃO de designerAssignment.designerId (ou novo assignedAt) = 1 azul por atribuição real.
   const u1b = listen<Task>("tasks", (snap) => {
+    const firstRun = !seededDa;
     snap.docChanges().forEach((ch) => {
-      if (ch.type !== "modified" && ch.type !== "added") return;
+      if (ch.type !== "added" && ch.type !== "modified" && ch.type !== "removed") return;
+      if (ch.type === "removed") { lastDesignerId.delete(ch.doc.id); lastAssignedAt.delete(ch.doc.id); return; }
       const t = { id: ch.doc.id, ...(ch.doc.data() as any) } as any;
-      const da = t.designerAssignment;
-      if (!da || da.designerId !== state.uid) return;          // nao fui eu o designer escolhido
-      if (da.assignedBy && da.assignedBy === state.uid) { diag("notifier.assign.skip", { taskId: t.id, reason: "self" }); return; }
+      const da = t.designerAssignment || {};
+      const cur = (da.designerId != null ? String(da.designerId) : null); // designer atual da tarefa
       const at = Number(da.assignedAt) || 0;
-      if (at && at < state.sinceMs) { diag("notifier.assign.skip", { taskId: t.id, reason: "before-login", at, sinceMs: state.sinceMs }); return; } // atribuicao anterior ao login
-      // F3.3.77A-R3 (FASE 3) — eventId/dedupKey CANÔNICO determinístico: designer_assigned:<taskId>:<designerId>:<assignedAtMs>.
-      // IDÊNTICO ao do renderer (notifScanAssign/notifAssignKeyOf) → o HUB colapsa os dois produtores; robusto a reatribuição (designerId novo → chave nova).
-      const _canonKey = `designer_assigned:${t.id}:${da.designerId || ""}:${at}`;
+      const prev = lastDesignerId.has(t.id) ? lastDesignerId.get(t.id) : undefined;
+      const prevAt = lastAssignedAt.has(t.id) ? lastAssignedAt.get(t.id) : undefined;
+      lastDesignerId.set(t.id, cur);
+      lastAssignedAt.set(t.id, at);
+      if (firstRun) return;                                    // BASELINE SEED: marca sem emitir
+      if (!cur || cur !== state.uid) return;                   // nao fui eu o designer escolhido
+      if (da.assignedBy && da.assignedBy === state.uid) { diag("notifier.assign.skip", { taskId: t.id, reason: "self" }); return; }
+      // NOVA/ALTERADA: mudança de designer (prev !== cur) OU novo assignedAt (re-envio ao mesmo
+      // designer). Sem transição ⇒ não duplica. NÃO hard-dropa por assignedAt ausente (at pode ser 0).
+      const changed = (prev !== cur) || (at !== prevAt);
+      if (!changed) { diag("notifier.assign.skip", { taskId: t.id, reason: "no-change", designerId: cur, at }); return; }
+      // F3.4.3 — dedupKey CANÔNICO (idêntico ao renderer quando há assignedAt): designer_assigned:
+      // <taskId>:<designerId>:<assignedAtMs>; se assignedAt for falsy, cai p/ designer_assigned:
+      // <taskId>:<designerId> (NÃO hard-dropa — o renderer descartava; o main, autoritativo, emite).
+      const _canonKey = at ? `designer_assigned:${t.id}:${da.designerId || ""}:${at}` : `designer_assigned:${t.id}:${da.designerId || ""}`;
       diag("assignment.producer", { taskId: t.id, type: ch.type, designerId: da.designerId, assignedBy: da.assignedBy, at, producer: "notifier.u1b", dedupKey: _canonKey }); // F3.3.10-DIAG (só log)
       const linha = `${t.title || "Cronograma"}${t.client ? " — " + t.client : ""}`;
       const byName = da.assignedByName || "";
@@ -107,6 +134,7 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
         dedupKey: _canonKey,
       });
     });
+    if (firstRun) seededDa = true;
   });
 
   // events: novo compromisso para mim

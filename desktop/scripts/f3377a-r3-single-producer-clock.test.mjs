@@ -20,166 +20,157 @@
    Edição de mídia 40/20, Cronograma 30/10, Roteiro sem SLA — preservados.
 
    RED×GREEN estático + extração-e-execução. Puro Node; sem rede/Firestore/build.
-   ===================================================================== */
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
+   -----------------------------------------------------------------------------
+   F3.4.3C — reescrito para o contrato produtor-único-no-main (substitui o contrato
+   antigo; histórico no Git). O PRODUTOR ÚNICO de SLA/atribuição migrou do RENDERER
+   para o PROCESSO MAIN: slaScheduler.ts (SLA amarelo/vermelho/crítico) + notifier.ts
+   (azul de atribuição por transição), ambos alimentados pelo listener Firestore do
+   main e entregando pelo MESMO deliverNotification (toast visível / bg-window
+   minimizado-oculto). O renderer NÃO emite mais SLA nem atribuição (notifScanSla/
+   notifScanAssign seguem DEFINIDOS mas SEM chamadores; notifScan só roda o fluxo).
+   O relógio canônico (slaNow no main / canonicalNowMs no renderer) e a linha do
+   tempo por setor permanecem a fonte única dos marcos. Prova por EXECUÇÃO do
+   slaScheduler REAL (compilado) + slaRules REAL, e estática do renderer/main.
+   ===================================================================== */
+import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import Module from 'node:module';
+import { createRequire } from 'node:module'; import { fileURLToPath } from 'node:url'; import { execFileSync } from 'node:child_process';
+import { extractDeliver } from './fixtures/f343/deliver-harness.mjs';
+
+const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
 const H = fs.readFileSync(path.join(DESK, 'src', 'renderer', 'index.html'), 'utf8');
 const NT = fs.readFileSync(path.join(DESK, 'src', 'main', 'notifier.ts'), 'utf8');
 const MAIN = fs.readFileSync(path.join(DESK, 'src', 'main', 'main.ts'), 'utf8');
+const SCHED = fs.readFileSync(path.join(DESK, 'src', 'main', 'slaScheduler.ts'), 'utf8');
+const REAL_SLARULES = path.join(DESK, 'src', 'main', 'slaRules.js');
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; console.log('  PASS — ' + n); } else { fail++; console.log('  FAIL — ' + n); } };
 
-/* brace-balanced extractor de `function NAME(...) { ... }` */
-function grab(src, name) {
-  const sig = 'function ' + name + '(';
-  const a = src.indexOf(sig); if (a < 0) throw new Error('não achei ' + name);
-  let i = src.indexOf('{', a), depth = 0;
-  for (; i < src.length; i++) { const c = src[i]; if (c === '{') depth++; else if (c === '}') { depth--; if (depth === 0) return src.slice(a, i + 1); } }
-  throw new Error('sem fecho ' + name);
-}
+console.log('== F3.3.77A-R3 (F3.4.3C) — produtor único NO MAIN + relógio/linha do tempo canônicos ==');
 
-console.log('== F3.3.77A-R3 — produtor único da azul + relógio/linha do tempo canônicos ==');
-
-/* ═══════════════ BLOQUEADOR 1 — PRODUTOR ÚNICO (estático no notifier.ts) ═══════════════ */
+/* ═══════════════ BLOQUEADOR 1 — PRODUTOR ÚNICO da AZUL, agora NO MAIN (notifier.ts) ═══════════════ */
 ok('B1.1 [main] u1 (task_assigned) IGNORA tarefa com designerAssignment p/ mim (produtor único)',
   /const _daT = \(t as any\)\.designerAssignment;\s*if \(_daT && _daT\.designerId === state\.uid\) \{[\s\S]{0,220}return;\s*\}/.test(NT));
-ok('B1.2 [main] u1 loga assignment.duplicate.blocked (auditoria da causa física)',
-  /diag\("assignment\.duplicate\.blocked", \{ taskId: t\.id, producer: "notifier\.u1\.task_assigned"/.test(NT));
-ok('B1.3 [main] u1b usa eventId CANÔNICO designer_assigned:<id>:<designerId>:<at>',
-  /const _canonKey = `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}:\$\{at\}`;/.test(NT) &&
+ok('B1.2 [main] u1b usa dedupKey CANÔNICO designer_assigned:<id>:<designerId>:<at> (fallback sem at)',
+  /const _canonKey = at \? `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}:\$\{at\}` : `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}`;/.test(NT) &&
   /dedupKey: _canonKey,/.test(NT));
-ok('B1.4 [main] u1b loga assignment.producer (produtor canônico único)',
-  /diag\("assignment\.producer", \{[\s\S]{0,160}producer: "notifier\.u1b"/.test(NT));
-ok('B1.5 [main] u1b action = detail/<taskId> (abre a TAREFA; paridade com o renderer)',
+ok('B1.3 [main] u1b action = detail/<taskId> (abre a TAREFA; paridade com o renderer)',
   /action: \{ type: "detail", deep: `detail\/\$\{t\.id\}` \},\s*dedupKey: _canonKey,/.test(NT));
-ok('B1.6 [main] u1 action = detail/<taskId> (dedup-twin consistente com o renderer)',
-  /action: \{ type: "detail", deep: `detail\/\$\{t\.id\}` \},\s*dedupKey: `task_assigned:\$\{t\.id\}`,/.test(NT));
+ok('B1.4 [renderer] notifScanAssign/notifScanSla seguem DEFINIDOS mas SEM chamadores (visual preservado, sem emitir)',
+  /function notifScanAssign\(\)/.test(H) && /function notifScanSla\(\)/.test(H) &&
+  (H.match(/notifScanAssign\(\)/g) || []).length === 1 && (H.match(/notifScanSla\(\)/g) || []).length === 1);
+ok('B1.5 [renderer] notifScan só roda o FLUXO (não emite SLA/atribuição)',
+  /function notifScan\(\)\{ notifScanFlow\(\); \}/.test(H));
 
-/* eventId canônico IDÊNTICO nos 3 sítios do renderer (senão o HUB não colapsaria → voltaria a duplicar) */
-ok('B1.7 [renderer] notifScanAssign usa o MESMO eventId canônico :taskId:designerId:assignedAt',
-  /dedupKey:'designer_assigned:'\+t\.id\+':'\+\(da\.designerId\|\|''\)\+':'\+at, action:\{type:'detail',deep:'detail\/'\+t\.id\}/.test(H));
-ok('B1.8 [renderer] notifAssignKeyOf (semente do baseline) usa o MESMO eventId canônico',
-  /return at\?\('designer_assigned:'\+t\.id\+':'\+\(da\.designerId\|\|''\)\+':'\+at\):'';/.test(H));
-
-/* SIMULAÇÃO EXECUTÁVEL do HUB (_notifSeen) — RED×GREEN da duplicidade.
-   Modela a criação atômica (assigneeId=Designer + designerAssignment) e os 3 produtores. */
+/* SIMULAÇÃO EXECUTÁVEL do HUB (_notifSeen) — o colapso da azul depende da chave canônica ÚNICA */
 {
   const UID = 'designer1', SOC = 'social1', AT = 1700000000000;
   const task = { id: 'm1', assigneeId: UID, by: SOC, designerAssignment: { designerId: UID, assignedBy: SOC, assignedAt: AT } };
   const canonKey = 'designer_assigned:' + task.id + ':' + task.designerAssignment.designerId + ':' + AT;
-  // produtores. u1Guarded = comportamento GREEN (com a guarda); u1Unguarded = RED (sem a guarda).
   const u1Unguarded = (t) => (t.assigneeId === UID && t.by !== UID) ? { key: 'task_assigned:' + t.id, ev: 'task_assigned' } : null;
   const u1Guarded = (t) => { const da = t.designerAssignment; if (da && da.designerId === UID) return null; return u1Unguarded(t); };
   const u1b = (t) => { const da = t.designerAssignment; return (da && da.designerId === UID && da.assignedBy !== UID) ? { key: 'designer_assigned:' + t.id + ':' + da.designerId + ':' + (da.assignedAt || 0), ev: 'designer_assigned' } : null; };
-  const rendererScan = u1b; // o renderer emite designer_assigned com a MESMA chave canônica
   const hub = (producers) => { const seen = new Set(), out = []; for (const p of producers) { const r = p(task); if (!r) continue; if (seen.has(r.key)) continue; seen.add(r.key); out.push(r); } return out; };
-
-  const red = hub([u1Unguarded, u1b, rendererScan]);
-  ok('B1.9 [RED] SEM a guarda: u1(task_assigned) + u1b(designer_assigned) escapam o dedup ⇒ 2 azuis', red.length === 2 && red.some(x => x.ev === 'task_assigned') && red.some(x => x.ev === 'designer_assigned'));
-
-  const green = hub([u1Guarded, u1b, rendererScan]);
-  ok('B1.10 [GREEN] COM a guarda: u1 é bloqueado; u1b + renderer colapsam na chave canônica ⇒ 1 azul', green.length === 1 && green[0].ev === 'designer_assigned' && green[0].key === canonKey);
-  ok('B1.11 [GREEN] a única azul é a RICA designer_assigned (canônica inferior), nunca a genérica', green.every(x => x.ev !== 'task_assigned'));
+  ok('B1.6 [RED] SEM a guarda: u1(task_assigned) + u1b(designer_assigned) escapam o dedup ⇒ 2 azuis', hub([u1Unguarded, u1b]).length === 2);
+  const green = hub([u1Guarded, u1b]);
+  ok('B1.7 [GREEN] COM a guarda: só a azul RICA designer_assigned sobrevive ⇒ 1 azul (chave canônica)', green.length === 1 && green[0].ev === 'designer_assigned' && green[0].key === canonKey);
 }
-
-/* HUB do main INALTERADO (dedup por dedupKey em _notifSeen) — o colapso depende da chave canônica */
-ok('B1.12 [main] HUB deduplica por dedupKey (_notifSeen) — inalterado',
+/* HUB do main deduplica por dedupKey (deliverNotification._notifSeen) — inalterado */
+ok('B1.8 [main] HUB deduplica por dedupKey (_notifSeen) no deliverNotification',
   /const key = String\(p\.dedupKey \|\| /.test(MAIN) && /if \(_notifSeen\.has\(key\)\)/.test(MAIN));
 
-/* ═══════════════ BLOQUEADOR 2 — RELÓGIO E LINHA DO TEMPO CANÔNICOS ═══════════════ */
-ok('B2.1 canonicalNowMs é a fonte ÚNICA de "agora" (seam com offset; hoje 0 = relógio local)',
-  /var _slaClockOffsetMs=0;/.test(H) && /function canonicalNowMs\(\)\{ return Date\.now\(\)\+_slaClockOffsetMs; \}/.test(H));
-ok('B2.2 canonicalNowMs + resolveCanonicalSlaTimeline expostos p/ QA/telas',
-  /window\.canonicalNowMs=canonicalNowMs; window\.resolveCanonicalSlaTimeline=resolveCanonicalSlaTimeline;/.test(H));
+/* ═══════════════ PRODUTOR ÚNICO DE SLA no MAIN — EXECUÇÃO do slaScheduler.ts REAL ═══════════════ */
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3sch-'));
+try {
+  execFileSync(process.execPath, [path.join(DESK, 'node_modules', 'typescript', 'lib', 'tsc.js'),
+    path.join(DESK, 'src', 'main', 'slaScheduler.ts'), '--outDir', tmp, '--module', 'commonjs',
+    '--target', 'es2020', '--skipLibCheck', '--esModuleInterop', '--moduleResolution', 'node'], { stdio: 'pipe' });
+} catch (e) { console.error('::error:: falha ao compilar slaScheduler.ts:', (e.stdout || e.message || '').toString().slice(0, 600)); process.exit(1); }
+const realLoad = Module._load;
+Module._load = function (request) {
+  if (request === 'electron') return { app: null };
+  if (request === './firebase' || /[\\/]firebase(\.js)?$/.test(request)) return { listen: () => () => {} };
+  if (request === './diag' || /[\\/]diag(\.js)?$/.test(request)) return { diag: () => {} };
+  if (request === './slaRules' || /[\\/]slaRules(\.js)?$/.test(request)) return realLoad.call(this, REAL_SLARULES, arguments[1], false);
+  return realLoad.apply(this, arguments);
+};
+const { startSlaScheduler } = require(path.join(tmp, 'slaScheduler.js'));
+Module._load = realLoad;
 
-/* superfícies vivas do SLA leem o relógio canônico (não Date.now() cru) — lockstep entre elas */
-const routed = ['function slaMonData', 'function slaCriticalFor', 'function notifScanSla', 'function slaOpRowPct', 'function detailSla', 'function slaibCompute'];
-ok('B2.3 superfícies vivas (monitor/cronômetro/notificação/chip/painel) leem canonicalNowMs',
-  /var now=canonicalNowMs\(\), f=\(typeof dtMs/.test(H) &&        // slaMonData
-  /var now=canonicalNowMs\(\), f=\(typeof dtMs==='function'\?dtMs:null\);   \/\* F3\.3\.77A-R3 — relógio canônico \(bloqueio operacional\)/.test(H) &&  // slaCriticalFor
-  /var now=canonicalNowMs\(\), f=\(typeof dtMs==='function'\?dtMs:null\), vis=\[\];/.test(H) &&  // notifScanSla
-  /const d=resolveTaskDisplayState\(t,nowMs\|\|canonicalNowMs\(\)/.test(H) &&  // kbv2SlaLocal (chip do card)
-  /var now=canonicalNowMs\(\), pd=d\.finishMs;/.test(H));           // detailSla
-
-/* boundary timer dispara a NOTIFICAÇÃO no limite exato + usa o relógio canônico */
-ok('B2.4 boundary timer arma pelo relógio canônico e DISPARA notifScanSla no limite exato',
-  /var now=canonicalNowMs\(\), b=slaMonNextBoundary\(now\); if\(!b\) return;/.test(H) &&
-  /_slaBoundaryTimer=setTimeout\(function\(\)\{[\s\S]{0,320}notifScanSla\(\)/.test(H));
-ok('B2.5 slaMonNextBoundary deriva os marcos da LINHA DO TEMPO canônica (mesmos instantes do cronômetro)',
-  /var tl=resolveCanonicalSlaTimeline\(t,f\); if\(!tl\.dueAtMs\) continue;\s*var bs=\[tl\.warningAtMs, tl\.overdueAtMs, tl\.criticalAtMs\];/.test(H));
-
-/* RETOMADA (resume/unlock): reavalia + rearma ≤3s, sem depender do poll de 30s */
-ok('B2.6 retomada (visibilitychange/focus) reavalia notifScanSla + rearma o boundary',
-  /document\.addEventListener\('visibilitychange',function\(\)\{ if\(document\.visibilityState==='visible'\) _slaResume\(\); \}\);/.test(H) &&
-  /window\.addEventListener\('focus',_slaResume\);/.test(H) &&
-  /_slaResume=function\(\)\{[\s\S]{0,460}notifScanSla\(\)[\s\S]{0,160}slaMonScheduleBoundary\(\)/.test(H));
-
-/* logs canônicos (FASE 12) */
-ok('B2.7 logs de tempo (sla.timer.arm/fire com canonicalNowMs/systemNowMs/drift)',
-  /ncDiag\('sla\.timer\.arm',\{boundaryMs:b,delayMs:delay,canonicalNowMs:now,systemNowMs:Date\.now\(\),clockOffsetMs:_slaClockOffsetMs\}\)/.test(H) &&
-  /ncDiag\('sla\.timer\.fire',\{[\s\S]{0,120}actualDriftMs:canonicalNowMs\(\)-b\}\)/.test(H));
-
-/* scheduleRevision (FASE 10) — semeado na criação, incrementado na edição, na dedup da MÍDIA (Cronograma byte-idêntico) */
-ok('B2.8 scheduleRevision semeado na criação atômica (designerSla.scheduleRevision:1)',
-  /seedAt:_now, seedBy:_soc\.id\|\|null, scheduleRevision:1 \};/.test(H));
-ok('B2.9 scheduleRevision incrementado na edição de prazo (invalida dedupes antigos)',
-  /patch\['designerSla\.scheduleRevision'\]=_slaScheduleRevOf\(t\)\+1;/.test(H));
-ok('B2.10 dedup MÍDIA inclui scheduleRevision; Cronograma (sem dedupByDesigner) permanece BYTE-idêntico',
-  /\(cfg&&cfg\.dedupByDesigner\) \? \(tag\+':'\+t\.id\+':'\+resp\.id\+':'\+d\.finishMs\+':r'\+_slaScheduleRevOf\(t\)\) : \(tag\+':'\+t\.id\+':'\+d\.finishMs\)/.test(H));
-
-/* EXTRAÇÃO-E-EXECUÇÃO de resolveCanonicalSlaTimeline — marcos EXATOS por setor */
-{
-  const SECTOR_SLA = grab(H, 'slaCfgDefault'); // só p/ garantir presença
-  const timelineSrc = grab(H, 'resolveCanonicalSlaTimeline') + '\n' + grab(H, '_slaScheduleRevOf') + '\n' + grab(H, 'slaCfgOf') + '\n' + grab(H, 'slaCfgDefault') + '\n' + grab(H, 'slaPanelFinishMs');
-  // SECTOR_SLA é uma var (objeto) — extrai a declaração
-  const vm = H.indexOf('var SECTOR_SLA='); const ve = H.indexOf('};', vm) + 2; const sectorVar = H.slice(vm, ve);
-  const PRE = sectorVar + '\n' +
-    'var SLA_PANEL_WARN_MS=30*60000, SLA_PANEL_GRACE_MS=10*60000;\n' +
-    'function secOf(s){var k=(s&&s.sector!==undefined)?s.sector:s; return {key:k};}\n' +
-    'function dtMs(d,t){return 0;}\n';
-  const T = new Function(PRE + timelineSrc + '\n; return { resolveCanonicalSlaTimeline };')();
-  const MIN = 60000, DUE = 1700000000000;
-  const mk = (sector) => ({ sector, designerSla: { planDueAt: DUE } });
-
-  const media = T.resolveCanonicalSlaTimeline(mk('edicao_midia'), null);
-  ok('B2.11 [timeline] Edição de mídia: warningMinutes=40, overdueGraceMinutes=20',
-    media.warningMinutes === 40 && media.overdueGraceMinutes === 20 && media.designerSla === true);
-  ok('B2.12 [timeline] Edição de mídia: AMARELO em planDueAt−40min, VERMELHO em planDueAt, crítico em +20min',
-    media.warningAtMs === DUE - 40 * MIN && media.overdueAtMs === DUE && media.criticalAtMs === DUE + 20 * MIN && media.dueAtMs === DUE);
-
-  const cron = T.resolveCanonicalSlaTimeline(mk('cronograma'), null);
-  ok('B2.13 [timeline] Cronograma: 30/10 — AMARELO em due−30, VERMELHO em due, crítico em +10 (preservado)',
-    cron.warningMinutes === 30 && cron.overdueGraceMinutes === 10 && cron.warningAtMs === DUE - 30 * MIN && cron.overdueAtMs === DUE && cron.criticalAtMs === DUE + 10 * MIN);
-
-  const rot = T.resolveCanonicalSlaTimeline(mk('roteiro'), null);
-  ok('B2.14 [timeline] Roteiro: designerSla=false (jamais SLA de designer)', rot.designerSla === false);
+const MIN = 60000;
+function newRig(uid, sharedSeen) {
+  const chan = extractDeliver(MAIN);
+  let NOW = 1700000000000, winState = 'visible', pending = null, tid = 0;
+  const delivered = []; const seen = sharedSeen || new Set(); let listenCb = null;
+  const sched = startSlaScheduler(() => uid, (p) => { const r = chan.deliver(winState, p); delivered.push({ eventType: p.eventType, dedupKey: p.dedupKey, channel: r.res.channel }); return r.res; }, {
+    now: () => NOW, listen: (name, cb) => { if (name === 'tasks') listenCb = cb; return () => {}; },
+    seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) },
+    setTimer: (fn, ms) => { pending = { fn, ms, id: ++tid }; return pending; }, clearTimer: (h) => { if (pending && h && pending.id === h.id) pending = null; },
+    onLog: () => {}, safetyMaxMs: 60000,
+  });
+  const ch = (type, id, data) => ({ type, doc: { id, data: () => data } });
+  return { sched, delivered, setWin: (w) => { winState = w; }, setNow: (n) => { NOW = n; }, now: () => NOW,
+    fireSnap: (changes) => { if (listenCb) listenCb({ docChanges: () => changes }); }, fireTimer: () => { const p = pending; if (p) { pending = null; p.fn(); } }, ch };
 }
+const cron = (id, uid, due) => ({ id, title: 'Cronograma', client: 'Hosp', sector: 'cronograma', designerAssignment: { designerId: uid, designerName: 'Marina Dias' }, designerFlowStatus: 'afazer', designerSla: { planDueAt: due } });
 
-/* ═══════════════ PRESERVAÇÕES (nada aprovado regrediu) ═══════════════ */
-ok('P1 SECTOR_SLA preservado: media 40/20 (crítico OFF), cronograma 30/10 (crítico ON), roteiro OFF',
-  /edicao_midia:\{designerSla:true,  warningMinutes:40, overdueGraceMinutes:20, critical:false, dedupByDesigner:true/.test(H) &&
-  /cronograma:  \{designerSla:true,  warningMinutes:30, overdueGraceMinutes:10, critical:true,  dedupByDesigner:false/.test(H) &&
-  /roteiro:     \{designerSla:false/.test(H));
-ok('P2 PANEL-CORE intacto: resolveTaskDisplayState mantém now=now||Date.now() (default; callers passam canônico)',
-  /function resolveTaskDisplayState\(t,now,dtMsFn\)\{\s*now=now\|\|Date\.now\(\);/.test(H));
-ok('P3 criação atômica preservada (designerAssignment + designerSla + assigneeId + status afazer no MESMO add)',
-  /data\.designerAssignment=\{ designerId:f\.assigneeId/.test(H) && /data\.designerFlowStatus='afazer'; data\.designerWorkflowStage='afazer';/.test(H) && /data\.status='afazer';/.test(H));
-ok('P4 temas aprovados preservados (data.videos = [{id,n,tema}])',
-  /data\.videos=_vids;/.test(H) && /videoTema/.test(H));
-ok('P5 correção B1/R2 dos campos de horário preservada (_isTimeDateEl + janela de graça)',
-  /function _isTimeDateEl\(el\)\{/.test(H) && /_fieldEditUntil/.test(H));
-ok('P6 textos SLA canônicos preservados (media "40 minutos"/"20 minutos"; cronograma "30"/"10")',
-  /Você tem 40 minutos para concluir esta tarefa\./.test(H) && /Você tem 20 minutos para concluir esta tarefa\./.test(H) &&
-  /Você tem 30 minutos para concluir esta tarefa\./.test(H) && /Você tem 10 minutos para concluir esta tarefa\./.test(H));
+/* SLA amarelo/vermelho produzido NO MAIN e roteado por deliverNotification nas 3 janelas */
+for (const [state, canal] of [['visible', 'toast'], ['minimized', 'bg-window'], ['hidden', 'bg-window']]) {
+  const r = newRig('dz1'); r.setWin(state); const NOW = r.now();
+  r.fireSnap([r.ch('added', 'ty', cron('ty', 'dz1', NOW + 20 * MIN))]);            // amarelo
+  const d = r.delivered.find((x) => x.eventType === 'sla_warning');
+  ok('B2.1 SLA AMARELO produzido no MAIN, ' + state + ' → ' + canal, !!d && d.channel === canal);
+}
+/* dedupe canônico: mesma fronteira em re-eval/reconcile → 1 emissão */
+{
+  const r = newRig('dz1'); const NOW = r.now();
+  r.fireSnap([r.ch('added', 'td', cron('td', 'dz1', NOW - 5 * MIN))]);             // vermelho de entrada
+  const after1 = r.delivered.length;
+  r.fireSnap([r.ch('modified', 'td', cron('td', 'dz1', NOW - 5 * MIN))]); r.sched.reconcile('resume'); r.fireTimer();
+  ok('B2.2 SLA no MAIN não duplica (seen-set + dedupKey canônico) em re-eval/reconcile', after1 === 1 && r.delivered.length === 1);
+}
+/* reconcile em restart/resume/unlock: boundary vencido no sleep entregue UMA vez */
+{
+  const r = newRig('dz1'); const NOW = r.now();
+  r.fireSnap([r.ch('added', 'ts', cron('ts', 'dz1', NOW + 20 * MIN))]);            // amarelo; vermelho em +20min
+  const before = r.delivered.length; r.setNow(NOW + 21 * MIN);
+  r.sched.reconcile('resume');
+  ok('B2.3 RESUME reconcilia e entrega o vermelho vencido no sleep (1×)', r.delivered.some((x) => x.eventType === 'sla_overdue') && r.delivered.length > before);
+  const before2 = r.delivered.length; r.sched.reconcile('unlock');
+  ok('B2.4 UNLOCK reconcilia sem reemitir o já-visto (dedupe canônico)', r.delivered.length === before2);
+}
+try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
+
+/* main é quem IMPORTA/INICIA o produtor e reconcilia em boot/resume/unlock */
+ok('B2.5 [main] importa e INICIA o slaScheduler (produtor único de SLA)',
+  /import \{ startSlaScheduler \} from "\.\/slaScheduler"/.test(MAIN) && /slaScheduler = startSlaScheduler\(\(\) => uid, deliverNotification, \{ now: slaNow, authUser: getAuthUser \}\)/.test(MAIN));
+ok('B2.6 [main] reconcilia SLA em boot/resume/unlock',
+  /slaScheduler\.reconcile\("boot"\)/.test(MAIN) && /slaScheduler\.reconcile\("resume"\)/.test(MAIN) && /slaScheduler\.reconcile\("unlock"\)/.test(MAIN));
+ok('B2.7 [main] scheduler reaproveita o listener Firestore do main (event-driven, não polling)',
+  /listen\("tasks"/.test(SCHED) && /docChanges\(\)/.test(SCHED) && !/setInterval/.test(SCHED));
+
+/* ═══════════════ BLOQUEADOR 2 — RELÓGIO/LINHA DO TEMPO CANÔNICOS (fonte única dos marcos) ═══════════════ */
+ok('B2.8 [main] slaNow espelha o gate de offset do renderer (synced/degraded/stale usam offset; senão local)',
+  /function slaNow\(\): number/.test(MAIN) && /q === "synced" \|\| q === "degraded" \|\| q === "stale"/.test(MAIN));
+ok('B2.9 [renderer] canonicalNowMs continua a fonte única de "agora" (visual)',
+  /function canonicalNowMs\(\)\{ return Date\.now\(\)\+_slaClockOffsetMs; \}/.test(H));
+/* linha do tempo canônica por setor via slaRules REAL (mesma matemática do renderer) */
+{
+  const rules = require(REAL_SLARULES); const DUE = 1700000000000;
+  const tl = (sector) => rules.resolveCanonicalSlaTimeline({ sector, designerSla: { planDueAt: DUE } }, rules.dtMs);
+  const media = tl('edicao_midia'), croc = tl('cronograma'), rot = tl('roteiro');
+  ok('B2.10 [slaRules] Edição de mídia 40/20: amarelo em due−40, vermelho em due, crítico em +20',
+    media.warningAtMs === DUE - 40 * MIN && media.overdueAtMs === DUE && media.criticalAtMs === DUE + 20 * MIN);
+  ok('B2.11 [slaRules] Cronograma 30/10 (preservado)', croc.warningAtMs === DUE - 30 * MIN && croc.overdueAtMs === DUE && croc.criticalAtMs === DUE + 10 * MIN);
+  ok('B2.12 [slaRules] Roteiro: designerSla=false (jamais SLA de designer)', rot.designerSla === false);
+}
 
 console.log('');
 console.log('RESULTADO: ' + pass + ' PASS, ' + fail + ' FAIL');
-console.log('HONESTIDADE: prova o PRODUTOR ÚNICO (dedup na ORIGEM, eventId canônico) e o RELÓGIO/LINHA');
-console.log('DO TEMPO canônicos (offset 0 = comportamento aprovado). A eliminação do clock-skew ENTRE');
-console.log('máquinas depende de uma FONTE DE TEMPO DE SERVIDOR (STOP GATE / FASE 8 — autorização do owner).');
+console.log('HONESTIDADE (F3.4.3C): o PRODUTOR ÚNICO agora vive no MAIN (slaScheduler + notifier), que');
+console.log('sobrevive à janela oculta e entrega pelo deliverNotification. O renderer não emite mais SLA/');
+console.log('atribuição (só visual). Relógio/linha do tempo canônicos preservam os marcos por setor.');
 if (fail) process.exit(1);

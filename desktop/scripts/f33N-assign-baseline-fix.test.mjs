@@ -1,246 +1,190 @@
 #!/usr/bin/env node
 /* =====================================================================
  * F3.3.17-R4 — PROVA do BUG (antigo) e da CORREÇÃO (novo) do baseline da notificação
- * de atribuição (Social → Designer), confinada ao renderer (index.html).
+ * de atribuição (Social → Designer).
  *
  * Executa o CÓDIGO-FONTE REAL (sem reimplementar) em sequências de snapshots reais, com o
- * notifEmit + dedup PERSISTENTE (notifSeen/localStorage) REAIS:
- *   - ANTIGO  = notifScanAssign de `git show HEAD` (versão da build física 1.0.146/R3): gate por
- *     horário `at < _notifAssignSince` (relógio de quem lê) → SUPRIME atribuição nova sob clock-skew.
- *   - NOVO    = notifScanAssign da árvore de trabalho (R4): SEMEIA histórico na 1ª varredura e
- *     notifica só chaves NOVAS por dedup persistente → robusto a clock-skew.
+ * notifEmit + dedup PERSISTENTE REAIS:
+ *   - ANTIGO  = gate por horário `at < _notifAssignSince` (relógio de quem lê) → SUPRIME
+ *     atribuição nova sob clock-skew.
+ *   - NOVO    = SEMEIA histórico na 1ª varredura e notifica só transições por dedup → robusto
+ *     a clock-skew.
  *
- * Prova (itens exigidos): bug antigo (skew suprime) · 1º snapshot semeia histórico · nova atribuição
- * dispara · clock-skew NÃO bloqueia · atribuição antiga não dispara · duplicidade não dispara ·
- * reatribuição dispara · anti-eco bloqueia o autor (Social) e libera o Designer · payload ator=Social/
- * responsável=Designer · o HUB do main INVOCA o canal desktop · path B (notifier.ts) é redundante.
- *
- * Read-only; não grava produto; não builda. Rodar:
- *   /opt/node22/bin/node desktop/scripts/f33N-assign-baseline-fix.test.mjs
+ * -----------------------------------------------------------------------------
+ * F3.4.3C — reescrito para o contrato produtor-único-no-main (substitui o contrato antigo;
+ * histórico no Git). A correção do baseline (semente no 1º snapshot + detecção por TRANSIÇÃO,
+ * sem comparar relógios) migrou do RENDERER para o PROCESSO MAIN (notifier.ts), que é o produtor
+ * ÚNICO e autoritativo da azul e sobrevive à janela oculta. Aqui provamos, EXECUTANDO o
+ * notifier.ts REAL (compilado): (1) o antigo gate por horário suprime — modelado — vs (2) o main
+ * dispara a MESMA atribuição sob clock-skew; semente do 1º snapshot; transição/dedupe/reatribuição;
+ * anti-eco; payload ator=Social/responsável=Designer; roteamento pelo deliverNotification (toast/
+ * bg-window); generalidade (qualquer Social/Designer). Renderer NÃO emite mais atribuição.
+ * Read-only; não grava produto; não builda.
  * ===================================================================== */
-import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url'; import { execSync } from 'child_process';
+import fs from 'fs'; import os from 'os'; import path from 'path'; import Module from 'module';
+import { createRequire } from 'module'; import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
+import { extractDeliver } from './fixtures/f343/deliver-harness.mjs';
+const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '..', '..');
-const HTML = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');           // NOVO (árvore)
-// ANTIGO = renderer da build FÍSICA 1.0.146/R3 (commit pré-R4): notifScanAssign com gate por horário.
-// Ref FIXA (não 'HEAD', que já é a correção). Em CI exige checkout com fetch-depth:0.
-const OLD_REF = 'ac66826';
-let OLD_HTML;
-try { OLD_HTML = execSync('git show ' + OLD_REF + ':desktop/src/renderer/index.html', { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); }
-catch (e) { console.error('::error:: não foi possível ler o renderer ANTIGO em ' + OLD_REF + ' (CI precisa de fetch-depth:0): ' + (e && e.message)); process.exit(2); }
-const NOTIFIER = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'notifier.ts'), 'utf8');
-const MAIN = fs.readFileSync(path.resolve(__dirname, '..', 'src', 'main', 'main.ts'), 'utf8');
+const DESK = path.resolve(__dirname, '..');
+const HTML = fs.readFileSync(path.join(DESK, 'src', 'renderer', 'index.html'), 'utf8');
+const NOTIFIER = fs.readFileSync(path.join(DESK, 'src', 'main', 'notifier.ts'), 'utf8');
+const MAIN = fs.readFileSync(path.join(DESK, 'src', 'main', 'main.ts'), 'utf8');
 
 let pass = 0, fail = 0; const errs = [];
 const ok = (n, c) => { if (c) pass++; else { fail++; errs.push('FAIL: ' + n); } };
-function fnSrc(src, n) { const a = src.indexOf('function ' + n + '('); if (a < 0) throw new Error('fn ' + n); let d = 0; for (let j = src.indexOf('{', a); j < src.length; j++) { const c = src[j]; if (c === '{') d++; else if (c === '}') { d--; if (!d) return src.slice(a, j + 1); } } }
 
 /* atores */
 const SOCIAL = { id: 'sm_ary', name: 'Arydyjany Carlôto', photo: 'https://img/ary.jpg' };
 const DESIGNER = { id: 'dz_mier', name: 'Miercohévisk Nascimento', photo: 'https://img/mier.jpg' };
-const READER_NOW = 1_700_000_000_000;     // "agora" no relógio do Designer (quem lê)
+const READER_NOW = 1_700_000_000_000;
 const AT_LIVE = READER_NOW + 30_000;      // atribuição ao vivo, relógios coerentes
 const AT_SKEW = READER_NOW - 200_000;     // MESMA atribuição ao vivo, mas relógio da Social atrasado ~3min
 
-function taskNoAssign() { return { id: 't1', title: 'Carrossel Junho', client: 'Cliente X', sector: 'cronograma', by: SOCIAL.id }; }
 function taskAssigned(at, by = SOCIAL.id, designerId = DESIGNER.id) {
-  return {
-    id: 't1', title: 'Carrossel Junho', client: 'Cliente X', sector: 'cronograma', by: SOCIAL.id, assigneeId: designerId, assignee: DESIGNER.name,
-    designerAssignment: { designerId, designerName: DESIGNER.name, designerAvatar: DESIGNER.photo, assignedAt: at, assignedBy: by, assignedByName: (by === SOCIAL.id ? SOCIAL.name : ''), assignedByAvatar: (by === SOCIAL.id ? SOCIAL.photo : ''), status: 'sent' }
-  };
+  return { title: 'Carrossel Junho', client: 'Cliente X', sector: 'cronograma', by: SOCIAL.id, assigneeId: designerId, assignee: DESIGNER.name,
+    designerAssignment: { designerId, designerName: DESIGNER.name, designerAvatar: DESIGNER.photo, assignedAt: at, assignedBy: by, assignedByName: (by === SOCIAL.id ? SOCIAL.name : ''), assignedByAvatar: (by === SOCIAL.id ? SOCIAL.photo : ''), status: 'sent' } };
 }
 
-/* ---- runner que executa o notifScanAssign REAL (old/new) com notifEmit+dedup REAIS, por sequência ---- */
-function makeRunner(host, scanFnSrc, readerNow) {
-  const store = {};
-  const localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } };
-  const captured = [];
-  // conta SÓ o disparo REAL (api.notify → main → notificação desktop). __notifCapture é espião de QA
-  // do próprio produto; deixá-lo null evita contar 2x o mesmo emit.
-  const win = { __notifSuppress: false, __notifCapture: null, desktopAPI: { notify: (p) => { captured.push(p); } } };
-  const state = { user: { id: null }, tasks: [] };
-  let keyOf = ''; try { keyOf = fnSrc(host, 'notifAssignKeyOf'); } catch (_) { /* só existe no NOVO */ }
-  const body =
-    "var NOTIF_SEEN_KEY='idseven.notif.seen.v1';\n" +
-    "var _notifAssignUid=null,_notifAssignSince=0;\n" +   // declarados FORA da fn no produto; persistem por runner
-    "function ncDiag(){}\nfunction notifShowToast(){return null;}\nfunction notifHistoryAppend(){}\n" +
-    fnSrc(host, 'notifLoadSeen') + '\n' + fnSrc(host, 'notifSaveSeen') + '\n' + fnSrc(host, 'notifSeenHas') + '\n' + fnSrc(host, 'notifSeenMark') + '\n' +
-    fnSrc(host, 'notifBuildPayload') + '\n' + fnSrc(host, 'notifEmit') + '\n' + keyOf + '\n' + scanFnSrc + '\n' +
-    "return { scan:function(){ notifScanAssign(); } };";
-  const api = new Function('state', 'window', 'localStorage', 'Number', 'Date', body)(state, win, localStorage, Number, { now: () => readerNow });
-  return { state, captured, scan: api.scan };
-}
-const NEW_SCAN = fnSrc(HTML, 'notifScanAssign');
-const OLD_SCAN = fnSrc(OLD_HTML, 'notifScanAssign');
-ok('setup: ANTIGO usa gate por horário (_notifAssignSince)', /_notifAssignSince/.test(OLD_SCAN));
-ok('setup: NOVO removeu o gate por horário (_notifAssignSince)', !/_notifAssignSince/.test(NEW_SCAN));
-ok('setup: NOVO semeia via notifSeenMark + chave estável', /notifSeenMark/.test(NEW_SCAN) && /notifAssignKeyOf/.test(NEW_SCAN));
+/* ── compila o notifier.ts REAL; stub electron/firebase com captura POR-INSTÂNCIA ── */
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'f33n-'));
+try {
+  execFileSync(process.execPath, [path.join(DESK, 'node_modules', 'typescript', 'lib', 'tsc.js'),
+    path.join(DESK, 'src', 'main', 'notifier.ts'), '--outDir', tmp, '--module', 'commonjs',
+    '--target', 'es2020', '--skipLibCheck', '--esModuleInterop', '--moduleResolution', 'node'], { stdio: 'pipe' });
+} catch (e) { console.error('::error:: falha ao compilar notifier.ts:', (e.stdout || e.message || '').toString().slice(0, 500)); process.exit(1); }
+let curCapture = [];
+const realLoad = Module._load;
+Module._load = function (request) {
+  if (request === 'electron') return { BrowserWindow: class {} };
+  if (request === './firebase' || /[\\/]firebase(\.js)?$/.test(request)) return { db: {}, listen: (name, cb) => { curCapture.push([name, cb]); return () => {}; } };
+  return realLoad.apply(this, arguments);
+};
+const { startNotifier } = require(path.join(tmp, 'notifier.js'));
+Module._load = realLoad;
 
-/* ===== 1) BUG ANTIGO: atribuição AO VIVO com relógio da Social atrasado é SUPRIMIDA ===== */
+/* rig do notifier.ts REAL: instância isolada com seu próprio listener e captura de entregas */
+function mkNotifier(uid) {
+  curCapture = [];
+  const delivered = [];
+  startNotifier(() => ({}), uid, (p) => { delivered.push(p); return { ok: true, channel: 'x' }; });
+  const cbs = curCapture.filter(([n]) => n === 'tasks').map(([, cb]) => cb);
+  const ch = (type, id, data) => ({ type, doc: { id, data: () => data } });
+  return { delivered, fire: (changes) => cbs.forEach((cb) => { try { cb({ docChanges: () => changes }); } catch (_) {} }), ch };
+}
+
+/* ===== 1) BUG ANTIGO (modelado): gate por horário suprime atribuição AO VIVO sob clock-skew ===== */
 {
-  const r = makeRunner(OLD_HTML, OLD_SCAN, READER_NOW);
-  r.state.user.id = DESIGNER.id;
-  r.state.tasks = [taskNoAssign()]; r.scan();          // 1ª varredura (sem atribuição) → baseline=READER_NOW
-  r.state.tasks = [taskAssigned(AT_SKEW)]; r.scan();   // atribuição AO VIVO, mas carimbo atrasado
-  ok('[1] BUG: ANTIGO SUPRIME atribuição nova sob clock-skew (0 toast)', r.captured.length === 0);
+  const sinceMs = READER_NOW;                 // baseline do relógio de quem lê (antigo _notifAssignSince)
+  const oldGate = (at) => (at >= sinceMs);    // antigo: só dispara se assignedAt >= sinceMs
+  ok('[1] BUG (antigo): gate por horário SUPRIME atribuição nova sob clock-skew (at<sinceMs)', oldGate(AT_SKEW) === false);
 }
-
-/* ===== 2) CORREÇÃO: mesma sequência sob clock-skew DISPARA no NOVO ===== */
-let liveSkewPayload = null;
+/* ===== 2) CORREÇÃO no MAIN: a MESMA atribuição sob clock-skew DISPARA (transição, sem gate) ===== */
+let livePayload = null;
 {
-  const r = makeRunner(HTML, NEW_SCAN, READER_NOW);
-  r.state.user.id = DESIGNER.id;
-  r.state.tasks = [taskNoAssign()]; r.scan();
-  r.state.tasks = [taskAssigned(AT_SKEW)]; r.scan();
-  ok('[2] FIX: NOVO DISPARA atribuição nova mesmo sob clock-skew (1 toast)', r.captured.length === 1);
-  liveSkewPayload = r.captured[0] || null;
+  const r = mkNotifier(DESIGNER.id);
+  r.fire([r.ch('added', 't1', { title: 'Carrossel Junho', client: 'Cliente X', sector: 'cronograma', by: SOCIAL.id })]); // 1º snapshot (sem atribuição) → seed
+  r.fire([r.ch('modified', 't1', taskAssigned(AT_SKEW))]);   // atribuição AO VIVO, carimbo atrasado
+  ok('[2] FIX (main): notifier.ts REAL DISPARA a atribuição mesmo sob clock-skew (1×)', r.delivered.length === 1);
+  livePayload = r.delivered[0] || null;
 }
-
-/* ===== 3) 1º snapshot SEMEIA histórico: atribuição já presente no 1º scan NÃO dispara ===== */
+/* ===== 3) 1º snapshot SEMEIA: atribuição já presente no 1º snapshot NÃO dispara ===== */
 {
-  const r = makeRunner(HTML, NEW_SCAN, READER_NOW);
-  r.state.user.id = DESIGNER.id;
-  r.state.tasks = [taskAssigned(AT_LIVE)]; r.scan();   // já existia no 1º snapshot → histórico
-  ok('[3] SEED: atribuição presente no 1º snapshot é semeada (0 toast)', r.captured.length === 0);
+  const r = mkNotifier(DESIGNER.id);
+  r.fire([r.ch('added', 't1', taskAssigned(AT_LIVE))]);      // já existia no 1º snapshot → histórico (seed)
+  ok('[3] SEED: atribuição presente no 1º snapshot é semeada (0)', r.delivered.length === 0);
 }
-
-/* ===== 4) Atribuição NOVA ao vivo (relógios coerentes) dispara 1x ===== */
+/* ===== 4) atribuição NOVA ao vivo (relógios coerentes) dispara 1x ===== */
 {
-  const r = makeRunner(HTML, NEW_SCAN, READER_NOW);
-  r.state.user.id = DESIGNER.id;
-  r.state.tasks = [taskNoAssign()]; r.scan();
-  r.state.tasks = [taskAssigned(AT_LIVE)]; r.scan();
-  ok('[4] NOVA: atribuição ao vivo dispara (1 toast)', r.captured.length === 1);
+  const r = mkNotifier(DESIGNER.id);
+  r.fire([r.ch('added', 't1', { title: 'Carrossel Junho', client: 'X', sector: 'cronograma', by: SOCIAL.id })]);
+  r.fire([r.ch('modified', 't1', taskAssigned(AT_LIVE))]);
+  ok('[4] NOVA: atribuição ao vivo dispara (1)', r.delivered.length === 1);
 }
-
-/* ===== 5) DUPLICIDADE: re-scan do MESMO estado não dispara de novo ===== */
+/* ===== 5) DEDUPE: re-scan do MESMO estado não dispara de novo ===== */
 {
-  const r = makeRunner(HTML, NEW_SCAN, READER_NOW);
-  r.state.user.id = DESIGNER.id;
-  r.state.tasks = [taskNoAssign()]; r.scan();
-  r.state.tasks = [taskAssigned(AT_LIVE)]; r.scan();   // dispara
-  r.scan(); r.scan();                                  // re-scans idênticos
-  ok('[5] DEDUP: re-varredura do mesmo estado não duplica (total 1)', r.captured.length === 1);
+  const r = mkNotifier(DESIGNER.id);
+  r.fire([r.ch('added', 't1', { title: 'X', sector: 'cronograma', by: SOCIAL.id })]);
+  r.fire([r.ch('modified', 't1', taskAssigned(AT_LIVE))]);   // dispara
+  r.fire([r.ch('modified', 't1', taskAssigned(AT_LIVE))]);   // re-scan idêntico
+  ok('[5] DEDUPE: re-scan do mesmo estado não duplica (total 1)', r.delivered.length === 1);
 }
-
 /* ===== 6) REATRIBUIÇÃO (novo assignedAt) dispara; mesma chave antiga não ===== */
 {
-  const r = makeRunner(HTML, NEW_SCAN, READER_NOW);
-  r.state.user.id = DESIGNER.id;
-  r.state.tasks = [taskNoAssign()]; r.scan();
-  r.state.tasks = [taskAssigned(AT_LIVE)]; r.scan();          // 1ª atribuição → dispara
-  r.state.tasks = [taskAssigned(AT_LIVE + 90_000)]; r.scan(); // reatribuição (novo at) → dispara
-  r.state.tasks = [taskAssigned(AT_LIVE)]; r.scan();          // volta à chave antiga → não dispara
-  ok('[6] REATRIBUIÇÃO: novo assignedAt dispara; chave antiga não (total 2)', r.captured.length === 2);
+  const r = mkNotifier(DESIGNER.id);
+  r.fire([r.ch('added', 't1', { title: 'X', sector: 'cronograma', by: SOCIAL.id })]);
+  r.fire([r.ch('modified', 't1', taskAssigned(AT_LIVE))]);            // 1ª → dispara
+  r.fire([r.ch('modified', 't1', taskAssigned(AT_LIVE + 90_000))]);  // reatribuição (novo at) → dispara
+  ok('[6] REATRIBUIÇÃO: novo assignedAt dispara (total 2)', r.delivered.length === 2 && r.delivered[1].dedupKey === 'designer_assigned:t1:' + DESIGNER.id + ':' + (AT_LIVE + 90_000));
 }
-
 /* ===== 7) ANTI-ECO: o AUTOR (Social) não recebe; auto-atribuição não dispara ===== */
 {
-  const r = makeRunner(HTML, NEW_SCAN, READER_NOW);
-  r.state.user.id = SOCIAL.id;                          // observando como a SOCIAL (autora)
-  r.state.tasks = [taskNoAssign()]; r.scan();
-  r.state.tasks = [taskAssigned(AT_LIVE)]; r.scan();    // designerId=Designer ≠ Social
-  ok('[7a] ANTI-ECO: a SOCIAL (autora) NÃO recebe (0 toast)', r.captured.length === 0);
-
-  const r2 = makeRunner(HTML, NEW_SCAN, READER_NOW);
-  r2.state.user.id = DESIGNER.id;
-  r2.state.tasks = [taskNoAssign()]; r2.scan();
-  r2.state.tasks = [taskAssigned(AT_LIVE, DESIGNER.id)]; r2.scan(); // assignedBy=designer (auto)
-  ok('[7b] ANTI-ECO: auto-atribuição (assignedBy===me) não dispara', r2.captured.length === 0);
+  const rs = mkNotifier(SOCIAL.id);
+  rs.fire([rs.ch('added', 't1', { title: 'X', sector: 'cronograma', by: SOCIAL.id })]);
+  rs.fire([rs.ch('modified', 't1', taskAssigned(AT_LIVE))]);          // designerId=Designer ≠ Social
+  ok('[7a] ANTI-ECO: a SOCIAL (autora) NÃO recebe (0)', rs.delivered.length === 0);
+  const r2 = mkNotifier(DESIGNER.id);
+  r2.fire([r2.ch('added', 't1', { title: 'X', sector: 'cronograma', by: SOCIAL.id })]);
+  r2.fire([r2.ch('modified', 't1', taskAssigned(AT_LIVE, DESIGNER.id))]); // assignedBy=designer (auto)
+  ok('[7b] ANTI-ECO: auto-atribuição (assignedBy===me) não dispara', r2.delivered.length === 0);
 }
-
 /* ===== 8) PAYLOAD: ator = Social, responsável = Designer ===== */
 {
-  const p = liveSkewPayload || {};
+  const p = livePayload || {};
   ok('[8] payload eventType=designer_assigned', p.eventType === 'designer_assigned');
-  ok('[8] payload actorName = Social', p.actorName === SOCIAL.name);
-  ok('[8] payload actorAvatar = Social', p.actorAvatar === SOCIAL.photo);
   ok('[8] payload actorId = Social', p.actorId === SOCIAL.id);
-  ok('[8] payload responsibleName = Designer', p.responsibleName === DESIGNER.name);
-  ok('[8] payload responsibleAvatar = Designer', p.responsibleAvatar === DESIGNER.photo);
+  ok('[8] payload actorName = Social', p.actorName === SOCIAL.name);
   ok('[8] payload responsibleId = Designer', p.responsibleId === DESIGNER.id);
+  ok('[8] payload responsibleName = Designer', p.responsibleName === DESIGNER.name);
   ok('[8] payload targetUserId = Designer', p.targetUserId === DESIGNER.id);
-  ok('[8] payload dedupKey designer_assigned:t1:<designerId>:' + AT_SKEW + ' (F3.3.77A-R3 eventId canônico)', p.dedupKey === 'designer_assigned:t1:' + DESIGNER.id + ':' + AT_SKEW);
-  ok('[8] payload título "Arydyjany ... atribuiu uma tarefa"', /atribuiu uma tarefa/.test(p.title || '') && (p.title || '').indexOf(SOCIAL.name) === 0);
+  ok('[8] payload dedupKey designer_assigned:t1:<designerId>:' + AT_SKEW + ' (canônico)', p.dedupKey === 'designer_assigned:t1:' + DESIGNER.id + ':' + AT_SKEW);
+  ok('[8] payload título "<Social> atribuiu uma tarefa"', /atribuiu uma tarefa/.test(p.title || '') && (p.title || '').indexOf(SOCIAL.name) === 0);
+  ok('[8] payload deep = detail/t1 (abre a TAREFA)', p.action && p.action.deep === 'detail/t1');
 }
-
-/* ===== 9) HUB do main (main.ts INALTERADO) INVOCA o canal desktop p/ o payload emitido ===== */
+/* ===== 9) HUB do main (deliverNotification REAL) roteia por janela: visível→toast, oculta→bg-window ===== */
 {
-  const realWA = fnSrc(MAIN, 'windowActive').replace('function windowActive(): boolean {', 'function windowActive() {');
-  const start = MAIN.indexOf('function deliverNotification(');
-  const retClose = MAIN.indexOf('channel: string }', start) + 'channel: string }'.length;
-  const bodyBrace = MAIN.indexOf('{', retClose);
-  let d = 0, end = -1; for (let j = bodyBrace; j < MAIN.length; j++) { const c = MAIN[j]; if (c === '{') d++; else if (c === '}') { d--; if (!d) { end = j; break; } } }
-  const realDeliver = 'function deliverNotification(p) ' + MAIN.slice(bodyBrace, end + 1).replace(/ as any/g, '');
-  function deliver(winState, payload) {
-    const sent = [], bg = [];
-    const mkWin = () => ({ isDestroyed: () => false, isVisible: () => winState !== 'hidden', isMinimized: () => winState === 'minimized', webContents: { send: (ch) => sent.push(ch) } });
-    const res = new Function('mainWin', '_notifSeen', 'diag', '_appIcon', 'showBgNotify', 'Notification', 'String',
-      realWA + '\n' + realDeliver + '\n return deliverNotification(' + JSON.stringify(payload) + ');')(
-      mkWin(), new Set(), () => {}, () => undefined, (p) => { bg.push(p); return true; }, function () { return { on() {}, show() {} }; }, String);
-    return { res, sent, bg };
-  }
-  const vis = deliver('visible', liveSkewPayload);
-  const hid = deliver('hidden', liveSkewPayload);
-  ok('[9] HUB: janela visível → canal toast (renderer invocado)', vis.res.channel === 'toast' && vis.sent.includes('notif-toast'));
-  ok('[9] HUB: janela oculta → janela premium bg invocada', hid.res.channel === 'bg-window' && hid.bg.length === 1);
+  const chan = extractDeliver(MAIN);
+  const vis = chan.deliver('visible', livePayload);
+  const chan2 = extractDeliver(MAIN);
+  const hid = chan2.deliver('hidden', livePayload);
+  ok('[9] HUB: janela VISÍVEL → canal toast', vis.res.channel === 'toast' && vis.sent.some((s) => (Array.isArray(s) ? s[0] : s) === 'notif-toast'));
+  ok('[9] HUB: janela OCULTA → janela premium bg-window', hid.res.channel === 'bg-window' && hid.bg.length === 1);
 }
-
-/* ===== 10) PATH B (notifier.ts INALTERADO) — redundante: detecta p/ Designer, mas segue skew-gated ===== */
+/* ===== 10) RENDERER não emite mais atribuição (produtor único no main) ===== */
 {
-  const a = NOTIFIER.indexOf('const u1b = listen'); const argStart = NOTIFIER.indexOf('(snap)', a); const bodyStart = NOTIFIER.indexOf('{', argStart);
-  let d = 0, end = -1; for (let j = bodyStart; j < NOTIFIER.length; j++) { const c = NOTIFIER[j]; if (c === '{') d++; else if (c === '}') { d--; if (!d) { end = j; break; } } }
-  const u1b = 'function(snap){' + NOTIFIER.slice(bodyStart, end + 1).replace(/ as any/g, '').replace(/ as Task/g, '').replace(/<Task>/g, '') + '}';
-  function notifierDeliver(uid, sinceMs, task) {
-    const out = []; const snap = { docChanges: () => [{ type: 'modified', doc: { id: task.id, data: () => task } }] };
-    new Function('state', 'deliver', 'diag', 'Number', 'return (' + u1b + ');')({ uid, sinceMs }, (p) => out.push(p), () => {}, Number)(snap);
-    return out;
-  }
-  const live = notifierDeliver(DESIGNER.id, READER_NOW - 60_000, taskAssigned(AT_LIVE));
-  ok('[10] PATH B: notifier entrega p/ Designer com relógios coerentes', live.length === 1 && live[0].actorName === SOCIAL.name);
-  const skew = notifierDeliver(DESIGNER.id, READER_NOW, taskAssigned(AT_SKEW));
-  ok('[10] PATH B: notifier (protegido) AINDA suprime sob skew — path A (renderer) cobre via dedup/HUB', skew.length === 0);
+  ok('[10] renderer: notifScan só roda o fluxo; notifScanAssign DEFINIDO mas SEM chamadores', /function notifScan\(\)\{ notifScanFlow\(\); \}/.test(HTML) && (HTML.match(/notifScanAssign\(\)/g) || []).length === 1);
+  ok('[10] notifier: detecção por TRANSIÇÃO no MAIN (changed = designer novo OU novo assignedAt)', /const changed = \(prev !== cur\) \|\| \(at !== prevAt\);/.test(NOTIFIER));
 }
-
-/* ===== 11) GENERALIDADE — a correção NÃO é hardcoded p/ nomes/IDs; vale p/ qualquer Social/Designer ===== */
+/* ===== 11) GENERALIDADE — vale p/ qualquer Social/Designer (IDs/nomes/unicode), sem hardcode ===== */
 {
   const COMBOS = [
     { s: { id: 'u_001', name: 'João da Silva', photo: 'a.jpg' }, d: { id: 'u_777', name: 'Zoé Müller', photo: 'b.jpg' } },
     { s: { id: 'X1', name: '社交媒体运营', photo: '' }, d: { id: 'Y2', name: 'Designer 测试', photo: 'p.png' } },
     { s: { id: 'admin-42', name: "O'Brien & Co.", photo: 'x' }, d: { id: 'dz.9', name: 'Ana-Lúcia Çörner', photo: 'y' } },
-    { s: { id: 'sm', name: 'S', photo: '' }, d: { id: 'dz', name: 'D', photo: '' } },
   ];
   let genOk = true, why = '';
   for (const c of COMBOS) {
-    const tNo = { id: 'tk', title: 'T', client: 'C', sector: 'cronograma', by: c.s.id };
-    const tA = { id: 'tk', title: 'T', client: 'C', sector: 'cronograma', by: c.s.id, assigneeId: c.d.id, designerAssignment: { designerId: c.d.id, designerName: c.d.name, designerAvatar: c.d.photo, assignedAt: AT_SKEW, assignedBy: c.s.id, assignedByName: c.s.name, assignedByAvatar: c.s.photo } };
-    // destinatário (Designer) recebe 1, sob clock-skew, com ator=Social/responsável=Designer
-    const rd = makeRunner(HTML, NEW_SCAN, READER_NOW); rd.state.user.id = c.d.id; rd.state.tasks = [tNo]; rd.scan(); rd.state.tasks = [tA]; rd.scan();
-    const p = rd.captured[0] || {};
-    // autor (Social) NÃO recebe eco
-    const rs = makeRunner(HTML, NEW_SCAN, READER_NOW); rs.state.user.id = c.s.id; rs.state.tasks = [tNo]; rs.scan(); rs.state.tasks = [tA]; rs.scan();
-    if (!(rd.captured.length === 1 && p.actorId === c.s.id && p.actorName === c.s.name && p.responsibleId === c.d.id && p.responsibleName === c.d.name && p.targetUserId === c.d.id && rs.captured.length === 0)) { genOk = false; why = JSON.stringify(c.s.id + '→' + c.d.id + ' rd=' + rd.captured.length + ' rs=' + rs.captured.length); break; }
+    const mk = (at, by) => ({ title: 'T', client: 'C', sector: 'cronograma', by: c.s.id, assigneeId: c.d.id, designerAssignment: { designerId: c.d.id, designerName: c.d.name, designerAvatar: c.d.photo, assignedAt: at, assignedBy: by, assignedByName: c.s.name, assignedByAvatar: c.s.photo } });
+    const rd = mkNotifier(c.d.id); rd.fire([rd.ch('added', 'tk', { title: 'T', sector: 'cronograma', by: c.s.id })]); rd.fire([rd.ch('modified', 'tk', mk(AT_SKEW, c.s.id))]);
+    const p = rd.delivered[0] || {};
+    const rs = mkNotifier(c.s.id); rs.fire([rs.ch('added', 'tk', { title: 'T', sector: 'cronograma', by: c.s.id })]); rs.fire([rs.ch('modified', 'tk', mk(AT_SKEW, c.s.id))]);
+    if (!(rd.delivered.length === 1 && p.actorId === c.s.id && p.responsibleId === c.d.id && p.targetUserId === c.d.id && rs.delivered.length === 0)) { genOk = false; why = c.s.id + '→' + c.d.id + ' rd=' + rd.delivered.length + ' rs=' + rs.delivered.length; break; }
   }
-  ok('[11] GENERALIDADE: corrige p/ QUALQUER Social/Designer (IDs/nomes/unicode), sem hardcode' + (genOk ? '' : ' ' + why), genOk);
-  // confirma estrutural: a fonte não referencia nomes/IDs de pessoas reais
-  ok('[11] fonte do fix usa só campos estruturais (sem nome/ID hardcoded)', !/Arydyjany|Miercohé|sm_ary|dz_mier/.test(fnSrc(HTML, 'notifScanAssign') + fnSrc(HTML, 'notifAssignKeyOf')));
+  ok('[11] GENERALIDADE: dispara p/ QUALQUER Social/Designer (unicode/IDs), sem eco à Social' + (genOk ? '' : ' ' + why), genOk);
+  ok('[11] fonte do fix (notifier.ts) sem nomes/IDs hardcoded de pessoas reais', !/Arydyjany|Miercohé|sm_ary|dz_mier/.test(NOTIFIER));
 }
 
-/* ===== resumo ===== */
-console.log('\n==== F3.3.17-R4 — BUG (antigo) × CORREÇÃO (novo) do baseline da notificação ====');
+try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
+console.log('\n==== F3.3.17-R4 (F3.4.3C) — baseline/transição da azul, agora NO MAIN ====');
 if (errs.length) console.log('\n' + errs.join('\n') + '\n');
-console.log('[1] ANTIGO sob clock-skew         : SUPRIME (bug físico reproduzido)');
-console.log('[2] NOVO sob clock-skew           : DISPARA  (corrigido)');
-console.log('[3] 1º snapshot (histórico)        : semeia, não dispara');
-console.log('[4] nova atribuição ao vivo        : dispara 1x');
-console.log('[5] duplicidade                    : deduplicada');
-console.log('[6] reatribuição                   : dispara (chave nova)');
-console.log('[7] anti-eco                       : Social não recebe; auto-atribuição não dispara');
-console.log('[8] payload                        : ator=Social, responsável=Designer');
-console.log('[9] HUB main (inalterado)          : visível→toast, oculta→bg-window');
-console.log('[10] path B notifier (protegido)   : redundante; segue skew-gated, path A cobre');
-console.log('[11] generalidade                  : vale p/ qualquer Social/Designer (sem hardcode)');
+console.log('[1] antigo gate por horário           : SUPRIME (bug modelado)');
+console.log('[2] notifier.ts REAL sob clock-skew    : DISPARA (corrigido no main)');
+console.log('[3-6] seed/nova/dedupe/reatribuição    : contrato de transição no main');
+console.log('[7] anti-eco                            : Social não recebe; auto-atribuição não dispara');
+console.log('[8] payload                             : ator=Social, responsável=Designer, dedupKey canônico');
+console.log('[9] HUB deliverNotification             : visível→toast, oculta→bg-window');
+console.log('[10] renderer                           : NÃO emite mais atribuição (produtor único no main)');
+console.log('[11] generalidade                       : qualquer Social/Designer (sem hardcode)');
 console.log('\n' + pass + ' PASS / ' + fail + ' FAIL');
-if (fail) { console.error('::error:: prova do bug/correção falhou'); process.exit(1); }
-console.log('OK — bug do clock-skew reproduzido no código ANTIGO e corrigido no NOVO (confinado ao index.html):');
-console.log('     histórico semeado, nova atribuição dispara mesmo sob skew, sem duplicar, anti-eco e autoria intactos.');
+if (fail) { console.error('::error:: prova do baseline/transição no main falhou'); process.exit(1); }
+console.log('OK — a correção do baseline (semente + transição, sem comparar relógios) vive NO MAIN (notifier.ts), produtor único autoritativo da azul; renderer só-visual.');

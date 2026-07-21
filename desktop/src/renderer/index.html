@@ -3499,11 +3499,12 @@ function slaMonScheduleBoundary(){
     var now=canonicalNowMs(), b=slaMonNextBoundary(now); if(!b) return;   /* F3.3.77A-R3 — relógio canônico */
     var delay=Math.max(80, Math.min(b-now+120, 30*60000));   // dispara no limite exato (cap 30min)
     try{ if(typeof ncDiag==='function') ncDiag('sla.timer.arm',{boundaryMs:b,delayMs:delay,canonicalNowMs:now,systemNowMs:Date.now(),clockOffsetMs:_slaClockOffsetMs}); }catch(_){}
-    // No limite EXATO: atualiza monitor/sino/card (slaibRefresh) E dispara a NOTIFICAÇÃO (toast) —
-    // sem o notifScanSla aqui, o toast laranja só sairia no poll de 30s (até 30s atrasado).
+    // No limite EXATO: atualiza monitor/sino/card (slaibRefresh — VISUAL). F3.4.3: a NOTIFICAÇÃO
+    // amarela/vermelha NÃO sai mais daqui — o produtor AUTORITATIVO é o MAIN (slaScheduler.ts),
+    // que sobrevive à janela minimizada/oculta. O renderer mantém só o visual do chip/monitor/painel.
     _slaBoundaryTimer=setTimeout(function(){
       try{ if(typeof ncDiag==='function') ncDiag('sla.timer.fire',{boundaryMs:b,canonicalNowMs:canonicalNowMs(),systemNowMs:Date.now(),actualDriftMs:canonicalNowMs()-b}); }catch(_){}
-      try{ slaibRefresh(); }catch(_){} try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){}
+      try{ slaibRefresh(); }catch(_){}
     }, delay);
   }catch(_){}
 }
@@ -3988,7 +3989,11 @@ function notifScanSla(){
         action:{type:'detail',deep:'detail/'+blk.id} })); }
   }catch(_){}
 }
-function notifScan(){ notifScanFlow(); notifScanSla(); notifScanAssign(); }
+/* F3.4.3 — PRODUTOR ÚNICO NO MAIN: o renderer detecta só FLUXO (notifScanFlow). As notificações de
+   SLA (amarelo/vermelho/crítico, antes notifScanSla) e de ATRIBUIÇÃO (azul, antes notifScanAssign)
+   passaram ao MAIN (slaScheduler.ts / notifier.ts), único produtor e à prova de janela oculta.
+   notifScanSla e notifScanAssign seguem DEFINIDOS abaixo, porém SEM chamador (diff mínimo). */
+function notifScan(){ notifScanFlow(); }
 
 /* F3.3.10-FIX (background) — DETECÇÃO de ATRIBUIÇÃO no RENDERER (espelha o notifier do main u1/u1b).
    Garante a entrega mesmo quando o listener Firestore do MAIN fica suspenso com o app em background
@@ -4052,8 +4057,11 @@ function notifScanAssign(){
 
 /* hooks: cada snapshot de dados + tick do SLA (transições por TEMPO) + intervalo de segurança */
 if(typeof renderFromSnapshot==='function'){ var _notif_rfs=renderFromSnapshot; renderFromSnapshot=function(){ var r=_notif_rfs.apply(this,arguments); try{ notifScan(); }catch(_){} return r; }; }
-if(typeof slaTick==='function'){ var _notif_tk=slaTick; slaTick=function(){ var r=_notif_tk.apply(this,arguments); try{ notifScanSla(); }catch(_){} return r; }; }
-try{ setInterval(function(){ try{ notifScanSla(); }catch(_){} try{ notifScanAssign(); }catch(_){} },30000); }catch(_){}
+/* F3.4.3 — REMOVIDO: o wrap do slaTick disparava notifScanSla (SLA no renderer). slaTick segue só como
+   tick VISUAL do contador; a NOTIFICAÇÃO de SLA é produzida no MAIN (slaScheduler.ts). */
+/* F3.4.3 — REMOVIDO: o poll de 30s disparava notifScanSla + notifScanAssign no renderer. Ambos os
+   produtores (SLA amarelo/vermelho e atribuição azul) vivem agora no MAIN (slaScheduler.ts /
+   notifier.ts), únicos e à prova de janela minimizada/oculta (Chromium congela timers do renderer). */
 /* F3.3.77A-R3 (FASE 9) — RETOMADA (resume/unlock): o Windows pode SUSPENDER o processo, congelando o
    setTimeout do boundary. Ao voltar o foco/visibilidade, reavalia IMEDIATAMENTE a linha do tempo canônica:
    reemite (deduped) o amarelo/vermelho que venceu durante a suspensão e RE-ARMA o boundary timer — alvo ≤3s
@@ -4063,7 +4071,8 @@ try{
     // F3.3.77A-R4B — pede ressync do relógio canônico ao MAIN (offset pode ter defasado no sleep/lock);
     // o novo estado chega por onClockState e rearma as timelines. Melhor-esforço; nunca bloqueia.
     try{ if(window.desktopAPI&&typeof window.desktopAPI.clockRequestSync==='function') window.desktopAPI.clockRequestSync(); }catch(_){}
-    try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){}
+    /* F3.4.3 — SEM notifScanSla aqui: a reemissão do amarelo/vermelho vencido na retomada é do MAIN
+       (slaScheduler.reconcile('resume'/'unlock')). O renderer só rearma o VISUAL (boundary + refresh). */
     try{ if(typeof slaMonScheduleBoundary==='function') slaMonScheduleBoundary(); }catch(_){}
     try{ if(typeof slaibRefresh==='function') slaibRefresh(); }catch(_){}
     try{ if(typeof ncDiag==='function') ncDiag('sla.resume.recover',{vis:(typeof document!=='undefined'?document.visibilityState:'?'),canonicalNowMs:(typeof canonicalNowMs==='function'?canonicalNowMs():Date.now()),systemNowMs:Date.now()}); }catch(_){}
@@ -4090,7 +4099,8 @@ function _slaApplyClockState(s){
     // FASE 12 — rearma tudo com o novo relógio: cancela o boundary antigo e re-resolve/re-arma.
     try{ if(_slaBoundaryTimer){ clearTimeout(_slaBoundaryTimer); _slaBoundaryTimer=null; } }catch(_){}
     try{ if(typeof slaMonScheduleBoundary==='function') slaMonScheduleBoundary(); }catch(_){}
-    try{ if(typeof notifScanSla==='function') notifScanSla(); }catch(_){}
+    /* F3.4.3 — SEM notifScanSla: mudar o offset do relógio rearma só o VISUAL. A (re)emissão do
+       amarelo/vermelho é do MAIN (slaScheduler), que usa o MESMO offset via IPC clock-state. */
     try{ if(typeof slaibRefresh==='function') slaibRefresh(); }catch(_){}
     try{ if(typeof ncDiag==='function') ncDiag('sla.timer.rearm',{reason:'clock.offset.changed',offsetMs:newOffset}); }catch(_){}
   }catch(_){}

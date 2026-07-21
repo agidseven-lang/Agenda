@@ -1,0 +1,419 @@
+[
+  {
+    "name": "cron-running",
+    "uid": "dz1",
+    "eligible": false,
+    "count": 0,
+    "warningAtMs": 1700005400000,
+    "overdueAtMs": 1700007200000,
+    "criticalAtMs": 1700007800000,
+    "responsibleId": [],
+    "dedupKeys": [],
+    "titles": [],
+    "bodies": [],
+    "severities": [],
+    "deep": []
+  },
+  {
+    "name": "cron-warning-20",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699999400000,
+    "overdueAtMs": 1700001200000,
+    "criticalAtMs": 1700001800000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "sla_warning:t_cron:1700001200000"
+    ],
+    "titles": [
+      "Marina, prazo próximo"
+    ],
+    "bodies": [
+      "Você tem 30 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "warning"
+    ],
+    "deep": [
+      "detail/t_cron"
+    ]
+  },
+  {
+    "name": "cron-warning-edge30",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1700000000000,
+    "overdueAtMs": 1700001800000,
+    "criticalAtMs": 1700002400000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "sla_warning:t_cron:1700001800000"
+    ],
+    "titles": [
+      "Marina, prazo próximo"
+    ],
+    "bodies": [
+      "Você tem 30 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "warning"
+    ],
+    "deep": [
+      "detail/t_cron"
+    ]
+  },
+  {
+    "name": "cron-overdue-red",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699997900000,
+    "overdueAtMs": 1699999700000,
+    "criticalAtMs": 1700000300000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "sla_overdue:t_cron:1699999700000"
+    ],
+    "titles": [
+      "Marina, prazo encerrado"
+    ],
+    "bodies": [
+      "Você tem 10 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "critical"
+    ],
+    "deep": [
+      "detail/t_cron"
+    ]
+  },
+  {
+    "name": "cron-overdue-critical",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699997300000,
+    "overdueAtMs": 1699999100000,
+    "criticalAtMs": 1699999700000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "sla_critical:t_cron:1699999100000"
+    ],
+    "titles": [
+      "Marina, atraso crítico"
+    ],
+    "bodies": [
+      "Sinalize atraso imediatamente ou conclua a tarefa."
+    ],
+    "severities": [
+      "critical"
+    ],
+    "deep": [
+      "detail/t_cron"
+    ]
+  },
+  {
+    "name": "cron-none-nosla",
+    "uid": "dz1",
+    "eligible": false,
+    "count": 0,
+    "warningAtMs": 0,
+    "overdueAtMs": 0,
+    "criticalAtMs": 0,
+    "responsibleId": [],
+    "dedupKeys": [],
+    "titles": [],
+    "bodies": [],
+    "severities": [],
+    "deep": []
+  },
+  {
+    "name": "cron-completed",
+    "uid": "dz1",
+    "eligible": false,
+    "count": 0,
+    "warningAtMs": 1699997900000,
+    "overdueAtMs": 1699999700000,
+    "criticalAtMs": 1700000300000,
+    "responsibleId": [],
+    "dedupKeys": [],
+    "titles": [],
+    "bodies": [],
+    "severities": [],
+    "deep": []
+  },
+  {
+    "name": "cron-cancelled",
+    "uid": "dz1",
+    "eligible": false,
+    "count": 0,
+    "warningAtMs": 1699997900000,
+    "overdueAtMs": 1699999700000,
+    "criticalAtMs": 1700000300000,
+    "responsibleId": [],
+    "dedupKeys": [],
+    "titles": [],
+    "bodies": [],
+    "severities": [],
+    "deep": []
+  },
+  {
+    "name": "edm-warning-35",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699999700000,
+    "overdueAtMs": 1700002100000,
+    "criticalAtMs": 1700003300000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "media_warning_40:t_edm:dz1:1700002100000:r2"
+    ],
+    "titles": [
+      "Bruno, prazo próximo"
+    ],
+    "bodies": [
+      "Você tem 40 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "warning"
+    ],
+    "deep": [
+      "detail/t_edm"
+    ]
+  },
+  {
+    "name": "edm-overdue-5",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699997300000,
+    "overdueAtMs": 1699999700000,
+    "criticalAtMs": 1700000900000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "media_overdue_20:t_edm:dz1:1699999700000:r2"
+    ],
+    "titles": [
+      "Bruno, prazo encerrado"
+    ],
+    "bodies": [
+      "Você tem 20 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "critical"
+    ],
+    "deep": [
+      "detail/t_edm"
+    ]
+  },
+  {
+    "name": "edm-critical-window-none",
+    "uid": "dz1",
+    "eligible": false,
+    "count": 0,
+    "warningAtMs": 1699996100000,
+    "overdueAtMs": 1699998500000,
+    "criticalAtMs": 1699999700000,
+    "responsibleId": [],
+    "dedupKeys": [],
+    "titles": [],
+    "bodies": [],
+    "severities": [],
+    "deep": []
+  },
+  {
+    "name": "edm-deadline-changed-rev5",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699999700000,
+    "overdueAtMs": 1700002100000,
+    "criticalAtMs": 1700003300000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "media_warning_40:t_edm:dz1:1700002100000:r5"
+    ],
+    "titles": [
+      "Bruno, prazo próximo"
+    ],
+    "bodies": [
+      "Você tem 40 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "warning"
+    ],
+    "deep": [
+      "detail/t_edm"
+    ]
+  },
+  {
+    "name": "roteiro-warn-window",
+    "uid": "dz1",
+    "eligible": false,
+    "count": 0,
+    "warningAtMs": 1699999400000,
+    "overdueAtMs": 1700001200000,
+    "criticalAtMs": 1700001800000,
+    "responsibleId": [],
+    "dedupKeys": [],
+    "titles": [],
+    "bodies": [],
+    "severities": [],
+    "deep": []
+  },
+  {
+    "name": "non-eligible-other-uid",
+    "uid": "dz2",
+    "eligible": false,
+    "count": 0,
+    "warningAtMs": 1699999400000,
+    "overdueAtMs": 1700001200000,
+    "criticalAtMs": 1700001800000,
+    "responsibleId": [],
+    "dedupKeys": [],
+    "titles": [],
+    "bodies": [],
+    "severities": [],
+    "deep": []
+  },
+  {
+    "name": "reassigned-to-dz2",
+    "uid": "dz2",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699999400000,
+    "overdueAtMs": 1700001200000,
+    "criticalAtMs": 1700001800000,
+    "responsibleId": [
+      "dz2"
+    ],
+    "dedupKeys": [
+      "sla_warning:t_cron:1700001200000"
+    ],
+    "titles": [
+      "Carla, prazo próximo"
+    ],
+    "bodies": [
+      "Você tem 30 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "warning"
+    ],
+    "deep": [
+      "detail/t_cron"
+    ]
+  },
+  {
+    "name": "reassigned-old-dz1-excluded",
+    "uid": "dz1",
+    "eligible": false,
+    "count": 0,
+    "warningAtMs": 1699999400000,
+    "overdueAtMs": 1700001200000,
+    "criticalAtMs": 1700001800000,
+    "responsibleId": [],
+    "dedupKeys": [],
+    "titles": [],
+    "bodies": [],
+    "severities": [],
+    "deep": []
+  },
+  {
+    "name": "denorm-absent-assignee",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699999400000,
+    "overdueAtMs": 1700001200000,
+    "criticalAtMs": 1700001800000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "sla_warning:t_asg:1700001200000"
+    ],
+    "titles": [
+      "João, prazo próximo"
+    ],
+    "bodies": [
+      "Você tem 30 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "warning"
+    ],
+    "deep": [
+      "detail/t_asg"
+    ]
+  },
+  {
+    "name": "denorm-name-only",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699999400000,
+    "overdueAtMs": 1700001200000,
+    "criticalAtMs": 1700001800000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "sla_warning:t_cron:1700001200000"
+    ],
+    "titles": [
+      "Marina, prazo próximo"
+    ],
+    "bodies": [
+      "Você tem 30 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "warning"
+    ],
+    "deep": [
+      "detail/t_cron"
+    ]
+  },
+  {
+    "name": "cron-warning-noclient",
+    "uid": "dz1",
+    "eligible": true,
+    "count": 1,
+    "warningAtMs": 1699999400000,
+    "overdueAtMs": 1700001200000,
+    "criticalAtMs": 1700001800000,
+    "responsibleId": [
+      "dz1"
+    ],
+    "dedupKeys": [
+      "sla_warning:t_cron:1700001200000"
+    ],
+    "titles": [
+      "Marina, prazo próximo"
+    ],
+    "bodies": [
+      "Você tem 30 minutos para concluir esta tarefa."
+    ],
+    "severities": [
+      "warning"
+    ],
+    "deep": [
+      "detail/t_cron"
+    ]
+  }
+]

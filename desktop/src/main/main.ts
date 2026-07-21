@@ -14,8 +14,9 @@ import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
 import { startReminder } from "./reminder";
+import { startSlaScheduler } from "./slaScheduler"; // F3.4.3 — produtor AUTORITATIVO de SLA no main (amarelo/vermelho/crítico), sobrevive à janela oculta
 import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
-import { registerAuthIpc } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main)
+import { registerAuthIpc, getAuthUser } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main); F3.4.3 — papel autenticado p/ operational_block
 import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
 import { createClockSync } from "./clockSync"; // F3.3.77A-R4B — relógio canônico via cabeçalho HTTP Date (Cloud Run read-only)
 // UPDATER:BEGIN (F3.4.1A — atualizador nativo, processo main)
@@ -25,6 +26,7 @@ import { createUpdaterService } from "./updaterService";
 let mainWin: BrowserWindow | null = null;
 let stopNotifier: (() => void) | null = null;
 let stopReminder: (() => void) | null = null;
+let slaScheduler: ReturnType<typeof startSlaScheduler> | null = null; // F3.4.3 — SLA producer autoritativo (main)
 let clockSync: ReturnType<typeof createClockSync> | null = null; // F3.3.77A-R4B — relógio canônico (main)
 let quitting = false;
 // F3.3.70D3R10U — opts do tray centralizados (usados por startup, session-login,
@@ -39,6 +41,7 @@ function updaterTeardownForInstall() {
   try { if (stopNotifier) stopNotifier(); } catch { /* */ }
   try { if (stopReminder) stopReminder(); } catch { /* */ }
   try { if (clockSync) { clockSync.stop(); clockSync = null; } } catch { /* */ }
+  try { if (slaScheduler) { slaScheduler.stop(); slaScheduler = null; } } catch { /* */ } // F3.4.3
   try { stopBgNotify(); } catch { /* */ }
   try { destroyTray(); } catch { /* */ }
   diag("updater.teardownForInstall");
@@ -76,6 +79,18 @@ function windowActive(): boolean {
   // foco fazia "aberto sem foco" virar nativo genérico (a regressão reportada).
   const w = mainWin;
   return !!(w && !w.isDestroyed() && w.isVisible() && !w.isMinimized());
+}
+// F3.4.3 — "AGORA" CANÔNICO do produtor de SLA no main. Espelha EXATAMENTE o gate de offset do
+// renderer (_slaApplyClockState): aplica o offset só para synced/degraded/stale; local_fallback/
+// error ⇒ relógio local (offset 0). Assim o instante de disparo do amarelo/vermelho no MAIN é
+// idêntico ao do cronômetro/visual do renderer (mesma referência canônica em todas as máquinas).
+function slaNow(): number {
+  try {
+    const st = clockSync ? clockSync.getState() : null;
+    const q = st ? st.quality : "";
+    const useOffset = (q === "synced" || q === "degraded" || q === "stale");
+    return Date.now() + (useOffset && st ? Math.round(st.offsetMs) : 0);
+  } catch { return Date.now(); }
 }
 function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } {
   try {
@@ -279,6 +294,7 @@ function realQuit() {
   if (stopNotifier) stopNotifier();
   if (stopReminder) stopReminder();
   if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
+  if (slaScheduler) { try { slaScheduler.stop(); } catch { /* */ } slaScheduler = null; } // F3.4.3
   try { stopBgNotify(); } catch { /* */ }
   // F3.3.73I6C11 — "Sair do aplicativo" remove o icone da bandeja (evita tray-fantasma no Windows).
   try { destroyTray(); } catch { /* */ }
@@ -295,8 +311,8 @@ app.whenReady().then(() => {
   // F3.3.77A-R4B — RETOMADA/DESBLOQUEIO: ao voltar do sleep ou desbloquear a tela, ressincroniza o
   // relógio canônico (offset antigo pode estar defasado) e o renderer rearma as timelines de SLA.
   try {
-    powerMonitor.on("resume", () => { diag("power.resume"); if (clockSync) void clockSync.requestSync("resume"); });
-    powerMonitor.on("unlock-screen", () => { diag("power.unlock"); if (clockSync) void clockSync.requestSync("unlock"); });
+    powerMonitor.on("resume", () => { diag("power.resume"); if (clockSync) void clockSync.requestSync("resume"); if (slaScheduler) slaScheduler.reconcile("resume"); }); // F3.4.3 — reconcilia SLA perdido no sleep
+    powerMonitor.on("unlock-screen", () => { diag("power.unlock"); if (clockSync) void clockSync.requestSync("unlock"); if (slaScheduler) slaScheduler.reconcile("unlock"); }); // F3.4.3
   } catch { /* powerMonitor pode não existir em todas as plataformas */ }
   // UPDATER:BEGIN (F3.4.1A — ao retomar/desbloquear, reverifica atualização SE a verificação venceu)
   try {
@@ -415,6 +431,7 @@ app.whenReady().then(() => {
     try { ensureTray(trayWin, trayOpts); } catch { /* */ }
     if (stopNotifier) stopNotifier();
     if (stopReminder) stopReminder();
+    if (slaScheduler) { try { slaScheduler.stop(); } catch { /* */ } slaScheduler = null; } // F3.4.3
     if (uid) {
       // F3.3.3 — notifier/reminder roteiam pelo HUB (ganham toast in-app quando focado,
       // mantêm a nativa quando minimizado/tray). Mesmos eventos/dedup de antes.
@@ -429,6 +446,15 @@ app.whenReady().then(() => {
         onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
       });
       clockSync.start();
+      // F3.4.3 — PRODUTOR AUTORITATIVO DE SLA no MAIN (amarelo/vermelho/crítico). Reaproveita o
+      // listener Firestore long-polling (main, nunca suspenso), usa o MESMO "agora" canônico do
+      // renderer (slaNow → offset do clockSync) e entrega pelo MESMO HUB (deliverNotification →
+      // toast quando visível / bg-window quando oculto). reconcile('boot') entrega os boundaries
+      // já vencidos (ex.: app reaberto após o prazo) exatamente uma vez (seen-set persistente).
+      // authUser: papel AUTENTICADO (auth-core getUserSelf/login), usado só p/ o gate canSeeAll do
+      // operational_block — nunca o role do renderer, nunca a coleção users, nunca Rules/backend.
+      slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser });
+      slaScheduler.reconcile("boot");
       // UPDATER:BEGIN (F3.4.1A — política de verificação item 2: após restauração da sessão)
       if (updater) updater.checkAuto("session-restore");
       // UPDATER:END
@@ -439,6 +465,7 @@ app.whenReady().then(() => {
     if (stopNotifier) { stopNotifier(); stopNotifier = null; }
     if (stopReminder) { stopReminder(); stopReminder = null; }
     if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
+    if (slaScheduler) { try { slaScheduler.stop(); } catch { /* */ } slaScheduler = null; } // F3.4.3
   });
   // F3.3.77A-R4B — o renderer consulta/força a sincronização do relógio (sem expor token/URL/headers).
   ipcMain.handle("clock-get-state", () => (clockSync ? clockSync.getState() : null));

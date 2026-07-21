@@ -8,118 +8,116 @@
  * toast com app aberto / NATIVA minimizado/bandeja), com dedupKey IDÊNTICO ao do main → o HUB
  * deduplica (nunca duplica). O renderer roda em background (backgroundThrottling:false + switches).
  *
- * DOM (Chromium): carrega o renderer real, captura desktopAPI.notify, e prova que notifScanAssign:
- *   - EMITE designer_assigned p/ atribuição NOVA ao designer logado (dedupKey designer_assigned:<id>:<at>);
- *   - EMITE task_assigned p/ tarefa nova atribuída a mim (dedupKey task_assigned:<id>);
- *   - NÃO emite o histórico semeado no 1º snapshot (baseline R4 por semente + dedup, robusto a clock-skew);
- *   - NÃO emite atribuição feita por mim mesmo;
- *   - NÃO emite atribuição de OUTRO designer (não notifica usuário errado).
- * Estático: wiring (notifScan chama notifScanAssign), formato de dedupKey, baseline, e contrato de
- * canal no main (windowActive → toast; senão NATIVA) + switches anti-suspensão de background.
- * CI-safe: sem Chromium faz SKIP. Rodar: /opt/node22/bin/node desktop/scripts/f33D-background-notif.test.mjs */
-import fs from 'fs'; import path from 'path'; import os from 'os'; import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
+ * -----------------------------------------------------------------------------
+ * F3.4.3C — reescrito para o contrato produtor-único-no-main (substitui o contrato antigo;
+ * histórico no Git). A confiabilidade em background NÃO depende mais de o RENDERER espelhar a
+ * atribuição: o PROCESSO MAIN (notifier.ts) é o produtor ÚNICO e autoritativo — nunca é suspenso
+ * pelo Chromium (ao contrário do renderer minimizado/bandeja). Ele detecta a atribuição por
+ * TRANSIÇÃO (semente no 1º snapshot; emite só mudanças), usa o listener Firestore long-polling do
+ * main e entrega pelo MESMO deliverNotification (toast visível / bg-window minimizado-oculto) com
+ * dedupKey canônico. O renderer NÃO emite mais atribuição (notifScanAssign segue DEFINIDO mas SEM
+ * chamadores). Prova por EXECUÇÃO do notifier.ts REAL (compilado) nas 3 janelas + estática do
+ * renderer/main. Puro Node: sem Chromium, sem rede, sem build.
+ */
+import fs from 'fs'; import os from 'os'; import path from 'path'; import Module from 'module';
+import { createRequire } from 'module'; import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
+import { extractDeliver } from './fixtures/f343/deliver-harness.mjs';
+const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const R = path.resolve(__dirname, '..', 'src');
-const html0 = fs.readFileSync(path.resolve(R, 'renderer', 'index.html'), 'utf8');
-const mainTs = fs.readFileSync(path.resolve(R, 'main', 'main.ts'), 'utf8');
-
-function findChrome(){
-  const c = [];
-  if (process.env.CHROME_BIN) c.push(process.env.CHROME_BIN);
-  try { for (const d of fs.readdirSync('/opt/pw-browsers')) if (/^chromium-\d+$/.test(d)) c.push('/opt/pw-browsers/'+d+'/chrome-linux/chrome'); } catch (_) {}
-  c.push('/usr/bin/chromium','/usr/bin/chromium-browser','/usr/bin/google-chrome','/usr/bin/google-chrome-stable');
-  for (const x of c) { try { if (x && fs.existsSync(x)) return x; } catch (_) {} }
-  return null;
-}
-const CHROME = findChrome();
+const DESK = path.resolve(__dirname, '..');
+const HTML = fs.readFileSync(path.join(DESK, 'src', 'renderer', 'index.html'), 'utf8');
+const MAIN = fs.readFileSync(path.join(DESK, 'src', 'main', 'main.ts'), 'utf8');
+const NT = fs.readFileSync(path.join(DESK, 'src', 'main', 'notifier.ts'), 'utf8');
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) pass++; else { fail++; console.log('FAIL:', n); } };
 
-// ── estáticas ──
-ok('notifScanAssign existe', /function notifScanAssign\(\)/.test(html0));
-ok('notifScan chama notifScanAssign', /function notifScan\(\)\{ notifScanFlow\(\); notifScanSla\(\); notifScanAssign\(\); \}/.test(html0));
-ok('dedupKey designer_assigned idêntico ao main (<id>:<designerId>:<assignedAt> — F3.3.77A-R3 canônico)', /dedupKey:'designer_assigned:'\+t\.id\+':'\+\(da\.designerId\|\|''\)\+':'\+at/.test(html0));
-ok('dedupKey task_assigned idêntico ao main (<id>)', /dedupKey:'task_assigned:'\+t\.id/.test(html0));
-// F3.3.17-R4 — baseline robusto a clock-skew: SEMENTE do histórico no 1º snapshot + dedup persistente,
-// SEM comparar assignedAt (relógio de quem grava) com o relógio de quem lê (removido o gate at<_notifAssignSince).
-ok('baseline R4: semeia histórico no 1º snapshot + dedup persistente (sem comparar relógios)', /notifSeenMark\(ks\)/.test(html0) && /function notifAssignKeyOf/.test(html0) && !/at<_notifAssignSince/.test(html0));
-ok('roteamento: só o designer logado emite p/ si', /da\.designerId===me && da\.assignedBy!==me/.test(html0));
-ok('safety interval também roda notifScanAssign', /setInterval\(function\(\)\{ try\{ notifScanSla\(\); \}catch\(_\)\{\} try\{ notifScanAssign\(\); \}catch\(_\)\{\} \},30000\)/.test(html0));
-// contrato de canal no main (real): windowActive → toast; senão NATIVA
-ok('main: windowActive → toast; background → janela premium (showBgNotify) c/ nativa fallback', /if \(windowActive\(\)\) \{[\s\S]*?return \{ ok: true, channel: "toast" \};\s*\}[\s\S]*?const bgOk = showBgNotify\(p\);[\s\S]*?if \(!bgOk\) \{[\s\S]*?new Notification\(/.test(mainTs));
-ok('main: windowActive = visível e não-minimizado (minimizado/oculto → nativa)', /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
-ok('main: switches anti-suspensão de background', /disable-renderer-backgrounding/.test(mainTs) && /disable-background-timer-throttling/.test(mainTs));
+/* ── estáticas: PRODUTOR ÚNICO no MAIN; renderer só-visual ── */
+ok('renderer: notifScan só roda o FLUXO (não emite SLA/atribuição)', /function notifScan\(\)\{ notifScanFlow\(\); \}/.test(HTML));
+ok('renderer: notifScanAssign/notifScanSla DEFINIDOS mas SEM chamadores (visual preservado)',
+  /function notifScanAssign\(\)/.test(HTML) && /function notifScanSla\(\)/.test(HTML) &&
+  (HTML.match(/notifScanAssign\(\)/g) || []).length === 1 && (HTML.match(/notifScanSla\(\)/g) || []).length === 1);
+ok('main: notifier é o produtor (startNotifier no login) + listener Firestore no main', /startNotifier\(\(\) => mainWin, uid, deliverNotification\)/.test(MAIN) && /listen<Task>\("tasks"/.test(NT));
+ok('notifier: dedupKey CANÔNICO designer_assigned:<id>:<designerId>:<at> (fallback sem at)',
+  /const _canonKey = at \? `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}:\$\{at\}` : `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}`;/.test(NT));
+ok('notifier: detecção por TRANSIÇÃO (semente no 1º snapshot; emite mudança), sem hard-drop por assignedAt no CÓDIGO',
+  /if \(firstRun\) return;\s*\/\/ BASELINE SEED/.test(NT) && /const changed = \(prev !== cur\) \|\| \(at !== prevAt\);/.test(NT) && !/if \([^)]*assignedAt[^)]*< [^)]*sinceMs[^)]*\)\s*return/.test(NT) && !/at < state\.sinceMs/.test(NT));
+ok('main: canal windowActive → toast; background → janela premium (showBgNotify), nativa fallback',
+  /if \(windowActive\(\)\) \{[\s\S]*?return \{ ok: true, channel: "toast" \};\s*\}[\s\S]*?const bgOk = showBgNotify\(p\);[\s\S]*?if \(!bgOk\) \{[\s\S]*?new Notification\(/.test(MAIN));
+ok('main: windowActive = visível e não-minimizado (minimizado/oculto → background)', /isVisible\(\) && !w\.isMinimized\(\)/.test(MAIN));
+ok('main: switches anti-suspensão de background (renderer não congela o visual)', /disable-renderer-backgrounding/.test(MAIN) && /disable-background-timer-throttling/.test(MAIN));
 
-if (!CHROME) {
-  console.log('\nF3.3.10 BACKGROUND-NOTIF (estático): ' + pass + ' PASS / ' + fail + ' FAIL');
-  console.log('SKIP DOM: nenhum Chromium encontrado (defina CHROME_BIN p/ a prova DOM real).');
-  process.exit(fail ? 1 : 0);
-}
-
-const pre = `<script>
-window.firebase={initializeApp:function(){},firestore:Object.assign(function(){return{collection:function(){return{doc:function(){return{get:function(){return Promise.resolve({exists:false});},onSnapshot:function(){return function(){};}};},onSnapshot:function(){return function(){};},where:function(){return this;},orderBy:function(){return this;}};}};},{FieldValue:{arrayUnion:function(){return{};},serverTimestamp:function(){return 0;}}})};
-window.__N=[];
-window.desktopAPI={isDesktop:true,notify:function(p){window.__N.push(p);return Promise.resolve({ok:true,channel:'x'});},onNotifToast:function(){},onNotifHistory:function(){},onNotifOpen:function(){},sessionLogin:function(){},sessionLogout:function(){}};
-</script>`;
-let html = html0.replace('<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>', pre).replace('<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>', '');
-
-const driver = `<pre id="RESULT" style="position:fixed;z-index:9;color:#0f0;background:#000;white-space:pre-wrap">P</pre>
-<script>
-function go(){ var R={}; try{
-  try{ localStorage.removeItem('idseven.notif.seen.v1'); localStorage.removeItem('idseven.notif.history.v1'); }catch(_){}
-  var NOW=Date.now(), H=3600000;
-  state.user={id:'designer1',name:'Designer Um',role:'Designer'};
-  state.users=[{id:'social1',name:'Arydyjany Carlôto',role:'Social Media'},{id:'designer1',name:'Designer Um',role:'Designer'},{id:'designerX',name:'Outro',role:'Designer'}];
-  state.events=[];
-  document.body.classList.add('authed'); var ap=document.getElementById('app'); if(ap) ap.style.display='flex'; applyDesktopClass();
-  // F3.3.17-R4 — baseline por SEMENTE (robusto a clock-skew): a 1ª varredura SEMEIA o histórico já
-  // presente (sem notificar); só atribuições que CHEGAM depois (chave nova) disparam. NÃO pré-seta
-  // relógio (o bug antigo era comparar assignedAt da Social com o relógio do Designer).
-  var tNew={id:'tNew',title:'Cronograma semanal',client:'Hospital Visão',sector:'cronograma',designerAssignment:{designerId:'designer1',assignedBy:'social1',assignedByName:'Arydyjany Carlôto',designerName:'Designer Um',assignedAt:NOW}};
-  var tOld={id:'tOld',title:'Antigo',client:'Y',designerAssignment:{designerId:'designer1',assignedBy:'social1',assignedAt:NOW-2*H}};
-  var tMine={id:'tMine',title:'Eu atribui',client:'Z',designerAssignment:{designerId:'designer1',assignedBy:'designer1',assignedAt:NOW}};
-  var tOther={id:'tOther',title:'De outro',client:'W',designerAssignment:{designerId:'designerX',assignedBy:'social1',assignedAt:NOW}};
-  var tTask={id:'tTask',title:'Tarefa comum',client:'ACME',sector:'copywriting',assigneeId:'designer1',by:'social1',createdAt:NOW};
-  state.tasks=[tOld,tMine,tOther];             // 1º snapshot = histórico → SEMEIA (não notifica)
-  notifScanAssign();
-  state.tasks=[tNew,tOld,tMine,tOther,tTask];  // chegam as NOVAS (tNew/tTask) → só elas disparam
-  notifScanAssign();
-  R.notified = window.__N.map(function(p){ return {type:p.eventType,key:p.dedupKey,target:p.targetUserId,task:p.taskId,title:p.title}; });
-  // canal (replica deliverNotification do main): aberto/visível=toast; minimizado/oculto=nativa
-  function chan(w){ return (w.visible && !w.minimized) ? 'toast' : 'bg-window'; }
-  R.chan_visible=chan({visible:true,minimized:false});
-  R.chan_minimized=chan({visible:true,minimized:true});
-  R.chan_tray=chan({visible:false,minimized:false});
-}catch(e){ R.ERROR=String(e&&e.stack||e); } document.getElementById('RESULT').textContent='RESULT_JSON='+JSON.stringify(R); }
-if(document.readyState!=='loading') setTimeout(go,250); else document.addEventListener('DOMContentLoaded',function(){setTimeout(go,250);});
-</script>`;
-html = html.replace('</body>', driver + '\n</body>');
-
+/* ── compila o notifier.ts REAL e stuba electron/firebase (captura os listeners) ── */
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'f33d-'));
-const appFile = path.join(tmp, 'app.html');
-fs.writeFileSync(appFile, html);
-let dom = '';
-try { dom = execFileSync(CHROME, ['--headless=new','--no-sandbox','--disable-gpu','--window-size=1320,900','--virtual-time-budget=3500','--dump-dom','file://'+appFile], { encoding: 'utf8', maxBuffer: 96*1024*1024, stdio: ['ignore','pipe','ignore'] }); }
-catch (e) { console.error('::error:: falha no Chromium headless:', e.message); process.exit(1); }
-const m = dom.match(/RESULT_JSON=(\{[\s\S]*?\})<\/pre>/) || dom.match(/RESULT_JSON=(\{[\s\S]*\})/);
-if (!m) { console.error('::error:: driver DOM não produziu RESULT_JSON'); console.error(dom.slice(0,800)); process.exit(1); }
-let Rj; try { Rj = JSON.parse(m[1]); } catch (e) { console.error('::error:: RESULT_JSON inválido'); process.exit(1); }
+try {
+  execFileSync(process.execPath, [path.join(DESK, 'node_modules', 'typescript', 'lib', 'tsc.js'),
+    path.join(DESK, 'src', 'main', 'notifier.ts'), '--outDir', tmp, '--module', 'commonjs',
+    '--target', 'es2020', '--skipLibCheck', '--esModuleInterop', '--moduleResolution', 'node'], { stdio: 'pipe' });
+} catch (e) { console.error('::error:: falha ao compilar notifier.ts:', (e.stdout || e.message || '').toString().slice(0, 600)); process.exit(1); }
+let listenCalls = [];
+const realLoad = Module._load;
+Module._load = function (request) {
+  if (request === 'electron') return { BrowserWindow: class {} };
+  if (request === './firebase' || /[\\/]firebase(\.js)?$/.test(request)) return { db: {}, listen: (name, cb) => { listenCalls.push([name, cb]); return () => {}; } };
+  return realLoad.apply(this, arguments);
+};
+const { startNotifier } = require(path.join(tmp, 'notifier.js'));
+Module._load = realLoad;
+
+/* ── canal REAL (deliverNotification do main.ts) com estado de janela ajustável ── */
+const chan = extractDeliver(MAIN);
+let winState = 'visible';
+const delivered = [];
+function routedDeliver(p) { const r = chan.deliver(winState, p); delivered.push({ taskId: p.taskId, channel: r.res.channel, dedupKey: p.dedupKey, eventType: p.eventType, target: p.targetUserId, deep: p.action && p.action.deep }); return r.res; }
+
+const UID = 'designer1', SOC = 'social1';
+startNotifier(() => ({}), UID, routedDeliver);
+const tasksCbs = listenCalls.filter(([n]) => n === 'tasks').map(([, cb]) => cb);
+ok('notifier registrou listener(s) de tasks no MAIN', tasksCbs.length >= 1);
+const ch = (type, id, data) => ({ type, doc: { id, data: () => data } });
+const fire = (changes) => tasksCbs.forEach((cb) => { try { cb({ docChanges: () => changes }); } catch (_) {} });
+const da = (designerId, at) => ({ designerId, designerName: 'Marina Dias', assignedBy: SOC, assignedByName: 'Arydyjany Carlôto', assignedAt: at });
+const task = (id, designerId, at) => ({ title: 'Cronograma semanal', client: 'Hospital Visão', sector: 'cronograma', designerAssignment: da(designerId, at) });
+const NOW = 1700000000000;
+
+/* SEED — 1º snapshot marca o histórico SEM emitir (baseline), robusto a clock-skew (sem comparar relógios) */
+fire([ch('added', 'tOld', task('tOld', UID, NOW - 2 * 3600000)), ch('added', 'tOther', task('tOther', 'designerX', NOW))]);
+ok('SEED: histórico do 1º snapshot NÃO dispara (baseline por semente)', delivered.length === 0);
+
+/* app ABERTO/visível → toast */
+winState = 'visible';
+fire([ch('modified', 'tA', task('tA', UID, NOW + 1000))]);
+const dA = delivered.find((d) => d.taskId === 'tA');
+ok('app VISÍVEL: atribuição nova → canal toast (designer_assigned canônico)', dA && dA.channel === 'toast' && dA.eventType === 'designer_assigned' && dA.dedupKey === 'designer_assigned:tA:designer1:' + (NOW + 1000) && dA.deep === 'detail/tA');
+
+/* MINIMIZADO → bg-window */
+winState = 'minimized';
+fire([ch('modified', 'tB', task('tB', UID, NOW + 2000))]);
+ok('app MINIMIZADO: atribuição → janela premium (bg-window)', (delivered.find((d) => d.taskId === 'tB') || {}).channel === 'bg-window');
+
+/* OCULTO (X/bandeja) → bg-window */
+winState = 'hidden';
+fire([ch('modified', 'tC', task('tC', UID, NOW + 3000))]);
+ok('app OCULTO (bandeja): atribuição → janela premium (bg-window)', (delivered.find((d) => d.taskId === 'tC') || {}).channel === 'bg-window');
+
+/* dedupe canônico: reenvio idêntico NÃO duplica */
+const before = delivered.length;
+fire([ch('modified', 'tB', task('tB', UID, NOW + 2000))]);
+ok('dedupe canônico: reenvio idêntico NÃO duplica (guard de transição + HUB)', delivered.length === before);
+
+/* usuário certo: outro designer / auto-atribuição não notificam a mim */
+fire([ch('modified', 'tX', task('tX', 'designerZ', NOW + 4000))]);
+ok('usuário errado (outro designer) NÃO me notifica', !delivered.find((d) => d.taskId === 'tX'));
+fire([ch('modified', 'tMine', { title: 'Eu', designerAssignment: { designerId: UID, assignedBy: UID, assignedAt: NOW + 5000 } })]);
+ok('anti-eco: auto-atribuição (assignedBy===me) não dispara', !delivered.find((d) => d.taskId === 'tMine'));
+
+/* atribuição ANTIGA que chega AO VIVO (transição nova) NÃO é hard-dropada por assignedAt antigo */
+fire([ch('modified', 'tLate', task('tLate', UID, NOW - 6 * 3600000))]);
+ok('sem hard-drop por relógio: transição AO VIVO com assignedAt antigo AINDA dispara (autoritativo)', !!delivered.find((d) => d.taskId === 'tLate'));
+
+ok('total: exatamente as transições elegíveis foram entregues (tA,tB,tC,tLate)', delivered.length === 4);
+
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (_) {}
-if (Rj.ERROR) { console.error('::error:: erro no driver DOM:', Rj.ERROR); process.exit(1); }
-
-const N = Rj.notified || [];
-const has = (type, key) => N.some(x => x.type === type && x.key === key);
-ok('DOM: emite designer_assigned para atribuição NOVA (dedupKey canônico <id>:<designerId>:<assignedAt>)', N.some(x => x.type==='designer_assigned' && /^designer_assigned:tNew:designer1:\d+$/.test(x.key) && x.target==='designer1'));
-ok('DOM: emite task_assigned para tarefa nova atribuída a mim', has('task_assigned','task_assigned:tTask'));
-ok('DOM: NÃO emite atribuição anterior ao login (tOld)', !N.some(x => x.task==='tOld'));
-ok('DOM: NÃO emite atribuição feita por mim (tMine)', !N.some(x => x.task==='tMine'));
-ok('DOM: NÃO emite atribuição de OUTRO designer (tOther) — usuário certo', !N.some(x => x.task==='tOther'));
-ok('DOM: nenhum duplicado (1 por tarefa elegível)', N.length === 2);
-ok('canal: app aberto/visível → toast', Rj.chan_visible === 'toast');
-ok('canal: app minimizado → janela premium (bg-window)', Rj.chan_minimized === 'bg-window');
-ok('canal: app na bandeja/oculto → janela premium (bg-window)', Rj.chan_tray === 'bg-window');
-
-console.log('\nF3.3.10 BACKGROUND-NOTIF (estático+DOM): ' + pass + ' PASS / ' + fail + ' FAIL');
-if (fail) { console.error('::error:: detecção de atribuição em background divergiu do contrato'); process.exit(1); }
-console.log('OK — atribuição detectada no renderer (espelha main; baseline; usuário certo; sem duplicar) e roteada pelo HUB: toast com app aberto, NATIVA minimizado/bandeja. SLA/fluxo inalterados.');
+console.log('\nF3.3.10 (F3.4.3C) BACKGROUND-NOTIF — produtor único no MAIN: ' + pass + ' PASS / ' + fail + ' FAIL');
+if (fail) { console.error('::error:: atribuição em background divergiu do contrato produtor-único-no-main'); process.exit(1); }
+console.log('OK — atribuição detectada NO MAIN por transição (não no renderer), entregue pelo deliverNotification nas 3 janelas (visível→toast, min/oculto→bg-window), dedupe canônico, usuário certo, sem hard-drop por relógio.');
