@@ -46,6 +46,16 @@ export type PresenceClientState = {
   onlineCount: number;        // total de usuários on-line (do baseline agregado)
   wsEnabled: boolean;         // eco do /auth
   errorCode: string | null;   // sanitizado
+  // F3.4.2A Stage-2A-X2 — DIAGNÓSTICO sanitizado (para comprovar fisicamente quem/quando fecha o socket).
+  // Nenhum destes campos revela token/ticket/deviceId/UID/URL — só metadados de ciclo de vida.
+  wantConnected: boolean;         // INTENÇÃO (login on / logout off) — distingue queda de "desligado"
+  lastHeartbeatSentAt: number | null;  // último {t:"hb"} ENVIADO
+  lastCloseCode: number | null;   // code do último fechamento de socket (ws)
+  lastCloseReason: string | null; // reason sanitizado do último fechamento
+  lastCloseWasClient: boolean;    // true = fechado por disconnect() (explícito); false = inesperado
+  reconnectScheduled: number;     // nº de reconexões AGENDADAS
+  reconnectExecuted: number;      // nº de reconexões EXECUTADAS (openOnce por reconnect)
+  onlineDroppedAt: number | null; // instante em que onlineCount CAIU (para correlacionar com o log)
 };
 
 export type PresenceClientDeps = {
@@ -57,12 +67,6 @@ export type PresenceClientDeps = {
   now?: () => number;
   onLog?: (tag: string, data?: unknown) => void; // logger sanitizado (NUNCA recebe token)
   onState?: (state: PresenceClientState) => void; // empurra estado sanitizado ao renderer
-  // F3.4.2A Stage-2A-X — transições de INTENÇÃO de conexão (não de socket). onActive dispara quando
-  // wantConnected passa false->true (login/reabrir); onIdle quando true->false (logout/Sair/quit/update).
-  // O main usa isto para segurar/soltar o powerSaveBlocker('prevent-app-suspension'), mantendo o
-  // processo (WebSocket+heartbeat) vivo na bandeja. Reconexões transitórias NÃO disparam onIdle.
-  onActive?: () => void;
-  onIdle?: () => void;
   heartbeatMs?: number;
   timeoutMs?: number;
   setTimer?: (fn: () => void, ms: number) => any; // injetável p/ teste (default setTimeout)
@@ -98,6 +102,9 @@ export function createPresenceClient(deps: PresenceClientDeps) {
     phase: "idle", wsConnected: false, authValidated: false, service: SERVICE_LABEL,
     lastConnectAt: null, lastMessageAt: null, heartbeatActive: false, baselineReceived: false,
     onlineCount: 0, wsEnabled: false, errorCode: null,
+    // diagnóstico (Stage-2A-X2)
+    wantConnected: false, lastHeartbeatSentAt: null, lastCloseCode: null, lastCloseReason: null,
+    lastCloseWasClient: false, reconnectScheduled: 0, reconnectExecuted: 0, onlineDroppedAt: null,
   };
 
   let ws: any = null;
@@ -107,11 +114,25 @@ export function createPresenceClient(deps: PresenceClientDeps) {
   let wantConnected = false; // intenção do usuário (login on / logout off)
   let generation = 0;    // invalida callbacks de conexões antigas
 
+  // Sanitiza o "reason" do close (ws Buffer OU string): só [a-z0-9_ -], curto. NUNCA vaza dados privados.
+  function sanitizeReason(raw: unknown): string | null {
+    const s = (raw == null ? "" : (typeof raw === "string" ? raw : (raw as any).toString ? (raw as any).toString() : ""))
+      .replace(/[^a-zA-Z0-9_ -]/g, "").trim().slice(0, 60);
+    return s || null;
+  }
+
   function pushState(): void {
     try { if (deps.onState) deps.onState(publicState()); } catch { /* emitir estado nunca quebra */ }
   }
   function publicState(): PresenceClientState { return { ...st }; }
-  function set(patch: Partial<PresenceClientState>): void { Object.assign(st, patch); pushState(); }
+  function set(patch: Partial<PresenceClientState>): void {
+    // DIAGNÓSTICO: registra o INSTANTE em que a contagem CAIU (para correlacionar com fechamento/heartbeat).
+    if (typeof patch.onlineCount === "number" && patch.onlineCount < st.onlineCount) {
+      patch.onlineDroppedAt = now();
+      log("presence.online.dropped", { from: st.onlineCount, to: patch.onlineCount, at: patch.onlineDroppedAt });
+    }
+    Object.assign(st, patch); pushState();
+  }
 
   // ---- token + deviceId (mesmos arquivos 0600 do auth-core/probe) ----
   function readToken(): string | null {
@@ -141,7 +162,7 @@ export function createPresenceClient(deps: PresenceClientDeps) {
     set({ heartbeatActive: true });
     const tick = () => {
       if (gen !== generation || !ws) return;
-      try { ws.send(JSON.stringify({ t: "hb" })); } catch { /* socket morto: close cuidará */ }
+      try { ws.send(JSON.stringify({ t: "hb" })); set({ lastHeartbeatSentAt: now() }); } catch { /* socket morto: close cuidará */ }
       hbTimer = setTimer(tick, heartbeatMs);
     };
     hbTimer = setTimer(tick, heartbeatMs);
@@ -154,9 +175,16 @@ export function createPresenceClient(deps: PresenceClientDeps) {
     // jitter determinístico leve (sem Math.random): varia pela tentativa.
     const jitter = (attempts % 5) * 137;
     attempts += 1;
-    set({ phase: "reconnecting", wsConnected: false });
-    log("presence.reconnect.schedule", { attempts, backoffMs: backoff + jitter });
-    reconnectTimer = setTimer(() => { reconnectTimer = null; void openOnce(); }, backoff + jitter);
+    set({ phase: "reconnecting", wsConnected: false, reconnectScheduled: st.reconnectScheduled + 1 });
+    // DIAGNÓSTICO: reconexão AGENDADA (independe da janela; roda no main mesmo oculto na bandeja).
+    log("presence.reconnect.schedule", { attempts, backoffMs: backoff + jitter, wantConnected, scheduled: st.reconnectScheduled });
+    reconnectTimer = setTimer(() => {
+      reconnectTimer = null;
+      set({ reconnectExecuted: st.reconnectExecuted + 1 });
+      // DIAGNÓSTICO: reconexão EXECUTADA (o timer disparou) — prova que o main não estava suspenso.
+      log("presence.reconnect.exec", { executed: st.reconnectExecuted, wantConnected });
+      void openOnce();
+    }, backoff + jitter);
   }
 
   async function openOnce(): Promise<void> {
@@ -229,17 +257,28 @@ export function createPresenceClient(deps: PresenceClientDeps) {
         log("presence.transition.ignored_stage2a", { online: !!m.online });
       }
     };
-    const onClose = () => {
+    const onClose = (code?: any, reason?: any) => {
       if (gen !== generation) return;
       stopHeartbeat();
-      set({ wsConnected: false });
-      log("presence.ws.close", {});
+      // Aceita ws (.on close -> (code:number, reason:Buffer)) E DOM (.onclose -> (ev{code,reason})).
+      const cc = typeof code === "number" ? code
+        : (code && typeof code === "object" && typeof code.code === "number" ? code.code : null);
+      const rr = sanitizeReason(typeof reason !== "undefined" ? reason : (code && typeof code === "object" ? code.reason : undefined));
+      // onClose SÓ é atingido por fechamentos INESPERADOS: disconnect()/openOnce fazem generation++ antes de
+      // fechar, invalidando o callback do socket antigo (gen !== generation acima). Logo byClient=false aqui.
+      set({ wsConnected: false, lastCloseCode: cc, lastCloseReason: rr, lastCloseWasClient: false });
+      // DIAGNÓSTICO: fechamento INESPERADO — código/motivo + intenção. Responde "quem fechou (não o cliente) /
+      // código e motivo" e correlaciona com a queda da contagem.
+      log("presence.ws.close", { code: cc, reason: rr, byClient: false, wantConnected });
       ws = null;
       scheduleReconnect();
     };
-    const onError = () => {
+    const onError = (err?: any) => {
       if (gen !== generation) return;
-      log("presence.ws.error", {});
+      // erro SANITIZADO (só um código curto; nunca a mensagem crua que pode conter host/URL).
+      const ec = sanitizeReason(err && (err.code || err.type || (err.message && String(err.message).split(/\s+/)[0]))) || "ws_error";
+      set({ errorCode: ec });
+      log("presence.ws.error", { errorCode: ec });
       try { sock.close(); } catch { /* onClose fará o reconnect */ }
     };
 
@@ -247,8 +286,8 @@ export function createPresenceClient(deps: PresenceClientDeps) {
     if (typeof sock.on === "function") {
       sock.on("open", onOpen);
       sock.on("message", (d: any) => onMessage(d));
-      sock.on("close", onClose);
-      sock.on("error", onError);
+      sock.on("close", (code: any, reason: any) => onClose(code, reason));
+      sock.on("error", (err: any) => onError(err));
     } else {
       sock.onopen = onOpen;
       sock.onmessage = (ev: any) => onMessage(ev);
@@ -260,10 +299,8 @@ export function createPresenceClient(deps: PresenceClientDeps) {
   function connect(): void {
     const was = wantConnected;
     wantConnected = true;
-    // Só na transição false->true: liga o keep-alive (o main segura o powerSaveBlocker). Idempotente:
-    // chamar connect() já conectado é no-op e NÃO refaz onActive (evita start duplo do blocker).
-    if (!was) { try { if (deps.onActive) deps.onActive(); } catch { /* keep-alive nunca quebra o cliente */ } }
-    if (st.phase === "connecting" || st.phase === "connected" || st.phase === "authenticating") return; // guarda
+    if (!was) { set({ wantConnected: true }); log("presence.intent.connect", {}); } // INTENÇÃO false->true
+    if (st.phase === "connecting" || st.phase === "connected" || st.phase === "authenticating") return; // guarda (idempotente)
     if (reconnectTimer) { try { clearTimer(reconnectTimer); } catch { /* */ } reconnectTimer = null; }
     attempts = 0;
     void openOnce();
@@ -271,14 +308,16 @@ export function createPresenceClient(deps: PresenceClientDeps) {
   function disconnect(): void {
     const was = wantConnected;
     wantConnected = false;
-    // Só na transição true->false: solta o keep-alive (o main libera o powerSaveBlocker).
-    if (was) { try { if (deps.onIdle) deps.onIdle(); } catch { /* */ } }
+    if (was) { set({ wantConnected: false }); log("presence.intent.disconnect", {}); } // INTENÇÃO true->false (EXPLÍCITO)
     generation++; // invalida callbacks pendentes
     if (reconnectTimer) { try { clearTimer(reconnectTimer); } catch { /* */ } reconnectTimer = null; }
     stopHeartbeat();
+    // Fechamento EXPLÍCITO: generation++ (acima) já invalidou o onClose do socket; então gravamos o
+    // diagnóstico do close aqui mesmo (byClient=true, code 1000). Distingue de queda inesperada.
     if (ws) { try { ws.close(1000, "logout"); } catch { /* */ } ws = null; }
-    set({ phase: "idle", wsConnected: false, authValidated: false, baselineReceived: false, onlineCount: 0, errorCode: null });
-    log("presence.disconnect", {});
+    set({ phase: "idle", wsConnected: false, authValidated: false, baselineReceived: false, onlineCount: 0, errorCode: null,
+      lastCloseCode: 1000, lastCloseReason: "logout", lastCloseWasClient: true });
+    log("presence.disconnect", { code: 1000, reason: "logout", byClient: true });
   }
 
   return {

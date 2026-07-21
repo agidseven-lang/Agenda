@@ -38,25 +38,22 @@ const trayOpts = { isAutoStart, setAutoStart, quit: realQuit };
 // PRESENCE:BEGIN (F3.4.2A — instância da sonda de /auth + cliente WS; criadas no ready com userData real)
 let presenceProbe: ReturnType<typeof createPresenceProbe> | null = null;
 let presenceClient: ReturnType<typeof createPresenceClient> | null = null;
-// F3.4.2A Stage-2A-X — KEEP-ALIVE da presença: enquanto a INTENÇÃO for "conectado" (login→logout/Sair/
-// quit/update), seguramos powerSaveBlocker('prevent-app-suspension') para o processo (WebSocket+heartbeat
-// no main) NÃO ser suspenso pelo SO quando a janela é fechada no X (bandeja). Assim o Durable Object, que
-// remove o usuário no fechamento do socket, mantém o usuário on-line. Idempotente; require lazy (não muda
-// o import de topo). Liberado só na transição de intenção true->false (onIdle).
-let presencePsbId = -1;
-function presenceKeepAliveOn(): void {
-  try {
-    const psb = require("electron").powerSaveBlocker;
-    if (presencePsbId < 0 || !psb.isStarted(presencePsbId)) { presencePsbId = psb.start("prevent-app-suspension"); diag("presence.keepalive.on", { id: presencePsbId }); }
-  } catch { /* keep-alive é best-effort; nunca quebra a presença */ }
-}
-function presenceKeepAliveOff(): void {
-  try {
-    const psb = require("electron").powerSaveBlocker;
-    if (presencePsbId >= 0 && psb.isStarted(presencePsbId)) psb.stop(presencePsbId);
-    diag("presence.keepalive.off", { id: presencePsbId });
-  } catch { /* */ }
-  presencePsbId = -1;
+// F3.4.2A Stage-2A-X2 — CONTEXTO de DIAGNÓSTICO (sanitizado) anexado a cada evento de presença do main:
+// uptime do app, janela visível/oculta, tray ativo e rede on-line (booleano do Electron net). NUNCA
+// token/ticket/URL-com-ticket/deviceId/UID/IP/hostname. Só metadados de ciclo de vida p/ comprovar
+// fisicamente QUEM/QUANDO fecha o socket ao ocultar no X. SEM powerSaveBlocker (removido: sem prova de
+// suspensão do SO e com custo energético; a recuperação é reconexão + TTL do servidor).
+function presenceDiagCtx(): Record<string, unknown> {
+  const w = mainWin;
+  let netOnline: boolean | null = null;
+  try { netOnline = (require("electron").net?.isOnline?.() ?? null) as boolean | null; } catch { netOnline = null; }
+  let tray = false; try { tray = !!getTrayState().created; } catch { /* */ }
+  return {
+    uptimeMs: Math.round(process.uptime() * 1000),
+    winVisible: !!(w && !w.isDestroyed() && w.isVisible()),
+    winMinimized: !!(w && !w.isDestroyed() && w.isMinimized()),
+    tray, netOnline,
+  };
 }
 // PRESENCE:END
 // UPDATER:BEGIN (F3.4.1A — instância do atualizador + teardown seguro para quitAndInstall)
@@ -301,10 +298,11 @@ function createWindow() {
   mainWin.on("restore", () => diag("window.restore"));
   mainWin.on("show", () => diag("window.show"));
   mainWin.on("hide", () => diag("window.hide(tray)"));
-  // PRESENCE:BEGIN (F3.4.2A Stage-2A-X — reabrir da bandeja reconecta a presença SE tiver caído.
-  // Idempotente: connect() é no-op se já conectado/conectando (reutiliza a MESMA conexão; sem 2ª sessão,
-  // sem nova transição 0->1). Fechar no X só ESCONDE (acima); NUNCA chama disconnect.)
-  mainWin.on("show", () => { if (presenceClient) { try { presenceClient.connect(); } catch { /* presença nunca quebra a UI */ } } });
+  // PRESENCE:BEGIN (F3.4.2A Stage-2A-X2 — reabrir da bandeja apenas SOLICITA uma verificação (nudge):
+  // connect() é idempotente (no-op se já conectado/conectando). NÃO é o mecanismo principal de recuperação
+  // — a reconexão real roda no cliente (scheduleReconnect, backoff, no main, mesmo oculto). Fechar no X só
+  // ESCONDE (acima); NUNCA chama disconnect.)
+  mainWin.on("show", () => { try { diag("presence.show.verify", {}); if (presenceClient) presenceClient.connect(); } catch { /* presença nunca quebra a UI */ } });
   // PRESENCE:END
 }
 
@@ -341,11 +339,14 @@ app.whenReady().then(() => {
     powerMonitor.on("unlock-screen", () => { if (updater) updater.maybeCheckOnResume(); });
   } catch { /* */ }
   // UPDATER:END
-  // PRESENCE:BEGIN (F3.4.2A Stage-2A — ao retomar/desbloquear, reconecta o WebSocket de presença se caiu;
-  // connect() é idempotente: no-op se já conectado. Sem tempestade — backoff próprio do cliente.)
+  // PRESENCE:BEGIN (F3.4.2A Stage-2A-X2 — DIAGNÓSTICO do powerMonitor + reconexão idempotente.
+  // suspend/lock: SÓ registra (NÃO chama disconnect — suspensão é queda INESPERADA/pendente, não logout).
+  // resume/unlock: solicita verificação (connect idempotente). A reconexão real é do cliente (backoff).)
   try {
-    powerMonitor.on("resume", () => { if (presenceClient) { try { presenceClient.connect(); } catch { /* */ } } });
-    powerMonitor.on("unlock-screen", () => { if (presenceClient) { try { presenceClient.connect(); } catch { /* */ } } });
+    powerMonitor.on("suspend", () => { try { diag("presence.power.suspend", presenceDiagCtx()); } catch { /* */ } });
+    powerMonitor.on("lock-screen", () => { try { diag("presence.power.lock", presenceDiagCtx()); } catch { /* */ } });
+    powerMonitor.on("resume", () => { try { diag("presence.power.resume", presenceDiagCtx()); if (presenceClient) presenceClient.connect(); } catch { /* */ } });
+    powerMonitor.on("unlock-screen", () => { try { diag("presence.power.unlock", presenceDiagCtx()); if (presenceClient) presenceClient.connect(); } catch { /* */ } });
   } catch { /* */ }
   // PRESENCE:END
 
@@ -569,11 +570,9 @@ app.whenReady().then(() => {
     presenceClient = createPresenceClient({
       userDataDir: app.getPath("userData"),
       WebSocketCtor: PresenceWS,
-      onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } }, // sanitizado (NUNCA recebe token/ticket)
+      // Cada evento de presença ganha o CONTEXTO de diagnóstico do main (uptime/janela/tray/rede) — sanitizado.
+      onLog: (t, d) => { try { diag(t, { ...(d && typeof d === "object" ? d as any : { v: d }), ...presenceDiagCtx() }); } catch { /* */ } },
       onState: (s) => { try { const w = mainWin; if (w && !w.isDestroyed()) w.webContents.send("presence-realtime-state", s); } catch { /* */ } },
-      // Stage-2A-X: mantém o processo vivo na bandeja enquanto a presença deve estar conectada.
-      onActive: () => presenceKeepAliveOn(),
-      onIdle: () => presenceKeepAliveOff(),
     });
   } else {
     diag("presence.ws.unavailable", {}); // pacote ws ausente — presença WS inativa nesta build

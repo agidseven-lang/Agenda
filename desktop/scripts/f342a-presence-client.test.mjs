@@ -85,8 +85,12 @@ const baselineMsg = (n) => JSON.stringify({ type: 'baseline', serverNow: 1, user
     const dumpStates = JSON.stringify(states);
     ok('2 getState() NUNCA contém o token nem o ticket', dumpState.indexOf(TOKEN) === -1 && dumpState.indexOf('TICKET_SECRET') === -1);
     ok('2 states empurrados ao renderer NUNCA contêm token/ticket', dumpStates.indexOf(TOKEN) === -1 && dumpStates.indexOf('TICKET_SECRET') === -1);
-    const allowed = ['phase', 'wsConnected', 'authValidated', 'service', 'lastConnectAt', 'lastMessageAt', 'heartbeatActive', 'baselineReceived', 'onlineCount', 'wsEnabled', 'errorCode'].sort();
-    ok('2 chaves do estado == conjunto sanitizado exato', JSON.stringify(Object.keys(c.getState()).sort()) === JSON.stringify(allowed));
+    const allowed = ['phase', 'wsConnected', 'authValidated', 'service', 'lastConnectAt', 'lastMessageAt', 'heartbeatActive', 'baselineReceived', 'onlineCount', 'wsEnabled', 'errorCode',
+      'wantConnected', 'lastHeartbeatSentAt', 'lastCloseCode', 'lastCloseReason', 'lastCloseWasClient', 'reconnectScheduled', 'reconnectExecuted', 'onlineDroppedAt'].sort();
+    ok('2 chaves do estado == conjunto sanitizado exato (incl. diagnóstico Stage-2A-X2)', JSON.stringify(Object.keys(c.getState()).sort()) === JSON.stringify(allowed));
+    // O diagnóstico é SANITIZADO: nenhum campo novo revela token/ticket/deviceId/UID/URL.
+    const diagKeys = ['wantConnected', 'lastHeartbeatSentAt', 'lastCloseCode', 'lastCloseReason', 'lastCloseWasClient', 'reconnectScheduled', 'reconnectExecuted', 'onlineDroppedAt'];
+    ok('2 campos de diagnóstico não contêm token/ticket/deviceId no nome nem no valor', diagKeys.every((k) => !/token|ticket|device|uid/i.test(k)) && dumpState.indexOf('presence-device') === -1);
   }
 
   // 3) heartbeat: envia {t:"hb"} e mantém a sessão; heartbeatActive=true

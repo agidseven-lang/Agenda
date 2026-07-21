@@ -150,8 +150,10 @@ function stripComments(src) {
   ok('PC WSS /ws com ticket na URL + reconexão backoff + heartbeat', /wsEndpoint/.test(code) && /ticket/.test(code) && /scheduleReconnect/.test(code) && /heartbeat/i.test(code));
   ok('PC nenhuma chamada de log passa token/ticket', !/\blog\([^)]*\b(token|ticket)\b/i.test(code));
   ok('PC estado público sanitizado — nenhum literal token:/ticket: no código', !/\btoken\s*:/.test(code) && !/\bticket\s*:/.test(code));
-  // Stage-2A-X: intenção de conexão exposta ao main via onActive/onIdle (para o keep-alive).
-  ok('PC onActive/onIdle disparam na transição de intenção (para o keep-alive do main)', /onActive\?\:/.test(code) && /onIdle\?\:/.test(code) && /deps\.onActive/.test(code) && /deps\.onIdle/.test(code));
+  // Stage-2A-X2: SEM keep-alive (onActive/onIdle removidos) + DIAGNÓSTICO sanitizado (code/reason/quem/reconexão).
+  ok('PC sem onActive/onIdle (keep-alive removido)', !/onActive/.test(code) && !/onIdle/.test(code));
+  ok('PC diagnóstico: captura lastCloseCode/lastCloseReason/lastCloseWasClient + reconnectScheduled/Executed + onlineDroppedAt', /lastCloseCode/.test(code) && /lastCloseReason/.test(code) && /lastCloseWasClient/.test(code) && /reconnectScheduled/.test(code) && /reconnectExecuted/.test(code) && /onlineDroppedAt/.test(code) && /sanitizeReason/.test(code));
+  ok('PC reason do close é sanitizado (só [a-z0-9_ -], curto) — nunca vaza dados privados', /replace\(\/\[\^a-zA-Z0-9_ -\]\/g/.test(code));
 }
 
 // ---------- 6) main.ts: fiação Escopo A (onNotify->HUB) + PRESENCE (probe + WS) IPC (só em regiões) ----------
@@ -162,10 +164,11 @@ function stripComments(src) {
   ok('W3 IPC presence-auth-probe + createPresenceProbe + createPresenceClient + presence-realtime-state', /ipcMain\.handle\("presence-auth-probe"/.test(m) && /createPresenceProbe\(/.test(m) && /createPresenceClient\(/.test(m) && /ipcMain\.handle\("presence-realtime-state"/.test(m));
   ok('W4 sonda pós-login diagnóstico sem token (só status/duração/campos)', /presence\.login\.probe/.test(m) && !/presence\.login\.probe[^\n]*token/i.test(m));
   ok('W4b WS liga no login (connect) e desliga no logout/quit (disconnect)', /presenceClient\.connect\(\)/.test(m) && /presenceClient\.disconnect\(\)/.test(m));
-  // Stage-2A-X: keep-alive (powerSaveBlocker) + reabrir-da-bandeja reconecta — só dentro de regiões PRESENCE.
-  ok('W6 keep-alive: powerSaveBlocker prevent-app-suspension + onActive/onIdle fiados', /powerSaveBlocker/.test(m) && /prevent-app-suspension/.test(m) && /presenceKeepAliveOn\(\)/.test(m) && /presenceKeepAliveOff\(\)/.test(m) && /onActive:\s*\(\)\s*=>\s*presenceKeepAliveOn/.test(m) && /onIdle:\s*\(\)\s*=>\s*presenceKeepAliveOff/.test(m));
-  ok('W7 reabrir-da-bandeja reconecta (show -> connect idempotente)', /mainWin\.on\("show",\s*\(\)\s*=>\s*\{\s*if \(presenceClient\)/.test(m));
-  ok('W8 keep-alive/show-connect vivem SÓ em regiões sentinela (strip remove tudo)', !/powerSaveBlocker/.test(stripSentinels(m)) && !/presenceKeepAliveOn/.test(stripSentinels(m)));
+  // Stage-2A-X2: SEM powerSaveBlocker (removido) + DIAGNÓSTICO sanitizado (contexto do main) só em PRESENCE.
+  ok('W6 SEM powerSaveBlocker/prevent-app-suspension no CÓDIGO do main (removido)', !/powerSaveBlocker|prevent-app-suspension|presenceKeepAliveOn/.test(stripComments(m)));
+  ok('W7 diagnóstico do main: presenceDiagCtx (uptime/janela/tray/rede) + suspend/resume + onLog enriquecido', /function presenceDiagCtx\(/.test(m) && /uptimeMs/.test(m) && /presence\.power\.suspend/.test(m) && /\.\.\.presenceDiagCtx\(\)/.test(m));
+  ok('W7b reabrir-da-bandeja = verificação idempotente (show -> diag + connect; não é a recuperação principal)', /mainWin\.on\("show".*presence\.show\.verify/.test(m) && /presenceClient\.connect\(\)/.test(m));
+  ok('W8 toda a fiação nova (diag/show/power) vive SÓ em regiões sentinela (strip remove presenceDiagCtx)', !/presenceDiagCtx/.test(stripSentinels(m)) && !/presence\.show\.verify/.test(stripSentinels(m)));
   ok('W5 fiação nova SÓ dentro de regiões sentinela (strip == 1.0.177)', stripSentinels(m) === baseline('src/main/main.ts'));
 }
 

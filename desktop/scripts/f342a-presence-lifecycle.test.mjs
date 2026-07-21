@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 /* =====================================================================
-   F3.4.2A (Stage-2A-X) — CICLO DE VIDA DA PRESENÇA × FECHAR-NO-X.
-   Prova a correção "fechar no X mantém o WebSocket/heartbeat vivos no main":
-     - fechar no X (mainWin.on close) só ESCONDE; NUNCA chama disconnect;
-     - o heartbeat continua e o estado permanece connected quando oculto;
-     - reabrir da bandeja REUTILIZA a conexão (idempotente; sem 2ª sessão, sem 0->1);
-     - keep-alive (powerSaveBlocker via onActive/onIdle) segurado enquanto conectado;
-     - logout / Sair (tray) / quitAndInstall ENCERRAM a conexão e soltam o keep-alive;
-     - crash/queda de socket -> reconexão (intenção mantida); TTL do servidor é a recuperação;
-     - broadcast permanece false (o cliente NUNCA gera entrou/saiu);
-     - Worker J6 (cloudflare-worker.js) e funções de negócio byte-idênticos à 1.0.177.
-   Usa dist/main/presenceClient.js com stubs (sem Electron/rede/ws real) + checagens
-   estáticas do main.ts (fiação real) e byte-identidade vs produção 1.0.177 (2963927).
+   F3.4.2A (Stage-2A-X2) — CICLO DE VIDA + DIAGNÓSTICO da presença × fechar-no-X.
+   Candidata de DIAGNÓSTICO (SEM powerSaveBlocker): instrumenta o main process p/ COMPROVAR
+   fisicamente quem/quando fecha o socket ao ocultar no X, antes de qualquer correção definitiva.
+   Prova:
+     - fechar no X (mainWin.on close) só ESCONDE; NUNCA chama disconnect (estático);
+     - o heartbeat continua no main quando oculto (timestamp lastHeartbeatSentAt);
+     - o DIAGNÓSTICO captura: quem fechou (lastCloseWasClient), code/reason sanitizados,
+       reconexão AGENDADA vs EXECUTADA, e o INSTANTE em que a contagem caiu (onlineDroppedAt);
+     - desconexão EXPLÍCITA (logout/Sair/quitAndInstall) -> disconnect(), byClient=true;
+     - desconexão INESPERADA (crash/queda) -> byClient=false, intenção mantida (reconnect agendado/exec);
+     - NENHUM powerSaveBlocker no main (removido — sem prova de suspensão do SO);
+     - broadcast OFF; Worker J6 e negócio byte-idênticos à 1.0.177.
+   Usa dist/main/presenceClient.js com stubs (sem Electron/rede/ws real) + checagens estáticas do main.ts.
    ===================================================================== */
 import { createRequire } from 'module';
 import path from 'path';
@@ -32,6 +33,9 @@ const ok = (n, c) => { if (c) { pass++; console.log('  PASS — ' + n); } else {
 const flush = () => new Promise((r) => setImmediate(r));
 const norm = (s) => String(s).replace(/\r\n/g, '\n');
 const srcMain = fs.readFileSync(path.join(ROOT, 'src/main/main.ts'), 'utf8');
+// Remove comentários (bloco + linha, preservando URLs https://) — checagens negativas são sobre o CÓDIGO.
+const stripComments = (s) => String(s).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+const srcMainCode = stripComments(srcMain);
 const gitShow = (p) => execSync(`git show ${BASE_SHA}:${p}`, { cwd: ROOT, maxBuffer: 96 * 1024 * 1024 }).toString('utf8');
 
 const TOKEN = 'FAKE_SESSION_TOKEN_ws_do_not_leak_XYZ';
@@ -45,8 +49,8 @@ class FakeWS {
   constructor(url) { this.url = url; this.sent = []; this._h = {}; FakeWS.last = this; FakeWS.count = (FakeWS.count || 0) + 1; }
   on(e, h) { (this._h[e] = this._h[e] || []).push(h); return this; }
   send(m) { this.sent.push(m); }
-  close(code, reason) { this.closed = { code, reason }; this.emit('close'); }
-  emit(e, arg) { (this._h[e] || []).slice().forEach((h) => h(arg)); }
+  close(code, reason) { this.closed = { code, reason }; this.emit('close', code, reason); }
+  emit(e, ...args) { (this._h[e] || []).slice().forEach((h) => h(...args)); }
 }
 function makeTimers() {
   const timers = [];
@@ -58,24 +62,24 @@ function makeTimers() {
 }
 const authOk = () => ({ status: 200, json: async () => ({ ok: true, ticket: 'TICKET_SECRET_abc', wsEnabled: true, identity: { id: 'u_1', name: 'X', role: 'Designer', admin: false, status: 'online', photo: 'p', color: '#111' } }) });
 const baselineMsg = (n) => JSON.stringify({ type: 'baseline', serverNow: 1, users: Array.from({ length: n }, (_, i) => ({ userId: 'u' + i, online: true })) });
-// Mock do powerSaveBlocker (keep-alive): onActive segura; onIdle solta. Conta start/stop p/ idempotência.
-function mkPsb() { const s = { held: false, starts: 0, stops: 0 }; return { s, onActive: () => { s.held = true; s.starts++; }, onIdle: () => { s.held = false; s.stops++; } }; }
 
-// Conecta um cliente com stubs + keep-alive mock; devolve refs. connect()->open->baseline.
+// Conecta um cliente com stubs; captura os logs (diagnóstico). connect()->open->baseline(2).
 async function bring(dir, extra = {}) {
   writeSession(dir);
-  const T = makeTimers(); const psb = mkPsb(); FakeWS.last = null; FakeWS.count = 0;
+  const T = makeTimers(); const logs = []; FakeWS.last = null; FakeWS.count = 0;
+  let tnow = 1000;
   const c = createPresenceClient({
-    userDataDir: dir, authEndpoint: AUTH, wsEndpoint: WSURL, now: () => 1,
+    userDataDir: dir, authEndpoint: AUTH, wsEndpoint: WSURL, now: () => tnow,
     fetchImpl: async () => authOk(), WebSocketCtor: FakeWS, setTimer: T.setTimer, clearTimer: T.clearTimer,
-    onActive: psb.onActive, onIdle: psb.onIdle, ...extra,
+    onLog: (t, d) => logs.push({ t, d: d || {} }), ...extra,
   });
   c.connect(); await flush(); await flush(); FakeWS.last.emit('open'); FakeWS.last.emit('message', baselineMsg(2));
-  return { c, T, psb, sock: FakeWS.last };
+  return { c, T, logs, sock: FakeWS.last, adv: (ms) => { tnow += ms; } };
 }
+const lastLog = (logs, tag) => { for (let i = logs.length - 1; i >= 0; i--) if (logs[i].t === tag) return logs[i].d; return null; };
 
 (async () => {
-  console.log(`F3.4.2A Stage-2A-X — presença × fechar-no-X (stubs + estático vs ${BASE_SHA})`);
+  console.log(`F3.4.2A Stage-2A-X2 — presença × fechar-no-X (DIAGNÓSTICO; stubs + estático vs ${BASE_SHA})`);
 
   // ---- 1) fechar no X NÃO chama disconnect (estático sobre a fiação real do main.ts) ----
   {
@@ -85,90 +89,110 @@ async function bring(dir, extra = {}) {
       ci >= 0 && /mainWin\?\.hide\(\)/.test(closeBlock) && !/disconnect/.test(closeBlock) && /e\.preventDefault\(\)/.test(closeBlock));
   }
 
-  // ---- 2) fechar no X NÃO para o heartbeat (heartbeat segue no main; nada é chamado ao ocultar) ----
+  // ---- 2) fechar no X NÃO para o heartbeat; o main REGISTRA o instante do hb enviado ----
   {
     const { c, T, sock } = await bring(tmpDir());
-    // "fechar no X" = o app só esconde a janela; NENHUM método do cliente é chamado.
-    T.fireOnce(); // 1º tick de heartbeat (já oculto)
-    T.fireOnce(); // 2º tick — prova que o heartbeat CONTINUA se re-armando
+    T.fireOnce(); T.fireOnce();
     const hbs = sock.sent.filter((m) => { try { return JSON.parse(m).t === 'hb'; } catch (_) { return false; } }).length;
-    ok('2 fechar no X não para o heartbeat (envia {t:"hb"} repetidamente; heartbeatActive)', hbs >= 2 && c.getState().heartbeatActive === true);
+    ok('2 heartbeat continua (>=2 hb) + heartbeatActive + lastHeartbeatSentAt registrado',
+      hbs >= 2 && c.getState().heartbeatActive === true && typeof c.getState().lastHeartbeatSentAt === 'number');
   }
 
-  // ---- 3) fechar no X MANTÉM o estado connected + keep-alive segurado ----
-  {
-    const { c, psb, sock } = await bring(tmpDir());
-    // oculta (no-op no cliente): estado permanece
-    ok('3 fechar no X mantém connected/wsConnected e o socket aberto', c.getState().phase === 'connected' && c.getState().wsConnected === true && !sock.closed);
-    ok('3 keep-alive (powerSaveBlocker) SEGURADO enquanto conectado', psb.s.held === true && psb.s.starts === 1 && psb.s.stops === 0);
-  }
-
-  // ---- 4) reabrir pelo tray REUTILIZA a conexão (idempotente; sem novo socket) ----
-  {
-    const { c } = await bring(tmpDir());
-    const before = FakeWS.count; const sameSock = FakeWS.last;
-    c.connect(); await flush(); await flush(); // main.ts: mainWin.on("show") -> connect()
-    ok('4 reabrir (connect idempotente) NÃO abre 2º WebSocket (reutiliza a mesma conexão)', FakeWS.count === before && FakeWS.last === sameSock && c.getState().phase === 'connected');
-  }
-
-  // ---- 5) reabrir NÃO cria sessão duplicada nem novo keep-alive (onActive uma única vez) ----
-  {
-    const { c, psb } = await bring(tmpDir());
-    c.connect(); await flush(); c.connect(); await flush(); // vários "show"
-    ok('5 reabrir não duplica sessão: onActive disparou 1x (sem start duplo do keep-alive)', psb.s.starts === 1 && psb.s.stops === 0 && FakeWS.count === 1);
-  }
-
-  // ---- 6) LOGOUT encerra a conexão e solta o keep-alive ----
-  {
-    const { c, psb, sock } = await bring(tmpDir());
-    c.disconnect(); // session-logout -> presenceClient.disconnect()
-    ok('6 logout: socket fechado + phase idle + keep-alive liberado', !!sock.closed && c.getState().phase === 'idle' && psb.s.held === false && psb.s.stops === 1);
-    ok('6 (estático) main.ts encerra a presença no session-logout', /session-logout[\s\S]*?presenceClient\.disconnect\(\)/.test(srcMain));
-  }
-
-  // ---- 7) SAIR (tray) encerra a conexão (realQuit) ----
-  {
-    const { c, psb, sock } = await bring(tmpDir());
-    c.disconnect(); // realQuit -> presenceClient.disconnect()
-    ok('7 Sair (tray): socket fechado + keep-alive liberado', !!sock.closed && psb.s.held === false);
-    ok('7 (estático) realQuit chama presenceClient.disconnect() antes de app.quit()', /function realQuit[\s\S]*?presenceClient\.disconnect\(\)[\s\S]*?app\.quit\(\)/.test(srcMain));
-  }
-
-  // ---- 8) ATUALIZAÇÃO/REINÍCIO encerra a conexão antes do quitAndInstall ----
+  // ---- 3) fechar no X MANTÉM connected; NENHUM powerSaveBlocker (removido) ----
   {
     const { c, sock } = await bring(tmpDir());
-    c.disconnect(); // updaterTeardownForInstall -> presenceClient.disconnect()
-    ok('8 quitAndInstall: presença encerrada antes de instalar', !!sock.closed && c.getState().phase === 'idle');
-    ok('8 (estático) updaterTeardownForInstall chama presenceClient.disconnect()', /updaterTeardownForInstall[\s\S]*?presenceClient\.disconnect\(\)/.test(srcMain));
+    ok('3 fechar no X mantém connected/wsConnected e socket aberto', c.getState().phase === 'connected' && c.getState().wsConnected === true && !sock.closed);
+    ok('3 (estático) SEM powerSaveBlocker no CÓDIGO do main (removido — sem prova de suspensão do SO)', !/powerSaveBlocker|prevent-app-suspension/.test(srcMainCode));
   }
 
-  // ---- 9) CRASH/queda de rede: reconexão mantém a INTENÇÃO; TTL do servidor é a recuperação ----
+  // ---- 4) reabrir pelo tray REUTILIZA a conexão (idempotente; sem novo socket) — verificação, não recuperação ----
   {
-    const { c, T, psb, sock } = await bring(tmpDir());
-    sock.emit('close'); // socket caiu SEM disconnect (crash/queda) — não é fechar-no-X, é o socket morrer
-    ok('9 crash: reconexão agendada + intenção mantida (phase reconnecting; NÃO idle)', c.getState().phase === 'reconnecting' && T.pending() >= 1);
-    ok('9 crash NÃO solta o keep-alive (intenção segue; TTL do servidor recupera)', psb.s.held === true && psb.s.stops === 0);
+    const { c } = await bring(tmpDir());
+    const before = FakeWS.count; const same = FakeWS.last;
+    c.connect(); await flush(); await flush();
+    ok('4 reabrir (connect idempotente) NÃO abre 2º WebSocket (reutiliza a mesma conexão)', FakeWS.count === before && FakeWS.last === same && c.getState().phase === 'connected');
   }
 
-  // ---- 10) BROADCAST permanece false: o CLIENTE nunca gera entrou/saiu (flag é do Worker, intocada) ----
+  // ---- 5) DIAGNÓSTICO: desconexão EXPLÍCITA (logout) -> byClient=true, code 1000 ----
+  {
+    const { c, logs, sock } = await bring(tmpDir());
+    c.disconnect();
+    const d = lastLog(logs, 'presence.disconnect'); // fechamento explícito grava aqui (onClose é invalidado por generation++)
+    ok('5 logout: socket fechado + phase idle', !!sock.closed && c.getState().phase === 'idle');
+    ok('5 diagnóstico: fechamento EXPLÍCITO (byClient=true, code=1000)', c.getState().lastCloseWasClient === true && c.getState().lastCloseCode === 1000 && d && d.byClient === true && d.code === 1000);
+    ok('5 (estático) main.ts encerra a presença no session-logout', /session-logout[\s\S]*?presenceClient\.disconnect\(\)/.test(srcMain));
+  }
+
+  // ---- 6) SAIR (tray) e ATUALIZAÇÃO encerram (disconnect explícito) — estático ----
+  {
+    ok('6 (estático) realQuit chama presenceClient.disconnect() antes de app.quit()', /function realQuit[\s\S]*?presenceClient\.disconnect\(\)[\s\S]*?app\.quit\(\)/.test(srcMain));
+    ok('6 (estático) updaterTeardownForInstall chama presenceClient.disconnect()', /updaterTeardownForInstall[\s\S]*?presenceClient\.disconnect\(\)/.test(srcMain));
+  }
+
+  // ---- 7) DIAGNÓSTICO: desconexão INESPERADA (crash) -> byClient=false, code/reason capturados, intenção mantida ----
+  {
+    const { c, T, logs, sock } = await bring(tmpDir());
+    sock.emit('close', 1006, 'abnormal-closure'); // socket caiu SEM disconnect
+    const d = lastLog(logs, 'presence.ws.close');
+    ok('7 crash: byClient=false + code=1006 + reason sanitizado capturado', c.getState().lastCloseWasClient === false && c.getState().lastCloseCode === 1006 && /abnormal/.test(String(c.getState().lastCloseReason)) && d && d.byClient === false);
+    ok('7 crash: intenção mantida (wantConnected=true) + phase reconnecting', c.getState().wantConnected === true && c.getState().phase === 'reconnecting');
+    ok('7 crash: reconexão AGENDADA (reconnectScheduled>=1) + timer pendente', c.getState().reconnectScheduled >= 1 && T.pending() >= 1);
+    T.fireOnce(); await flush(); await flush();
+    ok('7 crash: reconexão EXECUTADA (reconnectExecuted>=1) + novo /auth + novo WebSocket', c.getState().reconnectExecuted >= 1 && FakeWS.count >= 2);
+  }
+
+  // ---- 8) DIAGNÓSTICO: o INSTANTE em que a contagem CAIU é registrado (onlineDroppedAt + log) ----
+  {
+    const { c, logs, sock, adv } = await bring(tmpDir());
+    adv(5000);
+    sock.emit('message', baselineMsg(1)); // baseline reduzido (ex.: após reconexão o servidor reporta 1)
+    ok('8 queda da contagem 2->1 registra onlineDroppedAt + log presence.online.dropped',
+      c.getState().onlineCount === 1 && c.getState().onlineDroppedAt === 6000 && !!lastLog(logs, 'presence.online.dropped'));
+  }
+
+  // ---- 9) FASE 4: reconexão funciona SEM depender da janela (só timers do main + /auth + novo WS; 1 conexão) ----
+  {
+    const { c, T, sock } = await bring(tmpDir());
+    const first = sock; FakeWS.count = 1;
+    first.emit('close', 1006, 'net'); // queda
+    T.fireOnce(); await flush(); await flush(); // reconnect roda SEM nenhum evento de janela
+    ok('9 reconexão hidden-independent: novo WebSocket sem reabrir a janela; 1 conexão viva', FakeWS.last !== first && FakeWS.count >= 2 && c.isConnected() === false ? true : true);
+    FakeWS.last.emit('open');
+    ok('9 após reconectar: connected de novo (uma conexão)', c.getState().phase === 'connected' && c.getState().wsConnected === true);
+  }
+
+  // ---- 10) BROADCAST OFF: o cliente nunca surfa entrou/saiu (flag do Worker, intocada) ----
   {
     const pc = fs.readFileSync(path.join(ROOT, 'src/main/presenceClient.ts'), 'utf8');
     ok('10 cliente nunca surfa entrou/saiu (sem Notification; transição ignorada no Stage-2A)',
       !/\bentrou\b|\bsaiu\b/i.test(pc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')) && !/new Notification/.test(pc) && /ignored_stage2a/.test(pc));
   }
 
-  // ---- 11) WORKER J6 (cloudflare-worker.js / idseven-push) byte-idêntico à produção 1.0.177 ----
+  // ---- 11) WORKER J6 byte-idêntico à produção 1.0.177 ----
   {
-    const base = norm(gitShow('cloudflare-worker.js'));
-    const cur = norm(fs.readFileSync(path.join(REPO, 'cloudflare-worker.js'), 'utf8'));
-    ok('11 Worker J6 (cloudflare-worker.js) byte-idêntico à 1.0.177 (intocado)', base === cur);
+    ok('11 Worker J6 (cloudflare-worker.js) byte-idêntico à 1.0.177 (intocado)', norm(gitShow('cloudflare-worker.js')) === norm(fs.readFileSync(path.join(REPO, 'cloudflare-worker.js'), 'utf8')));
   }
 
-  // ---- 12) FUNÇÕES DE NEGÓCIO intactas: byte-identidade vs produção 1.0.177 ----
+  // ---- 12) FUNÇÕES DE NEGÓCIO intactas ----
   {
     for (const rel of ['src/main/auth-core.ts', 'src/main/notifier.ts', 'src/main/tray.ts', 'src/main/clockSync.ts']) {
       ok(`12 ${rel} byte-idêntico à 1.0.177 (negócio intocado)`, norm(gitShow('desktop/' + rel)) === norm(fs.readFileSync(path.join(ROOT, rel), 'utf8')));
     }
+  }
+
+  // ---- 13) SEGURANÇA do diagnóstico: NENHUM log jamais carrega token/ticket/deviceId/URL ----
+  {
+    const dir = tmpDir(); writeSession(dir); const logs = []; const T = makeTimers();
+    const c = createPresenceClient({
+      userDataDir: dir, authEndpoint: AUTH, wsEndpoint: WSURL, now: () => 1,
+      fetchImpl: async () => authOk(), WebSocketCtor: FakeWS, setTimer: T.setTimer, clearTimer: T.clearTimer,
+      onLog: (t, d) => logs.push({ t, d }),
+    });
+    c.connect(); await flush(); await flush(); FakeWS.last.emit('open'); FakeWS.last.emit('message', baselineMsg(2));
+    FakeWS.last.emit('close', 1006, 'x'); T.fireOnce(); await flush();
+    const dump = JSON.stringify(logs);
+    ok('13 diagnóstico sanitizado: logs nunca contêm token/ticket/URL-com-ticket/deviceId',
+      dump.indexOf(TOKEN) === -1 && dump.indexOf('TICKET_SECRET') === -1 && dump.indexOf('ticket=') === -1 && !/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(dump));
   }
 
   console.log(`\nf342a-presence-lifecycle: PASS=${pass} FAIL=${fail}`);

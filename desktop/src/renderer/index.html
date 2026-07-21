@@ -8650,6 +8650,14 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
       +'<div class="divline"></div>'+presRow('Última conexão',presWhen(w&&w.lastConnectAt))
       +'<div class="divline"></div>'+presRow('Última mensagem',presWhen(w&&w.lastMessageAt));
     if(w&&w.errorCode) h+='<div class="divline"></div>'+presRow('Erro',String(w.errorCode));
+    // Stage-2A-X2 — DIAGNÓSTICO sanitizado (ao vivo): ajuda a observar quem/quando fecha o socket ao ocultar
+    // no X. Nenhum campo revela token/ticket/deviceId/URL — só metadados de ciclo de vida.
+    var closeTxt=(w&&w.lastCloseCode!=null)?(String(w.lastCloseCode)+(w.lastCloseReason?(' '+esc(String(w.lastCloseReason))):'')+(w.lastCloseWasClient?' (encerrado pelo app)':' (queda inesperada)')):'—';
+    h+='<div class="divline"></div>'+presRow('Intenção', (w&&w.wantConnected)?'Conectar':'Desligado')
+      +'<div class="divline"></div>'+presRow('Heartbeat enviado', presWhen(w&&w.lastHeartbeatSentAt))
+      +'<div class="divline"></div>'+presRow('Último fechamento', closeTxt)
+      +'<div class="divline"></div>'+presRow('Reconexões (agendadas/executadas)', (w?(String(w.reconnectScheduled||0)+' / '+String(w.reconnectExecuted||0)):'—'))
+      +'<div class="divline"></div>'+presRow('Contagem caiu em', presWhen(w&&w.onlineDroppedAt));
     var connected=!!(w&&w.wsConnected);
     var act=connected?'disconnect':'connect'; var lbl=connected?'Desconectar':'Conectar';
     h+='<div class="divline"></div><div class="settrow" style="cursor:default"><div class="icb">'+(typeof svg==='function'?svg('gear'):'')+'</div><div class="sm" style="flex:1"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-presws="'+act+'" style="background:var(--accent);color:#fff;border-color:transparent">'+esc(lbl)+'</button></div><div class="ss" style="margin-top:8px">Conexão WebSocket real ao Worker canário (credencial efêmera; a sessão permanece só no processo principal). Broadcast DESLIGADO nesta fase: recebe o baseline e o estado agregado, sem avisos de entrada/saída.</div></div></div>';
