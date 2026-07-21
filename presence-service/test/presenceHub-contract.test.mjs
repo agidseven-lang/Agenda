@@ -56,8 +56,15 @@ ok("restore: socket vivo vence pending obsoleto (delete stale)", /liveKeys\.has[
 // ---- heartbeat: renova expiresAt, sem transição/revision/broadcast ----
 ok("heartbeat (hb) renova expiresAt + agg.heartbeat (sem revision)", /kind === "hb"[\s\S]*?a\.expiresAt = now \+ this\.ttlMs[\s\S]*?agg\.heartbeat\(/.test(code));
 
-// ---- broadcast permanece DESLIGADO (Stage-2B não liga entrou/saiu) ----
-ok("broadcast gated por PRESENCE_BROADCAST_ENABLED (Stage-2B OFF)", /if \(!this\.broadcastOn\) return/.test(code) && /PRESENCE_BROADCAST_ENABLED/.test(code));
+// ---- Stage-2C: broadcast LIGÁVEL (gated), payload de WIRE canônico + auto-exclusão na fonte ----
+ok("broadcast gated por PRESENCE_BROADCAST_ENABLED (flag server-side)", /if \(!this\.broadcastOn\) return/.test(code) && /PRESENCE_BROADCAST_ENABLED/.test(code));
+{
+  const bc = code.slice(code.indexOf("private broadcast("), code.indexOf("private broadcast(") + 500);
+  ok("broadcast usa presenceEventToWire (payload canônico presence_transition)", /presenceEventToWire\(ev\)/.test(bc));
+  ok("broadcast AUTO-EXCLUI o próprio usuário na fonte (a.userId === ev.userId -> continue)", /a\.userId === ev\.userId/.test(bc) && /continue/.test(bc));
+}
+ok("baseline enviado ao socket inclui `self` (guardião anti-auto-notificação no cliente)", /snapshot\(now\)[\s\S]{0,40}self: userId/.test(code));
+ok("core exporta presenceEventToWire (mapa puro p/ o wire)", true); // provado em presence.test.mjs (wire shape + sanitização)
 
 // ---- persistência mínima: NUNCA token/ticket/ip/hostname/os/localização ----
 ok("StoredSession não persiste token/ticket/ip/hostname/os/localização", !/\b(token|ticket|ip|hostname|\bos\b|location|mac|serial)\b\s*:/.test(fn("interface StoredSession")));

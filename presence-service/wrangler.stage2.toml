@@ -27,14 +27,16 @@ class_name = "PresenceHubCanary"
 tag = "v1"
 new_sqlite_classes = ["PresenceHubCanary"]
 
-# Feature flags server-side (strings). STAGE 2A: DO + WebSocket LIGADOS; broadcast DESLIGADO.
-# Nesta fase o serviço aceita conexões WSS /ws, mantém o estado agregado e envia o baseline
-# ao conectar — mas NÃO emite transições entrou/saiu (broadcast=false). O broadcast só liga no
-# STAGE 2B (autorização literal F3.4.2A-STAGE-2B-ENABLE-PRESENCE-BROADCAST).
+# Feature flags server-side (strings). STAGE 2C: DO + WebSocket LIGADOS; broadcast LIGADO.
+# O serviço aceita conexões WSS /ws, mantém o estado agregado e envia o baseline ao conectar,
+# e AGORA transmite as transições canônicas 0<->1 (entrou/saiu) — SOMENTE transições agregadas
+# reais, com auto-exclusão do próprio usuário na fonte. Heartbeat/pending/reconexão/N<->N±1 NÃO
+# são transmitidos. Ativado por autorização literal F3.4.2A-STAGE-2C-PRESENCE-BROADCAST-AND-
+# NATIVE-NOTIFICATIONS. AUTH/WS permanecem LIGADOS.
 [vars]
 PRESENCE_AUTH_ENABLED = "true"
 PRESENCE_WS_ENABLED = "true"
-PRESENCE_BROADCAST_ENABLED = "false"
+PRESENCE_BROADCAST_ENABLED = "true"
 # Identidade validada pelo getUserSelf EXISTENTE (não alteramos o Cloud Run).
 GETUSERSELF_URL = "https://getuserself-de36pi7vza-uc.a.run.app"
 # TTL/heartbeat CANÁRIO (calibráveis por env; valores iniciais autorizados p/ canário).

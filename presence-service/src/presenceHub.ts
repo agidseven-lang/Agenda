@@ -20,7 +20,7 @@
  * identity(+rev por usuário). NUNCA token/ticket/IP/hostname/SO/localização.
  * ===================================================================== */
 // @ts-ignore — módulo ESM puro
-import { PresenceAggregator } from "./core.mjs";
+import { PresenceAggregator, presenceEventToWire } from "./core.mjs";
 import type { Env, Identity, PresenceEvent } from "./types";
 
 interface Attachment { userId: string; deviceId: string; identity: Identity; lastSeen: number; expiresAt: number; status: "connected" | "pending"; }
@@ -100,10 +100,12 @@ export class PresenceHubCanary {
   }
 
   private broadcast(ev: PresenceEvent): void {
-    if (!this.broadcastOn) return; // Stage-2B: broadcast permanece DESLIGADO (transições só no agregado/baseline)
-    const msg = JSON.stringify(ev);
+    if (!this.broadcastOn) return; // gate: só transmite quando PRESENCE_BROADCAST_ENABLED=true (Stage-2C)
+    // Payload de WIRE canônico (presence_transition + user:{id,name,photo,role}); sanitizado.
+    const msg = JSON.stringify(presenceEventToWire(ev));
     for (const ws of this.ctx.getWebSockets()) {
       const a = this.readAtt(ws);
+      // AUTO-EXCLUSÃO NA FONTE: o próprio usuário NUNCA recebe a transição sobre si (nem em outra aba).
       if (!a || a.userId === ev.userId) continue;
       try { ws.send(msg); } catch { /* socket morto: TTL/close cuidam */ }
     }
@@ -137,7 +139,10 @@ export class PresenceHubCanary {
     else if (reconnecting) { this.log("presence.reconnect.same_device", { userId, deviceId }); }
     await this.reschedule();
 
-    try { server.send(JSON.stringify(this.agg.snapshot(now))); } catch { /* baseline best-effort */ }
+    // Baseline (roster agregado sanitizado) + `self` = o PRÓPRIO userId deste socket. `self` só é
+    // enviado a ESTA conexão (é o id do próprio dono) e serve de guardião anti-auto-notificação no
+    // cliente (defesa em profundidade; a exclusão primária já ocorre na fonte, em broadcast()).
+    try { server.send(JSON.stringify({ ...this.agg.snapshot(now), self: userId })); } catch { /* baseline best-effort */ }
     return new Response(null, { status: 101, webSocket: client });
   }
 

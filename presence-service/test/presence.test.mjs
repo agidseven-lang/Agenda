@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* Testes puros da agregação de presença (máquina de estados; sem Cloudflare). */
-import { PresenceAggregator, FORBIDDEN_EVENT_FIELDS } from "../src/core.mjs";
+import { PresenceAggregator, FORBIDDEN_EVENT_FIELDS, presenceEventToWire } from "../src/core.mjs";
 
 let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) { pass++; console.log("  PASS — " + n); } else { fail++; console.error("  FAIL — " + n); } };
@@ -150,6 +150,23 @@ const TTL = 90000;
 {
   const a = new PresenceAggregator(TTL);
   ok("2B markPending de device inexistente = false (no-op)", a.markPending("Z", "dz") === false && !a.isOnline("Z"));
+}
+
+// ---- Stage-2C: payload de WIRE canônico do broadcast (presenceEventToWire) ----
+{
+  const a = new PresenceAggregator(TTL); let t = 1000;
+  const on = a.connect("A", "d1", t, idA);
+  const w = presenceEventToWire(on);
+  ok("2C wire ONLINE: type=presence_transition + online:true", w.type === "presence_transition" && w.online === true);
+  ok("2C wire ONLINE: user aninhado {id,name,photo,role} (sem userId flat)", w.user && w.user.id === "A" && w.user.name === "Alice Real" && w.user.photo === "pa" && w.user.role === "Social Media" && w.userId === undefined);
+  ok("2C wire ONLINE: eventId presence:A:1:online + transitionRevision 1", w.eventId === "presence:A:1:online" && w.transitionRevision === 1);
+  ok("2C wire: NUNCA carrega campos proibidos (token/ip/deviceId/hostname/os/…)", FORBIDDEN_EVENT_FIELDS.every((k) => !(k in w) && !(w.user && k in w.user)));
+  const off = a.disconnect("A", "d1", t + 1);
+  const wo = presenceEventToWire(off);
+  ok("2C wire OFFLINE: online:false + eventId presence:A:2:offline", wo.online === false && wo.eventId === "presence:A:2:offline" && wo.transitionRevision === 2);
+  // robusto a evento nulo/parcial (broadcast nunca quebra)
+  const wn = presenceEventToWire(null);
+  ok("2C wire de evento nulo é seguro (type presence_transition, user vazio)", wn.type === "presence_transition" && wn.user.id === "" && wn.online === false);
 }
 
 console.log(`\npresence.test: PASS=${pass} FAIL=${fail}`);

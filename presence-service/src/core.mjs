@@ -182,5 +182,23 @@ export class PresenceAggregator {
   }
 }
 
+/**
+ * F3.4.2A Stage-2C — mapeia um evento de transição INTERNO (do agregador) para o PAYLOAD DE WIRE
+ * canônico transmitido no broadcast. Formato EXIGIDO pelo mandato (sanitizado; sem token/ticket/
+ * deviceId/IP/hostname/e-mail/localização/SO). O eventId já vem no formato
+ * presence:<userId>:<transitionRevision>:<online|offline>. Função PURA (testável isoladamente).
+ */
+export function presenceEventToWire(ev) {
+  const e = ev || {};
+  return {
+    eventId: String(e.eventId || ""),
+    type: "presence_transition",
+    online: !!e.online,
+    user: { id: String(e.userId || ""), name: e.name || "", photo: e.photo || "", role: e.role || "" },
+    transitionedAt: e.transitionedAt || 0,
+    transitionRevision: e.transitionRevision || 0,
+  };
+}
+
 /** Campos que um evento/snapshot NUNCA pode conter (guarda de sanitização, usada em teste). */
 export const FORBIDDEN_EVENT_FIELDS = ["token", "sessionToken", "ip", "hostname", "deviceId", "location", "os", "mac", "serial"];
