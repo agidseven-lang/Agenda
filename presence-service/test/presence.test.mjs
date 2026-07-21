@@ -96,5 +96,61 @@ const TTL = 90000;
   ok("reconexão do mesmo device NÃO gera entrada falsa (já estava 1)", e === null);
 }
 
+// ==================== Stage-2B: fechamento inesperado retido até TTL ====================
+
+// ---- markPending: mantém on-line, sem transição, sem resetar expiresAt ----
+{
+  const a = new PresenceAggregator(TTL); let t = 1000;
+  a.connect("A", "d1", t, idA);
+  const p = a.markPending("A", "d1"); // queda inesperada
+  ok("2B markPending mantém o device (sem remover) e sem transição", p === true && a.isOnline("A") && a.sessionCount("A") === 1);
+  ok("2B markPending NÃO reseta expiresAt (TTL do último heartbeat)", a.nextExpiry() === t + TTL);
+  ok("2B markPending deixa o device como pending", a.deviceStatus("A", "d1") === "pending");
+  ok("2B pending antes do TTL: sweep não remove (segue on-line)", a.sweep(t + 1000).length === 0 && a.isOnline("A"));
+  const s = a.sweep(t + TTL + 1);
+  ok("2B pending após TTL: UMA saída (1->0)", s.length === 1 && s[0].online === false && s[0].eventId === "presence:A:2:offline");
+  ok("2B após TTL: offline", !a.isOnline("A"));
+  ok("2B sweep repetido pós-pending é idempotente", a.sweep(t + TTL + 2).length === 0 && a.users.get("A").revision === 2);
+}
+
+// ---- reconexão do MESMO device antes do TTL preserva on-line (sem entrada/saída, sem revision) ----
+{
+  const a = new PresenceAggregator(TTL); let t = 1000;
+  const rev0 = a.connect("A", "d1", t, idA).transitionRevision;
+  a.markPending("A", "d1"); // queda
+  const e = a.connect("A", "d1", t + 5000, idA); // reconecta MESMO device antes do TTL
+  ok("2B reconnect mesmo device: sem transição (null)", e === null);
+  ok("2B reconnect: revision inalterada (sem entrada/saída falsa)", a.users.get("A").revision === rev0);
+  ok("2B reconnect: volta a connected + renova expiresAt", a.deviceStatus("A", "d1") === "connected" && a.nextExpiry() === t + 5000 + TTL);
+  ok("2B reconnect: continua on-line", a.isOnline("A"));
+  ok("2B reconnect: sweep no TTL antigo NÃO remove (expiresAt renovado)", a.sweep(t + TTL + 1).length === 0 && a.isOnline("A"));
+}
+
+// ---- explícito (goodbye/logout/Sair) remove imediatamente; contraste com inesperado ----
+{
+  const a = new PresenceAggregator(TTL); let t = 1000;
+  a.connect("A", "d1", t, idA);
+  const e = a.disconnect("A", "d1", t + 1); // explícito
+  ok("2B explícito: remove já + offline imediato", e && e.online === false && !a.isOnline("A") && a.sessionCount("A") === 0);
+}
+
+// ---- duas sessões: uma cai (pending) não derruba; última pendência gera UMA saída no TTL ----
+{
+  const a = new PresenceAggregator(TTL); let t = 1000;
+  a.connect("A", "d1", t, idA); a.connect("A", "d2", t + 1, idA);
+  a.markPending("A", "d1"); // uma cai (inesperado)
+  ok("2B 2 sessões, 1 pending: sem saída, contagem preservada", a.isOnline("A") && a.sessionCount("A") === 2);
+  const e = a.disconnect("A", "d2", t + 2); // a outra sai explícito -> resta d1 pending ainda válido
+  ok("2B sai a última CONNECTED com pending ainda válido: sem offline (resta pending)", e === null && a.isOnline("A") && a.sessionCount("A") === 1);
+  const s = a.sweep(t + TTL + 1); // d1 pending expira
+  ok("2B último pending expira: UMA saída", s.length === 1 && s[0].online === false && !a.isOnline("A"));
+}
+
+// ---- markPending em device inexistente (ex.: já removido por goodbye) é no-op ----
+{
+  const a = new PresenceAggregator(TTL);
+  ok("2B markPending de device inexistente = false (no-op)", a.markPending("Z", "dz") === false && !a.isOnline("Z"));
+}
+
 console.log(`\npresence.test: PASS=${pass} FAIL=${fail}`);
 process.exit(fail ? 1 : 0);

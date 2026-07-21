@@ -81,33 +81,45 @@ export class PresenceAggregator {
     if (!u) { u = { revision: 0, online: false, transitionedAt: 0, identity: null, devices: new Map() }; this.users.set(userId, u); }
     return u;
   }
-  /** Conecta/renova um dispositivo. Retorna transição 'online' apenas em 0->1. */
+  /** Conecta/renova um dispositivo (status=connected). Reutiliza a sessão lógica se o mesmo
+   *  deviceId já existir (pending OU connected) — NÃO emite transição nesse caso (1↔1). Transição
+   *  'online' SOMENTE em 0->1 (dispositivo realmente novo). Limpa o estado pending ao reconectar. */
   connect(userId, deviceId, now, identity) {
     const u = this._u(userId);
     if (identity) u.identity = identity;
+    const existed = u.devices.has(deviceId);   // reconexão do MESMO device (reuso) vs device novo
     const was = u.devices.size;
-    u.devices.set(deviceId, { lastSeen: now, expiresAt: now + this.ttlMs });
-    if (was === 0) { u.online = true; u.revision += 1; u.transitionedAt = now; return this._evt(userId, true); }
-    return null;
+    u.devices.set(deviceId, { status: "connected", lastSeen: now, expiresAt: now + this.ttlMs });
+    if (!existed && was === 0) { u.online = true; u.revision += 1; u.transitionedAt = now; return this._evt(userId, true); }
+    return null; // 1↔1 (reuso do mesmo device) OU N->N+1 (device novo com já-online): sem transição
   }
-  /** Restaura um dispositivo após hibernação/eviction SEM emitir transição (rebuild do estado). */
-  seed(userId, deviceId, lastSeen, expiresAt, identity, revision) {
+  /** Restaura um dispositivo após hibernação/eviction SEM emitir transição (rebuild do estado).
+   *  `status` ('connected'|'pending') vem do socket vivo (connected) ou do storage (pending). */
+  seed(userId, deviceId, lastSeen, expiresAt, identity, revision, status) {
     const u = this._u(userId);
     if (identity) u.identity = identity;
-    u.devices.set(deviceId, { lastSeen, expiresAt });
+    u.devices.set(deviceId, { status: status === "pending" ? "pending" : "connected", lastSeen, expiresAt });
     if (typeof revision === "number" && revision > u.revision) u.revision = revision;
     u.online = u.devices.size > 0;
     if (u.online && lastSeen > u.transitionedAt) u.transitionedAt = lastSeen;
   }
-  /** Heartbeat: renova expiração. NUNCA transição, NUNCA revision, NUNCA broadcast. */
+  /** Heartbeat: renova expiração + marca connected. NUNCA transição, NUNCA revision, NUNCA broadcast. */
   heartbeat(userId, deviceId, now) {
     const u = this.users.get(userId);
     if (!u || !u.devices.has(deviceId)) return false;
     const d = u.devices.get(deviceId);
-    d.lastSeen = now; d.expiresAt = now + this.ttlMs;
+    d.lastSeen = now; d.expiresAt = now + this.ttlMs; d.status = "connected";
     return true;
   }
-  /** Desconexão explícita. Retorna transição 'offline' apenas em 1->0. */
+  /** Fechamento INESPERADO: marca o dispositivo como PENDING sem removê-lo (mantém o usuário
+   *  agregado on-line) e SEM resetar expiresAt (TTL medido do ÚLTIMO heartbeat). Nunca transição. */
+  markPending(userId, deviceId /*, now */) {
+    const u = this.users.get(userId);
+    if (!u || !u.devices.has(deviceId)) return false; // já removido (ex.: goodbye) — no-op
+    u.devices.get(deviceId).status = "pending"; // preserva lastSeen/expiresAt
+    return true;
+  }
+  /** Desconexão EXPLÍCITA (goodbye/logout/Sair/update): remove o dispositivo já. 1->0 emite 'offline'. */
   disconnect(userId, deviceId, now) {
     const u = this.users.get(userId);
     if (!u || !u.devices.has(deviceId)) return null;
@@ -115,6 +127,8 @@ export class PresenceAggregator {
     if (u.devices.size === 0) { u.online = false; u.revision += 1; u.transitionedAt = now; return this._evt(userId, false); }
     return null;
   }
+  hasDevice(userId, deviceId) { const u = this.users.get(userId); return !!(u && u.devices.has(deviceId)); }
+  deviceStatus(userId, deviceId) { const u = this.users.get(userId); const d = u && u.devices.get(deviceId); return d ? d.status : null; }
   /** Varredura por TTL (chamada pelo alarm). Idempotente: remove só expirados; 1->0 emite uma vez. */
   sweep(now) {
     const out = [];
