@@ -72,18 +72,21 @@ jobs:
           echo "antes: $H"
           echo "$H" | grep -q '"ok":true' && echo "worker esta vivo (sera excluido)" || echo "aviso: /health nao respondeu ok antes (segue exclusao mesmo assim)"
 
-      - name: "EXCLUIR — wrangler delete (worker + DO PresenceHubCanary + dados)"
+      - name: "EXCLUIR — wrangler delete por NOME (idempotente: worker + DO + dados)"
         working-directory: presence-service
         run: |
-          set -eo pipefail
-          # Alvo explicito pelo config (name=idseven-presence-canary). --force cobre dependencias.
-          # printf alimenta qualquer confirmacao interativa residual; em CI wrangler roda nao-interativo.
-          printf 'y\ny\n' | npx wrangler delete -c wrangler.stage2.toml --force 2>&1 | tee del.log || {
-            # fallback explicito por nome, caso o -c exija flags extras
-            printf 'y\ny\n' | npx wrangler delete --name "$TARGET" --force 2>&1 | tee -a del.log
-          }
-          grep -qiE 'Successfully deleted|deleted .*idseven-presence-canary|has been deleted' del.log || { echo "::error::wrangler nao confirmou a exclusao"; exit 1; }
-          echo "OK: wrangler confirmou a exclusao de $TARGET"
+          set +e
+          # Delete por NOME (evita enumeracao de KV do `-c`, que exige permissao que o token nao tem).
+          # `wrangler delete` de um Worker remove o script + o namespace do DO (PresenceHubCanary) + dados.
+          printf 'y\n' | npx wrangler delete --name "$TARGET" --force 2>&1 | tee del.log
+          echo "---- avaliando resultado (idempotente) ----"
+          if grep -qiE 'Successfully deleted|has been deleted|Deleted .*'"$TARGET" del.log; then
+            echo "OK: worker $TARGET EXCLUIDO agora."
+          elif grep -qiE 'does not exist|code: *10090' del.log; then
+            echo "OK: worker $TARGET JA NAO EXISTE na conta (idempotente — objetivo alcancado)."
+          else
+            echo "::error::resultado inesperado do delete (ver del.log acima)"; exit 1
+          fi
 
       - name: "Pos-verificacao — endpoint NAO responde mais (worker + rota removidos)"
         run: |
