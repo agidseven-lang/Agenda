@@ -1,0 +1,239 @@
+# =====================================================================
+# [manual] F3.4.2A Stage-2A-X — Publicacao da PRERELEASE canario Desktop 1.0.179-canary.3
+# ---------------------------------------------------------------------
+# Publica a prerelease CANARIO 1.0.179-canary.3 (Stage-2A-X: correcao "fechar-no-X
+# mantem o WebSocket/heartbeat de presenca vivos no processo main" — powerSaveBlocker
+# 'prevent-app-suspension' segurado enquanto conectado + reabrir-da-bandeja reconecta;
+# fechar no X NUNCA chama disconnect; BROADCAST permanece DESLIGADO) do run 29788826773.
+# TUDO PINADO: run id, SHA do codigo canario (alvo da tag), ids+digests dos artifacts,
+# hashes SHA-256 (EXE/MSI/canary.yml/blockmap), tag e titulo. A 1.0.179-canary.2 fica NO-GO.
+# NAO builda, NAO deploya, NAO toca Firebase/Worker J6/Cloud Run/Rules; NAO liga broadcast;
+# NAO mexe na producao estavel 1.0.178. So GITHUB_TOKEN padrao. Execucao SOMENTE manual.
+# =====================================================================
+name: "[manual] F3.4.2A Stage-2A-X Desktop Canary Release — 1.0.179-canary.3"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-DESKTOP-1.0.179-CANARY.3 para autorizar"
+        required: true
+        default: ""
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "29788826773"
+      CANARY_SHA: "e7c400c9103f8acd48dbeadeda801e060b7fe34d"
+      DESK_BRANCH: "desktop/f342a-x-tray-presence-persistence-canary"
+      TAG: "v1.0.179-canary.3"
+      TITLE: "Agenda ID Seven Desktop 1.0.179-canary.3 — Presenca sobrevive ao fechar-no-X (broadcast OFF) (CANARIO)"
+      ART_INST: "agenda-id-seven-desktop-1.0.179-canary.3-installer"
+      ART_INST_DIGEST: "sha256:4cf701757a50a8396cbe421316be12efd1ce305048874e19424079747552c9cf"
+      ART_META: "agenda-id-seven-desktop-1.0.179-canary.3-updatemeta"
+      ART_META_DIGEST: "sha256:6d8d44f772ab4c912590579b51a812d2ba795eaa8104e96339f5963ce8572f46"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.179-canary.3-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.179-canary.3-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.179-canary.3-x64.exe.blockmap"
+      CY_NAME: "canary.yml"
+      EXP_EXE: "1e44589d6a256598a982bef147e6de125be2f997bebec9132688033e0c488aee"
+      EXP_MSI: "0af5abde4e2db57fe70fbdb6278c39f9997ecca5012e26b65ba0da46f03c03c8"
+      EXP_CY: "1f3076fd918f458b41d35a24faf23439efdf25d9607edc8fdebd9df371866466"
+      EXP_BM: "703baafdf1b0f6d44e151f68ddea79218d630c1d4dd1ba2d28d85c9939209827"
+      LATEST_TAG_EXP: "v1.0.178"
+    steps:
+      - name: "Gate 1 — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "PUBLICAR-DESKTOP-1.0.179-CANARY.3" ]; then
+            echo "::error::confirmacao invalida — nada foi publicado"; exit 1
+          fi
+          echo "OK: confirmacao literal valida"
+
+      - name: "Gate 2 — run completed/success"
+        run: |
+          set -euo pipefail
+          ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion')"
+          echo "run $RUN_ID: $ST"
+          [ "$ST" = "completed|success" ] || { echo "::error::run invalido para publicacao"; exit 1; }
+
+      - name: "Gate 3 — head do branch canario == SHA pinado (alvo da tag)"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$DESK_BRANCH" --jq '.object.sha')"
+          echo "head $DESK_BRANCH: $H (esperado $CANARY_SHA)"
+          [ "$H" = "$CANARY_SHA" ] || { echo "::error::branch canario moveu; alvo da tag divergiu"; exit 1; }
+
+      - name: "Gate 4 — tag e release nao podem existir"
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then echo "::error::tag $TAG ja existe"; exit 1; fi
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          echo "OK: tag e release livres"
+
+      - name: "Gate 5 — artifacts: ids+digests conferem"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          check() {
+            local name="$1" digest="$2"
+            local d
+            d="$(echo "$json" | jq -r --arg n "$name" '.artifacts[] | select(.name==$n) | .digest')"
+            echo "artifact $name: $d"
+            [ "$d" = "$digest" ] || { echo "::error::digest do artifact $name divergente ($d != $digest)"; exit 1; }
+            local exp
+            exp="$(echo "$json" | jq -r --arg n "$name" '.artifacts[] | select(.name==$n) | .expired')"
+            [ "$exp" = "false" ] || { echo "::error::artifact $name expirado"; exit 1; }
+          }
+          check "$ART_INST" "$ART_INST_DIGEST"
+          check "$ART_META" "$ART_META_DIGEST"
+          echo "OK: artifacts intactos"
+
+      - name: "Baixar artifacts (installer + updatemeta)"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          ls -lh pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$CY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::asset ausente no artifact: $f"; exit 1; }
+          done
+          test -f pacote/app-update.yml && { echo "::error::app-update.yml NAO deve ser asset publico"; exit 1; } || true
+
+      - name: "Gate 6 — hashes SHA-256 conferem (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          H_EXE="$(sha256sum "pacote/$EXE_NAME" | awk '{print $1}')"
+          H_MSI="$(sha256sum "pacote/$MSI_NAME" | awk '{print $1}')"
+          H_CY="$(sha256sum "pacote/$CY_NAME" | awk '{print $1}')"
+          H_BM="$(sha256sum "pacote/$BM_NAME" | awk '{print $1}')"
+          echo "exe=$H_EXE"; echo "msi=$H_MSI"; echo "canary.yml=$H_CY"; echo "blockmap=$H_BM"
+          [ "$H_EXE" = "$EXP_EXE" ] || { echo "::error::hash EXE divergente"; exit 1; }
+          [ "$H_MSI" = "$EXP_MSI" ] || { echo "::error::hash MSI divergente"; exit 1; }
+          [ "$H_CY" = "$EXP_CY" ] || { echo "::error::hash canary.yml divergente"; exit 1; }
+          [ "$H_BM" = "$EXP_BM" ] || { echo "::error::hash blockmap divergente"; exit 1; }
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.179-canary.3" "pacote/$CY_NAME" || { echo "::error::canary.yml version incorreta"; exit 1; }
+          grep -qF "$EXE_NAME" "pacote/$CY_NAME" || { echo "::error::canary.yml nao referencia o EXE"; exit 1; }
+          echo "OK: hashes conferem + canary.yml coerente"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.179-canary.3 — Presenca sobrevive ao fechar-no-X (broadcast OFF) (CANARIO)
+
+          PRERELEASE de teste (canal `canary`). NAO e latest, NAO e para distribuicao geral.
+          Instalar SOMENTE em maquina real autorizada (owner / 2o computador).
+
+          O QUE MUDA vs 1.0.179-canary.2 (correcao cirurgica, DESKTOP-ONLY)
+          - CORRECAO "FECHAR-NO-X MANTEM A PRESENCA": fechar a janela no X passa a apenas ESCONDER (bandeja),
+            mantendo o WebSocket e o heartbeat VIVOS no processo main. Antes, apos fechar no X, o usuario podia
+            cair para off-line (o Durable Object remove no fechamento do socket). Agora:
+            (1) powerSaveBlocker('prevent-app-suspension') e segurado enquanto a presenca deve estar conectada
+                (login -> logout/Sair/quit/atualizacao), evitando que o SO suspenda o processo na bandeja;
+            (2) reabrir pela bandeja reconecta de forma IDEMPOTENTE (reutiliza a MESMA conexao; sem 2a sessao,
+                sem nova transicao 0->1);
+            (3) fechar no X NUNCA chama disconnect.
+          - Regra canonica de ciclo de vida: fechar-no-X = esconder (segue on-line); a presenca so encerra em
+            LOGOUT, SAIR (bandeja), app quit real e ATUALIZACAO/REINICIO. Crash/queda de rede -> reconexao com
+            backoff; o TTL do servidor e o mecanismo de recuperacao.
+          - BROADCAST permanece DESLIGADO (Stage-2A): recebe baseline + estado agregado; NAO ha "entrou"/"saiu".
+          - ZERO REGRESSAO: funcoes de negocio byte-identicas a 1.0.177 (gate region-scoped + app.asar);
+            Worker J6 (idseven-push) byte-identico; Cloud Run/Firestore/Rules/producao 1.0.178 intocados.
+          - Runtime do updater CANARIO inalterado: allowPrerelease=true, channel="canary", allowDowngrade=false,
+            autoDownload=false, autoInstallOnAppQuit=false, forceDevUpdateConfig=false. Canal ISOLADO.
+
+          NOTIFICACAO IMEDIATA DE UPDATE (cadeia canario)
+          - Uma maquina ja rodando a 1.0.179-canary.2 deve detectar esta 1.0.179-canary.3 e mostrar
+            "NOVA ATUALIZACAO DISPONIVEL" (produtor unico via HUB), pelo canal canary.
+
+          STATUS DAS CANDIDATAS
+          - 1.0.179-canary.2: NO-GO (fechar-no-X derrubava a presenca). NAO promover.
+          - 1.0.179-canary.3: candidata desta correcao.
+
+          HASHES OFICIAIS (SHA-256)
+          - EXE: 1e44589d6a256598a982bef147e6de125be2f997bebec9132688033e0c488aee
+          - MSI: 0af5abde4e2db57fe70fbdb6278c39f9997ecca5012e26b65ba0da46f03c03c8
+          - canary.yml: 1f3076fd918f458b41d35a24faf23439efdf25d9607edc8fdebd9df371866466
+          - blockmap: 703baafdf1b0f6d44e151f68ddea79218d630c1d4dd1ba2d28d85c9939209827
+          Confira com SHA256SUMS anexado (sha256sum -c SHA256SUMS) ou certutil -hashfile <arquivo> SHA256.
+
+          PROVA FISICA (parte do owner) — contas REAIS, SEM usuarios ficticios
+          1. Atualizacao automatica: na maquina com 1.0.179-canary.2, confirme "NOVA ATUALIZACAO DISPONIVEL"
+             e atualize para 1.0.179-canary.3 (confirme em Sobre).
+          2. owner + Tatiana conectados: contagem = 2.
+          3. Feche a janela da Tatiana SO no X; confirme o icone na bandeja; aguarde >= 3 minutos:
+             a contagem deve CONTINUAR = 2 (a presenca sobrevive ao fechar-no-X).
+          4. Reabra pela bandeja: continua = 2, SEM sessao duplicada.
+          5. Logout da Tatiana: a contagem cai para 1. Repita com Sair (bandeja), desligamento abrupto e
+             perda de internet (recuperacao pelo TTL).
+
+          RISCOS CONHECIDOS
+          - Instalador nao assinado (SmartScreen/MOTW). Integridade por SHA-512 (canary.yml) + SHA-256 (release).
+          - MSI e contingencia manual; o auto-update usa SOMENTE o EXE NSIS (canal canary).
+          - Presenca em tempo real segue em BASELINE (broadcast OFF). A ativacao do broadcast e um estagio
+            futuro autorizado (F3.4.2A-STAGE-2B-ENABLE-PRESENCE-BROADCAST).
+
+          Procedencia: run 29788826773 (success); fonte desktop/f342a-x-tray-presence-persistence-canary @ e7c400c.
+          NOTAS
+          wc -l notas.md
+
+      - name: "Publicar prerelease (prerelease=true, latest=false) — 7 assets"
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$CANARY_SHA" \
+            --prerelease \
+            --latest=false \
+            --title "$TITLE" \
+            --notes-file notas.md \
+            "pacote/$EXE_NAME" \
+            "pacote/$MSI_NAME" \
+            "pacote/$CY_NAME" \
+            "pacote/$BM_NAME" \
+            "pacote/SHA256SUMS" \
+            "pacote/VERSAO-DESKTOP.txt" \
+            "pacote/RELATORIO-DESKTOP.txt"
+          echo "publicado: $TAG"
+
+      - name: "Pos-verificacao (flags/assets/target + 1.0.178 segue Latest)"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" \
+            --json tagName,targetCommitish,isPrerelease,isDraft,assets \
+            --jq '{tag:.tagName,target:.targetCommitish,prerelease:.isPrerelease,draft:.isDraft,assets:[.assets[].name]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "true|false" ] || { echo "::error::flags incorretas: $FLAGS (esperado true|false)"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "7" ] || { echo "::error::esperado 7 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$CY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset ausente na release: $a"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
+          [ "$TGT" = "$CANARY_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          # A 1.0.178 PRECISA continuar sendo o Latest do repo (canario NUNCA vira latest).
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          echo "Latest do repo: $LATEST_TAG"
+          [ "$LATEST_TAG" = "$LATEST_TAG_EXP" ] || { echo "::error::Latest do repo mudou: $LATEST_TAG (esperado $LATEST_TAG_EXP)"; exit 1; }
+          [ "$LATEST_TAG" != "$TAG" ] || { echo "::error::canario virou Latest!"; exit 1; }
+          echo "===== GO: PRERELEASE CANARIO 1.0.179-canary.3 PUBLICADA; 1.0.178 segue Latest ====="
+
+      - name: "Smoke — re-baixar EXE + canary.yml da release e reconferir hashes"
+        run: |
+          set -euo pipefail
+          rm -rf smoke; mkdir -p smoke
+          gh release download "$TAG" -R "$REPO" -p "$EXE_NAME" -p "$CY_NAME" -D smoke
+          S_EXE="$(sha256sum "smoke/$EXE_NAME" | awk '{print $1}')"
+          S_CY="$(sha256sum "smoke/$CY_NAME" | awk '{print $1}')"
+          [ "$S_EXE" = "$EXP_EXE" ] || { echo "::error::smoke EXE hash divergente"; exit 1; }
+          [ "$S_CY" = "$EXP_CY" ] || { echo "::error::smoke canary.yml hash divergente"; exit 1; }
+          echo "SMOKE OK: EXE e canary.yml publicados conferem byte a byte."
