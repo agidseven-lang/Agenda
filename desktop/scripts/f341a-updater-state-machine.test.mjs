@@ -361,6 +361,44 @@ async function toAvailable(svc, auto, ver) {
     ok('RED redige token/bearer', /token=<redacted>/i.test(r) && /bearer=<redacted>/i.test(r));
   }
 
+  // ---- Stage-2C: LEMBRAR MAIS TARDE (snooze persistido; gate da renotificação de "available") ----
+  {
+    const store = { s: null };
+    delete require.cache[require.resolve(SVC)];
+    FAKE_AUTO = new FakeAuto(); FAKE_VERSION = '1.0.179-canary.4';
+    const nowBox = { t: 1000 };
+    const notifies = [];
+    const mod = require(SVC);
+    const svc = mod.createUpdaterService({
+      getWindow: () => fakeWin, onLog: () => {}, beforeInstall: () => {},
+      now: () => nowBox.t, getVersion: () => FAKE_VERSION,
+      onNotify: (kind, st) => notifies.push({ kind, v: st.availableVersion }),
+      readSnooze: () => store.s, writeSnooze: (x) => { store.s = x; }, snoozeMs: 10000,
+    });
+    svc.check(); await flush();
+    FAKE_AUTO.emit('update-available', { version: '1.0.179-canary.5', files: [{ size: 1 }] });
+    ok('SNZ available (sem snooze) notifica 1x', notifies.length === 1 && notifies[0].kind === 'available');
+    svc.defer();
+    ok('SNZ defer grava snooze {version, channel=canary, until=now+snoozeMs}', !!store.s && store.s.version === '1.0.179-canary.5' && store.s.channel === 'canary' && store.s.until === 11000);
+    nowBox.t = 5000; // < until: snooze ativo
+    svc.check(); await flush();
+    FAKE_AUTO.emit('update-available', { version: '1.0.179-canary.5', files: [{ size: 1 }] });
+    ok('SNZ snooze ativo SUPRIME a renotificação da MESMA versão', notifies.length === 1);
+    FAKE_AUTO.emit('update-available', { version: '1.0.179-canary.6', files: [{ size: 1 }] });
+    ok('SNZ versão DIFERENTE ignora o snooze (nova versão notifica)', notifies.length === 2 && notifies[1].v === '1.0.179-canary.6');
+    store.s = { version: '1.0.179-canary.5', channel: 'canary', until: 5000 };
+    nowBox.t = 6000; // > until: snooze expirado
+    FAKE_AUTO.emit('update-available', { version: '1.0.179-canary.5', files: [{ size: 1 }] });
+    ok('SNZ snooze EXPIRADO volta a notificar', notifies.length === 3);
+    store.s = { version: '1.0.179-canary.5', channel: 'canary', until: 999999 };
+    await svc.download(); await flush();
+    ok('SNZ download() LIMPA o snooze (usuário iniciou o download)', store.s === null);
+    const before = notifies.length;
+    store.s = { version: '1.0.179-canary.5', channel: 'canary', until: 999999 };
+    FAKE_AUTO.emit('update-downloaded', { version: '1.0.179-canary.5' });
+    ok('SNZ downloaded NUNCA é suprimido por snooze ("pronto para instalar" sempre chega)', notifies.length === before + 1 && notifies[notifies.length - 1].kind === 'downloaded');
+  }
+
   console.log(`\nf341a-updater-state-machine: PASS=${pass} FAIL=${fail}`);
   Module._load = origLoad;
   process.exit(fail ? 1 : 0);

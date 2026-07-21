@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
-   F3.4.2A (Stage-1B) — GATE DE PRESERVAÇÃO REGION-SCOPED (canário 1.0.179-canary.4).
-   Prova que a candidata CANÁRIO 1.0.179-canary.4 difere da PRODUÇÃO FÍSICA
+   F3.4.2A (Stage-1B) — GATE DE PRESERVAÇÃO REGION-SCOPED (canário 1.0.179-canary.5).
+   Prova que a candidata CANÁRIO 1.0.179-canary.5 difere da PRODUÇÃO FÍSICA
    APROVADA 1.0.177 (commit 2963927) SOMENTE nas regiões sentinela
    `UPDATER:BEGIN…UPDATER:END` + `PRESENCE:BEGIN…PRESENCE:END` e em arquivos
    whitelisted (NOVOS). Fora disso, BYTE-IDENTIDADE (HARD NO-GO).
@@ -64,7 +64,7 @@ function fnSrc(SRC, name) {
   return null;
 }
 
-console.log(`F3.4.2A — region-scoped invariance (candidata CANÁRIO 1.0.179-canary.4 vs produção ${BASE_SHA})`);
+console.log(`F3.4.2A — region-scoped invariance (candidata CANÁRIO 1.0.179-canary.5 vs produção ${BASE_SHA})`);
 
 // ---------- 1) RENDERER: fora das regiões sentinela, byte-idêntico ----------
 {
@@ -145,7 +145,9 @@ function stripComments(src) {
   ok('PC presente e substancial (createPresenceClient)', p.length > 2000 && /createPresenceClient/.test(code));
   ok('PC lê o token do MESMO session.json (0600); token só no main', /session\.json/.test(code) && /readToken/.test(code));
   ok('PC /auth usa Authorization: Bearer <token>', /Bearer\s*["']\s*\+\s*token/.test(code));
-  ok('PC body do /auth = { deviceId } (sem userId/token)', /body:\s*JSON\.stringify\(\{ deviceId \}\)/.test(code) && !/userId/.test(code));
+  // O corpo do /auth é LITERALMENTE { deviceId } (prova direta). O cliente LÊ `u.userId` do baseline do
+  // servidor (inbound, roster) — legítimo; o que é proibido é ENVIAR userId (uma CHAVE `userId:` de saída).
+  ok('PC body do /auth = { deviceId } (nunca ENVIA userId — sem chave userId:)', /body:\s*JSON\.stringify\(\{ deviceId \}\)/.test(code) && !/userId\s*:/.test(code));
   ok('PC deviceId = randomUUID persistido; sem hostname/MAC/IP/serial', /randomUUID\(\)/.test(code) && /presence-device\.json/.test(code) && !/hostname|networkInterfaces|macAddress|\bserial\b/i.test(code));
   ok('PC WSS /ws com ticket na URL + reconexão backoff + heartbeat', /wsEndpoint/.test(code) && /ticket/.test(code) && /scheduleReconnect/.test(code) && /heartbeat/i.test(code));
   ok('PC nenhuma chamada de log passa token/ticket', !/\blog\([^)]*\b(token|ticket)\b/i.test(code));
@@ -200,7 +202,7 @@ function stripComments(src) {
 {
   const b = JSON.parse(baseline('package.json'));
   const c = JSON.parse(current('package.json'));
-  ok('P version 1.0.177 → 1.0.179-canary.4', b.version === '1.0.177' && c.version === '1.0.179-canary.4');
+  ok('P version 1.0.177 → 1.0.179-canary.5', b.version === '1.0.177' && c.version === '1.0.179-canary.5');
   ok('P electron-updater ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['electron-updater']) && c.dependencies && c.dependencies['electron-updater'] === '6.8.9');
   ok('P ws (cliente WebSocket de presença) ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['ws']) && c.dependencies && typeof c.dependencies['ws'] === 'string' && /^\^?8\./.test(c.dependencies['ws']));
   // zera version + remove electron-updater E ws dos deps → o restante deve ser idêntico à 1.0.177
@@ -228,7 +230,7 @@ function stripComments(src) {
   ok('L candidata com electron-updater no lock', /"node_modules\/electron-updater"/.test(c));
   ok('L produção sem ws no lock', !/"node_modules\/ws"/.test(b));
   ok('L candidata com ws no lock', /"node_modules\/ws"/.test(c));
-  ok('L lock version 1.0.177 → 1.0.179-canary.4', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.179-canary\.4"/.test(c));
+  ok('L lock version 1.0.177 → 1.0.179-canary.5', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.179-canary\.5"/.test(c));
 }
 
 // ---------- 12) FUNÇÕES CRÍTICAS DE NEGÓCIO: byte-idênticas (mandato) ----------
@@ -253,6 +255,43 @@ function stripComments(src) {
   ok('B13 clockSync byte-idêntico', baseline('src/main/clockSync.ts') === current('src/main/clockSync.ts'));
   ok('B13 notifier (notificação azul/SLA) byte-idêntico', baseline('src/main/notifier.ts') === current('src/main/notifier.ts'));
   ok('B13 tray byte-idêntico', baseline('src/main/tray.ts') === current('src/main/tray.ts'));
+}
+
+// ---------- 14) Stage-2C: broadcast/notificações de presença + snooze + tela Equipe + J6 intocado ----------
+{
+  const m = current('src/main/main.ts');
+  const svc = current('src/main/updaterService.ts');
+  const pc = stripComments(current('src/main/presenceClient.ts'));
+  const cur = current('src/renderer/index.html');
+  const stripped = stripSentinels(cur);
+
+  // main.ts — produtor ÚNICO de entrada/saída via HUB + snooze injetado (só em regiões sentinela)
+  ok('C1 main fia onPresenceEvent -> deliverNotification (ON-LINE/OFF-LINE, entrou/saiu)', /onPresenceEvent:\s*\(kind, user, meta\)/.test(m) && /"USU\S+RIO ON-LINE"/.test(m) && /"USU\S+RIO OFF-LINE"/.test(m) && /entrou no sistema/.test(m) && /saiu do sistema/.test(m) && /deliverNotification\(/.test(m));
+  ok('C2 notificação de presença: dedupKey=eventId + deep equipe + severity verde/neutro', /dedupKey:\s*meta\.eventId/.test(m) && /deep:\s*"equipe"/.test(m) && /severity:\s*online\s*\?\s*"success"\s*:\s*"info"/.test(m));
+  ok('C3 main injeta snooze (relógio canônico + readSnooze/writeSnooze em userData)', /now:\s*\(\)\s*=>[\s\S]{0,120}offsetMs/.test(m) && /readSnooze:/.test(m) && /writeSnooze:/.test(m) && /updater-snooze\.json/.test(m));
+  ok('C4 fiação Stage-2C do main vive SÓ em regiões sentinela (strip == 1.0.177)', stripSentinels(m) === baseline('src/main/main.ts'));
+
+  // updaterService.ts (NOVO/whitelisted) — "LEMBRAR MAIS TARDE" persistido, produtor único preservado
+  ok('C5 updaterService: SNOOZE persistido (snoozeActiveFor suprime notify; defer grava; download/install limpam)', /SNOOZE_MS/.test(svc) && /snoozeActiveFor\(/.test(svc) && /writeSnooze\(\{/.test(svc) && /clearSnooze\("download"\)/.test(svc) && /clearSnooze\("install"\)/.test(svc));
+  ok('C6 updaterService: notify de "available" é GATED pelo snooze (não repete a cada verificação)', /snoozeActiveFor\(ver\)/.test(svc) && /updater\.snooze\.suppress/.test(svc));
+
+  // presenceClient.ts (NOVO/whitelisted) — consumo do wire + dedupe + guardião anti-self + roster sanitizado
+  ok('C7 presenceClient consome presence_transition + baseline.self + dedupe (eventId + revision > baseline)', /presence_transition/.test(pc) && /m\.self/.test(pc) && /seenEvents/.test(pc) && /baselineRev/.test(pc));
+  // roster SEM deviceId é provado em RUNTIME (f342a-presence-client + presence-notifications: roster.every(!('deviceId' in e))).
+  // Aqui: guardião anti-self + gancho + tipo de roster sanitizado (id/name/photo/role/online/lastSeen/sessions — sem deviceId).
+  ok('C8 presenceClient: guardião anti-auto-notificação + gancho onPresenceEvent + tipo de roster sanitizado', /uid === selfId/.test(pc) && /deps\.onPresenceEvent\(/.test(pc) && /PresenceRosterEntry/.test(pc) && !/PresenceRosterEntry\s*=\s*\{[^}]*deviceId/.test(pc));
+
+  // renderer — tela Equipe em tempo real vive SÓ em PRESENCE (some no strip); sem deviceId
+  ok('C9 painel Equipe (presEquipePanel) existe e some no strip (só em PRESENCE)', /presEquipePanel/.test(cur) && !/presEquipePanel/.test(stripped));
+  ok('C10 painel Equipe: On-line agora / Visto por último / sessões só admin; sem deviceId', /On-line agora/.test(cur) && /Visto por .ltimo .s/.test(cur) && /state\.user\.admin/.test(cur) && !/presEquipePanel[\s\S]{0,4000}deviceId/.test(cur));
+}
+
+// ---------- 15) Worker J6 (idseven-push) BYTE-IDÊNTICO à baseline 1.0.177 (fora do escopo) ----------
+{
+  // idseven-push vive na RAIZ do repo (wrangler.toml). Stage-2C toca só desktop/ + presence-service/.
+  const j6cur = norm(execSync('git show HEAD:wrangler.toml', { cwd: ROOT, maxBuffer: 32 * 1024 * 1024 }).toString('utf8'));
+  const j6base = norm(execSync(`git show ${BASE_SHA}:wrangler.toml`, { cwd: ROOT, maxBuffer: 32 * 1024 * 1024 }).toString('utf8'));
+  ok('J6 wrangler.toml (idseven-push) byte-idêntico à produção 1.0.177 (Worker J6 intocado)', j6cur === j6base && /name\s*=\s*"idseven-push"/.test(j6cur));
 }
 
 console.log(`\nf342a-region-invariance: PASS=${pass} FAIL=${fail}`);

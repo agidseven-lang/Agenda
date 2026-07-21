@@ -67,10 +67,20 @@ export type UpdaterDeps = {
   // notificação IMEDIATA de atualização (produtor ÚNICO no main). Recebe só o kind + o
   // ESTADO PÚBLICO já sanitizado (sem token/URL/headers). Ausência ⇒ comportamento 1.0.178.
   onNotify?: (kind: "available" | "downloaded", state: UpdaterState) => void;
+  // F3.4.2A Stage-2C — "LEMBRAR MAIS TARDE" persistido (snooze). O main injeta a leitura/gravação
+  // (arquivo em userData) e o relógio canônico (now). Ausência ⇒ sem snooze (comportamento anterior).
+  readSnooze?: () => UpdaterSnooze | null;
+  writeSnooze?: (s: UpdaterSnooze | null) => void;
+  snoozeMs?: number; // duração do silêncio ao adiar (default SNOOZE_MS)
 };
+
+// Registro de snooze persistido: silencia a notificação de "disponível" desta versão/canal até `until`.
+export type UpdaterSnooze = { version: string; channel: string; until: number };
 
 // 6h entre verificações automáticas (impede tempestade de chamadas).
 export const CHECK_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
+// "Lembrar mais tarde": silêncio padrão de 8h (persistido; sobrevive a reinício; relógio canônico).
+export const SNOOZE_MS = 8 * 60 * 60 * 1000;
 
 // Redige qualquer URL/segredo antes de logar (nunca token/URL nos logs).
 export function redact(s: unknown): string {
@@ -130,6 +140,25 @@ export function createUpdaterService(deps: UpdaterDeps) {
   let inFlightCheck = false;
   let periodic: ReturnType<typeof setInterval> | null = null;
 
+  // ---- LEMBRAR MAIS TARDE (snooze persistido) ----
+  const readSnooze = deps.readSnooze || (() => null);
+  const writeSnooze = deps.writeSnooze || (() => { /* sem persistência: sem snooze */ });
+  const snoozeMs = typeof deps.snoozeMs === "number" && deps.snoozeMs > 0 ? deps.snoozeMs : SNOOZE_MS;
+  // Snooze ATIVO para ESTA versão+canal disponível? (relógio canônico via now()). Versão/canal
+  // diferentes ⇒ snooze não se aplica (nova versão sempre volta a notificar).
+  function snoozeActiveFor(version: string): boolean {
+    try {
+      const s = readSnooze();
+      if (!s || typeof s.until !== "number") return false;
+      if (String(s.version) !== String(version) || String(s.channel) !== String(state.channel)) return false;
+      return now() < s.until;
+    } catch { return false; }
+  }
+  // Limpa o snooze quando: usuário baixa/instala, versão instalada, ou versão deixa de ser superior.
+  function clearSnooze(why: string): void {
+    try { if (readSnooze()) { writeSnooze(null); deps.onLog("updater.snooze.clear", { why }); } } catch { /* */ }
+  }
+
   function publicState(): UpdaterState {
     // cópia sanitizada — NUNCA token/URL/headers/caminho de arquivo interno.
     return {
@@ -186,10 +215,17 @@ export function createUpdaterService(deps: UpdaterDeps) {
     deps.onLog("updater.available", { version: ver });
     // F3.4.2A — produtor ÚNICO da notificação imediata: o main monta o NotifPayload e roteia
     // pelo HUB (deliverNotification). Nunca pode quebrar a máquina de estados do updater.
-    try { if (deps.onNotify) deps.onNotify("available", publicState()); } catch { /* notificar nunca derruba o updater */ }
+    // Stage-2C — "LEMBRAR MAIS TARDE": se houver snooze ATIVO para esta versão, o estado/UI seguem
+    // atualizados, mas a NOTIFICAÇÃO é suprimida (não repete a cada verificação automática).
+    if (ver && snoozeActiveFor(ver)) {
+      deps.onLog("updater.snooze.suppress", { version: ver });
+    } else {
+      try { if (deps.onNotify) deps.onNotify("available", publicState()); } catch { /* notificar nunca derruba o updater */ }
+    }
   });
   autoUpdater.on("update-not-available", (info: any) => {
     set({ status: "up_to_date", availableVersion: null, progress: null, error: null });
+    clearSnooze("up_to_date"); // versão deixou de ser superior (instalada/superada): limpa o snooze
     deps.onLog("updater.up_to_date", { version: String((info && info.version) || "") });
   });
   autoUpdater.on("download-progress", (p: any) => {
@@ -248,6 +284,7 @@ export function createUpdaterService(deps: UpdaterDeps) {
     if ((state.status !== "update_available" && state.status !== "deferred") || !state.availableVersion) {
       return { ok: false, reason: "no_update" };
     }
+    clearSnooze("download"); // usuário iniciou o download: não faz mais sentido adiar
     set({ status: "downloading", progress: null, error: null });
     try {
       await autoUpdater.downloadUpdate();
@@ -276,6 +313,7 @@ export function createUpdaterService(deps: UpdaterDeps) {
       emit(); // permanece 'downloaded'; a UI mostra instrução clara
       return { ok: false, reason: "busy", detail: String((guard && guard.reason) || "busy") };
     }
+    clearSnooze("install"); // usuário está instalando: limpa qualquer adiamento
     set({ status: "installing" });
     deps.onLog("updater.install.begin", { version: state.availableVersion });
     try {
@@ -297,6 +335,11 @@ export function createUpdaterService(deps: UpdaterDeps) {
   function defer(): { ok: boolean } {
     if (state.status === "update_available" || state.status === "downloaded" || state.status === "downloading" || state.status === "error") {
       set({ status: "deferred" });
+    }
+    // LEMBRAR MAIS TARDE: persiste o snooze SÓ quando há uma versão disponível concreta (senão não há
+    // o que lembrar). Relógio canônico via now(). Enquanto ativo, a verificação automática NÃO renotifica.
+    if (state.availableVersion) {
+      try { const until = now() + snoozeMs; writeSnooze({ version: String(state.availableVersion), channel: String(state.channel), until }); deps.onLog("updater.snooze.set", { until }); } catch { /* snooze é best-effort */ }
     }
     deps.onLog("updater.deferred", {});
     return { ok: true };

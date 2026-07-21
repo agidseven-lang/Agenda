@@ -506,6 +506,11 @@ app.whenReady().then(() => {
     getWindow: () => mainWin,
     onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } },
     beforeInstall: () => updaterTeardownForInstall(),
+    // F3.4.2A Stage-2C — RELÓGIO CANÔNICO (offset do clockSync) p/ o snooze "Lembrar mais tarde".
+    now: () => { try { return Date.now() + ((clockSync && clockSync.getState && clockSync.getState().offsetMs) || 0); } catch { return Date.now(); } },
+    // Persistência do snooze (arquivo 0600 em userData). null => remove. NUNCA guarda token/URL.
+    readSnooze: () => { try { const p = path.join(app.getPath("userData"), "updater-snooze.json"); const j = JSON.parse(fs.readFileSync(p, "utf8")); if (j && typeof j.version === "string" && typeof j.until === "number") return { version: j.version, channel: String(j.channel || ""), until: j.until }; } catch { /* sem snooze */ } return null; },
+    writeSnooze: (s) => { try { const p = path.join(app.getPath("userData"), "updater-snooze.json"); if (s === null) { try { fs.unlinkSync(p); } catch { /* já não existe */ } } else { fs.writeFileSync(p, JSON.stringify(s), { mode: 0o600 }); } } catch { /* best-effort */ } },
     // F3.4.2A (Escopo A) — NOTIFICAÇÃO IMEDIATA de atualização, PRODUTOR ÚNICO: o updater
     // avisa, o main monta o payload e roteia pelo MESMO HUB (deliverNotification) de todas as
     // notificações — toast in-app quando a janela está visível, nativa/premium quando na bandeja.
@@ -573,11 +578,37 @@ app.whenReady().then(() => {
       // Cada evento de presença ganha o CONTEXTO de diagnóstico do main (uptime/janela/tray/rede) — sanitizado.
       onLog: (t, d) => { try { diag(t, { ...(d && typeof d === "object" ? d as any : { v: d }), ...presenceDiagCtx() }); } catch { /* */ } },
       onState: (s) => { try { const w = mainWin; if (w && !w.isDestroyed()) w.webContents.send("presence-realtime-state", s); } catch { /* */ } },
+      // F3.4.2A Stage-2C — PRODUTOR ÚNICO das notificações de entrada/saída: o cliente entrega só
+      // transições FRESCAS (dedupe + revision) e NUNCA sobre o próprio usuário; o main monta o
+      // NotifPayload e roteia pelo MESMO HUB (deliverNotification) — toast in-app quando visível,
+      // premium/nativa quando na bandeja/oculto/bloqueado. dedupKey=eventId impede repetição.
+      onPresenceEvent: (kind, user, meta) => {
+        try {
+          const nome = String((user && user.name) || "").trim() || "Usuário";
+          const online = kind === "online";
+          deliverNotification({
+            eventId: meta.eventId,
+            eventType: online ? "presence_online" : "presence_offline",
+            title: online ? "USUÁRIO ON-LINE" : "USUÁRIO OFF-LINE",
+            body: online ? (nome + " entrou no sistema.") : (nome + " saiu do sistema."),
+            actorId: String((user && user.id) || ""),
+            actorName: nome,
+            actorAvatar: String((user && user.photo) || ""),
+            context: String((user && user.role) || ""),
+            severity: online ? "success" : "info", // verde (entrou) / neutro-cinza (saiu)
+            sound: false,
+            createdAt: Number(meta.transitionedAt) || Date.now(),
+            action: { type: "deep", deep: "equipe" },
+            dedupKey: meta.eventId,
+            source: "presence",
+          });
+        } catch { /* notificar nunca pode quebrar a presença */ }
+      },
     });
   } else {
     diag("presence.ws.unavailable", {}); // pacote ws ausente — presença WS inativa nesta build
   }
-  const presenceIdleState = { phase: "idle", wsConnected: false, authValidated: false, service: "idseven-presence-canary", lastConnectAt: null, lastMessageAt: null, heartbeatActive: false, baselineReceived: false, onlineCount: 0, wsEnabled: false, errorCode: null };
+  const presenceIdleState = { phase: "idle", wsConnected: false, authValidated: false, service: "idseven-presence-canary", lastConnectAt: null, lastMessageAt: null, heartbeatActive: false, baselineReceived: false, onlineCount: 0, wsEnabled: false, errorCode: null, roster: [] as any[] };
   ipcMain.handle("presence-realtime-state", () => (presenceClient ? presenceClient.getState() : presenceIdleState));
   ipcMain.handle("presence-realtime-connect", () => { try { if (presenceClient) presenceClient.connect(); } catch { /* */ } return { ok: !!presenceClient }; });
   ipcMain.handle("presence-realtime-disconnect", () => { try { if (presenceClient) presenceClient.disconnect("logout"); } catch { /* */ } return { ok: !!presenceClient }; });

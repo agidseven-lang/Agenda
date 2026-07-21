@@ -8717,6 +8717,70 @@ function afterClientView(){const ta=document.getElementById('cvwNote');if(ta){ta
   }catch(_){}
 })();
 /* PRESENCE:END */
+/* PRESENCE:BEGIN (F3.4.2A Stage-2C — TELA EQUIPE em tempo real: pontos on-line/off-line, visto por
+   último, contagem de sessões só p/ admin. Injeção ADITIVA por DOM na aba Equipe — NÃO altera
+   renderEquipe() nem qualquer função de negócio. Só em builds prerelease. Sem deviceId/IP/host. */
+(function(){
+  if(typeof window==='undefined'||typeof document==='undefined') return;
+  try{ var ver=(window.desktopAPI&&window.desktopAPI.version)||''; if(!/-/.test(String(ver))) return; }catch(_){ return; }
+  var __eqRoster=[];
+  function eqTime(ms){ try{ if(!ms) return '—'; return new Date(ms).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }catch(_){ return '—'; } }
+  function eqAvatar(e){
+    var ph=(e&&e.photo)?String(e.photo):'';
+    if(ph) return '<img src="'+esc(ph)+'" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex:0 0 auto">';
+    var ini=(String((e&&e.name)||'?').trim().charAt(0)||'?').toUpperCase();
+    return '<div style="width:36px;height:36px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--soft);font-weight:800;font-size:15px">'+esc(ini)+'</div>';
+  }
+  function eqPanelInner(){
+    var roster=Array.isArray(__eqRoster)?__eqRoster:[];
+    var isAdmin=false; try{ isAdmin=!!(state&&state.user&&state.user.admin); }catch(_){}
+    var selfId=''; try{ selfId=(state&&state.user&&state.user.id)||''; }catch(_){}
+    var list=roster.slice().sort(function(a,b){ var d=((b.online?1:0)-(a.online?1:0)); if(d) return d; return String(a.name||'').localeCompare(String(b.name||'')); });
+    var onlineN=list.reduce(function(n,e){return n+(e.online?1:0);},0);
+    var rows=list.map(function(e){
+      var on=!!e.online;
+      var dot='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto;background:'+(on?'#34D399':'#9BA0AB')+';box-shadow:0 0 0 3px '+(on?'rgba(52,211,153,.18)':'rgba(155,160,171,.14)')+'"></span>';
+      var when=on?'On-line agora':('Visto por último às '+eqTime(e.lastSeen));
+      var n=Number(e.sessions)||0;
+      var sess=(isAdmin&&on&&n>0)?('<span style="margin-left:8px;font-size:11px;color:var(--faint)">'+n+' '+(n>1?'sessões':'sessão')+'</span>'):'';
+      var you=(selfId&&e.id===selfId)?' <span style="color:var(--faint);font-weight:600">(você)</span>':'';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:9px 2px">'+eqAvatar(e)+
+        '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px">'+dot+'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.name||'')+'</span>'+you+'</div>'+
+        '<div style="font-size:12px;color:var(--soft)">'+esc(e.role||'Equipe')+' · '+esc(when)+sess+'</div></div></div>';
+    }).join('');
+    if(!rows) rows='<div style="padding:10px 2px;color:var(--faint);font-size:13px">Sincronizando presença…</div>';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+        '<div style="font-weight:800;font-size:13px;letter-spacing:.2px">Presença em tempo real</div>'+
+        '<span style="font-size:12px;color:var(--soft)">'+onlineN+' on-line</span></div>'+rows;
+  }
+  function eqOnEquipe(){ try{ return !!(state&&state.tab==='equipe'&&!state.form); }catch(_){ return false; } }
+  function eqEnsure(){
+    if(!eqOnEquipe()) return;
+    var host=document.getElementById('content'); if(!host) return;
+    if(document.getElementById('presEquipePanel')) return; // já presente (evita duplicar/loop)
+    var card=document.createElement('div'); card.className='card'; card.id='presEquipePanel';
+    card.style.cssText='margin-bottom:12px;padding:12px 14px'; card.innerHTML=eqPanelInner();
+    var scr=host.querySelector('.scr');
+    if(scr&&scr.firstChild) scr.insertBefore(card,scr.firstChild);
+    else if(scr) scr.appendChild(card);
+    else host.insertBefore(card,host.firstChild);
+  }
+  function eqRefresh(){ var p=document.getElementById('presEquipePanel'); if(p) p.innerHTML=eqPanelInner(); else eqEnsure(); }
+  // Assina o MESMO estado sanitizado (roster) do main. `onRealtimeState` aceita múltiplos ouvintes.
+  try{
+    var api=(window.desktopAPI&&window.desktopAPI.presence)?window.desktopAPI.presence:null;
+    if(api&&typeof api.onRealtimeState==='function') api.onRealtimeState(function(s){ __eqRoster=(s&&Array.isArray(s.roster))?s.roster:[]; eqRefresh(); });
+    if(api&&typeof api.realtimeState==='function') api.realtimeState().then(function(s){ if(s&&Array.isArray(s.roster)){ __eqRoster=s.roster; eqRefresh(); } });
+  }catch(_){}
+  // Observa re-render do #content (troca de aba) p/ (re)injetar o painel na Equipe. childList SEM
+  // subtree: só dispara quando render() troca o innerHTML do #content — a injeção no .scr NÃO refira.
+  try{
+    var root=document.getElementById('content');
+    if(root&&typeof MutationObserver!=='undefined'){ new MutationObserver(function(){ eqEnsure(); }).observe(root,{childList:true}); }
+    eqEnsure();
+  }catch(_){}
+})();
+/* PRESENCE:END */
 </script>
 </body>
 </html>

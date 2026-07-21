@@ -164,11 +164,16 @@ const lastLog = (logs, tag) => { for (let i = logs.length - 1; i >= 0; i--) if (
     ok('9 após reconectar: connected de novo (uma conexão)', c.getState().phase === 'connected' && c.getState().wsConnected === true);
   }
 
-  // ---- 10) BROADCAST OFF: o cliente nunca surfa entrou/saiu (flag do Worker, intocada) ----
+  // ---- 10) Stage-2C: o cliente SURFA entrou/saiu via onPresenceEvent (HUB único no main), com dedupe + guardião ----
   {
     const pc = fs.readFileSync(path.join(ROOT, 'src/main/presenceClient.ts'), 'utf8');
-    ok('10 cliente nunca surfa entrou/saiu (sem Notification; transição ignorada no Stage-2A)',
-      !/\bentrou\b|\bsaiu\b/i.test(pc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')) && !/new Notification/.test(pc) && /ignored_stage2a/.test(pc));
+    const code = pc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    ok('10 cliente surfa transição via deps.onPresenceEvent (produtor = HUB único no main)',
+      /deps\.onPresenceEvent\(\s*online \? "online" : "offline"/.test(code));
+    ok('10 cliente NÃO cria Notification próprio + removeu o ignored_stage2a (só o HUB entrega)',
+      !/new Notification/.test(code) && !/ignored_stage2a/.test(code));
+    ok('10 antes de notificar: DEDUPE (eventId) + revision > baseline + guardião anti-self',
+      /seenEvents\.has\(eventId\)/.test(code) && /rev <= \(baselineRev\.get/.test(code) && /uid === selfId/.test(code));
   }
 
   // ---- 11) WORKER J6 byte-idêntico à produção 1.0.177 ----

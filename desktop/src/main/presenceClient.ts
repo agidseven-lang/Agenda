@@ -33,6 +33,14 @@ const DEFAULT_TIMEOUT_MS = 15000;
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30000;
 
+// F3.4.2A Stage-2C — entrada do ROSTER de presença (tela Equipe em tempo real). SANITIZADO:
+// só identidade já visível no app (id/name/photo/role) + presença; NUNCA deviceId/IP/host/URL.
+// `sessions` é a contagem de dispositivos do baseline (exibida só a admin no renderer).
+export type PresenceRosterEntry = {
+  id: string; name: string; photo: string; role: string;
+  online: boolean; lastSeen: number; sessions: number;
+};
+
 // Estado SANITIZADO exposto ao renderer (diagnóstico). NUNCA token/ticket/deviceId/URL.
 export type PresenceClientState = {
   phase: "idle" | "authenticating" | "connecting" | "connected" | "reconnecting" | "error";
@@ -56,6 +64,8 @@ export type PresenceClientState = {
   reconnectScheduled: number;     // nº de reconexões AGENDADAS
   reconnectExecuted: number;      // nº de reconexões EXECUTADAS (openOnce por reconnect)
   onlineDroppedAt: number | null; // instante em que onlineCount CAIU (para correlacionar com o log)
+  // F3.4.2A Stage-2C — ROSTER agregado (tela Equipe em tempo real). SANITIZADO, sem deviceId.
+  roster: PresenceRosterEntry[];
 };
 
 export type PresenceClientDeps = {
@@ -67,6 +77,10 @@ export type PresenceClientDeps = {
   now?: () => number;
   onLog?: (tag: string, data?: unknown) => void; // logger sanitizado (NUNCA recebe token)
   onState?: (state: PresenceClientState) => void; // empurra estado sanitizado ao renderer
+  // F3.4.2A Stage-2C — gancho de NOTIFICAÇÃO de presença (produtor: o main monta o NotifPayload e
+  // roteia pelo HUB deliverNotification). Só disparado para transições canônicas FRESCAS (dedupe +
+  // revision > baseline) e NUNCA para o próprio usuário. `user` já é sanitizado (id/name/photo/role).
+  onPresenceEvent?: (kind: "online" | "offline", user: { id: string; name: string; photo: string; role: string }, meta: { eventId: string; transitionedAt: number; transitionRevision: number; sessions: number }) => void;
   heartbeatMs?: number;
   timeoutMs?: number;
   setTimer?: (fn: () => void, ms: number) => any; // injetável p/ teste (default setTimeout)
@@ -105,7 +119,19 @@ export function createPresenceClient(deps: PresenceClientDeps) {
     // diagnóstico (Stage-2A-X2)
     wantConnected: false, lastHeartbeatSentAt: null, lastCloseCode: null, lastCloseReason: null,
     lastCloseWasClient: false, reconnectScheduled: 0, reconnectExecuted: 0, onlineDroppedAt: null,
+    // Stage-2C — roster agregado (tela Equipe)
+    roster: [],
   };
+
+  // F3.4.2A Stage-2C — estado de agregação/dedupe (só no main; nunca vaza ao renderer):
+  //  - selfId: o PRÓPRIO userId (do baseline.self) — guardião anti-auto-notificação (defesa em profundidade).
+  //  - baselineRev: maior transitionRevision conhecida por usuário — só notifica revision > baseline.
+  //  - seenEvents: eventIds já processados — dedupe contra replay/alarm/reconexão.
+  //  - rosterMap: estado agregado por usuário para a tela Equipe.
+  let selfId: string | null = null;
+  const baselineRev = new Map<string, number>();
+  const seenEvents = new Set<string>();
+  const rosterMap = new Map<string, PresenceRosterEntry>();
 
   let ws: any = null;
   let hbTimer: any = null;
@@ -132,6 +158,17 @@ export function createPresenceClient(deps: PresenceClientDeps) {
       log("presence.online.dropped", { from: st.onlineCount, to: patch.onlineCount, at: patch.onlineDroppedAt });
     }
     Object.assign(st, patch); pushState();
+  }
+  // F3.4.2A Stage-2C — recomputa o roster (array ordenado por nome) + onlineCount a partir do rosterMap
+  // e empurra o estado sanitizado (opcionalmente com um patch adicional). Fonte única da tela Equipe.
+  function publishRoster(patch?: Partial<PresenceClientState>): void {
+    const arr = Array.from(rosterMap.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    const online = arr.reduce((n, e) => n + (e.online ? 1 : 0), 0);
+    set({ ...(patch || {}), roster: arr, onlineCount: online });
+  }
+  // Zera a agregação de presença (logout/troca de usuário): roster, dedupe e identidade própria.
+  function clearAggregation(): void {
+    rosterMap.clear(); baselineRev.clear(); seenEvents.clear(); selfId = null;
   }
 
   // ---- token + deviceId (mesmos arquivos 0600 do auth-core/probe) ----
@@ -244,17 +281,58 @@ export function createPresenceClient(deps: PresenceClientDeps) {
       let raw = data; try { if (data && typeof data === "object" && "data" in data) raw = (data as any).data; } catch { /* */ }
       let m: any = null;
       try { m = JSON.parse(typeof raw === "string" ? raw : (raw && raw.toString ? raw.toString() : "")); } catch { return; }
-      if (m && m.type === "baseline") {
-        // Baseline: substitui o estado local; NÃO notifica (entrou/saiu não existem no Stage 2A).
-        const count = Array.isArray(m.users) ? m.users.length : 0;
-        set({ baselineReceived: true, onlineCount: count });
-        log("presence.baseline", { onlineCount: count });
-      } else if (m && m.type === "presence") {
-        // Broadcast=false no Stage 2A: não deveríamos receber isto. Se vier, NÃO notificamos
-        // (mandato: STOP antes de entrou/saiu). Apenas ajustamos a contagem agregada.
-        const delta = m.online ? 1 : -1;
-        set({ onlineCount: Math.max(0, st.onlineCount + delta) });
-        log("presence.transition.ignored_stage2a", { online: !!m.online });
+      if (!m || typeof m !== "object") return;
+
+      if (m.type === "baseline") {
+        // BASELINE (conexão/reconexão): substitui o roster e sincroniza a MAIOR revision conhecida por
+        // usuário. NUNCA notifica entrou/saiu (FASE 3 — o baseline só atualiza a tela Equipe). Guarda o
+        // PRÓPRIO id (m.self) p/ o guardião anti-auto-notificação. seenEvents/baselineRev NÃO são zerados
+        // aqui: transições ocorridas durante a queda ficam absorvidas pelo baseline (sem spam ao voltar).
+        if (typeof m.self === "string" && m.self) selfId = m.self;
+        rosterMap.clear();
+        const users = Array.isArray(m.users) ? m.users : [];
+        for (const u of users) {
+          const id = String((u && u.userId) || "");
+          if (!id) continue;
+          const rev = Number(u && u.transitionRevision) || 0;
+          if (rev > (baselineRev.get(id) || 0)) baselineRev.set(id, rev); // baseline nunca REGRIDE a revision
+          rosterMap.set(id, {
+            id, name: String((u && u.name) || ""), photo: String((u && u.photo) || ""),
+            role: String((u && u.role) || ""), online: true,
+            lastSeen: Number(u && u.lastSeen) || 0, sessions: Number(u && u.sessions) || 1,
+          });
+        }
+        publishRoster({ baselineReceived: true });
+        log("presence.baseline", { onlineCount: rosterMap.size });
+        return;
+      }
+
+      if (m.type === "presence_transition") {
+        // TRANSIÇÃO CANÔNICA (0<->1) transmitida pelo Worker. DEDUPE por eventId + só é FRESCA se
+        // revision > baseline conhecida do usuário — replay/alarm/reconexão NÃO podem duplicar.
+        const user = (m.user && typeof m.user === "object") ? m.user : {};
+        const uid = String(user.id || "");
+        const eventId = String(m.eventId || "");
+        const rev = Number(m.transitionRevision) || 0;
+        const online = !!m.online;
+        if (!uid || !eventId) return;
+        if (seenEvents.has(eventId)) { log("presence.transition.dup", { online }); return; }             // dedupe eventId
+        if (rev <= (baselineRev.get(uid) || 0)) { log("presence.transition.stale", { online }); return; } // já conhecido/antigo
+        seenEvents.add(eventId);
+        if (seenEvents.size > 4000) { const it = seenEvents.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; seenEvents.delete(v.value); } }
+        baselineRev.set(uid, rev);
+        const name = String(user.name || ""), photo = String(user.photo || ""), role = String(user.role || "");
+        const transitionedAt = Number(m.transitionedAt) || now();
+        const prevEntry = rosterMap.get(uid);
+        const prevSessions = (prevEntry && prevEntry.sessions) || 0;
+        rosterMap.set(uid, { id: uid, name, photo, role, online, lastSeen: transitionedAt, sessions: online ? Math.max(1, prevSessions) : 0 });
+        publishRoster();
+        // GUARDIÃO anti-auto-notificação (defesa em profundidade; a exclusão primária já ocorre na fonte).
+        if (selfId && uid === selfId) { log("presence.transition.self_skip", { online }); return; }
+        log("presence.transition." + (online ? "online" : "offline"), { rev });
+        try { if (deps.onPresenceEvent) deps.onPresenceEvent(online ? "online" : "offline", { id: uid, name, photo, role }, { eventId, transitionedAt, transitionRevision: rev, sessions: online ? Math.max(1, prevSessions) : 0 }); }
+        catch { /* notificar nunca quebra o cliente */ }
+        return;
       }
     };
     const onClose = (code?: any, reason?: any) => {
@@ -322,8 +400,9 @@ export function createPresenceClient(deps: PresenceClientDeps) {
       try { ws.close(1000, "goodbye"); } catch { /* */ }
       ws = null;
     }
+    clearAggregation(); // logout/Sair/troca de usuário: descarta roster + dedupe + selfId (sem vazamento entre sessões)
     set({ phase: "idle", wsConnected: false, authValidated: false, baselineReceived: false, onlineCount: 0, errorCode: null,
-      lastCloseCode: 1000, lastCloseReason: r, lastCloseWasClient: true });
+      roster: [], lastCloseCode: 1000, lastCloseReason: r, lastCloseWasClient: true });
     log("presence.disconnect", { code: 1000, reason: r, byClient: true });
   }
 
