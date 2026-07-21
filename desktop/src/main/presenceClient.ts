@@ -305,19 +305,26 @@ export function createPresenceClient(deps: PresenceClientDeps) {
     attempts = 0;
     void openOnce();
   }
-  function disconnect(): void {
+  // Fechamento EXPLÍCITO (F3.4.2A Stage-2B). O cliente ENVIA um goodbye ANTES de fechar, para o servidor
+  // remover a sessão IMEDIATAMENTE (logout/Sair/atualização) — em vez de retê-la pendente até o TTL.
+  // reason ∈ {logout, tray_exit, update}; default logout. Só encerra a PRÓPRIA conexão (o DO usa a
+  // identidade do ticket/attachment, nunca um userId/deviceId do corpo).
+  function disconnect(reason?: string): void {
     const was = wantConnected;
+    const r = reason === "tray_exit" || reason === "update" ? reason : "logout";
     wantConnected = false;
-    if (was) { set({ wantConnected: false }); log("presence.intent.disconnect", {}); } // INTENÇÃO true->false (EXPLÍCITO)
-    generation++; // invalida callbacks pendentes
+    if (was) { set({ wantConnected: false }); log("presence.intent.disconnect", { reason: r }); } // INTENÇÃO true->false
+    generation++; // invalida callbacks pendentes (o onClose deste socket não reprograma reconexão)
     if (reconnectTimer) { try { clearTimer(reconnectTimer); } catch { /* */ } reconnectTimer = null; }
     stopHeartbeat();
-    // Fechamento EXPLÍCITO: generation++ (acima) já invalidou o onClose do socket; então gravamos o
-    // diagnóstico do close aqui mesmo (byClient=true, code 1000). Distingue de queda inesperada.
-    if (ws) { try { ws.close(1000, "logout"); } catch { /* */ } ws = null; }
+    if (ws) {
+      try { ws.send(JSON.stringify({ type: "goodbye", reason: r })); } catch { /* socket já morto: TTL do servidor cuidará */ }
+      try { ws.close(1000, "goodbye"); } catch { /* */ }
+      ws = null;
+    }
     set({ phase: "idle", wsConnected: false, authValidated: false, baselineReceived: false, onlineCount: 0, errorCode: null,
-      lastCloseCode: 1000, lastCloseReason: "logout", lastCloseWasClient: true });
-    log("presence.disconnect", { code: 1000, reason: "logout", byClient: true });
+      lastCloseCode: 1000, lastCloseReason: r, lastCloseWasClient: true });
+    log("presence.disconnect", { code: 1000, reason: r, byClient: true });
   }
 
   return {

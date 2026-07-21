@@ -116,17 +116,20 @@ const lastLog = (logs, tag) => { for (let i = logs.length - 1; i >= 0; i--) if (
   // ---- 5) DIAGNÓSTICO: desconexão EXPLÍCITA (logout) -> byClient=true, code 1000 ----
   {
     const { c, logs, sock } = await bring(tmpDir());
-    c.disconnect();
+    c.disconnect("logout");
     const d = lastLog(logs, 'presence.disconnect'); // fechamento explícito grava aqui (onClose é invalidado por generation++)
     ok('5 logout: socket fechado + phase idle', !!sock.closed && c.getState().phase === 'idle');
-    ok('5 diagnóstico: fechamento EXPLÍCITO (byClient=true, code=1000)', c.getState().lastCloseWasClient === true && c.getState().lastCloseCode === 1000 && d && d.byClient === true && d.code === 1000);
-    ok('5 (estático) main.ts encerra a presença no session-logout', /session-logout[\s\S]*?presenceClient\.disconnect\(\)/.test(srcMain));
+    ok('5 diagnóstico: fechamento EXPLÍCITO (byClient=true, code=1000, reason logout)', c.getState().lastCloseWasClient === true && c.getState().lastCloseCode === 1000 && c.getState().lastCloseReason === 'logout' && d && d.byClient === true && d.code === 1000);
+    // Stage-2B: envia goodbye {type,reason} ANTES de fechar -> servidor remove a sessão JÁ (não fica pendente até TTL).
+    const gb = sock.sent.map((m) => { try { return JSON.parse(m); } catch (_) { return null; } }).find((x) => x && x.type === 'goodbye');
+    ok('5 goodbye enviado antes do close (reason=logout)', !!gb && gb.reason === 'logout');
+    ok('5 (estático) main.ts: session-logout -> disconnect("logout")', /session-logout[\s\S]*?presenceClient\.disconnect\("logout"\)/.test(srcMain));
   }
 
   // ---- 6) SAIR (tray) e ATUALIZAÇÃO encerram (disconnect explícito) — estático ----
   {
-    ok('6 (estático) realQuit chama presenceClient.disconnect() antes de app.quit()', /function realQuit[\s\S]*?presenceClient\.disconnect\(\)[\s\S]*?app\.quit\(\)/.test(srcMain));
-    ok('6 (estático) updaterTeardownForInstall chama presenceClient.disconnect()', /updaterTeardownForInstall[\s\S]*?presenceClient\.disconnect\(\)/.test(srcMain));
+    ok('6 (estático) realQuit -> disconnect("tray_exit") antes de app.quit()', /function realQuit[\s\S]*?presenceClient\.disconnect\("tray_exit"\)[\s\S]*?app\.quit\(\)/.test(srcMain));
+    ok('6 (estático) updaterTeardownForInstall -> disconnect("update")', /updaterTeardownForInstall[\s\S]*?presenceClient\.disconnect\("update"\)/.test(srcMain));
   }
 
   // ---- 7) DIAGNÓSTICO: desconexão INESPERADA (crash) -> byClient=false, code/reason capturados, intenção mantida ----

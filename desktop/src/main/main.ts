@@ -65,7 +65,7 @@ function updaterTeardownForInstall() {
   try { if (stopReminder) stopReminder(); } catch { /* */ }
   try { if (clockSync) { clockSync.stop(); clockSync = null; } } catch { /* */ }
   try { stopBgNotify(); } catch { /* */ }
-  try { if (presenceClient) presenceClient.disconnect(); } catch { /* Stage-2A: encerra WS de presença antes de instalar */ }
+  try { if (presenceClient) presenceClient.disconnect("update"); } catch { /* Stage-2B: goodbye(update) — remove a sessão já antes de instalar */ }
   try { destroyTray(); } catch { /* */ }
   diag("updater.teardownForInstall");
 }
@@ -312,8 +312,8 @@ function realQuit() {
   if (stopReminder) stopReminder();
   if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
   try { stopBgNotify(); } catch { /* */ }
-  // PRESENCE:BEGIN (F3.4.2A Stage-2A — "Sair" (tray) encerra a conexão WebSocket de presença)
-  try { if (presenceClient) presenceClient.disconnect(); } catch { /* */ }
+  // PRESENCE:BEGIN (F3.4.2A Stage-2B — "Sair" (tray) encerra a presença JÁ: goodbye(tray_exit))
+  try { if (presenceClient) presenceClient.disconnect("tray_exit"); } catch { /* */ }
   // PRESENCE:END
   // F3.3.73I6C11 — "Sair do aplicativo" remove o icone da bandeja (evita tray-fantasma no Windows).
   try { destroyTray(); } catch { /* */ }
@@ -494,8 +494,8 @@ app.whenReady().then(() => {
     if (stopNotifier) { stopNotifier(); stopNotifier = null; }
     if (stopReminder) { stopReminder(); stopReminder = null; }
     if (clockSync) { try { clockSync.stop(); } catch { /* */ } clockSync = null; }
-    // PRESENCE:BEGIN (F3.4.2A Stage-2A — logout encerra a conexão WebSocket de presença)
-    if (presenceClient) { try { presenceClient.disconnect(); } catch { /* */ } }
+    // PRESENCE:BEGIN (F3.4.2A Stage-2B — logout encerra a presença JÁ: goodbye(logout))
+    if (presenceClient) { try { presenceClient.disconnect("logout"); } catch { /* */ } }
     // PRESENCE:END
   });
   // F3.3.77A-R4B — o renderer consulta/força a sincronização do relógio (sem expor token/URL/headers).
@@ -580,7 +580,7 @@ app.whenReady().then(() => {
   const presenceIdleState = { phase: "idle", wsConnected: false, authValidated: false, service: "idseven-presence-canary", lastConnectAt: null, lastMessageAt: null, heartbeatActive: false, baselineReceived: false, onlineCount: 0, wsEnabled: false, errorCode: null };
   ipcMain.handle("presence-realtime-state", () => (presenceClient ? presenceClient.getState() : presenceIdleState));
   ipcMain.handle("presence-realtime-connect", () => { try { if (presenceClient) presenceClient.connect(); } catch { /* */ } return { ok: !!presenceClient }; });
-  ipcMain.handle("presence-realtime-disconnect", () => { try { if (presenceClient) presenceClient.disconnect(); } catch { /* */ } return { ok: !!presenceClient }; });
+  ipcMain.handle("presence-realtime-disconnect", () => { try { if (presenceClient) presenceClient.disconnect("logout"); } catch { /* */ } return { ok: !!presenceClient }; });
   // PRESENCE:END
 
   // F3.3.10-DIAG — HEARTBEAT do MAIN: prova que o processo principal (e o notifier) seguem VIVOS

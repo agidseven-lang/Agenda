@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* =====================================================================
-   F3.4.2A (Stage-1B) — GATE DE PRESERVAÇÃO REGION-SCOPED (canário 1.0.179-canary.3).
-   Prova que a candidata CANÁRIO 1.0.179-canary.3 difere da PRODUÇÃO FÍSICA
+   F3.4.2A (Stage-1B) — GATE DE PRESERVAÇÃO REGION-SCOPED (canário 1.0.179-canary.4).
+   Prova que a candidata CANÁRIO 1.0.179-canary.4 difere da PRODUÇÃO FÍSICA
    APROVADA 1.0.177 (commit 2963927) SOMENTE nas regiões sentinela
    `UPDATER:BEGIN…UPDATER:END` + `PRESENCE:BEGIN…PRESENCE:END` e em arquivos
    whitelisted (NOVOS). Fora disso, BYTE-IDENTIDADE (HARD NO-GO).
@@ -64,7 +64,7 @@ function fnSrc(SRC, name) {
   return null;
 }
 
-console.log(`F3.4.2A — region-scoped invariance (candidata CANÁRIO 1.0.179-canary.3 vs produção ${BASE_SHA})`);
+console.log(`F3.4.2A — region-scoped invariance (candidata CANÁRIO 1.0.179-canary.4 vs produção ${BASE_SHA})`);
 
 // ---------- 1) RENDERER: fora das regiões sentinela, byte-idêntico ----------
 {
@@ -154,6 +154,8 @@ function stripComments(src) {
   ok('PC sem onActive/onIdle (keep-alive removido)', !/onActive/.test(code) && !/onIdle/.test(code));
   ok('PC diagnóstico: captura lastCloseCode/lastCloseReason/lastCloseWasClient + reconnectScheduled/Executed + onlineDroppedAt', /lastCloseCode/.test(code) && /lastCloseReason/.test(code) && /lastCloseWasClient/.test(code) && /reconnectScheduled/.test(code) && /reconnectExecuted/.test(code) && /onlineDroppedAt/.test(code) && /sanitizeReason/.test(code));
   ok('PC reason do close é sanitizado (só [a-z0-9_ -], curto) — nunca vaza dados privados', /replace\(\/\[\^a-zA-Z0-9_ -\]\/g/.test(code));
+  // Stage-2B: disconnect(reason) ENVIA goodbye antes de fechar (logout/tray_exit/update) — remoção imediata no servidor.
+  ok('PC disconnect(reason) envia goodbye {type,reason} antes de fechar', /function disconnect\(reason/.test(code) && /JSON\.stringify\(\{ type: "goodbye", reason: r \}\)/.test(code) && /"tray_exit"[\s\S]{0,20}"update"/.test(code));
 }
 
 // ---------- 6) main.ts: fiação Escopo A (onNotify->HUB) + PRESENCE (probe + WS) IPC (só em regiões) ----------
@@ -163,7 +165,7 @@ function stripComments(src) {
   ok('W2 dedupKey canônico de update (available/downloaded)', /dedupKey:\s*`desktop_update_available:/.test(m) && /dedupKey:\s*`desktop_update_downloaded:/.test(m));
   ok('W3 IPC presence-auth-probe + createPresenceProbe + createPresenceClient + presence-realtime-state', /ipcMain\.handle\("presence-auth-probe"/.test(m) && /createPresenceProbe\(/.test(m) && /createPresenceClient\(/.test(m) && /ipcMain\.handle\("presence-realtime-state"/.test(m));
   ok('W4 sonda pós-login diagnóstico sem token (só status/duração/campos)', /presence\.login\.probe/.test(m) && !/presence\.login\.probe[^\n]*token/i.test(m));
-  ok('W4b WS liga no login (connect) e desliga no logout/quit (disconnect)', /presenceClient\.connect\(\)/.test(m) && /presenceClient\.disconnect\(\)/.test(m));
+  ok('W4b WS liga no login (connect) e desliga no logout/Sair/update (disconnect com goodbye reason)', /presenceClient\.connect\(\)/.test(m) && /presenceClient\.disconnect\("logout"\)/.test(m) && /presenceClient\.disconnect\("tray_exit"\)/.test(m) && /presenceClient\.disconnect\("update"\)/.test(m));
   // Stage-2A-X2: SEM powerSaveBlocker (removido) + DIAGNÓSTICO sanitizado (contexto do main) só em PRESENCE.
   ok('W6 SEM powerSaveBlocker/prevent-app-suspension no CÓDIGO do main (removido)', !/powerSaveBlocker|prevent-app-suspension|presenceKeepAliveOn/.test(stripComments(m)));
   ok('W7 diagnóstico do main: presenceDiagCtx (uptime/janela/tray/rede) + suspend/resume + onLog enriquecido', /function presenceDiagCtx\(/.test(m) && /uptimeMs/.test(m) && /presence\.power\.suspend/.test(m) && /\.\.\.presenceDiagCtx\(\)/.test(m));
@@ -198,7 +200,7 @@ function stripComments(src) {
 {
   const b = JSON.parse(baseline('package.json'));
   const c = JSON.parse(current('package.json'));
-  ok('P version 1.0.177 → 1.0.179-canary.3', b.version === '1.0.177' && c.version === '1.0.179-canary.3');
+  ok('P version 1.0.177 → 1.0.179-canary.4', b.version === '1.0.177' && c.version === '1.0.179-canary.4');
   ok('P electron-updater ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['electron-updater']) && c.dependencies && c.dependencies['electron-updater'] === '6.8.9');
   ok('P ws (cliente WebSocket de presença) ausente na produção, presente na candidata', !(b.dependencies && b.dependencies['ws']) && c.dependencies && typeof c.dependencies['ws'] === 'string' && /^\^?8\./.test(c.dependencies['ws']));
   // zera version + remove electron-updater E ws dos deps → o restante deve ser idêntico à 1.0.177
@@ -226,7 +228,7 @@ function stripComments(src) {
   ok('L candidata com electron-updater no lock', /"node_modules\/electron-updater"/.test(c));
   ok('L produção sem ws no lock', !/"node_modules\/ws"/.test(b));
   ok('L candidata com ws no lock', /"node_modules\/ws"/.test(c));
-  ok('L lock version 1.0.177 → 1.0.179-canary.3', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.179-canary\.3"/.test(c));
+  ok('L lock version 1.0.177 → 1.0.179-canary.4', /"version":\s*"1\.0\.177"/.test(b) && /"version":\s*"1\.0\.179-canary\.4"/.test(c));
 }
 
 // ---------- 12) FUNÇÕES CRÍTICAS DE NEGÓCIO: byte-idênticas (mandato) ----------
