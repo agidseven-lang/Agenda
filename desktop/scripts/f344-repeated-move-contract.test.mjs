@@ -27,15 +27,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
 const ROOT = path.resolve(DESK, '..');
 const STABLE = '68598fae54e75dd34a399ffca65649cc8ff6d16c'; // Desktop 1.0.180 oficial (tag v1.0.180)
-const gitShow = (spec) => execFileSync('git', ['-C', ROOT, 'show', spec], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+// EOL-NORMALIZAÇÃO (lição F3.4.3 no runner Windows): o checkout aplica autocrlf (árvore de
+// trabalho = CRLF) e `git show` emite o BLOB (LF) — comparar bytes crus daria falso-negativo.
+// Normalizamos AMBOS os lados p/ LF: a prova aqui é identidade de CONTEÚDO; a byte-identidade
+// rastreada (EOL-imune) é dos gates region-invariance (blob git hash-object × rev-parse).
+const nrm = (s) => String(s).replace(/\r\n/g, '\n');
+const gitShow = (spec) => nrm(execFileSync('git', ['-C', ROOT, 'show', spec], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }));
 const BASE_HTML = gitShow(STABLE + ':desktop/src/renderer/index.html');
-const CUR_HTML = fs.readFileSync(path.join(DESK, 'src', 'renderer', 'index.html'), 'utf8');
+const CUR_HTML = nrm(fs.readFileSync(path.join(DESK, 'src', 'renderer', 'index.html'), 'utf8'));
 const BASE_MAIN = gitShow(STABLE + ':desktop/src/main/main.ts');
-const CUR_MAIN = fs.readFileSync(path.join(DESK, 'src', 'main', 'main.ts'), 'utf8');
+const CUR_MAIN = nrm(fs.readFileSync(path.join(DESK, 'src', 'main', 'main.ts'), 'utf8'));
 const BASE_NOTIF = gitShow(STABLE + ':desktop/src/main/notifier.ts');
-const CUR_NOTIF = fs.readFileSync(path.join(DESK, 'src', 'main', 'notifier.ts'), 'utf8');
+const CUR_NOTIF = nrm(fs.readFileSync(path.join(DESK, 'src', 'main', 'notifier.ts'), 'utf8'));
 const BASE_RULES = gitShow(STABLE + ':desktop/src/main/slaRules.js');
-const CUR_RULES = fs.readFileSync(path.join(DESK, 'src', 'main', 'slaRules.js'), 'utf8');
+const CUR_RULES = nrm(fs.readFileSync(path.join(DESK, 'src', 'main', 'slaRules.js'), 'utf8'));
 const rules = require(path.join(DESK, 'src', 'main', 'slaRules.js'));
 
 let pass = 0, fail = 0; const flog = [];
