@@ -21,7 +21,10 @@
 #      prereleases historicas (canary) seguem preservadas como prereleases;
 #   9) smoke: re-baixa EXE + latest.yml da release e reconfere os hashes.
 # NAO builda, NAO deploya, NAO toca Firebase/Worker/Rules/flags, NAO mexe em
-# releases/tags antigas. Sem secrets alem do GITHUB_TOKEN padrao.
+# releases/tags antigas.
+# CREDENCIAIS (decisao do owner): leituras/verificacoes usam o GITHUB_TOKEN padrao; as ESCRITAS
+# (criar tag v1.0.180 + criar release + enviar assets) usam EXCLUSIVAMENTE secrets.RELEASE_PAT
+# (env por-step; NUNCA impresso/logado — o Actions mascara secrets; apenas checagem de presenca).
 # Execucao SOMENTE manual (workflow_dispatch), somente apos GO fisico do owner.
 # =====================================================================
 name: "[manual] F3.4.3E Desktop Stable Release — 1.0.180 (Latest)"
@@ -230,12 +233,17 @@ jobs:
           NOTAS
           wc -l notas.md
 
-      - name: "Criar a tag pinada (git data API) — diagnostico EXPLICITO de bloqueio"
+      - name: "Criar a tag pinada (git data API) — ESCRITA via RELEASE_PAT"
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
+          # ESCRITA usa EXCLUSIVAMENTE o RELEASE_PAT (env deste step). Checagem de PRESENCA apenas
+          # (nunca imprime/exibe o valor; o Actions mascara secrets nos logs).
+          [ -n "$GH_TOKEN" ] || { echo "::error::secrets.RELEASE_PAT ausente/vazio — nada publicado"; exit 1; }
           # Cria refs/tags/v1.0.180 -> SHA pinado ANTES da release (a release entao ANEXA a tag
-          # existente; nao precisa criar ref). Se uma regra do repositorio bloquear a criacao, a
-          # resposta COMPLETA da API e impressa como diagnostico exato (nomeia a regra/permissao).
+          # existente; nao precisa criar ref). Se algo bloquear a criacao, a resposta da API e
+          # impressa como diagnostico (contem apenas a mensagem de erro; nunca o token).
           if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
             TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
             [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para OUTRO sha ($TS)"; exit 1; }
@@ -249,9 +257,12 @@ jobs:
             echo "OK: tag $TAG criada em $STABLE_SHA"
           fi
 
-      - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets"
+      - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets — ESCRITA via RELEASE_PAT"
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "::error::secrets.RELEASE_PAT ausente/vazio — nada publicado"; exit 1; }
           gh release create "$TAG" -R "$REPO" \
             --target "$STABLE_SHA" \
             --latest=true \
