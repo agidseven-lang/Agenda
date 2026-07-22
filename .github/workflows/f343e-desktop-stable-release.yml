@@ -33,6 +33,10 @@ name: "[manual] F3.4.3E Desktop Stable Release — 1.0.180 (Latest)"
         description: "Digite PUBLICAR-DESKTOP-1.0.180-STABLE para autorizar"
         required: true
         default: ""
+      ref:
+        description: "IGNORADO — só compatibilidade de schema com o dispatch registrado (mecanismo de branch)"
+        required: false
+        default: "desktop/f343-background-notifications-hotfix"
 
 permissions:
   contents: write
@@ -80,13 +84,26 @@ jobs:
           ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion')"
           echo "run $RUN_ID: $ST"
           [ "$ST" = "completed|success" ] || { echo "::error::run invalido para publicacao"; exit 1; }
+          # ANTES-DE-PUBLICAR #3 (owner): o run FOI construido do commit pinado 68598fa.
+          HS="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.head_sha')"
+          echo "run head_sha: $HS (esperado $STABLE_SHA)"
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::run NAO foi construido do commit pinado 68598fa"; exit 1; }
 
-      - name: "Gate 3 — head do branch estavel == SHA pinado (alvo da tag)"
+      - name: "Gate 3 — 68598fa ancestral do head; delta pos-candidato SO em .github/workflows (mecanismo de branch)"
         run: |
           set -euo pipefail
+          # A tag alveja o SHA PINADO ($STABLE_SHA), nunca o head. Este gate prova que o unico
+          # delta pos-candidato na branch e o MECANISMO DE PUBLICACAO (.github/workflows/**) —
+          # zero codigo/produto/worker/android depois do candidato buildado.
           H="$(gh api "repos/$REPO/git/ref/heads/$DESK_BRANCH" --jq '.object.sha')"
-          echo "head $DESK_BRANCH: $H (esperado $STABLE_SHA)"
-          [ "$H" = "$STABLE_SHA" ] || { echo "::error::branch estavel moveu; alvo da tag divergiu"; exit 1; }
+          echo "head $DESK_BRANCH: $H (alvo da tag PINADO: $STABLE_SHA)"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H")"
+          STATUS="$(echo "$CMP" | jq -r '.status')"
+          echo "compare $STABLE_SHA...$H: status=$STATUS"
+          { [ "$STATUS" = "identical" ] || [ "$STATUS" = "ahead" ]; } || { echo "::error::branch divergiu do candidato (status=$STATUS)"; exit 1; }
+          BAD="$(echo "$CMP" | jq -r '.files[].filename' | grep -v '^\.github/workflows/' || true)"
+          if [ -n "$BAD" ]; then echo "::error::mudanca POS-candidato FORA de .github/workflows: $BAD"; exit 1; fi
+          echo "OK: alvo da tag = $STABLE_SHA (pinado); delta pos-candidato = so o mecanismo de publicacao"
 
       - name: "Gate 4 — tag e release nao podem existir"
         run: |
@@ -121,6 +138,8 @@ jobs:
             test -f "pacote/$f" || { echo "::error::asset ausente no artifact: $f"; exit 1; }
           done
           test -f pacote/app-update.yml && { echo "::error::app-update.yml NAO deve ser asset publico"; exit 1; } || true
+          # ANTES-DE-PUBLICAR #6 (owner): canary.yml AUSENTE (canal estavel puro, sem ambiguidade).
+          test -f pacote/canary.yml && { echo "::error::canary.yml presente — canal ambiguo, ABORTAR"; exit 1; } || true
 
       - name: "Gate 6 — hashes SHA-256 conferem (aborta se divergir)"
         run: |
@@ -137,7 +156,12 @@ jobs:
           ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
           grep -q "version: 1.0.180" "pacote/$LY_NAME" || { echo "::error::latest.yml version incorreta"; exit 1; }
           grep -qF "$EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml nao referencia o EXE (mesmo run)"; exit 1; }
-          echo "OK: hashes conferem + latest.yml coerente (EXE do mesmo run)"
+          # ANTES-DE-PUBLICAR #7-9 (owner): canal/flags REGISTRADOS pelo build (VERSAO-DESKTOP.txt,
+          # espelho do gate que abriu o app.asar e provou allowPrerelease->channel->allowDowngrade).
+          grep -Eq '^channel +: latest$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem channel=latest"; exit 1; }
+          grep -Eq '^allowPrerelease +: false$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem allowPrerelease=false"; exit 1; }
+          grep -Eq '^allowDowngrade +: false$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem allowDowngrade=false"; exit 1; }
+          echo "OK: hashes conferem + latest.yml coerente (EXE do mesmo run) + channel=latest/allowPrerelease=false/allowDowngrade=false"
 
       - name: "Release notes"
         run: |

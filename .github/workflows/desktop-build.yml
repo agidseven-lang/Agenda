@@ -1,265 +1,277 @@
 # =====================================================================
-# [manual] F3.4.3E — Desktop Build (ESTAVEL 1.0.180)
+# [manual] F3.4.3E — Publicacao da RELEASE ESTAVEL Desktop 1.0.180 (PRODUCAO / Latest)
 # ---------------------------------------------------------------------
-# Builda o Desktop no canal ESTAVEL (latest) a partir do `ref` e GERA, do
-# MESMO build, a metadata de update: latest.yml + <exe>.blockmap + app-update.yml.
-# `--publish never`: o CI NUNCA publica (o release gated e o unico publicador).
-# Gates fail-closed:
-#   - suite F3.4.3/F3.4.3E: region-invariance (fonte vs ESTAVEL 1.0.178 @9444e7f,
-#     versao=1.0.180, so hunks autorizados, modulos protegidos + Worker + Android
-#     byte-identicos, guards estaveis intactos); Golden Master 219/0; contrato
-#     F3.4.3E (f343d 44/0); preservacao; maquina de estados do updater;
-#   - metadata ESTAVEL (latest.yml PRESENTE + canary.yml AUSENTE + sha512/size/
-#     blockmap/app-update.yml provider+SEM segredo);
-#   - prova-de-versao (package.json EMPACOTADO == 1.0.180) + renderer EMPACOTADO
-#     byte-identico a FONTE do commit buildado (build nao adulterou o auditado);
-#   - FLAGS no app.asar: allowPrerelease=false -> channel=latest -> allowDowngrade=false
-#     (+ autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false; rejeita canary).
-# NAO publica release; NAO toca Worker/Firebase/Firestore/Rules/Cloudflare/Android.
-# Execucao SOMENTE manual (workflow_dispatch).
+# Publica a release ESTAVEL de PRODUCAO 1.0.180 (canal latest) do run
+# 29881247041 (build gated, todos os gates verdes; fonte 68598fa =
+# rc.2 fisicamente aprovado + APENAS o numero de versao). Substitui a
+# 1.0.178 como Latest. TUDO PINADO: run id, SHA do codigo (alvo da tag),
+# nomes+digests dos artifacts, hashes SHA-256 (EXE/MSI/latest.yml/blockmap),
+# tag e titulo. O job:
+#   1) exige confirmacao literal (input);
+#   2) valida run 29881247041 = completed/success;
+#   3) confirma o head do branch estavel == SHA pinado (alvo da tag);
+#   4) aborta se a tag/release v1.0.180 ja existir;
+#   5) baixa os 2 artifacts (installer + updatemeta), confere ids+digests e
+#      os hashes byte a byte (divergiu => aborta SEM publicar);
+#   6) cria a release prerelease=false, latest=true, tag no SHA estavel;
+#   7) anexa 7 assets: EXE, MSI, latest.yml, blockmap, SHA256SUMS,
+#      VERSAO-DESKTOP.txt, RELATORIO-DESKTOP.txt (app-update.yml NAO e asset);
+#   8) pos-verifica flags/assets/target + confirma que a 1.0.180 VIROU Latest,
+#      a 1.0.178 segue PRESERVADA (release existe, deixa de ser Latest), e as
+#      prereleases historicas (canary) seguem preservadas como prereleases;
+#   9) smoke: re-baixa EXE + latest.yml da release e reconfere os hashes.
+# NAO builda, NAO deploya, NAO toca Firebase/Worker/Rules/flags, NAO mexe em
+# releases/tags antigas. Sem secrets alem do GITHUB_TOKEN padrao.
+# Execucao SOMENTE manual (workflow_dispatch), somente apos GO fisico do owner.
 # =====================================================================
-name: "[manual] F3.4.3E Desktop Build (stable 1.0.180)"
+name: "[manual] F3.4.3E Desktop Stable Release — 1.0.180 (Latest)"
 
 "on":
   workflow_dispatch:
     inputs:
-      ref:
-        description: "Branch/commit a buildar (ex.: desktop/f343-background-notifications-hotfix)"
+      confirm:
+        description: "Digite PUBLICAR-DESKTOP-1.0.180-STABLE para autorizar"
         required: true
+        default: ""
+      ref:
+        description: "IGNORADO — só compatibilidade de schema com o dispatch registrado (mecanismo de branch)"
+        required: false
         default: "desktop/f343-background-notifications-hotfix"
 
 permissions:
-  contents: read
+  contents: write
+  actions: read
 
 jobs:
-  build:
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
+  publish:
+    runs-on: ubuntu-latest
     env:
-      APP_DIR: "desktop"
-      BASE_SHA: "9444e7fab945956258a45cfcebb00bbd87e72447" # ESTAVEL 1.0.178 (baseline F3.4.3)
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "29881247041"
+      STABLE_SHA: "68598fae54e75dd34a399ffca65649cc8ff6d16c"
+      DESK_BRANCH: "desktop/f343-background-notifications-hotfix"
+      TAG: "v1.0.180"
+      TITLE: "Agenda ID Seven Desktop 1.0.180 — Produção Estável"
+      ART_INST: "agenda-id-seven-desktop-1.0.180-installer"
+      ART_INST_DIGEST: "sha256:c1d74e2664315e525969e0def7b38851ed1162ba29db108192d8ac06cde6f73e"
+      ART_META: "agenda-id-seven-desktop-1.0.180-updatemeta"
+      ART_META_DIGEST: "sha256:120c38195452e0250a33103237863fdf8e437423f96149ef2d19bd175443c39f"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.180-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.180-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.180-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "8068d61ea823ce627fc310ea699212b34cf74e58e49e05a4c694df51011dc313"
+      EXP_MSI: "d1962f055de459752b4e836b1e182d8410bc0470ff8a524d89784f05de0d0038"
+      EXP_LY: "cbf68242132318eefcebbb2a4c15d83a79e42047feb623d3d8914fb57a57591c"
+      EXP_BM: "87e8b445eb3221059fc5636de0d3f1a9262f4253aba5fefd8c1963e94feea997"
+      PROD_PREV_TAG: "v1.0.178"
+      CANARY_A_TAG: "v1.0.178-canary.2"
+      CANARY_B_TAG: "v1.0.179-canary.5"
     steps:
-      - name: Checkout (ref escolhido; history completo p/ baseline)
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.ref }}
-          fetch-depth: 0
-
-      - name: Derivar versao (package.json e a fonte unica)
+      - name: "Gate 1 — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
-          APP_VERSION=$(node -p "require('./desktop/package.json').version")
-          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
-          echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-$APP_VERSION" >> "$GITHUB_ENV"
-          echo "versao=$APP_VERSION"
-          [ "$APP_VERSION" = "1.0.180" ] || { echo "::error:: versao != 1.0.180 (build ESTAVEL exige a versao exata)"; exit 1; }
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: npm install
-        working-directory: ${{ env.APP_DIR }}
-        run: npm install --no-audit --no-fund
-
-      - name: TypeScript build (main + preload + updaterService)
-        working-directory: ${{ env.APP_DIR }}
-        run: npm run build
-
-      - name: Gate F3.4.3 region-invariance (fonte vs ESTAVEL 1.0.178 @9444e7f; versao 1.0.180)
-        working-directory: ${{ env.APP_DIR }}
-        run: node scripts/f343-hotfix-region-invariance.test.mjs
-
-      - name: Gate Golden Master (slaRules ≡ renderer 1.0.178, valor-a-valor 219/0)
-        working-directory: ${{ env.APP_DIR }}
-        run: node scripts/f343-sla-golden-master.test.mjs
-
-      - name: Gate F3.4.3E contrato (atribuicao limpa + trava por setor + flag consumida/limpa — 44/0)
-        working-directory: ${{ env.APP_DIR }}
-        run: node scripts/f343d-designer-assignment-reauth-audit.test.mjs
-
-      - name: Gate preservacao (guard-rails; Worker/Android byte-identicos; sem polling/powerSaveBlocker)
-        working-directory: ${{ env.APP_DIR }}
-        run: node scripts/f343-preservation.test.mjs
-
-      - name: Gate maquina de estados do updater (sem identidades; updater intocado vs 1.0.178)
-        working-directory: ${{ env.APP_DIR }}
-        run: node scripts/f341a-updater-state-machine.test.mjs
-
-      - name: electron-builder (NSIS + MSI + metadata do MESMO build)
-        working-directory: ${{ env.APP_DIR }}
-        run: npx electron-builder --win nsis msi --publish never
-
-      - name: Gate tray icon empacotado
-        working-directory: ${{ env.APP_DIR }}
-        run: |
-          if [ -f "dist-installer/win-unpacked/resources/icon.png" ]; then
-            echo "resources/icon.png OK (tray tera icone)"
-          else
-            echo "::error:: resources/icon.png AUSENTE no pacote"; exit 1
+          if [ "$CONFIRM" != "PUBLICAR-DESKTOP-1.0.180-STABLE" ]; then
+            echo "::error::confirmacao invalida — nada foi publicado"; exit 1
           fi
+          echo "OK: confirmacao literal valida"
 
-      - name: Gate metadata de update (CANAL LATEST — latest.yml + blockmap + app-update.yml do MESMO build)
-        working-directory: ${{ env.APP_DIR }}
+      - name: "Gate 2 — run completed/success"
         run: |
-          set -e
-          LY="dist-installer/latest.yml"
-          if [ ! -f "$LY" ]; then
-            echo "::error:: latest.yml NAO gerado (channel do publish != latest?). PARAR E REPORTAR."
-            ls -la dist-installer || true; exit 1
-          fi
-          if [ -f "dist-installer/canary.yml" ]; then echo "::error:: canary.yml TAMBEM gerado — canal ambiguo. PARAR E REPORTAR."; exit 1; fi
-          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap 2>/dev/null | head -1)
-          test -n "$BM" || { echo "::error:: <exe>.blockmap NAO gerado"; exit 1; }
-          AU="dist-installer/win-unpacked/resources/app-update.yml"
-          test -f "$AU" || { echo "::error:: app-update.yml NAO empacotado"; exit 1; }
-          echo "===== latest.yml ====="; cat "$LY"
-          echo "===== app-update.yml ====="; cat "$AU"
-          EXE_PATH=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
-          EXE_NAME=$(basename "$EXE_PATH")
-          grep -q "version: $APP_VERSION" "$LY" || { echo "::error:: latest.yml version != $APP_VERSION"; exit 1; }
-          grep -qE "^path: $EXE_NAME" "$LY" || { echo "::error:: latest.yml path nao aponta para $EXE_NAME"; exit 1; }
-          grep -qF "url: $EXE_NAME" "$LY" || { echo "::error:: latest.yml files[].url != $EXE_NAME"; exit 1; }
-          META_SHA512=$(grep -E '^sha512:' "$LY" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
-          CALC_SHA512=$(openssl dgst -sha512 -binary "$EXE_PATH" | openssl base64 -A)
-          { [ -n "$META_SHA512" ] && [ "$META_SHA512" = "$CALC_SHA512" ]; } || { echo "::error:: sha512 do latest.yml != sha512 do EXE"; echo "meta=$META_SHA512"; echo "calc=$CALC_SHA512"; exit 1; }
-          META_SIZE=$(grep -E 'size:' "$LY" | head -1 | grep -oE '[0-9]+' | head -1)
-          CALC_SIZE=$(wc -c < "$EXE_PATH" | tr -d ' ')
-          [ "$META_SIZE" = "$CALC_SIZE" ] || { echo "::error:: size do latest.yml ($META_SIZE) != size do EXE ($CALC_SIZE)"; exit 1; }
-          [ "$(basename "$BM")" = "${EXE_NAME}.blockmap" ] || { echo "::error:: blockmap ($BM) nao corresponde ao EXE ($EXE_NAME)"; exit 1; }
-          grep -q "provider: github" "$AU" || { echo "::error:: app-update.yml provider != github"; exit 1; }
-          grep -q "owner: agidseven-lang" "$AU" || { echo "::error:: app-update.yml owner errado"; exit 1; }
-          grep -q "repo: Agenda" "$AU" || { echo "::error:: app-update.yml repo errado"; exit 1; }
-          if grep -qiE '(token|secret|password|gh_token|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml contem possivel segredo"; exit 1; fi
-          echo "GATE metadata ESTAVEL OK: latest.yml (version/path/url/sha512/size/blockmap conferem) + app-update.yml github SEM segredo; canary.yml AUSENTE (canal isolado)."
+          set -euo pipefail
+          ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion')"
+          echo "run $RUN_ID: $ST"
+          [ "$ST" = "completed|success" ] || { echo "::error::run invalido para publicacao"; exit 1; }
+          # ANTES-DE-PUBLICAR #3 (owner): o run FOI construido do commit pinado 68598fa.
+          HS="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.head_sha')"
+          echo "run head_sha: $HS (esperado $STABLE_SHA)"
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::run NAO foi construido do commit pinado 68598fa"; exit 1; }
 
-      - name: Gate prova-de-versao (package.json empacotado == 1.0.180) + renderer EMPACOTADO == fonte do commit
-        working-directory: ${{ env.APP_DIR }}
+      - name: "Gate 3 — 68598fa ancestral do head; delta pos-candidato SO em .github/workflows (mecanismo de branch)"
         run: |
-          set -e
-          ASAR="dist-installer/win-unpacked/resources/app.asar"
-          test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
-          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"
-          npx --yes @electron/asar extract "$ASAR" "$EXDIR"
-          # (a) prova-de-versao: a versao EXIBIDA vem do package.json empacotado (fonte unica).
-          # Caminho COMPLETO montado no bash e passado via ENV (mesmo padrao do check renderer, que
-          # ja passa) — evita (i) backslash Windows virar escape na string-literal do require e
-          # (ii) mangling MSYS de um literal "/package.json" (Git-bash o troca por C:\...\Git\...).
-          PKGJSON="$EXDIR/package.json"
-          PKGV=$(PKGJSON="$PKGJSON" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKGJSON,"utf8")).version||"")')
-          [ "$PKGV" = "1.0.180" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.180"; exit 1; }
-          # (b) renderer EMPACOTADO byte-identico a FONTE do commit buildado (build nao adulterou o auditado).
-          EXIDX="$EXDIR/src/renderer/index.html"
-          test -f "$EXIDX" || { echo "::error:: renderer nao encontrado no asar"; exit 1; }
-          git show ${GITHUB_SHA}:desktop/src/renderer/index.html > "$RUNNER_TEMP/src-index.html"
-          EXIDX="$EXIDX" SRC="$RUNNER_TEMP/src-index.html" node -e '
-            const fs=require("fs"); const nrm=s=>String(s).replace(/\r\n/g,"\n");
-            const a=nrm(fs.readFileSync(process.env.EXIDX,"utf8"));
-            const b=nrm(fs.readFileSync(process.env.SRC,"utf8"));
-            if(a!==b){console.error("renderer EMPACOTADO != fonte do commit buildado");process.exit(1);}
-            console.log("renderer EMPACOTADO == fonte auditada (byte-identico).");
-          '
-          test -f "$EXDIR/dist/main/updaterService.js" || { echo "::error:: updaterService.js ausente no asar"; exit 1; }
-          grep -q "createUpdaterService" "$EXDIR/dist/main/main.js" || { echo "::error:: wiring do updater ausente no main.js empacotado"; exit 1; }
-          echo "GATE prova-de-versao (1.0.180) + renderer==fonte OK."
+          set -euo pipefail
+          # A tag alveja o SHA PINADO ($STABLE_SHA), nunca o head. Este gate prova que o unico
+          # delta pos-candidato na branch e o MECANISMO DE PUBLICACAO (.github/workflows/**) —
+          # zero codigo/produto/worker/android depois do candidato buildado.
+          H="$(gh api "repos/$REPO/git/ref/heads/$DESK_BRANCH" --jq '.object.sha')"
+          echo "head $DESK_BRANCH: $H (alvo da tag PINADO: $STABLE_SHA)"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H")"
+          STATUS="$(echo "$CMP" | jq -r '.status')"
+          echo "compare $STABLE_SHA...$H: status=$STATUS"
+          { [ "$STATUS" = "identical" ] || [ "$STATUS" = "ahead" ]; } || { echo "::error::branch divergiu do candidato (status=$STATUS)"; exit 1; }
+          BAD="$(echo "$CMP" | jq -r '.files[].filename' | grep -v '^\.github/workflows/' || true)"
+          if [ -n "$BAD" ]; then echo "::error::mudanca POS-candidato FORA de .github/workflows: $BAD"; exit 1; fi
+          echo "OK: alvo da tag = $STABLE_SHA (pinado); delta pos-candidato = so o mecanismo de publicacao"
 
-      - name: Gate FLAGS do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade + 6 flags)
-        working-directory: ${{ env.APP_DIR }}
+      - name: "Gate 4 — tag e release nao podem existir"
         run: |
-          set -e
-          US="$RUNNER_TEMP/asarx/dist/main/updaterService.js"
-          test -f "$US" || { echo "::error:: updaterService.js ausente no app.asar extraido"; exit 1; }
-          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowPrerelease != false no app.asar"; exit 1; }
-          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" || { echo "::error:: channel != latest no app.asar"; exit 1; }
-          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowDowngrade != false no app.asar"; exit 1; }
-          grep -Eq 'autoUpdater\.autoDownload[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: autoDownload != false no app.asar"; exit 1; }
-          grep -Eq 'autoUpdater\.autoInstallOnAppQuit[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: autoInstallOnAppQuit != false no app.asar"; exit 1; }
-          grep -Eq 'autoUpdater\.forceDevUpdateConfig[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: forceDevUpdateConfig != false no app.asar"; exit 1; }
-          if grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"canary"' "$US"; then echo "::error:: channel=canary presente no build ESTAVEL — canal ambiguo"; exit 1; fi
-          LP=$(grep -nE 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" | head -1 | cut -d: -f1)
-          LC=$(grep -nE 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" | head -1 | cut -d: -f1)
-          LD=$(grep -nE 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" | head -1 | cut -d: -f1)
-          { [ -n "$LP" ] && [ -n "$LC" ] && [ -n "$LD" ] && [ "$LP" -lt "$LC" ] && [ "$LC" -lt "$LD" ]; } || { echo "::error:: ordem incorreta: exige allowPrerelease($LP) < channel($LC) < allowDowngrade($LD)"; exit 1; }
-          echo "===== flags no updaterService.js EMPACOTADO ====="
-          grep -nE 'allowPrerelease|autoUpdater\.channel|allowDowngrade|autoDownload|autoInstallOnAppQuit|forceDevUpdateConfig' "$US" | head -20
-          echo "GATE flags no app.asar OK: allowPrerelease=false ($LP) -> channel=latest ($LC) -> allowDowngrade=false ($LD) + 3 flags."
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then echo "::error::tag $TAG ja existe"; exit 1; fi
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          echo "OK: tag e release livres"
 
-      - name: Empacotar bundle (instalador + metadata + relatorios + hashes)
-        working-directory: ${{ env.APP_DIR }}
+      - name: "Gate 5 — artifacts: ids+digests conferem"
         run: |
-          set -e
-          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
-          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
-          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
-          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
-          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"
-          cp dist-installer/latest.yml "$OUT/"
-          cp "$BM" "$OUT/"
-          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo "")
-          BM_NAME=$(basename "$BM")
-          EXE_SHA=$(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')
-          MSI_SHA=$([ -n "$MSI" ] && sha256sum "$OUT/$MSI_NAME" | awk '{print $1}' || echo "")
-          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" > SHA256SUMS )
-          {
-            echo "productName : Agenda ID Seven Desktop"
-            echo "versionName : $APP_VERSION"
-            echo "channel     : latest"
-            echo "allowPrerelease : false"
-            echo "allowDowngrade  : false"
-            echo "appId       : br.com.idseven.agenda.desktop"
-            echo "instalador  : $EXE_NAME"
-            echo "SHA-256 exe : $EXE_SHA"
-            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $MSI_SHA"
-            echo "metadata    : latest.yml + $BM_NAME (MESMO build); app-update.yml SOMENTE dentro do pacote"
-            echo "commit      : $GITHUB_SHA"
-            echo "ref         : ${{ github.event.inputs.ref }}"
-            echo "baseline    : ESTAVEL 1.0.178 @ $BASE_SHA (invariancia region-scoped F3.4.3 verificada)"
-            echo "origem      : promocao do rc.2 fisicamente aprovado (818fa13) + apenas o numero de versao"
-          } > "$OUT/VERSAO-DESKTOP.txt"
-          {
-            echo "===== RELATORIO DESKTOP (F3.4.3E estavel 1.0.180) ====="
-            echo "Gerado (UTC) : $(date -u)"
-            echo "Ref / commit : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
-            echo ""
-            echo "----- Arquivos no package -----"; ls -lh "$OUT"
-            echo ""; echo "----- VERSAO-DESKTOP -----"; cat "$OUT/VERSAO-DESKTOP.txt"
-            echo ""; echo "----- latest.yml -----"; cat "$OUT/latest.yml"
-            echo ""; echo "----- app-update.yml (dentro do pacote) -----"; cat dist-installer/win-unpacked/resources/app-update.yml
-          } > "$OUT/RELATORIO-DESKTOP.txt"
-          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          check() {
+            local name="$1" digest="$2" d exp
+            d="$(echo "$json" | jq -r --arg n "$name" '.artifacts[] | select(.name==$n) | .digest')"
+            echo "artifact $name: $d"
+            [ "$d" = "$digest" ] || { echo "::error::digest do artifact $name divergente ($d != $digest)"; exit 1; }
+            exp="$(echo "$json" | jq -r --arg n "$name" '.artifacts[] | select(.name==$n) | .expired')"
+            [ "$exp" = "false" ] || { echo "::error::artifact $name expirado"; exit 1; }
+          }
+          check "$ART_INST" "$ART_INST_DIGEST"
+          check "$ART_META" "$ART_META_DIGEST"
+          echo "OK: artifacts intactos"
 
-      - name: Upload installer (artifact)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-installer
-          path: |
-            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
-            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
-          if-no-files-found: error
-          retention-days: 30
+      - name: "Baixar artifacts (installer + updatemeta)"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          ls -lh pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::asset ausente no artifact: $f"; exit 1; }
+          done
+          test -f pacote/app-update.yml && { echo "::error::app-update.yml NAO deve ser asset publico"; exit 1; } || true
+          # ANTES-DE-PUBLICAR #6 (owner): canary.yml AUSENTE (canal estavel puro, sem ambiguidade).
+          test -f pacote/canary.yml && { echo "::error::canary.yml presente — canal ambiguo, ABORTAR"; exit 1; } || true
 
-      - name: Upload update-metadata (latest.yml + blockmap + SHA256SUMS + relatorios)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-updatemeta
-          path: |
-            dist-pkg/latest.yml
-            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
-            dist-pkg/SHA256SUMS
-            dist-pkg/VERSAO-DESKTOP.txt
-            dist-pkg/RELATORIO-DESKTOP.txt
-          if-no-files-found: error
-          retention-days: 30
+      - name: "Gate 6 — hashes SHA-256 conferem (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          H_EXE="$(sha256sum "pacote/$EXE_NAME" | awk '{print $1}')"
+          H_MSI="$(sha256sum "pacote/$MSI_NAME" | awk '{print $1}')"
+          H_LY="$(sha256sum "pacote/$LY_NAME" | awk '{print $1}')"
+          H_BM="$(sha256sum "pacote/$BM_NAME" | awk '{print $1}')"
+          echo "exe=$H_EXE"; echo "msi=$H_MSI"; echo "latest.yml=$H_LY"; echo "blockmap=$H_BM"
+          [ "$H_EXE" = "$EXP_EXE" ] || { echo "::error::hash EXE divergente"; exit 1; }
+          [ "$H_MSI" = "$EXP_MSI" ] || { echo "::error::hash MSI divergente"; exit 1; }
+          [ "$H_LY" = "$EXP_LY" ] || { echo "::error::hash latest.yml divergente"; exit 1; }
+          [ "$H_BM" = "$EXP_BM" ] || { echo "::error::hash blockmap divergente"; exit 1; }
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.180" "pacote/$LY_NAME" || { echo "::error::latest.yml version incorreta"; exit 1; }
+          grep -qF "$EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml nao referencia o EXE (mesmo run)"; exit 1; }
+          # ANTES-DE-PUBLICAR #7-9 (owner): canal/flags REGISTRADOS pelo build (VERSAO-DESKTOP.txt,
+          # espelho do gate que abriu o app.asar e provou allowPrerelease->channel->allowDowngrade).
+          grep -Eq '^channel +: latest$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem channel=latest"; exit 1; }
+          grep -Eq '^allowPrerelease +: false$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem allowPrerelease=false"; exit 1; }
+          grep -Eq '^allowDowngrade +: false$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem allowDowngrade=false"; exit 1; }
+          echo "OK: hashes conferem + latest.yml coerente (EXE do mesmo run) + channel=latest/allowPrerelease=false/allowDowngrade=false"
 
-      - name: Upload bundle (tudo)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-bundle
-          path: dist-pkg/
-          if-no-files-found: error
-          retention-days: 30
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.180 — Produção Estável
+
+          Sucessora da 1.0.178 como versão oficial (Latest), canal ESTÁVEL (latest). Instalar em
+          máquinas autorizadas após conferência de hash. Auto-update: máquinas 1.0.178 detectam,
+          baixam (após ação do usuário) e instalam (após confirmação) esta 1.0.180 pelo canal latest.
+
+          O QUE MUDA vs 1.0.178
+          - F3.4.3 — NOTIFICAÇÕES DE FUNDO com PRODUTOR ÚNICO no processo MAIN: as notificações de
+            SLA (amarela/vermelha/crítica), de ATRIBUIÇÃO (azul) e o operational_block passam a ser
+            produzidas no main (slaScheduler/notifier), que sobrevive à janela minimizada/fechada no X
+            (bandeja). O renderer mantém só o visual. Regras de SLA portadas VALOR-A-VALOR (Golden
+            Master 219/0). Aprovado fisicamente pelo owner (aberto, minimizado, fechado no X).
+          - F3.4.3E — correção do vazamento de estado `_sendAfterSave`: a flag é inicializada em
+            false, CONSUMIDA e LIMPA com segurança no saveTask (uma tentativa interrompida por
+            validação/erro não deixa ação pendente), e limpa na troca de setor; e o modal de envio ao
+            cliente só abre quando o setor SALVO é comprovadamente de cliente (isClientSector). Assim,
+            uma atribuição interna ao Designer (edicao_midia/Social/Roteiro) NUNCA abre o modal de
+            reautenticação/cliente. Aprovado fisicamente pelo owner.
+
+          UPDATER (produção)
+          - allowPrerelease=false, channel="latest", allowDowngrade=false, autoDownload=false,
+            autoInstallOnAppQuit=false, forceDevUpdateConfig=false (verificado DENTRO do app.asar).
+            Download só após ação do usuário; instalação só após confirmação; nunca silencioso.
+            Máquinas estáveis NUNCA veem prereleases/canário (canal isolado). Metadata do MESMO build:
+            latest.yml + <exe>.blockmap; app-update.yml só dentro do pacote (provider github público,
+            sem token no cliente).
+
+          PRESERVAÇÃO (zero regressão fora do escopo aprovado)
+          - Código de produto byte-idêntico ao rc.2 fisicamente aprovado (diff = só o número de
+            versão). Worker J6 (cloudflare-worker.js) + wrangler + Android byte-idênticos à 1.0.178.
+            updaterService/bgNotify/firebase/tray/reminder/clockSync/auth-core/preload intocados.
+          - Rollback: 1.0.178 PRESERVADA (reinstalar / re-marcar Latest). Prereleases históricas
+            (v1.0.178-canary.*, v1.0.179-canary.*) preservadas.
+
+          HASHES OFICIAIS (SHA-256)
+          - EXE: 8068d61ea823ce627fc310ea699212b34cf74e58e49e05a4c694df51011dc313
+          - MSI: d1962f055de459752b4e836b1e182d8410bc0470ff8a524d89784f05de0d0038
+          - latest.yml: cbf68242132318eefcebbb2a4c15d83a79e42047feb623d3d8914fb57a57591c
+          - blockmap: 87e8b445eb3221059fc5636de0d3f1a9262f4253aba5fefd8c1963e94feea997
+          Confira com SHA256SUMS anexado (sha256sum -c SHA256SUMS) ou certutil -hashfile <arquivo> SHA256.
+
+          INSTALACAO
+          1. Feche o app atual pela bandeja (Sair).
+          2. Baixe o EXE, confira o SHA-256.
+          3. Rode o instalador (SmartScreen: Mais informações -> Executar assim mesmo; app sem assinatura).
+          4. Abra e faça login. Confirme 1.0.180 em Sobre.
+
+          RISCOS CONHECIDOS
+          - Instalador nao assinado (SmartScreen/MOTW). Integridade por SHA-512 (latest.yml) + SHA-256 (release).
+          - MSI e contingencia manual; o auto-update usa SOMENTE o EXE NSIS (canal latest).
+
+          Procedencia: run 29881247041 (success); fonte desktop/f343-background-notifications-hotfix @ 68598fa
+          (promoção do rc.2 818fa13 fisicamente aprovado + apenas o número de versão).
+          NOTAS
+          wc -l notas.md
+
+      - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets"
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" \
+            --latest=true \
+            --title "$TITLE" \
+            --notes-file notas.md \
+            "pacote/$EXE_NAME" \
+            "pacote/$MSI_NAME" \
+            "pacote/$LY_NAME" \
+            "pacote/$BM_NAME" \
+            "pacote/SHA256SUMS" \
+            "pacote/VERSAO-DESKTOP.txt" \
+            "pacote/RELATORIO-DESKTOP.txt"
+          echo "publicado: $TAG"
+
+      - name: "Pos-verificacao (flags/assets/target + 1.0.180 e Latest; 1.0.178 e canarios preservados)"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" \
+            --json tagName,targetCommitish,isPrerelease,isDraft,assets \
+            --jq '{tag:.tagName,target:.targetCommitish,prerelease:.isPrerelease,draft:.isDraft,assets:[.assets[].name]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS (esperado false|false)"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "7" ] || { echo "::error::esperado 7 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset ausente na release: $a"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
+          [ "$TGT" = "$STABLE_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          echo "Latest do repo: $LATEST_TAG"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          # 1.0.178 PRESERVADA (release ainda existe; deixa de ser Latest) e canarios preservados como prereleases.
+          gh release view "$PROD_PREV_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_PREV_TAG" || { echo "::error::1.0.178 sumiu"; exit 1; }
+          CA="$(gh release view "$CANARY_A_TAG" -R "$REPO" --json isPrerelease --jq '.isPrerelease')"
+          CB="$(gh release view "$CANARY_B_TAG" -R "$REPO" --json isPrerelease --jq '.isPrerelease')"
+          { [ "$CA" = "true" ] && [ "$CB" = "true" ]; } || { echo "::error::canarios historicos alterados (prerelease != true)"; exit 1; }
+          echo "===== GO: 1.0.180 ESTAVEL PUBLICADA e Latest; 1.0.178 + canarios preservados ====="
+
+      - name: "Smoke — re-baixar EXE + latest.yml da release e reconferir hashes"
+        run: |
+          set -euo pipefail
+          rm -rf smoke; mkdir -p smoke
+          gh release download "$TAG" -R "$REPO" -p "$EXE_NAME" -p "$LY_NAME" -D smoke
+          S_EXE="$(sha256sum "smoke/$EXE_NAME" | awk '{print $1}')"
+          S_LY="$(sha256sum "smoke/$LY_NAME" | awk '{print $1}')"
+          [ "$S_EXE" = "$EXP_EXE" ] || { echo "::error::smoke EXE hash divergente"; exit 1; }
+          [ "$S_LY" = "$EXP_LY" ] || { echo "::error::smoke latest.yml hash divergente"; exit 1; }
+          echo "SMOKE OK: EXE e latest.yml publicados conferem byte a byte (mesmo run)."
