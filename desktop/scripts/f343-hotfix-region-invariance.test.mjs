@@ -51,10 +51,10 @@ function authorized(rel) {
   return false;
 }
 
-/* ── 1) versão: PERMITE somente a rc exata 1.0.180-rc.2 (F3.4.3E — nova QA privada) ── */
+/* ── 1) versão: PERMITE somente a ESTÁVEL exata 1.0.180 (F3.4.3E-STABLE — promoção à produção) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.180-rc.2 (rc exata permitida)', pj.version === '1.0.180-rc.2');
+  ok('1 package.json version === 1.0.180 (estável exata permitida)', pj.version === '1.0.180');
 }
 
 /* ── 2) git diff --name-only 9444e7f -- desktop: TODA mudança rastreada deve ser AUTORIZADA ── */
