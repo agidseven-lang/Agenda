@@ -144,7 +144,8 @@ jobs:
           EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"
           npx --yes @electron/asar extract "$ASAR" "$EXDIR"
           # (a) prova-de-versao: a versao EXIBIDA vem do package.json empacotado (fonte unica).
-          PKGV=$(node -p "require('$EXDIR/package.json').version")
+          # Caminho via ENV (evita backslash do path Windows virar escape na string-literal do require).
+          PKGV=$(EXDIR="$EXDIR" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.EXDIR+"/package.json","utf8")).version||"")')
           [ "$PKGV" = "1.0.180" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.180"; exit 1; }
           # (b) renderer EMPACOTADO byte-identico a FONTE do commit buildado (build nao adulterou o auditado).
           EXIDX="$EXDIR/src/renderer/index.html"
