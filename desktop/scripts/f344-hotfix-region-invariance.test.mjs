@@ -45,10 +45,10 @@ function authorized(rel) {
   return false;
 }
 
-/* ── 1) versão: SOMENTE a rc privada exata 1.0.181-rc.1 ── */
+/* ── 1) versão: SOMENTE o candidato ESTÁVEL exato 1.0.181 (F3.4.4A) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.181-rc.1 (rc privada exata do F3.4.4)', pj.version === '1.0.181-rc.1');
+  ok('1 package.json version === 1.0.181 (candidato ESTÁVEL exato do F3.4.4A)', pj.version === '1.0.181');
 }
 
 /* ── 2) git diff --name-only 68598fa -- desktop: TODA mudança deve ser AUTORIZADA ── */

@@ -57,10 +57,10 @@ function authorized(rel) {
   return false;
 }
 
-/* ── 1) versão: PERMITE somente a rc privada exata 1.0.181-rc.1 (F3.4.4 — hotfix sobre a 1.0.180) ── */
+/* ── 1) versão: PERMITE somente o candidato ESTÁVEL exato 1.0.181 (F3.4.4A — promoção da rc.1 aprovada) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.181-rc.1 (rc privada exata do F3.4.4)', pj.version === '1.0.181-rc.1');
+  ok('1 package.json version === 1.0.181 (candidato ESTÁVEL exato do F3.4.4A)', pj.version === '1.0.181');
 }
 
 /* ── 2) git diff --name-only 9444e7f -- desktop: TODA mudança rastreada deve ser AUTORIZADA ── */
