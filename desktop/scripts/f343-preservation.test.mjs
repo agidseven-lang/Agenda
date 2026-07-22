@@ -50,16 +50,16 @@ ok('27 VISUAL preservado (slaibRefresh/slaMonScheduleBoundary/slaibRender intact
 ok('27 main IMPORTA e INICIA o slaScheduler (produtor único)', /import \{ startSlaScheduler \} from "\.\/slaScheduler"/.test(MAIN) && /slaScheduler = startSlaScheduler\(\(\) => uid, deliverNotification, \{ now: slaNow(, authUser: getAuthUser)? \}\)/.test(MAIN));
 ok('27 main reconcilia SLA em resume/unlock/boot', /slaScheduler\.reconcile\("resume"\)/.test(MAIN) && /slaScheduler\.reconcile\("unlock"\)/.test(MAIN) && /slaScheduler\.reconcile\("boot"\)/.test(MAIN));
 
-/* ── 28 — Worker J6 byte-idêntico (cloudflare-worker.js + wrangler.toml intocados vs 9444e7f) ── */
-function sha(buf) { return crypto.createHash('sha256').update(buf).digest('hex'); }
-try {
-  const curWorker = fs.readFileSync(path.join(ROOT, 'cloudflare-worker.js'));
-  const baseWorker = execFileSync('git', ['-C', ROOT, 'show', BASE_REF + ':cloudflare-worker.js'], { maxBuffer: 256 * 1024 * 1024 });
-  ok('28 cloudflare-worker.js sha256 == blob 9444e7f (byte-idêntico)', sha(curWorker) === sha(baseWorker));
-  const curWr = fs.readFileSync(path.join(ROOT, 'wrangler.toml'));
-  const baseWr = execFileSync('git', ['-C', ROOT, 'show', BASE_REF + ':wrangler.toml'], { maxBuffer: 16 * 1024 * 1024 });
-  ok('28 wrangler.toml byte-idêntico vs 9444e7f', sha(curWr) === sha(baseWr));
-} catch (e) { ok('28 worker/wrangler byte-idênticos', false); flog.push('  (28 erro: ' + (e && e.message || e) + ')'); }
+/* ── 28 — Worker J6 byte-idêntico (blob git vs 9444e7f; CRLF-agnóstico, robusto no runner Windows) ──
+   SHA de BLOB do git (hash-object da árvore vs rev-parse do baseline): imune à normalização de
+   fim-de-linha do checkout; qualquer mudança REAL de conteúdo do Worker altera o blob. */
+{
+  const blobOf = (spec, rel) => { const r = git([spec, rel]); return (typeof r === 'string' && r.indexOf('__GITERR__') !== 0) ? r.trim() : null; };
+  const wcur = blobOf('hash-object', 'cloudflare-worker.js'), wbase = blobOf('rev-parse', BASE_REF + ':cloudflare-worker.js');
+  ok('28 cloudflare-worker.js byte-idêntico a 9444e7f (blob git)', wcur !== null && wbase !== null && wcur === wbase);
+  const rcur = blobOf('hash-object', 'wrangler.toml'), rbase = blobOf('rev-parse', BASE_REF + ':wrangler.toml');
+  ok('28 wrangler.toml byte-idêntico a 9444e7f (blob git)', rcur !== null && rbase !== null && rcur === rbase);
+}
 
 /* ── 29 — funções de negócio byte/valor-idênticas: o GOLDEN MASTER passa ── */
 try {

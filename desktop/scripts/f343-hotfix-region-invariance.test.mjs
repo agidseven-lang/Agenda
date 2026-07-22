@@ -105,16 +105,16 @@ function authorized(rel) {
   ok('5 slaRules.js + slaScheduler.ts presentes (produtor único no main)', fs.existsSync(path.join(DESK, 'src', 'main', 'slaRules.js')) && fs.existsSync(path.join(DESK, 'src', 'main', 'slaScheduler.ts')));
 }
 
-/* ── 6) Worker Cloudflare + wrangler byte-idênticos (sha256 vs blob 9444e7f) ── */
+/* ── 6) Worker Cloudflare + wrangler byte-idênticos (blob git vs 9444e7f) ──
+   Comparação via SHA de BLOB do git (hash-object da árvore de trabalho vs rev-parse do baseline),
+   IGUAL aos gates #3/#4/#8 — robusta à normalização de fim-de-linha do checkout (o runner Windows
+   aplica CRLF via autocrlf; um SHA256 do byte cru da árvore daria falso-negativo). O blob prova
+   identidade de CONTEÚDO rastreado: qualquer mudança real do Worker altera o blob. */
 {
-  try {
-    const curW = fs.readFileSync(path.join(ROOT, 'cloudflare-worker.js'));
-    const baseW = execFileSync('git', ['-C', ROOT, 'show', BASE + ':cloudflare-worker.js'], { maxBuffer: 256 * 1024 * 1024 });
-    ok('6 cloudflare-worker.js byte-idêntico a 9444e7f', sha(curW) === sha(baseW));
-    const curWr = fs.readFileSync(path.join(ROOT, 'wrangler.toml'));
-    const baseWr = execFileSync('git', ['-C', ROOT, 'show', BASE + ':wrangler.toml'], { maxBuffer: 16 * 1024 * 1024 });
-    ok('6 wrangler.toml byte-idêntico a 9444e7f', sha(curWr) === sha(baseWr));
-  } catch (e) { ok('6 worker/wrangler byte-idênticos', false); flog.push('  (6 erro: ' + (e && e.message || e) + ')'); }
+  const cw = workBlob('cloudflare-worker.js'), cb = baseBlob('cloudflare-worker.js');
+  ok('6 cloudflare-worker.js byte-idêntico a 9444e7f (blob git)', cw !== null && cb !== null && cw === cb);
+  const ww = workBlob('wrangler.toml'), wb = baseBlob('wrangler.toml');
+  ok('6 wrangler.toml byte-idêntico a 9444e7f (blob git)', ww !== null && wb !== null && ww === wb);
 }
 
 /* ── 7) android-native-beta/** intocado (sem mudança rastreada nem arquivo novo) ── */
