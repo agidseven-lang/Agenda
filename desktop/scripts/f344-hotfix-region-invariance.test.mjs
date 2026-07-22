@@ -121,10 +121,13 @@ function authorized(rel) {
   }
 }
 
-/* ── 9) delta do index.html LIMITADO ao bloco notifScan (resto byte-idêntico) ── */
+/* ── 9) delta do index.html LIMITADO ao bloco notifScan (resto byte-idêntico) ──
+ * EOL-normalizado (runner Windows: árvore CRLF via autocrlf × blob LF do git show — lição
+ * F3.4.3). A byte-identidade rastreada EOL-imune já é provada nos itens #3/#4 (blob git). */
 {
-  const cur = fs.readFileSync(path.join(DESK, 'src', 'renderer', 'index.html'), 'utf8');
-  const base = git(['show', BASE + ':desktop/src/renderer/index.html']);
+  const nrm = (s) => String(s).replace(/\r\n/g, '\n');
+  const cur = nrm(fs.readFileSync(path.join(DESK, 'src', 'renderer', 'index.html'), 'utf8'));
+  const base = nrm(git(['show', BASE + ':desktop/src/renderer/index.html']));
   const BLOCK = /\/\* F3\.4\.3 — PRODUTOR ÚNICO NO MAIN:[\s\S]*?function notifScan\(\)\{[^}]*\}/;
   ok('9 bloco notifScan presente nos dois lados', BLOCK.test(cur) && BLOCK.test(base));
   ok('9 index.html: FORA do bloco notifScan, byte-idêntico a 68598fa',
