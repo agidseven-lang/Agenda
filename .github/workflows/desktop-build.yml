@@ -144,8 +144,11 @@ jobs:
           EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"
           npx --yes @electron/asar extract "$ASAR" "$EXDIR"
           # (a) prova-de-versao: a versao EXIBIDA vem do package.json empacotado (fonte unica).
-          # Caminho via ENV (evita backslash do path Windows virar escape na string-literal do require).
-          PKGV=$(EXDIR="$EXDIR" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.EXDIR+"/package.json","utf8")).version||"")')
+          # Caminho COMPLETO montado no bash e passado via ENV (mesmo padrao do check renderer, que
+          # ja passa) — evita (i) backslash Windows virar escape na string-literal do require e
+          # (ii) mangling MSYS de um literal "/package.json" (Git-bash o troca por C:\...\Git\...).
+          PKGJSON="$EXDIR/package.json"
+          PKGV=$(PKGJSON="$PKGJSON" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKGJSON,"utf8")).version||"")')
           [ "$PKGV" = "1.0.180" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.180"; exit 1; }
           # (b) renderer EMPACOTADO byte-identico a FONTE do commit buildado (build nao adulterou o auditado).
           EXIDX="$EXDIR/src/renderer/index.html"
