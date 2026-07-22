@@ -105,12 +105,20 @@ jobs:
           if [ -n "$BAD" ]; then echo "::error::mudanca POS-candidato FORA de .github/workflows: $BAD"; exit 1; fi
           echo "OK: alvo da tag = $STABLE_SHA (pinado); delta pos-candidato = so o mecanismo de publicacao"
 
-      - name: "Gate 4 — tag e release nao podem existir"
+      - name: "Gate 4 — release NAO pode existir; tag so pode preexistir APONTANDO para o SHA pinado"
         run: |
           set -euo pipefail
-          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then echo "::error::tag $TAG ja existe"; exit 1; fi
+          # A release JAMAIS pode preexistir (nunca republicar/alterar versao). A tag pode preexistir
+          # SOMENTE apontando EXATAMENTE para o SHA pinado (resto de tentativa anterior DESTE workflow
+          # pinado, interrompida entre criar-tag e criar-release) — qualquer outro alvo aborta.
           if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
-          echo "OK: tag e release livres"
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG existe apontando para OUTRO sha ($TS != $STABLE_SHA)"; exit 1; }
+            echo "OK: release livre; tag $TAG preexiste apontando EXATAMENTE para o SHA pinado"
+          else
+            echo "OK: release e tag livres"
+          fi
 
       - name: "Gate 5 — artifacts: ids+digests conferem"
         run: |
@@ -222,6 +230,25 @@ jobs:
           NOTAS
           wc -l notas.md
 
+      - name: "Criar a tag pinada (git data API) — diagnostico EXPLICITO de bloqueio"
+        run: |
+          set -euo pipefail
+          # Cria refs/tags/v1.0.180 -> SHA pinado ANTES da release (a release entao ANEXA a tag
+          # existente; nao precisa criar ref). Se uma regra do repositorio bloquear a criacao, a
+          # resposta COMPLETA da API e impressa como diagnostico exato (nomeia a regra/permissao).
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para OUTRO sha ($TS)"; exit 1; }
+            echo "tag $TAG ja existe no SHA pinado — segue para a release"
+          else
+            set +e
+            OUT="$(gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" 2>&1)"; RC=$?
+            set -e
+            echo "$OUT"
+            [ $RC -eq 0 ] || { echo "::error::criacao da tag $TAG BLOQUEADA — a resposta acima nomeia a regra exata"; exit 1; }
+            echo "OK: tag $TAG criada em $STABLE_SHA"
+          fi
+
       - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets"
         run: |
           set -euo pipefail
@@ -254,7 +281,10 @@ jobs:
           done
           if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
           TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
-          [ "$TGT" = "$STABLE_SHA" ] || { echo "::error::target incorreto: $TGT"; exit 1; }
+          echo "targetCommitish (informativo): $TGT"
+          # Prova AUTORITATIVA do alvo exigido pelo owner: o objeto da TAG aponta para 68598fa.
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag $TAG nao aponta para o SHA pinado ($TAGSHA)"; exit 1; }
           LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
           echo "Latest do repo: $LATEST_TAG"
           [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
