@@ -3989,11 +3989,14 @@ function notifScanSla(){
         action:{type:'detail',deep:'detail/'+blk.id} })); }
   }catch(_){}
 }
-/* F3.4.3 — PRODUTOR ÚNICO NO MAIN: o renderer detecta só FLUXO (notifScanFlow). As notificações de
-   SLA (amarelo/vermelho/crítico, antes notifScanSla) e de ATRIBUIÇÃO (azul, antes notifScanAssign)
-   passaram ao MAIN (slaScheduler.ts / notifier.ts), único produtor e à prova de janela oculta.
-   notifScanSla e notifScanAssign seguem DEFINIDOS abaixo, porém SEM chamador (diff mínimo). */
-function notifScan(){ notifScanFlow(); }
+/* F3.4.3 — PRODUTOR ÚNICO NO MAIN: SLA (notifScanSla) e ATRIBUIÇÃO (notifScanAssign) passaram ao
+   MAIN (slaScheduler.ts / notifier.ts). F3.4.4 — o FLUXO (movimentação de card, notifScanFlow)
+   TAMBÉM passou ao MAIN (notifier.ts u3 + slaRules), com identidade por TRANSIÇÃO CONCRETA
+   (from>to + carimbo autoritativo) — corrige a notificação única vitalícia por tarefa/quadro
+   (dedupKey antigo eventType:taskId:faseAtual persistido em localStorage) e os retornos B→A sem
+   evento. O renderer NÃO produz nenhuma notificação em paralelo; notifScanSla/notifScanAssign/
+   notifScanFlow seguem DEFINIDOS, porém SEM chamador (diff mínimo, QA-only). */
+function notifScan(){}
 
 /* F3.3.10-FIX (background) — DETECÇÃO de ATRIBUIÇÃO no RENDERER (espelha o notifier do main u1/u1b).
    Garante a entrega mesmo quando o listener Firestore do MAIN fica suspenso com o app em background

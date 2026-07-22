@@ -435,7 +435,9 @@ app.whenReady().then(() => {
     if (uid) {
       // F3.3.3 — notifier/reminder roteiam pelo HUB (ganham toast in-app quando focado,
       // mantêm a nativa quando minimizado/tray). Mesmos eventos/dedup de antes.
-      stopNotifier = startNotifier(() => mainWin, uid, deliverNotification);
+      // F3.4.4 — passa o papel AUTENTICADO (main, F3.4.3) p/ o roteamento de FLUXO (supervisão
+      // vê-tudo) do produtor u3; sem authUser ⇒ sem privilégio vê-tudo (fail-closed).
+      stopNotifier = startNotifier(() => mainWin, uid, deliverNotification, getAuthUser);
       stopReminder = startReminder(() => mainWin, uid, deliverNotification);
       // F3.3.77A-R4B — RELÓGIO CANÔNICO: liga a sincronização (main) via cabeçalho HTTP Date do
       // getUserSelf (Cloud Run, read-only, SEM auth ⇒ zero mutação). Empurra o offset ao renderer,

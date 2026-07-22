@@ -13,6 +13,11 @@ import { BrowserWindow } from "electron";
 import { listen } from "./firebase";
 import { diag } from "./diag";
 
+// F3.4.4 — slaRules.js é CommonJS puro (sem .d.ts): require dinâmico (mesmo padrão do
+// slaScheduler.ts); dist/main/slaRules.js é copiado pelo build (copy-renderer.js).
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const rules: any = require("./slaRules");
+
 type Task = { id: string; title?: string; client?: string; sector?: string; assigneeId?: string; assignee?: string; assigneeName?: string; assigneePhoto?: string; by?: string; createdAt?: number };
 type Event = { id: string; title?: string; date?: string; start?: string; ownerId?: string; by?: string; createdAt?: number };
 
@@ -29,7 +34,7 @@ type Deliver = (p: NotifPayload) => unknown;
 
 export type NotifierState = { uid: string; sinceMs: number };
 
-export function startNotifier(getWin: () => BrowserWindow | null, uid: string, deliver: Deliver) {
+export function startNotifier(getWin: () => BrowserWindow | null, uid: string, deliver: Deliver, getAuthUser?: () => ({ id: string; role?: string; admin?: boolean } | null)) {
   const state: NotifierState = { uid, sinceMs: Date.now() };
   diag("notifier.start", { uid, sinceMs: state.sinceMs }); // F3.3.10-DIAG (só log)
 
@@ -137,6 +142,33 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
     if (firstRun) seededDa = true;
   });
 
+  // F3.4.4 — tasks (added/modified/removed): MOVIMENTAÇÃO DE CARD (transição REAL de quadro/fase).
+  // Produtor ÚNICO autoritativo no MAIN (o renderer não produz fluxo em paralelo — notifScan é no-op).
+  // Contrato: fase canônica por tarefa (porte valor-idêntico em slaRules/deriveCanonicalTaskState) →
+  // transição real (prev≠cur; seed do 1º snapshot NÃO emite; restart = novo seed sem histórico) →
+  // identidade da TRANSIÇÃO CONCRETA (eventType:taskId:from>to:uid:carimbo autoritativo de
+  // history[]/clientActions{}) → assinatura por tarefa (replay idêntico não repete; retorno B→A e
+  // repetição legítima A→B SEMPRE emitem; NENHUM bloqueio vitalício por taskId) → deliver (HUB dedup).
+  // Roteamento PRESERVADO (resolveNotificationTargets team_flow): equipe da tarefa + supervisão
+  // (papel autenticado do main via getAuthUser — F3.4.3; sem authUser ⇒ sem privilégio vê-tudo).
+  const flowDet = rules.createFlowDetector();
+  const u3 = listen<Task>("tasks", (snap) => {
+    const firstRun = !flowDet.isSeeded();
+    snap.docChanges().forEach((ch) => {
+      if (ch.type !== "added" && ch.type !== "modified" && ch.type !== "removed") return;
+      if (ch.type === "removed") { flowDet.drop(ch.doc.id); return; }
+      const t = { id: ch.doc.id, ...(ch.doc.data() as any) } as any;
+      const ev = flowDet.scanDoc(t);                          // null durante o seed / sem transição real
+      if (!ev) return;
+      const au = (typeof getAuthUser === "function" ? getAuthUser() : null) || null;
+      const seeAll = !!(au && rules.canSeeAllRole((au as any).role, (au as any).admin));
+      const p = rules.flowEmissionFor(t, state.uid, seeAll, ev);
+      diag("flow.producer", { taskId: t.id, type: ch.type, from: ev.fromPhase, to: ev.toPhase, stamp: ev.stamp, emitted: !!p, dedupKey: (p && p.dedupKey) || "", producer: "notifier.u3" });
+      if (p) deliver(p as NotifPayload);
+    });
+    if (firstRun) flowDet.sealSeed();                         // BASELINE SEED: 1º snapshot marca sem emitir
+  });
+
   // events: novo compromisso para mim
   const u2 = listen<Event>("events", (snap) => {
     snap.docChanges().forEach((ch) => {
@@ -158,5 +190,5 @@ export function startNotifier(getWin: () => BrowserWindow | null, uid: string, d
     });
   });
 
-  return () => { u1(); u1b(); u2(); };
+  return () => { u1(); u1b(); u3(); u2(); };
 }

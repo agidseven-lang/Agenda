@@ -278,6 +278,231 @@ function nextBoundaryMs(task, nowMs, dtMsFn){
   }catch(_e){ return 0; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════════════
+ * F3.4.4 — FLUXO (movimentação de card): fase canônica + detector de TRANSIÇÃO CONCRETA.
+ * -------------------------------------------------------------------------------------
+ * Porte VALOR-IDÊNTICO do Flow Engine do renderer (index.html 1.0.180: deriveCanonicalTaskState
+ * e todos os sinais/predicados que ele lê) — provado pelo Golden Master
+ * (desktop/scripts/f344-flow-golden-master.test.mjs, 0 divergência sobre o corpus).
+ *
+ * CONTRATO F3.4.4 (produtor no MAIN):
+ *   snapshot Firestore (notifier.u3) → estado anterior POR TAREFA (lastPhase) → transição real
+ *   (prev≠cur) → identidade da TRANSIÇÃO CONCRETA (eventType:taskId:from>to:uid:carimbo) →
+ *   assinatura por tarefa (replay idêntico NUNCA repete; retorno/repetição legítima SEMPRE emite)
+ *   → deliverNotification (HUB) → toast/bgNotify.
+ *
+ * CARIMBO AUTORITATIVO (auditado — nenhum timestamp client-side inventado): todo escritor de
+ * movimentação/fase grava no PRÓPRIO documento history[]={kind:'moved'|'designer_moved'|…, at/atMs}
+ * ou clientActions{}.at (index.html:6022, 6054, 7484-7492, 7560-7576). O carimbo da transição é o
+ * MAIOR `at` de history[]+clientActions{} (a MESMA fonte do notifLastActorId aprovado) + o tamanho
+ * dos dois conjuntos (cresce a cada ação real; idêntico em replay do mesmo doc).
+ *
+ * GARANTIAS: sem bloqueio vitalício por taskId; sem localStorage; seed no 1º snapshot SEM emitir;
+ * restart = novo seed sem histórico; A→B → B→A → A→B = 3 eventos; replay/snapshot repetido = 0.
+ * ═══════════════════════════════════════════════════════════════════════════════════ */
+
+/* ---- Fases canônicas — index.html:5696-5707 (VERBATIM) ---- */
+var TASK_PHASE={
+  PLANNING:'planning',
+  THEMES_SENT:'themes_sent',
+  THEMES_APPROVED:'themes_approved',
+  AWAITING_DESIGNER:'awaiting_designer',
+  DESIGNER_PRODUCING:'designer_producing',
+  DESIGNER_REVISING:'designer_revising',
+  DESIGNER_DELIVERED:'designer_delivered',
+  AWAITING_CLIENT_APPROVAL:'awaiting_client_approval',
+  CLIENT_REQUESTED_CHANGES:'client_requested_changes',
+  COMPLETED:'completed'
+};
+
+/* ---- Predicados/sinais lidos por deriveCanonicalTaskState — portes VERBATIM ---- */
+/* index.html:2325 */
+function isClientSector(k){return k==='cronograma'||k==='roteiro';}
+/* index.html:4882-4884 */
+function isTaskCompleted(t){
+  return !!(t&&(t.finalApprovalCompleted===true||t.clientApprovedFlag===true||t.operationalStatus==='concluido'||t.cronStatus==='aprovado_final'||t.clientFlowStatus==='concluido'));
+}
+/* index.html:4860 */
+function hasDesigner(t){return !!(t&&t.designerAssignment&&t.designerAssignment.designerId)&&secOf(t.sector).key!=='roteiro';}
+/* index.html:4911 */
+function designerCol(t){var v=(t&&t.designerFlowStatus||'').toString();if(['afazer','andamento','revisao','concluido'].indexOf(v)>=0)return v;return (t&&t.status)||'afazer';}
+/* index.html:5049-5053 */
+function pendingLegend(t){var a=Array.isArray(t.cronContents)?t.cronContents:[];return !a.length||a.some(function(c){return !(c&&c.legenda&&String(c.legenda).trim());});}
+function pendingFeed(t){var a=Array.isArray(t.cronContents)?t.cronContents:[];return !a.length||a.some(function(c){return !(c&&c.feedImageUrl);});}
+function pendingStory(t){var a=Array.isArray(t.cronContents)?t.cronContents:[];return a.some(function(c){return c&&c.storyImageUrl;})&&a.some(function(c){return !(c&&c.storyImageUrl);});}
+function pendingProduction(t){return pendingLegend(t)||pendingFeed(t);}
+function designerDelivered(t){return hasDesigner(t)&&designerCol(t)==='concluido';}
+/* index.html:6410-6419 */
+function clientApprovalPhaseOf(t){
+  var e=(t&&t.clientApprovalPhase||'').toString();if(e==='themes'||e==='production'||e==='final')return e;
+  if(t&&t.finalApprovalCompleted===true)return 'final';
+  if(t&&(t.cronStatus==='ready_for_final_client_review'||t.workflowStage==='entrega'||t.workflowStage==='revisao_final'))return 'final';
+  var arr=Array.isArray(t&&t.cronContents)?t.cronContents:[];var total=arr.length||0;
+  if(total>0){var withLeg=arr.filter(function(c){return c&&c.legenda&&String(c.legenda).trim();}).length;
+    var withFeed=arr.filter(function(c){return c&&c.feedImageUrl;}).length;
+    if(withLeg===total&&withFeed===total)return 'production';}
+  return 'themes';
+}
+/* index.html:5058-5063 */
+function pendingClientItems(t){var ci=t&&t.clientItems;if(!ci||typeof ci!=='object')return [];
+  var ph=clientApprovalPhaseOf(t);var out=[];
+  Object.keys(ci).forEach(function(k){var m=k.match(/^i(\d+)$/);if(!m)return;var it=ci[k]||{};
+    if((it.cs==='em_revisao'||it.cs==='editado')&&it.phase===ph)out.push({idx:+m[1],cs:it.cs,note:it.note||''});});
+  return out;}
+function hasPendingItemRevision(t){return pendingClientItems(t).length>0;}
+/* index.html:5082-5092 */
+function isFullyComplete(t){
+  if(!isClientSector(secOf(t.sector).key))return (t&&t.status)==='concluido';
+  if(hasDesigner(t)&&!designerDelivered(t))return false;
+  if(pendingProduction(t))return false;
+  if(pendingStory(t))return false;
+  if((t.clientReview&&t.clientReview.status)==='revisao')return false;
+  return !!(t.finalApprovalCompleted===true||t.operationalStatus==='concluido'||t.clientFlowStatus==='concluido');
+}
+/* index.html:5709-5714 */
+function flowCompletedSignal(t){return isTaskCompleted(t);}
+function flowSentToClientSignal(t){var cs=(t&&t.cronStatus||'').toString();return cs==='ready_for_final_client_review'||cs==='reenviado_cliente'||(t&&t.clientApprovalPhase==='final');}
+function flowClientChangesSignal(t){var cr=(t&&t.clientReview&&t.clientReview.status||'').toString();return cr==='revisao'||(t&&t.clientFlowStatus==='revisao')||hasPendingItemRevision(t);}
+function flowThemesApprovedSignal(t){if(hasDesigner(t))return false;var cf=(t&&t.clientFlowStatus||'').toString();var cr=(t&&t.clientReview&&t.clientReview.status||'').toString();var ph=(t&&t.clientApprovalPhase||'').toString();return cf==='aprovado'||(cr==='aprovado'&&ph!=='final'&&ph!=='production');}
+function flowThemesSentSignal(t){if(hasDesigner(t))return false;var cf=(t&&t.clientFlowStatus||'').toString();var cs=(t&&t.cronStatus||'').toString();var ph=(t&&t.clientApprovalPhase||'').toString();if(ph==='final')return false;return cf==='enviado'||cf==='reenviado'||cs==='enviado_cliente'||!!(t&&(t.clientSentBy||t.clientReviewToken||t.shareToken));}
+
+/* ---- Fase canônica da tarefa — index.html:5716-5742 (VERBATIM) ---- */
+function deriveCanonicalTaskState(t){
+  if(!t)return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:false};
+  var isCron=isClientSector(secOf(t.sector).key);
+  if(!isCron){
+    var s=(t.status||'afazer');
+    var phase=s==='concluido'?TASK_PHASE.COMPLETED:(s==='revisao'?TASK_PHASE.DESIGNER_REVISING:(s==='andamento'?TASK_PHASE.DESIGNER_PRODUCING:TASK_PHASE.AWAITING_DESIGNER));
+    return {phase:phase,owner:'social',isCron:false};
+  }
+  if(flowCompletedSignal(t)||isFullyComplete(t))return {phase:TASK_PHASE.COMPLETED,owner:'social',isCron:true};
+  if(flowClientChangesSignal(t))return {phase:TASK_PHASE.CLIENT_REQUESTED_CHANGES,owner:'social',isCron:true};
+  if(flowSentToClientSignal(t))return {phase:TASK_PHASE.AWAITING_CLIENT_APPROVAL,owner:'client',isCron:true};
+  if(hasDesigner(t)){
+    var dc=designerCol(t);var dfs=(t.designerFlowStatus||'').toString();
+    if(dc==='concluido'||dfs==='entregue')return {phase:TASK_PHASE.DESIGNER_DELIVERED,owner:'social',isCron:true};
+    if(dc==='revisao')return {phase:TASK_PHASE.DESIGNER_REVISING,owner:'designer',isCron:true};
+    if(dc==='andamento')return {phase:TASK_PHASE.DESIGNER_PRODUCING,owner:'designer',isCron:true};
+    return {phase:TASK_PHASE.AWAITING_DESIGNER,owner:'designer',isCron:true};
+  }
+  if(secOf(t.sector).key==='roteiro'&&flowThemesApprovedSignal(t))return {phase:TASK_PHASE.COMPLETED,owner:'social',isCron:true};
+  if(flowThemesApprovedSignal(t))return {phase:TASK_PHASE.THEMES_APPROVED,owner:'social',isCron:true};
+  if(flowThemesSentSignal(t))return {phase:TASK_PHASE.THEMES_SENT,owner:'client',isCron:true};
+  return {phase:TASK_PHASE.PLANNING,owner:'social',isCron:true};
+}
+
+/* ---- Rótulo humano da etapa — index.html:3587-3588 (VERBATIM) ---- */
+var NOTIF_PHASE_LABEL={planning:'Planejamento',awaiting_designer:'Aguardando designer',designer_producing:'Em produção',designer_revising:'Em revisão',designer_delivered:'Entregue pelo designer',awaiting_client_approval:'Enviado ao cliente',client_requested_changes:'Ajuste solicitado',completed:'Concluída'};
+function notifPhaseLabel(ph){ return NOTIF_PHASE_LABEL[ph]||''; }
+
+/* ---- Transição de FASE → evento — SUPERSET compatível de notifFlowEvent (index.html:3591-3602).
+ * Os 6 destinos legados são BYTE-idênticos (eventType/título/severidade preservados). NOVO (F3.4.4):
+ * RETORNO ao quadro "A Fazer" do designer (produção/revisão/entrega → awaiting_designer) passa a
+ * notificar — a ATRIBUIÇÃO (planning/themes_* → awaiting_designer) segue EXCLUSIVA do notifier.u1b
+ * (azul designer_assigned), sem duplicar. ---- */
+function flowEventOf(prevPhase,curPhase){
+  if(prevPhase===curPhase) return null;
+  switch(curPhase){
+    case 'designer_producing':       return {eventType:'flow_production_started', title:'Produção iniciada',            severity:'info'};
+    case 'designer_revising':        return {eventType:'flow_in_review',          title:'Enviado para revisão',         severity:'info'};
+    case 'designer_delivered':       return {eventType:'flow_designer_delivered', title:'Designer entregou',             severity:'success'};
+    case 'awaiting_client_approval': return {eventType:'flow_sent_to_client',     title:'Cronograma enviado ao cliente',severity:'info'};
+    case 'client_requested_changes': return {eventType:'flow_client_changes',     title:'Cliente solicitou ajuste',     severity:'warning'};
+    case 'completed':                return {eventType:'flow_completed',          title:'Tarefa concluída',             severity:'success'};
+    case 'awaiting_designer':
+      if(prevPhase==='designer_producing'||prevPhase==='designer_revising'||prevPhase==='designer_delivered')
+        return {eventType:'flow_returned_to_todo', title:'Tarefa retornou para A Fazer', severity:'info'};
+      return null;
+    default: return null;
+  }
+}
+
+/* ---- Última ação autoritativa do documento — porte de notifLastActorId (index.html:3695-3703),
+ * devolvendo TAMBÉM o carimbo (maior `at` de history[]+clientActions{}). ---- */
+function flowLastActionOf(t){
+  var ev=[];
+  try{
+    (Array.isArray(t&&t.history)?t.history:[]).forEach(function(e){ if(e&&e.at) ev.push({at:Number(e.at),by:e.byId||e.by||null}); });
+    var ca=(t&&t.clientActions&&typeof t.clientActions==='object')?t.clientActions:{};
+    Object.keys(ca).forEach(function(k){ var a=ca[k]; if(a&&a.at) ev.push({at:Number(a.at),by:a.by||a.byId||null}); });
+  }catch(_e){}
+  if(!ev.length) return {at:0,byId:null};
+  ev.sort(function(a,b){return b.at-a.at;});
+  return {at:ev[0].at,byId:ev[0].by||null};
+}
+
+/* ---- Carimbo da transição: maior `at` + tamanhos de history/clientActions (crescem a cada ação
+ * REAL gravada; idênticos num replay do MESMO doc). Nunca inventa relógio local. ---- */
+function flowStampOf(t){
+  var la=flowLastActionOf(t), h=0, c=0;
+  try{ h=Array.isArray(t&&t.history)?t.history.length:0; }catch(_e){}
+  try{ c=(t&&t.clientActions&&typeof t.clientActions==='object')?Object.keys(t.clientActions).length:0; }catch(_e){}
+  return String(la.at||0)+':h'+h+':c'+c;
+}
+
+/* ---- ATOR denormalizado (main sem diretório; o toast re-resolve foto/nome REAIS via
+ * notifNormalize no renderer — paridade com notifActor: sem ator → responsável). ---- */
+function flowActorDenorm(t){
+  var la=flowLastActionOf(t), aid=la.byId||'';
+  if(aid){
+    var da=(t&&t.designerAssignment)||{};
+    if(aid===da.designerId)   return {id:aid,name:da.designerName||'',avatar:da.designerAvatar||da.designerPhoto||''};
+    if(aid===da.assignedBy)   return {id:aid,name:da.assignedByName||'',avatar:da.assignedByAvatar||da.assignedByPhoto||''};
+    if(aid===(t&&t.assigneeId))return {id:aid,name:(t&&(t.assignee||t.assigneeName))||'',avatar:(t&&t.assigneePhoto)||''};
+    try{ var hs=Array.isArray(t&&t.history)?t.history:[]; for(var i=hs.length-1;i>=0;i--){ var e=hs[i]; if(e&&(e.byId===aid||e.byUid===aid)&&e.by&&typeof e.by==='string'){ return {id:aid,name:e.by,avatar:''}; } } }catch(_e){}
+    return {id:aid,name:'',avatar:''};
+  }
+  return notifResponsibleDenorm(t);
+}
+
+/* ---- DETECTOR por usuário logado (o notifier reinicia por uid): estado anterior por tarefa +
+ * assinatura da última transição processada. SEM persistência; SEM bloqueio vitalício. ---- */
+function createFlowDetector(){
+  var lastPhase=Object.create(null), lastSig=Object.create(null), seeded=false;
+  return {
+    isSeeded:function(){ return seeded; },
+    sealSeed:function(){ seeded=true; },
+    drop:function(id){ delete lastPhase[id]; delete lastSig[id]; },
+    /* devolve o EVENTO da transição concreta ou null; SEMPRE registra o quadro atual. */
+    scanDoc:function(t){
+      if(!t||!t.id) return null;
+      var cur=''; try{ cur=(deriveCanonicalTaskState(t)||{}).phase||''; }catch(_e){ cur=''; }
+      var prev=Object.prototype.hasOwnProperty.call(lastPhase,t.id)?lastPhase[t.id]:undefined;
+      lastPhase[t.id]=cur;                                    // estado atual registrado a CADA snapshot
+      if(!seeded||prev===undefined||prev===cur) return null;  // seed/tarefa-nova/sem-mudança/replay igual
+      var ev=flowEventOf(prev,cur); if(!ev) return null;      // destino sem evento mapeado (paridade)
+      var stamp=flowStampOf(t);
+      var sig=prev+'>'+cur+':'+stamp;
+      if(lastSig[t.id]===sig) return null;                    // replay da MESMA transição concreta
+      lastSig[t.id]=sig;                                      // assinatura atualizada após CADA evento
+      return { eventType:ev.eventType, title:ev.title, severity:ev.severity, fromPhase:prev, toPhase:cur, stamp:stamp };
+    }
+  };
+}
+
+/* ---- EMISSÃO (roteamento + payload) — paridade com o notifScanFlow do renderer:
+ * mesmos destinatários (equipe da tarefa + supervisão), mesmos textos/títulos/severidade/etapa/
+ * corpo/subtítulo/deep-link. Identidade NOVA da transição concreta em eventId/dedupKey. ---- */
+function flowEmissionFor(t, uid, seeAll, ev){
+  if(!t||!t.id||!uid||!ev) return null;
+  var tg=resolveNotificationTargets({ eventType:ev.eventType, task:t, currentUser:{id:uid}, currentUserCanSeeAll:!!seeAll });
+  if(!tg.shouldNotifyCurrentUser) return null;
+  var actor=flowActorDenorm(t), resp=notifResponsibleDenorm(t);
+  var idty=ev.eventType+':'+t.id+':'+ev.fromPhase+'>'+ev.toPhase+':'+uid+':'+ev.stamp;
+  return notifBuildPayload({
+    eventId:idty, dedupKey:idty,
+    eventType:ev.eventType, taskId:t.id, taskTitle:t.title||'Tarefa', clientName:t.client||'',
+    actorId:actor.id||'', actorName:actor.name||'', actorAvatar:actor.avatar||'',
+    responsibleId:resp.id||'', responsibleName:resp.name||'', responsibleAvatar:resp.avatar||'',
+    targetUserId:uid, notificationType:tg.notificationType, etapa:notifPhaseLabel(ev.toPhase), status:ev.toPhase,
+    severity:ev.severity, sound:true, title:ev.title,
+    subtitle:(actor.name||''),
+    body:(t.title||'Tarefa')+(t.client?(' — '+t.client):''),
+    context:'', anchor:ev.toPhase, action:{type:'detail',deep:'detail/'+t.id},
+    source:'notifier'
+  });
+}
+
 module.exports = {
   // domínio / util
   SECTORS: SECTORS, SECTOR_ALIAS: SECTOR_ALIAS, secOf: secOf,
@@ -294,5 +519,18 @@ module.exports = {
   // papel / bloqueio operacional (autenticado)
   MANAGER_KW: MANAGER_KW, norm: norm, roleCat: roleCat, canSeeAllRole: canSeeAllRole, operationalBlockFor: operationalBlockFor,
   // main-only
-  notifResponsibleDenorm: notifResponsibleDenorm, slaEmissionsFor: slaEmissionsFor, nextBoundaryMs: nextBoundaryMs
+  notifResponsibleDenorm: notifResponsibleDenorm, slaEmissionsFor: slaEmissionsFor, nextBoundaryMs: nextBoundaryMs,
+  // F3.4.4 — fluxo (movimentação de card) no MAIN
+  TASK_PHASE: TASK_PHASE, isClientSector: isClientSector, isTaskCompleted: isTaskCompleted,
+  hasDesigner: hasDesigner, designerCol: designerCol,
+  pendingLegend: pendingLegend, pendingFeed: pendingFeed, pendingStory: pendingStory,
+  pendingProduction: pendingProduction, designerDelivered: designerDelivered,
+  clientApprovalPhaseOf: clientApprovalPhaseOf, pendingClientItems: pendingClientItems,
+  hasPendingItemRevision: hasPendingItemRevision, isFullyComplete: isFullyComplete,
+  flowCompletedSignal: flowCompletedSignal, flowSentToClientSignal: flowSentToClientSignal,
+  flowClientChangesSignal: flowClientChangesSignal, flowThemesApprovedSignal: flowThemesApprovedSignal,
+  flowThemesSentSignal: flowThemesSentSignal, deriveCanonicalTaskState: deriveCanonicalTaskState,
+  NOTIF_PHASE_LABEL: NOTIF_PHASE_LABEL, notifPhaseLabel: notifPhaseLabel,
+  flowEventOf: flowEventOf, flowLastActionOf: flowLastActionOf, flowStampOf: flowStampOf,
+  flowActorDenorm: flowActorDenorm, createFlowDetector: createFlowDetector, flowEmissionFor: flowEmissionFor
 };

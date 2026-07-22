@@ -1,32 +1,34 @@
 # =====================================================================
-# [manual] F3.4.3E — Desktop Build (ESTAVEL 1.0.180)
+# [manual] F3.4.4 — Desktop Build (rc PRIVADA 1.0.181-rc.1)
 # ---------------------------------------------------------------------
-# Builda o Desktop no canal ESTAVEL (latest) a partir do `ref` e GERA, do
-# MESMO build, a metadata de update: latest.yml + <exe>.blockmap + app-update.yml.
-# `--publish never`: o CI NUNCA publica (o release gated e o unico publicador).
+# Build PRIVADA do hotfix F3.4.4 (notificacao de movimentacao repetida): EXE + MSI +
+# SHA256SUMS + relatorios, artifacts PRIVADOS somente. `--publish never`: o CI NUNCA
+# publica; NAO cria release/tag; NAO marca Latest; latest.yml gerado fica PRIVADO no
+# artifact (nenhuma maquina estavel o ve — distribuicao e SO por release, que nao existe
+# aqui; alem disso 1.0.181-rc.1 e prerelease semver, rejeitada por allowPrerelease=false).
 # Gates fail-closed:
-#   - suite F3.4.3/F3.4.3E: region-invariance (fonte vs ESTAVEL 1.0.178 @9444e7f,
-#     versao=1.0.180, so hunks autorizados, modulos protegidos + Worker + Android
-#     byte-identicos, guards estaveis intactos); Golden Master 219/0; contrato
-#     F3.4.3E (f343d 44/0); preservacao; maquina de estados do updater;
-#   - metadata ESTAVEL (latest.yml PRESENTE + canary.yml AUSENTE + sha512/size/
-#     blockmap/app-update.yml provider+SEM segredo);
-#   - prova-de-versao (package.json EMPACOTADO == 1.0.180) + renderer EMPACOTADO
-#     byte-identico a FONTE do commit buildado (build nao adulterou o auditado);
+#   - suite F3.4.3/F3.4.3E integral (region 9444e7f, Golden Master SLA 219/0, f343d 44/0,
+#     preservacao, maquina de estados do updater) — zero regressao;
+#   - suite F3.4.4: flow golden master (fase renderer==main, 0 divergencia), contrato da
+#     movimentacao repetida (RED forense no baseline 68598fa + GREEN 30), region-invariance
+#     vs Desktop 1.0.180 OFICIAL @68598fa (so o produtor de fluxo no main + testes mudam);
+#   - metadata (latest.yml + blockmap + app-update.yml sem segredo — PRIVADOS);
+#   - prova-de-versao (package.json EMPACOTADO == 1.0.181-rc.1) + renderer EMPACOTADO
+#     byte-identico a FONTE do commit buildado;
 #   - FLAGS no app.asar: allowPrerelease=false -> channel=latest -> allowDowngrade=false
 #     (+ autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false; rejeita canary).
 # NAO publica release; NAO toca Worker/Firebase/Firestore/Rules/Cloudflare/Android.
 # Execucao SOMENTE manual (workflow_dispatch).
 # =====================================================================
-name: "[manual] F3.4.3E Desktop Build (stable 1.0.180)"
+name: "[manual] F3.4.4 Desktop Build (private rc 1.0.181-rc.1)"
 
 "on":
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (ex.: desktop/f343-background-notifications-hotfix)"
+        description: "Branch/commit a buildar (ex.: desktop/f344-repeated-card-move-notification-hotfix)"
         required: true
-        default: "desktop/f343-background-notifications-hotfix"
+        default: "desktop/f344-repeated-card-move-notification-hotfix"
 
 permissions:
   contents: read
@@ -40,6 +42,7 @@ jobs:
     env:
       APP_DIR: "desktop"
       BASE_SHA: "9444e7fab945956258a45cfcebb00bbd87e72447" # ESTAVEL 1.0.178 (baseline F3.4.3)
+      STABLE_180_SHA: "68598fae54e75dd34a399ffca65649cc8ff6d16c" # Desktop 1.0.180 OFICIAL (baseline F3.4.4)
     steps:
       - name: Checkout (ref escolhido; history completo p/ baseline)
         uses: actions/checkout@v4
@@ -53,7 +56,7 @@ jobs:
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
           echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-$APP_VERSION" >> "$GITHUB_ENV"
           echo "versao=$APP_VERSION"
-          [ "$APP_VERSION" = "1.0.180" ] || { echo "::error:: versao != 1.0.180 (build ESTAVEL exige a versao exata)"; exit 1; }
+          [ "$APP_VERSION" = "1.0.181-rc.1" ] || { echo "::error:: versao != 1.0.181-rc.1 (build rc PRIVADA do F3.4.4 exige a versao exata)"; exit 1; }
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -68,7 +71,7 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: npm run build
 
-      - name: Gate F3.4.3 region-invariance (fonte vs ESTAVEL 1.0.178 @9444e7f; versao 1.0.180)
+      - name: Gate F3.4.3 region-invariance (fonte vs ESTAVEL 1.0.178 @9444e7f; versao 1.0.181-rc.1)
         working-directory: ${{ env.APP_DIR }}
         run: node scripts/f343-hotfix-region-invariance.test.mjs
 
@@ -87,6 +90,18 @@ jobs:
       - name: Gate maquina de estados do updater (sem identidades; updater intocado vs 1.0.178)
         working-directory: ${{ env.APP_DIR }}
         run: node scripts/f341a-updater-state-machine.test.mjs
+
+      - name: Gate F3.4.4 flow golden master (fase canonica renderer == main; 0 divergencia)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f344-flow-golden-master.test.mjs
+
+      - name: Gate F3.4.4 contrato movimentacao repetida (RED forense 68598fa + GREEN 30)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f344-repeated-move-contract.test.mjs
+
+      - name: Gate F3.4.4 region-invariance (fonte vs Desktop 1.0.180 OFICIAL @68598fa)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f344-hotfix-region-invariance.test.mjs
 
       - name: electron-builder (NSIS + MSI + metadata do MESMO build)
         working-directory: ${{ env.APP_DIR }}
@@ -135,7 +150,7 @@ jobs:
           if grep -qiE '(token|secret|password|gh_token|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml contem possivel segredo"; exit 1; fi
           echo "GATE metadata ESTAVEL OK: latest.yml (version/path/url/sha512/size/blockmap conferem) + app-update.yml github SEM segredo; canary.yml AUSENTE (canal isolado)."
 
-      - name: Gate prova-de-versao (package.json empacotado == 1.0.180) + renderer EMPACOTADO == fonte do commit
+      - name: Gate prova-de-versao (package.json empacotado == 1.0.181-rc.1) + renderer EMPACOTADO == fonte do commit
         working-directory: ${{ env.APP_DIR }}
         run: |
           set -e
@@ -149,7 +164,7 @@ jobs:
           # (ii) mangling MSYS de um literal "/package.json" (Git-bash o troca por C:\...\Git\...).
           PKGJSON="$EXDIR/package.json"
           PKGV=$(PKGJSON="$PKGJSON" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKGJSON,"utf8")).version||"")')
-          [ "$PKGV" = "1.0.180" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.180"; exit 1; }
+          [ "$PKGV" = "1.0.181-rc.1" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.181-rc.1"; exit 1; }
           # (b) renderer EMPACOTADO byte-identico a FONTE do commit buildado (build nao adulterou o auditado).
           EXIDX="$EXDIR/src/renderer/index.html"
           test -f "$EXIDX" || { echo "::error:: renderer nao encontrado no asar"; exit 1; }
@@ -163,7 +178,7 @@ jobs:
           '
           test -f "$EXDIR/dist/main/updaterService.js" || { echo "::error:: updaterService.js ausente no asar"; exit 1; }
           grep -q "createUpdaterService" "$EXDIR/dist/main/main.js" || { echo "::error:: wiring do updater ausente no main.js empacotado"; exit 1; }
-          echo "GATE prova-de-versao (1.0.180) + renderer==fonte OK."
+          echo "GATE prova-de-versao (1.0.181-rc.1) + renderer==fonte OK."
 
       - name: Gate FLAGS do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade + 6 flags)
         working-directory: ${{ env.APP_DIR }}
@@ -215,11 +230,12 @@ jobs:
             echo "metadata    : latest.yml + $BM_NAME (MESMO build); app-update.yml SOMENTE dentro do pacote"
             echo "commit      : $GITHUB_SHA"
             echo "ref         : ${{ github.event.inputs.ref }}"
-            echo "baseline    : ESTAVEL 1.0.178 @ $BASE_SHA (invariancia region-scoped F3.4.3 verificada)"
-            echo "origem      : promocao do rc.2 fisicamente aprovado (818fa13) + apenas o numero de versao"
+            echo "baseline    : Desktop 1.0.180 OFICIAL @ $STABLE_180_SHA (invariancia F3.4.4) + ESTAVEL 1.0.178 @ $BASE_SHA (invariancia F3.4.3)"
+            echo "origem      : hotfix F3.4.4 (produtor de FLUXO no main; 1 notificacao por transicao real) a partir de 68598fa"
+            echo "distribuicao: PRIVADA (sem release, sem tag, sem Latest, sem latest.yml publico)"
           } > "$OUT/VERSAO-DESKTOP.txt"
           {
-            echo "===== RELATORIO DESKTOP (F3.4.3E estavel 1.0.180) ====="
+            echo "===== RELATORIO DESKTOP (F3.4.4 rc PRIVADA 1.0.181-rc.1) ====="
             echo "Gerado (UTC) : $(date -u)"
             echo "Ref / commit : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
             echo ""

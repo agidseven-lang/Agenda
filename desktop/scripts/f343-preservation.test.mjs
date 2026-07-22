@@ -35,7 +35,11 @@ ok('26 scheduler reaproveita o listener Firestore do main (event-driven)', /list
 
 /* ── 27 — PRODUTOR ÚNICO de SLA no main; renderer não emite SLA por timer/scan ── */
 ok('27 notifScanSla e notifScanAssign seguem DEFINIDOS (diff mínimo)', /function notifScanSla\(\)/.test(HTML) && /function notifScanAssign\(\)/.test(HTML));
-ok('27 notifScan NÃO chama mais notifScanSla/notifScanAssign', /function notifScan\(\)\{ notifScanFlow\(\); \}/.test(HTML));
+// F3.4.4 — o FLUXO também passou ao MAIN (notifier.u3 + slaRules): notifScan virou no-op e
+// notifScanFlow segue DEFINIDA sem chamador (mesma convenção de contagem: 1 = só a definição).
+ok('27 notifScan é no-op (SLA+atribuição+FLUXO todos no MAIN — F3.4.4)', /function notifScan\(\)\{\}/.test(HTML));
+ok('27 notifScanFlow segue DEFINIDA (diff mínimo)', /function notifScanFlow\(\)\{/.test(HTML));
+ok('27 notifScanFlow sem chamador no renderer (só a definição casa `notifScanFlow()`)', (HTML.match(/notifScanFlow\(\)/g) || []).length === 1);
 ok('27 boundary timer NÃO dispara notifScanSla (só slaibRefresh VISUAL)', !/_slaBoundaryTimer=setTimeout\(function\(\)\{[\s\S]{0,320}notifScanSla\(\)/.test(HTML));
 ok('27 sem poll de 30s chamando notifScanSla/notifScanAssign', !/setInterval\(function\(\)\{ try\{ notifScanSla/.test(HTML));
 ok('27 _slaResume NÃO chama notifScanSla', !/_slaResume=function\(\)\{[\s\S]{0,600}notifScanSla\(\)/.test(HTML));

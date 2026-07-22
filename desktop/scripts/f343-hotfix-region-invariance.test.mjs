@@ -48,13 +48,19 @@ function authorized(rel) {
   if (/^desktop\/scripts\/f343[a-z0-9]*-[^/]*\.test\.mjs$/.test(rel)) return true;   // novos testes do hotfix (f343-, f343d-, …)
   if (/^desktop\/scripts\/fixtures\/f343\//.test(rel)) return true;         // fixtures do hotfix
   if (rel === 'desktop/scripts/F343-TEST-STATUS.md') return true;           // registro de status do hotfix
+  // F3.4.4 — hotfix da movimentação repetida (produtor de FLUXO no main): testes/fixtures próprios.
+  // O diff de PRODUTO do F3.4.4 usa os MESMOS arquivos já autorizados acima (main.ts/notifier.ts/
+  // index.html/slaRules.js/package*); o gate fino contra a 1.0.180 oficial é o
+  // f344-hotfix-region-invariance.test.mjs (baseline 68598fa).
+  if (/^desktop\/scripts\/f344[a-z0-9-]*\.test\.mjs$/.test(rel)) return true;
+  if (/^desktop\/scripts\/fixtures\/f344\//.test(rel)) return true;
   return false;
 }
 
-/* ── 1) versão: PERMITE somente a ESTÁVEL exata 1.0.180 (F3.4.3E-STABLE — promoção à produção) ── */
+/* ── 1) versão: PERMITE somente a rc privada exata 1.0.181-rc.1 (F3.4.4 — hotfix sobre a 1.0.180) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.180 (estável exata permitida)', pj.version === '1.0.180');
+  ok('1 package.json version === 1.0.181-rc.1 (rc privada exata do F3.4.4)', pj.version === '1.0.181-rc.1');
 }
 
 /* ── 2) git diff --name-only 9444e7f -- desktop: TODA mudança rastreada deve ser AUTORIZADA ── */
