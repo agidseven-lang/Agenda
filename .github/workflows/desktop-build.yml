@@ -1,23 +1,32 @@
 # =====================================================================
-# [manual] Agenda ID Seven Desktop — Windows installer build
+# [manual] F3.4.3E — Desktop Build (ESTAVEL 1.0.180)
 # ---------------------------------------------------------------------
-# Gera o instalador Windows (NSIS .exe + MSI) do app Desktop e empacota
-# bundle ZIP com: instalador, VERSAO-DESKTOP.txt, RELATORIO-DESKTOP.txt,
-# INSTRUCOES-INSTALACAO-DESKTOP.txt.
-#
-# NAO toca: APK Android, site agendaidseven.com.br, Cloudflare Worker
-# de push, Firebase Functions, Resend, Secret Manager, Firestore Rules.
+# Builda o Desktop no canal ESTAVEL (latest) a partir do `ref` e GERA, do
+# MESMO build, a metadata de update: latest.yml + <exe>.blockmap + app-update.yml.
+# `--publish never`: o CI NUNCA publica (o release gated e o unico publicador).
+# Gates fail-closed:
+#   - suite F3.4.3/F3.4.3E: region-invariance (fonte vs ESTAVEL 1.0.178 @9444e7f,
+#     versao=1.0.180, so hunks autorizados, modulos protegidos + Worker + Android
+#     byte-identicos, guards estaveis intactos); Golden Master 219/0; contrato
+#     F3.4.3E (f343d 44/0); preservacao; maquina de estados do updater;
+#   - metadata ESTAVEL (latest.yml PRESENTE + canary.yml AUSENTE + sha512/size/
+#     blockmap/app-update.yml provider+SEM segredo);
+#   - prova-de-versao (package.json EMPACOTADO == 1.0.180) + renderer EMPACOTADO
+#     byte-identico a FONTE do commit buildado (build nao adulterou o auditado);
+#   - FLAGS no app.asar: allowPrerelease=false -> channel=latest -> allowDowngrade=false
+#     (+ autoDownload/autoInstallOnAppQuit/forceDevUpdateConfig=false; rejeita canary).
+# NAO publica release; NAO toca Worker/Firebase/Firestore/Rules/Cloudflare/Android.
 # Execucao SOMENTE manual (workflow_dispatch).
 # =====================================================================
-name: "[manual] Desktop Build (Windows)"
+name: "[manual] F3.4.3E Desktop Build (stable 1.0.180)"
 
 "on":
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (default: desktop/local-1.0.77-cronograma-client-flow-phase1)"
+        description: "Branch/commit a buildar (ex.: desktop/f343-background-notifications-hotfix)"
         required: true
-        default: "desktop/local-1.0.77-cronograma-client-flow-phase1"
+        default: "desktop/f343-background-notifications-hotfix"
 
 permissions:
   contents: read
@@ -30,13 +39,13 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      # F3.3.70D3R10I — rotulo derivado do package.json (passo "Derivar versao"); nada hardcoded.
-      DIST_BASENAME: ""
+      BASE_SHA: "9444e7fab945956258a45cfcebb00bbd87e72447" # ESTAVEL 1.0.178 (baseline F3.4.3)
     steps:
-      - name: Checkout (ref escolhido)
+      - name: Checkout (ref escolhido; history completo p/ baseline)
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
 
       - name: Derivar versao (package.json e a fonte unica)
         run: |
@@ -44,6 +53,7 @@ jobs:
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
           echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-$APP_VERSION" >> "$GITHUB_ENV"
           echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.180" ] || { echo "::error:: versao != 1.0.180 (build ESTAVEL exige a versao exata)"; exit 1; }
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -54,172 +64,194 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: npm install --no-audit --no-fund
 
-      - name: TypeScript build (main + preload)
+      - name: TypeScript build (main + preload + updaterService)
         working-directory: ${{ env.APP_DIR }}
         run: npm run build
 
-      - name: electron-builder (NSIS + MSI)
+      - name: Gate F3.4.3 region-invariance (fonte vs ESTAVEL 1.0.178 @9444e7f; versao 1.0.180)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f343-hotfix-region-invariance.test.mjs
+
+      - name: Gate Golden Master (slaRules ≡ renderer 1.0.178, valor-a-valor 219/0)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f343-sla-golden-master.test.mjs
+
+      - name: Gate F3.4.3E contrato (atribuicao limpa + trava por setor + flag consumida/limpa — 44/0)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f343d-designer-assignment-reauth-audit.test.mjs
+
+      - name: Gate preservacao (guard-rails; Worker/Android byte-identicos; sem polling/powerSaveBlocker)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f343-preservation.test.mjs
+
+      - name: Gate maquina de estados do updater (sem identidades; updater intocado vs 1.0.178)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f341a-updater-state-machine.test.mjs
+
+      - name: electron-builder (NSIS + MSI + metadata do MESMO build)
         working-directory: ${{ env.APP_DIR }}
         run: npx electron-builder --win nsis msi --publish never
 
-      - name: Gate tray icon empacotado (F3.3.22/F3.3.70D3R10I)
+      - name: Gate tray icon empacotado
         working-directory: ${{ env.APP_DIR }}
         run: |
           if [ -f "dist-installer/win-unpacked/resources/icon.png" ]; then
             echo "resources/icon.png OK (tray tera icone)"
           else
-            echo "::error:: resources/icon.png AUSENTE no pacote — tray ficaria invisivel (nativeImage.createEmpty)."
-            ls -la dist-installer/win-unpacked/resources/ 2>/dev/null || true
-            exit 1
+            echo "::error:: resources/icon.png AUSENTE no pacote"; exit 1
           fi
 
-      - name: Gate prova-de-versao (sem versao stale/hardcoded no renderer empacotado)
+      - name: Gate metadata de update (CANAL LATEST — latest.yml + blockmap + app-update.yml do MESMO build)
         working-directory: ${{ env.APP_DIR }}
         run: |
-          # F3.3.70D3R10U — NO-GO absoluto: 1.0.146-149 em qualquer lugar do renderer
-          # empacotado, e qualquer rotulo literal "Desktop 1\.0\.<n>" / "Versao 1.0.<n>"
-          # (a versao real deriva de app.getVersion em runtime; literal = regressao).
-          # HONESTIDADE DO GATE: o renderer real vive DENTRO de app.asar — a versao
-          # anterior deste gate grepava app*/src/renderer (que nao existe com asar) e
-          # PASSAVA EM BRANCO. Agora extrai o asar e FALHA se o renderer nao for achado.
-          set +e
-          RDIR=""
+          set -e
+          LY="dist-installer/latest.yml"
+          if [ ! -f "$LY" ]; then
+            echo "::error:: latest.yml NAO gerado (channel do publish != latest?). PARAR E REPORTAR."
+            ls -la dist-installer || true; exit 1
+          fi
+          if [ -f "dist-installer/canary.yml" ]; then echo "::error:: canary.yml TAMBEM gerado — canal ambiguo. PARAR E REPORTAR."; exit 1; fi
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap 2>/dev/null | head -1)
+          test -n "$BM" || { echo "::error:: <exe>.blockmap NAO gerado"; exit 1; }
+          AU="dist-installer/win-unpacked/resources/app-update.yml"
+          test -f "$AU" || { echo "::error:: app-update.yml NAO empacotado"; exit 1; }
+          echo "===== latest.yml ====="; cat "$LY"
+          echo "===== app-update.yml ====="; cat "$AU"
+          EXE_PATH=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          EXE_NAME=$(basename "$EXE_PATH")
+          grep -q "version: $APP_VERSION" "$LY" || { echo "::error:: latest.yml version != $APP_VERSION"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "$LY" || { echo "::error:: latest.yml path nao aponta para $EXE_NAME"; exit 1; }
+          grep -qF "url: $EXE_NAME" "$LY" || { echo "::error:: latest.yml files[].url != $EXE_NAME"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "$LY" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "$EXE_PATH" | openssl base64 -A)
+          { [ -n "$META_SHA512" ] && [ "$META_SHA512" = "$CALC_SHA512" ]; } || { echo "::error:: sha512 do latest.yml != sha512 do EXE"; echo "meta=$META_SHA512"; echo "calc=$CALC_SHA512"; exit 1; }
+          META_SIZE=$(grep -E 'size:' "$LY" | head -1 | grep -oE '[0-9]+' | head -1)
+          CALC_SIZE=$(wc -c < "$EXE_PATH" | tr -d ' ')
+          [ "$META_SIZE" = "$CALC_SIZE" ] || { echo "::error:: size do latest.yml ($META_SIZE) != size do EXE ($CALC_SIZE)"; exit 1; }
+          [ "$(basename "$BM")" = "${EXE_NAME}.blockmap" ] || { echo "::error:: blockmap ($BM) nao corresponde ao EXE ($EXE_NAME)"; exit 1; }
+          grep -q "provider: github" "$AU" || { echo "::error:: app-update.yml provider != github"; exit 1; }
+          grep -q "owner: agidseven-lang" "$AU" || { echo "::error:: app-update.yml owner errado"; exit 1; }
+          grep -q "repo: Agenda" "$AU" || { echo "::error:: app-update.yml repo errado"; exit 1; }
+          if grep -qiE '(token|secret|password|gh_token|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml contem possivel segredo"; exit 1; fi
+          echo "GATE metadata ESTAVEL OK: latest.yml (version/path/url/sha512/size/blockmap conferem) + app-update.yml github SEM segredo; canary.yml AUSENTE (canal isolado)."
+
+      - name: Gate prova-de-versao (package.json empacotado == 1.0.180) + renderer EMPACOTADO == fonte do commit
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
           ASAR="dist-installer/win-unpacked/resources/app.asar"
-          if [ -f "$ASAR" ]; then
-            EXDIR="$RUNNER_TEMP/asar-extract"
-            rm -rf "$EXDIR"; mkdir -p "$EXDIR"
-            npx --yes @electron/asar extract "$ASAR" "$EXDIR"
-            if [ $? -ne 0 ]; then echo "::error:: falha ao extrair app.asar para o gate"; exit 1; fi
-            RDIR="$EXDIR/src/renderer"
-          else
-            for d in dist-installer/win-unpacked/resources/app*/src/renderer; do
-              if [ -d "$d" ]; then RDIR="$d"; break; fi
-            done
-          fi
-          if [ ! -d "$RDIR" ] || [ ! -f "$RDIR/index.html" ]; then
-            echo "::error:: renderer empacotado NAO encontrado (asar/app) — gate nao pode passar em branco."
-            ls -la dist-installer/win-unpacked/resources/ 2>/dev/null
-            exit 1
-          fi
-          echo "renderer real localizado: $RDIR"
-          PAT='1\.0\.14[6-9]|Desktop 1\.0\.[0-9]+|Vers..?o 1\.0\.[0-9]+'
-          FOUND=$(grep -rlE "$PAT" "$RDIR" 2>/dev/null)
-          if [ -n "$FOUND" ]; then
-            echo "::error:: rotulo de versao stale/hardcoded no renderer empacotado: $FOUND"
-            grep -rnE "$PAT" $FOUND 2>/dev/null | head -8
-            exit 1
-          fi
-          echo "renderer sem 1.0.146-149 e sem 'Desktop/Versao 1.0.<n>' literal — versao deriva de app.getVersion."
+          test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"
+          npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          # (a) prova-de-versao: a versao EXIBIDA vem do package.json empacotado (fonte unica).
+          PKGV=$(node -p "require('$EXDIR/package.json').version")
+          [ "$PKGV" = "1.0.180" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.180"; exit 1; }
+          # (b) renderer EMPACOTADO byte-identico a FONTE do commit buildado (build nao adulterou o auditado).
+          EXIDX="$EXDIR/src/renderer/index.html"
+          test -f "$EXIDX" || { echo "::error:: renderer nao encontrado no asar"; exit 1; }
+          git show ${GITHUB_SHA}:desktop/src/renderer/index.html > "$RUNNER_TEMP/src-index.html"
+          EXIDX="$EXIDX" SRC="$RUNNER_TEMP/src-index.html" node -e '
+            const fs=require("fs"); const nrm=s=>String(s).replace(/\r\n/g,"\n");
+            const a=nrm(fs.readFileSync(process.env.EXIDX,"utf8"));
+            const b=nrm(fs.readFileSync(process.env.SRC,"utf8"));
+            if(a!==b){console.error("renderer EMPACOTADO != fonte do commit buildado");process.exit(1);}
+            console.log("renderer EMPACOTADO == fonte auditada (byte-identico).");
+          '
+          test -f "$EXDIR/dist/main/updaterService.js" || { echo "::error:: updaterService.js ausente no asar"; exit 1; }
+          grep -q "createUpdaterService" "$EXDIR/dist/main/main.js" || { echo "::error:: wiring do updater ausente no main.js empacotado"; exit 1; }
+          echo "GATE prova-de-versao (1.0.180) + renderer==fonte OK."
 
-      - name: Empacotar bundle (instalador + relatorios)
+      - name: Gate FLAGS do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade + 6 flags)
         working-directory: ${{ env.APP_DIR }}
         run: |
-          set +e
-          OUT="$GITHUB_WORKSPACE/dist-pkg"
-          mkdir -p "$OUT"
-          # Copia instaladores (nome vem do electron-builder.yml artifactName)
-          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*.exe 2>/dev/null | head -1)
-          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*.msi 2>/dev/null | head -1)
-          if [ -z "$EXE" ]; then echo "::error::instalador .exe nao gerado"; exit 1; fi
-          cp "$EXE" "$OUT/"
-          [ -n "$MSI" ] && cp "$MSI" "$OUT/"
-          EXE_NAME=$(basename "$EXE")
-          MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo "")
+          set -e
+          US="$RUNNER_TEMP/asarx/dist/main/updaterService.js"
+          test -f "$US" || { echo "::error:: updaterService.js ausente no app.asar extraido"; exit 1; }
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowPrerelease != false no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" || { echo "::error:: channel != latest no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowDowngrade != false no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.autoDownload[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: autoDownload != false no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.autoInstallOnAppQuit[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: autoInstallOnAppQuit != false no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.forceDevUpdateConfig[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: forceDevUpdateConfig != false no app.asar"; exit 1; }
+          if grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"canary"' "$US"; then echo "::error:: channel=canary presente no build ESTAVEL — canal ambiguo"; exit 1; fi
+          LP=$(grep -nE 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" | head -1 | cut -d: -f1)
+          LC=$(grep -nE 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" | head -1 | cut -d: -f1)
+          LD=$(grep -nE 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" | head -1 | cut -d: -f1)
+          { [ -n "$LP" ] && [ -n "$LC" ] && [ -n "$LD" ] && [ "$LP" -lt "$LC" ] && [ "$LC" -lt "$LD" ]; } || { echo "::error:: ordem incorreta: exige allowPrerelease($LP) < channel($LC) < allowDowngrade($LD)"; exit 1; }
+          echo "===== flags no updaterService.js EMPACOTADO ====="
+          grep -nE 'allowPrerelease|autoUpdater\.channel|allowDowngrade|autoDownload|autoInstallOnAppQuit|forceDevUpdateConfig' "$US" | head -20
+          echo "GATE flags no app.asar OK: allowPrerelease=false ($LP) -> channel=latest ($LC) -> allowDowngrade=false ($LD) + 3 flags."
+
+      - name: Empacotar bundle (instalador + metadata + relatorios + hashes)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"
+          cp dist-installer/latest.yml "$OUT/"
+          cp "$BM" "$OUT/"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo "")
+          BM_NAME=$(basename "$BM")
           EXE_SHA=$(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')
           MSI_SHA=$([ -n "$MSI" ] && sha256sum "$OUT/$MSI_NAME" | awk '{print $1}' || echo "")
-          # VERSAO-DESKTOP.txt — prova do que esta dentro
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" > SHA256SUMS )
           {
             echo "productName : Agenda ID Seven Desktop"
             echo "versionName : $APP_VERSION"
+            echo "channel     : latest"
+            echo "allowPrerelease : false"
+            echo "allowDowngrade  : false"
             echo "appId       : br.com.idseven.agenda.desktop"
             echo "instalador  : $EXE_NAME"
             echo "SHA-256 exe : $EXE_SHA"
-            if [ -n "$MSI_NAME" ]; then
-              echo "instalador2 : $MSI_NAME"
-              echo "SHA-256 msi : $MSI_SHA"
-            fi
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $MSI_SHA"
+            echo "metadata    : latest.yml + $BM_NAME (MESMO build); app-update.yml SOMENTE dentro do pacote"
             echo "commit      : $GITHUB_SHA"
             echo "ref         : ${{ github.event.inputs.ref }}"
-            echo "espelha APK : 1.0.64-beta-build-artifact-version-fix"
+            echo "baseline    : ESTAVEL 1.0.178 @ $BASE_SHA (invariancia region-scoped F3.4.3 verificada)"
+            echo "origem      : promocao do rc.2 fisicamente aprovado (818fa13) + apenas o numero de versao"
           } > "$OUT/VERSAO-DESKTOP.txt"
-          # RELATORIO-DESKTOP.txt — checagens
           {
-            echo "===== RELATORIO DESKTOP - Agenda ID Seven Desktop ====="
+            echo "===== RELATORIO DESKTOP (F3.4.3E estavel 1.0.180) ====="
             echo "Gerado (UTC) : $(date -u)"
             echo "Ref / commit : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
             echo ""
-            echo "----- Arquivos no instalador package -----"
-            ls -lh "$OUT"
-            echo ""
-            echo "----- Conferencia de versao -----"
-            cat "$OUT/VERSAO-DESKTOP.txt"
+            echo "----- Arquivos no package -----"; ls -lh "$OUT"
+            echo ""; echo "----- VERSAO-DESKTOP -----"; cat "$OUT/VERSAO-DESKTOP.txt"
+            echo ""; echo "----- latest.yml -----"; cat "$OUT/latest.yml"
+            echo ""; echo "----- app-update.yml (dentro do pacote) -----"; cat dist-installer/win-unpacked/resources/app-update.yml
           } > "$OUT/RELATORIO-DESKTOP.txt"
-          # INSTRUCOES-INSTALACAO-DESKTOP.txt (printf para nao quebrar a YAML)
-          printf '%s\n' \
-            "==== COMO INSTALAR - Agenda ID Seven Desktop (Windows) ====" \
-            "" \
-            "*** IMPORTANTE - ANTES DE INSTALAR (correcao 1.0.77) ***" \
-            "- Se ja existe uma versao instalada, FECHE-A PELA BANDEJA:" \
-            "  clique direito no icone na bandeja (perto do relogio) -> 'Sair'." \
-            "- O app mora na bandeja; clicar no X apenas esconde, NAO encerra," \
-            "  e a versao antiga travava os arquivos, impedindo a atualizacao" \
-            "  (era a causa de continuar aparecendo 1.0.66)." \
-            "- A partir do 1.0.77 o instalador ja ENCERRA a versao antiga" \
-            "  automaticamente, mas fechar pela bandeja antes garante 100%." \
-            "" \
-            "1) Baixe o instalador (.exe ou .msi). PREFIRA o .exe." \
-            "2) De dois cliques. Se o Windows SmartScreen avisar:" \
-            "   - clique em 'Mais informacoes' -> 'Executar assim mesmo'." \
-            "   - O app NAO esta assinado com certificado de empresa nesta fase" \
-            "     (mesma situacao do APK x Play Protect - esperado em beta)." \
-            "3) Marque 'Criar atalho na area de trabalho' se desejar." \
-            "4) Apos instalar, abra o app pelo menu Iniciar ou icone." \
-            "5) Faca login com a mesma conta do celular." \
-            "" \
-            "==== TRAY (BANDEJA) e NOTIFICACOES ====" \
-            "- Fechar a janela (X) ENVIA o app para a bandeja (nao encerra)." \
-            "- Para reabrir: duplo clique no icone na bandeja." \
-            "- Para encerrar de verdade: clique direito no icone -> Sair." \
-            "- As notificacoes funcionam enquanto o app estiver aberto, minimizado" \
-            "  ou na bandeja. Se voce 'Sair', param ate reabrir." \
-            "" \
-            "==== INICIAR COM O WINDOWS ====" \
-            "- Marque na bandeja: 'Iniciar com o Windows'." \
-            "- O app sobe oculto na bandeja a cada login do Windows." \
-            "- Garante notificacoes confiaveis sem precisar abrir manualmente." \
-            "" \
-            "==== O QUE NOTIFICA ====" \
-            "- Nova tarefa atribuida a voce." \
-            "- Novo compromisso criado para voce." \
-            "- Lembrete: 1 hora antes do compromisso." \
-            "- Clique na notificacao abre a tela certa do app." \
-            "" \
-            "==== SINCRONIZACAO COM O CELULAR ====" \
-            "- Mesma base Firebase do APK. Criar/mover no Desktop reflete no celular" \
-            "  em tempo real, e vice-versa." \
-            "" \
-            "==== LIMITACOES CONHECIDAS NESTA FASE ====" \
-            "- Push com o app totalmente encerrado (igual FCM do Android) exige" \
-            "  backend dedicado para Desktop - sera tratado em fase futura." \
-            "- Lembrete pode chegar tambem no celular (cada dispositivo lembra)." \
-            "- Sem certificado de codigo: SmartScreen avisa na primeira instalacao." \
-            > "$OUT/INSTRUCOES-INSTALACAO-DESKTOP.txt"
-          # ZIP de distribuicao
-          (cd "$OUT" && powershell -Command "Compress-Archive -Path * -DestinationPath ../${DIST_BASENAME}.zip -Force")
-          mv "$GITHUB_WORKSPACE/${DIST_BASENAME}.zip" "$OUT/${DIST_BASENAME}.zip" 2>/dev/null || true
-          ls -lh "$OUT"
-          echo "== VERSAO-DESKTOP =="; cat "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
 
       - name: Upload installer (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-installer
-          path: dist-pkg/Agenda-ID-Seven-Desktop-*.*
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload bundle (ZIP com instaladores + relatorios)
+      - name: Upload update-metadata (latest.yml + blockmap + SHA256SUMS + relatorios)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/VERSAO-DESKTOP.txt
+            dist-pkg/RELATORIO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload bundle (tudo)
         if: always()
         uses: actions/upload-artifact@v4
         with:
