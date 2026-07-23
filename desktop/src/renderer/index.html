@@ -2886,6 +2886,10 @@ function resolveTaskDisplayState(t,now,dtMsFn){
   // PANEL-CORE é extraído isolado (teste), slaCfgOf não existe → mantém as constantes 30/10.
   var _WARN=SLA_PANEL_WARN_MS, _GRACE=SLA_PANEL_GRACE_MS;
   try{ if(typeof slaCfgOf==='function'){ var _c=slaCfgOf(t); if(_c){ _WARN=(_c.warningMinutes||30)*60000; _GRACE=(_c.overdueGraceMinutes||10)*60000; } } }catch(_e){}
+  // F3.4.5 — ABERTURA REAL da janela concedida ao Designer (designerSla.planStartAt; fallback
+  // designerAssignment.startDate/startTime): o AMARELO jamais antecede o início planejado. Sem
+  // início registrado (_START=0), max(x,0)=x ⇒ comportamento aprovado BYTE-idêntico.
+  var _START=0; try{ var _dsS=(t&&t.designerSla)||{}; _START=Number(_dsS.planStartAt)||0; if(!(_START>0)){ var _daS=(t&&t.designerAssignment)||{}; var _fS=dtMsFn||(typeof dtMs==='function'?dtMs:null); if(_daS.startDate&&typeof _fS==='function'){ _START=Number(_fS(_daS.startDate,_daS.startTime||'00:00'))||0; } } if(!(_START>0)) _START=0; }catch(_eS){ _START=0; }
   if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,label:'Concluído',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(!hasSla||!finishMs)   return {sev:'neutro',state:'none',finishMs:finishMs,label:'',remainingMin:0,overdueMin:0,graceRemainingMin:0,remainingMs:0,overdueMs:0,graceRemainingMs:0,critical:false,hasSla:hasSla,inPanel:false};
   if(now>=finishMs){ var over=Math.max(1,Math.round((now-finishMs)/60000));
@@ -2896,7 +2900,7 @@ function resolveTaskDisplayState(t,now,dtMsFn){
     var graceLeft=Math.max(0,Math.round((finishMs+_GRACE-now)/60000));
     var critical=(now>=finishMs+_GRACE);
     return {sev:'vermelho',state:'overdue',finishMs:finishMs,label:'Prazo encerrado',remainingMin:0,overdueMin:over,graceRemainingMin:graceLeft,remainingMs:0,overdueMs:(now-finishMs),graceRemainingMs:Math.max(0,finishMs+_GRACE-now),critical:critical,hasSla:true,inPanel:true}; }
-  if(now>=finishMs-_WARN){ var left=Math.max(1,Math.round((finishMs-now)/60000));
+  if(now>=Math.max(finishMs-_WARN,_START)){ var left=Math.max(1,Math.round((finishMs-now)/60000));
     return {sev:'laranja',state:'warning',finishMs:finishMs,label:'Prazo próximo',remainingMin:left,overdueMin:0,graceRemainingMin:0,remainingMs:Math.max(0,finishMs-now),overdueMs:0,graceRemainingMs:0,critical:false,hasSla:true,inPanel:true}; }
   var rem=Math.max(1,Math.round((finishMs-now)/60000));
   return {sev:'azul',state:'running',finishMs:finishMs,label:'Em prazo',remainingMin:rem,overdueMin:0,graceRemainingMin:0,remainingMs:Math.max(0,finishMs-now),overdueMs:0,graceRemainingMs:0,critical:false,hasSla:true,inPanel:false};
@@ -2960,9 +2964,11 @@ function resolveCanonicalSlaTimeline(t,dtMsFn){
   var cfg=(typeof slaCfgOf==='function')?slaCfgOf(t):slaCfgDefault();
   var dueAtMs=(typeof slaPanelFinishMs==='function')?(slaPanelFinishMs(t,f)||0):0;
   var warnMin=(cfg&&cfg.warningMinutes)||30, graceMin=(cfg&&cfg.overdueGraceMinutes)||10;
+  // F3.4.5 — mesma abertura real da janela usada por resolveTaskDisplayState (clamp do amarelo).
+  var _START=0; try{ var _dsS=(t&&t.designerSla)||{}; _START=Number(_dsS.planStartAt)||0; if(!(_START>0)){ var _daS=(t&&t.designerAssignment)||{}; if(_daS.startDate&&typeof f==='function'){ _START=Number(f(_daS.startDate,_daS.startTime||'00:00'))||0; } } if(!(_START>0)) _START=0; }catch(_eS){ _START=0; }
   var tz=''; try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone||''; }catch(_){}
   return { dueAtMs:dueAtMs,
-    warningAtMs:dueAtMs?(dueAtMs-warnMin*60000):0,   // AMARELO: prazo final − warningMinutes
+    warningAtMs:dueAtMs?Math.min(Math.max(dueAtMs-warnMin*60000,_START),dueAtMs):0,   // AMARELO: max(prazo final − warningMinutes, INÍCIO planejado) — F3.4.5: nunca antes da abertura real
     overdueAtMs:dueAtMs,                              // VERMELHO: no PRAZO FINAL (planDueAt)
     criticalAtMs:dueAtMs?(dueAtMs+graceMin*60000):0, // fim da tolerância (setores com critical)
     warningMinutes:warnMin, overdueGraceMinutes:graceMin,

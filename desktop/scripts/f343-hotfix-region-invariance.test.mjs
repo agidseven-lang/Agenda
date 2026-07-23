@@ -54,13 +54,17 @@ function authorized(rel) {
   // f344-hotfix-region-invariance.test.mjs (baseline 68598fa).
   if (/^desktop\/scripts\/f344[a-z0-9-]*\.test\.mjs$/.test(rel)) return true;
   if (/^desktop\/scripts\/fixtures\/f344\//.test(rel)) return true;
+  // F3.4.5 — hotfix do timestamp da amarela: testes/fixtures próprios (o conteúdo das FONTES segue
+  // gateado byte-a-byte pelo delta AUTORIZADO em f345-hotfix-region-invariance.test.mjs @e4692c9).
+  if (/^desktop\/scripts\/f345[a-z0-9-]*\.test\.mjs$/.test(rel)) return true;
+  if (/^desktop\/scripts\/fixtures\/f345\//.test(rel)) return true;
   return false;
 }
 
 /* ── 1) versão: PERMITE somente o candidato ESTÁVEL exato 1.0.181 (F3.4.4A — promoção da rc.1 aprovada) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.181 (candidato ESTÁVEL exato do F3.4.4A)', pj.version === '1.0.181');
+  ok('1 package.json version === 1.0.182 (candidato ESTÁVEL exato do F3.4.5)', pj.version === '1.0.182');
 }
 
 /* ── 2) git diff --name-only 9444e7f -- desktop: TODA mudança rastreada deve ser AUTORIZADA ── */

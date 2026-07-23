@@ -22,6 +22,7 @@
  * ===================================================================================== */
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url'; import { createRequire } from 'module';
 import { execFileSync } from 'child_process';
+import { applyF345SlaDelta } from './fixtures/f345/authorized-delta.mjs'; // F3.4.5 — delta AUTORIZADO do clamp planStartAt
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
@@ -343,10 +344,12 @@ function move(t, axis, to, by, at) {
     ok('C byte: blocos u1+u1b do notifier VERBATIM (azul única preservada)', CUR_NOTIF.indexOf(U1U1B) >= 0);
     ok('C byte: bloco u2 (events) VERBATIM', CUR_NOTIF.indexOf(U2) >= 0);
   }
-  // slaRules: TODO o conteúdo SLA pré-existente é PREFIXO byte-idêntico (F3.4.4 é aditivo)
+  // slaRules: TODO o conteúdo SLA pré-existente é PREFIXO byte-idêntico — F3.4.5 re-ancora: a base
+  // 68598fa recebe SOMENTE o delta AUTORIZADO do hotfix do timestamp da amarela (clamp planStartAt,
+  // fonte única fixtures/f345/authorized-delta.mjs); QUALQUER outro byte na região SLA reprova.
   {
     const basePrefix = BASE_RULES.slice(0, BASE_RULES.indexOf('module.exports = {'));
-    ok('C byte: slaRules SLA intacto (F3.4.4 puramente aditivo antes de module.exports)', CUR_RULES.indexOf(basePrefix) === 0);
+    ok('C byte: slaRules SLA intacto (F3.4.4 aditivo + delta AUTORIZADO F3.4.5, nada mais)', CUR_RULES.indexOf(applyF345SlaDelta(basePrefix)) === 0);
   }
   // dedupe NOVO nunca colide com chaves legadas persistidas (formatos disjuntos)
   ok('C formatos disjuntos: identidade nova sempre contém ">" e o legado nunca', 'flow_production_started:T1:awaiting_designer>designer_producing:D1:1:h1:c0'.indexOf('>') > 0 && 'flow_production_started:T1:designer_producing'.indexOf('>') < 0);
