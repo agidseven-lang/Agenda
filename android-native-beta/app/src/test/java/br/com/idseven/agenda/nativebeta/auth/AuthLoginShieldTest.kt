@@ -26,7 +26,20 @@ class AuthLoginShieldTest {
 
     private val SRC = "src/main/java/br/com/idseven/agenda/nativebeta"
 
-    // Arquivos do CAMINHO DE LOGIN ativo (nao pode tocar users/Crypto/hash/salt).
+    /**
+     * Remove comentarios (bloco e linha) para varrer SOMENTE CODIGO — a documentacao pode citar
+     * "Crypto.verify"/"users" ao explicar o que foi REMOVIDO sem reintroduzir o padrao proibido.
+     * (Trunca "//" tambem em URLs, mas o scan busca Crypto/users/pass/salt/Intent, nao esquemas.)
+     */
+    private fun codeOnly(src: String): String {
+        val noBlock = src.replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), " ")
+        return noBlock.lines().joinToString("\n") { line ->
+            val idx = line.indexOf("//")
+            if (idx >= 0) line.substring(0, idx) else line
+        }
+    }
+
+    // Arquivos do CAMINHO DE LOGIN ativo (nao pode tocar users/Crypto/hash/salt) — SO codigo.
     private val loginPath by lazy {
         listOf(
             "$SRC/data/auth/ServerAuthRepository.kt",
@@ -37,6 +50,14 @@ class AuthLoginShieldTest {
             "$SRC/data/session/SessionManager.kt",
             "$SRC/data/session/SessionBootstrapper.kt",
             "$SRC/features/auth/LoginViewModel.kt",
+        ).associateWith { codeOnly(locate(it)) }
+    }
+
+    // Versao com texto integral (comentarios inclusos) — para asserts de PRESENCA de codigo esperado.
+    private val loginPathRaw by lazy {
+        listOf(
+            "$SRC/data/auth/ServerAuthRepository.kt",
+            "$SRC/data/auth/AuthApiClient.kt",
         ).associateWith { locate(it) }
     }
 
@@ -67,7 +88,7 @@ class AuthLoginShieldTest {
         }
     }
 
-    // 14. token nunca vai a log: as classes de auth/sessao nao usam android.util.Log.
+    // 14. token nunca vai a log: as classes de auth/sessao nao usam android.util.Log (so codigo).
     @Test
     fun t14_semLogDeToken() {
         val sensitive = listOf(
@@ -76,7 +97,7 @@ class AuthLoginShieldTest {
             "$SRC/data/session/SessionManager.kt",
             "$SRC/data/session/SecureSessionStore.kt",
             "$SRC/data/session/SessionCipher.kt",
-        ).associateWith { locate(it) }
+        ).associateWith { codeOnly(locate(it)) }
         sensitive.forEach { (name, body) ->
             assertFalse("$name nao pode logar (evita vazar token)", body.contains("android.util.Log"))
             assertFalse("$name nao pode chamar Log.", Regex("(^|[^A-Za-z])Log\\.").containsMatchIn(body))
@@ -87,7 +108,7 @@ class AuthLoginShieldTest {
     @Test
     fun t15_semTokenEmIntentOuDeepLink() {
         loginPath.plus(
-            listOf("$SRC/data/session/SecureSessionStore.kt", "$SRC/data/session/SessionCipher.kt").associateWith { locate(it) },
+            listOf("$SRC/data/session/SecureSessionStore.kt", "$SRC/data/session/SessionCipher.kt").associateWith { codeOnly(locate(it)) },
         ).forEach { (name, body) ->
             assertFalse("$name nao pode usar Intent (evita token em Intent)", body.contains("Intent("))
             assertFalse("$name nao pode putExtra (evita token em Intent)", body.contains("putExtra"))
@@ -96,12 +117,13 @@ class AuthLoginShieldTest {
     }
 
     // reforca: ServerAuthRepository usa os endpoints REAIS via BuildConfig (loginUser/getUserSelf).
+    // Usa o texto BRUTO (codeOnly truncaria "https://" no "//").
     @Test
     fun tEndpoints_usaBuildConfigReal() {
-        val repo = loginPath.entries.first { it.key.endsWith("ServerAuthRepository.kt") }.value
+        val repo = loginPathRaw.entries.first { it.key.endsWith("ServerAuthRepository.kt") }.value
         assertTrue(repo.contains("BuildConfig.AUTH_LOGIN_URL"))
         assertTrue(repo.contains("BuildConfig.AUTH_SELF_URL"))
-        val client = loginPath.entries.first { it.key.endsWith("AuthApiClient.kt") }.value
+        val client = loginPathRaw.entries.first { it.key.endsWith("AuthApiClient.kt") }.value
         assertTrue("HTTPS obrigatorio (fail-closed)", client.contains("startsWith(\"https://\")"))
     }
 
