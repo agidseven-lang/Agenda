@@ -29,17 +29,9 @@ object Crypto {
         return sb.toString()
     }
 
-    // djb2 idêntico ao web: h=5381; h=((h<<5)+h+code)|0 ; return "h"+(h>>>0)
-    private fun legacyHashPass(s: String): String {
-        var h = 5381
-        for (c in s) h = (h shl 5) + h + c.code
-        val unsigned = h.toLong() and 0xFFFFFFFFL
-        return "h$unsigned"
-    }
-
-    fun verify(pass: String?, salt: String?, pw: String): Boolean {
-        if (pass == null) return false
-        return if (salt != null && pass.startsWith("s2:")) pass == hashPw(pw, salt)
-        else pass == legacyHashPass(pw)
-    }
+    // F4.2B — REMOVIDO: verify() e legacyHashPass(). Eram usados SOMENTE pela autenticacao
+    // client-side (AuthRepo.login/changePassword), agora server-side. NENHUMA verificacao de senha
+    // ocorre mais no aparelho. hashPw()/randSalt() permanecem apenas para o CADASTRO (register),
+    // que cria a conta com o mesmo esquema do PWA por nao existir endpoint server-side de criacao
+    // de conta (documentado; fora do fluxo de LOGIN).
 }

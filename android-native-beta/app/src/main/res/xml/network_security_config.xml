@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F4.2B — Trafego em texto claro (HTTP) PROIBIDO em todo o app. A autenticacao server-side
+  (loginUser/getUserSelf/changePassword) e todo o trafego so ocorrem por HTTPS. Reforca o
+  usesCleartextTraffic="false" do manifest e o fail-closed do AuthApiClient (rejeita URL nao-https).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

@@ -1,7 +1,19 @@
-# Build do APK do app SaaS NATIVO BETA (Kotlin + Jetpack Compose) em /android-native-beta.
-# App em PARALELO ao PWA e ao app aprovado — package br.com.idseven.agenda.nativebeta.
-# Fase 0: app limpo (abre + tela smoke + proteção contra crash). Firebase entra na Fase 1.
-# Redisparo manual de CI: 1.0.14 (commit 23a0bb6 não acionou o workflow automaticamente).
+# =====================================================================
+# [F4.2B] Build Android Nativo Beta (SaaS) — APK PRIVADO de QA
+# ---------------------------------------------------------------------
+# Copia do branch do workflow REGISTRADO (dispatch com ref=<branch> executa ESTA copia).
+# Nesta branch (android/f42b-server-auth-secure-session) o build:
+#   - compila o CODIGO DO REF despachado (checkout sem ref fixo → github.sha do dispatch);
+#   - GATE de versao (versionCode 127 estritamente > 126; versionName 1.0.147-beta-auth-server-session);
+#   - restaura google-services.json (secret) — necessario ao plugin google-services;
+#   - roda os 33 testes JVM de autenticacao/sessao (br.com.idseven.agenda.nativebeta.auth.*),
+#     inclusive o GATE DE BLINDAGEM (login sem users/Crypto/hash/salt; token nao vaza);
+#   - GATE de region-invariance (so android-native-beta/** + este workflow mudam vs a baseline
+#     congelada d940a29; Desktop/Worker/Firestore/Rules/Functions intocados);
+#   - assembleRelease (APK assinado com o keystore de TESTE — QA privado, nao Play);
+#   - calcula SHA-256 do APK + relatorio; publica ARTIFACT PRIVADO (retencao 14 dias).
+# NAO gera AAB. NAO cria release. NAO publica. NAO distribui. NO-GO para producao ate F4.2C.
+# =====================================================================
 name: Build Android Nativo Beta (SaaS)
 
 on:
@@ -18,9 +30,41 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      BASELINE_SHA: "d940a2981126961a153583b1e96fd58510117e74"
+      EXPECT_VERSION_CODE: "127"
+      EXPECT_VERSION_NAME: "1.0.147-beta-auth-server-session"
     steps:
-      - name: Checkout
+      - name: Checkout (ref despachado; history completo p/ o gate de baseline)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gate de versao (versionCode monotonico + versionName exato)
+        run: |
+          set -euo pipefail
+          GRADLE="android-native-beta/app/build.gradle"
+          VC=$(grep -oE 'versionCode [0-9]+' "$GRADLE" | awk '{print $2}')
+          VN=$(grep -oE 'versionName "[^"]+"' "$GRADLE" | sed -E 's/versionName "(.*)"/\1/')
+          echo "versionCode=$VC versionName=$VN"
+          [ "$VC" = "$EXPECT_VERSION_CODE" ] || { echo "::error::versionCode=$VC != $EXPECT_VERSION_CODE"; exit 1; }
+          [ "$VC" -gt 126 ] || { echo "::error::versionCode nao e estritamente > 126"; exit 1; }
+          [ "$VN" = "$EXPECT_VERSION_NAME" ] || { echo "::error::versionName=$VN != $EXPECT_VERSION_NAME"; exit 1; }
+          grep -q 'applicationId "br.com.idseven.agenda.nativebeta"' "$GRADLE" || { echo "::error::applicationId alterado (deve permanecer nativebeta nesta fase)"; exit 1; }
+
+      - name: Gate region-invariance (so android-native-beta/** + este workflow vs baseline d940a29)
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASELINE_SHA" HEAD || true)
+          echo "=== arquivos alterados vs baseline ==="; echo "$CHANGED"
+          BAD=$(echo "$CHANGED" | grep -v '^android-native-beta/' | grep -v '^.github/workflows/build-android-native-beta.yml$' || true)
+          if [ -n "$BAD" ]; then echo "::error::mudanca FORA de android-native-beta/**: $BAD"; exit 1; fi
+          # Desktop / Worker / Firestore Rules / Functions intocados (se existirem na arvore da baseline).
+          for p in "desktop" "cloudflare-worker.js" "wrangler.toml" "functions" "scripts/patch-firestore-password-reset-rules.mjs"; do
+            D=$(git diff --name-only "$BASELINE_SHA" HEAD -- "$p" || true)
+            [ -z "$D" ] || { echo "::error::alteracao proibida em $p: $D"; exit 1; }
+          done
+          echo "OK: apenas Android (android-native-beta/**) + workflow mudaram; Desktop/Worker/Rules/Functions intocados."
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -46,21 +90,56 @@ jobs:
           GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
         run: |
           if [ -z "$GS_JSON" ]; then
-            echo "::error::Secret GOOGLE_SERVICES_JSON_BETA ausente — necessário pelo plugin google-services (Firebase) a partir da Fase 1."
+            echo "::error::Secret GOOGLE_SERVICES_JSON_BETA ausente — necessário pelo plugin google-services (Firebase)."
             exit 1
           fi
           printf '%s' "$GS_JSON" > android-native-beta/app/google-services.json
           echo "google-services.json gravado ($(wc -c < android-native-beta/app/google-services.json) bytes)."
 
-      - name: gradlew clean assembleRelease
+      - name: Testes JVM de auth/sessao (33) + gate de blindagem (login sem users/Crypto/hash/salt)
         working-directory: android-native-beta
         run: |
           chmod +x ./gradlew
+          ./gradlew testDebugUnitTest --tests "br.com.idseven.agenda.nativebeta.auth.*" --no-daemon --stacktrace
+
+      - name: gradlew clean assembleRelease (APK QA privado)
+        working-directory: android-native-beta
+        run: |
           ./gradlew clean assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK release (nome único por versão + commit)
+      - name: SHA-256 do APK + relatorio
+        run: |
+          set -euo pipefail
+          APK="android-native-beta/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK" || { echo "::error::APK nao gerado"; exit 1; }
+          OUT="dist-apk"; mkdir -p "$OUT"
+          cp "$APK" "$OUT/idseven-nativebeta-1.0.147-beta-auth-server-session.apk"
+          APK_SHA=$(sha256sum "$OUT/idseven-nativebeta-1.0.147-beta-auth-server-session.apk" | awk '{print $1}')
+          ( cd "$OUT" && sha256sum idseven-nativebeta-1.0.147-beta-auth-server-session.apk > SHA256SUMS )
+          {
+            echo "===== RELATORIO ANDROID (F4.2B — login server-side + sessao Keystore) ====="
+            echo "Gerado (UTC) : $(date -u)"
+            echo "Branch/commit: android/f42b-server-auth-secure-session @ $GITHUB_SHA"
+            echo "applicationId: br.com.idseven.agenda.nativebeta (preservado nesta fase)"
+            echo "versionCode  : 127"
+            echo "versionName  : 1.0.147-beta-auth-server-session"
+            echo "assinatura   : keystore de TESTE (QA privado; NAO Play/producao)"
+            echo "APK          : idseven-nativebeta-1.0.147-beta-auth-server-session.apk"
+            echo "SHA-256 APK  : $APK_SHA"
+            echo "Endpoints    : loginUser/getUserSelf/changePassword (Cloud Run, contrato Desktop 1.0.181)"
+            echo "STATUS       : NO-GO PARA PRODUCAO ate F4.2C (Firebase Custom Token + Firestore autenticado + Rules)"
+          } > "$OUT/RELATORIO-ANDROID.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+          cat "$OUT/RELATORIO-ANDROID.txt"
+
+      - name: Upload APK privado + hashes + relatorio (retencao 14 dias)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: idseven-nativebeta-1.0.14-beta-notify-debug-fix-${{ github.sha }}
-          path: android-native-beta/app/build/outputs/apk/release/app-release.apk
+          name: idseven-nativebeta-1.0.147-beta-auth-server-session-${{ github.sha }}
+          path: |
+            dist-apk/idseven-nativebeta-1.0.147-beta-auth-server-session.apk
+            dist-apk/SHA256SUMS
+            dist-apk/RELATORIO-ANDROID.txt
           if-no-files-found: error
+          retention-days: 14

@@ -12,8 +12,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 126
-        versionName "1.0.146-beta-board-rebuild"
+        versionCode 127
+        versionName "1.0.147-beta-auth-server-session"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
@@ -25,6 +25,17 @@ android {
         def _resetCnf = project.findProperty('PASSWORD_RESET_CONFIRM_URL') ?: ''
         buildConfigField "String", "PASSWORD_RESET_REQUEST_URL", "\"${_resetReq}\""
         buildConfigField "String", "PASSWORD_RESET_CONFIRM_URL", "\"${_resetCnf}\""
+
+        // F4.2B — Endpoints server-side REAIS de autenticacao (Cloud Run Gen2), os MESMOS
+        // usados pela Desktop oficial 1.0.181 (desktop/src/main/auth-core.ts @ e4692c9). NAO sao
+        // secret (o cliente Desktop os expoe); vem de configuracao de build AUDITAVEL, com default
+        // publico e override por -P (nunca repetidos em varias classes; nunca token/credencial).
+        def _loginUrl  = project.findProperty('AUTH_LOGIN_URL')           ?: 'https://loginuser-de36pi7vza-uc.a.run.app'
+        def _selfUrl   = project.findProperty('AUTH_SELF_URL')            ?: 'https://getuserself-de36pi7vza-uc.a.run.app'
+        def _chPwUrl   = project.findProperty('AUTH_CHANGE_PASSWORD_URL') ?: 'https://changepassword-de36pi7vza-uc.a.run.app'
+        buildConfigField "String", "AUTH_LOGIN_URL", "\"${_loginUrl}\""
+        buildConfigField "String", "AUTH_SELF_URL", "\"${_selfUrl}\""
+        buildConfigField "String", "AUTH_CHANGE_PASSWORD_URL", "\"${_chPwUrl}\""
     }
 
     signingConfigs {
@@ -112,6 +123,9 @@ dependencies {
     // ===== Teste de screenshot do card (JVM, sem emulador) =====
     // Roborazzi renderiza o Compose com Robolectric (graphicsMode NATIVE) -> PNG real.
     testImplementation "junit:junit:4.13.2"
+    // F4.2B — org.json REAL no classpath dos testes JVM (o org.json do android.jar e stub/mock);
+    // e coroutines-test opcional (usamos runBlocking do core, ja transitivo). So testes; nao vai no APK.
+    testImplementation "org.json:json:20240303"
     testImplementation "org.robolectric:robolectric:4.14.1"
     testImplementation platform("androidx.compose:compose-bom:2024.10.01")
     testImplementation "androidx.compose.ui:ui-test-junit4"

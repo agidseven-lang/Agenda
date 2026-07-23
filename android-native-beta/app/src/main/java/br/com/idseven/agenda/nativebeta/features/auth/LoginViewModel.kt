@@ -4,7 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.idseven.agenda.nativebeta.data.AuthRepo
-import br.com.idseven.agenda.nativebeta.data.SessionStore
+import br.com.idseven.agenda.nativebeta.data.auth.AuthErrorMapper
+import br.com.idseven.agenda.nativebeta.data.session.AppSession
+import br.com.idseven.agenda.nativebeta.data.session.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,53 +19,55 @@ sealed class AuthUi {
     data class Info(val message: String) : AuthUi()
 }
 
-// Reset por admin (legado, mantido para compatibilidade): quando o usuario entra
-// com senha temporaria (mustChangePassword=true), o VM NAO cria sessao; expoe
-// `pendingChange` para a tela mostrar "Criar nova senha". So apos a troca a
-// sessao e gravada.
+// F4.2B — a troca por senha temporaria (mustChangePassword) era client-side (users.get + Crypto.verify).
+// Foi RETIRADA do fluxo ativo de login. `pendingChange` permanece como tipo/StateFlow por compatibilidade
+// da tela, porem NUNCA e preenchido: quem entra com senha temporaria usa o fluxo de recuperacao (server-side).
 data class PendingPasswordChange(
     val uid: String, val name: String?, val tempPassword: String,
 )
 
-// Self-service: redefinicao em 2 passos pelo proprio usuario (1.0.39+).
-// Step 1 = informar e-mail; Step 2 = digitar codigo + nova senha.
 sealed class ForgotState {
     data object Step1Email : ForgotState()
     data class Step2Code(val email: String) : ForgotState()
-    data object Done : ForgotState() // exibe sucesso antes de voltar pro login
+    data object Done : ForgotState()
 }
 
-// MVVM: estados loading/erro/info. O sucesso do login salva a sessão (DataStore),
-// e a navegação é reativa (AppRoot observa a sessão). Sem crash em nenhum caminho.
+/**
+ * F4.2B — Login SERVER-SIDE. O login usa o SessionManager (loginUser → token → sessao criptografada
+ * pelo Keystore; navegacao reativa via SessionManager.state, observado no AppRoot). NENHUM acesso a
+ * colecao users, NENHUM Crypto.verify, NENHUM hash/salt no caminho de login. Senha so em memoria
+ * durante a tentativa (parametro local), nunca persistida.
+ *
+ * Cadastro (register) e recuperacao (requestReset/confirmReset) seguem no AuthRepo — o cadastro por
+ * nao existir endpoint server-side de criacao de conta (documentado; F4.2C), a recuperacao por JA ser
+ * server-side (Cloud Functions). Nenhum deles verifica senha no aparelho.
+ */
 class LoginViewModel(app: Application) : AndroidViewModel(app) {
-    private val sessionStore = SessionStore(app)
+    private val session: SessionManager = AppSession.get(app)
 
     private val _ui = MutableStateFlow<AuthUi>(AuthUi.Idle)
     val ui: StateFlow<AuthUi> = _ui.asStateFlow()
 
-    // null = login normal; preenchido = exige troca antes de criar sessão.
+    // Sempre null nesta fase (fluxo de senha temporaria client-side removido).
     private val _pendingChange = MutableStateFlow<PendingPasswordChange?>(null)
     val pendingChange: StateFlow<PendingPasswordChange?> = _pendingChange.asStateFlow()
 
-    // Estado do fluxo self-service de redefinicao por codigo (1.0.39+).
     private val _forgot = MutableStateFlow<ForgotState>(ForgotState.Step1Email)
     val forgot: StateFlow<ForgotState> = _forgot.asStateFlow()
 
+    // Single-flight: bloqueia envios simultaneos (evita multiplas requisicoes de login em paralelo).
+    private var submitting = false
+
     fun login(idOrPhone: String, password: String) {
+        if (submitting) return
+        submitting = true
         _ui.value = AuthUi.Loading
         viewModelScope.launch {
-            when (val r = AuthRepo.login(idOrPhone, password)) {
-                is AuthRepo.Result.Ok -> {
-                    if (r.mustChangePassword) {
-                        // Não cria sessão; manda a tela mostrar "Criar nova senha".
-                        _pendingChange.value = PendingPasswordChange(r.uid, r.name, password)
-                        _ui.value = AuthUi.Info("Sua senha é temporária. Defina uma nova senha para continuar.")
-                    } else {
-                        sessionStore.save(r.uid, r.name) // dispara navegação reativa
-                        _ui.value = AuthUi.Idle // evita spinner travado ao voltar do logout (VM é da Activity)
-                    }
-                }
-                is AuthRepo.Result.Err -> _ui.value = AuthUi.Error(r.message)
+            try {
+                val err = session.login(idOrPhone, password) // senha so aqui; nao guardamos referencia
+                _ui.value = if (err == null) AuthUi.Idle else AuthUi.Error(AuthErrorMapper.message(err))
+            } finally {
+                submitting = false
             }
         }
     }
@@ -78,8 +82,6 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // Self-service step 1: solicita codigo por e-mail (envio real). Sempre
-    // mensagem generica para nao revelar se o e-mail existe; avanca para step 2.
     fun requestReset(email: String) {
         _ui.value = AuthUi.Loading
         viewModelScope.launch {
@@ -93,9 +95,6 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // Self-service step 2: confirma codigo + nova senha. Em sucesso, exibe
-    // estado Done para a tela mostrar "Senha redefinida com sucesso." e voltar
-    // pro login.
     fun confirmReset(code: String, newPassword: String, confirmPassword: String) {
         val st = _forgot.value
         if (st !is ForgotState.Step2Code) {
@@ -119,24 +118,10 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
         _ui.value = AuthUi.Idle
     }
 
-    // Troca a senha após login com temporária. Só cria sessão se a troca for OK.
+    // F4.2B — fluxo de senha temporaria removido do caminho ativo (era client-side). Mantido como
+    // no-op por compatibilidade da tela: pendingChange nunca e preenchido, entao nunca executa.
     fun changePassword(newPassword: String, confirmPassword: String) {
-        val p = _pendingChange.value ?: return
-        if (newPassword != confirmPassword) {
-            _ui.value = AuthUi.Error("As senhas não coincidem.")
-            return
-        }
-        _ui.value = AuthUi.Loading
-        viewModelScope.launch {
-            when (val r = AuthRepo.changePassword(p.uid, p.tempPassword, newPassword)) {
-                is AuthRepo.Result.Ok -> {
-                    sessionStore.save(r.uid, r.name)
-                    _pendingChange.value = null
-                    _ui.value = AuthUi.Idle
-                }
-                is AuthRepo.Result.Err -> _ui.value = AuthUi.Error(r.message)
-            }
-        }
+        _pendingChange.value ?: return
     }
 
     fun cancelChange() {

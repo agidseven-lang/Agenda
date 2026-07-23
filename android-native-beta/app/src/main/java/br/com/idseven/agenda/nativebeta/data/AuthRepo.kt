@@ -77,34 +77,11 @@ object AuthRepo {
             }
         }
 
-    suspend fun login(idOrPhone: String, password: String): Result = suspendCancellableCoroutine { cont ->
-        val id = idOrPhone.trim().lowercase()
-        if (id.isEmpty() || password.isEmpty()) {
-            cont.resume(Result.Err("Preencha e-mail/WhatsApp e senha.")); return@suspendCancellableCoroutine
-        }
-        val idDigits = digits(id)
-        db.collection("users").get()
-            .addOnSuccessListener { snap ->
-                val doc = snap.documents.firstOrNull { d ->
-                    val email = (d.getString("email") ?: "").lowercase()
-                    val phone = digits(d.getString("phone") ?: "")
-                    email == id || (idDigits.isNotEmpty() && phone == idDigits)
-                }
-                if (doc == null) { cont.resume(Result.Err("E-mail/WhatsApp ou senha incorretos.")); return@addOnSuccessListener }
-                when (doc.getString("status")) {
-                    "pendente" -> { cont.resume(Result.Err("Cadastro aguardando aprovação.")); return@addOnSuccessListener }
-                    "removido", "excluido" -> { cont.resume(Result.Err("Conta inativa.")); return@addOnSuccessListener }
-                }
-                if (!Crypto.verify(doc.getString("pass"), doc.getString("salt"), password)) {
-                    cont.resume(Result.Err("E-mail/WhatsApp ou senha incorretos.")); return@addOnSuccessListener
-                }
-                val mustChange = doc.getBoolean("mustChangePassword") == true
-                cont.resume(Result.Ok(doc.id, doc.getString("name"), mustChange))
-            }
-            .addOnFailureListener { ex ->
-                cont.resume(Result.Err("Não foi possível entrar agora. Verifique a internet. (${ex.message})"))
-            }
-    }
+    // F4.2B — REMOVIDO: login client-side (db.collection("users").get() + Crypto.verify no aparelho).
+    // A autenticacao agora e SERVER-SIDE (ServerAuthRepository → loginUser/getUserSelf), fiel ao
+    // contrato da Desktop 1.0.181. O login NUNCA baixa users nem le hash/salt no cliente.
+    // Igualmente REMOVIDO o changePassword client-side por senha temporaria (users.get + Crypto.verify);
+    // recuperacao de senha segue pelo fluxo server-side (requestPasswordReset/confirmPasswordReset).
 
     suspend fun register(name: String, role: String, phone: String, email: String, password: String): Result =
         suspendCancellableCoroutine { cont ->
@@ -176,34 +153,7 @@ object AuthRepo {
         }
     }
 
-    // Troca de senha após login com senha temporária. Re-autentica com a senha antiga
-    // (defesa em profundidade), atualiza hash e zera mustChangePassword. Não cria sessão.
-    suspend fun changePassword(uid: String, currentPassword: String, newPassword: String): Result =
-        suspendCancellableCoroutine { cont ->
-            if (newPassword.length < 6) {
-                cont.resume(Result.Err("A nova senha precisa ter pelo menos 6 caracteres.")); return@suspendCancellableCoroutine
-            }
-            if (newPassword == currentPassword) {
-                cont.resume(Result.Err("A nova senha deve ser diferente da atual.")); return@suspendCancellableCoroutine
-            }
-            val ref = db.collection("users").document(uid)
-            ref.get().addOnSuccessListener { d ->
-                if (d == null || !d.exists()) { cont.resume(Result.Err("Conta não encontrada.")); return@addOnSuccessListener }
-                if (!Crypto.verify(d.getString("pass"), d.getString("salt"), currentPassword)) {
-                    cont.resume(Result.Err("Senha atual incorreta.")); return@addOnSuccessListener
-                }
-                val salt = Crypto.randSalt()
-                ref.update(
-                    mapOf(
-                        "pass" to Crypto.hashPw(newPassword, salt),
-                        "salt" to salt,
-                        "mustChangePassword" to false,
-                        "passwordChangedAt" to System.currentTimeMillis(),
-                    )
-                ).addOnSuccessListener { cont.resume(Result.Ok(uid, d.getString("name"))) }
-                    .addOnFailureListener { ex -> cont.resume(Result.Err("Não foi possível atualizar a senha. (${ex.message})")) }
-            }.addOnFailureListener { ex ->
-                cont.resume(Result.Err("Não foi possível verificar a conta. (${ex.message})"))
-            }
-        }
+    // F4.2B — changePassword client-side (users.get + Crypto.verify) REMOVIDO. A troca de senha
+    // autenticada e server-side (ServerAuthRepository.changePassword → endpoint changePassword com
+    // Bearer). O fluxo de senha temporaria por aparelho deixou de existir.
 }
