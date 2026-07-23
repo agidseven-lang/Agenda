@@ -1,0 +1,333 @@
+# =====================================================================
+# [manual] F3.4.5 — Publicacao da RELEASE ESTAVEL Desktop 1.0.182 (PRODUCAO / Latest)
+# ---------------------------------------------------------------------
+# Publica a release ESTAVEL de PRODUCAO 1.0.182 (canal latest) do run
+# 30016688862 (candidato estavel gated, 25/25 steps verdes; fonte 11520f5 =
+# base OFICIAL 1.0.181 @e4692c9 + SOMENTE o clamp AUTORIZADO F3.4.5 do
+# timestamp da amarela + versao + testes/workflows — provado pelo gate
+# f345-hotfix-region-invariance DENTRO do proprio run). Substitui a 1.0.181
+# como Latest. TUDO PINADO: run id, SHA do codigo (alvo da tag), nomes+digests
+# dos artifacts, hashes SHA-256 (EXE/MSI/latest.yml/blockmap), tag e titulo. O job:
+#   0) verifica RELEASE_PAT presente E ATIVO (leitura read-only) ANTES de tudo;
+#   1) exige confirmacao literal (input) — publicacao direta estavel AUTORIZADA
+#      pelo mandato F3.4.5 apos todos os gates verdes;
+#   2) valida run 30016688862 = completed/success E head_sha == SHA pinado;
+#   3) confirma que o delta pos-candidato na branch e SO .github/workflows/**;
+#   4) aborta se a tag/release v1.0.182 ja existir (tag preexistente so se
+#      apontar EXATAMENTE para o SHA pinado);
+#   5) baixa os 2 artifacts (installer + updatemeta), confere ids+digests e
+#      os hashes byte a byte (divergiu => aborta SEM publicar);
+#   6) cria a release prerelease=false, latest=true, tag no SHA estavel;
+#   7) anexa 7 assets: EXE, MSI, latest.yml, blockmap, SHA256SUMS,
+#      VERSAO-DESKTOP.txt, RELATORIO-DESKTOP.txt (app-update.yml NAO e asset);
+#   8) pos-verifica flags/assets/target + confirma que a 1.0.182 VIROU Latest,
+#      a 1.0.181 segue PRESERVADA para rollback (release existe, deixa de ser
+#      Latest), 1.0.180 e 1.0.178 historicas seguem presentes e os canarios
+#      seguem prereleases;
+#   9) smoke: re-baixa EXE + latest.yml da release e reconfere os hashes.
+# NAO builda, NAO deploya, NAO toca Firebase/Worker/Rules/flags/Android, NAO
+# mexe em releases/tags antigas.
+# MECANISMO DE BRANCH: este arquivo e a COPIA DO BRANCH do workflow ja
+# registrado f343e-desktop-stable-release.yml — o dispatch com
+# ref=desktop/f345-yellow-sla-timestamp-hotfix executa ESTA copia pinada
+# (nenhum push a main necessario). MESMO mecanismo aprovado da v1.0.181.
+# CREDENCIAIS (padrao aprovado F3.4.3E/F3.4.4A): leituras/verificacoes usam o GITHUB_TOKEN
+# padrao; as ESCRITAS (criar tag v1.0.182 + criar release + enviar assets) usam EXCLUSIVAMENTE
+# secrets.RELEASE_PAT (env por-step; NUNCA impresso/logado — o Actions mascara secrets; checagem
+# de presenca+atividade read-only; ausente/invalido => aborta SEM publicar NADA). Depois do smoke,
+# o protocolo pede REMOCAO do secret e REVOGACAO do token temporario.
+# Execucao SOMENTE manual (workflow_dispatch). Publicacao estavel direta autorizada
+# pelo mandato F3.4.5-DESKTOP-YELLOW-SLA-INCORRECT-TIMESTAMP-STABLE-HOTFIX.
+# =====================================================================
+name: "[manual] F3.4.5 Desktop Stable Release — 1.0.182 (Latest)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-DESKTOP-1.0.182-STABLE para autorizar"
+        required: true
+        default: ""
+      ref:
+        description: "IGNORADO — só compatibilidade de schema com o dispatch registrado (mecanismo de branch)"
+        required: false
+        default: "desktop/f345-yellow-sla-timestamp-hotfix"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      RUN_ID: "30016688862"
+      STABLE_SHA: "11520f5ab59a8ca90b6a2d82bff741dc9ebe8cca"
+      DESK_BRANCH: "desktop/f345-yellow-sla-timestamp-hotfix"
+      TAG: "v1.0.182"
+      TITLE: "Agenda ID Seven Desktop 1.0.182 — Produção Estável"
+      ART_INST: "agenda-id-seven-desktop-1.0.182-installer"
+      ART_INST_DIGEST: "sha256:ac624853e8f5c65e6d9b604022ab0e789db2a0a34b0f88eccd26348f547702d6"
+      ART_META: "agenda-id-seven-desktop-1.0.182-updatemeta"
+      ART_META_DIGEST: "sha256:9595ac46f9b2e7fc6a60d8bcf422c29cfa06ec11968b10f3970f0db047fd7c45"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.182-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.182-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.182-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "80bba928974762d74e23828b72fd4dd20d5ee5c593413b986d98ff6a766006e8"
+      EXP_MSI: "ae022f730685be6588715a538a353a2e623afb558a89e92dd9b3628f090ba7dd"
+      EXP_LY: "73b0ace3bfbe27a60a4ca4b45e8253bd0e1c6df86b80337540e245bd2d414736"
+      EXP_BM: "5819e669d0de6b6118a28b26ea0bb1e62c3998a12214cb03a16315eeef157d52"
+      PROD_PREV_TAG: "v1.0.181"
+      PROD_ROLLBACK_TAG: "v1.0.180"
+      PROD_HIST_TAG: "v1.0.178"
+      CANARY_A_TAG: "v1.0.178-canary.2"
+      CANARY_B_TAG: "v1.0.179-canary.5"
+    steps:
+      - name: "Gate 0 — RELEASE_PAT presente e ATIVO (leitura read-only; nada publicado se falhar)"
+        env:
+          PAT: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+          # Mandato F3.4.5: verificar RELEASE_PAT ANTES da tag/release; ausente => PARAR e pedir
+          # novo token temporario ao owner. Checagem de PRESENCA + uma LEITURA (valida atividade)
+          # — nunca imprime o valor (o Actions mascara secrets nos logs).
+          [ -n "$PAT" ] || { echo "::error::secrets.RELEASE_PAT AUSENTE — PARAR: solicitar ao owner novo token temporario. NADA foi publicado."; exit 1; }
+          FN="$(GH_TOKEN="$PAT" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::RELEASE_PAT presente porem INATIVO/sem acesso (leitura falhou) — PARAR: solicitar token valido. NADA foi publicado."; exit 1; }
+          echo "OK: RELEASE_PAT presente e ativo (leitura de repos/$REPO confirmada)"
+
+      - name: "Gate 1 — confirmacao literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "PUBLICAR-DESKTOP-1.0.182-STABLE" ]; then
+            echo "::error::confirmacao invalida — nada foi publicado"; exit 1
+          fi
+          echo "OK: confirmacao literal valida"
+
+      - name: "Gate 2 — run completed/success no SHA pinado"
+        run: |
+          set -euo pipefail
+          ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion')"
+          echo "run $RUN_ID: $ST"
+          [ "$ST" = "completed|success" ] || { echo "::error::run invalido para publicacao"; exit 1; }
+          HS="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.head_sha')"
+          echo "run head_sha: $HS (esperado $STABLE_SHA)"
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::run NAO foi construido do commit pinado 11520f5"; exit 1; }
+
+      - name: "Gate 3 — 11520f5 ancestral do head; delta pos-candidato SO em .github/workflows (mecanismo de branch)"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$DESK_BRANCH" --jq '.object.sha')"
+          echo "head $DESK_BRANCH: $H (alvo da tag PINADO: $STABLE_SHA)"
+          CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H")"
+          STATUS="$(echo "$CMP" | jq -r '.status')"
+          echo "compare $STABLE_SHA...$H: status=$STATUS"
+          { [ "$STATUS" = "identical" ] || [ "$STATUS" = "ahead" ]; } || { echo "::error::branch divergiu do candidato (status=$STATUS)"; exit 1; }
+          BAD="$(echo "$CMP" | jq -r '.files[].filename' | grep -v '^\.github/workflows/' || true)"
+          if [ -n "$BAD" ]; then echo "::error::mudanca POS-candidato FORA de .github/workflows: $BAD"; exit 1; fi
+          echo "OK: alvo da tag = $STABLE_SHA (pinado); delta pos-candidato = so o mecanismo de publicacao"
+
+      - name: "Gate 4 — release NAO pode existir; tag so pode preexistir APONTANDO para o SHA pinado"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG existe apontando para OUTRO sha ($TS != $STABLE_SHA)"; exit 1; }
+            echo "OK: release livre; tag $TAG preexiste apontando EXATAMENTE para o SHA pinado"
+          else
+            echo "OK: release e tag livres"
+          fi
+
+      - name: "Gate 5 — artifacts: ids+digests conferem"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          check() {
+            local name="$1" digest="$2" d exp
+            d="$(echo "$json" | jq -r --arg n "$name" '.artifacts[] | select(.name==$n) | .digest')"
+            echo "artifact $name: $d"
+            [ "$d" = "$digest" ] || { echo "::error::digest do artifact $name divergente ($d != $digest)"; exit 1; }
+            exp="$(echo "$json" | jq -r --arg n "$name" '.artifacts[] | select(.name==$n) | .expired')"
+            [ "$exp" = "false" ] || { echo "::error::artifact $name expirado"; exit 1; }
+          }
+          check "$ART_INST" "$ART_INST_DIGEST"
+          check "$ART_META" "$ART_META_DIGEST"
+          echo "OK: artifacts intactos"
+
+      - name: "Baixar artifacts (installer + updatemeta)"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          ls -lh pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::asset ausente no artifact: $f"; exit 1; }
+          done
+          test -f pacote/app-update.yml && { echo "::error::app-update.yml NAO deve ser asset publico"; exit 1; } || true
+          test -f pacote/canary.yml && { echo "::error::canary.yml presente — canal ambiguo, ABORTAR"; exit 1; } || true
+
+      - name: "Gate 6 — hashes SHA-256 conferem (aborta se divergir)"
+        run: |
+          set -euo pipefail
+          H_EXE="$(sha256sum "pacote/$EXE_NAME" | awk '{print $1}')"
+          H_MSI="$(sha256sum "pacote/$MSI_NAME" | awk '{print $1}')"
+          H_LY="$(sha256sum "pacote/$LY_NAME" | awk '{print $1}')"
+          H_BM="$(sha256sum "pacote/$BM_NAME" | awk '{print $1}')"
+          echo "exe=$H_EXE"; echo "msi=$H_MSI"; echo "latest.yml=$H_LY"; echo "blockmap=$H_BM"
+          [ "$H_EXE" = "$EXP_EXE" ] || { echo "::error::hash EXE divergente"; exit 1; }
+          [ "$H_MSI" = "$EXP_MSI" ] || { echo "::error::hash MSI divergente"; exit 1; }
+          [ "$H_LY" = "$EXP_LY" ] || { echo "::error::hash latest.yml divergente"; exit 1; }
+          [ "$H_BM" = "$EXP_BM" ] || { echo "::error::hash blockmap divergente"; exit 1; }
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.182" "pacote/$LY_NAME" || { echo "::error::latest.yml version incorreta"; exit 1; }
+          grep -qF "$EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml nao referencia o EXE (mesmo run)"; exit 1; }
+          grep -Eq '^channel +: latest$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem channel=latest"; exit 1; }
+          grep -Eq '^allowPrerelease +: false$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem allowPrerelease=false"; exit 1; }
+          grep -Eq '^allowDowngrade +: false$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem allowDowngrade=false"; exit 1; }
+          echo "OK: hashes conferem + latest.yml coerente (EXE do mesmo run) + channel=latest/allowPrerelease=false/allowDowngrade=false"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.182 — Produção Estável
+
+          Sucessora da 1.0.181 como versão oficial (Latest), canal ESTÁVEL (latest). Instalar em
+          máquinas autorizadas após conferência de hash. Auto-update: máquinas 1.0.181 detectam,
+          baixam (após ação do usuário) e instalam (após confirmação) esta 1.0.182 pelo canal latest.
+
+          O QUE MUDA vs 1.0.181
+          - F3.4.5 — TIMESTAMP DA NOTIFICAÇÃO AMARELA (SLA do Designer): a amarela passa a respeitar
+            a ABERTURA REAL da janela concedida pela Social. O instante do amarelo agora é
+            max(prazo final − warningMinutes, início planejado) — nunca ANTES do início planejado
+            (designerSla.planStartAt; fallback designerAssignment.startDate/startTime). Corrige o
+            caso físico da 1.0.181 em que uma tarefa com início 10:45 e prazo 11:10 (janela menor
+            que 30 min) disparava a amarela ~10:40, junto da azul de atribuição.
+          - A AZUL de atribuição permanece exatamente como está (evento separado, imediato).
+          - A VERMELHA permanece exatamente no PRAZO FINAL (planDueAt); os 10 minutos adicionais e
+            a crítica/operational_block permanecem intocados. Janelas planejadas normais
+            (≥ warningMinutes) ficam BYTE-idênticas ao comportamento aprovado (amarelo em prazo−30).
+          - Textos, títulos, cores, destinatários, avatar, deep links, dedupe, produtor único no
+            main, relógio canônico, reconcile (boot/resume/unlock) e alteração de prazo preservados.
+            Se o início legítimo da janela coincidir com a atribuição (início = agora), a amarela
+            imediata é preservada (coincidência legítima).
+
+          UPDATER (produção)
+          - allowPrerelease=false, channel="latest", allowDowngrade=false, autoDownload=false,
+            autoInstallOnAppQuit=false, forceDevUpdateConfig=false (verificado DENTRO do app.asar).
+            Download só após ação do usuário; instalação só após confirmação; nunca silencioso.
+            Metadata do MESMO build: latest.yml + <exe>.blockmap; app-update.yml só dentro do pacote.
+
+          PRESERVAÇÃO (zero regressão fora do escopo aprovado)
+          - Fonte = 1.0.181 OFICIAL @e4692c9 + SOMENTE o clamp autorizado (index.html + slaRules.js,
+            valor-idênticos, Golden Master 219/0 preservado) + versão + testes/workflows — provado
+            pelo gate f345-hotfix-region-invariance no próprio run. Worker J6 + wrangler + Android +
+            Functions/Rules byte-idênticos. slaScheduler/notifier/clockSync/updaterService/auth
+            intocados. Golden Master TEMPORAL novo (RED da 1.0.181 reproduzido + GREEN 43/0);
+            SLA Golden Master 219/0; Flow Golden Master 842-corpus 0 divergência; contrato
+            movimentação repetida 64/0; f343d 44/0; updater state-machine 57/0.
+          - Rollback: 1.0.181 PRESERVADA (reinstalar / re-marcar Latest); 1.0.180 e 1.0.178
+            históricas preservadas. Prereleases canary preservadas.
+
+          HASHES OFICIAIS (SHA-256)
+          - EXE: 80bba928974762d74e23828b72fd4dd20d5ee5c593413b986d98ff6a766006e8
+          - MSI: ae022f730685be6588715a538a353a2e623afb558a89e92dd9b3628f090ba7dd
+          - latest.yml: 73b0ace3bfbe27a60a4ca4b45e8253bd0e1c6df86b80337540e245bd2d414736
+          - blockmap: 5819e669d0de6b6118a28b26ea0bb1e62c3998a12214cb03a16315eeef157d52
+          Confira com SHA256SUMS anexado (sha256sum -c SHA256SUMS) ou certutil -hashfile <arquivo> SHA256.
+
+          INSTALACAO
+          1. Feche o app atual pela bandeja (Sair) — ou aceite a atualização dentro do próprio app.
+          2. Baixe o EXE, confira o SHA-256.
+          3. Rode o instalador (SmartScreen: Mais informações -> Executar assim mesmo; app sem assinatura).
+          4. Abra e faça login. Confirme 1.0.182 em Sobre.
+
+          RISCOS CONHECIDOS
+          - Instalador nao assinado (SmartScreen/MOTW). Integridade por SHA-512 (latest.yml) + SHA-256 (release).
+          - MSI e contingencia manual; o auto-update usa SOMENTE o EXE NSIS (canal latest).
+
+          Procedencia: run 30016688862 (success, 25/25 steps); fonte desktop/f345-yellow-sla-timestamp-hotfix
+          @ 11520f5 (base 1.0.181 OFICIAL e4692c9 + clamp autorizado F3.4.5 — delta provado por gate).
+          NOTAS
+          wc -l notas.md
+
+      - name: "Criar a tag pinada (git data API) — ESCRITA via RELEASE_PAT"
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "::error::secrets.RELEASE_PAT ausente/vazio — nada publicado"; exit 1; }
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para OUTRO sha ($TS)"; exit 1; }
+            echo "tag $TAG ja existe no SHA pinado — segue para a release"
+          else
+            set +e
+            OUT="$(gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" 2>&1)"; RC=$?
+            set -e
+            echo "$OUT"
+            [ $RC -eq 0 ] || { echo "::error::criacao da tag $TAG BLOQUEADA — a resposta acima nomeia a regra exata"; exit 1; }
+            echo "OK: tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets — ESCRITA via RELEASE_PAT"
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "::error::secrets.RELEASE_PAT ausente/vazio — nada publicado"; exit 1; }
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" \
+            --latest=true \
+            --title "$TITLE" \
+            --notes-file notas.md \
+            "pacote/$EXE_NAME" \
+            "pacote/$MSI_NAME" \
+            "pacote/$LY_NAME" \
+            "pacote/$BM_NAME" \
+            "pacote/SHA256SUMS" \
+            "pacote/VERSAO-DESKTOP.txt" \
+            "pacote/RELATORIO-DESKTOP.txt"
+          echo "publicado: $TAG"
+
+      - name: "Pos-verificacao (flags/assets/target + 1.0.182 e Latest; 1.0.181 + 1.0.180 + 1.0.178 e canarios preservados)"
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" -R "$REPO" \
+            --json tagName,targetCommitish,isPrerelease,isDraft,assets \
+            --jq '{tag:.tagName,target:.targetCommitish,prerelease:.isPrerelease,draft:.isDraft,assets:[.assets[].name]}'
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS (esperado false|false)"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "7" ] || { echo "::error::esperado 7 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt RELATORIO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset ausente na release: $a"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag $TAG nao aponta para o SHA pinado ($TAGSHA)"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          echo "Latest do repo: $LATEST_TAG"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          gh release view "$PROD_PREV_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_PREV_TAG" || { echo "::error::1.0.181 (rollback imediato) sumiu"; exit 1; }
+          gh release view "$PROD_ROLLBACK_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_ROLLBACK_TAG" || { echo "::error::1.0.180 sumiu"; exit 1; }
+          gh release view "$PROD_HIST_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_HIST_TAG" || { echo "::error::1.0.178 (historica) sumiu"; exit 1; }
+          CA="$(gh release view "$CANARY_A_TAG" -R "$REPO" --json isPrerelease --jq '.isPrerelease')"
+          CB="$(gh release view "$CANARY_B_TAG" -R "$REPO" --json isPrerelease --jq '.isPrerelease')"
+          { [ "$CA" = "true" ] && [ "$CB" = "true" ]; } || { echo "::error::canarios historicos alterados (prerelease != true)"; exit 1; }
+          echo "===== GO: 1.0.182 ESTAVEL PUBLICADA e Latest; 1.0.181 + 1.0.180 + 1.0.178 + canarios preservados ====="
+
+      - name: "Smoke — re-baixar EXE + latest.yml da release e reconferir hashes"
+        run: |
+          set -euo pipefail
+          rm -rf smoke; mkdir -p smoke
+          gh release download "$TAG" -R "$REPO" -p "$EXE_NAME" -p "$LY_NAME" -D smoke
+          S_EXE="$(sha256sum "smoke/$EXE_NAME" | awk '{print $1}')"
+          S_LY="$(sha256sum "smoke/$LY_NAME" | awk '{print $1}')"
+          [ "$S_EXE" = "$EXP_EXE" ] || { echo "::error::smoke EXE hash divergente"; exit 1; }
+          [ "$S_LY" = "$EXP_LY" ] || { echo "::error::smoke latest.yml hash divergente"; exit 1; }
+          echo "SMOKE OK: EXE e latest.yml publicados conferem byte a byte (mesmo run)."
