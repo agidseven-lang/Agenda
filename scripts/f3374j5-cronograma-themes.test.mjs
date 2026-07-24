@@ -219,8 +219,14 @@ if (BASEPATH) {
     'handleClientCronogramaState', 'handleClientCronogramaCrawler', 'clientPhase', 'phaseCopy', 'clientAckedPhase',
     'renderClientPhaseAckHtml', 'renderClientSuccessHtml', 'premiumTypeOf', 'statusLabel', 'frequencyLabel',
     'ogClientMeta', 'handleShareCard', 'shareCardHtml'];
-  const diffs = SAME_FNS.filter((n) => { try { return fnSrc(base.SRC, n) !== fnSrc(SRC, n); } catch (e) { return true; } });
-  ok('C42 handlers/estado/ação/OG byte-idênticos: ' + (diffs.length ? 'DIVERGEM: ' + diffs.join(',') : 'todos iguais'), diffs.length === 0);
+  // F3.5.0 — delta AUTORIZADO no handleClientCronogramaView: EXATAMENTE as 2 linhas do
+  // registro idempotente de primeira visualização (flags duplas; recordClientFirstView).
+  // O compare remove o delta BYTE-EXATO (uma única ocorrência) do lado novo; qualquer
+  // outra divergência — em view ou em qualquer função pinada — continua REPROVANDO.
+  const F350_VIEW_DELTA = '    // F3.5.0 — primeira visualização (WORKER_BUILD f350): idempotente, flags duplas, 1 campo.\n    try { await recordClientFirstView(env, accessToken, task); } catch (_) { }\n';
+  const stripF350 = (n, s) => { if (n !== 'handleClientCronogramaView') return s; const i = s.indexOf(F350_VIEW_DELTA); return i < 0 ? s : s.slice(0, i) + s.slice(i + F350_VIEW_DELTA.length); };
+  const diffs = SAME_FNS.filter((n) => { try { return fnSrc(base.SRC, n) !== stripF350(n, fnSrc(SRC, n)); } catch (e) { return true; } });
+  ok('C42 handlers/estado/ação/OG byte-idênticos (view: módulo delta AUTORIZADO F3.5.0): ' + (diffs.length ? 'DIVERGEM: ' + diffs.join(',') : 'todos iguais'), diffs.length === 0);
   ok('C43 PREMIUM_TYPES const byte-idêntico', constObj(base.SRC, 'PREMIUM_TYPES') === constObj(SRC, 'PREMIUM_TYPES'));
 } else {
   ok('C41 (pulado — defina BASELINE_SRC p/ prova byte-idêntica)', false);

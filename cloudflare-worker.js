@@ -130,7 +130,7 @@ const PREMIUM_TYPES = {
 // (nunca token/dado de cliente). Distingue inequivocamente ESTE worker no host que o
 // serviu — a string de VERSÃO é idêntica entre QA e produção, então versão sozinha não
 // prova qual runtime respondeu. Presença de build=j3c => é a candidata J3C.
-const WORKER_BUILD = "j6-cronograma-two-stage";
+const WORKER_BUILD = "f350-client-progress-tracking";
 function premiumTypeOf(task) {
   const sec = (task && typeof task.sector === "string") ? task.sector.trim().toLowerCase() : "";
   return sec === "roteiro" ? PREMIUM_TYPES.roteiro : PREMIUM_TYPES.cronograma;
@@ -459,6 +459,12 @@ export default {
       if (stateMatch && request.method === "GET") {
         return handleClientCronogramaState(stateMatch[1], env);
       }
+      // F3.5.0 — ACOMPANHAMENTO DO PROJETO: contrato público SANITIZADO (aditivo; flags
+      // duplas; ZERO writes; o /state acima NÃO muda). Desligado/ausente → not_found genérico.
+      const progressMatch = url.pathname.match(/^\/cliente\/cronograma\/([A-Za-z0-9_-]{4,128})\/progress\/?$/);
+      if (progressMatch && request.method === "GET") {
+        return handleClientCronogramaProgress(progressMatch[1], env);
+      }
       // V64.42 — TEAM ACTION: equipe (Social/Admin) sinaliza correcao de item para o Worker
       // limpar `clientItems[iX].cs` (destrancar o card preso em "Ajuste solicitado") e disparar
       // a notificacao premium ao cliente (Web Push, quando habilitado). Gated por env.TEAM_API_KEY
@@ -519,7 +525,7 @@ export default {
       return handlePushRelay(request, env);
     }
 
-    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-j6-cronograma-two-stage", build: WORKER_BUILD }, 200, env);
+    return json({ ok: true, service: "idseven-push", version: "V64.59-c20-failopen-f350-client-progress", build: WORKER_BUILD }, 200, env);
   },
 
   async scheduled(event, env, ctx) {
@@ -1572,6 +1578,8 @@ async function handleClientCronogramaView(token, env, origin) {
     // resultado); serve de prova viva de qual tipo o portal enxergou para a tarefa REAL.
     const pt = premiumTypeOf(task);
     console.log(`[CLIENT-VIEW] ok task=${task.id} client=${task.client || ""} portalType=${pt.key}`);
+    // F3.5.0 — primeira visualização (WORKER_BUILD f350): idempotente, flags duplas, 1 campo.
+    try { await recordClientFirstView(env, accessToken, task); } catch (_) { }
     // P2: a tela de SUCESSO só aparece na aprovação FINAL REAL.
     // V64.14 (status-consistency): o gate usa SÓ os sinais deliberados de encerramento final
     // (finalApprovalCompleted / clientFlowStatus='concluido'). O status BRUTO do kanban
@@ -2401,6 +2409,337 @@ async function handleClientCronogramaState(token, env) {
   }
 }
 
+/* ============================= F3.5.0 PROGRESS (INICIO) =============================
+   ACOMPANHAMENTO DO PROJETO — projeção pública SANITIZADA do andamento (F3.5.0A).
+   - MÓDULO PURO e centralizado: tradução única interno→cliente (nomes técnicos NUNCA
+     chegam ao navegador) + percentual DETERMINÍSTICO (pesos fixos por etapa; nada de
+     tempo decorrido ou contagem de cliques).
+   - Dupla feature flag: env.CLIENT_PROGRESS_TRACKING_ENABLED==="true" E
+     task.clientProgressEnabled===true. Com QUALQUER flag desligada: portal byte-idêntico,
+     nenhum endpoint novo consultado, nenhum write novo, nenhum erro.
+   - GET /cliente/cronograma/:token/progress → contrato público (no-store; ZERO writes).
+     O /state NÃO muda nesta fase.
+   - Visualização: clientPortalFirstViewedAt gravado UMA vez (idempotente, horário do
+     servidor, updateMask de 1 campo — NÃO toca updatedAt/status/kanban/SLA).
+   =================================================================================== */
+
+/* Tabela EXATA de pesos (entregue no relatório antes do deploy QA).
+   Etapas de EVENTO concluem ao acontecer (received/viewed/approved/available/done);
+   etapas de EXECUÇÃO (production/internal_review/scheduling) ficam 'current' enquanto
+   rodam e concluem quando uma etapa posterior é alcançada. */
+const PROGRESS_STAGES = [
+  { key: "received",          weight: 5,   kind: "event" },
+  { key: "viewed",            weight: 10,  kind: "event" },
+  { key: "schedule_approved", weight: 25,  kind: "event" },
+  { key: "production",        weight: 45,  kind: "run"   },
+  { key: "internal_review",   weight: 60,  kind: "run"   },
+  { key: "client_review",     weight: 75,  kind: "event" },
+  { key: "scheduling",        weight: 90,  kind: "run"   },
+  { key: "done",              weight: 100, kind: "event" },
+];
+
+/* Tradução ÚNICA dos rótulos/descrições públicos (docWord = "Cronograma" | "Roteiro"). */
+function progressStageCopy(docWord) {
+  return {
+    received:          { label: docWord + " recebido",        desc: "Seu " + docWord.toLowerCase() + " foi preparado e enviado pela equipe." },
+    viewed:            { label: "Visualizado pelo cliente",   desc: "Confirmamos que você abriu o link seguro." },
+    schedule_approved: { label: docWord + " aprovado",        desc: "Temas aprovados por você — produção liberada." },
+    production:        { label: "Conteúdos em produção",      desc: "Nossa equipe está produzindo os conteúdos." },
+    internal_review:   { label: "Revisão interna",            desc: "Controle de qualidade da equipe antes de chegar até você." },
+    client_review:     { label: "Disponível para aprovação",  desc: "Versão final disponível para a sua avaliação." },
+    scheduling:        { label: "Programação",                desc: "Programação das publicações em andamento." },
+    done:              { label: "Concluído",                  desc: "Processo concluído. Obrigado pela parceria!" },
+  };
+}
+
+/* Sinais REAIS (campos já gravados hoje) → etapa alcançada. PURO e determinístico. */
+function progressSignals(task) {
+  const t = task || {};
+  const ci = (t.clientItems && typeof t.clientItems === "object") ? t.clientItems : {};
+  const items = Array.isArray(t.cronWeeks) ? t.cronWeeks : (Array.isArray(t.cronContents) ? t.cronContents : []);
+  const total = items.length || 0;
+  let themesAllApproved = total > 0;
+  for (let i = 0; i < total; i++) { const it = ci["i" + i]; if (!(it && it.cs === "aprovado" && it.phase === "themes")) { themesAllApproved = false; break; } }
+  const ph = clientPhase(t);
+  const done = t.finalApprovalCompleted === true || t.clientFlowStatus === "concluido";
+  const scheduling = t.status === "aprovado";
+  const clientReview = t.cronStatus === "ready_for_final_client_review" || ph === "final";
+  const internalReview = t.status === "revisao";
+  const production = t.status === "andamento" || t.workflowStage === "producao" || ph === "production"
+    || t.cronStatus === "sent_to_designer" || t.cronStatus === "in_design" || t.cronStatus === "ready_for_client";
+  const approved = themesAllApproved || t.cronStatus === "aprovado_cliente" || t.clientFlowStatus === "aprovado"
+    || ((t.clientReview && t.clientReview.status) === "aprovado");
+  const viewed = Number(t.clientPortalFirstViewedAt) > 0;
+  const pendingAdjust = Object.keys(ci).some(function (k) { const it = ci[k]; return it && (it.cs === "em_revisao" || it.cs === "editado") && it.phase === ph; });
+  return { done, scheduling, clientReview, internalReview, production, approved, viewed, pendingAdjust, totalItems: total };
+}
+
+/* Estados das 8 etapas + percentual. Regras:
+   - eixo de produção: received(0)→approved(2)→production(3)→internal_review(4)→
+     client_review(5)→scheduling(6)→done(7); alcançar etapa posterior CONCLUI as anteriores;
+   - viewed(1) é EXCEÇÃO literal do mandato: só conclui com clientPortalFirstViewedAt;
+   - pedido de ajuste NUNCA apaga etapa concluída (sinais de evento são persistentes);
+   - percent = MAIOR peso entre etapas concluídas (0–100; 100 SÓ com done real). */
+function computeProgressStages(task) {
+  const s = progressSignals(task);
+  const reachedAxis = s.done ? 7 : (s.scheduling ? 6 : (s.clientReview ? 5 : (s.internalReview ? 4 : (s.production ? 3 : (s.approved ? 2 : 0)))));
+  const states = new Array(8).fill("pending");
+  for (let i = 0; i < 8; i++) {
+    if (i === 1) { states[1] = s.viewed ? "completed" : "pending"; continue; }
+    if (i < reachedAxis || reachedAxis === 7) { states[i] = "completed"; continue; }
+    if (i === reachedAxis) {
+      const kind = PROGRESS_STAGES[i].kind;
+      states[i] = (kind === "event") ? "completed" : "current";
+    }
+  }
+  // etapa 'current' única e coerente: se a alcançada é EVENTO (concluída na hora), a
+  // PRÓXIMA etapa pendente do eixo vira 'current' (nada em execução ⇒ aguardando a próxima).
+  if (!s.done && states.indexOf("current") < 0) {
+    for (let i = 0; i < 8; i++) { if (i !== 1 && states[i] === "pending") { states[i] = "current"; break; } }
+  }
+  let percent = 0;
+  for (let i = 0; i < 8; i++) if (states[i] === "completed") percent = Math.max(percent, PROGRESS_STAGES[i].weight);
+  if (percent > 100) percent = 100;
+  if (percent < 0) percent = 0;
+  if (percent === 100 && !s.done) percent = 90; // trava dupla: 100% SÓ com conclusão real
+  return { states, percent, signals: s };
+}
+
+/* Datas estimadas: SÓ quando existir uma data real e autorizada no item (string de data). */
+function progressEstimatedDate(c) {
+  const v = (c && (c.date || c.data || c.estimatedDate || c.dt) || "").toString().trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  if (/^\d{2}\/\d{2}(\/\d{4})?$/.test(v)) return v;
+  return "";
+}
+
+/* Contrato público SANITIZADO (nenhum taskId/userId/e-mail/telefone/SLA/nome interno). */
+function buildClientProgress(task, nowMs, projectId) {
+  const t = task || {};
+  const pt = premiumTypeOf(t);
+  const docWord = pt.key === "roteiro" ? "Roteiro" : "Cronograma";
+  const copy = progressStageCopy(docWord);
+  const cp = computeProgressStages(t);
+  const ci = (t.clientItems && typeof t.clientItems === "object") ? t.clientItems : {};
+  const items = Array.isArray(t.cronWeeks) ? t.cronWeeks : (Array.isArray(t.cronContents) ? t.cronContents : []);
+
+  let revision = Number(t.updatedAt) || 0;
+  revision = Math.max(revision, Number(t.clientPortalFirstViewedAt) || 0);
+  if (t.clientLastAction && Number(t.clientLastAction.at)) revision = Math.max(revision, Number(t.clientLastAction.at));
+  Object.keys(ci).forEach(function (k) { const it = ci[k]; if (it && Number(it.at)) revision = Math.max(revision, Number(it.at)); });
+
+  const stageAt = function (key) {
+    if (key === "viewed") return Number(t.clientPortalFirstViewedAt) || 0;
+    if (key === "done" && cp.signals.done) return revision;
+    return 0; // sem carimbo real específico → 0 (o front mostra só quando existir)
+  };
+  const stages = PROGRESS_STAGES.map(function (st, i) {
+    return {
+      key: st.key,
+      label: copy[st.key].label,
+      state: cp.states[i],
+      updatedAt: stageAt(st.key),
+      description: copy[st.key].desc,
+      percent: st.weight,
+    };
+  });
+  const currentIdx = cp.states.indexOf("current");
+  const firstPending = (function () { for (let i = 0; i < 8; i++) if (cp.states[i] === "pending" && i !== 1) return i; return -1; })();
+  const overallStatus = cp.signals.done ? copy.done.label : (currentIdx >= 0 ? stages[currentIdx].label : copy.done.label);
+  const nextExpectedStage = cp.signals.done ? "" : (function () {
+    for (let i = (currentIdx >= 0 ? currentIdx + 1 : 0); i < 8; i++) if (cp.states[i] === "pending" && i !== 1) return stages[i].label;
+    return firstPending >= 0 ? stages[firstPending].label : "";
+  })();
+
+  const stageWord = function () {
+    if (cp.signals.done) return "Concluído";
+    if (currentIdx === 3) return "Em produção";
+    if (currentIdx === 4) return "Em revisão interna";
+    if (currentIdx === 5) return "Disponível para aprovação";
+    if (currentIdx === 6) return "Em programação";
+    return "Aguardando";
+  };
+  const contents = items.map(function (raw, i) {
+    const c = (raw && typeof raw === "object") ? raw : {};
+    const ov = ci["i" + i] || {};
+    const cs = ov.cs || c.cs || "";
+    const title = (typeof ov.theme === "string" && ov.theme) ? ov.theme : (c.t || c.tema || (pt.itemName + " " + (i + 1)));
+    const fmtRaw = (c.formato || c.format || "").toString().trim();
+    const format = pt.key === "roteiro" ? "Roteiro" : (fmtRaw ? fmtRaw.charAt(0).toUpperCase() + fmtRaw.slice(1).toLowerCase() : pt.itemName);
+    let publicStatus, approvalState;
+    if (cs === "aprovado") { publicStatus = "Aprovado"; approvalState = "aprovado"; }
+    else if (cs === "em_revisao") { publicStatus = "Ajuste solicitado"; approvalState = "ajuste_solicitado"; }
+    else if (cs === "editado") { publicStatus = "Ajustado por você"; approvalState = "ajuste_solicitado"; }
+    else { publicStatus = stageWord(); approvalState = "pendente"; }
+    const out = {
+      publicId: "c" + (i + 1),
+      title: String(title),
+      format: format,
+      publicStatus: publicStatus,
+      approvalState: approvalState,
+      lastUpdatedAt: Number(ov.at) || 0,
+    };
+    const ed = progressEstimatedDate(c);
+    if (ed) out.estimatedDate = ed;
+    return out;
+  });
+
+  const approvalStateGlobal = cp.signals.done ? "concluida"
+    : (cp.signals.pendingAdjust ? "ajuste_solicitado"
+      : (currentIdx === 5 || currentIdx === 2 || currentIdx === 1 ? "aguardando_cliente" : "em_andamento"));
+
+  return {
+    projectId: projectId || "",
+    title: String(t.title || pt.titleFallback || docWord),
+    overallStatus: overallStatus,
+    progressPercent: cp.percent,
+    lastUpdatedAt: revision,
+    nextExpectedStage: nextExpectedStage,
+    stages: stages,
+    contents: contents,
+    approvalState: approvalStateGlobal,
+    revision: revision,
+  };
+}
+
+/* Flags DUPLAS — as duas precisam estar ligadas. */
+function clientProgressFlagsOn(env, task) {
+  return !!(env && env.CLIENT_PROGRESS_TRACKING_ENABLED === "true" && task && task.clientProgressEnabled === true);
+}
+
+/* projectId público DERIVADO (SHA-256 do id interno, truncado) — o taskId cru nunca sai. */
+async function publicProjectId(taskId) {
+  try {
+    const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("id7-progress:" + String(taskId)));
+    return "p" + [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+  } catch (_) { return "p0000000000000000"; }
+}
+
+/* Primeira visualização — IDEMPOTENTE: grava clientPortalFirstViewedAt UMA vez, com horário
+   do SERVIDOR, updateMask de 1 campo. NÃO toca updatedAt/status/kanban/SLA/notificações.
+   Nunca roda com flags desligadas; nunca roda no polling (/progress não escreve). */
+async function recordClientFirstView(env, accessToken, task) {
+  if (!clientProgressFlagsOn(env, task)) return false;
+  if (Number(task.clientPortalFirstViewedAt) > 0) return false;
+  const nowMs = Date.now();
+  const url = `${FIRESTORE_BASE}/projects/${env.FCM_PROJECT_ID}/databases/(default)/documents/tasks/${task.id}?updateMask.fieldPaths=clientPortalFirstViewedAt`;
+  try {
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Authorization": "Bearer " + accessToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: { clientPortalFirstViewedAt: { integerValue: String(nowMs) } } }),
+    });
+    if (res.ok) { task.clientPortalFirstViewedAt = nowMs; console.log("[PROGRESS] primeira visualizacao registrada task=" + task.id); return true; }
+    console.warn("[PROGRESS] falha ao registrar visualizacao:", res.status);
+  } catch (e) { console.warn("[PROGRESS] erro ao registrar visualizacao:", e && e.message); }
+  return false;
+}
+
+/* GET /cliente/cronograma/:token/progress — contrato público (no-store; ZERO writes). */
+async function handleClientCronogramaProgress(token, env) {
+  try {
+    if (!(env && env.CLIENT_PROGRESS_TRACKING_ENABLED === "true")) return jsonNoStore({ ok: false, error: "not_found" }, 200, env);
+    let accessToken;
+    try { accessToken = await getAccessToken(env, FCM_SCOPE + " " + DATASTORE_SCOPE); }
+    catch (e) { return jsonNoStore({ ok: false, error: "auth" }, 200, env); }
+    const task = await queryTaskByToken(env, accessToken, token);
+    if (!task || task.clientProgressEnabled !== true) return jsonNoStore({ ok: false, error: "not_found" }, 200, env);
+    const pid = await publicProjectId(task.id);
+    return jsonNoStore(Object.assign({ ok: true }, buildClientProgress(task, Date.now(), pid)), 200, env);
+  } catch (e) {
+    return jsonNoStore({ ok: false, error: "err" }, 200, env);
+  }
+}
+function jsonNoStore(obj, status, env) {
+  return new Response(JSON.stringify(obj), { status: status || 200, headers: Object.assign({ "Content-Type": "application/json", "Cache-Control": "no-store" }, corsHeaders(env)) });
+}
+
+/* Seção "ACOMPANHAMENTO DO PROJETO" — SÓ com as duas flags ligadas; caso contrário devolve
+   strings VAZIAS e o HTML do portal permanece BYTE-IDÊNTICO ao atual. */
+function clientProgressSectionParts(task, env) {
+  if (!clientProgressFlagsOn(env, task)) return { css: "", html: "", js: "" };
+  const p = buildClientProgress(task, Date.now(), "");
+  const esc = escapeHtml;
+  const hhmm = function (ms) { if (!ms) return ""; try { const d = new Date(Number(ms)); return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2); } catch (_) { return ""; } };
+  const css =
+    ".id7p-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}" +
+    ".id7p-cur{display:flex;flex-direction:column;gap:2px}.id7p-k{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}" +
+    ".id7p-cur b{font-size:15px}" +
+    ".id7p-pct{font-size:22px;font-weight:800;color:#34D399;white-space:nowrap}" +
+    ".id7p-bar{height:10px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid var(--line);overflow:hidden}" +
+    ".id7p-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#5B6CFF,#34D399)}" +
+    ".id7p-anim .id7p-fill{transition:width .6s ease}" +
+    ".id7p-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:8px;font-size:12px;color:var(--mut)}.id7p-meta b{color:var(--ink)}" +
+    ".id7p-stages{list-style:none;margin:14px 0 0;padding:0}" +
+    ".id7p-st{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed rgba(255,255,255,.06)}" +
+    ".id7p-st:last-child{border-bottom:none}" +
+    ".id7p-dot{width:12px;height:12px;border-radius:50%;margin-top:3px;flex:0 0 12px;background:rgba(255,255,255,.12);border:1px solid var(--line)}" +
+    ".id7p-st.done .id7p-dot{background:#34D399;border-color:#34D399}" +
+    ".id7p-st.cur .id7p-dot{background:#5B6CFF;border-color:#5B6CFF;box-shadow:0 0 0 4px rgba(91,108,255,.18)}" +
+    ".id7p-st .id7p-tx{flex:1;min-width:0}.id7p-st b{font-size:13px;display:block}" +
+    ".id7p-st small{color:var(--faint);font-size:11.5px;line-height:1.35;display:block}" +
+    ".id7p-st.pend b{color:var(--mut);font-weight:600}" +
+    ".id7p-st.cur b{color:#cdd3ff}" +
+    ".id7p-when{font-size:11px;color:var(--faint);white-space:nowrap;margin-top:2px}" +
+    ".id7p-cts{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}" +
+    ".id7p-ct{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12.5px}" +
+    ".id7p-ct .n{width:20px;height:20px;border-radius:6px;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 20px;color:var(--mut)}" +
+    ".id7p-ct .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+    ".id7p-ct .s{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--mut);white-space:nowrap}" +
+    ".id7p-ct .s.ok{color:#34D399;border-color:rgba(52,211,153,.4)}" +
+    ".id7p-ct .s.adj{color:#F59E0B;border-color:rgba(245,158,11,.4)}" +
+    "@media (max-width:520px){.id7p-pct{font-size:19px}.id7p-when{display:none}}";
+  const stagesHtml = p.stages.map(function (st) {
+    const cls = st.state === "completed" ? "done" : (st.state === "current" ? "cur" : "pend");
+    return '<li class="id7p-st ' + cls + '" data-id7pst="' + esc(st.key) + '"><span class="id7p-dot"></span>' +
+      '<div class="id7p-tx"><b>' + esc(st.label) + '</b><small>' + esc(st.description) + '</small></div>' +
+      '<span class="id7p-when" data-id7pwhen>' + esc(hhmm(st.updatedAt)) + '</span></li>';
+  }).join("");
+  const ctsHtml = p.contents.length ? '<div class="id7p-cts" id="id7p-cts">' + p.contents.map(function (c, i) {
+    const scls = c.approvalState === "aprovado" ? " ok" : (c.approvalState === "ajuste_solicitado" ? " adj" : "");
+    return '<div class="id7p-ct" data-id7pct="' + i + '"><span class="n">' + (i + 1) + '</span>' +
+      '<span class="t">' + esc(c.title) + '</span>' +
+      (c.estimatedDate ? '<span class="id7p-when">' + esc(c.estimatedDate) + '</span>' : '') +
+      '<span class="s' + scls + '" data-id7pcts>' + esc(c.publicStatus) + '</span></div>';
+  }).join("") + '</div>' : "";
+  const html =
+    '<div class="sec"><h2>Acompanhamento do projeto</h2></div>' +
+    '<div class="card pad" id="id7prog" data-rev="' + Number(p.revision) + '">' +
+      '<div class="id7p-head"><div class="id7p-cur"><span class="id7p-k">Etapa atual</span><b id="id7p-cur">' + esc(p.overallStatus) + '</b></div>' +
+      '<div class="id7p-pct" id="id7p-pct">' + p.progressPercent + '%</div></div>' +
+      '<div class="id7p-bar"><div class="id7p-fill" id="id7p-fill" style="width:' + p.progressPercent + '%"></div></div>' +
+      '<div class="id7p-meta"><span>Última atualização: <b id="id7p-upd">' + esc(hhmm(p.lastUpdatedAt) || "—") + '</b></span>' +
+      '<span>Próxima etapa: <b id="id7p-next">' + esc(p.nextExpectedStage || "—") + '</b></span></div>' +
+      '<ol class="id7p-stages" id="id7p-stages">' + stagesHtml + '</ol>' + ctsHtml +
+    '</div>';
+  const js = "\n" +
+    "/* F3.5.0 — ACOMPANHAMENTO: snapshot server-side + polling proprio 6s (no-store)." +
+    " So re-renderiza quando revision CRESCE (sem animacao falsa; sem duplicar). Falha de" +
+    " rede = silencio (mantem o estado; o proximo tick recupera sozinho). */\n" +
+    "(function(){\n" +
+    "var el=document.getElementById('id7prog');if(!el)return;\n" +
+    "var REV=Number(el.getAttribute('data-rev')||0),FIRST=true;\n" +
+    "function stcls(s){return s==='completed'?'done':(s==='current'?'cur':'pend');}\n" +
+    "function hhmm(ms){if(!ms)return '';try{var d=new Date(Number(ms));function z(n){return ('0'+n).slice(-2);}return z(d.getDate())+'/'+z(d.getMonth()+1)+' '+z(d.getHours())+':'+z(d.getMinutes());}catch(_){return '';}}\n" +
+    "function apply(j){\n" +
+    " if(FIRST){el.classList.add('id7p-anim');FIRST=false;}\n" +
+    " var f=document.getElementById('id7p-fill');if(f)f.style.width=Math.max(0,Math.min(100,Number(j.progressPercent)||0))+'%';\n" +
+    " var p=document.getElementById('id7p-pct');if(p)p.textContent=(Number(j.progressPercent)||0)+'%';\n" +
+    " var c=document.getElementById('id7p-cur');if(c)c.textContent=j.overallStatus||'';\n" +
+    " var u=document.getElementById('id7p-upd');if(u)u.textContent=hhmm(j.lastUpdatedAt)||'—';\n" +
+    " var n=document.getElementById('id7p-next');if(n)n.textContent=j.nextExpectedStage||'—';\n" +
+    " (j.stages||[]).forEach(function(st){var li=el.querySelector('[data-id7pst=\"'+st.key+'\"]');if(!li)return;li.className='id7p-st '+stcls(st.state);var w=li.querySelector('[data-id7pwhen]');if(w)w.textContent=hhmm(st.updatedAt);});\n" +
+    " (j.contents||[]).forEach(function(ct,i){var row=el.querySelector('[data-id7pct=\"'+i+'\"]');if(!row)return;var s=row.querySelector('[data-id7pcts]');if(s){s.textContent=ct.publicStatus||'';s.className='s'+(ct.approvalState==='aprovado'?' ok':(ct.approvalState==='ajuste_solicitado'?' adj':''));}});\n" +
+    "}\n" +
+    "function tick(){fetch('/cliente/cronograma/'+encodeURIComponent(TOKEN)+'/progress',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){\n" +
+    " if(!j||!j.ok)return;var rv=Number(j.revision||0);if(rv<=REV)return;REV=rv;el.setAttribute('data-rev',String(REV));apply(j);\n" +
+    "}).catch(function(){});}\n" +
+    "setInterval(tick,6000);\n" +
+    "})();\n";
+  return { css: css, html: html, js: js };
+}
+/* ============================== F3.5.0 PROGRESS (FIM) ============================== */
+
 /* Persistência ADITIVA e granular do feedback do cliente (V64.7).
    NÃO reescreve cronWeeks (evita clobber de edição concorrente do Desktop) e NÃO
    toca cronStatus/clientReview/history. Grava em 3 campos novos (merge por updateMask):
@@ -2604,7 +2943,17 @@ async function writeClientGranular(env, accessToken, task, e) {
 async function queryTaskByToken(env, accessToken, token) {
   for (const field of ["clientReviewToken", "shareToken"]) {
     const task = await queryTaskByField(env, accessToken, field, token);
-    if (task) { console.log(`[CLIENT-VIEW] task achada por ${field}`); return task; }
+    if (task) {
+      // F3.5.0 — revogação/expiração OPCIONAIS do link (aditivo, task-level, fail-open):
+      // revoked=true OU expiresAt vencido ⇒ tratado como NÃO ENCONTRADO em TODAS as rotas
+      // do cliente (mesma página 404 amigável). Campos AUSENTES ⇒ comportamento idêntico
+      // ao atual (links existentes preservados). Token só aparece truncado (6 chars).
+      if (task.clientReviewTokenRevoked === true) { console.log(`[CLIENT-VIEW] link revogado: ${String(token).slice(0, 6)}…`); return null; }
+      const _expMs = Number(task.clientReviewTokenExpiresAt) || 0;
+      if (_expMs > 0 && Date.now() > _expMs) { console.log(`[CLIENT-VIEW] link expirado: ${String(token).slice(0, 6)}…`); return null; }
+      console.log(`[CLIENT-VIEW] task achada por ${field}`);
+      return task;
+    }
   }
   return null;
 }
@@ -3537,6 +3886,10 @@ function renderClientHtml(task, token, env, origin) {
   const ogTitle = escapeHtml(ogTitleRaw);
   const ogDesc = escapeHtml(ogDescRaw);
 
+  // F3.5.0 — ACOMPANHAMENTO DO PROJETO (flags duplas). Com QUALQUER flag desligada as 3
+  // partes são strings VAZIAS e o HTML abaixo permanece BYTE-IDÊNTICO ao portal atual.
+  const prog = clientProgressSectionParts(task, env);
+
   return '<!doctype html>\n<html lang="pt-BR"><head>\n' +
 '<meta charset="utf-8"/>\n' +
 '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>\n' +
@@ -3546,7 +3899,7 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token, pt.i
 '<meta name="description" content="' + ogDesc + '"/>\n' +
 '<meta name="theme-color" content="#5B6CFF"/>\n' +
 '<meta name="robots" content="noindex,nofollow"/>\n' +
-'<style>' + CV_CSS + '</style></head><body>\n' +
+'<style>' + CV_CSS + prog.css + '</style></head><body>\n' +
 '<div class="wrap">' +
   '<div class="topbar"><div class="brand">' + CV_LOGO + '<div class="bn">Agenda ID Seven<small>Visão do Cliente</small></div></div>' +
     '<div class="secure">' + ICN.shield + '<span class="lbl">Link seguro</span></div></div>' +
@@ -3574,6 +3927,7 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token, pt.i
     '<div style="text-align:right;margin-top:10px"><button class="ibtn" data-act="sendGenObs">' + ICN.note + 'Enviar observação geral</button></div></div>' +
   '<div class="sec' + (acts.length ? '' : ' hide') + '" data-histsec><h2>Histórico de feedback</h2></div>' +
   '<div class="hist" id="hist">' + histHtml + '</div>' +
+  prog.html +
   '<div class="foot">Link público seguro · Agenda ID Seven · ' + new Date().getFullYear() + '</div>' +
 '</div>' +
 '<div class="gactions"><div class="inner">' + (pendingRevision
@@ -3595,7 +3949,7 @@ ogClientMeta(origin, ogTitleRaw, ogDescRaw, "/cliente/cronograma/" + token, pt.i
 // VAPID_PUBLIC_KEY e injetada para uso em pushManager.subscribe (aplicationServerKey).
 'var ENABLE_PUSH=' + JSON.stringify(env && env.ENABLE_CLIENT_WEB_PUSH === "true") + ';' +
 'var VAPID_PUBLIC_KEY=' + JSON.stringify((env && env.VAPID_PUBLIC_KEY) || "") + ';\n' +
-CV_JS + '\n</script>\n' +
+CV_JS + prog.js + '\n</script>\n' +
 '</body></html>';
 }
 

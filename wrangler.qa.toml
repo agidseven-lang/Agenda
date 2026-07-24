@@ -25,3 +25,6 @@ WHATSAPP_TEMPLATE_LANG = "pt_BR"
 WHATSAPP_GRAPH_VERSION = "v25.0"
 VAPID_SUBJECT = "mailto:contato@agendaidseven.com.br"
 ENABLE_CLIENT_WEB_PUSH = "true"
+# F3.5.0A — ACOMPANHAMENTO DO PROJETO: flag global DESLIGADA por padrão no deploy QA.
+# A seção só aparece com esta flag "true" E task.clientProgressEnabled=true (dupla flag).
+CLIENT_PROGRESS_TRACKING_ENABLED = "false"
