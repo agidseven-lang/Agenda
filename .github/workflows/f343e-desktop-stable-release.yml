@@ -8,7 +8,8 @@
 # workflows — provado pelo gate f346-hotfix-region-invariance DENTRO do run). Substitui a 1.0.182
 # como Latest. TUDO PINADO: run id, SHA do codigo (alvo da tag), nomes+digests
 # dos artifacts, hashes SHA-256 (EXE/MSI/latest.yml/blockmap), tag e titulo. O job:
-#   0) verifica RELEASE_PAT presente E ATIVO (leitura read-only) ANTES de tudo;
+#   0) gera o token temporario do Release Bot (GitHub App) e valida acesso +
+#      Contents:write + escopo restrito ao Agenda (read-only) ANTES de tudo;
 #   1) exige confirmacao literal (input) — publicacao direta estavel AUTORIZADA
 #      pelo mandato F3.4.5 apos todos os gates verdes;
 #   2) valida run 30016688862 = completed/success E head_sha == SHA pinado;
@@ -31,11 +32,14 @@
 # registrado f343e-desktop-stable-release.yml — o dispatch com
 # ref=desktop/f346-calendar-grid-visual-hotfix executa ESTA copia pinada
 # (nenhum push a main necessario). MESMO mecanismo aprovado da v1.0.181.
-# CREDENCIAIS (padrao aprovado F3.4.3E/F3.4.4A): leituras/verificacoes usam o GITHUB_TOKEN
-# padrao; as ESCRITAS (criar tag v1.0.183 + criar release + enviar assets) usam EXCLUSIVAMENTE
-# secrets.RELEASE_PAT (env por-step; NUNCA impresso/logado — o Actions mascara secrets; checagem
-# de presenca+atividade read-only; ausente/invalido => aborta SEM publicar NADA). Depois do smoke,
-# o protocolo pede REMOCAO do secret e REVOGACAO do token temporario.
+# CREDENCIAIS (OPS-GITHUB-APP-PERMANENT-RELEASE-AUTOMATION): leituras/gates/downloads usam o
+# GITHUB_TOKEN padrao (somente leitura). As ESCRITAS (criar tag + criar release + enviar assets +
+# marcar Latest) usam EXCLUSIVAMENTE um TOKEN TEMPORARIO do GitHub App "Agenda ID Seven Release
+# Bot", gerado NESTE run por actions/create-github-app-token@v3 (vars.RELEASE_APP_CLIENT_ID +
+# secrets.RELEASE_APP_PRIVATE_KEY; instalacao restrita ao repositorio Agenda; permission
+# contents:write). O token expira sozinho (~1h) e e revogado no post-step da action — NENHUM
+# PAT manual, NENHUMA rotina de criacao/remocao/revogacao manual, SEM fallback de escrita.
+# O token NUNCA e impresso (o Actions mascara secrets/outputs sensiveis).
 # Execucao SOMENTE manual (workflow_dispatch). Publicacao estavel direta autorizada
 # pelo mandato F3.4.6-DESKTOP-CALENDAR-DAY-GRID-VISUAL-RESTORE-STABLE.
 # =====================================================================
@@ -53,8 +57,9 @@ name: "[manual] F3.4.6 Desktop Stable Release — 1.0.183 (Latest)"
         required: false
         default: "desktop/f346-calendar-grid-visual-hotfix"
 
+# GITHUB_TOKEN SOMENTE LEITURA (mandato OPS): toda ESCRITA sai do token do Release Bot.
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 jobs:
@@ -87,18 +92,33 @@ jobs:
       CANARY_A_TAG: "v1.0.178-canary.2"
       CANARY_B_TAG: "v1.0.179-canary.5"
     steps:
-      - name: "Gate 0 — RELEASE_PAT presente e ATIVO (leitura read-only; nada publicado se falhar)"
+      - name: "Gate 0a — gerar token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + Contents:write + escopo SO Agenda (read-only)"
         env:
-          PAT: ${{ secrets.RELEASE_PAT }}
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
         run: |
           set -euo pipefail
-          # Mandato F3.4.5: verificar RELEASE_PAT ANTES da tag/release; ausente => PARAR e pedir
-          # novo token temporario ao owner. Checagem de PRESENCA + uma LEITURA (valida atividade)
-          # — nunca imprime o valor (o Actions mascara secrets nos logs).
-          [ -n "$PAT" ] || { echo "::error::secrets.RELEASE_PAT AUSENTE — PARAR: solicitar ao owner novo token temporario. NADA foi publicado."; exit 1; }
-          FN="$(GH_TOKEN="$PAT" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
-          [ "$FN" = "$REPO" ] || { echo "::error::RELEASE_PAT presente porem INATIVO/sem acesso (leitura falhou) — PARAR: solicitar token valido. NADA foi publicado."; exit 1; }
-          echo "OK: RELEASE_PAT presente e ativo (leitura de repos/$REPO confirmada)"
+          # Validacao SEM escrita: leitura do repo + inventario da instalacao (escopo) + permissao.
+          # O token NUNCA e impresso (mascarado pelo Actions).
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA foi publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso de leitura a $REPO — NADA foi publicado."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"; W="$(echo "$J" | jq -r '.repositories[0].permissions.push')"
+          echo "instalacao do Release Bot: total_count=$N repo=$R contents_write=$W"
+          [ "$N" = "1" ] || { echo "::error::escopo do Release Bot NAO esta limitado a 1 repositorio ($N) — NADA foi publicado."; exit 1; }
+          [ "$R" = "$REPO" ] || { echo "::error::escopo do Release Bot aponta para outro repositorio ($R) — NADA foi publicado."; exit 1; }
+          [ "$W" = "true" ] || { echo "::error::token do Release Bot SEM Contents:write — NADA foi publicado."; exit 1; }
+          echo "OK: Release Bot ativo, Contents:write, escopo restrito a $REPO"
 
       - name: "Gate 1 — confirmacao literal"
         env:
@@ -255,12 +275,12 @@ jobs:
           delta autorizado F3.4.6 — provado por gate).
           NOTAS
 
-      - name: "Criar a tag pinada (git data API) — ESCRITA via RELEASE_PAT"
+      - name: "Criar a tag pinada (git data API) — ESCRITA via token do Release Bot"
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
         run: |
           set -euo pipefail
-          [ -n "$GH_TOKEN" ] || { echo "::error::secrets.RELEASE_PAT ausente/vazio — nada publicado"; exit 1; }
+          [ -n "$GH_TOKEN" ] || { echo "::error::token do Release Bot ausente/vazio — nada publicado"; exit 1; }
           if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
             TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
             [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para OUTRO sha ($TS)"; exit 1; }
@@ -274,12 +294,12 @@ jobs:
             echo "OK: tag $TAG criada em $STABLE_SHA"
           fi
 
-      - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets — ESCRITA via RELEASE_PAT"
+      - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets — ESCRITA via token do Release Bot"
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
         run: |
           set -euo pipefail
-          [ -n "$GH_TOKEN" ] || { echo "::error::secrets.RELEASE_PAT ausente/vazio — nada publicado"; exit 1; }
+          [ -n "$GH_TOKEN" ] || { echo "::error::token do Release Bot ausente/vazio — nada publicado"; exit 1; }
           gh release create "$TAG" -R "$REPO" \
             --target "$STABLE_SHA" \
             --latest=true \
