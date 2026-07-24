@@ -1,0 +1,63 @@
+# =====================================================================
+# [manual] OPS — Release Bot Self-Test (GitHub App "Agenda ID Seven Release Bot")
+# ---------------------------------------------------------------------
+# Prova, SEM NENHUMA ESCRITA, que a automacao permanente de release esta pronta:
+#   1) gera um token TEMPORARIO do App via actions/create-github-app-token@v3
+#      (vars.RELEASE_APP_CLIENT_ID + secrets.RELEASE_APP_PRIVATE_KEY; expira ~1h e
+#      e revogado no post-step da action);
+#   2) confirma ACESSO de leitura ao repositorio agidseven-lang/Agenda;
+#   3) confirma a permissao Contents: WRITE do token (campo permissions.push do
+#      inventario da instalacao — checagem declarativa, sem escrever nada);
+#   4) prova o ESCOPO LIMITADO: a instalacao enxerga EXATAMENTE 1 repositorio, o Agenda.
+# NAO cria tag, NAO cria release, NAO envia assets, NAO modifica arquivos, NAO
+# imprime o token (o Actions mascara secrets/outputs sensiveis).
+# Saida esperada no log: RELEASE BOT READY
+# Publicacoes REAIS continuam exigindo o comando literal PUBLICAR-DESKTOP-X.Y.Z-STABLE
+# no workflow de release (f343e-desktop-stable-release.yml) — este self-test nao publica.
+# =====================================================================
+name: "[manual] OPS Release Bot Self-Test (App token — sem escrita)"
+
+"on":
+  workflow_dispatch:
+
+# GITHUB_TOKEN minimo (leitura); nenhuma escrita em lugar nenhum.
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    env:
+      REPO: agidseven-lang/Agenda
+    steps:
+      - name: "1 — gerar token temporario do Release Bot (GitHub App)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+
+      - name: "2/3/4 — acesso + Contents:write + escopo limitado ao Agenda (ZERO escrita)"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio"; exit 1; }
+          # 2) acesso de leitura ao Agenda
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso de leitura a $REPO"; exit 1; }
+          echo "acesso ao repositorio: OK ($FN)"
+          # 3+4) inventario da instalacao: escopo + permissao (leitura declarativa; nada e escrito)
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"
+          R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          W="$(echo "$J" | jq -r '.repositories[0].permissions.push')"
+          echo "escopo da instalacao: total_count=$N repo=$R contents_write=$W"
+          [ "$N" = "1" ] || { echo "::error::escopo NAO limitado a 1 repositorio (total=$N)"; exit 1; }
+          [ "$R" = "$REPO" ] || { echo "::error::escopo aponta para outro repositorio ($R)"; exit 1; }
+          [ "$W" = "true" ] || { echo "::error::token SEM Contents:write (permissions.push=$W)"; exit 1; }
+          echo "confirmado: NENHUMA tag criada, NENHUMA release criada, NENHUM asset enviado, NENHUM arquivo modificado."
+          echo "RELEASE BOT READY"

@@ -1,48 +1,65 @@
 # =====================================================================
-# [manual] F3.4.3E — Publicacao da RELEASE ESTAVEL Desktop 1.0.180 (PRODUCAO / Latest)
+# [manual] F3.4.6 — Publicacao da RELEASE ESTAVEL Desktop 1.0.183 (PRODUCAO / Latest)
 # ---------------------------------------------------------------------
-# Publica a release ESTAVEL de PRODUCAO 1.0.180 (canal latest) do run
-# 29881247041 (build gated, todos os gates verdes; fonte 68598fa =
-# rc.2 fisicamente aprovado + APENAS o numero de versao). Substitui a
-# 1.0.178 como Latest. TUDO PINADO: run id, SHA do codigo (alvo da tag),
-# nomes+digests dos artifacts, hashes SHA-256 (EXE/MSI/latest.yml/blockmap),
-# tag e titulo. O job:
-#   1) exige confirmacao literal (input);
-#   2) valida run 29881247041 = completed/success;
-#   3) confirma o head do branch estavel == SHA pinado (alvo da tag);
-#   4) aborta se a tag/release v1.0.180 ja existir;
+# Publica a release ESTAVEL de PRODUCAO 1.0.183 (canal latest) do run
+# 30090998191 (candidato estavel gated, 28/28 steps verdes — inclui o QA VISUAL
+# Playwright 37/0 da grade diaria; fonte 3981bf2 = base OFICIAL 1.0.182 @11520f5 +
+# SOMENTE o delta AUTORIZADO F3.4.6 da grade do calendario + versao + testes/
+# workflows — provado pelo gate f346-hotfix-region-invariance DENTRO do run). Substitui a 1.0.182
+# como Latest. TUDO PINADO: run id, SHA do codigo (alvo da tag), nomes+digests
+# dos artifacts, hashes SHA-256 (EXE/MSI/latest.yml/blockmap), tag e titulo. O job:
+#   0) gera o token temporario do Release Bot (GitHub App) e valida acesso +
+#      Contents:write + escopo restrito ao Agenda (read-only) ANTES de tudo;
+#   1) exige confirmacao literal (input) — publicacao direta estavel AUTORIZADA
+#      pelo mandato F3.4.5 apos todos os gates verdes;
+#   2) valida run 30016688862 = completed/success E head_sha == SHA pinado;
+#   3) confirma que o delta pos-candidato na branch e SO .github/workflows/**;
+#   4) aborta se a tag/release v1.0.183 ja existir (tag preexistente so se
+#      apontar EXATAMENTE para o SHA pinado);
 #   5) baixa os 2 artifacts (installer + updatemeta), confere ids+digests e
 #      os hashes byte a byte (divergiu => aborta SEM publicar);
 #   6) cria a release prerelease=false, latest=true, tag no SHA estavel;
 #   7) anexa 7 assets: EXE, MSI, latest.yml, blockmap, SHA256SUMS,
 #      VERSAO-DESKTOP.txt, RELATORIO-DESKTOP.txt (app-update.yml NAO e asset);
-#   8) pos-verifica flags/assets/target + confirma que a 1.0.180 VIROU Latest,
-#      a 1.0.178 segue PRESERVADA (release existe, deixa de ser Latest), e as
-#      prereleases historicas (canary) seguem preservadas como prereleases;
+#   8) pos-verifica flags/assets/target + confirma que a 1.0.182 VIROU Latest,
+#      a 1.0.182 segue PRESERVADA para rollback (release existe, deixa de ser
+#      Latest), 1.0.181/1.0.180/1.0.178 historicas seguem presentes e os canarios
+#      seguem prereleases;
 #   9) smoke: re-baixa EXE + latest.yml da release e reconfere os hashes.
-# NAO builda, NAO deploya, NAO toca Firebase/Worker/Rules/flags, NAO mexe em
-# releases/tags antigas.
-# CREDENCIAIS (decisao do owner): leituras/verificacoes usam o GITHUB_TOKEN padrao; as ESCRITAS
-# (criar tag v1.0.180 + criar release + enviar assets) usam EXCLUSIVAMENTE secrets.RELEASE_PAT
-# (env por-step; NUNCA impresso/logado — o Actions mascara secrets; apenas checagem de presenca).
-# Execucao SOMENTE manual (workflow_dispatch), somente apos GO fisico do owner.
+# NAO builda, NAO deploya, NAO toca Firebase/Worker/Rules/flags/Android, NAO
+# mexe em releases/tags antigas.
+# MECANISMO DE BRANCH: este arquivo e a COPIA DO BRANCH do workflow ja
+# registrado f343e-desktop-stable-release.yml — o dispatch com
+# ref=desktop/f346-calendar-grid-visual-hotfix executa ESTA copia pinada
+# (nenhum push a main necessario). MESMO mecanismo aprovado da v1.0.181.
+# CREDENCIAIS (OPS-GITHUB-APP-PERMANENT-RELEASE-AUTOMATION): leituras/gates/downloads usam o
+# GITHUB_TOKEN padrao (somente leitura). As ESCRITAS (criar tag + criar release + enviar assets +
+# marcar Latest) usam EXCLUSIVAMENTE um TOKEN TEMPORARIO do GitHub App "Agenda ID Seven Release
+# Bot", gerado NESTE run por actions/create-github-app-token@v3 (vars.RELEASE_APP_CLIENT_ID +
+# secrets.RELEASE_APP_PRIVATE_KEY; instalacao restrita ao repositorio Agenda; permission
+# contents:write). O token expira sozinho (~1h) e e revogado no post-step da action — NENHUM
+# PAT manual, NENHUMA rotina de criacao/remocao/revogacao manual, SEM fallback de escrita.
+# O token NUNCA e impresso (o Actions mascara secrets/outputs sensiveis).
+# Execucao SOMENTE manual (workflow_dispatch). Publicacao estavel direta autorizada
+# pelo mandato F3.4.6-DESKTOP-CALENDAR-DAY-GRID-VISUAL-RESTORE-STABLE.
 # =====================================================================
-name: "[manual] F3.4.3E Desktop Stable Release — 1.0.180 (Latest)"
+name: "[manual] F3.4.6 Desktop Stable Release — 1.0.183 (Latest)"
 
 "on":
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Digite PUBLICAR-DESKTOP-1.0.180-STABLE para autorizar"
+        description: "Digite PUBLICAR-DESKTOP-1.0.183-STABLE para autorizar"
         required: true
         default: ""
       ref:
         description: "IGNORADO — só compatibilidade de schema com o dispatch registrado (mecanismo de branch)"
         required: false
-        default: "desktop/f343-background-notifications-hotfix"
+        default: "desktop/f346-calendar-grid-visual-hotfix"
 
+# GITHUB_TOKEN SOMENTE LEITURA (mandato OPS): toda ESCRITA sai do token do Release Bot.
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 jobs:
@@ -51,53 +68,80 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: agidseven-lang/Agenda
-      RUN_ID: "29881247041"
-      STABLE_SHA: "68598fae54e75dd34a399ffca65649cc8ff6d16c"
-      DESK_BRANCH: "desktop/f343-background-notifications-hotfix"
-      TAG: "v1.0.180"
-      TITLE: "Agenda ID Seven Desktop 1.0.180 — Produção Estável"
-      ART_INST: "agenda-id-seven-desktop-1.0.180-installer"
-      ART_INST_DIGEST: "sha256:c1d74e2664315e525969e0def7b38851ed1162ba29db108192d8ac06cde6f73e"
-      ART_META: "agenda-id-seven-desktop-1.0.180-updatemeta"
-      ART_META_DIGEST: "sha256:120c38195452e0250a33103237863fdf8e437423f96149ef2d19bd175443c39f"
-      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.180-x64.exe"
-      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.180-x64.msi"
-      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.180-x64.exe.blockmap"
+      RUN_ID: "30090998191"
+      STABLE_SHA: "3981bf2bf8611caf8bb7057e2245b5834bf66754"
+      DESK_BRANCH: "desktop/f346-calendar-grid-visual-hotfix"
+      TAG: "v1.0.183"
+      TITLE: "Agenda ID Seven Desktop 1.0.183 — Produção Estável"
+      ART_INST: "agenda-id-seven-desktop-1.0.183-installer"
+      ART_INST_DIGEST: "sha256:190eea748efb60b53c7cbb7edb82a3aa53af740d7ff0c643cee7a7ac029b7e0b"
+      ART_META: "agenda-id-seven-desktop-1.0.183-updatemeta"
+      ART_META_DIGEST: "sha256:108cf4b49653304d7dccdbc7b79b982b8d0021bd68a981a2236ea02427765b3c"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.183-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.183-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.183-x64.exe.blockmap"
       LY_NAME: "latest.yml"
-      EXP_EXE: "8068d61ea823ce627fc310ea699212b34cf74e58e49e05a4c694df51011dc313"
-      EXP_MSI: "d1962f055de459752b4e836b1e182d8410bc0470ff8a524d89784f05de0d0038"
-      EXP_LY: "cbf68242132318eefcebbb2a4c15d83a79e42047feb623d3d8914fb57a57591c"
-      EXP_BM: "87e8b445eb3221059fc5636de0d3f1a9262f4253aba5fefd8c1963e94feea997"
-      PROD_PREV_TAG: "v1.0.178"
+      EXP_EXE: "c5cdd2a645871ab3ea6e1c53e7e93b4d62af62272a2d65a7423627f37f138887"
+      EXP_MSI: "4b8b8a29ae371866ecb2d4a65ca301b5a929f5606fab25f7869b3c6740b6be45"
+      EXP_LY: "4ca79eec5ae4e63021a4f96cd0ff19632fa1c02ceb0ff2ec66e255fe8e7903c0"
+      EXP_BM: "52ce721564fe4ed5235448afc17aa330fcce79626241a531b03a2e22e149bc6e"
+      PROD_PREV_TAG: "v1.0.182"
+      PROD_ROLLBACK_TAG: "v1.0.181"
+      PROD_HIST_TAG: "v1.0.180"
+      PROD_HIST2_TAG: "v1.0.178"
       CANARY_A_TAG: "v1.0.178-canary.2"
       CANARY_B_TAG: "v1.0.179-canary.5"
     steps:
+      - name: "Gate 0a — gerar token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + Contents:write + escopo SO Agenda (read-only)"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Validacao SEM escrita: leitura do repo + inventario da instalacao (escopo) + permissao.
+          # O token NUNCA e impresso (mascarado pelo Actions).
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA foi publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso de leitura a $REPO — NADA foi publicado."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"; W="$(echo "$J" | jq -r '.repositories[0].permissions.push')"
+          echo "instalacao do Release Bot: total_count=$N repo=$R contents_write=$W"
+          [ "$N" = "1" ] || { echo "::error::escopo do Release Bot NAO esta limitado a 1 repositorio ($N) — NADA foi publicado."; exit 1; }
+          [ "$R" = "$REPO" ] || { echo "::error::escopo do Release Bot aponta para outro repositorio ($R) — NADA foi publicado."; exit 1; }
+          [ "$W" = "true" ] || { echo "::error::token do Release Bot SEM Contents:write — NADA foi publicado."; exit 1; }
+          echo "OK: Release Bot ativo, Contents:write, escopo restrito a $REPO"
+
       - name: "Gate 1 — confirmacao literal"
         env:
           CONFIRM: ${{ github.event.inputs.confirm }}
         run: |
-          if [ "$CONFIRM" != "PUBLICAR-DESKTOP-1.0.180-STABLE" ]; then
+          if [ "$CONFIRM" != "PUBLICAR-DESKTOP-1.0.183-STABLE" ]; then
             echo "::error::confirmacao invalida — nada foi publicado"; exit 1
           fi
           echo "OK: confirmacao literal valida"
 
-      - name: "Gate 2 — run completed/success"
+      - name: "Gate 2 — run completed/success no SHA pinado"
         run: |
           set -euo pipefail
           ST="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.status + "|" + .conclusion')"
           echo "run $RUN_ID: $ST"
           [ "$ST" = "completed|success" ] || { echo "::error::run invalido para publicacao"; exit 1; }
-          # ANTES-DE-PUBLICAR #3 (owner): o run FOI construido do commit pinado 68598fa.
           HS="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.head_sha')"
           echo "run head_sha: $HS (esperado $STABLE_SHA)"
-          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::run NAO foi construido do commit pinado 68598fa"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::run NAO foi construido do commit pinado 3981bf2"; exit 1; }
 
-      - name: "Gate 3 — 68598fa ancestral do head; delta pos-candidato SO em .github/workflows (mecanismo de branch)"
+      - name: "Gate 3 — 3981bf2 ancestral do head; delta pos-candidato SO em .github/workflows (mecanismo de branch)"
         run: |
           set -euo pipefail
-          # A tag alveja o SHA PINADO ($STABLE_SHA), nunca o head. Este gate prova que o unico
-          # delta pos-candidato na branch e o MECANISMO DE PUBLICACAO (.github/workflows/**) —
-          # zero codigo/produto/worker/android depois do candidato buildado.
           H="$(gh api "repos/$REPO/git/ref/heads/$DESK_BRANCH" --jq '.object.sha')"
           echo "head $DESK_BRANCH: $H (alvo da tag PINADO: $STABLE_SHA)"
           CMP="$(gh api "repos/$REPO/compare/$STABLE_SHA...$H")"
@@ -111,9 +155,6 @@ jobs:
       - name: "Gate 4 — release NAO pode existir; tag so pode preexistir APONTANDO para o SHA pinado"
         run: |
           set -euo pipefail
-          # A release JAMAIS pode preexistir (nunca republicar/alterar versao). A tag pode preexistir
-          # SOMENTE apontando EXATAMENTE para o SHA pinado (resto de tentativa anterior DESTE workflow
-          # pinado, interrompida entre criar-tag e criar-release) — qualquer outro alvo aborta.
           if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
           if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
             TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
@@ -149,7 +190,6 @@ jobs:
             test -f "pacote/$f" || { echo "::error::asset ausente no artifact: $f"; exit 1; }
           done
           test -f pacote/app-update.yml && { echo "::error::app-update.yml NAO deve ser asset publico"; exit 1; } || true
-          # ANTES-DE-PUBLICAR #6 (owner): canary.yml AUSENTE (canal estavel puro, sem ambiguidade).
           test -f pacote/canary.yml && { echo "::error::canary.yml presente — canal ambiguo, ABORTAR"; exit 1; } || true
 
       - name: "Gate 6 — hashes SHA-256 conferem (aborta se divergir)"
@@ -165,10 +205,8 @@ jobs:
           [ "$H_LY" = "$EXP_LY" ] || { echo "::error::hash latest.yml divergente"; exit 1; }
           [ "$H_BM" = "$EXP_BM" ] || { echo "::error::hash blockmap divergente"; exit 1; }
           ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
-          grep -q "version: 1.0.180" "pacote/$LY_NAME" || { echo "::error::latest.yml version incorreta"; exit 1; }
+          grep -q "version: 1.0.183" "pacote/$LY_NAME" || { echo "::error::latest.yml version incorreta"; exit 1; }
           grep -qF "$EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml nao referencia o EXE (mesmo run)"; exit 1; }
-          # ANTES-DE-PUBLICAR #7-9 (owner): canal/flags REGISTRADOS pelo build (VERSAO-DESKTOP.txt,
-          # espelho do gate que abriu o app.asar e provou allowPrerelease->channel->allowDowngrade).
           grep -Eq '^channel +: latest$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem channel=latest"; exit 1; }
           grep -Eq '^allowPrerelease +: false$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem allowPrerelease=false"; exit 1; }
           grep -Eq '^allowDowngrade +: false$' pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem allowDowngrade=false"; exit 1; }
@@ -177,73 +215,72 @@ jobs:
       - name: "Release notes"
         run: |
           cat > notas.md <<'NOTAS'
-          Agenda ID Seven Desktop 1.0.180 — Produção Estável
+          Agenda ID Seven Desktop 1.0.183 — Produção Estável
 
-          Sucessora da 1.0.178 como versão oficial (Latest), canal ESTÁVEL (latest). Instalar em
-          máquinas autorizadas após conferência de hash. Auto-update: máquinas 1.0.178 detectam,
-          baixam (após ação do usuário) e instalam (após confirmação) esta 1.0.180 pelo canal latest.
+          Sucessora da 1.0.182 como versão oficial (Latest), canal ESTÁVEL (latest). Auto-update:
+          máquinas 1.0.182 detectam, baixam (após ação do usuário) e instalam (após confirmação)
+          esta 1.0.183 pelo canal latest.
 
-          O QUE MUDA vs 1.0.178
-          - F3.4.3 — NOTIFICAÇÕES DE FUNDO com PRODUTOR ÚNICO no processo MAIN: as notificações de
-            SLA (amarela/vermelha/crítica), de ATRIBUIÇÃO (azul) e o operational_block passam a ser
-            produzidas no main (slaScheduler/notifier), que sobrevive à janela minimizada/fechada no X
-            (bandeja). O renderer mantém só o visual. Regras de SLA portadas VALOR-A-VALOR (Golden
-            Master 219/0). Aprovado fisicamente pelo owner (aberto, minimizado, fechado no X).
-          - F3.4.3E — correção do vazamento de estado `_sendAfterSave`: a flag é inicializada em
-            false, CONSUMIDA e LIMPA com segurança no saveTask (uma tentativa interrompida por
-            validação/erro não deixa ação pendente), e limpa na troca de setor; e o modal de envio ao
-            cliente só abre quando o setor SALVO é comprovadamente de cliente (isClientSector). Assim,
-            uma atribuição interna ao Designer (edicao_midia/Social/Roteiro) NUNCA abre o modal de
-            reautenticação/cliente. Aprovado fisicamente pelo owner.
+          O QUE MUDA vs 1.0.182
+          - F3.4.6 — GRADE DIÁRIA DO CALENDÁRIO (Agenda/Mês) RESTAURADA: cada dia volta a ter a sua
+            PRÓPRIA célula emoldurada (superfície + borda), com as divisões horizontais e verticais
+            visíveis — 7 colunas fixas (domingo a sábado), alturas consistentes por semana, número do
+            dia e compromissos (dots) DENTRO da própria célula, células vazias sempre visíveis, datas
+            do mês anterior/seguinte discretas porém visíveis, data atual contornada e seleção em
+            destaque. Visual idêntico ao anteriormente aprovado (linhagem PWA .cell); o port Desktop
+            havia herdado células transparentes ("datas soltas numa área única" — prova física do owner).
+          - Implementação CIRÚRGICA: apenas classes novas .agcell/.agcell-dim/.agcell-today/.agcell-sel
+            no <style> e a célula do calendarGrid passando a usá-las. NENHUMA regra de negócio, dado,
+            contrato, scheduler, notificação, SLA, dedupe ou autenticação alterada (provado por gate
+            byte-a-byte vs 1.0.182 no próprio run de build).
+          - QA VISUAL automatizado no CI: 37 asserts + 17 capturas (meses de 5/6 linhas, início no
+            domingo/meio da semana, mês vazio, vários compromissos no mesmo dia, cancelados, todos os
+            filtros, busca, 1366×768, 1920×1080, janela restaurada, escala 100%/125%, tema escuro).
 
           UPDATER (produção)
           - allowPrerelease=false, channel="latest", allowDowngrade=false, autoDownload=false,
             autoInstallOnAppQuit=false, forceDevUpdateConfig=false (verificado DENTRO do app.asar).
             Download só após ação do usuário; instalação só após confirmação; nunca silencioso.
-            Máquinas estáveis NUNCA veem prereleases/canário (canal isolado). Metadata do MESMO build:
-            latest.yml + <exe>.blockmap; app-update.yml só dentro do pacote (provider github público,
-            sem token no cliente).
+            Metadata do MESMO build: latest.yml + <exe>.blockmap; app-update.yml só dentro do pacote.
 
           PRESERVAÇÃO (zero regressão fora do escopo aprovado)
-          - Código de produto byte-idêntico ao rc.2 fisicamente aprovado (diff = só o número de
-            versão). Worker J6 (cloudflare-worker.js) + wrangler + Android byte-idênticos à 1.0.178.
-            updaterService/bgNotify/firebase/tray/reminder/clockSync/auth-core/preload intocados.
-          - Rollback: 1.0.178 PRESERVADA (reinstalar / re-marcar Latest). Prereleases históricas
-            (v1.0.178-canary.*, v1.0.179-canary.*) preservadas.
+          - Fonte = 1.0.182 OFICIAL @11520f5 + SOMENTE a grade autorizada (index.html) + versão +
+            testes/workflows. slaRules/slaScheduler/notifier/clockSync/updaterService/auth intocados.
+            Worker J6 + wrangler + Android + Functions/Rules byte-idênticos. Suítes: SLA Golden Master
+            219/0 · Golden Master TEMPORAL 43/0 · Flow Golden Master 842-corpus 0 divergência ·
+            contrato movimentação repetida 64/0 · f343d 44/0 · updater state-machine 57/0 ·
+            regiões f343/f344/f345/f346 verdes · QA visual 37/0.
+          - Rollback: 1.0.182 PRESERVADA (reinstalar / re-marcar Latest); 1.0.181, 1.0.180 e 1.0.178
+            históricas preservadas. Prereleases canary preservadas.
 
           HASHES OFICIAIS (SHA-256)
-          - EXE: 8068d61ea823ce627fc310ea699212b34cf74e58e49e05a4c694df51011dc313
-          - MSI: d1962f055de459752b4e836b1e182d8410bc0470ff8a524d89784f05de0d0038
-          - latest.yml: cbf68242132318eefcebbb2a4c15d83a79e42047feb623d3d8914fb57a57591c
-          - blockmap: 87e8b445eb3221059fc5636de0d3f1a9262f4253aba5fefd8c1963e94feea997
+          - EXE: c5cdd2a645871ab3ea6e1c53e7e93b4d62af62272a2d65a7423627f37f138887
+          - MSI: 4b8b8a29ae371866ecb2d4a65ca301b5a929f5606fab25f7869b3c6740b6be45
+          - latest.yml: 4ca79eec5ae4e63021a4f96cd0ff19632fa1c02ceb0ff2ec66e255fe8e7903c0
+          - blockmap: 52ce721564fe4ed5235448afc17aa330fcce79626241a531b03a2e22e149bc6e
           Confira com SHA256SUMS anexado (sha256sum -c SHA256SUMS) ou certutil -hashfile <arquivo> SHA256.
 
           INSTALACAO
-          1. Feche o app atual pela bandeja (Sair).
-          2. Baixe o EXE, confira o SHA-256.
-          3. Rode o instalador (SmartScreen: Mais informações -> Executar assim mesmo; app sem assinatura).
-          4. Abra e faça login. Confirme 1.0.180 em Sobre.
+          1. Aceite a atualização dentro do próprio app (1.0.182 detecta esta versão no canal latest) —
+             ou feche pela bandeja (Sair), baixe o EXE e confira o SHA-256.
+          2. SmartScreen: Mais informações -> Executar assim mesmo (app sem assinatura).
+          3. Abra e confirme 1.0.183 em Sobre. Verifique a Agenda/Mês: cada dia com a sua moldura.
 
           RISCOS CONHECIDOS
           - Instalador nao assinado (SmartScreen/MOTW). Integridade por SHA-512 (latest.yml) + SHA-256 (release).
           - MSI e contingencia manual; o auto-update usa SOMENTE o EXE NSIS (canal latest).
 
-          Procedencia: run 29881247041 (success); fonte desktop/f343-background-notifications-hotfix @ 68598fa
-          (promoção do rc.2 818fa13 fisicamente aprovado + apenas o número de versão).
+          Procedencia: run 30090998191 (success, 28/28 steps, QA visual 37/0); fonte
+          desktop/f346-calendar-grid-visual-hotfix @ 3981bf2 (base 1.0.182 OFICIAL 11520f5 +
+          delta autorizado F3.4.6 — provado por gate).
           NOTAS
-          wc -l notas.md
 
-      - name: "Criar a tag pinada (git data API) — ESCRITA via RELEASE_PAT"
+      - name: "Criar a tag pinada (git data API) — ESCRITA via token do Release Bot"
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
         run: |
           set -euo pipefail
-          # ESCRITA usa EXCLUSIVAMENTE o RELEASE_PAT (env deste step). Checagem de PRESENCA apenas
-          # (nunca imprime/exibe o valor; o Actions mascara secrets nos logs).
-          [ -n "$GH_TOKEN" ] || { echo "::error::secrets.RELEASE_PAT ausente/vazio — nada publicado"; exit 1; }
-          # Cria refs/tags/v1.0.180 -> SHA pinado ANTES da release (a release entao ANEXA a tag
-          # existente; nao precisa criar ref). Se algo bloquear a criacao, a resposta da API e
-          # impressa como diagnostico (contem apenas a mensagem de erro; nunca o token).
+          [ -n "$GH_TOKEN" ] || { echo "::error::token do Release Bot ausente/vazio — nada publicado"; exit 1; }
           if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
             TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
             [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para OUTRO sha ($TS)"; exit 1; }
@@ -257,12 +294,12 @@ jobs:
             echo "OK: tag $TAG criada em $STABLE_SHA"
           fi
 
-      - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets — ESCRITA via RELEASE_PAT"
+      - name: "Publicar release ESTAVEL (prerelease=false, latest=true) — 7 assets — ESCRITA via token do Release Bot"
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
         run: |
           set -euo pipefail
-          [ -n "$GH_TOKEN" ] || { echo "::error::secrets.RELEASE_PAT ausente/vazio — nada publicado"; exit 1; }
+          [ -n "$GH_TOKEN" ] || { echo "::error::token do Release Bot ausente/vazio — nada publicado"; exit 1; }
           gh release create "$TAG" -R "$REPO" \
             --target "$STABLE_SHA" \
             --latest=true \
@@ -277,7 +314,7 @@ jobs:
             "pacote/RELATORIO-DESKTOP.txt"
           echo "publicado: $TAG"
 
-      - name: "Pos-verificacao (flags/assets/target + 1.0.180 e Latest; 1.0.178 e canarios preservados)"
+      - name: "Pos-verificacao (flags/assets/target + 1.0.183 e Latest; 1.0.182 + 1.0.181 + 1.0.180 + 1.0.178 e canarios preservados)"
         run: |
           set -euo pipefail
           gh release view "$TAG" -R "$REPO" \
@@ -291,20 +328,19 @@ jobs:
             gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset ausente na release: $a"; exit 1; }
           done
           if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
-          TGT="$(gh release view "$TAG" -R "$REPO" --json targetCommitish --jq '.targetCommitish')"
-          echo "targetCommitish (informativo): $TGT"
-          # Prova AUTORITATIVA do alvo exigido pelo owner: o objeto da TAG aponta para 68598fa.
           TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
           [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag $TAG nao aponta para o SHA pinado ($TAGSHA)"; exit 1; }
           LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
           echo "Latest do repo: $LATEST_TAG"
           [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
-          # 1.0.178 PRESERVADA (release ainda existe; deixa de ser Latest) e canarios preservados como prereleases.
-          gh release view "$PROD_PREV_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_PREV_TAG" || { echo "::error::1.0.178 sumiu"; exit 1; }
+          gh release view "$PROD_PREV_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_PREV_TAG" || { echo "::error::1.0.182 (rollback imediato) sumiu"; exit 1; }
+          gh release view "$PROD_ROLLBACK_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_ROLLBACK_TAG" || { echo "::error::1.0.181 sumiu"; exit 1; }
+          gh release view "$PROD_HIST_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_HIST_TAG" || { echo "::error::1.0.180 (historica) sumiu"; exit 1; }
+          gh release view "$PROD_HIST2_TAG" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$PROD_HIST2_TAG" || { echo "::error::1.0.178 (historica) sumiu"; exit 1; }
           CA="$(gh release view "$CANARY_A_TAG" -R "$REPO" --json isPrerelease --jq '.isPrerelease')"
           CB="$(gh release view "$CANARY_B_TAG" -R "$REPO" --json isPrerelease --jq '.isPrerelease')"
           { [ "$CA" = "true" ] && [ "$CB" = "true" ]; } || { echo "::error::canarios historicos alterados (prerelease != true)"; exit 1; }
-          echo "===== GO: 1.0.180 ESTAVEL PUBLICADA e Latest; 1.0.178 + canarios preservados ====="
+          echo "===== GO: 1.0.183 ESTAVEL PUBLICADA e Latest; 1.0.182 + 1.0.181 + 1.0.180 + 1.0.178 + canarios preservados ====="
 
       - name: "Smoke — re-baixar EXE + latest.yml da release e reconferir hashes"
         run: |
