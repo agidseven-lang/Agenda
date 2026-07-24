@@ -8,8 +8,11 @@
 # workflows — provado pelo gate f346-hotfix-region-invariance DENTRO do run). Substitui a 1.0.182
 # como Latest. TUDO PINADO: run id, SHA do codigo (alvo da tag), nomes+digests
 # dos artifacts, hashes SHA-256 (EXE/MSI/latest.yml/blockmap), tag e titulo. O job:
-#   0) gera o token temporario do Release Bot (GitHub App) e valida acesso +
-#      Contents:write + escopo restrito ao Agenda (read-only) ANTES de tudo;
+#   0) gera o token temporario do Release Bot (GitHub App) pedindo EXPLICITAMENTE
+#      contents:write + workflows:write — a API rejeita (422) pedidos acima do
+#      concedido a instalacao, entao o SUCESSO da geracao E a prova das
+#      permissoes — e valida acesso + escopo restrito ao Agenda (read-only)
+#      ANTES de tudo;
 #   1) exige confirmacao literal (input) — publicacao direta estavel AUTORIZADA
 #      pelo mandato F3.4.5 apos todos os gates verdes;
 #   2) valida run 30016688862 = completed/success E head_sha == SHA pinado;
@@ -36,8 +39,10 @@
 # GITHUB_TOKEN padrao (somente leitura). As ESCRITAS (criar tag + criar release + enviar assets +
 # marcar Latest) usam EXCLUSIVAMENTE um TOKEN TEMPORARIO do GitHub App "Agenda ID Seven Release
 # Bot", gerado NESTE run por actions/create-github-app-token@v3 (vars.RELEASE_APP_CLIENT_ID +
-# secrets.RELEASE_APP_PRIVATE_KEY; instalacao restrita ao repositorio Agenda; permission
-# contents:write). O token expira sozinho (~1h) e e revogado no post-step da action — NENHUM
+# secrets.RELEASE_APP_PRIVATE_KEY; instalacao restrita ao repositorio Agenda; permissions
+# contents:write + workflows:write — a PROVA das permissoes e o proprio sucesso da geracao,
+# pois a API rejeita pedidos acima do concedido; a sonda permissions.push foi REMOVIDA por
+# ser invalida para tokens finos). O token expira sozinho (~1h) e e revogado no post-step da action — NENHUM
 # PAT manual, NENHUMA rotina de criacao/remocao/revogacao manual, SEM fallback de escrita.
 # O token NUNCA e impresso (o Actions mascara secrets/outputs sensiveis).
 # Execucao SOMENTE manual (workflow_dispatch). Publicacao estavel direta autorizada
@@ -101,24 +106,29 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: Agenda
           permission-contents: write
+          permission-workflows: write
 
-      - name: "Gate 0b — token do Release Bot ATIVO + Contents:write + escopo SO Agenda (read-only)"
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda (read-only)"
         env:
           BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
         run: |
           set -euo pipefail
-          # Validacao SEM escrita: leitura do repo + inventario da instalacao (escopo) + permissao.
+          # Validacao SEM escrita: leitura do repo + inventario da instalacao (escopo).
+          # A prova de Contents:write + Workflows:write e o SUCESSO do Gate 0a: a API
+          # rejeita (422) pedidos acima do concedido a instalacao. A antiga sonda
+          # permissions.push foi REMOVIDA (mandato de correcao) — projeta papeis
+          # classicos e NAO reflete tokens reduzidos a permissoes finas. Alem disso,
+          # as proprias escritas (tag/release/assets) sao fail-closed.
           # O token NUNCA e impresso (mascarado pelo Actions).
           [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA foi publicado."; exit 1; }
           FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
           [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso de leitura a $REPO — NADA foi publicado."; exit 1; }
           J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
-          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"; W="$(echo "$J" | jq -r '.repositories[0].permissions.push')"
-          echo "instalacao do Release Bot: total_count=$N repo=$R contents_write=$W"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          echo "instalacao do Release Bot: total_count=$N repo=$R"
           [ "$N" = "1" ] || { echo "::error::escopo do Release Bot NAO esta limitado a 1 repositorio ($N) — NADA foi publicado."; exit 1; }
           [ "$R" = "$REPO" ] || { echo "::error::escopo do Release Bot aponta para outro repositorio ($R) — NADA foi publicado."; exit 1; }
-          [ "$W" = "true" ] || { echo "::error::token do Release Bot SEM Contents:write — NADA foi publicado."; exit 1; }
-          echo "OK: Release Bot ativo, Contents:write, escopo restrito a $REPO"
+          echo "OK: Release Bot ativo (contents:write + workflows:write comprovados no Gate 0a), escopo restrito a $REPO"
 
       - name: "Gate 1 — confirmacao literal"
         env:

@@ -2,15 +2,28 @@
 # [manual] OPS — Release Bot Self-Test (GitHub App "Agenda ID Seven Release Bot")
 # ---------------------------------------------------------------------
 # Prova, SEM NENHUMA ESCRITA, que a automacao permanente de release esta pronta:
-#   1) gera um token TEMPORARIO do App via actions/create-github-app-token@v3
-#      (vars.RELEASE_APP_CLIENT_ID + secrets.RELEASE_APP_PRIVATE_KEY; expira ~1h e
-#      e revogado no post-step da action);
+#   1) PROVA POSITIVA — gera um token TEMPORARIO do App via
+#      actions/create-github-app-token@v3 pedindo EXPLICITAMENTE
+#      permission-contents: write + permission-workflows: write.
+#      A API do GitHub REJEITA (422 "The permissions requested are not granted
+#      to this installation") qualquer pedido acima do concedido — logo o
+#      SUCESSO da geracao E a prova de que a instalacao possui Contents:write
+#      e Workflows:write. (NAO usar permissions.push do inventario: aquele
+#      campo projeta papeis classicos e NAO reflete tokens reduzidos a
+#      permissoes finas — sonda removida pelo mandato de correcao.)
 #   2) confirma ACESSO de leitura ao repositorio agidseven-lang/Agenda;
-#   3) confirma a permissao Contents: WRITE do token (campo permissions.push do
-#      inventario da instalacao — checagem declarativa, sem escrever nada);
-#   4) prova o ESCOPO LIMITADO: a instalacao enxerga EXATAMENTE 1 repositorio, o Agenda.
-# NAO cria tag, NAO cria release, NAO envia assets, NAO modifica arquivos, NAO
-# imprime o token (o Actions mascara secrets/outputs sensiveis).
+#   3) prova o ESCOPO LIMITADO: a instalacao enxerga EXATAMENTE 1 repositorio, o Agenda;
+#   4) CONTROLE NEGATIVO (menor privilegio) — tenta gerar um 2o token pedindo
+#      permission-administration: write (permissao que o App NAO possui) com
+#      continue-on-error: true; essa tentativa TEM QUE FALHAR. Se ela passar,
+#      o self-test FALHA (App super-permissionado). O token dessa tentativa
+#      NUNCA e usado e nenhuma escrita e executada.
+#   5) consulta a release Latest em modo READ-ONLY (GET; nada e alterado);
+#   6) tokens sao revogados automaticamente nos post-steps da action (alem da
+#      expiracao ~1h). NENHUM token e impresso (o Actions mascara os outputs).
+# PROIBIDO (e nenhum passo faz): criar tag temporaria, criar branch, criar
+# draft release, enviar asset, editar arquivo, alterar release, "testar
+# escrita" criando e apagando recurso.
 # Saida esperada no log: RELEASE BOT READY
 # Publicacoes REAIS continuam exigindo o comando literal PUBLICAR-DESKTOP-X.Y.Z-STABLE
 # no workflow de release (f343e-desktop-stable-release.yml) — este self-test nao publica.
@@ -30,7 +43,7 @@ jobs:
     env:
       REPO: agidseven-lang/Agenda
     steps:
-      - name: "1 — gerar token temporario do Release Bot (GitHub App)"
+      - name: "1 — PROVA POSITIVA: token com Contents:write + Workflows:write"
         id: release_bot
         uses: actions/create-github-app-token@v3
         with:
@@ -39,25 +52,59 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: Agenda
           permission-contents: write
+          permission-workflows: write
 
-      - name: "2/3/4 — acesso + Contents:write + escopo limitado ao Agenda (ZERO escrita)"
+      - name: "2/3 — acesso de leitura + escopo limitado ao Agenda (ZERO escrita)"
         env:
           BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
         run: |
           set -euo pipefail
           [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio"; exit 1; }
+          echo "prova positiva: token gerado pedindo permission-contents:write + permission-workflows:write (a API rejeitaria com 422 qualquer pedido acima do concedido a instalacao)"
           # 2) acesso de leitura ao Agenda
           FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
           [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso de leitura a $REPO"; exit 1; }
           echo "acesso ao repositorio: OK ($FN)"
-          # 3+4) inventario da instalacao: escopo + permissao (leitura declarativa; nada e escrito)
+          # 3) inventario da instalacao: escopo (leitura declarativa; nada e escrito).
+          #    A sonda permissions.push foi REMOVIDA — nao e prova valida de
+          #    Contents:write para tokens finos (mandato de correcao).
           J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
           N="$(echo "$J" | jq -r '.total_count')"
           R="$(echo "$J" | jq -r '.repositories[0].full_name')"
-          W="$(echo "$J" | jq -r '.repositories[0].permissions.push')"
-          echo "escopo da instalacao: total_count=$N repo=$R contents_write=$W"
+          echo "escopo da instalacao: total_count=$N repo=$R"
           [ "$N" = "1" ] || { echo "::error::escopo NAO limitado a 1 repositorio (total=$N)"; exit 1; }
           [ "$R" = "$REPO" ] || { echo "::error::escopo aponta para outro repositorio ($R)"; exit 1; }
-          [ "$W" = "true" ] || { echo "::error::token SEM Contents:write (permissions.push=$W)"; exit 1; }
-          echo "confirmado: NENHUMA tag criada, NENHUMA release criada, NENHUM asset enviado, NENHUM arquivo modificado."
+
+      - name: "4 — CONTROLE NEGATIVO: pedir Administration:write TEM QUE FALHAR"
+        id: canary
+        continue-on-error: true
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-administration: write
+
+      - name: "4b — validar controle negativo (rejeicao obrigatoria; token do canario NUNCA e usado)"
+        env:
+          CANARY_OUTCOME: ${{ steps.canary.outcome }}
+        run: |
+          set -euo pipefail
+          echo "controle negativo (Administration:write): outcome=$CANARY_OUTCOME"
+          if [ "$CANARY_OUTCOME" != "failure" ]; then
+            echo "::error::controle negativo REPROVOU: o pedido de Administration:write NAO foi rejeitado — App super-permissionado ou estado inesperado; self-test FALHOU (nenhum token do canario foi usado; nenhuma escrita ocorreu)"; exit 1
+          fi
+          echo "controle negativo OK: o GitHub rejeitou a permissao NAO concedida — o App segue limitado (menor privilegio); nenhum token dessa tentativa foi usado"
+
+      - name: "5 — consultar release Latest (somente leitura) + veredito"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          LT="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ -n "$LT" ] || { echo "::error::consulta read-only da release Latest falhou"; exit 1; }
+          echo "release Latest (GET read-only): $LT"
+          echo "confirmado: NENHUMA tag criada, NENHUM branch criado, NENHUMA release/draft criada, NENHUM asset enviado, NENHUM arquivo modificado, NENHUMA release alterada."
+          echo "tokens: revogados automaticamente nos post-steps da action (e expiram sozinhos em ~1h)."
           echo "RELEASE BOT READY"
