@@ -1,0 +1,230 @@
+# =====================================================================
+# [manual] F3.5.0 — DEPLOY OFICIAL do ACOMPANHAMENTO DO PROJETO no J6 de
+# PRODUÇÃO (idseven-push) com a FLAG GLOBAL DESLIGADA.
+# ---------------------------------------------------------------------
+# Mandato F3.5.0-PRODUCTION-CLIENT-PROGRESS-TRACKING-CONTROLLED-ROLLOUT:
+#   • fonte = candidata F3.5.0A (db325d9 + delta ADITIVO; provas byte a byte);
+#   • wrangler.toml de produção BYTE-IDÊNTICO ao db325d9 e SEM a var
+#     CLIENT_PROGRESS_TRACKING_ENABLED ⇒ flag global OFF POR AUSÊNCIA
+#     (nenhum cliente vê a seção; navegador não chama /progress; zero writes);
+#   • TODAS as suítes rodam no runner ANTES (qualquer vermelho ⇒ SEM deploy);
+#   • pré-deploy: registra Version ID ATIVO + sha256 do script VIVO (rollback
+#     exato preparado); pós-deploy: novo Version ID @100%, smoke no portal
+#     oficial, /progress ESCURO, contratos /share+OG+artes, e provas read-only
+#     no Firestore: NENHUMA tarefa com clientProgressEnabled e NENHUMA com
+#     clientPortalFirstViewedAt (nenhum campo novo; nenhum cliente viu);
+#   • FALHA em qualquer smoke pós-deploy ⇒ ROLLBACK AUTOMÁTICO para o
+#     deployment anterior (API de deployments, version_id capturado antes)
+#     + reverificação de que a J6 voltou a 100%.
+# NÃO habilita a função para nenhum cliente (isso exige a autorização literal
+# ATIVAR-ACOMPANHAMENTO-PRODUCAO-PARA-CLIENTE em fase própria).
+# NENHUM secret/token impresso; tokens de teste SINTÉTICOS; QA não utilizado.
+# =====================================================================
+name: "[manual] F3.5.0 Deploy PRODUÇÃO (acompanhamento — flag global OFF)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PUBLICAR-F350-J6-PRODUCAO para autorizar"
+        required: true
+        default: ""
+      ref:
+        description: "Branch/commit da candidata F3.5.0A"
+        required: true
+        default: "worker/f350-client-progress-tracking"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f350-prod-deploy
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  PROD_URL: https://aprovar.agendaidseven.com.br
+  PROD_WDEV: https://idseven-push.agidseven.workers.dev
+  EXPECT_VERSION_OLD: V64.59-c20-failopen-j6-cronograma-two-stage
+  EXPECT_VERSION_NEW: V64.59-c20-failopen-f350-client-progress
+  EXPECT_BUILD_NEW: f350-client-progress-tracking
+  PROD_SHA: db325d9fccbd2111e276d4d3f0e87d7a0a3edf09
+  J4_SHA: 85787d0de0fcf0c18d18762cc43fa45ac628d030
+  BASE_SHA: f9b54ce320f345e50f9893415d7eeef87ef9ecbc
+  C20_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
+  WORKER_SHA256: "bebf9d1fe9020fa970dbd7fa63ad23b8c2c3848425a6880894d38e804101416a"
+  FS_BASE: "https://firestore.googleapis.com/v1/projects/agenda-id-seven/databases/(default)"
+  T_NF: f350proddeploy000000000000000000000000000001
+
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: "Gate 1 — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "PUBLICAR-F350-J6-PRODUCAO" ] || { echo "::error::confirmação inválida — nada foi publicado"; exit 1; }
+          echo "OK"
+
+      - name: Checkout candidata F3.5.0A
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 1
+
+      - name: "Buscar bases históricas (fetch dirigido de 4 SHAs)"
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin ${PROD_SHA} ${J4_SHA} ${BASE_SHA} ${C20_SHA}
+          for S in ${PROD_SHA} ${J4_SHA} ${BASE_SHA} ${C20_SHA}; do
+            git cat-file -e "$S^{commit}" || { echo "::error::SHA histórico ausente: $S"; exit 1; }
+          done
+
+      - name: "Gate 2 — identidade da fonte + flag OFF por construção + TODAS as suítes (vermelho ⇒ sem deploy)"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          echo "HEAD=$(git rev-parse HEAD)" | tee out/pre.txt
+          S=$(sha256sum cloudflare-worker.js | cut -d' ' -f1); echo "worker sha256=$S" | tee -a out/pre.txt
+          [ "$S" = "$WORKER_SHA256" ] || { echo "::error::worker difere do candidato F3.5.0A aprovado"; exit 1; }
+          node --check cloudflare-worker.js
+          grep -q 'version: "V64.59-c20-failopen-f350-client-progress"' cloudflare-worker.js
+          grep -Fq 'const WORKER_BUILD = "f350-client-progress-tracking";' cloudflare-worker.js
+          grep -Fq 'function clientProgressFlagsOn(env, task)' cloudflare-worker.js
+          grep -Fq 'async function handleClientCronogramaProgress(token, env)' cloudflare-worker.js
+          grep -Fq 'clientReviewTokenRevoked === true' cloudflare-worker.js
+          grep -Fq 'const themesOnly = pt.key !== "roteiro" && phase === "themes";' cloudflare-worker.js
+          grep -Fq 'if (premiumTypeOf(task).key === "roteiro") return "themes";' cloudflare-worker.js
+          grep -q 'F3.3.74F — FAIL-OPEN DO OG' cloudflare-worker.js
+          # PRODUÇÃO com flag OFF POR AUSÊNCIA: wrangler.toml byte-idêntico ao db325d9 e SEM a var
+          git diff --quiet ${PROD_SHA} -- wrangler.toml || { echo "::error::wrangler.toml de produção DIVERGE do db325d9"; exit 1; }
+          if grep -q 'CLIENT_PROGRESS_TRACKING_ENABLED' wrangler.toml; then echo "::error::flag global presente no toml de produção"; exit 1; fi
+          grep -q 'name = "idseven-push"' wrangler.toml
+          grep -q 'crons = \["\* \* \* \* \*"\]' wrangler.toml
+          # fontes históricas + TODAS as suítes
+          git show ${PROD_SHA}:cloudflare-worker.js > /tmp/base-db325d9.js
+          git show ${J4_SHA}:cloudflare-worker.js  > /tmp/prod-j4.js
+          git show ${BASE_SHA}:cloudflare-worker.js > /tmp/base-f9b54ce.js
+          git show ${C20_SHA}:cloudflare-worker.js > /tmp/rollback-c20.js
+          F350_BASE_SRC=/tmp/base-db325d9.js node scripts/f350-client-progress.test.mjs
+          WORKER_SRC=/tmp/prod-j4.js EXPECT=red node scripts/f3374j5-cronograma-themes.test.mjs
+          BASELINE_SRC=/tmp/prod-j4.js node scripts/f3374j5-cronograma-themes.test.mjs
+          BASELINE_SRC=/tmp/base-f9b54ce.js node scripts/f3374j3-roteiro-portal.test.mjs
+          WORKER_SRC=/tmp/rollback-c20.js EXPECT=c20 node scripts/f3374j-failopen-contract.test.mjs
+          EXPECT=failopen RED_PROVED=1 DIFF_SCOPE_OK=1 node scripts/f3374j-failopen-contract.test.mjs
+          echo "GATE 2 OK: fonte íntegra, flag OFF por construção, TODAS as suítes verdes"
+
+      - name: "Pré-deploy — registrar deployment ATIVO + hash do script VIVO (rollback exato)"
+        id: prev
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
+          PV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version')
+          [ "$PV" = "$EXPECT_VERSION_OLD" ] || { echo "::error::produção não está na J6 esperada ($PV)"; exit 1; }
+          DEP=$(curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
+          PVID=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].version_id')
+          PPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage')
+          { [ -n "$PVID" ] && [ "$PVID" != "null" ] && [ "$PPCT" = "100" ]; } || { echo "::error::deployment ativo não capturado"; exit 1; }
+          echo "PREV_VID=$PVID" | tee out/rollback.txt
+          echo "prev_vid=$PVID" >> "$GITHUB_OUTPUT"
+          for EP in "workers/scripts/idseven-push" "workers/scripts/idseven-push/content"; do
+            curl -sS --max-time 60 -H "$AUTH" "$API/accounts/$ACC/$EP" -o live-before.js 2>/dev/null && [ -s live-before.js ] && break
+          done
+          if [ -s live-before.js ]; then sha256sum live-before.js | tee -a out/rollback.txt; else echo "(hash do script vivo indisponível — rollback pelo Version ID)" | tee -a out/rollback.txt; fi
+          rm -f live-before.js
+          echo "ROLLBACK PREPARADO: deployment $PVID (J6) @100% + comando de reversão via API"
+
+      - name: "Deploy OFICIAL (idseven-push; wrangler.toml byte-idêntico ao db325d9)"
+        id: deploy
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy > out/deploy-prod.txt 2>&1 || true
+          tail -8 out/deploy-prod.txt
+          grep -q "idseven-push" out/deploy-prod.txt || { echo "::error::deploy não confirmou o serviço"; exit 1; }
+          if grep -q "idseven-push-qa" out/deploy-prod.txt; then echo "::error::deploy tocou o serviço ERRADO"; exit 1; fi
+          NEWVID=$(grep -oiE 'Current Version ID: [0-9a-f-]+' out/deploy-prod.txt | awk '{print $NF}' | tail -1)
+          [ -n "$NEWVID" ] || { echo "::error::sem Version ID novo"; exit 1; }
+          echo "NEW_VID=$NEWVID" | tee -a out/rollback.txt
+          echo "new_vid=$NEWVID" >> "$GITHUB_OUTPUT"
+
+      - name: "Smoke PÓS-DEPLOY no portal oficial (falha ⇒ rollback automático no passo seguinte)"
+        id: smoke
+        run: |
+          set -uo pipefail
+          FAIL=0
+          for U in "$PROD_URL" "$PROD_WDEV"; do
+            DEADLINE=$(( $(date +%s) + 150 )); V=""
+            while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+              V=$(curl -sS --max-time 15 "$U/" | jq -r '.version' 2>/dev/null || true)
+              [ "$V" = "$EXPECT_VERSION_NEW" ] && break; sleep 3
+            done
+            B=$(curl -sS --max-time 15 "$U/" | jq -r '.build' 2>/dev/null || true)
+            echo "$U -> version=$V build=$B"
+            { [ "$V" = "$EXPECT_VERSION_NEW" ] && [ "$B" = "$EXPECT_BUILD_NEW" ]; } || FAIL=1
+          done
+          API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
+          DEP=$(curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
+          LVID=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].version_id'); LPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage')
+          echo "deployment ativo: $LVID @$LPCT% (novo esperado: ${{ steps.deploy.outputs.new_vid }})"
+          { [ "$LVID" = "${{ steps.deploy.outputs.new_vid }}" ] && [ "$LPCT" = "100" ]; } || FAIL=1
+          # flag global OFF ao vivo: /progress ESCURO + no-store
+          PR=$(curl -sS --max-time 30 -D out/hprog.txt "$PROD_URL/cliente/cronograma/$T_NF/progress")
+          echo "progress(flag OFF): $PR"
+          echo "$PR" | jq -e '.ok == false and .error == "not_found"' >/dev/null || FAIL=1
+          grep -qi 'cache-control: *no-store' out/hprog.txt || FAIL=1
+          # portal 404 amigável + /share not_found com OG + artes byte-exatas (contratos herdados)
+          ST=$(curl -sS --max-time 30 -A "Mozilla/5.0" -o out/view404.html -w '%{http_code}' "$PROD_URL/cliente/cronograma/$T_NF")
+          grep -q "Cronograma não encontrado" out/view404.html || FAIL=1
+          [ "$ST" = "404" ] || FAIL=1
+          ST2=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D out/h1.txt -o out/b1.html -w '%{http_code}' "$PROD_URL/share/cronograma/$T_NF")
+          OGN=$(grep -c 'property="og:' out/b1.html || true)
+          { [ "$ST2" = "200" ] && [ "$OGN" -ge 9 ]; } || FAIL=1
+          s1=$(curl -sS --max-time 30 "$PROD_URL/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
+          s2=$(curl -sS --max-time 30 "$PROD_URL/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          [ "$s1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || FAIL=1
+          [ "$s2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || FAIL=1
+          [ "$FAIL" = "0" ] || { echo "::error::SMOKE PÓS-DEPLOY FALHOU — acionando rollback automático"; exit 1; }
+          echo "SMOKE OK: portal oficial vivo com F350 e flag global OFF (seção invisível; /progress escuro)"
+
+      - name: "Prova Firestore read-only — nenhuma tarefa recebeu campo novo; nenhum cliente viu a seção"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ] || { echo "::error::SA ausente"; exit 1; }
+          umask 077; printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" >/dev/null 2>&1
+          TOKEN="$(gcloud auth print-access-token)"
+          cnt() { curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$FS_BASE/documents:runQuery" -d "$1" | jq '[.[]|select(.document)]|length'; }
+          N1=$(cnt '{"structuredQuery":{"from":[{"collectionId":"tasks"}],"where":{"fieldFilter":{"field":{"fieldPath":"clientProgressEnabled"},"op":"EQUAL","value":{"booleanValue":true}}},"limit":10}}')
+          N2=$(cnt '{"structuredQuery":{"from":[{"collectionId":"tasks"}],"where":{"fieldFilter":{"field":{"fieldPath":"clientPortalFirstViewedAt"},"op":"GREATER_THAN","value":{"integerValue":"0"}}},"limit":10}}')
+          rm -f "$RUNNER_TEMP/sa.json"
+          echo "tarefas com clientProgressEnabled=true: $N1 | com clientPortalFirstViewedAt: $N2"
+          { [ "$N1" = "0" ] && [ "$N2" = "0" ]; } || { echo "::error::há tarefa com campo novo — investigar antes de qualquer ativação"; exit 1; }
+          echo "PROVA OK: zero campos novos em tarefas; zero visualizações registradas (nenhum cliente viu a seção)"
+
+      - name: "ROLLBACK AUTOMÁTICO (só se o pós-deploy falhar)"
+        if: failure() && steps.deploy.outcome == 'success'
+        run: |
+          set -uo pipefail
+          API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
+          PREV="${{ steps.prev.outputs.prev_vid }}"
+          echo "revertendo idseven-push para o deployment anterior $PREV…"
+          curl -fsS -X POST -H "$AUTH" -H "Content-Type: application/json" \
+            "$API/accounts/$ACC/workers/scripts/idseven-push/deployments" \
+            -d "{\"strategy\":\"percentage\",\"versions\":[{\"version_id\":\"$PREV\",\"percentage\":100}]}" >/dev/null \
+            && echo "rollback enviado" || echo "::error::rollback via API falhou — executar manualmente: wrangler rollback $PREV"
+          for i in $(seq 1 30); do V=$(curl -sS --max-time 15 "$PROD_URL/" | jq -r '.version' 2>/dev/null || true); [ "$V" = "$EXPECT_VERSION_OLD" ] && break; sleep 3; done
+          echo "produção após rollback: version=$V (esperado $EXPECT_VERSION_OLD)"
+          [ "$V" = "$EXPECT_VERSION_OLD" ] && echo "ROLLBACK CONFIRMADO: J6 anterior de volta a 100%" || echo "::error::confirmar rollback manualmente"
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f350-prod-deploy-evidence
+          path: out/
+          retention-days: 90
