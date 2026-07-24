@@ -1,0 +1,226 @@
+# =====================================================================
+# [manual] F3.5.0A — DEPLOY QA do ACOMPANHAMENTO DO PROJETO (flag OFF).
+#
+# Publica SOMENTE no serviço de QA `idseven-push-qa` (workers.dev +
+# aprovar-qa.agendaidseven.com.br; SEM rota de produção; SEM cron) a candidata
+# F3.5.0A (seção "Acompanhamento do projeto" atrás de DUPLA flag —
+# CLIENT_PROGRESS_TRACKING_ENABLED=false no deploy + clientProgressEnabled
+# por tarefa; endpoint aditivo /progress; primeira visualização idempotente;
+# revogação/expiração opcionais do link). Produção (`idseven-push`) segue
+# INTOCADA na J6 — e este workflow PROVA isso ao vivo:
+#   • roda no runner, ANTES do deploy: suíte F350 41/41 (byte-idêntico flag
+#     OFF vs db325d9 + sanitização + 8 etapas + percentual), 74J5 RED (j4) +
+#     GREEN 43/43, 74J3 GREEN 35/35 e o contrato 74J (RED c20 + GREEN);
+#   • captura o deployment ATIVO de produção ANTES, deploya QA, e exige o
+#     MESMO deployment ativo DEPOIS (id inalterado @100%) + versão/build J6
+#     vivos + script vivo de produção SEM o marcador F350;
+#   • QA: version/build F350 propagados, /progress ESCURO (flag OFF ⇒
+#     not_found genérico), /share not_found com OG e artes byte-exatas.
+# NENHUM secret impresso; tokens SINTÉTICOS apenas; NENHUMA tarefa real tocada.
+# =====================================================================
+name: "[manual] F3.5.0A Deploy QA (acompanhamento do projeto — flag OFF)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite ESPELHAR-QA-F350 para autorizar o deploy de QA"
+        required: true
+        default: ""
+      ref:
+        description: "Branch/commit da candidata F3.5.0A"
+        required: true
+        default: "worker/f350-client-progress-tracking"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f350-deploy-qa
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  QA_WDEV: https://idseven-push-qa.agidseven.workers.dev
+  QA_CUSTOM: https://aprovar-qa.agendaidseven.com.br
+  PROD_URL: https://aprovar.agendaidseven.com.br
+  EXPECT_VERSION_QA: V64.59-c20-failopen-f350-client-progress
+  EXPECT_BUILD_QA: f350-client-progress-tracking
+  EXPECT_VERSION_PROD: V64.59-c20-failopen-j6-cronograma-two-stage
+  EXPECT_BUILD_PROD: j6-cronograma-two-stage
+  PROD_SHA: db325d9fccbd2111e276d4d3f0e87d7a0a3edf09
+  J4_SHA: 85787d0de0fcf0c18d18762cc43fa45ac628d030
+  BASE_SHA: f9b54ce320f345e50f9893415d7eeef87ef9ecbc
+  C20_SHA: 928669eb2408c50e4b2fdd93a930ae443a8568d4
+  T_NF: f350qadeploy0000000000000000000000000000000001
+
+jobs:
+  deploy-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate 1 — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          [ "$CONFIRM" = "ESPELHAR-QA-F350" ] || { echo "::error::confirmação inválida — deploy QA negado"; exit 1; }
+          echo "OK"
+
+      - name: Checkout candidata F3.5.0A
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: "Gate 2 — identidade da fonte + suítes herméticas no runner"
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          echo "HEAD=$(git rev-parse HEAD)" | tee out/pre.txt
+          sha256sum cloudflare-worker.js | tee -a out/pre.txt
+          node --check cloudflare-worker.js
+          # identidade da candidata F3.5.0A
+          grep -q 'version: "V64.59-c20-failopen-f350-client-progress"' cloudflare-worker.js || { echo "::error::fonte não é a candidata F350"; exit 1; }
+          grep -Fq 'const WORKER_BUILD = "f350-client-progress-tracking";' cloudflare-worker.js || { echo "::error::WORKER_BUILD F350 ausente"; exit 1; }
+          grep -Fq 'function clientProgressFlagsOn(env, task)' cloudflare-worker.js || { echo "::error::dupla flag F350 ausente"; exit 1; }
+          grep -Fq 'async function handleClientCronogramaProgress(token, env)' cloudflare-worker.js || { echo "::error::endpoint /progress ausente"; exit 1; }
+          grep -Fq 'async function recordClientFirstView(env, accessToken, task)' cloudflare-worker.js || { echo "::error::first-view idempotente ausente"; exit 1; }
+          grep -Fq 'clientReviewTokenRevoked === true' cloudflare-worker.js || { echo "::error::gate de revogação ausente"; exit 1; }
+          # J5/J3/74F preservados na candidata
+          grep -Fq 'const themesOnly = pt.key !== "roteiro" && phase === "themes";' cloudflare-worker.js || { echo "::error::predicado J5 sumiu"; exit 1; }
+          grep -Fq 'if (premiumTypeOf(task).key === "roteiro") return "themes";' cloudflare-worker.js || { echo "::error::guard J3 sumiu"; exit 1; }
+          grep -q 'F3.3.74F — FAIL-OPEN DO OG' cloudflare-worker.js || { echo "::error::bloco fail-open sumiu"; exit 1; }
+          # isolamento QA/produção intacto + flag OFF no template QA
+          grep -q 'name = "idseven-push-qa"' wrangler.qa.toml || { echo "::error::template QA inválido"; exit 1; }
+          grep -q 'CLIENT_PROGRESS_TRACKING_ENABLED = "false"' wrangler.qa.toml || { echo "::error::flag global do QA não está false"; exit 1; }
+          if grep -qE '^\s*route|^\s*routes|custom_domain|\[triggers\]|crons' wrangler.qa.toml; then
+            echo "::error::template QA contém rota/cron — quebraria o isolamento"; exit 1; fi
+          grep -q 'name = "idseven-push"' wrangler.toml || { echo "::error::wrangler.toml de produção alterado?"; exit 1; }
+          git diff --quiet ${PROD_SHA} -- wrangler.toml || { echo "::error::wrangler.toml de produção DIVERGE do db325d9"; exit 1; }
+          # fontes históricas para provas byte-idênticas / RED
+          git show ${PROD_SHA}:cloudflare-worker.js > /tmp/base-db325d9.js
+          git show ${J4_SHA}:cloudflare-worker.js  > /tmp/prod-j4.js
+          git show ${BASE_SHA}:cloudflare-worker.js > /tmp/base-f9b54ce.js
+          git show ${C20_SHA}:cloudflare-worker.js > /tmp/rollback-c20.js
+          echo "— suíte F350 (41 checagens: flag OFF byte-idêntico ao db325d9 + sanitização + etapas + percent + revogação) —"
+          F350_BASE_SRC=/tmp/base-db325d9.js node scripts/f350-client-progress.test.mjs
+          echo "— suíte 74J5 RED (repro no j4) + GREEN 43/43 (baseline j4) —"
+          WORKER_SRC=/tmp/prod-j4.js EXPECT=red node scripts/f3374j5-cronograma-themes.test.mjs
+          BASELINE_SRC=/tmp/prod-j4.js node scripts/f3374j5-cronograma-themes.test.mjs
+          echo "— suíte 74J3 GREEN 35/35 (baseline f9b54ce) —"
+          BASELINE_SRC=/tmp/base-f9b54ce.js node scripts/f3374j3-roteiro-portal.test.mjs
+          echo "— contrato 74J RED (c20) + GREEN (failopen) —"
+          WORKER_SRC=/tmp/rollback-c20.js EXPECT=c20 node scripts/f3374j-failopen-contract.test.mjs
+          EXPECT=failopen RED_PROVED=1 DIFF_SCOPE_OK=1 node scripts/f3374j-failopen-contract.test.mjs
+          echo "GATE 2 OK: fonte F350 íntegra + todas as suítes verdes no runner"
+
+      - name: "Pré-deploy — captura o deployment ATIVO de produção (prova de intocabilidade)"
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
+          DEP=$(curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
+          PVID=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].version_id')
+          PPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage')
+          echo "PROD_VID_BEFORE=$PVID" | tee out/prod-before.txt
+          echo "PROD_PCT_BEFORE=$PPCT" | tee -a out/prod-before.txt
+          [ -n "$PVID" ] && [ "$PVID" != "null" ] || { echo "::error::não foi possível capturar o deployment de produção"; exit 1; }
+          PV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version')
+          [ "$PV" = "$EXPECT_VERSION_PROD" ] || { echo "::error::produção não está na J6 esperada antes do deploy"; exit 1; }
+          echo "produção ANTES: $PV @ deployment $PVID ($PPCT%)"
+
+      - name: "Deploy QA (serviço próprio; produção intocada)"
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --config wrangler.qa.toml > out/deploy-qa.txt 2>&1 || true
+          tail -8 out/deploy-qa.txt
+          grep -q "idseven-push-qa" out/deploy-qa.txt || { echo "::error::deploy QA não confirmou o serviço"; exit 1; }
+
+      - name: "Propagação + contratos no QA (flag OFF: /progress ESCURO; portal e share intactos)"
+        run: |
+          set -uo pipefail
+          for U in "$QA_WDEV" "$QA_CUSTOM"; do
+            DEADLINE=$(( $(date +%s) + 120 )); V=""
+            while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+              V=$(curl -sS --max-time 15 "$U/" | jq -r '.version' 2>/dev/null || true)
+              [ "$V" = "$EXPECT_VERSION_QA" ] && break; sleep 3
+            done
+            B=$(curl -sS --max-time 15 "$U/" | jq -r '.build' 2>/dev/null || true)
+            echo "$U -> version=$V build=$B"
+            [ "$V" = "$EXPECT_VERSION_QA" ] || { echo "::error::QA não propagou versão em $U"; exit 1; }
+            [ "$B" = "$EXPECT_BUILD_QA" ] || { echo "::error::QA build divergente em $U"; exit 1; }
+          done
+          # F350: com a flag GLOBAL OFF o /progress é ESCURO (not_found genérico + no-store), sem vazamento
+          PR=$(curl -sS --max-time 30 -D out/hprog.txt "$QA_CUSTOM/cliente/cronograma/$T_NF/progress")
+          echo "progress(flag OFF, token sintético): $PR"
+          echo "$PR" | jq -e '.ok == false and .error == "not_found"' >/dev/null || { echo "::error::/progress não está escuro com flag OFF"; exit 1; }
+          grep -qi 'cache-control: *no-store' out/hprog.txt || { echo "::error::/progress sem no-store"; exit 1; }
+          # portal 404 amigável para token sintético (nenhuma tarefa real consultada além do not-found)
+          ST=$(curl -sS --max-time 30 -A "Mozilla/5.0" -o out/view404.html -w '%{http_code}' "$QA_CUSTOM/cliente/cronograma/$T_NF")
+          grep -q "Cronograma não encontrado" out/view404.html || { echo "::error::página 404 amigável divergente"; exit 1; }
+          [ "$ST" = "404" ] || { echo "::error::view de token inexistente não devolveu 404"; exit 1; }
+          # /share not_found com OG (contrato herdado) + artes byte-exatas
+          hv() { grep -i "^$1:" "$2" 2>/dev/null | tail -1 | tr -d '\r' | sed 's/^[^:]*: *//' || true; }
+          ST2=$(curl -sS --max-time 30 -A "WhatsApp/2.23.20.0" -D out/h1.txt -o out/b1.html -w '%{http_code}' "$QA_CUSTOM/share/cronograma/$T_NF")
+          OGN=$(grep -c 'property="og:' out/b1.html || true)
+          { [ "$ST2" = "200" ] && [ "$OGN" -ge 9 ] && [ "$(hv x-share-task out/h1.txt)" = "not_found" ]; } || { echo "::error::contrato /share not_found divergente"; exit 1; }
+          s1=$(curl -sS --max-time 30 "$QA_CUSTOM/og/wa-card-v64-39.jpg" | sha256sum | cut -d' ' -f1)
+          s2=$(curl -sS --max-time 30 "$QA_CUSTOM/og/wa-card-roteiro-v64-60.jpg" | sha256sum | cut -d' ' -f1)
+          [ "$s1" = "c038636db3cf294b1edf34820c5fc68cca1ae13cd28c94a203d0590c44843eea" ] || { echo "::error::arte cron divergente"; exit 1; }
+          [ "$s2" = "f64f6f3e36020b05ae2491a544fb45937e7798d3e48eeae5865aa04549389cf3" ] || { echo "::error::arte roteiro divergente"; exit 1; }
+          echo "OK: QA vivo (F350 flag OFF) com portal/share/artes intactos e /progress escuro"
+
+      - name: "PROVA DE CÓDIGO VIVO — QA contém F350; PRODUÇÃO segue J6 (deployment INALTERADO)"
+        run: |
+          set -uo pipefail
+          API="https://api.cloudflare.com/client/v4"; AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"; ACC="$CLOUDFLARE_ACCOUNT_ID"
+          UPVID=$(grep -oiE 'Current Version ID: [0-9a-f-]+' out/deploy-qa.txt | awk '{print $NF}' | tail -1)
+          echo "Version ID do upload QA: ${UPVID:-<ausente>}"
+          [ -n "$UPVID" ] || { echo "::error::deploy-qa.txt sem Version ID"; exit 1; }
+          QDEP=$(curl -sS --max-time 30 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push-qa/deployments")
+          QVID=$(echo "$QDEP" | jq -r '.result.deployments[0].versions[0].version_id' 2>/dev/null || true)
+          QPCT=$(echo "$QDEP" | jq -r '.result.deployments[0].versions[0].percentage' 2>/dev/null || true)
+          echo "deployment ativo QA: $QVID @$QPCT%"
+          { [ "$QVID" = "$UPVID" ] && [ "$QPCT" = "100" ]; } || { echo "::error::deployment ativo do QA não é o upload F350 desta run"; exit 1; }
+          dl() {
+            for EP in "workers/scripts/$1" "workers/scripts/$1/content"; do
+              for i in 1 2; do
+                curl -sS --max-time 60 -H "$AUTH" "$API/accounts/$ACC/$EP" -o "$2" 2>/dev/null && [ -s "$2" ] && return 0
+                sleep 3
+              done
+            done
+            return 1
+          }
+          if dl idseven-push-qa qa-live.js; then
+            grep -Fq 'clientProgressFlagsOn' qa-live.js || { echo "::error::script VIVO do QA sem o marcador F350"; exit 1; }
+            echo "script vivo QA: marcador F350 PRESENTE"
+          else
+            echo "::warning::API de conteúdo do QA indisponível — identidade já provada pelo Version ID"
+          fi
+          # PRODUÇÃO: deployment id IGUAL ao capturado antes do deploy + versão/build J6 + sem F350
+          PVID_BEFORE=$(grep '^PROD_VID_BEFORE=' out/prod-before.txt | cut -d= -f2)
+          DEP=$(curl -sS --max-time 25 -H "$AUTH" "$API/accounts/$ACC/workers/scripts/idseven-push/deployments")
+          LVID=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].version_id' 2>/dev/null || true)
+          LPCT=$(echo "$DEP" | jq -r '.result.deployments[0].versions[0].percentage' 2>/dev/null || true)
+          echo "deployment ativo produção: $LVID @$LPCT% (antes: $PVID_BEFORE)"
+          { [ "$LVID" = "$PVID_BEFORE" ] && [ "$LPCT" = "100" ]; } || { echo "::error::deployment de produção MUDOU durante o deploy QA"; exit 1; }
+          PV=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.version'); PB=$(curl -sS --max-time 25 "$PROD_URL/" | jq -r '.build')
+          echo "produção /: version=$PV build=$PB"
+          [ "$PV" = "$EXPECT_VERSION_PROD" ] || { echo "::error::versão de produção divergente"; exit 1; }
+          [ "$PB" = "$EXPECT_BUILD_PROD" ] || { echo "::error::build de produção divergente"; exit 1; }
+          if dl idseven-push prod-live.js; then
+            if grep -Fq 'CLIENT_PROGRESS_TRACKING_ENABLED' prod-live.js; then echo "::error::PRODUÇÃO CONTÉM F350 — deploy indevido!"; exit 1; fi
+            grep -q 'V64.59-c20-failopen-j6-cronograma-two-stage' prod-live.js || { echo "::error::produção não é mais a J6?"; exit 1; }
+            echo "script vivo produção: SEM F350, ainda J6 (bônus confirmado)"
+          else
+            echo "::warning::API de conteúdo de produção indisponível — deployment inalterado já provado"
+          fi
+          rm -f qa-live.js prod-live.js
+          echo "PRODUÇÃO INTOCADA: mesmo deployment ativo @100%, J6 viva, sem F350"
+
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f350-qa-deploy-evidence
+          path: out/
+          retention-days: 30
