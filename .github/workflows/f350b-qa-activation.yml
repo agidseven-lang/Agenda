@@ -1,0 +1,223 @@
+# =====================================================================
+# [manual] F3.5.0B — ATIVAÇÃO CONTROLADA do Acompanhamento (QA) em UM
+# Cronograma real autorizado — e ROLLBACK.
+# ---------------------------------------------------------------------
+# O ALVO (cliente|título) vem EXCLUSIVAMENTE do secret F350B_TARGET
+# (formato: "Cliente Exato|Título Exato"; título pode ser vazio se o
+# cliente tiver 1 só cronograma). REPO É PÚBLICO: nomes de cliente/título,
+# taskId e token NUNCA aparecem em inputs, logs ou echos — só contagens,
+# hashes curtos e campos genéricos (status/percent/timestamps).
+#
+# action=ativar   → (1) redeploy SÓ do idseven-push-qa com a var de runtime
+#                    CLIENT_PROGRESS_TRACKING_ENABLED sobreposta para "true"
+#                    (--var; o wrangler.qa.toml permanece com "false");
+#                    (2) localiza EXATAMENTE 1 tarefa pelo alvo (query
+#                    composta client==...&&title==...; 0 ou >1 → aborta);
+#                    (3) registra o valor ANTERIOR de clientProgressEnabled;
+#                    (4) PATCH updateMask=clientProgressEnabled=true (1 campo;
+#                    NÃO toca updatedAt/status/kanban/SLA — provado por
+#                    snapshot antes/depois dos demais campos);
+#                    (5) auditoria global: count(clientProgressEnabled==true)==1.
+# action=status   → leituras SANITIZADAS (contagem global; flag/firstViewedAt/
+#                    percent da tarefa alvo; versão QA) — zero writes.
+# action=reverter → restaura clientProgressEnabled ao valor anterior (input
+#                    prev; "absent" = REMOVE o campo), redeploy QA a partir do
+#                    wrangler.qa.toml puro (flag "false"), count==0, imutabilidade.
+# PRODUÇÃO (idseven-push / aprovar.agendaidseven.com.br): NUNCA tocada.
+# =====================================================================
+name: "[manual] F3.5.0B QA Activation (um cronograma real; sem tokens em log)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "ativar | status | reverter"
+        required: true
+        type: choice
+        options:
+          - ativar
+          - status
+          - reverter
+      confirm:
+        description: "Digite F350B-QA para confirmar"
+        required: true
+        default: ""
+      prev:
+        description: "SÓ p/ reverter: valor anterior de clientProgressEnabled (absent|true|false)"
+        required: false
+        default: "absent"
+      ref:
+        description: "Branch/commit da candidata F350 (fonte do wrangler.qa.toml)"
+        required: true
+        default: "worker/f350-client-progress-tracking"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f350b-qa-activation
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  GCP_PROJECT: "agenda-id-seven"
+  FS_BASE: "https://firestore.googleapis.com/v1/projects/agenda-id-seven/databases/(default)"
+  QA_URL: https://aprovar-qa.agendaidseven.com.br
+  PROD_URL: https://aprovar.agendaidseven.com.br
+  EXPECT_VERSION_QA: V64.59-c20-failopen-f350-client-progress
+  EXPECT_VERSION_PROD: V64.59-c20-failopen-j6-cronograma-two-stage
+  WORKER_SHA256: "bebf9d1fe9020fa970dbd7fa63ad23b8c2c3848425a6880894d38e804101416a"
+
+jobs:
+  f350b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: "Gate — confirmação + alvo no secret (nunca impresso)"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+          F350B_TARGET: ${{ secrets.F350B_TARGET }}
+        run: |
+          set -eu
+          [ "$CONFIRM" = "F350B-QA" ] || { echo "::error::confirmação inválida — nada foi tocado"; exit 1; }
+          [ -n "${F350B_TARGET:-}" ] || { echo "::error::secret F350B_TARGET ausente (formato: Cliente|Título) — nada foi tocado"; exit 1; }
+          umask 077
+          printf '%s' "$F350B_TARGET" > "$RUNNER_TEMP/target.txt"
+          H=$(sha256sum "$RUNNER_TEMP/target.txt" | cut -c1-12)
+          echo "alvo carregado do secret (sha256/12: $H) — valores NUNCA impressos"
+
+      - name: Checkout candidata F350
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 1
+
+      - name: "Identidade da fonte (mesmo worker do run QA verde)"
+        run: |
+          set -euo pipefail
+          echo "HEAD=$(git rev-parse HEAD)"
+          S=$(sha256sum cloudflare-worker.js | cut -d' ' -f1)
+          [ "$S" = "$WORKER_SHA256" ] || { echo "::error::worker difere do candidato aprovado no deploy QA"; exit 1; }
+          grep -q 'CLIENT_PROGRESS_TRACKING_ENABLED = "false"' wrangler.qa.toml || { echo "::error::toml QA não está com flag false"; exit 1; }
+
+      - name: "Auth service account (arquivo temporário; nunca impresso)"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ] || { echo "::error::GOOGLE_APPLICATION_CREDENTIALS_JSON ausente"; exit 1; }
+          umask 077
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/sa.json" >/dev/null 2>&1
+          gcloud config set project "$GCP_PROJECT" >/dev/null 2>&1
+          echo "SA ativada (valor NÃO impresso)."
+
+      - name: "Executar ação (${{ github.event.inputs.action }}) — writes mínimos, logs sanitizados"
+        env:
+          ACTION: ${{ github.event.inputs.action }}
+          PREV: ${{ github.event.inputs.prev }}
+        run: |
+          set -euo pipefail
+          TOKEN="$(gcloud auth print-access-token)"; [ -n "$TOKEN" ]
+          CLIENTE="$(cut -d'|' -f1 "$RUNNER_TEMP/target.txt")"
+          TITULO="$(cut -d'|' -f2- "$RUNNER_TEMP/target.txt")"
+
+          locate() { # devolve o NAME completo do doc da tarefa alvo em $RUNNER_TEMP/docname (nunca impresso)
+            local filters q n
+            if [ -n "$TITULO" ]; then
+              q=$(jq -nc --arg c "$CLIENTE" --arg t "$TITULO" '{structuredQuery:{from:[{collectionId:"tasks"}],where:{compositeFilter:{op:"AND",filters:[{fieldFilter:{field:{fieldPath:"client"},op:"EQUAL",value:{stringValue:$c}}},{fieldFilter:{field:{fieldPath:"title"},op:"EQUAL",value:{stringValue:$t}}}]}},limit:5}}')
+            else
+              q=$(jq -nc --arg c "$CLIENTE" '{structuredQuery:{from:[{collectionId:"tasks"}],where:{fieldFilter:{field:{fieldPath:"client"},op:"EQUAL",value:{stringValue:$c}}},limit:5}}')
+            fi
+            curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$FS_BASE/documents:runQuery" -d "$q" > "$RUNNER_TEMP/rows.json"
+            n=$(jq '[.[]|select(.document)]|length' "$RUNNER_TEMP/rows.json")
+            echo "tarefas localizadas para o alvo: $n"
+            [ "$n" = "1" ] || { echo "::error::esperado EXATAMENTE 1 (ache o alvo com o título exato no secret) — nada foi tocado"; exit 1; }
+            jq -r '[.[]|select(.document)][0].document.name' "$RUNNER_TEMP/rows.json" > "$RUNNER_TEMP/docname"
+          }
+          snap() { # snapshot SANITIZADO dos campos que NÃO podem mudar
+            curl -fsS -H "Authorization: Bearer $TOKEN" "https://firestore.googleapis.com/v1/$(cat "$RUNNER_TEMP/docname")" \
+              | jq -Sc '{status:(.fields.status.stringValue//null),cronStatus:(.fields.cronStatus.stringValue//null),clientFlowStatus:(.fields.clientFlowStatus.stringValue//null),workflowStage:(.fields.workflowStage.stringValue//null),updatedAt:(.fields.updatedAt.integerValue//null),finalApprovalCompleted:(.fields.finalApprovalCompleted.booleanValue//null)}'
+          }
+          getflag() {
+            curl -fsS -H "Authorization: Bearer $TOKEN" "https://firestore.googleapis.com/v1/$(cat "$RUNNER_TEMP/docname")" \
+              | jq -r '.fields.clientProgressEnabled.booleanValue | if type=="boolean" then tostring else "absent" end'
+          }
+          countOn() {
+            local q n
+            q='{"structuredQuery":{"from":[{"collectionId":"tasks"}],"where":{"fieldFilter":{"field":{"fieldPath":"clientProgressEnabled"},"op":"EQUAL","value":{"booleanValue":true}}},"limit":10}}'
+            curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$FS_BASE/documents:runQuery" -d "$q" | jq '[.[]|select(.document)]|length'
+          }
+          firstview() {
+            curl -fsS -H "Authorization: Bearer $TOKEN" "https://firestore.googleapis.com/v1/$(cat "$RUNNER_TEMP/docname")" \
+              | jq -r '.fields.clientPortalFirstViewedAt.integerValue // "absent"'
+          }
+
+          if [ "$ACTION" = "status" ]; then
+            locate
+            echo "clientProgressEnabled=$(getflag) | clientPortalFirstViewedAt=$(firstview) | total_global_com_flag=$(countOn)"
+            echo "campos imutáveis (sanitizado): $(snap)"
+            V=$(curl -sS --max-time 20 "$QA_URL/" | jq -r '.version'); echo "QA version=$V"
+            exit 0
+          fi
+
+          if [ "$ACTION" = "ativar" ]; then
+            # 1) redeploy SÓ do QA com a flag global sobreposta em runtime (toml segue false)
+            npx --yes wrangler@4 deploy --config wrangler.qa.toml --var CLIENT_PROGRESS_TRACKING_ENABLED:true > "$RUNNER_TEMP/deploy.txt" 2>&1 || true
+            grep -q "idseven-push-qa" "$RUNNER_TEMP/deploy.txt" || { echo "::error::deploy QA não confirmou"; tail -5 "$RUNNER_TEMP/deploy.txt"; exit 1; }
+            for i in $(seq 1 20); do V=$(curl -sS --max-time 15 "$QA_URL/" | jq -r '.version' 2>/dev/null || true); [ "$V" = "$EXPECT_VERSION_QA" ] && break; sleep 3; done
+            [ "$V" = "$EXPECT_VERSION_QA" ] || { echo "::error::QA não propagou"; exit 1; }
+            echo "QA redeployado (flag global ON em runtime): version=$V"
+            # 2-4) localizar, registrar anterior, habilitar SÓ o campo
+            locate
+            BEFORE=$(snap); PREVVAL=$(getflag)
+            echo "valor ANTERIOR de clientProgressEnabled: $PREVVAL (use em prev= no reverter)"
+            curl -fsS -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+              "https://firestore.googleapis.com/v1/$(cat "$RUNNER_TEMP/docname")?updateMask.fieldPaths=clientProgressEnabled" \
+              -d '{"fields":{"clientProgressEnabled":{"booleanValue":true}}}' >/dev/null
+            AFTER=$(snap)
+            [ "$(getflag)" = "true" ] || { echo "::error::flag da tarefa não gravou"; exit 1; }
+            [ "$BEFORE" = "$AFTER" ] || { echo "::error::CAMPOS IMUTÁVEIS MUDARAM: antes=$BEFORE depois=$AFTER"; exit 1; }
+            echo "imutabilidade OK (status/cronStatus/clientFlowStatus/workflowStage/updatedAt/final intactos): $AFTER"
+            N=$(countOn); echo "auditoria global: tarefas com clientProgressEnabled=true → $N"
+            [ "$N" = "1" ] || { echo "::error::mais de uma tarefa habilitada — reverta imediatamente"; exit 1; }
+            PV=$(curl -sS --max-time 20 "$PROD_URL/" | jq -r '.version')
+            [ "$PV" = "$EXPECT_VERSION_PROD" ] || { echo "::error::produção divergente"; exit 1; }
+            echo "produção segue J6: $PV — ATIVAÇÃO CONTROLADA CONCLUÍDA"
+            exit 0
+          fi
+
+          if [ "$ACTION" = "reverter" ]; then
+            locate
+            BEFORE=$(snap)
+            case "$PREV" in
+              absent) curl -fsS -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+                        "https://firestore.googleapis.com/v1/$(cat "$RUNNER_TEMP/docname")?updateMask.fieldPaths=clientProgressEnabled" \
+                        -d '{"fields":{}}' >/dev/null ;;
+              true|false) curl -fsS -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+                        "https://firestore.googleapis.com/v1/$(cat "$RUNNER_TEMP/docname")?updateMask.fieldPaths=clientProgressEnabled" \
+                        -d "{\"fields\":{\"clientProgressEnabled\":{\"booleanValue\":$PREV}}}" >/dev/null ;;
+              *) echo "::error::prev inválido (absent|true|false)"; exit 1 ;;
+            esac
+            AFTER=$(snap)
+            [ "$BEFORE" = "$AFTER" ] || { echo "::error::CAMPOS IMUTÁVEIS MUDARAM no rollback: antes=$BEFORE depois=$AFTER"; exit 1; }
+            echo "flag da tarefa restaurada para: $(getflag) (esperado $PREV)"
+            N=$(countOn); echo "auditoria global pós-rollback: $N"
+            [ "$N" = "0" ] || { echo "::error::ainda há tarefa com a flag ligada"; exit 1; }
+            # redeploy QA a partir do toml PURO (flag global volta a false)
+            npx --yes wrangler@4 deploy --config wrangler.qa.toml > "$RUNNER_TEMP/deploy.txt" 2>&1 || true
+            grep -q "idseven-push-qa" "$RUNNER_TEMP/deploy.txt" || { echo "::error::redeploy de rollback não confirmou"; exit 1; }
+            for i in $(seq 1 20); do V=$(curl -sS --max-time 15 "$QA_URL/" | jq -r '.version' 2>/dev/null || true); [ "$V" = "$EXPECT_VERSION_QA" ] && break; sleep 3; done
+            R=$(curl -sS --max-time 20 "$QA_URL/cliente/cronograma/f350brollback000000000000000000000000000000001/progress")
+            echo "$R" | jq -e '.ok == false and .error == "not_found"' >/dev/null || { echo "::error::/progress não voltou a ficar escuro"; exit 1; }
+            PV=$(curl -sS --max-time 20 "$PROD_URL/" | jq -r '.version')
+            [ "$PV" = "$EXPECT_VERSION_PROD" ] || { echo "::error::produção divergente"; exit 1; }
+            echo "ROLLBACK CONCLUÍDO: flag global OFF, /progress escuro, tarefa restaurada, produção J6 intacta"
+            exit 0
+          fi
+          echo "::error::action desconhecida"; exit 1
+
+      - name: "Limpeza (sempre)"
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json" "$RUNNER_TEMP/target.txt" "$RUNNER_TEMP/docname" "$RUNNER_TEMP/rows.json" 2>/dev/null || true
