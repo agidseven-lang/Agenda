@@ -58,13 +58,19 @@ function authorized(rel) {
   // gateado byte-a-byte pelo delta AUTORIZADO em f345-hotfix-region-invariance.test.mjs @e4692c9).
   if (/^desktop\/scripts\/f345[a-z0-9-]*\.test\.mjs$/.test(rel)) return true;
   if (/^desktop\/scripts\/fixtures\/f345\//.test(rel)) return true;
+  // F3.4.6 — hotfix visual da grade diária do calendário: testes/fixtures/QA-visual próprios
+  // (fonte gateada byte-a-byte pelo delta AUTORIZADO em f346-hotfix-region-invariance @11520f5).
+  if (/^desktop\/scripts\/f346[a-z0-9-]*\.test\.mjs$/.test(rel)) return true;
+  if (/^desktop\/scripts\/fixtures\/f346\//.test(rel)) return true;
+  if (/^desktop\/scripts\/visual-qa-f346[a-z0-9-]*\.mjs$/.test(rel)) return true;
+  if (/^desktop\/qa-out-f346\//.test(rel)) return true;                        // saída do QA visual (nunca commitada)
   return false;
 }
 
 /* ── 1) versão: PERMITE somente o candidato ESTÁVEL exato 1.0.181 (F3.4.4A — promoção da rc.1 aprovada) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.182 (candidato ESTÁVEL exato do F3.4.5)', pj.version === '1.0.182');
+  ok('1 package.json version === 1.0.183 (candidato ESTÁVEL exato do F3.4.6)', pj.version === '1.0.183');
 }
 
 /* ── 2) git diff --name-only 9444e7f -- desktop: TODA mudança rastreada deve ser AUTORIZADA ── */

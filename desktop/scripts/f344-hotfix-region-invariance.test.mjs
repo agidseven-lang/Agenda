@@ -21,6 +21,7 @@
 import path from 'path'; import fs from 'fs';
 import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
 import { applyF345SlaDelta } from './fixtures/f345/authorized-delta.mjs'; // F3.4.5 — delta AUTORIZADO do clamp planStartAt
+import { applyF346CalendarDelta } from './fixtures/f346/authorized-delta.mjs'; // F3.4.6 — delta AUTORIZADO da grade diária do calendário
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
 const ROOT = path.resolve(DESK, '..');
@@ -47,13 +48,19 @@ function authorized(rel) {
   // pelo delta AUTORIZADO em f345-hotfix-region-invariance.test.mjs @e4692c9).
   if (/^desktop\/scripts\/f345[a-z0-9-]*\.test\.mjs$/.test(rel)) return true;
   if (/^desktop\/scripts\/fixtures\/f345\//.test(rel)) return true;
+  // F3.4.6 — hotfix visual da grade diária: testes/fixtures/QA-visual próprios (fonte gateada
+  // byte-a-byte pelo delta AUTORIZADO em f346-hotfix-region-invariance.test.mjs @11520f5).
+  if (/^desktop\/scripts\/f346[a-z0-9-]*\.test\.mjs$/.test(rel)) return true;
+  if (/^desktop\/scripts\/fixtures\/f346\//.test(rel)) return true;
+  if (/^desktop\/scripts\/visual-qa-f346[a-z0-9-]*\.mjs$/.test(rel)) return true;
+  if (/^desktop\/qa-out-f346\//.test(rel)) return true;                        // saída do QA visual (nunca commitada)
   return false;
 }
 
 /* ── 1) versão: SOMENTE o candidato ESTÁVEL exato 1.0.182 (F3.4.5) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.182 (candidato ESTÁVEL exato do F3.4.5)', pj.version === '1.0.182');
+  ok('1 package.json version === 1.0.183 (candidato ESTÁVEL exato do F3.4.6)', pj.version === '1.0.183');
 }
 
 /* ── 2) git diff --name-only 68598fa -- desktop: TODA mudança deve ser AUTORIZADA ── */
@@ -135,11 +142,11 @@ function authorized(rel) {
   const base = nrm(git(['show', BASE + ':desktop/src/renderer/index.html']));
   const BLOCK = /\/\* F3\.4\.3 — PRODUTOR ÚNICO NO MAIN:[\s\S]*?function notifScan\(\)\{[^}]*\}/;
   ok('9 bloco notifScan presente nos dois lados', BLOCK.test(cur) && BLOCK.test(base));
-  // F3.4.5 re-ancora: a base 68598fa recebe SOMENTE o delta AUTORIZADO do hotfix do timestamp da
-  // amarela (clamp planStartAt em resolveTaskDisplayState/resolveCanonicalSlaTimeline); qualquer
-  // outra mudança fora do bloco notifScan continua reprovando.
-  ok('9 index.html: FORA do bloco notifScan, byte-idêntico a 68598fa + delta AUTORIZADO F3.4.5',
-    cur.replace(BLOCK, '<NOTIFSCAN>') === applyF345SlaDelta(base).replace(BLOCK, '<NOTIFSCAN>'));
+  // F3.4.5/F3.4.6 re-ancoram: a base 68598fa recebe SOMENTE os deltas AUTORIZADOS (clamp
+  // planStartAt do timestamp da amarela + grade diária do calendário); qualquer outra mudança
+  // fora do bloco notifScan continua reprovando.
+  ok('9 index.html: FORA do bloco notifScan, byte-idêntico a 68598fa + deltas AUTORIZADOS F3.4.5+F3.4.6',
+    cur.replace(BLOCK, '<NOTIFSCAN>') === applyF346CalendarDelta(applyF345SlaDelta(base)).replace(BLOCK, '<NOTIFSCAN>'));
 }
 
 console.log('\n===== F3.4.4 — HOTFIX REGION-INVARIANCE (baseline OFICIAL 68598fa / rc 1.0.181-rc.1) =====');

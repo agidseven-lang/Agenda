@@ -14,6 +14,7 @@
 import path from 'path'; import fs from 'fs';
 import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
 import { applyF345SlaDelta } from './fixtures/f345/authorized-delta.mjs';
+import { applyF346CalendarDelta } from './fixtures/f346/authorized-delta.mjs'; // F3.4.6 — delta AUTORIZADO da grade diária (encadeado)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
@@ -28,14 +29,14 @@ const show = (p) => nrm(git(['show', BASE + ':' + p]));
 const cur = (p) => nrm(fs.readFileSync(path.join(REPO, p), 'utf8'));
 
 /* ── 1/2) fontes SLA: base + delta AUTORIZADO, byte-idêntico ── */
-ok('1 index.html == base e4692c9 + delta AUTORIZADO F3.4.5 (nada além do clamp)', applyF345SlaDelta(show('desktop/src/renderer/index.html')) === cur('desktop/src/renderer/index.html'));
+ok('1 index.html == base e4692c9 + deltas AUTORIZADOS F3.4.5+F3.4.6 (clamp + grade diária)', applyF346CalendarDelta(applyF345SlaDelta(show('desktop/src/renderer/index.html'))) === cur('desktop/src/renderer/index.html'));
 ok('2 slaRules.js == base e4692c9 + delta AUTORIZADO F3.4.5 (nada além do clamp)', applyF345SlaDelta(show('desktop/src/main/slaRules.js')) === cur('desktop/src/main/slaRules.js'));
 
 /* ── 3) package.json: SOMENTE a versão muda (1.0.181 → 1.0.182) ── */
 {
   const a = JSON.parse(show('desktop/package.json'));
   const b = JSON.parse(cur('desktop/package.json'));
-  ok('3 versão de destino 1.0.182', b.version === '1.0.182' && a.version === '1.0.181');
+  ok('3 versão de destino 1.0.183 (F3.4.6)', b.version === '1.0.183' && a.version === '1.0.181');
   a.version = b.version;
   ok('3b package.json: NENHUM outro campo mudou', JSON.stringify(a) === JSON.stringify(b));
 }
@@ -44,7 +45,7 @@ ok('2 slaRules.js == base e4692c9 + delta AUTORIZADO F3.4.5 (nada além do clamp
 {
   const a = JSON.parse(show('desktop/package-lock.json'));
   const b = JSON.parse(cur('desktop/package-lock.json'));
-  ok('4 lock: versão raiz 1.0.182', b.version === '1.0.182' && b.packages[''].version === '1.0.182');
+  ok('4 lock: versão raiz 1.0.183', b.version === '1.0.183' && b.packages[''].version === '1.0.183');
   a.version = b.version; a.packages[''].version = b.packages[''].version;
   ok('4b lock: NENHUMA dependência mudou', JSON.stringify(a) === JSON.stringify(b));
 }
@@ -62,7 +63,7 @@ ok('2 slaRules.js == base e4692c9 + delta AUTORIZADO F3.4.5 (nada além do clamp
     '.github/workflows/desktop-build.yml',
     '.github/workflows/f343e-desktop-stable-release.yml', // release estável re-pinado p/ v1.0.182 (mesmo caminho registrado usado pela F3.4.4A)
   ];
-  const allowNew = (f) => /^desktop\/scripts\/f345-[^/]+\.mjs$/.test(f) || /^desktop\/scripts\/fixtures\/f345\//.test(f) || /^desktop\/scripts\/fixtures\/f343\/golden\.json$/.test(f);
+  const allowNew = (f) => /^desktop\/scripts\/f345-[^/]+\.mjs$/.test(f) || /^desktop\/scripts\/fixtures\/f345\//.test(f) || /^desktop\/scripts\/fixtures\/f343\/golden\.json$/.test(f) || /^desktop\/scripts\/f346-[^/]+\.mjs$/.test(f) || /^desktop\/scripts\/fixtures\/f346\//.test(f) || /^desktop\/scripts\/visual-qa-f346[^/]*\.mjs$/.test(f) || /^desktop\/qa-out-f346\//.test(f);
   const changed = git(['diff', '--name-only', BASE, '--', '.']).split('\n').map((s) => s.trim()).filter(Boolean);
   const untracked = git(['status', '--porcelain']).split('\n').map((s) => s.trim()).filter((l) => l.startsWith('??')).map((l) => l.slice(2).trim());
   const all = [...new Set([...changed, ...untracked])];

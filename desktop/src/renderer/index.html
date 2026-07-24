@@ -205,6 +205,16 @@
   .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0;scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
   .chip{flex:none;border:1px solid var(--line);background:var(--surface);color:var(--soft);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:700;white-space:nowrap}
+  /* F3.4.6 — GRADE DIÁRIA da Agenda/Mês: restaura as MOLDURAS individuais de cada dia (visual
+     aprovado da linhagem PWA .cell): cada data na sua própria célula com superfície+borda (linhas
+     e colunas delimitadas), fora-do-mês discreto porém VISÍVEL, hoje contornado, seleção em accent.
+     Somente classes NOVAS (.agcell*); nenhum seletor global alterado. */
+  .agcell{aspect-ratio:1;border-radius:10px;background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;transition:background .12s,border-color .12s}
+  .agcell:hover{background:var(--surface2)}
+  .agcell-dim{background:transparent;border-color:var(--line-soft);color:var(--faint)}
+  .agcell-dim:hover{background:var(--surface)}
+  .agcell-today{border-color:var(--accent)}
+  .agcell-sel,.agcell-sel:hover{background:var(--accent);border-color:transparent;color:#fff}
   .colsel{display:flex;gap:8px;margin:10px 0}
   .colsel .c{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 4px;text-align:center}
   .colsel .c .cl{font-size:10px;font-weight:800}
@@ -4772,7 +4782,7 @@ function calendarGrid(y,m,evs){
     const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     const inM=d.getMonth()===m,isT=ds===todayStr(),isS=ds===agSel;
     const dots=(byDay[ds]||[]).slice(0,4).map(e=>'<span style="width:5px;height:5px;border-radius:50%;background:'+typeOf(e.type).color+'"></span>').join('');
-    cells+='<button data-day="'+ds+'" style="aspect-ratio:1;border-radius:10px;background:'+(isS?'var(--accent)':'transparent')+';border:1px solid '+(isT&&!isS?'var(--accent)':'transparent')+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:'+(isS?'#fff':inM?'var(--ink)':'var(--faint)')+';font-size:13px;font-weight:700">'+d.getDate()+'<div style="display:flex;gap:2px;height:5px">'+(isS?'':dots)+'</div></button>';
+    cells+='<button data-day="'+ds+'" class="agcell'+(inM?'':' agcell-dim')+(isT?' agcell-today':'')+(isS?' agcell-sel':'')+'">'+d.getDate()+'<div style="display:flex;gap:2px;height:5px">'+(isS?'':dots)+'</div></button>';
   }
   return '<div class="card" style="padding:14px 8px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px">'+DOW.map(d=>'<div style="text-align:center;font-size:10px;font-weight:800;color:var(--faint)">'+d+'</div>').join('')+'</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">'+cells+'</div></div>';
 }

@@ -1,10 +1,10 @@
 # =====================================================================
-# [manual] F3.4.5 — Desktop Build (candidato ESTAVEL 1.0.182 — PRIVADO, sem publicar)
+# [manual] F3.4.6 — Desktop Build (candidato ESTAVEL 1.0.183 — PRIVADO, sem publicar)
 # ---------------------------------------------------------------------
-# Build do CANDIDATO ESTAVEL 1.0.182 (F3.4.5 — hotfix do TIMESTAMP da notificacao AMARELA:
-# clamp warningAt = max(planDueAt−warningMinutes, planStartAt) em resolveTaskDisplayState +
-# resolveCanonicalSlaTimeline, index.html + slaRules.js, a partir da base OFICIAL 1.0.181
-# @e4692c9). EXE + MSI + latest.yml + blockmap + SHA256SUMS + relatorios, artifacts PRIVADOS
+# Build do CANDIDATO ESTAVEL 1.0.183 (F3.4.6 — hotfix VISUAL da GRADE DIARIA do calendario:
+# classes .agcell* restauram as MOLDURAS individuais de cada dia na Agenda/Mes — visual
+# aprovado da linhagem PWA .cell — a partir da base OFICIAL 1.0.182 @11520f5; nenhuma regra
+# de negocio alterada). EXE + MSI + latest.yml + blockmap + SHA256SUMS + relatorios, artifacts PRIVADOS
 # somente. `--publish never`: o CI NUNCA publica; NAO cria release/tag; NAO marca Latest
 # (o unico publicador e o workflow de release gated ja autorizado pelo mandato F3.4.5,
 # disparado SOMENTE depois de todos os gates verdes).
@@ -13,8 +13,10 @@
 #     preservacao, maquina de estados do updater) — zero regressao;
 #   - suite F3.4.4 re-ancorada (flow golden master; contrato movimentacao repetida 64/0;
 #     region-invariance 68598fa + delta AUTORIZADO F3.4.5 30/0);
-#   - suite F3.4.5: golden master TEMPORAL (RED da 1.0.181 reproduzido + GREEN 43/0) +
-#     region-invariance vs 1.0.181 OFICIAL @e4692c9 (SO o clamp + versao + testes/workflows);
+#   - suite F3.4.5: golden master TEMPORAL (RED + GREEN 43/0) + region-invariance @e4692c9;
+#   - suite F3.4.6: region-invariance vs 1.0.182 OFICIAL @11520f5 (SO a grade + versao +
+#     testes/workflows) + QA VISUAL Playwright (37 asserts + 17 capturas: celulas emolduradas,
+#     7 colunas, dots na data, dim, hoje, filtros, busca, cancelados, viewports/escalas);
 #   - metadata (latest.yml + blockmap + app-update.yml sem segredo — PRIVADOS);
 #   - prova-de-versao (package.json EMPACOTADO == 1.0.182) + renderer EMPACOTADO
 #     byte-identico a FONTE do commit buildado;
@@ -23,15 +25,15 @@
 # NAO publica release; NAO toca Worker/Firebase/Firestore/Rules/Cloudflare/Android.
 # Execucao SOMENTE manual (workflow_dispatch).
 # =====================================================================
-name: "[manual] F3.4.5 Desktop Build (stable candidate 1.0.182)"
+name: "[manual] F3.4.6 Desktop Build (stable candidate 1.0.183)"
 
 "on":
   workflow_dispatch:
     inputs:
       ref:
-        description: "Branch/commit a buildar (ex.: desktop/f345-yellow-sla-timestamp-hotfix)"
+        description: "Branch/commit a buildar (ex.: desktop/f346-calendar-grid-visual-hotfix)"
         required: true
-        default: "desktop/f345-yellow-sla-timestamp-hotfix"
+        default: "desktop/f346-calendar-grid-visual-hotfix"
 
 permissions:
   contents: read
@@ -47,6 +49,7 @@ jobs:
       BASE_SHA: "9444e7fab945956258a45cfcebb00bbd87e72447" # ESTAVEL 1.0.178 (baseline F3.4.3)
       STABLE_180_SHA: "68598fae54e75dd34a399ffca65649cc8ff6d16c" # Desktop 1.0.180 OFICIAL (baseline F3.4.4)
       STABLE_181_SHA: "e4692c93644bd4deb380b2ec5ecc486dfcb205ca" # Desktop 1.0.181 OFICIAL (baseline F3.4.5)
+      STABLE_182_SHA: "11520f5ab59a8ca90b6a2d82bff741dc9ebe8cca" # Desktop 1.0.182 OFICIAL (baseline F3.4.6)
     steps:
       - name: Checkout (ref escolhido; history completo p/ baseline)
         uses: actions/checkout@v4
@@ -60,7 +63,7 @@ jobs:
           echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
           echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-$APP_VERSION" >> "$GITHUB_ENV"
           echo "versao=$APP_VERSION"
-          [ "$APP_VERSION" = "1.0.182" ] || { echo "::error:: versao != 1.0.182 (candidato ESTAVEL do F3.4.5 exige a versao exata)"; exit 1; }
+          [ "$APP_VERSION" = "1.0.183" ] || { echo "::error:: versao != 1.0.183 (candidato ESTAVEL do F3.4.6 exige a versao exata)"; exit 1; }
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -115,6 +118,26 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: node scripts/f345-hotfix-region-invariance.test.mjs
 
+      - name: Gate F3.4.6 region-invariance (fonte vs Desktop 1.0.182 OFICIAL @11520f5)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f346-hotfix-region-invariance.test.mjs
+
+      - name: Gate F3.4.6 QA VISUAL da grade diaria (Playwright + Chromium; 37 asserts + capturas)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          npm i --no-save playwright@1.47.2 --no-audit --no-fund
+          npx playwright install chromium
+          node scripts/visual-qa-f346-calendar.mjs
+
+      - name: Upload capturas do QA visual (grade diaria)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.183-visual-qa-calendario
+          path: desktop/qa-out-f346/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: electron-builder (NSIS + MSI + metadata do MESMO build)
         working-directory: ${{ env.APP_DIR }}
         run: npx electron-builder --win nsis msi --publish never
@@ -162,7 +185,7 @@ jobs:
           if grep -qiE '(token|secret|password|gh_token|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml contem possivel segredo"; exit 1; fi
           echo "GATE metadata ESTAVEL OK: latest.yml (version/path/url/sha512/size/blockmap conferem) + app-update.yml github SEM segredo; canary.yml AUSENTE (canal isolado)."
 
-      - name: Gate prova-de-versao (package.json empacotado == 1.0.182) + renderer EMPACOTADO == fonte do commit
+      - name: Gate prova-de-versao (package.json empacotado == 1.0.183) + renderer EMPACOTADO == fonte do commit
         working-directory: ${{ env.APP_DIR }}
         run: |
           set -e
@@ -176,7 +199,7 @@ jobs:
           # (ii) mangling MSYS de um literal "/package.json" (Git-bash o troca por C:\...\Git\...).
           PKGJSON="$EXDIR/package.json"
           PKGV=$(PKGJSON="$PKGJSON" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKGJSON,"utf8")).version||"")')
-          [ "$PKGV" = "1.0.182" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.182"; exit 1; }
+          [ "$PKGV" = "1.0.183" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.183"; exit 1; }
           # (b) renderer EMPACOTADO byte-identico a FONTE do commit buildado (build nao adulterou o auditado).
           EXIDX="$EXDIR/src/renderer/index.html"
           test -f "$EXIDX" || { echo "::error:: renderer nao encontrado no asar"; exit 1; }
@@ -190,7 +213,7 @@ jobs:
           '
           test -f "$EXDIR/dist/main/updaterService.js" || { echo "::error:: updaterService.js ausente no asar"; exit 1; }
           grep -q "createUpdaterService" "$EXDIR/dist/main/main.js" || { echo "::error:: wiring do updater ausente no main.js empacotado"; exit 1; }
-          echo "GATE prova-de-versao (1.0.182) + renderer==fonte OK."
+          echo "GATE prova-de-versao (1.0.183) + renderer==fonte OK."
 
       - name: Gate FLAGS do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade + 6 flags)
         working-directory: ${{ env.APP_DIR }}
@@ -242,12 +265,12 @@ jobs:
             echo "metadata    : latest.yml + $BM_NAME (MESMO build); app-update.yml SOMENTE dentro do pacote"
             echo "commit      : $GITHUB_SHA"
             echo "ref         : ${{ github.event.inputs.ref }}"
-            echo "baseline    : Desktop 1.0.181 OFICIAL @ $STABLE_181_SHA (invariancia F3.4.5) + 1.0.180 @ $STABLE_180_SHA (F3.4.4) + 1.0.178 @ $BASE_SHA (F3.4.3)"
-            echo "origem      : F3.4.5 — hotfix do timestamp da AMARELA: warningAt = max(planDueAt-warningMinutes, planStartAt); vermelha/critica/textos/dedupe intocados"
+            echo "baseline    : Desktop 1.0.182 OFICIAL @ $STABLE_182_SHA (invariancia F3.4.6) + 1.0.181 @ $STABLE_181_SHA (F3.4.5) + 1.0.180 @ $STABLE_180_SHA (F3.4.4) + 1.0.178 @ $BASE_SHA (F3.4.3)"
+            echo "origem      : F3.4.6 — grade diaria do calendario restaurada (.agcell*: moldura por dia, 7 colunas, dots na data, dim fora-do-mes); regras de negocio/SLA intocados"
             echo "distribuicao: PRIVADA (candidato estavel; publicacao SO via release gated apos todos os gates verdes)"
           } > "$OUT/VERSAO-DESKTOP.txt"
           {
-            echo "===== RELATORIO DESKTOP (F3.4.5 candidato ESTAVEL 1.0.182 — hotfix timestamp amarela) ====="
+            echo "===== RELATORIO DESKTOP (F3.4.6 candidato ESTAVEL 1.0.183 — grade diaria do calendario) ====="
             echo "Gerado (UTC) : $(date -u)"
             echo "Ref / commit : ${{ github.event.inputs.ref }} @ $GITHUB_SHA"
             echo ""
