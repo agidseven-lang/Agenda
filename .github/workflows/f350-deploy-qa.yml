@@ -70,7 +70,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.ref }}
-          fetch-depth: 0
+          fetch-depth: 1
+
+      # fetch DIRIGIDO (rápido e determinístico): só os 4 commits históricos usados nas
+      # provas byte-idênticas/RED — evita o clone completo (fetch-depth 0), que ficou
+      # lento demais com o histórico atual do repositório.
+      - name: "Buscar bases históricas (fetch dirigido de 4 SHAs)"
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin ${PROD_SHA} ${J4_SHA} ${BASE_SHA} ${C20_SHA}
+          for S in ${PROD_SHA} ${J4_SHA} ${BASE_SHA} ${C20_SHA}; do
+            git cat-file -e "$S^{commit}" || { echo "::error::SHA histórico ausente: $S"; exit 1; }
+          done
+          echo "OK: 4 bases históricas disponíveis"
 
       - name: "Gate 2 — identidade da fonte + suítes herméticas no runner"
         run: |
