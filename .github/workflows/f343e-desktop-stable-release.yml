@@ -194,7 +194,7 @@ jobs:
 
       - name: "Release notes"
         run: |
-                    cat > notas.md <<'NOTAS'
+          cat > notas.md <<'NOTAS'
           Agenda ID Seven Desktop 1.0.183 — Produção Estável
 
           Sucessora da 1.0.182 como versão oficial (Latest), canal ESTÁVEL (latest). Auto-update:
