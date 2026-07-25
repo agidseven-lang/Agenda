@@ -19,7 +19,7 @@
  * ===================================================================================== */
 import path from 'path'; import fs from 'fs';
 import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
-import { applyF347IndexDelta, F347_MAIN_MARKERS, F347_SOURCE_FILES } from './fixtures/f347/authorized-delta.mjs';
+import { applyF347IndexDelta, F347_MAIN_MARKERS, F347_SOURCE_FILES, isF347Authorized } from './fixtures/f347/authorized-delta.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
@@ -88,7 +88,7 @@ for (const [rel, markers] of Object.entries(F347_MAIN_MARKERS)) {
   const changed = git(['diff', '--name-only', BASE, '--', '.']).split('\n').map((s) => s.trim()).filter(Boolean);
   const untracked = git(['status', '--porcelain']).split('\n').map((s) => s.trim()).filter((l) => l.startsWith('??')).map((l) => l.slice(2).trim());
   const all = [...new Set([...changed, ...untracked])];
-  const bad = all.filter((f) => !ALLOW.includes(f) && !allowNew(f));
+  const bad = all.filter((f) => !ALLOW.includes(f) && !allowNew(f) && !isF347Authorized(f)); // + testes de env/harness/versão da fase de auditoria pré-publicação
   if (bad.length) console.log('FORA da allowlist F3.4.7:\n' + bad.join('\n'));
   ok('5 mudanças vs 3981bf2 restritas à allowlist F3.4.7 (5 fontes + versão + testes)', bad.length === 0);
 }

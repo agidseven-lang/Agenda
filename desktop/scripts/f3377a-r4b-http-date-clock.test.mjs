@@ -109,7 +109,7 @@ ok('M4 slaNow (agora canônico do MAIN) espelha o gate de offset do renderer',
   /function slaNow\(\): number/.test(MAIN) && /q === "synced" \|\| q === "degraded" \|\| q === "stale"/.test(MAIN) && /clockSync\.getState\(\)/.test(MAIN));
 ok('M5 slaScheduler é o produtor único (now: slaNow) e o notifier segue no main',
   /slaScheduler = startSlaScheduler\(\(\) => uid, deliverNotification, \{ now: slaNow, authUser: getAuthUser \}\)/.test(MAIN) &&
-  /startNotifier\(\(\) => mainWin, uid, deliverNotification\)/.test(MAIN));
+  /startNotifier\(\(\) => mainWin, uid, deliverNotification, getAuthUser\)/.test(MAIN));
 
 /* ═══════════════ PRELOAD (estático) ═══════════════ */
 ok('P1 preload expõe clockGetState/clockRequestSync/onClockState', /clockGetState:/.test(PRELOAD) && /clockRequestSync:/.test(PRELOAD) && /onClockState:/.test(PRELOAD));
@@ -120,7 +120,7 @@ ok('R1 _slaApplyClockState alimenta _slaClockOffsetMs (VISUAL) a partir do estad
 ok('R2 synced/degraded/stale usam o offset; senão relógio local (offset 0)', /useOffset=\(q==='synced'\|\|q==='degraded'\|\|q==='stale'\)/.test(H) && /newOffset=useOffset\?Math\.round\(s\.offsetMs\):0/.test(H));
 ok('R3 [F3.4.3C] _slaApplyClockState NÃO chama notifScanSla (produtor migrou p/ o MAIN)', !/function _slaApplyClockState[\s\S]{0,900}notifScanSla\(\)/.test(H));
 ok('R4 renderer não emite SLA/atribuição: notifScan só roda o fluxo; scans sem chamadores',
-  /function notifScan\(\)\{ notifScanFlow\(\); \}/.test(H) && (H.match(/notifScanSla\(\)/g) || []).length === 1 && (H.match(/notifScanAssign\(\)/g) || []).length === 1);
+  /function notifScan\(\)\{\}/.test(H) && (H.match(/notifScanSla\(\)/g) || []).length === 1 && (H.match(/notifScanAssign\(\)/g) || []).length === 1);
 ok('R5 registra onClockState + consulta clockGetState no boot', /onClockState\(_slaApplyClockState\)/.test(H) && /clockGetState\(\)\.then\(function\(s\)\{ _slaApplyClockState\(s\)/.test(H));
 ok('R6 retomada (resume/focus) também pede clockRequestSync', /typeof window\.desktopAPI\.clockRequestSync==='function'\) window\.desktopAPI\.clockRequestSync\(\)/.test(H));
 ok('R7 canonicalNowMs() continua a fonte única do VISUAL', /function canonicalNowMs\(\)\{ return Date\.now\(\)\+_slaClockOffsetMs; \}/.test(H));

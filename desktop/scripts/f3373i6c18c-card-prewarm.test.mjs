@@ -45,7 +45,9 @@ function fnTs(name) {
 }
 
 /* ── A: versão 1.0.166 (gate 25) ── */
-ok('A1 versão da candidata (linha 1.0.177 — 77A; aceita -QA/-QA.n no build QA)', /^1\.0\.177(-QA(\.\d+)?)?$/.test(PJ.version) && S('package-lock.json').includes('"version": "' + PJ.version + '"'));
+// F3.4.7 — re-âncora do pin de versão (era 1.0.177/77A) à candidata atual 1.0.184; o CONTRATO funcional
+// do prewarm (D5/D6/E6/H2...) é release-independente e segue provado byte-a-byte abaixo (nada afrouxado).
+ok('A1 versão da candidata (linha 1.0.184 — F3.4.7; aceita -QA/-QA.n no build QA)', /^1\.0\.184(-QA(\.\d+)?)?$/.test(PJ.version) && S('package-lock.json').includes('"version": "' + PJ.version + '"'));
 
 /* ── B: validação de URL (gates 1-5, micro-exec REAL) ── */
 const MODC = 'const SHARE_PATH = "/share/cronograma/";\nconst HOST = "aprovar.agendaidseven.com.br";\n';

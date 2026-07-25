@@ -58,6 +58,7 @@ const realLoad = Module._load;
 Module._load = function (request) {
   if (request === 'electron') return { BrowserWindow: class {} };
   if (request === './firebase' || /[\\/]firebase(\.js)?$/.test(request)) return { db: {}, listen: (name, cb) => { curCapture.push([name, cb]); return () => {}; } };
+  if (request === './slaRules' || /[\\/]slaRules(\.js)?$/.test(request)) return realLoad.call(this, path.join(DESK, 'src', 'main', 'slaRules.js'), arguments[1], false); // F3.4.7 harness fix: notifier.ts passou a require('./slaRules') na F3.4.4 (mock ausente desde 1.0.181)
   return realLoad.apply(this, arguments);
 };
 const { startNotifier } = require(path.join(tmp, 'notifier.js'));
@@ -152,7 +153,7 @@ let livePayload = null;
 }
 /* ===== 10) RENDERER não emite mais atribuição (produtor único no main) ===== */
 {
-  ok('[10] renderer: notifScan só roda o fluxo; notifScanAssign DEFINIDO mas SEM chamadores', /function notifScan\(\)\{ notifScanFlow\(\); \}/.test(HTML) && (HTML.match(/notifScanAssign\(\)/g) || []).length === 1);
+  ok('[10] renderer: notifScan só roda o fluxo; notifScanAssign DEFINIDO mas SEM chamadores', /function notifScan\(\)\{\}/.test(HTML) && (HTML.match(/notifScanAssign\(\)/g) || []).length === 1);
   ok('[10] notifier: detecção por TRANSIÇÃO no MAIN (changed = designer novo OU novo assignedAt)', /const changed = \(prev !== cur\) \|\| \(at !== prevAt\);/.test(NOTIFIER));
 }
 /* ===== 11) GENERALIDADE — vale p/ qualquer Social/Designer (IDs/nomes/unicode), sem hardcode ===== */

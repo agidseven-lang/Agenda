@@ -31,6 +31,7 @@ const realLoad = Module._load;
 Module._load = function (request) {
   if (request === 'electron') return { BrowserWindow: class {} };
   if (request === './firebase' || /[\\/]firebase(\.js)?$/.test(request)) return { db: {}, listen: (name, cb) => { listenCalls.push([name, cb]); return () => {}; } };
+  if (request === './slaRules' || /[\\/]slaRules(\.js)?$/.test(request)) return realLoad.call(this, path.join(DESK, 'src', 'main', 'slaRules.js'), arguments[1], false); // F3.4.7 harness fix: notifier.ts passou a require('./slaRules') na F3.4.4 (mock ausente desde 1.0.181)
   return realLoad.apply(this, arguments);
 };
 const { startNotifier } = require(notifierJs);

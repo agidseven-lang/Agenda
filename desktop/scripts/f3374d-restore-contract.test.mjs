@@ -128,12 +128,14 @@ ok('R14 Roteiro usa o MESMO envelope (mensagem por setor; sem rota nova; sem Des
   if (IS_QA) {
     ok('R16 [77A/QA] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" PRESENTE (build QA)',
       h.includes("AMBIENTE QA") && h.includes("NÃO USAR COM CLIENTES"));
-    ok('R17 [77A/QA] versão 1.0.177-QA/-QA.n (package.json com sufixo -QA)', /^1\.0\.177-QA(\.\d+)?$/.test(PKG.version));
+    ok('R17 [77A/QA] versão 1.0.184-QA/-QA.n (package.json com sufixo -QA)', /^1\.0\.184-QA(\.\d+)?$/.test(PKG.version)); // F3.4.7 — re-âncora 1.0.177→1.0.184 (contrato de restauração release-independente)
   } else {
     ok('R16 [77A] banner "AMBIENTE QA — NÃO USAR COM CLIENTES" AUSENTE (produção)',
       !h.includes("AMBIENTE QA") && !h.includes("NÃO USAR COM CLIENTES") && !h.includes('banner permanente de QA'));
-    ok('R17 [77A] versão 1.0.177 (package.json, sem -QA) e NENHUM literal de versão no renderer',
-      PKG.version === '1.0.177' && !h.includes('1.0.177-QA') && !h.includes('1.0.177'));
+    // F3.4.7 — re-âncora do pin de versão (era 1.0.177) à candidata 1.0.184; a prova "sem literal de
+    // versão no renderer" (deriva de IPC) segue idêntica; o contrato de restauração não é afrouxado.
+    ok('R17 [77A] versão 1.0.184 (package.json, sem -QA) e NENHUM literal de versão no renderer',
+      PKG.version === '1.0.184' && !h.includes('1.0.184-QA') && !h.includes('1.0.184'));
   }
 }
 

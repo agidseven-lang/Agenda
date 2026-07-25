@@ -86,7 +86,8 @@ export const F347_SOURCE_FILES = [
   'desktop/src/main/slaScheduler.ts',
 ];
 
-/** Testes re-ancorados por causa do delta AUTORIZADO F3.4.7 (pins de fonte da cadeia de notificação). */
+/** Testes re-ancorados por causa do delta AUTORIZADO F3.4.7 (pins de fonte da cadeia de notificação)
+ *  + testes com correção de HARNESS/versão da fase de auditoria pré-publicação (env/harness fix). */
 export const F347_REANCHORED_TESTS = [
   'desktop/scripts/f33A-notif-central.test.mjs',
   'desktop/scripts/f33C-assignment-toast.test.mjs',
@@ -98,6 +99,15 @@ export const F347_REANCHORED_TESTS = [
   'desktop/scripts/f3311-baseline-freeze.test.mjs',
   'desktop/scripts/f343-preexisting-registry.test.mjs',
   'desktop/scripts/fixtures/f343/deliver-harness.mjs',
+  // F3.4.7 pré-publicação — correção de env/harness (mock ./slaRules ausente desde F3.4.4) +
+  // re-âncora de pins de arquitetura (notifScan vazio; startNotifier c/ getAuthUser) e de versão.
+  'desktop/scripts/f33N-assign-baseline-fix.test.mjs',
+  'desktop/scripts/f343-assignment-transition.test.mjs',
+  'desktop/scripts/f3377a-r3-single-producer-clock.test.mjs',
+  'desktop/scripts/f3377a-r4b-http-date-clock.test.mjs',
+  'desktop/scripts/f3373i6c18c-card-prewarm.test.mjs',
+  'desktop/scripts/f3373i6c18h-stable-token.test.mjs',
+  'desktop/scripts/f3374d-restore-contract.test.mjs',
 ];
 
 /**

@@ -211,7 +211,9 @@ ok('G2 [gate17] call sites de warn existentes não recebem token (apenas o Error
 ok('H1 alias ensureReviewToken delega para o helper estável (call sites intactos)',
   /async function ensureReviewToken\(taskId\)\{return ensureStableClientReviewToken\(taskId\);\}/.test(HTML));
 ok('H2 single-flight declarado (Map por tarefa)', /const _tokenFlight=new Map\(\);/.test(HTML));
-ok('H3 [gate20] versão da candidata (linha 1.0.177 — 77A; aceita -QA/-QA.n no build QA)', /^1\.0\.177(-QA(\.\d+)?)?$/.test(PKG.version));
+// F3.4.7 — re-âncora do pin de versão (era 1.0.177/77A) à candidata atual 1.0.184; o CONTRATO do
+// stable-token (E1..H2, 29 asserts) é release-independente e segue provado (nada afrouxado).
+ok('H3 [gate20] versão da candidata (linha 1.0.184 — F3.4.7; aceita -QA/-QA.n no build QA)', /^1\.0\.184(-QA(\.\d+)?)?$/.test(PKG.version));
 ok('H4 fonte consultada ANTES de gerar (get antecede genReviewToken no fluxo frio)', (() => {
   const iGet = SRC_ENSURE.indexOf('await ref.get()');
   const iGen = SRC_ENSURE.indexOf('genReviewToken()');

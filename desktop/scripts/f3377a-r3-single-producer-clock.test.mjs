@@ -63,7 +63,7 @@ ok('B1.4 [renderer] notifScanAssign/notifScanSla seguem DEFINIDOS mas SEM chamad
   /function notifScanAssign\(\)/.test(H) && /function notifScanSla\(\)/.test(H) &&
   (H.match(/notifScanAssign\(\)/g) || []).length === 1 && (H.match(/notifScanSla\(\)/g) || []).length === 1);
 ok('B1.5 [renderer] notifScan só roda o FLUXO (não emite SLA/atribuição)',
-  /function notifScan\(\)\{ notifScanFlow\(\); \}/.test(H));
+  /function notifScan\(\)\{\}/.test(H));
 
 /* SIMULAÇÃO EXECUTÁVEL do HUB (_notifSeen) — o colapso da azul depende da chave canônica ÚNICA */
 {

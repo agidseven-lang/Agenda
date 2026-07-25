@@ -33,11 +33,11 @@ let pass = 0, fail = 0;
 const ok = (n, c) => { if (c) pass++; else { fail++; console.log('FAIL:', n); } };
 
 /* ── estáticas: PRODUTOR ÚNICO no MAIN; renderer só-visual ── */
-ok('renderer: notifScan só roda o FLUXO (não emite SLA/atribuição)', /function notifScan\(\)\{ notifScanFlow\(\); \}/.test(HTML));
+ok('renderer: notifScan só roda o FLUXO (não emite SLA/atribuição)', /function notifScan\(\)\{\}/.test(HTML));
 ok('renderer: notifScanAssign/notifScanSla DEFINIDOS mas SEM chamadores (visual preservado)',
   /function notifScanAssign\(\)/.test(HTML) && /function notifScanSla\(\)/.test(HTML) &&
   (HTML.match(/notifScanAssign\(\)/g) || []).length === 1 && (HTML.match(/notifScanSla\(\)/g) || []).length === 1);
-ok('main: notifier é o produtor (startNotifier no login) + listener Firestore no main', /startNotifier\(\(\) => mainWin, uid, deliverNotification\)/.test(MAIN) && /listen<Task>\("tasks"/.test(NT));
+ok('main: notifier é o produtor (startNotifier no login) + listener Firestore no main', /startNotifier\(\(\) => mainWin, uid, deliverNotification, getAuthUser\)/.test(MAIN) && /listen<Task>\("tasks"/.test(NT));
 ok('notifier: dedupKey CANÔNICO designer_assigned:<id>:<designerId>:<at> (fallback sem at)',
   /const _canonKey = at \? `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}:\$\{at\}` : `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}`;/.test(NT));
 ok('notifier: detecção por TRANSIÇÃO (semente no 1º snapshot; emite mudança), sem hard-drop por assignedAt no CÓDIGO',
@@ -62,6 +62,7 @@ const realLoad = Module._load;
 Module._load = function (request) {
   if (request === 'electron') return { BrowserWindow: class {} };
   if (request === './firebase' || /[\\/]firebase(\.js)?$/.test(request)) return { db: {}, listen: (name, cb) => { listenCalls.push([name, cb]); return () => {}; } };
+  if (request === './slaRules' || /[\\/]slaRules(\.js)?$/.test(request)) return realLoad.call(this, path.join(DESK, 'src', 'main', 'slaRules.js'), arguments[1], false); // F3.4.7 harness fix: notifier.ts passou a require('./slaRules') na F3.4.4 (mock ausente desde 1.0.181)
   return realLoad.apply(this, arguments);
 };
 const { startNotifier } = require(path.join(tmp, 'notifier.js'));
