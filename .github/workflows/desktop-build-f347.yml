@@ -45,11 +45,43 @@ jobs:
       STABLE_182_SHA: "11520f5ab59a8ca90b6a2d82bff741dc9ebe8cca" # Desktop 1.0.182 OFICIAL (F3.4.6)
       STABLE_183_SHA: "3981bf2bf8611caf8bb7057e2245b5834bf66754" # Desktop 1.0.183 OFICIAL (F3.4.7)
     steps:
+      # [F3.4.7 fix ambiental] O runner Windows tem git core.autocrlf=true (Git for Windows) e o repo
+      # NAO tem .gitattributes -> o checkout converteria LF->CRLF, quebrando os harnesses que fatiam o
+      # fonte por marcadores '\n' (ex.: f33G-editprazo-write). Forcamos LF ANTES do checkout. Correcao
+      # EXCLUSIVAMENTE ambiental no workflow: NAO altera fonte/teste/candidata; checkout segue pinado.
+      - name: Forcar LF no checkout (Windows core.autocrlf=true quebraria harness LF-based)
+        shell: bash
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          echo "git global: core.autocrlf=$(git config --global --get core.autocrlf) core.eol=$(git config --global --get core.eol)"
+
       - name: Checkout (commit EXATO 03c5893 PINADO; history completo p/ baselines)
         uses: actions/checkout@v4
         with:
           ref: "03c5893f7c5baf810032bd2a922522a77c1b4680"
           fetch-depth: 0
+
+      - name: Gate LINE ENDINGS LF (aborta se arquivo-chave estiver CRLF no worktree)
+        shell: bash
+        run: |
+          set -e
+          FILES="desktop/scripts/f33G-editprazo-write.test.mjs \
+                 desktop/src/renderer/index.html \
+                 desktop/src/main/main.ts \
+                 desktop/src/main/firebase.ts \
+                 desktop/src/main/bgNotify.ts \
+                 desktop/src/main/slaScheduler.ts"
+          echo "== git ls-files --eol (i/=index, w/=worktree) =="
+          git ls-files --eol -- $FILES | tee "$RUNNER_TEMP/eol.txt"
+          # aborta se QUALQUER arquivo-chave tiver working-tree eol crlf ou mixed
+          if grep -Eq 'w/(crlf|mixed)' "$RUNNER_TEMP/eol.txt"; then
+            echo "::error:: CRLF/mixed detectado no worktree em arquivo-chave — abortando (fix LF nao aplicado)"; exit 1
+          fi
+          # garante que os 6 arquivos foram realmente inspecionados (evita falso-verde por caminho errado)
+          N=$(git ls-files --eol -- $FILES | wc -l | tr -d ' ')
+          [ "$N" -ge 6 ] || { echo "::error:: esperados >=6 arquivos em ls-files --eol, vi $N"; exit 1; }
+          echo "LINE ENDINGS: LF CONFIRMED"
 
       - name: Derivar versao (package.json e a fonte unica) — exige 1.0.184 exato, sem sufixo
         run: |
