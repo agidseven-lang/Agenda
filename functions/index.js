@@ -1465,6 +1465,91 @@ exports.getUserSelf = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-ce
 exports._handleGetUserSelf = handleGetUserSelf;
 
 /* ============================================================================
+   F4.2C — issueFirebaseAuthToken (Firebase Custom Token do PROPRIO usuario).
+   ----------------------------------------------------------------------------
+   - PONTE de identidade Firebase Auth para os clientes REAIS (Android nativo e
+     Desktop): troca a sessao HMAC VALIDA por um Firebase Custom Token do MESMO
+     uid (uid deterministico = doc id de users; NUNCA cria identidade paralela;
+     signInWithCustomToken reutiliza o mesmo usuario a cada login).
+   - Session-gated (authVerifySessionToken): POST apenas; uid vem SO da sessao
+     verificada. Le SOMENTE users/<session.uid>; usuario inexistente => 404;
+     status inativo (pendente/removido/excluido — MESMA politica do loginUser)
+     ou disabled === true => 403 user_inactive (fail-closed).
+   - createCustomToken(uid) SEM claims adicionais: menor privilegio real —
+     role/admin sao MUTAVEIS e as Rules desta fase NAO consomem claims; incluir
+     claims exigira mandato proprio. Token expira ~1h (padrao Firebase Admin) e
+     NUNCA e logado nem persistido no servidor (logs = uid mascarado apenas).
+   - ADC/IAM (gen2 sem chave privada): createCustomToken assina via API signBlob
+     — a service account de RUNTIME precisa de roles/iam.serviceAccountTokenCreator
+     sobre ela mesma; sem isso => 500 token_issue_failed (motivo interno so nos
+     logs; resposta generica sem detalhe).
+   - ADITIVO: NENHUM endpoint existente muda; Desktop/Android atuais seguem
+     intocados ate consumirem a ponte. NAO altera Rules. DORMENTE sem
+     AUTH_SESSION_SECRET => 401.
+   - Handler PURO testavel: ctx.db e ctx.createCustomToken injetaveis (mock).
+   ============================================================================ */
+const AUTH_INACTIVE_STATUSES = ["pendente", "removido", "excluido"];   // politica do loginUser (user_inactive)
+async function handleIssueFirebaseAuthToken(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  // Autenticacao de SESSAO estrita (assinatura + exp + scope=session via AUTH_SESSION_SECRET).
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { status: 401, json: { ok: false, error: "invalid_session" } };
+  // Rate-limit por requester (uid da sessao) + IP. Chaves namespaced (isoladas dos outros endpoints).
+  const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
+  const rlKeys = ["fat:" + auth.uid].concat(ip ? ["fati:" + ip] : []);
+  if (rlKeys.some((k) => notifRlBlocked(k, now))) return { status: 429, json: { ok: false, error: "rate_limited" } };
+  // Le SOMENTE o proprio doc (auth.uid): precisa EXISTIR e estar ATIVO (fail-closed).
+  const db = ctx.db || notifDb();
+  let snap;
+  try { snap = await db.collection("users").doc(auth.uid).get(); }
+  catch (e) {
+    try { logger.error("[issueFirebaseAuthToken] leitura falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "lookup_failed" } };
+  }
+  if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
+  const d = snap.data() || {};
+  const st = String(d.status || "");
+  if (AUTH_INACTIVE_STATUSES.indexOf(st) >= 0 || d.disabled === true) {
+    try { logger.info("[issueFirebaseAuthToken] negado (inativo)", { uid: notifMaskUid(auth.uid) }); } catch (_) {}
+    return { status: 403, json: { ok: false, error: "user_inactive" } };
+  }
+  // Custom Token do MESMO uid, SEM claims adicionais (ver cabecalho). NUNCA logar o token.
+  const create = ctx.createCustomToken || ((uid) => admin.auth().createCustomToken(uid));
+  let fbToken;
+  try { fbToken = await create(auth.uid); }
+  catch (e) {
+    try { logger.error("[issueFirebaseAuthToken] emissao falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "token_issue_failed" } };
+  }
+  if (typeof fbToken !== "string" || !fbToken) return { status: 500, json: { ok: false, error: "token_issue_failed" } };
+  rlKeys.forEach((k) => notifRlClear(k));
+  try { logger.info("[issueFirebaseAuthToken] ok", { uid: notifMaskUid(auth.uid) }); } catch (_) {}
+  return { status: 200, json: { ok: true, uid: auth.uid, firebaseToken: fbToken, expiresInSec: 3600 } };
+}
+
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE sem AUTH_SESSION_SECRET
+// => 401 (via authVerifySessionToken). Token NUNCA logado; Cache-Control no-store.
+exports.issueFirebaseAuthToken = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }   // preflight: sem auth, sem segredo, sem Firestore
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleIssueFirebaseAuthToken({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[issueFirebaseAuthToken] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+
+// Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
+exports._handleIssueFirebaseAuthToken = handleIssueFirebaseAuthToken;
+
+/* ============================================================================
    F3.3.21-B3.20 — registerFcmToken / removeMyFcmToken (FCM token do PROPRIO usuario).
    ----------------------------------------------------------------------------
    - Base server-side para MIGRAR a gestao de fcmTokens/fcmTokenMeta que hoje o
