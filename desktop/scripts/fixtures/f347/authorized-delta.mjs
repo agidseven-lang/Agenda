@@ -122,5 +122,6 @@ export function isF347Authorized(rel) {
   if (F347_REANCHORED_TESTS.includes(rel)) return true;
   if (/^desktop\/scripts\/f347-[^/]+\.mjs$/.test(rel)) return true;
   if (/^desktop\/scripts\/fixtures\/f347\//.test(rel)) return true;
+  if (rel === '.github/workflows/desktop-build-f347.yml') return true; // workflow de build oficial F3.4.7 (sem publicar)
   return false;
 }

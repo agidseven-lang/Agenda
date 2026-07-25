@@ -1,0 +1,284 @@
+# =====================================================================
+# [manual] F3.4.7 — Desktop Build (candidato ESTAVEL 1.0.184 — PRIVADO, sem publicar)
+# ---------------------------------------------------------------------
+# Build OFICIAL do candidato ESTAVEL 1.0.184 (F3.4.7 — recuperacao da ENTREGA VISUAL IMEDIATA das
+# notificacoes amarela/vermelha; base OFICIAL 1.0.183 @3981bf2; contrato de SLA/regras intocado).
+# Produz EXE + MSI + latest.yml + blockmap + SHA256SUMS + SBOM + logs; artifacts PRIVADOS.
+# `--publish never`: o CI NUNCA publica; NAO cria release/tag; NAO marca Latest. Esta e a PROPRIA
+# build final da 1.0.184: apos o GO fisico, a MESMA build e os MESMOS hashes serao publicados SEM
+# rebuild (pelo workflow de release gated, disparado SOMENTE com o literal PUBLICAR-DESKTOP-1.0.184-STABLE).
+# Gates fail-closed (todos verdes obrigatorio):
+#   - cadeia region-invariance f343..f346 (baselines 1.0.178/180/181/182) + F3.4.7 @3981bf2;
+#   - golden masters SLA (f343 219/0) + fluxo (f344) + temporal (f345) + contrato movimentacao (f344);
+#   - preservacao + maquina de estados do updater;
+#   - F3.4.7: entrega visual imediata (46/0) + harness INDEPENDENTE dos 15 comportamentos (18/0);
+#   - prova-de-versao (package.json empacotado == 1.0.184) + renderer empacotado == fonte do commit;
+#   - flags do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade=false);
+#   - identidade Windows: AppUserModelId br.com.idseven.agenda.desktop + appId + tray + close-to-tray;
+#   - assinatura: inspeciona/registra o estado Authenticode (mesmo processo da 1.0.183 — sem cert cfg);
+#   - SBOM (CycloneDX) + hashes SHA-256 completos.
+# NAO publica release; NAO toca Worker/Firebase/Firestore/Rules/Cloudflare/Android.
+# Execucao SOMENTE manual (workflow_dispatch).
+# =====================================================================
+name: "[manual] F3.4.7 Desktop Build (stable candidate 1.0.184)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit a buildar (F3.4.7)"
+        required: true
+        default: "desktop/f347-immediate-yellow-red-notifications-recovery"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: "desktop"
+      BASE_SHA: "9444e7fab945956258a45cfcebb00bbd87e72447"     # ESTAVEL 1.0.178 (baseline F3.4.3)
+      STABLE_180_SHA: "68598fae54e75dd34a399ffca65649cc8ff6d16c" # Desktop 1.0.180 OFICIAL (F3.4.4)
+      STABLE_181_SHA: "e4692c93644bd4deb380b2ec5ecc486dfcb205ca" # Desktop 1.0.181 OFICIAL (F3.4.5)
+      STABLE_182_SHA: "11520f5ab59a8ca90b6a2d82bff741dc9ebe8cca" # Desktop 1.0.182 OFICIAL (F3.4.6)
+      STABLE_183_SHA: "3981bf2bf8611caf8bb7057e2245b5834bf66754" # Desktop 1.0.183 OFICIAL (F3.4.7)
+    steps:
+      - name: Checkout (ref escolhido; history completo p/ baselines)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Derivar versao (package.json e a fonte unica) — exige 1.0.184 exato, sem sufixo
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "DIST_BASENAME=Agenda-ID-Seven-Desktop-$APP_VERSION" >> "$GITHUB_ENV"
+          echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.184" ] || { echo "::error:: versao != 1.0.184 (candidato ESTAVEL do F3.4.7 exige a versao exata, sem beta/canary/RC/QA)"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido ($APP_VERSION)"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci (instalacao limpa e reproduzivel)
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + updaterService + renderer)
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run build
+
+      - name: Lint (tsc --noEmit como verificacao de tipos estrita)
+        working-directory: ${{ env.APP_DIR }}
+        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
+
+      # ---------- GATES DE SUITE (fail-closed) ----------
+      - name: Gate F3.4.7 entrega visual imediata (46/0)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f347-immediate-visual-delivery.test.mjs
+      - name: Gate F3.4.7 harness INDEPENDENTE dos 15 comportamentos (18/0)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f347-independent-behavior.test.mjs
+      - name: Gate F3.4.7 region-invariance (fonte vs 1.0.183 OFICIAL @3981bf2)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f347-hotfix-region-invariance.test.mjs
+      - name: Gate F3.4.3 region-invariance (@9444e7f) + Golden Master SLA (219/0) + contrato + preservacao + updater
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          node scripts/f343-hotfix-region-invariance.test.mjs
+          node scripts/f343-sla-golden-master.test.mjs
+          node scripts/f343d-designer-assignment-reauth-audit.test.mjs
+          node scripts/f343-preservation.test.mjs
+          node scripts/f341a-updater-state-machine.test.mjs
+          node scripts/f343-preexisting-registry.test.mjs
+      - name: Gate F3.4.4 (flow golden master + contrato movimentacao + region @68598fa)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          node scripts/f344-flow-golden-master.test.mjs
+          node scripts/f344-repeated-move-contract.test.mjs
+          node scripts/f344-hotfix-region-invariance.test.mjs
+      - name: Gate F3.4.5 (golden master temporal + region @e4692c9)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          node scripts/f345-sla-timestamp-golden-master.test.mjs
+          node scripts/f345-hotfix-region-invariance.test.mjs
+      - name: Gate F3.4.6 region-invariance (@11520f5)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f346-hotfix-region-invariance.test.mjs
+      - name: Gate cadeia de notificacao re-ancorada (env/harness/arquitetura verdes)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          for t in f33A-notif-central f33C-assignment-toast f33F-bg-notify f33D-background-notif \
+                   f33E-main-notifier f33G-editprazo-write f33H-hotfix-ui f3311-baseline-freeze \
+                   f33N-assign-baseline-fix f343-assignment-transition f343-delivery-channel \
+                   f343-operational-block f3377a-r3-single-producer-clock f3377a-r4b-http-date-clock; do
+            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate $t vermelho"; exit 1; }
+          done
+
+      - name: electron-builder (NSIS + MSI + metadata do MESMO build; --publish never)
+        working-directory: ${{ env.APP_DIR }}
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado (tray tera icone)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          test -f "dist-installer/win-unpacked/resources/icon.png" || { echo "::error:: resources/icon.png AUSENTE no pacote"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (package.json empacotado == 1.0.184) + renderer EMPACOTADO == fonte do commit
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"
+          test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"
+          npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGJSON="$EXDIR/package.json"
+          PKGV=$(PKGJSON="$PKGJSON" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.PKGJSON,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.184" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.184"; exit 1; }
+          EXIDX="$EXDIR/src/renderer/index.html"
+          test -f "$EXIDX" || { echo "::error:: renderer nao encontrado no asar"; exit 1; }
+          git show ${GITHUB_SHA}:desktop/src/renderer/index.html > "$RUNNER_TEMP/src-index.html"
+          EXIDX="$EXIDX" SRC="$RUNNER_TEMP/src-index.html" node -e '
+            const fs=require("fs"); const nrm=s=>String(s).replace(/\r\n/g,"\n");
+            if(nrm(fs.readFileSync(process.env.EXIDX,"utf8"))!==nrm(fs.readFileSync(process.env.SRC,"utf8"))){console.error("renderer EMPACOTADO != fonte do commit");process.exit(1);}
+            console.log("renderer EMPACOTADO == fonte auditada (byte-identico).");'
+          echo "GATE prova-de-versao (1.0.184) + renderer==fonte OK."
+
+      - name: Gate FLAGS do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade=false)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          US="$RUNNER_TEMP/asarx/dist/main/updaterService.js"
+          test -f "$US" || { echo "::error:: updaterService.js ausente no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowPrerelease != false"; exit 1; }
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" || { echo "::error:: channel != latest"; exit 1; }
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowDowngrade != false"; exit 1; }
+          if grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"canary"' "$US"; then echo "::error:: channel=canary no build ESTAVEL"; exit 1; fi
+          echo "GATE flags do updater no app.asar OK."
+
+      - name: Gate identidade Windows (AppUserModelId + appId + close-to-tray no bundle)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"
+          MAINJS="$EXDIR/dist/main/main.js"
+          grep -q 'br.com.idseven.agenda.desktop' "$MAINJS" || { echo "::error:: AppUserModelId ausente no main.js empacotado"; exit 1; }
+          grep -q 'setAppUserModelId' "$MAINJS" || { echo "::error:: setAppUserModelId ausente"; exit 1; }
+          # close-to-tray: o handler de close esconde (nao encerra) fora do realQuit
+          grep -q 'preventDefault' "$MAINJS" || { echo "::error:: handler de close (preventDefault/hide) ausente"; exit 1; }
+          # appId do instalador
+          grep -q 'appId: br.com.idseven.agenda.desktop' electron-builder.yml || { echo "::error:: appId divergente no electron-builder.yml"; exit 1; }
+          echo "GATE identidade Windows OK: AppUserModelId=br.com.idseven.agenda.desktop; appId conferido; close-to-tray presente."
+
+      - name: Inspecao de ASSINATURA Authenticode (mesmo processo da 1.0.183 — registra o estado)
+        shell: pwsh
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          $exe = (Get-ChildItem dist-installer -Filter 'Agenda-ID-Seven-Desktop-*-x64.exe' | Select-Object -First 1).FullName
+          $sig = Get-AuthenticodeSignature $exe
+          "EXE           : $exe"
+          "AuthenticodeStatus: $($sig.Status)"
+          "SignerCertificate : $($sig.SignerCertificate)"
+          # A 1.0.183 oficial NAO e assinada (sem certificado configurado no CI). Registramos o estado
+          # (esperado: NotSigned) para PARIDADE com a 1.0.183; a assinatura real depende de o owner
+          # fornecer um certificado de code-signing (acao do owner; nunca embutido no repo).
+          if ($sig.Status -ne 'Valid' -and $sig.Status -ne 'NotSigned') { Write-Error "Status de assinatura inesperado: $($sig.Status)"; exit 1 }
+          "PARIDADE 1.0.183: candidata mantem o MESMO processo de assinatura (sem cert -> NotSigned)."
+
+      - name: Gate metadata de update (latest.yml + blockmap + app-update.yml — sha512/size conferem)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          LY="dist-installer/latest.yml"
+          test -f "$LY" || { echo "::error:: latest.yml NAO gerado (channel != latest?)"; ls -la dist-installer || true; exit 1; }
+          if [ -f "dist-installer/canary.yml" ]; then echo "::error:: canary.yml gerado — canal ambiguo"; exit 1; fi
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap 2>/dev/null | head -1)
+          test -n "$BM" || { echo "::error:: <exe>.blockmap NAO gerado"; exit 1; }
+          AU="dist-installer/win-unpacked/resources/app-update.yml"
+          test -f "$AU" || { echo "::error:: app-update.yml NAO empacotado"; exit 1; }
+          EXE_PATH=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); EXE_NAME=$(basename "$EXE_PATH")
+          grep -q "version: $APP_VERSION" "$LY" || { echo "::error:: latest.yml version != $APP_VERSION"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "$LY" || { echo "::error:: latest.yml path != $EXE_NAME"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "$LY" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "$EXE_PATH" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error:: sha512 do latest.yml != EXE"; exit 1; }
+          grep -q "provider: github" "$AU" && grep -q "owner: agidseven-lang" "$AU" && grep -q "repo: Agenda" "$AU" || { echo "::error:: app-update.yml provider/owner/repo divergente"; exit 1; }
+          if grep -qiE '(token|secret|password|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml com possivel segredo"; exit 1; fi
+          echo "GATE metadata OK: latest.yml (version/path/sha512) + app-update.yml github SEM segredo; canary.yml AUSENTE."
+
+      - name: SBOM (CycloneDX via npm sbom) + fallback npm ls
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set +e
+          npm sbom --sbom-format cyclonedx --omit dev > "$RUNNER_TEMP/sbom-cyclonedx.json" 2>/dev/null
+          if [ ! -s "$RUNNER_TEMP/sbom-cyclonedx.json" ]; then
+            echo "npm sbom indisponivel; usando npm ls --all --json como SBOM de dependencias"
+            npm ls --all --json > "$RUNNER_TEMP/sbom-cyclonedx.json" 2>/dev/null || echo '{}' > "$RUNNER_TEMP/sbom-cyclonedx.json"
+          fi
+          wc -c "$RUNNER_TEMP/sbom-cyclonedx.json"
+
+      - name: Empacotar bundle (instalador + metadata + SBOM + relatorios + hashes)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"
+          cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          EXE_SHA=$(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')
+          MSI_SHA=$([ -n "$MSI" ] && sha256sum "$OUT/$MSI_NAME" | awk '{print $1}' || echo "")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "channel     : latest"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "AppUserModelId : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $EXE_SHA"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $MSI_SHA"
+            echo "commit      : $GITHUB_SHA"
+            echo "ref         : ${{ github.event.inputs.ref }}"
+            echo "baseline    : Desktop 1.0.183 OFICIAL @ $STABLE_183_SHA (invariancia F3.4.7)"
+            echo "origem      : F3.4.7 — entrega visual imediata amarela/vermelha (auto-cura listener + ACK render + dedupe pos-aceite + guarda unica de toast); SLA/regras intocados"
+            echo "assinatura  : mesmo processo da 1.0.183 (sem certificado de code-signing configurado -> NotSigned)"
+            echo "distribuicao: PRIVADA (candidato estavel; publicacao SO via release gated apos GO fisico e literal PUBLICAR-DESKTOP-1.0.184-STABLE)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload installer (artifact PRIVADO)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload metadata + SBOM + hashes (artifact PRIVADO)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-${{ env.APP_VERSION }}-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
