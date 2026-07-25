@@ -64,7 +64,7 @@ class EventFormActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!Perm.canManage(Session.name(this))) { finish(); return }
+        if (!Perm.isAdmin(this)) { finish(); return }
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         editId = intent.getStringExtra("id")
         try {
@@ -202,7 +202,8 @@ class EventFormActivity : AppCompatActivity() {
 
     // ---- Responsável ----
     private fun loadTeam() {
-        FirebaseFirestore.getInstance().collection("users").get()
+        // F4.2C: usa a projecao publica usersPublic (PII-free), nao mais a colecao `users`.
+        FirebaseFirestore.getInstance().collection("usersPublic").get()
             .addOnSuccessListener { snap ->
                 try {
                     team = snap.documents.map { UserLite(it.id, it.getString("name"), it.getString("color"), it.getString("photo"), it.getString("status")) }

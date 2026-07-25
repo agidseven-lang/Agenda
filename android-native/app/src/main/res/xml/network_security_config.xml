@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F4.2C: proibe trafego em texto claro (cleartext) em todo o app. Defesa em profundidade
+     junto com usesCleartextTraffic=false no manifest e o gate https:// no UrlHttpClient. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

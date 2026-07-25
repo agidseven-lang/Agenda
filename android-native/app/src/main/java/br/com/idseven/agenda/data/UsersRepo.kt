@@ -17,8 +17,11 @@ data class UserLite(
 object UsersRepo {
     private val db get() = FirebaseFirestore.getInstance()
 
+    // F4.2C: le a projecao PUBLICA (PII-free) usersPublic {id,name,role,admin,status,photo,color},
+    // mantida pela trigger/backfill do servidor. NAO le mais a colecao `users` (que expunha
+    // pass/salt/phone/email de todos).
     fun listen(onData: (List<UserLite>) -> Unit): ListenerRegistration {
-        return db.collection("users").addSnapshotListener { snap, e ->
+        return db.collection("usersPublic").addSnapshotListener { snap, e ->
             if (e != null) { onData(emptyList()); return@addSnapshotListener }
             onData(snap?.documents?.map {
                 UserLite(

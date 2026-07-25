@@ -46,7 +46,7 @@ class EventDetailActivity : AppCompatActivity() {
     private var usReg: ListenerRegistration? = null
     private var users: Map<String, UserLite> = emptyMap()
     private var lastEvent: EventItem? = null
-    private val admin get() = Perm.canManage(Session.name(this))
+    private val admin get() = Perm.isAdmin(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

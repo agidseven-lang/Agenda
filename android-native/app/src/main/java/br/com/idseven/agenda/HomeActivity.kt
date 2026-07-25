@@ -42,7 +42,7 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun onNovo() {
-        if (!Perm.canManage(Session.name(this))) {
+        if (!Perm.isAdmin(this)) {
             Toast.makeText(this, "Apenas administradores criam compromissos. Você recebe e executa as demandas.", Toast.LENGTH_LONG).show()
             return
         }

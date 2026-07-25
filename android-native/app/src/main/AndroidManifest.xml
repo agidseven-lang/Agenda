@@ -13,6 +13,8 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.IDSeven">
 
         <activity
@@ -40,5 +42,17 @@
             android:name=".EventFormActivity"
             android:windowSoftInputMode="adjustResize"
             android:exported="false" />
+
+        <!-- F4.2C: recepção de push (FCM). Token registrado pelo endpoint oficial registerFcmToken. -->
+        <service
+            android:name=".data.fcm.AgendaMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
     </application>
 </manifest>

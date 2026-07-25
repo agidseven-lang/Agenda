@@ -10,8 +10,17 @@ android {
         applicationId "br.com.idseven.agenda"
         minSdk 26
         targetSdk 34
-        versionCode 17
-        versionName "0.2.15-detalhe-align"
+        versionCode 18
+        versionName "0.3.0-f42c-firebase-auth-prod"
+
+        // F4.2C: base dos endpoints oficiais (Functions Gen2, us-central1). Publica (NAO e segredo);
+        // sobreponivel no CI via -PBACKEND_BASE_URL=...
+        def backendBase = (project.findProperty('BACKEND_BASE_URL') ?: 'https://us-central1-agenda-id-seven.cloudfunctions.net')
+        buildConfigField "String", "BACKEND_BASE_URL", "\"${backendBase}\""
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     signingConfigs {
@@ -49,9 +58,16 @@ dependencies {
     implementation "androidx.fragment:fragment-ktx:1.8.5"
     implementation "com.google.android.material:material:1.12.0"
 
-    // Firebase Android NATIVO (Firestore). BoM controla as versões.
+    // Firebase Android NATIVO. BoM controla as versões.
     implementation platform("com.google.firebase:firebase-bom:33.7.0")
     implementation "com.google.firebase:firebase-firestore"
+    // F4.2C: identidade Firebase (Custom Token bridge) + push oficial (FCM).
+    implementation "com.google.firebase:firebase-auth"
+    implementation "com.google.firebase:firebase-messaging"
+
+    // Testes unitários (JVM) — org.json real para o parsing do Backend/sessão.
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.json:json:20240303"
 }
 
 // Processa app/google-services.json (DEVE ficar no final). NÃO usa Firebase Auth.

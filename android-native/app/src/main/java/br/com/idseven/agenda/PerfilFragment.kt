@@ -13,6 +13,7 @@ import android.widget.TextView
 import androidx.fragment.app.Fragment
 import br.com.idseven.agenda.data.Perm
 import br.com.idseven.agenda.data.Session
+import br.com.idseven.agenda.data.auth.Auth
 
 class PerfilFragment : Fragment() {
     override fun onCreateView(i: LayoutInflater, c: ViewGroup?, s: Bundle?): View {
@@ -28,16 +29,23 @@ class PerfilFragment : Fragment() {
         box.addView(t)
 
         val papel = TextView(ctx)
-        papel.text = if (Perm.canManage(nome)) "Administrador (cria e gerencia)" else "Equipe (recebe e executa)"
+        // F4.2C: papel real vem do getUserSelf (Session.isAdmin), nao mais do nome.
+        papel.text = if (Perm.isAdmin(ctx)) "Administrador (cria e gerencia)" else "Equipe (recebe e executa)"
         papel.setTextColor(Color.parseColor("#9aa0ac")); papel.gravity = Gravity.CENTER; papel.setPadding(0, 10, 0, 30)
         box.addView(papel)
 
         val sair = Button(ctx); sair.text = "Sair"; sair.setTextColor(Color.WHITE); sair.setBackgroundColor(Color.parseColor("#5b6cff"))
         sair.setOnClickListener {
-            Session.clear(ctx)
-            val i2 = Intent(ctx, MainActivity::class.java)
-            i2.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(i2); requireActivity().finish()
+            sair.isEnabled = false
+            // Logout completo: FirebaseAuth.signOut + limpa sessao + Keystore; depois volta ao login.
+            Auth.manager(ctx).signOut {
+                val act = activity ?: return@signOut
+                act.runOnUiThread {
+                    val i2 = Intent(ctx, MainActivity::class.java)
+                    i2.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(i2); act.finish()
+                }
+            }
         }
         box.addView(sair)
         return box
