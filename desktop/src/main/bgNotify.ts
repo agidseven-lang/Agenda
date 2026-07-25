@@ -19,6 +19,27 @@ let bgWin: BrowserWindow | null = null;
 let onOpen: ((deep: string) => void) | null = null;
 let wired = false;
 const WIDTH = 430;
+// F3.4.7 — PROVA DE RENDER: o "bgnotify-rendered" (que antes era só log) vira ACK de entrega.
+// Cada card enviado arma um prazo; se o ACK do dedupKey não chegar (janela não carregou, renderer
+// morto, GPU/transparência falhou, load falhou), o main dispara o fallback (Notification nativa)
+// via onNoRender — a entrega visual deixa de ser OTIMISTA. 4s cobre o load inicial da janela.
+const ACK_TIMEOUT_MS = 4000;
+const pendingAck = new Map<string, { timer: ReturnType<typeof setTimeout>; onNoRender: () => void }>();
+function ackArm(key: string, onNoRender: () => void): void {
+  ackCancel(key); // um card por dedupKey: rearmar substitui o prazo anterior
+  const timer = setTimeout(() => {
+    pendingAck.delete(key);
+    diag("bg.render.timeout", { dedupKey: key, timeoutMs: ACK_TIMEOUT_MS });
+    try { onNoRender(); } catch { /* fallback nunca pode derrubar o main */ }
+  }, ACK_TIMEOUT_MS);
+  pendingAck.set(key, { timer, onNoRender });
+}
+function ackCancel(key: string): void {
+  const p = pendingAck.get(key);
+  if (!p) return;
+  try { clearTimeout(p.timer); } catch { /* */ }
+  pendingAck.delete(key);
+}
 
 function position(h: number): void {
   if (!bgWin || bgWin.isDestroyed()) return;
@@ -39,8 +60,12 @@ function wireIpc(): void {
   ipcMain.on("bgnotify-empty", () => { try { if (bgWin && !bgWin.isDestroyed()) bgWin.hide(); } catch { /* */ } });
   // bg renderer -> main: clique em "Abrir tarefa" -> reabrir mainWindow + navegar (deep link)
   ipcMain.on("bgnotify-open", (_e, deep: string) => { diag("bg.open", { deep }); try { onOpen && onOpen(String(deep || "")); } catch { /* */ } });
-  // bg renderer -> main: prova de render (diag local) — confirma que o card premium foi montado
-  ipcMain.on("bgnotify-rendered", (_e, info: unknown) => { try { diag("bg.rendered", info as any); } catch { /* */ } });
+  // bg renderer -> main: prova de render — confirma que o card premium foi montado.
+  // F3.4.7 — além do log, o ACK cancela o fallback pendente daquele dedupKey.
+  ipcMain.on("bgnotify-rendered", (_e, info: unknown) => {
+    try { diag("bg.rendered", info as any); } catch { /* */ }
+    try { const k = info && (info as any).dedupKey; if (k) ackCancel(String(k)); } catch { /* */ }
+  });
 }
 
 function ensureWin(): BrowserWindow {
@@ -68,15 +93,23 @@ function ensureWin(): BrowserWindow {
 /** Registra o callback de "abrir tarefa" (reabrir mainWindow + deep link) e os IPC. */
 export function initBgNotify(openCb: (deep: string) => void): void { onOpen = openCb; wireIpc(); }
 
-/** Exibe (ou enfileira) um card premium em background. Retorna false se não conseguiu exibir. */
-export function showBgNotify(p: any): boolean {
+/** Exibe (ou enfileira) um card premium em background. Retorna false se não conseguiu exibir.
+ *  F3.4.7 — onNoRender (opcional): chamado UMA vez se o card não provar render (ACK
+ *  "bgnotify-rendered" do mesmo dedupKey) dentro de ACK_TIMEOUT_MS — fallback do chamador. */
+export function showBgNotify(p: any, onNoRender?: () => void): boolean {
   try {
     const win = ensureWin();
     const send = () => { try { if (!win.isDestroyed()) { win.showInactive(); win.webContents.send("bg-card", p); } } catch { /* */ } };
     if (win.webContents.isLoading()) win.webContents.once("did-finish-load", send); else send();
-    diag("bg.show", { dedupKey: p && p.dedupKey, severity: p && p.severity, eventType: p && p.eventType, taskId: p && p.taskId });
+    const key = p && p.dedupKey ? String(p.dedupKey) : "";
+    if (key && typeof onNoRender === "function") ackArm(key, onNoRender);
+    diag("bg.show", { dedupKey: p && p.dedupKey, severity: p && p.severity, eventType: p && p.eventType, taskId: p && p.taskId, ackArmed: !!(key && typeof onNoRender === "function") });
     return true;
   } catch (e) { diag("bg.error", { err: String(((e as any) && (e as any).message) || e) }); return false; }
 }
 
-export function stopBgNotify(): void { try { if (bgWin && !bgWin.isDestroyed()) bgWin.destroy(); } catch { /* */ } bgWin = null; }
+export function stopBgNotify(): void {
+  try { pendingAck.forEach((v) => { try { clearTimeout(v.timer); } catch { /* */ } }); pendingAck.clear(); } catch { /* */ } // F3.4.7 — nenhum fallback tardio após teardown
+  try { if (bgWin && !bgWin.isDestroyed()) bgWin.destroy(); } catch { /* */ }
+  bgWin = null;
+}

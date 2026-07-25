@@ -15,6 +15,7 @@
 import path from 'path'; import fs from 'fs';
 import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
 import { applyF346CalendarDelta } from './fixtures/f346/authorized-delta.mjs';
+import { applyF347IndexDelta, isF347Authorized } from './fixtures/f347/authorized-delta.mjs'; // F3.4.7 — delta AUTORIZADO da entrega visual amarela/vermelha (encadeado)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
@@ -29,7 +30,7 @@ const show = (p) => nrm(git(['show', BASE + ':' + p]));
 const cur = (p) => nrm(fs.readFileSync(path.join(REPO, p), 'utf8'));
 
 /* ── 1) index.html: base + delta AUTORIZADO, byte-idêntico (nada além da grade) ── */
-ok('1 index.html == base 11520f5 + delta AUTORIZADO F3.4.6 (só .agcell* + célula por classes)', applyF346CalendarDelta(show('desktop/src/renderer/index.html')) === cur('desktop/src/renderer/index.html'));
+ok('1 index.html == base 11520f5 + deltas AUTORIZADOS F3.4.6+F3.4.7 (grade diária + entrega visual)', applyF347IndexDelta(applyF346CalendarDelta(show('desktop/src/renderer/index.html'))) === cur('desktop/src/renderer/index.html'));
 
 /* ── 2) SLA INTOCADO: slaRules.js byte-idêntico à 1.0.182 ── */
 ok('2 slaRules.js byte-idêntico a 11520f5 (SLA amarelo/vermelho fora do escopo F3.4.6)', show('desktop/src/main/slaRules.js') === cur('desktop/src/main/slaRules.js'));
@@ -38,7 +39,7 @@ ok('2 slaRules.js byte-idêntico a 11520f5 (SLA amarelo/vermelho fora do escopo 
 {
   const a = JSON.parse(show('desktop/package.json'));
   const b = JSON.parse(cur('desktop/package.json'));
-  ok('3 versão de destino 1.0.183', b.version === '1.0.183' && a.version === '1.0.182');
+  ok('3 versão de destino 1.0.184 (F3.4.7)', b.version === '1.0.184' && a.version === '1.0.182');
   a.version = b.version;
   ok('3b package.json: NENHUM outro campo mudou', JSON.stringify(a) === JSON.stringify(b));
 }
@@ -47,7 +48,7 @@ ok('2 slaRules.js byte-idêntico a 11520f5 (SLA amarelo/vermelho fora do escopo 
 {
   const a = JSON.parse(show('desktop/package-lock.json'));
   const b = JSON.parse(cur('desktop/package-lock.json'));
-  ok('4 lock: versão raiz 1.0.183', b.version === '1.0.183' && b.packages[''].version === '1.0.183');
+  ok('4 lock: versão raiz 1.0.184', b.version === '1.0.184' && b.packages[''].version === '1.0.184');
   a.version = b.version; a.packages[''].version = b.packages[''].version;
   ok('4b lock: NENHUMA dependência mudou', JSON.stringify(a) === JSON.stringify(b));
 }
@@ -68,18 +69,19 @@ ok('2 slaRules.js byte-idêntico a 11520f5 (SLA amarelo/vermelho fora do escopo 
   const changed = git(['diff', '--name-only', BASE, '--', '.']).split('\n').map((s) => s.trim()).filter(Boolean);
   const untracked = git(['status', '--porcelain']).split('\n').map((s) => s.trim()).filter((l) => l.startsWith('??')).map((l) => l.slice(2).trim());
   const all = [...new Set([...changed, ...untracked])];
-  const bad = all.filter((f) => !ALLOW.includes(f) && !allowNew(f));
+  const bad = all.filter((f) => !ALLOW.includes(f) && !allowNew(f) && !isF347Authorized(f)); // F3.4.7 — delega o escopo da correção ao guard f347
   if (bad.length) console.log('FORA da allowlist F3.4.6:\n' + bad.join('\n'));
-  ok('5 mudanças vs 11520f5 restritas à allowlist F3.4.6 (grade + versão + testes + workflows)', bad.length === 0);
+  ok('5 mudanças vs 11520f5 restritas à allowlist F3.4.6 (grade + versão + testes + workflows) + escopo F3.4.7', bad.length === 0);
 }
 
 /* ── 6) regiões CRÍTICAS byte-idênticas à base ── */
 {
   const FROZEN = [
+    // F3.4.7 — slaScheduler.ts, main.ts, bgNotify.ts e firebase.ts saíram (correção AUTORIZADA; escopo em f347).
     'cloudflare-worker.js', 'wrangler.toml',
-    'desktop/src/main/slaScheduler.ts', 'desktop/src/main/notifier.ts', 'desktop/src/main/clockSync.ts',
-    'desktop/src/main/main.ts', 'desktop/src/main/bgNotify.ts', 'desktop/src/main/auth-core.ts',
-    'desktop/src/main/updaterService.ts', 'desktop/src/main/firebase.ts', 'desktop/src/main/tray.ts',
+    'desktop/src/main/notifier.ts', 'desktop/src/main/clockSync.ts',
+    'desktop/src/main/auth-core.ts',
+    'desktop/src/main/updaterService.ts', 'desktop/src/main/tray.ts',
     'desktop/src/main/reminder.ts', 'desktop/src/main/auth.ts', 'desktop/electron-builder.yml',
   ];
   let same = true, who = '';

@@ -65,7 +65,8 @@ ok('P1 Worker/OG intacto', /const OG_IMG_PATH = "\/og\/wa-card-v64-38\.jpg"/.tes
 ok('P2 F3.3.13 Editar prazo intacto', /async function slaEditPrazoCommit\(taskId, ov\)\{/.test(DH) && /patch\['designerSla\.planStartAt'\]=startMs; patch\['designerSla\.planDueAt'\]=dueMs;/.test(DH) && /if\(hadPF\) patch\['designerSla\.plannedFinishAt'\]=dueMs;/.test(DH));
 // F3.3.70D3R10AA: contrato atualizado por ordem do owner — mensagem SEM cache-bust (regime 19/06).
 ok('P3 mensagem WhatsApp no regime restaurado (link estavel — D3R10AA)', /const url=buildShareClientUrl\(ctx&&ctx\.token\);/.test(DH));
-ok('P4 notificações background intactas (main.ts)', /const bgOk = showBgNotify\(p\);/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: showBgNotify(p, onNoRender); premium primária, bg-window preservado.
+ok('P4 notificações background intactas (main.ts)', /const bgOk = showBgNotify\(p, \(\) => \{/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
 ok('P5 SLA engine read-only intacto', /function notifScanSla\(\)/.test(DH) && /function slaPanelFinishMs\(t,dtMsFn\)\{/.test(DH));
 ok('P6 Kanban (superfície kbv2 + builder) intactos', /function kbv2BoardHtml\(cols, cardFn\)\{/.test(DH) && /<div class="kbv2-board-surface"><div class="kbv2-board">/.test(DH));
 

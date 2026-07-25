@@ -152,7 +152,8 @@ ok('S4 read-back presente (get + slaPanelFinishMs + gate AND)', /await db\.colle
 ok('S5 handler do "Salvar prazo" chama slaEditPrazoCommit (não é mais no-op)', /if\(e\.target\.id==='slaedit-save'\)\{ slaEditPrazoCommit\(taskId, ov\); return; \}/.test(DH));
 // F3.3.70D3R10AA: contrato atualizado por ordem do owner — mensagem SEM cache-bust (regime 19/06).
 ok('S6 mensagem WhatsApp no regime restaurado (link estavel, sem ?v= — D3R10AA)', /const url=buildShareClientUrl\(ctx&&ctx\.token\);/.test(DH));
-ok('S7 notificações background INTOCADAS (showBgNotify primário, canal bg-window)', /const bgOk = showBgNotify\(p\);/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: showBgNotify(p, onNoRender) — premium primária, bg-window preservado.
+ok('S7 notificações background INTOCADAS (showBgNotify primário, canal bg-window)', /const bgOk = showBgNotify\(p, \(\) => \{/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
 ok('S8 Worker/OG INTOCADO (OG_IMG_PATH + dimensões 1200x630)', /const OG_IMG_PATH = "\/og\/wa-card-v64-38\.jpg"/.test(WK) && /og:image:width" content="1200"/.test(WK));
 ok('S9 SLA Monitor lê pelo MESMO canônico (resolveCanonicalSlaTimeline→slaPanelFinishMs em slaMonNextBoundary) — F3.3.77A-R3', /var tl=resolveCanonicalSlaTimeline\(t,f\); if\(!tl\.dueAtMs\) continue;/.test(DH) && /function resolveCanonicalSlaTimeline\(t,dtMsFn\)\{[\s\S]{0,400}slaPanelFinishMs\(t,f\)/.test(DH));
 

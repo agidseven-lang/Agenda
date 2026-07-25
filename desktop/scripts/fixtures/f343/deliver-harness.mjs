@@ -15,6 +15,11 @@ export function fnSrc(src, n) {
  *  - resultado: { res:{ok,channel}, sent:[canais webContents.send], bg:[payloads bg], nativeClick(fn) } */
 export function extractDeliver(MAIN) {
   const realWA = fnSrc(MAIN, 'windowActive').replace('function windowActive(): boolean {', 'function windowActive() {');
+  // F3.4.7 — a nativa foi extraída p/ o helper nativeNotify (usada como fallback imediato E tardio/no-ACK).
+  // O harness executa o helper REAL (mesma prova de canal/clique), agora fora do corpo do deliver.
+  const realNative = fnSrc(MAIN, 'nativeNotify')
+    .replace('function nativeNotify(p: NotifPayload, key: string, deep: string): boolean {', 'function nativeNotify(p, key, deep) {')
+    .replace(/ as any/g, '').replace(/ as const/g, '');
   const start = MAIN.indexOf('function deliverNotification(');
   const retClose = MAIN.indexOf('channel: string }', start) + 'channel: string }'.length;
   const bodyBrace = MAIN.indexOf('{', retClose);
@@ -42,7 +47,10 @@ export function extractDeliver(MAIN) {
     NotificationMock.prototype.show = function () { winCalls.push('native.show'); };
     NotificationMock.isSupported = () => true;
     const run = new Function('mainWin', '_notifSeen', 'diag', '_appIcon', 'showBgNotify', 'Notification', 'String', '__P',
-      realWA + '\n' + realDeliver + '\n return deliverNotification(__P);');
+      realWA + '\n' + realNative + '\n' + realDeliver + '\n return deliverNotification(__P);');
+    // showBgNotify(p, onNoRender): bgOk=true ⇒ card exibido/renderizado (ACK chega — sem fallback);
+    // bgOk=false ⇒ janela indisponível ⇒ fallback nativo imediato (o onNoRender do no-ACK não roda
+    // neste harness síncrono, pois o ACK é assíncrono na prática — cobrimos o no-ACK na suíte F3.4.7).
     const out = run(mainWin, seen, () => {}, () => undefined, (p) => { bg.push(p); return bgOk; }, NotificationMock, String, payload);
     return { res: out, sent, bg, winCalls, fireNativeClick: () => { if (nativeClickCb) nativeClickCb(); }, hadNativeClick: () => !!nativeClickCb };
   }

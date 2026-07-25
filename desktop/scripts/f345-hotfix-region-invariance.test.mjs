@@ -15,6 +15,7 @@ import path from 'path'; import fs from 'fs';
 import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
 import { applyF345SlaDelta } from './fixtures/f345/authorized-delta.mjs';
 import { applyF346CalendarDelta } from './fixtures/f346/authorized-delta.mjs'; // F3.4.6 — delta AUTORIZADO da grade diária (encadeado)
+import { applyF347IndexDelta, isF347Authorized } from './fixtures/f347/authorized-delta.mjs'; // F3.4.7 — delta AUTORIZADO da entrega visual amarela/vermelha (encadeado)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
@@ -29,14 +30,14 @@ const show = (p) => nrm(git(['show', BASE + ':' + p]));
 const cur = (p) => nrm(fs.readFileSync(path.join(REPO, p), 'utf8'));
 
 /* ── 1/2) fontes SLA: base + delta AUTORIZADO, byte-idêntico ── */
-ok('1 index.html == base e4692c9 + deltas AUTORIZADOS F3.4.5+F3.4.6 (clamp + grade diária)', applyF346CalendarDelta(applyF345SlaDelta(show('desktop/src/renderer/index.html'))) === cur('desktop/src/renderer/index.html'));
+ok('1 index.html == base e4692c9 + deltas AUTORIZADOS F3.4.5+F3.4.6+F3.4.7 (clamp + grade + entrega visual)', applyF347IndexDelta(applyF346CalendarDelta(applyF345SlaDelta(show('desktop/src/renderer/index.html')))) === cur('desktop/src/renderer/index.html'));
 ok('2 slaRules.js == base e4692c9 + delta AUTORIZADO F3.4.5 (nada além do clamp)', applyF345SlaDelta(show('desktop/src/main/slaRules.js')) === cur('desktop/src/main/slaRules.js'));
 
 /* ── 3) package.json: SOMENTE a versão muda (1.0.181 → 1.0.182) ── */
 {
   const a = JSON.parse(show('desktop/package.json'));
   const b = JSON.parse(cur('desktop/package.json'));
-  ok('3 versão de destino 1.0.183 (F3.4.6)', b.version === '1.0.183' && a.version === '1.0.181');
+  ok('3 versão de destino 1.0.184 (F3.4.7)', b.version === '1.0.184' && a.version === '1.0.181');
   a.version = b.version;
   ok('3b package.json: NENHUM outro campo mudou', JSON.stringify(a) === JSON.stringify(b));
 }
@@ -45,7 +46,7 @@ ok('2 slaRules.js == base e4692c9 + delta AUTORIZADO F3.4.5 (nada além do clamp
 {
   const a = JSON.parse(show('desktop/package-lock.json'));
   const b = JSON.parse(cur('desktop/package-lock.json'));
-  ok('4 lock: versão raiz 1.0.183', b.version === '1.0.183' && b.packages[''].version === '1.0.183');
+  ok('4 lock: versão raiz 1.0.184', b.version === '1.0.184' && b.packages[''].version === '1.0.184');
   a.version = b.version; a.packages[''].version = b.packages[''].version;
   ok('4b lock: NENHUMA dependência mudou', JSON.stringify(a) === JSON.stringify(b));
 }
@@ -67,19 +68,20 @@ ok('2 slaRules.js == base e4692c9 + delta AUTORIZADO F3.4.5 (nada além do clamp
   const changed = git(['diff', '--name-only', BASE, '--', '.']).split('\n').map((s) => s.trim()).filter(Boolean);
   const untracked = git(['status', '--porcelain']).split('\n').map((s) => s.trim()).filter((l) => l.startsWith('??')).map((l) => l.slice(2).trim());
   const all = [...new Set([...changed, ...untracked])];
-  const bad = all.filter((f) => !ALLOW.includes(f) && !allowNew(f));
+  const bad = all.filter((f) => !ALLOW.includes(f) && !allowNew(f) && !isF347Authorized(f)); // F3.4.7 — delega o escopo da correção ao guard f347
   if (bad.length) console.log('FORA da allowlist F3.4.5:\n' + bad.join('\n'));
-  ok('5 mudanças vs e4692c9 restritas à allowlist F3.4.5 (fontes SLA + versão + testes + workflows)', bad.length === 0);
+  ok('5 mudanças vs e4692c9 restritas à allowlist F3.4.5 (fontes SLA + versão + testes + workflows) + escopo F3.4.7', bad.length === 0);
 }
 
 /* ── 6) regiões CRÍTICAS byte-idênticas à base ── */
 {
   const FROZEN = [
+    // F3.4.7 — slaScheduler.ts, main.ts, bgNotify.ts e firebase.ts saíram (correção AUTORIZADA; escopo em f347).
     'cloudflare-worker.js', 'wrangler.toml',
-    'desktop/src/main/slaScheduler.ts', 'desktop/src/main/notifier.ts', 'desktop/src/main/clockSync.ts',
-    'desktop/src/main/main.ts', 'desktop/src/main/bgNotify.ts', 'desktop/src/main/auth-core.ts',
-    'desktop/src/main/updaterService.ts', 'desktop/src/main/firebase.ts', 'desktop/src/main/tray.ts',
-    'desktop/src/main/reminder.ts', 'desktop/src/main/auth.ts', 'desktop/src/main/notifier.ts',
+    'desktop/src/main/notifier.ts', 'desktop/src/main/clockSync.ts',
+    'desktop/src/main/auth-core.ts',
+    'desktop/src/main/updaterService.ts', 'desktop/src/main/tray.ts',
+    'desktop/src/main/reminder.ts', 'desktop/src/main/auth.ts',
   ];
   let same = true, who = '';
   for (const f of FROZEN) { if (show(f) !== cur(f)) { same = false; who = f; break; } }

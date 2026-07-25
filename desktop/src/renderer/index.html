@@ -3867,10 +3867,15 @@ function notifShowToast(p){
    payload chega só pela captura (notif-history) e entra na Central, sem aparecer no canto inferior
    direito. Compensação CIRÚRGICA: exibe o toast premium para ESSES eventos pela própria captura, UMA
    vez por dedupKey (nunca duplica o toast das demais) e só com a janela visível (mantém a regra
-   aprovada: minimizado/bandeja = nativa). NÃO altera SLA/fluxo/dedup/roteamento/severidade/som. */
+   aprovada: minimizado/bandeja = nativa). NÃO altera SLA/fluxo/dedup/roteamento/severidade/som.
+   F3.4.7 — a MESMA compensação passa a cobrir TODOS os eventos (inclusive amarela/vermelha de SLA,
+   que estavam descobertas): notifToastOnce(p) é a porta ÚNICA do toast premium — chamada pelo canal
+   notif-toast E pela captura notif-history — com guarda once-por-dedupKey COMPARTILHADA (o mesmo
+   payload vindo pelos dois canais renderiza UMA vez; nunca duplica, nunca perde). */
 var notifAttrToastSeen={};
 function notifIsAttrEvent(p){ var e=p&&p.eventType; return e==='designer_assigned'||e==='task_assigned'; }
-function notifAttrToastOnce(p){ try{ var k=String((p&&(p.dedupKey||p.eventId))||''); if(!k) return false; if(notifAttrToastSeen[k]) return false; notifAttrToastSeen[k]=1; notifShowToast(p); return true; }catch(_){ return false; } }
+function notifToastOnce(p){ try{ var k=String((p&&(p.dedupKey||p.eventId))||''); if(!k) return false; if(notifAttrToastSeen[k]) return false; notifAttrToastSeen[k]=1; notifShowToast(p); return true; }catch(_){ return false; } }
+function notifAttrToastOnce(p){ return notifToastOnce(p); }
 
 /* ROTEAMENTO: Electron (HUB do main decide canal) ou fallback direto (navegador/QA). Dedup local. */
 /* F3.3.10-DIAG — log local (via main) de eventos do renderer; build instrumentada (sem rede/Firestore). */
@@ -4137,7 +4142,7 @@ try{ setInterval(function(){ try{ ncDiag('scan.tick',{vis:(typeof document!=='un
    Só log local via main; não altera comportamento. Removível. */
 try{ document.addEventListener('visibilitychange', function(){ try{ ncDiag('visibility',{state:document.visibilityState}); }catch(_){} }); ncDiag('boot',{state:(typeof document!=='undefined'?document.visibilityState:'?')}); }catch(_){}
 /* receber TOAST do HUB do main (janela focada/visível) */
-try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ if(notifIsAttrEvent(p)){ notifAttrToastOnce(p); } else { notifShowToast(p); } try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} }); } }catch(_){}
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifToastOnce(p); try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} }); } }catch(_){}   /* F3.4.7 — TODOS os eventos passam pela guarda once-por-dedupKey (mesma porta da compensação) */
 /* F3.3.10 — onNotifHistory (captura 100% toast×nativa via hub do main) é registrado UMA vez no bloco F3.3.10-NOTIF-CENTRAL. */
 /* exposto p/ QA/testes (não afeta produção) */
 try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifScanFlow=notifScanFlow; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; window.resolveNotificationTargets=resolveNotificationTargets; window.resolveUserIdentity=resolveUserIdentity; window.notifNormalize=notifNormalize; window.notifIdentity=notifIdentity; window.notifResponsible=notifResponsible; window.notifActor=notifActor; window.notifPhaseLabel=notifPhaseLabel; window.__notifResetFlow=function(){ _notifPhase={}; _notifBaseline=false; _notifUid=null; }; }catch(_){}
@@ -4564,7 +4569,7 @@ function afterNotifCentral(){
   var cx=document.querySelector('[data-nc-close]'); if(cx) cx.onclick=function(){ notifDetailId=null; var c=document.getElementById('content'); if(c){ c.innerHTML=renderNotifCentral(); afterNotifCentral(); } };
 }
 /* registro do canal de captura 100% (hub do main → histórico local). Capture-only. */
-try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(notifIsAttrEvent(p) && (typeof document==='undefined'||document.visibilityState!=='hidden')) notifAttrToastOnce(p); }catch(_){} }); } }catch(_){}
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifHistory==='function'){ window.desktopAPI.onNotifHistory(function(p){ try{ notifHistoryAppend(p); }catch(_){} try{ if(typeof document==='undefined'||document.visibilityState!=='hidden') notifToastOnce(p); }catch(_){} }); } }catch(_){}   /* F3.4.7 — compensação estendida a TODOS os eventos (era só atribuição); once compartilhado ⇒ nunca duplica */
 /* ════════════════════════ F3.3.10-NOTIF-CENTRAL END ════════════════════════ */
 
 /* ---- HOJE ---- */

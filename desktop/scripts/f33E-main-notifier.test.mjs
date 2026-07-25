@@ -35,7 +35,8 @@ const ok = (n, c) => { if (c) pass++; else { fail++; console.log('FAIL:', n); } 
 ok('main: notifier inicia no session-login (produtor no main)', /ipcMain\.on\("session-login"[\s\S]*?startNotifier\(\(\) => mainWin, uid, deliverNotification\)/.test(mainTs));
 ok('main: X (close) esconde na bandeja, processo vivo (hide, não quit)', /on\("close",[\s\S]*?if \(!quitting\)[\s\S]*?mainWin\?\.hide\(\)/.test(mainTs));
 ok('main: notifier só para em logout/Sair (não no minimize/hide)', /function realQuit\(\)[\s\S]*?stopNotifier\(\)/.test(mainTs) && !/on\("minimize"[^\n]*stopNotifier/.test(mainTs) && !/on\("hide"[^\n]*stopNotifier/.test(mainTs));
-ok('main: background = janela premium própria (showBgNotify); nativa = fallback', /return \{ ok: true, channel: "toast" \};\s*\}[\s\S]*?const bgOk = showBgNotify\(p\);/.test(mainTs) && /if \(!bgOk\) \{[\s\S]*?const n = new Notification\(/.test(mainTs));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: showBgNotify(p, onNoRender) — premium primária; nativa (nativeNotify) = fallback.
+ok('main: background = janela premium própria (showBgNotify); nativa = fallback', /return \{ ok: true, channel: "toast" \};\s*\}[\s\S]*?const bgOk = showBgNotify\(p, \(\) => \{/.test(mainTs) && /if \(!bgOk\) nativeOk = nativeNotify\(p, key, deep\);/.test(mainTs) && /function nativeNotify\([\s\S]*?const n = new Notification\(/.test(mainTs));
 ok('main: windowActive = visível e não-minimizado (minimizado/oculto → background)', /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
 ok('main: Notification nativa tem click handler (abre a tarefa via deep link)', /n\.on\("click"[\s\S]*?send\("notif-open", deep\)/.test(mainTs));
 ok('firebase(main): transporte long-polling (onSnapshot realtime em Node/main)', /initializeFirestore\(fbApp, \{ experimentalForceLongPolling: true \}\)/.test(fbTs));

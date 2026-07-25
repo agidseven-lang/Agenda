@@ -57,8 +57,15 @@ ok('html: prova de render (bgAPI.rendered)', /bgAPI\.rendered/.test(html));
 // ── main.ts: roteamento ──
 ok('main: importa bgNotify', /import \{[\s\S]*?\} from "\.\/bgNotify"/.test(mainTs) && /showBgNotify/.test(mainTs) && /initBgNotify/.test(mainTs) && /stopBgNotify/.test(mainTs));
 ok('main: app aberto/visível mantém TOAST premium', /if \(windowActive\(\)\) \{[\s\S]*?send\("notif-toast", p\)[\s\S]*?channel: "toast"/.test(mainTs));
-ok('main: background -> showBgNotify (primário)', /const bgOk = showBgNotify\(p\);/.test(mainTs));
-ok('main: nativa do Windows é FALLBACK (só se bg falhar)', /if \(!bgOk\) \{[\s\S]*?new Notification\(/.test(mainTs));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: showBgNotify agora recebe onNoRender (fallback do no-ACK). A janela
+// premium segue PRIMÁRIA em background; deixou de ser otimista — sem prova de render (ACK), cai p/ a nativa.
+ok('main: background -> showBgNotify (primário, com fallback no-ACK)', /const bgOk = showBgNotify\(p, \(\) => \{/.test(mainTs));
+// F3.4.7 — a nativa (helper nativeNotify) é FALLBACK: imediato quando a janela premium falha (!bgOk)
+// E tardio quando a premium foi agendada mas não provou render (no-ACK → onNoRender chama nativeNotify).
+ok('main: nativa do Windows é FALLBACK (bg indisponível OU sem prova de render)',
+  /if \(!bgOk\) nativeOk = nativeNotify\(p, key, deep\);/.test(mainTs)
+  && /const lateOk = nativeNotify\(p, key, deep\);/.test(mainTs)
+  && /function nativeNotify\([\s\S]*?new Notification\(/.test(mainTs));
 ok('main: canal bg-window', /channel = bgOk \? "bg-window"/.test(mainTs));
 ok('main: initBgNotify reabre mainWindow + deep link', /initBgNotify\(\([^)]*\) => \{[\s\S]*?w\.show\(\);[\s\S]*?send\("notif-open", deep\)/.test(mainTs));
 ok('main: stopBgNotify no realQuit', /function realQuit\(\)[\s\S]*?stopBgNotify\(\)/.test(mainTs));

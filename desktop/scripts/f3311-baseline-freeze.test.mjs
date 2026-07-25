@@ -42,8 +42,10 @@ ok('A7 preview usa /share (NAO /cliente) — buildClientMessage', /function buil
 
 // ===== B) NOTIFICAÇÕES EM BACKGROUND — congelado =====
 ok('B1 app aberto/visivel -> TOAST premium (notif-toast, channel toast)', /if \(windowActive\(\)\) \{[\s\S]*?send\("notif-toast", p\)[\s\S]*?channel: "toast"/.test(MAIN));
-ok('B2 background -> backgroundNotificationWindow (showBgNotify, channel bg-window)', /const bgOk = showBgNotify\(p\);/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
-ok('B3 nativa do Windows = FALLBACK (so se a janela premium falhar)', /if \(!bgOk\) \{[\s\S]*?new Notification\(/.test(MAIN));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: showBgNotify recebe onNoRender (fallback do no-ACK); premium primária, bg-window preservado.
+ok('B2 background -> backgroundNotificationWindow (showBgNotify, channel bg-window)', /const bgOk = showBgNotify\(p, \(\) => \{/.test(MAIN) && /channel = bgOk \? "bg-window"/.test(MAIN));
+// F3.4.7 — nativa (helper nativeNotify) = FALLBACK: imediato (!bgOk) OU tardio (no-ACK).
+ok('B3 nativa do Windows = FALLBACK (so se a janela premium falhar ou nao provar render)', /if \(!bgOk\) nativeOk = nativeNotify\(p, key, deep\);/.test(MAIN) && /function nativeNotify\([\s\S]*?new Notification\(/.test(MAIN));
 ok('B4 windowActive = visivel e nao-minimizado', /isVisible\(\) && !w\.isMinimized\(\)/.test(MAIN));
 ok('B5 X/fechar -> bandeja (hide), processo vivo', /on\("close",[\s\S]*?if \(!quitting\)[\s\S]*?mainWin\?\.hide\(\)/.test(MAIN) && /window-all-closed[\s\S]*?preventDefault/.test(MAIN));
 ok('B6 clique reabre mainWindow + deep link (initBgNotify)', /initBgNotify\(\([^)]*\) => \{[\s\S]*?w\.show\(\)[\s\S]*?send\("notif-open", deep\)/.test(MAIN));

@@ -92,50 +92,65 @@ function slaNow(): number {
     return Date.now() + (useOffset && st ? Math.round(st.offsetMs) : 0);
   } catch { return Date.now(); }
 }
+// F3.4.7 — Notification NATIVA extraída em helper: usada como fallback imediato (janela premium
+// indisponível) E como fallback tardio (janela premium agendada mas SEM prova de render/ACK).
+function nativeNotify(p: NotifPayload, key: string, deep: string): boolean {
+  try {
+    const n = new Notification({
+      title: String(p.title || "Agenda ID Seven"),
+      body: String(p.body || ""),
+      silent: p.sound === false,
+      icon: _appIcon(),
+    });
+    n.on("click", () => {
+      diag("native.click", { dedupKey: key, deep });
+      const w = mainWin;
+      if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
+    });
+    n.show();
+    return true;
+  } catch (e2) { diag("native.fallback.error", { err: String(((e2 as any) && (e2 as any).message) || e2) }); return false; }
+}
 function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } {
   try {
     if (!p || typeof p !== "object") return { ok: false, channel: "none" };
     const key = String(p.dedupKey || `${p.eventType || "evt"}:${p.taskId || ""}:${p.createdAt || ""}`);
     if (_notifSeen.has(key)) { diag("deliver.dedup", { key }); return { ok: true, channel: "dedup" }; }
-    _notifSeen.add(key);
     diag("deliver.begin", { eventType: p.eventType, taskId: p.taskId, targetUserId: p.targetUserId, actorId: p.actorId, responsibleId: p.responsibleId, dedupKey: key, windowActive: windowActive(), visible: !!(mainWin && !mainWin.isDestroyed() && mainWin.isVisible()), minimized: !!(mainWin && !mainWin.isDestroyed() && mainWin.isMinimized()) });
-    if (_notifSeen.size > 4000) { const it = _notifSeen.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; _notifSeen.delete(v.value); } }
     // F3.3.10 — CAPTURA p/ a Central (histórico local no renderer). CAPTURE-ONLY: encaminha o MESMO
     // payload já deduplicado, sem alterar roteamento/toast/nativa/dedup/som/severidade/destino. Nunca
     // pode impedir a entrega — por isso vem em try/catch isolado e ANTES da decisão toast×nativa.
     try { mainWin?.webContents.send("notif-history", p); } catch { /* captura nunca afeta a notificação real */ }
     const deep = (p.action && p.action.deep) ? String(p.action.deep) : "";
+    // F3.4.7 — o dedup do HUB só é GRAVADO após um canal REAL aceitar a entrega. Antes, a chave era
+    // marcada ANTES do resultado: uma falha silenciosa bloqueava aquela transição PARA SEMPRE
+    // (contrato: nenhum bloqueio permanente de transições futuras). Falha total ⇒ chave livre ⇒
+    // o produtor (slaScheduler) reentrega no próximo eval (≤60s).
+    const markSeen = () => {
+      _notifSeen.add(key);
+      if (_notifSeen.size > 4000) { const it = _notifSeen.values(); for (let i = 0; i < 1000; i++) { const v = it.next(); if (v.done) break; _notifSeen.delete(v.value); } }
+    };
     if (windowActive()) {
       mainWin?.webContents.send("notif-toast", p);
       diag("deliver.toast", { dedupKey: key, taskId: p.taskId });
+      markSeen();
       return { ok: true, channel: "toast" };
     }
     // BACKGROUND (minimizado/oculto/bandeja) — F3.3.10-BG: a entrega visual CONFIÁVEL é a janela
     // PREMIUM própria do app (controlada pelo main, aparece mesmo com a mainWindow hidden e NÃO
-    // depende da Notification nativa do Windows). A nativa do SO vira FALLBACK só se a janela
-    // premium não puder ser exibida. Clique → reabre a mainWindow e navega (deep link). A captura
+    // depende da Notification nativa do Windows). A nativa do SO vira FALLBACK se a janela premium
+    // não puder ser exibida — F3.4.7: OU se ela não PROVAR o render (ACK bgnotify-rendered) no
+    // prazo (deixou de ser otimista). Clique → reabre a mainWindow e navega (deep link). A captura
     // p/ a Central já foi feita acima (notif-history), independente do canal.
-    const bgOk = showBgNotify(p);
+    const bgOk = showBgNotify(p, () => {
+      const lateOk = nativeNotify(p, key, deep);
+      diag("deliver.bg.noAck→native", { dedupKey: key, taskId: p.taskId, nativeOk: lateOk });
+    });
     let nativeOk = false;
-    if (!bgOk) {
-      try {
-        const n = new Notification({
-          title: String(p.title || "Agenda ID Seven"),
-          body: String(p.body || ""),
-          silent: p.sound === false,
-          icon: _appIcon(),
-        });
-        n.on("click", () => {
-          diag("native.click", { dedupKey: key, deep });
-          const w = mainWin;
-          if (w) { if (w.isMinimized()) w.restore(); w.show(); w.focus(); if (deep) w.webContents.send("notif-open", deep); }
-        });
-        n.show();
-        nativeOk = true;
-      } catch (e2) { diag("native.fallback.error", { err: String(((e2 as any) && (e2 as any).message) || e2) }); }
-    }
+    if (!bgOk) nativeOk = nativeNotify(p, key, deep);
     const channel = bgOk ? "bg-window" : (nativeOk ? "native" : "none");
     diag("deliver.bg", { dedupKey: key, deep, taskId: p.taskId, title: String(p.title || ""), channel, fallbackNative: !bgOk });
+    if (bgOk || nativeOk) markSeen();
     return { ok: bgOk || nativeOk, channel };
   } catch (e) { diag("deliver.error", { err: String(((e as any) && (e as any).message) || e) }); return { ok: false, channel: "error" }; }
 }

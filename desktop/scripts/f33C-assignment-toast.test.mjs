@@ -12,7 +12,7 @@
  *   B bothChannels_visible — atribuição por history E toast (ordem do main) => exatamente 1 (sem duplicar)
  *   C nativeOnly_hidden    — atribuição só por history + janela OCULTA => 0 (nativa cuida; aprovado)
  *   D sla_bothChannels     — sla_warning por history+toast => 1 (comportamento inalterado)
- *   E sla_historyOnly      — sla_warning só por history => 0 (captura é só histórico p/ não-atribuição)
+ *   E sla_historyOnly      — sla_warning só por history + visível => 1 (F3.4.7: rede de segurança da amarela/vermelha)
  *
  * Estático: invariantes da compensação (helper, escopo, dedup, gating por visibilidade).
  * CI-safe: sem Chromium faz SKIP (não quebra). Rodar: /opt/node22/bin/node desktop/scripts/f33C-assignment-toast.test.mjs */
@@ -36,9 +36,11 @@ const ok = (n, c) => { if (c) pass++; else { fail++; console.log('FAIL:', n); } 
 
 // ── invariantes estáticas (valem mesmo sem navegador) ──
 ok('helper notifIsAttrEvent escopa designer_assigned/task_assigned', /function notifIsAttrEvent\(p\)\{ var e=p&&p\.eventType; return e==='designer_assigned'\|\|e==='task_assigned'; \}/.test(html));
-ok('notifAttrToastOnce dedup por dedupKey e chama notifShowToast', /function notifAttrToastOnce\(p\)\{[\s\S]*?notifAttrToastSeen\[k\][\s\S]*?notifShowToast\(p\)/.test(html));
-ok('onNotifToast: atribuição via once-guard, demais via notifShowToast', /onNotifToast\(function\(p\)\{ if\(notifIsAttrEvent\(p\)\)\{ notifAttrToastOnce\(p\); \} else \{ notifShowToast\(p\); \}/.test(html));
-ok('onNotifHistory compensa atribuição só com janela visível', /onNotifHistory\(function\(p\)\{[\s\S]*?if\(notifIsAttrEvent\(p\) && \(typeof document==='undefined'\|\|document\.visibilityState!=='hidden'\)\) notifAttrToastOnce\(p\)/.test(html));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: a guarda once-por-dedupKey mora em notifToastOnce (porta única);
+// notifAttrToastOnce é alias. Ambos os canais (notif-toast e captura) passam por ela — nunca duplica.
+ok('guarda notifToastOnce dedup por dedupKey e chama notifShowToast', /function notifToastOnce\(p\)\{[\s\S]*?notifAttrToastSeen\[k\][\s\S]*?notifShowToast\(p\)/.test(html) && /function notifAttrToastOnce\(p\)\{ return notifToastOnce\(p\); \}/.test(html));
+ok('onNotifToast: TODOS os eventos via guarda única (notifToastOnce)', /onNotifToast\(function\(p\)\{ notifToastOnce\(p\);/.test(html));
+ok('onNotifHistory compensa TODOS os eventos só com janela visível', /onNotifHistory\(function\(p\)\{[\s\S]*?if\(typeof document==='undefined'\|\|document\.visibilityState!=='hidden'\) notifToastOnce\(p\)/.test(html));
 ok('toast de atribuição tem layout em linhas próprio (isAttr)', /if\(isAttr\)\{[\s\S]*?ntf-ti">atribuiu uma tarefa<\/div>[\s\S]*?ntf-attr-task[\s\S]*?ntf-attr-cli/.test(html));
 ok('layout de atribuição não afeta demais toasts (else mantém estrutura)', /\} else \{\s*el\.innerHTML='<div class="ntf-card">'\+av/.test(html));
 
@@ -105,7 +107,10 @@ ok('A — atribuição (nativa-only) + visível: toast premium aparece (FIX)', R
 ok('B — atribuição (history+toast): exatamente 1 toast (sem duplicar)', R.B_bothChannels_visible === 1);
 ok('C — atribuição + janela oculta: 0 toast in-app (nativa cuida)', R.C_nativeOnly_hidden === 0);
 ok('D — sla (history+toast): 1 toast (inalterado)', R.D_sla_bothChannels === 1);
-ok('E — sla só por captura: 0 toast (captura é só histórico p/ não-atribuição)', R.E_sla_historyOnly === 0);
+// F3.4.7 — CONTRATO ATUALIZADO (correção da regressão): a amarela/vermelha que o canal notif-toast
+// às vezes não renderiza com a janela ABERTA é compensada pela captura (rede de segurança). SLA só por
+// captura + janela visível ⇒ 1 toast (antes 0). Duplicação segue impossível (guarda once-por-dedupKey).
+ok('E — sla só por captura + visível: 1 toast (rede de segurança da amarela/vermelha — F3.4.7)', R.E_sla_historyOnly === 1);
 // F — estrutura em linhas (Problema 2): sem cortar/espremer informação
 ok('F — linha 1 = nome de quem atribuiu', R.struct && R.struct.who === 'Arydyjany Carlôto');
 ok('F — linha 2 = "atribuiu uma tarefa"', R.struct && R.struct.line2 === 'atribuiu uma tarefa');

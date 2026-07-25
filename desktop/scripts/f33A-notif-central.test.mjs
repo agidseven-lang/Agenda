@@ -95,12 +95,17 @@ ok('NOTIF-CENTRAL persiste só em localStorage', /localStorage\.setItem\(NOTIF_H
 // ── captura renderer (hooks) ──
 ok('notifEmit captura no histórico (capture-only)', /if\(delivered\)\{ try\{ if\(typeof notifHistoryAppend==='function'\) notifHistoryAppend\(p\); \}catch\(_\)\{\} \}/.test(html));
 ok('onNotifToast também captura no histórico', /onNotifToast\(function\(p\)\{[\s\S]*?if\(typeof notifHistoryAppend==='function'\) notifHistoryAppend\(p\);/.test(html));
-ok('toast premium intacto p/ não-atribuição (notifShowToast no else)', /onNotifToast\(function\(p\)\{ if\(notifIsAttrEvent\(p\)\)\{ notifAttrToastOnce\(p\); \} else \{ notifShowToast\(p\); \}/.test(html));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: o canal notif-toast passa a rotear TODOS os eventos pela guarda
+// única once-por-dedupKey (notifToastOnce) — o toast premium segue idêntico; muda só a porta.
+ok('toast premium via guarda única once-por-dedupKey (notifToastOnce)', /onNotifToast\(function\(p\)\{ notifToastOnce\(p\);/.test(html) && /function notifToastOnce\(p\)\{[\s\S]*?notifShowToast\(p\)/.test(html));
 // F3.3.10-FIX — toast de atribuição (Social → Designer): compensação cirúrgica, deduplicada, escopada
 ok('compensação: notifAttrToastOnce chama notifShowToast', /function notifAttrToastOnce\(p\)\{[\s\S]*?notifShowToast\(p\)/.test(html));
 ok('compensação: só designer_assigned/task_assigned', /function notifIsAttrEvent\(p\)\{ var e=p&&p\.eventType; return e==='designer_assigned'\|\|e==='task_assigned'; \}/.test(html));
 ok('compensação: dedup por dedupKey (não duplica)', /if\(notifAttrToastSeen\[k\]\) return false; notifAttrToastSeen\[k\]=1;/.test(html));
-ok('compensação: onNotifHistory só com janela visível', /onNotifHistory\(function\(p\)\{[\s\S]*?if\(notifIsAttrEvent\(p\) && \(typeof document==='undefined'\|\|document\.visibilityState!=='hidden'\)\) notifAttrToastOnce\(p\)/.test(html));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: a compensação via captura cobre TODOS os eventos (era só atribuição),
+// mantendo o gate de janela visível (minimizado/bandeja = nativa/bg-window). Corrige a amarela/vermelha
+// que o canal notif-toast às vezes não renderizava com a janela aberta.
+ok('compensação (captura) p/ todos os eventos só com janela visível', /onNotifHistory\(function\(p\)\{[\s\S]*?if\(typeof document==='undefined'\|\|document\.visibilityState!=='hidden'\) notifToastOnce\(p\)/.test(html));
 ok('tab Notificações aditiva', /\{k:'notificacoes',l:'Notifica[çc][õo]es',i:'bell'\}/.test(html));
 ok('render() roteia notificacoes', /else if\(state\.tab==='notificacoes'\)\{c\.innerHTML=renderNotifCentral\(\);afterNotifCentral\(\);\}/.test(html));
 ok('badge de não-lidas no nav (aditivo)', /notifNavBadge\(t\.k\)/.test(html));
@@ -109,7 +114,9 @@ ok('badge de não-lidas no nav (aditivo)', /notifNavBadge\(t\.k\)/.test(html));
 ok('main.ts encaminha notif-history (capture)', /webContents\.send\("notif-history", p\)/.test(mainTs));
 ok('main.ts captura em try/catch (não afeta entrega)', /try \{ mainWin\?\.webContents\.send\("notif-history", p\); \} catch/.test(mainTs));
 ok('main.ts: toast premium aprovado intacto', /webContents\.send\("notif-toast", p\)/.test(mainTs) && /channel: "toast"/.test(mainTs));
-ok('main.ts: nativa preservada como FALLBACK + janela premium primaria (bg-window)', /new Notification\(/.test(mainTs) && /showBgNotify\(p\)/.test(mainTs) && /"bg-window"/.test(mainTs));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: showBgNotify agora recebe onNoRender (fallback do no-ACK); a janela
+// premium segue primária (bg-window) e a nativa (nativeNotify) segue como fallback.
+ok('main.ts: nativa preservada como FALLBACK + janela premium primaria (bg-window)', /new Notification\(/.test(mainTs) && /showBgNotify\(p, \(\) => \{/.test(mainTs) && /"bg-window"/.test(mainTs));
 ok('main.ts: windowActive (regra de canal) intacta', /function windowActive\(\)/.test(mainTs) && /isVisible\(\) && !w\.isMinimized\(\)/.test(mainTs));
 ok('main.ts: backgroundThrottling:false (timers em background)', /backgroundThrottling:\s*false/.test(mainTs));
 ok('main.ts: switches anti-backgrounding (SLA confiável minimizado/bandeja)', /disable-background-timer-throttling/.test(mainTs) && /disable-renderer-backgrounding/.test(mainTs) && /disable-backgrounding-occluded-windows/.test(mainTs));

@@ -42,8 +42,11 @@ ok('notifier: dedupKey CANÔNICO designer_assigned:<id>:<designerId>:<at> (fallb
   /const _canonKey = at \? `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}:\$\{at\}` : `designer_assigned:\$\{t\.id\}:\$\{da\.designerId \|\| ""\}`;/.test(NT));
 ok('notifier: detecção por TRANSIÇÃO (semente no 1º snapshot; emite mudança), sem hard-drop por assignedAt no CÓDIGO',
   /if \(firstRun\) return;\s*\/\/ BASELINE SEED/.test(NT) && /const changed = \(prev !== cur\) \|\| \(at !== prevAt\);/.test(NT) && !/if \([^)]*assignedAt[^)]*< [^)]*sinceMs[^)]*\)\s*return/.test(NT) && !/at < state\.sinceMs/.test(NT));
+// F3.4.7 — RE-ÂNCORA AUTORIZADA: showBgNotify agora recebe onNoRender (fallback do no-ACK); a nativa
+// (helper nativeNotify) segue como fallback quando a janela premium falha (!bgOk).
 ok('main: canal windowActive → toast; background → janela premium (showBgNotify), nativa fallback',
-  /if \(windowActive\(\)\) \{[\s\S]*?return \{ ok: true, channel: "toast" \};\s*\}[\s\S]*?const bgOk = showBgNotify\(p\);[\s\S]*?if \(!bgOk\) \{[\s\S]*?new Notification\(/.test(MAIN));
+  /if \(windowActive\(\)\) \{[\s\S]*?return \{ ok: true, channel: "toast" \};\s*\}[\s\S]*?const bgOk = showBgNotify\(p, \(\) => \{[\s\S]*?if \(!bgOk\) nativeOk = nativeNotify\(p, key, deep\);/.test(MAIN)
+  && /function nativeNotify\([\s\S]*?new Notification\(/.test(MAIN));
 ok('main: windowActive = visível e não-minimizado (minimizado/oculto → background)', /isVisible\(\) && !w\.isMinimized\(\)/.test(MAIN));
 ok('main: switches anti-suspensão de background (renderer não congela o visual)', /disable-renderer-backgrounding/.test(MAIN) && /disable-background-timer-throttling/.test(MAIN));
 

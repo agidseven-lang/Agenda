@@ -29,14 +29,44 @@ export function listen<T extends DocumentData>(
   cb: (snap: QuerySnapshot<T>) => void
 ) {
   // F3.3.10-DIAG — loga cada snapshot recebido pelo MAIN (prova se o realtime chega em background)
-  // + erros de transporte. NÃO altera o comportamento: só chama cb e segue.
-  diag("firestore.listen.attach", { col: name });
-  return onSnapshot(
-    query(collection(db, name)) as any,
-    (s: any) => {
-      try { diag("firestore.snapshot", { col: name, size: s.size, changes: (s.docChanges && s.docChanges() || []).length }); } catch { /* */ }
-      cb(s as any);
-    },
-    (err: any) => { try { diag("firestore.error", { col: name, err: String((err && err.message) || err) }); } catch { /* */ } }
-  );
+  // + erros de transporte.
+  // F3.4.7 — AUTO-CURA: quando o callback de ERRO do onSnapshot dispara, o SDK do Firestore
+  // ENCERRA o listener em definitivo (ele não volta sozinho). Sem reanexar, o main fica surdo
+  // para sempre (Desktop vive dias na bandeja): tarefa nova/prazo alterado nunca entram no mapa
+  // do slaScheduler e NENHUMA amarela/vermelha é emitida em NENHUM estado de janela, enquanto o
+  // timer de segurança segue reavaliando um mapa CONGELADO (parece vivo no log). Correção:
+  // re-attach com backoff exponencial capado (5s→60s), resetado no primeiro snapshot saudável.
+  let stopped = false;
+  let unsub: (() => void) | null = null;
+  let rearmTimer: ReturnType<typeof setTimeout> | null = null;
+  let attempt = 0;
+  const attach = (): void => {
+    if (stopped) return;
+    diag("firestore.listen.attach", { col: name, attempt });
+    unsub = onSnapshot(
+      query(collection(db, name)) as any,
+      (s: any) => {
+        attempt = 0; // stream saudável ⇒ backoff volta ao início
+        try { diag("firestore.snapshot", { col: name, size: s.size, changes: (s.docChanges && s.docChanges() || []).length }); } catch { /* */ }
+        cb(s as any);
+      },
+      (err: any) => {
+        try { diag("firestore.error", { col: name, err: String((err && err.message) || err) }); } catch { /* */ }
+        try { if (unsub) unsub(); } catch { /* */ }
+        unsub = null;
+        if (stopped) return;
+        attempt++;
+        const delayMs = Math.min(5000 * Math.pow(2, attempt - 1), 60000);
+        try { diag("firestore.listen.rearm", { col: name, attempt, delayMs }); } catch { /* */ }
+        rearmTimer = setTimeout(attach, delayMs);
+      }
+    );
+  };
+  attach();
+  return () => {
+    stopped = true;
+    try { if (rearmTimer) { clearTimeout(rearmTimer); rearmTimer = null; } } catch { /* */ }
+    try { if (unsub) unsub(); } catch { /* */ }
+    unsub = null;
+  };
 }

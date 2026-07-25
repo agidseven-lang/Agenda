@@ -16,6 +16,7 @@
  * ===================================================================================== */
 import path from 'path'; import crypto from 'crypto'; import fs from 'fs';
 import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
+import { isF347Authorized } from './fixtures/f347/authorized-delta.mjs'; // F3.4.7 — correção da entrega visual amarela/vermelha (delega o escopo ao guard f347)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
 const ROOT = path.resolve(DESK, '..');
@@ -45,6 +46,7 @@ const AUTH_EXACT = new Set([
 ]);
 function authorized(rel) {
   if (AUTH_EXACT.has(rel)) return true;
+  if (isF347Authorized(rel)) return true;   // F3.4.7 — fonte/testes da correção da entrega visual (escopo byte-a-byte em f347-hotfix-region-invariance)
   if (/^desktop\/scripts\/f343[a-z0-9]*-[^/]*\.test\.mjs$/.test(rel)) return true;   // novos testes do hotfix (f343-, f343d-, …)
   if (/^desktop\/scripts\/fixtures\/f343\//.test(rel)) return true;         // fixtures do hotfix
   if (rel === 'desktop/scripts/F343-TEST-STATUS.md') return true;           // registro de status do hotfix
@@ -70,7 +72,7 @@ function authorized(rel) {
 /* ── 1) versão: PERMITE somente o candidato ESTÁVEL exato 1.0.181 (F3.4.4A — promoção da rc.1 aprovada) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.183 (candidato ESTÁVEL exato do F3.4.6)', pj.version === '1.0.183');
+  ok('1 package.json version === 1.0.184 (candidato ESTÁVEL exato do F3.4.7)', pj.version === '1.0.184');
 }
 
 /* ── 2) git diff --name-only 9444e7f -- desktop: TODA mudança rastreada deve ser AUTORIZADA ── */
@@ -100,7 +102,8 @@ function authorized(rel) {
 /* ── 4) BYTE-IDENTIDADE explícita dos módulos SENSÍVEIS (reforço além do #3) ── */
 {
   const SENSITIVE = [
-    'desktop/src/main/bgNotify.ts', 'desktop/src/main/firebase.ts', 'desktop/src/main/updaterService.ts',
+    // F3.4.7 — bgNotify.ts e firebase.ts saíram (correção AUTORIZADA da entrega visual; escopo em f347).
+    'desktop/src/main/updaterService.ts',
     'desktop/src/main/tray.ts', 'desktop/src/main/reminder.ts', 'desktop/src/main/clockSync.ts',
     'desktop/src/main/auth-core.ts', 'desktop/src/main/autostart.ts', 'desktop/src/main/diag.ts',
     'desktop/src/main/prewarm.ts', 'desktop/src/preload/preload.ts', 'desktop/src/preload/bgnotify-preload.ts',

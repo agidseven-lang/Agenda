@@ -22,6 +22,7 @@ import path from 'path'; import fs from 'fs';
 import { fileURLToPath } from 'url'; import { execFileSync } from 'child_process';
 import { applyF345SlaDelta } from './fixtures/f345/authorized-delta.mjs'; // F3.4.5 — delta AUTORIZADO do clamp planStartAt
 import { applyF346CalendarDelta } from './fixtures/f346/authorized-delta.mjs'; // F3.4.6 — delta AUTORIZADO da grade diária do calendário
+import { applyF347IndexDelta, isF347Authorized } from './fixtures/f347/authorized-delta.mjs'; // F3.4.7 — delta AUTORIZADO da entrega visual amarela/vermelha
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DESK = path.resolve(__dirname, '..');
 const ROOT = path.resolve(DESK, '..');
@@ -42,6 +43,7 @@ const AUTH_EXACT = new Set([
 ]);
 function authorized(rel) {
   if (AUTH_EXACT.has(rel)) return true;
+  if (isF347Authorized(rel)) return true;   // F3.4.7 — fonte/testes da correção da entrega visual (escopo byte-a-byte em f347)
   if (/^desktop\/scripts\/f344[a-z0-9-]*\.test\.mjs$/.test(rel)) return true;   // testes do hotfix F3.4.4
   if (/^desktop\/scripts\/fixtures\/f344\//.test(rel)) return true;             // fixtures do hotfix
   // F3.4.5 — hotfix do timestamp da amarela: testes/fixtures próprios (fontes gateadas byte-a-byte
@@ -60,7 +62,7 @@ function authorized(rel) {
 /* ── 1) versão: SOMENTE o candidato ESTÁVEL exato 1.0.182 (F3.4.5) ── */
 {
   const pj = JSON.parse(fs.readFileSync(path.join(DESK, 'package.json'), 'utf8'));
-  ok('1 package.json version === 1.0.183 (candidato ESTÁVEL exato do F3.4.6)', pj.version === '1.0.183');
+  ok('1 package.json version === 1.0.184 (candidato ESTÁVEL exato do F3.4.7)', pj.version === '1.0.184');
 }
 
 /* ── 2) git diff --name-only 68598fa -- desktop: TODA mudança deve ser AUTORIZADA ── */
@@ -89,8 +91,9 @@ function authorized(rel) {
 /* ── 4) BYTE-IDENTIDADE explícita dos módulos SENSÍVEIS (reforço) ── */
 {
   const SENSITIVE = [
-    'desktop/src/main/slaScheduler.ts', 'desktop/src/main/auth.ts',
-    'desktop/src/main/bgNotify.ts', 'desktop/src/main/firebase.ts', 'desktop/src/main/updaterService.ts',
+    // F3.4.7 — slaScheduler.ts, bgNotify.ts e firebase.ts saíram (correção AUTORIZADA; escopo em f347).
+    'desktop/src/main/auth.ts',
+    'desktop/src/main/updaterService.ts',
     'desktop/src/main/tray.ts', 'desktop/src/main/reminder.ts', 'desktop/src/main/clockSync.ts',
     'desktop/src/main/auth-core.ts', 'desktop/src/main/autostart.ts', 'desktop/src/main/diag.ts',
     'desktop/src/main/prewarm.ts', 'desktop/src/preload/preload.ts', 'desktop/src/preload/bgnotify-preload.ts',
@@ -145,8 +148,8 @@ function authorized(rel) {
   // F3.4.5/F3.4.6 re-ancoram: a base 68598fa recebe SOMENTE os deltas AUTORIZADOS (clamp
   // planStartAt do timestamp da amarela + grade diária do calendário); qualquer outra mudança
   // fora do bloco notifScan continua reprovando.
-  ok('9 index.html: FORA do bloco notifScan, byte-idêntico a 68598fa + deltas AUTORIZADOS F3.4.5+F3.4.6',
-    cur.replace(BLOCK, '<NOTIFSCAN>') === applyF346CalendarDelta(applyF345SlaDelta(base)).replace(BLOCK, '<NOTIFSCAN>'));
+  ok('9 index.html: FORA do bloco notifScan, byte-idêntico a 68598fa + deltas AUTORIZADOS F3.4.5+F3.4.6+F3.4.7',
+    cur.replace(BLOCK, '<NOTIFSCAN>') === applyF347IndexDelta(applyF346CalendarDelta(applyF345SlaDelta(base))).replace(BLOCK, '<NOTIFSCAN>'));
 }
 
 console.log('\n===== F3.4.4 — HOTFIX REGION-INVARIANCE (baseline OFICIAL 68598fa / rc 1.0.181-rc.1) =====');

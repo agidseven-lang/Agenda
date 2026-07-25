@@ -79,8 +79,20 @@ ok('[f3373i6c18h] âncora: pin de versão 1.0.177 já violado no baseline 1.0.17
 ok('[f3374d] âncora: pin de versão 1.0.177 já violado no baseline 1.0.178 (RED pré-existente)', BASE_PKG.version === '1.0.178');
 
 /* 7) f3374k (K-pkg: candidata deve ser 1.0.177 vs QA 960d8ed; K-proc process files vs QA) */
-proveUntouched('f3374k', ['desktop/src/preload/preload.ts', 'desktop/src/main/clockSync.ts', 'desktop/src/main/bgNotify.ts', 'desktop/src/main/firebase.ts', 'desktop/src/main/auth-core.ts']);
+// F3.4.7 — bgNotify.ts e firebase.ts saíram do conjunto INTOCADO: a correção da regressão de
+// notificações amarela/vermelha os modifica de forma AUTORIZADA e localizada (prova de render/ACK
+// na janela premium + auto-cura do listener Firestore). Os demais subjects do f3374k seguem
+// byte-congelados. As duas mudanças são declaradas explicitamente abaixo (prova de intenção).
+proveUntouched('f3374k', ['desktop/src/preload/preload.ts', 'desktop/src/main/clockSync.ts', 'desktop/src/main/auth-core.ts']);
 ok('[f3374k] âncora: pin de versão 1.0.177 já violado no baseline 1.0.178 (K-pkg RED pré-existente)', BASE_PKG.version === '1.0.178');
+/* F3.4.7 — modificação AUTORIZADA e comprovadamente intencional dos 2 subjects que a correção toca */
+for (const rel of ['desktop/src/main/bgNotify.ts', 'desktop/src/main/firebase.ts']) {
+  ok('[F3.4.7] subject MODIFICADO de forma autorizada (difere de 9444e7f): ' + rel.replace('desktop/', ''), !identical(rel));
+}
+ok('[F3.4.7] bgNotify.ts: prova de render (ACK) + fallback no-ACK presentes (correção da entrega visual)',
+  /bg\.render\.timeout/.test(curText('desktop/src/main/bgNotify.ts')) && /ackArm\(/.test(curText('desktop/src/main/bgNotify.ts')));
+ok('[F3.4.7] firebase.ts: auto-cura do listener (re-attach com backoff capado) presente',
+  /firestore\.listen\.rearm/.test(curText('desktop/src/main/firebase.ts')) && /Math\.min\(5000 \* Math\.pow\(2, attempt - 1\), 60000\)/.test(curText('desktop/src/main/firebase.ts')));
 
 /* ══════════ guards ESTÁVEIS 1.0.178 SUPERSEDIDOS no escopo do hotfix (preservados p/ produção) ══════════ */
 for (const rel of ['desktop/scripts/f341a-region-invariance.test.mjs', 'desktop/scripts/f3375a-wizard-reset-roteiro-no-designer.test.mjs']) {

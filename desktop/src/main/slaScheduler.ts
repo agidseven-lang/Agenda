@@ -112,7 +112,16 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
       for (const p of payloads || []) {
         const key = String((p && p.dedupKey) || "");
         if (!key || seen.has(key)) continue;
-        try { deliver(p); seen.add(key); log("sla.emit", { dedupKey: key, eventType: p.eventType, taskId: p.taskId || taskId, nowMs: t0 }); }
+        // F3.4.7 — seen só é gravado quando o HUB ACEITA a entrega ({ok:true}). Antes, deliver()
+        // (deliverNotification) NUNCA lança — devolve {ok:false} engolido — e a chave era marcada
+        // mesmo com falha total: a transição ficava PERDIDA para sempre (viola o contrato de
+        // dedupe: nenhum bloqueio permanente). Falha ⇒ chave livre ⇒ reentrega no próximo eval.
+        try {
+          const r: any = deliver(p);
+          const accepted = !(r && typeof r === "object" && (r as any).ok === false);
+          if (accepted) { seen.add(key); log("sla.emit", { dedupKey: key, eventType: p.eventType, taskId: p.taskId || taskId, nowMs: t0, channel: (r && (r as any).channel) || "" }); }
+          else { log("sla.deliver.retry", { dedupKey: key, channel: (r && (r as any).channel) || "", nowMs: t0 }); }
+        }
         catch (e) { log("sla.deliver.error", { dedupKey: key, err: String((e as any) && (e as any).message || e) }); }
       }
     };
