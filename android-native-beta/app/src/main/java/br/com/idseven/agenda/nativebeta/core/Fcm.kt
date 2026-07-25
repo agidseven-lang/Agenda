@@ -2,21 +2,27 @@ package br.com.idseven.agenda.nativebeta.core
 
 import android.content.Context
 import android.provider.Settings
-import com.google.firebase.firestore.FieldPath
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import br.com.idseven.agenda.nativebeta.data.auth.FcmRegisterOutcome
+import br.com.idseven.agenda.nativebeta.data.auth.ServerAuthRepository
+import br.com.idseven.agenda.nativebeta.data.session.SecureSessionStore
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
-// Registra o token FCM no doc do usuário (users.fcmTokens) — mesmo campo do PWA/Worker.
-// Guarda o uid em prefs para que o serviço de mensagens consiga atualizar o token
-// no Firestore quando ele rotacionar (onNewToken), mesmo sem novo login.
+// F4.2C — Registro do token FCM pelo ENDPOINT AUTENTICADO (registerFcmToken), substituindo o write
+// direto em users/{uid}.fcmTokens. O Bearer e a sessao server-side (Keystore) e o UID e derivado da
+// sessao NO SERVIDOR — impossivel registrar token para outro UID. Guardamos uid/token em prefs para
+// diagnostico e para o servico de mensagens reagir a rotacao (onNewToken), sempre via o mesmo endpoint.
 //
-// PÓS-REINSTALAÇÃO o token FCM ROTACIONA. Além de adicionar o novo em `fcmTokens`,
-// gravamos `fcmTokenMeta[token] = { deviceId, lastSeenAt }` usando um deviceId estável
-// do aparelho. O Worker/Functions deduplicam por deviceId pegando o token de maior
-// lastSeenAt -> o token ANTIGO deste mesmo aparelho deixa de ser usado (substituído),
-// sem precisar removê-lo manualmente. Logs claros para diagnóstico.
+// PÓS-REINSTALAÇÃO o token FCM ROTACIONA: enviamos o novo token + um deviceId estavel do aparelho;
+// o backend deduplica por deviceId (mantendo o de maior lastSeenAt), aposentando o token antigo do
+// MESMO aparelho sem precisar removê-lo manualmente. Nenhuma gravacao direta no Firestore.
 object Fcm {
+    // Escopo leve para a chamada de rede (o listener do token roda na main thread; a rede NAO pode).
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     fun register(ctx: Context, uid: String?) {
         if (uid.isNullOrBlank()) return
         try {
@@ -29,23 +35,21 @@ object Fcm {
                         return@addOnSuccessListener
                     }
                     prefs.edit().putString("token", token).apply()
+                    // Sessao real (Keystore) → Bearer do endpoint. Sem sessao valida, NAO registra.
+                    val sessionToken = SecureSessionStore(ctx.applicationContext).load()?.token
+                    if (sessionToken.isNullOrBlank()) {
+                        android.util.Log.w("Fcm", "[FCM_NO_SESSION] uid=$uid (sem sessao — registro adiado)")
+                        return@addOnSuccessListener
+                    }
                     val deviceId = stableDeviceId(ctx)
-                    val meta = mapOf(
-                        "deviceId" to deviceId,
-                        "lastSeenAt" to System.currentTimeMillis(),
-                        "platform" to "android-native",
-                    )
-                    FirebaseFirestore.getInstance().collection("users").document(uid)
-                        .update(
-                            "fcmTokens", FieldValue.arrayUnion(token),
-                            FieldPath.of("fcmTokenMeta", token), meta,
-                        )
-                        .addOnSuccessListener {
-                            android.util.Log.i("Fcm", "[FCM_TOKEN_SYNCED] uid=$uid device=$deviceId token=${token.take(12)}…")
+                    scope.launch {
+                        when (val r = ServerAuthRepository().registerFcmToken(sessionToken, token, deviceId, "android")) {
+                            is FcmRegisterOutcome.Success ->
+                                android.util.Log.i("Fcm", "[FCM_TOKEN_SYNCED] device=$deviceId count=${r.count} token=${token.take(12)}…")
+                            else ->
+                                android.util.Log.w("Fcm", "[FCM_TOKEN_SYNC_FAILED] device=$deviceId result=$r")
                         }
-                        .addOnFailureListener { e ->
-                            android.util.Log.w("Fcm", "[FCM_TOKEN_SYNC_FAILED] uid=$uid err=${e.message}")
-                        }
+                    }
                 }
                 .addOnFailureListener { e ->
                     android.util.Log.w("Fcm", "[FCM_TOKEN_FETCH_FAILED] uid=$uid err=${e.message}")
@@ -53,9 +57,9 @@ object Fcm {
         } catch (_: Throwable) { }
     }
 
-    // Identificador estável por aparelho (não muda na reinstalação) para agrupar tokens
-    // do mesmo device e descartar o antigo. Não é PII sensível e fica só no doc do usuário.
-    private fun stableDeviceId(ctx: Context): String = try {
+    // Identificador estável por aparelho (nao muda na reinstalacao) para o backend agrupar tokens do
+    // mesmo device e aposentar o antigo. Nao e PII sensivel. Reusado pelo AppFirebaseMessagingService.
+    internal fun stableDeviceId(ctx: Context): String = try {
         Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ANDROID_ID)?.takeIf { it.isNotBlank() } ?: "unknown"
     } catch (_: Throwable) { "unknown" }
 }

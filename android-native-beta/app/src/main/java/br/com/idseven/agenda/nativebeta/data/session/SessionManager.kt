@@ -3,6 +3,7 @@ package br.com.idseven.agenda.nativebeta.data.session
 import android.content.Context
 import br.com.idseven.agenda.nativebeta.data.auth.AuthError
 import br.com.idseven.agenda.nativebeta.data.auth.LoginOutcome
+import br.com.idseven.agenda.nativebeta.data.auth.RealFirebaseBridge
 import br.com.idseven.agenda.nativebeta.data.auth.ServerAuthRepository
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -26,6 +27,7 @@ class SessionManager(
     private val store: SessionVault,
     private val repo: ServerAuthRepository,
     private val bootstrapper: SessionBootstrapper,
+    private val firebaseGate: FirebaseSessionGate,   // F4.2C — ponte de identidade Firebase
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     private val _state = MutableStateFlow<SessionUiState>(SessionUiState.Loading)
@@ -34,11 +36,21 @@ class SessionManager(
     // Single-flight: uma tentativa de login por vez (reforca o guard do ViewModel).
     private val inFlight = AtomicBoolean(false)
 
-    /** Arranque: valida a sessao existente por getUserSelf. */
+    /**
+     * Arranque: valida a sessao existente por getUserSelf e SO libera as telas (listeners Firestore)
+     * apos garantir a identidade Firebase (F4.2C). Rede fora no Firebase => Unavailable (mantem a
+     * sessao). 401/inativo/UID divergente => wipe integral + volta ao login.
+     */
     suspend fun bootstrap() {
         _state.value = SessionUiState.Loading
         _state.value = when (val r = bootstrapper.run()) {
-            is BootstrapResult.Authenticated -> SessionUiState.Authenticated(r.session)
+            is BootstrapResult.Authenticated -> when (val g = firebaseGate.ensure(r.session)) {
+                FirebaseSessionGate.Result.Ok -> SessionUiState.Authenticated(r.session)
+                FirebaseSessionGate.Result.Expired -> { wipe(); SessionUiState.LoggedOut }
+                FirebaseSessionGate.Result.Disabled -> { wipe(); SessionUiState.LoggedOut }
+                FirebaseSessionGate.Result.UidMismatch -> { wipe(); SessionUiState.LoggedOut }
+                is FirebaseSessionGate.Result.Unavailable -> SessionUiState.Unavailable(g.error) // transitorio: sessao preservada, sem listeners
+            }
             BootstrapResult.NeedLogin -> SessionUiState.LoggedOut
             is BootstrapResult.Unavailable -> SessionUiState.Unavailable(r.error)
         }
@@ -61,9 +73,20 @@ class SessionManager(
                         expiresAtMs = r.expiresAtMs,
                         profile = r.user,
                     )
-                    store.save(session)
-                    _state.value = SessionUiState.Authenticated(session)
-                    null
+                    store.save(session)  // sessao precisa existir para o issue/bridge
+                    // F4.2C — login novo e ATOMICO: estabelecer a identidade Firebase ANTES de
+                    // liberar Authenticated (listeners Firestore). Qualquer falha limpa a sessao
+                    // recem-salva (nao deixa meia-sessao sem Firebase).
+                    when (val g = firebaseGate.ensure(session)) {
+                        FirebaseSessionGate.Result.Ok -> {
+                            _state.value = SessionUiState.Authenticated(session)
+                            null
+                        }
+                        FirebaseSessionGate.Result.Expired -> { wipe(); AuthError.SESSION_EXPIRED }
+                        FirebaseSessionGate.Result.Disabled -> { wipe(); AuthError.USER_DISABLED }
+                        FirebaseSessionGate.Result.UidMismatch -> { wipe(); AuthError.IDENTITY_MISMATCH }
+                        is FirebaseSessionGate.Result.Unavailable -> { wipe(); g.error }
+                    }
                 }
                 is LoginOutcome.Failure -> r.error
             }
@@ -72,12 +95,19 @@ class SessionManager(
         }
     }
 
+    /** F4.2C — wipe integral: desloga o Firebase e limpa a sessao + a chave do Keystore. */
+    private fun wipe() {
+        firebaseGate.signOut()
+        store.clear(deleteKey = true)
+    }
+
     /**
      * Logout: SEM endpoint de revogacao server-side no contrato auditado (F4.2A) — risco formalmente
      * documentado e adiado para F4.2C. Aqui: limpeza INTEGRAL local (token + sessionId + perfil +
      * chave do Keystore) e retorno ao login.
      */
     suspend fun logout() {
+        firebaseGate.signOut()          // F4.2C — encerra a identidade Firebase junto do wipe local
         store.clear(deleteKey = true)
         _state.value = SessionUiState.LoggedOut
     }
@@ -86,11 +116,12 @@ class SessionManager(
     suspend fun retry() = bootstrap()
 
     companion object {
-        /** Fabrica com as dependencias reais (Keystore + endpoints da Desktop 1.0.181). */
+        /** Fabrica com as dependencias reais (Keystore + endpoints + FirebaseAuth oficial). */
         fun create(context: Context): SessionManager {
             val store = SecureSessionStore(context.applicationContext)
             val repo = ServerAuthRepository()
-            return SessionManager(store, repo, SessionBootstrapper(store, repo))
+            val gate = FirebaseSessionGate(repo, RealFirebaseBridge())
+            return SessionManager(store, repo, SessionBootstrapper(store, repo), gate)
         }
     }
 }

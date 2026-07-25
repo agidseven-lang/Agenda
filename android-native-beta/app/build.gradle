@@ -12,8 +12,8 @@ android {
         applicationId "br.com.idseven.agenda.nativebeta"
         minSdk 26
         targetSdk 34
-        versionCode 127
-        versionName "1.0.147-beta-auth-server-session"
+        versionCode 128
+        versionName "1.0.148-beta-firebase-auth-canonical"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
@@ -36,6 +36,16 @@ android {
         buildConfigField "String", "AUTH_LOGIN_URL", "\"${_loginUrl}\""
         buildConfigField "String", "AUTH_SELF_URL", "\"${_selfUrl}\""
         buildConfigField "String", "AUTH_CHANGE_PASSWORD_URL", "\"${_chPwUrl}\""
+
+        // F4.2C — Endpoints server-side REAIS adicionados: issueFirebaseAuthToken (Firebase Custom
+        // Token, Bearer da sessao) e registerFcmToken (FCM sem write direto no Firestore). Forma
+        // canonica cloudfunctions.net Gen2 (projeto agenda-id-seven, us-central1), a MESMA usada por
+        // functions/index.js; sobreponivel por -P no CI (-PAUTH_FIREBASE_TOKEN_URL / -PAUTH_REGISTER_FCM_URL).
+        // NAO sao secret; NUNCA token/credencial em BuildConfig.
+        def _fbTokUrl  = project.findProperty('AUTH_FIREBASE_TOKEN_URL')  ?: 'https://us-central1-agenda-id-seven.cloudfunctions.net/issueFirebaseAuthToken'
+        def _fcmRegUrl = project.findProperty('AUTH_REGISTER_FCM_URL')    ?: 'https://us-central1-agenda-id-seven.cloudfunctions.net/registerFcmToken'
+        buildConfigField "String", "AUTH_FIREBASE_TOKEN_URL", "\"${_fbTokUrl}\""
+        buildConfigField "String", "AUTH_REGISTER_FCM_URL", "\"${_fcmRegUrl}\""
     }
 
     signingConfigs {
@@ -103,8 +113,10 @@ dependencies {
     // Sessão local (DataStore Preferences)
     implementation "androidx.datastore:datastore-preferences:1.1.1"
 
-    // Firebase Android NATIVO (Firestore). BoM controla as versões. NÃO usa Firebase Auth.
+    // Firebase Android NATIVO. BoM controla as versões. F4.2C adiciona firebase-auth (Custom Token
+    // via issueFirebaseAuthToken) para autenticar o Firestore com request.auth real.
     implementation platform("com.google.firebase:firebase-bom:33.7.0")
+    implementation "com.google.firebase:firebase-auth"
     implementation "com.google.firebase:firebase-firestore"
     implementation "com.google.firebase:firebase-messaging"
     implementation "com.google.firebase:firebase-functions"
@@ -137,5 +149,5 @@ dependencies {
     testImplementation "io.github.takahirom.roborazzi:roborazzi-junit-rule:1.30.1"
 }
 
-// Processa app/google-services.json (DEVE ficar no final). NÃO usa Firebase Auth.
+// Processa app/google-services.json (DEVE ficar no final). F4.2C usa Firebase Auth (Custom Token).
 apply plugin: "com.google.gms.google-services"

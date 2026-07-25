@@ -54,5 +54,6 @@ object AuthErrorMapper {
         AuthError.INVALID_RESPONSE -> "Não foi possível concluir agora. Tente novamente em instantes."
         AuthError.UNAVAILABLE -> "Serviço indisponível no momento. Tente novamente."
         AuthError.BAD_REQUEST -> "Preencha e-mail/WhatsApp e senha."
+        AuthError.IDENTITY_MISMATCH -> "Falha na verificação de identidade. Entre novamente."
     }
 }

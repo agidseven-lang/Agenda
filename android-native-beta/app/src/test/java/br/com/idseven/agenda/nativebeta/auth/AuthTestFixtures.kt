@@ -1,6 +1,7 @@
 package br.com.idseven.agenda.nativebeta.auth
 
 import br.com.idseven.agenda.nativebeta.data.auth.AuthApi
+import br.com.idseven.agenda.nativebeta.data.auth.FirebaseBridge
 import br.com.idseven.agenda.nativebeta.data.session.SessionCipher
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -19,13 +20,26 @@ class FakeAuthApi(
     private var loginReply: AuthApi.HttpReply,
     private var selfReply: AuthApi.HttpReply = ok(JSONObject().put("ok", true)),
     private var changeReply: AuthApi.HttpReply = ok(JSONObject().put("ok", true)),
+    // F4.2C — respostas roteirizadas dos endpoints novos (default = sucesso).
+    private var firebaseReply: AuthApi.HttpReply = ok(JSONObject().put("ok", true).put("uid", "").put("firebaseToken", "FBT").put("expiresInSec", 3600)),
+    private var fcmReply: AuthApi.HttpReply = ok(JSONObject().put("ok", true).put("saved", true).put("count", 1)),
 ) : AuthApi {
     var lastIdentifier: String? = null
     var lastPasswordSeen: String? = null
     var lastSelfToken: String? = null
     var loginCalls = 0
+    // F4.2C — instrumentacao dos endpoints novos (prova de Bearer/payload; nunca vaza segredo).
+    var firebaseCalls = 0
+    var lastFirebaseToken: String? = null
+    var fcmCalls = 0
+    var lastFcmSessionToken: String? = null
+    var lastFcmToken: String? = null
+    var lastFcmDeviceId: String? = null
+    var lastFcmPlatform: String? = null
 
     fun setSelf(reply: AuthApi.HttpReply) { selfReply = reply }
+    fun setFirebase(reply: AuthApi.HttpReply) { firebaseReply = reply }
+    fun setFcm(reply: AuthApi.HttpReply) { fcmReply = reply }
 
     override suspend fun postLogin(identifier: String, password: String): AuthApi.HttpReply {
         loginCalls++
@@ -41,6 +55,21 @@ class FakeAuthApi(
 
     override suspend fun postChangePassword(token: String, oldPassword: String, newPassword: String): AuthApi.HttpReply =
         changeReply
+
+    override suspend fun postFirebaseToken(token: String): AuthApi.HttpReply {
+        firebaseCalls++
+        lastFirebaseToken = token
+        return firebaseReply
+    }
+
+    override suspend fun postRegisterFcm(token: String, fcmToken: String, deviceId: String, platform: String): AuthApi.HttpReply {
+        fcmCalls++
+        lastFcmSessionToken = token
+        lastFcmToken = fcmToken
+        lastFcmDeviceId = deviceId
+        lastFcmPlatform = platform
+        return fcmReply
+    }
 
     companion object {
         fun ok(body: JSONObject) = AuthApi.HttpReply(200, body, AuthApi.Transport.OK)
@@ -93,4 +122,33 @@ class FixedKeyAesGcmCipher(seed: Byte = 7) : SessionCipher {
     }
 
     override fun isDeviceBound(): Boolean = true
+}
+
+/**
+ * F4.2C — Fake do FirebaseBridge (JVM; sem SDK Firebase). Simula:
+ *  - `current`: uid do FirebaseUser ja restaurado pelo SDK (null = SDK sem usuario);
+ *  - `signInUid`: uid que o signInWithCustomToken devolvera (para provar UID valido/divergente);
+ *  - `throwOnSignIn`: falha do SDK (Custom Token rejeitado / erro de rede do Firebase).
+ * Registra chamadas/signOut/custom token visto (para provar que so vive em memoria e nunca vaza).
+ */
+class FakeFirebaseBridge(
+    var current: String? = null,
+    var signInUid: String? = null,
+    var throwOnSignIn: Boolean = false,
+) : FirebaseBridge {
+    var signInCalls = 0
+    var signOuts = 0
+    var lastCustomToken: String? = null
+
+    override suspend fun signInWithCustomToken(customToken: String): String {
+        signInCalls++
+        lastCustomToken = customToken
+        if (throwOnSignIn) throw RuntimeException("firebase_boom")
+        current = signInUid
+        return signInUid ?: throw IllegalStateException("firebase_no_user")
+    }
+
+    override fun currentUid(): String? = current
+
+    override fun signOut() { signOuts++; current = null }
 }

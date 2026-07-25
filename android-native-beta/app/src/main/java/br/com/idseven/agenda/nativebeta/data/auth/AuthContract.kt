@@ -35,6 +35,7 @@ enum class AuthError {
     INVALID_RESPONSE,      // corpo malformado / contrato quebrado
     UNAVAILABLE,           // indisponibilidade transitoria (nao derruba sessao valida)
     BAD_REQUEST,           // campos vazios antes de enviar
+    IDENTITY_MISMATCH,     // F4.2C — uid Firebase != uid da sessao (bloqueio total de seguranca)
 }
 
 /** Resultado de login: sucesso carrega token+expiracao+perfil; falha carrega SOMENTE o erro canonico. */
@@ -57,4 +58,25 @@ sealed class ChangePasswordOutcome {
     data object Success : ChangePasswordOutcome()
     data object Expired : ChangePasswordOutcome()
     data class Failure(val error: AuthError) : ChangePasswordOutcome()
+}
+
+/**
+ * F4.2C — Resultado de issueFirebaseAuthToken (endpoint oficial, Bearer da sessao). O Custom Token
+ * e EFEMERO: fica confinado no Success, so em memoria, consumido imediatamente pelo FirebaseBridge e
+ * NUNCA persistido/logado/enviado a analytics.
+ */
+sealed class FirebaseTokenOutcome {
+    data class Success(val customToken: String) : FirebaseTokenOutcome()
+    data object Expired : FirebaseTokenOutcome()                     // 401 → sessao vencida (limpar)
+    data class Blocked(val error: AuthError) : FirebaseTokenOutcome()   // 403 → usuario inativo
+    data class Unavailable(val error: AuthError) : FirebaseTokenOutcome()  // rede/timeout/5xx/dormant
+    data class Failure(val error: AuthError) : FirebaseTokenOutcome()      // corpo malformado
+}
+
+/** F4.2C — Resultado de registerFcmToken (substitui o write direto em users/{uid}.fcmTokens). */
+sealed class FcmRegisterOutcome {
+    data class Success(val count: Int) : FcmRegisterOutcome()
+    data object Expired : FcmRegisterOutcome()                        // 401 → sessao vencida
+    data class Unavailable(val error: AuthError) : FcmRegisterOutcome()   // rede/timeout/5xx
+    data class Failure(val error: AuthError) : FcmRegisterOutcome()
 }

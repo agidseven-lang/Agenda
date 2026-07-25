@@ -29,6 +29,8 @@ class AuthApiClient(
     private val loginUrl: String,
     private val selfUrl: String,
     private val changePasswordUrl: String,
+    private val firebaseTokenUrl: String,
+    private val registerFcmUrl: String,
 ) : AuthApi {
 
     override suspend fun postLogin(identifier: String, password: String): AuthApi.HttpReply {
@@ -42,6 +44,21 @@ class AuthApiClient(
     override suspend fun postChangePassword(token: String, oldPassword: String, newPassword: String): AuthApi.HttpReply {
         val payload = JSONObject().put("oldPassword", oldPassword).put("newPassword", newPassword)
         return post(changePasswordUrl, payload, token)
+    }
+
+    // F4.2C — issueFirebaseAuthToken: POST vazio; o uid do Custom Token vem SEMPRE da sessao no
+    // servidor (Bearer), nunca do corpo. A resposta e reduzida a status+JSONObject por post().
+    override suspend fun postFirebaseToken(token: String): AuthApi.HttpReply =
+        post(firebaseTokenUrl, JSONObject(), token)
+
+    // F4.2C — registerFcmToken: substitui o write direto em users/{uid}.fcmTokens. Campo do token
+    // do dispositivo = "token" (contrato do endpoint), com deviceId + platform. Bearer da sessao.
+    override suspend fun postRegisterFcm(token: String, fcmToken: String, deviceId: String, platform: String): AuthApi.HttpReply {
+        val payload = JSONObject()
+            .put("token", fcmToken)
+            .put("deviceId", deviceId)
+            .put("platform", platform)
+        return post(registerFcmUrl, payload, token)
     }
 
     private suspend fun post(url: String, payload: JSONObject, token: String?): AuthApi.HttpReply =

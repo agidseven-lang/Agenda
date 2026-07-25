@@ -1,25 +1,31 @@
 package br.com.idseven.agenda.nativebeta.core
 
 import android.content.Context
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import br.com.idseven.agenda.nativebeta.data.auth.ServerAuthRepository
+import br.com.idseven.agenda.nativebeta.data.session.SecureSessionStore
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.runBlocking
 
-// Notificações remotas (FCM). Quando o token rotaciona, atualiza users.fcmTokens no
-// Firestore (lendo o uid salvo no login) — assim o Worker de push sempre alcança este
-// aparelho, inclusive para o usuário RESPONSÁVEL pelo compromisso. Mensagens viram
-// notificação local do sistema (funciona com o app fechado).
+// Notificações remotas (FCM). Quando o token rotaciona, F4.2C registra o novo token pelo ENDPOINT
+// AUTENTICADO (registerFcmToken, Bearer da sessao real do Keystore) — substituindo o write direto em
+// users/{uid}.fcmTokens. O UID e derivado da sessao NO SERVIDOR (impossivel registrar para outro UID).
+// Assim o Worker de push alcança este aparelho, inclusive para o usuário RESPONSÁVEL pelo compromisso.
+// Mensagens viram notificação local do sistema (funciona com o app fechado).
 class AppFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         try {
             val prefs = getSharedPreferences("fcm", Context.MODE_PRIVATE)
             prefs.edit().putString("token", token).apply()
-            val uid = prefs.getString("uid", null)
-            if (!uid.isNullOrBlank()) {
-                FirebaseFirestore.getInstance().collection("users").document(uid)
-                    .update("fcmTokens", FieldValue.arrayUnion(token))
+            // onNewToken roda em thread de background do SDK FCM — pode bloquear ate concluir o
+            // registro. Sem sessao valida, adia (o proximo login/registro reenvia).
+            val sessionToken = SecureSessionStore(applicationContext).load()?.token
+            if (!sessionToken.isNullOrBlank()) {
+                val deviceId = Fcm.stableDeviceId(applicationContext)
+                runBlocking {
+                    ServerAuthRepository().registerFcmToken(sessionToken, token, deviceId, "android")
+                }
             }
         } catch (_: Throwable) { }
     }

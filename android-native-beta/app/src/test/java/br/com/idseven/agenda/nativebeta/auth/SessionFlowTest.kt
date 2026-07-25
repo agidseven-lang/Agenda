@@ -1,6 +1,7 @@
 package br.com.idseven.agenda.nativebeta.auth
 
 import br.com.idseven.agenda.nativebeta.data.auth.AuthUser
+import br.com.idseven.agenda.nativebeta.data.session.FirebaseSessionGate
 import br.com.idseven.agenda.nativebeta.data.session.SecureSession
 import br.com.idseven.agenda.nativebeta.data.session.SessionBootstrapper
 import br.com.idseven.agenda.nativebeta.data.session.SessionManager
@@ -26,9 +27,17 @@ class SessionFlowTest {
     private fun session(uid: String, token: String, exp: Long = future, status: String = "ativo") =
         SecureSession(uid, token, "sid-$uid", exp, AuthUser(id = uid, name = uid, role = "designer", status = status))
 
-    private fun manager(vault: FakeVault, api: FakeAuthApi, now: Long = System.currentTimeMillis()): SessionManager {
+    // F4.2C — bridge default alinhado a sessao existente: currentUid == uid do cofre, entao o
+    // gate resolve para Ok sem re-cunhar (preserva o comportamento dos testes de bootstrap da F4.2B).
+    private fun manager(
+        vault: FakeVault,
+        api: FakeAuthApi,
+        now: Long = System.currentTimeMillis(),
+        bridge: FakeFirebaseBridge = FakeFirebaseBridge(current = vault.current?.uid, signInUid = vault.current?.uid),
+    ): SessionManager {
         val repo = ServerAuthRepository(api)
-        return SessionManager(vault, repo, SessionBootstrapper(vault, repo) { now }) { now }
+        val gate = FirebaseSessionGate(repo, bridge)
+        return SessionManager(vault, repo, SessionBootstrapper(vault, repo) { now }, gate) { now }
     }
 
     // 16. bootstrap com sessao valida + getUserSelf OK → Authenticated e perfil atualizado.
@@ -107,38 +116,47 @@ class SessionFlowTest {
     }
 
     // 22. troca de usuario: login U2 sobre sessao U1 substitui integralmente a sessao.
+    // F4.2C: bridge assina Firebase como U2 (novo usuario) e o gate valida uid == U2 (sem vazamento).
     @Test
     fun t22_trocaDeUsuario() = runBlocking {
         val vault = FakeVault(session("U1", "tok-1"))
         val api = FakeAuthApi(FakeAuthApi.loginSuccess("U2", "Tatiana", "tok-2", 1_900_000_000L))
-        val mgr = manager(vault, api)
+        val bridge = FakeFirebaseBridge(current = null, signInUid = "U2")
+        val mgr = manager(vault, api, bridge = bridge)
         val err = mgr.login("tatiana@idseven.com", "senha")
         assertNull(err)
         assertEquals("U2", vault.current!!.uid)
         assertEquals("tok-2", vault.current!!.token)
+        assertEquals("FBT", bridge.lastCustomToken)  // custom token efemero usado
     }
 
     // 23. single-flight: enquanto um login esta em andamento, um segundo e ignorado (nao chama a API).
     @Test
     fun t23_singleFlight() = runBlocking {
-        val gate = CompletableDeferred<Unit>()
+        val barrier = CompletableDeferred<Unit>()
         val slowApi = object : br.com.idseven.agenda.nativebeta.data.auth.AuthApi {
             var calls = 0
             override suspend fun postLogin(identifier: String, password: String): br.com.idseven.agenda.nativebeta.data.auth.AuthApi.HttpReply {
-                calls++; gate.await(); return FakeAuthApi.loginSuccess("U1", "Owner", "tok", 1_900_000_000L)
+                calls++; barrier.await(); return FakeAuthApi.loginSuccess("U1", "Owner", "tok", 1_900_000_000L)
             }
             override suspend fun postSelf(token: String) = FakeAuthApi.http(200)
             override suspend fun postChangePassword(token: String, oldPassword: String, newPassword: String) = FakeAuthApi.http(200)
+            override suspend fun postFirebaseToken(token: String) =
+                FakeAuthApi.ok(org.json.JSONObject().put("ok", true).put("firebaseToken", "FBT"))
+            override suspend fun postRegisterFcm(token: String, fcmToken: String, deviceId: String, platform: String) =
+                FakeAuthApi.ok(org.json.JSONObject().put("ok", true).put("count", 1))
         }
         val vault = FakeVault()
         val mgr = manager(vault, FakeAuthApi(FakeAuthApi.http(500)))
-        val mgr2 = SessionManager(vault, ServerAuthRepository(slowApi), SessionBootstrapper(vault, ServerAuthRepository(slowApi)))
-        val job = launch { mgr2.login("a@b.c", "x") }   // entra e suspende em gate.await()
+        val repo2 = ServerAuthRepository(slowApi)
+        val fbGate = FirebaseSessionGate(repo2, FakeFirebaseBridge(current = null, signInUid = "U1"))
+        val mgr2 = SessionManager(vault, repo2, SessionBootstrapper(vault, repo2), fbGate)
+        val job = launch { mgr2.login("a@b.c", "x") }   // entra e suspende em barrier.await()
         while (slowApi.calls < 1) yield()
         val second = mgr2.login("a@b.c", "x")            // in-flight → ignorado, NAO chama a API
         assertNull(second)
         assertEquals(1, slowApi.calls)
-        gate.complete(Unit)
+        barrier.complete(Unit)
         job.join()
         assertEquals(1, slowApi.calls)
     }

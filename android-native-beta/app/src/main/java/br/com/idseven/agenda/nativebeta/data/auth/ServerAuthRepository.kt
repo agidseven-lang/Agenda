@@ -25,6 +25,8 @@ class ServerAuthRepository(
         loginUrl = BuildConfig.AUTH_LOGIN_URL,
         selfUrl = BuildConfig.AUTH_SELF_URL,
         changePasswordUrl = BuildConfig.AUTH_CHANGE_PASSWORD_URL,
+        firebaseTokenUrl = BuildConfig.AUTH_FIREBASE_TOKEN_URL,
+        registerFcmUrl = BuildConfig.AUTH_REGISTER_FCM_URL,
     ),
 ) {
     companion object {
@@ -103,6 +105,55 @@ class ServerAuthRepository(
         if (reply.status == 403) return SelfOutcome.Blocked(AuthError.FORBIDDEN)
         if (reply.status in 500..599) return SelfOutcome.Unavailable(AuthError.SERVER_ERROR)
         return SelfOutcome.Failure(AuthErrorMapper.mapAuthedFailure(reply))
+    }
+
+    /**
+     * F4.2C — issueFirebaseAuthToken. POST vazio + Bearer da sessao. Devolve o Custom Token EFEMERO
+     * (so em memoria). 401 => Expired (limpar sessao); 403 => Blocked/inativo; rede/5xx/dormant =>
+     * Unavailable (login novo trata como atomico; restore tolera). Espelha a estrutura de self().
+     */
+    suspend fun issueFirebaseAuthToken(token: String): FirebaseTokenOutcome {
+        val reply = api.postFirebaseToken(token)
+        when (reply.transport) {
+            AuthApi.Transport.NO_NETWORK -> return FirebaseTokenOutcome.Unavailable(AuthError.NO_NETWORK)
+            AuthApi.Transport.TIMEOUT -> return FirebaseTokenOutcome.Unavailable(AuthError.TIMEOUT)
+            AuthApi.Transport.SSL_OR_IO -> return FirebaseTokenOutcome.Unavailable(AuthError.UNAVAILABLE)
+            AuthApi.Transport.BAD_URL -> return FirebaseTokenOutcome.Unavailable(AuthError.UNAVAILABLE)
+            AuthApi.Transport.OK -> Unit
+        }
+        val j = reply.body
+        if (reply.status == 200 && j != null && j.optBoolean("ok", false)) {
+            val fbToken = j.optString("firebaseToken", "")
+            if (fbToken.isNotBlank()) return FirebaseTokenOutcome.Success(fbToken)
+            return FirebaseTokenOutcome.Failure(AuthError.INVALID_RESPONSE)
+        }
+        if (reply.status == 401) return FirebaseTokenOutcome.Expired
+        if (reply.status == 403) return FirebaseTokenOutcome.Blocked(AuthError.USER_DISABLED)
+        if (reply.status in 500..599) return FirebaseTokenOutcome.Unavailable(AuthError.SERVER_ERROR)
+        return FirebaseTokenOutcome.Failure(AuthErrorMapper.mapAuthedFailure(reply))
+    }
+
+    /**
+     * F4.2C — registerFcmToken. Substitui o write direto em users/{uid}.fcmTokens. POST
+     * {token,deviceId,platform} + Bearer. 401 => Expired; rede/5xx => Unavailable. O UID e derivado
+     * da sessao no servidor (impossivel registrar token para outro UID).
+     */
+    suspend fun registerFcmToken(token: String, fcmToken: String, deviceId: String, platform: String): FcmRegisterOutcome {
+        val reply = api.postRegisterFcm(token, fcmToken, deviceId, platform)
+        when (reply.transport) {
+            AuthApi.Transport.NO_NETWORK -> return FcmRegisterOutcome.Unavailable(AuthError.NO_NETWORK)
+            AuthApi.Transport.TIMEOUT -> return FcmRegisterOutcome.Unavailable(AuthError.TIMEOUT)
+            AuthApi.Transport.SSL_OR_IO -> return FcmRegisterOutcome.Unavailable(AuthError.UNAVAILABLE)
+            AuthApi.Transport.BAD_URL -> return FcmRegisterOutcome.Unavailable(AuthError.UNAVAILABLE)
+            AuthApi.Transport.OK -> Unit
+        }
+        val j = reply.body
+        if (reply.status == 200 && j != null && j.optBoolean("ok", false)) {
+            return FcmRegisterOutcome.Success(j.optInt("count", 0))
+        }
+        if (reply.status == 401) return FcmRegisterOutcome.Expired
+        if (reply.status in 500..599) return FcmRegisterOutcome.Unavailable(AuthError.SERVER_ERROR)
+        return FcmRegisterOutcome.Failure(AuthErrorMapper.mapAuthedFailure(reply))
     }
 
     /** changePassword (sessao autenticada; senha atual re-verificada NO SERVIDOR). */
