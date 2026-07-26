@@ -61,7 +61,8 @@ jobs:
           echo "SA ativa; projeto=${GCP_PROJECT}"
 
       - name: "PART 4 — confirmar projeto + database"
-        run: echo "projeto=${GCP_PROJECT}  database=(default)  collection=tasks  (mesmo alvo do Worker: FCM_PROJECT_ID=agenda-id-seven)"
+        run: |
+          echo "projeto=${GCP_PROJECT}  database=(default)  collection=tasks  (mesmo alvo do Worker; FCM_PROJECT_ID=agenda-id-seven)"
 
       - name: "PART 1 — Firestore runQuery READ-ONLY: o token existe em tasks? (só contagens)"
         run: |
