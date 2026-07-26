@@ -35,19 +35,24 @@ jobs:
           LINK: ${{ secrets.SHARE_PROBE_LINK }}
         run: |
           set -euo pipefail
-          [ -n "${LINK:-}" ] || { echo "::error::SHARE_PROBE_LINK ausente/vazio"; exit 1; }
-          echo "::add-mask::${LINK}"
-          TOK="$(printf '%s' "${LINK}" | sed -n 's#.*/cronograma/\([^/?#]*\).*#\1#p')"
-          [ -n "${TOK}" ] || { echo "::error::não extraí o token do link"; exit 1; }
-          echo "::add-mask::${TOK}"
-          LINK_SHA="$(printf '%s' "${LINK}" | sha256sum | cut -c1-16)"
-          {
-            echo "TOK=${TOK}"
-            echo "LINK_SHA=${LINK_SHA}"
-            echo "PORTAL_URL=https://aprovar.agendaidseven.com.br/cliente/cronograma/${TOK}"
-            echo "SHARE_URL=https://aprovar.agendaidseven.com.br/share/cronograma/${TOK}"
-          } >> "$GITHUB_ENV"
-          echo "Identificador do link (SHA-256[0:16]) = ${LINK_SHA}"
+          if [ -z "${LINK:-}" ]; then
+            echo "SHARE_PROBE_LINK ausente (owner removeu o secret) — consultas por TOKEN (Part 1) serão PULADAS; auditoria de coleções/rules/agregados (Parts 3/5/6) segue (não precisa do token)."
+            echo "SECRET_ABSENT=1" >> "$GITHUB_ENV"
+          else
+            echo "::add-mask::${LINK}"
+            TOK="$(printf '%s' "${LINK}" | sed -n 's#.*/cronograma/\([^/?#]*\).*#\1#p')"
+            [ -n "${TOK}" ] || { echo "::error::não extraí o token do link"; exit 1; }
+            echo "::add-mask::${TOK}"
+            LINK_SHA="$(printf '%s' "${LINK}" | sha256sum | cut -c1-16)"
+            {
+              echo "SECRET_ABSENT=0"
+              echo "TOK=${TOK}"
+              echo "LINK_SHA=${LINK_SHA}"
+              echo "PORTAL_URL=https://aprovar.agendaidseven.com.br/cliente/cronograma/${TOK}"
+              echo "SHARE_URL=https://aprovar.agendaidseven.com.br/share/cronograma/${TOK}"
+            } >> "$GITHUB_ENV"
+            echo "Identificador do link (SHA-256[0:16]) = ${LINK_SHA}"
+          fi
 
       - name: "Auth gcloud (uso READ-ONLY do SA)"
         env:
@@ -67,6 +72,7 @@ jobs:
       - name: "PART 1 — Firestore runQuery READ-ONLY: o token existe em tasks? (só contagens)"
         run: |
           set +e
+          if [ "${SECRET_ABSENT:-0}" = "1" ]; then echo "PART 1 PULADA — secret SHARE_PROBE_LINK removido pelo owner (consulta por token indisponível; já provado em F3.5.1C: 0 docs)."; exit 0; fi
           AT="$(gcloud auth print-access-token 2>/dev/null)"
           [ -n "$AT" ] || { echo "::warning::sem access token"; }
           URL="https://firestore.googleapis.com/v1/projects/${GCP_PROJECT}/databases/(default)/documents:runQuery"
