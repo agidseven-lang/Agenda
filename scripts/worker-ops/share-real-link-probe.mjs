@@ -30,7 +30,26 @@ const UAS = {
 const HDRS = ['content-type','cache-control','cf-cache-status','age','vary','x-share-task','x-share-type','x-share-cache','x-id7-worker-build','server-timing','location'];
 const OGF  = ['og:url','og:image','og:title','og:description','twitter:card'];
 const sha12 = s => crypto.createHash('sha256').update(String(s)).digest('hex').slice(0,12);
+const sha16 = s => crypto.createHash('sha256').update(String(s)).digest('hex').slice(0,16);
 const ask = q => { const rl = readline.createInterface({ input: process.stdin, output: process.stdout }); return new Promise(r => rl.question(q, a => { rl.close(); r(a.trim()); })); };
+
+// Dimensões REAIS do JPEG (marcador SOF) — valida a og:image que o Meta baixa (Cenário D).
+function jpegDims(buf){
+  try{
+    if (buf.length < 4 || buf[0] !== 0xFF || buf[1] !== 0xD8) return null;   // SOI
+    let i = 2; const n = buf.length;
+    while (i + 9 < n){
+      if (buf[i] !== 0xFF){ i++; continue; }
+      const mk = buf[i+1];
+      if ((mk>=0xC0&&mk<=0xC3)||(mk>=0xC5&&mk<=0xC7)||(mk>=0xC9&&mk<=0xCB)||(mk>=0xCD&&mk<=0xCF)){
+        return { h: (buf[i+5]<<8)|buf[i+6], w: (buf[i+7]<<8)|buf[i+8] };
+      }
+      if (mk===0xD8||mk===0xD9||(mk>=0xD0&&mk<=0xD7)){ i += 2; continue; }
+      const len = (buf[i+2]<<8)|buf[i+3]; if (len < 2) return null; i += 2 + len;
+    }
+  }catch(_){ /* ignore */ }
+  return null;
+}
 
 function parseOG(body){
   const o = {};
@@ -82,7 +101,7 @@ function printRow(r){
   const bogus = origin + '/share/cronograma/' + 'deadbeefcafe0011deadbeefcafe0011deadbeefcafe0011';
 
   console.log('F3.5.1B — sonda do link real (token mascarado como TKN#' + H + ')');
-  console.log('origin=' + origin + '  token.sha256[0:12]=' + H + '  (o token NUNCA é impresso)');
+  console.log('link.sha256[0:16]=' + sha16(link) + '  origin=' + origin + '  token.sha256[0:12]=' + H + '  (link/token NUNCA são impressos)');
 
   console.log('\n===== A) GET por UA × variante de query (og:url / headers / cache) =====');
   const resolvedRows = [];
@@ -109,8 +128,11 @@ function printRow(r){
   try{
     const ir = await fetch(imgUrl, { method: 'GET', headers: { 'user-agent': UAS.facebook } });
     const buf = Buffer.from(await ir.arrayBuffer());
+    const dim = jpegDims(buf);
     console.log('• og:image=' + mask(imgUrl));
-    console.log('      status=' + ir.status + '  content-type=' + ir.headers.get('content-type') + '  content-length=' + (ir.headers.get('content-length') || buf.length) + '  cf-cache=' + (ir.headers.get('cf-cache-status')||'-') + '  bytes-lidos=' + buf.length);
+    console.log('      status=' + ir.status + '  content-type=' + ir.headers.get('content-type') + '  content-length=' + (ir.headers.get('content-length') || buf.length) + '  cf-cache=' + (ir.headers.get('cf-cache-status')||'-') + '  bytes-lidos=' + buf.length + '  dimensoes=' + (dim ? (dim.w + 'x' + dim.h) : '(nao-JPEG/indeterminado)'));
+    const okImg = ir.status === 200 && /image\/jpeg/i.test(ir.headers.get('content-type')||'') && dim && dim.w === 1200 && dim.h === 630;
+    console.log('      imagem_valida_para_meta=' + (okImg ? 'SIM (200 image/jpeg 1200x630)' : 'NAO — investigar CENÁRIO D'));
   }catch(e){ console.log('• og:image fetch ERRO: ' + String(e && e.message || e)); }
 
   console.log('\n===== VEREDITO (indicativo — decisão final é sua) =====');

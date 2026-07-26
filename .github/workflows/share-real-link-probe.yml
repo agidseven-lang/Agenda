@@ -1,0 +1,65 @@
+# =====================================================================
+# [manual] F3.5.1B — SONDA READ-ONLY DO LINK REAL (token-safe, runner)
+# ---------------------------------------------------------------------
+# Executa a sonda de diagnóstico do LINK REAL (secret SHARE_PROBE_LINK) a partir de um runner
+# com egress aberto. ESTRITAMENTE READ-ONLY: só GET/HEAD ao host de preview + leitura da og:image.
+# NÃO faz escrita/deploy/build/publicação; NÃO toca Firestore/Worker/releases/Android/Rules.
+# SEGURANÇA: mascara o secret e o token com ::add-mask:: ANTES de qualquer uso; identifica o link
+# só por SHA-256 truncado; NUNCA imprime URL completo/token; NÃO gera artifact; NÃO grava body.
+# Autorizada pelo owner (secret configurado + literal PROBE-REAL-LINK). PARA após o diagnóstico.
+# =====================================================================
+name: "[manual] F3.5.1B Share Real-Link Probe (read-only, token-safe)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Digite PROBE-REAL-LINK para autorizar a sonda read-only"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Gate — confirmação literal"
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          set -euo pipefail
+          [ "${CONFIRM}" = "PROBE-REAL-LINK" ] || { echo "::error::confirmação inválida — nada executado"; exit 1; }
+          echo "OK: confirmação válida"
+
+      - name: "Mascarar secret + token IMEDIATAMENTE + derivar identificador (hash)"
+        env:
+          LINK: ${{ secrets.SHARE_PROBE_LINK }}
+        run: |
+          set -euo pipefail
+          [ -n "${LINK:-}" ] || { echo "::error::SHARE_PROBE_LINK ausente/vazio"; exit 1; }
+          # 1) mascara o link inteiro em TODA a saída subsequente do job
+          echo "::add-mask::${LINK}"
+          # 2) extrai o token (último segmento após /cronograma/) e mascara também
+          TOK="$(printf '%s' "${LINK}" | sed -n 's#.*/cronograma/\([^/?#]*\).*#\1#p')"
+          if [ -n "${TOK}" ]; then echo "::add-mask::${TOK}"; fi
+          # 3) identificador PÚBLICO do link = SHA-256 truncado (nunca o link em si)
+          LINK_SHA="$(printf '%s' "${LINK}" | sha256sum | cut -c1-16)"
+          echo "Identificador do link (SHA-256[0:16]) = ${LINK_SHA}"
+
+      - name: "Checkout do script da sonda (feature branch, sem credenciais)"
+        uses: actions/checkout@v4
+        with:
+          ref: desktop/f351-whatsapp-premium-card-recovery
+          persist-credentials: false
+
+      - name: "Setup Node 20"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "Sonda read-only (GET/HEAD; UAs normal/WhatsApp/facebookexternalhit; mascarada)"
+        env:
+          SHARE_LINK: ${{ secrets.SHARE_PROBE_LINK }}
+        run: node scripts/worker-ops/share-real-link-probe.mjs
