@@ -1,0 +1,253 @@
+# =====================================================================
+# [manual] F4.2F — Desktop Build (ESTAVEL 1.0.185 — Firebase Auth SILENCIOSO; PRIVADO, sem publicar)
+# ---------------------------------------------------------------------
+# Build OFICIAL do candidato ESTAVEL 1.0.185 (F4.2F — bridge de Firebase Auth SILENCIOSO ADITIVO;
+# base OFICIAL 1.0.184 @03c5893; login/UI/telas/SLA/notificacoes/updater INTOCADOS). Produz EXE +
+# MSI + latest.yml + blockmap + SHA256SUMS + SBOM; artifacts PRIVADOS. `--publish never`: o CI
+# NUNCA publica; NAO cria release/tag/Latest. Esta e a PROPRIA build final da 1.0.185: apos os gates
+# verdes, os MESMOS bytes/hashes serao publicados SEM rebuild (release gated, literal
+# PUBLICAR-DESKTOP-1.0.185-STABLE). Gates fail-closed (todos verdes obrigatorio):
+#   - F4.2F region-invariance vs 1.0.184 @03c5893 (so a allow-list F4.2F muda; SLA/notif/updater/
+#     main TS/Worker/Android/Functions/Rules/portal byte-identicos);
+#   - F4.2F bridge 30/30 (login preservado, ciclo do Custom Token, uid, fail-open x fail-closed,
+#     backoff sem loop, bootstrap/logout, token nunca persistido/logado, Firestore autenticado);
+#   - PRESERVACAO: SLA Golden Master + fluxo + temporal + entrega visual imediata + harness
+#     independente + updater state-machine + notifier + delivery-channel + auth-core hermetico;
+#   - prova-de-versao (package.json empacotado == 1.0.185) + renderer EMPACOTADO == fonte do commit;
+#   - firebaseAuthBridge.js + firebase-auth-compat empacotados (bridge presente no app);
+#   - flags do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade=false);
+#   - identidade Windows (AppUserModelId/appId/close-to-tray); Authenticode (NotSigned em paridade);
+#   - metadata (latest.yml 1.0.185 + blockmap + app-update.yml sem segredo) + SBOM + hashes SHA-256.
+# NAO publica; NAO toca Worker/Firebase/Firestore/Rules/Functions/Android/portal. Execucao SO manual.
+# =====================================================================
+name: "[manual] F4.2F Desktop Build (stable candidate 1.0.185 — silent Firebase Auth)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch/commit a buildar (F4.2F)"
+        required: true
+        default: "desktop/f42f-silent-firebase-auth-prod-bridge"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: "desktop"
+      BASE_184_SHA: "03c5893f7c5baf810032bd2a922522a77c1b4680" # Desktop 1.0.184 OFICIAL (tag v1.0.184)
+    steps:
+      - name: Checkout (ref escolhido; history completo p/ region-invariance)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Derivar versao (package.json e a fonte unica) — exige 1.0.185 exato, sem sufixo
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.185" ] || { echo "::error:: versao != 1.0.185 (candidato ESTAVEL F4.2F exige a versao exata, sem beta/canary/RC/QA)"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido ($APP_VERSION)"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci (instalacao limpa e reproduzivel)
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + renderer)
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run build
+
+      - name: Lint (tsc --noEmit — verificacao de tipos estrita, inclui auth-core/auth F4.2F)
+        working-directory: ${{ env.APP_DIR }}
+        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
+
+      # ---------- GATES F4.2F (fail-closed) ----------
+      - name: Gate F4.2F region-invariance (so allow-list F4.2F muda vs 1.0.184 @03c5893)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f42f-region-invariance.test.mjs
+      - name: Gate F4.2F bridge de Firebase Auth silencioso (30/30)
+        working-directory: ${{ env.APP_DIR }}
+        run: node scripts/f42f-firebase-auth-bridge.test.mjs
+
+      # ---------- GATES DE PRESERVACAO (comportamento 1.0.184 inalterado) ----------
+      - name: Gate PRESERVACAO — SLA/fluxo/temporal/entrega-visual/updater/notifier/auth-core
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          for t in f3356-auth-core \
+                   f343-sla-golden-master f344-flow-golden-master f345-sla-timestamp-golden-master \
+                   f344-repeated-move-contract f343-delivery-channel f343-preservation \
+                   f341a-updater-state-machine f347-immediate-visual-delivery f347-independent-behavior \
+                   f33E-main-notifier f33D-background-notif f33F-bg-notify f33C-assignment-toast \
+                   f343-assignment-transition f343-operational-block f3377a-r3-single-producer-clock \
+                   f3377a-r4b-http-date-clock f3311-baseline-freeze; do
+            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate de preservacao $t vermelho"; exit 1; }
+          done
+
+      - name: electron-builder (NSIS + MSI + metadata do MESMO build; --publish never)
+        working-directory: ${{ env.APP_DIR }}
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          test -f "dist-installer/win-unpacked/resources/icon.png" || { echo "::error:: resources/icon.png AUSENTE no pacote"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (asar == 1.0.185) + renderer + firebaseAuthBridge.js EMPACOTADOS == fonte
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"
+          test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"
+          npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")' P="$EXDIR/package.json")
+          [ "$PKGV" = "1.0.185" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.185"; exit 1; }
+          # renderer + bridge empacotados == fonte do commit (byte-identico, LF)
+          for rel in src/renderer/index.html src/renderer/firebaseAuthBridge.js; do
+            EX="$EXDIR/$rel"; test -f "$EX" || { echo "::error:: $rel ausente no asar"; exit 1; }
+            git show ${GITHUB_SHA}:desktop/$rel > "$RUNNER_TEMP/src.tmp"
+            EX="$EX" SRC="$RUNNER_TEMP/src.tmp" node -e '
+              const fs=require("fs"); const nrm=s=>String(s).replace(/\r\n/g,"\n");
+              if(nrm(fs.readFileSync(process.env.EX,"utf8"))!==nrm(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.EX+" EMPACOTADO != fonte do commit");process.exit(1);}'
+            echo "  $rel EMPACOTADO == fonte (byte-identico)"
+          done
+          # bridge realmente cableado no renderer + Firebase Auth compat presente
+          grep -q 'firebase-auth-compat.js' "$EXDIR/src/renderer/index.html" || { echo "::error:: firebase-auth-compat ausente no renderer empacotado"; exit 1; }
+          grep -q 'src="firebaseAuthBridge.js"' "$EXDIR/src/renderer/index.html" || { echo "::error:: firebaseAuthBridge.js nao referenciado no renderer"; exit 1; }
+          grep -q 'signInWithCustomToken' "$EXDIR/src/renderer/index.html" || { echo "::error:: signInWithCustomToken ausente"; exit 1; }
+          # IPC de token no main empacotado (bridge server-side)
+          grep -q 'auth-firebase-token' "$EXDIR/dist/main/auth.js" || { echo "::error:: IPC auth-firebase-token ausente no main empacotado"; exit 1; }
+          echo "GATE prova-de-versao 1.0.185 + renderer/bridge==fonte + Firebase Auth cableado OK."
+
+      - name: Gate FLAGS do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade=false)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          US="$RUNNER_TEMP/asarx/dist/main/updaterService.js"
+          test -f "$US" || { echo "::error:: updaterService.js ausente no app.asar"; exit 1; }
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowPrerelease != false"; exit 1; }
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" || { echo "::error:: channel != latest"; exit 1; }
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowDowngrade != false"; exit 1; }
+          if grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"canary"' "$US"; then echo "::error:: channel=canary no build ESTAVEL"; exit 1; fi
+          echo "GATE flags do updater no app.asar OK (stable/latest)."
+
+      - name: Gate identidade Windows (AppUserModelId + appId + close-to-tray)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          MAINJS="$RUNNER_TEMP/asarx/dist/main/main.js"
+          grep -q 'br.com.idseven.agenda.desktop' "$MAINJS" || { echo "::error:: AppUserModelId ausente"; exit 1; }
+          grep -q 'setAppUserModelId' "$MAINJS" || { echo "::error:: setAppUserModelId ausente"; exit 1; }
+          grep -q 'preventDefault' "$MAINJS" || { echo "::error:: close-to-tray ausente"; exit 1; }
+          grep -q 'appId: br.com.idseven.agenda.desktop' electron-builder.yml || { echo "::error:: appId divergente"; exit 1; }
+          echo "GATE identidade Windows OK."
+
+      - name: Inspecao de ASSINATURA Authenticode (paridade 1.0.184 — registra o estado)
+        shell: pwsh
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          $exe = (Get-ChildItem dist-installer -Filter 'Agenda-ID-Seven-Desktop-*-x64.exe' | Select-Object -First 1).FullName
+          $sig = Get-AuthenticodeSignature $exe
+          "EXE: $exe"; "AuthenticodeStatus: $($sig.Status)"
+          if ($sig.Status -ne 'Valid' -and $sig.Status -ne 'NotSigned') { Write-Error "Status de assinatura inesperado: $($sig.Status)"; exit 1 }
+          "PARIDADE 1.0.184: mesmo processo (sem cert -> NotSigned)."
+
+      - name: Gate metadata de update (latest.yml 1.0.185 + blockmap + app-update.yml sem segredo)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          LY="dist-installer/latest.yml"
+          test -f "$LY" || { echo "::error:: latest.yml NAO gerado (channel != latest?)"; ls -la dist-installer || true; exit 1; }
+          if [ -f "dist-installer/canary.yml" ]; then echo "::error:: canary.yml gerado — canal ambiguo"; exit 1; fi
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap 2>/dev/null | head -1)
+          test -n "$BM" || { echo "::error:: <exe>.blockmap NAO gerado"; exit 1; }
+          AU="dist-installer/win-unpacked/resources/app-update.yml"
+          test -f "$AU" || { echo "::error:: app-update.yml NAO empacotado"; exit 1; }
+          EXE_PATH=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); EXE_NAME=$(basename "$EXE_PATH")
+          grep -q "version: $APP_VERSION" "$LY" || { echo "::error:: latest.yml version != $APP_VERSION"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "$LY" || { echo "::error:: latest.yml path != $EXE_NAME"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "$LY" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "$EXE_PATH" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error:: sha512 do latest.yml != EXE"; exit 1; }
+          grep -q "provider: github" "$AU" && grep -q "owner: agidseven-lang" "$AU" && grep -q "repo: Agenda" "$AU" || { echo "::error:: app-update.yml provider/owner/repo divergente"; exit 1; }
+          if grep -qiE '(token|secret|password|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml com possivel segredo"; exit 1; fi
+          echo "GATE metadata OK: latest.yml 1.0.185 + app-update.yml github SEM segredo; canary.yml AUSENTE."
+
+      - name: SBOM (CycloneDX via npm sbom) + fallback npm ls
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set +e
+          npm sbom --sbom-format cyclonedx --omit dev > "$RUNNER_TEMP/sbom-cyclonedx.json" 2>/dev/null
+          if [ ! -s "$RUNNER_TEMP/sbom-cyclonedx.json" ]; then
+            npm ls --all --json > "$RUNNER_TEMP/sbom-cyclonedx.json" 2>/dev/null || echo '{}' > "$RUNNER_TEMP/sbom-cyclonedx.json"
+          fi
+          wc -c "$RUNNER_TEMP/sbom-cyclonedx.json"
+
+      - name: Empacotar bundle (instalador + metadata + SBOM + hashes)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"
+          cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "channel     : latest"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA"
+            echo "baseline    : Desktop 1.0.184 OFICIAL @ $BASE_184_SHA (region-invariance F4.2F)"
+            echo "origem      : F4.2F — Firebase Auth SILENCIOSO aditivo (ENABLED=true/REQUIRED=false); login/UI/SLA/notif/updater intocados"
+            echo "assinatura  : mesmo processo da 1.0.184 (sem code-signing -> NotSigned)"
+            echo "distribuicao: PRIVADA (candidato estavel; publicacao SO via release gated apos literal PUBLICAR-DESKTOP-1.0.185-STABLE)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload installer (artifact PRIVADO)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.185-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload metadata + SBOM + hashes (artifact PRIVADO)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.185-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
