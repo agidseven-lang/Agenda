@@ -119,9 +119,18 @@ jobs:
           withUrl="$(printf '%s' "$json" | jq '[.[]|select((.document.fields.clientReviewUrl.stringValue // "")|length>0)]|length' 2>/dev/null)"
           urlNoToken="$(printf '%s' "$json" | jq '[.[]|select(((.document.fields.clientReviewUrl.stringValue // "")|length>0) and ((.document.fields.clientReviewToken.stringValue // "")|length<=3))]|length' 2>/dev/null)"
           tokenNoUrl="$(printf '%s' "$json" | jq '[.[]|select(((.document.fields.clientReviewToken.stringValue // "")|length>3) and ((.document.fields.clientReviewUrl.stringValue // "")|length==0))]|length' 2>/dev/null)"
-          echo "  amostradas=${sampled:-?}  com_clientReviewToken=${withToken:-?}  com_clientReviewUrl=${withUrl:-?}"
-          echo "  ANOMALIA url_SEM_token=${urlNoToken:-?}   token_SEM_url=${tokenNoUrl:-?}"
-          echo "  (url_SEM_token>0 => escrita PARCIAL/perda de token = falha sistêmica de persistência; =0 => integridade OK, link órfão é pontual)"
+          echo "  [RECENTE orderBy createdAt] amostradas=${sampled:-?}  com_clientReviewToken=${withToken:-?}  com_clientReviewUrl=${withUrl:-?}  url_SEM_token=${urlNoToken:-?}  token_SEM_url=${tokenNoUrl:-?}"
+          # amostra AMPLA (sem orderBy; ordem por __name__) — taxa GERAL de tokens persistidos na coleção
+          bbody='{"structuredQuery":{"from":[{"collectionId":"tasks"}],"limit":300}}'
+          bresp="$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer ${AT}" -H "Content-Type: application/json" -X POST "$URL" -d "$bbody")"
+          bcode="$(printf '%s' "$bresp" | tail -n1)"; bjson="$(printf '%s' "$bresp" | sed '$d')"
+          btot="$(printf '%s' "$bjson" | jq '[.[]|select(.document)]|length' 2>/dev/null)"
+          btok="$(printf '%s' "$bjson" | jq '[.[]|select((.document.fields.clientReviewToken.stringValue // "")|length>3)]|length' 2>/dev/null)"
+          burl="$(printf '%s' "$bjson" | jq '[.[]|select((.document.fields.clientReviewUrl.stringValue // "")|length>0)]|length' 2>/dev/null)"
+          bshare="$(printf '%s' "$bjson" | jq '[.[]|select((.document.fields.shareToken.stringValue // "")|length>3)]|length' 2>/dev/null)"
+          banom="$(printf '%s' "$bjson" | jq '[.[]|select(((.document.fields.clientReviewUrl.stringValue // "")|length>0) and ((.document.fields.clientReviewToken.stringValue // "")|length<=3))]|length' 2>/dev/null)"
+          echo "  [AMPLA sem orderBy] http=${bcode} amostradas=${btot:-?}  com_clientReviewToken=${btok:-?}  com_clientReviewUrl=${burl:-?}  com_shareToken_legado=${bshare:-?}  url_SEM_token=${banom:-?}"
+          echo "  (AMPLA com_token>0 => persistência FUNCIONA p/ parte das tarefas => órfão pontual; AMPLA com_token=0 => nenhuma tarefa tem token = falha sistêmica OU tokens vivem em campo/rota diferente)"
 
       - name: "Cleanup (always) — remover credenciais/temporários"
         if: always()
