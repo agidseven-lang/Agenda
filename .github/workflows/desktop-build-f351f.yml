@@ -36,7 +36,7 @@ jobs:
         shell: bash
     env:
       APP_DIR: "desktop"
-      CAND_SHA: "95b540bb7620a8caf6b24754b272bb28496e1b1c" # candidato 1.0.186 (roll-forward; pin imutavel)
+      CAND_SHA: "e87ef4b59c4edc6c6fd6249fd7f4ac07b6413048" # candidato 1.0.186 (roll-forward; pin imutavel)
       BASE_184_SHA: "03c5893f7c5baf810032bd2a922522a77c1b4680" # Desktop 1.0.184 OFICIAL (tag v1.0.184)
     steps:
       - name: Forcar LF no checkout (Windows core.autocrlf=true quebraria harness LF-based)
@@ -48,7 +48,7 @@ jobs:
       - name: Checkout (SHA EXATO do candidato PINADO; history completo p/ baseline 1.0.184)
         uses: actions/checkout@v4
         with:
-          ref: "95b540bb7620a8caf6b24754b272bb28496e1b1c"
+          ref: "e87ef4b59c4edc6c6fd6249fd7f4ac07b6413048"
           fetch-depth: 0
 
       - name: Gate LINE ENDINGS LF (aborta se arquivo-chave estiver CRLF no worktree)
