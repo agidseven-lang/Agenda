@@ -1,0 +1,108 @@
+# =====================================================================
+# [manual] F3.5.1C — TOKEN PERSISTENCE ROOT-CAUSE (READ-ONLY, token-safe)
+# ---------------------------------------------------------------------
+# Descobre por que o token do link real (SHARE_PROBE_LINK) não existe no Firestore. ESTRITAMENTE
+# READ-ONLY: Firestore runQuery (leitura) + Firebase Rules GET (leitura). NÃO escreve, NÃO faz
+# deploy/build/publish, NÃO altera Worker/Rules/dados. Mascara secret+token com ::add-mask:: antes
+# de qualquer uso; identifica o link só por SHA-256 truncado; NUNCA imprime link/token/URL completos,
+# taskId, nome do cliente ou conteúdo do Cronograma — SÓ contagens/estado. Sem artifact. SA de
+# leitura = secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON (projeto agenda-id-seven). Limpa temporários
+# em always(). Trigger por branch throwaway run-token-audit (tags são bloqueadas p/ push).
+# =====================================================================
+name: "[manual] F3.5.1C Token Persistence Root-Cause (read-only)"
+
+"on":
+  push:
+    branches:
+      - "run-token-audit"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT: "agenda-id-seven"
+    steps:
+      - name: "Gate — branch throwaway"
+        run: |
+          set -euo pipefail
+          case "${{ github.ref }}" in refs/heads/run-token-audit) echo "OK";; *) echo "::error::trigger inesperado (${{ github.ref }})"; exit 1;; esac
+
+      - name: "Mascarar secret+token IMEDIATAMENTE + derivar identificadores"
+        env:
+          LINK: ${{ secrets.SHARE_PROBE_LINK }}
+        run: |
+          set -euo pipefail
+          [ -n "${LINK:-}" ] || { echo "::error::SHARE_PROBE_LINK ausente/vazio"; exit 1; }
+          echo "::add-mask::${LINK}"
+          TOK="$(printf '%s' "${LINK}" | sed -n 's#.*/cronograma/\([^/?#]*\).*#\1#p')"
+          [ -n "${TOK}" ] || { echo "::error::não extraí o token do link"; exit 1; }
+          echo "::add-mask::${TOK}"
+          LINK_SHA="$(printf '%s' "${LINK}" | sha256sum | cut -c1-16)"
+          {
+            echo "TOK=${TOK}"
+            echo "LINK_SHA=${LINK_SHA}"
+            echo "PORTAL_URL=https://aprovar.agendaidseven.com.br/cliente/cronograma/${TOK}"
+            echo "SHARE_URL=https://aprovar.agendaidseven.com.br/share/cronograma/${TOK}"
+          } >> "$GITHUB_ENV"
+          echo "Identificador do link (SHA-256[0:16]) = ${LINK_SHA}"
+
+      - name: "Auth gcloud (uso READ-ONLY do SA)"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -euo pipefail
+          [ -n "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ] || { echo "::error::GOOGLE_APPLICATION_CREDENTIALS_JSON ausente."; exit 1; }
+          printf '%s' "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null 2>&1
+          gcloud config set project "$GCP_PROJECT" >/dev/null 2>&1
+          echo "SA ativa; projeto=${GCP_PROJECT}"
+
+      - name: "PART 4 — confirmar projeto + database"
+        run: echo "projeto=${GCP_PROJECT}  database=(default)  collection=tasks  (mesmo alvo do Worker: FCM_PROJECT_ID=agenda-id-seven)"
+
+      - name: "PART 1 — Firestore runQuery READ-ONLY: o token existe em tasks? (só contagens)"
+        run: |
+          set +e
+          AT="$(gcloud auth print-access-token 2>/dev/null)"
+          [ -n "$AT" ] || { echo "::warning::sem access token"; }
+          URL="https://firestore.googleapis.com/v1/projects/${GCP_PROJECT}/databases/(default)/documents:runQuery"
+          q() {
+            field="$1"; val="$2"
+            body="{\"structuredQuery\":{\"from\":[{\"collectionId\":\"tasks\"}],\"where\":{\"fieldFilter\":{\"field\":{\"fieldPath\":\"${field}\"},\"op\":\"EQUAL\",\"value\":{\"stringValue\":\"${val}\"}}},\"limit\":1}}"
+            resp="$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer ${AT}" -H "Content-Type: application/json" -X POST "$URL" -d "$body")"
+            code="$(printf '%s' "$resp" | tail -n1)"
+            json="$(printf '%s' "$resp" | sed '$d')"
+            found="$(printf '%s' "$json" | jq '[.[]|select(.document)]|length' 2>/dev/null)"
+            [ -n "$found" ] || found="?"
+            err="$(printf '%s' "$json" | jq -r '.error.status // empty' 2>/dev/null)"
+            echo "  campo=${field}  http=${code}  docs_encontrados=${found}  ${err:+erro=$err}"
+          }
+          echo "link.sha256[0:16]=${LINK_SHA}  collection=tasks  (valores de consulta mascarados)"
+          echo "----- consulta por campo -----"
+          q "clientReviewToken" "$TOK"
+          q "shareToken" "$TOK"
+          q "clientReviewUrl" "$PORTAL_URL"
+          echo "----- veredito Part 1 -----"
+          echo "docs_encontrados=0 em TODOS os campos + http=200 => token AUSENTE no Firestore server-side."
+          echo "http=403/401 => SA sem permissão de leitura (Part 1 inconclusiva; precisa datastore.viewer)."
+
+      - name: "PART 3 — Firebase Rules VIVAS (read-only): autorização de write em tasks/{taskId}"
+        run: |
+          set -e
+          AT="$(gcloud auth print-access-token 2>/dev/null)"
+          REL="$(curl -fsSL -H "Authorization: Bearer ${AT}" "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" 2>/dev/null || true)"
+          RULESET="$(printf '%s' "$REL" | jq -r '.rulesetName // empty' 2>/dev/null)"
+          if [ -z "$RULESET" ]; then echo "::warning::não obtive rulesetName (SA sem firebaserules.viewer?); Part 3 inconclusiva."; exit 0; fi
+          curl -fsSL -H "Authorization: Bearer ${AT}" "https://firebaserules.googleapis.com/v1/${RULESET}" | jq -r '.source.files[0].content' > /tmp/rules.txt || true
+          echo "rules vivas: $(wc -l < /tmp/rules.txt) linhas  (ruleset confirmado)"
+          echo "===== match blocks + allow + auth (LÓGICA das Rules; sem dados de cliente) ====="
+          grep -nE 'match |allow (read|write|update|create|list|get|delete)|request\.auth|isSigned|signedIn|hasRole|role|claim|resource\.data|request\.resource' /tmp/rules.txt | head -80
+          echo "===== bloco literal em torno de /tasks ====="
+          grep -nE -A3 -B1 'tasks' /tmp/rules.txt | head -60
+
+      - name: "Cleanup (always) — remover credenciais/temporários"
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" /tmp/rules.txt 2>/dev/null || true
