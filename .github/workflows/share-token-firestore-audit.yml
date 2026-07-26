@@ -104,6 +104,25 @@ jobs:
           echo "===== bloco literal em torno de /tasks ====="
           grep -nE -A3 -B1 'tasks' /tmp/rules.txt | head -60
 
+      - name: "PART 5 — integridade agregada: tarefas COMPARTILHADAS mantêm o token? (só contagens)"
+        run: |
+          set +e
+          AT="$(gcloud auth print-access-token 2>/dev/null)"
+          URL="https://firestore.googleapis.com/v1/projects/${GCP_PROJECT}/databases/(default)/documents:runQuery"
+          body='{"structuredQuery":{"from":[{"collectionId":"tasks"}],"orderBy":[{"field":{"fieldPath":"createdAt"},"direction":"DESCENDING"}],"limit":150}}'
+          resp="$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer ${AT}" -H "Content-Type: application/json" -X POST "$URL" -d "$body")"
+          code="$(printf '%s' "$resp" | tail -n1)"; json="$(printf '%s' "$resp" | sed '$d')"
+          if [ "$code" != "200" ]; then echo "  http=${code} (sem orderBy? tentando amostra simples)"; body='{"structuredQuery":{"from":[{"collectionId":"tasks"}],"limit":150}}'; resp="$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer ${AT}" -H "Content-Type: application/json" -X POST "$URL" -d "$body")"; code="$(printf '%s' "$resp" | tail -n1)"; json="$(printf '%s' "$resp" | sed '$d')"; fi
+          echo "  http=${code}"
+          sampled="$(printf '%s' "$json" | jq '[.[]|select(.document)]|length' 2>/dev/null)"
+          withToken="$(printf '%s' "$json" | jq '[.[]|select((.document.fields.clientReviewToken.stringValue // "")|length>3)]|length' 2>/dev/null)"
+          withUrl="$(printf '%s' "$json" | jq '[.[]|select((.document.fields.clientReviewUrl.stringValue // "")|length>0)]|length' 2>/dev/null)"
+          urlNoToken="$(printf '%s' "$json" | jq '[.[]|select(((.document.fields.clientReviewUrl.stringValue // "")|length>0) and ((.document.fields.clientReviewToken.stringValue // "")|length<=3))]|length' 2>/dev/null)"
+          tokenNoUrl="$(printf '%s' "$json" | jq '[.[]|select(((.document.fields.clientReviewToken.stringValue // "")|length>3) and ((.document.fields.clientReviewUrl.stringValue // "")|length==0))]|length' 2>/dev/null)"
+          echo "  amostradas=${sampled:-?}  com_clientReviewToken=${withToken:-?}  com_clientReviewUrl=${withUrl:-?}"
+          echo "  ANOMALIA url_SEM_token=${urlNoToken:-?}   token_SEM_url=${tokenNoUrl:-?}"
+          echo "  (url_SEM_token>0 => escrita PARCIAL/perda de token = falha sistêmica de persistência; =0 => integridade OK, link órfão é pontual)"
+
       - name: "Cleanup (always) — remover credenciais/temporários"
         if: always()
         run: rm -f "$RUNNER_TEMP/gcp-sa.json" /tmp/rules.txt 2>/dev/null || true
