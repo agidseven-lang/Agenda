@@ -132,6 +132,30 @@ jobs:
           echo "  [AMPLA sem orderBy] http=${bcode} amostradas=${btot:-?}  com_clientReviewToken=${btok:-?}  com_clientReviewUrl=${burl:-?}  com_shareToken_legado=${bshare:-?}  url_SEM_token=${banom:-?}"
           echo "  (AMPLA com_token>0 => persistência FUNCIONA p/ parte das tarefas => órfão pontual; AMPLA com_token=0 => nenhuma tarefa tem token = falha sistêmica OU tokens vivem em campo/rota diferente)"
 
+      - name: "PART 6 — F3.5.1D: coleções de recuperação existem/populadas? soft-delete em uso? (só contagens)"
+        run: |
+          set +e
+          AT="$(gcloud auth print-access-token 2>/dev/null)"
+          URL="https://firestore.googleapis.com/v1/projects/${GCP_PROJECT}/databases/(default)/documents:runQuery"
+          probeColl() {
+            body="{\"structuredQuery\":{\"from\":[{\"collectionId\":\"$1\"}],\"limit\":1}}"
+            resp="$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer ${AT}" -H "Content-Type: application/json" -X POST "$URL" -d "$body")"
+            code="$(printf '%s' "$resp" | tail -n1)"; j="$(printf '%s' "$resp" | sed '$d')"
+            n="$(printf '%s' "$j" | jq '[.[]|select(.document)]|length' 2>/dev/null)"
+            echo "  coleção '$1': http=${code} docs>=${n:-?}"
+          }
+          echo "----- coleções de recuperação candidatas (existe/populada?) -----"
+          for c in archivedTasks completedTasks tasksArchive trash deletedTasks clientActions clientReviews approvals taskBackups tasksTrash; do probeColl "$c"; done
+          echo "----- tasks com marcador de SOFT-DELETE (deletedAt/archivedAt) -----"
+          for field in deletedAt archivedAt; do
+            body="{\"structuredQuery\":{\"from\":[{\"collectionId\":\"tasks\"}],\"where\":{\"fieldFilter\":{\"field\":{\"fieldPath\":\"${field}\"},\"op\":\"GREATER_THAN\",\"value\":{\"integerValue\":\"0\"}}},\"limit\":5}}"
+            resp="$(curl -s -w $'\n%{http_code}' -H "Authorization: Bearer ${AT}" -H "Content-Type: application/json" -X POST "$URL" -d "$body")"
+            code="$(printf '%s' "$resp" | tail -n1)"; j="$(printf '%s' "$resp" | sed '$d')"
+            n="$(printf '%s' "$j" | jq '[.[]|select(.document)]|length' 2>/dev/null)"
+            echo "  tasks.${field}>0: http=${code} docs=${n:-?}"
+          done
+          echo "  (todas coleções vazias/inexistentes + nenhum soft-delete => hard-delete confirmado, sem recuperação a nível de app)"
+
       - name: "Cleanup (always) — remover credenciais/temporários"
         if: always()
         run: rm -f "$RUNNER_TEMP/gcp-sa.json" /tmp/rules.txt 2>/dev/null || true
