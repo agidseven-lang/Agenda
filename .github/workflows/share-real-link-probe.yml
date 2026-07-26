@@ -10,7 +10,13 @@
 # =====================================================================
 name: "[manual] F3.5.1B Share Real-Link Probe (read-only, token-safe)"
 
+# Trigger por TAG throwaway (probe-real-link-*) — roda a partir do PRÓPRIO commit da tag, sem
+# exigir o workflow no branch default (evita qualquer escrita em main). workflow_dispatch fica
+# disponível caso o arquivo passe a existir no default no futuro.
 "on":
+  push:
+    tags:
+      - "probe-real-link-*"
   workflow_dispatch:
     inputs:
       confirm:
@@ -25,13 +31,19 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: "Gate — confirmação literal"
+      - name: "Gate — confirmação (dispatch) ou tag de sonda (push)"
         env:
           CONFIRM: ${{ github.event.inputs.confirm }}
+          EVT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          [ "${CONFIRM}" = "PROBE-REAL-LINK" ] || { echo "::error::confirmação inválida — nada executado"; exit 1; }
-          echo "OK: confirmação válida"
+          if [ "${EVT}" = "workflow_dispatch" ]; then
+            [ "${CONFIRM}" = "PROBE-REAL-LINK" ] || { echo "::error::confirmação inválida — nada executado"; exit 1; }
+          else
+            case "${REF}" in refs/tags/probe-real-link-*) : ;; *) echo "::error::trigger inesperado (${REF})"; exit 1;; esac
+          fi
+          echo "OK: autorização válida (${EVT})"
 
       - name: "Mascarar secret + token IMEDIATAMENTE + derivar identificador (hash)"
         env:
@@ -48,10 +60,10 @@ jobs:
           LINK_SHA="$(printf '%s' "${LINK}" | sha256sum | cut -c1-16)"
           echo "Identificador do link (SHA-256[0:16]) = ${LINK_SHA}"
 
-      - name: "Checkout do script da sonda (feature branch, sem credenciais)"
+      - name: "Checkout do script da sonda (commit que disparou; sem credenciais)"
         uses: actions/checkout@v4
         with:
-          ref: desktop/f351-whatsapp-premium-card-recovery
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: "Setup Node 20"
