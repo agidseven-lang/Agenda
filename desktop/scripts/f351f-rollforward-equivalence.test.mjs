@@ -21,8 +21,8 @@ let fail = 0;
 const ok = (m) => console.log('  ok   ' + m);
 const bad = (m) => { console.error('  FAIL ' + m); fail++; };
 
-// 1) base 1.0.184 acessível
-try { g(`cat-file -e ${BASE}^{commit}`); ok('base 1.0.184 @' + BASE.slice(0, 7) + ' acessível'); }
+// 1) base 1.0.184 acessível (sem '^{commit}': o caret e mangled pelo cmd.exe do execSync no Windows)
+try { const t = g(`cat-file -t ${BASE}`).trim(); t === 'commit' ? ok('base 1.0.184 @' + BASE.slice(0, 7) + ' acessível (commit)') : bad('base ' + BASE + ' não é commit (' + t + ')'); }
 catch { bad('base ' + BASE + ' inacessível — checkout precisa de fetch-depth: 0'); }
 
 // 2) TODOS os arquivos alterados vs 1.0.184 ⊆ allowlist (só versionamento + este gate)
