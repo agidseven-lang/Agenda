@@ -83,12 +83,15 @@ jobs:
         run: node scripts/f42f-firebase-auth-bridge.test.mjs
 
       # ---------- GATES DE PRESERVACAO (comportamento 1.0.184 inalterado) ----------
-      - name: Gate PRESERVACAO — SLA/fluxo/temporal/entrega-visual/updater/notifier/auth-core
+      # NOTA: f3356-auth-core NAO entra aqui — sua asserção session-file-0600 checa bits de modo
+      # Unix (mode & 0o777 == 0o600), que NAO valem no windows-latest (o build oficial 1.0.184
+      # tambem nao o rodava no Windows por isso). A auth-core do F4.2F (issueFirebaseToken + login
+      # preservado + logout + token nunca persistido) e coberta no Windows pelo f42f-firebase-auth-bridge.
+      - name: Gate PRESERVACAO — SLA/fluxo/temporal/entrega-visual/updater/notifier (Windows-safe)
         working-directory: ${{ env.APP_DIR }}
         run: |
           set -e
-          for t in f3356-auth-core \
-                   f343-sla-golden-master f344-flow-golden-master f345-sla-timestamp-golden-master \
+          for t in f343-sla-golden-master f344-flow-golden-master f345-sla-timestamp-golden-master \
                    f344-repeated-move-contract f343-delivery-channel f343-preservation \
                    f341a-updater-state-machine f347-immediate-visual-delivery f347-independent-behavior \
                    f33E-main-notifier f33D-background-notif f33F-bg-notify f33C-assignment-toast \
