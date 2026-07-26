@@ -2286,6 +2286,9 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- F4.2F — Firebase Auth SILENCIOSO: mesmo app/CDN do Firestore (compat) + bridge puro testável. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="firebaseAuthBridge.js"></script>
 <script>
 /* WEB PREVIEW 1.0.65 — Paridade com o APK nativo.
    Espelha o app Android (Compose) e usa o MESMO Firestore.
@@ -2294,6 +2297,50 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
 const FIREBASE_CONFIG={apiKey:"AIzaSyBbeZ5M9iNgzw5382iCIDKB-G2QqKuwAes",authDomain:"agenda-id-seven.firebaseapp.com",projectId:"agenda-id-seven",storageBucket:"agenda-id-seven.firebasestorage.app",messagingSenderId:"391529908613",appId:"1:391529908613:web:ba62ed04ff7d0d776cdcec"};
 firebase.initializeApp(FIREBASE_CONFIG);
 const db=firebase.firestore();
+
+/* ══ F4.2F — BRIDGE DE FIREBASE AUTH SILENCIOSO (produção, ADITIVO) ══════════════════════════
+   Não altera login/UI/telas/funcionalidades. Após o login server-side (startApp) e no bootstrap
+   (authSelf), assina no MESMO app Firebase do renderer (default — o que faz as operações Firestore)
+   com um Custom Token EFÊMERO cunhado no MAIN (issueFirebaseAuthToken, Bearer da sessão). Confirma
+   uid == sessão. REQUIRED=false ⇒ falha TRANSITÓRIA nunca bloqueia (fail-open, backoff, sem loop).
+   Segurança (uid divergente / usuário desativado / sessão inválida) ⇒ fail-closed (signOut+login).
+   Custom Token só em memória: nunca logado/persistido/localStorage/arquivo/DevTools. */
+var _fbAuthBridge=null;
+function _fbDiag(state,data){try{if(window.desktopAPI&&window.desktopAPI.diagLog)window.desktopAPI.diagLog('fbauth.'+String(state).replace(/^firebaseAuthBridge\./,''),data||{});}catch(_){ }}
+function _fbAuth(){try{return firebase.auth();}catch(_){return null;}}
+function firebaseAuthSignOut(){try{var a=_fbAuth();if(a&&a.currentUser)return a.signOut().catch(function(){});}catch(_){ }return Promise.resolve();}
+function startFirebaseAuthBridge(u){
+  try{
+    var FAB=window.FirebaseAuthBridge;
+    if(!FAB||!FAB.FLAGS||!FAB.FLAGS.enabled)return;                 // DESKTOP_FIREBASE_AUTH_ENABLED=false ⇒ comportamento 1.0.184
+    var uid0=(u&&u.id)||((typeof state!=='undefined'&&state.user&&state.user.id))||'';
+    if(_fbAuthBridge){try{_fbAuthBridge.stop();}catch(_){ }}
+    _fbAuthBridge=FAB.createFirebaseAuthBridge({
+      flags:FAB.FLAGS,
+      expectedUid:function(){return (typeof state!=='undefined'&&state.user&&state.user.id)||uid0||'';},
+      currentUid:function(){var a=_fbAuth();return (a&&a.currentUser&&a.currentUser.uid)||'';},
+      issueToken:function(){
+        try{if(!window.desktopAPI||typeof window.desktopAPI.authFirebaseToken!=='function')return Promise.resolve({ok:false,transient:true,reason:'no_ipc'});}
+        catch(_){return Promise.resolve({ok:false,transient:true,reason:'no_ipc'});}
+        return window.desktopAPI.authFirebaseToken().then(function(r){r=r||{};return {ok:!!r.ok,token:r.token,uid:r.uid,transient:!!r.transient,fatal:!!r.fatal,reason:r.error};}).catch(function(){return {ok:false,transient:true,reason:'ipc_error'};});
+      },
+      signIn:function(token){
+        var a=_fbAuth();if(!a)return Promise.resolve({ok:false,transient:true,reason:'no_auth_sdk'});
+        return a.signInWithCustomToken(token).then(function(){var cu=a.currentUser;return {ok:true,uid:(cu&&cu.uid)||''};}).catch(function(e){
+          var code=(e&&e.code)||'';
+          var mismatch=(code==='auth/custom-token-mismatch');
+          var transient=(code==='auth/network-request-failed'||code==='auth/timeout'||code==='auth/internal-error'||code==='auth/too-many-requests');
+          return {ok:false,transient:transient,mismatch:mismatch,reason:code||'signin_error'};
+        });
+      },
+      signOut:function(){return firebaseAuthSignOut();},
+      onFailClosed:function(reason){_fbDiag('failClosed',{reason:reason});try{if(typeof logout==='function')logout();}catch(_){ }},
+      onSuccess:function(){},
+      log:function(st,data){_fbDiag(st,data);}
+    });
+    _fbAuthBridge.run('session');
+  }catch(_){/* o bridge NUNCA pode quebrar o app (fail-open) */}
+}
 
 /* 1.0.105 — FONTE ÚNICA da versão exibida na UI. Evita rótulos defasados (o login mostrava
    "1.0.103" mesmo na build nova). Reaplica nos elementos estáticos (login, watermark, título). */
@@ -2546,12 +2593,14 @@ async function doRegister(){
 }
 function saveSession(u){localStorage.setItem('wp_uid',u.id);localStorage.setItem('wp_name',u.name||'');}
 function clearSession(){localStorage.removeItem('wp_uid');localStorage.removeItem('wp_name');localStorage.removeItem('wp_team_jwt');}
-function startApp(u){state.user=u;saveSession(u);document.body.classList.add("authed");document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}}
+function startApp(u){state.user=u;saveSession(u);document.body.classList.add("authed");document.getElementById("login").classList.add("hidden");document.getElementById("app").style.display="flex";subscribeData();render();try{window.desktopAPI&&window.desktopAPI.sessionLogin(u.id)}catch(_){}try{startFirebaseAuthBridge(u)}catch(_){}}
 async function logout(){
   /* F3.3.56-G5a — FIX: "Sair da conta" também limpa a SESSÃO SERVER-SIDE no
      processo main (userData/session.json). Sem isto, o boot re-logava sozinho
      via authSelf ao reabrir o app após o logout. */
   try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.begin')}catch(_){}
+  try{if(_fbAuthBridge){_fbAuthBridge.stop();}}catch(_){}
+  try{await firebaseAuthSignOut();}catch(_){}
   try{if(window.desktopAPI&&window.desktopAPI.authLogout){await window.desktopAPI.authLogout();}}catch(_){}
   try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.afterAuthLogout')}catch(_){}
   try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}

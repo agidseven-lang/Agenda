@@ -29,6 +29,8 @@ export function registerAuthIpc(): void {
       login: process.env.IDS_AUTH_LOGIN_URL || "",
       self: process.env.IDS_AUTH_SELF_URL || "",
       changePassword: process.env.IDS_AUTH_CHPW_URL || "",
+      // F4.2F — override hermético do endpoint issueFirebaseAuthToken (só testes; default = produção).
+      firebaseToken: process.env.IDS_AUTH_FBTOKEN_URL || "",
     },
     // F3.3.73I6C11 — diagnostico behavior-preserving do auth-core (nunca loga token).
     log: (tag: string, data?: unknown) => diag("authcore." + tag, data),
@@ -41,4 +43,12 @@ export function registerAuthIpc(): void {
   ipcMain.handle("auth-admin-change-user-email", (_e, targetId: string, newEmail: string, confirm: string, reason: string) => core.adminChangeUserEmail(targetId, newEmail, confirm, reason));
   ipcMain.handle("auth-logout", () => { diag("ipc.auth-logout"); _authUser = null; return core.logout(); });
   ipcMain.handle("auth-session-status", () => core.status());
+  // F4.2F — issueFirebaseAuthToken (Custom Token EFÊMERO). Retorna {ok,token?,uid?,transient?,fatal?}.
+  // O token cruza para o renderer SÓ p/ signInWithCustomToken imediato; NUNCA é logado aqui (o diag
+  // registra apenas ok/uid/error). Segurança (fatal) e infra (transient) sinalizadas ao bridge.
+  ipcMain.handle("auth-firebase-token", async () => {
+    const r = await core.issueFirebaseToken();
+    diag("ipc.auth-firebase-token", { ok: r.ok, transient: !!r.transient, fatal: !!r.fatal, error: r.error, hasToken: !!r.token });
+    return r;
+  });
 }

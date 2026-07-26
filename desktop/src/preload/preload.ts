@@ -65,6 +65,9 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   authSelf: (): Promise<any> => ipcRenderer.invoke("auth-self"),
   authChangePassword: (oldPassword: string, newPassword: string): Promise<any> => ipcRenderer.invoke("auth-change-password", oldPassword, newPassword),
   authLogout: (): Promise<any> => ipcRenderer.invoke("auth-logout"),
+  // F4.2F — Custom Token do Firebase (Bearer da sessão no main). Retorna {ok,token?,uid?,transient?,fatal?}.
+  // O token é EFÊMERO: o renderer o usa imediatamente em signInWithCustomToken e NÃO o guarda/loga.
+  authFirebaseToken: (): Promise<any> => ipcRenderer.invoke("auth-firebase-token"),
   // F3.3.71A — troca segura de e-mail de login (self/admin); nunca expoe token
   authChangeEmail: (currentPassword: string, newEmail: string): Promise<any> => ipcRenderer.invoke("auth-change-email", currentPassword, newEmail),
   authAdminChangeUserEmail: (targetId: string, newEmail: string, confirm: string, reason: string): Promise<any> => ipcRenderer.invoke("auth-admin-change-user-email", targetId, newEmail, confirm, reason),

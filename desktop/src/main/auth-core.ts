@@ -21,7 +21,10 @@ export type AuthResult = {
   active?: boolean; expiresAt?: number;
 };
 type Session = { token: string; expiresAt: number; uid: string };
-type Urls = { login: string; self: string; changePassword: string; changeEmail: string; adminChangeEmail: string };
+type Urls = { login: string; self: string; changePassword: string; changeEmail: string; adminChangeEmail: string; firebaseToken: string };
+// F4.2F — resultado de issueFirebaseAuthToken. `token` é o Custom Token EFÊMERO (nunca logado/persistido).
+// `fatal` => segurança/sessão (fail-closed); `transient` => infra (fail-open). `uid` vem SEMPRE da sessão.
+export type FirebaseTokenResult = { ok: boolean; token?: string; uid?: string; transient?: boolean; fatal?: boolean; error?: string };
 
 const DEFAULT_URLS: Urls = {
   login: "https://loginuser-de36pi7vza-uc.a.run.app",
@@ -30,6 +33,9 @@ const DEFAULT_URLS: Urls = {
   // F3.3.71A — troca segura de e-mail (self/admin); v2 run.app segue o padrao dos demais
   changeEmail: "https://changeloginemail-de36pi7vza-uc.a.run.app",
   adminChangeEmail: "https://adminchangeuseremail-de36pi7vza-uc.a.run.app",
+  // F4.2F — issueFirebaseAuthToken (Firebase Custom Token, Bearer da sessão). MESMO endpoint OFICIAL
+  // provado pelo Android F4.2C/F4.2E. POST vazio; o uid vem SEMPRE da sessão no servidor.
+  firebaseToken: "https://us-central1-agenda-id-seven.cloudfunctions.net/issueFirebaseAuthToken",
 };
 const HTTP_TIMEOUT_MS = 15000;
 const EXP_SAFETY_MS = 30000;          // folga p/ não expirar "em voo"
@@ -172,6 +178,29 @@ export function createAuthCore(opts: { storeDir: string; urls?: Partial<Urls>; l
       if (r.status === 200 && j.ok === true) return { ok: true };
       if (r.status === 401 && (j && j.error) === "unauthorized") { wipe(); return { ok: false, error: "expired" }; }
       return { ok: false, error: (j && j.error) || ("http_" + r.status) };
+    },
+    /**
+     * F4.2F — issueFirebaseAuthToken: POST vazio + Bearer da sessão → Custom Token EFÊMERO.
+     * Espelha o contrato provado no Android F4.2C: 200+{ok,firebaseToken,uid} => Success;
+     * 401 => sessão inválida (limpa; fatal/fail-closed); 403 => usuário desativado (fatal/fail-closed);
+     * rede/timeout/5xx/resposta inválida => transitória (fail-open, o bridge tolera com backoff).
+     * O token NUNCA é logado/persistido: só retorna ao chamador (IPC) que o entrega ao renderer p/
+     * signInWithCustomToken imediato. O uid é o da sessão (autoritativo no servidor).
+     */
+    async issueFirebaseToken(): Promise<FirebaseTokenResult> {
+      if (!valid()) { if (mem) wipe(); return { ok: false, fatal: true, error: "no_session" }; }
+      let r;
+      try { r = await post(urls.firebaseToken, {}, (mem as Session).token); }
+      catch { return { ok: false, transient: true, error: "network" }; }
+      const j = r.json || {};
+      if (r.status === 200 && j.ok === true && typeof j.firebaseToken === "string" && j.firebaseToken) {
+        log("firebaseToken.ok", { uid: (mem as Session).uid }); // NUNCA loga o token
+        return { ok: true, token: j.firebaseToken, uid: String(j.uid || (mem as Session).uid || "") };
+      }
+      if (r.status === 401) { wipe(); return { ok: false, fatal: true, error: "expired" }; }
+      if (r.status === 403) { return { ok: false, fatal: true, error: "disabled" }; }
+      // 0 (sem status), 5xx, 429, 200-sem-token, e demais 4xx → transitória (não bloquear a Desktop).
+      return { ok: false, transient: true, error: "http_" + r.status };
     },
     /** Logout seguro: limpa memória e o arquivo de sessão. */
     logout(): AuthResult { wipe(); return { ok: true }; },
