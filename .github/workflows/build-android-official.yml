@@ -316,18 +316,27 @@ jobs:
       - name: VERIFICACAO — ausencia do PACOTE nativebeta no APK e no AAB (identidade)
         run: |
           set -euo pipefail
-          for f in "$APK" "$AAB"; do
-            if grep -qa "br/com/idseven/agenda/nativebeta" "$f"; then echo "::error::pacote nativebeta (descritor dex) presente em $f"; exit 1; fi
-            if grep -qa "br\.com\.idseven\.agenda\.nativebeta" "$f"; then echo "::error::pacote nativebeta (dotted) presente em $f"; exit 1; fi
+          # IMPORTANTE: APK/AAB sao ZIP; classes.dex fica DEFLATE-comprimido dentro. Um grep no zip
+          # bruto nao enxerga os descritores de classe. Descompactamos e so entao varremos o dex
+          # (descritores MUTF-8 tipo Lbr/com/idseven/agenda/...; ficam legiveis).
+          EXA="$RUNNER_TEMP/apk_x"; EXB="$RUNNER_TEMP/aab_x"
+          rm -rf "$EXA" "$EXB"; mkdir -p "$EXA" "$EXB"
+          unzip -q -o "$APK" -d "$EXA"
+          unzip -q -o "$AAB" -d "$EXB"
+          for d in "$EXA" "$EXB"; do
+            if grep -rqa "br/com/idseven/agenda/nativebeta" "$d"; then echo "::error::pacote nativebeta (descritor dex) presente em $d"; exit 1; fi
+            if grep -rqa "br\.com\.idseven\.agenda\.nativebeta" "$d"; then echo "::error::pacote nativebeta (dotted) presente em $d"; exit 1; fi
           done
-          grep -qa "br/com/idseven/agenda" "$APK" || { echo "::error::pacote oficial ausente no APK"; exit 1; }
+          grep -rqa "br/com/idseven/agenda" "$EXA" || { echo "::error::pacote oficial ausente no APK (dex)"; exit 1; }
+          grep -rqa "br/com/idseven/agenda" "$EXB" || { echo "::error::pacote oficial ausente no AAB (dex)"; exit 1; }
           # Informativo: o literal 'nativebeta' remanescente e o MARCADOR DE ORIGEM (campo Firestore
           # "src"), contrato do backend (functions/index.js + worker: if src!="nativebeta" nao notifica).
-          N=$(grep -oa "nativebeta" "$APK" | wc -l | tr -d ' ')
+          N=$(grep -roa "nativebeta" "$EXA" | wc -l | tr -d ' ')
           echo "literal 'nativebeta' (marcador src, contrato backend) no APK: $N ocorrencia(s) — esperado (nao e pacote)."
-          echo "no_package_nativebeta=confirmed" >> dist/identity.txt
+          echo "no_package_nativebeta=confirmed (dex descompactado)" >> dist/identity.txt
           echo "src_marker_literal_count_apk=$N" >> dist/identity.txt
-          echo "OK: PACOTE nativebeta ausente; pacote oficial presente."
+          rm -rf "$EXA" "$EXB"
+          echo "OK: PACOTE nativebeta ausente; pacote oficial presente (dex descompactado)."
 
       - name: VERIFICACAO — google-services no artefato (project/App ID/FCM/Auth; sem nativebeta)
         run: |
