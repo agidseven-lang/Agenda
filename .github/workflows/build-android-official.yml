@@ -87,9 +87,13 @@ jobs:
           # package oficial presente entre os clients
           jq -e --arg p "$EXPECT_APP_ID" '[.client[].client_info.android_client_info.package_name] | index($p)' "$GS" >/dev/null \
             || { echo "::error::package $EXPECT_APP_ID ausente no google-services.json"; exit 1; }
-          # pacote nativebeta NAO pode estar presente
-          if jq -e '[.client[].client_info.android_client_info.package_name] | any(. == "br.com.idseven.agenda.nativebeta")' "$GS" >/dev/null; then
-            echo "::error::google-services.json contem o pacote nativebeta (deve ser oficial)"; exit 1; fi
+          # Nota: um google-services.json de PROJETO lista TODOS os apps registrados no Firebase
+          # (o projeto agenda-id-seven ainda tem o app beta registrado alem do oficial). Isso e
+          # ESPERADO e inofensivo: o plugin seleciona o client cujo package == applicationId. A
+          # "ausencia do package nativebeta" e exigida/validada nos ARTIFACTS (APK/AAB, job 2), nao
+          # no json bruto. Registramos so a contagem de clients (informativo).
+          NCLIENTS=$(jq '[.client[]] | length' "$GS")
+          echo "clients no google-services.json (multi-app do projeto): $NCLIENTS (oficial presente)."
           # App ID (mobilesdk_app_id) do client oficial (nao secreto — vai no APK como google_app_id)
           APPID=$(jq -r --arg p "$EXPECT_APP_ID" '.client[] | select(.client_info.android_client_info.package_name==$p) | .client_info.mobilesdk_app_id' "$GS")
           [ -n "$APPID" ] || { echo "::error::mobilesdk_app_id ausente para $EXPECT_APP_ID"; exit 1; }
