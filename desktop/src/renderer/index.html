@@ -6995,10 +6995,16 @@ function buildClientMessage(ctx){
   // 1.0.124 — a mensagem usa o LINK DE COMPARTILHAMENTO (/share/...), que gera a prévia premium
   // do card no WhatsApp (OG dedicado) e redireciona ao portal. Sem asteriscos/emoji; modelo aprovado.
   // O botão "Revisar e aprovar" vive no PORTAL (aberto pelo link) — não há botão dentro do grupo.
-  // F3.3.70D3R10AA — SEM ?v= na mensagem: restaura o regime VALIDADO EM PRODUCAO de 19/06
-  // (commit 6d46bce, decisao registrada do owner: "sem cache-bust agora"). URL estavel por
-  // cliente = preview raspado uma vez fica cacheado e o card aparece de forma consistente.
-  const url=buildShareClientUrl(ctx&&ctx.token);
+  // F3.5.1 — RECUPERACAO DO CARD PREMIUM (WhatsApp Business). CAUSA-RAIZ COMPROVADA: o link
+  // ESTAVEL /share/cronograma/<token> (sem ?v=) ficou com PREVIEW ENVENENADO no cache do
+  // WhatsApp/Meta — provavel primeira raspagem durante a janela de OG fail-closed (c20, 17/07,
+  // /share devolvia 404 SEM OG). O Worker HOJE e fail-open (raspagem nova => 200 + card OG
+  // completo, provado ao vivo run 30210777512), mas o WhatsApp NUNCA re-raspa a MESMA URL.
+  // Reabilita o cache-bust EXISTENTE (V64.40, withWhatsAppPreviewBust) SOMENTE no link ENVIADO:
+  // o ?v=<ts> faz o WhatsApp tratar como URL nova e raspar o card na hora. O Worker IGNORA a
+  // querystring (rota por url.pathname), servindo o MESMO card premium. NAO altera token/path/
+  // dominio/rota nem o clientReviewUrl salvo (/cliente/...); links ja enviados seguem validos.
+  const url=withWhatsAppPreviewBust(buildShareClientUrl(ctx&&ctx.token));
   // F3.3.73I6C16 — Roteiro identifica-se corretamente como "Roteiro de gravação de vídeos".
   if(ctx&&ctx.sector==='roteiro'){
     return 'Olá, '+nome+'.\n'+
