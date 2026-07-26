@@ -3,17 +3,31 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "org.jetbrains.kotlin.plugin.compose"
 apply plugin: "io.github.takahirom.roborazzi"
 
+// ─── F4.2E — Assinatura OFICIAL de producao (Play) ────────────────────────────────
+// Resolvida EXCLUSIVAMENTE dos Secrets do CI, via variaveis de ambiente. NUNCA versionada,
+// NUNCA hardcoded, NUNCA logada. SEM fallback: se qualquer parte faltar, hasOfficialSigning
+// = false e a build RELEASE FALHA (guard em tasks.configureEach abaixo) — jamais assina com
+// idseven-test.keystore / debug.keystore.
+def officialStoreFile     = System.getenv("ANDROID_OFFICIAL_KEYSTORE_FILE")     // .p12 decodificado no runner
+def officialStorePassword = System.getenv("ANDROID_OFFICIAL_KEYSTORE_PASSWORD")
+def officialKeyAlias      = System.getenv("ANDROID_OFFICIAL_KEY_ALIAS")
+def officialKeyPassword   = System.getenv("ANDROID_OFFICIAL_KEY_PASSWORD")
+def hasOfficialSigning = officialStoreFile?.trim() && officialStorePassword?.trim() &&
+                         officialKeyAlias?.trim() && officialKeyPassword?.trim() &&
+                         file(officialStoreFile).exists()
+
 android {
-    namespace "br.com.idseven.agenda.nativebeta"
+    namespace "br.com.idseven.agenda"
     compileSdk 34
 
     defaultConfig {
-        // App SaaS beta — instala LADO A LADO do app aprovado e do PWA (package distinto).
-        applicationId "br.com.idseven.agenda.nativebeta"
+        // F4.2E — IDENTIDADE OFICIAL de producao (primeira publicacao na Play; Play nunca recebeu
+        // este pacote). Sem sufixos de pre-lancamento no applicationId/versionName.
+        applicationId "br.com.idseven.agenda"
         minSdk 26
         targetSdk 34
-        versionCode 128
-        versionName "1.0.148-beta-firebase-auth-canonical"
+        versionCode 129
+        versionName "1.0.0"
         vectorDrawables { useSupportLibrary true }
 
         // URLs reais das Cloud Functions Gen2 sao resolvidas no CI via
@@ -49,15 +63,27 @@ android {
     }
 
     signingConfigs {
-        // Assinatura de TESTE com keystore FIXO versionado no repo
-        // (idseven-test.keystore). Garante o MESMO certificado em todo build
-        // (GitLab, GitHub Actions e local) -> APKs sempre atualizaveis entre si.
-        // NAO e chave de producao/Play (senha padrao "android").
+        // Assinatura de TESTE (keystore FIXO versionado, senha padrao "android"). LEGADO —
+        // usada SOMENTE em builds DEBUG/QA locais. NUNCA referenciada pelo release oficial.
         debugtest {
             storeFile file("idseven-test.keystore")
             storePassword "android"
             keyAlias "androiddebugkey"
             keyPassword "android"
+        }
+        // Assinatura OFICIAL (Play). So e registrada quando TODOS os Secrets existem — sem
+        // fallback. storeType PKCS12 (formato da chave oficial idseven-agenda-upload).
+        if (hasOfficialSigning) {
+            official {
+                storeFile file(officialStoreFile)
+                storePassword officialStorePassword
+                keyAlias officialKeyAlias
+                keyPassword officialKeyPassword
+                storeType "PKCS12"
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+            }
         }
     }
 
@@ -65,7 +91,13 @@ android {
         debug { }
         release {
             // debuggable nao definido -> default FALSE (release nao-depuravel).
-            signingConfig signingConfigs.debugtest
+            // PRODUCAO: assinatura OFICIAL exclusiva. Sem Secrets -> signingConfig null e o
+            // guard (tasks.configureEach) ABORTA o build release (nunca teste/debug/nao-assinado).
+            if (hasOfficialSigning) {
+                signingConfig signingConfigs.official
+            } else {
+                signingConfig null
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
@@ -98,6 +130,32 @@ android {
                     showCauses true
                     showStandardStreams true
                 }
+            }
+        }
+    }
+}
+
+// ─── F4.2E — GATE de assinatura oficial (fail-closed) ─────────────────────────────
+// Sem os Secrets oficiais, QUALQUER empacotamento de release aborta — nunca gera APK/AAB
+// nao-assinado nem assinado com chave de teste/debug. Duas camadas:
+//  (1) config-time: se o alvo pedido for assemble/bundleRelease, falha ANTES de compilar.
+//  (2) execution-time (doFirst): rede de seguranca em qualquer caminho ate o empacotamento.
+def _officialSigningError =
+    "NO-GO F4.2E: build RELEASE oficial exige os Secrets ANDROID_OFFICIAL_KEYSTORE_B64/_PASSWORD, " +
+    "ANDROID_OFFICIAL_KEY_ALIAS/_PASSWORD (decodificados em ANDROID_OFFICIAL_KEYSTORE_FILE). " +
+    "Sem fallback para idseven-test.keystore/debug.keystore."
+def _releaseTaskNames = ["assemblerelease", "bundlerelease", "packagerelease", "packagereleasebundle"]
+def _wantsReleasePackaging = gradle.startParameter.taskNames.any { n ->
+    _releaseTaskNames.contains(n.toLowerCase().replaceFirst(/^:?app:/, "").replaceFirst(/^:/, ""))
+}
+if (_wantsReleasePackaging && !hasOfficialSigning) {
+    throw new GradleException(_officialSigningError + " (config-time)")
+}
+tasks.configureEach { task ->
+    if (task.name in ["packageRelease", "packageReleaseBundle", "assembleRelease", "bundleRelease"]) {
+        task.doFirst {
+            if (!hasOfficialSigning) {
+                throw new GradleException(_officialSigningError + " (execution-time)")
             }
         }
     }

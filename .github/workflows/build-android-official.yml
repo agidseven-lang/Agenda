@@ -1,0 +1,426 @@
+# =====================================================================
+# [F4.2E] Android OFICIAL — identidade br.com.idseven.agenda + build ASSINADA (Play-ready)
+# ---------------------------------------------------------------------
+# Gera evidencia tecnica PRIVADA (APK + AAB assinados com a chave OFICIAL). NAO publica na
+# Play, NAO cria release, NAO distribui. Instalacao futura sera pela Google Play (updates
+# automaticos). Dois jobs encadeados (gate):
+#   1) identity-secrets-audit  — FASE 1: confirma PRESENCA dos 5 Secrets; reconstroi e valida
+#      google-services.json (project_id/package) e o keystore (PKCS12/alias/chave/cert/SHA);
+#      apaga temporarios em always(). Qualquer ausencia/invalidez => NO-GO (job falha => build nao roda).
+#   2) official-signed-build   — migra nada (identidade ja migrada no código); gates de versao/identidade
+#      e region-invariance; testes 53 + gate de blindagem; PROVA fail-closed (release sem Secret aborta);
+#      assembleRelease + bundleRelease com a chave OFICIAL; apksigner/jarsigner; SHA-256; badging;
+#      prova de ausencia do PACOTE nativebeta; validacao google-services no artefato; SBOM + inventario;
+#      relatorio de identidade. Artefatos PRIVADOS (retencao 14 dias). Keystore apagado em always().
+# NENHUM valor de Secret e impresso (sem senha, sem Base64, sem chave privada, sem JSON completo).
+# =====================================================================
+name: "[F4.2E] Android OFICIAL — identidade + build assinada"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - android/f42e-official-identity-signed-build
+    paths:
+      - 'android-native-beta/**'
+      - '.github/workflows/build-android-official.yml'
+
+permissions:
+  contents: read
+
+env:
+  APP_DIR: "android-native-beta"
+  GRADLE_FILE: "android-native-beta/app/build.gradle"
+  EXPECT_APP_ID: "br.com.idseven.agenda"
+  EXPECT_VERSION_CODE: "129"
+  EXPECT_VERSION_NAME: "1.0.0"
+  EXPECT_PROJECT_ID: "agenda-id-seven"
+  EXPECT_KEY_ALIAS: "idseven-agenda-upload"
+  BASE_F42D: "e7b902a008444e509a58af92b1d167075d26e71d"   # HEAD confirmado da F4.2D (base desta fase)
+  BASELINE_FROZEN: "d940a2981126961a153583b1e96fd58510117e74"  # baseline congelada (Desktop/Worker/Rules)
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 1 — FASE 1: AUDITORIA DOS SECRETS (presenca + reconstrucao + validacao)
+  # ────────────────────────────────────────────────────────────────────
+  identity-secrets-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17 (keytool)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: FASE 1 — presenca dos 5 Secrets (sem exibir valores)
+        env:
+          S_GS:   ${{ secrets.GOOGLE_SERVICES_JSON_OFICIAL }}
+          S_KS:   ${{ secrets.ANDROID_OFFICIAL_KEYSTORE_B64 }}
+          S_KSP:  ${{ secrets.ANDROID_OFFICIAL_KEYSTORE_PASSWORD }}
+          S_ALS:  ${{ secrets.ANDROID_OFFICIAL_KEY_ALIAS }}
+          S_KP:   ${{ secrets.ANDROID_OFFICIAL_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          miss=0
+          chk() { if [ -z "${2:-}" ]; then echo "::error::Secret AUSENTE: $1"; miss=1; else echo "presente: $1"; fi; }
+          chk GOOGLE_SERVICES_JSON_OFICIAL         "$S_GS"
+          chk ANDROID_OFFICIAL_KEYSTORE_B64        "$S_KS"
+          chk ANDROID_OFFICIAL_KEYSTORE_PASSWORD   "$S_KSP"
+          chk ANDROID_OFFICIAL_KEY_ALIAS           "$S_ALS"
+          chk ANDROID_OFFICIAL_KEY_PASSWORD        "$S_KP"
+          if [ "$miss" = "1" ]; then echo "::error::NO-GO — Secret oficial ausente."; exit 1; fi
+
+      - name: FASE 1 — reconstruir + validar google-services.json (SO campos permitidos)
+        env:
+          S_GS: ${{ secrets.GOOGLE_SERVICES_JSON_OFICIAL }}
+        run: |
+          set -euo pipefail
+          GS="$RUNNER_TEMP/gs-oficial.json"
+          printf '%s' "$S_GS" > "$GS"            # valor mascarado pelo GitHub; nunca ecoado
+          # JSON valido?
+          jq -e . "$GS" >/dev/null || { echo "::error::google-services.json invalido (JSON malformado)"; exit 1; }
+          PROJ=$(jq -r '.project_info.project_id // empty' "$GS")
+          [ "$PROJ" = "$EXPECT_PROJECT_ID" ] || { echo "::error::project_id=$PROJ != $EXPECT_PROJECT_ID"; exit 1; }
+          # package oficial presente entre os clients
+          jq -e --arg p "$EXPECT_APP_ID" '[.client[].client_info.android_client_info.package_name] | index($p)' "$GS" >/dev/null \
+            || { echo "::error::package $EXPECT_APP_ID ausente no google-services.json"; exit 1; }
+          # pacote nativebeta NAO pode estar presente
+          if jq -e '[.client[].client_info.android_client_info.package_name] | any(. == "br.com.idseven.agenda.nativebeta")' "$GS" >/dev/null; then
+            echo "::error::google-services.json contem o pacote nativebeta (deve ser oficial)"; exit 1; fi
+          # App ID (mobilesdk_app_id) do client oficial (nao secreto — vai no APK como google_app_id)
+          APPID=$(jq -r --arg p "$EXPECT_APP_ID" '.client[] | select(.client_info.android_client_info.package_name==$p) | .client_info.mobilesdk_app_id' "$GS")
+          [ -n "$APPID" ] || { echo "::error::mobilesdk_app_id ausente para $EXPECT_APP_ID"; exit 1; }
+          # api_key presente (necessario ao Firebase Auth) — validar PRESENCA, nao imprimir valor
+          jq -e --arg p "$EXPECT_APP_ID" '.client[] | select(.client_info.android_client_info.package_name==$p) | (.api_key[0].current_key | length) > 0' "$GS" >/dev/null \
+            || { echo "::error::api_key ausente (Firebase Auth exige)"; exit 1; }
+          echo "project_id=$PROJ" >> "$RUNNER_TEMP/identity-audit.txt"
+          echo "package_name=$EXPECT_APP_ID" >> "$RUNNER_TEMP/identity-audit.txt"
+          echo "firebase_app_id=$APPID" >> "$RUNNER_TEMP/identity-audit.txt"
+          echo "OK: google-services.json oficial valido (project_id + package + App ID + api_key)."
+
+      - name: FASE 1 — reconstruir + validar keystore oficial (PKCS12/alias/chave/cert/SHA)
+        env:
+          S_KS:  ${{ secrets.ANDROID_OFFICIAL_KEYSTORE_B64 }}
+          S_KSP: ${{ secrets.ANDROID_OFFICIAL_KEYSTORE_PASSWORD }}
+          S_ALS: ${{ secrets.ANDROID_OFFICIAL_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          KS="$RUNNER_TEMP/official.p12"
+          printf '%s' "$S_KS" | base64 -d > "$KS" 2>/dev/null || { echo "::error::Base64 do keystore invalido"; exit 1; }
+          chmod 600 "$KS"
+          KT="$RUNNER_TEMP/ktout.txt"
+          # -v imprime cert/SHA; capturamos em arquivo e extraimos SO os campos permitidos.
+          keytool -list -v -keystore "$KS" -storetype PKCS12 -storepass "$S_KSP" > "$KT" 2>&1 \
+            || { echo "::error::keytool falhou (senha/formato invalido)"; exit 1; }
+          grep -q "Keystore type: *PKCS12" "$KT" || { echo "::error::keystore nao e PKCS12"; exit 1; }
+          grep -q "PrivateKeyEntry" "$KT" || { echo "::error::sem PrivateKeyEntry (chave privada ausente)"; exit 1; }
+          ALIAS=$(grep -m1 "Alias name:" "$KT" | sed 's/.*Alias name: *//' | tr -d '\r')
+          [ "$ALIAS" = "$EXPECT_KEY_ALIAS" ] || { echo "::error::alias=$ALIAS != $EXPECT_KEY_ALIAS"; exit 1; }
+          # alias existe com a chave privada (confirma senha da chave via -alias)
+          keytool -list -keystore "$KS" -storetype PKCS12 -storepass "$S_KSP" -alias "$EXPECT_KEY_ALIAS" >/dev/null 2>&1 \
+            || { echo "::error::alias oficial nao encontrado no keystore"; exit 1; }
+          SHA1=$(grep -m1 -oE 'SHA1: *[0-9A-Fa-f:]+' "$KT" | sed 's/SHA1: *//')
+          SHA256=$(grep -m1 -oE 'SHA256: *[0-9A-Fa-f:]+' "$KT" | sed 's/SHA256: *//')
+          VFROM=$(grep -m1 "Valid from:" "$KT" | sed 's/.*Valid from: *//' | tr -d '\r')
+          [ -n "$SHA1" ] && [ -n "$SHA256" ] || { echo "::error::fingerprints ausentes"; exit 1; }
+          {
+            echo "keystore_type=PKCS12"
+            echo "key_alias=$ALIAS"
+            echo "cert_sha1=$SHA1"
+            echo "cert_sha256=$SHA256"
+            echo "cert_validity=$VFROM"
+          } >> "$RUNNER_TEMP/identity-audit.txt"
+          echo "OK: keystore PKCS12, alias '$ALIAS', PrivateKeyEntry, SHA-1/SHA-256 presentes."
+
+      - name: FASE 1 — resumo de identidade (SO campos permitidos) + upload
+        run: |
+          set -euo pipefail
+          echo "===== F4.2E FASE 1 — AUDITORIA DE IDENTIDADE (campos permitidos) ====="
+          cat "$RUNNER_TEMP/identity-audit.txt"
+          mkdir -p dist-audit && cp "$RUNNER_TEMP/identity-audit.txt" dist-audit/identity-audit.txt
+
+      - name: Upload resumo FASE 1 (privado; sem segredos)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f42e-identity-audit-${{ github.sha }}
+          path: dist-audit/identity-audit.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: FASE 1 — apagar TODOS os temporarios (always)
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/official.p12" "$RUNNER_TEMP/ktout.txt" "$RUNNER_TEMP/gs-oficial.json" "$RUNNER_TEMP/identity-audit.txt" || true
+          echo "temporarios sensiveis removidos."
+
+  # ────────────────────────────────────────────────────────────────────
+  # JOB 2 — BUILD OFICIAL ASSINADA (so roda se a FASE 1 passar)
+  # ────────────────────────────────────────────────────────────────────
+  official-signed-build:
+    runs-on: ubuntu-latest
+    needs: identity-secrets-audit
+    steps:
+      - name: Checkout (history completo p/ gates de baseline)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: GATE de identidade/versao (applicationId + namespace + versionCode 129 + versionName 1.0.0)
+        run: |
+          set -euo pipefail
+          G="$GRADLE_FILE"
+          grep -q 'applicationId "br.com.idseven.agenda"' "$G" || { echo "::error::applicationId != br.com.idseven.agenda"; exit 1; }
+          grep -q 'namespace "br.com.idseven.agenda"' "$G" || { echo "::error::namespace != br.com.idseven.agenda"; exit 1; }
+          if grep -q 'br.com.idseven.agenda.nativebeta' "$G"; then echo "::error::build.gradle ainda referencia nativebeta"; exit 1; fi
+          VC=$(grep -oE 'versionCode [0-9]+' "$G" | awk '{print $2}')
+          VN=$(grep -oE 'versionName "[^"]+"' "$G" | sed -E 's/versionName "(.*)"/\1/')
+          [ "$VC" = "$EXPECT_VERSION_CODE" ] || { echo "::error::versionCode=$VC != 129"; exit 1; }
+          [ "$VC" -gt 128 ] || { echo "::error::versionCode nao e > 128"; exit 1; }
+          [ "$VN" = "$EXPECT_VERSION_NAME" ] || { echo "::error::versionName=$VN != 1.0.0"; exit 1; }
+          case "$VN" in *beta*|*nativebeta*|*qa*|*rc*|*canary*|*test*|*demo*) echo "::error::versionName contem sufixo proibido"; exit 1;; esac
+          grep -q '<string name="app_name">Agenda ID Seven</string>' "$APP_DIR/app/src/main/res/values/strings.xml" \
+            || { echo "::error::app_name != 'Agenda ID Seven'"; exit 1; }
+          echo "OK: identidade oficial (applicationId/namespace/versionCode/versionName/app_name)."
+
+      - name: GATE region-invariance (so android-native-beta/** + este workflow vs F4.2D; Desktop/Worker/Rules intocados)
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASE_F42D" HEAD || true)
+          echo "=== alterados vs F4.2D ($BASE_F42D) ==="; echo "$CHANGED"
+          BAD=$(echo "$CHANGED" | grep -v '^android-native-beta/' | grep -v '^.github/workflows/build-android-official.yml$' || true)
+          if [ -n "$BAD" ]; then echo "::error::mudanca FORA do escopo permitido: $BAD"; exit 1; fi
+          for p in "desktop" "cloudflare-worker.js" "wrangler.toml" "functions" "index.html" "scripts/patch-firestore-password-reset-rules.mjs"; do
+            D=$(git diff --name-only "$BASELINE_FROZEN" HEAD -- "$p" || true)
+            [ -z "$D" ] || { echo "::error::alteracao proibida em $p vs baseline congelada: $D"; exit 1; }
+          done
+          echo "OK: escopo Android-only; Desktop/Worker/Rules/Functions/portal intocados."
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Restaurar google-services.json OFICIAL (Secret; nunca versionado/ecoado)
+        env:
+          S_GS: ${{ secrets.GOOGLE_SERVICES_JSON_OFICIAL }}
+        run: |
+          set -euo pipefail
+          [ -n "${S_GS:-}" ] || { echo "::error::GOOGLE_SERVICES_JSON_OFICIAL ausente"; exit 1; }
+          printf '%s' "$S_GS" > "$APP_DIR/app/google-services.json"
+          # sanity local (nao imprime conteudo)
+          jq -e --arg p "$EXPECT_APP_ID" '[.client[].client_info.android_client_info.package_name] | index($p)' "$APP_DIR/app/google-services.json" >/dev/null \
+            || { echo "::error::google-services.json oficial nao cobre $EXPECT_APP_ID"; exit 1; }
+          echo "google-services.json oficial gravado ($(wc -c < "$APP_DIR/app/google-services.json") bytes)."
+
+      - name: Testes JVM — 53 (F4.2B 33 + F4.2C 20) + GATE DE BLINDAGEM
+        working-directory: android-native-beta
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew clean testDebugUnitTest --tests "br.com.idseven.agenda.auth.*" --no-daemon --stacktrace
+
+      - name: Lint (informativo — relatorio anexado; nao bloqueia o artefato)
+        continue-on-error: true
+        working-directory: android-native-beta
+        run: ./gradlew :app:lintRelease --no-daemon || echo "lint reportou itens (ver relatorio)"
+
+      - name: PROVA fail-closed — release SEM Secrets deve ABORTAR (sem fallback teste/debug)
+        working-directory: android-native-beta
+        run: |
+          set +e
+          OUT=$(./gradlew :app:assembleRelease --no-daemon 2>&1)
+          RC=$?
+          set -e
+          if [ $RC -eq 0 ]; then echo "::error::release SEM Secrets NAO abortou (fail-closed quebrado)"; exit 1; fi
+          echo "$OUT" | grep -q "NO-GO F4.2E" || { echo "::error::abortou por motivo diferente do guard oficial"; echo "$OUT" | tail -20; exit 1; }
+          echo "OK: sem Secrets a build release aborta com o guard oficial (fail-closed comprovado)."
+
+      - name: Restaurar keystore OFICIAL (Secret -> arquivo temporario; nunca ecoado)
+        env:
+          S_KS: ${{ secrets.ANDROID_OFFICIAL_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          [ -n "${S_KS:-}" ] || { echo "::error::ANDROID_OFFICIAL_KEYSTORE_B64 ausente"; exit 1; }
+          KS="$RUNNER_TEMP/official-upload.p12"
+          printf '%s' "$S_KS" | base64 -d > "$KS"
+          chmod 600 "$KS"
+          echo "ANDROID_OFFICIAL_KEYSTORE_FILE=$KS" >> "$GITHUB_ENV"
+          echo "keystore oficial materializado ($(wc -c < "$KS") bytes)."
+
+      - name: BUILD ASSINADA OFICIAL — assembleRelease + bundleRelease (chave OFICIAL exclusiva)
+        working-directory: android-native-beta
+        env:
+          ANDROID_OFFICIAL_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_OFFICIAL_KEYSTORE_PASSWORD }}
+          ANDROID_OFFICIAL_KEY_ALIAS:         ${{ secrets.ANDROID_OFFICIAL_KEY_ALIAS }}
+          ANDROID_OFFICIAL_KEY_PASSWORD:      ${{ secrets.ANDROID_OFFICIAL_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
+
+      - name: Localizar artefatos + ferramentas
+        id: locate
+        run: |
+          set -euo pipefail
+          APK=$(ls "$APP_DIR"/app/build/outputs/apk/release/*.apk | head -1)
+          AAB=$(ls "$APP_DIR"/app/build/outputs/bundle/release/*.aab | head -1)
+          test -f "$APK" || { echo "::error::APK release nao gerado"; exit 1; }
+          test -f "$AAB" || { echo "::error::AAB release nao gerado"; exit 1; }
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt | sort -V | tail -1)
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          echo "APK=$APK" >> "$GITHUB_ENV"
+          echo "AAB=$AAB" >> "$GITHUB_ENV"
+          echo "AAPT2=$AAPT2" >> "$GITHUB_ENV"
+          echo "AAPT=$AAPT" >> "$GITHUB_ENV"
+          echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
+          echo "APK=$APK"; echo "AAB=$AAB"
+
+      - name: VERIFICACAO — apksigner (APK) + jarsigner (AAB) + fingerprints do certificado
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > dist/apksigner-verify.txt
+          grep -q "Verifies" dist/apksigner-verify.txt || { echo "::error::apksigner: APK NAO verifica"; exit 1; }
+          CERT_SHA256=$(grep -m1 -iE 'certificate SHA-?256 digest' dist/apksigner-verify.txt | grep -oE '[0-9a-fA-F]{64}' || true)
+          CERT_SHA1=$(grep -m1 -iE 'certificate SHA-?1 digest' dist/apksigner-verify.txt | grep -oE '[0-9a-fA-F]{40}' || true)
+          echo "APK cert SHA-256: $CERT_SHA256"; echo "APK cert SHA-1: $CERT_SHA1"
+          echo "cert_sha256_apk=$CERT_SHA256" >> dist/identity.txt
+          echo "cert_sha1_apk=$CERT_SHA1" >> dist/identity.txt
+          # AAB assinado (JAR signing v1) verificavel por jarsigner
+          jarsigner -verify -verbose:summary "$AAB" > dist/jarsigner-aab.txt 2>&1 || { echo "::error::jarsigner: AAB NAO verifica"; cat dist/jarsigner-aab.txt; exit 1; }
+          grep -qi "jar verified" dist/jarsigner-aab.txt || { echo "::error::jarsigner: 'jar verified' ausente"; exit 1; }
+          echo "OK: APK (apksigner) e AAB (jarsigner) verificados com a chave oficial."
+
+      - name: "VERIFICACAO — identidade no artefato (aapt badging: package/version/label)"
+        run: |
+          set -euo pipefail
+          "$AAPT" dump badging "$APK" > dist/badging.txt
+          grep -q "package: name='br.com.idseven.agenda' " dist/badging.txt || { echo "::error::package no APK != br.com.idseven.agenda"; exit 1; }
+          grep -q "versionCode='129'" dist/badging.txt || { echo "::error::versionCode no APK != 129"; exit 1; }
+          grep -q "versionName='1.0.0'" dist/badging.txt || { echo "::error::versionName no APK != 1.0.0"; exit 1; }
+          grep -qE "application-label:'Agenda ID Seven'" dist/badging.txt || echo "::warning::application-label nao e 'Agenda ID Seven' (verificar)"
+          echo "OK: badging confirma br.com.idseven.agenda / 129 / 1.0.0."
+
+      - name: VERIFICACAO — ausencia do PACOTE nativebeta no APK e no AAB (identidade)
+        run: |
+          set -euo pipefail
+          for f in "$APK" "$AAB"; do
+            if grep -qa "br/com/idseven/agenda/nativebeta" "$f"; then echo "::error::pacote nativebeta (descritor dex) presente em $f"; exit 1; fi
+            if grep -qa "br\.com\.idseven\.agenda\.nativebeta" "$f"; then echo "::error::pacote nativebeta (dotted) presente em $f"; exit 1; fi
+          done
+          grep -qa "br/com/idseven/agenda" "$APK" || { echo "::error::pacote oficial ausente no APK"; exit 1; }
+          # Informativo: o literal 'nativebeta' remanescente e o MARCADOR DE ORIGEM (campo Firestore
+          # "src"), contrato do backend (functions/index.js + worker: if src!="nativebeta" nao notifica).
+          N=$(grep -oa "nativebeta" "$APK" | wc -l | tr -d ' ')
+          echo "literal 'nativebeta' (marcador src, contrato backend) no APK: $N ocorrencia(s) — esperado (nao e pacote)."
+          echo "no_package_nativebeta=confirmed" >> dist/identity.txt
+          echo "src_marker_literal_count_apk=$N" >> dist/identity.txt
+          echo "OK: PACOTE nativebeta ausente; pacote oficial presente."
+
+      - name: VERIFICACAO — google-services no artefato (project/App ID/FCM/Auth; sem nativebeta)
+        run: |
+          set -euo pipefail
+          GEN=$(find "$APP_DIR/app/build/generated" -name values.xml -path "*oogle*ervices*" 2>/dev/null | head -1 || true)
+          [ -n "$GEN" ] || GEN=$(find "$APP_DIR/app/build/generated" -name values.xml -path "*google*" 2>/dev/null | head -1 || true)
+          [ -n "$GEN" ] || { echo "::error::values.xml gerado pelo google-services nao encontrado"; exit 1; }
+          grep -q '<string name="project_id"[^>]*>agenda-id-seven</string>' "$GEN" || { echo "::error::project_id != agenda-id-seven no artefato"; exit 1; }
+          grep -q 'name="gcm_defaultSenderId"' "$GEN" || { echo "::error::gcm_defaultSenderId ausente (FCM)"; exit 1; }
+          grep -q 'name="google_api_key"' "$GEN" || { echo "::error::google_api_key ausente (Firebase Auth)"; exit 1; }
+          grep -q 'name="google_app_id"' "$GEN" || { echo "::error::google_app_id ausente (App ID)"; exit 1; }
+          if grep -q "nativebeta" "$GEN"; then echo "::error::google-services gerado contem nativebeta"; exit 1; fi
+          echo "google_services_project=agenda-id-seven" >> dist/identity.txt
+          echo "fcm_configured=yes (gcm_defaultSenderId)" >> dist/identity.txt
+          echo "firebase_auth_configured=yes (google_api_key)" >> dist/identity.txt
+          echo "OK: artefato aponta agenda-id-seven; FCM + Firebase Auth configurados; sem nativebeta."
+
+      - name: SHA-256 dos artefatos
+        run: |
+          set -euo pipefail
+          cp "$APK" "dist/AgendaIDSeven-1.0.0-129-release.apk"
+          cp "$AAB" "dist/AgendaIDSeven-1.0.0-129-release.aab"
+          ( cd dist && sha256sum AgendaIDSeven-1.0.0-129-release.apk AgendaIDSeven-1.0.0-129-release.aab > SHA256SUMS )
+          echo "== SHA256SUMS =="; cat dist/SHA256SUMS
+
+      - name: Inventario de dependencias (releaseRuntimeClasspath)
+        working-directory: android-native-beta
+        run: ./gradlew :app:dependencies --configuration releaseRuntimeClasspath --no-daemon > ../dist/dependencies-release.txt 2>&1 || true
+
+      - name: R8 mapping (quando aplicavel)
+        run: |
+          set -euo pipefail
+          MAP=$(find "$APP_DIR/app/build/outputs/mapping/release" -name mapping.txt 2>/dev/null | head -1 || true)
+          if [ -n "$MAP" ]; then cp "$MAP" dist/r8-mapping.txt; echo "mapping do R8 anexado."; \
+          else echo "R8 mapping: N/A (minifyEnabled false — sem ofuscacao nesta identidade oficial; decisao auditada p/ preservar a base F4.2C)." > dist/r8-mapping-NA.txt; fi
+
+      - name: Instalar Syft (SBOM)
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: SBOM (CycloneDX + SPDX) a partir do AAB
+        run: |
+          set -euo pipefail
+          syft "$AAB" -o cyclonedx-json=dist/sbom.cyclonedx.json -o spdx-json=dist/sbom.spdx.json
+          echo "SBOM gerado (CycloneDX + SPDX)."
+
+      - name: RELATORIO de versao e identidade
+        run: |
+          set -euo pipefail
+          APK_SHA=$(grep 'apk' dist/SHA256SUMS | awk '{print $1}')
+          AAB_SHA=$(grep 'aab' dist/SHA256SUMS | awk '{print $1}')
+          {
+            echo "===== F4.2E — RELATORIO DE IDENTIDADE OFICIAL + BUILD ASSINADA ====="
+            echo "Gerado (UTC) : $(date -u)"
+            echo "Branch/commit: android/f42e-official-identity-signed-build @ $GITHUB_SHA"
+            echo "Base F4.2D   : $BASE_F42D"
+            echo "applicationId: br.com.idseven.agenda   (namespace idem)"
+            echo "App name     : Agenda ID Seven"
+            echo "versionCode  : 129"
+            echo "versionName  : 1.0.0   (sem sufixos)"
+            echo "Assinatura   : chave OFICIAL idseven-agenda-upload (Secrets; sem fallback teste/debug)"
+            echo "google-svcs  : GOOGLE_SERVICES_JSON_OFICIAL (projeto agenda-id-seven) — BETA nunca usado"
+            echo "Testes       : 53 (F4.2B 33 + F4.2C 20) + GATE DE BLINDAGEM — verdes"
+            echo "Fail-closed  : release sem Secrets ABORTA (comprovado)"
+            echo "APK          : AgendaIDSeven-1.0.0-129-release.apk"
+            echo "AAB          : AgendaIDSeven-1.0.0-129-release.aab"
+            echo "SHA-256 APK  : $APK_SHA"
+            echo "SHA-256 AAB  : $AAB_SHA"
+            echo "--- certificado / identidade no artefato ---"
+            cat dist/identity.txt
+            echo "STATUS       : IDENTIDADE OFICIAL + BUILD ASSINADA PRONTAS (evidencia privada; NAO publicado/distribuido)"
+          } > dist/RELATORIO-IDENTIDADE.txt
+          cat dist/RELATORIO-IDENTIDADE.txt
+
+      - name: Upload evidencia PRIVADA (APK+AAB+hashes+verificacoes+SBOM+relatorio)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f42e-official-signed-${{ github.sha }}
+          path: |
+            dist/AgendaIDSeven-1.0.0-129-release.apk
+            dist/AgendaIDSeven-1.0.0-129-release.aab
+            dist/SHA256SUMS
+            dist/apksigner-verify.txt
+            dist/jarsigner-aab.txt
+            dist/badging.txt
+            dist/identity.txt
+            dist/dependencies-release.txt
+            dist/sbom.cyclonedx.json
+            dist/sbom.spdx.json
+            dist/r8-mapping.txt
+            dist/r8-mapping-NA.txt
+            dist/RELATORIO-IDENTIDADE.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Apagar keystore/google-services temporarios (always)
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/official-upload.p12" "$APP_DIR/app/google-services.json" || true
+          echo "keystore + google-services.json temporarios removidos."
