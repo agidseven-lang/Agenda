@@ -120,13 +120,15 @@ jobs:
           npx --yes @electron/asar extract "$ASAR" "$EXDIR"
           PKGV=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")' P="$EXDIR/package.json")
           [ "$PKGV" = "1.0.185" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.185"; exit 1; }
-          # renderer + bridge empacotados == fonte do commit (byte-identico, LF)
+          # renderer + bridge empacotados == fonte CHECKED-OUT (working tree do ref buildado),
+          # byte-identico (LF). NAO usar GITHUB_SHA: o dispatch veio de main (workflow), enquanto o
+          # checkout e do branch F4.2F (inputs.ref) — a fonte auditada e a working tree.
           for rel in src/renderer/index.html src/renderer/firebaseAuthBridge.js; do
             EX="$EXDIR/$rel"; test -f "$EX" || { echo "::error:: $rel ausente no asar"; exit 1; }
-            git show ${GITHUB_SHA}:desktop/$rel > "$RUNNER_TEMP/src.tmp"
-            EX="$EX" SRC="$RUNNER_TEMP/src.tmp" node -e '
+            test -f "$rel" || { echo "::error:: $rel ausente na working tree"; exit 1; }
+            EX="$EX" SRC="$rel" node -e '
               const fs=require("fs"); const nrm=s=>String(s).replace(/\r\n/g,"\n");
-              if(nrm(fs.readFileSync(process.env.EX,"utf8"))!==nrm(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.EX+" EMPACOTADO != fonte do commit");process.exit(1);}'
+              if(nrm(fs.readFileSync(process.env.EX,"utf8"))!==nrm(fs.readFileSync(process.env.SRC,"utf8"))){console.error(process.env.EX+" EMPACOTADO != fonte checked-out");process.exit(1);}'
             echo "  $rel EMPACOTADO == fonte (byte-identico)"
           done
           # bridge realmente cableado no renderer + Firebase Auth compat presente
