@@ -118,7 +118,7 @@ jobs:
           test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
           EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"
           npx --yes @electron/asar extract "$ASAR" "$EXDIR"
-          PKGV=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")' P="$EXDIR/package.json")
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
           [ "$PKGV" = "1.0.185" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.185"; exit 1; }
           # renderer + bridge empacotados == fonte CHECKED-OUT (working tree do ref buildado),
           # byte-identico (LF). NAO usar GITHUB_SHA: o dispatch veio de main (workflow), enquanto o
