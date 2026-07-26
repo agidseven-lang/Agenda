@@ -10,13 +10,13 @@
 # =====================================================================
 name: "[manual] F3.5.1B Share Real-Link Probe (read-only, token-safe)"
 
-# Trigger por TAG throwaway (probe-real-link-*) — roda a partir do PRÓPRIO commit da tag, sem
-# exigir o workflow no branch default (evita qualquer escrita em main). workflow_dispatch fica
-# disponível caso o arquivo passe a existir no default no futuro.
+# Trigger por BRANCH throwaway (run-share-probe) — roda a partir do PRÓPRIO commit empurrado, sem
+# exigir o workflow no branch default (evita qualquer escrita em main; tags são bloqueadas p/ push).
+# workflow_dispatch fica disponível caso o arquivo passe a existir no default no futuro.
 "on":
   push:
-    tags:
-      - "probe-real-link-*"
+    branches:
+      - "run-share-probe"
   workflow_dispatch:
     inputs:
       confirm:
@@ -41,7 +41,7 @@ jobs:
           if [ "${EVT}" = "workflow_dispatch" ]; then
             [ "${CONFIRM}" = "PROBE-REAL-LINK" ] || { echo "::error::confirmação inválida — nada executado"; exit 1; }
           else
-            case "${REF}" in refs/tags/probe-real-link-*) : ;; *) echo "::error::trigger inesperado (${REF})"; exit 1;; esac
+            case "${REF}" in refs/heads/run-share-probe) : ;; *) echo "::error::trigger inesperado (${REF})"; exit 1;; esac
           fi
           echo "OK: autorização válida (${EVT})"
 
