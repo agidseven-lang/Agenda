@@ -1,0 +1,103 @@
+# =====================================================================
+# [manual] F3.5.1 — LIVE PROBE (read-only) do Card Premium do WhatsApp em PRODUÇÃO
+# ---------------------------------------------------------------------
+# Diagnóstico AO VIVO do incidente "Card Premium não aparece no WhatsApp Business".
+# SOMENTE leituras GET/HEAD públicas contra o Worker oficial (aprovar.agendaidseven.com.br).
+# NÃO faz deploy, NÃO usa secrets, NÃO escreve nada, NÃO imprime token real (usa um
+# token sintético de diagnóstico; respostas não-resolvidas são no-store => sem cache-poison).
+# Objetivo: comprovar no ambiente vivo (o dono exigiu) — versão/build do Worker, se a
+# imagem OG do card está viva (status/Content-Type/tamanho), e se a rota /share entrega OG.
+# =====================================================================
+name: "[manual] F3.5.1 Card Premium — Live Probe (read-only)"
+
+"on":
+  workflow_dispatch:
+    inputs:
+      probe_token:
+        description: "Token de diagnóstico (sintético). NÃO cole token real de cliente."
+        required: false
+        default: "DIAGNOSTIC-PROBE-NOT-A-REAL-TOKEN"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      BASE: "https://aprovar.agendaidseven.com.br"
+      UA_WA: "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+      UA_WA2: "WhatsApp/2.23.20.0 A"
+      UA_BROWSER: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+      # Candidatas conhecidas das DUAS linhagens do Worker (A=legacy-risk v64-38; B=j6/f350 v64-39 + roteiro-v64-60)
+      OG_IMG_CANDIDATES: "/og/wa-card-v64-39.jpg /og/wa-card-v64-38.jpg /og/wa-card-roteiro-v64-60.jpg"
+    steps:
+      - name: "1) Identidade do Worker VIVO (GET / → version/build)"
+        run: |
+          set -uo pipefail
+          echo "== GET $BASE/ (health/identity) =="
+          curl -sS -m 30 -D - -o /tmp/root.json "$BASE/" | sed -n '1,20p' || true
+          echo "--- body (version/build/service) ---"
+          cat /tmp/root.json 2>/dev/null | head -c 800; echo
+
+      - name: "2) IMAGENS OG conhecidas (ambas linhagens) — status/type/size/magic"
+        run: |
+          set -uo pipefail
+          for P in $OG_IMG_CANDIDATES; do
+            echo "======== GET $BASE$P ========"
+            code=$(curl -sS -m 40 -D /tmp/h.txt -o /tmp/img.bin -w '%{http_code}' "$BASE$P" || echo "ERR")
+            echo "HTTP=$code"
+            grep -iE '^(content-type|content-length|cache-control|cf-cache-status|age|etag):' /tmp/h.txt || true
+            echo "bytes=$(wc -c < /tmp/img.bin)  magic=$(od -An -tx1 -N4 /tmp/img.bin | tr -d ' ')  (jpeg=ffd8ff..)"
+            echo ""
+          done
+
+      - name: "4) /share/cronograma/<diag> como CRAWLER do WhatsApp (OG servido?)"
+        run: |
+          set -uo pipefail
+          T="${{ github.event.inputs.probe_token }}"
+          echo "== GET $BASE/share/cronograma/<diag> UA=facebookexternalhit =="
+          curl -sS -m 40 -D /tmp/hs.txt -o /tmp/share.html -A "$UA_WA" "$BASE/share/cronograma/$T" || echo "curl exit=$?"
+          echo "--- status + headers relevantes ---"
+          sed -n '1,3p' /tmp/hs.txt
+          grep -iE '^(content-type|cache-control|cf-cache-status|x-share-cache|x-share-task|x-share-type|x-id7-worker-build|age|last-modified|etag):' /tmp/hs.txt || true
+          echo "--- body size ---"; wc -c /tmp/share.html
+          echo "--- OG/twitter meta tags entregues ao crawler ---"
+          grep -ioE '<meta[^>]+(property="og:[a-z:]+"|name="twitter:[a-z]+")[^>]*content="[^"]*"[^>]*>' /tmp/share.html | sed -E 's/(token|Token)=[^"& ]+/\1=REDACTED/g' | head -30
+          echo "--- og:image extraído ---"
+          OGIMG=$(grep -ioE '<meta[^>]+property="og:image"[^>]+content="[^"]+"' /tmp/share.html | grep -oiE 'content="[^"]+"' | head -1 | sed -E 's/content="([^"]+)"/\1/')
+          echo "og:image = $OGIMG"
+          echo "$OGIMG" > /tmp/ogimg.txt
+
+      - name: "5) Buscar a og:image ANUNCIADA e conferir (o que o WhatsApp tentaria baixar)"
+        run: |
+          set -uo pipefail
+          OGIMG=$(cat /tmp/ogimg.txt 2>/dev/null)
+          if [ -z "$OGIMG" ]; then echo "::warning:: nenhuma og:image na resposta do /share"; exit 0; fi
+          echo "== GET $OGIMG (como o crawler faria) =="
+          curl -sS -m 40 -D /tmp/ho.txt -o /tmp/ogimg.bin "$OGIMG" || echo "curl exit=$?"
+          sed -n '1,20p' /tmp/ho.txt
+          wc -c /tmp/ogimg.bin; file /tmp/ogimg.bin || true
+          od -An -tx1 -N4 /tmp/ogimg.bin
+
+      - name: "6) Variações: HEAD, UA WhatsApp, navegador comum (redirect?), roteiro"
+        run: |
+          set -uo pipefail
+          T="${{ github.event.inputs.probe_token }}"
+          echo "== HEAD /share/cronograma (crawler) =="
+          curl -sS -m 30 -I -A "$UA_WA" "$BASE/share/cronograma/$T" | sed -n '1,15p' || true
+          echo ""; echo "== GET /share/cronograma UA=WhatsApp/2.23 =="
+          curl -sS -m 30 -D - -o /dev/null -A "$UA_WA2" "$BASE/share/cronograma/$T" | sed -n '1,3p' || true
+          echo ""; echo "== GET /share/cronograma UA=navegador comum (redirect p/ /cliente?) =="
+          curl -sS -m 30 -D - -o /dev/null -A "$UA_BROWSER" "$BASE/share/cronograma/$T" | grep -iE '^(HTTP/|location|x-share|content-type):' | sed -n '1,10p' || true
+          echo ""; echo "== GET /share/roteiro (crawler) =="
+          curl -sS -m 30 -D - -o /tmp/shr.html -A "$UA_WA" "$BASE/share/roteiro/$T" | sed -n '1,3p' || true
+          grep -ioE '<meta[^>]+property="og:image"[^>]+content="[^"]+"' /tmp/shr.html | head -1 || echo "(sem og:image no /share/roteiro)"
+
+      - name: "7) Resumo"
+        run: |
+          echo "PROBE concluído. Interpretação:"
+          echo "- Passo 1: string version/build revela QUAL Worker está vivo."
+          echo "- Passos 2/3: se a og:image NÃO for 200 image/jpeg (magic FFD8FF), o WhatsApp não carrega o card (causa D/E)."
+          echo "- Passo 4: se /share entrega 200 + og:image completa, a rota está OK (fail-open) => causa provável cache/Meta ou URL da Desktop."
+          echo "- Passo 5: confere a MESMA imagem que o WhatsApp tentaria baixar."
