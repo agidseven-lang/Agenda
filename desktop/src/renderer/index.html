@@ -2144,6 +2144,20 @@ body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-t
 body.desktop .kbv2-column-body>.kbv2-card.kbv2-card--cards:only-child{ flex:0 0 auto; }
 body.desktop .kbv2-column-body>.kbv2-card.kbv2-card--cards:only-child>.kbv2-card-origin,
 body.desktop .kbv2-column-body>.kbv2-card.kbv2-card--cards:only-child>.kbv2-card-footer{ margin-top:0; }
+/* F3.5.2C — QUADRO de "Edição de Cards": COLUNA com ALTURA NATURAL. A correção F3.5.2B compactou o
+   CARD, mas a .kbv2-column-body (flex:1 1 auto) continuava preenchendo a altura da coluna e o botão
+   "Adicionar tarefa" ficava ancorado no fundo — deixando um grande vão entre o card e o botão. Aqui,
+   SÓ no quadro marcado .kbv2-board--cards (aplicado apenas quando boardSector==='edicao_cards'), a
+   coluna deixa de esticar (align-items:flex-start) e o corpo passa a ter altura natural (flex:0 0 auto)
+   — o botão fica logo após o último card. Os quadros dos demais setores ficam BYTE-IDÊNTICOS. */
+body.desktop .kbv2-board.kbv2-board--cards{ align-items:flex-start; }
+body.desktop .kbv2-board.kbv2-board--cards .kbv2-column-body{ flex:0 0 auto; }
+/* F3.5.2C — Legenda / Observações no card (rótulo + prévia de até 2 linhas; conteúdo completo em Detalhes). */
+body.desktop .kbv2-card-note{ display:flex; flex-direction:column; gap:2px; }
+body.desktop .kbv2-card-note .kbv2-note-k{ font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#8a93a7; }
+body.desktop .kbv2-card-note .kbv2-note-v{ font-size:13px; color:#c6cdda; line-height:1.35; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+/* Tema (título) do card de Edição de Cards: valor real, até 2 linhas, depois trunca. */
+body.desktop .kbv2-card.kbv2-card--cards .kbv2-title{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 body.desktop .kbv2-btn{ height:40px; border-radius:11px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:var(--kbv2-ink); font-size:13.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; }
 body.desktop .kbv2-btn svg{ width:16px; height:16px; }
 body.desktop .kbv2-btn:hover{ background:rgba(255,255,255,.09); }
@@ -5498,7 +5512,11 @@ function renderBoard(){
         taskChips()+
       '</div>'+
     '</div>';
-    h+=kbv2BoardHtml(STATUS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})));
+    /* F3.5.2C — só o quadro de Edição de Cards ganha a classe .kbv2-board--cards (coluna de altura
+       natural, sem vão até "Adicionar tarefa"). Demais setores: saída BYTE-IDÊNTICA. */
+    let _bh=kbv2BoardHtml(STATUS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})));
+    if(state.boardSector==='edicao_cards')_bh=_bh.replace('<div class="kbv2-board">','<div class="kbv2-board kbv2-board--cards">');
+    h+=_bh;
     return h+'</div>';
   }
   // Mobile: mantém o seletor de coluna única (paridade APK)
@@ -5880,6 +5898,19 @@ function deriveOperationalCardPresentation(t, persp){
   return {phase:cs.phase,statusLabel:statusLabel,tone:pp.color,nextAction:next,isFinal:isFinal,
           ownerLabel:opOwnerLabel(cs,persp,isFinal)};
 }
+/* F3.5.2C — leitura canônica de campos do card (Edição de Cards) com fallback seguro p/ tarefas
+   antigas: prioriza cardTema/cardLegenda/cardObs já gravados; senão deriva de title/desc ("Legenda:"/
+   "Obs.:"). NÃO grava, NÃO migra, NÃO duplica campos no Firestore. */
+function cardsFieldOf(t, which){
+  try{
+    if(which==='tema')   return String((t&&t.cardTema)||(t&&t.title)||'');
+    if(which==='legenda'){ if(t&&t.cardLegenda!=null)return String(t.cardLegenda);
+      var m=/(?:^|\n)Legenda:\s*([^\n]*)/.exec((t&&t.desc)||''); return m?m[1].trim():''; }
+    if(which==='obs'){ if(t&&t.cardObs!=null)return String(t.cardObs);
+      var m2=/(?:^|\n)Obs\.?:\s*([^\n]*)/.exec((t&&t.desc)||''); return m2?m2[1].trim():''; }
+  }catch(_){}
+  return '';
+}
 function kbv2Card(t, persp){
   const designerView = persp==='designer' && isClientSector(secOf(t.sector).key) && hasDesigner(t);
   const clientView = persp==='client' && isClientSector(secOf(t.sector).key);
@@ -5953,6 +5984,14 @@ function kbv2Card(t, persp){
        (cron&&cron.label&&cron.label!==s.label?'<span class="kbv2-chip kbv2-chip-soft">'+esc(cron.label)+'</span>':'')+
        (t.priority?'<span class="kbv2-chip" style="color:#F87171;background:'+withAlpha('#EF4444',.18)+';border-color:'+withAlpha('#EF4444',.46)+'"><i class="kbv2-chip-dot" style="background:#EF4444"></i>Prioridade</span>':'')+
      '</div>';
+  /* F3.5.2C — Edição de Cards: Legenda / Observações no card (compacto, até 2 linhas, SÓ quando
+     preenchidos — vazio não reserva espaço). Lê os campos canônicos cardLegenda/cardObs (fallback:
+     parse seguro do desc). Conteúdo completo continua no modal Detalhes. Isolado ao setor. */
+  if(s.key==='edicao_cards'){
+    const _cl=cardsFieldOf(t,'legenda'), _co=cardsFieldOf(t,'obs');
+    if(_cl)h+='<div class="kbv2-card-note"><div class="kbv2-note-k">Legenda</div><div class="kbv2-note-v">'+esc(_cl)+'</div></div>';
+    if(_co)h+='<div class="kbv2-card-note"><div class="kbv2-note-k">Observações</div><div class="kbv2-note-v">'+esc(_co)+'</div></div>';
+  }
   // 7) trilho + 8) etapa
   if(prog){
     let rail='';
@@ -6039,7 +6078,11 @@ function afterBoard(){const s=document.getElementById('bSearch');if(s)s.oninput=
 function isDesignerAxisMove(t){return isDesignerFlow(t)&&((state.user&&designerOf(t)===state.user.id)||!!state.designerBoard);}
 function designerMoveOpts(t){const cur=designerCol(t);
   if(cur==='afazer')return [{key:'andamento',label:'Em andamento',desc:'Começar a produção'}];
-  if(cur==='concluido')return [{key:'andamento',label:'Reabrir (Em andamento)',desc:'Voltar a produzir'}];
+  /* F3.5.2C — Edição de Cards: de Concluído também é permitido voltar para Revisão (matriz bidirecional
+     completa do setor). Demais setores permanecem BYTE-IDÊNTICOS (só 'Reabrir (Em andamento)'). */
+  if(cur==='concluido')return (secOf(t.sector).key==='edicao_cards')
+    ? [{key:'revisao',label:'Revisão/Ajuste',desc:'Reabrir em Revisão'},{key:'andamento',label:'Reabrir (Em andamento)',desc:'Voltar a produzir'}]
+    : [{key:'andamento',label:'Reabrir (Em andamento)',desc:'Voltar a produzir'}];
   // role-aware (passo 2): em Revisão/Ajuste, o designer corrige e volta a produzir ou entrega.
   if(cur==='revisao')return [{key:'andamento',label:'Em andamento',desc:'Corrigir o ajuste'},{key:'concluido',label:'Entregue',desc:'Reentregar para a Social'}];
   return [{key:'concluido',label:'Entregue',desc:'Entrega para a Social finalizar'},{key:'revisao',label:'Revisão/Ajuste',desc:'Marcar que há ajuste a corrigir'},{key:'afazer',label:'A Fazer',desc:'Pausar e retornar'}];
@@ -6057,6 +6100,29 @@ async function moveStatus(taskId,newStatus){
   if(slaGuardBlocked(taskId))return;   // FASE 5: atraso crítico bloqueia avançar/concluir OUTRAS tarefas
   const t=state.tasks.find(x=>x.id===taskId);if(!t)return;const now=Date.now();
   if(isDesignerAxisMove(t)){
+    if(secOf(t.sector).key==='edicao_cards'){
+      /* F3.5.2C — Edição de Cards: eixo do designer ISOLADO e BIDIRECIONAL. Sincroniza t.status em
+         TODOS os 4 estados — o quadro do setor agrupa por t.status; sem sincronizar 'afazer' o card
+         NÃO voltava (bug reportado: A Fazer→andamento funcionava, andamento→A Fazer não). NÃO semeia
+         designerSla (as notificações do card são EXCLUSIVAMENTE do cardsRules T-30/T-10). Concluir marca
+         doneAt (cardsRules SUPRIME via slaPanelDelivered); reabrir LIMPA doneAt/designerSla.finishedAt
+         (REATIVA o prazo). Não altera início/término/tema/legenda/obs/designer/cliente/lote. Isolado ao
+         setor — demais setores permanecem byte-idênticos no ramo abaixo. */
+      const oc=designerCol(t);
+      const done=(newStatus==='concluido'||newStatus==='entregue');
+      const leavingDone=(oc==='concluido')&&!done;
+      const pc={ designerFlowStatus:newStatus, designerWorkflowStage:newStatus, status:(done?'concluido':newStatus),
+        history:firebase.firestore.FieldValue.arrayUnion({kind:'designer_moved',axis:'designerFlowStatus',from:oc,to:newStatus,byUid:(state.user&&state.user.id)||null,byId:state.user.id,at:now,atMs:now,source:'desktop'}) };
+      if(done){ pc.doneAt=now; pc.doneBy=state.user.id; }
+      else if(leavingDone){ pc.doneAt=firebase.firestore.FieldValue.delete(); pc.doneBy=firebase.firestore.FieldValue.delete(); pc['designerSla.finishedAt']=firebase.firestore.FieldValue.delete(); }
+      const opt={ designerFlowStatus:newStatus, designerWorkflowStage:newStatus, status:(done?'concluido':newStatus) };
+      if(done){ opt.doneAt=now; opt.doneBy=state.user.id; } else if(leavingDone){ opt.doneAt=null; opt.doneBy=null; if(t.designerSla){ t.designerSla=Object.assign({},t.designerSla,{finishedAt:null}); } }
+      Object.assign(t, opt);
+      closeModal();render();
+      try{ await db.collection('tasks').doc(taskId).update(pc); }
+      catch(e){ console.warn('moveStatus(cards):',e); }
+      return;
+    }
     // EIXO DO DESIGNER (fonte única): grava designerFlowStatus; NÃO toca em status genérico nem doneAt.
     const old=designerCol(t);
     const patch={designerFlowStatus:newStatus,designerWorkflowStage:newStatus,history:firebase.firestore.FieldValue.arrayUnion({kind:'designer_moved',axis:'designerFlowStatus',from:old,to:newStatus,byUid:(state.user&&state.user.id)||null,byId:state.user.id,at:now,atMs:now,source:'desktop'})};
