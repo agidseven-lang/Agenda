@@ -185,8 +185,10 @@ function slaEmissionsFor(task, uid, nowMs, dtMsFn){
     // TIPO 1 — SLA é PESSOAL: dispara SOMENTE p/ o designer responsável (porta do roteador puro).
     var tg=resolveNotificationTargets({ eventType:'sla_warning', task:t, currentUser:{id:uid} });
     if(!tg.shouldNotifyCurrentUser) return out;
-    // Roteiro NÃO tem SLA de designer (jamais amarelo/vermelho).
-    if(typeof secOf==='function' && ((secOf(t.sector)||{}).key==='roteiro')) return out;
+    // Roteiro NÃO tem SLA de designer (jamais amarelo/vermelho). F3.5.2 — 'edicao_cards' usa um
+    // PRODUTOR PRÓPRIO E ISOLADO (cardsEmissionsFor, T-30/T-10 ANTES do prazo): o produtor
+    // COMPARTILHADO de SLA NUNCA emite p/ esses setores (cronograma/edicao_midia byte-idênticos).
+    if(typeof secOf==='function'){ var _sk=(secOf(t.sector)||{}).key; if(_sk==='roteiro'||_sk==='edicao_cards') return out; }
     // CONFIG DE SLA POR SETOR (fonte única slaCfgOf; default 30/10). designerSla:false não emite.
     var cfg=(typeof slaCfgOf==='function')?slaCfgOf(t):null;
     if(cfg && !cfg.designerSla) return out;
@@ -279,6 +281,87 @@ function nextBoundaryMs(task, nowMs, dtMsFn){
     var tl=resolveCanonicalSlaTimeline(t,f); if(!tl.dueAtMs) return 0;
     var now=(typeof nowMs==='number')?nowMs:Date.now();
     var bs=[tl.warningAtMs, tl.overdueAtMs, tl.criticalAtMs], best=0;
+    for(var k=0;k<bs.length;k++){ if(bs[k]>now && (!best||bs[k]<best)) best=bs[k]; }
+    return best;
+  }catch(_e){ return 0; }
+}
+
+/* ════ F3.5.2 — EDIÇÃO DE CARDS: produtor de notificação ISOLADO (T-30 amarela / T-10 vermelha) ════
+ * O setor INTERNO 'edicao_cards' NÃO usa o motor de SLA do designer (SECTOR_SLA/designerSla/
+ * resolveTaskDisplayState — cujo VERMELHO nasce NO prazo). Aqui o VERMELHO nasce ANTES do prazo
+ * (due−10) e o AMARELO em due−30. A PRODUÇÃO é 100% isolada por setor (estas funções); a ENTREGA
+ * reutiliza EXCLUSIVAMENTE o canal oficial aprovado (slaScheduler.emitList → deliver →
+ * deliverNotification: toast premium / bg-window / nativa Windows / clique-restaura-foca) e a
+ * DEDUP PERSISTENTE (seen-store) com CHAVE PRÓPRIA — sem novo notifier/scheduler/listener/tray.
+ * Bandas: amarela [due−30, due−10) · vermelha [due−10, due) e adiante (a vermelha SUBSTITUI a
+ * amarela). Cada banda emite UMA vez (dedup taskId+tipo+dueAt+revisão-de-prazo). Concluída/
+ * cancelada ⇒ nada. Prazo alterado ⇒ novo dueAt/rev ⇒ recálculo (as antigas já vistas não repetem). */
+var CARDS_WARN_MS = 30*60000;   // AMARELA: due − 30min
+var CARDS_RED_MS  = 10*60000;   // VERMELHA: due − 10min
+function isCardsSector(t){ try{ return (secOf(t&&t.sector)||{}).key==='edicao_cards'; }catch(_){ return false; } }
+/* prazo do card a partir dos SEUS PRÓPRIOS campos (dueDate/dueTime), sem tocar o resolvedor
+ * congelado slaPanelFinishMs (que prioriza designerSla — ausente em cards). */
+function cardFinishMs(t, dtMsFn){
+  var f=dtMsFn||(typeof dtMs==='function'?dtMs:function(){return 0;});
+  var dd=t&&(t.dueDate||t.due); if(!dd) return 0;
+  var ms=Number(f(dd,(t&&t.dueTime)||'23:59'))||0; return ms>0?ms:0;
+}
+/* revisão de prazo: incrementada quando a Social edita o prazo do card (dedup contra "voltar ao
+ * mesmo valor"); default 1. O dueAt (finishMs) já cobre a maioria das mudanças de prazo. */
+function cardDeadlineRev(t){ try{ return Number(t&&t.cardDeadlineRev)||1; }catch(_){ return 1; } }
+function cardsDisplayState(t, now, dtMsFn){
+  now=now||Date.now();
+  if(!isCardsSector(t)) return {sev:'neutro',state:'none',finishMs:0,inPanel:false,remainingMs:0};
+  var finishMs=cardFinishMs(t,dtMsFn);
+  if(slaPanelDelivered(t)) return {sev:'verde',state:'completed',finishMs:finishMs,inPanel:false,remainingMs:0};
+  if(!finishMs)           return {sev:'neutro',state:'none',finishMs:0,inPanel:false,remainingMs:0};
+  var warnAt=finishMs-CARDS_WARN_MS, redAt=finishMs-CARDS_RED_MS;
+  if(now>=redAt)  return {sev:'vermelho',state:'overdue',finishMs:finishMs,inPanel:true,remainingMs:Math.max(0,finishMs-now)}; // VERMELHA (inclui após o prazo; dedup ⇒ 1 entrega)
+  if(now>=warnAt) return {sev:'laranja', state:'warning',finishMs:finishMs,inPanel:true,remainingMs:Math.max(0,finishMs-now)}; // AMARELA
+  return {sev:'azul',state:'running',finishMs:finishMs,inPanel:false,remainingMs:Math.max(0,finishMs-now)};                    // ainda longe do prazo
+}
+/* EMISSÃO isolada — retorna [payload] da banda ATUAL (0 ou 1), via notifBuildPayload, roteada SÓ ao
+ * designer responsável (mesmo roteador puro). eventType 'sla_cards_*' (casa /^sla_/ ⇒ identidade
+ * designer-focada do toast oficial); severity warning/critical ⇒ MESMO amarelo/vermelho aprovado. */
+function cardsEmissionsFor(task, uid, nowMs, dtMsFn){
+  var out=[];
+  try{
+    var t=task; if(!t||!isCardsSector(t)) return out;
+    var now=(typeof nowMs==='number')?nowMs:Date.now();
+    var f=dtMsFn||(typeof dtMs==='function'?dtMs:null);
+    var tg=resolveNotificationTargets({ eventType:'sla_warning', task:t, currentUser:{id:uid} });
+    if(!tg.shouldNotifyCurrentUser) return out;                 // pessoal: só o designer responsável
+    var d=cardsDisplayState(t,now,f); if(!d||!d.inPanel) return out;
+    var resp=notifResponsibleDenorm(t);
+    var fn=first(resp.name||''), tl=(t.title||'Card')+(t.client?(' — '+t.client):''), pf=slaibFmtHM(d.finishMs);
+    var rev=cardDeadlineRev(t);
+    var base={ taskId:t.id, taskTitle:t.title||'Card', clientName:t.client||'',
+      actorId:resp.id, actorName:resp.name, actorAvatar:resp.avatar,
+      responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
+      targetUserId:uid, notificationType:'sla_personal', etapa:'Edição de Cards', status:d.state,
+      subtitle:tl, anchor:d.finishMs, action:{type:'detail',deep:'detail/'+t.id} };
+    if(d.state==='warning'){
+      out.push(notifBuildPayload(Object.assign({},base,{ eventType:'sla_cards_warning', severity:'warning', sound:true,
+        title:(fn?fn+', ':'')+'prazo próximo — Edição de Cards', body:'Faltam 30 minutos para o prazo deste card.',
+        context:'Prazo: '+pf+' · Vence em '+slaCount(d.remainingMs), dedupKey:'cards_warning:'+t.id+':'+d.finishMs+':r'+rev })));
+    } else if(d.state==='overdue'){
+      out.push(notifBuildPayload(Object.assign({},base,{ eventType:'sla_cards_overdue', severity:'critical', sound:true,
+        title:(fn?fn+', ':'')+'prazo crítico — Edição de Cards', body:'Faltam 10 minutos para o prazo deste card.',
+        context:'Prazo: '+pf+' · Vence em '+slaCount(d.remainingMs), dedupKey:'cards_overdue:'+t.id+':'+d.finishMs+':r'+rev })));
+    }
+  }catch(_e){}
+  return out;
+}
+/* PRÓXIMO marco futuro (due−30 / due−10) p/ ESTE card, ou 0 — contribui ao MESMO timer único do
+ * scheduler (wake preciso em T-30/T-10), sem criar segundo scheduler. */
+function cardsNextBoundaryMs(task, nowMs, dtMsFn){
+  try{
+    var t=task; if(!t||!isCardsSector(t)) return 0;
+    if(slaPanelDelivered(t)) return 0;
+    var now=(typeof nowMs==='number')?nowMs:Date.now();
+    var f=dtMsFn||(typeof dtMs==='function'?dtMs:null);
+    var finishMs=cardFinishMs(t,f); if(!finishMs) return 0;
+    var bs=[finishMs-CARDS_WARN_MS, finishMs-CARDS_RED_MS], best=0;
     for(var k=0;k<bs.length;k++){ if(bs[k]>now && (!best||bs[k]<best)) best=bs[k]; }
     return best;
   }catch(_e){ return 0; }
@@ -526,6 +609,9 @@ module.exports = {
   MANAGER_KW: MANAGER_KW, norm: norm, roleCat: roleCat, canSeeAllRole: canSeeAllRole, operationalBlockFor: operationalBlockFor,
   // main-only
   notifResponsibleDenorm: notifResponsibleDenorm, slaEmissionsFor: slaEmissionsFor, nextBoundaryMs: nextBoundaryMs,
+  // F3.5.2 — Edição de Cards: produtor ISOLADO T-30/T-10 (entrega pelo canal oficial)
+  isCardsSector: isCardsSector, cardFinishMs: cardFinishMs, cardDeadlineRev: cardDeadlineRev,
+  cardsDisplayState: cardsDisplayState, cardsEmissionsFor: cardsEmissionsFor, cardsNextBoundaryMs: cardsNextBoundaryMs,
   // F3.4.4 — fluxo (movimentação de card) no MAIN
   TASK_PHASE: TASK_PHASE, isClientSector: isClientSector, isTaskCompleted: isTaskCompleted,
   hasDesigner: hasDesigner, designerCol: designerCol,

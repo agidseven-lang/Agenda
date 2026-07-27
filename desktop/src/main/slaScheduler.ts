@@ -131,6 +131,12 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
       let emissions: NotifPayload[] = [];
       try { emissions = slaRules.slaEmissionsFor(task, uid, t0) || []; } catch (e) { emissions = []; log("sla.emit.error", { taskId: task && task.id, err: String((e as any) && (e as any).message || e) }); }
       emitList(emissions, task && task.id);
+      // F3.5.2 — EDIÇÃO DE CARDS: produtor ISOLADO (T-30 amarela / T-10 vermelha). Entrega pelo
+      // MESMO emitList (⇒ MESMO deliver=deliverNotification + MESMA dedup persistente seen-store),
+      // sem novo notifier/scheduler/listener/tray. Só emite p/ tarefas do setor 'edicao_cards'.
+      let cardEmissions: NotifPayload[] = [];
+      try { cardEmissions = slaRules.cardsEmissionsFor(task, uid, t0) || []; } catch (e) { cardEmissions = []; log("cards.emit.error", { taskId: task && task.id, err: String((e as any) && (e as any).message || e) }); }
+      emitList(cardEmissions, task && task.id);
     });
     // F3.4.3 — operational_block: varredura POR-USUÁRIO (gated em canSeeAll do papel AUTENTICADO).
     // Preserva integralmente o comportamento aprovado da 1.0.178 (condição/destinatário/título/texto/
@@ -151,6 +157,11 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
       let b = 0;
       try { b = Number(slaRules.nextBoundaryMs(task, t0)) || 0; } catch { b = 0; }
       if (b > t0 && (!best || b < best)) best = b;
+      // F3.5.2 — contribui os marcos T-30/T-10 dos cards ao MESMO timer único (wake preciso), sem
+      // criar segundo scheduler; 0 p/ tarefas não-cards.
+      let bc = 0;
+      try { bc = Number(slaRules.cardsNextBoundaryMs(task, t0)) || 0; } catch { bc = 0; }
+      if (bc > t0 && (!best || bc < best)) best = bc;
     });
     return best;
   }
