@@ -10,7 +10,7 @@ const outMain = path.join(DESK, "dist", "main");
 try { fs.mkdirSync(outMain, { recursive: true }); } catch (_) {}
 
 // Módulos .js escritos à mão (não passam pelo tsc) que precisam ir p/ dist/main.
-const HANDWRITTEN_JS = ["slaRules.js"];
+const HANDWRITTEN_JS = ["slaRules.js", "cardsRules.js"];
 for (const name of HANDWRITTEN_JS) {
   const src = path.join(DESK, "src", "main", name);
   const dst = path.join(outMain, name);

@@ -35,6 +35,13 @@ import { diag } from "./diag";
 // caminho relativo que o build copia p/ dist/main/slaRules.js (build:renderer → copy-renderer.js).
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const slaRules: any = require("./slaRules");
+// F3.5.2 — produtor ISOLADO de Edição de Cards (módulo SEPARADO; slaRules permanece byte-idêntico).
+// OPCIONAL: em produção o build (copy-renderer HANDWRITTEN_JS) copia cardsRules.js p/ dist/main; se
+// não resolver (ex.: harness de teste que compila só este arquivo), degrada para no-op (cards não
+// emitem) sem quebrar o produtor de SLA existente.
+let cardsRules: any = { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 };
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+try { cardsRules = require("./cardsRules"); } catch { /* módulo opcional */ }
 
 type NotifPayload = { dedupKey?: string; eventType?: string; taskId?: string; [k: string]: unknown };
 type Deliver = (p: NotifPayload) => unknown;
@@ -135,7 +142,7 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
       // MESMO emitList (⇒ MESMO deliver=deliverNotification + MESMA dedup persistente seen-store),
       // sem novo notifier/scheduler/listener/tray. Só emite p/ tarefas do setor 'edicao_cards'.
       let cardEmissions: NotifPayload[] = [];
-      try { cardEmissions = slaRules.cardsEmissionsFor(task, uid, t0) || []; } catch (e) { cardEmissions = []; log("cards.emit.error", { taskId: task && task.id, err: String((e as any) && (e as any).message || e) }); }
+      try { cardEmissions = cardsRules.cardsEmissionsFor(task, uid, t0) || []; } catch (e) { cardEmissions = []; log("cards.emit.error", { taskId: task && task.id, err: String((e as any) && (e as any).message || e) }); }
       emitList(cardEmissions, task && task.id);
     });
     // F3.4.3 — operational_block: varredura POR-USUÁRIO (gated em canSeeAll do papel AUTENTICADO).
@@ -160,7 +167,7 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
       // F3.5.2 — contribui os marcos T-30/T-10 dos cards ao MESMO timer único (wake preciso), sem
       // criar segundo scheduler; 0 p/ tarefas não-cards.
       let bc = 0;
-      try { bc = Number(slaRules.cardsNextBoundaryMs(task, t0)) || 0; } catch { bc = 0; }
+      try { bc = Number(cardsRules.cardsNextBoundaryMs(task, t0)) || 0; } catch { bc = 0; }
       if (bc > t0 && (!best || bc < best)) best = bc;
     });
     return best;
