@@ -7868,7 +7868,13 @@ function openSheet(which){
 }
 
 /* ---- TASK FORM (wizard) ---- */
-function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false};}
+function newForm(sector){return {id:null,step:0,sector:sector||null,title:'',client:'',assigneeId:null,assignee:'',status:'afazer',startDate:'',startTime:'',endDate:'',endTime:'',dueDate:'',dueTime:'',priority:false,subtype:null,fields:{},contents:[],items:[],videos:[],checklist:[],link:'',obs:'',_openContent:null,_sendAfterSave:false,/* F3.5.2 — Edição de Cards (aditivo): N cards avulsos {tema,legenda,obs,dueDate,dueTime} + quantidade */cards:[],cardsQty:1};}
+/* F3.5.2 — quem pode CRIAR tarefas de Edição de Cards: Social Media / Administrador (contrato atual
+   de supervisão). Designer recebe/movimenta, mas não cria em nome da Social. Gate SÓ do novo setor. */
+function canCreateCards(){try{return (typeof canSeeAll==='function')&&state&&state.user&&canSeeAll(state.user);}catch(_){return false;}}
+/* F3.5.2 — limite técnico seguro de criação em lote (bem abaixo do teto de 500 do batch do Firestore). */
+var CARDS_MAX_BATCH=50;
+function cardsQtyOf(f){var n=Math.floor(Number(f&&f.cardsQty)||0);return (n>=1&&n<=CARDS_MAX_BATCH)?n:(n<1?1:CARDS_MAX_BATCH);}
 function openTaskForm(sector){closeModal();if(sector&&secOf(sector).descontinuado)sector=null;state.form=newForm(sector);if(sector)state.form.step=1;render();}
 // F3.3.75A — função CANÔNICA de "Nova tarefa": TODO entry point de CRIAÇÃO recomeça na ETAPA 1
 // (Setor), sem reaproveitar etapa/setor/título/cliente/responsável/briefing/conteúdos/anexos/
@@ -7891,12 +7897,16 @@ function renderForm(){
     '<button class="iconbtn" data-form="close">'+svg('close')+'</button></div></div>'+
     '<div class="stepper">'+STEPS.map((st,i)=>'<div class="st"><div class="sc '+(i<f.step?'done':'')+' '+(i===f.step?'on':'')+'">'+(i<f.step?'✓':(i+1))+'</div><div class="slab '+(i===f.step?'on':'')+'">'+st+'</div></div>'+(i<3?'<div class="ln '+(i<f.step?'done':'')+'"></div>':'')).join('')+'</div><div class="scr">';
   if(f.step===0)h+=stepSector();else if(f.step===1)h+=stepDados();else if(f.step===2)h+=stepBriefing();else h+=stepReview();
-  h+='</div><div class="footer-nav">'+(f.step>0?'<button class="btn ghost" data-form="back">Voltar</button>':'')+(f.step<3?'<button class="btn" data-form="next">Próximo</button>':'<button class="btn" data-form="save">'+(f.id?'Salvar alterações':'Salvar tarefa')+'</button>')+'</div>';
+  // F3.5.2 — botão final "Criar N tarefas" p/ Edição de Cards (lote); demais setores inalterados.
+  const _isCardsF=!!(f.sector&&secOf(f.sector).key==='edicao_cards');
+  const _saveLbl=_isCardsF?('Criar '+cardsQtyOf(f)+(cardsQtyOf(f)===1?' tarefa':' tarefas')):(f.id?'Salvar alterações':'Salvar tarefa');
+  h+='</div><div class="footer-nav">'+(f.step>0?'<button class="btn ghost" data-form="back">Voltar</button>':'')+(f.step<3?'<button class="btn" data-form="next">Próximo</button>':'<button class="btn" data-form="save">'+_saveLbl+'</button>')+'</div>';
   return '<div class="form-wrap">'+h+'</div>';
 }
 function stepSector(){const f=state.form;let h='<div class="lbl">Escolha o setor</div>';
   // 71C7: oferece SOMENTE setores ativos (descontinuado sai da criação, não do histórico)
-  SECTORS.filter(s=>!s.descontinuado).forEach(s=>{const sel=f.sector===s.key;h+='<button class="sector-card '+(sel?'sel':'')+'" data-fsector="'+s.key+'" style="'+(sel?'background:'+withAlpha(s.color,.12)+';border-color:'+s.color:'')+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div><div class="sm"><div class="sl">'+esc(s.label)+'</div><div class="sd">'+esc(s.desc)+'</div></div>'+(sel?'<div style="color:'+s.color+'">✓</div>':'')+'</button>';});
+  // F3.5.2: 'Edição de Cards' é INTERNO — só aparece p/ quem pode criar (Social/Admin).
+  SECTORS.filter(s=>!s.descontinuado && (s.key!=='edicao_cards'||canCreateCards())).forEach(s=>{const sel=f.sector===s.key;h+='<button class="sector-card '+(sel?'sel':'')+'" data-fsector="'+s.key+'" style="'+(sel?'background:'+withAlpha(s.color,.12)+';border-color:'+s.color:'')+'"><div class="icb" style="background:'+withAlpha(s.color,.18)+';color:'+s.color+'">'+svg(s.icon)+'</div><div class="sm"><div class="sl">'+esc(s.label)+'</div><div class="sd">'+esc(s.desc)+'</div></div>'+(sel?'<div style="color:'+s.color+'">✓</div>':'')+'</button>';});
   return h;
 }
 function stepDados(){const f=state.form;const t=tpl();
@@ -7906,6 +7916,22 @@ function stepDados(){const f=state.form;const t=tpl();
   const isRoteiro=(typeof secOf==='function')&&secOf(f.sector).key==='roteiro';
   // F3.3.77A-R2 (B2) — Edição de mídia: Designer + PRAZO no formulário INICIAL (nasce atribuída).
   const isMedia=(typeof secOf==='function')&&secOf(f.sector).key==='edicao_midia';
+  // F3.5.2 — Edição de Cards (ETAPA 2/DADOS): Cliente + Quantidade + Designer. SEM Etapa e SEM
+  // prazo único (cada card tem prazo próprio na etapa Briefing). Fluxo 100% interno.
+  const isCards=(typeof secOf==='function')&&secOf(f.sector).key==='edicao_cards';
+  if(isCards){
+    return ''+
+    '<div class="fgroup"><div class="fgroup-h">Identificação</div>'+
+      '<div class="lbl">Cliente / Empresa <span class="req">obrigatório</span></div><input class="inp" id="fClient" placeholder="Ex.: Hospital Visão" value="'+esc(f.client)+'">'+
+      '<div style="height:14px"></div><div class="lbl">Quantidade de tarefas <span class="req">obrigatório</span></div>'+
+      '<input class="inp" id="fCardsQty" type="number" min="1" max="'+CARDS_MAX_BATCH+'" step="1" inputmode="numeric" placeholder="Ex.: 5" value="'+esc(f.cardsQty||'')+'">'+
+      '<div style="font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.45">Cada tarefa vira um <b style="color:var(--soft)">card individual</b> (tema, legenda, observações e <b style="color:var(--soft)">prazo próprios</b>), atribuído ao mesmo designer. Máx. '+CARDS_MAX_BATCH+' por lote.</div>'+
+    '</div>'+
+    '<div class="fgroup"><div class="fgroup-h">Atribuição</div>'+
+      '<div class="lbl">Designer responsável <span class="req">obrigatório</span></div>'+assigneeField()+
+      '<div style="font-size:11.5px;color:var(--faint);margin-top:7px;line-height:1.45">As tarefas <b style="color:var(--soft)">nascem atribuídas</b> ao designer escolhido e entram no <b style="color:var(--soft)">quadro dele</b>; ele recebe a notificação na hora. Sem cliente externo, link, portal ou Card Premium.</div>'+
+    '</div>';
+  }
   const dt=(ic,id,type,val)=>'<div class="dt-field">'+svg(ic)+'<input class="inp dt" id="'+id+'" type="'+type+'" value="'+esc(val)+'"></div>';
   return ''+
   '<div class="fgroup"><div class="fgroup-h">Identificação</div>'+
@@ -7943,6 +7969,21 @@ function openAssignee(){
     us.map(u=>'<button class="settrow" data-pickasg="'+u.id+'">'+avatar(u,34)+'<div class="sm"><div class="sl">'+esc(u.name)+'</div><div class="ss">'+esc(u.role||'')+'</div></div>'+(state.form.assigneeId===u.id?'<span style="color:var(--accent)">✓</span>':'')+'</button>').join('')+'</div></div>';
 }
 function stepBriefing(){const f=state.form;const t=tpl();const s=secOf(f.sector);let h='';
+  // F3.5.2 — Edição de Cards (ETAPA 3/BRIEFING): uma seção INDEPENDENTE por card (Tema obrig. /
+  // Legenda opc. / Observações opc. / Prazo individual obrig. data+hora). Sem checklist/link/cliente.
+  if(secOf(f.sector).key==='edicao_cards'){
+    const n=cardsQtyOf(f);
+    h+='<div class="lbl">Cards do lote ('+n+')</div>';
+    for(let i=0;i<n;i++){const c=f.cards[i]||{};const open=(f._openContent===i);const filled=(c.tema||c.legenda||c.obs||c.dueDate);
+      h+='<div class="content-card '+(open?'open':'')+'"><button class="ch" data-content="'+i+'"><span class="cd '+(filled?'fill':'')+'"></span><span class="ct">Card '+(i+1)+'</span><span style="color:var(--soft)">'+(open?'▲':'▼')+'</span></button><div class="cb">'+
+        '<div class="lbl">Tema <span class="req">obrigatório</span></div><input class="inp" data-cardtema="'+i+'" placeholder="Tema do card '+(i+1)+'" value="'+esc(c.tema||'')+'">'+
+        '<div style="height:8px"></div><div class="lbl">Legenda</div><textarea class="inp" data-cardleg="'+i+'" placeholder="Legenda (opcional)">'+esc(c.legenda||'')+'</textarea>'+
+        '<div style="height:8px"></div><div class="lbl">Observações</div><textarea class="inp" data-cardobs="'+i+'" placeholder="Observações (opcional)">'+esc(c.obs||'')+'</textarea>'+
+        '<div style="height:8px"></div><div class="row" style="gap:12px"><div style="flex:1"><div class="lbl">Data do prazo <span class="req">obrigatório</span></div><div class="dt-field">'+svg('calendar')+'<input class="inp dt" data-carddue="'+i+'" type="date" value="'+esc(c.dueDate||'')+'"></div></div><div style="flex:1"><div class="lbl">Hora do prazo <span class="req">obrigatório</span></div><div class="dt-field">'+svg('clock')+'<input class="inp dt" data-cardduet="'+i+'" type="time" value="'+esc(c.dueTime||'')+'"></div></div></div>'+
+        '</div></div>';
+    }
+    return h;
+  }
   if(t&&t.subtypes){
     h+='<div class="lbl">'+esc(t.subLabel||'Tipo')+'</div><div class="chips" style="margin-bottom:14px">'+Object.keys(t.subtypes).map(k=>'<button class="chip" data-fsub="'+k+'" style="'+(f.subtype===k?'background:var(--accent);border-color:transparent;color:#fff':'')+'">'+esc(t.subtypes[k].label)+'</button>').join('')+'</div>';
     const sub=curSub();
@@ -7986,6 +8027,27 @@ function checklistHtml(def){const f=state.form;if(f.checklist.length===0&&def&&d
 function fmtDateBR(d){if(!d)return '';const p=String(d).split('-');return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):d;}
 function revItem(ic,l,v){return '<div class="rev-it">'+svg(ic)+'<div class="rev-it-m"><div class="rev-it-l">'+esc(l)+'</div><div class="rev-it-v">'+esc(v)+'</div></div></div>';}
 function stepReview(){const f=state.form;const s=secOf(f.sector);const sub=curSub();const u=f.assigneeId?state.users.find(x=>x.id===f.assigneeId):null;
+  // F3.5.2 — Edição de Cards (ETAPA 4/REVISÃO): resumo do lote + os N cards com prazos individuais.
+  // Sem botão "Enviar ao cliente" (setor interno, não-cliente).
+  if(secOf(f.sector).key==='edicao_cards'){
+    const n=cardsQtyOf(f);
+    let hc='<div class="rev-head"><div class="rev-badge" style="background:'+withAlpha(s.color,.16)+';color:'+s.color+'">'+svg(s.icon)+'<span>'+esc(s.label)+'</span></div>'+
+      '<div class="rev-h-title">Revisão do lote</div><div class="rev-h-sub">Confira os '+n+(n===1?' card':' cards')+' antes de criar.</div></div>';
+    hc+='<div class="rev-card">'+
+      (f.client?'<div class="rev-client">'+svg('place')+'<span>'+esc(f.client)+'</span></div>':'')+
+      '<div class="rev-grid">'+revItem('grid','Setor',s.label)+revItem('checklist','Quantidade',n+(n===1?' card':' cards'))+'</div>'+
+      '<div class="rev-divider"></div>'+
+      '<div class="rev-resp">'+(u?avatar(u,42):'<div class="av" style="width:42px;height:42px;background:var(--surface2);color:var(--faint)">'+svg('person')+'</div>')+
+        '<div class="rev-resp-m"><div class="rev-resp-l">Designer responsável</div><div class="rev-resp-n">'+(u?esc(u.name):'Ninguém atribuído')+'</div>'+(u&&u.role?'<div class="rev-resp-r">'+esc(u.role)+'</div>':'')+'</div>'+
+        '<button class="rev-edit" data-formgoto="resp">Editar</button>'+
+      '</div></div>';
+    hc+='<div class="rev-sec-h"><span>Cards</span><span class="rev-count">'+n+'</span></div><div class="rev-contents">';
+    for(let i=0;i<n;i++){const c=f.cards[i]||{};const pz=c.dueDate?(fmtDateBR(c.dueDate)+(c.dueTime?' às '+c.dueTime:'')):'sem prazo';
+      hc+='<div class="rev-content"><div class="rev-content-n">'+(i+1)+'</div><div class="rev-content-m"><div class="rev-content-t">'+esc(c.tema||'(sem tema)')+'</div>'+(c.legenda?'<div class="rev-content-l">'+esc(c.legenda)+'</div>':'')+(c.obs?'<div class="rev-content-l">Obs.: '+esc(c.obs)+'</div>':'')+'<div class="rev-content-l">Prazo: '+esc(pz)+'</div></div></div>';}
+    hc+='</div>';
+    hc+='<div class="rev-quick"><button class="rev-edit2" data-formgoto="1">'+svg('editnote')+'Editar dados</button><button class="rev-edit2" data-formgoto="2">'+svg('description')+'Editar cards</button></div>';
+    return hc;
+  }
   const stt=stOf(f.status);
   const prazo=f.dueDate?fmtDateBR(f.dueDate):'Sem prazo definido';
   // Cabecalho premium
@@ -8063,6 +8125,13 @@ function afterForm(){
   bind('[data-item]',e=>state.form.items[+e.dataset.item]=e.value);
   bind('[data-vtema]',e=>{const i=+e.dataset.vtema;state.form.videos[i]=state.form.videos[i]||{};state.form.videos[i].tema=e.value;});
   bind('[data-chk]',e=>state.form.checklist[+e.dataset.chk].t=e.value);
+  // F3.5.2 — Edição de Cards: quantidade + campos por-card (tema/legenda/obs/prazo) → state.form.cards[i]
+  bind('#fCardsQty',e=>{state.form.cardsQty=e.value;});
+  bind('[data-cardtema]',e=>{const i=+e.dataset.cardtema;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].tema=e.value;});
+  bind('[data-cardleg]',e=>{const i=+e.dataset.cardleg;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].legenda=e.value;});
+  bind('[data-cardobs]',e=>{const i=+e.dataset.cardobs;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].obs=e.value;});
+  bind('[data-carddue]',e=>{const i=+e.dataset.carddue;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].dueDate=e.value;});
+  bind('[data-cardduet]',e=>{const i=+e.dataset.cardduet;state.form.cards[i]=state.form.cards[i]||{};state.form.cards[i].dueTime=e.value;});
   // date/time: indicador nativo oculto -> clicar no campo abre o seletor via showPicker()
   c.querySelectorAll('.dt-field').forEach(w=>{const inp=w.querySelector('input');if(!inp)return;
     w.addEventListener('click',()=>{try{inp.showPicker&&inp.showPicker();}catch(_){inp.focus();}});});
@@ -8082,6 +8151,10 @@ async function saveTask(){const f=state.form;
   // 1.0.104 — trava anti-duplo-envio: dois cliques rápidos em "Confirmar/Enviar" criavam
   // DOIS docs de tarefa (duas telas/cards). Um único add por submissão.
   if(f._saving)return; f._saving=true;
+  // F3.5.2 — Edição de Cards: criação em LOTE ATÔMICA (N docs individuais). Early-return ANTES de
+  // TODA a lógica de tarefa única (add() legado 8125, gate de cliente isClientSector, ramo
+  // edicao_midia) — esses caminhos permanecem BYTE-idênticos para os demais setores.
+  if(f.sector&&secOf(f.sector).key==='edicao_cards'){ return saveCardsBatch(); }
   // F3.4.3E — CONSUMO SEGURO de _sendAfterSave: captura o valor e LIMPA o estado IMEDIATAMENTE.
   // Uma tentativa interrompida por validação/erro NÃO pode deixar ação pendente para outro clique,
   // tarefa ou setor — o modal de envio ao cliente só reabre com um NOVO clique explícito. Nunca
@@ -8139,6 +8212,54 @@ async function saveTask(){const f=state.form;
   }else{
     state.tab='tarefas';state.boardSector=sector;boardCol=0;render();
   }
+}
+/* F3.5.2 — Edição de Cards: cria N tarefas INDIVIDUAIS de forma ATÔMICA (db.batch → tudo-ou-nada;
+   nunca lote parcial). Cada card = 1 documento na coleção 'tasks' com o shape CANÔNICO reaproveitado
+   (title=tema, sector, status:'afazer', assignee/assigneeId, dueDate/dueTime/due, by, createdAt, src) +
+   campos ADITIVOS (cardLegenda/cardObs/cardTema, internal, cardsBatchId, cardDeadlineRev) + roteamento
+   ao designer (designerAssignment.designerId, SEM designerSla → fora do motor de SLA congelado).
+   INTERNO: nunca grava clientReviewToken/shareToken/clientReviewUrl/cronStatus/clientFlowStatus, nunca
+   chama token/Card Premium/Worker/portal, nunca mostra "Enviar ao cliente". */
+async function saveCardsBatch(){
+  const f=state.form; if(!f){return;}
+  if(!f.client.trim()){f._saving=false;alert('Informe o cliente.');f.step=1;render();return;}
+  if(!f.assigneeId){f._saving=false;alert('Escolha o Designer responsável.');f.step=1;render();return;}
+  const n=cardsQtyOf(f);
+  const u=state.users.find(x=>x.id===f.assigneeId)||{};
+  const _now=Date.now(); const _soc=state.user||{};
+  const norm=[];
+  for(let i=0;i<n;i++){const c=f.cards[i]||{}; const tema=String(c.tema||'').trim();
+    if(!tema){f._saving=false;alert('Card '+(i+1)+': informe o tema (obrigatório).');f.step=2;render();return;}
+    if(!c.dueDate||!c.dueTime){f._saving=false;alert('Card '+(i+1)+': informe a data e a hora do prazo (obrigatório).');f.step=2;render();return;}
+    norm.push({tema:tema,legenda:String(c.legenda||'').trim(),obs:String(c.obs||'').trim(),dueDate:c.dueDate,dueTime:c.dueTime});
+  }
+  const batchId='cards_'+_now+'_'+Math.random().toString(36).slice(2,8);
+  const socialOwner=isSocialUser(u)?u:(isSocialUser(_soc)?_soc:null);
+  try{
+    const batch=db.batch();
+    for(let i=0;i<norm.length;i++){const c=norm[i]; const ref=db.collection('tasks').doc();
+      const descParts=[]; if(c.legenda)descParts.push('Legenda: '+c.legenda); if(c.obs)descParts.push('Obs.: '+c.obs);
+      const data={ title:c.tema, client:f.client.trim(), sector:'edicao_cards', desc:descParts.join('\n'),
+        status:'afazer', assignee:u.name||'', assigneeId:f.assigneeId, link:'', priority:false,
+        startDate:'', startTime:'', endDate:c.dueDate, endTime:c.dueTime,
+        dueDate:c.dueDate, dueTime:c.dueTime, due:c.dueDate, checklist:[],
+        by:_soc.id||null, createdAt:_now, src:'webpreview',
+        /* aditivos do setor (leitores existentes ignoram por filtrarem por sector/eixo) */
+        cardTema:c.tema, cardLegenda:c.legenda, cardObs:c.obs, internal:true,
+        cardsBatchId:batchId, cardIndex:(i+1), cardsBatchTotal:norm.length, cardDeadlineRev:1,
+        /* roteia ao QUADRO do designer (hasDesigner) — SEM designerSla (não entra no SLA congelado) */
+        designerAssignment:{ designerId:f.assigneeId, designerName:u.name||'', designerAvatar:photoOf(u)||'', designerPhoto:photoOf(u)||'',
+          assignedAt:_now, assignedBy:_soc.id||null, assignedById:_soc.id||null, assignedByName:_soc.name||'', assignedByAvatar:photoOf(_soc)||'', assignedByPhoto:photoOf(_soc)||'', status:'sent',
+          startDate:'', startTime:'', endDate:c.dueDate, endTime:c.dueTime, obs:c.obs||'' },
+        designerFlowStatus:'afazer', designerWorkflowStage:'afazer',
+        designerResponsibleId:f.assigneeId, designerResponsibleName:u.name||'' };
+      if(socialOwner){data.socialOwnerId=socialOwner.id;data.socialOwnerName=socialOwner.name||'';data.socialFlowStatus='afazer';data.socialWorkflowStage='afazer';}
+      batch.set(ref,data);
+    }
+    await batch.commit();  // ATÔMICO: ou todos os N docs, ou nenhum
+  }catch(e){f._saving=false;console.warn('saveCardsBatch',e);alert('Não foi possível criar as tarefas. Verifique a conexão e tente novamente (nada foi criado).');render();return;}
+  state.form=null;
+  state.tab='tarefas';state.boardSector='edicao_cards';boardCol=0;render();
 }
 
 /* ---- EVENT DELEGATION ----
@@ -8343,6 +8464,23 @@ document.addEventListener('focusout',function(){if(_deferRender)setTimeout(funct
 });
 function stepNext(){const f=state.form;
   if(f.step===0&&!f.sector){alert('Escolha o setor.');return;}
+  // F3.5.2 — Edição de Cards: validação própria (Dados: cliente+designer+quantidade; Briefing: cada
+  // card com tema + prazo data/hora). NÃO exige título único (cada card tem o SEU tema como título).
+  if(f.sector&&secOf(f.sector).key==='edicao_cards'){
+    if(f.step===1){
+      if(!f.client.trim()){alert('Informe o cliente.');return;}
+      if(!f.assigneeId){alert('Escolha o Designer responsável.');return;}
+      const q=Math.floor(Number(f.cardsQty)||0);
+      if(!(q>=1&&q<=CARDS_MAX_BATCH)){alert('Informe uma quantidade válida de tarefas (1 a '+CARDS_MAX_BATCH+').');return;}
+    }
+    if(f.step===2){const n=cardsQtyOf(f);
+      for(let i=0;i<n;i++){const c=f.cards[i]||{};
+        if(!c.tema||!String(c.tema).trim()){alert('Card '+(i+1)+': informe o tema (obrigatório).');return;}
+        if(!c.dueDate||!c.dueTime){alert('Card '+(i+1)+': informe a data e a hora do prazo (obrigatório).');return;}
+      }
+    }
+    f.step=Math.min(3,f.step+1);render();return;
+  }
   if(f.step===1){const t=tpl();if(t&&t.clientRequired&&!f.client.trim()){alert('Para '+secOf(state.form.sector).label+' o cliente é obrigatório.');return;}if(!f.title.trim()){alert('Informe o título.');return;}}
   f.step=Math.min(3,f.step+1);render();
 }
