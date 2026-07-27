@@ -57,6 +57,7 @@ function makeSched(dir, uid, startNowMs) {
   const { startSlaScheduler } = require(path.join(dir, 'slaScheduler.js'));
   const st = { now: startNowMs, delivered: [], seen: new Set(), timers: [], snapCb: null };
   const h = startSlaScheduler(() => uid, (p) => st.delivered.push(p), {
+    cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
     now: () => st.now,
     listen: (_n, cb) => { st.snapCb = cb; return () => {}; },
     seen: { has: (k) => st.seen.has(k), add: (k) => st.seen.add(k) },

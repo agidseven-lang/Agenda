@@ -227,6 +227,7 @@ function newRig(deliverImpl) {
     designerSla: { planDueAt: FINISH }, designerAssignment: { designerId: 'U1' } };
   const delivered = []; const seen = new Set(); const logs = []; let listenCb = null;
   const sched = startSlaScheduler(() => 'U1', (p) => { delivered.push(p.dedupKey); return deliverImpl(p); }, {
+    cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
     now: () => NOW,
     listen: (name, cb) => { if (name === 'tasks') listenCb = cb; return () => {}; },
     seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) },

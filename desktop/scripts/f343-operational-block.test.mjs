@@ -69,6 +69,7 @@ function newRig(uid, authUser, sharedSeen) {
     payloads.push(p);
     return r.res;
   }, {
+    cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
     now: () => NOW,
     listen: (name, cb) => { if (name === 'tasks') listenCb = cb; return () => {}; },
     seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) },

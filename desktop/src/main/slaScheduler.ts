@@ -35,13 +35,6 @@ import { diag } from "./diag";
 // caminho relativo que o build copia p/ dist/main/slaRules.js (build:renderer → copy-renderer.js).
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const slaRules: any = require("./slaRules");
-// F3.5.2 — produtor ISOLADO de Edição de Cards (módulo SEPARADO; slaRules permanece byte-idêntico).
-// OPCIONAL: em produção o build (copy-renderer HANDWRITTEN_JS) copia cardsRules.js p/ dist/main; se
-// não resolver (ex.: harness de teste que compila só este arquivo), degrada para no-op (cards não
-// emitem) sem quebrar o produtor de SLA existente.
-let cardsRules: any = { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 };
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-try { cardsRules = require("./cardsRules"); } catch { /* módulo opcional */ }
 
 type NotifPayload = { dedupKey?: string; eventType?: string; taskId?: string; [k: string]: unknown };
 type Deliver = (p: NotifPayload) => unknown;
@@ -59,6 +52,10 @@ export type SlaSchedulerOpts = {
   // F3.4.3 — papel AUTENTICADO do usuário logado (auth-core getUserSelf/login → {id,role,admin}),
   // usado SÓ para o gate canSeeAll do operational_block. null enquanto o papel não é confirmado.
   authUser?: () => { id: string; role: string; admin: boolean } | null;
+  // F3.5.2 — produtor ISOLADO de Edição de Cards. INJETÁVEL só para teste (mock explícito). Em
+  // PRODUÇÃO opts.cardsRules é undefined ⇒ require("./cardsRules") RÍGIDO (falha alto se o módulo não
+  // estiver empacotado — jamais no-op silencioso). O build exige cardsRules.js no app.asar.
+  cardsRules?: { cardsEmissionsFor: (task: any, uid: string, now: number) => NotifPayload[]; cardsNextBoundaryMs: (task: any, now: number) => number };
 };
 
 /** Seen-set PERSISTENTE (JSON em userData) — padrão updater-snooze: { [dedupKey]: ts }, capado. */
@@ -100,6 +97,11 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
   const clearTimer = opts.clearTimer || ((h: any) => clearTimeout(h));
   const SAFETY_MAX_MS = opts.safetyMaxMs || 60000;
   const authUser = opts.authUser || (() => null); // F3.4.3 — papel autenticado p/ operational_block
+  // F3.5.2 — produtor de Edição de Cards: mock injetável (teste) OU require RÍGIDO (produção). Sem
+  // try/catch: módulo ausente na build empacotada ⇒ ERRO alto (nunca no-op). Gate de build garante
+  // a presença em app.asar. O produtor de SLA dos demais setores é INDEPENDENTE disto (byte-idêntico).
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const cardsRules: any = opts.cardsRules || require("./cardsRules");
 
   const tasks = new Map<string, any>();
   let timer: any = null;

@@ -106,6 +106,7 @@ function newRig(uid, sharedSeen) {
   let NOW = 1700000000000, winState = 'visible', pending = null, tid = 0;
   const delivered = []; const seen = sharedSeen || new Set(); let listenCb = null;
   const sched = startSlaScheduler(() => uid, (p) => { const r = chan.deliver(winState, p); delivered.push({ eventType: p.eventType, dedupKey: p.dedupKey, channel: r.res.channel }); return r.res; }, {
+    cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
     now: () => NOW, listen: (name, cb) => { if (name === 'tasks') listenCb = cb; return () => {}; },
     seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) },
     setTimer: (fn, ms) => { pending = { fn, ms, id: ++tid }; return pending; }, clearTimer: (h) => { if (pending && h && pending.id === h.id) pending = null; },

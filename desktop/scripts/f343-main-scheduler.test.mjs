@@ -50,6 +50,7 @@ function newRig(uid, sharedSeen) {
   const seen = sharedSeen || new Set();
   let listenCb = null;
   const sched = startSlaScheduler(() => uid, (p) => { const r = chan.deliver(winState, p); delivered.push({ dedupKey: p.dedupKey, eventType: p.eventType, channel: r.res.channel, targetUserId: p.targetUserId }); return r.res; }, {
+    cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
     now: () => NOW,
     listen: (name, cb) => { if (name === 'tasks') listenCb = cb; return () => {}; },
     seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) },

@@ -139,6 +139,7 @@ let bg;
   let mode = { ok: false, channel: 'none' };
   const delivered = []; const seen = new Set(); let cb = null;
   const s = startSlaScheduler(() => 'U1', (p) => { delivered.push(p.dedupKey); return mode; }, {
+    cardsRules: { cardsEmissionsFor: () => [], cardsNextBoundaryMs: () => 0 }, // F3.5.2 — mock explícito (cards testados à parte)
     now: () => NOW, listen: (n, c) => { if (n === 'tasks') cb = c; return () => {}; },
     seen: { has: (k) => seen.has(k), add: (k) => seen.add(k) }, setTimer: () => 0, clearTimer: () => {}, onLog: () => {}, authUser: () => null });
   cb({ docChanges: () => [{ type: 'added', doc: { id: 'T1', data: () => task } }] });
