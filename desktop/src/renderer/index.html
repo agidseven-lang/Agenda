@@ -2318,14 +2318,18 @@ const APP_VER={ desktop:DESK_VER, tag:'Fluxo', apk:DESK_VER };
 
 /* ---- Domínio (Types.kt) ---- */
 const SECTORS=[
-  {key:'edicao_midia',label:'Edição de mídia',color:'#60A5FA',desc:'Cortes, legendas e exportação',icon:'movie'},
+  {key:'edicao_midia',label:'Edição de vídeos',color:'#60A5FA',desc:'Cortes, legendas e exportação',icon:'movie'},/* F3.5.2 — rótulo visual 'Edição de mídia'→'Edição de vídeos'; key INTERNA preservada (compat tarefas/filtros/histórico) */
   {key:'cronograma',label:'Cronograma',color:'#34D399',desc:'Planejamento de publicações',icon:'calendar'},
   /* F3.3.71C7 — setor DESCONTINUADO para NOVAS tarefas (corte de escopo do owner).
      A definição permanece para tarefas HISTÓRICAS: secOf/alias/labels/cores/Board
      continuam resolvendo 'copywriting' e 'copy' normalmente. */
   {key:'copywriting',label:'Copywriting',color:'#22D3EE',desc:'Textos, legendas e anúncios',icon:'editnote',descontinuado:true},
   {key:'roteiro',label:'Roteiro',color:'#F59E0B',desc:'Roteiros de gravação de vídeos',icon:'description'},
-  {key:'programacao_posts',label:'Programação de posts',color:'#A78BFA',desc:'Agendamento e publicação',icon:'grid'}];
+  {key:'programacao_posts',label:'Programação de posts',color:'#A78BFA',desc:'Agendamento e publicação',icon:'grid'},
+  /* F3.5.2 — NOVO 5º setor INTERNO (não-cliente): cards avulsos individuais. ADITIVO.
+     NÃO entra em isClientSector (sem Card Premium/link/portal/Worker), SECTOR_ALIAS nem SECTOR_SLA
+     (perfil de notificação próprio T-30/T-10). key estável 'edicao_cards' — nunca reusa outro setor. */
+  {key:'edicao_cards',label:'Edição de Cards',color:'#F472B6',desc:'Criação de cards avulsos',icon:'image'}];
 const SECTOR_ALIAS={design:'edicao_midia',copy:'copywriting',postagem:'programacao_posts'};
 function secOf(k){const kk=SECTOR_ALIAS[k]||k;return SECTORS.find(s=>s.key===kk)||SECTORS[0];}
 /* F3.3.73I6C16 — Roteiro passa a usar o MESMO fluxo-cliente do Cronograma (Card Premium):
