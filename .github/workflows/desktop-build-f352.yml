@@ -203,8 +203,11 @@ jobs:
           set -e
           EXDIR="$RUNNER_TEMP/asarx"
           test -f "$EXDIR/dist/main/cardsRules.js" || { echo "::error:: dist/main/cardsRules.js AUSENTE no app.asar"; exit 1; }
-          SRC_SHA=$(sha256sum src/main/cardsRules.js | awk '{print $1}')
-          ASAR_SHA=$(sha256sum "$EXDIR/dist/main/cardsRules.js" | awk '{print $1}')
+          # tr -d '\\': sha256sum (coreutils) PREFIXA '\' na linha quando o caminho contem barra
+          # invertida (RUNNER_TEMP no Windows e D:\a\_temp\...). O HASH em si nao tem '\'; removemos
+          # o escape p/ comparar o valor puro (fonte usa caminho relativo, sem prefixo).
+          SRC_SHA=$(sha256sum src/main/cardsRules.js | awk '{print $1}' | tr -d '\\')
+          ASAR_SHA=$(sha256sum "$EXDIR/dist/main/cardsRules.js" | awk '{print $1}' | tr -d '\\')
           echo "cardsRules.js SHA-256 fonte=$SRC_SHA asar=$ASAR_SHA"
           [ "$SRC_SHA" = "$ASAR_SHA" ] || { echo "::error:: cardsRules.js empacotado != fonte"; exit 1; }
           N=$(find "$EXDIR" -name cardsRules.js | wc -l | tr -d ' ')
