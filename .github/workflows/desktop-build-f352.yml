@@ -6,20 +6,21 @@
 # PRESERVADA); 5o setor edicao_cards (aditivo); wizard + criacao em LOTE atomica; produtor de
 # notificacao ISOLADO T-30/T-10 (cardsRules.js) entregue EXCLUSIVAMENTE pelo canal oficial
 # deliverNotification. Card Premium/cliente/Worker/SLA dos demais setores: BYTE-IDENTICOS a 1.0.186.
+#
+# DOIS JOBS (mesmo SHA pinado b84639d):
+#   job "verify" (ubuntu): PHASE B — checkout limpo, tsc + lint + TODAS as suites de gate
+#     (5 f352 incl. packaging sintetico do app.asar + golden masters + comportamentais) + f351f
+#     PRESERVADO byte-identico (NAO rodado como gate). Cross-platform-safe.
+#   job "build" (windows, needs verify): PHASE I — electron-builder (--publish never) e PROVAS do
+#     pacote real: app.asar (prova-de-versao 1.0.187 + renderer==fonte + F4.2F ausente), cardsRules.js
+#     EMPACOTADO no app.asar REAL (SHA-256==fonte; 1 copia; cardsEmissionsFor exportada; slaScheduler
+#     require rigido), flags do updater (allowPrerelease=false->channel=latest->allowDowngrade=false),
+#     identidade Windows (AppUserModelId/appId/close-to-tray), Authenticode (NotSigned em paridade),
+#     metadata (latest.yml 1.0.187 + blockmap + app-update.yml sem segredo), SBOM, hashes SHA-256.
 # Produz EXE + MSI + latest.yml + blockmap + SHA256SUMS + SBOM; artifacts PRIVADOS. `--publish never`:
-# o CI NUNCA publica; NAO cria release/tag/Latest. Esta e a PROPRIA build final da 1.0.187: apos os
-# gates verdes, os MESMOS bytes/hashes serao publicados SEM rebuild (release gated, literal
-# PUBLICAR-DESKTOP-1.0.187-STABLE). Gates fail-closed (todos verdes obrigatorio):
-#   - F3.5.2 cards: notify + source-invariance (Card Premium byte-identico vs 1.0.186) + recipient +
-#     channel-substitution (amarela->vermelha, 3 janelas, canal oficial) + packaging (app.asar);
-#   - f351f-rollforward-equivalence PRESERVADO (presente + byte-identico a 1.0.186; NAO rodado como gate);
-#   - golden masters SLA/fluxo/temporal + contrato movimentacao + entrega visual + updater/notifier/baseline;
-#   - prova-de-versao (package.json empacotado == 1.0.187) + renderer EMPACOTADO == fonte + F4.2F AUSENTE;
-#   - cardsRules.js EMPACOTADO no app.asar (SHA-256 == fonte; 1 copia; cardsEmissionsFor exportada);
-#   - flags do updater no app.asar (allowPrerelease=false -> channel=latest -> allowDowngrade=false);
-#   - identidade Windows (AppUserModelId/appId/close-to-tray); Authenticode (NotSigned em paridade);
-#   - metadata (latest.yml 1.0.187 + blockmap + app-update.yml sem segredo) + SBOM + hashes SHA-256.
-# NAO publica; NAO toca Worker/Firebase/Firestore/Rules/Functions/Android/portal. Execucao SO manual.
+# o CI NUNCA publica; NAO cria release/tag/Latest. Apos os gates verdes, os MESMOS bytes/hashes serao
+# publicados SEM rebuild (release gated, literal PUBLICAR-DESKTOP-1.0.187-STABLE). NAO toca Worker/
+# Firebase/Firestore/Rules/Functions/Android/portal. Execucao SO manual.
 # =====================================================================
 name: "[manual] F3.5.2 Desktop Build (stable 1.0.187 — Edicao de Cards)"
 
@@ -30,16 +31,90 @@ name: "[manual] F3.5.2 Desktop Build (stable 1.0.187 — Edicao de Cards)"
 permissions:
   contents: read
 
+env:
+  CAND_SHA: "b84639da0af95203db0b8c6b9d0335f74d56cadf" # candidato 1.0.187 (F3.5.2; pin imutavel)
+  BASE_186_SHA: "e87ef4b59c4edc6c6fd6249fd7f4ac07b6413048" # Desktop 1.0.186 OFICIAL (tag v1.0.186)
+
 jobs:
+  # ============================ PHASE B — gates em checkout limpo (Linux) ============================
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (SHA EXATO do candidato PINADO; history completo p/ baseline 1.0.186)
+        uses: actions/checkout@v4
+        with:
+          ref: "b84639da0af95203db0b8c6b9d0335f74d56cadf"
+          fetch-depth: 0
+
+      - name: Derivar versao (package.json e a fonte unica) — exige 1.0.187 exato, sem sufixo
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.187" ] || { echo "::error:: versao != 1.0.187"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido ($APP_VERSION)"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci (instalacao limpa e reproduzivel)
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + updaterService + renderer + cardsRules)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit — verificacao de tipos estrita)
+        working-directory: desktop
+        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
+
+      - name: Gate F3.5.2 CARDS (notify + source-invariance/Card-Premium + recipient + substituicao + packaging app.asar)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in f352-cards-notify f352-cards-source-invariance f352-cards-recipient f352-cards-channel-substitution; do
+            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate F3.5.2 $t vermelho"; exit 1; }
+          done
+          echo "== f352-cards-packaging (empacotamento sintetico do app.asar) =="
+          node scripts/f352-cards-packaging.mjs || { echo "::error:: gate de empacotamento cardsRules vermelho"; exit 1; }
+
+      - name: Gate f351f PRESERVADO (presente + byte-identico a 1.0.186; NAO rodado como gate da feature)
+        working-directory: desktop
+        run: |
+          set -e
+          test -f scripts/f351f-rollforward-equivalence.test.mjs || { echo "::error:: f351f AUSENTE (deve permanecer preservado)"; exit 1; }
+          D=$(git diff "$BASE_186_SHA" -- scripts/f351f-rollforward-equivalence.test.mjs || true)
+          [ -z "$D" ] || { echo "::error:: f351f ALTERADO vs 1.0.186 (deve ser byte-identico)"; exit 1; }
+          echo "f351f PRESERVADO byte-identico (nao executado como gate da feature)."
+
+      - name: Gate PRESERVACAO — golden masters SLA/fluxo/temporal + comportamentais (1.0.186 inalterado)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in f343-sla-golden-master f344-flow-golden-master f345-sla-timestamp-golden-master \
+                   f344-repeated-move-contract f343-delivery-channel f343-preservation \
+                   f341a-updater-state-machine f347-immediate-visual-delivery f347-independent-behavior \
+                   f33E-main-notifier f33D-background-notif f33F-bg-notify f33C-assignment-toast \
+                   f343-assignment-transition f343-main-scheduler f343-operational-block \
+                   f3377a-r3-single-producer-clock f3377a-r4b-http-date-clock f3311-baseline-freeze; do
+            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate de preservacao $t vermelho"; exit 1; }
+          done
+          echo "PHASE B: TODOS OS GATES APLICAVEIS VERDES."
+
+  # ============================ PHASE I — build oficial Windows (packaging real) ============================
   build:
+    needs: verify
     runs-on: windows-latest
     defaults:
       run:
         shell: bash
     env:
       APP_DIR: "desktop"
-      CAND_SHA: "b84639da0af95203db0b8c6b9d0335f74d56cadf" # candidato 1.0.187 (F3.5.2; pin imutavel)
-      BASE_186_SHA: "e87ef4b59c4edc6c6fd6249fd7f4ac07b6413048" # Desktop 1.0.186 OFICIAL (tag v1.0.186)
     steps:
       - name: Forcar LF no checkout (Windows core.autocrlf=true quebraria harness LF-based)
         run: |
@@ -47,7 +122,7 @@ jobs:
           git config --global core.eol lf
           echo "git global: core.autocrlf=$(git config --global --get core.autocrlf) core.eol=$(git config --global --get core.eol)"
 
-      - name: Checkout (SHA EXATO do candidato PINADO; history completo p/ baseline 1.0.186)
+      - name: Checkout (SHA EXATO do candidato PINADO; history completo)
         uses: actions/checkout@v4
         with:
           ref: "b84639da0af95203db0b8c6b9d0335f74d56cadf"
@@ -89,44 +164,6 @@ jobs:
         working-directory: ${{ env.APP_DIR }}
         run: npm run build
 
-      - name: Lint (tsc --noEmit — verificacao de tipos estrita)
-        working-directory: ${{ env.APP_DIR }}
-        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
-
-      # ---------- GATES F3.5.2 (Edicao de Cards) ----------
-      - name: Gate F3.5.2 CARDS (notify + source-invariance/Card-Premium + recipient + substituicao + packaging)
-        working-directory: ${{ env.APP_DIR }}
-        run: |
-          set -e
-          for t in f352-cards-notify f352-cards-source-invariance f352-cards-recipient f352-cards-channel-substitution; do
-            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate F3.5.2 $t vermelho"; exit 1; }
-          done
-          echo "== f352-cards-packaging (app.asar) =="
-          node scripts/f352-cards-packaging.mjs || { echo "::error:: gate de empacotamento cardsRules vermelho"; exit 1; }
-
-      - name: Gate f351f PRESERVADO (presente + byte-identico a 1.0.186; NAO rodado como gate da feature)
-        working-directory: ${{ env.APP_DIR }}
-        run: |
-          set -e
-          test -f scripts/f351f-rollforward-equivalence.test.mjs || { echo "::error:: f351f AUSENTE (deve permanecer preservado)"; exit 1; }
-          D=$(git diff "$BASE_186_SHA" -- scripts/f351f-rollforward-equivalence.test.mjs || true)
-          [ -z "$D" ] || { echo "::error:: f351f ALTERADO vs 1.0.186 (deve ser byte-identico)"; exit 1; }
-          echo "f351f PRESERVADO byte-identico (nao executado como gate da feature)."
-
-      # ---------- GATES DE PRESERVACAO (comportamento 1.0.186 inalterado) ----------
-      - name: Gate PRESERVACAO — SLA/fluxo/temporal/entrega-visual/updater/notifier (Windows-safe)
-        working-directory: ${{ env.APP_DIR }}
-        run: |
-          set -e
-          for t in f343-sla-golden-master f344-flow-golden-master f345-sla-timestamp-golden-master \
-                   f344-repeated-move-contract f343-delivery-channel f343-preservation \
-                   f341a-updater-state-machine f347-immediate-visual-delivery f347-independent-behavior \
-                   f33E-main-notifier f33D-background-notif f33F-bg-notify f33C-assignment-toast \
-                   f343-assignment-transition f343-main-scheduler f343-operational-block \
-                   f3377a-r3-single-producer-clock f3377a-r4b-http-date-clock f3311-baseline-freeze; do
-            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate de preservacao $t vermelho"; exit 1; }
-          done
-
       - name: electron-builder (NSIS + MSI + metadata do MESMO build; --publish never)
         working-directory: ${{ env.APP_DIR }}
         run: npx electron-builder --win nsis msi --publish never
@@ -160,7 +197,7 @@ jobs:
           done
           echo "GATE prova-de-versao 1.0.187 + renderer==fonte + F4.2F AUSENTE OK."
 
-      - name: Gate cardsRules EMPACOTADO no app.asar (SHA-256 == fonte; 1 copia; cardsEmissionsFor exportada)
+      - name: Gate cardsRules EMPACOTADO no app.asar REAL (SHA-256 == fonte; 1 copia; cardsEmissionsFor exportada)
         working-directory: ${{ env.APP_DIR }}
         run: |
           set -e
