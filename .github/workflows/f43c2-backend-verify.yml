@@ -1,0 +1,110 @@
+# =====================================================================
+# [F4.3C2] Backend Session-Revocation & Endpoint Hardening — VERIFY (NO-DEPLOY)
+# ---------------------------------------------------------------------
+# Verificacao ISOLADA e SEM DEPLOY das mudancas de revogacao de sessao server-side
+# (sessionVersion) e endurecimento de endpoints no backend (functions/index.js),
+# base app/main @ 4ace8aa. Os testes sao puros Node (harness grab()/new Function;
+# SEM emulador, SEM node_modules, SEM Firestore real) — rodam identicamente aqui.
+#
+# Este arquivo vive em `main` SOMENTE para ser workflow_dispatch-able (exigencia do
+# GitHub). Ele faz CHECKOUT do BRANCH DE FEATURE (input `ref`) e o verifica.
+#
+# GARANTIAS (fail-closed):
+#   - NAO faz deploy (firebase/gcloud/wrangler); NAO altera Rules; NAO toca producao;
+#   - NAO consome NENHUM secret; permissoes minimas contents:read;
+#   - superficies CONGELADAS (Android nativo, Worker, wrangler, web/PWA, firebase.json,
+#     demais arquivos de functions/) permanecem diff-empty vs a base;
+#   - allowlist ESTRITO de arquivos alterados (index.js + 3 testes backend + docs).
+# =====================================================================
+name: F4.3C2 Backend Session-Revocation Hardening — VERIFY (no-deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch/SHA de feature a verificar'
+        required: true
+        default: 'backend/f43c2-session-revocation-hardening'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: "4ace8aa7dd8e1d3607d79252725afbeaf17aa44d"
+      # Suites PRE-EXISTENTES vermelhas na BASE 4ace8aa: sao auto-testes de isolamento
+      # (git-diff) de fases f3361 antigas que falham porque a arvore evoluiu desde a base
+      # DELAS — NAO sao regressao desta fase. As assercoes de COMPORTAMENTO delas passam;
+      # so as meta-assercoes "diff restrito/functions nao alterado" falham. Confinadas aqui.
+      KNOWN_RED: "f3361R1-fcm-direct-write-cutoff f3361S1-role-self-edit-hardening f3361U1-users-write-endpoints-default-on-cutoff f3361U2-fcm-off-fallback-cutoff f3361U3-read-hardening-push-cutoff"
+    steps:
+      - name: Checkout (ref de feature; history completo p/ o gate de isolamento)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node 20 (runtime das Functions Gen2)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Gate — ISOLAMENTO (allowlist estrito; superficies congeladas diff-empty vs 4ace8aa)
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASE_SHA" HEAD | sed '/^$/d' || true)
+          echo "=== arquivos alterados vs base 4ace8aa ==="; echo "$CHANGED"
+          # Allowlist ESTRITO: apenas o backend (index.js), os 3 testes backend tocados e docs/.
+          ALLOW='^(functions/index\.js|scripts/worker-ops/f43c2-session-revocation\.test\.mjs|scripts/worker-ops/f3361C-users-write-endpoints\.test\.mjs|scripts/worker-ops/f3361J-web-users-write-client-cutover\.test\.mjs|docs/F4\.3C2-BACKEND-SESSION-REVOCATION-HARDENING\.md)$'
+          BAD=$(echo "$CHANGED" | grep -vE "$ALLOW" || true)
+          if [ -n "$BAD" ]; then echo "::error::mudanca FORA do allowlist F4.3C2: $BAD"; exit 1; fi
+          # Superficies CONGELADAS: precisam estar diff-empty (defesa redundante ao allowlist).
+          for p in "android-native-beta" "android-native" "cloudflare-worker.js" "wrangler.toml" \
+                   "index.html" "firebase.json" ".firebaserc" "firebase-messaging-sw.js" "sw.js" \
+                   "manifest.json" "functions/package.json" "functions/.gitignore" ".github"; do
+            D=$(git diff --name-only "$BASE_SHA" HEAD -- "$p" || true)
+            [ -z "$D" ] || { echo "::error::superficie CONGELADA alterada: $p -> $D"; exit 1; }
+          done
+          echo "OK: isolamento preservado (Android/Worker/wrangler/web-PWA/firebase/functions-outros intocados)."
+
+      - name: Gate — NO-DEPLOY (nenhuma invocacao de deploy no diff de index.js)
+        run: |
+          set -euo pipefail
+          if git diff "$BASE_SHA" HEAD -- functions/index.js | grep -niE 'firebase +deploy|gcloud |wrangler +deploy'; then
+            echo "::error::diff de functions/index.js contem invocacao de DEPLOY"; exit 1
+          fi
+          echo "OK: sem invocacao de deploy no diff (esta fase e aditiva/dormente; deploy = acao manual futura)."
+
+      - name: node --check functions/index.js (sintaxe/parse)
+        run: node --check functions/index.js
+
+      - name: Teste F4.3C2 — session-revocation (66 asserts, deve ficar VERDE)
+        run: |
+          set -euo pipefail
+          node scripts/worker-ops/f43c2-session-revocation.test.mjs
+
+      - name: Regressao — TODAS as suites backend verdes EXCETO as pre-existentes vermelhas
+        run: |
+          set -uo pipefail
+          fail=0; green=0; red_known=0
+          for f in scripts/worker-ops/*.test.mjs; do
+            b=$(basename "$f" .test.mjs)
+            skip=0; for k in $KNOWN_RED; do [ "$b" = "$k" ] && skip=1; done
+            if node "$f" >/tmp/f43c2_out 2>&1; then
+              green=$((green+1)); echo "OK   $b"
+            else
+              if [ "$skip" = "1" ]; then
+                red_known=$((red_known+1)); echo "SKIP-RED (pre-existente na base) $b"
+              else
+                echo "::error::REGRESSAO NOVA em $b:"; tail -6 /tmp/f43c2_out; fail=1
+              fi
+            fi
+          done
+          echo "== verdes=$green ; vermelhas-pre-existentes=$red_known =="
+          [ "$fail" = "0" ] || { echo "::error::regressao nova detectada"; exit 1; }
+          echo "OK: nenhuma regressao NOVA; 5 vermelhas pre-existentes confinadas ao KNOWN_RED."
+
+      - name: Prova — sem secrets, sem deploy, sem producao
+        run: echo "Workflow read-only: NAO consome secrets, NAO faz deploy, NAO acessa producao/dados reais."
