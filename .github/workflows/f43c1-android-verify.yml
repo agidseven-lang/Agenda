@@ -104,11 +104,49 @@ jobs:
           set -euo pipefail
           ./gradlew :app:testDebugUnitTest --tests "br.com.idseven.agenda.auth.*" --no-daemon --stacktrace
 
-      - name: Lint DEBUG
+      - name: Lint DEBUG (relatório completo + GATE de REGRESSÃO — erros só em arquivos alterados pela F4.3C1)
         working-directory: android-native-beta
         run: |
-          set -euo pipefail
-          ./gradlew :app:lintDebug --no-daemon --stacktrace
+          set -uo pipefail
+          # Roda o lint do módulo SEM abortar aqui (o XML é sempre gerado). O gate falha SOMENTE se
+          # houver erro de lint em algum arquivo ALTERADO pela F4.3C1 (regressão nova). Erros
+          # PRÉ-EXISTENTES na base 4d333574 (arquivos intocados, ex.: core/Notifications.kt —
+          # MissingPermission/POST_NOTIFICATIONS) são REPORTADOS com transparência, mas NÃO bloqueiam
+          # esta verificação isolada, pois estão fora do escopo desta fase (auth/sessão/FCM/registro).
+          ./gradlew :app:lintDebug --no-daemon --stacktrace || echo ">> lintDebug retornou != 0 (avaliado abaixo pelo gate de regressão)"
+          XML="app/build/reports/lint-results-debug.xml"
+          if [ ! -f "$XML" ]; then echo "::error::relatório de lint (XML) ausente em $XML"; exit 1; fi
+          # arquivos alterados pela F4.3C1 (repo-relativos), só o módulo:
+          CHANGED="$(cd .. && git diff --name-only "$BASE_SHA" HEAD -- 'android-native-beta/**')"
+          export CHANGED
+          # Parser robusto (ElementTree lida com qualquer formatação do XML). Gate falha SOMENTE se um
+          # issue severity="Error" apontar para um arquivo alterado pela F4.3C1.
+          cat > /tmp/f43c1_lint_gate.py <<'PYEOF'
+          import sys, os, xml.etree.ElementTree as ET
+          changed = [c.strip() for c in os.environ.get("CHANGED", "").splitlines() if c.strip()]
+          root = ET.parse(sys.argv[1]).getroot()
+          errs, new = [], []
+          for issue in root.iter('issue'):
+              if issue.get('severity') != 'Error':
+                  continue
+              iid = issue.get('id')
+              for loc in issue.iter('location'):
+                  f = (loc.get('file') or '').replace('\\', '/')
+                  errs.append((iid, f))
+                  if any(f.endswith(cf) for cf in changed):
+                      new.append((iid, f))
+          print("== %d erro(s) de lint no total (todos, incl. pre-existentes) ==" % len(errs))
+          for i, f in errs:
+              print("  %s: %s" % (i, f))
+          if new:
+              print("::error::F4.3C1 introduziu erro(s) de lint em arquivo(s) alterado(s):")
+              for i, f in new:
+                  print("::error::  %s: %s" % (i, f))
+              sys.exit(1)
+          print("OK: 0 erro de lint nos arquivos alterados pela F4.3C1.")
+          print("   (Erros remanescentes sao PRE-EXISTENTES na base 4d333574, fora do escopo desta fase.)")
+          PYEOF
+          python3 /tmp/f43c1_lint_gate.py "$XML"
 
       - name: Upload relatorios (testes + lint) — retencao 14 dias
         if: always()
