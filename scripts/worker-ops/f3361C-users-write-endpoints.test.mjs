@@ -50,6 +50,9 @@ const FN_NAMES = [
   "authRequireAdminSession", "handleUpdateUserSelf", "handleTouchUserLastSeen",
   "handleAdminCreateUser", "handleAdminUpdateUser", "handleAdminSetUserStatus",
   "handleAdminSetUserAdmin", "handleDisableUser",
+  // F4.3C2: as mutacoes admin agora incrementam sessionVersion via este helper (revogacao server-side).
+  // Grab aditivo p/ o harness linkar a nova dependencia; assercoes inalteradas (checam campos, nao o shape).
+  "authBumpUserSessionTx",
 ];
 const CONST_NAMES = ["AUTH_SESSION_TTL_MS", "CHPW_MIN_LEN", "CHPW_MAX_LEN",
   "USER_SELF_UPDATE_KEYS", "USER_ADMIN_UPDATE_KEYS", "USER_STATUS_VALUES"];

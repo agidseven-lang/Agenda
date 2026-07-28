@@ -65,7 +65,9 @@ ok("A20 clients novos não logam token/sessão", _clientBodies.length>0 && !/con
 function grab(n){ let a=SRC.indexOf("async function "+n+"("); if(a<0)a=SRC.indexOf("function "+n+"("); if(a<0)throw new Error("fn? "+n); let d=0; for(let j=SRC.indexOf("{",a); j<SRC.length; j++){ const c=SRC[j]; if(c==="{")d++; else if(c==="}"){ d--; if(!d)return SRC.slice(a,j+1); } } throw new Error("end? "+n); }
 function grabConst(n){ const m=new RegExp("^const "+n+"\\b[^\\n]*$","m").exec(SRC); if(!m)throw new Error("const? "+n); return m[0]; }
 const CONSTS=["AUTH_SESSION_TTL_MS","USER_SELF_UPDATE_KEYS"];
-const FNS=["sha256Hex","hashPw","randSalt","normEmail","isValidEmail","notifMaskUid","notifSignToken","notifVerifyToken","authSessionSecret","authVerifySessionToken","authUserPublicOut","notifRlBlocked","notifRlFail","notifRlClear","notifDb","uwValidColor","uwValidPhoto","uwValidReminder","uwValidStr","uwTargetId","handleUpdateUserSelf","handleDeleteMyAccount"];
+// F4.3C2: deleteMyAccount agora incrementa sessionVersion via authBumpUserSessionTx (revogacao
+// server-side). Grab aditivo p/ o harness linkar a dependencia; assercoes B11/B12 inalteradas.
+const FNS=["sha256Hex","hashPw","randSalt","normEmail","isValidEmail","notifMaskUid","notifSignToken","notifVerifyToken","authSessionSecret","authVerifySessionToken","authUserPublicOut","notifRlBlocked","notifRlFail","notifRlClear","notifDb","uwValidColor","uwValidPhoto","uwValidReminder","uwValidStr","uwTargetId","handleUpdateUserSelf","handleDeleteMyAccount","authBumpUserSessionTx"];
 let BODY=""; for(const n of CONSTS)BODY+=grabConst(n)+"\n"; for(const n of FNS)BODY+=grab(n)+"\n";
 const PRELUDE=`
   var NOTIF_RL_MAX=5,NOTIF_RL_WINDOW_MS=3e5,NOTIF_RL_BLOCK_MS=9e5;var __notifRlState=new Map();

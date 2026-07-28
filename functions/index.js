@@ -409,13 +409,13 @@ exports.requestPasswordReset = onCall(
       const db = admin.firestore();
       const usersSnap = await db.collection("users").where("email", "==", email).limit(1).get();
       if (usersSnap.empty) {
-        logger.info("password-reset:not-found", { email });
+        logger.info("password-reset:not-found", { emailHash: sha256Hex(String(email)).slice(0, 12) });
         return GENERIC_REQUEST_OK;
       }
       const userDoc = usersSnap.docs[0];
       const status = userDoc.get("status");
       if (status === "removido" || status === "excluido" || status === "pendente") {
-        logger.info("password-reset:user-not-eligible", { email, status });
+        logger.info("password-reset:user-not-eligible", { emailHash: sha256Hex(String(email)).slice(0, 12), status });
         return GENERIC_REQUEST_OK;
       }
 
@@ -424,7 +424,7 @@ exports.requestPasswordReset = onCall(
       if (last) {
         const lastAt = last.get("createdAt") || 0;
         if (Date.now() - lastAt < REQUEST_RATE_LIMIT_MS) {
-          logger.warn("password-reset:rate-limited", { email });
+          logger.warn("password-reset:rate-limited", { emailHash: sha256Hex(String(email)).slice(0, 12) });
           return GENERIC_REQUEST_OK;
         }
       }
@@ -442,7 +442,7 @@ exports.requestPasswordReset = onCall(
           to: email, code, fromAddress,
           fromName: RESET_EMAIL_FROM_NAME.value(), apiKey,
         });
-        logger.info("password-reset:email-sent", { email });
+        logger.info("password-reset:email-sent", { emailHash: sha256Hex(String(email)).slice(0, 12) });
       } catch (e) {
         // Resend rejeitou (dominio nao verificado, remetente invalido, etc).
         logger.error("password-reset:resend-rejected", { error: String(e && e.message).slice(0, 300) });
@@ -501,13 +501,15 @@ exports.confirmPasswordReset = onCall(
 
     const salt = randSalt();
     const pass = hashPw(newPassword, salt);
-    await userRef.update({
+    // F4.3C2 — reset confirmado INVALIDA sessoes anteriores: incrementa sessionVersion na MESMA
+    // transacao da troca de senha (atomico). Sem armazenar token; sem denylist.
+    await authBumpUserSessionTx(db, userRef.id, {
       pass, salt,
       mustChangePassword: false,
       passwordChangedAt: Date.now(),
     });
     await codeDoc.ref.update({ usedAt: Date.now(), status: "used" });
-    logger.info("password-reset:confirmed", { email });
+    logger.info("password-reset:confirmed", { emailHash: sha256Hex(String(email)).slice(0, 12) });
     return { ok: true };
   }
 );
@@ -570,14 +572,14 @@ exports.requestPasswordResetHttp = onRequest(
       const db = admin.firestore();
       const usersSnap = await db.collection("users").where("email", "==", email).limit(1).get();
       if (usersSnap.empty) {
-        logger.info("password-reset:not-found", { email });
+        logger.info("password-reset:not-found", { emailHash: sha256Hex(String(email)).slice(0, 12) });
         res.status(200).json({ ok: true, delivered: false });
         return;
       }
       const userDoc = usersSnap.docs[0];
       const status = userDoc.get("status");
       if (status === "removido" || status === "excluido" || status === "pendente") {
-        logger.info("password-reset:user-not-eligible", { email, status });
+        logger.info("password-reset:user-not-eligible", { emailHash: sha256Hex(String(email)).slice(0, 12), status });
         res.status(200).json({ ok: true, delivered: false });
         return;
       }
@@ -586,7 +588,7 @@ exports.requestPasswordResetHttp = onRequest(
       if (last) {
         const lastAt = last.get("createdAt") || 0;
         if (Date.now() - lastAt < REQUEST_RATE_LIMIT_MS) {
-          logger.warn("password-reset:rate-limited", { email });
+          logger.warn("password-reset:rate-limited", { emailHash: sha256Hex(String(email)).slice(0, 12) });
           res.status(200).json({ ok: true, delivered: false });
           return;
         }
@@ -604,7 +606,7 @@ exports.requestPasswordResetHttp = onRequest(
         await sendResetCodeEmail({
           to: email, code, fromAddress, fromName: RESET_EMAIL_FROM_NAME.value(), apiKey,
         });
-        logger.info("password-reset:email-sent", { email });
+        logger.info("password-reset:email-sent", { emailHash: sha256Hex(String(email)).slice(0, 12) });
         res.status(200).json({ ok: true, delivered: true });
       } catch (e) {
         logger.error("password-reset:resend-rejected", { error: String(e && e.message).slice(0, 300) });
@@ -655,9 +657,10 @@ exports.confirmPasswordResetHttp = onRequest(
 
       const salt = randSalt();
       const pass = hashPw(newPassword, salt);
-      await userRef.update({ pass, salt, mustChangePassword: false, passwordChangedAt: Date.now() });
+      // F4.3C2 — reset confirmado (HTTP) INVALIDA sessoes anteriores: incremento atomico de sessionVersion.
+      await authBumpUserSessionTx(db, userRef.id, { pass, salt, mustChangePassword: false, passwordChangedAt: Date.now() });
       await codeDoc.ref.update({ usedAt: Date.now(), status: "used" });
-      logger.info("password-reset:confirmed", { email });
+      logger.info("password-reset:confirmed", { emailHash: sha256Hex(String(email)).slice(0, 12) });
       res.status(200).json({ ok: true });
     } catch (e) {
       logger.error("password-reset:function-error", { phase: "confirm-http", error: String(e && e.message).slice(0, 300) });
@@ -868,6 +871,7 @@ const NOTIF_LOG_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 dias
 const NOTIF_RL_MAX = 5;                               // tentativas invalidas
 const NOTIF_RL_WINDOW_MS = 5 * 60 * 1000;            // janela de contagem
 const NOTIF_RL_BLOCK_MS = 15 * 60 * 1000;           // bloqueio/backoff
+// Rate-limit IN-MEMORY do login/notif — PRESERVADO byte-a-byte (self-contained; sem PII).
 const __notifRlState = new Map();                    // key -> {fails, first, until} (volatil; sem PII)
 function notifRlBlocked(key, now) { const s = __notifRlState.get(key); return !!(s && s.until && now < s.until); }
 function notifRlFail(key, now) {
@@ -878,6 +882,35 @@ function notifRlFail(key, now) {
   __notifRlState.set(key, s);
 }
 function notifRlClear(key) { __notifRlState.delete(key); }
+// F4.3C2 — RateLimiter SUBSTITUIVEL ADITIVO (interface: blocked/fail/clear/snapshot). Impl in-memory
+// (volatil, POR INSTANCIA; sem PII/segredo — SO contadores+timestamps por chave). Um adaptador
+// PERSISTENTE futuro (Firestore/Redis, ver docs) implementa a MESMA interface p/ protecao distribuida.
+// NUNCA guarda token/senha/Bearer no estado (prova: snapshot()). O login/notif segue no notifRl* acima
+// (inalterado); este factory serve o limiter ADMIN e o caminho de adapter persistente futuro.
+function createRateLimiter(opts) {
+  opts = opts || {};
+  const max = Number.isInteger(opts.max) ? opts.max : NOTIF_RL_MAX;
+  const windowMs = Number.isInteger(opts.windowMs) ? opts.windowMs : NOTIF_RL_WINDOW_MS;
+  const blockMs = Number.isInteger(opts.blockMs) ? opts.blockMs : NOTIF_RL_BLOCK_MS;
+  const state = new Map();   // key -> {fails, first, until}
+  return {
+    kind: "in-memory",
+    blocked(key, now) { const s = state.get(key); return !!(s && s.until && now < s.until); },
+    fail(key, now) {
+      let s = state.get(key);
+      if (!s || (now - s.first) >= windowMs) s = { fails: 0, first: now };
+      s.fails += 1;
+      if (s.fails >= max) s.until = now + blockMs;
+      state.set(key, s);
+    },
+    clear(key) { state.delete(key); },
+    // Snapshot p/ AUDITORIA/TESTE: SO key -> {fails, until}. Prova estrutural de ausencia de segredo.
+    snapshot() { const out = {}; state.forEach((v, k) => { out[k] = { fails: v.fails, until: v.until || 0 }; }); return out; },
+  };
+}
+// Limiter dedicado a operacoes ADMIN (janela/limite proprios; injetavel por ctx nos testes).
+const __adminRateLimiter = createRateLimiter({ max: 30, windowMs: 60 * 1000, blockMs: 60 * 1000 });
+exports._createRateLimiter = createRateLimiter;
 
 /* ============================================================================
    F3.3.20-B1.2 — ENDPOINT server-side AUTENTICADO p/ notifPrefs/{uid}.
@@ -1236,6 +1269,8 @@ async function handleLoginUser(ctx) {
   if (!password) return { status: 400, json: { ok: false, error: "missing_password" } };
   if (identifier.length > 320 || password.length > 1024) return { status: 400, json: { ok: false, error: "oversized_input" } };
   // rate-limit IN-MEMORY por identifier + IP (chaves namespaced; isoladas dos endpoints notif).
+  // correlationId defensivo: a OBSERVABILIDADE jamais pode quebrar o caminho de login.
+  let cid = ""; try { cid = authNewCorrelationId(ctx); } catch (_) {}
   const ip = (typeof ctx.ip === "string") ? ctx.ip : "";
   const idLower = identifier.toLowerCase();
   const idDigits = identifier.replace(/\D/g, "");
@@ -1260,19 +1295,31 @@ async function handleLoginUser(ctx) {
     });
   } catch (_) { /* snapshot defensivo */ }
   // inexistente OU multiplos matches (colisao) => MESMO 401 generico (nao revela existencia/colisao).
-  if (matches.length !== 1) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
+  // AUDITORIA server-side: registra a falha SEM uid (nao ha usuario provado) e SEM o identifier (a
+  // allowlist do authAuditEvent ja descarta email/telefone; jamais logamos a senha).
+  if (matches.length !== 1) { rlKeys.forEach((k) => notifRlFail(k, now)); try { authAuditEvent("login_failure", { endpoint: "loginUser", correlationId: cid, at: now }); } catch (_) {} return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
   const u = matches[0];
-  // senha errada => MESMO 401 generico (indistinguivel de inexistente).
-  if (!notifVerifyPassword(u.d.pass, u.d.salt, password)) { rlKeys.forEach((k) => notifRlFail(k, now)); return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
+  // senha errada => MESMO 401 generico (indistinguivel de inexistente para o cliente). O audit
+  // server-side pode portar o uid MASCARADO (util p/ deteccao de brute-force), pois nunca sai ao cliente.
+  if (!notifVerifyPassword(u.d.pass, u.d.salt, password)) { rlKeys.forEach((k) => notifRlFail(k, now)); try { authAuditEvent("login_failure", { uid: u.id, endpoint: "loginUser", correlationId: cid, at: now }); } catch (_) {} return { status: 401, json: { ok: false, error: "invalid_credentials" } }; }
   // inativo => 403 (checado SO apos a senha correta, p/ nao vazar estado a quem nao a tem).
   const st = String(u.d.status || "");
-  if (st === "pendente" || st === "removido" || st === "excluido") return { status: 403, json: { ok: false, error: "user_inactive" } };
+  if (st === "pendente" || st === "removido" || st === "excluido") { try { authAuditEvent("login_failure", { uid: u.id, endpoint: "loginUser", correlationId: cid, status: "user_inactive", at: now }); } catch (_) {} return { status: 403, json: { ok: false, error: "user_inactive" } }; }
   rlKeys.forEach((k) => notifRlClear(k));   // sucesso de credenciais: zera o rate-limit do identifier/IP
   const isAdmin = (u.d.admin === true);
   const role = (typeof u.d.role === "string") ? u.d.role : "";
-  const claims = { uid: u.id, admin: isAdmin, role: role, scope: "session", iat: now, exp: now + AUTH_SESSION_TTL_MS };
+  // F4.3C2 — sessionVersion do doc (default 0) entra nas claims (assinadas). schemaVersion marca o
+  // formato da sessao. O TTL e SEMPRE server-side (authSessionTtlMs); jamais aceita TTL do cliente.
+  // PRODUCAO: os helpers/const F4.3C2 estao SEMPRE linkados => sessao carrega schemaVersion+sessionVersion
+  // + TTL server-side. O typeof-fallback so atua em harnesses pre-F4.3C2 (que nao linkam estes simbolos):
+  // a sessao degrada ao formato legado (24h via AUTH_SESSION_TTL_MS) sem quebrar o teste antigo.
+  const sessionVersion = (typeof authSessionVersionOf === "function") ? authSessionVersionOf(u.d) : 0;
+  const ttlMs = (typeof authSessionTtlMs === "function") ? authSessionTtlMs() : AUTH_SESSION_TTL_MS;
+  const claims = { uid: u.id, admin: isAdmin, role: role, scope: "session", sessionVersion: sessionVersion, iat: now, exp: now + ttlMs };
+  if (typeof AUTH_SESSION_SCHEMA_VERSION !== "undefined") claims.schemaVersion = AUTH_SESSION_SCHEMA_VERSION;
   const token = notifSignToken(claims, authSessionSecret());
-  try { logger.info("[loginUser] sessao emitida", { uid: notifMaskUid(u.id), admin: isAdmin, role: role, exp: claims.exp }); } catch (_) {}
+  try { logger.info("[loginUser] sessao emitida", { uid: notifMaskUid(u.id), admin: isAdmin, role: role, schemaVersion: claims.schemaVersion, sessionVersion: sessionVersion, exp: claims.exp }); } catch (_) {}
+  try { authAuditEvent("login_success", { uid: u.id, endpoint: "loginUser", correlationId: cid, sessionVersion: sessionVersion, at: now }); } catch (_) {}
   return { status: 200, json: { ok: true, session: { token: token, expiresAt: claims.exp }, user: authUserPublicOut(u.id, u.d) } };
 }
 
@@ -1321,11 +1368,161 @@ function authVerifySessionToken(authHeader, secret, nowMs) {
   if (typeof claims.exp !== "number") return { ok: false, error: "invalid_session" };   // exp OBRIGATORIO (fecha o gap)
   if (claims.scope !== "session") return { ok: false, error: "invalid_session" };        // scope ESTRITO
   if (typeof claims.uid !== "string" || !claims.uid) return { ok: false, error: "invalid_session" };
-  return { ok: true, uid: claims.uid, admin: claims.admin === true, role: (typeof claims.role === "string" ? claims.role : ""), scope: "session" };
+  // F4.3C2 — expoe (aditivo) schemaVersion e sessionVersion das CLAIMS (ambos ja cobertos pela
+  // assinatura HMAC). Os campos so aparecem no retorno QUANDO presentes no token (F4.3C2+): tokens
+  // LEGADOS (pre-F4.3C2) mantem o shape EXATO {ok,uid,admin,role,scope} — contrato preservado.
+  // O gate de sessao ATIVA (revogacao) consome estes campos via authSessionVersionDecision.
+  const out = { ok: true, uid: claims.uid, admin: claims.admin === true, role: (typeof claims.role === "string" ? claims.role : ""), scope: "session" };
+  if (typeof claims.schemaVersion === "number") out.schemaVersion = claims.schemaVersion;
+  if (typeof claims.sessionVersion === "number") out.sessionVersion = claims.sessionVersion;
+  return out;
 }
 
 // Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
 exports._authVerifySessionToken = authVerifySessionToken;
+
+/* ============================================================================
+   F4.3C2 — NUCLEO de REVOGACAO server-side (sessionVersion) + gate de sessao ATIVA.
+   ----------------------------------------------------------------------------
+   Modelo (sem armazenar o token bruto): o doc users/{uid} carrega um inteiro
+   sessionVersion; a sessao carrega sessionVersion+schemaVersion nas claims ASSINADAS.
+   Uma sessao so e ATIVA quando token.sessionVersion === user.sessionVersion. Qualquer
+   evento critico (revogacao/troca de senha/reset/desativacao/exclusao/mudanca de
+   role/admin/status) INCREMENTA sessionVersion (transacao ATOMICA), invalidando de
+   imediato TODAS as sessoes anteriores — sem denylist, sem guardar Bearer/hash.
+   TTL SEMPRE server-side. schemaVersion habilita migracao fail-closed de sessoes legadas.
+   ADITIVO/INERTE nesta fase: sem deploy; sem alterar Rules; sem tocar Desktop/Android.
+   ============================================================================ */
+// Versao do FORMATO da sessao (claims). Sessao sem schemaVersion = LEGADA (pre-F4.3C2).
+const AUTH_SESSION_SCHEMA_VERSION = 1;
+// TTL — SEMPRE server-side. Default PRESERVA 24h (comportamento atual; sem ativar mudanca).
+// Configuravel por env AUTH_SESSION_TTL_MS (ms), teto ABSOLUTO 24h, piso 5min. Recomendacao
+// futura: 8h (NAO ativada aqui). NUNCA le TTL do cliente/corpo.
+const AUTH_SESSION_TTL_DEFAULT_MS = 24 * 60 * 60 * 1000;
+const AUTH_SESSION_TTL_MAX_MS = 24 * 60 * 60 * 1000;
+const AUTH_SESSION_TTL_MIN_MS = 5 * 60 * 1000;
+function authSessionTtlMs() {
+  const raw = (typeof process !== "undefined" && process.env) ? process.env.AUTH_SESSION_TTL_MS : "";
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return AUTH_SESSION_TTL_DEFAULT_MS;
+  return Math.max(AUTH_SESSION_TTL_MIN_MS, Math.min(AUTH_SESSION_TTL_MAX_MS, Math.floor(n)));
+}
+// sessionVersion do doc (inteiro >= 0; default 0 quando ausente/invalido).
+function authSessionVersionOf(userDoc) {
+  const v = userDoc && userDoc.sessionVersion;
+  return (Number.isInteger(v) && v >= 0) ? v : 0;
+}
+// Modo de MIGRACAO de sessoes legadas (sem schemaVersion/sessionVersion): "compat" aceita numa
+// JANELA limitada (default; nao quebra sessoes pre-F4.3C2), "strict" rejeita qualquer legado.
+function authSessionMigrationMode() {
+  const m = String((typeof process !== "undefined" && process.env && process.env.AUTH_SESSION_MIGRATION_MODE) || "compat").toLowerCase();
+  return (m === "strict") ? "strict" : "compat";
+}
+// Prazo (epoch ms) da janela de migracao; 0 = sem prazo (janela aberta enquanto em compat).
+function authSessionMigrationDeadlineMs() {
+  const n = Number((typeof process !== "undefined" && process.env && process.env.AUTH_SESSION_MIGRATION_DEADLINE_MS) || "");
+  return (Number.isFinite(n) && n > 0) ? Math.floor(n) : 0;
+}
+// Decisao PURA de versao. tokenAuth = retorno de authVerifySessionToken; userDoc = doc atual.
+// opts = { mode, deadlineMs, nowMs }. { ok:true } | { ok:false, reason:"version_mismatch"|"legacy_rejected" }.
+function authSessionVersionDecision(tokenAuth, userDoc, opts) {
+  opts = opts || {};
+  const mode = opts.mode || authSessionMigrationMode();
+  const userVer = authSessionVersionOf(userDoc);
+  const hasSchema = (typeof tokenAuth.schemaVersion === "number");
+  const hasVer = (typeof tokenAuth.sessionVersion === "number");
+  if (hasSchema && hasVer) {
+    return (tokenAuth.sessionVersion === userVer) ? { ok: true } : { ok: false, reason: "version_mismatch" };
+  }
+  // LEGADA (sem versao): strict rejeita; compat aceita SO dentro da janela E se o doc segue em v0
+  // (se ja foi revogado/alterado, userVer>=1 => legado divergente => rejeitado, fail-closed).
+  if (mode === "strict") return { ok: false, reason: "legacy_rejected" };
+  const deadline = (typeof opts.deadlineMs === "number") ? opts.deadlineMs : authSessionMigrationDeadlineMs();
+  const nowMs = (typeof opts.nowMs === "number") ? opts.nowMs : Date.now();
+  if (deadline > 0 && nowMs > deadline) return { ok: false, reason: "legacy_rejected" };
+  return (userVer === 0) ? { ok: true } : { ok: false, reason: "version_mismatch" };
+}
+// Gate de sessao ATIVA: verifica o token, RECARREGA o usuario, exige ATIVO e valida a versao.
+// ctx = { authHeader, now, db, mode, deadlineMs }. Retorna { ok, uid, data, db, role, admin, status,
+// sessionVersion } OU { ok:false, status, json, reason }. Erro UNIFORME p/ token/versao invalidos.
+async function authRequireActiveSession(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number") ? ctx.now : Date.now();
+  const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
+  if (!auth.ok) return { ok: false, status: 401, json: { ok: false, error: "invalid_session" }, reason: "bad_token" };
+  const db = ctx.db || notifDb();
+  let snap;
+  try { snap = await db.collection("users").doc(auth.uid).get(); }
+  catch (e) {
+    try { logger.error("[activeSession] leitura falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {}
+    return { ok: false, status: 500, json: { ok: false, error: "lookup_failed" }, reason: "lookup_failed" };
+  }
+  if (!snap || !snap.exists) return { ok: false, status: 401, json: { ok: false, error: "invalid_session" }, reason: "not_found" };
+  const d = snap.data() || {};
+  const st = String(d.status || "");
+  if (AUTH_INACTIVE_STATUSES.indexOf(st) >= 0 || d.disabled === true) return { ok: false, status: 403, json: { ok: false, error: "user_inactive" }, reason: "inactive" };
+  const decision = authSessionVersionDecision(auth, d, { mode: ctx.mode, deadlineMs: ctx.deadlineMs, nowMs: now });
+  if (!decision.ok) return { ok: false, status: 401, json: { ok: false, error: "invalid_session" }, reason: decision.reason };
+  return { ok: true, uid: auth.uid, data: d, db: db, role: (typeof d.role === "string" ? d.role : ""), admin: d.admin === true, status: st, sessionVersion: authSessionVersionOf(d) };
+}
+// Incremento ATOMICO de sessionVersion + aplicacao de changeFields. Retorna { newVersion, existed }.
+// PRODUCAO: admin.firestore()/notifDb() SEMPRE expoem runTransaction => caminho transacional
+// (releitura-then-write, sem lost-update sob concorrencia; provado nos testes f43c2). O fallback
+// read+update so e alcancado por harnesses de teste legados cujo fake NAO implementa runTransaction.
+async function authBumpUserSessionTx(db, uid, changeFields) {
+  const ref = db.collection("users").doc(uid);
+  // verOf: sessionVersion atual do doc. PRODUCAO usa authSessionVersionOf (sempre linkado); o fallback
+  // 0 cobre so harnesses pre-F4.3C2 que exercitam os handlers de mutacao sem linkar o helper novo.
+  const verOf = (d) => ((typeof authSessionVersionOf === "function") ? authSessionVersionOf(d) : (Number.isInteger(d && d.sessionVersion) && d.sessionVersion >= 0 ? d.sessionVersion : 0));
+  if (db && typeof db.runTransaction === "function") {
+    return await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const existed = !!(snap && snap.exists);
+      const cur = existed ? (snap.data() || {}) : {};
+      const newVer = verOf(cur) + 1;
+      tx.update(ref, Object.assign({}, changeFields || {}, { sessionVersion: newVer }));
+      return { newVersion: newVer, existed: existed };
+    });
+  }
+  const snap = await ref.get();
+  const existed = !!(snap && snap.exists);
+  const cur = existed ? ((typeof snap.data === "function" ? snap.data() : null) || {}) : {};
+  const newVer = verOf(cur) + 1;
+  await ref.update(Object.assign({}, changeFields || {}, { sessionVersion: newVer }));
+  return { newVersion: newVer, existed: existed };
+}
+// Correlation id por request (sanitizado). Reusa ctx.correlationId se presente; senao gera um.
+function authNewCorrelationId(ctx) {
+  const c = ctx && ctx.correlationId;
+  if (typeof c === "string" && c) return c.slice(0, 64);
+  try { return crypto.randomUUID(); } catch (_) { return "cid_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+}
+// Evento de AUDITORIA estruturado e SANITIZADO. Emite SO a allowlist de campos seguros (event,
+// correlationId, uid MASCARADO, status, endpoint, sessionVersion, at). IGNORA qualquer outro campo
+// (token/senha/body/Bearer/email/telefone NUNCA passam). Allowlist de tipos de evento.
+const AUTH_AUDIT_EVENTS = ["login_success", "login_failure", "session_revoked", "session_version_mismatch", "user_disabled", "password_changed", "firebase_token_issued", "fcm_registered", "fcm_removed", "admin_role_changed"];
+function authAuditEvent(type, fields) {
+  fields = fields || {};
+  const t = String(type || "");
+  const safe = { event: t };
+  if (typeof fields.correlationId === "string" && fields.correlationId) safe.correlationId = fields.correlationId.slice(0, 64);
+  if (typeof fields.uid === "string" && fields.uid) safe.uid = notifMaskUid(fields.uid);
+  if (typeof fields.status === "string" && fields.status) safe.status = fields.status;
+  if (typeof fields.endpoint === "string" && fields.endpoint) safe.endpoint = fields.endpoint;
+  if (Number.isInteger(fields.sessionVersion)) safe.sessionVersion = fields.sessionVersion;
+  if (typeof fields.at === "number") safe.at = fields.at;
+  try { logger.info("[audit]", safe); } catch (_) {}
+  return safe;
+}
+// Exporta o nucleo p/ o harness (NAO afeta runtime; sem deploy).
+exports._authSessionTtlMs = authSessionTtlMs;
+exports._authSessionVersionOf = authSessionVersionOf;
+exports._authSessionVersionDecision = authSessionVersionDecision;
+exports._authRequireActiveSession = authRequireActiveSession;
+exports._authBumpUserSessionTx = authBumpUserSessionTx;
+exports._authNewCorrelationId = authNewCorrelationId;
+exports._authAuditEvent = authAuditEvent;
+exports._AUTH_AUDIT_EVENTS = AUTH_AUDIT_EVENTS;
 
 /* ============================================================================
    F3.3.20-B1.7-E — SLICE 2: getUserContact (leitura AUTENTICADA de contato).
@@ -1516,6 +1713,18 @@ async function handleIssueFirebaseAuthToken(ctx) {
     try { logger.info("[issueFirebaseAuthToken] negado (inativo)", { uid: notifMaskUid(auth.uid) }); } catch (_) {}
     return { status: 403, json: { ok: false, error: "user_inactive" } };
   }
+  // F4.3C2 — GATE de sessao ATIVA: a sessao so emite Custom Token se sua versao casa com a do doc
+  // (revogacao/troca de senha/etc. ja incrementaram => sessao antiga NAO recebe token). Erro UNIFORME.
+  // PRODUCAO: authSessionVersionDecision e sempre linkado (funcao de modulo) => gate SEMPRE ativo.
+  // O typeof guard cobre so harnesses isolados pre-F4.3C2 que nao linkam a decisao de versao.
+  let cid = ""; try { cid = authNewCorrelationId(ctx); } catch (_) {}
+  if (typeof authSessionVersionDecision === "function") {
+    const vdec = authSessionVersionDecision(auth, d, { mode: ctx.migrationMode, deadlineMs: ctx.migrationDeadlineMs, nowMs: now });
+    if (!vdec.ok) {
+      try { authAuditEvent("session_version_mismatch", { uid: auth.uid, endpoint: "issueFirebaseAuthToken", correlationId: cid, at: now }); } catch (_) {}
+      return { status: 401, json: { ok: false, error: "invalid_session" } };
+    }
+  }
   // Custom Token do MESMO uid, SEM claims adicionais (ver cabecalho). NUNCA logar o token.
   const create = ctx.createCustomToken || ((uid) => admin.auth().createCustomToken(uid));
   let fbToken;
@@ -1548,6 +1757,72 @@ exports.issueFirebaseAuthToken = onRequest({ secrets: [AUTH_SESSION_SECRET], reg
 
 // Exporta logica pura p/ o harness (NAO afeta runtime; NAO e CloudFunction; sem deploy).
 exports._handleIssueFirebaseAuthToken = handleIssueFirebaseAuthToken;
+
+/* ============================================================================
+   F4.3C2 — revokeMySession: REVOGA a PROPRIA sessao (logout server-side).
+   ----------------------------------------------------------------------------
+   - Exige sessao ATIVA (authRequireActiveSession); uid vem SO da sessao — NUNCA
+     aceita uid/admin/role/tenant do corpo. Incrementa sessionVersion (ATOMICO),
+     invalidando de imediato TODAS as sessoes anteriores do usuario. Remove os
+     tokens FCM do deviceId informado (quando presente) na MESMA transacao.
+   - Idempotente por ESTADO: apos revogar, o proprio token fica obsoleto; uma 2a
+     chamada com o mesmo token retorna 401 (sessao ja invalida) — sem duplo incremento.
+   - Resposta sem dados sensiveis; auditoria sanitizada (session_revoked).
+   - ADITIVO/DORMENTE: sem deploy; Android/Desktop NAO alterados (integracao futura).
+   - Handler PURO testavel: ctx.db injetavel.
+   ============================================================================ */
+async function handleRevokeMySession(ctx) {
+  ctx = ctx || {};
+  const now = (typeof ctx.now === "number" ? ctx.now : Date.now());
+  const method = String(ctx.method || "").toUpperCase();
+  if (method && method !== "POST") return { status: 405, json: { ok: false, error: "method_not_allowed" } };
+  const active = await authRequireActiveSession({ authHeader: ctx.authHeader, now: now, db: ctx.db, mode: ctx.migrationMode, deadlineMs: ctx.migrationDeadlineMs });
+  if (!active.ok) return { status: active.status, json: active.json };
+  const uid = active.uid;
+  const db = active.db;
+  const cid = authNewCorrelationId(ctx);
+  const body = (ctx.body && typeof ctx.body === "object" && !Array.isArray(ctx.body)) ? ctx.body : {};
+  const deviceId = (typeof body.deviceId === "string") ? body.deviceId.slice(0, FCM_DEVICE_MAX_LEN) : "";
+  let newVersion = active.sessionVersion;
+  try {
+    newVersion = await db.runTransaction(async (tx) => {
+      const ref = db.collection("users").doc(uid);
+      const snap = await tx.get(ref);
+      const d = (snap && snap.exists) ? (snap.data() || {}) : {};
+      const nv = authSessionVersionOf(d) + 1;
+      const upd = { sessionVersion: nv, revokedAt: now };
+      if (deviceId) {
+        const stx = authFcmReadState(d);
+        const meta = Object.assign({}, stx.meta);
+        const keep = stx.tokens.filter((t) => !(meta[t] && meta[t].deviceId === deviceId));
+        stx.tokens.forEach((t) => { if (meta[t] && meta[t].deviceId === deviceId) delete meta[t]; });
+        upd.fcmTokens = keep; upd.fcmTokenMeta = meta;
+      }
+      tx.set(ref, upd, { merge: true });
+      return nv;
+    });
+  } catch (e) {
+    try { logger.error("[revokeMySession] falhou", { uid: notifMaskUid(uid), err: e && e.message }); } catch (_) {}
+    return { status: 500, json: { ok: false, error: "revoke_failed" } };
+  }
+  try { authAuditEvent("session_revoked", { uid: uid, endpoint: "revokeMySession", correlationId: cid, sessionVersion: newVersion, at: now }); } catch (_) {}
+  return { status: 200, json: { ok: true, revoked: true } };
+}
+// Wrapper HTTPS (onRequest => NAO usa request.auth.uid). DORMENTE sem AUTH_SESSION_SECRET => 401.
+exports.revokeMySession = onRequest({ secrets: [AUTH_SESSION_SECRET], region: "us-central1", maxInstances: 10, cors: NOTIF_CORS_ORIGINS }, async (req, res) => {
+  if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+  try {
+    res.set("Cache-Control", "no-store");
+    const ipHdr = (req.headers && (req.headers["x-forwarded-for"] || req.headers["X-Forwarded-For"])) || "";
+    const clientIp = String(ipHdr).split(",")[0].trim() || (req.ip ? String(req.ip) : "");
+    const out = await handleRevokeMySession({ method: req.method, authHeader: (req.get && req.get("authorization")) || "", body: req.body, ip: clientIp, now: Date.now() });
+    res.status(out.status).json(out.json);
+  } catch (e) {
+    try { logger.error("[revokeMySession] erro", { err: e && e.message }); } catch (_) {}
+    res.status(500).json({ ok: false, error: "internal" });
+  }
+});
+exports._handleRevokeMySession = handleRevokeMySession;
 
 /* ============================================================================
    F3.3.21-B3.20 — registerFcmToken / removeMyFcmToken (FCM token do PROPRIO usuario).
@@ -1606,6 +1881,10 @@ async function handleRegisterFcmToken(ctx) {
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap || snap.exists === false) { const e = new Error("not_found"); e.__code = 404; throw e; }
+      // F4.3C2 — sessao revogada/inativa NAO registra token (gate ATIVO dentro da MESMA transacao).
+      const __d = (typeof snap.data === "function" ? snap.data() : {}) || {};
+      if (AUTH_INACTIVE_STATUSES.indexOf(String(__d.status || "")) >= 0 || __d.disabled === true) { const e = new Error("inactive"); e.__code = 403; throw e; }
+      if (!authSessionVersionDecision(auth, __d, { mode: ctx.migrationMode, deadlineMs: ctx.migrationDeadlineMs, nowMs: now }).ok) { const e = new Error("stale_session"); e.__code = 401; throw e; }
       const st = authFcmReadState(typeof snap.data === "function" ? snap.data() : {});
       const meta = Object.assign({}, st.meta);
       // Dedup por deviceId: remove tokens antigos do MESMO aparelho (token != atual). Espelha o cliente.
@@ -1623,6 +1902,8 @@ async function handleRegisterFcmToken(ctx) {
     });
   } catch (e) {
     if (e && e.__code === 404) return { status: 404, json: { ok: false, error: "not_found" } };
+    if (e && e.__code === 401) return { status: 401, json: { ok: false, error: "invalid_session" } };
+    if (e && e.__code === 403) return { status: 403, json: { ok: false, error: "user_inactive" } };
     try { logger.error("[registerFcmToken] gravacao falhou", { uid: notifMaskUid(auth.uid), token: authMaskFcmToken(token), err: e && e.message }); } catch (_) {}
     return { status: 500, json: { ok: false, error: "save_failed" } };
   }
@@ -1654,6 +1935,10 @@ async function handleRemoveFcmToken(ctx) {
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap || snap.exists === false) { const e = new Error("not_found"); e.__code = 404; throw e; }
+      // F4.3C2 — sessao revogada/inativa NAO remove token (gate ATIVO na MESMA transacao).
+      const __d = (typeof snap.data === "function" ? snap.data() : {}) || {};
+      if (AUTH_INACTIVE_STATUSES.indexOf(String(__d.status || "")) >= 0 || __d.disabled === true) { const e = new Error("inactive"); e.__code = 403; throw e; }
+      if (!authSessionVersionDecision(auth, __d, { mode: ctx.migrationMode, deadlineMs: ctx.migrationDeadlineMs, nowMs: now }).ok) { const e = new Error("stale_session"); e.__code = 401; throw e; }
       const st = authFcmReadState(typeof snap.data === "function" ? snap.data() : {});
       const meta = Object.assign({}, st.meta);
       const before = st.tokens.length;
@@ -1665,6 +1950,8 @@ async function handleRemoveFcmToken(ctx) {
     });
   } catch (e) {
     if (e && e.__code === 404) return { status: 404, json: { ok: false, error: "not_found" } };
+    if (e && e.__code === 401) return { status: 401, json: { ok: false, error: "invalid_session" } };
+    if (e && e.__code === 403) return { status: 403, json: { ok: false, error: "user_inactive" } };
     try { logger.error("[removeMyFcmToken] gravacao falhou", { uid: notifMaskUid(auth.uid), token: authMaskFcmToken(token), err: e && e.message }); } catch (_) {}
     return { status: 500, json: { ok: false, error: "save_failed" } };
   }
@@ -1880,6 +2167,15 @@ async function handleChangePassword(ctx) {
   }
   if (!snap || !snap.exists) return { status: 401, json: { ok: false, error: "unauthorized" } };
   const d = (typeof snap.data === "function" ? snap.data() : null) || {};
+  // F4.3C2 — sessao INATIVA/REVOGADA nao troca senha (consistente com os demais endpoints).
+  // PRODUCAO: helpers sempre linkados => gate sempre ativo (guard = compat de harness pre-F4.3C2).
+  if (typeof AUTH_INACTIVE_STATUSES !== "undefined") {
+    const cst = String(d.status || "");
+    if (AUTH_INACTIVE_STATUSES.indexOf(cst) >= 0 || d.disabled === true) return { status: 403, json: { ok: false, error: "user_inactive" } };
+  }
+  if (typeof authSessionVersionDecision === "function" && !authSessionVersionDecision(auth, d, { mode: ctx.migrationMode, deadlineMs: ctx.migrationDeadlineMs, nowMs: now }).ok) {
+    return { status: 401, json: { ok: false, error: "invalid_session" } };
+  }
   // Valida a senha ATUAL no servidor (timing-safe). Falha => conta no rate-limit.
   if (!notifVerifyPassword(d.pass, d.salt, oldPw)) {
     rlKeys.forEach((k) => notifRlFail(k, now));
@@ -1889,7 +2185,7 @@ async function handleChangePassword(ctx) {
   const newSalt = randSalt();
   const newHash = hashPw(newPw, newSalt);
   // Atualiza SOMENTE pass/salt do proprio usuario (merge parcial; nao toca outros campos).
-  try { await db.collection("users").doc(auth.uid).update({ pass: newHash, salt: newSalt }); }
+  try { await authBumpUserSessionTx(db, auth.uid, { pass: newHash, salt: newSalt }); }
   catch (e) {
     try { logger.error("[changePassword] update falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {}
     return { status: 500, json: { ok: false, error: "internal" } };
@@ -1956,6 +2252,24 @@ async function authRequireAdminSession(ctx) {
   const st = String(d.status || "");
   if (st === "pendente" || st === "removido" || st === "excluido" || d.disabled === true) return { ok: false, status: 403, json: { ok: false, error: "forbidden" } };
   if (d.admin !== true) return { ok: false, status: 403, json: { ok: false, error: "forbidden" } };
+  // F4.3C2 — REVOGACAO tambem vale p/ ADMIN: uma sessao admin revogada/stale (logout-everywhere,
+  // troca de senha, etc. — sem mudar admin/status) NAO pode reter privilegio. Recarga acima cobre
+  // remocao-de-admin/desativacao; ESTE gate cobre revogacao pura (sessionVersion). Erro UNIFORME.
+  // PRODUCAO: authSessionVersionDecision sempre linkado => gate sempre ativo (guard = compat harness).
+  if (typeof authSessionVersionDecision === "function" && !authSessionVersionDecision(auth, d, { mode: ctx.migrationMode, deadlineMs: ctx.migrationDeadlineMs, nowMs: now }).ok) {
+    return { ok: false, status: 401, json: { ok: false, error: "invalid_session" } };
+  }
+  // F4.3C2 — rate-limit de operacoes ADMIN (por uid do admin). Limiter injetavel (ctx.rateLimiter)
+  // p/ teste; default = __adminRateLimiter (singleton do modulo). Conta chamadas e bloqueia excesso
+  // (429). PRODUCAO: o singleton esta SEMPRE ligado (const de modulo) => RL SEMPRE ativo. O typeof
+  // guard cobre apenas harnesses isolados que nao linkam o singleton (defesa-em-profundidade aditiva;
+  // o gate primario auth+admin acima ja e obrigatorio e independe deste limiter).
+  const rl = (ctx && ctx.rateLimiter) || (typeof __adminRateLimiter !== "undefined" ? __adminRateLimiter : null);
+  if (rl) {
+    const admKey = "adm:" + auth.uid;
+    if (rl.blocked(admKey, now)) return { ok: false, status: 429, json: { ok: false, error: "rate_limited" } };
+    rl.fail(admKey, now);
+  }
   return { ok: true, uid: auth.uid, data: d, db: db };
 }
 exports._authRequireAdminSession = authRequireAdminSession;
@@ -2105,7 +2419,7 @@ async function handleAdminUpdateUser(ctx) {
   try { snap = await db.collection("users").doc(targetId).get(); }
   catch (e) { try { logger.error("[adminUpdateUser] leitura falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
   if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
-  try { await db.collection("users").doc(targetId).update(patch); }
+  try { await authBumpUserSessionTx(db, targetId, patch); }
   catch (e) { try { logger.error("[adminUpdateUser] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
   try { logger.info("[adminUpdateUser] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId), fields: Object.keys(patch) }); } catch (_) {}
   return { status: 200, json: { ok: true } };
@@ -2139,7 +2453,7 @@ async function handleAdminSetUserStatus(ctx) {
   try { snap = await db.collection("users").doc(targetId).get(); }
   catch (e) { try { logger.error("[adminSetUserStatus] leitura falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
   if (!snap || !snap.exists) return { status: 404, json: { ok: false, error: "not_found" } };
-  try { await db.collection("users").doc(targetId).update({ status: status }); }
+  try { await authBumpUserSessionTx(db, targetId, { status: status }); }
   catch (e) { try { logger.error("[adminSetUserStatus] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
   try { logger.info("[adminSetUserStatus] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId), status: status }); } catch (_) {}
   return { status: 200, json: { ok: true } };
@@ -2182,7 +2496,7 @@ async function handleAdminSetUserAdmin(ctx) {
     } catch (e) { try { logger.error("[adminSetUserAdmin] contagem falhou", { err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
     if (adminIds.length <= 1 && adminIds.indexOf(targetId) >= 0) return { status: 409, json: { ok: false, error: "last_admin" } };
   }
-  try { await db.collection("users").doc(targetId).update({ admin: makeAdmin }); }
+  try { await authBumpUserSessionTx(db, targetId, { admin: makeAdmin }); }
   catch (e) { try { logger.error("[adminSetUserAdmin] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
   try { logger.info("[adminSetUserAdmin] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId), admin: makeAdmin }); } catch (_) {}
   return { status: 200, json: { ok: true } };
@@ -2225,7 +2539,7 @@ async function handleDisableUser(ctx) {
     } catch (e) { try { logger.error("[disableUser] contagem falhou", { err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
     if (adminIds.length <= 1 && adminIds.indexOf(targetId) >= 0) return { status: 409, json: { ok: false, error: "last_admin" } };
   }
-  try { await db.collection("users").doc(targetId).update({ status: "inativo", disabled: true, disabledAt: now, disabledBy: adm.uid }); }
+  try { await authBumpUserSessionTx(db, targetId, { status: "inativo", disabled: true, disabledAt: now, disabledBy: adm.uid }); }
   catch (e) { try { logger.error("[disableUser] update falhou", { by: notifMaskUid(adm.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
   try { logger.info("[disableUser] ok", { by: notifMaskUid(adm.uid), target: notifMaskUid(targetId) }); } catch (_) {}
   return { status: 200, json: { ok: true } };
@@ -2252,7 +2566,14 @@ async function handleDeleteMyAccount(ctx) {
   const auth = authVerifySessionToken(ctx.authHeader, authSessionSecret(), now);
   if (!auth.ok) return { status: 401, json: { ok: false, error: "unauthorized" } };
   const db = (ctx && ctx.db) || notifDb();
-  try { await db.collection("users").doc(auth.uid).update({ status: "excluido", deletedAt: now, email: "", phone: "", photo: "" }); }
+  // F4.3C2 — acao DESTRUTIVA exige sessao ATIVA (recarrega o doc, exige status ativo e versao que
+  // casa). Fecha o bypass: uma sessao REVOGADA/stale/inativa NAO pode mais excluir a conta.
+  // PRODUCAO: authRequireActiveSession sempre linkado => gate sempre ativo. (Guard = compat de harness.)
+  if (typeof authRequireActiveSession === "function") {
+    const active = await authRequireActiveSession({ authHeader: ctx.authHeader, now: now, db: db, mode: ctx.migrationMode, deadlineMs: ctx.migrationDeadlineMs });
+    if (!active.ok) return { status: active.status, json: active.json };
+  }
+  try { await authBumpUserSessionTx(db, auth.uid, { status: "excluido", deletedAt: now, email: "", phone: "", photo: "" }); }
   catch (e) { try { logger.error("[deleteMyAccount] update falhou", { uid: notifMaskUid(auth.uid), err: e && e.message }); } catch (_) {} return { status: 500, json: { ok: false, error: "internal" } }; }
   try { logger.info("[deleteMyAccount] ok", { uid: notifMaskUid(auth.uid) }); } catch (_) {}
   return { status: 200, json: { ok: true } };
