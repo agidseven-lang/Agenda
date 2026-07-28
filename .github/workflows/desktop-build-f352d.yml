@@ -1,0 +1,337 @@
+# =====================================================================
+# [manual] F3.5.2D — Desktop Build (ESTAVEL 1.0.191 = 1.0.190 + proporcao/alinhamento de quadro e card de "Edicao de Cards")
+# ---------------------------------------------------------------------
+# Build OFICIAL do candidato ESTAVEL 1.0.191, sobre a base 1.0.190 OFICIAL (@f8e0184). Delta F3.5.2D
+# (isolado ao setor edicao_cards, EXCLUSIVAMENTE VISUAL/layout):
+#   REMOVE os overrides F3.5.2B (.kbv2-card--cards:only-child{flex:0 0 auto}+margin-top:0) e F3.5.2C
+#   (.kbv2-board--cards{align-items:flex-start}+.kbv2-column-body{flex:0 0 auto}) e faz o setor REUTILIZAR
+#   o contrato canonico do Cronograma/Designer: colunas preenchem a altura + card unico ESTICA (PROD1.6) +
+#   a caixa .kbv2-card-notes (Legenda/Observacoes) assume o papel elastico do .kbv2-card-themes.
+# cardsRules/slaRules/main/notifier/tray/bgNotify/updaterService/firebase/slaScheduler + Card Premium +
+# movimentacao (isDesignerAxisMove/designerMoveOpts/moveStatus) + cardsFieldOf: BYTE-IDENTICOS a 1.0.190.
+#
+# DOIS JOBS (mesmo SHA pinado 9aaff13):
+#   job "verify" (ubuntu): tsc + lint + f352d + 5 suites f352 + packaging + golden masters + comportamentais;
+#     f352c(1.0.190)/f352b(1.0.189)/f351f(1.0.186) PRESERVADOS byte-identicos (NAO reancorados/rodados como gate).
+#   job "build" (windows, needs verify): electron-builder (--publish never) + provas do app.asar:
+#     versao 1.0.191, renderer==fonte, F4.2F ausente, .kbv2-card-notes PRESENTE e .kbv2-board--cards SEM uso
+#     funcional, cardsRules empacotado (SHA==fonte), flags do updater, identidade Windows, Authenticode,
+#     metadata latest.yml 1.0.191 + blockmap, SBOM, hashes.
+# `--publish never`: o CI NUNCA publica; NAO cria release/tag/Latest. Execucao SO manual.
+# =====================================================================
+name: "[manual] F3.5.2D Desktop Build (stable 1.0.191 — Edicao de Cards: proporcao/alinhamento de quadro e card)"
+
+"on":
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  CAND_SHA: "9aaff137a78c154945dbcf2af02a30cc39164058" # candidato 1.0.191 (F3.5.2D; pin imutavel)
+  BASE_190_SHA: "f8e01846fbdeed9c66604fe152031fadae5152c0" # Desktop 1.0.190 OFICIAL (tag v1.0.190; base do delta)
+  BASE_189_SHA: "92cfb018c46beb92f7ee43f1e954661b92a41bac" # 1.0.189 (ancora do f352b preservado)
+  BASE_186_SHA: "e87ef4b59c4edc6c6fd6249fd7f4ac07b6413048" # 1.0.186 (ancora do f351f preservado)
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (SHA EXATO do candidato PINADO; history completo p/ baselines)
+        uses: actions/checkout@v4
+        with:
+          ref: "9aaff137a78c154945dbcf2af02a30cc39164058"
+          fetch-depth: 0
+
+      - name: Derivar versao — exige 1.0.191 exato, sem sufixo
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.191" ] || { echo "::error:: versao != 1.0.191"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido ($APP_VERSION)"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + updaterService + renderer + cardsRules)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
+
+      - name: Gate F3.5.2/D CARDS (notify + source-invariance/Card-Premium + recipient + substituicao + intervalo + proporcao/alinhamento + packaging)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in f352-cards-notify f352-cards-source-invariance f352-cards-recipient f352-cards-channel-substitution f352a-cards-interval f352d-cards-board-card-proportion; do
+            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate F3.5.2/D $t vermelho"; exit 1; }
+          done
+          echo "== f352-cards-packaging =="
+          node scripts/f352-cards-packaging.mjs || { echo "::error:: gate de empacotamento cardsRules vermelho"; exit 1; }
+
+      - name: Gate f352c PRESERVADO (byte-identico a 1.0.190; suite-checkpoint da versao anterior — NAO reancorado, NAO rodado como gate)
+        working-directory: desktop
+        run: |
+          set -e
+          test -f scripts/f352c-cards-content-move.test.mjs || { echo "::error:: f352c AUSENTE"; exit 1; }
+          D=$(git diff "$BASE_190_SHA" -- scripts/f352c-cards-content-move.test.mjs || true)
+          [ -z "$D" ] || { echo "::error:: f352c ALTERADO vs 1.0.190 (proibido reancorar suite historica)"; exit 1; }
+          echo "f352c PRESERVADO byte-identico a 1.0.190."
+
+      - name: Gate f352b/f351f PRESERVADOS (byte-identicos a 1.0.189/1.0.186)
+        working-directory: desktop
+        run: |
+          set -e
+          D=$(git diff "$BASE_189_SHA" -- scripts/f352b-cards-kanban-layout.test.mjs || true)
+          [ -z "$D" ] || { echo "::error:: f352b ALTERADO vs 1.0.189"; exit 1; }
+          D=$(git diff "$BASE_186_SHA" -- scripts/f351f-rollforward-equivalence.test.mjs || true)
+          [ -z "$D" ] || { echo "::error:: f351f ALTERADO vs 1.0.186"; exit 1; }
+          echo "f352b (1.0.189) e f351f (1.0.186) PRESERVADOS byte-identicos."
+
+      - name: Gate ISOLAMENTO — diff so em desktop/ (Android/Worker/Rules/Functions intactos)
+        working-directory: desktop
+        run: |
+          set -e
+          git -C .. diff --name-only "$BASE_190_SHA" -- . ':!desktop' | tee /tmp/outside.txt
+          [ ! -s /tmp/outside.txt ] || { echo "::error:: mudanca FORA de desktop/"; exit 1; }
+          echo "OK: nenhum arquivo fora de desktop/ mudou vs 1.0.190."
+
+      - name: Gate PRESERVACAO — golden masters + comportamentais (1.0.190 inalterado)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in f343-sla-golden-master f344-flow-golden-master f345-sla-timestamp-golden-master \
+                   f344-repeated-move-contract f343-delivery-channel f343-preservation \
+                   f341a-updater-state-machine f347-immediate-visual-delivery f347-independent-behavior \
+                   f33E-main-notifier f33D-background-notif f33F-bg-notify f33C-assignment-toast \
+                   f343-assignment-transition f343-main-scheduler f343-operational-block \
+                   f3377a-r3-single-producer-clock f3377a-r4b-http-date-clock f3311-baseline-freeze; do
+            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate de preservacao $t vermelho"; exit 1; }
+          done
+          echo "PHASE B: TODOS OS GATES APLICAVEIS VERDES."
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: "desktop"
+    steps:
+      - name: Forcar LF no checkout
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Checkout (SHA EXATO do candidato PINADO)
+        uses: actions/checkout@v4
+        with:
+          ref: "9aaff137a78c154945dbcf2af02a30cc39164058"
+          fetch-depth: 0
+
+      - name: Gate LINE ENDINGS LF
+        run: |
+          set -e
+          FILES="desktop/src/renderer/index.html desktop/src/main/main.ts desktop/src/main/firebase.ts desktop/src/main/bgNotify.ts desktop/src/main/slaScheduler.ts desktop/src/main/cardsRules.js"
+          git ls-files --eol -- $FILES | tee "$RUNNER_TEMP/eol.txt"
+          if grep -Eq 'w/(crlf|mixed)' "$RUNNER_TEMP/eol.txt"; then echo "::error:: CRLF/mixed em arquivo-chave"; exit 1; fi
+          N=$(git ls-files --eol -- $FILES | wc -l | tr -d ' '); [ "$N" -ge 6 ] || { echo "::error:: esperados >=6, vi $N"; exit 1; }
+          echo "LINE ENDINGS: LF CONFIRMED"
+
+      - name: Derivar versao — exige 1.0.191 exato
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          [ "$APP_VERSION" = "1.0.191" ] || { echo "::error:: versao != 1.0.191"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run build
+
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: ${{ env.APP_DIR }}
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          test -f "dist-installer/win-unpacked/resources/icon.png" || { echo "::error:: resources/icon.png AUSENTE"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (asar == 1.0.191) + renderer EMPACOTADO == fonte + F4.2F AUSENTE
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.191" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.191"; exit 1; }
+          EX="$EXDIR/src/renderer/index.html"; SRC="src/renderer/index.html"; test -f "$EX" || { echo "::error:: index.html ausente no asar"; exit 1; }
+          EX="$EX" SRC="$SRC" node -e 'const fs=require("fs");const nrm=s=>String(s).replace(/\r\n/g,"\n");if(nrm(fs.readFileSync(process.env.EX,"utf8"))!==nrm(fs.readFileSync(process.env.SRC,"utf8"))){console.error("index.html EMPACOTADO != fonte");process.exit(1);}'
+          echo "  index.html EMPACOTADO == fonte"
+          test ! -f "$EXDIR/src/renderer/firebaseAuthBridge.js" || { echo "::error:: firebaseAuthBridge.js presente (F4.2F)"; exit 1; }
+          for k in 'firebase-auth-compat' 'signInWithCustomToken' 'startFirebaseAuthBridge' 'DESKTOP_FIREBASE_AUTH'; do
+            if grep -q "$k" "$EX"; then echo "::error:: '$k' presente no renderer (F4.2F)"; exit 1; fi
+          done
+          echo "GATE prova-de-versao 1.0.191 + renderer==fonte + F4.2F AUSENTE OK."
+
+      - name: Gate F3.5.2D empacotado (.kbv2-card-notes PRESENTE; .kbv2-board--cards SEM uso funcional; overrides F3.5.2B/C ausentes)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXH="$RUNNER_TEMP/asarx/src/renderer/index.html"
+          grep -q 'kbv2-card-notes' "$EXH" || { echo "::error:: .kbv2-card-notes ausente no app.asar"; exit 1; }
+          grep -q 'body.desktop .kbv2-card>.kbv2-card-notes{ flex:0 1 auto' "$EXH" || { echo "::error:: contrato elastico .kbv2-card-notes ausente"; exit 1; }
+          if grep -Eq 'class="kbv2-board[^"]*kbv2-board--cards' "$EXH"; then echo "::error:: .kbv2-board--cards ainda APLICADA (F3.5.2C)"; exit 1; fi
+          if grep -Eq '\.kbv2-card--cards:only-child\{ flex:0 0 auto' "$EXH"; then echo "::error:: override F3.5.2B ainda presente"; exit 1; fi
+          if grep -Eq '\.kbv2-board\.kbv2-board--cards\{ align-items:flex-start' "$EXH"; then echo "::error:: override F3.5.2C ainda presente"; exit 1; fi
+          echo "GATE F3.5.2D empacotado OK (contrato canonico + caixa de notas; overrides removidos)."
+
+      - name: Gate cardsRules EMPACOTADO (SHA-256 == fonte; 1 copia; cardsEmissionsFor exportada)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"
+          test -f "$EXDIR/dist/main/cardsRules.js" || { echo "::error:: dist/main/cardsRules.js AUSENTE no app.asar"; exit 1; }
+          SRC_SHA=$(sha256sum src/main/cardsRules.js | awk '{print $1}' | tr -d '\\')
+          ASAR_SHA=$(sha256sum "$EXDIR/dist/main/cardsRules.js" | awk '{print $1}' | tr -d '\\')
+          echo "cardsRules.js SHA fonte=$SRC_SHA asar=$ASAR_SHA"
+          [ "$SRC_SHA" = "$ASAR_SHA" ] || { echo "::error:: cardsRules.js empacotado != fonte"; exit 1; }
+          N=$(find "$EXDIR" -name cardsRules.js | wc -l | tr -d ' '); [ "$N" = "1" ] || { echo "::error:: esperado 1 cardsRules.js, vi $N"; exit 1; }
+          node -e 'const c=require(process.env.RUNNER_TEMP+"/asarx/dist/main/cardsRules.js"); if(typeof c.cardsEmissionsFor!=="function"){console.error("cardsEmissionsFor nao exportada");process.exit(1);}'
+          grep -q 'require("./cardsRules")' "$EXDIR/dist/main/slaScheduler.js" || { echo "::error:: slaScheduler NAO require ./cardsRules"; exit 1; }
+          echo "CARDS RULES PACKAGING: VERIFIED"
+
+      - name: Gate FLAGS do updater no app.asar
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          US="$RUNNER_TEMP/asarx/dist/main/updaterService.js"; test -f "$US" || { echo "::error:: updaterService.js ausente"; exit 1; }
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowPrerelease != false"; exit 1; }
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" || { echo "::error:: channel != latest"; exit 1; }
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowDowngrade != false"; exit 1; }
+          if grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"canary"' "$US"; then echo "::error:: channel=canary no build ESTAVEL"; exit 1; fi
+          echo "GATE flags do updater OK (stable/latest)."
+
+      - name: Gate identidade Windows (AppUserModelId + appId + close-to-tray)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          MAINJS="$RUNNER_TEMP/asarx/dist/main/main.js"
+          grep -q 'br.com.idseven.agenda.desktop' "$MAINJS" || { echo "::error:: AppUserModelId ausente"; exit 1; }
+          grep -q 'setAppUserModelId' "$MAINJS" || { echo "::error:: setAppUserModelId ausente"; exit 1; }
+          grep -q 'preventDefault' "$MAINJS" || { echo "::error:: close-to-tray ausente"; exit 1; }
+          grep -q 'appId: br.com.idseven.agenda.desktop' electron-builder.yml || { echo "::error:: appId divergente"; exit 1; }
+          echo "GATE identidade Windows OK."
+
+      - name: Inspecao de ASSINATURA Authenticode (paridade 1.0.190)
+        shell: pwsh
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          $exe = (Get-ChildItem dist-installer -Filter 'Agenda-ID-Seven-Desktop-*-x64.exe' | Select-Object -First 1).FullName
+          $sig = Get-AuthenticodeSignature $exe
+          "EXE: $exe"; "AuthenticodeStatus: $($sig.Status)"
+          if ($sig.Status -ne 'Valid' -and $sig.Status -ne 'NotSigned') { Write-Error "Status inesperado: $($sig.Status)"; exit 1 }
+          "PARIDADE 1.0.190: mesmo processo (sem cert -> NotSigned)."
+
+      - name: Gate metadata de update (latest.yml 1.0.191 + blockmap + app-update.yml sem segredo)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          LY="dist-installer/latest.yml"; test -f "$LY" || { echo "::error:: latest.yml NAO gerado"; ls -la dist-installer || true; exit 1; }
+          if [ -f "dist-installer/canary.yml" ]; then echo "::error:: canary.yml gerado"; exit 1; fi
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap 2>/dev/null | head -1); test -n "$BM" || { echo "::error:: blockmap NAO gerado"; exit 1; }
+          AU="dist-installer/win-unpacked/resources/app-update.yml"; test -f "$AU" || { echo "::error:: app-update.yml NAO empacotado"; exit 1; }
+          EXE_PATH=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); EXE_NAME=$(basename "$EXE_PATH")
+          grep -q "version: $APP_VERSION" "$LY" || { echo "::error:: latest.yml version != $APP_VERSION"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "$LY" || { echo "::error:: latest.yml path != $EXE_NAME"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "$LY" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "$EXE_PATH" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error:: sha512 do latest.yml != EXE"; exit 1; }
+          grep -q "provider: github" "$AU" && grep -q "owner: agidseven-lang" "$AU" && grep -q "repo: Agenda" "$AU" || { echo "::error:: app-update.yml provider/owner/repo divergente"; exit 1; }
+          if grep -qiE '(token|secret|password|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml com possivel segredo"; exit 1; fi
+          echo "GATE metadata OK: latest.yml 1.0.191 + app-update.yml github SEM segredo."
+
+      - name: SBOM (CycloneDX via npm sbom) + fallback
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set +e
+          npm sbom --sbom-format cyclonedx --omit dev > "$RUNNER_TEMP/sbom-cyclonedx.json" 2>/dev/null
+          if [ ! -s "$RUNNER_TEMP/sbom-cyclonedx.json" ]; then npm ls --all --json > "$RUNNER_TEMP/sbom-cyclonedx.json" 2>/dev/null || echo '{}' > "$RUNNER_TEMP/sbom-cyclonedx.json"; fi
+          wc -c "$RUNNER_TEMP/sbom-cyclonedx.json"
+
+      - name: Empacotar bundle (instalador + metadata + SBOM + hashes)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "channel     : latest"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA"
+            echo "candidato   : $CAND_SHA (F3.5.2D — proporcao/alinhamento de quadro e card de Edicao de Cards)"
+            echo "baseline    : Desktop 1.0.190 OFICIAL (commit f8e0184; index.html byte-identico exceto o layout do setor)"
+            echo "origem      : F3.5.2D — quadro canonico + card na proporcao do Cronograma (.kbv2-card-notes elastico); overrides F3.5.2B/C removidos; cardsRules/Card Premium/movimentacao/notificacoes/demais setores byte-identicos"
+            echo "assinatura  : mesmo processo da 1.0.190 (sem code-signing -> NotSigned)"
+            echo "distribuicao: PRIVADA (publicacao SO via release gated apos literal PUBLICAR-DESKTOP-1.0.191-STABLE)"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload installer (artifact PRIVADO)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.191-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload metadata + SBOM + hashes (artifact PRIVADO)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.191-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30
