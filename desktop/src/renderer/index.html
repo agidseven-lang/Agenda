@@ -2134,24 +2134,15 @@ body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
 body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:1 1 auto; min-height:0; }
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-origin,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-themes,
+body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-notes,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-top:auto; }
-/* F3.5.2B — "Edição de Cards" no Kanban: card com ALTURA NATURAL do conteúdo. O setor edicao_cards
-   é INTERNO e NÃO possui lista de temas (.kbv2-card-themes) para absorver a sobra vertical; por isso
-   a regra PROD1.6 de "card único" (flex:1 1 auto + margin-top:auto) o deixava alto, com um grande vão
-   vazio. SOMENTE para .kbv2-card--cards (classe marcada apenas quando sector==='edicao_cards')
-   desligamos o esticamento e a distribuição de sobra — os DEMAIS setores permanecem BYTE-IDÊNTICOS
-   (a classe nunca é aplicada a eles; maior especificidade vence a regra :only-child acima). */
-body.desktop .kbv2-column-body>.kbv2-card.kbv2-card--cards:only-child{ flex:0 0 auto; }
-body.desktop .kbv2-column-body>.kbv2-card.kbv2-card--cards:only-child>.kbv2-card-origin,
-body.desktop .kbv2-column-body>.kbv2-card.kbv2-card--cards:only-child>.kbv2-card-footer{ margin-top:0; }
-/* F3.5.2C — QUADRO de "Edição de Cards": COLUNA com ALTURA NATURAL. A correção F3.5.2B compactou o
-   CARD, mas a .kbv2-column-body (flex:1 1 auto) continuava preenchendo a altura da coluna e o botão
-   "Adicionar tarefa" ficava ancorado no fundo — deixando um grande vão entre o card e o botão. Aqui,
-   SÓ no quadro marcado .kbv2-board--cards (aplicado apenas quando boardSector==='edicao_cards'), a
-   coluna deixa de esticar (align-items:flex-start) e o corpo passa a ter altura natural (flex:0 0 auto)
-   — o botão fica logo após o último card. Os quadros dos demais setores ficam BYTE-IDÊNTICOS. */
-body.desktop .kbv2-board.kbv2-board--cards{ align-items:flex-start; }
-body.desktop .kbv2-board.kbv2-board--cards .kbv2-column-body{ flex:0 0 auto; }
+/* F3.5.2D — "Edição de Cards" REUTILIZA o contrato canônico do Cronograma/Designer: o card único
+   ESTICA (flex:1 1 auto, regra PROD1.6 acima) e a COLUNA preenche a altura (sem override de board).
+   Como o setor não tem lista de temas, a caixa .kbv2-card-notes (Legenda/Observações) assume o MESMO
+   papel elástico do .kbv2-card-themes (bloco central que absorve a sobra vertical e entra na
+   distribuição de respiro via margin-top:auto acima) — o rodapé ancora na base, sem vão morto único.
+   Removidos os overrides F3.5.2B (card de altura natural) e F3.5.2C (coluna .kbv2-board--cards):
+   edicao_cards passa a seguir EXATAMENTE o mesmo sistema de proporção do Cronograma. */
 /* F3.5.2C — Legenda / Observações no card (rótulo + prévia de até 2 linhas; conteúdo completo em Detalhes). */
 body.desktop .kbv2-card-note{ display:flex; flex-direction:column; gap:2px; }
 body.desktop .kbv2-card-note .kbv2-note-k{ font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#8a93a7; }
@@ -2187,6 +2178,14 @@ body.desktop .kbv2-card>*{ flex:0 0 auto; }
 body.desktop .kbv2-card>.kbv2-card-themes{ flex:0 1 auto; min-height:0; display:flex; flex-direction:column; }
 body.desktop .kbv2-card-themes>.kbv2-themes-h{ flex:0 0 auto; }
 body.desktop .kbv2-card-themes>.kbv2-themes-list{ flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+/* F3.5.2D — .kbv2-card-notes (Legenda/Observações da Edição de Cards) = MESMO contrato elástico do
+   .kbv2-card-themes: bloco central que absorve a sobra vertical (flex:0 1 auto) e rola internamente se
+   passar da coluna (CARD-FIT-NOTEBOOK). Assim o card de edicao_cards preenche a coluna no mesmo padrão
+   do Cronograma, sem vão morto; rodapé/botões ancoram na base. Só aparece quando há Legenda/Obs. */
+body.desktop .kbv2-card>.kbv2-card-notes{ flex:0 1 auto; min-height:0; display:flex; flex-direction:column; gap:11px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.20) transparent; }
+body.desktop .kbv2-card-notes>.kbv2-card-note{ flex:0 0 auto; }
+body.desktop .kbv2-card-notes::-webkit-scrollbar{ width:8px; }
+body.desktop .kbv2-card-notes::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:8px; }
 /* scrollbar fininha/discreta (dark premium) só na lista de temas */
 body.desktop .kbv2-themes-list{ scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.20) transparent; }
 body.desktop .kbv2-themes-list::-webkit-scrollbar{ width:8px; }
@@ -5512,11 +5511,10 @@ function renderBoard(){
         taskChips()+
       '</div>'+
     '</div>';
-    /* F3.5.2C — só o quadro de Edição de Cards ganha a classe .kbv2-board--cards (coluna de altura
-       natural, sem vão até "Adicionar tarefa"). Demais setores: saída BYTE-IDÊNTICA. */
-    let _bh=kbv2BoardHtml(STATUS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})));
-    if(state.boardSector==='edicao_cards')_bh=_bh.replace('<div class="kbv2-board">','<div class="kbv2-board kbv2-board--cards">');
-    h+=_bh;
+    /* F3.5.2D — Edição de Cards volta a usar o quadro CANÔNICO (mesmo do Designer/demais setores): as
+       colunas preenchem a altura da área útil e "Adicionar tarefa" ancora no rodapé. Removida a classe
+       .kbv2-board--cards da F3.5.2C. Saída BYTE-IDÊNTICA à dos demais setores. */
+    h+=kbv2BoardHtml(STATUS.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})));
     return h+'</div>';
   }
   // Mobile: mantém o seletor de coluna única (paridade APK)
@@ -5989,8 +5987,15 @@ function kbv2Card(t, persp){
      parse seguro do desc). Conteúdo completo continua no modal Detalhes. Isolado ao setor. */
   if(s.key==='edicao_cards'){
     const _cl=cardsFieldOf(t,'legenda'), _co=cardsFieldOf(t,'obs');
-    if(_cl)h+='<div class="kbv2-card-note"><div class="kbv2-note-k">Legenda</div><div class="kbv2-note-v">'+esc(_cl)+'</div></div>';
-    if(_co)h+='<div class="kbv2-card-note"><div class="kbv2-note-k">Observações</div><div class="kbv2-note-v">'+esc(_co)+'</div></div>';
+    /* F3.5.2D — Legenda/Observações vão numa caixa .kbv2-card-notes (o "themes-equivalente" do setor):
+       bloco central elástico que preenche a sobra vertical no MESMO padrão do Cronograma. Só é criado
+       quando há Legenda e/ou Observações — campos vazios NÃO reservam altura nem deixam rótulo solto. */
+    if(_cl||_co){
+      h+='<div class="kbv2-card-notes">'+
+         (_cl?'<div class="kbv2-card-note"><div class="kbv2-note-k">Legenda</div><div class="kbv2-note-v">'+esc(_cl)+'</div></div>':'')+
+         (_co?'<div class="kbv2-card-note"><div class="kbv2-note-k">Observações</div><div class="kbv2-note-v">'+esc(_co)+'</div></div>':'')+
+       '</div>';
+    }
   }
   // 7) trilho + 8) etapa
   if(prog){
