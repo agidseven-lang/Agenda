@@ -95,6 +95,8 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
                     _ui.value = AuthUi.Info("Se o e-mail estiver cadastrado, enviamos um código de 6 dígitos. Confira sua caixa de entrada (e o spam).")
                 }
                 is AuthRepo.Result.Err -> _ui.value = AuthUi.Error(r.message)
+                // F4.3C1 — estado impossivel neste endpoint (so register o produz); limpa o loading.
+                is AuthRepo.Result.RegistrationUnavailable -> _ui.value = AuthUi.Idle
             }
         }
     }
@@ -113,6 +115,8 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
                     _ui.value = AuthUi.Info("Senha redefinida com sucesso. Entre com a nova senha.")
                 }
                 is AuthRepo.Result.Err -> _ui.value = AuthUi.Error(r.message)
+                // F4.3C1 — estado impossivel neste endpoint (so register o produz); limpa o loading.
+                is AuthRepo.Result.RegistrationUnavailable -> _ui.value = AuthUi.Idle
             }
         }
     }
