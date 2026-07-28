@@ -80,3 +80,15 @@ sealed class FcmRegisterOutcome {
     data class Unavailable(val error: AuthError) : FcmRegisterOutcome()   // rede/timeout/5xx
     data class Failure(val error: AuthError) : FcmRegisterOutcome()
 }
+
+/**
+ * F4.3C1 (MED-1) — Resultado de removeMyFcmToken: revoga o token FCM do PROPRIO usuario no logout.
+ * O UID e derivado da sessao NO SERVIDOR (impossivel remover token de outro UID). Espelha o shape
+ * de FcmRegisterOutcome. O token FCM/Bearer NUNCA sao logados.
+ */
+sealed class FcmRemoveOutcome {
+    data class Success(val count: Int) : FcmRemoveOutcome()
+    data object Expired : FcmRemoveOutcome()                        // 401 → sessao vencida
+    data class Unavailable(val error: AuthError) : FcmRemoveOutcome()   // rede/timeout/5xx
+    data class Failure(val error: AuthError) : FcmRemoveOutcome()
+}

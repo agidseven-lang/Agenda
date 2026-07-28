@@ -27,6 +27,7 @@ class ServerAuthRepository(
         changePasswordUrl = BuildConfig.AUTH_CHANGE_PASSWORD_URL,
         firebaseTokenUrl = BuildConfig.AUTH_FIREBASE_TOKEN_URL,
         registerFcmUrl = BuildConfig.AUTH_REGISTER_FCM_URL,
+        removeFcmUrl = BuildConfig.AUTH_REMOVE_FCM_URL,
     ),
 ) {
     companion object {
@@ -154,6 +155,29 @@ class ServerAuthRepository(
         if (reply.status == 401) return FcmRegisterOutcome.Expired
         if (reply.status in 500..599) return FcmRegisterOutcome.Unavailable(AuthError.SERVER_ERROR)
         return FcmRegisterOutcome.Failure(AuthErrorMapper.mapAuthedFailure(reply))
+    }
+
+    /**
+     * F4.3C1 (MED-1) — removeMyFcmToken. Revoga o token FCM do PROPRIO usuario no LOGOUT (Bearer da
+     * sessao). O UID e derivado da sessao NO SERVIDOR (impossivel remover token de outro UID). 401 =>
+     * Expired; rede/5xx => Unavailable. Espelha registerFcmToken. NUNCA loga token/Bearer.
+     */
+    suspend fun removeMyFcmToken(token: String, fcmToken: String, deviceId: String, platform: String): FcmRemoveOutcome {
+        val reply = api.postRemoveFcm(token, fcmToken, deviceId, platform)
+        when (reply.transport) {
+            AuthApi.Transport.NO_NETWORK -> return FcmRemoveOutcome.Unavailable(AuthError.NO_NETWORK)
+            AuthApi.Transport.TIMEOUT -> return FcmRemoveOutcome.Unavailable(AuthError.TIMEOUT)
+            AuthApi.Transport.SSL_OR_IO -> return FcmRemoveOutcome.Unavailable(AuthError.UNAVAILABLE)
+            AuthApi.Transport.BAD_URL -> return FcmRemoveOutcome.Unavailable(AuthError.UNAVAILABLE)
+            AuthApi.Transport.OK -> Unit
+        }
+        val j = reply.body
+        if (reply.status == 200 && j != null && j.optBoolean("ok", false)) {
+            return FcmRemoveOutcome.Success(j.optInt("count", 0))
+        }
+        if (reply.status == 401) return FcmRemoveOutcome.Expired
+        if (reply.status in 500..599) return FcmRemoveOutcome.Unavailable(AuthError.SERVER_ERROR)
+        return FcmRemoveOutcome.Failure(AuthErrorMapper.mapAuthedFailure(reply))
     }
 
     /** changePassword (sessao autenticada; senha atual re-verificada NO SERVIDOR). */

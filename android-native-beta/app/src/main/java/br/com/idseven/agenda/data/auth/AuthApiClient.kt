@@ -31,6 +31,7 @@ class AuthApiClient(
     private val changePasswordUrl: String,
     private val firebaseTokenUrl: String,
     private val registerFcmUrl: String,
+    private val removeFcmUrl: String,
 ) : AuthApi {
 
     override suspend fun postLogin(identifier: String, password: String): AuthApi.HttpReply {
@@ -59,6 +60,16 @@ class AuthApiClient(
             .put("deviceId", deviceId)
             .put("platform", platform)
         return post(registerFcmUrl, payload, token)
+    }
+
+    // F4.3C1 — removeMyFcmToken: revoga o token FCM do proprio usuario no logout. Mesmo shape do
+    // register {token,deviceId,platform}; o servidor remove pelo valor do token e deriva o uid da sessao.
+    override suspend fun postRemoveFcm(token: String, fcmToken: String, deviceId: String, platform: String): AuthApi.HttpReply {
+        val payload = JSONObject()
+            .put("token", fcmToken)
+            .put("deviceId", deviceId)
+            .put("platform", platform)
+        return post(removeFcmUrl, payload, token)
     }
 
     private suspend fun post(url: String, payload: JSONObject, token: String?): AuthApi.HttpReply =

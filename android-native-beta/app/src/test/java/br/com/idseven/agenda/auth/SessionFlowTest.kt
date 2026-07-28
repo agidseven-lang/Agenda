@@ -37,7 +37,7 @@ class SessionFlowTest {
     ): SessionManager {
         val repo = ServerAuthRepository(api)
         val gate = FirebaseSessionGate(repo, bridge)
-        return SessionManager(vault, repo, SessionBootstrapper(vault, repo) { now }, gate) { now }
+        return SessionManager(vault, repo, SessionBootstrapper(vault, repo) { now }, gate, FakeFcmRevoker()) { now }
     }
 
     // 16. bootstrap com sessao valida + getUserSelf OK → Authenticated e perfil atualizado.
@@ -145,12 +145,14 @@ class SessionFlowTest {
                 FakeAuthApi.ok(org.json.JSONObject().put("ok", true).put("firebaseToken", "FBT"))
             override suspend fun postRegisterFcm(token: String, fcmToken: String, deviceId: String, platform: String) =
                 FakeAuthApi.ok(org.json.JSONObject().put("ok", true).put("count", 1))
+            override suspend fun postRemoveFcm(token: String, fcmToken: String, deviceId: String, platform: String) =
+                FakeAuthApi.ok(org.json.JSONObject().put("ok", true).put("count", 0))
         }
         val vault = FakeVault()
         val mgr = manager(vault, FakeAuthApi(FakeAuthApi.http(500)))
         val repo2 = ServerAuthRepository(slowApi)
         val fbGate = FirebaseSessionGate(repo2, FakeFirebaseBridge(current = null, signInUid = "U1"))
-        val mgr2 = SessionManager(vault, repo2, SessionBootstrapper(vault, repo2), fbGate)
+        val mgr2 = SessionManager(vault, repo2, SessionBootstrapper(vault, repo2), fbGate, FakeFcmRevoker())
         val job = launch { mgr2.login("a@b.c", "x") }   // entra e suspende em barrier.await()
         while (slowApi.calls < 1) yield()
         val second = mgr2.login("a@b.c", "x")            // in-flight → ignorado, NAO chama a API

@@ -18,6 +18,9 @@ interface AuthApi {
     /** F4.2C — registerFcmToken: POST {token,deviceId,platform} + Bearer da sessao → {ok,count,...}. */
     suspend fun postRegisterFcm(token: String, fcmToken: String, deviceId: String, platform: String): HttpReply
 
+    /** F4.3C1 — removeMyFcmToken: POST {token,deviceId,platform} + Bearer da sessao → {ok,count,...}. */
+    suspend fun postRemoveFcm(token: String, fcmToken: String, deviceId: String, platform: String): HttpReply
+
     data class HttpReply(val status: Int, val body: JSONObject?, val transport: Transport)
     enum class Transport { OK, NO_NETWORK, TIMEOUT, SSL_OR_IO, BAD_URL }
 }

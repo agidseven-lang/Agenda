@@ -55,11 +55,11 @@ fun AppRoot() {
         is SessionUiState.LoggedOut -> LoginScreen()
         is SessionUiState.Authenticated -> MainScaffold(
             session = UserSession(s.session.uid, s.session.profile.name),
-            onLogout = { scope.launch { session.logout() } },
+            onLogout = { scope.launch { android.util.Log.i("Auth", "[LOGOUT] fcmRevoke=${session.logout()}") } },
         )
         is SessionUiState.Unavailable -> Unavailable(
             onRetry = { scope.launch { session.retry() } },
-            onLogout = { scope.launch { session.logout() } },
+            onLogout = { scope.launch { android.util.Log.i("Auth", "[LOGOUT] fcmRevoke=${session.logout()}") } },
         )
     }
 }

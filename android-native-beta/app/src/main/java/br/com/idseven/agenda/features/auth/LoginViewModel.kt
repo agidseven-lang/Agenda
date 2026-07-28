@@ -78,6 +78,10 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
             when (val r = AuthRepo.register(name, role, phone, email, password)) {
                 is AuthRepo.Result.Ok -> _ui.value = AuthUi.Info("Cadastro enviado! Aguarde a aprovação de um administrador para entrar.")
                 is AuthRepo.Result.Err -> _ui.value = AuthUi.Error(r.message)
+                // F4.3C1 (HIGH-2) — cadastro direto desabilitado (fail-closed). Mensagem NEUTRA e
+                // orientadora (nao e erro temporario); a submissao nao cria nada no Firestore.
+                is AuthRepo.Result.RegistrationUnavailable ->
+                    _ui.value = AuthUi.Info("O cadastro de novos usuários é realizado pelo administrador do sistema.")
             }
         }
     }

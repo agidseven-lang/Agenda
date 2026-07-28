@@ -8,11 +8,18 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.lifecycleScope
 import br.com.idseven.agenda.MainActivity
+import br.com.idseven.agenda.data.session.AuthenticatedFirestoreExecutor
 import br.com.idseven.agenda.designsystem.theme.IDSevenBetaTheme
 import br.com.idseven.agenda.features.notif.ReminderPremiumScreen
 import br.com.idseven.agenda.features.notif.ReminderRow
 import br.com.idseven.agenda.shared.DateUtil
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlin.coroutines.resume
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 // Tela PREMIUM do lembrete 1h antes, aberta como CHAMADA (full-screen intent).
 // Aparece sobre a tela de bloqueio e liga a tela, sem o usuário precisar tocar.
@@ -66,22 +73,34 @@ class ReminderAlarmActivity : ComponentActivity() {
         val photoState = androidx.compose.runtime.mutableStateOf(photo)
         val nameState = androidx.compose.runtime.mutableStateOf(resp)
         if (respId != null) {
-            android.util.Log.i("ReminderDiag", "[REMINDER_PHOTO_RESOLVE_START] respId=$respId intentPhoto=${!photo.isNullOrBlank()}")
-            runCatching {
-                com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                    .collection("users").document(respId).get()
-                    .addOnSuccessListener { d ->
-                        // Mesma lista de campos do UsersRepo (foto pode estar em qualquer um).
-                        val p = listOf("photo", "photoUrl", "avatar", "avatarUrl", "image", "imageUrl", "picture", "foto")
-                            .firstNotNullOfOrNull { k -> d.getString(k)?.takeIf { it.isNotBlank() } }
-                        val nm = d.getString("name")?.takeIf { it.isNotBlank() }
-                        if (!p.isNullOrBlank()) photoState.value = p   // foto ATUAL do responsável
-                        if (!nm.isNullOrBlank()) nameState.value = nm
-                        android.util.Log.i("ReminderDiag", "[REMINDER_PHOTO_RESOLVED] respId=$respId hasPhoto=${!p.isNullOrBlank()} name=$nm")
+            // F4.3C1 (MED-2 / Correcao 3) — a resolucao de foto/nome via Firestore SO ocorre com a
+            // identidade Firebase estabelecida (AuthenticatedFirestoreExecutor, FAIL-CLOSED). Sem
+            // sessao/gate, NAO consulta o Firestore: mantem o payload do intent (fallback seguro, sem
+            // PII alem do que a propria notificacao ja trouxe). NUNCA request.auth == null.
+            android.util.Log.i("ReminderDiag", "[REMINDER_PHOTO_RESOLVE_START] gated intentPhoto=${!photo.isNullOrBlank()}")
+            lifecycleScope.launch {
+                val exec = AuthenticatedFirestoreExecutor.create(this@ReminderAlarmActivity)
+                val outcome = runCatching {
+                    exec.withAuthenticatedFirestore { db, _ -> getUserDocGated(db, respId) }
+                }.getOrElse {
+                    AuthenticatedFirestoreExecutor.Outcome.Denied(AuthenticatedFirestoreExecutor.GateState.FirebaseAuthFailure)
+                }
+                when (outcome) {
+                    is AuthenticatedFirestoreExecutor.Outcome.Ok -> {
+                        val d = outcome.value
+                        if (d != null && d.exists()) {
+                            // Mesma lista de campos do UsersRepo (foto pode estar em qualquer um).
+                            val p = listOf("photo", "photoUrl", "avatar", "avatarUrl", "image", "imageUrl", "picture", "foto")
+                                .firstNotNullOfOrNull { k -> d.getString(k)?.takeIf { it.isNotBlank() } }
+                            val nm = d.getString("name")?.takeIf { it.isNotBlank() }
+                            if (!p.isNullOrBlank()) photoState.value = p   // foto ATUAL do responsável
+                            if (!nm.isNullOrBlank()) nameState.value = nm
+                            android.util.Log.i("ReminderDiag", "[REMINDER_PHOTO_RESOLVED] gated hasPhoto=${!p.isNullOrBlank()}")
+                        }
                     }
-                    .addOnFailureListener { e ->
-                        android.util.Log.w("ReminderDiag", "[REMINDER_PHOTO_RESOLVE_FAILED] respId=$respId err=${e.message}")
-                    }
+                    is AuthenticatedFirestoreExecutor.Outcome.Denied ->
+                        android.util.Log.i("ReminderDiag", "[REMINDER_PHOTO_SKIPPED] gate=${outcome.state} — fallback ao intent, sem Firestore")
+                }
             }
         }
 
@@ -120,4 +139,12 @@ class ReminderAlarmActivity : ComponentActivity() {
             }
         }
     }
+
+    // F4.3C1 — aguarda o DocumentSnapshot DENTRO do bloco autenticado (executa SO apos gate == Ok).
+    private suspend fun getUserDocGated(db: FirebaseFirestore, uid: String): DocumentSnapshot? =
+        suspendCancellableCoroutine { cont ->
+            db.collection("users").document(uid).get()
+                .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
+                .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+        }
 }

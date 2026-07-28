@@ -60,6 +60,10 @@ android {
         def _fcmRegUrl = project.findProperty('AUTH_REGISTER_FCM_URL')    ?: 'https://us-central1-agenda-id-seven.cloudfunctions.net/registerFcmToken'
         buildConfigField "String", "AUTH_FIREBASE_TOKEN_URL", "\"${_fbTokUrl}\""
         buildConfigField "String", "AUTH_REGISTER_FCM_URL", "\"${_fcmRegUrl}\""
+        // F4.3C1 — removeMyFcmToken (revogacao do token FCM no logout). Forma canonica cloudfunctions.net
+        // Gen2 (projeto agenda-id-seven, us-central1), a MESMA de registerFcmToken; sobreponivel por -P.
+        def _fcmRemUrl = project.findProperty('AUTH_REMOVE_FCM_URL')     ?: 'https://us-central1-agenda-id-seven.cloudfunctions.net/removeMyFcmToken'
+        buildConfigField "String", "AUTH_REMOVE_FCM_URL", "\"${_fcmRemUrl}\""
     }
 
     signingConfigs {

@@ -2,16 +2,13 @@ package br.com.idseven.agenda.data
 
 import android.util.Log
 import br.com.idseven.agenda.BuildConfig
-import com.google.firebase.firestore.FirebaseFirestore
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.UnknownHostException
 import javax.net.ssl.SSLException
-import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -29,9 +26,11 @@ object AuthRepo {
         // de receber sessão. O caller (VM) NÃO grava sessão até a troca concluir.
         data class Ok(val uid: String, val name: String?, val mustChangePassword: Boolean = false) : Result()
         data class Err(val message: String) : Result()
+        // F4.3C1 (HIGH-2) — cadastro INDISPONIVEL de forma explicita (sem write direto em /users; sem
+        // endpoint server-side de cadastro nesta fase). Estado neutro p/ a UI (nao e erro temporario).
+        data object RegistrationUnavailable : Result()
     }
 
-    private val db get() = FirebaseFirestore.getInstance()
     private fun digits(s: String) = s.replace(Regex("\\D"), "")
 
     // Endpoints HTTPS onRequest (1.0.43+). URLs sao as URIs REAIS resolvidas
@@ -83,28 +82,14 @@ object AuthRepo {
     // Igualmente REMOVIDO o changePassword client-side por senha temporaria (users.get + Crypto.verify);
     // recuperacao de senha segue pelo fluxo server-side (requestPasswordReset/confirmPasswordReset).
 
+    // F4.3C1 (HIGH-2 / CRIT-2 no cliente) — cadastro direto em /users pelo SDK Firestore DESABILITADO
+    // (fail-closed). NAO escreve no Firestore, NAO cria usuario, NAO simula sucesso, e NAO confia em
+    // admin/role/status/uid vindos do cliente (um cliente modificado poderia forjar admin:true sob as
+    // Rules abertas). Sem endpoint server-side de cadastro autorizado nesta fase (F4.3C1), o cadastro
+    // fica INDISPONIVEL de forma explicita — a UI orienta a procurar um administrador.
+    @Suppress("UNUSED_PARAMETER")
     suspend fun register(name: String, role: String, phone: String, email: String, password: String): Result =
-        suspendCancellableCoroutine { cont ->
-            val n = name.trim(); val em = email.trim().lowercase()
-            if (n.isEmpty() || em.isEmpty() || password.isEmpty()) {
-                cont.resume(Result.Err("Preencha nome, e-mail e senha.")); return@suspendCancellableCoroutine
-            }
-            val salt = Crypto.randSalt()
-            val data = hashMapOf<String, Any?>(
-                "name" to n,
-                "role" to role.trim(),
-                "phone" to phone.trim(),
-                "email" to em,
-                "pass" to Crypto.hashPw(password, salt),
-                "salt" to salt,
-                "status" to "pendente",
-                "admin" to false,
-                "createdAt" to System.currentTimeMillis()
-            )
-            db.collection("users").add(data)
-                .addOnSuccessListener { ref -> cont.resume(Result.Ok(ref.id, n)) }
-                .addOnFailureListener { ex -> cont.resume(Result.Err("Erro ao enviar cadastro: ${ex.message ?: "tente novamente"}")) }
-        }
+        Result.RegistrationUnavailable
 
     // Redefinicao AUTONOMA por codigo de e-mail (1.0.43+, endpoint HTTPS
     // onRequest com URL real injetada por BuildConfig). Logs internos detalhados
@@ -116,12 +101,15 @@ object AuthRepo {
             return Result.Err("Informe um e-mail válido.")
         }
         val url = FN_REQUEST_URL
-        val (http, body, exc) = postJson(url, JSONObject().put("email", em))
+        val (http, _, exc) = postJson(url, JSONObject().put("email", em))
         if (exc != null) {
-            Log.w(TAG, "requestReset url=$url cls=${exc.javaClass.simpleName} kind=${classifyError(exc)} msg=${exc.message?.take(200)}")
+            // F4.3C1 (LOG) — SANITIZADO: endpoint logico + classe do erro de transporte. NUNCA url
+            // completa, exc.message, corpo de resposta ou PII.
+            Log.w(TAG, "requestReset endpoint=requestPasswordReset kind=${classifyError(exc)}")
             return Result.Err("Não foi possível enviar sua solicitação agora. Verifique a internet e tente de novo.")
         }
-        Log.i(TAG, "requestReset url=$url http=$http body=${body.take(200)}")
+        // F4.3C1 (LOG) — SANITIZADO: so o status HTTP. NUNCA o corpo (email/phone/code/token).
+        Log.i(TAG, "requestReset endpoint=requestPasswordReset httpStatus=$http")
         return if (http == 200) Result.Ok("", null)
         else Result.Err("Não foi possível enviar sua solicitação agora. Tente novamente em instantes.")
     }
@@ -140,10 +128,12 @@ object AuthRepo {
         val payload = JSONObject().put("email", em).put("code", cd).put("newPassword", newPassword)
         val (http, body, exc) = postJson(url, payload)
         if (exc != null) {
-            Log.w(TAG, "confirmReset url=$url cls=${exc.javaClass.simpleName} kind=${classifyError(exc)} msg=${exc.message?.take(200)}")
+            // F4.3C1 (LOG) — SANITIZADO: endpoint logico + classe do erro de transporte (idem requestReset).
+            Log.w(TAG, "confirmReset endpoint=confirmPasswordReset kind=${classifyError(exc)}")
             return Result.Err("Não foi possível redefinir a senha agora. Verifique a internet e tente de novo.")
         }
-        Log.i(TAG, "confirmReset url=$url http=$http body=${body.take(200)}")
+        // F4.3C1 (LOG) — SANITIZADO: so o status HTTP. NUNCA o corpo (email/code/token/mensagem crua).
+        Log.i(TAG, "confirmReset endpoint=confirmPasswordReset httpStatus=$http")
         val json = runCatching { JSONObject(body) }.getOrNull()
         return when {
             http == 200 && json?.optBoolean("ok", false) == true -> Result.Ok("", null)

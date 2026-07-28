@@ -32,7 +32,7 @@ class FirebaseSessionFlowTest {
     private fun mgr(vault: FakeVault, api: FakeAuthApi, bridge: FakeFirebaseBridge, now: Long = System.currentTimeMillis()): SessionManager {
         val repo = ServerAuthRepository(api)
         val gate = FirebaseSessionGate(repo, bridge)
-        return SessionManager(vault, repo, SessionBootstrapper(vault, repo) { now }, gate) { now }
+        return SessionManager(vault, repo, SessionBootstrapper(vault, repo) { now }, gate, FakeFcmRevoker()) { now }
     }
 
     // ==================== LOGIN ====================

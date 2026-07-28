@@ -2,6 +2,7 @@ package br.com.idseven.agenda.auth
 
 import br.com.idseven.agenda.data.auth.AuthApi
 import br.com.idseven.agenda.data.auth.FirebaseBridge
+import br.com.idseven.agenda.data.session.FcmRevoker
 import br.com.idseven.agenda.data.session.SessionCipher
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -69,6 +70,26 @@ class FakeAuthApi(
         lastFcmDeviceId = deviceId
         lastFcmPlatform = platform
         return fcmReply
+    }
+
+    // F4.3C1 — instrumentacao do removeMyFcmToken (prova de Bearer/payload no logout; nunca vaza segredo).
+    var removeFcmCalls = 0
+    var lastRemoveSessionToken: String? = null
+    var lastRemoveFcmToken: String? = null
+    var lastRemoveDeviceId: String? = null
+    var lastRemovePlatform: String? = null
+    private var removeReply: AuthApi.HttpReply = ok(JSONObject().put("ok", true).put("saved", true).put("removed", true).put("count", 0))
+    var removeDelayMs: Long = 0L   // F4.3C1 — simula demora (para provar o timeout CURTO do logout)
+    fun setRemoveFcm(reply: AuthApi.HttpReply) { removeReply = reply }
+
+    override suspend fun postRemoveFcm(token: String, fcmToken: String, deviceId: String, platform: String): AuthApi.HttpReply {
+        removeFcmCalls++
+        lastRemoveSessionToken = token
+        lastRemoveFcmToken = fcmToken
+        lastRemoveDeviceId = deviceId
+        lastRemovePlatform = platform
+        if (removeDelayMs > 0) kotlinx.coroutines.delay(removeDelayMs)
+        return removeReply
     }
 
     companion object {
@@ -151,4 +172,18 @@ class FakeFirebaseBridge(
     override fun currentUid(): String? = current
 
     override fun signOut() { signOuts++; current = null }
+}
+
+/**
+ * F4.3C1 — Fake do FcmRevoker (JVM; sem Android). `fcm` = (fcmToken, deviceId) do cache local, ou
+ * null (ausente). Registra read()/clearLocal() para provar a ORDEM (revoga antes de limpar) e a
+ * limpeza do cache no logout.
+ */
+class FakeFcmRevoker(
+    var fcm: Pair<String, String>? = null,
+) : FcmRevoker {
+    var reads = 0
+    var clears = 0
+    override fun read(): Pair<String, String>? { reads++; return fcm }
+    override fun clearLocal() { clears++ }
 }
