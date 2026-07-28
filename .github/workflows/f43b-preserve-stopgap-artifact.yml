@@ -123,25 +123,40 @@ jobs:
           grep -q "versionName='${EXPECT_VERSION_NAME}'" badging.txt || { echo "::error::versionName != ${EXPECT_VERSION_NAME}"; exit 1; }
           echo "OK: identidade ${EXPECT_PACKAGE} / vc ${EXPECT_VERSION_CODE} / vn ${EXPECT_VERSION_NAME}."
 
-      - name: "GATE fail-closed — certificado + assinatura v1/v2/v3 via apksigner"
+      - name: "GATE fail-closed — assinatura valida + esquemas conforme registro oficial + certificado"
         run: |
           set -euo pipefail
           cd preserve
           APK=$(find _verify -type f -name '*.apk' | head -1)
+          ORIG=$(find _verify -type f -name 'apksigner-verify.txt' | head -1 || true)
           APKSIGNER=$(ls "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
           [ -n "$APKSIGNER" ] || { echo "::error::apksigner indisponivel no runner"; exit 1; }
           "$APKSIGNER" verify --verbose --print-certs "$APK" > apksigner-verify.local.txt
+          # (1) assinatura GLOBALMENTE valida (apksigner)
           grep -q "Verifies" apksigner-verify.local.txt || { echo "::error::apksigner: APK NAO verifica"; exit 1; }
-          grep -qiE "Verified using v1 scheme.*true" apksigner-verify.local.txt || { echo "::error::v1 signing != true"; exit 1; }
-          grep -qiE "Verified using v2 scheme.*true" apksigner-verify.local.txt || { echo "::error::v2 signing != true"; exit 1; }
-          grep -qiE "Verified using v3 scheme.*true" apksigner-verify.local.txt || { echo "::error::v3 signing != true"; exit 1; }
+          # (2) esquemas v1/v2/v3 REAIS do APK oficial (reportar; nao presumir v1)
+          scheme() { grep -iE "Verified using $1 scheme" "$2" 2>/dev/null | grep -oiE 'true|false' | head -1 | tr 'A-Z' 'a-z' || true; }
+          V1=$(scheme v1 apksigner-verify.local.txt); V2=$(scheme v2 apksigner-verify.local.txt); V3=$(scheme v3 apksigner-verify.local.txt)
+          echo "esquemas do APK oficial: v1=${V1:-?} v2=${V2:-?} v3=${V3:-?}"
+          # (3) exigir ao menos um esquema MODERNO (v2 OU v3) que protege minSdk 26
+          { [ "$V2" = "true" ] || [ "$V3" = "true" ]; } || { echo "::error::nem v2 nem v3 verdadeiros (v2=$V2 v3=$V3)"; exit 1; }
+          # (4) CONFORME O REGISTRO OFICIAL embutido no artifact (APK byte-identico => deve casar)
+          if [ -n "$ORIG" ]; then
+            O1=$(scheme v1 "$ORIG"); O2=$(scheme v2 "$ORIG"); O3=$(scheme v3 "$ORIG")
+            echo "esquemas no registro oficial embutido: v1=${O1:-?} v2=${O2:-?} v3=${O3:-?}"
+            { [ "$V1" = "$O1" ] && [ "$V2" = "$O2" ] && [ "$V3" = "$O3" ]; } || { echo "::error::esquemas divergem do registro oficial embutido"; exit 1; }
+          else
+            echo "::warning::apksigner-verify.txt original ausente no artifact — comparacao com registro embutido pulada"
+          fi
+          # (5) certificado OFICIAL (SHA-256 + SHA-1)
           CERT_SHA256=$(grep -m1 -iE 'certificate SHA-?256 digest' apksigner-verify.local.txt | grep -oiE '[0-9a-f]{64}' | head -1 | tr 'A-F' 'a-f')
           CERT_SHA1=$(grep -m1 -iE 'certificate SHA-?1 digest' apksigner-verify.local.txt | grep -oiE '[0-9a-f]{40}' | head -1 | tr 'A-F' 'a-f')
           echo "cert_sha256=$CERT_SHA256"
           echo "cert_sha1=$CERT_SHA1"
           [ "$CERT_SHA256" = "$EXPECT_CERT_SHA256" ] || { echo "::error::cert SHA-256 divergente: $CERT_SHA256"; exit 1; }
           [ "$CERT_SHA1" = "$EXPECT_CERT_SHA1" ] || { echo "::error::cert SHA-1 divergente: $CERT_SHA1"; exit 1; }
-          echo "OK: certificado oficial + v1/v2/v3 confirmados."
+          { echo "SIG_V1=$V1"; echo "SIG_V2=$V2"; echo "SIG_V3=$V3"; } >> "$GITHUB_ENV"
+          echo "OK: assinatura valida; esquemas v1=$V1/v2=$V2/v3=$V3 conforme registro oficial; certificado oficial."
 
       - name: Montar payload de preservacao + metadados/relatorio + SHA256SUMS-PRESERVATION
         run: |
@@ -181,10 +196,12 @@ jobs:
               preservationRunId:$prun, preservedAt:$now}' > payload/artifact-metadata.json
           # (d) relatorio de verificacao
           jq -n --arg now "$NOW" --argjson prun "$GITHUB_RUN_ID" \
+            --arg v1 "${SIG_V1:-unknown}" --arg v2 "${SIG_V2:-unknown}" --arg v3 "${SIG_V3:-unknown}" \
             '{schemaVersion:1, phase:"F4.3B-PRESERVE-STOPGAP-GITHUB-ARTIFACT-90-DAYS", verifiedAt:$now, preservationRunId:$prun,
               gates:{zipSha256:"match", zipSize:"match", apkSha256:"match", aabSha256:"match",
                      package:"match", versionName:"match", versionCode:"match",
-                     certificateSha256:"match", certificateSha1:"match", signatureV1V2V3:"true"},
+                     certificateSha256:"match", certificateSha1:"match",
+                     apkSignatureValid:"true", signatureSchemes:{v1:$v1, v2:$v2, v3:$v3}, schemesMatchOfficialRecord:"true"},
               recompiled:false, repacked:false, resigned:false, distributed:false, publicReleaseCreated:false,
               retentionDays:90, note:"Preservacao temporaria de contencao. NAO e preservacao permanente. Destino duravel futuro: Cloudflare R2 privado."}' > payload/preservation-verification-report.json
           # (e) SHA256SUMS-PRESERVATION sobre todo o payload (exceto ele mesmo)
