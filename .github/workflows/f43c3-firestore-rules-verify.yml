@@ -1,0 +1,90 @@
+# =====================================================================
+# [F4.3C3] Firestore Rules deny-by-default — VERIFY no EMULATOR (NO-DEPLOY)
+# ---------------------------------------------------------------------
+# Valida as Rules-alvo EXCLUSIVAMENTE no Firebase Emulator Suite (project FICTÍCIO
+# demo-agenda-id-seven-f43c3), com fixtures sintéticas. NÃO faz deploy de Rules,
+# NÃO altera o ruleset ativo, NÃO acessa produção, NÃO consome secrets, NÃO usa
+# service account. Prova também a incompatibilidade ESPERADA da Desktop 1.0.191
+# (sem request.auth) — DENY total sob as Rules-alvo.
+#
+# Vive em `main` só para ser workflow_dispatch-able; verifica o branch de feature via `ref`.
+# =====================================================================
+name: F4.3C3 Firestore Rules deny-by-default — VERIFY (emulator, no-deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch/SHA de feature a verificar'
+        required: true
+        default: 'security/f43c3-firestore-rules-emulator'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: "2f6031b955586ee5b227fff013cc1ae7d81d652f"
+      D: "security/firestore/f43c3"
+    steps:
+      - name: Checkout (ref de feature; history completo p/ o gate de isolamento)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Gate — ISOLAMENTO (allowlist estrito; superfícies congeladas diff-empty vs base)
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASE_SHA" HEAD | sed '/^$/d' || true)
+          echo "=== arquivos alterados vs base ==="; echo "$CHANGED"
+          ALLOW='^(security/firestore/f43c3/|docs/F4\.3C3-[A-Z-]+\.md$)'
+          BAD=$(echo "$CHANGED" | grep -vE "$ALLOW" || true)
+          if [ -n "$BAD" ]; then echo "::error::mudança FORA do allowlist F4.3C3: $BAD"; exit 1; fi
+          # Superfícies CONGELADAS: diff-empty obrigatório.
+          for p in "desktop" "android-native-beta" "android-native" "cloudflare-worker.js" "wrangler.toml" \
+                   "functions" "index.html" "firebase.json" ".firebaserc" "sw.js" "firebase-messaging-sw.js" \
+                   "manifest.json" "ops/firestore-rules-baseline" ".github"; do
+            DF=$(git diff --name-only "$BASE_SHA" HEAD -- "$p" || true)
+            [ -z "$DF" ] || { echo "::error::superfície CONGELADA alterada: $p -> $DF"; exit 1; }
+          done
+          echo "OK: isolamento preservado (Desktop/Android/Worker/functions/web-PWA/baseline intocados)."
+
+      - name: Gate — NO-DEPLOY / sem produção no diff e no runner
+        run: |
+          set -euo pipefail
+          if git grep -nE 'firebase +deploy|gcloud |wrangler +deploy|GOOGLE_APPLICATION_CREDENTIALS' -- "$D" ; then
+            echo "::error::referência a deploy/credencial de produção em $D"; exit 1
+          fi
+          # project id do emulador deve ser o FICTÍCIO
+          grep -q "demo-agenda-id-seven-f43c3" "$D/tests/_harness.mjs" || { echo "::error::project id fictício ausente"; exit 1; }
+          echo "OK: sem deploy, sem service account, project fictício."
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup JDK 17 (Firestore Emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Instalar deps do harness (sem secrets)
+        working-directory: security/firestore/f43c3
+        run: npm install --no-audit --no-fund
+
+      - name: Rodar Rules no Emulator (80 asserts; project demo-agenda-id-seven-f43c3)
+        working-directory: security/firestore/f43c3
+        run: |
+          set -euo pipefail
+          chmod +x ./run.sh
+          ./run.sh
+
+      - name: Prova — emulador-only, sem deploy, sem produção
+        run: |
+          echo "F4.3C3 verificado SOMENTE no Firebase Emulator Suite (project fictício)."
+          echo "NENHUM deploy de Rules; ruleset ativo INTOCADO; sem secrets; sem produção; sem dados reais."
