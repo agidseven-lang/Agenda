@@ -151,12 +151,14 @@ class F43C1LocalHardeningTest {
         assertNull(vault.current)
     }
 
-    // 8. 5xx (falha do servidor) mapeia para ServerFailure, mas AINDA encerra o logout.
+    // 8. resposta INESPERADA do servidor (4xx != 401) mapeia para ServerFailure, mas AINDA encerra o
+    //    logout. (Contrato: 5xx e transporte => Unavailable => NetworkFailure; 4xx/malformado =>
+    //    Failure => ServerFailure — espelha registerFcmToken.)
     @Test
     fun t08_logout_serverFailureAindaEncerra() = runBlocking {
         val vault = FakeVault(session("U1", "tok"))
         val api = FakeAuthApi(FakeAuthApi.http(500))
-        api.setRemoveFcm(FakeAuthApi.http(503, JSONObject().put("ok", false)))
+        api.setRemoveFcm(FakeAuthApi.http(400, JSONObject().put("ok", false)))
         val mgr = manager(vault, api, revoker())
         assertEquals(LogoutFcmResult.ServerFailure, mgr.logout())
         assertTrue(mgr.state.value is SessionUiState.LoggedOut)
@@ -463,8 +465,8 @@ class F43C1LocalHardeningTest {
         assertTrue(bridge.signOuts >= 1)
     }
 
-    // 35. IDEMPOTENCIA da limpeza: mesmo com a revogacao FALHANDO (5xx), a limpeza integral acontece
-    //     igual ao sucesso (cofre + chave + cache + estado + signOut).
+    // 35. IDEMPOTENCIA da limpeza: mesmo com a revogacao FALHANDO (5xx => NetworkFailure, transitorio),
+    //     a limpeza integral acontece igual ao sucesso (cofre + chave + cache + estado + signOut).
     @Test
     fun t35_sessao_limpezaIntegralMesmoComRevogacaoFalha() = runBlocking {
         val vault = FakeVault(session("U1", "tok"))
@@ -473,7 +475,7 @@ class F43C1LocalHardeningTest {
         val bridge = FakeFirebaseBridge(current = "U1")
         val rev = revoker()
         val mgr = manager(vault, api, rev, bridge)
-        assertEquals(LogoutFcmResult.ServerFailure, mgr.logout())
+        assertEquals(LogoutFcmResult.NetworkFailure, mgr.logout())
         assertNull(vault.current)                                  // cofre limpo
         assertTrue(vault.lastDeleteKey)                            // chave removida
         assertEquals(1, rev.clears)                                // cache FCM limpo
