@@ -1,0 +1,246 @@
+# =====================================================================
+# [F4.3B-PRESERVE-STOPGAP] Preservacao TEMPORARIA (90 dias) do APK/AAB Android OFICIAL
+# ---------------------------------------------------------------------
+# Contencao URGENTE antes da expiracao (2026-08-09) do artifact 8633091751 (run 30205814202).
+# COPIA PURA DE BYTES. NAO recompila, NAO reempacota, NAO assina, NAO faz zipalign, NAO
+# distribui, NAO cria release nem URL publica. Baixa o artifact oficial pela API, VERIFICA
+# integridade+identidade (fail-closed) e RE-UPLOAD como novo artifact com retention 90 dias,
+# guardando o ZIP original BYTE-IDENTICO. Um segundo job baixa o novo artifact e reconfirma.
+# Somente GITHUB_TOKEN efemero (actions:read/contents:read). Sem RELEASE_PAT, sem Cloudflare.
+# Nunca imprime tokens/secrets/URLs assinadas. Nenhum gate usa continue-on-error.
+# =====================================================================
+name: "[F4.3B-PRESERVE-STOPGAP] Preservar APK Android oficial (90 dias)"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SRC_RUN_ID: "30205814202"
+  SRC_ARTIFACT_ID: "8633091751"
+  EXPECT_ZIP_SHA256: "2b1ac56aa1483ae270059b29477c9a680d5fae985b6e5a76b6dfa1df60e8bd8f"
+  EXPECT_ZIP_SIZE: "32286886"
+  EXPECT_APK_SHA256: "dca77db1251da63acf07cf015241134adebea5fd90272994f889a881d38f123f"
+  EXPECT_AAB_SHA256: "1c14d39188d28997bdedf53e828eefcb96ba913cae3e0786da48e0aa65320a83"
+  EXPECT_CERT_SHA256: "0c16dc2088c43c3c51c19e41dedfb07fbcec74a00f50f2ec4eba6585c950752d"
+  EXPECT_CERT_SHA1: "0e6ef79bc383a96284079a18e0b0bf40f0621485"
+  EXPECT_PACKAGE: "br.com.idseven.agenda"
+  EXPECT_VERSION_NAME: "1.0.0"
+  EXPECT_VERSION_CODE: "129"
+  NEW_ARTIFACT_NAME: "f43b-preserved-official-android-1.0.0-129"
+
+jobs:
+  # ==================================================================
+  # JOB 1 — recuperar + verificar (fail-closed) + re-upload (retention 90)
+  # ==================================================================
+  preserve:
+    runs-on: ubuntu-latest
+    outputs:
+      apk_name: ${{ steps.locate.outputs.apk_name }}
+      aab_name: ${{ steps.locate.outputs.aab_name }}
+      apk_size: ${{ steps.locate.outputs.apk_size }}
+    steps:
+      - name: Baixar o artifact oficial pela API (sem vazar a URL assinada)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p preserve && cd preserve
+          # (1) obter o 302 SEM segui-lo — Authorization vai SO para api.github.com
+          RESP=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${SRC_ARTIFACT_ID}/zip")
+          HTTP=$(printf '%s' "$RESP" | awk '{print $1}')
+          REDIR=$(printf '%s' "$RESP" | awk '{print $2}')
+          echo "::add-mask::$REDIR"
+          if [ "$HTTP" != "302" ] || [ -z "$REDIR" ]; then
+            echo "::error::download indisponivel (HTTP=$HTTP) — artifact ausente/expirado/incompleto"; exit 1
+          fi
+          # (2) baixar o blob assinado SEM Authorization
+          curl -sS -L -o original-artifact-8633091751.zip "$REDIR"
+          test -s original-artifact-8633091751.zip || { echo "::error::download vazio/incompleto"; exit 1; }
+          echo "download concluido."
+
+      - name: "GATE fail-closed — SHA-256 + tamanho do ZIP original"
+        run: |
+          set -euo pipefail
+          cd preserve
+          ZIP_SHA=$(sha256sum original-artifact-8633091751.zip | awk '{print $1}')
+          ZIP_SIZE=$(stat -c%s original-artifact-8633091751.zip)
+          echo "zip_sha256=$ZIP_SHA"
+          echo "zip_size=$ZIP_SIZE"
+          [ "$ZIP_SHA" = "$EXPECT_ZIP_SHA256" ] || { echo "::error::ZIP SHA-256 divergente: $ZIP_SHA != $EXPECT_ZIP_SHA256"; exit 1; }
+          [ "$ZIP_SIZE" = "$EXPECT_ZIP_SIZE" ] || { echo "::error::ZIP size divergente: $ZIP_SIZE != $EXPECT_ZIP_SIZE"; exit 1; }
+          echo "OK: ZIP original byte-fiel (hash + tamanho)."
+
+      - name: Descompactar SOMENTE para verificacao (nao modifica os originais)
+        run: |
+          set -euo pipefail
+          cd preserve
+          mkdir -p _verify
+          unzip -q -o original-artifact-8633091751.zip -d _verify
+          echo "conteudo do artifact:"; find _verify -type f | sed 's#_verify/##' | sort
+
+      - name: "GATE fail-closed — localizar + hashear APK/AAB (hashes oficiais)"
+        id: locate
+        run: |
+          set -euo pipefail
+          cd preserve
+          APK=$(find _verify -type f -name '*.apk' | head -1 || true)
+          AAB=$(find _verify -type f -name '*.aab' | head -1 || true)
+          [ -n "$APK" ] || { echo "::error::APK ausente no artifact"; exit 1; }
+          [ -n "$AAB" ] || { echo "::error::AAB ausente no artifact"; exit 1; }
+          APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
+          AAB_SHA=$(sha256sum "$AAB" | awk '{print $1}')
+          APK_SIZE=$(stat -c%s "$APK")
+          echo "apk=$(basename "$APK") size=$APK_SIZE sha256=$APK_SHA"
+          echo "aab=$(basename "$AAB") sha256=$AAB_SHA"
+          [ "$APK_SHA" = "$EXPECT_APK_SHA256" ] || { echo "::error::APK SHA-256 divergente: $APK_SHA"; exit 1; }
+          [ "$AAB_SHA" = "$EXPECT_AAB_SHA256" ] || { echo "::error::AAB SHA-256 divergente: $AAB_SHA"; exit 1; }
+          {
+            echo "apk_name=$(basename "$APK")"
+            echo "aab_name=$(basename "$AAB")"
+            echo "apk_size=$APK_SIZE"
+          } >> "$GITHUB_OUTPUT"
+          echo "OK: APK + AAB byte-identicos aos hashes oficiais."
+
+      - name: "GATE fail-closed — identidade (package/versionName/versionCode) via aapt"
+        run: |
+          set -euo pipefail
+          cd preserve
+          APK=$(find _verify -type f -name '*.apk' | head -1)
+          AAPT=$(ls "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"/build-tools/*/aapt 2>/dev/null | sort -V | tail -1 || true)
+          [ -n "$AAPT" ] || { echo "::error::aapt indisponivel no runner"; exit 1; }
+          "$AAPT" dump badging "$APK" > badging.txt
+          grep -q "package: name='${EXPECT_PACKAGE}' " badging.txt || { echo "::error::package != ${EXPECT_PACKAGE}"; exit 1; }
+          grep -q "versionCode='${EXPECT_VERSION_CODE}'" badging.txt || { echo "::error::versionCode != ${EXPECT_VERSION_CODE}"; exit 1; }
+          grep -q "versionName='${EXPECT_VERSION_NAME}'" badging.txt || { echo "::error::versionName != ${EXPECT_VERSION_NAME}"; exit 1; }
+          echo "OK: identidade ${EXPECT_PACKAGE} / vc ${EXPECT_VERSION_CODE} / vn ${EXPECT_VERSION_NAME}."
+
+      - name: "GATE fail-closed — certificado + assinatura v1/v2/v3 via apksigner"
+        run: |
+          set -euo pipefail
+          cd preserve
+          APK=$(find _verify -type f -name '*.apk' | head -1)
+          APKSIGNER=$(ls "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
+          [ -n "$APKSIGNER" ] || { echo "::error::apksigner indisponivel no runner"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > apksigner-verify.local.txt
+          grep -q "Verifies" apksigner-verify.local.txt || { echo "::error::apksigner: APK NAO verifica"; exit 1; }
+          grep -qiE "Verified using v1 scheme.*true" apksigner-verify.local.txt || { echo "::error::v1 signing != true"; exit 1; }
+          grep -qiE "Verified using v2 scheme.*true" apksigner-verify.local.txt || { echo "::error::v2 signing != true"; exit 1; }
+          grep -qiE "Verified using v3 scheme.*true" apksigner-verify.local.txt || { echo "::error::v3 signing != true"; exit 1; }
+          CERT_SHA256=$(grep -m1 -iE 'certificate SHA-?256 digest' apksigner-verify.local.txt | grep -oiE '[0-9a-f]{64}' | head -1 | tr 'A-F' 'a-f')
+          CERT_SHA1=$(grep -m1 -iE 'certificate SHA-?1 digest' apksigner-verify.local.txt | grep -oiE '[0-9a-f]{40}' | head -1 | tr 'A-F' 'a-f')
+          echo "cert_sha256=$CERT_SHA256"
+          echo "cert_sha1=$CERT_SHA1"
+          [ "$CERT_SHA256" = "$EXPECT_CERT_SHA256" ] || { echo "::error::cert SHA-256 divergente: $CERT_SHA256"; exit 1; }
+          [ "$CERT_SHA1" = "$EXPECT_CERT_SHA1" ] || { echo "::error::cert SHA-1 divergente: $CERT_SHA1"; exit 1; }
+          echo "OK: certificado oficial + v1/v2/v3 confirmados."
+
+      - name: Montar payload de preservacao + metadados/relatorio + SHA256SUMS-PRESERVATION
+        run: |
+          set -euo pipefail
+          cd preserve
+          APK=$(find _verify -type f -name '*.apk' | head -1)
+          AAB=$(find _verify -type f -name '*.aab' | head -1)
+          APK_B=$(basename "$APK"); AAB_B=$(basename "$AAB")
+          APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
+          AAB_SHA=$(sha256sum "$AAB" | awk '{print $1}')
+          APK_SIZE=$(stat -c%s "$APK"); AAB_SIZE=$(stat -c%s "$AAB")
+          ZIP_SHA=$(sha256sum original-artifact-8633091751.zip | awk '{print $1}')
+          ZIP_SIZE=$(stat -c%s original-artifact-8633091751.zip)
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          mkdir -p payload
+          # (a) ZIP original byte-identico
+          cp original-artifact-8633091751.zip payload/
+          # (b) TODOS os arquivos originais extraidos (APK/AAB/SHA256SUMS/SBOM/relatorios/evidencias) — sem alterar
+          find _verify -type f -exec cp {} payload/ \;
+          # (c) metadados canonicos
+          jq -n \
+            --arg pkg "$EXPECT_PACKAGE" --arg vn "$EXPECT_VERSION_NAME" --argjson vc "$EXPECT_VERSION_CODE" \
+            --arg apk "$APK_B" --arg apksha "$APK_SHA" --argjson apksize "$APK_SIZE" \
+            --arg aab "$AAB_B" --arg aabsha "$AAB_SHA" --argjson aabsize "$AAB_SIZE" \
+            --arg csha256 "$EXPECT_CERT_SHA256" --arg csha1 "$EXPECT_CERT_SHA1" \
+            --argjson srun "$SRC_RUN_ID" --argjson sart "$SRC_ARTIFACT_ID" \
+            --arg zipsha "$ZIP_SHA" --argjson zipsize "$ZIP_SIZE" \
+            --argjson prun "$GITHUB_RUN_ID" --arg now "$NOW" \
+            '{schemaVersion:1, status:"preserved-temporary-90d-not-distributed",
+              packageName:$pkg, versionName:$vn, versionCode:$vc,
+              apkFile:$apk, apkSha256:$apksha, apkSize:$apksize,
+              aabFile:$aab, aabSha256:$aabsha, aabSize:$aabsize,
+              certificateSha256:$csha256, certificateSha1:$csha1,
+              sourceRunId:$srun, sourceArtifactId:$sart, builtCommit:"75e98cb8",
+              originalZipName:"original-artifact-8633091751.zip", originalZipSha256:$zipsha, originalZipSize:$zipsize,
+              distributionEnabled:false, publicUrl:null,
+              preservationRunId:$prun, preservedAt:$now}' > payload/artifact-metadata.json
+          # (d) relatorio de verificacao
+          jq -n --arg now "$NOW" --argjson prun "$GITHUB_RUN_ID" \
+            '{schemaVersion:1, phase:"F4.3B-PRESERVE-STOPGAP-GITHUB-ARTIFACT-90-DAYS", verifiedAt:$now, preservationRunId:$prun,
+              gates:{zipSha256:"match", zipSize:"match", apkSha256:"match", aabSha256:"match",
+                     package:"match", versionName:"match", versionCode:"match",
+                     certificateSha256:"match", certificateSha1:"match", signatureV1V2V3:"true"},
+              recompiled:false, repacked:false, resigned:false, distributed:false, publicReleaseCreated:false,
+              retentionDays:90, note:"Preservacao temporaria de contencao. NAO e preservacao permanente. Destino duravel futuro: Cloudflare R2 privado."}' > payload/preservation-verification-report.json
+          # (e) SHA256SUMS-PRESERVATION sobre todo o payload (exceto ele mesmo)
+          ( cd payload && find . -type f ! -name 'SHA256SUMS-PRESERVATION' -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS-PRESERVATION )
+          echo "== SHA256SUMS-PRESERVATION =="; cat payload/SHA256SUMS-PRESERVATION
+          echo "== payload =="; ls -l payload
+
+      - name: Upload NOVO artifact de preservacao (retention 90 dias)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NEW_ARTIFACT_NAME }}
+          path: preserve/payload/
+          retention-days: 90
+          if-no-files-found: error
+          compression-level: 0
+
+  # ==================================================================
+  # JOB 2 — re-baixar o NOVO artifact e reconfirmar byte-a-byte (fail-closed)
+  # ==================================================================
+  verify-preserved:
+    runs-on: ubuntu-latest
+    needs: preserve
+    steps:
+      - name: Baixar o NOVO artifact recem-criado
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.NEW_ARTIFACT_NAME }}
+          path: check
+
+      - name: "POS-UPLOAD fail-closed — reconfirmar ZIP + APK + AAB"
+        run: |
+          set -euo pipefail
+          cd check
+          ZIP_SHA=$(sha256sum original-artifact-8633091751.zip | awk '{print $1}')
+          [ "$ZIP_SHA" = "$EXPECT_ZIP_SHA256" ] || { echo "::error::pos-upload: ZIP divergente: $ZIP_SHA"; exit 1; }
+          APK=$(find . -maxdepth 1 -type f -name '*.apk' | head -1)
+          AAB=$(find . -maxdepth 1 -type f -name '*.aab' | head -1)
+          APK_SHA=$(sha256sum "$APK" | awk '{print $1}')
+          AAB_SHA=$(sha256sum "$AAB" | awk '{print $1}')
+          [ "$APK_SHA" = "$EXPECT_APK_SHA256" ] || { echo "::error::pos-upload: APK divergente: $APK_SHA"; exit 1; }
+          [ "$AAB_SHA" = "$EXPECT_AAB_SHA256" ] || { echo "::error::pos-upload: AAB divergente: $AAB_SHA"; exit 1; }
+          echo "OK pos-upload: original-artifact-8633091751.zip + APK + AAB byte-identicos aos valores oficiais."
+
+      - name: Registrar NOVO artifact (ID/digest/retencao/expiracao) + provar ausencia de release publico
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          A=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts")
+          echo "== NOVO artifact =="
+          echo "$A" | jq -r --arg n "$NEW_ARTIFACT_NAME" \
+            '.artifacts[] | select(.name==$n) | "new_artifact_id=\(.id)\nnew_digest=\(.digest)\nsize_in_bytes=\(.size_in_bytes)\nexpires_at=\(.expires_at)\ncreated_at=\(.created_at)\nexpired=\(.expired)"'
+          # ausencia de release publico criado por esta fase (informativo — nao criamos nenhum)
+          R=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases?per_page=1")
+          echo "release Latest atual (inalterado por esta fase): $(echo "$R" | jq -r '.[0].tag_name // "none"')"
+          echo "OK: nenhuma release/URL publica criada por esta fase."
