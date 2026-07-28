@@ -107,4 +107,5 @@ jobs:
           echo "OK: nenhuma regressao NOVA; 5 vermelhas pre-existentes confinadas ao KNOWN_RED."
 
       - name: Prova — sem secrets, sem deploy, sem producao
-        run: echo "Workflow read-only: NAO consome secrets, NAO faz deploy, NAO acessa producao/dados reais."
+        run: |
+          echo "Workflow read-only. NAO consome secrets, NAO faz deploy, NAO acessa producao/dados reais."
