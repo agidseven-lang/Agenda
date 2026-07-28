@@ -1,0 +1,10 @@
+[01-anônimo] 12/12 ok
+[02-users] 12/12 ok
+[03-tasks] 14/14 ok
+[04-events] 8/8 ok
+[05-chats] 9/9 ok
+[06-campos/mass-assignment] 9/9 ok
+[07-desktop-1.0.191] 8/8 ok
+[08-f43c2-identidades] 8/8 ok
+F4.3C3 RULES (emulator): 80 OK, 0 FALHOU (total 80)
+[run] RC=0

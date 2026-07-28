@@ -1,0 +1,23 @@
+{
+  "artifact": "A — BASELINE COMPROVADA (read-only, byte-exata)",
+  "file": "firestore.baseline-proven.rules",
+  "purpose": "Cópia byte-idêntica da última captura viva byte-exata comprovada das Firestore Rules de produção. NÃO é fonte de deploy. Serve como referência auditável (diff/rollback) para o design das Rules-alvo.",
+  "rulesetName": "projects/agenda-id-seven/rulesets/2ebfb400-c5d1-4d13-b0de-b24b00710799",
+  "release": "cloud.firestore",
+  "sha256": "0f621e2f50f19e4f2bd4279735d450033c720939bbef3d1a4542d3d56f26bdf6",
+  "lineCount": 147,
+  "byteCount": 5592,
+  "deployedUpdateTime": "2026-06-23T17:59:34.130417Z",
+  "capturedAt": "2026-06-26T15:53:32.876Z",
+  "captureSource": "Firebase Rules API GET (ops/firestore-rules-baseline/, capturedByWorkflow firestore-rules-baseline-capture.yml, captureRunId 28249260055)",
+  "origin": "ops/firestore-rules-baseline/live-firestore.rules @ main — copiado byte-a-byte (cmp OK).",
+  "auditVerdict": "NO-GO (HIGH:1 users PII / MEDIUM:8 / INFO:20)",
+  "knownRisk": "users com leitura direta ABERTA (allow read: if true) expõe PII/credenciais: pass, salt, fcmTokens, phone, email. events/tasks/chats também abertos (if true) e deletáveis por qualquer cliente.",
+  "limitacoesDaProva": [
+    "Esta é a ÚLTIMA captura BYTE-EXATA comprovada (2026-06-23). NÃO comprova o ruleset ATIVO ATUAL em produção.",
+    "Existem workflows de deploy POSTERIORES (firestore-rules-users-read-close-deploy, firestore-rules-users-create-update-close-deploy, firestore-rules-userspublic-read-deploy) que aplicaram patches cirúrgicos ao ruleset LIVE após 2026-06-23 — porém SEM captura viva byte-exata suficiente. Portanto o ruleset ativo em produção permanece NÃO COMPROVADO.",
+    "NÃO declarar as Rules atuais seguras. NÃO assumir que a produção corresponde a este arquivo nem aos arquivos locais.",
+    "Este baseline é SOMENTE documento: firebase.json (repo) NÃO possui chave firestore; nenhum deploy é publicado por este baseline."
+  ],
+  "note": "BASELINE ONLY — NOT a deploy source. F4.3C3 não implanta, não promove e não substitui nenhum ruleset."
+}

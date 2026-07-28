@@ -1,0 +1,13 @@
+{
+  "name": "f43c3-firestore-rules-emulator",
+  "private": true,
+  "type": "module",
+  "description": "F4.3C3 — validação isolada de Firestore Rules deny-by-default no Firebase Emulator Suite (project demo-agenda-id-seven-f43c3). SEM deploy, SEM produção, SEM dados reais.",
+  "scripts": {
+    "test": "node tests/run-all.mjs"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase": "^10.14.1"
+  }
+}
