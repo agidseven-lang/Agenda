@@ -1,0 +1,122 @@
+# =====================================================================
+# [F4.3C1] Android Local Security Hardening — VERIFY (DEBUG-ONLY)
+# ---------------------------------------------------------------------
+# Verificacao ISOLADA das correcoes locais de seguranca do Android (F4.3C1),
+# base f42e @4d333574. Como o ambiente de desenvolvimento nao possui Android SDK,
+# a compilacao/lint/testes unitarios sao provados AQUI (GitHub Actions).
+#
+# Este arquivo vive em `main` SOMENTE para ser workflow_dispatch-able (exigencia do
+# GitHub). Ele faz CHECKOUT do BRANCH DE FEATURE (input `ref`) e o verifica.
+# O branch de feature permanece 100% dentro de android-native-beta/** (isolamento).
+#
+# GARANTIAS (fail-closed):
+#   - NAO gera APK; NAO gera AAB; NAO assina; NAO publica; NAO faz deploy;
+#   - NAO altera identidade (versionCode 129 / versionName 1.0.0 / applicationId);
+#   - roda SOMENTE tarefas DEBUG sem empacotamento: compileDebugSources,
+#     testDebugUnitTest (auth.*), lintDebug.
+#   - o proprio build.gradle do modulo ja aborta qualquer assemble/bundleRelease
+#     sem os Secrets oficiais (rede de seguranca adicional).
+# Permissoes minimas: contents:read (nao escreve no repo, nao cria release).
+# =====================================================================
+name: F4.3C1 Android Local Security Hardening — VERIFY (debug-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch/SHA de feature a verificar'
+        required: true
+        default: 'android/f43c1-local-security-hardening'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: "4d333574bd94ecd369cc39e2c0ef66cffee10267"
+      EXPECT_VERSION_CODE: "129"
+      EXPECT_VERSION_NAME: "1.0.0"
+    steps:
+      - name: Checkout (ref de feature; history completo p/ o gate de isolamento)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Gate — identidade congelada (versionCode 129 / versionName 1.0.0 / applicationId br.com.idseven.agenda)
+        run: |
+          set -euo pipefail
+          GRADLE="android-native-beta/app/build.gradle"
+          VC=$(grep -oE 'versionCode [0-9]+' "$GRADLE" | awk '{print $2}')
+          VN=$(grep -oE 'versionName "[^"]+"' "$GRADLE" | sed -E 's/versionName "(.*)"/\1/')
+          echo "versionCode=$VC versionName=$VN"
+          [ "$VC" = "$EXPECT_VERSION_CODE" ] || { echo "::error::versionCode=$VC != $EXPECT_VERSION_CODE (identidade oficial deve ser preservada)"; exit 1; }
+          [ "$VN" = "$EXPECT_VERSION_NAME" ] || { echo "::error::versionName=$VN != $EXPECT_VERSION_NAME"; exit 1; }
+          grep -q 'applicationId "br.com.idseven.agenda"' "$GRADLE" || { echo "::error::applicationId != br.com.idseven.agenda"; exit 1; }
+          echo "OK: identidade oficial congelada preservada (sem alteracao de versao/assinatura/package)."
+
+      - name: Gate — isolamento (so android-native-beta/** mudou vs base 4d333574; superficies congeladas intocadas)
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASE_SHA" HEAD || true)
+          echo "=== arquivos alterados vs base 4d333574 ==="; echo "$CHANGED"
+          BAD=$(echo "$CHANGED" | sed '/^$/d' | grep -v '^android-native-beta/' || true)
+          if [ -n "$BAD" ]; then echo "::error::mudanca FORA de android-native-beta/**: $BAD"; exit 1; fi
+          for p in "desktop" "cloudflare-worker.js" "wrangler.toml" "functions" "presence-service" "scripts" "portal"; do
+            D=$(git diff --name-only "$BASE_SHA" HEAD -- "$p" || true)
+            [ -z "$D" ] || { echo "::error::alteracao proibida em $p: $D"; exit 1; }
+          done
+          echo "OK: apenas android-native-beta/** mudou; Desktop/Worker/Rules/Functions/portal intocados."
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Restaurar google-services.json (secret GOOGLE_SERVICES_JSON_BETA — exigido pelo plugin google-services)
+        env:
+          GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GS_JSON:-}" ]; then
+            echo "::error::Secret GOOGLE_SERVICES_JSON_BETA ausente — necessario pelo plugin google-services (Firebase)."
+            exit 1
+          fi
+          printf '%s' "$GS_JSON" > android-native-beta/app/google-services.json
+          echo "google-services.json gravado ($(wc -c < android-native-beta/app/google-services.json) bytes)."
+
+      - name: Compilar DEBUG (fontes; SEM empacotar/assinar APK/AAB)
+        working-directory: android-native-beta
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :app:compileDebugSources --no-daemon --stacktrace
+
+      - name: Testes unitarios (F4.3C1 + F4.2B/F4.2C) — testDebugUnitTest --tests "br.com.idseven.agenda.auth.*"
+        working-directory: android-native-beta
+        run: |
+          set -euo pipefail
+          ./gradlew :app:testDebugUnitTest --tests "br.com.idseven.agenda.auth.*" --no-daemon --stacktrace
+
+      - name: Lint DEBUG
+        working-directory: android-native-beta
+        run: |
+          set -euo pipefail
+          ./gradlew :app:lintDebug --no-daemon --stacktrace
+
+      - name: Upload relatorios (testes + lint) — retencao 14 dias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f43c1-verify-reports-${{ github.run_id }}
+          path: |
+            android-native-beta/app/build/reports/tests/testDebugUnitTest/**
+            android-native-beta/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 14
