@@ -23,6 +23,11 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   onNotifToast: (cb: (payload: any) => void) => {
     ipcRenderer.on("notif-toast", (_e, p: any) => cb(p));
   },
+  // F3.5.3 — renderer confirma o RENDER do toast (dedupKey): sem ACK, o main entrega pelo fallback.
+  notifToastAck: (dedupKey: string) => { try { ipcRenderer.send("notif-toast-ack", String(dedupKey || "")); } catch { /* */ } },
+  // F3.5.3 — COLAGEM explícita no formulário (Legenda/Tema/Observações): texto simples do clipboard
+  // via módulo do Electron no main (determinístico; independe do accelerator nativo). Nunca HTML.
+  clipboardReadText: (): Promise<string> => ipcRenderer.invoke("clipboard-read-text"),
   // F3.3.10 — main -> renderer: CAPTURA p/ a Central de Notificações (histórico local). Capture-only:
   // o main encaminha o MESMO payload já entregue (toast OU nativa), sem alterar roteamento/entrega.
   onNotifHistory: (cb: (payload: any) => void) => {

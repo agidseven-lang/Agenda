@@ -12,6 +12,8 @@ import os from "os";
 import { ensureTray, recreateTray, getTrayState, destroyTray } from "./tray";
 import { isAutoStart, setAutoStart } from "./autostart";
 import { startNotifier } from "./notifier";
+import { startNotifierA } from "./notifierA"; // F3.5.3 — produtor DURÁVEL Categoria A (todos os usuários ativos; backlog/cursor/recibos)
+import { createToastAckTracker } from "./toastAck"; // F3.5.3 — prova de render do toast (paridade com o ACK da bg-window)
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
 import { startReminder } from "./reminder";
 import { startSlaScheduler } from "./slaScheduler"; // F3.4.3 — produtor AUTORITATIVO de SLA no main (amarelo/vermelho/crítico), sobrevive à janela oculta
@@ -69,6 +71,8 @@ type NotifPayload = {
   action?: { type?: string; deep?: string }; dedupKey?: string; source?: string; providerCalled?: boolean;
 };
 const _notifSeen = new Set<string>();
+// F3.5.3 — ACK do toast: tracker do prazo de render (4s). Fallback bg/nativa quando não há prova.
+const toastAck = createToastAckTracker({ onLog: (t, d) => { try { diag(t, d as any); } catch { /* */ } } });
 function _appIcon(): string | undefined {
   try { return path.join(app.getAppPath(), "build", "icon.png"); } catch { return undefined; }
 }
@@ -133,6 +137,19 @@ function deliverNotification(p: NotifPayload): { ok: boolean; channel: string } 
     if (windowActive()) {
       mainWin?.webContents.send("notif-toast", p);
       diag("deliver.toast", { dedupKey: key, taskId: p.taskId });
+      // F3.5.3 — WATCHDOG DE ACK (aditivo; roteamento/dedup 1.0.191 preservados): o renderer
+      // confirma o RENDER via "notif-toast-ack" (dedupKey). Sem ACK em 4s (listener ausente, erro de
+      // JS, recarga), o fallback entrega pela bg-window/nativa — a janela "aberta" deixa de perder
+      // notificação em silêncio. Guarda typeof: harnesses que extraem só este corpo (fixtures f343)
+      // rodam SEM o tracker e mantêm a semântica aprovada byte-a-byte.
+      if (typeof toastAck !== "undefined" && toastAck) {
+        toastAck.arm(key, () => {
+          const bgOk2 = showBgNotify(p, () => { const l2 = nativeNotify(p, key, deep); diag("deliver.toast.noAck.bg.noAck.native", { dedupKey: key, nativeOk: l2 }); });
+          let nOk2 = false;
+          if (!bgOk2) nOk2 = nativeNotify(p, key, deep);
+          diag("deliver.toast.noAck.fallback", { dedupKey: key, channel: bgOk2 ? "bg-window" : (nOk2 ? "native" : "none") });
+        });
+      }
       markSeen();
       return { ok: true, channel: "toast" };
     }
@@ -359,6 +376,11 @@ app.whenReady().then(() => {
   // F3.3.3 — renderer pede notificação (fluxo/SLA/bloqueio detectados no renderer).
   // O HUB decide o canal (toast in-app x nativa) e faz dedup. Sem provider externo.
   ipcMain.handle("notify", (_e, payload: NotifPayload) => deliverNotification(payload));
+  // F3.5.3 — renderer confirma o RENDER do toast (dedupKey): cancela o fallback pendente.
+  ipcMain.on("notif-toast-ack", (_e, key: string) => { toastAck.ack(String(key || "")); });
+  // F3.5.3 — leitura de texto da área de transferência p/ o pipeline explícito de COLAGEM do
+  // formulário (Legenda/Tema/Observações). SOMENTE texto simples; nunca HTML executável.
+  ipcMain.handle("clipboard-read-text", () => { try { return String(clipboard.readText() || ""); } catch { return ""; } });
   ipcMain.handle("autostart-get", () => isAutoStart());
   ipcMain.handle("autostart-set", (_e, v: boolean) => { setAutoStart(v); return isAutoStart(); });
   ipcMain.handle("app-quit", () => { realQuit(); });
@@ -452,8 +474,15 @@ app.whenReady().then(() => {
       // mantêm a nativa quando minimizado/tray). Mesmos eventos/dedup de antes.
       // F3.4.4 — passa o papel AUTENTICADO (main, F3.4.3) p/ o roteamento de FLUXO (supervisão
       // vê-tudo) do produtor u3; sem authUser ⇒ sem privilégio vê-tudo (fail-closed).
-      stopNotifier = startNotifier(() => mainWin, uid, deliverNotification, getAuthUser);
-      stopReminder = startReminder(() => mainWin, uid, deliverNotification);
+      // F3.5.3 — Categoria A DURÁVEL (atribuição/movimentação/conclusão/reabertura p/ TODOS os
+      // usuários ativos, ator incluído): backlog do 1º snapshot (recupera o perdido com o PC
+      // desligado) + tempo real, com cursor/recibos/deviceId persistentes. Instância ÚNICA por
+      // login, COMPOSTA no stopNotifier — logout/troca/quit/updater já a encerram pelos teardowns
+      // aprovados (nenhuma linha nova nas regiões pinadas). toastAck.clear() idem (sem fallback
+      // tardio cruzando usuários).
+      const _stopEventNew = startNotifier(() => mainWin, uid, deliverNotification, getAuthUser);
+      const _notifierA = startNotifierA(uid, deliverNotification);
+      stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } try { toastAck.clear(); } catch { /* */ } };
       // F3.3.77A-R4B — RELÓGIO CANÔNICO: liga a sincronização (main) via cabeçalho HTTP Date do
       // getUserSelf (Cloud Run, read-only, SEM auth ⇒ zero mutação). Empurra o offset ao renderer,
       // que o aplica em canonicalNowMs()/_slaClockOffsetMs e rearma as timelines de SLA.

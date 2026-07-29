@@ -4168,7 +4168,7 @@ try{ setInterval(function(){ try{ ncDiag('scan.tick',{vis:(typeof document!=='un
    Só log local via main; não altera comportamento. Removível. */
 try{ document.addEventListener('visibilitychange', function(){ try{ ncDiag('visibility',{state:document.visibilityState}); }catch(_){} }); ncDiag('boot',{state:(typeof document!=='undefined'?document.visibilityState:'?')}); }catch(_){}
 /* receber TOAST do HUB do main (janela focada/visível) */
-try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifToastOnce(p); try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} }); } }catch(_){}   /* F3.4.7 — TODOS os eventos passam pela guarda once-por-dedupKey (mesma porta da compensação) */
+try{ if(window.desktopAPI&&typeof window.desktopAPI.onNotifToast==='function'){ window.desktopAPI.onNotifToast(function(p){ notifToastOnce(p); try{ if(typeof notifHistoryAppend==='function') notifHistoryAppend(p); }catch(_){} /* F3.5.3 — ACK de render: confirma ao main (mostrado agora OU já mostrado antes pela guarda once — nos dois casos o fallback deve ser cancelado). Se notifToastOnce lançou/não rodou, NÃO há ACK e o main entrega pelo fallback. */ try{ var k=String((p&&(p.dedupKey||p.eventId))||''); if(k&&window.desktopAPI&&typeof window.desktopAPI.notifToastAck==='function') window.desktopAPI.notifToastAck(k); }catch(_){} }); } }catch(_){}   /* F3.4.7 — TODOS os eventos passam pela guarda once-por-dedupKey (mesma porta da compensação) */
 /* F3.3.10 — onNotifHistory (captura 100% toast×nativa via hub do main) é registrado UMA vez no bloco F3.3.10-NOTIF-CENTRAL. */
 /* exposto p/ QA/testes (não afeta produção) */
 try{ window.notifShowToast=notifShowToast; window.notifBuildPayload=notifBuildPayload; window.notifEmit=notifEmit; window.notifScan=notifScan; window.notifScanSla=notifScanSla; window.notifScanFlow=notifScanFlow; window.notifFlowEvent=notifFlowEvent; window.notifRoute=notifRoute; window.resolveNotificationTargets=resolveNotificationTargets; window.resolveUserIdentity=resolveUserIdentity; window.notifNormalize=notifNormalize; window.notifIdentity=notifIdentity; window.notifResponsible=notifResponsible; window.notifActor=notifActor; window.notifPhaseLabel=notifPhaseLabel; window.__notifResetFlow=function(){ _notifPhase={}; _notifBaseline=false; _notifUid=null; }; }catch(_){}
@@ -8228,7 +8228,75 @@ function afterForm(){
   // date/time: indicador nativo oculto -> clicar no campo abre o seletor via showPicker()
   c.querySelectorAll('.dt-field').forEach(w=>{const inp=w.querySelector('input');if(!inp)return;
     w.addEventListener('click',()=>{try{inp.showPicker&&inp.showPicker();}catch(_){inp.focus();}});});
+  f353WirePasteRecovery(c);   // F3.5.3 — colagem explícita nos campos de texto do formulário (Legenda/Tema/Obs)
 }
+/* ════ F3.5.3 — RECUPERAÇÃO DE COLAGEM (escopo: SOMENTE o formulário "Nova tarefa") ════
+   Causa provada: o app não tem menu de aplicação (main.ts removeMenu) e NENHUM handler de
+   contextmenu/paste existia no renderer — "colar pelo menu" era IMPOSSÍVEL e Ctrl+V/Shift+Insert
+   dependiam exclusivamente do accelerator nativo do Chromium, sem fallback. Este pipeline torna a
+   colagem DETERMINÍSTICA nos campos de texto do formulário: (1) evento 'paste' explícito (texto
+   puro no cursor); (2) Ctrl+V / Meta+V / Shift+Insert lendo o clipboard via módulo do Electron
+   (IPC no main); (3) menu de contexto próprio com Colar/Copiar/Recortar. SEMPRE texto simples
+   (nunca HTML executável); preserva quebras de linha/acentos/emojis; dispara 'input' para o bind
+   capturar o valor (salvo/exibido/Detalhes). Guardas: só com state.form aberto e só em campos de
+   texto — atalhos globais e o clipboard do Card Premium (_copy/copy-card-image) ficam intocados. */
+function f353IsTextField(el){ if(!el||!el.tagName) return false; var tag=el.tagName.toLowerCase(); if(tag==='textarea') return true; if(tag!=='input') return false; var ty=(el.getAttribute('type')||'text').toLowerCase(); return ty==='text'||ty===''||ty==='search'||ty==='url'||ty==='tel'; }
+function f353InsertPlainText(el, text){
+  try{
+    if(!el||!f353IsTextField(el)) return false;
+    var t=String(text==null?'':text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    if(!t) return false;
+    var s=(typeof el.selectionStart==='number')?el.selectionStart:el.value.length;
+    var e=(typeof el.selectionEnd==='number')?el.selectionEnd:el.value.length;
+    if(typeof el.setRangeText==='function'){ el.setRangeText(t, s, e, 'end'); }
+    else { el.value=el.value.slice(0,s)+t+el.value.slice(e); try{ el.selectionStart=el.selectionEnd=s+t.length; }catch(_){} }
+    try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(_){ if(typeof el.oninput==='function') el.oninput({target:el}); }
+    return true;
+  }catch(_){ return false; }
+}
+async function f353PasteFromClipboard(el){
+  var txt='';
+  try{ if(window.desktopAPI&&typeof window.desktopAPI.clipboardReadText==='function') txt=await window.desktopAPI.clipboardReadText(); }catch(_){ txt=''; }
+  if(!txt){ try{ if(navigator.clipboard&&navigator.clipboard.readText) txt=await navigator.clipboard.readText(); }catch(_){ txt=''; } }
+  return f353InsertPlainText(el, txt);
+}
+function f353CloseCtxMenu(){ try{ var m=document.getElementById('f353Ctx'); if(m) m.remove(); }catch(_){} }
+function f353WirePasteRecovery(root){
+  if(!root||root.__f353Paste) return; root.__f353Paste=true;
+  // (1) 'paste' explícito — texto puro no cursor (cobre qualquer origem que gere o evento).
+  root.addEventListener('paste', function(ev){
+    if(!state.form) return; var el=ev.target; if(!f353IsTextField(el)) return;
+    var t=''; try{ t=(ev.clipboardData&&ev.clipboardData.getData&&ev.clipboardData.getData('text/plain'))||''; }catch(_){ t=''; }
+    ev.preventDefault(); ev.stopPropagation();
+    if(t) f353InsertPlainText(el, t); else f353PasteFromClipboard(el);
+  }, true);
+  // (2) Ctrl+V / Meta+V / Shift+Insert — caminho determinístico (clipboard do Electron via IPC).
+  root.addEventListener('keydown', function(ev){
+    if(!state.form) return; var el=ev.target; if(!f353IsTextField(el)) return;
+    var isV=(ev.key==='v'||ev.key==='V'||ev.keyCode===86);
+    var isIns=(ev.key==='Insert'||ev.keyCode===45);
+    if(((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&isV)||(ev.shiftKey&&isIns)){
+      ev.preventDefault(); ev.stopPropagation();
+      f353PasteFromClipboard(el);
+    }
+  }, true);
+  // (3) menu de contexto próprio — Colar/Copiar/Recortar, só nos campos de texto do formulário.
+  root.addEventListener('contextmenu', function(ev){
+    if(!state.form) return; var el=ev.target; if(!f353IsTextField(el)) return;
+    ev.preventDefault(); f353CloseCtxMenu();
+    var m=document.createElement('div'); m.id='f353Ctx';
+    m.style.cssText='position:fixed;z-index:99999;background:var(--surface2,#1a1c24);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px;min-width:150px;box-shadow:0 12px 32px rgba(0,0,0,.45)';
+    function mi(label,fn){ var b=document.createElement('button'); b.textContent=label; b.style.cssText='display:block;width:100%;text-align:left;background:transparent;border:0;color:inherit;font:inherit;padding:8px 10px;border-radius:8px;cursor:pointer'; b.onmouseenter=function(){b.style.background='rgba(255,255,255,.08)';}; b.onmouseleave=function(){b.style.background='transparent';}; b.onclick=function(e){ e.preventDefault(); f353CloseCtxMenu(); fn(); }; return b; }
+    m.appendChild(mi('Colar', function(){ try{ el.focus(); }catch(_){} f353PasteFromClipboard(el); }));
+    m.appendChild(mi('Copiar', function(){ try{ var s=el.selectionStart||0, e2=el.selectionEnd||0; var v=(e2>s)?el.value.slice(s,e2):el.value; if(v&&typeof _copy==='function') _copy(v); }catch(_){} }));
+    m.appendChild(mi('Recortar', function(){ try{ var s=el.selectionStart||0, e2=el.selectionEnd||0; var v=el.value.slice(s,e2); if(v){ if(typeof _copy==='function') _copy(v); el.setRangeText('', s, e2, 'end'); el.dispatchEvent(new Event('input',{bubbles:true})); } }catch(_){} }));
+    var x=Math.min(ev.clientX, (window.innerWidth||1200)-170), y=Math.min(ev.clientY, (window.innerHeight||800)-140);
+    m.style.left=x+'px'; m.style.top=y+'px';
+    document.body.appendChild(m);
+    setTimeout(function(){ document.addEventListener('click', f353CloseCtxMenu, { once:true }); },0);
+  }, true);
+}
+try{ window.__f353InsertPlainText=f353InsertPlainText; window.__f353IsTextField=f353IsTextField; }catch(_){}
 function composedDesc(){const f=state.form;const sub=curSub();const t=tpl();let lines=[];
   if(sub)lines.push(sub.formTitle);
   const fields=(sub?sub.fields:(t?t.fields:[]))||[];
