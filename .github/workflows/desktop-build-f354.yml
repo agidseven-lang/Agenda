@@ -156,12 +156,15 @@ jobs:
           [ "$N" = "0" ] || { echo "::error:: diff do index.html toca a colagem ($N linhas)"; exit 1; }
           echo "COLAGEM NA LEGENDA: fora do diff (0 mencoes nas hunks)."
 
-      - name: Gate CARD PREMIUM + LAYOUT — regioes fora do diff do renderer
+      - name: Gate CARD PREMIUM — funcoes/regioes fora do diff do renderer (o layout kbv2 E o escopo autorizado do COMMIT A)
         run: |
           set -e
-          N=$(git diff "$BASE_193_SHA" HEAD -- desktop/src/renderer/index.html | grep -cE 'ensureReviewToken|ensureStableClientReviewToken|buildShareClientUrl|buildClientMessage|canSendToClient|openSendClientModal|clientReviewToken|og:image|/share/|kbv2-|isClientSector' || true)
-          [ "$N" = "0" ] || { echo "::error:: diff do index.html toca Card Premium/layout kbv2 ($N linhas)"; exit 1; }
-          echo "CARD PREMIUM + LAYOUT kbv2: fora do diff (0 mencoes nas hunks)."
+          # F3.5.4: o congelamento do LAYOUT kbv2 (fases F3.5.2D/F3.5.3x) foi SUPERADO pela autorizacao
+          # do COMMIT A (KanbanTaskCardUnified reescreve o card kbv2). O que permanece ABSOLUTO e o
+          # CARD PREMIUM do WhatsApp: todas as funcoes/regioes abaixo tem que ficar FORA das hunks.
+          N=$(git diff "$BASE_193_SHA" HEAD -- desktop/src/renderer/index.html | grep -cE 'ensureReviewToken|ensureStableClientReviewToken|buildShareClientUrl|buildClientMessage|canSendToClient|openSendClientModal|clientReviewToken|og:image|/share/|isClientSector' || true)
+          [ "$N" = "0" ] || { echo "::error:: diff do index.html toca Card Premium ($N linhas)"; exit 1; }
+          echo "CARD PREMIUM: fora do diff (0 mencoes nas hunks)."
 
       - name: Gate SUITES SUPERADAS — preservadas byte-identicas (classificadas; nao rodadas como gate)
         run: |
