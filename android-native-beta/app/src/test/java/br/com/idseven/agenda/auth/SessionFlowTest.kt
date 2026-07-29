@@ -147,6 +147,9 @@ class SessionFlowTest {
                 FakeAuthApi.ok(org.json.JSONObject().put("ok", true).put("count", 1))
             override suspend fun postRemoveFcm(token: String, fcmToken: String, deviceId: String, platform: String) =
                 FakeAuthApi.ok(org.json.JSONObject().put("ok", true).put("count", 0))
+            // F4.3C4B — getUserContact (nao usado neste cenario de single-flight).
+            override suspend fun postContact(token: String, uid: String) =
+                FakeAuthApi.ok(org.json.JSONObject().put("ok", true).put("uid", uid).put("contact", org.json.JSONObject()))
         }
         val vault = FakeVault()
         val mgr = manager(vault, FakeAuthApi(FakeAuthApi.http(500)))
