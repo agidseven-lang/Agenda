@@ -1,0 +1,170 @@
+# =====================================================================
+# [F4.3C4C] Desktop Auth Compatibility PROTOTYPE — VERIFY (emulator-only)
+# ---------------------------------------------------------------------
+# Verifica o protótipo ISOLADO prototypes/desktop-f43c4c-auth-compatibility/
+# (branch prototype/f43c4c-desktop-auth-compatibility, base main@0674024e):
+# prova de Firebase Auth EXPLÍCITO pós-login (custom token ->
+# signInWithCustomToken -> uid check -> request.auth) contra as Rules-alvo
+# F4.3C3 byte-idênticas, SOMENTE em emuladores (Auth+Firestore) com backend
+# sintético e project FICTÍCIO demo-agenda-id-seven-f43c4c.
+#
+# Este arquivo vive em `main` SOMENTE para ser workflow_dispatch-able. Ele faz
+# CHECKOUT do BRANCH DO PROTÓTIPO (input `ref`) e o verifica.
+#
+# GARANTIAS (fail-closed):
+#   - NÃO é build da Desktop: nenhum EXE/MSI/NSIS, nenhum electron-builder,
+#     nenhum release, nenhum APK/AAB, nenhuma assinatura, nenhum upload;
+#   - NÃO faz deploy de NADA (Rules/Worker/backend/functions) e NÃO conecta
+#     em produção (sem project real, sem endpoint real, sem service account);
+#   - GATE DE ISOLAMENTO: o diff vs base contém SOMENTE o diretório do
+#     protótipo + docs/F4.3C4C-*.md; desktop/ (Golden Master 1.0.191),
+#     android*, functions, Worker, ops/ (captura viva F4.3C4A), security/,
+#     app/, web-PWA e .github ficam diff-empty;
+#   - GATE ANTI-1.0.185: proibido invocar/importar signInAnonymously;
+#     obrigatório o fluxo explícito (ensureAuthenticated + custom token);
+#   - GATE RULES PIN: SHA-256 das Rules-alvo == artefato F4.3C3 (nao pode
+#     enfraquecer);
+#   - vermelho a menos que a suíte imprima literalmente "40 OK, 0 FALHOU".
+# Permissões mínimas: contents:read (não escreve no repo, não cria release).
+# =====================================================================
+name: F4.3C4C Desktop Auth Prototype — VERIFY (emulator-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch/SHA do protótipo a verificar'
+        required: true
+        default: 'prototype/f43c4c-desktop-auth-compatibility'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: "0674024eb9be6be916e9cad2137b4bae47934e81"
+      P: "prototypes/desktop-f43c4c-auth-compatibility"
+      RULES_SHA: "3af8c08a25990e112c578662064a4333f466da72ca3ca359ef2c874537341c23"
+    steps:
+      - name: Checkout (ref do protótipo; history completo p/ o gate de isolamento)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Gate — ISOLAMENTO (allowlist estrito; superfícies congeladas diff-empty vs base)
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASE_SHA" HEAD | sed '/^$/d' || true)
+          echo "=== arquivos alterados vs base ==="; echo "$CHANGED"
+          ALLOW='^(prototypes/desktop-f43c4c-auth-compatibility/|docs/F4\.3C4C-[A-Za-z0-9.-]+\.md$)'
+          BAD=$(echo "$CHANGED" | grep -vE "$ALLOW" || true)
+          if [ -n "$BAD" ]; then echo "::error::mudança FORA do allowlist F4.3C4C: $BAD"; exit 1; fi
+          # Superfícies CONGELADAS: diff-empty obrigatório (inclui Desktop Golden Master 1.0.191).
+          for p in "desktop" "android-native-beta" "android-native" "functions" "cloudflare-worker.js" \
+                   "wrangler.toml" "index.html" "sw.js" "firebase-messaging-sw.js" "manifest.json" \
+                   "scripts" "ops" "security" "app" "presence-service" ".github" "firebase.json" ".firebaserc"; do
+            DF=$(git diff --name-only "$BASE_SHA" HEAD -- "$p" || true)
+            [ -z "$DF" ] || { echo "::error::superfície CONGELADA alterada: $p -> $DF"; exit 1; }
+          done
+          echo "OK: isolamento preservado (Desktop GM/Android/Worker/functions/ops/security/app/web-PWA/.github intocados)."
+
+      - name: Gate — NO-BUILD / NO-DEPLOY / NO-PUBLISH (protótipo estruturalmente incapaz)
+        run: |
+          set -euo pipefail
+          # Nenhum comando de build/publicação da Desktop ou de artefato móvel.
+          if grep -RInE 'electron-builder|npm run dist|--publish|makensis|\.exe\b|\.msi\b|assembleRelease|bundleRelease|apksigner|jarsigner|signingConfig|keystore' \
+               --include='*.mjs' --include='*.js' --include='*.json' --include='*.rules' --exclude-dir=node_modules "$P"; then
+            echo "::error::comando/artefato de BUILD/PUBLICAÇÃO encontrado no protótipo"; exit 1
+          fi
+          # Nenhum comando de deploy (Rules/Worker/backend) e nenhum upload.
+          if grep -RInE 'firebase +deploy|gcloud +[a-z]|wrangler +(deploy|publish|r2)|aws +s3|gsutil ' \
+               --include='*.mjs' --include='*.js' --include='*.json' --include='*.rules' --exclude-dir=node_modules "$P"; then
+            echo "::error::comando de DEPLOY/UPLOAD encontrado no protótipo"; exit 1
+          fi
+          # PROVA POSITIVA: o único uso do firebase-tools é o emulador (exec), com project fictício.
+          grep -q 'firebase emulators:exec --only auth,firestore --project demo-agenda-id-seven-f43c4c' "$P/package.json" \
+            || { echo "::error::script de teste não é emulators:exec com project fictício"; exit 1; }
+          echo "OK: sem build, sem deploy, sem publicação; somente emuladores."
+
+      - name: Gate — ANTI-PRODUÇÃO (sem project real, endpoint real, credencial ou dado real)
+        run: |
+          set -euo pipefail
+          # Project ID real (o fictício demo-agenda-id-seven-f43c4c é o ÚNICO permitido).
+          if grep -RInP 'agenda-id-seven(?!-f43c4c)|agenda-id-sete' \
+               --include='*.mjs' --include='*.js' --include='*.json' --exclude-dir=node_modules "$P"; then
+            echo "::error::referência a project REAL no protótipo"; exit 1
+          fi
+          # Endpoints reais.
+          if grep -RInE 'run\.app|cloudfunctions\.net|firebaseio\.com|firebaseapp\.com|web\.app' \
+               --include='*.mjs' --include='*.js' --include='*.json' --exclude-dir=node_modules "$P"; then
+            echo "::error::endpoint REAL no protótipo"; exit 1
+          fi
+          # Service account / chave privada / credencial real.
+          if grep -RInE 'serviceAccount|private_key|BEGIN PRIVATE KEY' \
+               --include='*.mjs' --include='*.js' --include='*.json' --exclude-dir=node_modules "$P"; then
+            echo "::error::service account/chave privada no protótipo"; exit 1
+          fi
+          if grep -RInE 'export[[:space:]]+GOOGLE_APPLICATION_CREDENTIALS|GOOGLE_APPLICATION_CREDENTIALS[[:space:]]*=[^=]' \
+               --include='*.mjs' --include='*.js' --include='*.json' --exclude-dir=node_modules "$P"; then
+            echo "::error::atribuição de credencial real no protótipo"; exit 1
+          fi
+          # PROVA POSITIVA: project fictício e usuários sintéticos.
+          grep -q 'demo-agenda-id-seven-f43c4c' "$P/tests/_harness.mjs" || { echo "::error::project fictício ausente do harness"; exit 1; }
+          grep -q 'Sintética' "$P/src/synth-backend.mjs" || { echo "::error::usuários sintéticos ausentes"; exit 1; }
+          echo "OK: zero produção (project fictício, endpoints locais, sem credencial, dados sintéticos)."
+
+      - name: Gate — ANTI-1.0.185 (nenhuma autenticação silenciosa/anônima; fluxo explícito obrigatório)
+        run: |
+          set -euo pipefail
+          # PROIBIDO: invocar ou importar signInAnonymously (menção em comentário proibitivo é permitida).
+          if grep -RInE 'signInAnonymously[[:space:]]*\(|import[^;]*signInAnonymously' "$P/src" "$P/tests"; then
+            echo "::error::uso de signInAnonymously (modelo 1.0.185 PROIBIDO)"; exit 1
+          fi
+          # OBRIGATÓRIO: fluxo explícito com custom token + confronto de uid + estados fechados.
+          grep -q 'signInWithCustomToken' "$P/src/auth-bridge.mjs" || { echo "::error::fluxo custom token ausente"; exit 1; }
+          grep -q 'ensureAuthenticated' "$P/src/auth-bridge.mjs" || { echo "::error::ensureAuthenticated ausente"; exit 1; }
+          grep -q 'UidMismatch' "$P/src/auth-bridge.mjs" || { echo "::error::estado UidMismatch ausente"; exit 1; }
+          # OBRIGATÓRIO: teste A12 (construtor sem side effects) presente na suíte.
+          grep -q '"A12"' "$P/tests/run-all.mjs" || { echo "::error::teste anti-1.0.185 (A12) ausente"; exit 1; }
+          echo "OK: autenticação explícita fail-closed; modelo 1.0.185 estruturalmente ausente."
+
+      - name: Gate — RULES PIN (byte-idênticas ao artefato F4.3C3)
+        run: |
+          set -euo pipefail
+          GOT=$(sha256sum "$P/rules/firestore.f43c3-target.rules" | awk '{print $1}')
+          echo "rules sha256=$GOT"
+          [ "$GOT" = "$RULES_SHA" ] || { echo "::error::Rules-alvo divergem do F4.3C3 ($GOT != $RULES_SHA)"; exit 1; }
+          echo "OK: Rules-alvo byte-idênticas (pin $RULES_SHA)."
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup JDK 21 (Firestore Emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Instalar deps do protótipo (sem secrets)
+        working-directory: prototypes/desktop-f43c4c-auth-compatibility
+        run: npm install --no-audit --no-fund
+
+      - name: Rodar os 40 testes nos EMULADORES (project demo-agenda-id-seven-f43c4c)
+        working-directory: prototypes/desktop-f43c4c-auth-compatibility
+        run: |
+          set -euo pipefail
+          npx firebase emulators:exec --only auth,firestore --project demo-agenda-id-seven-f43c4c \
+            "node tests/run-all.mjs" 2>&1 | tee run.out
+          grep -q '40 OK, 0 FALHOU' run.out || { echo "::error::suíte não imprimiu '40 OK, 0 FALHOU'"; exit 1; }
+          echo "OK: 40/40 verdes nos emuladores."
+
+      - name: Prova — emulador-only, sem Desktop, sem deploy, sem produção
+        run: |
+          echo "F4.3C4C verificado SOMENTE nos emuladores (Auth+Firestore) com backend sintético."
+          echo "Desktop 1.0.191 (Golden Master) INTOCADA; nenhum EXE/MSI; nenhum release; nenhum deploy;"
+          echo "nenhum project/endpoint/credencial/dado REAL; Rules-alvo F4.3C3 byte-idênticas (pin)."
