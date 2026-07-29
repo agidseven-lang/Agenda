@@ -1,0 +1,921 @@
+{
+  "resumo": {
+    "1366x768": {
+      "alturaAntes": [
+        608,
+        608
+      ],
+      "alturaDepois": [
+        409,
+        456
+      ],
+      "reducaoPct": [
+        32.7,
+        24.9
+      ],
+      "deltasDepois": {
+        "topo": 0,
+        "base": 47.4375,
+        "altura": 47.4375,
+        "trilho": 47.4375,
+        "etapa": 47.4375,
+        "prazo": 47.4375,
+        "botões": 47.4375
+      },
+      "deltasAntes": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 0,
+        "etapa": 204.109375,
+        "prazo": 8.90625,
+        "botões": 0
+      }
+    },
+    "1600x900": {
+      "alturaAntes": [
+        703,
+        703
+      ],
+      "alturaDepois": [
+        422,
+        475
+      ],
+      "reducaoPct": [
+        39.9,
+        32.5
+      ],
+      "deltasDepois": {
+        "topo": 0,
+        "base": 52.4375,
+        "altura": 52.4375,
+        "trilho": 52.4375,
+        "etapa": 52.4375,
+        "prazo": 52.4375,
+        "botões": 52.4375
+      },
+      "deltasAntes": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 178.453125,
+        "etapa": 178.453125,
+        "prazo": 18.59375,
+        "botões": 0.015625
+      }
+    },
+    "1920x1080": {
+      "alturaAntes": [
+        851,
+        851
+      ],
+      "alturaDepois": [
+        430,
+        479
+      ],
+      "reducaoPct": [
+        49.5,
+        43.7
+      ],
+      "deltasDepois": {
+        "topo": 0,
+        "base": 49.4375,
+        "altura": 49.4375,
+        "trilho": 49.4375,
+        "etapa": 49.4375,
+        "prazo": 49.4375,
+        "botões": 49.4375
+      },
+      "deltasAntes": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 226.015625,
+        "etapa": 226.015625,
+        "prazo": 23.28125,
+        "botões": 0.015625
+      }
+    }
+  },
+  "metrics": {
+    "antes-incident-1366x768": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 88,
+          "cardBottom": 696,
+          "cardHeight": 608,
+          "blocks": {
+            "topo": 88,
+            "trilho": 0,
+            "etapa": 461.21875,
+            "prazo": 541.0625,
+            "botões": 648.984375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 88,
+          "cardBottom": 696,
+          "cardHeight": 608,
+          "blocks": {
+            "topo": 88,
+            "trilho": 0,
+            "etapa": 257.109375,
+            "prazo": 549.96875,
+            "botões": 648.984375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 0,
+        "etapa": 204.109375,
+        "prazo": 8.90625,
+        "botões": 0
+      }
+    },
+    "antes-incident-1600x900": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 106,
+          "cardBottom": 809,
+          "cardHeight": 703,
+          "blocks": {
+            "topo": 106,
+            "trilho": 571.203125,
+            "etapa": 598.203125,
+            "prazo": 691.34375,
+            "botões": 756
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 106,
+          "cardBottom": 809,
+          "cardHeight": 703,
+          "blocks": {
+            "topo": 106,
+            "trilho": 392.75,
+            "etapa": 419.75,
+            "prazo": 709.9375,
+            "botões": 755.984375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 178.453125,
+        "etapa": 178.453125,
+        "prazo": 18.59375,
+        "botões": 0.015625
+      }
+    },
+    "antes-incident-1920x1080": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 123,
+          "cardBottom": 974,
+          "cardHeight": 851,
+          "blocks": {
+            "topo": 123,
+            "trilho": 685.265625,
+            "etapa": 714.265625,
+            "prazo": 809.40625,
+            "botões": 916.96875
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 123,
+          "cardBottom": 974,
+          "cardHeight": 851,
+          "blocks": {
+            "topo": 123,
+            "trilho": 459.25,
+            "etapa": 488.25,
+            "prazo": 832.6875,
+            "botões": 916.984375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 226.015625,
+        "etapa": 226.015625,
+        "prazo": 23.28125,
+        "botões": 0.015625
+      }
+    },
+    "antes-multi-1366x768": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 88,
+          "cardBottom": 526.140625,
+          "cardHeight": 438.140625,
+          "blocks": {
+            "topo": 88,
+            "trilho": 0,
+            "etapa": 375.296875,
+            "prazo": 455.140625,
+            "botões": 479.140625
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 88,
+          "cardBottom": 543.953125,
+          "cardHeight": 455.953125,
+          "blocks": {
+            "topo": 88,
+            "trilho": 0,
+            "etapa": 257.109375,
+            "prazo": 472.953125,
+            "botões": 496.953125
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 17.8125,
+        "altura": 17.8125,
+        "trilho": 0,
+        "etapa": 118.1875,
+        "prazo": 17.8125,
+        "botões": 17.8125
+      }
+    },
+    "antes-multi-1600x900": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 106,
+          "cardBottom": 698.03125,
+          "cardHeight": 592.03125,
+          "blocks": {
+            "topo": 106,
+            "trilho": 495.890625,
+            "etapa": 522.890625,
+            "prazo": 616.03125,
+            "botões": 645.03125
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 106,
+          "cardBottom": 753.84375,
+          "cardHeight": 647.84375,
+          "blocks": {
+            "topo": 106,
+            "trilho": 373.703125,
+            "etapa": 400.703125,
+            "prazo": 671.84375,
+            "botões": 700.84375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 55.8125,
+        "altura": 55.8125,
+        "trilho": 122.1875,
+        "etapa": 122.1875,
+        "prazo": 55.8125,
+        "botões": 55.8125
+      }
+    },
+    "antes-multi-1920x1080": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 123,
+          "cardBottom": 722.734375,
+          "cardHeight": 599.734375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 510.59375,
+            "etapa": 539.59375,
+            "prazo": 634.734375,
+            "botões": 665.734375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 123,
+          "cardBottom": 810.09375,
+          "cardHeight": 687.09375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 403.953125,
+            "etapa": 432.953125,
+            "prazo": 722.09375,
+            "botões": 753.09375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 87.359375,
+        "altura": 87.359375,
+        "trilho": 106.640625,
+        "etapa": 106.640625,
+        "prazo": 87.359375,
+        "botões": 87.359375
+      }
+    },
+    "antes-cron-1366x768": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 88,
+          "cardBottom": 696,
+          "cardHeight": 608,
+          "blocks": {
+            "topo": 88,
+            "trilho": 0,
+            "etapa": 276.296875,
+            "prazo": 576.5625,
+            "botões": 648.984375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 88,
+          "cardBottom": 696,
+          "cardHeight": 608,
+          "blocks": {
+            "topo": 88,
+            "trilho": 0,
+            "etapa": 257.109375,
+            "prazo": 532.96875,
+            "botões": 648.984375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 0,
+        "etapa": 19.1875,
+        "prazo": 43.59375,
+        "botões": 0
+      }
+    },
+    "antes-cron-1600x900": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 106,
+          "cardBottom": 809,
+          "cardHeight": 703,
+          "blocks": {
+            "topo": 106,
+            "trilho": 403.578125,
+            "etapa": 430.578125,
+            "prazo": 720.34375,
+            "botões": 755.96875
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 106,
+          "cardBottom": 809,
+          "cardHeight": 703,
+          "blocks": {
+            "topo": 106,
+            "trilho": 413.421875,
+            "etapa": 440.421875,
+            "prazo": 689.28125,
+            "botões": 756
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 9.84375,
+        "etapa": 9.84375,
+        "prazo": 31.0625,
+        "botões": 0.03125
+      }
+    },
+    "antes-cron-1920x1080": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 123,
+          "cardBottom": 974,
+          "cardHeight": 851,
+          "blocks": {
+            "topo": 123,
+            "trilho": 470.25,
+            "etapa": 499.25,
+            "prazo": 844.1875,
+            "botões": 916.984375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 123,
+          "cardBottom": 974,
+          "cardHeight": 851,
+          "blocks": {
+            "topo": 123,
+            "trilho": 481.921875,
+            "etapa": 510.921875,
+            "prazo": 810.03125,
+            "botões": 917
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 0,
+        "altura": 0,
+        "trilho": 11.671875,
+        "etapa": 11.671875,
+        "prazo": 34.15625,
+        "botões": 0.015625
+      }
+    },
+    "depois-incident-1366x768": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 88,
+          "cardBottom": 496.921875,
+          "cardHeight": 408.921875,
+          "blocks": {
+            "topo": 88,
+            "trilho": 351.921875,
+            "etapa": 370.921875,
+            "prazo": 426.921875,
+            "botões": 450.921875
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 88,
+          "cardBottom": 544.359375,
+          "cardHeight": 456.359375,
+          "blocks": {
+            "topo": 88,
+            "trilho": 399.359375,
+            "etapa": 418.359375,
+            "prazo": 474.359375,
+            "botões": 498.359375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 47.4375,
+        "altura": 47.4375,
+        "trilho": 47.4375,
+        "etapa": 47.4375,
+        "prazo": 47.4375,
+        "botões": 47.4375
+      }
+    },
+    "depois-incident-1600x900": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 106,
+          "cardBottom": 528.28125,
+          "cardHeight": 422.28125,
+          "blocks": {
+            "topo": 106,
+            "trilho": 376.28125,
+            "etapa": 396.28125,
+            "prazo": 452.28125,
+            "botões": 477.28125
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 106,
+          "cardBottom": 580.71875,
+          "cardHeight": 474.71875,
+          "blocks": {
+            "topo": 106,
+            "trilho": 428.71875,
+            "etapa": 448.71875,
+            "prazo": 504.71875,
+            "botões": 529.71875
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 52.4375,
+        "altura": 52.4375,
+        "trilho": 52.4375,
+        "etapa": 52.4375,
+        "prazo": 52.4375,
+        "botões": 52.4375
+      }
+    },
+    "depois-incident-1920x1080": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 123,
+          "cardBottom": 552.9375,
+          "cardHeight": 429.9375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 400.9375,
+            "etapa": 421.9375,
+            "prazo": 478.9375,
+            "botões": 504.9375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 123,
+          "cardBottom": 602.375,
+          "cardHeight": 479.375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 450.375,
+            "etapa": 471.375,
+            "prazo": 528.375,
+            "botões": 554.375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 49.4375,
+        "altura": 49.4375,
+        "trilho": 49.4375,
+        "etapa": 49.4375,
+        "prazo": 49.4375,
+        "botões": 49.4375
+      }
+    },
+    "depois-multi-1366x768": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 88,
+          "cardBottom": 496.921875,
+          "cardHeight": 408.921875,
+          "blocks": {
+            "topo": 88,
+            "trilho": 351.921875,
+            "etapa": 370.921875,
+            "prazo": 426.921875,
+            "botões": 450.921875
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 88,
+          "cardBottom": 544.359375,
+          "cardHeight": 456.359375,
+          "blocks": {
+            "topo": 88,
+            "trilho": 399.359375,
+            "etapa": 418.359375,
+            "prazo": 474.359375,
+            "botões": 498.359375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 47.4375,
+        "altura": 47.4375,
+        "trilho": 47.4375,
+        "etapa": 47.4375,
+        "prazo": 47.4375,
+        "botões": 47.4375
+      }
+    },
+    "depois-multi-1600x900": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 106,
+          "cardBottom": 528.28125,
+          "cardHeight": 422.28125,
+          "blocks": {
+            "topo": 106,
+            "trilho": 376.28125,
+            "etapa": 396.28125,
+            "prazo": 452.28125,
+            "botões": 477.28125
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 106,
+          "cardBottom": 580.71875,
+          "cardHeight": 474.71875,
+          "blocks": {
+            "topo": 106,
+            "trilho": 428.71875,
+            "etapa": 448.71875,
+            "prazo": 504.71875,
+            "botões": 529.71875
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 52.4375,
+        "altura": 52.4375,
+        "trilho": 52.4375,
+        "etapa": 52.4375,
+        "prazo": 52.4375,
+        "botões": 52.4375
+      }
+    },
+    "depois-multi-1920x1080": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 123,
+          "cardBottom": 552.9375,
+          "cardHeight": 429.9375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 400.9375,
+            "etapa": 421.9375,
+            "prazo": 478.9375,
+            "botões": 504.9375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 123,
+          "cardBottom": 602.375,
+          "cardHeight": 479.375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 450.375,
+            "etapa": 471.375,
+            "prazo": 528.375,
+            "botões": 554.375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 49.4375,
+        "altura": 49.4375,
+        "trilho": 49.4375,
+        "etapa": 49.4375,
+        "prazo": 49.4375,
+        "botões": 49.4375
+      }
+    },
+    "depois-cron-1366x768": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 88,
+          "cardBottom": 523.359375,
+          "cardHeight": 435.359375,
+          "blocks": {
+            "topo": 88,
+            "trilho": 378.359375,
+            "etapa": 397.359375,
+            "prazo": 453.359375,
+            "botões": 477.359375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 88,
+          "cardBottom": 499.359375,
+          "cardHeight": 411.359375,
+          "blocks": {
+            "topo": 88,
+            "trilho": 354.359375,
+            "etapa": 373.359375,
+            "prazo": 429.359375,
+            "botões": 453.359375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 24,
+        "altura": 24,
+        "trilho": 24,
+        "etapa": 24,
+        "prazo": 24,
+        "botões": 24
+      }
+    },
+    "depois-cron-1600x900": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 106,
+          "cardBottom": 558.71875,
+          "cardHeight": 452.71875,
+          "blocks": {
+            "topo": 106,
+            "trilho": 406.71875,
+            "etapa": 426.71875,
+            "prazo": 482.71875,
+            "botões": 507.71875
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 106,
+          "cardBottom": 534.71875,
+          "cardHeight": 428.71875,
+          "blocks": {
+            "topo": 106,
+            "trilho": 382.71875,
+            "etapa": 402.71875,
+            "prazo": 458.71875,
+            "botões": 483.71875
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 24,
+        "altura": 24,
+        "trilho": 24,
+        "etapa": 24,
+        "prazo": 24,
+        "botões": 24
+      }
+    },
+    "depois-cron-1920x1080": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 123,
+          "cardBottom": 579.375,
+          "cardHeight": 456.375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 427.375,
+            "etapa": 448.375,
+            "prazo": 505.375,
+            "botões": 531.375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 123,
+          "cardBottom": 555.375,
+          "cardHeight": 432.375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 403.375,
+            "etapa": 424.375,
+            "prazo": 481.375,
+            "botões": 507.375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 24,
+        "altura": 24,
+        "trilho": 24,
+        "etapa": 24,
+        "prazo": 24,
+        "botões": 24
+      }
+    },
+    "depois-designers-1366x768": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 88,
+          "cardBottom": 496.921875,
+          "cardHeight": 408.921875,
+          "blocks": {
+            "topo": 88,
+            "trilho": 351.921875,
+            "etapa": 370.921875,
+            "prazo": 426.921875,
+            "botões": 450.921875
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 88,
+          "cardBottom": 544.359375,
+          "cardHeight": 456.359375,
+          "blocks": {
+            "topo": 88,
+            "trilho": 399.359375,
+            "etapa": 418.359375,
+            "prazo": 474.359375,
+            "botões": 498.359375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 47.4375,
+        "altura": 47.4375,
+        "trilho": 47.4375,
+        "etapa": 47.4375,
+        "prazo": 47.4375,
+        "botões": 47.4375
+      }
+    },
+    "depois-designers-1600x900": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 106,
+          "cardBottom": 528.28125,
+          "cardHeight": 422.28125,
+          "blocks": {
+            "topo": 106,
+            "trilho": 376.28125,
+            "etapa": 396.28125,
+            "prazo": 452.28125,
+            "botões": 477.28125
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 106,
+          "cardBottom": 580.71875,
+          "cardHeight": 474.71875,
+          "blocks": {
+            "topo": 106,
+            "trilho": 428.71875,
+            "etapa": 448.71875,
+            "prazo": 504.71875,
+            "botões": 529.71875
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 52.4375,
+        "altura": 52.4375,
+        "trilho": 52.4375,
+        "etapa": 52.4375,
+        "prazo": 52.4375,
+        "botões": 52.4375
+      }
+    },
+    "depois-designers-1920x1080": {
+      "columns": [
+        {
+          "col": 0,
+          "cardTop": 123,
+          "cardBottom": 552.9375,
+          "cardHeight": 429.9375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 400.9375,
+            "etapa": 421.9375,
+            "prazo": 478.9375,
+            "botões": 504.9375
+          }
+        },
+        {
+          "col": 1,
+          "cardTop": 123,
+          "cardBottom": 602.375,
+          "cardHeight": 479.375,
+          "blocks": {
+            "topo": 123,
+            "trilho": 450.375,
+            "etapa": 471.375,
+            "prazo": 528.375,
+            "botões": 554.375
+          }
+        }
+      ],
+      "deltas": {
+        "topo": 0,
+        "base": 49.4375,
+        "altura": 49.4375,
+        "trilho": 49.4375,
+        "etapa": 49.4375,
+        "prazo": 49.4375,
+        "botões": 49.4375
+      }
+    }
+  }
+}
