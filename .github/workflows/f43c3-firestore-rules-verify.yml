@@ -55,12 +55,21 @@ jobs:
       - name: Gate — NO-DEPLOY / sem produção no diff e no runner
         run: |
           set -euo pipefail
-          if git grep -nE 'firebase +deploy|gcloud |wrangler +deploy|GOOGLE_APPLICATION_CREDENTIALS' -- "$D" ; then
-            echo "::error::referência a deploy/credencial de produção em $D"; exit 1
+          # (a) Nenhum COMANDO de deploy pode existir nesta fase.
+          if git grep -nE 'firebase +deploy|wrangler +deploy|gcloud +[a-z]' -- "$D" ; then
+            echo "::error::comando de deploy encontrado em $D"; exit 1
           fi
-          # project id do emulador deve ser o FICTÍCIO
+          # (b) Nenhuma ATRIBUIÇÃO/export de credencial REAL (uso de produção).
+          #     O guard defensivo do run.sh — recusar-se a rodar SE a credencial estiver presente — é
+          #     PERMITIDO e verificado em (c). Ele NÃO é violação: aplica a MESMA política deste gate.
+          if git grep -nE 'export[[:space:]]+GOOGLE_APPLICATION_CREDENTIALS|GOOGLE_APPLICATION_CREDENTIALS[[:space:]]*=[^=]' -- "$D" ; then
+            echo "::error::atribuição de GOOGLE_APPLICATION_CREDENTIALS (credencial real) em $D"; exit 1
+          fi
+          # (c) PROVA POSITIVA: run.sh DEVE abortar se uma credencial real estiver presente no ambiente.
+          grep -q 'GOOGLE_APPLICATION_CREDENTIALS:-' "$D/run.sh" || { echo "::error::run.sh sem guard anti-credencial-real"; exit 1; }
+          # (d) O project id do emulador DEVE ser o FICTÍCIO.
           grep -q "demo-agenda-id-seven-f43c3" "$D/tests/_harness.mjs" || { echo "::error::project id fictício ausente"; exit 1; }
-          echo "OK: sem deploy, sem service account, project fictício."
+          echo "OK: sem comando de deploy; sem atribuição de credencial real; guard anti-credencial presente; project fictício."
 
       - name: Setup Node 20
         uses: actions/setup-node@v4
