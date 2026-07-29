@@ -77,7 +77,8 @@ function deriveTaskEvents(t, o) {
       type: type, recipientMode: 'all_active_users',
       taskId: taskId, taskTitle: title, sector: sector,
       actorId: byId, actorNameDenorm: (typeof e.by === 'string' ? e.by : ''),
-      assignedDesignerId: '', assignedDesignerNameDenorm: '',
+      actorPhotoDenorm: '',
+      assignedDesignerId: '', assignedDesignerNameDenorm: '', assignedDesignerPhotoDenorm: '',
       fromStatus: from, toStatus: to, at: at
     });
   }
@@ -91,7 +92,9 @@ function deriveTaskEvents(t, o) {
       type: 'task_assigned', recipientMode: 'all_active_users',
       taskId: taskId, taskTitle: title, sector: sector,
       actorId: str(da.assignedBy), actorNameDenorm: str(da.assignedByName),
+      actorPhotoDenorm: str(da.assignedByAvatar || da.assignedByPhoto),
       assignedDesignerId: str(da.designerId), assignedDesignerNameDenorm: str(da.designerName),
+      assignedDesignerPhotoDenorm: str(da.designerAvatar || da.designerPhoto),
       fromStatus: '', toStatus: '', at: aAt
     });
   }
@@ -104,7 +107,9 @@ function deriveTaskEvents(t, o) {
       type: 'task_assigned', recipientMode: 'all_active_users',
       taskId: taskId, taskTitle: title, sector: sector,
       actorId: str(t.by), actorNameDenorm: '',
+      actorPhotoDenorm: '',
       assignedDesignerId: str(t.assigneeId), assignedDesignerNameDenorm: str(t.assignee || t.assigneeName),
+      assignedDesignerPhotoDenorm: str(t.assigneePhoto),
       fromStatus: '', toStatus: '', at: cAt
     });
   }
@@ -145,16 +150,27 @@ function evSeverity(type) {
  * o filtro antigo team_flow NÃO se aplica; ator INCLUÍDO por contrato).
  * resolveName(id) → nome real do diretório (usersPublic) ou ''.
  */
-function buildCategoryAPayload(ev, uid, resolveName) {
-  var rn = (typeof resolveName === 'function') ? resolveName : function () { return ''; };
-  var ator = rn(ev.actorId) || ev.actorNameDenorm || '';
-  var designer = rn(ev.assignedDesignerId) || ev.assignedDesignerNameDenorm || '';
+// F3.5.3A — resolveProfile(id) → {name, photo} (diretório usersPublic do notifierA). Retro-compat:
+// funções antigas que retornavam só o NOME (string) seguem aceitas.
+function buildCategoryAPayload(ev, uid, resolveProfile) {
+  var AP = require('./actorProfile');
+  var look = function (id) {
+    if (!id || typeof resolveProfile !== 'function') return null;
+    var r = null; try { r = resolveProfile(id); } catch (_e) { r = null; }
+    if (r == null) return null;
+    if (typeof r === 'string') return { name: r, photo: '' };
+    return { name: (r && r.name) || '', photo: (r && r.photo) || '' };
+  };
+  var atorP = AP.resolveNotificationActorProfile({ actorId: ev.actorId, nameDenorm: ev.actorNameDenorm, photoDenorm: ev.actorPhotoDenorm }, look);
+  var respP = AP.resolveNotificationActorProfile({ actorId: ev.assignedDesignerId, nameDenorm: ev.assignedDesignerNameDenorm, photoDenorm: ev.assignedDesignerPhotoDenorm }, look);
+  var ator = atorP.name || '';
+  var designer = respP.name || '';
   return {
     eventId: ev.eventId, dedupKey: ev.eventId,
     eventType: ev.type, notificationType: 'all_active_users',
     taskId: ev.taskId, taskTitle: ev.taskTitle, clientName: '',
-    actorId: ev.actorId || '', actorName: ator, actorAvatar: '',
-    responsibleId: ev.assignedDesignerId || '', responsibleName: designer, responsibleAvatar: '',
+    actorId: ev.actorId || '', actorName: ator, actorAvatar: atorP.photo,
+    responsibleId: ev.assignedDesignerId || '', responsibleName: designer, responsibleAvatar: respP.photo,
     targetUserId: uid, createdAt: ev.at,
     title: evTitle(ev.type), body: evBody(ev, ator, designer),
     context: ev.fromStatus ? (columnLabel(ev.fromStatus) + ' → ' + columnLabel(ev.toStatus)) : 'Tarefas',

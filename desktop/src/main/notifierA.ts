@@ -65,14 +65,14 @@ export function startNotifierA(uid: string, deliver: Deliver, opts?: NotifierAOp
   const clearTimer = opts.clearTimer || ((h: any) => clearTimeout(h));
 
   const tasks = new Map<string, any>();
-  const names = new Map<string, string>();   // usersPublic: id -> name (nomes REAIS no corpo)
+  const names = new Map<string, { name: string; photo: string }>();   // usersPublic: id -> {name, photo} (F3.5.3A: nome REAL + FOTO canônica do ator)
   let stopped = false;
   let timer: any = null;
   const deviceId = store.deviceId();
 
   log("notifA.start", { uid, deviceId: String(deviceId).slice(0, 8), cursorAt: store.cursorGet(uid), retentionMs, lateGraceMs });
 
-  function resolveName(id: string): string { return (id && names.get(String(id))) || ""; }
+  function resolveName(id: string): { name: string; photo: string } | null { return (id && names.get(String(id))) || null; }
 
   /** Fila elegível: derivada dos docs ATUAIS, filtrada por retenção+cursor(-grace)+recibos, asc. */
   function pendingEvents(): any[] {
@@ -131,7 +131,7 @@ export function startNotifierA(uid: string, deliver: Deliver, opts?: NotifierAOp
       for (const ch of changes) {
         const id = ch && ch.doc && ch.doc.id; if (!id) continue;
         if (ch.type === "removed") names.delete(id);
-        else { const d = (ch.doc.data && ch.doc.data()) || {}; if (d && d.name) names.set(id, String(d.name)); }
+        else { const d: any = (ch.doc.data && ch.doc.data()) || {}; if (d && d.name) names.set(id, { name: String(d.name), photo: String(d.photo || "") }); }
       }
     } catch { /* diretório nunca derruba a entrega */ }
   });
