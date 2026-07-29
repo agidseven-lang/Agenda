@@ -2178,6 +2178,14 @@ body.desktop .kbv2-menu-it{ width:100%; display:flex; align-items:center; gap:10
 body.desktop .kbv2-menu-it svg{ width:16px; height:16px; color:#8a93a7; }
 body.desktop .kbv2-menu-it:hover{ background:rgba(255,255,255,.06); }
 body.desktop .kbv2-menu-del{ color:#ff6b61; } body.desktop .kbv2-menu-del svg{ color:#ff6b61; }
+/* F3.5.4-B — faixa de seleção de Designers (autoload): os cartões de seleção continuam VISÍVEIS
+   acima do quadro; chip ativo destacado; contagem por designer; rolagem horizontal discreta. */
+body.desktop .f354-dstrip{ display:flex; gap:8px; overflow-x:auto; padding:10px 2px 2px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.18) transparent; }
+body.desktop .f354-dchip{ display:inline-flex; align-items:center; gap:7px; padding:5px 11px 5px 6px; border-radius:999px; border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.04); color:#c6cdda; font-size:12px; font-weight:700; cursor:pointer; flex:0 0 auto; }
+body.desktop .f354-dchip .av{ border-radius:50%; }
+body.desktop .f354-dchip i{ font-style:normal; font-size:10.5px; font-weight:800; padding:1px 7px; border-radius:999px; background:rgba(124,108,255,.16); color:#bcaeff; }
+body.desktop .f354-dchip:hover{ background:rgba(255,255,255,.08); }
+body.desktop .f354-dchip.on{ border-color:rgba(124,108,255,.55); background:rgba(124,108,255,.14); color:#e6e1ff; }
 /* ═══ CARD-FIT-NOTEBOOK — card SEMPRE inteiro; só a LISTA de temas rola ═══
    Opção 2 (aprovada pelo owner): o card nunca excede a área visível da coluna — topo e
    rodapé aparecem JUNTOS, em qualquer card. Mecânica: o card tem max-height:100% (da
@@ -2589,7 +2597,7 @@ async function logout(){
   try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.begin')}catch(_){}
   try{if(window.desktopAPI&&window.desktopAPI.authLogout){await window.desktopAPI.authLogout();}}catch(_){}
   try{window.desktopAPI&&window.desktopAPI.diagLog&&window.desktopAPI.diagLog('logout.afterAuthLogout')}catch(_){}
-  try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}
+  try{window.desktopAPI&&window.desktopAPI.sessionLogout()}catch(_){} for(const k in unsub){if(unsub[k])unsub[k]();unsub[k]=null;}clearSession();state.user=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';document.body.classList.remove('authed');if(typeof closeCardMenus==='function')closeCardMenus();var _ca=document.getElementById('cornerAvatar');if(_ca)_ca.remove();var _sm=document.getElementById('sla-monitor');if(_sm)_sm.remove();var _bl=document.getElementById('slaib-bell');if(_bl)_bl.remove();var _bo=document.getElementById('slaib-ov');if(_bo)_bo.remove();document.getElementById('app').style.display='none';document.getElementById('login').classList.remove('hidden');loginMode='login';try{slaibRefresh();}catch(_){}renderLogin();}
 function subscribeData(){
   /* F3.3.56-G2 — roster via usersPublic (projeção allowlist {id,name,role,admin,
      status,photo,color} mantida pelo trigger syncUsersPublic). O renderer deixa
@@ -4975,6 +4983,30 @@ function designerBoardsList(){
   return Object.keys(ids).map(id=>{const u=state.users.find(x=>x.id===id)||{id:id,name:'Designer'};return {u:u,count:ids[id]};})
     .sort((a,b)=>(a.u.name||'').toLowerCase()<(b.u.name||'').toLowerCase()?-1:1);
 }
+/* F3.5.4-B — AUTOLOAD do quadro de Designers. A tela NUNCA abre vazia à espera de clique:
+   Designer logado → o PRÓPRIO quadro (sem clicar no próprio nome); Admin/Social Media → última
+   seleção DESTE usuário (persistida localmente POR usuário; NUNCA vaza entre contas no mesmo
+   computador) ou o 1º Designer ativo na ordenação canônica (designerBoardsList, A→Z); sem
+   Designer ativo → estado vazio explícito do hub. Os cartões de seleção permanecem visíveis
+   (faixa compacta acima do quadro). Reutiliza os LISTENERS GLOBAIS existentes (subscribeData)
+   — nenhum listener novo, nenhum duplicado; tempo real e contadores vêm do mesmo snapshot. */
+var DESIGNER_SEL_KEY='idseven.designerSel.v1';
+function f354DesignerSelLoad(uid){ try{ var m=JSON.parse(localStorage.getItem(DESIGNER_SEL_KEY)||'{}'); var e=m&&m[String(uid||'')]; return (e&&e.id)?String(e.id):null; }catch(_){ return null; } }
+function f354DesignerSelSave(uid,id){ try{ if(!uid||!id)return; var m={}; try{ m=JSON.parse(localStorage.getItem(DESIGNER_SEL_KEY)||'{}')||{}; }catch(_e){ m={}; } if(!m||typeof m!=='object')m={}; m[String(uid)]={id:String(id),at:Date.now(),ctx:'designers'}; localStorage.setItem(DESIGNER_SEL_KEY,JSON.stringify(m)); }catch(_){} }
+function f354DesignerAutoPick(){ try{
+  var dz=designerBoardsList(); if(!dz.length) return null;
+  var me=state.user&&state.user.id;
+  if(me&&dz.some(function(d){return d.u&&d.u.id===me;})) return me;
+  var saved=f354DesignerSelLoad(me);
+  if(saved&&dz.some(function(d){return d.u&&d.u.id===saved;})) return saved;
+  return dz[0].u.id;
+}catch(_){ return null; } }
+function f354DesignerStrip(activeId){ try{
+  var dz=designerBoardsList(); if(!dz.length) return '';
+  return '<div class="f354-dstrip">'+dz.map(function(d){
+    return '<button class="f354-dchip'+(d.u.id===activeId?' on':'')+'" data-designerboard="'+d.u.id+'" title="'+esc(d.u.name||'Designer')+' · '+d.count+' tarefa'+(d.count===1?'':'s')+'">'+avatar(d.u,22)+'<span>'+esc((d.u.name||'Designer').split(' ')[0])+'</span><i>'+d.count+'</i></button>';
+  }).join('')+'</div>';
+}catch(_){ return ''; } }
 // Abas superiores da área de Tarefas: Meu quadro · Cliente · Designers · Social Medias.
 // Cliente/Designers/Social Medias só para Social/Admin (canSeeAll); designer comum vê só Meu quadro.
 // 1.0.103 — aba ATIVA derivada do estado (toolbar única e coerente).
@@ -5048,7 +5080,7 @@ function renderDesignerBoard(){
     '<div class="scr-head"><div class="d-board-head"><button class="iconbtn" data-board="flowdesigners">'+svg('back')+'</button>'+
     avatar(p,44)+
     '<div style="flex:1;min-width:0"><div class="d-bh-title">Designer · '+esc((p.name||'').split(' ')[0]||'Designer')+'</div><div class="d-bh-sub">'+esc(p.role||'Designer')+' · '+list.length+' tarefa'+(list.length===1?'':'s')+(late>0?(' · '+late+' em atraso'):'')+'</div></div></div></div>'+
-    '<div class="scr" style="padding-top:0">'+boardToolbar()+
+    '<div class="scr" style="padding-top:0">'+f354DesignerStrip(id)+boardToolbar()+
     kbv2BoardHtml(DESIGNER_COLS4.map((st,i)=>({label:st.label,color:st.color,key:st.key,tasks:byStatus[i]})), t=>kbv2Card(t,'designer'));
   return h+'</div>';
 }
@@ -8462,8 +8494,8 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-roleboards]')){state.roleBoards=true;state.personBoard=null;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-personboard]')){state.personBoard=el.dataset.personboard;state.roleBoards=false;state.flowView=null;state.designerBoard=null;state.socialBoard=null;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-flowclient]')){state.flowView='client';state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-flowdesigners]')){state.flowView='designers';state.designerBoard=null;state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
-  if(el=g('[data-designerboard]')){state.flowView='designers';state.designerBoard=el.dataset.designerboard;state.socialBoard=null;boardQuery='';render();return;}
+  if(el=g('[data-flowdesigners]')){state.flowView='designers';state.designerBoard=f354DesignerAutoPick();state.socialBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
+  if(el=g('[data-designerboard]')){state.flowView='designers';state.designerBoard=el.dataset.designerboard;f354DesignerSelSave(state.user&&state.user.id,state.designerBoard);state.socialBoard=null;boardQuery='';render();return;}
   if(el=g('[data-flowsocials]')){state.flowView='socials';state.socialBoard=null;state.designerBoard=null;state.personBoard=null;state.roleBoards=false;state.boardSector=null;boardQuery='';render();return;}
   if(el=g('[data-socialboard]')){state.flowView='socials';state.socialBoard=el.dataset.socialboard;state.designerBoard=null;boardQuery='';render();return;}
   if(el=g('[data-board]')){const a=el.dataset.board;
@@ -8526,7 +8558,7 @@ document.addEventListener('click',async e=>{
   if(el=g('[data-senddesigner]')){openDesignerModal(el.dataset.senddesigner);return;}
   // detail-hierarchy-v2: marcar item(ns) como corrigido(s) + atalho p/ quadro do designer
   if(el=g('[data-teamfix]')){await markItemsAdjusted(el.dataset.teamfix);return;}
-  if(el=g('[data-goboard]')){closeModal();state.flowView='designers';state.designerBoard=el.dataset.goboard;state.personBoard=null;state.boardSector=null;state.socialBoard=null;render();return;}
+  if(el=g('[data-goboard]')){closeModal();state.flowView='designers';state.designerBoard=el.dataset.goboard;f354DesignerSelSave(state.user&&state.user.id,state.designerBoard);state.personBoard=null;state.boardSector=null;state.socialBoard=null;render();return;}
   if(el=g('[data-pickdesigner]')){const p=el.dataset.pickdesigner.split('|');openDesignerDeadline(p[0],p[1]);return;}
   if(el=g('[data-designersend]')){
     const p=el.dataset.designersend.split('|');const gid=id=>document.getElementById(id);
