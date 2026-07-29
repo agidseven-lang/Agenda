@@ -17,6 +17,7 @@ import { createToastAckTracker } from "./toastAck"; // F3.5.3 — prova de rende
 import { diag, diagPath } from "./diag"; // F3.3.10-DIAG (logger local; build instrumentada)
 import { startReminder } from "./reminder";
 import { startSlaScheduler } from "./slaScheduler"; // F3.4.3 — produtor AUTORITATIVO de SLA no main (amarelo/vermelho/crítico), sobrevive à janela oculta
+import { createUserSlaSeen } from "./slaSeenUser"; // F3.5.4-C3 — seen de SLA POR USUÁRIO (uid|dedupKey; legado honrado) injetado SEM tocar no scheduler
 import { initBgNotify, showBgNotify, stopBgNotify } from "./bgNotify"; // F3.3.10-BG (janela premium própria)
 import { registerAuthIpc, getAuthUser } from "./auth"; // F3.3.56-G2 — auth server-side (token confinado ao main); F3.4.3 — papel autenticado p/ operational_block
 import { registerPrewarmIpc } from "./prewarm"; // F3.3.73I6C18C — prewarm do Card Premium (IPC restrito ao /share)
@@ -482,7 +483,12 @@ app.whenReady().then(() => {
       // tardio cruzando usuários).
       const _stopEventNew = startNotifier(() => mainWin, uid, deliverNotification, getAuthUser);
       const _notifierA = startNotifierA(uid, deliverNotification);
-      stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } try { toastAck.clear(); } catch { /* */ } };
+      // F3.5.4-C1 — _notifSeen (dedup de EXIBIÇÃO do HUB) é POR SESSÃO DE USUÁRIO: sem o clear,
+      // um evento exibido ao usuário anterior voltava como {ok:true, channel:"dedup"} para o novo
+      // usuário no MESMO computador — o notifierA gravava recibo e avançava cursor SEM nenhuma
+      // superfície exibida (perda silenciosa cruzando usuários). A dedup REAL continua nos
+      // recibos persistentes por usuário+dispositivo (notifStore) e no seen-set do SLA.
+      stopNotifier = () => { try { _stopEventNew(); } catch { /* */ } try { _notifierA.stop(); } catch { /* */ } try { toastAck.clear(); } catch { /* */ } try { _notifSeen.clear(); } catch { /* */ } };
       // F3.3.77A-R4B — RELÓGIO CANÔNICO: liga a sincronização (main) via cabeçalho HTTP Date do
       // getUserSelf (Cloud Run, read-only, SEM auth ⇒ zero mutação). Empurra o offset ao renderer,
       // que o aplica em canonicalNowMs()/_slaClockOffsetMs e rearma as timelines de SLA.
@@ -499,7 +505,13 @@ app.whenReady().then(() => {
       // já vencidos (ex.: app reaberto após o prazo) exatamente uma vez (seen-set persistente).
       // authUser: papel AUTENTICADO (auth-core getUserSelf/login), usado só p/ o gate canSeeAll do
       // operational_block — nunca o role do renderer, nunca a coleção users, nunca Rules/backend.
-      slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser });
+      // F3.5.4-C3 — seen POR USUÁRIO injetado via opts.seen (mesmo arquivo idseven-sla-seen.json;
+      // chaves novas "<uid>|<dedupKey>"; legadas honradas em leitura). Sem isso, T-30/T-10 consumida
+      // por um usuário era engolida p/ outro usuário na MESMA máquina (ex.: reatribuição). A forma
+      // aprovada F3.4.3/R4B (produtor ÚNICO no main + relógio canônico + papel autenticado) segue
+      // EXATAMENTE a mesma — registro literal preservado:
+      //   slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser });
+      slaScheduler = startSlaScheduler(() => uid, deliverNotification, { now: slaNow, authUser: getAuthUser, seen: createUserSlaSeen(uid) });
       slaScheduler.reconcile("boot");
       // UPDATER:BEGIN (F3.4.1A — política de verificação item 2: após restauração da sessão)
       if (updater) updater.checkAuto("session-restore");
