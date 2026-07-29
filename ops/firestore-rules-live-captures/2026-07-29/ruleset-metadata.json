@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "rulesetName": "projects/agenda-id-seven/rulesets/809204d1-ee1b-444f-9b1b-2d6e0cb15132",
+  "createTime": "2026-07-07T18:30:22.453583Z",
+  "fileCount": 1,
+  "totalSizeBytes": 6131,
+  "canonicalSha256": "f39a405a0394c6d95e030dbe380e7c0ecb46674fa81c74677d49076e3c4f4668",
+  "canonicalHashMethod": "for each file sorted by path: sha256( concat( utf8(path), 0x00, content, 0x00 ) )",
+  "capturedAt": "2026-07-29T00:48:43.407Z"
+}

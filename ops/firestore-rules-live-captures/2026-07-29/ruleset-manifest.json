@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "rulesetName": "projects/agenda-id-seven/rulesets/809204d1-ee1b-444f-9b1b-2d6e0cb15132",
+  "fileCount": 1,
+  "canonicalSha256": "f39a405a0394c6d95e030dbe380e7c0ecb46674fa81c74677d49076e3c4f4668",
+  "files": [
+    {
+      "order": 0,
+      "path": "firestore.rules.generated",
+      "storedAs": "files/firestore.rules.generated",
+      "bytes": 6131,
+      "lines": 161,
+      "sha256": "527d4a3cb9091c374d54a0edf6b96ac8e05d2650f7d4e28aed2c438a671cb7ee"
+    }
+  ]
+}

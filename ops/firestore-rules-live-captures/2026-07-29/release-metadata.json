@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "projectId": "agenda-id-seven",
+  "service": "cloud.firestore",
+  "releaseName": "projects/agenda-id-seven/releases/cloud.firestore",
+  "activeRulesetName": "projects/agenda-id-seven/rulesets/809204d1-ee1b-444f-9b1b-2d6e0cb15132",
+  "releaseCreateTime": "2026-05-19T01:31:45.839293Z",
+  "releaseUpdateTime": "2026-07-07T18:30:22.742581Z",
+  "capturedAt": "2026-07-29T00:48:43.407Z",
+  "captureMode": "read-only",
+  "productionDataAccessed": false,
+  "productionDataModified": false,
+  "deployExecuted": false,
+  "source": "Firebase Rules API GET",
+  "captureRunId": "30412227718"
+}
