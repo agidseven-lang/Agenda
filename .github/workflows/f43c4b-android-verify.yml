@@ -1,0 +1,185 @@
+# =====================================================================
+# [F4.3C4B] Android users -> usersPublic Migration — VERIFY (DEBUG-ONLY)
+# ---------------------------------------------------------------------
+# Verificacao ISOLADA da migracao do diretorio Android da colecao privada `users`
+# para a projecao publica `usersPublic` (F4.3C4B), base f43c1 @b414568b.
+# Como o ambiente de desenvolvimento nao possui Android SDK, compilacao/lint/testes
+# unitarios sao provados AQUI (GitHub Actions). Espelha f43c1-android-verify.yml.
+#
+# Este arquivo vive em `main` SOMENTE para ser workflow_dispatch-able. Ele faz
+# CHECKOUT do BRANCH DE FEATURE (input `ref`) e o verifica.
+#
+# GARANTIAS (fail-closed):
+#   - NAO gera APK; NAO gera AAB; NAO assina; NAO publica; NAO faz deploy;
+#   - NAO altera identidade (versionCode 129 / versionName 1.0.0 / applicationId);
+#   - GATE ESTATICO: nenhum codigo de producao Android (app/src/main) contem
+#     collection("users") / document("users/ (comentarios ignorados; testes permitidos);
+#   - roda SOMENTE tarefas DEBUG sem empacotamento: compileDebugSources,
+#     testDebugUnitTest (auth.* — inclui os 30 testes F4.3C4B + F4.2B/F4.2C/F4.3C1), lintDebug.
+#   - NAO toca Rules/captura viva/Desktop/Worker/functions (gate de isolamento).
+# Permissoes minimas: contents:read (nao escreve no repo, nao cria release).
+# =====================================================================
+name: F4.3C4B Android usersPublic Migration — VERIFY (debug-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch/SHA de feature a verificar'
+        required: true
+        default: 'android/f43c4b-userspublic-migration'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: "b414568b49a121b2ab3bfd0aa976705206e34bf1"
+      EXPECT_VERSION_CODE: "129"
+      EXPECT_VERSION_NAME: "1.0.0"
+    steps:
+      - name: Checkout (ref de feature; history completo p/ o gate de isolamento)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+          fetch-depth: 0
+
+      - name: Gate — identidade congelada (versionCode 129 / versionName 1.0.0 / applicationId br.com.idseven.agenda)
+        run: |
+          set -euo pipefail
+          GRADLE="android-native-beta/app/build.gradle"
+          VC=$(grep -oE 'versionCode [0-9]+' "$GRADLE" | awk '{print $2}')
+          VN=$(grep -oE 'versionName "[^"]+"' "$GRADLE" | sed -E 's/versionName "(.*)"/\1/')
+          echo "versionCode=$VC versionName=$VN"
+          [ "$VC" = "$EXPECT_VERSION_CODE" ] || { echo "::error::versionCode=$VC != $EXPECT_VERSION_CODE"; exit 1; }
+          [ "$VN" = "$EXPECT_VERSION_NAME" ] || { echo "::error::versionName=$VN != $EXPECT_VERSION_NAME"; exit 1; }
+          grep -q 'applicationId "br.com.idseven.agenda"' "$GRADLE" || { echo "::error::applicationId != br.com.idseven.agenda"; exit 1; }
+          echo "OK: identidade oficial preservada (sem alteracao de versao/assinatura/package)."
+
+      - name: Gate — isolamento (so android-native-beta/** + docs/F4.3C4B-*.md vs base b414568; superficies congeladas intocadas)
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASE_SHA" HEAD || true)
+          echo "=== arquivos alterados vs base b414568 ==="; echo "$CHANGED"
+          BAD=$(echo "$CHANGED" | sed '/^$/d' | grep -vE '^(android-native-beta/|docs/F4\.3C4B-[A-Z-]+\.md$)' || true)
+          if [ -n "$BAD" ]; then echo "::error::mudanca FORA do allowlist F4.3C4B: $BAD"; exit 1; fi
+          for p in "desktop" "cloudflare-worker.js" "wrangler.toml" "functions" "presence-service" "scripts" "portal" \
+                   "ops/firestore-rules-baseline" "ops/firestore-rules-live-captures" "index.html" "firebase.json" ".github"; do
+            D=$(git diff --name-only "$BASE_SHA" HEAD -- "$p" || true)
+            [ -z "$D" ] || { echo "::error::alteracao proibida em $p: $D"; exit 1; }
+          done
+          echo "OK: apenas android-native-beta/** (+ doc F4.3C4B) mudou; Desktop/Worker/Rules/captura/functions/portal intocados."
+
+      - name: Gate — ESTATICO no-users (app/src/main sem collection("users"); comentarios ignorados; testes fora do escopo)
+        run: |
+          set -euo pipefail
+          python3 - <<'PYEOF'
+          import os, re, sys
+          root = "android-native-beta/app/src/main"
+          pats = ['collection("users")', 'document("users/']
+          block = re.compile(r"/\*.*?\*/", re.S)
+          bad = []
+          for dirpath, _, files in os.walk(root):
+              for fn in files:
+                  if not fn.endswith((".kt", ".java")):
+                      continue
+                  p = os.path.join(dirpath, fn)
+                  src = open(p, encoding="utf-8", errors="replace").read()
+                  code = block.sub(" ", src)
+                  code = "\n".join(l.split("//", 1)[0] for l in code.splitlines())
+                  for pat in pats:
+                      if pat in code:
+                          bad.append(f"{p}: {pat}")
+          if bad:
+              print("::error::codigo de PRODUCAO Android acessa a colecao privada `users`:")
+              for b in bad:
+                  print("::error::  " + b)
+              sys.exit(1)
+          print("OK: nenhum codigo de producao (app/src/main) acessa collection(\"users\") — gate estatico verde.")
+          PYEOF
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Restaurar google-services.json (secret GOOGLE_SERVICES_JSON_BETA — exigido pelo plugin google-services)
+        env:
+          GS_JSON: ${{ secrets.GOOGLE_SERVICES_JSON_BETA }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GS_JSON:-}" ]; then
+            echo "::error::Secret GOOGLE_SERVICES_JSON_BETA ausente."; exit 1
+          fi
+          printf '%s' "$GS_JSON" > android-native-beta/app/google-services.json
+          echo "google-services.json gravado ($(wc -c < android-native-beta/app/google-services.json) bytes)."
+
+      - name: Compilar DEBUG (fontes; SEM empacotar/assinar APK/AAB)
+        working-directory: android-native-beta
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :app:compileDebugSources --no-daemon --stacktrace
+
+      - name: Testes unitarios (F4.3C4B 30 + F4.3C1 35 + F4.2B/F4.2C) — testDebugUnitTest --tests "br.com.idseven.agenda.auth.*"
+        working-directory: android-native-beta
+        run: |
+          set -euo pipefail
+          ./gradlew :app:testDebugUnitTest --tests "br.com.idseven.agenda.auth.*" --no-daemon --stacktrace
+
+      - name: Lint DEBUG (relatorio completo + GATE de REGRESSAO — erros so em arquivos alterados pela F4.3C4B)
+        working-directory: android-native-beta
+        run: |
+          set -uo pipefail
+          ./gradlew :app:lintDebug --no-daemon --stacktrace || echo ">> lintDebug retornou != 0 (avaliado abaixo pelo gate de regressao)"
+          XML="app/build/reports/lint-results-debug.xml"
+          if [ ! -f "$XML" ]; then echo "::error::relatorio de lint (XML) ausente em $XML"; exit 1; fi
+          CHANGED="$(cd .. && git diff --name-only "$BASE_SHA" HEAD -- 'android-native-beta/**')"
+          export CHANGED
+          cat > /tmp/f43c4b_lint_gate.py <<'PYEOF'
+          import sys, os, xml.etree.ElementTree as ET
+          changed = [c.strip() for c in os.environ.get("CHANGED", "").splitlines() if c.strip()]
+          root = ET.parse(sys.argv[1]).getroot()
+          errs, new = [], []
+          for issue in root.iter('issue'):
+              if issue.get('severity') != 'Error':
+                  continue
+              iid = issue.get('id')
+              for loc in issue.iter('location'):
+                  f = (loc.get('file') or '').replace('\\', '/')
+                  errs.append((iid, f))
+                  if any(f.endswith(cf) for cf in changed):
+                      new.append((iid, f))
+          print("== %d erro(s) de lint no total (incl. pre-existentes) ==" % len(errs))
+          for i, f in errs:
+              print("  %s: %s" % (i, f))
+          if new:
+              print("::error::F4.3C4B introduziu erro(s) de lint em arquivo(s) alterado(s):")
+              for i, f in new:
+                  print("::error::  %s: %s" % (i, f))
+              sys.exit(1)
+          print("OK: 0 erro de lint nos arquivos alterados pela F4.3C4B.")
+          PYEOF
+          python3 /tmp/f43c4b_lint_gate.py "$XML"
+
+      - name: Prova — debug-only, sem APK/AAB, sem deploy
+        run: |
+          echo "F4.3C4B verificado: gate estatico no-users + compileDebugSources + testDebugUnitTest(auth.*) + lint-regressao."
+          echo "NENHUM assembleRelease/bundleRelease/assinatura/publicacao/deploy; identidade 129/1.0.0 preservada."
+
+      - name: Upload relatorios (testes + lint) — retencao 14 dias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f43c4b-verify-reports-${{ github.run_id }}
+          path: |
+            android-native-beta/app/build/reports/tests/testDebugUnitTest/**
+            android-native-beta/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 14
