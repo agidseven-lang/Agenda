@@ -1,0 +1,15 @@
+{
+  "name": "desktop-f43c4c-auth-compatibility-prototype",
+  "private": true,
+  "type": "module",
+  "description": "F4.3C4C — protótipo ISOLADO (não é a Desktop): prova de Firebase Auth EXPLÍCITO pós-login com as Rules-alvo F4.3C3, SOMENTE em emuladores (project fictício demo-agenda-id-seven-f43c4c). Sem produção, sem deploy, sem build oficial.",
+  "scripts": {
+    "test": "firebase emulators:exec --only auth,firestore --project demo-agenda-id-seven-f43c4c \"node tests/run-all.mjs\""
+  },
+  "dependencies": {
+    "firebase": "^10.14.1"
+  },
+  "devDependencies": {
+    "firebase-tools": "^13.35.1"
+  }
+}

@@ -1,0 +1,140 @@
+rules_version = '2';
+// =====================================================================
+// F4.3C3 — RULES-ALVO SEGURAS (deny-by-default) — PROPOSTA / EMULATOR-ONLY
+// ---------------------------------------------------------------------
+// NÃO É ARQUIVO DE DEPLOY. Representa o ESTADO FINAL desejado APÓS a migração
+// segura de TODOS os clientes para request.auth (Firebase Auth / Custom Token).
+//
+// Modelo real (auditado): SINGLE-TENANT / TEAM. Membros AUTENTICADOS compartilham
+// events e tasks (listeners de coleção inteira, sem filtro por usuário); users é
+// PRIVADA (pass/salt/fcmTokens); usersPublic é a projeção-roster; chats é escopo
+// por participants. NÃO existe tenantId (não inventar). NÃO existe participants em
+// events (single-owner ownerId+by). O campo sessionVersion NÃO existe no backend
+// canônico (revogação é server-side F4.3C2; Rules não enxergam claims de token).
+//
+// Ponte de revogação: isActiveUser() usa get() no doc users do PRÓPRIO caller para
+// bloquear usuário inativo/desativado/excluído mesmo com token válido (custo: 1 get/op).
+//
+// A Desktop 1.0.191 (Golden Master) NÃO usa request.auth => DENY aqui (incompatibilidade
+// ESPERADA e documentada — ver F4.3C3-DESKTOP-MIGRATION-CONSTRAINT.md). NÃO enfraquecer
+// as Rules para a Desktop passar; NÃO criar exceção anônima.
+// =====================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- Helpers pequenos ----------
+    function signedIn() { return request.auth != null; }
+    function uid()      { return request.auth.uid; }
+
+    // Usuário ATIVO — defesa-em-profundidade via get() no PRÓPRIO doc users.
+    // Bloqueia inativo/pendente/removido/excluido/disabled mesmo com token válido.
+    function userDoc()      { return get(/databases/$(database)/documents/users/$(uid())).data; }
+    function userExists()   { return exists(/databases/$(database)/documents/users/$(uid())); }
+    function isActiveUser() {
+      return signedIn() && userExists()
+        && !(userDoc().get('status', 'ativo') in ['inativo','pendente','removido','excluido'])
+        && userDoc().get('disabled', false) != true;
+    }
+
+    // Igualdade campo-a-campo (imutabilidade) tolerante a ausência.
+    function keep(field) {
+      return request.resource.data.get(field, null) == resource.data.get(field, null);
+    }
+    function isCreator()   { return signedIn() && resource.data.get('by', '') == uid(); }
+    function willBeMine()  { return signedIn() && request.resource.data.get('by', '') == uid(); }
+
+    // ============================================================
+    // users — PRIVADA (server-only). Cliente NÃO lê (pass/salt/fcmTokens/PII)
+    // nem escreve. Toda escrita via Admin SDK/backend (bypassa Rules). Perfil
+    // próprio via usersPublic (projeção) ou endpoint getUserSelf do backend.
+    // Cobre: sem list; sem alterar role/admin/status/sessionVersion/pass/salt/fcm;
+    // sem criar admin; sem registro direto; sem registrar token FCM direto.
+    // (Android hoje lê users cru — MIGRAÇÃO exigida: passar a usersPublic.)
+    // ============================================================
+    match /users/{userId} {
+      allow read, write: if false;
+    }
+
+    // ============================================================
+    // usersPublic — PROJEÇÃO SEGURA (roster). Leitura por usuário ATIVO.
+    // Cliente NÃO escreve (mantida por trigger syncUsersPublic / Admin SDK).
+    // Projeção allowlist {id,name,role,admin,status,photo,color} — NUNCA
+    // pass/salt/sessionVersion/fcmTokens/email/phone/códigos (garantido pelo produtor).
+    // ============================================================
+    match /usersPublic/{userId} {
+      allow get, list: if isActiveUser();
+      allow write: if false;
+    }
+
+    // ============================================================
+    // events (Agenda) — agenda de EQUIPE (single-tenant). Membro ATIVO lê/edita.
+    // Criador (by) e responsável (ownerId) IMUTÁVEIS; createdAt/src imutáveis.
+    // Exclusão só pelo criador ou responsável. (events NÃO têm participants[].)
+    // ============================================================
+    match /events/{eventId} {
+      allow get, list: if isActiveUser();
+      allow create: if isActiveUser() && willBeMine();
+      allow update: if isActiveUser()
+        && keep('by') && keep('ownerId') && keep('createdAt') && keep('src');
+      allow delete: if isActiveUser()
+        && (resource.data.get('by','') == uid() || resource.data.get('ownerId','') == uid());
+    }
+
+    // ============================================================
+    // tasks (Quadro/Kanban) — quadro de EQUIPE. Membro ATIVO lê/edita.
+    // Criador (by)/createdAt/src/cardsBatchId IMUTÁVEIS. status e designerFlowStatus
+    // restritos aos 4 valores canônicos {afazer,andamento,revisao,concluido}.
+    // Exclusão só pelo criador ou responsável (assigneeId).
+    // Worker (service account) escreve tokens/clientReview via Admin SDK (bypassa Rules).
+    // ============================================================
+    match /tasks/{taskId} {
+      function validStatus(s) { return s in ['afazer','andamento','revisao','concluido']; }
+      function statusOk(data) {
+        return (!('status' in data) || validStatus(data.status))
+          && (!('designerFlowStatus' in data) || validStatus(data.designerFlowStatus));
+      }
+      allow get, list: if isActiveUser();
+      allow create: if isActiveUser() && willBeMine() && statusOk(request.resource.data);
+      allow update: if isActiveUser()
+        && keep('by') && keep('createdAt') && keep('src') && keep('cardsBatchId')
+        && statusOk(request.resource.data);
+      allow delete: if isActiveUser()
+        && (resource.data.get('by','') == uid() || resource.data.get('assigneeId','') == uid());
+    }
+
+    // ============================================================
+    // chats + messages — DM/grupo por participants. Só participante ATIVO acessa.
+    // participants imutável no update. senderId (campo `by`) == uid e imutável.
+    // Query suportada: chats where participants array-contains uid; messages orderBy at.
+    // ============================================================
+    match /chats/{chatId} {
+      allow get, list: if isActiveUser() && uid() in resource.data.get('participants', []);
+      allow create: if isActiveUser() && uid() in request.resource.data.get('participants', []);
+      allow update: if isActiveUser() && uid() in resource.data.get('participants', [])
+        && request.resource.data.participants == resource.data.participants;
+      allow delete: if false;
+
+      match /messages/{msgId} {
+        function chat() { return get(/databases/$(database)/documents/chats/$(chatId)).data; }
+        function member() { return isActiveUser() && uid() in chat().get('participants', []); }
+        allow get, list: if member();
+        allow create: if member() && request.resource.data.get('by','') == uid();
+        allow update, delete: if false;   // mensagens imutáveis
+      }
+    }
+
+    // ============================================================
+    // Coleções SERVER-ONLY — cliente sem acesso (Admin SDK/backend/Worker bypassa).
+    // ============================================================
+    match /notifLog/{logId}              { allow read, write: if false; }
+    match /notifPrefs/{docId}            { allow read, write: if false; }
+    match /passwordResetCodes/{codeId}   { allow read, write: if false; }
+    match /passwordResetRequests/{reqId} { allow read, write: if false; }
+    match /waPreviewDiagnostics/{diagId} { allow read, write: if false; }
+
+    // ---------- DENY BY DEFAULT (qualquer outra coleção) ----------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
