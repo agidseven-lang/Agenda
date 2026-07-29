@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.map
 // Sessão local com DataStore. O "logado" é o ID do documento em users (igual ao PWA).
 private val Context.sessionDataStore by preferencesDataStore(name = "idseven_session")
 
-data class UserSession(val uid: String, val name: String)
+// F4.3C4B — `admin` vem do PERFIL VERIFICADO PELO SERVIDOR (loginUser/getUserSelf →
+// SecureSession.profile.admin), NUNCA do diretório usersPublic (o Android não consome o
+// `admin` de documento legível pelo cliente). Default false preserva chamadas existentes.
+data class UserSession(val uid: String, val name: String, val admin: Boolean = false)
 
 class SessionStore(context: Context) {
     private val appCtx = context.applicationContext

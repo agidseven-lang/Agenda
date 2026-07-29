@@ -92,6 +92,23 @@ class FakeAuthApi(
         return removeReply
     }
 
+    // F4.3C4B — instrumentacao do getUserContact (contato individual autorizado; nunca vaza segredo).
+    var contactCalls = 0
+    var lastContactSessionToken: String? = null
+    var lastContactUid: String? = null
+    private var contactReply: AuthApi.HttpReply = ok(
+        JSONObject().put("ok", true).put("uid", "U1")
+            .put("contact", JSONObject().put("phone", "").put("email", "")),
+    )
+    fun setContact(reply: AuthApi.HttpReply) { contactReply = reply }
+
+    override suspend fun postContact(token: String, uid: String): AuthApi.HttpReply {
+        contactCalls++
+        lastContactSessionToken = token
+        lastContactUid = uid
+        return contactReply
+    }
+
     companion object {
         fun ok(body: JSONObject) = AuthApi.HttpReply(200, body, AuthApi.Transport.OK)
         fun http(status: Int, body: JSONObject? = null) = AuthApi.HttpReply(status, body, AuthApi.Transport.OK)

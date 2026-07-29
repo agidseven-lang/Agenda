@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,12 +59,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.idseven.agenda.data.UserSession
+import br.com.idseven.agenda.data.auth.ContactOutcome
+import br.com.idseven.agenda.data.auth.ServerAuthRepository
+import br.com.idseven.agenda.data.session.SecureSessionStore
 import br.com.idseven.agenda.designsystem.components.Avatar
 import br.com.idseven.agenda.designsystem.components.Pill
 import br.com.idseven.agenda.designsystem.theme.Tokens
 import br.com.idseven.agenda.domain.UserColor
 import br.com.idseven.agenda.domain.UserLite
 import br.com.idseven.agenda.shared.DateUtil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // Versão real do APK (reflete app/build.gradle -> sempre a versão instalada). Sem hardcode.
 private val BUILD = br.com.idseven.agenda.BuildConfig.VERSION_NAME
@@ -89,6 +95,26 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
     val lastScheduled by NotifyDiag.lastScheduled.collectAsState()
     val lastFired by NotifyDiag.lastFired.collectAsState()
     val lastError by NotifyDiag.lastError.collectAsState()
+
+    // F4.3C4B — contato do PRÓPRIO usuário via endpoint getUserContact (autorização self-or-admin
+    // NO SERVIDOR; resposta allowlist {phone,email}). usersPublic não carrega PII e a coleção
+    // privada `users` NÃO é mais lida pelo app. Falha/indisponível => "Não informado" (fallback
+    // neutro, fail-closed; NUNCA consulta Firestore como fallback). Resposta nunca é logada.
+    var contactEmail by remember { mutableStateOf<String?>(null) }
+    var contactPhone by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(sheet) {
+        if (sheet == "conta" && contactEmail == null && contactPhone == null) {
+            val token = withContext(Dispatchers.IO) {
+                SecureSessionStore(context.applicationContext).load()?.token
+            }
+            if (!token.isNullOrBlank()) {
+                when (val c = ServerAuthRepository().getUserContact(token, session.uid)) {
+                    is ContactOutcome.Success -> { contactEmail = c.email; contactPhone = c.phone }
+                    else -> Unit
+                }
+            }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(18.dp))
@@ -147,8 +173,8 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                         SheetTitle("Conta")
                         InfoLine("Nome", name)
                         InfoLine("Função", currentUser?.role?.takeIf { it.isNotBlank() } ?: "Não informado")
-                        InfoLine("E-mail", currentUser?.email?.takeIf { it.isNotBlank() } ?: "Não informado")
-                        InfoLine("WhatsApp", currentUser?.phone?.takeIf { it.isNotBlank() } ?: "Não informado")
+                        InfoLine("E-mail", contactEmail?.takeIf { it.isNotBlank() } ?: "Não informado")
+                        InfoLine("WhatsApp", contactPhone?.takeIf { it.isNotBlank() } ?: "Não informado")
                         InfoLine("Status", "Ativa")
                         InfoLine("Permissão", if (currentUser?.admin == true) "Administrador" else "Membro da equipe")
                         InfoLine("ID do usuário", session.uid)
@@ -173,9 +199,15 @@ fun ProfileScreen(currentUser: UserLite?, session: UserSession, onLogout: () -> 
                             context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE).getString("token", null)
                         }
                         val hasToken = localToken != null
-                        // Este aparelho está registrado na conta do usuário logado? (token local ∈ users/{uid}.fcmTokens)
-                        val deviceRegistered = remember(permRefresh, currentUser) {
-                            !localToken.isNullOrBlank() && (currentUser?.fcmTokens?.contains(localToken) == true)
+                        // F4.3C4B — "Este aparelho na conta" = ACK do SERVIDOR no último registerFcmToken
+                        // deste uid (prefs "fcm": registered_ok/registered_uid, gravadas SÓ após Success do
+                        // endpoint). Substitui a leitura de users/{uid}.fcmTokens — a coleção privada está
+                        // fechada e o app não a consulta mais. Sem ACK => "Ausente" (estado honesto).
+                        val deviceRegistered = remember(permRefresh) {
+                            val fcmPrefs = context.getSharedPreferences("fcm", android.content.Context.MODE_PRIVATE)
+                            !localToken.isNullOrBlank() &&
+                                fcmPrefs.getBoolean("registered_ok", false) &&
+                                fcmPrefs.getString("registered_uid", null) == session.uid
                         }
                         val firedPersist = remember(permRefresh) {
                             context.getSharedPreferences("notifydiag", android.content.Context.MODE_PRIVATE).getString("last_fired", null)

@@ -82,6 +82,19 @@ sealed class FcmRegisterOutcome {
 }
 
 /**
+ * F4.3C4B — Resultado de getUserContact (endpoint oficial; autorizacao self-or-admin NO SERVIDOR).
+ * Resposta allowlist SOMENTE {phone,email} do uid pedido. Usado para o CONTATO INDIVIDUAL
+ * autorizado (ex.: e-mail/WhatsApp do PROPRIO usuario na tela Conta) — NUNCA para diretorio
+ * (diretorio = usersPublic) e NUNCA lendo a colecao privada `users` pelo SDK.
+ */
+sealed class ContactOutcome {
+    data class Success(val phone: String, val email: String) : ContactOutcome()
+    data object Expired : ContactOutcome()                        // 401 → sessao vencida
+    data class Unavailable(val error: AuthError) : ContactOutcome()   // rede/timeout/5xx
+    data class Failure(val error: AuthError) : ContactOutcome()       // 403/404/corpo malformado
+}
+
+/**
  * F4.3C1 (MED-1) — Resultado de removeMyFcmToken: revoga o token FCM do PROPRIO usuario no logout.
  * O UID e derivado da sessao NO SERVIDOR (impossivel remover token de outro UID). Espelha o shape
  * de FcmRegisterOutcome. O token FCM/Bearer NUNCA sao logados.

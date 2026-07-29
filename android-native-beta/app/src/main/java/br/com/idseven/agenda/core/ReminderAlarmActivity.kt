@@ -89,7 +89,7 @@ class ReminderAlarmActivity : ComponentActivity() {
                     is AuthenticatedFirestoreExecutor.Outcome.Ok -> {
                         val d = outcome.value
                         if (d != null && d.exists()) {
-                            // Mesma lista de campos do UsersRepo (foto pode estar em qualquer um).
+                            // Mesmos aliases de foto do UserPublicMapper (a projecao grava `photo`).
                             val p = listOf("photo", "photoUrl", "avatar", "avatarUrl", "image", "imageUrl", "picture", "foto")
                                 .firstNotNullOfOrNull { k -> d.getString(k)?.takeIf { it.isNotBlank() } }
                             val nm = d.getString("name")?.takeIf { it.isNotBlank() }
@@ -141,9 +141,11 @@ class ReminderAlarmActivity : ComponentActivity() {
     }
 
     // F4.3C1 — aguarda o DocumentSnapshot DENTRO do bloco autenticado (executa SO apos gate == Ok).
+    // F4.3C4B — foto/nome vem da projecao PUBLICA usersPublic (name/photo comprovados); a colecao
+    // privada `users` esta FECHADA nas Rules vivas e NAO e mais consultada pelo app.
     private suspend fun getUserDocGated(db: FirebaseFirestore, uid: String): DocumentSnapshot? =
         suspendCancellableCoroutine { cont ->
-            db.collection("users").document(uid).get()
+            db.collection("usersPublic").document(uid).get()
                 .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
                 .addOnFailureListener { if (cont.isActive) cont.resume(null) }
         }

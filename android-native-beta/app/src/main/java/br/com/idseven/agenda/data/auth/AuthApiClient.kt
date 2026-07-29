@@ -32,6 +32,7 @@ class AuthApiClient(
     private val firebaseTokenUrl: String,
     private val registerFcmUrl: String,
     private val removeFcmUrl: String,
+    private val contactUrl: String,
 ) : AuthApi {
 
     override suspend fun postLogin(identifier: String, password: String): AuthApi.HttpReply {
@@ -71,6 +72,11 @@ class AuthApiClient(
             .put("platform", platform)
         return post(removeFcmUrl, payload, token)
     }
+
+    // F4.3C4B — getUserContact: POST {uid} + Bearer da sessao. Autorizacao (self-or-admin) e feita
+    // NO SERVIDOR; a resposta e allowlist {phone,email}. NUNCA le a colecao `users` pelo SDK.
+    override suspend fun postContact(token: String, uid: String): AuthApi.HttpReply =
+        post(contactUrl, JSONObject().put("uid", uid), token)
 
     private suspend fun post(url: String, payload: JSONObject, token: String?): AuthApi.HttpReply =
         withContext(Dispatchers.IO) {

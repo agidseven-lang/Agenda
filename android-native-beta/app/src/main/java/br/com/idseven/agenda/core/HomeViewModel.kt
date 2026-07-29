@@ -5,7 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import br.com.idseven.agenda.data.EventRepo
 import br.com.idseven.agenda.data.TaskRepo
-import br.com.idseven.agenda.data.UsersRepo
+import br.com.idseven.agenda.data.UsersPublicRepo
 import br.com.idseven.agenda.domain.EventItem
 import br.com.idseven.agenda.domain.TaskItem
 import br.com.idseven.agenda.domain.UserLite
@@ -29,8 +29,10 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             .catch { emit(UiList.Error(it.message ?: "Falha ao carregar a agenda")) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiList.Loading)
 
+    // F4.3C4B — diretório via usersPublic, SOMENTE após o Session Gate (fail-closed; sem fallback
+    // para a coleção privada `users`, sem acesso anônimo). Gate negado => UiList.Error.
     val users: StateFlow<UiList<UserLite>> =
-        UsersRepo.users().map { UiList.Data(it) as UiList<UserLite> }
+        UsersPublicRepo.create(app).users().map { UiList.Data(it) as UiList<UserLite> }
             .catch { emit(UiList.Error(it.message ?: "Falha ao carregar a equipe")) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiList.Loading)
 

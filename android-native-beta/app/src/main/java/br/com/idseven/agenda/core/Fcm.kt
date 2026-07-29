@@ -44,10 +44,18 @@ object Fcm {
                     val deviceId = stableDeviceId(ctx)
                     scope.launch {
                         when (val r = ServerAuthRepository().registerFcmToken(sessionToken, token, deviceId, "android")) {
-                            is FcmRegisterOutcome.Success ->
+                            is FcmRegisterOutcome.Success -> {
+                                // F4.3C4B — ACK do servidor persistido p/ o diagnóstico "Este aparelho na
+                                // conta" (substitui a leitura de users/{uid}.fcmTokens, que não existe mais
+                                // no cliente). Gravado SÓ após Success do endpoint; limpo no logout junto
+                                // com o cache (FcmRevoker.clearLocal).
+                                prefs.edit().putBoolean("registered_ok", true).putString("registered_uid", uid).apply()
                                 android.util.Log.i("Fcm", "[FCM_TOKEN_SYNCED] device=$deviceId count=${r.count} token=${token.take(12)}…")
-                            else ->
+                            }
+                            else -> {
+                                prefs.edit().putBoolean("registered_ok", false).apply()
                                 android.util.Log.w("Fcm", "[FCM_TOKEN_SYNC_FAILED] device=$deviceId result=$r")
+                            }
                         }
                     }
                 }

@@ -28,6 +28,7 @@ class ServerAuthRepository(
         firebaseTokenUrl = BuildConfig.AUTH_FIREBASE_TOKEN_URL,
         registerFcmUrl = BuildConfig.AUTH_REGISTER_FCM_URL,
         removeFcmUrl = BuildConfig.AUTH_REMOVE_FCM_URL,
+        contactUrl = BuildConfig.AUTH_CONTACT_URL,
     ),
 ) {
     companion object {
@@ -178,6 +179,35 @@ class ServerAuthRepository(
         if (reply.status == 401) return FcmRemoveOutcome.Expired
         if (reply.status in 500..599) return FcmRemoveOutcome.Unavailable(AuthError.SERVER_ERROR)
         return FcmRemoveOutcome.Failure(AuthErrorMapper.mapAuthedFailure(reply))
+    }
+
+    /**
+     * F4.3C4B — getUserContact: contato individual AUTORIZADO ({phone,email} de UM uid; self-or-admin
+     * decidido NO SERVIDOR). Usado SOMENTE quando a finalidade e contato individual (ex.: e-mail/
+     * WhatsApp do proprio usuario na tela Conta). NUNCA para diretorio; NUNCA le `users` pelo SDK.
+     * 401 => Expired; 403 => Failure(FORBIDDEN); rede/5xx => Unavailable. Resposta NUNCA logada.
+     */
+    suspend fun getUserContact(token: String, uid: String): ContactOutcome {
+        val reply = api.postContact(token, uid)
+        when (reply.transport) {
+            AuthApi.Transport.NO_NETWORK -> return ContactOutcome.Unavailable(AuthError.NO_NETWORK)
+            AuthApi.Transport.TIMEOUT -> return ContactOutcome.Unavailable(AuthError.TIMEOUT)
+            AuthApi.Transport.SSL_OR_IO -> return ContactOutcome.Unavailable(AuthError.UNAVAILABLE)
+            AuthApi.Transport.BAD_URL -> return ContactOutcome.Unavailable(AuthError.UNAVAILABLE)
+            AuthApi.Transport.OK -> Unit
+        }
+        val j = reply.body
+        if (reply.status == 200 && j != null && j.optBoolean("ok", false)) {
+            val c = j.optJSONObject("contact")
+            return ContactOutcome.Success(
+                phone = c?.optString("phone", "") ?: "",
+                email = c?.optString("email", "") ?: "",
+            )
+        }
+        if (reply.status == 401) return ContactOutcome.Expired
+        if (reply.status == 403) return ContactOutcome.Failure(AuthError.FORBIDDEN)
+        if (reply.status in 500..599) return ContactOutcome.Unavailable(AuthError.SERVER_ERROR)
+        return ContactOutcome.Failure(AuthErrorMapper.mapAuthedFailure(reply))
     }
 
     /** changePassword (sessao autenticada; senha atual re-verificada NO SERVIDOR). */

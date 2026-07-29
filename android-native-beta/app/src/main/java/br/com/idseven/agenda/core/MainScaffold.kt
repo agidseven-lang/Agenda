@@ -120,9 +120,12 @@ fun MainScaffold(session: UserSession, onLogout: () -> Unit) {
     val usersState by vm.users.collectAsState()
     val tasksState by vm.tasks.collectAsState()
 
-    val users = usersState.itemsOrEmpty()
+    // F4.3C4B — o roster vem de usersPublic (sem `admin`); o admin do PRÓPRIO usuário é sobreposto
+    // a partir do perfil server-verificado (getUserSelf → session.admin). Membros do diretório
+    // ficam com admin=false (autorização por papel é server-side; nunca confiar no doc do cliente).
+    val users = usersState.itemsOrEmpty().map { if (it.id == session.uid) it.copy(admin = session.admin) else it }
     val currentUser = users.firstOrNull { it.id == session.uid }
-    val canManage = currentUser?.admin == true
+    val canManage = session.admin
 
     // Notificações: canais, permissão (Android 13+) e registro do token FCM.
     val context = LocalContext.current

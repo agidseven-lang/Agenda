@@ -54,7 +54,9 @@ fun AppRoot() {
         is SessionUiState.Loading -> Splash()
         is SessionUiState.LoggedOut -> LoginScreen()
         is SessionUiState.Authenticated -> MainScaffold(
-            session = UserSession(s.session.uid, s.session.profile.name),
+            // F4.3C4B — admin do PRÓPRIO usuário vem do perfil server-verificado (getUserSelf),
+            // nunca do diretório usersPublic.
+            session = UserSession(s.session.uid, s.session.profile.name, s.session.profile.admin),
             onLogout = { scope.launch { android.util.Log.i("Auth", "[LOGOUT] fcmRevoke=${session.logout()}") } },
         )
         is SessionUiState.Unavailable -> Unavailable(

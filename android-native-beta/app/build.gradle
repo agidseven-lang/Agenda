@@ -64,6 +64,12 @@ android {
         // Gen2 (projeto agenda-id-seven, us-central1), a MESMA de registerFcmToken; sobreponivel por -P.
         def _fcmRemUrl = project.findProperty('AUTH_REMOVE_FCM_URL')     ?: 'https://us-central1-agenda-id-seven.cloudfunctions.net/removeMyFcmToken'
         buildConfigField "String", "AUTH_REMOVE_FCM_URL", "\"${_fcmRemUrl}\""
+        // F4.3C4B — getUserContact (contato individual autorizado {phone,email}; self-or-admin NO
+        // SERVIDOR). Mesma forma canonica cloudfunctions.net Gen2 dos endpoints F4.2C/F4.3C1 acima
+        // (padrao comprovado em producao por issueFirebaseAuthToken/registerFcmToken); sobreponivel
+        // por -PAUTH_CONTACT_URL. Prova fisica do endpoint fica para o checkpoint (F4.3C4E).
+        def _contactUrl = project.findProperty('AUTH_CONTACT_URL')       ?: 'https://us-central1-agenda-id-seven.cloudfunctions.net/getUserContact'
+        buildConfigField "String", "AUTH_CONTACT_URL", "\"${_contactUrl}\""
     }
 
     signingConfigs {
