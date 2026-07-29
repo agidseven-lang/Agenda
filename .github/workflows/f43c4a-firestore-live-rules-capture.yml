@@ -1,0 +1,244 @@
+# =====================================================================
+# [F4.3C4A] Captura BYTE-EXATA (read-only) do ruleset Firestore ATIVO em produção.
+# ---------------------------------------------------------------------
+# Modelado no read-only audit provado (firestore-rules-live-audit.yml): SOMENTE GET na
+# Firebase Rules API (releases/cloud.firestore -> rulesetName -> ruleset content) + GET dos
+# índices (Firestore Admin, read-only). Preserva o conteúdo byte-exato + metadados + manifesto
+# + hashes (por-arquivo e canônico) e prova release INALTERADA (before == after => sem publicação).
+#
+# NÃO publica Rules, NÃO faz firebase deploy, NÃO cria/patcha/deleta ruleset ou release,
+# NÃO toca documentos Firestore (nenhum /documents, :runQuery, :batchGet, :commit),
+# NÃO altera índices, NÃO faz build/APK/AAB/release, NÃO toca Cloudflare/Worker/Desktop/Android.
+# permissions: contents:read (sem escrita no GitHub, salvo artifact técnico). SA via secret em
+# arquivo temporário (mascarada, removida no fim); access token mascarado. GET-only HTTP.
+#
+# A captura byte-exata é emitida como tar+base64 no log (para reconstrução byte-exata e verificável
+# no repo, via rota MCP da sessão) e como artifact privado. Vive em main só p/ ser dispatch-able.
+# =====================================================================
+name: "[F4.3C4A] Firestore LIVE Ruleset Byte-Exact Capture (read-only, no-deploy)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_capture:
+        description: "Type CAPTURE_LIVE_RULES to run the read-only live-ruleset capture"
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f43c4a-firestore-live-rules-capture
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT: "agenda-id-seven"
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard confirm_capture (== CAPTURE_LIVE_RULES)
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm_capture }}
+        run: |
+          set -eu
+          [ "$CONFIRM" = "CAPTURE_LIVE_RULES" ] || { echo "::error:: confirm_capture != CAPTURE_LIVE_RULES — abortando."; exit 1; }
+          echo "confirm_capture OK."
+
+      - name: Checkout main (baseline p/ comparação)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Auth gcloud (SA via secret -> arquivo temporário; valor NÃO impresso)
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          set -eu
+          if [ -z "${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}" ]; then
+            echo "::error:: NO-GO — CREDENCIAL READ-ONLY INDISPONIVEL (secret ausente)"; exit 1
+          fi
+          printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/gcp-sa.json"
+          gcloud auth activate-service-account --key-file="$RUNNER_TEMP/gcp-sa.json" >/dev/null 2>&1 || {
+            echo "::error:: NO-GO — CREDENCIAL READ-ONLY INDISPONIVEL (activate falhou)"; exit 1; }
+          gcloud config set project "$GCP_PROJECT" >/dev/null 2>&1
+          echo "SA ativada (valor não impresso)."
+
+      - name: FASE 1 — GET release ATIVA (before) [GET-only]
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -X GET -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" \
+            -o release-before.json || { echo "::error:: NO-GO — GET release falhou (403/sem capacidade)"; exit 1; }
+          RS="$(jq -r '.rulesetName' release-before.json)"
+          [ -n "$RS" ] && [ "$RS" != "null" ] || { echo "::error:: NO-GO — rulesetName vazio"; exit 1; }
+          echo "RULESET_NAME=$RS" >> "$GITHUB_ENV"
+          echo "release ativa: $RS @ $(jq -r '.updateTime' release-before.json)"
+
+      - name: FASE 2 — GET ruleset (conteúdo byte-exato) [GET-only]
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -X GET -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/${RULESET_NAME}" \
+            -o ruleset.json || { echo "::error:: NO-GO — GET ruleset falhou"; exit 1; }
+          node -e 'const r=require("./ruleset.json");const f=(r.source&&r.source.files)||[];if(!f.length){console.error("::error:: NO-GO — source.files vazio (conteúdo incompleto)");process.exit(1)}for(const x of f){if(typeof x.content!=="string"||!x.name){console.error("::error:: NO-GO — arquivo do ruleset incompleto");process.exit(1)}}console.log("ruleset files="+f.length)'
+
+      - name: FASE 3 — GET índices ativos (read-only, best-effort)
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          if curl -fsS -X GET -H "Authorization: Bearer $TOKEN" \
+            "https://firestore.googleapis.com/v1/projects/${GCP_PROJECT}/databases/(default)/collectionGroups/-/indexes" \
+            -o indexes-raw.json ; then
+            echo "indexes GET OK ($(jq '.indexes|length' indexes-raw.json 2>/dev/null || echo '?') índices)"
+          else
+            echo '{"indexes":[],"_note":"GET indexes falhou/sem capacidade — NAO COMPROVADO"}' > indexes-raw.json
+            echo "::warning:: indexes GET falhou — registrando NAO COMPROVADO (não bloqueia a captura das Rules)"
+          fi
+
+      - name: Construir captura (files + metadata + manifesto + hashes canônicos)
+        run: |
+          set -eu
+          mkdir -p capture/files
+          cat > "$RUNNER_TEMP/build.mjs" <<'NODE'
+          import fs from "node:fs"; import crypto from "node:crypto";
+          const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
+          const rs = JSON.parse(fs.readFileSync("ruleset.json", "utf8"));
+          const relB = JSON.parse(fs.readFileSync("release-before.json", "utf8"));
+          const files = (rs.source && rs.source.files) || [];
+          const recs = files.map((f, i) => {
+            const buf = Buffer.from(f.content, "utf8");
+            const safe = f.name.replace(/[^A-Za-z0-9._-]/g, "_");
+            fs.writeFileSync("capture/files/" + safe, buf);
+            return { order: i, path: f.name, storedAs: "files/" + safe, bytes: buf.length, lines: f.content.split("\n").length, sha256: sha(buf) };
+          });
+          // hash canônico: por path ordenado -> concat( utf8(path), 0x00, content, 0x00 )
+          const sorted = [...recs].sort((a, b) => a.path < b.path ? -1 : 1);
+          const parts = [];
+          for (const r of sorted) { const f = files.find(x => x.name === r.path); parts.push(Buffer.from(r.path, "utf8"), Buffer.from([0]), Buffer.from(f.content, "utf8"), Buffer.from([0])); }
+          const canonical = sha(Buffer.concat(parts));
+          const totalBytes = recs.reduce((s, r) => s + r.bytes, 0);
+          const capturedAt = new Date().toISOString();
+          const relMeta = { schemaVersion: 1, projectId: "agenda-id-seven", service: "cloud.firestore", releaseName: relB.name || "projects/agenda-id-seven/releases/cloud.firestore", activeRulesetName: relB.rulesetName, releaseCreateTime: relB.createTime || null, releaseUpdateTime: relB.updateTime || null, capturedAt, captureMode: "read-only", productionDataAccessed: false, productionDataModified: false, deployExecuted: false, source: "Firebase Rules API GET", captureRunId: process.env.GITHUB_RUN_ID || null };
+          const rsMeta = { schemaVersion: 1, rulesetName: relB.rulesetName, createTime: rs.createTime || null, fileCount: recs.length, totalSizeBytes: totalBytes, canonicalSha256: canonical, canonicalHashMethod: "for each file sorted by path: sha256( concat( utf8(path), 0x00, content, 0x00 ) )", capturedAt };
+          const manifest = { schemaVersion: 1, rulesetName: relB.rulesetName, fileCount: recs.length, canonicalSha256: canonical, files: recs };
+          fs.writeFileSync("capture/release-metadata.json", JSON.stringify(relMeta, null, 2) + "\n");
+          fs.writeFileSync("capture/ruleset-metadata.json", JSON.stringify(rsMeta, null, 2) + "\n");
+          fs.writeFileSync("capture/ruleset-manifest.json", JSON.stringify(manifest, null, 2) + "\n");
+          fs.writeFileSync("capture/SHA256SUMS", recs.map(r => r.sha256 + "  " + r.storedAs).join("\n") + "\n");
+          let idx; try { idx = JSON.parse(fs.readFileSync("indexes-raw.json", "utf8")); } catch (_) { idx = { indexes: [] }; }
+          const idxClean = (idx.indexes || []).map(x => ({ name: x.name || null, queryScope: x.queryScope || null, state: x.state || null, fields: (x.fields || []).map(fp => ({ fieldPath: fp.fieldPath, order: fp.order || null, arrayConfig: fp.arrayConfig || null })) }));
+          fs.writeFileSync("capture/indexes-readonly.json", JSON.stringify({ schemaVersion: 1, projectId: "agenda-id-seven", database: "(default)", capturedAt, indexCount: idxClean.length, indexes: idxClean, _note: idx._note || null }, null, 2) + "\n");
+          console.log("CAPTURE_CANONICAL_SHA256=" + canonical);
+          console.log("CAPTURE_RULESET_NAME=" + relB.rulesetName);
+          console.log("CAPTURE_FILE_COUNT=" + recs.length);
+          console.log("CAPTURE_TOTAL_BYTES=" + totalBytes);
+          for (const r of recs) console.log("FILE " + r.path + " bytes=" + r.bytes + " lines=" + r.lines + " sha256=" + r.sha256);
+          NODE
+          node "$RUNNER_TEMP/build.mjs"
+
+      - name: FASE pós — GET release (after) + provar before == after (sem publicação)
+        run: |
+          set -eu
+          TOKEN="$(gcloud auth print-access-token)"; echo "::add-mask::$TOKEN"
+          curl -fsS -X GET -H "Authorization: Bearer $TOKEN" \
+            "https://firebaserules.googleapis.com/v1/projects/${GCP_PROJECT}/releases/cloud.firestore" \
+            -o release-after.json
+          BRS=$(jq -r '.rulesetName' release-before.json); ARS=$(jq -r '.rulesetName' release-after.json)
+          BUT=$(jq -r '.updateTime' release-before.json); AUT=$(jq -r '.updateTime' release-after.json)
+          echo "before: $BRS @ $BUT"; echo "after : $ARS @ $AUT"
+          [ "$BRS" = "$ARS" ] || { echo "::error:: NO-GO — rulesetName mudou (captura NÃO pode publicar)"; exit 1; }
+          [ "$BUT" = "$AUT" ] || { echo "::error:: NO-GO — updateTime mudou (release alterado)"; exit 1; }
+          echo "RELEASE_UNCHANGED=true" >> "$GITHUB_ENV"
+          echo "Release INALTERADO: nenhuma publicação ocorreu (read-only comprovado)."
+
+      - name: Comparar vs baseline comprovada (local, sem alterar)
+        run: |
+          set -eu
+          BASE="ops/firestore-rules-baseline/live-firestore.rules"
+          LIVEF="$(ls capture/files/* 2>/dev/null | head -1 || true)"
+          if [ -f "$BASE" ] && [ -n "$LIVEF" ]; then
+            BSHA=$(sha256sum "$BASE" | awk '{print $1}'); LSHA=$(sha256sum "$LIVEF" | awk '{print $1}')
+            echo "baseline_sha256=$BSHA"; echo "live_sha256=$LSHA"
+            if [ "$BSHA" = "$LSHA" ]; then echo "COMPARE_BASELINE=identical" >> "$GITHUB_ENV"; echo "COMPARE_BASELINE=identical";
+            else echo "COMPARE_BASELINE=different" >> "$GITHUB_ENV"; echo "COMPARE_BASELINE=different (esperado: live evoluiu além da baseline de 2026-06-23)"; fi
+            diff -u "$BASE" "$LIVEF" > capture/baseline-vs-live.diff || true
+            echo "--- baseline-vs-live.diff (até 220 linhas) ---"; head -220 capture/baseline-vs-live.diff || true
+          else
+            echo "COMPARE_BASELINE=unavailable" >> "$GITHUB_ENV"; echo "COMPARE_BASELINE=unavailable"
+          fi
+
+      - name: Relatório de verificação (capture-verification-report.json)
+        run: |
+          set -eu
+          cat > "$RUNNER_TEMP/report.mjs" <<'NODE'
+          import fs from "node:fs";
+          const rsMeta = JSON.parse(fs.readFileSync("capture/ruleset-metadata.json", "utf8"));
+          const relMeta = JSON.parse(fs.readFileSync("capture/release-metadata.json", "utf8"));
+          const rep = {
+            schemaVersion: 1,
+            phase: "F4.3C4A",
+            capturedAt: rsMeta.capturedAt,
+            rulesetName: rsMeta.rulesetName,
+            createTime: rsMeta.createTime,
+            fileCount: rsMeta.fileCount,
+            totalSizeBytes: rsMeta.totalSizeBytes,
+            canonicalSha256: rsMeta.canonicalSha256,
+            gates: {
+              rulesetNameNonEmpty: !!rsMeta.rulesetName,
+              filesComplete: rsMeta.fileCount > 0,
+              releaseUnchanged: process.env.RELEASE_UNCHANGED === "true",
+            },
+            compareBaseline: process.env.COMPARE_BASELINE || "unavailable",
+            dataAccess: { documents: false, runQuery: false, batchGet: false, commit: false },
+            deployExecuted: false,
+            productionDataAccessed: false,
+            productionDataModified: false,
+            captureRunId: relMeta.captureRunId,
+          };
+          fs.writeFileSync("capture/capture-verification-report.json", JSON.stringify(rep, null, 2) + "\n");
+          console.log(JSON.stringify(rep, null, 2));
+          NODE
+          node "$RUNNER_TEMP/report.mjs"
+
+      - name: Emitir captura byte-exata no log (tar + base64) para reconstrução verificável
+        run: |
+          set -eu
+          ( cd capture && tar -cf - . ) | base64 -w 100 > capture.tar.b64
+          echo "TAR_B64_LINES=$(wc -l < capture.tar.b64)  TAR_B64_SHA256=$(sha256sum capture.tar.b64 | awk '{print $1}')"
+          echo "-----F43C4A_CAPTURE_TAR_B64_BEGIN-----"
+          cat capture.tar.b64
+          echo "-----F43C4A_CAPTURE_TAR_B64_END-----"
+
+      - name: Prova estática — nenhum endpoint de DADOS Firestore foi usado
+        run: |
+          set -eu
+          echo "Endpoints usados (GET-only): firebaserules releases/cloud.firestore + ruleset; firestore collectionGroups/-/indexes."
+          echo "NENHUM /documents, :runQuery, :batchGet, :commit; NENHUM POST/PUT/PATCH/DELETE; NENHUM firebase/gcloud/wrangler deploy."
+
+      - name: Upload artifact seguro (captura + releases; SEM credenciais)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f43c4a-firestore-live-ruleset-capture
+          path: |
+            capture/**
+            release-before.json
+            release-after.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Limpeza (service account)
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gcp-sa.json" 2>/dev/null || true
