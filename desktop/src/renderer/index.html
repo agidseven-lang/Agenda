@@ -2048,54 +2048,54 @@ body.desktop .kbv2-empty-s{ font-size:12.5px; color:#828c9e; max-width:200px; li
 
 /* ───────── CARD dark premium ───────── */
 body.desktop .kbv2-card{
-  position:relative; display:flex; flex-direction:column; gap:13px;
+  position:relative; display:flex; flex-direction:column; gap:9px;
   /* F3.3.2 (correção do corte real): NÃO encolher dentro da coluna flex que rola — sem
      flex-shrink o flexbox comprimia/amputava os cards quando havia 2+ na coluna. Agora o card
      mantém a altura natural e a COLUNA rola (o widget SLA é flutuante, não disputa altura). */
   flex:0 0 auto;
   scroll-snap-align:start;   /* rolagem alinha o card inteiro no topo (ver card completo com naturalidade) */
-  padding:16px; border-radius:16px; background:linear-gradient(180deg,#161d2e,#121726); border:1px solid rgba(255,255,255,.08);
+  padding:13px; border-radius:14px; background:linear-gradient(180deg,#161d2e,#121726); border:1px solid rgba(255,255,255,.08);
   box-shadow:0 1px 2px rgba(0,0,0,.35), 0 16px 36px -20px rgba(0,0,0,.65);
 }
-body.desktop .kbv2-card::before{ content:""; position:absolute; left:16px; right:16px; top:0; height:3px; border-radius:0 0 3px 3px; background:var(--kacc,#6d5efc); opacity:.9; }
+body.desktop .kbv2-card::before{ content:""; position:absolute; left:13px; right:13px; top:0; height:3px; border-radius:0 0 3px 3px; background:var(--kacc,#6d5efc); opacity:.9; }
 /* F1.1 — TOP do card em 2 zonas estáveis: esquerda (status) ↔ direita (SLA + due agrupados, lado a lado). Sem margin-left:auto. */
 body.desktop .kbv2-card-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; flex-wrap:wrap; min-width:0; }
 body.desktop .kbv2-top-r{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; flex:0 1 auto; }
-body.desktop .kbv2-status,body.desktop .kbv2-due{ font-size:12px; font-weight:700; padding:6px 11px; border-radius:9px; border:1px solid transparent; display:inline-flex; align-items:center; gap:7px; line-height:1.25; }
+body.desktop .kbv2-status,body.desktop .kbv2-due{ font-size:11px; font-weight:700; padding:4px 9px; border-radius:8px; border:1px solid transparent; display:inline-flex; align-items:center; gap:7px; line-height:1.25; }
 body.desktop .kbv2-status-dot{ width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
 body.desktop .kbv2-due{ font-weight:600; flex:0 0 auto; white-space:nowrap; }
-body.desktop .kbv2-card-profile{ display:flex; align-items:center; gap:12px; }
+body.desktop .kbv2-card-profile{ display:flex; align-items:center; gap:9px; }
 body.desktop .kbv2-av{ position:relative; flex:0 0 auto; }
-body.desktop .kbv2-av .av{ width:48px; height:48px; border-radius:50%; }
-body.desktop .kbv2-presence{ position:absolute; right:0; bottom:0; width:12px; height:12px; border-radius:50%; background:#2fcf8f; border:2px solid #141a29; }
+body.desktop .kbv2-av .av{ width:34px; height:34px; border-radius:50%; }
+body.desktop .kbv2-presence{ position:absolute; right:0; bottom:0; width:9px; height:9px; border-radius:50%; background:#2fcf8f; border:2px solid #141a29; }
 body.desktop .kbv2-pm{ min-width:0; }
-body.desktop .kbv2-name{ font-size:15px; font-weight:700; color:var(--kbv2-ink); line-height:1.25; }
-body.desktop .kbv2-role{ font-size:12.5px; color:#8b94a6; margin-top:2px; }
-body.desktop .kbv2-card-origin{ display:flex; align-items:flex-start; gap:9px; padding:9px 12px; border-radius:11px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06); font-size:12.5px; color:#aab3c4; line-height:1.35; }
-body.desktop .kbv2-card-origin svg{ width:16px; height:16px; color:#6f7889; flex:0 0 auto; margin-top:1px; }
+body.desktop .kbv2-name{ font-size:13.5px; font-weight:700; color:var(--kbv2-ink); line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+body.desktop .kbv2-role{ font-size:11px; color:#8b94a6; margin-top:1px; }
+body.desktop .kbv2-card-origin{ display:flex; align-items:center; gap:6px; padding:0; border:0; background:transparent; font-size:11.5px; color:#8b94a6; line-height:1.3; min-width:0; }
+body.desktop .kbv2-card-origin svg{ width:13px; height:13px; color:#6f7889; flex:0 0 auto; }
 body.desktop .kbv2-card-origin b{ color:var(--kbv2-ink); font-weight:700; }
-body.desktop .kbv2-origin-tx{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+body.desktop .kbv2-origin-tx{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 body.desktop .kbv2-origin-l1{ color:#c6cdda; }
 body.desktop .kbv2-origin-l2{ color:#8b94a6; font-size:12px; }
-body.desktop .kbv2-tier{ font-size:11px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#9d8bff; }
-body.desktop .kbv2-title{ font-size:18px; font-weight:800; color:var(--kbv2-ink); line-height:1.25; letter-spacing:-.01em; margin-top:4px; }
+body.desktop .kbv2-tier{ font-size:10px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:#9d8bff; }
+body.desktop .kbv2-title{ font-size:15px; font-weight:800; color:var(--kbv2-ink); line-height:1.3; letter-spacing:-.01em; margin-top:2px; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 body.desktop .kbv2-card-chips{ display:flex; gap:7px; flex-wrap:wrap; }
-body.desktop .kbv2-chip{ font-size:12px; font-weight:700; padding:5px 10px; border-radius:8px; border:1px solid transparent; display:inline-flex; align-items:center; gap:6px; line-height:1.2; }
+body.desktop .kbv2-chip{ font-size:11px; font-weight:700; padding:3px 8px; border-radius:7px; border:1px solid transparent; display:inline-flex; align-items:center; gap:6px; line-height:1.2; }
 body.desktop .kbv2-chip-dot{ width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
 body.desktop .kbv2-chip-soft{ background:rgba(124,108,255,.16); color:#bcaeff; border-color:rgba(124,108,255,.34); }
 /* F1 — chip SLA local (discreto, premium, dark). Severidades: azul/laranja/vermelho/verde */
 /* F1.1 — chip SLA na MESMA proporção do .kbv2-due (fonte 12 / padding 6×11 / raio 9 / dot 7). */
-body.desktop .kbv2-sla{ font-size:12px; font-weight:700; padding:6px 11px; border-radius:9px; display:inline-flex; align-items:center; gap:7px; line-height:1.25; border:1px solid transparent; white-space:nowrap; }
+body.desktop .kbv2-sla{ font-size:11px; font-weight:700; padding:4px 9px; border-radius:8px; display:inline-flex; align-items:center; gap:7px; line-height:1.25; border:1px solid transparent; white-space:nowrap; }
 body.desktop .kbv2-sla::before{ content:""; width:7px; height:7px; border-radius:50%; background:currentColor; flex:0 0 auto; }
 body.desktop .kbv2-sla-azul{ color:#7fa6ff; background:rgba(91,108,255,.16); border-color:rgba(91,108,255,.34); }
 body.desktop .kbv2-sla-laranja{ color:#f2a93b; background:rgba(242,169,59,.16); border-color:rgba(242,169,59,.38); }
 body.desktop .kbv2-sla-vermelho{ color:#ff6b61; background:rgba(239,68,68,.16); border-color:rgba(239,68,68,.40); }
 body.desktop .kbv2-sla-verde{ color:#37d196; background:rgba(47,207,143,.16); border-color:rgba(47,207,143,.34); }
-body.desktop .kbv2-card-rail{ display:flex; align-items:center; gap:0; padding:3px 2px; }
-body.desktop .kbv2-card-rail i{ width:10px; height:10px; border-radius:50%; background:#313a4d; flex:0 0 auto; }
+body.desktop .kbv2-card-rail{ display:flex; align-items:center; gap:0; padding:2px 2px; }
+body.desktop .kbv2-card-rail i{ width:8px; height:8px; border-radius:50%; background:#313a4d; flex:0 0 auto; }
 body.desktop .kbv2-card-rail i.done{ background:#2fcf8f; }
 body.desktop .kbv2-card-rail i.att{ background:#f59e0b; margin-left:6px; }
-body.desktop .kbv2-card-rail .ln{ flex:1 1 auto; height:3px; background:#2a3346; }
+body.desktop .kbv2-card-rail .ln{ flex:1 1 auto; height:2px; background:#2a3346; }
 body.desktop .kbv2-card-rail .ln.done{ background:linear-gradient(90deg,#2fcf8f,#7fe0bb); }
 body.desktop .kbv2-card-stage{ display:flex; flex-direction:column; gap:6px; }
 body.desktop .kbv2-srow{ display:flex; gap:8px; font-size:13px; align-items:baseline; }
@@ -2103,23 +2103,28 @@ body.desktop .kbv2-sk{ flex:0 0 auto; min-width:66px; font-size:11px; font-weigh
 body.desktop .kbv2-sv{ font-weight:700; }
 body.desktop .kbv2-sv2{ color:var(--kbv2-ink2,#c2cad8); }
 /* F3.3.2 (reteste) — "Sua etapa / Próxima ação" premium (ícone + micro-label + pill) */
-body.desktop .kbv2-stage2{ display:flex; flex-direction:column; gap:9px; }
-body.desktop .kbv2-st2-row{ display:flex; align-items:flex-start; gap:10px; }
-body.desktop .kbv2-st2-ic{ width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; margin-top:1px; }
-body.desktop .kbv2-st2-ic svg{ width:15px; height:15px; }
+body.desktop .kbv2-stage2{ display:flex; flex-direction:column; gap:6px; }
+body.desktop .kbv2-st2-row{ display:flex; align-items:center; gap:8px; }
+body.desktop .kbv2-st2-ic{ width:20px; height:20px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; margin-top:1px; }
+body.desktop .kbv2-st2-ic svg{ width:12px; height:12px; }
 body.desktop .kbv2-st2-ic-next{ color:#9aa4b6; background:rgba(255,255,255,.05); }
-body.desktop .kbv2-st2-tx{ min-width:0; display:flex; flex-direction:column; gap:3px; }
-body.desktop .kbv2-st2-k{ font-size:10.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:#8a93a7; }
-body.desktop .kbv2-st2-pill{ align-self:flex-start; font-size:12.5px; font-weight:800; padding:3px 10px; border-radius:8px; border:1px solid transparent; line-height:1.3; }
-body.desktop .kbv2-st2-next{ font-size:13px; font-weight:600; color:var(--kbv2-ink2,#c2cad8); line-height:1.3; }
+body.desktop .kbv2-st2-tx{ min-width:0; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+body.desktop .kbv2-st2-k{ font-size:9.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:#8a93a7; }
+body.desktop .kbv2-st2-pill{ align-self:center; font-size:11.5px; font-weight:800; padding:2px 8px; border-radius:8px; border:1px solid transparent; line-height:1.3; }
+body.desktop .kbv2-st2-next{ font-size:12px; font-weight:600; color:var(--kbv2-ink2,#c2cad8); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 body.desktop .kbv2-card-themes{ border:1px solid rgba(255,255,255,.07); border-radius:12px; overflow:hidden; background:rgba(255,255,255,.025); }
-body.desktop .kbv2-themes-h{ font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#8a93a7; padding:9px 12px; background:rgba(255,255,255,.04); }
-body.desktop .kbv2-theme{ display:flex; align-items:flex-start; gap:10px; padding:9px 12px; border-top:1px solid rgba(255,255,255,.06); font-size:13px; color:#c6cdda; line-height:1.4; }
-body.desktop .kbv2-theme-n{ flex:0 0 auto; width:20px; height:20px; border-radius:7px; background:rgba(124,108,255,.18); color:#bcaeff; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+body.desktop .kbv2-themes-h{ font-size:9.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#8a93a7; padding:6px 10px; background:rgba(255,255,255,.04); }
+body.desktop .kbv2-theme{ display:flex; align-items:flex-start; gap:8px; padding:6px 10px; border-top:1px solid rgba(255,255,255,.06); font-size:12px; color:#c6cdda; line-height:1.35; }
+body.desktop .kbv2-theme-n{ flex:0 0 auto; width:16px; height:16px; border-radius:5px; background:rgba(124,108,255,.18); color:#bcaeff; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; margin-top:1px; }
 body.desktop .kbv2-theme-t{ flex:1 1 auto; min-width:0; }
-body.desktop .kbv2-card-chk{ font-size:12.5px; color:#8b94a6; }
-body.desktop .kbv2-card-date{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--kbv2-ink); font-weight:600; }
-body.desktop .kbv2-card-date svg{ width:15px; height:15px; color:#6f7889; }
+body.desktop .kbv2-card-chk{ font-size:11.5px; color:#8b94a6; display:flex; align-items:center; gap:6px; }
+body.desktop .kbv2-card-chk svg{ width:12px; height:12px; color:#6f7889; flex:0 0 auto; }
+/* F3.5.4 — prévia canônica: mini-listas mostram até 2 itens (sem rolagem interna); o excedente
+   vira "+N temas" e o conteúdo COMPLETO permanece no Detalhes (contrato de compactação). */
+body.desktop .kbv2-themes-list .kbv2-theme:nth-child(n+3){ display:none; }
+body.desktop .kbv2-themes-more{ padding:5px 10px; border-top:1px solid rgba(255,255,255,.06); font-size:10.5px; font-weight:800; color:#9d8bff; letter-spacing:.04em; }
+body.desktop .kbv2-card-date{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--kbv2-ink); font-weight:600; }
+body.desktop .kbv2-card-date svg{ width:13px; height:13px; color:#6f7889; }
 body.desktop .kbv2-card-footer{ display:flex; gap:8px; margin-top:2px; }
 /* PROD1.6 — CARD ÚNICO preenche 100% a altura da coluna (sem sobra embaixo), SEM esticar tudo
    igual (sem space-between bruto) e SEM inflar fontes/avatar (sem zoom). A sobra vertical é
@@ -2136,6 +2141,14 @@ body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-origin,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-themes,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-notes,
 body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-top:auto; }
+/* F3.5.4 — CONTRATO UNIFICADO (KanbanTaskCardUnified): o card ÚNICO NÃO estica nem espalha
+   conteúdo — mesma altura natural e mesma distribuição do multi-card em TODOS os setores
+   (regras PROD1.6 acima NEUTRALIZADAS pela cascata; texto preservado como registro). */
+body.desktop .kbv2-column-body>.kbv2-card:only-child{ flex:0 0 auto; min-height:auto; }
+body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-origin,
+body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-themes,
+body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-notes{ margin-top:0; }
+body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-top:2px; }
 /* F3.5.2D — "Edição de Cards" REUTILIZA o contrato canônico do Cronograma/Designer: o card único
    ESTICA (flex:1 1 auto, regra PROD1.6 acima) e a COLUNA preenche a altura (sem override de board).
    Como o setor não tem lista de temas, a caixa .kbv2-card-notes (Legenda/Observações) assume o MESMO
@@ -2145,17 +2158,18 @@ body.desktop .kbv2-column-body>.kbv2-card:only-child>.kbv2-card-footer{ margin-t
    edicao_cards passa a seguir EXATAMENTE o mesmo sistema de proporção do Cronograma. */
 /* F3.5.2C — Legenda / Observações no card (rótulo + prévia de até 2 linhas; conteúdo completo em Detalhes). */
 body.desktop .kbv2-card-note{ display:flex; flex-direction:column; gap:2px; }
-body.desktop .kbv2-card-note .kbv2-note-k{ font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#8a93a7; }
-body.desktop .kbv2-card-note .kbv2-note-v{ font-size:13px; color:#c6cdda; line-height:1.35; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
-/* Tema (título) do card de Edição de Cards: valor real, até 2 linhas, depois trunca. */
-body.desktop .kbv2-card.kbv2-card--cards .kbv2-title{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
-body.desktop .kbv2-btn{ height:40px; border-radius:11px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:var(--kbv2-ink); font-size:13.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; }
-body.desktop .kbv2-btn svg{ width:16px; height:16px; }
+body.desktop .kbv2-card-note .kbv2-note-k{ font-size:9.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#8a93a7; display:flex; align-items:center; gap:5px; }
+body.desktop .kbv2-card-note .kbv2-note-k svg{ width:11px; height:11px; color:#6f7889; flex:0 0 auto; }
+body.desktop .kbv2-card-note .kbv2-note-v{ font-size:12px; color:#c6cdda; line-height:1.35; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+/* F3.5.4 — clamp de 2 linhas do título é UNIVERSAL (regra base .kbv2-title); a variante
+   .kbv2-card--cards deixou de existir: NENHUM setor tem classe própria no card unificado. */
+body.desktop .kbv2-btn{ height:34px; border-radius:9px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.05); color:var(--kbv2-ink); font-size:12.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:7px; cursor:pointer; }
+body.desktop .kbv2-btn svg{ width:14px; height:14px; }
 body.desktop .kbv2-btn:hover{ background:rgba(255,255,255,.09); }
 body.desktop .kbv2-btn-main{ flex:1 1 auto; border:0; color:#fff; background:linear-gradient(135deg,#6d5efc,#4d7cff); box-shadow:0 8px 20px -8px rgba(80,70,240,.55); }
 body.desktop .kbv2-btn-main:hover{ filter:brightness(1.08); }
 body.desktop .kbv2-btn:not(.kbv2-btn-main):not(.kbv2-btn-dots){ flex:1 1 auto; }
-body.desktop .kbv2-btn-dots{ width:44px; flex:0 0 auto; font-size:18px; }
+body.desktop .kbv2-btn-dots{ width:38px; flex:0 0 auto; font-size:16px; }
 /* menu popover ⋯ (portal no <body> quando aberto) */
 body.desktop .kbv2-more{ position:relative; display:inline-flex; }
 body.desktop .kbv2-menu{ display:none; position:fixed; z-index:9999; min-width:210px; background:#161c2b; border:1px solid rgba(255,255,255,.1); border-radius:12px; box-shadow:0 18px 44px -12px rgba(0,0,0,.6); padding:6px; }
@@ -2182,7 +2196,7 @@ body.desktop .kbv2-card-themes>.kbv2-themes-list{ flex:1 1 auto; min-height:0; o
    .kbv2-card-themes: bloco central que absorve a sobra vertical (flex:0 1 auto) e rola internamente se
    passar da coluna (CARD-FIT-NOTEBOOK). Assim o card de edicao_cards preenche a coluna no mesmo padrão
    do Cronograma, sem vão morto; rodapé/botões ancoram na base. Só aparece quando há Legenda/Obs. */
-body.desktop .kbv2-card>.kbv2-card-notes{ flex:0 1 auto; min-height:0; display:flex; flex-direction:column; gap:11px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.20) transparent; }
+body.desktop .kbv2-card>.kbv2-card-notes{ flex:0 1 auto; min-height:0; display:flex; flex-direction:column; gap:8px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.20) transparent; }
 body.desktop .kbv2-card-notes>.kbv2-card-note{ flex:0 0 auto; }
 body.desktop .kbv2-card-notes::-webkit-scrollbar{ width:8px; }
 body.desktop .kbv2-card-notes::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:8px; }
@@ -2206,9 +2220,8 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
   body.desktop .kbv2-column-header{ padding:11px 15px 9px }
   body.desktop .kbv2-column-add{ height:39px; margin:9px 13px 10px }
   body.desktop .kbv2-column-body{ gap:12px }
-  body.desktop .kbv2-card{ gap:11px; padding:14px }
-  body.desktop .kbv2-av .av{ width:44px; height:44px }
-  body.desktop .kbv2-title{ font-size:17px }
+  body.desktop .kbv2-card{ gap:8px; padding:12px }
+  body.desktop .kbv2-title{ font-size:14.5px }
   body.desktop .kbv2-theme{ padding:7px 12px }
   body.desktop .kbv2-btn{ height:38px }
 }
@@ -2226,15 +2239,12 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
   body.desktop .kbv2-column-header .kbv2-ctitle{ font-size:13.5px }
   body.desktop .kbv2-column-add{ height:34px; margin:6px 12px 8px; font-size:12.5px }
   body.desktop .kbv2-column-body{ gap:9px; padding:4px 12px 6px }
-  /* card: blocos secundários saem (espaço p/ temas); essenciais seguem premium */
-  body.desktop .kbv2-card>.kbv2-card-origin,
-  body.desktop .kbv2-card>.kbv2-card-rail,
-  body.desktop .kbv2-card>.kbv2-card-chk{ display:none }
-  body.desktop .kbv2-card{ gap:7px; padding:12px }
-  body.desktop .kbv2-av .av{ width:38px; height:38px }
-  body.desktop .kbv2-name{ font-size:14px }
-  body.desktop .kbv2-role{ font-size:11.5px }
-  body.desktop .kbv2-title{ font-size:16px; margin-top:1px; line-height:1.2 }
+  /* F3.5.4 — card unificado compacto: NENHUM bloco some no notebook (origem/trilho/checklist
+     agora são linhas mínimas); apenas densidade extra. Conteúdo nunca é perdido. */
+  body.desktop .kbv2-card{ gap:7px; padding:11px }
+  body.desktop .kbv2-name{ font-size:13px }
+  body.desktop .kbv2-role{ font-size:10.5px }
+  body.desktop .kbv2-title{ font-size:14px; margin-top:1px; line-height:1.25 }
   body.desktop .kbv2-tier{ font-size:10.5px }
   body.desktop .kbv2-theme{ padding:6px 11px; font-size:12.5px }
   body.desktop .kbv2-themes-h{ padding:6px 11px }
@@ -2260,10 +2270,9 @@ body.desktop .kbv2-themes-list::-webkit-scrollbar-thumb:hover{ background:rgba(2
   body.desktop .kbv2-column-header .kbv2-ccount{ height:20px }
   body.desktop .kbv2-column-add{ height:32px; margin:5px 11px 7px }
   body.desktop .kbv2-column-body{ gap:8px; padding:3px 11px 5px }
-  body.desktop .kbv2-card{ gap:6px; padding:11px }
-  body.desktop .kbv2-av .av{ width:36px; height:36px }
-  body.desktop .kbv2-name{ font-size:13.5px }
-  body.desktop .kbv2-title{ font-size:15px }
+  body.desktop .kbv2-card{ gap:6px; padding:10px }
+  body.desktop .kbv2-name{ font-size:12.5px }
+  body.desktop .kbv2-title{ font-size:13.5px }
   body.desktop .kbv2-theme{ padding:5px 11px; font-size:12px }
   body.desktop .kbv2-themes-h{ padding:5px 11px; font-size:10px }
   body.desktop .kbv2-status,body.desktop .kbv2-due,body.desktop .kbv2-sla{ padding:4px 8px; font-size:10px }
@@ -5948,10 +5957,12 @@ function kbv2Card(t, persp){
   // F1 — SLA local: acento do card e chip discreto (sem alterar estrutura)
   const _sla=kbv2SlaLocal(t);
   const _slaAcc=_sla.sev==='laranja'?'#F2A93B':(_sla.sev==='vermelho'?'#EF4444':(_sla.sev==='verde'?'#2FCF8F':acc));
-  /* F3.5.2B — marca APENAS o card do setor interno "Edição de Cards" para receber a compactação
-     visual isolada (altura natural no Kanban). Para qualquer outro setor a classe NÃO é adicionada,
-     mantendo a saída HTML byte-idêntica à 1.0.188. */
-  let h='<div class="kbv2-card'+(s.key==='edicao_cards'?' kbv2-card--cards':'')+'" data-card-renderer="canonical-board-card" style="--kacc:'+_slaAcc+'">';
+  /* F3.5.4 — KanbanTaskCardUnified: UM único esqueleto compacto para TODOS os setores (nenhuma
+     classe por setor). Slots canônicos: cabeçalho · responsável · origem · cliente+título · setor ·
+     conteúdo específico (≤2 linhas/campo; "+N" p/ listas) · trilho · etapa · próxima ação · prazo ·
+     ações. Conteúdo varia por setor; ESTRUTURA nunca. Menos texto, mais ícones (todos com tooltip);
+     conteúdo integral permanece no Detalhes. Marker aprovado preservado + identidade do componente. */
+  let h='<div class="kbv2-card" data-card-renderer="canonical-board-card" data-card-component="KanbanTaskCardUnified" style="--kacc:'+_slaAcc+'">';
   // 1) topo: status + SLA (F1) + prazo
   h+='<div class="kbv2-card-top">'+
        '<span class="kbv2-status" style="color:'+pres.tone+';background:'+withAlpha(pres.tone,.18)+';border-color:'+withAlpha(pres.tone,.48)+'"><i class="kbv2-status-dot" style="background:'+pres.tone+'"></i>'+esc(topLabel)+'</span>'+
@@ -5962,12 +5973,12 @@ function kbv2Card(t, persp){
      '</div>';
   // 2) perfil
   h+='<div class="kbv2-card-profile">'+
-       '<span class="kbv2-av">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},48):'<div class="av" style="width:48px;height:48px">'+svg('person')+'</div>')+'<i class="kbv2-presence"></i></span>'+
-       '<div class="kbv2-pm"><div class="kbv2-name">'+esc(asgName||'Sem responsável')+'</div>'+
+       '<span class="kbv2-av">'+(asgName?avatar(asg||{name:asgName,id:t.assigneeId},34):'<div class="av" style="width:34px;height:34px">'+svg('person')+'</div>')+'<i class="kbv2-presence"></i></span>'+
+       '<div class="kbv2-pm"><div class="kbv2-name" title="'+esc(asgName||'Sem responsável')+'">'+esc(asgName||'Sem responsável')+'</div>'+
          '<div class="kbv2-role">'+esc(asg&&asg.role?asg.role:'Responsável')+'</div></div>'+
      '</div>';
-  // 3) enviado por
-  if(reqName)h+='<div class="kbv2-card-origin">'+svg('person')+'<div class="kbv2-origin-tx"><div class="kbv2-origin-l1">Enviado por <b>'+esc(reqName)+'</b></div>'+(t.createdAt?'<div class="kbv2-origin-l2">'+fmtDateTimeBR(t.createdAt)+'</div>':'')+'</div></div>';
+  // 3) ORIGEM — linha compacta única (ícone + quem enviou + data/hora; tooltip com a frase completa)
+  if(reqName)h+='<div class="kbv2-card-origin" title="'+esc('Enviado por '+reqName+(t.createdAt?(' em '+fmtDateTimeBR(t.createdAt)):''))+'">'+svg('person')+'<span class="kbv2-origin-tx">por <b>'+esc(reqName)+'</b>'+(t.createdAt?(' · '+esc(fmtDateTimeBR(t.createdAt))):'')+'</span></div>';
   // 4-5) tier (cliente) + título
   h+='<div class="kbv2-card-main">'+
        (t.client?'<div class="kbv2-tier">'+esc(t.client)+'</div>':'')+
@@ -5992,12 +6003,37 @@ function kbv2Card(t, persp){
        quando há Legenda e/ou Observações — campos vazios NÃO reservam altura nem deixam rótulo solto. */
     if(_cl||_co){
       h+='<div class="kbv2-card-notes">'+
-         (_cl?'<div class="kbv2-card-note"><div class="kbv2-note-k">Legenda</div><div class="kbv2-note-v">'+esc(_cl)+'</div></div>':'')+
-         (_co?'<div class="kbv2-card-note"><div class="kbv2-note-k">Observações</div><div class="kbv2-note-v">'+esc(_co)+'</div></div>':'')+
+         (_cl?'<div class="kbv2-card-note" title="'+esc(_cl)+'"><div class="kbv2-note-k">'+svg('description')+'<span>Legenda</span></div><div class="kbv2-note-v">'+esc(_cl)+'</div></div>':'')+
+         (_co?'<div class="kbv2-card-note" title="'+esc(_co)+'"><div class="kbv2-note-k">'+svg('notes')+'<span>Observações</span></div><div class="kbv2-note-v">'+esc(_co)+'</div></div>':'')+
        '</div>';
     }
   }
-  // 7) trilho + 8) etapa
+  // 6) SLOT ESPECÍFICO (cron): TEMAS — prévia ≤2 + "+N · ver em Detalhes" (.kbv2-themes-list)
+  // INTERNA quando o card seria mais alto que a coluna (CARD-FIT-NOTEBOOK). Cabeçalho "Temas"
+  // fica fixo; só a lista rola. Cards com 1–3 temas que cabem mostram tudo, sem rolagem.
+  if(cron&&cron.list.length){
+    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">'+(cron.list.length>1?'Temas':'Tema')+'</div>'+
+       '<div class="kbv2-themes-list">'+
+       cron.list.map(c=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(c._i+1)+'</span><span class="kbv2-theme-t">'+esc(c.tema||'(sem tema)')+'</span></div>').join('')+
+       '</div>'+
+       (cron.list.length>2?'<div class="kbv2-themes-more" title="Conteúdo completo em Detalhes">+'+(cron.list.length-2)+' tema'+(cron.list.length-2===1?'':'s')+' · ver em Detalhes</div>':'')+
+     '</div>';
+  }
+  else if(!clientView&&isCron&&(!cron||!cron.list.length)){
+    /* F3.3.70D3R10I — rascunho SEM temas: estrutura premium NUNCA some (mockup aprovado).
+       Placeholders "a definir" SOMENTE na visao interna (nunca persp 'client'/Card Premium).
+       F3.3.70D3R10I-B — cobre TAMBEM o cronograma 'nunca-tocado' (sem cronContents gravado):
+       o formulario inicia contents:[] e saveTask so grava se houver entrada; sem o campo,
+       cronOf() e null — ainda assim o card interno mostra a caixa Temas (3 placeholders). */
+    const phN=cron?Math.max(1,Math.min(cron.count||2,2)):2;   // F3.5.4 — prévia canônica: ≤2 linhas
+    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">Temas</div>'+
+       '<div class="kbv2-themes-list kbv2-themes-ph">'+
+       Array.from({length:phN},(_,i)=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(i+1)+'</span><span class="kbv2-theme-t">Tema '+(i+1)+' — a definir</span></div>').join('')+
+       '</div></div>';
+    h+='<div class="kbv2-hint">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium).</span></div>';
+  }
+  if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;h+='<div class="kbv2-card-chk" title="Checklist: '+done+' de '+t.checklist.length+' itens concluídos (completo em Detalhes)">'+svg('check')+'<span>'+done+' de '+t.checklist.length+' no checklist</span></div>';}
+  // 7) trilho de progresso + 8) etapa atual + 9) próxima ação
   if(prog){
     let rail='';
     for(let i2=0;i2<prog.total;i2++){
@@ -6014,39 +6050,15 @@ function kbv2Card(t, persp){
          '<div class="kbv2-st2-row">'+
            '<span class="kbv2-st2-ic" style="color:'+acc+';background:'+withAlpha(acc,.14)+'">'+svg('flag')+'</span>'+
            '<div class="kbv2-st2-tx"><div class="kbv2-st2-k">'+esc(etapaLbl)+'</div>'+
-             '<span class="kbv2-st2-pill" style="color:'+acc+';background:'+withAlpha(acc,.16)+';border-color:'+withAlpha(acc,.34)+'">'+esc(etapaVal)+'</span></div>'+
+             '<span class="kbv2-st2-pill" title="'+esc(etapaVal)+'" style="color:'+acc+';background:'+withAlpha(acc,.16)+';border-color:'+withAlpha(acc,.34)+'">'+esc(etapaVal)+'</span></div>'+
          '</div>'+
          (pres.nextAction?'<div class="kbv2-st2-row">'+
            '<span class="kbv2-st2-ic kbv2-st2-ic-next">'+svg('arr')+'</span>'+
            '<div class="kbv2-st2-tx"><div class="kbv2-st2-k">Próxima ação</div>'+
-             '<div class="kbv2-st2-next">'+esc(pres.nextAction)+'</div></div>'+
+             '<div class="kbv2-st2-next" title="'+esc(pres.nextAction)+'">'+esc(pres.nextAction)+'</div></div>'+
          '</div>':'')+
        '</div>';
   }
-  // 9) TEMA(S) — a lista vai num wrapper próprio (.kbv2-themes-list) que ganha rolagem
-  // INTERNA quando o card seria mais alto que a coluna (CARD-FIT-NOTEBOOK). Cabeçalho "Temas"
-  // fica fixo; só a lista rola. Cards com 1–3 temas que cabem mostram tudo, sem rolagem.
-  if(cron&&cron.list.length){
-    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">'+(cron.list.length>1?'Temas':'Tema')+'</div>'+
-       '<div class="kbv2-themes-list">'+
-       cron.list.map(c=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(c._i+1)+'</span><span class="kbv2-theme-t">'+esc(c.tema||'(sem tema)')+'</span></div>').join('')+
-       '</div>'+
-     '</div>';
-  }
-  else if(!clientView&&isCron&&(!cron||!cron.list.length)){
-    /* F3.3.70D3R10I — rascunho SEM temas: estrutura premium NUNCA some (mockup aprovado).
-       Placeholders "a definir" SOMENTE na visao interna (nunca persp 'client'/Card Premium).
-       F3.3.70D3R10I-B — cobre TAMBEM o cronograma 'nunca-tocado' (sem cronContents gravado):
-       o formulario inicia contents:[] e saveTask so grava se houver entrada; sem o campo,
-       cronOf() e null — ainda assim o card interno mostra a caixa Temas (3 placeholders). */
-    const phN=cron?Math.max(1,Math.min(cron.count||3,3)):3;
-    h+='<div class="kbv2-card-themes"><div class="kbv2-themes-h">Temas</div>'+
-       '<div class="kbv2-themes-list kbv2-themes-ph">'+
-       Array.from({length:phN},(_,i)=>'<div class="kbv2-theme"><span class="kbv2-theme-n">'+(i+1)+'</span><span class="kbv2-theme-t">Tema '+(i+1)+' — a definir</span></div>').join('')+
-       '</div></div>';
-    h+='<div class="kbv2-hint">🔒 <span>Preencha ao menos <b>1 tema</b> para liberar o <b>envio ao cliente</b> (Card Premium).</span></div>';
-  }
-  if(Array.isArray(t.checklist)&&t.checklist.length){const done=t.checklist.filter(c=>c.d).length;h+='<div class="kbv2-card-chk">'+done+' de '+t.checklist.length+' no checklist</div>';}
   // 10) data
   if(t.dueDate||t.due)h+='<div class="kbv2-card-date">'+svg('calendar')+'<span>'+fmtDateBR(t.dueDate||t.due)+(t.dueTime?' às '+esc(t.dueTime):'')+'</span></div>';
   // 11) footer ações (reutiliza handlers existentes via data-*)
