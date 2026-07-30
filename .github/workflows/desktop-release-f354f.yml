@@ -25,7 +25,7 @@ name: "F3.5.4F Desktop Release — 1.0.197 no canal do updater (SLA por designer
     branches:
       - "desktop/f354f-sla-timer-task-update-1.0.197"
     paths:
-      - ".github/workflows/desktop-release-f354e.yml"
+      - ".github/workflows/desktop-release-f354f.yml"
   workflow_dispatch: {}
 
 permissions:
