@@ -1,0 +1,262 @@
+# =====================================================================
+# F3.5.4D — Publicacao da Desktop 1.0.195 no CANAL DO ATUALIZADOR INTERNO (Latest)
+# ---------------------------------------------------------------------
+# Publica a versao 1.0.195 (card SaaS Premium — F3.5.4B/C) no canal REALMENTE consumido pelo
+# electron-updater da producao (provider github → release Latest nao-prerelease com latest.yml):
+# a 1.0.194 instalada passa a DETECTAR a 1.0.195 em Configuracoes → Atualizacoes → Verificar →
+# Baixar → Instalar e reiniciar. NENHUM download manual pelo owner.
+# USA EXCLUSIVAMENTE os BYTES do run de build F3.5.4C 30503981919 (gated, verde; --publish never):
+# NAO RECOMPILA — baixa os 2 artifacts e publica os MESMOS bytes. TUDO PINADO: run id, digests dos
+# artifacts, 5 hashes SHA-256, tag v1.0.195 no head EXATO da branch de teste. 6 assets conforme a
+# autorizacao F3.5.4D: EXE, MSI, latest.yml, blockmap, SHA256SUMS, VERSAO-DESKTOP.txt.
+# ESCRITAS (tag + release + Latest) SO via token temporario do GitHub App "Agenda ID Seven
+# Release Bot" (expira sozinho); GITHUB_TOKEN permanece somente leitura; sem RELEASE_PAT.
+# Roda NA PROPRIA branch de teste (main e INTOCAVEL nesta fase): dispara no push DESTE arquivo
+# (publicacao ja autorizada expressamente pela F3.5.4D) + workflow_dispatch p/ reexecucao.
+# v1.0.194 permanece PRESERVADA como rollback oficial (release/tag intocadas); v1.0.193/192 idem.
+# NAO builda, NAO altera codigo, NAO toca Firebase/Worker/Rules/Functions/Android.
+# A publicacao NAO significa aprovacao fisica do visual — o teste fisico do owner vem depois,
+# exclusivamente pelo atualizador interno.
+# =====================================================================
+name: "F3.5.4D Desktop Release — 1.0.195 no canal do updater (card SaaS Premium; sem build novo)"
+"on":
+  push:
+    branches:
+      - "desktop/f354c-card-saas-premium-1.0.195-test"
+    paths:
+      - ".github/workflows/desktop-release-f354d.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: agidseven-lang/Agenda
+      # ── PINAGEM COMPLETA (F3.5.4C GO tecnico; run verde 45 passos) ──
+      RUN_ID: "30503981919"
+      STABLE_SHA: "a4687480b32d7d55355ce0eba1ab19de78503425"
+      TEST_BRANCH: "desktop/f354c-card-saas-premium-1.0.195-test"
+      BASE_194_SHA: "f5a38a35934dd92203a87e76e23d267e18bd974c"
+      TAG: "v1.0.195"
+      TITLE: "Agenda ID Seven Desktop 1.0.195 — Card SaaS Premium"
+      ART_INST: "agenda-id-seven-desktop-1.0.195-test-installer"
+      ART_INST_DIGEST: "sha256:cdee2123ee0824f04bc598cd2f34ebda3e23243ecf484545cd7ae6ae6663c642"
+      ART_META: "agenda-id-seven-desktop-1.0.195-test-updatemeta"
+      ART_META_DIGEST: "sha256:9d9e04ed7b2912a75a141e29383d9485aad80c384f77cb59c4be0a1561887361"
+      EXE_NAME: "Agenda-ID-Seven-Desktop-1.0.195-x64.exe"
+      MSI_NAME: "Agenda-ID-Seven-Desktop-1.0.195-x64.msi"
+      BM_NAME: "Agenda-ID-Seven-Desktop-1.0.195-x64.exe.blockmap"
+      LY_NAME: "latest.yml"
+      EXP_EXE: "b7379f7dc64ffa3d019fce16535c2d06a575729c01324affe20b87d29b820f10"
+      EXP_MSI: "03579f65abfc424477511a00a9e46ed238b536b175d1ea37efe25057b3760514"
+      EXP_LY: "c00512857b9eb6b418fbcd75bddb1ef0d658b1bd8b61d9bfe688789f6b912898"
+      EXP_BM: "c189d4542d961625279b2b95e5a89bd0bb59a83ec2be1252df30a41832f499a4"
+      EXP_SBOM: "458e91a1ec9619486580001ff146a276b55318c132f7c4d9a598e73d42e0f40c"
+      PROD_PREV_TAG: "v1.0.194"
+      PROD_ROLLBACK_TAG: "v1.0.194"
+      PROD_HIST_TAG: "v1.0.193"
+    steps:
+      - name: "Gate 0 — contexto: branch de teste correta (publicacao autorizada F3.5.4D)"
+        run: |
+          set -euo pipefail
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error::ref '${{ github.ref_name }}' != $TEST_BRANCH — nada publicado"; exit 1; }
+          echo "OK: rodando na branch de teste autorizada"
+
+      - name: "Gate 0a — token temporario do Release Bot (GitHub App; expira sozinho)"
+        id: release_bot
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: Agenda
+          permission-contents: write
+          permission-workflows: write
+
+      - name: "Gate 0b — token do Release Bot ATIVO + escopo SO Agenda"
+        env:
+          BOT_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$BOT_TOKEN" ] || { echo "::error::token do Release Bot vazio — NADA publicado."; exit 1; }
+          FN="$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$REPO" --jq '.full_name' 2>/dev/null || true)"
+          [ "$FN" = "$REPO" ] || { echo "::error::Release Bot sem acesso a $REPO."; exit 1; }
+          J="$(GH_TOKEN="$BOT_TOKEN" gh api /installation/repositories)"
+          N="$(echo "$J" | jq -r '.total_count')"; R="$(echo "$J" | jq -r '.repositories[0].full_name')"
+          { [ "$N" = "1" ] && [ "$R" = "$REPO" ]; } || { echo "::error::escopo do Release Bot != {1 repo, $REPO} ($N,$R)."; exit 1; }
+          echo "OK: Release Bot ativo, escopo restrito a $REPO"
+
+      - name: "Gate 1 — run de build F3.5.4C completed/success e head EXATO"
+        run: |
+          set -euo pipefail
+          J="$(gh api "repos/$REPO/actions/runs/$RUN_ID")"
+          ST="$(echo "$J" | jq -r '.status + "|" + .conclusion')"
+          HS="$(echo "$J" | jq -r '.head_sha')"
+          BR="$(echo "$J" | jq -r '.head_branch')"
+          echo "run $RUN_ID: $ST head=$HS branch=$BR"
+          [ "$ST" = "completed|success" ] || { echo "::error::run de build invalido"; exit 1; }
+          [ "$HS" = "$STABLE_SHA" ] || { echo "::error::head do run != STABLE_SHA"; exit 1; }
+          [ "$BR" = "$TEST_BRANCH" ] || { echo "::error::branch do run != branch de teste"; exit 1; }
+
+      - name: "Gate 2 — STABLE_SHA e o TIP da branch de teste e descende da 1.0.194"
+        run: |
+          set -euo pipefail
+          H="$(gh api "repos/$REPO/git/ref/heads/$TEST_BRANCH" --jq '.object.sha')"
+          [ "$H" = "$STABLE_SHA" ] || { echo "::error::tip da branch ($H) != STABLE_SHA"; exit 1; }
+          CMP="$(gh api "repos/$REPO/compare/$BASE_194_SHA...$STABLE_SHA" --jq '.status')"
+          { [ "$CMP" = "ahead" ] || [ "$CMP" = "identical" ]; } || { echo "::error::STABLE_SHA nao descende da 1.0.194 ($CMP)"; exit 1; }
+          echo "OK: tip==STABLE_SHA; descende da base 1.0.194"
+
+      - name: "Gate 3 — release v1.0.195 NAO existe; tag so pode preexistir apontando p/ STABLE_SHA"
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then echo "::error::release $TAG ja existe"; exit 1; fi
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          fi
+          echo "OK: release/tag livres (ou tag ja em STABLE_SHA)"
+
+      - name: "Gate 4 — artifacts: ids+digests conferem (mesmos bytes do run verde)"
+        run: |
+          set -euo pipefail
+          json="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" --paginate)"
+          chk() { local d; d="$(echo "$json" | jq -r --arg n "$1" '.artifacts[]|select(.name==$n)|.digest')"; echo "$1: $d"; [ "$d" = "$2" ] || { echo "::error::digest $1 divergente"; exit 1; }; }
+          chk "$ART_INST" "$ART_INST_DIGEST"
+          chk "$ART_META" "$ART_META_DIGEST"
+
+      - name: "Baixar artifacts (installer + updatemeta) — SEM recompilar"
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_INST" -D pacote
+          gh run download "$RUN_ID" -R "$REPO" -n "$ART_META" -D pacote
+          for f in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS SBOM-cyclonedx.json VERSAO-DESKTOP.txt; do
+            test -f "pacote/$f" || { echo "::error::arquivo ausente: $f"; exit 1; }
+          done
+          if [ -f pacote/canary.yml ]; then echo "::error::canary.yml presente — canal ambiguo"; exit 1; fi
+
+      - name: "Gate 5 — hashes SHA-256 + latest.yml (versao/EXE/sha512) + VERSAO-DESKTOP"
+        run: |
+          set -euo pipefail
+          declare -A EXP=( ["$EXE_NAME"]="$EXP_EXE" ["$MSI_NAME"]="$EXP_MSI" ["$LY_NAME"]="$EXP_LY" ["$BM_NAME"]="$EXP_BM" ["SBOM-cyclonedx.json"]="$EXP_SBOM" )
+          for f in "${!EXP[@]}"; do
+            H="$(sha256sum "pacote/$f" | awk '{print $1}')"; echo "$f=$H"
+            [ "$H" = "${EXP[$f]}" ] || { echo "::error::hash $f divergente"; exit 1; }
+          done
+          ( cd pacote && sha256sum -c SHA256SUMS ) || { echo "::error::SHA256SUMS nao confere"; exit 1; }
+          grep -q "version: 1.0.195" "pacote/$LY_NAME" || { echo "::error::latest.yml version != 1.0.195"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "pacote/$LY_NAME" || { echo "::error::latest.yml path != EXE"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "pacote/$LY_NAME" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "pacote/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do latest.yml != EXE (updater rejeitaria)"; exit 1; }
+          grep -q "versionName : 1.0.195" pacote/VERSAO-DESKTOP.txt || { echo "::error::VERSAO-DESKTOP sem 1.0.195"; exit 1; }
+          grep -q "1.0.195-card-saas-premium-test" pacote/VERSAO-DESKTOP.txt || { echo "::error::rotulo da candidata ausente"; exit 1; }
+          echo "OK: 5 hashes + SHA256SUMS + latest.yml (1.0.195/EXE/sha512==EXE) + VERSAO-DESKTOP"
+
+      - name: "Release notes"
+        run: |
+          cat > notas.md <<'NOTAS'
+          Agenda ID Seven Desktop 1.0.195 — Card SaaS Premium
+
+          Atualização disponibilizada pelo ATUALIZADOR INTERNO do app sobre a 1.0.194
+          (Configurações → Atualizações → Verificar atualizações → Baixar → Instalar e
+          reiniciar). NENHUM download manual é necessário.
+
+          O QUE MUDA vs 1.0.194 (F3.5.4B/C — reformulação profissional do card de tarefa)
+          - Campo "por" exibe somente o PRIMEIRO NOME de quem enviou (ex.: "por Miercohévisk");
+            o nome completo permanece no tooltip e nos Detalhes (nenhum dado alterado).
+          - TODOS os temas visíveis no card: tarefa com 1, 4, 8 ou 12 temas mostra 1, 4, 8 ou 12;
+            a linha "+N temas · ver em Detalhes" foi REMOVIDA; nenhum tema fica oculto.
+          - Fonte dos temas ampliada (13px) e seção TEMAS ampliada (mais espaçosa, com contagem
+            no cabeçalho, melhor contraste; texto quebra naturalmente, sem cortar à direita).
+          - Card com ALTURA NATURAL: cresce conforme o conteúdo real, sem esticar e sem espaços
+            artificiais; SEM rolagem interna na seção TEMAS — a rolagem acontece na COLUNA.
+          - MESMA estrutura de card nos cinco quadros (Meu quadro, Designers, Social Medias,
+            Setores e Clientes); Detalhes/Mover/menu ⋯/editar/excluir inalterados.
+
+          PRESERVAÇÃO (provado por gates no build 30503981919)
+          - NENHUMA alteração em: Card Premium do Cronograma/Roteiro, colagem na Legenda,
+            aprovação, solicitação de alteração, links públicos, notificações (imediatas,
+            T-30/T-10, tempo real), máquina de estados, tray/fechar no X, atualizador,
+            login/logout, roster e agenda — main.ts, Categoria B e todo o núcleo durável
+            BYTE-IDÊNTICOS à 1.0.194.
+          - NENHUMA alteração em Worker/Cloudflare/Firebase/Firestore Rules/Functions/banco.
+            Android permanece PAUSADO.
+          - Rollback oficial: 1.0.194 PRESERVADA (release e tag intactas); 1.0.193/1.0.192 idem.
+
+          IMPORTANTE: esta versão ainda DEPENDE DE VALIDAÇÃO FÍSICA do owner (visual do card).
+          A publicação apenas disponibiliza a atualização pelo mecanismo oficial.
+
+          Procedência: run de build F3.5.4C 30503981919 (success; --publish never; gates de
+          empacotamento do novo card verdes) @ commit a4687480 (branch
+          desktop/f354c-card-saas-premium-1.0.195-test = 1.0.194 OFICIAL + commits 9aef1b2 feat
+          + a468748 ci). Mesmos bytes; sem recompilar. Confira SHA-256 em SHA256SUMS
+          (sha256sum -c SHA256SUMS).
+          NOTAS
+
+      - name: "Criar tag v1.0.195 pinada em STABLE_SHA — ESCRITA via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPO/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            TS="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+            [ "$TS" = "$STABLE_SHA" ] || { echo "::error::tag $TAG aponta para outro sha ($TS)"; exit 1; }
+          else
+            gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$TAG" -f sha="$STABLE_SHA" >/dev/null
+            echo "tag $TAG criada em $STABLE_SHA"
+          fi
+
+      - name: "Publicar release no canal do updater (latest=true, prerelease=false) — 6 assets — via Release Bot"
+        env:
+          GH_TOKEN: ${{ steps.release_bot.outputs.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" -R "$REPO" \
+            --target "$STABLE_SHA" --latest=true \
+            --title "$TITLE" --notes-file notas.md \
+            "pacote/$EXE_NAME" "pacote/$MSI_NAME" "pacote/$LY_NAME" "pacote/$BM_NAME" "pacote/SHA256SUMS" "pacote/VERSAO-DESKTOP.txt"
+          echo "publicado: $TAG (canal do electron-updater: release Latest com latest.yml)"
+
+      - name: "Pos-verificacao (Latest=1.0.195; 1.0.194 rollback + 1.0.193/1.0.192 preservadas)"
+        run: |
+          set -euo pipefail
+          FLAGS="$(gh release view "$TAG" -R "$REPO" --json isPrerelease,isDraft --jq '(.isPrerelease|tostring)+"|"+(.isDraft|tostring)')"
+          [ "$FLAGS" = "false|false" ] || { echo "::error::flags incorretas: $FLAGS"; exit 1; }
+          N="$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets|length')"
+          [ "$N" = "6" ] || { echo "::error::esperado 6 assets, encontrados $N"; exit 1; }
+          for a in "$EXE_NAME" "$MSI_NAME" "$LY_NAME" "$BM_NAME" SHA256SUMS VERSAO-DESKTOP.txt; do
+            gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "$a" || { echo "::error::asset $a ausente"; exit 1; }
+          done
+          if gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name' | grep -qx "app-update.yml"; then echo "::error::app-update.yml nao pode ser asset"; exit 1; fi
+          TAGSHA="$(gh api "repos/$REPO/git/ref/tags/$TAG" --jq '.object.sha')"
+          [ "$TAGSHA" = "$STABLE_SHA" ] || { echo "::error::tag != STABLE_SHA"; exit 1; }
+          LATEST_TAG="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name')"
+          [ "$LATEST_TAG" = "$TAG" ] || { echo "::error::Latest do repo != $TAG (got $LATEST_TAG)"; exit 1; }
+          for t in "$PROD_PREV_TAG" "$PROD_HIST_TAG" "v1.0.192"; do
+            gh release view "$t" -R "$REPO" --json tagName --jq '.tagName' | grep -qx "$t" || { echo "::error::$t (preservacao/rollback) sumiu"; exit 1; }
+          done
+          echo "===== GO: 1.0.195 no canal do updater (Latest); 1.0.194 preservada como rollback ====="
+
+      - name: "Smoke do FEED DO UPDATER — exatamente o que o electron-updater consome (sem instalar)"
+        run: |
+          set -euo pipefail
+          rm -rf smoke; mkdir -p smoke
+          # feed publico identico ao consultado pelo app (provider github, canal latest)
+          curl -fsSL "https://github.com/$REPO/releases/latest/download/latest.yml" -o smoke/latest.yml
+          [ "$(sha256sum smoke/latest.yml | awk '{print $1}')" = "$EXP_LY" ] || { echo "::error::feed latest.yml hash divergente"; exit 1; }
+          grep -q "version: 1.0.195" smoke/latest.yml || { echo "::error::feed sem version 1.0.195"; exit 1; }
+          grep -qE "^path: $EXE_NAME" smoke/latest.yml || { echo "::error::feed sem path do EXE"; exit 1; }
+          curl -fsSL -o smoke/"$EXE_NAME" "https://github.com/$REPO/releases/latest/download/$EXE_NAME"
+          [ "$(sha256sum smoke/$EXE_NAME | awk '{print $1}')" = "$EXP_EXE" ] || { echo "::error::EXE do canal divergente"; exit 1; }
+          curl -fsSL -o smoke/"$BM_NAME" "https://github.com/$REPO/releases/latest/download/$BM_NAME"
+          [ "$(sha256sum smoke/$BM_NAME | awk '{print $1}')" = "$EXP_BM" ] || { echo "::error::blockmap do canal divergente"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' smoke/latest.yml | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "smoke/$EXE_NAME" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error::sha512 do feed != EXE do feed"; exit 1; }
+          echo "SMOKE DO UPDATER OK: 1.0.194 vai detectar/baixar a 1.0.195 (versao+path+sha512+blockmap integros). Nenhuma instalacao executada no CI."
