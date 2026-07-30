@@ -121,6 +121,14 @@ export function startSlaScheduler(getUid: () => string | null, deliver: Deliver,
       for (const p of payloads || []) {
         const key = String((p && p.dedupKey) || "");
         if (!key || seen.has(key)) continue;
+        // F3.5.4H — MIGRAÇÃO DE CHAVE sem duplicata: se o payload declara chaves LEGADAS
+        // (formato 1.0.198, sem uid) e alguma já foi vista, a transição JÁ FOI entregue a este
+        // usuário — marca a chave nova como consumida e NÃO reentrega. Aditivo e inerte para
+        // payloads sem legacyDedupKeys.
+        const legacy: unknown = (p as any).legacyDedupKeys;
+        if (Array.isArray(legacy) && legacy.some((k2) => k2 && seen.has(String(k2)))) {
+          seen.add(key); log("sla.dedup.legacy", { dedupKey: key }); continue;
+        }
         // F3.4.7 — seen só é gravado quando o HUB ACEITA a entrega ({ok:true}). Antes, deliver()
         // (deliverNotification) NUNCA lança — devolve {ok:false} engolido — e a chave era marcada
         // mesmo com falha total: a transição ficava PERDIDA para sempre (viola o contrato de

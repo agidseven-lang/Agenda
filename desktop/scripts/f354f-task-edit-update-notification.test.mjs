@@ -58,6 +58,8 @@ function mkCtx(taskDoc, { canSee = true } = {}) {
       { id: 'desB', name: 'João Pedro', role: 'Designer', photo: '' }], tasks: [taskDoc], tab: '', boardSector: null, form: null },
     boardCol: 0,
     canSeeAll: () => canSee,
+    /* F3.5.4H — saveCardsEdit grava dueAt/startAt canônicos via dtMs (real; require direto — S só é declarado depois) */
+    dtMs: require2(path.join(ROOT, 'src', 'main', 'slaRules.js')).dtMs,
     flashToast: (m) => toasts.push(m), alert: (m) => toasts.push('ALERT:' + m),
     render: () => {}, closeModal: () => {}, closeCardMenus: () => {},
     firebase: { firestore: { FieldValue: { arrayUnion: (e) => ({ __arrayUnion: [e] }) } } },
@@ -116,10 +118,14 @@ const dueOldMs = S.dtMs(DUE_OLD.d, DUE_OLD.t), dueNewMs = S.dtMs(DUE_NEW.d, DUE_
     && oldKey.includes(':' + dueOldMs + ':r1'),
   'alertas ANTIGOS cancelados: com o novo prazo o doc sai da janela e o próximo marco re-arma p/ T-30 novo');
 }
-/* 17 */ {
+/* 17 — EMENDA F3.5.4H: a chave de dedup passou a incluir o uid do destinatário
+ * (task:uid:dueAt:rev) e carrega a chave 1.0.198 em legacyDedupKeys p/ migração sem duplicata. */
+{
   const em = C.cardsEmissionsFor(T, 'desA', dueNewMs - 29 * 60000, S.dtMs);
-  ok(em.length === 1 && em[0].eventType === 'sla_cards_warning' && em[0].dedupKey === 'cards_warning:T1:' + dueNewMs + ':r2',
-  'NOVOS alertas criados no prazo novo (dedupKey com dueAt novo + rev 2 — jamais colide com o antigo)');
+  ok(em.length === 1 && em[0].eventType === 'sla_cards_warning'
+    && em[0].dedupKey === 'cards_warning:T1:desA:' + dueNewMs + ':r2'
+    && Array.isArray(em[0].legacyDedupKeys) && em[0].legacyDedupKeys[0] === 'cards_warning:T1:' + dueNewMs + ':r2',
+  'NOVOS alertas criados no prazo novo (dedupKey com uid + dueAt novo + rev 2 — jamais colide com o antigo)');
 }
 
 console.log('\n══ task_updated — derivação durável + destinatário + conteúdo ══');

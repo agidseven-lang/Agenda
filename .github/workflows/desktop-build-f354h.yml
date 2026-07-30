@@ -1,0 +1,771 @@
+# =====================================================================
+# [push/manual] F3.5.4H — Desktop Build de TESTE (candidata 1.0.199 — correcao do disparo vermelho T-10)
+# ---------------------------------------------------------------------
+# Build da CANDIDATA DE TESTE 1.0.199 (rotulo: 1.0.199-red-notification-boundary-fix) sobre a base
+# 1.0.198 OFICIAL (@009f2c6, tag v1.0.198). Delta CIRURGICO F3.5.4H (a 1.0.198 foi aprovada
+# fisicamente em TUDO exceto o MOMENTO do disparo da notificacao NATIVA vermelha, que ocorria ANTES
+# da janela T-10 correta). Causa-raiz DUPLA provada por reproducao deterministica (scheduler REAL):
+#   (1) nenhum timestamp canonico persistido — os saves gravavam so strings dueDate/dueTime e cada
+#       maquina RE-PARSEAVA via new Date LOCAL; fuso divergente do leitor deslocava TODOS os marcos
+#       (Recife x UTC => redAt -180min => vermelha nativa 3h ANTES da janela real);
+#   (2) o estado 'overdue' (now>=redAt SEM teto) permitia catch-up RETROATIVO apos o prazo no
+#       boot/reconexao, com corpo falso "Faltam 10 minutos".
+# Correcao (SO logica do disparo): (a) persistir dueAt/startAt em ms (maquina de quem DEFINE) em
+# saveCardsBatch/saveCardsEdit; cardFinishMs e kbv2SlaLiveData priorizam Number(t.dueAt) (fallback
+# compat parse); (b) GATE TEMPORAL VERMELHO puro shouldFireRedNotification: emite SOMENTE quando
+# now >= dueAt-10min E now < dueAt E !completed E uid==designer atribuido E !consumida (nunca antes,
+# 1x ao cruzar, sem repeticao, sem retro); (c) edicao de prazo cancela o antigo (rev bump + dueAt
+# novo) e a dedup passa a incluir o uid (cards_{warning,overdue}:taskId:UID:dueAtMs:rN) com
+# legacyDedupKeys carregando a chave 1.0.198 p/ migracao SEM duplicata.
+# GATES ANTIGOS SUBSTITUIDOS (nao apagados silenciosamente): a Categoria B da F3.5.4G exigia
+# slaScheduler.ts E cardsRules.js byte-identicos; como a F3.5.4H os altera cirurgicamente, esses 2
+# saem da byte-identidade e ganham um gate DIFF CONTROLADO F3.5.4H (cardsRules: gate puro presente +
+# literais WARN/RED preservados + chaves uid+legacy; slaScheduler: diff = SO o bloco aditivo
+# legacyDedupKeys, 0 remocoes). Os outros 6 arquivos da Categoria B seguem byte-identicos a 1.0.198.
+# O index.html muda em APENAS 3 pontos autorizados (saveCardsBatch/saveCardsEdit gravam dueAt/startAt
+# + kbv2SlaLiveData prioriza dueAt) — gate dedicado garante que o LAYOUT 1.0.198 (card/monitor/sino/
+# tipografia) fica intacto. Todos os gates de layout da F3.5.4G sao PRESERVADOS (verificam que a
+# 1.0.198 aprovada nao regride). PROVA VISUAL: 6 evidencias reais F3.5.4H (docs/f354h-qa) do momento
+# do disparo (amarelo antes de T-10 sem vermelho; vermelho no T-10 exato; +1s sem duplicata; prazo
+# editado sem alerta antigo; minimizado no T-10; fechado no X no T-10) — SUBSTITUEM as 15 cenas de
+# layout da F3.5.4G (que este delta nao toca; layout gated estruturalmente).
+# Congelados byte-identicos a 1.0.198: main.ts, slaSeenUser.ts, os 6 arquivos frozen da Categoria B,
+# nucleo duravel (notifier/notifierA/notifEvents/notifStore/toastAck/actorProfile/preloads/bgnotify),
+# Card Premium e colagem fora do diff. Worker/Rules/Functions/Android intocados (gate de isolamento).
+#
+# Roda no PROPRIO ref (on: push desta branch de teste + workflow_dispatch): NENHUM commit em main.
+# `--publish never`: NUNCA publica; NAO cria release/tag/stable/latest. Artefatos = artifacts
+# PRIVADOS do run, exclusivamente para TESTE FISICO do owner. Producao 1.0.198 permanece intocada.
+# =====================================================================
+name: "[push/manual] F3.5.4H Desktop Build (candidata 1.0.199 — correcao do disparo vermelho T-10)"
+"on":
+  push:
+    branches:
+      - "desktop/f354h-red-notification-boundary-1.0.199"
+    paths-ignore:
+      - ".github/workflows/desktop-release-f354h.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  BASE_198_SHA: "009f2c6ef2064dbdd18f5a2995669128df13a9ce" # Desktop 1.0.198 OFICIAL (tag v1.0.198; base do delta F3.5.4H)
+  TEST_BRANCH: "desktop/f354h-red-notification-boundary-1.0.199"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout (SHA do push nesta branch de teste; history completo p/ baselines)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA — branch de teste correta e descendente da 1.0.198 pinada
+        run: |
+          set -e
+          [ "${{ github.ref_name }}" = "$TEST_BRANCH" ] || { echo "::error:: ref '${{ github.ref_name }}' != $TEST_BRANCH"; exit 1; }
+          git merge-base --is-ancestor "$BASE_198_SHA" HEAD || { echo "::error:: HEAD nao descende da base 1.0.198 ($BASE_198_SHA)"; exit 1; }
+          echo "ref=$TEST_BRANCH head=$(git rev-parse HEAD) base=$BASE_198_SHA OK"
+
+      - name: Derivar versao — exige 1.0.199 exato, sem sufixo (candidata de teste; NAO producao)
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "versao=$APP_VERSION"
+          [ "$APP_VERSION" = "1.0.199" ] || { echo "::error:: versao != 1.0.199"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido ($APP_VERSION)"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build (main + preload + renderer + modulos .js)
+        working-directory: desktop
+        run: npm run build
+
+      - name: Lint (tsc --noEmit)
+        working-directory: desktop
+        run: node ./node_modules/typescript/lib/tsc.js -p tsconfig.json --noEmit
+
+      - name: Instalar Playwright/Chromium (suites INTERATIVAS F3.5.4G + provas visuais)
+        working-directory: desktop
+        run: |
+          set -e
+          sudo mkdir -p /opt/pw-browsers && sudo chown "$USER" /opt/pw-browsers
+          npm i --no-save playwright@1.56.1 --no-audit --no-fund
+          PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers npx playwright install --with-deps chromium
+
+      - name: Gate F3.5.3 — notificacoes duraveis 37/37 + colagem 15/15
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f353-durable-notifications.test.mjs || { echo "::error:: f353 duraveis vermelho"; exit 1; }
+          node scripts/f353-paste-recovery.test.mjs || { echo "::error:: f353 colagem vermelho"; exit 1; }
+
+      - name: Gate F3.5.3A — foto do ator 25/25 (resolvedor canonico + payload + notifierA ponta-a-ponta)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f353a-actor-photo.test.mjs || { echo "::error:: f353a foto do ator vermelho"; exit 1; }
+
+      - name: Gate F3.5.4/B/E/F/G — Kanban 40/40 + Designers + notificacoes 38/38 + SHELL + SLA + EDICAO 32/32 + MONITOR 26/26 + SINO 15/15 (layout 1.0.198 preservado)
+        working-directory: desktop
+        run: |
+          set -e
+          node scripts/f354-kanban-unified.test.mjs || { echo "::error:: f354 kanban unificado (RESTAURADA 1.0.196) vermelho"; exit 1; }
+          node scripts/f354-designer-autoload.test.mjs || { echo "::error:: f354 designers autoload vermelho"; exit 1; }
+          node scripts/f354-notifications-reliability.test.mjs || { echo "::error:: f354 notificacoes (C3e emendada F3.5.4H: DIFF CONTROLADO) vermelho"; exit 1; }
+          node scripts/f354e-card-template-unification.test.mjs || { echo "::error:: f354e UNIFICACAO do card (RESTAURADA 1.0.196) vermelho"; exit 1; }
+          node scripts/f354f-sla-designer-live-timer.test.mjs || { echo "::error:: f354f SLA (banda->monitor) vermelho"; exit 1; }
+          node scripts/f354f-task-edit-update-notification.test.mjs || { echo "::error:: f354f EDICAO/task_updated (emendada F3.5.4H: chave uid+legacy) vermelho"; exit 1; }
+          node scripts/f354g-sla-top-monitor.test.mjs || { echo "::error:: f354g MONITOR SUPERIOR (layout 1.0.198 preservado) vermelho"; exit 1; }
+          node scripts/f354g-bell-notification-panel.test.mjs || { echo "::error:: f354g SINO (layout 1.0.198 preservado) vermelho"; exit 1; }
+
+      - name: Gate F3.5.4H — disparo vermelho T-10 (boundary 45/45 fake-timer + reproducao deterministica scheduler REAL)
+        working-directory: desktop
+        run: |
+          set -e
+          # A suite principal cobre: gate puro shouldFireRedNotification; linha do tempo T-31->T+1 (T-30
+          # amarela, T-10 vermelha, nada antes/no prazo/depois); +1s sem duplicata; init/reconexao sem
+          # retro; prazo editado (zero no antigo, unica no novo com rev2); multimaquina por relogio
+          # canonico (offset +/-15min NAO antecipa); migracao de chave 1.0.198 sem duplicata.
+          node scripts/f354h-red-notification-boundary.test.mjs || { echo "::error:: f354h boundary do disparo vermelho vermelho"; exit 1; }
+          # Reproducao deterministica no slaScheduler REAL (relogio fake): timeline canonica + boot retro
+          # + multimaquina (subprocesso TZ) provando redAt IDENTICO com dueAt canonico persistido.
+          node scripts/f354h-repro.mjs || { echo "::error:: f354h reproducao deterministica vermelho"; exit 1; }
+
+      - name: Gate F3.5.2/A funcionais (notify + source-invariance/Card-Premium + recipient + substituicao + intervalo + packaging)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in f352-cards-notify f352-cards-source-invariance f352-cards-recipient f352-cards-channel-substitution f352a-cards-interval; do
+            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate F3.5.2/A $t vermelho"; exit 1; }
+          done
+          echo "== f352-cards-packaging =="
+          node scripts/f352-cards-packaging.mjs || { echo "::error:: gate de empacotamento cardsRules vermelho"; exit 1; }
+
+      - name: Gate PRESERVACAO aplicavel (golden masters + canal/dedup/SLA/opblock/updater/bg/central/clock/baseline)
+        working-directory: desktop
+        run: |
+          set -e
+          for t in f343-sla-golden-master f344-flow-golden-master f345-sla-timestamp-golden-master \
+                   f343-delivery-channel f343-preservation f341a-updater-state-machine \
+                   f347-immediate-visual-delivery f347-independent-behavior f33F-bg-notify \
+                   f343-main-scheduler f343-operational-block f33A-notif-central \
+                   f3377a-r4b-http-date-clock f3311-baseline-freeze; do
+            echo "== $t =="; node "scripts/$t.test.mjs" || { echo "::error:: gate de preservacao $t vermelho"; exit 1; }
+          done
+          echo "PRESERVACAO APLICAVEL: TODOS VERDES."
+
+      - name: Gate CATEGORIA B — 6 arquivos frozen byte-identicos a 1.0.198 (infra de entrega intocada)
+        run: |
+          set -e
+          # F3.5.4H — slaScheduler.ts e cardsRules.js SAEM da byte-identidade (recebem o delta cirurgico
+          # do disparo vermelho; verificados no gate DIFF CONTROLADO abaixo). Os OUTROS 6 arquivos da
+          # Categoria B (infra de entrega + motor SLA do designer) SEGUEM byte-identicos a 1.0.198.
+          for f in desktop/src/main/slaRules.js \
+                   desktop/src/main/bgNotify.ts desktop/src/main/tray.ts desktop/src/main/updaterService.ts \
+                   desktop/src/main/firebase.ts desktop/src/main/reminder.ts; do
+            D=$(git diff "$BASE_198_SHA" HEAD -- "$f" || true)
+            [ -z "$D" ] || { echo "::error:: $f ALTERADO vs 1.0.198 (frozen da Categoria B deve ser byte-identico)"; exit 1; }
+          done
+          echo "CATEGORIA B: 6 arquivos frozen byte-identicos a 1.0.198."
+
+      - name: Gate DIFF CONTROLADO F3.5.4H — cardsRules.js (gate puro + literais WARN/RED) + slaScheduler.ts (SO legacyDedupKeys)
+        run: |
+          set -e
+          # cardsRules.js: a UNICA autorizacao de emissao vermelha e a funcao pura shouldFireRedNotification
+          # (now ∈ [dueAt-10min, dueAt)); os LITERAIS herdados WARN=30min/RED=10min ficam intactos; as
+          # chaves de dedup passam a incluir o uid do destinatario e carregam a chave legada 1.0.198.
+          CR="desktop/src/main/cardsRules.js"
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$CR" || { echo "::error:: CARDS_WARN_MS (30min) alterado"; exit 1; }
+          grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$CR" || { echo "::error:: CARDS_RED_MS (10min) alterado"; exit 1; }
+          grep -qF 'function shouldFireRedNotification(' "$CR" || { echo "::error:: gate puro shouldFireRedNotification ausente"; exit 1; }
+          grep -qF 'if(now < due - CARDS_RED_MS) return false;' "$CR" || { echo "::error:: guarda 'antes de T-10' ausente"; exit 1; }
+          grep -qF 'if(now >= due) return false;' "$CR" || { echo "::error:: guarda 'no prazo/depois' (sem retro) ausente"; exit 1; }
+          grep -qF "dedupKey:'cards_warning:' + t.id + ':' + uid + ':' + d.finishMs + ':r' + rev" "$CR" || { echo "::error:: chave amarela sem uid"; exit 1; }
+          grep -qF "dedupKey:'cards_overdue:' + t.id + ':' + uid + ':' + d.finishMs + ':r' + rev" "$CR" || { echo "::error:: chave vermelha sem uid"; exit 1; }
+          grep -qF 'legacyDedupKeys' "$CR" || { echo "::error:: legacyDedupKeys (migracao 1.0.198) ausente"; exit 1; }
+          grep -qF 'shouldFireRedNotification: shouldFireRedNotification' "$CR" || { echo "::error:: shouldFireRedNotification nao exportada"; exit 1; }
+          # slaScheduler.ts: o diff vs 1.0.198 deve conter SOMENTE o bloco aditivo legacyDedupKeys
+          # (nenhuma linha de entrega removida/alterada): 0 remocoes reais, insercoes contem legacyDedupKeys.
+          SCH="desktop/src/main/slaScheduler.ts"
+          REM=$(git diff "$BASE_198_SHA" HEAD -- "$SCH" | grep -E '^-' | grep -vE '^---' | wc -l | tr -d ' ')
+          [ "$REM" = "0" ] || { echo "::error:: slaScheduler.ts tem $REM remocao(oes) — diff nao e puramente aditivo"; exit 1; }
+          git diff "$BASE_198_SHA" HEAD -- "$SCH" | grep -qF 'legacyDedupKeys' || { echo "::error:: diff do slaScheduler.ts nao contem o bloco legacyDedupKeys"; exit 1; }
+          git diff "$BASE_198_SHA" HEAD -- "$SCH" | grep -qF 'sla.dedup.legacy' || { echo "::error:: log sla.dedup.legacy ausente do bloco aditivo"; exit 1; }
+          echo "DIFF CONTROLADO F3.5.4H: cardsRules.js (gate puro + literais + chaves uid/legacy) + slaScheduler.ts (SO aditivo legacyDedupKeys) OK."
+
+      - name: Gate INDEX.HTML — diff vs 1.0.198 SO nos 3 pontos autorizados (dueAt/startAt) — layout congelado
+        run: |
+          set -e
+          # F3.5.4H toca o renderer em APENAS 3 pontos: saveCardsBatch e saveCardsEdit gravam dueAt/startAt
+          # canonicos (ms) e kbv2SlaLiveData prioriza Number(t.dueAt). NENHUMA linha de layout (card/monitor/
+          # sino/tipografia) pode aparecer no diff: o LAYOUT 1.0.198 aprovado fica byte-intacto.
+          H="desktop/src/renderer/index.html"
+          DIFF=$(git diff -U0 "$BASE_198_SHA" HEAD -- "$H" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+          # (a) nenhuma linha adicionada/removida FORA da allowlist de tokens do delta temporal
+          BAD=$(printf '%s\n' "$DIFF" | grep -vE 'dueAt|startAt|F3\.5\.4H|due=Number|dueDate|Fallback|instante|TIMESTAMP|due>0' || true)
+          [ -z "$BAD" ] || { echo "::error:: index.html diff toca linha FORA dos 3 pontos autorizados:"; printf '%s\n' "$BAD"; exit 1; }
+          # (b) nenhum token de LAYOUT congelado no diff (banda/monitor/sino/blocos de estilo do card)
+          if printf '%s\n' "$DIFF" | grep -qE 'kbv2-sla-live|sla-monitor|f354g-|slaib|f354b-card-styles|f354e-card-styles|kbv2-card-notes|line-clamp|kbv2-theme'; then
+            echo "::error:: index.html diff toca LAYOUT congelado (card/monitor/sino)"; exit 1; fi
+          # (c) os 3 pontos autorizados estao PRESENTES no diff
+          printf '%s\n' "$DIFF" | grep -qF 'var due=Number(t.dueAt)||0;' || { echo "::error:: kbv2SlaLiveData nao prioriza dueAt"; exit 1; }
+          N=$(printf '%s\n' "$DIFF" | grep -cF "startAt:(Number(dtMs(c.startDate,c.startTime||'00:00'))||0), dueAt:(Number(dtMs(c.endDate,c.endTime||'23:59'))||0)," || true)
+          [ "$N" -ge 2 ] || { echo "::error:: saveCardsBatch/saveCardsEdit nao gravam dueAt/startAt canonicos (vi $N/2)"; exit 1; }
+          echo "INDEX.HTML: diff confinado aos 3 pontos autorizados; LAYOUT 1.0.198 congelado."
+
+      - name: Gate SUPERFICIES CONGELADAS — main/pipeline de notificacao/preloads/bg byte-identicos a 1.0.198
+        run: |
+          set -e
+          # F3.5.4G — notifierA.ts e notifEvents.js VOLTAM ao congelamento byte-a-byte (a fase nao os
+          # toca): o gate "DIFF CONTROLADO" da F3.5.4F e SUBSTITUIDO por este re-congelamento (mais
+          # forte — nenhum gate apagado, substituido cirurgicamente). 11 superficies congeladas.
+          for f in desktop/src/main/main.ts desktop/src/main/slaSeenUser.ts desktop/src/renderer/bgnotify.html \
+                   desktop/src/preload/preload.ts desktop/src/preload/bgnotify-preload.ts \
+                   desktop/src/main/notifier.ts desktop/src/main/toastAck.ts desktop/src/main/notifStore.ts \
+                   desktop/src/main/actorProfile.js desktop/src/main/notifierA.ts desktop/src/main/notifEvents.js; do
+            D=$(git diff "$BASE_198_SHA" HEAD -- "$f" || true)
+            [ -z "$D" ] || { echo "::error:: $f ALTERADO vs 1.0.198 (F3.5.4G e SO renderer/scripts/docs/workflows)"; exit 1; }
+          done
+          echo "SUPERFICIES CONGELADAS: 11 arquivos byte-identicos a 1.0.198 (incl. notifEvents/notifierA re-congelados)."
+
+      - name: Gate COLAGEM — f353WirePasteRecovery fora do diff do renderer (vs 1.0.198) (-U0 = so linhas +/- reais)
+        run: |
+          set -e
+          N=$(git diff -U0 "$BASE_198_SHA" HEAD -- desktop/src/renderer/index.html | grep -c "f353WirePasteRecovery" || true)
+          [ "$N" = "0" ] || { echo "::error:: diff do index.html toca a colagem ($N linhas)"; exit 1; }
+          echo "COLAGEM NA LEGENDA: fora do diff (0 mencoes nas linhas alteradas)."
+
+      - name: Gate CARD PREMIUM — funcoes/regioes fora do diff do renderer (-U0 = so linhas +/- reais)
+        run: |
+          set -e
+          # -U0: o helper kbv2FirstName foi inserido ADJACENTE ao inicio de kbv2Card, cujas 2 primeiras
+          # linhas (INALTERADAS) citam isClientSector — com contexto default elas apareceriam na hunk
+          # sem serem mudanca. O gate conta APENAS linhas realmente adicionadas/removidas.
+          N=$(git diff -U0 "$BASE_198_SHA" HEAD -- desktop/src/renderer/index.html | grep -cE 'ensureReviewToken|ensureStableClientReviewToken|buildShareClientUrl|buildClientMessage|canSendToClient|openSendClientModal|clientReviewToken|og:image|/share/|isClientSector' || true)
+          [ "$N" = "0" ] || { echo "::error:: diff do index.html toca Card Premium ($N linhas)"; exit 1; }
+          echo "CARD PREMIUM: fora do diff (0 mencoes nas linhas alteradas)."
+
+      - name: Gate SUITES SUPERADAS — preservadas byte-identicas (vs 1.0.198) (classificadas; nao rodadas como gate)
+        run: |
+          set -e
+          for f in f333-notif f3377a-r3-single-producer-clock f33C-assignment-toast f33D-background-notif \
+                   f33E-main-notifier f33K-notif-actor f33N-assign-baseline-fix f343-assignment-transition \
+                   f343-preexisting-registry f344-repeated-move-contract f352d-cards-board-card-proportion; do
+            P="desktop/scripts/$f.test.mjs"
+            test -f "$P" || { echo "::error:: suite superada $f AUSENTE (proibido apagar)"; exit 1; }
+            D=$(git diff "$BASE_198_SHA" HEAD -- "$P" || true)
+            [ -z "$D" ] || { echo "::error:: suite superada $f ALTERADA (proibido reancorar)"; exit 1; }
+          done
+          echo "11 suites superadas: PRESERVADAS byte-identicas."
+
+      - name: Gate NOVO CONTRATO DO CARD na FONTE (primeiro nome + todos os temas + sem ocultacao + cascata)
+        run: |
+          set -e
+          H="desktop/src/renderer/index.html"
+          # negativos (contrato antigo REPROVADO extinto)
+          N=$(grep -c 'kbv2-themes-more' "$H" || true); [ "$N" = "0" ] || { echo "::error:: kbv2-themes-more ainda presente ($N)"; exit 1; }
+          if grep -q 'nth-child(n+3)' "$H"; then echo "::error:: seletor de ocultacao nth-child(n+3) presente"; exit 1; fi
+          if grep -E '\.kbv2-theme(-t)?\{[^}]*(line-clamp|text-overflow)' "$H" >/dev/null; then echo "::error:: clamp/ellipsis nos temas"; exit 1; fi
+          # positivos (novo contrato)
+          grep -q 'function kbv2FirstName' "$H" || { echo "::error:: helper kbv2FirstName ausente"; exit 1; }
+          grep -qF "por <b>'+esc(kbv2FirstName(reqName))+'</b>" "$H" || { echo "::error:: campo 'por' nao usa kbv2FirstName"; exit 1; }
+          grep -qF "title=\"'+esc('Enviado por '+reqName" "$H" || { echo "::error:: tooltip da origem sem o nome COMPLETO"; exit 1; }
+          grep -q 'kbv2-themes-count' "$H" || { echo "::error:: contagem no cabecalho Temas ausente"; exit 1; }
+          grep -q 'id="f354b-card-styles"' "$H" || { echo "::error:: bloco f354b-card-styles ausente"; exit 1; }
+          grep -qF 'body.desktop .kbv2-column-body>.kbv2-card{ max-height:none; }' "$H" || { echo "::error:: altura natural (max-height:none) ausente"; exit 1; }
+          grep -qF 'body.desktop .kbv2-card-themes>.kbv2-themes-list{ overflow-y:visible; min-height:auto; }' "$H" || { echo "::error:: override anti-scroll dos temas ausente"; exit 1; }
+          grep -qF 'body.desktop .kbv2-card>.kbv2-card-notes{ overflow-y:visible; min-height:auto; }' "$H" || { echo "::error:: override anti-scroll das notas ausente"; exit 1; }
+          # cascata: bloco f354b vem DEPOIS dos literais historicos CARD-FIT (pinados por suites antigas)
+          H="$H" node -e 's=require("fs").readFileSync(process.env.H,"utf8");const a=s.indexOf("overflow-y:auto; overscroll-behavior:contain"),b=s.indexOf("id=\"f354b-card-styles\"");if(!(a>0&&b>a)){console.error("bloco f354b NAO vem depois do CARD-FIT");process.exit(1);}'
+          # mesmos handlers e mesmo componente nos 5 quadros
+          for a in 'data-detail=' 'data-move=' 'data-cardmenu=' 'data-resend=' 'data-del='; do
+            grep -qF "$a" "$H" || { echo "::error:: handler $a ausente"; exit 1; }
+          done
+          C=$(grep -o 'kbv2BoardHtml(' "$H" | wc -l | tr -d ' '); [ "$C" -ge 6 ] || { echo "::error:: kbv2BoardHtml esperado em >=5 quadros + definicao, vi $C"; exit 1; }
+          grep -q 'KanbanTaskCardUnified' "$H" || { echo "::error:: identidade KanbanTaskCardUnified ausente"; exit 1; }
+          echo "NOVO CONTRATO DO CARD (fonte): VERIFIED"
+
+      - name: Gate ISOLAMENTO — diff vs 1.0.198 SO nos arquivos autorizados F3.5.4H
+        run: |
+          set -e
+          # Allowlist F3.5.4H: renderer (3 pontos), cardsRules.js, slaScheduler.ts, os scripts f354h-*,
+          # as 4 suites emendadas (f352a/f353a/f354-notifications-reliability/f354f-task-edit), docs
+          # F3.5.4H + docs/f354h-qa, package*, e os 2 workflows f354h. Android/Worker/Rules/Functions/
+          # main/nucleo duravel: INTOCAVEIS.
+          git diff --name-only "$BASE_198_SHA" HEAD | grep -vE '^(desktop/src/renderer/index\.html$|desktop/src/main/cardsRules\.js$|desktop/src/main/slaScheduler\.ts$|desktop/scripts/f354h-red-notification-boundary\.test\.mjs$|desktop/scripts/f354h-repro\.mjs$|desktop/scripts/f354h-qa-evidence\.mjs$|desktop/scripts/f352a-cards-interval\.test\.mjs$|desktop/scripts/f353a-actor-photo\.test\.mjs$|desktop/scripts/f354-notifications-reliability\.test\.mjs$|desktop/scripts/f354f-task-edit-update-notification\.test\.mjs$|desktop/package\.json$|desktop/package-lock\.json$|docs/F3\.5\.4H-|docs/f354h-qa/|\.github/workflows/desktop-build-f354h\.yml$|\.github/workflows/desktop-release-f354h\.yml$)' | tee /tmp/outside.txt || true
+          [ ! -s /tmp/outside.txt ] || { echo "::error:: mudanca FORA do escopo F3.5.4H (Android/Worker/Rules/Functions/main/nucleo duravel intocaveis)"; exit 1; }
+          echo "OK: diff vs 1.0.198 contem SOMENTE os arquivos autorizados F3.5.4H."
+
+      - name: PROVAS VISUAIS F3.5.4H — 6 evidencias reais do disparo vermelho T-10 (Chromium; scheduler REAL -> toast/bgnotify REAIS)
+        working-directory: desktop
+        run: |
+          set -e
+          # SUBSTITUI as 15 cenas de LAYOUT da F3.5.4G (que este delta nao toca; layout gated
+          # estruturalmente acima) pelas 6 evidencias do MOMENTO do disparo — que E o que a fase muda.
+          # Cada evidencia dirige o slaScheduler REAL com relogio fake e renderiza o payload REALMENTE
+          # entregue no toast REAL (notifShowToast) e na janela REAL de background (bgnotify.html).
+          node scripts/f354h-qa-evidence.mjs
+          git diff --quiet -- package.json package-lock.json || { echo "::error:: provas visuais alteraram package.json/lock"; exit 1; }
+          N=$(ls ../docs/f354h-qa/*.png | wc -l | tr -d ' '); echo "PNGs: $N"; [ "$N" = "6" ] || { echo "::error:: esperadas 6 evidencias, vi $N"; exit 1; }
+          test -f ../docs/f354h-qa/evidence-f354h.json || { echo "::error:: evidence-f354h.json ausente"; exit 1; }
+
+      - name: Upload evidencias reais F3.5.4H (artifact PRIVADO)
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.199-test-evidencias
+          path: |
+            docs/f354h-qa/
+          if-no-files-found: error
+          retention-days: 30
+
+  build:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_DIR: "desktop"
+    steps:
+      - name: Forcar LF no checkout
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Checkout (mesmo SHA do run)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Gate REF + ANCESTRIA (windows)
+        run: |
+          set -e
+          git merge-base --is-ancestor "$BASE_198_SHA" HEAD || { echo "::error:: HEAD nao descende da base 1.0.198"; exit 1; }
+
+      - name: Gate LINE ENDINGS LF
+        run: |
+          set -e
+          FILES="desktop/src/renderer/index.html desktop/src/main/main.ts desktop/src/main/firebase.ts desktop/src/main/bgNotify.ts desktop/src/main/slaScheduler.ts desktop/src/main/cardsRules.js desktop/src/main/notifierA.ts desktop/src/main/notifStore.ts desktop/src/main/toastAck.ts desktop/src/main/notifEvents.js desktop/src/main/actorProfile.js desktop/src/main/slaSeenUser.ts"
+          git ls-files --eol -- $FILES | tee "$RUNNER_TEMP/eol.txt"
+          if grep -Eq 'w/(crlf|mixed)' "$RUNNER_TEMP/eol.txt"; then echo "::error:: CRLF/mixed em arquivo-chave"; exit 1; fi
+          N=$(git ls-files --eol -- $FILES | wc -l | tr -d ' '); [ "$N" -ge 12 ] || { echo "::error:: esperados >=12, vi $N"; exit 1; }
+          echo "LINE ENDINGS: LF CONFIRMED"
+
+      - name: Derivar versao — exige 1.0.199 exato
+        run: |
+          APP_VERSION=$(node -p "require('./desktop/package.json').version")
+          echo "APP_VERSION=$APP_VERSION" >> "$GITHUB_ENV"
+          [ "$APP_VERSION" = "1.0.199" ] || { echo "::error:: versao != 1.0.199"; exit 1; }
+          case "$APP_VERSION" in *-*) echo "::error:: versao com sufixo proibido"; exit 1;; esac
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: npm ci
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci --no-audit --no-fund
+
+      - name: TypeScript build
+        working-directory: ${{ env.APP_DIR }}
+        run: npm run build
+
+      - name: electron-builder (NSIS + MSI; --publish never)
+        working-directory: ${{ env.APP_DIR }}
+        run: npx electron-builder --win nsis msi --publish never
+
+      - name: Gate tray icon empacotado
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          test -f "dist-installer/win-unpacked/resources/icon.png" || { echo "::error:: resources/icon.png AUSENTE"; exit 1; }
+          echo "resources/icon.png OK"
+
+      - name: Gate prova-de-versao (asar == 1.0.199) + renderer EMPACOTADO == fonte + F4.2F AUSENTE
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          ASAR="dist-installer/win-unpacked/resources/app.asar"; test -f "$ASAR" || { echo "::error:: app.asar ausente"; exit 1; }
+          EXDIR="$RUNNER_TEMP/asarx"; rm -rf "$EXDIR"; mkdir -p "$EXDIR"; npx --yes @electron/asar extract "$ASAR" "$EXDIR"
+          PKGV=$(P="$EXDIR/package.json" node -e 'console.log(JSON.parse(require("fs").readFileSync(process.env.P,"utf8")).version||"")')
+          [ "$PKGV" = "1.0.199" ] || { echo "::error:: package.json EMPACOTADO version=$PKGV != 1.0.199"; exit 1; }
+          EX="$EXDIR/src/renderer/index.html"; SRC="src/renderer/index.html"; test -f "$EX" || { echo "::error:: index.html ausente no asar"; exit 1; }
+          EX="$EX" SRC="$SRC" node -e 'const fs=require("fs");const nrm=s=>String(s).replace(/\r\n/g,"\n");if(nrm(fs.readFileSync(process.env.EX,"utf8"))!==nrm(fs.readFileSync(process.env.SRC,"utf8"))){console.error("index.html EMPACOTADO != fonte");process.exit(1);}'
+          echo "  index.html EMPACOTADO == fonte"
+          test ! -f "$EXDIR/src/renderer/firebaseAuthBridge.js" || { echo "::error:: firebaseAuthBridge.js presente (F4.2F)"; exit 1; }
+          for k in 'firebase-auth-compat' 'signInWithCustomToken' 'startFirebaseAuthBridge' 'DESKTOP_FIREBASE_AUTH'; do
+            if grep -q "$k" "$EX"; then echo "::error:: '$k' presente no renderer (F4.2F)"; exit 1; fi
+          done
+          echo "GATE prova-de-versao 1.0.199 + renderer==fonte + F4.2F AUSENTE OK."
+
+      - name: Gate F3.5.3/A + F3.5.4 EMPACOTADOS (nucleo duravel + actorProfile + slaSeenUser + autoload + retry + IPCs + colagem)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"
+          for f in notifEvents.js notifierA.js notifStore.js toastAck.js actorProfile.js slaSeenUser.js; do
+            test -f "$EXDIR/dist/main/$f" || { echo "::error:: dist/main/$f AUSENTE no app.asar"; exit 1; }
+          done
+          SRC_SHA=$(sha256sum src/main/notifEvents.js | awk '{print $1}' | tr -d '\\')
+          ASAR_SHA=$(sha256sum "$EXDIR/dist/main/notifEvents.js" | awk '{print $1}' | tr -d '\\')
+          [ "$SRC_SHA" = "$ASAR_SHA" ] || { echo "::error:: notifEvents.js empacotado != fonte"; exit 1; }
+          SRCA_SHA=$(sha256sum src/main/actorProfile.js | awk '{print $1}' | tr -d '\\')
+          ASARA_SHA=$(sha256sum "$EXDIR/dist/main/actorProfile.js" | awk '{print $1}' | tr -d '\\')
+          [ "$SRCA_SHA" = "$ASARA_SHA" ] || { echo "::error:: actorProfile.js empacotado != fonte"; exit 1; }
+          grep -q "require('./actorProfile')" "$EXDIR/dist/main/notifEvents.js" || { echo "::error:: notifEvents nao usa o resolvedor actorProfile"; exit 1; }
+          grep -q 'actorPhotoDenorm' "$EXDIR/dist/main/notifEvents.js" || { echo "::error:: actorPhotoDenorm ausente do notifEvents"; exit 1; }
+          grep -q 'actorAvatar: atorP.photo' "$EXDIR/dist/main/notifEvents.js" || { echo "::error:: payload sem actorAvatar vindo do resolvedor"; exit 1; }
+          grep -q 'photo' "$EXDIR/dist/main/notifierA.js" || { echo "::error:: notifierA sem indexacao de foto do usersPublic"; exit 1; }
+          MAINJS="$EXDIR/dist/main/main.js"
+          grep -q 'notif-toast-ack' "$MAINJS" || { echo "::error:: IPC notif-toast-ack ausente"; exit 1; }
+          grep -q 'clipboard-read-text' "$MAINJS" || { echo "::error:: IPC clipboard-read-text ausente"; exit 1; }
+          grep -q 'startNotifierA' "$MAINJS" || { echo "::error:: notifierA nao ligado no main"; exit 1; }
+          NJS="$EXDIR/dist/main/notifier.js"
+          if grep -q '"tasks"' "$NJS"; then echo "::error:: notifier.js ainda escuta tasks (produtores antigos u1/u1b/u3)"; exit 1; fi
+          grep -q '"events"' "$NJS" || { echo "::error:: event_new (Agenda) sumiu do notifier"; exit 1; }
+          PRE="$EXDIR/dist/preload/preload.js"
+          grep -q 'notifToastAck' "$PRE" || { echo "::error:: preload sem notifToastAck"; exit 1; }
+          grep -q 'clipboardReadText' "$PRE" || { echo "::error:: preload sem clipboardReadText"; exit 1; }
+          EXH="$EXDIR/src/renderer/index.html"
+          grep -q 'f353WirePasteRecovery' "$EXH" || { echo "::error:: pipeline de colagem ausente no renderer"; exit 1; }
+          grep -q 'notifToastAck' "$EXH" || { echo "::error:: ACK do toast ausente no renderer"; exit 1; }
+          node -e 'const n=require(process.env.RUNNER_TEMP+"/asarx/dist/main/notifEvents.js"); for(const k of ["deriveTaskEvents","buildCategoryAPayload"]) if(typeof n[k]!=="function"){console.error(k+" nao exportada");process.exit(1);}'
+          node -e 'const a=require(process.env.RUNNER_TEMP+"/asarx/dist/main/actorProfile.js"); for(const k of ["sanitizePhotoUrl","initialsOf","resolveNotificationActorProfile"]) if(typeof a[k]!=="function"){console.error(k+" nao exportada");process.exit(1);} if(a.sanitizePhotoUrl("javascript:alert(1)")!==""){console.error("sanitizePhotoUrl ACEITA javascript:");process.exit(1);} if(a.sanitizePhotoUrl("file:///c:/x.png")!==""){console.error("sanitizePhotoUrl ACEITA file:");process.exit(1);} if(a.sanitizePhotoUrl("https://exemplo.com/f.png")!=="https://exemplo.com/f.png"){console.error("sanitizePhotoUrl REJEITA https valida");process.exit(1);}'
+          node -e 'const s=require(process.env.RUNNER_TEMP+"/asarx/dist/main/slaSeenUser.js"); if(typeof s.createUserSlaSeen!=="function"){console.error("createUserSlaSeen nao exportada");process.exit(1);}'
+          grep -q 'createUserSlaSeen' "$MAINJS" || { echo "::error:: main.js sem injecao do seen POR USUARIO"; exit 1; }
+          grep -q '_notifSeen.clear()' "$MAINJS" || { echo "::error:: main.js sem clear do dedup por sessao (C1)"; exit 1; }
+          grep -q 'f354DesignerAutoPick' "$EXH" || { echo "::error:: renderer sem o autoload da tela Designers"; exit 1; }
+          grep -q 'f354DesignerStrip' "$EXH" || { echo "::error:: renderer sem a faixa de selecao de Designers"; exit 1; }
+          grep -q 'idseven.designerSel.v1' "$EXH" || { echo "::error:: renderer sem persistencia da selecao por usuario"; exit 1; }
+          grep -q '_bootDelay' "$EXH" || { echo "::error:: renderer sem retry do bootstrap (C4)"; exit 1; }
+          if grep -q "' kbv2-card--cards'" "$EXH"; then echo "::error:: variante --cards ainda emitida"; exit 1; fi
+          echo "GATE F3.5.3/A + F3.5.4 EMPACOTADOS: VERIFIED"
+
+      - name: Gate F3.5.4C EMPACOTADO — card SaaS Premium no app.asar (substitui o gate antigo da previa "+N temas")
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXH="$RUNNER_TEMP/asarx/src/renderer/index.html"
+          # 1-3: helper + campo "por" com PRIMEIRO NOME + tooltip com nome completo
+          grep -q 'function kbv2FirstName' "$EXH" || { echo "::error:: kbv2FirstName ausente no empacotado"; exit 1; }
+          grep -qF "por <b>'+esc(kbv2FirstName(reqName))+'</b>" "$EXH" || { echo "::error:: campo 'por' empacotado nao usa kbv2FirstName"; exit 1; }
+          grep -qF "title=\"'+esc('Enviado por '+reqName" "$EXH" || { echo "::error:: tooltip empacotado sem nome completo"; exit 1; }
+          # 4-6: ocultacoes EXTINTAS (gate ANTIGO exigia kbv2-themes-more; SUBSTITUIDO pela ausencia)
+          N=$(grep -c 'kbv2-themes-more' "$EXH" || true); [ "$N" = "0" ] || { echo "::error:: kbv2-themes-more presente no empacotado ($N)"; exit 1; }
+          if grep -q 'nth-child(n+3)' "$EXH"; then echo "::error:: nth-child(n+3) presente no empacotado"; exit 1; fi
+          if grep -E '\.kbv2-theme(-t)?\{[^}]*(line-clamp|text-overflow)' "$EXH" >/dev/null; then echo "::error:: clamp/ellipsis nos temas empacotados"; exit 1; fi
+          # 7: todos os temas iterados (map SEM slice/cap na emissao)
+          grep -qF "cron.list.map(c=>'<div class=\"kbv2-theme\">" "$EXH" || { echo "::error:: iteracao completa dos temas ausente"; exit 1; }
+          if grep -qF "cron.list.slice(" "$EXH"; then echo "::error:: slice na lista de temas (cap reintroduzido)"; exit 1; fi
+          # 8/10/12: altura natural + sem scroll interno efetivo (overrides f354b DEPOIS do CARD-FIT)
+          grep -q 'id="f354b-card-styles"' "$EXH" || { echo "::error:: bloco f354b-card-styles ausente no empacotado"; exit 1; }
+          grep -qF 'body.desktop .kbv2-column-body>.kbv2-card{ max-height:none; }' "$EXH" || { echo "::error:: max-height:none ausente"; exit 1; }
+          grep -qF 'body.desktop .kbv2-card-themes>.kbv2-themes-list{ overflow-y:visible; min-height:auto; }' "$EXH" || { echo "::error:: anti-scroll dos temas ausente"; exit 1; }
+          grep -qF 'body.desktop .kbv2-card>.kbv2-card-notes{ overflow-y:visible; min-height:auto; }' "$EXH" || { echo "::error:: anti-scroll das notas ausente"; exit 1; }
+          EXH="$EXH" node -e 's=require("fs").readFileSync(process.env.EXH,"utf8");const a=s.indexOf("overflow-y:auto; overscroll-behavior:contain"),b=s.indexOf("id=\"f354b-card-styles\"");if(!(a>0&&b>a)){console.error("cascata invalida: f354b nao vem depois do CARD-FIT");process.exit(1);}'
+          # 9/11: sem line-clamp na area de temas (acima) e sem filler artificial (esticamento neutralizado)
+          grep -qF ':only-child{ flex:0 0 auto; min-height:auto; }' "$EXH" || { echo "::error:: neutralizacao do esticamento ausente"; exit 1; }
+          # 13: mesmo componente nos 5 quadros
+          C=$(grep -o 'kbv2BoardHtml(' "$EXH" | wc -l | tr -d ' '); [ "$C" -ge 6 ] || { echo "::error:: kbv2BoardHtml esperado >=6 ocorrencias (5 quadros + def), vi $C"; exit 1; }
+          grep -q 'KanbanTaskCardUnified' "$EXH" || { echo "::error:: KanbanTaskCardUnified ausente"; exit 1; }
+          # 14-18: handlers/data-attributes operacionais integros (Detalhes/Mover/menu/reenviar/excluir)
+          for a in 'data-detail=' 'data-move=' 'data-cardmenu=' 'data-resend=' 'data-del=' 'data-menu-of=' 'kbv2-menu-it'; do
+            grep -qF "$a" "$EXH" || { echo "::error:: '$a' ausente no empacotado"; exit 1; }
+          done
+          # contagem no cabecalho Temas
+          grep -q 'kbv2-themes-count' "$EXH" || { echo "::error:: contagem do cabecalho Temas ausente"; exit 1; }
+          echo "GATE F3.5.4C EMPACOTADO (card SaaS Premium): VERIFIED"
+
+      - name: Gate F3.5.4E EMPACOTADO — SHELL UNICO no app.asar (renderizador unico + painel universal)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXH="$RUNNER_TEMP/asarx/src/renderer/index.html"
+          # causa-raiz (i): isDesktop Electron-aware — tcv4 IMPOSSIVEL no app em qualquer janela/escala
+          grep -qF "const IS_ELECTRON_APP=!!(typeof window!=='undefined'&&window.api);" "$EXH" || { echo "::error:: IS_ELECTRON_APP ausente"; exit 1; }
+          grep -qF "function isDesktop(){return IS_ELECTRON_APP||DESKTOP_MQ.matches;}" "$EXH" || { echo "::error:: isDesktop sem o guard Electron"; exit 1; }
+          # defesa em profundidade: guarda na 1a instrucao do template legado
+          grep -qF "if(isDesktop())return kbv2Card(t, persp);" "$EXH" || { echo "::error:: guarda do taskCard ausente"; exit 1; }
+          # UNICA chamada real do template legado permanece no ramo mobile (paridade APK)
+          N=$(grep -c 'colTasks\.map(taskCard)' "$EXH" || true); [ "$N" = "1" ] || { echo "::error:: chamadas reais de taskCard != 1 ($N)"; exit 1; }
+          # painel central UNIVERSAL: empty state + LEGENDA no padrao do TEMAS + nome 2 linhas
+          grep -q 'kbv2-slot-empty' "$EXH" || { echo "::error:: empty state do painel central ausente"; exit 1; }
+          grep -qF 'Sem itens vinculados' "$EXH" || { echo "::error:: texto do empty state ausente"; exit 1; }
+          grep -q 'id="f354e-card-styles"' "$EXH" || { echo "::error:: bloco f354e-card-styles ausente"; exit 1; }
+          grep -qF 'body.desktop .kbv2-card-notes{ border:1px solid rgba(255,255,255,.07); border-radius:11px;' "$EXH" || { echo "::error:: painel da LEGENDA ausente"; exit 1; }
+          grep -qF -- '-webkit-line-clamp:unset' "$EXH" || { echo "::error:: LEGENDA ainda clampada"; exit 1; }
+          EXH="$EXH" node -e 's=require("fs").readFileSync(process.env.EXH,"utf8");const a=s.indexOf("id=\"f354b-card-styles\""),b=s.indexOf("id=\"f354e-card-styles\"");if(!(a>0&&b>a)){console.error("cascata invalida: f354e nao vem depois de f354b");process.exit(1);}'
+          node -e 's=require("fs").readFileSync(process.env.RUNNER_TEMP+"/asarx/src/renderer/index.html","utf8");const z=s.indexOf("id=\"f354e-card-styles\"");const blk=s.slice(z,z+3000);if(!/\.kbv2-name\{ white-space:normal; display:-webkit-box;/.test(blk)){console.error("nome 2 linhas ausente no bloco f354e");process.exit(1);}'
+          # checklist com contagem mesmo vazio (0 de 0)
+          grep -qF "if(Array.isArray(t.checklist)){const done=t.checklist.filter(c=>c.d).length;" "$EXH" || { echo "::error:: checklist 0-de-0 ausente"; exit 1; }
+          echo "GATE F3.5.4E EMPACOTADO (shell unico): VERIFIED"
+
+      - name: Gate F3.5.4G EMPACOTADO — SLA no monitor superior + sino restaurado no app.asar (20 gates)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXH="$RUNNER_TEMP/asarx/src/renderer/index.html"
+          DM="$RUNNER_TEMP/asarx/dist/main"
+          # 1 — SLA REMOVIDO do card (banda extinta: zero classe/atributo/updater de banda)
+          if grep -q 'kbv2-sla-live' "$EXH"; then echo "::error:: banda .kbv2-sla-live AINDA presente"; exit 1; fi
+          if grep -q 'data-sla-live' "$EXH"; then echo "::error:: data-sla-live AINDA presente"; exit 1; fi
+          if grep -q 'f354fLiveEls\|f354fSlaLiveUpdate' "$EXH"; then echo "::error:: updater de banda AINDA presente"; exit 1; fi
+          # 2 — MONITOR SUPERIOR contem o SLA vivo (camada f354g completa)
+          for k in 'function f354gMonCtxUid' 'function f354gMonAlerts' 'function f354gMonLiveUpdate' 'data-f354g-count' 'f354gMonDropGrp'; do
+            grep -qF "$k" "$EXH" || { echo "::error:: '$k' ausente"; exit 1; }
+          done
+          # 3 — avatar REAL no monitor (30px, MAIOR que os 22px reprovados)
+          grep -qF 'avatar(top.userRef,30)' "$EXH" || { echo "::error:: avatar 30px do monitor ausente"; exit 1; }
+          if grep -qF 'avatar(_resp2,22)' "$EXH"; then echo "::error:: avatar 22px do card reintroduzido"; exit 1; fi
+          # 4 — nome do Designer no monitor (clamp 2 linhas + tooltip)
+          grep -q 'f354g-nm' "$EXH" || { echo "::error:: nome do Designer no monitor ausente"; exit 1; }
+          # 5 — contador em TEMPO REAL no monitor (estado puro + tick por textContent)
+          grep -qF 'function f354fSlaLiveState(marks,now){' "$EXH" || { echo "::error:: estado puro do contador ausente"; exit 1; }
+          grep -qF "c.textContent!==ga[0].text" "$EXH" || { echo "::error:: tick por textContent ausente"; exit 1; }
+          # 6 — scheduler global UNICO com gate por DADOS (correcao do sino)
+          grep -qF 'if(slaMonHasActive()||f354gMonHasActive()) slaTick();' "$EXH" || { echo "::error:: gate por dados ausente"; exit 1; }
+          N=$(grep -o 'setInterval(function(){[^"]*},1000)' "$EXH" | wc -l); [ "$N" = "1" ] || { echo "::error:: intervals de 1s != 1 ($N)"; exit 1; }
+          # 7 — NENHUM timer por card
+          EXH="$EXH" node -e 's=require("fs").readFileSync(process.env.EXH,"utf8");const i=s.indexOf("function kbv2Card(");let d=0,j=s.indexOf("{",i);for(let k=j;k<s.length;k++){const c=s[k];if(c==="{")d++;else if(c==="}"){d--;if(!d){const b=s.slice(i,k+1);if(/setInterval|setTimeout|kbv2-sla-live/.test(b)){console.error("timer/banda DENTRO de kbv2Card");process.exit(1);}break;}}}'
+          # 8 — contexto por Designer tratado (aba designerBoard/personBoard; isolamento por uid)
+          grep -qF 'state.designerBoard' "$EXH" || { echo "::error:: contexto designerBoard ausente"; exit 1; }
+          grep -qF 'if(ctx&&rid!==ctx) continue;' "$EXH" || { echo "::error:: isolamento por uid do contexto ausente"; exit 1; }
+          # 9 — reatribuicao tratada (uid re-resolvido a cada avaliacao; roteador do main intacto)
+          grep -qF "task.designerAssignment.designerId)||task.assigneeId" "$DM/slaRules.js" || { echo "::error:: roteador por designerId ausente"; exit 1; }
+          grep -qF 'designerOf(t)' "$EXH" || { echo "::error:: designerOf no monitor ausente"; exit 1; }
+          # 10 — conclusao/reabertura tratadas (delivered + isTaskCompleted reavaliados por leitura)
+          grep -qF 'if(slaPanelDelivered(t)) return null;' "$EXH" || { echo "::error:: guarda delivered ausente"; exit 1; }
+          grep -qF 'isTaskCompleted(t)) continue;' "$EXH" || { echo "::error:: guarda de conclusao no monitor ausente"; exit 1; }
+          # 11 — edicao de prazo RECALCULA (rev bump + boundary do monitor + T-30/T-10 preservadas)
+          grep -qF 'patch.cardDeadlineRev=(Number(t.cardDeadlineRev)||1)+1;' "$EXH" || { echo "::error:: bump de cardDeadlineRev ausente"; exit 1; }
+          grep -qF 'mk.warnMs, mk.redMs, mk.dueMs' "$EXH" || { echo "::error:: boundary do monitor sem os marcos dos cards"; exit 1; }
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-30 dos cards alterada"; exit 1; }
+          grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$DM/cardsRules.js" || { echo "::error:: T-10 dos cards alterada"; exit 1; }
+          grep -qF 'var SLA_PANEL_WARN_MS=30*60000' "$EXH" || { echo "::error:: janela amarela do panel-core alterada"; exit 1; }
+          grep -qF 'var SLA_PANEL_GRACE_MS=10*60000' "$EXH" || { echo "::error:: tolerancia vermelha do panel-core alterada"; exit 1; }
+          # 12 — SINO clicavel (binding direto no elemento)
+          grep -qF "bell.addEventListener('click',slaibToggle)" "$EXH" || { echo "::error:: binding do sino ausente"; exit 1; }
+          # 13 — sino ABRE painel + painel ESTAVEL por assinatura (correcao anti-rebuild)
+          grep -qF 'function slaibToggle(){' "$EXH" || { echo "::error:: slaibToggle ausente"; exit 1; }
+          grep -qF "listEl.getAttribute('data-sig')===sig" "$EXH" || { echo "::error:: assinatura do painel do sino ausente"; exit 1; }
+          grep -qF 'data-slaib-txt' "$EXH" || { echo "::error:: atualizacao de texto em lugar ausente"; exit 1; }
+          # 14 — itens do sino ABREM a tarefa
+          grep -qF 'data-slaib-open' "$EXH" || { echo "::error:: acao Abrir tarefa do sino ausente"; exit 1; }
+          grep -qF 'function slaibOpenTask(taskId){' "$EXH" || { echo "::error:: slaibOpenTask ausente"; exit 1; }
+          # guarda anti-rect-zero (sino nunca e jogado p/ fora da tela)
+          grep -qF 'avr.width>0&&avr.height>0' "$EXH" || { echo "::error:: guarda rect-zero do alinhamento ausente"; exit 1; }
+          # 15 — task_updated PRESERVADO (F3.5.4F congelada e presente no pacote)
+          grep -qF "eventId: 'task_updated:' + taskId" "$DM/notifEvents.js" || { echo "::error:: task_updated ausente do pacote"; exit 1; }
+          grep -qF "recipientMode: 'assigned_designer'" "$DM/notifEvents.js" || { echo "::error:: recipientMode ausente"; exit 1; }
+          grep -qF 'assigned_designer' "$DM/notifierA.js" || { echo "::error:: filtro pessoal no notifierA ausente"; exit 1; }
+          grep -qF "atualizou o prazo: " "$DM/notifEvents.js" || { echo "::error:: corpo de prazo anterior->novo ausente"; exit 1; }
+          grep -qF 'data-cardedit' "$EXH" || { echo "::error:: acao Editar tarefa ausente"; exit 1; }
+          grep -qF 'async function saveCardsEdit(){' "$EXH" || { echo "::error:: saveCardsEdit ausente"; exit 1; }
+          # 16 — tray PRESERVADO
+          grep -qF 'window.close' "$DM/main.js" || { echo "::error:: contrato close->tray ausente"; exit 1; }
+          grep -qF 'ensureTray' "$DM/main.js" || { echo "::error:: ensureTray ausente"; exit 1; }
+          # 17 — card APROVADO preservado (cascata f354b<f354e; bloco f354f de banda EXTINTO)
+          EXH="$EXH" node -e 's=require("fs").readFileSync(process.env.EXH,"utf8");const a=s.indexOf("id=\"f354b-card-styles\""),b=s.indexOf("id=\"f354e-card-styles\"");if(!(a>0&&b>a)){console.error("cascata f354b/f354e invalida");process.exit(1);}if(s.indexOf("f354f-sla-live-styles")>=0){console.error("bloco de estilo da banda AINDA presente");process.exit(1);}'
+          grep -qF 'PROD1.6' "$EXH" || { echo "::error:: literal PROD1.6 sumiu"; exit 1; }
+          grep -qF 'CARD-FIT-NOTEBOOK' "$EXH" || { echo "::error:: literal CARD-FIT-NOTEBOOK sumiu"; exit 1; }
+          # 18 — notificacoes PRESERVADAS (toast + bg premium)
+          grep -qF 'notif-toast' "$DM/main.js" || { echo "::error:: canal toast ausente"; exit 1; }
+          grep -qF 'showBgNotify' "$DM/main.js" || { echo "::error:: canal bg-window ausente"; exit 1; }
+          # 19 — updater PRESERVADO (stable/latest)
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$DM/updaterService.js" || { echo "::error:: channel != latest"; exit 1; }
+          # 20 — Android NAO tocado (diff vs base sem android/)
+          A=$(git diff --name-only "$BASE_198_SHA" HEAD | grep -c '^android/' || true)
+          [ "$A" = "0" ] || { echo "::error:: diff toca android/ ($A arquivos)"; exit 1; }
+          echo "GATE F3.5.4G EMPACOTADO (20 gates): VERIFIED"
+
+      - name: Gate cardsRules EMPACOTADO (SHA-256 == fonte; 1 copia; cardsEmissionsFor exportada)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"
+          test -f "$EXDIR/dist/main/cardsRules.js" || { echo "::error:: dist/main/cardsRules.js AUSENTE no app.asar"; exit 1; }
+          SRC_SHA=$(sha256sum src/main/cardsRules.js | awk '{print $1}' | tr -d '\\')
+          ASAR_SHA=$(sha256sum "$EXDIR/dist/main/cardsRules.js" | awk '{print $1}' | tr -d '\\')
+          echo "cardsRules.js SHA fonte=$SRC_SHA asar=$ASAR_SHA"
+          [ "$SRC_SHA" = "$ASAR_SHA" ] || { echo "::error:: cardsRules.js empacotado != fonte"; exit 1; }
+          N=$(find "$EXDIR" -name cardsRules.js | wc -l | tr -d ' '); [ "$N" = "1" ] || { echo "::error:: esperado 1 cardsRules.js, vi $N"; exit 1; }
+          node -e 'const c=require(process.env.RUNNER_TEMP+"/asarx/dist/main/cardsRules.js"); if(typeof c.cardsEmissionsFor!=="function"){console.error("cardsEmissionsFor nao exportada");process.exit(1);}'
+          grep -q 'require("./cardsRules")' "$EXDIR/dist/main/slaScheduler.js" || { echo "::error:: slaScheduler NAO require ./cardsRules"; exit 1; }
+          echo "CARDS RULES PACKAGING: VERIFIED"
+
+      - name: Gate F3.5.4H EMPACOTADO — logica do disparo vermelho T-10 no app.asar (20 gates da diretiva)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          EXDIR="$RUNNER_TEMP/asarx"; DM="$EXDIR/dist/main"; EXH="$EXDIR/src/renderer/index.html"
+          CR="$DM/cardsRules.js"; SC="$DM/slaScheduler.js"
+          # 1 — funcao PURA presente e exportada (unica autorizacao de emissao vermelha)
+          grep -qF 'function shouldFireRedNotification(' "$CR" || { echo "::error:: (1) gate puro ausente"; exit 1; }
+          node -e 'const c=require(process.env.RUNNER_TEMP+"/asarx/dist/main/cardsRules.js"); if(typeof c.shouldFireRedNotification!=="function"){console.error("shouldFireRedNotification nao exportada");process.exit(1);}'
+          # 2-3 — FORMULAS: amarela=due-30min, vermelha=due-10min (literais herdados INTACTOS)
+          grep -qF 'var CARDS_WARN_MS = 30 * 60000' "$CR" || { echo "::error:: (2) formula amarela (30min) alterada"; exit 1; }
+          grep -qF 'var CARDS_RED_MS  = 10 * 60000' "$CR" || { echo "::error:: (3) formula vermelha (10min) alterada"; exit 1; }
+          # 4 — SEM Math.abs (comparacoes em ms crus; nenhuma simetria acidental)
+          if grep -q 'Math.abs' "$CR"; then echo "::error:: (4) Math.abs presente em cardsRules"; exit 1; fi
+          # 5 — cardFinishMs prioriza o dueAt CANONICO persistido (parse local so como fallback compat)
+          grep -qF 'var ca = Number(t && t.dueAt) || 0; if(ca > 0) return ca;' "$CR" || { echo "::error:: (5) cardFinishMs nao prioriza dueAt canonico"; exit 1; }
+          # 6 — relogio canonico UNICO no renderer (offset aplicado 1x; espelho do main)
+          grep -qF 'function canonicalNowMs(' "$EXH" || { echo "::error:: (6) canonicalNowMs ausente do renderer"; exit 1; }
+          grep -qF '_slaApplyClockState' "$EXH" || { echo "::error:: (6) espelho do estado do relogio ausente"; exit 1; }
+          # 7 — guarda now >= redAt (nunca antes da janela T-10)
+          grep -qF 'if(now < due - CARDS_RED_MS) return false;' "$CR" || { echo "::error:: (7) guarda now>=redAt ausente"; exit 1; }
+          # 8 — guarda now < dueAt (nunca no prazo nem depois; sem retro)
+          grep -qF 'if(now >= due) return false;' "$CR" || { echo "::error:: (8) guarda now<dueAt (sem retro) ausente"; exit 1; }
+          # 9 — guarda de conclusao (tarefa concluida nao dispara)
+          grep -qF 'if(o.completed) return false;' "$CR" || { echo "::error:: (9) guarda completed ausente"; exit 1; }
+          # 10 — guarda de destinatario (uid == designer atualmente atribuido)
+          grep -qF "if(!uid || !cur || uid !== cur) return false;" "$CR" || { echo "::error:: (10) guarda de destinatario (uid) ausente"; exit 1; }
+          # 11 — dedup por task + uid + dueAt + rev
+          grep -qF "dedupKey:'cards_overdue:' + t.id + ':' + uid + ':' + d.finishMs + ':r' + rev" "$CR" || { echo "::error:: (11) dedup vermelho sem uid/dueAt/rev"; exit 1; }
+          # 12-13 — catch-up UNICO via gate + migracao de chave 1.0.198 (legacyDedupKeys no scheduler)
+          grep -qF 'legacyDedupKeys' "$CR" || { echo "::error:: (12) legacyDedupKeys ausente do produtor"; exit 1; }
+          grep -qF 'legacyDedupKeys' "$SC" || { echo "::error:: (13) migracao legacyDedupKeys ausente do scheduler empacotado"; exit 1; }
+          grep -qF 'sla.dedup.legacy' "$SC" || { echo "::error:: (13) log da migracao legada ausente"; exit 1; }
+          # 14 — o gate revalida em cada avaliacao (okRed chama shouldFireRedNotification)
+          grep -qF 'var okRed = shouldFireRedNotification({' "$CR" || { echo "::error:: (14) emissao vermelha nao passa pelo gate puro"; exit 1; }
+          # 15 — edicao de prazo cancela o antigo: rev bump + dueAt novo gravado (renderer)
+          grep -qF 'patch.cardDeadlineRev=(Number(t.cardDeadlineRev)||1)+1;' "$EXH" || { echo "::error:: (15) bump de rev na edicao ausente"; exit 1; }
+          grep -qF "dueAt:(Number(dtMs(c.endDate,c.endTime||'23:59'))||0)," "$EXH" || { echo "::error:: (15) dueAt canonico nao regravado na edicao/criacao"; exit 1; }
+          # 16 — renderer NAO e produtor (notifScan vazio; produtor unico no main)
+          grep -qF 'function notifScan(){}' "$EXH" || { echo "::error:: (16) renderer voltou a ser produtor (notifScan nao-vazio)"; exit 1; }
+          # 17-18 — Monitor SLA e Sino NAO disparam a nativa (sem api.notify/notifEmit nas fontes visuais)
+          node -e 's=require("fs").readFileSync(process.env.EXH,"utf8");if(/f354gMon\w*[\s\S]{0,400}?api\.notify/.test(s)){console.error("(17) Monitor dispara nativa");process.exit(1);}if(/slaib\w*[\s\S]{0,300}?api\.notify/.test(s)){console.error("(18) Sino dispara nativa");process.exit(1);}' EXH="$EXH"
+          # 19 — tray PRESERVADO (close->tray; produtor autoritativo segue vivo no main)
+          grep -qF 'ensureTray' "$DM/main.js" || { echo "::error:: (19) ensureTray ausente"; exit 1; }
+          grep -qF 'startSlaScheduler' "$DM/main.js" || { echo "::error:: (19) produtor autoritativo (scheduler) nao ligado no main"; exit 1; }
+          # 20 — LAYOUT 1.0.198 preservado: index.html EMPACOTADO diff vs 1.0.198 SO nos 3 pontos autorizados
+          DIFF=$(git diff -U0 "$BASE_198_SHA" HEAD -- desktop/src/renderer/index.html | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+          if printf '%s\n' "$DIFF" | grep -qE 'kbv2-sla-live|sla-monitor|f354g-|slaib|f354b-card-styles|f354e-card-styles|kbv2-card-notes|line-clamp|kbv2-theme'; then echo "::error:: (20) diff empacotado toca LAYOUT congelado"; exit 1; fi
+          printf '%s\n' "$DIFF" | grep -qF 'var due=Number(t.dueAt)||0;' || { echo "::error:: (20) index empacotado nao prioriza dueAt"; exit 1; }
+          echo "GATE F3.5.4H EMPACOTADO (20 gates): VERIFIED"
+
+      - name: Gate FLAGS do updater no app.asar (estrutural; build de teste NAO publica)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          US="$RUNNER_TEMP/asarx/dist/main/updaterService.js"; test -f "$US" || { echo "::error:: updaterService.js ausente"; exit 1; }
+          grep -Eq 'autoUpdater\.allowPrerelease[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowPrerelease != false"; exit 1; }
+          grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"latest"' "$US" || { echo "::error:: channel != latest"; exit 1; }
+          grep -Eq 'autoUpdater\.allowDowngrade[[:space:]]*=[[:space:]]*false' "$US" || { echo "::error:: allowDowngrade != false"; exit 1; }
+          if grep -Eq 'autoUpdater\.channel[[:space:]]*=[[:space:]]*"canary"' "$US"; then echo "::error:: channel=canary"; exit 1; fi
+          echo "GATE flags do updater OK (estrutura stable/latest; nada publicado)."
+
+      - name: Gate identidade Windows (AppUserModelId + appId + close-to-tray)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          MAINJS="$RUNNER_TEMP/asarx/dist/main/main.js"
+          grep -q 'br.com.idseven.agenda.desktop' "$MAINJS" || { echo "::error:: AppUserModelId ausente"; exit 1; }
+          grep -q 'setAppUserModelId' "$MAINJS" || { echo "::error:: setAppUserModelId ausente"; exit 1; }
+          grep -q 'preventDefault' "$MAINJS" || { echo "::error:: close-to-tray ausente"; exit 1; }
+          grep -q 'appId: br.com.idseven.agenda.desktop' electron-builder.yml || { echo "::error:: appId divergente"; exit 1; }
+          echo "GATE identidade Windows OK."
+
+      - name: Inspecao de ASSINATURA Authenticode (paridade 1.0.198)
+        shell: pwsh
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          $exe = (Get-ChildItem dist-installer -Filter 'Agenda-ID-Seven-Desktop-*-x64.exe' | Select-Object -First 1).FullName
+          $sig = Get-AuthenticodeSignature $exe
+          "EXE: $exe"; "AuthenticodeStatus: $($sig.Status)"
+          if ($sig.Status -ne 'Valid' -and $sig.Status -ne 'NotSigned') { Write-Error "Status inesperado: $($sig.Status)"; exit 1 }
+          "PARIDADE 1.0.198: mesmo processo (sem cert -> NotSigned)."
+
+      - name: Gate metadata de update (latest.yml 1.0.199 + blockmap + app-update.yml sem segredo; NADA e publicado)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          LY="dist-installer/latest.yml"; test -f "$LY" || { echo "::error:: latest.yml NAO gerado"; ls -la dist-installer || true; exit 1; }
+          if [ -f "dist-installer/canary.yml" ]; then echo "::error:: canary.yml gerado"; exit 1; fi
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap 2>/dev/null | head -1); test -n "$BM" || { echo "::error:: blockmap NAO gerado"; exit 1; }
+          AU="dist-installer/win-unpacked/resources/app-update.yml"; test -f "$AU" || { echo "::error:: app-update.yml NAO empacotado"; exit 1; }
+          EXE_PATH=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1); EXE_NAME=$(basename "$EXE_PATH")
+          grep -q "version: $APP_VERSION" "$LY" || { echo "::error:: latest.yml version != $APP_VERSION"; exit 1; }
+          grep -qE "^path: $EXE_NAME" "$LY" || { echo "::error:: latest.yml path != $EXE_NAME"; exit 1; }
+          META_SHA512=$(grep -E '^sha512:' "$LY" | head -1 | sed -E 's/^sha512:[[:space:]]*//' | tr -d '\r')
+          CALC_SHA512=$(openssl dgst -sha512 -binary "$EXE_PATH" | openssl base64 -A)
+          [ "$META_SHA512" = "$CALC_SHA512" ] || { echo "::error:: sha512 do latest.yml != EXE"; exit 1; }
+          grep -q "provider: github" "$AU" && grep -q "owner: agidseven-lang" "$AU" && grep -q "repo: Agenda" "$AU" || { echo "::error:: app-update.yml provider/owner/repo divergente"; exit 1; }
+          if grep -qiE '(token|secret|password|pat)[[:space:]]*[:=][[:space:]]*[^[:space:]]' "$AU"; then echo "::error:: app-update.yml com possivel segredo"; exit 1; fi
+          echo "GATE metadata OK: latest.yml 1.0.199 + app-update.yml github SEM segredo (arquivos ficam SO no artifact)."
+
+      - name: SBOM (CycloneDX via npm sbom) + fallback
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set +e
+          npm sbom --sbom-format cyclonedx --omit dev > "$RUNNER_TEMP/sbom-cyclonedx.json" 2>/dev/null
+          if [ ! -s "$RUNNER_TEMP/sbom-cyclonedx.json" ]; then npm ls --all --json > "$RUNNER_TEMP/sbom-cyclonedx.json" 2>/dev/null || echo '{}' > "$RUNNER_TEMP/sbom-cyclonedx.json"; fi
+          wc -c "$RUNNER_TEMP/sbom-cyclonedx.json"
+
+      - name: Empacotar bundle (instalador + metadata + SBOM + hashes)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          set -e
+          OUT="$GITHUB_WORKSPACE/dist-pkg"; mkdir -p "$OUT"
+          EXE=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe | head -1)
+          MSI=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.msi 2>/dev/null | head -1)
+          BM=$(ls dist-installer/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap | head -1)
+          cp "$EXE" "$OUT/"; [ -n "$MSI" ] && cp "$MSI" "$OUT/"; cp dist-installer/latest.yml "$OUT/"; cp "$BM" "$OUT/"
+          cp "$RUNNER_TEMP/sbom-cyclonedx.json" "$OUT/SBOM-cyclonedx.json"
+          EXE_NAME=$(basename "$EXE"); MSI_NAME=$([ -n "$MSI" ] && basename "$MSI" || echo ""); BM_NAME=$(basename "$BM")
+          ( cd "$OUT" && sha256sum "$EXE_NAME" ${MSI_NAME:+$MSI_NAME} latest.yml "$BM_NAME" SBOM-cyclonedx.json > SHA256SUMS )
+          {
+            echo "productName : Agenda ID Seven Desktop"
+            echo "versionName : $APP_VERSION"
+            echo "rotulo      : 1.0.199-red-notification-boundary-fix (CANDIDATA — correcao do disparo vermelho T-10)"
+            echo "channel     : latest (estrutura do updater; NADA publicado)"
+            echo "appId       : br.com.idseven.agenda.desktop"
+            echo "instalador  : $EXE_NAME"
+            echo "SHA-256 exe : $(sha256sum "$OUT/$EXE_NAME" | awk '{print $1}')"
+            [ -n "$MSI_NAME" ] && echo "instalador2 : $MSI_NAME" && echo "SHA-256 msi : $(sha256sum "$OUT/$MSI_NAME" | awk '{print $1}')"
+            echo "commit      : $GITHUB_SHA (branch $GITHUB_REF_NAME)"
+            echo "baseline    : Desktop 1.0.198 OFICIAL (commit 009f2c6; tag v1.0.198 preservada)"
+            echo "origem      : F3.5.4H — correcao CIRURGICA do momento do disparo da notificacao NATIVA vermelha: dueAt/startAt canonicos persistidos (mesmo instante em todas as maquinas); GATE TEMPORAL VERMELHO puro shouldFireRedNotification (emite SO em [dueAt-10min, dueAt): nunca antes, 1x ao cruzar, sem repeticao, sem retro); edicao de prazo cancela o antigo (rev bump + dueAt novo); dedup com uid + legacyDedupKeys (migracao 1.0.198 sem duplicata). Layout 1.0.198 (card/monitor/sino) INTACTO; Categoria B (6 frozen) byte-identica; slaScheduler/cardsRules com DIFF CONTROLADO"
+            echo "assinatura  : mesmo processo da 1.0.198 (sem code-signing -> NotSigned)"
+            echo "distribuicao: CANDIDATA DE TESTE PRIVADA — SEM release, SEM tag, SEM stable/latest, SEM deploy; somente artifact p/ teste fisico do owner"
+          } > "$OUT/VERSAO-DESKTOP.txt"
+          echo "== SHA256SUMS =="; cat "$OUT/SHA256SUMS"
+
+      - name: Upload installer (artifact PRIVADO)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.199-test-installer
+          path: |
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.msi
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload metadata + SBOM + hashes (artifact PRIVADO)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-id-seven-desktop-1.0.199-test-updatemeta
+          path: |
+            dist-pkg/latest.yml
+            dist-pkg/Agenda-ID-Seven-Desktop-*-x64.exe.blockmap
+            dist-pkg/SHA256SUMS
+            dist-pkg/SBOM-cyclonedx.json
+            dist-pkg/VERSAO-DESKTOP.txt
+          if-no-files-found: error
+          retention-days: 30

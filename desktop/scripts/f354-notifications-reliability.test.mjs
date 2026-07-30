@@ -193,8 +193,23 @@ for (const who of ['adm', 'social1', 'dz2']) {
 
 ok(/seen: createUserSlaSeen\(uid\)/.test(MAIN), 'C3d main.ts injeta o seen POR USUÁRIO no startSlaScheduler (como nos rigs acima)');
 { const { execSync } = await import('child_process');
-  const d = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/slaScheduler.ts src/main/slaRules.js src/main/cardsRules.js src/main/bgNotify.ts src/main/tray.ts src/main/updaterService.ts src/main/firebase.ts src/main/reminder.ts', { cwd: DESK }).toString();
-  ok(d.trim() === '', 'C3e slaScheduler + TODA a Categoria B byte-idênticos à 1.0.192 (correção 100% via injeção)'); }
+  /* EMENDA F3.5.4H — os 6 arquivos abaixo (slaRules + toda a infra de entrega Categoria B) PERMANECEM
+   * byte-idênticos à 1.0.192: a correção do disparo vermelho não os toca. slaScheduler.ts e cardsRules.js
+   * receberam a ÚNICA alteração autorizada da fase — verificada logo abaixo por DIFF CONTROLADO. */
+  const frozen = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/slaRules.js src/main/bgNotify.ts src/main/tray.ts src/main/updaterService.ts src/main/firebase.ts src/main/reminder.ts', { cwd: DESK }).toString();
+  ok(frozen.trim() === '', 'C3e infra de entrega (Categoria B: slaRules/bgNotify/tray/updater/firebase/reminder) byte-idêntica à 1.0.192');
+  /* slaScheduler.ts: diff = SÓ o bloco aditivo legacyDedupKeys (nenhuma linha de entrega removida/alterada). */
+  const sch = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/slaScheduler.ts', { cwd: DESK }).toString();
+  const added = sch.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++'));
+  const removed = sch.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+  ok(removed.length === 0 && added.length === 8 && /legacyDedupKeys/.test(sch) && /seen\.add\(key\); log\("sla\.dedup\.legacy"/.test(sch),
+    'C3e slaScheduler.ts — DIFF CONTROLADO F3.5.4H: só o bloco aditivo legacyDedupKeys (0 remoções; 8 inserções; migração sem duplicata)');
+  /* cardsRules.js: gate temporal vermelho puro presente + literais WARN/RED preservados + chaves uid+legacy. */
+  const cr = fs.readFileSync(path.join(DESK, 'src', 'main', 'cardsRules.js'), 'utf8');
+  ok(cr.includes('var CARDS_WARN_MS = 30 * 60000') && cr.includes('var CARDS_RED_MS  = 10 * 60000')
+    && cr.includes('function shouldFireRedNotification(') && /now < due - CARDS_RED_MS/.test(cr) && /now >= due/.test(cr)
+    && cr.includes("legacyDedupKeys"),
+    'C3e cardsRules.js — DIFF CONTROLADO F3.5.4H: gate vermelho puro + literais WARN/RED + chaves uid/legacy'); }
 
 console.log(`\n===== RESULTADO: ${pass} PASS / ${fail} FAIL =====`);
 process.exit(fail ? 1 : 0);

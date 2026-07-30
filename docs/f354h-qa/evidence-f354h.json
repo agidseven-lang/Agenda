@@ -1,0 +1,61 @@
+{
+  "cenas": {
+    "01-amarelo-antes-t10-sem-vermelho": {
+      "toast": true,
+      "w": 420,
+      "sev": "warn",
+      "border": "rgb(241, 242, 244)",
+      "body": "Boaz, prazo próximo — Edição de Cards19:39Qualidade de vida começa aqui — Hospital VisãoFaltam 30 minutos para o prazo deste card.Prazo: 16:00 · Vence em 30:00×",
+      "count": 1,
+      "err": ""
+    },
+    "02-vermelho-instante-t10": {
+      "toast": true,
+      "w": 420,
+      "sev": "crit",
+      "border": "rgb(241, 242, 244)",
+      "body": "Boaz, prazo crítico — Edição de Cards19:39Qualidade de vida começa aqui — Hospital VisãoFaltam 10 minutos para o prazo deste card.Prazo: 16:00 · Vence em 10:00×",
+      "count": 1,
+      "err": ""
+    },
+    "03-mais-1s-sem-duplicata": {
+      "toast": true,
+      "w": 420,
+      "sev": "crit",
+      "border": "rgb(241, 242, 244)",
+      "body": "Boaz, prazo crítico — Edição de Cards19:39Qualidade de vida começa aqui — Hospital VisãoFaltam 10 minutos para o prazo deste card.Prazo: 16:00 · Vence em 10:00×",
+      "count": 1,
+      "err": ""
+    },
+    "04-prazo-editado-sem-alerta-antigo": {
+      "toast": true,
+      "w": 420,
+      "sev": "crit",
+      "border": "rgb(241, 242, 244)",
+      "body": "Boaz, prazo crítico — Edição de Cards19:39Qualidade de vida começa aqui — Hospital VisãoFaltam 10 minutos para o prazo deste card.Prazo: 18:00 · Vence em 10:00×",
+      "count": 1,
+      "err": ""
+    },
+    "05-minimizado-t10-bgwindow": {
+      "rendered": {
+        "dedupKey": "cards_overdue:T1:desA:1785600000000:r1",
+        "severity": "critical",
+        "eventType": "sla_cards_overdue",
+        "isAttr": false,
+        "count": 1
+      },
+      "text": "Boaz, prazo crítico — Edição de Cards19:39Qualidade de vida começa aqui — Hospital VisãoFaltam 10 minutos para o prazo deste card.Prazo: 16:00 · Vence em 10:00Abrir tarefa!×"
+    },
+    "06-fechado-no-x-t10-tray": {
+      "rendered": {
+        "dedupKey": "cards_overdue:T1:desA:1785600000000:r1",
+        "severity": "critical",
+        "eventType": "sla_cards_overdue",
+        "isAttr": false,
+        "count": 1
+      },
+      "text": "Boaz, prazo crítico — Edição de Cards19:39Qualidade de vida começa aqui — Hospital VisãoFaltam 10 minutos para o prazo deste card.Prazo: 16:00 · Vence em 10:00Abrir tarefa!×"
+    }
+  },
+  "regra": "vermelha SÓ em [dueAt−10min, dueAt); nunca antes; 1× ao cruzar; sem repetição; sem retro"
+}

@@ -27,11 +27,34 @@ var CARDS_RED_MS  = 10 * 60000;   // VERMELHA: due − 10min
 
 /* setor por STRING BRUTA (não usa secOf — 'edicao_cards' não tem alias; saveCardsBatch grava literal). */
 function isCardsSector(t){ try{ return ((t && t.sector) || '') === 'edicao_cards'; }catch(_){ return false; } }
-/* prazo do card a partir dos SEUS PRÓPRIOS campos (dueDate/dueTime). */
+/* prazo do card — F3.5.4H: prioriza o TIMESTAMP CANÔNICO PERSISTIDO (t.dueAt em ms, gravado por
+ * QUEM DEFINE o prazo). Antes, o instante era re-derivado POR MÁQUINA de dueDate/dueTime via
+ * new Date local: fuso/hora-de-parede divergente do LEITOR deslocava TODOS os marcos (provado:
+ * Recife×UTC ⇒ redAt −180min ⇒ vermelha nativa ANTES da janela real). Fallback compat: docs
+ * antigos sem dueAt seguem no parse local (comportamento anterior, inalterado). */
 function cardFinishMs(t, dtMsFn){
+  var ca = Number(t && t.dueAt) || 0; if(ca > 0) return ca;
   var f = dtMsFn || S.dtMs;
   var dd = t && (t.dueDate || t.due); if(!dd) return 0;
   var ms = Number(f(dd, (t && t.dueTime) || '23:59')) || 0; return ms > 0 ? ms : 0;
+}
+/* ══ F3.5.4H — GATE TEMPORAL VERMELHO (função PURA central; única autorização de emissão T-10) ══
+ * true SOMENTE quando: dueAtMs válido; tarefa NÃO concluída; destinatário É o designer atualmente
+ * atribuído (uid canônico); nowMs >= dueAtMs−10min; nowMs < dueAtMs; ainda não consumida.
+ * Antes de redAt ⇒ false. Em/void após dueAt ⇒ false (NÃO existe alerta de atraso p/ cards; o
+ * crítico/bloqueio do designerSla é regra separada e intacta). Sem Math.abs; sem arredondamento;
+ * comparações em ms crus. */
+function shouldFireRedNotification(o){
+  o = o || {};
+  var due = Number(o.dueAtMs) || 0; if(!(due > 0)) return false;
+  if(o.completed) return false;
+  var uid = String(o.recipientUid || ''), cur = String(o.currentAssigneeUid || '');
+  if(!uid || !cur || uid !== cur) return false;
+  var now = Number(o.nowMs); if(!Number.isFinite(now)) return false;
+  if(now < due - CARDS_RED_MS) return false;   // ANTES da janela T-10: PROIBIDO
+  if(now >= due) return false;                 // no prazo/depois: T-10 nunca dispara (nem retroativo)
+  if(o.alreadyConsumed) return false;
+  return true;
 }
 /* revisão de prazo p/ dedup (default 1); o dueAt já cobre a maioria das mudanças. */
 function cardDeadlineRev(t){ try{ return Number(t && t.cardDeadlineRev) || 1; }catch(_){ return 1; } }
@@ -66,14 +89,33 @@ function cardsEmissionsFor(task, uid, nowMs, dtMsFn){
       responsibleId:resp.id, responsibleName:resp.name, responsibleAvatar:resp.avatar,
       targetUserId:uid, notificationType:'sla_personal', etapa:'Edição de Cards', status:d.state,
       subtitle:tl, anchor:d.finishMs, action:{ type:'detail', deep:'detail/' + t.id } };
+    /* F3.5.4H — chaves de dedup passam a INCLUIR o uid do destinatário (mandato:
+     * task:uid:dueAt:rev). legacyDedupKeys carrega a chave 1.0.198 p/ o emitList do scheduler
+     * NÃO reentregar a quem já recebeu antes do upgrade (migração sem duplicata). */
     if(d.state === 'warning'){
-      out.push(S.notifBuildPayload(Object.assign({}, base, { eventType:'sla_cards_warning', severity:'warning', sound:true,
+      var plW = S.notifBuildPayload(Object.assign({}, base, { eventType:'sla_cards_warning', severity:'warning', sound:true,
         title:(fn ? fn + ', ' : '') + 'prazo próximo — Edição de Cards', body:'Faltam 30 minutos para o prazo deste card.',
-        context:'Prazo: ' + pf + ' · Vence em ' + S.slaCount(d.remainingMs), dedupKey:'cards_warning:' + t.id + ':' + d.finishMs + ':r' + rev })));
+        context:'Prazo: ' + pf + ' · Vence em ' + S.slaCount(d.remainingMs),
+        dedupKey:'cards_warning:' + t.id + ':' + uid + ':' + d.finishMs + ':r' + rev }));
+      /* anexado APÓS o build: notifBuildPayload (slaRules congelado) retorna allowlist fixa e
+       * descartaria o campo — a chave legada precisa chegar VIVA ao emitList do scheduler. */
+      plW.legacyDedupKeys = ['cards_warning:' + t.id + ':' + d.finishMs + ':r' + rev];
+      out.push(plW);
     } else if(d.state === 'overdue'){
-      out.push(S.notifBuildPayload(Object.assign({}, base, { eventType:'sla_cards_overdue', severity:'critical', sound:true,
-        title:(fn ? fn + ', ' : '') + 'prazo crítico — Edição de Cards', body:'Faltam 10 minutos para o prazo deste card.',
-        context:'Prazo: ' + pf + ' · Vence em ' + S.slaCount(d.remainingMs), dedupKey:'cards_overdue:' + t.id + ':' + d.finishMs + ':r' + rev })));
+      /* F3.5.4H — a VERMELHA só nasce pelo GATE TEMPORAL PURO: now ∈ [dueAt−10min, dueAt).
+       * Antes, o estado 'overdue' (now>=redAt SEM teto) permitia catch-up RETROATIVO após o
+       * prazo no boot/reconexão — com corpo falso "Faltam 10 minutos" (reproduzido). O gate
+       * também revalida destinatário (uid) e conclusão. Pós-dueAt: nenhum evento de cards. */
+      var okRed = shouldFireRedNotification({ nowMs:now, dueAtMs:d.finishMs, completed:S.slaPanelDelivered(t),
+        recipientUid:uid, currentAssigneeUid:String(resp.id || ''), alreadyConsumed:false });
+      if(okRed){
+        var plR = S.notifBuildPayload(Object.assign({}, base, { eventType:'sla_cards_overdue', severity:'critical', sound:true,
+          title:(fn ? fn + ', ' : '') + 'prazo crítico — Edição de Cards', body:'Faltam 10 minutos para o prazo deste card.',
+          context:'Prazo: ' + pf + ' · Vence em ' + S.slaCount(d.remainingMs),
+          dedupKey:'cards_overdue:' + t.id + ':' + uid + ':' + d.finishMs + ':r' + rev }));
+        plR.legacyDedupKeys = ['cards_overdue:' + t.id + ':' + d.finishMs + ':r' + rev];
+        out.push(plR);
+      }
     }
   }catch(_e){}
   return out;
@@ -95,5 +137,6 @@ function cardsNextBoundaryMs(task, nowMs, dtMsFn){
 module.exports = {
   CARDS_WARN_MS: CARDS_WARN_MS, CARDS_RED_MS: CARDS_RED_MS,
   isCardsSector: isCardsSector, cardFinishMs: cardFinishMs, cardDeadlineRev: cardDeadlineRev,
+  shouldFireRedNotification: shouldFireRedNotification,
   cardsDisplayState: cardsDisplayState, cardsEmissionsFor: cardsEmissionsFor, cardsNextBoundaryMs: cardsNextBoundaryMs
 };

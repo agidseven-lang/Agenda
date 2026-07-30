@@ -6247,8 +6247,12 @@ function kbv2SlaLiveData(t){
     var f=(typeof dtMs==='function'?dtMs:null);
     if(String(t.sector||'')==='edicao_cards'){
       if(slaPanelDelivered(t)) return null;
-      var dd=t.dueDate||t.due; if(!dd) return null;
-      var due=Number(f?f(dd,t.dueTime||'23:59'):0)||0; if(!(due>0)) return null;
+      /* F3.5.4H — prioriza o TIMESTAMP CANÔNICO persistido (dueAt em ms, gravado por quem define o
+         prazo): monitor e notificação nativa usam o MESMO instante em todas as máquinas. Fallback
+         compat: docs antigos sem dueAt seguem no parse local (comportamento anterior). */
+      var due=Number(t.dueAt)||0;
+      if(!(due>0)){ var dd=t.dueDate||t.due; if(!dd) return null; due=Number(f?f(dd,t.dueTime||'23:59'):0)||0; }
+      if(!(due>0)) return null;
       return {mode:'cards', dueMs:due, warnMs:due-F354F_CARDS_WARN_MS, redMs:due-F354F_CARDS_RED_MS, critMs:0};
     }
     if(!t.designerSla) return null;
@@ -8784,6 +8788,10 @@ async function saveCardsBatch(){
            dueDate/dueTime/due = TÉRMINO (canônico do prazo/referência das notificações T-30/T-10). */
         startDate:c.startDate, startTime:c.startTime, endDate:c.endDate, endTime:c.endTime,
         dueDate:c.endDate, dueTime:c.endTime, due:c.endDate, checklist:[],
+        /* F3.5.4H — TIMESTAMP CANÔNICO do prazo (ms), gravado por QUEM DEFINE (a Social): todas as
+           máquinas passam a usar o MESMO instante absoluto p/ T-30/T-10 (fuso divergente do leitor
+           não desloca mais os marcos). startAt idem (referência de início). */
+        startAt:(Number(dtMs(c.startDate,c.startTime||'00:00'))||0), dueAt:(Number(dtMs(c.endDate,c.endTime||'23:59'))||0),
         by:_soc.id||null, createdAt:_now, src:'webpreview',
         /* aditivos do setor (leitores existentes ignoram por filtrarem por sector/eixo) */
         cardTema:c.tema, cardLegenda:c.legenda, cardObs:c.obs, internal:true,
@@ -8865,6 +8873,8 @@ async function saveCardsEdit(){
     cardTema:tema, cardLegenda:legenda, cardObs:obs,
     startDate:c.startDate, startTime:c.startTime, endDate:c.endDate, endTime:c.endTime,
     dueDate:c.endDate, dueTime:c.endTime, due:c.endDate,
+    /* F3.5.4H — prazo canônico em ms atualizado JUNTO com o prazo editado (mesma fonte de quem edita) */
+    startAt:(Number(dtMs(c.startDate,c.startTime||'00:00'))||0), dueAt:(Number(dtMs(c.endDate,c.endTime||'23:59'))||0),
     updatedAt:_now, updatedBy:_soc.id||null, updatedByName:_soc.name||'',
     /* designerAssignment: preserva o objeto e ATUALIZA intervalo/obs; identidade do designer
        (e assignedAt/assignedBy*) SÓ muda quando o responsável muda — reatribuição real gera o

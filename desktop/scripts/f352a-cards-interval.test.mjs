@@ -92,8 +92,9 @@ function runSave(cards, behavior) {
   const env = mkDb(behavior); const alerts = [];
   const state = { user: { id: 'soc1', name: 'Social', role: 'social' }, users: [{ id: 'desA', name: 'Des A', role: 'designer' }],
     form: { client: 'Cliente Y', assigneeId: 'desA', cardsQty: cards.length, cards, _saving: true, step: 3 }, tab: '', boardSector: '' };
-  const saveCardsBatch = new Function('state', 'db', 'cardsQtyOf', 'CARDS_MAX_BATCH', 'isSocialUser', 'photoOf', 'alert', 'render', 'console', 'boardCol',
-    SCB + '\n;return saveCardsBatch;')(state, env.db, cardsQtyOf, CARDS_MAX_BATCH, (u) => !!(u && u.role === 'social'), () => '', (m) => alerts.push(m), () => {}, console, 0);
+  /* F3.5.4H — saveCardsBatch agora grava dueAt/startAt canônicos via dtMs (real) */
+  const saveCardsBatch = new Function('state', 'db', 'cardsQtyOf', 'CARDS_MAX_BATCH', 'isSocialUser', 'photoOf', 'alert', 'render', 'console', 'boardCol', 'dtMs',
+    SCB + '\n;return saveCardsBatch;')(state, env.db, cardsQtyOf, CARDS_MAX_BATCH, (u) => !!(u && u.role === 'social'), () => '', (m) => alerts.push(m), () => {}, console, 0, S.dtMs);
   return { env, alerts, saveCardsBatch };
 }
 const card = (e) => Object.assign({ tema: 'T', legenda: 'L', obs: 'O', startDate: '2026-08-01', startTime: '08:00', endDate: '2026-08-01', endTime: '15:00' }, e || {});
@@ -151,7 +152,18 @@ ok('(51) detalhe: fallback "Início: Não informado" gated em edicao_cards',
 
 /* ════ 8. INVARIÂNCIA — cardsRules byte-idêntico + Card Premium/isClientSector/saveTask byte-idênticos ════ */
 let base = null; try { base = execSync('git show ' + BASE + ':desktop/src/renderer/index.html', { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 }).toString(); } catch (_) { base = null; }
-ok('(52) cardsRules.js byte-idêntico à 1.0.187 (notificações intactas)', (() => { try { return execSync('git diff ' + BASE + ' -- desktop/src/main/cardsRules.js', { cwd: ROOT }).toString().trim() === ''; } catch (_) { return false; } })());
+/* (52) EMENDA F3.5.4H — cardsRules.js recebeu sua PRIMEIRA alteração autorizada desde 1.0.187
+ * (gate temporal vermelho puro + dueAt canônico + dedup com uid/legacy). Byte-identidade deixa de
+ * valer; o invariante REAL desta suíte (notificações T-30/T-10 pelo TÉRMINO) passa a ser verificado
+ * pelo DIFF CONTROLADO: literais WARN/RED preservados + gate puro presente + chaves com uid+legacy. */
+ok('(52) cardsRules.js — diff controlado F3.5.4H (WARN/RED literais + gate puro + chaves uid+legacy)', (() => { try {
+  const src = fs.readFileSync(path.join(DESK, 'src', 'main', 'cardsRules.js'), 'utf8');
+  return src.includes('var CARDS_WARN_MS = 30 * 60000') && src.includes('var CARDS_RED_MS  = 10 * 60000')
+    && src.includes('function shouldFireRedNotification(') && /now < due - CARDS_RED_MS/.test(src) && /now >= due/.test(src)
+    && src.includes("dedupKey:'cards_warning:' + t.id + ':' + uid + ':' + d.finishMs + ':r' + rev")
+    && src.includes("dedupKey:'cards_overdue:' + t.id + ':' + uid + ':' + d.finishMs + ':r' + rev")
+    && src.includes('legacyDedupKeys') && typeof C.shouldFireRedNotification === 'function';
+} catch (_) { return false; } })());
 ok('(53) slaRules.js byte-idêntico à 1.0.187', (() => { try { return execSync('git diff ' + BASE + ' -- desktop/src/main/slaRules.js', { cwd: ROOT }).toString().trim() === ''; } catch (_) { return false; } })());
 if (base) {
   const grab = (re, s) => { const m = s.match(re); return m ? m[0] : null; };

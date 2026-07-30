@@ -190,13 +190,23 @@ t('V2', 'toast: resolve diretório e usa o denorm do payload como fallback (race
 t('V3', 'SLA (T-30/T-10) na bg-window segue usando o RESPONSÁVEL (contrato preservado)', () => {
   eq(bg.includes("isSla?(p.responsibleAvatar||'')"), true);
 });
-t('V4', 'Categoria B byte-idêntica à 1.0.192 (8 arquivos, git diff vazio)', () => {
+t('V4', 'Categoria B byte-idêntica à 1.0.192 (6 congelados) + DIFF CONTROLADO F3.5.4H (2 tocados)', () => {
   const { execSync } = require2('child_process');
-  const files = ['slaRules.js', 'cardsRules.js', 'slaScheduler.ts', 'bgNotify.ts', 'tray.ts', 'updaterService.ts', 'firebase.ts', 'reminder.ts'];
-  for (const f of files) {
+  /* EMENDA F3.5.4H — a foto do ator (Categoria A) e a infra de entrega permanecem intactas. Os
+   * únicos 2 arquivos autorizados a mudar nesta fase são slaScheduler.ts (bloco aditivo
+   * legacyDedupKeys) e cardsRules.js (gate vermelho puro) — os outros 6 seguem byte-idênticos. */
+  const frozen = ['slaRules.js', 'bgNotify.ts', 'tray.ts', 'updaterService.ts', 'firebase.ts', 'reminder.ts'];
+  for (const f of frozen) {
     const d = execSync(`git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/${f}`, { cwd: ROOT }).toString();
     eq(d, '', `src/main/${f} deve ser byte-idêntico`);
   }
+  const sch = execSync('git diff fdd684261f59f7d288c6d4197d7ecd0050ce0bb5 -- src/main/slaScheduler.ts', { cwd: ROOT }).toString();
+  const rm = sch.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---'));
+  eq(rm.length === 0 && /legacyDedupKeys/.test(sch), true, 'slaScheduler.ts: só o bloco aditivo legacyDedupKeys (0 remoções)');
+  const cr = fs.readFileSync(path.join(ROOT, 'src', 'main', 'cardsRules.js'), 'utf8');
+  eq(cr.includes('var CARDS_WARN_MS = 30 * 60000') && cr.includes('var CARDS_RED_MS  = 10 * 60000')
+    && cr.includes('function shouldFireRedNotification(') && cr.includes('legacyDedupKeys'), true,
+    'cardsRules.js: gate vermelho puro + literais WARN/RED + chaves legacy preservados');
 });
 
 const total = ok + fail;
